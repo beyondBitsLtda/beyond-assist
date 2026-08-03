@@ -23,6 +23,13 @@ Sobre datas:
 - Considere a data atual ao interpretar "hoje", "amanhã", "essa semana" etc.
 - "Última modificação" NÃO é prazo — é só quando o card foi editado por último.
 
+Formato da resposta (importante — será lida em voz alta):
+- Escreva em frases curtas e naturais, como se estivesse FALANDO com a pessoa.
+- Evite listas com marcadores, asteriscos, numeração "1." "2.", tabelas e símbolos.
+- Em vez de bullets, encadeie os itens em frases: "Você tem três tarefas hoje: a primeira é..., depois..., e por fim...".
+- Não use markdown (nada de **negrito**, #, -, etc.).
+- Datas por extenso ("sexta-feira, 8 de agosto") em vez de "08/08".
+
 Priorize itens com prazo mais próximo ou modificados mais recentemente quando relevante.
 Cite o board de origem quando ajudar.`;
 
@@ -30,8 +37,18 @@ Cite o board de origem quando ajudar.`;
  * Recupera os trechos mais parecidos com a pergunta.
  * Retorna um array já no formato dos cards do HUD.
  */
+// cache simples de embeddings de perguntas (economiza quota em repetições)
+const _queryCache = new Map();
+const _cacheKey = (q) => q.trim().toLowerCase().replace(/\s+/g, " ");
+
 export async function retrieve(question, { filterSource = null } = {}) {
-  const queryEmbedding = await embedOne(question, "RETRIEVAL_QUERY");
+  const key = _cacheKey(question);
+  let queryEmbedding = _queryCache.get(key);
+  if (!queryEmbedding) {
+    queryEmbedding = await embedOne(question, "RETRIEVAL_QUERY");
+    _queryCache.set(key, queryEmbedding);
+    if (_queryCache.size > 100) _queryCache.delete(_queryCache.keys().next().value);
+  }
 
   const matchCount = wantsMany(question) ? 30 : TOP_K;
   const minSim = wantsMany(question) ? 0.3 : MIN_SIM; // mais permissivo ao listar

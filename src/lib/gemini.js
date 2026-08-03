@@ -27,6 +27,45 @@ function ai() {
  */
 export async function embed(texts, taskType = "RETRIEVAL_DOCUMENT") {
   const contents = Array.isArray(texts) ? texts : [texts];
+  // menos tentativas e esperas curtas: falha rápido em vez de travar minutos.
+  // (a ingestão em lote tem seu próprio ritmo; aqui priorizamos resposta rápida)
+  const maxAttempts = 2;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await ai().models.embedContent({
+        model: EMBED_MODEL,
+        contents,
+        config: { outputDimensionality: EMBED_DIM, taskType },
+      });
+      return res.embeddings.map((e) => e.values);
+    } catch (err) {
+      const msg = String(err?.message || err);
+      const is429 = msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota");
+      if (!is429) throw err;
+      if (attempt === maxAttempts) {
+        const e = new Error("QUOTA_EXCEEDED: limite do Gemini atingido. Aguarde ~1 min e tente de novo.");
+        e.code = "QUOTA";
+        throw e;
+      }
+      await new Promise((r) => setTimeout(r, 3000)); // uma espera curta só
+    }
+  }
+  throw new Error("embed: unreachable");
+}
+
+/** Conveniência: embedding de um único texto (number[]). */
+export async function embedOne(text, taskType = "RETRIEVAL_QUERY") {
+  const [v] = await embed(text, taskType);
+  return v;
+}
+
+/**
+ * Versão PACIENTE do embed, só para ingestão em lote.
+ * Espera o tempo que o Gemini pedir (retryDelay) para respeitar a quota,
+ * já que reindexar não precisa ser instantâneo.
+ */
+export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
+  const contents = Array.isArray(texts) ? texts : [texts];
   const maxAttempts = 4;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -40,20 +79,12 @@ export async function embed(texts, taskType = "RETRIEVAL_DOCUMENT") {
       const msg = String(err?.message || err);
       const is429 = msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota");
       if (!is429 || attempt === maxAttempts) throw err;
-      // extrai retryDelay do payload se houver ("Please retry in 12.2s")
       const m = msg.match(/retry in ([\d.]+)s/i);
       const waitSec = m ? Math.ceil(Number(m[1])) + 1 : 15 * attempt;
-      console.warn(`[gemini] quota atingida, esperando ${waitSec}s (tentativa ${attempt}/${maxAttempts})`);
       await new Promise((r) => setTimeout(r, waitSec * 1000));
     }
   }
-  throw new Error("embed: unreachable");
-}
-
-/** Conveniência: embedding de um único texto (number[]). */
-export async function embedOne(text, taskType = "RETRIEVAL_QUERY") {
-  const [v] = await embed(text, taskType);
-  return v;
+  throw new Error("embedForIngest: unreachable");
 }
 
 /**

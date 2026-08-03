@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase.js";
-import { embed } from "@/lib/gemini.js";
+import { embedForIngest } from "@/lib/gemini.js";
 import { chunkText } from "@/lib/ingest/chunk.js";
 import { loadTrello } from "@/lib/ingest/trello.js";
 import { loadBrain } from "@/lib/ingest/brain.js";
@@ -83,7 +83,7 @@ async function handle(req) {
     // ---- embeddings em mini-lotes com pausa ----
     for (let i = 0; i < slice.length; i += EMBED_BATCH) {
       const batch = slice.slice(i, i + EMBED_BATCH);
-      const vectors = await embed(batch.map(r => r.content), "RETRIEVAL_DOCUMENT");
+      const vectors = await embedForIngest(batch.map(r => r.content), "RETRIEVAL_DOCUMENT");
       batch.forEach((r, j) => (r.embedding = vectors[j]));
       if (i + EMBED_BATCH < slice.length) {
         await new Promise(r => setTimeout(r, BATCH_PAUSE_MS));
