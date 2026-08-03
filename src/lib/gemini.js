@@ -71,3 +71,35 @@ export async function* chatStream(prompt, systemInstruction) {
     if (text) yield text;
   }
 }
+
+// ---- TTS: gera áudio a partir de texto ----
+const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
+const TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
+
+/**
+ * Gera fala a partir de texto.
+ * Retorna { base64, sampleRate, mime } — áudio PCM cru (L16) que a rota
+ * converte em WAV para o navegador tocar.
+ */
+export async function synthesizeSpeech(text) {
+  const res = await ai().models.generateContent({
+    model: TTS_MODEL,
+    contents: [{ parts: [{ text }] }],
+    config: {
+      responseModalities: ["AUDIO"],
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: TTS_VOICE } },
+      },
+    },
+  });
+
+  const part = res?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
+  const inline = part?.inlineData;
+  if (!inline?.data) throw new Error("TTS: resposta sem áudio");
+
+  // mime tipo "audio/L16;codec=pcm;rate=24000"
+  const rateMatch = /rate=(\d+)/.exec(inline.mimeType || "");
+  const sampleRate = rateMatch ? Number(rateMatch[1]) : 24000;
+
+  return { base64: inline.data, sampleRate, mime: inline.mimeType || "audio/L16" };
+}
