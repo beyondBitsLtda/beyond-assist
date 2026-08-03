@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 
 const CY = "#38e1ff";
 const OR = "#ff9d3d";
@@ -37,6 +38,7 @@ export default function Page() {
 
   const recognitionRef = useRef(null);
   const answerRef = useRef("");
+  const audioRef = useRef(null);
 
   const canvasRef = useRef(null);
   const modeRef = useRef(mode);
@@ -283,23 +285,52 @@ export default function Page() {
     }
   }, [busy, addLog, voiceOn]);
 
-  // ---- TTS: falar texto (voz do navegador, pt-BR) ----
-  const speak = useCallback((text) => {
+  // ---- TTS: voz do navegador (fallback) ----
+  const speakBrowser = useCallback((text) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const clean = cleanForSpeech(text);
+    if (!clean) return;
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
+    const u = new SpeechSynthesisUtterance(clean);
     u.lang = "pt-BR";
     u.rate = 1.05;
-    u.pitch = 1.0;
-    // tenta escolher uma voz pt-BR se existir
     const voices = window.speechSynthesis.getVoices();
     const ptVoice = voices.find((v) => /pt-BR/i.test(v.lang)) || voices.find((v) => /pt/i.test(v.lang));
     if (ptVoice) u.voice = ptVoice;
     window.speechSynthesis.speak(u);
   }, []);
 
+  // ---- TTS: voz do Gemini (com fallback ao navegador) ----
+  const speak = useCallback(async (text) => {
+    if (typeof window === "undefined") return;
+    // cancela qualquer fala anterior
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+
+    try {
+      const res = await fetch("/api/speak", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error(`speak HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { URL.revokeObjectURL(url); audioRef.current = null; };
+      await audio.play();
+      addLog("[TTS]", GR, "voz Gemini");
+    } catch (err) {
+      // fallback: voz do navegador
+      addLog("[TTS]", OR, `Gemini falhou (${err.message}) → voz do navegador`);
+      speakBrowser(text);
+    }
+  }, [addLog, speakBrowser]);
+
   const stopSpeaking = useCallback(() => {
     if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
   }, []);
 
   // ---- STT: ouvir microfone (Web Speech API) ----
