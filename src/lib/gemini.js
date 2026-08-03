@@ -1,73 +1,118 @@
-import { GoogleGenAI } from "@google/genai";
+const KEY = process.env.TRELLO_KEY;
+const TOKEN = process.env.TRELLO_TOKEN;
+const DEFAULT_BOARD_IDS = (process.env.TRELLO_BOARD_IDS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
-const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
-const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-2.5-flash";
-const EMBED_DIM = Number(process.env.GEMINI_EMBED_DIM || 768);
+const API = "https://api.trello.com/1";
 
-let _ai = null;
-function ai() {
-  if (_ai) return _ai;
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "GEMINI_API_KEY não configurada. " +
-      "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
-    );
+function auth(qs = {}) {
+  const params = new URLSearchParams({ key: KEY, token: TOKEN, ...qs });
+  return params.toString();
+}
+
+async function tget(path, qs) {
+  const res = await fetch(`${API}${path}?${auth(qs)}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Trello ${path} → ${res.status} ${res.statusText} ${body.slice(0, 120)}`);
   }
-  _ai = new GoogleGenAI({ apiKey });
-  return _ai;
+  return res.json();
+}
+
+/** Formata ISO em "03 de agosto de 2026 (segunda-feira)" — melhor pro RAG. */
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit", month: "long", year: "numeric", weekday: "long",
+      timeZone: "America/Sao_Paulo",
+    }).format(d);
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
 }
 
 /**
- * Gera embeddings para um ou mais textos.
- * taskType: "RETRIEVAL_DOCUMENT" ao indexar, "RETRIEVAL_QUERY" ao buscar.
- * Retorna sempre um array de vetores (number[][]).
- *
- * Faz retry automático quando o Gemini devolve 429 (quota do free tier).
+ * Carrega cards abertos dos boards.
+ * opts.boardIds (opcional) sobrescreve TRELLO_BOARD_IDS — útil p/ ingest particionado.
  */
-export async function embed(texts, taskType = "RETRIEVAL_DOCUMENT") {
-  const contents = Array.isArray(texts) ? texts : [texts];
-  const maxAttempts = 4;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+export async function loadTrello(opts = {}) {
+  if (!KEY || !TOKEN) {
+    console.warn("[trello] TRELLO_KEY/TRELLO_TOKEN ausentes — pulando Trello.");
+    return [];
+  }
+  const boardIds = (opts.boardIds && opts.boardIds.length ? opts.boardIds : DEFAULT_BOARD_IDS);
+  if (!boardIds.length) {
+    console.warn("[trello] nenhum board configurado — pulando.");
+    return [];
+  }
+
+  const docs = [];
+
+  for (const boardRef of boardIds) {
     try {
-      const res = await ai().models.embedContent({
-        model: EMBED_MODEL,
-        contents,
-        config: { outputDimensionality: EMBED_DIM, taskType },
+      const board = await tget(`/boards/${boardRef}`, { fields: "name" });
+      const boardName = board?.name || boardRef;
+
+      // mapa idList → nome da lista
+      const lists = await tget(`/boards/${boardRef}/lists`, { fields: "name" });
+      const listName = Object.fromEntries((lists || []).map((l) => [l.id, l.name]));
+
+      const cards = await tget(`/boards/${boardRef}/cards`, {
+        fields: "name,desc,dateLastActivity,idList,shortUrl,labels,due,start,dueComplete",
+        filter: "open",
       });
-      return res.embeddings.map((e) => e.values);
+
+      for (const card of cards || []) {
+        const list = listName[card.idList] || "";
+        const labels = (card.labels || []).map((l) => l.name).filter(Boolean).join(", ");
+
+        // datas humanizadas (o Gemini indexa palavras — precisa ver "vence em", "prazo")
+        const dueLine = card.due
+          ? `Data de entrega/prazo: ${fmtDate(card.due)}${card.dueComplete ? " (concluído)" : ""}`
+          : "";
+        const startLine = card.start ? `Data de início: ${fmtDate(card.start)}` : "";
+        const modLine = card.dateLastActivity ? `Última modificação: ${fmtDate(card.dateLastActivity)}` : "";
+
+        const content = [
+          card.name,
+          list ? `Lista: ${list}` : "",
+          labels ? `Etiquetas: ${labels}` : "",
+          dueLine,
+          startLine,
+          modLine,
+          card.desc ? `\nDescrição:\n${card.desc}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n");
+
+        docs.push({
+          source: "trello",
+          external_id: card.id,
+          board: boardName,
+          title: card.name,
+          content,
+          last_modified: card.dateLastActivity || null,
+          metadata: {
+            list,
+            url: card.shortUrl,
+            labels,
+            due: card.due || null,
+            start: card.start || null,
+            due_complete: card.dueComplete || false,
+          },
+        });
+      }
+
+      console.log(`[trello] "${boardName}": ${(cards || []).length} cards`);
     } catch (err) {
-      const msg = String(err?.message || err);
-      const is429 = msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota");
-      if (!is429 || attempt === maxAttempts) throw err;
-      // extrai retryDelay do payload se houver ("Please retry in 12.2s")
-      const m = msg.match(/retry in ([\d.]+)s/i);
-      const waitSec = m ? Math.ceil(Number(m[1])) + 1 : 15 * attempt;
-      console.warn(`[gemini] quota atingida, esperando ${waitSec}s (tentativa ${attempt}/${maxAttempts})`);
-      await new Promise((r) => setTimeout(r, waitSec * 1000));
+      console.error(`[trello] falha no board ${boardRef}: ${err.message}`);
     }
   }
-  throw new Error("embed: unreachable");
-}
 
-/** Conveniência: embedding de um único texto (number[]). */
-export async function embedOne(text, taskType = "RETRIEVAL_QUERY") {
-  const [v] = await embed(text, taskType);
-  return v;
-}
-
-/**
- * Gera a resposta em streaming.
- * Retorna um async iterator de pedaços de texto (string).
- */
-export async function* chatStream(prompt, systemInstruction) {
-  const stream = await ai().models.generateContentStream({
-    model: CHAT_MODEL,
-    contents: prompt,
-    config: systemInstruction ? { systemInstruction } : undefined,
-  });
-  for await (const chunk of stream) {
-    const text = chunk.text;
-    if (text) yield text;
-  }
+  return docs;
 }
