@@ -22,16 +22,32 @@ function ai() {
  * Gera embeddings para um ou mais textos.
  * taskType: "RETRIEVAL_DOCUMENT" ao indexar, "RETRIEVAL_QUERY" ao buscar.
  * Retorna sempre um array de vetores (number[][]).
+ *
+ * Faz retry automático quando o Gemini devolve 429 (quota do free tier).
  */
 export async function embed(texts, taskType = "RETRIEVAL_DOCUMENT") {
   const contents = Array.isArray(texts) ? texts : [texts];
-  const res = await ai().models.embedContent({
-    model: EMBED_MODEL,
-    contents,
-    config: { outputDimensionality: EMBED_DIM, taskType },
-  });
-  // O SDK retorna { embeddings: [{ values: number[] }, ...] }
-  return res.embeddings.map((e) => e.values);
+  const maxAttempts = 4;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await ai().models.embedContent({
+        model: EMBED_MODEL,
+        contents,
+        config: { outputDimensionality: EMBED_DIM, taskType },
+      });
+      return res.embeddings.map((e) => e.values);
+    } catch (err) {
+      const msg = String(err?.message || err);
+      const is429 = msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota");
+      if (!is429 || attempt === maxAttempts) throw err;
+      // extrai retryDelay do payload se houver ("Please retry in 12.2s")
+      const m = msg.match(/retry in ([\d.]+)s/i);
+      const waitSec = m ? Math.ceil(Number(m[1])) + 1 : 15 * attempt;
+      console.warn(`[gemini] quota atingida, esperando ${waitSec}s (tentativa ${attempt}/${maxAttempts})`);
+      await new Promise((r) => setTimeout(r, waitSec * 1000));
+    }
+  }
+  throw new Error("embed: unreachable");
 }
 
 /** Conveniência: embedding de um único texto (number[]). */
