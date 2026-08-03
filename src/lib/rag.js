@@ -7,10 +7,18 @@ const MIN_SIM = Number(process.env.RAG_MIN_SIMILARITY || 0.55);
 /** Persona do Beyond — instrução de sistema do Gemini. */
 export const SYSTEM_INSTRUCTION = `Você é o "Beyond", assistente pessoal do usuário (estilo J.A.R.V.I.S.).
 Responda em português do Brasil, de forma direta e objetiva.
+
 Baseie-se SOMENTE no contexto fornecido (cards do Trello e notas do Beyond Brain).
 Se a resposta não estiver no contexto, diga claramente que não encontrou nos dados indexados.
-Quando fizer sentido, priorize os itens alterados mais recentemente (last_modified).
-Cite o board/nota de origem quando ajudar.`;
+
+Sobre datas:
+- Cada card do Trello pode ter "Data de entrega/prazo", "Data de início" e "Última modificação".
+- Quando o usuário perguntar sobre prazos, entregas, "hoje", "esta semana", "atrasadas", use "Data de entrega/prazo".
+- Considere a data atual ao interpretar "hoje", "amanhã", "essa semana" etc.
+- "Última modificação" NÃO é prazo — é só quando o card foi editado por último.
+
+Priorize itens com prazo mais próximo ou modificados mais recentemente quando relevante.
+Cite o board de origem quando ajudar.`;
 
 /**
  * Recupera os trechos mais parecidos com a pergunta.
@@ -40,8 +48,13 @@ export async function retrieve(question, { filterSource = null } = {}) {
   }));
 }
 
-/** Monta o prompt final: bloco de contexto + pergunta. */
+/** Monta o prompt final: bloco de contexto + pergunta + data de hoje. */
 export function buildPrompt(question, matches) {
+  const hoje = new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long", day: "2-digit", month: "long", year: "numeric",
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date());
+
   const context = matches.length
     ? matches
         .map(
@@ -51,7 +64,7 @@ export function buildPrompt(question, matches) {
         .join("\n\n---\n\n")
     : "(nenhum contexto relevante encontrado)";
 
-  return `CONTEXTO RECUPERADO:\n${context}\n\nPERGUNTA DO USUÁRIO:\n${question}\n\nResponda usando o contexto acima.`;
+  return `DATA DE HOJE: ${hoje}\n\nCONTEXTO RECUPERADO:\n${context}\n\nPERGUNTA DO USUÁRIO:\n${question}\n\nResponda usando o contexto acima.`;
 }
 
 // ---------- helpers ----------
