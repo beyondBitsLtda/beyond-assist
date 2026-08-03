@@ -154,36 +154,47 @@ export default function Page() {
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, []);
 
-  // ---- reindexar via /api/ingest em fatias (cabe em 60s por chamada) ----
+  // ---- reindexar via /api/ingest em fatias com paginação (respeita quota Gemini) ----
   const reindex = useCallback(async () => {
     if (ingesting) return;
     setIngesting(true);
 
     const secret = typeof window !== "undefined" ? (localStorage.getItem("ingestSecret") || "") : "";
     const headers = secret ? { "x-ingest-secret": secret } : {};
-    const boardCount = 4; // TRELLO_BOARD_IDS tem 4 boards
-    const steps = [
-      ...Array.from({ length: boardCount }, (_, i) => ({ label: `trello board ${i + 1}/${boardCount}`, url: `/api/ingest?source=trello&boardIndex=${i}` })),
-      { label: "brain (notas)", url: `/api/ingest?source=brain` },
+    const boardCount = 4;
+    const sources = [
+      ...Array.from({ length: boardCount }, (_, i) => ({ label: `board ${i + 1}/${boardCount}`, source: "trello", extra: `&boardIndex=${i}` })),
+      { label: "brain (notas)", source: "brain", extra: "" },
     ];
 
-    let totalChunks = 0;
-    for (const step of steps) {
-      addLog("[INGEST]", OR, `→ ${step.label}…`);
-      try {
-        const res = await fetch(step.url, { method: "POST", headers });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          addLog("[INGEST]", OR, `✗ ${step.label}: ${data.errors?.[0] || res.status}`);
-          continue;
+    let grandTotal = 0;
+    for (const src of sources) {
+      let offset = 0;
+      let pageNum = 1;
+      while (true) {
+        addLog("[INGEST]", OR, `→ ${src.label} · fatia ${pageNum} (offset ${offset})…`);
+        try {
+          const res = await fetch(`/api/ingest?source=${src.source}${src.extra}&offset=${offset}`, {
+            method: "POST",
+            headers,
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            addLog("[INGEST]", OR, `✗ ${src.label}: ${data.errors?.[0]?.slice(0, 80) || res.status}`);
+            break;
+          }
+          grandTotal += data.chunks_processed || 0;
+          addLog("[INGEST]", GR, `✓ ${src.label} f${pageNum}: ${data.chunks_processed}/${data.chunks_total} chunks`);
+          if (data.done) break;
+          offset = data.next_offset;
+          pageNum++;
+        } catch (err) {
+          addLog("[INGEST]", OR, `✗ ${src.label}: ${err.message}`);
+          break;
         }
-        totalChunks += data.chunks || 0;
-        addLog("[INGEST]", GR, `✓ ${step.label}: ${data.docs} docs · ${data.chunks} chunks`);
-      } catch (err) {
-        addLog("[INGEST]", OR, `✗ ${step.label}: ${err.message}`);
       }
     }
-    addLog("[INGEST]", CY, `finalizado · total ${totalChunks} chunks indexados`);
+    addLog("[INGEST]", CY, `finalizado · ${grandTotal} chunks indexados`);
     setIngesting(false);
   }, [ingesting, addLog]);
 
