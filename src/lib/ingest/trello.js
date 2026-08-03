@@ -21,6 +21,21 @@ async function tget(path, qs) {
   return res.json();
 }
 
+/** Formata ISO em "03 de agosto de 2026 (segunda-feira)" — melhor pro RAG. */
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit", month: "long", year: "numeric", weekday: "long",
+      timeZone: "America/Sao_Paulo",
+    }).format(d);
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}
+
 /**
  * Carrega cards abertos dos boards.
  * opts.boardIds (opcional) sobrescreve TRELLO_BOARD_IDS — útil p/ ingest particionado.
@@ -48,18 +63,29 @@ export async function loadTrello(opts = {}) {
       const listName = Object.fromEntries((lists || []).map((l) => [l.id, l.name]));
 
       const cards = await tget(`/boards/${boardRef}/cards`, {
-        fields: "name,desc,dateLastActivity,idList,shortUrl,labels",
+        fields: "name,desc,dateLastActivity,idList,shortUrl,labels,due,start,dueComplete",
         filter: "open",
       });
 
       for (const card of cards || []) {
         const list = listName[card.idList] || "";
         const labels = (card.labels || []).map((l) => l.name).filter(Boolean).join(", ");
+
+        // datas humanizadas (o Gemini indexa palavras — precisa ver "vence em", "prazo")
+        const dueLine = card.due
+          ? `Data de entrega/prazo: ${fmtDate(card.due)}${card.dueComplete ? " (concluído)" : ""}`
+          : "";
+        const startLine = card.start ? `Data de início: ${fmtDate(card.start)}` : "";
+        const modLine = card.dateLastActivity ? `Última modificação: ${fmtDate(card.dateLastActivity)}` : "";
+
         const content = [
           card.name,
           list ? `Lista: ${list}` : "",
           labels ? `Etiquetas: ${labels}` : "",
-          card.desc ? `\n${card.desc}` : "",
+          dueLine,
+          startLine,
+          modLine,
+          card.desc ? `\nDescrição:\n${card.desc}` : "",
         ]
           .filter(Boolean)
           .join("\n");
@@ -71,7 +97,14 @@ export async function loadTrello(opts = {}) {
           title: card.name,
           content,
           last_modified: card.dateLastActivity || null,
-          metadata: { list, url: card.shortUrl, labels },
+          metadata: {
+            list,
+            url: card.shortUrl,
+            labels,
+            due: card.due || null,
+            start: card.start || null,
+            due_complete: card.dueComplete || false,
+          },
         });
       }
 
