@@ -9,14 +9,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // Gemini free tier: 100 requests/min de embedding.
-// Trabalhamos em lotes de 10 chunks/request, com pausa entre lotes.
 const EMBED_BATCH = 10;
-const BATCH_PAUSE_MS = 7000; // ~8 lotes/min
+const BATCH_PAUSE_MS = 4000; // pausa menor: 10 chunks a cada ~5s = ~120/min (perto do limite mas com retry)
 const UPSERT_BATCH = 100;
 
-// Máximo de chunks por chamada HTTP (cabe em 60s da Vercel).
-// 4 lotes × (embed ~2s + pausa 7s) = ~36s → sobra tempo p/ carregar/upsert.
-const MAX_CHUNKS_PER_CALL = 40;
+// Máximo de chunks por chamada HTTP. Menor = mais chamadas, mas cada uma cabe folgado em 60s.
+const MAX_CHUNKS_PER_CALL = 20;
 
 async function handle(req) {
   const need = (process.env.INGEST_SECRET || "").trim();
