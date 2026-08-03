@@ -1,8 +1,14 @@
 import { embedOne } from "./gemini.js";
 import { supabase } from "./supabase.js";
 
-const TOP_K = Number(process.env.RAG_TOP_K || 5);
+const TOP_K = Number(process.env.RAG_TOP_K || 8);
 const MIN_SIM = Number(process.env.RAG_MIN_SIMILARITY || 0.55);
+
+/** Detecta perguntas do tipo "liste tudo" para buscar mais resultados. */
+function wantsMany(question) {
+  const q = question.toLowerCase();
+  return /\b(todas|todos|liste|listar|lista|quais s[ãa]o|me diga tudo|tudo que|completa|completo)\b/.test(q);
+}
 
 /** Persona do Beyond — instrução de sistema do Gemini. */
 export const SYSTEM_INSTRUCTION = `Você é o "Beyond", assistente pessoal do usuário (estilo J.A.R.V.I.S.).
@@ -27,10 +33,13 @@ Cite o board de origem quando ajudar.`;
 export async function retrieve(question, { filterSource = null } = {}) {
   const queryEmbedding = await embedOne(question, "RETRIEVAL_QUERY");
 
+  const matchCount = wantsMany(question) ? 30 : TOP_K;
+  const minSim = wantsMany(question) ? 0.3 : MIN_SIM; // mais permissivo ao listar
+
   const { data, error } = await supabase.rpc("match_documents", {
     query_embedding: queryEmbedding,
-    match_count: TOP_K,
-    min_similarity: MIN_SIM,
+    match_count: matchCount,
+    min_similarity: minSim,
     filter_source: filterSource,
   });
   if (error) throw new Error(`match_documents: ${error.message}`);
