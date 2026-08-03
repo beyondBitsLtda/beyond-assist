@@ -93,6 +93,62 @@ export function buildPrompt(question, matches) {
   return `DATA DE HOJE: ${hoje}\n\nCONTEXTO RECUPERADO:\n${context}\n\nPERGUNTA DO USUÁRIO:\n${question}\n\nResponda usando o contexto acima.`;
 }
 
+// ---------- roteamento por board/projeto ----------
+
+// nomes dos boards conhecidos + apelidos que você pode falar
+const BOARD_ALIASES = [
+  { match: /(crm\s*amparar|amparar\s*acompanhamento|acompanhamento)/i, board: "CRM - Amparar - Acompanhamento" },
+  { match: /(quarto\s*de\s*guerra|quarto)/i, board: "Quarto de Guerra" },
+  { match: /(rotina\s*beyond|rotina)/i, board: "Rotina Beyond" },
+  { match: /\bcrm\b/i, board: "CRM" }, // depois dos mais específicos!
+];
+
+/** Detecta se a pergunta cita um board conhecido. Retorna o nome exato ou null. */
+export function detectBoard(question) {
+  for (const { match, board } of BOARD_ALIASES) {
+    if (match.test(question)) return board;
+  }
+  return null;
+}
+
+/**
+ * Busca TODOS os cards de um board via SQL (sem busca semântica).
+ * Preciso e completo — traz o board inteiro.
+ */
+export async function retrieveByBoard(boardName, { onlyOpen = false } = {}) {
+  const { data, error } = await supabase
+    .from("documents")
+    .select("external_id, board, title, content, metadata, last_modified")
+    .eq("source", "trello")
+    .ilike("board", boardName); // case-insensitive, nome exato do board
+  if (error) throw new Error(`retrieveByBoard: ${error.message}`);
+
+  const seen = new Map();
+  for (const row of data || []) {
+    const cardId = String(row.external_id).split("#")[0];
+    if (seen.has(cardId)) continue;
+    const done = row.metadata?.due_complete === true;
+    if (onlyOpen && done) continue;
+    seen.set(cardId, {
+      source: "TRELLO",
+      board: row.board || "",
+      title: row.title || "(sem título)",
+      snippet: shorten(row.content, 180),
+      content: row.content,
+      sim: "—",
+      pct: 100,
+      last_modified: row.last_modified,
+      modified: relTime(row.last_modified),
+      due: row.metadata?.due || null,
+      list: row.metadata?.list || null,
+    });
+  }
+  // ordena por lista e depois por prazo
+  return [...seen.values()].sort((a, b) =>
+    (a.list || "").localeCompare(b.list || "") || (a.due || "").localeCompare(b.due || "")
+  );
+}
+
 // ---------- roteamento por data ----------
 
 /** Detecta se a pergunta é sobre PRAZO/DATA (hoje, semana, atrasadas…). */
