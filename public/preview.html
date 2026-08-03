@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beyond Bits — HUD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; height:100%; background:#000; font-family:'Rajdhani',sans-serif; color:#cfeffb; overflow:hidden; }
+  .mono { font-family:'JetBrains Mono',monospace; }
+  input { font-family:'JetBrains Mono',monospace; }
+  input::placeholder { color:rgba(207,239,251,0.4); }
+  ::-webkit-scrollbar { width:5px; height:5px; }
+  ::-webkit-scrollbar-thumb { background:rgba(56,225,255,0.25); border-radius:3px; }
+  @keyframes bb-flicker { 0%,100%{opacity:.85} 50%{opacity:1} }
+  @keyframes bb-blink   { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+  @keyframes bb-slidein { from{opacity:0; transform:translateX(-8px)} to{opacity:1; transform:translateX(0)} }
+  @keyframes bb-sweep   { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+  @keyframes bb-dot     { 0%,100%{opacity:.35} 50%{opacity:1} }
+  #wrap { position:fixed; inset:0; display:flex; flex-direction:column; }
+  header, footer { position:relative; z-index:2; display:flex; align-items:center; padding:14px 26px; }
+  header { justify-content:space-between; border-bottom:1px solid rgba(56,225,255,0.16); background:linear-gradient(180deg, rgba(6,20,26,0.6), transparent); }
+  footer { gap:18px; border-top:1px solid rgba(56,225,255,0.16); background:linear-gradient(0deg, rgba(6,20,26,0.6), transparent); }
+  main { position:relative; z-index:2; flex:1; display:grid; grid-template-columns:minmax(220px,320px) minmax(0,1fr) minmax(280px,360px); min-height:0; }
+  aside { display:flex; flex-direction:column; min-height:0; min-width:0; }
+  .panelHead { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid rgba(56,225,255,0.1); }
+  .card { flex:none; border:1px solid rgba(56,225,255,0.3); border-radius:6px; padding:13px 14px; background:linear-gradient(160deg, rgba(56,225,255,0.05), rgba(0,0,0,0.2)); position:relative; overflow:hidden; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div style="position:absolute; inset:0; background-image:linear-gradient(rgba(56,225,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(56,225,255,0.035) 1px, transparent 1px); background-size:44px 44px; pointer-events:none;"></div>
+  <div style="position:absolute; top:-25%; left:50%; transform:translateX(-50%); width:900px; height:900px; border-radius:50%; background:radial-gradient(circle, rgba(56,225,255,0.10), transparent 62%); pointer-events:none;"></div>
+
+  <!-- TOP -->
+  <header>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <div style="width:26px; height:26px; border:1.5px solid #38e1ff; border-radius:50%; box-shadow:0 0 14px rgba(56,225,255,0.5); display:flex; align-items:center; justify-content:center;">
+        <div style="width:9px; height:9px; background:#38e1ff; border-radius:50%; box-shadow:0 0 8px #38e1ff;"></div>
+      </div>
+      <div>
+        <div style="font-size:19px; font-weight:700; letter-spacing:4px; color:#eafcff; line-height:1;">BEYOND&nbsp;BITS</div>
+        <div class="mono" style="font-size:9px; letter-spacing:3px; color:rgba(56,225,255,0.6); margin-top:3px;">J.A.R.V.I.S. ASSISTANT INTERFACE</div>
+      </div>
+    </div>
+    <div class="mono" style="display:flex; align-items:center; gap:10px; font-size:10px;">
+      <div style="text-align:right; margin-right:8px;">
+        <div id="clock" style="color:#eafcff; font-size:15px; letter-spacing:2px;">00:00:00</div>
+        <div id="uptime" style="color:rgba(56,225,255,0.5); font-size:9px; letter-spacing:2px;">SYS.UPTIME 00:00:00</div>
+      </div>
+      <div id="conns" style="display:flex; gap:10px;"></div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main>
+    <aside style="border-right:1px solid rgba(56,225,255,0.12); background:linear-gradient(90deg, rgba(6,18,24,0.35), transparent);">
+      <div class="panelHead">
+        <div class="mono" style="font-size:11px; letter-spacing:3px; color:#38e1ff;">◈ SYSTEM_LOGS</div>
+        <div class="mono" style="font-size:9px; color:rgba(255,157,61,0.85); animation:bb-flicker 2s infinite;">● LIVE</div>
+      </div>
+      <div id="logs" style="flex:1; overflow:hidden; padding:12px 14px; display:flex; flex-direction:column; justify-content:flex-end; gap:7px;"></div>
+    </aside>
+
+    <section style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:0; min-width:0;">
+      <div style="position:relative; width:min(52vh,520px); height:min(52vh,520px); display:flex; align-items:center; justify-content:center;">
+        <div style="position:absolute; inset:-6%; border:1px solid rgba(56,225,255,0.12); border-radius:50%; border-top-color:rgba(56,225,255,0.45); border-right-color:rgba(56,225,255,0.28); animation:bb-sweep 14s linear infinite;"></div>
+        <div style="position:absolute; inset:4%; border:1px dashed rgba(255,157,61,0.18); border-radius:50%; animation:bb-sweep 22s linear infinite reverse;"></div>
+        <canvas id="cv" style="position:absolute; inset:0; width:100%; height:100%;"></canvas>
+        <div style="position:relative; text-align:center; pointer-events:none;">
+          <div id="modeLabel" class="mono" style="font-size:11px; letter-spacing:5px; color:#38e1ff;">IDLE</div>
+          <div id="modeSub" class="mono" style="font-size:13px; letter-spacing:2px; color:rgba(207,239,251,0.55); margin-top:6px;">awaiting command</div>
+        </div>
+      </div>
+      <div style="margin-top:26px; width:min(80%,560px); text-align:center;">
+        <div class="mono" style="font-size:10px; letter-spacing:3px; color:rgba(56,225,255,0.5); margin-bottom:8px;">↳ INTENT INTERPRETATION</div>
+        <div id="transcript" style="font-size:19px; line-height:1.4; color:#eafcff; font-weight:500; white-space:pre-wrap;">Standby. Digite uma pergunta abaixo e pressione Enter.</div>
+      </div>
+    </section>
+
+    <aside style="border-left:1px solid rgba(56,225,255,0.12); background:linear-gradient(270deg, rgba(6,18,24,0.35), transparent);">
+      <div class="panelHead">
+        <div class="mono" style="font-size:11px; letter-spacing:3px; color:#38e1ff;">◈ RETRIEVED_CONTEXT</div>
+        <div id="cardCount" class="mono" style="font-size:9px; color:rgba(56,225,255,0.5);">pgvector · 0 matches</div>
+      </div>
+      <div id="cards" style="flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px;">
+        <div class="mono" style="font-size:10.5px; color:rgba(207,239,251,0.4);">aguardando primeira consulta…</div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- BOTTOM -->
+  <footer>
+    <div class="mono" style="font-size:10px; letter-spacing:3px; color:rgba(56,225,255,0.5);">STATE</div>
+    <div id="stateChip" style="display:flex; align-items:center; gap:8px; padding:8px 14px; border-radius:5px; border:1px solid #38e1ff; color:#38e1ff;">
+      <span id="stateDot" style="width:7px; height:7px; border-radius:50%; background:#38e1ff; box-shadow:0 0 8px #38e1ff;"></span>
+      <span id="stateTxt" style="font-weight:600; letter-spacing:1.5px; font-size:13px;">IDLE</span>
+    </div>
+    <div class="mono" style="flex:1; display:flex; align-items:center; gap:10px; padding:9px 14px; border:1px solid rgba(56,225,255,0.18); border-radius:5px; background:rgba(56,225,255,0.03);">
+      <span style="color:#38e1ff; font-size:13px;">&gt;_</span>
+      <input id="q" placeholder="pergunte algo sobre seus quadros / notas…" style="flex:1; background:transparent; border:none; outline:none; color:#eafcff; font-size:12px; letter-spacing:.5px;">
+    </div>
+    <div class="mono" style="font-size:9px; letter-spacing:2px; color:rgba(56,225,255,0.4);">GEMINI · SUPABASE · TRELLO</div>
+  </footer>
+</div>
+
+<script>
+// ===== base da API: relativo (quando servido pelo Next em /preview.html) =====
+const API = ""; // mesma origem. Se abrir via file://, troque por "http://localhost:3000"
+const CY="#38e1ff", OR="#ff9d3d", GR="#7bd88f", PU="#c9a6ff";
+let mode="idle", logId=100, start=Date.now(), busy=false;
+
+const $ = (id)=>document.getElementById(id);
+const pad=(n)=>String(n).padStart(2,"0");
+const fmt=(d)=>`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+// clock/uptime
+setInterval(()=>{
+  const d=new Date(), up=Math.floor((Date.now()-start)/1000);
+  $("clock").textContent=fmt(d);
+  $("uptime").textContent=`SYS.UPTIME ${pad(Math.floor(up/3600))}:${pad(Math.floor(up/60)%60)}:${pad(up%60)}`;
+},1000);
+
+// logs
+function addLog(tag,color,msg){
+  const el=document.createElement("div");
+  el.className="mono"; el.style.cssText="font-size:10.5px; line-height:1.45; animation:bb-slidein .35s ease;";
+  el.innerHTML=`<span style="color:rgba(255,255,255,0.32)">${fmt(new Date())}</span><span style="color:${color}; margin:0 5px">${tag}</span><span style="color:#a9cede">${msg}</span>`;
+  const box=$("logs"); box.appendChild(el);
+  while(box.children.length>11) box.removeChild(box.firstChild);
+}
+addLog("[BOOT]",CY,"core online · pgvector ready");
+addLog("[RAG]",CY,"index warm · dim=768");
+
+// conexões (health)
+const connList=[["SUPABASE"],["TRELLO"],["GEMINI"]];
+function dotColor(ok){ return ok==null?"rgba(207,239,251,0.35)":(ok?GR:OR); }
+function renderConns(state){
+  $("conns").innerHTML="";
+  connList.forEach(([label])=>{
+    const ok = state?state[label.toLowerCase()]:null, c=dotColor(ok);
+    const d=document.createElement("div");
+    d.style.cssText="display:flex; align-items:center; gap:6px; padding:5px 10px; border:1px solid rgba(56,225,255,0.18); border-radius:3px; background:rgba(56,225,255,0.03);";
+    d.innerHTML=`<span style="width:7px; height:7px; border-radius:50%; background:${c}; box-shadow:0 0 8px ${c}; animation:bb-dot 1.8s ease-in-out infinite;"></span><span style="color:#bfe8f5">${label}</span>`;
+    $("conns").appendChild(d);
+  });
+}
+renderConns(null);
+fetch(API+"/api/health").then(r=>r.json()).then(renderConns).catch(()=>{});
+
+// modo
+const META={ idle:["IDLE","awaiting command",CY], listening:["LISTENING","retrieving context",GR], speaking:["SPEAKING","streaming response",OR] };
+function setMode(m){
+  mode=m; const [l,s,c]=META[m];
+  $("modeLabel").textContent=l; $("modeLabel").style.color=c;
+  $("modeSub").textContent=s;
+  $("stateTxt").textContent=l; $("stateChip").style.borderColor=c; $("stateChip").style.color=c;
+  $("stateDot").style.background=c; $("stateDot").style.boxShadow=`0 0 8px ${c}`;
+}
+
+function meter(pct){ const f=Math.round((pct||0)/10); return "█".repeat(f)+"░".repeat(10-f); }
+function renderCards(list){
+  $("cardCount").textContent=`pgvector · ${list.length} matches`;
+  const box=$("cards"); box.innerHTML="";
+  if(!list.length){ box.innerHTML='<div class="mono" style="font-size:10.5px; color:rgba(207,239,251,0.4)">sem matches acima do limiar.</div>'; return; }
+  list.forEach(c=>{
+    const brain=c.source==="BRAIN", accent=brain?PU:CY, edge=brain?"rgba(201,166,255,0.32)":"rgba(56,225,255,0.3)";
+    const el=document.createElement("div"); el.className="card"; el.style.borderColor=edge;
+    el.innerHTML=`
+      <div style="position:absolute; top:0; left:0; width:3px; height:100%; background:${accent}; box-shadow:0 0 10px ${accent};"></div>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <span class="mono" style="font-size:8.5px; letter-spacing:2px; padding:3px 7px; border:1px solid ${edge}; border-radius:3px; color:${accent}; background:rgba(0,0,0,0.3);">${c.source}</span>
+        <span class="mono" style="font-size:9px; color:rgba(207,239,251,0.4);">${c.board||""}</span>
+      </div>
+      <div style="font-size:15px; font-weight:600; color:#eafcff; line-height:1.25;">${c.title||""}</div>
+      <div style="font-size:12.5px; color:rgba(169,206,222,0.8); margin-top:5px; line-height:1.4;">${c.snippet||""}</div>
+      <div class="mono" style="font-size:9px; color:rgba(56,225,255,0.55); margin-top:9px;">SIM ${meter(c.pct)} ${c.sim||""}</div>
+      <div style="display:flex; align-items:center; gap:6px; margin-top:9px; padding-top:9px; border-top:1px dashed rgba(56,225,255,0.14);">
+        <span style="width:6px; height:6px; border-radius:50%; background:${OR}; box-shadow:0 0 7px ${OR};"></span>
+        <span class="mono" style="font-size:9px; letter-spacing:1px; color:rgba(255,157,61,0.85);">LAST_MODIFIED</span>
+        <span class="mono" style="font-size:10px; color:#ffbe7a; margin-left:auto;">${c.modified||"—"}</span>
+      </div>`;
+    box.appendChild(el);
+  });
+}
+
+// pergunta ao backend (SSE)
+async function ask(q){
+  if(!q.trim()||busy) return;
+  busy=true; setMode("listening"); renderCards([]); $("transcript").textContent=`"${q}"`;
+  addLog("[EMBED]",GR,"query → vector [768d]");
+  let answer="";
+  try{
+    const res=await fetch(API+"/api/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q})});
+    if(!res.ok||!res.body) throw new Error("HTTP "+res.status);
+    const reader=res.body.getReader(), dec=new TextDecoder(); let buf="";
+    while(true){
+      const {done,value}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      const parts=buf.split("\n\n"); buf=parts.pop()||"";
+      for(const p of parts){
+        let ev="message", data="";
+        for(const line of p.split("\n")){
+          if(line.startsWith("event:")) ev=line.slice(6).trim();
+          else if(line.startsWith("data:")) data+=line.slice(5).trim();
+        }
+        if(!data) continue;
+        let payload; try{ payload=JSON.parse(data); }catch{ payload=data; }
+        if(ev==="context"){ renderCards(payload||[]); addLog("[MATCH]",GR,`${(payload||[]).length} cards`); setMode("speaking"); $("transcript").textContent=""; }
+        else if(ev==="token"){ answer+=payload; $("transcript").textContent=answer; }
+        else if(ev==="error"){ addLog("[ERR]",OR,String(payload?.message||payload)); }
+        else if(ev==="done"){ addLog("[STATE]",CY,"core → IDLE"); }
+      }
+    }
+  }catch(e){
+    addLog("[ERR]",OR,e.message);
+    $("transcript").textContent="Falha ao consultar o backend: "+e.message+"\n(rode `npm run dev` e acesse via http://localhost:3000/preview.html)";
+  }finally{ busy=false; setMode("idle"); }
+}
+$("q").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!busy){ const v=e.target.value; e.target.value=""; ask(v);} });
+
+// ===== canvas =====
+(function(){
+  const cv=$("cv"), ctx=cv.getContext("2d"); let cw=0,ch=0,phase=0; const NB=96;
+  function resize(){ const dpr=Math.min(devicePixelRatio||1,2), r=cv.getBoundingClientRect(); cv.width=Math.max(1,r.width*dpr); cv.height=Math.max(1,r.height*dpr); ctx.setTransform(dpr,0,0,dpr,0,0); cw=r.width; ch=r.height; }
+  resize(); new ResizeObserver(resize).observe(cv);
+  (function draw(){
+    const w=cw,h=ch,cx=w/2,cy=h/2,base=Math.min(w,h)*0.26; ctx.clearRect(0,0,w,h);
+    const now=performance.now()/1000; let amp,speed,glow;
+    if(mode==="idle"){amp=.1;speed=.6;glow=.5+.2*Math.sin(now*1.6);}
+    else if(mode==="listening"){amp=.42;speed=2.2;glow=.75+.2*Math.sin(now*6);}
+    else{amp=.72;speed=3.6;glow=.9;}
+    phase+=0.016*speed;
+    for(let i=0;i<NB;i++){
+      const ang=(i/NB)*Math.PI*2, seed=i*.35;
+      let mag=Math.sin(seed*1.3+phase*2.1)*.5+Math.sin(seed*2.7-phase*1.4)*.3+Math.sin(seed*.7+phase*3.3)*.2; mag=(mag+1)/2;
+      if(mode==="idle") mag=.15+mag*.12;
+      const len=base*(.14+mag*amp);
+      const x1=cx+Math.cos(ang)*base,y1=cy+Math.sin(ang)*base,x2=cx+Math.cos(ang)*(base+len),y2=cy+Math.sin(ang)*(base+len);
+      const g=ctx.createLinearGradient(x1,y1,x2,y2); g.addColorStop(0,"rgba(56,225,255,0.85)"); g.addColorStop(1,mag>.7?"rgba(255,157,61,0.95)":"rgba(56,225,255,0.15)");
+      ctx.strokeStyle=g; ctx.lineWidth=2.2; ctx.lineCap="round"; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    }
+    const gr=ctx.createRadialGradient(cx,cy,0,cx,cy,base*.95); gr.addColorStop(0,`rgba(56,225,255,${.3*glow})`); gr.addColorStop(.5,`rgba(56,225,255,${.1*glow})`); gr.addColorStop(1,"rgba(56,225,255,0)");
+    ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(cx,cy,base*.95,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=`rgba(56,225,255,${.55+glow*.4})`; ctx.lineWidth=1.6; ctx.shadowBlur=18; ctx.shadowColor=CY; ctx.beginPath(); ctx.arc(cx,cy,base*.7,0,Math.PI*2); ctx.stroke(); ctx.shadowBlur=0;
+    if(mode!=="idle"){ const rings=mode==="speaking"?3:2; for(let k=0;k<rings;k++){ const prog=((now*(mode==="speaking"?1.1:.7)+k/rings)%1), rr=base*(.7+prog*1.5); ctx.strokeStyle=`rgba(56,225,255,${(1-prog)*.35})`; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(cx,cy,rr,0,Math.PI*2); ctx.stroke(); } }
+    ctx.strokeStyle="rgba(56,225,255,0.25)"; ctx.lineWidth=1;
+    for(let i=0;i<60;i++){ const a=(i/60)*Math.PI*2+now*.05, r0=base*1.55, r1=base*(i%5===0?1.66:1.6); ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*r0,cy+Math.sin(a)*r0); ctx.lineTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1); ctx.stroke(); }
+    requestAnimationFrame(draw);
+  })();
+})();
+</script>
+</body>
+</html>
