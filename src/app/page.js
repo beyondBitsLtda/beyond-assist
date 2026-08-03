@@ -154,28 +154,37 @@ export default function Page() {
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, []);
 
-  // ---- reindexar via /api/ingest (roda na Vercel, sem terminal) ----
+  // ---- reindexar via /api/ingest em fatias (cabe em 60s por chamada) ----
   const reindex = useCallback(async () => {
     if (ingesting) return;
     setIngesting(true);
-    addLog("[INGEST]", OR, "iniciando reindexação…");
-    try {
-      const secret = typeof window !== "undefined" ? (localStorage.getItem("ingestSecret") || "") : "";
-      const res = await fetch("/api/ingest", {
-        method: "POST",
-        headers: secret ? { "x-ingest-secret": secret } : {},
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        addLog("[INGEST]", OR, `falhou: ${data.error || res.status}`);
-      } else {
-        addLog("[INGEST]", GR, `ok · trello=${data.trello} brain=${data.brain} chunks=${data.chunks}`);
+
+    const secret = typeof window !== "undefined" ? (localStorage.getItem("ingestSecret") || "") : "";
+    const headers = secret ? { "x-ingest-secret": secret } : {};
+    const boardCount = 4; // TRELLO_BOARD_IDS tem 4 boards
+    const steps = [
+      ...Array.from({ length: boardCount }, (_, i) => ({ label: `trello board ${i + 1}/${boardCount}`, url: `/api/ingest?source=trello&boardIndex=${i}` })),
+      { label: "brain (notas)", url: `/api/ingest?source=brain` },
+    ];
+
+    let totalChunks = 0;
+    for (const step of steps) {
+      addLog("[INGEST]", OR, `→ ${step.label}…`);
+      try {
+        const res = await fetch(step.url, { method: "POST", headers });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          addLog("[INGEST]", OR, `✗ ${step.label}: ${data.errors?.[0] || res.status}`);
+          continue;
+        }
+        totalChunks += data.chunks || 0;
+        addLog("[INGEST]", GR, `✓ ${step.label}: ${data.docs} docs · ${data.chunks} chunks`);
+      } catch (err) {
+        addLog("[INGEST]", OR, `✗ ${step.label}: ${err.message}`);
       }
-    } catch (err) {
-      addLog("[INGEST]", OR, err.message);
-    } finally {
-      setIngesting(false);
     }
+    addLog("[INGEST]", CY, `finalizado · total ${totalChunks} chunks indexados`);
+    setIngesting(false);
   }, [ingesting, addLog]);
 
   // ---- pergunta real ao backend (SSE) ----
