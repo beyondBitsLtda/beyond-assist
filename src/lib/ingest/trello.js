@@ -1,6 +1,6 @@
 const KEY = process.env.TRELLO_KEY;
 const TOKEN = process.env.TRELLO_TOKEN;
-const BOARD_IDS = (process.env.TRELLO_BOARD_IDS || "")
+const DEFAULT_BOARD_IDS = (process.env.TRELLO_BOARD_IDS || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
@@ -22,23 +22,23 @@ async function tget(path, qs) {
 }
 
 /**
- * Carrega todos os cards abertos dos boards configurados.
- * Aceita tanto o id completo (24 hex) quanto o short link da URL.
- * Retorna documentos prontos para indexar.
+ * Carrega cards abertos dos boards.
+ * opts.boardIds (opcional) sobrescreve TRELLO_BOARD_IDS — útil p/ ingest particionado.
  */
-export async function loadTrello() {
+export async function loadTrello(opts = {}) {
   if (!KEY || !TOKEN) {
     console.warn("[trello] TRELLO_KEY/TRELLO_TOKEN ausentes — pulando Trello.");
     return [];
   }
-  if (!BOARD_IDS.length) {
-    console.warn("[trello] TRELLO_BOARD_IDS vazio — pulando Trello.");
+  const boardIds = (opts.boardIds && opts.boardIds.length ? opts.boardIds : DEFAULT_BOARD_IDS);
+  if (!boardIds.length) {
+    console.warn("[trello] nenhum board configurado — pulando.");
     return [];
   }
 
   const docs = [];
 
-  for (const boardRef of BOARD_IDS) {
+  for (const boardRef of boardIds) {
     try {
       const board = await tget(`/boards/${boardRef}`, { fields: "name" });
       const boardName = board?.name || boardRef;
