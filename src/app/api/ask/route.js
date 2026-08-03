@@ -1,4 +1,4 @@
-import { retrieve, buildPrompt, SYSTEM_INSTRUCTION } from "@/lib/rag.js";
+import { retrieve, retrieveByDate, detectDateRange, buildPrompt, SYSTEM_INSTRUCTION } from "@/lib/rag.js";
 import { chatStream } from "@/lib/gemini.js";
 
 export const runtime = "nodejs";
@@ -32,7 +32,12 @@ export async function POST(req) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const matches = await retrieve(question, { filterSource });
+        // roteia: pergunta de prazo/data → filtro SQL; senão → RAG vetorial
+        const range = detectDateRange(question);
+        const matches = range
+          ? await retrieveByDate(range)
+          : await retrieve(question, { filterSource });
+
         send(controller, "context", matches);
 
         const prompt = buildPrompt(question, matches);

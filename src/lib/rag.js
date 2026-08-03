@@ -76,6 +76,70 @@ export function buildPrompt(question, matches) {
   return `DATA DE HOJE: ${hoje}\n\nCONTEXTO RECUPERADO:\n${context}\n\nPERGUNTA DO USUÁRIO:\n${question}\n\nResponda usando o contexto acima.`;
 }
 
+// ---------- roteamento por data ----------
+
+/** Detecta se a pergunta é sobre PRAZO/DATA (hoje, semana, atrasadas…). */
+export function detectDateRange(question) {
+  const q = question.toLowerCase();
+  if (/\b(atrasad|venceu|passou do prazo|em atraso|vencid)/.test(q)) return "overdue";
+  if (/\b(amanh[ãa])/.test(q)) return "tomorrow";
+  if (/\b(esta semana|essa semana|na semana|semana que|pr[óo]ximos dias|pr[óo]xima semana)/.test(q)) return "week";
+  if (/\b(hoje|do dia|para o dia|de hoje)/.test(q)) return "today";
+  return null; // não é pergunta de data → usa RAG normal
+}
+
+/**
+ * Busca tarefas do Trello filtrando pela data de vencimento (SQL, sem vetores).
+ * Retorna no MESMO formato dos matches do RAG, p/ o HUD renderizar igual.
+ */
+export async function retrieveByDate(range) {
+  const now = new Date();
+  const spNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const y = spNow.getFullYear(), mo = spNow.getMonth(), d = spNow.getDate();
+  const startToday = new Date(Date.UTC(y, mo, d, 3, 0, 0)); // 00:00 BRT
+  const endToday = new Date(startToday.getTime() + 864e5);
+  const endTomorrow = new Date(endToday.getTime() + 864e5);
+  const endWeek = new Date(startToday.getTime() + 7 * 864e5);
+
+  let lo = null, hi = null, onlyOpen = false;
+  if (range === "today") { lo = startToday; hi = endToday; }
+  else if (range === "tomorrow") { lo = endToday; hi = endTomorrow; }
+  else if (range === "week") { lo = startToday; hi = endWeek; }
+  else if (range === "overdue") { hi = startToday; onlyOpen = true; }
+
+  let q = supabase
+    .from("documents")
+    .select("external_id, board, title, content, metadata, last_modified")
+    .eq("source", "trello")
+    .not("metadata->>due", "is", null);
+  if (lo) q = q.gte("metadata->>due", lo.toISOString());
+  if (hi) q = q.lt("metadata->>due", hi.toISOString());
+
+  const { data, error } = await q;
+  if (error) throw new Error(`retrieveByDate: ${error.message}`);
+
+  const seen = new Map();
+  for (const row of data || []) {
+    const cardId = String(row.external_id).split("#")[0];
+    if (seen.has(cardId)) continue;
+    const done = row.metadata?.due_complete === true;
+    if (onlyOpen && done) continue;
+    seen.set(cardId, {
+      source: "TRELLO",
+      board: row.board || "",
+      title: row.title || "(sem título)",
+      snippet: shorten(row.content, 180),
+      content: row.content,
+      sim: "—",
+      pct: 100,
+      last_modified: row.last_modified,
+      modified: relTime(row.last_modified),
+      due: row.metadata?.due || null,
+    });
+  }
+  return [...seen.values()].sort((a, b) => (a.due || "").localeCompare(b.due || ""));
+}
+
 // ---------- helpers ----------
 function shorten(text, n) {
   const t = (text || "").replace(/\s+/g, " ").trim();
