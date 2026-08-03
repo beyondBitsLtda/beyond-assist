@@ -31,6 +31,12 @@ export default function Page() {
   const [busy, setBusy] = useState(false);
   const [conn, setConn] = useState({ supabase: null, trello: null, gemini: null });
   const [ingesting, setIngesting] = useState(false);
+  const [listening, setListening] = useState(false);   // mic ativo (STT)
+  const [voiceOn, setVoiceOn] = useState(true);         // ler respostas em voz alta (TTS)
+  const [voiceSupported, setVoiceSupported] = useState(true);
+
+  const recognitionRef = useRef(null);
+  const answerRef = useRef("");
 
   const canvasRef = useRef(null);
   const modeRef = useRef(mode);
@@ -63,6 +69,17 @@ export default function Page() {
       .then((s) => { if (alive) setConn(s); })
       .catch(() => {});
     return () => { alive = false; };
+  }, []);
+
+  // pré-carrega vozes do TTS e verifica suporte a microfone
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) setVoiceSupported(false);
   }, []);
 
   // canvas visualizer (porta do mockup)
@@ -204,6 +221,7 @@ export default function Page() {
     setBusy(true);
     setQuestion(q);
     setAnswer("");
+    answerRef.current = "";
     setCards([]);
     setMode("listening");
     addLog("[EMBED]", GR, "query → vector [768d]");
@@ -243,7 +261,7 @@ export default function Page() {
             setMode("speaking");
             addLog("[GEMINI]", OR, "streaming tokens");
           } else if (event === "token") {
-            setAnswer((a) => a + payload);
+            setAnswer((a) => { const na = a + payload; answerRef.current = na; return na; });
           } else if (event === "error") {
             addLog("[ERR]", OR, String(payload?.message || payload));
             setAnswer((a) => a + `\n[erro: ${payload?.message || payload}]`);
@@ -258,8 +276,74 @@ export default function Page() {
     } finally {
       setBusy(false);
       setMode("idle");
+      // lê a resposta em voz alta (TTS do navegador)
+      if (voiceOn && answerRef.current.trim()) {
+        speak(answerRef.current);
+      }
     }
-  }, [busy, addLog]);
+  }, [busy, addLog, voiceOn]);
+
+  // ---- TTS: falar texto (voz do navegador, pt-BR) ----
+  const speak = useCallback((text) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "pt-BR";
+    u.rate = 1.05;
+    u.pitch = 1.0;
+    // tenta escolher uma voz pt-BR se existir
+    const voices = window.speechSynthesis.getVoices();
+    const ptVoice = voices.find((v) => /pt-BR/i.test(v.lang)) || voices.find((v) => /pt/i.test(v.lang));
+    if (ptVoice) u.voice = ptVoice;
+    window.speechSynthesis.speak(u);
+  }, []);
+
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
+  }, []);
+
+  // ---- STT: ouvir microfone (Web Speech API) ----
+  const toggleMic = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setVoiceSupported(false); addLog("[VOICE]", OR, "navegador sem suporte a microfone"); return; }
+
+    // se já está ouvindo, para
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+      setListening(false);
+      return;
+    }
+
+    stopSpeaking(); // não ouvir enquanto fala
+    const rec = new SR();
+    rec.lang = "pt-BR";
+    rec.interimResults = true;
+    rec.continuous = false;
+    recognitionRef.current = rec;
+
+    let finalText = "";
+    rec.onstart = () => { setListening(true); addLog("[VOICE]", GR, "ouvindo…"); };
+    rec.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += t;
+        else interim += t;
+      }
+      setInput(finalText || interim);
+    };
+    rec.onerror = (e) => { addLog("[VOICE]", OR, `mic: ${e.error}`); };
+    rec.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+      const q = (finalText || "").trim();
+      if (q) { addLog("[VOICE]", CY, `→ "${q}"`); setInput(""); ask(q); }
+      else addLog("[VOICE]", OR, "nada capturado");
+    };
+    rec.start();
+  }, [addLog, ask, stopSpeaking]);
 
   const meterFor = (pct) => {
     const filled = Math.round((pct || 0) / 10);
@@ -414,11 +498,54 @@ export default function Page() {
               if (e.key === "Enter" && !busy) { ask(input); setInput(""); }
             }}
             disabled={busy}
-            placeholder={busy ? "processando…" : 'pergunte algo sobre seus quadros / notas…'}
+            placeholder={busy ? "processando…" : (listening ? "ouvindo… fale agora" : 'pergunte ou clique no microfone…')}
             style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#eafcff", fontSize: 12, letterSpacing: 0.5 }}
           />
         </div>
-        <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(56,225,255,0.4)" }}>GEMINI · SUPABASE · TRELLO</div>
+
+        {/* botão de microfone (STT) */}
+        <button
+          onClick={toggleMic}
+          disabled={busy}
+          title={listening ? "Parar de ouvir" : "Falar (microfone)"}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 44, height: 44, borderRadius: "50%",
+            border: `1.5px solid ${listening ? OR : CY}`,
+            background: listening ? "rgba(255,157,61,0.15)" : "rgba(56,225,255,0.06)",
+            color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer",
+            boxShadow: listening ? `0 0 16px ${OR}` : "none",
+            animation: listening ? "bb-dot 1s ease-in-out infinite" : "none",
+            transition: "all .2s",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="23" />
+            <line x1="8" y1="23" x2="16" y2="23" />
+          </svg>
+        </button>
+
+        {/* toggle de voz (TTS) */}
+        <button
+          onClick={() => { if (voiceOn) stopSpeaking(); setVoiceOn(v => !v); }}
+          title={voiceOn ? "Voz ligada (clique p/ mutar)" : "Voz desligada"}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 40, height: 40, borderRadius: "50%",
+            border: `1px solid ${voiceOn ? CY : "rgba(207,239,251,0.3)"}`,
+            background: "rgba(56,225,255,0.04)", color: voiceOn ? CY : "rgba(207,239,251,0.4)",
+            cursor: "pointer", transition: "all .2s",
+          }}
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+            {voiceOn
+              ? <><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></>
+              : <><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></>}
+          </svg>
+        </button>
       </footer>
     </div>
   );
