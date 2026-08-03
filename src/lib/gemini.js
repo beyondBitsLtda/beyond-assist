@@ -1,10 +1,22 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-2.5-flash";
 const EMBED_DIM = Number(process.env.GEMINI_EMBED_DIM || 768);
+
+let _ai = null;
+function ai() {
+  if (_ai) return _ai;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY não configurada. " +
+      "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
+    );
+  }
+  _ai = new GoogleGenAI({ apiKey });
+  return _ai;
+}
 
 /**
  * Gera embeddings para um ou mais textos.
@@ -13,7 +25,7 @@ const EMBED_DIM = Number(process.env.GEMINI_EMBED_DIM || 768);
  */
 export async function embed(texts, taskType = "RETRIEVAL_DOCUMENT") {
   const contents = Array.isArray(texts) ? texts : [texts];
-  const res = await ai.models.embedContent({
+  const res = await ai().models.embedContent({
     model: EMBED_MODEL,
     contents,
     config: { outputDimensionality: EMBED_DIM, taskType },
@@ -33,7 +45,7 @@ export async function embedOne(text, taskType = "RETRIEVAL_QUERY") {
  * Retorna um async iterator de pedaços de texto (string).
  */
 export async function* chatStream(prompt, systemInstruction) {
-  const stream = await ai.models.generateContentStream({
+  const stream = await ai().models.generateContentStream({
     model: CHAT_MODEL,
     contents: prompt,
     config: systemInstruction ? { systemInstruction } : undefined,
