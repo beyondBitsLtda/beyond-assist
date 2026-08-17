@@ -3,10 +3,41 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 
-const CY = "#38e1ff";
-const OR = "#ff9d3d";
-const GR = "#7bd88f";
-const PU = "#c9a6ff";
+const CY = "var(--cy-hex)";
+const OR = "var(--or-hex)";
+const GR = "var(--gr-hex)";
+const PU = "var(--pu-hex)";
+
+const THEMES = {
+  blue: { 
+    name: "Cyber Blue", 
+    cy: { hex: "#38e1ff", rgb: "56, 225, 255" }, 
+    or: { hex: "#ff9d3d", rgb: "255, 157, 61" }, 
+    gr: { hex: "#7bd88f", rgb: "123, 216, 143" }, 
+    pu: { hex: "#c9a6ff", rgb: "201, 166, 255" } 
+  },
+  green: { 
+    name: "Matrix Green", 
+    cy: { hex: "#00ff41", rgb: "0, 255, 65" }, 
+    or: { hex: "#ffb000", rgb: "255, 176, 0" }, 
+    gr: { hex: "#00bfff", rgb: "0, 191, 255" }, 
+    pu: { hex: "#ff00ff", rgb: "255, 0, 255" } 
+  },
+  crimson: { 
+    name: "Crimson Red", 
+    cy: { hex: "#ff3838", rgb: "255, 56, 56" }, 
+    or: { hex: "#ffae42", rgb: "255, 174, 66" }, 
+    gr: { hex: "#7bd88f", rgb: "123, 216, 143" }, 
+    pu: { hex: "#3838ff", rgb: "56, 56, 255" } 
+  },
+  amber: { 
+    name: "Amber Terminal", 
+    cy: { hex: "#ffb000", rgb: "255, 176, 0" }, 
+    or: { hex: "#ff4500", rgb: "255, 69, 0" }, 
+    gr: { hex: "#32cd32", rgb: "50, 205, 50" }, 
+    pu: { hex: "#c9a6ff", rgb: "201, 166, 255" } 
+  },
+};
 
 const MODE_META = {
   idle: { label: "IDLE", sub: "awaiting command", color: CY },
@@ -18,6 +49,7 @@ const pad = (n) => String(n).padStart(2, "0");
 const fmtClock = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
 export default function Page() {
+  const [themeId, setThemeId] = useState("blue");
   const [mode, setMode] = useState("idle");
   const [clock, setClock] = useState(fmtClock(new Date()));
   const [uptime, setUptime] = useState("00:00:00");
@@ -32,8 +64,8 @@ export default function Page() {
   const [busy, setBusy] = useState(false);
   const [conn, setConn] = useState({ supabase: null, trello: null, gemini: null });
   const [ingesting, setIngesting] = useState(false);
-  const [listening, setListening] = useState(false);   // mic ativo (STT)
-  const [voiceOn, setVoiceOn] = useState(true);         // ler respostas em voz alta (TTS)
+  const [listening, setListening] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(true);
   const [voiceSupported, setVoiceSupported] = useState(true);
 
   const recognitionRef = useRef(null);
@@ -44,6 +76,28 @@ export default function Page() {
   const modeRef = useRef(mode);
   const startRef = useRef(Date.now());
   const logIdRef = useRef(100);
+
+  // Carregar/Salvar Tema no LocalStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("beyond_theme");
+      if (saved && THEMES[saved]) setThemeId(saved);
+    }
+  }, []);
+
+  const theme = THEMES[themeId] || THEMES.blue;
+  const themeRef = useRef(theme);
+  
+  useEffect(() => {
+    themeRef.current = theme;
+    if (typeof window !== "undefined") localStorage.setItem("beyond_theme", themeId);
+  }, [theme, themeId]);
+
+  const cycleTheme = useCallback(() => {
+    const keys = Object.keys(THEMES);
+    const nextIdx = (keys.indexOf(themeId) + 1) % keys.length;
+    setThemeId(keys[nextIdx]);
+  }, [themeId]);
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
 
@@ -84,7 +138,7 @@ export default function Page() {
     if (!SR) setVoiceSupported(false);
   }, []);
 
-  // canvas visualizer (porta do mockup)
+  // canvas visualizer
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv) return;
@@ -109,6 +163,7 @@ export default function Page() {
       const base = Math.min(w, h) * 0.26;
       ctx.clearRect(0, 0, w, h);
       const m = modeRef.current;
+      const t = themeRef.current;
       const now = performance.now() / 1000;
 
       let amp, speed, coreGlow;
@@ -129,21 +184,21 @@ export default function Page() {
         const x1 = cx + Math.cos(ang) * base, y1 = cy + Math.sin(ang) * base;
         const x2 = cx + Math.cos(ang) * (base + len), y2 = cy + Math.sin(ang) * (base + len);
         const g = ctx.createLinearGradient(x1, y1, x2, y2);
-        g.addColorStop(0, "rgba(56,225,255,0.85)");
-        g.addColorStop(1, mag > 0.7 ? "rgba(255,157,61,0.95)" : "rgba(56,225,255,0.15)");
+        g.addColorStop(0, `rgba(${t.cy.rgb},0.85)`);
+        g.addColorStop(1, mag > 0.7 ? `rgba(${t.or.rgb},0.95)` : `rgba(${t.cy.rgb},0.15)`);
         ctx.strokeStyle = g; ctx.lineWidth = 2.2; ctx.lineCap = "round";
         ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
       }
 
       const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, base * 0.95);
-      gr.addColorStop(0, `rgba(56,225,255,${0.3 * coreGlow})`);
-      gr.addColorStop(0.5, `rgba(56,225,255,${0.1 * coreGlow})`);
-      gr.addColorStop(1, "rgba(56,225,255,0)");
+      gr.addColorStop(0, `rgba(${t.cy.rgb},${0.3 * coreGlow})`);
+      gr.addColorStop(0.5, `rgba(${t.cy.rgb},${0.1 * coreGlow})`);
+      gr.addColorStop(1, `rgba(${t.cy.rgb},0)`);
       ctx.fillStyle = gr;
       ctx.beginPath(); ctx.arc(cx, cy, base * 0.95, 0, Math.PI * 2); ctx.fill();
 
-      ctx.strokeStyle = `rgba(56,225,255,${0.55 + coreGlow * 0.4})`;
-      ctx.lineWidth = 1.6; ctx.shadowBlur = 18; ctx.shadowColor = CY;
+      ctx.strokeStyle = `rgba(${t.cy.rgb},${0.55 + coreGlow * 0.4})`;
+      ctx.lineWidth = 1.6; ctx.shadowBlur = 18; ctx.shadowColor = t.cy.hex;
       ctx.beginPath(); ctx.arc(cx, cy, base * 0.7, 0, Math.PI * 2); ctx.stroke();
       ctx.shadowBlur = 0;
 
@@ -152,13 +207,13 @@ export default function Page() {
         for (let k = 0; k < rings; k++) {
           const prog = ((now * (m === "speaking" ? 1.1 : 0.7) + k / rings) % 1);
           const rr = base * (0.7 + prog * 1.5);
-          ctx.strokeStyle = `rgba(56,225,255,${(1 - prog) * 0.35})`;
+          ctx.strokeStyle = `rgba(${t.cy.rgb},${(1 - prog) * 0.35})`;
           ctx.lineWidth = 1.2;
           ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke();
         }
       }
 
-      ctx.strokeStyle = "rgba(56,225,255,0.25)"; ctx.lineWidth = 1;
+      ctx.strokeStyle = `rgba(${t.cy.rgb},0.25)`; ctx.lineWidth = 1;
       for (let i = 0; i < 60; i++) {
         const a = (i / 60) * Math.PI * 2 + now * 0.05;
         const r0 = base * 1.55, r1 = base * (i % 5 === 0 ? 1.66 : 1.6);
@@ -173,7 +228,7 @@ export default function Page() {
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, []);
 
-  // ---- reindexar via /api/ingest em fatias com paginação (respeita quota Gemini) ----
+  // ---- reindexar via /api/ingest em fatias com paginação ----
   const reindex = useCallback(async () => {
     if (ingesting) return;
     setIngesting(true);
@@ -194,8 +249,7 @@ export default function Page() {
         addLog("[INGEST]", OR, `→ ${src.label} · fatia ${pageNum} (offset ${offset})…`);
         try {
           const res = await fetch(`/api/ingest?source=${src.source}${src.extra}&offset=${offset}`, {
-            method: "POST",
-            headers,
+            method: "POST", headers,
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {
@@ -279,9 +333,7 @@ export default function Page() {
       setBusy(false);
       setMode("idle");
       // lê a resposta em voz alta (TTS do navegador)
-      if (voiceOn && answerRef.current.trim()) {
-        speak(answerRef.current);
-      }
+      if (voiceOn && answerRef.current.trim()) speak(answerRef.current);
     }
   }, [busy, addLog, voiceOn]);
 
@@ -303,7 +355,6 @@ export default function Page() {
   // ---- TTS: voz do Gemini (com fallback ao navegador) ----
   const speak = useCallback(async (text) => {
     if (typeof window === "undefined") return;
-    // cancela qualquer fala anterior
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
 
@@ -322,7 +373,6 @@ export default function Page() {
       await audio.play();
       addLog("[TTS]", GR, "voz Gemini");
     } catch (err) {
-      // fallback: voz do navegador
       addLog("[TTS]", OR, `Gemini falhou (${err.message}) → voz do navegador`);
       speakBrowser(text);
     }
@@ -339,7 +389,6 @@ export default function Page() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { setVoiceSupported(false); addLog("[VOICE]", OR, "navegador sem suporte a microfone"); return; }
 
-    // se já está ouvindo, para
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
@@ -347,7 +396,7 @@ export default function Page() {
       return;
     }
 
-    stopSpeaking(); // não ouvir enquanto fala
+    stopSpeaking(); 
     const rec = new SR();
     rec.lang = "pt-BR";
     rec.interimResults = true;
@@ -399,29 +448,35 @@ export default function Page() {
   const mono = { fontFamily: "'JetBrains Mono',monospace" };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", fontFamily: "'Rajdhani',sans-serif", color: "#cfeffb", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div style={{
+      "--cy-hex": theme.cy.hex, "--cy-rgb": theme.cy.rgb,
+      "--or-hex": theme.or.hex, "--or-rgb": theme.or.rgb,
+      "--gr-hex": theme.gr.hex, "--gr-rgb": theme.gr.rgb,
+      "--pu-hex": theme.pu.hex, "--pu-rgb": theme.pu.rgb,
+      position: "fixed", inset: 0, background: "#000", fontFamily: "'Rajdhani',sans-serif", color: "#cfeffb", overflow: "hidden", display: "flex", flexDirection: "column" 
+    }}>
       {/* ambient grid + glow */}
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(56,225,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(56,225,255,0.035) 1px, transparent 1px)", backgroundSize: "44px 44px", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", top: "-25%", left: "50%", transform: "translateX(-50%)", width: 900, height: 900, borderRadius: "50%", background: "radial-gradient(circle, rgba(56,225,255,0.10), transparent 62%)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(var(--cy-rgb),0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--cy-rgb),0.035) 1px, transparent 1px)", backgroundSize: "44px 44px", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", top: "-25%", left: "50%", transform: "translateX(-50%)", width: 900, height: 900, borderRadius: "50%", background: "radial-gradient(circle, rgba(var(--cy-rgb),0.10), transparent 62%)", pointerEvents: "none" }} />
 
       {/* TOP BAR */}
-      <header style={{ position: "relative", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 26px", borderBottom: "1px solid rgba(56,225,255,0.16)", background: "linear-gradient(180deg, rgba(6,20,26,0.6), transparent)" }}>
+      <header style={{ position: "relative", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 26px", borderBottom: "1px solid rgba(var(--cy-rgb),0.16)", background: "linear-gradient(180deg, rgba(6,20,26,0.6), transparent)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ width: 26, height: 26, border: "1.5px solid #38e1ff", borderRadius: "50%", boxShadow: "0 0 14px rgba(56,225,255,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ width: 9, height: 9, background: CY, borderRadius: "50%", boxShadow: "0 0 8px #38e1ff" }} />
+          <div style={{ width: 26, height: 26, border: "1.5px solid var(--cy-hex)", borderRadius: "50%", boxShadow: "0 0 14px rgba(var(--cy-rgb),0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 9, height: 9, background: CY, borderRadius: "50%", boxShadow: "0 0 8px var(--cy-hex)" }} />
           </div>
           <div>
             <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: 4, color: "#eafcff", lineHeight: 1 }}>BEYOND&nbsp;BITS</div>
-            <div style={{ ...mono, fontSize: 9, letterSpacing: 3, color: "rgba(56,225,255,0.6)", marginTop: 3 }}>J.A.R.V.I.S. ASSISTANT INTERFACE</div>
+            <div style={{ ...mono, fontSize: 9, letterSpacing: 3, color: "rgba(var(--cy-rgb),0.6)", marginTop: 3 }}>J.A.R.V.I.S. ASSISTANT INTERFACE</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, ...mono, fontSize: 10, letterSpacing: 1 }}>
           <div style={{ textAlign: "right", marginRight: 8 }}>
             <div style={{ color: "#eafcff", fontSize: 15, letterSpacing: 2 }}>{clock}</div>
-            <div style={{ color: "rgba(56,225,255,0.5)", fontSize: 9, letterSpacing: 2 }}>SYS.UPTIME {uptime}</div>
+            <div style={{ color: "rgba(var(--cy-rgb),0.5)", fontSize: 9, letterSpacing: 2 }}>SYS.UPTIME {uptime}</div>
           </div>
           {connList.map((c) => (
-            <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", border: "1px solid rgba(56,225,255,0.18)", borderRadius: 3, background: "rgba(56,225,255,0.03)" }}>
+            <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", border: "1px solid rgba(var(--cy-rgb),0.18)", borderRadius: 3, background: "rgba(var(--cy-rgb),0.03)" }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor(c.ok), boxShadow: `0 0 8px ${dotColor(c.ok)}`, animation: "bb-dot 1.8s ease-in-out infinite" }} />
               <span style={{ color: "#bfe8f5" }}>{c.label}</span>
             </div>
@@ -430,7 +485,7 @@ export default function Page() {
             onClick={reindex}
             disabled={ingesting}
             title="Reindexar Trello + Beyond Brain (roda na Vercel)"
-            style={{ ...mono, display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", border: `1px solid ${ingesting ? OR : CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: ingesting ? OR : "#eafcff", cursor: ingesting ? "wait" : "pointer", fontSize: 10, letterSpacing: 2 }}
+            style={{ ...mono, display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", border: `1px solid ${ingesting ? OR : CY}`, borderRadius: 3, background: "rgba(var(--cy-rgb),0.06)", color: ingesting ? OR : "#eafcff", cursor: ingesting ? "wait" : "pointer", fontSize: 10, letterSpacing: 2 }}
           >
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: ingesting ? OR : CY, boxShadow: `0 0 8px ${ingesting ? OR : CY}`, animation: ingesting ? "bb-dot 0.9s ease-in-out infinite" : "none" }} />
             {ingesting ? "SYNCING…" : "◈ SYNC"}
@@ -441,10 +496,10 @@ export default function Page() {
       {/* MAIN GRID */}
       <main style={{ position: "relative", zIndex: 2, flex: 1, display: "grid", gridTemplateColumns: "minmax(220px,320px) minmax(0,1fr) minmax(280px,360px)", minHeight: 0 }}>
         {/* LEFT: LOGS */}
-        <aside style={{ borderRight: "1px solid rgba(56,225,255,0.12)", display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(90deg, rgba(6,18,24,0.35), transparent)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
+        <aside style={{ borderRight: "1px solid rgba(var(--cy-rgb),0.12)", display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(90deg, rgba(6,18,24,0.35), transparent)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(var(--cy-rgb),0.1)" }}>
             <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ SYSTEM_LOGS</div>
-            <div style={{ ...mono, fontSize: 9, color: "rgba(255,157,61,0.85)", animation: "bb-flicker 2s infinite" }}>● LIVE</div>
+            <div style={{ ...mono, fontSize: 9, color: "rgba(var(--or-rgb),0.85)", animation: "bb-flicker 2s infinite" }}>● LIVE</div>
           </div>
           <div style={{ flex: 1, overflow: "hidden", padding: "12px 14px", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 7 }}>
             {logs.map((log) => (
@@ -461,8 +516,8 @@ export default function Page() {
         {/* CENTER: VISUALIZER */}
         <section style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, minWidth: 0 }}>
           <div style={{ position: "relative", width: "min(52vh,520px)", height: "min(52vh,520px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ position: "absolute", inset: "-6%", border: "1px solid rgba(56,225,255,0.12)", borderRadius: "50%", borderTopColor: "rgba(56,225,255,0.45)", borderRightColor: "rgba(56,225,255,0.28)", animation: "bb-sweep 14s linear infinite" }} />
-            <div style={{ position: "absolute", inset: "4%", border: "1px dashed rgba(255,157,61,0.18)", borderRadius: "50%", animation: "bb-sweep 22s linear infinite reverse" }} />
+            <div style={{ position: "absolute", inset: "-6%", border: "1px solid rgba(var(--cy-rgb),0.12)", borderRadius: "50%", borderTopColor: "rgba(var(--cy-rgb),0.45)", borderRightColor: "rgba(var(--cy-rgb),0.28)", animation: "bb-sweep 14s linear infinite" }} />
+            <div style={{ position: "absolute", inset: "4%", border: "1px dashed rgba(var(--or-rgb),0.18)", borderRadius: "50%", animation: "bb-sweep 22s linear infinite reverse" }} />
             <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
             <div style={{ position: "relative", textAlign: "center", pointerEvents: "none" }}>
               <div style={{ ...mono, fontSize: 11, letterSpacing: 5, color: meta.color }}>{meta.label}</div>
@@ -470,16 +525,16 @@ export default function Page() {
             </div>
           </div>
           <div style={{ marginTop: 26, width: "min(80%,560px)", textAlign: "center" }}>
-            <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(56,225,255,0.5)", marginBottom: 8 }}>↳ INTENT INTERPRETATION</div>
+            <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(var(--cy-rgb),0.5)", marginBottom: 8 }}>↳ INTENT INTERPRETATION</div>
             <div style={{ fontSize: 19, lineHeight: 1.4, color: "#eafcff", fontWeight: 500, letterSpacing: 0.4, whiteSpace: "pre-wrap" }}>{transcript}</div>
           </div>
         </section>
 
         {/* RIGHT: CONTEXT */}
-        <aside style={{ borderLeft: "1px solid rgba(56,225,255,0.12)", display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(270deg, rgba(6,18,24,0.35), transparent)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
+        <aside style={{ borderLeft: "1px solid rgba(var(--cy-rgb),0.12)", display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(270deg, rgba(6,18,24,0.35), transparent)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(var(--cy-rgb),0.1)" }}>
             <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ RETRIEVED_CONTEXT</div>
-            <div style={{ ...mono, fontSize: 9, color: "rgba(56,225,255,0.5)" }}>pgvector · {cards.length} matches</div>
+            <div style={{ ...mono, fontSize: 9, color: "rgba(var(--cy-rgb),0.5)" }}>pgvector · {cards.length} matches</div>
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
             {cards.length === 0 && (
@@ -490,9 +545,9 @@ export default function Page() {
             {cards.map((c, i) => {
               const brain = c.source === "BRAIN";
               const accent = brain ? PU : CY;
-              const edge = brain ? "rgba(201,166,255,0.32)" : "rgba(56,225,255,0.3)";
+              const edge = brain ? "rgba(var(--pu-rgb),0.32)" : "rgba(var(--cy-rgb),0.3)";
               return (
-                <div key={i} style={{ flex: "none", border: `1px solid ${edge}`, borderRadius: 6, padding: "13px 14px", background: "linear-gradient(160deg, rgba(56,225,255,0.05), rgba(0,0,0,0.2))", position: "relative", overflow: "hidden" }}>
+                <div key={i} style={{ flex: "none", border: `1px solid ${edge}`, borderRadius: 6, padding: "13px 14px", background: "linear-gradient(160deg, rgba(var(--cy-rgb),0.05), rgba(0,0,0,0.2))", position: "relative", overflow: "hidden" }}>
                   <div style={{ position: "absolute", top: 0, left: 0, width: 3, height: "100%", background: accent, boxShadow: `0 0 10px ${accent}` }} />
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                     <span style={{ ...mono, fontSize: 8.5, letterSpacing: 2, padding: "3px 7px", border: `1px solid ${edge}`, borderRadius: 3, color: accent, background: "rgba(0,0,0,0.3)" }}>{c.source}</span>
@@ -500,10 +555,10 @@ export default function Page() {
                   </div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: "#eafcff", letterSpacing: 0.3, lineHeight: 1.25 }}>{c.title}</div>
                   <div style={{ fontSize: 12.5, color: "rgba(169,206,222,0.8)", marginTop: 5, lineHeight: 1.4 }}>{c.snippet}</div>
-                  <div style={{ ...mono, fontSize: 9, color: "rgba(56,225,255,0.55)", marginTop: 9 }}>SIM {meterFor(c.pct)} {c.sim}</div>
-                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 9, paddingTop: 9, borderTop: "1px dashed rgba(56,225,255,0.14)" }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: OR, boxShadow: "0 0 7px #ff9d3d" }} />
-                    <span style={{ ...mono, fontSize: 9, letterSpacing: 1, color: "rgba(255,157,61,0.85)" }}>LAST_MODIFIED</span>
+                  <div style={{ ...mono, fontSize: 9, color: "rgba(var(--cy-rgb),0.55)", marginTop: 9 }}>SIM {meterFor(c.pct)} {c.sim}</div>
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 9, paddingTop: 9, borderTop: "1px dashed rgba(var(--cy-rgb),0.14)" }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: OR, boxShadow: "0 0 7px var(--or-hex)" }} />
+                    <span style={{ ...mono, fontSize: 9, letterSpacing: 1, color: "rgba(var(--or-rgb),0.85)" }}>LAST_MODIFIED</span>
                     <span style={{ ...mono, fontSize: 10, color: "#ffbe7a", marginLeft: "auto", whiteSpace: "nowrap" }}>{c.modified}</span>
                   </div>
                 </div>
@@ -514,13 +569,13 @@ export default function Page() {
       </main>
 
       {/* BOTTOM COMMAND BAR */}
-      <footer style={{ position: "relative", zIndex: 2, display: "flex", alignItems: "center", gap: 18, padding: "14px 26px", borderTop: "1px solid rgba(56,225,255,0.16)", background: "linear-gradient(0deg, rgba(6,20,26,0.6), transparent)" }}>
-        <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(56,225,255,0.5)" }}>STATE</div>
+      <footer style={{ position: "relative", zIndex: 2, display: "flex", alignItems: "center", gap: 18, padding: "14px 26px", borderTop: "1px solid rgba(var(--cy-rgb),0.16)", background: "linear-gradient(0deg, rgba(6,20,26,0.6), transparent)" }}>
+        <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(var(--cy-rgb),0.5)" }}>STATE</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 5, border: `1px solid ${meta.color}`, color: meta.color }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: meta.color, boxShadow: `0 0 8px ${meta.color}` }} />
           <span style={{ fontWeight: 600, letterSpacing: 1.5, fontSize: 13 }}>{meta.label}</span>
         </div>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid rgba(56,225,255,0.18)", borderRadius: 5, background: "rgba(56,225,255,0.03)", ...mono }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid rgba(var(--cy-rgb),0.18)", borderRadius: 5, background: "rgba(var(--cy-rgb),0.03)", ...mono }}>
           <span style={{ color: CY, fontSize: 13 }}>&gt;_</span>
           <input
             value={input}
@@ -534,6 +589,27 @@ export default function Page() {
           />
         </div>
 
+        {/* botão de troca de tema */}
+        <button
+          onClick={cycleTheme}
+          title={`Trocar Tema (${theme.name})`}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 44, height: 44, borderRadius: "50%",
+            border: `1px solid rgba(var(--cy-rgb), 0.4)`,
+            background: "rgba(var(--cy-rgb),0.04)", color: CY,
+            cursor: "pointer", transition: "all .2s",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/>
+            <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/>
+            <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>
+            <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+          </svg>
+        </button>
+
         {/* botão de microfone (STT) */}
         <button
           onClick={toggleMic}
@@ -543,9 +619,9 @@ export default function Page() {
             display: "flex", alignItems: "center", justifyContent: "center",
             width: 44, height: 44, borderRadius: "50%",
             border: `1.5px solid ${listening ? OR : CY}`,
-            background: listening ? "rgba(255,157,61,0.15)" : "rgba(56,225,255,0.06)",
+            background: listening ? "rgba(var(--or-rgb),0.15)" : "rgba(var(--cy-rgb),0.06)",
             color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer",
-            boxShadow: listening ? `0 0 16px ${OR}` : "none",
+            boxShadow: listening ? `0 0 16px var(--or-hex)` : "none",
             animation: listening ? "bb-dot 1s ease-in-out infinite" : "none",
             transition: "all .2s",
           }}
@@ -566,7 +642,7 @@ export default function Page() {
             display: "flex", alignItems: "center", justifyContent: "center",
             width: 40, height: 40, borderRadius: "50%",
             border: `1px solid ${voiceOn ? CY : "rgba(207,239,251,0.3)"}`,
-            background: "rgba(56,225,255,0.04)", color: voiceOn ? CY : "rgba(207,239,251,0.4)",
+            background: "rgba(var(--cy-rgb),0.04)", color: voiceOn ? CY : "rgba(207,239,251,0.4)",
             cursor: "pointer", transition: "all .2s",
           }}
         >
