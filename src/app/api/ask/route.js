@@ -89,10 +89,14 @@ export async function POST(req) {
 
         send(controller, "done", { ok: true });
       } catch (err) {
-        const msg = String(err?.message || err);
-        const friendly = err?.code === "QUOTA" || msg.includes("QUOTA_EXCEEDED") || msg.includes("RESOURCE_EXHAUSTED")
-          ? "⚠️ Quota do Gemini cheia. Aguarde cerca de 1 minuto e pergunte de novo. (Dica: evite clicar em SYNC logo antes de perguntar.)"
-          : msg;
+        // gemini.js já tenta de novo sozinho pra erros transitórios (429/503) e troca o
+        // JSON cru da API por um erro com .code curto — só resta mapear pra uma frase.
+        const friendly =
+          err?.code === "QUOTA"
+            ? "⚠️ Quota do Gemini cheia. Aguarde cerca de 1 minuto e pergunte de novo. (Dica: evite clicar em SYNC logo antes de perguntar.)"
+            : err?.code === "UNAVAILABLE"
+            ? "⚠️ O Gemini está com alta demanda no momento (já tentei de novo automaticamente). Espere um instante e pergunte de novo."
+            : String(err?.message || err);
         send(controller, "error", { message: friendly });
       } finally {
         controller.close();

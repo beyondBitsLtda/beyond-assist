@@ -1,0 +1,18 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/api/health/route": "/api/health",
+  "/api/kanban/route": "/api/kanban",
+  "/api/speak/route": "/api/speak",
+  "/api/tasks-summary/route": "/api/tasks-summary",
+  "/api/thoughts/route": "/api/thoughts",
+  "/api/ask/route": "/api/ask",
+  "/api/tasks/route": "/api/tasks",
+  "/api/boards-overview/route": "/api/boards-overview",
+  "/api/ingest/route": "/api/ingest",
+  "/(panels)/assistant/page": "/assistant",
+  "/(panels)/page": "/",
+  "/(panels)/dashboard/page": "/dashboard",
+  "/(panels)/tasks/page": "/tasks",
+  "/(panels)/boards/page": "/boards",
+  "/(panels)/thoughts/page": "/thoughts"
+}
