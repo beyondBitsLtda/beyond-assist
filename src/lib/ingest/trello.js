@@ -58,9 +58,9 @@ export async function loadTrello(opts = {}) {
       const board = await tget(`/boards/${boardRef}`, { fields: "name" });
       const boardName = board?.name || boardRef;
 
-      // mapa idList → nome da lista
-      const lists = await tget(`/boards/${boardRef}/lists`, { fields: "name" });
-      const listName = Object.fromEntries((lists || []).map((l) => [l.id, l.name]));
+      // mapa idList → { name, pos } — pos é a ordem real das colunas no board (pro Kanban)
+      const lists = await tget(`/boards/${boardRef}/lists`, { fields: "name,pos" });
+      const listMeta = Object.fromEntries((lists || []).map((l) => [l.id, { name: l.name, pos: l.pos }]));
 
       const cards = await tget(`/boards/${boardRef}/cards`, {
         fields: "name,desc,dateLastActivity,idList,shortUrl,labels,due,start,dueComplete",
@@ -68,7 +68,8 @@ export async function loadTrello(opts = {}) {
       });
 
       for (const card of cards || []) {
-        const list = listName[card.idList] || "";
+        const list = listMeta[card.idList]?.name || "";
+        const listPos = listMeta[card.idList]?.pos ?? null;
         const labels = (card.labels || []).map((l) => l.name).filter(Boolean).join(", ");
 
         // datas humanizadas (o Gemini indexa palavras — precisa ver "vence em", "prazo")
@@ -99,6 +100,7 @@ export async function loadTrello(opts = {}) {
           last_modified: card.dateLastActivity || null,
           metadata: {
             list,
+            list_pos: listPos,
             url: card.shortUrl,
             labels,
             due: card.due || null,

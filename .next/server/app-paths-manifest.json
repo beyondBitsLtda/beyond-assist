@@ -1,0 +1,11 @@
+{
+  "/api/kanban/route": "app/api/kanban/route.js",
+  "/api/boards-overview/route": "app/api/boards-overview/route.js",
+  "/api/thoughts/route": "app/api/thoughts/route.js",
+  "/api/tasks/route": "app/api/tasks/route.js",
+  "/(panels)/page": "app/(panels)/page.js",
+  "/(panels)/assistant/page": "app/(panels)/assistant/page.js",
+  "/(panels)/boards/page": "app/(panels)/boards/page.js",
+  "/(panels)/tasks/page": "app/(panels)/tasks/page.js",
+  "/(panels)/thoughts/page": "app/(panels)/thoughts/page.js"
+}

@@ -130,6 +130,7 @@ export async function retrieveByBoard(boardName, { onlyOpen = false } = {}) {
     const done = row.metadata?.due_complete === true;
     if (onlyOpen && done) continue;
     seen.set(cardId, {
+      id: cardId,
       source: "TRELLO",
       board: row.board || "",
       title: row.title || "(sem título)",
@@ -140,13 +141,26 @@ export async function retrieveByBoard(boardName, { onlyOpen = false } = {}) {
       last_modified: row.last_modified,
       modified: relTime(row.last_modified),
       due: row.metadata?.due || null,
+      start: row.metadata?.start || null,
       list: row.metadata?.list || null,
+      list_pos: row.metadata?.list_pos ?? null,
+      labels: row.metadata?.labels || "",
+      due_complete: done,
+      url: row.metadata?.url || null,
     });
   }
-  // ordena por lista e depois por prazo
-  return [...seen.values()].sort((a, b) =>
-    (a.list || "").localeCompare(b.list || "") || (a.due || "").localeCompare(b.due || "")
-  );
+  // ordena pela ordem real das listas no board (list_pos; sem pos ainda → fallback alfabético) e depois por prazo
+  return [...seen.values()].sort((a, b) => {
+    if (a.list_pos == null && b.list_pos != null) return 1;
+    if (a.list_pos != null && b.list_pos == null) return -1;
+    if (a.list_pos == null && b.list_pos == null) {
+      const byList = (a.list || "").localeCompare(b.list || "");
+      if (byList) return byList;
+    } else if (a.list_pos !== b.list_pos) {
+      return a.list_pos - b.list_pos;
+    }
+    return (a.due || "").localeCompare(b.due || "");
+  });
 }
 
 // ---------- roteamento por data ----------
