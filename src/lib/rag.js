@@ -33,6 +33,30 @@ Formato da resposta (importante — será lida em voz alta):
 Priorize itens com prazo mais próximo ou modificados mais recentemente quando relevante.
 Cite o board de origem quando ajudar.`;
 
+/** Persona do modo "Geral" — mesma base, mas autorizada a usar busca do Google quando o contexto indexado não basta. */
+export const SYSTEM_INSTRUCTION_GENERAL = `Você é o "Beyond", assistente pessoal do usuário (estilo J.A.R.V.I.S.), agora em modo GERAL.
+Responda em português do Brasil, de forma direta e objetiva.
+
+Neste modo você enxerga um recorte amplo de TODOS os dados indexados (Trello + notas do Beyond Brain),
+não só um board específico. Priorize sempre esse contexto indexado como fonte principal.
+
+Você também tem acesso a busca do Google. Use-a quando a pergunta pedir informação atual, externa,
+ou que claramente não está (e não deveria estar) nos dados pessoais indexados — por exemplo notícias,
+preços, prazos legais, ou qualquer coisa do mundo real fora do Trello/Beyond Brain.
+Quando usar informação vinda da busca, deixe claro que essa parte veio da internet, não dos seus dados.
+Se nem o contexto indexado nem a busca resolverem, diga claramente que não encontrou.
+
+Sobre datas:
+- Cada card do Trello pode ter "Data de entrega/prazo", "Data de início" e "Última modificação".
+- Considere a data atual ao interpretar "hoje", "amanhã", "essa semana" etc.
+- "Última modificação" NÃO é prazo — é só quando o card foi editado por último.
+
+Formato da resposta (importante — será lida em voz alta):
+- Escreva em frases curtas e naturais, como se estivesse FALANDO com a pessoa.
+- Evite listas com marcadores, asteriscos, numeração "1." "2.", tabelas e símbolos.
+- Não use markdown (nada de **negrito**, #, -, etc.).
+- Datas por extenso ("sexta-feira, 8 de agosto") em vez de "08/08".`;
+
 /**
  * Recupera os trechos mais parecidos com a pergunta.
  * Retorna um array já no formato dos cards do HUD.
@@ -41,7 +65,7 @@ Cite o board de origem quando ajudar.`;
 const _queryCache = new Map();
 const _cacheKey = (q) => q.trim().toLowerCase().replace(/\s+/g, " ");
 
-export async function retrieve(question, { filterSource = null } = {}) {
+export async function retrieve(question, { filterSource = null, topK = null, minSim = null } = {}) {
   const key = _cacheKey(question);
   let queryEmbedding = _queryCache.get(key);
   if (!queryEmbedding) {
@@ -50,13 +74,14 @@ export async function retrieve(question, { filterSource = null } = {}) {
     if (_queryCache.size > 100) _queryCache.delete(_queryCache.keys().next().value);
   }
 
-  const matchCount = wantsMany(question) ? 30 : TOP_K;
-  const minSim = wantsMany(question) ? 0.3 : MIN_SIM; // mais permissivo ao listar
+  // topK/minSim explícitos (ex.: modo "Geral") vencem a heurística padrão.
+  const matchCount = topK ?? (wantsMany(question) ? 30 : TOP_K);
+  const minSimilarity = minSim ?? (wantsMany(question) ? 0.3 : MIN_SIM); // mais permissivo ao listar
 
   const { data, error } = await supabase.rpc("match_documents", {
     query_embedding: queryEmbedding,
     match_count: matchCount,
-    min_similarity: minSim,
+    min_similarity: minSimilarity,
     filter_source: filterSource,
   });
   if (error) throw new Error(`match_documents: ${error.message}`);
@@ -72,6 +97,15 @@ export async function retrieve(question, { filterSource = null } = {}) {
     last_modified: row.last_modified,
     modified: relTime(row.last_modified),
   }));
+}
+
+/**
+ * Busca ampla, sem filtro de board/source — usada pelo modo "Geral" do assistente,
+ * que precisa enxergar tudo que está indexado (todos os boards + Beyond Brain),
+ * não só o que uma busca padrão (top_k pequeno) traria.
+ */
+export async function retrieveGeneral(question) {
+  return retrieve(question, { topK: 40, minSim: 0.25 });
 }
 
 /** Monta o prompt final: bloco de contexto + pergunta + data de hoje. */

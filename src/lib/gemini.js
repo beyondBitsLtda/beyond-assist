@@ -90,12 +90,20 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
 /**
  * Gera a resposta em streaming.
  * Retorna um async iterator de pedaços de texto (string).
+ *
+ * `tools` (opcional) — ex.: [{ googleSearch: {} }] pra habilitar grounding com
+ * busca do Google (o modelo decide sozinho quando de fato buscar). Usado pelo
+ * modo "Geral" do assistente.
  */
-export async function* chatStream(prompt, systemInstruction) {
+export async function* chatStream(prompt, systemInstruction, { tools } = {}) {
+  const config = {};
+  if (systemInstruction) config.systemInstruction = systemInstruction;
+  if (tools) config.tools = tools;
+
   const stream = await ai().models.generateContentStream({
     model: CHAT_MODEL,
     contents: prompt,
-    config: systemInstruction ? { systemInstruction } : undefined,
+    config: Object.keys(config).length ? config : undefined,
   });
   for await (const chunk of stream) {
     const text = chunk.text;

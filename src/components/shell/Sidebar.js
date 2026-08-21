@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { CY, mono } from "@/lib/theme.js";
 
 const ITEMS = [
+  { href: "/dashboard", label: "DASHBOARD", glyph: "▧" },
   { href: "/", label: "QUARTO DE GUERRA", glyph: "◈" },
   { href: "/boards", label: "BOARDS", glyph: "▦" },
   { href: "/tasks", label: "TAREFAS", glyph: "⏱" },

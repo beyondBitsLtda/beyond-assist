@@ -11,6 +11,17 @@ const MODE_META = {
   speaking: { label: "SPEAKING", sub: "streaming response", color: OR },
 };
 
+const TASKS_SCOPE = "__tasks__";
+const THOUGHTS_SCOPE = "__thoughts__";
+
+/** Corta um buffer de texto em frases completas (terminadas em . ! ? ou quebra de linha). */
+function splitSentences(text) {
+  const matches = text.match(/[^.!?\n]+[.!?\n]+/g);
+  if (!matches) return { sentences: [], rest: text };
+  const consumed = matches.join("").length;
+  return { sentences: matches.map((s) => s.trim()).filter(Boolean), rest: text.slice(consumed) };
+}
+
 export default function AssistantPage() {
   const { logs, addLog } = useLog();
   const [mode, setMode] = useState("idle");
@@ -23,14 +34,39 @@ export default function AssistantPage() {
   const [voiceOn, setVoiceOn] = useState(true);         // ler respostas em voz alta (TTS)
   const [voiceSupported, setVoiceSupported] = useState(true);
 
+  // escopo do assistente: "painel" (board/tarefas/pensamentos específico) ou "geral" (tudo + web)
+  const [scopeMode, setScopeMode] = useState("panel");
+  const [scopePanel, setScopePanel] = useState("Quarto de Guerra");
+  const [panelOptions, setPanelOptions] = useState(["Quarto de Guerra"]);
+
   const recognitionRef = useRef(null);
   const answerRef = useRef("");
   const audioRef = useRef(null);
+  const currentAudioResolveRef = useRef(null);
+
+  // fila de TTS frase-a-frase: síntese começa assim que a frase fica pronta (em paralelo
+  // com a reprodução da frase anterior), tocada estritamente em ordem.
+  const speechBufferRef = useRef("");
+  const speechQueueRef = useRef(Promise.resolve());
+  const speechGenRef = useRef(0); // pergunta nova invalida frases pendentes de uma pergunta antiga
 
   const canvasRef = useRef(null);
   const modeRef = useRef(mode);
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
+
+  // lista de boards pro seletor de escopo "Este painel" (Quarto de Guerra + os demais indexados)
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/boards-overview")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive || !d.ok) return;
+        setPanelOptions(["Quarto de Guerra", ...(d.boards || []).map((b) => b.board)]);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   // pré-carrega vozes do TTS e verifica suporte a microfone
   useEffect(() => {
@@ -132,6 +168,88 @@ export default function AssistantPage() {
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, []);
 
+  // ---- TTS frase-a-frase: sintetiza e toca cada frase assim que ela fica pronta ----
+
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    if (currentAudioResolveRef.current) {
+      const resolve = currentAudioResolveRef.current;
+      currentAudioResolveRef.current = null;
+      resolve(); // libera a fila de reprodução, que senão ficaria travada esperando o onended
+    }
+  }, []);
+
+  const synthesizeSentence = useCallback(async (text) => {
+    try {
+      const res = await fetch("/api/speak", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error(`speak HTTP ${res.status}`);
+      const blob = await res.blob();
+      return { url: URL.createObjectURL(blob) };
+    } catch (err) {
+      return { url: null, error: err };
+    }
+  }, []);
+
+  const playSentence = useCallback((synthesisPromise, text, gen) => {
+    return synthesisPromise.then((result) => {
+      if (gen !== speechGenRef.current) {
+        if (result?.url) URL.revokeObjectURL(result.url);
+        return;
+      }
+      return new Promise((resolve) => {
+        currentAudioResolveRef.current = resolve;
+        const finish = () => { currentAudioResolveRef.current = null; resolve(); };
+
+        if (result?.url) {
+          const audio = new Audio(result.url);
+          audioRef.current = audio;
+          audio.onended = () => { URL.revokeObjectURL(result.url); audioRef.current = null; addLog("[TTS]", GR, "voz Gemini"); finish(); };
+          audio.onerror = () => { URL.revokeObjectURL(result.url); audioRef.current = null; finish(); };
+          audio.play().catch(finish);
+        } else {
+          addLog("[TTS]", OR, "Gemini falhou → voz do navegador");
+          if (typeof window === "undefined" || !window.speechSynthesis) return finish();
+          const clean = cleanForSpeech(text);
+          if (!clean) return finish();
+          const u = new SpeechSynthesisUtterance(clean);
+          u.lang = "pt-BR";
+          u.rate = 1.05;
+          const voices = window.speechSynthesis.getVoices();
+          const ptVoice = voices.find((v) => /pt-BR/i.test(v.lang)) || voices.find((v) => /pt/i.test(v.lang));
+          if (ptVoice) u.voice = ptVoice;
+          u.onend = finish;
+          u.onerror = finish;
+          window.speechSynthesis.speak(u);
+        }
+      });
+    });
+  }, [addLog]);
+
+  const enqueueSpeech = useCallback((text, gen) => {
+    const clean = (text || "").trim();
+    if (!clean) return;
+    // síntese começa JÁ (não espera a vez de tocar) — roda em paralelo com a frase
+    // anterior tocando, fechando o gap entre frases.
+    const synthesisPromise = synthesizeSentence(clean);
+    speechQueueRef.current = speechQueueRef.current.then(() => {
+      if (gen !== speechGenRef.current) return;
+      return playSentence(synthesisPromise, clean, gen);
+    });
+  }, [synthesizeSentence, playSentence]);
+
+  // ---- escopo do assistente ----
+  const computeScope = useCallback(() => {
+    if (scopeMode === "general") return { mode: "general" };
+    if (scopePanel === TASKS_SCOPE) return { mode: "panel", range: "auto" };
+    if (scopePanel === THOUGHTS_SCOPE) return { mode: "panel", source: "brain" };
+    return { mode: "panel", board: scopePanel };
+  }, [scopeMode, scopePanel]);
+
   // ---- pergunta real ao backend (SSE) ----
   const ask = useCallback(async (q) => {
     if (!q.trim() || busy) return;
@@ -141,6 +259,12 @@ export default function AssistantPage() {
     answerRef.current = "";
     setCards([]);
     setMode("listening");
+
+    stopSpeaking(); // corta qualquer fala de uma resposta anterior
+    const gen = ++speechGenRef.current;
+    speechBufferRef.current = "";
+    const voiceEnabled = voiceOn;
+
     addLog("[EMBED]", GR, "query → vector [768d]");
     addLog("[RAG]", CY, "similarity search · top_k");
 
@@ -148,7 +272,7 @@ export default function AssistantPage() {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({ question: q, scope: computeScope() }),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
@@ -179,6 +303,14 @@ export default function AssistantPage() {
             addLog("[GEMINI]", OR, "streaming tokens");
           } else if (event === "token") {
             setAnswer((a) => { const na = a + payload; answerRef.current = na; return na; });
+            if (voiceEnabled) {
+              speechBufferRef.current += payload;
+              const { sentences, rest } = splitSentences(speechBufferRef.current);
+              if (sentences.length) {
+                speechBufferRef.current = rest;
+                for (const sentence of sentences) enqueueSpeech(sentence, gen);
+              }
+            }
           } else if (event === "error") {
             addLog("[ERR]", OR, String(payload?.message || payload));
             setAnswer((a) => a + `\n[erro: ${payload?.message || payload}]`);
@@ -193,60 +325,12 @@ export default function AssistantPage() {
     } finally {
       setBusy(false);
       setMode("idle");
-      // lê a resposta em voz alta (TTS do navegador)
-      if (voiceOn && answerRef.current.trim()) {
-        speak(answerRef.current);
-      }
+      // fala o que sobrou no buffer (última frase, sem pontuação final)
+      const remaining = speechBufferRef.current.trim();
+      speechBufferRef.current = "";
+      if (voiceEnabled && remaining) enqueueSpeech(remaining, gen);
     }
-  }, [busy, addLog, voiceOn]);
-
-  // ---- TTS: voz do navegador (fallback) ----
-  const speakBrowser = useCallback((text) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    const clean = cleanForSpeech(text);
-    if (!clean) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(clean);
-    u.lang = "pt-BR";
-    u.rate = 1.05;
-    const voices = window.speechSynthesis.getVoices();
-    const ptVoice = voices.find((v) => /pt-BR/i.test(v.lang)) || voices.find((v) => /pt/i.test(v.lang));
-    if (ptVoice) u.voice = ptVoice;
-    window.speechSynthesis.speak(u);
-  }, []);
-
-  // ---- TTS: voz do Gemini (com fallback ao navegador) ----
-  const speak = useCallback(async (text) => {
-    if (typeof window === "undefined") return;
-    // cancela qualquer fala anterior
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-
-    try {
-      const res = await fetch("/api/speak", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      if (!res.ok) throw new Error(`speak HTTP ${res.status}`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => { URL.revokeObjectURL(url); audioRef.current = null; };
-      await audio.play();
-      addLog("[TTS]", GR, "voz Gemini");
-    } catch (err) {
-      // fallback: voz do navegador
-      addLog("[TTS]", OR, `Gemini falhou (${err.message}) → voz do navegador`);
-      speakBrowser(text);
-    }
-  }, [addLog, speakBrowser]);
-
-  const stopSpeaking = useCallback(() => {
-    if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-  }, []);
+  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech]);
 
   // ---- STT: ouvir microfone (Web Speech API) ----
   const toggleMic = useCallback(() => {
@@ -301,6 +385,41 @@ export default function AssistantPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      {/* ESCOPO DO ASSISTENTE */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 26px", borderBottom: "1px solid rgba(56,225,255,0.1)", flexWrap: "wrap" }}>
+        <span style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(56,225,255,0.5)" }}>ESCOPO</span>
+        <div style={{ display: "flex", gap: 4 }}>
+          {[{ key: "panel", label: "ESTE PAINEL" }, { key: "general", label: "GERAL" }].map((m) => (
+            <button
+              key={m.key}
+              onClick={() => setScopeMode(m.key)}
+              style={{
+                ...mono, fontSize: 9.5, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                border: `1px solid ${scopeMode === m.key ? CY : "rgba(56,225,255,0.18)"}`,
+                background: scopeMode === m.key ? "rgba(56,225,255,0.1)" : "transparent",
+                color: scopeMode === m.key ? "#eafcff" : "rgba(207,239,251,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        {scopeMode === "panel" ? (
+          <select
+            value={scopePanel}
+            onChange={(e) => setScopePanel(e.target.value)}
+            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: "1px solid rgba(56,225,255,0.18)", background: "#08131a", color: "#eafcff" }}
+          >
+            {panelOptions.map((b) => <option key={b} value={b}>{b}</option>)}
+            <option value={TASKS_SCOPE}>Tarefas (por prazo)</option>
+            <option value={THOUGHTS_SCOPE}>Pensamentos</option>
+          </select>
+        ) : (
+          <span style={{ ...mono, fontSize: 9, color: PU }}>vê todos os painéis · pode buscar na web quando precisar</span>
+        )}
+      </div>
+
       {/* MAIN GRID */}
       <main style={{ position: "relative", flex: 1, display: "grid", gridTemplateColumns: "minmax(220px,320px) minmax(0,1fr) minmax(280px,360px)", minHeight: 0 }}>
         {/* LEFT: LOGS */}
