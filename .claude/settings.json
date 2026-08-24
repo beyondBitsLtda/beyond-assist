@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout 8 curl -s -N -X POST https://beyond-assist-blue.vercel.app/api/ask -H \"content-type: application/json\" -d '{\"question\":\"quais chamados estao abertos no sentinela?\",\"scope\":{\"mode\":\"panel\",\"source\":\"sentinel\"}}')",
+      "Bash(curl -s -N -X POST http://localhost:3000/api/ask -H \"content-type: application/json\" -d '{\"question\":\"quais chamados estao abertos no sentinela?\",\"scope\":{\"mode\":\"panel\",\"source\":\"sentinel\"}}')",
+      "Read(//tmp/**)",
+      "Bash(curl -s -N -X POST http://localhost:3000/api/ask -H \"content-type: application/json\" -d '{\"question\":\"me fala sobre os chamados de suporte\",\"scope\":{\"mode\":\"panel\",\"source\":\"sentinel\"}}')",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(git commit -m 'Corrige assistente '\\\\''só vendo um projeto'\\\\'' no Sentinela *)"
+    ]
+  }
+}
