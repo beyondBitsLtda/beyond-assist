@@ -16,7 +16,7 @@ export async function GET() {
 
   // Sentinela: projeto Supabase separado — conta linhas em support_tickets
   try {
-    if (process.env.SENTINEL_SUPABASE_URL && process.env.SENTINEL_SUPABASE_SECRET_KEY) {
+    if (process.env.SUBABASE_TESTE_URL && process.env.SERVICE_KEY_TESTE) {
       const { error } = await sentinelSupabase.from("support_tickets").select("id", { count: "exact", head: true });
       status.sentinel = !error;
     }

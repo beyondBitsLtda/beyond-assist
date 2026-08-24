@@ -1,4 +1,0 @@
-{
-  "/api/sentinel/dashboard/route": "app/api/sentinel/dashboard/route.js",
-  "/(panels)/sentinel/page": "app/(panels)/sentinel/page.js"
-}

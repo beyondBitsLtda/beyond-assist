@@ -8,11 +8,14 @@ let _client = null;
 
 function getClient() {
   if (_client) return _client;
-  const url = process.env.SENTINEL_SUPABASE_URL;
-  const key = process.env.SENTINEL_SUPABASE_SECRET_KEY;
+  // nomes exatamente como o usuário criou na Vercel (projeto Sentinela é separado do
+  // Beyond Brain, gerenciado com seu próprio conjunto de variáveis — "SUBABASE" é typo
+  // dele, mantido de propósito pra bater com o que já está configurado lá).
+  const url = process.env.SUBABASE_TESTE_URL;
+  const key = process.env.SERVICE_KEY_TESTE;
   if (!url || !key) {
     throw new Error(
-      "SENTINEL_SUPABASE_URL ou SENTINEL_SUPABASE_SECRET_KEY não configuradas. " +
+      "SUBABASE_TESTE_URL ou SERVICE_KEY_TESTE não configuradas. " +
       "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
     );
   }
