@@ -1,3 +1,3 @@
 {
-  "/(panels)/assistant/page": "app/(panels)/assistant/page.js"
+  "/api/ask/route": "app/api/ask/route.js"
 }

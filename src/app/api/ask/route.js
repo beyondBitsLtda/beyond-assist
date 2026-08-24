@@ -2,6 +2,7 @@ import {
   retrieve, retrieveByDate, detectDateRange, retrieveByBoard, detectBoard,
   retrieveGeneral, buildPrompt, SYSTEM_INSTRUCTION, SYSTEM_INSTRUCTION_GENERAL,
 } from "@/lib/rag.js";
+import { searchThoughts, listThoughts, toMatchFormat } from "@/lib/notes.js";
 import { chatStream } from "@/lib/gemini.js";
 
 export const runtime = "nodejs";
@@ -60,7 +61,13 @@ export async function POST(req) {
           const range = scope.range === "auto" ? (detectDateRange(question) || "upcoming") : scope.range;
           matches = await retrieveByDate(range);
         } else if (scope?.mode === "panel" && scope.source === "brain") {
-          matches = await retrieve(question, { filterSource: "brain" });
+          // busca textual direto na tabela `notes` (não depende de SYNC/embeddings) — é o
+          // caminho confiável pra "leia minha nota sobre X". Sem termo reconhecido na
+          // pergunta (ex.: "lê minha última nota"), usa as notas mais recentes, pra sempre
+          // ter conteúdo real pra ler em vez de "não encontrei".
+          const found = await searchThoughts(question);
+          const thoughts = found.length ? found : (await listThoughts({ limit: 5 })).thoughts;
+          matches = thoughts.map(toMatchFormat);
         } else {
           // sem escopo explícito: roteador de intenção automático (programação decide o método)
           //  1) tem data? → filtro SQL por prazo

@@ -17,6 +17,11 @@ Responda em português do Brasil, de forma direta e objetiva.
 Baseie-se SOMENTE no contexto fornecido (cards do Trello e notas do Beyond Brain).
 Se a resposta não estiver no contexto, diga claramente que não encontrou nos dados indexados.
 
+Quando o usuário pedir para "ler", "mostrar" ou "falar" uma nota/pensamento específico,
+reproduza o conteúdo dela de forma completa e fiel — é uma LEITURA, não um resumo. Se houver
+mais de uma nota parecida no contexto, leia a que combina melhor com o pedido; se não tiver
+certeza de qual é, pergunte qual delas antes de ler, ou descreva rapidamente as opções.
+
 Sobre datas:
 - Cada card do Trello pode ter "Data de entrega/prazo", "Data de início" e "Última modificação".
 - Quando o usuário perguntar sobre prazos, entregas, "hoje", "esta semana", "atrasadas", use "Data de entrega/prazo".
@@ -45,6 +50,9 @@ ou que claramente não está (e não deveria estar) nos dados pessoais indexados
 preços, prazos legais, ou qualquer coisa do mundo real fora do Trello/Beyond Brain.
 Quando usar informação vinda da busca, deixe claro que essa parte veio da internet, não dos seus dados.
 Se nem o contexto indexado nem a busca resolverem, diga claramente que não encontrou.
+
+Quando o usuário pedir para "ler", "mostrar" ou "falar" uma nota/pensamento específico,
+reproduza o conteúdo dela de forma completa e fiel — é uma LEITURA, não um resumo.
 
 Sobre datas:
 - Cada card do Trello pode ter "Data de entrega/prazo", "Data de início" e "Última modificação".
@@ -262,12 +270,13 @@ export async function retrieveByDate(range) {
 }
 
 // ---------- helpers ----------
-function shorten(text, n) {
+// exportados pra reuso em notes.js (formato de card do Pensamentos combina com o do RAG)
+export function shorten(text, n) {
   const t = (text || "").replace(/\s+/g, " ").trim();
   return t.length > n ? t.slice(0, n - 1) + "…" : t;
 }
 
-function relTime(iso) {
+export function relTime(iso) {
   if (!iso) return "—";
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "—";
