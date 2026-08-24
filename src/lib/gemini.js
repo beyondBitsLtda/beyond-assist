@@ -160,6 +160,8 @@ const TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
  * converte em WAV para o navegador tocar.
  */
 export async function synthesizeSpeech(text) {
+  // essa é a ÚNICA fonte de voz do app (sem voz alternativa) — vale insistir mais que
+  // o padrão antes de desistir, já que agora só roda 1-2x por resposta, não por frase.
   const res = await withTransientRetry(() =>
     ai().models.generateContent({
       model: TTS_MODEL,
@@ -170,7 +172,8 @@ export async function synthesizeSpeech(text) {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: TTS_VOICE } },
         },
       },
-    })
+    }),
+    { attempts: 5, delayMs: 1500 }
   );
 
   const part = res?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);

@@ -3,16 +3,16 @@
   "functions": {
     "/api/boards-overview": {},
     "/api/health": {},
+    "/api/ask": {},
     "/api/kanban": {},
+    "/api/tasks-summary": {},
     "/api/speak": {
       "maxDuration": 60
     },
-    "/api/tasks-summary": {},
     "/api/thoughts": {},
-    "/api/ask": {},
-    "/api/tasks": {},
     "/api/ingest": {
       "maxDuration": 60
-    }
+    },
+    "/api/tasks": {}
   }
 }
