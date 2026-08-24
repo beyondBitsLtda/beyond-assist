@@ -49,6 +49,10 @@ export default function AssistantPage() {
   const speechBufferRef = useRef("");
   const speechQueueRef = useRef(Promise.resolve());
   const speechGenRef = useRef(0); // pergunta nova invalida frases pendentes de uma pergunta antiga
+  // voz "travada" pra resposta atual: null = ainda não decidiu, "gemini" ou "browser".
+  // Depois da 1ª frase decidir, TODAS as frases seguintes da mesma resposta usam a mesma voz —
+  // nunca alterna Gemini↔navegador no meio de uma fala (quebra o fluxo da interação).
+  const speechEngineRef = useRef(null);
 
   const canvasRef = useRef(null);
   const modeRef = useRef(mode);
@@ -206,13 +210,17 @@ export default function AssistantPage() {
         const finish = () => { currentAudioResolveRef.current = null; resolve(); };
 
         if (result?.url) {
+          speechEngineRef.current = "gemini";
           const audio = new Audio(result.url);
           audioRef.current = audio;
           audio.onended = () => { URL.revokeObjectURL(result.url); audioRef.current = null; addLog("[TTS]", GR, "voz Gemini"); finish(); };
           audio.onerror = () => { URL.revokeObjectURL(result.url); audioRef.current = null; finish(); };
           audio.play().catch(finish);
         } else {
-          addLog("[TTS]", OR, "Gemini falhou → voz do navegador");
+          if (!result?.skipped) {
+            addLog("[TTS]", OR, "Gemini falhou → voz do navegador (resto desta resposta continua no navegador, sem alternar)");
+          }
+          speechEngineRef.current = "browser"; // trava: nenhuma frase seguinte desta resposta tenta o Gemini de novo
           if (typeof window === "undefined" || !window.speechSynthesis) return finish();
           const clean = cleanForSpeech(text);
           if (!clean) return finish();
@@ -233,9 +241,13 @@ export default function AssistantPage() {
   const enqueueSpeech = useCallback((text, gen) => {
     const clean = (text || "").trim();
     if (!clean) return;
+    // se uma frase anterior desta MESMA resposta já caiu pro navegador, nem tenta o
+    // Gemini de novo — evita alternar de voz no meio da fala (e poupa uma chamada
+    // que já sabemos que provavelmente vai falhar de novo).
+    const tryGemini = speechEngineRef.current !== "browser";
     // síntese começa JÁ (não espera a vez de tocar) — roda em paralelo com a frase
     // anterior tocando, fechando o gap entre frases.
-    const synthesisPromise = synthesizeSentence(clean);
+    const synthesisPromise = tryGemini ? synthesizeSentence(clean) : Promise.resolve({ url: null, skipped: true });
     speechQueueRef.current = speechQueueRef.current.then(() => {
       if (gen !== speechGenRef.current) return;
       return playSentence(synthesisPromise, clean, gen);
@@ -263,6 +275,7 @@ export default function AssistantPage() {
     stopSpeaking(); // corta qualquer fala de uma resposta anterior
     const gen = ++speechGenRef.current;
     speechBufferRef.current = "";
+    speechEngineRef.current = null; // nova resposta → nova chance pro Gemini decidir a voz
     const voiceEnabled = voiceOn;
 
     addLog("[EMBED]", GR, "query → vector [768d]");

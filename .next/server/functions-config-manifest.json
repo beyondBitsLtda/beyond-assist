@@ -4,15 +4,15 @@
     "/api/boards-overview": {},
     "/api/health": {},
     "/api/kanban": {},
-    "/api/ask": {},
     "/api/speak": {
       "maxDuration": 60
     },
-    "/api/tasks": {},
+    "/api/tasks-summary": {},
     "/api/thoughts": {},
+    "/api/ask": {},
+    "/api/tasks": {},
     "/api/ingest": {
       "maxDuration": 60
-    },
-    "/api/tasks-summary": {}
+    }
   }
 }
