@@ -1,1 +1,14 @@
 node_modules
+
+# segredos — nunca commitar
+.env
+.env.local
+.env*.local
+
+# build do Next.js
+.next
+out
+
+# outros
+*.log
+.DS_Store

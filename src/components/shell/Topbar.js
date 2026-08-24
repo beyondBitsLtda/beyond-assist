@@ -16,7 +16,7 @@ export default function Topbar() {
   const { addLog } = useLog();
   const [clock, setClock] = useState(fmtClock(new Date()));
   const [uptime, setUptime] = useState("00:00:00");
-  const [conn, setConn] = useState({ supabase: null, trello: null, gemini: null });
+  const [conn, setConn] = useState({ supabase: null, trello: null, gemini: null, sentinel: null });
   const [ingesting, setIngesting] = useState(false);
   const startRef = useRef(Date.now());
 
@@ -89,6 +89,7 @@ export default function Topbar() {
     { label: "SUPABASE", ok: conn.supabase },
     { label: "TRELLO", ok: conn.trello },
     { label: "GEMINI", ok: conn.gemini },
+    { label: "SENTINELA", ok: conn.sentinel },
   ];
 
   return (

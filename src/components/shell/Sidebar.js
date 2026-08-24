@@ -10,6 +10,7 @@ const ITEMS = [
   { href: "/boards", label: "BOARDS", glyph: "▦" },
   { href: "/tasks", label: "TAREFAS", glyph: "⏱" },
   { href: "/thoughts", label: "PENSAMENTOS", glyph: "✎" },
+  { href: "/sentinel", label: "SENTINELA", glyph: "◆" },
   { href: "/assistant", label: "ASSISTENTE", glyph: "◉" },
 ];
 
