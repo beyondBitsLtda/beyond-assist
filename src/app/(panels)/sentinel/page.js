@@ -107,7 +107,7 @@ export default function SentinelPage() {
               </button>
             </div>
             {summaryError && <div style={{ ...mono, fontSize: 11, color: OR, marginBottom: 16 }}>⚠ {summaryError}</div>}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
+            <div className="bb-chart-grid">
               <HBarChart title="CHAMADOS POR STATUS" rows={statusRows} series={oneSeries} />
               <HBarChart title="CHAMADOS POR PRIORIDADE" rows={priorityRows} series={oneSeries} />
               <HBarChart title="SLA ESTOURADO (ABERTOS)" rows={slaRows} series={oneSeries} />

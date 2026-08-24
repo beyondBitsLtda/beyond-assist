@@ -2,22 +2,35 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLog } from "./LogProvider.js";
-import { CY, OR, GR, mono, dotColor } from "@/lib/theme.js";
+import { CY, OR, GR, PU, mono, dotColor } from "@/lib/theme.js";
 
 const pad = (n) => String(n).padStart(2, "0");
 const fmtClock = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+/** Converte a chave VAPID pública (base64 URL-safe) pro formato que o PushManager espera. */
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i);
+  return output;
+}
 
 /**
  * Barra superior compartilhada por todos os painéis: relógio/uptime, bolinhas de conexão
  * (Supabase/Trello/Gemini) e o botão SYNC (reindexação completa) — migrados de page.js,
  * porque agora são relevantes pra todos os painéis, não só o Assistente.
  */
-export default function Topbar() {
+export default function Topbar({ onToggleSidebar }) {
   const { addLog } = useLog();
   const [clock, setClock] = useState(fmtClock(new Date()));
   const [uptime, setUptime] = useState("00:00:00");
   const [conn, setConn] = useState({ supabase: null, trello: null, gemini: null, sentinel: null });
   const [ingesting, setIngesting] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [subscribed, setSubscribed] = useState(false);
+  const [subBusy, setSubBusy] = useState(false);
   const startRef = useRef(Date.now());
 
   // relógio + uptime
@@ -40,6 +53,65 @@ export default function Topbar() {
       .catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  // notificações push: registra o service worker e checa se este dispositivo já está inscrito
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    setPushSupported(true);
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((reg) => reg.pushManager.getSubscription())
+      .then((sub) => setSubscribed(!!sub))
+      .catch(() => {});
+  }, []);
+
+  const toggleNotifications = useCallback(async () => {
+    if (subBusy || typeof window === "undefined") return;
+    setSubBusy(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+
+      if (subscribed) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch("/api/notifications/subscribe", {
+            method: "DELETE",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          }).catch(() => {});
+          await sub.unsubscribe();
+        }
+        setSubscribed(false);
+        addLog("[PUSH]", CY, "notificações desativadas");
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        addLog("[PUSH]", OR, `permissão negada (${permission})`);
+        return;
+      }
+
+      const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+      const res = await fetch("/api/notifications/subscribe", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setSubscribed(true);
+      addLog("[PUSH]", GR, "notificações ativadas");
+    } catch (err) {
+      addLog("[PUSH]", OR, `falha: ${err.message}`);
+    } finally {
+      setSubBusy(false);
+    }
+  }, [subscribed, subBusy, addLog]);
 
   // ---- reindexar via /api/ingest em fatias com paginação (respeita quota Gemini) ----
   const reindex = useCallback(async () => {
@@ -95,12 +167,25 @@ export default function Topbar() {
   return (
     <header
       style={{
-        position: "relative", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "flex-end",
+        position: "relative", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
         padding: "14px 26px", borderBottom: "1px solid rgba(56,225,255,0.16)",
         background: "linear-gradient(180deg, rgba(6,20,26,0.6), transparent)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10, ...mono, fontSize: 10, letterSpacing: 1 }}>
+      <button
+        className="bb-hamburger"
+        onClick={onToggleSidebar}
+        aria-label="Abrir menu"
+        style={{ alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 6, border: "1px solid rgba(56,225,255,0.25)", background: "rgba(56,225,255,0.05)", color: CY, cursor: "pointer", flex: "none" }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+
+      <div className="bb-topbar-row" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flex: 1, ...mono, fontSize: 10, letterSpacing: 1 }}>
         <div style={{ textAlign: "right", marginRight: 8 }}>
           <div style={{ color: "#eafcff", fontSize: 15, letterSpacing: 2 }}>{clock}</div>
           <div style={{ color: "rgba(56,225,255,0.5)", fontSize: 9, letterSpacing: 2 }}>SYS.UPTIME {uptime}</div>
@@ -120,6 +205,28 @@ export default function Topbar() {
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: ingesting ? OR : CY, boxShadow: `0 0 8px ${ingesting ? OR : CY}`, animation: ingesting ? "bb-dot 0.9s ease-in-out infinite" : "none" }} />
           {ingesting ? "SYNCING…" : "◈ SYNC"}
         </button>
+
+        {pushSupported && (
+          <button
+            onClick={toggleNotifications}
+            disabled={subBusy}
+            title={subscribed ? "Notificações ativadas (clique pra desativar)" : "Ativar notificações (chamado novo, reaberto, SLA, tarefa atrasada...)"}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 34, height: 34, borderRadius: "50%",
+              border: `1px solid ${subscribed ? PU : "rgba(207,239,251,0.3)"}`,
+              background: subscribed ? "rgba(201,166,255,0.08)" : "rgba(56,225,255,0.04)",
+              color: subscribed ? PU : "rgba(207,239,251,0.5)",
+              cursor: subBusy ? "wait" : "pointer", transition: "all .2s", flex: "none",
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              {!subscribed && <line x1="3" y1="3" x2="21" y2="21" stroke={OR} />}
+            </svg>
+          </button>
+        )}
       </div>
     </header>
   );

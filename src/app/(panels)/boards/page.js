@@ -40,7 +40,7 @@ export default function BoardsOverviewPage() {
 
       {error && <div style={{ ...mono, fontSize: 11, color: OR, marginBottom: 16 }}>⚠ {error}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+      <div className="bb-chart-grid">
         {(boards || []).map((b) => (
           <div key={b.board} style={{ border: "1px solid rgba(56,225,255,0.18)", borderRadius: 8, padding: "16px 18px", background: "linear-gradient(160deg, rgba(56,225,255,0.05), rgba(0,0,0,0.2))" }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "#eafcff" }}>{b.board}</div>

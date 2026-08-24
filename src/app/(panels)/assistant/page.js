@@ -41,6 +41,7 @@ export default function AssistantPage() {
   const [voiceSupported, setVoiceSupported] = useState(true);
   const [geminiVoiceEnabled, setGeminiVoiceEnabled] = useState(true); // tentar a voz do Gemini? (desligado = só navegador)
   const [geminiVoiceStatus, setGeminiVoiceStatus] = useState(null);   // null=não testada ainda · true=ok · false=falhou (última tentativa real)
+  const [mobileTab, setMobileTab] = useState("visualizer"); // só usado no mobile (ver globals.css): "logs" | "visualizer" | "context"
 
   // escopo do assistente: "painel" (board/tarefas/pensamentos específico) ou "geral" (tudo + web)
   const [scopeMode, setScopeMode] = useState("panel");
@@ -461,10 +462,29 @@ export default function AssistantPage() {
         )}
       </div>
 
+      {/* abas — só aparecem no mobile (ver .bb-assistant-tabs em globals.css), a grid vira pilha e mostra um painel por vez */}
+      <div className="bb-assistant-tabs" style={{ gap: 4, padding: "8px 26px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
+        {[{ key: "logs", label: "LOGS" }, { key: "visualizer", label: "VISUALIZER" }, { key: "context", label: "CONTEXTO" }].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setMobileTab(t.key)}
+            style={{
+              ...mono, fontSize: 9.5, letterSpacing: 1, padding: "6px 12px", borderRadius: 3,
+              border: `1px solid ${mobileTab === t.key ? CY : "rgba(56,225,255,0.18)"}`,
+              background: mobileTab === t.key ? "rgba(56,225,255,0.1)" : "transparent",
+              color: mobileTab === t.key ? "#eafcff" : "rgba(207,239,251,0.55)",
+              cursor: "pointer",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {/* MAIN GRID */}
-      <main style={{ position: "relative", flex: 1, display: "grid", gridTemplateColumns: "minmax(220px,320px) minmax(0,1fr) minmax(280px,360px)", minHeight: 0 }}>
+      <main className="bb-assistant-grid" style={{ position: "relative", flex: 1, display: "grid", gridTemplateColumns: "minmax(220px,320px) minmax(0,1fr) minmax(280px,360px)", minHeight: 0 }}>
         {/* LEFT: LOGS */}
-        <aside style={{ borderRight: "1px solid rgba(56,225,255,0.12)", display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(90deg, rgba(6,18,24,0.35), transparent)" }}>
+        <aside className={`bb-assistant-pane${mobileTab === "logs" ? " bb-active" : ""}`} style={{ borderRight: "1px solid rgba(56,225,255,0.12)", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(90deg, rgba(6,18,24,0.35), transparent)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
             <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ SYSTEM_LOGS</div>
             <div style={{ ...mono, fontSize: 9, color: "rgba(255,157,61,0.85)", animation: "bb-flicker 2s infinite" }}>● LIVE</div>
@@ -482,7 +502,7 @@ export default function AssistantPage() {
         </aside>
 
         {/* CENTER: VISUALIZER */}
-        <section style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, minWidth: 0 }}>
+        <section className={`bb-assistant-pane${mobileTab === "visualizer" ? " bb-active" : ""}`} style={{ position: "relative", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, minWidth: 0 }}>
           <div style={{ position: "relative", width: "min(52vh,520px)", height: "min(52vh,520px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div style={{ position: "absolute", inset: "-6%", border: "1px solid rgba(56,225,255,0.12)", borderRadius: "50%", borderTopColor: "rgba(56,225,255,0.45)", borderRightColor: "rgba(56,225,255,0.28)", animation: "bb-sweep 14s linear infinite" }} />
             <div style={{ position: "absolute", inset: "4%", border: "1px dashed rgba(255,157,61,0.18)", borderRadius: "50%", animation: "bb-sweep 22s linear infinite reverse" }} />
@@ -499,7 +519,7 @@ export default function AssistantPage() {
         </section>
 
         {/* RIGHT: CONTEXT */}
-        <aside style={{ borderLeft: "1px solid rgba(56,225,255,0.12)", display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(270deg, rgba(6,18,24,0.35), transparent)" }}>
+        <aside className={`bb-assistant-pane${mobileTab === "context" ? " bb-active" : ""}`} style={{ borderLeft: "1px solid rgba(56,225,255,0.12)", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(270deg, rgba(6,18,24,0.35), transparent)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
             <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ RETRIEVED_CONTEXT</div>
             <div style={{ ...mono, fontSize: 9, color: "rgba(56,225,255,0.5)" }}>pgvector · {cards.length} matches</div>

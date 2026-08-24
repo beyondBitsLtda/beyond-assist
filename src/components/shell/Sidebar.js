@@ -14,13 +14,13 @@ const ITEMS = [
   { href: "/assistant", label: "ASSISTENTE", glyph: "◉" },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ open = false, onNavigate }) {
   const pathname = usePathname();
 
   return (
     <aside
+      className={`bb-sidebar${open ? " bb-open" : ""}`}
       style={{
-        position: "relative", zIndex: 2, width: 208, flex: "none",
         borderRight: "1px solid rgba(56,225,255,0.16)",
         display: "flex", flexDirection: "column",
         background: "linear-gradient(180deg, rgba(6,20,26,0.6), transparent)",
@@ -43,6 +43,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               style={{
                 display: "flex", alignItems: "center", gap: 10, padding: "10px 18px",
                 color: active ? "#eafcff" : "rgba(207,239,251,0.55)",

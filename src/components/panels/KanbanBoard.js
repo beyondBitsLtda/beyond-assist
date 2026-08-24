@@ -65,7 +65,7 @@ export default function KanbanBoard({ board }) {
 
       <div style={{ flex: 1, minHeight: 0, overflowX: "auto", overflowY: "hidden", padding: "18px 24px", display: "flex", gap: 16, alignItems: "flex-start" }}>
         {(columns || []).map((col) => (
-          <div key={col.list} style={{ flex: "none", width: 280, height: "100%", display: "flex", flexDirection: "column", border: "1px solid rgba(56,225,255,0.14)", borderRadius: 8, background: "rgba(56,225,255,0.02)" }}>
+          <div key={col.list} className="bb-kanban-col" style={{ flex: "none", height: "100%", display: "flex", flexDirection: "column", border: "1px solid rgba(56,225,255,0.14)", borderRadius: 8, background: "rgba(56,225,255,0.02)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
               <span style={{ ...mono, fontSize: 10.5, letterSpacing: 1.5, color: "#eafcff" }}>{col.list}</span>
               <span style={{ ...mono, fontSize: 9, color: "rgba(56,225,255,0.5)" }}>{col.cards.length}</span>

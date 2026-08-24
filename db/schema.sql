@@ -66,3 +66,45 @@ $$;
 --    então habilitamos RLS sem policies públicas (nega qualquer acesso anon).
 alter table public.documents enable row level security;
 -- (a service_role ignora RLS por design; o cliente anon fica sem acesso)
+
+-- ============================================================
+--  Notificações push — rode esta seção UMA vez a mais (aditivo,
+--  não mexe nas tabelas acima). Guarda inscrições de push e o
+--  registro de "já avisei sobre isso", pra não repetir notificação
+--  a cada ciclo de verificação do cron.
+-- ============================================================
+
+-- 6) Inscrições Web Push (uma por dispositivo/navegador que ativou notificações)
+create table if not exists public.push_subscriptions (
+  endpoint    text primary key,
+  p256dh      text not null,
+  auth        text not null,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.push_subscriptions enable row level security;
+
+-- 7) Registro de eventos já notificados (idempotência do cron de notificação)
+create table if not exists public.notified_events (
+  id          bigint generated always as identity primary key,
+  event_type  text not null,   -- 'ticket_new' | 'ticket_reopened' | 'ticket_sla_breach' | 'ticket_sla_near' | 'trello_card_new' | 'trello_task_overdue'
+  entity_id   text not null,   -- id do chamado/card (composto com timestamp p/ eventos repetíveis, ex. reabertura)
+  created_at  timestamptz not null default now(),
+  unique (event_type, entity_id)
+);
+
+alter table public.notified_events enable row level security;
+create index if not exists notified_events_type_idx on public.notified_events (event_type);
+
+-- 8) Último status conhecido de cada chamado do Sentinela — necessário pra detectar
+--    reabertura (Resolvido/Fechado → Aberto), já que a API do Sentinela não guarda
+--    histórico de transição de status.
+create table if not exists public.sentinel_ticket_snapshot (
+  ticket_id   uuid primary key,
+  status      text not null,
+  checked_at  timestamptz not null default now()
+);
+
+alter table public.sentinel_ticket_snapshot enable row level security;
+-- (as 3 tabelas acima só são acessadas pela service_role, nas rotas /api/notifications
+-- e /api/cron/notify — mesmo padrão de "nega tudo pro anon" da tabela documents)

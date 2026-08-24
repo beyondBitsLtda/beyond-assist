@@ -74,7 +74,7 @@ export default function DashboardPage() {
 
       {error && <div style={{ ...mono, fontSize: 11, color: OR, marginBottom: 16 }}>⚠ {error}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
+      <div className="bb-chart-grid">
         <HBarChart title="TAREFAS POR PRAZO" rows={tasksRows} series={tasksSeries} />
         <HBarChart title="BOARDS · ABERTOS × CONCLUÍDOS" rows={boardsRows} series={boardsSeries} />
         <HBarChart title="QUARTO DE GUERRA · CARDS POR LISTA" rows={listRows} series={listSeries} />
