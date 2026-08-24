@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CY, OR, PU, mono } from "@/lib/theme.js";
 import { CHART } from "@/lib/chartPalette.js";
+import SentinelTicketDetail from "./SentinelTicketDetail.js";
 
 const PRIORITY_COLOR = {
   "Baixa": CHART.status.good,
@@ -16,6 +17,7 @@ export default function SentinelKanban({ project }) {
   const [columns, setColumns] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,7 +69,9 @@ export default function SentinelKanban({ project }) {
                 return (
                   <div
                     key={t.id}
-                    style={{ border: `1px solid ${breached ? "rgba(255,157,61,0.4)" : "rgba(56,225,255,0.18)"}`, borderRadius: 6, padding: "10px 12px", background: "rgba(0,0,0,0.25)" }}
+                    onClick={() => setSelectedId(t.id)}
+                    title="Clique pra ver o chamado completo"
+                    style={{ border: `1px solid ${breached ? "rgba(255,157,61,0.4)" : "rgba(56,225,255,0.18)"}`, borderRadius: 6, padding: "10px 12px", background: "rgba(0,0,0,0.25)", cursor: "pointer" }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                       <span style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.4)" }}>#{t.display_id}</span>
@@ -100,6 +104,10 @@ export default function SentinelKanban({ project }) {
           <div style={{ ...mono, fontSize: 11, color: "rgba(207,239,251,0.4)" }}>nenhum chamado encontrado.</div>
         )}
       </div>
+
+      {selectedId && (
+        <SentinelTicketDetail ticketId={selectedId} onClose={() => setSelectedId(null)} />
+      )}
     </div>
   );
 }

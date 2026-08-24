@@ -1,4 +1,4 @@
-import { listProjects, listTickets, groupByStatus } from "@/lib/sentinel.js";
+import { listProjects, listTickets, groupByStatus, attachProjectNames } from "@/lib/sentinel.js";
 import { jsonResponse } from "@/lib/http.js";
 
 export const runtime = "nodejs";
@@ -17,8 +17,7 @@ export async function GET(req) {
       listProjects(),
       listTickets({ projectId }),
     ]);
-    const nameById = Object.fromEntries(projects.map((p) => [p.id, p.name]));
-    const withProject = tickets.map((t) => ({ ...t, project: nameById[t.project_id] || null }));
+    const withProject = attachProjectNames(tickets, projects);
     const columns = groupByStatus(withProject);
     return jsonResponse({ ok: true, columns });
   } catch (err) {

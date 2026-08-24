@@ -3,6 +3,7 @@ import {
   retrieveGeneral, buildPrompt, SYSTEM_INSTRUCTION, SYSTEM_INSTRUCTION_GENERAL,
 } from "@/lib/rag.js";
 import { searchThoughts, listThoughts, toMatchFormat } from "@/lib/notes.js";
+import { retrieveSentinelTickets } from "@/lib/sentinel.js";
 import { chatStream } from "@/lib/gemini.js";
 
 export const runtime = "nodejs";
@@ -39,7 +40,8 @@ async function* chatStreamWithFallback(prompt, systemInstruction, tools) {
  *   - { mode: "panel", board }   → força o board inteiro (bypassa detecção automática)
  *   - { mode: "panel", range }   → força o filtro de prazo (hoje/semana/atrasadas...)
  *   - { mode: "panel", source: "brain" } → só notas do Beyond Brain
- *   - { mode: "general" }        → busca ampla em tudo + grounding com Google Search
+ *   - { mode: "panel", source: "sentinel" } → só chamados do Sentinela
+ *   - { mode: "general" }        → busca ampla em tudo (Trello + Brain + Sentinela) + grounding com Google Search
  *   - ausente / { mode: "auto" } → comportamento padrão (detecção automática por regex)
  *
  * Responde via SSE com três eventos que mapeiam direto no HUD:
@@ -73,8 +75,20 @@ export async function POST(req) {
         if (scope?.mode === "general") {
           // modo "Geral": busca ampla em tudo que está indexado + pode buscar na web.
           matches = await retrieveGeneral(question);
+          // chamados do Sentinela não passam pelo pipeline de embeddings (leitura ao vivo),
+          // então entram à parte aqui — sem derrubar a resposta se o Sentinela não estiver
+          // configurado nesse deploy.
+          try {
+            const tickets = await retrieveSentinelTickets(question);
+            matches = [...matches, ...tickets];
+          } catch {}
           systemInstruction = SYSTEM_INSTRUCTION_GENERAL;
           tools = [{ googleSearch: {} }];
+        } else if (scope?.mode === "panel" && scope.source === "sentinel") {
+          // busca chamados do Sentinela direto (sem SYNC/embeddings) — detecta projeto,
+          // prioridade, status ou SLA estourado citados na pergunta; senão busca por
+          // palavra no título/descrição; sem nada disso, prioriza os com SLA estourado.
+          matches = await retrieveSentinelTickets(question);
         } else if (scope?.mode === "panel" && scope.board) {
           matches = await retrieveByBoard(scope.board);
           if (matches.length > 40) matches = matches.slice(0, 40);

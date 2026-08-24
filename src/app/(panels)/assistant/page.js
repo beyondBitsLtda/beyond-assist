@@ -13,6 +13,7 @@ const MODE_META = {
 
 const TASKS_SCOPE = "__tasks__";
 const THOUGHTS_SCOPE = "__thoughts__";
+const SENTINEL_SCOPE = "__sentinel__";
 
 // Tamanho mínimo (em caracteres) pro primeiro pedaço da resposta antes de mandar pro TTS.
 // Poucas chamadas maiores erram menos que muitas chamadas pequenas (uma por frase esgotava
@@ -277,6 +278,7 @@ export default function AssistantPage() {
     if (scopeMode === "general") return { mode: "general" };
     if (scopePanel === TASKS_SCOPE) return { mode: "panel", range: "auto" };
     if (scopePanel === THOUGHTS_SCOPE) return { mode: "panel", source: "brain" };
+    if (scopePanel === SENTINEL_SCOPE) return { mode: "panel", source: "sentinel" };
     return { mode: "panel", board: scopePanel };
   }, [scopeMode, scopePanel]);
 
@@ -452,6 +454,7 @@ export default function AssistantPage() {
             {panelOptions.map((b) => <option key={b} value={b}>{b}</option>)}
             <option value={TASKS_SCOPE}>Tarefas (por prazo)</option>
             <option value={THOUGHTS_SCOPE}>Pensamentos</option>
+            <option value={SENTINEL_SCOPE}>Chamados (Sentinela)</option>
           </select>
         ) : (
           <span style={{ ...mono, fontSize: 9, color: PU }}>vê todos os painéis · pode buscar na web quando precisar</span>
@@ -509,8 +512,9 @@ export default function AssistantPage() {
             )}
             {cards.map((c, i) => {
               const brain = c.source === "BRAIN";
-              const accent = brain ? PU : CY;
-              const edge = brain ? "rgba(201,166,255,0.32)" : "rgba(56,225,255,0.3)";
+              const sentinel = c.source === "SENTINELA";
+              const accent = brain ? PU : sentinel ? OR : CY;
+              const edge = brain ? "rgba(201,166,255,0.32)" : sentinel ? "rgba(255,157,61,0.32)" : "rgba(56,225,255,0.3)";
               return (
                 <div key={i} style={{ flex: "none", border: `1px solid ${edge}`, borderRadius: 6, padding: "13px 14px", background: "linear-gradient(160deg, rgba(56,225,255,0.05), rgba(0,0,0,0.2))", position: "relative", overflow: "hidden" }}>
                   <div style={{ position: "absolute", top: 0, left: 0, width: 3, height: "100%", background: accent, boxShadow: `0 0 10px ${accent}` }} />
