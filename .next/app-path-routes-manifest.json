@@ -1,18 +1,18 @@
 {
   "/_not-found/page": "/_not-found",
-  "/api/ask/route": "/api/ask",
-  "/api/boards-overview/route": "/api/boards-overview",
   "/api/health/route": "/api/health",
-  "/api/thoughts/route": "/api/thoughts",
-  "/api/tasks/route": "/api/tasks",
-  "/api/kanban/route": "/api/kanban",
-  "/api/tasks-summary/route": "/api/tasks-summary",
-  "/api/speak/route": "/api/speak",
+  "/api/boards-overview/route": "/api/boards-overview",
   "/api/ingest/route": "/api/ingest",
-  "/(panels)/tasks/page": "/tasks",
+  "/api/tasks-summary/route": "/api/tasks-summary",
+  "/api/thoughts/route": "/api/thoughts",
+  "/api/ask/route": "/api/ask",
+  "/api/kanban/route": "/api/kanban",
+  "/api/speak/route": "/api/speak",
+  "/api/tasks/route": "/api/tasks",
   "/(panels)/boards/page": "/boards",
-  "/(panels)/thoughts/page": "/thoughts",
   "/(panels)/dashboard/page": "/dashboard",
   "/(panels)/page": "/",
-  "/(panels)/assistant/page": "/assistant"
+  "/(panels)/tasks/page": "/tasks",
+  "/(panels)/assistant/page": "/assistant",
+  "/(panels)/thoughts/page": "/thoughts"
 }

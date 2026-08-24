@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor } from "@/lib/theme.js";
 
@@ -14,8 +15,8 @@ const TASKS_SCOPE = "__tasks__";
 const THOUGHTS_SCOPE = "__thoughts__";
 
 // Tamanho mínimo (em caracteres) pro primeiro pedaço da resposta antes de mandar pro TTS.
-// Só a voz do Gemini é usada (sem voz alternativa) — poucas chamadas maiores erram menos
-// que muitas chamadas pequenas (uma por frase esgotava o limite de requisições da API).
+// Poucas chamadas maiores erram menos que muitas chamadas pequenas (uma por frase esgotava
+// o limite de requisições da API do Gemini).
 const TTS_HEAD_CHARS = 150;
 
 /** Corta um buffer de texto nas últimas frases completas (terminadas em . ! ? ou quebra de linha). */
@@ -49,11 +50,15 @@ export default function AssistantPage() {
   const currentAudioResolveRef = useRef(null);
 
   // fila de TTS em 2 pedaços (cabeça + resto): a cabeça sai assim que atinge um tamanho
-  // mínimo, o resto sai quando a resposta termina — só 1-2 chamadas por resposta, tocadas
-  // em ordem, sempre na voz do Gemini (sem alternar pra outra voz).
+  // mínimo, o resto sai quando a resposta termina — só 1-2 chamadas por resposta, tocadas em ordem.
   const speechBufferRef = useRef("");
   const speechQueueRef = useRef(Promise.resolve());
   const speechGenRef = useRef(0); // pergunta nova invalida pedaços pendentes de uma pergunta antiga
+  // voz "travada" pra resposta atual: null = ainda não decidiu, "gemini" ou "browser".
+  // A cabeça decide; se cair pro navegador, o resto desta MESMA resposta continua no
+  // navegador (nunca alterna de novo dentro da mesma resposta) — só 2 pedaços agora,
+  // então isso não tem mais o problema de corrida que tinha por frase.
+  const speechEngineRef = useRef(null);
 
   const canvasRef = useRef(null);
   const modeRef = useRef(mode);
@@ -73,9 +78,13 @@ export default function AssistantPage() {
     return () => { alive = false; };
   }, []);
 
-  // verifica suporte a microfone (STT do navegador). TTS é só o Gemini — nada pra pré-carregar aqui.
+  // pré-carrega vozes do TTS de reserva (navegador) e verifica suporte a microfone
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) setVoiceSupported(false);
   }, []);
@@ -169,9 +178,10 @@ export default function AssistantPage() {
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, []);
 
-  // ---- TTS em 2 pedaços: só a voz do Gemini — se falhar, pula o trecho em vez de trocar de voz ----
+  // ---- TTS em 2 pedaços: voz do Gemini, com voz do navegador como reserva (nunca alterna no meio) ----
 
   const stopSpeaking = useCallback(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     if (currentAudioResolveRef.current) {
       const resolve = currentAudioResolveRef.current;
@@ -187,7 +197,12 @@ export default function AssistantPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ text }),
       });
-      if (!res.ok) throw new Error(`speak HTTP ${res.status}`);
+      if (!res.ok) {
+        // extrai a mensagem real do corpo (ex.: "UNAVAILABLE: ...") em vez de só o status —
+        // ajuda a diagnosticar POR QUE o Gemini está falhando, não só QUE falhou.
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || `speak HTTP ${res.status}`);
+      }
       const blob = await res.blob();
       return { url: URL.createObjectURL(blob) };
     } catch (err) {
@@ -195,25 +210,45 @@ export default function AssistantPage() {
     }
   }, []);
 
-  const playChunk = useCallback((synthesisPromise, gen) => {
+  const playChunk = useCallback((synthesisPromise, text, gen) => {
     return synthesisPromise.then((result) => {
       if (gen !== speechGenRef.current) {
         if (result?.url) URL.revokeObjectURL(result.url);
         return;
       }
-      if (!result?.url) {
-        // sem voz alternativa — o texto já está na tela, só pula o áudio deste trecho.
-        addLog("[TTS]", OR, "Gemini indisponível — pulando este trecho (texto continua na tela)");
-        return;
-      }
       return new Promise((resolve) => {
         currentAudioResolveRef.current = resolve;
         const finish = () => { currentAudioResolveRef.current = null; resolve(); };
-        const audio = new Audio(result.url);
-        audioRef.current = audio;
-        audio.onended = () => { URL.revokeObjectURL(result.url); audioRef.current = null; addLog("[TTS]", GR, "voz Gemini"); finish(); };
-        audio.onerror = () => { URL.revokeObjectURL(result.url); audioRef.current = null; finish(); };
-        audio.play().catch(finish);
+
+        if (result?.url) {
+          speechEngineRef.current = "gemini";
+          const audio = new Audio(result.url);
+          audioRef.current = audio;
+          audio.onended = () => { URL.revokeObjectURL(result.url); audioRef.current = null; addLog("[TTS]", GR, "voz Gemini"); finish(); };
+          audio.onerror = () => { URL.revokeObjectURL(result.url); audioRef.current = null; finish(); };
+          audio.play().catch(finish);
+        } else {
+          // sem áudio do Gemini pra este pedaço — cai pra voz do navegador. Se isso já
+          // aconteceu na cabeça desta resposta, o resto nem tenta o Gemini de novo (evita
+          // alternar de voz no meio da fala; ver enqueueSpeech).
+          if (!result?.skipped) {
+            const reason = String(result?.error?.message || "").slice(0, 90);
+            addLog("[TTS]", OR, `Gemini indisponível${reason ? ` (${reason})` : ""} → voz do navegador`);
+          }
+          speechEngineRef.current = "browser";
+          if (typeof window === "undefined" || !window.speechSynthesis) return finish();
+          const clean = cleanForSpeech(text);
+          if (!clean) return finish();
+          const u = new SpeechSynthesisUtterance(clean);
+          u.lang = "pt-BR";
+          u.rate = 1.05;
+          const voices = window.speechSynthesis.getVoices();
+          const ptVoice = voices.find((v) => /pt-BR/i.test(v.lang)) || voices.find((v) => /pt/i.test(v.lang));
+          if (ptVoice) u.voice = ptVoice;
+          u.onend = finish;
+          u.onerror = finish;
+          window.speechSynthesis.speak(u);
+        }
       });
     });
   }, [addLog]);
@@ -221,12 +256,15 @@ export default function AssistantPage() {
   const enqueueSpeech = useCallback((text, gen) => {
     const clean = (text || "").trim();
     if (!clean) return;
+    // se a cabeça desta resposta já caiu pro navegador, nem tenta o Gemini de novo no
+    // resto — evita alternar de voz no meio da fala.
+    const tryGemini = speechEngineRef.current !== "browser";
     // síntese começa JÁ (não espera a vez de tocar) — roda em paralelo com o pedaço
     // anterior tocando, fechando o gap entre a cabeça e o resto da resposta.
-    const synthesisPromise = synthesizeChunk(clean);
+    const synthesisPromise = tryGemini ? synthesizeChunk(clean) : Promise.resolve({ url: null, skipped: true });
     speechQueueRef.current = speechQueueRef.current.then(() => {
       if (gen !== speechGenRef.current) return;
-      return playChunk(synthesisPromise, gen);
+      return playChunk(synthesisPromise, clean, gen);
     });
   }, [synthesizeChunk, playChunk]);
 
@@ -251,6 +289,7 @@ export default function AssistantPage() {
     stopSpeaking(); // corta qualquer fala de uma resposta anterior
     const gen = ++speechGenRef.current;
     speechBufferRef.current = "";
+    speechEngineRef.current = null; // nova resposta → nova chance pro Gemini decidir a voz
     const voiceEnabled = voiceOn;
     let headSent = false; // cabeça (1º pedaço) já foi mandada pro TTS nesta resposta?
 

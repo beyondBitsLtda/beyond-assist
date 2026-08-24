@@ -1,18 +1,18 @@
 {
   "version": 1,
   "functions": {
+    "/api/ask": {},
     "/api/boards-overview": {},
     "/api/health": {},
-    "/api/ask": {},
     "/api/kanban": {},
-    "/api/tasks-summary": {},
     "/api/speak": {
       "maxDuration": 60
     },
     "/api/thoughts": {},
+    "/api/tasks-summary": {},
+    "/api/tasks": {},
     "/api/ingest": {
       "maxDuration": 60
-    },
-    "/api/tasks": {}
+    }
   }
 }
