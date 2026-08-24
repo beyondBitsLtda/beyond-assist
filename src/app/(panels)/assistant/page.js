@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { useLog } from "@/components/shell/LogProvider.js";
-import { CY, OR, GR, PU, mono, meterFor } from "@/lib/theme.js";
+import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 
 const MODE_META = {
   idle: { label: "IDLE", sub: "awaiting command", color: CY },
@@ -38,6 +38,8 @@ export default function AssistantPage() {
   const [listening, setListening] = useState(false);   // mic ativo (STT)
   const [voiceOn, setVoiceOn] = useState(true);         // ler respostas em voz alta (TTS)
   const [voiceSupported, setVoiceSupported] = useState(true);
+  const [geminiVoiceEnabled, setGeminiVoiceEnabled] = useState(true); // tentar a voz do Gemini? (desligado = só navegador)
+  const [geminiVoiceStatus, setGeminiVoiceStatus] = useState(null);   // null=não testada ainda · true=ok · false=falhou (última tentativa real)
 
   // escopo do assistente: "painel" (board/tarefas/pensamentos específico) ou "geral" (tudo + web)
   const [scopeMode, setScopeMode] = useState("panel");
@@ -222,6 +224,7 @@ export default function AssistantPage() {
 
         if (result?.url) {
           speechEngineRef.current = "gemini";
+          setGeminiVoiceStatus(true);
           const audio = new Audio(result.url);
           audioRef.current = audio;
           audio.onended = () => { URL.revokeObjectURL(result.url); audioRef.current = null; addLog("[TTS]", GR, "voz Gemini"); finish(); };
@@ -234,6 +237,7 @@ export default function AssistantPage() {
           if (!result?.skipped) {
             const reason = String(result?.error?.message || "").slice(0, 90);
             addLog("[TTS]", OR, `Gemini indisponível${reason ? ` (${reason})` : ""} → voz do navegador`);
+            setGeminiVoiceStatus(false); // só marca "falhou" numa tentativa real — não quando foi pulada de propósito
           }
           speechEngineRef.current = "browser";
           if (typeof window === "undefined" || !window.speechSynthesis) return finish();
@@ -256,9 +260,9 @@ export default function AssistantPage() {
   const enqueueSpeech = useCallback((text, gen) => {
     const clean = (text || "").trim();
     if (!clean) return;
-    // se a cabeça desta resposta já caiu pro navegador, nem tenta o Gemini de novo no
-    // resto — evita alternar de voz no meio da fala.
-    const tryGemini = speechEngineRef.current !== "browser";
+    // tenta o Gemini só se o usuário deixou ligado E a cabeça desta resposta ainda não
+    // caiu pro navegador (senão o resto nem tenta de novo — evita alternar no meio da fala).
+    const tryGemini = geminiVoiceEnabled && speechEngineRef.current !== "browser";
     // síntese começa JÁ (não espera a vez de tocar) — roda em paralelo com o pedaço
     // anterior tocando, fechando o gap entre a cabeça e o resto da resposta.
     const synthesisPromise = tryGemini ? synthesizeChunk(clean) : Promise.resolve({ url: null, skipped: true });
@@ -266,7 +270,7 @@ export default function AssistantPage() {
       if (gen !== speechGenRef.current) return;
       return playChunk(synthesisPromise, clean, gen);
     });
-  }, [synthesizeChunk, playChunk]);
+  }, [synthesizeChunk, playChunk, geminiVoiceEnabled]);
 
   // ---- escopo do assistente ----
   const computeScope = useCallback(() => {
@@ -592,6 +596,37 @@ export default function AssistantPage() {
               ? <><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></>
               : <><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></>}
           </svg>
+        </button>
+
+        {/* liga/desliga a voz do Gemini especificamente + mostra se ela tá disponível */}
+        <button
+          onClick={() => setGeminiVoiceEnabled((v) => !v)}
+          title={
+            !geminiVoiceEnabled
+              ? "Voz Gemini desativada — usando só a voz do navegador (clique pra reativar)"
+              : geminiVoiceStatus === false
+              ? "Voz Gemini ativada, mas a última tentativa falhou (clique pra desativar e usar só a voz do navegador)"
+              : geminiVoiceStatus === true
+              ? "Voz Gemini ativada e funcionando (clique pra desativar)"
+              : "Voz Gemini ativada, ainda sem tentativa nesta sessão (clique pra desativar)"
+          }
+          style={{
+            display: "flex", alignItems: "center", gap: 7,
+            padding: "0 13px", height: 40, borderRadius: 20,
+            border: `1px solid ${geminiVoiceEnabled ? CY : "rgba(207,239,251,0.25)"}`,
+            background: geminiVoiceEnabled ? "rgba(56,225,255,0.04)" : "transparent",
+            color: geminiVoiceEnabled ? "#eafcff" : "rgba(207,239,251,0.45)",
+            cursor: "pointer", transition: "all .2s", ...mono, fontSize: 9.5, letterSpacing: 1.5,
+          }}
+        >
+          <span
+            style={{
+              width: 7, height: 7, borderRadius: "50%",
+              background: dotColor(geminiVoiceEnabled ? geminiVoiceStatus : null),
+              boxShadow: geminiVoiceEnabled && geminiVoiceStatus != null ? `0 0 8px ${dotColor(geminiVoiceStatus)}` : "none",
+            }}
+          />
+          VOZ GEMINI{!geminiVoiceEnabled ? " · OFF" : geminiVoiceStatus === true ? " · OK" : geminiVoiceStatus === false ? " · FALHOU" : ""}
         </button>
       </footer>
     </div>
