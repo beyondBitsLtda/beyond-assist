@@ -9,6 +9,29 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
+ * Gera a resposta com `tools` (grounding via Google Search); se a chamada falhar, tenta
+ * de novo SEM a ferramenta antes de desistir. Muitas contas/planos do Gemini não têm
+ * grounding com Google Search liberado, e a API costuma devolver isso como um erro que
+ * parece cota estourada — sem essa queda, o modo "Geral" nunca funcionaria nessas contas,
+ * mesmo a busca normal (sem web) estando totalmente disponível.
+ */
+async function* chatStreamWithFallback(prompt, systemInstruction, tools) {
+  const primary = chatStream(prompt, systemInstruction, { tools });
+  let yieldedAny = false;
+  try {
+    for await (const piece of primary) {
+      yieldedAny = true;
+      yield piece;
+    }
+  } catch (err) {
+    // só cai pro modo sem ferramenta se AINDA NÃO saiu nenhum token — uma falha depois que
+    // a resposta já começou a chegar não pode ser "reiniciada" sem duplicar/misturar texto.
+    if (!tools || yieldedAny) throw err;
+    for await (const piece of chatStream(prompt, systemInstruction, {})) yield piece;
+  }
+}
+
+/**
  * POST /api/ask
  * body: { question: string, filterSource?: 'trello' | 'brain', scope?: Scope }
  *
@@ -90,7 +113,7 @@ export async function POST(req) {
         send(controller, "context", matches);
 
         const prompt = buildPrompt(question, matches);
-        for await (const piece of chatStream(prompt, systemInstruction, { tools })) {
+        for await (const piece of chatStreamWithFallback(prompt, systemInstruction, tools)) {
           send(controller, "token", piece);
         }
 
