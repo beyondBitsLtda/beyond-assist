@@ -104,7 +104,17 @@ export function summarizeTickets(tickets) {
 
 /** Extrai palavras significativas de uma pergunta pra buscar no título/descrição do chamado. */
 function tokenize(query) {
-  const stop = new Set(["a", "o", "as", "os", "de", "da", "do", "das", "dos", "que", "e", "é", "um", "uma", "pra", "para", "com", "sobre", "chamado", "chamados", "ticket", "tickets", "leia", "ler", "lê", "me", "mostra", "mostre", "qual", "quais", "tem", "tenho", "sentinela"]);
+  // inclui verbos/palavras de endereçamento conversacional e termos genéricos do domínio
+  // (ex.: "suporte" — todo chamado É de suporte, não filtra nada de verdade) — sem isso,
+  // uma pergunta solta tipo "me fala sobre os chamados de suporte" vira busca por "suporte"
+  // e estreita pra um punhado de chamados por acidente.
+  const stop = new Set([
+    "a", "o", "as", "os", "de", "da", "do", "das", "dos", "que", "e", "é", "um", "uma", "pra", "para", "com",
+    "sobre", "chamado", "chamados", "ticket", "tickets", "leia", "ler", "lê", "me", "mostra", "mostre",
+    "qual", "quais", "tem", "tenho", "sentinela", "fala", "fale", "falar", "diz", "diga", "conta", "conte",
+    "informa", "informe", "suporte", "sistema", "status", "como", "estao", "estão", "esta", "está",
+    "vc", "você", "beyond",
+  ]);
   return (query || "")
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
@@ -138,24 +148,47 @@ export async function retrieveSentinelTickets(question, { projectId } = {}) {
     filtered = filtered.filter((t) => t.response_breached || t.resolution_breached);
   }
 
-  // termo livre no título/descrição — só se ainda sobrar muita coisa pra decidir
+  // termo livre no título/descrição — só se ainda sobrar muita coisa pra decidir, e só se o
+  // resultado não ficar minúsculo (< 5): um match muito estreito é mais provável ser
+  // coincidência de palavra genérica do que a intenção real de restringir a busca.
   const terms = tokenize(question);
   if (terms.length && filtered.length > 15) {
     const textMatch = filtered.filter((t) =>
       terms.some((term) => (t.title || "").toLowerCase().includes(term) || (t.description || "").toLowerCase().includes(term))
     );
-    if (textMatch.length) filtered = textMatch;
+    if (textMatch.length >= 5) filtered = textMatch;
   }
 
-  // nenhum filtro bateu → prioriza os com SLA estourado, corta em 40 pro contexto do Gemini
+  // nenhum filtro bateu → round-robin entre projetos (SLA estourado primeiro dentro de cada
+  // um), pra nenhum projeto sumir do contexto só porque outro tem mais chamados atrasados
   if (filtered.length === tickets.length) {
-    filtered = [...tickets].sort((a, b) => {
-      const bad = (t) => (t.response_breached || t.resolution_breached ? 0 : 1);
-      return bad(a) - bad(b);
-    });
+    filtered = diversifyByProject(tickets);
   }
 
   return filtered.slice(0, 40).map(toMatchFormat);
+}
+
+/** Intercala chamados de cada projeto (1 de cada por vez), priorizando SLA estourado dentro de cada um. */
+function diversifyByProject(tickets) {
+  const byProject = new Map();
+  for (const t of tickets) {
+    const key = t.project_id || "-";
+    if (!byProject.has(key)) byProject.set(key, []);
+    byProject.get(key).push(t);
+  }
+  const breachedFirst = (a, b) => {
+    const bad = (t) => (t.response_breached || t.resolution_breached ? 0 : 1);
+    return bad(a) - bad(b);
+  };
+  const queues = [...byProject.values()].map((list) => [...list].sort(breachedFirst));
+
+  const result = [];
+  for (let i = 0; queues.some((q) => i < q.length); i++) {
+    for (const q of queues) {
+      if (i < q.length) result.push(q[i]);
+    }
+  }
+  return result;
 }
 
 /** Converte um chamado pro mesmo formato de card usado pelo RAG (source/title/content/sim/modified…). */
