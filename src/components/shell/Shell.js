@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { LogProvider } from "./LogProvider.js";
 import Sidebar from "./Sidebar.js";
 import Topbar from "./Topbar.js";
@@ -12,6 +13,16 @@ import Topbar from "./Topbar.js";
  */
 export default function Shell({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // no mobile, abrir o app já direto no Assistente (chat) — o Kanban só faz sentido como
+  // painel específico que você escolhe visitar, não como tela inicial numa tela pequena
+  useEffect(() => {
+    if (pathname !== "/") return;
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(max-width: 768px)").matches) router.replace("/assistant");
+  }, [pathname, router]);
 
   return (
     <LogProvider>

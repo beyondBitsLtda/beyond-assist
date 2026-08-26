@@ -10,8 +10,11 @@ function wantsMany(question) {
   return /\b(todas|todos|liste|listar|lista|quais s[ãa]o|me diga tudo|tudo que|completa|completo)\b/.test(q);
 }
 
-/** Persona do Beyond — instrução de sistema do Gemini. */
-export const SYSTEM_INSTRUCTION = `Você é o "Beyond", assistente pessoal do usuário (estilo J.A.R.V.I.S.).
+/** Persona da Lisa — instrução de sistema do Gemini. */
+export const SYSTEM_INSTRUCTION = `Você é a "Lisa", assistente pessoal do usuário (estilo J.A.R.V.I.S.).
+Esse é o seu nome — aceite ser chamada assim e apresente-se como Lisa sempre que o usuário
+cumprimentar (ex.: "oi", "olá") ou perguntar quem você é. Nunca se refira a si mesma como
+"Beyond" — "Beyond Brain" é só o nome do banco de notas do usuário, não o seu nome.
 Responda em português do Brasil, de forma direta e objetiva.
 
 Baseie-se SOMENTE no contexto fornecido (cards do Trello, notas do Beyond Brain, e chamados
@@ -48,7 +51,10 @@ Priorize itens com prazo mais próximo ou modificados mais recentemente quando r
 Cite o board de origem quando ajudar.`;
 
 /** Persona do modo "Geral" — mesma base, mas autorizada a usar busca do Google quando o contexto indexado não basta. */
-export const SYSTEM_INSTRUCTION_GENERAL = `Você é o "Beyond", assistente pessoal do usuário (estilo J.A.R.V.I.S.), agora em modo GERAL.
+export const SYSTEM_INSTRUCTION_GENERAL = `Você é a "Lisa", assistente pessoal do usuário (estilo J.A.R.V.I.S.), agora em modo GERAL.
+Esse é o seu nome — aceite ser chamada assim e apresente-se como Lisa sempre que o usuário
+cumprimentar ou perguntar quem você é. Nunca se refira a si mesma como "Beyond" — "Beyond Brain"
+é só o nome do banco de notas do usuário, não o seu nome.
 Responda em português do Brasil, de forma direta e objetiva.
 
 Neste modo você enxerga um recorte amplo de TODOS os dados indexados (Trello + notas do Beyond Brain
@@ -130,8 +136,12 @@ export async function retrieveGeneral(question) {
   return retrieve(question, { topK: 40, minSim: 0.25 });
 }
 
-/** Monta o prompt final: bloco de contexto + pergunta + data de hoje. */
-export function buildPrompt(question, matches) {
+/**
+ * Monta o prompt final: bloco de contexto + pergunta + data de hoje.
+ * `note` (opcional) — linha extra de contexto ativo, ex.: qual projeto do Sentinela foi
+ * selecionado manualmente no seletor de escopo (ver src/app/(panels)/assistant/page.js).
+ */
+export function buildPrompt(question, matches, note = null) {
   const hoje = new Intl.DateTimeFormat("pt-BR", {
     weekday: "long", day: "2-digit", month: "long", year: "numeric",
     timeZone: "America/Sao_Paulo",
@@ -146,7 +156,9 @@ export function buildPrompt(question, matches) {
         .join("\n\n---\n\n")
     : "(nenhum contexto relevante encontrado)";
 
-  return `DATA DE HOJE: ${hoje}\n\nCONTEXTO RECUPERADO:\n${context}\n\nPERGUNTA DO USUÁRIO:\n${question}\n\nResponda usando o contexto acima.`;
+  const noteBlock = note ? `\n\nCONTEXTO ATIVO: ${note}` : "";
+
+  return `DATA DE HOJE: ${hoje}${noteBlock}\n\nCONTEXTO RECUPERADO:\n${context}\n\nPERGUNTA DO USUÁRIO:\n${question}\n\nResponda usando o contexto acima.`;
 }
 
 // ---------- roteamento por board/projeto ----------

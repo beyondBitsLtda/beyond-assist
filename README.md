@@ -3,7 +3,7 @@
 App Next.js que responde perguntas sobre seus dados do **Trello** e do **Beyond Brain**,
 com uma interface HUD (estilo J.A.R.V.I.S.) ligada ao streaming real do Gemini.
 
-> Fases 1–3 (cérebro/RAG) + interface (HUD ligado ao `/api/ask`). Voz ("Beyond") é a Fase 4.
+> Fases 1–3 (cérebro/RAG) + interface (HUD ligado ao `/api/ask`). Voz (a assistente se chama "Lisa") é a Fase 4.
 
 ---
 
@@ -65,30 +65,63 @@ os cards da direita são preenchidos pelo RAG real e a resposta aparece em strea
 
 ---
 
+## SYNC — como funciona, e como automatizar de hora em hora
+
+O botão **◈ SYNC** (Topbar, aparece em toda aba) e o **↻ ATUALIZAR** de cada painel puxam dado
+fresco do Trello + Beyond Brain, geram embeddings (Gemini) e gravam em `public.documents`
+(Supabase) — é o **único** jeito de atualizar esse índice; os painéis de Trello (Kanban,
+Boards, Dashboard, Tarefas) só leem o que já está lá, então ficam desatualizados até um SYNC rodar.
+
+Como o plano Hobby da Vercel limita funções a 60s e o Gemini tem cota de embeddings por
+minuto, uma sincronização completa é fatiada em várias chamadas pequenas a `/api/ingest`
+(≤20 chunks por chamada) — é por isso que o SYNC "demora" e mostra progresso nos logs, em vez
+de ser instantâneo.
+
+**Pra rodar isso automaticamente 1x por hora, sem precisar clicar em nada:**
+
+1. Rode `db/schema.sql` (se ainda não rodou) — cria `public.sync_progress`, que guarda o
+   progresso do ciclo automático.
+2. Rode `db/cron.sql` no SQL Editor do Supabase, depois de trocar os dois placeholders
+   (domínio da Vercel + `INGEST_SECRET`) pelos valores reais. Isso agenda, via `pg_cron` +
+   `pg_net` (extensões nativas do Supabase):
+   - a cada hora (minuto 0): reinicia o ciclo (`/api/cron/sync?reset=1`);
+   - a cada minuto: avança uma fatia do ciclo (`/api/cron/sync`) — sem custo quando não há
+     ciclo em andamento.
+
+O progresso mora inteiro no Postgres (`public.sync_progress`, linha única) — a Vercel não
+precisa ficar "acordada" entre os ticks, e reiniciar o deploy não perde o lugar onde parou.
+
+---
+
 ## Estrutura
 
 ```
 beyond-bits/
 ├─ .env                 # SEGREDOS (gitignored)
 ├─ .env.example         # modelo sem segredos (versionado)
-├─ db/schema.sql        # pgvector + documents + match_documents
+├─ db/
+│  ├─ schema.sql        # pgvector + documents + match_documents + sync_progress
+│  └─ cron.sql          # agenda o SYNC automático de hora em hora (pg_cron + pg_net)
 ├─ src/
 │  ├─ lib/
 │  │  ├─ supabase.js    # cliente service_role (SERVER-ONLY)
 │  │  ├─ gemini.js      # embeddings + chat streaming
-│  │  ├─ rag.js         # busca + prompt + persona
-│  │  └─ ingest/{chunk,trello,brain}.js
+│  │  ├─ rag.js         # busca + prompt + persona (Lisa)
+│  │  ├─ sync.js         # loop do botão SYNC manual (navegador)
+│  │  └─ ingest/{chunk,trello,brain,runSlice}.js  # runSlice = 1 fatia, usado pelo manual E pelo cron
 │  └─ app/
 │     ├─ layout.js
 │     ├─ page.js        # HUD (interface) ligado ao /api/ask
 │     ├─ globals.css
 │     └─ api/
-│        ├─ ask/route.js    # SSE: context/token/done
-│        └─ health/route.js # bolinhas de conexão
+│        ├─ ask/route.js         # SSE: context/token/done
+│        ├─ ingest/route.js      # 1 fatia de reindexação (botão SYNC manual)
+│        ├─ cron/sync/route.js   # 1 fatia de reindexação (tick automático — Supabase pg_cron)
+│        └─ health/route.js      # bolinhas de conexão
 └─ scripts/{ingest,ask}.mjs
 ```
 
 ## Próximas fases
 
-- **Fase 4 — Voz:** wake word "Beyond" (Picovoice), STT e TTS; máquina de estados real.
+- **Fase 4 — Voz:** wake word "Lisa" (Picovoice), STT e TTS; máquina de estados real.
 - **Fase 6 — Produção:** webhook do Trello para reindexar em tempo real, auth, hardening.

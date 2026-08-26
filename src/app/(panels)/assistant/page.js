@@ -48,6 +48,12 @@ export default function AssistantPage() {
   const [scopePanel, setScopePanel] = useState("Quarto de Guerra");
   const [panelOptions, setPanelOptions] = useState(["Quarto de Guerra"]);
 
+  // projeto do Sentinela selecionado manualmente (só usado quando o escopo é "Chamados (Sentinela)") —
+  // sem isso o assistente não sabe dizer de qual projeto de teste está falando, a menos que o
+  // nome do projeto apareça literalmente na pergunta.
+  const [sentinelProjectId, setSentinelProjectId] = useState("all");
+  const [sentinelProjects, setSentinelProjects] = useState([]);
+
   const recognitionRef = useRef(null);
   const answerRef = useRef("");
   const audioRef = useRef(null);
@@ -78,6 +84,16 @@ export default function AssistantPage() {
         if (!alive || !d.ok) return;
         setPanelOptions(["Quarto de Guerra", ...(d.boards || []).map((b) => b.board)]);
       })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // lista de projetos do Sentinela pro seletor manual (mesma fonte que a aba Sentinela usa)
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/sentinel/projects")
+      .then((r) => r.json())
+      .then((d) => { if (alive && d.ok) setSentinelProjects(d.projects || []); })
       .catch(() => {});
     return () => { alive = false; };
   }, []);
@@ -279,9 +295,9 @@ export default function AssistantPage() {
     if (scopeMode === "general") return { mode: "general" };
     if (scopePanel === TASKS_SCOPE) return { mode: "panel", range: "auto" };
     if (scopePanel === THOUGHTS_SCOPE) return { mode: "panel", source: "brain" };
-    if (scopePanel === SENTINEL_SCOPE) return { mode: "panel", source: "sentinel" };
+    if (scopePanel === SENTINEL_SCOPE) return { mode: "panel", source: "sentinel", projectId: sentinelProjectId };
     return { mode: "panel", board: scopePanel };
-  }, [scopeMode, scopePanel]);
+  }, [scopeMode, scopePanel, sentinelProjectId]);
 
   // ---- pergunta real ao backend (SSE) ----
   const ask = useCallback(async (q) => {
@@ -422,7 +438,7 @@ export default function AssistantPage() {
       ? answer || "…"
       : mode === "listening"
       ? `"${question}"`
-      : 'Standby. Digite uma pergunta abaixo e pressione Enter. (voz "Beyond" chega na Fase 4)';
+      : 'Standby. Digite uma pergunta abaixo e pressione Enter. Eu sou a Lisa.';
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -457,14 +473,31 @@ export default function AssistantPage() {
             <option value={THOUGHTS_SCOPE}>Pensamentos</option>
             <option value={SENTINEL_SCOPE}>Chamados (Sentinela)</option>
           </select>
-        ) : (
+        ) : null}
+
+        {/* projeto do Sentinela — só aparece com o escopo "Chamados (Sentinela)" selecionado,
+            pra Lisa saber exatamente de qual projeto de teste está falando */}
+        {scopeMode === "panel" && scopePanel === SENTINEL_SCOPE && (
+          <select
+            value={sentinelProjectId}
+            onChange={(e) => setSentinelProjectId(e.target.value)}
+            title="Projeto de teste (Sentinela) — força a resposta a considerar só esse projeto"
+            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: `1px solid ${OR}55`, background: "#08131a", color: "#eafcff" }}
+          >
+            <option value="all">Todos os projetos</option>
+            {sentinelProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        )}
+
+        {scopeMode === "general" && (
           <span style={{ ...mono, fontSize: 9, color: PU }}>vê todos os painéis · pode buscar na web quando precisar</span>
         )}
       </div>
 
-      {/* abas — só aparecem no mobile (ver .bb-assistant-tabs em globals.css), a grid vira pilha e mostra um painel por vez */}
+      {/* abas — só aparecem no mobile (ver .bb-assistant-tabs em globals.css). No mobile o
+          chat abre direto (sem a coluna de contexto — ela some de vez, nem vira aba) */}
       <div className="bb-assistant-tabs" style={{ gap: 4, padding: "8px 26px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
-        {[{ key: "logs", label: "LOGS" }, { key: "visualizer", label: "VISUALIZER" }, { key: "context", label: "CONTEXTO" }].map((t) => (
+        {[{ key: "visualizer", label: "CHAT" }, { key: "logs", label: "LOGS" }].map((t) => (
           <button
             key={t.key}
             onClick={() => setMobileTab(t.key)}
@@ -518,8 +551,8 @@ export default function AssistantPage() {
           </div>
         </section>
 
-        {/* RIGHT: CONTEXT */}
-        <aside className={`bb-assistant-pane${mobileTab === "context" ? " bb-active" : ""}`} style={{ borderLeft: "1px solid rgba(56,225,255,0.12)", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(270deg, rgba(6,18,24,0.35), transparent)" }}>
+        {/* RIGHT: CONTEXT — some de vez no mobile (não é aba, ver .bb-assistant-context em globals.css) */}
+        <aside className="bb-assistant-pane bb-assistant-context" style={{ borderLeft: "1px solid rgba(56,225,255,0.12)", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(270deg, rgba(6,18,24,0.35), transparent)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
             <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ RETRIEVED_CONTEXT</div>
             <div style={{ ...mono, fontSize: 9, color: "rgba(56,225,255,0.5)" }}>pgvector · {cards.length} matches</div>
@@ -558,11 +591,11 @@ export default function AssistantPage() {
       </main>
 
       {/* BOTTOM COMMAND BAR */}
-      <footer style={{ position: "relative", display: "flex", alignItems: "center", gap: 18, padding: "14px 26px", borderTop: "1px solid rgba(56,225,255,0.16)", background: "linear-gradient(0deg, rgba(6,20,26,0.6), transparent)" }}>
-        <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(56,225,255,0.5)" }}>STATE</div>
+      <footer className="bb-footer" style={{ position: "relative", display: "flex", alignItems: "center", gap: 18, padding: "14px 26px", borderTop: "1px solid rgba(56,225,255,0.16)", background: "linear-gradient(0deg, rgba(6,20,26,0.6), transparent)" }}>
+        <div className="bb-footer-hide" style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(56,225,255,0.5)" }}>STATE</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 5, border: `1px solid ${meta.color}`, color: meta.color }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: meta.color, boxShadow: `0 0 8px ${meta.color}` }} />
-          <span style={{ fontWeight: 600, letterSpacing: 1.5, fontSize: 13 }}>{meta.label}</span>
+          <span className="bb-footer-hide" style={{ fontWeight: 600, letterSpacing: 1.5, fontSize: 13 }}>{meta.label}</span>
         </div>
         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid rgba(56,225,255,0.18)", borderRadius: 5, background: "rgba(56,225,255,0.03)", ...mono }}>
           <span style={{ color: CY, fontSize: 13 }}>&gt;_</span>
@@ -650,7 +683,9 @@ export default function AssistantPage() {
               boxShadow: geminiVoiceEnabled && geminiVoiceStatus != null ? `0 0 8px ${dotColor(geminiVoiceStatus)}` : "none",
             }}
           />
-          VOZ GEMINI{!geminiVoiceEnabled ? " · OFF" : geminiVoiceStatus === true ? " · OK" : geminiVoiceStatus === false ? " · FALHOU" : ""}
+          <span className="bb-footer-hide">
+            VOZ GEMINI{!geminiVoiceEnabled ? " · OFF" : geminiVoiceStatus === true ? " · OK" : geminiVoiceStatus === false ? " · FALHOU" : ""}
+          </span>
         </button>
       </footer>
     </div>

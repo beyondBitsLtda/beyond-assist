@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLog } from "./LogProvider.js";
 import { CY, OR, GR, PU, mono, dotColor } from "@/lib/theme.js";
+import { runFullSync } from "@/lib/sync.js";
 
 const pad = (n) => String(n).padStart(2, "0");
 const fmtClock = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -117,43 +118,14 @@ export default function Topbar({ onToggleSidebar }) {
   const reindex = useCallback(async () => {
     if (ingesting) return;
     setIngesting(true);
-
-    const secret = typeof window !== "undefined" ? (localStorage.getItem("ingestSecret") || "") : "";
-    const headers = secret ? { "x-ingest-secret": secret } : {};
-    const boardCount = 4;
-    const sources = [
-      ...Array.from({ length: boardCount }, (_, i) => ({ label: `board ${i + 1}/${boardCount}`, source: "trello", extra: `&boardIndex=${i}` })),
-      { label: "brain (notas)", source: "brain", extra: "" },
-    ];
-
-    let grandTotal = 0;
-    for (const src of sources) {
-      let offset = 0;
-      let pageNum = 1;
-      while (true) {
-        addLog("[INGEST]", OR, `→ ${src.label} · fatia ${pageNum} (offset ${offset})…`);
-        try {
-          const res = await fetch(`/api/ingest?source=${src.source}${src.extra}&offset=${offset}`, {
-            method: "POST",
-            headers,
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            addLog("[INGEST]", OR, `✗ ${src.label}: ${data.errors?.[0]?.slice(0, 80) || res.status}`);
-            break;
-          }
-          grandTotal += data.chunks_processed || 0;
-          addLog("[INGEST]", GR, `✓ ${src.label} f${pageNum}: ${data.chunks_processed}/${data.chunks_total} chunks`);
-          if (data.done) break;
-          offset = data.next_offset;
-          pageNum++;
-        } catch (err) {
-          addLog("[INGEST]", OR, `✗ ${src.label}: ${err.message}`);
-          break;
-        }
-      }
-    }
-    addLog("[INGEST]", CY, `finalizado · ${grandTotal} chunks indexados`);
+    await runFullSync({
+      onProgress: (ev) => {
+        if (ev.type === "start") addLog("[INGEST]", OR, `→ ${ev.label} · fatia ${ev.pageNum} (offset ${ev.offset})…`);
+        else if (ev.type === "chunk") addLog("[INGEST]", GR, `✓ ${ev.label} f${ev.pageNum}: ${ev.processed}/${ev.total} chunks`);
+        else if (ev.type === "error") addLog("[INGEST]", OR, `✗ ${ev.label}: ${ev.message}`);
+        else if (ev.type === "finished") addLog("[INGEST]", CY, `finalizado · ${ev.grandTotal} chunks indexados`);
+      },
+    });
     setIngesting(false);
   }, [ingesting, addLog]);
 

@@ -51,6 +51,11 @@ input::placeholder { color: rgba(207,239,251,0.4); }
   .bb-assistant-grid { display: flex; flex-direction: column; }
   .bb-assistant-pane { display: none; }
   .bb-assistant-pane.bb-active { display: flex; }
+  .bb-assistant-context { display: none !important; } /* some de vez no mobile, nunca vira aba */
+
+  /* rodapé do chat: tira texto redundante (rótulos), fica só ícone+cor, pra não espremer/sobrepor */
+  .bb-footer { gap: 8px !important; padding-left: 14px !important; padding-right: 14px !important; }
+  .bb-footer-hide { display: none !important; }
 
   .bb-kanban-col { width: min(85vw, 280px); }
 

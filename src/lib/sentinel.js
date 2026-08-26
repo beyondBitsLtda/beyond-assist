@@ -113,7 +113,7 @@ function tokenize(query) {
     "sobre", "chamado", "chamados", "ticket", "tickets", "leia", "ler", "lê", "me", "mostra", "mostre",
     "qual", "quais", "tem", "tenho", "sentinela", "fala", "fale", "falar", "diz", "diga", "conta", "conte",
     "informa", "informe", "suporte", "sistema", "status", "como", "estao", "estão", "esta", "está",
-    "vc", "você", "beyond",
+    "vc", "você", "beyond", "lisa",
   ]);
   return (query || "")
     .toLowerCase()

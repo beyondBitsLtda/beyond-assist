@@ -6,7 +6,9 @@
       "Read(//tmp/**)",
       "Bash(curl -s -N -X POST http://localhost:3000/api/ask -H \"content-type: application/json\" -d '{\"question\":\"me fala sobre os chamados de suporte\",\"scope\":{\"mode\":\"panel\",\"source\":\"sentinel\"}}')",
       "Bash(taskkill //F //IM node.exe)",
-      "Bash(git commit -m 'Corrige assistente '\\\\''só vendo um projeto'\\\\'' no Sentinela *)"
+      "Bash(git commit -m 'Corrige assistente '\\\\''só vendo um projeto'\\\\'' no Sentinela *)",
+      "Bash(curl -s https://beyond-assist-blue.vercel.app/)",
+      "Bash(curl -sI https://beyond-assist-blue.vercel.app/)"
     ]
   }
 }

@@ -108,3 +108,29 @@ create table if not exists public.sentinel_ticket_snapshot (
 alter table public.sentinel_ticket_snapshot enable row level security;
 -- (as 3 tabelas acima só são acessadas pela service_role, nas rotas /api/notifications
 -- e /api/cron/notify — mesmo padrão de "nega tudo pro anon" da tabela documents)
+
+-- ============================================================
+--  SYNC automático (a cada hora) — rode esta seção UMA vez a mais (aditivo).
+--  Guarda o progresso do ciclo de reindexação disparado pelo pg_cron do Supabase
+--  (ver db/cron.sql), já que uma sincronização completa não cabe numa única chamada
+--  de função da Vercel (limite de 60s no plano Hobby) — o progresso avança 1 fatia por
+--  minuto, e esta linha única (id=1) é onde cada tick sabe em que passo retomar.
+-- ============================================================
+
+-- 9) Progresso do ciclo de SYNC (linha única, id sempre 1)
+create table if not exists public.sync_progress (
+  id           int primary key default 1,
+  status       text not null default 'idle',  -- 'idle' | 'running'
+  step_index   int not null default 0,        -- índice do passo atual (boards do Trello + brain)
+  offset_val   int not null default 0,        -- offset de chunks dentro do passo atual
+  grand_total  int not null default 0,        -- total de chunks processados neste ciclo
+  started_at   timestamptz,
+  last_error   text,
+  updated_at   timestamptz not null default now(),
+  constraint sync_progress_singleton check (id = 1)
+);
+
+insert into public.sync_progress (id) values (1) on conflict (id) do nothing;
+
+alter table public.sync_progress enable row level security;
+-- (só acessada pela service_role, em /api/cron/sync — mesmo padrão das tabelas acima)

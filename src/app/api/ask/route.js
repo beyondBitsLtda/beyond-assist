@@ -3,7 +3,7 @@ import {
   retrieveGeneral, buildPrompt, SYSTEM_INSTRUCTION, SYSTEM_INSTRUCTION_GENERAL,
 } from "@/lib/rag.js";
 import { searchThoughts, listThoughts, toMatchFormat } from "@/lib/notes.js";
-import { retrieveSentinelTickets } from "@/lib/sentinel.js";
+import { retrieveSentinelTickets, listProjects } from "@/lib/sentinel.js";
 import { chatStream } from "@/lib/gemini.js";
 
 export const runtime = "nodejs";
@@ -71,6 +71,7 @@ export async function POST(req) {
         let matches;
         let systemInstruction = SYSTEM_INSTRUCTION;
         let tools;
+        let promptNote = null; // linha extra de contexto (ex.: projeto do Sentinela selecionado à mão)
 
         if (scope?.mode === "general") {
           // modo "Geral": busca ampla em tudo que está indexado + pode buscar na web.
@@ -85,10 +86,22 @@ export async function POST(req) {
           systemInstruction = SYSTEM_INSTRUCTION_GENERAL;
           tools = [{ googleSearch: {} }];
         } else if (scope?.mode === "panel" && scope.source === "sentinel") {
-          // busca chamados do Sentinela direto (sem SYNC/embeddings) — detecta projeto,
-          // prioridade, status ou SLA estourado citados na pergunta; senão busca por
-          // palavra no título/descrição; sem nada disso, prioriza os com SLA estourado.
-          matches = await retrieveSentinelTickets(question);
+          // busca chamados do Sentinela direto (sem SYNC/embeddings) — se um projeto foi
+          // selecionado manualmente no seletor (scope.projectId), filtra só por ele; senão
+          // detecta projeto/prioridade/status/SLA citados na pergunta, ou busca por palavra.
+          const projectId = scope.projectId && scope.projectId !== "all" ? scope.projectId : null;
+          matches = await retrieveSentinelTickets(question, { projectId });
+          if (projectId) {
+            try {
+              const projects = await listProjects();
+              const proj = projects.find((p) => p.id === projectId);
+              if (proj) {
+                promptNote = `O usuário selecionou manualmente o projeto de teste "${proj.name}" no seletor — ` +
+                  `todos os chamados do contexto abaixo são desse projeto. Deixe claro na resposta que você ` +
+                  `está falando do projeto "${proj.name}" (ex.: se perguntarem "qual projeto é esse?", responda com esse nome).`;
+              }
+            } catch {}
+          }
         } else if (scope?.mode === "panel" && scope.board) {
           matches = await retrieveByBoard(scope.board);
           if (matches.length > 40) matches = matches.slice(0, 40);
@@ -126,7 +139,7 @@ export async function POST(req) {
 
         send(controller, "context", matches);
 
-        const prompt = buildPrompt(question, matches);
+        const prompt = buildPrompt(question, matches, promptNote);
         for await (const piece of chatStreamWithFallback(prompt, systemInstruction, tools)) {
           send(controller, "token", piece);
         }
