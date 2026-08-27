@@ -152,6 +152,13 @@ export default function AssistantPage() {
       const m = modeRef.current;
       const now = performance.now() / 1000;
 
+      // Canvas não entende var(--accent-rgb)/var(--accent-hex) (isso só funciona em CSS/DOM) —
+      // por isso lê o valor JÁ resolvido da variável a cada frame, pra acompanhar o tema
+      // escolhido no seletor sem travar numa cor fixa.
+      const rootStyle = getComputedStyle(document.documentElement);
+      const accentRgb = rootStyle.getPropertyValue("--accent-rgb").trim() || "56, 225, 255";
+      const accentHex = rootStyle.getPropertyValue("--accent-hex").trim() || "#38e1ff";
+
       let amp, speed, coreGlow;
       if (m === "idle") { amp = 0.1; speed = 0.6; coreGlow = 0.5 + 0.2 * Math.sin(now * 1.6); }
       else if (m === "listening") { amp = 0.42; speed = 2.2; coreGlow = 0.75 + 0.2 * Math.sin(now * 6); }
@@ -170,21 +177,21 @@ export default function AssistantPage() {
         const x1 = cx + Math.cos(ang) * base, y1 = cy + Math.sin(ang) * base;
         const x2 = cx + Math.cos(ang) * (base + len), y2 = cy + Math.sin(ang) * (base + len);
         const g = ctx.createLinearGradient(x1, y1, x2, y2);
-        g.addColorStop(0, "rgba(var(--accent-rgb),0.85)");
-        g.addColorStop(1, mag > 0.7 ? "rgba(255,157,61,0.95)" : "rgba(var(--accent-rgb),0.15)");
+        g.addColorStop(0, `rgba(${accentRgb},0.85)`);
+        g.addColorStop(1, mag > 0.7 ? "rgba(255,157,61,0.95)" : `rgba(${accentRgb},0.15)`);
         ctx.strokeStyle = g; ctx.lineWidth = 2.2; ctx.lineCap = "round";
         ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
       }
 
       const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, base * 0.95);
-      gr.addColorStop(0, `rgba(var(--accent-rgb),${0.3 * coreGlow})`);
-      gr.addColorStop(0.5, `rgba(var(--accent-rgb),${0.1 * coreGlow})`);
-      gr.addColorStop(1, "rgba(var(--accent-rgb),0)");
+      gr.addColorStop(0, `rgba(${accentRgb},${0.3 * coreGlow})`);
+      gr.addColorStop(0.5, `rgba(${accentRgb},${0.1 * coreGlow})`);
+      gr.addColorStop(1, `rgba(${accentRgb},0)`);
       ctx.fillStyle = gr;
       ctx.beginPath(); ctx.arc(cx, cy, base * 0.95, 0, Math.PI * 2); ctx.fill();
 
-      ctx.strokeStyle = `rgba(var(--accent-rgb),${0.55 + coreGlow * 0.4})`;
-      ctx.lineWidth = 1.6; ctx.shadowBlur = 18; ctx.shadowColor = CY;
+      ctx.strokeStyle = `rgba(${accentRgb},${0.55 + coreGlow * 0.4})`;
+      ctx.lineWidth = 1.6; ctx.shadowBlur = 18; ctx.shadowColor = accentHex;
       ctx.beginPath(); ctx.arc(cx, cy, base * 0.7, 0, Math.PI * 2); ctx.stroke();
       ctx.shadowBlur = 0;
 
@@ -193,13 +200,13 @@ export default function AssistantPage() {
         for (let k = 0; k < rings; k++) {
           const prog = ((now * (m === "speaking" ? 1.1 : 0.7) + k / rings) % 1);
           const rr = base * (0.7 + prog * 1.5);
-          ctx.strokeStyle = `rgba(var(--accent-rgb),${(1 - prog) * 0.35})`;
+          ctx.strokeStyle = `rgba(${accentRgb},${(1 - prog) * 0.35})`;
           ctx.lineWidth = 1.2;
           ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke();
         }
       }
 
-      ctx.strokeStyle = "rgba(var(--accent-rgb),0.25)"; ctx.lineWidth = 1;
+      ctx.strokeStyle = `rgba(${accentRgb},0.25)`; ctx.lineWidth = 1;
       for (let i = 0; i < 60; i++) {
         const a = (i / 60) * Math.PI * 2 + now * 0.05;
         const r0 = base * 1.55, r1 = base * (i % 5 === 0 ? 1.66 : 1.6);

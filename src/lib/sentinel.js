@@ -3,7 +3,7 @@ import { shorten, relTime } from "./rag.js";
 
 // Ordem lógica do fluxo de chamados — confirmada pelo usuário. Não existe coluna de
 // posição em support_tickets (diferente das listas do Trello), então a ordem é fixa aqui.
-export const STATUS_ORDER = ["Aberto", "Aguardando Cliente", "Resolvido", "Fechado"];
+export const STATUS_ORDER = ["Aberto", "Em Análise", "Em Desenvolvimento", "Aguardando Cliente", "Resolvido", "Fechado"];
 const PRIORITIES = ["Crítica", "Alta", "Média", "Baixa"];
 
 const TICKET_FIELDS =
