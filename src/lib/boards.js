@@ -30,11 +30,17 @@ export async function summarizeBoard(boardName) {
   const lowerName = boardName.toLowerCase();
 
   const lists = new Map();
-  let total = 0, open = 0, done = 0;
+  const now = Date.now();
+  let total = 0, open = 0, done = 0, overdue = 0;
   for (const card of all) {
     if ((card.board || "").toLowerCase() !== lowerName) continue;
     total++;
-    if (card.due_complete) done++; else open++;
+    if (card.due_complete) {
+      done++;
+    } else {
+      open++;
+      if (card.due && new Date(card.due).getTime() < now) overdue++;
+    }
 
     const listName = card.list || "(sem lista)";
     if (!lists.has(listName)) {
@@ -50,6 +56,7 @@ export async function summarizeBoard(boardName) {
     total,
     open,
     done,
+    overdue, // subconjunto de `open` — abertos que já venceram
     lists: [...lists.values()].sort(compareByListPos),
   };
 }
