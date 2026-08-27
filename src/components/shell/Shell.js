@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogProvider } from "./LogProvider.js";
 import Sidebar from "./Sidebar.js";
 import Topbar from "./Topbar.js";
+import NotificationToasts from "./NotificationToasts.js";
 import { applyAccentTheme } from "@/lib/accentThemes.js";
 
 /**
@@ -52,6 +53,7 @@ export default function Shell({ children }) {
           <Topbar onToggleSidebar={() => setSidebarOpen((v) => !v)} />
           <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>{children}</div>
         </div>
+        <NotificationToasts />
       </div>
     </LogProvider>
   );

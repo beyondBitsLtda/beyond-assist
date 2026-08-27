@@ -38,6 +38,23 @@ export async function removeSubscription(endpoint) {
   await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
 }
 
+/**
+ * Eventos recentes (mais novos que `since`) — usado pelo aviso DENTRO do app (banner + voz),
+ * como complemento ao push do sistema operacional: a aba aberta consulta isso periodicamente
+ * e não precisa de permissão nenhuma do navegador pra funcionar.
+ */
+export async function listRecentNotifications(since) {
+  let q = supabase
+    .from("notified_events")
+    .select("event_type, entity_id, title, body, url, created_at")
+    .order("created_at", { ascending: true })
+    .limit(20);
+  if (since) q = q.gt("created_at", since);
+  const { data, error } = await q;
+  if (error) throw new Error(`listRecentNotifications: ${error.message}`);
+  return (data || []).filter((r) => r.title); // eventos antigos (de antes dessa coluna existir) não têm título — pula
+}
+
 /** Manda uma notificação pra TODOS os dispositivos inscritos; remove inscrições mortas (404/410). */
 export async function broadcast({ title, body, url = "/", tag }) {
   ensureConfigured();
@@ -74,9 +91,14 @@ async function alreadyNotifiedSet(eventType) {
   return new Set((data || []).map((r) => r.entity_id));
 }
 
-async function markNotified(eventType, entityId) {
-  // upsert: seguro mesmo se dois ciclos rodarem em cima um do outro (unique cuida disso)
-  await supabase.from("notified_events").upsert({ event_type: eventType, entity_id: entityId }, { onConflict: "event_type,entity_id" });
+async function markNotified(ev) {
+  // upsert: seguro mesmo se dois ciclos rodarem em cima um do outro (unique cuida disso).
+  // Guarda título/corpo/url também — é o que /api/notifications/recent lê pro aviso dentro
+  // do app (banner + voz), não só pro push do sistema operacional.
+  await supabase.from("notified_events").upsert(
+    { event_type: ev.type, entity_id: ev.entityId, title: ev.title, body: ev.body, url: ev.url },
+    { onConflict: "event_type,entity_id" }
+  );
 }
 
 // ---------- Sentinela: chamado novo / reaberto / SLA estourado ou perto de estourar ----------
@@ -206,7 +228,7 @@ export async function detectAndNotify() {
 
   let sent = 0;
   for (const ev of events) {
-    await markNotified(ev.type, ev.entityId);
+    await markNotified(ev);
     try {
       const result = await broadcast({ title: ev.title, body: ev.body, url: ev.url, tag: `${ev.type}:${ev.entityId}` });
       sent += result.sent;

@@ -127,6 +127,37 @@ export function summarizeTickets(tickets) {
   return { byStatus, byPriority, sla: { responseBreached, resolutionBreached } };
 }
 
+/**
+ * Tendência diária de chamados abertos × resolvidos, últimos `days` dias — pro gráfico
+ * de linha do dashboard. Usa created_at/resolved_at que já existem em cada chamado, sem
+ * precisar de nenhuma tabela de histórico nova.
+ */
+export function buildDailyTrend(tickets, { days = 21 } = {}) {
+  const fmt = (d) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" }).format(d);
+  const dayKeys = [];
+  const buckets = new Map();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    const key = fmt(d);
+    dayKeys.push(key);
+    buckets.set(key, { opened: 0, resolved: 0 });
+  }
+  const minTime = Date.now() - days * 86400000;
+
+  for (const t of tickets) {
+    if (t.created_at && new Date(t.created_at).getTime() >= minTime) {
+      const key = fmt(new Date(t.created_at));
+      if (buckets.has(key)) buckets.get(key).opened++;
+    }
+    if (t.resolved_at && new Date(t.resolved_at).getTime() >= minTime) {
+      const key = fmt(new Date(t.resolved_at));
+      if (buckets.has(key)) buckets.get(key).resolved++;
+    }
+  }
+
+  return dayKeys.map((key) => ({ x: key, values: buckets.get(key) }));
+}
+
 /** Extrai palavras significativas de uma pergunta pra buscar no título/descrição do chamado. */
 function tokenize(query) {
   // inclui verbos/palavras de endereçamento conversacional e termos genéricos do domínio

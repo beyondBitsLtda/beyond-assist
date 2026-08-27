@@ -134,3 +134,16 @@ insert into public.sync_progress (id) values (1) on conflict (id) do nothing;
 
 alter table public.sync_progress enable row level security;
 -- (só acessada pela service_role, em /api/cron/sync — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  Notificações DENTRO do app (a mais, aditivo) — antes o título/corpo da notificação
+--  era montado só pra mandar o push e descartado; agora fica salvo, pra a aba aberta
+--  também poder mostrar um aviso na tela + falar em voz alta, sem esperar o push do SO
+--  (que exige permissão do navegador e só funciona por fora da aba).
+-- ============================================================
+
+-- 10) Guarda o texto de cada evento — /api/notifications/recent lê daqui
+alter table public.notified_events add column if not exists title text;
+alter table public.notified_events add column if not exists body  text;
+alter table public.notified_events add column if not exists url   text;
+create index if not exists notified_events_created_idx on public.notified_events (created_at);
