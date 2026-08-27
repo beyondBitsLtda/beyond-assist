@@ -1,5 +1,6 @@
 import { embedOne } from "./gemini.js";
 import { supabase } from "./supabase.js";
+import { loadAllTrelloCards } from "./liveTrello.js";
 
 const TOP_K = Number(process.env.RAG_TOP_K || 8);
 const MIN_SIM = Number(process.env.RAG_MIN_SIMILARITY || 0.55);
@@ -180,41 +181,35 @@ export function detectBoard(question) {
 }
 
 /**
- * Busca TODOS os cards de um board via SQL (sem busca semântica).
- * Preciso e completo — traz o board inteiro.
+ * Busca TODOS os cards de um board — direto do Trello (ao vivo, sem SYNC/embeddings).
+ * Preciso e completo — traz o board inteiro, sempre atual.
  */
 export async function retrieveByBoard(boardName, { onlyOpen = false } = {}) {
-  const { data, error } = await supabase
-    .from("documents")
-    .select("external_id, board, title, content, metadata, last_modified")
-    .eq("source", "trello")
-    .ilike("board", boardName); // case-insensitive, nome exato do board
-  if (error) throw new Error(`retrieveByBoard: ${error.message}`);
+  const all = await loadAllTrelloCards();
+  const lowerName = boardName.toLowerCase();
 
   const seen = new Map();
-  for (const row of data || []) {
-    const cardId = String(row.external_id).split("#")[0];
-    if (seen.has(cardId)) continue;
-    const done = row.metadata?.due_complete === true;
-    if (onlyOpen && done) continue;
-    seen.set(cardId, {
-      id: cardId,
+  for (const card of all) {
+    if ((card.board || "").toLowerCase() !== lowerName) continue;
+    if (onlyOpen && card.due_complete) continue;
+    seen.set(card.id, {
+      id: card.id,
       source: "TRELLO",
-      board: row.board || "",
-      title: row.title || "(sem título)",
-      snippet: shorten(row.content, 180),
-      content: row.content,
+      board: card.board,
+      title: card.title,
+      snippet: shorten(card.content, 180),
+      content: card.content,
       sim: "—",
       pct: 100,
-      last_modified: row.last_modified,
-      modified: relTime(row.last_modified),
-      due: row.metadata?.due || null,
-      start: row.metadata?.start || null,
-      list: row.metadata?.list || null,
-      list_pos: row.metadata?.list_pos ?? null,
-      labels: row.metadata?.labels || "",
-      due_complete: done,
-      url: row.metadata?.url || null,
+      last_modified: card.last_modified,
+      modified: relTime(card.last_modified),
+      due: card.due,
+      start: card.start,
+      list: card.list,
+      list_pos: card.list_pos,
+      labels: card.labels,
+      due_complete: card.due_complete,
+      url: card.url,
     });
   }
   // ordena pela ordem real das listas no board (list_pos; sem pos ainda → fallback alfabético) e depois por prazo
@@ -244,8 +239,8 @@ export function detectDateRange(question) {
 }
 
 /**
- * Busca tarefas do Trello filtrando pela data de vencimento (SQL, sem vetores).
- * Retorna no MESMO formato dos matches do RAG, p/ o HUD renderizar igual.
+ * Busca tarefas do Trello filtrando pela data de vencimento — direto do Trello (ao vivo,
+ * sem SYNC/embeddings). Retorna no MESMO formato dos matches do RAG, p/ o HUD renderizar igual.
  */
 export async function retrieveByDate(range) {
   const now = new Date();
@@ -262,34 +257,26 @@ export async function retrieveByDate(range) {
   else if (range === "week") { lo = startToday; hi = endWeek; }
   else if (range === "overdue") { hi = startToday; onlyOpen = true; }
 
-  let q = supabase
-    .from("documents")
-    .select("external_id, board, title, content, metadata, last_modified")
-    .eq("source", "trello")
-    .not("metadata->>due", "is", null);
-  if (lo) q = q.gte("metadata->>due", lo.toISOString());
-  if (hi) q = q.lt("metadata->>due", hi.toISOString());
-
-  const { data, error } = await q;
-  if (error) throw new Error(`retrieveByDate: ${error.message}`);
+  const all = await loadAllTrelloCards();
 
   const seen = new Map();
-  for (const row of data || []) {
-    const cardId = String(row.external_id).split("#")[0];
-    if (seen.has(cardId)) continue;
-    const done = row.metadata?.due_complete === true;
-    if (onlyOpen && done) continue;
-    seen.set(cardId, {
+  for (const card of all) {
+    if (!card.due) continue;
+    if (onlyOpen && card.due_complete) continue;
+    const due = new Date(card.due);
+    if (lo && due < lo) continue;
+    if (hi && due >= hi) continue;
+    seen.set(card.id, {
       source: "TRELLO",
-      board: row.board || "",
-      title: row.title || "(sem título)",
-      snippet: shorten(row.content, 180),
-      content: row.content,
+      board: card.board,
+      title: card.title,
+      snippet: shorten(card.content, 180),
+      content: card.content,
       sim: "—",
       pct: 100,
-      last_modified: row.last_modified,
-      modified: relTime(row.last_modified),
-      due: row.metadata?.due || null,
+      last_modified: card.last_modified,
+      modified: relTime(card.last_modified),
+      due: card.due,
     });
   }
   return [...seen.values()].sort((a, b) => (a.due || "").localeCompare(b.due || ""));

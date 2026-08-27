@@ -14,21 +14,16 @@
 --                                               tarefa atrasada), a cada 5 min — substitui
 --                                               o cron que estava em vercel.json
 --
---  ⚠️ IMPORTANTE — DOMÍNIO: troque TODO OS `<SEU-DOMINIO>` abaixo pelo domínio ESTÁVEL do
---  seu deploy (Vercel → projeto → Settings → Domains — geralmente `<projeto>.vercel.app`
---  ou um domínio próprio, SEM hash aleatório no meio). NÃO use uma URL de deploy específico
---  (com hash tipo `-dtusix9tv-` no meio) — essas ficam atrás de login da Vercel (testei:
---  retornam HTTP 302 pra vercel.com/sso-api) e o Supabase nunca vai conseguir chamar.
+--  Domínio já preenchido: beyond-assist-blue.vercel.app (testado — HTTP 200, sem proteção de
+--  login da Vercel). Se um dia trocar de domínio, é só substituir as 3 ocorrências dele abaixo.
 --
 --  Pré-requisitos (rode primeiro, nesta ordem):
---    1) db/schema.sql inteiro (cria public.sync_progress)
---    2) INGEST_SECRET já configurada no .env E na Vercel (mesmo segredo do botão SYNC manual)
---    3) CRON_SECRET já configurada no .env E na Vercel (mesmo segredo que o /api/cron/notify
---       já usa — se você ainda não tem, defina um valor aleatório nos dois lugares)
+--    1) db/schema.sql inteiro (cria public.sync_progress) — RODE ISSO ANTES, se ainda não rodou
+--    2) INGEST_SECRET e CRON_SECRET já configuradas no .env E na Vercel — já preenchidas
+--       abaixo com os valores atuais do seu .env; se você trocar essas variáveis depois,
+--       lembre de rodar este arquivo de novo com os novos valores
 --
---  Os secrets (INGEST_SECRET/CRON_SECRET) já estão preenchidos abaixo com os valores do seu
---  .env. Falta só trocar `<SEU-DOMINIO>` (3x) pelo domínio real — rode isto no SQL Editor do
---  projeto Supabase do Beyond Brain DEPOIS de trocar.
+--  Rode isto no SQL Editor do projeto Supabase do Beyond Brain.
 --
 --  (Prefere não deixar os secrets em texto puro aqui? Dá pra guardar em Supabase Vault —
 --  Project Settings → Vault — e trocar cada '<...>' abaixo por
@@ -47,7 +42,7 @@ select cron.schedule(
   '0 * * * *',
   $$
   select net.http_get(
-    url := 'https://<SEU-DOMINIO>/api/cron/sync?reset=1',
+    url := 'https://beyond-assist-blue.vercel.app/api/cron/sync?reset=1',
     headers := jsonb_build_object('x-ingest-secret', 'xcnN8BVNdJmatVX6H1JhlUsWTLflE2pQ'),
     timeout_milliseconds := 55000
   );
@@ -61,7 +56,7 @@ select cron.schedule(
   '* * * * *',
   $$
   select net.http_get(
-    url := 'https://<SEU-DOMINIO>/api/cron/sync',
+    url := 'https://beyond-assist-blue.vercel.app/api/cron/sync',
     headers := jsonb_build_object('x-ingest-secret', 'xcnN8BVNdJmatVX6H1JhlUsWTLflE2pQ'),
     timeout_milliseconds := 55000
   );
@@ -76,7 +71,7 @@ select cron.schedule(
   '*/5 * * * *',
   $$
   select net.http_get(
-    url := 'https://<SEU-DOMINIO>/api/cron/notify',
+    url := 'https://beyond-assist-blue.vercel.app/api/cron/notify',
     headers := jsonb_build_object('authorization', 'Bearer 498e55e6cfb7cb8f020b891eb090fc8ddad945c613b1c157'),
     timeout_milliseconds := 55000
   );

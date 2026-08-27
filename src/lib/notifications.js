@@ -1,6 +1,7 @@
 import webpush from "web-push";
 import { supabase } from "./supabase.js";
 import { listTickets } from "./sentinel.js";
+import { loadAllTrelloCards } from "./liveTrello.js";
 
 // limiar de "perto de estourar o SLA" — chamado ainda não estourado mas dentro dessa janela
 const SLA_NEAR_MS = 2 * 60 * 60 * 1000; // 2h
@@ -137,29 +138,12 @@ async function checkSentinelTickets(isFirstRun) {
 }
 
 // ---------- Trello: card novo / tarefa atrasada ----------
-// Lê da tabela `documents` (Beyond Brain) — mesma fonte dos outros painéis do Trello, ou
-// seja, só reflete o que já foi indexado pelo SYNC (mesma limitação que o resto do app já tem).
-
-async function listAllTrelloCards() {
-  const { data, error } = await supabase.from("documents").select("external_id, board, title, metadata").eq("source", "trello");
-  if (error) throw new Error(`listAllTrelloCards: ${error.message}`);
-  const seen = new Map();
-  for (const row of data || []) {
-    const cardId = String(row.external_id).split("#")[0];
-    if (seen.has(cardId)) continue;
-    seen.set(cardId, {
-      id: cardId,
-      title: row.title || "(sem título)",
-      board: row.board || "",
-      due: row.metadata?.due || null,
-      due_complete: row.metadata?.due_complete === true,
-    });
-  }
-  return [...seen.values()];
-}
+// Direto do Trello (ao vivo, sem SYNC/embeddings) — assim um card criado agora é detectado
+// já no próximo tick (5 min), sem esperar o ciclo de SYNC (que só existe pra manter os
+// embeddings do Assistente em dia, não pra isso).
 
 async function checkTrelloCards(isFirstRun) {
-  const cards = await listAllTrelloCards();
+  const cards = await loadAllTrelloCards({ fresh: true });
 
   if (isFirstRun) {
     // 1ª execução: só marca os cards atuais como "já vistos", sem notificar nada

@@ -41,6 +41,13 @@ export default function KanbanBoard({ board }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // atualiza sozinho de tempos em tempos — agora que lê direto do Trello (sem SYNC/embeddings),
+  // é rápido e barato o bastante pra não precisar de clique manual.
+  useEffect(() => {
+    const id = setInterval(load, 60000);
+    return () => clearInterval(id);
+  }, [load]);
+
   const totalCards = columns ? columns.reduce((n, c) => n + c.cards.length, 0) : 0;
 
   return (
@@ -55,7 +62,7 @@ export default function KanbanBoard({ board }) {
         <button
           onClick={load}
           disabled={loading}
-          title="Recarrega esta tela com o que já está indexado (não busca no Trello agora — pra isso, use o SYNC no topo)"
+          title="Busca direto do Trello (ao vivo) — atualiza sozinho a cada 1 min também"
           style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
         >
           {loading ? "…" : "↻ ATUALIZAR"}

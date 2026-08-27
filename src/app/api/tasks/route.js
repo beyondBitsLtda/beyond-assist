@@ -1,5 +1,6 @@
-import { supabase } from "@/lib/supabase.js";
+import { loadAllTrelloCards } from "@/lib/liveTrello.js";
 import { getDateBoundaries } from "@/lib/dateRanges.js";
+import { jsonResponse } from "@/lib/http.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,10 +8,8 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/tasks?range=<today|tomorrow|week|overdue|upcoming>
  *
- * Filtra documents do Trello pela data de vencimento (metadata->>'due'),
- * SEM busca vetorial. Retorna tudo que casa com o intervalo — preciso e completo.
- *
- * A data de vencimento vem de metadata.due (ISO), gravada na ingestão do Trello.
+ * Filtra cards do Trello pela data de vencimento — direto do Trello (ao vivo, sem
+ * SYNC/embeddings). Retorna tudo que casa com o intervalo — preciso e completo.
  */
 export async function GET(req) {
   const url = new URL(req.url);
@@ -26,46 +25,22 @@ export async function GET(req) {
   else if (range === "upcoming") { lo = startOfToday; hi = null; label = "próximas"; }
 
   try {
-    // pega todos os cards de Trello que têm 'due'
-    let q = supabase
-      .from("documents")
-      .select("external_id, board, title, content, metadata, last_modified")
-      .eq("source", "trello")
-      .not("metadata->>due", "is", null);
+    const all = await loadAllTrelloCards();
 
-    if (lo) q = q.gte("metadata->>due", lo.toISOString());
-    if (hi) q = q.lt("metadata->>due", hi.toISOString());
+    const tasks = all
+      .filter((c) => c.due)
+      .filter((c) => {
+        if (onlyOpen && c.due_complete) return false;
+        const due = new Date(c.due);
+        if (lo && due < lo) return false;
+        if (hi && due >= hi) return false;
+        return true;
+      })
+      .map((c) => ({ title: c.title, board: c.board, due: c.due, list: c.list, done: c.due_complete, url: c.url }))
+      .sort((a, b) => (a.due || "").localeCompare(b.due || ""));
 
-    const { data, error } = await q;
-    if (error) throw new Error(error.message);
-
-    // dedup por card (chunks têm external_id "id#0", "id#1"…)
-    const seen = new Map();
-    for (const row of data || []) {
-      const cardId = String(row.external_id).split("#")[0];
-      if (seen.has(cardId)) continue;
-      const done = row.metadata?.due_complete === true;
-      if (onlyOpen && done) continue; // atrasadas: ignora concluídas
-      seen.set(cardId, {
-        title: row.title,
-        board: row.board,
-        due: row.metadata?.due || null,
-        list: row.metadata?.list || null,
-        done,
-        url: row.metadata?.url || null,
-      });
-    }
-
-    const tasks = [...seen.values()].sort((a, b) => (a.due || "").localeCompare(b.due || ""));
-    return json({ ok: true, range: label, count: tasks.length, tasks });
+    return jsonResponse({ ok: true, range: label, count: tasks.length, tasks });
   } catch (err) {
-    return json({ ok: false, error: String(err?.message || err) }, 500);
+    return jsonResponse({ ok: false, error: String(err?.message || err) }, 500);
   }
-}
-
-function json(body, status = 200) {
-  return new Response(JSON.stringify(body, null, 2), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
-  });
 }

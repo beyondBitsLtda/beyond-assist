@@ -65,13 +65,27 @@ os cards da direita são preenchidos pelo RAG real e a resposta aparece em strea
 
 ---
 
+## Duas fontes de dado bem diferentes: tela (ao vivo) × Assistente (embeddings)
+
+O app tem duas operações que dependem do Trello de jeitos diferentes, e é importante não
+confundir uma com a outra:
+
+- **Tela** (Kanban, Boards, Dashboard, Tarefas) e **notificações push** (card novo, tarefa
+  atrasada) — leem o Trello **direto e ao vivo** (`src/lib/liveTrello.js` → `loadTrello()`),
+  sem passar pelo Supabase nem pelo Gemini. Sempre atual, sem depender do SYNC. O
+  **↻ ATUALIZAR** de cada painel só dispara essa leitura ao vivo (rápida, sem custo de API) —
+  e cada um desses painéis também se atualiza sozinho a cada 1 min.
+- **Assistente** (busca semântica livre, tipo "quais tarefas tenho relacionadas a X") —
+  essa sim depende de embeddings gerados pelo Gemini, gravados em `public.documents`
+  (Supabase) pelo **◈ SYNC**. Perguntas por board específico ou por prazo ("tarefas de hoje",
+  "cards do CRM") também já são ao vivo — só a busca semântica livre, sem filtro, é que
+  precisa do índice do SYNC.
+
 ## SYNC — como funciona, e como automatizar de hora em hora
 
-O botão **◈ SYNC** (Topbar, aparece em toda aba) é o **único** jeito de puxar dado fresco de
-verdade: ele lê o Trello + Beyond Brain, gera embeddings (Gemini) e grava em `public.documents`
-(Supabase). O **↻ ATUALIZAR** de cada painel é outra coisa — só recarrega a tela com o que já
-está indexado (rápido, sem custo de API); os painéis de Trello (Kanban, Boards, Dashboard,
-Tarefas) ficam desatualizados até um SYNC rodar, mesmo clicando em "atualizar".
+O botão **◈ SYNC** (Topbar, aparece em toda aba) é o jeito de manter o índice semântico do
+Assistente em dia: ele lê o Trello + Beyond Brain, gera embeddings (Gemini) e grava em
+`public.documents` (Supabase).
 
 Como o plano Hobby da Vercel limita funções a 60s e o Gemini tem cota de embeddings por
 minuto, uma sincronização completa é fatiada em várias chamadas pequenas a `/api/ingest`

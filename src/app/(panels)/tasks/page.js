@@ -41,6 +41,13 @@ export default function TasksPage() {
 
   useEffect(() => { load(range); }, [range, load]);
 
+  // atualiza sozinho de tempos em tempos — agora que lê direto do Trello (sem SYNC/embeddings),
+  // é rápido e barato o bastante pra não precisar de clique manual.
+  useEffect(() => {
+    const id = setInterval(() => load(range), 60000);
+    return () => clearInterval(id);
+  }, [load, range]);
+
   return (
     <div style={{ padding: "24px 28px", height: "100%", overflowY: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
@@ -64,7 +71,7 @@ export default function TasksPage() {
           <button
             onClick={() => load(range)}
             disabled={loading}
-            title="Recarrega esta tela com o que já está indexado (não busca no Trello agora — pra isso, use o SYNC no topo)"
+            title="Busca direto do Trello (ao vivo) — atualiza sozinho a cada 1 min também"
             style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", marginLeft: 6, border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
           >
             {loading ? "…" : "↻ ATUALIZAR"}
