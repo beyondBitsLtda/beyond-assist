@@ -7,6 +7,7 @@ import Sidebar from "./Sidebar.js";
 import Topbar from "./Topbar.js";
 import NotificationToasts from "./NotificationToasts.js";
 import { applyAccentTheme } from "@/lib/accentThemes.js";
+import { useIsMobile } from "@/lib/useIsMobile.js";
 
 /**
  * Casca compartilhada por todos os painéis: fundo com grid/glow + sidebar + topbar + conteúdo.
@@ -17,6 +18,10 @@ export default function Shell({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const isMobile = useIsMobile();
+  // no mobile, o Assistente é uma experiência própria em tela cheia (sem Topbar/Sidebar —
+  // ver src/app/(panels)/assistant/page.js) — as outras abas continuam com a casca normal.
+  const mobileAssistantFullScreen = isMobile && pathname === "/assistant";
 
   // no mobile, abrir o app já direto no Assistente (chat) — o Kanban só faz sentido como
   // painel específico que você escolhe visitar, não como tela inicial numa tela pequena
@@ -36,6 +41,20 @@ export default function Shell({ children }) {
       if (saved) applyAccentTheme(saved);
     } catch {}
   }, []);
+
+  // Assistente no mobile: tela cheia, sem Topbar/Sidebar — a própria página monta os
+  // controles dela (sync, voz, tema, escopo). Ainda dentro do LogProvider (o Assistente usa
+  // addLog) e com os avisos dentro do app funcionando igual.
+  if (mobileAssistantFullScreen) {
+    return (
+      <LogProvider>
+        <div style={{ position: "fixed", inset: 0, background: "#000", fontFamily: "'Rajdhani',sans-serif", color: "#cfeffb", overflow: "hidden" }}>
+          {children}
+          <NotificationToasts />
+        </div>
+      </LogProvider>
+    );
+  }
 
   return (
     <LogProvider>

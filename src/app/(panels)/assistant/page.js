@@ -6,6 +6,9 @@ import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 import { TTS_VOICES } from "@/lib/ttsVoices.js";
 import { pickBrowserVoice } from "@/lib/browserVoice.js";
+import { useIsMobile } from "@/lib/useIsMobile.js";
+import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
+import { runFullSync } from "@/lib/sync.js";
 
 const MODE_META = {
   idle: { label: "IDLE", sub: "awaiting command", color: CY },
@@ -59,6 +62,16 @@ export default function AssistantPage() {
   // nome do projeto apareça literalmente na pergunta.
   const [sentinelProjectId, setSentinelProjectId] = useState("all");
   const [sentinelProjects, setSentinelProjects] = useState([]);
+
+  // ---- mobile: tela própria, só o Assistente (ver Shell.js) ----
+  const isMobile = useIsMobile();
+  const [mobileView, setMobileView] = useState("chat"); // "chat" | "voice"
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
+  const [messages, setMessages] = useState([]); // histórico visível no modo chat (não é o mesmo que historyRef, que só guarda o último turno pra ações)
+  const [accentName, setAccentName] = useState(DEFAULT_ACCENT.name);
+  const [ingesting, setIngesting] = useState(false);
+  const [autoSync, setAutoSync] = useState(null);
+  const messagesEndRef = useRef(null);
 
   const recognitionRef = useRef(null);
   const answerRef = useRef("");
@@ -115,6 +128,42 @@ export default function AssistantPage() {
       .catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  // mobile: sem Topbar (ver Shell.js), então tema/auto-sync precisam de carregamento próprio aqui
+  useEffect(() => {
+    if (!isMobile || typeof window === "undefined") return;
+    try {
+      const saved = JSON.parse(localStorage.getItem("accentTheme") || "null");
+      if (saved?.name) setAccentName(saved.name);
+    } catch {}
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    let alive = true;
+    const check = () => fetch("/api/sync-status").then((r) => r.json()).then((s) => { if (alive) setAutoSync(s); }).catch(() => {});
+    check();
+    const id = setInterval(check, 30000);
+    return () => { alive = false; clearInterval(id); };
+  }, [isMobile]);
+
+  const chooseAccent = useCallback((theme) => {
+    applyAccentTheme(theme);
+    setAccentName(theme.name);
+    if (typeof window !== "undefined") localStorage.setItem("accentTheme", JSON.stringify(theme));
+  }, []);
+
+  const manualSync = useCallback(async () => {
+    if (ingesting) return;
+    setIngesting(true);
+    await runFullSync({
+      onProgress: (ev) => {
+        if (ev.type === "error") addLog("[INGEST]", OR, `✗ ${ev.label}: ${ev.message}`);
+        else if (ev.type === "finished") addLog("[INGEST]", CY, `finalizado · ${ev.grandTotal} chunks indexados`);
+      },
+    });
+    setIngesting(false);
+  }, [ingesting, addLog]);
 
   // pré-carrega vozes do TTS de reserva (navegador) e verifica suporte a microfone
   useEffect(() => {
@@ -332,6 +381,7 @@ export default function AssistantPage() {
     answerRef.current = "";
     setCards([]);
     setMode("listening");
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: q }]);
 
     stopSpeaking(); // corta qualquer fala de uma resposta anterior
     const gen = ++speechGenRef.current;
@@ -412,9 +462,11 @@ export default function AssistantPage() {
         }
       }
       historyRef.current = { question: q, cards: latestCards };
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: answerRef.current }]);
     } catch (err) {
       addLog("[ERR]", OR, err.message);
       setAnswer(`Falha ao consultar o backend: ${err.message}`);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: `Falha ao consultar o backend: ${err.message}` }]);
     } finally {
       setBusy(false);
       setMode("idle");
@@ -468,6 +520,12 @@ export default function AssistantPage() {
     rec.start();
   }, [addLog, ask, stopSpeaking]);
 
+  // modo chat (mobile): rola pro fim sempre que a conversa cresce ou a resposta vai chegando
+  useEffect(() => {
+    if (!isMobile || mobileView !== "chat") return;
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [isMobile, mobileView, messages, answer]);
+
   const meta = MODE_META[mode];
   const transcript =
     mode === "speaking" || answer
@@ -475,6 +533,228 @@ export default function AssistantPage() {
       : mode === "listening"
       ? `"${question}"`
       : 'Standby. Digite uma pergunta abaixo e pressione Enter. Eu sou a Lisa.';
+
+  // ==========================================================================================
+  // MOBILE — tela própria, só o Assistente (sem Topbar/Sidebar, ver Shell.js): escolhe entre
+  // conversa por CHAT (bolhas, como um app de chat de IA) ou por VOZ (tela escura, só a onda
+  // sonora no meio, como o modo de voz do ChatGPT). Reaproveita TODO o estado/lógica de cima
+  // (ask, toggleMic, canvasRef, voz, escopo) — só a apresentação muda.
+  // ==========================================================================================
+  if (isMobile) {
+    const autoSyncOk = autoSync?.ok && autoSync.status !== undefined;
+    const autoSyncColor = !autoSync
+      ? "rgba(207,239,251,0.35)"
+      : !autoSync.ok
+      ? OR
+      : autoSync.last_error
+      ? OR
+      : autoSync.status === "running"
+      ? CY
+      : autoSync.started_at
+      ? GR
+      : "rgba(207,239,251,0.35)";
+
+    return (
+      <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "#000" }}>
+        {/* barra superior mínima */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(var(--accent-rgb),0.12)", flex: "none" }}>
+          <button
+            onClick={() => setMobileSettingsOpen(true)}
+            aria-label="Configurações"
+            style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(var(--accent-rgb),0.05)", color: CY, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+          </button>
+          <div style={{ ...mono, fontSize: 12, letterSpacing: 3, color: CY }}>◈ LISA</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            <button
+              onClick={() => setMobileView("chat")}
+              title="Modo chat"
+              style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${mobileView === "chat" ? CY : "rgba(var(--accent-rgb),0.2)"}`, background: mobileView === "chat" ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: mobileView === "chat" ? "#eafcff" : "rgba(207,239,251,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+            </button>
+            <button
+              onClick={() => setMobileView("voice")}
+              title="Modo voz"
+              style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${mobileView === "voice" ? CY : "rgba(var(--accent-rgb),0.2)"}`, background: mobileView === "voice" ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: mobileView === "voice" ? "#eafcff" : "rgba(207,239,251,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /></svg>
+            </button>
+          </div>
+        </div>
+
+        {mobileView === "voice" ? (
+          // ---- MODO VOZ: tela escura, só a onda sonora, como o modo de voz do ChatGPT ----
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, padding: 20 }}>
+            <div style={{ position: "relative", width: "min(80vw,320px)", height: "min(80vw,320px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ position: "absolute", inset: "-6%", border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: "50%", borderTopColor: "rgba(var(--accent-rgb),0.45)", borderRightColor: "rgba(var(--accent-rgb),0.28)", animation: "bb-sweep 14s linear infinite" }} />
+              <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+              <div style={{ position: "relative", textAlign: "center", pointerEvents: "none" }}>
+                <div style={{ ...mono, fontSize: 10, letterSpacing: 5, color: meta.color }}>{meta.label}</div>
+              </div>
+            </div>
+            <button
+              onClick={toggleMic}
+              disabled={busy}
+              style={{
+                marginTop: 40, width: 76, height: 76, borderRadius: "50%",
+                border: `2px solid ${listening ? OR : CY}`,
+                background: listening ? "rgba(255,157,61,0.15)" : "rgba(var(--accent-rgb),0.08)",
+                color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer",
+                boxShadow: listening ? `0 0 24px ${OR}` : `0 0 20px rgba(var(--accent-rgb),0.4)`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
+              </svg>
+            </button>
+            <div style={{ ...mono, fontSize: 10, color: "rgba(207,239,251,0.4)", marginTop: 14, letterSpacing: 1, textAlign: "center", minHeight: 32, padding: "0 16px" }}>
+              {mode === "listening" ? `"${question}"` : mode === "speaking" ? "falando…" : "toque no microfone pra falar"}
+            </div>
+          </div>
+        ) : (
+          // ---- MODO CHAT: bolhas de conversa, tipo Gemini/ChatGPT ----
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
+              {messages.length === 0 && !busy && (
+                <div style={{ ...mono, fontSize: 11, color: "rgba(207,239,251,0.4)", textAlign: "center", marginTop: 40 }}>
+                  Oi! Eu sou a Lisa. Pergunte alguma coisa ou toque no microfone.
+                </div>
+              )}
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  style={{
+                    alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+                    maxWidth: "82%", padding: "10px 14px", borderRadius: m.role === "user" ? "14px 14px 3px 14px" : "14px 14px 14px 3px",
+                    background: m.role === "user" ? "rgba(var(--accent-rgb),0.16)" : "rgba(255,255,255,0.06)",
+                    border: `1px solid ${m.role === "user" ? "rgba(var(--accent-rgb),0.3)" : "rgba(255,255,255,0.08)"}`,
+                    fontSize: 14.5, lineHeight: 1.45, color: "#eafcff", whiteSpace: "pre-wrap", userSelect: "text",
+                  }}
+                >
+                  {m.text}
+                </div>
+              ))}
+              {busy && answer && (
+                <div style={{ alignSelf: "flex-start", maxWidth: "82%", padding: "10px 14px", borderRadius: "14px 14px 14px 3px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", fontSize: 14.5, lineHeight: 1.45, color: "#eafcff", whiteSpace: "pre-wrap", userSelect: "text" }}>
+                  {answer}
+                </div>
+              )}
+              {busy && !answer && (
+                <div style={{ alignSelf: "flex-start", ...mono, fontSize: 10, color: "rgba(207,239,251,0.4)", padding: "10px 14px" }}>pensando…</div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* barra de entrada */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderTop: "1px solid rgba(var(--accent-rgb),0.12)" }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", padding: "10px 14px", border: "1px solid rgba(var(--accent-rgb),0.2)", borderRadius: 22, background: "rgba(255,255,255,0.04)" }}>
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !busy && input.trim()) { ask(input); setInput(""); } }}
+                  disabled={busy}
+                  placeholder={busy ? "processando…" : listening ? "ouvindo…" : "Mensagem…"}
+                  style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#eafcff", fontSize: 15 }}
+                />
+              </div>
+              <button
+                onClick={toggleMic}
+                disabled={busy}
+                style={{ width: 42, height: 42, borderRadius: "50%", flex: "none", border: `1.5px solid ${listening ? OR : CY}`, background: listening ? "rgba(255,157,61,0.15)" : "rgba(var(--accent-rgb),0.06)", color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /></svg>
+              </button>
+              {input.trim() && (
+                <button
+                  onClick={() => { if (!busy) { ask(input); setInput(""); } }}
+                  disabled={busy}
+                  style={{ width: 42, height: 42, borderRadius: "50%", flex: "none", border: `1.5px solid ${CY}`, background: "rgba(var(--accent-rgb),0.14)", color: CY, cursor: busy ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* configurações — escopo, tema, voz, sync */}
+        {mobileSettingsOpen && (
+          <div
+            onClick={() => setMobileSettingsOpen(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end" }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: "100%", maxHeight: "80vh", overflowY: "auto", background: "#08131a", borderTop: "1px solid rgba(var(--accent-rgb),0.25)", borderRadius: "16px 16px 0 0", padding: "18px 18px 28px" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div style={{ ...mono, fontSize: 11, letterSpacing: 2, color: CY }}>◈ CONFIGURAÇÕES</div>
+                <button onClick={() => setMobileSettingsOpen(false)} style={{ ...mono, fontSize: 10, padding: "5px 10px", border: "1px solid rgba(var(--accent-rgb),0.2)", borderRadius: 4, background: "transparent", color: "rgba(207,239,251,0.6)", cursor: "pointer" }}>✕ fechar</button>
+              </div>
+
+              {/* escopo */}
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginBottom: 8 }}>ESCOPO</div>
+              <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                {[{ key: "panel", label: "ESTE PAINEL" }, { key: "general", label: "GERAL" }].map((m) => (
+                  <button key={m.key} onClick={() => setScopeMode(m.key)} style={{ ...mono, fontSize: 10, padding: "8px 12px", borderRadius: 6, border: `1px solid ${scopeMode === m.key ? CY : "rgba(var(--accent-rgb),0.18)"}`, background: scopeMode === m.key ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: scopeMode === m.key ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", flex: 1 }}>{m.label}</button>
+                ))}
+              </div>
+              {scopeMode === "panel" && (
+                <select value={scopePanel} onChange={(e) => setScopePanel(e.target.value)} style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#000", color: "#eafcff", width: "100%", marginBottom: 10 }}>
+                  {panelOptions.map((b) => <option key={b} value={b}>{b}</option>)}
+                  <option value={TASKS_SCOPE}>Tarefas (por prazo)</option>
+                  <option value={THOUGHTS_SCOPE}>Pensamentos</option>
+                  <option value={SENTINEL_SCOPE}>Chamados (Sentinela)</option>
+                </select>
+              )}
+              {scopeMode === "panel" && scopePanel === SENTINEL_SCOPE && (
+                <select value={sentinelProjectId} onChange={(e) => setSentinelProjectId(e.target.value)} style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: `1px solid ${OR}55`, background: "#000", color: "#eafcff", width: "100%", marginBottom: 10 }}>
+                  <option value="all">Todos os projetos</option>
+                  {sentinelProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              )}
+
+              {/* voz */}
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>VOZ</div>
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                <button onClick={() => { if (voiceOn) stopSpeaking(); setVoiceOn((v) => !v); }} style={{ ...mono, fontSize: 10, padding: "8px 12px", borderRadius: 6, border: `1px solid ${voiceOn ? CY : "rgba(207,239,251,0.3)"}`, background: voiceOn ? "rgba(var(--accent-rgb),0.1)" : "transparent", color: voiceOn ? "#eafcff" : "rgba(207,239,251,0.5)", cursor: "pointer", flex: 1 }}>{voiceOn ? "🔊 falar respostas: ON" : "🔇 falar respostas: OFF"}</button>
+              </div>
+              <select value={voiceName} onChange={(e) => { setVoiceName(e.target.value); if (typeof window !== "undefined") localStorage.setItem("voiceName", e.target.value); }} style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#000", color: "#eafcff", width: "100%", marginBottom: 10 }}>
+                {TTS_VOICES.map((v) => <option key={v.name} value={v.name}>{v.name} · {v.trait}</option>)}
+              </select>
+
+              {/* tema */}
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>COR DE DESTAQUE</div>
+              <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+                {ACCENT_THEMES.map((t) => (
+                  <button key={t.name} onClick={() => chooseAccent(t)} title={t.name} style={{ width: 30, height: 30, borderRadius: "50%", background: t.hex, border: `2px solid ${accentName === t.name ? "#eafcff" : "transparent"}`, cursor: "pointer" }} />
+                ))}
+              </div>
+
+              {/* sync */}
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>SINCRONIZAÇÃO</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: autoSyncColor, boxShadow: `0 0 8px ${autoSyncColor}`, flex: "none" }} />
+                <span style={{ ...mono, fontSize: 10.5, color: "rgba(207,239,251,0.7)" }}>
+                  AUTO-SYNC {!autoSync ? "…" : !autoSync.ok ? "não configurado" : autoSync.status === "running" ? "em andamento" : autoSync.started_at ? "ok" : "nunca rodou"}
+                </span>
+              </div>
+              <button
+                onClick={manualSync}
+                disabled={ingesting}
+                style={{ ...mono, fontSize: 10.5, letterSpacing: 1.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${ingesting ? OR : CY}`, background: "rgba(var(--accent-rgb),0.08)", color: ingesting ? OR : "#eafcff", cursor: ingesting ? "wait" : "pointer", width: "100%" }}
+              >
+                {ingesting ? "SINCRONIZANDO…" : "◈ SYNC AGORA"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
