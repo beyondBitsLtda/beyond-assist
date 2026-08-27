@@ -4,18 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { CY, OR, mono } from "@/lib/theme.js";
 import { CHART } from "@/lib/chartPalette.js";
 import HBarChart from "@/components/panels/HBarChart.js";
-import { runFullSync } from "@/lib/sync.js";
-import { useLog } from "@/components/shell/LogProvider.js";
 
 const RANGE_LABELS = { overdue: "Atrasadas", today: "Hoje", tomorrow: "Amanhã", week: "Esta semana", upcoming: "Próximas" };
 
 export default function DashboardPage() {
-  const { addLog } = useLog();
   const [summary, setSummary] = useState(null);
   const [boards, setBoards] = useState(null);
   const [kanban, setKanban] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
@@ -41,22 +37,6 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  // botão "atualizar" busca dado fresco de verdade: resincroniza (Trello+Gemini) antes de re-ler
-  const refresh = useCallback(async () => {
-    if (syncing) return;
-    setSyncing(true);
-    await runFullSync({
-      onProgress: (ev) => {
-        if (ev.type === "error") addLog("[INGEST]", OR, `✗ ${ev.label}: ${ev.message}`);
-        else if (ev.type === "finished") addLog("[INGEST]", CY, `finalizado · ${ev.grandTotal} chunks indexados`);
-      },
-    });
-    setSyncing(false);
-    await load();
-  }, [syncing, addLog, load]);
-
-  const busy = loading || syncing;
 
   const tasksRows = summary
     ? ["overdue", "today", "tomorrow", "week", "upcoming"].map((k) => ({
@@ -84,12 +64,12 @@ export default function DashboardPage() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ DASHBOARD</div>
         <button
-          onClick={refresh}
-          disabled={busy}
-          title="Resincroniza com o Trello (leva alguns segundos) e recarrega"
-          style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: busy ? "wait" : "pointer" }}
+          onClick={load}
+          disabled={loading}
+          title="Recarrega esta tela com o que já está indexado (não busca no Trello agora — pra isso, use o SYNC no topo)"
+          style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
         >
-          {syncing ? "SINCRONIZANDO…" : loading ? "…" : "↻ ATUALIZAR"}
+          {loading ? "…" : "↻ ATUALIZAR"}
         </button>
       </div>
 

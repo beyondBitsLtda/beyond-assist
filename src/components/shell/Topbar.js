@@ -8,6 +8,20 @@ import { runFullSync } from "@/lib/sync.js";
 const pad = (n) => String(n).padStart(2, "0");
 const fmtClock = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
+/** "há 3 min" / "há 2 h" a partir de um ISO — usado no indicador de SYNC automático. */
+function relTime(iso) {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  const diff = Math.max(0, Date.now() - then);
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "agora";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h} h`;
+  return `há ${Math.floor(h / 24)} d`;
+}
+
 /** Converte a chave VAPID pública (base64 URL-safe) pro formato que o PushManager espera. */
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -29,6 +43,7 @@ export default function Topbar({ onToggleSidebar }) {
   const [uptime, setUptime] = useState("00:00:00");
   const [conn, setConn] = useState({ supabase: null, trello: null, gemini: null, sentinel: null });
   const [ingesting, setIngesting] = useState(false);
+  const [autoSync, setAutoSync] = useState(null); // status do SYNC automático (pg_cron) — ver /api/sync-status
   const [pushSupported, setPushSupported] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [subBusy, setSubBusy] = useState(false);
@@ -53,6 +68,21 @@ export default function Topbar({ onToggleSidebar }) {
       .then((s) => { if (alive) setConn(s); })
       .catch(() => {});
     return () => { alive = false; };
+  }, []);
+
+  // status do SYNC automático (cron do Supabase) — busca ao montar e a cada 30s, pra
+  // refletir os ticks (1x/min) sem precisar recarregar a página.
+  useEffect(() => {
+    let alive = true;
+    const check = () => {
+      fetch("/api/sync-status")
+        .then((r) => r.json())
+        .then((s) => { if (alive) setAutoSync(s); })
+        .catch(() => {});
+    };
+    check();
+    const id = setInterval(check, 30000);
+    return () => { alive = false; clearInterval(id); };
   }, []);
 
   // notificações push: registra o service worker e checa se este dispositivo já está inscrito
@@ -136,6 +166,34 @@ export default function Topbar({ onToggleSidebar }) {
     { label: "SENTINELA", ok: conn.sentinel },
   ];
 
+  // indicador do SYNC automático (cron do Supabase) — cor/texto conforme o estado atual
+  let autoSyncColor = "rgba(207,239,251,0.35)"; // dim: ainda sem dado (carregando ou nunca rodou)
+  let autoSyncLabel = "…";
+  let autoSyncTitle = "Carregando status do SYNC automático…";
+  if (autoSync) {
+    if (!autoSync.ok) {
+      autoSyncColor = OR;
+      autoSyncLabel = "não configurado";
+      autoSyncTitle = `Ciclo automático não configurado — rode db/schema.sql e db/cron.sql no Supabase (ver README). Detalhe: ${autoSync.error || "tabela sync_progress não encontrada"}`;
+    } else if (!autoSync.started_at) {
+      autoSyncColor = "rgba(207,239,251,0.35)";
+      autoSyncLabel = "nunca rodou";
+      autoSyncTitle = "Nenhum ciclo automático rodou ainda — confira se db/cron.sql foi executado no Supabase.";
+    } else if (autoSync.last_error) {
+      autoSyncColor = OR;
+      autoSyncLabel = relTime(autoSync.updated_at) || "erro";
+      autoSyncTitle = `Último erro no ciclo automático: ${autoSync.last_error}`;
+    } else if (autoSync.status === "running") {
+      autoSyncColor = CY;
+      autoSyncLabel = "em andamento";
+      autoSyncTitle = `Ciclo em andamento desde ${relTime(autoSync.started_at)} · ${autoSync.grand_total || 0} chunks processados até agora`;
+    } else {
+      autoSyncColor = GR;
+      autoSyncLabel = relTime(autoSync.updated_at) || "ok";
+      autoSyncTitle = `Último ciclo automático concluído ${relTime(autoSync.updated_at)} · ${autoSync.grand_total || 0} chunks processados`;
+    }
+  }
+
   return (
     <header
       style={{
@@ -168,10 +226,18 @@ export default function Topbar({ onToggleSidebar }) {
             <span style={{ color: "#bfe8f5" }}>{c.label}</span>
           </div>
         ))}
+        <div
+          title={autoSyncTitle}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", border: "1px solid rgba(56,225,255,0.18)", borderRadius: 3, background: "rgba(56,225,255,0.03)" }}
+        >
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: autoSyncColor, boxShadow: `0 0 8px ${autoSyncColor}`, animation: autoSync?.status === "running" ? "bb-dot 0.9s ease-in-out infinite" : "none" }} />
+          <span style={{ color: "#bfe8f5" }}>AUTO-SYNC</span>
+          <span style={{ color: "rgba(207,239,251,0.6)" }}>{autoSyncLabel}</span>
+        </div>
         <button
           onClick={reindex}
           disabled={ingesting}
-          title="Reindexar Trello + Beyond Brain (roda na Vercel)"
+          title="Reindexar Trello + Beyond Brain agora mesmo (botão manual — o AUTO-SYNC ao lado roda sozinho 1x/hora)"
           style={{ ...mono, display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", border: `1px solid ${ingesting ? OR : CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: ingesting ? OR : "#eafcff", cursor: ingesting ? "wait" : "pointer", fontSize: 10, letterSpacing: 2 }}
         >
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: ingesting ? OR : CY, boxShadow: `0 0 8px ${ingesting ? OR : CY}`, animation: ingesting ? "bb-dot 0.9s ease-in-out infinite" : "none" }} />

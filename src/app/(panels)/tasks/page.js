@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CY, OR, GR, mono } from "@/lib/theme.js";
-import { runFullSync } from "@/lib/sync.js";
-import { useLog } from "@/components/shell/LogProvider.js";
 
 const RANGES = [
   { key: "overdue", label: "ATRASADAS" },
@@ -21,11 +19,9 @@ function fmtDue(iso) {
 }
 
 export default function TasksPage() {
-  const { addLog } = useLog();
   const [range, setRange] = useState("today");
   const [tasks, setTasks] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
 
   const load = useCallback(async (r) => {
@@ -44,22 +40,6 @@ export default function TasksPage() {
   }, []);
 
   useEffect(() => { load(range); }, [range, load]);
-
-  // botão "atualizar" busca dado fresco de verdade: resincroniza (Trello+Gemini) antes de re-ler
-  const refresh = useCallback(async () => {
-    if (syncing) return;
-    setSyncing(true);
-    await runFullSync({
-      onProgress: (ev) => {
-        if (ev.type === "error") addLog("[INGEST]", OR, `✗ ${ev.label}: ${ev.message}`);
-        else if (ev.type === "finished") addLog("[INGEST]", CY, `finalizado · ${ev.grandTotal} chunks indexados`);
-      },
-    });
-    setSyncing(false);
-    await load(range);
-  }, [syncing, addLog, load, range]);
-
-  const busy = loading || syncing;
 
   return (
     <div style={{ padding: "24px 28px", height: "100%", overflowY: "auto" }}>
@@ -82,12 +62,12 @@ export default function TasksPage() {
             </button>
           ))}
           <button
-            onClick={refresh}
-            disabled={busy}
-            title="Resincroniza com o Trello (leva alguns segundos) e recarrega"
-            style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", marginLeft: 6, border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: busy ? "wait" : "pointer" }}
+            onClick={() => load(range)}
+            disabled={loading}
+            title="Recarrega esta tela com o que já está indexado (não busca no Trello agora — pra isso, use o SYNC no topo)"
+            style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", marginLeft: 6, border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
           >
-            {syncing ? "SINCRONIZANDO…" : loading ? "…" : "↻ ATUALIZAR"}
+            {loading ? "…" : "↻ ATUALIZAR"}
           </button>
         </div>
       </div>

@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CY, OR, PU, mono } from "@/lib/theme.js";
-import { runFullSync } from "@/lib/sync.js";
-import { useLog } from "@/components/shell/LogProvider.js";
 
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -15,11 +13,9 @@ function fmtDate(iso) {
 const PAGE_SIZE = 30;
 
 export default function ThoughtsPage() {
-  const { addLog } = useLog();
   const [thoughts, setThoughts] = useState([]);
   const [nextOffset, setNextOffset] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
 
   const load = useCallback(async (offset, replace) => {
@@ -40,34 +36,17 @@ export default function ThoughtsPage() {
 
   useEffect(() => { load(0, true); }, [load]);
 
-  // botão "atualizar" também resincroniza (Trello+Gemini) — a lista em si já é lida direto do
-  // banco (sempre atual), mas isso garante que o índice do assistente sobre essas notas fica fresco.
-  const refresh = useCallback(async () => {
-    if (syncing) return;
-    setSyncing(true);
-    await runFullSync({
-      onProgress: (ev) => {
-        if (ev.type === "error") addLog("[INGEST]", OR, `✗ ${ev.label}: ${ev.message}`);
-        else if (ev.type === "finished") addLog("[INGEST]", CY, `finalizado · ${ev.grandTotal} chunks indexados`);
-      },
-    });
-    setSyncing(false);
-    await load(0, true);
-  }, [syncing, addLog, load]);
-
-  const busy = loading || syncing;
-
   return (
     <div style={{ padding: "24px 28px", height: "100%", overflowY: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ PENSAMENTOS REGISTRADOS</div>
         <button
-          onClick={refresh}
-          disabled={busy}
-          title="Resincroniza (leva alguns segundos) e recarrega"
-          style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: busy ? "wait" : "pointer" }}
+          onClick={() => load(0, true)}
+          disabled={loading}
+          title="Recarrega esta tela (já é lida direto do banco, sempre atual)"
+          style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
         >
-          {syncing ? "SINCRONIZANDO…" : loading ? "…" : "↻ ATUALIZAR"}
+          {loading ? "…" : "↻ ATUALIZAR"}
         </button>
       </div>
 
