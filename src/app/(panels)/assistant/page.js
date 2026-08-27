@@ -365,7 +365,9 @@ export default function AssistantPage() {
             addLog("[GEMINI]", OR, "streaming tokens");
           } else if (event === "action") {
             pendingActionRef.current = payload?.pending || null;
-            if (pendingActionRef.current) addLog("[ACTION]", PU, "aguardando confirmação…");
+            if (payload?.debug) addLog("[ACTION]", PU, `nenhuma ação detectada (intent=${payload.checkedIntent})`);
+            else if (pendingActionRef.current) addLog("[ACTION]", PU, "aguardando confirmação…");
+            else addLog("[ACTION]", PU, "resolvida");
           } else if (event === "token") {
             setAnswer((a) => { const na = a + payload; answerRef.current = na; return na; });
             // manda a "cabeça" (1º pedaço) assim que atinge um tamanho mínimo — depois disso

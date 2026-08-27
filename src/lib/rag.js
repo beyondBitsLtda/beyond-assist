@@ -49,7 +49,15 @@ Formato da resposta (importante — será lida em voz alta):
 - Datas por extenso ("sexta-feira, 8 de agosto") em vez de "08/08".
 
 Priorize itens com prazo mais próximo ou modificados mais recentemente quando relevante.
-Cite o board de origem quando ajudar.`;
+Cite o board de origem quando ajudar.
+
+IMPORTANTE — você NÃO tem o poder de mudar nada aqui (isso é só leitura/conversa). Se o
+usuário pedir pra mudar prazo, mover de lista, marcar como concluído ou qualquer outra
+alteração num card/chamado/nota, e você estiver gerando ESTA resposta, é porque o sistema
+de ações não reconheceu o pedido — NUNCA diga que "atualizou", "mudou", "moveu", "marcou"
+ou "salvou" algo, mesmo que pareça óbvio o que fazer. Isso seria mentira. Em vez disso,
+diga que não conseguiu identificar a ação com certeza e peça pra reformular (ex.: citar o
+nome exato do card, ou pedir de novo de um jeito mais direto).`;
 
 /** Persona do modo "Geral" — mesma base, mas autorizada a usar busca do Google quando o contexto indexado não basta. */
 export const SYSTEM_INSTRUCTION_GENERAL = `Você é a "Lisa", assistente pessoal do usuário (estilo J.A.R.V.I.S.), agora em modo GERAL.
@@ -84,7 +92,14 @@ Formato da resposta (importante — será lida em voz alta):
 - Escreva em frases curtas e naturais, como se estivesse FALANDO com a pessoa.
 - Evite listas com marcadores, asteriscos, numeração "1." "2.", tabelas e símbolos.
 - Não use markdown (nada de **negrito**, #, -, etc.).
-- Datas por extenso ("sexta-feira, 8 de agosto") em vez de "08/08".`;
+- Datas por extenso ("sexta-feira, 8 de agosto") em vez de "08/08".
+
+IMPORTANTE — você NÃO tem o poder de mudar nada aqui (isso é só leitura/conversa). Se o
+usuário pedir pra mudar prazo, mover de lista, marcar como concluído ou qualquer outra
+alteração num card/chamado/nota, e você estiver gerando ESTA resposta, é porque o sistema
+de ações não reconheceu o pedido — NUNCA diga que "atualizou", "mudou", "moveu", "marcou"
+ou "salvou" algo, mesmo que pareça óbvio o que fazer. Isso seria mentira. Em vez disso,
+diga que não conseguiu identificar a ação com certeza e peça pra reformular.`;
 
 /**
  * Recupera os trechos mais parecidos com a pergunta.
@@ -274,6 +289,7 @@ export async function retrieveByDate(range) {
     if (lo && due < lo) continue;
     if (hi && due >= hi) continue;
     seen.set(card.id, {
+      id: card.id,
       source: "TRELLO",
       board: card.board,
       title: card.title,

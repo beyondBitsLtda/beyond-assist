@@ -88,12 +88,22 @@ export async function POST(req) {
           }).catch(() => ({ intent: "none" }));
 
           if (intent.intent === "propose_action") {
-            const pending = await buildActionProposal(intent);
-            send(controller, "context", candidateCards);
-            send(controller, "action", { pending });
-            send(controller, "token", pending.summary);
-            send(controller, "done", { ok: true });
-            return;
+            try {
+              const pending = await buildActionProposal(intent);
+              send(controller, "context", candidateCards);
+              send(controller, "action", { pending });
+              send(controller, "token", pending.summary);
+              send(controller, "done", { ok: true });
+              return;
+            } catch (err) {
+              // não deixa cair pro fluxo normal (que poderia "confirmar" algo que não foi
+              // resolvido) — avisa o erro real e para por aqui.
+              send(controller, "context", candidateCards);
+              send(controller, "action", { pending: null });
+              send(controller, "token", `⚠️ Entendi que você quer mudar algo, mas não consegui: ${err.message}`);
+              send(controller, "done", { ok: true });
+              return;
+            }
           }
           if (intent.intent === "confirm_pending" && pendingAction) {
             let resultText;
@@ -115,7 +125,10 @@ export async function POST(req) {
             send(controller, "done", { ok: true });
             return;
           }
-          // "none" → segue pro fluxo normal de RAG abaixo, como sempre
+          // "none" → segue pro fluxo normal de RAG abaixo. Manda um evento mesmo assim (com
+          // debug=true) só pra aparecer no log do HUD que a detecção rodou e não achou nada —
+          // ajuda a diagnosticar se o roteamento de ação estiver falhando de novo.
+          send(controller, "action", { pending: pendingAction || null, debug: true, checkedIntent: intent.intent });
         }
 
         let matches;
