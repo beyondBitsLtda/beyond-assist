@@ -58,6 +58,26 @@ export async function getTicket(id) {
   return withBreachFlags(data);
 }
 
+/**
+ * Muda o status de um chamado — grava DE VERDADE na plataforma do Sentinela (mesmo banco
+ * que o sistema real usa, não é uma cópia isolada). Só mexe em `status`; não infere
+ * first_response_at/resolved_at, porque isso é lógica de negócio do fluxo de suporte real
+ * que não deveria ser presumida por fora dele.
+ */
+export async function updateTicketStatus(ticketId, status) {
+  if (!STATUS_ORDER.includes(status)) {
+    throw new Error(`status inválido: "${status}" (esperado um de: ${STATUS_ORDER.join(", ")})`);
+  }
+  const { data, error } = await sentinelSupabase
+    .from("support_tickets")
+    .update({ status })
+    .eq("id", ticketId)
+    .select(TICKET_FIELDS)
+    .single();
+  if (error) throw new Error(`updateTicketStatus: ${error.message}`);
+  return withBreachFlags(data);
+}
+
 /** Comentários de um chamado, em ordem cronológica. */
 export async function listComments(ticketId) {
   const { data, error } = await sentinelSupabase

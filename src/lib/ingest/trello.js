@@ -21,6 +21,15 @@ async function tget(path, qs) {
   return res.json();
 }
 
+async function twrite(method, path, qs) {
+  const res = await fetch(`${API}${path}?${auth(qs)}`, { method });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Trello ${method} ${path} → ${res.status} ${res.statusText} ${body.slice(0, 150)}`);
+  }
+  return res.json();
+}
+
 /** Formata ISO em "03 de agosto de 2026 (segunda-feira)" — melhor pro RAG. */
 function fmtDate(iso) {
   if (!iso) return "";
@@ -106,6 +115,8 @@ export async function loadTrello(opts = {}) {
             due: card.due || null,
             start: card.start || null,
             due_complete: card.dueComplete || false,
+            board_id: boardRef,
+            id_list: card.idList,
           },
         });
       }
@@ -117,4 +128,24 @@ export async function loadTrello(opts = {}) {
   }
 
   return docs;
+}
+
+/** Listas (colunas) de um board — { id, name } — pra resolver "mover pra lista X" por nome. */
+export async function getBoardLists(boardId) {
+  const lists = await tget(`/boards/${boardId}/lists`, { fields: "name" });
+  return (lists || []).map((l) => ({ id: l.id, name: l.name }));
+}
+
+/**
+ * Atualiza um card do Trello de verdade — usado pelas ações do Assistente (ver
+ * src/lib/assistantActions.js), sempre depois de confirmação do usuário.
+ * `due: null` remove o prazo; `due`/`dueComplete`/`idList` omitidos não são tocados.
+ */
+export async function updateTrelloCard(cardId, { due, idList, dueComplete } = {}) {
+  if (!KEY || !TOKEN) throw new Error("TRELLO_KEY/TRELLO_TOKEN ausentes — não dá pra escrever no Trello.");
+  const params = {};
+  if (due !== undefined) params.due = due === null ? "" : due;
+  if (dueComplete !== undefined) params.dueComplete = String(dueComplete);
+  if (idList !== undefined) params.idList = idList;
+  return twrite("PUT", `/cards/${cardId}`, params);
 }

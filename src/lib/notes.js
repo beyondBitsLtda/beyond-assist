@@ -45,6 +45,19 @@ export async function listThoughts({ limit = 50, offset = 0 } = {}) {
   return { thoughts, count: total, next_offset };
 }
 
+/** Cria um novo "pensamento" (nota do Beyond Brain) direto na tabela `notes`. */
+export async function createThought({ subject, moment = null, body = "", ref = null }) {
+  const clean = (subject || "").trim();
+  if (!clean) throw new Error("subject é obrigatório");
+
+  const row = { subject: clean, moment: moment || null, body: body || "", ref: ref || null };
+  if (USER_ID) row.user_id = USER_ID;
+
+  const { data, error } = await supabase.from("notes").insert(row).select("id, subject, moment, body, ref, created_at").single();
+  if (error) throw new Error(`createThought: ${error.message}`);
+  return data;
+}
+
 /** Extrai palavras significativas de uma pergunta pra usar como termo de busca. */
 function tokenize(query) {
   return (query || "")

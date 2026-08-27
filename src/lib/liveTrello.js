@@ -27,11 +27,13 @@ export async function loadAllTrelloCards({ fresh = false } = {}) {
   const cards = docs.map((d) => ({
     id: d.external_id,
     board: d.board || "",
+    board_id: d.metadata?.board_id || null,
     title: d.title || "(sem título)",
     content: d.content,
     last_modified: d.last_modified || null,
     list: d.metadata?.list || null,
     list_pos: d.metadata?.list_pos ?? null,
+    id_list: d.metadata?.id_list || null,
     url: d.metadata?.url || null,
     labels: d.metadata?.labels || "",
     due: d.metadata?.due || null,

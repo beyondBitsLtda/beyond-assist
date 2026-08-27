@@ -150,6 +150,85 @@ export async function* chatStream(prompt, systemInstruction, { tools } = {}) {
   }
 }
 
+/**
+ * Detecta se a mensagem do usuário é um PEDIDO DE AÇÃO sobre um card do Trello mencionado
+ * recentemente (mudar prazo, mover de lista, marcar concluído), ou uma confirmação/cancelamento
+ * de uma ação já proposta — usado só no contexto de boards do Trello no Assistente (ver
+ * src/lib/assistantActions.js e /api/ask). Chamada separada e SEM streaming — pequena e rápida,
+ * decide antes de montar a resposta conversacional normal.
+ *
+ * Retorna { intent: "none" } se não for nada disso (o caminho mais comum, de longe).
+ */
+export async function detectTrelloAction({ question, todayLabel, candidateCards = [], pendingAction = null }) {
+  const cardsBlock = candidateCards.length
+    ? candidateCards
+        .map((c) => `- id=${c.id} · "${c.title}" · board="${c.board}" · lista="${c.list || "—"}" · prazo=${c.due || "sem prazo"} · concluído=${c.due_complete}`)
+        .join("\n")
+    : "(nenhum card no contexto recente)";
+  const pendingBlock = pendingAction
+    ? `Existe uma AÇÃO PENDENTE de confirmação: ${JSON.stringify(pendingAction)}`
+    : "Não há nenhuma ação pendente no momento.";
+
+  const prompt = `Hoje é ${todayLabel}.
+
+CARDS DO TRELLO MENCIONADOS RECENTEMENTE (candidatos pra ação):
+${cardsBlock}
+
+${pendingBlock}
+
+MENSAGEM DO USUÁRIO:
+"${question}"
+
+Decida a intenção do usuário e responda SOMENTE com o JSON pedido.`;
+
+  const systemInstruction = `Você identifica se uma mensagem é um PEDIDO DE AÇÃO sobre um card do Trello
+listado acima (mudar prazo, mover de lista, marcar concluído/reabrir), uma CONFIRMAÇÃO ou
+CANCELAMENTO de uma ação pendente, ou nenhuma das duas (uma pergunta normal).
+
+Regras:
+- "propose_action": o usuário pediu claramente pra mudar algo em UM card específico dos
+  candidatos acima. Escolha o card_id mais provável pelo que foi dito. Pra "due", calcule a
+  data real em ISO 8601 (AAAA-MM-DD) a partir de hoje e da instrução (ex.: "amanhã" = hoje+1
+  dia); pra remover o prazo, new_value = "". Pra "list", new_value é o NOME da lista de
+  destino tal como o usuário disse (não precisa ser exato). Pra "due_complete", new_value é
+  "true" ou "false".
+- "confirm_pending" / "cancel_pending": SÓ use se já existir uma ação pendente E a mensagem
+  claramente concorda ("sim", "confirma", "pode", "manda", "isso") ou recusa ("não", "cancela",
+  "espera", "deixa quieto").
+- "none": qualquer outra coisa — pergunta normal, pedido ambíguo, ou nenhum card candidato
+  bate com o que foi pedido. Na dúvida, prefira "none": é mais seguro perguntar nada e deixar
+  a conversa normal responder do que agir em cima do card errado.`;
+
+  const res = await withTransientRetry(() =>
+    ai().models.generateContent({
+      model: CHAT_MODEL,
+      contents: prompt,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            intent: { type: "STRING", enum: ["none", "propose_action", "confirm_pending", "cancel_pending"] },
+            card_id: { type: "STRING" },
+            field: { type: "STRING", enum: ["due", "list", "due_complete"] },
+            new_value: { type: "STRING" },
+          },
+          required: ["intent"],
+        },
+      },
+    }),
+    { attempts: 2, delayMs: 800 }
+  );
+
+  try {
+    const parsed = JSON.parse(res.text);
+    return parsed && typeof parsed === "object" ? parsed : { intent: "none" };
+  } catch {
+    return { intent: "none" };
+  }
+}
+
 // ---- TTS: gera áudio a partir de texto ----
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";

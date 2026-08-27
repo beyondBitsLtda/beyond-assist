@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CY, OR, PU, GR, mono } from "@/lib/theme.js";
 import { CHART } from "@/lib/chartPalette.js";
 
@@ -11,6 +11,10 @@ const PRIORITY_COLOR = {
   "Crítica": CHART.status.critical,
 };
 
+// mesma ordem de src/lib/sentinel.js (STATUS_ORDER) — duplicado aqui de propósito: esse
+// arquivo é client-side e não pode importar sentinel.js (que puxa o cliente service_role).
+const STATUS_ORDER = ["Aberto", "Aguardando Cliente", "Resolvido", "Fechado"];
+
 function fmtDate(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -18,11 +22,13 @@ function fmtDate(iso) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(d);
 }
 
-/** Modal de detalhe de um chamado: descrição completa + histórico de comentários (somente leitura). */
-export default function SentinelTicketDetail({ ticketId, onClose }) {
+/** Modal de detalhe de um chamado: descrição completa, mudança de status e histórico de comentários. */
+export default function SentinelTicketDetail({ ticketId, onClose, onStatusChanged }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [statusError, setStatusError] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -44,6 +50,27 @@ export default function SentinelTicketDetail({ ticketId, onClose }) {
   const ticket = data?.ticket;
   const comments = data?.comments || [];
   const priorityColor = ticket ? (PRIORITY_COLOR[ticket.priority] || "rgba(207,239,251,0.5)") : CY;
+
+  const changeStatus = useCallback(async (newStatus) => {
+    if (statusBusy || !ticket || newStatus === ticket.status) return;
+    setStatusBusy(true);
+    setStatusError(null);
+    try {
+      const res = await fetch("/api/sentinel/ticket", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: ticket.id, status: newStatus }),
+      });
+      const d = await res.json();
+      if (!res.ok || !d.ok) throw new Error(d.error || `HTTP ${res.status}`);
+      setData((prev) => ({ ...prev, ticket: { ...prev.ticket, ...d.ticket } }));
+      onStatusChanged?.(ticket.id, newStatus);
+    } catch (err) {
+      setStatusError(err.message);
+    } finally {
+      setStatusBusy(false);
+    }
+  }, [statusBusy, ticket, onStatusChanged]);
 
   return (
     <div
@@ -72,8 +99,31 @@ export default function SentinelTicketDetail({ ticketId, onClose }) {
             <>
               <div style={{ fontSize: 18, fontWeight: 600, color: "#eafcff", lineHeight: 1.3 }}>{ticket.title}</div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-                <span style={{ ...mono, fontSize: 9, padding: "3px 8px", borderRadius: 3, border: "1px solid rgba(56,225,255,0.25)", color: "#eafcff" }}>{ticket.status}</span>
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 1.5, color: "rgba(56,225,255,0.5)", marginTop: 14, marginBottom: 6 }}>STATUS</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {STATUS_ORDER.map((s) => {
+                  const active = s === ticket.status;
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => changeStatus(s)}
+                      disabled={statusBusy || active}
+                      style={{
+                        ...mono, fontSize: 9.5, letterSpacing: 1, padding: "6px 11px", borderRadius: 4,
+                        border: `1px solid ${active ? CY : "rgba(56,225,255,0.22)"}`,
+                        background: active ? "rgba(56,225,255,0.14)" : "transparent",
+                        color: active ? "#eafcff" : "rgba(207,239,251,0.6)",
+                        cursor: statusBusy ? "wait" : active ? "default" : "pointer",
+                      }}
+                    >
+                      {statusBusy && !active ? "…" : s}
+                    </button>
+                  );
+                })}
+              </div>
+              {statusError && <div style={{ ...mono, fontSize: 10, color: OR, marginTop: 6 }}>⚠ {statusError}</div>}
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
                 {ticket.priority && (
                   <span style={{ ...mono, fontSize: 9, padding: "3px 8px", borderRadius: 3, border: `1px solid ${priorityColor}`, color: priorityColor }}>{ticket.priority}</span>
                 )}

@@ -116,6 +116,7 @@ export async function retrieve(question, { filterSource = null, topK = null, min
   if (error) throw new Error(`match_documents: ${error.message}`);
 
   return (data || []).map((row) => ({
+    id: String(row.external_id || "").split("#")[0],
     source: (row.source || "").toUpperCase(),
     board: row.board || "",
     title: row.title || "(sem título)",
@@ -137,16 +138,22 @@ export async function retrieveGeneral(question) {
   return retrieve(question, { topK: 40, minSim: 0.25 });
 }
 
+/** Data de hoje por extenso, em português — compartilhada entre o prompt do RAG e a
+ * detecção de ações do Assistente (ver detectTrelloAction em gemini.js). */
+export function todayLabel() {
+  return new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long", day: "2-digit", month: "long", year: "numeric",
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date());
+}
+
 /**
  * Monta o prompt final: bloco de contexto + pergunta + data de hoje.
  * `note` (opcional) — linha extra de contexto ativo, ex.: qual projeto do Sentinela foi
  * selecionado manualmente no seletor de escopo (ver src/app/(panels)/assistant/page.js).
  */
 export function buildPrompt(question, matches, note = null) {
-  const hoje = new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long", day: "2-digit", month: "long", year: "numeric",
-    timeZone: "America/Sao_Paulo",
-  }).format(new Date());
+  const hoje = todayLabel();
 
   const context = matches.length
     ? matches

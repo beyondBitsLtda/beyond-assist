@@ -1,10 +1,11 @@
 import {
   retrieve, retrieveByDate, detectDateRange, retrieveByBoard, detectBoard,
-  retrieveGeneral, buildPrompt, SYSTEM_INSTRUCTION, SYSTEM_INSTRUCTION_GENERAL,
+  retrieveGeneral, buildPrompt, todayLabel, SYSTEM_INSTRUCTION, SYSTEM_INSTRUCTION_GENERAL,
 } from "@/lib/rag.js";
 import { searchThoughts, listThoughts, toMatchFormat } from "@/lib/notes.js";
 import { retrieveSentinelTickets, listProjects } from "@/lib/sentinel.js";
-import { chatStream } from "@/lib/gemini.js";
+import { chatStream, detectTrelloAction } from "@/lib/gemini.js";
+import { buildActionProposal, executeAction } from "@/lib/assistantActions.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,11 @@ async function* chatStreamWithFallback(prompt, systemInstruction, tools) {
 
 /**
  * POST /api/ask
- * body: { question: string, filterSource?: 'trello' | 'brain', scope?: Scope }
+ * body: {
+ *   question: string, filterSource?: 'trello' | 'brain', scope?: Scope,
+ *   history?: { question: string, cards: Card[] },  // última pergunta+cards, pra ações do Assistente
+ *   pendingAction?: object,                          // ação proposta na resposta anterior, aguardando confirmação
+ * }
  *
  * Scope (opcional — vem do seletor "Este painel / Geral" do Assistente):
  *   - { mode: "panel", board }   → força o board inteiro (bypassa detecção automática)
@@ -44,13 +49,20 @@ async function* chatStreamWithFallback(prompt, systemInstruction, tools) {
  *   - { mode: "general" }        → busca ampla em tudo (Trello + Brain + Sentinela) + grounding com Google Search
  *   - ausente / { mode: "auto" } → comportamento padrão (detecção automática por regex)
  *
- * Responde via SSE com três eventos que mapeiam direto no HUD:
+ * Ações no Trello (mudar prazo/lista/concluído) — só quando há cards do Trello no `history`
+ * (última resposta) ou uma `pendingAction` de antes: antes de responder normalmente, um passo
+ * rápido (detectTrelloAction) decide se a mensagem é um pedido de ação ou uma confirmação/
+ * cancelamento. Se for, a ação NUNCA executa na primeira vez — primeiro propõe e pede
+ * confirmação; só executa de verdade quando a mensagem seguinte confirmar.
+ *
+ * Responde via SSE com estes eventos:
  *   - "context": cards recuperados  → coluna RETRIEVED_CONTEXT
+ *   - "action":  { pending: object|null } → o cliente guarda isso e manda de volta no próximo pedido
  *   - "token":   pedaços da resposta → transcript (estado SPEAKING)
  *   - "done":    fim do stream
  */
 export async function POST(req) {
-  const { question, filterSource = null, scope = null } = await req.json();
+  const { question, filterSource = null, scope = null, history = null, pendingAction = null } = await req.json();
 
   if (!question || typeof question !== "string") {
     return new Response(JSON.stringify({ error: "question é obrigatório" }), {
@@ -68,6 +80,44 @@ export async function POST(req) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        // ---- ações no Trello: detecta ANTES do fluxo normal, só quando faz sentido tentar ----
+        const candidateCards = (history?.cards || []).filter((c) => c.source === "TRELLO" && c.id);
+        if (candidateCards.length || pendingAction) {
+          const intent = await detectTrelloAction({
+            question, todayLabel: todayLabel(), candidateCards, pendingAction,
+          }).catch(() => ({ intent: "none" }));
+
+          if (intent.intent === "propose_action") {
+            const pending = await buildActionProposal(intent);
+            send(controller, "context", candidateCards);
+            send(controller, "action", { pending });
+            send(controller, "token", pending.summary);
+            send(controller, "done", { ok: true });
+            return;
+          }
+          if (intent.intent === "confirm_pending" && pendingAction) {
+            let resultText;
+            try {
+              resultText = await executeAction(pendingAction);
+            } catch (err) {
+              resultText = `⚠️ Não consegui aplicar a mudança: ${err.message}`;
+            }
+            send(controller, "context", candidateCards);
+            send(controller, "action", { pending: null });
+            send(controller, "token", resultText);
+            send(controller, "done", { ok: true });
+            return;
+          }
+          if (intent.intent === "cancel_pending" && pendingAction) {
+            send(controller, "context", candidateCards);
+            send(controller, "action", { pending: null });
+            send(controller, "token", "Beleza, não mudei nada.");
+            send(controller, "done", { ok: true });
+            return;
+          }
+          // "none" → segue pro fluxo normal de RAG abaixo, como sempre
+        }
+
         let matches;
         let systemInstruction = SYSTEM_INSTRUCTION;
         let tools;

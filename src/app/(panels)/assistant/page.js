@@ -56,6 +56,11 @@ export default function AssistantPage() {
 
   const recognitionRef = useRef(null);
   const answerRef = useRef("");
+  // última pergunta+cards e ação proposta ainda não confirmada — mandados de volta pro
+  // backend a cada pergunta nova, pra ele saber a que card "reprograme pra amanhã" se refere
+  // e se a mensagem atual está confirmando/cancelando uma ação (ver /api/ask).
+  const historyRef = useRef(null);
+  const pendingActionRef = useRef(null);
   const audioRef = useRef(null);
   const currentAudioResolveRef = useRef(null);
 
@@ -319,11 +324,16 @@ export default function AssistantPage() {
     addLog("[EMBED]", GR, "query → vector [768d]");
     addLog("[RAG]", CY, "similarity search · top_k");
 
+    let latestCards = [];
+
     try {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ question: q, scope: computeScope() }),
+        body: JSON.stringify({
+          question: q, scope: computeScope(),
+          history: historyRef.current, pendingAction: pendingActionRef.current,
+        }),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
@@ -348,10 +358,14 @@ export default function AssistantPage() {
           try { payload = JSON.parse(data); } catch { payload = data; }
 
           if (event === "context") {
-            setCards(payload || []);
-            addLog("[MATCH]", GR, `${(payload || []).length} cards recuperados`);
+            latestCards = payload || [];
+            setCards(latestCards);
+            addLog("[MATCH]", GR, `${latestCards.length} cards recuperados`);
             setMode("speaking");
             addLog("[GEMINI]", OR, "streaming tokens");
+          } else if (event === "action") {
+            pendingActionRef.current = payload?.pending || null;
+            if (pendingActionRef.current) addLog("[ACTION]", PU, "aguardando confirmação…");
           } else if (event === "token") {
             setAnswer((a) => { const na = a + payload; answerRef.current = na; return na; });
             // manda a "cabeça" (1º pedaço) assim que atinge um tamanho mínimo — depois disso
@@ -376,6 +390,7 @@ export default function AssistantPage() {
           }
         }
       }
+      historyRef.current = { question: q, cards: latestCards };
     } catch (err) {
       addLog("[ERR]", OR, err.message);
       setAnswer(`Falha ao consultar o backend: ${err.message}`);
