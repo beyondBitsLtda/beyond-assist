@@ -97,13 +97,19 @@ export async function embedOne(text, taskType = "RETRIEVAL_QUERY") {
 }
 
 /**
- * Versão PACIENTE do embed, só para ingestão em lote.
- * Espera o tempo que o Gemini pedir (retryDelay) para respeitar a quota,
- * já que reindexar não precisa ser instantâneo.
+ * Versão "paciente" do embed (mais tolerante que embed(), pra ingestão em lote), mas com
+ * paciência LIMITADA: cada chamada roda dentro de uma função da Vercel com teto de 60s
+ * (ver ingestSlice, src/lib/ingest/runSlice.js — usada tanto pelo botão SYNC manual quanto
+ * pelo tick automático), então esperar o tempo que o Gemini pedir (que pode passar de 30-60s
+ * sozinho) trava a função até ela ser morta no meio, sem nem registrar erro. Por isso o
+ * espera é sempre CURTA (teto de 8s) e poucas tentativas — se a quota não liberar rápido,
+ * desiste rápido também: quem chama (ingestSlice → /api/cron/sync) já tenta de novo no
+ * próximo tick, um minuto depois, sem perder o offset onde parou.
  */
 export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
   const contents = Array.isArray(texts) ? texts : [texts];
-  const maxAttempts = 4;
+  const maxAttempts = 2;
+  const MAX_WAIT_SEC = 8;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const res = await ai().models.embedContent({
@@ -113,10 +119,10 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
       });
       return res.embeddings.map((e) => e.values);
     } catch (err) {
-      if (!isTransientError(err) || attempt === maxAttempts) throw err;
+      if (!isTransientError(err) || attempt === maxAttempts) throw rewriteTransientError(err);
       const msg = String(err?.message || err);
       const m = msg.match(/retry in ([\d.]+)s/i);
-      const waitSec = m ? Math.ceil(Number(m[1])) + 1 : 15 * attempt;
+      const waitSec = Math.min(m ? Math.ceil(Number(m[1])) + 1 : 5 * attempt, MAX_WAIT_SEC);
       await new Promise((r) => setTimeout(r, waitSec * 1000));
     }
   }
