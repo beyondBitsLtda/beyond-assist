@@ -15,7 +15,7 @@ const EMPTY_FORM = { subject: "", moment: "", body: "", ref: "" };
 
 const inputStyle = {
   ...mono, fontSize: 12, padding: "9px 11px", borderRadius: 5,
-  border: "1px solid rgba(56,225,255,0.2)", background: "#08131a", color: "#eafcff",
+  border: "1px solid rgba(var(--accent-rgb),0.2)", background: "#08131a", color: "#eafcff",
   outline: "none", width: "100%",
 };
 
@@ -86,7 +86,7 @@ export default function ThoughtsPage() {
             onClick={() => load(0, true)}
             disabled={loading}
             title="Recarrega esta tela (já é lida direto do banco, sempre atual)"
-            style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
+            style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
           >
             {loading ? "…" : "↻ ATUALIZAR"}
           </button>
@@ -150,7 +150,7 @@ export default function ThoughtsPage() {
             </div>
             {t.moment && <div style={{ ...mono, fontSize: 9.5, color: PU, marginTop: 4 }}>{t.moment}</div>}
             {t.body && <div style={{ fontSize: 12.5, color: "rgba(207,239,251,0.8)", marginTop: 8, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{t.body}</div>}
-            {t.ref && <div style={{ ...mono, fontSize: 9, color: "rgba(56,225,255,0.5)", marginTop: 8 }}>#{t.ref}</div>}
+            {t.ref && <div style={{ ...mono, fontSize: 9, color: "rgba(var(--accent-rgb),0.5)", marginTop: 8 }}>#{t.ref}</div>}
           </div>
         ))}
         {!loading && thoughts.length === 0 && !error && (
@@ -163,7 +163,7 @@ export default function ThoughtsPage() {
           <button
             onClick={() => load(nextOffset, false)}
             disabled={loading}
-            style={{ ...mono, fontSize: 9.5, letterSpacing: 1.5, padding: "8px 16px", border: "1px solid rgba(56,225,255,0.25)", borderRadius: 4, background: "transparent", color: "rgba(207,239,251,0.7)", cursor: loading ? "wait" : "pointer" }}
+            style={{ ...mono, fontSize: 9.5, letterSpacing: 1.5, padding: "8px 16px", border: "1px solid rgba(var(--accent-rgb),0.25)", borderRadius: 4, background: "transparent", color: "rgba(207,239,251,0.7)", cursor: loading ? "wait" : "pointer" }}
           >
             {loading ? "carregando…" : "carregar mais"}
           </button>

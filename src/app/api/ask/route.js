@@ -5,7 +5,7 @@ import {
 import { searchThoughts, listThoughts, toMatchFormat } from "@/lib/notes.js";
 import { retrieveSentinelTickets, listProjects } from "@/lib/sentinel.js";
 import { chatStream, detectTrelloAction } from "@/lib/gemini.js";
-import { buildActionProposal, executeAction } from "@/lib/assistantActions.js";
+import { buildActionProposal, buildClarifyPrompt, executeAction } from "@/lib/assistantActions.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,9 +51,12 @@ async function* chatStreamWithFallback(prompt, systemInstruction, tools) {
  *
  * Ações no Trello (mudar prazo/lista/concluído) — só quando há cards do Trello no `history`
  * (última resposta) ou uma `pendingAction` de antes: antes de responder normalmente, um passo
- * rápido (detectTrelloAction) decide se a mensagem é um pedido de ação ou uma confirmação/
- * cancelamento. Se for, a ação NUNCA executa na primeira vez — primeiro propõe e pede
- * confirmação; só executa de verdade quando a mensagem seguinte confirmar.
+ * rápido (detectTrelloAction) decide a intenção. Dois fluxos possíveis, nunca executando de
+ * cara:
+ *   - 1 card claramente identificado → propõe e pede confirmação ("sim"/"não") antes de agir.
+ *   - vários cards parecidos → pergunta numerado qual é; a resposta (número, ou descrição)
+ *     já resolve E executa, sem precisar de outro "confirma?" — escolher a opção certa É a
+ *     confirmação.
  *
  * Responde via SSE com estes eventos:
  *   - "context": cards recuperados  → coluna RETRIEVED_CONTEXT
@@ -105,7 +108,44 @@ export async function POST(req) {
               return;
             }
           }
-          if (intent.intent === "confirm_pending" && pendingAction) {
+          if (intent.intent === "clarify_candidates" && intent.candidate_ids?.length >= 2) {
+            const chosen = candidateCards.filter((c) => intent.candidate_ids.includes(c.id));
+            if (chosen.length >= 2) {
+              const pending = buildClarifyPrompt({ field: intent.field, new_value: intent.new_value, candidates: chosen });
+              send(controller, "context", candidateCards);
+              send(controller, "action", { pending });
+              send(controller, "token", pending.summary);
+              send(controller, "done", { ok: true });
+              return;
+            }
+            // menos de 2 sobraram depois de cruzar com os candidatos reais — trata como "none"
+            // e cai pro fluxo normal abaixo, em vez de mostrar uma lista vazia/de 1 item.
+          }
+          if (intent.intent === "select_candidate" && pendingAction?.type === "clarify") {
+            const match = pendingAction.candidates.find((c) => c.card_id === intent.card_id);
+            if (match) {
+              try {
+                const resultText = await executeAction({
+                  card_id: match.card_id, card_title: match.title,
+                  field: pendingAction.field, new_value: pendingAction.new_value,
+                });
+                send(controller, "context", candidateCards);
+                send(controller, "action", { pending: null });
+                send(controller, "token", resultText);
+                send(controller, "done", { ok: true });
+                return;
+              } catch (err) {
+                send(controller, "context", candidateCards);
+                send(controller, "action", { pending: null });
+                send(controller, "token", `⚠️ Não consegui aplicar a mudança: ${err.message}`);
+                send(controller, "done", { ok: true });
+                return;
+              }
+            }
+            // não bateu com nenhum candidato da lista — cai pro "none"/fluxo normal, deixando
+            // a pendingAction como estava (o cliente manda de volta e tenta de novo)
+          }
+          if (intent.intent === "confirm_pending" && pendingAction?.type === "confirm") {
             let resultText;
             try {
               resultText = await executeAction(pendingAction);

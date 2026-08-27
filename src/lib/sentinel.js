@@ -92,6 +92,11 @@ export async function listComments(ticketId) {
 /** Agrupa os chamados em colunas por status, na ordem lógica do fluxo (STATUS_ORDER). */
 export function groupByStatus(tickets) {
   const columns = new Map();
+  // semeia TODOS os status do fluxo antes de distribuir os chamados — senão um status sem
+  // nenhum chamado no momento simplesmente não vira coluna, e não tem como arrastar um card
+  // pra lá (ela não existe na tela pra soltar).
+  for (const status of STATUS_ORDER) columns.set(status, { status, tickets: [] });
+
   for (const t of tickets) {
     const key = t.status || "(sem status)";
     if (!columns.has(key)) columns.set(key, { status: key, tickets: [] });

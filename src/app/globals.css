@@ -1,11 +1,19 @@
+/* Cor de destaque do HUD — trocável pelo seletor de tema no Topbar (ver
+   src/lib/accentThemes.js). Ciano é o padrão original; o seletor sobrescreve essas duas
+   variáveis via JS (document.documentElement.style.setProperty). */
+:root {
+  --accent-hex: #38e1ff;
+  --accent-rgb: 56, 225, 255;
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #000; }
-a { color: #38e1ff; text-decoration: none; }
+a { color: var(--accent-hex); text-decoration: none; }
 a:hover { color: #7febff; }
-::selection { background: rgba(56,225,255,0.3); color: #eaffff; }
+::selection { background: rgba(var(--accent-rgb), 0.3); color: #eaffff; }
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(56,225,255,0.25); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb), 0.25); border-radius: 3px; }
 
 input { font-family: 'JetBrains Mono', monospace; }
 input::placeholder { color: rgba(207,239,251,0.4); }

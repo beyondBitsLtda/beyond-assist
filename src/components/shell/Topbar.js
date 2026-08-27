@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLog } from "./LogProvider.js";
 import { CY, OR, GR, PU, mono, dotColor } from "@/lib/theme.js";
 import { runFullSync } from "@/lib/sync.js";
+import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
 
 const pad = (n) => String(n).padStart(2, "0");
 const fmtClock = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -47,7 +48,24 @@ export default function Topbar({ onToggleSidebar }) {
   const [pushSupported, setPushSupported] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [subBusy, setSubBusy] = useState(false);
+  const [accentName, setAccentName] = useState(DEFAULT_ACCENT.name); // só pro seletor saber qual destacar
   const startRef = useRef(Date.now());
+
+  // carrega a cor de destaque escolhida antes (Shell.js já aplica cedo — isso é só pro
+  // seletor saber qual bolinha marcar como ativa)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = JSON.parse(localStorage.getItem("accentTheme") || "null");
+      if (saved?.name) setAccentName(saved.name);
+    } catch {}
+  }, []);
+
+  const chooseAccent = useCallback((theme) => {
+    applyAccentTheme(theme);
+    setAccentName(theme.name);
+    if (typeof window !== "undefined") localStorage.setItem("accentTheme", JSON.stringify(theme));
+  }, []);
 
   // relógio + uptime
   useEffect(() => {
@@ -205,7 +223,7 @@ export default function Topbar({ onToggleSidebar }) {
     <header
       style={{
         position: "relative", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-        padding: "14px 26px", borderBottom: "1px solid rgba(56,225,255,0.16)",
+        padding: "14px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.16)",
         background: "linear-gradient(180deg, rgba(6,20,26,0.6), transparent)",
       }}
     >
@@ -213,7 +231,7 @@ export default function Topbar({ onToggleSidebar }) {
         className="bb-hamburger"
         onClick={onToggleSidebar}
         aria-label="Abrir menu"
-        style={{ alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 6, border: "1px solid rgba(56,225,255,0.25)", background: "rgba(56,225,255,0.05)", color: CY, cursor: "pointer", flex: "none" }}
+        style={{ alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(var(--accent-rgb),0.05)", color: CY, cursor: "pointer", flex: "none" }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <line x1="3" y1="6" x2="21" y2="6" />
@@ -225,17 +243,17 @@ export default function Topbar({ onToggleSidebar }) {
       <div className="bb-topbar-row" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flex: 1, ...mono, fontSize: 10, letterSpacing: 1 }}>
         <div style={{ textAlign: "right", marginRight: 8 }}>
           <div style={{ color: "#eafcff", fontSize: 15, letterSpacing: 2 }}>{clock}</div>
-          <div style={{ color: "rgba(56,225,255,0.5)", fontSize: 9, letterSpacing: 2 }}>SYS.UPTIME {uptime}</div>
+          <div style={{ color: "rgba(var(--accent-rgb),0.5)", fontSize: 9, letterSpacing: 2 }}>SYS.UPTIME {uptime}</div>
         </div>
         {connList.map((c) => (
-          <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", border: "1px solid rgba(56,225,255,0.18)", borderRadius: 3, background: "rgba(56,225,255,0.03)" }}>
+          <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", border: "1px solid rgba(var(--accent-rgb),0.18)", borderRadius: 3, background: "rgba(var(--accent-rgb),0.03)" }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor(c.ok), boxShadow: `0 0 8px ${dotColor(c.ok)}`, animation: "bb-dot 1.8s ease-in-out infinite" }} />
             <span style={{ color: "#bfe8f5" }}>{c.label}</span>
           </div>
         ))}
         <div
           title={autoSyncTitle}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", border: "1px solid rgba(56,225,255,0.18)", borderRadius: 3, background: "rgba(56,225,255,0.03)" }}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", border: "1px solid rgba(var(--accent-rgb),0.18)", borderRadius: 3, background: "rgba(var(--accent-rgb),0.03)" }}
         >
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: autoSyncColor, boxShadow: `0 0 8px ${autoSyncColor}`, animation: autoSync?.status === "running" ? "bb-dot 0.9s ease-in-out infinite" : "none" }} />
           <span style={{ color: "#bfe8f5" }}>AUTO-SYNC</span>
@@ -245,7 +263,7 @@ export default function Topbar({ onToggleSidebar }) {
           onClick={reindex}
           disabled={ingesting}
           title="Reindexar Trello + Beyond Brain agora mesmo (botão manual — o AUTO-SYNC ao lado roda sozinho 1x/hora)"
-          style={{ ...mono, display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", border: `1px solid ${ingesting ? OR : CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: ingesting ? OR : "#eafcff", cursor: ingesting ? "wait" : "pointer", fontSize: 10, letterSpacing: 2 }}
+          style={{ ...mono, display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", border: `1px solid ${ingesting ? OR : CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: ingesting ? OR : "#eafcff", cursor: ingesting ? "wait" : "pointer", fontSize: 10, letterSpacing: 2 }}
         >
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: ingesting ? OR : CY, boxShadow: `0 0 8px ${ingesting ? OR : CY}`, animation: ingesting ? "bb-dot 0.9s ease-in-out infinite" : "none" }} />
           {ingesting ? "SYNCING…" : "◈ SYNC"}
@@ -260,7 +278,7 @@ export default function Topbar({ onToggleSidebar }) {
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 34, height: 34, borderRadius: "50%",
               border: `1px solid ${subscribed ? PU : "rgba(207,239,251,0.3)"}`,
-              background: subscribed ? "rgba(201,166,255,0.08)" : "rgba(56,225,255,0.04)",
+              background: subscribed ? "rgba(201,166,255,0.08)" : "rgba(var(--accent-rgb),0.04)",
               color: subscribed ? PU : "rgba(207,239,251,0.5)",
               cursor: subBusy ? "wait" : "pointer", transition: "all .2s", flex: "none",
             }}
@@ -272,6 +290,23 @@ export default function Topbar({ onToggleSidebar }) {
             </svg>
           </button>
         )}
+
+        {/* cor de destaque do HUD — a escolha fica salva neste navegador */}
+        <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "0 8px", flex: "none" }} title="Cor de destaque">
+          {ACCENT_THEMES.map((t) => (
+            <button
+              key={t.name}
+              onClick={() => chooseAccent(t)}
+              title={t.name}
+              aria-label={`Tema ${t.name}`}
+              style={{
+                width: 16, height: 16, borderRadius: "50%", padding: 0, cursor: "pointer",
+                background: t.hex, border: `2px solid ${accentName === t.name ? "#eafcff" : "transparent"}`,
+                boxShadow: accentName === t.name ? `0 0 6px ${t.hex}` : "none",
+              }}
+            />
+          ))}
+        </div>
       </div>
     </header>
   );

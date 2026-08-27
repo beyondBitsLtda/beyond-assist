@@ -1,7 +1,10 @@
 // Paleta e helpers visuais compartilhados por todo o HUD (sidebar, topbar, painéis).
 // Extraído de page.js — antes vivia inline numa única tela, agora é usado por vários painéis.
 
-export const CY = "#38e1ff";
+// Referencia a variável CSS em vez de um hex fixo — trocável pelo seletor de tema no Topbar
+// (ver src/lib/accentThemes.js). rgba(56,225,255,...) espalhados pelo app também foram
+// convertidos pra rgba(var(--accent-rgb),...), que acompanham a mesma troca automaticamente.
+export const CY = "var(--accent-hex)";
 export const OR = "#ff9d3d";
 export const GR = "#7bd88f";
 export const PU = "#c9a6ff";

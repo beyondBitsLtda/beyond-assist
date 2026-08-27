@@ -88,7 +88,7 @@ export default function SentinelKanban({ project }) {
         <button
           onClick={load}
           disabled={loading}
-          style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
+          style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
         >
           {loading ? "…" : "↻ ATUALIZAR"}
         </button>
@@ -115,14 +115,14 @@ export default function SentinelKanban({ project }) {
               }}
               style={{
                 flex: "none", height: "100%", display: "flex", flexDirection: "column", borderRadius: 8,
-                border: `1px solid ${isDragOver ? CY : "rgba(56,225,255,0.14)"}`,
-                background: isDragOver ? "rgba(56,225,255,0.06)" : "rgba(56,225,255,0.02)",
+                border: `1px solid ${isDragOver ? CY : "rgba(var(--accent-rgb),0.14)"}`,
+                background: isDragOver ? "rgba(var(--accent-rgb),0.06)" : "rgba(var(--accent-rgb),0.02)",
                 transition: "background .15s, border-color .15s",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)" }}>
                 <span style={{ ...mono, fontSize: 10.5, letterSpacing: 1.5, color: "#eafcff" }}>{col.status}</span>
-                <span style={{ ...mono, fontSize: 9, color: "rgba(56,225,255,0.5)" }}>{col.tickets.length}</span>
+                <span style={{ ...mono, fontSize: 9, color: "rgba(var(--accent-rgb),0.5)" }}>{col.tickets.length}</span>
               </div>
               <div style={{ flex: 1, overflowY: "auto", padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                 {col.tickets.map((t) => {
@@ -136,7 +136,7 @@ export default function SentinelKanban({ project }) {
                       onDragEnd={() => { setDragTicketId(null); setDragOverStatus(null); }}
                       onClick={() => setSelectedId(t.id)}
                       title="Arraste pra outra coluna pra mudar o status, ou clique pra ver o chamado completo"
-                      style={{ border: `1px solid ${breached ? "rgba(255,157,61,0.4)" : "rgba(56,225,255,0.18)"}`, borderRadius: 6, padding: "10px 12px", background: "rgba(0,0,0,0.25)", cursor: "grab" }}
+                      style={{ border: `1px solid ${breached ? "rgba(255,157,61,0.4)" : "rgba(var(--accent-rgb),0.18)"}`, borderRadius: 6, padding: "10px 12px", background: "rgba(0,0,0,0.25)", cursor: "grab" }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                         <span style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.4)" }}>#{t.display_id}</span>

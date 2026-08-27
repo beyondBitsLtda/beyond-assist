@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogProvider } from "./LogProvider.js";
 import Sidebar from "./Sidebar.js";
 import Topbar from "./Topbar.js";
+import { applyAccentTheme } from "@/lib/accentThemes.js";
 
 /**
  * Casca compartilhada por todos os painéis: fundo com grid/glow + sidebar + topbar + conteúdo.
@@ -24,11 +25,22 @@ export default function Shell({ children }) {
     if (window.matchMedia("(max-width: 768px)").matches) router.replace("/assistant");
   }, [pathname, router]);
 
+  // aplica a cor de destaque escolhida antes (se houver) assim que o app carrega — o
+  // seletor de verdade fica no Topbar, mas isso precisa rodar cedo, antes de qualquer
+  // outro componente desenhar, senão pisca a cor padrão por um instante.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = JSON.parse(localStorage.getItem("accentTheme") || "null");
+      if (saved) applyAccentTheme(saved);
+    } catch {}
+  }, []);
+
   return (
     <LogProvider>
       <div style={{ position: "fixed", inset: 0, background: "#000", fontFamily: "'Rajdhani',sans-serif", color: "#cfeffb", overflow: "hidden", display: "flex" }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(56,225,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(56,225,255,0.035) 1px, transparent 1px)", backgroundSize: "44px 44px", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", top: "-25%", left: "50%", transform: "translateX(-50%)", width: 900, height: 900, borderRadius: "50%", background: "radial-gradient(circle, rgba(56,225,255,0.10), transparent 62%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(var(--accent-rgb),0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--accent-rgb),0.035) 1px, transparent 1px)", backgroundSize: "44px 44px", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: "-25%", left: "50%", transform: "translateX(-50%)", width: 900, height: 900, borderRadius: "50%", background: "radial-gradient(circle, rgba(var(--accent-rgb),0.10), transparent 62%)", pointerEvents: "none" }} />
 
         <div
           className={`bb-sidebar-backdrop${sidebarOpen ? " bb-open" : ""}`}

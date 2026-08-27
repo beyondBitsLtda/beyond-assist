@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { TTS_VOICES } from "./ttsVoices.js";
 
 const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-2.5-flash";
@@ -152,10 +153,11 @@ export async function* chatStream(prompt, systemInstruction, { tools } = {}) {
 
 /**
  * Detecta se a mensagem do usuário é um PEDIDO DE AÇÃO sobre um card do Trello mencionado
- * recentemente (mudar prazo, mover de lista, marcar concluído), ou uma confirmação/cancelamento
- * de uma ação já proposta — usado só no contexto de boards do Trello no Assistente (ver
- * src/lib/assistantActions.js e /api/ask). Chamada separada e SEM streaming — pequena e rápida,
- * decide antes de montar a resposta conversacional normal.
+ * recentemente (mudar prazo, mover de lista, marcar concluído), a ESCOLHA de qual card entre
+ * várias opções apresentadas, ou uma confirmação/cancelamento de uma ação já proposta — usado
+ * só no contexto de boards do Trello no Assistente (ver src/lib/assistantActions.js e
+ * /api/ask). Chamada separada e SEM streaming — pequena e rápida, decide antes de montar a
+ * resposta conversacional normal.
  *
  * Retorna { intent: "none" } se não for nada disso (o caminho mais comum, de longe).
  */
@@ -165,9 +167,14 @@ export async function detectTrelloAction({ question, todayLabel, candidateCards 
         .map((c) => `- id=${c.id} · "${c.title}" · board="${c.board}" · lista="${c.list || "—"}" · prazo=${c.due || "sem prazo"} · concluído=${c.due_complete}`)
         .join("\n")
     : "(nenhum card no contexto recente)";
-  const pendingBlock = pendingAction
-    ? `Existe uma AÇÃO PENDENTE de confirmação: ${JSON.stringify(pendingAction)}`
-    : "Não há nenhuma ação pendente no momento.";
+
+  let pendingBlock = "Não há nenhuma ação pendente no momento.";
+  if (pendingAction?.type === "clarify") {
+    const numbered = pendingAction.candidates.map((c, i) => `  ${i + 1}. id=${c.card_id} · "${c.title}" (${c.board})`).join("\n");
+    pendingBlock = `Você acabou de perguntar QUAL desses cards o usuário quer mudar (campo "${pendingAction.field}" → "${pendingAction.new_value}"):\n${numbered}`;
+  } else if (pendingAction?.type === "confirm") {
+    pendingBlock = `Existe uma AÇÃO PENDENTE de confirmação: ${JSON.stringify(pendingAction)}`;
+  }
 
   const prompt = `Hoje é ${todayLabel}.
 
@@ -182,22 +189,34 @@ MENSAGEM DO USUÁRIO:
 Decida a intenção do usuário e responda SOMENTE com o JSON pedido.`;
 
   const systemInstruction = `Você identifica se uma mensagem é um PEDIDO DE AÇÃO sobre um card do Trello
-listado acima (mudar prazo, mover de lista, marcar concluído/reabrir), uma CONFIRMAÇÃO ou
-CANCELAMENTO de uma ação pendente, ou nenhuma das duas (uma pergunta normal).
+listado acima (mudar prazo, mover de lista, marcar concluído/reabrir), a ESCOLHA de qual card
+entre opções que você acabou de listar, uma CONFIRMAÇÃO/CANCELAMENTO de uma ação pendente, ou
+nenhuma das anteriores (uma pergunta normal).
+
+O usuário quase nunca vai citar o nome EXATO do card — ele se refere de forma natural ("aquela
+tarefa que venceu ontem", "a do site da Criativa", "essa aí"). Use o contexto da conversa (o
+que foi discutido, prazos, boards) pra achar o(s) card(s) mais prováveis nos candidatos acima.
+Prefira AGIR (propose_action ou clarify_candidates) a cair em "none" sempre que o pedido for
+claramente uma ação sobre algo que aparece nos candidatos, mesmo que a referência seja vaga.
 
 Regras:
-- "propose_action": o usuário pediu claramente pra mudar algo em UM card específico dos
-  candidatos acima. Escolha o card_id mais provável pelo que foi dito. Pra "due", calcule a
-  data real em ISO 8601 (AAAA-MM-DD) a partir de hoje e da instrução (ex.: "amanhã" = hoje+1
-  dia); pra remover o prazo, new_value = "". Pra "list", new_value é o NOME da lista de
-  destino tal como o usuário disse (não precisa ser exato). Pra "due_complete", new_value é
-  "true" ou "false".
-- "confirm_pending" / "cancel_pending": SÓ use se já existir uma ação pendente E a mensagem
-  claramente concorda ("sim", "confirma", "pode", "manda", "isso") ou recusa ("não", "cancela",
-  "espera", "deixa quieto").
-- "none": qualquer outra coisa — pergunta normal, pedido ambíguo, ou nenhum card candidato
-  bate com o que foi pedido. Na dúvida, prefira "none": é mais seguro perguntar nada e deixar
-  a conversa normal responder do que agir em cima do card errado.`;
+- "propose_action": você tem UM candidato claramente mais provável que os outros pro que foi
+  pedido. Escolha o card_id. Pra "due", calcule a data real em ISO 8601 (AAAA-MM-DD) a partir
+  de hoje e da instrução (ex.: "amanhã" = hoje+1 dia); pra remover o prazo, new_value = "". Pra
+  "list", new_value é o NOME da lista de destino tal como o usuário disse (não precisa ser
+  exato). Pra "due_complete", new_value é "true" ou "false".
+- "clarify_candidates": DOIS OU MAIS candidatos combinam igualmente bem com o pedido, e você
+  não tem como saber qual sem perguntar. Preencha field/new_value (a ação já está clara, só
+  falta o card) e candidate_ids com os 2 a 4 ids mais prováveis, em ordem de probabilidade.
+- "select_candidate": só quando o bloco acima mostrar que você JÁ perguntou qual card (lista
+  numerada) — o usuário está respondendo qual é (por número, "a primeira/segunda", ou citando
+  algo do card). Devolva o card_id escolhido dessa lista.
+- "confirm_pending" / "cancel_pending": só quando já existir uma ação pendente do tipo
+  "confirm" (não "clarify") E a mensagem claramente concorda ("sim", "confirma", "pode",
+  "manda", "isso") ou recusa ("não", "cancela", "espera", "deixa quieto").
+- "none": só quando genuinamente não for nada disso, ou nenhum candidato tiver relação alguma
+  com o pedido. Não use "none" só por a referência ao card ser indireta — tente resolver pelo
+  contexto primeiro.`;
 
   const res = await withTransientRetry(() =>
     ai().models.generateContent({
@@ -209,10 +228,14 @@ Regras:
         responseSchema: {
           type: "OBJECT",
           properties: {
-            intent: { type: "STRING", enum: ["none", "propose_action", "confirm_pending", "cancel_pending"] },
+            intent: {
+              type: "STRING",
+              enum: ["none", "propose_action", "clarify_candidates", "select_candidate", "confirm_pending", "cancel_pending"],
+            },
             card_id: { type: "STRING" },
             field: { type: "STRING", enum: ["due", "list", "due_complete"] },
             new_value: { type: "STRING" },
+            candidate_ids: { type: "ARRAY", items: { type: "STRING" } },
           },
           required: ["intent"],
         },
@@ -231,14 +254,16 @@ Regras:
 
 // ---- TTS: gera áudio a partir de texto ----
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
-const TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
+const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
 
 /**
- * Gera fala a partir de texto.
+ * Gera fala a partir de texto. `voiceName` (opcional) sobrescreve a voz padrão — vem do
+ * seletor de voz do Assistente (guardado no navegador, ver src/app/api/speak/route.js).
  * Retorna { base64, sampleRate, mime } — áudio PCM cru (L16) que a rota
  * converte em WAV para o navegador tocar.
  */
-export async function synthesizeSpeech(text) {
+export async function synthesizeSpeech(text, voiceName) {
+  const voice = TTS_VOICES.some((v) => v.name === voiceName) ? voiceName : DEFAULT_TTS_VOICE;
   // essa é a ÚNICA fonte de voz do app (sem voz alternativa) — vale insistir mais que
   // o padrão antes de desistir, já que agora só roda 1-2x por resposta, não por frase.
   const res = await withTransientRetry(() =>
@@ -248,7 +273,7 @@ export async function synthesizeSpeech(text) {
       config: {
         responseModalities: ["AUDIO"],
         speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: TTS_VOICE } },
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
         },
       },
     }),

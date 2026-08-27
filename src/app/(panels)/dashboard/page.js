@@ -74,7 +74,7 @@ export default function DashboardPage() {
           onClick={load}
           disabled={loading}
           title="Busca direto do Trello (ao vivo) — atualiza sozinho a cada 1 min também"
-          style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
+          style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
         >
           {loading ? "…" : "↻ ATUALIZAR"}
         </button>

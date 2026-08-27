@@ -52,7 +52,7 @@ export default function KanbanBoard({ board }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)" }}>
         <div>
           <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ {board.toUpperCase()}</div>
           <div style={{ ...mono, fontSize: 9, color: "rgba(207,239,251,0.4)", marginTop: 4 }}>
@@ -63,7 +63,7 @@ export default function KanbanBoard({ board }) {
           onClick={load}
           disabled={loading}
           title="Busca direto do Trello (ao vivo) — atualiza sozinho a cada 1 min também"
-          style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
+          style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
         >
           {loading ? "…" : "↻ ATUALIZAR"}
         </button>
@@ -73,10 +73,10 @@ export default function KanbanBoard({ board }) {
 
       <div style={{ flex: 1, minHeight: 0, overflowX: "auto", overflowY: "hidden", padding: "18px 24px", display: "flex", gap: 16, alignItems: "flex-start" }}>
         {(columns || []).map((col) => (
-          <div key={col.list} className="bb-kanban-col" style={{ flex: "none", height: "100%", display: "flex", flexDirection: "column", border: "1px solid rgba(56,225,255,0.14)", borderRadius: 8, background: "rgba(56,225,255,0.02)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
+          <div key={col.list} className="bb-kanban-col" style={{ flex: "none", height: "100%", display: "flex", flexDirection: "column", border: "1px solid rgba(var(--accent-rgb),0.14)", borderRadius: 8, background: "rgba(var(--accent-rgb),0.02)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)" }}>
               <span style={{ ...mono, fontSize: 10.5, letterSpacing: 1.5, color: "#eafcff" }}>{col.list}</span>
-              <span style={{ ...mono, fontSize: 9, color: "rgba(56,225,255,0.5)" }}>{col.cards.length}</span>
+              <span style={{ ...mono, fontSize: 9, color: "rgba(var(--accent-rgb),0.5)" }}>{col.cards.length}</span>
             </div>
             <div style={{ flex: 1, overflowY: "auto", padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
               {col.cards.map((card) => {
@@ -88,14 +88,14 @@ export default function KanbanBoard({ board }) {
                     href={card.url || undefined}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ display: "block", border: `1px solid ${overdue ? "rgba(255,157,61,0.4)" : "rgba(56,225,255,0.18)"}`, borderRadius: 6, padding: "10px 12px", background: "rgba(0,0,0,0.25)", textDecoration: "none", color: "inherit" }}
+                    style={{ display: "block", border: `1px solid ${overdue ? "rgba(255,157,61,0.4)" : "rgba(var(--accent-rgb),0.18)"}`, borderRadius: 6, padding: "10px 12px", background: "rgba(0,0,0,0.25)", textDecoration: "none", color: "inherit" }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#eafcff", lineHeight: 1.3 }}>{card.title}</div>
                     {card.labels && (
                       <div style={{ ...mono, fontSize: 8.5, color: PU, marginTop: 6 }}>{card.labels}</div>
                     )}
                     {due && (
-                      <div style={{ ...mono, fontSize: 9, marginTop: 6, color: card.due_complete ? GR : overdue ? OR : "rgba(56,225,255,0.6)" }}>
+                      <div style={{ ...mono, fontSize: 9, marginTop: 6, color: card.due_complete ? GR : overdue ? OR : "rgba(var(--accent-rgb),0.6)" }}>
                         {card.due_complete ? "✓ concluído" : overdue ? `⚠ venceu ${due}` : `prazo ${due}`}
                       </div>
                     )}

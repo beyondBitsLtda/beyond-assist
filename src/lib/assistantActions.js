@@ -38,12 +38,31 @@ export async function buildActionProposal({ card_id, field, new_value }) {
   }
 
   return {
+    type: "confirm",
     card_id: card.id,
     card_title: card.title,
     board: card.board,
     field,
     new_value,
     summary: `Vou ${humanChange} no card "${card.title}" (${card.board}). Confirma?`,
+  };
+}
+
+/**
+ * Quando há mais de um card candidato pro mesmo pedido, monta a pergunta numerada — ainda
+ * NÃO decide nada, só apresenta as opções pro usuário escolher (ver intent "select_candidate"
+ * em detectTrelloAction, src/lib/gemini.js).
+ */
+export function buildClarifyPrompt({ field, new_value, candidates }) {
+  const numbered = candidates
+    .map((c, i) => `${i + 1}. "${c.title}" (${c.board}${c.list ? " · " + c.list : ""})`)
+    .join("\n");
+  return {
+    type: "clarify",
+    field,
+    new_value,
+    candidates: candidates.map((c) => ({ card_id: c.id, title: c.title, board: c.board })),
+    summary: `Encontrei mais de uma tarefa parecida:\n${numbered}\nQual delas? Pode responder com o número.`,
   };
 }
 

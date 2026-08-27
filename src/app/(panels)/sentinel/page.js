@@ -63,7 +63,7 @@ export default function SentinelPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 26px", borderBottom: "1px solid rgba(56,225,255,0.1)", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flexWrap: "wrap" }}>
         <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ SENTINELA</div>
         <div style={{ display: "flex", gap: 4, marginLeft: 12 }}>
           {VIEWS.map((v) => (
@@ -72,8 +72,8 @@ export default function SentinelPage() {
               onClick={() => setView(v.key)}
               style={{
                 ...mono, fontSize: 9.5, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${view === v.key ? CY : "rgba(56,225,255,0.18)"}`,
-                background: view === v.key ? "rgba(56,225,255,0.1)" : "transparent",
+                border: `1px solid ${view === v.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
+                background: view === v.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
                 color: view === v.key ? "#eafcff" : "rgba(207,239,251,0.55)",
                 cursor: "pointer",
               }}
@@ -85,7 +85,7 @@ export default function SentinelPage() {
         <select
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
-          style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: "1px solid rgba(56,225,255,0.18)", background: "#08131a", color: "#eafcff", marginLeft: "auto" }}
+          style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff", marginLeft: "auto" }}
         >
           <option value="all">Todos os projetos</option>
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -101,7 +101,7 @@ export default function SentinelPage() {
               <button
                 onClick={loadSummary}
                 disabled={loadingSummary}
-                style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: loadingSummary ? "wait" : "pointer" }}
+                style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff", cursor: loadingSummary ? "wait" : "pointer" }}
               >
                 {loadingSummary ? "…" : "↻ ATUALIZAR"}
               </button>

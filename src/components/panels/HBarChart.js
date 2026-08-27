@@ -22,12 +22,12 @@ export default function HBarChart({ title, rows, series, formatValue = (n) => St
   const maxValue = Math.max(1, ...rows.flatMap((r) => r.values));
 
   return (
-    <div style={{ border: "1px solid rgba(56,225,255,0.16)", borderRadius: 8, padding: "16px 18px", background: "linear-gradient(160deg, rgba(56,225,255,0.04), rgba(0,0,0,0.2))" }}>
+    <div style={{ border: "1px solid rgba(var(--accent-rgb),0.16)", borderRadius: 8, padding: "16px 18px", background: "linear-gradient(160deg, rgba(var(--accent-rgb),0.04), rgba(0,0,0,0.2))" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <div style={{ ...mono, fontSize: 10.5, letterSpacing: 2, color: CY }}>{title}</div>
         <button
           onClick={() => setShowTable((s) => !s)}
-          style={{ ...mono, fontSize: 8.5, letterSpacing: 1, padding: "4px 9px", border: "1px solid rgba(56,225,255,0.2)", borderRadius: 3, background: "transparent", color: "rgba(207,239,251,0.6)", cursor: "pointer" }}
+          style={{ ...mono, fontSize: 8.5, letterSpacing: 1, padding: "4px 9px", border: "1px solid rgba(var(--accent-rgb),0.2)", borderRadius: 3, background: "transparent", color: "rgba(207,239,251,0.6)", cursor: "pointer" }}
         >
           {showTable ? "◈ gráfico" : "▤ tabela"}
         </button>
@@ -51,9 +51,9 @@ export default function HBarChart({ title, rows, series, formatValue = (n) => St
           <table style={{ width: "100%", borderCollapse: "collapse", ...mono, fontSize: 10.5 }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left", padding: "4px 6px", color: "rgba(207,239,251,0.5)", borderBottom: "1px solid rgba(56,225,255,0.14)", fontWeight: 400 }}>painel</th>
+                <th style={{ textAlign: "left", padding: "4px 6px", color: "rgba(207,239,251,0.5)", borderBottom: "1px solid rgba(var(--accent-rgb),0.14)", fontWeight: 400 }}>painel</th>
                 {series.map((s) => (
-                  <th key={s.key} style={{ textAlign: "right", padding: "4px 6px", color: "rgba(207,239,251,0.5)", borderBottom: "1px solid rgba(56,225,255,0.14)", fontWeight: 400 }}>{s.name}</th>
+                  <th key={s.key} style={{ textAlign: "right", padding: "4px 6px", color: "rgba(207,239,251,0.5)", borderBottom: "1px solid rgba(var(--accent-rgb),0.14)", fontWeight: 400 }}>{s.name}</th>
                 ))}
               </tr>
             </thead>
@@ -111,7 +111,7 @@ export default function HBarChart({ title, rows, series, formatValue = (n) => St
                           style={{
                             position: "absolute", left: 0, bottom: "100%", marginBottom: 4, zIndex: 5,
                             ...mono, fontSize: 9, padding: "5px 9px", borderRadius: 4,
-                            background: "#0a1216", border: "1px solid rgba(56,225,255,0.3)", whiteSpace: "nowrap",
+                            background: "#0a1216", border: "1px solid rgba(var(--accent-rgb),0.3)", whiteSpace: "nowrap",
                           }}
                         >
                           <strong style={{ color: "#eafcff" }}>{formatValue(v)}</strong>{" "}

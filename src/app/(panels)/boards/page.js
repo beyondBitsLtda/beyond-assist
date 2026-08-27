@@ -40,7 +40,7 @@ export default function BoardsOverviewPage() {
           onClick={load}
           disabled={loading}
           title="Busca direto do Trello (ao vivo) — atualiza sozinho a cada 1 min também"
-          style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
+          style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
         >
           {loading ? "…" : "↻ ATUALIZAR"}
         </button>
@@ -50,7 +50,7 @@ export default function BoardsOverviewPage() {
 
       <div className="bb-chart-grid">
         {(boards || []).map((b) => (
-          <div key={b.board} style={{ border: "1px solid rgba(56,225,255,0.18)", borderRadius: 8, padding: "16px 18px", background: "linear-gradient(160deg, rgba(56,225,255,0.05), rgba(0,0,0,0.2))" }}>
+          <div key={b.board} style={{ border: "1px solid rgba(var(--accent-rgb),0.18)", borderRadius: 8, padding: "16px 18px", background: "linear-gradient(160deg, rgba(var(--accent-rgb),0.05), rgba(0,0,0,0.2))" }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "#eafcff" }}>{b.board}</div>
             <div style={{ ...mono, fontSize: 10, color: "rgba(207,239,251,0.5)", marginTop: 4 }}>
               {b.total} cards · <span style={{ color: GR }}>{b.open} abertos</span> · {b.done} concluídos

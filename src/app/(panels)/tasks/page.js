@@ -59,8 +59,8 @@ export default function TasksPage() {
               onClick={() => setRange(r.key)}
               style={{
                 ...mono, fontSize: 9.5, letterSpacing: 1.5, padding: "6px 12px", borderRadius: 3,
-                border: `1px solid ${range === r.key ? CY : "rgba(56,225,255,0.18)"}`,
-                background: range === r.key ? "rgba(56,225,255,0.1)" : "transparent",
+                border: `1px solid ${range === r.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
+                background: range === r.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
                 color: range === r.key ? "#eafcff" : "rgba(207,239,251,0.55)",
                 cursor: "pointer",
               }}
@@ -72,7 +72,7 @@ export default function TasksPage() {
             onClick={() => load(range)}
             disabled={loading}
             title="Busca direto do Trello (ao vivo) — atualiza sozinho a cada 1 min também"
-            style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", marginLeft: 6, border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(56,225,255,0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
+            style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", marginLeft: 6, border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
           >
             {loading ? "…" : "↻ ATUALIZAR"}
           </button>
@@ -88,13 +88,13 @@ export default function TasksPage() {
             href={t.url || undefined}
             target="_blank"
             rel="noreferrer"
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, border: "1px solid rgba(56,225,255,0.16)", borderRadius: 6, padding: "12px 16px", background: "rgba(56,225,255,0.02)", textDecoration: "none", color: "inherit" }}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, border: "1px solid rgba(var(--accent-rgb),0.16)", borderRadius: 6, padding: "12px 16px", background: "rgba(var(--accent-rgb),0.02)", textDecoration: "none", color: "inherit" }}
           >
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#eafcff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
               <div style={{ ...mono, fontSize: 9.5, color: "rgba(207,239,251,0.45)", marginTop: 4 }}>{t.board}{t.list ? ` · ${t.list}` : ""}</div>
             </div>
-            <div style={{ ...mono, fontSize: 10, flex: "none", color: t.done ? GR : range === "overdue" ? OR : "rgba(56,225,255,0.7)" }}>
+            <div style={{ ...mono, fontSize: 10, flex: "none", color: t.done ? GR : range === "overdue" ? OR : "rgba(var(--accent-rgb),0.7)" }}>
               {t.done ? "✓ concluída" : fmtDue(t.due)}
             </div>
           </a>

@@ -79,13 +79,13 @@ export default function SentinelTicketDetail({ ticketId, onClose, onStatusChange
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "min(680px, 100%)", maxHeight: "85vh", display: "flex", flexDirection: "column", border: "1px solid rgba(56,225,255,0.25)", borderRadius: 10, background: "#08131a", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}
+        style={{ width: "min(680px, 100%)", maxHeight: "85vh", display: "flex", flexDirection: "column", border: "1px solid rgba(var(--accent-rgb),0.25)", borderRadius: 10, background: "#08131a", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid rgba(56,225,255,0.14)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid rgba(var(--accent-rgb),0.14)" }}>
           <div style={{ ...mono, fontSize: 10.5, letterSpacing: 2, color: CY }}>◈ CHAMADO {ticket ? `#${ticket.display_id}` : ""}</div>
           <button
             onClick={onClose}
-            style={{ ...mono, fontSize: 10, padding: "5px 10px", border: "1px solid rgba(56,225,255,0.2)", borderRadius: 4, background: "transparent", color: "rgba(207,239,251,0.6)", cursor: "pointer" }}
+            style={{ ...mono, fontSize: 10, padding: "5px 10px", border: "1px solid rgba(var(--accent-rgb),0.2)", borderRadius: 4, background: "transparent", color: "rgba(207,239,251,0.6)", cursor: "pointer" }}
           >
             ✕ fechar
           </button>
@@ -99,7 +99,7 @@ export default function SentinelTicketDetail({ ticketId, onClose, onStatusChange
             <>
               <div style={{ fontSize: 18, fontWeight: 600, color: "#eafcff", lineHeight: 1.3 }}>{ticket.title}</div>
 
-              <div style={{ ...mono, fontSize: 9, letterSpacing: 1.5, color: "rgba(56,225,255,0.5)", marginTop: 14, marginBottom: 6 }}>STATUS</div>
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 1.5, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 6 }}>STATUS</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {STATUS_ORDER.map((s) => {
                   const active = s === ticket.status;
@@ -110,8 +110,8 @@ export default function SentinelTicketDetail({ ticketId, onClose, onStatusChange
                       disabled={statusBusy || active}
                       style={{
                         ...mono, fontSize: 9.5, letterSpacing: 1, padding: "6px 11px", borderRadius: 4,
-                        border: `1px solid ${active ? CY : "rgba(56,225,255,0.22)"}`,
-                        background: active ? "rgba(56,225,255,0.14)" : "transparent",
+                        border: `1px solid ${active ? CY : "rgba(var(--accent-rgb),0.22)"}`,
+                        background: active ? "rgba(var(--accent-rgb),0.14)" : "transparent",
                         color: active ? "#eafcff" : "rgba(207,239,251,0.6)",
                         cursor: statusBusy ? "wait" : active ? "default" : "pointer",
                       }}
@@ -145,7 +145,7 @@ export default function SentinelTicketDetail({ ticketId, onClose, onStatusChange
                 {ticket.description || "(sem descrição)"}
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 18, paddingTop: 14, borderTop: "1px dashed rgba(56,225,255,0.14)", ...mono, fontSize: 9.5, color: "rgba(207,239,251,0.5)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 18, paddingTop: 14, borderTop: "1px dashed rgba(var(--accent-rgb),0.14)", ...mono, fontSize: 9.5, color: "rgba(207,239,251,0.5)" }}>
                 <div>Aberto em<br /><span style={{ color: "#cfeffb" }}>{fmtDate(ticket.created_at)}</span></div>
                 <div>Última atualização<br /><span style={{ color: "#cfeffb" }}>{fmtDate(ticket.updated_at)}</span></div>
                 <div>Prazo de resposta<br /><span style={{ color: ticket.response_breached ? OR : "#cfeffb" }}>{fmtDate(ticket.sla_response_due)}</span></div>
@@ -153,13 +153,13 @@ export default function SentinelTicketDetail({ ticketId, onClose, onStatusChange
               </div>
 
               <div style={{ marginTop: 20 }}>
-                <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(56,225,255,0.5)", marginBottom: 10 }}>COMENTÁRIOS ({comments.length})</div>
+                <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginBottom: 10 }}>COMENTÁRIOS ({comments.length})</div>
                 {comments.length === 0 && (
                   <div style={{ ...mono, fontSize: 10, color: "rgba(207,239,251,0.35)" }}>nenhum comentário.</div>
                 )}
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {comments.map((c) => (
-                    <div key={c.id} style={{ border: "1px solid rgba(56,225,255,0.12)", borderRadius: 6, padding: "10px 12px", background: "rgba(56,225,255,0.02)" }}>
+                    <div key={c.id} style={{ border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: 6, padding: "10px 12px", background: "rgba(var(--accent-rgb),0.02)" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                         <span style={{ ...mono, fontSize: 9.5, color: "#eafcff" }}>{c.author_name || "—"}{c.author_role ? ` · ${c.author_role}` : ""}</span>
                         <span style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.4)" }}>{fmtDate(c.created_at)}</span>

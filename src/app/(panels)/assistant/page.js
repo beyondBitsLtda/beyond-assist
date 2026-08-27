@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
+import { TTS_VOICES } from "@/lib/ttsVoices.js";
 
 const MODE_META = {
   idle: { label: "IDLE", sub: "awaiting command", color: CY },
@@ -41,6 +42,9 @@ export default function AssistantPage() {
   const [voiceSupported, setVoiceSupported] = useState(true);
   const [geminiVoiceEnabled, setGeminiVoiceEnabled] = useState(true); // tentar a voz do Gemini? (desligado = só navegador)
   const [geminiVoiceStatus, setGeminiVoiceStatus] = useState(null);   // null=não testada ainda · true=ok · false=falhou (última tentativa real)
+  // voz do Gemini escolhida — guardada no navegador (não temos como ouvir as 30 vozes daqui
+  // pra saber quais soam femininas; teste e escolha a que preferir).
+  const [voiceName, setVoiceName] = useState("Kore");
   const [mobileTab, setMobileTab] = useState("visualizer"); // só usado no mobile (ver globals.css): "logs" | "visualizer" | "context"
 
   // escopo do assistente: "painel" (board/tarefas/pensamentos específico) ou "geral" (tudo + web)
@@ -91,6 +95,13 @@ export default function AssistantPage() {
       })
       .catch(() => {});
     return () => { alive = false; };
+  }, []);
+
+  // carrega a voz escolhida antes (se houver) — cada navegador guarda a sua
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem("voiceName");
+    if (saved) setVoiceName(saved);
   }, []);
 
   // lista de projetos do Sentinela pro seletor manual (mesma fonte que a aba Sentinela usa)
@@ -159,20 +170,20 @@ export default function AssistantPage() {
         const x1 = cx + Math.cos(ang) * base, y1 = cy + Math.sin(ang) * base;
         const x2 = cx + Math.cos(ang) * (base + len), y2 = cy + Math.sin(ang) * (base + len);
         const g = ctx.createLinearGradient(x1, y1, x2, y2);
-        g.addColorStop(0, "rgba(56,225,255,0.85)");
-        g.addColorStop(1, mag > 0.7 ? "rgba(255,157,61,0.95)" : "rgba(56,225,255,0.15)");
+        g.addColorStop(0, "rgba(var(--accent-rgb),0.85)");
+        g.addColorStop(1, mag > 0.7 ? "rgba(255,157,61,0.95)" : "rgba(var(--accent-rgb),0.15)");
         ctx.strokeStyle = g; ctx.lineWidth = 2.2; ctx.lineCap = "round";
         ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
       }
 
       const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, base * 0.95);
-      gr.addColorStop(0, `rgba(56,225,255,${0.3 * coreGlow})`);
-      gr.addColorStop(0.5, `rgba(56,225,255,${0.1 * coreGlow})`);
-      gr.addColorStop(1, "rgba(56,225,255,0)");
+      gr.addColorStop(0, `rgba(var(--accent-rgb),${0.3 * coreGlow})`);
+      gr.addColorStop(0.5, `rgba(var(--accent-rgb),${0.1 * coreGlow})`);
+      gr.addColorStop(1, "rgba(var(--accent-rgb),0)");
       ctx.fillStyle = gr;
       ctx.beginPath(); ctx.arc(cx, cy, base * 0.95, 0, Math.PI * 2); ctx.fill();
 
-      ctx.strokeStyle = `rgba(56,225,255,${0.55 + coreGlow * 0.4})`;
+      ctx.strokeStyle = `rgba(var(--accent-rgb),${0.55 + coreGlow * 0.4})`;
       ctx.lineWidth = 1.6; ctx.shadowBlur = 18; ctx.shadowColor = CY;
       ctx.beginPath(); ctx.arc(cx, cy, base * 0.7, 0, Math.PI * 2); ctx.stroke();
       ctx.shadowBlur = 0;
@@ -182,13 +193,13 @@ export default function AssistantPage() {
         for (let k = 0; k < rings; k++) {
           const prog = ((now * (m === "speaking" ? 1.1 : 0.7) + k / rings) % 1);
           const rr = base * (0.7 + prog * 1.5);
-          ctx.strokeStyle = `rgba(56,225,255,${(1 - prog) * 0.35})`;
+          ctx.strokeStyle = `rgba(var(--accent-rgb),${(1 - prog) * 0.35})`;
           ctx.lineWidth = 1.2;
           ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke();
         }
       }
 
-      ctx.strokeStyle = "rgba(56,225,255,0.25)"; ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(var(--accent-rgb),0.25)"; ctx.lineWidth = 1;
       for (let i = 0; i < 60; i++) {
         const a = (i / 60) * Math.PI * 2 + now * 0.05;
         const r0 = base * 1.55, r1 = base * (i % 5 === 0 ? 1.66 : 1.6);
@@ -220,7 +231,7 @@ export default function AssistantPage() {
       const res = await fetch("/api/speak", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, voice: voiceName }),
       });
       if (!res.ok) {
         // extrai a mensagem real do corpo (ex.: "UNAVAILABLE: ...") em vez de só o status —
@@ -233,7 +244,7 @@ export default function AssistantPage() {
     } catch (err) {
       return { url: null, error: err };
     }
-  }, []);
+  }, [voiceName]);
 
   const playChunk = useCallback((synthesisPromise, text, gen) => {
     return synthesisPromise.then((result) => {
@@ -460,8 +471,8 @@ export default function AssistantPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {/* ESCOPO DO ASSISTENTE */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 26px", borderBottom: "1px solid rgba(56,225,255,0.1)", flexWrap: "wrap" }}>
-        <span style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(56,225,255,0.5)" }}>ESCOPO</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flexWrap: "wrap" }}>
+        <span style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)" }}>ESCOPO</span>
         <div style={{ display: "flex", gap: 4 }}>
           {[{ key: "panel", label: "ESTE PAINEL" }, { key: "general", label: "GERAL" }].map((m) => (
             <button
@@ -469,8 +480,8 @@ export default function AssistantPage() {
               onClick={() => setScopeMode(m.key)}
               style={{
                 ...mono, fontSize: 9.5, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${scopeMode === m.key ? CY : "rgba(56,225,255,0.18)"}`,
-                background: scopeMode === m.key ? "rgba(56,225,255,0.1)" : "transparent",
+                border: `1px solid ${scopeMode === m.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
+                background: scopeMode === m.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
                 color: scopeMode === m.key ? "#eafcff" : "rgba(207,239,251,0.55)",
                 cursor: "pointer",
               }}
@@ -483,7 +494,7 @@ export default function AssistantPage() {
           <select
             value={scopePanel}
             onChange={(e) => setScopePanel(e.target.value)}
-            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: "1px solid rgba(56,225,255,0.18)", background: "#08131a", color: "#eafcff" }}
+            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
           >
             {panelOptions.map((b) => <option key={b} value={b}>{b}</option>)}
             <option value={TASKS_SCOPE}>Tarefas (por prazo)</option>
@@ -513,15 +524,15 @@ export default function AssistantPage() {
 
       {/* abas — só aparecem no mobile (ver .bb-assistant-tabs em globals.css). No mobile o
           chat abre direto (sem a coluna de contexto — ela some de vez, nem vira aba) */}
-      <div className="bb-assistant-tabs" style={{ gap: 4, padding: "8px 26px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
+      <div className="bb-assistant-tabs" style={{ gap: 4, padding: "8px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)" }}>
         {[{ key: "visualizer", label: "CHAT" }, { key: "logs", label: "LOGS" }].map((t) => (
           <button
             key={t.key}
             onClick={() => setMobileTab(t.key)}
             style={{
               ...mono, fontSize: 9.5, letterSpacing: 1, padding: "6px 12px", borderRadius: 3,
-              border: `1px solid ${mobileTab === t.key ? CY : "rgba(56,225,255,0.18)"}`,
-              background: mobileTab === t.key ? "rgba(56,225,255,0.1)" : "transparent",
+              border: `1px solid ${mobileTab === t.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
+              background: mobileTab === t.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
               color: mobileTab === t.key ? "#eafcff" : "rgba(207,239,251,0.55)",
               cursor: "pointer",
             }}
@@ -534,8 +545,8 @@ export default function AssistantPage() {
       {/* MAIN GRID */}
       <main className="bb-assistant-grid" style={{ position: "relative", flex: 1, display: "grid", gridTemplateColumns: "minmax(220px,320px) minmax(0,1fr) minmax(280px,360px)", minHeight: 0 }}>
         {/* LEFT: LOGS */}
-        <aside className={`bb-assistant-pane${mobileTab === "logs" ? " bb-active" : ""}`} style={{ borderRight: "1px solid rgba(56,225,255,0.12)", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(90deg, rgba(6,18,24,0.35), transparent)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
+        <aside className={`bb-assistant-pane${mobileTab === "logs" ? " bb-active" : ""}`} style={{ borderRight: "1px solid rgba(var(--accent-rgb),0.12)", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(90deg, rgba(6,18,24,0.35), transparent)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)" }}>
             <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ SYSTEM_LOGS</div>
             <div style={{ ...mono, fontSize: 9, color: "rgba(255,157,61,0.85)", animation: "bb-flicker 2s infinite" }}>● LIVE</div>
           </div>
@@ -554,7 +565,7 @@ export default function AssistantPage() {
         {/* CENTER: VISUALIZER */}
         <section className={`bb-assistant-pane${mobileTab === "visualizer" ? " bb-active" : ""}`} style={{ position: "relative", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, minWidth: 0 }}>
           <div style={{ position: "relative", width: "min(52vh,520px)", height: "min(52vh,520px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ position: "absolute", inset: "-6%", border: "1px solid rgba(56,225,255,0.12)", borderRadius: "50%", borderTopColor: "rgba(56,225,255,0.45)", borderRightColor: "rgba(56,225,255,0.28)", animation: "bb-sweep 14s linear infinite" }} />
+            <div style={{ position: "absolute", inset: "-6%", border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: "50%", borderTopColor: "rgba(var(--accent-rgb),0.45)", borderRightColor: "rgba(var(--accent-rgb),0.28)", animation: "bb-sweep 14s linear infinite" }} />
             <div style={{ position: "absolute", inset: "4%", border: "1px dashed rgba(255,157,61,0.18)", borderRadius: "50%", animation: "bb-sweep 22s linear infinite reverse" }} />
             <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
             <div style={{ position: "relative", textAlign: "center", pointerEvents: "none" }}>
@@ -563,16 +574,16 @@ export default function AssistantPage() {
             </div>
           </div>
           <div style={{ marginTop: 26, width: "min(80%,560px)", textAlign: "center" }}>
-            <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(56,225,255,0.5)", marginBottom: 8 }}>↳ INTENT INTERPRETATION</div>
+            <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(var(--accent-rgb),0.5)", marginBottom: 8 }}>↳ INTENT INTERPRETATION</div>
             <div style={{ fontSize: 19, lineHeight: 1.4, color: "#eafcff", fontWeight: 500, letterSpacing: 0.4, whiteSpace: "pre-wrap" }}>{transcript}</div>
           </div>
         </section>
 
         {/* RIGHT: CONTEXT — some de vez no mobile (não é aba, ver .bb-assistant-context em globals.css) */}
-        <aside className="bb-assistant-pane bb-assistant-context" style={{ borderLeft: "1px solid rgba(56,225,255,0.12)", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(270deg, rgba(6,18,24,0.35), transparent)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(56,225,255,0.1)" }}>
+        <aside className="bb-assistant-pane bb-assistant-context" style={{ borderLeft: "1px solid rgba(var(--accent-rgb),0.12)", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(270deg, rgba(6,18,24,0.35), transparent)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)" }}>
             <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ RETRIEVED_CONTEXT</div>
-            <div style={{ ...mono, fontSize: 9, color: "rgba(56,225,255,0.5)" }}>pgvector · {cards.length} matches</div>
+            <div style={{ ...mono, fontSize: 9, color: "rgba(var(--accent-rgb),0.5)" }}>pgvector · {cards.length} matches</div>
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
             {cards.length === 0 && (
@@ -584,9 +595,9 @@ export default function AssistantPage() {
               const brain = c.source === "BRAIN";
               const sentinel = c.source === "SENTINELA";
               const accent = brain ? PU : sentinel ? OR : CY;
-              const edge = brain ? "rgba(201,166,255,0.32)" : sentinel ? "rgba(255,157,61,0.32)" : "rgba(56,225,255,0.3)";
+              const edge = brain ? "rgba(201,166,255,0.32)" : sentinel ? "rgba(255,157,61,0.32)" : "rgba(var(--accent-rgb),0.3)";
               return (
-                <div key={i} style={{ flex: "none", border: `1px solid ${edge}`, borderRadius: 6, padding: "13px 14px", background: "linear-gradient(160deg, rgba(56,225,255,0.05), rgba(0,0,0,0.2))", position: "relative", overflow: "hidden" }}>
+                <div key={i} style={{ flex: "none", border: `1px solid ${edge}`, borderRadius: 6, padding: "13px 14px", background: "linear-gradient(160deg, rgba(var(--accent-rgb),0.05), rgba(0,0,0,0.2))", position: "relative", overflow: "hidden" }}>
                   <div style={{ position: "absolute", top: 0, left: 0, width: 3, height: "100%", background: accent, boxShadow: `0 0 10px ${accent}` }} />
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                     <span style={{ ...mono, fontSize: 8.5, letterSpacing: 2, padding: "3px 7px", border: `1px solid ${edge}`, borderRadius: 3, color: accent, background: "rgba(0,0,0,0.3)" }}>{c.source}</span>
@@ -594,8 +605,8 @@ export default function AssistantPage() {
                   </div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: "#eafcff", letterSpacing: 0.3, lineHeight: 1.25 }}>{c.title}</div>
                   <div style={{ fontSize: 12.5, color: "rgba(169,206,222,0.8)", marginTop: 5, lineHeight: 1.4 }}>{c.snippet}</div>
-                  <div style={{ ...mono, fontSize: 9, color: "rgba(56,225,255,0.55)", marginTop: 9 }}>SIM {meterFor(c.pct)} {c.sim}</div>
-                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 9, paddingTop: 9, borderTop: "1px dashed rgba(56,225,255,0.14)" }}>
+                  <div style={{ ...mono, fontSize: 9, color: "rgba(var(--accent-rgb),0.55)", marginTop: 9 }}>SIM {meterFor(c.pct)} {c.sim}</div>
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 9, paddingTop: 9, borderTop: "1px dashed rgba(var(--accent-rgb),0.14)" }}>
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: OR, boxShadow: "0 0 7px #ff9d3d" }} />
                     <span style={{ ...mono, fontSize: 9, letterSpacing: 1, color: "rgba(255,157,61,0.85)" }}>LAST_MODIFIED</span>
                     <span style={{ ...mono, fontSize: 10, color: "#ffbe7a", marginLeft: "auto", whiteSpace: "nowrap" }}>{c.modified}</span>
@@ -608,13 +619,13 @@ export default function AssistantPage() {
       </main>
 
       {/* BOTTOM COMMAND BAR */}
-      <footer className="bb-footer" style={{ position: "relative", display: "flex", alignItems: "center", gap: 18, padding: "14px 26px", borderTop: "1px solid rgba(56,225,255,0.16)", background: "linear-gradient(0deg, rgba(6,20,26,0.6), transparent)" }}>
-        <div className="bb-footer-hide" style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(56,225,255,0.5)" }}>STATE</div>
+      <footer className="bb-footer" style={{ position: "relative", display: "flex", alignItems: "center", gap: 18, padding: "14px 26px", borderTop: "1px solid rgba(var(--accent-rgb),0.16)", background: "linear-gradient(0deg, rgba(6,20,26,0.6), transparent)" }}>
+        <div className="bb-footer-hide" style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(var(--accent-rgb),0.5)" }}>STATE</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 5, border: `1px solid ${meta.color}`, color: meta.color }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: meta.color, boxShadow: `0 0 8px ${meta.color}` }} />
           <span className="bb-footer-hide" style={{ fontWeight: 600, letterSpacing: 1.5, fontSize: 13 }}>{meta.label}</span>
         </div>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid rgba(56,225,255,0.18)", borderRadius: 5, background: "rgba(56,225,255,0.03)", ...mono }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid rgba(var(--accent-rgb),0.18)", borderRadius: 5, background: "rgba(var(--accent-rgb),0.03)", ...mono }}>
           <span style={{ color: CY, fontSize: 13 }}>&gt;_</span>
           <input
             value={input}
@@ -637,7 +648,7 @@ export default function AssistantPage() {
             display: "flex", alignItems: "center", justifyContent: "center",
             width: 44, height: 44, borderRadius: "50%",
             border: `1.5px solid ${listening ? OR : CY}`,
-            background: listening ? "rgba(255,157,61,0.15)" : "rgba(56,225,255,0.06)",
+            background: listening ? "rgba(255,157,61,0.15)" : "rgba(var(--accent-rgb),0.06)",
             color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer",
             boxShadow: listening ? `0 0 16px ${OR}` : "none",
             animation: listening ? "bb-dot 1s ease-in-out infinite" : "none",
@@ -660,7 +671,7 @@ export default function AssistantPage() {
             display: "flex", alignItems: "center", justifyContent: "center",
             width: 40, height: 40, borderRadius: "50%",
             border: `1px solid ${voiceOn ? CY : "rgba(207,239,251,0.3)"}`,
-            background: "rgba(56,225,255,0.04)", color: voiceOn ? CY : "rgba(207,239,251,0.4)",
+            background: "rgba(var(--accent-rgb),0.04)", color: voiceOn ? CY : "rgba(207,239,251,0.4)",
             cursor: "pointer", transition: "all .2s",
           }}
         >
@@ -688,7 +699,7 @@ export default function AssistantPage() {
             display: "flex", alignItems: "center", gap: 7,
             padding: "0 13px", height: 40, borderRadius: 20,
             border: `1px solid ${geminiVoiceEnabled ? CY : "rgba(207,239,251,0.25)"}`,
-            background: geminiVoiceEnabled ? "rgba(56,225,255,0.04)" : "transparent",
+            background: geminiVoiceEnabled ? "rgba(var(--accent-rgb),0.04)" : "transparent",
             color: geminiVoiceEnabled ? "#eafcff" : "rgba(207,239,251,0.45)",
             cursor: "pointer", transition: "all .2s", ...mono, fontSize: 9.5, letterSpacing: 1.5,
           }}
@@ -704,6 +715,24 @@ export default function AssistantPage() {
             VOZ GEMINI{!geminiVoiceEnabled ? " · OFF" : geminiVoiceStatus === true ? " · OK" : geminiVoiceStatus === false ? " · FALHOU" : ""}
           </span>
         </button>
+
+        {/* qual das 30 vozes do Gemini usar — a Google não documenta gênero, então teste e
+            escolha a que soar certa; a escolha fica salva neste navegador. */}
+        {geminiVoiceEnabled && (
+          <select
+            value={voiceName}
+            onChange={(e) => {
+              setVoiceName(e.target.value);
+              if (typeof window !== "undefined") localStorage.setItem("voiceName", e.target.value);
+            }}
+            title="Voz do Gemini (a Google não documenta gênero — teste e escolha a que preferir)"
+            style={{ ...mono, fontSize: 9.5, padding: "0 10px", height: 40, borderRadius: 20, border: "1px solid rgba(var(--accent-rgb),0.2)", background: "#08131a", color: "#eafcff" }}
+          >
+            {TTS_VOICES.map((v) => (
+              <option key={v.name} value={v.name}>{v.name} · {v.trait}</option>
+            ))}
+          </select>
+        )}
       </footer>
     </div>
   );
