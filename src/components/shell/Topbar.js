@@ -124,6 +124,13 @@ export default function Topbar({ onToggleSidebar }) {
       }
 
       const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!publicKey) {
+        throw new Error(
+          "NEXT_PUBLIC_VAPID_PUBLIC_KEY não configurada nesse deploy. " +
+          "Defina em Vercel → Settings → Environment Variables e refaça o deploy " +
+          "(variáveis NEXT_PUBLIC_* só entram em vigor em um build novo)."
+        );
+      }
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
