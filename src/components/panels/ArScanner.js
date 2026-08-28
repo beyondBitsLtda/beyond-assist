@@ -7,14 +7,15 @@ import { loadArKpis } from "@/lib/arDashboardData.js";
 import { drawScanOverlay } from "@/lib/qrPseudo3d.js";
 
 const DETECT_MS = 350; // o QR não muda a cada frame — não precisa detectar a 60fps, só reagir rápido o bastante
+const AUTO_PROCEED_MS = 500; // detecção estável por esse tempo → já projeta sozinho, sem esperar toque
 
 /**
  * Fase de "reconhecimento": câmera comum (getUserMedia, sem WebXR ainda) procurando o QR do
  * MODO TV (ver src/components/panels/TvArMarker.js) via BarcodeDetector — API nativa do
  * Chrome/Android, bem mais confiável que tentar "reconhecer a tela só de olhar" (o WebXR não
  * dá acesso a pixel bruto de câmera por privacidade, então isso não seria possível de verdade).
- * Ao achar, já reage na hora com uns KPIs "3D" flutuando sobre o próprio preview da câmera —
- * só depois, se o usuário quiser, entra em AR de verdade (ver dashboard/ar/page.js).
+ * Assim que o QR fica estável na mira por meio segundo, já entra sozinho em AR e projeta o
+ * painel ali — sem precisar tocar em nada (mira → projeta, num gesto só).
  */
 export default function ArScanner({ onProceed, onCancel }) {
   const videoRef = useRef(null);
@@ -24,8 +25,11 @@ export default function ArScanner({ onProceed, onCancel }) {
   const detectorRef = useRef(null);
   const kpisRef = useRef([]);
   const matchedRef = useRef(null); // { deviceId, corners, lastSeen }
+  const firstMatchAtRef = useRef(null); // quando o QR atual começou a ser visto sem interrupção
+  const proceededRef = useRef(false);
   const rafRef = useRef(null);
   const intervalRef = useRef(null);
+  const doProceedRef = useRef(null); // setado depois de declarar stopAndProceed, chamado da tick de detecção
 
   const [supported, setSupported] = useState(null); // null=checando
   const [status, setStatus] = useState("starting"); // "starting" | "scanning" | "matched" | "error"
@@ -69,6 +73,20 @@ export default function ArScanner({ onProceed, onCancel }) {
         setStatus("scanning");
         loadArKpis().then((k) => { kpisRef.current = k; }).catch(() => {});
 
+        // para a câmera do scanner ANTES de entrar em WebXR — dois consumidores de câmera ao
+        // mesmo tempo não são confiáveis no celular (a sessão AR pode falhar em pegar a câmera) —
+        // e dispara sozinho quando o QR fica estável, sem esperar toque (ver AUTO_PROCEED_MS)
+        const doProceed = () => {
+          if (proceededRef.current) return;
+          proceededRef.current = true;
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          if (rafRef.current) cancelAnimationFrame(rafRef.current);
+          streamRef.current?.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+          onProceed?.(matchedRef.current?.deviceId || null);
+        };
+        doProceedRef.current = doProceed;
+
         intervalRef.current = setInterval(async () => {
           if (cancelled) return;
           try {
@@ -79,7 +97,9 @@ export default function ArScanner({ onProceed, onCancel }) {
               const { scale } = boxRef.current;
               const corners = hit.cornerPoints.map((p) => ({ x: p.x * scale, y: p.y * scale }));
               matchedRef.current = { deviceId: info.deviceId, corners, lastSeen: performance.now() };
+              if (firstMatchAtRef.current == null) firstMatchAtRef.current = performance.now();
               setStatus("matched");
+              if (performance.now() - firstMatchAtRef.current >= AUTO_PROCEED_MS) doProceed();
             }
           } catch {
             // detect() pode falhar num frame isolado (câmera ainda ajustando foco/exposição) — tenta de novo no próximo tick
@@ -95,6 +115,7 @@ export default function ArScanner({ onProceed, onCancel }) {
               drawScanOverlay(ctx, m.corners, kpisRef.current, performance.now());
             } else if (m) {
               matchedRef.current = null;
+              firstMatchAtRef.current = null; // perdeu antes de estabilizar — precisa recomeçar a contagem
               setStatus("scanning"); // perdeu o QR de vista — volta a procurar
             }
           }
@@ -114,17 +135,11 @@ export default function ArScanner({ onProceed, onCancel }) {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
-  }, [supported, recalcBox]);
+  }, [supported, recalcBox, onProceed]);
 
   const stopAndProceed = useCallback(() => {
-    // para a câmera do scanner ANTES de entrar em WebXR — dois consumidores de câmera ao
-    // mesmo tempo não são confiáveis no celular (a sessão AR pode falhar em pegar a câmera)
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    onProceed?.(matchedRef.current?.deviceId || null);
-  }, [onProceed]);
+    doProceedRef.current?.();
+  }, []);
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#000" }}>
@@ -133,7 +148,7 @@ export default function ArScanner({ onProceed, onCancel }) {
 
       <div style={{ position: "absolute", top: 18, left: 18, right: 18, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
         <div style={{ ...mono, fontSize: 11, letterSpacing: 1, color: "#fff", background: "rgba(0,0,0,0.6)", padding: "8px 12px", borderRadius: 6, maxWidth: 280, lineHeight: 1.5 }}>
-          {status === "matched" ? "✅ dashboard reconhecido" : status === "scanning" ? "🔍 procurando o QR do MODO TV…" : status === "error" ? `⚠ ${err}` : "iniciando câmera…"}
+          {status === "matched" ? "✅ reconhecido — projetando…" : status === "scanning" ? "🔍 procurando o QR do MODO TV…" : status === "error" ? `⚠ ${err}` : "iniciando câmera…"}
         </div>
         <button onClick={onCancel} style={{ ...mono, fontSize: 11, letterSpacing: 1.5, padding: "8px 14px", border: "1px solid #fff", borderRadius: 6, background: "rgba(0,0,0,0.6)", color: "#fff", cursor: "pointer", flex: "none" }}>
           ✕ CANCELAR

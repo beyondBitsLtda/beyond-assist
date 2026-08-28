@@ -1,20 +1,18 @@
-// Desenha o "painel" do Dashboard AR direto em Canvas 2D — vira uma textura aplicada numa
-// malha 3D no modo AR (src/app/(panels)/dashboard/ar/page.js). Não dá pra reaproveitar os
-// componentes SVG (PieChart.js/LineChart.js/HBarChart.js) direto: SVG data-URI desenhado
-// num canvas pode "contaminar" a textura e quebrar o uso em WebGL — então isso é uma
-// reimplementação enxuta em Canvas 2D dos MESMOS três tipos de gráfico, com a MESMA paleta
-// (src/lib/chartPalette.js), só que compostos num painel único, legível a distância de parede.
+// Primitivas de desenho do painel AR em Canvas 2D (compostas pelo "chrome" em
+// src/lib/arPanelRenderer.js, que monta a moldura + barra de abas + conteúdo de cada tela).
+// Não dá pra reaproveitar os componentes SVG (PieChart.js/LineChart.js/HBarChart.js) direto:
+// SVG data-URI desenhado num canvas pode "contaminar" a textura e quebrar o uso em WebGL —
+// então isso é uma reimplementação enxuta em Canvas 2D dos mesmos tipos de gráfico, com a
+// mesma paleta (src/lib/chartPalette.js).
 
-const BG_TOP = "#0b1216";
-const BG_BOTTOM = "#04070a";
-const INK = "#eafcff";
-const INK_DIM = "rgba(207,239,251,0.55)";
-const INK_FAINT = "rgba(207,239,251,0.3)";
-const LINE = "rgba(207,239,251,0.12)";
-const MONO = "'JetBrains Mono', ui-monospace, monospace";
-const SANS = "'Rajdhani', sans-serif";
+export const INK = "#eafcff";
+export const INK_DIM = "rgba(207,239,251,0.55)";
+export const INK_FAINT = "rgba(207,239,251,0.3)";
+export const LINE = "rgba(207,239,251,0.12)";
+export const MONO = "'JetBrains Mono', ui-monospace, monospace";
+export const SANS = "'Rajdhani', sans-serif";
 
-function roundRect(ctx, x, y, w, h, r) {
+export function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -24,7 +22,7 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function panelBox(ctx, x, y, w, h, title, accent) {
+export function panelBox(ctx, x, y, w, h, title, accent) {
   roundRect(ctx, x, y, w, h, 14);
   ctx.fillStyle = "rgba(255,255,255,0.025)";
   ctx.fill();
@@ -37,7 +35,7 @@ function panelBox(ctx, x, y, w, h, title, accent) {
   ctx.fillText(title, x + 22, y + 18);
 }
 
-function drawDonut(ctx, cx, cy, R, r, rows) {
+export function drawDonut(ctx, cx, cy, R, r, rows) {
   const total = rows.reduce((s, x) => s + x.value, 0);
   if (!rows.length || total <= 0) {
     ctx.fillStyle = INK_FAINT;
@@ -73,7 +71,7 @@ function drawDonut(ctx, cx, cy, R, r, rows) {
   ctx.textBaseline = "alphabetic";
 }
 
-function drawLegend(ctx, x, y, w, rows, formatValue) {
+export function drawLegend(ctx, x, y, w, rows, formatValue) {
   const total = rows.reduce((s, r) => s + (r.value ?? 0), 0);
   let cy = y;
   for (const row of rows) {
@@ -90,7 +88,7 @@ function drawLegend(ctx, x, y, w, rows, formatValue) {
   }
 }
 
-function drawLine(ctx, x, y, w, h, points, series) {
+export function drawLine(ctx, x, y, w, h, points, series) {
   if (!points.length) {
     ctx.fillStyle = INK_FAINT;
     ctx.font = `20px ${SANS}`;
@@ -156,7 +154,7 @@ function drawLine(ctx, x, y, w, h, points, series) {
   ctx.textAlign = "left";
 }
 
-function drawHBars(ctx, x, y, w, h, rows, series, formatValue) {
+export function drawHBars(ctx, x, y, w, h, rows, series, formatValue) {
   if (!rows.length) {
     ctx.fillStyle = INK_FAINT;
     ctx.font = `20px ${SANS}`;
@@ -201,89 +199,5 @@ function drawHBars(ctx, x, y, w, h, rows, series, formatValue) {
       ctx.fillText(s.name, lx + 20, ly + 2);
       lx += ctx.measureText(s.name).width + 46;
     }
-  }
-}
-
-/**
- * data: {
- *   updatedLabel: string,
- *   kpis: [{ label, value, critical? }],
- *   pie: { title, rows: [{key,label,value}] },
- *   line: { title, points, series } | null,
- *   bars: { title, rows: [{key,label,values:number[]}], series },
- * }
- */
-export function drawDashboardPanel(canvas, data) {
-  const ctx = canvas.getContext("2d");
-  const W = canvas.width, H = canvas.height;
-  ctx.clearRect(0, 0, W, H);
-
-  const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, BG_TOP);
-  grad.addColorStop(1, BG_BOTTOM);
-  roundRect(ctx, 0, 0, W, H, 26);
-  ctx.fillStyle = grad;
-  ctx.fill();
-  ctx.strokeStyle = "rgba(63,208,242,0.35)";
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // cabeçalho
-  ctx.fillStyle = "#3fd0f2";
-  ctx.font = `700 30px ${MONO}`;
-  ctx.textBaseline = "top";
-  ctx.fillText("◈ BEYOND BITS · DASHBOARD AO VIVO", 34, 30);
-  ctx.fillStyle = INK_FAINT;
-  ctx.font = `18px ${MONO}`;
-  ctx.textAlign = "right";
-  ctx.fillText(data.updatedLabel || "", W - 34, 38);
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-
-  // KPIs
-  const kpiY = 92, kpiH = 96;
-  const kpis = data.kpis || [];
-  const kpiW = kpis.length ? (W - 68 - (kpis.length - 1) * 18) / kpis.length : 0;
-  kpis.forEach((k, i) => {
-    const kx = 34 + i * (kpiW + 18);
-    roundRect(ctx, kx, kpiY, kpiW, kpiH, 12);
-    ctx.fillStyle = k.critical ? "rgba(230,103,103,0.10)" : "rgba(255,255,255,0.03)";
-    ctx.fill();
-    ctx.strokeStyle = k.critical ? "rgba(230,103,103,0.5)" : "rgba(207,239,251,0.16)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.fillStyle = k.critical ? "#e66767" : INK;
-    ctx.font = `700 40px ${MONO}`;
-    ctx.fillText(String(k.value), kx + 20, kpiY + 46);
-    ctx.fillStyle = INK_DIM;
-    ctx.font = `15px ${MONO}`;
-    ctx.fillText(k.label, kx + 20, kpiY + 76);
-  });
-
-  // área de gráficos
-  const chartsY = kpiY + kpiH + 24;
-  const chartsH = 340;
-  const leftW = W * 0.42, rightW = W - leftW - 34 * 2 - 20;
-  const leftX = 34, rightX = leftX + leftW + 20;
-
-  panelBox(ctx, leftX, chartsY, leftW, chartsH, data.pie?.title || "", "#3987e5");
-  const rows = (data.pie?.rows || []).map((r, i) => ({ ...r, color: ["#3987e5", "#d95926", "#199e70", "#c98500"][i % 4] }));
-  drawDonut(ctx, leftX + leftW * 0.32, chartsY + chartsH / 2 + 12, 108, 62, rows);
-  drawLegend(ctx, leftX + leftW * 0.6, chartsY + 70, chartsH - 90, rows, (n) => String(n));
-
-  if (data.line) {
-    panelBox(ctx, rightX, chartsY, rightW, chartsH, data.line.title, "#199e70");
-    drawLine(ctx, rightX + 10, chartsY + 56, rightW - 20, chartsH - 70, data.line.points, data.line.series);
-  } else if (data.bars) {
-    panelBox(ctx, rightX, chartsY, rightW, chartsH, data.bars.title, "#d95926");
-    drawHBars(ctx, rightX + 22, chartsY + 66, rightW - 44, chartsH - 90, data.bars.rows, data.bars.series);
-  }
-
-  // barra inferior — só desenha se tiver as duas coisas acima (senão já usou "bars" em cima)
-  if (data.line && data.bars) {
-    const barsY = chartsY + chartsH + 24;
-    const barsH = H - barsY - 30;
-    panelBox(ctx, leftX, barsY, W - leftX * 2, barsH, data.bars.title, "#d95926");
-    drawHBars(ctx, leftX + 22, barsY + 66, W - leftX * 2 - 44, barsH - 90, data.bars.rows, data.bars.series);
   }
 }

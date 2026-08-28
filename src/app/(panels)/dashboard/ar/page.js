@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as THREE from "three";
 import { CY, OR, GR, PU, mono } from "@/lib/theme.js";
-import { drawDashboardPanel } from "@/lib/arCanvasCharts.js";
-import { loadArData } from "@/lib/arDashboardData.js";
+import { drawArPanel } from "@/lib/arPanelRenderer.js";
+import { loadArScreenPayload } from "@/lib/arDashboardData.js";
+import { AR_SCREENS, getTabHotspots } from "@/lib/arNav.js";
 import ArScanner from "@/components/panels/ArScanner.js";
 
 // Textura do painel — proporção 1600x980 fica legível de longe e não pesa demais como
@@ -15,6 +16,21 @@ const PANEL_W = 1.15; // metros — do tamanho de um monitor médio "pendurado" 
 const PANEL_H = PANEL_W * (TEX_H / TEX_W);
 const REFRESH_MS = 45000;
 const SCALE_MIN = 0.4, SCALE_MAX = 2.5;
+const TAB_HOTSPOTS = getTabHotspots(TEX_W); // fixo — só depende da largura da textura, não dos dados
+const TAP_MOVE_PX = 14, TAP_MS = 450; // limites pra distinguir "toque" (navega) de "arrastar" (reposiciona)
+
+/** Raycast do toque na tela até o painel 3D → coordenadas UV → pixel do canvas (1600x980) —
+ * é o que permite "apontar pra figura projetada" virar um clique de verdade numa aba. */
+function hitTestPanelTap(s, clientX, clientY) {
+  if (!s.panel || !s.camera || typeof window === "undefined") return null;
+  const ndcX = (clientX / window.innerWidth) * 2 - 1;
+  const ndcY = -(clientY / window.innerHeight) * 2 + 1;
+  const raycaster = s.raycaster || (s.raycaster = new THREE.Raycaster());
+  raycaster.setFromCamera({ x: ndcX, y: ndcY }, s.camera);
+  const hits = raycaster.intersectObject(s.panel, false);
+  if (!hits.length || !hits[0].uv) return null;
+  return { x: hits[0].uv.x * TEX_W, y: (1 - hits[0].uv.y) * TEX_H };
+}
 
 /**
  * Dashboard em Realidade Aumentada (WebXR): aponta a câmera pra uma superfície (parede, mesa),
@@ -40,6 +56,8 @@ export default function DashboardArPage() {
   const [arMode, setArMode] = useState("aiming"); // "aiming" | "placed"
   const [reticleVisible, setReticleVisible] = useState(false);
   const [pairedWith, setPairedWith] = useState(null); // deviceId do QR reconhecido no scanner (null = AR direto, sem parear)
+  const [activeScreen, setActiveScreen] = useState("dashboard"); // aba do painel projetado — ver src/lib/arNav.js
+  const activeScreenRef = useRef("dashboard"); // espelha activeScreen pros closures do refreshData/onPointerUp (evita estado velho)
   const [err, setErr] = useState(null);
 
   useEffect(() => {
@@ -47,17 +65,19 @@ export default function DashboardArPage() {
     navigator.xr.isSessionSupported("immersive-ar").then(setSupported).catch(() => setSupported(false));
   }, []);
 
-  const lastDataRef = useRef(null); // último dado carregado — usado pra redesenhar a prévia assim que ela remonta (ex: ao sair do AR)
+  const lastDataRef = useRef(null); // último payload carregado — usado pra redesenhar a prévia assim que ela remonta (ex: ao sair do AR)
 
-  // busca os dados reais (mesmas fontes ao vivo do Dashboard normal) e redesenha a textura;
-  // roda de cara (pra prévia) e continua rodando enquanto a sessão AR estiver ativa.
+  // busca os dados reais da aba ATIVA (mesmas fontes ao vivo do Dashboard normal, ver
+  // src/lib/arDashboardData.js) e redesenha a textura; roda de cara (pra prévia), de novo
+  // sempre que a aba muda (ver useEffect abaixo), e continua rodando enquanto o AR está ativo.
   const refreshData = useCallback(async () => {
     try {
-      const data = await loadArData();
+      const data = await loadArScreenPayload(activeScreenRef.current);
       lastDataRef.current = data;
       const canvas = xr.current.texCanvas || previewCanvasRef.current;
       if (canvas) {
-        drawDashboardPanel(canvas, data);
+        const { hotspots } = drawArPanel(canvas, data);
+        xr.current.hotspots = hotspots;
         if (xr.current.texture) xr.current.texture.needsUpdate = true;
       }
     } catch {
@@ -72,7 +92,7 @@ export default function DashboardArPage() {
     if (node) {
       node.width = TEX_W;
       node.height = TEX_H;
-      if (lastDataRef.current) drawDashboardPanel(node, lastDataRef.current);
+      if (lastDataRef.current) drawArPanel(node, lastDataRef.current);
     }
   }, []);
 
@@ -82,10 +102,18 @@ export default function DashboardArPage() {
     return () => clearInterval(id);
   }, [refreshData]);
 
+  // trocar de aba (toque numa aba do painel, ou pelos botões da tela de pouso) busca na hora,
+  // sem esperar os 45s do ciclo automático — sensação de navegação, não de "esperar carregar".
+  useEffect(() => {
+    activeScreenRef.current = activeScreen;
+    refreshData();
+  }, [activeScreen, refreshData]);
+
   const cleanupAr = useCallback(() => {
     const s = xr.current;
     if (s.renderer) s.renderer.setAnimationLoop(null);
     if (s.hitTestSource) { s.hitTestSource.cancel?.(); s.hitTestSource = null; }
+    if (s.transientHitTestSource) { s.transientHitTestSource.cancel?.(); s.transientHitTestSource = null; }
     if (s.renderer?.domElement?.parentNode) s.renderer.domElement.parentNode.removeChild(s.renderer.domElement);
     if (s.renderer) s.renderer.dispose();
     xr.current = {};
@@ -94,6 +122,7 @@ export default function DashboardArPage() {
     setReticleVisible(false);
     setPhase("landing");
     setPairedWith(null);
+    setActiveScreen("dashboard");
   }, []);
 
   useEffect(() => () => cleanupAr(), [cleanupAr]); // garante limpeza se sair da página com a sessão aberta
@@ -121,11 +150,17 @@ export default function DashboardArPage() {
     setArMode("aiming");
   }, []);
 
-  // ---- gestos de toque na fase "placed": 1 dedo arrasta, 2 dedos beliscam (zoom) e giram ----
+  // ---- gestos de toque na fase "placed": TOQUE RÁPIDO (sem arrastar) numa aba navega — ver
+  // onPointerUp/hitTestPanelTap; 1 dedo ARRASTANDO gruda em qualquer superfície real (parede,
+  // mesa, o que a câmera enxergar, via WebXR Transient Input Hit Test), 2 dedos beliscam
+  // (zoom) e giram. O arrasto só "confirma" depois de mexer um pouco (TAP_MOVE_PX) — senão
+  // TODO toque, mesmo parado, já reposicionaria o painel antes de dar tempo de virar clique. ----
   const onPointerDown = useCallback((e) => {
     if (xr.current.mode !== "placed") return;
-    const g = (xr.current.gesture ||= { pointers: new Map() });
+    const g = (xr.current.gesture ||= { pointers: new Map(), downInfo: new Map() });
     g.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    g.downInfo.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() });
+    g.singleDragConfirmed = false;
     if (g.pointers.size >= 2) { g.pinchDist = null; g.pinchAngle = null; } // recomeça do zero pra não "pular"
   }, []);
 
@@ -138,18 +173,24 @@ export default function DashboardArPage() {
     const curr = { x: e.clientX, y: e.clientY };
 
     if (g.pointers.size === 1) {
-      // 1 dedo: arrasta o painel no próprio plano (ao longo dos eixos locais dele, não da tela) —
-      // sensibilidade escalada pela distância até a câmera, pra "parecer" o mesmo gesto físico
-      // esteja o painel perto ou longe.
-      const camPos = new THREE.Vector3();
-      s.camera.getWorldPosition(camPos);
-      const dist = camPos.distanceTo(s.panel.position);
-      const sens = dist * 0.0018;
-      const dx = curr.x - prev.x, dy = curr.y - prev.y;
-      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(s.panel.quaternion);
-      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(s.panel.quaternion);
-      s.panel.position.addScaledVector(right, dx * sens);
-      s.panel.position.addScaledVector(up, -dy * sens);
+      const down = g.downInfo?.get(e.pointerId);
+      const moved = down ? Math.hypot(curr.x - down.x, curr.y - down.y) : 999;
+      if (moved > TAP_MOVE_PX) g.singleDragConfirmed = true; // passou do limiar — não é mais toque, é arrasto de verdade
+      if (g.singleDragConfirmed && s.transientHitTestSource) {
+        // com suporte a hit-test por toque, o loop de animação já move o painel seguindo a
+        // superfície real sob o dedo a cada frame (ver startAr) — não precisa de nada aqui.
+        // Sem suporte (fallback), desliza aproximado dentro do próprio plano onde foi fixado.
+      } else if (g.singleDragConfirmed) {
+        const camPos = new THREE.Vector3();
+        s.camera.getWorldPosition(camPos);
+        const dist = camPos.distanceTo(s.panel.position);
+        const sens = dist * 0.0018;
+        const dx = curr.x - prev.x, dy = curr.y - prev.y;
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(s.panel.quaternion);
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(s.panel.quaternion);
+        s.panel.position.addScaledVector(right, dx * sens);
+        s.panel.position.addScaledVector(up, -dy * sens);
+      }
     } else if (g.pointers.size === 2) {
       // 2 dedos: belisca pra redimensionar, gira pra rotacionar em torno do próprio painel —
       // os dois ao mesmo tempo, como no álbum de fotos de qualquer celular.
@@ -175,10 +216,28 @@ export default function DashboardArPage() {
   }, []);
 
   const onPointerUp = useCallback((e) => {
-    const g = xr.current.gesture;
+    const s = xr.current;
+    const g = s.gesture;
     if (!g) return;
+    const wasSingle = g.pointers.size === 1 && g.pointers.has(e.pointerId) && !g.singleDragConfirmed;
+    const down = g.downInfo?.get(e.pointerId);
     g.pointers.delete(e.pointerId);
+    g.downInfo?.delete(e.pointerId);
     if (g.pointers.size < 2) { g.pinchDist = null; g.pinchAngle = null; }
+
+    // toque rápido (sem arrastar de verdade) numa aba do painel = navega — "apontar pra
+    // figura projetada" virando clique de verdade, via raycast 3D → UV → hotspot da aba.
+    if (s.mode === "placed" && wasSingle && down) {
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+      const dt = performance.now() - down.t;
+      if (moved < TAP_MOVE_PX && dt < TAP_MS) {
+        const pt = hitTestPanelTap(s, e.clientX, e.clientY);
+        if (pt) {
+          const hit = TAB_HOTSPOTS.find((h) => pt.x >= h.x && pt.x <= h.x + h.w && pt.y >= h.y && pt.y <= h.y + h.h);
+          if (hit) setActiveScreen(hit.key);
+        }
+      }
+    }
   }, []);
 
   const startAr = useCallback(async (deviceId = null) => {
@@ -216,7 +275,9 @@ export default function DashboardArPage() {
       panel.visible = false;
       scene.add(panel);
 
-      xr.current = { renderer, scene, camera, reticle, panel, texture, texCanvas, mode: "aiming" };
+      // veio do scanner de QR (deviceId != null): fixa sozinho assim que achar uma superfície
+      // válida na mesma mira, em vez de esperar um toque em FIXAR — "mira no QR e já projeta".
+      xr.current = { renderer, scene, camera, reticle, panel, texture, texCanvas, mode: "aiming", autoLock: deviceId != null };
 
       const sessionInit = {
         requiredFeatures: ["hit-test"],
@@ -235,6 +296,17 @@ export default function DashboardArPage() {
       const hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
       xr.current.hitTestSource = hitTestSource;
       xr.current.referenceSpace = referenceSpace;
+
+      // hit-test "por toque": pra arrastar o painel pra QUALQUER superfície real (parede,
+      // mesa, o que for) seguindo o dedo, em vez de só deslizar no próprio plano onde foi
+      // fixado — é o que faz "arrastar até a parede" funcionar de verdade.
+      try {
+        xr.current.transientHitTestSource = await session.requestHitTestSourceForTransientInput({ profile: "generic-touchscreen" });
+      } catch {
+        xr.current.transientHitTestSource = null; // sem suporte nesse aparelho — arrastar continua funcionando, só sem "grudar" na superfície
+      }
+
+      const tmpMat = new THREE.Matrix4(); // reusado no arrasto por hit-test, evita alocar por frame
 
       let lastReticleVisible = false;
       renderer.setAnimationLoop((_ts, frame) => {
@@ -260,8 +332,22 @@ export default function DashboardArPage() {
             panel.visible = true;
             panel.position.setFromMatrixPosition(reticle.matrix);
             panel.quaternion.setFromRotationMatrix(reticle.matrix);
+            // veio do QR: fixa sozinho na 1ª superfície válida encontrada na mesma mira —
+            // "aponta pro QR e já projeta", sem esperar um toque em FIXAR.
+            if (s.autoLock) { s.autoLock = false; lockPanel(); }
           } else {
             panel.visible = false;
+          }
+        } else if (s.mode === "placed" && s.gesture?.singleDragConfirmed && s.transientHitTestSource && frame) {
+          // arrastando com 1 dedo: gruda o painel na superfície real embaixo do dedo, a cada
+          // frame — funciona em parede, mesa, qualquer coisa que a câmera reconheça, não só
+          // no plano onde ele foi fixado originalmente.
+          const hits = frame.getHitTestResultsForTransientInput(s.transientHitTestSource);
+          if (hits.length > 0 && hits[0].results.length > 0) {
+            const pose = hits[0].results[0].getPose(referenceSpace);
+            tmpMat.fromArray(pose.transform.matrix);
+            panel.position.setFromMatrixPosition(tmpMat);
+            panel.quaternion.setFromRotationMatrix(tmpMat);
           }
         }
         renderer.render(scene, camera);
@@ -273,7 +359,7 @@ export default function DashboardArPage() {
       setErr(e?.message || "Não foi possível iniciar a sessão de AR.");
       cleanupAr();
     }
-  }, [cleanupAr, refreshData]);
+  }, [cleanupAr, refreshData, lockPanel]);
 
   const stopAr = useCallback(() => {
     xr.current.session?.end?.().catch(() => cleanupAr());
@@ -305,7 +391,7 @@ export default function DashboardArPage() {
                   ? reticleVisible
                     ? "◈ mova o celular pra ajustar — toque em FIXAR quando estiver no lugar certo"
                     : "◈ procurando uma superfície… aponte pra uma parede ou mesa bem iluminada"
-                  : "◈ fixado — arraste com 1 dedo pra mover, belisque pra redimensionar, gire com 2 dedos"}
+                  : "◈ fixado — toque numa aba do painel pra navegar · arraste com 1 dedo pra mover (gruda na parede/mesa), belisque/gire com 2 dedos"}
               </div>
               <button
                 onClick={stopAr}
@@ -387,10 +473,15 @@ export default function DashboardArPage() {
                 que aparece no canto dele — a Lisa reconhece que é o dashboard e já mostra uns KPIs "flutuando" em
                 cima da tela antes mesmo de entrar em AR de verdade.
               </div>
-              <div style={{ fontSize: 12.5, lineHeight: 1.6, marginBottom: 16, maxWidth: 560, color: "rgba(207,239,251,0.55)" }}>
+              <div style={{ fontSize: 12.5, lineHeight: 1.6, marginBottom: 10, maxWidth: 560, color: "rgba(207,239,251,0.55)" }}>
                 Depois (com ou sem QR), o painel aparece "fantasma" seguindo a mira em tempo real — toque em
-                FIXAR quando estiver no lugar certo, e ajuste com gestos: arrastar (1 dedo), redimensionar e girar
-                (2 dedos). Mesmos gráficos do Dashboard normal, atualizando sozinho a cada {Math.round(REFRESH_MS / 1000)}s.
+                FIXAR quando estiver no lugar certo, e ajuste com gestos: arrastar (1 dedo, gruda em parede/mesa),
+                redimensionar e girar (2 dedos).
+              </div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.6, marginBottom: 16, maxWidth: 560, color: "rgba(207,239,251,0.55)" }}>
+                O painel projetado tem abas — toque numa delas, apontando pra própria figura, pra navegar entre{" "}
+                {AR_SCREENS.map((s) => s.label.toLowerCase()).join(", ")}. Dados ao vivo, atualizando sozinho a
+                cada {Math.round(REFRESH_MS / 1000)}s.
               </div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
                 <button
