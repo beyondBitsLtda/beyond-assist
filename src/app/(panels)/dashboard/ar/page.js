@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as THREE from "three";
-import { CY, OR, GR, mono } from "@/lib/theme.js";
+import { CY, OR, GR, PU, mono } from "@/lib/theme.js";
 import { CHART } from "@/lib/chartPalette.js";
 import { drawDashboardPanel } from "@/lib/arCanvasCharts.js";
 
@@ -13,6 +13,7 @@ const TEX_W = 1600, TEX_H = 980;
 const PANEL_W = 1.15; // metros — do tamanho de um monitor médio "pendurado" na parede
 const PANEL_H = PANEL_W * (TEX_H / TEX_W);
 const REFRESH_MS = 45000;
+const SCALE_MIN = 0.4, SCALE_MAX = 2.5;
 
 async function loadArData() {
   const [boardsRes, overdueRes, sentinelRes] = await Promise.all([
@@ -69,19 +70,26 @@ async function loadArData() {
 
 /**
  * Dashboard em Realidade Aumentada (WebXR): aponta a câmera pra uma superfície (parede, mesa),
- * toca na tela pra "fixar" o painel do dashboard ali, e ele fica ancorado enquanto você anda
- * pela sala — como um monitor virtual. Só funciona no Chrome/Android com suporte a ARCore;
+ * fixa o painel ali e ainda ajusta a mão — arrasta com 1 dedo pra mover, belisca com 2 pra
+ * redimensionar, gira com 2 dedos pra rotacionar. Só funciona no Chrome/Android (ARCore);
  * WebXR immersive-ar não existe no Safari/iOS (ver aviso abaixo quando não suportado).
+ *
+ * Fluxo em 2 fases:
+ *  1. "aiming" — o painel (semitransparente) segue em tempo real a superfície detectada sob a
+ *     mira, tipo um "fantasma" — dá pra ver exatamente onde vai cair ANTES de fixar.
+ *  2. "placed" — o painel fica congelado onde foi fixado, e passa a responder a gestos de toque
+ *     (arrastar/beliscar/girar) pra ajuste fino, sem depender de acertar o hit-test de novo.
  */
 export default function DashboardArPage() {
   const containerRef = useRef(null);
   const overlayRef = useRef(null);
   const previewCanvasRef = useRef(null);
-  const xr = useRef({}); // guarda tudo que é imperativo (renderer, scene, session, refs do three.js) fora do ciclo do React
+  const xr = useRef({}); // guarda tudo que é imperativo (renderer, scene, session, refs do three.js, gestos) fora do ciclo do React
 
   const [supported, setSupported] = useState(null); // null=checando, true/false
   const [active, setActive] = useState(false);
-  const [placed, setPlaced] = useState(false);
+  const [arMode, setArMode] = useState("aiming"); // "aiming" | "placed"
+  const [reticleVisible, setReticleVisible] = useState(false);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
@@ -132,10 +140,94 @@ export default function DashboardArPage() {
     if (s.renderer) s.renderer.dispose();
     xr.current = {};
     setActive(false);
-    setPlaced(false);
+    setArMode("aiming");
+    setReticleVisible(false);
   }, []);
 
   useEffect(() => () => cleanupAr(), [cleanupAr]); // garante limpeza se sair da página com a sessão aberta
+
+  // fixa o painel na pose atual da mira — reseta escala/giro (sempre parte "do zero" ao fixar,
+  // o ajuste fino por gesto acontece DEPOIS, na fase "placed")
+  const lockPanel = useCallback(() => {
+    const s = xr.current;
+    if (!s.reticle?.visible || !s.panel) return;
+    s.panel.position.setFromMatrixPosition(s.reticle.matrix);
+    s.panel.quaternion.setFromRotationMatrix(s.reticle.matrix);
+    s.panel.scale.setScalar(1);
+    s.panel.visible = true;
+    s.panel.material.opacity = 1;
+    s.mode = "placed";
+    setArMode("placed");
+  }, []);
+
+  // volta a fase de mira: o painel passa a seguir a superfície detectada em tempo real de novo
+  // (e volta a ficar semitransparente — o "fantasma" que distingue mira de fixado)
+  const repositionPanel = useCallback(() => {
+    const s = xr.current;
+    s.mode = "aiming";
+    if (s.panel) s.panel.material.opacity = 0.6;
+    setArMode("aiming");
+  }, []);
+
+  // ---- gestos de toque na fase "placed": 1 dedo arrasta, 2 dedos beliscam (zoom) e giram ----
+  const onPointerDown = useCallback((e) => {
+    if (xr.current.mode !== "placed") return;
+    const g = (xr.current.gesture ||= { pointers: new Map() });
+    g.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (g.pointers.size >= 2) { g.pinchDist = null; g.pinchAngle = null; } // recomeça do zero pra não "pular"
+  }, []);
+
+  const onPointerMove = useCallback((e) => {
+    const s = xr.current;
+    if (s.mode !== "placed" || !s.panel || !s.camera) return;
+    const g = s.gesture;
+    if (!g || !g.pointers.has(e.pointerId)) return;
+    const prev = g.pointers.get(e.pointerId);
+    const curr = { x: e.clientX, y: e.clientY };
+
+    if (g.pointers.size === 1) {
+      // 1 dedo: arrasta o painel no próprio plano (ao longo dos eixos locais dele, não da tela) —
+      // sensibilidade escalada pela distância até a câmera, pra "parecer" o mesmo gesto físico
+      // esteja o painel perto ou longe.
+      const camPos = new THREE.Vector3();
+      s.camera.getWorldPosition(camPos);
+      const dist = camPos.distanceTo(s.panel.position);
+      const sens = dist * 0.0018;
+      const dx = curr.x - prev.x, dy = curr.y - prev.y;
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(s.panel.quaternion);
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(s.panel.quaternion);
+      s.panel.position.addScaledVector(right, dx * sens);
+      s.panel.position.addScaledVector(up, -dy * sens);
+    } else if (g.pointers.size === 2) {
+      // 2 dedos: belisca pra redimensionar, gira pra rotacionar em torno do próprio painel —
+      // os dois ao mesmo tempo, como no álbum de fotos de qualquer celular.
+      g.pointers.set(e.pointerId, curr);
+      const pts = [...g.pointers.values()];
+      const [p1, p2] = pts;
+      const dist2 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      const angle2 = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      if (g.pinchDist != null) {
+        const ratio = dist2 / g.pinchDist;
+        const newScale = Math.min(SCALE_MAX, Math.max(SCALE_MIN, s.panel.scale.x * ratio));
+        s.panel.scale.setScalar(newScale);
+      }
+      if (g.pinchAngle != null) {
+        const deltaAngle = angle2 - g.pinchAngle;
+        s.panel.rotateOnAxis(new THREE.Vector3(0, 0, 1), -deltaAngle);
+      }
+      g.pinchDist = dist2;
+      g.pinchAngle = angle2;
+      return; // já atualizou os dois pointers acima
+    }
+    g.pointers.set(e.pointerId, curr);
+  }, []);
+
+  const onPointerUp = useCallback((e) => {
+    const g = xr.current.gesture;
+    if (!g) return;
+    g.pointers.delete(e.pointerId);
+    if (g.pointers.size < 2) { g.pinchDist = null; g.pinchAngle = null; }
+  }, []);
 
   const startAr = useCallback(async () => {
     setErr(null);
@@ -151,7 +243,7 @@ export default function DashboardArPage() {
       const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
       const reticle = new THREE.Mesh(
-        new THREE.RingGeometry(0.07, 0.09, 32).rotateX(-Math.PI / 2),
+        new THREE.RingGeometry(0.06, 0.075, 32).rotateX(-Math.PI / 2),
         new THREE.MeshBasicMaterial({ color: 0x3fd0f2 })
       );
       reticle.matrixAutoUpdate = false;
@@ -166,13 +258,12 @@ export default function DashboardArPage() {
       texture.colorSpace = THREE.SRGBColorSpace;
       const panel = new THREE.Mesh(
         new THREE.PlaneGeometry(PANEL_W, PANEL_H),
-        new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide })
+        new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
       );
       panel.visible = false;
-      panel.matrixAutoUpdate = true;
       scene.add(panel);
 
-      xr.current = { renderer, scene, camera, reticle, panel, texture, texCanvas };
+      xr.current = { renderer, scene, camera, reticle, panel, texture, texCanvas, mode: "aiming" };
 
       const sessionInit = {
         requiredFeatures: ["hit-test"],
@@ -192,25 +283,32 @@ export default function DashboardArPage() {
       xr.current.hitTestSource = hitTestSource;
       xr.current.referenceSpace = referenceSpace;
 
-      const controller = renderer.xr.getController(0);
-      controller.addEventListener("select", () => {
-        if (!reticle.visible) return;
-        panel.position.setFromMatrixPosition(reticle.matrix);
-        panel.quaternion.setFromRotationMatrix(reticle.matrix);
-        panel.visible = true;
-        setPlaced(true);
-      });
-      scene.add(controller);
-
+      let lastReticleVisible = false;
       renderer.setAnimationLoop((_ts, frame) => {
-        if (frame && xr.current.hitTestSource) {
-          const results = frame.getHitTestResults(xr.current.hitTestSource);
+        const s = xr.current;
+        if (frame && s.hitTestSource) {
+          const results = frame.getHitTestResults(s.hitTestSource);
           if (results.length > 0) {
             const pose = results[0].getPose(referenceSpace);
             reticle.visible = true;
             reticle.matrix.fromArray(pose.transform.matrix);
           } else {
             reticle.visible = false;
+          }
+          if (reticle.visible !== lastReticleVisible) {
+            lastReticleVisible = reticle.visible;
+            setReticleVisible(reticle.visible);
+          }
+        }
+        // fase "aiming": o painel-fantasma segue a mira ao vivo, pra você ver exatamente
+        // onde vai cair antes de tocar em FIXAR — é essa prévia que faltava antes.
+        if (s.mode === "aiming") {
+          if (reticle.visible) {
+            panel.visible = true;
+            panel.position.setFromMatrixPosition(reticle.matrix);
+            panel.quaternion.setFromRotationMatrix(reticle.matrix);
+          } else {
+            panel.visible = false;
           }
         }
         renderer.render(scene, camera);
@@ -236,16 +334,64 @@ export default function DashboardArPage() {
       <div ref={overlayRef} style={{ position: "fixed", inset: 0, pointerEvents: active ? "auto" : "none" }}>
         {active && (
           <>
-            <div style={{ position: "absolute", top: 18, left: 18, right: 18, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div style={{ ...mono, fontSize: 11, letterSpacing: 1.5, color: "#fff", background: "rgba(0,0,0,0.55)", padding: "8px 12px", borderRadius: 6, maxWidth: 260 }}>
-                {placed ? "◈ painel fixado — toque de novo pra reposicionar" : "◈ aponte pra uma parede ou mesa e toque na tela pra fixar o painel"}
+            {/* camada full-screen que captura os gestos de arrastar/beliscar/girar na fase
+                "placed" — fica atrás dos cartões de UI abaixo na ordem do DOM, então não
+                atrapalha os botões (eles ficam por cima onde se sobrepõem). */}
+            <div
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+              style={{ position: "absolute", inset: 0, touchAction: "none" }}
+            />
+
+            <div style={{ position: "absolute", top: 18, left: 18, right: 18, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+              <div style={{ ...mono, fontSize: 11, letterSpacing: 1, color: "#fff", background: "rgba(0,0,0,0.6)", padding: "8px 12px", borderRadius: 6, maxWidth: 280, lineHeight: 1.5 }}>
+                {arMode === "aiming"
+                  ? reticleVisible
+                    ? "◈ mova o celular pra ajustar — toque em FIXAR quando estiver no lugar certo"
+                    : "◈ procurando uma superfície… aponte pra uma parede ou mesa bem iluminada"
+                  : "◈ fixado — arraste com 1 dedo pra mover, belisque pra redimensionar, gire com 2 dedos"}
               </div>
               <button
                 onClick={stopAr}
-                style={{ ...mono, fontSize: 11, letterSpacing: 1.5, padding: "8px 14px", border: "1px solid #fff", borderRadius: 6, background: "rgba(0,0,0,0.55)", color: "#fff", cursor: "pointer" }}
+                style={{ ...mono, fontSize: 11, letterSpacing: 1.5, padding: "8px 14px", border: "1px solid #fff", borderRadius: 6, background: "rgba(0,0,0,0.6)", color: "#fff", cursor: "pointer", flex: "none" }}
               >
                 ✕ SAIR
               </button>
+            </div>
+
+            <div style={{ position: "absolute", left: 18, right: 18, bottom: 22, display: "flex", justifyContent: "center", gap: 10 }}>
+              {arMode === "aiming" ? (
+                <button
+                  onClick={lockPanel}
+                  disabled={!reticleVisible}
+                  style={{
+                    ...mono, fontSize: 13, letterSpacing: 2, padding: "14px 28px", borderRadius: 30,
+                    border: `1.5px solid ${reticleVisible ? GR : "rgba(255,255,255,0.3)"}`,
+                    background: reticleVisible ? "rgba(123,216,143,0.25)" : "rgba(255,255,255,0.08)",
+                    color: reticleVisible ? "#fff" : "rgba(255,255,255,0.45)",
+                    cursor: reticleVisible ? "pointer" : "not-allowed",
+                  }}
+                >
+                  🔒 FIXAR AQUI
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={repositionPanel}
+                    style={{ ...mono, fontSize: 11.5, letterSpacing: 1.5, padding: "12px 18px", borderRadius: 24, border: `1.5px solid ${CY}`, background: "rgba(0,0,0,0.6)", color: "#fff", cursor: "pointer" }}
+                  >
+                    ✎ REPOSICIONAR
+                  </button>
+                  <button
+                    onClick={() => { if (xr.current.panel) xr.current.panel.scale.setScalar(1); }}
+                    style={{ ...mono, fontSize: 11.5, letterSpacing: 1.5, padding: "12px 18px", borderRadius: 24, border: `1.5px solid ${PU}`, background: "rgba(0,0,0,0.6)", color: "#fff", cursor: "pointer" }}
+                  >
+                    ↺ TAMANHO
+                  </button>
+                </>
+              )}
             </div>
           </>
         )}
@@ -275,10 +421,14 @@ export default function DashboardArPage() {
 
           {supported === true && (
             <>
-              <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 16, maxWidth: 560, color: "rgba(207,239,251,0.8)" }}>
-                Aponte a câmera pra uma parede ou mesa, toque na tela pra fixar o painel ali, e ele fica "pendurado"
-                enquanto você anda pela sala — os mesmos gráficos do Dashboard normal (cards por board, carga por
-                board, tendência do Sentinela), atualizando sozinho a cada {Math.round(REFRESH_MS / 1000)}s.
+              <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 8, maxWidth: 560, color: "rgba(207,239,251,0.8)" }}>
+                Aponte a câmera pra uma parede ou mesa — o painel aparece "fantasma" seguindo a mira em
+                tempo real, então toque em <strong>FIXAR AQUI</strong> quando estiver no lugar certo. Depois de
+                fixado, dá pra ajustar com gestos: arrastar (1 dedo), redimensionar e girar (2 dedos).
+              </div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.6, marginBottom: 16, maxWidth: 560, color: "rgba(207,239,251,0.55)" }}>
+                Os mesmos gráficos do Dashboard normal (cards por board, carga por board, tendência do
+                Sentinela), atualizando sozinho a cada {Math.round(REFRESH_MS / 1000)}s.
               </div>
               <button
                 onClick={startAr}
