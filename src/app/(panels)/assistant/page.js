@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
@@ -11,6 +12,13 @@ import { useIsMobile } from "@/lib/useIsMobile.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
 import { getDeviceId, matchNavCommand } from "@/lib/deviceId.js";
 import { runFullSync } from "@/lib/sync.js";
+
+// carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
+// realmente ligar a Visão 3D; desktop-only por decisão do usuário, nunca entra no bundle mobile.
+const LisaAvatar3D = dynamic(() => import("@/components/panels/LisaAvatar3D.js"), {
+  ssr: false,
+  loading: () => null,
+});
 
 const MODE_META = {
   idle: { label: "IDLE", sub: "awaiting command", color: CY },
@@ -69,6 +77,11 @@ export default function AssistantPage() {
   // Modo Persona: liga a personalidade descrita em persona.md (raiz do repo) por cima das
   // respostas — desligado por padrão (tom direto/neutro de sempre).
   const [personaMode, setPersonaMode] = useState(false);
+
+  // Visão do avatar: "traditional" (visualizador de onda de sempre) ou "3d" (corpo/modelo 3D,
+  // ver LisaAvatar3D.js) — DESKTOP-ONLY de propósito (o toggle só existe no branch desktop
+  // deste componente, então nunca aparece nem carrega no mobile).
+  const [avatarView, setAvatarView] = useState("traditional");
 
   // ---- mobile: tela própria, só o Assistente (ver Shell.js) ----
   const isMobile = useIsMobile();
@@ -142,6 +155,19 @@ export default function AssistantPage() {
       if (typeof window !== "undefined") localStorage.setItem("personaMode", next ? "1" : "0");
       return next;
     });
+  }, []);
+
+  // carrega a Visão do avatar escolhida antes — cada navegador guarda a sua (ver nota acima:
+  // só tem efeito no desktop, mas não custa nada carregar a preferência sempre)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem("avatarView");
+    if (saved === "3d" || saved === "traditional") setAvatarView(saved);
+  }, []);
+
+  const chooseAvatarView = useCallback((view) => {
+    setAvatarView(view);
+    if (typeof window !== "undefined") localStorage.setItem("avatarView", view);
   }, []);
 
   // lista de projetos do Sentinela pro seletor manual (mesma fonte que a aba Sentinela usa)
@@ -927,6 +953,26 @@ export default function AssistantPage() {
         >
           🎭 PERSONA {personaMode ? "ON" : "OFF"}
         </button>
+
+        {/* Visão do avatar: visualizador de onda de sempre × corpo em modelo 3D — desktop-only */}
+        <div style={{ display: "flex", gap: 4 }}>
+          {[{ key: "traditional", label: "◈ VISÃO TRADICIONAL" }, { key: "3d", label: "🧑 VISÃO 3D" }].map((v) => (
+            <button
+              key={v.key}
+              onClick={() => chooseAvatarView(v.key)}
+              title={v.key === "3d" ? "Corpo em modelo 3D no lugar do visualizador — arraste/belisque pra ajustar o enquadramento" : "Visualizador de onda tradicional"}
+              style={{
+                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                border: `1px solid ${avatarView === v.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
+                background: avatarView === v.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
+                color: avatarView === v.key ? "#eafcff" : "rgba(207,239,251,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* abas — só aparecem no mobile (ver .bb-assistant-tabs em globals.css). No mobile o
@@ -971,15 +1017,32 @@ export default function AssistantPage() {
 
         {/* CENTER: VISUALIZER */}
         <section className={`bb-assistant-pane${mobileTab === "visualizer" ? " bb-active" : ""}`} style={{ position: "relative", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, minWidth: 0 }}>
-          <div style={{ position: "relative", width: "min(52vh,520px)", height: "min(52vh,520px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ position: "absolute", inset: "-6%", border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: "50%", borderTopColor: "rgba(var(--accent-rgb),0.45)", borderRightColor: "rgba(var(--accent-rgb),0.28)", animation: "bb-sweep 14s linear infinite" }} />
-            <div style={{ position: "absolute", inset: "4%", border: "1px dashed rgba(255,157,61,0.18)", borderRadius: "50%", animation: "bb-sweep 22s linear infinite reverse" }} />
-            <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
-            <div style={{ position: "relative", textAlign: "center", pointerEvents: "none" }}>
-              <div style={{ ...mono, fontSize: 11, letterSpacing: 5, color: meta.color }}>{meta.label}</div>
-              <div style={{ fontSize: 13, letterSpacing: 2, color: "rgba(207,239,251,0.55)", marginTop: 6, ...mono }}>{meta.sub}</div>
+          {avatarView === "3d" ? (
+            <div style={{ position: "relative", width: "min(64vh,620px)", height: "min(64vh,620px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ position: "absolute", inset: "-3%", border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: 16, pointerEvents: "none" }} />
+              <LisaAvatar3D mode={mode} />
+              <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, textAlign: "center", pointerEvents: "none" }}>
+                <div style={{ ...mono, fontSize: 10, letterSpacing: 4, color: meta.color }}>{meta.label}</div>
+              </div>
+              <a
+                href="https://sketchfab.com/3d-models/android-cyborg-anime-girl-5fda47ea8ca048f7939f78da94aea54f"
+                target="_blank" rel="noreferrer"
+                style={{ position: "absolute", bottom: -18, right: 0, ...mono, fontSize: 7.5, letterSpacing: 0.5, color: "rgba(207,239,251,0.3)", textDecoration: "none" }}
+              >
+                modelo: "Android Cyborg Anime Girl" por lawlietrecluze · CC-BY-4.0
+              </a>
             </div>
-          </div>
+          ) : (
+            <div style={{ position: "relative", width: "min(52vh,520px)", height: "min(52vh,520px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ position: "absolute", inset: "-6%", border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: "50%", borderTopColor: "rgba(var(--accent-rgb),0.45)", borderRightColor: "rgba(var(--accent-rgb),0.28)", animation: "bb-sweep 14s linear infinite" }} />
+              <div style={{ position: "absolute", inset: "4%", border: "1px dashed rgba(255,157,61,0.18)", borderRadius: "50%", animation: "bb-sweep 22s linear infinite reverse" }} />
+              <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+              <div style={{ position: "relative", textAlign: "center", pointerEvents: "none" }}>
+                <div style={{ ...mono, fontSize: 11, letterSpacing: 5, color: meta.color }}>{meta.label}</div>
+                <div style={{ fontSize: 13, letterSpacing: 2, color: "rgba(207,239,251,0.55)", marginTop: 6, ...mono }}>{meta.sub}</div>
+              </div>
+            </div>
+          )}
           <div style={{ marginTop: 26, width: "min(80%,560px)", textAlign: "center" }}>
             <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(var(--accent-rgb),0.5)", marginBottom: 8 }}>↳ INTENT INTERPRETATION</div>
             <div style={{ fontSize: 19, lineHeight: 1.4, color: "#eafcff", fontWeight: 500, letterSpacing: 0.4, whiteSpace: "pre-wrap" }}>{transcript}</div>
