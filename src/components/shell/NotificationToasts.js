@@ -6,7 +6,7 @@ import { CY, OR, mono } from "@/lib/theme.js";
 import { speakText } from "@/lib/browserVoice.js";
 import { useLog } from "./LogProvider.js";
 
-const POLL_MS = 25000;
+const POLL_MS = 12000; // o cron que detecta agora roda a cada 1 min (não usa Gemini, sem custo de cota) — vale conferir mais rápido também
 const TOAST_MS = 9000;
 const CRITICAL_TYPES = new Set(["ticket_sla_breach", "trello_task_overdue"]);
 

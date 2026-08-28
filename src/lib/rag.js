@@ -1,6 +1,7 @@
 import { embedOne } from "./gemini.js";
 import { supabase } from "./supabase.js";
 import { loadAllTrelloCards } from "./liveTrello.js";
+import { getPersonaText } from "./persona.js";
 
 const TOP_K = Number(process.env.RAG_TOP_K || 8);
 const MIN_SIM = Number(process.env.RAG_MIN_SIMILARITY || 0.55);
@@ -100,6 +101,28 @@ alteração num card/chamado/nota, e você estiver gerando ESTA resposta, é por
 de ações não reconheceu o pedido — NUNCA diga que "atualizou", "mudou", "moveu", "marcou"
 ou "salvou" algo, mesmo que pareça óbvio o que fazer. Isso seria mentira. Em vez disso,
 diga que não conseguiu identificar a ação com certeza e peça pra reformular.`;
+
+/**
+ * Aplica a personalidade de persona.md (raiz do repo) por cima de uma instrução base — só
+ * quando o usuário liga "Modo Persona" no seletor do Assistente (padrão é desligado, com o
+ * tom direto/neutro de sempre). O tom/humor descrito em persona.md é uma CAMADA por cima do
+ * conteúdo — nunca substitui as regras de formato/precisão da instrução base, só as combina.
+ */
+export function withPersona(baseInstruction, personaMode) {
+  if (!personaMode) return baseInstruction;
+  const persona = getPersonaText();
+  if (!persona.trim()) return baseInstruction;
+  return `${baseInstruction}
+
+---
+MODO PERSONA ATIVADO — o usuário ligou isso explicitamente nas configurações do Assistente.
+Incorpore o estilo/personalidade descritos abaixo nas suas respostas, MANTENDO todas as
+regras acima (formato pra fala, basear-se só no contexto, nunca afirmar que executou uma
+ação que não executou). O tom da persona é uma camada por cima do conteúdo certo — nunca em
+troca de precisão ou clareza; se a personalidade e a precisão conflitarem, precisão vence.
+
+${persona}`;
+}
 
 /**
  * Recupera os trechos mais parecidos com a pergunta.

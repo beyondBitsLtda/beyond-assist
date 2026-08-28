@@ -65,6 +65,10 @@ export default function AssistantPage() {
   const [sentinelProjectId, setSentinelProjectId] = useState("all");
   const [sentinelProjects, setSentinelProjects] = useState([]);
 
+  // Modo Persona: liga a personalidade descrita em persona.md (raiz do repo) por cima das
+  // respostas — desligado por padrão (tom direto/neutro de sempre).
+  const [personaMode, setPersonaMode] = useState(false);
+
   // ---- mobile: tela própria, só o Assistente (ver Shell.js) ----
   const isMobile = useIsMobile();
   const [mobileView, setMobileView] = useState("chat"); // "chat" | "voice"
@@ -119,6 +123,20 @@ export default function AssistantPage() {
     if (typeof window === "undefined") return;
     const saved = localStorage.getItem("voiceName");
     if (saved) setVoiceName(saved);
+  }, []);
+
+  // carrega se o Modo Persona estava ligado — cada navegador guarda o seu
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setPersonaMode(localStorage.getItem("personaMode") === "1");
+  }, []);
+
+  const togglePersonaMode = useCallback(() => {
+    setPersonaMode((v) => {
+      const next = !v;
+      if (typeof window !== "undefined") localStorage.setItem("personaMode", next ? "1" : "0");
+      return next;
+    });
   }, []);
 
   // lista de projetos do Sentinela pro seletor manual (mesma fonte que a aba Sentinela usa)
@@ -425,7 +443,7 @@ export default function AssistantPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          question: q, scope: computeScope(),
+          question: q, scope: computeScope(), personaMode,
           history: historyRef.current, pendingAction: pendingActionRef.current,
         }),
       });
@@ -500,7 +518,7 @@ export default function AssistantPage() {
       speechBufferRef.current = "";
       if (voiceEnabled && remaining) enqueueSpeech(remaining, gen);
     }
-  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech]);
+  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode]);
 
   // ---- STT: ouvir microfone (Web Speech API) ----
   const toggleMic = useCallback(() => {
@@ -759,6 +777,15 @@ export default function AssistantPage() {
                 ))}
               </div>
 
+              {/* persona */}
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>PERSONALIDADE</div>
+              <button
+                onClick={togglePersonaMode}
+                style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${personaMode ? PU : "rgba(var(--accent-rgb),0.18)"}`, background: personaMode ? "rgba(201,166,255,0.12)" : "transparent", color: personaMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 14 }}
+              >
+                🎭 Modo Persona: {personaMode ? "ON" : "OFF"}
+              </button>
+
               {/* sync */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>SINCRONIZAÇÃO</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -833,6 +860,21 @@ export default function AssistantPage() {
         {scopeMode === "general" && (
           <span style={{ ...mono, fontSize: 9, color: PU }}>vê todos os painéis · pode buscar na web quando precisar</span>
         )}
+
+        {/* Modo Persona — liga a personalidade de persona.md por cima das respostas */}
+        <button
+          onClick={togglePersonaMode}
+          title={personaMode ? "Modo Persona ligado (persona.md) — clique pra desligar" : "Modo Persona desligado (tom direto de sempre) — clique pra ligar"}
+          style={{
+            ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3, marginLeft: "auto",
+            border: `1px solid ${personaMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
+            background: personaMode ? "rgba(201,166,255,0.12)" : "transparent",
+            color: personaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+            cursor: "pointer",
+          }}
+        >
+          🎭 PERSONA {personaMode ? "ON" : "OFF"}
+        </button>
       </div>
 
       {/* abas — só aparecem no mobile (ver .bb-assistant-tabs em globals.css). No mobile o

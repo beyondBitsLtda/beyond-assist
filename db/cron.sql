@@ -12,8 +12,11 @@
 --    1) beyond-sync-start / beyond-sync-tick → SYNC automático (Trello+Gemini): reinicia
 --       1x/hora, avança uma fatia a cada 2 min (mais devagar de propósito — ver nota abaixo)
 --    2) beyond-notify-tick                   → notificações push (chamado novo, SLA,
---                                               tarefa atrasada), a cada 5 min — substitui
---                                               o cron que estava em vercel.json
+--                                               tarefa atrasada), a cada 1 min — substitui
+--                                               o cron que estava em vercel.json. Diferente
+--                                               do SYNC, isso NÃO chama o Gemini (só lê
+--                                               Trello/Sentinela ao vivo), então não disputa
+--                                               cota — pode ficar rápido sem problema.
 --
 --  Domínio já preenchido: beyond-assist-blue.vercel.app (testado — HTTP 200, sem proteção de
 --  login da Vercel). Se um dia trocar de domínio, é só substituir as 3 ocorrências dele abaixo.
@@ -68,12 +71,13 @@ select cron.schedule(
   $$
 );
 
--- ---------- Notificações push (chamado novo/reaberto, SLA, tarefa atrasada), 1x/5min ----------
+-- ---------- Notificações push (chamado novo/reaberto, SLA, tarefa atrasada), 1x/min ----------
 -- Substitui o cron que estava em vercel.json (removido de lá — violava o limite do Hobby).
+-- Não usa Gemini — só lê Trello/Sentinela ao vivo — então 1x/min não disputa cota com nada.
 
 select cron.schedule(
   'beyond-notify-tick',
-  '*/5 * * * *',
+  '* * * * *',
   $$
   select net.http_get(
     url := 'https://beyond-assist-blue.vercel.app/api/cron/notify',

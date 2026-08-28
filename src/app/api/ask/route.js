@@ -1,6 +1,6 @@
 import {
   retrieve, retrieveByDate, detectDateRange, retrieveByBoard, detectBoard,
-  retrieveGeneral, buildPrompt, todayLabel, SYSTEM_INSTRUCTION, SYSTEM_INSTRUCTION_GENERAL,
+  retrieveGeneral, buildPrompt, todayLabel, withPersona, SYSTEM_INSTRUCTION, SYSTEM_INSTRUCTION_GENERAL,
 } from "@/lib/rag.js";
 import { searchThoughts, listThoughts, toMatchFormat } from "@/lib/notes.js";
 import { retrieveSentinelTickets, listProjects } from "@/lib/sentinel.js";
@@ -78,9 +78,12 @@ async function* chatStreamWithFallback(prompt, systemInstruction, tools) {
  *   - "action":  { pending: object|null } → o cliente guarda isso e manda de volta no próximo pedido
  *   - "token":   pedaços da resposta → transcript (estado SPEAKING)
  *   - "done":    fim do stream
+ *
+ * `personaMode` (opcional, default false) — liga a personalidade de persona.md por cima da
+ * instrução normal (ver withPersona em rag.js). Vem do seletor de configurações do Assistente.
  */
 export async function POST(req) {
-  const { question, filterSource = null, scope = null, history = null, pendingAction = null } = await req.json();
+  const { question, filterSource = null, scope = null, history = null, pendingAction = null, personaMode = false } = await req.json();
 
   if (!question || typeof question !== "string") {
     return new Response(JSON.stringify({ error: "question é obrigatório" }), {
@@ -259,7 +262,7 @@ export async function POST(req) {
         send(controller, "context", matches);
 
         const prompt = buildPrompt(question, matches, promptNote);
-        for await (const piece of chatStreamWithFallback(prompt, systemInstruction, tools)) {
+        for await (const piece of chatStreamWithFallback(prompt, withPersona(systemInstruction, personaMode), tools)) {
           send(controller, "token", piece);
         }
 
