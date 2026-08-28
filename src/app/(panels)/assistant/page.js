@@ -21,9 +21,10 @@ const THOUGHTS_SCOPE = "__thoughts__";
 const SENTINEL_SCOPE = "__sentinel__";
 
 // Tamanho mínimo (em caracteres) pro primeiro pedaço da resposta antes de mandar pro TTS.
-// Poucas chamadas maiores erram menos que muitas chamadas pequenas (uma por frase esgotava
-// o limite de requisições da API do Gemini).
-const TTS_HEAD_CHARS = 150;
+// Ainda são só 2 chamadas de TTS por resposta no total (cabeça + resto) — baixar esse
+// número não aumenta chamada nenhuma, só faz a cabeça sair mais cedo (a fala começa assim
+// que a 1ª frase completa passar desse tamanho, em vez de esperar várias frases se juntarem).
+const TTS_HEAD_CHARS = 40;
 
 /** Corta um buffer de texto nas últimas frases completas (terminadas em . ! ? ou quebra de linha). */
 function splitSentences(text) {

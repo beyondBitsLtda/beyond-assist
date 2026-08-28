@@ -60,70 +60,79 @@ export async function loadTrello(opts = {}) {
     return [];
   }
 
-  const docs = [];
-
-  for (const boardRef of boardIds) {
+  // Busca todos os boards EM PARALELO (não um de cada vez) — e, dentro de cada board, os 3
+  // pedidos (nome/listas/cards) também são independentes entre si, então também vão juntos.
+  // Isso é o maior peso na demora entre perguntar e a resposta começar a chegar: sequencial,
+  // 4 boards × 3 chamadas cada podiam somar bem mais que em paralelo (limitado só pela mais
+  // lenta das chamadas, não pela SOMA de todas).
+  const perBoard = await Promise.all(boardIds.map(async (boardRef) => {
     try {
-      const board = await tget(`/boards/${boardRef}`, { fields: "name" });
+      const [board, lists, cards] = await Promise.all([
+        tget(`/boards/${boardRef}`, { fields: "name" }),
+        tget(`/boards/${boardRef}/lists`, { fields: "name,pos" }),
+        tget(`/boards/${boardRef}/cards`, {
+          fields: "name,desc,dateLastActivity,idList,shortUrl,labels,due,start,dueComplete",
+          filter: "open",
+        }),
+      ]);
       const boardName = board?.name || boardRef;
-
-      // mapa idList → { name, pos } — pos é a ordem real das colunas no board (pro Kanban)
-      const lists = await tget(`/boards/${boardRef}/lists`, { fields: "name,pos" });
       const listMeta = Object.fromEntries((lists || []).map((l) => [l.id, { name: l.name, pos: l.pos }]));
-
-      const cards = await tget(`/boards/${boardRef}/cards`, {
-        fields: "name,desc,dateLastActivity,idList,shortUrl,labels,due,start,dueComplete",
-        filter: "open",
-      });
-
-      for (const card of cards || []) {
-        const list = listMeta[card.idList]?.name || "";
-        const listPos = listMeta[card.idList]?.pos ?? null;
-        const labels = (card.labels || []).map((l) => l.name).filter(Boolean).join(", ");
-
-        // datas humanizadas (o Gemini indexa palavras — precisa ver "vence em", "prazo")
-        const dueLine = card.due
-          ? `Data de entrega/prazo: ${fmtDate(card.due)}${card.dueComplete ? " (concluído)" : ""}`
-          : "";
-        const startLine = card.start ? `Data de início: ${fmtDate(card.start)}` : "";
-        const modLine = card.dateLastActivity ? `Última modificação: ${fmtDate(card.dateLastActivity)}` : "";
-
-        const content = [
-          card.name,
-          list ? `Lista: ${list}` : "",
-          labels ? `Etiquetas: ${labels}` : "",
-          dueLine,
-          startLine,
-          modLine,
-          card.desc ? `\nDescrição:\n${card.desc}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n");
-
-        docs.push({
-          source: "trello",
-          external_id: card.id,
-          board: boardName,
-          title: card.name,
-          content,
-          last_modified: card.dateLastActivity || null,
-          metadata: {
-            list,
-            list_pos: listPos,
-            url: card.shortUrl,
-            labels,
-            due: card.due || null,
-            start: card.start || null,
-            due_complete: card.dueComplete || false,
-            board_id: boardRef,
-            id_list: card.idList,
-          },
-        });
-      }
-
       console.log(`[trello] "${boardName}": ${(cards || []).length} cards`);
+      return { boardRef, boardName, listMeta, cards: cards || [] };
     } catch (err) {
       console.error(`[trello] falha no board ${boardRef}: ${err.message}`);
+      return null;
+    }
+  }));
+
+  const docs = [];
+
+  for (const board of perBoard) {
+    if (!board) continue;
+    const { boardRef, boardName, listMeta, cards } = board;
+    for (const card of cards) {
+      const list = listMeta[card.idList]?.name || "";
+      const listPos = listMeta[card.idList]?.pos ?? null;
+      const labels = (card.labels || []).map((l) => l.name).filter(Boolean).join(", ");
+
+      // datas humanizadas (o Gemini indexa palavras — precisa ver "vence em", "prazo")
+      const dueLine = card.due
+        ? `Data de entrega/prazo: ${fmtDate(card.due)}${card.dueComplete ? " (concluído)" : ""}`
+        : "";
+      const startLine = card.start ? `Data de início: ${fmtDate(card.start)}` : "";
+      const modLine = card.dateLastActivity ? `Última modificação: ${fmtDate(card.dateLastActivity)}` : "";
+
+      const content = [
+        card.name,
+        list ? `Lista: ${list}` : "",
+        labels ? `Etiquetas: ${labels}` : "",
+        dueLine,
+        startLine,
+        modLine,
+        card.desc ? `\nDescrição:\n${card.desc}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      docs.push({
+        source: "trello",
+        external_id: card.id,
+        board: boardName,
+        title: card.name,
+        content,
+        last_modified: card.dateLastActivity || null,
+        metadata: {
+          list,
+          list_pos: listPos,
+          url: card.shortUrl,
+          labels,
+          due: card.due || null,
+          start: card.start || null,
+          due_complete: card.dueComplete || false,
+          board_id: boardRef,
+          id_list: card.idList,
+        },
+      });
     }
   }
 
