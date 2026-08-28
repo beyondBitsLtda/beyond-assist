@@ -58,6 +58,13 @@ export default function AssistantPage() {
   const [voiceSupported, setVoiceSupported] = useState(true);
   const [geminiVoiceEnabled, setGeminiVoiceEnabled] = useState(true); // tentar a voz do Gemini? (desligado = só navegador)
   const [geminiVoiceStatus, setGeminiVoiceStatus] = useState(null);   // null=não testada ainda · true=ok · false=falhou (última tentativa real)
+  // "disjuntor": sem isso, CADA resposta nova testava o Gemini do zero — se ele estivesse
+  // instável, uma resposta saía na voz dele e a próxima já caía pro navegador, sem padrão
+  // nenhum (é o que dava a sensação de "ficar trocando"). Uma vez que falha de verdade,
+  // para de tentar por um tempo (fica só na voz do navegador, de forma CONSISTENTE) em vez
+  // de tentar de novo já na pergunta seguinte.
+  const GEMINI_COOLDOWN_MS = 60000;
+  const geminiDownUntilRef = useRef(0);
   // voz do Gemini escolhida — guardada no navegador (não temos como ouvir as 30 vozes daqui
   // pra saber quais soam femininas; teste e escolha a que preferir).
   const [voiceName, setVoiceName] = useState("Kore");
@@ -445,14 +452,19 @@ export default function AssistantPage() {
     if (result?.url) {
       speechEngineRef.current = "gemini";
       setGeminiVoiceStatus(true);
+      geminiDownUntilRef.current = 0; // deu certo — desarma o disjuntor, se estivesse armado
     } else {
       // sem áudio do Gemini pra este pedaço — cai pra voz do navegador. Se isso já
       // aconteceu na cabeça desta resposta, o resto nem tenta o Gemini de novo (evita
       // alternar de voz no meio da fala).
       if (!result?.skipped) {
         const reason = String(result?.error?.message || "").slice(0, 90);
-        addLog("[TTS]", OR, `Gemini indisponível${reason ? ` (${reason})` : ""} → voz do navegador`);
+        const cooldownSec = Math.round(GEMINI_COOLDOWN_MS / 1000);
+        addLog("[TTS]", OR, `Gemini indisponível${reason ? ` (${reason})` : ""} → voz do navegador (sem tentar de novo por ${cooldownSec}s)`);
         setGeminiVoiceStatus(false); // só marca "falhou" numa tentativa real — não quando foi pulada de propósito
+        // ARMA o disjuntor: falha de verdade → some tentar o Gemini de novo por um tempo,
+        // em vez de já testar de novo na próxima pergunta (é isso que causava a alternância).
+        geminiDownUntilRef.current = Date.now() + GEMINI_COOLDOWN_MS;
       }
       speechEngineRef.current = "browser";
     }
@@ -501,7 +513,7 @@ export default function AssistantPage() {
     // diferentes. Rápido (não espera áudio tocar), então não reabre o gap que isso evita.
     const thisDecision = engineDecisionRef.current.then(() => {
       if (gen !== speechGenRef.current) return { url: null, skipped: true };
-      const tryGemini = geminiVoiceEnabled && speechEngineRef.current !== "browser";
+      const tryGemini = geminiVoiceEnabled && speechEngineRef.current !== "browser" && Date.now() >= geminiDownUntilRef.current;
       return resolveChunkEngine(tryGemini, clean);
     });
     engineDecisionRef.current = thisDecision.catch(() => ({ url: null, skipped: true }));
@@ -1292,7 +1304,11 @@ export default function AssistantPage() {
 
         {/* liga/desliga a voz do Gemini especificamente + mostra se ela tá disponível */}
         <button
-          onClick={() => setGeminiVoiceEnabled((v) => !v)}
+          onClick={() => setGeminiVoiceEnabled((v) => {
+            const next = !v;
+            if (next) geminiDownUntilRef.current = 0; // reativou na mão → tenta de novo já na próxima, não espera o disjuntor
+            return next;
+          })}
           title={
             !geminiVoiceEnabled
               ? "Voz Gemini desativada — usando só a voz do navegador (clique pra reativar)"
