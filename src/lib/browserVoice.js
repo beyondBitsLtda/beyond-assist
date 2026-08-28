@@ -18,29 +18,38 @@ export function pickBrowserVoice(voices) {
   );
 }
 
-/** Fala um texto pela voz do Gemini (via /api/speak); se falhar, cai pra voz do navegador. */
-export async function speakText(text, { voiceName } = {}) {
+/**
+ * Fala um texto em voz alta. `browserOnly: true` pula o Gemini de propósito — usado pelos
+ * avisos dentro do app (ver NotificationToasts.js), que não precisam da voz "premium" e
+ * MULTIPLICAM chamadas ao Gemini se você tiver mais de uma aba/dispositivo aberto ao mesmo
+ * tempo (cada um fala cada aviso por conta própria) — competindo por cota com o Assistente,
+ * que é quem realmente precisa da voz do Gemini. Sem esse parâmetro, cai pra voz do Gemini
+ * (via /api/speak) com fallback pro navegador se falhar — é o que o Assistente usa.
+ */
+export async function speakText(text, { voiceName, browserOnly = false } = {}) {
   const clean = (text || "").trim();
   if (!clean || typeof window === "undefined") return;
 
-  try {
-    const res = await fetch("/api/speak", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: clean, voice: voiceName }),
-    });
-    if (!res.ok) throw new Error(`speak HTTP ${res.status}`);
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    await new Promise((resolve) => {
-      audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
-      audio.onerror = () => { URL.revokeObjectURL(url); resolve(); };
-      audio.play().catch(resolve);
-    });
-    return;
-  } catch {
-    // cai pra voz do navegador
+  if (!browserOnly) {
+    try {
+      const res = await fetch("/api/speak", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: clean, voice: voiceName }),
+      });
+      if (!res.ok) throw new Error(`speak HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      await new Promise((resolve) => {
+        audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+        audio.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+        audio.play().catch(resolve);
+      });
+      return;
+    } catch {
+      // cai pra voz do navegador
+    }
   }
 
   if (!window.speechSynthesis) return;

@@ -9,7 +9,8 @@
 --  pelo plano da Vercel — só a EXECUÇÃO roda lá (como função normal, sem ser um "cron job"
 --  aos olhos da Vercel).
 --
---    1) beyond-sync-start / beyond-sync-tick → SYNC automático (Trello+Gemini), 1x/hora
+--    1) beyond-sync-start / beyond-sync-tick → SYNC automático (Trello+Gemini): reinicia
+--       1x/hora, avança uma fatia a cada 2 min (mais devagar de propósito — ver nota abaixo)
 --    2) beyond-notify-tick                   → notificações push (chamado novo, SLA,
 --                                               tarefa atrasada), a cada 5 min — substitui
 --                                               o cron que estava em vercel.json
@@ -49,11 +50,15 @@ select cron.schedule(
   $$
 );
 
--- 3) A cada minuto: avança uma fatia do ciclo (não faz nada se nenhum ciclo
---    estiver em andamento — chamada barata, só 2 leituras na sync_progress)
+-- 3) A cada 2 minutos: avança uma fatia do ciclo (não faz nada se nenhum ciclo estiver em
+--    andamento — chamada barata, só 2 leituras na sync_progress). 2 em 2 minutos, não 1 em 1,
+--    de propósito: cada fatia chama o Gemini pra gerar embeddings, e isso disputa cota com
+--    o chat/voz do Assistente — de 1 em 1 minuto, o ciclo de SYNC sozinho já estourava a
+--    cota gratuita boa parte do tempo. O ciclo completo demora mais pra terminar, mas
+--    sobra bem mais cota pra você usar o Assistente sem esbarrar em "cota cheia".
 select cron.schedule(
   'beyond-sync-tick',
-  '* * * * *',
+  '*/2 * * * *',
   $$
   select net.http_get(
     url := 'https://beyond-assist-blue.vercel.app/api/cron/sync',

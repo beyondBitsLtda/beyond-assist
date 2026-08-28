@@ -17,6 +17,21 @@ export const dynamic = "force-dynamic";
  * parece cota estourada — sem essa queda, o modo "Geral" nunca funcionaria nessas contas,
  * mesmo a busca normal (sem web) estando totalmente disponível.
  */
+// Filtro LOCAL (sem gastar chamada do Gemini) antes de decidir se vale a pena chamar
+// detectTrelloAction — sem isso, toda mensagem numa conversa com cards do Trello no
+// histórico disparava uma chamada extra ao Gemini, mesmo perguntas totalmente normais
+// ("obrigado", "e sobre X?"). Isso competia por cota com o resto do app (SYNC automático,
+// TTS, o chat em si) e ajudava a esgotar a cota bem mais rápido.
+const ACTION_VERB_RE = /reprogram|remarc|adia|prazo|mud[ae]|mov[ei]|movid|marc[ae]|marque|conclu|reabr|status|\blista\b|coluna|cancel[ae]|fech[ae]|fechad|resolvid|abert[oa]/i;
+const SHORT_REPLY_RE = /^\s*(sim|s|confirma|confirmo|pode|manda|isso|ok|beleza|claro|bora|faz|vai|n[ãa]o|n|cancela|cancele|espera|deixa)\b/i;
+
+/** Vale a pena chamar detectTrelloAction (custa uma chamada ao Gemini) pra esta mensagem? */
+function mightBeAction(question, hasPending) {
+  const q = (question || "").trim();
+  if (hasPending && SHORT_REPLY_RE.test(q)) return true; // resposta curta a uma ação pendente
+  return ACTION_VERB_RE.test(q);
+}
+
 async function* chatStreamWithFallback(prompt, systemInstruction, tools) {
   const primary = chatStream(prompt, systemInstruction, { tools });
   let yieldedAny = false;
@@ -85,7 +100,8 @@ export async function POST(req) {
       try {
         // ---- ações no Trello: detecta ANTES do fluxo normal, só quando faz sentido tentar ----
         const candidateCards = (history?.cards || []).filter((c) => c.source === "TRELLO" && c.id);
-        if (candidateCards.length || pendingAction) {
+        const shouldCheckAction = (candidateCards.length || pendingAction) && mightBeAction(question, !!pendingAction);
+        if (shouldCheckAction) {
           const intent = await detectTrelloAction({
             question, todayLabel: todayLabel(), candidateCards, pendingAction,
           }).catch(() => ({ intent: "none" }));

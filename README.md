@@ -99,8 +99,10 @@ de ser instantâneo.
 2. Rode `db/cron.sql` no SQL Editor do Supabase, depois de trocar os placeholders (domínio +
    `INGEST_SECRET` + `CRON_SECRET`) pelos valores reais. Isso agenda, via `pg_cron` + `pg_net`
    (extensões nativas do Supabase, sem custo extra):
-   - **SYNC** — a cada hora (minuto 0) reinicia o ciclo, e a cada minuto avança uma fatia
-     (`/api/cron/sync`) — sem custo quando não há ciclo em andamento;
+   - **SYNC** — a cada hora (minuto 0) reinicia o ciclo, e a cada 2 min avança uma fatia
+     (`/api/cron/sync`) — sem custo quando não há ciclo em andamento. 2 em 2 min, não 1 em 1,
+     de propósito: cada fatia chama o Gemini pra gerar embeddings, e isso disputa cota com o
+     chat/voz do Assistente — mais devagar sobra mais cota pro uso interativo;
    - **Notificações** — a cada 5 min chama `/api/cron/notify` (chamado novo/reaberto, SLA
      estourando, tarefa atrasada).
 
@@ -115,6 +117,28 @@ todo deploy subsequente por dias, sem sintoma óbvio além do "X" nos checks do 
 os dois crons agora são agendados pelo **Supabase** (que não tem esse limite), e `vercel.json`
 ficou vazio — as rotas continuam sendo funções normais da Vercel, só não são mais "cron jobs"
 aos olhos dela.
+
+---
+
+## Cota do Gemini — várias chaves com troca automática
+
+O plano gratuito do Gemini tem limite por minuto **e** por dia — com o SYNC automático rodando
+o dia inteiro em segundo plano mais o uso normal do Assistente, é fácil esbarrar nisso.
+
+Pra aliviar, o app aceita **mais de uma API key**, testando na ordem e trocando pra próxima
+automaticamente quando uma bate no limite de cota (não troca por outros tipos de erro):
+
+```
+GEMINI_API_KEYS=chave-do-projeto-1,chave-do-projeto-2,chave-do-projeto-3
+```
+
+Defina essa variável (em vez de `GEMINI_API_KEY`) na Vercel e no `.env`, separando as chaves por
+vírgula. **Cada chave precisa vir de um projeto diferente** no Google Cloud/AI Studio — chaves do
+mesmo projeto compartilham a mesma cota, então usar várias delas não ajuda em nada. Dá pra criar
+vários projetos na mesma conta Google (não precisa de contas separadas), gerando uma API key nova
+em cada um.
+
+Sem `GEMINI_API_KEYS`, o app continua funcionando normalmente só com `GEMINI_API_KEY` (uma chave).
 
 ---
 

@@ -51,13 +51,15 @@ export default function NotificationToasts() {
       sinceRef.current = data.now;
       if (typeof window !== "undefined") localStorage.setItem("notifSince", data.now);
 
-      const voiceName = typeof window !== "undefined" ? localStorage.getItem("voiceName") : null;
       for (const ev of events) {
         const id = `${ev.event_type}:${ev.entity_id}:${ev.created_at}`;
         const critical = CRITICAL_TYPES.has(ev.event_type);
         setToasts((prev) => [...prev, { id, title: ev.title, body: ev.body, url: ev.url, critical }]);
         addLog("[AVISO]", critical ? OR : CY, ev.title);
-        speakText(`${ev.title}. ${ev.body || ""}`, { voiceName }).catch(() => {});
+        // browserOnly: de propósito — voz do navegador, sem gastar cota do Gemini (o
+        // Assistente é quem precisa dela; com várias abas/dispositivos abertos, cada um
+        // falaria o mesmo aviso pela voz "premium", multiplicando chamadas à toa).
+        speakText(`${ev.title}. ${ev.body || ""}`, { browserOnly: true }).catch(() => {});
         setTimeout(() => dismiss(id), TOAST_MS);
       }
     } catch {

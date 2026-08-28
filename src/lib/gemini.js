@@ -5,18 +5,36 @@ const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-2.5-flash";
 const EMBED_DIM = Number(process.env.GEMINI_EMBED_DIM || 768);
 
-let _ai = null;
+// ---- múltiplas chaves do Gemini, com troca automática quando uma esgota a cota ----
+// GEMINI_API_KEYS="chave1,chave2,chave3" (uma lista) — cada chave precisa ser de um
+// PROJETO diferente no Google Cloud/AI Studio pra ter cota própria de verdade (chaves do
+// MESMO projeto compartilham a mesma cota, então trocar entre elas não ajuda em nada).
+// Mantém GEMINI_API_KEY funcionando sozinha se só houver uma (comportamento de sempre).
+const KEYS = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "")
+  .split(",").map((k) => k.trim()).filter(Boolean);
+
+const _clients = new Map(); // chave → cliente (reaproveita entre chamadas)
+let keyPtr = 0; // índice da chave "atual" — avança quando uma esgota a cota
+
 function ai() {
-  if (_ai) return _ai;
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  if (!KEYS.length) {
     throw new Error(
-      "GEMINI_API_KEY não configurada. " +
+      "GEMINI_API_KEY (ou GEMINI_API_KEYS) não configurada. " +
       "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
     );
   }
-  _ai = new GoogleGenAI({ apiKey });
-  return _ai;
+  const key = KEYS[keyPtr % KEYS.length];
+  if (!_clients.has(key)) _clients.set(key, new GoogleGenAI({ apiKey: key }));
+  return _clients.get(key);
+}
+
+/** Chamado nos pontos de retry quando o erro é de COTA (não de alta demanda) — avança pra
+ * próxima chave configurada, pra a PRÓXIMA tentativa já sair usando outro projeto/cota.
+ * Sem efeito (mod 1) se só existir uma chave configurada. */
+function rotateKeyOnQuota(err) {
+  if (KEYS.length > 1 && isQuotaError(String(err?.message || err))) {
+    keyPtr = (keyPtr + 1) % KEYS.length;
+  }
 }
 
 // ---- erros transitórios do Gemini (429 quota / 503 alta demanda) ----
@@ -56,6 +74,7 @@ async function withTransientRetry(fn, { attempts = 3, delayMs = 1200 } = {}) {
       return await fn();
     } catch (err) {
       if (!isTransientError(err) || attempt === attempts) throw rewriteTransientError(err);
+      rotateKeyOnQuota(err);
       await new Promise((r) => setTimeout(r, delayMs * attempt));
     }
   }
@@ -84,6 +103,7 @@ export async function embed(texts, taskType = "RETRIEVAL_DOCUMENT") {
       return res.embeddings.map((e) => e.values);
     } catch (err) {
       if (!isTransientError(err) || attempt === maxAttempts) throw rewriteTransientError(err);
+      rotateKeyOnQuota(err);
       await new Promise((r) => setTimeout(r, 3000)); // uma espera curta só
     }
   }
@@ -120,6 +140,7 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
       return res.embeddings.map((e) => e.values);
     } catch (err) {
       if (!isTransientError(err) || attempt === maxAttempts) throw rewriteTransientError(err);
+      rotateKeyOnQuota(err);
       const msg = String(err?.message || err);
       const m = msg.match(/retry in ([\d.]+)s/i);
       const waitSec = Math.min(m ? Math.ceil(Number(m[1])) + 1 : 5 * attempt, MAX_WAIT_SEC);
