@@ -159,6 +159,18 @@ enquanto você anda pela sala.
   sem risco de "contaminar" o canvas.
 - Os dados são as mesmas fontes ao vivo do Dashboard normal (Trello/Sentinela direto, sem
   SYNC/embeddings), atualizando sozinho a cada 45s enquanto a sessão AR estiver aberta.
+- **Reconhecimento de tela (opcional):** o MODO TV do Dashboard mostra um QR discreto no
+  canto (`src/components/panels/TvArMarker.js`). No modo AR, o botão "🔍 ESCANEAR TELA" abre
+  uma pré-visualização de câmera comum (sem WebXR ainda) que procura esse QR via
+  `BarcodeDetector` — API nativa do Chrome/Android. O WebXR não dá acesso a pixel bruto de
+  câmera pra "reconhecer a tela só de olhar" (bloqueado por privacidade), então o QR é o que
+  torna isso confiável. Ao achar, já reage na hora com uns KPIs "3D" flutuando sobre o próprio
+  preview (`src/lib/qrPseudo3d.js`, canvas puro, sem engine 3D) — só depois, se quiser, entra
+  em AR de verdade pra fixar o painel completo no espaço.
+- Fixação com preview ao vivo: o painel aparece semitransparente seguindo a mira em tempo
+  real ANTES de fixar (não é "tocar e já cravar às cegas"). Depois de fixado, ajusta com
+  gestos — arrastar (1 dedo), redimensionar e girar (2 dedos) — sem depender de acertar o
+  hit-test de novo.
 
 ## Estrutura
 

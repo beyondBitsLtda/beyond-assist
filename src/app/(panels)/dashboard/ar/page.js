@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import * as THREE from "three";
 import { CY, OR, GR, PU, mono } from "@/lib/theme.js";
-import { CHART } from "@/lib/chartPalette.js";
 import { drawDashboardPanel } from "@/lib/arCanvasCharts.js";
+import { loadArData } from "@/lib/arDashboardData.js";
+import ArScanner from "@/components/panels/ArScanner.js";
 
 // Textura do painel — proporção 1600x980 fica legível de longe e não pesa demais como
 // textura WebGL num celular. O plano 3D usa a mesma proporção (ver PANEL_W/PANEL_H abaixo).
@@ -14,59 +15,6 @@ const PANEL_W = 1.15; // metros — do tamanho de um monitor médio "pendurado" 
 const PANEL_H = PANEL_W * (TEX_H / TEX_W);
 const REFRESH_MS = 45000;
 const SCALE_MIN = 0.4, SCALE_MAX = 2.5;
-
-async function loadArData() {
-  const [boardsRes, overdueRes, sentinelRes] = await Promise.all([
-    fetch("/api/boards-overview").then((r) => r.json()).catch(() => ({ ok: false })),
-    fetch("/api/tasks?range=overdue").then((r) => r.json()).catch(() => ({ ok: false })),
-    fetch("/api/sentinel/dashboard?project=all").then((r) => r.json()).catch(() => ({ ok: false })),
-  ]);
-  const boards = boardsRes.ok ? boardsRes.boards || [] : [];
-  const overdueTasks = overdueRes.ok ? overdueRes.tasks || [] : [];
-  const sentinel = sentinelRes.ok ? sentinelRes : null;
-
-  const kpis = [{ label: "TAREFAS ATRASADAS", value: overdueTasks.length, critical: overdueTasks.length > 0 }];
-  if (sentinel) {
-    const breached = (sentinel.sla?.responseBreached || 0) + (sentinel.sla?.resolutionBreached || 0);
-    const closedLike = (sentinel.byStatus?.["Resolvido"] || 0) + (sentinel.byStatus?.["Fechado"] || 0);
-    const total = Object.values(sentinel.byStatus || {}).reduce((s, n) => s + n, 0);
-    kpis.push({ label: "SLA ESTOURADO", value: breached, critical: breached > 0 });
-    kpis.push({ label: "TICKETS ABERTOS", value: Math.max(0, total - closedLike), critical: false });
-  }
-
-  const pieRows = boards.map((b) => ({ key: b.board, label: b.board, value: b.total || 0 }));
-
-  const boardsBarRows = boards
-    .map((b) => ({
-      key: b.board, label: b.board,
-      values: [Math.max(0, (b.open || 0) - (b.overdue || 0)), b.overdue || 0, b.done || 0],
-    }))
-    .sort((a, b) => (b.values[0] + b.values[1] + b.values[2]) - (a.values[0] + a.values[1] + a.values[2]));
-  const barsSeries = [
-    { key: "ontime", name: "No prazo", color: CHART.categorical[0] },
-    { key: "overdue", name: "Atrasado", color: CHART.status.critical },
-    { key: "done", name: "Concluído", color: CHART.categorical[2] },
-  ];
-
-  const line = sentinel && sentinel.trend
-    ? {
-        title: "SENTINELA · ABERTOS × RESOLVIDOS (21D)",
-        points: sentinel.trend,
-        series: [
-          { key: "opened", name: "Abertos", color: CHART.categorical[0] },
-          { key: "resolved", name: "Resolvidos", color: CHART.categorical[2] },
-        ],
-      }
-    : null;
-
-  return {
-    updatedLabel: new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(new Date()),
-    kpis,
-    pie: { title: "CARDS POR BOARD", rows: pieRows },
-    line,
-    bars: { title: "CARGA POR BOARD · NO PRAZO × ATRASADO × CONCLUÍDO", rows: boardsBarRows, series: barsSeries },
-  };
-}
 
 /**
  * Dashboard em Realidade Aumentada (WebXR): aponta a câmera pra uma superfície (parede, mesa),
@@ -87,9 +35,11 @@ export default function DashboardArPage() {
   const xr = useRef({}); // guarda tudo que é imperativo (renderer, scene, session, refs do three.js, gestos) fora do ciclo do React
 
   const [supported, setSupported] = useState(null); // null=checando, true/false
+  const [phase, setPhase] = useState("landing"); // "landing" | "scanning" | (WebXR ativo, ver `active`)
   const [active, setActive] = useState(false);
   const [arMode, setArMode] = useState("aiming"); // "aiming" | "placed"
   const [reticleVisible, setReticleVisible] = useState(false);
+  const [pairedWith, setPairedWith] = useState(null); // deviceId do QR reconhecido no scanner (null = AR direto, sem parear)
   const [err, setErr] = useState(null);
 
   useEffect(() => {
@@ -142,6 +92,8 @@ export default function DashboardArPage() {
     setActive(false);
     setArMode("aiming");
     setReticleVisible(false);
+    setPhase("landing");
+    setPairedWith(null);
   }, []);
 
   useEffect(() => () => cleanupAr(), [cleanupAr]); // garante limpeza se sair da página com a sessão aberta
@@ -229,8 +181,9 @@ export default function DashboardArPage() {
     if (g.pointers.size < 2) { g.pinchDist = null; g.pinchAngle = null; }
   }, []);
 
-  const startAr = useCallback(async () => {
+  const startAr = useCallback(async (deviceId = null) => {
     setErr(null);
+    setPairedWith(deviceId);
     try {
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -347,6 +300,7 @@ export default function DashboardArPage() {
 
             <div style={{ position: "absolute", top: 18, left: 18, right: 18, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
               <div style={{ ...mono, fontSize: 11, letterSpacing: 1, color: "#fff", background: "rgba(0,0,0,0.6)", padding: "8px 12px", borderRadius: 6, maxWidth: 280, lineHeight: 1.5 }}>
+                {pairedWith && <div style={{ color: GR, fontSize: 9.5, marginBottom: 3 }}>🔗 pareado via QR</div>}
                 {arMode === "aiming"
                   ? reticleVisible
                     ? "◈ mova o celular pra ajustar — toque em FIXAR quando estiver no lugar certo"
@@ -397,7 +351,14 @@ export default function DashboardArPage() {
         )}
       </div>
 
-      {!active && (
+      {!active && phase === "scanning" && (
+        <ArScanner
+          onProceed={(deviceId) => { setPhase("landing"); startAr(deviceId); }}
+          onCancel={() => setPhase("landing")}
+        />
+      )}
+
+      {!active && phase === "landing" && (
         <div style={{ position: "relative", zIndex: 2, height: "100%", overflowY: "auto", padding: "28px 24px", color: "#cfeffb", fontFamily: "'Rajdhani',sans-serif" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
             <div style={{ ...mono, fontSize: 12, letterSpacing: 3, color: CY }}>◈ DASHBOARD · MODO AR</div>
@@ -422,20 +383,29 @@ export default function DashboardArPage() {
           {supported === true && (
             <>
               <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 8, maxWidth: 560, color: "rgba(207,239,251,0.8)" }}>
-                Aponte a câmera pra uma parede ou mesa — o painel aparece "fantasma" seguindo a mira em
-                tempo real, então toque em <strong>FIXAR AQUI</strong> quando estiver no lugar certo. Depois de
-                fixado, dá pra ajustar com gestos: arrastar (1 dedo), redimensionar e girar (2 dedos).
+                Se tiver o <strong>MODO TV</strong> do Dashboard aberto numa TV/monitor da sala, aponte a câmera pro QR
+                que aparece no canto dele — a Lisa reconhece que é o dashboard e já mostra uns KPIs "flutuando" em
+                cima da tela antes mesmo de entrar em AR de verdade.
               </div>
               <div style={{ fontSize: 12.5, lineHeight: 1.6, marginBottom: 16, maxWidth: 560, color: "rgba(207,239,251,0.55)" }}>
-                Os mesmos gráficos do Dashboard normal (cards por board, carga por board, tendência do
-                Sentinela), atualizando sozinho a cada {Math.round(REFRESH_MS / 1000)}s.
+                Depois (com ou sem QR), o painel aparece "fantasma" seguindo a mira em tempo real — toque em
+                FIXAR quando estiver no lugar certo, e ajuste com gestos: arrastar (1 dedo), redimensionar e girar
+                (2 dedos). Mesmos gráficos do Dashboard normal, atualizando sozinho a cada {Math.round(REFRESH_MS / 1000)}s.
               </div>
-              <button
-                onClick={startAr}
-                style={{ ...mono, fontSize: 12, letterSpacing: 2, padding: "12px 22px", border: `1px solid ${GR}`, borderRadius: 6, background: "rgba(123,216,143,0.12)", color: GR, cursor: "pointer", marginBottom: 20 }}
-              >
-                ▣ INICIAR AR
-              </button>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+                <button
+                  onClick={() => setPhase("scanning")}
+                  style={{ ...mono, fontSize: 12, letterSpacing: 2, padding: "12px 22px", border: `1px solid ${CY}`, borderRadius: 6, background: "rgba(var(--accent-rgb),0.1)", color: CY, cursor: "pointer" }}
+                >
+                  🔍 ESCANEAR TELA
+                </button>
+                <button
+                  onClick={() => startAr()}
+                  style={{ ...mono, fontSize: 12, letterSpacing: 2, padding: "12px 22px", border: `1px solid ${GR}`, borderRadius: 6, background: "rgba(123,216,143,0.12)", color: GR, cursor: "pointer" }}
+                >
+                  ▣ AR DIRETO (SEM QR)
+                </button>
+              </div>
               {err && <div style={{ ...mono, fontSize: 10.5, color: OR, marginBottom: 16 }}>⚠ {err}</div>}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 1.5, color: "rgba(207,239,251,0.4)", marginBottom: 8 }}>PRÉVIA DO PAINEL</div>
               <div style={{ border: "1px solid rgba(var(--accent-rgb),0.16)", borderRadius: 10, overflow: "hidden", maxWidth: 640 }}>

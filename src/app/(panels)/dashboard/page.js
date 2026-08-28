@@ -8,6 +8,7 @@ import HBarChart from "@/components/panels/HBarChart.js";
 import PieChart from "@/components/panels/PieChart.js";
 import LineChart from "@/components/panels/LineChart.js";
 import SentinelTicketDetail from "@/components/panels/SentinelTicketDetail.js";
+import TvArMarker from "@/components/panels/TvArMarker.js";
 
 const RANGE_LABELS = { overdue: "Atrasadas", today: "Hoje", tomorrow: "Amanhã", week: "Esta semana", upcoming: "Próximas" };
 const AGING_BUCKETS = [
@@ -266,6 +267,7 @@ export default function DashboardPage() {
         {selectedTicketId && (
           <SentinelTicketDetail ticketId={selectedTicketId} onClose={() => setSelectedTicketId(null)} onStatusChanged={load} />
         )}
+        <TvArMarker />
       </div>
     );
   }
