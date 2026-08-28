@@ -5,16 +5,25 @@ const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-2.5-flash";
 const EMBED_DIM = Number(process.env.GEMINI_EMBED_DIM || 768);
 
-// ---- múltiplas chaves do Gemini, com troca automática quando uma esgota a cota ----
+// ---- múltiplas chaves do Gemini, em RODÍZIO a cada chamada ----
 // GEMINI_API_KEYS="chave1,chave2,chave3" (uma lista) — cada chave precisa ser de um
 // PROJETO diferente no Google Cloud/AI Studio pra ter cota própria de verdade (chaves do
 // MESMO projeto compartilham a mesma cota, então trocar entre elas não ajuda em nada).
 // Mantém GEMINI_API_KEY funcionando sozinha se só houver uma (comportamento de sempre).
+//
+// Rodízio PROATIVO (uma chave diferente a cada chamada, não só depois de uma falha): se o
+// limite de cada chave é por MINUTO (bem comum nos modelos preview, como o de TTS), martelar
+// sempre a MESMA chave até ela estourar significa ficar preso ao teto de uma única chave a
+// maior parte do tempo. Espalhando as chamadas entre as N chaves desde o início, o limite
+// efetivo do app vira ~N vezes o de uma chave só, em vez de só reagir depois de já ter
+// tomado 429 — e como cada nova tentativa de retry também chama ai() de novo, uma falha por
+// cota já naturalmente cai numa chave diferente na tentativa seguinte, sem precisar de
+// nenhuma lógica extra pra isso.
 const KEYS = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "")
   .split(",").map((k) => k.trim()).filter(Boolean);
 
 const _clients = new Map(); // chave → cliente (reaproveita entre chamadas)
-let keyPtr = 0; // índice da chave "atual" — avança quando uma esgota a cota
+let keyPtr = 0; // índice da PRÓXIMA chave a usar — avança a cada chamada (rodízio)
 
 function ai() {
   if (!KEYS.length) {
@@ -24,17 +33,9 @@ function ai() {
     );
   }
   const key = KEYS[keyPtr % KEYS.length];
+  keyPtr = (keyPtr + 1) % KEYS.length;
   if (!_clients.has(key)) _clients.set(key, new GoogleGenAI({ apiKey: key }));
   return _clients.get(key);
-}
-
-/** Chamado nos pontos de retry quando o erro é de COTA (não de alta demanda) — avança pra
- * próxima chave configurada, pra a PRÓXIMA tentativa já sair usando outro projeto/cota.
- * Sem efeito (mod 1) se só existir uma chave configurada. */
-function rotateKeyOnQuota(err) {
-  if (KEYS.length > 1 && isQuotaError(String(err?.message || err))) {
-    keyPtr = (keyPtr + 1) % KEYS.length;
-  }
 }
 
 // ---- erros transitórios do Gemini (429 quota / 503 alta demanda) ----
@@ -74,7 +75,8 @@ async function withTransientRetry(fn, { attempts = 3, delayMs = 1200 } = {}) {
       return await fn();
     } catch (err) {
       if (!isTransientError(err) || attempt === attempts) throw rewriteTransientError(err);
-      rotateKeyOnQuota(err);
+      // não precisa rodar a chave na mão aqui — a próxima chamada a ai() (na próxima
+      // tentativa deste mesmo retry) já pega a PRÓXIMA chave do rodízio sozinha.
       await new Promise((r) => setTimeout(r, delayMs * attempt));
     }
   }
@@ -103,7 +105,6 @@ export async function embed(texts, taskType = "RETRIEVAL_DOCUMENT") {
       return res.embeddings.map((e) => e.values);
     } catch (err) {
       if (!isTransientError(err) || attempt === maxAttempts) throw rewriteTransientError(err);
-      rotateKeyOnQuota(err);
       await new Promise((r) => setTimeout(r, 3000)); // uma espera curta só
     }
   }
@@ -140,7 +141,6 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
       return res.embeddings.map((e) => e.values);
     } catch (err) {
       if (!isTransientError(err) || attempt === maxAttempts) throw rewriteTransientError(err);
-      rotateKeyOnQuota(err);
       const msg = String(err?.message || err);
       const m = msg.match(/retry in ([\d.]+)s/i);
       const waitSec = Math.min(m ? Math.ceil(Number(m[1])) + 1 : 5 * attempt, MAX_WAIT_SEC);
