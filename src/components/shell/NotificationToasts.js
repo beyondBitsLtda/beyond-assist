@@ -23,6 +23,10 @@ export default function NotificationToasts() {
   const [toasts, setToasts] = useState([]);
   const sinceRef = useRef(null);
   const bootstrappedRef = useRef(false);
+  const inFlightRef = useRef(false); // guarda contra checagens sobrepostas (setInterval + visibilitychange
+                                      // podem disparar quase juntos; sem isso, as duas leem o mesmo "since"
+                                      // antes de qualquer uma atualizar, e cada uma cria seus próprios toasts
+                                      // pros mesmos eventos — daí a duplicação reportada)
 
   const dismiss = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -30,6 +34,8 @@ export default function NotificationToasts() {
 
   const check = useCallback(async () => {
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       const qs = sinceRef.current ? `?since=${encodeURIComponent(sinceRef.current)}` : "";
       const res = await fetch(`/api/notifications/recent${qs}`);
@@ -64,6 +70,8 @@ export default function NotificationToasts() {
       }
     } catch {
       // silencioso — não é crítico, só tenta de novo no próximo ciclo
+    } finally {
+      inFlightRef.current = false;
     }
   }, [addLog, dismiss]);
 

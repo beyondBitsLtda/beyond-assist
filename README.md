@@ -142,6 +142,24 @@ Sem `GEMINI_API_KEYS`, o app continua funcionando normalmente só com `GEMINI_AP
 
 ---
 
+## Dashboard em AR (WebXR)
+
+Em `/dashboard/ar` (botão "◫ MODO AR" no Dashboard normal): aponta a câmera do celular pra
+uma parede ou mesa, toca na tela pra fixar ali um painel com os mesmos gráficos do Dashboard
+(cards por board, carga por board, tendência do Sentinela), que fica ancorado no espaço
+enquanto você anda pela sala.
+
+- **Só funciona no Chrome/Android com suporte a ARCore** — usa a API WebXR
+  (`navigator.xr`, sessão `immersive-ar` + `hit-test`). **Safari/iOS não suporta WebXR
+  immersive-ar** (só existiria via app nativo com ARKit); no iPhone a página mostra um aviso
+  explicando isso em vez de tentar simular AR de qualquer jeito.
+- O painel não é o componente React de sempre renderizado como HTML — é desenhado direto em
+  Canvas 2D (`src/lib/arCanvasCharts.js`, mesma paleta de `src/lib/chartPalette.js`) e aplicado
+  como textura numa malha 3D via `three.js`, porque uma textura WebGL não pode vir de SVG/HTML
+  sem risco de "contaminar" o canvas.
+- Os dados são as mesmas fontes ao vivo do Dashboard normal (Trello/Sentinela direto, sem
+  SYNC/embeddings), atualizando sozinho a cada 45s enquanto a sessão AR estiver aberta.
+
 ## Estrutura
 
 ```

@@ -23,6 +23,9 @@ export default function Shell({ children }) {
   // no mobile, o Assistente é uma experiência própria em tela cheia (sem Topbar/Sidebar —
   // ver src/app/(panels)/assistant/page.js) — as outras abas continuam com a casca normal.
   const mobileAssistantFullScreen = isMobile && pathname === "/assistant";
+  // Dashboard AR também precisa da tela toda (câmera + canvas WebXR) — Sidebar/Topbar por
+  // cima só atrapalhariam a visão da câmera, e o próprio /dashboard/ar já desenha sua navegação.
+  const fullScreenNoChrome = mobileAssistantFullScreen || pathname === "/dashboard/ar";
 
   // no mobile, abrir o app já direto no Assistente (chat) — o Kanban só faz sentido como
   // painel específico que você escolhe visitar, não como tela inicial numa tela pequena
@@ -46,7 +49,7 @@ export default function Shell({ children }) {
   // Assistente no mobile: tela cheia, sem Topbar/Sidebar — a própria página monta os
   // controles dela (sync, voz, tema, escopo). Ainda dentro do LogProvider (o Assistente usa
   // addLog) e com os avisos dentro do app funcionando igual.
-  if (mobileAssistantFullScreen) {
+  if (fullScreenNoChrome) {
     return (
       <LogProvider>
         <div style={{ position: "fixed", inset: 0, background: "#000", fontFamily: "'Rajdhani',sans-serif", color: "#cfeffb", overflow: "hidden" }}>

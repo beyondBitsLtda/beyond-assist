@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { CY, OR, GR, PU, mono } from "@/lib/theme.js";
 import { CHART } from "@/lib/chartPalette.js";
 import HBarChart from "@/components/panels/HBarChart.js";
@@ -274,6 +275,13 @@ export default function DashboardPage() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ DASHBOARD</div>
         <div style={{ display: "flex", gap: 8 }}>
+          <Link
+            href="/dashboard/ar"
+            title="Aponte a câmera do celular pra uma parede/mesa e fixe o painel do dashboard ali (WebXR — Chrome/Android)"
+            style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: "1px solid rgba(var(--accent-rgb),0.3)", borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+          >
+            ◫ MODO AR
+          </Link>
           <button
             onClick={toggleTvMode}
             title="Tela cheia, letras maiores, revezando sozinho entre os gráficos — pra deixar ligado numa TV/monitor"
