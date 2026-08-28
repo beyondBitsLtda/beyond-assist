@@ -33,8 +33,8 @@ export default function LisaAvatar3D({ mode = "idle" }) {
     let disposed = false;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(35, 1, 0.05, 20);
-    camera.position.set(0, 0.28, 0.85);
+    const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 20);
+    camera.position.set(0, 0.26, 1.0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));

@@ -1018,8 +1018,7 @@ export default function AssistantPage() {
         {/* CENTER: VISUALIZER */}
         <section className={`bb-assistant-pane${mobileTab === "visualizer" ? " bb-active" : ""}`} style={{ position: "relative", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, minWidth: 0 }}>
           {avatarView === "3d" ? (
-            <div style={{ position: "relative", width: "min(64vh,620px)", height: "min(64vh,620px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ position: "absolute", inset: "-3%", border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: 16, pointerEvents: "none" }} />
+            <div style={{ position: "relative", width: "min(70vh,680px)", height: "min(70vh,680px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <LisaAvatar3D mode={mode} />
               <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, textAlign: "center", pointerEvents: "none" }}>
                 <div style={{ ...mono, fontSize: 10, letterSpacing: 4, color: meta.color }}>{meta.label}</div>
