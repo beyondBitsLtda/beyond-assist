@@ -403,11 +403,12 @@ export default function AssistantPage() {
     }
   }, []);
 
-  // teto de espera pela voz do Gemini — sem isso, uma chamada lenta podia deixar a resposta
-  // em silêncio por muitos segundos antes de sequer cair pra voz do navegador. Passado esse
-  // tempo, desiste e cai pro navegador na hora (a chamada ao Gemini continua em segundo
-  // plano até resolver sozinha, só não fica mais ninguém esperando por ela).
-  const SPEAK_TIMEOUT_MS = 3200;
+  // teto de espera pela voz do Gemini — só uma rede de segurança pra uma chamada REALMENTE
+  // travada (nunca volta), não uma tentativa de "acelerar" — 3,2s tinha derrubado toda
+  // chamada, mesmo as que iam terminar dando certo em alguns segundos. Passado esse tempo
+  // (bem mais folgado agora), desiste e cai pro navegador (a chamada ao Gemini continua em
+  // segundo plano até resolver sozinha, só não fica mais ninguém esperando por ela).
+  const SPEAK_TIMEOUT_MS = 9000;
 
   const synthesizeChunk = useCallback(async (text) => {
     const controller = new AbortController();

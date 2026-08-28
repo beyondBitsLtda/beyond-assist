@@ -300,11 +300,10 @@ const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
  */
 export async function synthesizeSpeech(text, voiceName) {
   const voice = TTS_VOICES.some((v) => v.name === voiceName) ? voiceName : DEFAULT_TTS_VOICE;
-  // Fala AO VIVO durante a conversa — precisa ser rápido bem mais do que precisa "insistir":
-  // com attempts=5/delayMs=1500 de antes, um único soluço transitório do Gemini podia
-  // significar até ~15s de espera SÓ em backoff antes de sequer cair pra voz do navegador,
-  // o que na prática parecia "trava e demora muito". Falha rápido aqui — o cliente
-  // (synthesizeChunk, no Assistente) já cai pra voz do navegador na hora se isso não bastar.
+  // Fala AO VIVO durante a conversa — o corte anterior (attempts=2/delayMs=500), combinado
+  // com um teto curto no cliente, acabou derrubando praticamente toda tentativa (a voz do
+  // Gemini simplesmente parou de aparecer). 3 tentativas com um espaçamento moderado dá uma
+  // chance real de dar certo sem voltar ao extremo antigo de ~15s de backoff só pra desistir.
   const res = await withTransientRetry(() =>
     ai().models.generateContent({
       model: TTS_MODEL,
@@ -316,7 +315,7 @@ export async function synthesizeSpeech(text, voiceName) {
         },
       },
     }),
-    { attempts: 2, delayMs: 500 }
+    { attempts: 3, delayMs: 700 }
   );
 
   const part = res?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
