@@ -28,10 +28,14 @@ export default function Shell({ children }) {
   const fullScreenNoChrome = mobileAssistantFullScreen || pathname === "/dashboard/ar";
 
   // no mobile, abrir o app já direto no Assistente (chat) — o Kanban só faz sentido como
-  // painel específico que você escolhe visitar, não como tela inicial numa tela pequena
+  // painel específico que você escolhe visitar, não como tela inicial numa tela pequena.
+  // Só força esse redirect na 1ª entrada da sessão — senão o atalho "Outros painéis" do
+  // Assistente mobile (que pode levar de volta pra "/") ficaria preso num loop de redirect.
   useEffect(() => {
     if (pathname !== "/") return;
     if (typeof window === "undefined") return;
+    if (sessionStorage.getItem("bb-entered")) return;
+    sessionStorage.setItem("bb-entered", "1");
     if (window.matchMedia("(max-width: 768px)").matches) router.replace("/assistant");
   }, [pathname, router]);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
@@ -73,6 +74,10 @@ export default function AssistantPage() {
   const isMobile = useIsMobile();
   const [mobileView, setMobileView] = useState("chat"); // "chat" | "voice"
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
+  // no mobile o Assistente é tela cheia (sem Sidebar/Topbar — ver Shell.js), então essas são
+  // as ÚNICAS abas que existem nesse modo: sem esse atalho, não tem como chegar nos outros
+  // painéis (Dashboard, AR, Quarto de Guerra, etc.) a partir do celular.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [messages, setMessages] = useState([]); // histórico visível no modo chat (não é o mesmo que historyRef, que só guarda o último turno pra ações)
   const [accentName, setAccentName] = useState(DEFAULT_ACCENT.name);
   const [ingesting, setIngesting] = useState(false);
@@ -611,6 +616,14 @@ export default function AssistantPage() {
           <div style={{ ...mono, fontSize: 12, letterSpacing: 3, color: CY }}>◈ LISA</div>
           <div style={{ display: "flex", gap: 4 }}>
             <button
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Outros painéis"
+              title="Outros painéis (Dashboard, AR, Quarto de Guerra…)"
+              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(var(--accent-rgb),0.05)", color: CY, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
+            </button>
+            <button
               onClick={() => setMobileView("chat")}
               title="Modo chat"
               style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${mobileView === "chat" ? CY : "rgba(var(--accent-rgb),0.2)"}`, background: mobileView === "chat" ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: mobileView === "chat" ? "#eafcff" : "rgba(207,239,251,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
@@ -801,6 +814,45 @@ export default function AssistantPage() {
               >
                 {ingesting ? "SINCRONIZANDO…" : "◈ SYNC AGORA"}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* atalho pros outros painéis — no mobile o Assistente é tela cheia e não tem
+            Sidebar/Topbar, então sem isso não teria como chegar em nenhum outro lugar do app */}
+        {mobileNavOpen && (
+          <div
+            onClick={() => setMobileNavOpen(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end" }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: "100%", maxHeight: "80vh", overflowY: "auto", background: "#08131a", borderTop: "1px solid rgba(var(--accent-rgb),0.25)", borderRadius: "16px 16px 0 0", padding: "18px 18px 28px" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div style={{ ...mono, fontSize: 11, letterSpacing: 2, color: CY }}>◈ OUTROS PAINÉIS</div>
+                <button onClick={() => setMobileNavOpen(false)} style={{ ...mono, fontSize: 10, padding: "5px 10px", border: "1px solid rgba(var(--accent-rgb),0.2)", borderRadius: 4, background: "transparent", color: "rgba(207,239,251,0.6)", cursor: "pointer" }}>✕ fechar</button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {[
+                  { href: "/dashboard", glyph: "▧", label: "DASHBOARD" },
+                  { href: "/dashboard/ar", glyph: "◫", label: "DASHBOARD · MODO AR" },
+                  { href: "/", glyph: "◈", label: "QUARTO DE GUERRA" },
+                  { href: "/boards", glyph: "▦", label: "BOARDS" },
+                  { href: "/tasks", glyph: "⏱", label: "TAREFAS" },
+                  { href: "/thoughts", glyph: "✎", label: "PENSAMENTOS" },
+                  { href: "/sentinel", glyph: "◆", label: "SENTINELA" },
+                ].map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileNavOpen(false)}
+                    style={{ ...mono, fontSize: 12, letterSpacing: 1.5, padding: "14px 16px", borderRadius: 8, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "rgba(var(--accent-rgb),0.05)", color: "#eafcff", textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}
+                  >
+                    <span style={{ color: CY }}>{item.glyph}</span> {item.label}
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         )}
