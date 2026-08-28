@@ -147,3 +147,38 @@ alter table public.notified_events add column if not exists title text;
 alter table public.notified_events add column if not exists body  text;
 alter table public.notified_events add column if not exists url   text;
 create index if not exists notified_events_created_idx on public.notified_events (created_at);
+
+-- ============================================================
+--  Comandos remotos (a mais, aditivo) — "abre o dashboard" falado num dispositivo (ex.:
+--  celular) navega os OUTROS dispositivos com o app aberto (desktop, TV em Modo TV...) pra
+--  aquela tela, sem tocar no que deu o comando. Mesmo padrão de fila curta que as
+--  notificações: cada dispositivo tem um id salvo no navegador e faz polling rápido
+--  (ver src/lib/deviceId.js e src/components/shell/RemoteCommandListener.js).
+-- ============================================================
+
+-- 11) Fila de comandos — linhas antigas não importam, só as mais novas que o último
+--     "since" de cada dispositivo (não precisa marcar como "lido")
+create table if not exists public.remote_commands (
+  id            bigint generated always as identity primary key,
+  action        text not null,          -- só 'navigate' por enquanto
+  target        text not null,          -- rota, ex.: '/dashboard'
+  origin_device text not null,          -- id do dispositivo que mandou (ele mesmo ignora)
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists remote_commands_created_idx on public.remote_commands (created_at);
+alter table public.remote_commands enable row level security;
+-- (só acessada pela service_role, em /api/remote-command — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  Fix: criar nota nova pela aplicação (a mais, aditivo) — a tabela `notes` (criada fora
+--  deste arquivo, antes deste app existir) tem `user_id` como NOT NULL, provavelmente
+--  pensada pra um esquema com login (auth.users). Este app não tem login — é de uso
+--  pessoal — e só preenche `user_id` se a env var BRAIN_USER_ID estiver configurada (ver
+--  src/lib/notes.js); sem ela, o insert falhava com "null value in column user_id".
+--  Relaxar o NOT NULL resolve sem precisar descobrir/inventar um UUID de usuário.
+-- ============================================================
+
+-- 12) Permite user_id nulo em notes — só afeta linhas novas sem BRAIN_USER_ID configurada;
+--     linhas existentes (com ou sem user_id) continuam exatamente como estão.
+alter table public.notes alter column user_id drop not null;

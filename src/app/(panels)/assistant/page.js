@@ -8,6 +8,7 @@ import { TTS_VOICES } from "@/lib/ttsVoices.js";
 import { pickBrowserVoice } from "@/lib/browserVoice.js";
 import { useIsMobile } from "@/lib/useIsMobile.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
+import { getDeviceId, matchNavCommand } from "@/lib/deviceId.js";
 import { runFullSync } from "@/lib/sync.js";
 
 const MODE_META = {
@@ -376,6 +377,29 @@ export default function AssistantPage() {
   // ---- pergunta real ao backend (SSE) ----
   const ask = useCallback(async (q) => {
     if (!q.trim() || busy) return;
+
+    // "abre o dashboard" etc. — comando local reconhecido sem gastar chamada nenhuma do
+    // Gemini: não passa pelo fluxo normal de pergunta/resposta, só avisa os OUTROS
+    // dispositivos abertos (ver RemoteCommandListener.js) e confirma na hora.
+    const nav = matchNavCommand(q);
+    if (nav) {
+      stopSpeaking();
+      const gen = ++speechGenRef.current;
+      speechEngineRef.current = null;
+      const confirmText = `Abrindo ${nav.label} nos outros dispositivos.`;
+      setQuestion(q);
+      setAnswer(confirmText);
+      setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: q }, { id: `a${Date.now() + 1}`, role: "assistant", text: confirmText }]);
+      addLog("[REMOTE]", PU, `→ ${nav.label} (${nav.target})`);
+      fetch("/api/remote-command", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target: nav.target, originDevice: getDeviceId() }),
+      }).catch((err) => addLog("[REMOTE]", OR, `falha: ${err.message}`));
+      if (voiceOn) enqueueSpeech(confirmText, gen);
+      return;
+    }
+
     setBusy(true);
     setQuestion(q);
     setAnswer("");

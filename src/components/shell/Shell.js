@@ -6,6 +6,7 @@ import { LogProvider } from "./LogProvider.js";
 import Sidebar from "./Sidebar.js";
 import Topbar from "./Topbar.js";
 import NotificationToasts from "./NotificationToasts.js";
+import RemoteCommandListener from "./RemoteCommandListener.js";
 import { applyAccentTheme } from "@/lib/accentThemes.js";
 import { useIsMobile } from "@/lib/useIsMobile.js";
 
@@ -51,6 +52,7 @@ export default function Shell({ children }) {
         <div style={{ position: "fixed", inset: 0, background: "#000", fontFamily: "'Rajdhani',sans-serif", color: "#cfeffb", overflow: "hidden" }}>
           {children}
           <NotificationToasts />
+          <RemoteCommandListener />
         </div>
       </LogProvider>
     );
@@ -73,6 +75,7 @@ export default function Shell({ children }) {
           <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>{children}</div>
         </div>
         <NotificationToasts />
+        <RemoteCommandListener />
       </div>
     </LogProvider>
   );
