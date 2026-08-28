@@ -157,6 +157,68 @@ export default function AssistantPage() {
     });
   }, []);
 
+  // ---- Modo Observância: a Lisa "vê" pela câmera (getUserMedia) e pode descrever o que
+  // enxerga — postura, cor de roupa, gesto com a mão, expressão — junto com a resposta de
+  // texto normal (mesma pergunta ao Gemini, agora com uma foto anexada). DESLIGADO por
+  // padrão e de propósito SEM localStorage: é câmera apontada pra você, então cada sessão
+  // pede de novo — não fica "ligado sozinho" na próxima vez que abrir o app. Não manda vídeo
+  // contínuo nem guarda nada — só tira 1 foto no instante de cada pergunta, manda pro Gemini
+  // responder, e descarta (não é salva em lugar nenhum, nem local nem no Supabase).
+  const [observanceMode, setObservanceMode] = useState(false);
+  const [observanceError, setObservanceError] = useState(null);
+  const observanceVideoRef = useRef(null);
+  const observanceStreamRef = useRef(null);
+
+  useEffect(() => {
+    if (!observanceMode) {
+      observanceStreamRef.current?.getTracks().forEach((t) => t.stop());
+      observanceStreamRef.current = null;
+      return;
+    }
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setObservanceError("este navegador não dá acesso à câmera");
+      setObservanceMode(false);
+      return;
+    }
+    let cancelled = false;
+    setObservanceError(null);
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+      .then((stream) => {
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        observanceStreamRef.current = stream;
+        if (observanceVideoRef.current) {
+          observanceVideoRef.current.srcObject = stream;
+          observanceVideoRef.current.play().catch(() => {});
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setObservanceError(err?.name === "NotAllowedError" ? "permissão de câmera negada" : (err?.message || "não consegui acessar a câmera"));
+        setObservanceMode(false);
+      });
+    return () => {
+      cancelled = true;
+      observanceStreamRef.current?.getTracks().forEach((t) => t.stop());
+      observanceStreamRef.current = null;
+    };
+  }, [observanceMode]);
+
+  // tira a foto ATUAL da câmera (só no instante da pergunta, nunca antes) — reduzida pra no
+  // máx. 640px no lado maior, o bastante pra contar dedos/ver cor de roupa sem gastar token
+  // à toa com resolução alta que o Gemini nem precisa.
+  const captureObservanceFrame = useCallback(() => {
+    const v = observanceVideoRef.current;
+    if (!v || !v.videoWidth) return null;
+    const maxSide = 640;
+    const scale = Math.min(1, maxSide / Math.max(v.videoWidth, v.videoHeight));
+    const w = Math.round(v.videoWidth * scale), h = Math.round(v.videoHeight * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(v, 0, 0, w, h);
+    const base64 = canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
+    return base64 ? { mimeType: "image/jpeg", data: base64 } : null;
+  }, []);
+
   // carrega a Visão do avatar escolhida antes — cada navegador guarda a sua (ver nota acima:
   // só tem efeito no desktop, mas não custa nada carregar a preferência sempre)
   useEffect(() => {
@@ -476,6 +538,7 @@ export default function AssistantPage() {
         body: JSON.stringify({
           question: q, scope: computeScope(), personaMode,
           history: historyRef.current, pendingAction: pendingActionRef.current,
+          image: observanceMode ? captureObservanceFrame() : null,
         }),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
@@ -549,7 +612,7 @@ export default function AssistantPage() {
       speechBufferRef.current = "";
       if (voiceEnabled && remaining) enqueueSpeech(remaining, gen);
     }
-  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode]);
+  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame]);
 
   // ---- STT: ouvir microfone (Web Speech API) ----
   const toggleMic = useCallback(() => {
@@ -825,6 +888,22 @@ export default function AssistantPage() {
                 🎭 Modo Persona: {personaMode ? "ON" : "OFF"}
               </button>
 
+              {/* observância */}
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>OBSERVÂNCIA (CÂMERA)</div>
+              <button
+                onClick={() => setObservanceMode((v) => !v)}
+                style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${observanceMode ? GR : "rgba(var(--accent-rgb),0.18)"}`, background: observanceMode ? "rgba(123,216,143,0.12)" : "transparent", color: observanceMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+              >
+                👁 Modo Observância: {observanceMode ? "ON" : "OFF"}
+              </button>
+              {observanceMode && (
+                <video ref={observanceVideoRef} autoPlay playsInline muted style={{ width: "100%", maxWidth: 160, aspectRatio: "4/3", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, display: "block" }} />
+              )}
+              {observanceError && <div style={{ ...mono, fontSize: 9.5, color: OR, marginBottom: 8 }}>⚠ {observanceError}</div>}
+              <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
+                Tira 1 foto só no instante de cada pergunta pra Lisa poder ver o que você mostra — nada fica salvo.
+              </div>
+
               {/* sync */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>SINCRONIZAÇÃO</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -973,6 +1052,26 @@ export default function AssistantPage() {
             </button>
           ))}
         </div>
+
+        {/* Modo Observância — liga a câmera, tira 1 foto no instante de cada pergunta e manda
+            junto pro Gemini (multimodal); nunca fica ligado sozinho entre recarregamentos. */}
+        <button
+          onClick={() => setObservanceMode((v) => !v)}
+          title={observanceMode ? "Modo Observância ligado — a câmera tira 1 foto por pergunta, nada fica salvo. Clique pra desligar" : "Ligar a câmera pra Lisa poder ver o que você mostra (postura, roupa, gestos) ao responder"}
+          style={{
+            ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+            border: `1px solid ${observanceMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+            background: observanceMode ? "rgba(123,216,143,0.12)" : "transparent",
+            color: observanceMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+            cursor: "pointer",
+          }}
+        >
+          👁 OBSERVÂNCIA {observanceMode ? "ON" : "OFF"}
+        </button>
+        {observanceMode && (
+          <video ref={observanceVideoRef} autoPlay playsInline muted title="o que a câmera vê agora — só uma foto disso é enviada, no instante de cada pergunta" style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
+        )}
+        {observanceError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {observanceError}</span>}
       </div>
 
       {/* abas — só aparecem no mobile (ver .bb-assistant-tabs em globals.css). No mobile o

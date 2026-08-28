@@ -157,18 +157,27 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
  * `tools` (opcional) — ex.: [{ googleSearch: {} }] pra habilitar grounding com
  * busca do Google (o modelo decide sozinho quando de fato buscar). Usado pelo
  * modo "Geral" do assistente.
+ *
+ * `image` (opcional) — { mimeType, data (base64) } — uma foto tirada na hora pela câmera
+ * (Modo Observância do Assistente, ver src/app/(panels)/assistant/page.js). Quando presente,
+ * vira multimodal: o mesmo modelo de chat (gemini-2.5-flash) também enxerga imagem, sem
+ * precisar de nenhum modelo/endpoint separado.
  */
-export async function* chatStream(prompt, systemInstruction, { tools } = {}) {
+export async function* chatStream(prompt, systemInstruction, { tools, image } = {}) {
   const config = {};
   if (systemInstruction) config.systemInstruction = systemInstruction;
   if (tools) config.tools = tools;
+
+  const contents = image
+    ? [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType: image.mimeType, data: image.data } }] }]
+    : prompt;
 
   // retry só na abertura do stream (antes de qualquer chunk chegar) — 429/503 costumam
   // se resolver em segundos; uma vez que o texto começou a chegar não há o que repetir.
   const stream = await withTransientRetry(() =>
     ai().models.generateContentStream({
       model: CHAT_MODEL,
-      contents: prompt,
+      contents,
       config: Object.keys(config).length ? config : undefined,
     })
   );
