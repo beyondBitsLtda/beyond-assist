@@ -110,12 +110,18 @@ export default function AssistantPage() {
   // fila de TTS em 2 pedaços (cabeça + resto): a cabeça sai assim que atinge um tamanho
   // mínimo, o resto sai quando a resposta termina — só 1-2 chamadas por resposta, tocadas em ordem.
   const speechBufferRef = useRef("");
-  const speechQueueRef = useRef(Promise.resolve());
+  const speechQueueRef = useRef(Promise.resolve()); // ordem de REPRODUÇÃO (espera o áudio anterior acabar de tocar)
+  // ordem de DECISÃO do motor (gemini/navegador) — deliberadamente separada da fila de
+  // reprodução acima: só espera a tentativa ao Gemini do pedaço anterior VOLTAR (sucesso ou
+  // falha), não o áudio dele tocar até o fim. Sem isso, numa resposta curta o "resto" podia
+  // decidir tentar o Gemini ANTES de saber que a "cabeça" tinha falhado (a chamada ao Gemini
+  // TTS é mais lenta que o streaming do texto às vezes) — daí cabeça e resto saíam em vozes
+  // diferentes, com um silêncio no meio enquanto o resto esperava a tentativa dele mesmo.
+  const engineDecisionRef = useRef(Promise.resolve());
   const speechGenRef = useRef(0); // pergunta nova invalida pedaços pendentes de uma pergunta antiga
   // voz "travada" pra resposta atual: null = ainda não decidiu, "gemini" ou "browser".
   // A cabeça decide; se cair pro navegador, o resto desta MESMA resposta continua no
-  // navegador (nunca alterna de novo dentro da mesma resposta) — só 2 pedaços agora,
-  // então isso não tem mais o problema de corrida que tinha por frase.
+  // navegador (nunca alterna de novo dentro da mesma resposta).
   const speechEngineRef = useRef(null);
 
   const canvasRef = useRef(null);
@@ -397,12 +403,21 @@ export default function AssistantPage() {
     }
   }, []);
 
+  // teto de espera pela voz do Gemini — sem isso, uma chamada lenta podia deixar a resposta
+  // em silêncio por muitos segundos antes de sequer cair pra voz do navegador. Passado esse
+  // tempo, desiste e cai pro navegador na hora (a chamada ao Gemini continua em segundo
+  // plano até resolver sozinha, só não fica mais ninguém esperando por ela).
+  const SPEAK_TIMEOUT_MS = 3200;
+
   const synthesizeChunk = useCallback(async (text) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), SPEAK_TIMEOUT_MS);
     try {
       const res = await fetch("/api/speak", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ text, voice: voiceName }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         // extrai a mensagem real do corpo (ex.: "UNAVAILABLE: ...") em vez de só o status —
@@ -413,68 +428,91 @@ export default function AssistantPage() {
       const blob = await res.blob();
       return { url: URL.createObjectURL(blob) };
     } catch (err) {
-      return { url: null, error: err };
+      return { url: null, error: err?.name === "AbortError" ? new Error(`Gemini demorou mais de ${SPEAK_TIMEOUT_MS / 1000}s`) : err };
+    } finally {
+      clearTimeout(timeout);
     }
   }, [voiceName]);
 
-  const playChunk = useCallback((synthesisPromise, text, gen) => {
-    return synthesisPromise.then((result) => {
-      if (gen !== speechGenRef.current) {
-        if (result?.url) URL.revokeObjectURL(result.url);
-        return;
+  // Decide o motor (gemini/navegador) DESTE pedaço — chamado só depois que o pedaço anterior
+  // já teve o motor dele decidido (ver enqueueSpeech), nunca antes. Fica de fora da fila de
+  // REPRODUÇÃO de propósito: decidir é rápido (só espera a resposta do /api/speak, não o
+  // áudio tocar até o fim), então o próximo pedaço já pode começar a sintetizar enquanto o
+  // atual ainda está sendo ouvido — é isso que fecha o gap sem reabrir a corrida de voz.
+  const resolveChunkEngine = useCallback(async (tryGemini, text) => {
+    const result = tryGemini ? await synthesizeChunk(text) : { url: null, skipped: true };
+    if (result?.url) {
+      speechEngineRef.current = "gemini";
+      setGeminiVoiceStatus(true);
+    } else {
+      // sem áudio do Gemini pra este pedaço — cai pra voz do navegador. Se isso já
+      // aconteceu na cabeça desta resposta, o resto nem tenta o Gemini de novo (evita
+      // alternar de voz no meio da fala).
+      if (!result?.skipped) {
+        const reason = String(result?.error?.message || "").slice(0, 90);
+        addLog("[TTS]", OR, `Gemini indisponível${reason ? ` (${reason})` : ""} → voz do navegador`);
+        setGeminiVoiceStatus(false); // só marca "falhou" numa tentativa real — não quando foi pulada de propósito
       }
-      return new Promise((resolve) => {
-        currentAudioResolveRef.current = resolve;
-        const finish = () => { currentAudioResolveRef.current = null; resolve(); };
+      speechEngineRef.current = "browser";
+    }
+    return result;
+  }, [synthesizeChunk, addLog]);
 
-        if (result?.url) {
-          speechEngineRef.current = "gemini";
-          setGeminiVoiceStatus(true);
-          const audio = new Audio(result.url);
-          audioRef.current = audio;
-          audio.onended = () => { URL.revokeObjectURL(result.url); audioRef.current = null; addLog("[TTS]", GR, "voz Gemini"); finish(); };
-          audio.onerror = () => { URL.revokeObjectURL(result.url); audioRef.current = null; finish(); };
-          audio.play().catch(finish);
-        } else {
-          // sem áudio do Gemini pra este pedaço — cai pra voz do navegador. Se isso já
-          // aconteceu na cabeça desta resposta, o resto nem tenta o Gemini de novo (evita
-          // alternar de voz no meio da fala; ver enqueueSpeech).
-          if (!result?.skipped) {
-            const reason = String(result?.error?.message || "").slice(0, 90);
-            addLog("[TTS]", OR, `Gemini indisponível${reason ? ` (${reason})` : ""} → voz do navegador`);
-            setGeminiVoiceStatus(false); // só marca "falhou" numa tentativa real — não quando foi pulada de propósito
-          }
-          speechEngineRef.current = "browser";
-          if (typeof window === "undefined" || !window.speechSynthesis) return finish();
-          const clean = cleanForSpeech(text);
-          if (!clean) return finish();
-          const u = new SpeechSynthesisUtterance(clean);
-          u.lang = "pt-BR";
-          u.rate = 1.05;
-          const ptVoice = pickBrowserVoice(window.speechSynthesis.getVoices());
-          if (ptVoice) u.voice = ptVoice;
-          u.onend = finish;
-          u.onerror = finish;
-          window.speechSynthesis.speak(u);
-        }
-      });
+  const playResult = useCallback((result, text, gen) => {
+    if (gen !== speechGenRef.current) {
+      if (result?.url) URL.revokeObjectURL(result.url);
+      return;
+    }
+    return new Promise((resolve) => {
+      currentAudioResolveRef.current = resolve;
+      const finish = () => { currentAudioResolveRef.current = null; resolve(); };
+
+      if (result?.url) {
+        const audio = new Audio(result.url);
+        audioRef.current = audio;
+        audio.onended = () => { URL.revokeObjectURL(result.url); audioRef.current = null; addLog("[TTS]", GR, "voz Gemini"); finish(); };
+        audio.onerror = () => { URL.revokeObjectURL(result.url); audioRef.current = null; finish(); };
+        audio.play().catch(finish);
+      } else {
+        if (typeof window === "undefined" || !window.speechSynthesis) return finish();
+        const clean = cleanForSpeech(text);
+        if (!clean) return finish();
+        const u = new SpeechSynthesisUtterance(clean);
+        u.lang = "pt-BR";
+        u.rate = 1.05;
+        const ptVoice = pickBrowserVoice(window.speechSynthesis.getVoices());
+        if (ptVoice) u.voice = ptVoice;
+        u.onend = finish;
+        u.onerror = finish;
+        window.speechSynthesis.speak(u);
+      }
     });
   }, [addLog]);
 
   const enqueueSpeech = useCallback((text, gen) => {
     const clean = (text || "").trim();
     if (!clean) return;
-    // tenta o Gemini só se o usuário deixou ligado E a cabeça desta resposta ainda não
-    // caiu pro navegador (senão o resto nem tenta de novo — evita alternar no meio da fala).
-    const tryGemini = geminiVoiceEnabled && speechEngineRef.current !== "browser";
-    // síntese começa JÁ (não espera a vez de tocar) — roda em paralelo com o pedaço
-    // anterior tocando, fechando o gap entre a cabeça e o resto da resposta.
-    const synthesisPromise = tryGemini ? synthesizeChunk(clean) : Promise.resolve({ url: null, skipped: true });
-    speechQueueRef.current = speechQueueRef.current.then(() => {
-      if (gen !== speechGenRef.current) return;
-      return playChunk(synthesisPromise, clean, gen);
+
+    // fila de DECISÃO: só decide se tenta o Gemini pra este pedaço depois que o pedaço
+    // anterior já sabe o motor dele — fecha a corrida em que, numa resposta curta, o "resto"
+    // decidia tentar o Gemini antes de saber se a "cabeça" tinha falhado (a chamada de TTS é
+    // mais lenta que o streaming do texto, às vezes) — daí cabeça e resto saíam em vozes
+    // diferentes. Rápido (não espera áudio tocar), então não reabre o gap que isso evita.
+    const thisDecision = engineDecisionRef.current.then(() => {
+      if (gen !== speechGenRef.current) return { url: null, skipped: true };
+      const tryGemini = geminiVoiceEnabled && speechEngineRef.current !== "browser";
+      return resolveChunkEngine(tryGemini, clean);
     });
-  }, [synthesizeChunk, playChunk, geminiVoiceEnabled]);
+    engineDecisionRef.current = thisDecision.catch(() => ({ url: null, skipped: true }));
+
+    // fila de REPRODUÇÃO: toca em ordem, esperando o pedaço anterior acabar de tocar — mas o
+    // motor deste pedaço, acima, já pode estar decidido bem antes disso.
+    speechQueueRef.current = speechQueueRef.current.then(async () => {
+      const result = await thisDecision;
+      if (gen !== speechGenRef.current) return;
+      return playResult(result, clean, gen);
+    });
+  }, [resolveChunkEngine, playResult, geminiVoiceEnabled]);
 
   // ---- escopo do assistente ----
   const computeScope = useCallback(() => {
