@@ -29,9 +29,15 @@ function clientFor(key) {
   return _clients.get(key);
 }
 
-/** `attempt` (1-based, vem de withTransientRetry ou do for-loop de quem chama): a 1ª
- * tentativa de QUALQUER chamada usa sempre a chave prioritária; só a partir da 2ª (ou seja,
- * só depois de uma falha real) é que cai pro rodízio das chaves de reserva. */
+// a prioritária tenta 2x SOZINHA antes de cair pra reserva — a maioria dos soluços dela é
+// sobrecarga passageira (503), que resolve sozinha só tentando de novo NA MESMA chave boa;
+// cair já na 1ª falha pra uma reserva (que pode estar com cota zerada, como as 3 gratuitas
+// estão hoje) trocava um problema passageiro por uma falha praticamente garantida.
+const PRIMARY_ATTEMPTS = 2;
+
+/** `attempt` (1-based, vem de withTransientRetry ou do for-loop de quem chama): as primeiras
+ * PRIMARY_ATTEMPTS tentativas de QUALQUER chamada usam a chave prioritária; só depois disso
+ * (falhou de verdade mais de uma vez) é que cai pro rodízio das chaves de reserva. */
 function ai(attempt = 1) {
   if (!KEYS.length) {
     throw new Error(
@@ -39,7 +45,7 @@ function ai(attempt = 1) {
       "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
     );
   }
-  if (attempt <= 1 || !RESERVE_KEYS.length) return clientFor(PRIMARY_KEY);
+  if (attempt <= PRIMARY_ATTEMPTS || !RESERVE_KEYS.length) return clientFor(PRIMARY_KEY);
   const key = RESERVE_KEYS[reservePtr % RESERVE_KEYS.length];
   reservePtr = (reservePtr + 1) % RESERVE_KEYS.length;
   return clientFor(key);
@@ -69,7 +75,7 @@ function keyLabelFor(attempt) {
   // não dá pra apontar qual reserva exata sem expor o ponteiro interno do rodízio (que é
   // global, compartilhado entre chamadas concorrentes) — "de reserva" já basta pra
   // diferenciar "minha chave paga estourou" de "uma das gratuitas estourou".
-  return attempt > 1 && RESERVE_KEYS.length ? "chave de reserva (gratuita)" : "chave prioritária";
+  return attempt > PRIMARY_ATTEMPTS && RESERVE_KEYS.length ? "chave de reserva (gratuita)" : "chave prioritária";
 }
 
 function rewriteTransientError(err, attempt) {
