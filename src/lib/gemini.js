@@ -60,15 +60,28 @@ function isTransientError(err) {
   const msg = String(err?.message || err);
   return isQuotaError(msg) || isOverloadError(msg);
 }
-function rewriteTransientError(err) {
+/** Rótulo de qual chave um attempt usou — só pra diagnóstico em log, nunca expõe a chave em si.
+ * Sem isso, "QUOTA_EXCEEDED" parecia sempre a MESMA coisa não importava se foi a chave
+ * prioritária (paga) ou uma de reserva (grátis) que falhou — impossível saber qual das duas
+ * sem essa distinção, e "minha API paga estourou cota" e "uma reserva grátis estourou" são
+ * diagnósticos bem diferentes. */
+function keyLabelFor(attempt) {
+  // não dá pra apontar qual reserva exata sem expor o ponteiro interno do rodízio (que é
+  // global, compartilhado entre chamadas concorrentes) — "de reserva" já basta pra
+  // diferenciar "minha chave paga estourou" de "uma das gratuitas estourou".
+  return attempt > 1 && RESERVE_KEYS.length ? "chave de reserva (gratuita)" : "chave prioritária";
+}
+
+function rewriteTransientError(err, attempt) {
   const msg = String(err?.message || err);
+  const key = keyLabelFor(attempt);
   if (isQuotaError(msg)) {
-    const e = new Error("QUOTA_EXCEEDED: limite do Gemini atingido. Aguarde ~1 min e tente de novo.");
+    const e = new Error(`QUOTA_EXCEEDED (${key}): limite do Gemini atingido. Aguarde ~1 min e tente de novo.`);
     e.code = "QUOTA";
     return e;
   }
   if (isOverloadError(msg)) {
-    const e = new Error("UNAVAILABLE: o Gemini está com alta demanda no momento. Tente de novo em instantes.");
+    const e = new Error(`UNAVAILABLE (${key}): o Gemini está com alta demanda no momento. Tente de novo em instantes.`);
     e.code = "UNAVAILABLE";
     return e;
   }
@@ -83,7 +96,7 @@ async function withTransientRetry(fn, { attempts = 3, delayMs = 1200 } = {}) {
     try {
       return await fn(attempt);
     } catch (err) {
-      if (!isTransientError(err) || attempt === attempts) throw rewriteTransientError(err);
+      if (!isTransientError(err) || attempt === attempts) throw rewriteTransientError(err, attempt);
       await new Promise((r) => setTimeout(r, delayMs * attempt));
     }
   }
@@ -111,7 +124,7 @@ export async function embed(texts, taskType = "RETRIEVAL_DOCUMENT") {
       });
       return res.embeddings.map((e) => e.values);
     } catch (err) {
-      if (!isTransientError(err) || attempt === maxAttempts) throw rewriteTransientError(err);
+      if (!isTransientError(err) || attempt === maxAttempts) throw rewriteTransientError(err, attempt);
       await new Promise((r) => setTimeout(r, 3000)); // uma espera curta só
     }
   }
@@ -147,7 +160,7 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
       });
       return res.embeddings.map((e) => e.values);
     } catch (err) {
-      if (!isTransientError(err) || attempt === maxAttempts) throw rewriteTransientError(err);
+      if (!isTransientError(err) || attempt === maxAttempts) throw rewriteTransientError(err, attempt);
       const msg = String(err?.message || err);
       const m = msg.match(/retry in ([\d.]+)s/i);
       const waitSec = Math.min(m ? Math.ceil(Number(m[1])) + 1 : 5 * attempt, MAX_WAIT_SEC);
