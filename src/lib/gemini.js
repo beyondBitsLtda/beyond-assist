@@ -5,37 +5,44 @@ const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-2.5-flash";
 const EMBED_DIM = Number(process.env.GEMINI_EMBED_DIM || 768);
 
-// ---- múltiplas chaves do Gemini, em RODÍZIO a cada chamada ----
-// GEMINI_API_KEYS="chave1,chave2,chave3" (uma lista) — cada chave precisa ser de um
+// ---- múltiplas chaves do Gemini: 1ª = PRIORITÁRIA, as demais = reserva em rodízio ----
+// GEMINI_API_KEYS="chaveBoa,chave2,chave3" (uma lista) — cada chave precisa ser de um
 // PROJETO diferente no Google Cloud/AI Studio pra ter cota própria de verdade (chaves do
 // MESMO projeto compartilham a mesma cota, então trocar entre elas não ajuda em nada).
 // Mantém GEMINI_API_KEY funcionando sozinha se só houver uma (comportamento de sempre).
 //
-// Rodízio PROATIVO (uma chave diferente a cada chamada, não só depois de uma falha): se o
-// limite de cada chave é por MINUTO (bem comum nos modelos preview, como o de TTS), martelar
-// sempre a MESMA chave até ela estourar significa ficar preso ao teto de uma única chave a
-// maior parte do tempo. Espalhando as chamadas entre as N chaves desde o início, o limite
-// efetivo do app vira ~N vezes o de uma chave só, em vez de só reagir depois de já ter
-// tomado 429 — e como cada nova tentativa de retry também chama ai() de novo, uma falha por
-// cota já naturalmente cai numa chave diferente na tentativa seguinte, sem precisar de
-// nenhuma lógica extra pra isso.
+// A PRIMEIRA chave da lista é sempre a 1ª tentativa de cada chamada — pensada pra ser uma
+// chave com faturamento ativado (cota bem maior, praticamente não deveria falhar). As
+// demais só entram em RODÍZIO nas tentativas de retry seguintes, quando a 1ª falhou por
+// cota/sobrecarga — servem de reserva gratuita, não como parceiras de carga o tempo todo.
+// Se só houver 1 chave configurada, o comportamento é o de sempre (sem reserva nenhuma).
 const KEYS = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "")
   .split(",").map((k) => k.trim()).filter(Boolean);
+const PRIMARY_KEY = KEYS[0];
+const RESERVE_KEYS = KEYS.slice(1);
 
 const _clients = new Map(); // chave → cliente (reaproveita entre chamadas)
-let keyPtr = 0; // índice da PRÓXIMA chave a usar — avança a cada chamada (rodízio)
+let reservePtr = 0; // índice da PRÓXIMA chave de reserva — avança só quando a prioritária falha
 
-function ai() {
+function clientFor(key) {
+  if (!_clients.has(key)) _clients.set(key, new GoogleGenAI({ apiKey: key }));
+  return _clients.get(key);
+}
+
+/** `attempt` (1-based, vem de withTransientRetry ou do for-loop de quem chama): a 1ª
+ * tentativa de QUALQUER chamada usa sempre a chave prioritária; só a partir da 2ª (ou seja,
+ * só depois de uma falha real) é que cai pro rodízio das chaves de reserva. */
+function ai(attempt = 1) {
   if (!KEYS.length) {
     throw new Error(
       "GEMINI_API_KEY (ou GEMINI_API_KEYS) não configurada. " +
       "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
     );
   }
-  const key = KEYS[keyPtr % KEYS.length];
-  keyPtr = (keyPtr + 1) % KEYS.length;
-  if (!_clients.has(key)) _clients.set(key, new GoogleGenAI({ apiKey: key }));
-  return _clients.get(key);
+  if (attempt <= 1 || !RESERVE_KEYS.length) return clientFor(PRIMARY_KEY);
+  const key = RESERVE_KEYS[reservePtr % RESERVE_KEYS.length];
+  reservePtr = (reservePtr + 1) % RESERVE_KEYS.length;
+  return clientFor(key);
 }
 
 // ---- erros transitórios do Gemini (429 quota / 503 alta demanda) ----
@@ -68,15 +75,15 @@ function rewriteTransientError(err) {
   return err;
 }
 
-/** Repete a chamada quando o erro é transitório (429/503); troca por mensagem curta se persistir. */
+/** Repete a chamada quando o erro é transitório (429/503); troca por mensagem curta se persistir.
+ * `fn` recebe o número da tentativa (1-based) — repassa pra ai(attempt), que só sai da chave
+ * prioritária pra reserva a partir da 2ª tentativa (ver comentário de ai() acima). */
 async function withTransientRetry(fn, { attempts = 3, delayMs = 1200 } = {}) {
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      return await fn();
+      return await fn(attempt);
     } catch (err) {
       if (!isTransientError(err) || attempt === attempts) throw rewriteTransientError(err);
-      // não precisa rodar a chave na mão aqui — a próxima chamada a ai() (na próxima
-      // tentativa deste mesmo retry) já pega a PRÓXIMA chave do rodízio sozinha.
       await new Promise((r) => setTimeout(r, delayMs * attempt));
     }
   }
@@ -97,7 +104,7 @@ export async function embed(texts, taskType = "RETRIEVAL_DOCUMENT") {
   const maxAttempts = 2;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const res = await ai().models.embedContent({
+      const res = await ai(attempt).models.embedContent({
         model: EMBED_MODEL,
         contents,
         config: { outputDimensionality: EMBED_DIM, taskType },
@@ -133,7 +140,7 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
   const MAX_WAIT_SEC = 8;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const res = await ai().models.embedContent({
+      const res = await ai(attempt).models.embedContent({
         model: EMBED_MODEL,
         contents,
         config: { outputDimensionality: EMBED_DIM, taskType },
@@ -174,8 +181,8 @@ export async function* chatStream(prompt, systemInstruction, { tools, images } =
 
   // retry só na abertura do stream (antes de qualquer chunk chegar) — 429/503 costumam
   // se resolver em segundos; uma vez que o texto começou a chegar não há o que repetir.
-  const stream = await withTransientRetry(() =>
-    ai().models.generateContentStream({
+  const stream = await withTransientRetry((attempt) =>
+    ai(attempt).models.generateContentStream({
       model: CHAT_MODEL,
       contents,
       config: Object.keys(config).length ? config : undefined,
@@ -254,8 +261,8 @@ Regras:
   com o pedido. Não use "none" só por a referência ao card ser indireta — tente resolver pelo
   contexto primeiro.`;
 
-  const res = await withTransientRetry(() =>
-    ai().models.generateContent({
+  const res = await withTransientRetry((attempt) =>
+    ai(attempt).models.generateContent({
       model: CHAT_MODEL,
       contents: prompt,
       config: {
@@ -304,8 +311,8 @@ export async function synthesizeSpeech(text, voiceName) {
   // com um teto curto no cliente, acabou derrubando praticamente toda tentativa (a voz do
   // Gemini simplesmente parou de aparecer). 3 tentativas com um espaçamento moderado dá uma
   // chance real de dar certo sem voltar ao extremo antigo de ~15s de backoff só pra desistir.
-  const res = await withTransientRetry(() =>
-    ai().models.generateContent({
+  const res = await withTransientRetry((attempt) =>
+    ai(attempt).models.generateContent({
       model: TTS_MODEL,
       contents: [{ parts: [{ text }] }],
       config: {
@@ -348,8 +355,8 @@ Na ESMAGADORA MAIORIA das vezes não vai ter nada relevante pra dizer — nesse 
  */
 export async function describeScreenIfNotable(image, systemInstruction = SCREEN_WATCH_INSTRUCTION) {
   const res = await withTransientRetry(
-    () =>
-      ai().models.generateContent({
+    (attempt) =>
+      ai(attempt).models.generateContent({
         model: CHAT_MODEL,
         contents: [{ role: "user", parts: [{ text: "Aqui está a tela agora." }, { inlineData: { mimeType: image.mimeType, data: image.data } }] }],
         config: { systemInstruction },
