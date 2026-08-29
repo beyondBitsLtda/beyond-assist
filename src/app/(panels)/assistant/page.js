@@ -304,34 +304,54 @@ export default function AssistantPage() {
     return base64 ? { mimeType: "image/jpeg", data: base64 } : null;
   }, []);
 
-  // vigília proativa: dispara em intervalos espaçados, SÓ fala quando /api/screen-comment
-  // devolve um comentário de verdade — usa a voz do NAVEGADOR (não a do Gemini) de propósito,
-  // igual ao NotificationToasts: evita gastar cota de TTS extra numa resposta que ninguém pediu,
-  // e não mexe na fila/geração de fala da conversa principal (não interrompe uma resposta em andamento).
+  // espelham o valor mais recente em ref — de propósito NÃO entram nas deps do efeito de
+  // vigília abaixo, senão ligar/desligar a voz no meio da sessão reiniciaria a vigília
+  // (e dispararia uma checagem extra na hora, gastando cota à toa por causa de um toggle
+  // que não tem nada a ver com o Modo Tela).
+  const personaModeForScreenRef = useRef(personaMode);
+  personaModeForScreenRef.current = personaMode;
+  const voiceOnForScreenRef = useRef(voiceOn);
+  voiceOnForScreenRef.current = voiceOn;
+  const voiceNameForScreenRef = useRef(voiceName);
+  voiceNameForScreenRef.current = voiceName;
+
+  // vigília proativa: dispara já na hora de ligar (pra dar sinal de vida imediato, em vez de
+  // ficar quieta os primeiros 4 min sem dar pra saber se está funcionando) e depois em
+  // intervalos espaçados — SÓ fala quando /api/screen-comment devolve um comentário de
+  // verdade; toda tentativa (com ou sem comentário, com ou sem erro) fica registrada no
+  // log — sem isso, "nada digno de nota" e "falhou por cota" pareciam a mesma coisa: silêncio.
+  // Usa a voz do NAVEGADOR (não a do Gemini) de propósito, igual ao NotificationToasts: evita
+  // gastar cota de TTS extra numa fala que ninguém pediu, e não mexe na fila/geração de fala
+  // da conversa principal (não interrompe uma resposta em andamento).
   useEffect(() => {
     if (!screenMode || !screenAutoComment) return;
     let cancelled = false;
     const tick = async () => {
       const frame = captureScreenFrame();
-      if (!frame) return;
+      if (!frame) { addLog("[TELA]", OR, "vigília: sem retrato da tela ainda (compartilhamento iniciando?)"); return; }
       try {
         const res = await fetch("/api/screen-comment", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ image: frame, personaMode }),
+          body: JSON.stringify({ image: frame, personaMode: personaModeForScreenRef.current }),
         });
         const data = await res.json().catch(() => ({}));
-        if (cancelled || !data?.ok || !data.comment) return;
+        if (cancelled) return;
+        if (!data?.ok) { addLog("[TELA]", OR, `vigília falhou: ${data?.error || `HTTP ${res.status}`}`); return; }
+        if (!data.comment) { addLog("[TELA]", CY, "vigília: nada digno de nota agora"); return; }
         addLog("[TELA]", PU, data.comment);
         setMessages((m) => [...m, { id: `screen${Date.now()}`, role: "assistant", text: data.comment }]);
-        if (voiceOn) speakText(data.comment, { browserOnly: true, voiceName }).catch(() => {});
-      } catch {
-        // silencioso — só tenta de novo no próximo ciclo
+        if (voiceOnForScreenRef.current) speakText(data.comment, { browserOnly: true, voiceName: voiceNameForScreenRef.current }).catch(() => {});
+      } catch (err) {
+        if (!cancelled) addLog("[TELA]", OR, `vigília falhou: ${err?.message || err}`);
       }
     };
+    // pequeno atraso na 1ª chamada — dá tempo do <video> do compartilhamento (outro efeito,
+    // ligado por screenMode) realmente começar a produzir frames antes da 1ª tentativa
+    const kickoff = setTimeout(tick, 1000);
     const id = setInterval(tick, SCREEN_COMMENT_INTERVAL_MS);
-    return () => { cancelled = true; clearInterval(id); };
-  }, [screenMode, screenAutoComment, captureScreenFrame, personaMode, voiceOn, voiceName, addLog]);
+    return () => { cancelled = true; clearTimeout(kickoff); clearInterval(id); };
+  }, [screenMode, screenAutoComment, captureScreenFrame, addLog]);
 
   // carrega a Visão do avatar escolhida antes — cada navegador guarda a sua (ver nota acima:
   // só tem efeito no desktop, mas não custa nada carregar a preferência sempre)
