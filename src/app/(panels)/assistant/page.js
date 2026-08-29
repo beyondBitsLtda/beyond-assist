@@ -166,6 +166,10 @@ export default function AssistantPage() {
   // responder, e descarta (não é salva em lugar nenhum, nem local nem no Supabase).
   const [observanceMode, setObservanceMode] = useState(false);
   const [observanceError, setObservanceError] = useState(null);
+  // "user" = frontal, "environment" = traseira — só faz diferença de verdade no celular (a
+  // maioria dos notebooks só tem uma câmera). Não persiste em localStorage de propósito,
+  // mesmo motivo do resto do Modo Observância: cada sessão começa do mesmo jeito.
+  const [cameraFacing, setCameraFacing] = useState("user");
   const observanceVideoRef = useRef(null);
   const observanceStreamRef = useRef(null);
 
@@ -182,7 +186,9 @@ export default function AssistantPage() {
     }
     let cancelled = false;
     setObservanceError(null);
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+    // "ideal" (não "exact") — em aparelho sem câmera traseira de verdade, cai pra qualquer
+    // câmera disponível em vez de falhar com OverconstrainedError.
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: cameraFacing } }, audio: false })
       .then((stream) => {
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
         observanceStreamRef.current = stream;
@@ -201,7 +207,7 @@ export default function AssistantPage() {
       observanceStreamRef.current?.getTracks().forEach((t) => t.stop());
       observanceStreamRef.current = null;
     };
-  }, [observanceMode]);
+  }, [observanceMode, cameraFacing]);
 
   // tira a foto ATUAL da câmera (só no instante da pergunta, nunca antes) — reduzida pra no
   // máx. 640px no lado maior, o bastante pra contar dedos/ver cor de roupa sem gastar token
@@ -1227,7 +1233,15 @@ export default function AssistantPage() {
                 👁 Modo Observância: {observanceMode ? "ON" : "OFF"}
               </button>
               {observanceMode && (
-                <video ref={observanceVideoRef} autoPlay playsInline muted style={{ width: "100%", maxWidth: 160, aspectRatio: "4/3", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, display: "block" }} />
+                <>
+                  <video ref={observanceVideoRef} autoPlay playsInline muted style={{ width: "100%", maxWidth: 160, aspectRatio: "4/3", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, display: "block" }} />
+                  <button
+                    onClick={() => setCameraFacing((f) => (f === "user" ? "environment" : "user"))}
+                    style={{ ...mono, fontSize: 10, padding: "8px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "transparent", color: "rgba(207,239,251,0.7)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+                  >
+                    🔄 câmera: {cameraFacing === "user" ? "frontal" : "traseira"} (trocar)
+                  </button>
+                </>
               )}
               {observanceError && <div style={{ ...mono, fontSize: 9.5, color: OR, marginBottom: 8 }}>⚠ {observanceError}</div>}
               <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
