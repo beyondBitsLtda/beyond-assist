@@ -349,10 +349,10 @@ const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
  */
 export async function synthesizeSpeech(text, voiceName) {
   const voice = TTS_VOICES.some((v) => v.name === voiceName) ? voiceName : DEFAULT_TTS_VOICE;
-  // Fala AO VIVO durante a conversa — o corte anterior (attempts=2/delayMs=500), combinado
-  // com um teto curto no cliente, acabou derrubando praticamente toda tentativa (a voz do
-  // Gemini simplesmente parou de aparecer). 3 tentativas com um espaçamento moderado dá uma
-  // chance real de dar certo sem voltar ao extremo antigo de ~15s de backoff só pra desistir.
+  // Fala AO VIVO durante a conversa. Agora que a chave prioritária está confirmada boa (chat +
+  // voz + embeddings testados direto), 2 tentativas NA CHAVE BOA (PRIMARY_ATTEMPTS=2, ver
+  // ai()) valem mais que 3 com a última arriscando uma reserva capenga — menos tempo somado
+  // até desistir, sem abrir mão de uma segunda chance pra um soluço passageiro.
   const res = await withTransientRetry((attempt) =>
     ai(attempt).models.generateContent({
       model: TTS_MODEL,
@@ -364,7 +364,7 @@ export async function synthesizeSpeech(text, voiceName) {
         },
       },
     }),
-    { attempts: 3, delayMs: 700 }
+    { attempts: 2, delayMs: 600 }
   );
 
   const part = res?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
