@@ -11,6 +11,7 @@ const ITEMS = [
   { href: "/tasks", label: "TAREFAS", glyph: "⏱" },
   { href: "/thoughts", label: "PENSAMENTOS", glyph: "✎" },
   { href: "/sentinel", label: "SENTINELA", glyph: "◆" },
+  { href: "/delp-tasks", label: "TAREFAS DELP", glyph: "🏢" },
   { href: "/assistant", label: "ASSISTENTE", glyph: "◉" },
   { href: "/gemini-keys", label: "CHAVES GEMINI", glyph: "🔑" },
 ];

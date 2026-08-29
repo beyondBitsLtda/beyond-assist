@@ -7,7 +7,7 @@ import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 import { TTS_VOICES } from "@/lib/ttsVoices.js";
-import { pickBrowserVoice, speakText } from "@/lib/browserVoice.js";
+import { pickBrowserVoice, speakText, stopBrowserVoiceAudio, isBrowserVoiceAudioPlaying } from "@/lib/browserVoice.js";
 import { useIsMobile } from "@/lib/useIsMobile.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
 import { getDeviceId, matchNavCommand } from "@/lib/deviceId.js";
@@ -450,7 +450,12 @@ export default function AssistantPage() {
         // tenta a voz do Gemini primeiro (com fallback automático pro navegador se falhar) —
         // antes era só navegador de propósito, pra poupar cota; agora que tem uma chave
         // prioritária com faturamento e folga de sobra, vale usar a voz de verdade aqui também.
-        if (voiceOnForScreenRef.current) speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+        // Mas só fala se a Lisa NÃO estiver falando nada agora (resposta em andamento, ou
+        // acabou de acordar com o gesto) — comentário passivo da vigília nunca deve entrar
+        // por cima de uma fala explícita; o texto ainda aparece no chat/log de qualquer jeito.
+        const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
+        if (jaFalando) addLog("[TELA]", CY, "vigília: comentário achado, mas a Lisa já está falando — só no texto desta vez");
+        else if (voiceOnForScreenRef.current) speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
       } catch (err) {
         if (!cancelled) addLog("[TELA]", OR, `vigília falhou: ${err?.message || err}`);
       }
@@ -638,6 +643,10 @@ export default function AssistantPage() {
       currentAudioResolveRef.current = null;
       resolve(); // libera a fila de reprodução, que senão ficaria travada esperando o onended
     }
+    // corta TAMBÉM qualquer áudio tocado via speakText() (vigília do Modo Tela, saudação do
+    // gesto) — esse pipeline usa um <audio> próprio, fora do audioRef acima. Sem isto, "parar"
+    // só cortava o pipeline principal e a vigília/gesto continuavam falando por cima.
+    stopBrowserVoiceAudio();
   }, []);
   stopSpeakingForGestureRef.current = stopSpeaking;
 

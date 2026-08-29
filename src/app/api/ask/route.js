@@ -1,11 +1,12 @@
 import {
   retrieve, retrieveByDate, detectDateRange, retrieveByBoard, detectBoard,
-  retrieveGeneral, buildPrompt, todayLabel, withPersona, SYSTEM_INSTRUCTION, SYSTEM_INSTRUCTION_GENERAL,
+  retrieveGeneral, buildPrompt, todayLabel, withPersona, withContextDocs, SYSTEM_INSTRUCTION, SYSTEM_INSTRUCTION_GENERAL,
 } from "@/lib/rag.js";
 import { searchThoughts, listThoughts, toMatchFormat } from "@/lib/notes.js";
 import { retrieveSentinelTickets, listProjects } from "@/lib/sentinel.js";
 import { chatStream, detectTrelloAction } from "@/lib/gemini.js";
 import { buildActionProposal, buildClarifyPrompt, executeAction } from "@/lib/assistantActions.js";
+import { hasDelpTasks, getDelpTasksForContext } from "@/lib/delpTasks.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +31,24 @@ function mightBeAction(question, hasPending) {
   const q = (question || "").trim();
   if (hasPending && SHORT_REPLY_RE.test(q)) return true; // resposta curta a uma ação pendente
   return ACTION_VERB_RE.test(q);
+}
+
+// ---- consentimento pra falar de tarefas da Delp (a empresa) ----
+// O usuário pediu explicitamente: SEMPRE perguntar antes de incluir dados da Delp numa
+// resposta sobre tarefas — nunca entrar "de graça" no contexto, mesmo que a pergunta pareça
+// claramente sobre tarefas. Reaproveita o MESMO mecanismo de pendingAction já usado pras
+// ações do Trello (o cliente já guarda e devolve esse campo, sem precisar de código novo lá).
+const DELP_AFFIRMATIVE_RE = /^\s*(sim|s|claro|quero|pode|manda|isso|ok|okay|beleza|com certeza|positivo|uhum|manda ver)\b/i;
+const DELP_NEGATIVE_RE = /^\s*(n[ãa]o|n|deixa|dispensa|negativo|nem|sem isso|agora não|deixa pra l[áa])\b/i;
+
+/** Pergunta parece ser sobre tarefas? De propósito NÃO usa uma regex ampla tipo /tarefa/ pra
+ * texto livre — isso colidiria com comandos de ação do Trello ("conclua minha tarefa X") e
+ * perguntaria da Delp sem necessidade. Só dispara em sinais inequívocos: o seletor "Tarefas"
+ * do Assistente (scope.range) ou a própria pergunta citando um prazo/data. */
+function looksLikeTasksQuestion(question, scope) {
+  if (scope?.mode === "panel" && scope.range) return true;
+  if (scope && scope.mode !== "auto") return false; // outro escopo explícito (Geral, board, Brain, Sentinel) não é "tarefas"
+  return !!detectDateRange(question);
 }
 
 async function* chatStreamWithFallback(prompt, systemInstruction, tools, images) {
@@ -83,7 +102,13 @@ async function* chatStreamWithFallback(prompt, systemInstruction, tools, images)
  * instrução normal (ver withPersona em rag.js). Vem do seletor de configurações do Assistente.
  */
 export async function POST(req) {
-  const { question, filterSource = null, scope = null, history = null, pendingAction = null, personaMode = false, images: rawImages = null } = await req.json();
+  const body = await req.json();
+  const { filterSource = null, history = null, pendingAction = null, images: rawImages = null } = body;
+  // question/scope/personaMode são `let` porque o fluxo de consentimento da Delp (abaixo)
+  // pode SUBSTITUÍ-los pela pergunta/escopo ORIGINAIS quando resolve um "sim"/"não" — o
+  // usuário respondeu à pergunta de consentimento, não fez uma pergunta nova de verdade.
+  let { question, scope = null, personaMode = false } = body;
+  let delpConsent = false; // só vira true se o usuário confirmar explicitamente nesta troca
   // uma ou mais imagens: câmera (Modo Observância) e/ou captura de tela (Modo Tela) — cada
   // uma valida sozinha, entradas malformadas simplesmente não entram na lista.
   const images = Array.isArray(rawImages) ? rawImages.filter((img) => img?.data && img?.mimeType) : [];
@@ -104,9 +129,34 @@ export async function POST(req) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        // ---- consentimento pra falar de tarefas da Delp — ver comentário da regex acima ----
+        if (pendingAction?.type === "delp_consent") {
+          const q = question.trim();
+          if (DELP_AFFIRMATIVE_RE.test(q)) delpConsent = true;
+          if (DELP_AFFIRMATIVE_RE.test(q) || DELP_NEGATIVE_RE.test(q)) {
+            // resolvido (positivo ou negativo) — volta pra pergunta/escopo ORIGINAIS, que
+            // ficaram estacionados no pendingAction esperando essa resposta.
+            question = pendingAction.originalQuestion;
+            scope = pendingAction.scope;
+            personaMode = pendingAction.personaMode;
+          }
+          // nem sim nem não reconhecido — trata como uma pergunta NOVA (abandona o
+          // consentimento pendente) em vez de travar esperando um formato de resposta que
+          // talvez nunca venha
+        } else if (!pendingAction && looksLikeTasksQuestion(question, scope) && await hasDelpTasks()) {
+          send(controller, "context", []);
+          send(controller, "action", { pending: { type: "delp_consent", originalQuestion: question, scope, personaMode } });
+          send(controller, "token", "Antes de continuar — quer que eu leve em conta também as tarefas da Delp?");
+          send(controller, "done", { ok: true });
+          return;
+        }
+
         // ---- ações no Trello: detecta ANTES do fluxo normal, só quando faz sentido tentar ----
         const candidateCards = (history?.cards || []).filter((c) => c.source === "TRELLO" && c.id);
-        const shouldCheckAction = (candidateCards.length || pendingAction) && mightBeAction(question, !!pendingAction);
+        // exclui explicitamente o consentimento da Delp (não é uma ação do Trello — evita
+        // gastar uma chamada do Gemini tentando interpretar "sim"/"não" como ação de card)
+        const shouldCheckAction = pendingAction?.type !== "delp_consent" &&
+          (candidateCards.length || pendingAction) && mightBeAction(question, !!pendingAction);
         if (shouldCheckAction) {
           // se detectTrelloAction FALHAR (ex.: cota do Gemini), isso antes virava "none"
           // silenciosamente — parecia "a Lisa não entendeu o pedido" quando na verdade a
@@ -281,10 +331,15 @@ export async function POST(req) {
             "vê nelas, descreva com base NAS IMAGENS de verdade — não invente. Se a pergunta não tiver " +
             "nada a ver com isso, ignore-as e responda normalmente."
           : null;
-        const combinedNote = [promptNote, imageNote].filter(Boolean).join(" ") || null;
+        // Tarefas da Delp — só entra se o usuário CONFIRMOU no fluxo de consentimento acima;
+        // nunca é buscado/incluído de graça.
+        const delpNote = delpConsent
+          ? `TAREFAS DA DELP (empresa onde o usuário trabalha) — o usuário PEDIU EXPLICITAMENTE\npra considerar isso agora:\n${await getDelpTasksForContext()}`
+          : null;
+        const combinedNote = [promptNote, imageNote, delpNote].filter(Boolean).join("\n\n") || null;
 
         const prompt = buildPrompt(question, matches, combinedNote);
-        for await (const piece of chatStreamWithFallback(prompt, withPersona(systemInstruction, personaMode), tools, images)) {
+        for await (const piece of chatStreamWithFallback(prompt, withContextDocs(withPersona(systemInstruction, personaMode)), tools, images)) {
           send(controller, "token", piece);
         }
 

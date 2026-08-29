@@ -12,3 +12,9 @@ out
 # outros
 *.log
 .DS_Store
+
+# planilha de tarefas da Delp — dado confidencial da empresa (nomes de colegas, títulos de
+# projeto). A fonte "de verdade" pro Kanban fica no Supabase (upload pela tela /delp-tasks,
+# ver src/lib/delpTasks.js), não precisa estar versionada — e não deveria.
+contexto/*.xlsx
+contexto/*.xls

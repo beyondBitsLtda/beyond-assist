@@ -1,11 +1,52 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CY, OR, GR, PU, mono } from "@/lib/theme.js";
+import { drawDonut, drawLegend, drawLine, drawHBars } from "@/lib/arCanvasCharts.js";
+import { CHART } from "@/lib/chartPalette.js";
 
 const POLL_MS = 20000;
 const MODEL_LABELS = { chat: "CHAT", tts: "VOZ (TTS)", embed: "EMBEDDINGS" };
 const REASON_LABELS = { rpd: "cota diária", rpm: "cota por minuto", overload: "sobrecarga", unsupported: "modelo indisponível" };
+const MODEL_CHART_COLORS = { chat: CHART.categorical[0], tts: CHART.categorical[1], embed: CHART.categorical[2] };
+
+/** Canvas que se redesenha sozinho quando o container muda de tamanho (ResizeObserver) ou
+ * quando `deps` muda — escala pro devicePixelRatio pra não ficar borrado em tela de alta
+ * densidade (as primitivas de src/lib/arCanvasCharts.js foram feitas pra textura WebGL, sem
+ * DPR nenhum, então essa escala fica por conta de quem desenha na TELA de verdade, aqui). */
+function UsageChart({ height, draw, deps }) {
+  const canvasRef = useRef(null);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+    const render = () => {
+      const w = container.clientWidth || 1;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.round(w * dpr));
+      canvas.height = Math.max(1, Math.round(height * dpr));
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${height}px`;
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, height);
+      draw(ctx, w, height);
+    };
+    render();
+    const ro = new ResizeObserver(render);
+    ro.observe(container);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  return (
+    <div ref={containerRef} style={{ width: "100%" }}>
+      <canvas ref={canvasRef} />
+    </div>
+  );
+}
 
 function fmtRemaining(ms) {
   if (ms <= 0) return "agora";
@@ -23,16 +64,20 @@ function fmtRemaining(ms) {
  */
 export default function GeminiKeysPage() {
   const [data, setData] = useState(null);
+  const [usage, setUsage] = useState(null); // consumo (gráficos) — separado do status/cooldown acima
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/gemini-keys/status");
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error || "falha ao carregar status");
-      setData(json);
+      const [statusRes, usageRes] = await Promise.all([
+        fetch("/api/gemini-keys/status").then((r) => r.json()),
+        fetch("/api/gemini-keys/usage").then((r) => r.json()),
+      ]);
+      if (!statusRes.ok) throw new Error(statusRes.error || "falha ao carregar status");
+      setData(statusRes);
+      if (usageRes.ok) setUsage(usageRes); // consumo é só um extra visual — não trava o painel se falhar
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -95,6 +140,61 @@ export default function GeminiKeysPage() {
           </div>
         ))}
       </div>
+
+      {usage && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ ...mono, fontSize: 10, letterSpacing: 2, color: "rgba(207,239,251,0.55)", marginBottom: 10 }}>
+            ◈ CONSUMO · ÚLTIMOS 14 DIAS
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) minmax(260px, 1.4fr)", gap: 14, marginBottom: 14 }}>
+            <div style={{ border: "1px solid rgba(var(--accent-rgb),0.16)", borderRadius: 8, padding: 14, background: "rgba(0,0,0,0.2)" }}>
+              <div style={{ ...mono, fontSize: 9.5, letterSpacing: 1.5, color: "rgba(207,239,251,0.45)", marginBottom: 6 }}>POR MODELO</div>
+              <UsageChart
+                height={260}
+                deps={[usage.byModel]}
+                draw={(ctx, w, h) => {
+                  const rows = usage.byModel
+                    .filter((m) => m.total > 0)
+                    .map((m) => ({ label: MODEL_LABELS[m.key] || m.key, value: m.total, color: MODEL_CHART_COLORS[m.key] || CHART.categorical[3] }));
+                  drawDonut(ctx, Math.min(140, w * 0.35), h / 2, Math.min(95, w * 0.3), Math.min(58, w * 0.18), rows);
+                  drawLegend(ctx, Math.min(140, w * 0.35) * 2 - 20, 40, h - 60, rows, (v) => String(v));
+                }}
+              />
+            </div>
+            <div style={{ border: "1px solid rgba(var(--accent-rgb),0.16)", borderRadius: 8, padding: 14, background: "rgba(0,0,0,0.2)" }}>
+              <div style={{ ...mono, fontSize: 9.5, letterSpacing: 1.5, color: "rgba(207,239,251,0.45)", marginBottom: 6 }}>NO TEMPO (sucesso × falha)</div>
+              <UsageChart
+                height={260}
+                deps={[usage.daily]}
+                draw={(ctx, w, h) => {
+                  const points = usage.daily.map((d) => ({ x: d.day.slice(5), values: { success: d.success, fail: d.fail } }));
+                  drawLine(ctx, 10, 20, w - 20, h - 30, points, [
+                    { key: "success", name: "sucesso", color: CHART.status.good },
+                    { key: "fail", name: "falha", color: CHART.status.critical },
+                  ]);
+                }}
+              />
+            </div>
+          </div>
+          <div style={{ border: "1px solid rgba(var(--accent-rgb),0.16)", borderRadius: 8, padding: 14, background: "rgba(0,0,0,0.2)" }}>
+            <div style={{ ...mono, fontSize: 9.5, letterSpacing: 1.5, color: "rgba(207,239,251,0.45)", marginBottom: 6 }}>POR CHAVE</div>
+            <div style={{ maxHeight: 320, overflowY: "auto" }}>
+              <UsageChart
+                height={Math.max(120, usage.byKey.filter((k) => k.total > 0).length * 28)}
+                deps={[usage.byKey]}
+                draw={(ctx, w, h) => {
+                  const used = usage.byKey.filter((k) => k.total > 0).sort((a, b) => b.total - a.total);
+                  const rows = used.map((k) => ({ label: `chave #${k.keyIndex + 1}`, values: [k.success, k.fail] }));
+                  drawHBars(ctx, 10, 14, w - 20, h - 14, rows, [
+                    { name: "sucesso", color: CHART.status.good },
+                    { name: "falha", color: CHART.status.critical },
+                  ]);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ overflowX: "auto", border: "1px solid rgba(var(--accent-rgb),0.16)", borderRadius: 8 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", ...mono, fontSize: 11 }}>

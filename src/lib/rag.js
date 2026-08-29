@@ -2,6 +2,7 @@ import { embedOne } from "./gemini.js";
 import { supabase } from "./supabase.js";
 import { loadAllTrelloCards } from "./liveTrello.js";
 import { getPersonaText } from "./persona.js";
+import { getContextDocsText } from "./context.js";
 
 const TOP_K = Number(process.env.RAG_TOP_K || 8);
 const MIN_SIM = Number(process.env.RAG_MIN_SIMILARITY || 0.55);
@@ -122,6 +123,24 @@ ação que não executou). O tom da persona é uma camada por cima do conteúdo 
 troca de precisão ou clareza; se a personalidade e a precisão conflitarem, precisão vence.
 
 ${persona}`;
+}
+
+/**
+ * Acrescenta os arquivos de contexto pessoal (contexto/*.md — ex.: lord.md, com nome,
+ * família, carreira do usuário) à instrução de sistema. Ao contrário de withPersona (que só
+ * entra com o Modo Persona ligado), isso é SEMPRE aplicado, incondicional — o usuário pediu
+ * explicitamente que a Lisa "sempre leve em conta" esse contexto, sem precisar ligar nada.
+ */
+export function withContextDocs(baseInstruction) {
+  const text = getContextDocsText();
+  if (!text.trim()) return baseInstruction;
+  return `${baseInstruction}
+
+---
+CONTEXTO PESSOAL DO USUÁRIO (sempre vale, não precisa mencionar isso explicitamente a menos
+que seja relevante pra pergunta) — arquivos abaixo de contexto/*.md:
+
+${text}`;
 }
 
 /**

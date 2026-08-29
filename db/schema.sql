@@ -206,3 +206,71 @@ create table if not exists public.gemini_key_health (
 
 alter table public.gemini_key_health enable row level security;
 -- (só acessada pela service_role, em src/lib/geminiKeyHealth.js — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  Uso diário das chaves do Gemini (a mais, aditivo) — pro painel /gemini-keys mostrar
+--  gráficos de consumo (pizza por modelo, barra por chave, curva por dia), não só o status
+--  de cooldown. Uma LINHA POR DIA×CHAVE×MODELO (agregada, não uma linha por chamada — evita
+--  a tabela crescer sem limite) incrementada via função (increment_gemini_usage), chamada de
+--  markOk/markCooldown em src/lib/geminiKeyHealth.js — ou seja, em TODA tentativa de chamada
+--  ao Gemini, sucesso ou falha.
+-- ============================================================
+
+-- 14) Contadores do dia (fuso UTC) — sucesso e falha separados, pra dar pra ver não só
+--     "quanto foi usado" mas "quanto disso falhou" por chave/modelo.
+create table if not exists public.gemini_key_usage_daily (
+  day            date not null,
+  key_index      int  not null,
+  model          text not null,
+  success_count  int  not null default 0,
+  fail_count     int  not null default 0,
+  primary key (day, key_index, model)
+);
+
+alter table public.gemini_key_usage_daily enable row level security;
+-- (só acessada pela service_role, em src/lib/geminiKeyHealth.js — mesmo padrão das tabelas acima)
+
+-- Incremento atômico — evita a corrida de "ler o valor, somar 1, escrever de volta" quando
+-- duas invocações da função na Vercel tentam contar uma chamada no mesmíssimo instante.
+create or replace function public.increment_gemini_usage(
+  p_day date, p_key_index int, p_model text, p_success boolean
+) returns void
+language plpgsql
+as $$
+begin
+  insert into public.gemini_key_usage_daily (day, key_index, model, success_count, fail_count)
+  values (p_day, p_key_index, p_model, case when p_success then 1 else 0 end, case when p_success then 0 else 1 end)
+  on conflict (day, key_index, model) do update
+    set success_count = public.gemini_key_usage_daily.success_count + excluded.success_count,
+        fail_count    = public.gemini_key_usage_daily.fail_count    + excluded.fail_count;
+end;
+$$;
+
+-- ============================================================
+--  Tarefas da Delp (a mais, aditivo) — Kanban de tarefas da empresa onde o usuário trabalha
+--  (tela /delp-tasks), alimentado por upload manual de uma planilha exportada do PMO (ver
+--  contexto/Delp.xlsx — NUNCA comitado no git, é dado confidencial da empresa; a fonte "de
+--  verdade" fica aqui no Supabase, não no arquivo). Ver src/lib/delpTasks.js.
+--  Cada upload SUBSTITUI tudo (não acumula histórico de uploads antigos).
+-- ============================================================
+
+-- 15) Uma linha por tarefa — id vem da própria planilha do PMO, não gerado aqui.
+create table if not exists public.delp_tasks (
+  id             int  primary key,
+  titulo         text not null,
+  legenda        text,
+  prioridade     text,
+  pontos         numeric,
+  data_inicio    date,
+  data_limite    date,
+  etapa          text,
+  relacionado_a  text,
+  atribuido_a    text,
+  colaboradores  text,
+  status         text not null,
+  sprint         text,
+  updated_at     timestamptz not null default now()
+);
+
+alter table public.delp_tasks enable row level security;
+-- (só acessada pela service_role, em src/lib/delpTasks.js — mesmo padrão das tabelas acima)

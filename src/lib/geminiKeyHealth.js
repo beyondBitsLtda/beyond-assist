@@ -66,11 +66,29 @@ export async function pickKeyIndex(n, model, exclude = new Set()) {
   return finalPool[0];
 }
 
+/** Registra uma tentativa de chamada (sucesso ou falha) pro painel de uso (/gemini-keys) —
+ * agregado por dia via a função increment_gemini_usage (ver db/schema.sql), nunca uma linha
+ * por chamada. Nunca deixa uma falha de log derrubar o fluxo real do Gemini — só registra
+ * e ignora erro. */
+async function logUsage(keyIndex, model, success) {
+  try {
+    await supabase.rpc("increment_gemini_usage", {
+      p_day: new Date().toISOString().slice(0, 10),
+      p_key_index: keyIndex,
+      p_model: model,
+      p_success: success,
+    });
+  } catch {
+    // Supabase/RPC indisponível — só perde a estatística deste tick, não é crítico
+  }
+}
+
 /** Marca (chave × modelo) de cooldown até `untilMs`, por `reason` ('rpd'|'rpm'|'overload'|
  * 'unsupported'). Atualiza o cache na hora (efeito imediato nesta invocação) e persiste no
  * Supabase em segundo plano (efeito nas PRÓXIMAS invocações/instâncias). */
 export async function markCooldown(keyIndex, model, { untilMs, reason, error }) {
   cache.set(`${keyIndex}:${model}`, { until: untilMs, reason });
+  logUsage(keyIndex, model, false); // fire-and-forget — não trava o retorno desta função por causa da estatística
   try {
     await supabase.from("gemini_key_health").upsert(
       {
@@ -90,6 +108,7 @@ export async function markCooldown(keyIndex, model, { untilMs, reason, error }) 
 /** Limpa o cooldown de (chave × modelo) — chamado num sucesso, pra ela voltar a ser
  * escolhida imediatamente (não precisa esperar o cooldown expirar sozinho). */
 export async function markOk(keyIndex, model) {
+  logUsage(keyIndex, model, true); // fire-and-forget, igual acima — todo sucesso conta pro painel de uso
   const key = `${keyIndex}:${model}`;
   if (!cache.has(key)) return; // nunca esteve em cooldown — nada a limpar, evita escrita à toa
   cache.delete(key);

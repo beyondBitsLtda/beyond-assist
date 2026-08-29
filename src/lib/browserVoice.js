@@ -18,6 +18,28 @@ export function pickBrowserVoice(voices) {
   );
 }
 
+// Áudio do Gemini (via /api/speak) tocado por ESTE módulo — rastreado aqui porque quem chama
+// speakText (vigília do Modo Tela, saudação do gesto de acordar) não guarda referência nenhuma
+// pro <audio> criado, então nada conseguia cortá-lo depois. `gen` é um contador de geração: cada
+// chamada de speakText pega o número mais recente ANTES de esperar a rede (/api/speak), e só toca
+// o áudio se ninguém mais novo tiver assumido nesse meio-tempo — sem isso, dava pra um
+// stopBrowserVoiceAudio() cortar o áudio JÁ tocando e mesmo assim, alguns instantes depois, o
+// fetch antigo (que já estava em voo) terminar e tocar por cima da fala nova mesmo assim.
+let currentAudio = null;
+let gen = 0;
+
+/** Corta o áudio do Gemini que ESTE módulo tiver em reprodução (ou ainda esperando a rede) —
+ * usado pelo stopSpeaking() do Assistente pra garantir que parar a fala pare TUDO, não só o
+ * pedaço tocado pelo pipeline principal de TTS. */
+export function stopBrowserVoiceAudio() {
+  gen++;
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+}
+
+export function isBrowserVoiceAudioPlaying() {
+  return !!currentAudio;
+}
+
 /**
  * Fala um texto em voz alta. `browserOnly: true` pula o Gemini de propósito — usado pelos
  * avisos dentro do app (ver NotificationToasts.js), que não precisam da voz "premium" e
@@ -25,10 +47,18 @@ export function pickBrowserVoice(voices) {
  * tempo (cada um fala cada aviso por conta própria) — competindo por cota com o Assistente,
  * que é quem realmente precisa da voz do Gemini. Sem esse parâmetro, cai pra voz do Gemini
  * (via /api/speak) com fallback pro navegador se falhar — é o que o Assistente usa.
+ *
+ * Sempre corta qualquer fala ANTERIOR deste módulo antes de começar a nova (nunca duas chamadas
+ * de speakText tocando ao mesmo tempo) — foi assim que a vigília do Modo Tela e a saudação do
+ * gesto de acordar chegaram a se sobrepor.
  */
 export async function speakText(text, { voiceName, browserOnly = false } = {}) {
   const clean = (text || "").trim();
   if (!clean || typeof window === "undefined") return;
+
+  const myGen = ++gen;
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  window.speechSynthesis?.cancel();
 
   if (!browserOnly) {
     try {
@@ -39,11 +69,13 @@ export async function speakText(text, { voiceName, browserOnly = false } = {}) {
       });
       if (!res.ok) throw new Error(`speak HTTP ${res.status}`);
       const blob = await res.blob();
+      if (myGen !== gen) return; // uma fala mais nova assumiu enquanto esperávamos a rede
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      currentAudio = audio;
       await new Promise((resolve) => {
-        audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
-        audio.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+        audio.onended = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
+        audio.onerror = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
         audio.play().catch(resolve);
       });
       return;
@@ -52,7 +84,7 @@ export async function speakText(text, { voiceName, browserOnly = false } = {}) {
     }
   }
 
-  if (!window.speechSynthesis) return;
+  if (myGen !== gen || !window.speechSynthesis) return;
   const u = new SpeechSynthesisUtterance(clean);
   u.lang = "pt-BR";
   u.rate = 1.05;
