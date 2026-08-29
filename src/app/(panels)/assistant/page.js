@@ -532,11 +532,14 @@ export default function AssistantPage() {
   }, []);
 
   // teto de espera pela voz do Gemini — só uma rede de segurança pra uma chamada REALMENTE
-  // travada (nunca volta), não uma tentativa de "acelerar" — 3,2s tinha derrubado toda
-  // chamada, mesmo as que iam terminar dando certo em alguns segundos. Passado esse tempo
-  // (bem mais folgado agora), desiste e cai pro navegador (a chamada ao Gemini continua em
-  // segundo plano até resolver sozinha, só não fica mais ninguém esperando por ela).
-  const SPEAK_TIMEOUT_MS = 9000;
+  // travada (nunca volta), NÃO uma tentativa de "acelerar" a resposta. Já errei esse número
+  // pra menos duas vezes: 3,2s matava toda chamada; depois 9s ainda cortava o servidor no
+  // meio das PRÓPRIAS 3 tentativas dele (retry com espera do lado do servidor soma tempo
+  // real, e o corte no navegador chegava antes do servidor terminar de tentar). A Vercel já
+  // tem um teto absoluto de 60s pra função (ver maxDuration em /api/speak) — não faz sentido
+  // replicar isso aqui com um número curto chutado; esse valor só existe pra pegar uma
+  // conexão de rede genuinamente travada, não pra apressar o Gemini.
+  const SPEAK_TIMEOUT_MS = 20000;
 
   const synthesizeChunk = useCallback(async (text) => {
     const controller = new AbortController();
