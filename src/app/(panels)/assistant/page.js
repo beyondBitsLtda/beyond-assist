@@ -218,23 +218,143 @@ export default function AssistantPage() {
     return base64 ? { mimeType: "image/jpeg", data: base64 } : null;
   }, []);
 
+  // ---- Gesto de acordar (✌️ V de vitória) — com o Modo Observância ligado, mostrar esse
+  // gesto pra câmera faz a Lisa perguntar "o que você precisa?" e já abrir o microfone
+  // sozinha, sem precisar tocar em nada — pensado pra quando você NEM está olhando pra tela.
+  // Usa @mediapipe/tasks-vision (reconhecimento de gestos pronto do Google, rodando local no
+  // navegador via WASM — os arquivos ficam em public/mediapipe/, sem depender de nenhum CDN
+  // externo em runtime) — não tenta reconhecer um gesto "customizado" (isso exigiria treinar
+  // um modelo do zero, caro e nada garantido); usa um dos gestos JÁ reconhecidos de fábrica.
+  const gestureRecognizerRef = useRef(null);
+  const lastGestureTriggerRef = useRef(0);
+  const GESTURE_COOLDOWN_MS = 4000; // evita disparar de novo enquanto ainda está segurando o gesto
+  const GESTURE_CONFIDENCE_MIN = 0.6;
+  // espelham estado que ainda não foi declarado neste ponto do arquivo (stopSpeaking/toggleMic
+  // vêm depois) — sem isso, o efeito abaixo teria que depender deles e recarregaria o
+  // reconhecedor de gestos (modelo de ~8MB) toda vez que qualquer coisa nem relacionada
+  // mudasse. As atribuições reais ficam perto de onde cada um é declarado, mais abaixo.
+  const stopSpeakingForGestureRef = useRef(null);
+  const toggleMicForGestureRef = useRef(null);
+  const listeningForGestureRef = useRef(listening);
+  listeningForGestureRef.current = listening;
+  const busyForGestureRef = useRef(busy);
+  busyForGestureRef.current = busy;
+
+  const triggerWake = useCallback(async () => {
+    addLog("[GESTO]", PU, "✌️ detectado — acordando");
+    stopSpeakingForGestureRef.current?.();
+    try {
+      await speakText("Oi! O que você precisa?", { voiceName: voiceNameForScreenRef.current });
+    } catch {
+      // segue e abre o mic mesmo se a fala falhar — o gesto não pode ficar "preso" por isso
+    }
+    toggleMicForGestureRef.current?.();
+  }, [addLog]);
+
+  useEffect(() => {
+    if (!observanceMode) {
+      gestureRecognizerRef.current?.close?.();
+      gestureRecognizerRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    let intervalId = null;
+    (async () => {
+      try {
+        const { GestureRecognizer, FilesetResolver } = await import("@mediapipe/tasks-vision");
+        const vision = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
+        const recognizer = await GestureRecognizer.createFromOptions(vision, {
+          baseOptions: { modelAssetPath: "/mediapipe/gesture_recognizer.task", delegate: "GPU" },
+          runningMode: "VIDEO",
+        });
+        if (cancelled) { recognizer.close(); return; }
+        gestureRecognizerRef.current = recognizer;
+        addLog("[GESTO]", GR, "reconhecimento pronto — mostra ✌️ pra câmera pra chamar a Lisa");
+
+        intervalId = setInterval(() => {
+          const v = observanceVideoRef.current;
+          const rec = gestureRecognizerRef.current;
+          if (!v || !rec || !v.videoWidth) return;
+          try {
+            const result = rec.recognizeForVideo(v, performance.now());
+            const top = result?.gestures?.[0]?.[0];
+            if (top?.categoryName === "Victory" && top.score >= GESTURE_CONFIDENCE_MIN) {
+              const now = Date.now();
+              if (
+                now - lastGestureTriggerRef.current > GESTURE_COOLDOWN_MS &&
+                !listeningForGestureRef.current &&
+                !busyForGestureRef.current
+              ) {
+                lastGestureTriggerRef.current = now;
+                triggerWake();
+              }
+            }
+          } catch {
+            // detecção falhou num frame isolado — ignora, tenta de novo no próximo tick
+          }
+        }, 400);
+      } catch (err) {
+        if (!cancelled) addLog("[GESTO]", OR, `não consegui iniciar reconhecimento de gestos: ${err?.message || err}`);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+      gestureRecognizerRef.current?.close?.();
+      gestureRecognizerRef.current = null;
+    };
+  }, [observanceMode, addLog, triggerWake]);
+
   // ---- Modo Tela: a Lisa "vê" a tela do computador (getDisplayMedia) — DESKTOP-ONLY (o
   // toggle só existe no branch desktop deste componente, "enquanto mexo no PC"), com 2
   // modos que se somam:
   //  - reativo: liga a captura, e cada pergunta manda um retrato ATUAL da tela junto (mesmo
   //    mecanismo do Modo Observância — ver captureObservanceFrame acima).
-  //  - proativo (screenAutoComment): além disso, vigia sozinha em intervalos espaçados (ver
-  //    SCREEN_COMMENT_INTERVAL_MS) e só fala alguma coisa quando o Gemini decide que há algo
-  //    genuinamente digno de nota (ver /api/screen-comment) — na maioria das vezes fica quieta.
+  //  - proativo (screenAutoComment): além disso, vigia sozinha num intervalo configurável
+  //    (screenIntervalMs) e só fala alguma coisa quando o Gemini decide que há algo
+  //    genuinamente digno de nota (ver /api/screen-comment) — na maioria das vezes fica
+  //    quieta. Um direcionamento livre (screenFocus) pode ser dado pra pautar o que ela
+  //    prioriza notar.
   // O navegador SEMPRE pede permissão nativa (escolher tela/janela/aba) — isso não dá pra
   // pular, é trava de segurança do próprio Chrome/Edge. Igual à câmera, sem localStorage de
   // propósito (não fica ligado sozinho na próxima vez que abrir o app).
-  const SCREEN_COMMENT_INTERVAL_MS = 2 * 60 * 1000; // 2 min — dá pra encurtar agora que tem uma chave prioritária com folga de cota
+  const SCREEN_INTERVAL_OPTIONS = [
+    { value: 5000, label: "5 segundos" },
+    { value: 15000, label: "15 segundos" },
+    { value: 30000, label: "30 segundos" },
+    { value: 60000, label: "1 minuto" },
+    { value: 120000, label: "2 minutos" },
+    { value: 300000, label: "5 minutos" },
+  ];
   const [screenMode, setScreenMode] = useState(false);
   const [screenAutoComment, setScreenAutoComment] = useState(false);
   const [screenError, setScreenError] = useState(null);
+  const [screenIntervalMs, setScreenIntervalMs] = useState(30000); // com o pool de 35 chaves, intervalos curtos deixaram de ser um problema de cota
+  const [screenFocus, _setScreenFocus] = useState(""); // direcionamento livre: "preste atenção em X" — some no prompt da vigília
+  const screenFocusRef = useRef(""); // lido fresco a cada tick, sem reiniciar o intervalo a cada tecla digitada
+  screenFocusRef.current = screenFocus;
   const screenVideoRef = useRef(null);
   const screenStreamRef = useRef(null);
+
+  // carrega intervalo/direcionamento salvos — preferências de fluxo de trabalho, não segredo
+  // nenhum, então (ao contrário do próprio toggle da câmera/tela) tudo bem persistir entre sessões
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedMs = Number(localStorage.getItem("screenIntervalMs"));
+    if (SCREEN_INTERVAL_OPTIONS.some((o) => o.value === savedMs)) setScreenIntervalMs(savedMs);
+    const savedFocus = localStorage.getItem("screenFocus");
+    if (savedFocus) _setScreenFocus(savedFocus);
+  }, []);
+
+  const chooseScreenInterval = useCallback((ms) => {
+    setScreenIntervalMs(ms);
+    if (typeof window !== "undefined") localStorage.setItem("screenIntervalMs", String(ms));
+  }, []);
+
+  const updateScreenFocus = useCallback((text) => {
+    _setScreenFocus(text);
+    if (typeof window !== "undefined") localStorage.setItem("screenFocus", text);
+  }, []);
 
   useEffect(() => {
     if (!screenMode) {
@@ -319,7 +439,7 @@ export default function AssistantPage() {
         const res = await fetch("/api/screen-comment", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ image: frame, personaMode: personaModeForScreenRef.current }),
+          body: JSON.stringify({ image: frame, personaMode: personaModeForScreenRef.current, focus: screenFocusRef.current || null }),
         });
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
@@ -338,9 +458,9 @@ export default function AssistantPage() {
     // pequeno atraso na 1ª chamada — dá tempo do <video> do compartilhamento (outro efeito,
     // ligado por screenMode) realmente começar a produzir frames antes da 1ª tentativa
     const kickoff = setTimeout(tick, 1000);
-    const id = setInterval(tick, SCREEN_COMMENT_INTERVAL_MS);
+    const id = setInterval(tick, screenIntervalMs);
     return () => { cancelled = true; clearTimeout(kickoff); clearInterval(id); };
-  }, [screenMode, screenAutoComment, captureScreenFrame, addLog]);
+  }, [screenMode, screenAutoComment, screenIntervalMs, captureScreenFrame, addLog]);
 
   // carrega a Visão do avatar escolhida antes — cada navegador guarda a sua (ver nota acima:
   // só tem efeito no desktop, mas não custa nada carregar a preferência sempre)
@@ -519,6 +639,7 @@ export default function AssistantPage() {
       resolve(); // libera a fila de reprodução, que senão ficaria travada esperando o onended
     }
   }, []);
+  stopSpeakingForGestureRef.current = stopSpeaking;
 
   // teto de espera pela voz do Gemini — só uma rede de segurança pra uma chamada REALMENTE
   // travada (nunca volta), NÃO uma tentativa de "acelerar" a resposta. Já errei esse número
@@ -809,6 +930,7 @@ export default function AssistantPage() {
     };
     rec.start();
   }, [addLog, ask, stopSpeaking]);
+  toggleMicForGestureRef.current = toggleMic;
 
   // modo chat (mobile): rola pro fim sempre que a conversa cresce ou a resposta vai chegando
   useEffect(() => {
@@ -1249,7 +1371,7 @@ export default function AssistantPage() {
             <video ref={screenVideoRef} autoPlay playsInline muted title="o que está sendo compartilhado — só um retrato disso é enviado por vez" style={{ width: 72, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
             <button
               onClick={() => setScreenAutoComment((v) => !v)}
-              title={screenAutoComment ? `Vigiando sozinha a cada ${SCREEN_COMMENT_INTERVAL_MS / 60000} min — só fala se achar algo digno de nota. Clique pra desligar` : "Deixar a Lisa de olho na tela sozinha, comentando só quando achar algo relevante (sem você perguntar)"}
+              title={screenAutoComment ? "Vigiando sozinha — só fala se achar algo digno de nota. Clique pra desligar" : "Deixar a Lisa de olho na tela sozinha, comentando só quando achar algo relevante (sem você perguntar)"}
               style={{
                 ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
                 border: `1px solid ${screenAutoComment ? PU : "rgba(var(--accent-rgb),0.18)"}`,
@@ -1260,6 +1382,25 @@ export default function AssistantPage() {
             >
               💬 AUTO {screenAutoComment ? "ON" : "OFF"}
             </button>
+            {screenAutoComment && (
+              <>
+                <select
+                  value={screenIntervalMs}
+                  onChange={(e) => chooseScreenInterval(Number(e.target.value))}
+                  title="De quanto em quanto tempo ela verifica a tela sozinha"
+                  style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
+                >
+                  {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+                </select>
+                <input
+                  value={screenFocus}
+                  onChange={(e) => updateScreenFocus(e.target.value)}
+                  placeholder="direcionamento (ex.: avise se o build quebrar)"
+                  title="O que ela deve priorizar notar na tela — fica em branco pra ela decidir sozinha o que é relevante"
+                  style={{ ...mono, fontSize: 9, padding: "5px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff", width: 220 }}
+                />
+              </>
+            )}
           </>
         )}
         {screenError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {screenError}</span>}
