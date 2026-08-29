@@ -158,18 +158,18 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
  * busca do Google (o modelo decide sozinho quando de fato buscar). Usado pelo
  * modo "Geral" do assistente.
  *
- * `image` (opcional) — { mimeType, data (base64) } — uma foto tirada na hora pela câmera
- * (Modo Observância do Assistente, ver src/app/(panels)/assistant/page.js). Quando presente,
- * vira multimodal: o mesmo modelo de chat (gemini-2.5-flash) também enxerga imagem, sem
- * precisar de nenhum modelo/endpoint separado.
+ * `images` (opcional) — [{ mimeType, data (base64) }] — uma ou mais fotos tiradas na hora
+ * (Modo Observância = câmera, Modo Tela = captura de tela; ver assistant/page.js). Quando
+ * presente, vira multimodal: o mesmo modelo de chat (gemini-2.5-flash) também enxerga
+ * imagem, sem precisar de nenhum modelo/endpoint separado.
  */
-export async function* chatStream(prompt, systemInstruction, { tools, image } = {}) {
+export async function* chatStream(prompt, systemInstruction, { tools, images } = {}) {
   const config = {};
   if (systemInstruction) config.systemInstruction = systemInstruction;
   if (tools) config.tools = tools;
 
-  const contents = image
-    ? [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType: image.mimeType, data: image.data } }] }]
+  const contents = images?.length
+    ? [{ role: "user", parts: [{ text: prompt }, ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } }))] }]
     : prompt;
 
   // retry só na abertura do stream (antes de qualquer chunk chegar) — 429/503 costumam
@@ -327,4 +327,36 @@ export async function synthesizeSpeech(text, voiceName) {
   const sampleRate = rateMatch ? Number(rateMatch[1]) : 24000;
 
   return { base64: inline.data, sampleRate, mime: inline.mimeType || "audio/L16" };
+}
+
+// ---- Modo Tela (proativo): vigília periódica da tela, ver /api/screen-comment ----
+// Instrução BASE — quem chama (a rota) decide se aplica withPersona() por cima antes de
+// passar pra cá, do mesmo jeito que já faz com o systemInstruction do chat normal (evita
+// import circular: rag.js já importa deste arquivo, então esse não pode importar de rag.js).
+export const SCREEN_WATCH_INSTRUCTION = `Você é a Lisa, observando a tela do usuário enquanto ele trabalha no computador, através de UMA captura de tela por vez (não é vídeo contínuo — a próxima só vem daqui a alguns minutos).
+
+Comente SOMENTE se houver algo genuinamente digno de nota: um erro visível, uma mensagem de aviso/alerta, algo que parece travado ou quebrado, ou um padrão claramente problemático que valha chamar atenção. Não narre o óbvio, não descreva o que a pessoa já sabe que está fazendo, não comente sobre conteúdo comum de trabalho só por comentar.
+
+Na ESMAGADORA MAIORIA das vezes não vai ter nada relevante pra dizer — nesse caso, responda EXATAMENTE com a palavra NADA (maiúsculas, sem mais nada). Quando tiver algo a dizer de verdade, seja breve: 1 frase curta, direta ao ponto.`;
+
+/**
+ * Analisa UMA captura de tela e decide se vale comentar algo — usado pelo modo proativo (a
+ * pessoa NÃO perguntou nada, é a Lisa "de olho" sozinha). Chamada não-streaming, simples e
+ * barata de propósito (é chamada periodicamente, sem interação do usuário).
+ *
+ * Retorna o comentário (string) ou null quando não há nada digno de nota.
+ */
+export async function describeScreenIfNotable(image, systemInstruction = SCREEN_WATCH_INSTRUCTION) {
+  const res = await withTransientRetry(
+    () =>
+      ai().models.generateContent({
+        model: CHAT_MODEL,
+        contents: [{ role: "user", parts: [{ text: "Aqui está a tela agora." }, { inlineData: { mimeType: image.mimeType, data: image.data } }] }],
+        config: { systemInstruction },
+      }),
+    { attempts: 2, delayMs: 500 }
+  );
+  const text = (res.text || "").trim();
+  if (!text || /^nada\.?$/i.test(text)) return null;
+  return text;
 }

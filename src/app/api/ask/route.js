@@ -32,8 +32,8 @@ function mightBeAction(question, hasPending) {
   return ACTION_VERB_RE.test(q);
 }
 
-async function* chatStreamWithFallback(prompt, systemInstruction, tools, image) {
-  const primary = chatStream(prompt, systemInstruction, { tools, image });
+async function* chatStreamWithFallback(prompt, systemInstruction, tools, images) {
+  const primary = chatStream(prompt, systemInstruction, { tools, images });
   let yieldedAny = false;
   try {
     for await (const piece of primary) {
@@ -44,7 +44,7 @@ async function* chatStreamWithFallback(prompt, systemInstruction, tools, image) 
     // só cai pro modo sem ferramenta se AINDA NÃO saiu nenhum token — uma falha depois que
     // a resposta já começou a chegar não pode ser "reiniciada" sem duplicar/misturar texto.
     if (!tools || yieldedAny) throw err;
-    for await (const piece of chatStream(prompt, systemInstruction, { image })) yield piece;
+    for await (const piece of chatStream(prompt, systemInstruction, { images })) yield piece;
   }
 }
 
@@ -83,8 +83,10 @@ async function* chatStreamWithFallback(prompt, systemInstruction, tools, image) 
  * instrução normal (ver withPersona em rag.js). Vem do seletor de configurações do Assistente.
  */
 export async function POST(req) {
-  const { question, filterSource = null, scope = null, history = null, pendingAction = null, personaMode = false, image: rawImage = null } = await req.json();
-  const image = rawImage?.data && rawImage?.mimeType ? rawImage : null;
+  const { question, filterSource = null, scope = null, history = null, pendingAction = null, personaMode = false, images: rawImages = null } = await req.json();
+  // uma ou mais imagens: câmera (Modo Observância) e/ou captura de tela (Modo Tela) — cada
+  // uma valida sozinha, entradas malformadas simplesmente não entram na lista.
+  const images = Array.isArray(rawImages) ? rawImages.filter((img) => img?.data && img?.mimeType) : [];
 
   if (!question || typeof question !== "string") {
     return new Response(JSON.stringify({ error: "question é obrigatório" }), {
@@ -262,19 +264,20 @@ export async function POST(req) {
 
         send(controller, "context", matches);
 
-        // Modo Observância (ver assistant/page.js): uma foto tirada na hora pela câmera do
-        // usuário — avisa o Gemini que ela está anexada e pra que serve, senão ele não sabe
-        // que pode/deve olhar pra imagem ao responder.
-        const imageNote = image
-          ? "Há uma FOTO anexada, tirada agora mesmo pela câmera do usuário (Modo Observância). " +
-            "Se a pergunta for sobre o que você vê (postura, roupa, gesto com a mão, expressão, etc.), " +
-            "descreva com base NA IMAGEM de verdade — não invente. Se a pergunta não tiver nada a ver " +
-            "com a imagem, ignore-a e responda normalmente."
+        // Modo Observância (câmera) e/ou Modo Tela (captura de tela) — ver assistant/page.js:
+        // avisa o Gemini que há imagem(ns) anexada(s) e pra que servem, senão ele não sabe
+        // que pode/deve olhar pra elas ao responder.
+        const imageNote = images.length
+          ? "Há " + (images.length > 1 ? "IMAGENS anexadas" : "uma IMAGEM anexada") + ", tiradas agora mesmo: " +
+            "pode ser uma foto da câmera do usuário (postura, roupa, gesto, expressão — Modo Observância) " +
+            "e/ou uma captura da tela do computador dele (Modo Tela). Se a pergunta for sobre o que você " +
+            "vê nelas, descreva com base NAS IMAGENS de verdade — não invente. Se a pergunta não tiver " +
+            "nada a ver com isso, ignore-as e responda normalmente."
           : null;
         const combinedNote = [promptNote, imageNote].filter(Boolean).join(" ") || null;
 
         const prompt = buildPrompt(question, matches, combinedNote);
-        for await (const piece of chatStreamWithFallback(prompt, withPersona(systemInstruction, personaMode), tools, image)) {
+        for await (const piece of chatStreamWithFallback(prompt, withPersona(systemInstruction, personaMode), tools, images)) {
           send(controller, "token", piece);
         }
 

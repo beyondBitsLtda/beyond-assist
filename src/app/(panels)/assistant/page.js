@@ -7,7 +7,7 @@ import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 import { TTS_VOICES } from "@/lib/ttsVoices.js";
-import { pickBrowserVoice } from "@/lib/browserVoice.js";
+import { pickBrowserVoice, speakText } from "@/lib/browserVoice.js";
 import { useIsMobile } from "@/lib/useIsMobile.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
 import { getDeviceId, matchNavCommand } from "@/lib/deviceId.js";
@@ -231,6 +231,107 @@ export default function AssistantPage() {
     const base64 = canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
     return base64 ? { mimeType: "image/jpeg", data: base64 } : null;
   }, []);
+
+  // ---- Modo Tela: a Lisa "vê" a tela do computador (getDisplayMedia) — DESKTOP-ONLY (o
+  // toggle só existe no branch desktop deste componente, "enquanto mexo no PC"), com 2
+  // modos que se somam:
+  //  - reativo: liga a captura, e cada pergunta manda um retrato ATUAL da tela junto (mesmo
+  //    mecanismo do Modo Observância — ver captureObservanceFrame acima).
+  //  - proativo (screenAutoComment): além disso, vigia sozinha em intervalos espaçados (ver
+  //    SCREEN_COMMENT_INTERVAL_MS) e só fala alguma coisa quando o Gemini decide que há algo
+  //    genuinamente digno de nota (ver /api/screen-comment) — na maioria das vezes fica quieta.
+  // O navegador SEMPRE pede permissão nativa (escolher tela/janela/aba) — isso não dá pra
+  // pular, é trava de segurança do próprio Chrome/Edge. Igual à câmera, sem localStorage de
+  // propósito (não fica ligado sozinho na próxima vez que abrir o app).
+  const SCREEN_COMMENT_INTERVAL_MS = 4 * 60 * 1000; // 4 min — espaçado de propósito, essa vigília custa cota a cada tick
+  const [screenMode, setScreenMode] = useState(false);
+  const [screenAutoComment, setScreenAutoComment] = useState(false);
+  const [screenError, setScreenError] = useState(null);
+  const screenVideoRef = useRef(null);
+  const screenStreamRef = useRef(null);
+
+  useEffect(() => {
+    if (!screenMode) {
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+      setScreenAutoComment(false); // sem tela, comentário automático não tem o que analisar
+      return;
+    }
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+      setScreenError("este navegador não suporta compartilhamento de tela");
+      setScreenMode(false);
+      return;
+    }
+    let cancelled = false;
+    setScreenError(null);
+    navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+      .then((stream) => {
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        screenStreamRef.current = stream;
+        if (screenVideoRef.current) {
+          screenVideoRef.current.srcObject = stream;
+          screenVideoRef.current.play().catch(() => {});
+        }
+        // se a pessoa parar o compartilhamento pelo controle nativo do navegador (barra
+        // "parar de compartilhar"), desliga o modo aqui também — senão o app acha que ainda tem tela
+        const [track] = stream.getVideoTracks();
+        track?.addEventListener("ended", () => setScreenMode(false));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setScreenError(err?.name === "NotAllowedError" ? "permissão de compartilhamento de tela negada" : (err?.message || "não consegui iniciar o compartilhamento de tela"));
+        setScreenMode(false);
+      });
+    return () => {
+      cancelled = true;
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+    };
+  }, [screenMode]);
+
+  // retrato ATUAL da tela — maior que a foto da câmera (1280px) porque precisa dar pra ler
+  // texto/UI pequena, não só reconhecer forma/cor.
+  const captureScreenFrame = useCallback(() => {
+    const v = screenVideoRef.current;
+    if (!v || !v.videoWidth) return null;
+    const maxSide = 1280;
+    const scale = Math.min(1, maxSide / Math.max(v.videoWidth, v.videoHeight));
+    const w = Math.round(v.videoWidth * scale), h = Math.round(v.videoHeight * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(v, 0, 0, w, h);
+    const base64 = canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
+    return base64 ? { mimeType: "image/jpeg", data: base64 } : null;
+  }, []);
+
+  // vigília proativa: dispara em intervalos espaçados, SÓ fala quando /api/screen-comment
+  // devolve um comentário de verdade — usa a voz do NAVEGADOR (não a do Gemini) de propósito,
+  // igual ao NotificationToasts: evita gastar cota de TTS extra numa resposta que ninguém pediu,
+  // e não mexe na fila/geração de fala da conversa principal (não interrompe uma resposta em andamento).
+  useEffect(() => {
+    if (!screenMode || !screenAutoComment) return;
+    let cancelled = false;
+    const tick = async () => {
+      const frame = captureScreenFrame();
+      if (!frame) return;
+      try {
+        const res = await fetch("/api/screen-comment", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ image: frame, personaMode }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled || !data?.ok || !data.comment) return;
+        addLog("[TELA]", PU, data.comment);
+        setMessages((m) => [...m, { id: `screen${Date.now()}`, role: "assistant", text: data.comment }]);
+        if (voiceOn) speakText(data.comment, { browserOnly: true, voiceName }).catch(() => {});
+      } catch {
+        // silencioso — só tenta de novo no próximo ciclo
+      }
+    };
+    const id = setInterval(tick, SCREEN_COMMENT_INTERVAL_MS);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [screenMode, screenAutoComment, captureScreenFrame, personaMode, voiceOn, voiceName, addLog]);
 
   // carrega a Visão do avatar escolhida antes — cada navegador guarda a sua (ver nota acima:
   // só tem efeito no desktop, mas não custa nada carregar a preferência sempre)
@@ -582,6 +683,10 @@ export default function AssistantPage() {
 
     let latestCards = [];
 
+    // câmera (Observância) e/ou tela (Modo Tela) — cada uma só entra se estiver ligada e
+    // conseguir tirar o retrato; nenhuma das duas depende da outra.
+    const images = [observanceMode && captureObservanceFrame(), screenMode && captureScreenFrame()].filter(Boolean);
+
     try {
       const res = await fetch("/api/ask", {
         method: "POST",
@@ -589,7 +694,7 @@ export default function AssistantPage() {
         body: JSON.stringify({
           question: q, scope: computeScope(), personaMode,
           history: historyRef.current, pendingAction: pendingActionRef.current,
-          image: observanceMode ? captureObservanceFrame() : null,
+          images: images.length ? images : null,
         }),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
@@ -663,7 +768,7 @@ export default function AssistantPage() {
       speechBufferRef.current = "";
       if (voiceEnabled && remaining) enqueueSpeech(remaining, gen);
     }
-  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame]);
+  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame]);
 
   // ---- STT: ouvir microfone (Web Speech API) ----
   const toggleMic = useCallback(() => {
@@ -1123,6 +1228,43 @@ export default function AssistantPage() {
           <video ref={observanceVideoRef} autoPlay playsInline muted title="o que a câmera vê agora — só uma foto disso é enviada, no instante de cada pergunta" style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
         )}
         {observanceError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {observanceError}</span>}
+
+        {/* Modo Tela — desktop-only ("enquanto mexo no PC"). Reativo (cada pergunta manda um
+            retrato da tela) + proativo opcional (vigia sozinha e só fala se achar algo digno de
+            nota, ver o useEffect de screenAutoComment acima). O navegador SEMPRE pede permissão
+            nativa pra escolher tela/janela/aba — isso não dá pra pular. */}
+        <button
+          onClick={() => setScreenMode((v) => !v)}
+          title={screenMode ? "Modo Tela ligado — o navegador pede pra você escolher o que compartilhar. Clique pra desligar" : "Compartilhar a tela pra Lisa poder ver o que está acontecendo nela"}
+          style={{
+            ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+            border: `1px solid ${screenMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+            background: screenMode ? "rgba(123,216,143,0.12)" : "transparent",
+            color: screenMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+            cursor: "pointer",
+          }}
+        >
+          🖵 TELA {screenMode ? "ON" : "OFF"}
+        </button>
+        {screenMode && (
+          <>
+            <video ref={screenVideoRef} autoPlay playsInline muted title="o que está sendo compartilhado — só um retrato disso é enviado por vez" style={{ width: 72, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
+            <button
+              onClick={() => setScreenAutoComment((v) => !v)}
+              title={screenAutoComment ? `Vigiando sozinha a cada ${SCREEN_COMMENT_INTERVAL_MS / 60000} min — só fala se achar algo digno de nota. Clique pra desligar` : "Deixar a Lisa de olho na tela sozinha, comentando só quando achar algo relevante (sem você perguntar)"}
+              style={{
+                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                border: `1px solid ${screenAutoComment ? PU : "rgba(var(--accent-rgb),0.18)"}`,
+                background: screenAutoComment ? "rgba(201,166,255,0.12)" : "transparent",
+                color: screenAutoComment ? "#eafcff" : "rgba(207,239,251,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              💬 AUTO {screenAutoComment ? "ON" : "OFF"}
+            </button>
+          </>
+        )}
+        {screenError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {screenError}</span>}
       </div>
 
       {/* abas — só aparecem no mobile (ver .bb-assistant-tabs em globals.css). No mobile o

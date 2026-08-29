@@ -172,6 +172,24 @@ enquanto você anda pela sala.
   gestos — arrastar (1 dedo), redimensionar e girar (2 dedos) — sem depender de acertar o
   hit-test de novo.
 
+## Modo Observância (câmera) e Modo Tela
+
+Dois toggles no Assistente que tornam a conversa multimodal (mesmo modelo de chat,
+`gemini-2.5-flash`, também enxerga imagem — sem endpoint/modelo separado):
+
+- **👁 Observância** (câmera, desktop + mobile): liga a câmera frontal; cada pergunta manda
+  um retrato do instante junto pro Gemini responder (postura, roupa, gesto, expressão).
+- **🖵 Tela** (`getDisplayMedia`, desktop-only — "enquanto mexo no PC"): mesma ideia, mas a
+  imagem é uma captura de tela. Tem um sub-modo **💬 AUTO**: vigia sozinha a cada 4 min
+  (`/api/screen-comment`) e só fala alguma coisa quando o Gemini decide que há algo
+  genuinamente digno de nota — na maioria das vezes fica em silêncio. Fala com a voz do
+  NAVEGADOR (não a do Gemini) de propósito, pra não competir por cota de TTS com a conversa
+  principal nem interromper uma resposta em andamento.
+
+Nenhuma das duas fica ligada sozinha entre recarregamentos (sem localStorage, de propósito —
+é câmera/tela, cada sessão pede de novo) e nenhuma foto é salva em lugar nenhum, nem local
+nem no Supabase — só trafega pro Gemini na hora e é descartada.
+
 ## Estrutura
 
 ```
