@@ -285,11 +285,10 @@ export async function POST(req) {
       } catch (err) {
         // gemini.js já tenta de novo sozinho pra erros transitórios (429/503) e troca o
         // JSON cru da API por um erro com .code curto — só resta mapear pra uma frase.
-        // O .message ainda carrega qual CHAVE falhou (ver keyLabelFor em gemini.js) — sem
+        // err.keyLabel (ver rewriteTransientError em gemini.js) diz qual CHAVE falhou — sem
         // repassar isso, "cota cheia" parecia sempre a mesma coisa não importava se foi a
         // chave prioritária (paga) ou uma de reserva (grátis), impossível de diferenciar.
-        const keyHint = /\(([^)]+)\):/.exec(String(err?.message || ""))?.[1];
-        const keySuffix = keyHint ? ` [${keyHint}]` : "";
+        const keySuffix = err?.keyLabel ? ` [${err.keyLabel}]` : "";
         const friendly =
           err?.code === "QUOTA"
             ? `⚠️ Quota do Gemini cheia${keySuffix}. Aguarde cerca de 1 minuto e pergunte de novo. (Dica: evite clicar em SYNC logo antes de perguntar.)`

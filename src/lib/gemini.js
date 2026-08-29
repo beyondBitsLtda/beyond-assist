@@ -75,14 +75,20 @@ function keyLabelFor(attempt) {
 function rewriteTransientError(err, attempt) {
   const msg = String(err?.message || err);
   const key = keyLabelFor(attempt);
+  // .keyLabel vai DIRETO no objeto — nunca embutido só no texto da mensagem. Embutir e depois
+  // tentar extrair de volta com regex quebrou na primeira tentativa: o rótulo "chave de
+  // reserva (gratuita)" tem parênteses DENTRO dele, e isso confundia a regex que tentava
+  // recuperar esse valor lá no /api/ask. Propriedade própria não tem essa armadilha.
   if (isQuotaError(msg)) {
-    const e = new Error(`QUOTA_EXCEEDED (${key}): limite do Gemini atingido. Aguarde ~1 min e tente de novo.`);
+    const e = new Error(`QUOTA_EXCEEDED: limite do Gemini atingido. Aguarde ~1 min e tente de novo.`);
     e.code = "QUOTA";
+    e.keyLabel = key;
     return e;
   }
   if (isOverloadError(msg)) {
-    const e = new Error(`UNAVAILABLE (${key}): o Gemini está com alta demanda no momento. Tente de novo em instantes.`);
+    const e = new Error(`UNAVAILABLE: o Gemini está com alta demanda no momento. Tente de novo em instantes.`);
     e.code = "UNAVAILABLE";
+    e.keyLabel = key;
     return e;
   }
   return err;
