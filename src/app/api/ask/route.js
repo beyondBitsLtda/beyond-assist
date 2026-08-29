@@ -1,12 +1,27 @@
 import {
   retrieve, retrieveByDate, detectDateRange, retrieveByBoard, detectBoard,
-  retrieveGeneral, buildPrompt, todayLabel, withPersona, withContextDocs, SYSTEM_INSTRUCTION, SYSTEM_INSTRUCTION_GENERAL,
+  retrieveGeneral, buildPrompt, todayLabel, withPersona, withContextDocs, shorten, relTime,
+  SYSTEM_INSTRUCTION, SYSTEM_INSTRUCTION_GENERAL,
 } from "@/lib/rag.js";
 import { searchThoughts, listThoughts, toMatchFormat } from "@/lib/notes.js";
 import { retrieveSentinelTickets, listProjects } from "@/lib/sentinel.js";
 import { chatStream, detectTrelloAction } from "@/lib/gemini.js";
 import { buildActionProposal, buildClarifyPrompt, executeAction } from "@/lib/assistantActions.js";
-import { hasDelpTasks, getDelpTasksForContext } from "@/lib/delpTasks.js";
+import { hasDelpTasks, getDelpTasksForContext, listDelpTasks } from "@/lib/delpTasks.js";
+
+/** Converte tarefas da Delp pro mesmo formato de "card" usado pelo resto do RAG (ver
+ * retrieveByBoard/retrieveByDate em rag.js) — assim o HUD e o prompt tratam igual, não
+ * importa a origem. Usado quando o usuário escolhe o escopo "Tarefas Delp" no seletor. */
+function delpTasksToMatches(tasks) {
+  return tasks.map((t) => {
+    const content = `Status: ${t.status}\nResponsável: ${t.atribuido_a || "—"}\nColaboradores: ${t.colaboradores || "—"}\nPrazo: ${t.data_limite || "—"}\nInício: ${t.data_inicio || "—"}\nEtapa: ${t.etapa || "—"}\nSprint: ${t.sprint || "—"}\nRelacionado a: ${t.relacionado_a || "—"}${t.legenda ? `\nLegenda: ${t.legenda}` : ""}`;
+    return {
+      id: String(t.id), source: "DELP", board: "Tarefas Delp", title: t.titulo,
+      snippet: shorten(content, 180), content, sim: "—", pct: 100,
+      last_modified: t.updated_at, modified: relTime(t.updated_at), due: t.data_limite,
+    };
+  });
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -284,6 +299,10 @@ export async function POST(req) {
               }
             } catch {}
           }
+        } else if (scope?.mode === "panel" && scope.source === "delp") {
+          // escolher este escopo explicitamente já É o consentimento — não passa pelo gate
+          // de "quer que eu leve em conta a Delp?" abaixo (ver looksLikeTasksQuestion).
+          matches = delpTasksToMatches(await listDelpTasks());
         } else if (scope?.mode === "panel" && scope.board) {
           matches = await retrieveByBoard(scope.board);
           if (matches.length > 40) matches = matches.slice(0, 40);

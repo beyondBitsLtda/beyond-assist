@@ -29,6 +29,7 @@ const MODE_META = {
 const TASKS_SCOPE = "__tasks__";
 const THOUGHTS_SCOPE = "__thoughts__";
 const SENTINEL_SCOPE = "__sentinel__";
+const DELP_SCOPE = "__delp__";
 
 
 export default function AssistantPage() {
@@ -816,6 +817,10 @@ export default function AssistantPage() {
     if (scopePanel === TASKS_SCOPE) return { mode: "panel", range: "auto" };
     if (scopePanel === THOUGHTS_SCOPE) return { mode: "panel", source: "brain" };
     if (scopePanel === SENTINEL_SCOPE) return { mode: "panel", source: "sentinel", projectId: sentinelProjectId };
+    // escolher este escopo explicitamente JÁ É o consentimento pra falar de tarefas da Delp —
+    // não passa pelo "quer que eu leve em conta a Delp?" (ver /api/ask), que só existe pra
+    // quando o assunto surge sem o usuário ter pedido isso de propósito.
+    if (scopePanel === DELP_SCOPE) return { mode: "panel", source: "delp" };
     return { mode: "panel", board: scopePanel };
   }, [scopeMode, scopePanel, sentinelProjectId]);
 
@@ -1177,6 +1182,7 @@ export default function AssistantPage() {
                   <option value={TASKS_SCOPE}>Tarefas (por prazo)</option>
                   <option value={THOUGHTS_SCOPE}>Pensamentos</option>
                   <option value={SENTINEL_SCOPE}>Chamados (Sentinela)</option>
+                  <option value={DELP_SCOPE}>Tarefas Delp</option>
                 </select>
               )}
               {scopeMode === "panel" && scopePanel === SENTINEL_SCOPE && (
