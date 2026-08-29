@@ -35,7 +35,11 @@ export async function POST(req) {
       },
     });
   } catch (err) {
-    return json({ error: String(err?.message || err) }, 500);
+    // err.keyLabel (ver rewriteTransientError em gemini.js) diz qual chave falhou — prioritária
+    // (paga) ou de reserva (grátis). Faltava aqui — por isso os logs [TTS] no Assistente
+    // não mostravam esse detalhe, só o /api/ask e o /api/screen-comment mostravam.
+    const keySuffix = err?.keyLabel ? ` [${err.keyLabel}]` : "";
+    return json({ error: `${String(err?.message || err)}${keySuffix}` }, 500);
   }
 }
 
