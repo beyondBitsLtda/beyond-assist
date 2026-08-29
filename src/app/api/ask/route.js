@@ -108,9 +108,16 @@ export async function POST(req) {
         const candidateCards = (history?.cards || []).filter((c) => c.source === "TRELLO" && c.id);
         const shouldCheckAction = (candidateCards.length || pendingAction) && mightBeAction(question, !!pendingAction);
         if (shouldCheckAction) {
+          // se detectTrelloAction FALHAR (ex.: cota do Gemini), isso antes virava "none"
+          // silenciosamente — parecia "a Lisa não entendeu o pedido" quando na verdade a
+          // chamada nem chegou a rodar. Guarda o erro real pra mandar no debug abaixo.
+          let detectError = null;
           const intent = await detectTrelloAction({
             question, todayLabel: todayLabel(), candidateCards, pendingAction,
-          }).catch(() => ({ intent: "none" }));
+          }).catch((err) => {
+            detectError = `${String(err?.message || err)}${err?.keyLabel ? ` [${err.keyLabel}]` : ""}`;
+            return { intent: "none" };
+          });
 
           if (intent.intent === "propose_action") {
             try {
@@ -190,7 +197,7 @@ export async function POST(req) {
           // "none" → segue pro fluxo normal de RAG abaixo. Manda um evento mesmo assim (com
           // debug=true) só pra aparecer no log do HUD que a detecção rodou e não achou nada —
           // ajuda a diagnosticar se o roteamento de ação estiver falhando de novo.
-          send(controller, "action", { pending: pendingAction || null, debug: true, checkedIntent: intent.intent });
+          send(controller, "action", { pending: pendingAction || null, debug: true, checkedIntent: intent.intent, detectError });
         }
 
         let matches;

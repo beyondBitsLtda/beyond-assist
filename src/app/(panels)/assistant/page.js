@@ -737,7 +737,8 @@ export default function AssistantPage() {
             addLog("[GEMINI]", OR, "streaming tokens");
           } else if (event === "action") {
             pendingActionRef.current = payload?.pending || null;
-            if (payload?.debug) addLog("[ACTION]", PU, `nenhuma ação detectada (intent=${payload.checkedIntent})`);
+            if (payload?.debug && payload?.detectError) addLog("[ACTION]", OR, `detecção FALHOU (não é "não entendi", é erro de verdade): ${payload.detectError}`);
+            else if (payload?.debug) addLog("[ACTION]", PU, `nenhuma ação detectada (intent=${payload.checkedIntent})`);
             else if (pendingActionRef.current) addLog("[ACTION]", PU, "aguardando confirmação…");
             else addLog("[ACTION]", PU, "resolvida");
           } else if (event === "token") {
