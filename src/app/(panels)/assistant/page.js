@@ -1232,6 +1232,53 @@ export default function AssistantPage() {
               {observanceError && <div style={{ ...mono, fontSize: 9.5, color: OR, marginBottom: 8 }}>⚠ {observanceError}</div>}
               <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
                 Tira 1 foto só no instante de cada pergunta pra Lisa poder ver o que você mostra — nada fica salvo.
+                Com o modo ligado, ela também cumprimenta sozinha se reconhecer a Alice ou a Nala na câmera.
+              </div>
+
+              {/* Modo Tela — compartilhar a tela do dispositivo. A maioria dos navegadores de
+                  CELULAR não tem suporte a getDisplayMedia (compartilhamento de tela) — o botão
+                  fica disponível, mas se o seu navegador não suportar, aparece o aviso de erro
+                  abaixo em vez de travar/fingir que funcionou. */}
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>MODO TELA</div>
+              <button
+                onClick={() => setScreenMode((v) => !v)}
+                style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${screenMode ? GR : "rgba(var(--accent-rgb),0.18)"}`, background: screenMode ? "rgba(123,216,143,0.12)" : "transparent", color: screenMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+              >
+                🖵 Modo Tela: {screenMode ? "ON" : "OFF"}
+              </button>
+              {screenMode && (
+                <>
+                  <video ref={screenVideoRef} autoPlay playsInline muted title="o que está sendo compartilhado" style={{ width: "100%", maxWidth: 160, aspectRatio: "4/3", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 8, display: "block" }} />
+                  <button
+                    onClick={() => setScreenAutoComment((v) => !v)}
+                    style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${screenAutoComment ? PU : "rgba(var(--accent-rgb),0.18)"}`, background: screenAutoComment ? "rgba(201,166,255,0.12)" : "transparent", color: screenAutoComment ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+                  >
+                    💬 Vigiar sozinha: {screenAutoComment ? "ON" : "OFF"}
+                  </button>
+                  {screenAutoComment && (
+                    <>
+                      <select
+                        value={screenIntervalMs}
+                        onChange={(e) => chooseScreenInterval(Number(e.target.value))}
+                        style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#000", color: "#eafcff", width: "100%", marginBottom: 8 }}
+                      >
+                        {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+                      </select>
+                      <input
+                        value={screenFocus}
+                        onChange={(e) => updateScreenFocus(e.target.value)}
+                        placeholder="direcionamento (ex.: avise se o build quebrar)"
+                        style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#000", color: "#eafcff", width: "100%", marginBottom: 8 }}
+                      />
+                    </>
+                  )}
+                </>
+              )}
+              {screenError && <div style={{ ...mono, fontSize: 9.5, color: OR, marginBottom: 8 }}>⚠ {screenError}</div>}
+              <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
+                O navegador sempre pede permissão nativa pra escolher o que compartilhar. A maioria
+                dos navegadores de CELULAR não suporta compartilhamento de tela por um site — se
+                for o seu caso, o aviso acima vai dizer isso claramente.
               </div>
 
               {/* sync */}
@@ -1328,6 +1375,7 @@ export default function AssistantPage() {
             <option value={TASKS_SCOPE}>Tarefas (por prazo)</option>
             <option value={THOUGHTS_SCOPE}>Pensamentos</option>
             <option value={SENTINEL_SCOPE}>Chamados (Sentinela)</option>
+            <option value={DELP_SCOPE}>Tarefas Delp</option>
           </select>
         ) : null}
 
