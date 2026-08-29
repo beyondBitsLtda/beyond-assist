@@ -243,7 +243,7 @@ export default function AssistantPage() {
   // O navegador SEMPRE pede permissão nativa (escolher tela/janela/aba) — isso não dá pra
   // pular, é trava de segurança do próprio Chrome/Edge. Igual à câmera, sem localStorage de
   // propósito (não fica ligado sozinho na próxima vez que abrir o app).
-  const SCREEN_COMMENT_INTERVAL_MS = 4 * 60 * 1000; // 4 min — espaçado de propósito, essa vigília custa cota a cada tick
+  const SCREEN_COMMENT_INTERVAL_MS = 2 * 60 * 1000; // 2 min — dá pra encurtar agora que tem uma chave prioritária com folga de cota
   const [screenMode, setScreenMode] = useState(false);
   const [screenAutoComment, setScreenAutoComment] = useState(false);
   const [screenError, setScreenError] = useState(null);
@@ -341,7 +341,10 @@ export default function AssistantPage() {
         if (!data.comment) { addLog("[TELA]", CY, "vigília: nada digno de nota agora"); return; }
         addLog("[TELA]", PU, data.comment);
         setMessages((m) => [...m, { id: `screen${Date.now()}`, role: "assistant", text: data.comment }]);
-        if (voiceOnForScreenRef.current) speakText(data.comment, { browserOnly: true, voiceName: voiceNameForScreenRef.current }).catch(() => {});
+        // tenta a voz do Gemini primeiro (com fallback automático pro navegador se falhar) —
+        // antes era só navegador de propósito, pra poupar cota; agora que tem uma chave
+        // prioritária com faturamento e folga de sobra, vale usar a voz de verdade aqui também.
+        if (voiceOnForScreenRef.current) speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
       } catch (err) {
         if (!cancelled) addLog("[TELA]", OR, `vigília falhou: ${err?.message || err}`);
       }
