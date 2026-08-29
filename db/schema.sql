@@ -182,3 +182,27 @@ alter table public.remote_commands enable row level security;
 -- 12) Permite user_id nulo em notes — só afeta linhas novas sem BRAIN_USER_ID configurada;
 --     linhas existentes (com ou sem user_id) continuam exatamente como estão.
 alter table public.notes alter column user_id drop not null;
+
+-- ============================================================
+--  Saúde das chaves do Gemini (a mais, aditivo) — rodízio "burro" (só por posição na
+--  lista) não sabia que CADA MODELO tem cota própria (uma chave pode estar ótima pro
+--  chat e zerada pra voz, ao mesmo tempo) nem persistia nada entre invocações da função
+--  na Vercel (variável em memória se perde a qualquer momento, sem aviso). Esta tabela é
+--  a fonte de verdade duravel de "essa chave×modelo tá de cooldown até quando" — ver
+--  src/lib/geminiKeyHealth.js.
+-- ============================================================
+
+-- 13) Uma linha por (índice da chave, nome do modelo) — só existe linha pra combinação
+--     que já falhou alguma vez; ausência de linha = "nunca falhou, pode usar".
+create table if not exists public.gemini_key_health (
+  key_index      int  not null,   -- posição da chave em GEMINI_API_KEYS (0-based) — nunca a chave em si
+  model          text not null,   -- ex.: 'gemini-3.6-flash', 'gemini-2.5-flash-preview-tts'
+  cooldown_until timestamptz,     -- null/passado = disponível de novo
+  reason         text,            -- 'rpd' (diário) | 'rpm' (por minuto) | 'other'
+  last_error     text,
+  updated_at     timestamptz not null default now(),
+  primary key (key_index, model)
+);
+
+alter table public.gemini_key_health enable row level security;
+-- (só acessada pela service_role, em src/lib/geminiKeyHealth.js — mesmo padrão das tabelas acima)

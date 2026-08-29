@@ -22,8 +22,8 @@ export async function POST(req) {
     const comment = await describeScreenIfNotable(image, withPersona(SCREEN_WATCH_INSTRUCTION, personaMode));
     return jsonResponse({ ok: true, comment });
   } catch (err) {
-    // err.keyLabel (ver rewriteTransientError em gemini.js) diz qual chave falhou — prioritária
-    // (paga) ou de reserva (grátis) — informação essencial pra diagnosticar erro de cota.
+    // err.keyLabel (ver rewriteError em gemini.js) diz qual chave do pool falhou —
+    // informação essencial pra diagnosticar erro de cota.
     const keySuffix = err?.keyLabel ? ` [${err.keyLabel}]` : "";
     return jsonResponse({ ok: false, error: `${String(err?.message || err)}${keySuffix}` }, 500);
   }

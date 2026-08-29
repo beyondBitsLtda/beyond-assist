@@ -292,7 +292,7 @@ export async function POST(req) {
       } catch (err) {
         // gemini.js já tenta de novo sozinho pra erros transitórios (429/503) e troca o
         // JSON cru da API por um erro com .code curto — só resta mapear pra uma frase.
-        // err.keyLabel (ver rewriteTransientError em gemini.js) diz qual CHAVE falhou — sem
+        // err.keyLabel (ver rewriteError em gemini.js) diz qual CHAVE do pool falhou — sem
         // repassar isso, "cota cheia" parecia sempre a mesma coisa não importava se foi a
         // chave prioritária (paga) ou uma de reserva (grátis), impossível de diferenciar.
         const keySuffix = err?.keyLabel ? ` [${err.keyLabel}]` : "";

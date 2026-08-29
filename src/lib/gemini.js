@@ -1,133 +1,148 @@
 import { GoogleGenAI } from "@google/genai";
 import { TTS_VOICES } from "./ttsVoices.js";
+import { pickKeyIndex, markCooldown, markOk } from "./geminiKeyHealth.js";
 
 const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 // gemini-2.5-flash foi descontinuado pra projetos novos no Google Cloud (confirmado ao vivo:
 // erro 404 "no longer available to new users", recomendando este aqui) — projetos antigos
-// ainda tinham acesso legado ao 2.5, mas o projeto novo (chave prioritária) não. Testado e
-// funcionando nas chaves antigas E na nova antes de trocar o padrão.
+// ainda tinham acesso legado ao 2.5, outros não. Testado e funcionando em várias chaves
+// antes de trocar o padrão.
 const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-3.6-flash";
 const EMBED_DIM = Number(process.env.GEMINI_EMBED_DIM || 768);
 
-// ---- múltiplas chaves do Gemini: 1ª = PRIORITÁRIA, as demais = reserva em rodízio ----
-// GEMINI_API_KEYS="chaveBoa,chave2,chave3" (uma lista) — cada chave precisa ser de um
-// PROJETO diferente no Google Cloud/AI Studio pra ter cota própria de verdade (chaves do
-// MESMO projeto compartilham a mesma cota, então trocar entre elas não ajuda em nada).
-// Mantém GEMINI_API_KEY funcionando sozinha se só houver uma (comportamento de sempre).
+// ---- múltiplas chaves do Gemini — pool único, saúde rastreada por (chave × MODELO) ----
+// GEMINI_API_KEYS="chave1,chave2,...,chaveN" — cada chave precisa ser de um PROJETO
+// diferente no Google Cloud/AI Studio pra ter cota própria de verdade (chaves do MESMO
+// projeto compartilham a mesma cota, então trocar entre elas não ajuda em nada). Mantém
+// GEMINI_API_KEY funcionando sozinha se só houver uma.
 //
-// A PRIMEIRA chave da lista é sempre a 1ª tentativa de cada chamada — pensada pra ser uma
-// chave com faturamento ativado (cota bem maior, praticamente não deveria falhar). As
-// demais só entram em RODÍZIO nas tentativas de retry seguintes, quando a 1ª falhou por
-// cota/sobrecarga — servem de reserva gratuita, não como parceiras de carga o tempo todo.
-// Se só houver 1 chave configurada, o comportamento é o de sempre (sem reserva nenhuma).
+// Todas as chaves são tratadas como IGUAIS no pool — não existe mais "prioritária vs
+// reserva" por POSIÇÃO na lista. Em vez disso, cada (chave × modelo) tem sua própria saúde
+// rastreada e persistida (ver geminiKeyHealth.js): uma chave pode estar ótima pro chat e
+// zerada pra voz ao mesmo tempo (cota é por modelo, não por chave só), e o estado sobrevive
+// entre invocações da função na Vercel (que não garante manter nada em memória). Isso
+// também resolve sozinho o velho problema de "AUTO-SYNC (embeddings) competindo com chat/
+// voz pela mesma chave": como a cota de EMBED_MODEL é rastreada separada da de CHAT_MODEL/
+// TTS_MODEL, uma chave exaurida de embeddings continua disponível pro chat na mesma hora.
 const KEYS = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "")
   .split(",").map((k) => k.trim()).filter(Boolean);
-const PRIMARY_KEY = KEYS[0];
-const RESERVE_KEYS = KEYS.slice(1);
 
 const _clients = new Map(); // chave → cliente (reaproveita entre chamadas)
-let reservePtr = 0; // índice da PRÓXIMA chave de reserva — avança só quando a prioritária falha
 
 function clientFor(key) {
   if (!_clients.has(key)) _clients.set(key, new GoogleGenAI({ apiKey: key }));
   return _clients.get(key);
 }
 
-// a prioritária tenta 2x SOZINHA antes de cair pra reserva — a maioria dos soluços dela é
-// sobrecarga passageira (503), que resolve sozinha só tentando de novo NA MESMA chave boa;
-// cair já na 1ª falha pra uma reserva (que pode estar com cota zerada, como as 3 gratuitas
-// estão hoje) trocava um problema passageiro por uma falha praticamente garantida.
-const PRIMARY_ATTEMPTS = 2;
+if (!KEYS.length) {
+  // não lança aqui (isso quebraria qualquer import deste módulo, inclusive em build) —
+  // só lança de verdade quando alguém tentar usar de fato, em withTransientRetry.
+}
 
-/** `attempt` (1-based, vem de withTransientRetry ou do for-loop de quem chama): as primeiras
- * PRIMARY_ATTEMPTS tentativas de QUALQUER chamada usam a chave prioritária; só depois disso
- * (falhou de verdade mais de uma vez) é que cai pro rodízio das chaves de reserva.
- *
- * `skipPrimary` — pro AUTO-SYNC (embedForIngest): ele roda sozinho em segundo plano, sem
- * ninguém esperando a resposta na hora, e pode ficar minutos martelando embeddings a cada
- * fatia. NUNCA usa a chave prioritária, pra ela sobrar inteira pro chat/voz/visão — que são
- * as coisas que a pessoa está de fato esperando ver na tela. Sem reserva configurada, cai na
- * prioritária mesmo assim (não trava o app por causa disso). */
-function ai(attempt = 1, { skipPrimary = false } = {}) {
-  if (!KEYS.length) {
-    throw new Error(
-      "GEMINI_API_KEY (ou GEMINI_API_KEYS) não configurada. " +
-      "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
+/** Rótulo de qual chave um índice representa — só pra diagnóstico em log (nunca expõe a
+ * chave em si, só a posição dela na lista, 1-based pra ficar legível). */
+function keyLabelFor(index) {
+  return `chave #${index + 1}`;
+}
+
+// ---- classifica o erro cru do Gemini — decide SE repete, e por QUANTO TEMPO a chave usada
+// deve ficar de cooldown pra este modelo específico ----
+// A API costuma devolver o corpo cru como uma string JSON aninhada e feia. Detectamos por
+// substring (robusto o bastante pro texto que a API realmente devolve).
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function classifyGeminiError(err) {
+  const msg = String(err?.message || err);
+
+  if (msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota") || /\b429\b/.test(msg)) {
+    // Google diz explicitamente no quotaId se o limite é DIÁRIO ("PerDay") ou por minuto —
+    // sem essa distinção, um cooldown fixo de 60s é curto demais pra cota diária (fica
+    // tentando de novo a cada minuto o dia inteiro à toa) e longo demais pra cota por minuto.
+    const isDaily = /PerDay/i.test(msg);
+    const retryMatch = msg.match(/retry in ([\d.]+)s/i);
+    return {
+      transient: true,
+      code: "QUOTA",
+      reason: isDaily ? "rpd" : "rpm",
+      untilMs: isDaily
+        ? Date.now() + 0.5 * DAY_MS // cota diária: meio dia de cooldown (aproximação segura — melhor esperar de mais que martelar uma chave zerada)
+        : Date.now() + (retryMatch ? Math.ceil(Number(retryMatch[1])) * 1000 + 2000 : 90_000),
+    };
+  }
+  if (msg.includes("UNAVAILABLE") || msg.includes("high demand") || /\b503\b/.test(msg)) {
+    return { transient: true, code: "UNAVAILABLE", reason: "overload", untilMs: Date.now() + 30_000 };
+  }
+  if (msg.includes("NOT_FOUND") || /"code":\s*404/.test(msg)) {
+    // modelo não existe/não está disponível NESTE projeto específico (ex.: descontinuado só
+    // pra contas novas) — outra chave/projeto pode muito bem ter acesso. Trata como "tenta
+    // outra chave" também, com cooldown bem longo (não é algo que se resolve sozinho em
+    // minutos — só mudando de modelo ou o Google revertendo a política).
+    return { transient: true, code: "UNSUPPORTED", reason: "unsupported", untilMs: Date.now() + 30 * DAY_MS };
+  }
+  return { transient: false };
+}
+
+function rewriteError(err, index, classified) {
+  const key = keyLabelFor(index);
+  if (classified.code === "QUOTA") {
+    const e = new Error(
+      `QUOTA_EXCEEDED: limite do Gemini atingido${classified.reason === "rpd" ? " (cota DIÁRIA)" : ""}. Aguarde e tente de novo.`
     );
-  }
-  if (skipPrimary && RESERVE_KEYS.length) {
-    const key = RESERVE_KEYS[reservePtr % RESERVE_KEYS.length];
-    reservePtr = (reservePtr + 1) % RESERVE_KEYS.length;
-    return clientFor(key);
-  }
-  if (attempt <= PRIMARY_ATTEMPTS || !RESERVE_KEYS.length) return clientFor(PRIMARY_KEY);
-  const key = RESERVE_KEYS[reservePtr % RESERVE_KEYS.length];
-  reservePtr = (reservePtr + 1) % RESERVE_KEYS.length;
-  return clientFor(key);
-}
-
-// ---- erros transitórios do Gemini (429 quota / 503 alta demanda) ----
-// A API costuma devolver o corpo cru como uma string JSON aninhada e feia
-// (ex.: {"error":{"message":"{\"error\":{\"code\":503,...}}",...}}). Detectamos
-// por substring (robusto o bastante pro texto que a API realmente devolve) e
-// trocamos por uma mensagem curta e acionável — nunca mostramos o JSON cru pro usuário.
-function isQuotaError(msg) {
-  return msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota") || msg.includes("429");
-}
-function isOverloadError(msg) {
-  return msg.includes("UNAVAILABLE") || msg.includes("high demand") || msg.includes("503");
-}
-function isTransientError(err) {
-  const msg = String(err?.message || err);
-  return isQuotaError(msg) || isOverloadError(msg);
-}
-/** Rótulo de qual chave um attempt usou — só pra diagnóstico em log, nunca expõe a chave em si.
- * Sem isso, "QUOTA_EXCEEDED" parecia sempre a MESMA coisa não importava se foi a chave
- * prioritária (paga) ou uma de reserva (grátis) que falhou — impossível saber qual das duas
- * sem essa distinção, e "minha API paga estourou cota" e "uma reserva grátis estourou" são
- * diagnósticos bem diferentes. */
-function keyLabelFor(attempt) {
-  // não dá pra apontar qual reserva exata sem expor o ponteiro interno do rodízio (que é
-  // global, compartilhado entre chamadas concorrentes) — "de reserva" já basta pra
-  // diferenciar "minha chave paga estourou" de "uma das gratuitas estourou".
-  return attempt > PRIMARY_ATTEMPTS && RESERVE_KEYS.length ? "chave de reserva (gratuita)" : "chave prioritária";
-}
-
-function rewriteTransientError(err, attempt) {
-  const msg = String(err?.message || err);
-  const key = keyLabelFor(attempt);
-  // .keyLabel vai DIRETO no objeto — nunca embutido só no texto da mensagem. Embutir e depois
-  // tentar extrair de volta com regex quebrou na primeira tentativa: o rótulo "chave de
-  // reserva (gratuita)" tem parênteses DENTRO dele, e isso confundia a regex que tentava
-  // recuperar esse valor lá no /api/ask. Propriedade própria não tem essa armadilha.
-  if (isQuotaError(msg)) {
-    const e = new Error(`QUOTA_EXCEEDED: limite do Gemini atingido. Aguarde ~1 min e tente de novo.`);
     e.code = "QUOTA";
     e.keyLabel = key;
     return e;
   }
-  if (isOverloadError(msg)) {
-    const e = new Error(`UNAVAILABLE: o Gemini está com alta demanda no momento. Tente de novo em instantes.`);
+  if (classified.code === "UNAVAILABLE") {
+    const e = new Error("UNAVAILABLE: o Gemini está com alta demanda no momento. Tente de novo em instantes.");
     e.code = "UNAVAILABLE";
+    e.keyLabel = key;
+    return e;
+  }
+  if (classified.code === "UNSUPPORTED") {
+    const e = new Error("Esse modelo não está disponível numa das chaves configuradas (tentando outra automaticamente).");
+    e.code = "UNSUPPORTED";
     e.keyLabel = key;
     return e;
   }
   return err;
 }
 
-/** Repete a chamada quando o erro é transitório (429/503); troca por mensagem curta se persistir.
- * `fn` recebe o número da tentativa (1-based) — repassa pra ai(attempt), que só sai da chave
- * prioritária pra reserva a partir da 2ª tentativa (ver comentário de ai() acima). */
-async function withTransientRetry(fn, { attempts = 3, delayMs = 1200 } = {}) {
+/**
+ * Executa `fn(client)` com retry, escolhendo uma chave diferente do pool a cada tentativa
+ * (evita repetir uma que já falhou NESTA MESMA chamada lógica) e respeitando o cooldown de
+ * cada (chave × `model`) — ver geminiKeyHealth.js. Em sucesso, limpa o cooldown dessa
+ * combinação (se houvesse). `computeDelay(attempt, err)` (opcional) sobrescreve o espaçamento
+ * padrão entre tentativas — usado por embedForIngest, que precisa respeitar um teto de
+ * espera bem mais curto (função da Vercel tem limite de 60s).
+ */
+async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, computeDelay = null } = {}) {
+  if (!KEYS.length) {
+    throw new Error(
+      "GEMINI_API_KEY (ou GEMINI_API_KEYS) não configurada. " +
+      "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
+    );
+  }
+  const tried = new Set();
+  let lastErr;
   for (let attempt = 1; attempt <= attempts; attempt++) {
+    const index = await pickKeyIndex(KEYS.length, model, tried);
+    tried.add(index);
+    const client = clientFor(KEYS[index]);
     try {
-      return await fn(attempt);
+      const result = await fn(client);
+      await markOk(index, model);
+      return result;
     } catch (err) {
-      if (!isTransientError(err) || attempt === attempts) throw rewriteTransientError(err, attempt);
-      await new Promise((r) => setTimeout(r, delayMs * attempt));
+      lastErr = err;
+      const classified = classifyGeminiError(err);
+      if (!classified.transient) throw err; // erro genuinamente não-transitório — não adianta repetir
+      await markCooldown(index, model, { untilMs: classified.untilMs, reason: classified.reason, error: err?.message || err });
+      if (attempt === attempts) throw rewriteError(err, index, classified);
+      const wait = computeDelay ? computeDelay(attempt, err) : delayMs * attempt;
+      await new Promise((r) => setTimeout(r, wait));
     }
   }
-  throw new Error("withTransientRetry: unreachable");
+  throw lastErr || new Error("withTransientRetry: unreachable");
 }
 
 /**
@@ -139,23 +154,12 @@ async function withTransientRetry(fn, { attempts = 3, delayMs = 1200 } = {}) {
  */
 export async function embed(texts, taskType = "RETRIEVAL_DOCUMENT") {
   const contents = Array.isArray(texts) ? texts : [texts];
-  // menos tentativas e esperas curtas: falha rápido em vez de travar minutos.
-  // (a ingestão em lote tem seu próprio ritmo; aqui priorizamos resposta rápida)
-  const maxAttempts = 2;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const res = await ai(attempt).models.embedContent({
-        model: EMBED_MODEL,
-        contents,
-        config: { outputDimensionality: EMBED_DIM, taskType },
-      });
-      return res.embeddings.map((e) => e.values);
-    } catch (err) {
-      if (!isTransientError(err) || attempt === maxAttempts) throw rewriteTransientError(err, attempt);
-      await new Promise((r) => setTimeout(r, 3000)); // uma espera curta só
-    }
-  }
-  throw new Error("embed: unreachable");
+  const res = await withTransientRetry(
+    EMBED_MODEL,
+    (client) => client.models.embedContent({ model: EMBED_MODEL, contents, config: { outputDimensionality: EMBED_DIM, taskType } }),
+    { attempts: 2, delayMs: 3000 } // menos tentativas e espera curta: falha rápido em vez de travar minutos
+  );
+  return res.embeddings.map((e) => e.values);
 }
 
 /** Conveniência: embedding de um único texto (number[]). */
@@ -169,34 +173,27 @@ export async function embedOne(text, taskType = "RETRIEVAL_QUERY") {
  * paciência LIMITADA: cada chamada roda dentro de uma função da Vercel com teto de 60s
  * (ver ingestSlice, src/lib/ingest/runSlice.js — usada tanto pelo botão SYNC manual quanto
  * pelo tick automático), então esperar o tempo que o Gemini pedir (que pode passar de 30-60s
- * sozinho) trava a função até ela ser morta no meio, sem nem registrar erro. Por isso o
- * espera é sempre CURTA (teto de 8s) e poucas tentativas — se a quota não liberar rápido,
- * desiste rápido também: quem chama (ingestSlice → /api/cron/sync) já tenta de novo no
- * próximo tick, um minuto depois, sem perder o offset onde parou.
+ * sozinho) trava a função até ela ser morta no meio, sem nem registrar erro. Por isso a
+ * espera é sempre CURTA (teto de 8s) — se a cota não liberar rápido, desiste rápido também:
+ * quem chama (ingestSlice → /api/cron/sync) já tenta de novo no próximo tick, com uma
+ * chave diferente do pool, sem perder o offset onde parou.
  */
 export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
   const contents = Array.isArray(texts) ? texts : [texts];
-  const maxAttempts = 2;
   const MAX_WAIT_SEC = 8;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      // skipPrimary: AUTO-SYNC roda sozinho em segundo plano e pode martelar isso por
-      // minutos — nunca toca na chave prioritária, pra ela sobrar inteira pro chat/voz/visão.
-      const res = await ai(attempt, { skipPrimary: true }).models.embedContent({
-        model: EMBED_MODEL,
-        contents,
-        config: { outputDimensionality: EMBED_DIM, taskType },
-      });
-      return res.embeddings.map((e) => e.values);
-    } catch (err) {
-      if (!isTransientError(err) || attempt === maxAttempts) throw rewriteTransientError(err, attempt);
-      const msg = String(err?.message || err);
-      const m = msg.match(/retry in ([\d.]+)s/i);
-      const waitSec = Math.min(m ? Math.ceil(Number(m[1])) + 1 : 5 * attempt, MAX_WAIT_SEC);
-      await new Promise((r) => setTimeout(r, waitSec * 1000));
+  const res = await withTransientRetry(
+    EMBED_MODEL,
+    (client) => client.models.embedContent({ model: EMBED_MODEL, contents, config: { outputDimensionality: EMBED_DIM, taskType } }),
+    {
+      attempts: 2,
+      computeDelay: (attempt, err) => {
+        const msg = String(err?.message || err);
+        const m = msg.match(/retry in ([\d.]+)s/i);
+        return Math.min(m ? (Math.ceil(Number(m[1])) + 1) * 1000 : 5000 * attempt, MAX_WAIT_SEC * 1000);
+      },
     }
-  }
-  throw new Error("embedForIngest: unreachable");
+  );
+  return res.embeddings.map((e) => e.values);
 }
 
 /**
@@ -209,8 +206,8 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
  *
  * `images` (opcional) — [{ mimeType, data (base64) }] — uma ou mais fotos tiradas na hora
  * (Modo Observância = câmera, Modo Tela = captura de tela; ver assistant/page.js). Quando
- * presente, vira multimodal: o mesmo modelo de chat (gemini-2.5-flash) também enxerga
- * imagem, sem precisar de nenhum modelo/endpoint separado.
+ * presente, vira multimodal: o mesmo modelo de chat também enxerga imagem, sem precisar de
+ * nenhum modelo/endpoint separado.
  */
 export async function* chatStream(prompt, systemInstruction, { tools, images } = {}) {
   const config = {};
@@ -223,8 +220,8 @@ export async function* chatStream(prompt, systemInstruction, { tools, images } =
 
   // retry só na abertura do stream (antes de qualquer chunk chegar) — 429/503 costumam
   // se resolver em segundos; uma vez que o texto começou a chegar não há o que repetir.
-  const stream = await withTransientRetry((attempt) =>
-    ai(attempt).models.generateContentStream({
+  const stream = await withTransientRetry(CHAT_MODEL, (client) =>
+    client.models.generateContentStream({
       model: CHAT_MODEL,
       contents,
       config: Object.keys(config).length ? config : undefined,
@@ -303,29 +300,31 @@ Regras:
   com o pedido. Não use "none" só por a referência ao card ser indireta — tente resolver pelo
   contexto primeiro.`;
 
-  const res = await withTransientRetry((attempt) =>
-    ai(attempt).models.generateContent({
-      model: CHAT_MODEL,
-      contents: prompt,
-      config: {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            intent: {
-              type: "STRING",
-              enum: ["none", "propose_action", "clarify_candidates", "select_candidate", "confirm_pending", "cancel_pending"],
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: prompt,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              intent: {
+                type: "STRING",
+                enum: ["none", "propose_action", "clarify_candidates", "select_candidate", "confirm_pending", "cancel_pending"],
+              },
+              card_id: { type: "STRING" },
+              field: { type: "STRING", enum: ["due", "list", "due_complete"] },
+              new_value: { type: "STRING" },
+              candidate_ids: { type: "ARRAY", items: { type: "STRING" } },
             },
-            card_id: { type: "STRING" },
-            field: { type: "STRING", enum: ["due", "list", "due_complete"] },
-            new_value: { type: "STRING" },
-            candidate_ids: { type: "ARRAY", items: { type: "STRING" } },
+            required: ["intent"],
           },
-          required: ["intent"],
         },
-      },
-    }),
+      }),
     { attempts: 2, delayMs: 800 }
   );
 
@@ -349,21 +348,21 @@ const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
  */
 export async function synthesizeSpeech(text, voiceName) {
   const voice = TTS_VOICES.some((v) => v.name === voiceName) ? voiceName : DEFAULT_TTS_VOICE;
-  // Fala AO VIVO durante a conversa. Agora que a chave prioritária está confirmada boa (chat +
-  // voz + embeddings testados direto), 2 tentativas NA CHAVE BOA (PRIMARY_ATTEMPTS=2, ver
-  // ai()) valem mais que 3 com a última arriscando uma reserva capenga — menos tempo somado
-  // até desistir, sem abrir mão de uma segunda chance pra um soluço passageiro.
-  const res = await withTransientRetry((attempt) =>
-    ai(attempt).models.generateContent({
-      model: TTS_MODEL,
-      contents: [{ parts: [{ text }] }],
-      config: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+  // Fala AO VIVO durante a conversa — 2 tentativas, cada uma numa chave diferente do pool
+  // (a saúde por chave×modelo já evita repetir uma que sabidamente está zerada pra TTS).
+  const res = await withTransientRetry(
+    TTS_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: TTS_MODEL,
+        contents: [{ parts: [{ text }] }],
+        config: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+          },
         },
-      },
-    }),
+      }),
     { attempts: 2, delayMs: 600 }
   );
 
@@ -403,8 +402,9 @@ Fique em silêncio de verdade (responda EXATAMENTE com a palavra NADA, maiúscul
  */
 export async function describeScreenIfNotable(image, systemInstruction = SCREEN_WATCH_INSTRUCTION) {
   const res = await withTransientRetry(
-    (attempt) =>
-      ai(attempt).models.generateContent({
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
         model: CHAT_MODEL,
         contents: [{ role: "user", parts: [{ text: "Aqui está a tela agora." }, { inlineData: { mimeType: image.mimeType, data: image.data } }] }],
         config: { systemInstruction },
