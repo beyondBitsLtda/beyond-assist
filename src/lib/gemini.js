@@ -2,7 +2,11 @@ import { GoogleGenAI } from "@google/genai";
 import { TTS_VOICES } from "./ttsVoices.js";
 
 const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
-const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-2.5-flash";
+// gemini-2.5-flash foi descontinuado pra projetos novos no Google Cloud (confirmado ao vivo:
+// erro 404 "no longer available to new users", recomendando este aqui) — projetos antigos
+// ainda tinham acesso legado ao 2.5, mas o projeto novo (chave prioritária) não. Testado e
+// funcionando nas chaves antigas E na nova antes de trocar o padrão.
+const CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-3.6-flash";
 const EMBED_DIM = Number(process.env.GEMINI_EMBED_DIM || 768);
 
 // ---- múltiplas chaves do Gemini: 1ª = PRIORITÁRIA, as demais = reserva em rodízio ----
