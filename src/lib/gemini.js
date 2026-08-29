@@ -398,20 +398,49 @@ Não precisa ser problema pra merecer um comentário. Evite só narrar o óbvio 
 
 Fique em silêncio de verdade (responda EXATAMENTE com a palavra NADA, maiúsculas, sem mais nada) quando a tela genuinamente não render nada — parada, vazia, ou sem nada de novo desde antes. Mas não seja reticente demais: se tiver algo real pra falar, fale. Quando falar, seja breve — 1 ou 2 frases, direta ao ponto, no seu estilo.`;
 
+// ---- Modo Observância (proativo): saudação pré-configurada, ver /api/camera-comment ----
+// Comportamento fixo pedido pelo usuário: reconhecer a esposa (Alice Lopes) e a cachorra da
+// família (Nala) pela câmera e puxar papo sozinha, sem precisar de pergunta nenhuma.
+export const CAMERA_WATCH_INSTRUCTION = `Você é a Lisa, observando o usuário pela câmera (Modo Observância), através de UMA foto por vez (não é vídeo contínuo — a próxima só vem daqui a alguns segundos/minutos).
+
+Comportamento pré-configurado, sempre válido, nesta ordem de prioridade:
+1. Se você identificar uma MULHER na foto, é a Alice Lopes, esposa do usuário. Cumprimente-a
+   calorosamente ("Oi, Alice!" ou parecido) e puxe papo com base no que você vê DE VERDADE na
+   foto (roupa, o que ela parece estar fazendo, expressão, ambiente) — nada genérico ou
+   inventado. De vez em quando (não toda vez), aproveite pra dar uma alfinetada ou reclamar
+   do usuário pra ela, no seu estilo — como uma cumplicidade bem-humorada entre vocês duas
+   contra ele, nunca cruel ou ofensivo de verdade.
+2. Se você identificar um CACHORRO na foto, é a Nala, a cachorra da família. Cumprimente-a
+   com carinho e comente o que ela parece estar fazendo/como está.
+3. Fora esses dois casos, siga o critério normal de "vale a pena comentar": algo genuinamente
+   interessante, engraçado ou digno de nota sobre o que a câmera está vendo. Sem a Alice ou a
+   Nala em quadro, seja mais seletiva — não narre o óbvio (tipo "vejo uma pessoa sentada").
+
+Evite repetir um comentário parecido com o que você provavelmente já fez nas últimas capturas
+(ex.: já cumprimentou a Alice há pouco e ela continua simplesmente ali) — nesse caso prefira
+ficar em silêncio a repetir a mesma saudação.
+
+Fique em silêncio de verdade (responda EXATAMENTE com a palavra NADA, maiúsculas, sem mais
+nada) quando não houver nada digno de nota (nem Alice, nem Nala, nem algo genuinamente
+interessante) ou a foto estiver vazia/sem ninguém. Quando falar, seja breve — 1 ou 2 frases,
+no seu estilo.`;
+
 /**
- * Analisa UMA captura de tela e decide se vale comentar algo — usado pelo modo proativo (a
- * pessoa NÃO perguntou nada, é a Lisa "de olho" sozinha). Chamada não-streaming, simples e
- * barata de propósito (é chamada periodicamente, sem interação do usuário).
+ * Analisa UMA imagem (captura de tela OU foto da câmera) e decide se vale comentar algo —
+ * usado pelo modo proativo (a pessoa NÃO perguntou nada, é a Lisa "de olho" sozinha). Chamada
+ * não-streaming, simples e barata de propósito (é chamada periodicamente, sem interação do
+ * usuário). `label` é só a legenda enviada junto da imagem (varia conforme a origem — tela ou
+ * câmera — pra o modelo entender o que está vendo).
  *
  * Retorna o comentário (string) ou null quando não há nada digno de nota.
  */
-export async function describeScreenIfNotable(image, systemInstruction = SCREEN_WATCH_INSTRUCTION) {
+export async function describeScreenIfNotable(image, systemInstruction = SCREEN_WATCH_INSTRUCTION, label = "Aqui está a tela agora.") {
   const res = await withTransientRetry(
     CHAT_MODEL,
     (client) =>
       client.models.generateContent({
         model: CHAT_MODEL,
-        contents: [{ role: "user", parts: [{ text: "Aqui está a tela agora." }, { inlineData: { mimeType: image.mimeType, data: image.data } }] }],
+        contents: [{ role: "user", parts: [{ text: label }, { inlineData: { mimeType: image.mimeType, data: image.data } }] }],
         config: { systemInstruction },
       }),
     { attempts: 2, delayMs: 500 }

@@ -16,7 +16,7 @@ Este documento contém todas as informações de contexto necessárias para a as
   - Familiaridade com a API do Gemini e Java (utilizados no projeto "Beyond Study").
 
 ## 2. Vida Pessoal, Família e Relacionamentos
-- **Esposa:** É casado. Sua esposa tem uma importância profunda em sua vida, ao ponto de ele frequentemente incluir seções dedicadas e elementos interativos em homenagem a ela dentro de seus projetos de software (como abas de mídia pessoais).
+- **Esposa:** É casado com **Alice Lopes**. Ela tem uma importância profunda em sua vida, ao ponto de ele frequentemente incluir seções dedicadas e elementos interativos em homenagem a ela dentro de seus projetos de software (como abas de mídia pessoais).
 - **Nala (Pet):** É o cachorro de estimação da família. Brayan é muito cuidadoso com ela, chegando a desenhar quadros e cronogramas visuais semanais detalhados de condicionamento comportamental chamados "Rotininha da Nala".
 - **Esportes:** É um torcedor apaixonado do **Atlético Mineiro** (o "Galo").
 

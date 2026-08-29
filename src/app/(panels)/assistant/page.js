@@ -467,6 +467,46 @@ export default function AssistantPage() {
     return () => { cancelled = true; clearTimeout(kickoff); clearInterval(id); };
   }, [screenMode, screenAutoComment, screenIntervalMs, captureScreenFrame, addLog]);
 
+  // ---- Modo Observância (proativo): saudação pré-configurada — enquanto a câmera estiver
+  // ligada, a Lisa "de olho" sozinha (nenhuma pergunta precisa ser feita); se aparecer a
+  // esposa do usuário (Alice) ou a cachorra da família (Nala), cumprimenta e puxa papo
+  // sozinha (comportamento fixo, ver CAMERA_WATCH_INSTRUCTION em src/lib/gemini.js). Mesmo
+  // padrão da vigília do Modo Tela acima — dispara logo ao ligar, depois em intervalos
+  // espaçados, só fala quando /api/camera-comment devolver um comentário de verdade. Ao
+  // contrário do Modo Tela, não tem toggle separado de "auto" — o usuário pediu que rode
+  // sempre que a Observância estiver ligada.
+  useEffect(() => {
+    if (!observanceMode) return;
+    let cancelled = false;
+    const tick = async () => {
+      const frame = captureObservanceFrame();
+      if (!frame) { addLog("[OBS]", OR, "saudação: sem retrato da câmera ainda"); return; }
+      try {
+        const res = await fetch("/api/camera-comment", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ image: frame, personaMode: personaModeForScreenRef.current }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!data?.ok) { addLog("[OBS]", OR, `saudação falhou: ${data?.error || `HTTP ${res.status}`}`); return; }
+        if (!data.comment) { addLog("[OBS]", CY, "saudação: nada digno de nota agora"); return; }
+        addLog("[OBS]", PU, data.comment);
+        setMessages((m) => [...m, { id: `obsgreet${Date.now()}`, role: "assistant", text: data.comment }]);
+        // mesma regra de prioridade de voz da vigília do Modo Tela — nunca fala por cima de
+        // uma fala já em andamento (resposta normal, ou saudação do gesto de acordar).
+        const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
+        if (jaFalando) addLog("[OBS]", CY, "saudação: comentário achado, mas a Lisa já está falando — só no texto desta vez");
+        else if (voiceOnForScreenRef.current) speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+      } catch (err) {
+        if (!cancelled) addLog("[OBS]", OR, `saudação falhou: ${err?.message || err}`);
+      }
+    };
+    const kickoff = setTimeout(tick, 1500);
+    const id = setInterval(tick, 30000); // sem seletor de intervalo (diferente do Modo Tela) — 30s é um meio-termo entre responsivo e não gastar cota à toa
+    return () => { cancelled = true; clearTimeout(kickoff); clearInterval(id); };
+  }, [observanceMode, captureObservanceFrame, addLog]);
+
   // carrega a Visão do avatar escolhida antes — cada navegador guarda a sua (ver nota acima:
   // só tem efeito no desktop, mas não custa nada carregar a preferência sempre)
   useEffect(() => {
