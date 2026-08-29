@@ -37,13 +37,24 @@ const PRIMARY_ATTEMPTS = 2;
 
 /** `attempt` (1-based, vem de withTransientRetry ou do for-loop de quem chama): as primeiras
  * PRIMARY_ATTEMPTS tentativas de QUALQUER chamada usam a chave prioritária; só depois disso
- * (falhou de verdade mais de uma vez) é que cai pro rodízio das chaves de reserva. */
-function ai(attempt = 1) {
+ * (falhou de verdade mais de uma vez) é que cai pro rodízio das chaves de reserva.
+ *
+ * `skipPrimary` — pro AUTO-SYNC (embedForIngest): ele roda sozinho em segundo plano, sem
+ * ninguém esperando a resposta na hora, e pode ficar minutos martelando embeddings a cada
+ * fatia. NUNCA usa a chave prioritária, pra ela sobrar inteira pro chat/voz/visão — que são
+ * as coisas que a pessoa está de fato esperando ver na tela. Sem reserva configurada, cai na
+ * prioritária mesmo assim (não trava o app por causa disso). */
+function ai(attempt = 1, { skipPrimary = false } = {}) {
   if (!KEYS.length) {
     throw new Error(
       "GEMINI_API_KEY (ou GEMINI_API_KEYS) não configurada. " +
       "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
     );
+  }
+  if (skipPrimary && RESERVE_KEYS.length) {
+    const key = RESERVE_KEYS[reservePtr % RESERVE_KEYS.length];
+    reservePtr = (reservePtr + 1) % RESERVE_KEYS.length;
+    return clientFor(key);
   }
   if (attempt <= PRIMARY_ATTEMPTS || !RESERVE_KEYS.length) return clientFor(PRIMARY_KEY);
   const key = RESERVE_KEYS[reservePtr % RESERVE_KEYS.length];
@@ -165,7 +176,9 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
   const MAX_WAIT_SEC = 8;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const res = await ai(attempt).models.embedContent({
+      // skipPrimary: AUTO-SYNC roda sozinho em segundo plano e pode martelar isso por
+      // minutos — nunca toca na chave prioritária, pra ela sobrar inteira pro chat/voz/visão.
+      const res = await ai(attempt, { skipPrimary: true }).models.embedContent({
         model: EMBED_MODEL,
         contents,
         config: { outputDimensionality: EMBED_DIM, taskType },
