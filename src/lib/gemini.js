@@ -340,6 +340,11 @@ Regras:
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
 
+// Pra o painel de status (/api/gemini-keys/status) montar a matriz chave×modelo sem nunca
+// expor as chaves em si — só quantas existem e quais modelos usam cota própria.
+export const GEMINI_KEY_COUNT = KEYS.length;
+export const GEMINI_MODELS = { chat: CHAT_MODEL, tts: TTS_MODEL, embed: EMBED_MODEL };
+
 /**
  * Gera fala a partir de texto. `voiceName` (opcional) sobrescreve a voz padrão — vem do
  * seletor de voz do Assistente (guardado no navegador, ver src/app/api/speak/route.js).

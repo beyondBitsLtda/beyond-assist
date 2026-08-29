@@ -1100,6 +1100,7 @@ export default function AssistantPage() {
                   { href: "/tasks", glyph: "⏱", label: "TAREFAS" },
                   { href: "/thoughts", glyph: "✎", label: "PENSAMENTOS" },
                   { href: "/sentinel", glyph: "◆", label: "SENTINELA" },
+                  { href: "/gemini-keys", glyph: "🔑", label: "CHAVES GEMINI" },
                 ].map((item) => (
                   <Link
                     key={item.href}

@@ -12,6 +12,7 @@ const ITEMS = [
   { href: "/thoughts", label: "PENSAMENTOS", glyph: "✎" },
   { href: "/sentinel", label: "SENTINELA", glyph: "◆" },
   { href: "/assistant", label: "ASSISTENTE", glyph: "◉" },
+  { href: "/gemini-keys", label: "CHAVES GEMINI", glyph: "🔑" },
 ];
 
 export default function Sidebar({ open = false, onNavigate }) {
