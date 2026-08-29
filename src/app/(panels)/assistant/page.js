@@ -30,20 +30,6 @@ const TASKS_SCOPE = "__tasks__";
 const THOUGHTS_SCOPE = "__thoughts__";
 const SENTINEL_SCOPE = "__sentinel__";
 
-// Tamanho mínimo (em caracteres) pro primeiro pedaço da resposta antes de mandar pro TTS.
-// Ainda são só 2 chamadas de TTS por resposta no total (cabeça + resto) — baixar esse
-// número não aumenta chamada nenhuma, só faz a cabeça sair mais cedo (a fala começa assim
-// que a 1ª frase completa passar desse tamanho, em vez de esperar várias frases se juntarem).
-const TTS_HEAD_CHARS = 40;
-
-/** Corta um buffer de texto nas últimas frases completas (terminadas em . ! ? ou quebra de linha). */
-function splitSentences(text) {
-  const matches = text.match(/[^.!?\n]+[.!?\n]+/g);
-  if (!matches) return { sentences: [], rest: text };
-  const consumed = matches.join("").length;
-  return { sentences: matches.map((s) => s.trim()).filter(Boolean), rest: text.slice(consumed) };
-}
-
 
 export default function AssistantPage() {
   const { logs, addLog } = useLog();
@@ -114,16 +100,16 @@ export default function AssistantPage() {
   const audioRef = useRef(null);
   const currentAudioResolveRef = useRef(null);
 
-  // fila de TTS em 2 pedaços (cabeça + resto): a cabeça sai assim que atinge um tamanho
-  // mínimo, o resto sai quando a resposta termina — só 1-2 chamadas por resposta, tocadas em ordem.
-  const speechBufferRef = useRef("");
+  // fila de TTS: 1 chamada só por resposta (o texto INTEIRO, mandado quando a resposta
+  // termina de chegar) — de propósito, não mais "cabeça + resto" em 2 chamadas separadas.
+  // O ganho de latência de começar a falar mais cedo (antes da resposta toda chegar) não
+  // valia o preço: cabeça e resto eram decididos quase-independentemente, e se um desse
+  // certo com o Gemini e o outro não, a MESMA resposta saía com duas vozes diferentes no
+  // meio — nem o travamento de engenharia (engineDecisionRef abaixo) resolvia isso de
+  // verdade, porque a falha podia vir DEPOIS da cabeça já ter decidido (e começado a tocar).
   const speechQueueRef = useRef(Promise.resolve()); // ordem de REPRODUÇÃO (espera o áudio anterior acabar de tocar)
-  // ordem de DECISÃO do motor (gemini/navegador) — deliberadamente separada da fila de
-  // reprodução acima: só espera a tentativa ao Gemini do pedaço anterior VOLTAR (sucesso ou
-  // falha), não o áudio dele tocar até o fim. Sem isso, numa resposta curta o "resto" podia
-  // decidir tentar o Gemini ANTES de saber que a "cabeça" tinha falhado (a chamada ao Gemini
-  // TTS é mais lenta que o streaming do texto às vezes) — daí cabeça e resto saíam em vozes
-  // diferentes, com um silêncio no meio enquanto o resto esperava a tentativa dele mesmo.
+  // ordem de DECISÃO do motor (gemini/navegador) entre RESPOSTAS diferentes — evita que uma
+  // pergunta nova decida seu motor antes da anterior ainda estar sendo decidida.
   const engineDecisionRef = useRef(Promise.resolve());
   const speechGenRef = useRef(0); // pergunta nova invalida pedaços pendentes de uma pergunta antiga
   // voz "travada" pra resposta atual: null = ainda não decidiu, "gemini" ou "browser".
@@ -699,10 +685,8 @@ export default function AssistantPage() {
 
     stopSpeaking(); // corta qualquer fala de uma resposta anterior
     const gen = ++speechGenRef.current;
-    speechBufferRef.current = "";
     speechEngineRef.current = null; // nova resposta → nova chance pro Gemini decidir a voz
     const voiceEnabled = voiceOn;
-    let headSent = false; // cabeça (1º pedaço) já foi mandada pro TTS nesta resposta?
 
     addLog("[EMBED]", GR, "query → vector [768d]");
     addLog("[RAG]", CY, "similarity search · top_k");
@@ -758,20 +742,6 @@ export default function AssistantPage() {
             else addLog("[ACTION]", PU, "resolvida");
           } else if (event === "token") {
             setAnswer((a) => { const na = a + payload; answerRef.current = na; return na; });
-            // manda a "cabeça" (1º pedaço) assim que atinge um tamanho mínimo — depois disso
-            // o restante só acumula, e sai inteiro no fim (evento "done"). No máx. 2 chamadas
-            // de TTS por resposta, em vez de uma por frase (é o que esgotava o limite da API).
-            if (voiceEnabled) {
-              speechBufferRef.current += payload;
-              if (!headSent && speechBufferRef.current.length >= TTS_HEAD_CHARS) {
-                const { sentences, rest } = splitSentences(speechBufferRef.current);
-                if (sentences.length) {
-                  headSent = true;
-                  enqueueSpeech(sentences.join(" "), gen);
-                  speechBufferRef.current = rest;
-                }
-              }
-            }
           } else if (event === "error") {
             addLog("[ERR]", OR, String(payload?.message || payload));
             setAnswer((a) => a + `\n[erro: ${payload?.message || payload}]`);
@@ -789,10 +759,10 @@ export default function AssistantPage() {
     } finally {
       setBusy(false);
       setMode("idle");
-      // fala o que sobrou (o "resto" se a cabeça já saiu, ou a resposta inteira se era curta)
-      const remaining = speechBufferRef.current.trim();
-      speechBufferRef.current = "";
-      if (voiceEnabled && remaining) enqueueSpeech(remaining, gen);
+      // fala a resposta INTEIRA de uma vez, só agora que terminou de chegar — 1 chamada de
+      // TTS por resposta, nunca duas vozes diferentes na mesma fala (ver nota no topo do arquivo).
+      const full = answerRef.current.trim();
+      if (voiceEnabled && full) enqueueSpeech(full, gen);
     }
   }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame]);
 
