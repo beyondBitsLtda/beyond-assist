@@ -1432,6 +1432,7 @@ export default function AssistantPage() {
                   { href: "/scheduled-announcements", glyph: "⏰", label: "FALAS AGENDADAS" },
                   { href: "/code-repos", glyph: "🐙", label: "REPOSITÓRIOS" },
                   { href: "/code-tasks", glyph: "🛠️", label: "TAREFAS DE CÓDIGO" },
+                  { href: "/sync-status", glyph: "📊", label: "PROGRESSO DO SYNC" },
                 ].map((item) => (
                   <Link
                     key={item.href}

@@ -15,6 +15,7 @@ const ITEMS = [
   { href: "/scheduled-announcements", label: "FALAS AGENDADAS", glyph: "⏰" },
   { href: "/code-repos", label: "REPOSITÓRIOS", glyph: "🐙" },
   { href: "/code-tasks", label: "TAREFAS DE CÓDIGO", glyph: "🛠️" },
+  { href: "/sync-status", label: "PROGRESSO DO SYNC", glyph: "📊" },
   { href: "/assistant", label: "ASSISTENTE", glyph: "◉" },
   { href: "/gemini-keys", label: "CHAVES GEMINI", glyph: "🔑" },
 ];

@@ -396,3 +396,19 @@ create table if not exists public.code_tasks (
 
 alter table public.code_tasks enable row level security;
 -- (só acessada pela service_role, em src/lib/codeTasks.js — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  Painel visual de progresso do SYNC (a mais, aditivo) — /sync-status precisa saber quantos
+--  pedaços já estão indexados por fonte/board (ex.: quantos chunks cada repositório do
+--  GitHub já tem) sem trazer a tabela `documents` inteira pro servidor só pra contar.
+-- ============================================================
+
+-- 20) Contagem agregada por fonte+board — usada pelo painel, não pela busca em si.
+create or replace function public.document_counts()
+returns table (source text, board text, cnt bigint)
+language sql stable
+as $$
+  select source, board, count(*) as cnt
+  from public.documents
+  group by source, board;
+$$;
