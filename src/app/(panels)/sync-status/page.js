@@ -1,10 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CY, OR, GR, PU, mono } from "@/lib/theme.js";
 
 const POLL_MS = 8000;
 const SOURCE_LABELS = { trello: "TRELLO", brain: "BEYOND BRAIN", github: "CÓDIGO (GITHUB)" };
+
+/** "3min", "1h 20min", "menos de 1min" — sempre por extenso, nunca "NaN" nem negativo. */
+function fmtEta(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  if (seconds < 60) return "menos de 1min";
+  const totalMin = Math.round(seconds / 60);
+  if (totalMin < 60) return `~${totalMin}min`;
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  return m ? `~${h}h ${m}min` : `~${h}h`;
+}
+
+function ProgressBar({ pct, color }) {
+  return (
+    <div style={{ height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+      <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, pct))}%`, background: color, borderRadius: 4, transition: "width 0.6s ease" }} />
+    </div>
+  );
+}
 
 /**
  * Visão ao vivo do progresso do SYNC automático (pg_cron, ver /api/cron/sync) — o que já
@@ -15,12 +33,44 @@ export default function SyncStatusPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [sort, setSort] = useState("name"); // "name" | "count"
+  const [etaSeconds, setEtaSeconds] = useState(null);
+  // velocidade observada (pedaços/segundo) entre uma atualização e outra, suavizada — não
+  // vem do servidor, é calculada aqui comparando o `grand_total` de agora com o de antes.
+  // Sem isso não dá pra estimar tempo nenhum: não sabemos de antemão quantos arquivos cada
+  // repositório tem sem varrer todos (caro), só o RITMO real de avanço.
+  const rateRef = useRef({ lastGrandTotal: null, lastTime: null, rate: null });
 
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/sync-status");
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "falha ao carregar status");
+
+      const now = Date.now();
+      const prev = rateRef.current;
+      if (json.status === "running" && prev.lastTime != null && prev.lastGrandTotal != null) {
+        const dt = (now - prev.lastTime) / 1000;
+        const dChunks = (json.grand_total ?? 0) - prev.lastGrandTotal;
+        if (dt > 0 && dChunks >= 0) {
+          const instRate = dChunks / dt;
+          prev.rate = prev.rate == null ? instRate : prev.rate * 0.7 + instRate * 0.3; // suaviza (evita ETA pulando a cada poll)
+        }
+      }
+      prev.lastGrandTotal = json.grand_total ?? 0;
+      prev.lastTime = now;
+
+      // estima o total de pedaços do ciclo inteiro pela média dos passos JÁ concluídos —
+      // repositórios variam muito de tamanho, então isso é uma aproximação, não uma conta exata.
+      const stepsCompleted = json.step_index ?? 0;
+      if (json.status === "running" && stepsCompleted > 0 && prev.rate > 0 && json.totalSteps) {
+        const avgPerStep = (json.grand_total ?? 0) / stepsCompleted;
+        const stepsRemaining = Math.max(0, json.totalSteps - stepsCompleted - 1);
+        const remainingChunks = stepsRemaining * avgPerStep;
+        setEtaSeconds(remainingChunks / prev.rate);
+      } else if (json.status !== "running") {
+        setEtaSeconds(null);
+      }
+
       setData(json);
       setError(null);
     } catch (err) {
@@ -65,6 +115,23 @@ export default function SyncStatusPage() {
               {data.started_at && <span>iniciado: {new Date(data.started_at).toLocaleString("pt-BR")}</span>}
               {data.totalSteps ? <span>passo {(data.step_index ?? 0) + 1} de {data.totalSteps}</span> : null}
             </div>
+
+            {data.totalSteps > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <ProgressBar pct={(((data.step_index ?? 0) + 1) / data.totalSteps) * 100} color={statusColor} />
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
+                  <span style={{ ...mono, fontSize: 9.5, color: "rgba(207,239,251,0.4)" }}>
+                    {Math.round((((data.step_index ?? 0) + 1) / data.totalSteps) * 100)}% dos passos
+                  </span>
+                  {running && (
+                    <span style={{ ...mono, fontSize: 9.5, color: "rgba(207,239,251,0.55)" }}>
+                      {etaSeconds != null ? `tempo estimado: ${fmtEta(etaSeconds)}` : "calculando estimativa…"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {data.last_error && <div style={{ ...mono, fontSize: 10.5, color: OR, marginTop: 8 }}>⚠ último erro: {data.last_error}</div>}
           </div>
 
@@ -125,7 +192,10 @@ export default function SyncStatusPage() {
           )}
 
           <div style={{ ...mono, fontSize: 9.5, color: "rgba(207,239,251,0.35)", marginTop: 18 }}>
-            atualiza sozinho a cada {POLL_MS / 1000}s.
+            atualiza sozinho a cada {POLL_MS / 1000}s. O tempo estimado é uma aproximação —
+            calculado pela velocidade real observada e pelo tamanho médio dos repositórios já
+            concluídos, não por uma contagem exata de tudo que falta (repositórios variam
+            muito de tamanho).
           </div>
         </>
       )}
