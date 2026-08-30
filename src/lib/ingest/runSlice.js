@@ -5,14 +5,21 @@ import { loadTrello } from "@/lib/ingest/trello.js";
 import { loadBrain } from "@/lib/ingest/brain.js";
 import { loadGithub, countEnabledRepos } from "@/lib/ingest/github.js";
 
-// Gemini free tier: 100 requests/min de embedding.
+// Esses números foram calibrados quando só existiam 2-3 chaves do Gemini (single-key rate
+// limit ~100 req/min de embedding — daí a pausa de 4s a cada 10). Hoje embedForIngest já
+// roda por baixo dos panos num pool de 35 chaves com rodízio automático (ver
+// pickKeyIndex/withTransientRetry em geminiKeyHealth.js/gemini.js) — cada chamada de
+// embedForIngest já sai numa chave DIFERENTE da anterior, então a pausa não protege mais
+// nada de verdade (só deixa o sync mais lento à toa). Reduzida bem — se algum lote esbarrar
+// em cota mesmo assim, o retry com troca de chave já resolve sozinho, sem perder progresso.
 const EMBED_BATCH = 10;
-const BATCH_PAUSE_MS = 4000; // pausa menor: 10 chunks a cada ~5s = ~120/min (perto do limite mas com retry)
+const BATCH_PAUSE_MS = 400;
 const UPSERT_BATCH = 100;
 
 // Máximo de chunks por chamada. Menor = mais chamadas, mas cada uma cabe folgado em 60s
-// (limite de função da Vercel no plano Hobby — ver src/app/api/cron/sync/route.js).
-const MAX_CHUNKS_PER_CALL = 20;
+// (limite de função da Vercel no plano Hobby — ver src/app/api/cron/sync/route.js). Com a
+// pausa acima bem menor, dá pra processar bem mais chunks por chamada sem estourar o tempo.
+const MAX_CHUNKS_PER_CALL = 60;
 
 /**
  * Lista de "passos" de uma sincronização completa: um por board do Trello (na ordem de
