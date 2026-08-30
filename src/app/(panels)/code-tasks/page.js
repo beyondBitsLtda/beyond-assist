@@ -72,7 +72,19 @@ export default function CodeTasksPage() {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ repo, baseBranch, instruction, filePaths: selectedFiles }),
       });
-      const data = await res.json();
+      // resposta pode não ser JSON de verdade (ex.: a Vercel mata a função por estourar 60s
+      // e devolve a PÁGINA de erro dela, texto puro) — sem essa checagem, res.json() quebra
+      // com uma mensagem confusa tipo "Unexpected token 'A'..." em vez de dizer o que houve.
+      const raw = await res.text();
+      let data;
+      try { data = JSON.parse(raw); }
+      catch {
+        throw new Error(
+          res.status === 504 || raw.includes("FUNCTION_INVOCATION_TIMEOUT") || !res.ok
+            ? "o servidor demorou demais pra gerar a mudança (provavelmente muitos arquivos de contexto de uma vez) — tenta com menos arquivos selecionados ou um pedido mais específico"
+            : `resposta inesperada do servidor (HTTP ${res.status})`
+        );
+      }
       if (!data.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setResult(data);
       setInstruction("");

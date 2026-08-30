@@ -7,7 +7,11 @@ import { getBranchSha, createBranch, getFileSha, putFileContent, createPullReque
 // A Lisa nunca commita na branch escolhida — sempre cria uma branch NOVA a partir dela,
 // aplica os arquivos lá, e abre um Pull Request de volta pra base. Mesclar é sempre manual.
 
-const MAX_FILES_PER_TASK = 8;
+// Gemini precisa gerar o CONTEÚDO COMPLETO de cada arquivo de volta (não um diff) — quanto
+// mais arquivos (principalmente arquivos grandes, tipo um CSS global), mais tempo de geração,
+// e a função tem teto fixo de 60s (Vercel, plano Hobby, sem como aumentar). Um número menor
+// aqui reduz o risco de estourar esse teto e a função morrer sem devolver JSON nenhum.
+const MAX_FILES_PER_TASK = 6;
 
 const DIACRITICS_RE = new RegExp("[̀-ͯ]", "g"); // marcas de acento depois de normalize("NFD")
 
