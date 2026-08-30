@@ -16,7 +16,10 @@ export async function GET() {
 }
 
 /**
- * POST /api/code-tasks   body: { repo, baseBranch, instruction }
+ * POST /api/code-tasks   body: { repo, baseBranch, instruction, filePaths?: string[] }
+ *
+ * `filePaths` (opcional) — arquivos escolhidos manualmente na tela, garantidos no contexto
+ * além do que a busca semântica achar sozinha (ver runCodeTask em codeTasks.js).
  *
  * Roda a tarefa de ponta a ponta (contexto → Gemini propõe → branch nova → commit → PR) e
  * só devolve quando terminar (ou falhar) — sem fila em segundo plano por enquanto, então
@@ -24,11 +27,14 @@ export async function GET() {
  */
 export async function POST(req) {
   try {
-    const { repo, baseBranch, instruction } = await req.json();
+    const { repo, baseBranch, instruction, filePaths } = await req.json();
     if (!repo || !baseBranch || !instruction?.trim()) {
       return jsonResponse({ ok: false, error: "repo, baseBranch e instruction são obrigatórios" }, 400);
     }
-    const result = await runCodeTask({ repo, baseBranch, instruction: instruction.trim() });
+    const result = await runCodeTask({
+      repo, baseBranch, instruction: instruction.trim(),
+      filePaths: Array.isArray(filePaths) ? filePaths.filter(Boolean) : [],
+    });
     return jsonResponse(result, result.ok ? 200 : 500);
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err?.message || err) }, 500);

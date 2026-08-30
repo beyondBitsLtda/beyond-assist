@@ -15,6 +15,9 @@ export default function CodeTasksPage() {
   const [branches, setBranches] = useState([]);
   const [baseBranch, setBaseBranch] = useState("");
   const [instruction, setInstruction] = useState("");
+  const [codeFiles, setCodeFiles] = useState([]);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [fileFilter, setFileFilter] = useState("");
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
   const [tasks, setTasks] = useState(null);
@@ -36,6 +39,8 @@ export default function CodeTasksPage() {
   useEffect(() => {
     setBaseBranch("");
     setBranches([]);
+    setCodeFiles([]);
+    setSelectedFiles([]);
     if (!repo) return;
     fetch(`/api/code-repos/branches?repo=${encodeURIComponent(repo)}`)
       .then((r) => r.json())
@@ -47,8 +52,16 @@ export default function CodeTasksPage() {
         }
       })
       .catch(() => {});
+    fetch(`/api/code-repos/files?repo=${encodeURIComponent(repo)}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.ok) setCodeFiles(d.files || []); })
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repo]);
+
+  const toggleFile = (path) => {
+    setSelectedFiles((sel) => (sel.includes(path) ? sel.filter((p) => p !== path) : [...sel, path]));
+  };
 
   const submit = async () => {
     setRunning(true);
@@ -57,12 +70,13 @@ export default function CodeTasksPage() {
     try {
       const res = await fetch("/api/code-tasks", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ repo, baseBranch, instruction }),
+        body: JSON.stringify({ repo, baseBranch, instruction, filePaths: selectedFiles }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setResult(data);
       setInstruction("");
+      setSelectedFiles([]);
       await loadTasks();
     } catch (err) {
       setError(err.message);
@@ -101,6 +115,37 @@ export default function CodeTasksPage() {
 
           <div style={labelStyle}>O QUE VOCÊ QUER</div>
           <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="ex.: corrige o bug em X, adiciona um botão que faz Y" rows={4} style={{ ...inputStyle, resize: "vertical" }} />
+
+          <div style={labelStyle}>
+            ARQUIVOS (opcional — garante que entrem no contexto, além do que a busca semântica achar sozinha)
+          </div>
+          {repo ? (
+            <>
+              <input
+                value={fileFilter}
+                onChange={(e) => setFileFilter(e.target.value)}
+                placeholder={`filtrar entre ${codeFiles.length} arquivos indexados…`}
+                style={{ ...inputStyle, marginBottom: 6 }}
+              />
+              {selectedFiles.length > 0 && (
+                <div style={{ fontSize: 10.5, color: PU, marginBottom: 6 }}>{selectedFiles.length} selecionado(s): {selectedFiles.join(", ")}</div>
+              )}
+              <div style={{ maxHeight: 160, overflowY: "auto", border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: 6, padding: "6px 8px" }}>
+                {codeFiles
+                  .filter((f) => !fileFilter.trim() || f.toLowerCase().includes(fileFilter.toLowerCase()))
+                  .slice(0, 200)
+                  .map((f) => (
+                    <label key={f} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: 11.5, color: "#eafcff", cursor: "pointer" }}>
+                      <input type="checkbox" checked={selectedFiles.includes(f)} onChange={() => toggleFile(f)} />
+                      {f}
+                    </label>
+                  ))}
+                {codeFiles.length === 0 && <div style={{ ...mono, fontSize: 10, color: "rgba(207,239,251,0.4)" }}>nenhum arquivo indexado ainda pra esse repositório.</div>}
+              </div>
+            </>
+          ) : (
+            <div style={{ ...mono, fontSize: 10, color: "rgba(207,239,251,0.4)" }}>escolha um repositório primeiro</div>
+          )}
 
           {error && <div style={{ ...mono, fontSize: 10, color: OR, marginTop: 10 }}>⚠ {error}</div>}
           {result?.ok && (

@@ -61,14 +61,20 @@ export async function listRepoBranches(repo) {
  * Executa UMA tarefa de código de ponta a ponta: busca contexto → Gemini propõe as mudanças
  * → cria branch → aplica arquivos → abre PR. Registra o resultado (ou erro) em code_tasks
  * pra tela /code-tasks mostrar o histórico.
+ *
+ * `filePaths` (opcional) — arquivos que o usuário escolheu manualmente pra garantir que
+ * entrem no contexto, além do que a busca semântica achar sozinha. Existe porque busca
+ * semântica funciona bem pra "onde está o código que faz X", mas mal pra pedidos amplos tipo
+ * "mude o tema pra preto e branco" — os arquivos certos (theme.js, globals.css) não se
+ * parecem textualmente com o pedido, então a busca sozinha às vezes não os acha.
  */
-export async function runCodeTask({ repo, baseBranch, instruction }) {
+export async function runCodeTask({ repo, baseBranch, instruction, filePaths = [] }) {
   const task = await recordTask({ repo, base_branch: baseBranch, instruction, status: "running" });
 
   try {
-    // 1) contexto: busca semântica só nesse repo, pega os arquivos ÚNICOS mais relevantes
+    // 1) contexto: os arquivos escolhidos à mão (garantidos) + o que a busca semântica achar
     const matches = await retrieve(instruction, { filterSource: "github", filterBoard: repo, topK: 8, minSim: 0.3 });
-    const uniquePaths = [...new Set(matches.map((m) => m.title))].slice(0, MAX_FILES_PER_TASK);
+    const uniquePaths = [...new Set([...filePaths, ...matches.map((m) => m.title)])].slice(0, MAX_FILES_PER_TASK);
     const contextFiles = await getFullFileContents(repo, uniquePaths);
 
     // 2) Gemini propõe as mudanças (nunca aplica sozinho)
