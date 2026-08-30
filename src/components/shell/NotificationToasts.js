@@ -4,11 +4,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CY, OR, mono } from "@/lib/theme.js";
 import { speakText } from "@/lib/browserVoice.js";
+import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { useLog } from "./LogProvider.js";
 
 const POLL_MS = 12000; // o cron que detecta agora roda a cada 1 min (não usa Gemini, sem custo de cota) — vale conferir mais rápido também
 const TOAST_MS = 9000;
 const CRITICAL_TYPES = new Set(["ticket_sla_breach", "trello_task_overdue"]);
+// Falas agendadas (ver src/lib/scheduledAnnouncements.js) são um pedido explícito do usuário
+// pra soar com a voz de VERDADE da Lisa (Gemini), não a do navegador — ao contrário dos
+// outros avisos automáticos (Sentinela/Trello), que continuam de propósito na voz do
+// navegador (evita multiplicar chamada de TTS "premium" em cada aba/dispositivo aberto pra
+// um aviso que ninguém pediu). Uma fala agendada é diferente: foi o próprio usuário quem
+// programou aquele horário — vale a voz premium mesmo com esse custo.
+const GEMINI_VOICE_TYPES = new Set(["scheduled_announcement"]);
 
 /**
  * Avisos DENTRO do app: complementa o push do sistema operacional (que exige permissão e só
@@ -62,10 +70,19 @@ export default function NotificationToasts() {
         const critical = CRITICAL_TYPES.has(ev.event_type);
         setToasts((prev) => [...prev, { id, title: ev.title, body: ev.body, url: ev.url, critical }]);
         addLog("[AVISO]", critical ? OR : CY, ev.title);
-        // browserOnly: de propósito — voz do navegador, sem gastar cota do Gemini (o
-        // Assistente é quem precisa dela; com várias abas/dispositivos abertos, cada um
-        // falaria o mesmo aviso pela voz "premium", multiplicando chamadas à toa).
-        speakText(`${ev.title}. ${ev.body || ""}`, { browserOnly: true }).catch(() => {});
+        const spoken = cleanForSpeech(`${ev.title}. ${ev.body || ""}`);
+        if (GEMINI_VOICE_TYPES.has(ev.event_type)) {
+          // fala agendada: voz de verdade da Lisa (Gemini) — speakText já cai pro navegador
+          // sozinho se o Gemini falhar (ver src/lib/browserVoice.js), então isso nunca trava.
+          const voiceName = typeof window !== "undefined" ? localStorage.getItem("voiceName") : null;
+          speakText(spoken, { voiceName: voiceName || undefined }).catch(() => {});
+        } else {
+          // demais avisos automáticos: browserOnly de propósito — voz do navegador, sem
+          // gastar cota do Gemini (com várias abas/dispositivos abertos, cada um falaria o
+          // mesmo aviso pela voz "premium", multiplicando chamadas à toa por algo que
+          // ninguém pediu explicitamente).
+          speakText(spoken, { browserOnly: true }).catch(() => {});
+        }
         setTimeout(() => dismiss(id), TOAST_MS);
       }
     } catch {
