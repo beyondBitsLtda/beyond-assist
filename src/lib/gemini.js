@@ -181,11 +181,16 @@ export async function embedOne(text, taskType = "RETRIEVAL_QUERY") {
 export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
   const contents = Array.isArray(texts) ? texts : [texts];
   const MAX_WAIT_SEC = 8;
+  // attempts:2 fazia sentido com poucas chaves, mas com o pool de 35 (e boa parte podendo
+  // estar de cooldown de cota diária ao mesmo tempo — visto na prática: 17 de 35 em cooldown
+  // de uma vez) só 2 tentativas às vezes esgotava em chaves ruins por azar do rodízio, MESMO
+  // com bastante chave livre sobrando no pool inteiro. Mais tentativas dá mais chance de cair
+  // numa disponível sem desistir cedo demais.
   const res = await withTransientRetry(
     EMBED_MODEL,
     (client) => client.models.embedContent({ model: EMBED_MODEL, contents, config: { outputDimensionality: EMBED_DIM, taskType } }),
     {
-      attempts: 2,
+      attempts: 4,
       computeDelay: (attempt, err) => {
         const msg = String(err?.message || err);
         const m = msg.match(/retry in ([\d.]+)s/i);
