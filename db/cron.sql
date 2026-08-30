@@ -53,15 +53,17 @@ select cron.schedule(
   $$
 );
 
--- 3) A cada 2 minutos: avança uma fatia do ciclo (não faz nada se nenhum ciclo estiver em
---    andamento — chamada barata, só 2 leituras na sync_progress). 2 em 2 minutos, não 1 em 1,
---    de propósito: cada fatia chama o Gemini pra gerar embeddings, e isso disputa cota com
---    o chat/voz do Assistente — de 1 em 1 minuto, o ciclo de SYNC sozinho já estourava a
---    cota gratuita boa parte do tempo. O ciclo completo demora mais pra terminar, mas
---    sobra bem mais cota pra você usar o Assistente sem esbarrar em "cota cheia".
+-- 3) Avança uma fatia do ciclo (não faz nada se nenhum ciclo estiver em andamento — chamada
+--    barata, só 2 leituras na sync_progress). Era */2 * * * * (1 fatia a cada 2 MINUTOS) —
+--    calibrado numa época com só 2-3 chaves do Gemini, pra não disputar cota com o
+--    chat/voz do Assistente. Com o pool de 35 chaves (rodízio automático por chave×modelo,
+--    ver src/lib/geminiKeyHealth.js) essa preocupação ficou obsoleta — a mesma lógica que já
+--    motivou reduzir BATCH_PAUSE_MS em src/lib/ingest/runSlice.js. pg_cron aceita intervalo
+--    em SEGUNDOS (não só o cron de 5 campos, que não desce de 1 minuto) — 15s dá ~8x mais
+--    ticks por minuto que antes, sem precisar mexer em código nenhum.
 select cron.schedule(
   'beyond-sync-tick',
-  '*/2 * * * *',
+  '15 seconds',
   $$
   select net.http_get(
     url := 'https://beyond-assist-blue.vercel.app/api/cron/sync',

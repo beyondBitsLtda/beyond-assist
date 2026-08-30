@@ -14,7 +14,14 @@ import { loadGithub, countEnabledRepos } from "@/lib/ingest/github.js";
 // em cota mesmo assim, o retry com troca de chave já resolve sozinho, sem perder progresso.
 const EMBED_BATCH = 10;
 const BATCH_PAUSE_MS = 400;
-const UPSERT_BATCH = 100;
+// Cada linha carrega um vetor de 768 números (~13-15KB só de embedding, em texto JSON) —
+// com MAX_CHUNKS_PER_CALL alto, um upsert de 1 vez só (UPSERT_BATCH=100 nunca dividia,
+// já que uma fatia inteira cabia num lote só) virou uma chamada bem pesada, e passou a
+// aparecer "upsert: invalid input syntax for type json" logo depois desse aumento — indício
+// de payload grande demais em algum ponto do caminho (não confirmado com certeza, mas
+// reduzir o tamanho de cada upsert é seguro de qualquer jeito). Agora sempre quebra em
+// lotes menores de verdade.
+const UPSERT_BATCH = 20;
 
 // Máximo de chunks por chamada. Menor = mais chamadas, mas cada uma cabe folgado em 60s
 // (limite de função da Vercel no plano Hobby — ver src/app/api/cron/sync/route.js). Com a
