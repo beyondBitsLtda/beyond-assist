@@ -40,7 +40,11 @@ create extension if not exists pg_net with schema extensions;
 
 -- ---------- SYNC automático (Trello + Beyond Brain → embeddings), 1x/hora ----------
 
--- 2) A cada hora, no minuto 0: reseta o progresso e começa um novo ciclo
+-- 2) A cada hora, no minuto 0: só reinicia o progresso se o ciclo ANTERIOR já tiver
+--    terminado (status 'idle') — com muitos repositórios do GitHub, um ciclo completo pode
+--    legitimamente passar de 1h, e reiniciar à força descartaria o progresso sem nunca
+--    chegar aos repositórios do fim da lista (ver checagem em /api/cron/sync). Só força um
+--    reinício mesmo estando "running" se já fizer 6h+ (sinal de que travou de verdade).
 select cron.schedule(
   'beyond-sync-start',
   '0 * * * *',

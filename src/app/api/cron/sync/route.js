@@ -36,6 +36,20 @@ export async function GET(req) {
 
   try {
     if (reset) {
+      // Só reinicia se o ciclo ANTERIOR já tiver terminado (status 'idle') — sem essa
+      // checagem, com muitos repositórios do GitHub (+ o limite de taxa deles) um ciclo pode
+      // legitimamente passar de 1h, e o reset de toda hora descartaria o progresso e
+      // recomeçaria do zero pra sempre, sem nunca chegar aos repositórios do fim da lista.
+      // Válvula de segurança: se ainda estiver "running" depois de muito tempo (6h+), algo
+      // travou de verdade (não é só demora normal) — aí sim força um reinício.
+      const STUCK_AFTER_MS = 6 * 60 * 60 * 1000;
+      const { data: current, error: readErr } = await supabase.from("sync_progress").select("status, started_at").eq("id", 1).single();
+      if (readErr) throw new Error(readErr.message);
+      const startedAgoMs = current?.started_at ? Date.now() - new Date(current.started_at).getTime() : Infinity;
+      if (current?.status === "running" && startedAgoMs < STUCK_AFTER_MS) {
+        return json({ ok: true, note: "ciclo anterior ainda em andamento — não reiniciado", started_at: current.started_at });
+      }
+
       const { error } = await supabase
         .from("sync_progress")
         .update({ status: "running", step_index: 0, offset_val: 0, grand_total: 0, started_at: now, last_error: null, updated_at: now })
