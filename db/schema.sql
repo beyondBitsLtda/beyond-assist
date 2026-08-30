@@ -412,3 +412,24 @@ as $$
   from public.documents
   group by source, board;
 $$;
+
+-- ============================================================
+--  Cache de conteúdo do GitHub (a mais, aditivo) — repositórios grandes precisam de VÁRIOS
+--  ticks do SYNC pra terminar (limite de chunks por chamada); sem isso, loadGithub rebuscava
+--  a árvore + conteúdo de TODOS os arquivos em TODO tick, mesmo só continuando o mesmo
+--  repositório — com o tick a cada 15s (ver db/cron.sql), isso estourou o limite de taxa da
+--  API do GitHub (5000/hora, um token só, sem rodízio como o do Gemini). Ver
+--  src/lib/ingest/github.js.
+-- ============================================================
+
+-- 21) Um snapshot por repositório (arquivos+conteúdo já buscados), com validade curta —
+--     tempo de sobra pra um repositório terminar todos os ticks dele, mas curto o bastante
+--     pra pegar mudança de código relativamente rápido no próximo ciclo.
+create table if not exists public.github_fetch_cache (
+  repo        text primary key,
+  files       jsonb not null,   -- [{ path, sha, content }]
+  fetched_at  timestamptz not null default now()
+);
+
+alter table public.github_fetch_cache enable row level security;
+-- (só acessada pela service_role, em src/lib/ingest/github.js — mesmo padrão das tabelas acima)

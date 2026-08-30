@@ -92,42 +92,67 @@ export async function listIndexedFiles(repo) {
   return [...new Set((data || []).map((r) => r.title))].sort();
 }
 
+// Repositórios grandes precisam de VÁRIOS ticks pra terminar (teto de chunks por chamada,
+// ver MAX_CHUNKS_PER_CALL em runSlice.js) — sem cache, cada tick refazia o fetch da árvore +
+// conteúdo de TODOS os arquivos de novo, só pra usar uma fatia diferente. Com o tick do SYNC
+// rodando a cada 15s (ver db/cron.sql), isso estourou o limite de taxa da API do GitHub
+// (5000/hora, um token só — sem rodízio como o pool de chaves do Gemini). O cache guarda o
+// resultado já buscado por um tempo curto (o suficiente pra um repo terminar todos os ticks
+// dele, sem segurar código desatualizado por muito tempo entre ciclos).
+const CACHE_TTL_MS = 15 * 60 * 1000;
+
+async function getCachedFiles(repo) {
+  const { data } = await supabase.from("github_fetch_cache").select("files, fetched_at").eq("repo", repo).maybeSingle();
+  if (!data) return null;
+  if (Date.now() - new Date(data.fetched_at).getTime() > CACHE_TTL_MS) return null;
+  return data.files;
+}
+
+async function setCachedFiles(repo, files) {
+  await supabase.from("github_fetch_cache").upsert(
+    { repo, files, fetched_at: new Date().toISOString() },
+    { onConflict: "repo" }
+  );
+}
+
 /** Carrega TODOS os arquivos indexáveis de UM repositório (identificado por posição, ver
  * enabledRepos) já no formato de "doc" do pipeline de ingestão — chamado a cada tick
- * enquanto esse repo for o passo atual (ver runSlice.js), então refaz o fetch da árvore/
- * conteúdo toda vez (mesmo padrão de loadTrello/loadBrain — só o offset de chunks já
- * processados muda entre ticks, não o que é carregado). */
+ * enquanto esse repo for o passo atual (ver runSlice.js). Só busca de verdade no GitHub na
+ * PRIMEIRA vez (ou depois do cache expirar); os ticks seguintes do mesmo repo reaproveitam o
+ * que já foi buscado, sem gastar mais chamadas da API. */
 export async function loadGithub({ repoIndex }) {
   const repos = await enabledRepos();
   const repo = repos[Number(repoIndex)];
   if (!repo) throw new Error("repoIndex fora do range");
   if (!repo.default_branch) throw new Error(`repo ${repo.full_name} sem default_branch conhecida — rode a descoberta de novo`);
 
-  const tree = await getRepoTree(repo.full_name, repo.default_branch);
-  const files = tree.filter(isIndexable).sort((a, b) => a.path.localeCompare(b.path)).slice(0, MAX_FILES_PER_REPO);
+  let files = await getCachedFiles(repo.full_name);
+  if (!files) {
+    const tree = await getRepoTree(repo.full_name, repo.default_branch);
+    const entries = tree.filter(isIndexable).sort((a, b) => a.path.localeCompare(b.path)).slice(0, MAX_FILES_PER_REPO);
 
-  const contents = await mapLimit(files, 8, async (f) => {
-    try {
-      return await getBlobContent(repo.full_name, f.sha);
-    } catch {
-      return null; // 1 arquivo falhar não derruba o repo inteiro
-    }
-  });
-
-  const docs = [];
-  files.forEach((f, i) => {
-    const content = contents[i];
-    if (!content?.trim()) return;
-    docs.push({
-      source: "github",
-      external_id: f.path,
-      board: repo.full_name,
-      title: f.path,
-      content: `// ${repo.full_name}/${f.path}\n\n${content}`,
-      last_modified: null,
-      metadata: { repo: repo.full_name, path: f.path, sha: f.sha },
+    const contents = await mapLimit(entries, 8, async (f) => {
+      try {
+        return await getBlobContent(repo.full_name, f.sha);
+      } catch {
+        return null; // 1 arquivo falhar não derruba o repo inteiro
+      }
     });
-  });
 
-  return docs;
+    files = entries
+      .map((f, i) => ({ path: f.path, sha: f.sha, content: contents[i] }))
+      .filter((f) => f.content?.trim());
+
+    await setCachedFiles(repo.full_name, files).catch(() => {}); // cache é otimização — falhar em gravar não deve derrubar o tick
+  }
+
+  return files.map((f) => ({
+    source: "github",
+    external_id: f.path,
+    board: repo.full_name,
+    title: f.path,
+    content: `// ${repo.full_name}/${f.path}\n\n${f.content}`,
+    last_modified: null,
+    metadata: { repo: repo.full_name, path: f.path, sha: f.sha },
+  }));
 }
