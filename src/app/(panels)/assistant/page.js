@@ -701,15 +701,25 @@ export default function AssistantPage() {
   // travada (nunca volta), NÃO uma tentativa de "acelerar" a resposta. Já errei esse número
   // pra menos duas vezes: 3,2s matava toda chamada; depois 9s ainda cortava o servidor no
   // meio das PRÓPRIAS 3 tentativas dele (retry com espera do lado do servidor soma tempo
-  // real, e o corte no navegador chegava antes do servidor terminar de tentar). A Vercel já
-  // tem um teto absoluto de 60s pra função (ver maxDuration em /api/speak) — não faz sentido
-  // replicar isso aqui com um número curto chutado; esse valor só existe pra pegar uma
-  // conexão de rede genuinamente travada, não pra apressar o Gemini.
-  const SPEAK_TIMEOUT_MS = 20000;
+  // real, e o corte no navegador chegava antes do servidor terminar de tentar); depois 20s
+  // ainda derrubava respostas que estavam pra dar certo (com as chaves TODAS saudáveis no
+  // painel /gemini-keys — ou seja, não era cota, era só o Gemini demorando mais do que 20s
+  // pra sintetizar áudio às vezes). A Vercel já tem um teto absoluto de 60s pra função (ver
+  // maxDuration em /api/speak) — 45s dá bastante margem real sem deixar o navegador esperando
+  // depois que o servidor já teria desistido sozinho.
+  const SPEAK_TIMEOUT_MS = 45000;
+  // contador visível NA CONVERSA (não só no log de debug) enquanto espera — null = não está
+  // esperando voz nenhuma; número = segundos decorridos desde que a chamada começou. Existe
+  // pra deixar claro que a Lisa ainda está tentando a voz do Gemini (não travou), com quanto
+  // falta pro teto acima antes de cair pro navegador.
+  const [ttsWaitSeconds, setTtsWaitSeconds] = useState(null);
 
   const synthesizeChunk = useCallback(async (text) => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), SPEAK_TIMEOUT_MS);
+    const startedAt = Date.now();
+    setTtsWaitSeconds(0);
+    const tickId = setInterval(() => setTtsWaitSeconds(Math.round((Date.now() - startedAt) / 1000)), 1000);
     try {
       const res = await fetch("/api/speak", {
         method: "POST",
@@ -728,6 +738,8 @@ export default function AssistantPage() {
     } catch (err) {
       return { url: null, error: err?.name === "AbortError" ? new Error(`Gemini demorou mais de ${SPEAK_TIMEOUT_MS / 1000}s`) : err };
     } finally {
+      clearInterval(tickId);
+      setTtsWaitSeconds(null);
       clearTimeout(timeout);
     }
   }, [voiceName]);
@@ -1124,6 +1136,11 @@ export default function AssistantPage() {
               )}
               {busy && !answer && (
                 <div style={{ alignSelf: "flex-start", ...mono, fontSize: 10, color: "rgba(207,239,251,0.4)", padding: "10px 14px" }}>pensando…</div>
+              )}
+              {ttsWaitSeconds !== null && (
+                <div style={{ alignSelf: "flex-start", ...mono, fontSize: 10, color: CY, padding: "10px 14px" }}>
+                  ⏳ aguardando voz do Gemini… {ttsWaitSeconds}s / {SPEAK_TIMEOUT_MS / 1000}s
+                </div>
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -1593,6 +1610,11 @@ export default function AssistantPage() {
           <div style={{ marginTop: 26, width: "min(80%,560px)", textAlign: "center" }}>
             <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(var(--accent-rgb),0.5)", marginBottom: 8 }}>↳ INTENT INTERPRETATION</div>
             <div style={{ fontSize: 19, lineHeight: 1.4, color: "#eafcff", fontWeight: 500, letterSpacing: 0.4, whiteSpace: "pre-wrap" }}>{transcript}</div>
+            {ttsWaitSeconds !== null && (
+              <div style={{ ...mono, fontSize: 10.5, letterSpacing: 1, color: CY, marginTop: 10 }}>
+                ⏳ aguardando voz do Gemini… {ttsWaitSeconds}s / {SPEAK_TIMEOUT_MS / 1000}s
+              </div>
+            )}
           </div>
         </section>
 
