@@ -1004,6 +1004,19 @@ export default function AssistantPage() {
   }, [addLog, ask, stopSpeaking]);
   toggleMicForGestureRef.current = toggleMic;
 
+  // ---- microfone "segurar pra falar" (mobile) — igual WhatsApp: pressiona e segura o botão
+  // pra falar, solta pra parar de ouvir e já mandar. toggleMic() já faz exatamente isso num
+  // único disparo (liga se não estava ouvindo, desliga-e-envia se estava) — só precisa ser
+  // chamado 1x no press e 1x no release, nunca os dois no mesmo evento (por isso NÃO usa
+  // onClick aqui: um toque simples já dispara pointerdown+pointerup+click em sequência, e o
+  // click extra chamaria toggleMic() uma 3ª vez, reabrindo o mic logo depois de soltar).
+  const startMicHold = useCallback(() => {
+    if (!listening && !busy) toggleMic();
+  }, [listening, busy, toggleMic]);
+  const stopMicHold = useCallback(() => {
+    if (listening) toggleMic();
+  }, [listening, toggleMic]);
+
   // modo chat (mobile): rola pro fim sempre que a conversa cresce ou a resposta vai chegando
   useEffect(() => {
     if (!isMobile || mobileView !== "chat") return;
@@ -1087,8 +1100,13 @@ export default function AssistantPage() {
               </div>
             </div>
             <button
-              onClick={toggleMic}
+              onPointerDown={(e) => { e.preventDefault(); startMicHold(); }}
+              onPointerUp={stopMicHold}
+              onPointerLeave={stopMicHold}
+              onPointerCancel={stopMicHold}
+              onContextMenu={(e) => e.preventDefault()}
               disabled={busy}
+              title="Segure pra falar, solte pra enviar"
               style={{
                 marginTop: 40, width: 76, height: 76, borderRadius: "50%",
                 border: `2px solid ${listening ? OR : CY}`,
@@ -1096,6 +1114,7 @@ export default function AssistantPage() {
                 color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer",
                 boxShadow: listening ? `0 0 24px ${OR}` : `0 0 20px rgba(var(--accent-rgb),0.4)`,
                 display: "flex", alignItems: "center", justifyContent: "center",
+                touchAction: "none", userSelect: "none", WebkitUserSelect: "none",
               }}
             >
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1158,9 +1177,14 @@ export default function AssistantPage() {
                 />
               </div>
               <button
-                onClick={toggleMic}
+                onPointerDown={(e) => { e.preventDefault(); startMicHold(); }}
+                onPointerUp={stopMicHold}
+                onPointerLeave={stopMicHold}
+                onPointerCancel={stopMicHold}
+                onContextMenu={(e) => e.preventDefault()}
                 disabled={busy}
-                style={{ width: 42, height: 42, borderRadius: "50%", flex: "none", border: `1.5px solid ${listening ? OR : CY}`, background: listening ? "rgba(255,157,61,0.15)" : "rgba(var(--accent-rgb),0.06)", color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                title="Segure pra falar, solte pra enviar"
+                style={{ width: 42, height: 42, borderRadius: "50%", flex: "none", border: `1.5px solid ${listening ? OR : CY}`, background: listening ? "rgba(255,157,61,0.15)" : "rgba(var(--accent-rgb),0.06)", color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
               >
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /></svg>
               </button>
@@ -1356,6 +1380,8 @@ export default function AssistantPage() {
                   { href: "/thoughts", glyph: "✎", label: "PENSAMENTOS" },
                   { href: "/sentinel", glyph: "◆", label: "SENTINELA" },
                   { href: "/gemini-keys", glyph: "🔑", label: "CHAVES GEMINI" },
+                  { href: "/delp-tasks", glyph: "🏢", label: "TAREFAS DELP" },
+                  { href: "/scheduled-announcements", glyph: "⏰", label: "FALAS AGENDADAS" },
                 ].map((item) => (
                   <Link
                     key={item.href}

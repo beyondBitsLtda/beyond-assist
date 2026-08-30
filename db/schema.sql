@@ -274,3 +274,34 @@ create table if not exists public.delp_tasks (
 
 alter table public.delp_tasks enable row level security;
 -- (só acessada pela service_role, em src/lib/delpTasks.js — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  Falas agendadas (a mais, aditivo) — programar um horário do dia em que a Lisa fala/reporta
+--  algo sozinha, pra TODOS os dispositivos com o app aberto (reaproveita a MESMA fila de
+--  notified_events que já existe — ver src/lib/notifications.js — então o banner + voz nos
+--  dispositivos abertos e o push do sistema operacional já funcionam de graça, sem precisar
+--  de nenhum mecanismo de entrega novo). Verificado pelo MESMO cron de 1 min que já checa
+--  Sentinela/Trello (ver /api/cron/notify) — ver src/lib/scheduledAnnouncements.js.
+-- ============================================================
+
+-- 16) Uma linha por agendamento. `mode`:
+--     'fixed'  → fala `message` literalmente, sem chamar o Gemini.
+--     'report' → pede um relatório de verdade: roda `instruction` contra `scope` (mesmo
+--                formato do seletor de escopo do Assistente) e fala o que o Gemini responder.
+create table if not exists public.scheduled_announcements (
+  id            bigint generated always as identity primary key,
+  label         text not null,
+  time_of_day   time not null,                            -- horário local (America/Sao_Paulo)
+  days_of_week  int[] not null default '{0,1,2,3,4,5,6}',  -- 0=domingo..6=sábado
+  mode          text not null default 'fixed',             -- 'fixed' | 'report'
+  message       text,                                      -- usado quando mode='fixed'
+  scope         jsonb,                                     -- usado quando mode='report'
+  instruction   text,                                      -- usado quando mode='report'
+  persona_mode  boolean not null default false,
+  enabled       boolean not null default true,
+  last_fired_on date,                                       -- evita disparar 2x no mesmo dia
+  created_at    timestamptz not null default now()
+);
+
+alter table public.scheduled_announcements enable row level security;
+-- (só acessada pela service_role, em src/lib/scheduledAnnouncements.js — mesmo padrão das tabelas acima)

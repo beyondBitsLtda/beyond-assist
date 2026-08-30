@@ -1,27 +1,10 @@
 import {
-  retrieve, retrieveByDate, detectDateRange, retrieveByBoard, detectBoard,
-  retrieveGeneral, buildPrompt, todayLabel, withPersona, withContextDocs, shorten, relTime,
-  SYSTEM_INSTRUCTION, SYSTEM_INSTRUCTION_GENERAL,
+  detectDateRange, buildPrompt, todayLabel, withPersona, withContextDocs,
 } from "@/lib/rag.js";
-import { searchThoughts, listThoughts, toMatchFormat } from "@/lib/notes.js";
-import { retrieveSentinelTickets, listProjects } from "@/lib/sentinel.js";
 import { chatStream, detectTrelloAction } from "@/lib/gemini.js";
 import { buildActionProposal, buildClarifyPrompt, executeAction } from "@/lib/assistantActions.js";
-import { hasDelpTasks, getDelpTasksForContext, listDelpTasks } from "@/lib/delpTasks.js";
-
-/** Converte tarefas da Delp pro mesmo formato de "card" usado pelo resto do RAG (ver
- * retrieveByBoard/retrieveByDate em rag.js) — assim o HUD e o prompt tratam igual, não
- * importa a origem. Usado quando o usuário escolhe o escopo "Tarefas Delp" no seletor. */
-function delpTasksToMatches(tasks) {
-  return tasks.map((t) => {
-    const content = `Status: ${t.status}\nResponsável: ${t.atribuido_a || "—"}\nColaboradores: ${t.colaboradores || "—"}\nPrazo: ${t.data_limite || "—"}\nInício: ${t.data_inicio || "—"}\nEtapa: ${t.etapa || "—"}\nSprint: ${t.sprint || "—"}\nRelacionado a: ${t.relacionado_a || "—"}${t.legenda ? `\nLegenda: ${t.legenda}` : ""}`;
-    return {
-      id: String(t.id), source: "DELP", board: "Tarefas Delp", title: t.titulo,
-      snippet: shorten(content, 180), content, sim: "—", pct: 100,
-      last_modified: t.updated_at, modified: relTime(t.updated_at), due: t.data_limite,
-    };
-  });
-}
+import { hasDelpTasks, getDelpTasksForContext } from "@/lib/delpTasks.js";
+import { resolveScope } from "@/lib/scopeResolver.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -265,78 +248,10 @@ export async function POST(req) {
           send(controller, "action", { pending: pendingAction || null, debug: true, checkedIntent: intent.intent, detectError });
         }
 
-        let matches;
-        let systemInstruction = SYSTEM_INSTRUCTION;
-        let tools;
-        let promptNote = null; // linha extra de contexto (ex.: projeto do Sentinela selecionado à mão)
-
-        if (scope?.mode === "general") {
-          // modo "Geral": busca ampla em tudo que está indexado + pode buscar na web.
-          matches = await retrieveGeneral(question);
-          // chamados do Sentinela não passam pelo pipeline de embeddings (leitura ao vivo),
-          // então entram à parte aqui — sem derrubar a resposta se o Sentinela não estiver
-          // configurado nesse deploy.
-          try {
-            const tickets = await retrieveSentinelTickets(question);
-            matches = [...matches, ...tickets];
-          } catch {}
-          systemInstruction = SYSTEM_INSTRUCTION_GENERAL;
-          tools = [{ googleSearch: {} }];
-        } else if (scope?.mode === "panel" && scope.source === "sentinel") {
-          // busca chamados do Sentinela direto (sem SYNC/embeddings) — se um projeto foi
-          // selecionado manualmente no seletor (scope.projectId), filtra só por ele; senão
-          // detecta projeto/prioridade/status/SLA citados na pergunta, ou busca por palavra.
-          const projectId = scope.projectId && scope.projectId !== "all" ? scope.projectId : null;
-          matches = await retrieveSentinelTickets(question, { projectId });
-          if (projectId) {
-            try {
-              const projects = await listProjects();
-              const proj = projects.find((p) => p.id === projectId);
-              if (proj) {
-                promptNote = `O usuário selecionou manualmente o projeto de teste "${proj.name}" no seletor — ` +
-                  `todos os chamados do contexto abaixo são desse projeto. Deixe claro na resposta que você ` +
-                  `está falando do projeto "${proj.name}" (ex.: se perguntarem "qual projeto é esse?", responda com esse nome).`;
-              }
-            } catch {}
-          }
-        } else if (scope?.mode === "panel" && scope.source === "delp") {
-          // escolher este escopo explicitamente já É o consentimento — não passa pelo gate
-          // de "quer que eu leve em conta a Delp?" abaixo (ver looksLikeTasksQuestion).
-          matches = delpTasksToMatches(await listDelpTasks());
-        } else if (scope?.mode === "panel" && scope.board) {
-          matches = await retrieveByBoard(scope.board);
-          if (matches.length > 40) matches = matches.slice(0, 40);
-        } else if (scope?.mode === "panel" && scope.range) {
-          // "auto" (escopo "Tarefas" do seletor): tenta ler a data da própria pergunta
-          // ("atrasadas", "essa semana"...); sem pista nenhuma, cai pro conjunto mais amplo.
-          const range = scope.range === "auto" ? (detectDateRange(question) || "upcoming") : scope.range;
-          matches = await retrieveByDate(range);
-        } else if (scope?.mode === "panel" && scope.source === "brain") {
-          // busca textual direto na tabela `notes` (não depende de SYNC/embeddings) — é o
-          // caminho confiável pra "leia minha nota sobre X". Sem termo reconhecido na
-          // pergunta (ex.: "lê minha última nota"), usa as notas mais recentes, pra sempre
-          // ter conteúdo real pra ler em vez de "não encontrei".
-          const found = await searchThoughts(question);
-          const thoughts = found.length ? found : (await listThoughts({ limit: 5 })).thoughts;
-          matches = thoughts.map(toMatchFormat);
-        } else {
-          // sem escopo explícito: roteador de intenção automático (programação decide o método)
-          //  1) tem data? → filtro SQL por prazo
-          //  2) cita um board? → filtro SQL pelo board inteiro
-          //  3) senão → busca semântica (RAG)
-          const range = detectDateRange(question);
-          const board = detectBoard(question);
-
-          if (range) {
-            matches = await retrieveByDate(range);
-          } else if (board) {
-            matches = await retrieveByBoard(board);
-            // boards grandes: manda no máx. 40 pro Gemini (evita estourar contexto)
-            if (matches.length > 40) matches = matches.slice(0, 40);
-          } else {
-            matches = await retrieve(question, { filterSource });
-          }
-        }
+        // roteamento de escopo (Tarefas/Boards/Sentinela/Delp/Brain/Geral) — extraído pra
+        // src/lib/scopeResolver.js, reaproveitado também pelas falas agendadas (ver
+        // src/lib/scheduledAnnouncements.js), pra nunca divergir entre os dois usos.
+        const { matches, systemInstruction, tools, promptNote } = await resolveScope(scope, question, { filterSource });
 
         send(controller, "context", matches);
 

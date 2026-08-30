@@ -1,4 +1,5 @@
 import { detectAndNotify } from "@/lib/notifications.js";
+import { checkAndFireDueSchedules } from "@/lib/scheduledAnnouncements.js";
 import { jsonResponse } from "@/lib/http.js";
 
 export const runtime = "nodejs";
@@ -18,10 +19,12 @@ export async function GET(req) {
     if (auth !== `Bearer ${need}`) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
   }
 
-  try {
-    const result = await detectAndNotify();
-    return jsonResponse({ ok: true, ...result });
-  } catch (err) {
-    return jsonResponse({ ok: false, error: String(err?.message || err) }, 500);
-  }
+  // as duas checagens são independentes — uma falhar (ex.: Sentinela fora do ar) não pode
+  // impedir a outra de rodar (ex.: uma fala agendada que estava na hora de disparar).
+  const [notifyResult, scheduleResult] = await Promise.all([
+    detectAndNotify().catch((err) => ({ ok: false, error: String(err?.message || err) })),
+    checkAndFireDueSchedules().catch((err) => ({ ok: false, error: String(err?.message || err) })),
+  ]);
+
+  return jsonResponse({ ok: true, notify: notifyResult, schedules: scheduleResult });
 }
