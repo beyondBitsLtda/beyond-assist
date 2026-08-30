@@ -83,6 +83,15 @@ export async function countEnabledRepos() {
   return (await enabledRepos()).length;
 }
 
+/** Caminhos de arquivo já indexados de UM repositório — alimenta o 2º seletor ("arquivo")
+ * do escopo "Código" no Assistente. Lê da tabela `documents` (o que JÁ foi sincronizado),
+ * não faz nenhuma chamada ao GitHub — só mostra o que dá pra escolher de verdade. */
+export async function listIndexedFiles(repo) {
+  const { data, error } = await supabase.from("documents").select("title").eq("source", "github").eq("board", repo);
+  if (error) throw new Error(`listIndexedFiles: ${error.message}`);
+  return [...new Set((data || []).map((r) => r.title))].sort();
+}
+
 /** Carrega TODOS os arquivos indexáveis de UM repositório (identificado por posição, ver
  * enabledRepos) já no formato de "doc" do pipeline de ingestão — chamado a cada tick
  * enquanto esse repo for o passo atual (ver runSlice.js), então refaz o fetch da árvore/

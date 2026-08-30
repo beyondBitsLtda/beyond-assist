@@ -151,7 +151,7 @@ ${text}`;
 const _queryCache = new Map();
 const _cacheKey = (q) => q.trim().toLowerCase().replace(/\s+/g, " ");
 
-export async function retrieve(question, { filterSource = null, topK = null, minSim = null } = {}) {
+export async function retrieve(question, { filterSource = null, filterBoard = null, topK = null, minSim = null } = {}) {
   const key = _cacheKey(question);
   let queryEmbedding = _queryCache.get(key);
   if (!queryEmbedding) {
@@ -169,6 +169,7 @@ export async function retrieve(question, { filterSource = null, topK = null, min
     match_count: matchCount,
     min_similarity: minSimilarity,
     filter_source: filterSource,
+    filter_board: filterBoard,
   });
   if (error) throw new Error(`match_documents: ${error.message}`);
 

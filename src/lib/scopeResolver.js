@@ -5,6 +5,7 @@ import {
 import { searchThoughts, listThoughts, toMatchFormat } from "./notes.js";
 import { retrieveSentinelTickets, listProjects } from "./sentinel.js";
 import { listDelpTasks } from "./delpTasks.js";
+import { supabase } from "./supabase.js";
 
 // Extraído de /api/ask (mesma lógica, palavra por palavra) pra poder ser reaproveitado pelas
 // falas AGENDADAS (ver src/lib/scheduledAnnouncements.js) — sem isso, o roteamento de escopo
@@ -23,6 +24,26 @@ function delpTasksToMatches(tasks) {
       last_modified: t.updated_at, modified: relTime(t.updated_at), due: t.data_limite,
     };
   });
+}
+
+/** Lê um ARQUIVO específico já indexado por completo (todos os pedaços, na ordem certa) —
+ * é uma LEITURA (igual "leia minha nota X"), não busca semântica: usado quando o usuário
+ * escolhe um arquivo exato no seletor "Código" do Assistente. */
+async function retrieveGithubFile(repo, path) {
+  let q = supabase.from("documents").select("external_id, board, title, content, last_modified").eq("source", "github").eq("title", path);
+  if (repo) q = q.eq("board", repo);
+  const { data, error } = await q;
+  if (error) throw new Error(`retrieveGithubFile: ${error.message}`);
+  if (!data?.length) return [];
+
+  const sorted = [...data].sort((a, b) => Number(a.external_id.split("#").pop()) - Number(b.external_id.split("#").pop()));
+  const fullContent = sorted.map((r) => r.content).join("\n");
+  const first = sorted[0];
+  return [{
+    id: first.external_id, source: "GITHUB", board: first.board, title: first.title,
+    snippet: shorten(fullContent, 180), content: fullContent, sim: "—", pct: 100,
+    last_modified: first.last_modified, modified: relTime(first.last_modified),
+  }];
 }
 
 /**
@@ -62,10 +83,15 @@ export async function resolveScope(scope, question, { filterSource = null } = {}
   } else if (scope?.mode === "panel" && scope.source === "delp") {
     matches = delpTasksToMatches(await listDelpTasks());
   } else if (scope?.mode === "panel" && scope.source === "github") {
-    // busca semântica só no código indexado (ver src/lib/ingest/github.js) — mais permissivo
-    // que o padrão (minSim mais baixo) porque nome de função/variável raramente bate palavra
-    // por palavra com a pergunta em português.
-    matches = await retrieve(question, { filterSource: "github", topK: 15, minSim: 0.35 });
+    if (scope.path) {
+      // arquivo exato escolhido — lê ele inteiro, não busca semântica
+      matches = await retrieveGithubFile(scope.repo, scope.path);
+    } else {
+      // busca semântica no código indexado (ver src/lib/ingest/github.js) — filtra por
+      // repositório se um foi escolhido; minSim mais permissivo que o padrão porque nome de
+      // função/variável raramente bate palavra por palavra com a pergunta em português.
+      matches = await retrieve(question, { filterSource: "github", filterBoard: scope.repo || null, topK: 15, minSim: 0.35 });
+    }
   } else if (scope?.mode === "panel" && scope.board) {
     matches = await retrieveByBoard(scope.board);
     if (matches.length > 40) matches = matches.slice(0, 40);

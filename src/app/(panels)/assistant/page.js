@@ -68,6 +68,13 @@ export default function AssistantPage() {
   // nome do projeto apareça literalmente na pergunta.
   const [sentinelProjectId, setSentinelProjectId] = useState("all");
   const [sentinelProjects, setSentinelProjects] = useState([]);
+  // escopo "Código": qual repositório (like o seletor de projeto do Sentinela) e, dentro
+  // dele, qual arquivo específico (opcional — sem arquivo, é busca semântica; com arquivo,
+  // é leitura completa dele, ver resolveScope em scopeResolver.js).
+  const [codeRepo, setCodeRepo] = useState("all");
+  const [codeFile, setCodeFile] = useState("");
+  const [codeRepos, setCodeRepos] = useState([]);
+  const [codeFiles, setCodeFiles] = useState([]);
 
   // Modo Persona: liga a personalidade descrita em persona.md (raiz do repo) por cima das
   // respostas — desligado por padrão (tom direto/neutro de sempre).
@@ -538,6 +545,30 @@ export default function AssistantPage() {
     return () => { alive = false; };
   }, []);
 
+  // lista de repositórios conhecidos pro seletor manual do escopo "Código"
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/code-repos")
+      .then((r) => r.json())
+      .then((d) => { if (alive && d.ok) setCodeRepos(d.repos || []); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // arquivos já indexados do repositório escolhido — refaz sempre que o repositório muda;
+  // "all" (todos os repositórios) não tem lista de arquivo nenhuma (não dá pra ler "um
+  // arquivo" sem saber de qual repo).
+  useEffect(() => {
+    setCodeFile(""); // troca de repositório invalida o arquivo escolhido antes
+    if (codeRepo === "all") { setCodeFiles([]); return; }
+    let alive = true;
+    fetch(`/api/code-repos/files?repo=${encodeURIComponent(codeRepo)}`)
+      .then((r) => r.json())
+      .then((d) => { if (alive && d.ok) setCodeFiles(d.files || []); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [codeRepo]);
+
   // mobile: sem Topbar (ver Shell.js), então tema/auto-sync precisam de carregamento próprio aqui
   useEffect(() => {
     if (!isMobile || typeof window === "undefined") return;
@@ -840,9 +871,9 @@ export default function AssistantPage() {
     // não passa pelo "quer que eu leve em conta a Delp?" (ver /api/ask), que só existe pra
     // quando o assunto surge sem o usuário ter pedido isso de propósito.
     if (scopePanel === DELP_SCOPE) return { mode: "panel", source: "delp" };
-    if (scopePanel === CODE_SCOPE) return { mode: "panel", source: "github" };
+    if (scopePanel === CODE_SCOPE) return { mode: "panel", source: "github", repo: codeRepo !== "all" ? codeRepo : null, path: codeFile || null };
     return { mode: "panel", board: scopePanel };
-  }, [scopeMode, scopePanel, sentinelProjectId]);
+  }, [scopeMode, scopePanel, sentinelProjectId, codeRepo, codeFile]);
 
   // ---- pergunta real ao backend (SSE) ----
   const ask = useCallback(async (q) => {
@@ -1241,6 +1272,20 @@ export default function AssistantPage() {
                   {sentinelProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               )}
+              {scopeMode === "panel" && scopePanel === CODE_SCOPE && (
+                <>
+                  <select value={codeRepo} onChange={(e) => setCodeRepo(e.target.value)} style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: `1px solid ${PU}55`, background: "#000", color: "#eafcff", width: "100%", marginBottom: 10 }}>
+                    <option value="all">Todos os repositórios</option>
+                    {codeRepos.map((r) => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
+                  </select>
+                  {codeRepo !== "all" && (
+                    <select value={codeFile} onChange={(e) => setCodeFile(e.target.value)} style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: `1px solid ${PU}55`, background: "#000", color: "#eafcff", width: "100%", marginBottom: 10 }}>
+                      <option value="">Busca no repositório inteiro</option>
+                      {codeFiles.map((f) => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  )}
+                </>
+              )}
 
               {/* voz */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>VOZ</div>
@@ -1452,6 +1497,30 @@ export default function AssistantPage() {
           >
             <option value="all">Todos os projetos</option>
             {sentinelProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        )}
+
+        {/* repositório/arquivo — só aparecem com o escopo "Código" selecionado */}
+        {scopeMode === "panel" && scopePanel === CODE_SCOPE && (
+          <select
+            value={codeRepo}
+            onChange={(e) => setCodeRepo(e.target.value)}
+            title="Repositório — força a resposta a considerar só esse repo"
+            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
+          >
+            <option value="all">Todos os repositórios</option>
+            {codeRepos.map((r) => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
+          </select>
+        )}
+        {scopeMode === "panel" && scopePanel === CODE_SCOPE && codeRepo !== "all" && (
+          <select
+            value={codeFile}
+            onChange={(e) => setCodeFile(e.target.value)}
+            title="Arquivo específico — sem escolher nenhum, busca no repositório inteiro"
+            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff", maxWidth: 220 }}
+          >
+            <option value="">repositório inteiro</option>
+            {codeFiles.map((f) => <option key={f} value={f}>{f}</option>)}
           </select>
         )}
 

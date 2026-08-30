@@ -327,3 +327,47 @@ create table if not exists public.github_repos (
 
 alter table public.github_repos enable row level security;
 -- (só acessada pela service_role, em src/lib/ingest/github.js — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  Escopo "Código" com repositório/arquivo específico (a mais, aditivo) — o seletor de
+--  escopo do Assistente ganhou dois campos extras pra "Código": qual repositório e,
+--  dentro dele, qual arquivo. Pra filtrar por repositório na busca semântica sem trazer
+--  ruído de outros repos, match_documents precisa de mais um parâmetro (filter_board).
+-- ============================================================
+
+-- 18) Precisa DROPAR a versão antiga antes: adicionar um parâmetro novo cria uma segunda
+--     função com o mesmo nome (overload) em vez de substituir — dá ambiguidade na chamada.
+drop function if exists public.match_documents(vector(768), int, float, text);
+
+create or replace function public.match_documents(
+  query_embedding vector(768),
+  match_count     int   default 5,
+  min_similarity  float default 0.0,
+  filter_source   text  default null,
+  filter_board    text  default null
+)
+returns table (
+  id            bigint,
+  source        text,
+  external_id   text,
+  board         text,
+  title         text,
+  content       text,
+  last_modified timestamptz,
+  metadata      jsonb,
+  similarity    float
+)
+language sql stable
+as $$
+  select
+    d.id, d.source, d.external_id, d.board, d.title, d.content,
+    d.last_modified, d.metadata,
+    1 - (d.embedding <=> query_embedding) as similarity
+  from public.documents d
+  where d.embedding is not null
+    and (filter_source is null or d.source = filter_source)
+    and (filter_board is null or d.board = filter_board)
+    and 1 - (d.embedding <=> query_embedding) >= min_similarity
+  order by d.embedding <=> query_embedding
+  limit match_count;
+$$;
