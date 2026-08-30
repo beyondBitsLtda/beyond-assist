@@ -371,3 +371,28 @@ as $$
   order by d.embedding <=> query_embedding
   limit match_count;
 $$;
+
+-- ============================================================
+--  Tarefas de código (a mais, aditivo) — a Lisa PROPÕE mudança de código: cria uma branch
+--  nova a partir da base escolhida, aplica os arquivos, e abre um Pull Request — nunca
+--  mescla sozinha (ver src/lib/codeTasks.js). Exige que o GITHUB_TOKEN tenha permissão de
+--  escrita (Contents + Pull requests: Read and write), diferente do resto da indexação
+--  (que só precisa de leitura).
+-- ============================================================
+
+-- 19) Histórico de tarefas — pra tela /code-tasks mostrar o que já foi pedido e o link do PR.
+create table if not exists public.code_tasks (
+  id           bigint generated always as identity primary key,
+  repo         text not null,
+  base_branch  text not null,
+  instruction  text not null,
+  status       text not null default 'running',   -- 'running' | 'done' | 'error'
+  branch_name  text,
+  pr_url       text,
+  summary      text,
+  error        text,
+  created_at   timestamptz not null default now()
+);
+
+alter table public.code_tasks enable row level security;
+-- (só acessada pela service_role, em src/lib/codeTasks.js — mesmo padrão das tabelas acima)

@@ -336,6 +336,78 @@ Regras:
   }
 }
 
+// ---- Tarefas de código: a Lisa PROPÕE mudança de arquivo (nunca aplica sozinha — ver
+// src/lib/codeTasks.js, que cria a branch/commit/PR a partir disto) ----
+export async function planCodeChanges({ instruction, contextFiles = [], repo }) {
+  const filesBlock = contextFiles.length
+    ? contextFiles.map((f) => `--- ${f.path} ---\n${f.content}`).join("\n\n")
+    : "(nenhum arquivo de contexto encontrado — proponha só se tiver certeza do que fazer, ou devolva files vazio)";
+
+  const prompt = `Repositório: ${repo}
+
+ARQUIVOS RELEVANTES ENCONTRADOS (conteúdo COMPLETO e ATUAL de cada um):
+${filesBlock}
+
+PEDIDO DO USUÁRIO:
+"${instruction}"
+
+Proponha as mudanças de arquivo necessárias pra atender esse pedido.`;
+
+  const systemInstruction = `Você é a Lisa, propondo uma mudança de código que vai virar um Pull Request pro
+usuário revisar — ele NUNCA vê o código sendo aplicado direto, só o PR resultante, então a
+proposta precisa estar certa e completa.
+
+Regras estritas:
+- Para CADA arquivo que precisar mudar, devolva o CONTEÚDO COMPLETO do arquivo depois da
+  mudança — nunca um trecho, diff, ou só a parte alterada. Se o arquivo já existia no
+  contexto acima, parta exatamente dele e aplique só a mudança pedida, preservando todo o
+  resto igual (comentários, formatação, imports não relacionados).
+- Só inclua no resultado os arquivos que REALMENTE precisam mudar. Não "aproveite" pra
+  refatorar ou mudar estilo em código não relacionado ao pedido.
+- Se o pedido exigir um arquivo novo que não está no contexto, pode criar (path novo).
+- Se o contexto disponível não for suficiente pra ter certeza do que fazer com segurança,
+  devolva "files" vazio e explique o motivo em "unable_reason" — é preferível não propor nada
+  a propor algo errado que vira um PR ruim.
+- "summary": 1-2 frases, em português, resumindo a mudança — vira o título/corpo do PR.`;
+
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: prompt,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              summary: { type: "STRING" },
+              unable_reason: { type: "STRING" },
+              files: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: { path: { type: "STRING" }, content: { type: "STRING" } },
+                  required: ["path", "content"],
+                },
+              },
+            },
+            required: ["summary", "files"],
+          },
+        },
+      }),
+    { attempts: 2, delayMs: 800 }
+  );
+
+  try {
+    const parsed = JSON.parse(res.text);
+    return { summary: "", unable_reason: null, files: [], ...parsed };
+  } catch {
+    return { summary: "", unable_reason: "resposta do Gemini não veio em JSON válido", files: [] };
+  }
+}
+
 // ---- TTS: gera áudio a partir de texto ----
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";

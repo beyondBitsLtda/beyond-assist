@@ -1431,6 +1431,7 @@ export default function AssistantPage() {
                   { href: "/delp-tasks", glyph: "🏢", label: "TAREFAS DELP" },
                   { href: "/scheduled-announcements", glyph: "⏰", label: "FALAS AGENDADAS" },
                   { href: "/code-repos", glyph: "🐙", label: "REPOSITÓRIOS" },
+                  { href: "/code-tasks", glyph: "🛠️", label: "TAREFAS DE CÓDIGO" },
                 ].map((item) => (
                   <Link
                     key={item.href}
