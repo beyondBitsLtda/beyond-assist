@@ -30,6 +30,7 @@ const TASKS_SCOPE = "__tasks__";
 const THOUGHTS_SCOPE = "__thoughts__";
 const SENTINEL_SCOPE = "__sentinel__";
 const DELP_SCOPE = "__delp__";
+const CODE_SCOPE = "__code__";
 
 
 export default function AssistantPage() {
@@ -839,6 +840,7 @@ export default function AssistantPage() {
     // não passa pelo "quer que eu leve em conta a Delp?" (ver /api/ask), que só existe pra
     // quando o assunto surge sem o usuário ter pedido isso de propósito.
     if (scopePanel === DELP_SCOPE) return { mode: "panel", source: "delp" };
+    if (scopePanel === CODE_SCOPE) return { mode: "panel", source: "github" };
     return { mode: "panel", board: scopePanel };
   }, [scopeMode, scopePanel, sentinelProjectId]);
 
@@ -1230,6 +1232,7 @@ export default function AssistantPage() {
                   <option value={THOUGHTS_SCOPE}>Pensamentos</option>
                   <option value={SENTINEL_SCOPE}>Chamados (Sentinela)</option>
                   <option value={DELP_SCOPE}>Tarefas Delp</option>
+                  <option value={CODE_SCOPE}>Código</option>
                 </select>
               )}
               {scopeMode === "panel" && scopePanel === SENTINEL_SCOPE && (
@@ -1382,6 +1385,7 @@ export default function AssistantPage() {
                   { href: "/gemini-keys", glyph: "🔑", label: "CHAVES GEMINI" },
                   { href: "/delp-tasks", glyph: "🏢", label: "TAREFAS DELP" },
                   { href: "/scheduled-announcements", glyph: "⏰", label: "FALAS AGENDADAS" },
+                  { href: "/code-repos", glyph: "🐙", label: "REPOSITÓRIOS" },
                 ].map((item) => (
                   <Link
                     key={item.href}
@@ -1433,6 +1437,7 @@ export default function AssistantPage() {
             <option value={THOUGHTS_SCOPE}>Pensamentos</option>
             <option value={SENTINEL_SCOPE}>Chamados (Sentinela)</option>
             <option value={DELP_SCOPE}>Tarefas Delp</option>
+            <option value={CODE_SCOPE}>Código</option>
           </select>
         ) : null}
 

@@ -61,6 +61,11 @@ export async function resolveScope(scope, question, { filterSource = null } = {}
     }
   } else if (scope?.mode === "panel" && scope.source === "delp") {
     matches = delpTasksToMatches(await listDelpTasks());
+  } else if (scope?.mode === "panel" && scope.source === "github") {
+    // busca semântica só no código indexado (ver src/lib/ingest/github.js) — mais permissivo
+    // que o padrão (minSim mais baixo) porque nome de função/variável raramente bate palavra
+    // por palavra com a pergunta em português.
+    matches = await retrieve(question, { filterSource: "github", topK: 15, minSim: 0.35 });
   } else if (scope?.mode === "panel" && scope.board) {
     matches = await retrieveByBoard(scope.board);
     if (matches.length > 40) matches = matches.slice(0, 40);

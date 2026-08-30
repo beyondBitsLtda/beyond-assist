@@ -305,3 +305,25 @@ create table if not exists public.scheduled_announcements (
 
 alter table public.scheduled_announcements enable row level security;
 -- (só acessada pela service_role, em src/lib/scheduledAnnouncements.js — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  Indexação de código do GitHub (a mais, aditivo) — repositórios lidos por um fine-grained
+--  PAT (GITHUB_TOKEN, só leitura), indexados pelo MESMO pipeline de embeddings do Trello/
+--  Beyond Brain (tabela `documents` já existente, source='github' — ver
+--  src/lib/ingest/github.js e src/lib/ingest/runSlice.js). Essa tabela aqui só guarda QUAIS
+--  repositórios sincronizar (descobertos via /code-repos), não o código em si.
+-- ============================================================
+
+-- 17) Um repositório por linha — `enabled` decide se entra no ciclo de sincronização.
+create table if not exists public.github_repos (
+  id              bigint generated always as identity primary key,
+  full_name       text not null unique,   -- "owner/repo"
+  default_branch  text,
+  private         boolean not null default false,
+  enabled         boolean not null default true,
+  last_synced_at  timestamptz,
+  created_at      timestamptz not null default now()
+);
+
+alter table public.github_repos enable row level security;
+-- (só acessada pela service_role, em src/lib/ingest/github.js — mesmo padrão das tabelas acima)

@@ -11,9 +11,19 @@ export async function runFullSync({ onProgress } = {}) {
   const secret = typeof window !== "undefined" ? (localStorage.getItem("ingestSecret") || "") : "";
   const headers = secret ? { "x-ingest-secret": secret } : {};
   const boardCount = 4;
+  // repositórios do GitHub habilitados (ver /code-repos) — número dinâmico, ao contrário do
+  // Trello (boardCount fixo acima): não dá pra chutar uma constante aqui.
+  let repoCount = 0;
+  try {
+    const res = await fetch("/api/code-repos");
+    const data = await res.json();
+    if (data.ok) repoCount = (data.repos || []).filter((r) => r.enabled).length;
+  } catch {}
+
   const sources = [
     ...Array.from({ length: boardCount }, (_, i) => ({ label: `board ${i + 1}/${boardCount}`, source: "trello", extra: `&boardIndex=${i}` })),
     { label: "brain (notas)", source: "brain", extra: "" },
+    ...Array.from({ length: repoCount }, (_, i) => ({ label: `github ${i + 1}/${repoCount}`, source: "github", extra: `&repoIndex=${i}` })),
   ];
 
   let grandTotal = 0;

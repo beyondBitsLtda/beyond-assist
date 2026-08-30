@@ -3,6 +3,7 @@ import { embedForIngest } from "@/lib/gemini.js";
 import { chunkText } from "@/lib/ingest/chunk.js";
 import { loadTrello } from "@/lib/ingest/trello.js";
 import { loadBrain } from "@/lib/ingest/brain.js";
+import { loadGithub, countEnabledRepos } from "@/lib/ingest/github.js";
 
 // Gemini free tier: 100 requests/min de embedding.
 const EMBED_BATCH = 10;
@@ -20,11 +21,13 @@ const MAX_CHUNKS_PER_CALL = 20;
  * (O botão SYNC manual, no navegador, não usa isto — itera do jeito dele em src/lib/sync.js,
  * porque roda no cliente e não tem acesso a TRELLO_BOARD_IDS.)
  */
-export function buildSyncSteps() {
+export async function buildSyncSteps() {
   const boardIds = (process.env.TRELLO_BOARD_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const repoCount = await countEnabledRepos().catch(() => 0); // tabela pode nem existir ainda em deploys antigos — trata como "0 repos" em vez de quebrar o resto do sync
   return [
     ...boardIds.map((_, i) => ({ source: "trello", boardIndex: i, label: `board ${i + 1}/${boardIds.length}` })),
     { source: "brain", boardIndex: null, label: "brain (notas)" },
+    ...Array.from({ length: repoCount }, (_, i) => ({ source: "github", boardIndex: null, repoIndex: i, label: `github ${i + 1}/${repoCount}` })),
   ];
 }
 
@@ -36,7 +39,7 @@ export function buildSyncSteps() {
  *
  * Lança erro em vez de devolver `{ ok: false }` — quem chama decide como responder.
  */
-export async function ingestSlice({ source, boardIndex = null, offset = 0 }) {
+export async function ingestSlice({ source, boardIndex = null, repoIndex = null, offset = 0 }) {
   const report = {
     source, boardIndex, offset,
     docs: 0, chunks_total: 0, chunks_processed: 0, upserted: 0,
@@ -53,8 +56,12 @@ export async function ingestSlice({ source, boardIndex = null, offset = 0 }) {
     report.board = sources[0]?.board || boardId;
   } else if (source === "brain") {
     sources = await loadBrain();
+  } else if (source === "github") {
+    if (repoIndex === null || repoIndex === undefined) throw new Error("repoIndex obrigatório p/ github");
+    sources = await loadGithub({ repoIndex });
+    report.board = sources[0]?.board || null;
   } else {
-    throw new Error("source obrigatório: trello|brain");
+    throw new Error("source obrigatório: trello|brain|github");
   }
   report.docs = sources.length;
 

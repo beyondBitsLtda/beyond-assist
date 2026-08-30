@@ -8,6 +8,7 @@ const TASKS_SCOPE = "__tasks__";
 const THOUGHTS_SCOPE = "__thoughts__";
 const SENTINEL_SCOPE = "__sentinel__";
 const DELP_SCOPE = "__delp__";
+const CODE_SCOPE = "__code__";
 const GENERAL_SCOPE = "__general__";
 
 /** Mesmo mapeamento de scopeKind → objeto `scope` usado pelo Assistente (ver computeScope em
@@ -19,6 +20,7 @@ function scopeKindToScope(kind, sentinelProjectId) {
   if (kind === THOUGHTS_SCOPE) return { mode: "panel", source: "brain" };
   if (kind === SENTINEL_SCOPE) return { mode: "panel", source: "sentinel", projectId: sentinelProjectId || "all" };
   if (kind === DELP_SCOPE) return { mode: "panel", source: "delp" };
+  if (kind === CODE_SCOPE) return { mode: "panel", source: "github" };
   return { mode: "panel", board: kind };
 }
 
@@ -28,6 +30,7 @@ function scopeToLabel(scope) {
   if (scope.source === "brain") return "Pensamentos";
   if (scope.source === "sentinel") return "Chamados (Sentinela)";
   if (scope.source === "delp") return "Tarefas Delp";
+  if (scope.source === "github") return "Código";
   if (scope.range) return "Tarefas (por prazo)";
   if (scope.board) return scope.board;
   return "—";
@@ -200,6 +203,7 @@ export default function ScheduledAnnouncementsPage() {
                 <option value={THOUGHTS_SCOPE}>Pensamentos</option>
                 <option value={SENTINEL_SCOPE}>Chamados (Sentinela)</option>
                 <option value={DELP_SCOPE}>Tarefas Delp</option>
+                <option value={CODE_SCOPE}>Código</option>
                 {panelOptions.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
               {form.scopeKind === SENTINEL_SCOPE && (
@@ -220,6 +224,22 @@ export default function ScheduledAnnouncementsPage() {
           </div>
 
           {saveError && <div style={{ ...mono, fontSize: 10, color: OR, marginTop: 10 }}>⚠ {saveError}</div>}
+
+          {(() => {
+            // por que o botão abaixo pode estar desabilitado — sem isso, um campo obrigatório
+            // esquecido (ex.: o nome) deixava o clique sem NENHUM efeito visível, parecendo
+            // que a criação estava travada/quebrada quando na verdade só faltava preencher algo.
+            const missing = [];
+            if (!form.label.trim()) missing.push("nome");
+            if (form.mode === "fixed" && !form.message.trim()) missing.push("mensagem");
+            if (form.mode === "report" && !form.instruction.trim()) missing.push("o que pedir");
+            if (!missing.length || saving) return null;
+            return (
+              <div style={{ ...mono, fontSize: 10, color: "rgba(207,239,251,0.45)", marginTop: 10 }}>
+                preencha: {missing.join(", ")}
+              </div>
+            );
+          })()}
 
           <button
             onClick={submit}

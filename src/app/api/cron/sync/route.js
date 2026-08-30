@@ -50,7 +50,7 @@ export async function GET(req) {
       return json({ ok: true, note: "sem ciclo em andamento" });
     }
 
-    const steps = buildSyncSteps();
+    const steps = await buildSyncSteps();
     if (!steps.length || progress.step_index >= steps.length) {
       await supabase.from("sync_progress").update({ status: "idle", updated_at: now }).eq("id", 1);
       return json({ ok: true, note: steps.length ? "ciclo já concluído" : "nenhuma fonte configurada (TRELLO_BOARD_IDS vazio)" });
@@ -59,7 +59,7 @@ export async function GET(req) {
     const step = steps[progress.step_index];
     let report;
     try {
-      report = await ingestSlice({ source: step.source, boardIndex: step.boardIndex, offset: progress.offset_val });
+      report = await ingestSlice({ source: step.source, boardIndex: step.boardIndex, repoIndex: step.repoIndex, offset: progress.offset_val });
     } catch (err) {
       // erro transitório (ex.: quota do Gemini): mantém 'running' no mesmo offset — o
       // próximo tick (até 1 min depois) tenta de novo, sem perder o progresso já feito.

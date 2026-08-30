@@ -22,26 +22,31 @@ async function handle(req) {
   const url = new URL(req.url);
   const source = (url.searchParams.get("source") || "").toLowerCase();
   const boardIndexParam = url.searchParams.get("boardIndex");
+  const repoIndexParam = url.searchParams.get("repoIndex");
   const offset = Number(url.searchParams.get("offset") || 0);
 
   if (source === "trello" && (boardIndexParam === null || boardIndexParam === "")) {
     return json({ ok: false, error: "boardIndex obrigatório p/ trello" }, 400);
   }
-  if (source !== "trello" && source !== "brain") {
-    return json({ ok: false, error: "source obrigatório: trello|brain" }, 400);
+  if (source === "github" && (repoIndexParam === null || repoIndexParam === "")) {
+    return json({ ok: false, error: "repoIndex obrigatório p/ github" }, 400);
+  }
+  if (source !== "trello" && source !== "brain" && source !== "github") {
+    return json({ ok: false, error: "source obrigatório: trello|brain|github" }, 400);
   }
 
   try {
     const report = await ingestSlice({
       source,
       boardIndex: source === "trello" ? Number(boardIndexParam) : null,
+      repoIndex: source === "github" ? Number(repoIndexParam) : null,
       offset,
     });
     return json({ ok: true, ...report, errors: [] });
   } catch (err) {
     const msg = String(err?.message || err);
-    if (msg === "boardIndex fora do range") return json({ ok: false, error: msg }, 400);
-    return json({ ok: false, source, boardIndex: boardIndexParam, offset, errors: [msg] }, 500);
+    if (msg === "boardIndex fora do range" || msg === "repoIndex fora do range") return json({ ok: false, error: msg }, 400);
+    return json({ ok: false, source, boardIndex: boardIndexParam, repoIndex: repoIndexParam, offset, errors: [msg] }, 500);
   }
 }
 
