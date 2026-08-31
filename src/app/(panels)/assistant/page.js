@@ -99,6 +99,31 @@ export default function AssistantPage() {
   const [liveCode, setLiveCode] = useState(null); // { path, content } — arquivo sendo escrito agora
   const [liveCodeDone, setLiveCodeDone] = useState([]); // arquivos já concluídos nesta tarefa
   const currentCodeFileRef = useRef(null);
+  // janela flutuante e arrastável do Modo Código — abre sozinha quando uma tarefa começa,
+  // mostra em que ESTÁGIO a Lisa está (não só a última frase dita) e o código sendo escrito.
+  const [codeModalOpen, setCodeModalOpen] = useState(false);
+  const [codeModalPos, setCodeModalPos] = useState({ x: 90, y: 90 });
+  const [codeStage, setCodeStage] = useState(null); // 'context'|'writing'|'branching'|'committing'|'pr'|'done'|'error'
+  const CODE_STAGE_LABELS = {
+    context: "🔍 buscando contexto",
+    writing: "✍️ escrevendo o código",
+    branching: "🌿 criando branch",
+    committing: "📝 aplicando arquivos",
+    pr: "🔀 abrindo pull request",
+    done: "✅ concluído",
+    error: "⚠ erro",
+  };
+  const onCodeModalDragStart = useCallback((e) => {
+    const startX = e.clientX, startY = e.clientY;
+    const origX = codeModalPos.x, origY = codeModalPos.y;
+    const onMove = (ev) => setCodeModalPos({ x: origX + (ev.clientX - startX), y: origY + (ev.clientY - startY) });
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [codeModalPos]);
 
   useEffect(() => {
     fetch("/api/code-repos").then((r) => r.json()).then((d) => { if (d.ok) setCodeModeRepos((d.repos || []).filter((r) => r.enabled)); }).catch(() => {});
@@ -939,12 +964,15 @@ export default function AssistantPage() {
     setLiveCode(null);
     setLiveCodeDone([]);
     currentCodeFileRef.current = null;
+    setCodeStage(null);
+    setCodeModalOpen(true); // abre sozinha assim que a tarefa começa — não precisa procurar
 
     stopSpeaking();
     const gen = ++speechGenRef.current;
     speechEngineRef.current = null;
     const voiceEnabled = voiceOn;
     let narrationSoFar = "";
+    let receivedDone = false; // se a conexão cair sem isso, avisa em vez de só ficar quieto
 
     try {
       const res = await fetch("/api/code-tasks/stream", {
@@ -974,7 +1002,9 @@ export default function AssistantPage() {
           let payload;
           try { payload = JSON.parse(data); } catch { continue; }
 
-          if (event === "narration") {
+          if (event === "stage") {
+            setCodeStage(payload.stage);
+          } else if (event === "narration") {
             setMode("speaking");
             narrationSoFar += (narrationSoFar ? "\n\n" : "") + payload.text;
             setAnswer(narrationSoFar);
@@ -999,6 +1029,8 @@ export default function AssistantPage() {
             currentCodeFileRef.current = null;
             setLiveCode(null);
           } else if (event === "done") {
+            receivedDone = true;
+            setCodeStage(payload.ok ? "done" : "error");
             const finalText = payload.ok
               ? `${narrationSoFar}\n\nPR aberto: ${payload.pr_url}`
               : `${narrationSoFar}${narrationSoFar ? "\n\n" : ""}⚠ ${payload.error || "não consegui completar a tarefa"}`;
@@ -1009,7 +1041,20 @@ export default function AssistantPage() {
           }
         }
       }
+
+      // a conexão fechou sem NUNCA mandar "done" — normalmente a função estourou o teto de
+      // 60s da Vercel (Hobby, fixo) no meio da tarefa e foi morta. Sem isso, a tela ficava
+      // "parada" sem explicar nada (o `finally` só volta pro idle em silêncio).
+      if (!receivedDone) {
+        setCodeStage("error");
+        const msg = "a conexão foi encerrada antes de terminar (provavelmente estourou o limite de 60s da função) — tenta de novo com um pedido mais específico ou menos arquivos fixos";
+        addLog("[CÓDIGO]", OR, msg);
+        const finalText = `${narrationSoFar}${narrationSoFar ? "\n\n" : ""}⚠ ${msg}`;
+        setAnswer(finalText);
+        setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: finalText }]);
+      }
     } catch (err) {
+      setCodeStage("error");
       addLog("[CÓDIGO]", OR, err.message);
       setAnswer(`Falha na tarefa de código: ${err.message}`);
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: `Falha na tarefa de código: ${err.message}` }]);
@@ -1213,6 +1258,61 @@ export default function AssistantPage() {
       : mode === "listening"
       ? `"${question}"`
       : 'Standby. Digite uma pergunta abaixo e pressione Enter. Eu sou a Lisa.';
+
+  // Janela flutuante e arrastável do Modo Código — sobreposta, mostra o ESTÁGIO atual (não só
+  // a última frase dita), o código sendo escrito e qualquer erro. Compartilhada entre o
+  // layout mobile e desktop (os dois têm `return` próprios abaixo, então isso vira uma
+  // variável renderizada nos dois em vez de duplicar o JSX inteiro duas vezes).
+  const codeTaskModal = codeModalOpen && (
+    <div
+      style={{
+        position: "fixed", left: codeModalPos.x, top: codeModalPos.y, zIndex: 200,
+        width: "min(92vw, 520px)", maxHeight: "80vh", display: "flex", flexDirection: "column",
+        background: "#08131a", border: `1px solid ${PU}88`, borderRadius: 10,
+        boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.4)",
+      }}
+    >
+      <div
+        onPointerDown={onCodeModalDragStart}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+          padding: "10px 14px", borderBottom: "1px solid rgba(201,166,255,0.25)",
+          cursor: "grab", userSelect: "none", flex: "none",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <span style={{ ...mono, fontSize: 10, letterSpacing: 2, color: PU, flex: "none" }}>🛠️ MODO CÓDIGO</span>
+          <span style={{ ...mono, fontSize: 9.5, color: codeStage === "error" ? OR : codeStage === "done" ? GR : "rgba(207,239,251,0.65)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {codeStage ? CODE_STAGE_LABELS[codeStage] : "aguardando…"}
+          </span>
+        </div>
+        <button
+          onClick={() => setCodeModalOpen(false)}
+          style={{ ...mono, fontSize: 10, padding: "3px 8px", border: "1px solid rgba(207,239,251,0.25)", borderRadius: 4, background: "transparent", color: "rgba(207,239,251,0.6)", cursor: "pointer", flex: "none" }}
+        >
+          ✕
+        </button>
+      </div>
+      <div style={{ padding: "12px 14px", overflowY: "auto", flex: 1, minHeight: 0 }}>
+        <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "#eafcff", whiteSpace: "pre-wrap", marginBottom: liveCode || liveCodeDone.length ? 12 : 0 }}>
+          {answer || "…"}
+        </div>
+        {(liveCode || liveCodeDone.length > 0) && (
+          <div style={{ ...mono, fontSize: 10.5, background: "#000", border: "1px solid rgba(201,166,255,0.2)", borderRadius: 6, padding: "8px 10px" }}>
+            {liveCodeDone.map((f) => (
+              <div key={f.path} style={{ color: GR, marginBottom: 4 }}>✓ {f.path}</div>
+            ))}
+            {liveCode && (
+              <div>
+                <div style={{ color: PU, marginBottom: 3 }}>✎ {liveCode.path}</div>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all", color: "rgba(207,239,251,0.8)", fontSize: 9.5, lineHeight: 1.4, maxHeight: 240, overflowY: "auto" }}>{liveCode.content.slice(-3000)}</pre>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   // ==========================================================================================
   // MOBILE — tela própria, só o Assistente (sem Topbar/Sidebar, ver Shell.js): escolhe entre
@@ -1655,12 +1755,14 @@ export default function AssistantPage() {
             </div>
           </div>
         )}
+        {codeTaskModal}
       </div>
     );
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      {codeTaskModal}
       {/* ESCOPO DO ASSISTENTE */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flexWrap: "wrap" }}>
         <span style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)" }}>ESCOPO</span>

@@ -145,6 +145,7 @@ export async function runCodeTask({ repo, baseBranch, instruction, filePaths = [
  *
  * É um async generator — quem chama itera com `for await` (ver /api/code-tasks/stream).
  * Eventos possíveis:
+ *   { type: 'stage', stage }                     — mudou de fase (ver STAGES abaixo)
  *   { type: 'narration', text }                — algo pra Lisa "dizer" nesse momento
  *   { type: 'file_start', path }                — começou a escrever este arquivo
  *   { type: 'file_chunk', path, text }          — mais um pedaço do conteúdo desse arquivo
@@ -155,10 +156,12 @@ export async function* runCodeTaskStreaming({ repo, baseBranch, instruction, fil
   const task = await recordTask({ repo, base_branch: baseBranch, instruction, status: "running" });
 
   try {
+    yield { type: "stage", stage: "context" };
     yield { type: "narration", text: `Deixa eu dar uma olhada no repositório ${repo} pra ver quais arquivos são relevantes pra isso.` };
     const uniquePaths = await gatherContextPaths({ repo, instruction, filePaths });
     const contextFiles = await getFullFileContents(repo, uniquePaths);
 
+    yield { type: "stage", stage: "writing" };
     if (contextFiles.length) {
       yield { type: "narration", text: `Encontrei ${contextFiles.length} arquivo${contextFiles.length > 1 ? "s" : ""} relevante${contextFiles.length > 1 ? "s" : ""}. Vou escrever a mudança agora.` };
     } else {
@@ -192,22 +195,26 @@ export async function* runCodeTaskStreaming({ repo, baseBranch, instruction, fil
 
     if (!files.length) {
       unableReason = unableReason || summary || "a Lisa não encontrou uma mudança segura pra propor com o contexto disponível";
+      yield { type: "stage", stage: "error" };
       yield { type: "narration", text: unableReason };
       await updateTask(task.id, { status: "error", error: unableReason });
       yield { type: "done", ok: false, error: unableReason };
       return;
     }
 
+    yield { type: "stage", stage: "branching" };
     yield { type: "narration", text: `Beleza, vou criar uma branch nova a partir de \`${baseBranch}\` e aplicar ${files.length === 1 ? "o arquivo" : "os arquivos"}.` };
     const baseSha = await getBranchSha(repo, baseBranch);
     const branchName = `lisa/${slugify(instruction)}-${Date.now().toString(36)}`;
     await createBranch(repo, branchName, baseSha);
 
+    yield { type: "stage", stage: "committing" };
     for (const f of files) {
       const sha = await getFileSha(repo, f.path, branchName);
       await putFileContent(repo, f.path, f.content, `Lisa: ${summary || instruction}`.slice(0, 200), branchName, sha);
     }
 
+    yield { type: "stage", stage: "pr" };
     yield { type: "narration", text: "Pronto — abrindo o Pull Request pra você revisar." };
     const prTitle = `[Lisa] ${summary || instruction}`.slice(0, 250);
     const prBody = `Gerado automaticamente pela Lisa a partir do pedido:\n\n> ${instruction}\n\n${summary || ""}\n\n` +
@@ -216,11 +223,13 @@ export async function* runCodeTaskStreaming({ repo, baseBranch, instruction, fil
     const pr = await createPullRequest(repo, { title: prTitle, body: prBody, head: branchName, base: baseBranch });
 
     await updateTask(task.id, { status: "done", branch_name: branchName, pr_url: pr.html_url, summary: summary || null });
+    yield { type: "stage", stage: "done" };
     yield { type: "narration", text: `Feito! Abri o Pull Request — dá uma olhada quando puder.` };
     yield { type: "done", ok: true, pr_url: pr.html_url, files: files.map((f) => f.path), summary };
   } catch (err) {
     const msg = String(err?.message || err);
     await updateTask(task.id, { status: "error", error: msg });
+    yield { type: "stage", stage: "error" };
     yield { type: "narration", text: `Deu ruim tentando fazer isso: ${msg}` };
     yield { type: "done", ok: false, error: msg };
   }
