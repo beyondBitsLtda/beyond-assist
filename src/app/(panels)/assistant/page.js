@@ -103,8 +103,10 @@ export default function AssistantPage() {
   // arquivo + área de código com número de linha) — abre sozinha quando uma tarefa começa,
   // mostra em que ESTÁGIO a Lisa está (não só a última frase dita) e o código sendo escrito.
   const [codeModalOpen, setCodeModalOpen] = useState(false);
-  const [codeModalPos, setCodeModalPos] = useState({ x: 90, y: 90 });
-  const [codeModalSize, setCodeModalSize] = useState({ width: 640, height: 460 });
+  const [codeModalPos, setCodeModalPos] = useState({ x: 60, y: 50 });
+  // grande de propósito, tipo editor de verdade (VS Code aberto) — não uma janelinha de
+  // chat. O usuário pode redimensionar/arrastar/minimizar à vontade depois de aberta.
+  const [codeModalSize, setCodeModalSize] = useState({ width: 1040, height: 720 });
   const [codeModalMaximized, setCodeModalMaximized] = useState(false);
   const [codeModalMinimized, setCodeModalMinimized] = useState(false);
   const [codeActiveTab, setCodeActiveTab] = useState(null); // path da aba escolhida à mão; null = segue o arquivo sendo escrito agora

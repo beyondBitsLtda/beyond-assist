@@ -550,7 +550,11 @@ Reescreva ESTE arquivo especificamente pra fazer a parte que cabe a ele nesse pe
 
   const systemInstruction = `Você é a Lisa, reescrevendo UM arquivo de código como parte de uma mudança maior. Responda
 SOMENTE com o conteúdo completo do arquivo depois da mudança — nada de marcador, nada de
-explicação, nada de bloco de código markdown (sem \`\`\`), só o conteúdo puro do arquivo.
+explicação, nada de bloco de código markdown (sem \`\`\`), e principalmente NENHUMA linha de
+comentário no topo repetindo o caminho/nome do arquivo (tipo "// ${path}") — isso não fazia
+parte do arquivo original e já quebrou um build de verdade (era sintaxe de comentário inválida
+no tipo de arquivo em questão). A primeira linha da resposta já é a primeira linha real do
+arquivo.
 
 Se o arquivo já existia, parta EXATAMENTE do conteúdo atual mostrado acima e aplique só a
 parte da mudança que cabe a este arquivo — preserve todo o resto igual (comentários,

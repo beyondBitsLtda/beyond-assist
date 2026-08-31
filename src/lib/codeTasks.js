@@ -128,12 +128,11 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
       const { allFiles = [], matchPaths = [] } = state;
       const aiPicked = await selectRelevantFiles({ instruction, filePaths: allFiles, repo }).catch(() => []);
       const contextPaths = [...new Set([...filePaths.slice(0, MAX_FILES_PER_TASK), ...aiPicked, ...matchPaths])].slice(0, MAX_FILES_PER_TASK);
-      yield {
-        type: "narration",
-        text: contextPaths.length
-          ? `Vou olhar o conteúdo de ${contextPaths.length} arquivo${contextPaths.length > 1 ? "s" : ""}: ${contextPaths.join(", ")}.`
-          : "Não achei nenhum arquivo indexado relacionado — vou tentar mesmo assim, mas com cautela.",
-      };
+      // narração contextual, não literal — dá pra ver a LISTA de arquivos de verdade nas abas
+      // do editor quando o conteúdo de cada um começar a ser lido, não precisa recitar aqui.
+      if (contextPaths.length) {
+        yield { type: "narration", text: `Achei ${contextPaths.length} arquivo${contextPaths.length > 1 ? "s" : ""} que parece${contextPaths.length > 1 ? "m" : ""} relevante${contextPaths.length > 1 ? "s" : ""}.` };
+      }
       await setState({ stage: "context-fetch", contextPaths, contextFiles: [] });
       yield { type: "step_done", taskId: task.id, stage: "context-fetch", done: false };
       return;
@@ -185,7 +184,17 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
       const path = pathsToEdit[generatedFiles.length];
       const contextByPath = new Map(contextFiles.map((f) => [f.path, f.content]));
 
-      yield { type: "narration", text: `Editando \`${path}\`…` };
+      // narração só uma vez, ao COMEÇAR a escrever — não repete a cada arquivo (isso já
+      // aparece visualmente, como aba nova, na janela flutuante; não precisa narrar de novo
+      // arquivo por arquivo, o pedido foi por algo contextual, não uma lista mecânica).
+      if (generatedFiles.length === 0) {
+        yield {
+          type: "narration",
+          text: pathsToEdit.length > 1
+            ? `Beleza, vou escrever agora as mudanças nos ${pathsToEdit.length} arquivos.`
+            : `Beleza, vou escrever a mudança em \`${path}\`.`,
+        };
+      }
       yield { type: "file_start", path };
       let content = "";
       for await (const chunk of streamSingleFileChange({ instruction, summary, path, currentContent: contextByPath.get(path) || "", repo })) {
@@ -194,7 +203,13 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
       }
       yield { type: "file_end", path };
 
-      const nextGenerated = [...generatedFiles, { path, content: content.trim() }];
+      // rede de segurança: às vezes o modelo ecoa uma linha tipo "// caminho/do/arquivo.ext"
+      // no topo do conteúdo (mesmo com a instrução dizendo pra não fazer isso) — usando `//`,
+      // que é sintaxe de comentário INVÁLIDA em CSS e vários outros formatos. Isso já quebrou
+      // um build de verdade (globals.css). Corta essa linha se aparecer, não importa o motivo.
+      const cleaned = content.trim().replace(/^\/\/\s*\S+\.\w+\s*\r?\n+/, "");
+
+      const nextGenerated = [...generatedFiles, { path, content: cleaned }];
       const nextStage = nextGenerated.length >= pathsToEdit.length ? "branching" : "writing";
       await setState({ generatedFiles: nextGenerated, stage: nextStage });
       yield { type: "step_done", taskId: task.id, stage: nextStage, done: false };
@@ -216,7 +231,13 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
       yield { type: "stage", stage: "committing", taskId: task.id };
       const { generatedFiles = [], committedFiles = [], branchName, summary = "" } = state;
       const f = generatedFiles[committedFiles.length];
-      yield { type: "narration", text: `Aplicando \`${f.path}\`…` };
+      // narração só uma vez, ao começar a aplicar — não repete a cada arquivo commitado.
+      if (committedFiles.length === 0) {
+        yield {
+          type: "narration",
+          text: generatedFiles.length > 1 ? `Aplicando os ${generatedFiles.length} arquivos na branch nova.` : `Aplicando \`${f.path}\` na branch nova.`,
+        };
+      }
       const sha = await getFileSha(repo, f.path, branchName);
       await putFileContent(repo, f.path, f.content, `Lisa: ${summary || instruction}`.slice(0, 200), branchName, sha);
       const nextCommitted = [...committedFiles, f.path];
