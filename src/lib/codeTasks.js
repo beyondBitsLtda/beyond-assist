@@ -1,8 +1,18 @@
 import { supabase } from "./supabase.js";
 import { retrieve } from "./rag.js";
-import { planCodeChanges, streamCodeChanges, selectRelevantFiles } from "./gemini.js";
+import { planFilesToEdit, streamSingleFileChange, selectRelevantFiles } from "./gemini.js";
 import { getBranchSha, createBranch, getFileSha, putFileContent, createPullRequest, listBranches } from "./github.js";
 import { listIndexedFiles } from "./ingest/github.js";
+
+/** Junta um gerador de streaming inteiro numa string só — usado pelo fluxo SÍNCRONO
+ * (runCodeTask, /code-tasks) que não precisa mostrar o código aparecendo aos poucos, só o
+ * resultado final; o Modo Código do Assistente (runCodeTaskStreaming) consome o mesmo
+ * gerador pedaço por pedaço em vez disso. */
+async function collectStream(asyncIterable) {
+  let out = "";
+  for await (const chunk of asyncIterable) out += chunk;
+  return out;
+}
 
 // Tarefas de código: o usuário escolhe REPOSITÓRIO + BRANCH BASE e descreve o que quer.
 // A Lisa nunca commita na branch escolhida — sempre cria uma branch NOVA a partir dela,
@@ -101,13 +111,22 @@ export async function runCodeTask({ repo, baseBranch, instruction, filePaths = [
     const uniquePaths = await gatherContextPaths({ repo, instruction, filePaths });
     const contextFiles = await getFullFileContents(repo, uniquePaths);
 
-    // 2) Gemini propõe as mudanças (nunca aplica sozinho)
-    const plan = await planCodeChanges({ instruction, contextFiles, repo });
-    const files = (plan.files || []).slice(0, MAX_FILES_PER_TASK);
-    if (!files.length) {
+    // 2) Gemini decide QUAIS arquivos mudam (chamada rápida, só decide) — e SÓ DEPOIS gera o
+    // conteúdo de cada um, numa chamada separada por arquivo (mais rápido que gerar tudo
+    // junto numa chamada só, que estourava o teto de 60s da função em pedidos com vários
+    // arquivos — ver planFilesToEdit/streamSingleFileChange em gemini.js).
+    const plan = await planFilesToEdit({ instruction, contextFiles, repo });
+    const pathsToEdit = (plan.paths || []).slice(0, MAX_FILES_PER_TASK);
+    if (!pathsToEdit.length) {
       const reason = plan.unable_reason || "a Lisa não encontrou uma mudança segura pra propor com o contexto disponível";
       await updateTask(task.id, { status: "error", error: reason });
       return { ok: false, error: reason };
+    }
+    const contextByPath = new Map(contextFiles.map((f) => [f.path, f.content]));
+    const files = [];
+    for (const path of pathsToEdit) {
+      const content = await collectStream(streamSingleFileChange({ instruction, summary: plan.summary, path, currentContent: contextByPath.get(path) || "", repo }));
+      files.push({ path, content: content.trim() });
     }
 
     // 3) branch nova a partir da base escolhida — nunca commita na base em si
@@ -161,44 +180,43 @@ export async function* runCodeTaskStreaming({ repo, baseBranch, instruction, fil
     const uniquePaths = await gatherContextPaths({ repo, instruction, filePaths });
     const contextFiles = await getFullFileContents(repo, uniquePaths);
 
-    yield { type: "stage", stage: "writing" };
+    yield { type: "stage", stage: "planning" };
     if (contextFiles.length) {
-      yield { type: "narration", text: `Encontrei ${contextFiles.length} arquivo${contextFiles.length > 1 ? "s" : ""} relevante${contextFiles.length > 1 ? "s" : ""}. Vou escrever a mudança agora.` };
+      yield { type: "narration", text: `Encontrei ${contextFiles.length} arquivo${contextFiles.length > 1 ? "s" : ""} relevante${contextFiles.length > 1 ? "s" : ""}. Vou decidir o que precisa mudar.` };
     } else {
       yield { type: "narration", text: "Não achei nenhum arquivo indexado relacionado — vou tentar mesmo assim, mas com cautela." };
     }
 
-    const files = []; // { path, content } acumulado conforme o streaming vai terminando cada arquivo
-    let current = null; // { path, chunks: [] } — arquivo em andamento
-    let summary = "";
-    let unableReason = null;
+    // fase 1: decide QUAIS arquivos mudam (chamada rápida, sem gerar conteúdo ainda)
+    const plan = await planFilesToEdit({ instruction, contextFiles, repo });
+    const summary = plan.summary || "";
+    if (summary) yield { type: "narration", text: summary };
+    const pathsToEdit = (plan.paths || []).slice(0, MAX_FILES_PER_TASK);
 
-    for await (const ev of streamCodeChanges({ instruction, contextFiles, repo })) {
-      if (ev.type === "summary") {
-        summary = ev.text;
-        yield { type: "narration", text: ev.text };
-      } else if (ev.type === "file_start") {
-        current = { path: ev.path, chunks: [] };
-        yield { type: "narration", text: `Editando \`${ev.path}\`…` };
-        yield { type: "file_start", path: ev.path };
-      } else if (ev.type === "file_chunk" && current) {
-        current.chunks.push(ev.text);
-        yield { type: "file_chunk", path: current.path, text: ev.text };
-      } else if (ev.type === "file_end" && current) {
-        files.push({ path: current.path, content: current.chunks.join("") });
-        yield { type: "file_end", path: current.path };
-        current = null;
-      } else if (ev.type === "done") {
-        break;
+    // fase 2: gera o conteúdo de CADA arquivo numa chamada própria (mais rápida que gerar
+    // tudo junto — é isso que evita estourar o teto de 60s da função em pedidos com vários
+    // arquivos, ver comentário em planFilesToEdit no gemini.js)
+    yield { type: "stage", stage: "writing" };
+    const contextByPath = new Map(contextFiles.map((f) => [f.path, f.content]));
+    const files = [];
+    for (const path of pathsToEdit) {
+      yield { type: "narration", text: `Editando \`${path}\`…` };
+      yield { type: "file_start", path };
+      let content = "";
+      for await (const chunk of streamSingleFileChange({ instruction, summary, path, currentContent: contextByPath.get(path) || "", repo })) {
+        content += chunk;
+        yield { type: "file_chunk", path, text: chunk };
       }
+      yield { type: "file_end", path };
+      files.push({ path, content: content.trim() });
     }
 
     if (!files.length) {
-      unableReason = unableReason || summary || "a Lisa não encontrou uma mudança segura pra propor com o contexto disponível";
+      const reason = plan.unable_reason || summary || "a Lisa não encontrou uma mudança segura pra propor com o contexto disponível";
       yield { type: "stage", stage: "error" };
-      yield { type: "narration", text: unableReason };
-      await updateTask(task.id, { status: "error", error: unableReason });
-      yield { type: "done", ok: false, error: unableReason };
+      yield { type: "narration", text: reason };
+      await updateTask(task.id, { status: "error", error: reason });
+      yield { type: "done", ok: false, error: reason };
       return;
     }
 

@@ -106,6 +106,7 @@ export default function AssistantPage() {
   const [codeStage, setCodeStage] = useState(null); // 'context'|'writing'|'branching'|'committing'|'pr'|'done'|'error'
   const CODE_STAGE_LABELS = {
     context: "🔍 buscando contexto",
+    planning: "🧠 decidindo o que muda",
     writing: "✍️ escrevendo o código",
     branching: "🌿 criando branch",
     committing: "📝 aplicando arquivos",
