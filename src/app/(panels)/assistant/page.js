@@ -99,10 +99,15 @@ export default function AssistantPage() {
   const [liveCode, setLiveCode] = useState(null); // { path, content } — arquivo sendo escrito agora
   const [liveCodeDone, setLiveCodeDone] = useState([]); // arquivos já concluídos nesta tarefa
   const currentCodeFileRef = useRef(null);
-  // janela flutuante e arrastável do Modo Código — abre sozinha quando uma tarefa começa,
+  // janela flutuante e arrastável do Modo Código, com cara de editor (título + abas por
+  // arquivo + área de código com número de linha) — abre sozinha quando uma tarefa começa,
   // mostra em que ESTÁGIO a Lisa está (não só a última frase dita) e o código sendo escrito.
   const [codeModalOpen, setCodeModalOpen] = useState(false);
   const [codeModalPos, setCodeModalPos] = useState({ x: 90, y: 90 });
+  const [codeModalSize, setCodeModalSize] = useState({ width: 640, height: 460 });
+  const [codeModalMaximized, setCodeModalMaximized] = useState(false);
+  const [codeModalMinimized, setCodeModalMinimized] = useState(false);
+  const [codeActiveTab, setCodeActiveTab] = useState(null); // path da aba escolhida à mão; null = segue o arquivo sendo escrito agora
   const [codeStage, setCodeStage] = useState(null); // 'context'|'writing'|'branching'|'committing'|'pr'|'done'|'error'
   const CODE_STAGE_LABELS = {
     context: "🔍 buscando contexto",
@@ -115,6 +120,7 @@ export default function AssistantPage() {
     error: "⚠ erro",
   };
   const onCodeModalDragStart = useCallback((e) => {
+    if (codeModalMaximized) return; // maximizada preenche a tela — arrastar não faz sentido
     const startX = e.clientX, startY = e.clientY;
     const origX = codeModalPos.x, origY = codeModalPos.y;
     const onMove = (ev) => setCodeModalPos({ x: origX + (ev.clientX - startX), y: origY + (ev.clientY - startY) });
@@ -124,7 +130,23 @@ export default function AssistantPage() {
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-  }, [codeModalPos]);
+  }, [codeModalPos, codeModalMaximized]);
+  const onCodeModalResizeStart = useCallback((e) => {
+    e.stopPropagation();
+    if (codeModalMaximized) return;
+    const startX = e.clientX, startY = e.clientY;
+    const origW = codeModalSize.width, origH = codeModalSize.height;
+    const onMove = (ev) => setCodeModalSize({
+      width: Math.max(380, origW + (ev.clientX - startX)),
+      height: Math.max(260, origH + (ev.clientY - startY)),
+    });
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [codeModalSize, codeModalMaximized]);
 
   useEffect(() => {
     fetch("/api/code-repos").then((r) => r.json()).then((d) => { if (d.ok) setCodeModeRepos((d.repos || []).filter((r) => r.enabled)); }).catch(() => {});
@@ -951,6 +973,78 @@ export default function AssistantPage() {
   // ---- Modo Código: em vez de conversar, PROPÕE uma mudança de código (branch nova + PR) —
   // narra cada fase (fala e mostra o texto) e mostra o código de cada arquivo sendo escrito
   // ao vivo, ver /api/code-tasks/stream e runCodeTaskStreaming em src/lib/codeTasks.js.
+  // Roda UM passo (um pedido HTTP próprio, seu PRÓPRIO teto de 60s — ver /api/code-tasks/step)
+  // e devolve o que aconteceu ({taskId, done, ok, error?, pr_url?}) — askCodeMode chama isso
+  // em loop até `done`. Cada passo tem sua fresh janela de 60s, então a tarefa inteira nunca
+  // mais fica presa a uma conexão única (era isso que estourava com pedidos maiores).
+  const runCodeModeStep = useCallback(async ({ taskId, repo, baseBranch, instruction, filePaths, gen, narrationSoFarRef, voiceEnabled }) => {
+    const res = await fetch("/api/code-tasks/step", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ taskId, repo, baseBranch, instruction, filePaths }),
+    });
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let stepDone = null; // payload do evento "step_done" deste passo, se chegou
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
+      for (const part of parts) {
+        let event = "message", data = "";
+        for (const line of part.split("\n")) {
+          if (line.startsWith("event:")) event = line.slice(6).trim();
+          else if (line.startsWith("data:")) data += line.slice(5).trim();
+        }
+        if (!data) continue;
+        let payload;
+        try { payload = JSON.parse(data); } catch { continue; }
+
+        if (event === "stage") {
+          setCodeStage(payload.stage);
+        } else if (event === "narration") {
+          setMode("speaking");
+          narrationSoFarRef.current += (narrationSoFarRef.current ? "\n\n" : "") + payload.text;
+          setAnswer(narrationSoFarRef.current);
+          answerRef.current = narrationSoFarRef.current;
+          addLog("[CÓDIGO]", PU, payload.text);
+          // fala CADA narração conforme chega — a fila de fala já criada pra respostas
+          // normais (enqueueSpeech) toca cada uma em ordem sozinha, mesmo vindo de vários
+          // pedidos HTTP separados (um por passo).
+          if (voiceEnabled) enqueueSpeech(payload.text, gen);
+        } else if (event === "file_start") {
+          currentCodeFileRef.current = { path: payload.path, content: "" };
+          setLiveCode({ path: payload.path, content: "" });
+        } else if (event === "file_chunk") {
+          if (currentCodeFileRef.current?.path === payload.path) {
+            currentCodeFileRef.current.content += payload.text;
+            setLiveCode({ path: payload.path, content: currentCodeFileRef.current.content });
+          }
+        } else if (event === "file_end") {
+          if (currentCodeFileRef.current?.path === payload.path) {
+            setLiveCodeDone((d) => [...d, currentCodeFileRef.current]);
+          }
+          currentCodeFileRef.current = null;
+          setLiveCode(null);
+        } else if (event === "step_done") {
+          stepDone = payload;
+        }
+      }
+    }
+
+    // esse PASSO fechou sem "step_done" — o teto de 60s matou a função no meio dele. Como
+    // cada passo agora é bem menor que a tarefa inteira, isso deve ser raro, mas ainda pode
+    // acontecer num arquivo grande/lento — sem taskId salvo, não dá pra retomar sozinho.
+    if (!stepDone) throw new Error("um passo da tarefa foi cortado no meio (estourou 60s) — tenta de novo");
+    return stepDone;
+  }, [addLog, enqueueSpeech]);
+
   const askCodeMode = useCallback(async (q) => {
     if (!codeModeRepo || !codeModeBranch) {
       addLog("[CÓDIGO]", OR, "escolha um repositório e uma branch base antes de pedir uma mudança");
@@ -966,106 +1060,51 @@ export default function AssistantPage() {
     setLiveCodeDone([]);
     currentCodeFileRef.current = null;
     setCodeStage(null);
+    setCodeActiveTab(null);
+    setCodeModalMinimized(false);
     setCodeModalOpen(true); // abre sozinha assim que a tarefa começa — não precisa procurar
 
     stopSpeaking();
     const gen = ++speechGenRef.current;
     speechEngineRef.current = null;
     const voiceEnabled = voiceOn;
-    let narrationSoFar = "";
-    let receivedDone = false; // se a conexão cair sem isso, avisa em vez de só ficar quieto
+    const narrationSoFarRef = { current: "" };
 
     try {
-      const res = await fetch("/api/code-tasks/stream", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ repo: codeModeRepo, baseBranch: codeModeBranch, instruction: q, filePaths: codeModeFiles }),
-      });
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      let taskId = null;
+      let stepResult = null;
+      // chama /api/code-tasks/step repetidas vezes — cada chamada é UM PASSO (contexto,
+      // planejamento, 1 arquivo escrito, criar branch, 1 arquivo commitado, ou abrir o PR) —
+      // até a tarefa inteira terminar. Nunca mais uma única conexão carrega a tarefa toda.
+      do {
+        stepResult = await runCodeModeStep({
+          taskId, repo: codeModeRepo, baseBranch: codeModeBranch, instruction: q,
+          filePaths: codeModeFiles, gen, narrationSoFarRef, voiceEnabled,
+        });
+        taskId = stepResult.taskId ?? taskId;
+      } while (!stepResult.done);
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() || "";
-        for (const part of parts) {
-          let event = "message", data = "";
-          for (const line of part.split("\n")) {
-            if (line.startsWith("event:")) event = line.slice(6).trim();
-            else if (line.startsWith("data:")) data += line.slice(5).trim();
-          }
-          if (!data) continue;
-          let payload;
-          try { payload = JSON.parse(data); } catch { continue; }
-
-          if (event === "stage") {
-            setCodeStage(payload.stage);
-          } else if (event === "narration") {
-            setMode("speaking");
-            narrationSoFar += (narrationSoFar ? "\n\n" : "") + payload.text;
-            setAnswer(narrationSoFar);
-            answerRef.current = narrationSoFar;
-            addLog("[CÓDIGO]", PU, payload.text);
-            // fala CADA narração conforme chega (não espera a tarefa toda terminar) — é
-            // exatamente isso que faz parecer "comentando enquanto trabalha"; a fila de fala
-            // já criada pra respostas normais (enqueueSpeech) toca cada uma em ordem sozinha.
-            if (voiceEnabled) enqueueSpeech(payload.text, gen);
-          } else if (event === "file_start") {
-            currentCodeFileRef.current = { path: payload.path, content: "" };
-            setLiveCode({ path: payload.path, content: "" });
-          } else if (event === "file_chunk") {
-            if (currentCodeFileRef.current?.path === payload.path) {
-              currentCodeFileRef.current.content += payload.text;
-              setLiveCode({ path: payload.path, content: currentCodeFileRef.current.content });
-            }
-          } else if (event === "file_end") {
-            if (currentCodeFileRef.current?.path === payload.path) {
-              setLiveCodeDone((d) => [...d, currentCodeFileRef.current]);
-            }
-            currentCodeFileRef.current = null;
-            setLiveCode(null);
-          } else if (event === "done") {
-            receivedDone = true;
-            setCodeStage(payload.ok ? "done" : "error");
-            const finalText = payload.ok
-              ? `${narrationSoFar}\n\nPR aberto: ${payload.pr_url}`
-              : `${narrationSoFar}${narrationSoFar ? "\n\n" : ""}⚠ ${payload.error || "não consegui completar a tarefa"}`;
-            setAnswer(finalText);
-            setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: finalText }]);
-            if (payload.ok) addLog("[CÓDIGO]", GR, `PR aberto: ${payload.pr_url}`);
-            else addLog("[CÓDIGO]", OR, payload.error || "falhou");
-          }
-        }
-      }
-
-      // a conexão fechou sem NUNCA mandar "done" — normalmente a função estourou o teto de
-      // 60s da Vercel (Hobby, fixo) no meio da tarefa e foi morta. Sem isso, a tela ficava
-      // "parada" sem explicar nada (o `finally` só volta pro idle em silêncio).
-      if (!receivedDone) {
-        setCodeStage("error");
-        const msg = "a conexão foi encerrada antes de terminar (provavelmente estourou o limite de 60s da função) — tenta de novo com um pedido mais específico ou menos arquivos fixos";
-        addLog("[CÓDIGO]", OR, msg);
-        const finalText = `${narrationSoFar}${narrationSoFar ? "\n\n" : ""}⚠ ${msg}`;
-        setAnswer(finalText);
-        setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: finalText }]);
-      }
+      setCodeStage(stepResult.ok ? "done" : "error");
+      const finalText = stepResult.ok
+        ? `${narrationSoFarRef.current}\n\nPR aberto: ${stepResult.pr_url}`
+        : `${narrationSoFarRef.current}${narrationSoFarRef.current ? "\n\n" : ""}⚠ ${stepResult.error || "não consegui completar a tarefa"}`;
+      setAnswer(finalText);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: finalText }]);
+      if (stepResult.ok) addLog("[CÓDIGO]", GR, `PR aberto: ${stepResult.pr_url}`);
+      else addLog("[CÓDIGO]", OR, stepResult.error || "falhou");
     } catch (err) {
       setCodeStage("error");
       addLog("[CÓDIGO]", OR, err.message);
-      setAnswer(`Falha na tarefa de código: ${err.message}`);
-      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: `Falha na tarefa de código: ${err.message}` }]);
+      const finalText = `${narrationSoFarRef.current}${narrationSoFarRef.current ? "\n\n" : ""}⚠ ${err.message}`;
+      setAnswer(finalText);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: finalText }]);
     } finally {
       setBusy(false);
       setMode("idle");
       currentCodeFileRef.current = null;
       setLiveCode(null);
     }
-  }, [codeModeRepo, codeModeBranch, codeModeFiles, addLog, voiceOn, stopSpeaking, enqueueSpeech]);
+  }, [codeModeRepo, codeModeBranch, codeModeFiles, addLog, voiceOn, stopSpeaking, enqueueSpeech, runCodeModeStep]);
 
   // ---- pergunta real ao backend (SSE) ----
   const ask = useCallback(async (q) => {
@@ -1264,54 +1303,132 @@ export default function AssistantPage() {
   // a última frase dita), o código sendo escrito e qualquer erro. Compartilhada entre o
   // layout mobile e desktop (os dois têm `return` próprios abaixo, então isso vira uma
   // variável renderizada nos dois em vez de duplicar o JSX inteiro duas vezes).
+  const codeFilesOpen = [...liveCodeDone, ...(liveCode ? [liveCode] : [])];
+  const codeActivePath = codeActiveTab && codeFilesOpen.some((f) => f.path === codeActiveTab)
+    ? codeActiveTab
+    : (liveCode ? liveCode.path : codeFilesOpen[codeFilesOpen.length - 1]?.path) || null;
+  const codeActiveFile = codeFilesOpen.find((f) => f.path === codeActivePath) || null;
+  const codeActiveLines = codeActiveFile ? codeActiveFile.content.slice(-6000).split("\n") : [];
+
   const codeTaskModal = codeModalOpen && (
     <div
       style={{
-        position: "fixed", left: codeModalPos.x, top: codeModalPos.y, zIndex: 200,
-        width: "min(92vw, 520px)", maxHeight: "80vh", display: "flex", flexDirection: "column",
-        background: "#08131a", border: `1px solid ${PU}88`, borderRadius: 10,
-        boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.4)",
+        position: "fixed", left: codeModalMaximized ? "3vw" : codeModalPos.x, top: codeModalMaximized ? "5vh" : codeModalPos.y,
+        zIndex: 200, width: codeModalMaximized ? "94vw" : `min(92vw, ${codeModalSize.width}px)`,
+        height: codeModalMinimized ? "auto" : (codeModalMaximized ? "88vh" : `min(80vh, ${codeModalSize.height}px)`),
+        display: "flex", flexDirection: "column", overflow: "hidden",
+        background: "#1e1e1e", border: "1px solid #3c3c3c", borderRadius: 8,
+        boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,0,0,0.4)",
+        fontFamily: "Consolas, 'Cascadia Code', 'SF Mono', Menlo, monospace",
       }}
     >
+      {/* barra de título — igual VS Code: 3 bolinhas (fechar/minimizar/maximizar) + nome do arquivo ativo */}
       <div
         onPointerDown={onCodeModalDragStart}
+        onDoubleClick={() => setCodeModalMaximized((v) => !v)}
         style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
-          padding: "10px 14px", borderBottom: "1px solid rgba(201,166,255,0.25)",
-          cursor: "grab", userSelect: "none", flex: "none",
+          display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
+          background: "#323233", borderBottom: "1px solid #252526",
+          cursor: codeModalMaximized ? "default" : "grab", userSelect: "none", flex: "none",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <span style={{ ...mono, fontSize: 10, letterSpacing: 2, color: PU, flex: "none" }}>🛠️ MODO CÓDIGO</span>
-          <span style={{ ...mono, fontSize: 9.5, color: codeStage === "error" ? OR : codeStage === "done" ? GR : "rgba(207,239,251,0.65)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {codeStage ? CODE_STAGE_LABELS[codeStage] : "aguardando…"}
+        <div style={{ display: "flex", gap: 7, flex: "none" }}>
+          <span
+            onClick={(e) => { e.stopPropagation(); setCodeModalOpen(false); }}
+            title="fechar" style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57", cursor: "pointer" }}
+          />
+          <span
+            onClick={(e) => { e.stopPropagation(); setCodeModalMinimized((v) => !v); }}
+            title="minimizar" style={{ width: 12, height: 12, borderRadius: "50%", background: "#febc2e", cursor: "pointer" }}
+          />
+          <span
+            onClick={(e) => { e.stopPropagation(); setCodeModalMaximized((v) => !v); }}
+            title="maximizar" style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840", cursor: "pointer" }}
+          />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1, justifyContent: "center" }}>
+          <span style={{ fontSize: 10.5, letterSpacing: 1.5, color: "#cccccc", flex: "none" }}>🛠️ MODO CÓDIGO</span>
+          <span style={{ fontSize: 9.5, color: codeStage === "error" ? OR : codeStage === "done" ? GR : "rgba(204,204,204,0.6)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            — {codeStage ? CODE_STAGE_LABELS[codeStage] : "aguardando…"}
           </span>
         </div>
-        <button
-          onClick={() => setCodeModalOpen(false)}
-          style={{ ...mono, fontSize: 10, padding: "3px 8px", border: "1px solid rgba(207,239,251,0.25)", borderRadius: 4, background: "transparent", color: "rgba(207,239,251,0.6)", cursor: "pointer", flex: "none" }}
-        >
-          ✕
-        </button>
+        <div style={{ width: 54, flex: "none" }} />
       </div>
-      <div style={{ padding: "12px 14px", overflowY: "auto", flex: 1, minHeight: 0 }}>
-        <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "#eafcff", whiteSpace: "pre-wrap", marginBottom: liveCode || liveCodeDone.length ? 12 : 0 }}>
-          {answer || "…"}
-        </div>
-        {(liveCode || liveCodeDone.length > 0) && (
-          <div style={{ ...mono, fontSize: 10.5, background: "#000", border: "1px solid rgba(201,166,255,0.2)", borderRadius: 6, padding: "8px 10px" }}>
-            {liveCodeDone.map((f) => (
-              <div key={f.path} style={{ color: GR, marginBottom: 4 }}>✓ {f.path}</div>
-            ))}
-            {liveCode && (
-              <div>
-                <div style={{ color: PU, marginBottom: 3 }}>✎ {liveCode.path}</div>
-                <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all", color: "rgba(207,239,251,0.8)", fontSize: 9.5, lineHeight: 1.4, maxHeight: 240, overflowY: "auto" }}>{liveCode.content.slice(-3000)}</pre>
+
+      {!codeModalMinimized && (
+        <>
+          {/* narração da Lisa — comentando o que está fazendo, como um painel de notificação */}
+          <div style={{ padding: "8px 14px", background: "#252526", borderBottom: "1px solid #1e1e1e", flex: "none", maxHeight: 84, overflowY: "auto" }}>
+            <div style={{ fontSize: 11.5, lineHeight: 1.5, color: "#cccccc", fontStyle: "italic", whiteSpace: "pre-wrap" }}>
+              {answer || "…"}
+            </div>
+          </div>
+
+          {/* abas — um arquivo por aba, igual editor de código, clica pra ver outro já escrito */}
+          {codeFilesOpen.length > 0 && (
+            <div style={{ display: "flex", background: "#252526", borderBottom: "1px solid #1e1e1e", flex: "none", overflowX: "auto" }}>
+              {codeFilesOpen.map((f) => {
+                const isActive = f.path === codeActivePath;
+                const isStreaming = liveCode && f.path === liveCode.path;
+                const fileName = f.path.split("/").pop();
+                return (
+                  <div
+                    key={f.path}
+                    onClick={() => setCodeActiveTab(f.path)}
+                    title={f.path}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6, padding: "7px 12px",
+                      fontSize: 11, whiteSpace: "nowrap", cursor: "pointer", flex: "none",
+                      color: isActive ? "#ffffff" : "#969696",
+                      background: isActive ? "#1e1e1e" : "transparent",
+                      borderTop: `2px solid ${isActive ? PU : "transparent"}`,
+                      borderRight: "1px solid #1e1e1e",
+                    }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", flex: "none", background: isStreaming ? "#ffcc00" : GR }} />
+                    {fileName}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* corpo do editor — número de linha + código, fundo escuro igual VS Code */}
+          <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: "#1e1e1e" }}>
+            {codeActiveFile ? (
+              <div style={{ display: "flex", fontSize: 11.5, lineHeight: 1.55 }}>
+                <div style={{ flex: "none", padding: "8px 10px 8px 14px", textAlign: "right", color: "#5a5a5a", userSelect: "none", background: "#1e1e1e" }}>
+                  {codeActiveLines.map((_, i) => <div key={i}>{i + 1}</div>)}
+                </div>
+                <pre style={{ margin: 0, padding: "8px 14px 8px 6px", whiteSpace: "pre-wrap", wordBreak: "break-all", color: "#d4d4d4", flex: 1 }}>
+                  {codeActiveLines.map((line, i) => <div key={i}>{line || " "}</div>)}
+                </pre>
+              </div>
+            ) : (
+              <div style={{ padding: "16px 14px", fontSize: 11.5, color: "#5a5a5a" }}>
+                nenhum arquivo sendo editado ainda — a Lisa está {codeStage ? CODE_STAGE_LABELS[codeStage] : "começando"}…
               </div>
             )}
           </div>
-        )}
-      </div>
+
+          {/* barra de status inferior, igual VS Code */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "3px 12px", background: PU, flex: "none" }}>
+            <span style={{ fontSize: 9.5, color: "#1e1e1e" }}>{codeModeRepo || "—"} → {codeModeBranch || "—"}</span>
+            <span style={{ fontSize: 9.5, color: "#1e1e1e" }}>{liveCodeDone.length} arquivo(s) concluído(s)</span>
+          </div>
+
+          {/* alça de redimensionar, canto inferior direito */}
+          {!codeModalMaximized && (
+            <div
+              onPointerDown={onCodeModalResizeStart}
+              title="arrastar para redimensionar"
+              style={{ position: "absolute", right: 2, bottom: 2, width: 14, height: 14, cursor: "nwse-resize", opacity: 0.5 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14"><path d="M12 2 L2 12 M12 6 L6 12 M12 10 L10 12" stroke="#969696" strokeWidth="1" /></svg>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 

@@ -74,30 +74,59 @@ export default function CodeTasksPage() {
     });
   };
 
+  // Um PASSO da tarefa (um pedido HTTP com seu próprio teto de 60s — ver runCodeTaskStep em
+  // src/lib/codeTasks.js). submit() chama isso em loop, passando o taskId adiante, até o
+  // evento "step_done" vir com done:true — assim a tarefa inteira nunca fica presa a uma
+  // única janela de 60s, mesmo tocando vários arquivos ou com o Gemini mais lento.
+  const runStep = async (taskId) => {
+    const res = await fetch("/api/code-tasks/step", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ taskId, repo, baseBranch, instruction, filePaths: selectedFiles }),
+    });
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let stepDone = null;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
+      for (const part of parts) {
+        let event = "message", data = "";
+        for (const line of part.split("\n")) {
+          if (line.startsWith("event:")) event = line.slice(6).trim();
+          else if (line.startsWith("data:")) data += line.slice(5).trim();
+        }
+        if (!data) continue;
+        let payload;
+        try { payload = JSON.parse(data); } catch { continue; }
+        if (event === "stage") setResult((r) => ({ ...(r || {}), stage: payload.stage }));
+        else if (event === "step_done") stepDone = payload;
+      }
+    }
+    // esse passo fechou sem "step_done" — o teto de 60s matou a função no meio dele (raro,
+    // já que cada passo agora é bem menor que a tarefa toda, mas ainda possível num arquivo
+    // grande/lento).
+    if (!stepDone) throw new Error("um passo da tarefa foi cortado no meio (estourou 60s) — tenta de novo");
+    return stepDone;
+  };
+
   const submit = async () => {
     setRunning(true);
     setResult(null);
     setError(null);
     try {
-      const res = await fetch("/api/code-tasks", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ repo, baseBranch, instruction, filePaths: selectedFiles }),
-      });
-      // resposta pode não ser JSON de verdade (ex.: a Vercel mata a função por estourar 60s
-      // e devolve a PÁGINA de erro dela, texto puro) — sem essa checagem, res.json() quebra
-      // com uma mensagem confusa tipo "Unexpected token 'A'..." em vez de dizer o que houve.
-      const raw = await res.text();
-      let data;
-      try { data = JSON.parse(raw); }
-      catch {
-        throw new Error(
-          res.status === 504 || raw.includes("FUNCTION_INVOCATION_TIMEOUT") || !res.ok
-            ? "o servidor demorou demais pra gerar a mudança (provavelmente muitos arquivos de contexto de uma vez) — tenta com menos arquivos selecionados ou um pedido mais específico"
-            : `resposta inesperada do servidor (HTTP ${res.status})`
-        );
-      }
-      if (!data.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setResult(data);
+      let taskId = null;
+      let stepResult = null;
+      do {
+        stepResult = await runStep(taskId);
+        taskId = stepResult.taskId ?? taskId;
+      } while (!stepResult.done);
+      if (!stepResult.ok) throw new Error(stepResult.error || "não consegui completar a tarefa");
+      setResult(stepResult);
       setInstruction("");
       setSelectedFiles([]);
       await loadTasks();

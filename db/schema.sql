@@ -433,3 +433,19 @@ create table if not exists public.github_fetch_cache (
 
 alter table public.github_fetch_cache enable row level security;
 -- (só acessada pela service_role, em src/lib/ingest/github.js — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  Tarefa de código RETOMÁVEL em vários pedidos (a mais, aditivo) — o plano Hobby da Vercel
+--  tem teto FIXO de 60s por função, sem como aumentar. Uma tarefa de código (buscar contexto
+--  + decidir arquivos + escrever cada um + criar branch + commitar + abrir PR) podia passar
+--  disso fácil numa chamada só. Em vez de uma conexão única, agora cada "passo" é um pedido
+--  HTTP separado (o cliente chama de novo sozinho até terminar — mesmo padrão já usado pro
+--  SYNC dos repositórios, ver sync_progress) — cada passo tem seu PRÓPRIO teto de 60s, então
+--  a tarefa inteira não fica mais presa a uma única janela de 60s. Ver
+--  src/lib/codeTasks.js:runCodeTaskStep.
+-- ============================================================
+
+-- 22) Guarda o progresso entre um passo e o próximo (contexto já buscado, plano já decidido,
+--     arquivos já escritos, branch já criada) — sem isso, cada pedido teria que refazer tudo
+--     de novo do zero.
+alter table public.code_tasks add column if not exists state jsonb not null default '{}'::jsonb;
