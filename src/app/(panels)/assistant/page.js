@@ -80,6 +80,41 @@ export default function AssistantPage() {
   // respostas — desligado por padrão (tom direto/neutro de sempre).
   const [personaMode, setPersonaMode] = useState(false);
 
+  // Modo Código: com isso ligado (e um repositório+branch escolhidos), toda pergunta vira um
+  // PEDIDO DE MUDANÇA DE CÓDIGO em vez de uma conversa normal — ver askCodeMode/
+  // /api/code-tasks/stream. Narra cada fase (Lisa "comenta" o que está fazendo, com voz) e
+  // mostra o código de cada arquivo sendo escrito ao vivo (liveCode), não só o PR pronto no
+  // final. Nunca commita na branch escolhida — sempre cria uma branch nova e abre um PR.
+  const [codeMode, setCodeMode] = useState(false);
+  const [codeModeRepo, setCodeModeRepo] = useState("");
+  const [codeModeBranch, setCodeModeBranch] = useState("");
+  const [codeModeRepos, setCodeModeRepos] = useState([]);
+  const [codeModeBranches, setCodeModeBranches] = useState([]);
+  const [liveCode, setLiveCode] = useState(null); // { path, content } — arquivo sendo escrito agora
+  const [liveCodeDone, setLiveCodeDone] = useState([]); // arquivos já concluídos nesta tarefa
+  const currentCodeFileRef = useRef(null);
+
+  useEffect(() => {
+    fetch("/api/code-repos").then((r) => r.json()).then((d) => { if (d.ok) setCodeModeRepos((d.repos || []).filter((r) => r.enabled)); }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setCodeModeBranch("");
+    setCodeModeBranches([]);
+    if (!codeModeRepo) return;
+    fetch(`/api/code-repos/branches?repo=${encodeURIComponent(codeModeRepo)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) {
+          setCodeModeBranches(d.branches || []);
+          const found = codeModeRepos.find((r) => r.full_name === codeModeRepo);
+          setCodeModeBranch(found?.default_branch && d.branches.includes(found.default_branch) ? found.default_branch : d.branches[0] || "");
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codeModeRepo]);
+
   // Visão do avatar: "traditional" (visualizador de onda de sempre) ou "3d" (corpo/modelo 3D,
   // ver LisaAvatar3D.js) — DESKTOP-ONLY de propósito (o toggle só existe no branch desktop
   // deste componente, então nunca aparece nem carrega no mobile).
@@ -875,6 +910,105 @@ export default function AssistantPage() {
     return { mode: "panel", board: scopePanel };
   }, [scopeMode, scopePanel, sentinelProjectId, codeRepo, codeFile]);
 
+  // ---- Modo Código: em vez de conversar, PROPÕE uma mudança de código (branch nova + PR) —
+  // narra cada fase (fala e mostra o texto) e mostra o código de cada arquivo sendo escrito
+  // ao vivo, ver /api/code-tasks/stream e runCodeTaskStreaming em src/lib/codeTasks.js.
+  const askCodeMode = useCallback(async (q) => {
+    if (!codeModeRepo || !codeModeBranch) {
+      addLog("[CÓDIGO]", OR, "escolha um repositório e uma branch base antes de pedir uma mudança");
+      return;
+    }
+    setBusy(true);
+    setQuestion(q);
+    setAnswer("");
+    answerRef.current = "";
+    setMode("listening");
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: q }]);
+    setLiveCode(null);
+    setLiveCodeDone([]);
+    currentCodeFileRef.current = null;
+
+    stopSpeaking();
+    const gen = ++speechGenRef.current;
+    speechEngineRef.current = null;
+    const voiceEnabled = voiceOn;
+    let narrationSoFar = "";
+
+    try {
+      const res = await fetch("/api/code-tasks/stream", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ repo: codeModeRepo, baseBranch: codeModeBranch, instruction: q }),
+      });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+        for (const part of parts) {
+          let event = "message", data = "";
+          for (const line of part.split("\n")) {
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) data += line.slice(5).trim();
+          }
+          if (!data) continue;
+          let payload;
+          try { payload = JSON.parse(data); } catch { continue; }
+
+          if (event === "narration") {
+            setMode("speaking");
+            narrationSoFar += (narrationSoFar ? "\n\n" : "") + payload.text;
+            setAnswer(narrationSoFar);
+            answerRef.current = narrationSoFar;
+            addLog("[CÓDIGO]", PU, payload.text);
+            // fala CADA narração conforme chega (não espera a tarefa toda terminar) — é
+            // exatamente isso que faz parecer "comentando enquanto trabalha"; a fila de fala
+            // já criada pra respostas normais (enqueueSpeech) toca cada uma em ordem sozinha.
+            if (voiceEnabled) enqueueSpeech(payload.text, gen);
+          } else if (event === "file_start") {
+            currentCodeFileRef.current = { path: payload.path, content: "" };
+            setLiveCode({ path: payload.path, content: "" });
+          } else if (event === "file_chunk") {
+            if (currentCodeFileRef.current?.path === payload.path) {
+              currentCodeFileRef.current.content += payload.text;
+              setLiveCode({ path: payload.path, content: currentCodeFileRef.current.content });
+            }
+          } else if (event === "file_end") {
+            if (currentCodeFileRef.current?.path === payload.path) {
+              setLiveCodeDone((d) => [...d, currentCodeFileRef.current]);
+            }
+            currentCodeFileRef.current = null;
+            setLiveCode(null);
+          } else if (event === "done") {
+            const finalText = payload.ok
+              ? `${narrationSoFar}\n\nPR aberto: ${payload.pr_url}`
+              : `${narrationSoFar}${narrationSoFar ? "\n\n" : ""}⚠ ${payload.error || "não consegui completar a tarefa"}`;
+            setAnswer(finalText);
+            setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: finalText }]);
+            if (payload.ok) addLog("[CÓDIGO]", GR, `PR aberto: ${payload.pr_url}`);
+            else addLog("[CÓDIGO]", OR, payload.error || "falhou");
+          }
+        }
+      }
+    } catch (err) {
+      addLog("[CÓDIGO]", OR, err.message);
+      setAnswer(`Falha na tarefa de código: ${err.message}`);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: `Falha na tarefa de código: ${err.message}` }]);
+    } finally {
+      setBusy(false);
+      setMode("idle");
+      currentCodeFileRef.current = null;
+      setLiveCode(null);
+    }
+  }, [codeModeRepo, codeModeBranch, addLog, voiceOn, stopSpeaking, enqueueSpeech]);
+
   // ---- pergunta real ao backend (SSE) ----
   const ask = useCallback(async (q) => {
     if (!q.trim() || busy) return;
@@ -900,6 +1034,10 @@ export default function AssistantPage() {
       if (voiceOn) enqueueSpeech(confirmText, gen);
       return;
     }
+
+    // Modo Código ligado: a pergunta vira um pedido de mudança de código, não uma conversa —
+    // ver askCodeMode acima.
+    if (codeMode) return askCodeMode(q);
 
     setBusy(true);
     setQuestion(q);
@@ -991,7 +1129,7 @@ export default function AssistantPage() {
       const full = answerRef.current.trim();
       if (voiceEnabled && full) enqueueSpeech(full, gen);
     }
-  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame]);
+  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode]);
 
   // ---- STT: ouvir microfone (Web Speech API) ----
   const toggleMic = useCallback(() => {
@@ -1194,6 +1332,21 @@ export default function AssistantPage() {
                   ⏳ aguardando voz do Gemini… {ttsWaitSeconds}s / {SPEAK_TIMEOUT_MS / 1000}s
                 </div>
               )}
+              {(liveCode || liveCodeDone.length > 0) && (
+                <div style={{ alignSelf: "stretch", ...mono, fontSize: 10.5, background: "#08131a", border: `1px solid ${PU}55`, borderRadius: 8, padding: "10px 12px", maxHeight: 260, overflowY: "auto" }}>
+                  {liveCodeDone.map((f) => (
+                    <div key={f.path} style={{ marginBottom: 8 }}>
+                      <div style={{ color: GR, marginBottom: 3 }}>✓ {f.path}</div>
+                    </div>
+                  ))}
+                  {liveCode && (
+                    <div>
+                      <div style={{ color: PU, marginBottom: 3 }}>✎ {liveCode.path}</div>
+                      <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all", color: "rgba(207,239,251,0.8)", fontSize: 9.5, lineHeight: 1.4 }}>{liveCode.content.slice(-2000)}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
 
@@ -1312,6 +1465,34 @@ export default function AssistantPage() {
               >
                 🎭 Modo Persona: {personaMode ? "ON" : "OFF"}
               </button>
+
+              {/* modo código */}
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>MODO CÓDIGO</div>
+              <button
+                onClick={() => setCodeMode((v) => !v)}
+                style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${codeMode ? PU : "rgba(var(--accent-rgb),0.18)"}`, background: codeMode ? "rgba(201,166,255,0.12)" : "transparent", color: codeMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+              >
+                🛠️ Modo Código: {codeMode ? "ON" : "OFF"}
+              </button>
+              {codeMode && (
+                <>
+                  <select value={codeModeRepo} onChange={(e) => setCodeModeRepo(e.target.value)} style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#000", color: "#eafcff", width: "100%", marginBottom: 8 }}>
+                    <option value="">repositório…</option>
+                    {codeModeRepos.map((r) => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
+                  </select>
+                  {codeModeRepo && (
+                    <select value={codeModeBranch} onChange={(e) => setCodeModeBranch(e.target.value)} style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#000", color: "#eafcff", width: "100%", marginBottom: 8 }}>
+                      <option value="">branch base…</option>
+                      {codeModeBranches.map((b) => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  )}
+                  <div style={{ fontSize: 10.5, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
+                    Com isso ligado, toda mensagem vira um pedido de mudança de código nesse
+                    repositório/branch — ela cria uma branch nova e abre um Pull Request, nunca
+                    mescla sozinha.
+                  </div>
+                </>
+              )}
 
               {/* observância */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>OBSERVÂNCIA (CÂMERA)</div>
@@ -1545,6 +1726,43 @@ export default function AssistantPage() {
           🎭 PERSONA {personaMode ? "ON" : "OFF"}
         </button>
 
+        {/* Modo Código — toda mensagem vira pedido de mudança de código (branch nova + PR) */}
+        <button
+          onClick={() => setCodeMode((v) => !v)}
+          title={codeMode ? "Modo Código ligado — toda mensagem vira pedido de mudança. Clique pra desligar" : "Ligar Modo Código — a Lisa passa a propor mudança de código (branch + PR) em vez de conversar"}
+          style={{
+            ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+            border: `1px solid ${codeMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
+            background: codeMode ? "rgba(201,166,255,0.12)" : "transparent",
+            color: codeMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+            cursor: "pointer",
+          }}
+        >
+          🛠️ CÓDIGO {codeMode ? "ON" : "OFF"}
+        </button>
+        {codeMode && (
+          <>
+            <select
+              value={codeModeRepo}
+              onChange={(e) => setCodeModeRepo(e.target.value)}
+              style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
+            >
+              <option value="">repositório…</option>
+              {codeModeRepos.map((r) => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
+            </select>
+            {codeModeRepo && (
+              <select
+                value={codeModeBranch}
+                onChange={(e) => setCodeModeBranch(e.target.value)}
+                style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
+              >
+                <option value="">branch base…</option>
+                {codeModeBranches.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            )}
+          </>
+        )}
+
         {/* Visão do avatar: visualizador de onda de sempre × corpo em modelo 3D — desktop-only */}
         <div style={{ display: "flex", gap: 4 }}>
           {[{ key: "traditional", label: "◈ VISÃO TRADICIONAL" }, { key: "3d", label: "🧑 VISÃO 3D" }].map((v) => (
@@ -1715,6 +1933,19 @@ export default function AssistantPage() {
             {ttsWaitSeconds !== null && (
               <div style={{ ...mono, fontSize: 10.5, letterSpacing: 1, color: CY, marginTop: 10 }}>
                 ⏳ aguardando voz do Gemini… {ttsWaitSeconds}s / {SPEAK_TIMEOUT_MS / 1000}s
+              </div>
+            )}
+            {(liveCode || liveCodeDone.length > 0) && (
+              <div style={{ ...mono, fontSize: 10.5, textAlign: "left", background: "#08131a", border: `1px solid ${PU}55`, borderRadius: 8, padding: "12px 14px", maxHeight: 280, overflowY: "auto", marginTop: 14 }}>
+                {liveCodeDone.map((f) => (
+                  <div key={f.path} style={{ color: GR, marginBottom: 6 }}>✓ {f.path}</div>
+                ))}
+                {liveCode && (
+                  <div>
+                    <div style={{ color: PU, marginBottom: 4 }}>✎ {liveCode.path}</div>
+                    <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all", color: "rgba(207,239,251,0.8)", fontSize: 10, lineHeight: 1.4 }}>{liveCode.content.slice(-2500)}</pre>
+                  </div>
+                )}
               </div>
             )}
           </div>

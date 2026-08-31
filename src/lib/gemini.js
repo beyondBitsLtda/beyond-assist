@@ -413,6 +413,125 @@ Regras estritas:
   }
 }
 
+/**
+ * Igual planCodeChanges, mas em STREAMING — usado pelo "Modo Código" do Assistente (ver
+ * src/lib/codeTasks.js:runCodeTaskStreaming), pra mostrar o código sendo escrito ao vivo em
+ * vez de esperar tudo pronto. `responseSchema` (JSON estruturado) não dá pra usar em conjunto
+ * com streaming de um jeito que dê pra extrair pedaço por pedaço enquanto chega — por isso
+ * aqui é um formato próprio com marcadores de texto, simples de parsear incrementalmente.
+ *
+ * Yielda eventos: { type: 'summary', text } | { type: 'file_start', path } |
+ * { type: 'file_chunk', path, text } | { type: 'file_end', path } | { type: 'done' }
+ */
+export async function* streamCodeChanges({ instruction, contextFiles = [], repo }) {
+  const filesBlock = contextFiles.length
+    ? contextFiles.map((f) => `--- ${f.path} ---\n${f.content}`).join("\n\n")
+    : "(nenhum arquivo de contexto encontrado — proponha só se tiver certeza do que fazer, ou não proponha nenhum arquivo)";
+
+  const prompt = `Repositório: ${repo}
+
+ARQUIVOS RELEVANTES ENCONTRADOS (conteúdo COMPLETO e ATUAL de cada um):
+${filesBlock}
+
+PEDIDO DO USUÁRIO:
+"${instruction}"
+
+Proponha as mudanças de arquivo necessárias pra atender esse pedido, no formato exato pedido.`;
+
+  const systemInstruction = `Você é a Lisa, propondo uma mudança de código que vai virar um Pull Request pro
+usuário revisar — ele NUNCA vê o código sendo aplicado direto, só o PR resultante, então a
+proposta precisa estar certa e completa. Responda EXATAMENTE neste formato, sem nada fora dele:
+
+###SUMMARY###
+(1-2 frases em português resumindo a mudança que você vai fazer)
+###FILE: caminho/relativo/do/arquivo.ext###
+(conteúdo COMPLETO do arquivo depois da mudança — nunca um trecho, sempre o arquivo inteiro)
+###END_FILE###
+(repita o bloco ###FILE: ...### / ###END_FILE### pra cada arquivo que precisar mudar)
+###DONE###
+
+Se o contexto não for suficiente pra propor com segurança, responda só:
+###SUMMARY###
+(explique objetivamente por que não tem contexto suficiente)
+###DONE###
+(sem nenhum bloco ###FILE### nesse caso — nunca invente conteúdo de um arquivo que você não viu)
+
+Regras:
+- CADA arquivo mudado precisa do conteúdo COMPLETO, partindo exatamente do que já existia no
+  contexto acima (se existia) e aplicando só a mudança pedida — preserva todo o resto igual
+  (comentários, formatação, imports não relacionados).
+- Só inclua arquivos que REALMENTE precisam mudar — não aproveite pra refatorar ou mudar
+  estilo em código não relacionado ao pedido.
+- Pode criar um arquivo novo (path que não estava no contexto) se o pedido exigir.
+- NUNCA escreva texto fora dos marcadores ###...### — nem comentário, nem explicação solta.`;
+
+  // retry só na abertura do stream (antes de qualquer chunk chegar) — mesmo padrão de chatStream.
+  const stream = await withTransientRetry(CHAT_MODEL, (client) =>
+    client.models.generateContentStream({ model: CHAT_MODEL, contents: prompt, config: { systemInstruction } })
+  );
+
+  // parser incremental: o texto chega em pedaços que podem cortar um marcador ao meio, então
+  // acumula num buffer e só processa marcadores completos, devolvendo o resto pro próximo pedaço.
+  let buffer = "";
+  let mode = "summary"; // 'summary' | 'file' | 'done'
+  let currentPath = null;
+
+  for await (const chunk of stream) {
+    buffer += chunk.text || "";
+    let progressed = true;
+    while (progressed) {
+      progressed = false;
+      if (mode === "summary") {
+        const m = buffer.match(/^###SUMMARY###\r?\n?/);
+        if (m) { buffer = buffer.slice(m[0].length); mode = "summary_body"; progressed = true; }
+      } else if (mode === "summary_body") {
+        const idx = buffer.search(/###(FILE: [^#]+###|DONE###)/);
+        if (idx >= 0) {
+          const text = buffer.slice(0, idx).trim();
+          if (text) yield { type: "summary", text };
+          buffer = buffer.slice(idx);
+          mode = "between";
+          progressed = true;
+        }
+      } else if (mode === "between") {
+        const fileMatch = buffer.match(/^###FILE: ([^#]+)###\r?\n?/);
+        const doneMatch = buffer.match(/^###DONE###/);
+        if (fileMatch) {
+          currentPath = fileMatch[1].trim();
+          buffer = buffer.slice(fileMatch[0].length);
+          mode = "file_body";
+          yield { type: "file_start", path: currentPath };
+          progressed = true;
+        } else if (doneMatch) {
+          buffer = buffer.slice(doneMatch[0].length);
+          mode = "done";
+          yield { type: "done" };
+          progressed = true;
+        }
+      } else if (mode === "file_body") {
+        const idx = buffer.indexOf("###END_FILE###");
+        if (idx >= 0) {
+          const text = buffer.slice(0, idx);
+          if (text) yield { type: "file_chunk", path: currentPath, text };
+          yield { type: "file_end", path: currentPath };
+          buffer = buffer.slice(idx + "###END_FILE###".length);
+          mode = "between";
+          progressed = true;
+        } else if (buffer.length > 200) {
+          // manda o que já dá pra mandar com segurança, mas guarda uma folga (200 chars) pro
+          // caso do marcador ###END_FILE### estar chegando cortado ao meio entre pedaços
+          const safe = buffer.slice(0, buffer.length - 200);
+          if (safe) { yield { type: "file_chunk", path: currentPath, text: safe }; buffer = buffer.slice(safe.length); }
+        }
+      }
+    }
+  }
+  // sobrou algo no buffer sem fechar (resposta cortada/formato inesperado) — ainda manda o
+  // que tinha de conteúdo de arquivo em andamento, pra não perder trabalho já gerado
+  if (mode === "file_body" && buffer.trim()) yield { type: "file_chunk", path: currentPath, text: buffer };
+  if (mode !== "done") yield { type: "done" };
+}
+
 // ---- TTS: gera áudio a partir de texto ----
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
