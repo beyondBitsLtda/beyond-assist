@@ -90,6 +90,12 @@ export default function AssistantPage() {
   const [codeModeBranch, setCodeModeBranch] = useState("");
   const [codeModeRepos, setCodeModeRepos] = useState([]);
   const [codeModeBranches, setCodeModeBranches] = useState([]);
+  // arquivos escolhidos à mão, garantidos no contexto de TODO pedido enquanto o Modo Código
+  // ficar ligado (sem isso, só a busca semântica decide — e ela erra fácil em pedidos amplos
+  // tipo "mude o tema", que não se parecem textualmente com os arquivos de config certos).
+  const [codeModeFiles, setCodeModeFiles] = useState([]);
+  const [codeModeAvailableFiles, setCodeModeAvailableFiles] = useState([]);
+  const CODE_MODE_MAX_FILES = 6; // precisa bater com MAX_FILES_PER_TASK em src/lib/codeTasks.js
   const [liveCode, setLiveCode] = useState(null); // { path, content } — arquivo sendo escrito agora
   const [liveCodeDone, setLiveCodeDone] = useState([]); // arquivos já concluídos nesta tarefa
   const currentCodeFileRef = useRef(null);
@@ -101,6 +107,8 @@ export default function AssistantPage() {
   useEffect(() => {
     setCodeModeBranch("");
     setCodeModeBranches([]);
+    setCodeModeFiles([]);
+    setCodeModeAvailableFiles([]);
     if (!codeModeRepo) return;
     fetch(`/api/code-repos/branches?repo=${encodeURIComponent(codeModeRepo)}`)
       .then((r) => r.json())
@@ -111,6 +119,10 @@ export default function AssistantPage() {
           setCodeModeBranch(found?.default_branch && d.branches.includes(found.default_branch) ? found.default_branch : d.branches[0] || "");
         }
       })
+      .catch(() => {});
+    fetch(`/api/code-repos/files?repo=${encodeURIComponent(codeModeRepo)}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.ok) setCodeModeAvailableFiles(d.files || []); })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codeModeRepo]);
@@ -938,7 +950,7 @@ export default function AssistantPage() {
       const res = await fetch("/api/code-tasks/stream", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ repo: codeModeRepo, baseBranch: codeModeBranch, instruction: q }),
+        body: JSON.stringify({ repo: codeModeRepo, baseBranch: codeModeBranch, instruction: q, filePaths: codeModeFiles }),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
@@ -1007,7 +1019,7 @@ export default function AssistantPage() {
       currentCodeFileRef.current = null;
       setLiveCode(null);
     }
-  }, [codeModeRepo, codeModeBranch, addLog, voiceOn, stopSpeaking, enqueueSpeech]);
+  }, [codeModeRepo, codeModeBranch, codeModeFiles, addLog, voiceOn, stopSpeaking, enqueueSpeech]);
 
   // ---- pergunta real ao backend (SSE) ----
   const ask = useCallback(async (q) => {
@@ -1486,6 +1498,21 @@ export default function AssistantPage() {
                       {codeModeBranches.map((b) => <option key={b} value={b}>{b}</option>)}
                     </select>
                   )}
+                  {codeModeRepo && codeModeAvailableFiles.length > 0 && (
+                    <>
+                      <div style={{ ...mono, fontSize: 9, letterSpacing: 1, color: "rgba(207,239,251,0.45)", marginBottom: 4 }}>
+                        ARQUIVOS FIXOS (opcional, até {CODE_MODE_MAX_FILES} — ctrl/cmd+clique pra marcar mais de um; garante que entrem no contexto de toda pergunta enquanto o Modo Código estiver ligado)
+                      </div>
+                      <select
+                        multiple
+                        value={codeModeFiles}
+                        onChange={(e) => setCodeModeFiles(Array.from(e.target.selectedOptions).map((o) => o.value).slice(0, CODE_MODE_MAX_FILES))}
+                        style={{ ...mono, fontSize: 11, padding: "6px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#000", color: "#eafcff", width: "100%", height: 100, marginBottom: 8 }}
+                      >
+                        {codeModeAvailableFiles.map((f) => <option key={f} value={f}>{f}</option>)}
+                      </select>
+                    </>
+                  )}
                   <div style={{ fontSize: 10.5, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
                     Com isso ligado, toda mensagem vira um pedido de mudança de código nesse
                     repositório/branch — ela cria uma branch nova e abre um Pull Request, nunca
@@ -1758,6 +1785,17 @@ export default function AssistantPage() {
               >
                 <option value="">branch base…</option>
                 {codeModeBranches.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            )}
+            {codeModeRepo && codeModeAvailableFiles.length > 0 && (
+              <select
+                multiple
+                value={codeModeFiles}
+                onChange={(e) => setCodeModeFiles(Array.from(e.target.selectedOptions).map((o) => o.value).slice(0, CODE_MODE_MAX_FILES))}
+                title={`arquivos fixos (até ${CODE_MODE_MAX_FILES}, ctrl/cmd+clique pra marcar mais de um) — garantidos no contexto de toda pergunta enquanto o Modo Código estiver ligado`}
+                style={{ ...mono, fontSize: 9, padding: "4px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff", width: 160, height: 60 }}
+              >
+                {codeModeAvailableFiles.map((f) => <option key={f} value={f}>{f}</option>)}
               </select>
             )}
           </>
