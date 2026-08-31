@@ -3,6 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { CY, OR, GR, PU, mono } from "@/lib/theme.js";
 
+// Precisa bater com MAX_FILES_PER_TASK em src/lib/codeTasks.js (não dá pra importar de lá
+// direto — aquele módulo puxa segredo de servidor, quebraria num componente client). Sem
+// limitar aqui, dava pra marcar mais arquivo do que o backend aceita, e o excesso era
+// cortado em silêncio (em qualquer ordem) — foi assim que accentThemes.js e globals.css
+// sumiram do contexto mesmo estando marcados, só porque vieram depois na lista.
+const MAX_FILES = 6;
+
 /**
  * A Lisa PROPÕE mudança de código: escolhe repositório + branch base, descreve o pedido, ela
  * cria uma branch nova, aplica os arquivos e abre um Pull Request — nunca mescla sozinha (ver
@@ -60,7 +67,11 @@ export default function CodeTasksPage() {
   }, [repo]);
 
   const toggleFile = (path) => {
-    setSelectedFiles((sel) => (sel.includes(path) ? sel.filter((p) => p !== path) : [...sel, path]));
+    setSelectedFiles((sel) => {
+      if (sel.includes(path)) return sel.filter((p) => p !== path);
+      if (sel.length >= MAX_FILES) return sel; // no limite, ignora — nunca deixa passar do que o backend aceita
+      return [...sel, path];
+    });
   };
 
   const submit = async () => {
@@ -129,7 +140,7 @@ export default function CodeTasksPage() {
           <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="ex.: corrige o bug em X, adiciona um botão que faz Y" rows={4} style={{ ...inputStyle, resize: "vertical" }} />
 
           <div style={labelStyle}>
-            ARQUIVOS (opcional — garante que entrem no contexto, além do que a busca semântica achar sozinha)
+            ARQUIVOS (opcional, no máx. {MAX_FILES} — garante que entrem no contexto, além do que a busca semântica achar sozinha)
           </div>
           {repo ? (
             <>
@@ -139,19 +150,24 @@ export default function CodeTasksPage() {
                 placeholder={`filtrar entre ${codeFiles.length} arquivos indexados…`}
                 style={{ ...inputStyle, marginBottom: 6 }}
               />
-              {selectedFiles.length > 0 && (
-                <div style={{ fontSize: 10.5, color: PU, marginBottom: 6 }}>{selectedFiles.length} selecionado(s): {selectedFiles.join(", ")}</div>
-              )}
+              <div style={{ fontSize: 10.5, color: selectedFiles.length >= MAX_FILES ? OR : PU, marginBottom: 6 }}>
+                {selectedFiles.length}/{MAX_FILES} selecionado(s){selectedFiles.length ? `: ${selectedFiles.join(", ")}` : ""}
+                {selectedFiles.length >= MAX_FILES && " — limite atingido, desmarque algum pra trocar"}
+              </div>
               <div style={{ maxHeight: 160, overflowY: "auto", border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: 6, padding: "6px 8px" }}>
                 {codeFiles
                   .filter((f) => !fileFilter.trim() || f.toLowerCase().includes(fileFilter.toLowerCase()))
                   .slice(0, 200)
-                  .map((f) => (
-                    <label key={f} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: 11.5, color: "#eafcff", cursor: "pointer" }}>
-                      <input type="checkbox" checked={selectedFiles.includes(f)} onChange={() => toggleFile(f)} />
-                      {f}
-                    </label>
-                  ))}
+                  .map((f) => {
+                    const checked = selectedFiles.includes(f);
+                    const disabled = !checked && selectedFiles.length >= MAX_FILES;
+                    return (
+                      <label key={f} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: 11.5, color: disabled ? "rgba(207,239,251,0.35)" : "#eafcff", cursor: disabled ? "not-allowed" : "pointer" }}>
+                        <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggleFile(f)} />
+                        {f}
+                      </label>
+                    );
+                  })}
                 {codeFiles.length === 0 && <div style={{ ...mono, fontSize: 10, color: "rgba(207,239,251,0.4)" }}>nenhum arquivo indexado ainda pra esse repositório.</div>}
               </div>
             </>

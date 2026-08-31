@@ -77,8 +77,10 @@ export async function runCodeTask({ repo, baseBranch, instruction, filePaths = [
 
   try {
     // 1) contexto: os arquivos escolhidos à mão (garantidos) + o que a busca semântica achar
+    // filePaths (escolhidos à mão) sempre vêm primeiro no corte — nunca deixa a busca
+    // semântica empurrar pra fora um arquivo que o usuário pediu explicitamente.
     const matches = await retrieve(instruction, { filterSource: "github", filterBoard: repo, topK: 8, minSim: 0.3 });
-    const uniquePaths = [...new Set([...filePaths, ...matches.map((m) => m.title)])].slice(0, MAX_FILES_PER_TASK);
+    const uniquePaths = [...new Set([...filePaths.slice(0, MAX_FILES_PER_TASK), ...matches.map((m) => m.title)])].slice(0, MAX_FILES_PER_TASK);
     const contextFiles = await getFullFileContents(repo, uniquePaths);
 
     // 2) Gemini propõe as mudanças (nunca aplica sozinho)
