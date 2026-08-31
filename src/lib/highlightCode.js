@@ -1,19 +1,17 @@
-// Realce de sintaxe pro código que a Lisa escreve ao vivo no Modo Código (ver
-// src/app/(panels)/assistant/page.js) — client-side, via Prism (leve, sem CSS próprio: as
-// cores vêm do tema do próprio app, ver TOKEN_COLORS abaixo, não do "Dark+" do VS Code).
+// Detecção de linguagem pra realçar a sintaxe do código que a Lisa escreve ao vivo no Modo
+// Código (ver src/app/(panels)/assistant/page.js). O realce em si usa <Highlight> de
+// "prism-react-renderer" direto no componente (ela devolve os TOKENS já separados por linha,
+// então casa perfeito com o gutter de número de linha sem precisar fatiar HTML na mão).
+//
+// Por que prism-react-renderer e não o pacote "prismjs" puro: os arquivos de linguagem do
+// prismjs (prism-jsx.js etc.) esperam uma variável GLOBAL `Prism` já populada quando carregam
+// — funciona certinho num <script> solto ou no require() do Node, mas sob o bundler do
+// Next.js (client bundle) isso quebrava bem depois do primeiro carregamento, derrubando a
+// árvore de componentes inteira (tela toda preta, já que o body do app é preto por padrão) —
+// só na hora em que o realce rodava de verdade pela primeira vez (o 1º arquivo sendo escrito).
+// O prism-react-renderer empacota o Prism dele mesmo como um módulo comum, sem depender de
+// global nenhuma, então não tem esse risco.
 "use client";
-
-import Prism from "prismjs";
-// ordem importa — cada um espera que sua dependência já esteja carregada em Prism.languages
-// (jsx precisa de javascript, tsx precisa de jsx+typescript; os dois vêm de "prismjs" puro).
-import "prismjs/components/prism-typescript.js";
-import "prismjs/components/prism-jsx.js";
-import "prismjs/components/prism-tsx.js";
-import "prismjs/components/prism-json.js";
-import "prismjs/components/prism-bash.js";
-import "prismjs/components/prism-sql.js";
-import "prismjs/components/prism-yaml.js";
-import "prismjs/components/prism-python.js";
 
 const LANG_BY_EXT = {
   js: "javascript", mjs: "javascript", cjs: "javascript",
@@ -23,27 +21,15 @@ const LANG_BY_EXT = {
   css: "css",
   json: "json",
   html: "markup", htm: "markup", xml: "markup", svg: "markup",
-  sh: "bash", bash: "bash",
   sql: "sql",
   yml: "yaml", yaml: "yaml",
   py: "python",
+  md: "markdown",
 };
 
+/** Linguagem (no vocabulário do Prism) pra um caminho de arquivo, ou `null` se a extensão não
+ * tem gramática reconhecida — quem chama cai pro texto puro (sem cor) nesse caso. */
 export function langForPath(path) {
   const ext = String(path || "").split(".").pop().toLowerCase();
   return LANG_BY_EXT[ext] || null;
-}
-
-/** HTML já com os `<span class="token ...">` do Prism — seguro pra dangerouslySetInnerHTML
- * (o Prism escapa o texto na tokenização, é literalmente pra isso que ele serve). `null` se a
- * extensão do arquivo não tem gramática reconhecida — quem chama cai pro texto puro nesse caso. */
-export function highlightCode(content, path) {
-  const lang = langForPath(path);
-  const grammar = lang && Prism.languages[lang];
-  if (!grammar) return null;
-  try {
-    return Prism.highlight(content, grammar, lang);
-  } catch {
-    return null;
-  }
 }

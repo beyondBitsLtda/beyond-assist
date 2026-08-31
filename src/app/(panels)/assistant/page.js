@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
-import { highlightCode } from "@/lib/highlightCode.js";
+import { langForPath } from "@/lib/highlightCode.js";
+import { Highlight } from "prism-react-renderer";
 import { TTS_VOICES } from "@/lib/ttsVoices.js";
 import { pickBrowserVoice, speakText, stopBrowserVoiceAudio, isBrowserVoiceAudioPlaying } from "@/lib/browserVoice.js";
 import { useIsMobile } from "@/lib/useIsMobile.js";
@@ -1358,14 +1359,22 @@ export default function AssistantPage() {
     : (liveCode ? liveCode.path : codeFilesOpen[codeFilesOpen.length - 1]?.path) || null;
   const codeActiveFile = codeFilesOpen.find((f) => f.path === codeActivePath) || null;
   const codeActiveTail = codeActiveFile ? codeActiveFile.content.slice(-6000) : "";
-  const codeActiveLineCount = codeActiveFile ? codeActiveTail.split("\n").length : 0;
-  // destaque de sintaxe (Prism) recalculado só quando o CONTEÚDO realmente muda — cores vêm
-  // do tema do próprio app (ver <style> logo abaixo), não do "Dark+" do VS Code. `null` quando
-  // a extensão do arquivo não tem gramática reconhecida (cai pro texto puro, sem cor).
-  const codeActiveHtml = useMemo(
-    () => (codeActiveFile ? highlightCode(codeActiveTail, codeActiveFile.path) : null),
-    [codeActiveTail, codeActiveFile?.path]
-  );
+  const codeActiveLang = codeActiveFile ? langForPath(codeActiveFile.path) : null; // null = extensão sem gramática reconhecida, cai pro texto puro
+  // paleta do realce de sintaxe — cores do próprio app (CY/PU/GR/OR + o texto
+  // cyan-esbranquiçado de sempre), não a paleta padrão do Prism nem do VS Code.
+  const BB_CODE_THEME = {
+    plain: { color: "#cfeffb" },
+    styles: [
+      { types: ["comment", "prolog", "doctype", "cdata"], style: { color: "rgba(207,239,251,0.35)", fontStyle: "italic" } },
+      { types: ["string", "attr-value", "char", "inserted"], style: { color: GR } },
+      { types: ["keyword", "tag", "important", "atrule", "deleted"], style: { color: PU } },
+      { types: ["function", "class-name", "selector"], style: { color: CY } },
+      { types: ["number", "boolean", "constant", "regex", "symbol"], style: { color: OR } },
+      { types: ["punctuation", "operator"], style: { color: "rgba(207,239,251,0.55)" } },
+      { types: ["property", "attr-name"], style: { color: "rgba(207,239,251,0.85)" } },
+      { types: ["variable", "parameter", "builtin"], style: { color: "#eafcff" } },
+    ],
+  };
   const codeModeLog = messages.filter((m) => m.codeMode); // histórico só do Modo Código, pra caber inteiro na janela sem misturar com o chat normal
   const submitCodeModalInput = () => {
     const q = codeModalInput.trim();
@@ -1386,19 +1395,6 @@ export default function AssistantPage() {
         ...mono,
       }}
     >
-      {/* cores do realce de sintaxe (Prism) — paleta do próprio app (CY/PU/GR/OR + o texto
-          cyan-esbranquiçado de sempre), não a paleta padrão do Prism nem do VS Code. */}
-      <style>{`
-        .bb-code-hl .token.comment, .bb-code-hl .token.prolog, .bb-code-hl .token.doctype { color: rgba(207,239,251,0.35); font-style: italic; }
-        .bb-code-hl .token.string, .bb-code-hl .token.attr-value, .bb-code-hl .token.char { color: ${GR}; }
-        .bb-code-hl .token.keyword, .bb-code-hl .token.tag, .bb-code-hl .token.important, .bb-code-hl .token.atrule { color: ${PU}; }
-        .bb-code-hl .token.function, .bb-code-hl .token.class-name, .bb-code-hl .token.selector { color: var(--accent-hex); }
-        .bb-code-hl .token.number, .bb-code-hl .token.boolean, .bb-code-hl .token.constant, .bb-code-hl .token.regex { color: ${OR}; }
-        .bb-code-hl .token.punctuation, .bb-code-hl .token.operator { color: rgba(207,239,251,0.55); }
-        .bb-code-hl .token.property, .bb-code-hl .token.attr-name { color: rgba(207,239,251,0.85); }
-        .bb-code-hl .token.variable, .bb-code-hl .token.parameter, .bb-code-hl .token.builtin { color: #eafcff; }
-      `}</style>
-
       {/* barra de título — arrastável, com bolinhas de fechar/minimizar/maximizar (a função é
           universal; as cores ficam discretas pra não destoar do resto do app) */}
       <div
@@ -1508,18 +1504,31 @@ export default function AssistantPage() {
           {/* corpo do editor — número de linha + código com realce de sintaxe */}
           <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: "#050b10" }}>
             {codeActiveFile ? (
-              <div style={{ display: "flex", fontSize: 11.5, lineHeight: 1.55 }}>
-                <div style={{ flex: "none", padding: "8px 10px 8px 14px", textAlign: "right", color: "rgba(207,239,251,0.3)", userSelect: "none" }}>
-                  {Array.from({ length: codeActiveLineCount }, (_, i) => <div key={i}>{i + 1}</div>)}
-                </div>
-                {codeActiveHtml ? (
-                  <pre className="bb-code-hl" style={{ margin: 0, padding: "8px 14px 8px 6px", whiteSpace: "pre-wrap", wordBreak: "break-all", color: "#cfeffb", flex: 1 }}>
-                    <code dangerouslySetInnerHTML={{ __html: codeActiveHtml }} />
-                  </pre>
-                ) : (
+              codeActiveLang ? (
+                <Highlight code={codeActiveTail} language={codeActiveLang} theme={BB_CODE_THEME}>
+                  {({ tokens, getLineProps, getTokenProps }) => (
+                    <div style={{ display: "flex", fontSize: 11.5, lineHeight: 1.55 }}>
+                      <div style={{ flex: "none", padding: "8px 10px 8px 14px", textAlign: "right", color: "rgba(207,239,251,0.3)", userSelect: "none" }}>
+                        {tokens.map((_, i) => <div key={i}>{i + 1}</div>)}
+                      </div>
+                      <pre style={{ margin: 0, padding: "8px 14px 8px 6px", whiteSpace: "pre-wrap", wordBreak: "break-all", flex: 1 }}>
+                        {tokens.map((line, i) => (
+                          <div key={i} {...getLineProps({ line })}>
+                            {line.map((token, ti) => <span key={ti} {...getTokenProps({ token })} />)}
+                          </div>
+                        ))}
+                      </pre>
+                    </div>
+                  )}
+                </Highlight>
+              ) : (
+                <div style={{ display: "flex", fontSize: 11.5, lineHeight: 1.55 }}>
+                  <div style={{ flex: "none", padding: "8px 10px 8px 14px", textAlign: "right", color: "rgba(207,239,251,0.3)", userSelect: "none" }}>
+                    {codeActiveTail.split("\n").map((_, i) => <div key={i}>{i + 1}</div>)}
+                  </div>
                   <pre style={{ margin: 0, padding: "8px 14px 8px 6px", whiteSpace: "pre-wrap", wordBreak: "break-all", color: "#cfeffb", flex: 1 }}>{codeActiveTail}</pre>
-                )}
-              </div>
+                </div>
+              )
             ) : (
               <div style={{ padding: "16px 14px", fontSize: 11.5, color: "rgba(207,239,251,0.35)" }}>
                 nenhum arquivo sendo editado ainda — a Lisa está {codeStage ? CODE_STAGE_LABELS[codeStage] : "começando"}…
