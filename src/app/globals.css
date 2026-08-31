@@ -1,38 +1,21 @@
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #000; }
-a { color: #38e1ff; text-decoration: none; }
-a:hover { color: #7febff; }
-::selection { background: rgba(56,225,255,0.3); color: #eaffff; }
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(56,225,255,0.25); border-radius: 3px; }
+// beyondBitsLtda/beyond-assist/src/app/globals.css
 
-input { font-family: 'JetBrains Mono', monospace; }
-input::placeholder { color: rgba(207,239,251,0.4); }
-
-@keyframes bb-flicker { 0%,100%{opacity:.85} 50%{opacity:1} }
-@keyframes bb-blink   { 0%,49%{opacity:1} 50%,100%{opacity:0} }
-@keyframes bb-slidein { from{opacity:0; transform:translateX(-8px)} to{opacity:1; transform:translateX(0)} }
-@keyframes bb-sweep   { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
-@keyframes bb-dot     { 0%,100%{opacity:.35} 50%{opacity:1} }
-
-
-* { box-sizing: border-box; }
-
+/* Cor de destaque do HUD — trocável pelo seletor de tema no Topbar (ver
+   src/lib/accentThemes.js). Ciano é o padrão original; o seletor sobrescreve essas duas
+   variáveis via JS (document.documentElement.style.setProperty). */
 :root {
-  /* Cores Padrão (Cyber Blue) - Injetadas para o ::selection e scrollbar */
-  --cy-hex: #38e1ff;
-  --cy-rgb: 56, 225, 255;
+  --accent-hex: #ffffff;
+  --accent-rgb: 255, 255, 255;
 }
 
+* { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #000; }
-a { color: var(--cy-hex); text-decoration: none; }
-a:hover { color: #ffffff; }
-
-::selection { background: rgba(var(--cy-rgb), 0.3); color: #eaffff; }
+a { color: var(--accent-hex); text-decoration: none; }
+a:hover { color: #7febff; }
+::selection { background: rgba(var(--accent-rgb), 0.3); color: #eaffff; }
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(var(--cy-rgb), 0.25); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb), 0.25); border-radius: 3px; }
 
 input { font-family: 'JetBrains Mono', monospace; }
 input::placeholder { color: rgba(207,239,251,0.4); }
@@ -40,5 +23,68 @@ input::placeholder { color: rgba(207,239,251,0.4); }
 @keyframes bb-flicker { 0%,100%{opacity:.85} 50%{opacity:1} }
 @keyframes bb-blink   { 0%,49%{opacity:1} 50%,100%{opacity:0} }
 @keyframes bb-slidein { from{opacity:0; transform:translateX(-8px)} to{opacity:1; transform:translateX(0)} }
+@keyframes bb-sweep   { 0%{transform:rotate(0deg)} 100%{transform:ro
+ 50%,100%{opacity:0} }
+@keyframes bb-slidein { from{opacity:0; transform:translateX(-8px)} to{opacity:1; transform:translateX(0)} }
 @keyframes bb-sweep   { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
 @keyframes bb-dot     { 0%,100%{opacity:.35} 50%{opacity:1} }
+
+/* ============================================================
+   Responsivo (mobile ≤768px) — inline style não faz media query,
+   então só os pontos estruturais que quebram no celular viram
+   classe aqui; o resto do app continua inline como sempre foi.
+   Regras base primeiro, overrides do @media depois (cascata
+   normal, sem precisar de !important em lugar nenhum).
+   ============================================================ */
+.bb-sidebar { position: relative; width: 208px; flex: none; z-index: 2; }
+.bb-sidebar-backdrop { display: none; }
+.bb-hamburger { display: none; }
+.bb-kanban-col { width: 280px; }
+.bb-chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.bb-assistant-tabs { display: none; }
+.bb-assistant-pane { display: flex; }
+
+@media (max-width: 768px) {
+  .bb-sidebar {
+    position: fixed; inset: 0 auto 0 0; width: 78vw; max-width: 280px; z-
+px; }
+.bb-assistant-tabs { display: none; }
+.bb-assistant-pane { display: flex; }
+
+@media (max-width: 768px) {
+  .bb-sidebar {
+    position: fixed; inset: 0 auto 0 0; width: 78vw; max-width: 280px; z-index: 45;
+    transform: translateX(-100%); transition: transform .25s ease;
+    box-shadow: 8px 0 30px rgba(0,0,0,0.55);
+  }
+  .bb-sidebar.bb-open { transform: translateX(0); }
+
+  .bb-sidebar-backdrop.bb-open {
+    display: block; position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,0.5);
+  }
+
+  .bb-hamburger { display: flex; }
+
+  .bb-topbar-row { flex-wrap: wrap; row-gap: 8px; }
+
+  .bb-assistant-tabs { display: flex; }
+  .bb-assistant-grid { display: flex; flex-direction: column; }
+  .bb-assistant-pane { display: none; }
+  .bb-assistant-pane.bb-active { display: flex; }
+  .bb-assistant-context { display: none !important; } /* some de vez no mobile, nunca vira aba */
+
+  /* rodapé do chat: tira texto redundante (rótulos), fica só ícone+cor, pra não espremer/sobrepor */
+  .bb-footer { gap: 8px !important; padding-left: 14px !important; padding-right: 14px !important; }
+  .bb-footer-hide { display: none !important; }
+
+  .bb-kanban-col { width: min(85vw, 280px); }
+
+  /* mesmo a
+ter { gap: 8px !important; padding-left: 14px !important; padding-right: 14px !important; }
+  .bb-footer-hide { display: none !important; }
+
+  .bb-kanban-col { width: min(85vw, 280px); }
+
+  /* mesmo auto-fit de sempre, só com mínimo menor pra não estourar largura em tela bem estreita */
+  .bb-chart-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+}
