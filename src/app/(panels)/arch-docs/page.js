@@ -8,6 +8,8 @@ const STAGE_LABELS = {
   "scan-imports": "🕸️ seguindo os imports pra achar as conexões reais",
   describe: "🧠 descrevendo cada área",
   overview: "✍️ escrevendo a visão geral",
+  "explain-key-files": "📖 lendo os arquivos mais centrais de perto",
+  narrative: "🧭 reconstruindo o fluxo de uso e os casos de uso",
   render: "📄 montando o documento",
 };
 

@@ -693,6 +693,98 @@ centrais pelo nome. Tom direto, técnico, em português.`;
   return (res.text || "").trim();
 }
 
+/**
+ * Explica UM arquivo "chave" (escolhido por código, ver src/lib/archDocs.js — os mais
+ * importados por outros arquivos, ou pontos de entrada convencionais como page.js/route.js)
+ * pro leitor entender o PAPEL dele na arquitetura sem precisar ler o código inteiro sozinho.
+ * `content` já vem truncado por quem chama, se for muito grande.
+ */
+export async function explainKeyFile({ repo, path, content, area }) {
+  const prompt = `Repositório: ${repo}
+Arquivo: ${path} (área: ${area})
+
+CONTEÚDO:
+${content}
+
+Explique o que este arquivo faz e por que ele é uma peça importante da arquitetura — em 3-6
+frases. Cite trechos/nomes de função específicos quando ajudar a explicar. Não descreva
+sintaxe óbvia linha a linha; foque no PAPEL do arquivo no sistema como um todo.`;
+
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: prompt,
+        config: { systemInstruction: "Você explica trechos de código-chave de um repositório pra documentação técnica, em português — direto, específico, sem parafrasear sintaxe óbvia." },
+      }),
+    { attempts: 2, delayMs: 600 }
+  );
+  return (res.text || "").trim();
+}
+
+/**
+ * FLUXO DE USO (passo a passo de como um usuário/processo interage com a aplicação) e CASOS
+ * DE USO (por ator) do repositório inteiro — chamado uma vez, depois de todas as áreas já
+ * descritas. Devolve dados ESTRUTURADOS (nunca sintaxe de diagrama) — o diagrama em si (Mermaid)
+ * é montado em código a partir disso, pelo mesmo motivo do grafo de dependência: texto solto
+ * que precisa "compilar" certinho é onde a IA mais erra a mão.
+ */
+export async function planNarrative({ repo, overview, areaSummaries }) {
+  const areasBlock = areaSummaries.map((a) => `- ${a.name}: ${a.summary}`).join("\n");
+
+  const prompt = `Repositório: ${repo}
+
+VISÃO GERAL: ${overview}
+
+ÁREAS MAPEADAS:
+${areasBlock}
+
+Com base nisso, produza:
+1. "usage_flow": o fluxo de uso PRINCIPAL da aplicação, como uma sequência de 5 a 10 passos em
+   ORDEM, cada um com quem age ("actor" — ex.: "Usuário", "Frontend", "API", "Banco de dados",
+   um serviço externo específico) e o que acontece nesse passo ("action", 1 frase objetiva).
+   Cubra do início (o usuário chegando/interagindo) até o resultado final.
+2. "use_cases": os atores do sistema (ex.: "Usuário", "Administrador", "Tarefa agendada/cron",
+   um serviço externo que aciona algo) e, pra CADA ator, uma lista de 2-5 casos de uso
+   (frases curtas, no infinitivo, tipo "Perguntar algo à Lisa", "Disparar sync periódico").`;
+
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: prompt,
+        config: {
+          systemInstruction: "Você documenta o fluxo de uso e os casos de uso de uma aplicação de software pra documentação técnica, em português, com base no que já se sabe sobre as áreas do código.",
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              usage_flow: {
+                type: "ARRAY",
+                items: { type: "OBJECT", properties: { actor: { type: "STRING" }, action: { type: "STRING" } }, required: ["actor", "action"] },
+              },
+              use_cases: {
+                type: "ARRAY",
+                items: { type: "OBJECT", properties: { actor: { type: "STRING" }, cases: { type: "ARRAY", items: { type: "STRING" } } }, required: ["actor", "cases"] },
+              },
+            },
+            required: ["usage_flow", "use_cases"],
+          },
+        },
+      }),
+    { attempts: 2, delayMs: 800 }
+  );
+
+  try {
+    const parsed = JSON.parse(res.text);
+    return { usageFlow: parsed.usage_flow || [], useCases: parsed.use_cases || [] };
+  } catch {
+    return { usageFlow: [], useCases: [] };
+  }
+}
+
 // ---- TTS: gera áudio a partir de texto ----
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";

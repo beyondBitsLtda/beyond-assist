@@ -2,7 +2,7 @@ import { supabase } from "./supabase.js";
 import { listIndexedFiles } from "./ingest/github.js";
 import { getFullFileContents } from "./repoFiles.js";
 import { resolveFileImports } from "./importGraph.js";
-import { describeArchArea, writeArchOverview } from "./gemini.js";
+import { describeArchArea, writeArchOverview, explainKeyFile, planNarrative } from "./gemini.js";
 import { renderArchDocHtml } from "./archDocTemplate.js";
 
 // Mapa de Arquitetura: dado um repositório já indexado (ver /code-repos), gera um HTML
@@ -17,6 +17,29 @@ const MAX_AREAS = 24; // além disso, os menores grupos viram um "outros diverso
 const MAX_FILES_SCANNED = 500; // teto de segurança pra repositório muito grande — não trava a tarefa, só limita o grafo de dependência a uma amostra
 const SCAN_BATCH = 20; // arquivos por passo no scan de imports — puro I/O+regex, rápido, cabe folgado nos 60s
 const MAX_EDGES = 60; // no diagrama, só os laços mais fortes — o resto vira um emaranhado ilegível
+const MAX_KEY_FILES = 6; // quantos arquivos ganham leitura de código completa (com explicação) na seção de "código-chave"
+const MAX_KEY_FILE_CHARS = 8000; // teto de tamanho do conteúdo mostrado/enviado pra IA por arquivo-chave — arquivo gigante vira ruído, não clareza
+
+/** Escolhe os arquivos "chave" pra seção de leitura de código — por padrão, os mais
+ * IMPORTADOS por outros arquivos (quem depende de mais gente costuma ser mais central). Se o
+ * grafo de dependência não achou nada (repositório pequeno, ou imports não resolvidos), cai
+ * pro fallback de pegar arquivos das áreas com mais arquivos — nunca deixa a seção vazia. */
+function pickKeyFiles(fileInDegree, areas, max) {
+  const ranked = Object.entries(fileInDegree)
+    .filter(([, score]) => score > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([path]) => path);
+  let picked = ranked.slice(0, max);
+  if (picked.length < max) {
+    const fallback = areas
+      .slice()
+      .sort((a, b) => b.paths.length - a.paths.length)
+      .flatMap((a) => a.paths)
+      .filter((p) => !picked.includes(p));
+    picked = [...picked, ...fallback.slice(0, max - picked.length)];
+  }
+  return picked;
+}
 
 /** Chave de agrupamento "crua" de um caminho — pelas 2 primeiras pastas depois de um `src/`
  * opcional (convenção comum; funciona bem mesmo sem `src/`). Só uma heurística: nomes de
@@ -116,7 +139,7 @@ export async function* runArchDocStep({ docId, repo }) {
       yield { type: "narration", text: `Encontrei ${scanPaths.length} arquivo${scanPaths.length > 1 ? "s" : ""} em ${areas.length} área${areas.length > 1 ? "s" : ""}.` };
       await setState({
         stage: "scan-imports", allPaths: scanPaths, areas, keyMap,
-        edgeCounts: {}, scanIndex: 0,
+        edgeCounts: {}, fileInDegree: {}, scanIndex: 0,
       });
       yield { type: "step_done", docId: doc.id, stage: "scan-imports", done: false };
       return;
@@ -126,14 +149,15 @@ export async function* runArchDocStep({ docId, repo }) {
     // aresta ÁREA→ÁREA a partir dos imports resolvidos de verdade (ver importGraph.js).
     if (stage === "scan-imports") {
       yield { type: "stage", stage: "scan-imports", docId: doc.id };
-      const { allPaths = [], keyMap = {}, edgeCounts = {}, scanIndex = 0 } = state;
+      const { allPaths = [], areas = [], keyMap = {}, edgeCounts = {}, fileInDegree = {}, scanIndex = 0 } = state;
       if (scanIndex >= allPaths.length) {
         const edges = Object.entries(edgeCounts)
           .map(([key, weight]) => { const [from, to] = key.split("|"); return { from, to, weight }; })
           .sort((a, b) => b.weight - a.weight)
           .slice(0, MAX_EDGES);
         yield { type: "narration", text: `Mapeei ${edges.length} conexão${edges.length > 1 ? "ões" : ""} real${edges.length > 1 ? "is" : ""} entre as áreas.` };
-        await setState({ stage: "describe", edges, describeIndex: 0 });
+        const keyFiles = pickKeyFiles(fileInDegree, areas, MAX_KEY_FILES);
+        await setState({ stage: "describe", edges, describeIndex: 0, keyFiles });
         yield { type: "step_done", docId: doc.id, stage: "describe", done: false };
         return;
       }
@@ -141,16 +165,18 @@ export async function* runArchDocStep({ docId, repo }) {
       const batch = allPaths.slice(scanIndex, scanIndex + SCAN_BATCH);
       const files = await getFullFileContents(repo, batch);
       const nextEdgeCounts = { ...edgeCounts };
+      const nextInDegree = { ...fileInDegree };
       for (const f of files) {
         const fromArea = keyMap[rawAreaKey(f.path)] || rawAreaKey(f.path);
         for (const target of resolveFileImports(f.content, f.path, knownPaths)) {
+          nextInDegree[target] = (nextInDegree[target] || 0) + 1;
           const toArea = keyMap[rawAreaKey(target)] || rawAreaKey(target);
           if (toArea === fromArea) continue;
           const key = `${fromArea}|${toArea}`;
           nextEdgeCounts[key] = (nextEdgeCounts[key] || 0) + 1;
         }
       }
-      await setState({ edgeCounts: nextEdgeCounts, scanIndex: scanIndex + batch.length });
+      await setState({ edgeCounts: nextEdgeCounts, fileInDegree: nextInDegree, scanIndex: scanIndex + batch.length });
       yield { type: "step_done", docId: doc.id, stage: "scan-imports", done: false };
       return;
     }
@@ -176,6 +202,48 @@ export async function* runArchDocStep({ docId, repo }) {
       return;
     }
 
+    // Leitura de código-chave: um arquivo POR PASSO (busca o conteúdo real + pede uma
+    // explicação do papel dele na arquitetura) — os arquivos escolhidos em "scan-imports"
+    // (pickKeyFiles), tipicamente os mais importados por outros arquivos.
+    if (stage === "explain-key-files") {
+      yield { type: "stage", stage: "explain-key-files", docId: doc.id };
+      const { keyFiles = [], keyFilesDone = [], explainIndex = 0, keyMap = {} } = state;
+      if (explainIndex >= keyFiles.length) {
+        await setState({ stage: "narrative" });
+        yield { type: "step_done", docId: doc.id, stage: "narrative", done: false };
+        return;
+      }
+      const path = keyFiles[explainIndex];
+      yield { type: "narration", text: `Lendo \`${path}\` de perto.` };
+      const [fetched] = await getFullFileContents(repo, [path]);
+      let entry;
+      if (!fetched) {
+        entry = { path, content: "", truncated: false, explanation: "(não consegui recuperar o conteúdo deste arquivo)" };
+      } else {
+        const truncated = fetched.content.length > MAX_KEY_FILE_CHARS;
+        const shown = fetched.content.slice(0, MAX_KEY_FILE_CHARS);
+        const area = keyMap[rawAreaKey(path)] || rawAreaKey(path);
+        const explanation = await explainKeyFile({ repo, path, content: shown, area }).catch(() => "");
+        entry = { path, content: shown, truncated, explanation: explanation || "(sem explicação disponível)" };
+      }
+      await setState({ keyFilesDone: [...keyFilesDone, entry], explainIndex: explainIndex + 1 });
+      yield { type: "step_done", docId: doc.id, stage: "explain-key-files", done: false };
+      return;
+    }
+
+    if (stage === "narrative") {
+      yield { type: "stage", stage: "narrative", docId: doc.id };
+      yield { type: "narration", text: "Reconstruindo o fluxo de uso e os casos de uso da aplicação." };
+      const { areas = [], overview = "" } = state;
+      const { usageFlow, useCases } = await planNarrative({
+        repo, overview,
+        areaSummaries: areas.map((a) => ({ name: a.name, summary: a.summary })),
+      }).catch(() => ({ usageFlow: [], useCases: [] }));
+      await setState({ stage: "render", usageFlow, useCases });
+      yield { type: "step_done", docId: doc.id, stage: "render", done: false };
+      return;
+    }
+
     if (stage === "overview") {
       yield { type: "stage", stage: "overview", docId: doc.id };
       yield { type: "narration", text: "Escrevendo a visão geral do repositório." };
@@ -184,21 +252,24 @@ export async function* runArchDocStep({ docId, repo }) {
         repo,
         areaSummaries: areas.map((a) => ({ name: a.name, fileCount: a.paths.length, summary: a.summary })),
       }).catch(() => "");
-      await setState({ stage: "render", overview });
-      yield { type: "step_done", docId: doc.id, stage: "render", done: false };
+      await setState({ stage: "explain-key-files", explainIndex: 0, keyFilesDone: [], overview });
+      yield { type: "step_done", docId: doc.id, stage: "explain-key-files", done: false };
       return;
     }
 
     if (stage === "render") {
       yield { type: "stage", stage: "render", docId: doc.id };
       yield { type: "narration", text: "Montando o documento final." };
-      const { areas = [], edges = [], overview = "" } = state;
+      const { areas = [], edges = [], overview = "", keyFilesDone = [], usageFlow = [], useCases = [] } = state;
       const html = renderArchDocHtml({
         repo,
         generatedAt: new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date()),
         overview: overview || "(não consegui gerar uma visão geral desta vez.)",
         areas,
         edges,
+        usageFlow,
+        useCases,
+        keyFiles: keyFilesDone,
       });
       await updateDoc(doc.id, { status: "done", html });
       yield { type: "narration", text: "Pronto! O mapa de arquitetura está pronto pra ver." };
