@@ -11,6 +11,7 @@
     "ask": "node --env-file=.env scripts/ask.mjs"
   },
   "dependencies": {
+    "@babel/parser": "^8.0.4",
     "@google/genai": "^1.0.0",
     "@mediapipe/tasks-vision": "^1.0.1",
     "@supabase/supabase-js": "^2.45.0",

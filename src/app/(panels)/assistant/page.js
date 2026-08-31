@@ -125,6 +125,7 @@ export default function AssistantPage() {
     "context-fetch": "📖 lendo o conteúdo dos arquivos",
     planning: "🧠 decidindo o que muda",
     writing: "✍️ escrevendo o código",
+    fixing: "🔧 corrigindo um erro de sintaxe",
     branching: "🌿 criando branch",
     committing: "📝 aplicando arquivos",
     pr: "🔀 abrindo pull request",
@@ -1543,26 +1544,33 @@ export default function AssistantPage() {
           </div>
 
           {/* caixa de mensagem própria da janela — dá pra continuar pedindo ajustes ("corrige
-              esse erro") sem sair daqui nem voltar pra caixa principal do Assistente */}
+              esse erro") sem sair daqui nem voltar pra caixa principal do Assistente. Textarea
+              grande de propósito (não uma linha só) — pedido mais detalhado (arquivo certo,
+              texto exato do erro) dá resultado bem melhor do que uma frase curta, e precisa de
+              espaço pra escrever isso com conforto. Enter envia, Shift+Enter quebra linha. */}
           <form
             onSubmit={(e) => { e.preventDefault(); submitCodeModalInput(); }}
-            style={{ display: "flex", gap: 8, padding: "8px 10px", background: "rgba(0,0,0,0.3)", borderTop: "1px solid rgba(var(--accent-rgb),0.1)", flex: "none" }}
+            style={{ display: "flex", gap: 8, padding: "8px 10px", background: "rgba(0,0,0,0.3)", borderTop: "1px solid rgba(var(--accent-rgb),0.1)", flex: "none", alignItems: "flex-end" }}
           >
-            <input
+            <textarea
               value={codeModalInput}
               onChange={(e) => setCodeModalInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitCodeModalInput(); }
+              }}
               disabled={busy}
-              placeholder={busy ? "trabalhando…" : "peça outro ajuste, ex.: \"corrige esse erro\""}
+              placeholder={busy ? "trabalhando…" : "peça outro ajuste — quanto mais detalhe (arquivo, texto exato do erro), melhor o resultado. Enter envia, Shift+Enter quebra linha."}
+              rows={4}
               style={{
-                flex: 1, fontSize: 11.5, padding: "7px 10px", borderRadius: 5, border: "1px solid rgba(var(--accent-rgb),0.2)",
-                background: "#000", color: "#eafcff", fontFamily: "inherit",
+                flex: 1, fontSize: 11.5, lineHeight: 1.5, padding: "8px 10px", borderRadius: 5, border: "1px solid rgba(var(--accent-rgb),0.2)",
+                background: "#000", color: "#eafcff", fontFamily: "inherit", resize: "vertical", minHeight: 70,
               }}
             />
             <button
               type="submit"
               disabled={busy || !codeModalInput.trim()}
               style={{
-                fontSize: 10.5, padding: "0 14px", borderRadius: 5, border: `1px solid ${PU}`,
+                fontSize: 10.5, padding: "8px 14px", borderRadius: 5, border: `1px solid ${PU}`,
                 background: "rgba(201,166,255,0.15)", color: "#eafcff", cursor: busy ? "wait" : "pointer", flex: "none",
               }}
             >

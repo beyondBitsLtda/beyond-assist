@@ -535,13 +535,23 @@ Regras:
  * por arquivo (ver runCodeTaskStreaming) — input e output pequenos (só esse arquivo, não
  * todos juntos), o que é o que mantém cada chamada rápida o bastante pra caber nos 60s da
  * função mesmo quando a tarefa toca vários arquivos.
+ *
+ * `siblingChanges` (opcional) — os OUTROS arquivos já reescritos NESTA MESMA tarefa (path +
+ * conteúdo novo) — sem isso, cada arquivo era gerado no escuro em relação aos demais, podendo
+ * ficar inconsistente (ex.: renomear uma função no arquivo A sem atualizar quem a chama no
+ * arquivo B, gerado logo depois). Mostrar o que já mudou deixa a Lisa manter tudo coerente.
  */
-export async function* streamSingleFileChange({ instruction, summary, path, currentContent, repo }) {
+export async function* streamSingleFileChange({ instruction, summary, path, currentContent, siblingChanges = [], repo }) {
+  const siblingsBlock = siblingChanges.length
+    ? `\n\nOUTROS ARQUIVOS JÁ REESCRITOS NESTA MESMA TAREFA (conteúdo NOVO, pra você manter consistência — ex.: nomes de função/export que mudaram lá precisam bater aqui):\n${siblingChanges.map((f) => `--- ${f.path} ---\n${f.content}`).join("\n\n")}`
+    : "";
+
   const prompt = `Repositório: ${repo}
 Arquivo: ${path}
 
 CONTEÚDO ATUAL COMPLETO deste arquivo${currentContent ? "" : " (arquivo NOVO — ainda não existe)"}:
 ${currentContent || "(vazio)"}
+${siblingsBlock}
 
 PEDIDO GERAL DO USUÁRIO: "${instruction}"
 ${summary ? `RESUMO DO PLANO GERAL (pode envolver outros arquivos além deste): ${summary}` : ""}
@@ -562,6 +572,41 @@ formatação, imports não relacionados). Se for um arquivo novo, escreva ele do
 consistente com o resto do pedido.`;
 
   // retry só na abertura do stream (antes de qualquer chunk chegar) — mesmo padrão de chatStream.
+  const stream = await withTransientRetry(CHAT_MODEL, (client) =>
+    client.models.generateContentStream({ model: CHAT_MODEL, contents: prompt, config: { systemInstruction } })
+  );
+  for await (const chunk of stream) {
+    if (chunk.text) yield chunk.text;
+  }
+}
+
+/**
+ * Conserta UM erro de sintaxe ESPECÍFICO num arquivo que a Lisa acabou de escrever — chamado
+ * só quando a validação estrutural (ver src/lib/validateSyntax.js, sem IA, roda antes desta
+ * função) já encontrou um problema real, então aqui ela recebe o ERRO exato em vez de ter que
+ * adivinhar o que está errado. Mesmo formato de saída de streamSingleFileChange (conteúdo
+ * puro, em streaming) — é literalmente uma segunda passada sobre o mesmo arquivo.
+ */
+export async function* fixFileSyntaxError({ path, content, error, repo }) {
+  const prompt = `Repositório: ${repo}
+Arquivo: ${path}
+
+Você (a própria Lisa) escreveu este arquivo há pouco, mas ele tem um ERRO DE SINTAXE — um
+validador automático (não é opinião, é um parser de verdade) rejeitou com este erro:
+"${error}"
+
+CONTEÚDO ATUAL (com o erro):
+${content}
+
+Conserte SÓ o problema de sintaxe indicado, preservando o resto do conteúdo e a intenção da
+mudança exatamente como estavam. Não reescreva partes que não têm relação com o erro.`;
+
+  const systemInstruction = `Você é a Lisa, consertando um erro de sintaxe específico que um validador
+automático encontrou no arquivo que você mesma acabou de escrever. Responda SOMENTE com o
+conteúdo completo e corrigido do arquivo — nada de marcador, nada de explicação, nada de bloco
+de código markdown (sem \`\`\`), nenhuma linha de comentário com o caminho do arquivo. A
+primeira linha da resposta já é a primeira linha real do arquivo.`;
+
   const stream = await withTransientRetry(CHAT_MODEL, (client) =>
     client.models.generateContentStream({ model: CHAT_MODEL, contents: prompt, config: { systemInstruction } })
   );

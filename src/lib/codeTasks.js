@@ -1,8 +1,9 @@
 import { supabase } from "./supabase.js";
 import { retrieve } from "./rag.js";
-import { planFilesToEdit, streamSingleFileChange, selectRelevantFiles } from "./gemini.js";
+import { planFilesToEdit, streamSingleFileChange, selectRelevantFiles, fixFileSyntaxError } from "./gemini.js";
 import { getBranchSha, createBranch, getFileSha, putFileContent, createPullRequest, listBranches, getFileContentOnBranch } from "./github.js";
 import { listIndexedFiles } from "./ingest/github.js";
+import { validateFileSyntax } from "./validateSyntax.js";
 
 // Tarefas de código: o usuário escolhe REPOSITÓRIO + BRANCH BASE e descreve o que quer.
 // A Lisa nunca commita na branch escolhida — sempre cria uma branch NOVA a partir dela,
@@ -18,6 +19,14 @@ import { listIndexedFiles } from "./ingest/github.js";
 const MAX_FILES_PER_TASK = 6;
 
 const DIACRITICS_RE = new RegExp("[̀-ͯ]", "g"); // marcas de acento depois de normalize("NFD")
+
+// rede de segurança: às vezes o modelo ecoa uma linha tipo "// caminho/do/arquivo.ext" no
+// topo do conteúdo (mesmo com a instrução dizendo pra não fazer isso) — usando `//`, que é
+// sintaxe de comentário INVÁLIDA em CSS e vários outros formatos. Isso já quebrou um build de
+// verdade (globals.css). Corta essa linha se aparecer, não importa o motivo.
+function stripPathEchoComment(text) {
+  return text.trim().replace(/^\/\/\s*\S+\.\w+\s*\r?\n+/, "");
+}
 
 function slugify(text) {
   const s = String(text || "")
@@ -43,6 +52,42 @@ async function getFullFileContents(repo, paths) {
     results.push({ path, content: sorted.map((r) => r.content).join("\n") });
   }
   return results;
+}
+
+// Contexto por DEPENDÊNCIA — além do que a busca semântica e a Lisa (por nome) já escolhem,
+// olha os `import`/`require` de CADA arquivo já lido e tenta trazer junto os que ele realmente
+// usa (ou que o alteram) — melhor esforço, só relativo (./, ../) e o alias @/ (convenção deste
+// e de outros projetos Next.js, ver jsconfig.json); o que não resolver é só ignorado, sem
+// travar nada. Ajuda em pedidos que mexem numa peça só mas cuja mudança precisa "ver" quem a
+// importa ou o que ela importa pra ficar consistente.
+const IMPORT_RE = /(?:import[\s\S]*?from\s*|require\(\s*)["']([^"']+)["']/g;
+
+function extractImportSpecs(content) {
+  const specs = new Set();
+  IMPORT_RE.lastIndex = 0;
+  let m;
+  while ((m = IMPORT_RE.exec(content))) {
+    if (m[1].startsWith(".") || m[1].startsWith("@/")) specs.add(m[1]);
+  }
+  return [...specs];
+}
+
+function resolveImportSpec(spec, fromPath, knownPaths) {
+  let base;
+  if (spec.startsWith("@/")) {
+    base = `src/${spec.slice(2)}`;
+  } else {
+    const dir = fromPath.includes("/") ? fromPath.slice(0, fromPath.lastIndexOf("/")) : "";
+    const stack = [];
+    for (const part of (dir ? `${dir}/${spec}` : spec).split("/")) {
+      if (part === "." || part === "") continue;
+      if (part === "..") stack.pop();
+      else stack.push(part);
+    }
+    base = stack.join("/");
+  }
+  const candidates = [base, `${base}.js`, `${base}.jsx`, `${base}.ts`, `${base}.tsx`, `${base}/index.js`, `${base}/index.jsx`, `${base}/index.ts`, `${base}/index.tsx`];
+  return candidates.find((c) => knownPaths.has(c)) || null;
 }
 
 async function recordTask(row) {
@@ -172,8 +217,21 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
       const fetched = state.branchName
         ? await getFileContentOnBranch(repo, path, state.branchName).then((c) => (c != null ? { path, content: c } : null)).catch(() => null)
         : (await getFullFileContents(repo, [path]))[0];
-      if (fetched) await setState({ contextFiles: [...contextFiles, fetched] });
-      else await setState({ fetchSkipped: (state.fetchSkipped || 0) + 1 });
+      if (fetched) {
+        let nextPaths = contextPaths;
+        // dependência: se ainda cabe no limite, traz junto o que ESTE arquivo importa
+        // (melhor esforço — o que não resolver é ignorado, nunca trava a tarefa).
+        if (nextPaths.length < MAX_FILES_PER_TASK) {
+          const knownPaths = new Set(state.allFiles || []);
+          const resolved = extractImportSpecs(fetched.content)
+            .map((spec) => resolveImportSpec(spec, path, knownPaths))
+            .filter((p) => p && !nextPaths.includes(p));
+          if (resolved.length) nextPaths = [...nextPaths, ...resolved].slice(0, MAX_FILES_PER_TASK);
+        }
+        await setState({ contextFiles: [...contextFiles, fetched], contextPaths: nextPaths });
+      } else {
+        await setState({ fetchSkipped: (state.fetchSkipped || 0) + 1 });
+      }
       yield { type: "step_done", taskId: task.id, stage: "context-fetch", done: false };
       return;
     }
@@ -214,17 +272,23 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
       }
       yield { type: "file_start", path };
       let content = "";
-      for await (const chunk of streamSingleFileChange({ instruction, summary, path, currentContent: contextByPath.get(path) || "", repo })) {
+      for await (const chunk of streamSingleFileChange({ instruction, summary, path, currentContent: contextByPath.get(path) || "", siblingChanges: generatedFiles, repo })) {
         content += chunk;
         yield { type: "file_chunk", path, text: chunk };
       }
       yield { type: "file_end", path };
+      const cleaned = stripPathEchoComment(content);
 
-      // rede de segurança: às vezes o modelo ecoa uma linha tipo "// caminho/do/arquivo.ext"
-      // no topo do conteúdo (mesmo com a instrução dizendo pra não fazer isso) — usando `//`,
-      // que é sintaxe de comentário INVÁLIDA em CSS e vários outros formatos. Isso já quebrou
-      // um build de verdade (globals.css). Corta essa linha se aparecer, não importa o motivo.
-      const cleaned = content.trim().replace(/^\/\/\s*\S+\.\w+\s*\r?\n+/, "");
+      // validação ESTRUTURAL antes de seguir (sem IA, instantânea — ver validateSyntax.js):
+      // se o arquivo não é sintaticamente válido, não segue pra próxima etapa ainda — passa
+      // pelo estágio "fixing" primeiro, que manda o erro EXATO de volta pra Lisa consertar.
+      const validation = validateFileSyntax(path, cleaned);
+      if (!validation.ok) {
+        yield { type: "narration", text: `Opa, o que escrevi em \`${path}\` ficou com um erro de sintaxe (${validation.error}) — deixa eu corrigir antes de seguir.` };
+        await setState({ stage: "fixing", fixPath: path, fixContent: cleaned, fixError: validation.error, fixAttempts: 1 });
+        yield { type: "step_done", taskId: task.id, stage: "fixing", done: false };
+        return;
+      }
 
       const nextGenerated = [...generatedFiles, { path, content: cleaned }];
       const patch = { generatedFiles: nextGenerated };
@@ -241,6 +305,49 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
       await setState(patch);
       const nextStage = patch.stage;
       yield { type: "step_done", taskId: task.id, stage: nextStage, done: false };
+      return;
+    }
+
+    if (stage === "fixing") {
+      yield { type: "stage", stage: "fixing", taskId: task.id };
+      const { fixPath, fixContent, fixError, fixAttempts = 1, pathsToEdit = [], generatedFiles = [], summary = "" } = state;
+      const MAX_FIX_ATTEMPTS = 2; // não trava a tarefa inteira num arquivo teimoso — desiste e segue com um aviso
+
+      yield { type: "file_start", path: fixPath };
+      let fixed = "";
+      for await (const chunk of fixFileSyntaxError({ path: fixPath, content: fixContent, error: fixError, repo })) {
+        fixed += chunk;
+        yield { type: "file_chunk", path: fixPath, text: chunk };
+      }
+      yield { type: "file_end", path: fixPath };
+      const cleanedFixed = stripPathEchoComment(fixed);
+      const validation = validateFileSyntax(fixPath, cleanedFixed);
+
+      if (!validation.ok && fixAttempts < MAX_FIX_ATTEMPTS) {
+        yield { type: "narration", text: `Ainda não saiu certo (${validation.error}) — tentando de novo.` };
+        await setState({ fixContent: cleanedFixed, fixError: validation.error, fixAttempts: fixAttempts + 1 });
+        yield { type: "step_done", taskId: task.id, stage: "fixing", done: false };
+        return;
+      }
+
+      yield {
+        type: "narration",
+        text: validation.ok
+          ? "Corrigido — seguindo."
+          : `Não consegui corrigir sozinha o problema em \`${fixPath}\` (${validation.error}) — vou seguir mesmo assim, mas revise esse arquivo com atenção no PR.`,
+      };
+      const nextGenerated = [...generatedFiles, { path: fixPath, content: cleanedFixed }];
+      const patch = { generatedFiles: nextGenerated, fixPath: null, fixContent: null, fixError: null, fixAttempts: null };
+      if (nextGenerated.length < pathsToEdit.length) {
+        patch.stage = "writing";
+      } else if (state.branchName) {
+        patch.stage = "committing";
+        patch.committedFiles = [];
+      } else {
+        patch.stage = "branching";
+      }
+      await setState(patch);
+      yield { type: "step_done", taskId: task.id, stage: patch.stage, done: false };
       return;
     }
 
