@@ -1,7 +1,7 @@
 import { supabase } from "./supabase.js";
 import { retrieve } from "./rag.js";
 import { planFilesToEdit, streamSingleFileChange, selectRelevantFiles } from "./gemini.js";
-import { getBranchSha, createBranch, getFileSha, putFileContent, createPullRequest, listBranches } from "./github.js";
+import { getBranchSha, createBranch, getFileSha, putFileContent, createPullRequest, listBranches, getFileContentOnBranch } from "./github.js";
 import { listIndexedFiles } from "./ingest/github.js";
 
 // Tarefas de código: o usuário escolhe REPOSITÓRIO + BRANCH BASE e descreve o que quer.
@@ -86,15 +86,27 @@ export async function listRepoBranches(repo) {
  * sozinha. Existe porque busca semântica funciona bem pra "onde está o código que faz X",
  * mas mal pra pedidos amplos tipo "mude o tema pra preto e branco" — os arquivos certos
  * (theme.js, globals.css) não se parecem textualmente com o pedido.
+ *
+ * `continueBranch`/`existingPrUrl` (opcionais, só importam no 1º passo, ao criar tarefa
+ * nova) — permitem CONTINUAR numa branch/PR que uma tarefa anterior já criou, em vez de
+ * começar do zero (nova branch, novo PR) — é o que permite pedir "corrige esse erro" como
+ * conversa, depois de já ter uma mudança em andamento. Quando presentes: o contexto lê o
+ * conteúdo AO VIVO da branch em `continueBranch` (não do índice, que pode estar defasado em
+ * relação ao que a Lisa mesma acabou de commitar ali), pula a criação de branch nova, e
+ * reaproveita o PR já aberto (só o CONTEÚDO do PR muda, com os novos commits — GitHub
+ * atualiza sozinho, não precisa abrir outro).
  */
-export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, filePaths = [] }) {
+export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, filePaths = [], continueBranch, existingPrUrl }) {
   let task;
   if (taskId) {
     const { data, error } = await supabase.from("code_tasks").select("*").eq("id", taskId).single();
     if (error || !data) throw new Error("tarefa de código não encontrada (taskId inválido)");
     task = data;
   } else {
-    task = await recordTask({ repo, base_branch: baseBranch, instruction, status: "running", state: { stage: "context" } });
+    const initialState = { stage: "context" };
+    if (continueBranch) initialState.branchName = continueBranch;
+    if (existingPrUrl) initialState.prUrl = existingPrUrl;
+    task = await recordTask({ repo, base_branch: baseBranch, instruction, status: "running", state: initialState });
   }
 
   let state = task.state && typeof task.state === "object" ? task.state : { stage: "context" };
@@ -154,7 +166,12 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
         return;
       }
       const path = contextPaths[doneCount];
-      const [fetched] = await getFullFileContents(repo, [path]);
+      // continuando numa branch já existente: lê o conteúdo AO VIVO dela (via GitHub), não o
+      // do índice — senão uma correção pisaria em cima do commit anterior sem saber que ele
+      // já mudou o arquivo (o índice só é atualizado pelo sync periódico, não na hora).
+      const fetched = state.branchName
+        ? await getFileContentOnBranch(repo, path, state.branchName).then((c) => (c != null ? { path, content: c } : null)).catch(() => null)
+        : (await getFullFileContents(repo, [path]))[0];
       if (fetched) await setState({ contextFiles: [...contextFiles, fetched] });
       else await setState({ fetchSkipped: (state.fetchSkipped || 0) + 1 });
       yield { type: "step_done", taskId: task.id, stage: "context-fetch", done: false };
@@ -210,8 +227,19 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
       const cleaned = content.trim().replace(/^\/\/\s*\S+\.\w+\s*\r?\n+/, "");
 
       const nextGenerated = [...generatedFiles, { path, content: cleaned }];
-      const nextStage = nextGenerated.length >= pathsToEdit.length ? "branching" : "writing";
-      await setState({ generatedFiles: nextGenerated, stage: nextStage });
+      const patch = { generatedFiles: nextGenerated };
+      if (nextGenerated.length < pathsToEdit.length) {
+        patch.stage = "writing";
+      } else if (state.branchName) {
+        // continuando numa branch que já existe: pula "branching" (não cria outra) e vai
+        // direto pra "committing" nela mesma.
+        patch.stage = "committing";
+        patch.committedFiles = [];
+      } else {
+        patch.stage = "branching";
+      }
+      await setState(patch);
+      const nextStage = patch.stage;
       yield { type: "step_done", taskId: task.id, stage: nextStage, done: false };
       return;
     }
@@ -235,7 +263,7 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
       if (committedFiles.length === 0) {
         yield {
           type: "narration",
-          text: generatedFiles.length > 1 ? `Aplicando os ${generatedFiles.length} arquivos na branch nova.` : `Aplicando \`${f.path}\` na branch nova.`,
+          text: generatedFiles.length > 1 ? `Aplicando os ${generatedFiles.length} arquivos na branch.` : `Aplicando \`${f.path}\` na branch.`,
         };
       }
       const sha = await getFileSha(repo, f.path, branchName);
@@ -249,8 +277,22 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
 
     if (stage === "pr") {
       yield { type: "stage", stage: "pr", taskId: task.id };
+      const { generatedFiles = [], branchName, summary = "", prUrl } = state;
+
+      // continuando um PR que já existe: os commits novos já foram pro mesmo branch (acima),
+      // então o PR já reflete a mudança sozinho — GitHub atualiza automaticamente, não
+      // precisa (e não dá, a API rejeita) abrir outro PR pro mesmo head+base.
+      if (prUrl) {
+        await updateTask(task.id, { status: "done", branch_name: branchName, pr_url: prUrl, summary: summary || null });
+        yield { type: "narration", text: "Pronto — as mudanças novas já entraram no mesmo Pull Request de antes." };
+        yield {
+          type: "step_done", taskId: task.id, stage: "done", done: true, ok: true,
+          pr_url: prUrl, branchName, files: generatedFiles.map((f) => f.path), summary,
+        };
+        return;
+      }
+
       yield { type: "narration", text: "Pronto — abrindo o Pull Request pra você revisar." };
-      const { generatedFiles = [], branchName, summary = "" } = state;
       const prTitle = `[Lisa] ${summary || instruction}`.slice(0, 250);
       const prBody = `Gerado automaticamente pela Lisa a partir do pedido:\n\n> ${instruction}\n\n${summary || ""}\n\n` +
         `**Revise com atenção antes de mesclar** — nenhuma mudança feita por ela entra sem essa revisão.\n\n` +
@@ -261,7 +303,7 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
       yield { type: "narration", text: "Feito! Abri o Pull Request — dá uma olhada quando puder." };
       yield {
         type: "step_done", taskId: task.id, stage: "done", done: true, ok: true,
-        pr_url: pr.html_url, files: generatedFiles.map((f) => f.path), summary,
+        pr_url: pr.html_url, branchName, files: generatedFiles.map((f) => f.path), summary,
       };
       return;
     }

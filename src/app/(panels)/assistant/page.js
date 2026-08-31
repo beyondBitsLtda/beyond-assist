@@ -99,6 +99,12 @@ export default function AssistantPage() {
   const [liveCode, setLiveCode] = useState(null); // { path, content } — arquivo sendo escrito agora
   const [liveCodeDone, setLiveCodeDone] = useState([]); // arquivos já concluídos nesta tarefa
   const currentCodeFileRef = useRef(null);
+  // sessão de CONTINUAÇÃO — enquanto existir (mesmo repo+branch base), o próximo pedido de
+  // código não recomeça do zero: continua commitando na MESMA branch/PR já aberto, lendo o
+  // conteúdo AO VIVO do GitHub (não do índice, que pode estar desatualizado) pros arquivos
+  // já tocados. É o que permite "corrige esse erro" like conversa, sem abrir PR novo cada vez.
+  const [codeSession, setCodeSession] = useState(null); // { repo, baseBranch, branchName, prUrl, files }
+  const [codeModalInput, setCodeModalInput] = useState("");
   // janela flutuante e arrastável do Modo Código, com cara de editor (título + abas por
   // arquivo + área de código com número de linha) — abre sozinha quando uma tarefa começa,
   // mostra em que ESTÁGIO a Lisa está (não só a última frase dita) e o código sendo escrito.
@@ -161,6 +167,7 @@ export default function AssistantPage() {
     setCodeModeBranches([]);
     setCodeModeFiles([]);
     setCodeModeAvailableFiles([]);
+    setCodeSession(null); // trocou de repositório — a sessão de continuação (branch/PR em andamento) não faz mais sentido
     if (!codeModeRepo) return;
     fetch(`/api/code-repos/branches?repo=${encodeURIComponent(codeModeRepo)}`)
       .then((r) => r.json())
@@ -981,11 +988,11 @@ export default function AssistantPage() {
   // e devolve o que aconteceu ({taskId, done, ok, error?, pr_url?}) — askCodeMode chama isso
   // em loop até `done`. Cada passo tem sua fresh janela de 60s, então a tarefa inteira nunca
   // mais fica presa a uma conexão única (era isso que estourava com pedidos maiores).
-  const runCodeModeStep = useCallback(async ({ taskId, repo, baseBranch, instruction, filePaths, gen, narrationSoFarRef, voiceEnabled }) => {
+  const runCodeModeStep = useCallback(async ({ taskId, repo, baseBranch, instruction, filePaths, continueBranch, existingPrUrl, gen, narrationSoFarRef, voiceEnabled }) => {
     const res = await fetch("/api/code-tasks/step", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ taskId, repo, baseBranch, instruction, filePaths }),
+      body: JSON.stringify({ taskId, repo, baseBranch, instruction, filePaths, continueBranch, existingPrUrl }),
     });
     if (!res.ok || !res.body) { const e = new Error(`HTTP ${res.status}`); e.taskId = taskId; throw e; }
 
@@ -1066,20 +1073,24 @@ export default function AssistantPage() {
     setAnswer("");
     answerRef.current = "";
     setMode("listening");
-    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: q }]);
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: q, codeMode: true }]);
     setLiveCode(null);
     setLiveCodeDone([]);
     currentCodeFileRef.current = null;
     setCodeStage(null);
     setCodeActiveTab(null);
     setCodeModalMinimized(false);
-    setCodeModalOpen(true); // abre sozinha assim que a tarefa começa — não precisa procurar
+    setCodeModalOpen(true); // abre sozinha assim que a tarefa começa — não precisa procurar; fica aberta entre pedidos, não fecha sozinha
 
     stopSpeaking();
     const gen = ++speechGenRef.current;
     speechEngineRef.current = null;
     const voiceEnabled = voiceOn;
     const narrationSoFarRef = { current: "" };
+
+    // continua na MESMA branch/PR de uma sessão anterior (mesmo repo+branch base) — assim
+    // "corrige esse erro" vira um commit A MAIS na branch já aberta, não uma tarefa do zero.
+    const continuing = codeSession && codeSession.repo === codeModeRepo && codeSession.baseBranch === codeModeBranch ? codeSession : null;
 
     try {
       let taskId = null;
@@ -1096,7 +1107,9 @@ export default function AssistantPage() {
         try {
           stepResult = await runCodeModeStep({
             taskId, repo: codeModeRepo, baseBranch: codeModeBranch, instruction: q,
-            filePaths: codeModeFiles, gen, narrationSoFarRef, voiceEnabled,
+            filePaths: [...codeModeFiles, ...(continuing?.files || [])],
+            continueBranch: continuing?.branchName, existingPrUrl: continuing?.prUrl,
+            gen, narrationSoFarRef, voiceEnabled,
           });
           retries = 0; // um passo deu certo — zera a contagem, só desiste de vez em falhas SEGUIDAS
         } catch (stepErr) {
@@ -1112,25 +1125,34 @@ export default function AssistantPage() {
 
       setCodeStage(stepResult.ok ? "done" : "error");
       const finalText = stepResult.ok
-        ? `${narrationSoFarRef.current}\n\nPR aberto: ${stepResult.pr_url}`
+        ? `${narrationSoFarRef.current}\n\nPR ${continuing ? "atualizado" : "aberto"}: ${stepResult.pr_url}`
         : `${narrationSoFarRef.current}${narrationSoFarRef.current ? "\n\n" : ""}⚠ ${stepResult.error || "não consegui completar a tarefa"}`;
       setAnswer(finalText);
-      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: finalText }]);
-      if (stepResult.ok) addLog("[CÓDIGO]", GR, `PR aberto: ${stepResult.pr_url}`);
-      else addLog("[CÓDIGO]", OR, stepResult.error || "falhou");
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: finalText, codeMode: true }]);
+      if (stepResult.ok) {
+        addLog("[CÓDIGO]", GR, `PR ${continuing ? "atualizado" : "aberto"}: ${stepResult.pr_url}`);
+        // guarda a sessão pro PRÓXIMO pedido continuar na mesma branch/PR em vez de recomeçar
+        setCodeSession({
+          repo: codeModeRepo, baseBranch: codeModeBranch,
+          branchName: stepResult.branchName, prUrl: stepResult.pr_url,
+          files: stepResult.files || [],
+        });
+      } else {
+        addLog("[CÓDIGO]", OR, stepResult.error || "falhou");
+      }
     } catch (err) {
       setCodeStage("error");
       addLog("[CÓDIGO]", OR, err.message);
       const finalText = `${narrationSoFarRef.current}${narrationSoFarRef.current ? "\n\n" : ""}⚠ ${err.message}`;
       setAnswer(finalText);
-      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: finalText }]);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: finalText, codeMode: true }]);
     } finally {
       setBusy(false);
       setMode("idle");
       currentCodeFileRef.current = null;
       setLiveCode(null);
     }
-  }, [codeModeRepo, codeModeBranch, codeModeFiles, addLog, voiceOn, stopSpeaking, enqueueSpeech, runCodeModeStep]);
+  }, [codeModeRepo, codeModeBranch, codeModeFiles, codeSession, addLog, voiceOn, stopSpeaking, enqueueSpeech, runCodeModeStep]);
 
   // ---- pergunta real ao backend (SSE) ----
   const ask = useCallback(async (q) => {
@@ -1335,6 +1357,13 @@ export default function AssistantPage() {
     : (liveCode ? liveCode.path : codeFilesOpen[codeFilesOpen.length - 1]?.path) || null;
   const codeActiveFile = codeFilesOpen.find((f) => f.path === codeActivePath) || null;
   const codeActiveLines = codeActiveFile ? codeActiveFile.content.slice(-6000).split("\n") : [];
+  const codeModeLog = messages.filter((m) => m.codeMode); // histórico só do Modo Código, pra caber inteiro na janela sem misturar com o chat normal
+  const submitCodeModalInput = () => {
+    const q = codeModalInput.trim();
+    if (!q || busy) return;
+    setCodeModalInput("");
+    askCodeMode(q);
+  };
 
   const codeTaskModal = codeModalOpen && (
     <div
@@ -1378,16 +1407,49 @@ export default function AssistantPage() {
             — {codeStage ? CODE_STAGE_LABELS[codeStage] : "aguardando…"}
           </span>
         </div>
-        <div style={{ width: 54, flex: "none" }} />
+        <div style={{ width: 54, flex: "none", display: "flex", justifyContent: "flex-end" }}>
+          {!!codeSession && (
+            <span
+              onClick={(e) => { e.stopPropagation(); setCodeSession(null); }}
+              title="começar uma tarefa nova (branch e PR novos), em vez de continuar nesta"
+              style={{ fontSize: 9, color: "rgba(204,204,204,0.55)", cursor: "pointer", textDecoration: "underline", whiteSpace: "nowrap" }}
+            >
+              nova tarefa
+            </span>
+          )}
+        </div>
       </div>
 
       {!codeModalMinimized && (
         <>
-          {/* narração da Lisa — comentando o que está fazendo, como um painel de notificação */}
-          <div style={{ padding: "8px 14px", background: "#252526", borderBottom: "1px solid #1e1e1e", flex: "none", maxHeight: 84, overflowY: "auto" }}>
-            <div style={{ fontSize: 11.5, lineHeight: 1.5, color: "#cccccc", fontStyle: "italic", whiteSpace: "pre-wrap" }}>
-              {answer || "…"}
-            </div>
+          {/* conversa do Modo Código — fica ABERTA entre pedidos (não fecha nem esvazia
+              sozinha), pra dar pra pedir "corrige esse erro" continuando o mesmo papo
+              enquanto o código aparece do lado, sem precisar sair da janela */}
+          <div style={{ padding: "8px 14px", background: "#252526", borderBottom: "1px solid #1e1e1e", flex: "none", maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+            {codeModeLog.map((m) => (
+              <div key={m.id} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%" }}>
+                <div
+                  style={{
+                    fontSize: 11.5, lineHeight: 1.5, whiteSpace: "pre-wrap", padding: "6px 10px", borderRadius: 6,
+                    color: m.role === "user" ? "#1e1e1e" : "#cccccc",
+                    background: m.role === "user" ? "rgba(201,166,255,0.65)" : "rgba(255,255,255,0.05)",
+                    fontStyle: m.role === "user" ? "normal" : "italic",
+                  }}
+                >
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {busy && (
+              <div style={{ alignSelf: "flex-start", maxWidth: "88%" }}>
+                <div style={{ fontSize: 11.5, lineHeight: 1.5, color: "#cccccc", fontStyle: "italic", whiteSpace: "pre-wrap", padding: "6px 10px" }}>
+                  {answer || "…"}
+                </div>
+              </div>
+            )}
+            {!codeModeLog.length && !busy && (
+              <div style={{ fontSize: 11, color: "#5a5a5a" }}>peça uma mudança de código aqui embaixo, ou pela caixa principal do Assistente.</div>
+            )}
           </div>
 
           {/* abas — um arquivo por aba, igual editor de código, clica pra ver outro já escrito */}
@@ -1439,9 +1501,37 @@ export default function AssistantPage() {
 
           {/* barra de status inferior, igual VS Code */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "3px 12px", background: PU, flex: "none" }}>
-            <span style={{ fontSize: 9.5, color: "#1e1e1e" }}>{codeModeRepo || "—"} → {codeModeBranch || "—"}</span>
+            <span style={{ fontSize: 9.5, color: "#1e1e1e" }}>{codeModeRepo || "—"} → {codeModeBranch || "—"}{codeSession?.branchName ? ` (${codeSession.branchName})` : ""}</span>
             <span style={{ fontSize: 9.5, color: "#1e1e1e" }}>{liveCodeDone.length} arquivo(s) concluído(s)</span>
           </div>
+
+          {/* caixa de mensagem própria da janela — dá pra continuar pedindo ajustes ("corrige
+              esse erro") sem sair daqui nem voltar pra caixa principal do Assistente */}
+          <form
+            onSubmit={(e) => { e.preventDefault(); submitCodeModalInput(); }}
+            style={{ display: "flex", gap: 8, padding: "8px 10px", background: "#252526", borderTop: "1px solid #1e1e1e", flex: "none" }}
+          >
+            <input
+              value={codeModalInput}
+              onChange={(e) => setCodeModalInput(e.target.value)}
+              disabled={busy}
+              placeholder={busy ? "trabalhando…" : "peça outro ajuste, ex.: \"corrige esse erro\""}
+              style={{
+                flex: 1, fontSize: 11.5, padding: "7px 10px", borderRadius: 5, border: "1px solid #3c3c3c",
+                background: "#1e1e1e", color: "#d4d4d4", fontFamily: "inherit",
+              }}
+            />
+            <button
+              type="submit"
+              disabled={busy || !codeModalInput.trim()}
+              style={{
+                fontSize: 10.5, padding: "0 14px", borderRadius: 5, border: `1px solid ${PU}`,
+                background: "rgba(201,166,255,0.15)", color: "#eafcff", cursor: busy ? "wait" : "pointer", flex: "none",
+              }}
+            >
+              enviar
+            </button>
+          </form>
 
           {/* alça de redimensionar, canto inferior direito */}
           {!codeModalMaximized && (

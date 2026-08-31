@@ -120,6 +120,21 @@ export async function getFileSha(fullName, path, branch) {
   }
 }
 
+/** Conteúdo ATUAL de um arquivo numa branch específica (decodificado de base64) — diferente
+ * de getFullFileContents (codeTasks.js), que lê do índice (documents), possivelmente
+ * DESATUALIZADO em relação a commits recentes. Usado quando o usuário está CONTINUANDO uma
+ * tarefa na branch da Lisa (ex.: "corrige esse erro") — precisa ver o que ela mesma acabou de
+ * commitar ali, não o conteúdo original da branch base. null se o arquivo não existe ali. */
+export async function getFileContentOnBranch(fullName, path, branch) {
+  try {
+    const data = await gh(`/repos/${fullName}/contents/${encodePath(path)}`, { params: { ref: branch } });
+    if (!data || data.encoding !== "base64") return null;
+    return Buffer.from(data.content, "base64").toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
 /** Cria ou atualiza UM arquivo numa branch (commit direto via API de Contents — simples e
  * suficiente pra um punhado de arquivos por tarefa; não tenta juntar tudo num commit único). */
 export async function putFileContent(fullName, path, content, message, branch, sha) {
