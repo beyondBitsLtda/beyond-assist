@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
+import { highlightCode } from "@/lib/highlightCode.js";
 import { TTS_VOICES } from "@/lib/ttsVoices.js";
 import { pickBrowserVoice, speakText, stopBrowserVoiceAudio, isBrowserVoiceAudioPlaying } from "@/lib/browserVoice.js";
 import { useIsMobile } from "@/lib/useIsMobile.js";
@@ -1356,7 +1357,15 @@ export default function AssistantPage() {
     ? codeActiveTab
     : (liveCode ? liveCode.path : codeFilesOpen[codeFilesOpen.length - 1]?.path) || null;
   const codeActiveFile = codeFilesOpen.find((f) => f.path === codeActivePath) || null;
-  const codeActiveLines = codeActiveFile ? codeActiveFile.content.slice(-6000).split("\n") : [];
+  const codeActiveTail = codeActiveFile ? codeActiveFile.content.slice(-6000) : "";
+  const codeActiveLineCount = codeActiveFile ? codeActiveTail.split("\n").length : 0;
+  // destaque de sintaxe (Prism) recalculado só quando o CONTEÚDO realmente muda — cores vêm
+  // do tema do próprio app (ver <style> logo abaixo), não do "Dark+" do VS Code. `null` quando
+  // a extensão do arquivo não tem gramática reconhecida (cai pro texto puro, sem cor).
+  const codeActiveHtml = useMemo(
+    () => (codeActiveFile ? highlightCode(codeActiveTail, codeActiveFile.path) : null),
+    [codeActiveTail, codeActiveFile?.path]
+  );
   const codeModeLog = messages.filter((m) => m.codeMode); // histórico só do Modo Código, pra caber inteiro na janela sem misturar com o chat normal
   const submitCodeModalInput = () => {
     const q = codeModalInput.trim();
@@ -1372,38 +1381,52 @@ export default function AssistantPage() {
         zIndex: 200, width: codeModalMaximized ? "94vw" : `min(92vw, ${codeModalSize.width}px)`,
         height: codeModalMinimized ? "auto" : (codeModalMaximized ? "88vh" : `min(80vh, ${codeModalSize.height}px)`),
         display: "flex", flexDirection: "column", overflow: "hidden",
-        background: "#1e1e1e", border: "1px solid #3c3c3c", borderRadius: 8,
+        background: "#050b10", border: "1px solid rgba(var(--accent-rgb),0.28)", borderRadius: 10,
         boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,0,0,0.4)",
-        fontFamily: "Consolas, 'Cascadia Code', 'SF Mono', Menlo, monospace",
+        ...mono,
       }}
     >
-      {/* barra de título — igual VS Code: 3 bolinhas (fechar/minimizar/maximizar) + nome do arquivo ativo */}
+      {/* cores do realce de sintaxe (Prism) — paleta do próprio app (CY/PU/GR/OR + o texto
+          cyan-esbranquiçado de sempre), não a paleta padrão do Prism nem do VS Code. */}
+      <style>{`
+        .bb-code-hl .token.comment, .bb-code-hl .token.prolog, .bb-code-hl .token.doctype { color: rgba(207,239,251,0.35); font-style: italic; }
+        .bb-code-hl .token.string, .bb-code-hl .token.attr-value, .bb-code-hl .token.char { color: ${GR}; }
+        .bb-code-hl .token.keyword, .bb-code-hl .token.tag, .bb-code-hl .token.important, .bb-code-hl .token.atrule { color: ${PU}; }
+        .bb-code-hl .token.function, .bb-code-hl .token.class-name, .bb-code-hl .token.selector { color: var(--accent-hex); }
+        .bb-code-hl .token.number, .bb-code-hl .token.boolean, .bb-code-hl .token.constant, .bb-code-hl .token.regex { color: ${OR}; }
+        .bb-code-hl .token.punctuation, .bb-code-hl .token.operator { color: rgba(207,239,251,0.55); }
+        .bb-code-hl .token.property, .bb-code-hl .token.attr-name { color: rgba(207,239,251,0.85); }
+        .bb-code-hl .token.variable, .bb-code-hl .token.parameter, .bb-code-hl .token.builtin { color: #eafcff; }
+      `}</style>
+
+      {/* barra de título — arrastável, com bolinhas de fechar/minimizar/maximizar (a função é
+          universal; as cores ficam discretas pra não destoar do resto do app) */}
       <div
         onPointerDown={onCodeModalDragStart}
         onDoubleClick={() => setCodeModalMaximized((v) => !v)}
         style={{
           display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
-          background: "#323233", borderBottom: "1px solid #252526",
+          background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(var(--accent-rgb),0.18)",
           cursor: codeModalMaximized ? "default" : "grab", userSelect: "none", flex: "none",
         }}
       >
         <div style={{ display: "flex", gap: 7, flex: "none" }}>
           <span
             onClick={(e) => { e.stopPropagation(); setCodeModalOpen(false); }}
-            title="fechar" style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57", cursor: "pointer" }}
+            title="fechar" style={{ width: 11, height: 11, borderRadius: "50%", background: OR, cursor: "pointer", opacity: 0.75 }}
           />
           <span
             onClick={(e) => { e.stopPropagation(); setCodeModalMinimized((v) => !v); }}
-            title="minimizar" style={{ width: 12, height: 12, borderRadius: "50%", background: "#febc2e", cursor: "pointer" }}
+            title="minimizar" style={{ width: 11, height: 11, borderRadius: "50%", background: "rgba(207,239,251,0.4)", cursor: "pointer" }}
           />
           <span
             onClick={(e) => { e.stopPropagation(); setCodeModalMaximized((v) => !v); }}
-            title="maximizar" style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840", cursor: "pointer" }}
+            title="maximizar" style={{ width: 11, height: 11, borderRadius: "50%", background: GR, cursor: "pointer", opacity: 0.75 }}
           />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1, justifyContent: "center" }}>
-          <span style={{ fontSize: 10.5, letterSpacing: 1.5, color: "#cccccc", flex: "none" }}>🛠️ MODO CÓDIGO</span>
-          <span style={{ fontSize: 9.5, color: codeStage === "error" ? OR : codeStage === "done" ? GR : "rgba(204,204,204,0.6)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ fontSize: 10.5, letterSpacing: 1.5, color: PU, flex: "none" }}>🛠️ MODO CÓDIGO</span>
+          <span style={{ fontSize: 9.5, color: codeStage === "error" ? OR : codeStage === "done" ? GR : "rgba(207,239,251,0.55)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             — {codeStage ? CODE_STAGE_LABELS[codeStage] : "aguardando…"}
           </span>
         </div>
@@ -1412,7 +1435,7 @@ export default function AssistantPage() {
             <span
               onClick={(e) => { e.stopPropagation(); setCodeSession(null); }}
               title="começar uma tarefa nova (branch e PR novos), em vez de continuar nesta"
-              style={{ fontSize: 9, color: "rgba(204,204,204,0.55)", cursor: "pointer", textDecoration: "underline", whiteSpace: "nowrap" }}
+              style={{ fontSize: 9, color: "rgba(207,239,251,0.5)", cursor: "pointer", textDecoration: "underline", whiteSpace: "nowrap" }}
             >
               nova tarefa
             </span>
@@ -1425,14 +1448,15 @@ export default function AssistantPage() {
           {/* conversa do Modo Código — fica ABERTA entre pedidos (não fecha nem esvazia
               sozinha), pra dar pra pedir "corrige esse erro" continuando o mesmo papo
               enquanto o código aparece do lado, sem precisar sair da janela */}
-          <div style={{ padding: "8px 14px", background: "#252526", borderBottom: "1px solid #1e1e1e", flex: "none", maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ padding: "8px 14px", background: "rgba(0,0,0,0.25)", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flex: "none", maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
             {codeModeLog.map((m) => (
               <div key={m.id} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%" }}>
                 <div
                   style={{
                     fontSize: 11.5, lineHeight: 1.5, whiteSpace: "pre-wrap", padding: "6px 10px", borderRadius: 6,
-                    color: m.role === "user" ? "#1e1e1e" : "#cccccc",
-                    background: m.role === "user" ? "rgba(201,166,255,0.65)" : "rgba(255,255,255,0.05)",
+                    color: m.role === "user" ? "#eafcff" : "rgba(207,239,251,0.8)",
+                    background: m.role === "user" ? "rgba(var(--accent-rgb),0.16)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${m.role === "user" ? "rgba(var(--accent-rgb),0.3)" : "rgba(255,255,255,0.08)"}`,
                     fontStyle: m.role === "user" ? "normal" : "italic",
                   }}
                 >
@@ -1442,19 +1466,19 @@ export default function AssistantPage() {
             ))}
             {busy && (
               <div style={{ alignSelf: "flex-start", maxWidth: "88%" }}>
-                <div style={{ fontSize: 11.5, lineHeight: 1.5, color: "#cccccc", fontStyle: "italic", whiteSpace: "pre-wrap", padding: "6px 10px" }}>
+                <div style={{ fontSize: 11.5, lineHeight: 1.5, color: "rgba(207,239,251,0.8)", fontStyle: "italic", whiteSpace: "pre-wrap", padding: "6px 10px" }}>
                   {answer || "…"}
                 </div>
               </div>
             )}
             {!codeModeLog.length && !busy && (
-              <div style={{ fontSize: 11, color: "#5a5a5a" }}>peça uma mudança de código aqui embaixo, ou pela caixa principal do Assistente.</div>
+              <div style={{ fontSize: 11, color: "rgba(207,239,251,0.35)" }}>peça uma mudança de código aqui embaixo, ou pela caixa principal do Assistente.</div>
             )}
           </div>
 
           {/* abas — um arquivo por aba, igual editor de código, clica pra ver outro já escrito */}
           {codeFilesOpen.length > 0 && (
-            <div style={{ display: "flex", background: "#252526", borderBottom: "1px solid #1e1e1e", flex: "none", overflowX: "auto" }}>
+            <div style={{ display: "flex", background: "rgba(0,0,0,0.3)", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flex: "none", overflowX: "auto" }}>
               {codeFilesOpen.map((f) => {
                 const isActive = f.path === codeActivePath;
                 const isStreaming = liveCode && f.path === liveCode.path;
@@ -1467,13 +1491,13 @@ export default function AssistantPage() {
                     style={{
                       display: "flex", alignItems: "center", gap: 6, padding: "7px 12px",
                       fontSize: 11, whiteSpace: "nowrap", cursor: "pointer", flex: "none",
-                      color: isActive ? "#ffffff" : "#969696",
-                      background: isActive ? "#1e1e1e" : "transparent",
+                      color: isActive ? "#eafcff" : "rgba(207,239,251,0.45)",
+                      background: isActive ? "rgba(var(--accent-rgb),0.08)" : "transparent",
                       borderTop: `2px solid ${isActive ? PU : "transparent"}`,
-                      borderRight: "1px solid #1e1e1e",
+                      borderRight: "1px solid rgba(var(--accent-rgb),0.08)",
                     }}
                   >
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", flex: "none", background: isStreaming ? "#ffcc00" : GR }} />
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", flex: "none", background: isStreaming ? OR : GR }} />
                     {fileName}
                   </div>
                 );
@@ -1481,35 +1505,39 @@ export default function AssistantPage() {
             </div>
           )}
 
-          {/* corpo do editor — número de linha + código, fundo escuro igual VS Code */}
-          <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: "#1e1e1e" }}>
+          {/* corpo do editor — número de linha + código com realce de sintaxe */}
+          <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: "#050b10" }}>
             {codeActiveFile ? (
               <div style={{ display: "flex", fontSize: 11.5, lineHeight: 1.55 }}>
-                <div style={{ flex: "none", padding: "8px 10px 8px 14px", textAlign: "right", color: "#5a5a5a", userSelect: "none", background: "#1e1e1e" }}>
-                  {codeActiveLines.map((_, i) => <div key={i}>{i + 1}</div>)}
+                <div style={{ flex: "none", padding: "8px 10px 8px 14px", textAlign: "right", color: "rgba(207,239,251,0.3)", userSelect: "none" }}>
+                  {Array.from({ length: codeActiveLineCount }, (_, i) => <div key={i}>{i + 1}</div>)}
                 </div>
-                <pre style={{ margin: 0, padding: "8px 14px 8px 6px", whiteSpace: "pre-wrap", wordBreak: "break-all", color: "#d4d4d4", flex: 1 }}>
-                  {codeActiveLines.map((line, i) => <div key={i}>{line || " "}</div>)}
-                </pre>
+                {codeActiveHtml ? (
+                  <pre className="bb-code-hl" style={{ margin: 0, padding: "8px 14px 8px 6px", whiteSpace: "pre-wrap", wordBreak: "break-all", color: "#cfeffb", flex: 1 }}>
+                    <code dangerouslySetInnerHTML={{ __html: codeActiveHtml }} />
+                  </pre>
+                ) : (
+                  <pre style={{ margin: 0, padding: "8px 14px 8px 6px", whiteSpace: "pre-wrap", wordBreak: "break-all", color: "#cfeffb", flex: 1 }}>{codeActiveTail}</pre>
+                )}
               </div>
             ) : (
-              <div style={{ padding: "16px 14px", fontSize: 11.5, color: "#5a5a5a" }}>
+              <div style={{ padding: "16px 14px", fontSize: 11.5, color: "rgba(207,239,251,0.35)" }}>
                 nenhum arquivo sendo editado ainda — a Lisa está {codeStage ? CODE_STAGE_LABELS[codeStage] : "começando"}…
               </div>
             )}
           </div>
 
-          {/* barra de status inferior, igual VS Code */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "3px 12px", background: PU, flex: "none" }}>
-            <span style={{ fontSize: 9.5, color: "#1e1e1e" }}>{codeModeRepo || "—"} → {codeModeBranch || "—"}{codeSession?.branchName ? ` (${codeSession.branchName})` : ""}</span>
-            <span style={{ fontSize: 9.5, color: "#1e1e1e" }}>{liveCodeDone.length} arquivo(s) concluído(s)</span>
+          {/* barra de status inferior */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 12px", background: "rgba(0,0,0,0.4)", borderTop: "1px solid rgba(var(--accent-rgb),0.14)", flex: "none" }}>
+            <span style={{ fontSize: 9.5, color: PU }}>{codeModeRepo || "—"} → {codeModeBranch || "—"}{codeSession?.branchName ? ` (${codeSession.branchName})` : ""}</span>
+            <span style={{ fontSize: 9.5, color: "rgba(207,239,251,0.5)" }}>{liveCodeDone.length} arquivo(s) concluído(s)</span>
           </div>
 
           {/* caixa de mensagem própria da janela — dá pra continuar pedindo ajustes ("corrige
               esse erro") sem sair daqui nem voltar pra caixa principal do Assistente */}
           <form
             onSubmit={(e) => { e.preventDefault(); submitCodeModalInput(); }}
-            style={{ display: "flex", gap: 8, padding: "8px 10px", background: "#252526", borderTop: "1px solid #1e1e1e", flex: "none" }}
+            style={{ display: "flex", gap: 8, padding: "8px 10px", background: "rgba(0,0,0,0.3)", borderTop: "1px solid rgba(var(--accent-rgb),0.1)", flex: "none" }}
           >
             <input
               value={codeModalInput}
@@ -1517,8 +1545,8 @@ export default function AssistantPage() {
               disabled={busy}
               placeholder={busy ? "trabalhando…" : "peça outro ajuste, ex.: \"corrige esse erro\""}
               style={{
-                flex: 1, fontSize: 11.5, padding: "7px 10px", borderRadius: 5, border: "1px solid #3c3c3c",
-                background: "#1e1e1e", color: "#d4d4d4", fontFamily: "inherit",
+                flex: 1, fontSize: 11.5, padding: "7px 10px", borderRadius: 5, border: "1px solid rgba(var(--accent-rgb),0.2)",
+                background: "#000", color: "#eafcff", fontFamily: "inherit",
               }}
             />
             <button
@@ -1540,7 +1568,7 @@ export default function AssistantPage() {
               title="arrastar para redimensionar"
               style={{ position: "absolute", right: 2, bottom: 2, width: 14, height: 14, cursor: "nwse-resize", opacity: 0.5 }}
             >
-              <svg width="14" height="14" viewBox="0 0 14 14"><path d="M12 2 L2 12 M12 6 L6 12 M12 10 L10 12" stroke="#969696" strokeWidth="1" /></svg>
+              <svg width="14" height="14" viewBox="0 0 14 14"><path d="M12 2 L2 12 M12 6 L6 12 M12 10 L10 12" stroke="rgba(207,239,251,0.5)" strokeWidth="1" /></svg>
             </div>
           )}
         </>

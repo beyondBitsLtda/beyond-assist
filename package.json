@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.45.0",
     "exceljs": "^4.4.0",
     "next": "^15.0.0",
+    "prismjs": "^1.30.0",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
