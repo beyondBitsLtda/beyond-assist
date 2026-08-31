@@ -1,7 +1,8 @@
 import { supabase } from "./supabase.js";
 import { retrieve } from "./rag.js";
-import { planCodeChanges, streamCodeChanges } from "./gemini.js";
+import { planCodeChanges, streamCodeChanges, selectRelevantFiles } from "./gemini.js";
 import { getBranchSha, createBranch, getFileSha, putFileContent, createPullRequest, listBranches } from "./github.js";
+import { listIndexedFiles } from "./ingest/github.js";
 
 // Tarefas de código: o usuário escolhe REPOSITÓRIO + BRANCH BASE e descreve o que quer.
 // A Lisa nunca commita na branch escolhida — sempre cria uma branch NOVA a partir dela,
@@ -41,6 +42,25 @@ async function getFullFileContents(repo, paths) {
   return results;
 }
 
+/**
+ * Decide QUAIS arquivos entram no contexto de uma tarefa, combinando três fontes (nessa
+ * ordem de prioridade, até MAX_FILES_PER_TASK no total):
+ *   1. `filePaths` — o que o usuário marcou à mão (se marcou).
+ *   2. o que a Lisa mesma decidir que é relevante só pelos NOMES dos arquivos do repo (ver
+ *      selectRelevantFiles em gemini.js) — é isso que resolve pedidos amplos tipo "mude o
+ *      tema", que a busca semântica sozinha erra (arquivo de config não se parece
+ *      textualmente com o pedido).
+ *   3. busca semântica normal (bom pra "onde está o código que faz X").
+ */
+async function gatherContextPaths({ repo, instruction, filePaths = [] }) {
+  const [allFiles, matches] = await Promise.all([
+    listIndexedFiles(repo).catch(() => []),
+    retrieve(instruction, { filterSource: "github", filterBoard: repo, topK: 8, minSim: 0.3 }),
+  ]);
+  const aiPicked = await selectRelevantFiles({ instruction, filePaths: allFiles, repo }).catch(() => []);
+  return [...new Set([...filePaths.slice(0, MAX_FILES_PER_TASK), ...aiPicked, ...matches.map((m) => m.title)])].slice(0, MAX_FILES_PER_TASK);
+}
+
 async function recordTask(row) {
   const { data, error } = await supabase.from("code_tasks").insert(row).select().single();
   if (error) throw new Error(`recordTask: ${error.message}`);
@@ -76,11 +96,9 @@ export async function runCodeTask({ repo, baseBranch, instruction, filePaths = [
   const task = await recordTask({ repo, base_branch: baseBranch, instruction, status: "running" });
 
   try {
-    // 1) contexto: os arquivos escolhidos à mão (garantidos) + o que a busca semântica achar
-    // filePaths (escolhidos à mão) sempre vêm primeiro no corte — nunca deixa a busca
-    // semântica empurrar pra fora um arquivo que o usuário pediu explicitamente.
-    const matches = await retrieve(instruction, { filterSource: "github", filterBoard: repo, topK: 8, minSim: 0.3 });
-    const uniquePaths = [...new Set([...filePaths.slice(0, MAX_FILES_PER_TASK), ...matches.map((m) => m.title)])].slice(0, MAX_FILES_PER_TASK);
+    // 1) contexto: arquivos escolhidos à mão + o que a Lisa decidir sozinha (pelos nomes) +
+    // busca semântica — ver gatherContextPaths
+    const uniquePaths = await gatherContextPaths({ repo, instruction, filePaths });
     const contextFiles = await getFullFileContents(repo, uniquePaths);
 
     // 2) Gemini propõe as mudanças (nunca aplica sozinho)
@@ -137,9 +155,8 @@ export async function* runCodeTaskStreaming({ repo, baseBranch, instruction, fil
   const task = await recordTask({ repo, base_branch: baseBranch, instruction, status: "running" });
 
   try {
-    yield { type: "narration", text: `Deixa eu dar uma olhada no repositório ${repo} pra ver o que já existe relacionado a isso.` };
-    const matches = await retrieve(instruction, { filterSource: "github", filterBoard: repo, topK: 8, minSim: 0.3 });
-    const uniquePaths = [...new Set([...filePaths.slice(0, MAX_FILES_PER_TASK), ...matches.map((m) => m.title)])].slice(0, MAX_FILES_PER_TASK);
+    yield { type: "narration", text: `Deixa eu dar uma olhada no repositório ${repo} pra ver quais arquivos são relevantes pra isso.` };
+    const uniquePaths = await gatherContextPaths({ repo, instruction, filePaths });
     const contextFiles = await getFullFileContents(repo, uniquePaths);
 
     if (contextFiles.length) {

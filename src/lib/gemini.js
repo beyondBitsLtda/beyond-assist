@@ -341,6 +341,54 @@ Regras:
   }
 }
 
+/**
+ * Decide quais arquivos são relevantes pra um pedido só pelos NOMES/CAMINHOS deles (sem ver
+ * conteúdo ainda) — complementa a busca semântica (que falha em pedidos amplos tipo "mude o
+ * tema", já que arquivo de config não se parece textualmente com o pedido). Chamada leve e
+ * barata (só texto, sem embedding), usada por runCodeTask(Streaming) em codeTasks.js ANTES
+ * de buscar o conteúdo de verdade — assim a Lisa "entende sozinha" que precisa desses
+ * arquivos, sem o usuário precisar marcar manualmente.
+ */
+export async function selectRelevantFiles({ instruction, filePaths = [], repo }) {
+  if (!filePaths.length) return [];
+  const prompt = `Repositório: ${repo}
+
+LISTA DE ARQUIVOS DO REPOSITÓRIO (só os caminhos — você ainda não viu o conteúdo deles):
+${filePaths.join("\n")}
+
+PEDIDO DO USUÁRIO:
+"${instruction}"
+
+Pelos NOMES/CAMINHOS acima, quais arquivos são mais prováveis de precisar mudar ou servir de
+referência pra atender esse pedido? Pense em convenções comuns de projeto (ex.: pedido sobre
+"tema"/"cor"/"visual" costuma envolver arquivos com nome tipo theme, color, palette, style,
+css, config, globals). Devolva só os que você tem motivo real pra achar relevantes — no
+máximo uns 6, em ordem de confiança.`;
+
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: prompt,
+        config: {
+          systemInstruction: "Você ajuda a decidir quais arquivos de um repositório são relevantes pra um pedido, só pelos nomes/caminhos dos arquivos, sem ver o conteúdo.",
+          responseMimeType: "application/json",
+          responseSchema: { type: "OBJECT", properties: { paths: { type: "ARRAY", items: { type: "STRING" } } }, required: ["paths"] },
+        },
+      }),
+    { attempts: 2, delayMs: 500 }
+  );
+
+  try {
+    const parsed = JSON.parse(res.text);
+    const valid = new Set(filePaths); // nunca confia cegamente — só aceita caminho que existe de verdade
+    return (parsed.paths || []).filter((p) => valid.has(p)).slice(0, 6);
+  } catch {
+    return [];
+  }
+}
+
 // ---- Tarefas de código: a Lisa PROPÕE mudança de arquivo (nunca aplica sozinha — ver
 // src/lib/codeTasks.js, que cria a branch/commit/PR a partir disto) ----
 export async function planCodeChanges({ instruction, contextFiles = [], repo }) {
