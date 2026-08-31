@@ -449,3 +449,26 @@ alter table public.github_fetch_cache enable row level security;
 --     arquivos já escritos, branch já criada) — sem isso, cada pedido teria que refazer tudo
 --     de novo do zero.
 alter table public.code_tasks add column if not exists state jsonb not null default '{}'::jsonb;
+
+-- ============================================================
+--  Mapa de arquitetura (a mais, aditivo) — a Lisa gera um HTML autônomo (com diagrama) documen-
+--  tando a arquitetura de um repositório escolhido: áreas lógicas (agrupadas por pasta), o que
+--  cada uma faz (IA), e como se relacionam (grafo de dependência REAL, calculado a partir dos
+--  imports indexados — não "achismo" da IA). Mesmo padrão retomável em passos de code_tasks
+--  (cada passo é um pedido HTTP próprio, com seu próprio teto de 60s) — ver
+--  src/lib/archDocs.js:runArchDocStep.
+-- ============================================================
+
+-- 23) Histórico + progresso das gerações — o HTML final fica em `html`, só quando status='done'.
+create table if not exists public.arch_docs (
+  id          bigint generated always as identity primary key,
+  repo        text not null,
+  status      text not null default 'running',   -- 'running' | 'done' | 'error'
+  state       jsonb not null default '{}'::jsonb, -- progresso entre passos (áreas, grafo, resumos)
+  html        text,                               -- documento final autônomo (só quando status='done')
+  error       text,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.arch_docs enable row level security;
+-- (só acessada pela service_role, em src/lib/archDocs.js — mesmo padrão das tabelas acima)

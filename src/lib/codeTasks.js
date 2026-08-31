@@ -4,6 +4,8 @@ import { planFilesToEdit, streamSingleFileChange, selectRelevantFiles, fixFileSy
 import { getBranchSha, createBranch, getFileSha, putFileContent, createPullRequest, listBranches, getFileContentOnBranch } from "./github.js";
 import { listIndexedFiles } from "./ingest/github.js";
 import { validateFileSyntax } from "./validateSyntax.js";
+import { getFullFileContents } from "./repoFiles.js";
+import { extractImportSpecs, resolveImportSpec } from "./importGraph.js";
 
 // Tarefas de código: o usuário escolhe REPOSITÓRIO + BRANCH BASE e descreve o que quer.
 // A Lisa nunca commita na branch escolhida — sempre cria uma branch NOVA a partir dela,
@@ -36,58 +38,6 @@ function slugify(text) {
     .replace(/(^-+|-+$)/g, "")
     .slice(0, 40);
   return s || "tarefa";
-}
-
-/** Conteúdo COMPLETO (todos os pedaços, na ordem certa) de cada arquivo já indexado —
- * diferente da busca semântica normal (que devolve só o PEDAÇO que bateu), aqui a Lisa
- * precisa do arquivo INTEIRO pra poder reescrevê-lo com segurança. */
-async function getFullFileContents(repo, paths) {
-  const results = [];
-  for (const path of [...new Set(paths)]) {
-    const { data, error } = await supabase
-      .from("documents").select("external_id, content")
-      .eq("source", "github").eq("board", repo).eq("title", path);
-    if (error || !data?.length) continue;
-    const sorted = data.sort((a, b) => Number(a.external_id.split("#").pop()) - Number(b.external_id.split("#").pop()));
-    results.push({ path, content: sorted.map((r) => r.content).join("\n") });
-  }
-  return results;
-}
-
-// Contexto por DEPENDÊNCIA — além do que a busca semântica e a Lisa (por nome) já escolhem,
-// olha os `import`/`require` de CADA arquivo já lido e tenta trazer junto os que ele realmente
-// usa (ou que o alteram) — melhor esforço, só relativo (./, ../) e o alias @/ (convenção deste
-// e de outros projetos Next.js, ver jsconfig.json); o que não resolver é só ignorado, sem
-// travar nada. Ajuda em pedidos que mexem numa peça só mas cuja mudança precisa "ver" quem a
-// importa ou o que ela importa pra ficar consistente.
-const IMPORT_RE = /(?:import[\s\S]*?from\s*|require\(\s*)["']([^"']+)["']/g;
-
-function extractImportSpecs(content) {
-  const specs = new Set();
-  IMPORT_RE.lastIndex = 0;
-  let m;
-  while ((m = IMPORT_RE.exec(content))) {
-    if (m[1].startsWith(".") || m[1].startsWith("@/")) specs.add(m[1]);
-  }
-  return [...specs];
-}
-
-function resolveImportSpec(spec, fromPath, knownPaths) {
-  let base;
-  if (spec.startsWith("@/")) {
-    base = `src/${spec.slice(2)}`;
-  } else {
-    const dir = fromPath.includes("/") ? fromPath.slice(0, fromPath.lastIndexOf("/")) : "";
-    const stack = [];
-    for (const part of (dir ? `${dir}/${spec}` : spec).split("/")) {
-      if (part === "." || part === "") continue;
-      if (part === "..") stack.pop();
-      else stack.push(part);
-    }
-    base = stack.join("/");
-  }
-  const candidates = [base, `${base}.js`, `${base}.jsx`, `${base}.ts`, `${base}.tsx`, `${base}/index.js`, `${base}/index.jsx`, `${base}/index.ts`, `${base}/index.tsx`];
-  return candidates.find((c) => knownPaths.has(c)) || null;
 }
 
 async function recordTask(row) {

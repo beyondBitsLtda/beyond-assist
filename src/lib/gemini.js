@@ -615,6 +615,84 @@ primeira linha da resposta já é a primeira linha real do arquivo.`;
   }
 }
 
+// ---- Mapa de arquitetura: ver src/lib/archDocs.js ----
+// O DIAGRAMA (Mermaid) é montado no CÓDIGO a partir do grafo de dependência REAL (calculado
+// pelos imports indexados, não pela IA) — de propósito: pedir pra IA escrever sintaxe Mermaid
+// direto já causou dor de cabeça parecida com o bug do comentário no topo do CSS (texto solto
+// que devia ser sintaxe estrita tende a sair errado). A IA só escreve PROSA aqui (descrição de
+// área, resumo geral) — nunca nada que precise ser sintaticamente exato.
+
+/**
+ * Descreve o que UMA área (agrupamento de arquivos por pasta) de um repositório faz, só pelos
+ * CAMINHOS dos arquivos dela (sem ler conteúdo — rápido e barato, funciona bem porque nomes de
+ * arquivo/pasta já carregam bastante sinal). `relatedTo` (opcional) — nomes de outras áreas que
+ * o grafo de dependência real já mostrou que esta área importa ou é importada por, pra ajudar a
+ * IA a situar o papel dela no todo.
+ */
+export async function describeArchArea({ repo, areaName, paths, relatedTo = [] }) {
+  const prompt = `Repositório: ${repo}
+Área: ${areaName}
+
+ARQUIVOS DESTA ÁREA (${paths.length} no total, só os caminhos):
+${paths.slice(0, 60).join("\n")}${paths.length > 60 ? `\n... e mais ${paths.length - 60} arquivo(s)` : ""}
+${relatedTo.length ? `\nESTA ÁREA SE CONECTA (de verdade, via import) COM: ${relatedTo.join(", ")}` : ""}
+
+Descreva em 1-3 frases o que essa área do código provavelmente faz, com base nos nomes dos
+arquivos e da pasta — convenções comuns de projeto (ex.: "api" = rotas de backend, "components"
+= peças de UI reutilizáveis, "lib"/"utils" = lógica compartilhada, "hooks" = React hooks).`;
+
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: prompt,
+        config: {
+          systemInstruction: "Você documenta a arquitetura de um repositório de código, descrevendo áreas (pastas) só pelos caminhos dos arquivos dentro delas. Seja direto e específico — evite generalidades vagas tipo 'contém arquivos relacionados ao projeto'.",
+          responseMimeType: "application/json",
+          responseSchema: { type: "OBJECT", properties: { summary: { type: "STRING" } }, required: ["summary"] },
+        },
+      }),
+    { attempts: 2, delayMs: 600 }
+  );
+
+  try {
+    const parsed = JSON.parse(res.text);
+    return parsed.summary || "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Parágrafo de VISÃO GERAL do repositório inteiro, a partir do que já foi descoberto sobre
+ * cada área — chamado uma vez, no final, depois de todas as áreas já descritas.
+ */
+export async function writeArchOverview({ repo, areaSummaries }) {
+  const areasBlock = areaSummaries.map((a) => `- ${a.name} (${a.fileCount} arquivo${a.fileCount > 1 ? "s" : ""}): ${a.summary}`).join("\n");
+
+  const prompt = `Repositório: ${repo}
+
+ÁREAS JÁ MAPEADAS:
+${areasBlock}
+
+Escreva um parágrafo de visão geral (4-8 frases) explicando, pra alguém que nunca viu este
+código, do que se trata o projeto e como as peças principais se encaixam — cite as áreas mais
+centrais pelo nome. Tom direto, técnico, em português.`;
+
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: prompt,
+        config: { systemInstruction: "Você escreve a introdução de uma documentação técnica de arquitetura de software, em português, direto ao ponto." },
+      }),
+    { attempts: 2, delayMs: 600 }
+  );
+  return (res.text || "").trim();
+}
+
 // ---- TTS: gera áudio a partir de texto ----
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
