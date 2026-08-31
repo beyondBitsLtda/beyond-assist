@@ -111,6 +111,8 @@ export default function AssistantPage() {
   const [codeStage, setCodeStage] = useState(null); // 'context'|'writing'|'branching'|'committing'|'pr'|'done'|'error'
   const CODE_STAGE_LABELS = {
     context: "🔍 buscando contexto",
+    "context-select": "🧭 escolhendo os arquivos certos",
+    "context-fetch": "📖 lendo o conteúdo dos arquivos",
     planning: "🧠 decidindo o que muda",
     writing: "✍️ escrevendo o código",
     branching: "🌿 criando branch",
@@ -983,12 +985,15 @@ export default function AssistantPage() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ taskId, repo, baseBranch, instruction, filePaths }),
     });
-    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok || !res.body) { const e = new Error(`HTTP ${res.status}`); e.taskId = taskId; throw e; }
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     let stepDone = null; // payload do evento "step_done" deste passo, se chegou
+    let seenTaskId = taskId; // capturado do 1º evento que trouxer um (stage já traz, não só step_done) —
+    // assim, mesmo se a conexão cair antes do step_done, dá pra RETOMAR pelo mesmo taskId em
+    // vez de criar uma tarefa nova do zero.
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1005,6 +1010,7 @@ export default function AssistantPage() {
         if (!data) continue;
         let payload;
         try { payload = JSON.parse(data); } catch { continue; }
+        if (payload.taskId) seenTaskId = payload.taskId;
 
         if (event === "stage") {
           setCodeStage(payload.stage);
@@ -1040,8 +1046,11 @@ export default function AssistantPage() {
 
     // esse PASSO fechou sem "step_done" — o teto de 60s matou a função no meio dele. Como
     // cada passo agora é bem menor que a tarefa inteira, isso deve ser raro, mas ainda pode
-    // acontecer num arquivo grande/lento — sem taskId salvo, não dá pra retomar sozinho.
-    if (!stepDone) throw new Error("um passo da tarefa foi cortado no meio (estourou 60s) — tenta de novo");
+    // acontecer com o Gemini mais lento que o normal. Não é motivo pra desistir — quem chama
+    // (askCodeMode) tenta de novo automaticamente, retomando pelo MESMO taskId (o passo que
+    // foi cortado simplesmente refaz do zero, já que nada foi salvo em code_tasks.state até
+    // ele terminar).
+    if (!stepDone) { const e = new Error("um passo da tarefa foi cortado no meio (estourou 60s) — tentando de novo sozinha"); e.taskId = seenTaskId; throw e; }
     return stepDone;
   }, [addLog, enqueueSpeech]);
 
@@ -1076,13 +1085,28 @@ export default function AssistantPage() {
       // chama /api/code-tasks/step repetidas vezes — cada chamada é UM PASSO (contexto,
       // planejamento, 1 arquivo escrito, criar branch, 1 arquivo commitado, ou abrir o PR) —
       // até a tarefa inteira terminar. Nunca mais uma única conexão carrega a tarefa toda.
+      // Sem pressa nenhuma: se UM passo isolado falhar (rede, ou raramente estourar os 60s
+      // mesmo já sendo pequeno), tenta de novo sozinha em vez de desistir e jogar o erro pro
+      // usuário — só desiste de verdade depois de várias tentativas seguidas falhando.
+      let retries = 0;
+      const MAX_RETRIES = 20;
       do {
-        stepResult = await runCodeModeStep({
-          taskId, repo: codeModeRepo, baseBranch: codeModeBranch, instruction: q,
-          filePaths: codeModeFiles, gen, narrationSoFarRef, voiceEnabled,
-        });
+        try {
+          stepResult = await runCodeModeStep({
+            taskId, repo: codeModeRepo, baseBranch: codeModeBranch, instruction: q,
+            filePaths: codeModeFiles, gen, narrationSoFarRef, voiceEnabled,
+          });
+          retries = 0; // um passo deu certo — zera a contagem, só desiste de vez em falhas SEGUIDAS
+        } catch (stepErr) {
+          taskId = stepErr.taskId ?? taskId;
+          retries++;
+          if (retries > MAX_RETRIES) throw stepErr;
+          addLog("[CÓDIGO]", OR, `${stepErr.message} (tentativa ${retries}/${MAX_RETRIES})`);
+          await new Promise((r) => setTimeout(r, Math.min(2000 * retries, 15000)));
+          continue;
+        }
         taskId = stepResult.taskId ?? taskId;
-      } while (!stepResult.done);
+      } while (!stepResult?.done);
 
       setCodeStage(stepResult.ok ? "done" : "error");
       const finalText = stepResult.ok

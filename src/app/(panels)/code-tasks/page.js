@@ -83,11 +83,13 @@ export default function CodeTasksPage() {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ taskId, repo, baseBranch, instruction, filePaths: selectedFiles }),
     });
-    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok || !res.body) { const e = new Error(`HTTP ${res.status}`); e.taskId = taskId; throw e; }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     let stepDone = null;
+    let seenTaskId = taskId; // capturado do 1º evento com taskId (não só do step_done) — pra
+    // conseguir RETOMAR pelo mesmo taskId se a conexão cair antes do passo terminar.
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -103,14 +105,15 @@ export default function CodeTasksPage() {
         if (!data) continue;
         let payload;
         try { payload = JSON.parse(data); } catch { continue; }
+        if (payload.taskId) seenTaskId = payload.taskId;
         if (event === "stage") setResult((r) => ({ ...(r || {}), stage: payload.stage }));
         else if (event === "step_done") stepDone = payload;
       }
     }
     // esse passo fechou sem "step_done" — o teto de 60s matou a função no meio dele (raro,
-    // já que cada passo agora é bem menor que a tarefa toda, mas ainda possível num arquivo
-    // grande/lento).
-    if (!stepDone) throw new Error("um passo da tarefa foi cortado no meio (estourou 60s) — tenta de novo");
+    // já que cada passo agora é bem menor que a tarefa toda, mas ainda possível com o Gemini
+    // mais lento que o normal). submit() tenta de novo automaticamente, sem pressa.
+    if (!stepDone) { const e = new Error("um passo da tarefa foi cortado no meio (estourou 60s) — tentando de novo"); e.taskId = seenTaskId; throw e; }
     return stepDone;
   };
 
@@ -121,10 +124,24 @@ export default function CodeTasksPage() {
     try {
       let taskId = null;
       let stepResult = null;
+      // sem pressa: se UM passo isolado falhar, tenta de novo sozinho (retomando pelo mesmo
+      // taskId) em vez de desistir — só joga o erro pro usuário depois de várias falhas SEGUIDAS.
+      let retries = 0;
+      const MAX_RETRIES = 20;
       do {
-        stepResult = await runStep(taskId);
+        try {
+          stepResult = await runStep(taskId);
+          retries = 0;
+        } catch (stepErr) {
+          taskId = stepErr.taskId ?? taskId;
+          retries++;
+          if (retries > MAX_RETRIES) throw stepErr;
+          setResult((r) => ({ ...(r || {}), lastRetry: `${stepErr.message} (tentativa ${retries}/${MAX_RETRIES})` }));
+          await new Promise((r) => setTimeout(r, Math.min(2000 * retries, 15000)));
+          continue;
+        }
         taskId = stepResult.taskId ?? taskId;
-      } while (!stepResult.done);
+      } while (!stepResult?.done);
       if (!stepResult.ok) throw new Error(stepResult.error || "não consegui completar a tarefa");
       setResult(stepResult);
       setInstruction("");

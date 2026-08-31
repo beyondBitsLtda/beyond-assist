@@ -45,25 +45,6 @@ async function getFullFileContents(repo, paths) {
   return results;
 }
 
-/**
- * Decide QUAIS arquivos entram no contexto de uma tarefa, combinando três fontes (nessa
- * ordem de prioridade, até MAX_FILES_PER_TASK no total):
- *   1. `filePaths` — o que o usuário marcou à mão (se marcou).
- *   2. o que a Lisa mesma decidir que é relevante só pelos NOMES dos arquivos do repo (ver
- *      selectRelevantFiles em gemini.js) — é isso que resolve pedidos amplos tipo "mude o
- *      tema", que a busca semântica sozinha erra (arquivo de config não se parece
- *      textualmente com o pedido).
- *   3. busca semântica normal (bom pra "onde está o código que faz X").
- */
-async function gatherContextPaths({ repo, instruction, filePaths = [] }) {
-  const [allFiles, matches] = await Promise.all([
-    listIndexedFiles(repo).catch(() => []),
-    retrieve(instruction, { filterSource: "github", filterBoard: repo, topK: 8, minSim: 0.3 }),
-  ]);
-  const aiPicked = await selectRelevantFiles({ instruction, filePaths: allFiles, repo }).catch(() => []);
-  return [...new Set([...filePaths.slice(0, MAX_FILES_PER_TASK), ...aiPicked, ...matches.map((m) => m.title)])].slice(0, MAX_FILES_PER_TASK);
-}
-
 async function recordTask(row) {
   const { data, error } = await supabase.from("code_tasks").insert(row).select().single();
   if (error) throw new Error(`recordTask: ${error.message}`);
@@ -91,7 +72,9 @@ export async function listRepoBranches(repo) {
  *
  * É um async generator — quem chama itera com `for await` (ver /api/code-tasks/step).
  * Eventos possíveis:
- *   { type: 'stage', stage }                          — em qual fase este passo está
+ *   { type: 'stage', stage, taskId }                   — em qual fase este passo está (e o
+ *     id da tarefa, já desde o PRIMEIRO evento — importante pra quem chama saber o taskId
+ *     mesmo se a conexão cair ANTES do "step_done" deste passo, e conseguir retomar por ele)
  *   { type: 'narration', text }                        — algo pra Lisa "dizer" nesse momento
  *   { type: 'file_start'|'file_chunk'|'file_end', path, text? } — código de UM arquivo sendo escrito
  *   { type: 'step_done', taskId, stage, done, ok?, pr_url?, files?, summary?, error? } —
@@ -123,24 +106,64 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
   };
 
   try {
+    // Achar o contexto virou 3 passos pequenos (em vez de 1 só) — juntar "listar arquivos +
+    // busca semântica + a Lisa escolher por nome + ler o conteúdo de até 6 arquivos" numa
+    // chamada só ainda estourava os 60s de vez em quando (cada parte pode envolver uma
+    // chamada ao Gemini, que às vezes demora bem mais que o normal). Sem pressa nenhuma pra
+    // terminar rápido — só importa que NENHUM passo isolado ultrapasse o teto.
     if (stage === "context") {
-      yield { type: "stage", stage: "context" };
+      yield { type: "stage", stage: "context", taskId: task.id };
       yield { type: "narration", text: `Deixa eu dar uma olhada no repositório ${repo} pra ver quais arquivos são relevantes pra isso.` };
-      const uniquePaths = await gatherContextPaths({ repo, instruction, filePaths });
-      const contextFiles = await getFullFileContents(repo, uniquePaths);
+      const [allFiles, matches] = await Promise.all([
+        listIndexedFiles(repo).catch(() => []),
+        retrieve(instruction, { filterSource: "github", filterBoard: repo, topK: 8, minSim: 0.3 }),
+      ]);
+      await setState({ stage: "context-select", allFiles, matchPaths: matches.map((m) => m.title) });
+      yield { type: "step_done", taskId: task.id, stage: "context-select", done: false };
+      return;
+    }
+
+    if (stage === "context-select") {
+      yield { type: "stage", stage: "context-select", taskId: task.id };
+      const { allFiles = [], matchPaths = [] } = state;
+      const aiPicked = await selectRelevantFiles({ instruction, filePaths: allFiles, repo }).catch(() => []);
+      const contextPaths = [...new Set([...filePaths.slice(0, MAX_FILES_PER_TASK), ...aiPicked, ...matchPaths])].slice(0, MAX_FILES_PER_TASK);
       yield {
         type: "narration",
-        text: contextFiles.length
-          ? `Encontrei ${contextFiles.length} arquivo${contextFiles.length > 1 ? "s" : ""} relevante${contextFiles.length > 1 ? "s" : ""}.`
+        text: contextPaths.length
+          ? `Vou olhar o conteúdo de ${contextPaths.length} arquivo${contextPaths.length > 1 ? "s" : ""}: ${contextPaths.join(", ")}.`
           : "Não achei nenhum arquivo indexado relacionado — vou tentar mesmo assim, mas com cautela.",
       };
-      await setState({ stage: "planning", contextFiles });
-      yield { type: "step_done", taskId: task.id, stage: "planning", done: false };
+      await setState({ stage: "context-fetch", contextPaths, contextFiles: [] });
+      yield { type: "step_done", taskId: task.id, stage: "context-fetch", done: false };
+      return;
+    }
+
+    if (stage === "context-fetch") {
+      yield { type: "stage", stage: "context-fetch", taskId: task.id };
+      const { contextPaths = [], contextFiles = [] } = state;
+      const doneCount = contextFiles.length + (state.fetchSkipped || 0);
+      if (doneCount >= contextPaths.length) {
+        yield {
+          type: "narration",
+          text: contextFiles.length
+            ? `Encontrei ${contextFiles.length} arquivo${contextFiles.length > 1 ? "s" : ""} relevante${contextFiles.length > 1 ? "s" : ""}.`
+            : "Nenhum dos arquivos escolhidos estava indexado de fato — vou tentar mesmo assim, mas com cautela.",
+        };
+        await setState({ stage: "planning" });
+        yield { type: "step_done", taskId: task.id, stage: "planning", done: false };
+        return;
+      }
+      const path = contextPaths[doneCount];
+      const [fetched] = await getFullFileContents(repo, [path]);
+      if (fetched) await setState({ contextFiles: [...contextFiles, fetched] });
+      else await setState({ fetchSkipped: (state.fetchSkipped || 0) + 1 });
+      yield { type: "step_done", taskId: task.id, stage: "context-fetch", done: false };
       return;
     }
 
     if (stage === "planning") {
-      yield { type: "stage", stage: "planning" };
+      yield { type: "stage", stage: "planning", taskId: task.id };
       const plan = await planFilesToEdit({ instruction, contextFiles: state.contextFiles || [], repo });
       if (plan.summary) yield { type: "narration", text: plan.summary };
       const pathsToEdit = (plan.paths || []).slice(0, MAX_FILES_PER_TASK);
@@ -157,7 +180,7 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
     }
 
     if (stage === "writing") {
-      yield { type: "stage", stage: "writing" };
+      yield { type: "stage", stage: "writing", taskId: task.id };
       const { pathsToEdit = [], generatedFiles = [], contextFiles = [], summary = "" } = state;
       const path = pathsToEdit[generatedFiles.length];
       const contextByPath = new Map(contextFiles.map((f) => [f.path, f.content]));
@@ -179,7 +202,7 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
     }
 
     if (stage === "branching") {
-      yield { type: "stage", stage: "branching" };
+      yield { type: "stage", stage: "branching", taskId: task.id };
       yield { type: "narration", text: `Beleza, vou criar uma branch nova a partir de \`${baseBranch}\`.` };
       const baseSha = await getBranchSha(repo, baseBranch);
       const branchName = `lisa/${slugify(instruction)}-${Date.now().toString(36)}`;
@@ -190,7 +213,7 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
     }
 
     if (stage === "committing") {
-      yield { type: "stage", stage: "committing" };
+      yield { type: "stage", stage: "committing", taskId: task.id };
       const { generatedFiles = [], committedFiles = [], branchName, summary = "" } = state;
       const f = generatedFiles[committedFiles.length];
       yield { type: "narration", text: `Aplicando \`${f.path}\`…` };
@@ -204,7 +227,7 @@ export async function* runCodeTaskStep({ taskId, repo, baseBranch, instruction, 
     }
 
     if (stage === "pr") {
-      yield { type: "stage", stage: "pr" };
+      yield { type: "stage", stage: "pr", taskId: task.id };
       yield { type: "narration", text: "Pronto — abrindo o Pull Request pra você revisar." };
       const { generatedFiles = [], branchName, summary = "" } = state;
       const prTitle = `[Lisa] ${summary || instruction}`.slice(0, 250);
