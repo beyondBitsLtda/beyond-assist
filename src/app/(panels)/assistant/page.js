@@ -608,6 +608,14 @@ export default function AssistantPage() {
   const voiceNameForScreenRef = useRef(voiceName);
   voiceNameForScreenRef.current = voiceName;
 
+  // true enquanto QUALQUER vigília (Modo Tela OU Observância) estiver FALANDO um comentário ou
+  // esperando a janela de resposta dele — compartilhado entre as duas. Sem isso, um tick novo
+  // podia disparar (setInterval não espera o anterior terminar) enquanto o de antes ainda
+  // estava no meio de falar/ouvir a resposta, e as duas falas saíam JUNTAS, uma por cima da
+  // outra (foi exatamente isso que aconteceu: a réplica pro usuário e um comentário novo da
+  // vigília saindo ao mesmo tempo).
+  const proactiveTurnRef = useRef(false);
+
   // `ask` só é declarada bem mais abaixo no componente, mas os efeitos de vigília (Modo Tela/
   // Observância) — declarados aqui em cima — precisam poder chamá-la depois de um comentário.
   // Mesmo truque já usado em toggleMicForGestureRef: um ref populado com a função de verdade
@@ -701,11 +709,16 @@ export default function AssistantPage() {
         // Mas só fala se a Lisa NÃO estiver falando nada agora (resposta em andamento, ou
         // acabou de acordar com o gesto) — comentário passivo da vigília nunca deve entrar
         // por cima de uma fala explícita; o texto ainda aparece no chat/log de qualquer jeito.
-        const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
+        const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || proactiveTurnRef.current || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
         if (jaFalando) addLog("[TELA]", CY, "vigília: comentário achado, mas a Lisa já está falando — só no texto desta vez");
         else if (voiceOnForScreenRef.current) {
-          await speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
-          if (!cancelled) openReplyWindow(data.comment, "[TELA]");
+          proactiveTurnRef.current = true;
+          try {
+            await speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+            if (!cancelled) await openReplyWindow(data.comment, "[TELA]");
+          } finally {
+            proactiveTurnRef.current = false;
+          }
         }
       } catch (err) {
         if (!cancelled) addLog("[TELA]", OR, `vigília falhou: ${err?.message || err}`);
@@ -746,11 +759,16 @@ export default function AssistantPage() {
         setMessages((m) => [...m, { id: `obsgreet${Date.now()}`, role: "assistant", text: data.comment }]);
         // mesma regra de prioridade de voz da vigília do Modo Tela — nunca fala por cima de
         // uma fala já em andamento (resposta normal, ou saudação do gesto de acordar).
-        const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
+        const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || proactiveTurnRef.current || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
         if (jaFalando) addLog("[OBS]", CY, "saudação: comentário achado, mas a Lisa já está falando — só no texto desta vez");
         else if (voiceOnForScreenRef.current) {
-          await speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
-          if (!cancelled) openReplyWindow(data.comment, "[OBS]");
+          proactiveTurnRef.current = true;
+          try {
+            await speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+            if (!cancelled) await openReplyWindow(data.comment, "[OBS]");
+          } finally {
+            proactiveTurnRef.current = false;
+          }
         }
       } catch (err) {
         if (!cancelled) addLog("[OBS]", OR, `saudação falhou: ${err?.message || err}`);
