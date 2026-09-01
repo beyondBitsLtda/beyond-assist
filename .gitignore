@@ -18,3 +18,8 @@ out
 # ver src/lib/delpTasks.js), não precisa estar versionada — e não deveria.
 contexto/*.xlsx
 contexto/*.xls
+
+# código-fonte de OUTRA aplicação do usuário (a ferramenta de controle de testes), colado aqui
+# só pra referência/investigação (ver src/lib/sentinelTests.js) — não é parte do Beyond Bits,
+# não deveria ser versionado neste repositório.
+Controle-e-gest-o-de-testes-main/

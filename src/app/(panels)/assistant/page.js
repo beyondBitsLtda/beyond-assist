@@ -2381,6 +2381,7 @@ export default function AssistantPage() {
                   { href: "/code-repos", glyph: "🐙", label: "REPOSITÓRIOS" },
                   { href: "/code-tasks", glyph: "🛠️", label: "TAREFAS DE CÓDIGO" },
                   { href: "/arch-docs", glyph: "🗺️", label: "MAPA DE ARQUITETURA" },
+                  { href: "/test-mode", glyph: "🧪", label: "MODO DE TESTES" },
                   { href: "/sync-status", glyph: "📊", label: "PROGRESSO DO SYNC" },
                 ].map((item) => (
                   <Link

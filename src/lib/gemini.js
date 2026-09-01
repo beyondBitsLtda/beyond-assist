@@ -950,3 +950,72 @@ export async function describeScreenIfNotable(image, systemInstruction = SCREEN_
   if (!text || /^nada\.?$/i.test(text)) return null;
   return text;
 }
+
+// ---- Modo Assistente de Testes: ver src/lib/sentinelTests.js e /api/test-mode/* ----
+
+/**
+ * Compara UMA ou mais imagens da tela (o teste sendo executado ao vivo) com os PASSOS e o
+ * CRITÉRIO DE APROVAÇÃO de um caso de teste (vindos de cloud_runs.state — a aplicação de
+ * controle de testes do usuário), e dá um veredito. Deliberadamente CONSERVADORA: só devolve
+ * "Aprovado"/"Reprovado" quando a evidência na tela é clara o bastante; caso contrário devolve
+ * "indeterminado" — errar dizendo "não sei" é sempre melhor que aprovar/reprovar um teste
+ * errado, já que isso pode escrever de volta no sistema de testes de verdade.
+ */
+export async function evaluateTestCase({ itemTestado, descricao, condicaoAprovacao, images = [] }) {
+  const prompt = `ITEM TESTADO: ${itemTestado || "(não informado)"}
+
+PASSOS DO TESTE:
+${descricao || "(não informado)"}
+
+CRITÉRIO DE APROVAÇÃO:
+${condicaoAprovacao || "(não informado)"}
+
+As imagens anexadas são capturas da tela ATUAL de quem está executando este teste agora. Com
+base SÓ no que dá pra ver nas imagens, avalie se o critério de aprovação foi atendido.`;
+
+  const systemInstruction = `Você é a Lisa, ajudando alguém a executar um caso de teste, olhando a tela dele em tempo
+real. Sua função é comparar o que aparece na tela com o CRITÉRIO DE APROVAÇÃO do caso e dizer
+se passou ou não — mas seja CONSERVADORA: só diga "Aprovado" ou "Reprovado" quando a imagem
+mostrar evidência clara o bastante pra sustentar aquilo. Se a tela não mostrar informação
+suficiente pra decidir (etapa ainda não chegou lá, tela cortada, não dá pra ver o resultado
+final), diga "indeterminado" e explique o que falta ver — nunca chute. Isso pode ser gravado
+de volta no sistema de testes de verdade, então um veredito errado tem custo real.
+
+No campo "reasoning" (2-4 frases, em português, no seu estilo, direta): explique o que você vê
+e por que isso confirma, contraria, ou não é suficiente pra avaliar o critério.`;
+
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: [{
+          role: "user",
+          parts: [
+            { text: prompt },
+            ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } })),
+          ],
+        }],
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              verdict: { type: "STRING", enum: ["Aprovado", "Reprovado", "indeterminado"] },
+              reasoning: { type: "STRING" },
+            },
+            required: ["verdict", "reasoning"],
+          },
+        },
+      }),
+    { attempts: 2, delayMs: 600 }
+  );
+
+  try {
+    const parsed = JSON.parse(res.text);
+    return { verdict: parsed.verdict || "indeterminado", reasoning: parsed.reasoning || "" };
+  } catch {
+    return { verdict: "indeterminado", reasoning: "não consegui interpretar a resposta do modelo desta vez." };
+  }
+}

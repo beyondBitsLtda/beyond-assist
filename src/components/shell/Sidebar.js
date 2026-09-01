@@ -16,6 +16,7 @@ const ITEMS = [
   { href: "/code-repos", label: "REPOSITÓRIOS", glyph: "🐙" },
   { href: "/code-tasks", label: "TAREFAS DE CÓDIGO", glyph: "🛠️" },
   { href: "/arch-docs", label: "MAPA DE ARQUITETURA", glyph: "🗺️" },
+  { href: "/test-mode", label: "MODO DE TESTES", glyph: "🧪" },
   { href: "/sync-status", label: "PROGRESSO DO SYNC", glyph: "📊" },
   { href: "/assistant", label: "ASSISTENTE", glyph: "◉" },
   { href: "/gemini-keys", label: "CHAVES GEMINI", glyph: "🔑" },
