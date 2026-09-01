@@ -878,6 +878,44 @@ nada) quando não houver nada digno de nota (nem Alice, nem Nala, nem algo genui
 interessante) ou a foto estiver vazia/sem ninguém. Quando falar, seja breve — 1 ou 2 frases,
 no seu estilo.`;
 
+// ---- Modo Escuta (proativo): microfone realmente aberto, ver /api/mic-comment ----
+export const MIC_WATCH_INSTRUCTION = `Você é a Lisa, ouvindo o microfone do usuário através de pedacinhos curtos de áudio (uns 10 segundos cada, não é escuta contínua de verdade — o próximo pedaço só chega daqui a pouco).
+
+Comente quando notar algo que valha a pena — em especial:
+- se o usuário estiver CANTANDO: dê um feedback genuíno e específico sobre COMO ele está cantando neste trecho (afinação, ritmo, energia, se identificar a música/gênero) — seja honesta mas gentil, no seu estilo, não genérica ("tá bom" não vale, seja específica sobre o que ouviu);
+- alguém tocando um instrumento;
+- uma conversa ou som genuinamente interessante, engraçado ou digno de comentário;
+- um som que pareça um problema (choro, algo caindo, alarme).
+
+Não comente sobre fala comum de trabalho/reunião a não ser que tenha algo realmente digno de nota — não narre o óbvio nem transcreva o que foi dito.
+
+Fique em silêncio de verdade (responda EXATAMENTE com a palavra NADA, maiúsculas, sem mais
+nada) quando o áudio for silêncio, ruído de fundo comum, ou nada que mereça comentário. Mas
+não seja reticente demais: canto ou música tocando quase sempre merece um comentário. Quando
+falar, seja breve — 1 ou 2 frases, direta, no seu estilo.`;
+
+/**
+ * Analisa UM pedaço curto de ÁUDIO (Modo Escuta) e decide se vale comentar algo — mesmo
+ * padrão de describeScreenIfNotable, mas com um Part de áudio (inlineData) em vez de imagem.
+ * `audio` = { mimeType, data } — mimeType precisa ser um formato que o Gemini reconheça de
+ * verdade (ex.: "audio/wav"); testado direto contra a API antes de usar em produção.
+ */
+export async function describeAudioIfNotable(audio, systemInstruction = MIC_WATCH_INSTRUCTION) {
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: [{ role: "user", parts: [{ text: "Aqui está o áudio dos últimos segundos." }, { inlineData: { mimeType: audio.mimeType, data: audio.data } }] }],
+        config: { systemInstruction },
+      }),
+    { attempts: 2, delayMs: 500 }
+  );
+  const text = (res.text || "").trim();
+  if (!text || /^nada\.?$/i.test(text)) return null;
+  return text;
+}
+
 /**
  * Analisa UMA imagem (captura de tela OU foto da câmera) e decide se vale comentar algo —
  * usado pelo modo proativo (a pessoa NÃO perguntou nada, é a Lisa "de olho" sozinha). Chamada

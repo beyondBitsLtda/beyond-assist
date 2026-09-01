@@ -34,6 +34,59 @@ const SENTINEL_SCOPE = "__sentinel__";
 const DELP_SCOPE = "__delp__";
 const CODE_SCOPE = "__code__";
 
+// ---- Modo Escuta: grava um AudioBuffer decodificado (Web Audio API) como WAV PCM16 mono —
+// formato simples e garantido aceito pelo Gemini via inlineData (testado direto contra a API
+// antes de usar aqui; o WAV que o MediaRecorder produz sozinho varia de formato por navegador
+// e nem sempre é um tipo que o Gemini reconhece). Funções puras, fora do componente — não
+// dependem de nada do React.
+function encodeWavPCM16(audioBuffer) {
+  const numFrames = audioBuffer.length;
+  const sampleRate = audioBuffer.sampleRate;
+  // mixa todos os canais pra mono — mais simples, menor, e voz/canto não perde nada relevante nisso
+  const channels = [];
+  for (let c = 0; c < audioBuffer.numberOfChannels; c++) channels.push(audioBuffer.getChannelData(c));
+  const mono = new Float32Array(numFrames);
+  for (let i = 0; i < numFrames; i++) {
+    let sum = 0;
+    for (let c = 0; c < channels.length; c++) sum += channels[c][i];
+    mono[i] = sum / channels.length;
+  }
+  const dataSize = numFrames * 2; // 16 bits = 2 bytes por amostra
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true); // block align
+  view.setUint16(34, 16, true); // bits por amostra
+  writeStr(36, "data");
+  view.setUint32(40, dataSize, true);
+  let offset = 44;
+  for (let i = 0; i < numFrames; i++) {
+    const s = Math.max(-1, Math.min(1, mono[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    offset += 2;
+  }
+  return buffer;
+}
+
+function arrayBufferToBase64(buffer) {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const CHUNK = 0x8000; // evita "too many arguments" do apply em buffers grandes
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
 
 export default function AssistantPage() {
   const { logs, addLog } = useLog();
@@ -289,6 +342,16 @@ export default function AssistantPage() {
   const [cameraFacing, setCameraFacing] = useState("user");
   const observanceVideoRef = useRef(null);
   const observanceStreamRef = useRef(null);
+
+  // Modo Escuta: microfone fica de verdade aberto (não é o push-to-talk de sempre) ENQUANTO o
+  // Modo Tela ou a Observância estiverem ligados — nunca sozinho, foi assim que o usuário
+  // pediu. Grava pedacinhos curtos, manda pro Gemini analisar (pode comentar se estiver
+  // cantando bem, algo interessante ouvido, etc.) e descarta — nada de áudio fica salvo em
+  // lugar nenhum. Sem localStorage de propósito, mesmo motivo da Observância: sessão nova
+  // sempre começa com o mic desligado, nunca "liga sozinho".
+  const [micWatchMode, setMicWatchMode] = useState(false);
+  const [micWatchError, setMicWatchError] = useState(null);
+  const micWatchStreamRef = useRef(null);
 
   useEffect(() => {
     if (!observanceMode) {
@@ -630,6 +693,122 @@ export default function AssistantPage() {
     const id = setInterval(tick, 30000); // sem seletor de intervalo (diferente do Modo Tela) — 30s é um meio-termo entre responsivo e não gastar cota à toa
     return () => { cancelled = true; clearTimeout(kickoff); clearInterval(id); };
   }, [observanceMode, captureObservanceFrame, addLog]);
+
+  // abre o microfone só enquanto o Modo Escuta estiver ligado E (Modo Tela OU Observância)
+  // também estiver — desligando qualquer um dos dois, o mic fecha de verdade (para de captar
+  // som), não fica "pausado" escondido.
+  useEffect(() => {
+    if (!micWatchMode || !(screenMode || observanceMode)) {
+      micWatchStreamRef.current?.getTracks().forEach((t) => t.stop());
+      micWatchStreamRef.current = null;
+      return;
+    }
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setMicWatchError("este navegador não dá acesso ao microfone");
+      setMicWatchMode(false);
+      return;
+    }
+    let cancelled = false;
+    setMicWatchError(null);
+    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      .then((stream) => {
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        micWatchStreamRef.current = stream;
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setMicWatchError(err?.name === "NotAllowedError" ? "permissão de microfone negada" : (err?.message || "não consegui acessar o microfone"));
+        setMicWatchMode(false);
+      });
+    return () => {
+      cancelled = true;
+      micWatchStreamRef.current?.getTracks().forEach((t) => t.stop());
+      micWatchStreamRef.current = null;
+    };
+  }, [micWatchMode, screenMode, observanceMode]);
+
+  // grava UM pedaço de áudio (duração fixa) do stream já aberto, e devolve já em WAV+base64 —
+  // o MediaRecorder só sabe gravar em formato comprimido (webm/opus na maioria dos
+  // navegadores), então decodifica com o Web Audio API e reescreve como PCM16/WAV na mão
+  // (formato garantido aceito pelo Gemini; testado direto contra a API antes de usar aqui).
+  const recordMicChunk = useCallback((durationMs) => {
+    return new Promise((resolve, reject) => {
+      const stream = micWatchStreamRef.current;
+      if (!stream) { reject(new Error("microfone não está aberto")); return; }
+      const chunks = [];
+      let recorder;
+      try {
+        recorder = new MediaRecorder(stream);
+      } catch (err) {
+        reject(err);
+        return;
+      }
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onerror = (e) => reject(e.error || new Error("falha ao gravar áudio"));
+      recorder.onstop = async () => {
+        try {
+          const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+          const arrayBuffer = await blob.arrayBuffer();
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          const ctx = new AudioCtx();
+          const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+          const wav = encodeWavPCM16(audioBuffer);
+          ctx.close();
+          resolve({ mimeType: "audio/wav", data: arrayBufferToBase64(wav) });
+        } catch (err) {
+          reject(err);
+        }
+      };
+      recorder.start();
+      setTimeout(() => { if (recorder.state !== "inactive") recorder.stop(); }, durationMs);
+    });
+  }, []);
+
+  // ---- Modo Escuta (proativo): microfone realmente aberto, gravando pedacinhos curtos em
+  // sequência (grava → manda analisar → grava o próximo, sem sobrepor) enquanto o Modo Tela
+  // OU a Observância estiverem ligados — nunca sozinho. Mesma convenção de silêncio (NADA) e
+  // prioridade de voz das vigílias acima; ao contrário delas (setInterval de cadência fixa),
+  // aqui é um laço que se agenda sozinho, porque cada "captura" já TOMA um tempo pra gravar
+  // (não é instantâneo como printar a tela) — não faz sentido ter um intervalo fixo por cima.
+  const MIC_CHUNK_MS = 10000;
+  useEffect(() => {
+    if (!micWatchMode || !(screenMode || observanceMode)) return;
+    let cancelled = false;
+    const loop = async () => {
+      while (!cancelled) {
+        let clip;
+        try {
+          clip = await recordMicChunk(MIC_CHUNK_MS);
+        } catch (err) {
+          if (cancelled) break;
+          addLog("[MIC]", OR, `escuta: não consegui gravar (${err?.message || err})`);
+          await new Promise((r) => setTimeout(r, 4000));
+          continue;
+        }
+        if (cancelled) break;
+        try {
+          const res = await fetch("/api/mic-comment", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ audio: clip, personaMode: personaModeForScreenRef.current }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (cancelled) break;
+          if (!data?.ok) { addLog("[MIC]", OR, `escuta falhou: ${data?.error || `HTTP ${res.status}`}`); continue; }
+          if (!data.comment) { addLog("[MIC]", CY, "escuta: nada digno de nota agora"); continue; }
+          addLog("[MIC]", PU, data.comment);
+          setMessages((m) => [...m, { id: `mic${Date.now()}`, role: "assistant", text: data.comment }]);
+          const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
+          if (jaFalando) addLog("[MIC]", CY, "escuta: comentário achado, mas a Lisa já está falando — só no texto desta vez");
+          else if (voiceOnForScreenRef.current) speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+        } catch (err) {
+          if (!cancelled) addLog("[MIC]", OR, `escuta falhou: ${err?.message || err}`);
+        }
+      }
+    };
+    loop();
+    return () => { cancelled = true; };
+  }, [micWatchMode, screenMode, observanceMode, recordMicChunk, addLog]);
 
   // carrega a Visão do avatar escolhida antes — cada navegador guarda a sua (ver nota acima:
   // só tem efeito no desktop, mas não custa nada carregar a preferência sempre)
@@ -1971,6 +2150,23 @@ export default function AssistantPage() {
                 for o seu caso, o aviso acima vai dizer isso claramente.
               </div>
 
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>MODO ESCUTA</div>
+              <button
+                onClick={() => setMicWatchMode((v) => !v)}
+                disabled={!screenMode && !observanceMode}
+                title={!screenMode && !observanceMode ? "ligue o Modo Tela ou a Observância primeiro" : undefined}
+                style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${micWatchMode ? GR : "rgba(var(--accent-rgb),0.18)"}`, background: micWatchMode ? "rgba(123,216,143,0.12)" : "transparent", color: (!screenMode && !observanceMode) ? "rgba(207,239,251,0.3)" : (micWatchMode ? "#eafcff" : "rgba(207,239,251,0.55)"), cursor: (!screenMode && !observanceMode) ? "not-allowed" : "pointer", width: "100%", marginBottom: 8 }}
+              >
+                🎙️ Modo Escuta: {micWatchMode && (screenMode || observanceMode) ? "ON (ouvindo)" : "OFF"}
+              </button>
+              {micWatchError && <div style={{ ...mono, fontSize: 9.5, color: OR, marginBottom: 8 }}>⚠ {micWatchError}</div>}
+              <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
+                Microfone fica de verdade aberto (não é o "segure pra falar" de sempre) enquanto o
+                Modo Tela ou a Observância também estiverem ligados — grava pedacinhos curtos, a
+                Lisa comenta se achar algo (inclusive se você estiver cantando), e descarta na
+                hora. Nada de áudio fica salvo.
+              </div>
+
               {/* sync */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>SINCRONIZAÇÃO</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -2278,6 +2474,29 @@ export default function AssistantPage() {
           </>
         )}
         {screenError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {screenError}</span>}
+
+        {/* Modo Escuta — precisa do Modo Tela ou da Observância ligado (não roda sozinho, ver
+            useEffect de micWatchMode acima). Microfone REALMENTE aberto, diferente do
+            "segure pra falar" de sempre. */}
+        <button
+          onClick={() => setMicWatchMode((v) => !v)}
+          disabled={!screenMode && !observanceMode}
+          title={
+            !screenMode && !observanceMode
+              ? "ligue o Modo Tela ou a Observância primeiro"
+              : (micWatchMode ? "Modo Escuta ligado — microfone aberto de verdade, grava pedacinhos curtos e descarta. Clique pra desligar" : "Deixar o microfone aberto pra Lisa ir ouvindo (ex.: comentar se você estiver cantando)")
+          }
+          style={{
+            ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+            border: `1px solid ${micWatchMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+            background: micWatchMode ? "rgba(123,216,143,0.12)" : "transparent",
+            color: (!screenMode && !observanceMode) ? "rgba(207,239,251,0.3)" : (micWatchMode ? "#eafcff" : "rgba(207,239,251,0.55)"),
+            cursor: (!screenMode && !observanceMode) ? "not-allowed" : "pointer",
+          }}
+        >
+          🎙️ ESCUTA {micWatchMode && (screenMode || observanceMode) ? "ON" : "OFF"}
+        </button>
+        {micWatchError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {micWatchError}</span>}
       </div>
 
       {/* abas — só aparecem no mobile (ver .bb-assistant-tabs em globals.css). No mobile o
