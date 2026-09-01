@@ -710,7 +710,15 @@ export default function AssistantPage() {
     }
     let cancelled = false;
     setMicWatchError(null);
-    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    // desliga o processamento de ÁUDIO DE CHAMADA (cancelamento de eco, supressão de ruído,
+    // ganho automático) — esses três vêm LIGADOS por padrão, otimizados pra voz falada numa
+    // ligação, e comprimem/cortam justamente o tipo de som sustentado que canto tem (nota
+    // seca, vibrato, dinâmica) — sem desligar, a Lisa acaba ouvindo uma versão "achatada" do
+    // que você realmente cantou.
+    navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      video: false,
+    })
       .then((stream) => {
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
         micWatchStreamRef.current = stream;
@@ -731,9 +739,18 @@ export default function AssistantPage() {
   // o MediaRecorder só sabe gravar em formato comprimido (webm/opus na maioria dos
   // navegadores), então decodifica com o Web Audio API e reescreve como PCM16/WAV na mão
   // (formato garantido aceito pelo Gemini; testado direto contra a API antes de usar aqui).
+  //
+  // `getUserMedia` é assíncrono — o efeito que ABRE o microfone e o efeito que já começa o
+  // laço de gravação disparam no MESMO ciclo de render, então a 1ª chamada quase sempre
+  // chegava aqui ANTES do stream estar pronto ("microfone não está aberto" mesmo com a
+  // permissão já concedida). Espera um pouco pelo stream em vez de falhar na hora.
   const recordMicChunk = useCallback((durationMs) => {
-    return new Promise((resolve, reject) => {
-      const stream = micWatchStreamRef.current;
+    return new Promise(async (resolve, reject) => {
+      let stream = micWatchStreamRef.current;
+      for (let waited = 0; !stream && waited < 5000; waited += 200) {
+        await new Promise((r) => setTimeout(r, 200));
+        stream = micWatchStreamRef.current;
+      }
       if (!stream) { reject(new Error("microfone não está aberto")); return; }
       const chunks = [];
       let recorder;
