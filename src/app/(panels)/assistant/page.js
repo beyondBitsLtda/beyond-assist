@@ -608,6 +608,67 @@ export default function AssistantPage() {
   const voiceNameForScreenRef = useRef(voiceName);
   voiceNameForScreenRef.current = voiceName;
 
+  // `ask` só é declarada bem mais abaixo no componente, mas os efeitos de vigília (Modo Tela/
+  // Observância) — declarados aqui em cima — precisam poder chamá-la depois de um comentário.
+  // Mesmo truque já usado em toggleMicForGestureRef: um ref populado com a função de verdade
+  // assim que ela existir (linha mais abaixo), lido só na hora de USAR (dentro de um timer/
+  // callback assíncrono), nunca durante a montagem — por isso não quebra por ordem de declaração.
+  const askRef = useRef(null);
+
+  // Réplica do Modo Escuta: abre uma janela curta de reconhecimento de fala do navegador logo
+  // depois de um comentário falado — dá pra responder ou pedir algo sem apertar o microfone na
+  // mão. Resolve com o texto ouvido (ou "" se não ouviu nada dentro do tempo). Instância PRÓPRIA
+  // de reconhecimento, separada da do botão de microfone manual (toggleMic, mais abaixo) — não
+  // mexe no estado `listening` nem atrapalha se o usuário estiver segurando o mic por conta própria.
+  const listenForReply = useCallback((timeoutMs = 6000) => {
+    return new Promise((resolve) => {
+      if (typeof window === "undefined") { resolve(""); return; }
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { resolve(""); return; }
+      let finalText = "";
+      let settled = false;
+      const rec = new SR();
+      rec.lang = "pt-BR";
+      rec.interimResults = false;
+      rec.continuous = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(hardStop);
+        resolve(finalText.trim());
+      };
+      rec.onresult = (e) => {
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+        }
+      };
+      rec.onerror = finish;
+      rec.onend = finish;
+      const hardStop = setTimeout(() => { try { rec.stop(); } catch {} }, timeoutMs);
+      try { rec.start(); } catch { resolve(""); }
+    });
+  }, []);
+
+  // espelham busy/listening em ref — openReplyWindow precisa ler o valor MAIS RECENTE na hora
+  // de chamar (dentro de um timer da vigília), não o que existia quando o efeito foi montado.
+  const busyForWatchRef = useRef(busy);
+  busyForWatchRef.current = busy;
+  const listeningForWatchRef = useRef(listening);
+  listeningForWatchRef.current = listening;
+
+  // depois de um comentário FALADO (Modo Tela/Observância), abre a janela de resposta (só se
+  // o Modo Escuta estiver ligado, e só se ninguém já estiver com o mic manual na mão ou uma
+  // pergunta em andamento) — se a pessoa disser algo, vira uma pergunta normal, com o
+  // comentário original como contexto (pra "fala mais sobre isso" fazer sentido pro Gemini).
+  const openReplyWindow = useCallback(async (comment, logPrefix) => {
+    if (!micWatchMode || listeningForWatchRef.current || busyForWatchRef.current) return;
+    addLog(logPrefix, CY, "esperando alguns segundos por uma resposta…");
+    const transcript = await listenForReply(6000);
+    if (!transcript) { addLog(logPrefix, CY, "nada ouvido — seguindo."); return; }
+    addLog(logPrefix, GR, `→ "${transcript}"`);
+    askRef.current?.(`(Contexto: você, a Lisa, acabou de comentar: "${comment}") ${transcript}`, { displayText: transcript });
+  }, [micWatchMode, addLog, listenForReply]);
+
   // vigília proativa: dispara já na hora de ligar (pra dar sinal de vida imediato, em vez de
   // ficar quieta os primeiros 4 min sem dar pra saber se está funcionando) e depois em
   // intervalos espaçados — SÓ fala quando /api/screen-comment devolve um comentário de
@@ -642,7 +703,10 @@ export default function AssistantPage() {
         // por cima de uma fala explícita; o texto ainda aparece no chat/log de qualquer jeito.
         const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
         if (jaFalando) addLog("[TELA]", CY, "vigília: comentário achado, mas a Lisa já está falando — só no texto desta vez");
-        else if (voiceOnForScreenRef.current) speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+        else if (voiceOnForScreenRef.current) {
+          await speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+          if (!cancelled) openReplyWindow(data.comment, "[TELA]");
+        }
       } catch (err) {
         if (!cancelled) addLog("[TELA]", OR, `vigília falhou: ${err?.message || err}`);
       }
@@ -652,7 +716,7 @@ export default function AssistantPage() {
     const kickoff = setTimeout(tick, 1000);
     const id = setInterval(tick, screenIntervalMs);
     return () => { cancelled = true; clearTimeout(kickoff); clearInterval(id); };
-  }, [screenMode, screenAutoComment, screenIntervalMs, captureScreenFrame, addLog]);
+  }, [screenMode, screenAutoComment, screenIntervalMs, captureScreenFrame, addLog, openReplyWindow]);
 
   // ---- Modo Observância (proativo): saudação pré-configurada — enquanto a câmera estiver
   // ligada, a Lisa "de olho" sozinha (nenhuma pergunta precisa ser feita); se aparecer a
@@ -684,7 +748,10 @@ export default function AssistantPage() {
         // uma fala já em andamento (resposta normal, ou saudação do gesto de acordar).
         const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
         if (jaFalando) addLog("[OBS]", CY, "saudação: comentário achado, mas a Lisa já está falando — só no texto desta vez");
-        else if (voiceOnForScreenRef.current) speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+        else if (voiceOnForScreenRef.current) {
+          await speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+          if (!cancelled) openReplyWindow(data.comment, "[OBS]");
+        }
       } catch (err) {
         if (!cancelled) addLog("[OBS]", OR, `saudação falhou: ${err?.message || err}`);
       }
@@ -692,7 +759,7 @@ export default function AssistantPage() {
     const kickoff = setTimeout(tick, 1500);
     const id = setInterval(tick, 30000); // sem seletor de intervalo (diferente do Modo Tela) — 30s é um meio-termo entre responsivo e não gastar cota à toa
     return () => { cancelled = true; clearTimeout(kickoff); clearInterval(id); };
-  }, [observanceMode, captureObservanceFrame, addLog]);
+  }, [observanceMode, captureObservanceFrame, addLog, openReplyWindow]);
 
   // abre o microfone só enquanto o Modo Escuta estiver ligado E (Modo Tela OU Observância)
   // também estiver — desligando qualquer um dos dois, o mic fecha de verdade (para de captar
@@ -1354,7 +1421,12 @@ export default function AssistantPage() {
   }, [codeModeRepo, codeModeBranch, codeModeFiles, codeSession, addLog, voiceOn, stopSpeaking, enqueueSpeech, runCodeModeStep]);
 
   // ---- pergunta real ao backend (SSE) ----
-  const ask = useCallback(async (q) => {
+  // `displayText` (opcional) — o que aparece no chat/log, quando diferente do `q` de verdade
+  // mandado pro backend. Existe pra réplica do Modo Escuta (ver listenForReply abaixo): a
+  // pergunta enviada carrega um lembrete de qual foi o último comentário da Lisa (pro Gemini
+  // entender a que "isso" se refere), mas mostrar esse lembrete pro usuário seria estranho —
+  // ele só vê a própria fala transcrita, limpa.
+  const ask = useCallback(async (q, { displayText } = {}) => {
     if (!q.trim() || busy) return;
 
     // "abre o dashboard" etc. — comando local reconhecido sem gastar chamada nenhuma do
@@ -1383,13 +1455,14 @@ export default function AssistantPage() {
     // ver askCodeMode acima.
     if (codeMode) return askCodeMode(q);
 
+    const shown = displayText || q;
     setBusy(true);
-    setQuestion(q);
+    setQuestion(shown);
     setAnswer("");
     answerRef.current = "";
     setCards([]);
     setMode("listening");
-    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: q }]);
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
 
     stopSpeaking(); // corta qualquer fala de uma resposta anterior
     const gen = ++speechGenRef.current;
@@ -1474,6 +1547,7 @@ export default function AssistantPage() {
       if (voiceEnabled && full) enqueueSpeech(full, gen);
     }
   }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode]);
+  askRef.current = ask; // ver comentário no askRef acima — mantém sempre a versão mais recente pros efeitos de vigília chamarem
 
   // ---- STT: ouvir microfone (Web Speech API) ----
   const toggleMic = useCallback(() => {

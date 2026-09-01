@@ -90,5 +90,13 @@ export async function speakText(text, { voiceName, browserOnly = false } = {}) {
   u.rate = 1.05;
   const voice = pickBrowserVoice(window.speechSynthesis.getVoices());
   if (voice) u.voice = voice;
-  window.speechSynthesis.speak(u);
+  // espera terminar de falar antes de resolver (igual ao caminho do Gemini acima) — quem
+  // chama pode precisar saber QUANDO a fala realmente terminou (ex.: Modo Escuta, que abre
+  // uma janela de resposta logo depois). Sem isso, essa promise resolvia na hora, antes da
+  // fala nem começar a tocar de verdade.
+  await new Promise((resolve) => {
+    u.onend = resolve;
+    u.onerror = resolve;
+    window.speechSynthesis.speak(u);
+  });
 }
