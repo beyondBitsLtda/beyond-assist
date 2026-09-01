@@ -26,6 +26,9 @@ const MODE_META = {
   idle: { label: "IDLE", sub: "awaiting command", color: CY },
   listening: { label: "LISTENING", sub: "retrieving context", color: GR },
   speaking: { label: "SPEAKING", sub: "streaming response", color: OR },
+  // janela de resposta automática do Modo Escuta (ver openReplyWindow) — mesmo rótulo
+  // "LISTENING" do mic manual, mas o texto de baixo diz exatamente o que está diferente aqui.
+  autolisten: { label: "LISTENING", sub: "pode falar agora", color: GR },
 };
 
 const TASKS_SCOPE = "__tasks__";
@@ -87,6 +90,25 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
+// bipe curto (sintetizado na hora, sem arquivo de áudio nenhum) — sinal SONORO de "pode falar
+// agora", pra além do indicador visual, já que o usuário pode não estar olhando pra tela na
+// hora (é bem o ponto de deixar o microfone aberto sozinho).
+function playListenBeep() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.2);
+    osc.onended = () => ctx.close();
+  } catch {}
+}
 
 export default function AssistantPage() {
   const { logs, addLog } = useLog();
@@ -97,6 +119,9 @@ export default function AssistantPage() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);   // mic ativo (STT)
+  // true só durante a janela de resposta automática do Modo Escuta (listenForReply) — sinal
+  // visual/sonoro claro de "agora é sua vez de falar", separado do `listening` do botão manual.
+  const [autoListening, setAutoListening] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);         // ler respostas em voz alta (TTS)
   const [voiceSupported, setVoiceSupported] = useState(true);
   const [geminiVoiceEnabled, setGeminiVoiceEnabled] = useState(true); // tentar a voz do Gemini? (desligado = só navegador)
@@ -664,17 +689,43 @@ export default function AssistantPage() {
   const listeningForWatchRef = useRef(listening);
   listeningForWatchRef.current = listening;
 
-  // depois de um comentário FALADO (Modo Tela/Observância), abre a janela de resposta (só se
-  // o Modo Escuta estiver ligado, e só se ninguém já estiver com o mic manual na mão ou uma
-  // pergunta em andamento) — se a pessoa disser algo, vira uma pergunta normal, com o
-  // comentário original como contexto (pra "fala mais sobre isso" fazer sentido pro Gemini).
-  const openReplyWindow = useCallback(async (comment, logPrefix) => {
+  // depois de um comentário FALADO (Modo Tela/Observância) — ou da PRÓPRIA resposta dela numa
+  // réplica anterior — abre a janela de resposta (só se o Modo Escuta estiver ligado, e só se
+  // ninguém já estiver com o mic manual na mão ou uma pergunta em andamento). Se a pessoa
+  // disser algo, vira uma pergunta normal (com o que foi dito antes como contexto, pra "fala
+  // mais sobre isso" fazer sentido) e, depois dela terminar de responder, abre OUTRA janela —
+  // continua o vaivém sozinha enquanto o usuário continuar respondendo, até `MAX_REPLY_TURNS`
+  // (trava de segurança — não deixa ficar escutando pra sempre se algo nunca ficar em
+  // silêncio de verdade) ou até a pessoa ficar quieta (aí volta a ser só a vigília normal).
+  const MAX_REPLY_TURNS = 6;
+  const openReplyWindow = useCallback(async (comment, logPrefix, turn = 1) => {
     if (!micWatchMode || listeningForWatchRef.current || busyForWatchRef.current) return;
-    addLog(logPrefix, CY, "esperando alguns segundos por uma resposta…");
+    if (turn > MAX_REPLY_TURNS) { addLog(logPrefix, CY, "várias idas e voltas seguidas — parando a escuta automática por aqui (pode continuar na mão, segurando o microfone)."); return; }
+
+    playListenBeep();
+    setAutoListening(true);
+    setMode("autolisten");
+    addLog(logPrefix, CY, "🎙️ pode falar…");
     const transcript = await listenForReply(6000);
-    if (!transcript) { addLog(logPrefix, CY, "nada ouvido — seguindo."); return; }
+    setAutoListening(false);
+
+    if (!transcript) {
+      addLog(logPrefix, CY, "nada ouvido — seguindo.");
+      setMode("idle");
+      return;
+    }
     addLog(logPrefix, GR, `→ "${transcript}"`);
-    askRef.current?.(`(Contexto: você, a Lisa, acabou de comentar: "${comment}") ${transcript}`, { displayText: transcript });
+    await askRef.current?.(`(Contexto: você, a Lisa, acabou de comentar: "${comment}") ${transcript}`, { displayText: transcript });
+
+    // espera a resposta terminar de ser falada antes de abrir a PRÓXIMA janela — senão elas
+    // se atropelam (mesmo motivo do proactiveTurnRef nas vigílias).
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      const aindaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
+      if (!aindaFalando) break;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    openReplyWindow(answerRef.current || transcript, logPrefix, turn + 1);
   }, [micWatchMode, addLog, listenForReply]);
 
   // vigília proativa: dispara já na hora de ligar (pra dar sinal de vida imediato, em vez de
@@ -2268,6 +2319,11 @@ export default function AssistantPage() {
               >
                 🎙️ Modo Escuta: {micWatchMode && (screenMode || observanceMode) ? "ON (ouvindo)" : "OFF"}
               </button>
+              {autoListening && (
+                <div style={{ ...mono, fontSize: 11, letterSpacing: 1, padding: "8px 12px", borderRadius: 6, border: `1px solid ${GR}`, background: "rgba(123,216,143,0.18)", color: "#eafcff", marginBottom: 8, textAlign: "center", animation: "bb-dot 0.9s ease-in-out infinite" }}>
+                  🎙️ PODE FALAR AGORA
+                </div>
+              )}
               {micWatchError && <div style={{ ...mono, fontSize: 9.5, color: OR, marginBottom: 8 }}>⚠ {micWatchError}</div>}
               <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
                 Microfone fica de verdade aberto (não é o "segure pra falar" de sempre) enquanto o
@@ -2606,6 +2662,13 @@ export default function AssistantPage() {
           🎙️ ESCUTA {micWatchMode && (screenMode || observanceMode) ? "ON" : "OFF"}
         </button>
         {micWatchError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {micWatchError}</span>}
+        {/* pisca bem visível só durante a janela de resposta automática (ver openReplyWindow)
+            — sinal claro de "agora é sua vez", além do bipe sonoro que toca junto */}
+        {autoListening && (
+          <span style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3, border: `1px solid ${GR}`, background: "rgba(123,216,143,0.18)", color: "#eafcff", animation: "bb-dot 0.9s ease-in-out infinite" }}>
+            🎙️ PODE FALAR
+          </span>
+        )}
       </div>
 
       {/* abas — só aparecem no mobile (ver .bb-assistant-tabs em globals.css). No mobile o
