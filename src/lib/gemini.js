@@ -970,19 +970,26 @@ ${descricao || "(não informado)"}
 CRITÉRIO DE APROVAÇÃO:
 ${condicaoAprovacao || "(não informado)"}
 
-As imagens anexadas são capturas da tela ATUAL de quem está executando este teste agora. Com
-base SÓ no que dá pra ver nas imagens, avalie se o critério de aprovação foi atendido.`;
+As imagens anexadas são capturas de tela em ORDEM CRONOLÓGICA (da mais antiga pra mais
+recente) — não é só o instante atual, é o HISTÓRICO de momentos já observados ao longo da
+execução deste teste até agora (login, navegação, edição, resultado final etc., cada um pode
+ter sido capturado numa hora diferente). Junte a informação de TODAS elas — um passo
+confirmado numa imagem mais antiga continua valendo mesmo que não apareça mais na imagem mais
+recente. Avalie o critério de aprovação considerando a sequência INTEIRA, não só a última foto.`;
 
-  const systemInstruction = `Você é a Lisa, ajudando alguém a executar um caso de teste, olhando a tela dele em tempo
-real. Sua função é comparar o que aparece na tela com o CRITÉRIO DE APROVAÇÃO do caso e dizer
-se passou ou não — mas seja CONSERVADORA: só diga "Aprovado" ou "Reprovado" quando a imagem
-mostrar evidência clara o bastante pra sustentar aquilo. Se a tela não mostrar informação
-suficiente pra decidir (etapa ainda não chegou lá, tela cortada, não dá pra ver o resultado
-final), diga "indeterminado" e explique o que falta ver — nunca chute. Isso pode ser gravado
-de volta no sistema de testes de verdade, então um veredito errado tem custo real.
+  const systemInstruction = `Você é a Lisa, ajudando alguém a executar um caso de teste, olhando capturas da tela dele
+tiradas em momentos diferentes ao longo da execução (não é vídeo contínuo — são fotos
+espaçadas no tempo, em ordem). Sua função é reconstruir a SEQUÊNCIA do que já aconteceu a
+partir de todas as imagens juntas e comparar com o CRITÉRIO DE APROVAÇÃO do caso — mas seja
+CONSERVADORA: só diga "Aprovado" ou "Reprovado" quando a sequência de imagens mostrar evidência
+clara o bastante pra sustentar aquilo. Se ainda faltar ver alguma etapa (nenhuma imagem cobre
+aquele momento ainda), diga "indeterminado" e explique especificamente qual etapa falta —
+nunca chute. Isso pode ser gravado de volta no sistema de testes de verdade, então um veredito
+errado tem custo real.
 
-No campo "reasoning" (2-4 frases, em português, no seu estilo, direta): explique o que você vê
-e por que isso confirma, contraria, ou não é suficiente pra avaliar o critério.`;
+No campo "reasoning" (2-4 frases, em português, no seu estilo, direta): explique o que a
+SEQUÊNCIA de imagens mostra e por que isso confirma, contraria, ou ainda não é suficiente pra
+avaliar o critério.`;
 
   const res = await withTransientRetry(
     CHAT_MODEL,

@@ -55,6 +55,14 @@ export default function TestModePage() {
   const stream1Ref = useRef(null);
   const stream2Ref = useRef(null);
 
+  // histórico de capturas DESTE caso — um teste real costuma levar vários passos ao longo de
+  // vários "confere agora" (login, edição, logout, login de novo...); mandar só o frame ATUAL
+  // a cada vez fazia ela dizer "indeterminado" pra sempre, porque nenhuma foto sozinha mostra
+  // a sequência toda. Acumula (em ordem cronológica) e reseta quando troca de caso.
+  const MAX_HISTORY_FRAMES = 8;
+  const frameHistoryRef = useRef([]);
+  const [historyFrameCount, setHistoryFrameCount] = useState(0); // só pra mostrar na tela — o ref em si não re-renderiza sozinho
+
   const [voiceOn, setVoiceOn] = useState(true);
   const [autoWrite, setAutoWrite] = useState(false); // ela grava sozinha? desligado por padrão
   const [autoCheck, setAutoCheck] = useState(false); // modo automático (verifica sozinha de tempos em tempos)
@@ -88,6 +96,9 @@ export default function TestModePage() {
 
   useEffect(() => {
     setCaseDetail(null);
+    frameHistoryRef.current = []; // trocou de caso — histórico de capturas não faz mais sentido
+    setHistoryFrameCount(0);
+    setLastVerdict(null);
     if (!runId || !caseKey) return;
     fetch(`/api/test-mode/case?runId=${encodeURIComponent(runId)}&caseKey=${encodeURIComponent(caseKey)}`)
       .then((r) => r.json())
@@ -131,11 +142,17 @@ export default function TestModePage() {
   // ---- checagem (manual "confere agora" ou automática) ----
   const runCheck = useCallback(async () => {
     if (!caseDetail || checking) return;
-    const frames = [captureFrame(video1Ref.current), captureFrame(video2Ref.current)].filter(Boolean);
-    if (!frames.length) {
+    const newFrames = [captureFrame(video1Ref.current), captureFrame(video2Ref.current)].filter(Boolean);
+    if (!newFrames.length) {
       addLog("[TESTE]", OR, "nenhuma tela ligada ainda — liga o compartilhamento antes de conferir.");
       return;
     }
+    // acumula no histórico deste caso (mais antigas primeiro) e manda TUDO, não só o instante
+    // atual — um teste de verdade tem passos espalhados no tempo (login, edição, logout,
+    // login de novo...), uma foto sozinha quase nunca prova o critério inteiro.
+    frameHistoryRef.current = [...frameHistoryRef.current, ...newFrames].slice(-MAX_HISTORY_FRAMES);
+    const frames = frameHistoryRef.current;
+    setHistoryFrameCount(frames.length);
     setChecking(true);
     try {
       const res = await fetch("/api/test-mode/evaluate", {
@@ -275,6 +292,19 @@ export default function TestModePage() {
           >
             {checking ? "CONFERINDO…" : "◈ CONFERE AGORA"}
           </button>
+          {historyFrameCount > 0 && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+              <span style={{ ...mono, fontSize: 9.5, color: "rgba(207,239,251,0.45)" }}>
+                {historyFrameCount} captura{historyFrameCount > 1 ? "s" : ""} acumulada{historyFrameCount > 1 ? "s" : ""} deste caso — ela olha todas juntas, não só a última
+              </span>
+              <button
+                onClick={() => { frameHistoryRef.current = []; setHistoryFrameCount(0); addLog("[TESTE]", CY, "histórico de capturas deste caso foi limpo."); }}
+                style={{ ...mono, fontSize: 9, color: OR, background: "transparent", border: "none", cursor: "pointer", textDecoration: "underline" }}
+              >
+                limpar
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ---- coluna direita: veredito + histórico ---- */}
