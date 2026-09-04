@@ -108,6 +108,26 @@ export default function LisaAvatarIronMan({ mode = "idle" }) {
         controls.maxDistance = height * 2.5;
         controls.update();
 
+        // o Mixamo devolveu tudo com UMA cor só (viu no teste real: armadura inteira cinza/
+        // branca) — ele descarta as cores originais do IronMan.mtl porque eram cores lisas
+        // (Kd), sem imagem de textura de verdade, e o pipeline de rig dele não preserva isso.
+        // Sem o mapeamento original por peça (perdido nesse processo), aplica um vermelho
+        // metálico reconhecível no lugar — checa a cor de verdade em vez de sempre substituir,
+        // pra não estragar caso um dia o modelo venha com as cores certas.
+        const colorsSeen = new Set();
+        base.traverse((obj) => {
+          if (obj.isMesh && obj.material) {
+            for (const mat of Array.isArray(obj.material) ? obj.material : [obj.material]) {
+              if (mat.color) colorsSeen.add(mat.color.getHexString());
+            }
+          }
+        });
+        if (colorsSeen.size <= 1) {
+          base.traverse((obj) => {
+            if (obj.isMesh) obj.material = new THREE.MeshStandardMaterial({ color: 0xa11d1d, metalness: 0.6, roughness: 0.35 });
+          });
+        }
+
         mixer = new THREE.AnimationMixer(base);
         if (base.animations[0]) {
           actions.idle = mixer.clipAction(base.animations[0]);
@@ -145,17 +165,18 @@ export default function LisaAvatarIronMan({ mode = "idle" }) {
     ro.observe(container);
 
     let raf;
-    let lastMode = null;
     const clock = new THREE.Clock();
     const animate = () => {
       raf = requestAnimationFrame(animate);
       const dt = clock.getDelta();
       const m = modeRef.current;
       rim.color.setHex(MODE_TINT[m] || MODE_TINT.idle);
-      if (m !== lastMode) {
-        lastMode = m;
-        fadeTo(actions[m] || actions.idle);
-      }
+      // NÃO guarda "último modo visto" pra decidir se troca — isso tinha um bug real: se o modo
+      // virasse "speaking" ANTES do talking.fbx acabar de carregar, ficava preso no idle pra
+      // sempre (mesmo depois do clipe carregar), porque o modo em si não mudava de novo.
+      // Comparando direto a AÇÃO desejada (fadeTo já ignora se for a mesma de currentAction),
+      // assim que actions.speaking existir ele troca, não importa quando isso aconteça.
+      fadeTo(actions[m] || actions.idle);
       mixer?.update(dt);
       controls.update();
       renderer.render(scene, camera);
