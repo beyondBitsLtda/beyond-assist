@@ -23,3 +23,8 @@ contexto/*.xls
 # só pra referência/investigação (ver src/lib/sentinelTests.js) — não é parte do Beyond Bits,
 # não deveria ser versionado neste repositório.
 Controle-e-gest-o-de-testes-main/
+
+# fonte bruta do modelo 3D do Iron Man (.obj de 16MB + .max de 44MB) — só serviu pra rigar no
+# Mixamo (ver README em public/models/ironman/). O app só usa os .fbx já rigados, que ficam em
+# public/models/ironman/ (esses sim versionados) — a pasta original não precisa estar aqui.
+"3d model/"

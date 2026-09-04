@@ -21,6 +21,12 @@ const LisaAvatar3D = dynamic(() => import("@/components/panels/LisaAvatar3D.js")
   ssr: false,
   loading: () => null,
 });
+// segunda "aparência" 3D — Iron Man rigado (esqueleto de verdade via Mixamo), ver
+// src/components/panels/LisaAvatarIronMan.js. Mesmo contrato de props (mode), mesmo lazy-load.
+const LisaAvatarIronMan = dynamic(() => import("@/components/panels/LisaAvatarIronMan.js"), {
+  ssr: false,
+  loading: () => null,
+});
 
 const MODE_META = {
   idle: { label: "IDLE", sub: "awaiting command", color: CY },
@@ -271,6 +277,9 @@ export default function AssistantPage() {
   // ver LisaAvatar3D.js) — DESKTOP-ONLY de propósito (o toggle só existe no branch desktop
   // deste componente, então nunca aparece nem carrega no mobile).
   const [avatarView, setAvatarView] = useState("traditional");
+  // qual "corpo" 3D usar quando avatarView === "3d" — "cyborg" (original, sem esqueleto) ou
+  // "ironman" (rigado, com gestos de verdade por modo, ver LisaAvatarIronMan.js)
+  const [avatarSkin, setAvatarSkin] = useState("cyborg");
 
   // ---- mobile: tela própria, só o Assistente (ver Shell.js) ----
   const isMobile = useIsMobile();
@@ -969,11 +978,18 @@ export default function AssistantPage() {
     if (typeof window === "undefined") return;
     const saved = localStorage.getItem("avatarView");
     if (saved === "3d" || saved === "traditional") setAvatarView(saved);
+    const savedSkin = localStorage.getItem("avatarSkin");
+    if (savedSkin === "cyborg" || savedSkin === "ironman") setAvatarSkin(savedSkin);
   }, []);
 
   const chooseAvatarView = useCallback((view) => {
     setAvatarView(view);
     if (typeof window !== "undefined") localStorage.setItem("avatarView", view);
+  }, []);
+
+  const chooseAvatarSkin = useCallback((skin) => {
+    setAvatarSkin(skin);
+    if (typeof window !== "undefined") localStorage.setItem("avatarSkin", skin);
   }, []);
 
   // lista de projetos do Sentinela pro seletor manual (mesma fonte que a aba Sentinela usa)
@@ -2565,6 +2581,28 @@ export default function AssistantPage() {
           ))}
         </div>
 
+        {/* Aparência do corpo 3D — só faz sentido com a Visão 3D ligada */}
+        {avatarView === "3d" && (
+          <div style={{ display: "flex", gap: 4 }}>
+            {[{ key: "cyborg", label: "◈ CYBORG" }, { key: "ironman", label: "🤖 IRON MAN" }].map((s) => (
+              <button
+                key={s.key}
+                onClick={() => chooseAvatarSkin(s.key)}
+                title={s.key === "ironman" ? "Corpo rigado (esqueleto de verdade) — gestos reais por modo, se os clipes já tiverem sido enviados" : "Corpo original (sem esqueleto, só balanço/respiração)"}
+                style={{
+                  ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                  border: `1px solid ${avatarSkin === s.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
+                  background: avatarSkin === s.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
+                  color: avatarSkin === s.key ? "#eafcff" : "rgba(207,239,251,0.55)",
+                  cursor: "pointer",
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Modo Observância — liga a câmera, tira 1 foto no instante de cada pergunta e manda
             junto pro Gemini (multimodal); nunca fica ligado sozinho entre recarregamentos. */}
         <button
@@ -2716,17 +2754,19 @@ export default function AssistantPage() {
         <section className={`bb-assistant-pane${mobileTab === "visualizer" ? " bb-active" : ""}`} style={{ position: "relative", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, minWidth: 0 }}>
           {avatarView === "3d" ? (
             <div style={{ position: "relative", width: "min(70vh,680px)", height: "min(70vh,680px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <LisaAvatar3D mode={mode} />
+              {avatarSkin === "ironman" ? <LisaAvatarIronMan mode={mode} /> : <LisaAvatar3D mode={mode} />}
               <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, textAlign: "center", pointerEvents: "none" }}>
                 <div style={{ ...mono, fontSize: 10, letterSpacing: 4, color: meta.color }}>{meta.label}</div>
               </div>
-              <a
-                href="https://sketchfab.com/3d-models/android-cyborg-anime-girl-5fda47ea8ca048f7939f78da94aea54f"
-                target="_blank" rel="noreferrer"
-                style={{ position: "absolute", bottom: -18, right: 0, ...mono, fontSize: 7.5, letterSpacing: 0.5, color: "rgba(207,239,251,0.3)", textDecoration: "none" }}
-              >
-                modelo: "Android Cyborg Anime Girl" por lawlietrecluze · CC-BY-4.0
-              </a>
+              {avatarSkin !== "ironman" && (
+                <a
+                  href="https://sketchfab.com/3d-models/android-cyborg-anime-girl-5fda47ea8ca048f7939f78da94aea54f"
+                  target="_blank" rel="noreferrer"
+                  style={{ position: "absolute", bottom: -18, right: 0, ...mono, fontSize: 7.5, letterSpacing: 0.5, color: "rgba(207,239,251,0.3)", textDecoration: "none" }}
+                >
+                  modelo: "Android Cyborg Anime Girl" por lawlietrecluze · CC-BY-4.0
+                </a>
+              )}
             </div>
           ) : (
             <div style={{ position: "relative", width: "min(52vh,520px)", height: "min(52vh,520px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
