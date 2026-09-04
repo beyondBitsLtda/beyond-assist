@@ -42,10 +42,12 @@ export default function LisaAvatarIronMan({ mode = "idle" }) {
     let disposed = false;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 30);
-    // Mixamo exporta os personagens numa altura padrão (~1.7-1.8 unidades = pés em y=0, cabeça
-    // lá em cima) — então plano de busto começa mirando por volta do peito/queixo, não no chão.
-    camera.position.set(0, 1.5, 0.85);
+    // near/far MUITO abertos: a escala real do FBX só se sabe depois de carregado (unidade do
+    // Mixamo pode sair em "metros" ou em "centímetros-tratados-como-metro" dependendo do
+    // pipeline) — plano de câmera provisório aqui, o enquadramento de verdade é recalculado
+    // depois do load a partir do bounding box real do modelo (ver fitCameraToBust abaixo).
+    const camera = new THREE.PerspectiveCamera(32, 1, 0.01, 1000);
+    camera.position.set(0, 0, 2);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -53,11 +55,7 @@ export default function LisaAvatarIronMan({ mode = "idle" }) {
     container.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 1.45, 0);
     controls.enablePan = false;
-    // zoom livre: perto o bastante pra encarar o capacete, longe o bastante pra ver o corpo inteiro
-    controls.minDistance = 0.35;
-    controls.maxDistance = 3.6;
     controls.minPolarAngle = Math.PI * 0.15;
     controls.maxPolarAngle = Math.PI * 0.7;
     controls.enableDamping = true;
@@ -91,6 +89,25 @@ export default function LisaAvatarIronMan({ mode = "idle" }) {
         const base = await loadFBX(BASE_URL);
         if (disposed) return;
         wrapper.add(base);
+
+        // enquadramento de verdade: mede o modelo JÁ CARREGADO (em vez de chutar unidades) e
+        // mira num ponto proporcional à altura real dele — ~82% da altura total cai perto do
+        // peito/queixo, é o "plano de busto" pedido, funcionando não importa em que escala o
+        // FBX tenha vindo do Mixamo.
+        const box = new THREE.Box3().setFromObject(base);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const height = size.y || 1;
+        const bustY = box.min.y + height * 0.82;
+        controls.target.set(center.x, bustY, center.z);
+        camera.position.set(center.x, bustY, center.z + height * 0.42);
+        camera.near = Math.max(height * 0.005, 0.001);
+        camera.far = height * 50;
+        camera.updateProjectionMatrix();
+        controls.minDistance = height * 0.15;
+        controls.maxDistance = height * 2.5;
+        controls.update();
+
         mixer = new THREE.AnimationMixer(base);
         if (base.animations[0]) {
           actions.idle = mixer.clipAction(base.animations[0]);
