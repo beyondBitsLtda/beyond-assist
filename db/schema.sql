@@ -474,14 +474,14 @@ alter table public.arch_docs enable row level security;
 -- (só acessada pela service_role, em src/lib/archDocs.js — mesmo padrão das tabelas acima)
 
 -- ============================================================
---  Modo Vigia (a mais, aditivo) — memória das observações do Modo Tela. Com "Transmissão"
---  ligada (toggle novo dentro de Modo Tela), toda vez que a vigília do Modo Tela realmente
---  comenta algo (não em todo ciclo — a maioria fica muda, "nada digno de nota" não gera
---  linha aqui), o comentário é salvo aqui. O modo "Vigia" (toggle novo, igual o Modo Código)
---  lê os registros mais recentes pra responder perguntas tipo "o que você notou na minha
---  tela?" — e funciona de QUALQUER dispositivo (inclusive celular), já que é só ler uma
---  tabela na nuvem, não depende de a TELA estar sendo compartilhada NAQUELE aparelho. Ver
---  src/lib/screenWatch.js e /api/screen-watch/*.
+--  Modo Vigia (a mais, aditivo) — memória das observações do Modo Tela. Toda vez que a
+--  vigília do Modo Tela ("Vigiar sozinha") realmente comenta algo (não em todo ciclo — a
+--  maioria fica muda, "nada digno de nota" não gera linha aqui), o comentário é salvo aqui
+--  automaticamente. O modo "Vigia" (toggle novo, igual o Modo Código) lê os registros mais
+--  recentes pra responder perguntas tipo "o que você notou na minha tela?" — e funciona de
+--  QUALQUER dispositivo (inclusive celular), já que é só ler uma tabela na nuvem, não depende
+--  de a TELA estar sendo compartilhada NAQUELE aparelho. Ver src/lib/screenWatch.js e
+--  /api/screen-watch/*.
 -- ============================================================
 
 -- 24) Uma linha por observação real da vigília do Modo Tela (não por ciclo — só quando há
@@ -496,3 +496,30 @@ create index if not exists screen_observations_created_at_idx on public.screen_o
 
 alter table public.screen_observations enable row level security;
 -- (só acessada pela service_role, em src/lib/screenWatch.js — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  Transmissão (a mais, aditivo) — ver a tela de UM dispositivo AO VIVO (vídeo de verdade, não
+--  só texto) a partir de OUTRO, via WebRTC (peer-to-peer — o vídeo em si nunca passa pelo
+--  servidor, só a "apresentação" inicial entre os dois aparelhos). Mesmo padrão de fila curta +
+--  polling já usado pelos comandos remotos (ver remote_commands acima e
+--  src/lib/remoteCommands.js), só que endereçado (cada sinal tem um destinatário específico,
+--  não é "todo mundo escuta"). Ver src/lib/screenShareSignals.js (servidor) e
+--  src/lib/screenShareRTC.js (WebRTC no navegador).
+-- ============================================================
+
+-- 25) Sinalização WebRTC (SDP offer/answer + candidatos ICE) — linhas antigas não importam,
+--     só as mais novas endereçadas a mim que eu ainda não vi.
+create table if not exists public.screen_share_signals (
+  id          bigint generated always as identity primary key,
+  from_device text not null,
+  to_device   text not null,  -- id real do dispositivo, ou o pseudo-endereço 'HOST' (qualquer
+                               -- dispositivo transmitindo agora escuta esse também, além do seu id)
+  kind        text not null,  -- 'watch-request' | 'offer' | 'answer' | 'ice' | 'stop'
+  payload     jsonb not null default '{}'::jsonb,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists screen_share_signals_to_device_idx on public.screen_share_signals (to_device, created_at);
+
+alter table public.screen_share_signals enable row level security;
+-- (só acessada pela service_role, em src/lib/screenShareSignals.js — mesmo padrão das tabelas acima)

@@ -14,6 +14,7 @@ import { useIsMobile } from "@/lib/useIsMobile.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
 import { getDeviceId, matchNavCommand } from "@/lib/deviceId.js";
 import { runFullSync } from "@/lib/sync.js";
+import { hostScreenShare, viewerWatchScreen } from "@/lib/screenShareRTC.js";
 
 // carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
 // realmente ligar a Visão 3D; desktop-only por decisão do usuário, nunca entra no bundle mobile.
@@ -183,6 +184,27 @@ export default function AssistantPage() {
   const [vigiaAutoIntervalMs, setVigiaAutoIntervalMs] = useState(60000);
   const vigiaLastIdRef = useRef(0); // maior id já narrado — só o que vier DEPOIS disso conta
   useEffect(() => { if (!vigiaMode) setVigiaAutoOn(false); }, [vigiaMode]);
+
+  // Assistir ao vivo (Transmissão, lado espectador): pede pra ver a tela de OUTRO dispositivo
+  // que esteja com Modo Tela + Transmissão ligados — ver src/lib/screenShareRTC.js. Não
+  // depende de screenMode neste aparelho (é o ponto inteiro: assistir de qualquer lugar).
+  const [vigiaWatching, setVigiaWatching] = useState(false);
+  const [vigiaWatchStatus, setVigiaWatchStatus] = useState(null); // null|"procurando"|"connecting"|"connected"|"failed"|"closed"|"disconnected"
+  const vigiaWatchVideoRef = useRef(null);
+  const screenShareViewerRef = useRef(null);
+  useEffect(() => { if (!vigiaMode) setVigiaWatching(false); }, [vigiaMode]);
+  useEffect(() => {
+    if (!vigiaWatching) { setVigiaWatchStatus(null); return; }
+    screenShareViewerRef.current = viewerWatchScreen({
+      deviceId: getDeviceId(),
+      onTrack: (mediaStream) => {
+        if (vigiaWatchVideoRef.current) { vigiaWatchVideoRef.current.srcObject = mediaStream; vigiaWatchVideoRef.current.play().catch(() => {}); }
+      },
+      onStatus: setVigiaWatchStatus,
+      onLog: (msg) => addLog("[VIGIA]", OR, msg),
+    });
+    return () => { screenShareViewerRef.current?.stop(); screenShareViewerRef.current = null; };
+  }, [vigiaWatching, addLog]);
 
   const [codeModeRepo, setCodeModeRepo] = useState("");
   const [codeModeBranch, setCodeModeBranch] = useState("");
@@ -566,14 +588,15 @@ export default function AssistantPage() {
   const [screenFocus, _setScreenFocus] = useState(""); // direcionamento livre: "preste atenção em X" — some no prompt da vigília
   const screenFocusRef = useRef(""); // lido fresco a cada tick, sem reiniciar o intervalo a cada tecla digitada
   screenFocusRef.current = screenFocus;
-  // Transmissão: com isso ligado (além de Modo Tela + "Vigiar sozinha"), cada comentário de
-  // verdade da vigília também é salvo em screen_observations — memória pro Modo Vigia. Nunca
-  // persiste sozinha (não é preferência durável, é ligada/desligada por sessão, igual
-  // screenAutoComment — reseta quando a tela para de ser compartilhada).
+  // Transmissão: com isso ligado (e Modo Tela ativo), este dispositivo fica "assistível" ao
+  // vivo por outro (WebRTC peer-to-peer, ver src/lib/screenShareRTC.js — o vídeo em si nunca
+  // passa pelo servidor, só a sinalização inicial). Independente de "Vigiar sozinha"/persistir
+  // observações — isso agora é automático (ver a vigília abaixo), não precisa de toggle.
+  // Nunca persiste sozinha (não é preferência durável) — reseta quando a tela para de ser
+  // compartilhada.
   const [transmissionMode, setTransmissionMode] = useState(false);
-  const transmissionModeRef = useRef(false);
-  transmissionModeRef.current = transmissionMode;
-  useEffect(() => { if (!screenAutoComment) setTransmissionMode(false); }, [screenAutoComment]);
+  const screenShareHostRef = useRef(null);
+  useEffect(() => { if (!screenMode) setTransmissionMode(false); }, [screenMode]);
   const screenVideoRef = useRef(null);
   const screenStreamRef = useRef(null);
 
@@ -643,6 +666,28 @@ export default function AssistantPage() {
       screenStreamRef.current = null;
     };
   }, [screenMode]);
+
+  // Transmissão: enquanto ligada (e a tela realmente sendo compartilhada), este dispositivo
+  // vira "host" — escuta pedidos de outros dispositivos querendo assistir (ver
+  // src/lib/screenShareRTC.js) e abre uma conexão WebRTC por espectador. Espera 1s pelo mesmo
+  // motivo da vigília acima: dá tempo do <video> do compartilhamento começar a produzir frames.
+  useEffect(() => {
+    if (!transmissionMode || !screenMode) return;
+    const kickoff = setTimeout(() => {
+      const stream = screenStreamRef.current;
+      if (!stream) { addLog("[TRANSMISSÃO]", OR, "sem stream da tela ainda — tente desligar e ligar de novo"); return; }
+      screenShareHostRef.current = hostScreenShare({
+        deviceId: getDeviceId(),
+        stream,
+        onLog: (msg) => addLog("[TRANSMISSÃO]", PU, msg),
+      });
+    }, 1000);
+    return () => {
+      clearTimeout(kickoff);
+      screenShareHostRef.current?.stop();
+      screenShareHostRef.current = null;
+    };
+  }, [transmissionMode, screenMode, addLog]);
 
   // retrato ATUAL da tela — maior que a foto da câmera (1280px) porque precisa dar pra ler
   // texto/UI pequena, não só reconhecer forma/cor.
@@ -783,7 +828,7 @@ export default function AssistantPage() {
         const res = await fetch("/api/screen-comment", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ image: frame, personaMode: personaModeForScreenRef.current, focus: screenFocusRef.current || null, persist: transmissionModeRef.current }),
+          body: JSON.stringify({ image: frame, personaMode: personaModeForScreenRef.current, focus: screenFocusRef.current || null, persist: true }),
         });
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
@@ -2433,19 +2478,18 @@ export default function AssistantPage() {
                         placeholder="direcionamento (ex.: avise se o build quebrar)"
                         style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#000", color: "#eafcff", width: "100%", marginBottom: 8 }}
                       />
-                      <button
-                        onClick={() => setTransmissionMode((v) => !v)}
-                        style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${transmissionMode ? OR : "rgba(var(--accent-rgb),0.18)"}`, background: transmissionMode ? "rgba(217,89,38,0.12)" : "transparent", color: transmissionMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
-                      >
-                        📡 Transmissão: {transmissionMode ? "ON" : "OFF"}
-                      </button>
-                      {transmissionMode && (
-                        <div style={{ fontSize: 10.5, color: "rgba(207,239,251,0.45)", marginBottom: 8, lineHeight: 1.4 }}>
-                          Cada observação real fica salva numa memória — pergunte sobre ela no
-                          Modo Vigia (abaixo), de qualquer dispositivo.
-                        </div>
-                      )}
                     </>
+                  )}
+                  <button
+                    onClick={() => setTransmissionMode((v) => !v)}
+                    style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${transmissionMode ? OR : "rgba(var(--accent-rgb),0.18)"}`, background: transmissionMode ? "rgba(217,89,38,0.12)" : "transparent", color: transmissionMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+                  >
+                    📡 Transmissão: {transmissionMode ? "ON" : "OFF"}
+                  </button>
+                  {transmissionMode && (
+                    <div style={{ fontSize: 10.5, color: "rgba(207,239,251,0.45)", marginBottom: 8, lineHeight: 1.4 }}>
+                      Outro dispositivo com o Modo Vigia (abaixo) pode assistir esta tela AO VIVO agora.
+                    </div>
                   )}
                 </>
               )}
@@ -2456,9 +2500,10 @@ export default function AssistantPage() {
                 for o seu caso, o aviso acima vai dizer isso claramente.
               </div>
 
-              {/* modo vigia — NÃO depende de screenMode neste aparelho: lê a memória salva por
-                  Transmissão (que pode estar rodando em OUTRO dispositivo), então funciona até
-                  no celular enquanto o Modo Tela roda só no computador. */}
+              {/* modo vigia — NÃO depende de screenMode neste aparelho: lê a memória salva pela
+                  vigília, e assiste ao vivo via Transmissão (que pode estar rodando em OUTRO
+                  dispositivo) — então funciona até no celular enquanto o Modo Tela roda só no
+                  computador. */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>MODO VIGIA</div>
               <button
                 onClick={() => setVigiaMode((v) => !v)}
@@ -2483,12 +2528,27 @@ export default function AssistantPage() {
                       {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
                     </select>
                   )}
+                  <button
+                    onClick={() => setVigiaWatching((v) => !v)}
+                    style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${vigiaWatching ? GR : "rgba(var(--accent-rgb),0.18)"}`, background: vigiaWatching ? "rgba(123,216,143,0.12)" : "transparent", color: vigiaWatching ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+                  >
+                    📺 Assistir ao vivo: {vigiaWatching ? "ON" : "OFF"}
+                  </button>
+                  {vigiaWatching && (
+                    <>
+                      <video ref={vigiaWatchVideoRef} autoPlay playsInline style={{ width: "100%", aspectRatio: "16/9", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, background: "#000" }} />
+                      <div style={{ ...mono, fontSize: 10, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)", marginBottom: 8 }}>
+                        {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando o outro dispositivo…" : vigiaWatchStatus || "conectando…"}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
               <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
-                Com isso ligado, suas perguntas buscam no HISTÓRICO de observações que a Lisa já
-                fez sobre sua tela (via Transmissão) — não a tela ao vivo. Funciona em qualquer
-                aparelho, mesmo sem o Modo Tela ligado aqui.
+                Perguntas buscam no HISTÓRICO de observações que a Lisa já fez sobre sua tela.
+                "Assistir ao vivo" mostra a tela em tempo real de outro dispositivo com Modo Tela
+                + Transmissão ligados (funciona melhor na mesma rede/Wi-Fi). Tudo isso funciona
+                em qualquer aparelho, mesmo sem o Modo Tela ligado aqui.
               </div>
 
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>MODO ESCUTA</div>
@@ -2838,21 +2898,21 @@ export default function AssistantPage() {
                   title="O que ela deve priorizar notar na tela — fica em branco pra ela decidir sozinha o que é relevante"
                   style={{ ...mono, fontSize: 9, padding: "5px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff", width: 220 }}
                 />
-                <button
-                  onClick={() => setTransmissionMode((v) => !v)}
-                  title={transmissionMode ? "Transmissão ligada — cada observação real fica salva pro Modo Vigia poder responder depois. Clique pra desligar" : "Salvar as observações reais dessa vigília numa memória que o Modo Vigia pode consultar depois (de qualquer dispositivo)"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${transmissionMode ? OR : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: transmissionMode ? "rgba(217,89,38,0.12)" : "transparent",
-                    color: transmissionMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
-                >
-                  📡 TRANSMISSÃO {transmissionMode ? "ON" : "OFF"}
-                </button>
               </>
             )}
+            <button
+              onClick={() => setTransmissionMode((v) => !v)}
+              title={transmissionMode ? "Transmissão ligada — outro dispositivo com o Modo Vigia pode assistir sua tela AO VIVO agora. Clique pra desligar" : "Deixar outro dispositivo (ex.: seu celular, com o Modo Vigia) assistir esta tela AO VIVO"}
+              style={{
+                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                border: `1px solid ${transmissionMode ? OR : "rgba(var(--accent-rgb),0.18)"}`,
+                background: transmissionMode ? "rgba(217,89,38,0.12)" : "transparent",
+                color: transmissionMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              📡 TRANSMISSÃO {transmissionMode ? "ON" : "OFF"}
+            </button>
           </>
         )}
         {screenError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {screenError}</span>}
@@ -2898,6 +2958,27 @@ export default function AssistantPage() {
               >
                 {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
               </select>
+            )}
+            <button
+              onClick={() => setVigiaWatching((v) => !v)}
+              title={vigiaWatching ? "Assistindo ao vivo — clique pra parar" : "Ver AO VIVO a tela de outro dispositivo com Modo Tela + Transmissão ligados"}
+              style={{
+                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                border: `1px solid ${vigiaWatching ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+                background: vigiaWatching ? "rgba(123,216,143,0.12)" : "transparent",
+                color: vigiaWatching ? "#eafcff" : "rgba(207,239,251,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              📺 ASSISTIR {vigiaWatching ? "ON" : "OFF"}
+            </button>
+            {vigiaWatching && (
+              <>
+                <video ref={vigiaWatchVideoRef} autoPlay playsInline style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000" }} />
+                <span style={{ ...mono, fontSize: 8.5, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
+                  {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando…" : vigiaWatchStatus || "conectando…"}
+                </span>
+              </>
             )}
           </>
         )}
