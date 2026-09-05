@@ -29,6 +29,17 @@ const LisaAvatarIronMan = dynamic(() => import("@/components/panels/LisaAvatarIr
   loading: () => null,
 });
 
+/** Tela cheia de verdade (Fullscreen API do navegador, não um modal nosso) pro vídeo do
+ * "Assistir ao vivo" — clique/toque no preview pequeno abre isso. Cobre os 3 jeitos possíveis
+ * de pedir (padrão, Safari/Chrome antigos com prefixo, e o modo nativo do <video> do iOS
+ * Safari, que não implementa a Fullscreen API genérica pra elementos). */
+function enterVideoFullscreen(el) {
+  if (!el) return;
+  if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+  else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  else if (el.webkitEnterFullscreen) el.webkitEnterFullscreen();
+}
+
 const MODE_META = {
   idle: { label: "IDLE", sub: "awaiting command", color: CY },
   listening: { label: "LISTENING", sub: "retrieving context", color: GR },
@@ -2540,7 +2551,13 @@ export default function AssistantPage() {
                   </button>
                   {vigiaWatching && (
                     <>
-                      <video ref={vigiaWatchVideoRef} autoPlay playsInline muted onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)} style={{ width: "100%", aspectRatio: "16/9", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, background: "#000" }} />
+                      <video
+                        ref={vigiaWatchVideoRef} autoPlay playsInline muted
+                        onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
+                        onClick={(e) => enterVideoFullscreen(e.currentTarget)}
+                        title="Toque pra ver em tela cheia"
+                        style={{ width: "100%", aspectRatio: "16/9", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, background: "#000", cursor: "pointer" }}
+                      />
                       <div style={{ ...mono, fontSize: 10, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)", marginBottom: 8 }}>
                         {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando o outro dispositivo…" : vigiaWatchStatus || "conectando…"}
                       </div>
@@ -2978,7 +2995,13 @@ export default function AssistantPage() {
             </button>
             {vigiaWatching && (
               <>
-                <video ref={vigiaWatchVideoRef} autoPlay playsInline muted onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)} style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000" }} />
+                <video
+                  ref={vigiaWatchVideoRef} autoPlay playsInline muted
+                  onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
+                  onClick={(e) => enterVideoFullscreen(e.currentTarget)}
+                  title="Clique pra ver em tela cheia"
+                  style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000", cursor: "pointer" }}
+                />
                 <span style={{ ...mono, fontSize: 8.5, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
                   {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando…" : vigiaWatchStatus || "conectando…"}
                 </span>
