@@ -2536,7 +2536,7 @@ export default function AssistantPage() {
                   </button>
                   {vigiaWatching && (
                     <>
-                      <video ref={vigiaWatchVideoRef} autoPlay playsInline style={{ width: "100%", aspectRatio: "16/9", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, background: "#000" }} />
+                      <video ref={vigiaWatchVideoRef} autoPlay playsInline muted style={{ width: "100%", aspectRatio: "16/9", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, background: "#000" }} />
                       <div style={{ ...mono, fontSize: 10, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)", marginBottom: 8 }}>
                         {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando o outro dispositivo…" : vigiaWatchStatus || "conectando…"}
                       </div>
@@ -2974,7 +2974,7 @@ export default function AssistantPage() {
             </button>
             {vigiaWatching && (
               <>
-                <video ref={vigiaWatchVideoRef} autoPlay playsInline style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000" }} />
+                <video ref={vigiaWatchVideoRef} autoPlay playsInline muted style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000" }} />
                 <span style={{ ...mono, fontSize: 8.5, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
                   {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando…" : vigiaWatchStatus || "conectando…"}
                 </span>
