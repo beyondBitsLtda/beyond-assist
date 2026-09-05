@@ -1026,3 +1026,60 @@ avaliar o critério.`;
     return { verdict: "indeterminado", reasoning: "não consegui interpretar a resposta do modelo desta vez." };
   }
 }
+
+// ---- Modo Vigia: ver src/lib/screenWatch.js e /api/screen-watch/* ----
+// Memória das observações reais do Modo Tela (só quando ela realmente comentou algo, nunca
+// "nada digno de nota") — dois usos: responder pergunta sob demanda (qualquer dispositivo) e
+// narrar sozinha de tempos em tempos o que mudou desde a última vez (proativo, também de
+// qualquer dispositivo — não depende da tela estar sendo compartilhada NAQUELE aparelho).
+
+export const VIGIA_ASK_INSTRUCTION = `Você é a Lisa. O usuário está te perguntando sobre o que você vem observando na tela dele através do Modo Tela — mas você NÃO está vendo a tela agora nesta pergunta, só tem acesso ao HISTÓRICO de comentários reais que você já fez sobre ela (cada um com o horário).
+
+Responda com base SÓ nesse histórico, no seu estilo (direta, com personalidade). Se o histórico estiver vazio ou não tiver nada relacionado à pergunta, diga isso claramente — nunca invente uma observação que não está na lista. Seja breve, apropriado pra fala em voz alta.`;
+
+/** Responde uma pergunta sobre o HISTÓRICO de observações (não a tela ao vivo) — usado pelo
+ * Modo Vigia sob demanda, de qualquer dispositivo. `rows` = [{comment, created_at}], já em
+ * ordem cronológica. Sempre responde algo (nunca null) — mesmo que seja "não tenho registro
+ * disso ainda". */
+export async function answerAboutScreenHistory(question, rows, systemInstruction = VIGIA_ASK_INSTRUCTION) {
+  const historyText = rows.length
+    ? rows.map((r) => `[${new Date(r.created_at).toLocaleString("pt-BR")}] ${r.comment}`).join("\n")
+    : "(nenhuma observação registrada ainda)";
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: [{ role: "user", parts: [{ text: `HISTÓRICO DE OBSERVAÇÕES DA TELA:\n${historyText}\n\nPERGUNTA: ${question}` }] }],
+        config: { systemInstruction },
+      }),
+    { attempts: 2, delayMs: 600 }
+  );
+  return (res.text || "").trim() || "Não consegui pensar em uma resposta pra isso agora.";
+}
+
+export const VIGIA_DIGEST_INSTRUCTION = `Você é a Lisa, narrando pro usuário — de tempos em tempos, PROATIVAMENTE, sem ele ter perguntado nada — o que você notou de novo na tela dele desde a última vez que contou, através do Modo Tela (Transmissão ligada). Você recebe só os comentários NOVOS desde então (cada um com o horário).
+
+Sintetize num resumo curto e falado (não liste um por um mecanicamente) — 1 a 3 frases, no seu estilo. Se os itens novos forem repetitivos ou pouco relevantes pra valer a pena interromper o usuário, fique em silêncio de verdade (responda EXATAMENTE com a palavra NADA, maiúsculas, sem mais nada).`;
+
+/** Narra (ou não) o que há de novo desde a última checagem — usado pelo Modo Vigia proativo.
+ * `rows` = só as observações NOVAS (sinceId), em ordem cronológica. Retorna null quando não
+ * vale a pena falar (a maioria das checagens, se nada novo aconteceu ou o que houve é
+ * irrelevante). */
+export async function summarizeNewScreenActivity(rows, systemInstruction = VIGIA_DIGEST_INSTRUCTION) {
+  if (!rows.length) return null;
+  const newText = rows.map((r) => `[${new Date(r.created_at).toLocaleString("pt-BR")}] ${r.comment}`).join("\n");
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: [{ role: "user", parts: [{ text: `NOVO DESDE A ÚLTIMA VEZ:\n${newText}` }] }],
+        config: { systemInstruction },
+      }),
+    { attempts: 2, delayMs: 500 }
+  );
+  const text = (res.text || "").trim();
+  if (!text || /^nada\.?$/i.test(text)) return null;
+  return text;
+}

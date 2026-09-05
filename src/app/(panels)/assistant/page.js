@@ -172,6 +172,18 @@ export default function AssistantPage() {
   // mostra o código de cada arquivo sendo escrito ao vivo (liveCode), não só o PR pronto no
   // final. Nunca commita na branch escolhida — sempre cria uma branch nova e abre um PR.
   const [codeMode, setCodeMode] = useState(false);
+
+  // Modo Vigia: com isso ligado, toda pergunta busca no HISTÓRICO de observações do Modo Tela
+  // (tabela screen_observations, ver src/lib/screenWatch.js) em vez de conversar normalmente
+  // — não depende da tela estar sendo compartilhada NESTE aparelho, funciona de qualquer
+  // dispositivo (inclusive celular), já que só lê uma tabela na nuvem. `vigiaAutoOn` narra
+  // sozinha de tempos em tempos o que há de novo (mesmo padrão da vigília do Modo Tela).
+  const [vigiaMode, setVigiaMode] = useState(false);
+  const [vigiaAutoOn, setVigiaAutoOn] = useState(false);
+  const [vigiaAutoIntervalMs, setVigiaAutoIntervalMs] = useState(60000);
+  const vigiaLastIdRef = useRef(0); // maior id já narrado — só o que vier DEPOIS disso conta
+  useEffect(() => { if (!vigiaMode) setVigiaAutoOn(false); }, [vigiaMode]);
+
   const [codeModeRepo, setCodeModeRepo] = useState("");
   const [codeModeBranch, setCodeModeBranch] = useState("");
   const [codeModeRepos, setCodeModeRepos] = useState([]);
@@ -554,6 +566,14 @@ export default function AssistantPage() {
   const [screenFocus, _setScreenFocus] = useState(""); // direcionamento livre: "preste atenção em X" — some no prompt da vigília
   const screenFocusRef = useRef(""); // lido fresco a cada tick, sem reiniciar o intervalo a cada tecla digitada
   screenFocusRef.current = screenFocus;
+  // Transmissão: com isso ligado (além de Modo Tela + "Vigiar sozinha"), cada comentário de
+  // verdade da vigília também é salvo em screen_observations — memória pro Modo Vigia. Nunca
+  // persiste sozinha (não é preferência durável, é ligada/desligada por sessão, igual
+  // screenAutoComment — reseta quando a tela para de ser compartilhada).
+  const [transmissionMode, setTransmissionMode] = useState(false);
+  const transmissionModeRef = useRef(false);
+  transmissionModeRef.current = transmissionMode;
+  useEffect(() => { if (!screenAutoComment) setTransmissionMode(false); }, [screenAutoComment]);
   const screenVideoRef = useRef(null);
   const screenStreamRef = useRef(null);
 
@@ -565,11 +585,18 @@ export default function AssistantPage() {
     if (SCREEN_INTERVAL_OPTIONS.some((o) => o.value === savedMs)) setScreenIntervalMs(savedMs);
     const savedFocus = localStorage.getItem("screenFocus");
     if (savedFocus) _setScreenFocus(savedFocus);
+    const savedVigiaMs = Number(localStorage.getItem("vigiaAutoIntervalMs"));
+    if (SCREEN_INTERVAL_OPTIONS.some((o) => o.value === savedVigiaMs)) setVigiaAutoIntervalMs(savedVigiaMs);
   }, []);
 
   const chooseScreenInterval = useCallback((ms) => {
     setScreenIntervalMs(ms);
     if (typeof window !== "undefined") localStorage.setItem("screenIntervalMs", String(ms));
+  }, []);
+
+  const chooseVigiaAutoInterval = useCallback((ms) => {
+    setVigiaAutoIntervalMs(ms);
+    if (typeof window !== "undefined") localStorage.setItem("vigiaAutoIntervalMs", String(ms));
   }, []);
 
   const updateScreenFocus = useCallback((text) => {
@@ -582,6 +609,7 @@ export default function AssistantPage() {
       screenStreamRef.current?.getTracks().forEach((t) => t.stop());
       screenStreamRef.current = null;
       setScreenAutoComment(false); // sem tela, comentário automático não tem o que analisar
+      setTransmissionMode(false);
       return;
     }
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
@@ -755,7 +783,7 @@ export default function AssistantPage() {
         const res = await fetch("/api/screen-comment", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ image: frame, personaMode: personaModeForScreenRef.current, focus: screenFocusRef.current || null }),
+          body: JSON.stringify({ image: frame, personaMode: personaModeForScreenRef.current, focus: screenFocusRef.current || null, persist: transmissionModeRef.current }),
         });
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
@@ -790,6 +818,50 @@ export default function AssistantPage() {
     const id = setInterval(tick, screenIntervalMs);
     return () => { cancelled = true; clearTimeout(kickoff); clearInterval(id); };
   }, [screenMode, screenAutoComment, screenIntervalMs, captureScreenFrame, addLog, openReplyWindow]);
+
+  // Modo Vigia PROATIVO: ao contrário da vigília do Modo Tela acima, esta NÃO depende de
+  // screenMode/captureScreenFrame — só lê a tabela screen_observations na nuvem (ver
+  // src/lib/screenWatch.js), então funciona de QUALQUER dispositivo (ex.: liga no celular
+  // enquanto o Modo Tela + Transmissão rodam no computador). Ao ligar, primeiro só marca o
+  // ponteiro atual (sinceId=0 devolve o id mais recente sem narrar) — sem isso, a 1ª checagem
+  // narraria de uma vez todo o histórico que já existia antes de ligar.
+  useEffect(() => {
+    if (!vigiaAutoOn) return;
+    let cancelled = false;
+    vigiaLastIdRef.current = 0;
+    const tick = async () => {
+      try {
+        const res = await fetch("/api/screen-watch/digest", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sinceId: vigiaLastIdRef.current, personaMode: personaModeForScreenRef.current }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!data?.ok) { addLog("[VIGIA]", OR, `narração falhou: ${data?.error || `HTTP ${res.status}`}`); return; }
+        if (typeof data.latestId === "number") vigiaLastIdRef.current = data.latestId;
+        if (!data.comment) { addLog("[VIGIA]", CY, "nada novo digno de nota agora"); return; }
+        addLog("[VIGIA]", PU, data.comment);
+        setMessages((m) => [...m, { id: `vigia${Date.now()}`, role: "assistant", text: data.comment }]);
+        const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || proactiveTurnRef.current || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
+        if (jaFalando) addLog("[VIGIA]", CY, "narração achada, mas a Lisa já está falando — só no texto desta vez");
+        else if (voiceOnForScreenRef.current) {
+          proactiveTurnRef.current = true;
+          try {
+            await speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+            if (!cancelled) await openReplyWindow(data.comment, "[VIGIA]");
+          } finally {
+            proactiveTurnRef.current = false;
+          }
+        }
+      } catch (err) {
+        if (!cancelled) addLog("[VIGIA]", OR, `narração falhou: ${err?.message || err}`);
+      }
+    };
+    const kickoff = setTimeout(tick, 1000);
+    const id = setInterval(tick, vigiaAutoIntervalMs);
+    return () => { cancelled = true; clearTimeout(kickoff); clearInterval(id); };
+  }, [vigiaAutoOn, vigiaAutoIntervalMs, addLog, openReplyWindow]);
 
   // ---- Modo Observância (proativo): saudação pré-configurada — enquanto a câmera estiver
   // ligada, a Lisa "de olho" sozinha (nenhuma pergunta precisa ser feita); se aparecer a
@@ -1505,6 +1577,48 @@ export default function AssistantPage() {
     }
   }, [codeModeRepo, codeModeBranch, codeModeFiles, codeSession, addLog, voiceOn, stopSpeaking, enqueueSpeech, runCodeModeStep]);
 
+  // Modo Vigia sob demanda: pergunta sobre o HISTÓRICO de observações do Modo Tela (não a tela
+  // ao vivo) — chamada única, sem streaming (bem rápida, não precisa do mecanismo de passos do
+  // Modo Código). Funciona de qualquer dispositivo, mesmo sem a tela sendo compartilhada aqui.
+  const askVigiaMode = useCallback(async (q) => {
+    setBusy(true);
+    setQuestion(q);
+    setAnswer("");
+    answerRef.current = "";
+    setMode("listening");
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: q, vigiaMode: true }]);
+
+    stopSpeaking();
+    const gen = ++speechGenRef.current;
+    speechEngineRef.current = null;
+    const voiceEnabled = voiceOn;
+    setMode("speaking");
+
+    try {
+      const res = await fetch("/api/screen-watch/ask", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question: q, personaMode }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      const finalText = data.answer;
+      setAnswer(finalText);
+      answerRef.current = finalText;
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: finalText, vigiaMode: true }]);
+      addLog("[VIGIA]", PU, finalText);
+      if (voiceEnabled) enqueueSpeech(finalText, gen);
+    } catch (err) {
+      const finalText = `⚠ ${err.message}`;
+      setAnswer(finalText);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: finalText, vigiaMode: true }]);
+      addLog("[VIGIA]", OR, err.message);
+    } finally {
+      setBusy(false);
+      setMode("idle");
+    }
+  }, [personaMode, addLog, voiceOn, stopSpeaking, enqueueSpeech]);
+
   // ---- pergunta real ao backend (SSE) ----
   // `displayText` (opcional) — o que aparece no chat/log, quando diferente do `q` de verdade
   // mandado pro backend. Existe pra réplica do Modo Escuta (ver listenForReply abaixo): a
@@ -1539,6 +1653,10 @@ export default function AssistantPage() {
     // Modo Código ligado: a pergunta vira um pedido de mudança de código, não uma conversa —
     // ver askCodeMode acima.
     if (codeMode) return askCodeMode(q);
+
+    // Modo Vigia ligado: a pergunta busca no histórico de observações do Modo Tela — ver
+    // askVigiaMode acima.
+    if (vigiaMode) return askVigiaMode(q);
 
     const shown = displayText || q;
     setBusy(true);
@@ -1631,7 +1749,7 @@ export default function AssistantPage() {
       const full = answerRef.current.trim();
       if (voiceEnabled && full) enqueueSpeech(full, gen);
     }
-  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode]);
+  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode, vigiaMode, askVigiaMode]);
   askRef.current = ask; // ver comentário no askRef acima — mantém sempre a versão mais recente pros efeitos de vigília chamarem
 
   // ---- STT: ouvir microfone (Web Speech API) ----
@@ -2315,6 +2433,18 @@ export default function AssistantPage() {
                         placeholder="direcionamento (ex.: avise se o build quebrar)"
                         style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#000", color: "#eafcff", width: "100%", marginBottom: 8 }}
                       />
+                      <button
+                        onClick={() => setTransmissionMode((v) => !v)}
+                        style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${transmissionMode ? OR : "rgba(var(--accent-rgb),0.18)"}`, background: transmissionMode ? "rgba(217,89,38,0.12)" : "transparent", color: transmissionMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+                      >
+                        📡 Transmissão: {transmissionMode ? "ON" : "OFF"}
+                      </button>
+                      {transmissionMode && (
+                        <div style={{ fontSize: 10.5, color: "rgba(207,239,251,0.45)", marginBottom: 8, lineHeight: 1.4 }}>
+                          Cada observação real fica salva numa memória — pergunte sobre ela no
+                          Modo Vigia (abaixo), de qualquer dispositivo.
+                        </div>
+                      )}
                     </>
                   )}
                 </>
@@ -2324,6 +2454,41 @@ export default function AssistantPage() {
                 O navegador sempre pede permissão nativa pra escolher o que compartilhar. A maioria
                 dos navegadores de CELULAR não suporta compartilhamento de tela por um site — se
                 for o seu caso, o aviso acima vai dizer isso claramente.
+              </div>
+
+              {/* modo vigia — NÃO depende de screenMode neste aparelho: lê a memória salva por
+                  Transmissão (que pode estar rodando em OUTRO dispositivo), então funciona até
+                  no celular enquanto o Modo Tela roda só no computador. */}
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>MODO VIGIA</div>
+              <button
+                onClick={() => setVigiaMode((v) => !v)}
+                style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${vigiaMode ? OR : "rgba(var(--accent-rgb),0.18)"}`, background: vigiaMode ? "rgba(217,89,38,0.12)" : "transparent", color: vigiaMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+              >
+                👁️ Modo Vigia: {vigiaMode ? "ON" : "OFF"}
+              </button>
+              {vigiaMode && (
+                <>
+                  <button
+                    onClick={() => setVigiaAutoOn((v) => !v)}
+                    style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${vigiaAutoOn ? PU : "rgba(var(--accent-rgb),0.18)"}`, background: vigiaAutoOn ? "rgba(201,166,255,0.12)" : "transparent", color: vigiaAutoOn ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+                  >
+                    💬 Narrar sozinha: {vigiaAutoOn ? "ON" : "OFF"}
+                  </button>
+                  {vigiaAutoOn && (
+                    <select
+                      value={vigiaAutoIntervalMs}
+                      onChange={(e) => chooseVigiaAutoInterval(Number(e.target.value))}
+                      style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#000", color: "#eafcff", width: "100%", marginBottom: 8 }}
+                    >
+                      {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+                    </select>
+                  )}
+                </>
+              )}
+              <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
+                Com isso ligado, suas perguntas buscam no HISTÓRICO de observações que a Lisa já
+                fez sobre sua tela (via Transmissão) — não a tela ao vivo. Funciona em qualquer
+                aparelho, mesmo sem o Modo Tela ligado aqui.
               </div>
 
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>MODO ESCUTA</div>
@@ -2673,11 +2838,69 @@ export default function AssistantPage() {
                   title="O que ela deve priorizar notar na tela — fica em branco pra ela decidir sozinha o que é relevante"
                   style={{ ...mono, fontSize: 9, padding: "5px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff", width: 220 }}
                 />
+                <button
+                  onClick={() => setTransmissionMode((v) => !v)}
+                  title={transmissionMode ? "Transmissão ligada — cada observação real fica salva pro Modo Vigia poder responder depois. Clique pra desligar" : "Salvar as observações reais dessa vigília numa memória que o Modo Vigia pode consultar depois (de qualquer dispositivo)"}
+                  style={{
+                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                    border: `1px solid ${transmissionMode ? OR : "rgba(var(--accent-rgb),0.18)"}`,
+                    background: transmissionMode ? "rgba(217,89,38,0.12)" : "transparent",
+                    color: transmissionMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+                    cursor: "pointer",
+                  }}
+                >
+                  📡 TRANSMISSÃO {transmissionMode ? "ON" : "OFF"}
+                </button>
               </>
             )}
           </>
         )}
         {screenError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {screenError}</span>}
+
+        {/* Modo Vigia — pergunta (ou narra sozinha) sobre o HISTÓRICO de observações do Modo
+            Tela salvo com Transmissão. NÃO depende de screenMode neste aparelho — funciona de
+            qualquer dispositivo, inclusive celular, contanto que outro aparelho esteja
+            alimentando a memória (Modo Tela + Transmissão ligados lá). */}
+        <button
+          onClick={() => setVigiaMode((v) => !v)}
+          title={vigiaMode ? "Modo Vigia ligado — toda pergunta busca no histórico de observações da tela. Clique pra desligar" : "Perguntar sobre o que a Lisa vem observando na tela (via Transmissão), de qualquer dispositivo"}
+          style={{
+            ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+            border: `1px solid ${vigiaMode ? OR : "rgba(var(--accent-rgb),0.18)"}`,
+            background: vigiaMode ? "rgba(217,89,38,0.12)" : "transparent",
+            color: vigiaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+            cursor: "pointer",
+          }}
+        >
+          👁️ VIGIA {vigiaMode ? "ON" : "OFF"}
+        </button>
+        {vigiaMode && (
+          <>
+            <button
+              onClick={() => setVigiaAutoOn((v) => !v)}
+              title={vigiaAutoOn ? "Narrando sozinha o que há de novo — clique pra desligar" : "Deixar a Lisa te contar sozinha, de tempos em tempos, o que há de novo na tela (não precisa perguntar)"}
+              style={{
+                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                border: `1px solid ${vigiaAutoOn ? PU : "rgba(var(--accent-rgb),0.18)"}`,
+                background: vigiaAutoOn ? "rgba(201,166,255,0.12)" : "transparent",
+                color: vigiaAutoOn ? "#eafcff" : "rgba(207,239,251,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              💬 AUTO {vigiaAutoOn ? "ON" : "OFF"}
+            </button>
+            {vigiaAutoOn && (
+              <select
+                value={vigiaAutoIntervalMs}
+                onChange={(e) => chooseVigiaAutoInterval(Number(e.target.value))}
+                title="De quanto em quanto tempo ela verifica se há algo novo pra te contar"
+                style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
+              >
+                {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+              </select>
+            )}
+          </>
+        )}
 
         {/* Modo Escuta — precisa do Modo Tela ou da Observância ligado (não roda sozinho, ver
             useEffect de micWatchMode acima). Microfone REALMENTE aberto, diferente do

@@ -472,3 +472,27 @@ create table if not exists public.arch_docs (
 
 alter table public.arch_docs enable row level security;
 -- (só acessada pela service_role, em src/lib/archDocs.js — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  Modo Vigia (a mais, aditivo) — memória das observações do Modo Tela. Com "Transmissão"
+--  ligada (toggle novo dentro de Modo Tela), toda vez que a vigília do Modo Tela realmente
+--  comenta algo (não em todo ciclo — a maioria fica muda, "nada digno de nota" não gera
+--  linha aqui), o comentário é salvo aqui. O modo "Vigia" (toggle novo, igual o Modo Código)
+--  lê os registros mais recentes pra responder perguntas tipo "o que você notou na minha
+--  tela?" — e funciona de QUALQUER dispositivo (inclusive celular), já que é só ler uma
+--  tabela na nuvem, não depende de a TELA estar sendo compartilhada NAQUELE aparelho. Ver
+--  src/lib/screenWatch.js e /api/screen-watch/*.
+-- ============================================================
+
+-- 24) Uma linha por observação real da vigília do Modo Tela (não por ciclo — só quando há
+--     comentário de verdade).
+create table if not exists public.screen_observations (
+  id          bigint generated always as identity primary key,
+  comment     text not null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists screen_observations_created_at_idx on public.screen_observations (created_at desc);
+
+alter table public.screen_observations enable row level security;
+-- (só acessada pela service_role, em src/lib/screenWatch.js — mesmo padrão das tabelas acima)
