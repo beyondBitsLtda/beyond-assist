@@ -14,7 +14,8 @@ import { mono } from "@/lib/theme.js";
 const BASE_URL = "/models/ironman/base.fbx";
 const CLIP_URLS = { listening: "/models/ironman/listening.fbx", speaking: "/models/ironman/talking.fbx" };
 const MODE_TINT = { idle: 0x3fd0f2, listening: 0x7bd88f, speaking: 0xff9d3d };
-const FADE_S = 0.4;
+const GESTURE_KEYS = ["listening", "speaking"];
+const BLEND_RATE = 3.2; // 1/segundos — quão rápido o peso do gesto sobe/desce ao trocar de modo
 
 function loadFBX(url) {
   return new Promise((resolve, reject) => new FBXLoader().load(url, resolve, undefined, reject));
@@ -33,7 +34,10 @@ function clipMatchesSkeleton(clip, boneNames) {
  * "Corpo" 3D alternativo da Lisa — Iron Man rigado (esqueleto de verdade via Mixamo, ver
  * 3d model/IronMan/ e as instruções de rig passadas ao usuário). Ao contrário do LisaAvatar3D
  * (cyborg girl, sem esqueleto), este toca clipes de animação de verdade por modo (idle/ouvindo/
- * falando), com crossfade entre eles — gesto real, não só balanço/respiração simulados.
+ * falando). Idle toca sempre como base; listening/speaking entram por cima como camadas
+ * ADITIVAS de peso 0↔1 (não um crossfade tradicional) — testado e comprovado necessário: com
+ * crossfade, um osso que o gesto não cobre (ex.: braço que o clipe de "Talking" não anima)
+ * fica sem ninguém definindo ele assim que o idle esvazia, e volta pra pose de bind (T-pose).
  *
  * Escala/enquadramento de fábrica são um chute (nunca vi o resultado renderizado antes de
  * entregar) — por isso o OrbitControls fica ligado, pra ajustar zoom/ângulo na hora.
@@ -85,15 +89,8 @@ export default function LisaAvatarIronMan({ mode = "idle" }) {
     scene.add(wrapper);
 
     let mixer = null;
-    const actions = {};
-    let currentAction = null;
-    const fadeTo = (action) => {
-      if (!action || action === currentAction) return;
-      const prev = currentAction;
-      currentAction = action;
-      if (prev) prev.fadeOut(FADE_S);
-      action.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).fadeIn(FADE_S).play();
-    };
+    const actions = {}; // actions.idle = base absoluto, sempre com peso 1. actions.listening /
+    // actions.speaking = camadas ADITIVAS por cima, peso 0↔1 conforme o modo (ver animate()).
 
     (async () => {
       try {
@@ -155,14 +152,19 @@ export default function LisaAvatarIronMan({ mode = "idle" }) {
               colorsArr[i * 3] = c.r; colorsArr[i * 3 + 1] = c.g; colorsArr[i * 3 + 2] = c.b;
             }
             geo.setAttribute("color", new THREE.BufferAttribute(colorsArr, 3));
-            obj.material = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.6, roughness: 0.35, skinning: !!obj.isSkinnedMesh });
+            // "skinning" não existe mais como propriedade de material nessa versão do Three.js
+            // (deformação por esqueleto é automática pra qualquer SkinnedMesh) — só o resto.
+            obj.material = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.6, roughness: 0.35 });
           });
         }
 
         mixer = new THREE.AnimationMixer(base);
+        // idle é a base ABSOLUTA — toca pra sempre, peso 1, nunca esvazia. É o que evita a
+        // pose virar T-pose: se um gesto por cima não cobrir um osso, esse osso continua
+        // recebendo o valor do idle (nunca fica "sem ninguém animando ele").
         if (base.animations[0]) {
           actions.idle = mixer.clipAction(base.animations[0]);
-          fadeTo(actions.idle);
+          actions.idle.play();
         }
         setLoaded(true);
 
@@ -173,6 +175,15 @@ export default function LisaAvatarIronMan({ mode = "idle" }) {
         // Mixamo ainda), ignora em silêncio e o modo correspondente cai pro "idle" acima. Mas se
         // o arquivo existir e carregar SEM bater com nenhum osso do esqueleto do base.fbx (rig
         // de sessões diferentes do Mixamo, ver clipMatchesSkeleton), avisa em vez de ficar mudo.
+        //
+        // Convertidos pra ADITIVOS (relativos ao próprio 1º frame do clipe, ver
+        // THREE.AnimationUtils.makeClipAdditive) e tocados por cima do idle o tempo todo, com
+        // peso 0 até a vez deles (ver animate() abaixo) — bug real encontrado testando: com
+        // crossfade tradicional (idle perde peso, gesto ganha), qualquer osso que o gesto não
+        // anime (ex.: "Talking" pode não mexer nos braços) fica sem ninguém definindo o valor
+        // dele assim que o idle esvazia, e o Three.js volta esse osso pra pose de bind — que É
+        // a T-pose. Aditivo resolve isso: osso não coberto simplesmente recebe delta zero,
+        // continua com o que o idle já tinha definido, nunca "esquece" a pose.
         const status = {};
         await Promise.all(
           Object.entries(CLIP_URLS).map(async ([key, url]) => {
@@ -182,7 +193,12 @@ export default function LisaAvatarIronMan({ mode = "idle" }) {
               const clip = obj.animations[0];
               if (!clip) { status[key] = "arquivo sem clipe de animação"; return; }
               if (!clipMatchesSkeleton(clip, boneNames)) { status[key] = "esqueleto incompatível com o base.fbx (baixe de novo na mesma sessão do Mixamo)"; return; }
-              actions[key] = mixer.clipAction(clip);
+              THREE.AnimationUtils.makeClipAdditive(clip);
+              const action = mixer.clipAction(clip);
+              action.blendMode = THREE.AdditiveAnimationBlendMode;
+              action.setEffectiveWeight(0);
+              action.play();
+              actions[key] = action;
               status[key] = "ok";
             } catch {
               status[key] = "não encontrado — ainda não enviado";
@@ -213,12 +229,15 @@ export default function LisaAvatarIronMan({ mode = "idle" }) {
       const dt = clock.getDelta();
       const m = modeRef.current;
       rim.color.setHex(MODE_TINT[m] || MODE_TINT.idle);
-      // NÃO guarda "último modo visto" pra decidir se troca — isso tinha um bug real: se o modo
-      // virasse "speaking" ANTES do talking.fbx acabar de carregar, ficava preso no idle pra
-      // sempre (mesmo depois do clipe carregar), porque o modo em si não mudava de novo.
-      // Comparando direto a AÇÃO desejada (fadeTo já ignora se for a mesma de currentAction),
-      // assim que actions.speaking existir ele troca, não importa quando isso aconteça.
-      fadeTo(actions[m] || actions.idle);
+      // sobe o peso do gesto do modo atual, desce o dos outros — suave, não precisa saber se o
+      // clipe já carregou ou não (actions[k] só existe quando carrega com sucesso, ver acima).
+      for (const k of GESTURE_KEYS) {
+        const action = actions[k];
+        if (!action) continue;
+        const target = m === k ? 1 : 0;
+        const w = action.getEffectiveWeight();
+        action.setEffectiveWeight(w + (target - w) * Math.min(1, dt * BLEND_RATE));
+      }
       mixer?.update(dt);
       controls.update();
       renderer.render(scene, camera);
