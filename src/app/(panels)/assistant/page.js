@@ -198,7 +198,11 @@ export default function AssistantPage() {
     screenShareViewerRef.current = viewerWatchScreen({
       deviceId: getDeviceId(),
       onTrack: (mediaStream) => {
-        if (vigiaWatchVideoRef.current) { vigiaWatchVideoRef.current.srcObject = mediaStream; vigiaWatchVideoRef.current.play().catch(() => {}); }
+        addLog("[VIGIA]", GR, `stream recebida: ${mediaStream?.getVideoTracks().length ?? 0} faixa(s) de vídeo`);
+        if (vigiaWatchVideoRef.current) {
+          vigiaWatchVideoRef.current.srcObject = mediaStream;
+          vigiaWatchVideoRef.current.play().catch((err) => addLog("[VIGIA]", OR, `play() falhou: ${err.message}`));
+        }
       },
       onStatus: setVigiaWatchStatus,
       onLog: (msg) => addLog("[VIGIA]", OR, msg),
@@ -2536,7 +2540,7 @@ export default function AssistantPage() {
                   </button>
                   {vigiaWatching && (
                     <>
-                      <video ref={vigiaWatchVideoRef} autoPlay playsInline muted style={{ width: "100%", aspectRatio: "16/9", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, background: "#000" }} />
+                      <video ref={vigiaWatchVideoRef} autoPlay playsInline muted onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)} style={{ width: "100%", aspectRatio: "16/9", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, background: "#000" }} />
                       <div style={{ ...mono, fontSize: 10, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)", marginBottom: 8 }}>
                         {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando o outro dispositivo…" : vigiaWatchStatus || "conectando…"}
                       </div>
@@ -2974,7 +2978,7 @@ export default function AssistantPage() {
             </button>
             {vigiaWatching && (
               <>
-                <video ref={vigiaWatchVideoRef} autoPlay playsInline muted style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000" }} />
+                <video ref={vigiaWatchVideoRef} autoPlay playsInline muted onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)} style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000" }} />
                 <span style={{ ...mono, fontSize: 8.5, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
                   {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando…" : vigiaWatchStatus || "conectando…"}
                 </span>

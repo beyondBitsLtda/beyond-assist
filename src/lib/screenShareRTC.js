@@ -88,8 +88,12 @@ export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog }) {
     if (pc) return pc;
     pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     pc.onicecandidate = (e) => { if (e.candidate && hostId) sendSignal(deviceId, hostId, "ice", { candidate: e.candidate }); };
-    pc.ontrack = (e) => onTrack?.(e.streams[0]);
+    pc.ontrack = (e) => {
+      onLog?.(`faixa recebida: ${e.track.kind}, estado=${e.track.readyState}, mudo=${e.track.muted}, streams=${e.streams.length}`);
+      onTrack?.(e.streams[0]);
+    };
     pc.onconnectionstatechange = () => onStatus?.(pc.connectionState);
+    pc.oniceconnectionstatechange = () => onLog?.(`ICE: ${pc.iceConnectionState}`);
     return pc;
   };
 
