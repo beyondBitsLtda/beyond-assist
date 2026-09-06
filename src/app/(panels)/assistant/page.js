@@ -30,6 +30,21 @@ const LisaAvatarIronMan = dynamic(() => import("@/components/panels/LisaAvatarIr
   loading: () => null,
 });
 
+/** "Destrava" o autoplay de áudio da página — chame SEMPRE dentro do próprio onClick síncrono
+ * de um botão (nunca depois de um await). Navegadores só liberam o 1º play() de verdade se ele
+ * estiver bem colado num gesto do usuário; o Modo Rádio só fala depois de buscar o texto no
+ * Gemini (alguns segundos, várias idas à rede) — tempo demais pro navegador ainda contar como
+ * "gesto do usuário", então o 1º bloco tocava mudo. Um áudio silencioso tocado AQUI, na hora do
+ * clique, satisfaz a política do navegador pro resto da sessão (os áudios de verdade, mesmo
+ * vindos de código assíncrono bem depois, tocam normalmente depois disso). */
+function unlockAudioPlayback() {
+  try {
+    new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=").play().catch(() => {});
+  } catch {
+    // sem suporte a Audio (não deveria acontecer em nenhum navegador real) — só segue sem destravar
+  }
+}
+
 const MODE_META = {
   idle: { label: "IDLE", sub: "awaiting command", color: CY },
   listening: { label: "LISTENING", sub: "retrieving context", color: GR },
@@ -3008,7 +3023,7 @@ export default function AssistantPage() {
                   verdade da playlist (radio/playlist.txt, tocada via YouTube). */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>MODO RÁDIO</div>
               <button
-                onClick={() => setRadioMode((v) => !v)}
+                onClick={() => { unlockAudioPlayback(); setRadioMode((v) => !v); }}
                 style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${radioMode ? PU : "rgba(var(--accent-rgb),0.18)"}`, background: radioMode ? "rgba(201,166,255,0.12)" : "transparent", color: radioMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
               >
                 📻 Modo Rádio: {radioMode ? "ON" : "OFF"}
@@ -3597,7 +3612,7 @@ export default function AssistantPage() {
                 (novidades reais) com música de verdade da playlist (radio/playlist.txt). Ver o
                 useEffect de radioMode acima e o widget flutuante (radioWidget). */}
             <button
-              onClick={() => setRadioMode((v) => !v)}
+              onClick={() => { unlockAudioPlayback(); setRadioMode((v) => !v); }}
               title={radioMode ? "Modo Rádio ligado — veja o player no canto da tela. Clique pra desligar" : "Ligar o Modo Rádio: a Lisa vira apresentadora, intercalando novidades reais com música da sua playlist"}
               style={{
                 ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
