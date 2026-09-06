@@ -619,7 +619,12 @@ export default function AssistantPage() {
       screenShareCameraHostRef.current?.stop();
       screenShareCameraHostRef.current = null;
     };
-  }, [cameraVigiaMode, addLog]);
+    // cameraFacing nas dependências é de propósito, mesmo sem ser lido diretamente aqui: trocar
+    // de câmera cria um STREAM NOVO (o efeito de getUserMedia acima até PARA o antigo) — sem
+    // reiniciar a transmissão aqui, ela ficava presa mandando faixas já mortas do stream velho,
+    // e simplesmente parava de transmitir sem erro nenhum. Refazendo do zero (o retry acima já
+    // sonda até o stream novo ficar pronto), ela pega o stream certo depois da troca.
+  }, [cameraVigiaMode, cameraFacing, addLog]);
 
   // tira a foto ATUAL da câmera (só no instante da pergunta, nunca antes) — reduzida pra no
   // máx. 640px no lado maior, o bastante pra contar dedos/ver cor de roupa sem gastar token
@@ -2318,6 +2323,43 @@ export default function AssistantPage() {
     </div>
   );
 
+  // Preview flutuante das transmissões que este dispositivo está ASSISTINDO — fica SEMPRE
+  // montado (não depende de qual categoria de configurações está aberta). Antes, o <video>
+  // vivia dentro do acordeão de categorias — fechar/trocar de categoria enquanto assistia
+  // desmontava o elemento no meio da conexão (erro real visto: "play() ... removed from the
+  // document"), derrubando o vídeo sem motivo nenhum de rede.
+  const watchPreviews = (vigiaWatching || cameraWatching) && (
+    <div style={{ position: "fixed", bottom: 16, right: 16, zIndex: 220, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+      {vigiaWatching && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <video
+            ref={vigiaWatchVideoRef} autoPlay playsInline muted
+            onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
+            onClick={(e) => openFullscreen(e.currentTarget, "tela ao vivo")}
+            title="Toque pra ver em tela cheia"
+            style={{ width: 150, aspectRatio: "16/9", borderRadius: 8, objectFit: "cover", border: `1px solid ${GR}`, background: "#000", cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.5)" }}
+          />
+          <div style={{ ...mono, fontSize: 9, letterSpacing: 1, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.7)", marginTop: 4, background: "rgba(0,0,0,0.6)", padding: "2px 8px", borderRadius: 4 }}>
+            🖵 {vigiaWatchStatus === "connected" ? "AO VIVO" : (vigiaWatchStatus || "conectando…").toUpperCase()}
+          </div>
+        </div>
+      )}
+      {cameraWatching && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <video
+            ref={cameraWatchVideoRef} autoPlay playsInline muted
+            onClick={(e) => openFullscreen(e.currentTarget, "câmera ao vivo")}
+            title="Toque pra ver em tela cheia"
+            style={{ width: 150, aspectRatio: "16/9", borderRadius: 8, objectFit: "cover", border: `1px solid ${GR}`, background: "#000", cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.5)" }}
+          />
+          <div style={{ ...mono, fontSize: 9, letterSpacing: 1, color: cameraWatchStatus === "connected" ? GR : "rgba(207,239,251,0.7)", marginTop: 4, background: "rgba(0,0,0,0.6)", padding: "2px 8px", borderRadius: 4 }}>
+            📷 {cameraWatchStatus === "connected" ? "AO VIVO" : (cameraWatchStatus || "conectando…").toUpperCase()}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   // ==========================================================================================
   // MOBILE — tela própria, só o Assistente (sem Topbar/Sidebar, ver Shell.js): escolhe entre
   // conversa por CHAT (bolhas, como um app de chat de IA) ou por VOZ (tela escura, só a onda
@@ -2342,6 +2384,7 @@ export default function AssistantPage() {
       <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "#000" }}>
         {fullscreenOverlay}
         {cameraVigiaMessageToast}
+        {watchPreviews}
         {/* barra superior mínima */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(var(--accent-rgb),0.12)", flex: "none" }}>
           <button
@@ -2772,18 +2815,9 @@ export default function AssistantPage() {
                     📺 Assistir ao vivo: {vigiaWatching ? "ON" : "OFF"}
                   </button>
                   {vigiaWatching && (
-                    <>
-                      <video
-                        ref={vigiaWatchVideoRef} autoPlay playsInline muted
-                        onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
-                        onClick={(e) => openFullscreen(e.currentTarget, "tela ao vivo")}
-                        title="Toque pra ver em tela cheia"
-                        style={{ width: "100%", aspectRatio: "16/9", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, background: "#000", cursor: "pointer" }}
-                      />
-                      <div style={{ ...mono, fontSize: 10, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)", marginBottom: 8 }}>
-                        {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando o outro dispositivo…" : vigiaWatchStatus || "conectando…"}
-                      </div>
-                    </>
+                    <div style={{ ...mono, fontSize: 10, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)", marginBottom: 8 }}>
+                      {vigiaWatchStatus === "connected" ? "● ao vivo — veja o preview no canto da tela" : vigiaWatchStatus === "procurando" ? "procurando o outro dispositivo…" : vigiaWatchStatus || "conectando…"}
+                    </div>
                   )}
                   <button
                     onClick={() => setCameraWatching((v) => !v)}
@@ -2793,14 +2827,8 @@ export default function AssistantPage() {
                   </button>
                   {cameraWatching && (
                     <>
-                      <video
-                        ref={cameraWatchVideoRef} autoPlay playsInline muted
-                        onClick={(e) => openFullscreen(e.currentTarget, "câmera ao vivo")}
-                        title="Toque pra ver em tela cheia"
-                        style={{ width: "100%", aspectRatio: "16/9", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, background: "#000", cursor: "pointer" }}
-                      />
                       <div style={{ ...mono, fontSize: 10, color: cameraWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)", marginBottom: 8 }}>
-                        {cameraWatchStatus === "connected" ? "● ao vivo" : cameraWatchStatus === "procurando" ? "procurando o outro dispositivo…" : cameraWatchStatus || "conectando…"}
+                        {cameraWatchStatus === "connected" ? "● ao vivo — veja o preview no canto da tela" : cameraWatchStatus === "procurando" ? "procurando o outro dispositivo…" : cameraWatchStatus || "conectando…"}
                       </div>
                       <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
                         <input
@@ -2925,6 +2953,7 @@ export default function AssistantPage() {
       {codeTaskModal}
       {fullscreenOverlay}
       {cameraVigiaMessageToast}
+      {watchPreviews}
       {/* ESCOPO DO ASSISTENTE */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flexWrap: "wrap" }}>
         <span style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)" }}>ESCOPO</span>
@@ -3348,18 +3377,9 @@ export default function AssistantPage() {
                   📺 ASSISTIR {vigiaWatching ? "ON" : "OFF"}
                 </button>
                 {vigiaWatching && (
-                  <>
-                    <video
-                      ref={vigiaWatchVideoRef} autoPlay playsInline muted
-                      onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
-                      onClick={(e) => openFullscreen(e.currentTarget, "tela ao vivo")}
-                      title="Clique pra ver em tela cheia"
-                      style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000", cursor: "pointer" }}
-                    />
-                    <span style={{ ...mono, fontSize: 8.5, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
-                      {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando…" : vigiaWatchStatus || "conectando…"}
-                    </span>
-                  </>
+                  <span style={{ ...mono, fontSize: 8.5, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
+                    {vigiaWatchStatus === "connected" ? "● ao vivo — veja o canto da tela" : vigiaWatchStatus === "procurando" ? "procurando…" : vigiaWatchStatus || "conectando…"}
+                  </span>
                 )}
                 <button
                   onClick={() => setCameraWatching((v) => !v)}
@@ -3376,14 +3396,8 @@ export default function AssistantPage() {
                 </button>
                 {cameraWatching && (
                   <>
-                    <video
-                      ref={cameraWatchVideoRef} autoPlay playsInline muted
-                      onClick={(e) => openFullscreen(e.currentTarget, "câmera ao vivo")}
-                      title="Clique pra ver em tela cheia"
-                      style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000", cursor: "pointer" }}
-                    />
                     <span style={{ ...mono, fontSize: 8.5, color: cameraWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
-                      {cameraWatchStatus === "connected" ? "● ao vivo" : cameraWatchStatus === "procurando" ? "procurando…" : cameraWatchStatus || "conectando…"}
+                      {cameraWatchStatus === "connected" ? "● ao vivo — veja o canto da tela" : cameraWatchStatus === "procurando" ? "procurando…" : cameraWatchStatus || "conectando…"}
                     </span>
                     <input
                       value={cameraChatText}

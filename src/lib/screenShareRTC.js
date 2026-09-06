@@ -113,6 +113,17 @@ export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog, channel 
   let hostId = null;
   const pendingCandidates = []; // podem chegar antes do setRemoteDescription (corrida do polling)
 
+  const dropConnection = () => {
+    // conexão caiu (rede instável, ou o host trocou de câmera/tela e reiniciou a
+    // transmissão) — solta tudo e volta a mandar watch-request sozinho, sem precisar
+    // desligar/ligar manualmente pra reconectar.
+    hostId = null;
+    pc?.close();
+    pc = null;
+    pendingCandidates.length = 0;
+    onStatus?.("procurando");
+  };
+
   const ensurePc = () => {
     if (pc) return pc;
     pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
@@ -121,15 +132,18 @@ export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog, channel 
       onLog?.(`faixa recebida: ${e.track.kind}, estado=${e.track.readyState}, mudo=${e.track.muted}, streams=${e.streams.length}`);
       onTrack?.(e.streams[0]);
     };
-    pc.onconnectionstatechange = () => onStatus?.(pc.connectionState);
+    pc.onconnectionstatechange = () => {
+      onStatus?.(pc.connectionState);
+      if (["disconnected", "failed", "closed"].includes(pc.connectionState)) dropConnection();
+    };
     pc.oniceconnectionstatechange = () => onLog?.(`ICE: ${pc.iceConnectionState}`);
     return pc;
   };
 
   // insiste (não manda só uma vez): se o espectador ligar ANTES do outro lado começar a
-  // escutar de verdade (corrida de poucos segundos entre os dois toggles), um pedido único se
-  // perderia pra sempre — reenviando a cada poucos segundos até um host responder com um
-  // offer, a conexão acaba se formando mesmo que a ordem de ligar os dois não seja perfeita.
+  // escutar de verdade (corrida de poucos segundos entre os dois toggles), OU se a conexão
+  // cair depois (dropConnection acima zera hostId), reenviando sozinho a cada poucos segundos
+  // a conexão se forma/refaz sem precisar desligar/ligar manualmente.
   const hostAddress = `HOST:${channel}`;
   sendSignal(deviceId, hostAddress, "watch-request", {});
   onStatus?.("procurando");
@@ -140,7 +154,6 @@ export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog, channel 
     onSignal: async (s) => {
       if (s.kind === "offer") {
         hostId = s.from_device;
-        clearInterval(retryId);
         const conn = ensurePc();
         await conn.setRemoteDescription(s.payload.sdp);
         for (const c of pendingCandidates.splice(0)) await conn.addIceCandidate(c).catch(() => {});
