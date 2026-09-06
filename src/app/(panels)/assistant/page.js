@@ -551,9 +551,12 @@ export default function AssistantPage() {
       .then((stream) => {
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
         cameraVigiaStreamRef.current = stream;
+        addLog("[CÂMERA]", GR, `stream obtida: ${stream.getVideoTracks().length} vídeo, ${stream.getAudioTracks().length} áudio`);
         if (cameraVigiaVideoRef.current) {
           cameraVigiaVideoRef.current.srcObject = stream;
-          cameraVigiaVideoRef.current.play().catch(() => {});
+          cameraVigiaVideoRef.current.play().catch((err) => addLog("[CÂMERA]", OR, `preview: play() falhou: ${err.message}`));
+        } else {
+          addLog("[CÂMERA]", OR, "preview: elemento de vídeo ainda não estava pronto");
         }
       })
       .catch((err) => {
@@ -2765,7 +2768,13 @@ export default function AssistantPage() {
               </button>
               {cameraVigiaMode && (
                 <>
-                  <video ref={cameraVigiaVideoRef} autoPlay playsInline muted title="o que a câmera de vigia está vendo" style={{ width: "100%", maxWidth: 160, aspectRatio: "4/3", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, display: "block" }} />
+                  <video
+                    ref={cameraVigiaVideoRef} autoPlay playsInline muted
+                    onLoadedMetadata={(e) => addLog("[CÂMERA]", GR, `preview carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
+                    onError={() => addLog("[CÂMERA]", OR, "preview: erro ao decodificar o vídeo")}
+                    title="o que a câmera de vigia está vendo"
+                    style={{ width: "100%", maxWidth: 160, aspectRatio: "4/3", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, display: "block" }}
+                  />
                   <button
                     onClick={() => setCameraFacing((f) => (f === "user" ? "environment" : "user"))}
                     style={{ ...mono, fontSize: 10, padding: "8px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "transparent", color: "rgba(207,239,251,0.7)", cursor: "pointer", width: "100%", marginBottom: 8 }}
@@ -3305,7 +3314,13 @@ export default function AssistantPage() {
             </button>
             {cameraVigiaMode && (
               <>
-                <video ref={cameraVigiaVideoRef} autoPlay playsInline muted title="o que a câmera de vigia está vendo" style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
+                <video
+                  ref={cameraVigiaVideoRef} autoPlay playsInline muted
+                  onLoadedMetadata={(e) => addLog("[CÂMERA]", GR, `preview carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
+                  onError={() => addLog("[CÂMERA]", OR, "preview: erro ao decodificar o vídeo")}
+                  title="o que a câmera de vigia está vendo"
+                  style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }}
+                />
                 <button
                   onClick={() => setCameraFacing((f) => (f === "user" ? "environment" : "user"))}
                   title="Trocar entre câmera frontal e traseira (celular)"
