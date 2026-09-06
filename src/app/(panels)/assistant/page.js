@@ -576,7 +576,9 @@ export default function AssistantPage() {
         onChatMessage: (text) => {
           addLog("[CÂMERA]", GR, `mensagem recebida: ${text}`);
           setCameraVigiaIncomingMsg(text);
-          speakText(text).catch(() => {});
+          // mesma voz escolhida nas configurações (voz do Gemini, não a de reserva do
+          // navegador) — sem isso caía na voz padrão/genérica em vez da voz da Lisa de verdade.
+          speakText(text, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
           setTimeout(() => setCameraVigiaIncomingMsg((cur) => (cur === text ? null : cur)), 12000);
         },
       });
