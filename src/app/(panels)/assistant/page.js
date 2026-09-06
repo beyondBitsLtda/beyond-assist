@@ -536,13 +536,22 @@ export default function AssistantPage() {
 
     const speakRadio = async (text) => {
       if (!text || stopped) return;
-      // timeout de segurança: se algo cortar o áudio por fora (ex.: uma pergunta direta
-      // enquanto o rádio fala) sem disparar onended/onerror, o loop não pode ficar preso pra
-      // sempre esperando uma promise que nunca resolve.
-      await Promise.race([
-        speakText(text, { voiceName: voiceNameForScreenRef.current }).catch(() => {}),
-        new Promise((r) => setTimeout(r, 30000)),
-      ]);
+      // trava a vez (mesmo mecanismo que a vigília do Modo Tela/Observância já usa entre si) —
+      // sem isso, a vigília delas podia disparar NO MEIO da fala do rádio e cortar o áudio dela
+      // (speakText cancela qualquer fala anterior antes de começar uma nova, ver browserVoice.js)
+      // — bug real visto: rádio "pulava" ou parava no meio do comentário sem motivo aparente.
+      proactiveTurnRef.current = true;
+      try {
+        // timeout de segurança: se algo cortar o áudio por fora mesmo assim sem disparar
+        // onended/onerror, o loop não pode ficar preso pra sempre esperando uma promise que
+        // nunca resolve.
+        await Promise.race([
+          speakText(text, { voiceName: voiceNameForScreenRef.current }).catch(() => {}),
+          new Promise((r) => setTimeout(r, 30000)),
+        ]);
+      } finally {
+        proactiveTurnRef.current = false;
+      }
     };
 
     const fetchSegment = async (body) => {
