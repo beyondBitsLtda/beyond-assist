@@ -542,12 +542,14 @@ export default function AssistantPage() {
       // — bug real visto: rádio "pulava" ou parava no meio do comentário sem motivo aparente.
       proactiveTurnRef.current = true;
       try {
-        // timeout de segurança: se algo cortar o áudio por fora mesmo assim sem disparar
-        // onended/onerror, o loop não pode ficar preso pra sempre esperando uma promise que
-        // nunca resolve.
+        // timeout de segurança bem folgado (120s, não 30s) — um bloco mais falado (várias
+        // tarefas com data) pode legitimamente passar de 30-40s pra ler inteiro; um prazo curto
+        // demais disparava ENQUANTO ela ainda falava, e o bloco seguinte cortava o áudio no meio
+        // (bug real visto: "corta e já pula pro próximo" — não era outra vigília, era esse
+        // prazo). Isso aqui só existe pra não travar pra sempre se algo really der errado.
         await Promise.race([
           speakText(text, { voiceName: voiceNameForScreenRef.current }).catch(() => {}),
-          new Promise((r) => setTimeout(r, 30000)),
+          new Promise((r) => setTimeout(r, 120000)),
         ]);
       } finally {
         proactiveTurnRef.current = false;
