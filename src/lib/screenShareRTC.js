@@ -3,6 +3,10 @@
 // src/lib/screenShareSignals.js (polling, mesmo padrão dos comandos remotos). Só STUN público
 // (sem TURN) — funciona bem na mesma rede/Wi-Fi ou na maioria das redes domésticas; redes bem
 // restritivas (algumas corporativas/operadoras) podem não conseguir conectar direto.
+//
+// `channel` distingue qual "transmissão" é essa (hoje: "screen" ou "camera") — cada uma usa seu
+// próprio pseudo-endereço de broadcast ('HOST:screen'/'HOST:camera'), pra dar pra ligar as duas
+// ao mesmo tempo no mesmo dispositivo sem uma interferir na outra.
 
 const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 const POLL_MS = 1500;
@@ -15,12 +19,12 @@ async function sendSignal(fromDevice, toDevice, kind, payload) {
   }).catch(() => {}); // sinal perdido tenta nada — próximo ciclo de qualquer lado ainda pode salvar a conexão
 }
 
-function pollSignals({ myDevice, alsoHost, onSignal, onError }) {
+function pollSignals({ myDevice, alsoAddress, onSignal, onError }) {
   let sinceRef = null;
   let cancelled = false;
   const tick = async () => {
     try {
-      const qs = new URLSearchParams({ deviceId: myDevice, ...(alsoHost ? { alsoHost: "1" } : {}), ...(sinceRef ? { since: sinceRef } : {}) });
+      const qs = new URLSearchParams({ deviceId: myDevice, ...(alsoAddress ? { alsoAddress } : {}), ...(sinceRef ? { since: sinceRef } : {}) });
       const res = await fetch(`/api/screen-share/signal/recent?${qs}`);
       const data = await res.json();
       if (cancelled || !data?.ok) return;
@@ -35,9 +39,12 @@ function pollSignals({ myDevice, alsoHost, onSignal, onError }) {
   return () => { cancelled = true; clearInterval(id); };
 }
 
-/** Lado de quem está COMPARTILHANDO a tela (Modo Tela + Transmissão ligados). Escuta pedidos
- * de outros dispositivos querendo assistir e abre uma conexão (uma por espectador). */
-export function hostScreenShare({ deviceId, stream, onLog }) {
+/** Lado de quem está TRANSMITINDO (Modo Tela + Transmissão, ou a Câmera de Vigia). Escuta
+ * pedidos de outros dispositivos querendo assistir e abre uma conexão (uma por espectador).
+ * `onChatMessage(text, fromViewerId)` — mensagens de texto mandadas por um espectador (ver
+ * viewerWatchScreen abaixo), pra Lisa ler em voz alta e/ou exibir na tela de quem transmite. */
+export function hostScreenShare({ deviceId, stream, channel = "screen", onLog, onChatMessage }) {
+  const hostAddress = `HOST:${channel}`;
   const peers = new Map(); // viewerId → RTCPeerConnection
 
   const closePeer = (viewerId) => { peers.get(viewerId)?.close(); peers.delete(viewerId); };
@@ -59,12 +66,13 @@ export function hostScreenShare({ deviceId, stream, onLog }) {
 
   const stopPoll = pollSignals({
     myDevice: deviceId,
-    alsoHost: true,
+    alsoAddress: hostAddress,
     onSignal: async (s) => {
       const pc = peers.get(s.from_device);
       if (s.kind === "watch-request") await handleWatchRequest(s.from_device).catch((err) => onLog?.(`falha ao atender espectador: ${err.message}`));
       else if (s.kind === "answer" && pc) await pc.setRemoteDescription(s.payload.sdp).catch(() => {});
       else if (s.kind === "ice" && pc) await pc.addIceCandidate(s.payload.candidate).catch(() => {});
+      else if (s.kind === "chat") onChatMessage?.(s.payload.text, s.from_device);
       else if (s.kind === "stop") closePeer(s.from_device);
     },
     onError: (err) => onLog?.(`sinalização falhou: ${err.message}`),
@@ -78,8 +86,10 @@ export function hostScreenShare({ deviceId, stream, onLog }) {
   };
 }
 
-/** Lado de quem quer ASSISTIR a tela de outro dispositivo — Modo Vigia, "assistir ao vivo". */
-export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog }) {
+/** Lado de quem quer ASSISTIR a transmissão de outro dispositivo — Modo Vigia, "assistir ao
+ * vivo". Devolve `sendChat(text)` pra mandar uma mensagem de volta pro dispositivo que
+ * transmite (só funciona depois de parear com um host — ver onTrack/onStatus). */
+export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog, channel = "screen" }) {
   let pc = null;
   let hostId = null;
   const pendingCandidates = []; // podem chegar antes do setRemoteDescription (corrida do polling)
@@ -97,12 +107,11 @@ export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog }) {
     return pc;
   };
 
-  sendSignal(deviceId, "HOST", "watch-request", {});
+  sendSignal(deviceId, `HOST:${channel}`, "watch-request", {});
   onStatus?.("procurando");
 
   const stopPoll = pollSignals({
     myDevice: deviceId,
-    alsoHost: false,
     onSignal: async (s) => {
       if (s.kind === "offer") {
         hostId = s.from_device;
@@ -121,6 +130,11 @@ export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog }) {
   });
 
   return {
+    sendChat(text) {
+      if (!hostId || !text?.trim()) return false;
+      sendSignal(deviceId, hostId, "chat", { text: text.trim() });
+      return true;
+    },
     stop() {
       stopPoll();
       if (hostId) sendSignal(deviceId, hostId, "stop", {});

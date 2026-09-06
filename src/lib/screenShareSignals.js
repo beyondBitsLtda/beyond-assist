@@ -16,10 +16,11 @@ export async function sendScreenShareSignal({ fromDevice, toDevice, kind, payloa
   if (error) throw new Error(`sendScreenShareSignal: ${error.message}`);
 }
 
-/** Sinais endereçados a mim (meu deviceId real, e opcionalmente também 'HOST') mais novos que
- * `since`. Nunca devolve sinais que EU MESMO mandei (evita eco). */
-export async function listScreenShareSignals({ myDevice, alsoHost = false, since }) {
-  const addresses = alsoHost ? [myDevice, "HOST"] : [myDevice];
+/** Sinais endereçados a mim (meu deviceId real, e opcionalmente também um pseudo-endereço tipo
+ * 'HOST:screen'/'HOST:camera' — um por "canal" de transmissão) mais novos que `since`. Nunca
+ * devolve sinais que EU MESMO mandei (evita eco). */
+export async function listScreenShareSignals({ myDevice, alsoAddress = null, since }) {
+  const addresses = alsoAddress ? [myDevice, alsoAddress] : [myDevice];
   let q = supabase
     .from("screen_share_signals")
     .select("id, from_device, to_device, kind, payload, created_at")

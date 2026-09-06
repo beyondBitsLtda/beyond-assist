@@ -29,17 +29,6 @@ const LisaAvatarIronMan = dynamic(() => import("@/components/panels/LisaAvatarIr
   loading: () => null,
 });
 
-/** Tela cheia de verdade (Fullscreen API do navegador, não um modal nosso) pro vídeo do
- * "Assistir ao vivo" — clique/toque no preview pequeno abre isso. Cobre os 3 jeitos possíveis
- * de pedir (padrão, Safari/Chrome antigos com prefixo, e o modo nativo do <video> do iOS
- * Safari, que não implementa a Fullscreen API genérica pra elementos). */
-function enterVideoFullscreen(el) {
-  if (!el) return;
-  if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-  else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-  else if (el.webkitEnterFullscreen) el.webkitEnterFullscreen();
-}
-
 const MODE_META = {
   idle: { label: "IDLE", sub: "awaiting command", color: CY },
   listening: { label: "LISTENING", sub: "retrieving context", color: GR },
@@ -223,6 +212,51 @@ export default function AssistantPage() {
     });
     return () => { screenShareViewerRef.current?.stop(); screenShareViewerRef.current = null; };
   }, [vigiaWatching, addLog]);
+
+  // Assistir a Câmera de Vigia de outro dispositivo (canal "camera") — mesma mecânica de
+  // "Assistir ao vivo" acima, só que aponta pro canal da câmera em vez do da tela. `sendChat`
+  // manda uma mensagem de texto pro dispositivo que está com a câmera ligada — a Lisa lá lê em
+  // voz alta e mostra na tela dele, tipo um interfone.
+  const [cameraWatching, setCameraWatching] = useState(false);
+  const [cameraWatchStatus, setCameraWatchStatus] = useState(null);
+  const cameraWatchVideoRef = useRef(null);
+  const screenShareCameraViewerRef = useRef(null);
+  const [cameraChatText, setCameraChatText] = useState("");
+  useEffect(() => { if (!vigiaMode) setCameraWatching(false); }, [vigiaMode]);
+  useEffect(() => {
+    if (!cameraWatching) { setCameraWatchStatus(null); return; }
+    screenShareCameraViewerRef.current = viewerWatchScreen({
+      deviceId: getDeviceId(),
+      channel: "camera",
+      onTrack: (mediaStream) => {
+        addLog("[VIGIA]", GR, `câmera recebida: ${mediaStream?.getVideoTracks().length ?? 0} faixa(s) de vídeo`);
+        if (cameraWatchVideoRef.current) {
+          cameraWatchVideoRef.current.srcObject = mediaStream;
+          cameraWatchVideoRef.current.play().catch((err) => addLog("[VIGIA]", OR, `play() falhou: ${err.message}`));
+        }
+      },
+      onStatus: setCameraWatchStatus,
+      onLog: (msg) => addLog("[VIGIA]", OR, msg),
+    });
+    return () => { screenShareCameraViewerRef.current?.stop(); screenShareCameraViewerRef.current = null; };
+  }, [cameraWatching, addLog]);
+
+  const sendCameraChat = useCallback(() => {
+    const text = cameraChatText.trim();
+    if (!text) return;
+    const ok = screenShareCameraViewerRef.current?.sendChat(text);
+    if (ok) { addLog("[VIGIA]", GR, `mensagem enviada: ${text}`); setCameraChatText(""); }
+    else addLog("[VIGIA]", OR, "ainda não conectado a nenhum dispositivo com a Câmera de Vigia ligada");
+  }, [cameraChatText, addLog]);
+
+  // Tela cheia (custom, não a Fullscreen API nativa) pros vídeos ao vivo — a API nativa
+  // (video.requestFullscreen/webkitEnterFullscreen) se mostrou instável no navegador do
+  // celular do usuário (não abria e ainda recarregava a página). Isso aqui é só um overlay
+  // nosso reaproveitando o MESMO stream que já está tocando no preview pequeno.
+  const [fullscreenSource, setFullscreenSource] = useState(null); // {stream, label} | null
+  const openFullscreen = useCallback((videoEl, label) => {
+    if (videoEl?.srcObject) setFullscreenSource({ stream: videoEl.srcObject, label });
+  }, []);
 
   const [codeModeRepo, setCodeModeRepo] = useState("");
   const [codeModeBranch, setCodeModeBranch] = useState("");
@@ -439,6 +473,19 @@ export default function AssistantPage() {
   const [micWatchError, setMicWatchError] = useState(null);
   const micWatchStreamRef = useRef(null);
 
+  // Câmera de Vigia: como o Modo Tela + Transmissão, só que com a câmera do dispositivo no
+  // lugar da tela — grava com ÁUDIO junto (pra servir de monitor de ambiente, tipo babá
+  // eletrônica) e transmite ao vivo pra quem estiver assistindo no Modo Vigia de outro
+  // dispositivo (canal "camera", ver src/lib/screenShareRTC.js — mesma infra da Transmissão de
+  // tela, só um canal diferente). Quem assiste pode mandar mensagens de texto que a Lisa lê em
+  // voz alta e mostra na tela de quem está com a câmera ligada — tipo um interfone.
+  const [cameraVigiaMode, setCameraVigiaMode] = useState(false);
+  const [cameraVigiaError, setCameraVigiaError] = useState(null);
+  const cameraVigiaVideoRef = useRef(null);
+  const cameraVigiaStreamRef = useRef(null);
+  const screenShareCameraHostRef = useRef(null);
+  const [cameraVigiaIncomingMsg, setCameraVigiaIncomingMsg] = useState(null);
+
   useEffect(() => {
     if (!observanceMode) {
       observanceStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -474,6 +521,69 @@ export default function AssistantPage() {
       observanceStreamRef.current = null;
     };
   }, [observanceMode, cameraFacing]);
+
+  // Câmera de Vigia — câmera+microfone contínuos (ao contrário da Observância, que só tira UMA
+  // foto por pergunta). Independente da Observância: cada uma pode estar ligada sem a outra.
+  useEffect(() => {
+    if (!cameraVigiaMode) {
+      cameraVigiaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      cameraVigiaStreamRef.current = null;
+      return;
+    }
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setCameraVigiaError("este navegador não dá acesso à câmera");
+      setCameraVigiaMode(false);
+      return;
+    }
+    let cancelled = false;
+    setCameraVigiaError(null);
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: cameraFacing } }, audio: true })
+      .then((stream) => {
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        cameraVigiaStreamRef.current = stream;
+        if (cameraVigiaVideoRef.current) {
+          cameraVigiaVideoRef.current.srcObject = stream;
+          cameraVigiaVideoRef.current.play().catch(() => {});
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setCameraVigiaError(err?.name === "NotAllowedError" ? "permissão de câmera/microfone negada" : (err?.message || "não consegui acessar a câmera"));
+        setCameraVigiaMode(false);
+      });
+    return () => {
+      cancelled = true;
+      cameraVigiaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      cameraVigiaStreamRef.current = null;
+    };
+  }, [cameraVigiaMode, cameraFacing]);
+
+  // Câmera de Vigia: escuta pedidos de outros dispositivos querendo assistir (canal "camera")
+  // e mensagens de texto deles, que a Lisa lê em voz alta e mostra na tela por uns segundos.
+  useEffect(() => {
+    if (!cameraVigiaMode) return;
+    const kickoff = setTimeout(() => {
+      const stream = cameraVigiaStreamRef.current;
+      if (!stream) { addLog("[CÂMERA]", OR, "sem stream da câmera ainda — tente desligar e ligar de novo"); return; }
+      screenShareCameraHostRef.current = hostScreenShare({
+        deviceId: getDeviceId(),
+        stream,
+        channel: "camera",
+        onLog: (msg) => addLog("[CÂMERA]", PU, msg),
+        onChatMessage: (text) => {
+          addLog("[CÂMERA]", GR, `mensagem recebida: ${text}`);
+          setCameraVigiaIncomingMsg(text);
+          speakText(text).catch(() => {});
+          setTimeout(() => setCameraVigiaIncomingMsg((cur) => (cur === text ? null : cur)), 12000);
+        },
+      });
+    }, 1000);
+    return () => {
+      clearTimeout(kickoff);
+      screenShareCameraHostRef.current?.stop();
+      screenShareCameraHostRef.current = null;
+    };
+  }, [cameraVigiaMode, addLog]);
 
   // tira a foto ATUAL da câmera (só no instante da pergunta, nunca antes) — reduzida pra no
   // máx. 640px no lado maior, o bastante pra contar dedos/ver cor de roupa sem gastar token
@@ -2129,6 +2239,36 @@ export default function AssistantPage() {
     </div>
   );
 
+  // tela cheia customizada (ver openFullscreen acima) + aviso de mensagem recebida na Câmera de
+  // Vigia — compartilhados entre o branch mobile e o desktop abaixo, computados uma vez só.
+  const fullscreenOverlay = fullscreenSource && (
+    <div
+      onClick={() => setFullscreenSource(null)}
+      style={{ position: "fixed", inset: 0, zIndex: 300, background: "#000", display: "flex", alignItems: "center", justifyContent: "center" }}
+    >
+      <video
+        autoPlay playsInline muted
+        ref={(el) => { if (el && el.srcObject !== fullscreenSource.stream) el.srcObject = fullscreenSource.stream; }}
+        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+      />
+      <div style={{ position: "absolute", top: 16, left: 16, ...mono, fontSize: 10, letterSpacing: 2, color: "#fff", background: "rgba(0,0,0,0.6)", padding: "6px 10px", borderRadius: 4 }}>
+        {fullscreenSource.label}
+      </div>
+      <button
+        onClick={(e) => { e.stopPropagation(); setFullscreenSource(null); }}
+        style={{ position: "absolute", top: 16, right: 16, ...mono, fontSize: 11, letterSpacing: 1.5, padding: "8px 14px", border: "1px solid #fff", borderRadius: 6, background: "rgba(0,0,0,0.6)", color: "#fff", cursor: "pointer" }}
+      >
+        ✕ FECHAR
+      </button>
+    </div>
+  );
+
+  const cameraVigiaMessageToast = cameraVigiaIncomingMsg && (
+    <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 250, ...mono, fontSize: 12, padding: "10px 18px", borderRadius: 8, background: "rgba(123,216,143,0.95)", color: "#04150a", maxWidth: "80vw", textAlign: "center", boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }}>
+      💬 {cameraVigiaIncomingMsg}
+    </div>
+  );
+
   // ==========================================================================================
   // MOBILE — tela própria, só o Assistente (sem Topbar/Sidebar, ver Shell.js): escolhe entre
   // conversa por CHAT (bolhas, como um app de chat de IA) ou por VOZ (tela escura, só a onda
@@ -2151,6 +2291,8 @@ export default function AssistantPage() {
 
     return (
       <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "#000" }}>
+        {fullscreenOverlay}
+        {cameraVigiaMessageToast}
         {/* barra superior mínima */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(var(--accent-rgb),0.12)", flex: "none" }}>
           <button
@@ -2518,6 +2660,26 @@ export default function AssistantPage() {
                 for o seu caso, o aviso acima vai dizer isso claramente.
               </div>
 
+              {/* Câmera de Vigia — como o Modo Tela, só que filma com a câmera do dispositivo
+                  (áudio junto) em vez da tela. Funciona em celular também (ao contrário do Modo
+                  Tela). Quem assiste (Modo Vigia, "Assistir Câmera de Vigia") pode mandar
+                  mensagens que a Lisa lê em voz alta e mostra aqui — tipo um interfone. */}
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>CÂMERA DE VIGIA</div>
+              <button
+                onClick={() => setCameraVigiaMode((v) => !v)}
+                style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${cameraVigiaMode ? GR : "rgba(var(--accent-rgb),0.18)"}`, background: cameraVigiaMode ? "rgba(123,216,143,0.12)" : "transparent", color: cameraVigiaMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+              >
+                📷 Câmera de Vigia: {cameraVigiaMode ? "ON" : "OFF"}
+              </button>
+              {cameraVigiaMode && (
+                <video ref={cameraVigiaVideoRef} autoPlay playsInline muted title="o que a câmera de vigia está vendo" style={{ width: "100%", maxWidth: 160, aspectRatio: "4/3", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 8, display: "block" }} />
+              )}
+              {cameraVigiaError && <div style={{ ...mono, fontSize: 9.5, color: OR, marginBottom: 8 }}>⚠ {cameraVigiaError}</div>}
+              <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
+                Grava com áudio (pra servir de monitor de ambiente) e fica assistível ao vivo por
+                outro dispositivo, no Modo Vigia.
+              </div>
+
               {/* modo vigia — NÃO depende de screenMode neste aparelho: lê a memória salva pela
                   vigília, e assiste ao vivo via Transmissão (que pode estar rodando em OUTRO
                   dispositivo) — então funciona até no celular enquanto o Modo Tela roda só no
@@ -2557,12 +2719,46 @@ export default function AssistantPage() {
                       <video
                         ref={vigiaWatchVideoRef} autoPlay playsInline muted
                         onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
-                        onClick={(e) => enterVideoFullscreen(e.currentTarget)}
+                        onClick={(e) => openFullscreen(e.currentTarget, "tela ao vivo")}
                         title="Toque pra ver em tela cheia"
                         style={{ width: "100%", aspectRatio: "16/9", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, background: "#000", cursor: "pointer" }}
                       />
                       <div style={{ ...mono, fontSize: 10, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)", marginBottom: 8 }}>
                         {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando o outro dispositivo…" : vigiaWatchStatus || "conectando…"}
+                      </div>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setCameraWatching((v) => !v)}
+                    style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${cameraWatching ? GR : "rgba(var(--accent-rgb),0.18)"}`, background: cameraWatching ? "rgba(123,216,143,0.12)" : "transparent", color: cameraWatching ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+                  >
+                    📷 Assistir Câmera de Vigia: {cameraWatching ? "ON" : "OFF"}
+                  </button>
+                  {cameraWatching && (
+                    <>
+                      <video
+                        ref={cameraWatchVideoRef} autoPlay playsInline muted
+                        onClick={(e) => openFullscreen(e.currentTarget, "câmera ao vivo")}
+                        title="Toque pra ver em tela cheia"
+                        style={{ width: "100%", aspectRatio: "16/9", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, background: "#000", cursor: "pointer" }}
+                      />
+                      <div style={{ ...mono, fontSize: 10, color: cameraWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)", marginBottom: 8 }}>
+                        {cameraWatchStatus === "connected" ? "● ao vivo" : cameraWatchStatus === "procurando" ? "procurando o outro dispositivo…" : cameraWatchStatus || "conectando…"}
+                      </div>
+                      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                        <input
+                          value={cameraChatText}
+                          onChange={(e) => setCameraChatText(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") sendCameraChat(); }}
+                          placeholder="mensagem pra Lisa ler lá (ex.: hora de dormir)"
+                          style={{ ...mono, fontSize: 12, padding: "10px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#000", color: "#eafcff", flex: 1 }}
+                        />
+                        <button
+                          onClick={sendCameraChat}
+                          style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${GR}`, background: "rgba(123,216,143,0.12)", color: "#eafcff", cursor: "pointer" }}
+                        >
+                          ENVIAR
+                        </button>
                       </div>
                     </>
                   )}
@@ -2670,6 +2866,8 @@ export default function AssistantPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {codeTaskModal}
+      {fullscreenOverlay}
+      {cameraVigiaMessageToast}
       {/* ESCOPO DO ASSISTENTE */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flexWrap: "wrap" }}>
         <span style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)" }}>ESCOPO</span>
@@ -3002,6 +3200,27 @@ export default function AssistantPage() {
               🎙️ ESCUTA {micWatchMode && (screenMode || observanceMode) ? "ON" : "OFF"}
             </button>
             {micWatchError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {micWatchError}</span>}
+
+            {/* Câmera de Vigia — como o Modo Tela, só que filma com a câmera (áudio junto) em
+                vez da tela. Funciona em celular também. Quem assiste no Modo Vigia pode mandar
+                mensagens que a Lisa lê em voz alta e mostra aqui — tipo um interfone. */}
+            <button
+              onClick={() => setCameraVigiaMode((v) => !v)}
+              title={cameraVigiaMode ? "Câmera de Vigia ligada (com áudio) — outro dispositivo com o Modo Vigia pode assistir. Clique pra desligar" : "Filmar com a câmera (e microfone) pra outro dispositivo assistir ao vivo, tipo uma babá eletrônica"}
+              style={{
+                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                border: `1px solid ${cameraVigiaMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+                background: cameraVigiaMode ? "rgba(123,216,143,0.12)" : "transparent",
+                color: cameraVigiaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              📷 CÂMERA {cameraVigiaMode ? "ON" : "OFF"}
+            </button>
+            {cameraVigiaMode && (
+              <video ref={cameraVigiaVideoRef} autoPlay playsInline muted title="o que a câmera de vigia está vendo" style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
+            )}
+            {cameraVigiaError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {cameraVigiaError}</span>}
           </div>
         )}
 
@@ -3067,13 +3286,53 @@ export default function AssistantPage() {
                     <video
                       ref={vigiaWatchVideoRef} autoPlay playsInline muted
                       onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
-                      onClick={(e) => enterVideoFullscreen(e.currentTarget)}
+                      onClick={(e) => openFullscreen(e.currentTarget, "tela ao vivo")}
                       title="Clique pra ver em tela cheia"
                       style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000", cursor: "pointer" }}
                     />
                     <span style={{ ...mono, fontSize: 8.5, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
                       {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando…" : vigiaWatchStatus || "conectando…"}
                     </span>
+                  </>
+                )}
+                <button
+                  onClick={() => setCameraWatching((v) => !v)}
+                  title={cameraWatching ? "Assistindo a câmera ao vivo — clique pra parar" : "Ver AO VIVO a câmera de outro dispositivo com Câmera de Vigia ligada"}
+                  style={{
+                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                    border: `1px solid ${cameraWatching ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+                    background: cameraWatching ? "rgba(123,216,143,0.12)" : "transparent",
+                    color: cameraWatching ? "#eafcff" : "rgba(207,239,251,0.55)",
+                    cursor: "pointer",
+                  }}
+                >
+                  📷 ASSISTIR CÂMERA {cameraWatching ? "ON" : "OFF"}
+                </button>
+                {cameraWatching && (
+                  <>
+                    <video
+                      ref={cameraWatchVideoRef} autoPlay playsInline muted
+                      onClick={(e) => openFullscreen(e.currentTarget, "câmera ao vivo")}
+                      title="Clique pra ver em tela cheia"
+                      style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000", cursor: "pointer" }}
+                    />
+                    <span style={{ ...mono, fontSize: 8.5, color: cameraWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
+                      {cameraWatchStatus === "connected" ? "● ao vivo" : cameraWatchStatus === "procurando" ? "procurando…" : cameraWatchStatus || "conectando…"}
+                    </span>
+                    <input
+                      value={cameraChatText}
+                      onChange={(e) => setCameraChatText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") sendCameraChat(); }}
+                      placeholder="mensagem pra Lisa ler lá"
+                      title="A Lisa lê essa mensagem em voz alta e mostra na tela de quem está com a Câmera de Vigia ligada"
+                      style={{ ...mono, fontSize: 9, padding: "5px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff", width: 180 }}
+                    />
+                    <button
+                      onClick={sendCameraChat}
+                      style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3, border: `1px solid ${GR}`, background: "rgba(123,216,143,0.12)", color: "#eafcff", cursor: "pointer" }}
+                    >
+                      ENVIAR
+                    </button>
                   </>
                 )}
               </>
