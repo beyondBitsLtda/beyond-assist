@@ -21,6 +21,7 @@ async function sendSignal(fromDevice, toDevice, kind, payload) {
 
 function pollSignals({ myDevice, alsoAddress, onSignal, onError }) {
   let sinceRef = null;
+  let bootstrapped = false; // 1ª checagem só marca o ponto de partida, não processa nada
   let cancelled = false;
   const tick = async () => {
     try {
@@ -28,6 +29,12 @@ function pollSignals({ myDevice, alsoAddress, onSignal, onError }) {
       const res = await fetch(`/api/screen-share/signal/recent?${qs}`);
       const data = await res.json();
       if (cancelled || !data?.ok) return;
+      // sinalização é efêmera — um pedido de minutos atrás (de um teste anterior, por
+      // exemplo) nunca deve importar agora. Sem isso, a consulta pega sempre os sinais MAIS
+      // ANTIGOS primeiro (até um limite de linhas) e, depois de vários testes acumulando
+      // sinais velhos endereçados ao mesmo pseudo-endereço de broadcast, uma conexão nova
+      // nunca aparecia — ficava presa atrás da fila de lixo histórico.
+      if (!bootstrapped) { bootstrapped = true; sinceRef = data.now; return; }
       sinceRef = data.now;
       for (const s of data.signals || []) onSignal(s);
     } catch (err) {
@@ -107,14 +114,21 @@ export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog, channel 
     return pc;
   };
 
-  sendSignal(deviceId, `HOST:${channel}`, "watch-request", {});
+  // insiste (não manda só uma vez): se o espectador ligar ANTES do outro lado começar a
+  // escutar de verdade (corrida de poucos segundos entre os dois toggles), um pedido único se
+  // perderia pra sempre — reenviando a cada poucos segundos até um host responder com um
+  // offer, a conexão acaba se formando mesmo que a ordem de ligar os dois não seja perfeita.
+  const hostAddress = `HOST:${channel}`;
+  sendSignal(deviceId, hostAddress, "watch-request", {});
   onStatus?.("procurando");
+  const retryId = setInterval(() => { if (!hostId) sendSignal(deviceId, hostAddress, "watch-request", {}); }, 3000);
 
   const stopPoll = pollSignals({
     myDevice: deviceId,
     onSignal: async (s) => {
       if (s.kind === "offer") {
         hostId = s.from_device;
+        clearInterval(retryId);
         const conn = ensurePc();
         await conn.setRemoteDescription(s.payload.sdp);
         for (const c of pendingCandidates.splice(0)) await conn.addIceCandidate(c).catch(() => {});
@@ -136,6 +150,7 @@ export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog, channel 
       return true;
     },
     stop() {
+      clearInterval(retryId);
       stopPoll();
       if (hostId) sendSignal(deviceId, hostId, "stop", {});
       pc?.close();
