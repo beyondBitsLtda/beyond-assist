@@ -1079,7 +1079,31 @@ export async function summarizeNewScreenActivity(rows, systemInstruction = VIGIA
       }),
     { attempts: 2, delayMs: 500 }
   );
-  const text = (res.text || "").trim();
-  if (!text || /^nada\.?$/i.test(text)) return null;
-  return text;
+  const digestText = (res.text || "").trim();
+  if (!digestText || /^nada\.?$/i.test(digestText)) return null;
+  return digestText;
+}
+
+// ---- Câmera de Vigia: ver src/lib/screenShareRTC.js e assistant/page.js (onChatMessage) ----
+
+export const VIGIA_CAMERA_CHAT_INSTRUCTION = `Você é a Lisa. Alguém está assistindo AO VIVO a câmera de vigia de outro dispositivo (tipo uma babá eletrônica) e mandou uma mensagem de texto pra você ler em voz alta pra quem estiver perto dessa câmera.
+
+NÃO repita a mensagem palavra por palavra como um robô lendo em voz alta — interprete o que a pessoa quis dizer e fale isso com naturalidade, no seu estilo, como se você mesma estivesse ali avisando/comentando. Seja breve (1 frase, no máximo duas), apropriado pra ser ouvido em voz alta por quem está perto da câmera.`;
+
+/** Interpreta uma mensagem mandada por quem assiste a Câmera de Vigia e devolve o que a Lisa
+ * deve FALAR (não a mensagem crua) — sempre retorna algo (a pessoa mandou de propósito, merece
+ * resposta). Fala pelo MESMO pipeline de voz das respostas normais (/api/speak), garantindo a
+ * mesma voz configurada, nunca uma voz de reserva diferente. */
+export async function interpretVigiaChatMessage(text, systemInstruction = VIGIA_CAMERA_CHAT_INSTRUCTION) {
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: [{ role: "user", parts: [{ text: `MENSAGEM RECEBIDA: ${text}` }] }],
+        config: { systemInstruction },
+      }),
+    { attempts: 2, delayMs: 500 }
+  );
+  return (res.text || "").trim() || text;
 }

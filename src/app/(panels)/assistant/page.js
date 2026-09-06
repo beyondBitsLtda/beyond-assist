@@ -540,7 +540,14 @@ export default function AssistantPage() {
     }
     let cancelled = false;
     setCameraVigiaError(null);
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: cameraFacing } }, audio: true })
+    // resolução/taxa de quadros limitadas de propósito — sem isso, a câmera pode capturar em
+    // resolução alta (ex.: 4K num celular novo), pedindo mais banda do que o link consegue
+    // entregar de forma estável (principalmente passando pelo TURN de retransmissão, que tem
+    // capacidade compartilhada) — sintoma visto na prática: "fica bugando e não flui".
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: cameraFacing }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 30 } },
+      audio: true,
+    })
       .then((stream) => {
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
         cameraVigiaStreamRef.current = stream;
@@ -573,13 +580,27 @@ export default function AssistantPage() {
         stream,
         channel: "camera",
         onLog: (msg) => addLog("[CÂMERA]", PU, msg),
-        onChatMessage: (text) => {
+        onChatMessage: async (text) => {
           addLog("[CÂMERA]", GR, `mensagem recebida: ${text}`);
-          setCameraVigiaIncomingMsg(text);
-          // mesma voz escolhida nas configurações (voz do Gemini, não a de reserva do
-          // navegador) — sem isso caía na voz padrão/genérica em vez da voz da Lisa de verdade.
-          speakText(text, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
-          setTimeout(() => setCameraVigiaIncomingMsg((cur) => (cur === text ? null : cur)), 12000);
+          // interpreta antes de falar (não repete palavra por palavra) — e fala pelo MESMO
+          // pipeline de voz das respostas normais (mesma voz configurada, nunca a de reserva
+          // do navegador, que foi o que causava "a voz varia").
+          let reply = text;
+          try {
+            const res = await fetch("/api/screen-share/interpret", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ text, personaMode: personaModeForScreenRef.current }),
+            });
+            const data = await res.json();
+            if (data?.ok && data.reply) reply = data.reply;
+          } catch {
+            // sem interpretação por algum motivo — ainda assim fala a mensagem crua, melhor
+            // que ficar em silêncio quando alguém mandou de propósito.
+          }
+          setCameraVigiaIncomingMsg(reply);
+          speakText(reply, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+          setTimeout(() => setCameraVigiaIncomingMsg((cur) => (cur === reply ? null : cur)), 12000);
         },
       });
     }, 1000);
@@ -775,7 +796,9 @@ export default function AssistantPage() {
     }
     let cancelled = false;
     setScreenError(null);
-    navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+    // taxa de quadros limitada de propósito (ver mesmo comentário na Câmera de Vigia) — tela
+    // compartilhada raramente precisa de mais que uns 15fps pra dar pra acompanhar de longe.
+    navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15, max: 20 } }, audio: false })
       .then((stream) => {
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
         screenStreamRef.current = stream;
@@ -2677,7 +2700,15 @@ export default function AssistantPage() {
                 📷 Câmera de Vigia: {cameraVigiaMode ? "ON" : "OFF"}
               </button>
               {cameraVigiaMode && (
-                <video ref={cameraVigiaVideoRef} autoPlay playsInline muted title="o que a câmera de vigia está vendo" style={{ width: "100%", maxWidth: 160, aspectRatio: "4/3", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 8, display: "block" }} />
+                <>
+                  <video ref={cameraVigiaVideoRef} autoPlay playsInline muted title="o que a câmera de vigia está vendo" style={{ width: "100%", maxWidth: 160, aspectRatio: "4/3", borderRadius: 6, objectFit: "cover", border: `1px solid ${GR}55`, marginBottom: 6, display: "block" }} />
+                  <button
+                    onClick={() => setCameraFacing((f) => (f === "user" ? "environment" : "user"))}
+                    style={{ ...mono, fontSize: 10, padding: "8px 12px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "transparent", color: "rgba(207,239,251,0.7)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+                  >
+                    🔄 câmera: {cameraFacing === "user" ? "frontal" : "traseira"} (trocar)
+                  </button>
+                </>
               )}
               {cameraVigiaError && <div style={{ ...mono, fontSize: 9.5, color: OR, marginBottom: 8 }}>⚠ {cameraVigiaError}</div>}
               <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
@@ -3223,7 +3254,16 @@ export default function AssistantPage() {
               📷 CÂMERA {cameraVigiaMode ? "ON" : "OFF"}
             </button>
             {cameraVigiaMode && (
-              <video ref={cameraVigiaVideoRef} autoPlay playsInline muted title="o que a câmera de vigia está vendo" style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
+              <>
+                <video ref={cameraVigiaVideoRef} autoPlay playsInline muted title="o que a câmera de vigia está vendo" style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
+                <button
+                  onClick={() => setCameraFacing((f) => (f === "user" ? "environment" : "user"))}
+                  title="Trocar entre câmera frontal e traseira (celular)"
+                  style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "transparent", color: "rgba(207,239,251,0.7)", cursor: "pointer" }}
+                >
+                  🔄 {cameraFacing === "user" ? "frontal" : "traseira"}
+                </button>
+              </>
             )}
             {cameraVigiaError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {cameraVigiaError}</span>}
           </div>
