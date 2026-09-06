@@ -176,6 +176,14 @@ export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog, channel 
     onSignal: async (s) => {
       if (s.kind === "offer") {
         hostId = s.from_device;
+        // TODA oferta nova já é uma tentativa do ZERO do lado do host (ver hostScreenShare —
+        // ele recria a conexão a cada pedido/timeout). Sem descartar a conexão antiga aqui
+        // também, uma conexão travada (ex.: presa em "new") continuava sendo reaproveitada
+        // pra sempre — cada oferta nova caía numa conexão já capenga, nunca progredindo. Os
+        // dois lados precisam recomeçar juntos.
+        pc?.close();
+        pc = null;
+        pendingCandidates.length = 0;
         const conn = ensurePc();
         await conn.setRemoteDescription(s.payload.sdp);
         for (const c of pendingCandidates.splice(0)) await conn.addIceCandidate(c).catch(() => {});
