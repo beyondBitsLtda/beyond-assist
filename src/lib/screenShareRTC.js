@@ -1,14 +1,26 @@
 // Transmissão: WebRTC peer-to-peer entre dois dispositivos — o vídeo NUNCA passa pelo
 // servidor, só a sinalização inicial (offer/answer/candidatos ICE), via
-// src/lib/screenShareSignals.js (polling, mesmo padrão dos comandos remotos). Só STUN público
-// (sem TURN) — funciona bem na mesma rede/Wi-Fi ou na maioria das redes domésticas; redes bem
-// restritivas (algumas corporativas/operadoras) podem não conseguir conectar direto.
+// src/lib/screenShareSignals.js (polling, mesmo padrão dos comandos remotos).
 //
+// STUN sozinho só ajuda os dois lados a DESCOBRIREM seu próprio endereço público — quando o
+// NAT de um dos dois (comum em rede de operadora/4G, ou algumas redes corporativas) não deixa
+// o outro lado alcançar esse endereço diretamente, a conexão fica presa em "checking" e cai
+// pra "disconnected" sem nunca conectar (visto na prática: câmera de vigia entre duas redes
+// diferentes). Por isso também tem um TURN público gratuito (Open Relay Project, sem
+// cadastro) como reforço — ele retransmite o vídeo quando o caminho direto não existe. Ainda
+// assim, sem controle sobre a disponibilidade desse serviço público; se algum dia parar de
+// funcionar, a solução de verdade é um TURN próprio (ex.: coturn) ou um serviço pago (Twilio,
+// Xirsys).
+const ICE_SERVERS = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+];
 // `channel` distingue qual "transmissão" é essa (hoje: "screen" ou "camera") — cada uma usa seu
 // próprio pseudo-endereço de broadcast ('HOST:screen'/'HOST:camera'), pra dar pra ligar as duas
 // ao mesmo tempo no mesmo dispositivo sem uma interferir na outra.
 
-const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 const POLL_MS = 1500;
 
 async function sendSignal(fromDevice, toDevice, kind, payload) {
