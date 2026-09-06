@@ -93,7 +93,15 @@ export function hostScreenShare({ deviceId, stream, channel = "screen", onLog, o
     peers.set(viewerId, pc);
     peerCreatedAt.set(viewerId, Date.now());
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-    pc.onicecandidate = (e) => { if (e.candidate) sendSignal(deviceId, viewerId, "ice", { candidate: e.candidate }); };
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        onLog?.(`espectador ${viewerId.slice(0, 8)}: candidato local ${e.candidate.type}/${e.candidate.protocol}`);
+        sendSignal(deviceId, viewerId, "ice", { candidate: e.candidate });
+      } else {
+        onLog?.(`espectador ${viewerId.slice(0, 8)}: fim da coleta de candidatos`);
+      }
+    };
+    pc.onicegatheringstatechange = () => onLog?.(`espectador ${viewerId.slice(0, 8)}: coleta=${pc.iceGatheringState}`);
     pc.onconnectionstatechange = () => {
       onLog?.(`espectador ${viewerId.slice(0, 8)}: ${pc.connectionState}`);
       if (["closed", "failed", "disconnected"].includes(pc.connectionState)) closePeer(viewerId);
@@ -147,7 +155,15 @@ export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog, channel 
   const ensurePc = () => {
     if (pc) return pc;
     pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-    pc.onicecandidate = (e) => { if (e.candidate && hostId) sendSignal(deviceId, hostId, "ice", { candidate: e.candidate }); };
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        onLog?.(`candidato local: ${e.candidate.type}/${e.candidate.protocol}`);
+        if (hostId) sendSignal(deviceId, hostId, "ice", { candidate: e.candidate });
+      } else {
+        onLog?.(`fim da coleta de candidatos`);
+      }
+    };
+    pc.onicegatheringstatechange = () => onLog?.(`coleta: ${pc.iceGatheringState}`);
     pc.ontrack = (e) => {
       onLog?.(`faixa recebida: ${e.track.kind}, estado=${e.track.readyState}, mudo=${e.track.muted}, streams=${e.streams.length}`);
       onTrack?.(e.streams[0]);
