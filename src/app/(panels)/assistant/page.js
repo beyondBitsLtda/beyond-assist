@@ -177,6 +177,9 @@ export default function AssistantPage() {
   // Modo Persona: liga a personalidade descrita em persona.md (raiz do repo) por cima das
   // respostas — desligado por padrão (tom direto/neutro de sempre).
   const [personaMode, setPersonaMode] = useState(false);
+  // qual categoria de recursos está aberta na barra do desktop (null = todas fechadas) — ver
+  // a fileira de "chips" logo antes das abas CHAT/LOGS.
+  const [openSettingsCategory, setOpenSettingsCategory] = useState(null);
 
   // Modo Código: com isso ligado (e um repositório+branch escolhidos), toda pergunta vira um
   // PEDIDO DE MUDANÇA DE CÓDIGO em vez de uma conversa normal — ver askCodeMode/
@@ -2744,296 +2747,344 @@ export default function AssistantPage() {
           <span style={{ ...mono, fontSize: 9, color: PU }}>vê todos os painéis · pode buscar na web quando precisar</span>
         )}
 
-        {/* Modo Persona — liga a personalidade de persona.md por cima das respostas */}
-        <button
-          onClick={togglePersonaMode}
-          title={personaMode ? "Modo Persona ligado (persona.md) — clique pra desligar" : "Modo Persona desligado (tom direto de sempre) — clique pra ligar"}
-          style={{
-            ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3, marginLeft: "auto",
-            border: `1px solid ${personaMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-            background: personaMode ? "rgba(201,166,255,0.12)" : "transparent",
-            color: personaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-            cursor: "pointer",
-          }}
-        >
-          🎭 PERSONA {personaMode ? "ON" : "OFF"}
-        </button>
-
-        {/* Modo Código — toda mensagem vira pedido de mudança de código (branch nova + PR) */}
-        <button
-          onClick={() => setCodeMode((v) => !v)}
-          title={codeMode ? "Modo Código ligado — toda mensagem vira pedido de mudança. Clique pra desligar" : "Ligar Modo Código — a Lisa passa a propor mudança de código (branch + PR) em vez de conversar"}
-          style={{
-            ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-            border: `1px solid ${codeMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-            background: codeMode ? "rgba(201,166,255,0.12)" : "transparent",
-            color: codeMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-            cursor: "pointer",
-          }}
-        >
-          🛠️ CÓDIGO {codeMode ? "ON" : "OFF"}
-        </button>
-        {codeMode && (
-          <>
-            <select
-              value={codeModeRepo}
-              onChange={(e) => setCodeModeRepo(e.target.value)}
-              style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
-            >
-              <option value="">repositório…</option>
-              {codeModeRepos.map((r) => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
-            </select>
-            {codeModeRepo && (
-              <select
-                value={codeModeBranch}
-                onChange={(e) => setCodeModeBranch(e.target.value)}
-                style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
-              >
-                <option value="">branch base…</option>
-                {codeModeBranches.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select>
-            )}
-            {codeModeRepo && codeModeAvailableFiles.length > 0 && (
-              <select
-                multiple
-                value={codeModeFiles}
-                onChange={(e) => setCodeModeFiles(Array.from(e.target.selectedOptions).map((o) => o.value).slice(0, CODE_MODE_MAX_FILES))}
-                title={`arquivos fixos (até ${CODE_MODE_MAX_FILES}, ctrl/cmd+clique pra marcar mais de um) — garantidos no contexto de toda pergunta enquanto o Modo Código estiver ligado`}
-                style={{ ...mono, fontSize: 9, padding: "4px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff", width: 160, height: 60 }}
-              >
-                {codeModeAvailableFiles.map((f) => <option key={f} value={f}>{f}</option>)}
-              </select>
-            )}
-          </>
-        )}
-
-        {/* Visão do avatar: visualizador de onda de sempre × corpo em modelo 3D — desktop-only */}
-        <div style={{ display: "flex", gap: 4 }}>
-          {[{ key: "traditional", label: "◈ VISÃO TRADICIONAL" }, { key: "3d", label: "🧑 VISÃO 3D" }].map((v) => (
+        {/* categorias de recursos — colapsadas por padrão (ver openSettingsCategory). Antes
+            disto era uma FILEIRA ÚNICA com todo botão sempre visível ao mesmo tempo — virou
+            confuso de bater o olho ("um monte de toggle"). Agora só o "chip" da categoria
+            fica sempre visível (com uma bolinha ● indicando se algo dentro está ligado);
+            clique abre os controles daquela categoria numa linha própria abaixo. */}
+        <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
+          {[
+            { key: "appearance", label: "🎭 PERSONA", active: personaMode || avatarView === "3d" },
+            { key: "code", label: "🛠️ CÓDIGO", active: codeMode },
+            { key: "sensing", label: "👁 OBSERVAÇÃO", active: observanceMode || screenMode || micWatchMode },
+            { key: "vigia", label: "🕵️ VIGIA", active: vigiaMode },
+          ].map((cat) => (
             <button
-              key={v.key}
-              onClick={() => chooseAvatarView(v.key)}
-              title={v.key === "3d" ? "Corpo em modelo 3D no lugar do visualizador — arraste/belisque pra ajustar o enquadramento" : "Visualizador de onda tradicional"}
+              key={cat.key}
+              onClick={() => setOpenSettingsCategory((v) => (v === cat.key ? null : cat.key))}
+              title={cat.active ? `${cat.label} — algo ligado aqui dentro` : cat.label}
               style={{
                 ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${avatarView === v.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
-                background: avatarView === v.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
-                color: avatarView === v.key ? "#eafcff" : "rgba(207,239,251,0.55)",
+                border: `1px solid ${openSettingsCategory === cat.key ? CY : cat.active ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+                background: openSettingsCategory === cat.key ? "rgba(var(--accent-rgb),0.14)" : "transparent",
+                color: cat.active ? "#eafcff" : "rgba(207,239,251,0.55)",
                 cursor: "pointer",
               }}
             >
-              {v.label}
+              {cat.label} {cat.active ? "●" : ""} {openSettingsCategory === cat.key ? "▲" : "▼"}
             </button>
           ))}
         </div>
 
-        {/* Aparência do corpo 3D — só faz sentido com a Visão 3D ligada */}
-        {avatarView === "3d" && (
-          <div style={{ display: "flex", gap: 4 }}>
-            {[{ key: "cyborg", label: "◈ CYBORG" }, { key: "ironman", label: "🤖 IRON MAN" }].map((s) => (
-              <button
-                key={s.key}
-                onClick={() => chooseAvatarSkin(s.key)}
-                title={s.key === "ironman" ? "Corpo rigado (esqueleto de verdade) — gestos reais por modo, se os clipes já tiverem sido enviados" : "Corpo original (sem esqueleto, só balanço/respiração)"}
-                style={{
-                  ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                  border: `1px solid ${avatarSkin === s.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
-                  background: avatarSkin === s.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
-                  color: avatarSkin === s.key ? "#eafcff" : "rgba(207,239,251,0.55)",
-                  cursor: "pointer",
-                }}
-              >
-                {s.label}
-              </button>
-            ))}
+        {openSettingsCategory === "appearance" && (
+          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
+            {/* Modo Persona — liga a personalidade de persona.md por cima das respostas */}
+            <button
+              onClick={togglePersonaMode}
+              title={personaMode ? "Modo Persona ligado (persona.md) — clique pra desligar" : "Modo Persona desligado (tom direto de sempre) — clique pra ligar"}
+              style={{
+                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                border: `1px solid ${personaMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
+                background: personaMode ? "rgba(201,166,255,0.12)" : "transparent",
+                color: personaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              🎭 PERSONA {personaMode ? "ON" : "OFF"}
+            </button>
+
+            {/* Visão do avatar: visualizador de onda de sempre × corpo em modelo 3D — desktop-only */}
+            <div style={{ display: "flex", gap: 4 }}>
+              {[{ key: "traditional", label: "◈ VISÃO TRADICIONAL" }, { key: "3d", label: "🧑 VISÃO 3D" }].map((v) => (
+                <button
+                  key={v.key}
+                  onClick={() => chooseAvatarView(v.key)}
+                  title={v.key === "3d" ? "Corpo em modelo 3D no lugar do visualizador — arraste/belisque pra ajustar o enquadramento" : "Visualizador de onda tradicional"}
+                  style={{
+                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                    border: `1px solid ${avatarView === v.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
+                    background: avatarView === v.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
+                    color: avatarView === v.key ? "#eafcff" : "rgba(207,239,251,0.55)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Aparência do corpo 3D — só faz sentido com a Visão 3D ligada */}
+            {avatarView === "3d" && (
+              <div style={{ display: "flex", gap: 4 }}>
+                {[{ key: "cyborg", label: "◈ CYBORG" }, { key: "ironman", label: "🤖 IRON MAN" }].map((s) => (
+                  <button
+                    key={s.key}
+                    onClick={() => chooseAvatarSkin(s.key)}
+                    title={s.key === "ironman" ? "Corpo rigado (esqueleto de verdade) — gestos reais por modo, se os clipes já tiverem sido enviados" : "Corpo original (sem esqueleto, só balanço/respiração)"}
+                    style={{
+                      ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                      border: `1px solid ${avatarSkin === s.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
+                      background: avatarSkin === s.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
+                      color: avatarSkin === s.key ? "#eafcff" : "rgba(207,239,251,0.55)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Modo Observância — liga a câmera, tira 1 foto no instante de cada pergunta e manda
-            junto pro Gemini (multimodal); nunca fica ligado sozinho entre recarregamentos. */}
-        <button
-          onClick={() => setObservanceMode((v) => !v)}
-          title={observanceMode ? "Modo Observância ligado — a câmera tira 1 foto por pergunta, nada fica salvo. Clique pra desligar" : "Ligar a câmera pra Lisa poder ver o que você mostra (postura, roupa, gestos) ao responder"}
-          style={{
-            ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-            border: `1px solid ${observanceMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-            background: observanceMode ? "rgba(123,216,143,0.12)" : "transparent",
-            color: observanceMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-            cursor: "pointer",
-          }}
-        >
-          👁 OBSERVÂNCIA {observanceMode ? "ON" : "OFF"}
-        </button>
-        {observanceMode && (
-          <video ref={observanceVideoRef} autoPlay playsInline muted title="o que a câmera vê agora — só uma foto disso é enviada, no instante de cada pergunta" style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
-        )}
-        {observanceError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {observanceError}</span>}
-
-        {/* Modo Tela — desktop-only ("enquanto mexo no PC"). Reativo (cada pergunta manda um
-            retrato da tela) + proativo opcional (vigia sozinha e só fala se achar algo digno de
-            nota, ver o useEffect de screenAutoComment acima). O navegador SEMPRE pede permissão
-            nativa pra escolher tela/janela/aba — isso não dá pra pular. */}
-        <button
-          onClick={() => setScreenMode((v) => !v)}
-          title={screenMode ? "Modo Tela ligado — o navegador pede pra você escolher o que compartilhar. Clique pra desligar" : "Compartilhar a tela pra Lisa poder ver o que está acontecendo nela"}
-          style={{
-            ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-            border: `1px solid ${screenMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-            background: screenMode ? "rgba(123,216,143,0.12)" : "transparent",
-            color: screenMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-            cursor: "pointer",
-          }}
-        >
-          🖵 TELA {screenMode ? "ON" : "OFF"}
-        </button>
-        {screenMode && (
-          <>
-            <video ref={screenVideoRef} autoPlay playsInline muted title="o que está sendo compartilhado — só um retrato disso é enviado por vez" style={{ width: 72, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
+        {openSettingsCategory === "code" && (
+          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
+            {/* Modo Código — toda mensagem vira pedido de mudança de código (branch nova + PR) */}
             <button
-              onClick={() => setScreenAutoComment((v) => !v)}
-              title={screenAutoComment ? "Vigiando sozinha — só fala se achar algo digno de nota. Clique pra desligar" : "Deixar a Lisa de olho na tela sozinha, comentando só quando achar algo relevante (sem você perguntar)"}
+              onClick={() => setCodeMode((v) => !v)}
+              title={codeMode ? "Modo Código ligado — toda mensagem vira pedido de mudança. Clique pra desligar" : "Ligar Modo Código — a Lisa passa a propor mudança de código (branch + PR) em vez de conversar"}
               style={{
                 ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${screenAutoComment ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-                background: screenAutoComment ? "rgba(201,166,255,0.12)" : "transparent",
-                color: screenAutoComment ? "#eafcff" : "rgba(207,239,251,0.55)",
+                border: `1px solid ${codeMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
+                background: codeMode ? "rgba(201,166,255,0.12)" : "transparent",
+                color: codeMode ? "#eafcff" : "rgba(207,239,251,0.55)",
                 cursor: "pointer",
               }}
             >
-              💬 AUTO {screenAutoComment ? "ON" : "OFF"}
+              🛠️ CÓDIGO {codeMode ? "ON" : "OFF"}
             </button>
-            {screenAutoComment && (
+            {codeMode && (
               <>
                 <select
-                  value={screenIntervalMs}
-                  onChange={(e) => chooseScreenInterval(Number(e.target.value))}
-                  title="De quanto em quanto tempo ela verifica a tela sozinha"
-                  style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
+                  value={codeModeRepo}
+                  onChange={(e) => setCodeModeRepo(e.target.value)}
+                  style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
                 >
-                  {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+                  <option value="">repositório…</option>
+                  {codeModeRepos.map((r) => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
                 </select>
-                <input
-                  value={screenFocus}
-                  onChange={(e) => updateScreenFocus(e.target.value)}
-                  placeholder="direcionamento (ex.: avise se o build quebrar)"
-                  title="O que ela deve priorizar notar na tela — fica em branco pra ela decidir sozinha o que é relevante"
-                  style={{ ...mono, fontSize: 9, padding: "5px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff", width: 220 }}
-                />
+                {codeModeRepo && (
+                  <select
+                    value={codeModeBranch}
+                    onChange={(e) => setCodeModeBranch(e.target.value)}
+                    style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
+                  >
+                    <option value="">branch base…</option>
+                    {codeModeBranches.map((b) => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                )}
+                {codeModeRepo && codeModeAvailableFiles.length > 0 && (
+                  <select
+                    multiple
+                    value={codeModeFiles}
+                    onChange={(e) => setCodeModeFiles(Array.from(e.target.selectedOptions).map((o) => o.value).slice(0, CODE_MODE_MAX_FILES))}
+                    title={`arquivos fixos (até ${CODE_MODE_MAX_FILES}, ctrl/cmd+clique pra marcar mais de um) — garantidos no contexto de toda pergunta enquanto o Modo Código estiver ligado`}
+                    style={{ ...mono, fontSize: 9, padding: "4px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff", width: 160, height: 60 }}
+                  >
+                    {codeModeAvailableFiles.map((f) => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                )}
               </>
             )}
-            <button
-              onClick={() => setTransmissionMode((v) => !v)}
-              title={transmissionMode ? "Transmissão ligada — outro dispositivo com o Modo Vigia pode assistir sua tela AO VIVO agora. Clique pra desligar" : "Deixar outro dispositivo (ex.: seu celular, com o Modo Vigia) assistir esta tela AO VIVO"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${transmissionMode ? OR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: transmissionMode ? "rgba(217,89,38,0.12)" : "transparent",
-                color: transmissionMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              📡 TRANSMISSÃO {transmissionMode ? "ON" : "OFF"}
-            </button>
-          </>
+          </div>
         )}
-        {screenError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {screenError}</span>}
 
-        {/* Modo Vigia — pergunta (ou narra sozinha) sobre o HISTÓRICO de observações do Modo
-            Tela salvo com Transmissão. NÃO depende de screenMode neste aparelho — funciona de
-            qualquer dispositivo, inclusive celular, contanto que outro aparelho esteja
-            alimentando a memória (Modo Tela + Transmissão ligados lá). */}
-        <button
-          onClick={() => setVigiaMode((v) => !v)}
-          title={vigiaMode ? "Modo Vigia ligado — toda pergunta busca no histórico de observações da tela. Clique pra desligar" : "Perguntar sobre o que a Lisa vem observando na tela (via Transmissão), de qualquer dispositivo"}
-          style={{
-            ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-            border: `1px solid ${vigiaMode ? OR : "rgba(var(--accent-rgb),0.18)"}`,
-            background: vigiaMode ? "rgba(217,89,38,0.12)" : "transparent",
-            color: vigiaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-            cursor: "pointer",
-          }}
-        >
-          👁️ VIGIA {vigiaMode ? "ON" : "OFF"}
-        </button>
-        {vigiaMode && (
-          <>
+        {openSettingsCategory === "sensing" && (
+          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
+            {/* Modo Observância — liga a câmera, tira 1 foto no instante de cada pergunta e manda
+                junto pro Gemini (multimodal); nunca fica ligado sozinho entre recarregamentos. */}
             <button
-              onClick={() => setVigiaAutoOn((v) => !v)}
-              title={vigiaAutoOn ? "Narrando sozinha o que há de novo — clique pra desligar" : "Deixar a Lisa te contar sozinha, de tempos em tempos, o que há de novo na tela (não precisa perguntar)"}
+              onClick={() => setObservanceMode((v) => !v)}
+              title={observanceMode ? "Modo Observância ligado — a câmera tira 1 foto por pergunta, nada fica salvo. Clique pra desligar" : "Ligar a câmera pra Lisa poder ver o que você mostra (postura, roupa, gestos) ao responder"}
               style={{
                 ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${vigiaAutoOn ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-                background: vigiaAutoOn ? "rgba(201,166,255,0.12)" : "transparent",
-                color: vigiaAutoOn ? "#eafcff" : "rgba(207,239,251,0.55)",
+                border: `1px solid ${observanceMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+                background: observanceMode ? "rgba(123,216,143,0.12)" : "transparent",
+                color: observanceMode ? "#eafcff" : "rgba(207,239,251,0.55)",
                 cursor: "pointer",
               }}
             >
-              💬 AUTO {vigiaAutoOn ? "ON" : "OFF"}
+              👁 OBSERVÂNCIA {observanceMode ? "ON" : "OFF"}
             </button>
-            {vigiaAutoOn && (
-              <select
-                value={vigiaAutoIntervalMs}
-                onChange={(e) => chooseVigiaAutoInterval(Number(e.target.value))}
-                title="De quanto em quanto tempo ela verifica se há algo novo pra te contar"
-                style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
-              >
-                {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
-              </select>
+            {observanceMode && (
+              <video ref={observanceVideoRef} autoPlay playsInline muted title="o que a câmera vê agora — só uma foto disso é enviada, no instante de cada pergunta" style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
             )}
+            {observanceError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {observanceError}</span>}
+
+            {/* Modo Tela — desktop-only ("enquanto mexo no PC"). Reativo (cada pergunta manda um
+                retrato da tela) + proativo opcional (vigia sozinha e só fala se achar algo digno de
+                nota, ver o useEffect de screenAutoComment acima). O navegador SEMPRE pede permissão
+                nativa pra escolher tela/janela/aba — isso não dá pra pular. */}
             <button
-              onClick={() => setVigiaWatching((v) => !v)}
-              title={vigiaWatching ? "Assistindo ao vivo — clique pra parar" : "Ver AO VIVO a tela de outro dispositivo com Modo Tela + Transmissão ligados"}
+              onClick={() => setScreenMode((v) => !v)}
+              title={screenMode ? "Modo Tela ligado — o navegador pede pra você escolher o que compartilhar. Clique pra desligar" : "Compartilhar a tela pra Lisa poder ver o que está acontecendo nela"}
               style={{
                 ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${vigiaWatching ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: vigiaWatching ? "rgba(123,216,143,0.12)" : "transparent",
-                color: vigiaWatching ? "#eafcff" : "rgba(207,239,251,0.55)",
+                border: `1px solid ${screenMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+                background: screenMode ? "rgba(123,216,143,0.12)" : "transparent",
+                color: screenMode ? "#eafcff" : "rgba(207,239,251,0.55)",
                 cursor: "pointer",
               }}
             >
-              📺 ASSISTIR {vigiaWatching ? "ON" : "OFF"}
+              🖵 TELA {screenMode ? "ON" : "OFF"}
             </button>
-            {vigiaWatching && (
+            {screenMode && (
               <>
-                <video
-                  ref={vigiaWatchVideoRef} autoPlay playsInline muted
-                  onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
-                  onClick={(e) => enterVideoFullscreen(e.currentTarget)}
-                  title="Clique pra ver em tela cheia"
-                  style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000", cursor: "pointer" }}
-                />
-                <span style={{ ...mono, fontSize: 8.5, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
-                  {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando…" : vigiaWatchStatus || "conectando…"}
-                </span>
+                <video ref={screenVideoRef} autoPlay playsInline muted title="o que está sendo compartilhado — só um retrato disso é enviado por vez" style={{ width: 72, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
+                <button
+                  onClick={() => setScreenAutoComment((v) => !v)}
+                  title={screenAutoComment ? "Vigiando sozinha — só fala se achar algo digno de nota. Clique pra desligar" : "Deixar a Lisa de olho na tela sozinha, comentando só quando achar algo relevante (sem você perguntar)"}
+                  style={{
+                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                    border: `1px solid ${screenAutoComment ? PU : "rgba(var(--accent-rgb),0.18)"}`,
+                    background: screenAutoComment ? "rgba(201,166,255,0.12)" : "transparent",
+                    color: screenAutoComment ? "#eafcff" : "rgba(207,239,251,0.55)",
+                    cursor: "pointer",
+                  }}
+                >
+                  💬 AUTO {screenAutoComment ? "ON" : "OFF"}
+                </button>
+                {screenAutoComment && (
+                  <>
+                    <select
+                      value={screenIntervalMs}
+                      onChange={(e) => chooseScreenInterval(Number(e.target.value))}
+                      title="De quanto em quanto tempo ela verifica a tela sozinha"
+                      style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
+                    >
+                      {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+                    </select>
+                    <input
+                      value={screenFocus}
+                      onChange={(e) => updateScreenFocus(e.target.value)}
+                      placeholder="direcionamento (ex.: avise se o build quebrar)"
+                      title="O que ela deve priorizar notar na tela — fica em branco pra ela decidir sozinha o que é relevante"
+                      style={{ ...mono, fontSize: 9, padding: "5px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff", width: 220 }}
+                    />
+                  </>
+                )}
+                <button
+                  onClick={() => setTransmissionMode((v) => !v)}
+                  title={transmissionMode ? "Transmissão ligada — outro dispositivo com o Modo Vigia pode assistir sua tela AO VIVO agora. Clique pra desligar" : "Deixar outro dispositivo (ex.: seu celular, com o Modo Vigia) assistir esta tela AO VIVO"}
+                  style={{
+                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                    border: `1px solid ${transmissionMode ? OR : "rgba(var(--accent-rgb),0.18)"}`,
+                    background: transmissionMode ? "rgba(217,89,38,0.12)" : "transparent",
+                    color: transmissionMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+                    cursor: "pointer",
+                  }}
+                >
+                  📡 TRANSMISSÃO {transmissionMode ? "ON" : "OFF"}
+                </button>
               </>
             )}
-          </>
+            {screenError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {screenError}</span>}
+
+            {/* Modo Escuta — precisa do Modo Tela ou da Observância ligado (não roda sozinho, ver
+                useEffect de micWatchMode acima). Microfone REALMENTE aberto, diferente do
+                "segure pra falar" de sempre. */}
+            <button
+              onClick={() => setMicWatchMode((v) => !v)}
+              disabled={!screenMode && !observanceMode}
+              title={
+                !screenMode && !observanceMode
+                  ? "ligue o Modo Tela ou a Observância primeiro"
+                  : (micWatchMode ? "Modo Escuta ligado — microfone aberto de verdade, grava pedacinhos curtos e descarta. Clique pra desligar" : "Deixar o microfone aberto pra Lisa ir ouvindo (ex.: comentar se você estiver cantando)")
+              }
+              style={{
+                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                border: `1px solid ${micWatchMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+                background: micWatchMode ? "rgba(123,216,143,0.12)" : "transparent",
+                color: (!screenMode && !observanceMode) ? "rgba(207,239,251,0.3)" : (micWatchMode ? "#eafcff" : "rgba(207,239,251,0.55)"),
+                cursor: (!screenMode && !observanceMode) ? "not-allowed" : "pointer",
+              }}
+            >
+              🎙️ ESCUTA {micWatchMode && (screenMode || observanceMode) ? "ON" : "OFF"}
+            </button>
+            {micWatchError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {micWatchError}</span>}
+          </div>
         )}
 
-        {/* Modo Escuta — precisa do Modo Tela ou da Observância ligado (não roda sozinho, ver
-            useEffect de micWatchMode acima). Microfone REALMENTE aberto, diferente do
-            "segure pra falar" de sempre. */}
-        <button
-          onClick={() => setMicWatchMode((v) => !v)}
-          disabled={!screenMode && !observanceMode}
-          title={
-            !screenMode && !observanceMode
-              ? "ligue o Modo Tela ou a Observância primeiro"
-              : (micWatchMode ? "Modo Escuta ligado — microfone aberto de verdade, grava pedacinhos curtos e descarta. Clique pra desligar" : "Deixar o microfone aberto pra Lisa ir ouvindo (ex.: comentar se você estiver cantando)")
-          }
-          style={{
-            ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-            border: `1px solid ${micWatchMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-            background: micWatchMode ? "rgba(123,216,143,0.12)" : "transparent",
-            color: (!screenMode && !observanceMode) ? "rgba(207,239,251,0.3)" : (micWatchMode ? "#eafcff" : "rgba(207,239,251,0.55)"),
-            cursor: (!screenMode && !observanceMode) ? "not-allowed" : "pointer",
-          }}
-        >
-          🎙️ ESCUTA {micWatchMode && (screenMode || observanceMode) ? "ON" : "OFF"}
-        </button>
-        {micWatchError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {micWatchError}</span>}
+        {openSettingsCategory === "vigia" && (
+          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
+            {/* Modo Vigia — pergunta (ou narra sozinha) sobre o HISTÓRICO de observações do Modo
+                Tela. NÃO depende de screenMode neste aparelho — funciona de qualquer
+                dispositivo, inclusive celular, contanto que outro aparelho esteja alimentando
+                a memória (Modo Tela ligado lá) e/ou transmitindo ao vivo (Transmissão lá). */}
+            <button
+              onClick={() => setVigiaMode((v) => !v)}
+              title={vigiaMode ? "Modo Vigia ligado — toda pergunta busca no histórico de observações da tela. Clique pra desligar" : "Perguntar sobre o que a Lisa vem observando na tela, de qualquer dispositivo"}
+              style={{
+                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                border: `1px solid ${vigiaMode ? OR : "rgba(var(--accent-rgb),0.18)"}`,
+                background: vigiaMode ? "rgba(217,89,38,0.12)" : "transparent",
+                color: vigiaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              👁️ VIGIA {vigiaMode ? "ON" : "OFF"}
+            </button>
+            {vigiaMode && (
+              <>
+                <button
+                  onClick={() => setVigiaAutoOn((v) => !v)}
+                  title={vigiaAutoOn ? "Narrando sozinha o que há de novo — clique pra desligar" : "Deixar a Lisa te contar sozinha, de tempos em tempos, o que há de novo na tela (não precisa perguntar)"}
+                  style={{
+                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                    border: `1px solid ${vigiaAutoOn ? PU : "rgba(var(--accent-rgb),0.18)"}`,
+                    background: vigiaAutoOn ? "rgba(201,166,255,0.12)" : "transparent",
+                    color: vigiaAutoOn ? "#eafcff" : "rgba(207,239,251,0.55)",
+                    cursor: "pointer",
+                  }}
+                >
+                  💬 AUTO {vigiaAutoOn ? "ON" : "OFF"}
+                </button>
+                {vigiaAutoOn && (
+                  <select
+                    value={vigiaAutoIntervalMs}
+                    onChange={(e) => chooseVigiaAutoInterval(Number(e.target.value))}
+                    title="De quanto em quanto tempo ela verifica se há algo novo pra te contar"
+                    style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
+                  >
+                    {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+                  </select>
+                )}
+                <button
+                  onClick={() => setVigiaWatching((v) => !v)}
+                  title={vigiaWatching ? "Assistindo ao vivo — clique pra parar" : "Ver AO VIVO a tela de outro dispositivo com Modo Tela + Transmissão ligados"}
+                  style={{
+                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                    border: `1px solid ${vigiaWatching ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+                    background: vigiaWatching ? "rgba(123,216,143,0.12)" : "transparent",
+                    color: vigiaWatching ? "#eafcff" : "rgba(207,239,251,0.55)",
+                    cursor: "pointer",
+                  }}
+                >
+                  📺 ASSISTIR {vigiaWatching ? "ON" : "OFF"}
+                </button>
+                {vigiaWatching && (
+                  <>
+                    <video
+                      ref={vigiaWatchVideoRef} autoPlay playsInline muted
+                      onLoadedMetadata={(e) => addLog("[VIGIA]", GR, `vídeo carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
+                      onClick={(e) => enterVideoFullscreen(e.currentTarget)}
+                      title="Clique pra ver em tela cheia"
+                      style={{ width: 96, height: 54, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55`, background: "#000", cursor: "pointer" }}
+                    />
+                    <span style={{ ...mono, fontSize: 8.5, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
+                      {vigiaWatchStatus === "connected" ? "● ao vivo" : vigiaWatchStatus === "procurando" ? "procurando…" : vigiaWatchStatus || "conectando…"}
+                    </span>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {/* pisca bem visível só durante a janela de resposta automática (ver openReplyWindow)
-            — sinal claro de "agora é sua vez", além do bipe sonoro que toca junto */}
+            — sinal claro de "agora é sua vez", além do bipe sonoro que toca junto. Fica fora
+            das categorias colapsáveis de propósito — é um aviso urgente, não uma configuração,
+            então precisa aparecer mesmo com tudo fechado. */}
         {autoListening && (
           <span style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3, border: `1px solid ${GR}`, background: "rgba(123,216,143,0.18)", color: "#eafcff", animation: "bb-dot 0.9s ease-in-out infinite" }}>
             🎙️ PODE FALAR
