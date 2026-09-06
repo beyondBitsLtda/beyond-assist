@@ -69,7 +69,17 @@ export function hostScreenShare({ deviceId, stream, channel = "screen", onLog, o
   const closePeer = (viewerId) => { peers.get(viewerId)?.close(); peers.delete(viewerId); };
 
   const handleWatchRequest = async (viewerId) => {
-    closePeer(viewerId); // pedido novo do mesmo espectador (ex.: recarregou a página) — recomeça limpo
+    // se já existe uma conexão SAUDÁVEL (ainda tentando ou já conectada) pra esse mesmo
+    // espectador, ignora o pedido repetido — o espectador reenvia sozinho a cada poucos
+    // segundos até parear (ver viewerWatchScreen), e conectar de verdade pode levar mais tempo
+    // que isso (principalmente pelo TURN). Sem essa checagem, cada reenvio derrubava a conexão
+    // em andamento antes dela terminar de se formar — um impasse que nunca conectava.
+    const existing = peers.get(viewerId);
+    if (existing && !["closed", "failed", "disconnected"].includes(existing.connectionState)) {
+      onLog?.(`espectador ${viewerId.slice(0, 8)}: pedido repetido ignorado (conexão em ${existing.connectionState})`);
+      return;
+    }
+    closePeer(viewerId); // só chega aqui se não tinha nada saudável — recomeça limpo
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     peers.set(viewerId, pc);
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
@@ -142,12 +152,14 @@ export function viewerWatchScreen({ deviceId, onTrack, onStatus, onLog, channel 
 
   // insiste (não manda só uma vez): se o espectador ligar ANTES do outro lado começar a
   // escutar de verdade (corrida de poucos segundos entre os dois toggles), OU se a conexão
-  // cair depois (dropConnection acima zera hostId), reenviando sozinho a cada poucos segundos
-  // a conexão se forma/refaz sem precisar desligar/ligar manualmente.
+  // cair depois (dropConnection acima zera hostId), reenviando sozinho a conexão se forma/
+  // refaz sem precisar desligar/ligar manualmente. Intervalo de 8s (não 3s) de propósito —
+  // conectar de verdade pode levar mais que alguns segundos (principalmente pelo TURN), e
+  // insistir rápido demais só reiniciava a conexão antes dela terminar de se formar.
   const hostAddress = `HOST:${channel}`;
   sendSignal(deviceId, hostAddress, "watch-request", {});
   onStatus?.("procurando");
-  const retryId = setInterval(() => { if (!hostId) sendSignal(deviceId, hostAddress, "watch-request", {}); }, 3000);
+  const retryId = setInterval(() => { if (!hostId) sendSignal(deviceId, hostAddress, "watch-request", {}); }, 8000);
 
   const stopPoll = pollSignals({
     myDevice: deviceId,
