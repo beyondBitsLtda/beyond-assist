@@ -572,9 +572,17 @@ export default function AssistantPage() {
   // e mensagens de texto deles, que a Lisa lê em voz alta e mostra na tela por uns segundos.
   useEffect(() => {
     if (!cameraVigiaMode) return;
-    const kickoff = setTimeout(() => {
+    let cancelled = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 24; // ~6s de tolerância — câmera+microfone juntos podem demorar mais que a tela sozinha pra inicializar
+    const tryStart = () => {
+      if (cancelled) return;
       const stream = cameraVigiaStreamRef.current;
-      if (!stream) { addLog("[CÂMERA]", OR, "sem stream da câmera ainda — tente desligar e ligar de novo"); return; }
+      if (!stream) {
+        if (attempts++ < MAX_ATTEMPTS) { setTimeout(tryStart, 250); return; }
+        addLog("[CÂMERA]", OR, "sem stream da câmera depois de várias tentativas — tente desligar e ligar de novo");
+        return;
+      }
       screenShareCameraHostRef.current = hostScreenShare({
         deviceId: getDeviceId(),
         stream,
@@ -603,8 +611,10 @@ export default function AssistantPage() {
           setTimeout(() => setCameraVigiaIncomingMsg((cur) => (cur === reply ? null : cur)), 12000);
         },
       });
-    }, 1000);
+    };
+    const kickoff = setTimeout(tryStart, 500);
     return () => {
+      cancelled = true;
       clearTimeout(kickoff);
       screenShareCameraHostRef.current?.stop();
       screenShareCameraHostRef.current = null;
@@ -825,20 +835,31 @@ export default function AssistantPage() {
 
   // Transmissão: enquanto ligada (e a tela realmente sendo compartilhada), este dispositivo
   // vira "host" — escuta pedidos de outros dispositivos querendo assistir (ver
-  // src/lib/screenShareRTC.js) e abre uma conexão WebRTC por espectador. Espera 1s pelo mesmo
-  // motivo da vigília acima: dá tempo do <video> do compartilhamento começar a produzir frames.
+  // src/lib/screenShareRTC.js) e abre uma conexão WebRTC por espectador. Tenta várias vezes (não
+  // só uma vez após 1s) até o <video> do compartilhamento realmente ter um stream pronto — visto
+  // na prática (câmera de vigia) que um prazo fixo curto às vezes não é suficiente.
   useEffect(() => {
     if (!transmissionMode || !screenMode) return;
-    const kickoff = setTimeout(() => {
+    let cancelled = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 24;
+    const tryStart = () => {
+      if (cancelled) return;
       const stream = screenStreamRef.current;
-      if (!stream) { addLog("[TRANSMISSÃO]", OR, "sem stream da tela ainda — tente desligar e ligar de novo"); return; }
+      if (!stream) {
+        if (attempts++ < MAX_ATTEMPTS) { setTimeout(tryStart, 250); return; }
+        addLog("[TRANSMISSÃO]", OR, "sem stream da tela depois de várias tentativas — tente desligar e ligar de novo");
+        return;
+      }
       screenShareHostRef.current = hostScreenShare({
         deviceId: getDeviceId(),
         stream,
         onLog: (msg) => addLog("[TRANSMISSÃO]", PU, msg),
       });
-    }, 1000);
+    };
+    const kickoff = setTimeout(tryStart, 500);
     return () => {
+      cancelled = true;
       clearTimeout(kickoff);
       screenShareHostRef.current?.stop();
       screenShareHostRef.current = null;
