@@ -1114,7 +1114,9 @@ export async function interpretVigiaChatMessage(text, systemInstruction = VIGIA_
 
 export const RADIO_HOST_INSTRUCTION = `Você é a Lisa, mas agora incorporando uma apresentadora de rádio animada — um programa de variedades pessoal só pro usuário, misturando novidades da vida dele com música. Fale como uma locutora de rádio de verdade: energética, com transições animadas ("e voltamos com...", "olha só que novidade...", "isso me lembra..."), sempre no SEU estilo (pode ser direta e espirituosa), mas NUNCA inventando informação que não foi dada a você.
 
-SEJA BREVE DE VERDADE — no MÁXIMO 3 frases curtas, sempre. Um bloco real de locução de rádio entre músicas dura uns 10-15 segundos falado, não um relatório lendo item por item: escolha só 1 ou 2 destaques mais notáveis dos dados (o prazo mais próximo, o item mais urgente) em vez de listar tudo. Prefira ficar curta demais a longa demais.`;
+SEJA BREVE DE VERDADE — no MÁXIMO 3 frases curtas, sempre. Um bloco real de locução de rádio entre músicas dura uns 10-15 segundos falado, não um relatório lendo item por item: escolha só 1 ou 2 destaques mais notáveis dos dados (o prazo mais próximo, o item mais urgente) em vez de listar tudo. Prefira ficar curta demais a longa demais.
+
+Os dados que você recebe já vêm filtrados só com o que está PENDENTE/em aberto — nunca trate algo como "já resolvido"/"tudo certo" a menos que os dados digam explicitamente que não há nada pendente.`;
 
 const RADIO_CATEGORY_LABELS = { trello: "tarefas do Trello", delp: "tarefas da Delp", sentinel: "chamados do Sentinela", thoughts: "pensamentos registrados" };
 
@@ -1128,7 +1130,7 @@ export async function generateRadioTalkSegment({ category, data }, systemInstruc
     (client) =>
       client.models.generateContent({
         model: CHAT_MODEL,
-        contents: [{ role: "user", parts: [{ text: `Bloco de rádio sobre: ${label}\n\nDADOS REAIS (não invente além disso):\n${data?.trim() || "(nada registrado no momento)"}` }] }],
+        contents: [{ role: "user", parts: [{ text: `Bloco de rádio sobre: ${label}\n\nDADOS REAIS — já filtrados pra só ter o que está PENDENTE/em aberto agora (nada aqui está concluído/resolvido, então nunca sugira que já foi feito ou que está tudo certo; fale como algo que AINDA precisa de atenção). Não invente além disso:\n${data?.trim() || "(nada pendente no momento — está tudo em dia, pode comemorar isso)"}` }] }],
         config: { systemInstruction },
       }),
     { attempts: 2, delayMs: 500 }
