@@ -202,7 +202,10 @@ export default function AssistantPage() {
       deviceId: getDeviceId(),
       onTrack: (mediaStream) => {
         addLog("[VIGIA]", GR, `stream recebida: ${mediaStream?.getVideoTracks().length ?? 0} faixa(s) de vídeo`);
-        if (vigiaWatchVideoRef.current) {
+        // ontrack dispara UMA VEZ POR FAIXA (vídeo, áudio…) mesmo sendo o mesmo stream — sem
+        // essa checagem, religar o srcObject de novo pra cada faixa cancelava o play() anterior
+        // ("interrupted by a new load request"), inofensivo mas gerava ruído no log.
+        if (vigiaWatchVideoRef.current && vigiaWatchVideoRef.current.srcObject !== mediaStream) {
           vigiaWatchVideoRef.current.srcObject = mediaStream;
           vigiaWatchVideoRef.current.play().catch((err) => addLog("[VIGIA]", OR, `play() falhou: ${err.message}`));
         }
@@ -230,7 +233,7 @@ export default function AssistantPage() {
       channel: "camera",
       onTrack: (mediaStream) => {
         addLog("[VIGIA]", GR, `câmera recebida: ${mediaStream?.getVideoTracks().length ?? 0} faixa(s) de vídeo`);
-        if (cameraWatchVideoRef.current) {
+        if (cameraWatchVideoRef.current && cameraWatchVideoRef.current.srcObject !== mediaStream) {
           cameraWatchVideoRef.current.srcObject = mediaStream;
           cameraWatchVideoRef.current.play().catch((err) => addLog("[VIGIA]", OR, `play() falhou: ${err.message}`));
         }
