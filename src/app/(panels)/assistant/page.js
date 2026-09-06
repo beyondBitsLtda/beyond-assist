@@ -540,14 +540,11 @@ export default function AssistantPage() {
     }
     let cancelled = false;
     setCameraVigiaError(null);
-    // resolução/taxa de quadros limitadas de propósito — sem isso, a câmera pode capturar em
-    // resolução alta (ex.: 4K num celular novo), pedindo mais banda do que o link consegue
-    // entregar de forma estável (principalmente passando pelo TURN de retransmissão, que tem
-    // capacidade compartilhada) — sintoma visto na prática: "fica bugando e não flui".
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: cameraFacing }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 30 } },
-      audio: true,
-    })
+    // width/height/frameRate explícitos foram testados e pareceram travar a captura numa webcam
+    // real (preview ficava preto mesmo com metadata OK) — voltou a pedir só o facingMode, sem
+    // forçar resolução. Se "fica bugando e não flui" voltar a acontecer, o ajuste de banda
+    // precisa vir de outro lugar (ex.: RTCRtpSender.setParameters, não da constraint de captura).
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: cameraFacing } }, audio: true })
       .then((stream) => {
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
         cameraVigiaStreamRef.current = stream;
