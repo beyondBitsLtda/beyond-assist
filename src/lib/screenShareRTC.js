@@ -66,7 +66,12 @@ export function hostScreenShare({ deviceId, stream, channel = "screen", onLog, o
   const hostAddress = `HOST:${channel}`;
   const peers = new Map(); // viewerId → RTCPeerConnection
   const peerCreatedAt = new Map(); // viewerId → timestamp (ver STUCK_AT_NEW_MS abaixo)
-  const STUCK_AT_NEW_MS = 10000; // "new" que não sai do lugar em 10s está morta, não "ainda tentando"
+  // 10s (valor anterior) provou ser curto demais na prática: uma conexão real passando por
+  // TURN pode legitimamente demorar mais que isso pra sair de "new" — com o prazo curto, uma
+  // conexão que ia funcionar se dessa mais tempo era derrubada e recomeçada do zero antes de
+  // terminar, num loop que nunca estabiliza (bug real visto: "funcionava perfeito antes desse
+  // prazo existir"). 25s dá bem mais margem pra negociação legítima terminar.
+  const STUCK_AT_NEW_MS = 25000;
 
   const closePeer = (viewerId) => { peers.get(viewerId)?.close(); peers.delete(viewerId); peerCreatedAt.delete(viewerId); };
 
