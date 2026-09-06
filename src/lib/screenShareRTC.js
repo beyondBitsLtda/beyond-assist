@@ -65,8 +65,10 @@ function pollSignals({ myDevice, alsoAddress, onSignal, onError }) {
 export function hostScreenShare({ deviceId, stream, channel = "screen", onLog, onChatMessage }) {
   const hostAddress = `HOST:${channel}`;
   const peers = new Map(); // viewerId → RTCPeerConnection
+  const peerCreatedAt = new Map(); // viewerId → timestamp (ver STUCK_AT_NEW_MS abaixo)
+  const STUCK_AT_NEW_MS = 10000; // "new" que não sai do lugar em 10s está morta, não "ainda tentando"
 
-  const closePeer = (viewerId) => { peers.get(viewerId)?.close(); peers.delete(viewerId); };
+  const closePeer = (viewerId) => { peers.get(viewerId)?.close(); peers.delete(viewerId); peerCreatedAt.delete(viewerId); };
 
   const handleWatchRequest = async (viewerId) => {
     // se já existe uma conexão SAUDÁVEL (ainda tentando ou já conectada) pra esse mesmo
@@ -74,14 +76,22 @@ export function hostScreenShare({ deviceId, stream, channel = "screen", onLog, o
     // segundos até parear (ver viewerWatchScreen), e conectar de verdade pode levar mais tempo
     // que isso (principalmente pelo TURN). Sem essa checagem, cada reenvio derrubava a conexão
     // em andamento antes dela terminar de se formar — um impasse que nunca conectava.
+    //
+    // MAS: visto na prática (rede diferente) uma conexão pode ficar PRESA em "new" pra sempre
+    // (nunca progride pra "connecting"/"checking" — nem chega a tentar de verdade), e "new" não
+    // é um estado de falha — sem o prazo abaixo, isso ficava ignorando pedidos repetidos pra
+    // sempre, preso numa conexão que nunca ia sair do lugar.
     const existing = peers.get(viewerId);
-    if (existing && !["closed", "failed", "disconnected"].includes(existing.connectionState)) {
+    const stuckAtNew = existing?.connectionState === "new" && Date.now() - (peerCreatedAt.get(viewerId) || 0) > STUCK_AT_NEW_MS;
+    if (existing && !stuckAtNew && !["closed", "failed", "disconnected"].includes(existing.connectionState)) {
       onLog?.(`espectador ${viewerId.slice(0, 8)}: pedido repetido ignorado (conexão em ${existing.connectionState})`);
       return;
     }
+    if (stuckAtNew) onLog?.(`espectador ${viewerId.slice(0, 8)}: presa em "new" há mais de ${STUCK_AT_NEW_MS / 1000}s — recomeçando`);
     closePeer(viewerId); // só chega aqui se não tinha nada saudável — recomeça limpo
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     peers.set(viewerId, pc);
+    peerCreatedAt.set(viewerId, Date.now());
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
     pc.onicecandidate = (e) => { if (e.candidate) sendSignal(deviceId, viewerId, "ice", { candidate: e.candidate }); };
     pc.onconnectionstatechange = () => {
