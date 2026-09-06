@@ -1107,3 +1107,60 @@ export async function interpretVigiaChatMessage(text, systemInstruction = VIGIA_
   );
   return (res.text || "").trim() || text;
 }
+
+// ---- Modo Rádio: ver src/lib/radioPlaylist.js e /api/radio/* ----
+// A Lisa "incorpora" uma apresentadora de rádio — alterna blocos de locução (novidades reais
+// sobre Trello/Tarefas Delp/Sentinela/Pensamentos) com música de verdade tocada do YouTube.
+
+export const RADIO_HOST_INSTRUCTION = `Você é a Lisa, mas agora incorporando uma apresentadora de rádio animada — um programa de variedades pessoal só pro usuário, misturando novidades da vida dele com música. Fale como uma locutora de rádio de verdade: energética, com transições animadas ("e voltamos com...", "olha só que novidade...", "isso me lembra..."), sempre no SEU estilo (pode ser direta e espirituosa), mas NUNCA inventando informação que não foi dada a você. Seja breve — um bloco real de locução entre músicas tem poucas frases, não um relatório.`;
+
+const RADIO_CATEGORY_LABELS = { trello: "tarefas do Trello", delp: "tarefas da Delp", sentinel: "chamados do Sentinela", thoughts: "pensamentos registrados" };
+
+/** Bloco de locução sobre UMA categoria (dados reais já buscados por quem chama — ver
+ * /api/radio/segment). Sempre retorna algo falável, mesmo sem dados ("nada de novo por aqui"
+ * dito com graça, não um erro). */
+export async function generateRadioTalkSegment({ category, data }, systemInstruction = RADIO_HOST_INSTRUCTION) {
+  const label = RADIO_CATEGORY_LABELS[category] || category;
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: [{ role: "user", parts: [{ text: `Bloco de rádio sobre: ${label}\n\nDADOS REAIS (não invente além disso):\n${data?.trim() || "(nada registrado no momento)"}` }] }],
+        config: { systemInstruction },
+      }),
+    { attempts: 2, delayMs: 500 }
+  );
+  return (res.text || "").trim() || "Por enquanto nada de novo por aqui — mas a gente já volta.";
+}
+
+/** Anuncia (bem curto, 1 frase) a próxima música que vai tocar. */
+export async function announceRadioSong(title, systemInstruction = RADIO_HOST_INSTRUCTION) {
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: [{ role: "user", parts: [{ text: `Anuncie (bem curto, 1 frase só) a próxima música que vai tocar agora: "${title}"` }] }],
+        config: { systemInstruction },
+      }),
+    { attempts: 2, delayMs: 500 }
+  );
+  return (res.text || "").trim() || `E agora, vamos ouvir ${title}.`;
+}
+
+/** Comenta (1-2 frases) a música que ACABOU de tocar — não "ouviu" o áudio de verdade, comenta
+ * com base no título/artista, sem fingir uma análise técnica que não tem como fazer. */
+export async function commentRadioSong(title, systemInstruction = RADIO_HOST_INSTRUCTION) {
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: [{ role: "user", parts: [{ text: `Acabou de tocar "${title}". Comente rapidamente (1-2 frases, no seu estilo) sobre a música ou o artista.` }] }],
+        config: { systemInstruction },
+      }),
+    { attempts: 2, delayMs: 500 }
+  );
+  return (res.text || "").trim() || "Boa escolha, essa.";
+}

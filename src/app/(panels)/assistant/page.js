@@ -15,6 +15,7 @@ import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThe
 import { getDeviceId, matchNavCommand } from "@/lib/deviceId.js";
 import { runFullSync } from "@/lib/sync.js";
 import { hostScreenShare, viewerWatchScreen } from "@/lib/screenShareRTC.js";
+import { loadYouTubeAPI, createYouTubePlayer, playAndWaitEnded } from "@/lib/youtubePlayer.js";
 
 // carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
 // realmente ligar a Visão 3D; desktop-only por decisão do usuário, nunca entra no bundle mobile.
@@ -499,6 +500,117 @@ export default function AssistantPage() {
   const cameraVigiaStreamRef = useRef(null);
   const screenShareCameraHostRef = useRef(null);
   const [cameraVigiaIncomingMsg, setCameraVigiaIncomingMsg] = useState(null);
+
+  // Modo Rádio: a Lisa incorpora uma apresentadora de rádio, alternando blocos de locução
+  // (novidades reais de Trello/Tarefas Delp/Sentinela/Pensamentos, categoria sorteada) com
+  // música de verdade da playlist (radio/playlist.txt, tocada via YouTube IFrame API — ver
+  // src/lib/youtubePlayer.js). Ela anuncia a música antes de tocar e comenta depois que acaba.
+  const RADIO_CATEGORIES = ["trello", "delp", "sentinel", "thoughts"];
+  const [radioMode, setRadioMode] = useState(false);
+  const [radioStatus, setRadioStatus] = useState(null); // texto curto pro widget flutuante
+  const [radioNowPlaying, setRadioNowPlaying] = useState(null); // {title} | null
+  const radioContainerRef = useRef(null); // <div> onde o player do YouTube é montado
+  const radioPlayerRef = useRef(null); // instância YT.Player (uma só, reaproveitada entre músicas)
+  const radioPlaylistRef = useRef([]);
+  const radioRecentRef = useRef([]); // últimos videoIds tocados — evita repetir em sequência
+  const radioStateHandlerRef = useRef(null); // ver playAndWaitEnded
+
+  useEffect(() => {
+    if (!radioMode) { setRadioStatus(null); setRadioNowPlaying(null); return; }
+    let stopped = false;
+
+    const speakRadio = async (text) => {
+      if (!text || stopped) return;
+      // timeout de segurança: se algo cortar o áudio por fora (ex.: uma pergunta direta
+      // enquanto o rádio fala) sem disparar onended/onerror, o loop não pode ficar preso pra
+      // sempre esperando uma promise que nunca resolve.
+      await Promise.race([
+        speakText(text, { voiceName: voiceNameForScreenRef.current }).catch(() => {}),
+        new Promise((r) => setTimeout(r, 30000)),
+      ]);
+    };
+
+    const fetchSegment = async (body) => {
+      try {
+        const res = await fetch("/api/radio/segment", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+        const data = await res.json();
+        return data?.ok ? data.text : null;
+      } catch (err) {
+        addLog("[RÁDIO]", OR, `falha ao gerar locução: ${err.message}`);
+        return null;
+      }
+    };
+
+    const pickSong = () => {
+      const list = radioPlaylistRef.current;
+      if (!list.length) return null;
+      const recent = radioRecentRef.current;
+      const candidates = list.filter((s) => !recent.includes(s.videoId));
+      const pool = candidates.length ? candidates : list; // já tocou tudo recentemente — libera de novo
+      const song = pool[Math.floor(Math.random() * pool.length)];
+      radioRecentRef.current = [...recent.slice(-Math.max(0, list.length - 2)), song.videoId];
+      return song;
+    };
+
+    const run = async () => {
+      if (!radioPlaylistRef.current.length) {
+        try {
+          const res = await fetch("/api/radio/playlist");
+          const data = await res.json();
+          radioPlaylistRef.current = data?.ok ? data.playlist : [];
+          if (!radioPlaylistRef.current.length) addLog("[RÁDIO]", OR, "playlist vazia ou radio/playlist.txt não encontrado");
+        } catch (err) {
+          addLog("[RÁDIO]", OR, `falha ao carregar playlist: ${err.message}`);
+        }
+      }
+      await loadYouTubeAPI();
+      if (stopped) return;
+      if (!radioPlayerRef.current && radioContainerRef.current) {
+        radioPlayerRef.current = await createYouTubePlayer(radioContainerRef.current, {
+          onStateChange: (e) => radioStateHandlerRef.current?.(e),
+        });
+      }
+
+      while (!stopped) {
+        // bloco de locução — categoria sorteada
+        const category = RADIO_CATEGORIES[Math.floor(Math.random() * RADIO_CATEGORIES.length)];
+        setRadioStatus(`falando sobre ${category === "trello" ? "Trello" : category === "delp" ? "Tarefas Delp" : category === "sentinel" ? "Sentinela" : "pensamentos"}…`);
+        const talk = await fetchSegment({ kind: "talk", category });
+        if (stopped) break;
+        addLog("[RÁDIO]", PU, talk || "(sem locução desta vez)");
+        await speakRadio(talk);
+        if (stopped) break;
+
+        // bloco de música — só se a playlist carregou e o player está pronto
+        const song = pickSong();
+        if (song && radioPlayerRef.current) {
+          setRadioStatus("anunciando a música…");
+          const announce = await fetchSegment({ kind: "announce", songTitle: song.title });
+          if (stopped) break;
+          addLog("[RÁDIO]", PU, announce || `(tocando ${song.title})`);
+          await speakRadio(announce);
+          if (stopped) break;
+          setRadioNowPlaying(song);
+          setRadioStatus(`tocando: ${song.title}`);
+          await playAndWaitEnded(radioPlayerRef.current, song.videoId, radioStateHandlerRef);
+          setRadioNowPlaying(null);
+          if (stopped) break;
+          setRadioStatus("comentando a música…");
+          const comment = await fetchSegment({ kind: "comment", songTitle: song.title });
+          if (stopped) break;
+          addLog("[RÁDIO]", PU, comment || "(sem comentário desta vez)");
+          await speakRadio(comment);
+        }
+      }
+    };
+    run();
+
+    return () => {
+      stopped = true;
+      radioStateHandlerRef.current = null;
+      radioPlayerRef.current?.stopVideo?.();
+    };
+  }, [radioMode, addLog]);
 
   useEffect(() => {
     if (!observanceMode) {
@@ -2376,6 +2488,18 @@ export default function AssistantPage() {
     </div>
   );
 
+  // Widget flutuante do Modo Rádio — SEMPRE montado enquanto radioMode estiver ligado (mesma
+  // lição do bug do preview de "assistir": nunca deixar um player vivo dentro de algo que pode
+  // desmontar por causa de navegação na interface, tipo abrir/fechar categoria).
+  const radioWidget = radioMode && (
+    <div style={{ position: "fixed", bottom: 16, left: 16, zIndex: 210, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+      <div ref={radioContainerRef} style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${PU}`, boxShadow: "0 4px 16px rgba(0,0,0,0.5)" }} />
+      <div style={{ ...mono, fontSize: 9, letterSpacing: 1, color: "#eafcff", background: "rgba(0,0,0,0.7)", padding: "4px 10px", borderRadius: 4, maxWidth: 220 }}>
+        📻 {radioNowPlaying ? `TOCANDO: ${radioNowPlaying.title}` : (radioStatus || "sintonizando…").toUpperCase()}
+      </div>
+    </div>
+  );
+
   // ==========================================================================================
   // MOBILE — tela própria, só o Assistente (sem Topbar/Sidebar, ver Shell.js): escolhe entre
   // conversa por CHAT (bolhas, como um app de chat de IA) ou por VOZ (tela escura, só a onda
@@ -2401,6 +2525,7 @@ export default function AssistantPage() {
         {fullscreenOverlay}
         {cameraVigiaMessageToast}
         {watchPreviews}
+        {radioWidget}
         {/* barra superior mínima */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(var(--accent-rgb),0.12)", flex: "none" }}>
           <button
@@ -2878,6 +3003,22 @@ export default function AssistantPage() {
                 em qualquer aparelho, mesmo sem o Modo Tela ligado aqui.
               </div>
 
+              {/* Modo Rádio — a Lisa incorpora uma apresentadora de rádio, alternando locução
+                  (novidades reais de Trello/Tarefas Delp/Sentinela/Pensamentos) com música de
+                  verdade da playlist (radio/playlist.txt, tocada via YouTube). */}
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>MODO RÁDIO</div>
+              <button
+                onClick={() => setRadioMode((v) => !v)}
+                style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${radioMode ? PU : "rgba(var(--accent-rgb),0.18)"}`, background: radioMode ? "rgba(201,166,255,0.12)" : "transparent", color: radioMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
+              >
+                📻 Modo Rádio: {radioMode ? "ON" : "OFF"}
+              </button>
+              <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
+                A Lisa vira apresentadora: alterna blocos de novidades reais (Trello, Tarefas
+                Delp, Sentinela, Pensamentos) com música da sua playlist — anuncia antes de
+                tocar e comenta depois. Veja o player no canto inferior esquerdo da tela.
+              </div>
+
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>MODO ESCUTA</div>
               <button
                 onClick={() => setMicWatchMode((v) => !v)}
@@ -2976,6 +3117,7 @@ export default function AssistantPage() {
       {fullscreenOverlay}
       {cameraVigiaMessageToast}
       {watchPreviews}
+      {radioWidget}
       {/* ESCOPO DO ASSISTENTE */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flexWrap: "wrap" }}>
         <span style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)" }}>ESCOPO</span>
@@ -3064,6 +3206,7 @@ export default function AssistantPage() {
             { key: "code", label: "🛠️ CÓDIGO", active: codeMode },
             { key: "sensing", label: "👁 OBSERVAÇÃO", active: observanceMode || screenMode || micWatchMode },
             { key: "vigia", label: "🕵️ VIGIA", active: vigiaMode },
+            { key: "radio", label: "📻 RÁDIO", active: radioMode },
           ].map((cat) => (
             <button
               key={cat.key}
@@ -3444,6 +3587,30 @@ export default function AssistantPage() {
                   </>
                 )}
               </>
+            )}
+          </div>
+        )}
+
+        {openSettingsCategory === "radio" && (
+          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
+            {/* Modo Rádio — a Lisa incorpora uma apresentadora de rádio, alternando locução
+                (novidades reais) com música de verdade da playlist (radio/playlist.txt). Ver o
+                useEffect de radioMode acima e o widget flutuante (radioWidget). */}
+            <button
+              onClick={() => setRadioMode((v) => !v)}
+              title={radioMode ? "Modo Rádio ligado — veja o player no canto da tela. Clique pra desligar" : "Ligar o Modo Rádio: a Lisa vira apresentadora, intercalando novidades reais com música da sua playlist"}
+              style={{
+                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                border: `1px solid ${radioMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
+                background: radioMode ? "rgba(201,166,255,0.12)" : "transparent",
+                color: radioMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              📻 RÁDIO {radioMode ? "ON" : "OFF"}
+            </button>
+            {radioMode && (
+              <span style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.6)" }}>veja o player no canto inferior esquerdo</span>
             )}
           </div>
         )}
