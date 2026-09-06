@@ -196,25 +196,35 @@ export default function AssistantPage() {
   const vigiaWatchVideoRef = useRef(null);
   const screenShareViewerRef = useRef(null);
   useEffect(() => { if (!vigiaMode) setVigiaWatching(false); }, [vigiaMode]);
+
+  // linha(s) de diagnóstico mais recentes, mostradas DIRETO embaixo do preview flutuante (ver
+  // watchPreviews) — sem precisar navegar até a aba LOGS separada pra ver o que está
+  // acontecendo, especialmente útil no celular.
+  const [watchDebugLines, setWatchDebugLines] = useState([]);
+  const pushWatchDebug = useCallback((line) => {
+    setWatchDebugLines((lines) => [...lines.slice(-5), line]);
+  }, []);
+
   useEffect(() => {
     if (!vigiaWatching) { setVigiaWatchStatus(null); return; }
     screenShareViewerRef.current = viewerWatchScreen({
       deviceId: getDeviceId(),
       onTrack: (mediaStream) => {
         addLog("[VIGIA]", GR, `stream recebida: ${mediaStream?.getVideoTracks().length ?? 0} faixa(s) de vídeo`);
+        pushWatchDebug(`tela: faixa de vídeo recebida`);
         // ontrack dispara UMA VEZ POR FAIXA (vídeo, áudio…) mesmo sendo o mesmo stream — sem
         // essa checagem, religar o srcObject de novo pra cada faixa cancelava o play() anterior
         // ("interrupted by a new load request"), inofensivo mas gerava ruído no log.
         if (vigiaWatchVideoRef.current && vigiaWatchVideoRef.current.srcObject !== mediaStream) {
           vigiaWatchVideoRef.current.srcObject = mediaStream;
-          vigiaWatchVideoRef.current.play().catch((err) => addLog("[VIGIA]", OR, `play() falhou: ${err.message}`));
+          vigiaWatchVideoRef.current.play().catch((err) => { addLog("[VIGIA]", OR, `play() falhou: ${err.message}`); pushWatchDebug(`tela: play() falhou — ${err.message}`); });
         }
       },
-      onStatus: setVigiaWatchStatus,
-      onLog: (msg) => addLog("[VIGIA]", OR, msg),
+      onStatus: (s) => { setVigiaWatchStatus(s); pushWatchDebug(`tela: ${s}`); },
+      onLog: (msg) => { addLog("[VIGIA]", OR, msg); pushWatchDebug(`tela: ${msg}`); },
     });
     return () => { screenShareViewerRef.current?.stop(); screenShareViewerRef.current = null; };
-  }, [vigiaWatching, addLog]);
+  }, [vigiaWatching, addLog, pushWatchDebug]);
 
   // Assistir a Câmera de Vigia de outro dispositivo (canal "camera") — mesma mecânica de
   // "Assistir ao vivo" acima, só que aponta pro canal da câmera em vez do da tela. `sendChat`
@@ -233,16 +243,17 @@ export default function AssistantPage() {
       channel: "camera",
       onTrack: (mediaStream) => {
         addLog("[VIGIA]", GR, `câmera recebida: ${mediaStream?.getVideoTracks().length ?? 0} faixa(s) de vídeo`);
+        pushWatchDebug(`câmera: faixa de vídeo recebida`);
         if (cameraWatchVideoRef.current && cameraWatchVideoRef.current.srcObject !== mediaStream) {
           cameraWatchVideoRef.current.srcObject = mediaStream;
-          cameraWatchVideoRef.current.play().catch((err) => addLog("[VIGIA]", OR, `play() falhou: ${err.message}`));
+          cameraWatchVideoRef.current.play().catch((err) => { addLog("[VIGIA]", OR, `play() falhou: ${err.message}`); pushWatchDebug(`câmera: play() falhou — ${err.message}`); });
         }
       },
-      onStatus: setCameraWatchStatus,
-      onLog: (msg) => addLog("[VIGIA]", OR, msg),
+      onStatus: (s) => { setCameraWatchStatus(s); pushWatchDebug(`câmera: ${s}`); },
+      onLog: (msg) => { addLog("[VIGIA]", OR, msg); pushWatchDebug(`câmera: ${msg}`); },
     });
     return () => { screenShareCameraViewerRef.current?.stop(); screenShareCameraViewerRef.current = null; };
-  }, [cameraWatching, addLog]);
+  }, [cameraWatching, addLog, pushWatchDebug]);
 
   const sendCameraChat = useCallback(() => {
     const text = cameraChatText.trim();
@@ -2355,6 +2366,11 @@ export default function AssistantPage() {
           <div style={{ ...mono, fontSize: 9, letterSpacing: 1, color: cameraWatchStatus === "connected" ? GR : "rgba(207,239,251,0.7)", marginTop: 4, background: "rgba(0,0,0,0.6)", padding: "2px 8px", borderRadius: 4 }}>
             📷 {cameraWatchStatus === "connected" ? "AO VIVO" : (cameraWatchStatus || "conectando…").toUpperCase()}
           </div>
+        </div>
+      )}
+      {watchDebugLines.length > 0 && (
+        <div style={{ ...mono, fontSize: 8, lineHeight: 1.6, color: "rgba(207,239,251,0.85)", background: "rgba(0,0,0,0.75)", padding: "6px 8px", borderRadius: 6, maxWidth: 220, textAlign: "left" }}>
+          {watchDebugLines.map((line, i) => <div key={i}>{line}</div>)}
         </div>
       )}
     </div>
