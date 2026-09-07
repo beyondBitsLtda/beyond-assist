@@ -8,7 +8,7 @@ import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 import { langForPath } from "@/lib/highlightCode.js";
 import { Highlight } from "prism-react-renderer";
-import { TTS_VOICES } from "@/lib/ttsVoices.js";
+import { TTS_VOICES, STEVE_VOICE_NAME } from "@/lib/ttsVoices.js";
 import { pickBrowserVoice, speakText, stopBrowserVoiceAudio, isBrowserVoiceAudioPlaying } from "@/lib/browserVoice.js";
 import { useIsMobile } from "@/lib/useIsMobile.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
@@ -520,8 +520,8 @@ export default function AssistantPage() {
   // (novidades reais de Trello/Tarefas Delp/Sentinela/Pensamentos, categoria sorteada) com
   // música de verdade da playlist (radio/playlist.txt, tocada via YouTube IFrame API — ver
   // src/lib/youtubePlayer.js). Ela anuncia a música antes de tocar e comenta depois que acaba.
-  const RADIO_CATEGORIES = ["trello", "delp", "sentinel", "thoughts", "weather"];
-  const RADIO_CATEGORY_LABELS = { trello: "Trello", delp: "Tarefas Delp", sentinel: "Sentinela", thoughts: "pensamentos", weather: "previsão do tempo" };
+  const RADIO_CATEGORIES = ["trello", "delp", "sentinel", "thoughts", "weather", "news"];
+  const RADIO_CATEGORY_LABELS = { trello: "Trello", delp: "Tarefas Delp", sentinel: "Sentinela", thoughts: "pensamentos", weather: "previsão do tempo", news: "notícias (com o Steve)" };
   const [radioMode, setRadioMode] = useState(false);
   const [radioStatus, setRadioStatus] = useState(null); // texto curto pro widget flutuante
   const [radioNowPlaying, setRadioNowPlaying] = useState(null); // {title} | null
@@ -535,7 +535,7 @@ export default function AssistantPage() {
     if (!radioMode) { setRadioStatus(null); setRadioNowPlaying(null); return; }
     let stopped = false;
 
-    const speakRadio = async (text) => {
+    const speakRadio = async (text, voiceOverride) => {
       if (!text || stopped) return;
       // trava a vez (mesmo mecanismo que a vigília do Modo Tela/Observância já usa entre si) —
       // sem isso, a vigília delas podia disparar NO MEIO da fala do rádio e cortar o áudio dela
@@ -549,7 +549,7 @@ export default function AssistantPage() {
         // (bug real visto: "corta e já pula pro próximo" — não era outra vigília, era esse
         // prazo). Isso aqui só existe pra não travar pra sempre se algo really der errado.
         await Promise.race([
-          speakText(text, { voiceName: voiceNameForScreenRef.current }).catch(() => {}),
+          speakText(text, { voiceName: voiceOverride || voiceNameForScreenRef.current }).catch(() => {}),
           new Promise((r) => setTimeout(r, 120000)),
         ]);
       } finally {
@@ -605,7 +605,9 @@ export default function AssistantPage() {
         const talk = await fetchSegment({ kind: "talk", category });
         if (stopped) break;
         addLog("[RÁDIO]", PU, talk || "(sem locução desta vez)");
-        await speakRadio(talk);
+        // categoria "news" é narrada pelo Steve, com voz própria — as demais seguem com a voz
+        // da Lisa escolhida nas configurações.
+        await speakRadio(talk, category === "news" ? STEVE_VOICE_NAME : undefined);
         if (stopped) break;
 
         // bloco de música — só se a playlist carregou e o player está pronto
@@ -3111,6 +3113,7 @@ export default function AssistantPage() {
                   { href: "/tasks", glyph: "⏱", label: "TAREFAS" },
                   { href: "/thoughts", glyph: "✎", label: "PENSAMENTOS" },
                   { href: "/sentinel", glyph: "◆", label: "SENTINELA" },
+                  { href: "/news", glyph: "📰", label: "NOTÍCIAS & CLIMA" },
                   { href: "/gemini-keys", glyph: "🔑", label: "CHAVES GEMINI" },
                   { href: "/delp-tasks", glyph: "🏢", label: "TAREFAS DELP" },
                   { href: "/scheduled-announcements", glyph: "⏰", label: "FALAS AGENDADAS" },

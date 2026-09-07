@@ -5,6 +5,7 @@ import { listDelpTasks } from "@/lib/delpTasks.js";
 import { listTickets, summarizeTickets, STATUS_ORDER } from "@/lib/sentinel.js";
 import { listThoughts } from "@/lib/notes.js";
 import { getWeatherForecast } from "@/lib/weather.js";
+import { getTechNews } from "@/lib/techNews.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,6 +55,10 @@ async function buildCategoryData(category) {
       return cities
         .map((c) => `${c.city}: ${c.days.slice(0, 2).map((d, i) => `${i === 0 ? "hoje" : "amanhã"} ${d.description}, máx ${Math.round(d.max)}°C mín ${Math.round(d.min)}°C, ${d.rainChance}% de chance de chuva`).join("; ")}`)
         .join("\n");
+    }
+    if (category === "news") {
+      const items = await getTechNews({ limit: 8 });
+      return items.map((n) => `- [${n.source}] ${n.title}`).join("\n");
     }
     return "";
   } catch {

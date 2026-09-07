@@ -19,3 +19,10 @@ export const TTS_VOICES = [
   { name: "Vindemiatrix", trait: "Gentle" }, { name: "Sadachbia", trait: "Lively" },
   { name: "Sadaltager", trait: "Knowledgeable" }, { name: "Sulafat", trait: "Warm" },
 ];
+
+// Voz fixa do "Steve" — locutor de voz masculina do Modo Rádio pra categoria "news" (notícias),
+// com persona ao estilo Steve Jobs (ver STEVE_NEWS_INSTRUCTION em src/lib/gemini.js). Google não
+// documenta gênero oficialmente, mas "Charon" é uma das vozes de reconhecimento comum como
+// masculina pela comunidade — escolhida também pelo traço "Informative", que combina com um
+// locutor de notícias.
+export const STEVE_VOICE_NAME = "Charon";

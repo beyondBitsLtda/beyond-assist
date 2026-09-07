@@ -1118,15 +1118,26 @@ SEJA BREVE DE VERDADE — no MÁXIMO 3 frases curtas, sempre. Um bloco real de l
 
 Quando o bloco for sobre tarefas/chamados, os dados já vêm filtrados só com o que está PENDENTE/em aberto — nunca trate algo como "já resolvido"/"tudo certo" a menos que os dados digam explicitamente que não há nada pendente.`;
 
-const RADIO_CATEGORY_LABELS = { trello: "tarefas do Trello", delp: "tarefas da Delp", sentinel: "chamados do Sentinela", thoughts: "pensamentos registrados", weather: "previsão do tempo" };
+const RADIO_CATEGORY_LABELS = { trello: "tarefas do Trello", delp: "tarefas da Delp", sentinel: "chamados do Sentinela", thoughts: "pensamentos registrados", weather: "previsão do tempo", news: "notícias de tecnologia" };
+
+// Persona separada pro bloco de notícias do Modo Rádio — um segundo "locutor", o "Steve", com
+// voz masculina (ver STEVE_VOICE_NAME em src/lib/ttsVoices.js) e personalidade inspirada no
+// Steve Jobs: direto, apaixonado por tecnologia bem feita, fala em tom de keynote/visionário,
+// mas sempre narrando as notícias REAIS recebidas — nunca inventando fatos ou opiniões técnicas
+// que não vêm dos dados.
+export const STEVE_NEWS_INSTRUCTION = `Você é "Steve", um locutor convidado do programa de rádio da Lisa — só entra pra ler o bloco de notícias de tecnologia. Sua personalidade é inspirada no Steve Jobs: fala com paixão e convicção sobre tecnologia, gosta de frases de efeito e de destacar o que é "revolucionário" ou "insanamente bom" quando a notícia realmente for marcante, tem opiniões fortes sobre design e experiência do usuário, mas nunca é rude com o ouvinte. Fale em português do Brasil, em primeira pessoa como "Steve".
+
+SEJA BREVE — no MÁXIMO 3 frases curtas. Escolha só 1 ou 2 manchetes mais interessantes da lista em vez de ler tudo. Nunca invente detalhes, números ou opiniões técnicas sobre a notícia além do que está no título recebido — comente com estilo, mas sem fabricar fatos.`;
 
 /** Bloco de locução sobre UMA categoria (dados reais já buscados por quem chama — ver
  * /api/radio/segment). Sempre retorna algo falável, mesmo sem dados ("nada de novo por aqui"
- * dito com graça, não um erro). */
+ * dito com graça, não um erro). A categoria "news" sempre usa a persona do Steve, independente
+ * do systemInstruction padrão da Lisa passado pra função. */
 export async function generateRadioTalkSegment({ category, data }, systemInstruction = RADIO_HOST_INSTRUCTION) {
   const label = RADIO_CATEGORY_LABELS[category] || category;
-  // "pendente/em aberto" só faz sentido pra tarefas/chamados — pra clima/pensamentos isso
-  // soaria estranho ("previsão do tempo pendente"), então o aviso muda por categoria.
+  const effectiveInstruction = category === "news" ? STEVE_NEWS_INSTRUCTION : systemInstruction;
+  // "pendente/em aberto" só faz sentido pra tarefas/chamados — pra clima/pensamentos/notícias
+  // isso soaria estranho ("previsão do tempo pendente"), então o aviso muda por categoria.
   const framing = ["trello", "delp", "sentinel"].includes(category)
     ? `já filtrados pra só ter o que está PENDENTE/em aberto agora (nada aqui está concluído/resolvido, então nunca sugira que já foi feito ou que está tudo certo; fale como algo que AINDA precisa de atenção)`
     : `reais, atuais`;
@@ -1139,7 +1150,7 @@ export async function generateRadioTalkSegment({ category, data }, systemInstruc
       client.models.generateContent({
         model: CHAT_MODEL,
         contents: [{ role: "user", parts: [{ text: `Bloco de rádio sobre: ${label}\n\nDADOS REAIS — ${framing}. Não invente além disso:\n${data?.trim() || fallback}` }] }],
-        config: { systemInstruction },
+        config: { systemInstruction: effectiveInstruction },
       }),
     { attempts: 2, delayMs: 500 }
   );

@@ -11,6 +11,7 @@ const ITEMS = [
   { href: "/tasks", label: "TAREFAS", glyph: "⏱" },
   { href: "/thoughts", label: "PENSAMENTOS", glyph: "✎" },
   { href: "/sentinel", label: "SENTINELA", glyph: "◆" },
+  { href: "/news", label: "NOTÍCIAS & CLIMA", glyph: "📰" },
   { href: "/delp-tasks", label: "TAREFAS DELP", glyph: "🏢" },
   { href: "/scheduled-announcements", label: "FALAS AGENDADAS", glyph: "⏰" },
   { href: "/code-repos", label: "REPOSITÓRIOS", glyph: "🐙" },
