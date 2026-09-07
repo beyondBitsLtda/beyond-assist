@@ -2,7 +2,7 @@
   "name": "lisa-code",
   "displayName": "Lisa Code",
   "description": "A Lisa (Beyond Bits) dentro do VS Code — conversa, lê e propõe mudanças no seu código. Extensão de uso PESSOAL, nunca publicada.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "personal-use-only",
   "private": true,
   "engines": { "vscode": "^1.85.0" },
@@ -10,15 +10,21 @@
   "main": "./out/extension.js",
   "activationEvents": [],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "lisaCode", "title": "Lisa Code", "icon": "resources/icon.svg" }
+      ]
+    },
     "views": {
-      "explorer": [
+      "lisaCode": [
         { "id": "lisaCode.chatView", "name": "Lisa Code", "type": "webview" }
       ]
     },
     "commands": [
       { "command": "lisaCode.setToken", "title": "Lisa Code: Configurar token pessoal" },
       { "command": "lisaCode.setBaseUrl", "title": "Lisa Code: Configurar URL do Beyond Bits" },
-      { "command": "lisaCode.newConversation", "title": "Lisa Code: Nova conversa" }
+      { "command": "lisaCode.newConversation", "title": "Lisa Code: Nova conversa" },
+      { "command": "lisaCode.openFloating", "title": "Lisa Code: Abrir janela flutuante" }
     ],
     "configuration": {
       "title": "Lisa Code",

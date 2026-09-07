@@ -1,15 +1,19 @@
 import * as vscode from "vscode";
 import { LisaClient } from "./lisaClient";
 import { ChatViewProvider } from "./chatViewProvider";
+import { LisaPanel } from "./lisaPanel";
 
 const TOKEN_KEY = "lisaCode.token";
 
 export function activate(context: vscode.ExtensionContext) {
   const client = new LisaClient(context);
-  const provider = new ChatViewProvider(context, client);
+  const openFloating = () => LisaPanel.open(client);
+  const provider = new ChatViewProvider(openFloating);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, provider),
+
+    vscode.commands.registerCommand("lisaCode.openFloating", openFloating),
 
     vscode.commands.registerCommand("lisaCode.setToken", async () => {
       const value = await vscode.window.showInputBox({
@@ -38,7 +42,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     vscode.commands.registerCommand("lisaCode.newConversation", () => {
       client.reset();
-      provider.clear();
+      LisaPanel.clear();
     })
   );
 }
