@@ -47,11 +47,13 @@ const CACHE_MS = 30 * 60 * 1000;
 let _cache = null; // { at, data }
 
 /** Previsão de 4 dias pra Belo Horizonte e Vespasiano (MG) — usada pela aba do Sentinela e
- * pelo Modo Rádio (categoria "weather"). */
+ * pelo Modo Rádio (categoria "weather"). Busca as cidades em paralelo mas SEM tudo-ou-nada: uma
+ * falha pontual (ex.: 503 passageiro do Open-Meteo) numa cidade não deve derrubar a previsão da
+ * outra — bug real visto (Promise.all rejeitava tudo por causa de 1 cidade só). */
 export async function getWeatherForecast() {
   if (_cache && Date.now() - _cache.at < CACHE_MS) return _cache.data;
 
-  const data = await Promise.all(
+  const results = await Promise.allSettled(
     CITIES.map(async (c) => {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode&timezone=America%2FSao_Paulo&forecast_days=4`;
       const res = await fetch(url);
@@ -69,6 +71,9 @@ export async function getWeatherForecast() {
     })
   );
 
-  _cache = { at: Date.now(), data };
+  const data = results.filter((r) => r.status === "fulfilled").map((r) => r.value);
+  // só guarda em cache se pelo menos uma cidade veio — uma falha total não deve "grudar" por
+  // 30 minutos, deixa tentar de novo na próxima chamada.
+  if (data.length) _cache = { at: Date.now(), data };
   return data;
 }

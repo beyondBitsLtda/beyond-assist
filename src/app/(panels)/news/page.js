@@ -82,10 +82,13 @@ export default function NewsPage() {
       <div style={{ marginBottom: 24 }}>
         {weatherError && <div style={{ ...mono, fontSize: 11, color: OR }}>⚠ {weatherError}</div>}
         {loadingWeather && !weather && <div style={{ ...mono, fontSize: 10.5, color: "rgba(207,239,251,0.5)" }}>carregando previsão…</div>}
-        {weather && (
+        {weather && weather.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
             {weather.map((c) => <WeatherCard key={c.city} city={c} />)}
           </div>
+        )}
+        {weather && weather.length === 0 && (
+          <div style={{ ...mono, fontSize: 10.5, color: "rgba(207,239,251,0.5)" }}>previsão indisponível no momento — tenta de novo em instantes.</div>
         )}
       </div>
 
