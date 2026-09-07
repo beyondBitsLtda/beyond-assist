@@ -18,25 +18,41 @@ const DONE_PATTERN = /conclu|feito|pronto|finaliz|done|entregue/i;
 // src/lib/sentinel.js) — os 2 últimos do fluxo.
 const SENTINEL_DONE_STATUSES = new Set(STATUS_ORDER.slice(-2));
 
+/** Embaralha uma cópia do array (Fisher-Yates). */
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 /** Busca dados REAIS e recentes de uma categoria — texto compacto pronto pro prompt da Lisa
  * (Modo Rádio nunca inventa números/tarefas, só narra o que existe de verdade). Só inclui
  * itens PENDENTES/em aberto — o que já foi concluído/resolvido nunca aparece aqui, pra não vir
  * narrado como se ainda precisasse de ação. Nunca lança — uma fonte fora do ar vira "(nada
- * registrado)" pro bloco de rádio, não um erro 500. */
+ * registrado)" pro bloco de rádio, não um erro 500.
+ *
+ * Sempre SORTEIA a amostra final de um pool mais largo (em vez de pegar sempre o mesmo top-N
+ * fixo) — sem isso, toda vez que a mesma categoria caía de novo no Modo Rádio os dados eram
+ * IDÊNTICOS, e a Lisa/Steve acabavam falando quase a mesma coisa de novo (bug real reportado
+ * pelo usuário: "os assuntos se repetem demais"). */
 async function buildCategoryData(category) {
   try {
     if (category === "trello") {
       const cards = await loadAllTrelloCards();
       const pending = cards.filter((c) => !DONE_PATTERN.test(c.list || ""));
       const withDue = pending.filter((c) => c.due).sort((a, b) => new Date(a.due) - new Date(b.due));
-      const sample = (withDue.length ? withDue : pending).slice(0, 6);
+      const pool = (withDue.length ? withDue : pending).slice(0, 15); // ainda prioriza os mais urgentes, mas não trava sempre nos 6 primeiros
+      const sample = shuffle(pool).slice(0, 6);
       return sample.map((c) => `- [${c.board}${c.list ? ` / ${c.list}` : ""}] ${c.title}${c.due ? ` (prazo: ${c.due})` : ""}`).join("\n");
     }
     if (category === "delp") {
       const tasks = await listDelpTasks();
       const pending = tasks.filter((t) => !DONE_PATTERN.test(t.status || ""));
-      return pending
-        .slice(0, 10)
+      const sample = shuffle(pending.slice(0, 20)).slice(0, 8);
+      return sample
         .map((t) => `- [${t.status}] ${t.titulo} (responsável: ${t.atribuido_a || "—"}${t.data_limite ? `, prazo: ${t.data_limite}` : ""})`)
         .join("\n");
     }
@@ -47,8 +63,9 @@ async function buildCategoryData(category) {
       return `Chamados EM ABERTO por status: ${JSON.stringify(s.byStatus)}\nPor prioridade: ${JSON.stringify(s.byPriority)}\nSLA de resposta estourado: ${s.sla.responseBreached}\nSLA de resolução estourado: ${s.sla.resolutionBreached}`;
     }
     if (category === "thoughts") {
-      const { thoughts } = await listThoughts({ limit: 8 });
-      return thoughts.map((t) => `- ${t.subject}${t.body ? `: ${t.body.slice(0, 140)}` : ""}`).join("\n");
+      const { thoughts } = await listThoughts({ limit: 20 });
+      const sample = shuffle(thoughts).slice(0, 6);
+      return sample.map((t) => `- ${t.subject}${t.body ? `: ${t.body.slice(0, 140)}` : ""}`).join("\n");
     }
     if (category === "weather") {
       const cities = await getWeatherForecast();
@@ -57,8 +74,9 @@ async function buildCategoryData(category) {
         .join("\n");
     }
     if (category === "news") {
-      const items = await getTechNews({ limit: 8 });
-      return items.map((n) => `- [${n.source}] ${n.title}`).join("\n");
+      const items = await getTechNews({ limit: 20 });
+      const sample = shuffle(items).slice(0, 6);
+      return sample.map((n) => `- [${n.source}] ${n.title}`).join("\n");
     }
     return "";
   } catch {

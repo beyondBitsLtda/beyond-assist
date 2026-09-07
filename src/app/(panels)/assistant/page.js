@@ -529,6 +529,7 @@ export default function AssistantPage() {
   const radioPlayerRef = useRef(null); // instância YT.Player (uma só, reaproveitada entre músicas)
   const radioPlaylistRef = useRef([]);
   const radioRecentRef = useRef([]); // últimos videoIds tocados — evita repetir em sequência
+  const radioRecentCategoriesRef = useRef([]); // últimas categorias faladas — mesma ideia, evita "sempre os mesmos assuntos"
   const radioStateHandlerRef = useRef(null); // ver playAndWaitEnded
   const radioSkipRef = useRef(null); // preenchida enquanto uma música toca — ver botão "pular" no radioWidget
 
@@ -569,6 +570,15 @@ export default function AssistantPage() {
       }
     };
 
+    const pickCategory = () => {
+      const recent = radioRecentCategoriesRef.current;
+      const candidates = RADIO_CATEGORIES.filter((c) => !recent.includes(c));
+      const pool = candidates.length ? candidates : RADIO_CATEGORIES; // já falou de tudo recentemente — libera de novo
+      const category = pool[Math.floor(Math.random() * pool.length)];
+      radioRecentCategoriesRef.current = [...recent.slice(-Math.max(0, RADIO_CATEGORIES.length - 2)), category];
+      return category;
+    };
+
     const pickSong = () => {
       const list = radioPlaylistRef.current;
       if (!list.length) return null;
@@ -600,8 +610,8 @@ export default function AssistantPage() {
       }
 
       while (!stopped) {
-        // bloco de locução — categoria sorteada
-        const category = RADIO_CATEGORIES[Math.floor(Math.random() * RADIO_CATEGORIES.length)];
+        // bloco de locução — categoria sorteada (evitando repetir as últimas faladas)
+        const category = pickCategory();
         if (category === "news") {
           // notícias viram um "quadro" com o Steve: a Lisa chama ele, ele lê as manchetes com a
           // voz dele, e a Lisa comenta o que ele falou antes de seguir — como uma transição de
