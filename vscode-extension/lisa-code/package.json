@@ -2,7 +2,7 @@
   "name": "lisa-code",
   "displayName": "Lisa Code",
   "description": "A Lisa (Beyond Bits) dentro do VS Code — conversa, lê e propõe mudanças no seu código. Extensão de uso PESSOAL, nunca publicada.",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "personal-use-only",
   "private": true,
   "engines": { "vscode": "^1.85.0" },
@@ -35,11 +35,20 @@
           "description": "URL base do Beyond Bits (ex.: https://seu-deploy.vercel.app) — sem barra no final."
         }
       }
-    }
+    },
+    "themes": [
+      { "label": "Lisa HUD — Ciano", "uiTheme": "vs-dark", "path": "./themes/lisa-hud-ciano.json" },
+      { "label": "Lisa HUD — Azul", "uiTheme": "vs-dark", "path": "./themes/lisa-hud-azul.json" },
+      { "label": "Lisa HUD — Roxo", "uiTheme": "vs-dark", "path": "./themes/lisa-hud-roxo.json" },
+      { "label": "Lisa HUD — Rosa", "uiTheme": "vs-dark", "path": "./themes/lisa-hud-rosa.json" },
+      { "label": "Lisa HUD — Vermelho", "uiTheme": "vs-dark", "path": "./themes/lisa-hud-vermelho.json" },
+      { "label": "Lisa HUD — Dourado", "uiTheme": "vs-dark", "path": "./themes/lisa-hud-dourado.json" }
+    ]
   },
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -w -p ./",
+    "generate-themes": "node scripts/generate-themes.mjs",
     "package": "vsce package"
   },
   "devDependencies": {
