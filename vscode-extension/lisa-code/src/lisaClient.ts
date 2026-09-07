@@ -16,12 +16,13 @@ interface Content {
   parts: Part[];
 }
 
-const MAX_TOOL_ROUNDS = 8; // trava de segurança — evita loop infinito se o modelo insistir em chamar função
+const MAX_TOOL_ROUNDS = 10; // trava de segurança — evita loop infinito se o modelo insistir em chamar função (folga extra pro report_progress não roubar rodada de ferramenta de verdade)
 
 export type ChatEvent =
   | { type: "text"; text: string }
   | { type: "tool-start"; name: string; args: Record<string, unknown> }
   | { type: "tool-done"; name: string; summary: string }
+  | { type: "progress"; percent: number; status: string }
   | { type: "error"; message: string };
 
 /** Provedor de conteúdo virtual pro diff de propose_edit — serve o "depois" proposto sem
@@ -303,6 +304,7 @@ export class LisaClient {
     if (name === "search_workspace") return this.execSearchWorkspace(args);
     if (name === "create_file") return this.execCreateFile(args);
     if (name === "delete_file") return this.execDeleteFile(args);
+    if (name === "report_progress") return { ok: true }; // não executa nada de verdade — só um sinal de UI (ver send())
     return { error: `ferramenta desconhecida: ${name}` };
   }
 
@@ -334,6 +336,18 @@ export class LisaClient {
         const call = part.functionCall!;
         const name = call.name!;
         const args = call.args || {};
+
+        // report_progress não é uma ferramenta de verdade (não mexe em nada) — vira só uma
+        // atualização da barra de progresso na UI, não uma linha de "usando ferramenta X".
+        if (name === "report_progress") {
+          const percent = Math.max(0, Math.min(100, Number(args.percent) || 0));
+          const status = String(args.status || "");
+          yield { type: "progress", percent, status };
+          const result = await this.execTool(name, args);
+          responseParts.push({ functionResponse: { id: call.id, name, response: result as object } });
+          continue;
+        }
+
         yield { type: "tool-start", name, args };
         const result = await this.execTool(name, args);
         responseParts.push({ functionResponse: { id: call.id, name, response: result as object } });

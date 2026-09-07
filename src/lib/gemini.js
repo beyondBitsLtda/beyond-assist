@@ -1124,6 +1124,8 @@ REGRAS IMPORTANTES:
 - Use get_problems quando o usuário perguntar sobre erros/avisos do código, ou antes de propor uma correção — ela só reflete o que o VS Code já analisou (normalmente arquivos abertos), não é uma varredura nova do projeto inteiro.
 - Use search_workspace pra achar onde algo aparece no projeto (uma função, uma variável, um texto) antes de mexer — é busca de TEXTO LITERAL (não é regex).
 - Use list_pending_work só quando o usuário perguntar algo relacionado a tarefas/chamados/pensamentos, e narre só o que a ferramenta devolver — nunca invente números ou itens.
+- SEMPRE narre em texto, ANTES de cada ferramenta que for chamar, uma frase curta (1 linha) dizendo o que vai fazer e em qual arquivo/onde — nunca chame uma ferramenta em silêncio, sem explicar antes o que está prestes a fazer.
+- Em qualquer tarefa de CÓDIGO que vá precisar de mais de uma ferramenta (ex.: ler + editar, ou editar vários arquivos), chame report_progress logo no início com uma estimativa de quantas etapas o trabalho vai ter, e chame de novo a cada etapa concluída, atualizando o percentual. Sempre feche em percent:100 quando a tarefa acabar de verdade (inclusive se o usuário rejeitar uma proposta — feche o ciclo mesmo assim). Isso é uma ESTIMATIVA sua, não uma medição exata — não precisa ser perfeita, só dar uma noção real de progresso. Não use isso pra perguntas simples que não envolvem mexer em código.
 - Seja direta e técnica quando o assunto for código (você está ajudando um desenvolvedor dentro do editor dele), mas mantenha seu jeito de ser nas outras conversas.`;
 
 const LISA_CODE_TOOLS = [
@@ -1204,6 +1206,18 @@ const LISA_CODE_TOOLS = [
             explanation: { type: "string", description: "Explicação curta (1-2 frases) do porquê apagar" },
           },
           required: ["path", "explanation"],
+        },
+      },
+      {
+        name: "report_progress",
+        description: "Atualiza o progresso estimado de uma tarefa de código com várias etapas — chame cedo com uma estimativa, e de novo a cada etapa concluída. Sempre termine em percent:100 quando a tarefa acabar. É a SUA estimativa, não uma medição exata.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: {
+            percent: { type: "number", description: "0 a 100 — quanto da tarefa você estima já ter concluído" },
+            status: { type: "string", description: "Frase curta do status atual, ex.: \"Etapa 2 de 4: editando o endpoint da API\"" },
+          },
+          required: ["percent", "status"],
         },
       },
     ],

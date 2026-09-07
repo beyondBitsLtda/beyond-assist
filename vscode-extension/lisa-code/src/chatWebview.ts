@@ -16,8 +16,9 @@ export function bindChatMessages(webview: vscode.Webview, client: LisaClient): C
     try {
       for await (const event of client.send(msg.text)) {
         if (event.type === "text") post({ type: "lisa-text", text: event.text });
-        else if (event.type === "tool-start") post({ type: "tool-start", name: event.name });
+        else if (event.type === "tool-start") post({ type: "tool-start", name: event.name, args: event.args });
         else if (event.type === "tool-done") post({ type: "tool-done", name: event.name });
+        else if (event.type === "progress") post({ type: "progress", percent: event.percent, status: event.status });
         else if (event.type === "error") post({ type: "lisa-error", message: event.message });
       }
     } catch (err) {
@@ -76,6 +77,13 @@ export function getChatHtml(): string {
   .status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--hud); animation: hud-blink 1.4s steps(1) infinite; }
   @keyframes hud-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.15; } }
 
+  #progressWrap { padding: 10px 18px 0; max-width: 760px; margin: 0 auto; width: 100%; display: none; }
+  #progressWrap.show { display: block; }
+  #progressStatus { font-size: 10px; letter-spacing: 0.5px; color: var(--vscode-descriptionForeground); margin-bottom: 5px; display: flex; justify-content: space-between; gap: 8px; }
+  #progressPct { color: var(--hud); font-weight: bold; flex: none; }
+  #progressTrack { height: 4px; background: rgba(127, 127, 127, 0.18); border-radius: 2px; overflow: hidden; }
+  #progressFill { height: 100%; width: 0%; background: var(--hud); box-shadow: 0 0 6px var(--hud); transition: width 0.4s ease; }
+
   #log { flex: 1; overflow-y: auto; padding: 14px 18px; max-width: 760px; margin: 0 auto; width: 100%; }
   .msg { margin-bottom: 12px; white-space: pre-wrap; line-height: 1.5; animation: hud-slidein 0.25s ease; }
   @keyframes hud-slidein { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
@@ -117,6 +125,11 @@ export function getChatHtml(): string {
   </div>
   <span id="hudColorProbe" style="color: var(--hud); display: none;"></span>
 
+  <div id="progressWrap">
+    <div id="progressStatus"><span id="progressLabel"></span><span id="progressPct">0%</span></div>
+    <div id="progressTrack"><div id="progressFill"></div></div>
+  </div>
+
   <div id="log"></div>
   <div id="inputRow">
     <textarea id="input" rows="2" placeholder="Pergunte algo, ou peça pra Lisa mexer no código..."></textarea>
@@ -149,6 +162,36 @@ export function getChatHtml(): string {
     div.querySelector("span:last-child").textContent = text;
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
+  }
+
+  // narração rica por ferramenta — o que ela tá fazendo e ONDE, não só o nome técnico da função
+  function describeTool(name, args) {
+    args = args || {};
+    if (name === "read_file") return "Lendo " + args.path;
+    if (name === "propose_edit") return "Editando " + args.path + (args.explanation ? " — " + args.explanation : "");
+    if (name === "create_file") return "Criando " + args.path + (args.explanation ? " — " + args.explanation : "");
+    if (name === "delete_file") return "Apagando " + args.path + (args.explanation ? " — " + args.explanation : "");
+    if (name === "search_workspace") return "Buscando \\"" + args.query + "\\" no workspace" + (args.glob ? " (" + args.glob + ")" : "");
+    if (name === "get_problems") return "Vendo erros do editor" + (args.path ? " em " + args.path : "");
+    if (name === "list_pending_work") return "Consultando " + (args.source || "Beyond Bits");
+    return name;
+  }
+  let lastToolDesc = "";
+
+  const progressWrap = document.getElementById("progressWrap");
+  const progressFill = document.getElementById("progressFill");
+  const progressLabel = document.getElementById("progressLabel");
+  const progressPct = document.getElementById("progressPct");
+
+  function setProgress(percent, status) {
+    progressWrap.classList.add("show");
+    progressFill.style.width = Math.max(0, Math.min(100, percent)) + "%";
+    progressPct.textContent = Math.round(percent) + "%";
+    progressLabel.textContent = status || "";
+  }
+  function hideProgress() {
+    progressWrap.classList.remove("show");
+    progressFill.style.width = "0%";
   }
 
   function send() {
@@ -250,11 +293,15 @@ export function getChatHtml(): string {
     const msg = event.data;
     if (msg.type === "user-message") append("user", "VOCÊ", msg.text);
     else if (msg.type === "lisa-text") append("lisa", "LISA", msg.text);
-    else if (msg.type === "tool-start") appendTool("analisando: " + msg.name + "...", false);
-    else if (msg.type === "tool-done") appendTool(msg.name + " concluído", true);
+    else if (msg.type === "tool-start") { lastToolDesc = describeTool(msg.name, msg.args); appendTool(lastToolDesc + "...", false); }
+    else if (msg.type === "tool-done") appendTool((lastToolDesc || msg.name) + " — concluído", true);
+    else if (msg.type === "progress") setProgress(msg.percent, msg.status);
     else if (msg.type === "lisa-error") append("error", "⚠ ERRO", msg.message);
-    else if (msg.type === "turn-done") window.__lisaOrbSetMode?.("idle");
-    else if (msg.type === "clear") log.innerHTML = "";
+    else if (msg.type === "turn-done") {
+      window.__lisaOrbSetMode?.("idle");
+      if (progressWrap.classList.contains("show")) setTimeout(hideProgress, 1200);
+    }
+    else if (msg.type === "clear") { log.innerHTML = ""; hideProgress(); }
   });
 </script>
 </body>

@@ -2,7 +2,7 @@
   "name": "lisa-code",
   "displayName": "Lisa Code",
   "description": "A Lisa (Beyond Bits) dentro do VS Code — conversa, lê e propõe mudanças no seu código. Extensão de uso PESSOAL, nunca publicada.",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "publisher": "personal-use-only",
   "private": true,
   "engines": { "vscode": "^1.85.0" },
