@@ -1157,6 +1157,40 @@ export async function generateRadioTalkSegment({ category, data }, systemInstruc
   return (res.text || "").trim() || "Por enquanto nada de novo por aqui — mas a gente já volta.";
 }
 
+/** Lisa apresenta o Steve antes do bloco de notícias — transição curta e animada, no estilo dela,
+ * passando a palavra pro comentarista. Usa a persona normal da Lisa (RADIO_HOST_INSTRUCTION), não
+ * a do Steve. */
+export async function introduceSteve(systemInstruction = RADIO_HOST_INSTRUCTION) {
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: [{ role: "user", parts: [{ text: `Anuncie (bem curto, 1 frase só, no seu estilo animado de rádio) que agora você vai passar a palavra pro Steve, o comentarista de tecnologia do programa, pra ele trazer as notícias de hoje.` }] }],
+        config: { systemInstruction },
+      }),
+    { attempts: 2, delayMs: 500 }
+  );
+  return (res.text || "").trim() || "E agora, com as notícias de tecnologia, vamos direto ao Steve!";
+}
+
+/** Lisa reage ao que o Steve ACABOU de falar no bloco de notícias — comentário curto no estilo
+ * dela, reagindo ao conteúdo real que ele disse (sem inventar fatos novos além do que ele já
+ * comentou). */
+export async function commentAfterSteve(steveText, systemInstruction = RADIO_HOST_INSTRUCTION) {
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: [{ role: "user", parts: [{ text: `O Steve acabou de comentar essas notícias de tecnologia no programa:\n"${steveText}"\n\nReaja rapidamente (1-2 frases, no seu estilo), como se estivesse ouvindo ele ao vivo — pode concordar, discordar, brincar, ou relacionar com o que for pertinente pro seu usuário, mas sem inventar fatos novos além do que ele já disse.` }] }],
+        config: { systemInstruction },
+      }),
+    { attempts: 2, delayMs: 500 }
+  );
+  return (res.text || "").trim() || "Boa, Steve! Sempre direto ao ponto.";
+}
+
 /** Anuncia (bem curto, 1 frase) a próxima música que vai tocar. */
 export async function announceRadioSong(title, systemInstruction = RADIO_HOST_INSTRUCTION) {
   const res = await withTransientRetry(

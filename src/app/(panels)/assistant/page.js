@@ -530,6 +530,7 @@ export default function AssistantPage() {
   const radioPlaylistRef = useRef([]);
   const radioRecentRef = useRef([]); // últimos videoIds tocados — evita repetir em sequência
   const radioStateHandlerRef = useRef(null); // ver playAndWaitEnded
+  const radioSkipRef = useRef(null); // preenchida enquanto uma música toca — ver botão "pular" no radioWidget
 
   useEffect(() => {
     if (!radioMode) { setRadioStatus(null); setRadioNowPlaying(null); return; }
@@ -601,14 +602,40 @@ export default function AssistantPage() {
       while (!stopped) {
         // bloco de locução — categoria sorteada
         const category = RADIO_CATEGORIES[Math.floor(Math.random() * RADIO_CATEGORIES.length)];
-        setRadioStatus(`falando sobre ${RADIO_CATEGORY_LABELS[category] || category}…`);
-        const talk = await fetchSegment({ kind: "talk", category });
-        if (stopped) break;
-        addLog("[RÁDIO]", PU, talk || "(sem locução desta vez)");
-        // categoria "news" é narrada pelo Steve, com voz própria — as demais seguem com a voz
-        // da Lisa escolhida nas configurações.
-        await speakRadio(talk, category === "news" ? STEVE_VOICE_NAME : undefined);
-        if (stopped) break;
+        if (category === "news") {
+          // notícias viram um "quadro" com o Steve: a Lisa chama ele, ele lê as manchetes com a
+          // voz dele, e a Lisa comenta o que ele falou antes de seguir — como uma transição de
+          // rádio de verdade entre apresentadores, não só um bloco narrado com voz diferente.
+          setRadioStatus("chamando o Steve…");
+          const intro = await fetchSegment({ kind: "introduce-steve" });
+          if (stopped) break;
+          addLog("[RÁDIO]", PU, intro || "(Lisa chama o Steve)");
+          await speakRadio(intro);
+          if (stopped) break;
+
+          setRadioStatus("Steve com as notícias…");
+          const steveTalk = await fetchSegment({ kind: "talk", category });
+          if (stopped) break;
+          addLog("[RÁDIO]", PU, `[STEVE] ${steveTalk || "(sem notícias desta vez)"}`);
+          await speakRadio(steveTalk, STEVE_VOICE_NAME);
+          if (stopped) break;
+
+          if (steveTalk) {
+            setRadioStatus("comentando com o Steve…");
+            const reaction = await fetchSegment({ kind: "comment-steve", sourceText: steveTalk });
+            if (stopped) break;
+            addLog("[RÁDIO]", PU, reaction || "(sem comentário desta vez)");
+            await speakRadio(reaction);
+            if (stopped) break;
+          }
+        } else {
+          setRadioStatus(`falando sobre ${RADIO_CATEGORY_LABELS[category] || category}…`);
+          const talk = await fetchSegment({ kind: "talk", category });
+          if (stopped) break;
+          addLog("[RÁDIO]", PU, talk || "(sem locução desta vez)");
+          await speakRadio(talk);
+          if (stopped) break;
+        }
 
         // bloco de música — só se a playlist carregou e o player está pronto
         const song = pickSong();
@@ -621,7 +648,7 @@ export default function AssistantPage() {
           if (stopped) break;
           setRadioNowPlaying(song);
           setRadioStatus(`tocando: ${song.title}`);
-          await playAndWaitEnded(radioPlayerRef.current, song.videoId, radioStateHandlerRef);
+          await playAndWaitEnded(radioPlayerRef.current, song.videoId, radioStateHandlerRef, radioSkipRef);
           setRadioNowPlaying(null);
           if (stopped) break;
           setRadioStatus("comentando a música…");
@@ -637,6 +664,7 @@ export default function AssistantPage() {
     return () => {
       stopped = true;
       radioStateHandlerRef.current = null;
+      radioSkipRef.current = null;
       radioPlayerRef.current?.stopVideo?.();
     };
   }, [radioMode, addLog]);
@@ -2523,8 +2551,17 @@ export default function AssistantPage() {
   const radioWidget = radioMode && (
     <div style={{ position: "fixed", bottom: 16, left: 16, zIndex: 210, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
       <div ref={radioContainerRef} style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${PU}`, boxShadow: "0 4px 16px rgba(0,0,0,0.5)" }} />
-      <div style={{ ...mono, fontSize: 9, letterSpacing: 1, color: "#eafcff", background: "rgba(0,0,0,0.7)", padding: "4px 10px", borderRadius: 4, maxWidth: 220 }}>
-        📻 {radioNowPlaying ? `TOCANDO: ${radioNowPlaying.title}` : (radioStatus || "sintonizando…").toUpperCase()}
+      <div style={{ ...mono, fontSize: 9, letterSpacing: 1, color: "#eafcff", background: "rgba(0,0,0,0.7)", padding: "4px 10px", borderRadius: 4, maxWidth: 220, display: "flex", alignItems: "center", gap: 8 }}>
+        <span>📻 {radioNowPlaying ? `TOCANDO: ${radioNowPlaying.title}` : (radioStatus || "sintonizando…").toUpperCase()}</span>
+        {radioNowPlaying && (
+          <button
+            onClick={() => radioSkipRef.current?.()}
+            title="Pular música"
+            style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "2px 6px", borderRadius: 3, border: `1px solid ${PU}`, background: "rgba(255,255,255,0.06)", color: "#eafcff", cursor: "pointer", flex: "none" }}
+          >
+            ⏭ PULAR
+          </button>
+        )}
       </div>
     </div>
   );

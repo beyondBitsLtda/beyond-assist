@@ -35,15 +35,26 @@ export function createYouTubePlayer(el, { onStateChange } = {}) {
 }
 
 /** Toca `videoId` e resolve quando o vídeo termina (ENDED) — é assim que o Modo Rádio sabe a
- * hora certa de comentar a música e seguir pro próximo bloco. */
-export function playAndWaitEnded(player, videoId, stateHandlerRef) {
+ * hora certa de comentar a música e seguir pro próximo bloco. `skipRef` (opcional) é preenchido
+ * com uma função que força esse mesmo fluxo de "terminou" na hora — usada pelo botão de pular
+ * música: pra quem chama, pular e terminar naturalmente são a mesma coisa (o comentário da Lisa
+ * sobre a música continua rodando normalmente nos dois casos). */
+export function playAndWaitEnded(player, videoId, stateHandlerRef, skipRef) {
   return new Promise((resolve) => {
-    stateHandlerRef.current = (e) => {
-      if (e.data === window.YT.PlayerState.ENDED) {
-        stateHandlerRef.current = null;
-        resolve();
-      }
+    const finish = () => {
+      stateHandlerRef.current = null;
+      if (skipRef) skipRef.current = null;
+      resolve();
     };
+    stateHandlerRef.current = (e) => {
+      if (e.data === window.YT.PlayerState.ENDED) finish();
+    };
+    if (skipRef) {
+      skipRef.current = () => {
+        player.stopVideo();
+        finish();
+      };
+    }
     player.loadVideoById(videoId);
   });
 }
