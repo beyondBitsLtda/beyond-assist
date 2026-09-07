@@ -1119,8 +1119,10 @@ export async function interpretVigiaChatMessage(text, systemInstruction = VIGIA_
 export const LISA_CODE_INSTRUCTION = `Você é a Lisa, agora rodando como uma extensão dentro do VS Code do seu usuário — uma ferramenta PESSOAL dele, ninguém mais tem acesso a ela. Você pode ler e propor mudanças no código que ele está trabalhando, além de responder usando dados reais do Beyond Bits (Trello, Tarefas Delp, Sentinela, Pensamentos).
 
 REGRAS IMPORTANTES:
-- Você NUNCA escreve num arquivo diretamente — sempre usa a ferramenta propose_edit, que mostra um diff pro usuário aprovar ou rejeitar. A mudança só é aplicada de verdade depois que ele aprovar.
+- Você NUNCA escreve, cria ou apaga um arquivo diretamente — sempre usa propose_edit, create_file ou delete_file, que mostram a mudança pro usuário aprovar ou rejeitar antes de qualquer coisa tocar o disco de verdade.
 - Antes de propor uma edição num arquivo que você ainda não viu NESTA conversa, use read_file pra ler o conteúdo atual — nunca "adivinhe" o que já está no arquivo.
+- Use get_problems quando o usuário perguntar sobre erros/avisos do código, ou antes de propor uma correção — ela só reflete o que o VS Code já analisou (normalmente arquivos abertos), não é uma varredura nova do projeto inteiro.
+- Use search_workspace pra achar onde algo aparece no projeto (uma função, uma variável, um texto) antes de mexer — é busca de TEXTO LITERAL (não é regex).
 - Use list_pending_work só quando o usuário perguntar algo relacionado a tarefas/chamados/pensamentos, e narre só o que a ferramenta devolver — nunca invente números ou itens.
 - Seja direta e técnica quando o assunto for código (você está ajudando um desenvolvedor dentro do editor dele), mas mantenha seu jeito de ser nas outras conversas.`;
 
@@ -1156,6 +1158,52 @@ const LISA_CODE_TOOLS = [
           type: "object",
           properties: { source: { type: "string", enum: ["trello", "delp", "sentinel", "thoughts"] } },
           required: ["source"],
+        },
+      },
+      {
+        name: "get_problems",
+        description: "Lê os erros e avisos do Problems panel do VS Code (lint, TypeScript, etc.) — só reflete o que o VS Code já analisou até agora, não roda uma varredura nova.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: { path: { type: "string", description: "Opcional — caminho de um arquivo específico. Sem isso, traz de todo o workspace." } },
+          required: [],
+        },
+      },
+      {
+        name: "search_workspace",
+        description: "Busca um texto LITERAL (não é regex) em vários arquivos do workspace — use pra achar onde uma função/variável/trecho aparece antes de editar algo.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Texto exato a procurar" },
+            glob: { type: "string", description: "Opcional — filtro de arquivos, ex.: \"**/*.ts\". Sem isso, busca em todo o workspace." },
+          },
+          required: ["query"],
+        },
+      },
+      {
+        name: "create_file",
+        description: "Propõe criar um arquivo novo — o usuário confirma antes de qualquer coisa ser escrita no disco. Falha se o arquivo já existir (use propose_edit pra alterar um existente).",
+        parametersJsonSchema: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Caminho do novo arquivo, relativo à raiz do workspace" },
+            content: { type: "string", description: "Conteúdo inicial completo do arquivo" },
+            explanation: { type: "string", description: "Explicação curta (1-2 frases) do porquê desse arquivo" },
+          },
+          required: ["path", "content", "explanation"],
+        },
+      },
+      {
+        name: "delete_file",
+        description: "Propõe apagar um arquivo — o usuário confirma antes de qualquer coisa acontecer. Vai pra lixeira do sistema, não é apagado de forma permanente.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Caminho do arquivo a apagar, relativo à raiz do workspace" },
+            explanation: { type: "string", description: "Explicação curta (1-2 frases) do porquê apagar" },
+          },
+          required: ["path", "explanation"],
         },
       },
     ],

@@ -168,10 +168,141 @@ export class LisaClient {
     }
   }
 
+  /** Erros e avisos que o VS Code já detectou (Problems panel) — não roda nenhuma análise nova,
+   * só lê o que os language servers já calcularam até agora (por isso normalmente só cobre
+   * arquivos que já foram abertos/visitados nesta sessão do editor). */
+  private execGetProblems(args: Record<string, unknown>): unknown {
+    const relPath = args.path ? String(args.path) : undefined;
+    const SEVERITY = ["Erro", "Aviso", "Informação", "Dica"];
+    const toEntry = (uri: vscode.Uri, d: vscode.Diagnostic) => ({
+      path: vscode.workspace.asRelativePath(uri, false),
+      line: d.range.start.line + 1,
+      severity: SEVERITY[d.severity] || "Erro",
+      message: d.message,
+    });
+
+    let entries: ReturnType<typeof toEntry>[];
+    if (relPath) {
+      const uri = this.resolveWorkspacePath(relPath);
+      entries = vscode.languages.getDiagnostics(uri).map((d) => toEntry(uri, d));
+    } else {
+      entries = vscode.languages
+        .getDiagnostics()
+        .flatMap(([uri, diags]) => diags.map((d) => toEntry(uri, d)));
+    }
+    const MAX = 100;
+    return { problems: entries.slice(0, MAX), truncated: entries.length > MAX };
+  }
+
+  /** Busca um texto LITERAL (não regex) em vários arquivos — implementação própria e simples
+   * via findFiles + leitura linha a linha, já que a API estável do VS Code não expõe o motor de
+   * busca completo do painel Search (findTextInFiles ainda é API proposta, não estável). Trava
+   * de tamanho dos dois lados (arquivos escaneados e resultados) pra nunca travar num repo
+   * gigante nem devolver um payload enorme pro modelo. */
+  private async execSearchWorkspace(args: Record<string, unknown>): Promise<unknown> {
+    const query = String(args.query || "");
+    const glob = args.glob ? String(args.glob) : "**/*";
+    if (!query) return { error: "query é obrigatório" };
+    const EXCLUDE = "**/{node_modules,.git,dist,build,out,.next,coverage}/**";
+    const MAX_FILES = 500;
+    const MAX_MATCHES = 100;
+    try {
+      const uris = await vscode.workspace.findFiles(glob, EXCLUDE, MAX_FILES);
+      const matches: { path: string; line: number; text: string }[] = [];
+      for (const uri of uris) {
+        if (matches.length >= MAX_MATCHES) break;
+        let text: string;
+        try {
+          text = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8");
+        } catch {
+          continue;
+        }
+        if (!text.includes(query)) continue;
+        const relative = vscode.workspace.asRelativePath(uri, false);
+        const lines = text.split("\n");
+        for (let i = 0; i < lines.length && matches.length < MAX_MATCHES; i++) {
+          if (lines[i].includes(query)) matches.push({ path: relative, line: i + 1, text: lines[i].trim().slice(0, 200) });
+        }
+      }
+      return { matches, truncated: matches.length >= MAX_MATCHES };
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+  }
+
+  private async execCreateFile(args: Record<string, unknown>): Promise<unknown> {
+    const relPath = String(args.path || "");
+    const content = String(args.content ?? "");
+    const explanation = String(args.explanation || "");
+    try {
+      const uri = this.resolveWorkspacePath(relPath);
+      let exists = true;
+      try {
+        await vscode.workspace.fs.stat(uri);
+      } catch {
+        exists = false;
+      }
+      if (exists) return { created: false, error: `${relPath} já existe — use propose_edit pra alterar um arquivo existente` };
+
+      const choice = await vscode.window.showInformationMessage(
+        `Lisa propõe CRIAR o arquivo ${relPath}: ${explanation}`,
+        { modal: false },
+        "Criar",
+        "Rejeitar"
+      );
+      if (choice !== "Criar") return { created: false, reason: "usuário rejeitou a proposta" };
+
+      const dir = uri.with({ path: uri.path.slice(0, uri.path.lastIndexOf("/")) });
+      try {
+        await vscode.workspace.fs.createDirectory(dir);
+      } catch {
+        /* já existe */
+      }
+      await vscode.workspace.fs.writeFile(uri, Buffer.from(content, "utf8"));
+      const doc = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(doc);
+      return { created: true };
+    } catch (err) {
+      return { created: false, error: (err as Error).message };
+    }
+  }
+
+  /** Apagar é mais sério que editar — usa diálogo MODAL (força uma escolha explícita, não some
+   * sozinho como as notificações normais) e sempre manda pra lixeira do sistema (useTrash),
+   * nunca apaga de forma permanente. */
+  private async execDeleteFile(args: Record<string, unknown>): Promise<unknown> {
+    const relPath = String(args.path || "");
+    const explanation = String(args.explanation || "");
+    try {
+      const uri = this.resolveWorkspacePath(relPath);
+      try {
+        await vscode.workspace.fs.stat(uri);
+      } catch {
+        return { deleted: false, error: `${relPath} não existe` };
+      }
+
+      const choice = await vscode.window.showWarningMessage(
+        `Lisa propõe APAGAR o arquivo ${relPath}: ${explanation}`,
+        { modal: true },
+        "Apagar"
+      );
+      if (choice !== "Apagar") return { deleted: false, reason: "usuário rejeitou a proposta" };
+
+      await vscode.workspace.fs.delete(uri, { useTrash: true });
+      return { deleted: true };
+    } catch (err) {
+      return { deleted: false, error: (err as Error).message };
+    }
+  }
+
   private async execTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     if (name === "read_file") return this.execReadFile(args);
     if (name === "propose_edit") return this.execProposeEdit(args);
     if (name === "list_pending_work") return this.execListPendingWork(args);
+    if (name === "get_problems") return this.execGetProblems(args);
+    if (name === "search_workspace") return this.execSearchWorkspace(args);
+    if (name === "create_file") return this.execCreateFile(args);
+    if (name === "delete_file") return this.execDeleteFile(args);
     return { error: `ferramenta desconhecida: ${name}` };
   }
 
