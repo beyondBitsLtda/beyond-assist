@@ -22,6 +22,8 @@ export function bindChatMessages(webview: vscode.Webview, client: LisaClient): C
       }
     } catch (err) {
       post({ type: "lisa-error", message: (err as Error).message });
+    } finally {
+      post({ type: "turn-done" }); // sinal pro orbe do cabeçalho voltar pro estado "idle"
     }
   });
   return { clear: () => webview.postMessage({ type: "clear" }) };
@@ -64,18 +66,13 @@ export function getChatHtml(): string {
   @keyframes hud-sweep { from { left: -40%; } to { left: 100%; } }
 
   #header {
-    display: flex; align-items: center; gap: 10px; padding: 12px 18px 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 18px 12px;
     border-bottom: 1px solid var(--hud);
     border-bottom: 1px solid color-mix(in srgb, var(--hud) 20%, transparent);
   }
-  .badge { width: 20px; height: 20px; border: 1.5px solid var(--hud); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex: none;
-    box-shadow: 0 0 10px var(--hud);
-    box-shadow: 0 0 10px color-mix(in srgb, var(--hud) 60%, transparent);
-  }
-  .badge-dot { width: 6px; height: 6px; background: var(--hud); border-radius: 50%; box-shadow: 0 0 6px var(--hud); animation: hud-dot 1.6s ease-in-out infinite; }
-  @keyframes hud-dot { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
-  #headerTitle { font-size: 11px; letter-spacing: 3px; color: var(--hud); }
-  #headerStatus { margin-left: auto; font-size: 9px; letter-spacing: 1.5px; color: var(--vscode-descriptionForeground); display: flex; align-items: center; gap: 6px; }
+  #orb { width: 84px; height: 84px; }
+  #headerTitle { font-size: 11px; letter-spacing: 3px; color: var(--hud); margin-top: 2px; }
+  #headerStatus { font-size: 9px; letter-spacing: 1.5px; color: var(--vscode-descriptionForeground); display: flex; align-items: center; gap: 6px; }
   .status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--hud); animation: hud-blink 1.4s steps(1) infinite; }
   @keyframes hud-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.15; } }
 
@@ -114,10 +111,11 @@ export function getChatHtml(): string {
   <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
 
   <div id="header">
-    <div class="badge"><div class="badge-dot"></div></div>
+    <canvas id="orb"></canvas>
     <div id="headerTitle">◈ LISA CODE</div>
     <div id="headerStatus"><span class="status-dot"></span>SISTEMA ATIVO</div>
   </div>
+  <span id="hudColorProbe" style="color: var(--hud); display: none;"></span>
 
   <div id="log"></div>
   <div id="inputRow">
@@ -158,6 +156,7 @@ export function getChatHtml(): string {
     if (!text) return;
     vscodeApi.postMessage({ type: "send", text });
     input.value = "";
+    window.__lisaOrbSetMode?.("active");
   }
 
   document.getElementById("send").addEventListener("click", send);
@@ -166,6 +165,87 @@ export function getChatHtml(): string {
   });
   input.focus();
 
+  // "orbe" central — MESMO algoritmo do visualizador de voz do Beyond Bits (canvasRef em
+  // assistant/page.js): raios ondulando ao redor de um núcleo com glow + anéis de pulso quando
+  // ativo. Aqui só 2 estados (idle/active) em vez de idle/listening/speaking — a extensão não
+  // tem um "ouvindo" separado, só "parada" ou "trabalhando na resposta".
+  (function () {
+    const cv = document.getElementById("orb");
+    const ctx = cv.getContext("2d");
+    const probe = document.getElementById("hudColorProbe");
+    let mode = "idle";
+    window.__lisaOrbSetMode = (m) => { mode = m; };
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const SIZE = 84;
+    cv.width = SIZE * dpr; cv.height = SIZE * dpr;
+    cv.style.width = SIZE + "px"; cv.style.height = SIZE + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const NB = 40;
+    let phase = 0;
+
+    function draw() {
+      const w = SIZE, h = SIZE, cx = w / 2, cy = h / 2;
+      const base = Math.min(w, h) * 0.26;
+      ctx.clearRect(0, 0, w, h);
+      const now = performance.now() / 1000;
+
+      const rgbText = getComputedStyle(probe).color; // "rgb(r, g, b)" — resolve a cor do tema ativo
+      const m3 = /rgb\\((\\d+),\\s*(\\d+),\\s*(\\d+)\\)/.exec(rgbText);
+      const accentRgb = m3 ? m3[1] + "," + m3[2] + "," + m3[3] : "56,225,255";
+      const accentCss = "rgb(" + accentRgb + ")";
+
+      let amp, speed, coreGlow;
+      if (mode === "idle") { amp = 0.1; speed = 0.6; coreGlow = 0.5 + 0.2 * Math.sin(now * 1.6); }
+      else { amp = 0.72; speed = 3.6; coreGlow = 0.9; }
+      phase += 0.016 * speed;
+
+      for (let i = 0; i < NB; i++) {
+        const ang = (i / NB) * Math.PI * 2;
+        const seed = i * 0.35;
+        let mag = Math.sin(seed * 1.3 + phase * 2.1) * 0.5
+                + Math.sin(seed * 2.7 - phase * 1.4) * 0.3
+                + Math.sin(seed * 0.7 + phase * 3.3) * 0.2;
+        mag = (mag + 1) / 2;
+        if (mode === "idle") mag = 0.15 + mag * 0.12;
+        const len = base * (0.14 + mag * amp);
+        const x1 = cx + Math.cos(ang) * base, y1 = cy + Math.sin(ang) * base;
+        const x2 = cx + Math.cos(ang) * (base + len), y2 = cy + Math.sin(ang) * (base + len);
+        const g = ctx.createLinearGradient(x1, y1, x2, y2);
+        g.addColorStop(0, "rgba(" + accentRgb + ",0.85)");
+        g.addColorStop(1, mag > 0.7 ? "rgba(255,157,61,0.95)" : "rgba(" + accentRgb + ",0.15)");
+        ctx.strokeStyle = g; ctx.lineWidth = 2; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      }
+
+      const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, base * 0.95);
+      gr.addColorStop(0, "rgba(" + accentRgb + "," + (0.3 * coreGlow) + ")");
+      gr.addColorStop(0.5, "rgba(" + accentRgb + "," + (0.1 * coreGlow) + ")");
+      gr.addColorStop(1, "rgba(" + accentRgb + ",0)");
+      ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.arc(cx, cy, base * 0.95, 0, Math.PI * 2); ctx.fill();
+
+      ctx.strokeStyle = "rgba(" + accentRgb + "," + (0.55 + coreGlow * 0.4) + ")";
+      ctx.lineWidth = 1.6; ctx.shadowBlur = 14; ctx.shadowColor = accentCss;
+      ctx.beginPath(); ctx.arc(cx, cy, base * 0.7, 0, Math.PI * 2); ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      if (mode !== "idle") {
+        for (let k = 0; k < 3; k++) {
+          const prog = ((now * 1.1 + k / 3) % 1);
+          const rr = base * (0.7 + prog * 1.5);
+          ctx.strokeStyle = "rgba(" + accentRgb + "," + ((1 - prog) * 0.35) + ")";
+          ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke();
+        }
+      }
+
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  })();
+
   window.addEventListener("message", (event) => {
     const msg = event.data;
     if (msg.type === "user-message") append("user", "VOCÊ", msg.text);
@@ -173,6 +253,7 @@ export function getChatHtml(): string {
     else if (msg.type === "tool-start") appendTool("analisando: " + msg.name + "...", false);
     else if (msg.type === "tool-done") appendTool(msg.name + " concluído", true);
     else if (msg.type === "lisa-error") append("error", "⚠ ERRO", msg.message);
+    else if (msg.type === "turn-done") window.__lisaOrbSetMode?.("idle");
     else if (msg.type === "clear") log.innerHTML = "";
   });
 </script>
