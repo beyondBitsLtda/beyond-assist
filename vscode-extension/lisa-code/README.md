@@ -40,6 +40,23 @@ extensão carregada.
 
 `Lisa Code: Nova conversa` limpa o histórico e começa do zero.
 
+## Git (criar branch, commit, push)
+
+A Lisa pode criar branch, commitar e dar push — **cada operação abre um diálogo de confirmação
+antes de acontecer**, proporcional ao risco:
+
+| Operação | Portão |
+|---|---|
+| `create_branch` | notificação com nome da branch e de onde ela sai |
+| `git_commit` | diálogo **modal** com a mensagem e a lista COMPLETA de arquivos; destaca em vermelho qualquer arquivo com cara de segredo (`.env`, `.key`, `token`…) |
+| `git_push` | diálogo **modal** com branch e remoto; na branch principal avisa que dispara **deploy de produção** na Vercel |
+
+Regras estruturais (no código, não só no prompt): o commit exige a lista explícita de arquivos —
+não existe "commitar tudo" —, e **nunca** existe force push nem apagar branch/histórico.
+
+Pra tirar as três de circulação sem desinstalar: desligue `lisaCode.gitWriteEnabled` nas
+configurações.
+
 ## Como funciona a edição de código
 
 A Lisa nunca escreve, cria ou apaga um arquivo direto. Quando ela propõe uma mudança, a extensão

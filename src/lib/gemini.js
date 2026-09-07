@@ -1124,6 +1124,7 @@ REGRAS IMPORTANTES:
 - Use get_problems quando o usuário perguntar sobre erros/avisos do código, ou antes de propor uma correção — ela só reflete o que o VS Code já analisou (normalmente arquivos abertos), não é uma varredura nova do projeto inteiro.
 - Use search_workspace pra achar onde algo aparece no projeto (uma função, uma variável, um texto) antes de mexer — é busca de TEXTO LITERAL (não é regex).
 - Use list_pending_work só quando o usuário perguntar algo relacionado a tarefas/chamados/pensamentos, e narre só o que a ferramenta devolver — nunca invente números ou itens.
+- Você pode criar branch (create_branch), commitar (git_commit) e dar push (git_push) — todas pedem confirmação do usuário antes de agir. Regras: só commite arquivos que VOCÊ realmente mexeu nesta conversa, listando cada um explicitamente (não existe "commitar tudo"); nunca inclua arquivo de segredo/credencial (.env, chave, token) num commit; e nunca dê push sem o usuário ter pedido, especialmente na branch principal — ali o push dispara deploy de PRODUÇÃO. Se o trabalho merece branch própria, sugira create_branch antes de commitar na principal.
 - Use get_git_context quando o assunto envolver branch, "o que eu mudei", ou comparação com outra branch. A mensagem do usuário pode vir com um bloco "[contexto do editor]" no começo, dizendo qual arquivo está aberto, a linha do cursor, o trecho selecionado e a branch de comparação escolhida — use isso pra saber onde ele está sem perguntar, mas não repita esse bloco de volta pra ele.
 - SEMPRE narre em texto, ANTES de cada ferramenta que for chamar, uma frase curta (1 linha) dizendo o que vai fazer e em qual arquivo/onde — nunca chame uma ferramenta em silêncio, sem explicar antes o que está prestes a fazer.
 - Em qualquer tarefa de CÓDIGO que vá precisar de mais de uma ferramenta (ex.: ler + editar, ou editar vários arquivos), chame report_progress logo no início com uma estimativa de quantas etapas o trabalho vai ter, e chame de novo a cada etapa concluída, atualizando o percentual. Sempre feche em percent:100 quando a tarefa acabar de verdade (inclusive se o usuário rejeitar uma proposta — feche o ciclo mesmo assim). Isso é uma ESTIMATIVA sua, não uma medição exata — não precisa ser perfeita, só dar uma noção real de progresso. Não use isso pra perguntas simples que não envolvem mexer em código.
@@ -1216,6 +1217,41 @@ const LISA_CODE_TOOLS = [
           type: "object",
           properties: {
             base: { type: "string", description: "Opcional — branch pra comparar. Sem isso, usa a branch de comparação que o usuário escolheu na barra de contexto do painel." },
+          },
+          required: [],
+        },
+      },
+      {
+        name: "create_branch",
+        description: "Cria uma branch nova a partir do HEAD atual e muda pra ela. O usuário confirma antes. Use quando for começar um trabalho que merece branch própria — nunca commite direto na principal sem o usuário pedir.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Nome da branch, ex.: \"fix/prazo-atrasado\"" },
+            reason: { type: "string", description: "Motivo curto — aparece no diálogo de confirmação" },
+          },
+          required: ["name"],
+        },
+      },
+      {
+        name: "git_commit",
+        description: "Faz stage APENAS dos arquivos listados e commita. O usuário vê a lista completa e a mensagem antes de confirmar. Liste explicitamente os arquivos — nunca existe 'commitar tudo'.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: {
+            files: { type: "array", items: { type: "string" }, description: "Caminhos exatos (relativos à raiz) que entram no commit — só os que você realmente mexeu" },
+            message: { type: "string", description: "Mensagem do commit, no estilo do histórico do projeto" },
+          },
+          required: ["files", "message"],
+        },
+      },
+      {
+        name: "git_push",
+        description: "Envia a branch atual pro remoto. O usuário confirma num diálogo que mostra branch, remoto e — se for a branch principal — o aviso de que isso dispara deploy de PRODUÇÃO. Nunca faz force push.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: {
+            reason: { type: "string", description: "Motivo curto — aparece no diálogo de confirmação" },
           },
           required: [],
         },

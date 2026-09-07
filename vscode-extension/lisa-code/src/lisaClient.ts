@@ -1,5 +1,15 @@
 import * as vscode from "vscode";
-import { gitSnapshot } from "./gitContext";
+import { gitSnapshot, gitHeadInfo, gitCreateBranch, gitStageAndCommit, gitPushCurrent } from "./gitContext";
+
+/** Arquivos que NUNCA deveriam entrar num commit sem uma olhada extra — o aviso aparece em
+ * destaque no diálogo de confirmação (mesmo cuidado de sempre: conferir o que vai no commit
+ * antes de mandar, mesmo quando o nome do arquivo parece inofensivo). */
+const SENSITIVE_PATH = /(^|\/)\.env|\.pem$|\.key$|\.pfx$|\.p12$|id_rsa|credential|secret|token/i;
+
+/** Branches em que um push tem consequência maior que o normal neste projeto: subir na main
+ * dispara o deploy de PRODUÇÃO na Vercel. O diálogo diz isso explicitamente pra confirmação
+ * ser informada, não reflexa. */
+const PROTECTED_BRANCH = /^(main|master|prod|production)$/i;
 
 // Formato mínimo do jeito que o Gemini (@google/genai) representa uma conversa — só o que este
 // cliente realmente usa (texto e chamadas/respostas de função). O servidor (src/lib/gemini.js,
@@ -337,6 +347,102 @@ export class LisaClient {
     }
   }
 
+  /** Interruptor geral das operações de escrita no git (configuração `lisaCode.gitWriteEnabled`)
+   * — desligou, as três ferramentas recusam com uma mensagem clara em vez de agir. */
+  private gitWriteEnabled(): boolean {
+    return vscode.workspace.getConfiguration("lisaCode").get<boolean>("gitWriteEnabled", true);
+  }
+
+  private async execCreateBranch(args: Record<string, unknown>): Promise<unknown> {
+    if (!this.gitWriteEnabled()) return { created: false, error: "escrita no git desligada (configuração lisaCode.gitWriteEnabled)" };
+    const name = String(args.name || "").trim();
+    const reason = String(args.reason || "");
+    if (!name) return { created: false, error: "name é obrigatório" };
+
+    const head = await gitHeadInfo();
+    if (!head.available) return { created: false, error: head.error };
+
+    const choice = await vscode.window.showInformationMessage(
+      `Lisa quer criar a branch "${name}" (a partir de ${head.branch || "HEAD"}) e mudar pra ela.${reason ? ` Motivo: ${reason}` : ""}`,
+      { modal: false },
+      "Criar branch",
+      "Cancelar"
+    );
+    if (choice !== "Criar branch") return { created: false, reason: "usuário cancelou" };
+
+    try {
+      await gitCreateBranch(name);
+      return { created: true, branch: name, from: head.branch };
+    } catch (err) {
+      return { created: false, error: (err as Error).message };
+    }
+  }
+
+  private async execCommit(args: Record<string, unknown>): Promise<unknown> {
+    if (!this.gitWriteEnabled()) return { committed: false, error: "escrita no git desligada (configuração lisaCode.gitWriteEnabled)" };
+    const message = String(args.message || "").trim();
+    const files = Array.isArray(args.files) ? args.files.map((f) => String(f)) : [];
+    if (!message) return { committed: false, error: "message é obrigatório" };
+    if (!files.length) return { committed: false, error: "files é obrigatório — liste explicitamente os arquivos que entram no commit" };
+
+    const head = await gitHeadInfo();
+    if (!head.available) return { committed: false, error: head.error };
+
+    const sensitive = files.filter((f) => SENSITIVE_PATH.test(f));
+    const shown = files.slice(0, 15).map((f) => `  • ${f}`).join("\n");
+    const more = files.length > 15 ? `\n  … e mais ${files.length - 15}` : "";
+    const warn = sensitive.length
+      ? `\n\n⚠ ATENÇÃO: estes arquivos parecem conter segredo/credencial — confira antes:\n${sensitive.map((f) => `  • ${f}`).join("\n")}`
+      : "";
+
+    // modal: commit é consequente o suficiente pra exigir uma escolha explícita, não uma
+    // notificação que some sozinha.
+    const choice = await vscode.window.showWarningMessage(
+      `Commit na branch "${head.branch}"\n\nMensagem:\n${message}\n\nArquivos (${files.length}):\n${shown}${more}${warn}`,
+      { modal: true },
+      "Commitar"
+    );
+    if (choice !== "Commitar") return { committed: false, reason: "usuário cancelou" };
+
+    try {
+      await gitStageAndCommit(files, message);
+      return { committed: true, branch: head.branch, files: files.length };
+    } catch (err) {
+      return { committed: false, error: (err as Error).message };
+    }
+  }
+
+  private async execPush(args: Record<string, unknown>): Promise<unknown> {
+    if (!this.gitWriteEnabled()) return { pushed: false, error: "escrita no git desligada (configuração lisaCode.gitWriteEnabled)" };
+    const reason = String(args.reason || "");
+    const head = await gitHeadInfo();
+    if (!head.available) return { pushed: false, error: head.error };
+    if (!head.branch) return { pushed: false, error: "HEAD desanexado — sem branch pra empurrar" };
+
+    const protectedWarn = PROTECTED_BRANCH.test(head.branch)
+      ? `\n\n⚠ "${head.branch}" é a branch principal: isso vai pro repositório COMPARTILHADO e dispara o deploy de PRODUÇÃO na Vercel.`
+      : "";
+    const upstreamNote = head.hasUpstream ? "" : "\n\n(a branch ainda não existe no remoto — o push vai criá-la)";
+    const aheadNote = typeof head.ahead === "number" ? `\n\nCommits a enviar: ${head.ahead}` : "";
+    const pendingNote = head.pending.length
+      ? `\n\nObs.: ${head.pending.length} arquivo(s) com mudança NÃO commitada não vão nesse push.`
+      : "";
+
+    const choice = await vscode.window.showWarningMessage(
+      `Push de "${head.branch}" para "${head.remote || "origin"}".${reason ? `\n\nMotivo: ${reason}` : ""}${aheadNote}${protectedWarn}${upstreamNote}${pendingNote}`,
+      { modal: true },
+      "Enviar push"
+    );
+    if (choice !== "Enviar push") return { pushed: false, reason: "usuário cancelou" };
+
+    try {
+      const res = await gitPushCurrent();
+      return { pushed: true, ...res };
+    } catch (err) {
+      return { pushed: false, error: (err as Error).message };
+    }
+  }
+
   private async execTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     if (name === "read_file") return this.execReadFile(args);
     if (name === "propose_edit") return this.execProposeEdit(args);
@@ -346,6 +452,9 @@ export class LisaClient {
     if (name === "create_file") return this.execCreateFile(args);
     if (name === "delete_file") return this.execDeleteFile(args);
     if (name === "get_git_context") return gitSnapshot(args.base ? String(args.base) : this.compareBase);
+    if (name === "create_branch") return this.execCreateBranch(args);
+    if (name === "git_commit") return this.execCommit(args);
+    if (name === "git_push") return this.execPush(args);
     if (name === "report_progress") return { ok: true }; // não executa nada de verdade — só um sinal de UI (ver send())
     return { error: `ferramenta desconhecida: ${name}` };
   }
