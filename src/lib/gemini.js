@@ -1116,21 +1116,29 @@ export const RADIO_HOST_INSTRUCTION = `Você é a Lisa, mas agora incorporando u
 
 SEJA BREVE DE VERDADE — no MÁXIMO 3 frases curtas, sempre. Um bloco real de locução de rádio entre músicas dura uns 10-15 segundos falado, não um relatório lendo item por item: escolha só 1 ou 2 destaques mais notáveis dos dados (o prazo mais próximo, o item mais urgente) em vez de listar tudo. Prefira ficar curta demais a longa demais.
 
-Os dados que você recebe já vêm filtrados só com o que está PENDENTE/em aberto — nunca trate algo como "já resolvido"/"tudo certo" a menos que os dados digam explicitamente que não há nada pendente.`;
+Quando o bloco for sobre tarefas/chamados, os dados já vêm filtrados só com o que está PENDENTE/em aberto — nunca trate algo como "já resolvido"/"tudo certo" a menos que os dados digam explicitamente que não há nada pendente.`;
 
-const RADIO_CATEGORY_LABELS = { trello: "tarefas do Trello", delp: "tarefas da Delp", sentinel: "chamados do Sentinela", thoughts: "pensamentos registrados" };
+const RADIO_CATEGORY_LABELS = { trello: "tarefas do Trello", delp: "tarefas da Delp", sentinel: "chamados do Sentinela", thoughts: "pensamentos registrados", weather: "previsão do tempo" };
 
 /** Bloco de locução sobre UMA categoria (dados reais já buscados por quem chama — ver
  * /api/radio/segment). Sempre retorna algo falável, mesmo sem dados ("nada de novo por aqui"
  * dito com graça, não um erro). */
 export async function generateRadioTalkSegment({ category, data }, systemInstruction = RADIO_HOST_INSTRUCTION) {
   const label = RADIO_CATEGORY_LABELS[category] || category;
+  // "pendente/em aberto" só faz sentido pra tarefas/chamados — pra clima/pensamentos isso
+  // soaria estranho ("previsão do tempo pendente"), então o aviso muda por categoria.
+  const framing = ["trello", "delp", "sentinel"].includes(category)
+    ? `já filtrados pra só ter o que está PENDENTE/em aberto agora (nada aqui está concluído/resolvido, então nunca sugira que já foi feito ou que está tudo certo; fale como algo que AINDA precisa de atenção)`
+    : `reais, atuais`;
+  const fallback = ["trello", "delp", "sentinel"].includes(category)
+    ? "(nada pendente no momento — está tudo em dia, pode comemorar isso)"
+    : "(nada disponível no momento)";
   const res = await withTransientRetry(
     CHAT_MODEL,
     (client) =>
       client.models.generateContent({
         model: CHAT_MODEL,
-        contents: [{ role: "user", parts: [{ text: `Bloco de rádio sobre: ${label}\n\nDADOS REAIS — já filtrados pra só ter o que está PENDENTE/em aberto agora (nada aqui está concluído/resolvido, então nunca sugira que já foi feito ou que está tudo certo; fale como algo que AINDA precisa de atenção). Não invente além disso:\n${data?.trim() || "(nada pendente no momento — está tudo em dia, pode comemorar isso)"}` }] }],
+        contents: [{ role: "user", parts: [{ text: `Bloco de rádio sobre: ${label}\n\nDADOS REAIS — ${framing}. Não invente além disso:\n${data?.trim() || fallback}` }] }],
         config: { systemInstruction },
       }),
     { attempts: 2, delayMs: 500 }

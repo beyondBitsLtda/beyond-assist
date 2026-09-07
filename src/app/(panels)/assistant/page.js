@@ -520,7 +520,8 @@ export default function AssistantPage() {
   // (novidades reais de Trello/Tarefas Delp/Sentinela/Pensamentos, categoria sorteada) com
   // música de verdade da playlist (radio/playlist.txt, tocada via YouTube IFrame API — ver
   // src/lib/youtubePlayer.js). Ela anuncia a música antes de tocar e comenta depois que acaba.
-  const RADIO_CATEGORIES = ["trello", "delp", "sentinel", "thoughts"];
+  const RADIO_CATEGORIES = ["trello", "delp", "sentinel", "thoughts", "weather"];
+  const RADIO_CATEGORY_LABELS = { trello: "Trello", delp: "Tarefas Delp", sentinel: "Sentinela", thoughts: "pensamentos", weather: "previsão do tempo" };
   const [radioMode, setRadioMode] = useState(false);
   const [radioStatus, setRadioStatus] = useState(null); // texto curto pro widget flutuante
   const [radioNowPlaying, setRadioNowPlaying] = useState(null); // {title} | null
@@ -600,7 +601,7 @@ export default function AssistantPage() {
       while (!stopped) {
         // bloco de locução — categoria sorteada
         const category = RADIO_CATEGORIES[Math.floor(Math.random() * RADIO_CATEGORIES.length)];
-        setRadioStatus(`falando sobre ${category === "trello" ? "Trello" : category === "delp" ? "Tarefas Delp" : category === "sentinel" ? "Sentinela" : "pensamentos"}…`);
+        setRadioStatus(`falando sobre ${RADIO_CATEGORY_LABELS[category] || category}…`);
         const talk = await fetchSegment({ kind: "talk", category });
         if (stopped) break;
         addLog("[RÁDIO]", PU, talk || "(sem locução desta vez)");

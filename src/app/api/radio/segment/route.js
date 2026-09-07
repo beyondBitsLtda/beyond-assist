@@ -4,6 +4,7 @@ import { loadAllTrelloCards } from "@/lib/liveTrello.js";
 import { listDelpTasks } from "@/lib/delpTasks.js";
 import { listTickets, summarizeTickets, STATUS_ORDER } from "@/lib/sentinel.js";
 import { listThoughts } from "@/lib/notes.js";
+import { getWeatherForecast } from "@/lib/weather.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +48,12 @@ async function buildCategoryData(category) {
     if (category === "thoughts") {
       const { thoughts } = await listThoughts({ limit: 8 });
       return thoughts.map((t) => `- ${t.subject}${t.body ? `: ${t.body.slice(0, 140)}` : ""}`).join("\n");
+    }
+    if (category === "weather") {
+      const cities = await getWeatherForecast();
+      return cities
+        .map((c) => `${c.city}: ${c.days.slice(0, 2).map((d, i) => `${i === 0 ? "hoje" : "amanhã"} ${d.description}, máx ${Math.round(d.max)}°C mín ${Math.round(d.min)}°C, ${d.rainChance}% de chance de chuva`).join("; ")}`)
+        .join("\n");
     }
     return "";
   } catch {
