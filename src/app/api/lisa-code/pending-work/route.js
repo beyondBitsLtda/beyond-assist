@@ -21,8 +21,8 @@ export async function GET(req) {
     const source = new URL(req.url).searchParams.get("source");
     if (!VALID_SOURCES.has(source)) return jsonResponse({ ok: false, error: "source inválido — use trello, delp, sentinel ou thoughts" }, 400);
 
-    const data = await getCategoryData(source);
-    return jsonResponse({ ok: true, data: data || "(nada pendente no momento)" });
+    const { text } = await getCategoryData(source);
+    return jsonResponse({ ok: true, data: text || "(nada pendente no momento)" });
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err?.message || err) }, 500);
   }

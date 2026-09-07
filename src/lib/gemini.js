@@ -1189,7 +1189,9 @@ export const RADIO_HOST_INSTRUCTION = `Você é a Lisa, mas agora incorporando u
 
 SEJA BREVE DE VERDADE — no MÁXIMO 3 frases curtas, sempre. Um bloco real de locução de rádio entre músicas dura uns 10-15 segundos falado, não um relatório lendo item por item: escolha só 1 ou 2 destaques mais notáveis dos dados (o prazo mais próximo, o item mais urgente) em vez de listar tudo. Prefira ficar curta demais a longa demais.
 
-Quando o bloco for sobre tarefas/chamados, os dados já vêm filtrados só com o que está PENDENTE/em aberto — nunca trate algo como "já resolvido"/"tudo certo" a menos que os dados digam explicitamente que não há nada pendente.`;
+Quando o bloco for sobre tarefas/chamados, os dados já vêm filtrados só com o que está PENDENTE/em aberto — nunca trate algo como "já resolvido"/"tudo certo" a menos que os dados digam explicitamente que não há nada pendente.
+
+Quando um item tiver "ATRASADA há N dias", isso significa que o prazo JÁ PASSOU — fale disso como algo atrasado/urgente ("já venceu há X dias", "tá atrasada"), NUNCA como algo que "vai vencer" ou "está por vir". Quando tiver "vence em N dias" ou "vence HOJE", aí sim é um prazo futuro. Nunca troque um pelo outro — o rótulo já vem calculado certo, não tente calcular de novo por conta própria.`;
 
 const RADIO_CATEGORY_LABELS = { trello: "tarefas do Trello", delp: "tarefas da Delp", sentinel: "chamados do Sentinela", thoughts: "pensamentos registrados", weather: "previsão do tempo", news: "notícias de tecnologia" };
 

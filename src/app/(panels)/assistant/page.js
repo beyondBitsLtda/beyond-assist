@@ -529,7 +529,8 @@ export default function AssistantPage() {
   const radioPlayerRef = useRef(null); // instância YT.Player (uma só, reaproveitada entre músicas)
   const radioPlaylistRef = useRef([]);
   const radioRecentRef = useRef([]); // últimos videoIds tocados — evita repetir em sequência
-  const radioRecentCategoriesRef = useRef([]); // últimas categorias faladas — mesma ideia, evita "sempre os mesmos assuntos"
+  const radioCategoryBagRef = useRef([]); // "saco" embaralhado das categorias — garante passar por TODAS antes de repetir qualquer uma
+  const radioSeenKeysRef = useRef({}); // { trello: [...ids...], delp: [...], sentinel: [...], thoughts: [...], news: [...] } — itens já mencionados nesta sessão, pra pickVaried (pendingWork.js) evitar repeti-los enquanto houver opção nova
   const radioStateHandlerRef = useRef(null); // ver playAndWaitEnded
   const radioSkipRef = useRef(null); // preenchida enquanto uma música toca — ver botão "pular" no radioWidget
 
@@ -570,13 +571,40 @@ export default function AssistantPage() {
       }
     };
 
+    // "saco" embaralhado: garante passar pelas 6 categorias (em ordem aleatória) antes de
+    // repetir qualquer uma — mais forte que só "evitar as últimas faladas", que ainda deixava
+    // uma categoria voltar cedo demais por puro azar do sorteio (bug real reportado pelo
+    // usuário: "repetem muito mais assunto").
     const pickCategory = () => {
-      const recent = radioRecentCategoriesRef.current;
-      const candidates = RADIO_CATEGORIES.filter((c) => !recent.includes(c));
-      const pool = candidates.length ? candidates : RADIO_CATEGORIES; // já falou de tudo recentemente — libera de novo
-      const category = pool[Math.floor(Math.random() * pool.length)];
-      radioRecentCategoriesRef.current = [...recent.slice(-Math.max(0, RADIO_CATEGORIES.length - 2)), category];
-      return category;
+      if (!radioCategoryBagRef.current.length) {
+        radioCategoryBagRef.current = [...RADIO_CATEGORIES].sort(() => Math.random() - 0.5);
+      }
+      return radioCategoryBagRef.current.shift();
+    };
+
+    // busca um bloco de locução "talk", mandando quais itens dessa categoria já foram
+    // mencionados nesta sessão (radioSeenKeysRef) — o servidor (pendingWork.js) prioriza sortear
+    // itens AINDA NÃO ditos, só repetindo quando não sobra nenhum inédito. Sem isso, mesmo com
+    // amostragem aleatória, o mesmo item real podia sair de novo cedo demais por azar (bug real
+    // reportado: "tanta notícia/tarefa pra falar" e ainda assim repetindo sempre as mesmas).
+    const fetchTalk = async (category) => {
+      const excludeKeys = radioSeenKeysRef.current[category] || [];
+      try {
+        const res = await fetch("/api/radio/segment", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ kind: "talk", category, excludeKeys }),
+        });
+        const data = await res.json();
+        if (!data?.ok) return null;
+        if (data.usedKeys?.length) {
+          radioSeenKeysRef.current[category] = [...excludeKeys, ...data.usedKeys].slice(-200);
+        }
+        return data.text;
+      } catch (err) {
+        addLog("[RÁDIO]", OR, `falha ao gerar locução: ${err.message}`);
+        return null;
+      }
     };
 
     const pickSong = () => {
@@ -624,7 +652,7 @@ export default function AssistantPage() {
           if (stopped) break;
 
           setRadioStatus("Steve com as notícias…");
-          const steveTalk = await fetchSegment({ kind: "talk", category });
+          const steveTalk = await fetchTalk(category);
           if (stopped) break;
           addLog("[RÁDIO]", PU, `[STEVE] ${steveTalk || "(sem notícias desta vez)"}`);
           await speakRadio(steveTalk, STEVE_VOICE_NAME);
@@ -640,7 +668,7 @@ export default function AssistantPage() {
           }
         } else {
           setRadioStatus(`falando sobre ${RADIO_CATEGORY_LABELS[category] || category}…`);
-          const talk = await fetchSegment({ kind: "talk", category });
+          const talk = await fetchTalk(category);
           if (stopped) break;
           addLog("[RÁDIO]", PU, talk || "(sem locução desta vez)");
           await speakRadio(talk);
