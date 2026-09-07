@@ -1,0 +1,45 @@
+{
+  "name": "lisa-code",
+  "displayName": "Lisa Code",
+  "description": "A Lisa (Beyond Bits) dentro do VS Code — conversa, lê e propõe mudanças no seu código. Extensão de uso PESSOAL, nunca publicada.",
+  "version": "0.0.1",
+  "publisher": "personal-use-only",
+  "private": true,
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "main": "./out/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "views": {
+      "explorer": [
+        { "id": "lisaCode.chatView", "name": "Lisa Code", "type": "webview" }
+      ]
+    },
+    "commands": [
+      { "command": "lisaCode.setToken", "title": "Lisa Code: Configurar token pessoal" },
+      { "command": "lisaCode.setBaseUrl", "title": "Lisa Code: Configurar URL do Beyond Bits" },
+      { "command": "lisaCode.newConversation", "title": "Lisa Code: Nova conversa" }
+    ],
+    "configuration": {
+      "title": "Lisa Code",
+      "properties": {
+        "lisaCode.baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "URL base do Beyond Bits (ex.: https://seu-deploy.vercel.app) — sem barra no final."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -w -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0",
+    "@vscode/vsce": "^2.24.0"
+  }
+}

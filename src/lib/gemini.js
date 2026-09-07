@@ -1108,6 +1108,79 @@ export async function interpretVigiaChatMessage(text, systemInstruction = VIGIA_
   return (res.text || "").trim() || text;
 }
 
+// ---- Lisa Code: extensão pessoal do VS Code (ver src/app/api/lisa-code/*) ----
+// A Lisa dentro do editor, com permissão de ler e PROPOR mudanças no código do usuário. O
+// código de ler/escrever arquivo de verdade roda só NO CLIENTE (a extensão) — a função da
+// Vercel não tem acesso ao disco do usuário. Este servidor só decide, turno a turno, o que a
+// Lisa quer fazer a seguir (falar, ler um arquivo, propor uma edição, consultar as
+// funcionalidades do Beyond Bits) via function calling nativo do Gemini, e devolve isso cru pro
+// cliente executar — quem mantém o histórico da conversa e executa as ferramentas é sempre a
+// extensão, nunca este módulo.
+export const LISA_CODE_INSTRUCTION = `Você é a Lisa, agora rodando como uma extensão dentro do VS Code do seu usuário — uma ferramenta PESSOAL dele, ninguém mais tem acesso a ela. Você pode ler e propor mudanças no código que ele está trabalhando, além de responder usando dados reais do Beyond Bits (Trello, Tarefas Delp, Sentinela, Pensamentos).
+
+REGRAS IMPORTANTES:
+- Você NUNCA escreve num arquivo diretamente — sempre usa a ferramenta propose_edit, que mostra um diff pro usuário aprovar ou rejeitar. A mudança só é aplicada de verdade depois que ele aprovar.
+- Antes de propor uma edição num arquivo que você ainda não viu NESTA conversa, use read_file pra ler o conteúdo atual — nunca "adivinhe" o que já está no arquivo.
+- Use list_pending_work só quando o usuário perguntar algo relacionado a tarefas/chamados/pensamentos, e narre só o que a ferramenta devolver — nunca invente números ou itens.
+- Seja direta e técnica quando o assunto for código (você está ajudando um desenvolvedor dentro do editor dele), mas mantenha seu jeito de ser nas outras conversas.`;
+
+const LISA_CODE_TOOLS = [
+  {
+    functionDeclarations: [
+      {
+        name: "read_file",
+        description: "Lê o conteúdo atual de um arquivo do workspace aberto no VS Code do usuário. Use antes de propor qualquer edição num arquivo que você ainda não viu nesta conversa.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: { path: { type: "string", description: "Caminho do arquivo, relativo à raiz do workspace" } },
+          required: ["path"],
+        },
+      },
+      {
+        name: "propose_edit",
+        description: "Propõe uma mudança de código num arquivo — o usuário vê um diff e decide se aplica ou rejeita. Nunca escreve no disco sozinho.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Caminho do arquivo, relativo à raiz do workspace" },
+            newContent: { type: "string", description: "Conteúdo COMPLETO do arquivo depois da mudança (o arquivo inteiro, não um diff)" },
+            explanation: { type: "string", description: "Explicação curta (1-2 frases) do que mudou e por quê" },
+          },
+          required: ["path", "newContent", "explanation"],
+        },
+      },
+      {
+        name: "list_pending_work",
+        description: "Consulta itens REAIS e pendentes do Beyond Bits — nunca invente dados, só narre o que essa ferramenta devolver.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: { source: { type: "string", enum: ["trello", "delp", "sentinel", "thoughts"] } },
+          required: ["source"],
+        },
+      },
+    ],
+  },
+];
+
+/** Um turno da conversa da Lisa Code — recebe o histórico COMPLETO (`contents`, já incluindo
+ * qualquer chamada/resposta de função de turnos anteriores) e devolve só o próximo turno cru do
+ * modelo (texto e/ou chamadas de função). Quem gerencia o histórico e EXECUTA as ferramentas é
+ * sempre quem chama (a extensão do VS Code) — este servidor nunca toca em arquivo nenhum. */
+export async function runLisaCodeTurn(contents) {
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents,
+        config: { systemInstruction: LISA_CODE_INSTRUCTION, tools: LISA_CODE_TOOLS },
+      }),
+    { attempts: 2, delayMs: 800 }
+  );
+  const candidate = res.candidates?.[0];
+  return candidate?.content || { role: "model", parts: [{ text: res.text || "" }] };
+}
+
 // ---- Modo Rádio: ver src/lib/radioPlaylist.js e /api/radio/* ----
 // A Lisa "incorpora" uma apresentadora de rádio — alterna blocos de locução (novidades reais
 // sobre Trello/Tarefas Delp/Sentinela/Pensamentos) com música de verdade tocada do YouTube.
