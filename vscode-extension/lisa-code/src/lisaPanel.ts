@@ -22,6 +22,7 @@ export class LisaPanel {
     this.panel.webview.html = getChatHtml();
     this.handle = bindChatMessages(this.panel.webview, client);
     this.panel.onDidDispose(() => {
+      this.handle.dispose(); // solta os listeners de contexto (ver bindChatMessages)
       LisaPanel.current = undefined;
     });
   }

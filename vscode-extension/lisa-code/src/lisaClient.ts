@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { gitSnapshot } from "./gitContext";
 
 // Formato mínimo do jeito que o Gemini (@google/genai) representa uma conversa — só o que este
 // cliente realmente usa (texto e chamadas/respostas de função). O servidor (src/lib/gemini.js,
@@ -46,6 +47,14 @@ export class LisaClient {
   private contents: Content[] = [];
   private proposedProvider = new ProposedContentProvider();
 
+  // ---- contexto escolhido na barra do painel (ver chatWebview.ts) ----
+  /** branch usada como BASE DE COMPARAÇÃO — nunca faz checkout, é só referência pra ela saber
+   * "o que mudou em relação a X". */
+  private compareBase: string | undefined;
+  /** injeta automaticamente qual arquivo está aberto (e o que está selecionado) na mensagem,
+   * pra ela saber onde você está sem você precisar dizer. */
+  private includeEditorContext = true;
+
   constructor(private context: vscode.ExtensionContext) {
     context.subscriptions.push(
       vscode.workspace.registerTextDocumentContentProvider("lisa-code-proposed", this.proposedProvider)
@@ -54,6 +63,38 @@ export class LisaClient {
 
   reset() {
     this.contents = [];
+  }
+
+  setCompareBase(base: string | undefined) {
+    this.compareBase = base;
+  }
+  getCompareBase() {
+    return this.compareBase;
+  }
+  setIncludeEditorContext(on: boolean) {
+    this.includeEditorContext = on;
+  }
+  getIncludeEditorContext() {
+    return this.includeEditorContext;
+  }
+
+  /** Bloco curto de contexto do editor, prefixado à mensagem do usuário quando a opção está
+   * ligada — arquivo aberto, linha do cursor e o trecho selecionado (limitado, pra não estourar
+   * a mensagem com um arquivo inteiro selecionado por acidente). */
+  private editorContextBlock(): string {
+    if (!this.includeEditorContext) return "";
+    const ed = vscode.window.activeTextEditor;
+    if (!ed) return "";
+    const file = vscode.workspace.asRelativePath(ed.document.uri, false);
+    const line = ed.selection.active.line + 1;
+    const selected = ed.document.getText(ed.selection);
+    const parts = [`[contexto do editor] arquivo aberto: ${file} (linha ${line})`];
+    if (selected.trim()) {
+      const MAX = 4000;
+      parts.push(`trecho selecionado:\n${selected.length > MAX ? selected.slice(0, MAX) + "\n...(seleção truncada)" : selected}`);
+    }
+    if (this.compareBase) parts.push(`branch de comparação escolhida: ${this.compareBase}`);
+    return parts.join("\n") + "\n\n";
   }
 
   private async getToken(): Promise<string | undefined> {
@@ -304,6 +345,7 @@ export class LisaClient {
     if (name === "search_workspace") return this.execSearchWorkspace(args);
     if (name === "create_file") return this.execCreateFile(args);
     if (name === "delete_file") return this.execDeleteFile(args);
+    if (name === "get_git_context") return gitSnapshot(args.base ? String(args.base) : this.compareBase);
     if (name === "report_progress") return { ok: true }; // não executa nada de verdade — só um sinal de UI (ver send())
     return { error: `ferramenta desconhecida: ${name}` };
   }
@@ -312,7 +354,7 @@ export class LisaClient {
    * final em texto (ou até MAX_TOOL_ROUNDS, trava de segurança), emitindo eventos conforme
    * cada coisa acontece (texto falado, ferramenta chamada/concluída, erro). */
   async *send(userText: string): AsyncGenerator<ChatEvent> {
-    this.contents.push({ role: "user", parts: [{ text: userText }] });
+    this.contents.push({ role: "user", parts: [{ text: this.editorContextBlock() + userText }] });
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       let modelTurn: Content;

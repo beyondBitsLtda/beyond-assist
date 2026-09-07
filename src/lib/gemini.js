@@ -1124,6 +1124,7 @@ REGRAS IMPORTANTES:
 - Use get_problems quando o usuário perguntar sobre erros/avisos do código, ou antes de propor uma correção — ela só reflete o que o VS Code já analisou (normalmente arquivos abertos), não é uma varredura nova do projeto inteiro.
 - Use search_workspace pra achar onde algo aparece no projeto (uma função, uma variável, um texto) antes de mexer — é busca de TEXTO LITERAL (não é regex).
 - Use list_pending_work só quando o usuário perguntar algo relacionado a tarefas/chamados/pensamentos, e narre só o que a ferramenta devolver — nunca invente números ou itens.
+- Use get_git_context quando o assunto envolver branch, "o que eu mudei", ou comparação com outra branch. A mensagem do usuário pode vir com um bloco "[contexto do editor]" no começo, dizendo qual arquivo está aberto, a linha do cursor, o trecho selecionado e a branch de comparação escolhida — use isso pra saber onde ele está sem perguntar, mas não repita esse bloco de volta pra ele.
 - SEMPRE narre em texto, ANTES de cada ferramenta que for chamar, uma frase curta (1 linha) dizendo o que vai fazer e em qual arquivo/onde — nunca chame uma ferramenta em silêncio, sem explicar antes o que está prestes a fazer.
 - Em qualquer tarefa de CÓDIGO que vá precisar de mais de uma ferramenta (ex.: ler + editar, ou editar vários arquivos), chame report_progress logo no início com uma estimativa de quantas etapas o trabalho vai ter, e chame de novo a cada etapa concluída, atualizando o percentual. Sempre feche em percent:100 quando a tarefa acabar de verdade (inclusive se o usuário rejeitar uma proposta — feche o ciclo mesmo assim). Isso é uma ESTIMATIVA sua, não uma medição exata — não precisa ser perfeita, só dar uma noção real de progresso. Não use isso pra perguntas simples que não envolvem mexer em código.
 - Seja direta e técnica quando o assunto for código (você está ajudando um desenvolvedor dentro do editor dele), mas mantenha seu jeito de ser nas outras conversas.`;
@@ -1206,6 +1207,17 @@ const LISA_CODE_TOOLS = [
             explanation: { type: "string", description: "Explicação curta (1-2 frases) do porquê apagar" },
           },
           required: ["path", "explanation"],
+        },
+      },
+      {
+        name: "get_git_context",
+        description: "Lê o estado do Git do workspace (somente leitura — nunca faz checkout nem commit): branch atual, branches locais, arquivos modificados, e o que difere de uma branch de comparação. Use quando o assunto envolver 'o que eu mudei', branch, ou comparar com outra branch.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: {
+            base: { type: "string", description: "Opcional — branch pra comparar. Sem isso, usa a branch de comparação que o usuário escolheu na barra de contexto do painel." },
+          },
+          required: [],
         },
       },
       {

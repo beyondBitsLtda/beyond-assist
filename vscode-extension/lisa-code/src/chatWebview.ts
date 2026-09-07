@@ -1,17 +1,68 @@
 import * as vscode from "vscode";
 import { LisaClient } from "./lisaClient";
+import { gitSnapshot } from "./gitContext";
 
 export interface ChatHandle {
   clear(): void;
+  dispose(): void;
 }
+
+const NO_BASE = "— sem comparação —";
 
 /** Liga a lógica da conversa (send/ler eventos/mostrar ferramentas) num webview já criado —
  * usada tanto pelo painel flutuante (LisaPanel) quanto, se algum dia precisar, por outra
  * superfície — pra não duplicar essa lógica em dois lugares. */
 export function bindChatMessages(webview: vscode.Webview, client: LisaClient): ChatHandle {
+  const post = (data: unknown) => webview.postMessage(data);
+
+  /** manda pro painel o estado atual da barra de contexto (branch, base de comparação e qual
+   * arquivo está aberto) — chamado no início, quando o usuário troca algo, e quando ele muda
+   * de arquivo no editor. */
+  const postContext = async () => {
+    const snap = await gitSnapshot();
+    const ed = vscode.window.activeTextEditor;
+    post({
+      type: "context",
+      branch: snap.branch || null,
+      base: client.getCompareBase() || null,
+      file: ed ? vscode.workspace.asRelativePath(ed.document.uri, false) : null,
+      includeFile: client.getIncludeEditorContext(),
+    });
+  };
+
+  const disposables: vscode.Disposable[] = [
+    vscode.window.onDidChangeActiveTextEditor(() => void postContext()),
+  ];
+
   webview.onDidReceiveMessage(async (msg) => {
+    if (msg?.type === "pick-branch") {
+      const snap = await gitSnapshot();
+      if (!snap.available) {
+        vscode.window.showWarningMessage(`Lisa Code: ${snap.error}`);
+        return;
+      }
+      const picked = await vscode.window.showQuickPick([NO_BASE, ...(snap.branches || [])], {
+        title: "Branch de comparação (não faz checkout — é só referência pra Lisa)",
+        placeHolder: snap.branch ? `você está em: ${snap.branch}` : undefined,
+      });
+      if (picked === undefined) return;
+      client.setCompareBase(picked === NO_BASE ? undefined : picked);
+      await postContext();
+      return;
+    }
+
+    if (msg?.type === "toggle-file-context") {
+      client.setIncludeEditorContext(!client.getIncludeEditorContext());
+      await postContext();
+      return;
+    }
+
+    if (msg?.type === "ready") {
+      await postContext();
+      return;
+    }
+
     if (msg?.type !== "send" || !msg.text) return;
-    const post = (data: unknown) => webview.postMessage(data);
     post({ type: "user-message", text: msg.text });
     try {
       for await (const event of client.send(msg.text)) {
@@ -27,7 +78,10 @@ export function bindChatMessages(webview: vscode.Webview, client: LisaClient): C
       post({ type: "turn-done" }); // sinal pro orbe do cabeçalho voltar pro estado "idle"
     }
   });
-  return { clear: () => webview.postMessage({ type: "clear" }) };
+  return {
+    clear: () => webview.postMessage({ type: "clear" }),
+    dispose: () => disposables.forEach((d) => d.dispose()),
+  };
 }
 
 /** Visual "HUD estilo Jarvis" — cantos de mira, badge com ponto pulsante, linha de varredura
@@ -114,6 +168,20 @@ export function getChatHtml(): string {
   .status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--hud); animation: hud-blink 1.4s steps(1) infinite; }
   @keyframes hud-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.15; } }
 
+  /* barra de contexto — o que a Lisa está "vendo": branch, base de comparação, arquivo aberto */
+  #contextBar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 14px 2px; }
+  .chip {
+    font-family: inherit; font-size: 9.5px; letter-spacing: 0.5px; padding: 3px 9px; border-radius: 20px;
+    background: transparent; color: var(--vscode-descriptionForeground); max-width: 240px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    border: 1px solid var(--hud);
+    border: 1px solid color-mix(in srgb, var(--hud) 30%, transparent);
+  }
+  .chip.clickable { cursor: pointer; }
+  .chip.clickable:hover { border-color: var(--hud); color: var(--hud); }
+  .chip.on { color: var(--hud); border-color: var(--hud); background: color-mix(in srgb, var(--hud) 10%, transparent); }
+  .chip.off { opacity: 0.45; }
+
   #progressWrap { padding: 10px 18px 0; max-width: 760px; margin: 0 auto; width: 100%; display: none; }
   #progressWrap.show { display: block; }
   #progressStatus { font-size: 10px; letter-spacing: 0.5px; color: var(--vscode-descriptionForeground); margin-bottom: 5px; display: flex; justify-content: space-between; gap: 8px; }
@@ -163,6 +231,12 @@ export function getChatHtml(): string {
       <canvas id="orb"></canvas>
       <div id="headerTitle">◈ LISA CODE</div>
       <div id="headerStatus"><span class="status-dot"></span>SISTEMA ATIVO</div>
+    </div>
+
+    <div id="contextBar">
+      <span class="chip" id="chipBranch" title="Branch em que você está agora">⎇ —</span>
+      <span class="chip clickable off" id="chipCompare" title="Escolher branch de comparação — só referência pra Lisa, NÃO faz checkout">⇄ comparar…</span>
+      <span class="chip clickable" id="chipFile" title="Incluir o arquivo aberto (e a seleção) no contexto da conversa">📄 —</span>
     </div>
 
     <div id="progressWrap">
@@ -248,6 +322,36 @@ export function getChatHtml(): string {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   });
   input.focus();
+
+  const chipBranch = document.getElementById("chipBranch");
+  const chipCompare = document.getElementById("chipCompare");
+  const chipFile = document.getElementById("chipFile");
+  chipCompare.addEventListener("click", () => vscodeApi.postMessage({ type: "pick-branch" }));
+  chipFile.addEventListener("click", () => vscodeApi.postMessage({ type: "toggle-file-context" }));
+
+  function shortPath(p) {
+    if (!p) return null;
+    const parts = p.split("/");
+    return parts.length > 2 ? ".../" + parts.slice(-2).join("/") : p;
+  }
+
+  function setContext(ctx) {
+    chipBranch.textContent = "⎇ " + (ctx.branch || "sem git");
+    chipBranch.classList.toggle("off", !ctx.branch);
+
+    chipCompare.textContent = ctx.base ? "⇄ vs " + ctx.base : "⇄ comparar…";
+    chipCompare.classList.toggle("on", !!ctx.base);
+    chipCompare.classList.toggle("off", !ctx.base);
+
+    chipFile.textContent = "📄 " + (shortPath(ctx.file) || "nenhum arquivo");
+    chipFile.title = ctx.includeFile
+      ? "Arquivo aberto ENTRA no contexto (clique pra desligar)" + (ctx.file ? " — " + ctx.file : "")
+      : "Arquivo aberto NÃO entra no contexto (clique pra ligar)";
+    chipFile.classList.toggle("on", !!ctx.includeFile);
+    chipFile.classList.toggle("off", !ctx.includeFile);
+  }
+
+  vscodeApi.postMessage({ type: "ready" }); // pede o estado inicial da barra de contexto
 
   // "orbe" central — MESMO algoritmo do visualizador de voz do Beyond Bits (canvasRef em
   // assistant/page.js): raios ondulando ao redor de um núcleo com glow + anéis de pulso quando
@@ -337,6 +441,7 @@ export function getChatHtml(): string {
     else if (msg.type === "tool-start") { lastToolDesc = describeTool(msg.name, msg.args); appendTool(lastToolDesc + "...", false); }
     else if (msg.type === "tool-done") appendTool((lastToolDesc || msg.name) + " — concluído", true);
     else if (msg.type === "progress") setProgress(msg.percent, msg.status);
+    else if (msg.type === "context") setContext(msg);
     else if (msg.type === "lisa-error") append("error", "⚠ ERRO", msg.message);
     else if (msg.type === "turn-done") {
       window.__lisaOrbSetMode?.("idle");
