@@ -2,7 +2,7 @@
   "name": "lisa-code",
   "displayName": "Lisa Code",
   "description": "A Lisa (Beyond Bits) dentro do VS Code — conversa, lê e propõe mudanças no seu código. Extensão de uso PESSOAL, nunca publicada.",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "publisher": "personal-use-only",
   "private": true,
   "engines": { "vscode": "^1.85.0" },
@@ -24,7 +24,9 @@
       { "command": "lisaCode.setToken", "title": "Lisa Code: Configurar token pessoal" },
       { "command": "lisaCode.setBaseUrl", "title": "Lisa Code: Configurar URL do Beyond Bits" },
       { "command": "lisaCode.newConversation", "title": "Lisa Code: Nova conversa" },
-      { "command": "lisaCode.openFloating", "title": "Lisa Code: Abrir janela flutuante" }
+      { "command": "lisaCode.openFloating", "title": "Lisa Code: Abrir janela flutuante" },
+      { "command": "lisaCode.applyLook", "title": "Lisa Code: Aplicar visual da Lisa (tema + fonte)" },
+      { "command": "lisaCode.restoreLook", "title": "Lisa Code: Restaurar visual anterior" }
     ],
     "configuration": {
       "title": "Lisa Code",
@@ -42,7 +44,13 @@
       { "label": "Lisa HUD — Roxo", "uiTheme": "vs-dark", "path": "./themes/lisa-hud-roxo.json" },
       { "label": "Lisa HUD — Rosa", "uiTheme": "vs-dark", "path": "./themes/lisa-hud-rosa.json" },
       { "label": "Lisa HUD — Vermelho", "uiTheme": "vs-dark", "path": "./themes/lisa-hud-vermelho.json" },
-      { "label": "Lisa HUD — Dourado", "uiTheme": "vs-dark", "path": "./themes/lisa-hud-dourado.json" }
+      { "label": "Lisa HUD — Dourado", "uiTheme": "vs-dark", "path": "./themes/lisa-hud-dourado.json" },
+      { "label": "Lisa Imersivo — Ciano", "uiTheme": "vs-dark", "path": "./themes/lisa-imersivo-ciano.json" },
+      { "label": "Lisa Imersivo — Azul", "uiTheme": "vs-dark", "path": "./themes/lisa-imersivo-azul.json" },
+      { "label": "Lisa Imersivo — Roxo", "uiTheme": "vs-dark", "path": "./themes/lisa-imersivo-roxo.json" },
+      { "label": "Lisa Imersivo — Rosa", "uiTheme": "vs-dark", "path": "./themes/lisa-imersivo-rosa.json" },
+      { "label": "Lisa Imersivo — Vermelho", "uiTheme": "vs-dark", "path": "./themes/lisa-imersivo-vermelho.json" },
+      { "label": "Lisa Imersivo — Dourado", "uiTheme": "vs-dark", "path": "./themes/lisa-imersivo-dourado.json" }
     ]
   },
   "scripts": {

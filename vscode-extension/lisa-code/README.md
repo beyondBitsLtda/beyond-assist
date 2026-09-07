@@ -48,7 +48,25 @@ aprovar (apagar sempre vai pra lixeira do sistema, nunca é permanente).
 
 ## Temas de cores
 
-`Ctrl+Shift+P` → **Preferences: Color Theme** → escolha um dos 6 "Lisa HUD — <cor>" (mesma
-paleta do seletor de tema do Beyond Bits: Ciano, Azul, Roxo, Rosa, Vermelho, Dourado). Gerados a
-partir de `scripts/generate-themes.mjs` — se a paleta do app mudar, rode
+`Ctrl+Shift+P` → **Preferences: Color Theme** → duas famílias, uma por cor de destaque do
+Beyond Bits (Ciano, Azul, Roxo, Rosa, Vermelho, Dourado):
+
+- **Lisa HUD — <cor>**: fundo preto + painéis `#08131a`, igual o app.
+- **Lisa Imersivo — <cor>**: o fundo do VS Code inteiro (editor, barras, terminal) fica tingido
+  com a própria cor da Lisa bem escurecida — ex.: dourado vira `#110e05`, ciano vira `#041012`.
+
+Gerados por `scripts/generate-themes.mjs`; se a paleta do app mudar, rode
 `npm run generate-themes` de novo antes de empacotar.
+
+## Visual completo (tema + fonte)
+
+`Ctrl+Shift+P` → **Lisa Code: Aplicar visual da Lisa (tema + fonte)** → escolhe a cor e o tipo de
+fundo, e aplica de uma vez o tema + `editor.fontFamily`/`terminal.integrated.fontFamily`.
+**Lisa Code: Restaurar visual anterior** desfaz (o comando guarda o que estava antes).
+
+Um tema de cores do VS Code só controla CORES — fonte é configuração do usuário, por isso vira um
+comando e não parte do tema. E o editor do VS Code só usa fonte **instalada no sistema** (ele não
+baixa webfont como o navegador faz no Beyond Bits): sem JetBrains Mono instalada, a cadeia cai em
+Consolas sem quebrar nada. Se quiser a fonte de verdade na máquina, abra um chamado no GLPI pra TI
+avaliar e instalar. Dentro do painel da Lisa a fonte é carregada do Google Fonts (igual o app),
+então ali ela aparece correta independente do que está instalado.

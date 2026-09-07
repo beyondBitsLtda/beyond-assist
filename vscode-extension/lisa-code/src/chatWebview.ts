@@ -42,17 +42,54 @@ export function getChatHtml(): string {
 <html>
 <head>
 <meta charset="utf-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
 <style>
   :root { --hud: var(--vscode-focusBorder, #38e1ff); }
   * { box-sizing: border-box; }
   body {
     font-family: 'JetBrains Mono', 'Fira Code', Consolas, var(--vscode-editor-font-family), monospace;
     font-size: 13px; padding: 0; margin: 0; color: var(--vscode-foreground);
-    background: var(--vscode-editor-background); display: flex; flex-direction: column;
-    height: 100vh; position: relative; overflow: hidden;
+    background: transparent; height: 100vh; position: relative; overflow: hidden;
   }
 
-  .corner { position: fixed; width: 16px; height: 16px; border-color: var(--hud); opacity: 0.55; pointer-events: none; z-index: 5; }
+  /* camada de fundo (grade + manchas de luz derivando) — é o que aparece ATRÁS do vidro; sem
+     ela o blur não teria nada pra desfocar e a translucidez não leria como vidro. */
+  .backdrop { position: fixed; inset: 0; overflow: hidden; z-index: 0; }
+  .backdrop::before {
+    content: ""; position: absolute; inset: -20%; opacity: 0.05;
+    background-image: linear-gradient(var(--hud) 1px, transparent 1px), linear-gradient(90deg, var(--hud) 1px, transparent 1px);
+    background-size: 34px 34px;
+  }
+  .blob { position: absolute; width: 46vmin; height: 46vmin; border-radius: 50%; background: var(--hud); filter: blur(60px); opacity: 0.2; }
+  .blob.b1 { top: -12vmin; left: -8vmin; animation: hud-drift1 18s ease-in-out infinite alternate; }
+  .blob.b2 { bottom: -14vmin; right: -10vmin; animation: hud-drift2 22s ease-in-out infinite alternate; }
+  @keyframes hud-drift1 { to { transform: translate(6vmin, 8vmin) scale(1.15); } }
+  @keyframes hud-drift2 { to { transform: translate(-7vmin, -6vmin) scale(1.1); } }
+
+  /* o "card flutuante": translúcido + blur do que está atrás + sombra + oscilação lenta.
+     Atenção: isso é vidro DENTRO do painel — o VS Code não tem transparência de janela, então
+     não é see-through até o código/desktop, e sim até esta camada .backdrop aqui. */
+  .card {
+    position: absolute; inset: 10px; z-index: 1; display: flex; flex-direction: column;
+    border-radius: 14px; overflow: hidden;
+    border: 1px solid var(--hud);
+    border: 1px solid color-mix(in srgb, var(--hud) 28%, transparent);
+    background: var(--vscode-editor-background);
+    background: color-mix(in srgb, var(--vscode-editor-background) 62%, transparent);
+    backdrop-filter: blur(16px) saturate(1.25);
+    -webkit-backdrop-filter: blur(16px) saturate(1.25);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    animation: hud-float 7s ease-in-out infinite;
+  }
+  @keyframes hud-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card, .blob, .sweep::after { animation: none; }
+  }
+
+  .corner { position: absolute; width: 16px; height: 16px; border-color: var(--hud); opacity: 0.55; pointer-events: none; z-index: 5; }
   .corner.tl { top: 8px; left: 8px; border-top: 2px solid; border-left: 2px solid; }
   .corner.tr { top: 8px; right: 8px; border-top: 2px solid; border-right: 2px solid; }
   .corner.bl { bottom: 8px; left: 8px; border-bottom: 2px solid; border-left: 2px solid; }
@@ -72,7 +109,7 @@ export function getChatHtml(): string {
     border-bottom: 1px solid color-mix(in srgb, var(--hud) 20%, transparent);
   }
   #orb { width: 84px; height: 84px; }
-  #headerTitle { font-size: 11px; letter-spacing: 3px; color: var(--hud); margin-top: 2px; }
+  #headerTitle { font-family: 'Rajdhani', 'JetBrains Mono', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 4px; color: var(--hud); margin-top: 2px; }
   #headerStatus { font-size: 9px; letter-spacing: 1.5px; color: var(--vscode-descriptionForeground); display: flex; align-items: center; gap: 6px; }
   .status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--hud); animation: hud-blink 1.4s steps(1) infinite; }
   @keyframes hud-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.15; } }
@@ -115,25 +152,29 @@ export function getChatHtml(): string {
 </style>
 </head>
 <body>
-  <div class="sweep"></div>
-  <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
-
-  <div id="header">
-    <canvas id="orb"></canvas>
-    <div id="headerTitle">◈ LISA CODE</div>
-    <div id="headerStatus"><span class="status-dot"></span>SISTEMA ATIVO</div>
-  </div>
+  <div class="backdrop"><span class="blob b1"></span><span class="blob b2"></span></div>
   <span id="hudColorProbe" style="color: var(--hud); display: none;"></span>
 
-  <div id="progressWrap">
-    <div id="progressStatus"><span id="progressLabel"></span><span id="progressPct">0%</span></div>
-    <div id="progressTrack"><div id="progressFill"></div></div>
-  </div>
+  <div class="card">
+    <div class="sweep"></div>
+    <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
 
-  <div id="log"></div>
-  <div id="inputRow">
-    <textarea id="input" rows="2" placeholder="Pergunte algo, ou peça pra Lisa mexer no código..."></textarea>
-    <button id="send">ENVIAR</button>
+    <div id="header">
+      <canvas id="orb"></canvas>
+      <div id="headerTitle">◈ LISA CODE</div>
+      <div id="headerStatus"><span class="status-dot"></span>SISTEMA ATIVO</div>
+    </div>
+
+    <div id="progressWrap">
+      <div id="progressStatus"><span id="progressLabel"></span><span id="progressPct">0%</span></div>
+      <div id="progressTrack"><div id="progressFill"></div></div>
+    </div>
+
+    <div id="log"></div>
+    <div id="inputRow">
+      <textarea id="input" rows="2" placeholder="Pergunte algo, ou peça pra Lisa mexer no código..."></textarea>
+      <button id="send">ENVIAR</button>
+    </div>
   </div>
 <script>
   const vscodeApi = acquireVsCodeApi();
