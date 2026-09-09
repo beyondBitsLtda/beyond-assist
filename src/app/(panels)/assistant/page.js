@@ -535,6 +535,7 @@ export default function AssistantPage() {
   const [interactiveBubble, setInteractiveBubble] = useState(null); // { text, category } | null
   const [interactiveFace, setInteractiveFace] = useState(null); // expressão forçada, ou null = ela faz o que quiser
   const [interactiveSpeaking, setInteractiveSpeaking] = useState(false); // move a boca enquanto a fala toca
+  const [perceivedFace, setPerceivedFace] = useState(null); // cara que ela faz reagindo ao que VÊ (ver facePerception.js)
   const interactiveBagRef = useRef([]); // mesmo "saco embaralhado" do rádio: passa por todas antes de repetir
   const interactiveSeenRef = useRef({}); // itens já comentados por categoria (anti-repetição, ver pendingWork.js)
 
@@ -796,6 +797,43 @@ export default function AssistantPage() {
     return () => {
       stopped = true;
       if (timer) clearTimeout(timer);
+    };
+  }, [interactiveMode, addLog]);
+
+  // Ela REAGE ao que vê: expressão do seu rosto (blendshapes do MediaPipe) + ambiente (luz,
+  // movimento, quantas pessoas) — tudo local, nenhum quadro sai da máquina e não gasta cota do
+  // Gemini (ver src/lib/facePerception.js pra o porquê dessa escolha).
+  useEffect(() => {
+    if (!interactiveMode) {
+      setPerceivedFace(null);
+      return;
+    }
+    let cancelled = false;
+    let perception = null;
+    let intervalId = null;
+
+    (async () => {
+      const { createFacePerception } = await import("@/lib/facePerception.js");
+      perception = await createFacePerception();
+      if (cancelled) {
+        perception?.close();
+        return;
+      }
+      if (!perception) {
+        addLog("[INTERATIVO]", OR, "não consegui carregar a leitura de expressão — ela segue fazendo as caras dela sozinha");
+        return;
+      }
+      addLog("[INTERATIVO]", GR, "lendo sua expressão e o ambiente (local, nada sai daqui)");
+      intervalId = setInterval(() => {
+        const face = perception.read(observanceVideoRef.current);
+        setPerceivedFace((prev) => (prev === face ? prev : face)); // só re-renderiza quando muda de verdade
+      }, 250);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+      perception?.close();
     };
   }, [interactiveMode, addLog]);
 
@@ -2702,7 +2740,8 @@ export default function AssistantPage() {
         <video ref={observanceVideoRef} autoPlay playsInline muted style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
       )}
 
-      <LisaPixelFace expression={interactiveFace} speaking={interactiveSpeaking} size={isMobile ? 260 : 340} />
+      {/* prioridade: a cara do assunto que ela trouxe > a reação ao que ela vê > as graças dela */}
+      <LisaPixelFace expression={interactiveFace || perceivedFace} speaking={interactiveSpeaking} size={isMobile ? 260 : 340} />
 
       {interactiveBubble && (
         <div
@@ -2719,8 +2758,11 @@ export default function AssistantPage() {
       <div style={{ ...mono, fontSize: 9.5, letterSpacing: 1.5, color: "rgba(207,239,251,0.45)", textAlign: "center", lineHeight: 1.8 }}>
         <div>✌️ MOSTRE O GESTO PRA CHAMAR A LISA</div>
         <div style={{ color: observanceError ? OR : "rgba(207,239,251,0.35)" }}>
-          {observanceError ? `⚠ ${observanceError} — o gesto não vai funcionar` : "detecção rodando local, nenhuma imagem sai daqui"}
+          {observanceError
+            ? `⚠ ${observanceError} — sem gesto e sem leitura de expressão`
+            : `ELA REAGE À SUA CARA E AO AMBIENTE${perceivedFace ? ` · vendo: ${perceivedFace}` : ""}`}
         </div>
+        <div style={{ color: "rgba(207,239,251,0.25)" }}>tudo local — nenhuma imagem sai daqui</div>
       </div>
     </div>
   );
