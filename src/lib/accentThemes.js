@@ -8,6 +8,7 @@ export const ACCENT_THEMES = [
   { name: "Rosa", hex: "#ff5ea8", rgb: "255,94,168" },
   { name: "Vermelho", hex: "#ff5c5c", rgb: "255,92,92" },
   { name: "Dourado", hex: "#f2c94c", rgb: "242,201,76" },
+  { name: "Alto Contraste", hex: "#ffffff", rgb: "255,255,255" },
 ];
 
 export const DEFAULT_ACCENT = ACCENT_THEMES[0];
