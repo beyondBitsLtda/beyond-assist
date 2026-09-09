@@ -2740,8 +2740,9 @@ export default function AssistantPage() {
         <video ref={observanceVideoRef} autoPlay playsInline muted style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
       )}
 
-      {/* prioridade: a cara do assunto que ela trouxe > a reação ao que ela vê > as graças dela */}
-      <LisaPixelFace expression={interactiveFace || perceivedFace} speaking={interactiveSpeaking} size={isMobile ? 260 : 340} />
+      {/* expression = assunto que ela trouxe (ganha de tudo); reaction = o que ela vê pela
+          câmera (perde pro toque na tela, que é mais imediato) — ver LisaPixelFace.js */}
+      <LisaPixelFace expression={interactiveFace} reaction={perceivedFace} speaking={interactiveSpeaking} size={isMobile ? 260 : 340} />
 
       {interactiveBubble && (
         <div

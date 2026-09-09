@@ -25,6 +25,21 @@ const EYE_PATTERNS = {
   money: ["..#.#..", ".#####.", "#.#.#..", ".#####.", "..#.#.#", ".#####.", "..#.#.."],
 };
 
+// "Z" que sobe flutuando enquanto ela dorme
+const Z_PATTERN = ["#####", "...#.", "..#..", ".#...", "#####"];
+const Z_SPAWN_MS = 850; // um Z novo a cada ~0,85s
+const Z_LIFE_MS = 2600; // quanto tempo ele sobe até desaparecer
+
+// Cenas de resposta a TOQUE na tela. Reaproveitam o mesmo formato das ações espontâneas, então
+// um toque vira uma reaçãozinha com tempo (susto e depois risada) em vez de uma cara congelada.
+const TOUCH_ACTS = {
+  poke: [["surprised", 260], ["giggle", 620], ["happy", 500], ["idle", 0]],
+  pokeAgain: [["shocked", 240], ["annoyed", 700], ["grumpy", 500], ["idle", 0]],
+  pester: [["dizzy", 700], ["annoyed", 800], ["grumpy", 600], ["idle", 0]],
+  pet: [["love", 900], ["happy", 700], ["shy", 500], ["idle", 0]],
+  wake: [["blink", 130], ["surprised", 350], ["curious", 700], ["idle", 0]],
+};
+
 // eyeH/eyeW: tamanho do olho em células. lidTop/lidBottom: quanto corta de cima/baixo (sono,
 // raiva, desconfiança). curve: arqueia a base (olho de sorriso). brow/browAngle: sobrancelha e
 // inclinação (-1 = interna pra baixo = bravo, +1 = interna pra cima = preocupado).
@@ -156,11 +171,19 @@ const ACTS = [
   [["shy", 900], ["blink", 110], ["happy", 500], ["idle", 0]],
 ];
 
-export default function LisaPixelFace({ expression = null, speaking = false, size = 320 }) {
+/**
+ * `expression` = cara imposta de fora (ela está falando de um assunto) — ganha de tudo.
+ * `reaction`  = cara de reação ao que ela VÊ pela câmera (ver facePerception.js) — perde pro
+ *               toque, porque um toque de propósito é mais imediato que "você está sorrindo".
+ * Ordem final: expression > speaking > toque > reaction > graças espontâneas.
+ */
+export default function LisaPixelFace({ expression = null, reaction = null, speaking = false, size = 320 }) {
   const canvasRef = useRef(null);
   // props lidas dentro do laço de animação sem recriar o laço a cada render
   const forcedRef = useRef(expression);
   forcedRef.current = expression;
+  const reactionRef = useRef(reaction);
+  reactionRef.current = reaction;
   const speakingRef = useRef(speaking);
   speakingRef.current = speaking;
 
@@ -176,15 +199,73 @@ export default function LisaPixelFace({ expression = null, speaking = false, siz
     let nextActAt = performance.now() + 1200;
     let current = "idle";
     let lookX = 0;
+    // enquanto isso não expirar, a cena de TOQUE tem prioridade sobre a reação da câmera
+    let touchPriorityUntil = 0;
+    let zs = []; // partículas de "Z" do sono
+    let lastZ = 0;
+    let geom = { cx: 0, cy: 0, cell: 1 }; // atualizado no draw, usado pelo hit-test do toque
 
-    const startAct = (now) => {
-      act = ACTS[Math.floor(Math.random() * ACTS.length)];
+    const startAct = (now, sequence = null) => {
+      act = sequence || ACTS[Math.floor(Math.random() * ACTS.length)];
       actStep = 0;
       const [name, dur, lx = 0] = act[0];
       current = name;
       lookX = lx;
       stepUntil = now + dur;
     };
+
+    // ---- toque/clique na tela ----
+    const recentTaps = []; // horários dos toques recentes: tocar muito seguido irrita ela
+    const startTouchAct = (sequence, now) => {
+      const total = sequence.reduce((sum, [, d]) => sum + (d || 0), 0);
+      touchPriorityUntil = now + total;
+      startAct(now, sequence);
+    };
+
+    const onPointerDown = (e) => {
+      const now = performance.now();
+      const rect = cv.getBoundingClientRect();
+      // posição do toque em CÉLULAS a partir do centro — mesma régua do desenho
+      const gx = (e.clientX - rect.left - rect.width / 2) / geom.cell;
+      const gy = (e.clientY - rect.top - rect.height / 2) / geom.cell;
+
+      while (recentTaps.length && now - recentTaps[0] > 2500) recentTaps.shift();
+      recentTaps.push(now);
+
+      const wasSleeping = current === "sleeping" || current === "sleepy";
+      // a cara ocupa mais ou menos esse retângulo em células (olhos em cima, boca embaixo)
+      const onFace = Math.abs(gx) < 11 && gy > -11 && gy < 8;
+
+      if (wasSleeping) startTouchAct(TOUCH_ACTS.wake, now);
+      else if (recentTaps.length >= 5) startTouchAct(TOUCH_ACTS.pester, now);
+      else if (recentTaps.length >= 3) startTouchAct(TOUCH_ACTS.pokeAgain, now);
+      else if (onFace) startTouchAct(TOUCH_ACTS.poke, now);
+      else {
+        // tocou longe da cara: ela só OLHA pra onde você tocou
+        startTouchAct([["curious", 900, Math.max(-4, Math.min(4, gx / 3))], ["idle", 0]], now);
+      }
+      dragFrom = { x: e.clientX, y: e.clientY, dist: 0 };
+    };
+
+    // arrastar o dedo/mouse em cima dela = fazer carinho
+    let dragFrom = null;
+    const onPointerMove = (e) => {
+      if (!dragFrom) return;
+      dragFrom.dist += Math.hypot(e.clientX - dragFrom.x, e.clientY - dragFrom.y);
+      dragFrom.x = e.clientX;
+      dragFrom.y = e.clientY;
+      if (dragFrom.dist > 160) {
+        startTouchAct(TOUCH_ACTS.pet, performance.now());
+        dragFrom = null; // uma reação por carinho, senão fica reiniciando a cada pixel
+      }
+    };
+    const onPointerUp = () => { dragFrom = null; };
+
+    cv.addEventListener("pointerdown", onPointerDown);
+    cv.addEventListener("pointermove", onPointerMove);
+    cv.addEventListener("pointerup", onPointerUp);
+    cv.addEventListener("pointercancel", onPointerUp);
+    cv.addEventListener("pointerleave", onPointerUp);
 
     const advanceAct = (now) => {
       if (!act) return;
@@ -228,27 +309,27 @@ export default function LisaPixelFace({ expression = null, speaking = false, siz
       const accentRgb = rootStyle.getPropertyValue("--accent-rgb").trim() || "56, 225, 255";
       const accentHex = rootStyle.getPropertyValue("--accent-hex").trim() || "#38e1ff";
 
-      // prioridade: cara vinda de fora (reação/fala) > falando > graça espontânea
+      // ordem: assunto que ela trouxe > falando > cena de toque > reação da câmera > graça dela
+      const touching = now < touchPriorityUntil;
       let name = forcedRef.current || (speakingRef.current ? "speaking" : null);
+      if (!name && !touching) name = reactionRef.current;
       if (!name) {
         if (act && now >= stepUntil) advanceAct(now);
         else if (!act && now >= nextActAt) startAct(now);
         name = current;
       } else {
-        act = null; // reagir a você interrompe a graça em andamento
+        act = null; // algo mais importante que a graça em andamento
       }
       const face = FACES[name] || FACES.idle;
 
       const cell = Math.min(w, h) / GRID;
       const pad = cell * 0.16;
       const cx = w / 2, cy = h / 2;
+      geom = { cx, cy, cell }; // o hit-test do toque usa a mesma régua do desenho
       // roundRect não existe em navegador antigo (Chrome <99) e aqui é chamado centenas de
       // vezes POR FRAME — um throw apagaria a carinha inteira.
       const hasRoundRect = typeof ctx.roundRect === "function";
-      const lit = (gx, gy, alpha = 1) => {
-        const x = cx + gx * cell - cell / 2 + pad / 2;
-        const y = cy + gy * cell - cell / 2 + pad / 2;
-        const s = cell - pad;
+      const litPx = (x, y, s, alpha) => {
         ctx.fillStyle = `rgba(${accentRgb},${alpha})`;
         if (hasRoundRect) {
           ctx.beginPath();
@@ -258,6 +339,7 @@ export default function LisaPixelFace({ expression = null, speaking = false, siz
           ctx.fillRect(x, y, s, s);
         }
       };
+      const lit = (gx, gy, alpha = 1) => litPx(cx + gx * cell - cell / 2 + pad / 2, cy + gy * cell - cell / 2 + pad / 2, cell - pad, alpha);
 
       ctx.shadowBlur = cell * 1.1;
       ctx.shadowColor = accentHex;
@@ -324,6 +406,31 @@ export default function LisaPixelFace({ expression = null, speaking = false, siz
         }
       }
 
+      // --- "Z z z" subindo enquanto ela dorme ---
+      if (name === "sleeping") {
+        if (now - lastZ > Z_SPAWN_MS) {
+          // cada Z nasce um pouco diferente (tamanho e deriva), senão vira uma fileira robótica
+          zs.push({ born: now, scale: 0.45 + Math.random() * 0.35, sway: 0.6 + Math.random() * 1.2 });
+          lastZ = now;
+        }
+      } else {
+        zs.length = 0; // acordou: os Z's somem na hora, não ficam subindo sozinhos
+      }
+      zs = zs.filter((z) => now - z.born < Z_LIFE_MS);
+      for (const z of zs) {
+        const p = (now - z.born) / Z_LIFE_MS; // 0 = acabou de sair, 1 = sumiu
+        const zc = cell * z.scale; // "célula" do Z, menor que a da cara
+        const baseX = cx + 7 * cell + p * z.sway * cell;
+        const baseY = cy - 6 * cell - p * 9 * cell;
+        const alpha = (1 - p) * 0.8;
+        for (let row = 0; row < Z_PATTERN.length; row++) {
+          for (let col = 0; col < Z_PATTERN[row].length; col++) {
+            if (Z_PATTERN[row][col] !== "#") continue;
+            litPx(baseX + col * zc, baseY + row * zc, zc * 0.82, alpha);
+          }
+        }
+      }
+
       ctx.shadowBlur = 0;
       raf = requestAnimationFrame(draw);
     };
@@ -331,8 +438,19 @@ export default function LisaPixelFace({ expression = null, speaking = false, siz
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      cv.removeEventListener("pointerdown", onPointerDown);
+      cv.removeEventListener("pointermove", onPointerMove);
+      cv.removeEventListener("pointerup", onPointerUp);
+      cv.removeEventListener("pointercancel", onPointerUp);
+      cv.removeEventListener("pointerleave", onPointerUp);
     };
   }, []);
 
-  return <canvas ref={canvasRef} style={{ width: size, height: size, maxWidth: "100%", display: "block" }} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      // touchAction none: sem isso, arrastar o dedo pra fazer carinho rola a tela no celular
+      style={{ width: size, height: size, maxWidth: "100%", display: "block", cursor: "pointer", touchAction: "none" }}
+    />
+  );
 }
