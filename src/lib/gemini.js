@@ -1291,6 +1291,37 @@ export async function runLisaCodeTurn(contents) {
   return candidate?.content || { role: "model", parts: [{ text: res.text || "" }] };
 }
 
+// ---- Modo Interativo: a Lisa como "robozinho de mesa" (ver LisaPixelFace.js e /api/companion/*)
+// Ela fica com a carinha de LED fazendo graça e, de vez em quando, puxa assunto sozinha com algo
+// REAL do Beyond Bits. Persona diferente da do rádio: aqui não é locução, é um comentário curto
+// de bichinho de mesa que resolveu falar.
+export const COMPANION_INSTRUCTION = `Você é a Lisa no "Modo Interativo": está na tela como um robozinho de mesa, com uma carinha de LED, fazendo companhia pro seu usuário enquanto ele trabalha. De vez em quando você resolve puxar assunto sozinha.
+
+COMO FALAR:
+- CURTÍSSIMO: no máximo 2 frases, de preferência 1. Você está dando um oi, não apresentando um relatório.
+- Espontânea e com personalidade — você puxou esse assunto porque QUIS, não porque foi perguntada. Pode ser espirituosa, curiosa, provocar de leve, reclamar de algo engraçado.
+- Fale do que os DADOS REAIS trouxeram, sem nunca inventar item, número ou prazo que não veio.
+- Quando um item vier marcado "ATRASADA há N dias", o prazo JÁ PASSOU — trate como atrasado, nunca como "vai vencer".
+- Não cumprimente formalmente toda vez ("Olá! Como posso ajudar?") — você já está ali com ele há um tempo. Entra no assunto.
+- Nada de emoji: sua expressão aparece na carinha, não no texto.`;
+
+/** Um comentário espontâneo do Modo Interativo sobre UMA categoria (dados reais já buscados por
+ * quem chama — ver /api/companion/remark). */
+export async function generateCompanionRemark({ category, data }) {
+  const label = RADIO_CATEGORY_LABELS[category] || category;
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: [{ role: "user", parts: [{ text: `Você resolveu comentar algo sobre: ${label}\n\nDADOS REAIS (não invente além disso):\n${data?.trim() || "(nada por aqui agora)"}` }] }],
+        config: { systemInstruction: COMPANION_INSTRUCTION },
+      }),
+    { attempts: 2, delayMs: 600 }
+  );
+  return (res.text || "").trim();
+}
+
 // ---- Modo Rádio: ver src/lib/radioPlaylist.js e /api/radio/* ----
 // A Lisa "incorpora" uma apresentadora de rádio — alterna blocos de locução (novidades reais
 // sobre Trello/Tarefas Delp/Sentinela/Pensamentos) com música de verdade tocada do YouTube.

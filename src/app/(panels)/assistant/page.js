@@ -16,6 +16,7 @@ import { getDeviceId, matchNavCommand } from "@/lib/deviceId.js";
 import { runFullSync } from "@/lib/sync.js";
 import { hostScreenShare, viewerWatchScreen } from "@/lib/screenShareRTC.js";
 import { loadYouTubeAPI, createYouTubePlayer, playAndWaitEnded } from "@/lib/youtubePlayer.js";
+import LisaPixelFace from "@/components/panels/LisaPixelFace.js";
 
 // carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
 // realmente ligar a Visão 3D; desktop-only por decisão do usuário, nunca entra no bundle mobile.
@@ -522,6 +523,21 @@ export default function AssistantPage() {
   // src/lib/youtubePlayer.js). Ela anuncia a música antes de tocar e comenta depois que acaba.
   const RADIO_CATEGORIES = ["trello", "delp", "sentinel", "thoughts", "weather", "news"];
   const RADIO_CATEGORY_LABELS = { trello: "Trello", delp: "Tarefas Delp", sentinel: "Sentinela", thoughts: "pensamentos", weather: "previsão do tempo", news: "notícias (com o Steve)" };
+  // Modo Interativo — a Lisa como robozinho de mesa: tela limpa, carinha de LED fazendo graça
+  // sozinha (ver LisaPixelFace.js), e de vez em quando ela puxa assunto com algo REAL. A câmera
+  // fica ligada só pelo gesto ✌️ de acordar, que já roda 100% local no navegador (MediaPipe em
+  // public/mediapipe/) — nenhum quadro sai da máquina pra isso.
+  const INTERACTIVE_CATEGORIES = ["trello", "delp", "sentinel", "thoughts", "news"];
+  // cara que ela faz ao trazer cada assunto — determinístico de propósito (pedir a expressão pro
+  // modelo junto do texto exigiria parsear a resposta dele, que é frágil por nada).
+  const INTERACTIVE_FACE_BY_CATEGORY = { trello: "bored", delp: "thinking", sentinel: "surprised", thoughts: "curious", news: "happy" };
+  const [interactiveMode, setInteractiveMode] = useState(false);
+  const [interactiveBubble, setInteractiveBubble] = useState(null); // { text, category } | null
+  const [interactiveFace, setInteractiveFace] = useState(null); // expressão forçada, ou null = ela faz o que quiser
+  const [interactiveSpeaking, setInteractiveSpeaking] = useState(false); // move a boca enquanto a fala toca
+  const interactiveBagRef = useRef([]); // mesmo "saco embaralhado" do rádio: passa por todas antes de repetir
+  const interactiveSeenRef = useRef({}); // itens já comentados por categoria (anti-repetição, ver pendingWork.js)
+
   const [radioMode, setRadioMode] = useState(false);
   const [radioStatus, setRadioStatus] = useState(null); // texto curto pro widget flutuante
   const [radioNowPlaying, setRadioNowPlaying] = useState(null); // {title} | null
@@ -707,8 +723,92 @@ export default function AssistantPage() {
     };
   }, [radioMode, addLog]);
 
+  // Modo Interativo: de ~2 em ~2 min ela puxa assunto sozinha com algo REAL (categoria sorteada
+  // no "saco embaralhado", itens já comentados ficam de fora — ver /api/companion/remark).
   useEffect(() => {
-    if (!observanceMode) {
+    if (!interactiveMode) {
+      setInteractiveBubble(null);
+      setInteractiveFace(null);
+      return;
+    }
+    let stopped = false;
+    let timer = null;
+
+    const pickCategory = () => {
+      if (!interactiveBagRef.current.length) {
+        interactiveBagRef.current = [...INTERACTIVE_CATEGORIES].sort(() => Math.random() - 0.5);
+      }
+      return interactiveBagRef.current.shift();
+    };
+
+    const schedule = () => {
+      if (!stopped) timer = setTimeout(tick, 120000);
+    };
+
+    async function tick() {
+      if (stopped) return;
+      // ela não atropela nada: se está ocupada, falando, ou VOCÊ está no microfone, passa a vez
+      if (busyForGestureRef.current || listeningForGestureRef.current || proactiveTurnRef.current) {
+        schedule();
+        return;
+      }
+      const category = pickCategory();
+      try {
+        const res = await fetch("/api/companion/remark", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ category, excludeKeys: interactiveSeenRef.current[category] || [] }),
+        });
+        const data = await res.json();
+        if (stopped) return;
+        if (data?.ok && data.text) {
+          if (data.usedKeys?.length) {
+            interactiveSeenRef.current[category] = [...(interactiveSeenRef.current[category] || []), ...data.usedKeys].slice(-200);
+          }
+          setInteractiveBubble({ text: data.text, category });
+          setInteractiveFace(INTERACTIVE_FACE_BY_CATEGORY[category] || "curious");
+          addLog("[INTERATIVO]", PU, data.text);
+          if (voiceOnForScreenRef.current) {
+            proactiveTurnRef.current = true; // mesma trava das outras vigílias — senão uma fala corta a outra
+            setInteractiveSpeaking(true);
+            try {
+              await Promise.race([
+                speakText(data.text, { voiceName: voiceNameForScreenRef.current }).catch(() => {}),
+                new Promise((r) => setTimeout(r, 60000)),
+              ]);
+            } finally {
+              proactiveTurnRef.current = false;
+              setInteractiveSpeaking(false);
+            }
+          }
+          if (!stopped) {
+            setInteractiveFace(null); // solta a cara — volta a fazer graça sozinha
+            setTimeout(() => { if (!stopped) setInteractiveBubble(null); }, 12000);
+          }
+        }
+      } catch (err) {
+        addLog("[INTERATIVO]", OR, `falha ao buscar assunto: ${err.message}`);
+      }
+      schedule();
+    }
+
+    schedule();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [interactiveMode, addLog]);
+
+  // no mobile a view "companion" É o modo: entrar liga, sair desliga. Sem isso a câmera e o laço
+  // ficariam rodando enquanto você está lendo o chat em outra aba, sem nem ver a carinha.
+  useEffect(() => {
+    if (!isMobile) return;
+    setInteractiveMode(mobileView === "companion");
+  }, [isMobile, mobileView]);
+
+  // a câmera serve à Observância E ao Modo Interativo (que precisa dela só pro gesto de acordar)
+  useEffect(() => {
+    if (!observanceMode && !interactiveMode) {
       observanceStreamRef.current?.getTracks().forEach((t) => t.stop());
       observanceStreamRef.current = null;
       return;
@@ -734,6 +834,9 @@ export default function AssistantPage() {
       .catch((err) => {
         if (cancelled) return;
         setObservanceError(err?.name === "NotAllowedError" ? "permissão de câmera negada" : (err?.message || "não consegui acessar a câmera"));
+        // o Modo Interativo NÃO morre por falta de câmera — a carinha e as falas espontâneas
+        // continuam, só o gesto de acordar deixa de funcionar. Já a Observância sem câmera não
+        // faz sentido nenhum, então essa sim se desliga.
         setObservanceMode(false);
       });
     return () => {
@@ -741,7 +844,7 @@ export default function AssistantPage() {
       observanceStreamRef.current?.getTracks().forEach((t) => t.stop());
       observanceStreamRef.current = null;
     };
-  }, [observanceMode, cameraFacing]);
+  }, [observanceMode, interactiveMode, cameraFacing]);
 
   // Câmera de Vigia — câmera+microfone contínuos (ao contrário da Observância, que só tira UMA
   // foto por pergunta). Independente da Observância: cada uma pode estar ligada sem a outra.
@@ -894,7 +997,8 @@ export default function AssistantPage() {
   }, [addLog]);
 
   useEffect(() => {
-    if (!observanceMode) {
+    // vale pra Observância e pro Modo Interativo — nos dois o gesto ✌️ chama a Lisa
+    if (!observanceMode && !interactiveMode) {
       gestureRecognizerRef.current?.close?.();
       gestureRecognizerRef.current = null;
       return;
@@ -945,7 +1049,7 @@ export default function AssistantPage() {
       gestureRecognizerRef.current?.close?.();
       gestureRecognizerRef.current = null;
     };
-  }, [observanceMode, addLog, triggerWake]);
+  }, [observanceMode, interactiveMode, addLog, triggerWake]);
 
   // ---- Modo Tela: a Lisa "vê" a tela do computador (getDisplayMedia) — DESKTOP-ONLY (o
   // toggle só existe no branch desktop deste componente, "enquanto mexo no PC"), com 2
@@ -2583,6 +2687,44 @@ export default function AssistantPage() {
     </div>
   );
 
+  // Tela do Modo Interativo — a mesma nos dois formatos (no desktop entra como sobreposição de
+  // tela cheia, no mobile como a terceira "view" ao lado de chat/voz). Tela limpa de propósito:
+  // só a carinha, o que ela trouxe, e a dica do gesto.
+  //
+  // O <video> escondido aqui é ESSENCIAL: o reconhecedor de gestos lê de observanceVideoRef, e
+  // se esse elemento não existir o ✌️ simplesmente não funciona (mesma lição do preview que
+  // desmontava junto com a seção da interface). Só montamos quando a Observância está desligada,
+  // porque quando ela está ligada o elemento dela já existe — dois elementos com o MESMO ref
+  // brigariam, e o último a montar ganharia.
+  const interactiveScreen = (
+    <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, padding: 24, background: "#000", overflow: "hidden" }}>
+      {!observanceMode && (
+        <video ref={observanceVideoRef} autoPlay playsInline muted style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
+      )}
+
+      <LisaPixelFace expression={interactiveFace} speaking={interactiveSpeaking} size={isMobile ? 260 : 340} />
+
+      {interactiveBubble && (
+        <div
+          style={{
+            maxWidth: 520, textAlign: "center", fontSize: isMobile ? 14 : 15.5, lineHeight: 1.5, color: "#eafcff",
+            padding: "12px 18px", borderRadius: 12, border: "1px solid rgba(var(--accent-rgb),0.25)",
+            background: "rgba(var(--accent-rgb),0.06)", animation: "bb-slidein .3s ease",
+          }}
+        >
+          {interactiveBubble.text}
+        </div>
+      )}
+
+      <div style={{ ...mono, fontSize: 9.5, letterSpacing: 1.5, color: "rgba(207,239,251,0.45)", textAlign: "center", lineHeight: 1.8 }}>
+        <div>✌️ MOSTRE O GESTO PRA CHAMAR A LISA</div>
+        <div style={{ color: observanceError ? OR : "rgba(207,239,251,0.35)" }}>
+          {observanceError ? `⚠ ${observanceError} — o gesto não vai funcionar` : "detecção rodando local, nenhuma imagem sai daqui"}
+        </div>
+      </div>
+    </div>
+  );
+
   // Widget flutuante do Modo Rádio — SEMPRE montado enquanto radioMode estiver ligado (mesma
   // lição do bug do preview de "assistir": nunca deixar um player vivo dentro de algo que pode
   // desmontar por causa de navegação na interface, tipo abrir/fechar categoria).
@@ -2663,10 +2805,22 @@ export default function AssistantPage() {
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /></svg>
             </button>
+            {/* entrar/sair dessa view É ligar/desligar o modo — evita ficar com a câmera e o
+                laço rodando enquanto você está lendo o chat em outra aba */}
+            <button
+              onClick={() => setMobileView("companion")}
+              title="Modo interativo"
+              style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${mobileView === "companion" ? CY : "rgba(var(--accent-rgb),0.2)"}`, background: mobileView === "companion" ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: mobileView === "companion" ? "#eafcff" : "rgba(207,239,251,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}
+            >
+              🤖
+            </button>
           </div>
         </div>
 
-        {mobileView === "voice" ? (
+        {mobileView === "companion" ? (
+          // ---- MODO INTERATIVO: tela limpa, só a carinha dela (ver interactiveScreen) ----
+          interactiveScreen
+        ) : mobileView === "voice" ? (
           // ---- MODO VOZ: tela escura, só a onda sonora, como o modo de voz do ChatGPT ----
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, padding: 20 }}>
             <div style={{ position: "relative", width: "min(80vw,320px)", height: "min(80vw,320px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -3223,6 +3377,22 @@ export default function AssistantPage() {
       {cameraVigiaMessageToast}
       {watchPreviews}
       {radioWidget}
+      {/* Modo Interativo no desktop: sobreposição de tela cheia por cima do painel inteiro */}
+      {interactiveMode && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 240, display: "flex", flexDirection: "column", background: "#000" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", flex: "none" }}>
+            <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: CY }}>🤖 MODO INTERATIVO</div>
+            <button
+              onClick={() => setInteractiveMode(false)}
+              title="Sair do Modo Interativo"
+              style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "6px 12px", borderRadius: 4, border: "1px solid rgba(var(--accent-rgb),0.3)", background: "transparent", color: "rgba(207,239,251,0.7)", cursor: "pointer" }}
+            >
+              ✕ SAIR
+            </button>
+          </div>
+          {interactiveScreen}
+        </div>
+      )}
       {/* ESCOPO DO ASSISTENTE */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flexWrap: "wrap" }}>
         <span style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)" }}>ESCOPO</span>
@@ -3328,6 +3498,21 @@ export default function AssistantPage() {
               {cat.label} {cat.active ? "●" : ""} {openSettingsCategory === cat.key ? "▲" : "▼"}
             </button>
           ))}
+          {/* Este é um interruptor direto, não um acordeão como os de cima: o Modo Interativo
+              abre uma tela cheia própria, não tem controle nenhum pra mostrar numa gaveta. */}
+          <button
+            onClick={() => setInteractiveMode((v) => !v)}
+            title="Modo Interativo — tela limpa com a carinha da Lisa; mostre ✌️ pra chamar ela"
+            style={{
+              ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+              border: `1px solid ${interactiveMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+              background: interactiveMode ? "rgba(123,216,143,0.12)" : "transparent",
+              color: interactiveMode ? "#eafcff" : "rgba(207,239,251,0.55)",
+              cursor: "pointer",
+            }}
+          >
+            🤖 INTERATIVO {interactiveMode ? "●" : ""}
+          </button>
         </div>
 
         {openSettingsCategory === "appearance" && (
