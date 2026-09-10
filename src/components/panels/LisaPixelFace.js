@@ -33,6 +33,14 @@ const Z_PATTERN = ["#####", "...#.", "..#..", ".#...", "#####"];
 const Z_SPAWN_MS = 850;
 const Z_LIFE_MS = 2600;
 
+// notinhas que saem quando ela está de fone
+const NOTE_PATTERNS = [
+  ["..##", "..##", "..#.", "..#.", "..#.", "###.", "###."], // ♪
+  [".#..#", ".####", ".#..#", ".#..#", "##.##", "##.##"], // ♫
+];
+const NOTE_SPAWN_MS = 620;
+const NOTE_LIFE_MS = 2400;
+
 const F = (o) => ({ eyeH: 7, eyeW: 6, lidTop: 0, lidBottom: 0, curve: 0, mouth: "flat", brow: 0, browAngle: 0, wink: 0, tilt: 0, special: null, ...o });
 
 const FACES = {
@@ -218,6 +226,8 @@ export default function LisaPixelFace({
     let touchPriorityUntil = 0;
     let zs = [];
     let lastZ = 0;
+    let notes = [];
+    let lastNote = 0;
 
     // estado INTERPOLADO (é o que é desenhado); "target" vem da expressão vigente
     const cur = { eyeH: 7, eyeW: 6, lidTop: 0, lidBottom: 0, curve: 0, browOn: 0, browAngle: 0, tilt: 0, closeL: 0, closeR: 0, specialMix: 0, lookX: 0, bob: 0 };
@@ -501,16 +511,52 @@ export default function LisaPixelFace({
       drawMouth(curMouth, mouthMix);
 
       // ---- fone de ouvido (Modo Rádio) ----
+      // Antes era um arco grande por cima da cabeça com duas caixas nas laterais: ficou
+      // esquisito porque tapava o painel e não lia como fone nessa resolução. Agora é uma
+      // cápsula tipo AirPod na "orelha" (do lado dos olhos, sem cobrir nada) com haste e um
+      // cabo que balança pendurado — o cabo é o que faz ler na hora como fone, mesmo pequeno.
       if (cur.bob > 0.02) {
         const a = cur.bob;
-        const arcTop = EYE_TOP - 11;
-        for (let i = -8; i <= 8; i++) {
-          const dy = Math.round((i * i) / 26); // arco raso por cima da cabeça
-          lit(i, arcTop + dy, 0.85 * a);
-        }
+        const earY = EYE_TOP;
+        const earX = 11;
         for (const side of [-1, 1]) {
-          for (let gy = arcTop + 2; gy <= arcTop + 7; gy++) {
-            for (let gx = 0; gx < 2; gx++) lit(side * (9 + gx), gy, 0.9 * a);
+          for (let dx = 0; dx < 2; dx++) for (let dy = 0; dy < 2; dy++) lit(side * (earX + dx), earY + dy, 0.95 * a);
+          for (let dy = 2; dy <= 3; dy++) lit(side * earX, earY + dy, 0.85 * a); // haste
+          for (let k = 0; k < 6; k++) {
+            // cabo balançando, com os dois lados fora de fase pra não parecer espelhado
+            const sway = Math.sin(now / 320 + k * 0.6 + (side > 0 ? 0 : Math.PI)) * 0.9;
+            lit(side * earX + sway - side * k * 0.25, earY + 4 + k, (0.7 - k * 0.07) * a);
+          }
+        }
+      }
+
+      // ---- notinhas musicais saindo (de fone) ----
+      if (cur.bob > 0.5) {
+        if (now - lastNote > NOTE_SPAWN_MS) {
+          notes.push({
+            born: now,
+            side: Math.random() < 0.5 ? -1 : 1,
+            pat: NOTE_PATTERNS[Math.floor(Math.random() * NOTE_PATTERNS.length)],
+            scale: 0.4 + Math.random() * 0.3,
+            sway: 0.8 + Math.random() * 1.4,
+          });
+          lastNote = now;
+        }
+      } else {
+        notes.length = 0;
+      }
+      notes = notes.filter((n) => now - n.born < NOTE_LIFE_MS);
+      for (const n of notes) {
+        const p = (now - n.born) / NOTE_LIFE_MS;
+        const nc = cell * n.scale;
+        // sai do lado do fone, sobe e vai abrindo pra fora
+        const baseX = cx + n.side * (13 + p * 4) * cell + Math.sin(p * 6) * n.sway * cell * 0.4;
+        const baseY = cy + (EYE_TOP - p * 9) * cell;
+        const alpha = Math.sin(p * Math.PI) * 0.85; // aparece e desaparece suave
+        for (let row = 0; row < n.pat.length; row++) {
+          for (let col = 0; col < n.pat[row].length; col++) {
+            if (n.pat[row][col] !== "#") continue;
+            litPx(baseX + col * nc, baseY + row * nc, nc * 0.82, alpha);
           }
         }
       }

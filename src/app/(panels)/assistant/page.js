@@ -19,6 +19,7 @@ import { loadYouTubeAPI, createYouTubePlayer, playAndWaitEnded } from "@/lib/you
 import LisaPixelFace from "@/components/panels/LisaPixelFace.js";
 import LisaTicTacToe from "@/components/panels/LisaTicTacToe.js";
 import LisaPong from "@/components/panels/LisaPong.js";
+import LisaPenalty from "@/components/panels/LisaPenalty.js";
 import { loadGames } from "@/lib/gameHistory.js";
 
 // carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
@@ -2783,6 +2784,7 @@ export default function AssistantPage() {
             {[
               { key: "velha", label: "Jogo da Velha" },
               { key: "pong", label: "Pong" },
+              { key: "penalti", label: "Cobrança de Pênalti" },
             ].map((gm) => (
               <button
                 key={gm.key}
@@ -2835,7 +2837,7 @@ export default function AssistantPage() {
                 ) : (
                   gameStats.history.map((h, i) => (
                     <div key={i} style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.5)", display: "flex", justifyContent: "space-between", gap: 6 }}>
-                      <span>{h.game === "velha" ? "velha" : "pong"}{h.detail ? ` ${h.detail}` : ""}</span>
+                      <span>{h.game === "penalti" ? "pênalti" : h.game}{h.detail ? ` ${h.detail}` : ""}</span>
                       <span style={{ color: h.result === "win" ? GR : h.result === "loss" ? OR : "rgba(207,239,251,0.4)" }}>
                         {h.result === "win" ? "vitória" : h.result === "loss" ? "derrota" : "empate"}
                       </span>
@@ -2873,6 +2875,14 @@ export default function AssistantPage() {
           onMood={(m) => {
             setInteractiveFace(m);
             setTimeout(() => setInteractiveFace(null), 2000);
+          }}
+        />
+      )}
+      {interactiveGame === "penalti" && (
+        <LisaPenalty
+          onMood={(m) => {
+            setInteractiveFace(m);
+            setTimeout(() => setInteractiveFace(null), 2200);
           }}
         />
       )}
