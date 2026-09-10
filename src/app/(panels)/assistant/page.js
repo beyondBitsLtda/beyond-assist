@@ -20,6 +20,12 @@ import LisaPixelFace from "@/components/panels/LisaPixelFace.js";
 import LisaTicTacToe from "@/components/panels/LisaTicTacToe.js";
 import LisaPong from "@/components/panels/LisaPong.js";
 import LisaPenalty from "@/components/panels/LisaPenalty.js";
+import LisaConnect4 from "@/components/panels/LisaConnect4.js";
+import LisaMemory from "@/components/panels/LisaMemory.js";
+import LisaReflex from "@/components/panels/LisaReflex.js";
+import LisaBattleship from "@/components/panels/LisaBattleship.js";
+import LisaAirHockey from "@/components/panels/LisaAirHockey.js";
+import LisaRockPaper from "@/components/panels/LisaRockPaper.js";
 import { loadGames } from "@/lib/gameHistory.js";
 
 // carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
@@ -811,6 +817,13 @@ export default function AssistantPage() {
 
   interactiveGameRef.current = interactiveGame;
 
+  // cara que ela faz durante os jogos — a mesma para todos, e sempre TEMPORÁRIA: solta depois
+  // de um tempo pra ela voltar a fazer as graças dela em vez de congelar na última reação.
+  const gameMood = useCallback((m) => {
+    setInteractiveFace(m);
+    setTimeout(() => setInteractiveFace(null), 2400);
+  }, []);
+
   // reação à troca de música quando ela está de fone (Modo Rádio dentro do Interativo)
   useEffect(() => {
     if (!interactiveMode || !radioMode || !radioNowPlaying) return;
@@ -1087,7 +1100,11 @@ export default function AssistantPage() {
               if (
                 now - lastGestureTriggerRef.current > GESTURE_COOLDOWN_MS &&
                 !listeningForGestureRef.current &&
-                !busyForGestureRef.current
+                !busyForGestureRef.current &&
+                // com jogo aberto o gesto NÃO acorda: no pedra-papel-tesoura o ✌️ é a tesoura,
+                // e sem isso mostrar tesoura abriria o microfone no meio da partida. Nos outros
+                // jogos o motivo é o mesmo em espírito: ela não deve interromper o jogo.
+                !interactiveGameRef.current
               ) {
                 lastGestureTriggerRef.current = now;
                 triggerWake();
@@ -2785,6 +2802,12 @@ export default function AssistantPage() {
               { key: "velha", label: "Jogo da Velha" },
               { key: "pong", label: "Pong" },
               { key: "penalti", label: "Cobrança de Pênalti" },
+              { key: "lig4", label: "Lig 4" },
+              { key: "naval", label: "Batalha Naval" },
+              { key: "memoria", label: "Jogo da Memória" },
+              { key: "airhockey", label: "Air Hockey" },
+              { key: "reflexo", label: "Duelo de Reflexo" },
+              { key: "ppt", label: "Pedra-Papel-Tesoura (câmera)" },
             ].map((gm) => (
               <button
                 key={gm.key}
@@ -2862,30 +2885,21 @@ export default function AssistantPage() {
       />
 
       {interactiveGame === "velha" && (
-        <LisaTicTacToe
-          onMood={(m) => {
-            setInteractiveFace(m);
-            // a cara do jogo não fica presa: solta depois de um tempo pra ela voltar a viver
-            setTimeout(() => setInteractiveFace(null), 2600);
-          }}
-        />
+        <LisaTicTacToe onMood={gameMood} />
       )}
       {interactiveGame === "pong" && (
-        <LisaPong
-          onMood={(m) => {
-            setInteractiveFace(m);
-            setTimeout(() => setInteractiveFace(null), 2000);
-          }}
-        />
+        <LisaPong onMood={gameMood} />
       )}
       {interactiveGame === "penalti" && (
-        <LisaPenalty
-          onMood={(m) => {
-            setInteractiveFace(m);
-            setTimeout(() => setInteractiveFace(null), 2200);
-          }}
-        />
+        <LisaPenalty onMood={gameMood} />
       )}
+      {interactiveGame === "lig4" && <LisaConnect4 onMood={gameMood} />}
+      {interactiveGame === "naval" && <LisaBattleship onMood={gameMood} />}
+      {interactiveGame === "memoria" && <LisaMemory onMood={gameMood} />}
+      {interactiveGame === "airhockey" && <LisaAirHockey onMood={gameMood} />}
+      {interactiveGame === "reflexo" && <LisaReflex onMood={gameMood} />}
+      {/* o de câmera lê do MESMO <video> escondido que o gesto de acordar usa */}
+      {interactiveGame === "ppt" && <LisaRockPaper videoRef={observanceVideoRef} onMood={gameMood} />}
 
       {!interactiveGame && interactiveBubble && (
         <div

@@ -525,7 +525,7 @@ alter table public.screen_share_signals enable row level security;
 -- (só acessada pela service_role, em src/lib/screenShareSignals.js — mesmo padrão das tabelas acima)
 
 -- ============================================================
---  26) Partidas contra a Lisa (Modo Interativo — jogo da velha, pong e cobrança de pênalti)
+--  26) Partidas contra a Lisa (Modo Interativo — todos os joguinhos do menu)
 --
 --  Antes o histórico vivia no localStorage: persistia, mas era POR DISPOSITIVO (partida no PC
 --  não aparecia no celular). Aqui fica compartilhado. Ver src/lib/gameScores.js (servidor) e
@@ -534,7 +534,7 @@ alter table public.screen_share_signals enable row level security;
 -- ============================================================
 create table if not exists public.lisa_games (
   id         bigint generated always as identity primary key,
-  game       text not null,                    -- 'velha' | 'pong' | 'penalti'
+  game       text not null,                    -- 'velha'|'pong'|'penalti'|'lig4'|'naval'|'memoria'|'airhockey'|'reflexo'|'ppt'
   result     text not null,                    -- 'win' | 'loss' | 'draw' — do ponto de vista do USUÁRIO
   detail     text,                             -- livre (ex.: placar do pong, '5x3')
   device     text,                             -- de onde jogou (ver src/lib/deviceId.js), só pra curiosidade

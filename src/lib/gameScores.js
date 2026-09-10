@@ -6,7 +6,7 @@
 // reserva, pra o jogo não perder o placar se a rede/tabela falhar — ver src/lib/gameHistory.js.
 import { supabase } from "./supabase.js";
 
-const VALID_GAMES = new Set(["velha", "pong", "penalti"]);
+const VALID_GAMES = new Set(["velha", "pong", "penalti", "lig4", "naval", "memoria", "airhockey", "reflexo", "ppt"]);
 const VALID_RESULTS = new Set(["win", "loss", "draw"]);
 
 export async function recordGameServer({ game, result, detail = null, device = null }) {
