@@ -523,3 +523,26 @@ create index if not exists screen_share_signals_to_device_idx on public.screen_s
 
 alter table public.screen_share_signals enable row level security;
 -- (só acessada pela service_role, em src/lib/screenShareSignals.js — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  26) Partidas contra a Lisa (Modo Interativo — jogo da velha e pong)
+--
+--  Antes o histórico vivia no localStorage: persistia, mas era POR DISPOSITIVO (partida no PC
+--  não aparecia no celular). Aqui fica compartilhado. Ver src/lib/gameScores.js (servidor) e
+--  src/lib/gameHistory.js (navegador, que passou a falar com /api/games e só usa o
+--  localStorage como reserva quando a rede/tabela não responde).
+-- ============================================================
+create table if not exists public.lisa_games (
+  id         bigint generated always as identity primary key,
+  game       text not null,                    -- 'velha' | 'pong'
+  result     text not null,                    -- 'win' | 'loss' | 'draw' — do ponto de vista do USUÁRIO
+  detail     text,                             -- livre (ex.: placar do pong, '5x3')
+  device     text,                             -- de onde jogou (ver src/lib/deviceId.js), só pra curiosidade
+  created_at timestamptz not null default now()
+);
+
+create index if not exists lisa_games_created_at_idx on public.lisa_games (created_at desc);
+create index if not exists lisa_games_game_idx on public.lisa_games (game, created_at desc);
+
+alter table public.lisa_games enable row level security;
+-- (só acessada pela service_role, em src/lib/gameScores.js — mesmo padrão das tabelas acima)

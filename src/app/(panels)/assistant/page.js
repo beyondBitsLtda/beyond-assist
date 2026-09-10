@@ -19,7 +19,7 @@ import { loadYouTubeAPI, createYouTubePlayer, playAndWaitEnded } from "@/lib/you
 import LisaPixelFace from "@/components/panels/LisaPixelFace.js";
 import LisaTicTacToe from "@/components/panels/LisaTicTacToe.js";
 import LisaPong from "@/components/panels/LisaPong.js";
-import { loadScore, loadHistory } from "@/lib/gameHistory.js";
+import { loadGames } from "@/lib/gameHistory.js";
 
 // carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
 // realmente ligar a Visão 3D; desktop-only por decisão do usuário, nunca entra no bundle mobile.
@@ -2765,8 +2765,11 @@ export default function AssistantPage() {
           onClick={() => {
             const opening = !interactiveMenuOpen;
             setInteractiveMenuOpen(opening);
-            // placar só é lido ao abrir: é localStorage, não precisa ficar relendo
-            if (opening) setGameStats({ score: loadScore(), history: loadHistory({ limit: 6 }) });
+            // placar é lido só ao ABRIR o menu (vem do servidor, não precisa ficar consultando)
+            if (opening) {
+              setGameStats(null);
+              loadGames({ limit: 6 }).then(setGameStats);
+            }
           }}
           title="Menu do Modo Interativo"
           style={{ ...mono, fontSize: 13, width: 34, height: 34, borderRadius: 10, border: "1px solid rgba(var(--accent-rgb),0.3)", background: "rgba(0,0,0,0.55)", color: CY, cursor: "pointer" }}
@@ -2812,10 +2815,16 @@ export default function AssistantPage() {
               🎧 Modo Rádio: {radioMode ? "ON" : "OFF"}
             </button>
 
-            {gameStats && (
+            <div style={{ height: 1, background: "rgba(var(--accent-rgb),0.15)", margin: "2px 0" }} />
+            {!gameStats ? (
+              <div style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.35)" }}>carregando placar…</div>
+            ) : (
               <>
-                <div style={{ height: 1, background: "rgba(var(--accent-rgb),0.15)", margin: "2px 0" }} />
-                <div style={{ ...mono, fontSize: 8.5, letterSpacing: 2, color: "rgba(207,239,251,0.45)" }}>PLACAR GERAL</div>
+                <div style={{ ...mono, fontSize: 8.5, letterSpacing: 2, color: "rgba(207,239,251,0.45)", display: "flex", justifyContent: "space-between" }}>
+                  <span>PLACAR GERAL</span>
+                  {/* deixa claro quando o placar veio da reserva local em vez do banco */}
+                  {gameStats.source === "local" && <span style={{ color: OR }} title="não consegui falar com o servidor — mostrando só o que ficou guardado neste aparelho">local</span>}
+                </div>
                 <div style={{ ...mono, fontSize: 10, display: "flex", gap: 8 }}>
                   <span style={{ color: GR }}>{gameStats.score.wins}V</span>
                   <span style={{ color: OR }}>{gameStats.score.losses}D</span>

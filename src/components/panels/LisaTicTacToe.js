@@ -88,6 +88,8 @@ export default function LisaTicTacToe({ onMood, onFinish }) {
     if (!w) return;
     const outcome = w === "X" ? "win" : w === "O" ? "loss" : "draw";
     setResult(outcome);
+    // registra no servidor sem travar a interface — recordGame nunca lança (guarda de reserva
+    // no aparelho se a rede falhar, ver gameHistory.js)
     recordGame({ game: "velha", result: outcome });
     onMood?.(outcome === "win" ? "sad" : outcome === "loss" ? "proud" : "confused");
     onFinish?.(outcome);
