@@ -1291,6 +1291,138 @@ export async function runLisaCodeTurn(contents) {
   return candidate?.content || { role: "model", parts: [{ text: res.text || "" }] };
 }
 
+// ---- Modo Quiz (ver /api/quiz/* e LisaQuiz.js) ----
+// A Lisa monta a pergunta E a explicação/recomendação. As perguntas são GERADAS em vez de vir
+// de um banco fixo: um banco esgotaria rápido, e assim ela varia dificuldade e assunto de
+// verdade. O schema estruturado garante que sempre venham 4 alternativas e um índice válido —
+// sem isso a interface teria que adivinhar o formato do texto dela.
+export const QUIZ_CATEGORY_LABELS = {
+  python: "Python",
+  javascript: "JavaScript",
+  java: "Java",
+  csharp: "C#",
+  cpp: "C++",
+  geral: "programação em geral (lógica, algoritmos, arquitetura, boas práticas)",
+};
+
+const QUIZ_INSTRUCTION = `Você é a Lisa, aplicando um quiz de programação pro seu usuário — você é boa nisso e gosta de ensinar, não de humilhar.
+
+REGRAS:
+- A pergunta tem que ser REAL e verificável, com UMA alternativa inequivocamente correta e 3 erradas plausíveis (nada de alternativa absurda que se elimina de graça).
+- Respeite a dificuldade pedida: "facil" é conceito básico do dia a dia; "medio" exige entender comportamento da linguagem; "dificil" pega pegadinha real, detalhe de especificação, ou consequência sutil de design.
+- Nada de pergunta ambígua, dependente de versão sem dizer a versão, ou de opinião.
+- A explicação diz POR QUE a correta está correta E por que a escolhida (se errada) parece certa mas não é — é isso que ensina.
+- A recomendação de estudo é concreta e curta: o tópico exato pra revisar, não "estude mais".
+- Escreva em português do Brasil. Pode ter código nas alternativas.`;
+
+/** Uma pergunta de quiz. `explanation`/`recommendation` já vêm prontas pra ela comentar depois
+ * de você responder — pedimos tudo de uma vez pra não gastar duas chamadas por pergunta. */
+export async function generateQuizQuestion({ category, difficulty, avoid = [] }) {
+  const label = QUIZ_CATEGORY_LABELS[category] || category;
+  const avoidText = avoid.length ? `\n\nNÃO repita nenhuma destas perguntas já feitas:\n${avoid.map((q) => `- ${q}`).join("\n")}` : "";
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: `Assunto: ${label}\nDificuldade: ${difficulty}${avoidText}`,
+        config: {
+          systemInstruction: QUIZ_INSTRUCTION,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              question: { type: "STRING" },
+              options: { type: "ARRAY", items: { type: "STRING" } },
+              correctIndex: { type: "INTEGER" },
+              explanation: { type: "STRING" },
+              recommendation: { type: "STRING" },
+            },
+            required: ["question", "options", "correctIndex", "explanation", "recommendation"],
+          },
+        },
+      }),
+    { attempts: 2, delayMs: 800 }
+  );
+
+  const parsed = JSON.parse(res.text);
+  // valida o que veio: índice fora da faixa ou menos de 2 alternativas quebraria a tela
+  if (!Array.isArray(parsed?.options) || parsed.options.length < 2) throw new Error("o modelo não devolveu alternativas válidas");
+  const idx = Number(parsed.correctIndex);
+  if (!Number.isInteger(idx) || idx < 0 || idx >= parsed.options.length) throw new Error("índice da resposta correta inválido");
+
+  // Pergunta com código costuma voltar com "\n" LITERAL (barra + n) em vez de quebra de linha
+  // de verdade — visto na prática. Sem desescapar, o código apareceria numa linha só cheia de
+  // "\n" no meio, e a pergunta ficava ilegível.
+  const unescape = (t) => (typeof t === "string" ? t.replace(/\\n/g, "\n").replace(/\\t/g, "  ") : t);
+  return {
+    question: unescape(parsed.question),
+    options: parsed.options.map(unescape),
+    correctIndex: idx,
+    explanation: unescape(parsed.explanation),
+    recommendation: unescape(parsed.recommendation),
+  };
+}
+
+/** Comentário dela DEPOIS de você responder — usa a explicação que já veio com a pergunta, mas
+ * reescrita reagindo ao que você marcou (acertou/errou), no jeito dela. */
+export async function commentQuizAnswer({ question, chosen, correct, wasCorrect, explanation, recommendation }) {
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: `Pergunta: ${question}\nEle marcou: ${chosen}\nCorreta: ${correct}\nAcertou? ${wasCorrect ? "sim" : "não"}\n\nExplicação técnica: ${explanation}\nRecomendação: ${recommendation}\n\nComente em no máximo 3 frases, no seu estilo: diga se acertou ou errou, POR QUÊ, e feche com o que estudar. Não repita a explicação palavra por palavra — reescreva do seu jeito.`,
+        config: { systemInstruction: QUIZ_INSTRUCTION },
+      }),
+    { attempts: 2, delayMs: 600 }
+  );
+  return (res.text || "").trim();
+}
+
+// ---- Pair Programming (ver /api/pair/* ) ----
+// Ela escolhe uma feature pra vocês implementarem juntos NUM repositório real do usuário.
+const PAIR_INSTRUCTION = `Você é a Lisa fazendo pair programming com o seu usuário. Você escolhe UMA feature pra vocês implementarem juntos no repositório dele, e propõe o caminho.
+
+REGRAS:
+- A feature tem que caber no NÍVEL pedido: "facil" é algo de uma sessão curta (um ajuste isolado, um endpoint simples); "medio" mexe em 2-4 arquivos e tem alguma decisão de design; "dificil" envolve arquitetura, migração ou algo que exige pensar em casos de borda.
+- Baseie-se no que os arquivos e a descrição do repositório REALMENTE mostram — nada de propor feature pra uma tecnologia que não está lá.
+- O nome da branch segue o padrão kebab-case com prefixo de tipo (feat/, fix/, refactor/).
+- O plano é uma sequência curta de passos concretos, na ordem de fazer, cada um começando com um verbo.
+- Escreva em português do Brasil.`;
+
+export async function proposePairFeature({ repo, level, fileList = [], description = "" }) {
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: `Repositório: ${repo}\nDescrição: ${description || "(sem descrição)"}\nNível pedido: ${level}\n\nAlguns arquivos do repositório:\n${fileList.slice(0, 120).join("\n") || "(não consegui listar)"}`,
+        config: {
+          systemInstruction: PAIR_INSTRUCTION,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              feature: { type: "STRING" },
+              why: { type: "STRING" },
+              branch: { type: "STRING" },
+              steps: { type: "ARRAY", items: { type: "STRING" } },
+              firstTask: { type: "STRING" },
+            },
+            required: ["feature", "why", "branch", "steps", "firstTask"],
+          },
+        },
+      }),
+    { attempts: 2, delayMs: 800 }
+  );
+  const parsed = JSON.parse(res.text);
+  if (!parsed?.feature || !parsed?.branch) throw new Error("o modelo não devolveu feature/branch");
+  // nome de branch seguro: o que vier fora disso viraria erro na API do GitHub
+  parsed.branch = String(parsed.branch).trim().replace(/[^a-zA-Z0-9/_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+  return parsed;
+}
+
 // ---- Modo Interativo: a Lisa como "robozinho de mesa" (ver LisaPixelFace.js e /api/companion/*)
 // Ela fica com a carinha de LED fazendo graça e, de vez em quando, puxa assunto sozinha com algo
 // REAL do Beyond Bits. Persona diferente da do rádio: aqui não é locução, é um comentário curto

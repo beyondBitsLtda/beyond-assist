@@ -41,6 +41,11 @@ export default function LisaAirHockey({ onMood, onFinish }) {
     lisa: { x: W / 2, y: 60 },
     sparks: [],
     shake: 0,
+    // detecção de disco preso: acompanha o DESLOCAMENTO numa janela, não a velocidade — quando
+    // o taco dela prensa o disco na parede, a velocidade fica alta mas ele não sai do lugar.
+    stuckMs: 0,
+    sampleMs: 0,
+    lastSample: { x: W / 2, y: H / 2 },
   });
 
   const center = useCallback((toward = 1) => {
@@ -171,7 +176,8 @@ export default function LisaAirHockey({ onMood, onFinish }) {
 
         // taco dela: persegue o disco na metade dela, senão volta pra frente do gol
         const goHome = s.puck.y > H / 2;
-        const tx = goHome ? W / 2 : s.puck.x;
+        // limita o alcance lateral dela: colada na parede, ela prensava o disco contra ela
+        const tx = goHome ? W / 2 : Math.max(MALLET_R + 6, Math.min(W - MALLET_R - 6, s.puck.x));
         const ty = goHome ? 60 : Math.min(H / 2 - MALLET_R, s.puck.y - 6);
         const ang = Math.atan2(ty - s.lisa.y, tx - s.lisa.x);
         const dist = Math.hypot(tx - s.lisa.x, ty - s.lisa.y);
@@ -183,6 +189,26 @@ export default function LisaAirHockey({ onMood, onFinish }) {
 
         hitMallet(s.you, s.you.vx, s.you.vy);
         hitMallet(s.lisa, lvx, lvy);
+
+        // ---- destrava o disco ----
+        // Sem isto, ela prensava o disco num canto e a partida ficava parada pra sempre (bug
+        // relatado). A janela de amostragem é o que pega TODOS os casos de travamento, inclusive
+        // o "preso mas tremendo" — que um teste só de velocidade deixaria passar.
+        s.sampleMs += dt * 1000;
+        if (s.sampleMs >= 250) {
+          const moved = Math.hypot(s.puck.x - s.lastSample.x, s.puck.y - s.lastSample.y);
+          s.stuckMs = moved < 14 ? s.stuckMs + s.sampleMs : 0;
+          s.lastSample = { x: s.puck.x, y: s.puck.y };
+          s.sampleMs = 0;
+        }
+        if (s.stuckMs >= 1000) {
+          // empurra pro centro da mesa, com um desvio pra não ficar previsível
+          const ang = Math.atan2(H / 2 - s.puck.y, W / 2 - s.puck.x) + (Math.random() - 0.5) * 0.7;
+          s.puck.vx = Math.cos(ang) * 300;
+          s.puck.vy = Math.sin(ang) * 300;
+          s.stuckMs = 0;
+          spark(s.puck.x, s.puck.y, 8);
+        }
       }
 
       s.shake = Math.max(0, s.shake - dt * 4);

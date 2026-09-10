@@ -26,6 +26,8 @@ import LisaReflex from "@/components/panels/LisaReflex.js";
 import LisaBattleship from "@/components/panels/LisaBattleship.js";
 import LisaAirHockey from "@/components/panels/LisaAirHockey.js";
 import LisaRockPaper from "@/components/panels/LisaRockPaper.js";
+import LisaQuiz from "@/components/panels/LisaQuiz.js";
+import LisaPairProgramming from "@/components/panels/LisaPairProgramming.js";
 import { loadGames } from "@/lib/gameHistory.js";
 
 // carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
@@ -741,7 +743,11 @@ export default function AssistantPage() {
   // Modo Interativo: de ~2 em ~2 min ela puxa assunto sozinha com algo REAL (categoria sorteada
   // no "saco embaralhado", itens já comentados ficam de fora — ver /api/companion/remark).
   useEffect(() => {
-    if (!interactiveMode) {
+    // De fone (Modo Rádio), ela NÃO puxa assunto: a voz do rádio já é a voz dela ali, e a fala
+    // espontânea entrava por cima. A trava proactiveTurnRef sozinha não resolvia isso porque a
+    // checagem acontecia ANTES do fetch — quando o texto ficava pronto, segundos depois, o rádio
+    // podia já ter começado a falar (clássico check-then-act).
+    if (!interactiveMode || radioMode) {
       setInteractiveBubble(null);
       setInteractiveFace(null);
       return;
@@ -784,7 +790,10 @@ export default function AssistantPage() {
           setInteractiveBubble({ text: data.text, category });
           setInteractiveFace(INTERACTIVE_FACE_BY_CATEGORY[category] || "curious");
           addLog("[INTERATIVO]", PU, data.text);
-          if (voiceOnForScreenRef.current) {
+          // RE-CHECA a trava agora, não só antes do fetch: entre pedir o texto e ele chegar
+          // (segundos), outra vigília ou o rádio podem ter começado a falar. Sem isto, as duas
+          // vozes saíam juntas.
+          if (voiceOnForScreenRef.current && !proactiveTurnRef.current) {
             proactiveTurnRef.current = true; // mesma trava das outras vigílias — senão uma fala corta a outra
             setInteractiveSpeaking(true);
             try {
@@ -2831,6 +2840,21 @@ export default function AssistantPage() {
             )}
 
             <div style={{ height: 1, background: "rgba(var(--accent-rgb),0.15)", margin: "2px 0" }} />
+            <div style={{ ...mono, fontSize: 8.5, letterSpacing: 2, color: "rgba(207,239,251,0.45)" }}>🎓 ATIVIDADES</div>
+            {[
+              { key: "quiz", label: "Quiz de Programação" },
+              { key: "pair", label: "Pair Programming" },
+            ].map((act) => (
+              <button
+                key={act.key}
+                onClick={() => { setInteractiveGame(act.key); setInteractiveMenuOpen(false); setInteractiveBubble(null); }}
+                style={{ ...mono, fontSize: 10, letterSpacing: 1, padding: "7px 10px", borderRadius: 6, textAlign: "left", border: `1px solid ${interactiveGame === act.key ? CY : "rgba(var(--accent-rgb),0.18)"}`, background: interactiveGame === act.key ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: "#eafcff", cursor: "pointer" }}
+              >
+                {act.label}
+              </button>
+            ))}
+
+            <div style={{ height: 1, background: "rgba(var(--accent-rgb),0.15)", margin: "2px 0" }} />
 
             <button
               onClick={() => { unlockAudioPlayback(); setRadioMode((v) => !v); }}
@@ -2881,7 +2905,15 @@ export default function AssistantPage() {
         reaction={radioMode ? (radioNowPlaying ? "vibing" : null) : perceivedFace}
         speaking={interactiveSpeaking}
         headphones={radioMode}
-        size={interactiveGame ? (isMobile ? 130 : 170) : isMobile ? 260 : 340}
+        size={
+          interactiveGame === "quiz" || interactiveGame === "pair"
+            ? (isMobile ? 90 : 120) // atividades ocupam mais tela: a carinha encolhe mais
+            : interactiveGame
+            ? (isMobile ? 130 : 170)
+            : isMobile
+            ? 260
+            : 340
+        }
       />
 
       {interactiveGame === "velha" && (
@@ -2900,6 +2932,8 @@ export default function AssistantPage() {
       {interactiveGame === "reflexo" && <LisaReflex onMood={gameMood} />}
       {/* o de câmera lê do MESMO <video> escondido que o gesto de acordar usa */}
       {interactiveGame === "ppt" && <LisaRockPaper videoRef={observanceVideoRef} onMood={gameMood} />}
+      {interactiveGame === "quiz" && <LisaQuiz onMood={gameMood} />}
+      {interactiveGame === "pair" && <LisaPairProgramming onMood={gameMood} />}
 
       {!interactiveGame && interactiveBubble && (
         <div

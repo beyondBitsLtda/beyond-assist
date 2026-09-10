@@ -6,13 +6,18 @@ import { recordGame } from "@/lib/gameHistory.js";
 
 // Jogo da memória contra a Lisa, alternando a vez.
 //
-// A memória dela é IMPERFEITA de propósito: cada carta que aparece na mesa ela guarda com uma
-// probabilidade (MEMORY_CHANCE) em vez de gravar tudo. É o botão de dificuldade mais natural que
-// existe pra esse jogo — uma Lisa com memória perfeita acertaria todos os pares a partir da
-// segunda rodada e o jogo não teria sentido.
+// A memória dela é IMPERFEITA de propósito: cada carta exposta ela guarda com MEMORY_CHANCE em
+// vez de gravar tudo. É o botão de dificuldade mais natural do jogo — com memória perfeita ela
+// acertaria todos os pares a partir da 2ª rodada.
+//
+// ARQUITETURA (foi aqui que morava o bug de "ela não faz nada na vez dela"): virar carta e
+// RESOLVER o par são coisas separadas. `flip` só empilha em `open` (com atualização funcional),
+// e a resolução vive num efeito que observa `open.length === 2`. Antes, a vez dela virava a 2ª
+// carta chamando o MESMO `flip` capturado no closure anterior — que ainda via `open` vazio, então
+// tratava a 2ª carta como se fosse a 1ª, nunca resolvia o par e a vez travava pra sempre.
 const SYMBOLS = ["◆", "▲", "●", "■", "★", "✦", "⬢", "✚"];
 const MEMORY_CHANCE = 0.72;
-const FLIP_BACK_MS = 900; // tempo que o par errado fica virado antes de desvirar
+const FLIP_BACK_MS = 900;
 
 function shuffled() {
   const deck = [...SYMBOLS, ...SYMBOLS].map((s, i) => ({ id: i, sym: s }));
@@ -26,14 +31,13 @@ function shuffled() {
 export default function LisaMemory({ onMood, onFinish }) {
   const [deck, setDeck] = useState(shuffled);
   const [found, setFound] = useState({}); // id -> "you" | "lisa"
-  const [open, setOpen] = useState([]); // ids virados agora (no máx. 2)
+  const [open, setOpen] = useState([]); // ids virados agora (máx. 2)
   const [turn, setTurn] = useState("you");
   const [score, setScore] = useState({ you: 0, lisa: 0 });
-  const [busy, setBusy] = useState(false); // trava cliques enquanto o par errado está exposto
+  const [busy, setBusy] = useState(false); // par errado exposto: trava cliques
   const [result, setResult] = useState(null);
 
-  // o que ela "sabe": id -> símbolo, preenchido só às vezes (ver MEMORY_CHANCE)
-  const known = useRef({});
+  const known = useRef({}); // id -> símbolo, preenchido só às vezes (MEMORY_CHANCE)
   const onMoodRef = useRef(onMood);
   onMoodRef.current = onMood;
   const onFinishRef = useRef(onFinish);
@@ -51,84 +55,86 @@ export default function LisaMemory({ onMood, onFinish }) {
     onMoodRef.current?.("focused");
   }, []);
 
-  /** Toda carta exposta passa pela memória dela — inclusive as que VOCÊ virou. */
-  const remember = useCallback((ids) => {
-    for (const id of ids) {
+  // `flip` é ESTÁVEL (deps []) e só empilha — nada de decidir par aqui dentro
+  const flip = useCallback((id) => {
+    setOpen((prev) => (prev.length >= 2 || prev.includes(id) ? prev : [...prev, id]));
+  }, []);
+
+  // toda carta exposta passa pela memória dela — inclusive as que VOCÊ virou
+  useEffect(() => {
+    for (const id of open) {
+      if (known.current[id]) continue;
       if (Math.random() < MEMORY_CHANCE) {
         const card = deck.find((c) => c.id === id);
         if (card) known.current[id] = card.sym;
       }
     }
-  }, [deck]);
+  }, [open, deck]);
 
-  const flip = useCallback(
-    (id) => {
-      if (busy || result || found[id] || open.includes(id) || open.length >= 2) return;
-      const next = [...open, id];
-      setOpen(next);
-      remember(next);
-      if (next.length < 2) return;
-
-      const [a, b] = next.map((i) => deck.find((c) => c.id === i));
-      const who = turn;
-      if (a.sym === b.sym) {
-        setFound((prev) => ({ ...prev, [a.id]: who, [b.id]: who }));
-        setScore((prev) => ({ ...prev, [who]: prev[who] + 1 }));
-        setOpen([]);
-        onMoodRef.current?.(who === "you" ? "surprised" : "proud");
-        // quem acerta joga de novo — regra clássica, e dá ritmo à partida
-      } else {
-        setBusy(true);
-        onMoodRef.current?.(who === "you" ? "giggle" : "annoyed");
-        setTimeout(() => {
-          setOpen([]);
-          setBusy(false);
-          setTurn(who === "you" ? "lisa" : "you");
-        }, FLIP_BACK_MS);
-      }
-    },
-    [busy, result, found, open, deck, turn, remember]
-  );
-
-  // vez dela
+  // ---- resolução do par: um lugar só, para quem quer que tenha virado ----
   useEffect(() => {
-    if (result || turn !== "lisa" || busy || open.length) return;
-    onMoodRef.current?.("thinking");
+    if (open.length !== 2 || busy || result) return;
+    const [a, b] = open.map((i) => deck.find((c) => c.id === i));
+    if (!a || !b) return;
+    const who = turn;
+
+    if (a.sym === b.sym) {
+      setFound((prev) => ({ ...prev, [a.id]: who, [b.id]: who }));
+      setScore((prev) => ({ ...prev, [who]: prev[who] + 1 }));
+      setOpen([]);
+      onMoodRef.current?.(who === "you" ? "surprised" : "proud");
+      // quem acerta joga de novo (regra clássica) — a vez NÃO passa
+      return;
+    }
+
+    setBusy(true);
+    onMoodRef.current?.(who === "you" ? "giggle" : "annoyed");
     const id = setTimeout(() => {
+      setOpen([]);
+      setBusy(false);
+      setTurn(who === "you" ? "lisa" : "you");
+    }, FLIP_BACK_MS);
+    return () => clearTimeout(id);
+  }, [open, busy, result, deck, turn]);
+
+  // ---- vez dela, em dois passos guiados por ESTADO (sem timeout aninhado com closure velho) ----
+  // passo 1: escolhe a primeira carta
+  useEffect(() => {
+    if (result || turn !== "lisa" || busy || open.length !== 0) return;
+    onMoodRef.current?.("thinking");
+    const t = setTimeout(() => {
       const hidden = deck.filter((c) => !found[c.id]).map((c) => c.id);
       if (!hidden.length) return;
-
-      // procura na memória um par que ela lembre de VERDADE
-      const pair = (() => {
-        const bySym = {};
-        for (const cid of hidden) {
-          const sym = known.current[cid];
-          if (!sym) continue;
-          if (bySym[sym] !== undefined) return [bySym[sym], cid];
-          bySym[sym] = cid;
-        }
-        return null;
-      })();
-
-      if (pair) {
-        flip(pair[0]);
-        setTimeout(() => flip(pair[1]), 420);
-        return;
+      // se lembra de um par inteiro, começa por ele
+      const bySym = {};
+      for (const cid of hidden) {
+        const sym = known.current[cid];
+        if (!sym) continue;
+        if (bySym[sym] !== undefined) return flip(bySym[sym]);
+        bySym[sym] = cid;
       }
-      // não lembra de par nenhum: vira uma que ainda não conhece (melhor que sortear no escuro)
+      // senão, vira uma que ainda não conhece (melhor que sortear no escuro)
       const unknown = hidden.filter((cid) => !known.current[cid]);
-      const first = (unknown.length ? unknown : hidden)[Math.floor(Math.random() * (unknown.length || hidden.length))];
-      flip(first);
-      setTimeout(() => {
-        // depois de ver a primeira, talvez ela agora lembre do par dela
-        const sym = known.current[first];
-        const match = hidden.find((cid) => cid !== first && known.current[cid] === sym);
-        const other = hidden.filter((cid) => cid !== first);
-        flip(match ?? other[Math.floor(Math.random() * other.length)]);
-      }, 460);
-    }, 700);
-    return () => clearTimeout(id);
+      const pool = unknown.length ? unknown : hidden;
+      flip(pool[Math.floor(Math.random() * pool.length)]);
+    }, 650);
+    return () => clearTimeout(t);
   }, [turn, result, busy, open.length, deck, found, flip]);
+
+  // passo 2: com uma carta virada, escolhe a segunda (agora com o estado ATUAL em mãos)
+  useEffect(() => {
+    if (result || turn !== "lisa" || busy || open.length !== 1) return;
+    const t = setTimeout(() => {
+      const first = open[0];
+      const firstSym = deck.find((c) => c.id === first)?.sym;
+      const hidden = deck.filter((c) => !found[c.id] && c.id !== first).map((c) => c.id);
+      if (!hidden.length) return;
+      // ela acabou de VER a primeira, então sabe o símbolo: procura o par na memória
+      const match = hidden.find((cid) => known.current[cid] === firstSym);
+      flip(match ?? hidden[Math.floor(Math.random() * hidden.length)]);
+    }, 520);
+    return () => clearTimeout(t);
+  }, [turn, result, busy, open, deck, found, flip]);
 
   // fim: todas encontradas
   useEffect(() => {
@@ -151,17 +157,18 @@ export default function LisaMemory({ onMood, onFinish }) {
         {deck.map((c) => {
           const owner = found[c.id];
           const shown = owner || open.includes(c.id);
+          const canClick = !result && turn === "you" && !busy && !shown && open.length < 2;
           return (
             <button
               key={c.id}
-              onClick={() => turn === "you" && flip(c.id)}
-              disabled={!!result || turn !== "you" || busy || shown}
+              onClick={() => canClick && flip(c.id)}
+              disabled={!canClick}
               style={{
                 aspectRatio: "1", fontSize: 22, fontFamily: mono.fontFamily,
                 color: owner === "you" ? CY : owner === "lisa" ? OR : "#eafcff",
                 background: shown ? "rgba(var(--accent-rgb),0.12)" : "rgba(var(--accent-rgb),0.04)",
                 border: `1px solid ${shown ? "rgba(var(--accent-rgb),0.4)" : "rgba(var(--accent-rgb),0.15)"}`,
-                borderRadius: 8, cursor: !result && turn === "you" && !shown && !busy ? "pointer" : "default",
+                borderRadius: 8, cursor: canClick ? "pointer" : "default",
               }}
             >
               {shown ? c.sym : "?"}

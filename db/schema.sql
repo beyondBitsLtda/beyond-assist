@@ -546,3 +546,45 @@ create index if not exists lisa_games_game_idx on public.lisa_games (game, creat
 
 alter table public.lisa_games enable row level security;
 -- (só acessada pela service_role, em src/lib/gameScores.js — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  27) Modo Quiz e Pair Programming do Modo Interativo
+--
+--  Atividades que valem PONTUAÇÃO (ver src/lib/activities.js). Separadas de lisa_games porque
+--  guardam coisa que jogo não tem: categoria, dificuldade, a resposta dada e a recomendação de
+--  estudo que a Lisa deu.
+-- ============================================================
+create table if not exists public.lisa_quiz (
+  id           bigint generated always as identity primary key,
+  category     text not null,                  -- 'python'|'javascript'|'java'|'csharp'|'cpp'|'geral'
+  difficulty   text not null,                  -- 'facil'|'medio'|'dificil'
+  question     text not null,
+  chosen       text,                           -- alternativa que você marcou
+  correct      text,                           -- alternativa correta
+  is_correct   boolean not null,
+  points       int not null default 0,         -- pontos ganhos (pesa pela dificuldade)
+  recommendation text,                         -- o que ela recomendou estudar
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists lisa_quiz_created_at_idx on public.lisa_quiz (created_at desc);
+create index if not exists lisa_quiz_category_idx on public.lisa_quiz (category, difficulty);
+
+alter table public.lisa_quiz enable row level security;
+
+create table if not exists public.lisa_pair_sessions (
+  id           bigint generated always as identity primary key,
+  repo         text not null,                  -- "owner/repo"
+  branch       text,                           -- branch que ela criou pra dupla trabalhar
+  level        text not null,                  -- 'facil'|'medio'|'dificil'
+  feature      text not null,                  -- o que ela decidiu implementar
+  plan         text,                           -- passos propostos
+  status       text not null default 'aberta', -- 'aberta' | 'concluida' | 'abandonada'
+  points       int not null default 0,
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists lisa_pair_sessions_created_at_idx on public.lisa_pair_sessions (created_at desc);
+
+alter table public.lisa_pair_sessions enable row level security;
+-- (as duas só acessadas pela service_role — mesmo padrão das tabelas acima)
