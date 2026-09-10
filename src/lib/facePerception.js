@@ -14,11 +14,14 @@
 const MODEL_URL = "/mediapipe/face_landmarker.task";
 const WASM_PATH = "/mediapipe/wasm";
 
-// quanto tempo uma reação fica na cara dela antes de poder trocar — sem isso a expressão
-// tremeria a cada frame (piscada normal viraria "sono", etc.)
-const HOLD_MS = 1300;
-// a reação só troca depois de ganhar em 2 leituras seguidas: filtra frame solto/ruído
-const CONFIRM_READS = 2;
+// Quanto tempo uma reação FICA na cara dela, e quanto tempo ela espera antes de aceitar a
+// próxima. Os dois foram subidos bastante depois do usuário reclamar que ela "fica trocando de
+// interação rápido demais toda hora": só segurar a expressão não bastava — assim que soltava,
+// a leitura seguinte já emplacava outra, e o resultado era troca sem parar.
+const HOLD_MS = 2600; // a reação dura isso na cara
+const COOLDOWN_MS = 3200; // e depois disso ela fica "surda" a reações novas por um tempo
+// a reação só vale depois de ganhar em N leituras seguidas: filtra frame solto/ruído
+const CONFIRM_READS = 3;
 
 /** Regras de reação, em ordem de prioridade — a primeira que bater ganha. `b` é o mapa de
  * blendshapes (0..1) e `env` o que medimos do quadro. Os limiares saíram de teste na mão: alto
@@ -74,6 +77,7 @@ export async function createFacePerception() {
 
   let held = null;
   let heldUntil = 0;
+  let quietUntil = 0; // fim do descanso entre uma reação e a próxima
   let candidate = null;
   let candidateCount = 0;
 
@@ -122,6 +126,14 @@ export async function createFacePerception() {
 
       // ainda no tempo mínimo da reação atual: mantém, pra cara não tremer
       if (held && now < heldUntil) return held;
+      // acabou de reagir: descansa antes de aceitar a próxima (senão emenda uma na outra e ela
+      // fica trocando de cara sem parar). Solta a cara pra ela voltar às graças dela nesse meio.
+      if (now < quietUntil) {
+        held = null;
+        candidate = null;
+        candidateCount = 0;
+        return null;
+      }
 
       const hit = RULES.find((r) => {
         try {
@@ -141,7 +153,12 @@ export async function createFacePerception() {
       if (candidateCount < CONFIRM_READS) return held;
 
       held = next;
-      heldUntil = next ? now + HOLD_MS : 0;
+      if (next) {
+        heldUntil = now + HOLD_MS;
+        quietUntil = heldUntil + COOLDOWN_MS;
+      } else {
+        heldUntil = 0;
+      }
       return held;
     },
     close() {

@@ -17,6 +17,9 @@ import { runFullSync } from "@/lib/sync.js";
 import { hostScreenShare, viewerWatchScreen } from "@/lib/screenShareRTC.js";
 import { loadYouTubeAPI, createYouTubePlayer, playAndWaitEnded } from "@/lib/youtubePlayer.js";
 import LisaPixelFace from "@/components/panels/LisaPixelFace.js";
+import LisaTicTacToe from "@/components/panels/LisaTicTacToe.js";
+import LisaPong from "@/components/panels/LisaPong.js";
+import { loadScore, loadHistory } from "@/lib/gameHistory.js";
 
 // carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
 // realmente ligar a Visão 3D; desktop-only por decisão do usuário, nunca entra no bundle mobile.
@@ -536,8 +539,12 @@ export default function AssistantPage() {
   const [interactiveFace, setInteractiveFace] = useState(null); // expressão forçada, ou null = ela faz o que quiser
   const [interactiveSpeaking, setInteractiveSpeaking] = useState(false); // move a boca enquanto a fala toca
   const [perceivedFace, setPerceivedFace] = useState(null); // cara que ela faz reagindo ao que VÊ (ver facePerception.js)
+  const [interactiveMenuOpen, setInteractiveMenuOpen] = useState(false);
+  const [interactiveGame, setInteractiveGame] = useState(null); // null | "velha" | "pong"
+  const [gameStats, setGameStats] = useState(null); // { score, history } — lido do localStorage ao abrir o menu
   const interactiveBagRef = useRef([]); // mesmo "saco embaralhado" do rádio: passa por todas antes de repetir
   const interactiveSeenRef = useRef({}); // itens já comentados por categoria (anti-repetição, ver pendingWork.js)
+  const interactiveGameRef = useRef(null); // espelho de interactiveGame pro laço de falas não precisar dele nas dependências
 
   const [radioMode, setRadioMode] = useState(false);
   const [radioStatus, setRadioStatus] = useState(null); // texto curto pro widget flutuante
@@ -748,8 +755,9 @@ export default function AssistantPage() {
 
     async function tick() {
       if (stopped) return;
-      // ela não atropela nada: se está ocupada, falando, ou VOCÊ está no microfone, passa a vez
-      if (busyForGestureRef.current || listeningForGestureRef.current || proactiveTurnRef.current) {
+      // ela não atropela nada: se está ocupada, falando, VOCÊ está no microfone, ou tem jogo em
+      // andamento (puxar assunto no meio da partida é atrapalhar), passa a vez
+      if (busyForGestureRef.current || listeningForGestureRef.current || proactiveTurnRef.current || interactiveGameRef.current) {
         schedule();
         return;
       }
@@ -800,11 +808,22 @@ export default function AssistantPage() {
     };
   }, [interactiveMode, addLog]);
 
+  interactiveGameRef.current = interactiveGame;
+
+  // reação à troca de música quando ela está de fone (Modo Rádio dentro do Interativo)
+  useEffect(() => {
+    if (!interactiveMode || !radioMode || !radioNowPlaying) return;
+    setInteractiveFace("jam"); // música nova: ela se empolga
+    const id = setTimeout(() => setInteractiveFace(null), 2500);
+    return () => clearTimeout(id);
+  }, [interactiveMode, radioMode, radioNowPlaying]);
+
   // Ela REAGE ao que vê: expressão do seu rosto (blendshapes do MediaPipe) + ambiente (luz,
   // movimento, quantas pessoas) — tudo local, nenhum quadro sai da máquina e não gasta cota do
   // Gemini (ver src/lib/facePerception.js pra o porquê dessa escolha).
   useEffect(() => {
-    if (!interactiveMode) {
+    // de fone ela fica no mundo dela: não observa o ambiente (foi o pedido do Modo Rádio)
+    if (!interactiveMode || radioMode) {
       setPerceivedFace(null);
       return;
     }
@@ -835,7 +854,7 @@ export default function AssistantPage() {
       if (intervalId) clearInterval(intervalId);
       perception?.close();
     };
-  }, [interactiveMode, addLog]);
+  }, [interactiveMode, radioMode, addLog]);
 
   // no mobile a view "companion" É o modo: entrar liga, sair desliga. Sem isso a câmera e o laço
   // ficariam rodando enquanto você está lendo o chat em outra aba, sem nem ver a carinha.
@@ -2740,11 +2759,116 @@ export default function AssistantPage() {
         <video ref={observanceVideoRef} autoPlay playsInline muted style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
       )}
 
-      {/* expression = assunto que ela trouxe (ganha de tudo); reaction = o que ela vê pela
-          câmera (perde pro toque na tela, que é mais imediato) — ver LisaPixelFace.js */}
-      <LisaPixelFace expression={interactiveFace} reaction={perceivedFace} speaking={interactiveSpeaking} size={isMobile ? 260 : 340} />
+      {/* menuzinho suspenso: jogos, modo rádio e placar */}
+      <div style={{ position: "absolute", top: 10, right: 12, zIndex: 6, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+        <button
+          onClick={() => {
+            const opening = !interactiveMenuOpen;
+            setInteractiveMenuOpen(opening);
+            // placar só é lido ao abrir: é localStorage, não precisa ficar relendo
+            if (opening) setGameStats({ score: loadScore(), history: loadHistory({ limit: 6 }) });
+          }}
+          title="Menu do Modo Interativo"
+          style={{ ...mono, fontSize: 13, width: 34, height: 34, borderRadius: 10, border: "1px solid rgba(var(--accent-rgb),0.3)", background: "rgba(0,0,0,0.55)", color: CY, cursor: "pointer" }}
+        >
+          {interactiveMenuOpen ? "✕" : "☰"}
+        </button>
 
-      {interactiveBubble && (
+        {interactiveMenuOpen && (
+          <div style={{ width: 210, padding: 12, borderRadius: 12, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(4,10,14,0.95)", display: "flex", flexDirection: "column", gap: 8, boxShadow: "0 10px 30px rgba(0,0,0,0.6)" }}>
+            <div style={{ ...mono, fontSize: 8.5, letterSpacing: 2, color: "rgba(207,239,251,0.45)" }}>🎮 JOGOS</div>
+            {[
+              { key: "velha", label: "Jogo da Velha" },
+              { key: "pong", label: "Pong" },
+            ].map((gm) => (
+              <button
+                key={gm.key}
+                onClick={() => {
+                  setInteractiveGame(gm.key);
+                  setInteractiveMenuOpen(false);
+                  setInteractiveBubble(null);
+                }}
+                style={{ ...mono, fontSize: 10, letterSpacing: 1, padding: "7px 10px", borderRadius: 6, textAlign: "left", border: `1px solid ${interactiveGame === gm.key ? CY : "rgba(var(--accent-rgb),0.18)"}`, background: interactiveGame === gm.key ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: "#eafcff", cursor: "pointer" }}
+              >
+                {gm.label}
+              </button>
+            ))}
+            {interactiveGame && (
+              <button
+                onClick={() => { setInteractiveGame(null); setInteractiveFace(null); setInteractiveMenuOpen(false); }}
+                style={{ ...mono, fontSize: 10, letterSpacing: 1, padding: "7px 10px", borderRadius: 6, border: `1px solid ${OR}`, background: "transparent", color: OR, cursor: "pointer" }}
+              >
+                ✕ Sair do jogo
+              </button>
+            )}
+
+            <div style={{ height: 1, background: "rgba(var(--accent-rgb),0.15)", margin: "2px 0" }} />
+
+            <button
+              onClick={() => { unlockAudioPlayback(); setRadioMode((v) => !v); }}
+              title="De fone, ela para de olhar o ambiente e reage à música"
+              style={{ ...mono, fontSize: 10, letterSpacing: 1, padding: "7px 10px", borderRadius: 6, textAlign: "left", border: `1px solid ${radioMode ? GR : "rgba(var(--accent-rgb),0.18)"}`, background: radioMode ? "rgba(123,216,143,0.12)" : "transparent", color: "#eafcff", cursor: "pointer" }}
+            >
+              🎧 Modo Rádio: {radioMode ? "ON" : "OFF"}
+            </button>
+
+            {gameStats && (
+              <>
+                <div style={{ height: 1, background: "rgba(var(--accent-rgb),0.15)", margin: "2px 0" }} />
+                <div style={{ ...mono, fontSize: 8.5, letterSpacing: 2, color: "rgba(207,239,251,0.45)" }}>PLACAR GERAL</div>
+                <div style={{ ...mono, fontSize: 10, display: "flex", gap: 8 }}>
+                  <span style={{ color: GR }}>{gameStats.score.wins}V</span>
+                  <span style={{ color: OR }}>{gameStats.score.losses}D</span>
+                  <span style={{ color: "rgba(207,239,251,0.5)" }}>{gameStats.score.draws}E</span>
+                </div>
+                {gameStats.history.length === 0 ? (
+                  <div style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.35)" }}>nenhuma partida ainda</div>
+                ) : (
+                  gameStats.history.map((h, i) => (
+                    <div key={i} style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.5)", display: "flex", justifyContent: "space-between", gap: 6 }}>
+                      <span>{h.game === "velha" ? "velha" : "pong"}{h.detail ? ` ${h.detail}` : ""}</span>
+                      <span style={{ color: h.result === "win" ? GR : h.result === "loss" ? OR : "rgba(207,239,251,0.4)" }}>
+                        {h.result === "win" ? "vitória" : h.result === "loss" ? "derrota" : "empate"}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* expression = assunto/jogo/música (ganha de tudo); reaction = o que ela vê pela câmera
+          (perde pro toque na tela, que é mais imediato) — ver LisaPixelFace.js.
+          De fone, a reação passa a vir da música em vez do ambiente. */}
+      <LisaPixelFace
+        expression={interactiveFace}
+        reaction={radioMode ? (radioNowPlaying ? "vibing" : null) : perceivedFace}
+        speaking={interactiveSpeaking}
+        headphones={radioMode}
+        size={interactiveGame ? (isMobile ? 130 : 170) : isMobile ? 260 : 340}
+      />
+
+      {interactiveGame === "velha" && (
+        <LisaTicTacToe
+          onMood={(m) => {
+            setInteractiveFace(m);
+            // a cara do jogo não fica presa: solta depois de um tempo pra ela voltar a viver
+            setTimeout(() => setInteractiveFace(null), 2600);
+          }}
+        />
+      )}
+      {interactiveGame === "pong" && (
+        <LisaPong
+          onMood={(m) => {
+            setInteractiveFace(m);
+            setTimeout(() => setInteractiveFace(null), 2000);
+          }}
+        />
+      )}
+
+      {!interactiveGame && interactiveBubble && (
         <div
           style={{
             maxWidth: 520, textAlign: "center", fontSize: isMobile ? 14 : 15.5, lineHeight: 1.5, color: "#eafcff",
@@ -2756,15 +2880,19 @@ export default function AssistantPage() {
         </div>
       )}
 
-      <div style={{ ...mono, fontSize: 9.5, letterSpacing: 1.5, color: "rgba(207,239,251,0.45)", textAlign: "center", lineHeight: 1.8 }}>
-        <div>✌️ MOSTRE O GESTO PRA CHAMAR A LISA</div>
-        <div style={{ color: observanceError ? OR : "rgba(207,239,251,0.35)" }}>
-          {observanceError
-            ? `⚠ ${observanceError} — sem gesto e sem leitura de expressão`
-            : `ELA REAGE À SUA CARA E AO AMBIENTE${perceivedFace ? ` · vendo: ${perceivedFace}` : ""}`}
+      {!interactiveGame && (
+        <div style={{ ...mono, fontSize: 9.5, letterSpacing: 1.5, color: "rgba(207,239,251,0.45)", textAlign: "center", lineHeight: 1.8 }}>
+          <div>✌️ MOSTRE O GESTO PRA CHAMAR · TOQUE NELA PRA INTERAGIR</div>
+          <div style={{ color: observanceError ? OR : "rgba(207,239,251,0.35)" }}>
+            {radioMode
+              ? `🎧 DE FONE — NO MUNDO DELA, REAGINDO À MÚSICA${radioNowPlaying ? ` · ${radioNowPlaying.title}` : ""}`
+              : observanceError
+              ? `⚠ ${observanceError} — sem gesto e sem leitura de expressão`
+              : `ELA REAGE À SUA CARA E AO AMBIENTE${perceivedFace ? ` · vendo: ${perceivedFace}` : ""}`}
+          </div>
+          <div style={{ color: "rgba(207,239,251,0.25)" }}>tudo local — nenhuma imagem sai daqui</div>
         </div>
-        <div style={{ color: "rgba(207,239,251,0.25)" }}>tudo local — nenhuma imagem sai daqui</div>
-      </div>
+      )}
     </div>
   );
 
