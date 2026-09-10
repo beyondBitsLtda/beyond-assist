@@ -33,6 +33,16 @@ export default function LisaPenalty({ onMood, onFinish }) {
   const [last, setLast] = useState(null); // "gol" | "defendeu" | "fora"
   const [full, setFull] = useState(false);
 
+  // mesmo cuidado do pong: onMood/onFinish chegam como arrow nova a cada render do pai e
+  // `phase` muda a cada cobrança — se ficarem nas dependências, os efeitos desmontam/remontam e
+  // os listeners de ponteiro se perdem junto com o canvas. Por ref, ligam uma vez só.
+  const onMoodRef = useRef(onMood);
+  onMoodRef.current = onMood;
+  const onFinishRef = useRef(onFinish);
+  onFinishRef.current = onFinish;
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+
   const g = useRef({
     ball: { ...BALL_START, vx: 0, vy: 0 },
     drag: null, // { x, y } enquanto você mira
@@ -41,62 +51,52 @@ export default function LisaPenalty({ onMood, onFinish }) {
     shake: 0,
   });
 
-  // ---- mira por arrasto ----
-  useEffect(() => {
+  // Mira por arrasto. Handlers como PROP do React no <canvas>, não addEventListener num efeito:
+  // ao alternar tela cheia o canvas pode ser recriado, e um listener manual ficaria preso no
+  // elemento morto (foi assim que a raquete do pong parou de responder). Como prop, o React
+  // reatacha sozinho.
+  const toLogical = (e) => {
     const cv = canvasRef.current;
-    if (!cv) return;
+    const r = cv.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H };
+  };
 
-    const toLogical = (e) => {
-      const r = cv.getBoundingClientRect();
-      return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H };
-    };
+  const onAimDown = (e) => {
+    if (phaseRef.current !== "aim") return;
+    g.current.drag = toLogical(e);
+  };
 
-    const down = (e) => {
-      if (phase !== "aim") return;
-      g.current.drag = toLogical(e);
-    };
-    const move = (e) => {
-      if (!g.current.drag || phase !== "aim") return;
-      g.current.drag = toLogical(e);
-    };
-    const up = () => {
-      if (!g.current.drag || phase !== "aim") return;
-      const s = g.current;
-      // vetor da bola até onde você arrastou: direção do chute e força pelo comprimento
-      const dx = s.drag.x - s.ball.x;
-      const dy = s.drag.y - s.ball.y;
-      s.drag = null;
-      const len = Math.hypot(dx, dy);
-      if (len < 12) return; // toque solto sem arrastar: não chuta
-      const power = Math.min(1, len / MAX_DRAG);
-      const nx = dx / len;
-      const ny = dy / len;
-      s.ball.vx = nx * SHOT_SPEED * power;
-      s.ball.vy = ny * SHOT_SPEED * power;
+  const onAimMove = (e) => {
+    if (!g.current.drag || phaseRef.current !== "aim") return;
+    g.current.drag = toLogical(e);
+  };
 
-      // A goleira escolhe o lado com uma leitura IMPERFEITA da direção: acerta o lado com boa
-      // frequência, mas erra o suficiente pra dar gol. Chute mais forte = menos tempo pra ela
-      // reagir, então a chance dela cai — é o que faz a força valer a pena.
-      const readError = (Math.random() * 2 - 1) * 0.55;
-      const guessX = s.ball.x + (nx + readError) * 200;
-      const reaction = 1 - power * 0.35;
-      s.keeper.vx = Math.max(-1, Math.min(1, (guessX - (s.keeper.x + KEEPER_W / 2)) / 120)) * 420 * reaction;
-      s.keeper.dived = true;
-      setPhase("flying");
-      onMood?.("focused");
-    };
+  const onAimUp = () => {
+    if (!g.current.drag || phaseRef.current !== "aim") return;
+    const s = g.current;
+    // vetor da bola até onde você arrastou: direção do chute e força pelo comprimento
+    const dx = s.drag.x - s.ball.x;
+    const dy = s.drag.y - s.ball.y;
+    s.drag = null;
+    const len = Math.hypot(dx, dy);
+    if (len < 12) return; // toque solto sem arrastar: não chuta
+    const power = Math.min(1, len / MAX_DRAG);
+    const nx = dx / len;
+    const ny = dy / len;
+    s.ball.vx = nx * SHOT_SPEED * power;
+    s.ball.vy = ny * SHOT_SPEED * power;
 
-    cv.addEventListener("pointerdown", down);
-    cv.addEventListener("pointermove", move);
-    cv.addEventListener("pointerup", up);
-    cv.addEventListener("pointercancel", up);
-    return () => {
-      cv.removeEventListener("pointerdown", down);
-      cv.removeEventListener("pointermove", move);
-      cv.removeEventListener("pointerup", up);
-      cv.removeEventListener("pointercancel", up);
-    };
-  }, [phase, onMood]);
+    // A goleira escolhe o lado com uma leitura IMPERFEITA da direção: acerta o lado com boa
+    // frequência, mas erra o suficiente pra dar gol. Chute mais forte = menos tempo pra ela
+    // reagir, então a chance dela cai — é o que faz a força valer a pena.
+    const readError = (Math.random() * 2 - 1) * 0.55;
+    const guessX = s.ball.x + (nx + readError) * 200;
+    const reaction = 1 - power * 0.35;
+    s.keeper.vx = Math.max(-1, Math.min(1, (guessX - (s.keeper.x + KEEPER_W / 2)) / 120)) * 420 * reaction;
+    s.keeper.dived = true;
+    setPhase("flying");
+    onMoodRef.current?.("focused");
+  };
 
   // ---- física + desenho ----
   useEffect(() => {
@@ -125,12 +125,12 @@ export default function LisaPenalty({ onMood, onFinish }) {
       setLast(outcome);
       if (outcome === "gol") {
         setGoals((v) => v + 1);
-        onMood?.("sad");
+        onMoodRef.current?.("sad");
         g.current.shake = 1;
         spark(g.current.ball.x, g.current.ball.y, 18, "123,216,143");
       } else {
         setSaves((v) => v + 1);
-        onMood?.(outcome === "fora" ? "laugh" : "proud"); // ela ri se você mandar pra fora
+        onMoodRef.current?.(outcome === "fora" ? "laugh" : "proud"); // ela ri se você mandar pra fora
         spark(g.current.ball.x, g.current.ball.y, 12, "255,157,61");
       }
       setShot((n) => {
@@ -151,7 +151,7 @@ export default function LisaPenalty({ onMood, onFinish }) {
       lastT = now;
       const s = g.current;
 
-      if (phase === "flying") {
+      if (phaseRef.current === "flying") {
         s.ball.x += s.ball.vx * dt;
         s.ball.y += s.ball.vy * dt;
         s.keeper.x = Math.max(GOAL.x - 10, Math.min(GOAL.x + GOAL.w - KEEPER_W + 10, s.keeper.x + s.keeper.vx * dt));
@@ -223,7 +223,7 @@ export default function LisaPenalty({ onMood, onFinish }) {
       }
 
       // seta de mira: direção E força (a cor esquenta conforme a força)
-      if (s.drag && phase === "aim") {
+      if (s.drag && phaseRef.current === "aim") {
         const dx = s.drag.x - s.ball.x;
         const dy = s.drag.y - s.ball.y;
         const len = Math.min(MAX_DRAG, Math.hypot(dx, dy));
@@ -256,7 +256,7 @@ export default function LisaPenalty({ onMood, onFinish }) {
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [phase, onMood]);
+  }, []); // idem: nada de prop/estado nas deps, senão o canvas é recriado
 
   // fim das 5 cobranças: registra UMA vez
   const recordedRef = useRef(false);
@@ -280,8 +280,17 @@ export default function LisaPenalty({ onMood, onFinish }) {
     g.current.keeper = { x: W / 2 - KEEPER_W / 2, y: GOAL.y + GOAL.h - KEEPER_H, vx: 0, dived: false };
   };
 
-  const body = (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+  // ÚNICO elemento raiz, com o estilo alternando entre normal e tela cheia — duas estruturas
+  // diferentes de árvore faziam o React recriar o <canvas> ao alternar, e a mira parava de
+  // responder (mesmo bug que apareceu na raquete do pong).
+  return (
+    <div
+      style={
+        full
+          ? { position: "fixed", inset: 0, zIndex: 300, background: "#000", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 16 }
+          : { display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }
+      }
+    >
       <div style={{ ...mono, fontSize: 11, letterSpacing: 2, display: "flex", gap: 12, alignItems: "center" }}>
         <span style={{ color: GR }}>GOLS {goals}</span>
         <span style={{ color: OR }}>DEFESAS {saves}</span>
@@ -296,6 +305,10 @@ export default function LisaPenalty({ onMood, onFinish }) {
 
       <canvas
         ref={canvasRef}
+        onPointerDown={onAimDown}
+        onPointerMove={onAimMove}
+        onPointerUp={onAimUp}
+        onPointerCancel={onAimUp}
         style={{
           width: full ? `min(96vw, ${(94 * W) / H}vh)` : "min(92vw, 420px)",
           aspectRatio: `${W}/${H}`,
@@ -321,13 +334,6 @@ export default function LisaPenalty({ onMood, onFinish }) {
           COBRAR DE NOVO
         </button>
       )}
-    </div>
-  );
-
-  if (!full) return body;
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      {body}
     </div>
   );
 }

@@ -35,6 +35,17 @@ export default function LisaPong({ onMood, onFinish }) {
   const [full, setFull] = useState(false);
   const [lastSmash, setLastSmash] = useState(0); // só pra mostrar o aviso de "PANCADA!"
 
+  // onMood/onFinish chegam como arrow function nova a cada render do pai, e `result` muda no
+  // fim da partida: se qualquer um deles ficar nas dependências do laço de física, o efeito
+  // se desmonta e remonta (reatribuindo cv.width, o que LIMPA o canvas) sem necessidade.
+  // Por ref, o laço nasce uma vez e vive enquanto o componente existir.
+  const onMoodRef = useRef(onMood);
+  onMoodRef.current = onMood;
+  const onFinishRef = useRef(onFinish);
+  onFinishRef.current = onFinish;
+  const resultRef = useRef(result);
+  resultRef.current = result;
+
   const g = useRef({
     ball: { x: W / 2, y: H / 2, vx: 190, vy: 120 },
     you: H / 2 - PADDLE_H / 2,
@@ -61,34 +72,27 @@ export default function LisaPong({ onMood, onFinish }) {
     onMood?.("focused");
   };
 
-  // controle: mouse/dedo move a raquete da esquerda. A VELOCIDADE do movimento é medida aqui —
-  // é ela que decide se a batida foi uma pancada.
-  useEffect(() => {
+  // Controle da raquete: mouse/dedo. Passado como PROP do React no <canvas> (e não com
+  // addEventListener dentro de um efeito) de propósito — foi exatamente isso que quebrou: ao
+  // alternar tela cheia o canvas era recriado e o listener ficava preso no elemento morto, e a
+  // raquete parava de responder. Como prop, o React reatacha sozinho em qualquer remontagem.
+  const lastMoveRef = useRef({ y: null, t: 0 });
+  const handlePaddle = (e) => {
     const cv = canvasRef.current;
     if (!cv) return;
-    let lastY = null;
-    let lastT = 0;
-    const move = (e) => {
-      const rect = cv.getBoundingClientRect();
-      const y = ((e.clientY - rect.top) / rect.height) * H;
-      const now = performance.now();
-      const target = Math.max(0, Math.min(H - PADDLE_H, y - PADDLE_H / 2));
-      if (lastY !== null && now > lastT) {
-        const inst = ((target - lastY) / (now - lastT)) * 1000; // px/s em unidades lógicas
-        // média com o valor anterior: suaviza o serrilhado dos eventos de ponteiro
-        g.current.youVel = g.current.youVel * 0.4 + inst * 0.6;
-      }
-      lastY = target;
-      lastT = now;
-      g.current.you = target;
-    };
-    cv.addEventListener("pointermove", move);
-    cv.addEventListener("pointerdown", move);
-    return () => {
-      cv.removeEventListener("pointermove", move);
-      cv.removeEventListener("pointerdown", move);
-    };
-  }, []);
+    const rect = cv.getBoundingClientRect();
+    const y = ((e.clientY - rect.top) / rect.height) * H;
+    const now = performance.now();
+    const target = Math.max(0, Math.min(H - PADDLE_H, y - PADDLE_H / 2));
+    const prev = lastMoveRef.current;
+    if (prev.y !== null && now > prev.t) {
+      const inst = ((target - prev.y) / (now - prev.t)) * 1000; // px/s em unidades lógicas
+      // média com o valor anterior: suaviza o serrilhado dos eventos de ponteiro
+      g.current.youVel = g.current.youVel * 0.4 + inst * 0.6;
+    }
+    lastMoveRef.current = { y: target, t: now };
+    g.current.you = target;
+  };
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -116,7 +120,7 @@ export default function LisaPong({ onMood, onFinish }) {
       last = now;
       const s = g.current;
 
-      if (!result) {
+      if (!resultRef.current) {
         s.ball.x += s.ball.vx * dt;
         s.ball.y += s.ball.vy * dt;
 
@@ -141,7 +145,7 @@ export default function LisaPong({ onMood, onFinish }) {
             s.shake = 1;
             s.flash = 1;
             setLastSmash(now);
-            onMood?.("shocked"); // ela se assusta com a pancada
+            onMoodRef.current?.("shocked"); // ela se assusta com a pancada
           }
           // teto de velocidade: sem isso a bola começa a atravessar a raquete entre frames
           const sp = Math.hypot(s.ball.vx, s.ball.vy);
@@ -168,10 +172,10 @@ export default function LisaPong({ onMood, onFinish }) {
               const outcome = next.you >= WIN_SCORE ? "win" : "loss";
               setResult(outcome);
               recordGame({ game: "pong", result: outcome, detail: `${next.you}x${next.lisa}` });
-              onMood?.(outcome === "win" ? "sad" : "proud");
-              onFinish?.(outcome);
+              onMoodRef.current?.(outcome === "win" ? "sad" : "proud");
+              onFinishRef.current?.(outcome);
             } else {
-              onMood?.(who === "you" ? "surprised" : "smug");
+              onMoodRef.current?.(who === "you" ? "surprised" : "smug");
             }
             return next;
           });
@@ -237,12 +241,24 @@ export default function LisaPong({ onMood, onFinish }) {
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [result, reset, onMood, onFinish]);
+  }, [reset]); // `reset` é useCallback estável; result/onMood/onFinish vêm por ref (ver acima)
 
   const smashRecent = performance.now() - lastSmash < 700;
 
-  const body = (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+  // ATENÇÃO: um ÚNICO elemento raiz, com o estilo trocando entre normal e tela cheia.
+  // Antes isto era `if (!full) return body` e um wrapper por fora quando cheio — duas ESTRUTURAS
+  // diferentes de árvore, então o React destruía e recriava o <canvas> ao alternar. Os
+  // listeners de ponteiro (efeito com deps []) e o contexto de desenho ficavam presos no
+  // elemento morto: a raquete simplesmente parava de responder. Mantendo o mesmo elemento e só
+  // trocando o estilo, o canvas nunca é recriado.
+  return (
+    <div
+      style={
+        full
+          ? { position: "fixed", inset: 0, zIndex: 300, background: "#000", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 16 }
+          : { display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }
+      }
+    >
       <div style={{ ...mono, fontSize: 11, letterSpacing: 2, display: "flex", gap: 14, alignItems: "center" }}>
         <span style={{ color: CY }}>VOCÊ {score.you}</span>
         <span style={{ color: "rgba(207,239,251,0.35)" }}>até {WIN_SCORE}</span>
@@ -257,6 +273,8 @@ export default function LisaPong({ onMood, onFinish }) {
 
       <canvas
         ref={canvasRef}
+        onPointerMove={handlePaddle}
+        onPointerDown={handlePaddle}
         style={{
           width: full ? `min(96vw, ${(96 * W) / H}vh)` : "min(92vw, 420px)",
           aspectRatio: `${W}/${H}`,
@@ -280,16 +298,6 @@ export default function LisaPong({ onMood, onFinish }) {
           JOGAR DE NOVO
         </button>
       )}
-    </div>
-  );
-
-  // tela cheia como sobreposição fixa, não com a API de Fullscreen do navegador — a nativa já
-  // deu problema no mobile neste app (recarregava a página no Modo Tela), então aqui segue o
-  // mesmo caminho que funciona: um overlay nosso.
-  if (!full) return body;
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      {body}
     </div>
   );
 }
