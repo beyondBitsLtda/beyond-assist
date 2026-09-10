@@ -550,7 +550,8 @@ export default function AssistantPage() {
   const [perceivedFace, setPerceivedFace] = useState(null); // cara que ela faz reagindo ao que VÊ (ver facePerception.js)
   const [interactiveMenuOpen, setInteractiveMenuOpen] = useState(false);
   const [interactiveGame, setInteractiveGame] = useState(null); // null | "velha" | "pong"
-  const [gameStats, setGameStats] = useState(null); // { score, history } — lido do localStorage ao abrir o menu
+  const [gameStats, setGameStats] = useState(null); // { score, history } — lido ao abrir o menu
+  const [activityStats, setActivityStats] = useState(null); // pontos de quiz/pair (ver /api/activities)
   const interactiveBagRef = useRef([]); // mesmo "saco embaralhado" do rádio: passa por todas antes de repetir
   const interactiveSeenRef = useRef({}); // itens já comentados por categoria (anti-repetição, ver pendingWork.js)
   const interactiveGameRef = useRef(null); // espelho de interactiveGame pro laço de falas não precisar dele nas dependências
@@ -2795,7 +2796,14 @@ export default function AssistantPage() {
             // placar é lido só ao ABRIR o menu (vem do servidor, não precisa ficar consultando)
             if (opening) {
               setGameStats(null);
+              setActivityStats(null);
               loadGames({ limit: 6 }).then(setGameStats);
+              // pontuação das atividades: erro aqui NÃO some da tela — vira um aviso, porque o
+              // motivo mais provável é a tabela ainda não existir no banco
+              fetch("/api/activities")
+                .then((r) => r.json())
+                .then((d) => setActivityStats(d.ok ? d : { error: d.error }))
+                .catch((err) => setActivityStats({ error: err.message }));
             }
           }}
           title="Menu do Modo Interativo"
@@ -2865,12 +2873,39 @@ export default function AssistantPage() {
             </button>
 
             <div style={{ height: 1, background: "rgba(var(--accent-rgb),0.15)", margin: "2px 0" }} />
+
+            {/* pontuação das ATIVIDADES (quiz + pair) — vem do banco, separado do placar de
+                jogos porque é pontuação acumulada, não vitória/derrota */}
+            {activityStats && (
+              <>
+                <div style={{ ...mono, fontSize: 8.5, letterSpacing: 2, color: "rgba(207,239,251,0.45)" }}>PONTUAÇÃO</div>
+                {activityStats.error ? (
+                  <div style={{ ...mono, fontSize: 8.5, color: OR }} title={activityStats.error}>tabelas ainda não criadas no banco</div>
+                ) : (
+                  <>
+                    <div style={{ ...mono, fontSize: 11, color: GR, letterSpacing: 1 }}>
+                      {(activityStats.quiz?.points || 0) + (activityStats.pair?.points || 0)} pts
+                    </div>
+                    <div style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.5)", display: "flex", justifyContent: "space-between" }}>
+                      <span>quiz {activityStats.quiz?.correct || 0}/{activityStats.quiz?.total || 0}</span>
+                      <span>{activityStats.quiz?.points || 0} pts</span>
+                    </div>
+                    <div style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.5)", display: "flex", justifyContent: "space-between" }}>
+                      <span>pair {activityStats.pair?.done || 0}/{activityStats.pair?.total || 0}</span>
+                      <span>{activityStats.pair?.points || 0} pts</span>
+                    </div>
+                  </>
+                )}
+                <div style={{ height: 1, background: "rgba(var(--accent-rgb),0.15)", margin: "2px 0" }} />
+              </>
+            )}
+
             {!gameStats ? (
               <div style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.35)" }}>carregando placar…</div>
             ) : (
               <>
                 <div style={{ ...mono, fontSize: 8.5, letterSpacing: 2, color: "rgba(207,239,251,0.45)", display: "flex", justifyContent: "space-between" }}>
-                  <span>PLACAR GERAL</span>
+                  <span>PLACAR DOS JOGOS</span>
                   {/* deixa claro quando o placar veio da reserva local em vez do banco */}
                   {gameStats.source === "local" && <span style={{ color: OR }} title="não consegui falar com o servidor — mostrando só o que ficou guardado neste aparelho">local</span>}
                 </div>
