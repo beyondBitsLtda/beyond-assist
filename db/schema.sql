@@ -519,6 +519,10 @@ create table if not exists public.screen_share_signals (
   created_at  timestamptz not null default now()
 );
 
+--  REAPROVEITADA pelo jogo do disco (Modo Interativo → "Lançar Disco pra Nala"): os sinais
+--  dele têm kind começando com 'disc-' e vão todos pro pseudo-endereço 'DISCO', que as duas
+--  telas escutam. Não precisou de tabela nova porque a forma é a mesma — fila curta,
+--  endereçada, com payload jsonb. Ver src/lib/discSignals.js.
 create index if not exists screen_share_signals_to_device_idx on public.screen_share_signals (to_device, created_at);
 
 alter table public.screen_share_signals enable row level security;

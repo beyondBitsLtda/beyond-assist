@@ -26,8 +26,10 @@ import LisaReflex from "@/components/panels/LisaReflex.js";
 import LisaBattleship from "@/components/panels/LisaBattleship.js";
 import LisaAirHockey from "@/components/panels/LisaAirHockey.js";
 import LisaRockPaper from "@/components/panels/LisaRockPaper.js";
+import LisaDisc from "@/components/panels/LisaDisc.js";
 import LisaQuiz from "@/components/panels/LisaQuiz.js";
-import LisaPairProgramming from "@/components/panels/LisaPairProgramming.js";
+// LisaPairProgramming NÃO entra aqui de propósito: ele arrasta o Monaco junto, e o Pair
+// Programming agora vive na janela /pair. Importar aqui engordaria o pacote do Assistente à toa.
 import { loadGames } from "@/lib/gameHistory.js";
 
 // carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
@@ -548,7 +550,7 @@ export default function AssistantPage() {
     velha: "JOGO DA VELHA", pong: "PONG", penalti: "COBRANÇA DE PÊNALTI", lig4: "LIG 4",
     naval: "BATALHA NAVAL", memoria: "JOGO DA MEMÓRIA", airhockey: "AIR HOCKEY",
     reflexo: "DUELO DE REFLEXO", ppt: "PEDRA-PAPEL-TESOURA", quiz: "QUIZ DE PROGRAMAÇÃO",
-    pair: "PAIR PROGRAMMING",
+    pair: "PAIR PROGRAMMING", disco: "LANÇAR DISCO PRA NALA",
   };
   const [interactiveMode, setInteractiveMode] = useState(false);
   const [interactiveBubble, setInteractiveBubble] = useState(null); // { text, category } | null
@@ -557,11 +559,26 @@ export default function AssistantPage() {
   const [perceivedFace, setPerceivedFace] = useState(null); // cara que ela faz reagindo ao que VÊ (ver facePerception.js)
   const [interactiveMenuOpen, setInteractiveMenuOpen] = useState(false);
   const [interactiveGame, setInteractiveGame] = useState(null); // null | "velha" | "pong"
+  // O Pair Programming abre numa JANELA SÓ DELE (rota /pair, fora do grupo (panels), sem
+  // Sidebar/Topbar): a IDE precisa de tela, e aqui dentro ela divide espaço com a carinha, o
+  // menu e o plano — não sobra nada pra programar.
+  const [pairWindowBlocked, setPairWindowBlocked] = useState(false);
   const [gameStats, setGameStats] = useState(null); // { score, history } — lido ao abrir o menu
   const [activityStats, setActivityStats] = useState(null); // pontos de quiz/pair (ver /api/activities)
   const interactiveBagRef = useRef([]); // mesmo "saco embaralhado" do rádio: passa por todas antes de repetir
   const interactiveSeenRef = useRef({}); // itens já comentados por categoria (anti-repetição, ver pendingWork.js)
   const interactiveGameRef = useRef(null); // espelho de interactiveGame pro laço de falas não precisar dele nas dependências
+
+  /** Abre (ou traz pra frente) a janela do Pair Programming, já do tamanho da tela. A tela cheia
+   * de verdade quem pede é a própria /pair, no primeiro gesto lá dentro — navegador nenhum
+   * concede fullscreen a uma janela que acabou de abrir sozinha. */
+  const openPairWindow = useCallback(() => {
+    const w = Math.max(900, window.screen?.availWidth || 1280);
+    const h = Math.max(600, window.screen?.availHeight || 800);
+    const win = window.open("/pair", "lisa-pair", `popup=yes,width=${w},height=${h},left=0,top=0`);
+    setPairWindowBlocked(!win); // bloqueador de pop-up: o painel mostra o link manual
+    win?.focus();
+  }, []);
 
   const [radioMode, setRadioMode] = useState(false);
   const [radioStatus, setRadioStatus] = useState(null); // texto curto pro widget flutuante
@@ -2844,6 +2861,7 @@ export default function AssistantPage() {
               { key: "airhockey", label: "Air Hockey" },
               { key: "reflexo", label: "Duelo de Reflexo" },
               { key: "ppt", label: "Pedra-Papel-Tesoura (câmera)" },
+              { key: "disco", label: "Lançar Disco pra Nala (2 telas)" },
             ].map((gm) => (
               <button
                 key={gm.key}
@@ -2874,7 +2892,12 @@ export default function AssistantPage() {
             ].map((act) => (
               <button
                 key={act.key}
-                onClick={() => { setInteractiveGame(act.key); setInteractiveMenuOpen(false); setInteractiveBubble(null); }}
+                onClick={() => {
+                  setInteractiveGame(act.key);
+                  setInteractiveMenuOpen(false);
+                  setInteractiveBubble(null);
+                  if (act.key === "pair") openPairWindow();
+                }}
                 style={{ ...mono, fontSize: 10, letterSpacing: 1, padding: "7px 10px", borderRadius: 6, textAlign: "left", border: `1px solid ${interactiveGame === act.key ? CY : "rgba(var(--accent-rgb),0.18)"}`, background: interactiveGame === act.key ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: "#eafcff", cursor: "pointer" }}
               >
                 {act.label}
@@ -2997,7 +3020,9 @@ export default function AssistantPage() {
 
       {/* conteúdo com largura máxima: sem isto, no desktop os jogos ficavam perdidos no meio de
           uma faixa larguíssima e a leitura do quiz ficava ruim */}
-      <div style={{ width: "100%", maxWidth: isMobile ? "100%" : 620, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+      {/* o disco é jogo de campo largo (e a tela da Nala costuma ficar de lado, sendo vista de
+          longe): 620px espremeriam demais as 64 colunas do campo */}
+      <div style={{ width: "100%", maxWidth: isMobile ? "100%" : interactiveGame === "disco" ? 900 : 620, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
 
       {interactiveGame === "velha" && (
         <LisaTicTacToe onMood={gameMood} />
@@ -3015,8 +3040,27 @@ export default function AssistantPage() {
       {interactiveGame === "reflexo" && <LisaReflex onMood={gameMood} />}
       {/* o de câmera lê do MESMO <video> escondido que o gesto de acordar usa */}
       {interactiveGame === "ppt" && <LisaRockPaper videoRef={observanceVideoRef} onMood={gameMood} />}
+      {interactiveGame === "disco" && <LisaDisc onMood={gameMood} />}
       {interactiveGame === "quiz" && <LisaQuiz onMood={gameMood} />}
-      {interactiveGame === "pair" && <LisaPairProgramming onMood={gameMood} />}
+      {/* o Pair Programming mora na janela separada; aqui fica só o atalho pra reabrir */}
+      {interactiveGame === "pair" && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, textAlign: "center", maxWidth: 420 }}>
+          <div style={{ ...mono, fontSize: 10, letterSpacing: 1, color: "rgba(207,239,251,0.6)", lineHeight: 1.7 }}>
+            {pairWindowBlocked
+              ? "O NAVEGADOR BLOQUEOU A JANELA — LIBERE O POP-UP DESTE SITE OU ABRA PELO LINK ABAIXO"
+              : "ABRI NUMA JANELA SÓ PRA ISSO — A IDE PRECISA DA TELA INTEIRA"}
+          </div>
+          <button
+            onClick={openPairWindow}
+            style={{ ...mono, fontSize: 10, letterSpacing: 1.5, padding: "10px 18px", borderRadius: 6, border: `1px solid ${CY}`, background: "rgba(var(--accent-rgb),0.08)", color: "#eafcff", cursor: "pointer" }}
+          >
+            ⛶ ABRIR A JANELA DE NOVO
+          </button>
+          <a href="/pair" target="_blank" rel="noopener" style={{ ...mono, fontSize: 9, letterSpacing: 1, color: "rgba(207,239,251,0.4)" }}>
+            ou abrir numa aba: /pair
+          </a>
+        </div>
+      )}
 
       {!interactiveGame && interactiveBubble && (
         <div

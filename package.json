@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "ingest": "node --env-file=.env scripts/ingest.mjs",
-    "ask": "node --env-file=.env scripts/ask.mjs"
+    "ask": "node --env-file=.env scripts/ask.mjs",
+    "disc-balance": "node scripts/disc-balance.mjs"
   },
   "dependencies": {
     "@babel/parser": "^8.0.4",
