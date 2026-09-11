@@ -27,7 +27,6 @@ import LisaBattleship from "@/components/panels/LisaBattleship.js";
 import LisaAirHockey from "@/components/panels/LisaAirHockey.js";
 import LisaRockPaper from "@/components/panels/LisaRockPaper.js";
 import LisaDisc from "@/components/panels/LisaDisc.js";
-import LisaWorld from "@/components/panels/LisaWorld.js";
 import LisaQuiz from "@/components/panels/LisaQuiz.js";
 // LisaPairProgramming NÃO entra aqui de propósito: ele arrasta o Monaco junto, e o Pair
 // Programming agora vive na janela /pair. Importar aqui engordaria o pacote do Assistente à toa.
@@ -564,6 +563,8 @@ export default function AssistantPage() {
   // Sidebar/Topbar): a IDE precisa de tela, e aqui dentro ela divide espaço com a carinha, o
   // menu e o plano — não sobra nada pra programar.
   const [pairWindowBlocked, setPairWindowBlocked] = useState(false);
+  // o Mundo da Lisa também: isométrico, rolável e de tela cheia não cabe no painel
+  const [worldWindowBlocked, setWorldWindowBlocked] = useState(false);
   const [gameStats, setGameStats] = useState(null); // { score, history } — lido ao abrir o menu
   const [activityStats, setActivityStats] = useState(null); // pontos de quiz/pair (ver /api/activities)
   const interactiveBagRef = useRef([]); // mesmo "saco embaralhado" do rádio: passa por todas antes de repetir
@@ -578,6 +579,15 @@ export default function AssistantPage() {
     const h = Math.max(600, window.screen?.availHeight || 800);
     const win = window.open("/pair", "lisa-pair", `popup=yes,width=${w},height=${h},left=0,top=0`);
     setPairWindowBlocked(!win); // bloqueador de pop-up: o painel mostra o link manual
+    win?.focus();
+  }, []);
+
+  /** Mesma ideia pro Mundo da Lisa. */
+  const openWorldWindow = useCallback(() => {
+    const w = Math.max(900, window.screen?.availWidth || 1280);
+    const h = Math.max(600, window.screen?.availHeight || 800);
+    const win = window.open("/mundo", "lisa-mundo", `popup=yes,width=${w},height=${h},left=0,top=0`);
+    setWorldWindowBlocked(!win);
     win?.focus();
   }, []);
 
@@ -2853,8 +2863,8 @@ export default function AssistantPage() {
           >
             <div style={{ ...mono, fontSize: 8.5, letterSpacing: 2, color: "rgba(207,239,251,0.45)" }}>🏡 MUNDO</div>
             <button
-              onClick={() => { setInteractiveGame("mundo"); setInteractiveMenuOpen(false); setInteractiveBubble(null); }}
-              title="o quintal dela, que cresce com o que você joga e estuda nos outros modos"
+              onClick={() => { setInteractiveGame("mundo"); setInteractiveMenuOpen(false); setInteractiveBubble(null); openWorldWindow(); }}
+              title="o terreno dela em isométrico, tela cheia — cresce com o que você joga e estuda nos outros modos"
               style={{ ...mono, fontSize: 10, letterSpacing: 1, padding: "7px 10px", borderRadius: 6, textAlign: "left", border: `1px solid ${interactiveGame === "mundo" ? CY : "rgba(var(--accent-rgb),0.18)"}`, background: interactiveGame === "mundo" ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: "#eafcff", cursor: "pointer" }}
             >
               Mundo da Lisa
@@ -3052,7 +3062,25 @@ export default function AssistantPage() {
       {/* o de câmera lê do MESMO <video> escondido que o gesto de acordar usa */}
       {interactiveGame === "ppt" && <LisaRockPaper videoRef={observanceVideoRef} onMood={gameMood} />}
       {interactiveGame === "disco" && <LisaDisc onMood={gameMood} />}
-      {interactiveGame === "mundo" && <LisaWorld onMood={gameMood} />}
+      {/* o Mundo da Lisa mora na janela separada; aqui fica só o atalho pra reabrir */}
+      {interactiveGame === "mundo" && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, textAlign: "center", maxWidth: 420 }}>
+          <div style={{ ...mono, fontSize: 10, letterSpacing: 1, color: "rgba(207,239,251,0.6)", lineHeight: 1.7 }}>
+            {worldWindowBlocked
+              ? "O NAVEGADOR BLOQUEOU A JANELA — LIBERE O POP-UP DESTE SITE OU ABRA PELO LINK ABAIXO"
+              : "ABRI NUMA JANELA SÓ PRA ISSO — O TERRENO DELA PEDE A TELA INTEIRA"}
+          </div>
+          <button
+            onClick={openWorldWindow}
+            style={{ ...mono, fontSize: 10, letterSpacing: 1.5, padding: "10px 18px", borderRadius: 6, border: `1px solid ${CY}`, background: "rgba(var(--accent-rgb),0.08)", color: "#eafcff", cursor: "pointer" }}
+          >
+            ⛶ ABRIR O MUNDO DE NOVO
+          </button>
+          <a href="/mundo" target="_blank" rel="noopener" style={{ ...mono, fontSize: 9, letterSpacing: 1, color: "rgba(207,239,251,0.4)" }}>
+            ou abrir numa aba: /mundo
+          </a>
+        </div>
+      )}
       {interactiveGame === "quiz" && <LisaQuiz onMood={gameMood} />}
       {/* o Pair Programming mora na janela separada; aqui fica só o atalho pra reabrir */}
       {interactiveGame === "pair" && (

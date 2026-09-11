@@ -3,58 +3,72 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CY, GR, OR, mono } from "@/lib/theme.js";
 import { loadGames } from "@/lib/gameHistory.js";
-import { WORLD_ITEMS, availableActivities, houseLevel, nextItem, unlockedItems, worldXp, BUILD_ACTIVITY } from "@/lib/lisaWorld.js";
-import { LISA, LISA_H, LISA_W, STEVE, TOOLS, NOTE } from "./worldSprites.js";
+import {
+  BUILD_ACTIVITY, CASA, GRID, PATH_TILES, WORLD_ITEMS,
+  availableActivities, houseLevel, nextItem, unlockedItems, worldXp,
+} from "@/lib/lisaWorld.js";
+import { LISA, NOTE, STEVE, TOOLS } from "./worldSprites.js";
 import { NALA } from "./nalaSprites.js";
-import { BACK, GROUND, SPOTS, WALK_MAX, WALK_MIN, WH, WW, drawWorld, painter } from "./worldScene.js";
+import * as A from "./isoArt.js";
 
-// "Mundo da Lisa": o quintal e a casinha dela, em pixel, onde ela leva a vida dela — rega as
-// plantas, varre o quintal, brinca com a Nala, ouve música, recebe o Steve. O quintal ganha
-// construções conforme VOCÊ interage com ela nos modos interativos (as regras e a escada de
-// construções estão em src/lib/lisaWorld.js; o desenho do cenário, em worldScene.js).
+// "Mundo da Lisa": o terreno dela, em ISOMÉTRICO, ocupando a tela inteira e rolável. Ela leva a
+// vida ali — rega a horta, varre, brinca com a Nala, ouve música, acende a fogueira, recebe o
+// Steve. O terreno ganha construções conforme VOCÊ interage com ela nos outros modos (regras e
+// mapa em src/lib/lisaWorld.js; desenho em isoArt.js).
 //
-// Duas decisões que valem registro:
+// Três decisões que sustentam isso:
 //
-// 1. O cenário vai pra uma camada em CACHE (um canvas fora da tela) e só é redesenhado quando
-//    aparece construção nova, quando o dia vira noite ou quando a tela muda de tamanho. Casa,
-//    árvore e cerca somam mais de mil células acesas, e cada célula aqui é um roundRect COM
-//    sombra — redesenhar tudo isso 60 vezes por segundo derrubaria o quadro. Só os seres vivos
-//    e as partículas são redesenhados a cada quadro.
+// 1. O mundo inteiro é rasterizado UMA VEZ num canvas fora da tela do tamanho do terreno todo, e
+//    a câmera só recorta um pedaço com drawImage. São dezenas de milhares de células acesas,
+//    cada uma um roundRect com sombra — refazer isso a cada quadro seria impossível. Assim rolar
+//    sai de graça, e o cache só é refeito quando aparece construção nova ou o dia vira noite.
 //
-// 2. A hora é a de verdade do aparelho. Abrir isso de madrugada mostra o quintal escuro, com
-//    estrelas e o poste aceso — faz parecer que ela estava ali o tempo todo, que é o ponto.
+// 2. Em isométrico a ordem de desenho é tudo. As construções vão pro cache ordenadas por
+//    profundidade (tx+ty); e como os personagens são desenhados POR CIMA desse cache, o que
+//    estiver na frente deles é redesenhado depois — senão a Lisa apareceria em cima da casa ao
+//    passar atrás dela.
+//
+// 3. A hora é a de verdade do aparelho. De madrugada o terreno fica escuro, com estrelas, o poste
+//    aceso e a fogueira acesa — e ela vai olhar as estrelas, que é atividade só da noite.
 
-const NALA_H = 15;
-const LISA_SPEED = 11;     // células/s
-const NALA_SPEED = 16;
-const STEP_MS = 170;       // troca de perna
-const GAP_MIN_MS = 1800;   // respiro entre uma atividade e outra
-const GAP_VAR_MS = 3000;
+const CELL_MIN = 4;
+const CELL_MAX = 9;
+const LISA_SPEED = 2.6; // tiles por segundo
+const NALA_SPEED = 3.4;
+const STEP_MS = 150;
+const GAP_MIN_MS = 1600;
+const GAP_VAR_MS = 3200;
 const SEEN_KEY = "lisaWorld.seenXp";
 
 const isNight = (h) => h < 6 || h >= 19;
+const lerp = (a, b, t) => a + (b - a) * t;
 
-export default function LisaWorld({ onMood }) {
-  const [world, setWorld] = useState(null); // { xp, unlocked, level, next, source, erro }
-  const [novas, setNovas] = useState([]);   // construções que apareceram desde a última visita
-  const [label, setLabel] = useState("chegando no quintal…");
+export default function LisaWorld({ fullscreen = false }) {
+  const [world, setWorld] = useState(null);
+  const [novas, setNovas] = useState([]);
+  const [label, setLabel] = useState("chegando no terreno…");
+  const [cell, setCell] = useState(6);
+  const [seguir, setSeguir] = useState(true);
+  const [lista, setLista] = useState(false);
 
   const canvasRef = useRef(null);
-  const sceneRef = useRef({ unlocked: [], level: 1, night: isNight(new Date().getHours()), hour: new Date().getHours(), temCarta: false });
-  const onMoodRef = useRef(onMood);
-  onMoodRef.current = onMood;
+  const sceneRef = useRef({ unlocked: [], level: 1, night: isNight(new Date().getHours()), temCarta: false });
+  const camRef = useRef({ x: 40, y: 40 });
+  const dragRef = useRef(null);
+  const seguirRef = useRef(seguir);
+  seguirRef.current = seguir;
+  const cellRef = useRef(cell);
+  cellRef.current = cell;
 
-  // atores
-  const lisaRef = useRef({ x: 30, target: 30, flip: false, pose: "idle", step: 0 });
-  const nalaRef = useRef({ x: 52, target: 52, moving: false, jh: 0, jv: 0 });
+  const lisaRef = useRef({ tx: 6, ty: 20, targ: [6, 20], pose: "idle", flip: false, moving: false });
+  const nalaRef = useRef({ tx: 7, ty: 22, targ: [7, 22], moving: false, flip: false });
   const steveRef = useRef(null);
-  const discRef = useRef(null);
   const actRef = useRef(null);
   const nextAtRef = useRef(0);
   const bagRef = useRef([]);
   const buildQueueRef = useRef([]);
 
-  // ---- de onde vem o progresso: o que você já fez de verdade ----
+  // ---- progresso: o que você já fez de verdade ----
   useEffect(() => {
     let vivo = true;
     (async () => {
@@ -66,43 +80,43 @@ export default function LisaWorld({ onMood }) {
       const erro = acts && !acts.ok ? acts.error : null;
       const xp = worldXp({ games: games?.score, quiz: acts?.quiz, pair: acts?.pair });
       const unlocked = unlockedItems(xp);
-      const level = houseLevel(xp);
 
-      // o que ela construiu desde a última vez que você apareceu
       let seen = 0;
       try { seen = Number(localStorage.getItem(SEEN_KEY)) || 0; } catch {}
       const antes = new Set(unlockedItems(seen));
       const recem = WORLD_ITEMS.filter((i) => unlocked.includes(i.key) && !antes.has(i.key));
       try { localStorage.setItem(SEEN_KEY, String(xp)); } catch {}
 
-      setWorld({ xp, unlocked, level, next: nextItem(xp), source: games?.source, erro });
+      setWorld({ xp, unlocked, next: nextItem(xp), erro });
       setNovas(recem);
-      buildQueueRef.current = recem.slice(0, 2);
-      sceneRef.current = { unlocked, level, night: isNight(new Date().getHours()), hour: new Date().getHours(), temCarta: recem.length > 0 };
-      if (recem.length) onMoodRef.current?.("proud");
+      buildQueueRef.current = recem.filter((i) => i.tx != null).slice(0, 3);
+      sceneRef.current = { unlocked, level: houseLevel(xp), night: isNight(new Date().getHours()), temCarta: recem.length > 0 };
     })();
     return () => { vivo = false; };
   }, []);
 
+  /** Sorteia a próxima coisa que ela vai fazer. Saco embaralhado: passa por todas antes de
+   * repetir qualquer uma — mesmo padrão do rádio e das gracinhas da Nala. */
   const pickActivity = useCallback((now) => {
-    // obra primeiro: se ela construiu algo desde a sua última visita, mostra isso antes
     if (buildQueueRef.current.length) {
       const item = buildQueueRef.current.shift();
-      return { ...BUILD_ACTIVITY, label: `construindo: ${item.label.toLowerCase()}`, until: 0, startedAt: now, phase: "indo" };
+      return { ...BUILD_ACTIVITY, label: `construindo: ${item.label.toLowerCase()}`, at: [item.tx + item.w, item.ty + item.d], startedAt: now, phase: "indo" };
     }
-    const opts = availableActivities(sceneRef.current.unlocked);
+    const sc = sceneRef.current;
     if (!bagRef.current.length) {
-      const pool = [...opts];
+      const pool = availableActivities(sc.unlocked, sc.night);
       for (let i = pool.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [pool[i], pool[j]] = [pool[j], pool[i]];
       }
       bagRef.current = pool;
     }
-    // o saco pode ter sido montado antes de uma construção nova entrar: filtra na saída
     let a = bagRef.current.pop();
-    while (a && a.needs && !sceneRef.current.unlocked.includes(a.needs)) a = bagRef.current.pop();
-    return a ? { ...a, until: 0, startedAt: now, phase: "indo" } : null;
+    // o saco pode ter sido montado antes de uma construção entrar, ou de o dia virar noite
+    while (a && ((a.needs && !sc.unlocked.includes(a.needs)) || (a.night && !sc.night))) a = bagRef.current.pop();
+    if (!a) return null;
+    const at = a.at || [4 + Math.random() * (GRID - 8), 4 + Math.random() * (GRID - 8)];
+    return { ...a, at, startedAt: now, phase: "indo" };
   }, []);
 
   // ---- laço de desenho ----
@@ -118,19 +132,53 @@ export default function LisaWorld({ onMood }) {
     let hex = "#38e1ff";
     let readAt = 0;
     let staticKey = "";
+    let offScale = 1;
 
-    const makePaint = (c, cell) => {
-      const pad = cell * 0.16;
+    const makePaint = (c, size, ox = 0, oy = 0) => {
+      const pad = size * 0.16;
       const round = typeof c.roundRect === "function";
       return (gx, gy, alpha = 1) => {
-        if (alpha <= 0.02 || gx < -1 || gx > WW || gy < -1 || gy > WH) return;
+        if (alpha <= 0.02) return;
+        const x = (gx - ox) * size + pad / 2;
+        const y = (gy - oy) * size + pad / 2;
         c.fillStyle = `rgba(${accent},${alpha})`;
-        const x = gx * cell + pad / 2;
-        const y = gy * cell + pad / 2;
-        const s = cell - pad;
-        if (round) { c.beginPath(); c.roundRect(x, y, s, s, s * 0.28); c.fill(); }
-        else c.fillRect(x, y, s, s);
+        if (round) { c.beginPath(); c.roundRect(x, y, size - pad, size - pad, (size - pad) * 0.28); c.fill(); }
+        else c.fillRect(x, y, size - pad, size - pad);
       };
+    };
+
+    /** Tudo que fica parado no terreno, já em ordem de profundidade. */
+    const placed = (sc) => {
+      const out = [{ key: "casa", item: CASA }];
+      for (const it of WORLD_ITEMS) if (sc.unlocked.includes(it.key) && it.tx != null) out.push({ key: it.key, item: it });
+      return out.sort((a, b) => (a.item.tx + a.item.ty) - (b.item.tx + b.item.ty));
+    };
+
+    const drawObj = (P, key, item, sc, now) => {
+      switch (key) {
+        case "casa": A.drawCasa(P, item, sc.level, sc.night); break;
+        case "horta": A.drawHorta(P, item); break;
+        case "arvore1": case "arvore2": case "arvore3": A.drawArvore(P, item); break;
+        case "casinha": A.drawCasinha(P, item); break;
+        case "varal": A.drawVaral(P, item); break;
+        case "banco": A.drawBanco(P, item); break;
+        case "correio": A.drawCorreio(P, item, sc.temCarta); break;
+        case "poste1": A.drawPoste(P, item, sc.night); break;
+        case "radio": A.drawRadio(P, item); break;
+        case "portao": A.drawPortao(P, item); break;
+        case "flores": A.drawFlores(P, item); break;
+        case "mesa": A.drawMesa(P, item); break;
+        case "churras": A.drawChurras(P, item); break;
+        case "balanco": A.drawBalanco(P, item); break;
+        case "poco": A.drawPoco(P, item); break;
+        case "fogueira": A.drawFogueira(P, item); break;
+        case "oficina": A.drawOficina(P, item); break;
+        case "estufa": A.drawEstufa(P, item); break;
+        case "piscina": A.drawPiscina(P, item, now); break;
+        case "lago": A.drawLago(P, item, now); break;
+        case "mirante": A.drawMirante(P, item); break;
+        default: break;
+      }
     };
 
     const loop = (now) => {
@@ -145,156 +193,185 @@ export default function LisaWorld({ onMood }) {
         cv.height = Math.round(h * dpr);
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, w, h);
       if (now - readAt > 500) {
         readAt = now;
         const rs = getComputedStyle(document.documentElement);
         accent = rs.getPropertyValue("--accent-rgb").trim() || accent;
         hex = rs.getPropertyValue("--accent-hex").trim() || hex;
       }
-      const cell = w / WW;
+      const size = cellRef.current;
       const sc = sceneRef.current;
+      ctx.fillStyle = "#03080c";
+      ctx.fillRect(0, 0, w, h);
 
-      // ---- camada do cenário, em cache ----
-      const key = `${w}x${h}|${dpr}|${accent}|${sc.unlocked.join(",")}|${sc.level}|${sc.night}|${Math.floor(sc.hour * 4)}|${sc.temCarta}`;
+      // ---- o mundo inteiro, rasterizado uma vez só ----
+      const key = `${size}|${accent}|${sc.unlocked.join(",")}|${sc.level}|${sc.night}|${sc.temCarta}`;
       if (key !== staticKey) {
         staticKey = key;
-        off.width = Math.round(w * dpr);
-        off.height = Math.round(h * dpr);
-        offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        offCtx.clearRect(0, 0, w, h);
-        offCtx.shadowBlur = cell * 1.1;
+        // o canvas do mundo é grande: limita a resolução pra não estourar memória em tela retina
+        offScale = A.WORLD_W * size * A.WORLD_H * size * 4 < 9e6 ? 2 : 1;
+        off.width = Math.round(A.WORLD_W * size * offScale);
+        off.height = Math.round(A.WORLD_H * size * offScale);
+        offCtx.setTransform(offScale, 0, 0, offScale, 0, 0);
+        offCtx.clearRect(0, 0, A.WORLD_W * size, A.WORLD_H * size);
+        offCtx.shadowBlur = size * 1.1;
         offCtx.shadowColor = hex;
-        drawWorld(painter(makePaint(offCtx, cell)), sc);
+        const OP = { paint: makePaint(offCtx, size) };
+        if (sc.night) for (let i = 0; i < 90; i++) OP.paint((i * 53) % A.WORLD_W, (i * 29) % 42, 0.3 + 0.2 * Math.sin(i));
+        A.drawTerreno(OP, GRID);
+        if (sc.unlocked.includes("caminho")) A.drawCaminho(OP, PATH_TILES);
+        if (sc.unlocked.includes("cerca")) A.drawCerca(OP, GRID);
+        for (const o of placed(sc)) drawObj(OP, o.key, o.item, sc, 0);
+        if (sc.unlocked.includes("chamine")) A.drawChamine(OP, CASA, sc.level);
+        if (sc.unlocked.includes("antena")) A.drawAntena(OP, CASA, sc.level);
+        if (sc.unlocked.includes("solar")) {
+          const of = WORLD_ITEMS.find((i) => i.key === "oficina");
+          if (sc.unlocked.includes("oficina")) A.drawSolar(OP, of);
+        }
         offCtx.shadowBlur = 0;
       }
-      ctx.drawImage(off, 0, 0, w, h);
 
-      // ---- atores ----
-      ctx.shadowBlur = cell * 1.1;
-      ctx.shadowColor = hex;
-      const P = painter(makePaint(ctx, cell));
+      // ---- atividade ----
       const lisa = lisaRef.current;
       const nala = nalaRef.current;
-
-      // escolhe o que fazer
       let a = actRef.current;
-      if (!a && now > nextAtRef.current) {
+      if (!a && now > nextAtRef.current && sc.unlocked) {
         a = pickActivity(now);
         if (a) {
           actRef.current = a;
-          lisa.target = a.at ?? Math.round(WALK_MIN + Math.random() * (WALK_MAX - WALK_MIN));
+          lisa.targ = a.at;
           setLabel(a.label);
         }
       }
 
-      // caminhada até o lugar
-      const dx = (lisa.target ?? lisa.x) - lisa.x;
-      if (Math.abs(dx) > 0.6) {
-        const step = LISA_SPEED * dt;
-        lisa.x += Math.sign(dx) * Math.min(step, Math.abs(dx));
-        lisa.flip = dx < 0;
-        lisa.step = Math.floor(now / STEP_MS) % 2;
-        lisa.pose = lisa.step ? "walkA" : "walkB";
-      } else if (a) {
-        if (a.phase === "indo") {
-          a.phase = "fazendo";
-          a.until = now + a.ms;
-          a.startedAt = now;
-          if (a.key === "steve") steveRef.current = { x: SPOTS.casa + 6, phase: "chegando" };
-        }
-        lisa.pose = a.sit ? "sit" : a.tool ? "work" : a.key === "steve" || a.key === "nala" ? "armUp" : "idle";
-        if (now > a.until) {
-          actRef.current = null;
-          nextAtRef.current = now + GAP_MIN_MS + Math.random() * GAP_VAR_MS;
-          discRef.current = null;
-          if (a.key === "steve") steveRef.current = null;
-          setLabel("dando uma volta pelo quintal");
-        }
-      } else {
-        lisa.pose = "idle";
+      // ---- caminhada ----
+      const walk = (ent, speed) => {
+        const dx = ent.targ[0] - ent.tx;
+        const dy = ent.targ[1] - ent.ty;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 0.15) { ent.moving = false; return true; }
+        const step = Math.min(speed * dt, dist);
+        ent.tx += (dx / dist) * step;
+        ent.ty += (dy / dist) * step;
+        ent.moving = true;
+        // no isométrico, +tx vai pra direita da tela e +ty pra esquerda
+        ent.flip = dx - dy < 0;
+        return false;
+      };
+      const chegou = walk(lisa, LISA_SPEED);
+      if (a && chegou && a.phase === "indo") {
+        a.phase = "fazendo";
+        a.until = now + a.ms;
+        a.startedAt = now;
+        if (a.key === "steve") steveRef.current = { tx: CASA.tx + CASA.w, ty: CASA.ty + CASA.d, targ: [lisa.tx + 1.6, lisa.ty + 1.6], moving: true, flip: false };
       }
+      if (a?.phase === "fazendo" && now > a.until) {
+        actRef.current = null;
+        steveRef.current = null;
+        nextAtRef.current = now + GAP_MIN_MS + Math.random() * GAP_VAR_MS;
+        setLabel("dando uma volta pelo terreno");
+      }
+      lisa.pose = lisa.moving
+        ? (Math.floor(now / STEP_MS) % 2 ? "walkA" : "walkB")
+        : a?.phase === "fazendo"
+        ? (a.sit ? "sit" : a.tool ? "work" : a.key === "steve" || a.key === "nala" ? "armUp" : "idle")
+        : "idle";
 
-      // ---- Nala: anda atrás dela, menos quando estão brincando ----
+      // a Nala anda atrás; brincando, ela corre em volta
       const brincando = a?.key === "nala" && a.phase === "fazendo";
-      if (brincando) {
-        if (!discRef.current && (now - a.startedAt) % 4200 < 40) {
-          discRef.current = { x: lisa.x + 6, y: GROUND - 18, vx: 26, vy: -14 };
-        }
-        const d = discRef.current;
-        if (d) {
-          d.vy += 40 * dt;
-          d.x += d.vx * dt;
-          d.y += d.vy * dt;
-          nala.target = Math.min(WALK_MAX, d.x - 14);
-          if (d.y >= GROUND - 2 || Math.abs(nala.x + 14 - d.x) < 3) discRef.current = null;
-          else P.rect(Math.round(d.x), Math.round(d.y), 3, 2, 1);
-        } else {
-          nala.target = lisa.x + 20;
-        }
-      } else {
-        nala.target = lisa.x - 30;
-      }
-      nala.target = Math.max(0, Math.min(WW - 24, nala.target));
-      const ndx = nala.target - nala.x;
-      nala.moving = Math.abs(ndx) > 1;
-      if (nala.moving) nala.x += Math.sign(ndx) * Math.min(NALA_SPEED * dt, Math.abs(ndx));
-      // pulinho quando o disco passa por cima dela
-      if (brincando && discRef.current && nala.jh === 0 && Math.abs(discRef.current.x - (nala.x + 14)) < 5) nala.jv = -26;
-      if (nala.jv !== 0 || nala.jh > 0) {
-        nala.jv += 70 * dt;
-        nala.jh -= nala.jv * dt;
-        if (nala.jh <= 0) { nala.jh = 0; nala.jv = 0; }
-      }
+      nala.targ = brincando
+        ? [lisa.tx + 2.5 + Math.sin(now / 1400) * 2.5, lisa.ty + 2.5 + Math.cos(now / 1100) * 2.5]
+        : [lisa.tx - 1.6, lisa.ty + 1.6];
+      walk(nala, brincando ? NALA_SPEED * 1.4 : NALA_SPEED);
 
-      const nalaRows = nala.jh > 0.6 ? NALA.jump : nala.moving ? (Math.floor(now / 110) % 2 ? NALA.runA : NALA.runB) : Math.floor(now / 420) % 2 ? NALA.wag : NALA.idle;
-      P.sprite(nalaRows, nala.x, GROUND - (NALA_H - 1) - nala.jh);
-
-      // ---- Lisa ----
-      // sentada, ela aparece EM CIMA do banco, que fica na linha de trás
-      const sentada = a?.sit && a.phase === "fazendo";
-      const lisaY = sentada ? BACK - (LISA_H - 1) - 4 : GROUND - (LISA_H - 1);
-      drawFigure(P, LISA[lisa.pose] || LISA.idle, lisa.x, lisaY, lisa.flip);
-
-      // ferramenta na mão
-      if (a?.tool && a.phase === "fazendo") {
-        const rows = TOOLS[a.tool];
-        const hx = lisa.flip ? lisa.x + 1 : lisa.x + 11;
-        P.sprite(rows, hx, GROUND - 7);
-        if (a.key === "regar") {
-          for (let i = 0; i < 4; i++) {
-            const t = ((now / 500) + i / 4) % 1;
-            P.paint(Math.round(hx - 1 + t * 2), Math.round(GROUND - 3 + t * 3), 0.9 - t * 0.4);
-          }
-        }
-      }
-
-      // notas de música
-      if (a?.key === "musica" && a.phase === "fazendo") {
-        for (let i = 0; i < 3; i++) {
-          const t = ((now / 1700) + i / 3) % 1;
-          P.sprite(NOTE, SPOTS.radio + 2 + t * 5, GROUND - 12 - t * 14, Math.sin(t * Math.PI) * 0.9);
-        }
-      }
-
-      // fumaça da chaminé
-      if (sc.unlocked.includes("chamine")) {
-        for (let i = 0; i < 3; i++) {
-          const t = ((now / 2600) + i / 3) % 1;
-          const y = GROUND - (sc.level >= 3 ? 45 : 38) - t * 10;
-          P.rect(Math.round(SPOTS.casa + 25 + Math.sin(t * 4) * 2), Math.round(y), 2, 2, Math.sin(t * Math.PI) * 0.55);
-        }
-      }
-
-      // ---- Steve: chega da porta, fica um tempo e vai embora ----
       const st = steveRef.current;
       if (st && a) {
-        const vindo = now - a.startedAt < a.ms * 0.7;
-        const alvo = vindo ? lisa.x + 16 : SPOTS.casa + 6;
-        const sdx = alvo - st.x;
-        if (Math.abs(sdx) > 0.6) st.x += Math.sign(sdx) * Math.min(9 * dt, Math.abs(sdx));
-        const parado = Math.abs(sdx) <= 0.6;
-        drawFigure(P, parado ? STEVE.armUp : STEVE.idle, st.x, GROUND - (LISA_H - 1), sdx < 0);
+        const indo = now - a.startedAt < a.ms * 0.75;
+        st.targ = indo ? [lisa.tx + 1.6, lisa.ty + 1.6] : [CASA.tx + CASA.w, CASA.ty + CASA.d];
+        walk(st, 2.2);
+      }
+
+      // ---- câmera ----
+      const viewW = w / size;
+      const viewH = h / size;
+      const cam = camRef.current;
+      if (seguirRef.current) {
+        const p = A.iso(lisa.tx, lisa.ty);
+        cam.x = lerp(cam.x, p.x - viewW / 2, 1 - Math.exp(-dt / 0.35));
+        cam.y = lerp(cam.y, p.y - viewH / 2, 1 - Math.exp(-dt / 0.35));
+      }
+      cam.x = Math.max(0, Math.min(Math.max(0, A.WORLD_W - viewW), cam.x));
+      cam.y = Math.max(0, Math.min(Math.max(0, A.WORLD_H - viewH), cam.y));
+
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(off, cam.x * size * offScale, cam.y * size * offScale, w * offScale, h * offScale, 0, 0, w, h);
+
+      // ---- atores e partículas, por cima ----
+      ctx.shadowBlur = size * 1.1;
+      ctx.shadowColor = hex;
+      const P = { paint: makePaint(ctx, size, cam.x, cam.y) };
+      const put = (rows, p, flip) => {
+        const ox = Math.round(p.x - rows[0].length / 2);
+        const oy = Math.round(p.y - (rows.length - 1));
+        for (let r = 0; r < rows.length; r++)
+          for (let c = 0; c < rows[r].length; c++)
+            if (rows[r][c] === "#") P.paint(ox + (flip ? rows[r].length - 1 - c : c), oy + r, 1);
+      };
+
+      const pn = A.iso(nala.tx, nala.ty);
+      put(nala.moving ? (Math.floor(now / 110) % 2 ? NALA.runA : NALA.runB) : Math.floor(now / 420) % 2 ? NALA.wag : NALA.idle, pn, nala.flip);
+
+      const pl = A.iso(lisa.tx, lisa.ty);
+      put(LISA[lisa.pose] || LISA.idle, pl, lisa.flip);
+      if (a?.tool && a.phase === "fazendo") {
+        const hx = Math.round(pl.x + (lisa.flip ? -8 : 4));
+        const rows = TOOLS[a.tool];
+        for (let r = 0; r < rows.length; r++)
+          for (let c = 0; c < rows[r].length; c++)
+            if (rows[r][c] === "#") P.paint(hx + c, Math.round(pl.y - 8 + r), 1);
+        if (a.key === "regar" || a.key === "flores")
+          for (let i = 0; i < 4; i++) {
+            const t = ((now / 500) + i / 4) % 1;
+            P.paint(Math.round(hx + 2 + t * 2), Math.round(pl.y - 4 + t * 4), 0.9 - t * 0.4);
+          }
+      }
+      if (st) put(st.moving ? STEVE.idle : STEVE.armUp, A.iso(st.tx, st.ty), st.flip);
+
+      // o que estiver NA FRENTE deles é redesenhado — senão ela aparece em cima da casa
+      const frente = Math.min(lisa.tx + lisa.ty, nala.tx + nala.ty);
+      for (const o of placed(sc)) {
+        if (o.item.tx + o.item.ty <= frente) continue;
+        const p = A.iso(o.item.tx, o.item.ty + (o.item.d || 1));
+        if (Math.abs(p.x - pl.x) > 80 || Math.abs(p.y - pl.y) > 70) continue;
+        drawObj(P, o.key, o.item, sc, now);
+      }
+
+      // ---- partículas ----
+      if (sc.unlocked.includes("fogueira")) {
+        const f = WORLD_ITEMS.find((i) => i.key === "fogueira");
+        const c = A.iso(f.tx + f.w / 2, f.ty + f.d / 2);
+        for (let i = 0; i < 5; i++) {
+          const t = ((now / 900) + i / 5) % 1;
+          P.paint(Math.round(c.x + Math.sin(t * 9 + i) * 2), Math.round(c.y - 1 - t * 10), (1 - t) * (sc.night ? 1 : 0.45));
+        }
+      }
+      if (sc.unlocked.includes("chamine")) {
+        const cp = A.iso(CASA.tx + CASA.w - 1.2, CASA.ty + 0.8, A.casaAltura(sc.level) + 10);
+        for (let i = 0; i < 4; i++) {
+          const t = ((now / 2800) + i / 4) % 1;
+          P.paint(Math.round(cp.x + Math.sin(t * 5) * 3), Math.round(cp.y - 2 - t * 14), Math.sin(t * Math.PI) * 0.5);
+        }
+      }
+      if (a?.key === "musica" && a.phase === "fazendo" && sc.unlocked.includes("radio")) {
+        const r = WORLD_ITEMS.find((i) => i.key === "radio");
+        const c = A.iso(r.tx + 0.5, r.ty + 0.5);
+        for (let i = 0; i < 3; i++) {
+          const t = ((now / 1700) + i / 3) % 1;
+          const oy = Math.round(c.y - 12 - t * 16);
+          for (let rr = 0; rr < NOTE.length; rr++)
+            for (let cc = 0; cc < NOTE[rr].length; cc++)
+              if (NOTE[rr][cc] === "#") P.paint(Math.round(c.x + 3 + t * 4) + cc, oy + rr, Math.sin(t * Math.PI) * 0.9);
+        }
       }
 
       ctx.shadowBlur = 0;
@@ -304,68 +381,97 @@ export default function LisaWorld({ onMood }) {
     return () => cancelAnimationFrame(raf);
   }, [pickActivity]);
 
+  // ---- arrastar pra rolar ----
+  const onDown = (e) => {
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    dragRef.current = { x: e.clientX, y: e.clientY, cam: { ...camRef.current } };
+  };
+  const onMove = (e) => {
+    const d = dragRef.current;
+    if (!d) return;
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6) setSeguir(false);
+    camRef.current.x = d.cam.x - (e.clientX - d.x) / cellRef.current;
+    camRef.current.y = d.cam.y - (e.clientY - d.y) / cellRef.current;
+  };
+  const onUp = () => { dragRef.current = null; };
+
   const next = world?.next;
+  const btn = {
+    ...mono, fontSize: 9.5, letterSpacing: 1, padding: "6px 10px", borderRadius: 6,
+    border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(4,10,14,0.78)", color: "#eafcff", cursor: "pointer",
+  };
+  const shadow = { textShadow: "0 0 8px rgba(0,0,0,0.95)" };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "min(96vw, 940px)" }}>
-      <div style={{ width: "100%", border: "1px solid rgba(var(--accent-rgb),0.18)", borderRadius: 10, overflow: "hidden", background: "rgba(var(--accent-rgb),0.03)" }}>
-        <canvas ref={canvasRef} style={{ width: "100%", aspectRatio: `${WW} / ${WH}`, display: "block" }} />
+    <div
+      style={{
+        position: "relative", width: "100%", minHeight: 0, overflow: "hidden",
+        flex: fullscreen ? 1 : "none",
+        height: fullscreen ? undefined : "min(70vh, 560px)",
+        borderRadius: fullscreen ? 0 : 10,
+        border: fullscreen ? "none" : "1px solid rgba(var(--accent-rgb),0.18)",
+      }}
+    >
+      <canvas
+        ref={canvasRef}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        style={{ width: "100%", height: "100%", display: "block", touchAction: "none", cursor: "grab" }}
+      />
+
+      <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <button onClick={() => setSeguir((v) => !v)} style={{ ...btn, borderColor: seguir ? CY : "rgba(var(--accent-rgb),0.25)" }} title="a câmera acompanha a Lisa; arrastar a tela solta a câmera">
+          {seguir ? "◉ SEGUINDO ELA" : "○ CÂMERA LIVRE"}
+        </button>
+        <button onClick={() => setCell((c) => Math.max(CELL_MIN, c - 1))} style={btn} title="afastar">−</button>
+        <button onClick={() => setCell((c) => Math.min(CELL_MAX, c + 1))} style={btn} title="aproximar">+</button>
+        <button onClick={() => setLista((v) => !v)} style={btn}>{lista ? "✕" : "☰"} CONSTRUÇÕES</button>
       </div>
 
-      <div style={{ ...mono, fontSize: 11, letterSpacing: 1.5, color: CY, minHeight: 15, textAlign: "center" }}>
-        {world ? `A LISA ESTÁ ${label.toUpperCase()}` : "CARREGANDO O QUINTAL…"}
+      <div style={{ position: "absolute", top: 12, left: 14, ...mono, fontSize: 10.5, letterSpacing: 1.5, color: CY, ...shadow }}>
+        {world ? `A LISA ESTÁ ${label.toUpperCase()}` : "CARREGANDO O TERRENO…"}
       </div>
-
-      {novas.length > 0 && (
-        <div style={{ ...mono, fontSize: 10, letterSpacing: 1, color: GR, textAlign: "center", lineHeight: 1.6 }}>
-          ✦ DESDE A SUA ÚLTIMA VISITA ELA CONSTRUIU: {novas.map((n) => n.label).join(", ")}
-        </div>
-      )}
 
       {world && (
-        <div style={{ width: "100%", maxWidth: 560, display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ ...mono, fontSize: 9, letterSpacing: 1.5, display: "flex", justifyContent: "space-between", color: "rgba(207,239,251,0.55)" }}>
+        <div style={{ position: "absolute", left: 14, bottom: 12, right: 14, display: "flex", flexDirection: "column", gap: 5, pointerEvents: "none" }}>
+          {novas.length > 0 && (
+            <div style={{ ...mono, fontSize: 9.5, letterSpacing: 1, color: GR, ...shadow }}>
+              ✦ DESDE A SUA ÚLTIMA VISITA ELA CONSTRUIU: {novas.map((n) => n.label).join(", ")}
+            </div>
+          )}
+          <div style={{ ...mono, fontSize: 9, letterSpacing: 1, display: "flex", gap: 14, flexWrap: "wrap", color: "rgba(207,239,251,0.72)", ...shadow }}>
             <span>{world.xp} pts de convivência</span>
-            {next ? <span>falta {next.falta} pra {next.label.toLowerCase()}</span> : <span style={{ color: GR }}>quintal completo</span>}
+            {next ? <span>falta {next.falta} pra {next.label.toLowerCase()}</span> : <span style={{ color: GR }}>terreno completo</span>}
+            <span style={{ color: "rgba(207,239,251,0.42)" }}>{world.unlocked.length}/{WORLD_ITEMS.length} construções</span>
           </div>
           {next && (
-            <div style={{ height: 5, borderRadius: 3, background: "rgba(var(--accent-rgb),0.12)", overflow: "hidden" }}>
+            <div style={{ height: 4, maxWidth: 420, borderRadius: 3, background: "rgba(0,0,0,0.6)", overflow: "hidden" }}>
               <div style={{ width: `${Math.round(next.progresso * 100)}%`, height: "100%", background: CY }} />
             </div>
           )}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {WORLD_ITEMS.map((i) => {
-              const tem = world.unlocked.includes(i.key);
-              return (
-                <span
-                  key={i.key}
-                  title={tem ? i.note : `${i.note} · ${i.xp} pts`}
-                  style={{ ...mono, fontSize: 8.5, letterSpacing: 0.5, padding: "3px 7px", borderRadius: 12, border: `1px solid ${tem ? "rgba(123,216,143,0.5)" : "rgba(var(--accent-rgb),0.16)"}`, color: tem ? GR : "rgba(207,239,251,0.35)" }}
-                >
-                  {tem ? "✓ " : ""}{i.label}
-                </span>
-              );
-            })}
-          </div>
           {world.erro && (
-            <div style={{ ...mono, fontSize: 8.5, color: OR }} title={world.erro}>
-              ⚠ as tabelas de quiz/pair ainda não existem no banco — o quintal só está contando as partidas
+            <div style={{ ...mono, fontSize: 8.5, color: OR, ...shadow }} title={world.erro}>
+              ⚠ as tabelas de quiz/pair ainda não existem no banco — o terreno só está contando as partidas
             </div>
           )}
-          <div style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.35)", lineHeight: 1.6 }}>
-            o quintal cresce com o que você já joga e estuda com ela nos outros modos — não tem moeda separada aqui
-          </div>
+        </div>
+      )}
+
+      {lista && world && (
+        <div style={{ position: "absolute", top: 48, right: 10, width: 236, maxHeight: "72%", overflowY: "auto", padding: 10, borderRadius: 8, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(4,10,14,0.96)", display: "flex", flexDirection: "column", gap: 3 }}>
+          {WORLD_ITEMS.map((i) => {
+            const tem = world.unlocked.includes(i.key);
+            return (
+              <div key={i.key} style={{ ...mono, fontSize: 8.5, display: "flex", justifyContent: "space-between", gap: 8, color: tem ? GR : "rgba(207,239,251,0.4)" }} title={i.note}>
+                <span>{tem ? "✓ " : "· "}{i.label}</span>
+                <span style={{ opacity: 0.6 }}>{i.xp}</span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
-}
-
-/** Desenha uma figura podendo espelhar — as poses são todas viradas pra direita, e sem isso ela
- * andaria pra esquerda de costas. */
-function drawFigure(P, rows, ox, oy, flip) {
-  if (!flip) return P.sprite(rows, ox, oy);
-  for (let r = 0; r < rows.length; r++)
-    for (let c = 0; c < rows[r].length; c++)
-      if (rows[r][c] === "#") P.paint(Math.round(ox) + (LISA_W - 1 - c), Math.round(oy) + r, 1);
 }
