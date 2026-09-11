@@ -27,6 +27,7 @@ import LisaBattleship from "@/components/panels/LisaBattleship.js";
 import LisaAirHockey from "@/components/panels/LisaAirHockey.js";
 import LisaRockPaper from "@/components/panels/LisaRockPaper.js";
 import LisaDisc from "@/components/panels/LisaDisc.js";
+import LisaWorld from "@/components/panels/LisaWorld.js";
 import LisaQuiz from "@/components/panels/LisaQuiz.js";
 // LisaPairProgramming NÃO entra aqui de propósito: ele arrasta o Monaco junto, e o Pair
 // Programming agora vive na janela /pair. Importar aqui engordaria o pacote do Assistente à toa.
@@ -550,7 +551,7 @@ export default function AssistantPage() {
     velha: "JOGO DA VELHA", pong: "PONG", penalti: "COBRANÇA DE PÊNALTI", lig4: "LIG 4",
     naval: "BATALHA NAVAL", memoria: "JOGO DA MEMÓRIA", airhockey: "AIR HOCKEY",
     reflexo: "DUELO DE REFLEXO", ppt: "PEDRA-PAPEL-TESOURA", quiz: "QUIZ DE PROGRAMAÇÃO",
-    pair: "PAIR PROGRAMMING", disco: "LANÇAR DISCO PRA NALA",
+    pair: "PAIR PROGRAMMING", disco: "LANÇAR DISCO PRA NALA", mundo: "MUNDO DA LISA",
   };
   const [interactiveMode, setInteractiveMode] = useState(false);
   const [interactiveBubble, setInteractiveBubble] = useState(null); // { text, category } | null
@@ -2850,6 +2851,16 @@ export default function AssistantPage() {
               boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
             }}
           >
+            <div style={{ ...mono, fontSize: 8.5, letterSpacing: 2, color: "rgba(207,239,251,0.45)" }}>🏡 MUNDO</div>
+            <button
+              onClick={() => { setInteractiveGame("mundo"); setInteractiveMenuOpen(false); setInteractiveBubble(null); }}
+              title="o quintal dela, que cresce com o que você joga e estuda nos outros modos"
+              style={{ ...mono, fontSize: 10, letterSpacing: 1, padding: "7px 10px", borderRadius: 6, textAlign: "left", border: `1px solid ${interactiveGame === "mundo" ? CY : "rgba(var(--accent-rgb),0.18)"}`, background: interactiveGame === "mundo" ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: "#eafcff", cursor: "pointer" }}
+            >
+              Mundo da Lisa
+            </button>
+
+            <div style={{ height: 1, background: "rgba(var(--accent-rgb),0.15)", margin: "2px 0" }} />
             <div style={{ ...mono, fontSize: 8.5, letterSpacing: 2, color: "rgba(207,239,251,0.45)" }}>🎮 JOGOS</div>
             {[
               { key: "velha", label: "Jogo da Velha" },
@@ -3000,7 +3011,7 @@ export default function AssistantPage() {
         speaking={interactiveSpeaking}
         headphones={radioMode}
         size={
-          interactiveGame === "quiz" || interactiveGame === "pair"
+          interactiveGame === "quiz" || interactiveGame === "pair" || interactiveGame === "mundo"
             ? (isMobile ? 90 : 120) // atividades ocupam mais tela: a carinha encolhe mais
             : interactiveGame
             ? (isMobile ? 130 : 170)
@@ -3022,7 +3033,7 @@ export default function AssistantPage() {
           uma faixa larguíssima e a leitura do quiz ficava ruim */}
       {/* o disco é jogo de campo largo (e a tela da Nala costuma ficar de lado, sendo vista de
           longe): 620px espremeriam demais as 64 colunas do campo */}
-      <div style={{ width: "100%", maxWidth: isMobile ? "100%" : interactiveGame === "disco" ? 900 : 620, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+      <div style={{ width: "100%", maxWidth: isMobile ? "100%" : interactiveGame === "disco" ? 900 : interactiveGame === "mundo" ? 960 : 620, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
 
       {interactiveGame === "velha" && (
         <LisaTicTacToe onMood={gameMood} />
@@ -3041,6 +3052,7 @@ export default function AssistantPage() {
       {/* o de câmera lê do MESMO <video> escondido que o gesto de acordar usa */}
       {interactiveGame === "ppt" && <LisaRockPaper videoRef={observanceVideoRef} onMood={gameMood} />}
       {interactiveGame === "disco" && <LisaDisc onMood={gameMood} />}
+      {interactiveGame === "mundo" && <LisaWorld onMood={gameMood} />}
       {interactiveGame === "quiz" && <LisaQuiz onMood={gameMood} />}
       {/* o Pair Programming mora na janela separada; aqui fica só o atalho pra reabrir */}
       {interactiveGame === "pair" && (
