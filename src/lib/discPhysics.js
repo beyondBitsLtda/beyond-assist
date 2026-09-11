@@ -7,12 +7,17 @@
 // lance fraco cai curto, lance forte passa por cima e o do meio é pegável.
 //
 // Tudo em CÉLULAS do painel de LED e SEGUNDOS.
+//
+// O painel passou de 64x30 pra 96x45 células quando a Nala foi redesenhada: em 15x10 não cabia
+// focinho, orelha caída e olho, e ela virava um borrão. Como TODAS as distâncias cresceram pelo
+// mesmo fator 1.5 e o tempo ficou igual, as trajetórias são geometricamente idênticas às de
+// antes — o jogo não mudou de dificuldade, só de resolução. Confirmado pelo npm run disc-balance.
 
-export const FW = 64;      // largura do campo, em células
-export const FH = 30;      // altura
-export const GROUND = 26;  // linha onde as patas dela encostam
+export const FW = 96;      // largura do campo, em células
+export const FH = 45;      // altura
+export const GROUND = 39;  // linha onde as patas dela encostam
 
-const GRAV = 22;   // células/s²
+const GRAV = 33;   // células/s²
 // Estes quatro números são o BALANCEAMENTO do jogo, e foram calibrados com o teste em
 // scripts/ (mapa de força × ângulo). Os valores anteriores (16/40, arrasto 0.25) deixavam o
 // jogo sem graça: abaixo de força 45 o disco nunca chegava nela e acima disso ela pegava
@@ -20,26 +25,26 @@ const GRAV = 22;   // células/s²
 // cima. Com esta faixa, força fraca cai curto, força no talo passa direto, e o ângulo volta a
 // importar (o alcance depende de sen(2θ)).
 const DRAG = 0.12; // s⁻¹ — o planeio do disco; sem isso ele despenca que nem pedra
-const V_MIN = 12;  // velocidade de saída com força 0
-const V_MAX = 46;  // ...e com força 100
+const V_MIN = 18;  // velocidade de saída com força 0
+const V_MAX = 69;  // ...e com força 100
 
-export const NALA_W = 15;
-export const NALA_H = 10;
-export const MOUTH_DX = 14; // onde fica a boca dentro do desenho dela
-export const MOUTH_DY = 2;
+export const NALA_W = 22;
+export const NALA_H = 15;
+export const MOUTH_DX = 21; // onde fica a boca dentro do desenho dela
+export const MOUTH_DY = 3;
 
-export const NALA_SPEED = 18;     // células/s — de propósito NÃO dá pra chegar em tudo
+export const NALA_SPEED = 27;     // células/s — de propósito NÃO dá pra chegar em tudo
 export const NALA_REACT_MS = 350; // ela demora pra sacar o lance, como qualquer cachorro
-const JUMP_V = 26;
-const NALA_GRAV = 60;
-export const CATCH_DIST = 3; // distância boca↔disco que conta como pegada
-export const REACH = 11;     // altura máxima que ela alcança pulando
+const JUMP_V = 39;
+const NALA_GRAV = 90;
+export const CATCH_DIST = 4.5; // distância boca↔disco que conta como pegada
+export const REACH = 16.5;   // altura máxima que ela alcança pulando
 
 /** Estado inicial do disco pra um lance. */
 export function launchOf(angle, power) {
   const v = V_MIN + (V_MAX - V_MIN) * (Math.max(0, Math.min(100, power)) / 100);
   const r = (angle * Math.PI) / 180;
-  return { x: 0, y: GROUND - 3, vx: v * Math.cos(r), vy: -v * Math.sin(r), spin: 0 };
+  return { x: 0, y: GROUND - 4.5, vx: v * Math.cos(r), vy: -v * Math.sin(r), spin: 0 };
 }
 
 export function stepDisc(d, dt) {
@@ -50,7 +55,7 @@ export function stepDisc(d, dt) {
   d.spin += dt * 18;
 }
 
-export function newNala(x = 30) {
+export function newNala(x = 45) {
   return { x, vx: 0, jh: 0, jv: 0, target: x, phase: "idle", until: 0, wander: 0, bias: 0 };
 }
 
@@ -63,7 +68,7 @@ export function newNala(x = 30) {
  * leitura do ponto de queda e um tempo de reação diferente.
  */
 export function primeNala(n) {
-  n.bias = (Math.random() * 2 - 1) * 3.5; // células de erro ao ler onde o disco vai cair
+  n.bias = (Math.random() * 2 - 1) * 5.25; // células de erro ao ler onde o disco vai cair
   return NALA_REACT_MS * (0.7 + Math.random() * 1.1);
 }
 
@@ -106,9 +111,9 @@ export function moveNala(n, dt, speedScale = 1) {
 export function tryJump(n, d) {
   if (n.jh > 0 || n.jv !== 0) return false;
   const m = mouthOf(n);
-  if (Math.abs(d.x - m.x) >= 5) return false;
+  if (Math.abs(d.x - m.x) >= 7.5) return false;
   const height = GROUND - d.y;
-  if (height <= 3 || height > REACH) return false;
+  if (height <= 4.5 || height > REACH) return false;
   n.jv = -JUMP_V;
   return true;
 }
@@ -132,7 +137,7 @@ export function caughtBy(n, d) {
 
 /** Por que o lance acabou sem pegada — null enquanto o disco ainda está no ar. */
 export function discOutcome(d) {
-  if (d.x > FW + 3) return "longo";
+  if (d.x > FW + 4.5) return "longo";
   if (d.y >= GROUND) return d.x < MOUTH_DX ? "curto" : "fora de alcance";
   return null;
 }
@@ -149,7 +154,7 @@ export function stepRally(disc, nala, dt, chasing) {
   tryJump(nala, disc);
   stepJump(nala, dt);
   if (caughtBy(nala, disc)) {
-    const air = nala.jh > 1;
+    const air = nala.jh > 1.5; // escala com o resto do painel: 1 célula virou 1.5
     return { caught: true, air, why: air ? "no ar" : "no chão" };
   }
   const out = discOutcome(disc);

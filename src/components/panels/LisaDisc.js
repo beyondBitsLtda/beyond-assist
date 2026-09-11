@@ -30,95 +30,142 @@ const HELLO_MS = 6000;
 const PEER_TTL_MS = 16000;
 
 // ---- desenhos, em "#" e "." — mesma linguagem da carinha: um pixel aceso por célula ----
+// ---- desenhos, em "#" e "." — mesma linguagem da carinha: um pixel aceso por célula.
+// Cada pose tem 22x15 células. A primeira versão tinha 15x10 e a Nala saía um borrão: nesse
+// tamanho não cabem focinho, orelha caída, olho e vão entre as patas ao mesmo tempo, que é
+// justamente o que faz a silhueta ser lida como cachorro. Como aqui tudo acende na MESMA cor,
+// a leitura vem só do contorno e dos buracos apagados — daí a coluna apagada separando a
+// orelha da bochecha, e o olho vazado.
 const NALA = {
+  // parada: orelha caída, focinho pra frente, rabo levantado
   idle: [
-    ".............#.",
-    "...........####",
-    "..........#####",
-    "#.........##.##",
-    "##.....########",
-    ".##############",
-    ".#############.",
-    "..##......##...",
-    "..##......##...",
-    "..##......##...",
+    "......................",
+    "..............#####...",
+    "............########..",
+    "...........######.###.",
+    "..###.....###.###.####",
+    "..##.....####.########",
+    "..##.....####.#######.",
+    "...##.....###.#####...",
+    "...################...",
+    "...################...",
+    "...###############....",
+    "....#############.....",
+    "....###......###......",
+    "....###......###......",
+    "...#####....#####.....",
   ],
+  // rabo mais alto — alterna com a idle e vira abanada
   wag: [
-    "..#..........#.",
-    "..#........####",
-    ".##.......#####",
-    ".#........##.##",
-    "##.....########",
-    ".##############",
-    ".#############.",
-    "..##......##...",
-    "..##......##...",
-    "..##......##...",
+    "......................",
+    "..............#####...",
+    "..###.......########..",
+    "..##.......######.###.",
+    "..##......###.###.####",
+    "...##....####.########",
+    "...##....####.#######.",
+    "....#.....###.#####...",
+    "...################...",
+    "...################...",
+    "...###############....",
+    "....#############.....",
+    "....###......###......",
+    "....###......###......",
+    "...#####....#####.....",
   ],
+  // passada aberta
   runA: [
-    ".............#.",
-    "...........####",
-    "..........#####",
-    "#.........##.##",
-    "##.....########",
-    ".##############",
-    ".#############.",
-    ".##.......##...",
-    "#.#......#.#...",
-    "#..........#...",
+    "......................",
+    "..............#####...",
+    "............########..",
+    "...........######.###.",
+    "..###.....###.###.####",
+    "..##.....####.########",
+    "..##.....####.#######.",
+    "...##.....###.#####...",
+    "...################...",
+    "...################...",
+    "...###############....",
+    "....#############.....",
+    "...###.......###......",
+    "..###.........###.....",
+    ".####..........####...",
   ],
+  // patas recolhidas
   runB: [
-    ".............#.",
-    "...........####",
-    "..........#####",
-    "#.........##.##",
-    "##.....########",
-    ".##############",
-    ".#############.",
-    "..##.....##....",
-    "..##.....##....",
-    ".##.......##...",
+    "......................",
+    "..............#####...",
+    "..###.......########..",
+    "..##.......######.###.",
+    "..##......###.###.####",
+    "...##....####.########",
+    "...##....####.#######.",
+    "....#.....###.#####...",
+    "...################...",
+    "...################...",
+    "...###############....",
+    "....#############.....",
+    ".....###...###........",
+    ".....###...###........",
+    "....#####.#####.......",
   ],
+  // no ar: corpo esticado, patas dobradas, linhas de baixo vazias pra ela descolar do chão
   jump: [
-    "..............#",
-    "............###",
-    "...........####",
-    "#.........##.##",
-    "##......#######",
-    ".#############.",
-    ".############..",
-    "..###....###...",
-    "...#......#....",
-    "...............",
+    "..............#####...",
+    "............########..",
+    "...........######.###.",
+    "..........###.###.####",
+    "..###....####.########",
+    "...##....####.#######.",
+    "....#.....###.#####...",
+    "...################...",
+    "...################...",
+    "..###############.....",
+    "..#############.......",
+    "...####....####.......",
+    "...###......##........",
+    "......................",
+    "......................",
   ],
+  // sentada comemorando, com o disco na boca
   happy: [
-    "..#..........#.",
-    "..#........####",
-    ".##.......#####",
-    ".#........##.##",
-    ".#......#######",
-    ".##.....#######",
-    ".###....#######",
-    "..####....##...",
-    "..#####...##...",
-    "..#####...##...",
+    "......................",
+    "..............#####...",
+    "..###.......########..",
+    "..##.......######.###.",
+    "..##......###.###.####",
+    "...##....####.########",
+    "...##....####.#######.",
+    "....#.....###.#####...",
+    "...################...",
+    "..#################...",
+    "..#################...",
+    "..################....",
+    "..##########..###.....",
+    "..##########..###.....",
+    ".############.#####...",
   ],
   // cabeça baixa e rabo entre as pernas — precisa dar pra ver de longe que ela errou
   sad: [
-    "...............",
-    "...............",
-    "...........####",
-    "..........#####",
-    "..........##.##",
-    "#.......#######",
-    "###############",
-    ".##############",
-    "..##......##...",
-    "..##......##...",
+    "......................",
+    "......................",
+    "..............#####...",
+    "............########..",
+    "...........######.###.",
+    "..........###.###.####",
+    "..........###.########",
+    "..........###.#######.",
+    "..........###.#####...",
+    ".##################...",
+    ".#################....",
+    ".##.#############.....",
+    ".##.###......###......",
+    "..#.###......###......",
+    "...#####....#####.....",
   ],
 };
 
-const DISC = [".###.", "#####"];
+const DISC = [".#####.", "#######", ".#####."];
 
 /** Canvas com laço de animação, dpr e cor de destaque em cache — mesmo padrão do LisaPixelFace
  * (ler getComputedStyle a cada quadro força layout à toa). */
@@ -199,7 +246,7 @@ function useFieldCanvas(draw) {
 /** Chão: uma linha cheia e uns tufos esparsos — profundidade sem roubar atenção. */
 function drawGround(paint, now) {
   for (let x = 0; x < FW; x++) paint(x, GROUND + 1, 0.3);
-  for (let x = 1; x < FW; x += 5) paint(x, GROUND, 0.16 + 0.06 * Math.sin(now / 700 + x));
+  for (let x = 1; x < FW; x += 7) paint(x, GROUND, 0.16 + 0.06 * Math.sin(now / 700 + x));
 }
 
 // ============================================================================
@@ -254,7 +301,7 @@ function NalaField({ throwReq, onResult, onMood }) {
       // sem disco ela passeia — ficar parada feito estátua matava a graça da tela
       if (now > n.wander) {
         n.wander = now + 2600 + Math.random() * 3200;
-        n.target = clampX(18 + Math.random() * 24);
+        n.target = clampX(27 + Math.random() * 36);
       }
       moveNala(n, dt, 0.35);
       stepJump(n, dt);
@@ -265,7 +312,7 @@ function NalaField({ throwReq, onResult, onMood }) {
     // ---- qual desenho mostrar ----
     if ((n.phase === "happy" || n.phase === "sad") && now > n.until) n.phase = "idle";
     let rows;
-    if (n.jh > 0.4) rows = NALA.jump;
+    if (n.jh > 0.6) rows = NALA.jump;
     else if (n.phase === "happy") rows = NALA.happy;
     else if (n.phase === "sad") rows = NALA.sad;
     else if (Math.abs(n.vx) > 0.5) rows = Math.floor(now / 110) % 2 ? NALA.runA : NALA.runB;
@@ -273,9 +320,9 @@ function NalaField({ throwReq, onResult, onMood }) {
 
     sprite(rows, n.x, GROUND - (NALA_H - 1) - n.jh);
 
-    if (n.phase === "happy") sprite(DISC, mouth.x - 1, mouth.y - 1, 0.9);
+    if (n.phase === "happy") sprite(DISC, mouth.x - 3, mouth.y - 1, 0.9);
     // discRef (e não `disc`): se ele acabou de ser pego/perdido neste quadro, não desenha mais
-    if (discRef.current) sprite(DISC, disc.x - 2, disc.y, Math.floor(disc.spin) % 2 ? 1 : 0.75);
+    if (discRef.current) sprite(DISC, disc.x - 3, disc.y, Math.floor(disc.spin) % 2 ? 1 : 0.75);
   });
 
   const good = banner === "PEGOU!" || banner === "PEGOU NO AR!";
@@ -306,7 +353,7 @@ function ThrowerField({ onThrow, status }) {
     drawGround(paint, now);
 
     // marca mais ou menos até onde a Nala alcança — referência sem entregar o lance
-    for (let y = GROUND - 2; y <= GROUND; y++) paint(FW - 6, y, 0.18);
+    for (let y = GROUND - 3; y <= GROUND; y++) paint(FW - 9, y, 0.18);
 
     const a = aimRef.current;
     if (a) {
@@ -323,9 +370,9 @@ function ThrowerField({ onThrow, status }) {
     if (f) {
       stepDisc(f, dt);
       if (f.y >= GROUND || f.x > FW + 3) flyingRef.current = null;
-      else sprite(DISC, f.x - 2, f.y, 1);
+      else sprite(DISC, f.x - 3, f.y, 1);
     } else if (!a) {
-      sprite(DISC, 2, GROUND - 3, 0.9); // disco parado, esperando o gesto
+      sprite(DISC, 3, GROUND - 4, 0.9); // disco parado, esperando o gesto
     }
   });
 
