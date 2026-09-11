@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CY, GR, OR, mono } from "@/lib/theme.js";
 import { recordGame } from "@/lib/gameHistory.js";
 import { sendDiscSignal, pollDiscSignals } from "@/lib/discSignals.js";
+import { NALA, DISC, Z_GLYPH, POOP_PILE, PUDDLE, ANTICS } from "./nalaSprites.js";
 import {
   FW, FH, GROUND, NALA_H,
   clampX, gestureOf, launchOf, mouthOf, moveNala, newNala, primeNala, stepDisc, stepJump, stepRally,
@@ -29,143 +30,6 @@ const POLL_MS = 700;
 const HELLO_MS = 6000;
 const PEER_TTL_MS = 16000;
 
-// ---- desenhos, em "#" e "." — mesma linguagem da carinha: um pixel aceso por célula ----
-// ---- desenhos, em "#" e "." — mesma linguagem da carinha: um pixel aceso por célula.
-// Cada pose tem 22x15 células. A primeira versão tinha 15x10 e a Nala saía um borrão: nesse
-// tamanho não cabem focinho, orelha caída, olho e vão entre as patas ao mesmo tempo, que é
-// justamente o que faz a silhueta ser lida como cachorro. Como aqui tudo acende na MESMA cor,
-// a leitura vem só do contorno e dos buracos apagados — daí a coluna apagada separando a
-// orelha da bochecha, e o olho vazado.
-const NALA = {
-  // parada: orelha caída, focinho pra frente, rabo levantado
-  idle: [
-    "......................",
-    "..............#####...",
-    "............########..",
-    "...........######.###.",
-    "..###.....###.###.####",
-    "..##.....####.########",
-    "..##.....####.#######.",
-    "...##.....###.#####...",
-    "...################...",
-    "...################...",
-    "...###############....",
-    "....#############.....",
-    "....###......###......",
-    "....###......###......",
-    "...#####....#####.....",
-  ],
-  // rabo mais alto — alterna com a idle e vira abanada
-  wag: [
-    "......................",
-    "..............#####...",
-    "..###.......########..",
-    "..##.......######.###.",
-    "..##......###.###.####",
-    "...##....####.########",
-    "...##....####.#######.",
-    "....#.....###.#####...",
-    "...################...",
-    "...################...",
-    "...###############....",
-    "....#############.....",
-    "....###......###......",
-    "....###......###......",
-    "...#####....#####.....",
-  ],
-  // passada aberta
-  runA: [
-    "......................",
-    "..............#####...",
-    "............########..",
-    "...........######.###.",
-    "..###.....###.###.####",
-    "..##.....####.########",
-    "..##.....####.#######.",
-    "...##.....###.#####...",
-    "...################...",
-    "...################...",
-    "...###############....",
-    "....#############.....",
-    "...###.......###......",
-    "..###.........###.....",
-    ".####..........####...",
-  ],
-  // patas recolhidas
-  runB: [
-    "......................",
-    "..............#####...",
-    "..###.......########..",
-    "..##.......######.###.",
-    "..##......###.###.####",
-    "...##....####.########",
-    "...##....####.#######.",
-    "....#.....###.#####...",
-    "...################...",
-    "...################...",
-    "...###############....",
-    "....#############.....",
-    ".....###...###........",
-    ".....###...###........",
-    "....#####.#####.......",
-  ],
-  // no ar: corpo esticado, patas dobradas, linhas de baixo vazias pra ela descolar do chão
-  jump: [
-    "..............#####...",
-    "............########..",
-    "...........######.###.",
-    "..........###.###.####",
-    "..###....####.########",
-    "...##....####.#######.",
-    "....#.....###.#####...",
-    "...################...",
-    "...################...",
-    "..###############.....",
-    "..#############.......",
-    "...####....####.......",
-    "...###......##........",
-    "......................",
-    "......................",
-  ],
-  // sentada comemorando, com o disco na boca
-  happy: [
-    "......................",
-    "..............#####...",
-    "..###.......########..",
-    "..##.......######.###.",
-    "..##......###.###.####",
-    "...##....####.########",
-    "...##....####.#######.",
-    "....#.....###.#####...",
-    "...################...",
-    "..#################...",
-    "..#################...",
-    "..################....",
-    "..##########..###.....",
-    "..##########..###.....",
-    ".############.#####...",
-  ],
-  // cabeça baixa e rabo entre as pernas — precisa dar pra ver de longe que ela errou
-  sad: [
-    "......................",
-    "......................",
-    "..............#####...",
-    "............########..",
-    "...........######.###.",
-    "..........###.###.####",
-    "..........###.########",
-    "..........###.#######.",
-    "..........###.#####...",
-    ".##################...",
-    ".#################....",
-    ".##.#############.....",
-    ".##.###......###......",
-    "..#.###......###......",
-    "...#####....#####.....",
-  ],
-};
-
-const DISC = [".#####.", "#######", ".#####."];
 
 /** Canvas com laço de animação, dpr e cor de destaque em cache — mesmo padrão do LisaPixelFace
  * (ler getComputedStyle a cada quadro força layout à toa). */
@@ -249,14 +113,46 @@ function drawGround(paint, now) {
   for (let x = 1; x < FW; x += 7) paint(x, GROUND, 0.16 + 0.06 * Math.sin(now / 700 + x));
 }
 
+/**
+ * O que o desenho sozinho não entrega: o Z do sono, o jato do xixi e o "au au".
+ *
+ * As posições saem do desenho de cada pose: a cabeça dela dormindo fica à direita do monte, o
+ * focinho latindo fica na ponta de cima, e o xixi sai de baixo da barriga caindo pra trás.
+ */
+function drawAnticFx(antic, n, now, paint, sprite) {
+  const t = now - antic.startedAt;
+  if (antic.fx === "z") {
+    for (let i = 0; i < 3; i++) {
+      const p = ((t / 1600) + i / 3) % 1;
+      // nascem ACIMA da cabeça dela: saindo de GROUND-6 o Z ainda cobria o lombo
+      // sobem 18 linhas: com menos que isso os três Z (de 5 de altura) se empilhavam num borrão
+      sprite(Z_GLYPH, n.x + 15 + p * 4, GROUND - 9 - p * 18, Math.sin(p * Math.PI) * 0.85);
+    }
+  } else if (antic.fx === "pee" && t > 600) {
+    for (let i = 0; i < 5; i++) {
+      const p = ((t / 380) + i / 5) % 1;
+      paint(Math.round(n.x + 5 - p * 4), Math.round(GROUND - 3 + p * 3), 0.9 - p * 0.35);
+    }
+  } else if (antic.fx === "bark" && Math.floor(t / 200) % 2 === 0) {
+    paint(n.x + 23, GROUND - 12, 0.9);
+    paint(n.x + 24, GROUND - 11, 0.65);
+    paint(n.x + 23, GROUND - 10, 0.9);
+  }
+}
+
 // ============================================================================
 //  TELA DA NALA — recebe o lance e resolve se pegou
 // ============================================================================
+const ANTIC_GAP_MIN_MS = 3500;
+const ANTIC_GAP_VAR_MS = 5000;
+const LITTER_LIFE_MS = 26000; // quanto tempo o montinho e a poça ficam no chão
+const LITTER_MAX = 3;
+
 function NalaField({ throwReq, onResult, onMood }) {
   const [banner, setBanner] = useState(null);
 
   const discRef = useRef(null);
-  const nalaRef = useRef(newNala(30));
+  const nalaRef = useRef(newNala(45));
   const reactAtRef = useRef(0);
   const resolvedRef = useRef(true);
   const onResultRef = useRef(onResult);
@@ -264,11 +160,21 @@ function NalaField({ throwReq, onResult, onMood }) {
   const onMoodRef = useRef(onMood);
   onMoodRef.current = onMood;
 
+  // ---- as gracinhas que ela faz sozinha entre um lance e outro ----
+  const anticRef = useRef(null);     // { ...ANTIC, until, startedAt, dropped }
+  const nextAnticRef = useRef(0);
+  const bagRef = useRef([]);         // saco embaralhado: passa por todas antes de repetir
+  const litterRef = useRef([]);      // o que ela deixou no chão: { rows, x, born }
+
   // um lance novo chegou da outra tela
   useEffect(() => {
     if (!throwReq) return;
     discRef.current = { ...launchOf(throwReq.angle, throwReq.power), id: throwReq.id };
     resolvedRef.current = false;
+    // larga o que estava fazendo na hora: cachorro nenhum termina de coçar a orelha com um
+    // disco vindo na direção dele
+    anticRef.current = null;
+    nextAnticRef.current = performance.now() + ANTIC_GAP_MIN_MS;
     // primeNala sorteia o errinho de leitura e o tempo de reação DESTE lance — é o que impede
     // ela de virar uma parede que pega 100% assim que você acha o gesto certo
     reactAtRef.current = performance.now() + primeNala(nalaRef.current);
@@ -281,6 +187,13 @@ function NalaField({ throwReq, onResult, onMood }) {
     const n = nalaRef.current;
     const disc = discRef.current;
 
+    // o que ela deixou pra trás some devagar
+    litterRef.current = litterRef.current.filter((l) => now - l.born < LITTER_LIFE_MS);
+    for (const l of litterRef.current) {
+      const age = (now - l.born) / LITTER_LIFE_MS;
+      sprite(l.rows, l.x, GROUND - l.rows.length + 1, 0.55 * (1 - age) + 0.12);
+    }
+
     if (disc && !resolvedRef.current) {
       const res = stepRally(disc, n, dt, now >= reactAtRef.current);
       if (res) {
@@ -288,6 +201,7 @@ function NalaField({ throwReq, onResult, onMood }) {
         discRef.current = null;
         n.phase = res.caught ? "happy" : "sad";
         n.until = now + (res.caught ? 2200 : 1800);
+        nextAnticRef.current = n.until + ANTIC_GAP_MIN_MS;
         setBanner(
           res.caught ? (res.air ? "PEGOU NO AR!" : "PEGOU!")
           : res.why === "curto" ? "CURTO DEMAIS"
@@ -298,16 +212,46 @@ function NalaField({ throwReq, onResult, onMood }) {
         onResultRef.current?.({ id: disc.id, caught: res.caught, air: res.air, why: res.why });
       }
     } else if (!disc) {
-      // sem disco ela passeia — ficar parada feito estátua matava a graça da tela
-      if (now > n.wander) {
-        n.wander = now + 2600 + Math.random() * 3200;
-        n.target = clampX(27 + Math.random() * 36);
+      const a = anticRef.current;
+      if (a) {
+        // cagar e mijar deixam marca: solta no meio da gracinha, não no fim
+        if (!a.dropped && now - a.startedAt > a.ms * 0.55 && (a.fx === "poop" || a.fx === "pee")) {
+          a.dropped = true;
+          litterRef.current = [
+            ...litterRef.current.slice(-(LITTER_MAX - 1)),
+            // sob o traseiro dela, que no desenho fica à esquerda
+            { rows: a.fx === "poop" ? POOP_PILE : PUDDLE, x: Math.round(n.x + (a.fx === "poop" ? 2 : 0)), born: now },
+          ];
+        }
+        if (now > a.until) {
+          anticRef.current = null;
+          nextAnticRef.current = now + ANTIC_GAP_MIN_MS + Math.random() * ANTIC_GAP_VAR_MS;
+        }
+      } else if (n.phase === "idle" && now > nextAnticRef.current) {
+        if (!bagRef.current.length) {
+          const pool = [];
+          for (const it of ANTICS) for (let i = 0; i < (it.weight || 1); i++) pool.push(it);
+          for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pool[i], pool[j]] = [pool[j], pool[i]];
+          }
+          bagRef.current = pool;
+        }
+        const pick = bagRef.current.pop();
+        anticRef.current = { ...pick, until: now + pick.ms, startedAt: now, dropped: false };
+      } else {
+        // sem gracinha em curso ela passeia — ficar parada feito estátua matava a tela
+        if (now > n.wander) {
+          n.wander = now + 2600 + Math.random() * 3200;
+          n.target = clampX(27 + Math.random() * 36);
+        }
+        moveNala(n, dt, 0.35);
       }
-      moveNala(n, dt, 0.35);
       stepJump(n, dt);
     }
 
     const mouth = mouthOf(n);
+    const antic = discRef.current ? null : anticRef.current;
 
     // ---- qual desenho mostrar ----
     if ((n.phase === "happy" || n.phase === "sad") && now > n.until) n.phase = "idle";
@@ -315,10 +259,16 @@ function NalaField({ throwReq, onResult, onMood }) {
     if (n.jh > 0.6) rows = NALA.jump;
     else if (n.phase === "happy") rows = NALA.happy;
     else if (n.phase === "sad") rows = NALA.sad;
+    else if (antic) rows = NALA[antic.pose];
     else if (Math.abs(n.vx) > 0.5) rows = Math.floor(now / 110) % 2 ? NALA.runA : NALA.runB;
     else rows = Math.floor(now / 420) % 2 ? NALA.wag : NALA.idle;
 
-    sprite(rows, n.x, GROUND - (NALA_H - 1) - n.jh);
+    // o tremor de se coçar e de se sacudir sai do DESLOCAMENTO, não de arte nova: meia célula
+    // pra cada lado alterna o arredondamento e faz o corpo inteiro vibrar
+    const wob = antic?.shake ? (Math.floor(now / 70) % 2 ? 0.6 : -0.6) : 0;
+    sprite(rows, n.x + wob, GROUND - (NALA_H - 1) - n.jh);
+
+    if (antic?.fx) drawAnticFx(antic, n, now, paint, sprite);
 
     if (n.phase === "happy") sprite(DISC, mouth.x - 3, mouth.y - 1, 0.9);
     // discRef (e não `disc`): se ele acabou de ser pego/perdido neste quadro, não desenha mais
