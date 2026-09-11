@@ -43,10 +43,34 @@ export async function POST(req) {
     if (!repo) return jsonResponse({ ok: false, error: "repo é obrigatório" }, 400);
     if (!LEVELS.includes(level)) return jsonResponse({ ok: false, error: `nível inválido: ${level}` }, 400);
 
-    // descobre a branch base e lista arquivos pra ela propor algo que EXISTE nesse repo
-    const branches = await listBranches(repo).catch(() => []);
-    const base = branches.find((b) => ["main", "master"].includes(b.name))?.name || branches[0]?.name;
-    if (!base) return jsonResponse({ ok: false, error: `não consegui listar branches de ${repo}` }, 500);
+    // Descobre a branch base. ATENÇÃO: listBranches devolve STRINGS (ver src/lib/github.js e o
+    // seletor em /code-tasks), não objetos — eu tratava como `b.name` e por isso `base` saía
+    // sempre undefined MESMO com a listagem funcionando, e o erro acusava a listagem à toa.
+    let branches = [];
+    let listError = null;
+    try {
+      branches = await listBranches(repo);
+    } catch (err) {
+      listError = String(err?.message || err); // NÃO engole: é o que diz se foi permissão, 404, etc.
+    }
+
+    // se a listagem falhar, ainda dá pra tentar pela default_branch que já guardamos no banco
+    let base = branches.find((b) => ["main", "master"].includes(b)) || branches[0];
+    if (!base) {
+      const known = (await listGithubRepos().catch(() => [])).find((r) => r.full_name === repo);
+      base = known?.default_branch || null;
+    }
+    if (!base) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: listError
+            ? `não consegui ler as branches de ${repo}: ${listError}`
+            : `${repo} não tem nenhuma branch — repositório vazio? (faça o primeiro commit antes)`,
+        },
+        500
+      );
+    }
 
     const tree = await getRepoTree(repo, base).catch(() => []);
     const fileList = tree.filter((t) => t.type === "blob").map((t) => t.path);

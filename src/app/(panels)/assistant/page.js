@@ -543,6 +543,13 @@ export default function AssistantPage() {
   // cara que ela faz ao trazer cada assunto — determinístico de propósito (pedir a expressão pro
   // modelo junto do texto exigiria parsear a resposta dele, que é frágil por nada).
   const INTERACTIVE_FACE_BY_CATEGORY = { trello: "bored", delp: "thinking", sentinel: "surprised", thoughts: "curious", news: "happy" };
+  // nome que aparece ao lado da carinha no desktop quando uma atividade está aberta
+  const INTERACTIVE_LABELS = {
+    velha: "JOGO DA VELHA", pong: "PONG", penalti: "COBRANÇA DE PÊNALTI", lig4: "LIG 4",
+    naval: "BATALHA NAVAL", memoria: "JOGO DA MEMÓRIA", airhockey: "AIR HOCKEY",
+    reflexo: "DUELO DE REFLEXO", ppt: "PEDRA-PAPEL-TESOURA", quiz: "QUIZ DE PROGRAMAÇÃO",
+    pair: "PAIR PROGRAMMING",
+  };
   const [interactiveMode, setInteractiveMode] = useState(false);
   const [interactiveBubble, setInteractiveBubble] = useState(null); // { text, category } | null
   const [interactiveFace, setInteractiveFace] = useState(null); // expressão forçada, ou null = ela faz o que quiser
@@ -2782,27 +2789,16 @@ export default function AssistantPage() {
   // porque quando ela está ligada o elemento dela já existe — dois elementos com o MESMO ref
   // brigariam, e o último a montar ganharia.
   const interactiveScreen = (
-    <div
-      style={{
-        position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column",
-        alignItems: "center", background: "#000",
-        // Sem jogo: carinha centralizada e nada rola (é o "bichinho de mesa").
-        // Com jogo/atividade: alinha no TOPO e deixa ROLAR — no celular a explicação do quiz
-        // ficava abaixo da dobra e era impossível chegar nela com overflow:hidden.
-        justifyContent: interactiveGame ? "flex-start" : "center",
-        overflowY: interactiveGame ? "auto" : "hidden",
-        overflowX: "hidden",
-        gap: interactiveGame ? 12 : 18,
-        padding: interactiveGame ? "16px 12px 60px" : 24,
-        WebkitOverflowScrolling: "touch",
-      }}
-    >
+    // Duas camadas de propósito: a EXTERNA não rola e segura o menu (antes o menu ficava dentro
+    // da área rolável e ia parar em lugar esquisito), a INTERNA é a que rola quando há jogo ou
+    // atividade aberta.
+    <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "#000" }}>
       {!observanceMode && (
         <video ref={observanceVideoRef} autoPlay playsInline muted style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
       )}
 
       {/* menuzinho suspenso: jogos, modo rádio e placar */}
-      <div style={{ position: "sticky", top: 0, alignSelf: "flex-end", zIndex: 6, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, marginRight: 2 }}>
+      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 6, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
         <button
           onClick={() => {
             const opening = !interactiveMenuOpen;
@@ -2955,6 +2951,23 @@ export default function AssistantPage() {
         )}
       </div>
 
+      {/* camada que ROLA: só ela tem overflow, pra o menu acima nunca sair de lugar */}
+      <div
+        style={{
+          flex: 1, minHeight: 0, width: "100%", display: "flex", flexDirection: "column",
+          alignItems: "center",
+          justifyContent: interactiveGame ? "flex-start" : "center",
+          overflowY: interactiveGame ? "auto" : "hidden",
+          overflowX: "hidden",
+          gap: interactiveGame ? 14 : 18,
+          padding: interactiveGame ? (isMobile ? "16px 12px 60px" : "22px 24px 48px") : 24,
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+      {/* No DESKTOP com atividade aberta, a carinha e o nome viram um cabeçalho HORIZONTAL —
+          empilhado sobrava espaço vazio em cima e empurrava o conteúdo pra fora da tela.
+          No celular continua empilhado, que é o que cabe lá. */}
+      <div style={{ display: "flex", flexDirection: !isMobile && interactiveGame ? "row" : "column", alignItems: "center", gap: !isMobile && interactiveGame ? 14 : 8, flex: "none" }}>
       {/* expression = assunto/jogo/música (ganha de tudo); reaction = o que ela vê pela câmera
           (perde pro toque na tela, que é mais imediato) — ver LisaPixelFace.js.
           De fone, a reação passa a vir da música em vez do ambiente. */}
@@ -2973,6 +2986,18 @@ export default function AssistantPage() {
             : 340
         }
       />
+
+        {/* nome da atividade ao lado da carinha — só no desktop, onde há espaço horizontal */}
+        {!isMobile && interactiveGame && (
+          <div style={{ ...mono, fontSize: 12, letterSpacing: 3, color: CY }}>
+            {INTERACTIVE_LABELS[interactiveGame] || ""}
+          </div>
+        )}
+      </div>
+
+      {/* conteúdo com largura máxima: sem isto, no desktop os jogos ficavam perdidos no meio de
+          uma faixa larguíssima e a leitura do quiz ficava ruim */}
+      <div style={{ width: "100%", maxWidth: isMobile ? "100%" : 620, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
 
       {interactiveGame === "velha" && (
         <LisaTicTacToe onMood={gameMood} />
@@ -3018,6 +3043,8 @@ export default function AssistantPage() {
           <div style={{ color: "rgba(207,239,251,0.25)" }}>tudo local — nenhuma imagem sai daqui</div>
         </div>
       )}
+      </div>
+      </div>
     </div>
   );
 
