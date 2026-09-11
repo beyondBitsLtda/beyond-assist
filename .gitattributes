@@ -1,0 +1,3 @@
+
+# cópia vendorizada do Monaco: mantém byte a byte igual ao pacote (ver public/monaco/VENDOR.md)
+public/monaco/** -text

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CY, GR, OR, mono } from "@/lib/theme.js";
+import LisaPairIDE from "./LisaPairIDE.js";
 
 // Pair programming: ela pega um repositório SEU de verdade, olha os arquivos, decide uma feature
 // pro nível pedido, cria a branch e propõe o plano. A sessão vale pontos quando concluída
@@ -86,7 +87,7 @@ export default function LisaPairProgramming({ onMood }) {
   });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, width: "min(94vw, 460px)" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, width: session ? "min(96vw, 780px)" : "min(94vw, 460px)" }}>
       {!session && (
         <>
           <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(207,239,251,0.45)" }}>REPOSITÓRIO</div>
@@ -151,6 +152,18 @@ export default function LisaPairProgramming({ onMood }) {
           <div style={{ ...mono, fontSize: 10.5, lineHeight: 1.5, color: CY, padding: "8px 10px", borderRadius: 6, background: "rgba(var(--accent-rgb),0.07)" }}>
             ▶ COMECE POR: {session.firstTask}
           </div>
+
+          {/* a IDE: é aqui que a gente programa junto de verdade */}
+          {session.branch ? (
+            <>
+              <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(207,239,251,0.45)", marginTop: 2 }}>EDITOR · {session.branch}</div>
+              <LisaPairIDE repo={session.repo} branch={session.branch} onMood={onMood} />
+            </>
+          ) : (
+            <div style={{ ...mono, fontSize: 9, color: "rgba(207,239,251,0.4)" }}>
+              sem branch, sem editor — não vou deixar a gente commitar direto na {session.base}.
+            </div>
+          )}
 
           {session.saveError && (
             <div style={{ ...mono, fontSize: 9, color: OR }} title={session.saveError}>⚠ a sessão não foi gravada na tabela (não vai pontuar)</div>

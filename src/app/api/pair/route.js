@@ -1,7 +1,7 @@
-import { proposePairFeature } from "@/lib/gemini.js";
+import { proposePairFeature, editCodeWithLisa } from "@/lib/gemini.js";
 import { createPairSession, closePairSession, LEVELS } from "@/lib/activities.js";
 import { listGithubRepos } from "@/lib/ingest/github.js";
-import { getRepoTree, getBranchSha, createBranch, listBranches } from "@/lib/github.js";
+import { getRepoTree, getBranchSha, createBranch, listBranches, getFileContentOnBranch, getFileSha, putFileContent } from "@/lib/github.js";
 import { jsonResponse } from "@/lib/http.js";
 
 export const runtime = "nodejs";
@@ -37,7 +37,42 @@ export async function POST(req) {
       return jsonResponse({ ok: true });
     }
 
-    if (body.action !== "start") return jsonResponse({ ok: false, error: "action inválida — use start ou close" }, 400);
+    // ---- ações da IDE (ver LisaPairIDE.js) ----
+    if (body.action === "tree") {
+      const tree = await getRepoTree(body.repo, body.branch);
+      // só arquivos de texto que fazem sentido abrir num editor — sem binário, sem lock gigante
+      const files = tree
+        .filter((t) => t.type === "blob" && (t.size ?? 0) < 400_000)
+        .map((t) => t.path)
+        .filter((f) => !/(^|\/)(node_modules|\.next|dist|build)\//.test(f))
+        .filter((f) => /\.(js|jsx|ts|tsx|css|scss|json|md|ya?ml|html|py|java|cs|cpp|c|h|go|rb|php|sql|sh|txt)$/i.test(f));
+      return jsonResponse({ ok: true, files: files.slice(0, 800) });
+    }
+
+    if (body.action === "file") {
+      const content = await getFileContentOnBranch(body.repo, body.path, body.branch);
+      if (content === null) return jsonResponse({ ok: false, error: `não consegui ler ${body.path} (binário ou inexistente nessa branch)` }, 404);
+      return jsonResponse({ ok: true, content });
+    }
+
+    if (body.action === "edit") {
+      if (!body.instruction?.trim()) return jsonResponse({ ok: false, error: "instruction é obrigatório" }, 400);
+      const current = body.content ?? "";
+      const out = await editCodeWithLisa({ path: body.path, content: current, instruction: body.instruction });
+      // o modelo costuma comer a quebra de linha final; sem isso TODO salvamento vira um diff
+      // falso de "sem quebra de linha no fim do arquivo" mesmo quando ela só mexeu numa linha
+      if (current.endsWith("\n") && !out.newContent.endsWith("\n")) out.newContent += "\n";
+      return jsonResponse({ ok: true, ...out });
+    }
+
+    if (body.action === "save") {
+      // sha atual do arquivo NA BRANCH: a API do GitHub exige pra ATUALIZAR (sem ele, só cria)
+      const sha = await getFileSha(body.repo, body.path, body.branch);
+      await putFileContent(body.repo, body.path, body.content, body.message || `Lisa + você: ${body.path}`, body.branch, sha);
+      return jsonResponse({ ok: true });
+    }
+
+    if (body.action !== "start") return jsonResponse({ ok: false, error: "action inválida — use start, tree, file, edit, save ou close" }, 400);
 
     const { repo, level } = body;
     if (!repo) return jsonResponse({ ok: false, error: "repo é obrigatório" }, 400);

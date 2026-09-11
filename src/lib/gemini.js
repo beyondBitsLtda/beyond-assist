@@ -1423,6 +1423,47 @@ export async function proposePairFeature({ repo, level, fileList = [], descripti
   return parsed;
 }
 
+// ---- Edição de código a quatro mãos (IDE do Pair Programming, ver LisaPairIDE.js) ----
+// Ela devolve o arquivo INTEIRO reescrito, não um diff: aplicar patch textual de LLM é uma das
+// coisas mais frágeis que existe (contexto desalinhado, linha repetida, indentação diferente) e
+// o arquivo aqui já está inteiro na mão, então não há motivo pra correr esse risco.
+const PAIR_EDIT_INSTRUCTION = `Você é a Lisa programando JUNTO com o seu usuário, editando um arquivo que os dois estão vendo na tela.
+
+REGRAS:
+- Devolva o arquivo COMPLETO já alterado, do começo ao fim — nunca um trecho, nunca "resto igual", nunca marcador de omissão.
+- Mexa só no necessário pro que foi pedido. Preserve estilo, indentação, aspas e convenções do arquivo como estão.
+- Se o pedido for ambíguo ou arriscado, faça a interpretação mais conservadora e diga isso na explicação.
+- Se o pedido não fizer sentido pro arquivo (ex.: pedir coisa de backend num CSS), NÃO invente: devolva o arquivo intacto e explique o porquê.
+- A explicação é curta (1-3 frases), em português do Brasil, dizendo o que você mudou e por quê.`;
+
+export async function editCodeWithLisa({ path, content, instruction }) {
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client) =>
+      client.models.generateContent({
+        model: CHAT_MODEL,
+        contents: `Arquivo: ${path}\n\nPEDIDO: ${instruction}\n\nCONTEÚDO ATUAL:\n${content}`,
+        config: {
+          systemInstruction: PAIR_EDIT_INSTRUCTION,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              newContent: { type: "STRING" },
+              explanation: { type: "STRING" },
+              changed: { type: "BOOLEAN" },
+            },
+            required: ["newContent", "explanation", "changed"],
+          },
+        },
+      }),
+    { attempts: 2, delayMs: 800 }
+  );
+  const parsed = JSON.parse(res.text);
+  if (typeof parsed?.newContent !== "string") throw new Error("o modelo não devolveu o conteúdo do arquivo");
+  return parsed;
+}
+
 // ---- Modo Interativo: a Lisa como "robozinho de mesa" (ver LisaPixelFace.js e /api/companion/*)
 // Ela fica com a carinha de LED fazendo graça e, de vez em quando, puxa assunto sozinha com algo
 // REAL do Beyond Bits. Persona diferente da do rádio: aqui não é locução, é um comentário curto
