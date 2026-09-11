@@ -1,14 +1,19 @@
 // Desenho isométrico do Mundo da Lisa.
 //
-// A linguagem visual continua a mesma do resto do app — um painel de LED, um pixel aceso por
-// célula. O que muda é a PROJEÇÃO: em vez de um corte lateral, o terreno é visto de cima em
-// ângulo, e cada construção é uma caixa 3D rasterizada nessa mesma grade de células.
+// A linguagem visual continua a do resto do app — um painel de LED, um pixel aceso por célula.
+// O que muda é a PROJEÇÃO: em vez de um corte lateral, o terreno é visto de cima em ângulo, e
+// cada construção é uma caixa 3D rasterizada nessa mesma grade.
 //
 // Nada aqui é bitmap. Casa, árvore e piscina saem de primitivas (caixa, telhado em degraus,
-// piso, aresta), e é de propósito: numa grade de LED, onde tudo acende na MESMA cor, a leitura
-// vem da SILHUETA e da diferença de brilho entre as faces. As três faces de uma caixa saem com
-// brilhos diferentes (topo mais claro, lateral esquerda mais escura) — é isso, e só isso, que
-// faz o olho ler volume aqui.
+// piso, aresta) — e é isso que permite os dois ESTILOS abaixo sem desenhar nada duas vezes.
+//
+// DOIS ESTILOS, na mesma geometria:
+//   - "bloco": as faces são preenchidas, cada uma com um brilho diferente (topo mais claro,
+//     lateral esquerda mais escura). É a diferença de brilho, e só ela, que faz o olho ler
+//     volume quando tudo acende na mesma cor.
+//   - "linha": nenhuma face é preenchida — sobram só as arestas, e as de trás entram bem fracas.
+//     Vira um esquema de arame, que é o vocabulário do HUD do resto do app.
+// Quem decide é `P.linha`, então as funções de desenho são as MESMAS nos dois casos.
 
 export const TW = 8; // largura de um tile, em células
 export const TH = 4; // altura de um tile (metade da largura: projeção 2:1 clássica)
@@ -25,8 +30,8 @@ export const iso = (tx, ty, h = 0) => ({
   y: OY + (tx + ty) * (TH / 2) - h,
 });
 
-/** Quão "na frente" um tile está — define a ordem de desenho (pintor). */
-export const depth = (tx, ty) => tx + ty;
+/** Altura da parede da casa. A chaminé e a antena se penduram nela, então mora num lugar só. */
+export const casaAltura = (level) => (level >= 3 ? 24 : 16);
 
 // ---------- primitivas ----------
 
@@ -42,8 +47,10 @@ function line(P, a, b, alpha) {
 /**
  * Preenche a área de um retângulo de tiles, opcionalmente levantada. `mod` fura o preenchimento
  * (1 de cada `mod` células) — é assim que grama, água e folhagem deixam de ser mancha sólida.
+ * No estilo de linha não preenche nada: ali quem descreve a forma é a aresta.
  */
 export function floorFill(P, tx, ty, w, d, alpha, h = 0, mod = 0) {
+  if (P.linha) return;
   const N = TW;
   for (let i = 0; i <= w * N; i++)
     for (let j = 0; j <= d * N; j++) {
@@ -67,38 +74,55 @@ export function floorEdge(P, tx, ty, w, d, alpha, h = 0) {
   line(P, W, N, alpha);
 }
 
+/** Retângulo miúdo numa face (porta, janela, roupa no varal): cheio no estilo bloco, só o
+ * contorno no estilo linha. `skew` acompanha a inclinação da face isométrica. */
+export function blk(P, x, y, w, h, alpha, skew = 0) {
+  for (let i = 0; i < w; i++)
+    for (let j = 0; j < h; j++) {
+      if (P.linha && i > 0 && i < w - 1 && j > 0 && j < h - 1) continue;
+      P.paint(Math.round(x + i), Math.round(y + j + i * skew), alpha);
+    }
+}
+
 /**
- * Caixa isométrica. As três faces visíveis saem com brilhos DIFERENTES — sem isso a caixa vira
- * uma mancha chapada e o volume some.
+ * Caixa isométrica. No estilo bloco as três faces visíveis saem com brilhos DIFERENTES — sem
+ * isso a caixa vira mancha chapada e o volume some. No estilo linha ficam só as arestas, com as
+ * três de trás bem fracas, que é o que dá o efeito de arame.
  */
 export function isoBox(P, tx, ty, w, d, h, { top = 0.62, left = 0.26, right = 0.42, edge = 1, mod = 0 } = {}) {
   const N = iso(tx, ty);
   const E = iso(tx + w, ty);
   const S = iso(tx + w, ty + d);
   const W = iso(tx, ty + d);
+  const up = (p) => ({ x: p.x, y: p.y - h });
 
-  // as duas faces da frente: varre a aresta do chão e levanta h células
-  const face = (p1, p2, a) => {
-    const steps = Math.max(1, Math.round(Math.abs(p2.x - p1.x)) * 2);
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const x = Math.round(p1.x + (p2.x - p1.x) * t);
-      const yb = Math.round(p1.y + (p2.y - p1.y) * t);
-      for (let k = 0; k < h; k++) {
-        if (mod && (x * 2 + (yb - k)) % mod === 0) continue;
-        P.paint(x, yb - k, a);
+  if (!P.linha) {
+    const face = (p1, p2, a) => {
+      const steps = Math.max(1, Math.round(Math.abs(p2.x - p1.x)) * 2);
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const x = Math.round(p1.x + (p2.x - p1.x) * t);
+        const yb = Math.round(p1.y + (p2.y - p1.y) * t);
+        for (let k = 0; k < h; k++) {
+          if (mod && (x * 2 + (yb - k)) % mod === 0) continue;
+          P.paint(x, yb - k, a);
+        }
       }
-    }
-  };
-  face(W, S, left);
-  face(S, E, right);
-  floorFill(P, tx, ty, w, d, top, h, mod);
+    };
+    face(W, S, left);
+    face(S, E, right);
+    floorFill(P, tx, ty, w, d, top, h, mod);
+  } else {
+    // arame: as três arestas escondidas atrás da caixa entram fracas
+    line(P, N, up(N), 0.2);
+    line(P, N, W, 0.2);
+    line(P, N, E, 0.2);
+  }
 
-  // arestas por cima: é o que crava a silhueta
   floorEdge(P, tx, ty, w, d, edge, h);
-  line(P, W, { x: W.x, y: W.y - h }, edge);
-  line(P, S, { x: S.x, y: S.y - h }, edge);
-  line(P, E, { x: E.x, y: E.y - h }, edge);
+  line(P, W, up(W), edge);
+  line(P, S, up(S), edge);
+  line(P, E, up(E), edge);
   line(P, W, S, edge * 0.7);
   line(P, S, E, edge * 0.7);
 }
@@ -116,56 +140,8 @@ export function isoRoof(P, tx, ty, w, d, baseH, roofH, alpha = 0.9) {
   }
 }
 
-// ---------- construções ----------
-
-/** Altura da parede da casa. A chaminé e a antena se penduram nela, então mora num lugar só. */
-export const casaAltura = (level) => (level >= 3 ? 24 : 16);
-
-export function drawCasa(P, { tx, ty, w, d }, level, night) {
-  const h = casaAltura(level);
-  // top 0: quem tem telhado NÃO preenche o topo da parede, senão o telhado some debaixo dele
-  isoBox(P, tx, ty, w, d, h, { top: 0, left: 0.2, right: 0.36 });
-  isoRoof(P, tx - 0.4, ty - 0.4, w + 0.8, d + 0.8, h, 7);
-
-  // porta na face direita, e janelas acesas à noite
-  const door = iso(tx + w, ty + d * 0.55);
-  for (let i = 0; i < 5; i++) for (let j = 0; j < 9; j++) P.paint(Math.round(door.x - i), Math.round(door.y - j - Math.round(i / 2)), 0.95);
-
-  const glow = night ? 1 : 0.55;
-  const win = iso(tx + w * 0.45, ty + d);
-  for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) P.paint(Math.round(win.x - i), Math.round(win.y - 7 - j + Math.round(i / 2)), glow);
-  if (level >= 3) {
-    const w2 = iso(tx + w * 0.45, ty + d);
-    for (let i = 0; i < 5; i++) for (let j = 0; j < 4; j++) P.paint(Math.round(w2.x - i), Math.round(w2.y - 16 - j + Math.round(i / 2)), glow);
-  }
-}
-
-export function drawChamine(P, { tx, ty, w, d }, level) {
-  isoBox(P, tx + w - 1.6, ty + 0.4, 0.8, 0.8, casaAltura(level) + 10, { top: 0.6, left: 0.25, right: 0.42 });
-}
-
-export function drawAntena(P, { tx, ty, w, d }, level) {
-  const base = iso(tx + 1, ty + 1, casaAltura(level) + 7);
-  for (let j = 0; j < 12; j++) P.paint(Math.round(base.x), Math.round(base.y - j), 0.9);
-  for (let k = 0; k < 3; k++) {
-    const len = 9 - k * 2;
-    for (let i = -len / 2; i <= len / 2; i++) P.paint(Math.round(base.x + i), Math.round(base.y - 3 - k * 3), 0.75);
-  }
-}
-
-export function drawArvore(P, { tx, ty }) {
-  const t = iso(tx + 1, ty + 1);
-  for (let j = 0; j < 11; j++) {
-    P.paint(Math.round(t.x), Math.round(t.y - j), 0.75);
-    P.paint(Math.round(t.x + 1), Math.round(t.y - j), 0.55);
-  }
-  // copa: três bolhas furadinhas, com o contorno cravado por cima
-  const lobes = [[t.x + 0.5, t.y - 20, 9, 6.5], [t.x - 5, t.y - 15, 6, 4.5], [t.x + 6, t.y - 15, 6, 4.5]];
-  for (const [cx, cy, rx, ry] of lobes) ellipseFill(P, cx, cy, rx, ry, 0.72, 3);
-  for (const [cx, cy, rx, ry] of lobes) ellipseEdge(P, cx, cy, rx, ry, 1);
-}
-
 function ellipseFill(P, cx, cy, rx, ry, a, mod = 0) {
+  if (P.linha) return;
   for (let dy = -ry; dy <= ry; dy++)
     for (let dx = -rx; dx <= rx; dx++) {
       if ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) > 1) continue;
@@ -180,6 +156,47 @@ function ellipseEdge(P, cx, cy, rx, ry, a) {
     const r = (d * Math.PI) / 180;
     P.paint(Math.round(cx + Math.cos(r) * rx), Math.round(cy + Math.sin(r) * ry), a);
   }
+}
+
+// ---------- construções ----------
+
+export function drawCasa(P, { tx, ty, w, d }, level, night) {
+  const h = casaAltura(level);
+  // top 0: quem tem telhado NÃO preenche o topo da parede, senão o telhado some debaixo dele
+  isoBox(P, tx, ty, w, d, h, { top: 0, left: 0.2, right: 0.36 });
+  isoRoof(P, tx - 0.4, ty - 0.4, w + 0.8, d + 0.8, h, 7);
+
+  const door = iso(tx + w, ty + d * 0.55);
+  blk(P, door.x - 4, door.y - 8, 5, 9, 0.95, 0.5);
+
+  const glow = night ? 1 : 0.55;
+  const win = iso(tx + w * 0.45, ty + d);
+  blk(P, win.x - 4, win.y - 11, 5, 5, glow, -0.5);
+  if (level >= 3) blk(P, win.x - 4, win.y - 20, 5, 4, glow, -0.5);
+}
+
+export function drawChamine(P, { tx, ty, w }, level) {
+  isoBox(P, tx + w - 1.6, ty + 0.4, 0.8, 0.8, casaAltura(level) + 10, { top: 0.6, left: 0.25, right: 0.42 });
+}
+
+export function drawAntena(P, { tx, ty }, level) {
+  const base = iso(tx + 1, ty + 1, casaAltura(level) + 7);
+  for (let j = 0; j < 12; j++) P.paint(Math.round(base.x), Math.round(base.y - j), 0.9);
+  for (let k = 0; k < 3; k++) {
+    const len = 9 - k * 2;
+    for (let i = -len / 2; i <= len / 2; i++) P.paint(Math.round(base.x + i), Math.round(base.y - 3 - k * 3), 0.75);
+  }
+}
+
+export function drawArvore(P, { tx, ty }) {
+  const t = iso(tx + 1, ty + 1);
+  for (let j = 0; j < 11; j++) {
+    P.paint(Math.round(t.x), Math.round(t.y - j), 0.75);
+    P.paint(Math.round(t.x + 1), Math.round(t.y - j), 0.55);
+  }
+  const lobes = [[t.x + 0.5, t.y - 20, 9, 6.5], [t.x - 5, t.y - 15, 6, 4.5], [t.x + 6, t.y - 15, 6, 4.5]];
+  for (const [cx, cy, rx, ry] of lobes) ellipseFill(P, cx, cy, rx, ry, 0.72, 3);
+  for (const [cx, cy, rx, ry] of lobes) ellipseEdge(P, cx, cy, rx, ry, 1);
 }
 
 export function drawHorta(P, { tx, ty, w, d }) {
@@ -198,7 +215,7 @@ export function drawCasinha(P, { tx, ty, w, d }) {
   isoBox(P, tx, ty, w, d, 6, { top: 0, left: 0.2, right: 0.36 });
   isoRoof(P, tx - 0.3, ty - 0.3, w + 0.6, d + 0.6, 6, 4);
   const door = iso(tx + w, ty + d * 0.5);
-  for (let i = 0; i < 4; i++) for (let j = 0; j < 6; j++) P.paint(Math.round(door.x - i), Math.round(door.y - j - Math.round(i / 2)), 0.95);
+  blk(P, door.x - 3, door.y - 5, 4, 6, 0.95, 0.5);
 }
 
 export function drawVaral(P, { tx, ty, w }) {
@@ -214,7 +231,7 @@ export function drawVaral(P, { tx, ty, w }) {
     const t = k / 4;
     const px = Math.round(a.x + (b.x - a.x) * t);
     const py = Math.round(a.y + (b.y - a.y) * t - 11 + Math.sin(t * Math.PI) * 2);
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 7; j++) P.paint(px - 1 + i, py + j, 0.8);
+    blk(P, px - 1, py, 4, 7, 0.8);
   }
 }
 
@@ -222,7 +239,7 @@ export function drawBanco(P, { tx, ty, w, d }) {
   isoBox(P, tx, ty, w, d, 3, { top: 0.6, left: 0.25, right: 0.42 });
   const back = iso(tx, ty);
   const back2 = iso(tx + w, ty);
-  for (let j = 3; j < 9; j++) line(P, { x: back.x, y: back.y - j }, { x: back2.x, y: back2.y - j }, j > 7 ? 0.7 : 0.3);
+  for (let j = 3; j < 9; j++) line(P, { x: back.x, y: back.y - j }, { x: back2.x, y: back2.y - j }, j > 6 ? 0.7 : 0.3);
 }
 
 export function drawCorreio(P, { tx, ty }, temCarta) {
@@ -235,7 +252,7 @@ export function drawCorreio(P, { tx, ty }, temCarta) {
 export function drawPoste(P, { tx, ty }, night) {
   const p = iso(tx + 0.5, ty + 0.5);
   for (let j = 0; j < 18; j++) P.paint(Math.round(p.x), Math.round(p.y - j), 0.8);
-  for (let i = -2; i <= 2; i++) for (let j = 0; j < 3; j++) P.paint(Math.round(p.x + i), Math.round(p.y - 20 - j), night ? 1 : 0.6);
+  blk(P, p.x - 2, p.y - 22, 5, 3, night ? 1 : 0.6);
   if (night) ellipseEdge(P, p.x, p.y - 19, 7, 5, 0.14);
 }
 
@@ -251,7 +268,7 @@ export function drawPortao(P, { tx, ty, w }) {
   for (const p of [a, b]) for (let j = 0; j < 10; j++) P.paint(Math.round(p.x), Math.round(p.y - j), 0.9);
   const steps = Math.round(Math.abs(b.x - a.x));
   for (let i = 0; i <= steps; i += 2)
-    for (let j = 2; j < 11; j += 3) {
+    for (let j = 2; j < 9; j += 3) {
       const t = i / steps;
       P.paint(Math.round(a.x + (b.x - a.x) * t), Math.round(a.y + (b.y - a.y) * t - j), 0.6);
     }
@@ -321,7 +338,7 @@ export function drawOficina(P, { tx, ty, w, d }) {
   isoBox(P, tx, ty, w, d, 12, { top: 0, left: 0.2, right: 0.36 });
   isoRoof(P, tx - 0.3, ty - 0.3, w + 0.6, d + 0.6, 12, 5);
   const door = iso(tx + w, ty + d * 0.5);
-  for (let i = 0; i < 6; i++) for (let j = 0; j < 8; j++) P.paint(Math.round(door.x - i), Math.round(door.y - j - Math.round(i / 2)), 0.9);
+  blk(P, door.x - 5, door.y - 7, 6, 8, 0.9, 0.5);
 }
 
 export function drawSolar(P, { tx, ty, w, d }) {
@@ -341,12 +358,9 @@ export function drawEstufa(P, { tx, ty, w, d }) {
 export function drawPiscina(P, { tx, ty, w, d }, now = 0) {
   floorEdge(P, tx, ty, w, d, 0.9);
   floorFill(P, tx + 0.25, ty + 0.25, w - 0.5, d - 0.5, 0.4, -2, 2);
-  // ondinhas: linhas claras que andam devagar
   for (let k = 0; k < 4; k++) {
     const b = ty + 0.6 + ((k * 0.9 + (now / 2600) % 1) % (d - 1.2));
-    const p1 = iso(tx + 0.4, b, -2);
-    const p2 = iso(tx + w - 0.4, b, -2);
-    line(P, p1, p2, 0.85);
+    line(P, iso(tx + 0.4, b, -2), iso(tx + w - 0.4, b, -2), 0.85);
   }
 }
 
@@ -391,18 +405,23 @@ export function drawCerca(P, grid) {
   }
 }
 
-/** Chão do terreno: grama furadinha com uma malha de tiles bem fraca por cima. */
+/** Chão do terreno. No estilo bloco é grama furadinha com uma malha fraca por cima; no estilo
+ * linha a grama some e sobra a malha, mais densa — ali é ela que descreve o terreno. */
 export function drawTerreno(P, grid) {
   floorFill(P, 0, 0, grid, grid, 0.09, 0, 3);
-  for (let i = 0; i <= grid; i += 3) {
-    line(P, iso(i, 0), iso(i, grid), 0.05);
-    line(P, iso(0, i), iso(grid, i), 0.05);
+  // no estilo linha a malha é o chão, mas de tile em tile ela vira um tapete que compete com
+  // as construções — de dois em dois já descreve o terreno sem roubar a cena
+  const passo = P.linha ? 2 : 3;
+  const alfa = P.linha ? 0.11 : 0.05;
+  for (let i = 0; i <= grid; i += passo) {
+    line(P, iso(i, 0), iso(i, grid), alfa);
+    line(P, iso(0, i), iso(grid, i), alfa);
   }
 }
 
 export function drawCaminho(P, tiles) {
   for (const [tx, ty] of tiles) {
     floorFill(P, tx, ty, 1, 1, 0.4, 0, 2);
-    floorEdge(P, tx, ty, 1, 1, 0.22);
+    floorEdge(P, tx, ty, 1, 1, P.linha ? 0.55 : 0.22);
   }
 }

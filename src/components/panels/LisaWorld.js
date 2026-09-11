@@ -16,49 +16,61 @@ import * as A from "./isoArt.js";
 // Steve. O terreno ganha construções conforme VOCÊ interage com ela nos outros modos (regras e
 // mapa em src/lib/lisaWorld.js; desenho em isoArt.js).
 //
-// Três decisões que sustentam isso:
+// Quatro decisões que sustentam isso:
 //
-// 1. O mundo inteiro é rasterizado UMA VEZ num canvas fora da tela do tamanho do terreno todo, e
-//    a câmera só recorta um pedaço com drawImage. São dezenas de milhares de células acesas,
-//    cada uma um roundRect com sombra — refazer isso a cada quadro seria impossível. Assim rolar
-//    sai de graça, e o cache só é refeito quando aparece construção nova ou o dia vira noite.
+// 1. O mundo inteiro é rasterizado UMA VEZ num canvas fora da tela, do tamanho do terreno todo,
+//    e a câmera só recorta um pedaço com drawImage. São dezenas de milhares de células acesas,
+//    cada uma um roundRect com sombra — refazer isso a cada quadro seria impossível.
 //
-// 2. Em isométrico a ordem de desenho é tudo. As construções vão pro cache ordenadas por
-//    profundidade (tx+ty); e como os personagens são desenhados POR CIMA desse cache, o que
-//    estiver na frente deles é redesenhado depois — senão a Lisa apareceria em cima da casa ao
-//    passar atrás dela.
+// 2. Esse canvas é rasterizado num tamanho de célula FIXO (BASE), e o zoom é só uma escala na
+//    hora de recortar. Se o zoom mudasse o tamanho da célula, cada passo de pinça obrigaria a
+//    redesenhar o terreno inteiro e o gesto travaria no celular. Assim o cache só é refeito
+//    quando aparece construção nova, o dia vira noite, ou o estilo muda.
 //
-// 3. A hora é a de verdade do aparelho. De madrugada o terreno fica escuro, com estrelas, o poste
-//    aceso e a fogueira acesa — e ela vai olhar as estrelas, que é atividade só da noite.
+// 3. Em isométrico a ordem de desenho é tudo. O cache sai ordenado por profundidade (tx+ty); e
+//    como os personagens vão POR CIMA dele, o que estiver na frente deles é redesenhado depois —
+//    senão a Lisa aparece em cima da casa ao passar atrás.
+//
+// 4. A hora é a de verdade do aparelho. De madrugada o terreno fica escuro, com estrelas, o
+//    poste aceso e a fogueira acesa — e ela vai olhar as estrelas, que é atividade só da noite.
 
-const CELL_MIN = 4;
-const CELL_MAX = 9;
-const LISA_SPEED = 2.6; // tiles por segundo
+const BASE = 7;          // tamanho da célula no canvas do mundo (o zoom é escala em cima disso)
+const ZOOM_MIN = 0.55;
+const ZOOM_MAX = 2.4;
+const LISA_SPEED = 2.6;  // tiles por segundo
 const NALA_SPEED = 3.4;
 const STEP_MS = 150;
 const GAP_MIN_MS = 1600;
 const GAP_VAR_MS = 3200;
 const SEEN_KEY = "lisaWorld.seenXp";
+const ESTILO_KEY = "lisaWorld.estilo";
 
 const isNight = (h) => h < 6 || h >= 19;
 const lerp = (a, b, t) => a + (b - a) * t;
+const clampZoom = (z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
 
 export default function LisaWorld({ fullscreen = false }) {
   const [world, setWorld] = useState(null);
   const [novas, setNovas] = useState([]);
   const [label, setLabel] = useState("chegando no terreno…");
-  const [cell, setCell] = useState(6);
+  const [zoom, setZoom] = useState(1);
+  const [estilo, setEstilo] = useState("bloco"); // "bloco" | "linha"
   const [seguir, setSeguir] = useState(true);
   const [lista, setLista] = useState(false);
+  const [estreito, setEstreito] = useState(false);
 
   const canvasRef = useRef(null);
   const sceneRef = useRef({ unlocked: [], level: 1, night: isNight(new Date().getHours()), temCarta: false });
   const camRef = useRef({ x: 40, y: 40 });
   const dragRef = useRef(null);
+  const ptrsRef = useRef(new Map());
+  const pinchRef = useRef(null);
   const seguirRef = useRef(seguir);
   seguirRef.current = seguir;
-  const cellRef = useRef(cell);
-  cellRef.current = cell;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const estiloRef = useRef(estilo);
+  estiloRef.current = estilo;
 
   const lisaRef = useRef({ tx: 6, ty: 20, targ: [6, 20], pose: "idle", flip: false, moving: false });
   const nalaRef = useRef({ tx: 7, ty: 22, targ: [7, 22], moving: false, flip: false });
@@ -67,6 +79,28 @@ export default function LisaWorld({ fullscreen = false }) {
   const nextAtRef = useRef(0);
   const bagRef = useRef([]);
   const buildQueueRef = useRef([]);
+
+  // tela estreita: os botões perdem o texto e viram só o ícone. Antes a fileira quebrava em duas
+  // linhas no celular e cobria o que a Lisa estava fazendo.
+  useEffect(() => {
+    const ver = () => setEstreito(window.innerWidth < 640);
+    ver();
+    // no celular, com zoom 1 só cabe um pedaço do terreno na tela: começa mais afastado, senão
+    // a primeira impressão é de estar perdido no meio do mato
+    if (window.innerWidth < 640) setZoom(0.72);
+    window.addEventListener("resize", ver);
+    return () => window.removeEventListener("resize", ver);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const salvo = localStorage.getItem(ESTILO_KEY);
+      if (salvo === "linha" || salvo === "bloco") setEstilo(salvo);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem(ESTILO_KEY, estilo); } catch {}
+  }, [estilo]);
 
   // ---- progresso: o que você já fez de verdade ----
   useEffect(() => {
@@ -134,15 +168,16 @@ export default function LisaWorld({ fullscreen = false }) {
     let staticKey = "";
     let offScale = 1;
 
-    const makePaint = (c, size, ox = 0, oy = 0) => {
-      const pad = size * 0.16;
+    const makePaint = (c, size, linha, ox = 0, oy = 0) => {
+      // no estilo de linha a célula encolhe: o traço fica fino e a malha não vira mancha
+      const pad = size * (linha ? 0.46 : 0.16);
       const round = typeof c.roundRect === "function";
       return (gx, gy, alpha = 1) => {
         if (alpha <= 0.02) return;
         const x = (gx - ox) * size + pad / 2;
         const y = (gy - oy) * size + pad / 2;
         c.fillStyle = `rgba(${accent},${alpha})`;
-        if (round) { c.beginPath(); c.roundRect(x, y, size - pad, size - pad, (size - pad) * 0.28); c.fill(); }
+        if (round) { c.beginPath(); c.roundRect(x, y, size - pad, size - pad, (size - pad) * 0.3); c.fill(); }
         else c.fillRect(x, y, size - pad, size - pad);
       };
     };
@@ -199,24 +234,24 @@ export default function LisaWorld({ fullscreen = false }) {
         accent = rs.getPropertyValue("--accent-rgb").trim() || accent;
         hex = rs.getPropertyValue("--accent-hex").trim() || hex;
       }
-      const size = cellRef.current;
       const sc = sceneRef.current;
+      const linha = estiloRef.current === "linha";
+      const size = BASE * zoomRef.current; // célula na TELA
       ctx.fillStyle = "#03080c";
       ctx.fillRect(0, 0, w, h);
 
-      // ---- o mundo inteiro, rasterizado uma vez só ----
-      const key = `${size}|${accent}|${sc.unlocked.join(",")}|${sc.level}|${sc.night}|${sc.temCarta}`;
+      // ---- o mundo inteiro, rasterizado uma vez só, em tamanho fixo ----
+      const key = `${accent}|${sc.unlocked.join(",")}|${sc.level}|${sc.night}|${sc.temCarta}|${linha}`;
       if (key !== staticKey) {
         staticKey = key;
-        // o canvas do mundo é grande: limita a resolução pra não estourar memória em tela retina
-        offScale = A.WORLD_W * size * A.WORLD_H * size * 4 < 9e6 ? 2 : 1;
-        off.width = Math.round(A.WORLD_W * size * offScale);
-        off.height = Math.round(A.WORLD_H * size * offScale);
+        offScale = A.WORLD_W * BASE * A.WORLD_H * BASE * 4 < 9e6 ? 2 : 1;
+        off.width = Math.round(A.WORLD_W * BASE * offScale);
+        off.height = Math.round(A.WORLD_H * BASE * offScale);
         offCtx.setTransform(offScale, 0, 0, offScale, 0, 0);
-        offCtx.clearRect(0, 0, A.WORLD_W * size, A.WORLD_H * size);
-        offCtx.shadowBlur = size * 1.1;
+        offCtx.clearRect(0, 0, A.WORLD_W * BASE, A.WORLD_H * BASE);
+        offCtx.shadowBlur = BASE * 1.1;
         offCtx.shadowColor = hex;
-        const OP = { paint: makePaint(offCtx, size) };
+        const OP = { linha, paint: makePaint(offCtx, BASE, linha) };
         if (sc.night) for (let i = 0; i < 90; i++) OP.paint((i * 53) % A.WORLD_W, (i * 29) % 42, 0.3 + 0.2 * Math.sin(i));
         A.drawTerreno(OP, GRID);
         if (sc.unlocked.includes("caminho")) A.drawCaminho(OP, PATH_TILES);
@@ -224,10 +259,7 @@ export default function LisaWorld({ fullscreen = false }) {
         for (const o of placed(sc)) drawObj(OP, o.key, o.item, sc, 0);
         if (sc.unlocked.includes("chamine")) A.drawChamine(OP, CASA, sc.level);
         if (sc.unlocked.includes("antena")) A.drawAntena(OP, CASA, sc.level);
-        if (sc.unlocked.includes("solar")) {
-          const of = WORLD_ITEMS.find((i) => i.key === "oficina");
-          if (sc.unlocked.includes("oficina")) A.drawSolar(OP, of);
-        }
+        if (sc.unlocked.includes("solar") && sc.unlocked.includes("oficina")) A.drawSolar(OP, WORLD_ITEMS.find((i) => i.key === "oficina"));
         offCtx.shadowBlur = 0;
       }
 
@@ -235,7 +267,7 @@ export default function LisaWorld({ fullscreen = false }) {
       const lisa = lisaRef.current;
       const nala = nalaRef.current;
       let a = actRef.current;
-      if (!a && now > nextAtRef.current && sc.unlocked) {
+      if (!a && now > nextAtRef.current) {
         a = pickActivity(now);
         if (a) {
           actRef.current = a;
@@ -244,7 +276,6 @@ export default function LisaWorld({ fullscreen = false }) {
         }
       }
 
-      // ---- caminhada ----
       const walk = (ent, speed) => {
         const dx = ent.targ[0] - ent.tx;
         const dy = ent.targ[1] - ent.ty;
@@ -254,8 +285,7 @@ export default function LisaWorld({ fullscreen = false }) {
         ent.tx += (dx / dist) * step;
         ent.ty += (dy / dist) * step;
         ent.moving = true;
-        // no isométrico, +tx vai pra direita da tela e +ty pra esquerda
-        ent.flip = dx - dy < 0;
+        ent.flip = dx - dy < 0; // no isométrico, +tx vai pra direita e +ty pra esquerda
         return false;
       };
       const chegou = walk(lisa, LISA_SPEED);
@@ -277,7 +307,6 @@ export default function LisaWorld({ fullscreen = false }) {
         ? (a.sit ? "sit" : a.tool ? "work" : a.key === "steve" || a.key === "nala" ? "armUp" : "idle")
         : "idle";
 
-      // a Nala anda atrás; brincando, ela corre em volta
       const brincando = a?.key === "nala" && a.phase === "fazendo";
       nala.targ = brincando
         ? [lisa.tx + 2.5 + Math.sin(now / 1400) * 2.5, lisa.ty + 2.5 + Math.cos(now / 1100) * 2.5]
@@ -304,12 +333,17 @@ export default function LisaWorld({ fullscreen = false }) {
       cam.y = Math.max(0, Math.min(Math.max(0, A.WORLD_H - viewH), cam.y));
 
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(off, cam.x * size * offScale, cam.y * size * offScale, w * offScale, h * offScale, 0, 0, w, h);
+      ctx.drawImage(
+        off,
+        cam.x * BASE * offScale, cam.y * BASE * offScale,
+        viewW * BASE * offScale, viewH * BASE * offScale,
+        0, 0, w, h
+      );
 
       // ---- atores e partículas, por cima ----
       ctx.shadowBlur = size * 1.1;
       ctx.shadowColor = hex;
-      const P = { paint: makePaint(ctx, size, cam.x, cam.y) };
+      const P = { linha, paint: makePaint(ctx, size, linha, cam.x, cam.y) };
       const put = (rows, p, flip) => {
         const ox = Math.round(p.x - rows[0].length / 2);
         const oy = Math.round(p.y - (rows.length - 1));
@@ -381,25 +415,53 @@ export default function LisaWorld({ fullscreen = false }) {
     return () => cancelAnimationFrame(raf);
   }, [pickActivity]);
 
-  // ---- arrastar pra rolar ----
+  // ---- arrastar pra rolar, pinça pra aproximar ----
+  const dist2 = () => {
+    const [a, b] = [...ptrsRef.current.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
   const onDown = (e) => {
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    dragRef.current = { x: e.clientX, y: e.clientY, cam: { ...camRef.current } };
+    ptrsRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrsRef.current.size === 2) {
+      pinchRef.current = { d: dist2(), zoom: zoomRef.current };
+      dragRef.current = null; // arrastar e dar pinça ao mesmo tempo dá tranco
+    } else {
+      dragRef.current = { x: e.clientX, y: e.clientY, cam: { ...camRef.current } };
+    }
   };
   const onMove = (e) => {
+    if (!ptrsRef.current.has(e.pointerId)) return;
+    ptrsRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrsRef.current.size >= 2 && pinchRef.current) {
+      setZoom(clampZoom(pinchRef.current.zoom * (dist2() / pinchRef.current.d)));
+      return;
+    }
     const d = dragRef.current;
     if (!d) return;
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6) setSeguir(false);
-    camRef.current.x = d.cam.x - (e.clientX - d.x) / cellRef.current;
-    camRef.current.y = d.cam.y - (e.clientY - d.y) / cellRef.current;
+    camRef.current.x = d.cam.x - (e.clientX - d.x) / (BASE * zoomRef.current);
+    camRef.current.y = d.cam.y - (e.clientY - d.y) / (BASE * zoomRef.current);
   };
-  const onUp = () => { dragRef.current = null; };
+  const onUp = (e) => {
+    ptrsRef.current.delete(e.pointerId);
+    if (ptrsRef.current.size < 2) pinchRef.current = null;
+    if (ptrsRef.current.size === 0) dragRef.current = null;
+  };
+  const onWheel = (e) => {
+    setSeguir(false);
+    setZoom((z) => clampZoom(z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+  };
 
   const next = world?.next;
-  const btn = {
-    ...mono, fontSize: 9.5, letterSpacing: 1, padding: "6px 10px", borderRadius: 6,
-    border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(4,10,14,0.78)", color: "#eafcff", cursor: "pointer",
-  };
+  // botão com área de toque de verdade: os antigos tinham ~24px de altura e no celular não dava
+  // pra acertar o zoom
+  const btn = (ativo = false) => ({
+    ...mono, fontSize: 9.5, letterSpacing: 1, minWidth: 38, height: 36, padding: estreito ? "0 9px" : "0 12px",
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    borderRadius: 8, border: `1px solid ${ativo ? CY : "rgba(var(--accent-rgb),0.28)"}`,
+    background: ativo ? "rgba(var(--accent-rgb),0.16)" : "rgba(4,10,14,0.82)", color: "#eafcff", cursor: "pointer",
+  });
   const shadow = { textShadow: "0 0 8px rgba(0,0,0,0.95)" };
 
   return (
@@ -418,33 +480,41 @@ export default function LisaWorld({ fullscreen = false }) {
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
+        onWheel={onWheel}
         style={{ width: "100%", height: "100%", display: "block", touchAction: "none", cursor: "grab" }}
       />
 
-      <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-        <button onClick={() => setSeguir((v) => !v)} style={{ ...btn, borderColor: seguir ? CY : "rgba(var(--accent-rgb),0.25)" }} title="a câmera acompanha a Lisa; arrastar a tela solta a câmera">
-          {seguir ? "◉ SEGUINDO ELA" : "○ CÂMERA LIVRE"}
-        </button>
-        <button onClick={() => setCell((c) => Math.max(CELL_MIN, c - 1))} style={btn} title="afastar">−</button>
-        <button onClick={() => setCell((c) => Math.min(CELL_MAX, c + 1))} style={btn} title="aproximar">+</button>
-        <button onClick={() => setLista((v) => !v)} style={btn}>{lista ? "✕" : "☰"} CONSTRUÇÕES</button>
-      </div>
-
-      <div style={{ position: "absolute", top: 12, left: 14, ...mono, fontSize: 10.5, letterSpacing: 1.5, color: CY, ...shadow }}>
-        {world ? `A LISA ESTÁ ${label.toUpperCase()}` : "CARREGANDO O TERRENO…"}
+      {/* Barra de cima: rótulo e botões no MESMO flex. Antes eram duas caixas soltas em absolute
+          e, no celular, a fileira de botões quebrava em duas linhas e cobria o texto. Com
+          `flex:1, minWidth:0` o rótulo corta com reticências em vez de empurrar os botões. */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", pointerEvents: "none" }}>
+        <div style={{ ...mono, fontSize: estreito ? 9 : 10.5, letterSpacing: 1.2, color: CY, flex: 1, minWidth: 0, paddingTop: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...shadow }}>
+          {world ? `A LISA ESTÁ ${label.toUpperCase()}` : "CARREGANDO O TERRENO…"}
+        </div>
+        <div style={{ display: "flex", gap: 5, flex: "none", pointerEvents: "auto" }}>
+          <button onClick={() => setEstilo((v) => (v === "bloco" ? "linha" : "bloco"))} style={btn(estilo === "linha")} title="alterna entre volume preenchido e esquema de linhas">
+            {estilo === "linha" ? "◱" : "◧"}{estreito ? "" : estilo === "linha" ? " LINHA" : " BLOCO"}
+          </button>
+          <button onClick={() => setSeguir((v) => !v)} style={btn(seguir)} title="a câmera acompanha a Lisa; arrastar solta a câmera">
+            {seguir ? "◉" : "○"}{estreito ? "" : seguir ? " SEGUINDO" : " LIVRE"}
+          </button>
+          <button onClick={() => { setSeguir(false); setZoom((z) => clampZoom(z / 1.25)); }} style={btn()} title="afastar">−</button>
+          <button onClick={() => { setSeguir(false); setZoom((z) => clampZoom(z * 1.25)); }} style={btn()} title="aproximar">+</button>
+          <button onClick={() => setLista((v) => !v)} style={btn(lista)} title="construções">{lista ? "✕" : "☰"}</button>
+        </div>
       </div>
 
       {world && (
-        <div style={{ position: "absolute", left: 14, bottom: 12, right: 14, display: "flex", flexDirection: "column", gap: 5, pointerEvents: "none" }}>
+        <div style={{ position: "absolute", left: 12, bottom: 10, right: 12, display: "flex", flexDirection: "column", gap: 4, pointerEvents: "none" }}>
           {novas.length > 0 && (
-            <div style={{ ...mono, fontSize: 9.5, letterSpacing: 1, color: GR, ...shadow }}>
+            <div style={{ ...mono, fontSize: estreito ? 8.5 : 9.5, letterSpacing: 1, color: GR, maxHeight: 30, overflow: "hidden", ...shadow }}>
               ✦ DESDE A SUA ÚLTIMA VISITA ELA CONSTRUIU: {novas.map((n) => n.label).join(", ")}
             </div>
           )}
-          <div style={{ ...mono, fontSize: 9, letterSpacing: 1, display: "flex", gap: 14, flexWrap: "wrap", color: "rgba(207,239,251,0.72)", ...shadow }}>
+          <div style={{ ...mono, fontSize: estreito ? 8.5 : 9, letterSpacing: 1, display: "flex", gap: 12, flexWrap: "wrap", color: "rgba(207,239,251,0.72)", ...shadow }}>
             <span>{world.xp} pts de convivência</span>
             {next ? <span>falta {next.falta} pra {next.label.toLowerCase()}</span> : <span style={{ color: GR }}>terreno completo</span>}
-            <span style={{ color: "rgba(207,239,251,0.42)" }}>{world.unlocked.length}/{WORLD_ITEMS.length} construções</span>
+            <span style={{ color: "rgba(207,239,251,0.42)" }}>{world.unlocked.length}/{WORLD_ITEMS.length}</span>
           </div>
           {next && (
             <div style={{ height: 4, maxWidth: 420, borderRadius: 3, background: "rgba(0,0,0,0.6)", overflow: "hidden" }}>
@@ -460,7 +530,7 @@ export default function LisaWorld({ fullscreen = false }) {
       )}
 
       {lista && world && (
-        <div style={{ position: "absolute", top: 48, right: 10, width: 236, maxHeight: "72%", overflowY: "auto", padding: 10, borderRadius: 8, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(4,10,14,0.96)", display: "flex", flexDirection: "column", gap: 3 }}>
+        <div style={{ position: "absolute", top: 52, right: 10, width: estreito ? "min(78vw, 240px)" : 240, maxHeight: "66%", overflowY: "auto", padding: 10, borderRadius: 8, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(4,10,14,0.96)", display: "flex", flexDirection: "column", gap: 3 }}>
           {WORLD_ITEMS.map((i) => {
             const tem = world.unlocked.includes(i.key);
             return (
