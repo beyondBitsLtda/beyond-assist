@@ -102,23 +102,28 @@ export const NALA = {
     "......................",
     "......................",
   ],
-  // sentada — comemorando com o disco na boca, e também a gracinha "senta"
+  // sentada — comemorando com o disco na boca, e também a gracinha "senta".
+  // O que faz ela ser lida como cachorro sentado, e não como um bloco: o lombo DESCE em
+  // diagonal do ombro até a garupa no chão, e sobra um vão entre a garupa e a pata da frente.
+  // A versão anterior tinha as quatro linhas do meio da mesma largura e virava um tijolo.
+  // O rabo aqui é um COTOCO de três linhas, não o mastro das outras poses: sentada, um rabo
+  // comprido encosta na garupa e os dois viram uma coluna vertical só, que lê como poste.
   happy: [
     "......................",
     "..............#####...",
-    "..###.......########..",
-    "..##.......######.###.",
-    "..##......###.###.####",
-    "...##....####.########",
-    "...##....####.#######.",
-    "....#.....###.#####...",
-    "...################...",
-    "..#################...",
-    "..#################...",
+    "............########..",
+    "...........######.###.",
+    "..........###.###.####",
+    ".........####.########",
+    ".##......####.#######.",
+    "..##......###.#####...",
+    "...##...##########....",
+    "..###..###########....",
     "..################....",
-    "..##########..###.....",
-    "..##########..###.....",
-    ".############.#####...",
+    "..###############.....",
+    "..#########..#####....",
+    "..#########..#####....",
+    ".##########..######...",
   ],
   // cabeça baixa e rabo entre as pernas — precisa dar pra ver de longe que ela errou
   sad: [
@@ -216,23 +221,25 @@ export const NALA = {
     "...#####.....###......",
     "..#######...#####.....",
   ],
-  // sentada coçando a orelha com a pata de trás (o tremor vem do desenho, não da pose)
+  // sentada coçando a orelha: a pata de trás sobe POR FORA do corpo, no vazio entre o rabo e a
+  // orelha — dentro da silhueta ela simplesmente não apareceria, já que aqui tudo acende igual.
+  // Antes a perna se fundia com a orelha e a pose inteira virava uma massa diagonal.
   scratch: [
     "......................",
     "..............#####...",
-    "..###.......########..",
-    "..##.......######.###.",
-    "..##......###.###.####",
-    "...##....####.########",
-    "...##..######.#######.",
-    "....#..##.###.#####...",
-    "...################...",
-    "..#################...",
-    "..#################...",
+    "............########..",
+    "...........######.###.",
+    "..........###.###.####",
+    ".........####.########",
+    ".##...##.####.#######.",
+    "..##.###..###.#####...",
+    "...##.############....",
+    "..###..###########....",
     "..################....",
-    "..##########..###.....",
-    "..##########..###.....",
-    ".############.#####...",
+    "..###############.....",
+    "..#########..#####....",
+    "..#########..#####....",
+    ".##########..######...",
   ],
   // latindo: cabeça erguida e boca aberta (o vão entre as mandíbulas)
   bark: [
