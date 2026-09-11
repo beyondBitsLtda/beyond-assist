@@ -2782,13 +2782,27 @@ export default function AssistantPage() {
   // porque quando ela está ligada o elemento dela já existe — dois elementos com o MESMO ref
   // brigariam, e o último a montar ganharia.
   const interactiveScreen = (
-    <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, padding: 24, background: "#000", overflow: "hidden" }}>
+    <div
+      style={{
+        position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column",
+        alignItems: "center", background: "#000",
+        // Sem jogo: carinha centralizada e nada rola (é o "bichinho de mesa").
+        // Com jogo/atividade: alinha no TOPO e deixa ROLAR — no celular a explicação do quiz
+        // ficava abaixo da dobra e era impossível chegar nela com overflow:hidden.
+        justifyContent: interactiveGame ? "flex-start" : "center",
+        overflowY: interactiveGame ? "auto" : "hidden",
+        overflowX: "hidden",
+        gap: interactiveGame ? 12 : 18,
+        padding: interactiveGame ? "16px 12px 60px" : 24,
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
       {!observanceMode && (
         <video ref={observanceVideoRef} autoPlay playsInline muted style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />
       )}
 
       {/* menuzinho suspenso: jogos, modo rádio e placar */}
-      <div style={{ position: "absolute", top: 10, right: 12, zIndex: 6, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+      <div style={{ position: "sticky", top: 0, alignSelf: "flex-end", zIndex: 6, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, marginRight: 2 }}>
         <button
           onClick={() => {
             const opening = !interactiveMenuOpen;
@@ -2813,7 +2827,16 @@ export default function AssistantPage() {
         </button>
 
         {interactiveMenuOpen && (
-          <div style={{ width: 210, padding: 12, borderRadius: 12, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(4,10,14,0.95)", display: "flex", flexDirection: "column", gap: 8, boxShadow: "0 10px 30px rgba(0,0,0,0.6)" }}>
+          <div
+            style={{
+              width: isMobile ? "min(78vw, 240px)" : 210,
+              // a lista inteira não cabia na tela do celular e sumia cortada: agora ela mesma rola
+              maxHeight: "min(72vh, 560px)", overflowY: "auto", WebkitOverflowScrolling: "touch",
+              padding: 12, borderRadius: 12, border: "1px solid rgba(var(--accent-rgb),0.25)",
+              background: "rgba(4,10,14,0.97)", display: "flex", flexDirection: "column", gap: 8,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
+            }}
+          >
             <div style={{ ...mono, fontSize: 8.5, letterSpacing: 2, color: "rgba(207,239,251,0.45)" }}>🎮 JOGOS</div>
             {[
               { key: "velha", label: "Jogo da Velha" },

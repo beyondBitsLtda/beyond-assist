@@ -71,11 +71,21 @@ export default function LisaMemory({ onMood, onFinish }) {
     }
   }, [open, deck]);
 
-  // ---- resolução do par: um lugar só, para quem quer que tenha virado ----
+  // ---- resolução do par ----
+  // SEM timer aqui dentro, de propósito. Na versão anterior este efeito chamava setBusy(true) E
+  // agendava o setTimeout, com `busy` nas dependências: o setBusy disparava uma reexecução, o
+  // cleanup rodava clearTimeout e MATAVA o timer recém-agendado — as cartas nunca desviravam e
+  // a vez nunca passava pra Lisa (era esse o "ela não joga na vez dela").
+  // `resolvingRef` garante que cada par seja processado uma vez só, mesmo com reexecuções.
+  const resolvingRef = useRef(false);
+  const pendingTurnRef = useRef(null); // de quem era a vez quando o par errado foi virado
+
   useEffect(() => {
-    if (open.length !== 2 || busy || result) return;
+    if (open.length === 0) resolvingRef.current = false; // liberado pro próximo par
+    if (open.length !== 2 || result || resolvingRef.current) return;
     const [a, b] = open.map((i) => deck.find((c) => c.id === i));
     if (!a || !b) return;
+    resolvingRef.current = true;
     const who = turn;
 
     if (a.sym === b.sym) {
@@ -87,15 +97,23 @@ export default function LisaMemory({ onMood, onFinish }) {
       return;
     }
 
+    pendingTurnRef.current = who;
     setBusy(true);
     onMoodRef.current?.(who === "you" ? "giggle" : "annoyed");
+  }, [open, result, deck, turn]);
+
+  // ---- desvirar o par errado: efeito SÓ com `busy` na dependência ----
+  // Isolado assim, nenhuma outra mudança de estado cancela este timer.
+  useEffect(() => {
+    if (!busy) return;
     const id = setTimeout(() => {
+      const who = pendingTurnRef.current;
       setOpen([]);
       setBusy(false);
       setTurn(who === "you" ? "lisa" : "you");
     }, FLIP_BACK_MS);
     return () => clearTimeout(id);
-  }, [open, busy, result, deck, turn]);
+  }, [busy]);
 
   // ---- vez dela, em dois passos guiados por ESTADO (sem timeout aninhado com closure velho) ----
   // passo 1: escolhe a primeira carta

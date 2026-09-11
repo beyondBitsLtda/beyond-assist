@@ -45,6 +45,7 @@ export default function LisaAirHockey({ onMood, onFinish }) {
     // o taco dela prensa o disco na parede, a velocidade fica alta mas ele não sai do lugar.
     stuckMs: 0,
     sampleMs: 0,
+    backoffUntil: 0, // depois de destravar, ela RECUA por um instante (ver abaixo)
     lastSample: { x: W / 2, y: H / 2 },
   });
 
@@ -174,8 +175,11 @@ export default function LisaAirHockey({ onMood, onFinish }) {
           } else { s.puck.y = H - PUCK_R; s.puck.vy *= -1; }
         }
 
-        // taco dela: persegue o disco na metade dela, senão volta pra frente do gol
-        const goHome = s.puck.y > H / 2;
+        // taco dela: persegue o disco na metade dela, senão volta pra frente do gol.
+        // Durante o RECUO (logo após destravar o disco) ela vai pra casa mesmo com o disco no
+        // campo dela — sem isso ela reprensava o disco no canto em menos de um segundo e o
+        // empurrão de destravamento não adiantava nada.
+        const goHome = s.puck.y > H / 2 || now < s.backoffUntil;
         // limita o alcance lateral dela: colada na parede, ela prensava o disco contra ela
         const tx = goHome ? W / 2 : Math.max(MALLET_R + 6, Math.min(W - MALLET_R - 6, s.puck.x));
         const ty = goHome ? 60 : Math.min(H / 2 - MALLET_R, s.puck.y - 6);
@@ -201,13 +205,17 @@ export default function LisaAirHockey({ onMood, onFinish }) {
           s.lastSample = { x: s.puck.x, y: s.puck.y };
           s.sampleMs = 0;
         }
-        if (s.stuckMs >= 1000) {
-          // empurra pro centro da mesa, com um desvio pra não ficar previsível
-          const ang = Math.atan2(H / 2 - s.puck.y, W / 2 - s.puck.x) + (Math.random() - 0.5) * 0.7;
-          s.puck.vx = Math.cos(ang) * 300;
-          s.puck.vy = Math.sin(ang) * 300;
+        if (s.stuckMs >= 700) {
+          // Empurra pro CENTRO da mesa e, principalmente, MANDA ELA RECUAR. Só empurrar não
+          // resolvia: o taco dela continuava em cima e reprensava o disco na hora.
+          const ang = Math.atan2(H / 2 - s.puck.y, W / 2 - s.puck.x) + (Math.random() - 0.5) * 0.6;
+          s.puck.vx = Math.cos(ang) * 420;
+          s.puck.vy = Math.sin(ang) * 420;
+          // afasta o disco da parede na marra, senão ele sai raspando e trava de novo
+          s.puck.x = Math.max(PUCK_R + MALLET_R, Math.min(W - PUCK_R - MALLET_R, s.puck.x));
+          s.backoffUntil = now + 800;
           s.stuckMs = 0;
-          spark(s.puck.x, s.puck.y, 8);
+          spark(s.puck.x, s.puck.y, 10);
         }
       }
 
