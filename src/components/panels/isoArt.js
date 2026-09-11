@@ -408,7 +408,8 @@ export function drawCerca(P, grid) {
 /** Chão do terreno. No estilo bloco é grama furadinha com uma malha fraca por cima; no estilo
  * linha a grama some e sobra a malha, mais densa — ali é ela que descreve o terreno. */
 export function drawTerreno(P, grid) {
-  floorFill(P, 0, 0, grid, grid, 0.09, 0, 3);
+  // 0.09 fazia um tapete que competia com quem anda em cima dele
+  floorFill(P, 0, 0, grid, grid, 0.055, 0, 3);
   // no estilo linha a malha é o chão, mas de tile em tile ela vira um tapete que compete com
   // as construções — de dois em dois já descreve o terreno sem roubar a cena
   const passo = P.linha ? 2 : 3;

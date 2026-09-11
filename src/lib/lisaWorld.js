@@ -117,6 +117,9 @@ export const ACTIVITIES = [
   { key: "lago",      label: "olhando o lago",            ms: 10000, needs: "lago",     at: [23, 26] },
   { key: "mirante",   label: "no mirante",                ms: 11000, needs: "mirante",  at: [26, 4] },
   { key: "estrelas",  label: "olhando as estrelas",       ms: 10000, needs: null,       at: [18, 25], night: true },
+  // recolhida em casa: é por esta que dá pra clicar na casa e ver o dentro sem precisar
+  // mandar chuva pelo Modo Deus
+  { key: "dormir",    label: "recolhida em casa",         ms: 26000, needs: null,       dentro: true, night: true },
   { key: "obra",      label: "construindo",               ms: 10000, needs: null,       tool: "martelo", onlyOnBuild: true },
 ];
 

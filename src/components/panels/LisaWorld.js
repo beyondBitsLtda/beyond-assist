@@ -7,9 +7,15 @@ import {
   BUILD_ACTIVITY, CASA, GRID, PATH_TILES, WORLD_ITEMS,
   availableActivities, houseLevel, nextItem, unlockedItems, worldXp,
 } from "@/lib/lisaWorld.js";
-import { LISA, NOTE, STEVE, TOOLS } from "./worldSprites.js";
+import { ARMA, LADRAO, LISA, NOTE, SACO, STEVE, TOOLS, ZUMBI } from "./worldSprites.js";
 import { NALA } from "./nalaSprites.js";
 import * as A from "./isoArt.js";
+import CasaInterior from "./CasaInterior.js";
+import { pollWorldSignals, sendWorldSignal } from "@/lib/worldSignals.js";
+import {
+  GOD_EVENTS, HORDA, MORDIDA_ALCANCE, TIRO_ALCANCE, TIRO_INTERVALO,
+  criarInimigos, criarSorteador, passoInimigo, planoDe,
+} from "@/lib/worldEvents.js";
 
 // "Mundo da Lisa": o terreno dela, em ISOMÉTRICO, ocupando a tela inteira e rolável. Ela leva a
 // vida ali — rega a horta, varre, brinca com a Nala, ouve música, acende a fogueira, recebe o
@@ -44,6 +50,8 @@ const GAP_MIN_MS = 1600;
 const GAP_VAR_MS = 3200;
 const SEEN_KEY = "lisaWorld.seenXp";
 const ESTILO_KEY = "lisaWorld.estilo";
+const POLL_MS = 900;          // o Modo Deus escuta o outro aparelho nesse ritmo
+const SPAWN = [5, 28.5];      // por onde as ameaças entram: o portão
 
 const isNight = (h) => h < 6 || h >= 19;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -58,6 +66,9 @@ export default function LisaWorld({ fullscreen = false }) {
   const [seguir, setSeguir] = useState(true);
   const [lista, setLista] = useState(false);
   const [estreito, setEstreito] = useState(false);
+  const [painel, setPainel] = useState(false);   // painel do Modo Deus
+  const [interior, setInterior] = useState(false);
+  const [ultimo, setUltimo] = useState(null);    // último evento recebido, pro aviso na tela
 
   const canvasRef = useRef(null);
   const sceneRef = useRef({ unlocked: [], level: 1, night: isNight(new Date().getHours()), temCarta: false });
@@ -79,6 +90,20 @@ export default function LisaWorld({ fullscreen = false }) {
   const nextAtRef = useRef(0);
   const bagRef = useRef([]);
   const buildQueueRef = useRef([]);
+  const labelRef = useRef("");
+
+  // ---- Modo Deus ----
+  const climaRef = useRef(null);     // { tipo, until }
+  const horaRef = useRef(null);      // true = noite forçada, false = dia forçado, null = hora real
+  const eventoRef = useRef(null);    // o plano de reação em curso
+  const inimigosRef = useRef([]);
+  const mortesRef = useRef([]);      // baforadas de quem caiu
+  const falaRef = useRef(null);      // { texto, until }
+  const dentroRef = useRef(false);   // ela está DENTRO da casa
+  const armadaRef = useRef(false);
+  const tiroRef = useRef(null);      // traçante do disparo
+  const proxTiroRef = useRef(0);
+  const sorteadoresRef = useRef({});
 
   // tela estreita: os botões perdem o texto e viram só o ícone. Antes a fileira quebrava em duas
   // linhas no celular e cobria o que a Lisa estava fazendo.
@@ -152,6 +177,79 @@ export default function LisaWorld({ fullscreen = false }) {
     const at = a.at || [4 + Math.random() * (GRID - 8), 4 + Math.random() * (GRID - 8)];
     return { ...a, at, startedAt: now, phase: "indo" };
   }, []);
+
+  /** Onde fica cada lugar citado pelos planos de reação. */
+  const tileAlvo = useCallback((nome) => {
+    if (nome === "casa" || nome === "porta") return [CASA.tx + CASA.w + 0.8, CASA.ty + CASA.d * 0.5];
+    const it = WORLD_ITEMS.find((i) => i.key === nome);
+    if (!it || it.tx == null || !sceneRef.current.unlocked.includes(nome)) return null;
+    return [it.tx + (it.w || 1) + 0.8, it.ty + (it.d || 1) * 0.5];
+  }, []);
+
+  const fala = useCallback((grupo, now) => {
+    if (!grupo) return;
+    const s = (sorteadoresRef.current[grupo] ||= criarSorteador(grupo));
+    const texto = s();
+    if (texto) falaRef.current = { texto, until: now + 3400 };
+  }, []);
+
+  /**
+   * Aplica um evento do Modo Deus. Ela LARGA na hora o que estava fazendo — a graça é
+   * exatamente essa: você manda chover e ela abandona a horta no meio.
+   */
+  const aplicarEvento = useCallback((key) => {
+    const now = performance.now();
+    setUltimo({ key, at: Date.now() });
+    if (key === "calma") {
+      climaRef.current = null;
+      horaRef.current = null;
+      eventoRef.current = null;
+      inimigosRef.current = [];
+      dentroRef.current = false;
+      armadaRef.current = false;
+      setLabel("voltando ao normal");
+      return;
+    }
+    const ev = GOD_EVENTS.find((e) => e.key === key);
+    if (!ev) return;
+    if (ev.tipo === "clima") climaRef.current = { tipo: key, until: now + ev.ms };
+    if (ev.tipo === "hora") horaRef.current = key === "noite";
+    if (ev.tipo === "ameaca") {
+      inimigosRef.current = criarInimigos(key, SPAWN, HORDA[key] || 1).map((e) => ({ ...e, nasceEm: now + e.entraEm }));
+      armadaRef.current = false;
+    }
+    actRef.current = null;
+    dentroRef.current = false;
+    eventoRef.current = { key, passos: planoDe(key), i: -1, passo: null, ate: 0, until: now + (ev.ms || 4000), indo: false };
+  }, []);
+
+  // ---- escuta o outro aparelho ----
+  useEffect(() => {
+    let stop = false;
+    let timer = null;
+    let since = null;
+    let primed = false;
+    const loop = async () => {
+      try {
+        const { now, signals } = await pollWorldSignals(since);
+        since = now;
+        // a primeira leitura traz o rabo da fila (eventos de antes de eu abrir) — descarta
+        if (primed) for (const sig of signals) if (sig.kind === "evento") aplicarEvento(sig.payload?.evento);
+        primed = true;
+      } catch {
+        /* sem rede ou sem tabela: o painel local continua funcionando */
+      }
+      if (!stop) timer = setTimeout(loop, POLL_MS);
+    };
+    loop();
+    return () => { stop = true; clearTimeout(timer); };
+  }, [aplicarEvento]);
+
+  /** Manda pro outro aparelho E aplica aqui: assim funciona com duas telas ou com uma só. */
+  const mandar = useCallback((key) => {
+    sendWorldSignal("evento", { evento: key });
+    aplicarEvento(key);
+  }, [aplicarEvento]);
 
   // ---- laço de desenho ----
   useEffect(() => {
@@ -235,13 +333,19 @@ export default function LisaWorld({ fullscreen = false }) {
         hex = rs.getPropertyValue("--accent-hex").trim() || hex;
       }
       const sc = sceneRef.current;
+      // trocar o rótulo é setState: chamar a cada quadro rerenderizava o componente inteiro 60
+      // vezes por segundo à toa
+      const dizer = (t) => { if (t !== labelRef.current) { labelRef.current = t; setLabel(t); } };
+      // o Modo Deus manda na hora do dia: null = hora de verdade do aparelho
+      const noite = horaRef.current ?? sc.night;
+      const cena = { ...sc, night: noite };
       const linha = estiloRef.current === "linha";
       const size = BASE * zoomRef.current; // célula na TELA
       ctx.fillStyle = "#03080c";
       ctx.fillRect(0, 0, w, h);
 
       // ---- o mundo inteiro, rasterizado uma vez só, em tamanho fixo ----
-      const key = `${accent}|${sc.unlocked.join(",")}|${sc.level}|${sc.night}|${sc.temCarta}|${linha}`;
+      const key = `${accent}|${sc.unlocked.join(",")}|${sc.level}|${noite}|${sc.temCarta}|${linha}`;
       if (key !== staticKey) {
         staticKey = key;
         offScale = A.WORLD_W * BASE * A.WORLD_H * BASE * 4 < 9e6 ? 2 : 1;
@@ -252,11 +356,11 @@ export default function LisaWorld({ fullscreen = false }) {
         offCtx.shadowBlur = BASE * 1.1;
         offCtx.shadowColor = hex;
         const OP = { linha, paint: makePaint(offCtx, BASE, linha) };
-        if (sc.night) for (let i = 0; i < 90; i++) OP.paint((i * 53) % A.WORLD_W, (i * 29) % 42, 0.3 + 0.2 * Math.sin(i));
+        if (noite) for (let i = 0; i < 90; i++) OP.paint((i * 53) % A.WORLD_W, (i * 29) % 42, 0.3 + 0.2 * Math.sin(i));
         A.drawTerreno(OP, GRID);
         if (sc.unlocked.includes("caminho")) A.drawCaminho(OP, PATH_TILES);
         if (sc.unlocked.includes("cerca")) A.drawCerca(OP, GRID);
-        for (const o of placed(sc)) drawObj(OP, o.key, o.item, sc, 0);
+        for (const o of placed(sc)) drawObj(OP, o.key, o.item, cena, 0);
         if (sc.unlocked.includes("chamine")) A.drawChamine(OP, CASA, sc.level);
         if (sc.unlocked.includes("antena")) A.drawAntena(OP, CASA, sc.level);
         if (sc.unlocked.includes("solar") && sc.unlocked.includes("oficina")) A.drawSolar(OP, WORLD_ITEMS.find((i) => i.key === "oficina"));
@@ -266,13 +370,76 @@ export default function LisaWorld({ fullscreen = false }) {
       // ---- atividade ----
       const lisa = lisaRef.current;
       const nala = nalaRef.current;
+      const ev = eventoRef.current;
       let a = actRef.current;
-      if (!a && now > nextAtRef.current) {
+      if (!ev && !a && now > nextAtRef.current) {
         a = pickActivity(now);
         if (a) {
           actRef.current = a;
-          lisa.targ = a.at;
-          setLabel(a.label);
+          if (a.dentro) lisa.targ = tileAlvo("casa");
+          else lisa.targ = a.at;
+          dizer(a.label);
+        }
+      }
+
+      // ---- o plano de reação do Modo Deus ----
+      if (ev) {
+        const avancar = () => {
+          ev.i++;
+          let pas = ev.passos[ev.i];
+          while (pas && pas.needs && !sc.unlocked.includes(pas.needs)) { ev.i++; pas = ev.passos[ev.i]; }
+          ev.passo = pas || null;
+          if (!pas) return;
+          ev.ate = now + (pas.ms || 0);
+          ev.indo = false;
+          if (pas.fala) fala(pas.fala, now);
+          if (pas.ir) {
+            const t = tileAlvo(pas.ir);
+            if (t) { lisa.targ = t; ev.indo = true; }
+          }
+          if (pas.faz === "dentro") dentroRef.current = true;
+        };
+        if (ev.i < 0) avancar();
+        const pas = ev.passo;
+        // ela só fica armada quando CHEGA na oficina. Armá-la ao sair fazia com que ela
+        // fosse atirando pelo caminho e a horda acabasse antes de a luta começar.
+        if (pas?.faz === "pegar-arma" && !lisa.moving) armadaRef.current = true;
+        const vivos = inimigosRef.current.filter((e) => e.vivo).length;
+        let terminou = false;
+        if (!pas) terminou = false;
+        else if (ev.indo && lisa.moving) terminou = false;
+        else if (pas.faz === "lutar" || pas.faz === "perseguir") terminou = vivos === 0 || now > ev.ate;
+        else if (pas.faz === "dentro") terminou = false; // fica lá até o evento acabar
+        else terminou = now > ev.ate;
+        if (terminou && ev.i < ev.passos.length) avancar();
+        // o plano acabou e não sobrou ameaça: encerra na hora em vez de deixar o evento
+        // pendurado até o tempo dele estourar (era isso que travava o rótulo em "reagindo")
+        const acabou = !ev.passo && ev.i >= ev.passos.length;
+        if (now > ev.until || (acabou && vivos === 0 && !climaRef.current)) {
+          eventoRef.current = null;
+          dentroRef.current = false;
+          armadaRef.current = false;
+          inimigosRef.current = [];
+          nextAtRef.current = now + 1200;
+          dizer("voltando ao normal");
+        } else if (pas) {
+          dizer(
+            pas.faz === "lutar" ? `enfrentando os zumbis (${vivos} de pé)`
+            : pas.faz === "perseguir" ? "correndo atrás do ladrão"
+            : pas.faz === "recolher" ? "tirando a roupa do varal"
+            : pas.faz === "segurar" ? "segurando o varal"
+            : pas.faz === "dentro" ? "abrigada em casa"
+            : pas.faz === "pegar-arma" ? "buscando alguma coisa na oficina"
+            : pas.faz === "receber" ? "recebendo o Steve"
+            : ev.key === "zumbis" || ev.key === "ladrao" ? "comemorando"
+            : ev.key === "chuva" ? "tomando chuva"
+            : ev.key === "neve" ? "no meio da neve"
+            : ev.key === "vento" ? "no meio do vendaval"
+            : "reagindo"
+          );
+        }
+        if (pas?.faz === "receber" && !steveRef.current) {
+          steveRef.current = { tx: CASA.tx + CASA.w, ty: CASA.ty + CASA.d, targ: [lisa.tx + 1.6, lisa.ty + 1.6], moving: true, flip: false };
         }
       }
 
@@ -294,24 +461,88 @@ export default function LisaWorld({ fullscreen = false }) {
         a.until = now + a.ms;
         a.startedAt = now;
         if (a.key === "steve") steveRef.current = { tx: CASA.tx + CASA.w, ty: CASA.ty + CASA.d, targ: [lisa.tx + 1.6, lisa.ty + 1.6], moving: true, flip: false };
+        if (a.dentro) dentroRef.current = true; // chegou na porta: entrou
       }
       if (a?.phase === "fazendo" && now > a.until) {
         actRef.current = null;
         steveRef.current = null;
+        dentroRef.current = false;
         nextAtRef.current = now + GAP_MIN_MS + Math.random() * GAP_VAR_MS;
-        setLabel("dando uma volta pelo terreno");
+        dizer("dando uma volta pelo terreno");
       }
+      const fazEv = eventoRef.current?.passo?.faz;
       lisa.pose = lisa.moving
         ? (Math.floor(now / STEP_MS) % 2 ? "walkA" : "walkB")
+        : fazEv === "lutar" && armadaRef.current
+        ? "arma"
+        : fazEv === "recolher" || fazEv === "segurar"
+        ? "work"
+        : fazEv === "receber"
+        ? "armUp"
         : a?.phase === "fazendo"
         ? (a.sit ? "sit" : a.tool ? "work" : a.key === "steve" || a.key === "nala" ? "armUp" : "idle")
         : "idle";
 
       const brincando = a?.key === "nala" && a.phase === "fazendo";
-      nala.targ = brincando
+      // com ameaça no terreno a Nala larga tudo e vai pra cima do mais próximo
+      const ameaca = inimigosRef.current.find((e) => e.vivo && now >= e.nasceEm);
+      nala.targ = ameaca
+        ? [ameaca.tx, ameaca.ty]
+        : brincando
         ? [lisa.tx + 2.5 + Math.sin(now / 1400) * 2.5, lisa.ty + 2.5 + Math.cos(now / 1100) * 2.5]
         : [lisa.tx - 1.6, lisa.ty + 1.6];
+      // e ela persegue o ladrão de perto
+      if (eventoRef.current?.passo?.faz === "perseguir" && ameaca) lisa.targ = [ameaca.tx, ameaca.ty];
       walk(nala, brincando ? NALA_SPEED * 1.4 : NALA_SPEED);
+
+      // ---- as ameaças ----
+      const inimigos = inimigosRef.current;
+      if (inimigos.length) {
+        const alvoLisa = [lisa.tx, lisa.ty];
+        for (const e of inimigos) {
+          if (!e.vivo || now < e.nasceEm) continue;
+          if (e.tipo === "ladrao") {
+            // vai até a casa, "leva" alguma coisa e foge pelo portão
+            if (!e.fugindo) {
+              const porta = tileAlvo("casa");
+              if (passoInimigo(e, porta, dt, SPAWN)) { e.fugindo = true; e.levou = true; }
+            } else {
+              passoInimigo(e, alvoLisa, dt, SPAWN);
+              if (Math.hypot(e.tx - SPAWN[0], e.ty - SPAWN[1]) < 1.2) e.vivo = false;
+            }
+            // quem pega o ladrão é quem chegar perto: ela ou a Nala
+            const perto = Math.min(Math.hypot(e.tx - lisa.tx, e.ty - lisa.ty), Math.hypot(e.tx - nala.tx, e.ty - nala.ty));
+            if (perto < 1.5) { e.vivo = false; mortesRef.current.push({ tx: e.tx, ty: e.ty, until: now + 800 }); }
+          } else {
+            passoInimigo(e, alvoLisa, dt, SPAWN);
+          }
+        }
+        // ela atira, se tiver ido buscar a arma
+        if (armadaRef.current && now > proxTiroRef.current) {
+          let alvo = null;
+          let melhor = TIRO_ALCANCE;
+          for (const e of inimigos) {
+            if (!e.vivo || now < e.nasceEm) continue;
+            const d = Math.hypot(e.tx - lisa.tx, e.ty - lisa.ty);
+            if (d < melhor) { melhor = d; alvo = e; }
+          }
+          if (alvo) {
+            alvo.vida--;
+            proxTiroRef.current = now + TIRO_INTERVALO;
+            tiroRef.current = { de: [lisa.tx, lisa.ty], para: [alvo.tx, alvo.ty], until: now + 130 };
+            if (alvo.vida <= 0) { alvo.vivo = false; mortesRef.current.push({ tx: alvo.tx, ty: alvo.ty, until: now + 800 }); }
+          }
+        }
+        // a Nala morde quem chegar perto dela
+        for (const e of inimigos) {
+          if (!e.vivo || now < e.nasceEm) continue;
+          if (Math.hypot(e.tx - nala.tx, e.ty - nala.ty) < MORDIDA_ALCANCE && now > (e.proxMordida || 0)) {
+            e.proxMordida = now + 2000; // a Nala ajuda, mas não resolve sozinha
+            e.vida--;
+            if (e.vida <= 0) { e.vivo = false; mortesRef.current.push({ tx: e.tx, ty: e.ty, until: now + 800 }); }
+          }
+        }
+      }
 
       const st = steveRef.current;
       if (st && a) {
@@ -344,19 +575,67 @@ export default function LisaWorld({ fullscreen = false }) {
       ctx.shadowBlur = size * 1.1;
       ctx.shadowColor = hex;
       const P = { linha, paint: makePaint(ctx, size, linha, cam.x, cam.y) };
-      const put = (rows, p, flip) => {
+      /**
+       * Sombra no chão antes do personagem. Não é enfeite: sem ela quem anda some no meio do
+       * terreno, porque a silhueta tem o MESMO brilho das construções e a grama atrás é densa.
+       * A mancha escura abre um buraco no fundo e ainda assenta a figura no chão.
+       */
+      const sombra = (p, raio) => {
+        ctx.save();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "rgba(3,8,12,0.82)";
+        ctx.beginPath();
+        ctx.ellipse((p.x - cam.x) * size, (p.y - cam.y) * size, raio * size, raio * size * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      };
+      /**
+       * `contorno` desenha a MESMA silhueta em escuro, deslocada uma célula pros quatro lados,
+       * antes da figura. Sem isso quem anda some quando passa na frente de uma construção clara:
+       * a silhueta tem o mesmo brilho do cenário e some dentro dele. Fica só pros personagens —
+       * a horda inteira com contorno custaria caro à toa.
+       */
+      const put = (rows, p, flip, contorno = false) => {
+        sombra(p, rows[0].length * 0.42);
         const ox = Math.round(p.x - rows[0].length / 2);
         const oy = Math.round(p.y - (rows.length - 1));
+        const col = (c, r) => ox + (flip ? rows[r].length - 1 - c : c);
+        if (contorno) {
+          ctx.save();
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = "rgba(3,8,12,0.92)";
+          for (let r = 0; r < rows.length; r++)
+            for (let c = 0; c < rows[r].length; c++) {
+              if (rows[r][c] !== "#") continue;
+              const gx = col(c, r);
+              const gy = oy + r;
+              for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]])
+                ctx.fillRect((gx + dx - cam.x) * size, (gy + dy - cam.y) * size, size, size);
+            }
+          ctx.restore();
+        }
         for (let r = 0; r < rows.length; r++)
           for (let c = 0; c < rows[r].length; c++)
-            if (rows[r][c] === "#") P.paint(ox + (flip ? rows[r].length - 1 - c : c), oy + r, 1);
+            if (rows[r][c] === "#") P.paint(col(c, r), oy + r, 1);
       };
 
       const pn = A.iso(nala.tx, nala.ty);
-      put(nala.moving ? (Math.floor(now / 110) % 2 ? NALA.runA : NALA.runB) : Math.floor(now / 420) % 2 ? NALA.wag : NALA.idle, pn, nala.flip);
+      put(nala.moving ? (Math.floor(now / 110) % 2 ? NALA.runA : NALA.runB) : Math.floor(now / 420) % 2 ? NALA.wag : NALA.idle, pn, nala.flip, true);
 
       const pl = A.iso(lisa.tx, lisa.ty);
-      put(LISA[lisa.pose] || LISA.idle, pl, lisa.flip);
+      // dentro de casa ela não aparece no terreno — o que aparece é a janela acesa
+      if (!dentroRef.current) put(LISA[lisa.pose] || LISA.idle, pl, lisa.flip, true);
+      else {
+        const w1 = A.iso(CASA.tx + CASA.w * 0.45, CASA.ty + CASA.d);
+        for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) P.paint(Math.round(w1.x - 4 + i), Math.round(w1.y - 11 - j + Math.round(i / 2)), 1);
+      }
+      // a arminha na mão, enquanto está armada
+      if (!dentroRef.current && armadaRef.current && !lisa.moving) {
+        const hx = Math.round(pl.x + (lisa.flip ? -9 : 5));
+        for (let r = 0; r < ARMA.length; r++)
+          for (let c = 0; c < ARMA[r].length; c++)
+            if (ARMA[r][c] === "#") P.paint(hx + c, Math.round(pl.y - 12 + r), 1);
+      }
       if (a?.tool && a.phase === "fazendo") {
         const hx = Math.round(pl.x + (lisa.flip ? -8 : 4));
         const rows = TOOLS[a.tool];
@@ -369,16 +648,57 @@ export default function LisaWorld({ fullscreen = false }) {
             P.paint(Math.round(hx + 2 + t * 2), Math.round(pl.y - 4 + t * 4), 0.9 - t * 0.4);
           }
       }
-      if (st) put(st.moving ? STEVE.idle : STEVE.armUp, A.iso(st.tx, st.ty), st.flip);
+      if (st) put(st.moving ? STEVE.idle : STEVE.armUp, A.iso(st.tx, st.ty), st.flip, true);
+
+      // ---- ameaças, disparo e quem caiu ----
+      for (const e of inimigosRef.current) {
+        if (!e.vivo || now < e.nasceEm) continue;
+        const pe = A.iso(e.tx, e.ty);
+        const rows = e.tipo === "ladrao"
+          ? LADRAO.walk
+          : Math.floor(now / 220) % 2 ? ZUMBI.walkA : ZUMBI.walkB;
+        put(rows, pe, e.flip, e.tipo === "ladrao");
+        if (e.tipo === "ladrao" && e.levou)
+          for (let r = 0; r < SACO.length; r++)
+            for (let c = 0; c < SACO[r].length; c++)
+              if (SACO[r][c] === "#") P.paint(Math.round(pe.x) + 6 + c, Math.round(pe.y) - 14 + r, 0.9);
+      }
+      if (tiroRef.current) {
+        if (now > tiroRef.current.until) tiroRef.current = null;
+        else {
+          const a1 = A.iso(tiroRef.current.de[0], tiroRef.current.de[1]);
+          const a2 = A.iso(tiroRef.current.para[0], tiroRef.current.para[1]);
+          const n = Math.max(1, Math.round(Math.hypot(a2.x - a1.x, a2.y - a1.y)));
+          for (let i = 0; i <= n; i += 2)
+            P.paint(Math.round(a1.x + (a2.x - a1.x) * (i / n)), Math.round(a1.y - 12 + (a2.y - 12 - a1.y + 12) * (i / n)), 0.95);
+        }
+      }
+      mortesRef.current = mortesRef.current.filter((m) => now < m.until);
+      for (const m of mortesRef.current) {
+        const pm = A.iso(m.tx, m.ty);
+        const t = 1 - (m.until - now) / 800;
+        for (let k = 0; k < 7; k++) {
+          const ang = (k / 7) * Math.PI * 2;
+          P.paint(Math.round(pm.x + Math.cos(ang) * t * 9), Math.round(pm.y - 6 + Math.sin(ang) * t * 5), 1 - t);
+        }
+      }
 
       // o que estiver NA FRENTE deles é redesenhado — senão ela aparece em cima da casa
+      // Redesenhar quem está na frente deles custa caro: cada célula é um roundRect COM sombra,
+      // e uma casa sozinha são centenas delas. Aqui o brilho sai (são só tapumes, ninguém olha
+      // pra eles) e no máximo dois objetos entram — foi isso que devolveu o quadro a 60fps.
       const frente = Math.min(lisa.tx + lisa.ty, nala.tx + nala.ty);
+      ctx.shadowBlur = 0;
+      let tapumes = 0;
       for (const o of placed(sc)) {
+        if (tapumes >= 2) break;
         if (o.item.tx + o.item.ty <= frente) continue;
         const p = A.iso(o.item.tx, o.item.ty + (o.item.d || 1));
-        if (Math.abs(p.x - pl.x) > 80 || Math.abs(p.y - pl.y) > 70) continue;
-        drawObj(P, o.key, o.item, sc, now);
+        if (Math.abs(p.x - pl.x) > 46 || Math.abs(p.y - pl.y) > 40) continue;
+        drawObj(P, o.key, o.item, cena, now);
+        tapumes++;
       }
+      ctx.shadowBlur = size * 1.1;
 
       // ---- partículas ----
       if (sc.unlocked.includes("fogueira")) {
@@ -408,12 +728,59 @@ export default function LisaWorld({ fullscreen = false }) {
         }
       }
 
+      // ---- clima: desenhado em coordenada de TELA, não do mundo. Chuva presa ao terreno
+      // rolaria junto com a câmera, o que não é o que chuva faz. ----
+      const clima = climaRef.current;
+      if (clima && now > clima.until) climaRef.current = null;
+      if (clima && now <= clima.until) {
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = `rgba(${accent},0.55)`;
+        const n = clima.tipo === "neve" ? 90 : 150;
+        for (let i = 0; i < n; i++) {
+          const seed = i * 97.13;
+          if (clima.tipo === "chuva") {
+            const x = (seed * 7 + now * 0.22) % (w + 60) - 30;
+            const y = (seed * 13 + now * 1.25) % (h + 40);
+            ctx.fillRect(x, y, 1.5, 7);
+          } else if (clima.tipo === "neve") {
+            const x = (seed * 11 + now * 0.05 + Math.sin(now / 900 + i) * 22) % (w + 40) - 20;
+            const y = (seed * 17 + now * 0.16) % (h + 20);
+            ctx.fillRect(x, y, 2.5, 2.5);
+          } else {
+            const x = (seed * 19 + now * 1.9) % (w + 120) - 60;
+            const y = (seed * 23) % h;
+            ctx.fillRect(x, y, 16, 1.2);
+          }
+        }
+        ctx.shadowBlur = size * 1.1;
+      }
+
+      // ---- o que ela está dizendo, num balão em cima dela ----
+      if (falaRef.current && now > falaRef.current.until) falaRef.current = null;
+      if (falaRef.current && !dentroRef.current) {
+        ctx.shadowBlur = 0;
+        const texto = falaRef.current.texto;
+        ctx.font = `${Math.max(10, Math.round(size * 1.7))}px 'JetBrains Mono',monospace`;
+        const tw = ctx.measureText(texto).width;
+        const bx = (pl.x - cam.x) * size - tw / 2 - 8;
+        const by = (pl.y - cam.y) * size - 23 * size - 26;
+        ctx.fillStyle = "rgba(4,10,14,0.92)";
+        ctx.beginPath();
+        ctx.roundRect(bx, by, tw + 16, 24, 6);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(${accent},0.5)`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = "#eafcff";
+        ctx.fillText(texto, bx + 8, by + 16);
+      }
+
       ctx.shadowBlur = 0;
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [pickActivity]);
+  }, [pickActivity, tileAlvo, fala]);
 
   // ---- arrastar pra rolar, pinça pra aproximar ----
   const dist2 = () => {
@@ -421,7 +788,9 @@ export default function LisaWorld({ fullscreen = false }) {
     return Math.hypot(a.x - b.x, a.y - b.y);
   };
   const onDown = (e) => {
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    // capturar o ponteiro pode lançar (ponteiro já solto, ou evento sintético): se lançar aqui,
+    // o resto do handler não roda e o arrasto/clique nunca começa
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch {}
     ptrsRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (ptrsRef.current.size === 2) {
       pinchRef.current = { d: dist2(), zoom: zoomRef.current };
@@ -444,6 +813,22 @@ export default function LisaWorld({ fullscreen = false }) {
     camRef.current.y = d.cam.y - (e.clientY - d.y) / (BASE * zoomRef.current);
   };
   const onUp = (e) => {
+    const d = dragRef.current;
+    // clique curto (não arrasto) em cima da casa, com ela dentro: abre o interior
+    if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6 && dentroRef.current) {
+      const r = e.currentTarget.getBoundingClientRect();
+      const size = BASE * zoomRef.current;
+      const cx = camRef.current.x + (e.clientX - r.left) / size;
+      const cy = camRef.current.y + (e.clientY - r.top) / size;
+      const cantos = [
+        A.iso(CASA.tx, CASA.ty), A.iso(CASA.tx + CASA.w, CASA.ty),
+        A.iso(CASA.tx + CASA.w, CASA.ty + CASA.d), A.iso(CASA.tx, CASA.ty + CASA.d),
+      ];
+      const xs = cantos.map((c) => c.x);
+      const ys = cantos.map((c) => c.y);
+      const alto = A.casaAltura(sceneRef.current.level) + 10;
+      if (cx >= Math.min(...xs) && cx <= Math.max(...xs) && cy >= Math.min(...ys) - alto && cy <= Math.max(...ys)) setInterior(true);
+    }
     ptrsRef.current.delete(e.pointerId);
     if (ptrsRef.current.size < 2) pinchRef.current = null;
     if (ptrsRef.current.size === 0) dragRef.current = null;
@@ -500,7 +885,10 @@ export default function LisaWorld({ fullscreen = false }) {
           </button>
           <button onClick={() => { setSeguir(false); setZoom((z) => clampZoom(z / 1.25)); }} style={btn()} title="afastar">−</button>
           <button onClick={() => { setSeguir(false); setZoom((z) => clampZoom(z * 1.25)); }} style={btn()} title="aproximar">+</button>
-          <button onClick={() => setLista((v) => !v)} style={btn(lista)} title="construções">{lista ? "✕" : "☰"}</button>
+          <button onClick={() => { setPainel((v) => !v); setLista(false); }} style={btn(painel)} title="Modo Deus: manda chuva, zumbis e o Steve — de qualquer aparelho">
+            ⚡{estreito ? "" : " MODO DEUS"}
+          </button>
+          <button onClick={() => { setLista((v) => !v); setPainel(false); }} style={btn(lista)} title="construções">{lista ? "✕" : "☰"}</button>
         </div>
       </div>
 
@@ -509,6 +897,11 @@ export default function LisaWorld({ fullscreen = false }) {
           {novas.length > 0 && (
             <div style={{ ...mono, fontSize: estreito ? 8.5 : 9.5, letterSpacing: 1, color: GR, maxHeight: 30, overflow: "hidden", ...shadow }}>
               ✦ DESDE A SUA ÚLTIMA VISITA ELA CONSTRUIU: {novas.map((n) => n.label).join(", ")}
+            </div>
+          )}
+          {label.includes("casa") && (
+            <div style={{ ...mono, fontSize: estreito ? 8.5 : 9.5, letterSpacing: 1, color: CY, ...shadow }}>
+              🏠 ELA ESTÁ DENTRO — TOQUE NA CASA PRA VER
             </div>
           )}
           <div style={{ ...mono, fontSize: estreito ? 8.5 : 9, letterSpacing: 1, display: "flex", gap: 12, flexWrap: "wrap", color: "rgba(207,239,251,0.72)", ...shadow }}>
@@ -527,6 +920,44 @@ export default function LisaWorld({ fullscreen = false }) {
             </div>
           )}
         </div>
+      )}
+
+      {painel && (
+        <div style={{ position: "absolute", top: 52, right: 10, width: estreito ? "min(86vw, 300px)" : 300, maxHeight: "74%", overflowY: "auto", padding: 12, borderRadius: 10, border: `1px solid ${CY}`, background: "rgba(4,10,14,0.97)", display: "flex", flexDirection: "column", gap: 7 }}>
+          <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: CY }}>⚡ MODO DEUS</div>
+          <div style={{ fontSize: 11, lineHeight: 1.6, color: "rgba(207,239,251,0.7)" }}>
+            Abra o mundo noutro aparelho e mande daqui — a ação acontece lá. Ela larga o que estiver
+            fazendo e reage de verdade.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            {GOD_EVENTS.map((e) => (
+              <button
+                key={e.key}
+                onClick={() => mandar(e.key)}
+                style={{
+                  ...mono, fontSize: 9.5, letterSpacing: 0.5, padding: "10px 8px", borderRadius: 8, cursor: "pointer",
+                  textAlign: "left", lineHeight: 1.4, gridColumn: e.key === "calma" ? "span 2" : undefined,
+                  border: `1px solid ${e.tipo === "ameaca" ? OR : e.key === "calma" ? "rgba(123,216,143,0.5)" : "rgba(var(--accent-rgb),0.3)"}`,
+                  background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff",
+                }}
+              >
+                {e.icon} {e.label}
+              </button>
+            ))}
+          </div>
+          {ultimo && (
+            <div style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.5)" }}>
+              último: {GOD_EVENTS.find((e) => e.key === ultimo.key)?.label || ultimo.key}
+            </div>
+          )}
+          <div style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.35)", lineHeight: 1.6 }}>
+            os eventos viajam pela mesma fila do jogo do disco — não precisou de tabela nova
+          </div>
+        </div>
+      )}
+
+      {interior && (
+        <CasaInterior unlocked={world?.unlocked || []} night={horaRef.current ?? sceneRef.current.night} onClose={() => setInterior(false)} />
       )}
 
       {lista && world && (

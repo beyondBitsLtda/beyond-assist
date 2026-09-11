@@ -12,6 +12,10 @@ import {
   ACTIVITIES, CASA, GRID, PATH_TILES, WORLD_ITEMS,
   availableActivities, houseLevel, nextItem, unlockedItems, worldXp,
 } from "../src/lib/lisaWorld.js";
+import {
+  FALAS, GOD_EVENTS, HORDA, MORDIDA_ALCANCE, TIRO_INTERVALO, ZUMBI_VIDA,
+  criarInimigos, planoDe,
+} from "../src/lib/worldEvents.js";
 
 let fails = 0;
 const ok = (name, cond, extra = "") => {
@@ -79,6 +83,42 @@ for (const i of WORLD_ITEMS) {
   console.log(`  ${String(i.xp).padStart(5)} pts  ~${String(partidas).padStart(4)} partidas  ${i.label.padEnd(22)} (${ativ} atividades no terreno)`);
 }
 console.log(`\nou, só no pair programming médio (70 pts): ${Math.ceil(xps.at(-1) / 70)} sessões pro terreno completo`);
+
+// --- Modo Deus: os eventos e o que ela faz em cada um ---
+console.log("");
+const comPlano = GOD_EVENTS.filter((e) => e.tipo !== "parar" && e.tipo !== "hora");
+ok("todo evento tem plano de reação", comPlano.every((e) => planoDe(e.key).length > 0),
+  comPlano.map((e) => e.key + ":" + planoDe(e.key).length).join(" "));
+const passos = GOD_EVENTS.flatMap((e) => planoDe(e.key));
+ok("toda fala citada por um plano existe", passos.every((p) => !p.fala || FALAS[p.fala]),
+  passos.filter((p) => p.fala && !FALAS[p.fala]).map((p) => p.fala).join(", "));
+ok("todo `needs` de passo aponta pra uma construção real",
+  passos.every((p) => !p.needs || WORLD_ITEMS.some((i) => i.key === p.needs)));
+ok("todo destino de passo é um lugar conhecido",
+  passos.every((p) => !p.ir || ["casa", "porta"].includes(p.ir) || WORLD_ITEMS.some((i) => i.key === p.ir)));
+ok("nenhum grupo de falas está vazio", Object.values(FALAS).every((v) => v.length >= 3));
+ok("a horda entra em fila, não de uma vez", criarInimigos("zumbis", [5, 28], HORDA.zumbis).every((e, i) => i === 0 || e.entraEm > 0));
+
+// A luta precisa ser ENFRENTÁVEL: nem passeio de dois tiros, nem eterna. Com 6 zumbis de 2 de
+// vida a Nala limpava a horda sozinha enquanto a Lisa ia buscar a arma, e a luta nem acontecia.
+const simularLuta = () => {
+  const horda = criarInimigos("zumbis", [5, 28], HORDA.zumbis);
+  let t = 0;
+  let proxTiro = 0;
+  let proxMordida = 0;
+  while (t < 120000 && horda.some((e) => e.vivo)) {
+    t += 50;
+    const alvo = horda.find((e) => e.vivo && t >= e.entraEm);
+    if (!alvo) continue;
+    if (t >= proxTiro) { alvo.vida--; proxTiro = t + TIRO_INTERVALO; }
+    if (t >= proxMordida) { alvo.vida--; proxMordida = t + 2000; }
+    if (alvo.vida <= 0) alvo.vivo = false;
+  }
+  return t / 1000;
+};
+const dur = simularLuta();
+ok("a luta contra a horda dura um tempo decente", dur > 8 && dur < 45, dur.toFixed(1) + "s");
+console.log("  (" + HORDA.zumbis + " zumbis de " + ZUMBI_VIDA + " de vida, um tiro a cada " + TIRO_INTERVALO + "ms, mais a mordida da Nala)");
 
 console.log(fails ? `\n${fails} FALHA(S)` : "\nTUDO PASSOU");
 process.exit(fails ? 1 : 0);
