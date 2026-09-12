@@ -88,52 +88,13 @@ export function houseLevel(xp) {
   return 1;
 }
 
-/**
- * O que ela faz no terreno. `needs` é a construção necessária — sem ela a atividade nem entra
- * no sorteio, que é o que faz o mundo ficar mais movimentado conforme cresce.
- *
- * `at` é o tile pra onde ela caminha; sem ele, ela escolhe um canto qualquer e passeia.
- * `night` prende a atividade ao escuro (fogueira e estrelas só fazem sentido de noite).
- */
-export const ACTIVITIES = [
-  { key: "passear",   label: "passeando pelo terreno",    ms: 8000,  needs: null },
-  { key: "varrer",    label: "varrendo o quintal",        ms: 9000,  needs: null,       at: [10, 18], tool: "vassoura" },
-  { key: "nala",      label: "brincando com a Nala",      ms: 14000, needs: null,       at: [13, 21] },
-  { key: "regar",     label: "regando a horta",           ms: 10000, needs: "horta",    at: [7, 15],  tool: "regador" },
-  { key: "varal",     label: "estendendo roupa",          ms: 9000,  needs: "varal",    at: [21, 7] },
-  { key: "descansar", label: "descansando no banco",      ms: 12000, needs: "banco",    at: [11, 16], sit: true },
-  { key: "correio",   label: "vendo se chegou carta",     ms: 7000,  needs: "correio",  at: [3, 25] },
-  { key: "musica",    label: "ouvindo música",            ms: 12000, needs: "radio",    at: [14, 13] },
-  { key: "flores",    label: "cuidando das flores",       ms: 9000,  needs: "flores",   at: [26, 14], tool: "regador" },
-  { key: "mesa",      label: "arrumando a mesa",          ms: 9000,  needs: "mesa",     at: [21, 16] },
-  { key: "churras",   label: "acendendo a churrasqueira", ms: 11000, needs: "churras",  at: [7, 19] },
-  { key: "balanco",   label: "no balanço",                ms: 11000, needs: "balanco",  at: [4, 21] },
-  { key: "poco",      label: "tirando água do poço",      ms: 9000,  needs: "poco",     at: [10, 24] },
-  { key: "fogueira",  label: "na fogueira",               ms: 13000, needs: "fogueira", at: [16, 20], night: true },
-  { key: "steve",     label: "recebendo o Steve",         ms: 16000, needs: "antena",   at: [9, 12] },
-  { key: "oficina",   label: "mexendo na oficina",        ms: 12000, needs: "oficina",  at: [15, 6],  tool: "martelo" },
-  { key: "estufa",    label: "cuidando da estufa",        ms: 10000, needs: "estufa",   at: [22, 5] },
-  { key: "piscina",   label: "na beira da piscina",       ms: 13000, needs: "piscina",  at: [21, 21] },
-  { key: "lago",      label: "olhando o lago",            ms: 10000, needs: "lago",     at: [23, 26] },
-  { key: "mirante",   label: "no mirante",                ms: 11000, needs: "mirante",  at: [26, 4] },
-  { key: "estrelas",  label: "olhando as estrelas",       ms: 10000, needs: null,       at: [18, 25], night: true },
-  // recolhida em casa: é por esta que dá pra clicar na casa e ver o dentro sem precisar
-  // mandar chuva pelo Modo Deus
-  { key: "dormir",    label: "recolhida em casa",         ms: 26000, needs: null,       dentro: true, night: true },
-  { key: "obra",      label: "construindo",               ms: 10000, needs: null,       tool: "martelo", onlyOnBuild: true },
-];
+// O que ela faz e a que horas mora em src/lib/lisaRotina.js. Aqui ficou só a obra, que não é
+// rotina: é reação a uma construção nova.
 
-/** As atividades possíveis agora. A obra não entra no sorteio: ela só acontece quando algo NOVO
- * acaba de ser construído. */
-export function availableActivities(unlocked, night = false) {
-  const have = new Set(unlocked || []);
-  return ACTIVITIES.filter((a) => !a.onlyOnBuild && (!a.needs || have.has(a.needs)) && (!a.night || night));
-}
+/** A obra: fora da rotina de propósito. Só acontece quando alguma coisa ACABOU de ser
+ * construída, e por isso é enfileirada em vez de sorteada. */
+export const BUILD_ACTIVITY = { key: "obra", label: "construindo", anim: "martelar", ms: 10000 };
 
-export const BUILD_ACTIVITY = ACTIVITIES.find((a) => a.key === "obra");
-
-/** O caminho de pedra: do portão até a porta da casa, com uma travessa e um ramo pro fundo.
- * Mora aqui e não no desenho porque a Lisa ANDA por ele — é dado, não enfeite. */
 export const PATH_TILES = (() => {
   const t = [];
   for (let ty = 27; ty >= 9; ty--) t.push([5, ty]);  // do portão subindo até a travessa

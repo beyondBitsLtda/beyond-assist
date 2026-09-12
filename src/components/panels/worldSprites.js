@@ -1,15 +1,16 @@
-// Personagens e objetos de mão do Mundo da Lisa, no mesmo painel de LED do resto (um pixel
-// aceso por célula).
+// Personagens e objetos de mão do Mundo da Lisa, desenhados em grade ("#" é célula acesa).
 //
-// Só os SERES vivem aqui como bitmap. Casa, árvore, cerca e companhia são desenhados com
-// primitivas em worldScene.js — construção em grade de LED lê muito melhor em traço do que em
-// bloco cheio, que foi a lição das poses da Nala.
+// O terreno é traçado a caminho vetorial, mas os seres continuam nascendo aqui, célula a
+// célula: é o que dá a eles uma silhueta reconhecível e própria. Na hora de desenhar, `figura()`
+// preenche a silhueta inteira de escuro e contorna só a borda externa — o desenho sobrevive, o
+// aspecto de pontinhos não.
+//
+// Só os SERES vivem aqui como bitmap. Casa, árvore, cerca e companhia são desenhadas com
+// primitivas vetoriais em isoArt.js — construção em grade fica granulada, e foi por isso que o
+// terreno inteiro virou traço.
 //
 // A Lisa tem 14x23 células. A Nala é reaproveitada de nalaSprites.js (22x15), então a
 // proporção entre as duas já sai certa sem arte nova.
-
-export const LISA_W = 14;
-export const LISA_H = 23;
 
 export const LISA = {
   // parada: cabeça arredondada com os dois olhos vazados, igual à carinha dela no app
@@ -169,6 +170,34 @@ export const LISA = {
     "....##..##....",
     "...###..###...",
   ],
+  // os dois braços esticados pra cima: espreguiçar, pendurar roupa no varal, comemorar. É a
+  // única pose mais larga que as outras (18 em vez de 14) — os braços precisam de espaço ao
+  // lado da cabeça, e `figura` centraliza cada pose pela largura dela mesma.
+  alto: [
+    ".......####.......",
+    "##...########...##",
+    "##..##########..##",
+    "##..##########..##",
+    "##..##.####.##..##",
+    "##..##.####.##..##",
+    "##..##########..##",
+    "##...########...##",
+    "##.....####.....##",
+    "##..##########..##",
+    "##################",
+    "......######......",
+    "......######......",
+    "......######......",
+    "......######......",
+    "......######......",
+    "......######......",
+    "......######......",
+    "......##..##......",
+    "......##..##......",
+    "......##..##......",
+    "......##..##......",
+    ".....###..###.....",
+  ],
   // sentada no banco: coxa pra frente, canela pra baixo. As linhas de baixo ficam vazias
   // porque o assento do banco é que sustenta ela.
   sit: [
@@ -253,19 +282,9 @@ export const STEVE = {
   ],
 };
 
-/** Ferramentas: desenhadas na mão dela (ver LISA.work). Miúdas de propósito — nesse tamanho
- * basta sugerir o objeto. */
-export const TOOLS = {
-  regador: ["..###", ".####", "#####", ".###."],
-  vassoura: [".#.", ".#.", ".#.", "###", "###"],
-  martelo: ["###.", ".#..", ".#.."],
-};
-
-/** Nota musical do rádio — mesma ideia dos Z da Nala. */
-export const NOTE = ["..##", "..##", "###.", "###."];
-
-/** Carta na caixa de correio quando chega. */
-export const LETTER = ["#####", "#.#.#", "#####"];
+// As ferramentas (regador, vassoura, martelo) e a nota musical moravam aqui como bitmap. Saíram
+// quando as animações passaram a desenhá-las em traço, em lisaAnim.js: assim o regador inclina,
+// o martelo bate e a vassoura varre um arco, coisa que um bitmap parado não faz.
 
 // O ladrão se distingue pela faixa larga no lugar dos olhos e pelo gorro reto no topo. O zumbi,
 // pelos braços esticados pra frente e pelo corpo torto — em silhueta monocromática é o jeito de

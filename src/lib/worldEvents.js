@@ -16,6 +16,9 @@ export const GOD_EVENTS = [
   { key: "vento",  icon: "🌬", label: "Vento forte",        ms: 26000, tipo: "clima" },
   { key: "dia",    icon: "☀",  label: "Virar dia",          ms: 0,     tipo: "hora" },
   { key: "noite",  icon: "🌙", label: "Virar noite",        ms: 0,     tipo: "hora" },
+  // a rotina dela segue a hora de verdade do aparelho; isto corre o relógio pra você ver um dia
+  // inteiro em uns dois minutos, em vez de precisar voltar de madrugada pra ver ela dormindo
+  { key: "correr", icon: "⏩", label: "Acelerar o dia",     ms: 0,     tipo: "hora" },
   { key: "steve",  icon: "🧔", label: "Chamar o Steve",     ms: 30000, tipo: "visita" },
   { key: "ladrao", icon: "🥷", label: "Soltar um ladrão",   ms: 34000, tipo: "ameaca" },
   { key: "zumbis", icon: "🧟", label: "Horda de zumbis",    ms: 52000, tipo: "ameaca" },
