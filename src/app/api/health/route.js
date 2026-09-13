@@ -32,8 +32,12 @@ export async function GET() {
     }
   } catch {}
 
-  // Gemini: só checa se a chave está presente (evita gastar cota num ping)
-  status.gemini = Boolean(process.env.GEMINI_API_KEY);
+  // Gemini: só checa se a chave está presente (evita gastar cota num ping).
+  //
+  // Aceita as DUAS variáveis, na mesma ordem que o src/lib/gemini.js usa de verdade. Checar só a
+  // singular acendia a luz laranja em quem configurou o pool (GEMINI_API_KEYS) — ou seja, o
+  // indicador dizia que o Gemini estava fora enquanto ele respondia normalmente.
+  status.gemini = Boolean(process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY);
 
   return new Response(JSON.stringify(status), {
     headers: { "content-type": "application/json", "cache-control": "no-store" },
