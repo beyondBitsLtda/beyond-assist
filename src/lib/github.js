@@ -8,6 +8,12 @@ import { b64ParaTexto, textoParaB64 } from "./base64.js";
 
 const API = "https://api.github.com";
 
+// A API do GitHub RECUSA (403 "Request forbidden by administrative rules") qualquer chamada sem
+// User-Agent. Na Vercel isso nunca apareceu porque o `fetch` do Node manda um sozinho; o Worker
+// da Cloudflare não manda nenhum, e o painel de Repositórios inteiro caía em 403. Descoberto
+// rodando o Worker de verdade no workerd local, não lendo o código.
+const UA = "beyond-assist-lisa";
+
 function token() {
   const t = process.env.GITHUB_TOKEN;
   if (!t) throw new Error("GITHUB_TOKEN não configurado");
@@ -22,6 +28,7 @@ async function gh(path, { params } = {}) {
       Authorization: `Bearer ${token()}`,
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": UA,
     },
   });
   if (!res.ok) {
@@ -41,6 +48,7 @@ async function ghWrite(path, method, body) {
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
       "content-type": "application/json",
+      "User-Agent": UA,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
