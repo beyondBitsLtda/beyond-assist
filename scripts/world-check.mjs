@@ -10,7 +10,7 @@
 //   difícil de ver a olho num terreno de 30x30 com quase trinta coisas em cima.
 import {
   CASA, GRID, PATH_TILES, WORLD_ITEMS,
-  houseLevel, nextItem, unlockedItems, worldXp,
+  houseLevel, nextItem, ordemIso, unlockedItems, worldXp,
 } from "../src/lib/lisaWorld.js";
 import {
   FALAS, GOD_EVENTS, HORDA, MORDIDA_ALCANCE, TIRO_INTERVALO, ZUMBI_VIDA,
@@ -152,6 +152,31 @@ ok("o terreno completo enriquece o dia",
   horas.some((h) => acoesDaHora(h, WORLD_ITEMS.map((i) => i.key)).length > acoesDaHora(h, []).length));
 ok("de madrugada ela dorme", acoesDaHora(2, WORLD_ITEMS.map((i) => i.key)).join() === "dormir");
 ok("a noite do desenho bate com a rotina", ehNoite(2) && ehNoite(21) && !ehNoite(10));
+
+// --- ORDEM DE DESENHO: quem está atrás tem que sair antes ---
+// Ordenar por `tx+ty` colocava a casa (9x8) muito atrás do que ela é, e ela saía desenhada
+// DEPOIS da árvore que está na frente dela — a janela aparecia por cima da copa.
+const todas = [{ key: "casa", ...CASA }, ...WORLD_ITEMS.filter((i) => i.tx != null)];
+const ordem = ordemIso(todas);
+ok("a ordem de desenho não perde nem duplica peça", ordem.length === todas.length && new Set(ordem.map((o) => o.key)).size === todas.length);
+const posicao = new Map(ordem.map((o, i) => [o.key, i]));
+const podeTapar = (a, b) => (a.tx < b.tx + b.w && b.tx < a.tx + a.w) || (a.ty < b.ty + b.d && b.ty < a.ty + a.d);
+const foraDeOrdem = [];
+for (const a of todas)
+  for (const b of todas)
+    if (a !== b && podeTapar(a, b) && (a.tx + a.w <= b.tx || a.ty + a.d <= b.ty) && posicao.get(a.key) > posicao.get(b.key))
+      foraDeOrdem.push(`${a.key} depois de ${b.key}`);
+ok("tudo que está atrás é desenhado antes", foraDeOrdem.length === 0, foraDeOrdem.slice(0, 4).join(", "));
+const casaAntesDaArvore = posicao.get("casa") < posicao.get("arvore1");
+ok("a casa sai antes da árvore que fica na frente dela", casaAntesDaArvore,
+  `casa #${posicao.get("casa")}, arvore1 #${posicao.get("arvore1")}`);
+
+// --- os destinos fixos da rotina não podem cair dentro de uma construção ---
+const dentroDeObra = ([x, y]) => comArea.find((a) => x >= a.tx && x < a.tx + a.w && y >= a.ty && y < a.ty + a.d);
+const destinosRuins = Object.entries(ACOES)
+  .filter(([, a]) => Array.isArray(a.em) && dentroDeObra(a.em))
+  .map(([k, a]) => `${k}→${dentroDeObra(a.em).key}`);
+ok("nenhum destino fixo da rotina cai dentro de uma construção", destinosRuins.length === 0, destinosRuins.join(" "));
 
 // --- as PAREDES: porta e janela têm que caber na face onde são desenhadas ---
 // A porta da casa começava a 78% da parede e terminava depois do canto; a da oficina passava de

@@ -16,11 +16,14 @@
 export const TW = 8; // largura de um tile, em células
 export const TH = 4; // altura de um tile (metade da largura: projeção 2:1 clássica)
 
-export const OX = 126;
-export const OY = 62;
+// Origem e tamanho do canvas do mundo, em células. Dimensionados pra caber um terreno de 42
+// tiles: x = OX ± 42*4, y = OY + 42*4 pra baixo e a altura da casa (parede 52 + telhado 16 +
+// chaminé) pra cima.
+export const OX = 176;
+export const OY = 96;
 
-export const WORLD_W = 256; // o mundo inteiro, em células
-export const WORLD_H = 196;
+export const WORLD_W = 352; // o mundo inteiro, em células
+export const WORLD_H = 280;
 
 /** tile → célula. `h` é altura acima do chão. */
 export const iso = (tx, ty, h = 0) => ({
@@ -32,6 +35,10 @@ export const iso = (tx, ty, h = 0) => ({
  * O pincel. Converte coordenadas de célula pra pixel de tela e desenha caminhos.
  * `cell` é o tamanho da célula na tela; `camX/camY` a câmera, em células.
  */
+/** A cor do fundo. `solido` tampa com ela antes de tingir — praticamente opaca, senão o que está
+ *  atrás vaza e o traço de uma peça aparece dentro da outra. */
+const FUNDO = "rgba(3,8,12,0.985)";
+
 export function pincel(ctx, { cell, camX = 0, camY = 0, accent = "56,225,255" }) {
   const X = (p) => (p.x - camX) * cell;
   const Y = (p) => (p.y - camY) * cell;
@@ -64,7 +71,7 @@ export function pincel(ctx, { cell, camX = 0, camY = 0, accent = "56,225,255" })
     poli(pts, { a = 0.85, w = 1, fill = 0, solido = false } = {}) {
       if (pts.length < 3) return;
       caminho(pts, true);
-      if (solido) { ctx.fillStyle = "rgba(3,8,12,0.94)"; ctx.fill(); }
+      if (solido) { ctx.fillStyle = FUNDO; ctx.fill(); }
       if (fill > 0) {
         ctx.fillStyle = `rgba(${accent},${fill})`;
         ctx.fill();
@@ -79,7 +86,7 @@ export function pincel(ctx, { cell, camX = 0, camY = 0, accent = "56,225,255" })
     elipse(cx, cy, rx, ry, { a = 0.85, w = 1, fill = 0, solido = false } = {}) {
       ctx.beginPath();
       ctx.ellipse((cx - camX) * cell, (cy - camY) * cell, rx * cell, ry * cell, 0, 0, Math.PI * 2);
-      if (solido) { ctx.fillStyle = "rgba(3,8,12,0.94)"; ctx.fill(); }
+      if (solido) { ctx.fillStyle = FUNDO; ctx.fill(); }
       if (fill > 0) { ctx.fillStyle = `rgba(${accent},${fill})`; ctx.fill(); }
       if (a > 0.02) { ctx.strokeStyle = `rgba(${accent},${a})`; ctx.lineWidth = esp * w; ctx.stroke(); }
     },
@@ -219,9 +226,6 @@ export function aberturaNaFace(P, { tx, ty, w, d }, cfg, extra = {}) {
   abertura(P, p, dir ? DIR_DIR : DIR_ESQ, cfg.larg, cfg.alt, { tipo: cfg.tipo, ...extra });
 }
 
-/** A janela que o terreno acende quando ela está lá dentro. */
-export const janelaDaCasa = () => ABERTURAS.casa.find((j) => j.luz);
-
 /**
  * Barra com espessura: um quadrilátero fino em vez de um traço.
  *
@@ -330,7 +334,7 @@ export function abertura(P, p, dir, larg, alt, { tipo = "janela", acesa = false 
 /** Altura da parede da casa. A chaminé e a antena se penduram nela, então mora num lugar só. */
 export const casaAltura = (nivel) => (nivel >= 3 ? 52 : nivel >= 2 ? 34 : 30);
 
-export function drawCasa(P, { tx, ty, w, d }, nivel, noite) {
+export function drawCasa(P, { tx, ty, w, d }, nivel, luz) {
   const h = casaAltura(nivel);
   caixa(P, tx, ty, w, d, h);
   duasAguas(P, tx - 0.8, ty - 0.8, w + 1.6, d + 1.6, h, 16);
@@ -338,9 +342,9 @@ export function drawCasa(P, { tx, ty, w, d }, nivel, noite) {
   if (nivel >= 3) {
     // faixa entre os dois pavimentos, e as janelas de cima
     P.linha([iso(tx, ty + d, h / 2), iso(tx + w, ty + d, h / 2), iso(tx + w, ty, h / 2)], { a: 0.45, w: 0.9 });
-    for (const j of ABERTURAS.sobrado) aberturaNaFace(P, casa, { ...j, base: h / 2 + 6 }, { acesa: noite });
+    for (const j of ABERTURAS.sobrado) aberturaNaFace(P, casa, { ...j, base: h / 2 + 6 }, { acesa: luz });
   }
-  for (const j of ABERTURAS.casa) aberturaNaFace(P, casa, j, { acesa: j.luz && noite });
+  for (const j of ABERTURAS.casa) aberturaNaFace(P, casa, j, { acesa: j.luz && luz });
   caixa(P, tx + w, ty + 5.1, 0.6, 1.6, 2, { luz: 0.12 }); // degrau da porta
 }
 
@@ -369,12 +373,15 @@ export function drawAntena(P, { tx, ty, w, d }, nivel) {
  */
 export function drawArvore(P, { tx, ty, w = 2, d = 2 }) {
   const b = iso(tx + w / 2, ty + d / 2);
-  barra(P, b, { x: b.x, y: b.y - 21 }, 4.6, { fill: 0.1 });
-  barra(P, { x: b.x, y: b.y - 15 }, { x: b.x - 8, y: b.y - 23 }, 2.4);
-  barra(P, { x: b.x, y: b.y - 17 }, { x: b.x + 8, y: b.y - 25 }, 2.4);
-  // a copa engole o alto do tronco: solta em cima dele, a árvore vira pirulito
-  for (const [dx, dy, r] of [[-10, -25, 10], [10, -27, 10], [0, -34, 13]])
-    P.elipse(b.x + dx, b.y + dy, r, r * 0.8, { a: 0.85, fill: 0.07, solido: true });
+  // Tronco e copa, e mais nada. Os dois galhos que havia aqui saíam do tronco ABAIXO da copa e,
+  // em traço, liam como dois paus atravessados na frente da árvore — poluição pura.
+  barra(P, b, { x: b.x, y: b.y - 27 }, 5, { fill: 0.1 });
+  // A copa engole o alto do tronco (solta em cima dele, a árvore vira pirulito) e é pintada em
+  // duas passadas: PRIMEIRO os três tampos, DEPOIS os três contornos. Bolha por bolha, o
+  // preenchimento de uma cobria o contorno da outra e o tronco vazava entre elas.
+  const copa = [[-10, -25, 10], [10, -27, 10], [0, -34, 13]];
+  for (const [dx, dy, r] of copa) P.elipse(b.x + dx, b.y + dy, r, r * 0.8, { a: 0, solido: true });
+  for (const [dx, dy, r] of copa) P.elipse(b.x + dx, b.y + dy, r, r * 0.8, { a: 0.85, fill: 0.07 });
 }
 
 /**
@@ -749,9 +756,11 @@ export function drawCerca(P, grid) {
     const a = iso(ax, ay);
     const b = iso(bx, by);
     for (const h of [3, 6.5]) barra(P, { x: a.x, y: a.y - h }, { x: b.x, y: b.y - h }, 1, { a: 0.45 });
-    for (let i = 0; i <= 1; i += 1 / 12) {
-      const x = a.x + (b.x - a.x) * i;
-      const y = a.y + (b.y - a.y) * i;
+    const mouroes = Math.max(8, Math.round(grid / 2)); // um mourão a cada dois tiles
+    for (let i = 0; i <= mouroes; i++) {
+      const t = i / mouroes;
+      const x = a.x + (b.x - a.x) * t;
+      const y = a.y + (b.y - a.y) * t;
       barra(P, { x, y }, { x, y: y - 8.5 }, 1.5, { a: 0.6 });
     }
   }
@@ -764,7 +773,8 @@ export function drawCerca(P, grid) {
 export function drawTerreno(P, grid) {
   P.poli(cantos(0, 0, grid, grid), { a: 0.45, fill: 0.02 });
   P.poli(cantos(1, 1, grid - 2, grid - 2), { a: 0.1, w: 0.7 });
-  for (let i = 0; i < 46; i++) {
+  const tufos = Math.round(grid * grid * 0.06); // densidade fixa: num terreno maior, mais tufos
+  for (let i = 0; i < tufos; i++) {
     const tx = ((i * 7.3) % (grid - 2)) + 1;
     const ty = ((i * 11.7) % (grid - 2)) + 1;
     const p = iso(tx, ty);

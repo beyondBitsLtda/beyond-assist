@@ -5,7 +5,7 @@ import { CY, GR, OR, mono } from "@/lib/theme.js";
 import { loadGames } from "@/lib/gameHistory.js";
 import {
   BUILD_ACTIVITY, CASA, GRID, PATH_TILES, WORLD_ITEMS,
-  houseLevel, nextItem, unlockedItems, worldXp,
+  houseLevel, nextItem, ordemIso, unlockedItems, worldXp,
 } from "@/lib/lisaWorld.js";
 import { ACOES, blocoDa, ehNoite, horaDoMundo, proximaAcao } from "@/lib/lisaRotina.js";
 import { LADRAO, LISA, SACO, STEVE, ZUMBI } from "./worldSprites.js";
@@ -48,7 +48,7 @@ import {
 //    madrugada mostra a casa apagada. O Modo Deus vira o dia, vira a noite, ou corre o relógio.
 
 const BASE = 7;          // tamanho da célula no canvas do mundo (o zoom é escala em cima disso)
-const ZOOM_MIN = 0.55;
+const ZOOM_MIN = 0.3;   // o terreno tem 42 tiles: dá pra afastar até ver o quintal inteiro
 const ZOOM_MAX = 2.4;
 const PERTO = 1.2;       // o quanto a câmera aproxima quando ela para pra fazer alguma coisa
 const LISA_SPEED = 2.6;  // tiles por segundo
@@ -57,7 +57,7 @@ const GAP_MIN_MS = 1200;
 const GAP_VAR_MS = 2400;
 const SEEN_KEY = "lisaWorld.seenXp";
 const POLL_MS = 900;          // o Modo Deus escuta o outro aparelho nesse ritmo
-const SPAWN = [5, 28.5];      // por onde as ameaças entram: o portão
+const SPAWN = [7.5, 40.5];    // por onde as ameaças entram: o portão
 const CORRENDO = 240;         // "acelerar o dia": um dia inteiro em ~6 minutos, uma hora a cada 15s
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -80,7 +80,7 @@ export default function LisaWorld({ fullscreen = false }) {
 
   const canvasRef = useRef(null);
   const sceneRef = useRef({ unlocked: [], level: 1, night: ehNoite(horaReal()), temCarta: false, varal: true });
-  const camRef = useRef({ x: 40, y: 40 });
+  const camRef = useRef({ x: 60, y: 100 });
   const dragRef = useRef(null);
   const ptrsRef = useRef(new Map());
   const pinchRef = useRef(null);
@@ -90,8 +90,8 @@ export default function LisaWorld({ fullscreen = false }) {
   zoomRef.current = zoom;
   const pertoRef = useRef(1);   // aproximação automática, por cima do zoom que você escolheu
 
-  const lisaRef = useRef({ tx: 6, ty: 20, targ: [6, 20], pose: "idle", flip: false, moving: false });
-  const nalaRef = useRef({ tx: 7, ty: 22, targ: [7, 22], moving: false, flip: false });
+  const lisaRef = useRef({ tx: 8, ty: 20, targ: [8, 20], pose: "idle", flip: false, moving: false });
+  const nalaRef = useRef({ tx: 9, ty: 22, targ: [9, 22], moving: false, flip: false });
   const steveRef = useRef(null);
   const actRef = useRef(null);
   const ultimaRef = useRef(null);   // a última ação da rotina, pra não repetir em seguida
@@ -126,7 +126,7 @@ export default function LisaWorld({ fullscreen = false }) {
     ver();
     // no celular, com zoom 1 só cabe um pedaço do terreno na tela: começa mais afastado, senão
     // a primeira impressão é de estar perdido no meio do mato
-    if (window.innerWidth < 640) setZoom(0.72);
+    if (window.innerWidth < 640) setZoom(0.45);
     window.addEventListener("resize", ver);
     return () => window.removeEventListener("resize", ver);
   }, []);
@@ -288,12 +288,22 @@ export default function LisaWorld({ fullscreen = false }) {
     const placed = (sc) => {
       const out = [{ key: "casa", item: CASA }];
       for (const it of WORLD_ITEMS) if (sc.unlocked.includes(it.key) && it.tx != null) out.push({ key: it.key, item: it });
-      return out.sort((a, b) => (a.item.tx + a.item.ty) - (b.item.tx + b.item.ty));
+      // ordem topológica, não `tx+ty`: a casa ocupa 9x8 e o canto de trás dela é muito mais
+      // fundo do que ela é, então saía desenhada DEPOIS da árvore que está na frente — e a
+      // janela aparecia por cima da copa
+      return ordemIso(out);
     };
 
     const drawObj = (P, key, item, sc, now) => {
       switch (key) {
-        case "casa": A.drawCasa(P, item, sc.level, sc.night); break;
+        // a chaminé e a antena pertencem à casa, o painel solar à oficina: desenhados junto,
+        // eles entram na ordem de profundidade da peça. Soltos no fim, apareciam por cima das
+        // árvores que estão na frente.
+        case "casa":
+          A.drawCasa(P, item, sc.level, sc.night);
+          if (sc.unlocked.includes("chamine")) A.drawChamine(P, item, sc.level);
+          if (sc.unlocked.includes("antena")) A.drawAntena(P, item, sc.level);
+          break;
         case "horta": A.drawHorta(P, item); break;
         case "arvore1": case "arvore2": case "arvore3": A.drawArvore(P, item); break;
         case "casinha": A.drawCasinha(P, item); break;
@@ -309,7 +319,10 @@ export default function LisaWorld({ fullscreen = false }) {
         case "balanco": A.drawBalanco(P, item); break;
         case "poco": A.drawPoco(P, item); break;
         case "fogueira": A.drawFogueira(P, item); break;
-        case "oficina": A.drawOficina(P, item); break;
+        case "oficina":
+          A.drawOficina(P, item);
+          if (sc.unlocked.includes("solar")) A.drawSolar(P, item);
+          break;
         case "estufa": A.drawEstufa(P, item); break;
         case "piscina": A.drawPiscina(P, item, now); break;
         case "lago": A.drawLago(P, item, now); break;
@@ -372,23 +385,27 @@ export default function LisaWorld({ fullscreen = false }) {
         A.drawTerreno(OP, GRID);
         if (sc.unlocked.includes("caminho")) A.drawCaminho(OP, PATH_TILES);
         if (sc.unlocked.includes("cerca")) A.drawCerca(OP, GRID);
-        for (const o of placed(sc)) drawObj(OP, o.key, o.item, cena, 0);
-        if (sc.unlocked.includes("chamine")) A.drawChamine(OP, CASA, sc.level);
-        if (sc.unlocked.includes("antena")) A.drawAntena(OP, CASA, sc.level);
-        if (sc.unlocked.includes("solar") && sc.unlocked.includes("oficina")) A.drawSolar(OP, WORLD_ITEMS.find((i) => i.key === "oficina"));
+        const ordem = placed(sc);
+        for (const o of ordem) drawObj(OP, o.key, o.item, cena, 0);
         offCtx.shadowBlur = 0;
 
-        // O que fica NA FRENTE da casa, na tela. A janela acesa (quando ela está lá dentro) é
-        // pintada por cima do cache já pronto, então passava por cima da árvore plantada na
-        // frente da casa. Estas são as peças que precisam voltar depois dela.
-        const c0 = A.iso(CASA.tx, CASA.ty);
-        const c1 = A.iso(CASA.tx + CASA.w, CASA.ty + CASA.d);
-        const alto = A.casaAltura(sc.level) + 20;
-        naFrenteDaCasa = placed(sc).filter((o) => {
-          if (o.item.tx + o.item.ty <= CASA.tx + CASA.ty) return false;
-          const p = A.iso(o.item.tx, o.item.ty + (o.item.d || 1));
-          return p.x > c0.x - 30 && p.x < c1.x + 40 && p.y > c0.y - alto && p.y < c1.y + 30;
+        // A cauda da ordem de desenho que encosta na casa: tudo que vem DEPOIS dela e cai em
+        // cima dela na tela. Quando a Lisa está dentro, a janela acesa é pintada por cima do
+        // cache pronto e estas peças voltam em seguida — senão a luz da janela aparece colada
+        // por cima da árvore que está na frente da casa. Redesenhar a cauda inteira, e não uma
+        // peça escolhida a dedo, preserva a ordem entre elas.
+        const caixaDe = (b, alto) => ({
+          x0: A.iso(b.tx, b.ty + b.d).x, x1: A.iso(b.tx + b.w, b.ty).x,
+          y0: A.iso(b.tx, b.ty).y - alto, y1: A.iso(b.tx + b.w, b.ty + b.d).y,
         });
+        const cx = caixaDe(CASA, A.casaAltura(sc.level) + 36);
+        const iCasa = ordem.findIndex((o) => o.key === "casa");
+        naFrenteDaCasa = ordem.slice(iCasa + 1).filter((o) => {
+          const c = caixaDe(o.item, 50);
+          return c.x0 < cx.x1 && cx.x0 < c.x1 && c.y0 < cx.y1 && cx.y0 < c.y1;
+        });
+
+;
       }
 
       // ---- a rotina ----
@@ -624,12 +641,10 @@ export default function LisaWorld({ fullscreen = false }) {
 
       const P = A.pincel(ctx, { cell: size, camX: cam.x, camY: cam.y, accent });
 
-      // ---- a janela acesa, ainda no plano do CENÁRIO ----
-      // Vem antes dos atores e é seguida pelas peças que ficam na frente da casa. Pintada junto
-      // com os personagens, ela aparecia colada por cima da árvore plantada entre você e a casa.
+      // ---- a casa acesa, ainda no plano do CENÁRIO ----
       if (dentroRef.current) {
         ctx.shadowBlur = 0;
-        A.aberturaNaFace(P, CASA, A.janelaDaCasa(), { acesa: true });
+        for (const j of A.ABERTURAS.casa) if (j.luz) A.aberturaNaFace(P, CASA, j, { acesa: true });
         for (const o of naFrenteDaCasa) drawObj(P, o.key, o.item, cena, now);
       }
 

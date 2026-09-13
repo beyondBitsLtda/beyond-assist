@@ -10,7 +10,9 @@
 // construções, o mapa e as atividades sem navegador (npm run world-check).
 
 /** Lado do terreno, em tiles. O mundo inteiro é GRID x GRID. */
-export const GRID = 30;
+// Era 30, e a casa sozinha ocupa 9: com as construções em tamanho de verdade, tudo ficava
+// encostado em tudo. 42 dá espaço pra cada peça respirar e ainda sobra terreno pra crescer.
+export const GRID = 42;
 
 /** XP do mundo a partir das estatísticas REAIS já existentes. */
 export function worldXp({ games, quiz, pair } = {}) {
@@ -35,32 +37,32 @@ export function worldXp({ games, quiz, pair } = {}) {
  */
 export const WORLD_ITEMS = [
   { key: "caminho",  xp: 20,   label: "Caminho de pedra",   note: "liga o portão à porta" },
-  { key: "horta",    xp: 45,   label: "Horta",              note: "canteiro pra ela regar",       tx: 5,  ty: 10, w: 5, d: 4 },
-  { key: "arvore1",  xp: 80,   label: "Primeira árvore",    note: "sombra no terreno",            tx: 11, ty: 6,  w: 2, d: 2 },
+  { key: "horta",    xp: 45,   label: "Horta",              note: "canteiro pra ela regar",       tx: 3,  ty: 14, w: 6, d: 5 },
+  { key: "arvore1",  xp: 80,   label: "Primeira árvore",    note: "sombra no terreno",            tx: 15, ty: 10, w: 3, d: 3 },
   { key: "cerca",    xp: 120,  label: "Cerca",              note: "fecha o terreno" },
-  { key: "casinha",  xp: 170,  label: "Casinha da Nala",    note: "onde a Nala dorme",            tx: 15, ty: 8,  w: 3, d: 3 },
-  { key: "varal",    xp: 230,  label: "Varal",              note: "roupa secando ao vento",       tx: 20, ty: 5,  w: 8, d: 1 },
-  { key: "banco",    xp: 300,  label: "Banco",              note: "lugar pra ela descansar",      tx: 11, ty: 14, w: 2, d: 1 },
-  { key: "correio",  xp: 380,  label: "Caixa de correio",   note: "chega carta de vez em quando", tx: 2,  ty: 25, w: 1, d: 1 },
-  { key: "poste1",   xp: 470,  label: "Poste de luz",       note: "acende quando escurece",       tx: 11, ty: 10, w: 1, d: 1 },
-  { key: "radio",    xp: 570,  label: "Caixa de som",       note: "ela ouve música no terreno",   tx: 13, ty: 12, w: 1, d: 1 },
-  { key: "arvore2",  xp: 680,  label: "Segunda árvore",     note: "o terreno vai ficando verde",  tx: 25, ty: 9,  w: 2, d: 2 },
-  { key: "portao",   xp: 800,  label: "Portão",             note: "a entrada do terreno",         tx: 4,  ty: 27, w: 2, d: 1 },
-  { key: "flores",   xp: 930,  label: "Canteiro de flores", note: "cor no meio do verde",         tx: 27, ty: 13, w: 2, d: 2 },
-  { key: "mesa",     xp: 1070, label: "Mesa de piquenique", note: "pra receber gente",            tx: 21, ty: 13, w: 3, d: 2 },
-  { key: "churras",  xp: 1220, label: "Churrasqueira",      note: "fim de semana no quintal",     tx: 6,  ty: 16, w: 2, d: 2 },
-  { key: "balanco",  xp: 1380, label: "Balanço",            note: "pendurado numa trave",         tx: 2,  ty: 18, w: 4, d: 3 },
-  { key: "poco",     xp: 1550, label: "Poço",               note: "água pra horta",               tx: 9,  ty: 21, w: 2, d: 2 },
-  { key: "fogueira", xp: 1730, label: "Fogueira",           note: "acende de noite",              tx: 15, ty: 17, w: 2, d: 2 },
+  { key: "casinha",  xp: 170,  label: "Casinha da Nala",    note: "onde a Nala dorme",            tx: 21, ty: 16, w: 3, d: 3 },
+  { key: "varal",    xp: 230,  label: "Varal",              note: "roupa secando ao vento",       tx: 24, ty: 8,  w: 8, d: 1 },
+  { key: "banco",    xp: 300,  label: "Banco",              note: "lugar pra ela descansar",      tx: 12, ty: 20, w: 2, d: 1 },
+  { key: "correio",  xp: 380,  label: "Caixa de correio",   note: "chega carta de vez em quando", tx: 3,  ty: 36, w: 1, d: 1 },
+  { key: "poste1",   xp: 470,  label: "Poste de luz",       note: "acende quando escurece",       tx: 14, ty: 15, w: 1, d: 1 },
+  { key: "radio",    xp: 570,  label: "Caixa de som",       note: "ela ouve música no terreno",   tx: 18, ty: 21, w: 1, d: 1 },
+  { key: "arvore2",  xp: 680,  label: "Segunda árvore",     note: "o terreno vai ficando verde",  tx: 35, ty: 10, w: 3, d: 3 },
+  { key: "portao",   xp: 800,  label: "Portão",             note: "a entrada do terreno",         tx: 6,  ty: 40, w: 3, d: 1 },
+  { key: "flores",   xp: 930,  label: "Canteiro de flores", note: "cor no meio do verde",         tx: 36, ty: 16, w: 3, d: 3 },
+  { key: "mesa",     xp: 1070, label: "Mesa de piquenique", note: "pra receber gente",            tx: 28, ty: 13, w: 4, d: 3 },
+  { key: "churras",  xp: 1220, label: "Churrasqueira",      note: "fim de semana no quintal",     tx: 6,  ty: 23, w: 3, d: 2 },
+  { key: "balanco",  xp: 1380, label: "Balanço",            note: "pendurado numa trave",         tx: 11, ty: 27, w: 4, d: 3 },
+  { key: "poco",     xp: 1550, label: "Poço",               note: "água pra horta",               tx: 20, ty: 26, w: 3, d: 3 },
+  { key: "fogueira", xp: 1730, label: "Fogueira",           note: "acende de noite",              tx: 16, ty: 22, w: 2, d: 2 },
   { key: "antena",   xp: 1920, label: "Antena",             note: "é por ela que o Steve aparece" },
   { key: "chamine",  xp: 2120, label: "Chaminé",            note: "fumacinha no telhado" },
-  { key: "oficina",  xp: 2330, label: "Oficina",            note: "onde ela conserta as coisas",  tx: 13, ty: 1,  w: 4, d: 4 },
-  { key: "estufa",   xp: 2550, label: "Estufa",             note: "planta o ano inteiro",         tx: 21, ty: 1,  w: 4, d: 3 },
-  { key: "arvore3",  xp: 2780, label: "Terceira árvore",    note: "agora é um bosque",            tx: 1,  ty: 12, w: 2, d: 2 },
+  { key: "oficina",  xp: 2330, label: "Oficina",            note: "onde ela conserta as coisas",  tx: 18, ty: 2,  w: 5, d: 5 },
+  { key: "estufa",   xp: 2550, label: "Estufa",             note: "planta o ano inteiro",         tx: 27, ty: 2,  w: 5, d: 4 },
+  { key: "arvore3",  xp: 2780, label: "Terceira árvore",    note: "agora é um bosque",            tx: 3,  ty: 25, w: 3, d: 3 },
   { key: "solar",    xp: 3020, label: "Painel solar",       note: "no telhado da oficina" },
-  { key: "piscina",  xp: 3280, label: "Piscina",            note: "o luxo do terreno",            tx: 22, ty: 18, w: 5, d: 4 },
-  { key: "lago",     xp: 3550, label: "Lago",               note: "com peixe e tudo",             tx: 24, ty: 24, w: 4, d: 4 },
-  { key: "mirante",  xp: 3840, label: "Mirante",            note: "pra ver o terreno inteiro",    tx: 27, ty: 1,  w: 2, d: 2 },
+  { key: "piscina",  xp: 3280, label: "Piscina",            note: "o luxo do terreno",            tx: 28, ty: 20, w: 6, d: 5 },
+  { key: "lago",     xp: 3550, label: "Lago",               note: "com peixe e tudo",             tx: 29, ty: 29, w: 6, d: 5 },
+  { key: "mirante",  xp: 3840, label: "Mirante",            note: "pra ver o terreno inteiro",    tx: 36, ty: 2,  w: 3, d: 3 },
   { key: "sobrado",  xp: 4200, label: "Segundo andar",      note: "a casa cresce" },
 ];
 
@@ -69,7 +71,7 @@ export const WORLD_ITEMS = [
 // Era 7x6 com parede de 16 células — mais baixa que a própria moradora, que tem 23.
 // De longe parecia um galpãozinho. Agora ocupa 9x8 e a parede vai a 30 (52 com o sobrado), o que
 // encosta exatamente na árvore e na horta: se mexer aqui, rode o world-check.
-export const CASA = { tx: 2, ty: 2, w: 9, d: 8 };
+export const CASA = { tx: 3, ty: 3, w: 9, d: 8 };
 
 /** Chaves já construídas com esse XP. */
 export function unlockedItems(xp) {
@@ -108,11 +110,58 @@ export const BUILD_ACTIVITY = { key: "obra", label: "construindo", anim: "martel
  */
 export const PATH_TILES = (() => {
   const t = [];
-  for (let ty = 27; ty >= 15; ty--) t.push([5, ty]);  // do portão subindo pela esquerda
-  for (let tx = 5; tx <= 25; tx++) t.push([tx, 15]);  // travessa no meio do terreno
-  for (let ty = 14; ty >= 8; ty--) t.push([11, ty]);  // sobe até a porta da casa
-  for (let ty = 16; ty <= 23; ty++) t.push([18, ty]); // ramo pro fundo
+  for (let ty = 39; ty >= 21; ty--) t.push([7, ty]);   // do portão subindo pela esquerda
+  for (let tx = 7; tx <= 27; tx++) t.push([tx, 21]);   // travessa no meio do terreno
+  for (let ty = 20; ty >= 9; ty--) t.push([12, ty]);   // sobe até a porta da casa
+  for (let ty = 22; ty <= 33; ty++) t.push([26, ty]);  // ramo pro fundo
   const areas = [CASA, ...WORLD_ITEMS.filter((i) => i.tx != null)];
   const sobreConstrucao = ([x, y]) => areas.some((a) => x >= a.tx && x < a.tx + a.w && y >= a.ty && y < a.ty + a.d);
   return t.filter((p) => !sobreConstrucao(p));
 })();
+
+/**
+ * ORDEM DE DESENHO em isométrico.
+ *
+ * Ordenar por `tx+ty` (o canto de trás) só funciona quando todas as peças têm o mesmo tamanho.
+ * Com a casa ocupando 9x8 e uma árvore 2x2 encostada nela, o canto de trás da casa é muito mais
+ * fundo do que a casa realmente é — e ela sai desenhada depois de coisas que estão na frente,
+ * fazendo a janela aparecer por cima da copa da árvore.
+ *
+ * Aqui é ordenação topológica: A vem antes de B quando A TERMINA antes de B COMEÇAR num dos
+ * eixos, e só entre peças que podem se tapar (uma sombreia a outra em tx ou em ty). Sem essa
+ * segunda condição, duas peças em cantos opostos criariam uma dependência circular à toa.
+ */
+export function ordemIso(itens) {
+  const podeTapar = (a, b) =>
+    (a.tx < b.tx + b.w && b.tx < a.tx + a.w) || (a.ty < b.ty + b.d && b.ty < a.ty + a.d);
+  const atras = (a, b) => podeTapar(a, b) && (a.tx + a.w <= b.tx || a.ty + a.d <= b.ty);
+  const n = itens.length;
+  const grau = new Array(n).fill(0);
+  const depois = itens.map(() => []);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++) {
+      if (i !== j && atras(itens[i].item || itens[i], itens[j].item || itens[j])) {
+        depois[i].push(j);
+        grau[j]++;
+      }
+    }
+  // fila estável: entre peças sem dependência, a de trás primeiro
+  const chave = (i) => { const b = itens[i].item || itens[i]; return b.tx + b.ty; };
+  const fila = [];
+  for (let i = 0; i < n; i++) if (!grau[i]) fila.push(i);
+  fila.sort((a, b) => chave(a) - chave(b));
+  const out = [];
+  const posto = new Array(n).fill(false);
+  while (fila.length) {
+    const i = fila.shift();
+    if (posto[i]) continue;
+    posto[i] = true;
+    out.push(itens[i]);
+    let novos = false;
+    for (const j of depois[i]) if (--grau[j] === 0) { fila.push(j); novos = true; }
+    if (novos) fila.sort((a, b) => chave(a) - chave(b));
+  }
+  // se sobrar alguém (ciclo), entra no fim pela ordem antiga em vez de sumir da tela
+  for (let i = 0; i < n; i++) if (!posto[i]) out.push(itens[i]);
+  return out;
+}
