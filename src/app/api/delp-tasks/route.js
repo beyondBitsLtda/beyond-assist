@@ -1,7 +1,7 @@
 import { listDelpTasks } from "@/lib/delpTasks.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /** GET /api/delp-tasks — alimenta o Kanban em src/app/(panels)/delp-tasks/page.js. */

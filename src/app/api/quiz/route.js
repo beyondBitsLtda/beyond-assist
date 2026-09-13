@@ -2,7 +2,7 @@ import { generateQuizQuestion, commentQuizAnswer } from "@/lib/gemini.js";
 import { recordQuizAnswer, recentQuizQuestions, QUIZ_CATEGORIES, LEVELS, quizPointsFor } from "@/lib/activities.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**

@@ -1,7 +1,7 @@
 import { listProjects } from "@/lib/sentinel.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /** GET /api/sentinel/projects — projetos da plataforma de testes, pro seletor de filtro. */

@@ -1,6 +1,10 @@
 // Cliente GitHub (REST API) — leitura só, via fine-grained PAT (GITHUB_TOKEN). Usado pra
 // descobrir repositórios (src/lib/ingest/github.js) e indexar o código deles por embeddings
 // (mesmo pipeline do Trello/Beyond Brain — ver src/lib/ingest/runSlice.js).
+//
+// A conversão de base64 vem de src/lib/base64.js em vez de `Buffer`: `Buffer` é do Node e não
+// existe no Edge runtime do Cloudflare.
+import { b64ParaTexto, textoParaB64 } from "./base64.js";
 
 const API = "https://api.github.com";
 
@@ -72,13 +76,12 @@ export async function getRepoTree(fullName, branch) {
 }
 
 /** Conteúdo de um blob (arquivo) já decodificado de base64 pra utf8 — null se não for texto
- * (binário genuíno; a Buffer decodifica de qualquer jeito, então checamos "replacement
+ * (binário genuíno; a decodificação acontece de qualquer jeito, então checamos "replacement
  * character" como indício de que não era texto de verdade). */
 export async function getBlobContent(fullName, sha) {
   const data = await gh(`/repos/${fullName}/git/blobs/${sha}`);
   if (data.encoding !== "base64") return null;
-  const buf = Buffer.from(data.content, "base64");
-  const text = buf.toString("utf8");
+  const text = b64ParaTexto(data.content);
   if (text.includes("�")) return null; // indício forte de binário
   return text;
 }
@@ -129,7 +132,7 @@ export async function getFileContentOnBranch(fullName, path, branch) {
   try {
     const data = await gh(`/repos/${fullName}/contents/${encodePath(path)}`, { params: { ref: branch } });
     if (!data || data.encoding !== "base64") return null;
-    return Buffer.from(data.content, "base64").toString("utf8");
+    return b64ParaTexto(data.content);
   } catch {
     return null;
   }
@@ -138,7 +141,7 @@ export async function getFileContentOnBranch(fullName, path, branch) {
 /** Cria ou atualiza UM arquivo numa branch (commit direto via API de Contents — simples e
  * suficiente pra um punhado de arquivos por tarefa; não tenta juntar tudo num commit único). */
 export async function putFileContent(fullName, path, content, message, branch, sha) {
-  const body = { message, content: Buffer.from(content, "utf8").toString("base64"), branch };
+  const body = { message, content: textoParaB64(content), branch };
   if (sha) body.sha = sha;
   return ghWrite(`/repos/${fullName}/contents/${encodePath(path)}`, "PUT", body);
 }

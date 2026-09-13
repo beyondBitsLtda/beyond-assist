@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase.js";
 import { jsonResponse } from "@/lib/http.js";
 import { GEMINI_KEY_COUNT, GEMINI_MODELS } from "@/lib/gemini.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 const DAYS_BACK = 14;

@@ -1,4 +1,3 @@
-import webpush from "web-push";
 import { supabase } from "./supabase.js";
 import { listTickets } from "./sentinel.js";
 import { loadAllTrelloCards } from "./liveTrello.js";
@@ -6,20 +5,31 @@ import { loadAllTrelloCards } from "./liveTrello.js";
 // limiar de "perto de estourar o SLA" — chamado ainda não estourado mas dentro dessa janela
 const SLA_NEAR_MS = 2 * 60 * 60 * 1000; // 2h
 
-let configured = false;
-function ensureConfigured() {
-  if (configured) return;
-  const subject = process.env.VAPID_SUBJECT;
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  if (!subject || !publicKey || !privateKey) {
-    throw new Error(
-      "Chaves VAPID não configuradas (NEXT_PUBLIC_VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT). " +
-      "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
-    );
-  }
-  webpush.setVapidDetails(subject, publicKey, privateKey);
-  configured = true;
+/**
+ * O ENVIO das notificações não acontece mais aqui.
+ *
+ * O `web-push` puxa `agent-base`/`https-proxy-agent`, que precisam de `http`, `https` e `net`
+ * do Node. No Edge runtime do Cloudflare esses módulos não existem, e o build falhava — era a
+ * única rota do app que não compilava. Tentar contornar com import dinâmico não resolve: o
+ * empacotador segue o import do mesmo jeito.
+ *
+ * Então a responsabilidade foi separada. Este módulo faz o que sabe fazer — DETECTAR o que
+ * merece virar aviso e montar o envelope — e devolve a fila. Quem envia é o Worker de cron
+ * (workers/lisa-cron), que roda num runtime com Node de verdade e recebe essa fila na resposta
+ * da própria rota que ele chamou.
+ *
+ * A fila é por invocação: as duas coisas que disparam aviso (detectAndNotify e
+ * checkAndFireDueSchedules) rodam dentro da MESMA chamada de /api/cron/notify, e o cron nunca
+ * roda duas vezes ao mesmo tempo. Por isso um acumulador simples basta e não foi preciso criar
+ * tabela nova.
+ */
+let _fila = [];
+
+/** Esvazia e devolve a fila montada nesta invocação. Chamado pela rota do cron. */
+export function coletarEnviosPendentes() {
+  const fila = _fila;
+  _fila = [];
+  return fila;
 }
 
 /** Salva (ou atualiza) a inscrição de push de um dispositivo/navegador. */
@@ -55,32 +65,23 @@ export async function listRecentNotifications(since) {
   return (data || []).filter((r) => r.title); // eventos antigos (de antes dessa coluna existir) não têm título — pula
 }
 
-/** Manda uma notificação pra TODOS os dispositivos inscritos; remove inscrições mortas (404/410). */
+/**
+ * Monta o aviso para TODOS os dispositivos inscritos e põe na fila de envio.
+ *
+ * Mantém o nome e a assinatura de antes porque quem chama (detectAndNotify e
+ * scheduledAnnouncements) não precisa saber que o envio mudou de lugar. O que mudou é o
+ * retorno: `enfileirado` no lugar de `sent`, porque nesse instante ainda não foi enviado nada.
+ */
 export async function broadcast({ title, body, url = "/", tag }) {
-  ensureConfigured();
   const { data: subs, error } = await supabase.from("push_subscriptions").select("endpoint, p256dh, auth");
   if (error) throw new Error(`broadcast: ${error.message}`);
-  if (!subs?.length) return { sent: 0, removed: 0 };
+  if (!subs?.length) return { enfileirado: 0 };
 
-  const payload = JSON.stringify({ title, body, url, tag });
-  let sent = 0, removed = 0;
-
-  await Promise.all(
-    subs.map(async (s) => {
-      try {
-        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload);
-        sent++;
-      } catch (err) {
-        if (err?.statusCode === 404 || err?.statusCode === 410) {
-          await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
-          removed++;
-        }
-        // outros erros (ex.: rede instável): ignora essa inscrição neste ciclo, não derruba o resto
-      }
-    })
-  );
-
-  return { sent, removed };
+  _fila.push({
+    payload: JSON.stringify({ title, body, url, tag }),
+    inscricoes: subs.map((s) => ({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } })),
+  });
+  return { enfileirado: subs.length };
 }
 
 // ---------- registro de "já notificado" (idempotência entre ciclos do cron) ----------

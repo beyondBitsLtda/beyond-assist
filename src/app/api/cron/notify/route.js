@@ -1,10 +1,9 @@
-import { detectAndNotify } from "@/lib/notifications.js";
+import { coletarEnviosPendentes, detectAndNotify } from "@/lib/notifications.js";
 import { checkAndFireDueSchedules } from "@/lib/scheduledAnnouncements.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 /**
  * GET /api/cron/notify
@@ -26,5 +25,12 @@ export async function GET(req) {
     checkAndFireDueSchedules().catch((err) => ({ ok: false, error: String(err?.message || err) })),
   ]);
 
-  return jsonResponse({ ok: true, notify: notifyResult, schedules: scheduleResult });
+  // A fila vai na RESPOSTA, e quem envia é o Worker de cron (workers/lisa-cron). O envio saiu
+  // daqui porque o web-push precisa de http/https/net do Node, que não existem no Edge runtime.
+  return jsonResponse({
+    ok: true,
+    notify: notifyResult,
+    schedules: scheduleResult,
+    pendentes: coletarEnviosPendentes(),
+  });
 }

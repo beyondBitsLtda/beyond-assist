@@ -2,7 +2,7 @@ import { interpretVigiaChatMessage, VIGIA_CAMERA_CHAT_INSTRUCTION } from "@/lib/
 import { withPersona } from "@/lib/rag.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**

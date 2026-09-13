@@ -1,9 +1,9 @@
 import { synthesizeSpeech } from "@/lib/gemini.js";
 import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
+import { b64ParaBytes } from "@/lib/base64.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 /**
  * POST /api/speak   body: { text: string, voice?: string }
@@ -24,14 +24,14 @@ export async function POST(req) {
     const input = clean.length > 1200 ? clean.slice(0, 1200) : clean;
 
     const { base64, sampleRate } = await synthesizeSpeech(input, voice);
-    const pcm = Buffer.from(base64, "base64");
+    const pcm = b64ParaBytes(base64);
     const wav = pcmToWav(pcm, sampleRate, 1, 16);
 
     return new Response(wav, {
       headers: {
         "content-type": "audio/wav",
         "cache-control": "no-store",
-        "content-length": String(wav.length),
+        "content-length": String(wav.byteLength),
       },
     });
   } catch (err) {
@@ -41,28 +41,40 @@ export async function POST(req) {
   }
 }
 
-/** Monta um arquivo WAV a partir de PCM 16-bit little-endian. */
+/**
+ * Monta um arquivo WAV a partir de PCM 16-bit little-endian.
+ *
+ * Escrito com DataView/Uint8Array em vez de `Buffer`, que é do Node e não existe no Edge
+ * runtime do Cloudflare. O `true` no fim de cada `set` é o little-endian — WAV é little-endian,
+ * e esquecer esse argumento produz um arquivo que toca só chiado.
+ */
 function pcmToWav(pcm, sampleRate = 24000, channels = 1, bitsPerSample = 16) {
   const blockAlign = (channels * bitsPerSample) / 8;
   const byteRate = sampleRate * blockAlign;
   const dataSize = pcm.length;
-  const header = Buffer.alloc(44);
 
-  header.write("RIFF", 0);
-  header.writeUInt32LE(36 + dataSize, 4);
-  header.write("WAVE", 8);
-  header.write("fmt ", 12);
-  header.writeUInt32LE(16, 16);           // subchunk1 size (PCM)
-  header.writeUInt16LE(1, 20);            // audio format = PCM
-  header.writeUInt16LE(channels, 22);
-  header.writeUInt32LE(sampleRate, 24);
-  header.writeUInt32LE(byteRate, 28);
-  header.writeUInt16LE(blockAlign, 32);
-  header.writeUInt16LE(bitsPerSample, 34);
-  header.write("data", 36);
-  header.writeUInt32LE(dataSize, 40);
+  const saida = new Uint8Array(44 + dataSize);
+  const v = new DataView(saida.buffer);
+  const marca = (offset, texto) => {
+    for (let i = 0; i < texto.length; i++) v.setUint8(offset + i, texto.charCodeAt(i));
+  };
 
-  return Buffer.concat([header, pcm]);
+  marca(0, "RIFF");
+  v.setUint32(4, 36 + dataSize, true);
+  marca(8, "WAVE");
+  marca(12, "fmt ");
+  v.setUint32(16, 16, true);              // subchunk1 size (PCM)
+  v.setUint16(20, 1, true);               // audio format = PCM
+  v.setUint16(22, channels, true);
+  v.setUint32(24, sampleRate, true);
+  v.setUint32(28, byteRate, true);
+  v.setUint16(32, blockAlign, true);
+  v.setUint16(34, bitsPerSample, true);
+  marca(36, "data");
+  v.setUint32(40, dataSize, true);
+
+  saida.set(pcm, 44);
+  return saida;
 }
 
 function json(body, status = 200) {

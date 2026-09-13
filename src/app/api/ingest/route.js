@@ -1,8 +1,7 @@
 import { ingestSlice } from "@/lib/ingest/runSlice.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 /**
  * GET/POST /api/ingest?source=trello|brain&boardIndex=<n>&offset=<n>

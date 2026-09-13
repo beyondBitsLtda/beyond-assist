@@ -1,7 +1,7 @@
 import { recordGameServer, loadGamesServer } from "@/lib/gameScores.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /** GET /api/games?game=velha&limit=12 — histórico + placar das partidas contra a Lisa. */

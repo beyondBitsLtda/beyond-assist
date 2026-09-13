@@ -1,7 +1,7 @@
 import { listSchedules, createSchedule } from "@/lib/scheduledAnnouncements.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /** GET /api/scheduled-announcements — lista todos os agendamentos (ver tela /scheduled-announcements). */

@@ -2,7 +2,7 @@ import { generateRadioTalkSegment, announceRadioSong, commentRadioSong, introduc
 import { jsonResponse } from "@/lib/http.js";
 import { getCategoryData } from "@/lib/pendingWork.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**

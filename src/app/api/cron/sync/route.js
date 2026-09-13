@@ -1,9 +1,8 @@
 import { supabase } from "@/lib/supabase.js";
 import { ingestSlice, buildSyncSteps } from "@/lib/ingest/runSlice.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 /**
  * GET /api/cron/sync[?reset=1]

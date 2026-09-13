@@ -1,7 +1,7 @@
 import { listIndexedFiles } from "@/lib/ingest/github.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /** GET /api/code-repos/files?repo=owner/name — arquivos já indexados desse repositório,

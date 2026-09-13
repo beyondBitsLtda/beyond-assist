@@ -1,89 +1,54 @@
-import ExcelJS from "exceljs";
 import { supabase } from "./supabase.js";
 
 // Tarefas da Delp (empresa onde o usuário trabalha) — alimentadas por upload manual de uma
 // planilha exportada do PMO (tela /delp-tasks). A fonte "de verdade" é esta tabela no
-// Supabase, não o arquivo — cada upload SUBSTITUI tudo (ver replaceDelpTasks). Mapeia pelo
-// NOME do cabeçalho (não pela posição da coluna) — assim um export futuro com colunas
-// reordenadas ou um campo a mais/menos ainda funciona sem precisar mexer em código.
-const FIELD_MAP = {
-  "id": "id", "título": "titulo", "titulo": "titulo", "legenda": "legenda",
-  "prioridade": "prioridade", "pontos": "pontos",
-  "data de início": "data_inicio", "data de inicio": "data_inicio",
-  "data limite": "data_limite", "etapa": "etapa",
-  "relacionado a": "relacionado_a", "atribuído a": "atribuido_a", "atribuido a": "atribuido_a",
-  "colaboradores": "colaboradores", "status": "status", "sprint": "sprint",
+// Supabase, não o arquivo — cada upload SUBSTITUI tudo (ver replaceDelpTasks).
+//
+// A LEITURA da planilha mudou de lugar: agora acontece no navegador (src/lib/delpWorkbook.js),
+// e o que chega aqui já são linhas em JSON. Como quem monta essas linhas passou a ser o
+// cliente, o servidor não confia nelas — `sanearLinhasDelp` valida e recorta cada campo antes
+// de qualquer coisa ir pro banco.
+
+/** Campos que a tabela delp_tasks aceita. Qualquer outra chave que venha do cliente é
+ *  descartada em silêncio — não dá pra inserir coluna que não existe, e tentar seria um jeito
+ *  fácil de alguém sujar a tabela. */
+const CAMPOS_TEXTO = ["titulo", "legenda", "prioridade", "etapa", "relacionado_a", "atribuido_a", "colaboradores", "status", "sprint"];
+
+const texto = (v, max = 500) => {
+  if (v == null || v === "") return null;
+  return String(v).trim().slice(0, max) || null;
 };
 
-function normalizeHeader(h) {
-  return String(h ?? "").trim().toLowerCase();
-}
-
-/** "24/08/2026" (como a planilha do PMO exporta datas) → "2026-08-24" (formato que o
- * Postgres aceita numa coluna `date`). Também cobre o caso de a célula já vir como Date
- * (quando a coluna tem formatação de data de verdade no Excel, não texto). */
-function parseBrDate(v) {
-  if (!v) return null;
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
-  const m = String(v).trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!m) return null;
-  return `${m[3]}-${m[2]}-${m[1]}`;
-}
+/** Aceita só "AAAA-MM-DD" — o resto vira null em vez de deixar o Postgres recusar a inserção
+ *  inteira por causa de uma célula estranha numa linha só. */
+const dataIso = (v) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
 
 /**
- * Lê o buffer de um .xlsx exportado do PMO e devolve as linhas já no formato da tabela
- * delp_tasks. A 1ª linha do export é um título mesclado repetido em toda coluna (sem uso);
- * a linha de cabeçalho de verdade é a primeira que tiver uma célula "ID".
+ * Valida e recorta o que veio do navegador. Devolve as linhas prontas pro banco.
+ *
+ * Lança quando não sobra nada de aproveitável: um upload que não inseriria nada precisa
+ * aparecer como erro na tela, não como "sucesso, 0 tarefas".
  */
-export async function parseDelpWorkbook(buffer) {
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer);
-  const sheet = wb.worksheets[0];
-  if (!sheet) throw new Error("planilha sem nenhuma aba");
-
-  let headerRowIdx = null;
-  for (let i = 1; i <= Math.min(5, sheet.rowCount); i++) {
-    const values = sheet.getRow(i).values || [];
-    if (values.some((v) => normalizeHeader(v) === "id")) { headerRowIdx = i; break; }
+export function sanearLinhasDelp(entrada) {
+  if (!Array.isArray(entrada)) throw new Error("formato inválido: esperava uma lista de linhas");
+  const agora = new Date().toISOString();
+  const linhas = [];
+  for (const bruta of entrada) {
+    if (!bruta || typeof bruta !== "object") continue;
+    const id = Number(bruta.id);
+    if (!Number.isInteger(id) || id < 0) continue; // sem id não há como identificar a tarefa
+    const linha = { id, updated_at: agora };
+    for (const campo of CAMPOS_TEXTO) linha[campo] = texto(bruta[campo]);
+    linha.titulo = linha.titulo || `(sem título #${id})`;
+    linha.status = linha.status || "Sem status";
+    const pontos = Number(bruta.pontos);
+    linha.pontos = Number.isFinite(pontos) ? pontos : null;
+    linha.data_inicio = dataIso(bruta.data_inicio);
+    linha.data_limite = dataIso(bruta.data_limite);
+    linhas.push(linha);
   }
-  if (!headerRowIdx) throw new Error('não achei a linha de cabeçalho (esperava uma coluna "ID" nas primeiras linhas)');
-
-  const headerValues = sheet.getRow(headerRowIdx).values || [];
-  const colIndexByField = {}; // field (ver FIELD_MAP) -> índice da coluna (1-based)
-  headerValues.forEach((h, i) => {
-    const field = FIELD_MAP[normalizeHeader(h)];
-    if (field) colIndexByField[field] = i;
-  });
-  if (!colIndexByField.id || !colIndexByField.titulo || !colIndexByField.status) {
-    throw new Error("faltam colunas obrigatórias (ID, Título, Status) — confira o cabeçalho da planilha");
-  }
-
-  const rows = [];
-  for (let i = headerRowIdx + 1; i <= sheet.rowCount; i++) {
-    const values = sheet.getRow(i).values || [];
-    const get = (field) => (colIndexByField[field] ? values[colIndexByField[field]] : undefined);
-    const id = get("id");
-    if (!id) continue; // linha em branco (comum no fim da exportação)
-    const pontosRaw = get("pontos");
-    rows.push({
-      id: Number(id),
-      titulo: String(get("titulo") || "").trim() || `(sem título #${id})`,
-      legenda: get("legenda") ? String(get("legenda")).trim() : null,
-      prioridade: get("prioridade") != null && get("prioridade") !== "" ? String(get("prioridade")).trim() : null,
-      pontos: pontosRaw != null && pontosRaw !== "" ? Number(pontosRaw) : null,
-      data_inicio: parseBrDate(get("data_inicio")),
-      data_limite: parseBrDate(get("data_limite")),
-      etapa: get("etapa") ? String(get("etapa")).trim() : null,
-      relacionado_a: get("relacionado_a") ? String(get("relacionado_a")).trim() : null,
-      atribuido_a: get("atribuido_a") ? String(get("atribuido_a")).trim() : null,
-      colaboradores: get("colaboradores") ? String(get("colaboradores")).trim() : null,
-      status: String(get("status") || "").trim() || "Sem status",
-      sprint: get("sprint") ? String(get("sprint")).trim() : null,
-      updated_at: new Date().toISOString(),
-    });
-  }
-  if (!rows.length) throw new Error("nenhuma linha de tarefa encontrada na planilha");
-  return rows;
+  if (!linhas.length) throw new Error("nenhuma linha de tarefa válida na planilha");
+  return linhas;
 }
 
 /** Substitui TODAS as tarefas da Delp pelas da planilha recém enviada — cada upload é um

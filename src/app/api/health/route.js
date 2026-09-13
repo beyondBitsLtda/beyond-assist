@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase.js";
 import { sentinelSupabase } from "@/lib/sentinelSupabase.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /** GET /api/health → { supabase, trello, gemini, sentinel } (true = ok) */

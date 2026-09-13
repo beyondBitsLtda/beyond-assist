@@ -1,7 +1,7 @@
 import { listTickets, summarizeTickets, buildDailyTrend } from "@/lib/sentinel.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**

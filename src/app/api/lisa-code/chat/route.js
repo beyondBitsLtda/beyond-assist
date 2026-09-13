@@ -2,7 +2,7 @@ import { runLisaCodeTurn } from "@/lib/gemini.js";
 import { jsonResponse } from "@/lib/http.js";
 import { checkLisaCodeToken } from "@/lib/lisaCodeAuth.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**

@@ -13,6 +13,10 @@
     "world-check": "node scripts/world-check.mjs",
     "deploy-map": "node scripts/deploy-map.mjs"
   },
+  "//overrides": "@cloudflare/next-on-pages quer workers-types v4 e o wrangler v4 quer v5. É pacote só de TIPOS TypeScript e este projeto é JavaScript puro, então nada disso chega no build — fixar em v4 satisfaz o adaptador sem efeito nenhum em runtime.",
+  "overrides": {
+    "@cloudflare/workers-types": "^4.20240208.0"
+  },
   "dependencies": {
     "@babel/parser": "^8.0.4",
     "@google/genai": "^1.0.0",
@@ -26,7 +30,17 @@
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "three": "^0.185.1",
-    "web-push": "^3.6.7"
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.16",
+    "wrangler": "^4.131.1"
+  },
+  "allowScripts": {
+    "workerd@1.20250718.0": true,
+    "workerd@1.20260911.1": true,
+    "esbuild@0.14.47": true,
+    "esbuild@0.15.18": true,
+    "esbuild@0.28.1": true
   }
 }

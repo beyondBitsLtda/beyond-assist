@@ -3,7 +3,7 @@ import { withPersona } from "@/lib/rag.js";
 import { jsonResponse } from "@/lib/http.js";
 import { logScreenObservation } from "@/lib/screenWatch.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**

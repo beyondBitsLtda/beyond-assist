@@ -1,7 +1,7 @@
 import { setRepoEnabled } from "@/lib/ingest/github.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /** PATCH /api/code-repos/:id   body: { enabled: boolean } */

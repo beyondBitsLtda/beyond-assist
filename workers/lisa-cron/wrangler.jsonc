@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lisa-cron",
+  "main": "src/index.js",
+
+  // Trava o comportamento da plataforma numa data. Sem isso, uma mudança futura da Cloudflare
+  // poderia alterar o runtime debaixo de um deploy que já funcionava.
+  "compatibility_date": "2026-09-13",
+
+  // É esta linha que faz o web-push funcionar aqui — e foi justamente ela que não bastou no
+  // Pages, onde o Edge runtime não tem http/https/net.
+  "compatibility_flags": ["nodejs_compat"],
+
+  "triggers": {
+    "crons": [
+      "*/5 * * * *",   // notificações e falas agendadas
+      "*/15 * * * *",  // Map of Deploy
+      "0 * * * *"      // sync do cérebro, de hora em hora
+    ]
+  },
+
+  // TROQUE pelo endereço final da Lisa quando ligar o domínio. Os horários são em UTC.
+  "vars": { "LISA_URL": "https://lisa.pages.dev" },
+
+  "observability": { "enabled": true }
+}

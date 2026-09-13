@@ -1,7 +1,7 @@
 import { sendScreenShareSignal } from "@/lib/screenShareSignals.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**

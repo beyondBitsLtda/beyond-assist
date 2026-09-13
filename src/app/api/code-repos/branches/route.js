@@ -1,7 +1,7 @@
 import { listRepoBranches } from "@/lib/codeTasks.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /** GET /api/code-repos/branches?repo=owner/name — branches do repositório, pro seletor

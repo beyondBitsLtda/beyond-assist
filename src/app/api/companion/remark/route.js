@@ -2,7 +2,7 @@ import { generateCompanionRemark } from "@/lib/gemini.js";
 import { jsonResponse } from "@/lib/http.js";
 import { getCategoryData } from "@/lib/pendingWork.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**

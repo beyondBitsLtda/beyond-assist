@@ -1,9 +1,8 @@
 import { checarTodas } from "@/lib/deployChecks.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 /**
  * POST /api/map-of-deploy/check

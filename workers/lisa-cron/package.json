@@ -1,0 +1,16 @@
+{
+  "name": "lisa-cron",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

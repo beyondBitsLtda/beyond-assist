@@ -1,9 +1,8 @@
 import { listGithubRepos, discoverRepos } from "@/lib/ingest/github.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 /** GET /api/code-repos — lista repositórios já conhecidos (tela /code-repos). */
 export async function GET() {

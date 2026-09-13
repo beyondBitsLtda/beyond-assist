@@ -2,7 +2,7 @@ import { loadAllTrelloCards } from "@/lib/liveTrello.js";
 import { getDateBoundaries } from "@/lib/dateRanges.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**
