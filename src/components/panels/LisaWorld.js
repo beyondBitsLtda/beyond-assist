@@ -79,7 +79,7 @@ export default function LisaWorld({ fullscreen = false }) {
   const [ultimo, setUltimo] = useState(null);    // último evento recebido, pro aviso na tela
 
   const canvasRef = useRef(null);
-  const sceneRef = useRef({ unlocked: [], level: 1, night: ehNoite(horaReal()), temCarta: false });
+  const sceneRef = useRef({ unlocked: [], level: 1, night: ehNoite(horaReal()), temCarta: false, varal: true });
   const camRef = useRef({ x: 40, y: 40 });
   const dragRef = useRef(null);
   const ptrsRef = useRef(new Map());
@@ -152,14 +152,14 @@ export default function LisaWorld({ fullscreen = false }) {
       setWorld({ xp, unlocked, next: nextItem(xp), erro });
       setNovas(recem);
       buildQueueRef.current = recem.filter((i) => i.tx != null).slice(0, 3);
-      sceneRef.current = { unlocked, level: houseLevel(xp), night: ehNoite(horaReal()), temCarta: recem.length > 0 };
+      sceneRef.current = { unlocked, level: houseLevel(xp), night: ehNoite(horaReal()), temCarta: recem.length > 0, varal: true };
     })();
     return () => { vivo = false; };
   }, []);
 
   /** Onde fica cada lugar citado por um plano ou por uma ação da rotina. */
   const tileAlvo = useCallback((nome) => {
-    if (nome === "casa" || nome === "porta") return [CASA.tx + CASA.w + 0.8, CASA.ty + CASA.d * 0.5];
+    if (nome === "casa" || nome === "porta") return [CASA.tx + CASA.w + 0.9, CASA.ty + CASA.d * 0.78];
     const it = WORLD_ITEMS.find((i) => i.key === nome);
     if (!it || it.tx == null || !sceneRef.current.unlocked.includes(nome)) return null;
     return [it.tx + (it.w || 1) + 0.8, it.ty + (it.d || 1) * 0.5];
@@ -295,7 +295,7 @@ export default function LisaWorld({ fullscreen = false }) {
         case "horta": A.drawHorta(P, item); break;
         case "arvore1": case "arvore2": case "arvore3": A.drawArvore(P, item); break;
         case "casinha": A.drawCasinha(P, item); break;
-        case "varal": A.drawVaral(P, item); break;
+        case "varal": A.drawVaral(P, item, sc.varal); break;
         case "banco": A.drawBanco(P, item); break;
         case "correio": A.drawCorreio(P, item, sc.temCarta); break;
         case "poste1": A.drawPoste(P, item, sc.night); break;
@@ -352,7 +352,7 @@ export default function LisaWorld({ fullscreen = false }) {
       ctx.fillRect(0, 0, w, h);
 
       // ---- o mundo inteiro, rasterizado uma vez só, em tamanho fixo ----
-      const key = `${accent}|${sc.unlocked.join(",")}|${sc.level}|${noite}|${sc.temCarta}`;
+      const key = `${accent}|${sc.unlocked.join(",")}|${sc.level}|${noite}|${sc.temCarta}|${sc.varal}`;
       if (key !== staticKey) {
         staticKey = key;
         offScale = A.WORLD_W * BASE * A.WORLD_H * BASE * 4 < 9e6 ? 2 : 1;
@@ -394,6 +394,9 @@ export default function LisaWorld({ fullscreen = false }) {
       // ---- o plano de reação do Modo Deus ----
       if (ev) {
         const avancar = () => {
+          // sair do passo de recolher é o que esvazia o varal: antes ela recolhia a roupa e as
+          // peças continuavam penduradas, e a cena inteira perdia o sentido
+          if (ev.passo?.faz === "recolher") sc.varal = false;
           ev.i++;
           let pas = ev.passos[ev.i];
           while (pas && pas.needs && !sc.unlocked.includes(pas.needs)) { ev.i++; pas = ev.passos[ev.i]; }
@@ -474,6 +477,7 @@ export default function LisaWorld({ fullscreen = false }) {
         if (a.dentro) dentroRef.current = true; // chegou na porta: entrou
       }
       if (a?.phase === "fazendo" && now > a.until) {
+        if (a.key === "varal") sc.varal = true; // ela acabou de estender: o varal volta a ter roupa
         actRef.current = null;
         steveRef.current = null;
         dentroRef.current = false;
@@ -500,8 +504,13 @@ export default function LisaWorld({ fullscreen = false }) {
       const brincando = a?.anim === "lancar" && a.phase === "fazendo";
       // com ameaça no terreno a Nala larga tudo e vai pra cima do mais próximo
       const ameaca = inimigosRef.current.find((e) => e.vivo && now >= e.nasceEm);
+      // cachorro segue dono: quando a Lisa entra, a Nala vai atrás e SOME do terreno. Antes ela
+      // ficava plantada no quintal enquanto aparecia dormindo dentro de casa ao mesmo tempo.
+      const porta = tileAlvo("casa");
       nala.targ = ameaca
         ? [ameaca.tx, ameaca.ty]
+        : dentroRef.current
+        ? porta
         : brincando
         ? [lisa.tx + 2.5 + Math.sin(now / 1400) * 2.5, lisa.ty + 2.5 + Math.cos(now / 1100) * 2.5]
         : [lisa.tx - 1.6, lisa.ty + 1.6];
@@ -613,8 +622,9 @@ export default function LisaWorld({ fullscreen = false }) {
         P.figura(rows, p.x - rows[0].length / 2 + (g?.dx || 0), p.y - rows.length + (g?.dy || 0), { flip, lean: g?.lean || 0, agacha: g?.agacha || 0 });
       };
 
+      const nalaDentro = dentroRef.current && Math.hypot(nala.tx - porta[0], nala.ty - porta[1]) < 1.2;
       const pn = A.iso(nala.tx, nala.ty);
-      put(nala.moving ? (Math.floor(now / 110) % 2 ? NALA.runA : NALA.runB) : Math.floor(now / 420) % 2 ? NALA.wag : NALA.idle, pn, nala.flip);
+      if (!nalaDentro) put(nala.moving ? (Math.floor(now / 110) % 2 ? NALA.runA : NALA.runB) : Math.floor(now / 420) % 2 ? NALA.wag : NALA.idle, pn, nala.flip);
 
       const pl = A.iso(lisa.tx, lisa.ty);
       // dentro de casa ela não aparece no terreno — o que aparece é a janela acesa
@@ -623,11 +633,9 @@ export default function LisaWorld({ fullscreen = false }) {
         // e o objeto na mão: é ele que conta qual é a ação
         if (g) adereco(P, a.anim, now - a.startedAt, { x: pl.x + (g.dx || 0), y: pl.y + (g.dy || 0) }, lisa.flip);
       } else {
-        const j = A.iso(CASA.tx + CASA.w, CASA.ty + CASA.d * 0.2);
-        P.poli([
-          { x: j.x, y: j.y - 5 }, { x: j.x - 3, y: j.y - 6.5 },
-          { x: j.x - 3, y: j.y - 12 }, { x: j.x, y: j.y - 10.5 },
-        ], { a: 1, fill: 0.75 });
+        // ela está lá dentro: o que se vê do terreno é a janela acesa, na posição real dela
+        const j = A.janelaDaCasa(CASA);
+        A.abertura(P, j.p, j.dir, j.larg, j.alt, { acesa: true });
       }
       // a arminha na mão, enquanto está armada
       if (!dentroRef.current && armadaRef.current && !lisa.moving)

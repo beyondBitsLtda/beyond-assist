@@ -5,7 +5,7 @@ import { CY, mono } from "@/lib/theme.js";
 import { LISA } from "./worldSprites.js";
 import { NALA } from "./nalaSprites.js";
 import { adereco, gesto } from "./lisaAnim.js";
-import { pincel, volume } from "./isoArt.js";
+import { barra, pincel, volume } from "./isoArt.js";
 
 // O dentro da casa. Abre ao clicar nela enquanto a Lisa está lá — e ela está lá quando se
 // abriga da chuva, da neve ou do vento, ou quando a rotina a leva pra dentro (café, almoço,
@@ -106,44 +106,82 @@ export default function CasaInterior({ unlocked = [], night = false, onClose }) 
       }
 
       // ---- mobília ----
-      // os móveis são largos de propósito: com menos de um tile eles viravam postes finos ao
-      // lado dela, que tem 14 células de largura
-      caixa(0.9, 4.4, 3.2, 2.2, 7);                                  // sofá
-      caixa(0.9, 4.4, 3.2, 0.6, 17, { luz: 0.06 });                  // encosto
-      P.poli(quad(3.6, 3.4, 3.2, 2.8), { a: 0.35, fill: 0.04 });     // tapete
-      caixa(6.4, 4.2, 2.6, 2.2, 12);                                 // mesa
-      caixa(5.3, 4.6, 0.9, 1.4, 8, { luz: 0.06 });                   // cadeira e encosto
-      caixa(5.3, 4.6, 0.9, 0.4, 18, { luz: 0.04 });
-      caixa(9.2, 4.6, 0.9, 1.4, 8, { luz: 0.06 });
-      caixa(4.4, 0.2, 2.8, 0.7, 32, { luz: 0.05 });                  // estante
-      for (let k = 7; k < 32; k += 7) P.linha([iso(4.4, 0.9, k), iso(7.2, 0.9, k)], { a: 0.7, w: 0.8 });
+      //
+      // Tudo com pé: caixa pousada no chão vira caixote. É a perna à mostra que diz "móvel".
+      const pes = (tx, ty, tw, td, alt, larg = 1.3) => {
+        for (const [a, b] of [[0.18, 0.18], [tw - 0.18, 0.18], [0.18, td - 0.18], [tw - 0.18, td - 0.18]]) {
+          const q = iso(tx + a, ty + b);
+          barra(P, q, { x: q.x, y: q.y - alt }, larg);
+        }
+      };
+
+      // sofá: base, encosto alto e dois braços
+      pes(0.9, 4.4, 3.2, 2.2, 4, 1.1);
+      caixa(0.9, 4.4, 3.2, 2.2, 3, { luz: 0.1, base: 4 });
+      caixa(0.9, 4.4, 3.2, 0.5, 12, { luz: 0.06, base: 7 });
+      caixa(0.9, 4.4, 0.45, 2.2, 6, { luz: 0.08, base: 7 });
+      caixa(3.65, 4.4, 0.45, 2.2, 6, { luz: 0.08, base: 7 });
+
+      P.poli(quad(3.8, 3.2, 3.2, 2.8), { a: 0.4, fill: 0.05 });        // tapete
+      for (let i = 1; i < 4; i++) {
+        const t = i / 4;
+        const c = quad(3.8, 3.2, 3.2, 2.8);
+        P.linha([
+          { x: c[0].x + (c[3].x - c[0].x) * t, y: c[0].y + (c[3].y - c[0].y) * t },
+          { x: c[1].x + (c[2].x - c[1].x) * t, y: c[1].y + (c[2].y - c[1].y) * t },
+        ], { a: 0.18, w: 0.7 });
+      }
+
+      // mesa e duas cadeiras, com encosto — é o encosto que diferencia cadeira de banquinho
+      pes(6.4, 4.2, 2.6, 2.2, 12);
+      caixa(6.3, 4.1, 2.8, 2.4, 1.6, { luz: 0.14, base: 12 });
+      for (const [cx, cy] of [[5.2, 4.6], [9.3, 4.6]]) {
+        pes(cx, cy, 1, 1.4, 8, 1.1);
+        caixa(cx, cy, 1, 1.4, 1.4, { luz: 0.1, base: 8 });
+        caixa(cx, cy, 1, 0.3, 10, { luz: 0.06, base: 9.4 });
+      }
+
+      caixa(4.4, 0.2, 2.8, 0.7, 32, { luz: 0.05 });                    // estante
+      for (let k = 7; k < 32; k += 7) {
+        barra(P, iso(4.4, 0.9, k), iso(7.2, 0.9, k), 1.2, { a: 0.8 });
+        // os livros: umas poucas lombadas em cada prateleira
+        for (let i = 0; i < 5; i++) {
+          const q = iso(4.7 + i * 0.5, 0.85, k);
+          barra(P, q, { x: q.x, y: q.y - 4 - (i % 3) }, 1.1, { a: 0.5, fill: 0.1 });
+        }
+      }
 
       // janela na parede do fundo, acesa se for noite
       {
         const j = iso(9.6, 0.15);
         P.poli([
-          { x: j.x - 4, y: j.y - 34 }, { x: j.x + 4, y: j.y - 34 },
-          { x: j.x + 4, y: j.y - 20 }, { x: j.x - 4, y: j.y - 20 },
-        ], { a: 0.9, fill: night ? 0.7 : 0.12 });
-        P.linha([{ x: j.x, y: j.y - 34 }, { x: j.x, y: j.y - 20 }], { a: 0.9, w: 0.8 });
+          { x: j.x - 4.5, y: j.y - 34 }, { x: j.x + 4.5, y: j.y - 34 },
+          { x: j.x + 4.5, y: j.y - 20 }, { x: j.x - 4.5, y: j.y - 20 },
+        ], { a: 0.95, fill: night ? 0.7 : 0.12, solido: true });
+        P.linha([{ x: j.x, y: j.y - 34 }, { x: j.x, y: j.y - 20 }], { a: 0.8, w: 0.8 });
+        P.linha([{ x: j.x - 4.5, y: j.y - 27 }, { x: j.x + 4.5, y: j.y - 27 }], { a: 0.8, w: 0.8 });
       }
 
       // lareira, só se a chaminé existir lá fora
       if (unlocked.includes("chamine")) {
-        caixa(0.2, 0.2, 1.8, 0.8, 22, { luz: 0.05 });
+        caixa(0.2, 0.2, 1.8, 0.8, 24, { luz: 0.05 });
         const f = iso(1.1, 1.0);
-        P.poli([{ x: f.x - 3.2, y: f.y - 4 }, { x: f.x + 3.2, y: f.y - 4 }, { x: f.x + 3.2, y: f.y - 0.5 }, { x: f.x - 3.2, y: f.y - 0.5 }], { a: 0.8, fill: 0.25 });
+        P.poli([{ x: f.x - 3.6, y: f.y - 10 }, { x: f.x + 3.6, y: f.y - 10 }, { x: f.x + 3.6, y: f.y - 0.5 }, { x: f.x - 3.6, y: f.y - 0.5 }],
+          { a: 0.9, fill: 0.3, solido: true });
         for (let i = 0; i < 5; i++) {
           const t = ((now / 620) + i / 5) % 1;
-          P.ponto({ x: f.x - 2 + Math.sin(t * 8 + i) * 2, y: f.y - 4 - t * 7 }, { a: (1 - t) * 0.9, r: 0.5 });
+          P.ponto({ x: f.x - 2 + Math.sin(t * 8 + i) * 2, y: f.y - 3 - t * 7 }, { a: (1 - t) * 0.9, r: 0.5 });
         }
       }
 
-      // abajur
-      caixa(3.9, 6.5, 0.9, 0.9, 20, { luz: 0.07 });
+      // abajur de chão: haste fina e cúpula cônica bem aberta, senão vira um pilar
       {
-        const p = iso(4.35, 6.95, 20);
-        P.poli([{ x: p.x - 4, y: p.y }, { x: p.x + 4, y: p.y }, { x: p.x + 2.6, y: p.y - 5.5 }, { x: p.x - 2.6, y: p.y - 5.5 }], { a: 0.9, fill: night ? 0.75 : 0.15 });
+        const b = iso(4.3, 6.9);
+        P.elipse(b.x, b.y, 2.6, 1.4, { a: 0.8, fill: 0.12, solido: true });
+        barra(P, b, { x: b.x, y: b.y - 22 }, 1.1);
+        P.poli([{ x: b.x - 5.5, y: b.y - 22 }, { x: b.x + 5.5, y: b.y - 22 }, { x: b.x + 3, y: b.y - 29 }, { x: b.x - 3, y: b.y - 29 }],
+          { a: 0.95, fill: night ? 0.8 : 0.16, solido: true });
+        if (night) P.elipse(b.x, b.y - 20, 11, 6, { a: 0.12, fill: 0.03 });
       }
 
       // ---- ela ----
@@ -181,8 +219,9 @@ export default function CasaInterior({ unlocked = [], night = false, onClose }) 
         ? { pose: Math.floor(now / 160) % 2 ? "walkA" : "walkB", dx: 0, dy: 0, lean: 0, agacha: 0 }
         : gesto(L.anim || "andar", now - L.desde);
       const rows = LISA[g.pose] || LISA.idle;
-      // a pose sentada tem as fileiras de baixo vazias: ela precisa descer pra encostar no móvel
-      const sentou = g.pose === "sit" ? 5 : 0;
+      // sentada, ela sobe até o assento (7 células), descontadas as 3 fileiras vazias do desenho.
+      // Descendo, como estava antes, ela ficava de pé em cima do sofá.
+      const sentou = g.pose === "sit" ? -4 : 0;
       P.figura(rows, p.x - rows[0].length / 2 + g.dx, p.y - rows.length + g.dy + sentou, { flip: L.flip, lean: g.lean, agacha: g.agacha });
       if (!L.moving && L.anim) adereco(P, L.anim, now - L.desde, { x: p.x + g.dx, y: p.y + g.dy + sentou }, L.flip);
 

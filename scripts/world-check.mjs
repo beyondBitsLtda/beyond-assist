@@ -63,6 +63,9 @@ ok("nenhuma construção em cima de outra", sobrepostas.length === 0, sobreposta
 
 const caminhoFora = PATH_TILES.filter(([x, y]) => x < 0 || y < 0 || x >= GRID || y >= GRID);
 ok("o caminho de pedra fica dentro do terreno", caminhoFora.length === 0, `${PATH_TILES.length} tiles`);
+// a casa cresceu e a travessa passou a correr por baixo dela; o caminho agora se filtra sozinho
+const caminhoSobreObra = PATH_TILES.filter(([x, y]) => comArea.some((a) => x >= a.tx && x < a.tx + a.w && y >= a.ty && y < a.ty + a.d));
+ok("o caminho não passa por baixo de construção", caminhoSobreObra.length === 0, caminhoSobreObra.map((p) => p.join(",")).join(" "));
 
 // --- quanto custa na prática ---
 console.log("\nquanto custa cada construção (só jogando partidas, metade ganha):");

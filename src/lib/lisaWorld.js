@@ -39,7 +39,7 @@ export const WORLD_ITEMS = [
   { key: "arvore1",  xp: 80,   label: "Primeira árvore",    note: "sombra no terreno",            tx: 11, ty: 6,  w: 2, d: 2 },
   { key: "cerca",    xp: 120,  label: "Cerca",              note: "fecha o terreno" },
   { key: "casinha",  xp: 170,  label: "Casinha da Nala",    note: "onde a Nala dorme",            tx: 15, ty: 8,  w: 3, d: 3 },
-  { key: "varal",    xp: 230,  label: "Varal",              note: "roupa secando ao vento",       tx: 20, ty: 5,  w: 4, d: 1 },
+  { key: "varal",    xp: 230,  label: "Varal",              note: "roupa secando ao vento",       tx: 20, ty: 5,  w: 8, d: 1 },
   { key: "banco",    xp: 300,  label: "Banco",              note: "lugar pra ela descansar",      tx: 11, ty: 14, w: 2, d: 1 },
   { key: "correio",  xp: 380,  label: "Caixa de correio",   note: "chega carta de vez em quando", tx: 2,  ty: 25, w: 1, d: 1 },
   { key: "poste1",   xp: 470,  label: "Poste de luz",       note: "acende quando escurece",       tx: 11, ty: 10, w: 1, d: 1 },
@@ -49,7 +49,7 @@ export const WORLD_ITEMS = [
   { key: "flores",   xp: 930,  label: "Canteiro de flores", note: "cor no meio do verde",         tx: 27, ty: 13, w: 2, d: 2 },
   { key: "mesa",     xp: 1070, label: "Mesa de piquenique", note: "pra receber gente",            tx: 21, ty: 13, w: 3, d: 2 },
   { key: "churras",  xp: 1220, label: "Churrasqueira",      note: "fim de semana no quintal",     tx: 6,  ty: 16, w: 2, d: 2 },
-  { key: "balanco",  xp: 1380, label: "Balanço",            note: "pendurado numa trave",         tx: 2,  ty: 18, w: 3, d: 2 },
+  { key: "balanco",  xp: 1380, label: "Balanço",            note: "pendurado numa trave",         tx: 2,  ty: 18, w: 4, d: 3 },
   { key: "poco",     xp: 1550, label: "Poço",               note: "água pra horta",               tx: 9,  ty: 21, w: 2, d: 2 },
   { key: "fogueira", xp: 1730, label: "Fogueira",           note: "acende de noite",              tx: 15, ty: 17, w: 2, d: 2 },
   { key: "antena",   xp: 1920, label: "Antena",             note: "é por ela que o Steve aparece" },
@@ -64,8 +64,12 @@ export const WORLD_ITEMS = [
   { key: "sobrado",  xp: 4200, label: "Segundo andar",      note: "a casa cresce" },
 ];
 
-/** A casa existe desde sempre — é o ponto de partida, não uma construção. */
-export const CASA = { tx: 2, ty: 2, w: 7, d: 6 };
+// A casa existe desde sempre — é o ponto de partida, não uma construção.
+//
+// Era 7x6 com parede de 16 células — mais baixa que a própria moradora, que tem 23.
+// De longe parecia um galpãozinho. Agora ocupa 9x8 e a parede vai a 30 (52 com o sobrado), o que
+// encosta exatamente na árvore e na horta: se mexer aqui, rode o world-check.
+export const CASA = { tx: 2, ty: 2, w: 9, d: 8 };
 
 /** Chaves já construídas com esse XP. */
 export function unlockedItems(xp) {
@@ -95,11 +99,20 @@ export function houseLevel(xp) {
  * construída, e por isso é enfileirada em vez de sorteada. */
 export const BUILD_ACTIVITY = { key: "obra", label: "construindo", anim: "martelar", ms: 10000 };
 
+/**
+ * O caminho de pedra: do portão até a porta, com uma travessa e um ramo pro fundo.
+ *
+ * No fim ele é FILTRADO contra as construções. Traçar a mão e conferir a olho não se sustenta —
+ * a casa cresceu de 7x6 pra 9x8 e a travessa passou a correr por baixo dela e por dentro da
+ * horta. Assim o caminho contorna sozinho o que estiver no meio, agora e quando algo mudar.
+ */
 export const PATH_TILES = (() => {
   const t = [];
-  for (let ty = 27; ty >= 9; ty--) t.push([5, ty]);  // do portão subindo até a travessa
-  for (let tx = 5; tx <= 25; tx++) t.push([tx, 9]);  // travessa no meio do terreno
-  for (let ty = 10; ty <= 22; ty++) t.push([16, ty]); // ramo pro fundo
-  for (let ty = 8; ty >= 7; ty--) t.push([5, ty]);   // entrada da casa
-  return t;
+  for (let ty = 27; ty >= 15; ty--) t.push([5, ty]);  // do portão subindo pela esquerda
+  for (let tx = 5; tx <= 25; tx++) t.push([tx, 15]);  // travessa no meio do terreno
+  for (let ty = 14; ty >= 8; ty--) t.push([11, ty]);  // sobe até a porta da casa
+  for (let ty = 16; ty <= 23; ty++) t.push([18, ty]); // ramo pro fundo
+  const areas = [CASA, ...WORLD_ITEMS.filter((i) => i.tx != null)];
+  const sobreConstrucao = ([x, y]) => areas.some((a) => x >= a.tx && x < a.tx + a.w && y >= a.ty && y < a.ty + a.d);
+  return t.filter((p) => !sobreConstrucao(p));
 })();

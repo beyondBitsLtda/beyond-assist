@@ -28,9 +28,6 @@ export const iso = (tx, ty, h = 0) => ({
   y: OY + (tx + ty) * (TH / 2) - h,
 });
 
-/** Altura da parede da casa. A chaminé e a antena se penduram nela, então mora num lugar só. */
-export const casaAltura = (nivel) => (nivel >= 3 ? 24 : 16);
-
 /**
  * O pincel. Converte coordenadas de célula pra pixel de tela e desenha caminhos.
  * `cell` é o tamanho da célula na tela; `camX/camY` a câmera, em células.
@@ -155,9 +152,57 @@ export function pincel(ctx, { cell, camX = 0, camY = 0, accent = "56,225,255" })
   return P;
 }
 
-// ---------- peças de construção ----------
+
+// ---------- a régua ----------
+//
+// A Lisa tem 23 células de altura e 14 de largura. TUDO aqui é medido por ela, e é essa régua
+// que faltava: sem ela a casa saiu com a parede mais baixa que a moradora, a mesa virou um
+// caixote e o poço ganhou um telhado maior que ele mesmo.
+//
+//   porta 20 · janela 10 · mesa 12 · banco 8 · parede 30 · árvore 48 · poste 26
+//
+// A outra lição: nada de traço solto pra coisa que tem espessura. Poste, tronco, perna de mesa e
+// corrimão são desenhados com `barra` (um quadrilátero fino, cheio e contornado). Como linha de
+// 1px eles sumiam e o objeto virava um rabisco.
 
 const cantos = (tx, ty, w, d, h = 0) => [iso(tx, ty, h), iso(tx + w, ty, h), iso(tx + w, ty + d, h), iso(tx, ty + d, h)];
+
+/** Direção, na tela, de cada uma das duas faces visíveis de uma caixa. */
+export const DIR_DIR = { x: -1, y: 0.5 };   // face da direita: do canto leste pro sul
+export const DIR_ESQ = { x: -1, y: -0.5 };  // face da esquerda: do canto sul pro oeste
+
+/** Onde fica a janela da frente da casa — o mundo acende ela quando a Lisa está lá dentro. */
+export const janelaDaCasa = ({ tx, ty, w, d }) => ({ p: iso(tx + w, ty + d * 0.3, 9), dir: DIR_DIR, larg: 7, alt: 10 });
+
+/**
+ * Barra com espessura: um quadrilátero fino em vez de um traço.
+ *
+ * É o que faz um poste parecer um poste. Desenhado como `P.linha`, um mastro de 26 células vira
+ * um fio de cabelo que some contra o fundo e leva o objeto junto.
+ */
+export function barra(P, a, b, larg = 1.4, opts = {}) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const n = Math.hypot(dx, dy) || 1;
+  const px = (-dy / n) * (larg / 2);
+  const py = (dx / n) * (larg / 2);
+  P.poli([
+    { x: a.x + px, y: a.y + py }, { x: b.x + px, y: b.y + py },
+    { x: b.x - px, y: b.y - py }, { x: a.x - px, y: a.y - py },
+  ], { a: 0.9, fill: 0.14, solido: true, ...opts });
+}
+
+/** Cilindro em pé: poço, barril, tronco grosso. */
+export function cilindro(P, c, rx, ry, h, { luz = 0.1, a = 0.9 } = {}) {
+  P.poli([
+    { x: c.x - rx, y: c.y }, { x: c.x + rx, y: c.y },
+    { x: c.x + rx, y: c.y - h }, { x: c.x - rx, y: c.y - h },
+  ], { a: 0, fill: luz, solido: true });
+  P.linha([{ x: c.x - rx, y: c.y }, { x: c.x - rx, y: c.y - h }], { a });
+  P.linha([{ x: c.x + rx, y: c.y }, { x: c.x + rx, y: c.y - h }], { a });
+  P.elipse(c.x, c.y, rx, ry, { a: a * 0.5, w: 0.8 });
+  P.elipse(c.x, c.y - h, rx, ry, { a, fill: luz * 1.7, solido: true });
+}
 
 /**
  * Caixa isométrica em traço: o topo e as duas faces da frente.
@@ -182,7 +227,7 @@ export function volume(P, [N, E, S, W], h, { luz = 0.09, traco = 0.85, solido = 
   P.poli([up(N), up(E), up(S), up(W)], { fill: luz * 1.6, a: traco, solido });
 }
 
-/** Telhado de quatro águas: quatro triângulos que sobem até a cumeeira. */
+/** Telhado de quatro águas: quatro triângulos que sobem até um bico. Bom pra torre e poço. */
 export function telhado(P, tx, ty, w, d, base, alt, { luz = 0.08, solido = true } = {}) {
   const [N, E, S, W] = cantos(tx, ty, w, d, base);
   const topo = iso(tx + w / 2, ty + d / 2, base + alt);
@@ -193,227 +238,408 @@ export function telhado(P, tx, ty, w, d, base, alt, { luz = 0.08, solido = true 
   P.poli([S, E, topo], { fill: luz * 1.3, a: 0.85, solido });
 }
 
-/** Painel numa das faces da frente: porta, janela, vidro. */
-function painel(P, p, larg, alt, { a = 0.9, fill = 0 } = {}) {
-  const pts = [
-    { x: p.x, y: p.y },
-    { x: p.x - larg, y: p.y - larg / 2 },
-    { x: p.x - larg, y: p.y - larg / 2 - alt },
-    { x: p.x, y: p.y - alt },
-  ];
-  P.poli(pts, { a, fill });
+/**
+ * Telhado de DUAS águas, com cumeeira e empenas triangulares. É este que diz "casa": o de quatro
+ * águas vira um bico de pirâmide e o prédio fica com cara de tenda de circo.
+ */
+export function duasAguas(P, tx, ty, w, d, base, alt, { luz = 0.08 } = {}) {
+  const [N, E, S, W] = cantos(tx, ty, w, d, base);
+  const R1 = iso(tx, ty + d / 2, base + alt);
+  const R2 = iso(tx + w, ty + d / 2, base + alt);
+  P.poli([N, E, R2, R1], { fill: luz * 0.45, a: 0.5, solido: true });   // água de trás
+  P.poli([N, W, R1], { fill: luz * 0.5, a: 0.7, solido: true });        // empenas
+  P.poli([E, S, R2], { fill: luz * 1.1, a: 0.8, solido: true });
+  P.poli([W, S, R2, R1], { fill: luz * 1.5, a: 0.9, solido: true });    // água da frente
+  P.linha([R1, R2], { a: 0.95, w: 1.1 });                               // cumeeira
+}
+
+/**
+ * Abertura (porta ou janela) NA face, não flutuando na frente dela.
+ *
+ * `dir` é a direção da parede na tela. A versão anterior usava sempre a mesma direção, então a
+ * porta da face direita saía desenhada no plano da face esquerda: um losango torto pousado em
+ * cima da casa, que era parte do motivo de nada ali se reconhecer.
+ */
+export function abertura(P, p, dir, larg, alt, { tipo = "janela", acesa = false } = {}) {
+  const desloca = (t, dy = 0) => ({ x: p.x + dir.x * t, y: p.y + dir.y * t - dy });
+  P.poli([desloca(0), desloca(larg), desloca(larg, alt), desloca(0, alt)], { a: 0.95, fill: 0.06, solido: true });
+  const m = larg * 0.16;
+  const base = tipo === "porta" ? 0 : m;
+  P.poli([desloca(m, base), desloca(larg - m, base), desloca(larg - m, alt - m), desloca(m, alt - m)],
+    { a: 0.6, fill: acesa ? 0.7 : 0.1 });
+  if (tipo === "porta") {
+    // maçaneta: é o detalhe miúdo que diz "isto se abre"
+    const q = desloca(larg * 0.78, alt * 0.45);
+    P.elipse(q.x, q.y, 0.9, 0.9, { a: 0.95, fill: 0.5 });
+  } else {
+    P.linha([desloca(larg / 2, m), desloca(larg / 2, alt - m)], { a: 0.7, w: 0.8 });
+    P.linha([desloca(m, alt / 2), desloca(larg - m, alt / 2)], { a: 0.7, w: 0.8 });
+  }
 }
 
 // ---------- construções ----------
 
+/** Altura da parede da casa. A chaminé e a antena se penduram nela, então mora num lugar só. */
+export const casaAltura = (nivel) => (nivel >= 3 ? 52 : nivel >= 2 ? 34 : 30);
+
 export function drawCasa(P, { tx, ty, w, d }, nivel, noite) {
   const h = casaAltura(nivel);
   caixa(P, tx, ty, w, d, h);
-  telhado(P, tx - 0.5, ty - 0.5, w + 1, d + 1, h, 9);
-  painel(P, iso(tx + w, ty + d * 0.72), 7, 14, { a: 0.95, fill: 0.1 });            // porta
-  painel(P, iso(tx + w, ty + d * 0.3), 6, 8, { a: 0.9, fill: noite ? 0.55 : 0.06 }); // janela
+  duasAguas(P, tx - 0.8, ty - 0.8, w + 1.6, d + 1.6, h, 16);
   if (nivel >= 3) {
-    P.linha([iso(tx, ty + d, h / 2), iso(tx + w, ty + d, h / 2)], { a: 0.4 });
-    painel(P, iso(tx + w, ty + d * 0.6, h / 2 + 3), 6, 7, { a: 0.9, fill: noite ? 0.55 : 0.06 });
+    // faixa entre os dois pavimentos, e as janelas de cima
+    P.linha([iso(tx, ty + d, h / 2), iso(tx + w, ty + d, h / 2), iso(tx + w, ty, h / 2)], { a: 0.45, w: 0.9 });
+    abertura(P, iso(tx + w, ty + d * 0.32, h / 2 + 6), DIR_DIR, 7, 10, { acesa: noite });
+    abertura(P, iso(tx + w * 0.5, ty + d, h / 2 + 6), DIR_ESQ, 7, 10, { acesa: noite });
   }
+  // porta na face da direita, com degrau; janelas nas duas faces
+  abertura(P, iso(tx + w, ty + d * 0.78, 0), DIR_DIR, 9, 20, { tipo: "porta" });
+  caixa(P, tx + w, ty + d * 0.66, 0.6, 1.5, 2, { luz: 0.12 });
+  abertura(P, iso(tx + w, ty + d * 0.3, 9), DIR_DIR, 7, 10, { acesa: noite });
+  abertura(P, iso(tx + w * 0.68, ty + d, 9), DIR_ESQ, 7, 10, { acesa: noite });
+  abertura(P, iso(tx + w * 0.3, ty + d, 9), DIR_ESQ, 7, 10, { acesa: noite });
 }
 
-export function drawChamine(P, { tx, ty, w, d }, nivel) {
+export function drawChamine(P, { tx, ty, w }, nivel) {
   // nasce em cima da água do telhado, não no chão: antes era uma coluna inteira passando na
   // frente da casa
   const alto = casaAltura(nivel);
-  caixa(P, tx + w - 2.2, ty + 0.6, 1.1, 1.1, 8, { luz: 0.12, base: alto + 4 });
-  P.poli([iso(tx + w - 2.4, ty + 0.4, alto + 12), iso(tx + w - 0.9, ty + 0.4, alto + 12),
-          iso(tx + w - 0.9, ty + 1.9, alto + 12), iso(tx + w - 2.4, ty + 1.9, alto + 12)],
-         { a: 0.9, fill: 0.2, solido: true });
+  caixa(P, tx + w - 2.4, ty + 0.8, 1.3, 1.3, 12, { luz: 0.12, base: alto + 6 });
+  P.poli(cantos(tx + w - 2.7, ty + 0.5, 1.9, 1.9, alto + 18), { a: 0.9, fill: 0.22, solido: true });
 }
 
 export function drawAntena(P, { tx, ty, w, d }, nivel) {
-  const base = iso(tx + w / 2, ty + d / 2, casaAltura(nivel) + 8);
-  const topo = { x: base.x, y: base.y - 13 };
-  P.linha([base, topo], { a: 0.9 });
+  const base = iso(tx + w / 2, ty + d / 2, casaAltura(nivel) + 15);
+  barra(P, base, { x: base.x, y: base.y - 16 }, 1.1);
   for (let k = 0; k < 3; k++) {
-    const y = base.y - 3 - k * 3.5;
-    const meio = 4.5 - k;
-    P.linha([{ x: base.x - meio, y }, { x: base.x + meio, y }], { a: 0.7, w: 0.8 });
+    const y = base.y - 4 - k * 4;
+    const meio = 6 - k * 1.2;
+    barra(P, { x: base.x - meio, y }, { x: base.x + meio, y }, 0.9);
   }
 }
 
-export function drawArvore(P, { tx, ty }) {
-  const b = iso(tx + 1, ty + 1);
-  const topo = { x: b.x, y: b.y - 12 };
-  P.linha([{ x: b.x - 0.8, y: b.y }, topo], { a: 0.8, w: 1.3 });
-  P.linha([{ x: b.x + 0.8, y: b.y }, topo], { a: 0.8, w: 1.3 });
-  // copa: três bolhas sobrepostas, contorno fino e miolo quase transparente
-  for (const [dx, dy, rx, ry] of [[-5.5, -14.5, 6, 4.5], [6, -14.5, 6, 4.5], [0, -20, 9, 6.5]])
-    P.elipse(b.x + dx, b.y + dy, rx, ry, { a: 0.85, fill: 0.07, solido: true });
+/**
+ * Árvore: tronco GROSSO subindo do chão até dentro da copa, dois galhos, e a copa em três bolhas
+ * centradas nele. Antes o tronco eram duas linhas divergindo e a copa ficava deslocada pro lado —
+ * de longe parecia um balão amarrado num arame.
+ */
+export function drawArvore(P, { tx, ty, w = 2, d = 2 }) {
+  const b = iso(tx + w / 2, ty + d / 2);
+  barra(P, b, { x: b.x, y: b.y - 21 }, 4.6, { fill: 0.1 });
+  barra(P, { x: b.x, y: b.y - 15 }, { x: b.x - 8, y: b.y - 23 }, 2.4);
+  barra(P, { x: b.x, y: b.y - 17 }, { x: b.x + 8, y: b.y - 25 }, 2.4);
+  // a copa engole o alto do tronco: solta em cima dele, a árvore vira pirulito
+  for (const [dx, dy, r] of [[-10, -25, 10], [10, -27, 10], [0, -34, 13]])
+    P.elipse(b.x + dx, b.y + dy, r, r * 0.8, { a: 0.85, fill: 0.07, solido: true });
 }
 
+/**
+ * Horta: canteiro elevado com fileiras de pés de alface — caule curto e três folhas. Antes eram
+ * riscos soltos num losango, que de longe viravam mato.
+ */
 export function drawHorta(P, { tx, ty, w, d }) {
-  P.poli(cantos(tx, ty, w, d), { a: 0.5, fill: 0.05 });
-  for (let a = 0.6; a < w; a += 1.3)
-    for (let b = 0.6; b < d; b += 1.3) {
-      const p = iso(tx + a, ty + b);
-      P.linha([p, { x: p.x, y: p.y - 4 }], { a: 0.75, w: 0.8 });
-      P.linha([{ x: p.x, y: p.y - 2.5 }, { x: p.x - 1.6, y: p.y - 3.6 }], { a: 0.6, w: 0.7 });
-      P.linha([{ x: p.x, y: p.y - 3.4 }, { x: p.x + 1.6, y: p.y - 4.6 }], { a: 0.6, w: 0.7 });
+  caixa(P, tx, ty, w, d, 3, { luz: 0.05 });
+  for (let a = 0.7; a < w; a += 1.2)
+    for (let b = 0.6; b < d; b += 1.1) {
+      const p = iso(tx + a, ty + b, 3);
+      barra(P, p, { x: p.x, y: p.y - 3.5 }, 1, { fill: 0.1 });
+      P.elipse(p.x - 2.2, p.y - 4, 1.7, 1.3, { a: 0.8, fill: 0.1, solido: true });
+      P.elipse(p.x + 2.2, p.y - 4, 1.7, 1.3, { a: 0.8, fill: 0.1, solido: true });
+      P.elipse(p.x, p.y - 5, 2.4, 1.8, { a: 0.9, fill: 0.14, solido: true });
     }
 }
 
+/**
+ * Casinha da Nala: pequena, telhado de duas águas e a entrada em ARCO — é o arco que diz que é
+ * de cachorro, e não um galpão em miniatura.
+ */
 export function drawCasinha(P, { tx, ty, w, d }) {
-  caixa(P, tx, ty, w, d, 6);
-  telhado(P, tx - 0.4, ty - 0.4, w + 0.8, d + 0.8, 6, 5);
-  painel(P, iso(tx + w, ty + d * 0.5), 3, 4.5, { a: 0.95, fill: 0.16 });
+  caixa(P, tx, ty, w, d, 10);
+  duasAguas(P, tx - 0.4, ty - 0.4, w + 0.8, d + 0.8, 10, 8);
+  const p = iso(tx + w, ty + d * 0.5);
+  const desloca = (t, dy = 0) => ({ x: p.x + DIR_DIR.x * t, y: p.y + DIR_DIR.y * t - dy });
+  P.poli([desloca(0), desloca(7), desloca(7, 5), desloca(3.5, 8.5), desloca(0, 5)], { a: 0.95, fill: 0.3, solido: true });
 }
 
-export function drawVaral(P, { tx, ty, w }) {
-  const a = iso(tx, ty);
-  const b = iso(tx + w, ty);
-  P.linha([a, { x: a.x, y: a.y - 13 }], { a: 0.85 });
-  P.linha([b, { x: b.x, y: b.y - 13 }], { a: 0.85 });
-  // a corda cede no meio
+/**
+ * Varal: dois postes em T com a corda entre as travessas, e as peças penduradas com prendedor.
+ *
+ * `cheio` é o estado de verdade. Quando ela recolhe a roupa por causa da chuva, a roupa some do
+ * varal — antes ela recolhia e as peças continuavam lá, o que fazia a cena inteira perder o
+ * sentido.
+ */
+export function drawVaral(P, { tx, ty, w }, cheio = true) {
+  const a = iso(tx, ty + 0.5);
+  const b = iso(tx + w, ty + 0.5);
+  for (const p of [a, b]) {
+    barra(P, p, { x: p.x, y: p.y - 22 }, 1.8);
+    barra(P, { x: p.x - 5, y: p.y - 21 }, { x: p.x + 5, y: p.y - 21 }, 1.4);
+  }
   const corda = [];
-  for (let i = 0; i <= 10; i++) {
-    const t = i / 10;
-    corda.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t - 12 + Math.sin(t * Math.PI) * 2 });
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12;
+    corda.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t - 21 + Math.sin(t * Math.PI) * 2.5 });
   }
-  P.linha(corda, { a: 0.6, w: 0.7 });
+  P.linha(corda, { a: 0.65, w: 0.8 });
+  if (!cheio) return;
   for (let k = 1; k <= 3; k++) {
-    const p = corda[Math.round((10 * k) / 4)];
-    P.poli([{ x: p.x - 1.6, y: p.y }, { x: p.x + 1.6, y: p.y }, { x: p.x + 1.6, y: p.y + 6 }, { x: p.x - 1.6, y: p.y + 6 }], { a: 0.7, fill: 0.06 });
+    const p = corda[k * 3];
+    P.linha([{ x: p.x - 1.6, y: p.y - 1 }, { x: p.x - 1.6, y: p.y + 1 }], { a: 0.9, w: 0.9 }); // prendedor
+    P.linha([{ x: p.x + 1.6, y: p.y - 1 }, { x: p.x + 1.6, y: p.y + 1 }], { a: 0.9, w: 0.9 });
+    // camiseta: ombro largo e manga, que é o que faz ler como roupa e não como bandeirinha
+    P.poli([
+      { x: p.x - 2.6, y: p.y + 0.5 }, { x: p.x + 2.6, y: p.y + 0.5 },
+      { x: p.x + 3.8, y: p.y + 2.6 }, { x: p.x + 2.4, y: p.y + 3.4 }, { x: p.x + 2.4, y: p.y + 9 },
+      { x: p.x - 2.4, y: p.y + 9 }, { x: p.x - 2.4, y: p.y + 3.4 }, { x: p.x - 3.8, y: p.y + 2.6 },
+    ], { a: 0.9, fill: 0.1, solido: true });
   }
 }
 
+/** Banco: assento, encosto com ripas e quatro pés — não um caixote. */
 export function drawBanco(P, { tx, ty, w, d }) {
-  caixa(P, tx, ty, w, d, 3, { luz: 0.08 });
-  const a = iso(tx, ty, 3);
-  const b = iso(tx + w, ty, 3);
-  P.poli([a, b, { x: b.x, y: b.y - 5 }, { x: a.x, y: a.y - 5 }], { a: 0.7, fill: 0.05 });
+  for (const [a, b] of [[0.15, 0.2], [w - 0.15, 0.2], [0.15, d - 0.2], [w - 0.15, d - 0.2]]) {
+    const p = iso(tx + a, ty + b);
+    barra(P, p, { x: p.x, y: p.y - 8 }, 1.3);
+  }
+  caixa(P, tx, ty, w, d, 1.6, { base: 8, luz: 0.12 });
+  const e1 = iso(tx + 0.2, ty);
+  const e2 = iso(tx + w - 0.2, ty);
+  barra(P, { x: e1.x, y: e1.y - 8 }, { x: e1.x, y: e1.y - 17 }, 1.3);
+  barra(P, { x: e2.x, y: e2.y - 8 }, { x: e2.x, y: e2.y - 17 }, 1.3);
+  for (const k of [11, 14.5]) barra(P, { x: e1.x, y: e1.y - k }, { x: e2.x, y: e2.y - k }, 1.5);
 }
 
+/**
+ * Caixa de correio: poste, caixa de topo ARREDONDADO e a bandeirinha, que sobe quando chega
+ * carta. São as três coisas juntas que fazem reconhecer uma caixa de correio.
+ */
 export function drawCorreio(P, { tx, ty }, temCarta) {
   const p = iso(tx + 0.5, ty + 0.5);
-  P.linha([p, { x: p.x, y: p.y - 8 }], { a: 0.8 });
-  caixa(P, tx + 0.1, ty + 0.1, 0.8, 0.8, 12, { luz: 0.1 });
-  if (temCarta) P.linha([{ x: p.x + 3, y: p.y - 12 }, { x: p.x + 3, y: p.y - 16 }, { x: p.x + 5.5, y: p.y - 15 }], { a: 0.95, w: 0.8 });
+  barra(P, p, { x: p.x, y: p.y - 15 }, 1.8);
+  const c = { x: p.x, y: p.y - 15 };
+  P.poli([
+    { x: c.x - 4.5, y: c.y }, { x: c.x + 4.5, y: c.y }, { x: c.x + 4.5, y: c.y - 3.5 },
+    { x: c.x + 3, y: c.y - 6 }, { x: c.x - 3, y: c.y - 6 }, { x: c.x - 4.5, y: c.y - 3.5 },
+  ], { a: 0.95, fill: 0.14, solido: true });
+  P.linha([{ x: c.x - 4.5, y: c.y - 3.5 }, { x: c.x + 4.5, y: c.y - 3.5 }], { a: 0.4, w: 0.7 });
+  barra(P, { x: c.x + 4.5, y: c.y - 1 }, { x: c.x + 4.5, y: c.y - 1 - (temCarta ? 7 : 2) }, 1);
+  if (temCarta) {
+    P.poli([{ x: c.x + 5, y: c.y - 8 }, { x: c.x + 9.5, y: c.y - 8 }, { x: c.x + 9.5, y: c.y - 4.8 }, { x: c.x + 5, y: c.y - 4.8 }],
+      { a: 0.95, fill: 0.4, solido: true });
+    P.linha([{ x: c.x + 5, y: c.y - 8 }, { x: c.x + 7.2, y: c.y - 6.2 }, { x: c.x + 9.5, y: c.y - 8 }], { a: 0.9, w: 0.7 });
+  }
 }
 
+/**
+ * Poste de luz: base, mastro e o BRAÇO CURVO com a luminária pendurada — é a curva que diz
+ * "iluminação pública" em vez de "vara fincada no chão".
+ */
 export function drawPoste(P, { tx, ty }, noite) {
   const p = iso(tx + 0.5, ty + 0.5);
-  const topo = { x: p.x, y: p.y - 18 };
-  P.linha([p, topo], { a: 0.8 });
-  P.poli([{ x: topo.x - 2.5, y: topo.y }, { x: topo.x + 2.5, y: topo.y }, { x: topo.x + 1.5, y: topo.y - 3 }, { x: topo.x - 1.5, y: topo.y - 3 }], { a: 0.9, fill: noite ? 0.8 : 0.08 });
-  if (noite) P.elipse(topo.x, topo.y + 1, 8, 5.5, { a: 0.12, fill: 0.03 });
+  P.elipse(p.x, p.y, 3, 1.6, { a: 0.7, fill: 0.12, solido: true });
+  barra(P, p, { x: p.x, y: p.y - 26 }, 2);
+  const arco = [];
+  for (let i = 0; i <= 6; i++) {
+    const t = i / 6;
+    arco.push({ x: p.x + t * 7, y: p.y - 26 - Math.sin(t * Math.PI * 0.5) * 3 });
+  }
+  P.linha(arco, { a: 0.9, w: 1.6 });
+  const l = arco[6];
+  P.poli([{ x: l.x - 3.2, y: l.y + 1 }, { x: l.x + 3.2, y: l.y + 1 }, { x: l.x + 2, y: l.y + 4.6 }, { x: l.x - 2, y: l.y + 4.6 }],
+    { a: 0.95, fill: noite ? 0.85 : 0.1, solido: true });
+  if (noite) P.elipse(l.x, p.y, 13, 7, { a: 0.14, fill: 0.035 });
 }
 
+/** Caixa de som: gabinete com duas cúpulas (grave e agudo) na face da frente. */
 export function drawRadio(P, { tx, ty }) {
-  caixa(P, tx + 0.15, ty + 0.15, 0.7, 0.7, 6, { luz: 0.11 });
-  const p = iso(tx + 0.5, ty + 0.5);
-  P.elipse(p.x, p.y - 4, 1.6, 1.1, { a: 0.9 });
+  caixa(P, tx + 0.05, ty + 0.05, 0.9, 0.7, 11, { luz: 0.09 });
+  const f = iso(tx + 0.95, ty + 0.4, 0);
+  const meio = (t, dy) => ({ x: f.x + DIR_DIR.x * t, y: f.y + DIR_DIR.y * t - dy });
+  const g = meio(2.8, 3.5);
+  P.elipse(g.x, g.y, 2.3, 2.3, { a: 0.95, fill: 0.2 });
+  const t2 = meio(2.8, 8);
+  P.elipse(t2.x, t2.y, 1.2, 1.2, { a: 0.95, fill: 0.3 });
 }
 
+/**
+ * Portão: dois pilares e a folha com barras verticais mais a DIAGONAL de contraventamento — a
+ * diagonal é o que separa um portão de um pedaço de cerca.
+ */
 export function drawPortao(P, { tx, ty, w }) {
-  const a = iso(tx, ty);
-  const b = iso(tx + w, ty);
-  P.linha([a, { x: a.x, y: a.y - 10 }], { a: 0.9 });
-  P.linha([b, { x: b.x, y: b.y - 10 }], { a: 0.9 });
+  const a = iso(tx, ty + 0.5);
+  const b = iso(tx + w, ty + 0.5);
+  barra(P, a, { x: a.x, y: a.y - 18 }, 2.6);
+  barra(P, b, { x: b.x, y: b.y - 18 }, 2.6);
+  const alto = (p, k) => ({ x: p.x, y: p.y - k });
+  for (const k of [4, 13]) barra(P, alto(a, k), alto(b, k), 1.4);
   for (let i = 1; i < 5; i++) {
     const t = i / 5;
     const x = a.x + (b.x - a.x) * t;
     const y = a.y + (b.y - a.y) * t;
-    P.linha([{ x, y: y - 1.5 }, { x, y: y - 8.5 }], { a: 0.45, w: 0.7 });
+    barra(P, { x, y: y - 3 }, { x, y: y - 14 }, 1.1);
   }
+  barra(P, alto(a, 4.5), alto(b, 12.5), 1.1, { a: 0.6 });
 }
 
+/** Canteiro de flores: caule, miolo e pétalas em volta. Um ponto solto não vira flor. */
 export function drawFlores(P, { tx, ty, w, d }) {
-  P.poli(cantos(tx, ty, w, d), { a: 0.4, fill: 0.04 });
-  for (let a = 0.5; a < w; a += 0.8)
-    for (let b = 0.5; b < d; b += 0.8) {
-      const p = iso(tx + a, ty + b);
-      P.linha([p, { x: p.x, y: p.y - 3 }], { a: 0.5, w: 0.7 });
-      P.elipse(p.x, p.y - 3.6, 0.7, 0.55, { a: 0.9, fill: 0.25 });
+  caixa(P, tx, ty, w, d, 2, { luz: 0.04 });
+  for (let a = 0.45; a < w; a += 0.75)
+    for (let b = 0.45; b < d; b += 0.75) {
+      const p = iso(tx + a, ty + b, 2);
+      barra(P, p, { x: p.x, y: p.y - 5 }, 0.8, { fill: 0.08 });
+      const c = { x: p.x, y: p.y - 6.4 };
+      for (let k = 0; k < 5; k++) {
+        const ang = (k / 5) * Math.PI * 2;
+        P.elipse(c.x + Math.cos(ang) * 1.5, c.y + Math.sin(ang) * 1.2, 1.1, 0.9, { a: 0.85, fill: 0.16, solido: true });
+      }
+      P.elipse(c.x, c.y, 0.9, 0.8, { a: 0.95, fill: 0.55, solido: true });
     }
 }
 
+/** Mesa de piquenique: tampo, dois bancos corridos e pernas em X — o X é a assinatura dela. */
 export function drawMesa(P, { tx, ty, w, d }) {
-  caixa(P, tx + 0.3, ty + 0.6, w - 0.6, d - 1.2, 6, { luz: 0.1 });
-  caixa(P, tx + 0.3, ty, w - 0.6, 0.45, 3, { luz: 0.07 });
-  caixa(P, tx + 0.3, ty + d - 0.45, w - 0.6, 0.45, 3, { luz: 0.07 });
+  for (const bx of [tx + 0.5, tx + w - 0.5]) {
+    const p1 = iso(bx, ty + 0.4);
+    const p2 = iso(bx, ty + d - 0.4);
+    barra(P, { x: p1.x - 4, y: p1.y }, { x: p2.x + 1, y: p2.y - 12 }, 1.4);
+    barra(P, { x: p2.x + 4, y: p2.y }, { x: p1.x - 1, y: p1.y - 12 }, 1.4);
+  }
+  caixa(P, tx + 0.15, ty - 0.1, w - 0.3, 0.5, 1.4, { base: 7, luz: 0.09 });
+  caixa(P, tx + 0.15, ty + d - 0.4, w - 0.3, 0.5, 1.4, { base: 7, luz: 0.09 });
+  caixa(P, tx + 0.15, ty + 0.55, w - 0.3, d - 1.1, 1.8, { base: 12, luz: 0.13 });
 }
 
+/** Churrasqueira: cuba sobre pernas, GRELHA à mostra no topo e chaminé atrás. */
 export function drawChurras(P, { tx, ty, w, d }) {
-  caixa(P, tx, ty, w, d, 8, { luz: 0.09 });
-  caixa(P, tx + w - 0.9, ty + 0.1, 0.7, 0.7, 15, { luz: 0.1 });
-}
-
-export function drawBalanco(P, { tx, ty, w, d }) {
-  const a = iso(tx, ty + d / 2);
-  const b = iso(tx + w, ty + d / 2);
-  const topoA = { x: a.x, y: a.y - 15 };
-  const topoB = { x: b.x, y: b.y - 15 };
-  P.linha([{ x: a.x - 2, y: a.y }, topoA, { x: a.x + 2, y: a.y }], { a: 0.8 });
-  P.linha([{ x: b.x - 2, y: b.y }, topoB, { x: b.x + 2, y: b.y }], { a: 0.8 });
-  P.linha([topoA, topoB], { a: 0.85 });
-  const meio = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-  P.linha([{ x: meio.x - 3, y: meio.y - 15 }, { x: meio.x - 3, y: meio.y - 7 }], { a: 0.6, w: 0.7 });
-  P.linha([{ x: meio.x + 3, y: meio.y - 15 }, { x: meio.x + 3, y: meio.y - 7 }], { a: 0.6, w: 0.7 });
-  P.linha([{ x: meio.x - 4, y: meio.y - 7 }, { x: meio.x + 4, y: meio.y - 7 }], { a: 0.95, w: 1.2 });
-}
-
-export function drawPoco(P, { tx, ty, w, d }) {
-  caixa(P, tx, ty, w, d, 4, { luz: 0.06 });
-  const a = iso(tx + 0.3, ty + d / 2, 4);
-  const b = iso(tx + w - 0.3, ty + d / 2, 4);
-  P.linha([a, { x: a.x, y: a.y - 10 }], { a: 0.8 });
-  P.linha([b, { x: b.x, y: b.y - 10 }], { a: 0.8 });
-  telhado(P, tx - 0.4, ty - 0.4, w + 0.8, d + 0.8, 14, 4);
-}
-
-export function drawFogueira(P, { tx, ty, w, d }) {
-  const c = iso(tx + w / 2, ty + d / 2);
-  P.elipse(c.x, c.y, 6, 3.4, { a: 0.6 });
-  for (let a = 0; a < 360; a += 60) {
-    const r = (a * Math.PI) / 180;
-    P.elipse(c.x + Math.cos(r) * 5.5, c.y + Math.sin(r) * 3, 1.1, 0.8, { a: 0.75, fill: 0.08 });
+  for (const [a, b] of [[0.3, 0.3], [w - 0.3, 0.3], [0.3, d - 0.3], [w - 0.3, d - 0.3]]) {
+    const p = iso(tx + a, ty + b);
+    barra(P, p, { x: p.x, y: p.y - 9 }, 1.2);
+  }
+  caixa(P, tx + w - 0.85, ty + 0.2, 0.6, 0.6, 11, { base: 15, luz: 0.12 }); // chaminé, atrás
+  caixa(P, tx + 0.15, ty + 0.15, w - 0.3, d - 0.3, 6, { base: 9, luz: 0.09 });
+  const [N, E, S, W] = cantos(tx + 0.15, ty + 0.15, w - 0.3, d - 0.3, 15);
+  for (let i = 1; i < 7; i++) {
+    const t = i / 7;
+    P.linha([
+      { x: N.x + (W.x - N.x) * t, y: N.y + (W.y - N.y) * t },
+      { x: E.x + (S.x - E.x) * t, y: E.y + (S.y - E.y) * t },
+    ], { a: 0.75, w: 0.8 });
   }
 }
 
-export function drawOficina(P, { tx, ty, w, d }) {
-  caixa(P, tx, ty, w, d, 12);
-  telhado(P, tx - 0.4, ty - 0.4, w + 0.8, d + 0.8, 12, 6);
-  painel(P, iso(tx + w, ty + d * 0.5), 5, 8, { a: 0.9, fill: 0.12 });
+/** Balanço: dois pórticos em A bem abertos, viga no topo, duas correntes e o assento. */
+export function drawBalanco(P, { tx, ty, w, d }) {
+  const alto = 20;
+  const portico = (px) => {
+    const f = iso(px, ty + 0.2);
+    const t = iso(px, ty + d - 0.2);
+    const cume = { x: (f.x + t.x) / 2, y: (f.y + t.y) / 2 - alto };
+    barra(P, f, cume, 1.6);
+    barra(P, t, cume, 1.6);
+    return cume;
+  };
+  const c1 = portico(tx + 0.3);
+  const c2 = portico(tx + w - 0.3);
+  barra(P, c1, c2, 1.8);
+  const m = { x: (c1.x + c2.x) / 2, y: (c1.y + c2.y) / 2 };
+  for (const dx of [-4.5, 4.5]) barra(P, { x: m.x + dx, y: m.y }, { x: m.x + dx, y: m.y + 12 }, 1);
+  P.poli([{ x: m.x - 6.5, y: m.y + 12 }, { x: m.x + 6.5, y: m.y + 12 }, { x: m.x + 6.5, y: m.y + 14 }, { x: m.x - 6.5, y: m.y + 14 }],
+    { a: 0.95, fill: 0.25, solido: true });
 }
 
+/** Poço: cilindro de pedra, dois montantes, telhadinho do tamanho dele, manivela e balde. */
+export function drawPoco(P, { tx, ty, w, d }) {
+  const c = iso(tx + w / 2, ty + d / 2);
+  cilindro(P, c, 7.5, 3.8, 9, { luz: 0.08 });
+  const e = { x: c.x - 6, y: c.y - 9 };
+  const f = { x: c.x + 6, y: c.y - 9 };
+  barra(P, e, { x: e.x, y: e.y - 10 }, 1.6);
+  barra(P, f, { x: f.x, y: f.y - 10 }, 1.6);
+  duasAguas(P, tx - 0.15, ty - 0.15, w + 0.3, d + 0.3, 19, 5);
+  barra(P, { x: e.x, y: e.y - 8 }, { x: f.x, y: f.y - 8 }, 2);                                  // tambor
+  barra(P, { x: f.x, y: f.y - 8 }, { x: f.x + 3.5, y: f.y - 5.5 }, 1.1);                        // manivela
+  P.linha([{ x: c.x, y: c.y - 17 }, { x: c.x, y: c.y - 12 }], { a: 0.6, w: 0.7 });
+  P.poli([{ x: c.x - 2.4, y: c.y - 12 }, { x: c.x + 2.4, y: c.y - 12 }, { x: c.x + 1.8, y: c.y - 8 }, { x: c.x - 1.8, y: c.y - 8 }],
+    { a: 0.9, fill: 0.14, solido: true });
+}
+
+/** Fogueira: anel de pedras e a lenha cruzada em tenda. */
+export function drawFogueira(P, { tx, ty, w, d }) {
+  const c = iso(tx + w / 2, ty + d / 2);
+  for (let a = 0; a < 360; a += 45) {
+    const r = (a * Math.PI) / 180;
+    P.elipse(c.x + Math.cos(r) * 7, c.y + Math.sin(r) * 3.6, 1.6, 1.1, { a: 0.8, fill: 0.1, solido: true });
+  }
+  for (const dx of [-4, -1.5, 1.5, 4]) barra(P, { x: c.x + dx * 1.4, y: c.y - 0.5 }, { x: c.x - dx * 0.5, y: c.y - 11 }, 1.5);
+}
+
+/** Oficina: galpão de porta dupla larga — é a porta que diz que ali entra ferramenta, não gente. */
+export function drawOficina(P, { tx, ty, w, d }) {
+  caixa(P, tx, ty, w, d, 26);
+  duasAguas(P, tx - 0.6, ty - 0.6, w + 1.2, d + 1.2, 26, 11);
+  const p = iso(tx + w, ty + d * 0.66, 0);
+  abertura(P, p, DIR_DIR, 14, 19, { tipo: "porta" });
+  const meio = { x: p.x + DIR_DIR.x * 7, y: p.y + DIR_DIR.y * 7 };
+  P.linha([meio, { x: meio.x, y: meio.y - 19 }], { a: 0.8, w: 0.9 });
+  abertura(P, iso(tx + w, ty + d * 0.2, 11), DIR_DIR, 6, 8);
+}
+
+/** Painel solar: moldura inclinada no telhado da oficina, com as células marcadas. */
 export function drawSolar(P, { tx, ty, w, d }) {
-  const c = cantos(tx + 0.7, ty + 0.7, w - 1.4, d - 1.4, 17);
-  P.poli(c, { a: 0.9, fill: 0.16, solido: true });
+  const c = [iso(tx + 0.8, ty + 0.8, 30), iso(tx + w - 0.8, ty + 0.8, 34), iso(tx + w - 0.8, ty + d - 0.8, 30), iso(tx + 0.8, ty + d - 0.8, 26)];
+  P.poli(c, { a: 0.95, fill: 0.18, solido: true });
   for (let i = 1; i < 4; i++) {
     const t = i / 4;
     P.linha([
       { x: c[0].x + (c[3].x - c[0].x) * t, y: c[0].y + (c[3].y - c[0].y) * t },
       { x: c[1].x + (c[2].x - c[1].x) * t, y: c[1].y + (c[2].y - c[1].y) * t },
-    ], { a: 0.35, w: 0.7 });
+    ], { a: 0.45, w: 0.7 });
+    P.linha([
+      { x: c[0].x + (c[1].x - c[0].x) * t, y: c[0].y + (c[1].y - c[0].y) * t },
+      { x: c[3].x + (c[2].x - c[3].x) * t, y: c[3].y + (c[2].y - c[3].y) * t },
+    ], { a: 0.45, w: 0.7 });
   }
 }
 
+/**
+ * Estufa: a única transparente de propósito — as ripas aparecendo através do vidro são o que diz
+ * que aquilo é vidro, e não parede.
+ */
 export function drawEstufa(P, { tx, ty, w, d }) {
-  caixa(P, tx, ty, w, d, 10, { luz: 0.05, traco: 0.6, solido: false });
-  telhado(P, tx - 0.3, ty - 0.3, w + 0.6, d + 0.6, 10, 5, { luz: 0.04, solido: false });
+  caixa(P, tx, ty, w, d, 18, { luz: 0.04, traco: 0.55, solido: false });
+  duasAguas(P, tx - 0.3, ty - 0.3, w + 0.6, d + 0.6, 18, 8, { luz: 0.03 });
   for (let a = 1; a < w; a += 1) {
     const p = iso(tx + a, ty + d);
-    P.linha([p, { x: p.x, y: p.y - 10 }], { a: 0.3, w: 0.7 });
+    P.linha([p, { x: p.x, y: p.y - 18 }], { a: 0.35, w: 0.8 });
+  }
+  for (let b = 1; b < d; b += 1) {
+    const p = iso(tx + w, ty + b);
+    P.linha([p, { x: p.x, y: p.y - 18 }], { a: 0.35, w: 0.8 });
   }
 }
 
+/** Piscina: borda elevada, água rebaixada com ondulação e a escadinha de mão. */
 export function drawPiscina(P, { tx, ty, w, d }, agora = 0) {
-  P.poli(cantos(tx, ty, w, d), { a: 0.85 });
-  P.poli(cantos(tx + 0.35, ty + 0.35, w - 0.7, d - 0.7, -1.5), { a: 0.5, fill: 0.09, solido: true });
+  caixa(P, tx, ty, w, d, 2.5, { luz: 0.06 });
+  P.poli(cantos(tx + 0.4, ty + 0.4, w - 0.8, d - 0.8, 1), { a: 0.6, fill: 0.22, solido: true });
   for (let k = 0; k < 3; k++) {
-    const b = ty + 0.8 + ((k * 1.1 + ((agora / 2600) % 1)) % (d - 1.6));
-    P.linha([iso(tx + 0.6, b, -1.5), iso(tx + w - 0.6, b, -1.5)], { a: 0.5, w: 0.7 });
+    const b = ty + 0.9 + ((k * 1.2 + ((agora / 2600) % 1)) % (d - 1.8));
+    P.linha([iso(tx + 0.7, b, 1), iso(tx + w - 0.7, b, 1)], { a: 0.45, w: 0.7 });
   }
+  const e = iso(tx + w - 0.5, ty + 0.9, 2.5);
+  for (const dx of [-2.5, 2.5]) {
+    const arco = [];
+    for (let i = 0; i <= 6; i++) {
+      const t = i / 6;
+      arco.push({ x: e.x + dx, y: e.y - Math.sin(t * Math.PI * 0.85) * 10 - t * 1 });
+    }
+    P.linha(arco, { a: 0.9, w: 1.6 });
+  }
+  for (const k of [4, 8]) barra(P, { x: e.x - 3, y: e.y - k }, { x: e.x + 3, y: e.y - k }, 1);
 }
 
+/** Lago: água, ondas e os juncos na margem — sem os juncos vira uma poça. */
 export function drawLago(P, { tx, ty, w, d }, agora = 0) {
   const c = iso(tx + w / 2, ty + d / 2);
   P.elipse(c.x, c.y, w * 4, d * 2, { a: 0.85, fill: 0.07, solido: true });
@@ -421,27 +647,59 @@ export function drawLago(P, { tx, ty, w, d }, agora = 0) {
     const t = ((agora / 3400) + k / 3) % 1;
     P.elipse(c.x, c.y, w * 4 * t, d * 2 * t, { a: 0.35 * (1 - t), w: 0.7 });
   }
+  for (const [dx, dy] of [[-w * 3.4, -d * 0.6], [-w * 3, d * 0.9], [w * 3.2, -d * 0.9]]) {
+    const p = { x: c.x + dx, y: c.y + dy };
+    for (const k of [-1.6, 0, 1.6]) {
+      barra(P, { x: p.x + k, y: p.y }, { x: p.x + k * 2.2, y: p.y - 9 - Math.abs(k) }, 0.9);
+      P.elipse(p.x + k * 2.2, p.y - 10.5 - Math.abs(k), 0.9, 1.6, { a: 0.9, fill: 0.2, solido: true });
+    }
+  }
 }
 
+/** Mirante: quatro pernas, plataforma, guarda-corpo com balaústres e a escada de acesso. */
 export function drawMirante(P, { tx, ty, w, d }) {
-  caixa(P, tx + 0.4, ty + 0.4, w - 0.8, d - 0.8, 20, { luz: 0.07 });
-  const pl = cantos(tx - 0.4, ty - 0.4, w + 0.8, d + 0.8, 20);
-  P.poli(pl, { a: 0.9, fill: 0.1, solido: true });
-  const guarda = cantos(tx - 0.4, ty - 0.4, w + 0.8, d + 0.8, 25);
-  P.poli(guarda, { a: 0.6, w: 0.8 });
-  for (let i = 0; i < 4; i++) P.linha([pl[i], guarda[i]], { a: 0.6, w: 0.8 });
+  const alto = 28;
+  for (const [a, b] of [[0.3, 0.3], [w - 0.3, 0.3], [0.3, d - 0.3], [w - 0.3, d - 0.3]]) {
+    const p = iso(tx + a, ty + b);
+    barra(P, p, { x: p.x, y: p.y - alto }, 2);
+  }
+  const e = iso(tx + 0.3, ty + d - 0.3);
+  const f = iso(tx + w - 0.3, ty + d - 0.3);
+  for (const k of [alto * 0.35, alto * 0.7]) barra(P, { x: e.x, y: e.y - k }, { x: f.x, y: f.y - k }, 1.1, { a: 0.5 });
+  caixa(P, tx - 0.5, ty - 0.5, w + 1, d + 1, 2, { base: alto, luz: 0.13 });
+  const pl = cantos(tx - 0.5, ty - 0.5, w + 1, d + 1, alto + 2);
+  const guarda = cantos(tx - 0.5, ty - 0.5, w + 1, d + 1, alto + 10);
+  for (let i = 0; i < 4; i++) barra(P, pl[i], guarda[i], 1.6);
+  P.poli(guarda, { a: 0.8, w: 0.9 });
+  for (const [i, j] of [[3, 2], [2, 1]])
+    for (let k = 1; k < 5; k++) {
+      const t = k / 5;
+      const x = pl[i].x + (pl[j].x - pl[i].x) * t;
+      const y = pl[i].y + (pl[j].y - pl[i].y) * t;
+      barra(P, { x, y }, { x, y: y - 8 }, 0.9, { a: 0.5 });
+    }
+  const base = iso(tx + w / 2, ty + d + 1.4);
+  const topo = iso(tx + w / 2, ty + d - 0.4, alto);
+  for (const dx of [-2.5, 2.5]) barra(P, { x: base.x + dx, y: base.y }, { x: topo.x + dx, y: topo.y }, 1.1);
+  for (let k = 1; k < 8; k++) {
+    const t = k / 8;
+    const x = base.x + (topo.x - base.x) * t;
+    const y = base.y + (topo.y - base.y) * t;
+    barra(P, { x: x - 2.5, y }, { x: x + 2.5, y }, 0.9, { a: 0.6 });
+  }
 }
 
+/** Cerca: mourões com espessura e duas travessas. Como linha de 1px ela sumia. */
 export function drawCerca(P, grid) {
   const lados = [[0, 0, grid, 0], [0, grid, grid, grid], [0, 0, 0, grid], [grid, 0, grid, grid]];
   for (const [ax, ay, bx, by] of lados) {
     const a = iso(ax, ay);
     const b = iso(bx, by);
-    for (const h of [2.5, 5]) P.linha([{ x: a.x, y: a.y - h }, { x: b.x, y: b.y - h }], { a: 0.35, w: 0.7 });
+    for (const h of [3, 6.5]) barra(P, { x: a.x, y: a.y - h }, { x: b.x, y: b.y - h }, 1, { a: 0.45 });
     for (let i = 0; i <= 1; i += 1 / 12) {
       const x = a.x + (b.x - a.x) * i;
       const y = a.y + (b.y - a.y) * i;
-      P.linha([{ x, y }, { x, y: y - 6 }], { a: 0.5, w: 0.7 });
+      barra(P, { x, y }, { x, y: y - 8.5 }, 1.5, { a: 0.6 });
     }
   }
 }
@@ -457,12 +715,12 @@ export function drawTerreno(P, grid) {
     const tx = ((i * 7.3) % (grid - 2)) + 1;
     const ty = ((i * 11.7) % (grid - 2)) + 1;
     const p = iso(tx, ty);
-    P.linha([{ x: p.x - 1, y: p.y }, { x: p.x - 0.4, y: p.y - 2 }], { a: 0.16, w: 0.7 });
-    P.linha([{ x: p.x + 1, y: p.y }, { x: p.x + 0.4, y: p.y - 2.2 }], { a: 0.16, w: 0.7 });
+    P.linha([{ x: p.x - 1, y: p.y }, { x: p.x - 0.4, y: p.y - 1.8 }], { a: 0.13, w: 0.7 });
+    P.linha([{ x: p.x + 1, y: p.y }, { x: p.x + 0.4, y: p.y - 2 }], { a: 0.13, w: 0.7 });
   }
 }
 
-/** O caminho: duas margens contínuas, não cinquenta losangos soltos. */
+/** O caminho: lajotas assentadas, não cinquenta losangos soltos. */
 export function drawCaminho(P, tiles) {
   if (!tiles.length) return;
   for (const [tx, ty] of tiles) P.poli(cantos(tx + 0.12, ty + 0.12, 0.76, 0.76), { a: 0.3, fill: 0.05, w: 0.7 });
