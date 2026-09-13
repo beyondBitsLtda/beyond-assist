@@ -72,8 +72,20 @@ export async function ingestSlice({ source, boardIndex = null, repoIndex = null,
     sources = await loadBrain();
   } else if (source === "github") {
     if (repoIndex === null || repoIndex === undefined) throw new Error("repoIndex obrigatório p/ github");
-    sources = await loadGithub({ repoIndex });
-    report.board = sources[0]?.board || null;
+    const carga = await loadGithub({ repoIndex });
+    report.board = carga.board;
+
+    // Ainda baixando os arquivos do repositório. Não há o que indexar nesta invocação — e
+    // insistir seria estourar o limite de chamadas de saída do Worker, que é exatamente o
+    // motivo do carregamento ser fatiado (ver ORCAMENTO_DE_BUSCAS em ingest/github.js).
+    // Devolver o MESMO offset mantém o passo "em andamento": o próximo tique continua a baixa.
+    if (carga.incompleto) {
+      report.done = false;
+      report.next_offset = offset;
+      report.baixando = carga.faltam;
+      return report;
+    }
+    sources = carga.docs;
   } else {
     throw new Error("source obrigatório: trello|brain|github");
   }

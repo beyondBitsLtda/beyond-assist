@@ -102,7 +102,17 @@ export async function GET(req) {
       .from("sync_progress")
       .update({ offset_val: report.next_offset, grand_total: grandTotal, last_error: null, updated_at: now })
       .eq("id", 1);
-    return json({ ok: true, note: `passo "${step.label}" em andamento`, chunks_processed: report.chunks_processed, grand_total: grandTotal });
+
+    // `report.baixando` só aparece no passo do GitHub, enquanto os arquivos do repositório ainda
+    // estão sendo baixados em fatias (ver ORCAMENTO_DE_BUSCAS em ingest/github.js). Sem dizer
+    // isso, o painel mostraria "em andamento · 0 chunks" tique após tique e pareceria travado.
+    const detalhe = report.baixando ? ` (baixando arquivos, faltam ${report.baixando})` : "";
+    return json({
+      ok: true,
+      note: `passo "${step.label}" em andamento${detalhe}`,
+      chunks_processed: report.chunks_processed,
+      grand_total: grandTotal,
+    });
   } catch (err) {
     return json({ ok: false, error: String(err?.message || err) }, 500);
   }

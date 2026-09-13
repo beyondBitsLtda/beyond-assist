@@ -94,44 +94,85 @@ export async function listIndexedFiles(repo) {
 
 // Repositórios grandes precisam de VÁRIOS ticks pra terminar (teto de chunks por chamada,
 // ver MAX_CHUNKS_PER_CALL em runSlice.js) — sem cache, cada tick refazia o fetch da árvore +
-// conteúdo de TODOS os arquivos de novo, só pra usar uma fatia diferente. Com o tick do SYNC
-// rodando a cada 15s (ver db/cron.sql), isso estourou o limite de taxa da API do GitHub
-// (5000/hora, um token só — sem rodízio como o pool de chaves do Gemini). O cache guarda o
-// resultado já buscado por um tempo curto (o suficiente pra um repo terminar todos os ticks
-// dele, sem segurar código desatualizado por muito tempo entre ciclos).
-const CACHE_TTL_MS = 15 * 60 * 1000;
+// conteúdo de TODOS os arquivos de novo, só pra usar uma fatia diferente, e isso estourava o
+// limite de taxa da API do GitHub (5000/hora, um token só — sem rodízio como o pool de chaves
+// do Gemini). O cache guarda o que já foi buscado.
+//
+// A validade era de 15 minutos, curta de propósito pra pegar código novo rápido. Passou a ser
+// longa por uma razão de CORREÇÃO, não de eficiência: com o carregamento agora fatiado (ver
+// ORCAMENTO_DE_BUSCAS abaixo), um repositório no teto de 500 arquivos precisa de ~15 invocações
+// pra terminar de baixar, e a cada 5 minutos isso dá mais de uma hora. Com validade de 15
+// minutos o snapshot parcial expirava antes de ficar pronto, e o repositório recomeçava do zero
+// pra sempre, sem nunca ser indexado.
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
-async function getCachedFiles(repo) {
+// Um snapshot parcial não expira pela validade normal (senão nunca terminaria de montar), mas
+// também não pode ficar preso pra sempre se algo der errado no meio.
+const PARCIAL_MAX_MS = 24 * 60 * 60 * 1000;
+
+// Quantos arquivos buscar por invocação.
+//
+// Este número existe por causa da Cloudflare: um Worker do plano gratuito pode fazer no máximo
+// 50 chamadas de saída por invocação. Buscar os 500 arquivos de um repositório de uma vez —
+// que é o que este arquivo fazia, e funcionava na Vercel — dá "Too many subrequests by single
+// Worker invocation", e o passo do GitHub nunca passa.
+//
+// Sobra: 35 arquivos + árvore + gravação do cache + leitura dos repos ≈ 39 chamadas.
+const ORCAMENTO_DE_BUSCAS = 35;
+
+/**
+ * O que está guardado para um repositório.
+ *
+ * Formato novo: { v: 2, completo, pendentes: [{path, sha}], arquivos: [{path, sha, content}] }
+ * Formato antigo (array puro de arquivos) é aceito e tratado como um snapshot completo — assim
+ * o que já estava no banco continua valendo, sem migração.
+ */
+async function lerCache(repo) {
   const { data } = await supabase.from("github_fetch_cache").select("files, fetched_at").eq("repo", repo).maybeSingle();
   if (!data) return null;
-  if (Date.now() - new Date(data.fetched_at).getTime() > CACHE_TTL_MS) return null;
-  return data.files;
+
+  const idade = Date.now() - new Date(data.fetched_at).getTime();
+  const estado = Array.isArray(data.files)
+    ? { v: 2, completo: true, pendentes: [], arquivos: data.files }
+    : data.files;
+
+  if (estado?.completo) return idade > CACHE_TTL_MS ? null : estado;
+  return idade > PARCIAL_MAX_MS ? null : estado;
 }
 
-async function setCachedFiles(repo, files) {
+async function gravarCache(repo, estado) {
   await supabase.from("github_fetch_cache").upsert(
-    { repo, files, fetched_at: new Date().toISOString() },
+    { repo, files: estado, fetched_at: new Date().toISOString() },
     { onConflict: "repo" }
   );
 }
 
-/** Carrega TODOS os arquivos indexáveis de UM repositório (identificado por posição, ver
- * enabledRepos) já no formato de "doc" do pipeline de ingestão — chamado a cada tick
- * enquanto esse repo for o passo atual (ver runSlice.js). Só busca de verdade no GitHub na
- * PRIMEIRA vez (ou depois do cache expirar); os ticks seguintes do mesmo repo reaproveitam o
- * que já foi buscado, sem gastar mais chamadas da API. */
+/**
+ * Carrega os arquivos indexáveis de UM repositório (identificado por posição, ver
+ * enabledRepos) já no formato de "doc" do pipeline de ingestão.
+ *
+ * Devolve `{ docs, incompleto, faltam, board }`. Quando `incompleto` é true, esta invocação
+ * gastou o orçamento dela só baixando arquivos e ainda não há o que indexar — quem chama
+ * (ingestSlice) deve devolver "em andamento" sem avançar o offset, e o próximo tique continua
+ * de onde parou. É assim que um repositório grande atravessa o limite de chamadas do Worker.
+ */
 export async function loadGithub({ repoIndex }) {
   const repos = await enabledRepos();
   const repo = repos[Number(repoIndex)];
   if (!repo) throw new Error("repoIndex fora do range");
   if (!repo.default_branch) throw new Error(`repo ${repo.full_name} sem default_branch conhecida — rode a descoberta de novo`);
 
-  let files = await getCachedFiles(repo.full_name);
-  if (!files) {
+  let estado = await lerCache(repo.full_name);
+
+  if (!estado) {
     const tree = await getRepoTree(repo.full_name, repo.default_branch);
     const entries = tree.filter(isIndexable).sort((a, b) => a.path.localeCompare(b.path)).slice(0, MAX_FILES_PER_REPO);
+    estado = { v: 2, completo: false, pendentes: entries.map((e) => ({ path: e.path, sha: e.sha })), arquivos: [] };
+  }
 
-    const contents = await mapLimit(entries, 8, async (f) => {
+  if (!estado.completo) {
+    const lote = estado.pendentes.slice(0, ORCAMENTO_DE_BUSCAS);
+    const contents = await mapLimit(lote, 8, async (f) => {
       try {
         return await getBlobContent(repo.full_name, f.sha);
       } catch {
@@ -139,20 +180,31 @@ export async function loadGithub({ repoIndex }) {
       }
     });
 
-    files = entries
-      .map((f, i) => ({ path: f.path, sha: f.sha, content: contents[i] }))
-      .filter((f) => f.content?.trim());
+    estado.arquivos.push(
+      ...lote.map((f, i) => ({ path: f.path, sha: f.sha, content: contents[i] })).filter((f) => f.content?.trim())
+    );
+    estado.pendentes = estado.pendentes.slice(lote.length);
+    estado.completo = estado.pendentes.length === 0;
 
-    await setCachedFiles(repo.full_name, files).catch(() => {}); // cache é otimização — falhar em gravar não deve derrubar o tick
+    await gravarCache(repo.full_name, estado).catch(() => {});
+
+    if (!estado.completo) {
+      return { docs: [], incompleto: true, faltam: estado.pendentes.length, board: repo.full_name };
+    }
   }
 
-  return files.map((f) => ({
-    source: "github",
-    external_id: f.path,
+  return {
+    incompleto: false,
+    faltam: 0,
     board: repo.full_name,
-    title: f.path,
-    content: `// ${repo.full_name}/${f.path}\n\n${f.content}`,
-    last_modified: null,
-    metadata: { repo: repo.full_name, path: f.path, sha: f.sha },
-  }));
+    docs: estado.arquivos.map((f) => ({
+      source: "github",
+      external_id: f.path,
+      board: repo.full_name,
+      title: f.path,
+      content: `// ${repo.full_name}/${f.path}\n\n${f.content}`,
+      last_modified: null,
+      metadata: { repo: repo.full_name, path: f.path, sha: f.sha },
+    })),
+  };
 }
