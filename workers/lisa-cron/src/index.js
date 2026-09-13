@@ -2,35 +2,88 @@
 //
 // Existe por duas razões que se encontraram:
 //
-//  1. Cloudflare Pages NÃO tem agendamento. Quem tem Cron Triggers é o Workers. Sem este
+//  1. O Worker principal da Lisa tem o arquivo de entrada GERADO pelo adaptador a cada build,
+//     então pendurar um agendamento nele significaria remendar código gerado toda vez. Sem este
 //     arquivo a Lisa fica viva mas parada: não sincroniza o cérebro, não avisa de nada, e o Map
 //     of Deploy nunca acumula histórico.
 //
-//  2. O `web-push` precisa de http/https/net do Node e não compila no Edge runtime do Pages —
-//     foi a única coisa do app inteiro que não passou. Aqui, num Worker com `nodejs_compat`,
-//     ele roda. Então a rota /api/cron/notify DETECTA e devolve a fila, e quem ENVIA é aqui.
+//  2. O `web-push` precisa de http/https/net do Node e não compilava junto com o app. Aqui, num
+//     Worker com `nodejs_compat`, ele roda. Então a rota /api/cron/notify DETECTA e devolve a
+//     fila, e quem ENVIA é aqui.
 //
 // É um Worker minúsculo que roda algumas vezes por hora: cabe folgado no plano gratuito.
 
-/** Qual rota cada horário chama. A Cloudflare entrega em `event.cron` o padrão que disparou,
- *  então um Worker só dá conta dos três. */
-const ROTAS = {
-  "*/5 * * * *": "/api/cron/notify",
-  "*/15 * * * *": "/api/cron/deploy-check",
-  "0 * * * *": "/api/cron/sync",
+/**
+ * As rotas de cron da Lisa NÃO usam o mesmo segredo, e confundir os dois dá 401 silencioso:
+ *
+ *   - notify e deploy-check esperam `Authorization: Bearer <CRON_SECRET>`
+ *   - sync espera `x-ingest-secret: <INGEST_SECRET>` — é o mesmo segredo do botão SYNC manual,
+ *     porque é o mesmo trabalho
+ */
+const TAREFAS = {
+  notify: { rota: "/api/cron/notify", segredo: "CRON_SECRET" },
+  "deploy-check": { rota: "/api/cron/deploy-check", segredo: "CRON_SECRET" },
+  "sync-reinicia": { rota: "/api/cron/sync?reset=1", segredo: "INGEST_SECRET" },
+  "sync-avanca": { rota: "/api/cron/sync", segredo: "INGEST_SECRET" },
 };
 
-async function chamar(env, rota) {
-  const res = await fetch(env.LISA_URL + rota, {
-    headers: { authorization: `Bearer ${env.CRON_SECRET}` },
-  });
+/**
+ * Qual tarefa cada horário dispara. A Cloudflare entrega em `event.cron` o padrão que disparou.
+ *
+ * Repare que o sync são DUAS tarefas em horários diferentes, e é assim de propósito. Uma
+ * sincronização completa não cabe numa chamada só (cada fatia tem teto de 60s), então o ciclo é:
+ * de hora em hora alguém REINICIA o progresso, e alguém frequente AVANÇA uma fatia por vez. Só o
+ * reinício, sem os avanços, deixa o ciclo parado em "running" para sempre — que foi exatamente o
+ * bug da primeira versão deste arquivo.
+ *
+ * Por que o avanço pega carona no horário do notify em vez de ter o seu próprio: o plano
+ * gratuito limita quantos Cron Triggers um Worker pode ter, e três já é o que temos. Pegar
+ * carona não custa gatilho nenhum.
+ */
+const CRONS = {
+  "*/5 * * * *": ["notify", "sync-avanca"],
+  "*/15 * * * *": ["deploy-check"],
+  "0 * * * *": ["sync-reinicia"],
+};
+
+/** Quantas fatias tentar por disparo. O agendamento antigo avançava a cada 2 min; duas fatias a
+ *  cada 5 min chega perto disso sem gastar um gatilho a mais. Para na primeira que não tiver
+ *  mais trabalho, então não desperdiça chamada quando o ciclo já acabou. */
+const FATIAS_POR_DISPARO = 2;
+
+async function chamar(env, nome) {
+  const tarefa = TAREFAS[nome];
+  const headers =
+    tarefa.segredo === "INGEST_SECRET"
+      ? { "x-ingest-secret": env.INGEST_SECRET }
+      : { authorization: `Bearer ${env.CRON_SECRET}` };
+
+  const res = await fetch(env.LISA_URL + tarefa.rota, { headers });
   const texto = await res.text();
-  if (!res.ok) throw new Error(`${rota} → ${res.status} ${texto.slice(0, 200)}`);
+  if (!res.ok) throw new Error(`${tarefa.rota} → ${res.status} ${texto.slice(0, 200)}`);
   try {
     return JSON.parse(texto);
   } catch {
     return null;
   }
+}
+
+/**
+ * Avança o ciclo de sincronização algumas fatias.
+ *
+ * A rota devolve um `note` que diz o que aconteceu. Enquanto houver trabalho ele começa com
+ * `passo "..."`; qualquer outra coisa ("sem ciclo em andamento", "ciclo concluído", "nenhuma
+ * fonte configurada") significa que não adianta insistir agora.
+ */
+async function avancarSync(env) {
+  const notas = [];
+  for (let i = 0; i < FATIAS_POR_DISPARO; i++) {
+    const resposta = await chamar(env, "sync-avanca");
+    const nota = resposta?.note || "sem resposta";
+    notas.push(nota);
+    if (!nota.startsWith("passo ")) break;
+  }
+  return notas;
 }
 
 /**
@@ -72,31 +125,48 @@ async function enviarPendentes(env, pendentes) {
   return { enviados, removidos };
 }
 
+/** Roda as tarefas de um horário, em ordem, e devolve o que cada uma respondeu. Uma tarefa que
+ *  falha não impede as outras — notificação atrasada não pode derrubar a sincronização. */
+async function executar(env, nomes) {
+  const saida = {};
+  for (const nome of nomes) {
+    try {
+      if (nome === "sync-avanca") {
+        saida[nome] = await avancarSync(env);
+        continue;
+      }
+      const resposta = await chamar(env, nome);
+      if (nome === "notify") {
+        const envio = await enviarPendentes(env, resposta?.pendentes);
+        saida.envio = envio;
+        console.log(`[notify] ${envio.enviados} enviados, ${envio.removidos} inscrições mortas removidas`);
+      }
+      saida[nome] = resposta;
+    } catch (err) {
+      saida[nome] = { erro: err.message };
+      console.error(`[cron] ${nome}: ${err.message}`);
+    }
+  }
+  return saida;
+}
+
 export default {
   async scheduled(event, env, ctx) {
-    const rota = ROTAS[event.cron];
-    if (!rota) return;
-
-    ctx.waitUntil(
-      (async () => {
-        const resposta = await chamar(env, rota);
-        if (rota === "/api/cron/notify") {
-          const envio = await enviarPendentes(env, resposta?.pendentes);
-          console.log(`[notify] ${envio.enviados} enviados, ${envio.removidos} inscrições mortas removidas`);
-        }
-      })().catch((err) => console.error(`[cron] ${rota}: ${err.message}`))
-    );
+    const nomes = CRONS[event.cron];
+    if (!nomes) return;
+    ctx.waitUntil(executar(env, nomes));
   },
 
   /** Um GET no Worker dispara o mesmo trabalho, pra dar pra testar sem esperar o horário:
    *  `curl https://lisa-cron.SEU-SUBDOMINIO.workers.dev/?cron=*%2F5+*+*+*+*` */
-  async fetch(req, env, ctx) {
+  async fetch(req, env) {
     const cron = new URL(req.url).searchParams.get("cron");
-    if (!cron || !ROTAS[cron]) {
-      return new Response(`use ?cron= com um destes:\n${Object.keys(ROTAS).join("\n")}\n`, { status: 400 });
+    if (!cron || !CRONS[cron]) {
+      const lista = Object.entries(CRONS)
+        .map(([horario, nomes]) => `  ${horario}  →  ${nomes.join(", ")}`)
+        .join("\n");
+      return new Response(`use ?cron= com um destes:\n${lista}\n`, { status: 400 });
     }
-    const resposta = await chamar(env, ROTAS[cron]);
-    const extra = ROTAS[cron] === "/api/cron/notify" ? await enviarPendentes(env, resposta?.pendentes) : null;
-    return Response.json({ ok: true, rota: ROTAS[cron], resposta, envio: extra });
+    return Response.json({ ok: true, cron, resultado: await executar(env, CRONS[cron]) });
   },
 };

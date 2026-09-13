@@ -13,9 +13,9 @@
 
   "triggers": {
     "crons": [
-      "*/5 * * * *",   // notificações e falas agendadas
+      "*/5 * * * *",   // notificações e falas agendadas + avanço do ciclo de sync
       "*/15 * * * *",  // Map of Deploy
-      "0 * * * *"      // sync do cérebro, de hora em hora
+      "0 * * * *"      // reinício do ciclo de sync
     ]
   },
 
