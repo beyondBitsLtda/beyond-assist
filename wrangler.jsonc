@@ -8,6 +8,13 @@
   "name": "beyond-assist",
   "main": ".open-next/worker.js",
 
+  // Liga o endereço público https://beyond-assist.<subdominio>.workers.dev.
+  //
+  // Sem esta linha o Worker sobe e fica sem URL nenhuma ("No URLs enabled" no painel): ele
+  // existe, responde a cron e a service binding, mas ninguém consegue abrir no navegador. Deixar
+  // explícito aqui é melhor do que depender de um botão no painel, que some num projeto recriado.
+  "workers_dev": true,
+
   // Trava o comportamento da plataforma numa data: sem isso, uma mudança futura da Cloudflare
   // poderia alterar o runtime debaixo de um deploy que já funcionava.
   "compatibility_date": "2026-09-13",
