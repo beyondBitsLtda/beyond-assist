@@ -142,6 +142,34 @@ Sem `GEMINI_API_KEYS`, o app continua funcionando normalmente só com `GEMINI_AP
 
 ---
 
+## Map of Deploy — onde cada aplicação está hospedada, e se está no ar
+
+O **mapa** é um quadro do Trello, e continua sendo: a **coluna** é o servidor de hospedagem
+(CloudFlare, GitHub Pages, Vercel…), a **etiqueta** do card é a conta em que a hospedagem está, o
+**nome** do card é a aplicação e a **descrição** carrega o link. O painel lê esse quadro e
+acrescenta o que o Trello não sabe: se a aplicação respondeu.
+
+Duplicar o mapa no banco criaria duas verdades — por isso o Supabase guarda só o histórico de
+checagens (`deploy_checks`, item 28 do `db/schema.sql`).
+
+Pra ligar:
+
+1. **`TRELLO_DEPLOY_BOARD_ID`** (opcional): o id ou o código curto do quadro. Sem ela, usa
+   `jrz8oesi`, que é o quadro "Map Of Deploy". Usa as mesmas `TRELLO_KEY`/`TRELLO_TOKEN` do resto.
+2. **Criar a tabela** `deploy_checks` no Supabase (`db/schema.sql`). Sem ela o mapa ainda aparece,
+   só sem uptime nem contagem de quedas — e o painel avisa isso na tela.
+3. **Agendar `/api/cron/deploy-check`** na Vercel (Settings → Cron Jobs), de 5 em 5 ou de 15 em 15
+   minutos. É o tique que constrói o histórico: sem ele existe o estado do instante em que você
+   abriu a tela, e mais nada. Com `CRON_SECRET` definida, a Vercel manda o Bearer sozinha.
+
+No painel, **"quedas" conta episódios, não checagens**: três horas fora com checagem de 5 em 5
+minutos é *uma* queda, não trinta e seis. Clicar num card abre a pré-visualização do deploy num
+iframe — boa parte das hospedagens recusa ser embutida (`X-Frame-Options`), e nesse caso o painel
+diz isso em vez de mostrar um quadrado em branco.
+
+`npm run deploy-map` confere a leitura do quadro e a matemática de disponibilidade sem precisar do
+Trello nem do Supabase de pé.
+
 ## Dashboard em AR (WebXR)
 
 Em `/dashboard/ar` (botão "◫ MODO AR" no Dashboard normal): aponta a câmera do celular pra

@@ -10,7 +10,8 @@
     "ingest": "node --env-file=.env scripts/ingest.mjs",
     "ask": "node --env-file=.env scripts/ask.mjs",
     "disc-balance": "node scripts/disc-balance.mjs",
-    "world-check": "node scripts/world-check.mjs"
+    "world-check": "node scripts/world-check.mjs",
+    "deploy-map": "node scripts/deploy-map.mjs"
   },
   "dependencies": {
     "@babel/parser": "^8.0.4",

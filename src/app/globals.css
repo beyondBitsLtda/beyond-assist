@@ -32,6 +32,15 @@ input::placeholder { color: rgba(207,239,251,0.4); }
    normal, sem precisar de !important em lugar nenhum).
    ============================================================ */
 .bb-sidebar { position: relative; width: 208px; flex: none; z-index: 2; }
+
+/* A lista de painéis já passa da altura da tela em notebook. Rola dentro da própria barra, com
+   uma barra de rolagem fina que só aparece no hover — a padrão do Windows é larga e branca e
+   brigaria com o resto do HUD. */
+.bb-sidebar-nav { scrollbar-width: thin; scrollbar-color: rgba(var(--accent-rgb),0.28) transparent; }
+.bb-sidebar-nav::-webkit-scrollbar { width: 6px; }
+.bb-sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+.bb-sidebar-nav::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb),0.18); border-radius: 3px; }
+.bb-sidebar-nav:hover::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb),0.4); }
 .bb-sidebar-backdrop { display: none; }
 .bb-hamburger { display: none; }
 .bb-kanban-col { width: 280px; }

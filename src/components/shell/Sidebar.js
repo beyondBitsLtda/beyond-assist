@@ -15,6 +15,7 @@ const ITEMS = [
   { href: "/delp-tasks", label: "TAREFAS DELP", glyph: "🏢" },
   { href: "/scheduled-announcements", label: "FALAS AGENDADAS", glyph: "⏰" },
   { href: "/code-repos", label: "REPOSITÓRIOS", glyph: "🐙" },
+  { href: "/map-of-deploy", label: "MAP OF DEPLOY", glyph: "🚀" },
   { href: "/code-tasks", label: "TAREFAS DE CÓDIGO", glyph: "🛠️" },
   { href: "/arch-docs", label: "MAPA DE ARQUITETURA", glyph: "🗺️" },
   { href: "/test-mode", label: "MODO DE TESTES", glyph: "🧪" },
@@ -45,7 +46,14 @@ export default function Sidebar({ open = false, onNavigate }) {
         </div>
       </div>
 
-      <nav style={{ display: "flex", flexDirection: "column", padding: "10px 0", gap: 2 }}>
+      {/* `minHeight: 0` é o que permite o nav encolher dentro do flex e, aí sim, rolar. Sem
+          ele o flex dá ao nav a altura do conteúdo inteiro, a lista vaza pra fora da tela e os
+          últimos itens ficam inalcançáveis — não tem barra de rolagem porque não há transbordo:
+          o transbordo é da janela. */}
+      <nav
+        className="bb-sidebar-nav"
+        style={{ display: "flex", flexDirection: "column", padding: "10px 0", gap: 2, flex: 1, minHeight: 0, overflowY: "auto" }}
+      >
         {ITEMS.map((item) => {
           const active = pathname === item.href;
           return (
@@ -54,7 +62,7 @@ export default function Sidebar({ open = false, onNavigate }) {
               href={item.href}
               onClick={onNavigate}
               style={{
-                display: "flex", alignItems: "center", gap: 10, padding: "10px 18px",
+                display: "flex", alignItems: "center", gap: 10, padding: "10px 18px", flex: "none",
                 color: active ? "#eafcff" : "rgba(207,239,251,0.55)",
                 background: active ? "rgba(var(--accent-rgb),0.08)" : "transparent",
                 borderLeft: active ? `2px solid ${CY}` : "2px solid transparent",

@@ -592,3 +592,35 @@ create index if not exists lisa_pair_sessions_created_at_idx on public.lisa_pair
 
 alter table public.lisa_pair_sessions enable row level security;
 -- (as duas só acessadas pela service_role — mesmo padrão das tabelas acima)
+
+-- ============================================================
+--  28) Map of Deploy — histórico de disponibilidade
+--
+--  O MAPA (qual aplicação está em qual servidor, em qual conta, em qual endereço) mora no
+--  Trello e continua morando lá: o quadro é editado por gente, e duplicar isso aqui criaria
+--  duas verdades. O que o banco guarda é o que o Trello não sabe — se a aplicação respondeu.
+--
+--  Uma linha POR CHECAGEM, inclusive as bem-sucedidas. Gravar só as falhas pareceria economia,
+--  mas aí "3 falhas" não responde se foram 3 em 10 checagens ou 3 em 10 mil, e o uptime
+--  deixa de existir.
+-- ============================================================
+create table if not exists public.deploy_checks (
+  id         bigint generated always as identity primary key,
+  app_id     text not null,                  -- id do card no Trello (o mapa é lá)
+  nome       text not null,                  -- nome da aplicação no momento da checagem
+  servidor   text,                           -- coluna do quadro (CloudFlare, Gitpages, Vercel…)
+  conta      text,                           -- etiqueta do card
+  url        text not null,
+  ok         boolean not null,               -- 2xx/3xx. 404 na raiz é deploy quebrado, não "no ar"
+  status     int,                            -- código HTTP; null quando nem chegou a responder
+  ms         int,                            -- tempo de resposta
+  erro       text,                           -- timeout, DNS, conexão recusada…
+  checked_at timestamptz not null default now()
+);
+
+-- a consulta do painel é sempre "as últimas N horas, por aplicação"
+create index if not exists deploy_checks_checked_at_idx on public.deploy_checks (checked_at desc);
+create index if not exists deploy_checks_app_idx on public.deploy_checks (app_id, checked_at desc);
+
+alter table public.deploy_checks enable row level security;
+-- (só acessada pela service_role — mesmo padrão das tabelas acima)

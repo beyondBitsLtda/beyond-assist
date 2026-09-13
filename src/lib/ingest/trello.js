@@ -158,3 +158,37 @@ export async function updateTrelloCard(cardId, { due, idList, dueComplete } = {}
   if (idList !== undefined) params.idList = idList;
   return twrite("PUT", `/cards/${cardId}`, params);
 }
+
+/**
+ * Um board CRU, com as listas na ordem do quadro e a descrição inteira de cada card.
+ *
+ * Existe separado de `loadTrello()` porque serve a outra pergunta. Aquela monta texto pro RAG e
+ * só olha os boards de TRELLO_BOARD_IDS; esta entrega o quadro como ele é, pra quem precisa da
+ * ORDEM das colunas e da descrição sem formatação — hoje, o Map of Deploy. As credenciais do
+ * Trello continuam morando num arquivo só.
+ */
+export async function loadBoardRaw(boardRef) {
+  if (!KEY || !TOKEN) throw new Error("TRELLO_KEY/TRELLO_TOKEN não configuradas");
+  if (!boardRef) throw new Error("board não informado");
+  const [board, lists, cards] = await Promise.all([
+    tget(`/boards/${boardRef}`, { fields: "name,url" }),
+    tget(`/boards/${boardRef}/lists`, { fields: "name,pos" }),
+    tget(`/boards/${boardRef}/cards`, { fields: "name,desc,idList,shortUrl,labels,dateLastActivity", filter: "open" }),
+  ]);
+  const ordenadas = [...(lists || [])].sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0));
+  const nomeDaLista = Object.fromEntries(ordenadas.map((l) => [l.id, l.name]));
+  return {
+    nome: board?.name || boardRef,
+    url: board?.url || null,
+    listas: ordenadas.map((l) => l.name),
+    cards: (cards || []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      desc: c.desc || "",
+      list: nomeDaLista[c.idList] || "",
+      labels: (c.labels || []).map((l) => l.name).filter(Boolean),
+      shortUrl: c.shortUrl || null,
+      lastActivity: c.dateLastActivity || null,
+    })),
+  };
+}
