@@ -1,7 +1,7 @@
 import { listTestCases } from "@/lib/sentinelTests.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** GET /api/test-mode/cases?runId=<uuid> — lista enxuta dos casos de um run. */

@@ -2,7 +2,7 @@ import { synthesizeSpeech } from "@/lib/gemini.js";
 import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { b64ParaBytes } from "@/lib/base64.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**

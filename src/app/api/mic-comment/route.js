@@ -2,7 +2,7 @@ import { describeAudioIfNotable, MIC_WATCH_INSTRUCTION } from "@/lib/gemini.js";
 import { withPersona } from "@/lib/rag.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** POST /api/mic-comment   body: { audio: {mimeType, data}, personaMode? } — Modo Escuta (ver

@@ -1,6 +1,6 @@
 import { runArchDocStep } from "@/lib/archDocs.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**

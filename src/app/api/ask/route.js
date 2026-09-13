@@ -6,7 +6,7 @@ import { buildActionProposal, buildClarifyPrompt, executeAction } from "@/lib/as
 import { hasDelpTasks, getDelpTasksForContext } from "@/lib/delpTasks.js";
 import { resolveScope } from "@/lib/scopeResolver.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**

@@ -3,7 +3,7 @@ import { groupByList } from "@/lib/kanban.js";
 import { QUARTO_DE_GUERRA } from "@/lib/boards.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**

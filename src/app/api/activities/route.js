@@ -1,7 +1,7 @@
 import { loadActivityStats } from "@/lib/activities.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** GET /api/activities — pontuação do quiz e do pair programming (ver src/lib/activities.js). */

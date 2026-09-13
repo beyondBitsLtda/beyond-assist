@@ -2,7 +2,7 @@ import { describeScreenIfNotable, CAMERA_WATCH_INSTRUCTION } from "@/lib/gemini.
 import { withPersona } from "@/lib/rag.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**

@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // A Lisa na Cloudflare, no fluxo de Workers (que é o que o painel oferece hoje). O adaptador
+  // @opennextjs/cloudflare empacota o build do Next em `.open-next/` e o `wrangler deploy` sobe
+  // isso — por isso este arquivo precisa existir na RAIZ: sem ele o deploy falha reclamando que
+  // não achou nem o script do Worker nem o diretório de assets.
+  "name": "beyond-assist",
+  "main": ".open-next/worker.js",
+
+  // Trava o comportamento da plataforma numa data: sem isso, uma mudança futura da Cloudflare
+  // poderia alterar o runtime debaixo de um deploy que já funcionava.
+  "compatibility_date": "2026-09-13",
+
+  // `nodejs_compat` é o que dá APIs do Node ao Worker. O código da Lisa não depende delas (as
+  // conversões foram feitas com APIs da web), mas dependência indireta pode precisar — e o
+  // adaptador conta com a flag ligada.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  // As 21 páginas da Lisa são estáticas: saem daqui, pelo CDN, sem passar por função nenhuma.
+  // É por isso que o limite de CPU do plano gratuito não é o gargalo dela.
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  "observability": { "enabled": true }
+}

@@ -1,7 +1,7 @@
 import { getWeatherForecast } from "@/lib/weather.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** GET /api/weather — previsão de Belo Horizonte e Vespasiano (MG), ver src/lib/weather.js. */

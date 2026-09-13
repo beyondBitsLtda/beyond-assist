@@ -4,7 +4,7 @@ import { listGithubRepos } from "@/lib/ingest/github.js";
 import { getRepoTree, getBranchSha, createBranch, listBranches, getFileContentOnBranch, getFileSha, putFileContent } from "@/lib/github.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** GET /api/pair — repositórios disponíveis pra escolher (os mesmos da tela /code-repos). */

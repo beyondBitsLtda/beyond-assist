@@ -2,7 +2,7 @@ import { getCategoryData } from "@/lib/pendingWork.js";
 import { jsonResponse } from "@/lib/http.js";
 import { checkLisaCodeToken } from "@/lib/lisaCodeAuth.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const VALID_SOURCES = new Set(["trello", "delp", "sentinel", "thoughts"]);

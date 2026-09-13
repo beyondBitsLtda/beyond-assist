@@ -1,7 +1,7 @@
 import { updateSchedule, deleteSchedule } from "@/lib/scheduledAnnouncements.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** PATCH /api/scheduled-announcements/:id — atualização parcial (ex.: só {enabled:false}). */

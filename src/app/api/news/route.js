@@ -1,7 +1,7 @@
 import { getTechNews } from "@/lib/techNews.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** GET /api/news?category=ia — últimas notícias de tecnologia (português), ver src/lib/techNews.js.

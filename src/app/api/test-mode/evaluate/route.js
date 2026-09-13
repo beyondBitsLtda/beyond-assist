@@ -1,7 +1,7 @@
 import { evaluateTestCase } from "@/lib/gemini.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** POST /api/test-mode/evaluate   body: { itemTestado, descricao, condicaoAprovacao, images }

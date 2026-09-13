@@ -1,7 +1,7 @@
 import { writeTestCaseResult } from "@/lib/sentinelTests.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** POST /api/test-mode/write-result   body: { runId, caseKey, resultado, expectedUpdatedAt }

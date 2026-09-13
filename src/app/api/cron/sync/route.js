@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase.js";
 import { ingestSlice, buildSyncSteps } from "@/lib/ingest/runSlice.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**

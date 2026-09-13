@@ -12,7 +12,9 @@
     "disc-balance": "node scripts/disc-balance.mjs",
     "world-check": "node scripts/world-check.mjs",
     "deploy-map": "node scripts/deploy-map.mjs",
-    "cf:build": "next-on-pages"
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:deploy": "opennextjs-cloudflare deploy",
+    "cf:preview": "opennextjs-cloudflare preview"
   },
   "//overrides": "@cloudflare/next-on-pages quer workers-types v4 e o wrangler v4 quer v5. É pacote só de TIPOS TypeScript e este projeto é JavaScript puro, então nada disso chega no build — fixar em v4 satisfaz o adaptador sem efeito nenhum em runtime.",
   "overrides": {
@@ -21,14 +23,14 @@
   "//dependencies": "@cloudflare/next-on-pages e wrangler ficam em dependencies, e não em devDependencies, de propósito: o servidor de build da Cloudflare instala SÓ as dependências de produção. Como devDependency o adaptador não era instalado, o npx ia buscar uma cópia solta — num contexto onde o `overrides` acima não vale — e o build morria em ERESOLVE.",
   "dependencies": {
     "@babel/parser": "^8.0.4",
-    "@cloudflare/next-on-pages": "^1.13.16",
     "@google/genai": "^1.0.0",
     "@mediapipe/tasks-vision": "^1.0.1",
     "@monaco-editor/react": "^4.7.0",
+    "@opennextjs/cloudflare": "^1.20.6",
     "@supabase/supabase-js": "^2.45.0",
     "exceljs": "^4.4.0",
     "monaco-editor": "^0.56.0",
-    "next": "^15.0.0",
+    "next": "^15.5.25",
     "prism-react-renderer": "^2.4.1",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
@@ -39,8 +41,7 @@
   "allowScripts": {
     "workerd@1.20250718.0": true,
     "workerd@1.20260911.1": true,
-    "esbuild@0.14.47": true,
-    "esbuild@0.15.18": true,
-    "esbuild@0.28.1": true
+    "esbuild@0.28.1": true,
+    "esbuild@0.25.4": true
   }
 }

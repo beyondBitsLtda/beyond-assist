@@ -1,6 +1,6 @@
 import { runCodeTaskStep } from "@/lib/codeTasks.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**

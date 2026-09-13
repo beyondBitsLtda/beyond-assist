@@ -1,6 +1,6 @@
 import { getArchDocHtml } from "@/lib/archDocs.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** GET /api/arch-docs/:id/html — devolve o documento final PRONTO (text/html), pra abrir

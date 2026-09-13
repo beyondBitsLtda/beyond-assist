@@ -1,7 +1,7 @@
 import { listTestRuns } from "@/lib/sentinelTests.js";
 import { jsonResponse } from "@/lib/http.js";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** GET /api/test-mode/runs?project=<nome|all> — runs de um projeto de teste. */

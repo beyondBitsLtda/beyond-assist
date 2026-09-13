@@ -28,3 +28,5 @@ Controle-e-gest-o-de-testes-main/
 # Mixamo (ver README em public/models/ironman/). O app só usa os .fbx já rigados, que ficam em
 # public/models/ironman/ (esses sim versionados) — a pasta original não precisa estar aqui.
 "3d model/"
+.open-next/
+.vercel/
