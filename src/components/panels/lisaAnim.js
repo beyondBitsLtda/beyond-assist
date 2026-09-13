@@ -52,6 +52,11 @@ export const GESTOS = {
   balancar:   { pose: "idle",  ms: 1250, corpo: (f) => ({ dx: onda(f) * 1.1, dy: Math.abs(onda(f * 2)) * -0.7, lean: onda(f) * 0.16 }) },
   abanar:     { pose: "work",  ms: 640,  corpo: (f) => ({ dy: onda(f) * -0.4, lean: 0.24 + onda(f) * 0.06 }) },
   andar:      { pose: "walk",  ms: 300,  corpo: () => ({}) },
+  // O tiro é o único gesto cujo relógio vem de fora: o ciclo dele é o intervalo entre disparos
+  // (TIRO_INTERVALO), pra que o coice e o clarão caiam exatamente no tiro que o mundo deu.
+  atirar:     { pose: "arma",  ms: 750,  corpo: (f) => (f < 0.18
+                 ? { dx: -1.6 * (1 - f / 0.18), lean: -0.12 * (1 - f / 0.18) }
+                 : { dx: 0, lean: 0 }) },
 };
 
 /** A pose, o deslocamento e a curvatura do corpo neste instante da ação. */
@@ -259,6 +264,35 @@ export function adereco(P, anim, t, p, flip) {
         [{ x: p.x + (k - 1) * 5, y: p.y - 26 - pulso(f) * 2 }, { x: p.x + (k - 1) * 5, y: p.y - 29 - pulso(f) * 3 }],
         { a: pulso(f) * 0.7, w: 0.8 }
       );
+      break;
+    }
+    case "atirar": {
+      // a espingarda apontada pra frente, o clarão no cano no instante do disparo e a fumacinha
+      // saindo depois — é o conjunto que faz ler "ela atirou", e não "ela está de braço esticado"
+      const h = mao(12);
+      const cano = { x: h.x + s * 9, y: h.y - 1 };
+      P.poli([
+        { x: h.x - s * 2, y: h.y + 1.6 }, { x: h.x + s * 1.5, y: h.y + 1.6 },
+        { x: h.x + s * 2, y: h.y - 1 }, { x: h.x - s * 1.5, y: h.y - 1.4 },
+      ], { a: 0.95, fill: 0.25, solido: true });
+      P.poli([
+        { x: h.x + s * 1.5, y: h.y - 1.6 }, { x: cano.x, y: cano.y - 0.6 },
+        { x: cano.x, y: cano.y + 0.8 }, { x: h.x + s * 1.5, y: h.y + 0.6 },
+      ], { a: 0.95, fill: 0.3, solido: true });
+      if (f < 0.16) {
+        const q = 1 - f / 0.16;
+        for (let k = 0; k < 7; k++) {
+          const ang = (k / 7) * Math.PI * 2;
+          P.linha([
+            { x: cano.x + s * 1, y: cano.y },
+            { x: cano.x + s * 1 + Math.cos(ang) * 5 * q, y: cano.y + Math.sin(ang) * 3.5 * q },
+          ], { a: q, w: 1.1 });
+        }
+      } else if (f < 0.55) {
+        const q = (f - 0.16) / 0.39;
+        for (let k = 0; k < 3; k++)
+          P.ponto({ x: cano.x + s * (2 + q * 5 + k), y: cano.y - 1 - q * 5 - k * 0.6 }, { a: (1 - q) * 0.5, r: 0.8 });
+      }
       break;
     }
     case "dormir": {

@@ -8,7 +8,7 @@ import {
   houseLevel, nextItem, unlockedItems, worldXp,
 } from "@/lib/lisaWorld.js";
 import { ACOES, blocoDa, ehNoite, horaDoMundo, proximaAcao } from "@/lib/lisaRotina.js";
-import { ARMA, LADRAO, LISA, SACO, STEVE, ZUMBI } from "./worldSprites.js";
+import { LADRAO, LISA, SACO, STEVE, ZUMBI } from "./worldSprites.js";
 import { NALA } from "./nalaSprites.js";
 import { adereco, gesto } from "./lisaAnim.js";
 import * as A from "./isoArt.js";
@@ -115,6 +115,7 @@ export default function LisaWorld({ fullscreen = false }) {
   const armadaRef = useRef(false);
   const tiroRef = useRef(null);      // traçante do disparo
   const proxTiroRef = useRef(0);
+  const ultimoTiroRef = useRef(-9999); // relógio da animação do tiro: o coice cai no disparo
   const noiteRef = useRef(sceneRef.current.night);
   const sorteadoresRef = useRef({});
 
@@ -280,6 +281,7 @@ export default function LisaWorld({ fullscreen = false }) {
     let readAt = 0;
     let staticKey = "";
     let offScale = 1;
+    let naFrenteDaCasa = [];
     tempoRef.current.desde = last;
 
     /** Tudo que fica parado no terreno, já em ordem de profundidade. */
@@ -375,6 +377,18 @@ export default function LisaWorld({ fullscreen = false }) {
         if (sc.unlocked.includes("antena")) A.drawAntena(OP, CASA, sc.level);
         if (sc.unlocked.includes("solar") && sc.unlocked.includes("oficina")) A.drawSolar(OP, WORLD_ITEMS.find((i) => i.key === "oficina"));
         offCtx.shadowBlur = 0;
+
+        // O que fica NA FRENTE da casa, na tela. A janela acesa (quando ela está lá dentro) é
+        // pintada por cima do cache já pronto, então passava por cima da árvore plantada na
+        // frente da casa. Estas são as peças que precisam voltar depois dela.
+        const c0 = A.iso(CASA.tx, CASA.ty);
+        const c1 = A.iso(CASA.tx + CASA.w, CASA.ty + CASA.d);
+        const alto = A.casaAltura(sc.level) + 20;
+        naFrenteDaCasa = placed(sc).filter((o) => {
+          if (o.item.tx + o.item.ty <= CASA.tx + CASA.ty) return false;
+          const p = A.iso(o.item.tx, o.item.ty + (o.item.d || 1));
+          return p.x > c0.x - 30 && p.x < c1.x + 40 && p.y > c0.y - alto && p.y < c1.y + 30;
+        });
       }
 
       // ---- a rotina ----
@@ -399,7 +413,13 @@ export default function LisaWorld({ fullscreen = false }) {
           if (ev.passo?.faz === "recolher") sc.varal = false;
           ev.i++;
           let pas = ev.passos[ev.i];
-          while (pas && pas.needs && !sc.unlocked.includes(pas.needs)) { ev.i++; pas = ev.passos[ev.i]; }
+          // `needs` pula o passo quando a construção NÃO existe; `semA`, quando ela existe —
+          // é assim que o plano tem um caminho alternativo (pegar a arma em casa quando não há
+          // oficina) em vez de simplesmente ficar sem o passo
+          while (pas && ((pas.needs && !sc.unlocked.includes(pas.needs)) || (pas.semA && sc.unlocked.includes(pas.semA)))) {
+            ev.i++;
+            pas = ev.passos[ev.i];
+          }
           ev.passo = pas || null;
           if (!pas) return;
           ev.ate = now + (pas.ms || 0);
@@ -436,12 +456,12 @@ export default function LisaWorld({ fullscreen = false }) {
           dizer("voltando à rotina");
         } else if (pas) {
           dizer(
-            pas.faz === "lutar" ? `enfrentando os zumbis (${vivos} de pé)`
+            pas.faz === "lutar" ? (armadaRef.current ? `atirando nos zumbis (${vivos} de pé)` : `enfrentando os zumbis (${vivos} de pé)`)
             : pas.faz === "perseguir" ? "correndo atrás do ladrão"
             : pas.faz === "recolher" ? "tirando a roupa do varal"
             : pas.faz === "segurar" ? "segurando o varal"
             : pas.faz === "dentro" ? "abrigada em casa"
-            : pas.faz === "pegar-arma" ? "buscando alguma coisa na oficina"
+            : pas.faz === "pegar-arma" ? (sc.unlocked.includes("oficina") ? "buscando a arma na oficina" : "buscando a arma em casa")
             : pas.faz === "receber" ? "recebendo o Steve"
             : ev.key === "zumbis" || ev.key === "ladrao" ? "comemorando"
             : ev.key === "chuva" ? "tomando chuva"
@@ -504,6 +524,8 @@ export default function LisaWorld({ fullscreen = false }) {
       const brincando = a?.anim === "lancar" && a.phase === "fazendo";
       // com ameaça no terreno a Nala larga tudo e vai pra cima do mais próximo
       const ameaca = inimigosRef.current.find((e) => e.vivo && now >= e.nasceEm);
+      // armada e parada, ela VIRA PRA ONDE ATIRA — de costas pro alvo não lê como tiroteio
+      if (armadaRef.current && ameaca && !lisa.moving) lisa.flip = ameaca.tx - ameaca.ty < lisa.tx - lisa.ty;
       // cachorro segue dono: quando a Lisa entra, a Nala vai atrás e SOME do terreno. Antes ela
       // ficava plantada no quintal enquanto aparecia dormindo dentro de casa ao mesmo tempo.
       const porta = tileAlvo("casa");
@@ -552,7 +574,8 @@ export default function LisaWorld({ fullscreen = false }) {
           if (alvo) {
             alvo.vida--;
             proxTiroRef.current = now + TIRO_INTERVALO;
-            tiroRef.current = { de: [lisa.tx, lisa.ty], para: [alvo.tx, alvo.ty], until: now + 130 };
+            ultimoTiroRef.current = now;
+            tiroRef.current = { para: [alvo.tx, alvo.ty], until: now + 150 };
             if (alvo.vida <= 0) { alvo.vivo = false; mortesRef.current.push({ tx: alvo.tx, ty: alvo.ty, until: now + 800 }); }
           }
         }
@@ -599,10 +622,20 @@ export default function LisaWorld({ fullscreen = false }) {
         0, 0, w, h
       );
 
+      const P = A.pincel(ctx, { cell: size, camX: cam.x, camY: cam.y, accent });
+
+      // ---- a janela acesa, ainda no plano do CENÁRIO ----
+      // Vem antes dos atores e é seguida pelas peças que ficam na frente da casa. Pintada junto
+      // com os personagens, ela aparecia colada por cima da árvore plantada entre você e a casa.
+      if (dentroRef.current) {
+        ctx.shadowBlur = 0;
+        A.aberturaNaFace(P, CASA, A.janelaDaCasa(), { acesa: true });
+        for (const o of naFrenteDaCasa) drawObj(P, o.key, o.item, cena, now);
+      }
+
       // ---- atores e partículas, por cima ----
       ctx.shadowBlur = size * 0.7;
       ctx.shadowColor = hex;
-      const P = A.pincel(ctx, { cell: size, camX: cam.x, camY: cam.y, accent });
       /**
        * Sombra no chão antes do personagem. Não é enfeite: sem ela quem anda parece flutuar, e a
        * mancha escura ainda abre um buraco no fundo pra silhueta não se confundir com o cenário.
@@ -632,14 +665,10 @@ export default function LisaWorld({ fullscreen = false }) {
         put(LISA[lisa.pose] || LISA.idle, pl, lisa.flip, g);
         // e o objeto na mão: é ele que conta qual é a ação
         if (g) adereco(P, a.anim, now - a.startedAt, { x: pl.x + (g.dx || 0), y: pl.y + (g.dy || 0) }, lisa.flip);
-      } else {
-        // ela está lá dentro: o que se vê do terreno é a janela acesa, na posição real dela
-        const j = A.janelaDaCasa(CASA);
-        A.abertura(P, j.p, j.dir, j.larg, j.alt, { acesa: true });
       }
-      // a arminha na mão, enquanto está armada
+      // a espingarda na mão, com coice e clarão no instante de cada disparo
       if (!dentroRef.current && armadaRef.current && !lisa.moving)
-        P.figura(ARMA, pl.x + (lisa.flip ? -9 : 5), pl.y - 12, { flip: lisa.flip });
+        adereco(P, "atirar", now - ultimoTiroRef.current, pl, lisa.flip);
       if (st) put(st.moving ? STEVE.idle : STEVE.armUp, A.iso(st.tx, st.ty), st.flip);
 
       // ---- ameaças, disparo e quem caiu ----
@@ -655,9 +684,17 @@ export default function LisaWorld({ fullscreen = false }) {
       if (tiroRef.current) {
         if (now > tiroRef.current.until) tiroRef.current = null;
         else {
-          const a1 = A.iso(tiroRef.current.de[0], tiroRef.current.de[1]);
-          const a2 = A.iso(tiroRef.current.para[0], tiroRef.current.para[1]);
-          P.linha([{ x: a1.x, y: a1.y - 12 }, { x: a2.x, y: a2.y - 12 }], { a: 0.95, w: 0.8 });
+          const cano = { x: pl.x + (lisa.flip ? -14 : 14), y: pl.y - 13 };
+          const alvo = A.iso(tiroRef.current.para[0], tiroRef.current.para[1]);
+          P.linha([cano, { x: alvo.x, y: alvo.y - 12 }], { a: 0.95, w: 1.1 });
+          // estouro no zumbi atingido: sem ele não dá pra saber se o tiro pegou
+          for (let k = 0; k < 6; k++) {
+            const ang = (k / 6) * Math.PI * 2;
+            P.linha([
+              { x: alvo.x, y: alvo.y - 12 },
+              { x: alvo.x + Math.cos(ang) * 5, y: alvo.y - 12 + Math.sin(ang) * 4 },
+            ], { a: 0.8, w: 0.9 });
+          }
         }
       }
       mortesRef.current = mortesRef.current.filter((m) => now < m.until);

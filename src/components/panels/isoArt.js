@@ -171,8 +171,56 @@ const cantos = (tx, ty, w, d, h = 0) => [iso(tx, ty, h), iso(tx + w, ty, h), iso
 export const DIR_DIR = { x: -1, y: 0.5 };   // face da direita: do canto leste pro sul
 export const DIR_ESQ = { x: -1, y: -0.5 };  // face da esquerda: do canto sul pro oeste
 
-/** Onde fica a janela da frente da casa — o mundo acende ela quando a Lisa está lá dentro. */
-export const janelaDaCasa = ({ tx, ty, w, d }) => ({ p: iso(tx + w, ty + d * 0.3, 9), dir: DIR_DIR, larg: 7, alt: 10 });
+/**
+ * As aberturas de cada construção, num lugar só: o desenho usa, o mundo acende a janela da casa
+ * quando a Lisa está dentro, e o teste confere que nenhuma passa do canto da parede.
+ *
+ * `face` é "dir" (do canto leste ao sul) ou "esq" (do sul ao oeste); `centro` é a posição do meio
+ * da abertura ao longo da face, em TILES; `larg`/`alt`/`base` em células.
+ */
+export const ABERTURAS = {
+  casa: [
+    { face: "dir", centro: 6.2, larg: 9, alt: 20, base: 0, tipo: "porta" },
+    { face: "dir", centro: 2.4, larg: 7, alt: 10, base: 9, luz: true },
+    { face: "esq", centro: 6.1, larg: 7, alt: 10, base: 9, luz: true },
+    { face: "esq", centro: 2.7, larg: 7, alt: 10, base: 9, luz: true },
+  ],
+  sobrado: [
+    { face: "dir", centro: 2.6, larg: 7, alt: 10, luz: true },
+    { face: "esq", centro: 4.5, larg: 7, alt: 10, luz: true },
+  ],
+  oficina: [
+    { face: "dir", centro: 2.0, larg: 12, alt: 19, base: 0, tipo: "porta" },
+    { face: "esq", centro: 1.0, larg: 6, alt: 8, base: 11 },
+  ],
+};
+
+/** Quanto uma abertura de `larg` células ocupa ao longo da face, em tiles. */
+const emTiles = (larg) => larg / 8;
+
+/** A abertura cabe na parede? O teste do node usa isto. */
+export const abertaDentroDaParede = (lado, { centro, larg }) =>
+  centro - emTiles(larg) >= -1e-9 && centro + emTiles(larg) <= lado + 1e-9;
+
+/**
+ * Abertura numa das faces, posicionada em TILES ao longo dela.
+ *
+ * O centro é PRESO dentro da parede. Sem isso a porta da casa começava a 78% da face e terminava
+ * depois do canto, e a da oficina passava de longe: a abertura saía torta, dobrada pra fora da
+ * parede — que é exatamente o que fazia a entrada da casinha da Nala parecer entortada.
+ */
+export function aberturaNaFace(P, { tx, ty, w, d }, cfg, extra = {}) {
+  const dir = cfg.face === "dir";
+  const lado = dir ? d : w;
+  const meia = emTiles(cfg.larg);
+  const c = Math.min(lado - meia, Math.max(meia, cfg.centro));
+  const base = cfg.base || 0;
+  const p = dir ? iso(tx + w, ty + c - meia, base) : iso(tx + c + meia, ty + d, base);
+  abertura(P, p, dir ? DIR_DIR : DIR_ESQ, cfg.larg, cfg.alt, { tipo: cfg.tipo, ...extra });
+}
+
+/** A janela que o terreno acende quando ela está lá dentro. */
+export const janelaDaCasa = () => ABERTURAS.casa.find((j) => j.luz);
 
 /**
  * Barra com espessura: um quadrilátero fino em vez de um traço.
@@ -286,18 +334,14 @@ export function drawCasa(P, { tx, ty, w, d }, nivel, noite) {
   const h = casaAltura(nivel);
   caixa(P, tx, ty, w, d, h);
   duasAguas(P, tx - 0.8, ty - 0.8, w + 1.6, d + 1.6, h, 16);
+  const casa = { tx, ty, w, d };
   if (nivel >= 3) {
     // faixa entre os dois pavimentos, e as janelas de cima
     P.linha([iso(tx, ty + d, h / 2), iso(tx + w, ty + d, h / 2), iso(tx + w, ty, h / 2)], { a: 0.45, w: 0.9 });
-    abertura(P, iso(tx + w, ty + d * 0.32, h / 2 + 6), DIR_DIR, 7, 10, { acesa: noite });
-    abertura(P, iso(tx + w * 0.5, ty + d, h / 2 + 6), DIR_ESQ, 7, 10, { acesa: noite });
+    for (const j of ABERTURAS.sobrado) aberturaNaFace(P, casa, { ...j, base: h / 2 + 6 }, { acesa: noite });
   }
-  // porta na face da direita, com degrau; janelas nas duas faces
-  abertura(P, iso(tx + w, ty + d * 0.78, 0), DIR_DIR, 9, 20, { tipo: "porta" });
-  caixa(P, tx + w, ty + d * 0.66, 0.6, 1.5, 2, { luz: 0.12 });
-  abertura(P, iso(tx + w, ty + d * 0.3, 9), DIR_DIR, 7, 10, { acesa: noite });
-  abertura(P, iso(tx + w * 0.68, ty + d, 9), DIR_ESQ, 7, 10, { acesa: noite });
-  abertura(P, iso(tx + w * 0.3, ty + d, 9), DIR_ESQ, 7, 10, { acesa: noite });
+  for (const j of ABERTURAS.casa) aberturaNaFace(P, casa, j, { acesa: j.luz && noite });
+  caixa(P, tx + w, ty + 5.1, 0.6, 1.6, 2, { luz: 0.12 }); // degrau da porta
 }
 
 export function drawChamine(P, { tx, ty, w }, nivel) {
@@ -356,9 +400,17 @@ export function drawHorta(P, { tx, ty, w, d }) {
 export function drawCasinha(P, { tx, ty, w, d }) {
   caixa(P, tx, ty, w, d, 10);
   duasAguas(P, tx - 0.4, ty - 0.4, w + 0.8, d + 0.8, 10, 8);
-  const p = iso(tx + w, ty + d * 0.5);
+  // a entrada é centrada na parede e arredondada de verdade: fora de centro ela terminava depois
+  // do canto e saía torta, e como pentágono de bico o arco não lia
+  const larg = 7;
+  const p = iso(tx + w, ty + (d - larg / 4) / 2);
   const desloca = (t, dy = 0) => ({ x: p.x + DIR_DIR.x * t, y: p.y + DIR_DIR.y * t - dy });
-  P.poli([desloca(0), desloca(7), desloca(7, 5), desloca(3.5, 8.5), desloca(0, 5)], { a: 0.95, fill: 0.3, solido: true });
+  const arco = [desloca(0), desloca(larg)];
+  for (let i = 0; i <= 8; i++) {
+    const t = 1 - i / 8;
+    arco.push(desloca(larg * t, 4.5 + Math.sin(t * Math.PI) * 4));
+  }
+  P.poli(arco, { a: 0.95, fill: 0.3, solido: true });
 }
 
 /**
@@ -578,11 +630,12 @@ export function drawFogueira(P, { tx, ty, w, d }) {
 export function drawOficina(P, { tx, ty, w, d }) {
   caixa(P, tx, ty, w, d, 26);
   duasAguas(P, tx - 0.6, ty - 0.6, w + 1.2, d + 1.2, 26, 11);
-  const p = iso(tx + w, ty + d * 0.66, 0);
-  abertura(P, p, DIR_DIR, 14, 19, { tipo: "porta" });
-  const meio = { x: p.x + DIR_DIR.x * 7, y: p.y + DIR_DIR.y * 7 };
-  P.linha([meio, { x: meio.x, y: meio.y - 19 }], { a: 0.8, w: 0.9 });
-  abertura(P, iso(tx + w, ty + d * 0.2, 11), DIR_DIR, 6, 8);
+  const of = { tx, ty, w, d };
+  for (const j of ABERTURAS.oficina) aberturaNaFace(P, of, j);
+  // a fresta entre as duas folhas: é o que diz que a porta é dupla, de galpão
+  const porta = ABERTURAS.oficina[0];
+  const m = iso(tx + w, ty + porta.centro, 0);
+  P.linha([m, { x: m.x, y: m.y - porta.alt }], { a: 0.8, w: 0.9 });
 }
 
 /** Painel solar: moldura inclinada no telhado da oficina, com as células marcadas. */

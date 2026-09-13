@@ -18,6 +18,7 @@ import {
 } from "../src/lib/worldEvents.js";
 import { ACOES, BLOCOS, acoesDaHora, blocoDa, ehNoite, horaDoMundo, proximaAcao } from "../src/lib/lisaRotina.js";
 import { GESTOS, gesto } from "../src/components/panels/lisaAnim.js";
+import { ABERTURAS, abertaDentroDaParede } from "../src/components/panels/isoArt.js";
 import { LISA } from "../src/components/panels/worldSprites.js";
 
 let fails = 0;
@@ -91,6 +92,18 @@ ok("todo `needs` de passo aponta pra uma construção real",
 ok("todo destino de passo é um lugar conhecido",
   passos.every((p) => !p.ir || ["casa", "porta"].includes(p.ir) || WORLD_ITEMS.some((i) => i.key === p.ir)));
 ok("nenhum grupo de falas está vazio", Object.values(FALAS).every((v) => v.length >= 3));
+// O passo de se armar não pode depender de construção nenhuma: era o que tirava o tiroteio de
+// cena num terreno novo — a oficina não existia, o passo era pulado e ela enfrentava a horda
+// desarmada. Simula o filtro do componente com o terreno VAZIO.
+const armaEm = (construido) => {
+  const tem = new Set(construido);
+  return planoDe("zumbis").filter((p) => (!p.needs || tem.has(p.needs)) && (!p.semA || !tem.has(p.semA)))
+    .some((p) => p.faz === "pegar-arma");
+};
+ok("ela se arma mesmo com o terreno vazio", armaEm([]));
+ok("com oficina, ela se arma na oficina",
+  planoDe("zumbis").filter((p) => (!p.needs || p.needs === "oficina") && (!p.semA || p.semA !== "oficina"))
+    .filter((p) => p.faz === "pegar-arma").length === 1);
 ok("a horda entra em fila, não de uma vez", criarInimigos("zumbis", [5, 28], HORDA.zumbis).every((e, i) => i === 0 || e.entraEm > 0));
 
 // A luta precisa ser ENFRENTÁVEL: nem passeio de dois tiros, nem eterna. Com 6 zumbis de 2 de
@@ -139,6 +152,22 @@ ok("o terreno completo enriquece o dia",
   horas.some((h) => acoesDaHora(h, WORLD_ITEMS.map((i) => i.key)).length > acoesDaHora(h, []).length));
 ok("de madrugada ela dorme", acoesDaHora(2, WORLD_ITEMS.map((i) => i.key)).join() === "dormir");
 ok("a noite do desenho bate com a rotina", ehNoite(2) && ehNoite(21) && !ehNoite(10));
+
+// --- as PAREDES: porta e janela têm que caber na face onde são desenhadas ---
+// A porta da casa começava a 78% da parede e terminava depois do canto; a da oficina passava de
+// longe. A abertura saía dobrada pra fora, torta, e era isso que fazia a entrada da casinha da
+// Nala parecer entortada.
+const predios = { casa: CASA, sobrado: CASA, oficina: WORLD_ITEMS.find((i) => i.key === "oficina") };
+const foraDaParede = [];
+for (const [nome, lista] of Object.entries(ABERTURAS))
+  for (const j of lista) {
+    const b = predios[nome];
+    const lado = j.face === "dir" ? b.d : b.w;
+    if (!abertaDentroDaParede(lado, j)) foraDaParede.push(`${nome}/${j.face}@${j.centro}`);
+  }
+ok("toda porta e janela cabe na parede", foraDaParede.length === 0, foraDaParede.join(" "));
+ok("a casa tem porta", ABERTURAS.casa.some((j) => j.tipo === "porta"));
+ok("a janela que acende é uma só", ABERTURAS.casa.filter((j) => j.luz).length >= 1);
 
 // --- as ANIMAÇÕES: toda ação precisa ter um gesto próprio, senão o mundo volta a ser três
 // poses com rótulos diferentes ---

@@ -48,8 +48,10 @@ export const FALAS = {
  * `{ ir, fala, ms, faz }`, onde `ir` é o tile de destino (ou "casa" / "oficina" / "varal", que
  * o componente resolve pelo mapa) e `faz` é o que ela fica fazendo ao chegar.
  *
- * `needs` num passo pula ele quando aquela construção ainda não existe — sem varal não tem roupa
- * pra recolher, sem oficina ela enfrenta os zumbis de mãos vazias (e apanha mais).
+ * `needs` pula o passo quando aquela construção ainda NÃO existe — sem varal não tem roupa pra
+ * recolher. `semA` é o contrário: pula quando ela existe. Os dois juntos dão caminho alternativo
+ * ao plano (pegar a arma na oficina, ou em casa quando não há oficina) em vez de o passo
+ * simplesmente sumir e a cena perder o sentido.
  */
 export function planoDe(evento) {
   switch (evento) {
@@ -88,7 +90,12 @@ export function planoDe(evento) {
     case "zumbis":
       return [
         { fala: "zumbis", ms: 1400 },
+        // Ela PRECISA se armar, sempre. Antes só havia o passo da oficina, e como ele era pulado
+        // quando a oficina não existia, num terreno novo ela nunca pegava a arma: a horda chegava,
+        // a Nala mordia sozinha e o tiroteio — que é a graça do evento — simplesmente não
+        // acontecia. Sem oficina, ela busca em casa, que existe desde sempre.
         { ir: "oficina", needs: "oficina", faz: "pegar-arma", ms: 2600 },
+        { ir: "casa", semA: "oficina", faz: "pegar-arma", ms: 2600 },
         { faz: "lutar", ms: 40000 },
         { fala: "vitoria", ms: 2500 },
       ];
