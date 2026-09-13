@@ -31,5 +31,17 @@
     "binding": "ASSETS"
   },
 
+  // SEM ISTO, TODA PUBLICAÇÃO APAGA AS VARIÁVEIS DO PAINEL.
+  //
+  // O padrão do wrangler é tratar este arquivo como única fonte da verdade, igual a um
+  // terraform: no `deploy` ele DELETA toda variável que não esteja aqui dentro. Como o servidor
+  // de build da Cloudflare roda `wrangler deploy` a cada push, cada commit derrubava as chaves
+  // configuradas no painel — e o sintoma era só as luzinhas do topo ficando laranja, sem erro
+  // nenhum em log nenhum.
+  //
+  // As chaves não podem morar neste arquivo (ele é versionado), então a saída é o contrário:
+  // dizer ao wrangler para respeitar o que já está configurado lá.
+  "keep_vars": true,
+
   "observability": { "enabled": true }
 }
