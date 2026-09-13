@@ -7,8 +7,8 @@
   // poderia alterar o runtime debaixo de um deploy que já funcionava.
   "compatibility_date": "2026-09-13",
 
-  // É esta linha que faz o web-push funcionar aqui — e foi justamente ela que não bastou no
-  // Pages, onde o Edge runtime não tem http/https/net.
+  // É esta linha que faz o web-push funcionar aqui — e foi justamente ela que não bastou
+  // enquanto as rotas rodavam em Edge runtime, que não tem http/https/net.
   "compatibility_flags": ["nodejs_compat"],
 
   "triggers": {
@@ -19,8 +19,10 @@
     ]
   },
 
-  // TROQUE pelo endereço final da Lisa quando ligar o domínio. Os horários são em UTC.
-  "vars": { "LISA_URL": "https://lisa.pages.dev" },
+  // TROQUE pelo endereço final da Lisa. Recém-publicada ela atende em
+  // https://beyond-assist.<seu-subdominio>.workers.dev; depois, no domínio próprio.
+  // Os horários dos crons acima são em UTC.
+  "vars": { "LISA_URL": "https://beyond-assist.workers.dev" },
 
   "observability": { "enabled": true }
 }
