@@ -80,7 +80,10 @@ console.log("\n3) o avanço insiste enquanto há trabalho e para quando não há
     url.includes("/api/cron/sync") ? { ok: true, note: 'passo "Trello: Delp" em andamento' } : { ok: true, pendentes: [] }
   );
   const fatias = comTrabalho.filter((c) => c.url.endsWith("/api/cron/sync")).length;
-  conferir("havendo trabalho, avança mais de uma fatia por disparo", fatias === 2, `fatias: ${fatias}`);
+  // Propositalmente "mais de uma", e não um número exato: quantas fatias cabem num disparo é
+  // uma calibragem que vai mudar (ver FATIAS_POR_DISPARO). O que não pode mudar é insistir
+  // enquanto há trabalho — um disparo que avança uma fatia só nunca fecha um ciclo.
+  conferir("havendo trabalho, avança mais de uma fatia por disparo", fatias > 1, `fatias: ${fatias}`);
 
   const { chamadas: semTrabalho } = await disparar("*/5 * * * *", (url) =>
     url.includes("/api/cron/sync") ? { ok: true, note: "ciclo concluído" } : { ok: true, pendentes: [] }

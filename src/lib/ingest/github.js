@@ -99,16 +99,22 @@ export async function listIndexedFiles(repo) {
 // do Gemini). O cache guarda o que já foi buscado.
 //
 // A validade era de 15 minutos, curta de propósito pra pegar código novo rápido. Passou a ser
-// longa por uma razão de CORREÇÃO, não de eficiência: com o carregamento agora fatiado (ver
-// ORCAMENTO_DE_BUSCAS abaixo), um repositório no teto de 500 arquivos precisa de ~15 invocações
-// pra terminar de baixar, e a cada 5 minutos isso dá mais de uma hora. Com validade de 15
-// minutos o snapshot parcial expirava antes de ficar pronto, e o repositório recomeçava do zero
-// pra sempre, sem nunca ser indexado.
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+// longa por uma razão de CORREÇÃO, não de eficiência.
+//
+// Com o carregamento agora fatiado (ver ORCAMENTO_DE_BUSCAS abaixo), um repositório de umas 350
+// fontes precisa de ~10 invocações só pra terminar de baixar. Medido nesta conta: 16
+// repositórios dão cerca de 450 fatias num ciclo completo, o que leva umas 7 horas no ritmo do
+// Worker de cron. Um snapshot que expira antes disso é re-baixado no meio do próprio ciclo — e
+// com validade curta o repositório recomeçava do zero pra sempre, sem nunca ser indexado.
+//
+// 24 horas cobre um ciclo inteiro com folga. O preço é código novo demorar até um dia pra
+// aparecer nas respostas da Lisa. O jeito certo de reduzir isso sem voltar ao problema seria
+// guardar o SHA da árvore e só re-baixar quando ele mudar — vale fazer se a demora incomodar.
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // Um snapshot parcial não expira pela validade normal (senão nunca terminaria de montar), mas
 // também não pode ficar preso pra sempre se algo der errado no meio.
-const PARCIAL_MAX_MS = 24 * 60 * 60 * 1000;
+const PARCIAL_MAX_MS = 48 * 60 * 60 * 1000;
 
 // Quantos arquivos buscar por invocação.
 //

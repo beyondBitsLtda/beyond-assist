@@ -46,10 +46,20 @@ const CRONS = {
   "0 * * * *": ["sync-reinicia"],
 };
 
-/** Quantas fatias tentar por disparo. O agendamento antigo avançava a cada 2 min; duas fatias a
- *  cada 5 min chega perto disso sem gastar um gatilho a mais. Para na primeira que não tiver
- *  mais trabalho, então não desperdiça chamada quando o ciclo já acabou. */
-const FATIAS_POR_DISPARO = 2;
+/**
+ * Quantas fatias tentar por disparo. Para na primeira que não tiver mais trabalho, então não
+ * desperdiça chamada nenhuma quando o ciclo já acabou.
+ *
+ * Eram 2, que é mais ou menos o ritmo do agendamento antigo (a cada 2 min). Não serve mais: na
+ * Cloudflare o passo do GitHub precisa de várias invocações só para BAIXAR os arquivos de cada
+ * repositório (limite de 50 chamadas de saída por invocação — ver ingest/github.js). Com 16
+ * repositórios a conta dá ~450 fatias por ciclo; a 24 por hora isso é quase um dia, mais tempo
+ * do que a validade do snapshot, e o ciclo nunca fecharia.
+ *
+ * Cada fatia é uma chamada de saída deste Worker — o limite de 50 vale por invocação, então 5
+ * cabe folgado, e o trabalho pesado acontece do outro lado.
+ */
+const FATIAS_POR_DISPARO = 5;
 
 async function chamar(env, nome) {
   const tarefa = TAREFAS[nome];
