@@ -181,7 +181,22 @@ alter table public.remote_commands enable row level security;
 
 -- 12) Permite user_id nulo em notes — só afeta linhas novas sem BRAIN_USER_ID configurada;
 --     linhas existentes (com ou sem user_id) continuam exatamente como estão.
-alter table public.notes alter column user_id drop not null;
+--
+--     A checagem do `to_regclass` existe porque esta é a ÚNICA tabela que este arquivo mexe sem
+--     criar: a `notes` nasceu fora daqui, antes deste app. Num banco que já tem histórico isso
+--     nunca incomodou; num banco NOVO — como o do servidor local — a linha falhava com
+--     `relation "public.notes" does not exist`, e, rodando tudo num lote só, derrubava a criacão
+--     das 20 tabelas junto. Agora ela simplesmente não faz nada quando a tabela ainda não existe.
+--
+--     A `notes` em si não é criada aqui de propósito: a estrutura verdadeira dela deve vir do
+--     banco de origem, no dump da migração, e não de um palpite escrito neste arquivo — palpite
+--     errado quebraria a restauração dos dados por coluna faltando.
+do $$
+begin
+  if to_regclass('public.notes') is not null then
+    alter table public.notes alter column user_id drop not null;
+  end if;
+end $$;
 
 -- ============================================================
 --  Saúde das chaves do Gemini (a mais, aditivo) — rodízio "burro" (só por posição na
