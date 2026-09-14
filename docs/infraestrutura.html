@@ -719,8 +719,8 @@ npm run disc-balance    <span class="c"># jogo do disco</span></pre>
       <td>seção 8</td>
     </tr>
     <tr>
-      <td><b>Firewall desligado</b></td>
-      <td><code>ufw</code> instalado, nunca ativado. Portas <code>8000</code>, <code>5432</code> e <code>6543</code> respondem a qualquer aparelho da casa</td>
+      <td><b>Docker passa por fora do firewall</b></td>
+      <td><code>ufw</code> está <b>ativo</b>, mas <code>8000</code>, <code>5432</code> e <code>6543</code> respondem a qualquer aparelho da casa mesmo assim — o Docker escreve as próprias regras e não passa pelo filtro de entrada</td>
       <td><span class="selo s-falta">médio</span> só da rede local, não da internet</td>
       <td>abaixo</td>
     </tr>
@@ -734,18 +734,55 @@ npm run disc-balance    <span class="c"># jogo do disco</span></pre>
 </table>
 </div>
 
-<h4>Ligar o firewall</h4>
+<h4>O firewall já está ligado — e o que isso não protege</h4>
+<div class="aviso">
+  <span class="rot">Uma conclusão que eu tirei errada, e como descobri</span>
+  <p>
+    Uma versão anterior deste documento dizia que o <code>ufw</code> nunca tinha sido ativado.
+    A evidência era que as portas <code>8000</code>, <code>5432</code> e <code>6543</code>
+    respondiam da rede de casa. A conclusão estava errada: <code>ENABLED=yes</code>, serviço
+    <code>active</code>.
+  </p>
+  <p>
+    <b>O Docker escreve as próprias regras de rede e desvia do filtro de entrada do
+    <code>ufw</code>.</b> Porta publicada por container fica alcançável mesmo com o firewall
+    ligado e sem regra que a libere. Isso vale para qualquer máquina com Docker, não é
+    particularidade daqui.
+  </p>
+  <p style="margin-bottom:0">
+    O teste que separou as duas coisas: subir um servidor bobo numa porta qualquer
+    (<code>python3 -m http.server 8100</code>) e tentar de outra máquina. Deu timeout — o
+    firewall funciona. A <code>8000</code>, ao lado, respondeu em 0,1 s. A diferença entre as
+    duas não é o firewall: é quem abriu a porta.
+  </p>
+</div>
+
+<p>Como está hoje, medido de outro computador da casa:</p>
+<div class="rolo">
+<table>
+  <thead><tr><th>Porta</th><th>Quem abriu</th><th>Da rede de casa</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">22</td><td>SSH, liberado no <code>ufw</code></td><td>aberta — como se quer</td></tr>
+    <tr><td class="mono">3000</td><td>Lisa local, processo comum</td><td>bloqueada pelo firewall</td></tr>
+    <tr><td class="mono">8000</td><td>Supabase, via Docker</td><td><b>aberta</b>, passando por fora</td></tr>
+    <tr><td class="mono">5432</td><td>Postgres, via Docker</td><td><b>aberta</b> — protegida só pela senha</td></tr>
+    <tr><td class="mono">6543</td><td>pooler, via Docker</td><td><b>aberta</b></td></tr>
+  </tbody>
+</table>
+</div>
+
 <p>
-  A ordem importa: <code>allow ssh</code> vem <b>antes</b> de <code>enable</code>. Ligar firewall
-  por SSH sem liberar o SSH antes é a forma clássica de se trancar fora do próprio servidor.
+  <b>Regra de <code>ufw</code> não resolve isso</b> — ela é ignorada para essas portas. O que
+  resolve é fazer o container publicar só no <i>loopback</i>, editando o
+  <code>docker-compose.yml</code>: trocar <code>5432:5432</code> por
+  <code>127.0.0.1:5432:5432</code> e o mesmo para <code>6543</code>. Depois,
+  <code>docker compose up -d</code>.
 </p>
-<pre>sudo apt install -y ufw
-sudo ufw allow ssh
-sudo ufw --force enable
-sudo ufw status verbose</pre>
-<p>
-  Depois disso o Studio só abre pelo <code>ssh -L</code> da seção 5 — o que já é o caminho
-  recomendado. O túnel não é afetado: ele sai de dentro para fora.
+<p style="margin-bottom:0">
+  A <code>8000</code> pode ficar como está: é por ela que o túnel entrega, e quem chega de fora
+  ainda precisa da chave de serviço. As outras duas não têm motivo para atender a rede — para
+  acessar o Postgres do seu computador, use <code>ssh -L 5432:localhost:5432</code>, que é o
+  mesmo caminho do Studio.
 </p>
 
 <h4>Tirar a economia de energia do Wi-Fi</h4>
