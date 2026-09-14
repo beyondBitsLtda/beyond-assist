@@ -13,6 +13,7 @@
     "world-check": "node scripts/world-check.mjs",
     "deploy-map": "node scripts/deploy-map.mjs",
     "cron-check": "node scripts/cron-check.mjs",
+    "auth-check": "node scripts/auth-check.mjs",
     "cf:build": "opennextjs-cloudflare build",
     "cf:deploy": "opennextjs-cloudflare deploy",
     "cf:preview": "opennextjs-cloudflare preview"
