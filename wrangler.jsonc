@@ -15,6 +15,19 @@
   // explícito aqui é melhor do que depender de um botão no painel, que some num projeto recriado.
   "workers_dev": true,
 
+  // O endereço definitivo da Lisa.
+  //
+  // `custom_domain: true` faz o wrangler criar o registro DNS sozinho na zona beyond.dev.br e
+  // ligar o certificado — não precisa mexer no painel. Declarar aqui, e não lá, é o que faz o
+  // endereço voltar sozinho se o projeto for recriado do zero.
+  //
+  // O `.workers.dev` acima continua ligado de propósito: os dois servem o mesmo Worker, e manter
+  // o antigo por algumas semanas é um caminho alternativo de graça se o domínio novo der
+  // problema.
+  "routes": [
+    { "pattern": "lisa.beyond.dev.br", "custom_domain": true }
+  ],
+
   // Trava o comportamento da plataforma numa data: sem isso, uma mudança futura da Cloudflare
   // poderia alterar o runtime debaixo de um deploy que já funcionava.
   "compatibility_date": "2026-09-13",

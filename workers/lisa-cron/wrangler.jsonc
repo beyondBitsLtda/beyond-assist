@@ -19,10 +19,12 @@
     ]
   },
 
-  // TROQUE pelo endereço final da Lisa. Recém-publicada ela atende em
-  // https://beyond-assist.<seu-subdominio>.workers.dev; depois, no domínio próprio.
-  // Os horários dos crons acima são em UTC.
-  "vars": { "LISA_URL": "https://beyond-assist.workers.dev" },
+  // O endereço da Lisa. Os horários dos crons acima são em UTC.
+  //
+  // Aponta para o domínio próprio, e não para o .workers.dev, de propósito: o dia em que aquele
+  // endereço for desligado, este Worker pararia de sincronizar sem erro nenhum visível — ele roda
+  // no horário, a chamada falha, e o log fica num lugar que ninguém olha.
+  "vars": { "LISA_URL": "https://lisa.beyond.dev.br" },
 
   "observability": { "enabled": true }
 }
