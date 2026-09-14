@@ -7,7 +7,7 @@ import { CHART } from "@/lib/chartPalette.js";
 
 const POLL_MS = 20000;
 const MODEL_LABELS = { chat: "CHAT", tts: "VOZ (TTS)", embed: "EMBEDDINGS" };
-const REASON_LABELS = { rpd: "cota diária", rpm: "cota por minuto", overload: "sobrecarga", unsupported: "modelo indisponível" };
+const REASON_LABELS = { rpd: "cota diária", rpm: "cota por minuto", overload: "sobrecarga", unsupported: "modelo indisponível", timeout: "tempo esgotado" };
 const MODEL_CHART_COLORS = { chat: CHART.categorical[0], tts: CHART.categorical[1], embed: CHART.categorical[2] };
 
 /** Canvas que se redesenha sozinho quando o container muda de tamanho (ResizeObserver) ou
@@ -103,20 +103,46 @@ export default function GeminiKeysPage() {
   const healthMap = new Map();
   for (const row of health) healthMap.set(`${row.key_index}:${row.model}`, row);
 
+  // Por quanto tempo depois de uma falha a chave continua sendo mostrada como instável.
+  //
+  // Existe porque esta tela mentia por omissão. Ela só olhava cooldown ATIVO, e o cooldown de
+  // sobrecarga dura 30 segundos — então dizia "35 de 35 disponíveis" num dia com 136 falhas
+  // registradas. Tecnicamente correto e praticamente inútil: ninguém abre o painel dentro da
+  // janela de meio minuto em que o problema aparece.
+  //
+  // O `updated_at` da linha é permanente, então dá pra dizer "esta falhou há 8 minutos" bem
+  // depois de o cooldown ter passado. É a diferença entre um retrato do instante e algo que
+  // sirva pra decidir alguma coisa.
+  const JANELA_INSTAVEL_MS = 60 * 60 * 1000;
+
   const cellFor = (keyIndex, modelKey) => {
     const modelName = models[modelKey];
     const row = healthMap.get(`${keyIndex}:${modelName}`);
-    if (!row || !row.cooldown_until) return { available: true };
-    const untilMs = new Date(row.cooldown_until).getTime();
-    if (untilMs <= now) return { available: true };
-    return { available: false, remaining: untilMs - now, reason: row.reason, lastError: row.last_error, updatedAt: row.updated_at };
+    if (!row) return { available: true, estado: "limpa" };
+
+    const untilMs = row.cooldown_until ? new Date(row.cooldown_until).getTime() : 0;
+    if (untilMs > now) {
+      return { available: false, estado: "cooldown", remaining: untilMs - now, reason: row.reason, lastError: row.last_error, updatedAt: row.updated_at };
+    }
+
+    const desdeFalha = row.updated_at ? now - new Date(row.updated_at).getTime() : Infinity;
+    if (row.reason && desdeFalha < JANELA_INSTAVEL_MS) {
+      return { available: true, estado: "instavel", desdeFalha, reason: row.reason, lastError: row.last_error, updatedAt: row.updated_at };
+    }
+    return { available: true, estado: "limpa" };
   };
 
-  // resumo por modelo: quantas chaves disponíveis AGORA
+  // Resumo por modelo, em TRÊS estados e não dois. "35 de 35 disponíveis" num dia de centenas
+  // de falhas é uma verdade que não ajuda ninguém a decidir nada.
   const summary = modelKeys.map((mk) => {
-    let free = 0;
-    for (let i = 0; i < keyCount; i++) if (cellFor(i, mk).available) free++;
-    return { key: mk, label: MODEL_LABELS[mk] || mk, free, total: keyCount };
+    let livres = 0, instaveis = 0, bloqueadas = 0;
+    for (let i = 0; i < keyCount; i++) {
+      const c = cellFor(i, mk);
+      if (c.estado === "cooldown") bloqueadas++;
+      else if (c.estado === "instavel") instaveis++;
+      else livres++;
+    }
+    return { key: mk, label: MODEL_LABELS[mk] || mk, free: livres, instaveis, bloqueadas, total: keyCount };
   });
 
   return (
@@ -136,7 +162,10 @@ export default function GeminiKeysPage() {
           <div key={s.key} style={{ border: "1px solid rgba(var(--accent-rgb),0.16)", borderRadius: 8, padding: "14px 16px", background: "linear-gradient(160deg, rgba(var(--accent-rgb),0.04), rgba(0,0,0,0.2))" }}>
             <div style={{ ...mono, fontSize: 9.5, letterSpacing: 2, color: "rgba(207,239,251,0.55)", marginBottom: 8 }}>{s.label}</div>
             <div style={{ ...mono, fontSize: 26, fontWeight: 700, color: s.free > 0 ? GR : OR }}>{s.free}<span style={{ fontSize: 14, color: "rgba(207,239,251,0.4)" }}>/{s.total}</span></div>
-            <div style={{ fontSize: 11, color: "rgba(207,239,251,0.5)", marginTop: 4 }}>chaves disponíveis agora</div>
+            <div style={{ fontSize: 11, color: "rgba(207,239,251,0.5)", marginTop: 4 }}>
+              {s.bloqueadas > 0 ? `${s.bloqueadas} em cooldown agora` : "nenhuma em cooldown"}
+              {s.instaveis > 0 ? ` · ${s.instaveis} falhou na última hora` : ""}
+            </div>
           </div>
         ))}
       </div>
@@ -218,7 +247,15 @@ export default function GeminiKeysPage() {
                   const cell = cellFor(i, mk);
                   return (
                     <td key={mk} style={{ padding: "10px 14px", borderBottom: "1px solid rgba(var(--accent-rgb),0.08)", whiteSpace: "nowrap" }}>
-                      {cell.available ? (
+                      {cell.estado === "instavel" ? (
+                        <span
+                          title={cell.lastError || ""}
+                          style={{ color: "#e8c33a", cursor: cell.lastError ? "help" : "default" }}
+                        >
+                          ⚠️ falhou há {fmtRemaining(cell.desdeFalha)}
+                          <span style={{ color: "rgba(207,239,251,0.45)" }}> · {REASON_LABELS[cell.reason] || cell.reason}</span>
+                        </span>
+                      ) : cell.available ? (
                         <span style={{ color: GR }}>✅ disponível</span>
                       ) : (
                         <span
@@ -239,11 +276,21 @@ export default function GeminiKeysPage() {
       </div>
 
       <div style={{ ...mono, fontSize: 9.5, color: "rgba(207,239,251,0.4)", marginTop: 14, lineHeight: 1.6 }}>
+        ✅ disponível · ⚠️ falhou na última hora, mas já voltou · 🔴 bloqueada agora.
+        <br /><br />
+        O estado do meio foi acrescentado porque esta tela mentia por omissão: ela só olhava
+        cooldown ATIVO, e sobrecarga dura 30 segundos — então mostrava tudo disponível mesmo num
+        dia com centenas de falhas. Ninguém abre o painel dentro da janela de meio minuto em que
+        o problema aparece.
+        <br /><br />
         "cota diária" fica de cooldown por ~12h (aproximação segura pro reset do Google); "cota por
-        minuto" e "sobrecarga" voltam bem mais rápido; "modelo indisponível" significa que aquela
-        chave/projeto não tem acesso a esse modelo específico (pode ser definitivo, não só cota).
+        minuto" e "sobrecarga" voltam bem mais rápido; "tempo esgotado" é chave que pendurou e foi
+        cortada por nós (ver o teto por tentativa em src/lib/gemini.js); "modelo indisponível"
+        significa que aquela chave/projeto não tem acesso a esse modelo específico — pode ser
+        definitivo, não só cota.
+        <br /><br />
         Chaves sem nenhuma falha registrada aparecem sempre como disponíveis — nunca tentadas
-        ainda não é o mesmo que confirmadas boas.
+        ainda não é o mesmo que confirmadas boas. Para consumo real, veja os gráficos acima.
       </div>
     </div>
   );

@@ -1927,17 +1927,22 @@ export default function AssistantPage() {
   }, []);
   stopSpeakingForGestureRef.current = stopSpeaking;
 
-  // teto de espera pela voz do Gemini — só uma rede de segurança pra uma chamada REALMENTE
-  // travada (nunca volta), NÃO uma tentativa de "acelerar" a resposta. Já errei esse número
-  // pra menos duas vezes: 3,2s matava toda chamada; depois 9s ainda cortava o servidor no
-  // meio das PRÓPRIAS 3 tentativas dele (retry com espera do lado do servidor soma tempo
-  // real, e o corte no navegador chegava antes do servidor terminar de tentar); depois 20s
-  // ainda derrubava respostas que estavam pra dar certo (com as chaves TODAS saudáveis no
-  // painel /gemini-keys — ou seja, não era cota, era só o Gemini demorando mais do que 20s
-  // pra sintetizar áudio às vezes). A Vercel já tem um teto absoluto de 60s pra função (ver
-  // maxDuration em /api/speak) — 45s dá bastante margem real sem deixar o navegador esperando
-  // depois que o servidor já teria desistido sozinho.
-  const SPEAK_TIMEOUT_MS = 45000;
+  // Teto de espera pela voz do Gemini — rede de segurança pra uma chamada travada, NÃO uma
+  // tentativa de "acelerar" a resposta. Já errei pra menos três vezes: 3,2s matava toda
+  // chamada; 9s cortava o servidor no meio das próprias tentativas dele; 20s derrubava
+  // respostas que iam dar certo.
+  //
+  // Os 45s vieram depois, calibrados por um motivo que NÃO VALE MAIS: "a Vercel corta a
+  // função em 60s, então esperar mais é inútil". A Lisa saiu da Vercel; o Worker não tem
+  // esse corte. Medido em produção depois da mudança, em dez amostras: 4, 4, 5, 13, 27, 28,
+  // 39, 58, 69 e 112 segundos — duas de seis passavam de 45s e caíam pra voz do navegador.
+  //
+  // O número abaixo NÃO é escolhido por gosto: ele cobre o pior caso do servidor, que agora
+  // é limitado. São 3 tentativas de até 22s cada, com esperas entre elas (ver
+  // TTS_TETO_POR_TENTATIVA_MS em src/lib/gemini.js), o que dá ~68s. 75s dá a margem de rede.
+  // Mexer num sem mexer no outro reabre exatamente o problema que isto resolve: o navegador
+  // desistindo antes de o servidor terminar de tentar.
+  const SPEAK_TIMEOUT_MS = 75000;
   // contador visível NA CONVERSA (não só no log de debug) enquanto espera — null = não está
   // esperando voz nenhuma; número = segundos decorridos desde que a chamada começou. Existe
   // pra deixar claro que a Lisa ainda está tentando a voz do Gemini (não travou), com quanto

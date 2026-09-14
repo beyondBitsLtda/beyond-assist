@@ -54,6 +54,17 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function classifyGeminiError(err) {
   const msg = String(err?.message || err);
 
+  // Chamada que a GENTE cortou por demorar demais (ver o teto por tentativa em
+  // synthesizeSpeech). Precisa contar como transitória: se cair no caso geral lá embaixo,
+  // é tratada como erro definitivo, NÃO tenta outra chave, e o teto vira só uma forma mais
+  // rápida de falhar — o oposto do que ele existe pra fazer.
+  //
+  // Uma chave que pendurou uma vez costuma pendurar de novo em seguida, então ela sai de
+  // circulação por um minuto em vez dos 30s de uma sobrecarga comum.
+  if (err?.name === "AbortError" || /abort(ed)?/i.test(msg)) {
+    return { transient: true, code: "TIMEOUT", reason: "timeout", untilMs: Date.now() + 60_000 };
+  }
+
   if (msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota") || /\b429\b/.test(msg)) {
     // Google diz explicitamente no quotaId se o limite é DIÁRIO ("PerDay") ou por minuto —
     // sem essa distinção, um cooldown fixo de 60s é curto demais pra cota diária (fica
@@ -89,6 +100,12 @@ function rewriteError(err, index, classified) {
       `QUOTA_EXCEEDED: limite do Gemini atingido${classified.reason === "rpd" ? " (cota DIÁRIA)" : ""}. Aguarde e tente de novo.`
     );
     e.code = "QUOTA";
+    e.keyLabel = key;
+    return e;
+  }
+  if (classified.code === "TIMEOUT") {
+    const e = new Error("TIMEOUT: uma chave do Gemini travou e foi trocada por outra.");
+    e.code = "TIMEOUT";
     e.keyLabel = key;
     return e;
   }
@@ -787,6 +804,12 @@ Com base nisso, produza:
 
 // ---- TTS: gera áudio a partir de texto ----
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
+
+// Quanto esperar UMA tentativa de síntese antes de desistir dela e tentar outra chave.
+// Com 3 tentativas, o pior caso fica em ~68s (22 + 0,6 + 22 + 1,2 + 22) — limitado e
+// previsível. É esse número que o teto do navegador precisa cobrir (ver SPEAK_TIMEOUT_MS
+// no painel do Assistente); os dois só fazem sentido juntos.
+const TTS_TETO_POR_TENTATIVA_MS = 22_000;
 const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
 
 // Pra o painel de status (/api/gemini-keys/status) montar a matriz chave×modelo sem nunca
@@ -806,18 +829,33 @@ export async function synthesizeSpeech(text, voiceName) {
   // (a saúde por chave×modelo já evita repetir uma que sabidamente está zerada pra TTS).
   const res = await withTransientRetry(
     TTS_MODEL,
-    (client) =>
-      client.models.generateContent({
-        model: TTS_MODEL,
-        contents: [{ parts: [{ text }] }],
-        config: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+    (client) => {
+      // Teto POR TENTATIVA. Sem ele o SDK espera indefinidamente, e foi isso que medimos em
+      // produção: a distribuição é bimodal — ou responde em 4 a 13 segundos, ou pendura. Dez
+      // amostras deram 4, 4, 5, 13, 27, 28, 39, 58, 69 e 112 segundos.
+      //
+      // Cortar em 22s não torna a voz mais lenta: as chamadas boas já voltaram bem antes.
+      // O que muda é o pior caso, que deixa de ser "espera o quanto o Gemini quiser" e vira
+      // "troca de chave e tenta de novo". Uma chave pendurada não melhora esperando mais.
+      const controlador = new AbortController();
+      const relogio = setTimeout(() => controlador.abort(), TTS_TETO_POR_TENTATIVA_MS);
+      return client.models
+        .generateContent({
+          model: TTS_MODEL,
+          contents: [{ parts: [{ text }] }],
+          config: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+            },
+            abortSignal: controlador.signal,
           },
-        },
-      }),
-    { attempts: 2, delayMs: 600 }
+        })
+        .finally(() => clearTimeout(relogio));
+    },
+    // Três tentativas, e não duas: com o teto acima cada uma custa no máximo 22s, então a
+    // terceira cabe no orçamento. Antes, com tentativa sem teto, 2 já podiam passar de 100s.
+    { attempts: 3, delayMs: 600 }
   );
 
   const part = res?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
