@@ -1,0 +1,1105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Infraestrutura da Lisa — operação e manutenção</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap">
+<style>
+  :root {
+    --papel:#FFFFFF; --papel-2:#EAE5DF; --papel-3:#F5F2EE;
+    --tinta:#111111; --tinta-2:#5A5754; --tinta-3:#8B8783;
+    --linha:rgba(17,17,17,0.14); --linha-forte:rgba(17,17,17,0.30);
+    --vermelho:#CC0F10; --verde:#0B861D; --laranja:#FF6B05; --azul:#2362D3; --marinho:#213D75;
+    --codigo-bg:#141312; --codigo-tx:#EAE5DF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --papel:#0C0C0C; --papel-2:#171717; --papel-3:#141414;
+      --tinta:#EAE5DF; --tinta-2:#B0B0B0; --tinta-3:#7E7B78;
+      --linha:rgba(234,229,223,0.16); --linha-forte:rgba(234,229,223,0.34);
+      --vermelho:#E8221F; --verde:#34B44A; --laranja:#FF8A34; --azul:#5A8DEA; --marinho:#6E8FD0;
+      --codigo-bg:#000000; --codigo-tx:#EAE5DF;
+    }
+  }
+  :root[data-theme="dark"] {
+    --papel:#0C0C0C; --papel-2:#171717; --papel-3:#141414;
+    --tinta:#EAE5DF; --tinta-2:#B0B0B0; --tinta-3:#7E7B78;
+    --linha:rgba(234,229,223,0.16); --linha-forte:rgba(234,229,223,0.34);
+    --vermelho:#E8221F; --verde:#34B44A; --laranja:#FF8A34; --azul:#5A8DEA; --marinho:#6E8FD0;
+    --codigo-bg:#000000; --codigo-tx:#EAE5DF;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--papel); color: var(--tinta);
+    font-family: Barlow, "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+    font-weight: 500; font-size: 16.5px; line-height: 1.62; -webkit-font-smoothing: antialiased;
+  }
+  .env { max-width: 940px; margin: 0 auto; padding-inline: 20px; padding-block: 0 80px; }
+
+  /* ---------- capa ---------- */
+  .capa { padding-block: 44px 28px; border-bottom: 3px solid var(--vermelho); }
+  .marca { font-size: 11.5px; font-weight: 700; letter-spacing: 2.4px; text-transform: uppercase; color: var(--vermelho); margin-bottom: 14px; }
+  h1 { font-size: clamp(32px, 6vw, 50px); line-height: 1.05; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance; }
+  .resumo { font-size: 19px; color: var(--tinta-2); max-width: 64ch; margin: 0; }
+  .ficha { display: flex; flex-wrap: wrap; gap: 10px 30px; margin-top: 26px; font-size: 13.5px; }
+  .ficha b { display: block; font-size: 10.5px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--tinta-3); font-weight: 700; }
+  .ficha span { color: var(--tinta); font-weight: 600; }
+
+  /* ---------- sumario ---------- */
+  nav.sumario { background: var(--papel-3); border: 1px solid var(--linha); border-radius: 8px; padding: 20px 24px; margin: 32px 0; }
+  nav.sumario h2 { margin: 0 0 12px; border: 0; padding: 0; }
+  nav.sumario ol { margin: 0; padding-left: 22px; columns: 2; column-gap: 32px; }
+  nav.sumario li { margin-bottom: 6px; break-inside: avoid; }
+  nav.sumario a { color: var(--tinta); text-decoration: none; border-bottom: 1px solid var(--linha-forte); }
+  nav.sumario a:hover { color: var(--vermelho); border-color: var(--vermelho); }
+  @media (max-width: 620px) { nav.sumario ol { columns: 1; } }
+
+  h2 { font-size: 15px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; color: var(--tinta-3); margin: 64px 0 18px; padding-bottom: 8px; border-bottom: 1px solid var(--linha); scroll-margin-top: 16px; }
+  h3 { font-size: 21px; font-weight: 700; margin: 36px 0 10px; letter-spacing: -0.01em; text-wrap: balance; }
+  h4 { font-size: 16px; font-weight: 700; margin: 24px 0 8px; color: var(--tinta-2); }
+  p { margin: 0 0 14px; max-width: 72ch; }
+  a { color: var(--vermelho); text-underline-offset: 2px; }
+  code:not(pre code) { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace; font-size: 0.86em; background: var(--papel-2); padding: 1px 5px; border-radius: 3px; border: 1px solid var(--linha); word-break: break-word; }
+  strong, b { font-weight: 700; }
+
+  pre { margin: 12px 0; background: var(--codigo-bg); color: var(--codigo-tx); border-radius: 5px; padding: 14px 16px; overflow-x: auto; font-size: 13.5px; line-height: 1.6; font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace; border: 1px solid var(--linha-forte); }
+  pre .c { color: #8B9A8B; }
+
+  .caixa { background: var(--papel-3); border: 1px solid var(--linha); border-radius: 6px; padding: 20px 22px; margin: 22px 0; }
+  .caixa > :last-child { margin-bottom: 0; }
+  .caixa h3, .caixa h4 { margin-top: 0; }
+
+  .aviso { border-left: 4px solid var(--vermelho); background: var(--papel-3); padding: 16px 20px; margin: 20px 0; border-radius: 0 5px 5px 0; }
+  .aviso .rot { font-size: 10.5px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; color: var(--vermelho); display: block; margin-bottom: 6px; }
+  .aviso > :last-child { margin-bottom: 0; }
+  .cuidado { border-left-color: var(--laranja); } .cuidado .rot { color: var(--laranja); }
+  .certo { border-left-color: var(--verde); } .certo .rot { color: var(--verde); }
+
+  .rolo { overflow-x: auto; margin: 20px 0; border: 1px solid var(--linha); border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 560px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--linha); vertical-align: top; }
+  th { font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--tinta-3); font-weight: 700; background: var(--papel-3); }
+  tr:last-child td { border-bottom: 0; }
+  td.mono, th.mono { font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 13px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  ul.s { margin: 0 0 14px; padding-left: 20px; } ul.s li { margin-bottom: 7px; max-width: 70ch; }
+  ol.s { margin: 0 0 14px; padding-left: 22px; } ol.s li { margin-bottom: 9px; max-width: 70ch; }
+
+  .selo { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; white-space: nowrap; }
+  .s-ok { background: var(--verde); color: #FFF; }
+  .s-risco { background: var(--vermelho); color: #FFF; }
+  .s-falta { background: var(--laranja); color: #FFF; }
+  .s-info { background: var(--azul); color: #FFF; }
+
+  figure { margin: 26px 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption { font-size: 13.5px; color: var(--tinta-2); margin-top: 10px; padding-left: 14px; border-left: 2px solid var(--linha-forte); max-width: 70ch; }
+  .diag { border: 1px solid var(--linha); border-radius: 8px; background: var(--papel-3); padding: 14px; overflow-x: auto; }
+  .diag svg { min-width: 620px; }
+
+  .rodape { margin-top: 70px; padding-top: 22px; border-top: 1px solid var(--linha); font-size: 14px; color: var(--tinta-3); }
+  .topo { position: fixed; right: 18px; bottom: 18px; background: var(--vermelho); color: #FFF; border: 0; border-radius: 50%; width: 42px; height: 42px; font-size: 18px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.3); }
+  .topo:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+  @media print { .topo, nav.sumario { display: none; } body { font-size: 11pt; } }
+</style>
+</head>
+<body>
+<div class="env">
+
+<header class="capa">
+  <div class="marca">Beyond Bits · Documentação de infraestrutura</div>
+  <h1>Infraestrutura da Lisa</h1>
+  <p class="resumo">
+    Onde cada peça mora, o que ela faz, como operar no dia a dia, o que conferir de tempos em
+    tempos, o que fazer quando quebra — e como refazer tudo do zero. Escrito com os endereços,
+    versões e números reais desta instalação, medidos na máquina.
+  </p>
+  <div class="ficha">
+    <div><b>Situação</b><span>Em produção</span></div>
+    <div><b>Medido em</b><span>14/09/2026</span></div>
+    <div><b>Custo mensal</b><span>R$ 0 + energia</span></div>
+    <div><b>Pendências</b><span>3 — ver seção 9</span></div>
+  </div>
+</header>
+
+<nav class="sumario">
+  <h2>O que tem aqui</h2>
+  <ol>
+    <li><a href="#visao">A ideia em uma página</a></li>
+    <li><a href="#caminho">O caminho de uma requisição</a></li>
+    <li><a href="#rede">Mapa de rede: onde cada coisa mora</a></li>
+    <li><a href="#inventario">Inventário: cada peça e o que faz</a></li>
+    <li><a href="#acesso">Como acessar tudo</a></li>
+    <li><a href="#senhas">Onde estão as senhas e chaves</a></li>
+    <li><a href="#operar">Operação do dia a dia</a></li>
+    <li><a href="#manutencao">Manutenção periódica</a></li>
+    <li><a href="#pendencias">Pendências conhecidas</a></li>
+    <li><a href="#quebrou">Quando quebra: sintoma → causa → conserto</a></li>
+    <li><a href="#refazer">Refazer a migração do zero</a></li>
+    <li><a href="#voltar">Voltar atrás (plano B)</a></li>
+    <li><a href="#armadilhas">Armadilhas que já custaram caro</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ 1 -->
+<section>
+<h2 id="visao">1 · A ideia em uma página</h2>
+
+<p>
+  A Lisa é um app Next.js que roda como <b>Worker na Cloudflare</b> e guarda tudo num
+  <b>Supabase auto-hospedado num iMac 2014</b>, na casa do Brayan. Os dois se encontram por um
+  <b>túnel</b> que sai de dentro da casa para fora — por isso <b>nenhuma porta foi aberta no
+  roteador</b>, e nem foi preciso acesso à configuração dele.
+</p>
+
+<p>O desenho tem três razões, nessa ordem de importância:</p>
+<ul class="s">
+  <li><b>Não depender de infraestrutura de terceiros para os dados.</b> O banco é a parte que não dá pra recriar; ele mora em casa.</li>
+  <li><b>Custo zero.</b> Cloudflare no plano gratuito, Supabase auto-hospedado, domínio já existente.</li>
+  <li><b>Reversível.</b> O Supabase da nuvem continua de pé e intacto: voltar é trocar duas variáveis.</li>
+</ul>
+
+<div class="aviso cuidado">
+  <span class="rot">O que essa escolha custa</span>
+  <p style="margin-bottom:0">
+    O banco fica tão disponível quanto a casa. Queda de luz ou de internet derruba todos os
+    painéis até voltar — nada quebra de forma permanente, eles voltam sozinhos. E backup passou a
+    ser responsabilidade sua: o Supabase da nuvem fazia isso; ninguém faz agora.
+  </p>
+</div>
+</section>
+
+<!-- ============================================================ 2 -->
+<section>
+<h2 id="caminho">2 · O caminho de uma requisição</h2>
+
+<p>
+  Este é o percurso de quando você abre um painel da Lisa e ele mostra dados. Vale conhecer
+  porque <b>todo diagnóstico é descobrir em qual dessas setas parou</b>.
+</p>
+
+<figure>
+<div class="diag">
+<svg viewBox="0 0 900 300" role="img" aria-label="Diagrama do caminho de uma requisição, do navegador até o Postgres no iMac">
+  <defs>
+    <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#CC0F10"/>
+    </marker>
+  </defs>
+  <style>
+    .cx { fill:#FFFFFF; stroke:#111111; stroke-width:1.5; rx:6; }
+    .lb { font: 600 13px Barlow, sans-serif; fill:#111111; }
+    .sb { font: 500 11px Barlow, sans-serif; fill:#5A5754; }
+    .mn { font: 500 11px ui-monospace, Consolas, monospace; fill:#2362D3; }
+    .ln { stroke:#CC0F10; stroke-width:2; fill:none; marker-end:url(#seta); }
+    .zona { fill:none; stroke:#8B8783; stroke-width:1; stroke-dasharray:5 4; rx:8; }
+    .zt { font: 700 10px Barlow, sans-serif; fill:#8B8783; letter-spacing:1.4px; }
+    @media (prefers-color-scheme: dark) {
+      .cx { fill:#171717; stroke:#EAE5DF; }
+      .lb { fill:#EAE5DF; } .sb { fill:#B0B0B0; } .mn { fill:#5A8DEA; }
+      .ln { stroke:#E8221F; } .zona { stroke:#7E7B78; } .zt { fill:#7E7B78; }
+    }
+  </style>
+
+  <rect class="zona" x="292" y="18" width="318" height="160"/>
+  <text class="zt" x="300" y="34">NUVEM DA CLOUDFLARE</text>
+  <rect class="zona" x="636" y="18" width="250" height="264"/>
+  <text class="zt" x="644" y="34">CASA — iMac 2014</text>
+
+  <rect class="cx" x="14" y="70" width="132" height="58"/>
+  <text class="lb" x="30" y="94">Navegador</text>
+  <text class="sb" x="30" y="112">você, no celular ou PC</text>
+
+  <path class="ln" d="M 150 99 L 186 99"/>
+
+  <rect class="cx" x="190" y="70" width="92" height="58"/>
+  <text class="lb" x="206" y="94">DNS</text>
+  <text class="sb" x="206" y="112">Cloudflare</text>
+
+  <path class="ln" d="M 286 99 L 320 99"/>
+
+  <rect class="cx" x="324" y="60" width="146" height="78"/>
+  <text class="lb" x="338" y="84">Worker da Lisa</text>
+  <text class="mn" x="338" y="102">lisa.beyond.dev.br</text>
+  <text class="sb" x="338" y="120">Next.js · 63 rotas</text>
+
+  <path class="ln" d="M 474 99 L 508 99"/>
+
+  <rect class="cx" x="512" y="60" width="94" height="78"/>
+  <text class="lb" x="524" y="84">Borda</text>
+  <text class="sb" x="524" y="102">recebe o</text>
+  <text class="sb" x="524" y="118">túnel</text>
+
+  <path class="ln" d="M 610 99 L 648 99"/>
+
+  <rect class="cx" x="652" y="52" width="216" height="52"/>
+  <text class="lb" x="666" y="74">cloudflared</text>
+  <text class="sb" x="666" y="90">serviço do sistema · 4 conexões</text>
+
+  <path class="ln" d="M 760 108 L 760 132"/>
+
+  <rect class="cx" x="652" y="136" width="216" height="52"/>
+  <text class="lb" x="666" y="158">Envoy → PostgREST</text>
+  <text class="mn" x="666" y="174">localhost:8000</text>
+
+  <path class="ln" d="M 760 192 L 760 216"/>
+
+  <rect class="cx" x="652" y="220" width="216" height="52"/>
+  <text class="lb" x="666" y="242">PostgreSQL 17.6</text>
+  <text class="sb" x="666" y="258">26 tabelas · pgvector</text>
+
+  <text class="sb" x="14" y="205">A seta de volta percorre o mesmo caminho</text>
+  <text class="sb" x="14" y="223">na ordem inversa. Se um painel não carrega,</text>
+  <text class="sb" x="14" y="241">o diagnóstico é achar em qual seta parou —</text>
+  <text class="sb" x="14" y="259">a seção 10 tem a tabela para isso.</text>
+</svg>
+</div>
+<figcaption>
+  A Lisa <b>nunca fala SQL com o Postgres</b>. Ela chama o PostgREST por HTTP, que traduz para
+  SQL. É por isso que instalar só o PostgreSQL não funcionaria — foi a decisão mais importante
+  desta montagem.
+</figcaption>
+</figure>
+</section>
+
+<!-- ============================================================ 3 -->
+<section>
+<h2 id="rede">3 · Mapa de rede: onde cada coisa mora</h2>
+
+<figure>
+<div class="diag">
+<svg viewBox="0 0 900 420" role="img" aria-label="Mapa de rede mostrando o que roda na internet e o que roda dentro da casa">
+  <style>
+    .cx2 { fill:#FFFFFF; stroke:#111111; stroke-width:1.4; rx:5; }
+    .cf { fill:#FFFFFF; stroke:#FF6B05; stroke-width:2; rx:5; }
+    .cs { fill:#FFFFFF; stroke:#2362D3; stroke-width:2; rx:5; }
+    .ct { fill:#FFFFFF; stroke:#0B861D; stroke-width:2; rx:5; }
+    .t1 { font: 700 13px Barlow, sans-serif; fill:#111111; }
+    .t2 { font: 500 11px Barlow, sans-serif; fill:#5A5754; }
+    .t3 { font: 500 10.5px ui-monospace, Consolas, monospace; fill:#2362D3; }
+    .zz { fill:none; stroke:#8B8783; stroke-width:1.2; stroke-dasharray:6 5; rx:10; }
+    .zl { font: 700 11px Barlow, sans-serif; fill:#8B8783; letter-spacing:1.6px; }
+    .cn { stroke:#8B8783; stroke-width:1.5; fill:none; }
+    .cnf { stroke:#CC0F10; stroke-width:2.2; fill:none; }
+    @media (prefers-color-scheme: dark) {
+      .cx2, .cf, .cs, .ct { fill:#171717; }
+      .cx2 { stroke:#EAE5DF; }
+      .t1 { fill:#EAE5DF; } .t2 { fill:#B0B0B0; } .t3 { fill:#5A8DEA; }
+      .zz, .cn { stroke:#7E7B78; } .zl { fill:#7E7B78; } .cnf { stroke:#E8221F; }
+    }
+  </style>
+
+  <rect class="zz" x="10" y="26" width="530" height="378"/>
+  <text class="zl" x="22" y="46">INTERNET — NADA AQUI É SEU HARDWARE</text>
+
+  <rect class="cf" x="26" y="60" width="230" height="66"/>
+  <text class="t1" x="40" y="82">Worker · beyond-assist</text>
+  <text class="t3" x="40" y="99">lisa.beyond.dev.br</text>
+  <text class="t2" x="40" y="116">o app da Lisa · 16 painéis</text>
+
+  <rect class="cf" x="286" y="60" width="230" height="66"/>
+  <text class="t1" x="300" y="82">Worker · lisa-cron</text>
+  <text class="t3" x="300" y="99">lisa-cron.…workers.dev</text>
+  <text class="t2" x="300" y="116">o relógio · 3 horários</text>
+
+  <rect class="cx2" x="26" y="144" width="150" height="58"/>
+  <text class="t1" x="38" y="165">DNS + túnel</text>
+  <text class="t2" x="38" y="182">Cloudflare</text>
+
+  <rect class="cx2" x="188" y="144" width="150" height="58"/>
+  <text class="t1" x="200" y="165">GitHub Pages</text>
+  <text class="t3" x="200" y="182">beyond.dev.br</text>
+
+  <rect class="cx2" x="350" y="144" width="166" height="58"/>
+  <text class="t1" x="362" y="165">Zoho Mail</text>
+  <text class="t2" x="362" y="182">e-mail do domínio</text>
+
+  <rect class="cs" x="26" y="222" width="150" height="70"/>
+  <text class="t1" x="38" y="243">Gemini</text>
+  <text class="t2" x="38" y="260">35 chaves em rodízio</text>
+  <text class="t2" x="38" y="276">chat · voz · vetores</text>
+
+  <rect class="cs" x="188" y="222" width="150" height="70"/>
+  <text class="t1" x="200" y="243">Trello</text>
+  <text class="t2" x="200" y="260">3 quadros indexados</text>
+  <text class="t2" x="200" y="276">+ Map of Deploy</text>
+
+  <rect class="cs" x="350" y="222" width="166" height="70"/>
+  <text class="t1" x="362" y="243">GitHub API</text>
+  <text class="t2" x="362" y="260">16 repositórios</text>
+  <text class="t2" x="362" y="276">lidos e indexados</text>
+
+  <rect class="ct" x="26" y="312" width="238" height="76"/>
+  <text class="t1" x="38" y="333">Supabase nuvem · principal</text>
+  <text class="t2" x="38" y="350">PLANO B — intacto, fora de uso</text>
+  <text class="t2" x="38" y="367">desligar só depois de semanas</text>
+
+  <rect class="ct" x="278" y="312" width="238" height="76"/>
+  <text class="t1" x="290" y="333">Supabase nuvem · Sentinela</text>
+  <text class="t2" x="290" y="350">EM USO — não migrou</text>
+  <text class="t2" x="290" y="367">Sentinela + Controle de Teste</text>
+
+  <rect class="zz" x="560" y="26" width="330" height="378"/>
+  <text class="zl" x="572" y="46">CASA — REDE 192.168.1.x, WI-FI</text>
+
+  <rect class="cx2" x="576" y="60" width="298" height="52"/>
+  <text class="t1" x="590" y="82">Roteador</text>
+  <text class="t2" x="590" y="99">sem acesso ao painel · nada configurado nele</text>
+
+  <rect class="cx2" x="576" y="126" width="298" height="74"/>
+  <text class="t1" x="590" y="148">iMac 2014 · Zorin OS 17.3</text>
+  <text class="t3" x="590" y="165">bryan-iMac.local · 192.168.1.76</text>
+  <text class="t2" x="590" y="182">Core i5-4260U · 7,7 GB RAM · HD 500 GB</text>
+
+  <rect class="cx2" x="592" y="214" width="266" height="52"/>
+  <text class="t1" x="604" y="236">cloudflared</text>
+  <text class="t2" x="604" y="252">serviço · sobe com a máquina</text>
+
+  <rect class="cx2" x="592" y="280" width="266" height="52"/>
+  <text class="t1" x="604" y="302">Docker · 11 containers</text>
+  <text class="t2" x="604" y="318">Supabase completo</text>
+
+  <rect class="cx2" x="592" y="346" width="266" height="46"/>
+  <text class="t1" x="604" y="368">PostgreSQL 17.6 + pgvector</text>
+  <text class="t2" x="604" y="384">26 tabelas · o cérebro da Lisa</text>
+
+  <path class="cnf" d="M 516 93 C 545 93, 545 152, 574 152"/>
+  <path class="cn" d="M 725 200 L 725 212"/>
+  <path class="cn" d="M 725 266 L 725 278"/>
+  <path class="cn" d="M 725 332 L 725 344"/>
+</svg>
+</div>
+<figcaption>
+  A única ligação entre os dois mundos é a linha vermelha: o túnel. Ele é aberto <b>de dentro
+  para fora</b> pelo <code>cloudflared</code>, e por isso o roteador nunca precisou ser tocado —
+  para ele é uma conexão de saída comum, igual à de um navegador.
+</figcaption>
+</figure>
+
+<h3>Por que o roteador não entra nessa história</h3>
+<p>
+  A forma tradicional de publicar um servidor caseiro é abrir uma porta no roteador
+  (<i>port forwarding</i>) e apontar um DNS dinâmico para o IP residencial. Isso exige acesso ao
+  painel do roteador, expõe a máquina a varredura automática da internet inteira, e quebra toda
+  vez que a operadora troca o IP.
+</p>
+<p>
+  O túnel inverte a direção: o iMac <b>liga para a Cloudflare</b> e mantém a ligação aberta; o
+  tráfego volta por ela. Não há porta aberta, não há IP fixo, e o roteador não sabe que isso
+  está acontecendo.
+</p>
+</section>
+
+<!-- ============================================================ 4 -->
+<section>
+<h2 id="inventario">4 · Inventário: cada peça e o que faz</h2>
+
+<h3>Na nuvem</h3>
+<div class="rolo">
+<table>
+  <thead><tr><th>Peça</th><th>Endereço</th><th>O que faz</th><th>Se cair</th></tr></thead>
+  <tbody>
+    <tr><td><b>Worker beyond-assist</b></td><td class="mono">lisa.beyond.dev.br</td><td>O app inteiro: 16 painéis e 63 rotas de API. Páginas estáticas saem do CDN; as rotas rodam como função.</td><td>Lisa fora do ar</td></tr>
+    <tr><td><b>Worker lisa-cron</b></td><td class="mono">lisa-cron.beyondbitslisa<wbr>.workers.dev</td><td>O relógio. Chama três rotas da Lisa em horários fixos e envia as notificações push.</td><td>Lisa viva mas parada: não aprende, não avisa</td></tr>
+    <tr><td><b>DNS Cloudflare</b></td><td class="mono">beyond.dev.br</td><td>Zona do domínio. Registrador continua sendo o Registro.br; só a gestão de DNS é da Cloudflare.</td><td>Nada resolve</td></tr>
+    <tr><td><b>GitHub Pages</b></td><td class="mono">beyond.dev.br</td><td>O site institucional. Nuvem <b>cinza</b> no DNS — a Cloudflare só responde o endereço e sai fora.</td><td>Site fora; Lisa não sente</td></tr>
+    <tr><td><b>Zoho Mail</b></td><td class="mono">3 registros MX</td><td>E-mail do domínio, com SPF e DKIM.</td><td>E-mail para de chegar</td></tr>
+    <tr><td><b>Gemini</b></td><td>API do Google</td><td>Chat, voz e os vetores de busca. 35 chaves em rodízio automático, com cooldown por chave e por modelo.</td><td>Assistente e voz mudos</td></tr>
+    <tr><td><b>Trello</b></td><td>API</td><td>3 quadros indexados + o quadro do Map of Deploy.</td><td>Boards vazios; sync para no passo do Trello</td></tr>
+    <tr><td><b>Supabase nuvem · principal</b></td><td class="mono">wcwikmszduuqlytikjwq</td><td><span class="selo s-info">plano B</span> Intacto, fora de uso. Manter ligado algumas semanas.</td><td>—</td></tr>
+    <tr><td><b>Supabase nuvem · Sentinela</b></td><td class="mono">wilxxkkqgoigmrdgufej</td><td><span class="selo s-ok">em uso</span> Painel Sentinela e Controle de Teste. <b>Não migrou</b> e continua na nuvem.</td><td>Sentinela e Controle de Teste fora</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Em casa — o iMac</h3>
+<div class="rolo">
+<table>
+  <thead><tr><th>Item</th><th>Valor</th></tr></thead>
+  <tbody>
+    <tr><td>Nome na rede</td><td class="mono">bryan-iMac.local</td></tr>
+    <tr><td>IP (pode mudar)</td><td class="mono">192.168.1.76</td></tr>
+    <tr><td>Usuário</td><td class="mono">bryan</td></tr>
+    <tr><td>Sistema</td><td>Zorin OS 17.3 · kernel 6.8.0-84</td></tr>
+    <tr><td>Processador</td><td>Intel Core i5-4260U · 4 núcleos</td></tr>
+    <tr><td>Memória</td><td>7,7 GB — o banco inteiro cabe nela</td></tr>
+    <tr><td>Disco</td><td>HD 500 GB a 5400 rpm · 241 GB livres</td></tr>
+    <tr><td>Rede</td><td>Wi-Fi <code>wlp2s0</code> · cabo desconectado, por decisão</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h4>Os 11 containers</h4>
+<div class="rolo">
+<table>
+  <thead><tr><th>Container</th><th>Imagem</th><th>Para que serve</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">supabase-db</td><td class="mono">postgres:17.6.1.136</td><td><b>O banco.</b> É aqui que os dados moram</td></tr>
+    <tr><td class="mono">supabase-rest</td><td class="mono">postgrest:v14.17</td><td><b>Traduz HTTP em SQL.</b> É com ele que a Lisa fala</td></tr>
+    <tr><td class="mono">supabase-envoy</td><td class="mono">envoy:v1.39.1</td><td>Porteiro na porta 8000; distribui para os demais</td></tr>
+    <tr><td class="mono">supabase-studio</td><td class="mono">studio:2026.09.07</td><td>A tela de administração</td></tr>
+    <tr><td class="mono">supabase-auth</td><td class="mono">gotrue:v2.196.0</td><td>Login — a Lisa não usa, mas faz parte do conjunto</td></tr>
+    <tr><td class="mono">supabase-meta</td><td class="mono">postgres-meta:v0.99.0</td><td>API que o Studio usa para ler a estrutura</td></tr>
+    <tr><td class="mono">supabase-pooler</td><td class="mono">supavisor:2.9.12</td><td>Repartidor de conexões</td></tr>
+    <tr><td class="mono">supabase-storage</td><td class="mono">storage-api:v1.74.0</td><td>Arquivos — não usado hoje</td></tr>
+    <tr><td class="mono">supabase-realtime</td><td class="mono">realtime:v2.134.10</td><td>Mudanças ao vivo — não usado hoje</td></tr>
+    <tr><td class="mono">supabase-imgproxy</td><td class="mono">imgproxy:v3.31.4</td><td>Imagens — não usado hoje</td></tr>
+    <tr><td class="mono">supabase-edge-functions</td><td class="mono">edge-runtime:v1.76.2</td><td>Funções Deno — não usado hoje</td></tr>
+  </tbody>
+</table>
+</div>
+<p>
+  Cinco não são usados pela Lisa. Vêm no pacote oficial e removê-los quebraria dependências do
+  <code>docker-compose.yml</code> por pouco ganho — juntos ocupam uns 400 MB de memória, e há
+  3,2 GB livres.
+</p>
+
+<h4>Os dados</h4>
+<div class="rolo">
+<table>
+  <thead><tr><th>O quê</th><th class="num">Quantidade</th><th>Observação</th></tr></thead>
+  <tbody>
+    <tr><td>Tabelas</td><td class="num">26</td><td>20 do <code>db/schema.sql</code> + 6 herdadas do app antigo do Beyond Brain</td></tr>
+    <tr><td>Linhas</td><td class="num">18.787</td><td>conferidas uma a uma contra a origem</td></tr>
+    <tr><td>Documentos indexados</td><td class="num">11.375</td><td>10.898 de código, 423 do Trello, 54 de notas</td></tr>
+    <tr><td>Vetores</td><td class="num">11.375</td><td>768 dimensões cada — é a busca do Assistente</td></tr>
+    <tr><td>Tamanho na origem</td><td class="num">284 MB</td><td>cabe inteiro na memória do iMac</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="caixa">
+  <h4>As seis tabelas herdadas</h4>
+  <p style="margin-bottom:0">
+    <code>notes</code>, <code>note_links</code>, <code>note_relations</code>,
+    <code>brain_train_attempts</code>, <code>profiles</code> e <code>respostas</code> nasceram
+    num app anterior e <b>não são criadas pelo <code>db/schema.sql</code></b>. A Lisa só usa a
+    <code>notes</code> (as suas anotações do Beyond Brain). As outras foram trazidas para não
+    perder dado. <b>Isso importa se você recriar o banco</b> — ver seção 11.
+  </p>
+</div>
+</section>
+
+<!-- ============================================================ 5 -->
+<section>
+<h2 id="acesso">5 · Como acessar tudo</h2>
+
+<h3>Entrar no iMac</h3>
+<p>Do PowerShell do Windows, de qualquer lugar da casa:</p>
+<pre>ssh bryan@bryan-iMac.local</pre>
+<p>
+  Pede a senha do usuário do Zorin. <b>Nada aparece na tela enquanto você digita</b> — é normal.
+  Se o nome não resolver, use o número: <code>ssh bryan@192.168.1.76</code>.
+</p>
+<p>Para sair: <code>exit</code>. Para saber onde você está, olhe o texto antes do cursor:</p>
+<pre>PS C:\WINDOWS\System32&gt;    <span class="c">← Windows</span>
+bryan@bryan-iMac:~$        <span class="c">← dentro do iMac</span></pre>
+
+<h3>Abrir o Supabase Studio</h3>
+<div class="aviso cuidado">
+  <span class="rot">Não tente pelo endereço da rede</span>
+  <p style="margin-bottom:0">
+    <code>http://bryan-iMac.local:8000</code> até funciona hoje, mas depende de a porta estar
+    aberta na rede — e o plano é fechá-la (seção 9). O caminho certo carrega a porta para dentro
+    do SSH e não depende de nada disso.
+  </p>
+</div>
+<p>No PowerShell do Windows — <b>não</b> dentro do iMac:</p>
+<pre>ssh -L 8000:localhost:8000 bryan@bryan-iMac.local</pre>
+<p>Com essa janela aberta, no <b>navegador</b>:</p>
+<pre>http://localhost:8000</pre>
+<p>
+  Usuário <code>bryan</code>, senha em <code>DASHBOARD_PASSWORD</code> (seção 6). O túnel vive
+  enquanto a janela do SSH estiver aberta — fechou, para de responder. É o desenho: nada fica
+  exposto quando você não está usando.
+</p>
+
+<h3>Os endereços públicos</h3>
+<div class="rolo">
+<table>
+  <thead><tr><th>Endereço</th><th>O que é</th><th>Quem pode abrir</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">https://lisa.beyond.dev.br</td><td>A Lisa</td><td>qualquer um com o link</td></tr>
+    <tr><td class="mono">https://beyond-assist.beyondbitslisa.workers.dev</td><td>A Lisa, endereço antigo</td><td>idem — mantido como reserva</td></tr>
+    <tr><td class="mono">https://banco.beyond.dev.br</td><td>O banco, via túnel</td><td>só com a chave de serviço</td></tr>
+    <tr><td class="mono">https://beyond.dev.br</td><td>O site (GitHub Pages)</td><td>público</td></tr>
+    <tr><td class="mono">https://lisa-cron.beyondbitslisa.workers.dev</td><td>O relógio</td><td>aceita <code>?cron=</code> para teste manual</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Painéis da Cloudflare</h3>
+<p>
+  Conta <b>beyondbitsLisa</b> — há três contas na mesma credencial, e tudo da Lisa está nessa.
+  Workers &amp; Pages → <code>beyond-assist</code> e <code>lisa-cron</code>.
+</p>
+<pre>npx wrangler whoami                              <span class="c"># ver as contas</span>
+npx wrangler deployments status --name beyond-assist
+npx wrangler tail --name lisa-cron                <span class="c"># logs ao vivo do relógio</span></pre>
+</section>
+
+<!-- ============================================================ 6 -->
+<section>
+<h2 id="senhas">6 · Onde estão as senhas e chaves</h2>
+
+<p><b>Nenhum segredo está escrito neste arquivo.</b> Aqui está apenas onde encontrar cada um.</p>
+
+<div class="rolo">
+<table>
+  <thead><tr><th>O quê</th><th>Onde está</th><th>Como ver</th></tr></thead>
+  <tbody>
+    <tr><td>Senha do usuário do iMac</td><td>só na sua cabeça</td><td>não há como recuperar; só redefinir pelo modo de recuperação</td></tr>
+    <tr><td>Senha do Studio</td><td><code>.env</code> do Supabase</td><td class="mono">grep '^DASHBOARD_PASSWORD=' ~/supabase/docker/.env</td></tr>
+    <tr><td>Senha do Postgres</td><td>idem</td><td class="mono">grep '^POSTGRES_PASSWORD=' ~/supabase/docker/.env</td></tr>
+    <tr><td>Chave de serviço do banco</td><td>idem</td><td class="mono">grep '^SERVICE_ROLE_KEY=' ~/supabase/docker/.env</td></tr>
+    <tr><td>Chaves da Lisa em produção</td><td>Cloudflare, como <b>Secret</b></td><td><span class="selo s-risco">ilegíveis</span> só substituir</td></tr>
+    <tr><td>Chave SSH do Claude</td><td><code>~/.ssh/authorized_keys</code></td><td>linha marcada <code>claude-code-migracao-lisa</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="aviso">
+  <span class="rot">As 12 chaves da Cloudflare não podem mais ser lidas</span>
+  <p>
+    Elas foram convertidas de "variável" para "segredo", e segredo na Cloudflare é de mão única:
+    nem você nem ninguém lê o valor de volta — só substitui. Se perder uma, o caminho é gerar
+    nova no serviço de origem e cadastrar.
+  </p>
+  <p style="margin-bottom:0">
+    Duas se recuperam fácil: <code>SUPABASE_SERVICE_ROLE_KEY</code> está no <code>.env</code> do
+    iMac, e <code>SERVICE_KEY_TESTE</code> no painel do Supabase do Sentinela. As outras dez,
+    não — <b>se você não guardou cópia, guarde agora</b>, enquanto elas ainda funcionam.
+  </p>
+</div>
+
+<h4>O arquivo que manda em tudo, no iMac</h4>
+<pre>~/supabase/docker/.env          <span class="c"># permissão 600 — só o bryan lê</span>
+~/supabase/docker/.env.original <span class="c"># como veio de fábrica, para comparar</span></pre>
+<p>
+  Mexeu nele, precisa reiniciar os containers para valer:
+  <code>cd ~/supabase/docker &amp;&amp; docker compose up -d</code>.
+</p>
+</section>
+
+<!-- ============================================================ 7 -->
+<section>
+<h2 id="operar">7 · Operação do dia a dia</h2>
+
+<h3>A checagem de 10 segundos</h3>
+<p>Se desconfiar de alguma coisa, comece por aqui. Do seu Windows:</p>
+<pre>curl https://lisa.beyond.dev.br/api/health</pre>
+<p>Resposta saudável:</p>
+<pre>{"supabase":true,"trello":true,"gemini":true,"sentinel":true}</pre>
+<div class="rolo">
+<table>
+  <thead><tr><th>Se vier false</th><th>Significa</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">supabase</td><td>O banco no iMac não respondeu — túnel, containers ou a casa</td></tr>
+    <tr><td class="mono">trello</td><td><code>TRELLO_KEY</code>/<code>TRELLO_TOKEN</code> inválidos ou Trello fora</td></tr>
+    <tr><td class="mono">gemini</td><td>Nenhuma chave configurada (não checa cota, só presença)</td></tr>
+    <tr><td class="mono">sentinel</td><td>O <b>outro</b> Supabase, o da nuvem — nada a ver com o iMac</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Estado do iMac, de uma vez</h3>
+<pre>ssh bryan@bryan-iMac.local
+cd ~/supabase/docker
+docker compose ps                  <span class="c"># 11 containers, todos healthy</span>
+systemctl is-active cloudflared    <span class="c"># active</span>
+df -h /                            <span class="c"># espaço livre</span>
+free -h                            <span class="c"># memória</span></pre>
+
+<h3>Ver se a Lisa está aprendendo</h3>
+<p>
+  O chip <b>AUTO-SYNC</b> no topo da Lisa mostra isso. Passe o mouse nele: o balão traz o erro
+  exato, se houver. Pelo terminal:
+</p>
+<pre>curl https://lisa.beyond.dev.br/api/sync-status</pre>
+<p>
+  O campo <code>grand_total</code> cresce a cada fatia processada. Se ele não muda há horas, o
+  relógio parou — ver seção 10.
+</p>
+
+<h3>Disparar o relógio na mão</h3>
+<p>Útil para testar sem esperar o horário:</p>
+<pre>curl "https://lisa-cron.beyondbitslisa.workers.dev/?cron=*/5+*+*+*+*"   <span class="c"># avisos + sync</span>
+curl "https://lisa-cron.beyondbitslisa.workers.dev/?cron=*/15+*+*+*+*"  <span class="c"># Map of Deploy</span>
+curl "https://lisa-cron.beyondbitslisa.workers.dev/?cron=0+*+*+*+*"     <span class="c"># reinício do ciclo</span></pre>
+
+<h3>Os três horários</h3>
+<div class="rolo">
+<table>
+  <thead><tr><th>Horário (UTC)</th><th>O que dispara</th><th>Por quê assim</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">*/5 * * * *</td><td>Notificações + <b>5 fatias</b> do ciclo de sync</td><td>O avanço pega carona aqui porque o plano gratuito limita os gatilhos por Worker</td></tr>
+    <tr><td class="mono">*/15 * * * *</td><td>Map of Deploy</td><td>Checa as aplicações do quadro e grava o histórico</td></tr>
+    <tr><td class="mono">0 * * * *</td><td>Reinício do ciclo de sync</td><td>Só reinicia se o anterior terminou; força após 6h travado</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="caixa">
+  <h4>Dois segredos diferentes, e confundi-los dá 401 calado</h4>
+  <p style="margin-bottom:0">
+    <code>notify</code> e <code>deploy-check</code> esperam
+    <code>Authorization: Bearer &lt;CRON_SECRET&gt;</code>. O <code>sync</code> espera
+    <code>x-ingest-secret: &lt;INGEST_SECRET&gt;</code>, que é o mesmo do botão SYNC manual.
+    Trocar os dois faz o Worker rodar no horário, a rota recusar, e nada acontecer — sem erro
+    visível em lugar nenhum.
+  </p>
+</div>
+
+<h3>Rodar os testes do projeto</h3>
+<pre>npm run world-check     <span class="c"># Mundo da Lisa: desenho, rotina, animações</span>
+npm run cron-check      <span class="c"># Worker de cron, sem rede</span>
+npm run deploy-map      <span class="c"># lógica do Map of Deploy</span>
+npm run disc-balance    <span class="c"># jogo do disco</span></pre>
+</section>
+
+<!-- ============================================================ 8 -->
+<section>
+<h2 id="manutencao">8 · Manutenção periódica</h2>
+
+<div class="rolo">
+<table>
+  <thead><tr><th>Quando</th><th>O quê</th><th>Como</th></tr></thead>
+  <tbody>
+    <tr><td><b>Toda semana</b></td><td>Olhar o <code>/api/health</code> e o chip AUTO-SYNC</td><td>30 segundos; pega quase tudo</td></tr>
+    <tr><td><b>Todo mês</b></td><td>Espaço em disco do iMac</td><td class="mono">df -h / &amp;&amp; docker system df</td></tr>
+    <tr><td><b>Todo mês</b></td><td>Atualizar o sistema</td><td class="mono">sudo apt update &amp;&amp; sudo apt upgrade -y</td></tr>
+    <tr><td><b>Todo mês</b></td><td>Conferir uso na Cloudflare</td><td>Workers → Metrics. Abaixo de 30 mil chamadas/dia é folga</td></tr>
+    <tr><td><b>A cada 3 meses</b></td><td>Atualizar o Supabase</td><td class="mono">cd ~/supabase/docker &amp;&amp; docker compose pull &amp;&amp; docker compose up -d</td></tr>
+    <tr><td><b>A cada 3 meses</b></td><td>Limpar imagens antigas do Docker</td><td class="mono">docker image prune -a</td></tr>
+    <tr><td><b>Sempre</b></td><td><span class="selo s-falta">falta</span> Backup</td><td>ver abaixo — é a pendência mais séria</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Backup — o que precisa existir e ainda não existe</h3>
+<div class="aviso">
+  <span class="rot">Hoje não há backup nenhum</span>
+  <p style="margin-bottom:0">
+    Verificado: não há pasta <code>~/backups</code> nem linha de cron. O Supabase da nuvem fazia
+    isso sozinho; a partir da migração, não faz mais ninguém. <b>Se o disco do iMac morrer agora,
+    o cérebro da Lisa acabou</b> — os 11.375 vetores levariam dias de reindexação e quota do
+    Gemini para refazer, e as anotações do Beyond Brain não voltam.
+  </p>
+</div>
+<p>O que um backup mínimo precisa fazer:</p>
+<ol class="s">
+  <li>Um <code>pg_dump</code> diário do banco inteiro, do <b>container</b> (é ele que tem a versão certa do Postgres).</li>
+  <li>Guardar as cópias com data no nome, e <b>apagar as mais velhas que 14 dias</b> — sem isso o disco enche em silêncio e o banco para de aceitar escrita, que é a pior forma de descobrir que havia um backup rodando.</li>
+  <li>Copiar junto o <code>~/supabase/docker/.env</code>: sem ele, restaurar o banco não adianta, porque as chaves não batem.</li>
+  <li>Levar uma cópia para <b>fora do iMac</b> — pendrive, outro computador, nuvem. Backup no mesmo disco não protege de disco quebrado.</li>
+  <li>Testar a restauração uma vez. Backup nunca testado é esperança, não backup.</li>
+</ol>
+</section>
+
+<!-- ============================================================ 9 -->
+<section>
+<h2 id="pendencias">9 · Pendências conhecidas</h2>
+
+<p>Três coisas foram deixadas para depois, de propósito ou por decisão. Estão aqui para não virarem surpresa.</p>
+
+<div class="rolo">
+<table>
+  <thead><tr><th>Pendência</th><th>Situação medida</th><th>Risco</th><th>Conserto</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>Backup</b></td>
+      <td>Não existe</td>
+      <td><span class="selo s-risco">alto</span> perda total dos dados</td>
+      <td>seção 8</td>
+    </tr>
+    <tr>
+      <td><b>Firewall desligado</b></td>
+      <td><code>ufw</code> instalado, nunca ativado. Portas <code>8000</code>, <code>5432</code> e <code>6543</code> respondem a qualquer aparelho da casa</td>
+      <td><span class="selo s-falta">médio</span> só da rede local, não da internet</td>
+      <td>abaixo</td>
+    </tr>
+    <tr>
+      <td><b>Wi-Fi economizando energia</b></td>
+      <td><code>Power Management: on</code> — 30 quedas registradas em 11 h</td>
+      <td><span class="selo s-falta">médio</span> banco some enquanto cai</td>
+      <td>abaixo</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h4>Ligar o firewall</h4>
+<p>
+  A ordem importa: <code>allow ssh</code> vem <b>antes</b> de <code>enable</code>. Ligar firewall
+  por SSH sem liberar o SSH antes é a forma clássica de se trancar fora do próprio servidor.
+</p>
+<pre>sudo apt install -y ufw
+sudo ufw allow ssh
+sudo ufw --force enable
+sudo ufw status verbose</pre>
+<p>
+  Depois disso o Studio só abre pelo <code>ssh -L</code> da seção 5 — o que já é o caminho
+  recomendado. O túnel não é afetado: ele sai de dentro para fora.
+</p>
+
+<h4>Tirar a economia de energia do Wi-Fi</h4>
+<pre>sudo iwconfig wlp2s0 power off
+printf '[connection]\nwifi.powersave = 2\n' | sudo tee /etc/NetworkManager/conf.d/wifi-sem-economia.conf</pre>
+<p>
+  A primeira linha vale na hora e <b>não derruba a conexão</b>; a segunda faz valer após
+  reiniciar. Não reinicie o NetworkManager — isso sim cortaria o seu SSH, que passa pelo mesmo
+  Wi-Fi.
+</p>
+
+<h4>Duas limpezas rápidas</h4>
+<pre>rm ~/.uri-supabase          <span class="c"># tem a senha do banco da nuvem, já não serve</span>
+<span class="c"># e no painel do Supabase: Reset database password</span></pre>
+</section>
+
+<!-- ============================================================ 10 -->
+<section>
+<h2 id="quebrou">10 · Quando quebra: sintoma → causa → conserto</h2>
+
+<div class="rolo">
+<table>
+  <thead><tr><th>Sintoma</th><th>Causa provável</th><th>O que fazer</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Todos os painéis vazios; <code>supabase:false</code></td>
+      <td>Casa sem luz ou sem internet; iMac desligado; túnel caiu</td>
+      <td><code>curl https://banco.beyond.dev.br/</code> — se der <b>530</b>, o túnel está fora. Ligue o iMac; tudo sobe sozinho</td>
+    </tr>
+    <tr>
+      <td><code>banco.beyond.dev.br</code> dá <b>530</b></td>
+      <td><code>cloudflared</code> parado</td>
+      <td><code>sudo systemctl restart cloudflared</code> e <code>journalctl -u cloudflared -n 50</code></td>
+    </tr>
+    <tr>
+      <td>Túnel de pé, mas o banco não responde</td>
+      <td>Containers caídos</td>
+      <td><code>cd ~/supabase/docker &amp;&amp; docker compose ps</code>; <code>docker compose up -d</code></td>
+    </tr>
+    <tr>
+      <td><code>supabase-db</code> fica <i>unhealthy</i> ao subir</td>
+      <td>Inicialização demorando mais que o prazo do Compose — normal neste disco</td>
+      <td>Espere e rode <code>docker compose up -d</code> de novo. <b>Não é erro</b></td>
+    </tr>
+    <tr>
+      <td>Lisa parou de aprender; <code>grand_total</code> travado</td>
+      <td>Relógio parado, ou ciclo travado</td>
+      <td>Dispare na mão (seção 7). Se responder mas não avançar, force: <code>?reset=1</code> no sync</td>
+    </tr>
+    <tr>
+      <td><code>unauthorized</code> nas rotas de cron</td>
+      <td>Segredo trocado entre os dois Workers</td>
+      <td><code>CRON_SECRET</code> para notify/deploy-check, <code>INGEST_SECRET</code> para sync</td>
+    </tr>
+    <tr>
+      <td>Tudo que fala com GitHub dá <b>403</b></td>
+      <td>Falta o cabeçalho <code>User-Agent</code></td>
+      <td>Já corrigido em <code>src/lib/github.js</code>. Se voltar, foi regressão ali</td>
+    </tr>
+    <tr>
+      <td><code>Too many subrequests</code> no passo do GitHub</td>
+      <td>Mais de 50 chamadas de saída numa invocação</td>
+      <td>Já corrigido: o download é fatiado em 35 arquivos. Se voltar, reduza <code>ORCAMENTO_DE_BUSCAS</code></td>
+    </tr>
+    <tr>
+      <td>Luzes do topo laranja logo após um deploy</td>
+      <td>Publicação apagando as variáveis</td>
+      <td><code>keep_vars: true</code> no <code>wrangler.jsonc</code> impede isso. Confira se continua lá</td>
+    </tr>
+    <tr>
+      <td>Painel mostra versão antiga</td>
+      <td>Build criou versão mas não publicou</td>
+      <td><code>npx wrangler versions list --name beyond-assist</code> e promova a mais nova</td>
+    </tr>
+    <tr>
+      <td>Site ou e-mail do domínio fora</td>
+      <td>Registro DNS perdido</td>
+      <td><code>nslookup -type=mx beyond.dev.br 1.1.1.1</code>; compare com a seção 4</td>
+    </tr>
+    <tr>
+      <td>Não consigo entrar no iMac por SSH</td>
+      <td>Nome <code>.local</code> não resolveu</td>
+      <td>Use o IP: <code>ssh bryan@192.168.1.76</code></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="caixa">
+  <h4>O diagnóstico em três perguntas, nesta ordem</h4>
+  <ol class="s" style="margin-bottom:0">
+    <li><b>O banco responde?</b> <code>curl https://banco.beyond.dev.br/</code> — esperado <b>401</b>. Se der 530, o problema está em casa</li>
+    <li><b>A Lisa responde?</b> <code>curl https://lisa.beyond.dev.br/api/health</code> — separa problema de banco de problema de app</li>
+    <li><b>O relógio bate?</b> <code>grand_total</code> mudando no <code>/api/sync-status</code></li>
+  </ol>
+</div>
+</section>
+
+<!-- ============================================================ 11 -->
+<section>
+<h2 id="refazer">11 · Refazer a migração do zero</h2>
+
+<p>
+  Se o iMac morrer, ou você quiser repetir noutra máquina. A ordem importa: cada passo depende
+  do anterior. Tempo total: um dia tranquilo.
+</p>
+
+<h4>Fase 1 — a máquina</h4>
+<ol class="s">
+  <li>Zorin OS 64 bits, disco inteiro. Anote o usuário e a senha.</li>
+  <li>Proibir de dormir: <code>sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target</code> — e "Nunca" nas configurações de energia. Servidor que suspende some da rede.</li>
+  <li>Acesso remoto: <code>sudo apt install -y openssh-server &amp;&amp; sudo systemctl enable --now ssh</code></li>
+  <li>Descubra o nome: <code>hostname</code>. O endereço é esse nome com <code>.local</code>.</li>
+</ol>
+
+<h4>Fase 2 — Docker</h4>
+<pre>curl -fsSL https://get.docker.com -o get-docker.sh &amp;&amp; sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+sudo systemctl enable docker</pre>
+<div class="aviso cuidado">
+  <span class="rot">Saia e entre de novo</span>
+  <p style="margin-bottom:0">
+    O <code>usermod</code> só vale na próxima sessão. Continuar na mesma faz todo comando
+    <code>docker</code> dizer "permission denied" — e você vai achar que a instalação falhou.
+  </p>
+</div>
+
+<h4>Fase 3 — Supabase</h4>
+<pre>cd ~ &amp;&amp; git clone --depth 1 https://github.com/supabase/supabase
+cd supabase/docker &amp;&amp; cp .env.example .env</pre>
+<p>
+  <b>Gere as chaves.</b> O <code>.env.example</code> vem com valores públicos, iguais para todo
+  mundo no mundo. Os dois JWTs <b>não são aleatórios</b>: são assinados com o
+  <code>JWT_SECRET</code>, e o PostgREST confere a assinatura a cada chamada — chave inventada é
+  recusada sempre. Gere na própria máquina, com OpenSSL, e nunca por um site.
+</p>
+<p>Precisam sair do padrão: <code>POSTGRES_PASSWORD</code>, <code>JWT_SECRET</code>, <code>ANON_KEY</code>, <code>SERVICE_ROLE_KEY</code>, <code>DASHBOARD_USERNAME</code>, <code>DASHBOARD_PASSWORD</code>, os dois <code>LOGFLARE_*</code> e o <code>POOLER_TENANT_ID</code>.</p>
+<pre>docker compose pull        <span class="c"># 3 a 5 GB, demora</span>
+docker compose up -d
+docker compose ps          <span class="c"># todos healthy</span></pre>
+
+<h4>Fase 4 — estrutura</h4>
+<pre>scp db/schema.sql bryan@bryan-iMac.local:~/
+docker compose exec -T db psql -U postgres -d postgres &lt; ~/schema.sql</pre>
+<p>Confira: 20 tabelas, 3 funções, extensão <code>vector</code>.</p>
+
+<h4>Fase 5 — os dados</h4>
+<div class="aviso">
+  <span class="rot">A parte que já deu errado — leia antes</span>
+  <p>
+    A origem tem <b>26</b> tabelas; o <code>schema.sql</code> cria <b>20</b>. Um dump
+    <code>--data-only</code> traz todas, e ao chegar numa que não existe no destino o psql erra —
+    e passa a interpretar as <b>linhas de dados</b> seguintes como comandos SQL. <b>Um erro vira
+    novecentos</b> e o diagnóstico fica ilegível.
+  </p>
+  <p style="margin-bottom:0">
+    Por isso: primeiro garanta que toda tabela da origem exista no destino, só então copie os
+    dados.
+  </p>
+</div>
+<p>1. Pegue a conexão. <b>Use o Session pooler</b>, não a conexão direta: ela é só IPv6, e uma rede doméstica normalmente não tem IPv6. Se a senha tiver <code>@</code>, troque por <code>%40</code>.</p>
+<p>2. Use o <code>pg_dump</code> <b>de dentro do container</b> — ele é da mesma versão do servidor de origem, e o do sistema costuma ser antigo demais.</p>
+<pre><span class="c"># estrutura das tabelas que faltam no destino</span>
+docker compose exec -T db pg_dump "$URI" --schema-only --no-owner --no-privileges \
+  --table=public.notes --table=public.note_links --table=public.note_relations \
+  --table=public.brain_train_attempts --table=public.profiles --table=public.respostas \
+  &gt; ~/estrutura-extra.sql
+docker compose exec -T db psql -U postgres -d postgres &lt; ~/estrutura-extra.sql</pre>
+<p>3. Solte as chaves estrangeiras que apontam para <code>auth.users</code> — este app não tem login, e elas só impedem o dado de entrar:</p>
+<pre>select format('alter table %s drop constraint %I;', conrelid::regclass, conname)
+from pg_constraint c
+join pg_class t on t.oid = c.confrelid
+join pg_namespace n on n.oid = t.relnamespace
+where c.contype = 'f' and n.nspname = 'auth' and conrelid::regclass::text not like 'auth.%';</pre>
+<p>4. Agora sim, os dados:</p>
+<pre>docker compose exec -T db pg_dump "$URI" --data-only --schema=public --no-owner --no-privileges \
+  &gt; ~/dados.sql
+docker compose exec -T db psql -U postgres -d postgres &lt; ~/dados.sql</pre>
+<p>5. <b>Confira tabela por tabela</b>, contando as linhas dos dois lados. E confirme os vetores:</p>
+<pre>select count(*) from public.documents where embedding is not null;
+select vector_dims(embedding) from public.documents where embedding is not null limit 1;  <span class="c"># 768</span></pre>
+
+<h4>Fase 6 — o túnel</h4>
+<pre>curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared.deb
+cloudflared tunnel login          <span class="c"># abra o link no navegador do PC</span>
+cloudflared tunnel create banco-lisa</pre>
+<p>Crie <code>~/.cloudflared/config.yml</code> com o UUID que ele imprimiu:</p>
+<pre>tunnel: &lt;UUID&gt;
+credentials-file: /home/bryan/.cloudflared/&lt;UUID&gt;.json
+
+ingress:
+  - hostname: banco.beyond.dev.br
+    service: http://localhost:8000
+  - service: http_status:404</pre>
+<p>A última regra é obrigatória e é a rede de segurança: o que não bater acima é recusado. Sem ela o <code>cloudflared</code> nem inicia.</p>
+<pre>cloudflared tunnel ingress validate
+cloudflared tunnel route dns banco-lisa banco.beyond.dev.br</pre>
+<div class="aviso cuidado">
+  <span class="rot">O comando óbvio falha aqui</span>
+  <p style="margin-bottom:0">
+    <code>sudo cloudflared service install</code> responde <i>Cannot determine default
+    configuration path</i>, porque o <code>sudo</code> roda como root e o <code>~</code> do root é
+    <code>/root</code> — ele nem olha a sua pasta. Copie para <code>/etc/cloudflared</code>,
+    corrigindo o caminho da credencial junto.
+  </p>
+</div>
+<pre>sudo mkdir -p /etc/cloudflared
+sudo cp ~/.cloudflared/*.json /etc/cloudflared/
+sed 's:/home/bryan/.cloudflared/:/etc/cloudflared/:' ~/.cloudflared/config.yml | sudo tee /etc/cloudflared/config.yml &gt; /dev/null
+sudo chmod 600 /etc/cloudflared/*
+sudo cloudflared service install
+sudo systemctl enable --now cloudflared</pre>
+
+<h4>Fase 7 — apontar a Lisa</h4>
+<p>Duas variáveis no Worker, nenhuma linha de código:</p>
+<pre>SUPABASE_URL=https://banco.beyond.dev.br
+SUPABASE_SERVICE_ROLE_KEY=&lt;a SERVICE_ROLE_KEY do .env do iMac&gt;</pre>
+<p>
+  <b>Não encoste</b> em <code>SUBABASE_TESTE_URL</code> e <code>SERVICE_KEY_TESTE</code> — são do
+  Sentinela, que fica na nuvem. E sim, <code>SUBABASE</code> está escrito assim mesmo; o código
+  procura exatamente esse nome.
+</p>
+
+<h4>Fase 8 — provar que funcionou</h4>
+<p>
+  Contagens iguais não provam nada: os dois bancos têm os mesmos dados. <b>Grave uma marca só no
+  destino e peça à Lisa em produção.</b> Se ela devolver a marca, não há outra explicação:
+</p>
+<pre><span class="c"># no iMac</span>
+update public.sync_progress set last_error='PROVA-123' where id=1;
+<span class="c"># do seu PC</span>
+curl https://lisa.beyond.dev.br/api/sync-status
+<span class="c"># depois, limpe</span>
+update public.sync_progress set last_error=null where id=1;</pre>
+</section>
+
+<!-- ============================================================ 12 -->
+<section>
+<h2 id="voltar">12 · Voltar atrás (plano B)</h2>
+
+<p>
+  O Supabase da nuvem continua de pé, com os dados do dia da migração. Voltar leva minutos:
+</p>
+<ol class="s">
+  <li>No Worker <code>beyond-assist</code>, devolva <code>SUPABASE_URL</code> para o endereço do projeto na nuvem e <code>SUPABASE_SERVICE_ROLE_KEY</code> para a chave de lá (painel → Settings → API).</li>
+  <li>Publique.</li>
+  <li>Confira o <code>/api/health</code>.</li>
+</ol>
+
+<div class="aviso cuidado">
+  <span class="rot">O que você perde ao voltar</span>
+  <p style="margin-bottom:0">
+    <b>Tudo que a Lisa escreveu desde a migração</b> está só no iMac: novas indexações, histórico
+    do Map of Deploy, partidas, notificações. Antes de voltar, tire um <code>pg_dump</code> do
+    iMac — senão esses dados ficam órfãos.
+  </p>
+</div>
+
+<p>
+  Por isso vale manter o projeto da nuvem ligado por algumas semanas. Depois que você confiar no
+  iMac — e tiver backup rodando — aí sim desligue.
+</p>
+</section>
+
+<!-- ============================================================ 13 -->
+<section>
+<h2 id="armadilhas">13 · Armadilhas que já custaram caro</h2>
+
+<p>
+  Cada uma destas quebrou de verdade durante a montagem, e nenhuma dava erro óbvio. Estão aqui
+  porque é o tipo de coisa que volta.
+</p>
+
+<div class="rolo">
+<table>
+  <thead><tr><th>Armadilha</th><th>O que acontecia</th><th>Por quê</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>Publicação apagando as chaves</b></td>
+      <td>Luzes do topo ficavam laranja a cada push, sem erro em log nenhum</td>
+      <td>O wrangler trata o arquivo de configuração como fonte única da verdade e <b>deleta toda variável que não esteja nele</b>. Resolvido com <code>keep_vars: true</code></td>
+    </tr>
+    <tr>
+      <td><b>GitHub recusando tudo</b></td>
+      <td>403 em tudo que falava com GitHub</td>
+      <td>A API exige <code>User-Agent</code>. O Node manda sozinho; o Worker da Cloudflare não manda nenhum</td>
+    </tr>
+    <tr>
+      <td><b>Limite de chamadas por invocação</b></td>
+      <td>O passo do GitHub nunca passava</td>
+      <td>Plano gratuito permite <b>50 chamadas de saída por invocação</b>. Baixar 500 arquivos de uma vez estoura. Resolvido fatiando em 35</td>
+    </tr>
+    <tr>
+      <td><b>Ciclo que nunca fecharia</b></td>
+      <td>Sync andava mas não terminava</td>
+      <td>~450 fatias por ciclo a 2 por disparo dá 18 h — mais que a validade do snapshot, então os repositórios do começo eram re-baixados antes do fim</td>
+    </tr>
+    <tr>
+      <td><b>Segredo errado no relógio</b></td>
+      <td>Cron rodava, sync nunca avançava</td>
+      <td><code>sync</code> quer <code>x-ingest-secret</code>, não <code>Bearer</code>. Respondia 401 num log que ninguém lê</td>
+    </tr>
+    <tr>
+      <td><b>Schema que não criava banco novo</b></td>
+      <td>Zero tabelas criadas, erro em <code>public.notes</code></td>
+      <td>Uma linha alterava uma tabela que o arquivo nunca cria. No editor SQL tudo roda numa transação — um erro desfaz o lote inteiro</td>
+    </tr>
+    <tr>
+      <td><b>Conferência que mentia</b></td>
+      <td>Script dizia "todas as tabelas batem" tendo checado uma</td>
+      <td><code>docker compose exec</code> lê da entrada padrão e <b>engole o resto da lista</b> dentro de um <code>while read</code>. Resolvido com <code>&lt;/dev/null</code></td>
+    </tr>
+    <tr>
+      <td><b>Conexão direta ao Supabase</b></td>
+      <td><code>pg_dump</code> não conectava</td>
+      <td>O host direto resolve só para IPv6, e a rede doméstica é só IPv4. Use o <b>Session pooler</b></td>
+    </tr>
+    <tr>
+      <td><b>Senha com <code>@</code> na URI</b></td>
+      <td>Tentava conectar num servidor inexistente</td>
+      <td><code>@</code> separa senha de endereço numa URI. Tem que virar <code>%40</code></td>
+    </tr>
+    <tr>
+      <td><b>Comando rodado na máquina errada</b></td>
+      <td><code>Address already in use</code> ao abrir o Studio</td>
+      <td>O <code>ssh -L</code> foi rodado <b>dentro</b> do iMac. Olhe sempre o texto antes do cursor</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="caixa">
+  <h4>A lição que vale para todas</h4>
+  <p style="margin-bottom:0">
+    Nenhuma delas apareceu como erro na tela. Todas foram encontradas <b>medindo de fora</b> —
+    consultando o DNS num resolvedor público em vez do painel, rodando o Worker de verdade no
+    motor local em vez de reler o código, gravando uma marca no banco e perguntando à Lisa se ela
+    via. Painel mostra o que ele acha que fez; medição mostra o que aconteceu.
+  </p>
+</div>
+</section>
+
+<p class="rodape">
+  Beyond Bits · documentação de infraestrutura · números medidos na máquina em 14/09/2026 ·
+  mantenha este arquivo junto do código, em <code>docs/infraestrutura.html</code>
+</p>
+
+</div>
+<button class="topo" id="topo" title="Voltar ao topo" aria-label="Voltar ao topo">↑</button>
+<script>
+  document.getElementById("topo").addEventListener("click", function () {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+</script>
+</body>
+</html>
