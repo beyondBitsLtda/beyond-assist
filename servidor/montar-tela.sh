@@ -67,10 +67,15 @@ setsid nohup x11vnc \
   > "$LOG" 2>&1 < /dev/null &
 
 echo "=== subindo o websockify + noVNC (so em localhost)"
-setsid nohup python3 "$TELA/websockify/run" \
+# python3 -m websockify, e nao o ./run da pasta: o "run" e um script de SHELL que so
+# descobre o diretorio e chama o python. Passa-lo para o python3 da SyntaxError na
+# primeira linha - foi o que aconteceu na primeira montagem, e o unico sintoma visivel
+# era o noVNC simplesmente nao responder. O cd e necessario: o modulo mora na pasta
+# clonada, nao esta instalado no sistema.
+( cd "$TELA/websockify" && setsid nohup python3 -m websockify \
   --web "$TELA/novnc" \
   127.0.0.1:$PORTA_WEB 127.0.0.1:$PORTA_VNC \
-  >> "$LOG" 2>&1 < /dev/null &
+  >> "$LOG" 2>&1 < /dev/null & )
 
 sleep 4
 echo ""
@@ -79,7 +84,14 @@ ss -tln 2>/dev/null | grep -E ":($PORTA_VNC|$PORTA_WEB) " | sed 's/^/   /'
 echo "   (127.0.0.1 = so a propria maquina alcanca; o Caddy e a unica porta de entrada)"
 echo ""
 echo "=== o noVNC responde?"
-curl -s -o /dev/null -w "   http://127.0.0.1:$PORTA_WEB/vnc.html  ->  HTTP %{http_code}\n" -m 10 "http://127.0.0.1:$PORTA_WEB/vnc.html"
+# Este teste precisa REPROVAR, nao so imprimir: na primeira montagem ele mostrou
+# "HTTP 000" no meio de uma saida cheia de sinais verdes, e passou batido.
+codigo=$(curl -s -o /dev/null -w "%{http_code}" -m 10 "http://127.0.0.1:$PORTA_WEB/vnc.html")
+echo "   http://127.0.0.1:$PORTA_WEB/vnc.html  ->  HTTP $codigo"
+if [ "$codigo" != "200" ]; then
+  echo "   >>> O noVNC NAO SUBIU. ultimas linhas do log:"
+  tail -6 "$LOG" | sed 's/^/     /'
+fi
 
 echo ""
 echo "=== sobe sozinho depois de reiniciar?"
