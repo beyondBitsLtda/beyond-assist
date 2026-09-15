@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Infraestrutura da Lisa — operação e manutenção</title>
+<title>Manual da Lisa — funções, infraestrutura e operação</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap">
@@ -102,6 +102,10 @@
   figcaption { font-size: 13.5px; color: var(--tinta-2); margin-top: 10px; padding-left: 14px; border-left: 2px solid var(--linha-forte); max-width: 70ch; }
   .diag { border: 1px solid var(--linha); border-radius: 8px; background: var(--papel-3); padding: 14px; overflow-x: auto; }
   .diag svg { min-width: 620px; }
+  /* Legenda de diagrama. Fica numa classe, e não num `fill` fixo, porque o mesmo cinza
+     que serve ao fundo escuro dá 3,2:1 sobre o claro — abaixo do mínimo para texto
+     pequeno. Via token, cada tema recebe o seu. */
+  .diag text.mu { fill: var(--tinta-2); }
 
   .rodape { margin-top: 70px; padding-top: 22px; border-top: 1px solid var(--linha); font-size: 14px; color: var(--tinta-3); }
   .topo { position: fixed; right: 18px; bottom: 18px; background: var(--vermelho); color: #FFF; border: 0; border-radius: 50%; width: 42px; height: 42px; font-size: 18px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.3); }
@@ -113,20 +117,34 @@
 <div class="env">
 
 <header class="capa">
-  <div class="marca">Beyond Bits · Documentação de infraestrutura</div>
-  <h1>Infraestrutura da Lisa</h1>
+  <div class="marca">Beyond Bits · Manual de operação</div>
+  <h1>Manual da Lisa</h1>
   <p class="resumo">
-    Onde cada peça mora, o que ela faz, como operar no dia a dia, o que conferir de tempos em
-    tempos, o que fazer quando quebra — e como refazer tudo do zero. Escrito com os endereços,
-    versões e números reais desta instalação, medidos na máquina.
+    O documento único da Lisa: o que cada função faz e como ela funciona por dentro, onde cada
+    peça mora, como operar no dia a dia, onde estão as senhas, o que fazer quando quebra — e
+    como refazer tudo do zero. Escrito com os endereços, versões e números reais desta
+    instalação, medidos na máquina.
   </p>
   <div class="ficha">
     <div><b>Situação</b><span>Em produção</span></div>
-    <div><b>Medido em</b><span>14/09/2026</span></div>
+    <div><b>Medido em</b><span>15/09/2026</span></div>
     <div><b>Custo mensal</b><span>R$ 0 + energia</span></div>
-    <div><b>Pendências</b><span>3 — ver seção 9</span></div>
+    <div><b>Painéis</b><span>18</span></div>
+    <div><b>Pendências</b><span>5 — ver seção 17</span></div>
   </div>
 </header>
+
+<div class="caixa">
+  <h4 style="margin-top:0">Como usar este documento</h4>
+  <p style="margin-bottom:0">
+    Ele tem três partes. A <b>parte I</b> (1&ndash;4) é a infraestrutura: onde as coisas moram.
+    A <b>parte II</b> (5&ndash;12) é o manual das funções: cada painel da Lisa explicado primeiro
+    em português e depois por dentro. A <b>parte III</b> (13&ndash;21) é a operação: acessos,
+    senhas, rotina, defeitos conhecidos e como reconstruir. Se você chegou aqui com um problema,
+    vá direto para a <a href="#quebrou">seção 18</a>. Se chegou para entender, comece pela
+    <a href="#visao">1</a>. Se chegou para achar uma senha, <a href="#senhas">14</a>.
+  </p>
+</div>
 
 <nav class="sumario">
   <h2>O que tem aqui</h2>
@@ -135,6 +153,14 @@
     <li><a href="#caminho">O caminho de uma requisição</a></li>
     <li><a href="#rede">Mapa de rede: onde cada coisa mora</a></li>
     <li><a href="#inventario">Inventário: cada peça e o que faz</a></li>
+    <li><a href="#funcoes">Mapa das funções e suas dependências</a></li>
+    <li><a href="#cerebro">O cérebro: SYNC, embeddings e RAG</a></li>
+    <li><a href="#conversar">Conversar: o Assistente e seus modos</a></li>
+    <li><a href="#trabalho">Trabalho: quadros, tarefas e pensamentos</a></li>
+    <li><a href="#codigo">Código: indexar, documentar e propor mudanças</a></li>
+    <li><a href="#vigilancia">Vigilância: deploys, chamados e testes</a></li>
+    <li><a href="#maquina">A máquina: tela, chaves e progresso</a></li>
+    <li><a href="#relogio">O relógio: o que roda sozinho</a></li>
     <li><a href="#acesso">Como acessar tudo</a></li>
     <li><a href="#senhas">Onde estão as senhas e chaves</a></li>
     <li><a href="#operar">Operação do dia a dia</a></li>
@@ -257,7 +283,7 @@
   <text class="sb" x="14" y="205">A seta de volta percorre o mesmo caminho</text>
   <text class="sb" x="14" y="223">na ordem inversa. Se um painel não carrega,</text>
   <text class="sb" x="14" y="241">o diagnóstico é achar em qual seta parou —</text>
-  <text class="sb" x="14" y="259">a seção 10 tem a tabela para isso.</text>
+  <text class="sb" x="14" y="259">a seção 18 tem a tabela para isso.</text>
 </svg>
 </div>
 <figcaption>
@@ -405,7 +431,7 @@
 <table>
   <thead><tr><th>Peça</th><th>Endereço</th><th>O que faz</th><th>Se cair</th></tr></thead>
   <tbody>
-    <tr><td><b>Worker beyond-assist</b></td><td class="mono">lisa.beyond.dev.br</td><td>O app inteiro: 16 painéis e 63 rotas de API. Páginas estáticas saem do CDN; as rotas rodam como função.</td><td>Lisa fora do ar</td></tr>
+    <tr><td><b>Worker beyond-assist</b></td><td class="mono">lisa.beyond.dev.br</td><td>O app inteiro: 18 painéis e 65 rotas de API. Páginas estáticas saem do CDN; as rotas rodam como função.</td><td>Lisa fora do ar</td></tr>
     <tr><td><b>Worker lisa-cron</b></td><td class="mono">lisa-cron.beyondbitslisa<wbr>.workers.dev</td><td>O relógio. Chama três rotas da Lisa em horários fixos e envia as notificações push.</td><td>Lisa viva mas parada: não aprende, não avisa</td></tr>
     <tr><td><b>DNS Cloudflare</b></td><td class="mono">beyond.dev.br</td><td>Zona do domínio. Registrador continua sendo o Registro.br; só a gestão de DNS é da Cloudflare.</td><td>Nada resolve</td></tr>
     <tr><td><b>GitHub Pages</b></td><td class="mono">beyond.dev.br</td><td>O site institucional. Nuvem <b>cinza</b> no DNS — a Cloudflare só responde o endereço e sai fora.</td><td>Site fora; Lisa não sente</td></tr>
@@ -474,6 +500,29 @@
 </table>
 </div>
 
+<h4>Os processos fora do Docker</h4>
+<p>
+  O Docker cuida do banco. Estes cinco rodam como processos comuns do usuário
+  <code>bryan</code>, e sobem sozinhos no <code>crontab</code> depois de reiniciar — cada um com
+  um atraso diferente, porque dependem uns dos outros.
+</p>
+<div class="rolo">
+<table>
+  <thead><tr><th>Processo</th><th>Porta</th><th>O que faz</th><th>Sobe em</th></tr></thead>
+  <tbody>
+    <tr><td><b>Lisa</b> <span style="font-weight:500">(Next)</span></td><td class="mono">3000</td><td>O app inteiro, rodando localmente</td><td class="mono">@reboot +45s</td></tr>
+    <tr><td><b>Caddy</b></td><td class="mono">443, 8080</td><td>HTTPS de casa e o site da tela para o túnel</td><td class="mono">@reboot +60s</td></tr>
+    <tr><td><b>x11vnc</b></td><td class="mono">5900</td><td>Lê a tela do Xorg e injeta teclado e mouse</td><td class="mono">@reboot +75s</td></tr>
+    <tr><td><b>websockify</b></td><td class="mono">6080</td><td>Traduz VNC para WebSocket e serve o noVNC</td><td>junto com o x11vnc</td></tr>
+    <tr><td><b>cloudflared</b></td><td>—</td><td>O túnel. Serviço do <code>systemd</code>, esse sim</td><td>com o sistema</td></tr>
+  </tbody>
+</table>
+</div>
+<p>
+  Os atrasos não são superstição: o Caddy precisa da Lisa de pé para ter o que servir, e o x11vnc
+  precisa da <b>sessão gráfica aberta</b> — sem ela não há tela para capturar, e ele sobe e morre.
+</p>
+
 <div class="caixa">
   <h4>As seis tabelas herdadas</h4>
   <p style="margin-bottom:0">
@@ -481,14 +530,754 @@
     <code>brain_train_attempts</code>, <code>profiles</code> e <code>respostas</code> nasceram
     num app anterior e <b>não são criadas pelo <code>db/schema.sql</code></b>. A Lisa só usa a
     <code>notes</code> (as suas anotações do Beyond Brain). As outras foram trazidas para não
-    perder dado. <b>Isso importa se você recriar o banco</b> — ver seção 11.
+    perder dado. <b>Isso importa se você recriar o banco</b> — ver seção 19.
   </p>
 </div>
 </section>
 
 <!-- ============================================================ 5 -->
 <section>
-<h2 id="acesso">5 · Como acessar tudo</h2>
+<h2 id="funcoes">5 · Mapa das funções e suas dependências</h2>
+
+<p>
+  A Lisa tem dezoito painéis. Eles não são dezoito programas: são dezoito janelas para cinco
+  fontes de dados e um modelo de linguagem. Entender quais são essas fontes explica, de uma
+  vez, por que certos painéis param juntos quando algo cai — e por que outros continuam
+  funcionando sozinhos.
+</p>
+
+<figure>
+<div class="diag">
+<svg viewBox="0 0 900 470" role="img" aria-label="Diagrama de dependências: cinco fontes externas alimentando os painéis da Lisa">
+  <defs>
+    <marker id="setad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8B8783"/>
+    </marker>
+  </defs>
+  <g font-family="Barlow, sans-serif" font-size="12.5" font-weight="600">
+
+    <text x="18" y="24" font-size="11" font-weight="700" letter-spacing="1.4" class="mu">FONTES</text>
+    <text x="352" y="24" font-size="11" font-weight="700" letter-spacing="1.4" class="mu">O QUE A LISA FAZ COM ELAS</text>
+
+    <rect x="14" y="40" width="150" height="40" rx="5" fill="#2362D3"/>
+    <text x="89" y="58" text-anchor="middle" fill="#fff" font-size="12.5">Trello</text>
+    <text x="89" y="72" text-anchor="middle" fill="#fff" font-size="10" font-weight="500" opacity=".85">quadros e cards</text>
+
+    <rect x="14" y="92" width="150" height="40" rx="5" fill="#213D75"/>
+    <text x="89" y="110" text-anchor="middle" fill="#fff" font-size="12.5">GitHub</text>
+    <text x="89" y="124" text-anchor="middle" fill="#fff" font-size="10" font-weight="500" opacity=".85">código e Pull Requests</text>
+
+    <rect x="14" y="144" width="150" height="40" rx="5" fill="#0B861D"/>
+    <text x="89" y="162" text-anchor="middle" fill="#fff" font-size="12.5">Gemini</text>
+    <text x="89" y="176" text-anchor="middle" fill="#fff" font-size="10" font-weight="500" opacity=".85">35 chaves em rodízio</text>
+
+    <rect x="14" y="196" width="150" height="40" rx="5" fill="#FF6B05"/>
+    <text x="89" y="214" text-anchor="middle" fill="#fff" font-size="12" >Supabase de testes</text>
+    <text x="89" y="228" text-anchor="middle" fill="#fff" font-size="10" font-weight="500" opacity=".85">outra conta, na nuvem</text>
+
+    <rect x="14" y="248" width="150" height="40" rx="5" fill="#5A5754"/>
+    <text x="89" y="266" text-anchor="middle" fill="#fff" font-size="12.5">Web aberta</text>
+    <text x="89" y="280" text-anchor="middle" fill="#fff" font-size="10" font-weight="500" opacity=".85">RSS e Open-Meteo</text>
+
+    <rect x="14" y="316" width="150" height="54" rx="5" fill="#CC0F10"/>
+    <text x="89" y="336" text-anchor="middle" fill="#fff" font-size="12.5">Supabase de casa</text>
+    <text x="89" y="350" text-anchor="middle" fill="#fff" font-size="10" font-weight="500" opacity=".85">o banco, no iMac</text>
+    <text x="89" y="363" text-anchor="middle" fill="#fff" font-size="10" font-weight="500" opacity=".85">26 tabelas</text>
+
+    <g stroke="#8B8783" stroke-width="1.4" fill="none">
+      <path d="M 164 60 L 344 60" marker-end="url(#setad)"/>
+      <path d="M 164 112 L 344 112" marker-end="url(#setad)"/>
+      <path d="M 164 164 L 344 164" marker-end="url(#setad)"/>
+      <path d="M 164 216 L 344 216" marker-end="url(#setad)"/>
+      <path d="M 164 268 L 344 268" marker-end="url(#setad)"/>
+      <path d="M 164 343 L 250 343 L 250 405 L 344 405" marker-end="url(#setad)"/>
+    </g>
+
+    <g font-size="11.5" font-weight="600">
+      <rect x="344" y="42" width="540" height="36" rx="4" fill="none" stroke="#2362D3" stroke-width="1.4"/>
+      <text x="356" y="59" fill="currentColor">Quarto de Guerra · Boards · Tarefas · Map of Deploy · Falas agendadas</text>
+      <text x="356" y="72" font-size="10" font-weight="500" class="mu">leitura ao vivo — não passa pelo SYNC</text>
+
+      <rect x="344" y="94" width="540" height="36" rx="4" fill="none" stroke="#213D75" stroke-width="1.4"/>
+      <text x="356" y="111" fill="currentColor">Repositórios · Tarefas de código · Mapa de arquitetura</text>
+      <text x="356" y="124" font-size="10" font-weight="500" class="mu">ler indexa; escrever abre Pull Request</text>
+
+      <rect x="344" y="146" width="540" height="36" rx="4" fill="none" stroke="#0B861D" stroke-width="1.4"/>
+      <text x="356" y="163" fill="currentColor">Assistente · voz · embeddings · Modo de testes · Lisa Code</text>
+      <text x="356" y="176" font-size="10" font-weight="500" class="mu">tudo que pensa, escreve ou fala</text>
+
+      <rect x="344" y="198" width="540" height="36" rx="4" fill="none" stroke="#FF6B05" stroke-width="1.4"/>
+      <text x="356" y="215" fill="currentColor">Sentinela · Modo de testes</text>
+      <text x="356" y="228" font-size="10" font-weight="500" class="mu">chamados e casos de teste de outro produto</text>
+
+      <rect x="344" y="250" width="540" height="36" rx="4" fill="none" stroke="#5A5754" stroke-width="1.4"/>
+      <text x="356" y="267" fill="currentColor">Notícias &amp; Clima</text>
+      <text x="356" y="280" font-size="10" font-weight="500" class="mu">nenhuma chave necessária</text>
+
+      <rect x="344" y="386" width="540" height="38" rx="4" fill="none" stroke="#CC0F10" stroke-width="2"/>
+      <text x="356" y="404" fill="currentColor">TUDO — sessão, memória, histórico, embeddings, chamados, tarefas</text>
+      <text x="356" y="417" font-size="10" font-weight="500" class="mu">se ele cai, nem a tela de login funciona</text>
+    </g>
+
+    <text x="356" y="452" font-size="11" font-weight="500" class="mu">Pensamentos e Tarefas Delp também vivem só no banco de casa — sem fonte externa.</text>
+  </g>
+</svg>
+</div>
+<figcaption>
+  Lido de baixo para cima: o banco de casa é a única dependência que derruba tudo. As outras
+  derrubam faixas — e é por isso que vale saber qual painel depende de quê antes de sair
+  procurando defeito no lugar errado.
+</figcaption>
+</figure>
+
+<h3>Os dezoito painéis, numa tabela</h3>
+
+<div class="rolo">
+<table>
+  <thead><tr><th>Painel</th><th>Para que serve</th><th>Depende de</th></tr></thead>
+  <tbody>
+    <tr><td><b>Dashboard</b></td><td>Visão geral: tarefas do dia, chamados abertos, contadores dos quadros</td><td>Trello · Supabase de testes · banco</td></tr>
+    <tr><td><b>Quarto de Guerra</b></td><td>Kanban do quadro principal, ao vivo</td><td>Trello</td></tr>
+    <tr><td><b>Boards</b></td><td>Contadores de todos os outros quadros</td><td>Trello</td></tr>
+    <tr><td><b>Tarefas</b></td><td>Cards por data de vencimento: hoje, semana, atrasados</td><td>Trello</td></tr>
+    <tr><td><b>Pensamentos</b></td><td>Notas do Beyond Brain, lidas direto da tabela</td><td>banco</td></tr>
+    <tr><td><b>Sentinela</b></td><td>Chamados, SLA e tendência de outro produto</td><td>Supabase de testes</td></tr>
+    <tr><td><b>Notícias &amp; Clima</b></td><td>RSS de tecnologia e previsão do tempo</td><td>web aberta</td></tr>
+    <tr><td><b>Tarefas Delp</b></td><td>Planilha do PMO importada e consultável</td><td>banco</td></tr>
+    <tr><td><b>Falas agendadas</b></td><td>Avisos falados e notificados em horário marcado</td><td>banco · Trello · relógio</td></tr>
+    <tr><td><b>Repositórios</b></td><td>Quais repositórios do GitHub entram na indexação</td><td>GitHub · banco</td></tr>
+    <tr><td><b>Map of Deploy</b></td><td>Onde cada aplicação está hospedada e se respondeu</td><td>Trello · banco</td></tr>
+    <tr><td><b>Tarefas de código</b></td><td>A Lisa escreve código e abre Pull Request</td><td>GitHub (escrita) · Gemini</td></tr>
+    <tr><td><b>Mapa de arquitetura</b></td><td>Documento navegável das áreas de um repositório</td><td>Gemini · banco</td></tr>
+    <tr><td><b>Modo de testes</b></td><td>Executa casos de teste olhando a tela compartilhada</td><td>Gemini · Supabase de testes</td></tr>
+    <tr><td><b>Progresso do SYNC</b></td><td>Quanto do conhecimento já foi indexado, e o ritmo</td><td>banco</td></tr>
+    <tr><td><b>Assistente</b></td><td>Conversa, voz, e os modos Rádio, Vigia, Tela e Câmera</td><td>Gemini · banco · todo o resto</td></tr>
+    <tr><td><b>Chaves Gemini</b></td><td>Saúde das 35 chaves, por modelo</td><td>banco</td></tr>
+    <tr><td><b>Tela do servidor</b></td><td>Teclado, mouse e tela do iMac pelo navegador</td><td>x11vnc no iMac</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="aviso certo">
+  <span class="rot">A distinção que mais economiza tempo</span>
+  <p>
+    Alguns painéis leem o Trello <b>ao vivo</b>, a cada abertura. Outros leem o que o SYNC já
+    indexou no banco. Os primeiros mostram a verdade do minuto e ficam vazios se o Trello cair;
+    os segundos continuam respondendo com o que foi indexado, ainda que velho. Quando um número
+    diverge entre dois painéis, quase sempre é isso: um está ao vivo, o outro é memória.
+  </p>
+</div>
+</section>
+
+<!-- ============================================================ 6 -->
+<section>
+<h2 id="cerebro">6 · O cérebro: SYNC, embeddings e RAG</h2>
+
+<h3>Em português</h3>
+<p>
+  A Lisa não sabe das suas coisas por mágica, e também não manda tudo que você tem para o Gemini
+  a cada pergunta — seria caro, lento, e passaria do tamanho que cabe. O que ela faz se parece
+  com um índice remissivo de livro: de tempos em tempos ela lê tudo (cards do Trello, notas do
+  Beyond Brain, arquivos dos repositórios), quebra em pedaços pequenos e guarda, para cada
+  pedaço, uma espécie de impressão digital de significado. Quando você pergunta alguma coisa,
+  ela calcula a impressão digital da <em>pergunta</em>, procura no banco os pedaços mais
+  parecidos, e manda só esses para o modelo, junto da sua pergunta.
+</p>
+<p>
+  É por isso que a Lisa responde sobre um card que você escreveu ontem, mas talvez não sobre um
+  que você escreveu há dez minutos: o índice é atualizado em ciclos, não instantaneamente. E é
+  por isso que o painel <b>Progresso do SYNC</b> existe — ele mostra quanto do seu mundo já
+  entrou nesse índice.
+</p>
+
+<h3>Por dentro</h3>
+<p>
+  A impressão digital é um <b>embedding</b>: um vetor de 768 números que o Gemini calcula para um
+  trecho de texto, de modo que trechos com sentido parecido fiquem próximos nesse espaço de 768
+  dimensões. Eles moram na tabela <code>documents</code>, numa coluna do tipo <code>vector</code>
+  (extensão <code>pgvector</code> do Postgres). Hoje são <b>11.375 vetores</b>.
+</p>
+
+<figure>
+<div class="diag">
+<svg viewBox="0 0 880 262" role="img" aria-label="Fluxo de uma pergunta: a pergunta vira vetor, busca no banco, contexto vai ao Gemini, resposta volta">
+  <defs>
+    <marker id="seta6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8B8783"/>
+    </marker>
+  </defs>
+  <g font-family="Barlow, sans-serif" font-size="12" font-weight="600">
+
+    <text x="10" y="20" font-size="11" font-weight="700" letter-spacing="1.4" class="mu">CICLO DE INDEXAÇÃO — roda sozinho, de 10 em 10 minutos</text>
+    <rect x="10" y="30" width="120" height="38" rx="5" fill="#2362D3"/>
+    <text x="70" y="54" text-anchor="middle" fill="#fff" font-size="11.5">Trello · cards</text>
+    <rect x="10" y="74" width="120" height="32" rx="5" fill="#213D75"/>
+    <text x="70" y="95" text-anchor="middle" fill="#fff" font-size="11.5">GitHub · arquivos</text>
+    <rect x="10" y="112" width="120" height="32" rx="5" fill="#CC0F10"/>
+    <text x="70" y="133" text-anchor="middle" fill="#fff" font-size="11">Brain · notas</text>
+
+    <path d="M 132 88 L 176 88" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta6)" fill="none"/>
+    <rect x="178" y="62" width="120" height="52" rx="5" fill="none" stroke="#8B8783" stroke-width="1.4"/>
+    <text x="238" y="84" text-anchor="middle" fill="currentColor">quebrar em pedaços</text>
+    <text x="238" y="101" text-anchor="middle" font-size="9.5" font-weight="500" class="mu">ingest/chunk.js</text>
+
+    <path d="M 300 88 L 344 88" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta6)" fill="none"/>
+    <rect x="346" y="62" width="126" height="52" rx="5" fill="#0B861D"/>
+    <text x="409" y="84" text-anchor="middle" fill="#fff">Gemini embed</text>
+    <text x="409" y="100" text-anchor="middle" fill="#fff" font-size="10" font-weight="500" opacity=".85">768 números</text>
+
+    <path d="M 474 88 L 518 88" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta6)" fill="none"/>
+    <rect x="520" y="56" width="150" height="64" rx="5" fill="#CC0F10"/>
+    <text x="595" y="79" text-anchor="middle" fill="#fff">tabela documents</text>
+    <text x="595" y="95" text-anchor="middle" fill="#fff" font-size="10" font-weight="500" opacity=".85">pgvector · 11.375 vetores</text>
+    <text x="595" y="109" text-anchor="middle" fill="#fff" font-size="10" font-weight="500" opacity=".85">no iMac</text>
+
+    <line x1="10" y1="160" x2="870" y2="160" stroke="#8B8783" stroke-width="1" stroke-dasharray="4 4"/>
+
+    <text x="10" y="182" font-size="11" font-weight="700" letter-spacing="1.4" class="mu">UMA PERGUNTA SUA — em tempo real</text>
+    <rect x="10" y="192" width="120" height="40" rx="5" fill="none" stroke="#8B8783" stroke-width="1.4"/>
+    <text x="70" y="217" text-anchor="middle" fill="currentColor">sua pergunta</text>
+
+    <path d="M 132 212 L 176 212" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta6)" fill="none"/>
+    <rect x="178" y="192" width="120" height="40" rx="5" fill="#0B861D"/>
+    <text x="238" y="210" text-anchor="middle" fill="#fff" font-size="11.5">vira vetor</text>
+    <text x="238" y="225" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="500" opacity=".85">a mesma régua</text>
+
+    <path d="M 300 212 L 344 212" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta6)" fill="none"/>
+    <rect x="346" y="186" width="126" height="52" rx="5" fill="#CC0F10"/>
+    <text x="409" y="207" text-anchor="middle" fill="#fff" font-size="11">match_documents</text>
+    <text x="409" y="223" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="500" opacity=".85">os 8 mais próximos</text>
+
+    <path d="M 474 212 L 518 212" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta6)" fill="none"/>
+    <rect x="520" y="186" width="150" height="52" rx="5" fill="#0B861D"/>
+    <text x="595" y="207" text-anchor="middle" fill="#fff" font-size="11">Gemini responde</text>
+    <text x="595" y="223" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="500" opacity=".85">pergunta + os 8 trechos</text>
+
+    <path d="M 672 212 L 716 212" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta6)" fill="none"/>
+    <rect x="718" y="192" width="150" height="40" rx="5" fill="none" stroke="#0B861D" stroke-width="1.6"/>
+    <text x="793" y="217" text-anchor="middle" fill="currentColor">resposta na tela</text>
+  </g>
+</svg>
+</div>
+<figcaption>
+  As duas metades usam a mesma régua: o texto indexado e a sua pergunta viram vetores pelo mesmo
+  modelo. É isso que permite comparar significado com uma conta de distância.
+</figcaption>
+</figure>
+
+<h3>Os números que governam a busca</h3>
+<div class="rolo">
+<table>
+  <thead><tr><th>Variável</th><th>Valor aqui</th><th>O que muda se você mexer</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">RAG_TOP_K</td><td class="num">8</td><td>Quantos trechos vão junto da pergunta. Mais dá contexto e gasta mais; menos dá respostas curtas e às vezes cegas.</td></tr>
+    <tr><td class="mono">RAG_MIN_SIMILARITY</td><td class="num">padrão</td><td>Piso de parecença. Alto demais, a Lisa diz que não sabe; baixo demais, ela responde citando trecho que não tem nada a ver.</td></tr>
+    <tr><td class="mono">GEMINI_EMBED_DIM</td><td class="num">768</td><td>Tamanho do vetor. Não mexa sem reindexar tudo: vetores de tamanhos diferentes não se comparam.</td></tr>
+    <tr><td class="mono">GITHUB_ARQUIVOS_POR_VEZ</td><td class="num">400</td><td>Arquivos baixados por rodada. Era 35 na Cloudflare, por causa do teto de 50 chamadas de saída por invocação; em casa esse teto não existe.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="aviso">
+  <span class="rot">A armadilha do embedding</span>
+  <p>
+    Trocar <code>GEMINI_EMBED_MODEL</code> ou a dimensão sem reindexar não dá erro nenhum. A busca
+    simplesmente passa a devolver resultados ruins, e a Lisa fica meio boba sem nenhuma mensagem
+    explicando por quê. Se um dia a qualidade das respostas cair de repente, confira essas duas
+    variáveis antes de qualquer outra coisa.
+  </p>
+</div>
+</section>
+
+<!-- ============================================================ 7 -->
+<section>
+<h2 id="conversar">7 · Conversar: o Assistente e seus modos</h2>
+
+<p>
+  O Assistente é o painel mais denso da Lisa, porque não é uma função só: é uma conversa com
+  cinco modos ligados por cima dela. Vale entender a conversa primeiro; os modos são variações
+  do mesmo motor.
+</p>
+
+<h3>A conversa</h3>
+<h4>Em português</h4>
+<p>
+  Você escreve ou fala. A Lisa procura no que ela indexou o que tem a ver com a pergunta, monta
+  a resposta e, se a voz estiver ligada, fala. Se a pergunta for sobre um card do Trello, ela
+  pode propor uma ação — mover, comentar, criar — e faz só depois de você confirmar.
+</p>
+<h4>Por dentro</h4>
+<p>
+  A rota é <code>/api/ask</code>. Antes de chamar o Gemini, ela roda um filtro <b>local</b> que
+  decide se a mensagem pode ser um pedido de ação no Trello. Esse filtro existe por economia
+  medida: sem ele, toda mensagem numa conversa que tinha cards no histórico disparava uma
+  chamada extra ao Gemini — inclusive <em>obrigado</em> e <em>e sobre X?</em> — competindo por
+  cota com o SYNC e o resto do app.
+</p>
+<p>
+  A geração tenta primeiro com <code>tools</code> (busca no Google como fundamento). Se falhar,
+  <b>tenta de novo sem a ferramenta</b> antes de desistir. O motivo é específico: muitas contas
+  do Gemini não têm esse recurso liberado, e a API devolve isso como um erro que <em>parece</em>
+  cota estourada. Sem essa segunda tentativa, o modo Geral nunca funcionaria nessas contas,
+  mesmo com a busca comum inteiramente disponível.
+</p>
+
+<h3>A voz</h3>
+<h4>Em português</h4>
+<p>
+  A Lisa fala com a voz do Gemini. Se o Gemini demorar demais ou falhar, ela cai na voz do
+  próprio navegador — que soa pior, mas fala. É melhor uma voz sintética feia que silêncio.
+</p>
+<h4>Por dentro</h4>
+<p>
+  <code>/api/speak</code> recebe texto e devolve um WAV pronto para o <code>&lt;audio&gt;</code>.
+  O Gemini devolve PCM cru (L16, 24 kHz, mono) e o cabeçalho WAV é montado na rota. Cada
+  tentativa tem teto de <b>22 s</b>, com até 3 tentativas; o navegador espera <b>75 s</b> antes
+  de desistir e usar a voz local.
+</p>
+<div class="aviso cuidado">
+  <span class="rot">Por que 75 s, e não 45</span>
+  <p>
+    O valor antigo era 45 s, calibrado para o teto de 60 s que a Vercel impunha. Esse teto não
+    existe mais — agora a Lisa roda em casa, e a latência maior fazia a voz cair para o navegador
+    com frequência. Se um dia a hospedagem mudar de novo, esse número precisa ser reconsiderado
+    junto.
+  </p>
+</div>
+
+<h3>Os cinco modos</h3>
+<div class="rolo">
+<table>
+  <thead><tr><th>Modo</th><th>O que faz</th><th>Como funciona</th><th>Precisa de</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>Rádio</b></td>
+      <td>A Lisa vira locutora: comenta notícias, apresenta músicas, emenda blocos</td>
+      <td><code>/api/radio/segment</code> gera <b>um bloco por vez</b>. O cliente guarda as chaves do que já foi mencionado e manda na chamada seguinte, para ela não repetir o mesmo assunto.</td>
+      <td>Gemini · voz</td>
+    </tr>
+    <tr>
+      <td><b>Vigia</b></td>
+      <td>De tempos em tempos ela olha o que mudou e comenta — só quando vale a pena</td>
+      <td><code>/api/screen-watch/digest</code> pergunta o que há de novo desde o último id. Se nada merece comentário, devolve vazio e ela fica quieta.</td>
+      <td>Gemini</td>
+    </tr>
+    <tr>
+      <td><b>Tela</b></td>
+      <td>Você compartilha a tela e pergunta sobre o que está vendo</td>
+      <td>Um quadro do vídeo vira JPEG (no máximo 1280 px no lado maior) e vai junto da pergunta.</td>
+      <td>Gemini · permissão de tela</td>
+    </tr>
+    <tr>
+      <td><b>Câmera</b></td>
+      <td>Mesma ideia, com a câmera</td>
+      <td><code>/api/camera-comment</code>. Mesma técnica de captura.</td>
+      <td>Gemini · câmera · <b>HTTPS</b></td>
+    </tr>
+    <tr>
+      <td><b>Microfone</b></td>
+      <td>Ela escuta e comenta</td>
+      <td><code>/api/mic-comment</code>.</td>
+      <td>Gemini · microfone · <b>HTTPS</b></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="aviso">
+  <span class="rot">Por que o HTTPS não é luxo</span>
+  <p>
+    Navegador só libera microfone, câmera, compartilhamento de tela e notificações em
+    <code>https://</code> — ou em <code>localhost</code>. Foi por isso que a Lisa de casa ganhou
+    certificado de verdade em vez de rodar em <code>http://192.168.1.76:3000</code>: sem ele,
+    metade dos modos acima simplesmente não existiria naquele endereço, e sem mensagem de erro
+    que explicasse.
+  </p>
+</div>
+
+<h3>Um detalhe do navegador que parece bug e não é</h3>
+<p>
+  Navegadores só liberam o primeiro <code>play()</code> de áudio se ele estiver colado num gesto
+  seu. O Modo Rádio só fala depois de buscar o texto no Gemini — vários segundos, várias idas à
+  rede — tempo demais para ainda contar como gesto. Por isso, no clique, a Lisa toca um áudio
+  <b>silencioso</b>: isso satisfaz a política do navegador e libera o resto da sessão. Sem esse
+  truque, o primeiro bloco de rádio tocava mudo.
+</p>
+</section>
+
+<!-- ============================================================ 8 -->
+<section>
+<h2 id="trabalho">8 · Trabalho: quadros, tarefas e pensamentos</h2>
+
+<h3>Quarto de Guerra, Boards e Tarefas</h3>
+<h4>Em português</h4>
+<p>
+  São três vistas do mesmo Trello. O <b>Quarto de Guerra</b> é o kanban do quadro principal.
+  <b>Boards</b> conta os cards de todos os outros quadros. <b>Tarefas</b> ignora quadros e lista
+  por prazo: hoje, amanhã, semana, atrasados.
+</p>
+<h4>Por dentro</h4>
+<p>
+  Os três leem o Trello <b>ao vivo</b>, sem passar pelo SYNC e sem embeddings. É de propósito:
+  para prazo e contagem você quer o número exato de agora, não o que estava indexado na última
+  rodada. O custo é que, sem Trello, os três ficam vazios.
+</p>
+
+<h3>Pensamentos</h3>
+<p>
+  Notas do Beyond Brain, lidas <b>direto da tabela <code>notes</code></b>. Não depende do SYNC —
+  o SYNC só alimenta a tabela <code>documents</code>, que serve à busca por significado. Uma nota
+  escrita agora aparece aqui na hora, mesmo que a Lisa ainda não consiga <em>conversar</em> sobre
+  ela.
+</p>
+
+<h3>Tarefas Delp</h3>
+<p>
+  Alimentado por upload manual de uma planilha exportada do PMO. A leitura da planilha acontece
+  <b>no navegador</b>; o que chega ao servidor já são linhas em JSON. Cada upload
+  <b>substitui tudo</b> — a fonte de verdade passa a ser a tabela, não o arquivo.
+</p>
+
+<h3>Falas agendadas</h3>
+<h4>Em português</h4>
+<p>
+  Você marca: "toda segunda às 9h, me lembre dos cards atrasados". No horário, a Lisa fala e
+  manda notificação — mesmo com a aba fechada.
+</p>
+<h4>Por dentro</h4>
+<p>
+  Aqui há uma divisão que vale entender, porque ela explica onde procurar quando um aviso não
+  chega. A rota <code>/api/cron/notify</code> <b>detecta</b> o que merece virar aviso e devolve a
+  fila. Quem <b>envia</b> é o relógio, no iMac. O motivo é técnico: o envio usa
+  <code>web-push</code>, que precisa de APIs do Node que a rota não tem garantia de ter — e foi
+  justamente tirar essa biblioteca do projeto que permitiu o app caber no Worker da Cloudflare.
+</p>
+<p>
+  O relógio também limpa inscrições mortas: se o navegador desinstalou ou a permissão foi
+  revogada, o envio devolve 404 ou 410 e a inscrição é apagada. Sem isso, cada uma custaria uma
+  tentativa a cada cinco minutos, para sempre.
+</p>
+</section>
+
+<!-- ============================================================ 9 -->
+<section>
+<h2 id="codigo">9 · Código: indexar, documentar e propor mudanças</h2>
+
+<p>
+  Três painéis e uma extensão, em ordem crescente de poder: um só lê, um escreve documento, um
+  escreve código, e a extensão roda na sua máquina.
+</p>
+
+<h3>Repositórios</h3>
+<p>
+  A lista de repositórios do GitHub que entram no ciclo de indexação. Não mostra código: só quais
+  estão ligados. Ligar um repositório grande aumenta o tempo de SYNC proporcionalmente.
+  Precisa de <code>GITHUB_TOKEN</code> apenas com <b>leitura</b>.
+</p>
+
+<h3>Mapa de arquitetura</h3>
+<p>
+  A Lisa gera um HTML autônomo documentando um repositório já indexado: quais são as áreas do
+  código, o que cada uma faz, e como se relacionam. O grafo de dependência não é opinião do
+  modelo — é <b>calculado a partir dos <code>import</code> de verdade</b>. O trabalho é feito em
+  passos retomáveis, cada um com seu próprio teto de 60 s, para caber em qualquer hospedagem.
+</p>
+
+<h3>Tarefas de código</h3>
+<div class="aviso cuidado">
+  <span class="rot">Esta é a função com mais poder da Lisa</span>
+  <p>
+    Você descreve o pedido e escolhe repositório e branch base. A Lisa cria uma branch nova,
+    aplica os arquivos e <b>abre um Pull Request</b>. Ela nunca faz merge sozinha — a revisão
+    continua sendo sua. Exige um <code>GITHUB_TOKEN</code> com <b>escrita</b> (Contents e Pull
+    requests: Read and write), diferente do token de leitura usado na indexação.
+  </p>
+</div>
+
+<h3>Lisa Code — a extensão do VS Code</h3>
+<h4>Em português</h4>
+<p>
+  A Lisa dentro do editor, conversando sobre o código aberto na sua frente.
+</p>
+<h4>Por dentro</h4>
+<p>
+  <code>/api/lisa-code/chat</code> recebe o histórico inteiro da conversa já no formato do Gemini
+  — quem guarda esse estado é a extensão — e devolve o próximo turno cru do modelo: texto e/ou
+  chamadas de função. <b>A execução das ferramentas acontece sempre no lado do cliente</b>, nunca
+  no servidor. É a diferença entre a Lisa <em>pedir</em> para ler um arquivo seu e a Lisa
+  <em>poder</em> ler qualquer arquivo do servidor.
+</p>
+<p>
+  A autenticação é por <code>LISA_EXTENSION_TOKEN</code>, num cabeçalho próprio
+  (<code>x-lisa-token</code>), e não pelo login da Lisa — a extensão não tem navegador nem cookie.
+  Por isso <code>/api/lisa-code/</code> está na lista de caminhos liberados do portão.
+</p>
+</section>
+
+<!-- ============================================================ 10 -->
+<section>
+<h2 id="vigilancia">10 · Vigilância: deploys, chamados e testes</h2>
+
+<h3>Map of Deploy</h3>
+<h4>Em português</h4>
+<p>
+  O quadro que diz onde cada aplicação sua está hospedada — e, por cima, se ela respondeu na
+  última checagem. Verde é no ar; vermelho é fora.
+</p>
+<h4>Por dentro</h4>
+<p>
+  O mapa continua sendo o <b>Trello</b>: a coluna é o servidor, a etiqueta é a conta, a descrição
+  é o link. O painel não edita nada disso — ele lê o quadro e acrescenta o que o Trello não sabe,
+  que é se a aplicação respondeu. O histórico vem das checagens periódicas
+  (<code>/api/cron/deploy-check</code>, de 15 em 15 minutos), e é dele que saem o uptime e o
+  número de quedas.
+</p>
+<p>
+  Clicar num card abre a pré-visualização num <code>iframe</code>. Boa parte das hospedagens
+  recusa ser embutida (<code>X-Frame-Options</code>), então há sempre o botão de abrir em aba:
+  prometer prévia e entregar um quadrado branco seria pior do que avisar.
+</p>
+
+<h3>Sentinela</h3>
+<p>
+  Chamados e SLA de <b>outro produto</b>, que vive numa <b>segunda conta Supabase</b>, na nuvem
+  (<code>SUBABASE_TESTE_URL</code> e <code>SERVICE_KEY_TESTE</code>). Mostra contadores por
+  status e prioridade, SLA estourado, e a tendência diária de abertos contra resolvidos nos
+  últimos 21 dias.
+</p>
+<div class="aviso">
+  <span class="rot">Duas contas Supabase, e a confusão que elas causam</span>
+  <p>
+    Este projeto fala com <b>duas</b> contas Supabase diferentes: o banco da Lisa, que mora no
+    iMac, e o banco de testes, que continua na nuvem. Quando algum painel de chamados quebra,
+    o instinto é olhar o banco de casa — e ele está ótimo. O nome da variável tem um erro de
+    digitação histórico (<code>SUBABASE</code>, sem o <i>s</i>) que já custou tempo: se você
+    procurar por <code>SUPABASE_TESTE_URL</code>, não encontra.
+  </p>
+</div>
+
+<h3>Modo de testes</h3>
+<p>
+  Executa casos de teste olhando a tela compartilhada: você navega, a Lisa tira retratos e compara
+  com os passos e o critério de aceitação do caso. A rota <code>/api/test-mode/evaluate</code>
+  <b>não grava nada</b> — só devolve o veredito. Gravar é uma segunda ação, explícita
+  (<code>/write-result</code>). A separação é deliberada: avaliar é barato e reversível, registrar
+  resultado de teste não é.
+</p>
+
+<h3>Notícias &amp; Clima</h3>
+<p>
+  A única função sem nenhuma chave. Lê RSS público (Tecnoblog, Canaltech, Olhar Digital,
+  TabNews, Adrenaline, Startupi) e busca a previsão no <b>Open-Meteo</b>, que não pede cadastro.
+  Se um dia esse painel for o único quebrado, quase sempre é um feed que mudou de endereço.
+</p>
+</section>
+
+<!-- ============================================================ 11 -->
+<section>
+<h2 id="maquina">11 · A máquina: tela, chaves e progresso</h2>
+
+<h3>Tela do servidor</h3>
+<h4>Em português</h4>
+<p>
+  Ver e usar o iMac pelo navegador: teclado, mouse, tela. Funciona de dentro de casa
+  (<code>casa.beyond.dev.br</code>, embutido no painel) e de fora
+  (<code>tela.beyond.dev.br</code>, numa aba própria).
+</p>
+<h4>Por dentro</h4>
+<p>
+  Três peças prontas, nenhuma escrita aqui: o <b>x11vnc</b> lê a tela do Xorg e injeta teclado e
+  mouse; o <b>websockify</b> traduz VNC para WebSocket, que é o que navegador fala; o <b>noVNC</b>
+  é o cliente VNC em página web. O que a Lisa acrescenta é o enquadramento — mesmo endereço,
+  mesmo login, mesmo cadeado.
+</p>
+
+<figure>
+<div class="diag">
+<svg viewBox="0 0 880 250" role="img" aria-label="Os dois caminhos até a tela do iMac: de dentro de casa e de fora">
+  <defs>
+    <marker id="seta11" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8B8783"/>
+    </marker>
+  </defs>
+  <g font-family="Barlow, sans-serif" font-size="11.5" font-weight="600">
+
+    <text x="10" y="18" font-size="11" font-weight="700" letter-spacing="1.4" fill="#0B861D">DE DENTRO DE CASA</text>
+    <rect x="10" y="26" width="128" height="40" rx="5" fill="none" stroke="#8B8783" stroke-width="1.4"/>
+    <text x="74" y="43" text-anchor="middle" fill="currentColor">navegador</text>
+    <text x="74" y="57" text-anchor="middle" font-size="9.5" font-weight="500" class="mu">na rede local</text>
+    <path d="M 140 46 L 180 46" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta11)" fill="none"/>
+    <rect x="182" y="26" width="150" height="40" rx="5" fill="#0B861D"/>
+    <text x="257" y="43" text-anchor="middle" fill="#fff">casa.beyond.dev.br</text>
+    <text x="257" y="57" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="500" opacity=".85">192.168.1.76 · IP privado</text>
+
+    <text x="10" y="106" font-size="11" font-weight="700" letter-spacing="1.4" fill="#2362D3">DE FORA DE CASA</text>
+    <rect x="10" y="114" width="128" height="40" rx="5" fill="none" stroke="#8B8783" stroke-width="1.4"/>
+    <text x="74" y="131" text-anchor="middle" fill="currentColor">navegador</text>
+    <text x="74" y="145" text-anchor="middle" font-size="9.5" font-weight="500" class="mu">em qualquer lugar</text>
+    <path d="M 140 134 L 180 134" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta11)" fill="none"/>
+    <rect x="182" y="114" width="150" height="40" rx="5" fill="#2362D3"/>
+    <text x="257" y="131" text-anchor="middle" fill="#fff">tela.beyond.dev.br</text>
+    <text x="257" y="145" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="500" opacity=".85">Cloudflare → túnel</text>
+
+    <path d="M 334 46 L 380 46 L 380 88 L 420 88" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta11)" fill="none"/>
+    <path d="M 334 134 L 380 134 L 380 92 L 420 92" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta11)" fill="none"/>
+
+    <rect x="422" y="60" width="150" height="60" rx="5" fill="#CC0F10"/>
+    <text x="497" y="82" text-anchor="middle" fill="#fff">Caddy</text>
+    <text x="497" y="97" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="500" opacity=".85">TRAVA 1 — pergunta à Lisa</text>
+    <text x="497" y="110" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="500" opacity=".85">se a sessão vale</text>
+
+    <path d="M 574 90 L 614 90" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta11)" fill="none"/>
+    <rect x="616" y="60" width="128" height="60" rx="5" fill="none" stroke="#8B8783" stroke-width="1.4"/>
+    <text x="680" y="82" text-anchor="middle" fill="currentColor">websockify</text>
+    <text x="680" y="98" text-anchor="middle" font-size="9.5" font-weight="500" class="mu">127.0.0.1:6080</text>
+    <text x="680" y="111" text-anchor="middle" font-size="9.5" font-weight="500" class="mu">serve o noVNC</text>
+
+    <path d="M 680 122 L 680 156" stroke="#8B8783" stroke-width="1.4" marker-end="url(#seta11)" fill="none"/>
+    <rect x="600" y="158" width="160" height="58" rx="5" fill="#213D75"/>
+    <text x="680" y="180" text-anchor="middle" fill="#fff">x11vnc</text>
+    <text x="680" y="195" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="500" opacity=".85">TRAVA 2 — senha do VNC</text>
+    <text x="680" y="208" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="500" opacity=".85">127.0.0.1:5900</text>
+
+    <text x="10" y="196" font-size="11" font-weight="500" class="mu">As portas 5900 e 6080 escutam só em 127.0.0.1.</text>
+    <text x="10" y="212" font-size="11" font-weight="500" class="mu">Nenhum outro aparelho da casa as alcança direto —</text>
+    <text x="10" y="228" font-size="11" font-weight="500" class="mu">o Caddy é a única porta de entrada, nos dois caminhos.</text>
+  </g>
+</svg>
+</div>
+<figcaption>
+  Os dois caminhos convergem no Caddy. É lá que a primeira trava mora, e é por isso que o túnel
+  aponta para o Caddy e não direto para o websockify: apontar para a 6080 economizaria um salto e
+  entregaria o teclado da máquina a quem descobrisse o endereço.
+</figcaption>
+</figure>
+
+<div class="aviso">
+  <span class="rot">O que esta função realmente concede</span>
+  <p>
+    Quem passa as duas travas tem teclado e mouse da máquina onde mora o banco inteiro da Lisa.
+    Não é um acesso de leitura. A tela existe hoje em
+    <code>tela.beyond.dev.br</code> exposta à internet, protegida pelo login da Lisa e pela senha
+    do VNC — e não por uma terceira camada. Se um dia quiser apertar isso, o Cloudflare Access
+    entra na frente sem desmontar nada.
+  </p>
+</div>
+
+<h3>Chaves Gemini</h3>
+<h4>Em português</h4>
+<p>
+  As 35 chaves do Gemini, uma linha cada, uma coluna por modelo. Verde é chave limpa; amarelo é
+  chave que falhou há pouco; vermelho é chave em castigo.
+</p>
+<h4>Por dentro</h4>
+<p>
+  A Lisa não usa uma chave só: ela roda num <b>rodízio</b>, e cada chamada sai numa chave
+  diferente da anterior. Quando uma chave falha, ela entra em espera por um tempo proporcional ao
+  motivo. O painel classifica cada célula em três estados:
+</p>
+<div class="rolo">
+<table>
+  <thead><tr><th>Estado</th><th>Significa</th><th>Ação</th></tr></thead>
+  <tbody>
+    <tr><td><span class="selo s-ok">limpa</span></td><td>Nenhuma falha registrada na última hora</td><td>Nenhuma</td></tr>
+    <tr><td><span class="selo s-falta">instável</span></td><td>Falhou em algum momento da última hora, mas já saiu do castigo</td><td>Observar. Muitas amarelas de uma vez costuma ser rede, não chave.</td></tr>
+    <tr><td><span class="selo s-risco">em castigo</span></td><td>Falhou agora e está fora do rodízio até o prazo vencer</td><td>Se forem quase todas, a cota do dia acabou.</td></tr>
+  </tbody>
+</table>
+</div>
+<p>
+  O motivo aparece escrito na célula — <em>cota</em>, <em>tempo esgotado</em>, <em>chave
+  inválida</em>. A distinção importa: cota passa sozinha, chave inválida não.
+</p>
+
+<h3>Progresso do SYNC</h3>
+<p>
+  O que já está indexado <b>de verdade</b> na tabela <code>documents</code>, por fonte, e
+  detalhado por repositório no caso do GitHub — que é a fonte com mais itens e a mais lenta de
+  terminar. Não dispara nada: só lê.
+</p>
+<p>
+  A estimativa de tempo não vem do servidor. Ela é calculada no navegador comparando o total de
+  agora com o da atualização anterior, porque não dá para saber de antemão quantos arquivos cada
+  repositório tem sem varrer todos — só o <b>ritmo real</b> de avanço.
+</p>
+</section>
+
+<!-- ============================================================ 12 -->
+<section>
+<h2 id="relogio">12 · O relógio: o que roda sozinho</h2>
+
+<h3>Em português</h3>
+<p>
+  Quatro tarefas rodam sozinhas no iMac, sem ninguém abrir o navegador: mandar as notificações
+  agendadas, checar se os deploys estão no ar, reiniciar o ciclo de indexação e avançá-lo, e —
+  de madrugada — atualizar o próprio código da Lisa.
+</p>
+
+<h3>Por dentro</h3>
+<p>
+  Quem agenda é o <code>crontab</code> do usuário <code>bryan</code>, e quem executa é
+  <code>~/relogio/relogio-local.mjs</code>. Ele chama a Lisa em <code>localhost</code>.
+</p>
+
+<div class="rolo">
+<table>
+  <thead><tr><th>Quando</th><th>O quê</th><th>Por quê nesse ritmo</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">*/5</td><td>notificar</td><td>Falas agendadas com precisão de cinco minutos.</td></tr>
+    <tr><td class="mono">*/10</td><td>sincronizar</td><td>Avança a indexação até acabar. Protegido por <code>flock&nbsp;-n</code>.</td></tr>
+    <tr><td class="mono">*/15</td><td>deploys</td><td>Alimenta o uptime do Map of Deploy.</td></tr>
+    <tr><td class="mono">0 * * * *</td><td>reiniciar</td><td>Recomeça o ciclo de indexação de hora em hora.</td></tr>
+    <tr><td class="mono">30 3 * * *</td><td>atualizar</td><td>Puxa o código novo do GitHub e recompila, de madrugada.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="aviso certo">
+  <span class="rot">Duas travas que parecem detalhe e não são</span>
+  <p>
+    O <code>flock -n</code> na linha da sincronização: agora que ela roda até o fim, uma execução
+    pode durar mais que o intervalo entre duas. Sem a trava, duas rodariam sobre a mesma linha de
+    progresso, competindo por cota do Gemini e embaralhando o deslocamento. O <code>-n</code> faz
+    a segunda desistir em silêncio, que é o comportamento certo aqui.
+  </p>
+  <p>
+    O <code>atualizar-lisa.sh</code> só reinicia <b>se o build der certo</b>. Reiniciar com build
+    quebrado troca “versão antiga funcionando” por “nada funcionando”.
+  </p>
+</div>
+
+<h3>Por que o relógio saiu da Cloudflare</h3>
+<p>
+  O Worker <code>lisa-cron</code> continua publicado, mas <b>sem horários</b>. Três limites dele
+  deixaram de existir com a mudança:
+</p>
+<ul class="s">
+  <li><b>Chamadas de saída:</b> o plano gratuito para em 50 por invocação. Foi isso que obrigou o
+      download do GitHub a ser fatiado em 35 arquivos por vez. Em Node não há esse teto.</li>
+  <li><b>Tempo:</b> o Worker precisava responder rápido, então avançava 5 fatias e parava. Aqui o
+      ciclo vai até o fim.</li>
+  <li><b>Rede:</b> o Worker ia até a Cloudflare e voltava pelo túnel — duas travessias de internet
+      por chamada. O iMac fala com a Lisa em <code>localhost</code>.</li>
+</ul>
+<p>
+  Medido: <b>720 pedaços em 90 segundos</b> no iMac, contra cerca de <b>300 por hora</b> pelo
+  Worker.
+</p>
+<div class="aviso cuidado">
+  <span class="rot">Para religar o Worker um dia</span>
+  <p>
+    Devolva os horários em <code>workers/lisa-cron/wrangler.jsonc</code> e publique. A lista vazia
+    é necessária: <b>apagar a seção faria o wrangler manter os horários antigos</b>, e aí os dois
+    relógios rodariam ao mesmo tempo.
+  </p>
+</div>
+</section>
+
+<!-- ============================================================ 13 -->
+<section>
+<h2 id="acesso">13 · Como acessar tudo</h2>
 
 <h3>Entrar no iMac</h3>
 <p>Do PowerShell do Windows, de qualquer lugar da casa:</p>
@@ -506,7 +1295,7 @@ bryan@bryan-iMac:~$        <span class="c">← dentro do iMac</span></pre>
   <span class="rot">Não tente pelo endereço da rede</span>
   <p style="margin-bottom:0">
     <code>http://bryan-iMac.local:8000</code> até funciona hoje, mas depende de a porta estar
-    aberta na rede — e o plano é fechá-la (seção 9). O caminho certo carrega a porta para dentro
+    aberta na rede — e o plano é fechá-la (seção 17). O caminho certo carrega a porta para dentro
     do SSH e não depende de nada disso.
   </p>
 </div>
@@ -515,10 +1304,32 @@ bryan@bryan-iMac:~$        <span class="c">← dentro do iMac</span></pre>
 <p>Com essa janela aberta, no <b>navegador</b>:</p>
 <pre>http://localhost:8000</pre>
 <p>
-  Usuário <code>bryan</code>, senha em <code>DASHBOARD_PASSWORD</code> (seção 6). O túnel vive
+  Usuário <code>bryan</code>, senha em <code>DASHBOARD_PASSWORD</code> (seção 14). O túnel vive
   enquanto a janela do SSH estiver aberta — fechou, para de responder. É o desenho: nada fica
   exposto quando você não está usando.
 </p>
+
+<h3>Abrir a tela do iMac</h3>
+<p>
+  De dentro de casa, pelo painel <b>Tela do servidor</b> em
+  <code>https://casa.beyond.dev.br/maquina</code> — ela aparece embutida. De fora, em
+  <code>https://tela.beyond.dev.br</code>, que abre numa aba própria; o painel da Lisa da nuvem
+  tem o botão que leva até lá.
+</p>
+<p>
+  Nos dois casos a sequência é a mesma: primeiro o login da Lisa, depois a senha do VNC. Se a
+  primeira tela pedir e-mail, é a da Lisa; se pedir só senha, é a do VNC. Ver
+  <a href="#senhas">seção 14</a> para os comandos que imprimem cada uma.
+</p>
+<div class="aviso cuidado">
+  <span class="rot">Se a tela abrir preta</span>
+  <p style="margin-bottom:0">
+    Não é travamento. Já aconteceu de o brilho do iMac estar em 4 de 84, o que dá uma tela
+    idêntica a um sistema que não subiu. Confira o brilho antes de reiniciar qualquer coisa — e
+    esse valor <b>não sobrevive a reinício</b> hoje, o que está na
+    <a href="#pendencias">seção 17</a>.
+  </p>
+</div>
 
 <h3>Os endereços públicos</h3>
 <div class="rolo">
@@ -528,6 +1339,8 @@ bryan@bryan-iMac:~$        <span class="c">← dentro do iMac</span></pre>
     <tr><td class="mono">https://lisa.beyond.dev.br</td><td>A Lisa</td><td>qualquer um com o link</td></tr>
     <tr><td class="mono">https://beyond-assist.beyondbitslisa.workers.dev</td><td>A Lisa, endereço antigo</td><td>idem — mantido como reserva</td></tr>
     <tr><td class="mono">https://banco.beyond.dev.br</td><td>O banco, via túnel</td><td>só com a chave de serviço</td></tr>
+    <tr><td class="mono">https://casa.beyond.dev.br</td><td>A Lisa de casa, inteira</td><td>só de dentro da rede — o nome aponta para um IP privado</td></tr>
+    <tr><td class="mono">https://tela.beyond.dev.br</td><td>A tela do iMac, via túnel</td><td>de qualquer lugar, com o login da Lisa e a senha do VNC</td></tr>
     <tr><td class="mono">https://beyond.dev.br</td><td>O site (GitHub Pages)</td><td>público</td></tr>
     <tr><td class="mono">https://lisa-cron.beyondbitslisa.workers.dev</td><td>O relógio</td><td>aceita <code>?cron=</code> para teste manual</td></tr>
   </tbody>
@@ -544,19 +1357,92 @@ npx wrangler deployments status --name beyond-assist
 npx wrangler tail --name lisa-cron                <span class="c"># logs ao vivo do relógio</span></pre>
 </section>
 
-<!-- ============================================================ 6 -->
+<!-- ============================================================ 14 -->
 <section>
-<h2 id="senhas">6 · Onde estão as senhas e chaves</h2>
+<h2 id="senhas">14 · Onde estão as senhas e chaves</h2>
 
-<p><b>Nenhum segredo está escrito neste arquivo.</b> Aqui está apenas onde encontrar cada um.</p>
+<p>
+  <b>Nenhum segredo está escrito neste arquivo.</b> Aqui está apenas onde encontrar cada um, e o
+  comando exato que imprime o valor sozinho — sem rótulo junto, que é o erro que mais custa tempo
+  nesta lista.
+</p>
 
+<h3>As três que você digita</h3>
+<p>
+  Estas são as únicas que aparecem numa tela pedindo que você as escreva. Todo o resto é chave
+  que o sistema usa por conta própria.
+</p>
+
+<div class="rolo">
+<table>
+  <thead><tr><th>Quando aparece</th><th>O que é</th><th>Como descobrir</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Tela de login da Lisa<br><span style="font-size:12.5px;color:var(--tinta-3)">escura, com o nome LISA</span></td>
+      <td>usuário <code>bryan@beyond.dev.br</code> e senha do Supabase Auth</td>
+      <td class="mono">grep '^senha:' ~/.senha-lisa | sed 's/^senha:[[:space:]]*//'</td>
+    </tr>
+    <tr>
+      <td>Caixinha do noVNC<br><span style="font-size:12.5px;color:var(--tinta-3)">logo depois, ao abrir a tela</span></td>
+      <td>senha do VNC — <b>não tem usuário</b>, só senha</td>
+      <td class="mono">tail -1 ~/.senha-tela</td>
+    </tr>
+    <tr>
+      <td>Supabase Studio<br><span style="font-size:12.5px;color:var(--tinta-3)">caixa do navegador, em localhost:8000</span></td>
+      <td>usuário e senha do painel do banco</td>
+      <td class="mono">grep '^DASHBOARD_' ~/supabase/docker/.env</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="aviso">
+  <span class="rot">O erro que já custou uma noite</span>
+  <p>
+    Os dois arquivos de senha têm <b>rótulo dentro</b>. O <code>~/.senha-lisa</code> tem três
+    linhas (título, e-mail, senha) e o <code>~/.senha-tela</code> tem duas. Um <code>cat</code>
+    mostra o arquivo inteiro, e copiar a linha inteira leva junto o <code>senha:</code> e os
+    espaços — que fazem parte da linha, não da senha. O login recusa com “e-mail ou senha
+    incorretos”, e não há nada na tela sugerindo que o problema é esse. Os comandos da tabela
+    acima imprimem só o valor, exatamente para evitar isso.
+  </p>
+</div>
+
+<h3>Chave por função</h3>
+<p>
+  Quando um painel específico para de funcionar, esta tabela diz qual credencial olhar primeiro.
+  A coluna da direita é onde ela mora <b>no iMac</b> — na nuvem, as mesmas chaves são segredos da
+  Cloudflare e não podem ser lidas de volta.
+</p>
+
+<div class="rolo">
+<table>
+  <thead><tr><th>Função</th><th>Credencial</th><th>Onde está / como ver</th></tr></thead>
+  <tbody>
+    <tr><td>Quarto de Guerra · Boards · Tarefas · Map of Deploy · Falas agendadas</td><td class="mono">TRELLO_KEY<br>TRELLO_TOKEN<br>TRELLO_BOARD_IDS</td><td class="mono">grep '^TRELLO_' ~/lisa/.env</td></tr>
+    <tr><td>Assistente · voz · embeddings · Modo de testes · Mapa de arquitetura</td><td class="mono">GEMINI_API_KEYS</td><td class="mono">grep -c ',' &lt;&lt;&lt; "$(grep '^GEMINI_API_KEYS=' ~/lisa/.env)"<br><span style="font-weight:500">(conta as chaves sem mostrá-las)</span></td></tr>
+    <tr><td>Repositórios · Mapa de arquitetura <span class="selo s-info">leitura</span></td><td class="mono">GITHUB_TOKEN</td><td class="mono">grep '^GITHUB_TOKEN=' ~/lisa/.env</td></tr>
+    <tr><td>Tarefas de código <span class="selo s-risco">escrita</span></td><td class="mono">GITHUB_TOKEN</td><td>o mesmo token, mas precisa de Contents e Pull requests: <b>Read and write</b></td></tr>
+    <tr><td>Sentinela · Modo de testes</td><td class="mono">SUBABASE_TESTE_URL<br>SERVICE_KEY_TESTE</td><td>painel do <b>outro</b> Supabase, na nuvem — <code>grep '^SU.ABASE_TESTE\|^SERVICE_KEY_TESTE' ~/lisa/.env</code></td></tr>
+    <tr><td>Notificações push</td><td class="mono">VAPID_PRIVATE_KEY<br>NEXT_PUBLIC_VAPID_PUBLIC_KEY</td><td class="mono">grep '^VAPID\|^NEXT_PUBLIC_VAPID' ~/lisa/.env</td></tr>
+    <tr><td>Login da Lisa <span style="font-weight:500">(a assinatura do cookie)</span></td><td class="mono">SUPABASE_JWT_SECRET</td><td class="mono">grep '^JWT_SECRET=' ~/supabase/docker/.env</td></tr>
+    <tr><td>Relógio <span style="font-weight:500">(as rotas de cron)</span></td><td class="mono">CRON_SECRET<br>INGEST_SECRET</td><td class="mono">grep '^CRON_SECRET\|^INGEST_SECRET' ~/lisa/.env</td></tr>
+    <tr><td>Extensão do VS Code</td><td class="mono">LISA_EXTENSION_TOKEN</td><td>configurado na extensão e no ambiente da Lisa</td></tr>
+    <tr><td>Certificado de <code>casa</code> e <code>tela</code></td><td class="mono">CLOUDFLARE_API_TOKEN</td><td class="mono">cat ~/.token-cloudflare</td></tr>
+    <tr><td>Túnel <span style="font-weight:500">(banco e tela, de fora)</span></td><td>credencial do túnel</td><td class="mono">~/.cloudflared/&lt;id-do-túnel&gt;.json</td></tr>
+    <tr><td>Notícias &amp; Clima</td><td>—</td><td><span class="selo s-ok">nenhuma</span> RSS público e Open-Meteo não pedem cadastro</td></tr>
+    <tr><td>Pensamentos · Tarefas Delp · Progresso do SYNC · Chaves Gemini</td><td>—</td><td>só o banco de casa; não têm credencial própria</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Acessos à máquina e à infraestrutura</h3>
 <div class="rolo">
 <table>
   <thead><tr><th>O quê</th><th>Onde está</th><th>Como ver</th></tr></thead>
   <tbody>
-    <tr><td>Senha do usuário do iMac</td><td>só na sua cabeça</td><td>não há como recuperar; só redefinir pelo modo de recuperação</td></tr>
-    <tr><td>Senha do Studio</td><td><code>.env</code> do Supabase</td><td class="mono">grep '^DASHBOARD_PASSWORD=' ~/supabase/docker/.env</td></tr>
-    <tr><td>Senha do Postgres</td><td>idem</td><td class="mono">grep '^POSTGRES_PASSWORD=' ~/supabase/docker/.env</td></tr>
+    <tr><td>Senha do usuário do iMac (Zorin)</td><td>só na sua cabeça</td><td>não há como recuperar; só redefinir pelo modo de recuperação</td></tr>
+    <tr><td>Senha do Postgres</td><td><code>.env</code> do Supabase</td><td class="mono">grep '^POSTGRES_PASSWORD=' ~/supabase/docker/.env</td></tr>
     <tr><td>Chave de serviço do banco</td><td>idem</td><td class="mono">grep '^SERVICE_ROLE_KEY=' ~/supabase/docker/.env</td></tr>
     <tr><td>Chaves da Lisa em produção</td><td>Cloudflare, como <b>Secret</b></td><td><span class="selo s-risco">ilegíveis</span> só substituir</td></tr>
     <tr><td>Chave SSH do Claude</td><td><code>~/.ssh/authorized_keys</code></td><td>linha marcada <code>claude-code-migracao-lisa</code></td></tr>
@@ -565,31 +1451,53 @@ npx wrangler tail --name lisa-cron                <span class="c"># logs ao vivo
 </div>
 
 <div class="aviso">
-  <span class="rot">As 12 chaves da Cloudflare não podem mais ser lidas</span>
+  <span class="rot">As chaves da Cloudflare não podem mais ser lidas</span>
   <p>
-    Elas foram convertidas de "variável" para "segredo", e segredo na Cloudflare é de mão única:
-    nem você nem ninguém lê o valor de volta — só substitui. Se perder uma, o caminho é gerar
+    Elas foram convertidas de “variável” para “segredo”, e segredo na Cloudflare é de mão única:
+    nem você nem ninguém lê o valor de volta — só substitui. Se perder uma, o caminho é gerar uma
     nova no serviço de origem e cadastrar.
   </p>
   <p style="margin-bottom:0">
     Duas se recuperam fácil: <code>SUPABASE_SERVICE_ROLE_KEY</code> está no <code>.env</code> do
-    iMac, e <code>SERVICE_KEY_TESTE</code> no painel do Supabase do Sentinela. As outras dez,
-    não — <b>se você não guardou cópia, guarde agora</b>, enquanto elas ainda funcionam.
+    iMac, e <code>SERVICE_KEY_TESTE</code> no painel do Supabase do Sentinela. As outras, não —
+    <b>se você não guardou cópia, guarde agora</b>, enquanto elas ainda funcionam.
   </p>
 </div>
 
-<h4>O arquivo que manda em tudo, no iMac</h4>
-<pre>~/supabase/docker/.env          <span class="c"># permissão 600 — só o bryan lê</span>
-~/supabase/docker/.env.original <span class="c"># como veio de fábrica, para comparar</span></pre>
+<h3>Trocar uma senha</h3>
+<h4>A do login da Lisa</h4>
 <p>
-  Mexeu nele, precisa reiniciar os containers para valer:
-  <code>cd ~/supabase/docker &amp;&amp; docker compose up -d</code>.
+  Não é recuperável: o banco guarda um <b>hash</b>, que confere mas não volta. Se o
+  <code>~/.senha-lisa</code> sumir, o caminho é definir uma nova pela API de administração do
+  Supabase, com a chave de serviço que já está no iMac — o mesmo caminho que
+  <code>servidor/criar-usuario.sh</code> usa para criar o usuário.
+</p>
+<h4>A do VNC</h4>
+<pre>rm -f ~/.vnc/passwd ~/.senha-tela
+~/montar-tela.sh          <span class="c"># gera outra e reinicia o x11vnc</span>
+tail -1 ~/.senha-tela     <span class="c"># a nova</span></pre>
+<p>
+  Vale trocar sempre que ela aparecer em algum lugar que não seja o arquivo — histórico de chat,
+  captura de tela, mensagem. Já aconteceu uma vez, em 15/09/2026, e a senha foi rotacionada no
+  mesmo dia.
+</p>
+
+<h4>Os dois arquivos que mandam em tudo, no iMac</h4>
+<pre>~/supabase/docker/.env          <span class="c"># o banco — permissão 600, só o bryan lê</span>
+~/supabase/docker/.env.original <span class="c"># como veio de fábrica, para comparar</span>
+~/lisa/.env                     <span class="c"># o app — gerado por preparar-lisa-local.sh</span></pre>
+<p>
+  Mexeu no do Supabase, precisa reiniciar os containers para valer:
+  <code>cd ~/supabase/docker &amp;&amp; docker compose up -d</code>. Mexeu no da Lisa, precisa
+  reiniciar o app — e se a variável começar com <code>NEXT_PUBLIC_</code>, precisa
+  <b>recompilar</b>: essas são substituídas pelo valor durante o build, não lidas em tempo de
+  execução.
 </p>
 </section>
 
-<!-- ============================================================ 7 -->
+<!-- ============================================================ 15 -->
 <section>
-<h2 id="operar">7 · Operação do dia a dia</h2>
+<h2 id="operar">15 · Operação do dia a dia</h2>
 
 <h3>A checagem de 10 segundos</h3>
 <p>Se desconfiar de alguma coisa, comece por aqui. Do seu Windows:</p>
@@ -613,6 +1521,8 @@ npx wrangler tail --name lisa-cron                <span class="c"># logs ao vivo
 cd ~/supabase/docker
 docker compose ps                  <span class="c"># 11 containers, todos healthy</span>
 systemctl is-active cloudflared    <span class="c"># active</span>
+pgrep -c cloudflared               <span class="c"># 1 — dois é problema, ver seção 18</span>
+ss -tln | grep -E ":(443|3000|5900|6080|8080) "
 df -h /                            <span class="c"># espaço livre</span>
 free -h                            <span class="c"># memória</span></pre>
 
@@ -624,7 +1534,7 @@ free -h                            <span class="c"># memória</span></pre>
 <pre>curl https://lisa.beyond.dev.br/api/sync-status</pre>
 <p>
   O campo <code>grand_total</code> cresce a cada fatia processada. Se ele não muda há horas, o
-  relógio parou — ver seção 10.
+  relógio parou — ver seção 18.
 </p>
 
 <h3>Disparar o relógio na mão</h3>
@@ -663,9 +1573,9 @@ npm run deploy-map      <span class="c"># lógica do Map of Deploy</span>
 npm run disc-balance    <span class="c"># jogo do disco</span></pre>
 </section>
 
-<!-- ============================================================ 8 -->
+<!-- ============================================================ 16 -->
 <section>
-<h2 id="manutencao">8 · Manutenção periódica</h2>
+<h2 id="manutencao">16 · Manutenção periódica</h2>
 
 <div class="rolo">
 <table>
@@ -702,9 +1612,9 @@ npm run disc-balance    <span class="c"># jogo do disco</span></pre>
 </ol>
 </section>
 
-<!-- ============================================================ 9 -->
+<!-- ============================================================ 17 -->
 <section>
-<h2 id="pendencias">9 · Pendências conhecidas</h2>
+<h2 id="pendencias">17 · Pendências conhecidas</h2>
 
 <p>Três coisas foram deixadas para depois, de propósito ou por decisão. Estão aqui para não virarem surpresa.</p>
 
@@ -716,7 +1626,7 @@ npm run disc-balance    <span class="c"># jogo do disco</span></pre>
       <td><b>Backup</b></td>
       <td>Não existe</td>
       <td><span class="selo s-risco">alto</span> perda total dos dados</td>
-      <td>seção 8</td>
+      <td>seção 16</td>
     </tr>
     <tr>
       <td><b>Docker passa por fora do firewall</b></td>
@@ -729,6 +1639,18 @@ npm run disc-balance    <span class="c"># jogo do disco</span></pre>
       <td><code>Power Management: on</code> — 30 quedas registradas em 11 h</td>
       <td><span class="selo s-falta">médio</span> banco some enquanto cai</td>
       <td>abaixo</td>
+    </tr>
+    <tr>
+      <td><b>A tela está exposta à internet com duas travas</b></td>
+      <td><code>tela.beyond.dev.br</code> dá teclado e mouse da máquina onde mora o banco. O que separa a internet disso é o login da Lisa e a senha do VNC — decisão tomada em 15/09/2026, com a alternativa de uma terceira camada na frente</td>
+      <td><span class="selo s-falta">médio</span> aceito conscientemente</td>
+      <td>Cloudflare Access, se um dia quiser</td>
+    </tr>
+    <tr>
+      <td><b>O brilho do iMac não sobrevive a reinício</b></td>
+      <td>Volta para um valor baixo, e a tela fica idêntica a um sistema que não subiu</td>
+      <td><span class="selo s-info">baixo</span> susto, não perda</td>
+      <td>ajustar em Configurações → Tela, ou escrever no boot</td>
     </tr>
   </tbody>
 </table>
@@ -767,6 +1689,10 @@ npm run disc-balance    <span class="c"># jogo do disco</span></pre>
     <tr><td class="mono">8000</td><td>Supabase, via Docker</td><td><b>aberta</b>, passando por fora</td></tr>
     <tr><td class="mono">5432</td><td>Postgres, via Docker</td><td><b>aberta</b> — protegida só pela senha</td></tr>
     <tr><td class="mono">6543</td><td>pooler, via Docker</td><td><b>aberta</b></td></tr>
+    <tr><td class="mono">443</td><td>Caddy, HTTPS de casa</td><td>aberta — é a porta de entrada que se quer</td></tr>
+    <tr><td class="mono">8080</td><td>Caddy, site da tela para o túnel</td><td>presa em <code>127.0.0.1</code> — só o cloudflared alcança</td></tr>
+    <tr><td class="mono">6080</td><td>websockify / noVNC</td><td>presa em <code>127.0.0.1</code></td></tr>
+    <tr><td class="mono">5900</td><td>x11vnc</td><td>presa em <code>127.0.0.1</code></td></tr>
   </tbody>
 </table>
 </div>
@@ -799,9 +1725,9 @@ printf '[connection]\nwifi.powersave = 2\n' | sudo tee /etc/NetworkManager/conf.
 <span class="c"># e no painel do Supabase: Reset database password</span></pre>
 </section>
 
-<!-- ============================================================ 10 -->
+<!-- ============================================================ 18 -->
 <section>
-<h2 id="quebrou">10 · Quando quebra: sintoma → causa → conserto</h2>
+<h2 id="quebrou">18 · Quando quebra: sintoma → causa → conserto</h2>
 
 <div class="rolo">
 <table>
@@ -811,6 +1737,31 @@ printf '[connection]\nwifi.powersave = 2\n' | sudo tee /etc/NetworkManager/conf.
       <td>Todos os painéis vazios; <code>supabase:false</code></td>
       <td>Casa sem luz ou sem internet; iMac desligado; túnel caiu</td>
       <td><code>curl https://banco.beyond.dev.br/</code> — se der <b>530</b>, o túnel está fora. Ligue o iMac; tudo sobe sozinho</td>
+    </tr>
+    <tr>
+      <td>Um endereço do túnel dá <b>404</b>, e o túnel está no ar</td>
+      <td><b>Dois <code>cloudflared</code> rodando</b> para o mesmo túnel. A Cloudflare reparte os pedidos entre todas as conexões registradas; se um dos processos não tem regra de ingresso, parte do tráfego cai nele e volta 404</td>
+      <td><code>pgrep -a cloudflared</code> — tem que aparecer <b>um</b>, o do <code>systemd</code> com <code>--config</code>. Mate o outro pelo PID. Costuma nascer de uma linha colada sem querer no terminal</td>
+    </tr>
+    <tr>
+      <td>Login aceita, mas o botão fica em <b>VERIFICANDO…</b> para sempre</td>
+      <td>A página foi mandada para um destino que responde <b>204</b>, e navegador que recebe 204 não sai do lugar</td>
+      <td>Corrigido em 15/09/2026: o cliente passou a usar a mesma função <code>destinoSeguro</code> do servidor. Se voltar, olhe o parâmetro <code>?de=</code> na URL do login</td>
+    </tr>
+    <tr>
+      <td>Login recusa com <b>e-mail ou senha incorretos</b>, e a senha está certa</td>
+      <td>O rótulo do arquivo foi copiado junto da senha</td>
+      <td>Ver <a href="#senhas">seção 14</a>: os comandos de lá imprimem só o valor</td>
+    </tr>
+    <tr>
+      <td>A tela do noVNC carrega, mas diz <b>Falha ao conectar-se ao servidor</b></td>
+      <td>O WebSocket não subiu. Três causas já vistas: o <code>websockify</code> não está no ar; o caminho ficou duplicado; ou o portão derrubou o handshake</td>
+      <td><code>tail -20 ~/caddy-tela.log</code> e <code>tail -20 ~/caddy-casa.log</code> — a URI e o status de cada tentativa aparecem escritos. <b>502</b> é o portão; <b>404</b> é o caminho</td>
+    </tr>
+    <tr>
+      <td>O painel diz <b>A tela não está no ar</b></td>
+      <td><code>x11vnc</code> ou <code>websockify</code> parados — ou a sessão gráfica do iMac não está aberta</td>
+      <td><code>~/montar-tela.sh</code> remonta os dois e confere. Se reclamar do <code>Xauthority</code>, a sessão gráfica é que não subiu</td>
     </tr>
     <tr>
       <td><code>banco.beyond.dev.br</code> dá <b>530</b></td>
@@ -830,7 +1781,7 @@ printf '[connection]\nwifi.powersave = 2\n' | sudo tee /etc/NetworkManager/conf.
     <tr>
       <td>Lisa parou de aprender; <code>grand_total</code> travado</td>
       <td>Relógio parado, ou ciclo travado</td>
-      <td>Dispare na mão (seção 7). Se responder mas não avançar, force: <code>?reset=1</code> no sync</td>
+      <td>Dispare na mão (seção 15). Se responder mas não avançar, force: <code>?reset=1</code> no sync</td>
     </tr>
     <tr>
       <td><code>unauthorized</code> nas rotas de cron</td>
@@ -881,9 +1832,9 @@ printf '[connection]\nwifi.powersave = 2\n' | sudo tee /etc/NetworkManager/conf.
 </div>
 </section>
 
-<!-- ============================================================ 11 -->
+<!-- ============================================================ 19 -->
 <section>
-<h2 id="refazer">11 · Refazer a migração do zero</h2>
+<h2 id="refazer">19 · Refazer a migração do zero</h2>
 
 <p>
   Se o iMac morrer, ou você quiser repetir noutra máquina. A ordem importa: cada passo depende
@@ -1020,9 +1971,9 @@ curl https://lisa.beyond.dev.br/api/sync-status
 update public.sync_progress set last_error=null where id=1;</pre>
 </section>
 
-<!-- ============================================================ 12 -->
+<!-- ============================================================ 20 -->
 <section>
-<h2 id="voltar">12 · Voltar atrás (plano B)</h2>
+<h2 id="voltar">20 · Voltar atrás (plano B)</h2>
 
 <p>
   O Supabase da nuvem continua de pé, com os dados do dia da migração. Voltar leva minutos:
@@ -1048,9 +1999,9 @@ update public.sync_progress set last_error=null where id=1;</pre>
 </p>
 </section>
 
-<!-- ============================================================ 13 -->
+<!-- ============================================================ 21 -->
 <section>
-<h2 id="armadilhas">13 · Armadilhas que já custaram caro</h2>
+<h2 id="armadilhas">21 · Armadilhas que já custaram caro</h2>
 
 <p>
   Cada uma destas quebrou de verdade durante a montagem, e nenhuma dava erro óbvio. Estão aqui
