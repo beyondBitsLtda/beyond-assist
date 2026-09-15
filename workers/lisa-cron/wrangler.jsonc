@@ -11,12 +11,23 @@
   // enquanto as rotas rodavam em Edge runtime, que não tem http/https/net.
   "compatibility_flags": ["nodejs_compat"],
 
+  // DESLIGADO de propósito: quem agenda agora é o próprio iMac (crontab, ver
+  // ~/relogio/relogio-local.mjs lá). A mudança vale a pena por três motivos medidos:
+  //
+  //  - o iMac chama a Lisa em localhost, sem as duas travessias de internet por chamada;
+  //  - não existe teto de 50 chamadas de saída por invocação, então o download do GitHub
+  //    deixa de ser fatiado em 35 arquivos;
+  //  - não existe teto de tempo, então o ciclo avança até o fim em vez de 5 fatias por vez.
+  //
+  // Medido: 720 pedaços em 90 segundos aqui, contra cerca de 300 por HORA pelo Worker.
+  //
+  // A lista vazia é necessária: apagar a seção inteira faria o wrangler MANTER os horários
+  // antigos, e aí tudo rodaria em dobro.
+  //
+  // O Worker continua publicado, com o handler de `fetch`, para dar pra disparar na mão e para
+  // ser fácil religar se um dia o servidor de casa sair de cena.
   "triggers": {
-    "crons": [
-      "*/5 * * * *",   // notificações e falas agendadas + avanço do ciclo de sync
-      "*/15 * * * *",  // Map of Deploy
-      "0 * * * *"      // reinício do ciclo de sync
-    ]
+    "crons": []
   },
 
   // O endereço da Lisa. Os horários dos crons acima são em UTC.
