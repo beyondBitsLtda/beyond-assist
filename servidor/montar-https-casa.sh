@@ -59,6 +59,18 @@ $NOME {
 	handle_path /tela/* {
 		forward_auth $DESTINO {
 			uri /auth-check
+
+			# O Next NAO responde nada a um pedido que traz cabecalhos de upgrade: ele
+			# derruba a conexao. E o forward_auth repassa os cabecalhos originais, entao
+			# durante o handshake do WebSocket a pergunta "essa sessao vale?" voltava
+			# vazia e o Caddy traduzia isso em 502 — com a pagina do noVNC carregando
+			# inteira, o que fazia parecer problema do VNC.
+			#
+			# Tirar os dois cabecalhos transforma a pergunta num GET comum. O upgrade de
+			# verdade continua intacto: ele acontece no reverse_proxy abaixo, que recebe a
+			# requisicao original.
+			header_up -Connection
+			header_up -Upgrade
 		}
 		reverse_proxy localhost:6080
 	}
