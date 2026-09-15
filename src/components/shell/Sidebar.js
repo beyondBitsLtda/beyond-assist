@@ -24,6 +24,16 @@ const ITEMS = [
   { href: "/gemini-keys", label: "CHAVES GEMINI", glyph: "🔑" },
 ];
 
+// A tela do iMac só existe quando a Lisa está rodando DENTRO dele: quem serve o noVNC é o
+// próprio servidor de casa. Pela Cloudflare não há máquina do outro lado, e um item de menu
+// que sempre leva a um aviso de erro é pior do que item nenhum.
+//
+// A variável é lida em tempo de compilação (NEXT_PUBLIC_ é substituída pelo valor no build),
+// então isto some do pacote da Cloudflare em vez de virar uma checagem em tempo de execução.
+const ITENS = process.env.NEXT_PUBLIC_MODO_CASA === "1"
+  ? [...ITEMS, { href: "/maquina", label: "TELA DO SERVIDOR", glyph: "🖥️" }]
+  : ITEMS;
+
 export default function Sidebar({ open = false, onNavigate }) {
   const pathname = usePathname();
 
@@ -54,7 +64,7 @@ export default function Sidebar({ open = false, onNavigate }) {
         className="bb-sidebar-nav"
         style={{ display: "flex", flexDirection: "column", padding: "10px 0", gap: 2, flex: 1, minHeight: 0, overflowY: "auto" }}
       >
-        {ITEMS.map((item) => {
+        {ITENS.map((item) => {
           const active = pathname === item.href;
           return (
             <Link

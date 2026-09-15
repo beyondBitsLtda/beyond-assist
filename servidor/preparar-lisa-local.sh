@@ -49,6 +49,10 @@ ENV_LOCAL="$PASTA/.env"
   echo "SUPABASE_SERVICE_ROLE_KEY=$(pega SERVICE_ROLE_KEY)"
   echo "SUPABASE_ANON_KEY=$(pega ANON_KEY)"
   echo "SUPABASE_JWT_SECRET=$(pega JWT_SECRET)"
+  echo ""
+  echo "# Liga o que so faz sentido rodando DENTRO do iMac — hoje, o painel da tela"
+  echo "# (/maquina). E lida no build, entao mudar isto exige recompilar."
+  echo "NEXT_PUBLIC_MODO_CASA=1"
 } > "$ENV_LOCAL"
 
 # Valores que vieram de fora (passados no ambiente por quem chamou o script).

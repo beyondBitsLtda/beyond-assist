@@ -38,10 +38,32 @@ cat > "$CONF/Caddyfile" <<CADDYFILE
 }
 
 $NOME {
-	reverse_proxy $DESTINO {
-		# A Lisa precisa saber o endereço original para montar links e cookies corretos.
-		header_up Host {host}
-		header_up X-Forwarded-Proto {scheme}
+	# --- a tela do próprio iMac, em /tela/ -------------------------------------------------
+	# O noVNC não é servido pela Lisa: quem serve é o websockify, em 6080. Por isso este
+	# bloco vem ANTES do resto — `handle` é excludente, o primeiro que casa é o único que roda.
+	#
+	# `handle_path` (e não `handle`) tira o /tela da frente antes de repassar: o websockify
+	# conhece /vnc.html e /websockify, não /tela/vnc.html.
+	#
+	# O forward_auth é a trava que faltaria: /tela/* nunca chega ao Next, então o middleware
+	# não o protege. Aqui o Caddy pergunta à própria Lisa "essa sessão vale?" antes de deixar
+	# passar — e a Lisa responde com o mesmo cookie de login de sempre. Sem sessão, ela devolve
+	# um redirecionamento para /login, que o Caddy copia para o navegador.
+	#
+	# Continuam sendo DUAS travas: esta, e a senha do VNC que o x11vnc pede depois.
+	handle_path /tela/* {
+		forward_auth $DESTINO {
+			uri /auth-check
+		}
+		reverse_proxy localhost:6080
+	}
+
+	handle {
+		reverse_proxy $DESTINO {
+			# A Lisa precisa saber o endereço original para montar links e cookies corretos.
+			header_up Host {host}
+			header_up X-Forwarded-Proto {scheme}
+		}
 	}
 
 	# A porta 3000 continua bloqueada no firewall; quem atende a rede é este Caddy, em 443.

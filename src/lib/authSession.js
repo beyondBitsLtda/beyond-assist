@@ -153,5 +153,9 @@ export function destinoSeguro(bruto) {
   if (!valor.startsWith("/")) return "/";
   if (valor.startsWith("//")) return "/";   // "//host" é endereço externo disfarçado
   if (valor.startsWith("/login")) return "/";
+  // /auth-check não é uma tela: responde 204 vazio. Quem cai no login vindo dela foi mandado
+  // pelo Caddy (ver src/app/auth-check/route.js), e devolver a pessoa para um corpo vazio
+  // depois de entrar pareceria que o login falhou.
+  if (valor.startsWith("/auth-check")) return "/";
   return valor;
 }

@@ -51,7 +51,11 @@ console.log("\n1) quem passa sem login — e quem NÃO deveria passar");
   }
   // E estes NÃO podem ser livres, senão a trava não serve para nada.
   for (const c of ["/", "/dashboard", "/assistant", "/api/tasks", "/api/thoughts",
-                   "/api/delp-tasks", "/api/pair", "/api/notifications/subscribe"]) {
+                   "/api/delp-tasks", "/api/pair", "/api/notifications/subscribe",
+                   // /auth-check é o portão que o Caddy empresta para proteger a tela do
+                   // iMac. Se ele virasse livre, responderia 204 para qualquer um e a tela
+                   // ficaria aberta — sem nenhum erro aparecer em lugar nenhum.
+                   "/auth-check"]) {
     conferir(`protegido: ${c}`, !ehLivre(c));
   }
   // Armadilha clássica: prefixo que "quase" bate não pode abrir a porta.
@@ -117,6 +121,7 @@ console.log("\n5) para onde volta depois de entrar");
   conferir("endereço externo vira raiz", destinoSeguro("https://site-falso.com") === "/");
   conferir("//host disfarçado vira raiz", destinoSeguro("//site-falso.com") === "/", destinoSeguro("//site-falso.com"));
   conferir("voltar para /login vira raiz (senão faz laço)", destinoSeguro("/login") === "/");
+  conferir("voltar para /auth-check vira raiz (é 204 vazio, não é tela)", destinoSeguro("/auth-check") === "/");
   conferir("vazio vira raiz", destinoSeguro("") === "/");
   conferir("nulo vira raiz", destinoSeguro(null) === "/");
 }
