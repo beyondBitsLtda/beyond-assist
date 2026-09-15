@@ -18,6 +18,8 @@
 set -euo pipefail
 
 NOME="casa.beyond.dev.br"
+NOME_TELA="tela.beyond.dev.br"
+PORTA_TELA=8080
 DESTINO="localhost:3000"
 CADDY="$HOME/.local/bin/caddy"
 CONF="$HOME/.config/caddy"
@@ -86,6 +88,58 @@ $NOME {
 	# A porta 3000 continua bloqueada no firewall; quem atende a rede é este Caddy, em 443.
 	log {
 		output file $HOME/caddy-casa.log
+		level WARN
+	}
+}
+
+# --- a tela, alcancavel de FORA de casa -----------------------------------------------
+#
+# Este site nao tem certificado proprio, e nao precisa: quem termina o TLS e a
+# Cloudflare, e o trecho dali ate aqui corre dentro do tunel. Por isso o "http://"
+# explicito no endereco - sem ele o Caddy tentaria emitir um certificado para um nome
+# que nunca e alcancado diretamente, e falharia sem parar.
+#
+# A porta $PORTA_TELA so escuta aqui dentro; quem entrega e o cloudflared.
+#
+# O que fica exposto e deliberadamente curto: a tela, a tela de login e as rotas de
+# entrar e sair. O resto do app nao aparece neste nome. Nao e por desconfiar do portao -
+# e porque superficie que nao existe nao precisa ser defendida.
+http://$NOME_TELA:$PORTA_TELA {
+	# So o cloudflared, que roda nesta mesma maquina, precisa alcancar esta porta. Sem
+	# este bind o Caddy escutaria em todas as interfaces e a porta apareceria para a rede
+	# de casa tambem - sem necessidade nenhuma.
+	bind 127.0.0.1
+
+	handle_path /tela/* {
+		forward_auth $DESTINO {
+			uri /auth-check
+			header_up -Connection
+			header_up -Upgrade
+		}
+		reverse_proxy localhost:6080
+	}
+
+	# A tela de login precisa dos arquivos estaticos dela para renderizar; sem /_next/*
+	# a pagina chega em branco.
+	@entrada path /login /login/* /api/auth/* /auth-check /_next/* /favicon.ico
+	handle @entrada {
+		reverse_proxy $DESTINO {
+			header_up Host {host}
+			# A Cloudflare ja terminou o TLS; daqui para dentro e http, mas o navegador
+			# esta em https e os cookies "Secure" dependem disso ser dito.
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	# Abrir a raiz leva direto a tela. Sem sessao, o portao devolve o login.
+	handle {
+		# O "*" e obrigatorio a partir do Caddy 2.11: sem o matcher explicito ele recusa
+		# o redir com "wrong argument count", mesmo dentro de um handle que ja casou tudo.
+		redir * /tela/vnc.html?path=websockify&resize=scale&reconnect=1&show_dot=1
+	}
+
+	log {
+		output file $HOME/caddy-tela.log
 		level WARN
 	}
 }

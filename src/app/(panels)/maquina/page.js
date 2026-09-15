@@ -18,6 +18,15 @@ const TELA = "/tela/vnc.html?path=websockify&resize=scale&reconnect=1&show_dot=1
 
 const MODO_CASA = process.env.NEXT_PUBLIC_MODO_CASA === "1";
 
+// De fora de casa a tela vive num nome proprio, entregue pelo mesmo tunel que ja levava
+// o banco. Fica escrito aqui, e nao numa variavel de ambiente, porque nao e segredo: o
+// endereco sozinho nao abre nada. O que abre e o login, e depois a senha do VNC.
+//
+// Nao embuto num iframe como no modo casa: sao dominios diferentes, e faze-lo exigiria
+// afrouxar o cookie de sessao para todo o beyond.dev.br. Abrir numa aba custa um clique
+// e nao mexe em nada.
+const TELA_DE_FORA = "https://tela.beyond.dev.br";
+
 function Aviso({ cor, titulo, children }) {
   return (
     <div style={{ border: `1px solid ${cor}55`, background: `${cor}0f`, borderRadius: 8, padding: "14px 16px" }}>
@@ -36,14 +45,16 @@ function Aviso({ cor, titulo, children }) {
  * login, mesmo cadeado.
  */
 export default function MaquinaPage() {
-  const [estado, setEstado] = useState("checando"); // checando | pronto | ausente
+  const [estado, setEstado] = useState("checando"); // checando | pronto | ausente | fora
   const [cheia, setCheia] = useState(false);
   const quadro = useRef(null);
 
   // Antes de mostrar o iframe, confere se o noVNC está mesmo no ar. Sem isso, um x11vnc
   // parado daria uma moldura preta e vazia — que parece a tela do iMac desligada, e não é.
   useEffect(() => {
-    if (!MODO_CASA) return setEstado("ausente");
+    // Fora de casa nao adianta procurar /tela: quem serve aquele caminho e o Caddy do iMac,
+    // que a Lisa da nuvem nao alcanca. O caminho de la e o dominio proprio.
+    if (!MODO_CASA) return setEstado("fora");
     let vivo = true;
     fetch("/tela/vnc.html", { method: "HEAD", cache: "no-store" })
       .then((r) => vivo && setEstado(r.ok ? "pronto" : "ausente"))
@@ -82,13 +93,36 @@ export default function MaquinaPage() {
               A Lisa está no modo casa, mas o noVNC não respondeu. No iMac, rode{" "}
               <code style={{ ...mono, color: CY }}>~/montar-tela.sh</code> e recarregue esta página.
             </>
-          ) : (
-            <>
-              Este painel só funciona na Lisa de casa (<code style={{ ...mono, color: CY }}>casa.beyond.dev.br</code>),
-              porque quem serve a tela é o próprio iMac. Pela Cloudflare não há máquina do outro lado.
-            </>
-          )}
+          ) : null}
         </Aviso>
+      )}
+
+      {estado === "fora" && (
+        <>
+          <Aviso cor={CY} titulo="A TELA ABRE EM OUTRA ABA">
+            Você está na Lisa da nuvem. A tela mora no iMac e é entregue pelo mesmo túnel que já
+            leva o banco — em <code style={{ ...mono, color: CY }}>tela.beyond.dev.br</code>, um
+            domínio próprio. Por isso ela abre numa aba, e não aqui dentro: embutir exigiria
+            afrouxar o cookie de sessão para todo o <code style={{ ...mono, color: CY }}>beyond.dev.br</code>.
+          </Aviso>
+          <div>
+            <a
+              href={TELA_DE_FORA}
+              target="_blank"
+              rel="noreferrer"
+              style={{ ...mono, fontSize: 12, letterSpacing: 2, padding: "11px 22px", display: "inline-block",
+                       textDecoration: "none", color: "#04141a", background: CY, borderRadius: 6, fontWeight: 700 }}
+            >
+              ABRIR A TELA DO IMAC ↗
+            </a>
+          </div>
+          <div style={{ fontSize: 12.5, lineHeight: 1.7, color: "rgba(207,239,251,0.55)", maxWidth: 620 }}>
+            Lá você entra com o mesmo login da Lisa e, depois, com a senha do VNC — a de
+            <code style={{ ...mono, color: CY }}> ~/.senha-tela</code>. Se o iMac estiver
+            desligado ou sem internet, o endereço simplesmente não responde: não há nada na
+            nuvem servindo essa tela, só o túnel que sai da sua casa.
+          </div>
+        </>
       )}
 
       {estado === "pronto" && (

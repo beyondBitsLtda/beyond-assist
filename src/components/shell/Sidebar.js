@@ -24,15 +24,10 @@ const ITEMS = [
   { href: "/gemini-keys", label: "CHAVES GEMINI", glyph: "🔑" },
 ];
 
-// A tela do iMac só existe quando a Lisa está rodando DENTRO dele: quem serve o noVNC é o
-// próprio servidor de casa. Pela Cloudflare não há máquina do outro lado, e um item de menu
-// que sempre leva a um aviso de erro é pior do que item nenhum.
-//
-// A variável é lida em tempo de compilação (NEXT_PUBLIC_ é substituída pelo valor no build),
-// então isto some do pacote da Cloudflare em vez de virar uma checagem em tempo de execução.
-const ITENS = process.env.NEXT_PUBLIC_MODO_CASA === "1"
-  ? [...ITEMS, { href: "/maquina", label: "TELA DO SERVIDOR", glyph: "🖥️" }]
-  : ITEMS;
+// A tela do iMac agora existe nos dois lugares, por caminhos diferentes: em casa ela é
+// embutida direto; na nuvem, o painel entrega o endereço próprio que o túnel publica. Por
+// isso o item vale sempre — o painel é que decide qual das duas coisas mostrar.
+const ITENS = [...ITEMS, { href: "/maquina", label: "TELA DO SERVIDOR", glyph: "🖥️" }];
 
 export default function Sidebar({ open = false, onNavigate }) {
   const pathname = usePathname();
