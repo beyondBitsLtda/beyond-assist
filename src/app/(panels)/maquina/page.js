@@ -7,10 +7,14 @@ import { CY, OR, GR, mono } from "@/lib/theme.js";
 // Caddy (ver servidor/montar-https-casa.sh). Por isso ele só existe no modo casa — na
 // Cloudflare este caminho não leva a lugar nenhum, e o painel nem aparece no menu.
 //
-// `path=tela/websockify` é o detalhe que faz a coisa funcionar: o noVNC precisa saber para
-// onde abrir o WebSocket, e o padrão dele (`websockify`, relativo à raiz) daria
-// `/websockify`, que o Caddy não roteia.
-const TELA = "/tela/vnc.html?path=tela/websockify&resize=scale&reconnect=1&show_dot=1";
+// O `path=` é RELATIVO À PASTA DA PÁGINA, não à raiz do site. Como a página vive em /tela/,
+// `path=websockify` vira /tela/websockify — que é justamente o que o Caddy roteia (e onde ele
+// tira o /tela da frente antes de repassar).
+//
+// Escrever `path=tela/websockify` parece mais explícito e é o erro: dá /tela/tela/websockify,
+// e o sintoma no navegador é só "Falha ao conectar-se ao servidor" — a página carrega inteira,
+// o WebSocket é que leva 502.
+const TELA = "/tela/vnc.html?path=websockify&resize=scale&reconnect=1&show_dot=1";
 
 const MODO_CASA = process.env.NEXT_PUBLIC_MODO_CASA === "1";
 
