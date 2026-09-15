@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { destinoSeguro } from "@/lib/authSession.js";
 
 /**
  * A tela de entrada da Lisa.
@@ -40,11 +41,15 @@ export default function Login() {
         setEnviando(false);
         return;
       }
-      // `de` é para onde a pessoa tentava ir quando foi barrada. A limpeza contra endereço
-      // externo disfarçado acontece no servidor (destinoSeguro, em authSession.js); aqui só
-      // repassamos, e o pior caso é cair na raiz.
-      const de = new URLSearchParams(window.location.search).get("de") || "/";
-      window.location.href = de.startsWith("/") && !de.startsWith("//") ? de : "/";
+      // `de` é para onde a pessoa tentava ir quando foi barrada, e quem decide se aquele
+      // destino presta é destinoSeguro — a MESMA função que o servidor usa.
+      //
+      // Aqui havia uma segunda cópia da regra, escrita à mão, e ela não conhecia /auth-check.
+      // O resultado: o login dava certo, a página mandava o navegador para /auth-check, que
+      // responde 204 — e navegador que recebe 204 não sai do lugar. A tela ficava em
+      // "VERIFICANDO…" para sempre, sem erro nenhum, esperando uma navegação que não vinha.
+      // Duas cópias da mesma regra é uma a mais.
+      window.location.href = destinoSeguro(new URLSearchParams(window.location.search).get("de"));
     } catch {
       setErro("sem resposta do servidor");
       setEnviando(false);
