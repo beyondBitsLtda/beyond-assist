@@ -94,17 +94,56 @@ async function notificar() {
 // rodar para sempre consumindo cota do Gemini e da API do GitHub.
 const TETO_DE_FATIAS = 400;
 
+// Onde fica registrado que a cota diária acabou. Enquanto este arquivo tiver uma data no
+// futuro, as próximas rodadas nem tentam.
+//
+// Sem isso, o crontab dispara de 10 em 10 minutos contra um poço seco: em 15/09/2026 o ciclo
+// esgotou a cota DIÁRIA das chaves de embedding e ficou tentando o resto do dia. As tentativas
+// em si não gastam cota (são recusadas), mas enchem o log de erro e escondem um problema de
+// verdade no meio do ruído — e no dia em que a recusa vier acompanhada de espera, martelar é
+// exatamente o que não se quer fazer.
+const AVISO_DE_COTA = path.join(os.homedir(), ".sync-sem-cota-ate");
+
+function cotaAcabouAte() {
+  try {
+    const quando = Number(fs.readFileSync(AVISO_DE_COTA, "utf8").trim());
+    return Number.isFinite(quando) && quando > Date.now() ? quando : 0;
+  } catch { return 0; }
+}
+
 async function sincronizar() {
+  const bloqueadoAte = cotaAcabouAte();
+  if (bloqueadoAte) {
+    const horas = ((bloqueadoAte - Date.now()) / 3_600_000).toFixed(1);
+    return log(`sincronizar: sem cota de embedding, volto em ~${horas}h`);
+  }
+
   let fatias = 0, ultimaNota = "";
   const comecou = Date.now();
-  while (fatias < TETO_DE_FATIAS) {
-    const r = await chamar("/api/cron/sync", { segredo: "ingest" });
-    const nota = r?.note || "sem resposta";
-    fatias++;
-    if (!nota.startsWith("passo ")) { ultimaNota = nota; break; }
-    ultimaNota = nota;
-    if (fatias % 20 === 0) log(`  ...${fatias} fatias — ${nota}`);
+  try {
+    while (fatias < TETO_DE_FATIAS) {
+      const r = await chamar("/api/cron/sync", { segredo: "ingest" });
+      const nota = r?.note || "sem resposta";
+      fatias++;
+      if (!nota.startsWith("passo ")) { ultimaNota = nota; break; }
+      ultimaNota = nota;
+      if (fatias % 20 === 0) log(`  ...${fatias} fatias — ${nota}`);
+    }
+  } catch (err) {
+    // A rota devolve 500 com "cota DIÁRIA" quando o Gemini recusa por RPD. O cooldown que o
+    // app aplica na chave é de 12h; espero o mesmo, e não até a meia-noite, porque a cota do
+    // Gemini reinicia no fuso DELE, não no nosso.
+    if (/cota DIÁRIA/i.test(String(err?.message || err))) {
+      const ate = Date.now() + 12 * 3_600_000;
+      fs.writeFileSync(AVISO_DE_COTA, String(ate));
+      log(`sincronizar: cota diária de embedding esgotada após ${fatias} fatia(s) — pausando 12h`);
+      return;
+    }
+    throw err;
   }
+  // Terminou sem esbarrar na cota: se havia aviso velho, ele já não vale.
+  try { fs.unlinkSync(AVISO_DE_COTA); } catch {}
+
   const minutos = ((Date.now() - comecou) / 60000).toFixed(1);
   log(`sincronizar: ${fatias} fatia(s) em ${minutos} min — ${ultimaNota}`);
   if (fatias >= TETO_DE_FATIAS) log("  ATENÇÃO: parou no teto de segurança, não por ter terminado");

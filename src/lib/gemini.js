@@ -51,6 +51,30 @@ function keyLabelFor(index) {
 // substring (robusto o bastante pro texto que a API realmente devolve).
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Quando a cota DIÁRIA volta a valer.
+ *
+ * Ela reinicia à meia-noite do Pacífico — o fuso das contas do Google —, não à nossa. Antes
+ * aqui havia meio dia fixo, com o comentário de que era "aproximação segura". Medido em
+ * 15/09/2026: as chaves esgotaram e ficaram trancadas até 06:20-07:40 da manhã seguinte,
+ * enquanto o Google já as aceitaria desde as 04:00. Quase três horas de silêncio por dia, sem
+ * motivo — e justamente nas horas em que a máquina está ociosa e poderia indexar.
+ *
+ * `Intl` com o nome do fuso resolve horário de verão sozinho; somar -7 ou -8 na mão erraria
+ * duas vezes por ano.
+ */
+function proximaViradaDaCotaDiaria(agora = Date.now()) {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles", hour12: false,
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(new Date(agora)).reduce((acc, p) => (acc[p.type] = p.value, acc), {});
+  // `hour12: false` devolve "24" para meia-noite em algumas versões do ICU; o resto disso
+  // seria um cooldown negativo.
+  const decorrido = (Number(partes.hour) % 24) * 3600 + Number(partes.minute) * 60 + Number(partes.second);
+  return agora + (86_400 - decorrido) * 1000;
+}
+
+
 function classifyGeminiError(err) {
   const msg = String(err?.message || err);
 
@@ -76,7 +100,7 @@ function classifyGeminiError(err) {
       code: "QUOTA",
       reason: isDaily ? "rpd" : "rpm",
       untilMs: isDaily
-        ? Date.now() + 0.5 * DAY_MS // cota diária: meio dia de cooldown (aproximação segura — melhor esperar de mais que martelar uma chave zerada)
+        ? proximaViradaDaCotaDiaria()
         : Date.now() + (retryMatch ? Math.ceil(Number(retryMatch[1])) * 1000 + 2000 : 90_000),
     };
   }
@@ -132,7 +156,7 @@ function rewriteError(err, index, classified) {
  * padrão entre tentativas — usado por embedForIngest, que precisa respeitar um teto de
  * espera bem mais curto (função da Vercel tem limite de 60s).
  */
-async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, computeDelay = null } = {}) {
+async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, computeDelay = null, paraIngestao = false } = {}) {
   if (!KEYS.length) {
     throw new Error(
       "GEMINI_API_KEY (ou GEMINI_API_KEYS) não configurada. " +
@@ -142,7 +166,7 @@ async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, com
   const tried = new Set();
   let lastErr;
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const index = await pickKeyIndex(KEYS.length, model, tried);
+    const index = await pickKeyIndex(KEYS.length, model, tried, { paraIngestao });
     tried.add(index);
     const client = clientFor(KEYS[index]);
     try {
@@ -208,6 +232,10 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
     (client) => client.models.embedContent({ model: EMBED_MODEL, contents, config: { outputDimensionality: EMBED_DIM, taskType } }),
     {
       attempts: 4,
+      // A indexação fica restrita ao começo do pool; o fim é reserva da conversa (ver
+      // RESERVA_INTERATIVA em geminiKeyHealth.js). Sem esta linha, um ciclo de sync esgota a
+      // cota diária de TODAS as chaves de embedding e a próxima pergunta no chat espera 98s.
+      paraIngestao: true,
       computeDelay: (attempt, err) => {
         const msg = String(err?.message || err);
         const m = msg.match(/retry in ([\d.]+)s/i);
