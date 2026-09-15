@@ -35,14 +35,19 @@ cat > "$CONF/Caddyfile" <<CADDYFILE
 	# impossível aqui, e desnecessário: o DNS-01 prova a posse do domínio sem tráfego de
 	# entrada nenhum.
 	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+
+	# Sem isto o Caddy abre a porta 80 so para redirecionar http -> https, e nao sobe porque
+	# a 80 ja esta ocupada nesta maquina. O redirecionamento nao faz falta: o unico jeito de
+	# chegar aqui e pelo nome, e o nome so e usado em https.
+	auto_https disable_redirects
 }
 
 $NOME {
 	# --- a tela do próprio iMac, em /tela/ -------------------------------------------------
 	# O noVNC não é servido pela Lisa: quem serve é o websockify, em 6080. Por isso este
-	# bloco vem ANTES do resto — `handle` é excludente, o primeiro que casa é o único que roda.
+	# bloco vem ANTES do resto: handle e excludente, o primeiro que casa e o unico que roda.
 	#
-	# `handle_path` (e não `handle`) tira o /tela da frente antes de repassar: o websockify
+	# handle_path (e nao handle) tira o /tela da frente antes de repassar: o websockify
 	# conhece /vnc.html e /websockify, não /tela/vnc.html.
 	#
 	# O forward_auth é a trava que faltaria: /tela/* nunca chega ao Next, então o middleware
