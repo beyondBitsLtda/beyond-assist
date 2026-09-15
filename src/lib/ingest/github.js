@@ -118,13 +118,19 @@ const PARCIAL_MAX_MS = 48 * 60 * 60 * 1000;
 
 // Quantos arquivos buscar por invocação.
 //
-// Este número existe por causa da Cloudflare: um Worker do plano gratuito pode fazer no máximo
-// 50 chamadas de saída por invocação. Buscar os 500 arquivos de um repositório de uma vez —
-// que é o que este arquivo fazia, e funcionava na Vercel — dá "Too many subrequests by single
-// Worker invocation", e o passo do GitHub nunca passa.
-//
+// O padrão de 35 existe por causa da Cloudflare: um Worker do plano gratuito pode fazer no
+// máximo 50 chamadas de saída por invocação. Buscar os 500 arquivos de um repositório de uma
+// vez dá "Too many subrequests by single Worker invocation", e o passo do GitHub nunca passa.
 // Sobra: 35 arquivos + árvore + gravação do cache + leitura dos repos ≈ 39 chamadas.
-const ORCAMENTO_DE_BUSCAS = 35;
+//
+// É configurável porque esse teto é da CLOUDFLARE, não do trabalho. A mesma sincronização
+// rodando no servidor de casa, em Node, não tem limite nenhum de chamadas por invocação — lá
+// fatiar em 35 só faz o ciclo demorar horas à toa. O `.env` de lá sobe isso para centenas, e o
+// repositório inteiro entra numa passada.
+//
+// O limite REAL que continua valendo nos dois lugares é o da API do GitHub: 5.000 chamadas por
+// hora, com um token só. Por isso nada de infinito aqui.
+const ORCAMENTO_DE_BUSCAS = Math.max(1, Number(process.env.GITHUB_ARQUIVOS_POR_VEZ) || 35);
 
 /**
  * O que está guardado para um repositório.
