@@ -15,6 +15,7 @@
     "cron-check": "node scripts/cron-check.mjs",
     "auth-check": "node scripts/auth-check.mjs",
     "reserva-check": "node --import ./scripts/alias-loader.mjs scripts/reserva-check.mjs",
+    "fala-check": "node scripts/fala-check.mjs",
     "cf:build": "opennextjs-cloudflare build",
     "cf:deploy": "opennextjs-cloudflare deploy",
     "cf:preview": "opennextjs-cloudflare preview"

@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { TTS_VOICES } from "./ttsVoices.js";
 import { pickKeyIndex, markCooldown, markOk } from "./geminiKeyHealth.js";
+import { tetoDeSinteseMs } from "./cleanForSpeech.js";
 
 const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 // gemini-2.5-flash foi descontinuado pra projetos novos no Google Cloud (confirmado ao vivo:
@@ -833,11 +834,17 @@ Com base nisso, produza:
 // ---- TTS: gera áudio a partir de texto ----
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 
-// Quanto esperar UMA tentativa de síntese antes de desistir dela e tentar outra chave.
-// Com 3 tentativas, o pior caso fica em ~68s (22 + 0,6 + 22 + 1,2 + 22) — limitado e
-// previsível. É esse número que o teto do navegador precisa cobrir (ver SPEAK_TIMEOUT_MS
-// no painel do Assistente); os dois só fazem sentido juntos.
-const TTS_TETO_POR_TENTATIVA_MS = 22_000;
+// O teto de UMA tentativa de síntese não é mais um número fixo: ele acompanha o tamanho do
+// texto (ver tetoDeSinteseMs em src/lib/cleanForSpeech.js), entre 22s e 35s.
+//
+// O fixo de 22s era um erro de aritmética, não de calibragem. O tempo de síntese acompanha a
+// QUANTIDADE DE ÁUDIO pedida, e ~14 caracteres de português falado viram 1 segundo de áudio.
+// Uma resposta de 340 caracteres pede 24 segundos de fala: o teto era menor que o áudio, e
+// nenhuma das três tentativas podia dar certo. O painel mostrava três chaves seguidas com
+// "tempo esgotado" enquanto as 35 apareciam disponíveis — parecia chave, era conta.
+//
+// Com o corte em pedaços no cliente, cada chamada ficou curta; o teto proporcional é a rede
+// de segurança para quando um pedaço vier maior que o esperado.
 const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
 
 // Pra o painel de status (/api/gemini-keys/status) montar a matriz chave×modelo sem nunca
@@ -858,15 +865,13 @@ export async function synthesizeSpeech(text, voiceName) {
   const res = await withTransientRetry(
     TTS_MODEL,
     (client) => {
-      // Teto POR TENTATIVA. Sem ele o SDK espera indefinidamente, e foi isso que medimos em
-      // produção: a distribuição é bimodal — ou responde em 4 a 13 segundos, ou pendura. Dez
-      // amostras deram 4, 4, 5, 13, 27, 28, 39, 58, 69 e 112 segundos.
-      //
-      // Cortar em 22s não torna a voz mais lenta: as chamadas boas já voltaram bem antes.
-      // O que muda é o pior caso, que deixa de ser "espera o quanto o Gemini quiser" e vira
-      // "troca de chave e tenta de novo". Uma chave pendurada não melhora esperando mais.
+      // Teto POR TENTATIVA. Sem ele o SDK espera indefinidamente. As dez amostras medidas em
+      // produção foram 4, 4, 5, 13, 27, 28, 39, 58, 69 e 112 segundos — e a leitura antiga
+      // disso ("bimodal: ou volta rápido, ou pendurou") estava errada: seis das dez passavam
+      // de 22s, e o que separava as rápidas das lentas era o TAMANHO DO TEXTO, não a saúde da
+      // chave. O teto proporcional trata cada chamada pelo que ela realmente pede.
       const controlador = new AbortController();
-      const relogio = setTimeout(() => controlador.abort(), TTS_TETO_POR_TENTATIVA_MS);
+      const relogio = setTimeout(() => controlador.abort(), tetoDeSinteseMs(text));
       return client.models
         .generateContent({
           model: TTS_MODEL,
@@ -881,9 +886,10 @@ export async function synthesizeSpeech(text, voiceName) {
         })
         .finally(() => clearTimeout(relogio));
     },
-    // Três tentativas, e não duas: com o teto acima cada uma custa no máximo 22s, então a
-    // terceira cabe no orçamento. Antes, com tentativa sem teto, 2 já podiam passar de 100s.
-    { attempts: 3, delayMs: 600 }
+    // Duas tentativas, e não três: com o teto agora chegando a 35s, três não caberiam nos 75s
+    // que o navegador espera (ver SPEAK_TIMEOUT_MS no Assistente), e ele cortaria o servidor
+    // no meio da terceira. A relação entre os dois números é conferida por npm run fala-check.
+    { attempts: 2, delayMs: 600 }
   );
 
   const part = res?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
