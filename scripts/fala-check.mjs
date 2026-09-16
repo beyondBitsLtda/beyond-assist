@@ -1,128 +1,133 @@
-// Testa o corte do texto para a voz e o orçamento de tempo da síntese.
+// Guarda as duas decisões da voz que já custaram caro: o ORÇAMENTO de tempo (três números em
+// arquivos diferentes que só fazem sentido juntos) e o CORTE do texto (que serve à voz do
+// navegador e faz mal à do Gemini).
 //
-// Existe por causa de um defeito que era impossível de ver olhando o código: o teto de uma
-// tentativa de TTS era fixo em 22 s, e o cliente mandava a resposta INTEIRA numa chamada só.
-// Como o tempo de síntese acompanha a quantidade de áudio pedida, qualquer resposta acima de
-// ~300 caracteres pedia mais de 22 s de áudio — e nenhuma tentativa podia dar certo. O
-// sintoma no painel era "tempo esgotado" em três chaves seguidas, com todas as 35 marcadas
-// como disponíveis: parecia problema de chave, e era de aritmética.
+// A história, porque o código sozinho não conta e a intuição aponta para o lado errado:
+//
+// Presumi que o tempo de síntese acompanhasse a quantidade de áudio pedida — parecia óbvio —
+// e por isso cortei a fala em pedaços e fiz o teto crescer com o texto. Dez chamadas reais
+// medidas em 16/09/2026 desmentiram a premissa inteira:
+//
+//    76 caracteres  →  68s FALHA · 29s · 55s
+//   152 caracteres  →  51s · 68s FALHA · 15s
+//   304 caracteres  →  17s · 61s · 68s FALHA
+//   449 caracteres  →  43s · 43s · 19s · 16s · 18s   (cinco de cinco, nenhuma falha)
+//
+// O texto menor levou 55s; o maior foi o único sem falha nenhuma. O que existe não é relação
+// com o tamanho: é uma taxa alta de chamadas que penduram, e cada tentativa ou volta em
+// ~16-20s ou estoura o teto. Cortar em três, então, TRIPLICA os sorteios contra essa taxa —
+// e foi isso que fez o Modo Rádio cair para a voz do navegador o tempo todo.
 
-import { dividirParaFala, tetoDeSinteseMs, cleanForSpeech } from "../src/lib/cleanForSpeech.js";
+import fs from "node:fs";
+import { dividirParaFala, cleanForSpeech } from "../src/lib/cleanForSpeech.js";
 
 let falhas = 0;
 const ok = (t) => console.log(`  ok    ${t}`);
 const falha = (t, d = "") => { falhas++; console.log(`  FALHA ${t}${d ? ` — ${d}` : ""}`); };
 const conferir = (t, cond, d) => (cond ? ok(t) : falha(t, d));
 
-// Os dois números do outro lado da linha. Se algum mudar sem o outro, o teste abaixo reprova.
-const SPEAK_TIMEOUT_MS = 75_000;  // src/app/(panels)/assistant/page.js
-const TENTATIVAS = 2;             // synthesizeSpeech, em src/lib/gemini.js
-const ESPERA_ENTRE_MS = 600;
+// Os números do orçamento, cada um no seu arquivo. Se algum mudar sozinho, o item 1 reprova.
+const SPEAK_TIMEOUT_MS = 85_000;      // src/app/(panels)/assistant/page.js
+const TETO_DE_REDE_MS = 85_000;       // src/lib/browserVoice.js
+const TETO_POR_TENTATIVA_MS = 26_000; // TTS_TETO_POR_TENTATIVA_MS, src/lib/gemini.js
+const TENTATIVAS = 3;                 // synthesizeSpeech, src/lib/gemini.js
+const ESPERA_BASE_MS = 600;           // delayMs, que cresce: 600 na 1ª espera, 1200 na 2ª
 
-const RESPOSTA_REAL =
-  "Olá, Brayan. Eu sou a Lisa, sua assistente pessoal. Em que posso te ajudar hoje? " +
-  "Se você veio em busca da sua rotina, vale lembrar que você tem quatro tarefas com prazo " +
-  "para hoje, quarta-feira, 16 de setembro, incluindo mandar mensagem pro lead e elaborar a " +
-  "proposta de arquitetura da SATILOG. É só me dizer o que prefere resolver primeiro.";
+const BLOCO_DE_RADIO =
+  "Boa tarde, Brayan! Aqui é a Lisa, e você está ouvindo a sua rádio pessoal. " +
+  "Antes da próxima música, três coisas rápidas do seu quadro: a proposta da SATILOG venceu " +
+  "ontem e continua parada na coluna de execução, o card do lead do montador de móveis está " +
+  "sem responsável desde segunda, e o Sentinela registrou dois chamados novos de prioridade " +
+  "alta esta manhã. Nada disso é urgente agora, mas vale olhar antes do fim do dia. " +
+  "Agora sim, vamos à música.";
 
-console.log("\n1) o corte não inventa nem perde texto");
+const ler = (caminho) => fs.readFileSync(new URL(`../${caminho}`, import.meta.url), "utf8");
+
+console.log("\n1) o orçamento do servidor cabe na paciência de quem espera");
 {
-  const pedacos = dividirParaFala(RESPOSTA_REAL);
-  const juntos = pedacos.join(" ").replace(/\s+/g, " ").trim();
-  const original = RESPOSTA_REAL.replace(/\s+/g, " ").trim();
-  conferir("juntar os pedaços devolve o texto original", juntos === original,
-           `\n     esperado: ${original.slice(0, 70)}…\n     veio:     ${juntos.slice(0, 70)}…`);
-  conferir("gerou mais de um pedaço", pedacos.length > 1, `gerou ${pedacos.length}`);
-  conferir("nenhum pedaço vazio", pedacos.every((p) => p.trim().length > 0));
+  const esperas = Array.from({ length: TENTATIVAS - 1 }, (_, i) => ESPERA_BASE_MS * (i + 1)).reduce((a, b) => a + b, 0);
+  const piorCaso = TENTATIVAS * TETO_POR_TENTATIVA_MS + esperas;
+  console.log(`        (pior caso do servidor: ${piorCaso / 1000}s)`);
+  conferir(`cabe nos ${SPEAK_TIMEOUT_MS / 1000}s do Assistente`, piorCaso < SPEAK_TIMEOUT_MS,
+           `estoura em ${(piorCaso - SPEAK_TIMEOUT_MS) / 1000}s`);
+  conferir(`cabe nos ${TETO_DE_REDE_MS / 1000}s do speakText`, piorCaso < TETO_DE_REDE_MS,
+           `estoura em ${(piorCaso - TETO_DE_REDE_MS) / 1000}s`);
+  // Cortar o servidor no meio de uma tentativa que talvez desse certo é o desperdício que
+  // estes três números existem para evitar. Já aconteceu duas vezes, por descuido meu.
+  const sobra = (SPEAK_TIMEOUT_MS - piorCaso) / 1000;
+  conferir("sobra margem de rede, sem espera inútil", sobra >= 3 && sobra <= 20, `sobra ${sobra}s`);
 }
 
-console.log("\n2) texto curto continua numa chamada só");
+console.log("\n2) os números do teste batem com os do código");
+{
+  // Sem isto o teste vira decoração: passaria feliz enquanto o código diz outra coisa.
+  conferir("TTS_TETO_POR_TENTATIVA_MS", ler("src/lib/gemini.js").includes(`const TTS_TETO_POR_TENTATIVA_MS = ${TETO_POR_TENTATIVA_MS / 1000}_000;`));
+  conferir("attempts: 3", ler("src/lib/gemini.js").includes(`{ attempts: ${TENTATIVAS}, delayMs: ${ESPERA_BASE_MS} }`));
+  conferir("SPEAK_TIMEOUT_MS", ler("src/app/(panels)/assistant/page.js").includes(`const SPEAK_TIMEOUT_MS = ${SPEAK_TIMEOUT_MS};`));
+  conferir("TETO_DE_REDE_MS", ler("src/lib/browserVoice.js").includes(`const TETO_DE_REDE_MS = ${TETO_DE_REDE_MS / 1000}_000;`));
+}
+
+console.log("\n3) o teto por tentativa cobre uma chamada boa, com folga");
+{
+  // A mais lenta das tentativas BEM-SUCEDIDAS observadas: os 42,7s totais foram um teto de 22s
+  // estourado mais uma resposta de 20,7s. É esse 20,7 que o teto precisa cobrir.
+  const MAIOR_BOA_MS = 20_700;
+  conferir("o teto cobre a resposta boa mais lenta já medida", TETO_POR_TENTATIVA_MS > MAIOR_BOA_MS,
+           `teto ${TETO_POR_TENTATIVA_MS / 1000}s contra ${MAIOR_BOA_MS / 1000}s`);
+  const folga = (TETO_POR_TENTATIVA_MS - MAIOR_BOA_MS) / MAIOR_BOA_MS;
+  conferir("com pelo menos 20% de folga", folga >= 0.2, `folga de ${Math.round(folga * 100)}%`);
+}
+
+console.log("\n4) três tentativas, e o porquê em números");
+{
+  // Se uma tentativa pendura com probabilidade p, a fala só cai para a voz do navegador
+  // quando TODAS penduram. É a conta que deixei de fazer ao baixar para duas.
+  const p = 0.48; // falha por tentativa medida em 16/09: 96 falhas em 201 chamadas de TTS
+  const comDuas = p ** 2, comTres = p ** 3;
+  conferir("três tentativas caem para o navegador menos da metade das vezes que duas",
+           comTres < comDuas / 2, `duas: ${(comDuas * 100).toFixed(0)}% · três: ${(comTres * 100).toFixed(0)}%`);
+}
+
+console.log("\n5) o corte NÃO é usado no caminho do Gemini");
+{
+  // Este teste protege a conclusão da medição: voltar a cortar o texto antes de mandá-lo ao
+  // Gemini triplica os sorteios contra uma API que pendura, e foi assim que o rádio quebrou.
+  for (const arquivo of ["src/lib/browserVoice.js", "src/app/(panels)/assistant/page.js"]) {
+    const texto = ler(arquivo);
+    const marca = arquivo.includes("browserVoice") ? 'fetch("/api/speak"' : "enfileirarPedaco(bruto, gen)";
+    const antes = texto.split(marca)[0];
+    conferir(`${arquivo} manda o texto inteiro`, texto.includes(marca) && !antes.includes("dividirParaFala("),
+             texto.includes(marca) ? "há um corte antes da chamada" : `não achei ${marca}`);
+  }
+  conferir("browserVoice corta só depois de o Gemini falhar",
+           ler("src/lib/browserVoice.js").split("dividirParaFala(")[0].includes("cai pra voz do navegador"));
+}
+
+console.log("\n6) o corte serve à voz do navegador, que tem limite próprio");
+{
+  // O speechSynthesis do Chrome interrompe sozinho por volta de 15s de fala (~210 caracteres).
+  const LIMITE_DO_CHROME = 210;
+  // O mesmo alvo que browserVoice.js usa — este teste não vale nada se medir outro corte.
+  const pedacos = dividirParaFala(BLOCO_DE_RADIO, 120);
+  conferir("o alvo aqui é o mesmo do código", ler("src/lib/browserVoice.js").includes("dividirParaFala(clean, 120)"));
+  conferir(`bloco de rádio (${BLOCO_DE_RADIO.length} car) vira ${pedacos.length} pedaços`, pedacos.length >= 2);
+  const maior = Math.max(...pedacos.map((p) => p.length));
+  conferir("nenhum pedaço passa do que o Chrome aguenta falar", maior <= LIMITE_DO_CHROME, `o maior tem ${maior}`);
+  const junto = pedacos.join(" ").replace(/\s+/g, " ").trim();
+  conferir("o texto sobrevive inteiro ao corte", junto === BLOCO_DE_RADIO.replace(/\s+/g, " ").trim());
+}
+
+console.log("\n7) o corte não quebra em casos de borda");
 {
   conferir("uma frase curta não é cortada", dividirParaFala("Bom dia, Brayan.").length === 1);
   conferir("texto vazio não vira pedaço nenhum", dividirParaFala("").length === 0);
   conferir("só espaços não vira pedaço nenhum", dividirParaFala("   \n  ").length === 0);
-}
-
-console.log("\n3) frase gigante sem pontuação também é cortada");
-{
-  // Lista ditada, que existe na prática e não traz um ponto final em lugar nenhum.
+  // Lista ditada: existe na prática e não traz um ponto final em lugar nenhum.
   const semPonto = Array.from({ length: 60 }, (_, i) => `item número ${i + 1}`).join(", ");
   const pedacos = dividirParaFala(semPonto);
-  conferir("uma frase de " + semPonto.length + " caracteres não vira um pedaço só", pedacos.length > 1, `gerou ${pedacos.length}`);
-  const maior = Math.max(...pedacos.map((p) => p.length));
-  conferir("e nenhum pedaço passa muito do alvo", maior <= 180 * 1.7, `o maior tem ${maior}`);
-}
-
-console.log("\n4) o teto acompanha o tamanho, com piso e limite");
-{
-  conferir("texto curto recebe o piso", tetoDeSinteseMs("Oi.") === 22_000, `${tetoDeSinteseMs("Oi.")}`);
-  const medio = tetoDeSinteseMs("x".repeat(180));
-  conferir("180 caracteres pedem mais que o piso", medio > 22_000 && medio <= 35_000, `${medio}`);
-  conferir("texto enorme para no limite", tetoDeSinteseMs("x".repeat(5000)) === 35_000);
-  conferir("o teto cresce com o texto", tetoDeSinteseMs("x".repeat(300)) > tetoDeSinteseMs("x".repeat(100)));
-}
-
-console.log("\n5) o orçamento do servidor cabe na paciência do navegador");
-{
-  // Esta é a regra que já se quebrou uma vez: os dois números moram em arquivos diferentes e
-  // só fazem sentido juntos. Se o servidor puder demorar mais que o navegador espera, o
-  // navegador corta no meio de uma tentativa que talvez fosse dar certo.
-  const piorCaso = TENTATIVAS * 35_000 + (TENTATIVAS - 1) * ESPERA_ENTRE_MS;
-  conferir(`pior caso do servidor (${piorCaso / 1000}s) cabe nos ${SPEAK_TIMEOUT_MS / 1000}s do navegador`,
-           piorCaso < SPEAK_TIMEOUT_MS, `sobram ${(SPEAK_TIMEOUT_MS - piorCaso) / 1000}s`);
-}
-
-console.log("\n6) o caso que quebrou: cada pedaço cabe no próprio teto");
-{
-  // ~14 caracteres de português falado = 1 segundo de áudio. O teto de um pedaço precisa ser
-  // maior que o áudio que ele próprio pede — era exatamente isso que não acontecia.
-  const problemas = dividirParaFala(RESPOSTA_REAL)
-    .map((p) => ({ p, audioMs: (p.length / 14) * 1000, tetoMs: tetoDeSinteseMs(p) }))
-    .filter(({ audioMs, tetoMs }) => tetoMs <= audioMs * 1.2);
-  conferir("nenhum pedaço pede mais áudio do que o teto permite gerar", problemas.length === 0,
-           problemas.map(({ p, audioMs, tetoMs }) => `${p.length}car pede ${Math.round(audioMs / 1000)}s com teto ${tetoMs / 1000}s`).join("; "));
-
-  // E o contraste com o mundo de antes, para o teste contar a história:
-  const antes = 22_000;
-  const audioInteiro = (RESPOSTA_REAL.length / 14) * 1000;
-  conferir("(referência) o texto inteiro no teto antigo era impossível", audioInteiro > antes,
-           `${Math.round(audioInteiro / 1000)}s de áudio para um teto de ${antes / 1000}s`);
-}
-
-console.log("\n7) um bloco de Modo Radio inteiro");
-{
-  // O rádio fala blocos longos — o próprio código diz que um bloco "pode legitimamente
-  // passar de 30-40s pra ler inteiro". E ele usa speakText (browserVoice.js), um caminho
-  // DIFERENTE do chat: por isso continuou caindo pra voz do navegador mesmo depois de o
-  // chat ter sido consertado. Um conserto num caminho não conserta o outro.
-  const bloco =
-    "Boa tarde, Brayan! Aqui é a Lisa, e você está ouvindo a sua rádio pessoal. " +
-    "Antes da próxima música, três coisas rápidas do seu quadro: a proposta da SATILOG venceu " +
-    "ontem e continua parada na coluna de execução, o card do lead do montador de móveis está " +
-    "sem responsável desde segunda, e o Sentinela registrou dois chamados novos de prioridade " +
-    "alta esta manhã. Nada disso é urgente agora, mas vale olhar antes do fim do dia. " +
-    "Agora sim, vamos à música.";
-  const pedacos = dividirParaFala(bloco);
-  conferir(`bloco de ${bloco.length} caracteres (${Math.round(bloco.length / 14)}s de fala) vira ${pedacos.length} pedaços`, pedacos.length >= 3);
-  const ruins = pedacos.filter((p) => tetoDeSinteseMs(p) <= (p.length / 14) * 1000 * 1.2);
-  conferir("todo pedaço cabe no próprio teto", ruins.length === 0, ruins.map((p) => `${p.length}car`).join("; "));
-  const junto = pedacos.join(" ").replace(/\s+/g, " ").trim();
-  conferir("o texto sobrevive inteiro ao corte", junto === bloco.replace(/\s+/g, " ").trim());
-  // O contraste com o mundo de antes. A comparação é com os 22s do teto ANTIGO: no teto novo
-  // (35s) um bloco de 32s até caberia na conta, mas sem folga nenhuma para rede e fila — e é
-  // justamente essa folga que o corte devolve.
-  conferir("(referência) o bloco inteiro não cabia no teto antigo de 22s", (bloco.length / 14) * 1000 > 22_000,
-           `${Math.round(bloco.length / 14)}s de áudio`);
-  const maiorPedaco = Math.max(...pedacos.map((p) => p.length));
-  conferir("e o maior pedaço tem folga de sobra", (maiorPedaco / 14) * 1000 < tetoDeSinteseMs("x".repeat(maiorPedaco)) * 0.7,
-           `${Math.round(maiorPedaco / 14)}s de áudio para ${tetoDeSinteseMs("x".repeat(maiorPedaco)) / 1000}s de teto`);
-}
-
-console.log("\n8) o corte roda depois da limpeza, sem sobra de markdown");
-{
-  const sujo = "**Olá!** Veja `isto`.\n\nE também aquilo.";
-  const pedacos = dividirParaFala(cleanForSpeech(sujo));
-  conferir("nenhum pedaço carrega asterisco ou crase", pedacos.every((p) => !/[*`]/.test(p)), pedacos.join(" | "));
+  conferir(`frase de ${semPonto.length} caracteres sem ponto final também é cortada`, pedacos.length > 1);
+  conferir("e nenhum pedaço fica absurdo", Math.max(...pedacos.map((p) => p.length)) <= 180 * 1.7);
+  conferir("nenhum pedaço carrega markdown", dividirParaFala(cleanForSpeech("**Oi!** Veja `isto`.")).every((p) => !/[*`]/.test(p)));
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");

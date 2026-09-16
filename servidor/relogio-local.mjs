@@ -104,6 +104,18 @@ const TETO_DE_FATIAS = 400;
 // exatamente o que não se quer fazer.
 const AVISO_DE_COTA = path.join(os.homedir(), ".sync-sem-cota-ate");
 
+// A mesma conta que o app faz (ver proximaViradaDaCotaDiaria em src/lib/gemini.js): a cota
+// diária do Gemini reinicia à meia-noite do PACÍFICO. Manter duas contas diferentes para a
+// mesma coisa faria o relógio dormir horas depois de as chaves já terem voltado.
+function proximaViradaDaCotaDiaria(agora = Date.now()) {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles", hour12: false,
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(new Date(agora)).reduce((acc, p) => (acc[p.type] = p.value, acc), {});
+  const decorrido = (Number(partes.hour) % 24) * 3600 + Number(partes.minute) * 60 + Number(partes.second);
+  return agora + (86_400 - decorrido) * 1000;
+}
+
 function cotaAcabouAte() {
   try {
     const quando = Number(fs.readFileSync(AVISO_DE_COTA, "utf8").trim());
@@ -134,9 +146,10 @@ async function sincronizar() {
     // app aplica na chave é de 12h; espero o mesmo, e não até a meia-noite, porque a cota do
     // Gemini reinicia no fuso DELE, não no nosso.
     if (/cota DIÁRIA/i.test(String(err?.message || err))) {
-      const ate = Date.now() + 12 * 3_600_000;
+      const ate = proximaViradaDaCotaDiaria();
       fs.writeFileSync(AVISO_DE_COTA, String(ate));
-      log(`sincronizar: cota diária de embedding esgotada após ${fatias} fatia(s) — pausando 12h`);
+      const horas = ((ate - Date.now()) / 3_600_000).toFixed(1);
+      log(`sincronizar: cota diária de embedding esgotada após ${fatias} fatia(s) — volto em ~${horas}h`);
       return;
     }
     throw err;

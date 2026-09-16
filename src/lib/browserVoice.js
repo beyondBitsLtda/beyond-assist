@@ -30,10 +30,9 @@ export function pickBrowserVoice(voices) {
 let currentAudio = null;
 let gen = 0;
 
-// Quanto esperar a rede por UM pedaço. Casa com a paciência do Assistente
-// (SPEAK_TIMEOUT_MS) porque do outro lado é a mesma rota, com o mesmo orçamento de
-// tentativas — ver tetoDeSinteseMs em cleanForSpeech.js.
-const TETO_DE_REDE_MS = 75_000;
+// Quanto esperar a rede por uma fala. Casa com a paciência do Assistente (SPEAK_TIMEOUT_MS):
+// do outro lado é a mesma rota, com o mesmo orçamento de 3 tentativas de 26s.
+const TETO_DE_REDE_MS = 85_000;
 
 /** Corta o áudio do Gemini que ESTE módulo tiver em reprodução (ou ainda esperando a rede) —
  * usado pelo stopSpeaking() do Assistente pra garantir que parar a fala pare TUDO, não só o
@@ -72,79 +71,65 @@ export async function speakText(text, { voiceName, browserOnly = false } = {}) {
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
   window.speechSynthesis?.cancel();
 
-  // Um texto inteiro numa chamada só era o defeito que fazia o Modo Rádio cair pra voz do
-  // navegador toda hora. O tempo de síntese acompanha a QUANTIDADE DE ÁUDIO pedida, e um
-  // bloco de rádio tem 30-40 segundos de fala — muito além do que uma tentativa aguenta.
-  // Cortado em pedaços, cada chamada volta a caber, e a fala ainda começa antes.
+  // O texto vai INTEIRO para o Gemini, numa chamada só.
   //
-  // Serve também à voz do navegador: o Chrome corta utterances longas por conta própria,
-  // por volta de 15 segundos, e ninguém nunca soube por quê.
-  const pedacos = dividirParaFala(clean);
-  if (!pedacos.length) return;
-
-  // Uma vez que um pedaço cai pra voz do navegador, os seguintes vão junto. Alternar o
-  // timbre no meio de um bloco de rádio soa pior que usar a voz de reserva do começo ao fim.
-  let motor = browserOnly ? "navegador" : "gemini";
-
-  async function sintetizar(pedaco) {
-    if (motor !== "gemini") return null;
-    // Teto de rede por pedaço. Antes não havia nenhum: um pedido pendurado prendia a fala
-    // para sempre, e o que disfarçava isso era uma corrida de 120s lá no Modo Rádio.
+  // Eu cheguei a cortá-lo em pedaços aqui, achando que textos longos estouravam o tempo. A
+  // medição mostrou o contrário (ver dividirParaFala em cleanForSpeech.js): o bloco de 449
+  // caracteres foi o único que não falhou nenhuma vez em cinco. E cortar tem um custo que a
+  // intuição esconde — cada pedaço é um sorteio novo contra uma API que pendura com
+  // frequência, então três pedaços caem para a voz do navegador MUITO mais vezes que um.
+  if (!browserOnly) {
     const controlador = new AbortController();
+    // Teto de rede. Antes não havia nenhum: um pedido pendurado prendia a fala para sempre, e
+    // o que disfarçava isso era uma corrida de 120s escrita lá no Modo Rádio.
     const relogio = setTimeout(() => controlador.abort(), TETO_DE_REDE_MS);
     try {
       const res = await fetch("/api/speak", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: pedaco, voice: voiceName }),
+        body: JSON.stringify({ text: clean, voice: voiceName }),
         signal: controlador.signal,
       });
       if (!res.ok) throw new Error(`speak HTTP ${res.status}`);
-      return await res.blob();
+      const blob = await res.blob();
+      if (myGen !== gen) return; // uma fala mais nova assumiu enquanto esperávamos a rede
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      currentAudio = audio;
+      await new Promise((resolve) => {
+        audio.onended = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
+        audio.onerror = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
+        audio.play().catch(resolve);
+      });
+      return;
     } catch {
-      motor = "navegador";
-      return null;
+      // cai pra voz do navegador
     } finally {
       clearTimeout(relogio);
     }
   }
 
-  async function tocarDoGemini(blob) {
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    currentAudio = audio;
-    await new Promise((resolve) => {
-      audio.onended = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
-      audio.onerror = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
-      audio.play().catch(resolve);
-    });
-  }
+  if (myGen !== gen || !window.speechSynthesis) return;
 
-  async function tocarDoNavegador(pedaco) {
-    if (!window.speechSynthesis) return;
+  // AQUI sim o corte é necessário: o speechSynthesis do Chrome interrompe sozinho uma fala
+  // longa, por volta de 15 segundos, sem avisar. Um bloco de rádio inteiro era cortado no
+  // meio — e como isso só acontece na voz de reserva, passava por "a voz ruim falhou de novo".
+  const voice = pickBrowserVoice(window.speechSynthesis.getVoices());
+  // Alvo de 120, e não o padrão: o corte respeita fim de frase, então uma frase sozinha
+  // pode passar do alvo em até 60%. Com 120 o pior caso fica em ~192 caracteres, abaixo
+  // dos ~210 que o Chrome fala antes de interromper por conta própria.
+  for (const pedaco of dividirParaFala(clean, 120)) {
+    if (myGen !== gen) return;
     const u = new SpeechSynthesisUtterance(pedaco);
     u.lang = "pt-BR";
     u.rate = 1.05;
-    const voice = pickBrowserVoice(window.speechSynthesis.getVoices());
     if (voice) u.voice = voice;
-    // Espera terminar de falar antes de resolver. Quem chama pode precisar saber QUANDO a
-    // fala acabou de verdade (o Modo Escuta abre uma janela de resposta logo depois).
+    // Espera terminar de falar antes de seguir. Quem chama pode precisar saber QUANDO a fala
+    // acabou de verdade (o Modo Escuta abre uma janela de resposta logo depois).
     await new Promise((resolve) => {
       u.onend = resolve;
       u.onerror = resolve;
       window.speechSynthesis.speak(u);
     });
-  }
-
-  // Sintetiza o PRÓXIMO enquanto o atual toca. Sem isso, cortar em pedaços trocaria uma
-  // espera longa por vários silêncios no meio da fala — pior do que estava.
-  let emVoo = sintetizar(pedacos[0]);
-  for (let i = 0; i < pedacos.length; i++) {
-    const blob = await emVoo;
-    if (myGen !== gen) return; // uma fala mais nova assumiu enquanto esperávamos
-    emVoo = i + 1 < pedacos.length ? sintetizar(pedacos[i + 1]) : Promise.resolve(null);
-    if (blob) await tocarDoGemini(blob);
-    else await tocarDoNavegador(pedacos[i]);
-    if (myGen !== gen) return;
   }
 }

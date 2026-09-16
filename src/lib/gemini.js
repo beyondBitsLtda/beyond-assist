@@ -1,7 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { TTS_VOICES } from "./ttsVoices.js";
 import { pickKeyIndex, markCooldown, markOk } from "./geminiKeyHealth.js";
-import { tetoDeSinteseMs } from "./cleanForSpeech.js";
 
 const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 // gemini-2.5-flash foi descontinuado pra projetos novos no Google Cloud (confirmado ao vivo:
@@ -834,17 +833,18 @@ Com base nisso, produza:
 // ---- TTS: gera áudio a partir de texto ----
 const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 
-// O teto de UMA tentativa de síntese não é mais um número fixo: ele acompanha o tamanho do
-// texto (ver tetoDeSinteseMs em src/lib/cleanForSpeech.js), entre 22s e 35s.
+// Quanto esperar UMA tentativa de síntese antes de trocar de chave.
 //
-// O fixo de 22s era um erro de aritmética, não de calibragem. O tempo de síntese acompanha a
-// QUANTIDADE DE ÁUDIO pedida, e ~14 caracteres de português falado viram 1 segundo de áudio.
-// Uma resposta de 340 caracteres pede 24 segundos de fala: o teto era menor que o áudio, e
-// nenhuma das três tentativas podia dar certo. O painel mostrava três chaves seguidas com
-// "tempo esgotado" enquanto as 35 apareciam disponíveis — parecia chave, era conta.
+// Número fixo, e de propósito. Eu já tentei fazê-lo acompanhar o tamanho do texto, presumindo
+// que gerar mais áudio levasse mais tempo. Medi dez chamadas reais em 16/09/2026 e a premissa
+// não se sustenta (as amostras estão escritas em dividirParaFala, cleanForSpeech.js): 76
+// caracteres levaram 55s numa amostra, 304 levaram 17s, e o maior texto testado — 449
+// caracteres — foi o ÚNICO sem nenhuma falha em cinco tentativas.
 //
-// Com o corte em pedaços no cliente, cada chamada ficou curta; o teto proporcional é a rede
-// de segurança para quando um pedaço vier maior que o esperado.
+// O que a medição mostra é outra coisa: uma tentativa ou volta em ~16 a 20 segundos, ou
+// pendura até o teto. Daí 26s — folga de ~30% sobre a maior resposta boa observada (20,7s),
+// sem esperar à toa por uma chamada que já morreu.
+const TTS_TETO_POR_TENTATIVA_MS = 26_000;
 const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
 
 // Pra o painel de status (/api/gemini-keys/status) montar a matriz chave×modelo sem nunca
@@ -865,13 +865,12 @@ export async function synthesizeSpeech(text, voiceName) {
   const res = await withTransientRetry(
     TTS_MODEL,
     (client) => {
-      // Teto POR TENTATIVA. Sem ele o SDK espera indefinidamente. As dez amostras medidas em
-      // produção foram 4, 4, 5, 13, 27, 28, 39, 58, 69 e 112 segundos — e a leitura antiga
-      // disso ("bimodal: ou volta rápido, ou pendurou") estava errada: seis das dez passavam
-      // de 22s, e o que separava as rápidas das lentas era o TAMANHO DO TEXTO, não a saúde da
-      // chave. O teto proporcional trata cada chamada pelo que ela realmente pede.
+      // Teto POR TENTATIVA. Sem ele o SDK espera indefinidamente, e a distribuição É bimodal:
+      // ou a chamada volta em ~16-20s, ou pendura. A leitura original estava certa; foi a
+      // minha releitura dela ("o que separa rápidas de lentas é o tamanho do texto") que
+      // estava errada, e a medição de 16/09/2026 a desmentiu.
       const controlador = new AbortController();
-      const relogio = setTimeout(() => controlador.abort(), tetoDeSinteseMs(text));
+      const relogio = setTimeout(() => controlador.abort(), TTS_TETO_POR_TENTATIVA_MS);
       return client.models
         .generateContent({
           model: TTS_MODEL,
@@ -886,10 +885,14 @@ export async function synthesizeSpeech(text, voiceName) {
         })
         .finally(() => clearTimeout(relogio));
     },
-    // Duas tentativas, e não três: com o teto agora chegando a 35s, três não caberiam nos 75s
-    // que o navegador espera (ver SPEAK_TIMEOUT_MS no Assistente), e ele cortaria o servidor
-    // no meio da terceira. A relação entre os dois números é conferida por npm run fala-check.
-    { attempts: 2, delayMs: 600 }
+    // TRÊS tentativas, e não duas. Isto é o que mais importa para a taxa de queda para a voz
+    // do navegador, e a conta é direta: se metade das tentativas pendura, duas tentativas
+    // falham juntas em 25% das vezes e três em 12,5%. Eu tinha baixado para duas ao alargar o
+    // teto, e foi isso que fez o Modo Rádio cair para o navegador com muito mais frequência.
+    //
+    // Cabe no orçamento: 3 × 26s + as esperas = 79,8s, contra os 85s que o navegador aguarda
+    // (ver SPEAK_TIMEOUT_MS no Assistente). `npm run fala-check` confere essa conta.
+    { attempts: 3, delayMs: 600 }
   );
 
   const part = res?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);

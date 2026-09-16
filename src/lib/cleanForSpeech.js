@@ -59,21 +59,29 @@ export function cleanForSpeech(input) {
 // ---- corte em pedaços faláveis ---------------------------------------------------------
 
 /**
- * Quebra o texto em pedaços curtos o bastante para o Gemini sintetizar sem estourar o tempo.
+ * Quebra o texto em pedaços faláveis. Hoje serve A UM ÚNICO propósito: a voz de reserva do
+ * navegador.
  *
- * O motivo é físico, não estético: o tempo de síntese acompanha a QUANTIDADE DE ÁUDIO pedida.
- * Em português falado, ~14 caracteres viram 1 segundo de fala. Uma resposta de 340 caracteres
- * é quase meio minuto de áudio — e era mandada numa única chamada, com teto de 22 s. Não era
- * azar de chave: o teto era menor que o áudio, e nenhuma tentativa poderia dar certo. Foi
- * exatamente isso que apareceu em 16/09/2026, com três chaves seguidas marcadas como
- * "tempo esgotado" enquanto todas apareciam disponíveis no painel.
+ * O `speechSynthesis` do Chrome interrompe sozinho uma fala longa, por volta de 15 segundos,
+ * e não avisa. Cortar resolve isso.
  *
- * Cortar resolve duas coisas de uma vez: cada chamada volta a caber no teto, e a Lisa começa
- * a falar antes — o primeiro pedaço já toca enquanto o segundo está sendo sintetizado (a fila
- * de reprodução do Assistente já fazia isso; só faltava ter mais de um pedaço).
+ * O que ela NÃO deve fazer é cortar o texto que vai para o Gemini, e vale registrar por quê,
+ * porque a intuição aponta para o lado errado. Eu presumi que o tempo de síntese acompanhasse
+ * a quantidade de áudio pedida e cortei por isso. A medição (16/09/2026, dez chamadas reais)
+ * desmentiu:
  *
- * O corte respeita fim de frase. Falar "ele disse que" / "ia chegar tarde" com pausa no meio
- * soa pior que uma frase um pouco mais longa, então o alvo é orientação, não regra.
+ *    76 caracteres  →  68s FALHA · 29s · 55s
+ *   152 caracteres  →  51s · 68s FALHA · 15s
+ *   304 caracteres  →  17s · 61s · 68s FALHA
+ *   449 caracteres  →  43s · 43s · 19s · 16s · 18s   (cinco de cinco)
+ *
+ * O texto de 76 caracteres levou 55s; o de 304 levou 17s; e o maior de todos foi o único sem
+ * nenhuma falha. Não há correlação com o tamanho: o que existe é uma taxa alta de chamadas
+ * que penduram, independente do texto, e cada tentativa ou volta em ~16-20s ou estoura o teto.
+ *
+ * A consequência prática é o contrário do que parece: cortar em três MULTIPLICA por três as
+ * chances de a fala cair para a voz do navegador, porque cada pedaço é um sorteio novo. Menos
+ * chamadas, maiores, falham menos.
  */
 export function dividirParaFala(texto, alvo = 180) {
   const limpo = String(texto || "").trim();
@@ -111,21 +119,4 @@ export function dividirParaFala(texto, alvo = 180) {
   }
   if (atual.trim()) pedacos.push(atual.trim());
   return pedacos.filter(Boolean);
-}
-
-/**
- * Quanto esperar por UMA tentativa de síntese deste texto, em milissegundos.
- *
- * Um número fixo não serve: o mesmo teto que é generoso para "Bom dia" é impossível para um
- * parágrafo. Aqui ele acompanha o áudio pedido, com folga de 1,5× e um piso de 15 s para a
- * parte que não depende do tamanho (rede, fila do modelo, início da geração).
- *
- * O teto máximo não é gosto: o navegador desiste em 75 s (ver SPEAK_TIMEOUT_MS no Assistente)
- * e o servidor tenta 2 vezes. 2 × 35 s + a espera entre elas cabe; 2 × 45 s não caberia, e o
- * navegador cortaria o servidor no meio da segunda tentativa — que é precisamente o defeito
- * que estes dois números existem para evitar.
- */
-export function tetoDeSinteseMs(texto, { piso = 22_000, teto = 35_000 } = {}) {
-  const segundosDeAudio = String(texto || "").length / 14;
-  return Math.min(teto, Math.max(piso, Math.round((15 + 1.5 * segundosDeAudio) * 1000)));
 }

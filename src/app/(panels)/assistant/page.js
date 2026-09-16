@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { cleanForSpeech, dividirParaFala } from "@/lib/cleanForSpeech.js";
+import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 import { langForPath } from "@/lib/highlightCode.js";
@@ -1937,15 +1937,14 @@ export default function AssistantPage() {
   // esse corte. Medido em produção depois da mudança, em dez amostras: 4, 4, 5, 13, 27, 28,
   // 39, 58, 69 e 112 segundos — duas de seis passavam de 45s e caíam pra voz do navegador.
   //
-  // O número abaixo NÃO é escolhido por gosto: ele cobre o pior caso do servidor. São 2
-  // tentativas de até 35s cada, com a espera entre elas (ver tetoDeSinteseMs em
-  // src/lib/cleanForSpeech.js e synthesizeSpeech em src/lib/gemini.js), o que dá 70,6s. Os
-  // 75s aqui dão a margem de rede.
+  // O número abaixo NÃO é escolhido por gosto: ele cobre o pior caso do servidor. São 3
+  // tentativas de até 26s cada, com as esperas entre elas (ver TTS_TETO_POR_TENTATIVA_MS em
+  // src/lib/gemini.js), o que dá 79,8s. Os 85s aqui dão a margem de rede.
   //
   // Mexer num sem mexer no outro reabre exatamente o problema que isto resolve: o navegador
   // desistindo antes de o servidor terminar de tentar. `npm run fala-check` confere a conta —
-  // ela já se desencontrou uma vez.
-  const SPEAK_TIMEOUT_MS = 75000;
+  // ela já se desencontrou duas vezes.
+  const SPEAK_TIMEOUT_MS = 85000;
   // contador visível NA CONVERSA (não só no log de debug) enquanto espera — null = não está
   // esperando voz nenhuma; número = segundos decorridos desde que a chamada começou. Existe
   // pra deixar claro que a Lisa ainda está tentando a voz do Gemini (não travou), com quanto
@@ -2068,15 +2067,14 @@ export default function AssistantPage() {
     const bruto = (text || "").trim();
     if (!bruto) return;
 
-    // Uma resposta inteira ia numa chamada só de TTS, e era esse o defeito: o tempo de
-    // síntese acompanha o ÁUDIO pedido (~14 caracteres de português falado = 1 segundo de
-    // áudio), então um parágrafo de 340 caracteres pedia 24 segundos de fala a um teto de 22.
-    // Não havia como dar certo — e o sintoma era "tempo esgotado" em chave após chave, com o
-    // painel mostrando todas disponíveis.
+    // Uma chamada de TTS por resposta, e não uma por frase. Cortar parece melhor (a fala
+    // começaria antes) mas mede pior: cada pedaço é um sorteio novo contra uma API que
+    // pendura com frequência, e o primeiro que cai leva os seguintes junto para a voz do
+    // navegador. Ver a medição em dividirParaFala, cleanForSpeech.js.
     //
-    // Cortar aqui também faz a Lisa começar a falar antes: as filas acima já tocavam em ordem
-    // enquanto o pedaço seguinte era sintetizado; só faltava existir mais de um pedaço.
-    for (const pedaco of dividirParaFala(bruto)) enfileirarPedaco(pedaco, gen);
+    // O streaming da resposta já chama isto várias vezes quando o texto chega em partes; é
+    // daí que vem o paralelismo entre sintetizar e tocar, sem multiplicar chamadas à toa.
+    enfileirarPedaco(bruto, gen);
   }, [enfileirarPedaco]);
 
   // ---- escopo do assistente ----
