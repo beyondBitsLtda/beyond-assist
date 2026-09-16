@@ -1,3 +1,5 @@
+import { dividirParaFala } from "./cleanForSpeech.js";
+
 // A Web Speech API do navegador NÃO expõe gênero da voz (SpeechSynthesisVoice só tem
 // name/lang/etc.) — só dá pra tentar adivinhar pelo NOME, que varia por navegador/SO/idioma
 // instalado. Isso é uma aproximação, não uma garantia; nomes fora dessas listas caem no
@@ -28,12 +30,22 @@ export function pickBrowserVoice(voices) {
 let currentAudio = null;
 let gen = 0;
 
+// Quanto esperar a rede por UM pedaço. Casa com a paciência do Assistente
+// (SPEAK_TIMEOUT_MS) porque do outro lado é a mesma rota, com o mesmo orçamento de
+// tentativas — ver tetoDeSinteseMs em cleanForSpeech.js.
+const TETO_DE_REDE_MS = 75_000;
+
 /** Corta o áudio do Gemini que ESTE módulo tiver em reprodução (ou ainda esperando a rede) —
  * usado pelo stopSpeaking() do Assistente pra garantir que parar a fala pare TUDO, não só o
  * pedaço tocado pelo pipeline principal de TTS. */
 export function stopBrowserVoiceAudio() {
   gen++;
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  // Também a voz do navegador. Antes de a fala ser cortada em pedaços isso quase não
+  // aparecia: ou o Gemini tinha dado certo (e então só havia <audio> para pausar), ou a
+  // fala inteira era do navegador e quem chamava já cancelava por fora. Agora um bloco pode
+  // ser metade Gemini e metade navegador, e parar só metade dele seria estranho.
+  if (typeof window !== "undefined") window.speechSynthesis?.cancel();
 }
 
 export function isBrowserVoiceAudioPlaying() {
@@ -60,43 +72,79 @@ export async function speakText(text, { voiceName, browserOnly = false } = {}) {
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
   window.speechSynthesis?.cancel();
 
-  if (!browserOnly) {
+  // Um texto inteiro numa chamada só era o defeito que fazia o Modo Rádio cair pra voz do
+  // navegador toda hora. O tempo de síntese acompanha a QUANTIDADE DE ÁUDIO pedida, e um
+  // bloco de rádio tem 30-40 segundos de fala — muito além do que uma tentativa aguenta.
+  // Cortado em pedaços, cada chamada volta a caber, e a fala ainda começa antes.
+  //
+  // Serve também à voz do navegador: o Chrome corta utterances longas por conta própria,
+  // por volta de 15 segundos, e ninguém nunca soube por quê.
+  const pedacos = dividirParaFala(clean);
+  if (!pedacos.length) return;
+
+  // Uma vez que um pedaço cai pra voz do navegador, os seguintes vão junto. Alternar o
+  // timbre no meio de um bloco de rádio soa pior que usar a voz de reserva do começo ao fim.
+  let motor = browserOnly ? "navegador" : "gemini";
+
+  async function sintetizar(pedaco) {
+    if (motor !== "gemini") return null;
+    // Teto de rede por pedaço. Antes não havia nenhum: um pedido pendurado prendia a fala
+    // para sempre, e o que disfarçava isso era uma corrida de 120s lá no Modo Rádio.
+    const controlador = new AbortController();
+    const relogio = setTimeout(() => controlador.abort(), TETO_DE_REDE_MS);
     try {
       const res = await fetch("/api/speak", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: clean, voice: voiceName }),
+        body: JSON.stringify({ text: pedaco, voice: voiceName }),
+        signal: controlador.signal,
       });
       if (!res.ok) throw new Error(`speak HTTP ${res.status}`);
-      const blob = await res.blob();
-      if (myGen !== gen) return; // uma fala mais nova assumiu enquanto esperávamos a rede
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      currentAudio = audio;
-      await new Promise((resolve) => {
-        audio.onended = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
-        audio.onerror = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
-        audio.play().catch(resolve);
-      });
-      return;
+      return await res.blob();
     } catch {
-      // cai pra voz do navegador
+      motor = "navegador";
+      return null;
+    } finally {
+      clearTimeout(relogio);
     }
   }
 
-  if (myGen !== gen || !window.speechSynthesis) return;
-  const u = new SpeechSynthesisUtterance(clean);
-  u.lang = "pt-BR";
-  u.rate = 1.05;
-  const voice = pickBrowserVoice(window.speechSynthesis.getVoices());
-  if (voice) u.voice = voice;
-  // espera terminar de falar antes de resolver (igual ao caminho do Gemini acima) — quem
-  // chama pode precisar saber QUANDO a fala realmente terminou (ex.: Modo Escuta, que abre
-  // uma janela de resposta logo depois). Sem isso, essa promise resolvia na hora, antes da
-  // fala nem começar a tocar de verdade.
-  await new Promise((resolve) => {
-    u.onend = resolve;
-    u.onerror = resolve;
-    window.speechSynthesis.speak(u);
-  });
+  async function tocarDoGemini(blob) {
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    currentAudio = audio;
+    await new Promise((resolve) => {
+      audio.onended = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
+      audio.onerror = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
+      audio.play().catch(resolve);
+    });
+  }
+
+  async function tocarDoNavegador(pedaco) {
+    if (!window.speechSynthesis) return;
+    const u = new SpeechSynthesisUtterance(pedaco);
+    u.lang = "pt-BR";
+    u.rate = 1.05;
+    const voice = pickBrowserVoice(window.speechSynthesis.getVoices());
+    if (voice) u.voice = voice;
+    // Espera terminar de falar antes de resolver. Quem chama pode precisar saber QUANDO a
+    // fala acabou de verdade (o Modo Escuta abre uma janela de resposta logo depois).
+    await new Promise((resolve) => {
+      u.onend = resolve;
+      u.onerror = resolve;
+      window.speechSynthesis.speak(u);
+    });
+  }
+
+  // Sintetiza o PRÓXIMO enquanto o atual toca. Sem isso, cortar em pedaços trocaria uma
+  // espera longa por vários silêncios no meio da fala — pior do que estava.
+  let emVoo = sintetizar(pedacos[0]);
+  for (let i = 0; i < pedacos.length; i++) {
+    const blob = await emVoo;
+    if (myGen !== gen) return; // uma fala mais nova assumiu enquanto esperávamos
+    emVoo = i + 1 < pedacos.length ? sintetizar(pedacos[i + 1]) : Promise.resolve(null);
+    if (blob) await tocarDoGemini(blob);
+    else await tocarDoNavegador(pedacos[i]);
+    if (myGen !== gen) return;
+  }
 }

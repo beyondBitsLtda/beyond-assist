@@ -89,7 +89,36 @@ console.log("\n6) o caso que quebrou: cada pedaço cabe no próprio teto");
            `${Math.round(audioInteiro / 1000)}s de áudio para um teto de ${antes / 1000}s`);
 }
 
-console.log("\n7) o corte roda depois da limpeza, sem sobra de markdown");
+console.log("\n7) um bloco de Modo Radio inteiro");
+{
+  // O rádio fala blocos longos — o próprio código diz que um bloco "pode legitimamente
+  // passar de 30-40s pra ler inteiro". E ele usa speakText (browserVoice.js), um caminho
+  // DIFERENTE do chat: por isso continuou caindo pra voz do navegador mesmo depois de o
+  // chat ter sido consertado. Um conserto num caminho não conserta o outro.
+  const bloco =
+    "Boa tarde, Brayan! Aqui é a Lisa, e você está ouvindo a sua rádio pessoal. " +
+    "Antes da próxima música, três coisas rápidas do seu quadro: a proposta da SATILOG venceu " +
+    "ontem e continua parada na coluna de execução, o card do lead do montador de móveis está " +
+    "sem responsável desde segunda, e o Sentinela registrou dois chamados novos de prioridade " +
+    "alta esta manhã. Nada disso é urgente agora, mas vale olhar antes do fim do dia. " +
+    "Agora sim, vamos à música.";
+  const pedacos = dividirParaFala(bloco);
+  conferir(`bloco de ${bloco.length} caracteres (${Math.round(bloco.length / 14)}s de fala) vira ${pedacos.length} pedaços`, pedacos.length >= 3);
+  const ruins = pedacos.filter((p) => tetoDeSinteseMs(p) <= (p.length / 14) * 1000 * 1.2);
+  conferir("todo pedaço cabe no próprio teto", ruins.length === 0, ruins.map((p) => `${p.length}car`).join("; "));
+  const junto = pedacos.join(" ").replace(/\s+/g, " ").trim();
+  conferir("o texto sobrevive inteiro ao corte", junto === bloco.replace(/\s+/g, " ").trim());
+  // O contraste com o mundo de antes. A comparação é com os 22s do teto ANTIGO: no teto novo
+  // (35s) um bloco de 32s até caberia na conta, mas sem folga nenhuma para rede e fila — e é
+  // justamente essa folga que o corte devolve.
+  conferir("(referência) o bloco inteiro não cabia no teto antigo de 22s", (bloco.length / 14) * 1000 > 22_000,
+           `${Math.round(bloco.length / 14)}s de áudio`);
+  const maiorPedaco = Math.max(...pedacos.map((p) => p.length));
+  conferir("e o maior pedaço tem folga de sobra", (maiorPedaco / 14) * 1000 < tetoDeSinteseMs("x".repeat(maiorPedaco)) * 0.7,
+           `${Math.round(maiorPedaco / 14)}s de áudio para ${tetoDeSinteseMs("x".repeat(maiorPedaco)) / 1000}s de teto`);
+}
+
+console.log("\n8) o corte roda depois da limpeza, sem sobra de markdown");
 {
   const sujo = "**Olá!** Veja `isto`.\n\nE também aquilo.";
   const pedacos = dividirParaFala(cleanForSpeech(sujo));
