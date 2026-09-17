@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
+import { detectarAcordar, interpretarComando, escolherMusica, normalizar } from "@/lib/escutaPorPalavra.js";
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 import { langForPath } from "@/lib/highlightCode.js";
@@ -603,6 +604,14 @@ export default function AssistantPage() {
   const radioStateHandlerRef = useRef(null); // ver playAndWaitEnded
   const radioSkipRef = useRef(null); // preenchida enquanto uma música toca — ver botão "pular" no radioWidget
 
+  // ---- Modo Escuta por palavra ("Lisa, ...") ----
+  const [escutaPalavra, setEscutaPalavra] = useState(false);
+  const [escutaEstado, setEscutaEstado] = useState("dormindo"); // dormindo | acordada | ocupada
+  // Fila de UM pedido só. O laço do rádio a consome na próxima escolha de música, em vez
+  // de sortear. Uma fila maior não ajudaria: pedir duas músicas de uma vez não é como
+  // ninguém fala, e a segunda chegaria minutos depois, quando o pedido já não faz sentido.
+  const pedidoDeMusicaRef = useRef(null);
+
   useEffect(() => {
     if (!radioMode) { setRadioStatus(null); setRadioNowPlaying(null); return; }
     let stopped = false;
@@ -677,6 +686,13 @@ export default function AssistantPage() {
     };
 
     const pickSong = () => {
+      // Pedido falado tem precedência sobre o sorteio — é o "toca aquela do Pink Floyd".
+      const pedido = pedidoDeMusicaRef.current;
+      if (pedido) {
+        pedidoDeMusicaRef.current = null;
+        radioRecentRef.current = [...radioRecentRef.current, pedido.videoId];
+        return pedido;
+      }
       const list = radioPlaylistRef.current;
       if (!list.length) return null;
       const recent = radioRecentRef.current;
@@ -2438,6 +2454,161 @@ export default function AssistantPage() {
     }
   }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode, vigiaMode, askVigiaMode]);
   askRef.current = ask; // ver comentário no askRef acima — mantém sempre a versão mais recente pros efeitos de vigília chamarem
+
+  // ---- Modo Escuta por palavra: "Lisa, ..." ----
+  //
+  // O microfone fica aberto o tempo todo, mas nada acontece até a palavra de acordar. A
+  // decisão do que fazer com o que foi dito mora em src/lib/escutaPorPalavra.js, testada por
+  // `npm run escuta-check` — aqui fica só o que precisa do navegador: o microfone, o laço que
+  // religa o reconhecimento e a ligação com o rádio.
+  //
+  // Feito para ficar aberto NO IMAC, que é quem tem o microfone e as caixas de som.
+  const ESCUTA_JANELA_MS = 8000; // quanto ela espera o comando depois de ouvir só "Lisa"
+
+  useEffect(() => {
+    if (!escutaPalavra) { setEscutaEstado("dormindo"); return; }
+    if (typeof window === "undefined") return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      addLog("[ESCUTA]", OR, "este navegador não reconhece fala — use o Chrome ou o Edge");
+      setEscutaPalavra(false);
+      return;
+    }
+
+    let parado = false;
+    let rec = null;
+    let religar = null;
+    let acordadaAte = 0;
+    // Enquanto ela responde, o microfone fica fechado de propósito — e `onend` não pode
+    // religá-lo por conta própria, senão haveria dois reconhecimentos abertos ao mesmo tempo.
+    let processando = false;
+
+    // Um bip curto ao acordar. Parece enfeite e não é: sem retorno nenhum, a pessoa não sabe
+    // se foi ouvida e fala de novo por cima — que é justamente quando o reconhecimento erra.
+    const bip = () => {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator(), vol = ctx.createGain();
+        osc.frequency.value = 880; vol.gain.value = 0.06;
+        osc.connect(vol); vol.connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + 0.09);
+        setTimeout(() => ctx.close().catch(() => {}), 300);
+      } catch { /* sem áudio disponível — o modo continua funcionando, só mais mudo */ }
+    };
+
+    const tocar = async (alvo) => {
+      // Mesma rota que o laço do rádio usa. `getRadioPlaylist` lê o arquivo em tempo de build
+      // e não existe no navegador — chamá-la aqui daria ReferenceError em execução, sem o
+      // build reclamar de nada.
+      let lista = radioPlaylistRef.current;
+      if (!lista?.length) {
+        try {
+          const res = await fetch("/api/radio/playlist");
+          const data = await res.json();
+          lista = data?.ok ? data.playlist : [];
+          radioPlaylistRef.current = lista; // o rádio reaproveita quando for ligado
+        } catch { lista = []; }
+      }
+      const musica = alvo ? escolherMusica(alvo, lista) : null;
+
+      if (alvo && !musica) {
+        // Dizer "não achei" é melhor que tocar outra coisa: duas escolhas erradas e ninguém
+        // mais confia no modo. A playlist é o arquivo radio/playlist.txt, editado à mão.
+        addLog("[ESCUTA]", OR, `não achei "${alvo}" na playlist`);
+        await speakText(`Não achei ${alvo} na playlist.`, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+        return;
+      }
+      if (musica) {
+        pedidoDeMusicaRef.current = musica;
+        addLog("[ESCUTA]", PU, `pedido: ${musica.title}`);
+      }
+      if (!radioMode) setRadioMode(true);
+      else radioSkipRef.current?.(); // já estava tocando: pula para o pedido agora
+    };
+
+    const responder = async (dito) => {
+      const cmd = interpretarComando(dito);
+      addLog("[ESCUTA]", PU, `"${dito}" → ${cmd.tipo}`);
+      if (cmd.tipo === "parar") { stopSpeaking(); setRadioMode(false); return; }
+      if (cmd.tipo === "pular") { radioSkipRef.current?.(); return; }
+      if (cmd.tipo === "tocar") return tocar(cmd.alvo);
+      if (cmd.tipo === "perguntar") return askRef.current?.(cmd.texto);
+    };
+
+    const iniciar = () => {
+      if (parado) return;
+      rec = new SR();
+      rec.lang = "pt-BR";
+      rec.continuous = true;
+      rec.interimResults = false;
+
+      rec.onresult = async (ev) => {
+        if (parado) return;
+        const dito = ev.results[ev.results.length - 1]?.[0]?.transcript || "";
+        if (!dito.trim()) return;
+
+        const janelaAberta = Date.now() < acordadaAte;
+        const { acordou, resto } = detectarAcordar(dito);
+        if (!acordou && !janelaAberta) return; // conversa normal da casa — ignora
+
+        const comando = acordou ? resto : normalizar(dito);
+        if (!comando) {
+          // Ouviu só "Lisa": abre a janela e espera a próxima frase.
+          acordadaAte = Date.now() + ESCUTA_JANELA_MS;
+          setEscutaEstado("acordada");
+          bip();
+          // Sem isto o rótulo fica em "ouvindo o comando…" para sempre quando ninguém
+          // completa a frase — e aí não dá para saber se ela ainda está esperando algo.
+          setTimeout(() => { if (!parado && Date.now() >= acordadaAte) setEscutaEstado("dormindo"); }, ESCUTA_JANELA_MS + 200);
+          return;
+        }
+
+        acordadaAte = 0;
+        setEscutaEstado("ocupada");
+        if (acordou) bip();
+
+        // Fecha o microfone enquanto ela responde e fala, senão ela se escuta e se interrompe.
+        processando = true;
+        try { rec?.stop(); } catch { /* já parado */ }
+        try {
+          await responder(comando);
+          await speechQueueRef.current?.catch?.(() => {}); // espera a fala terminar de tocar
+        } catch (err) {
+          addLog("[ESCUTA]", OR, `falhou: ${err?.message || err}`);
+        }
+        processando = false;
+        if (!parado) { setEscutaEstado("dormindo"); iniciar(); }
+      };
+
+      rec.onerror = (ev) => {
+        // `no-speech` e `aborted` são rotina num microfone que fica aberto o dia todo; só
+        // valem log os erros que realmente impedem de ouvir.
+        if (ev?.error && !["no-speech", "aborted"].includes(ev.error)) {
+          addLog("[ESCUTA]", OR, `reconhecimento: ${ev.error}`);
+        }
+      };
+
+      // O reconhecimento do Chrome desiste sozinho de tempos em tempos, sem erro nenhum. Sem
+      // este religa, o modo morre calado depois de alguns minutos e não há como saber por quê.
+      //
+      // A condição é `!processando`, e não "a janela de comando está fechada" como escrevi
+      // primeiro: com aquela, ouvir só "Lisa" abria a janela e então o religa era justamente
+      // o que NÃO acontecia — ela ficaria esperando um comando de microfone fechado.
+      rec.onend = () => { if (!parado && !processando) religar = setTimeout(iniciar, 400); };
+
+      try { rec.start(); } catch { /* já estava rodando */ }
+    };
+
+    addLog("[ESCUTA]", PU, "ouvindo — diga \"Lisa\" e o comando");
+    iniciar();
+
+    return () => {
+      parado = true;
+      clearTimeout(religar);
+      try { rec?.stop(); } catch { /* já parado */ }
+      setEscutaEstado("dormindo");
+    };
+  }, [escutaPalavra, radioMode, addLog, stopSpeaking]);
 
   // ---- STT: ouvir microfone (Web Speech API) ----
   const toggleMic = useCallback(() => {
@@ -4326,6 +4497,30 @@ export default function AssistantPage() {
             </button>
             {radioMode && (
               <span style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.6)" }}>veja o player no canto inferior esquerdo</span>
+            )}
+
+            {/* Modo Escuta por palavra — a Lisa fica ouvindo e só reage depois de "Lisa".
+                Pensado para ficar aberto NO IMAC, que é quem tem microfone e caixas de som.
+                A decisão do que fazer com o que foi dito mora em src/lib/escutaPorPalavra.js. */}
+            <button
+              onClick={() => { unlockAudioPlayback(); setEscutaPalavra((v) => !v); }}
+              title={escutaPalavra
+                ? "Ouvindo. Diga \"Lisa\" e o comando — uma pergunta, ou \"toca ...\". Clique pra desligar"
+                : "Deixar o microfone aberto e reagir quando você disser \"Lisa\""}
+              style={{
+                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
+                border: `1px solid ${escutaPalavra ? GR : "rgba(var(--accent-rgb),0.18)"}`,
+                background: escutaPalavra ? "rgba(123,216,143,0.12)" : "transparent",
+                color: escutaPalavra ? "#eafcff" : "rgba(207,239,251,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              🎙️ &quot;LISA&quot; {escutaPalavra ? "ON" : "OFF"}
+            </button>
+            {escutaPalavra && (
+              <span style={{ ...mono, fontSize: 8.5, color: escutaEstado === "dormindo" ? "rgba(207,239,251,0.6)" : GR }}>
+                {escutaEstado === "acordada" ? "ouvindo o comando…" : escutaEstado === "ocupada" ? "respondendo…" : "diga \"Lisa\""}
+              </span>
             )}
           </div>
         )}
