@@ -150,5 +150,22 @@ console.log("\n8) mas o CORPO do codigo continua de fora");
   conferir("tem teto de 12 termos", termosDoConteudo("# " + Array.from({length:40},(_,i)=>`palavra${i}`).join(" ")).length <= 12);
 }
 
+console.log("\n9) o que ja foi entregue nao e contexto");
+{
+  // Medido com os dados reais: um arquivo "Painel SEO" trouxe quatro tarefas da Delp
+  // casadas por "painel", e as QUATRO estavam concluidas. Relacionadas, sim; uteis, nao.
+  const itens = [
+    { title: "Painel financeiro", status: "Concluído" },
+    { title: "Painel financeiro", status: "Em andamento" },
+    { title: "Painel de vendas", list: "Feito" },
+    { title: "Painel de vendas", list: "Fazendo" },
+  ];
+  const achados = itensRelevantes(["painel"], itens);
+  conferir("concluido nao aparece", achados.length === 2, JSON.stringify(achados));
+  conferir("e o que esta em andamento aparece",
+           achados.every((i) => /andamento|fazendo/i.test(i.status || i.list || "")),
+           JSON.stringify(achados));
+}
+
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");
 process.exit(falhas ? 1 : 0);

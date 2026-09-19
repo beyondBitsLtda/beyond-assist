@@ -150,6 +150,23 @@ export function pontuar(termos, item) {
 }
 
 /**
+ * O que já foi entregue não é contexto.
+ *
+ * Medido com os dados reais em 19/09/2026: abrir um arquivo chamado "Painel SEO" trouxe quatro
+ * tarefas da Delp casadas pela palavra "painel", e as QUATRO estavam concluídas. Tecnicamente
+ * relacionadas, praticamente ruído — ninguém precisa ser lembrado do que já acabou enquanto
+ * escreve código.
+ *
+ * Mesmo padrão que o resto do app usa (ver DONE_PATTERN em pendingWork.js), para "concluído"
+ * significar a mesma coisa em todo lugar.
+ */
+const CONCLUIDO = /conclu|feito|pronto|finaliz|done|entregue|arquivad/i;
+
+function estaConcluido(item) {
+  return CONCLUIDO.test(item?.status || "") || CONCLUIDO.test(item?.list || "");
+}
+
+/**
  * Os itens que valem mostrar, do mais para o menos relacionado.
  *
  * O piso é a decisão mais importante deste arquivo. Sem ele, todo arquivo aberto traria alguma
@@ -159,6 +176,7 @@ export function pontuar(termos, item) {
 export function itensRelevantes(termos, itens, { max = 4, piso = 3 } = {}) {
   if (!termos.length || !Array.isArray(itens)) return [];
   return itens
+    .filter((item) => !estaConcluido(item))
     .map((item) => ({ item, pontos: pontuar(termos, item) }))
     .filter((x) => x.pontos >= piso)
     .sort((a, b) => b.pontos - a.pontos)
