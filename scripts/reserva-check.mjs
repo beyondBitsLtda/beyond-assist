@@ -73,5 +73,24 @@ console.log("\n5) os dois rodízios são independentes");
   conferir("17 chamadas de indexação não movem o ponteiro da conversa", b === (a + 1) % N, `esperado ${(a + 1) % N}, veio ${b}`);
 }
 
+console.log("\n6) dois provedores, pools de tamanhos diferentes");
+{
+  // A saude das chaves passou a servir tambem a Groq, que tem um punhado de chaves contra
+  // as 35 do Gemini. Com UM ponteiro so, 35 chamadas ao Gemini o deixariam em 35, e a
+  // proxima chamada a Groq faria 35 % 3 — sempre a mesma chave, sempre. O rodizio
+  // continuaria no codigo e deixaria de existir na pratica, sem erro nenhum.
+  const MODELO_GROQ = "llama-3.3-70b-versatile";
+  for (let i = 0; i < N * 3; i++) await pickKeyIndex(N, MODELO, new Set());
+  const vistas = new Set();
+  for (let i = 0; i < 9; i++) vistas.add(await pickKeyIndex(3, MODELO_GROQ, new Set()));
+  conferir("o pool pequeno usa todas as chaves dele", vistas.size === 3, `usou ${[...vistas].join(",")}`);
+
+  // E a volta: mexer no pool pequeno nao pode bagunçar o grande.
+  const a = await pickKeyIndex(N, MODELO, new Set());
+  for (let i = 0; i < 7; i++) await pickKeyIndex(3, MODELO_GROQ, new Set());
+  const b = await pickKeyIndex(N, MODELO, new Set());
+  conferir("e nao move o ponteiro do pool grande", b === (a + 1) % N, `esperado ${(a + 1) % N}, veio ${b}`);
+}
+
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");
 process.exit(falhas ? 1 : 0);

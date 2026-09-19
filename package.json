@@ -18,7 +18,7 @@
     "fala-check": "node scripts/fala-check.mjs",
     "escuta-check": "node scripts/escuta-check.mjs",
     "comandos-check": "node scripts/comandos-check.mjs",
-    "groq-check": "node scripts/groq-check.mjs",
+    "groq-check": "node --import ./scripts/alias-loader.mjs scripts/groq-check.mjs",
     "cf:build": "opennextjs-cloudflare build",
     "cf:deploy": "opennextjs-cloudflare deploy",
     "cf:preview": "opennextjs-cloudflare preview"

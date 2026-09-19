@@ -18,7 +18,19 @@
 // padrão da OpenAI manda uma string de JSON. Esquecer de converter não quebra nada na hora —
 // a ferramenta só recebe argumentos vazios e a Lisa parece ter ficado confusa sozinha.
 
+import { pickKeyIndex, markCooldown, markOk } from "./geminiKeyHealth.js";
+
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+// Várias chaves em rodízio, igual ao Gemini. A camada gratuita da Groq é por CONTA, então
+// várias contas multiplicam a cota do dia — mesma ideia que fez o pool do Gemini chegar a 35.
+//
+// `GROQ_API_KEY` (singular) continua valendo como atalho de uma chave só: quem já tinha isso
+// configurado não precisa mexer em nada.
+const CHAVES = (process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || "")
+  .split(",")
+  .map((k) => k.trim())
+  .filter(Boolean);
 
 // Modelo padrão. Fica em variável porque os nomes na Groq mudam com alguma frequência, e um
 // nome morto aqui dentro daria "modelo não encontrado" sem explicar onde consertar.
@@ -115,9 +127,8 @@ export function paraContentDoGemini(mensagem) {
  * precisar saber qual provedor está atendendo.
  */
 export async function turnoNaGroq(contents, { instrucao, ferramentas } = {}) {
-  const chave = process.env.GROQ_API_KEY;
-  if (!chave) {
-    throw new Error("GROQ_API_KEY não configurada no servidor — pegue uma em console.groq.com e adicione ao ambiente da Lisa");
+  if (!CHAVES.length) {
+    throw new Error("GROQ_API_KEYS não configurada no servidor — pegue chaves em console.groq.com e adicione ao ambiente da Lisa (várias, separadas por vírgula)");
   }
 
   const corpo = {
@@ -128,31 +139,87 @@ export async function turnoNaGroq(contents, { instrucao, ferramentas } = {}) {
     temperature: 0.6,
   };
 
-  const res = await fetch(GROQ_URL, {
-    method: "POST",
-    headers: { authorization: `Bearer ${chave}`, "content-type": "application/json" },
-    body: JSON.stringify(corpo),
-  });
+  // Rodízio com as mesmas regras do Gemini: cada tentativa numa chave diferente, respeitando
+  // o cooldown de quem já falhou, e nunca repetindo uma que já falhou NESTA chamada.
+  const tentadas = new Set();
+  let ultimoErro;
+  for (let tentativa = 1; tentativa <= Math.min(3, CHAVES.length + 1); tentativa++) {
+    const indice = await pickKeyIndex(CHAVES.length, GROQ_MODEL, tentadas);
+    tentadas.add(indice);
 
-  if (!res.ok) {
+    let res;
+    try {
+      res = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: { authorization: `Bearer ${CHAVES[indice]}`, "content-type": "application/json" },
+        body: JSON.stringify(corpo),
+      });
+    } catch (err) {
+      // Falha de REDE, não da chave: castigar a chave por isso tiraria de circulação uma que
+      // está boa. Tenta a próxima sem marcar nada.
+      ultimoErro = err;
+      continue;
+    }
+
+    if (res.ok) {
+      await markOk(indice, GROQ_MODEL);
+      const json = await res.json();
+      const mensagem = json?.choices?.[0]?.message;
+      if (!mensagem) throw new Error("Groq devolveu uma resposta sem mensagem");
+      return paraContentDoGemini(mensagem);
+    }
+
     const detalhe = await res.text().catch(() => "");
-    // O nome do modelo é a causa mais provável de um 404 aqui, e é o que a mensagem precisa
-    // dizer: os identificadores da Groq mudam, e adivinhar no escuro custa tempo.
-    if (res.status === 404) {
-      throw new Error(`Groq não conhece o modelo "${GROQ_MODEL}" — ajuste GROQ_MODEL. Resposta: ${detalhe.slice(0, 200)}`);
+    const classificado = classificarErroDaGroq(res.status, detalhe);
+
+    if (!classificado.transitorio) {
+      // Modelo inexistente e corpo malformado não melhoram trocando de chave — e insistir
+      // gastaria as outras duas tentativas para chegar na mesma mensagem.
+      if (classificado.marcar) await markCooldown(indice, GROQ_MODEL, { untilMs: classificado.ateMs, reason: classificado.motivo, error: detalhe.slice(0, 200) });
+      throw new Error(classificado.mensagem);
     }
-    if (res.status === 429) {
-      const e = new Error("QUOTA_EXCEEDED: limite da Groq atingido. Aguarde e tente de novo.");
-      e.code = "QUOTA";
-      throw e;
-    }
-    throw new Error(`Groq respondeu ${res.status}: ${detalhe.slice(0, 300)}`);
+
+    await markCooldown(indice, GROQ_MODEL, { untilMs: classificado.ateMs, reason: classificado.motivo, error: detalhe.slice(0, 200) });
+    ultimoErro = Object.assign(new Error(classificado.mensagem), { code: classificado.code });
   }
 
-  const json = await res.json();
-  const mensagem = json?.choices?.[0]?.message;
-  if (!mensagem) throw new Error("Groq devolveu uma resposta sem mensagem");
-  return paraContentDoGemini(mensagem);
+  throw ultimoErro || new Error("Groq: todas as tentativas falharam");
 }
+
+/** Traduz o status HTTP da Groq para a mesma linguagem de cooldown que o Gemini já usa. */
+function classificarErroDaGroq(status, detalhe) {
+  const agora = Date.now();
+  if (status === 429) {
+    // A Groq informa o tempo de espera no corpo quando é limite por minuto. Usar o número dela
+    // é melhor que chutar: chutar para baixo martela, chutar para cima desperdiça a chave.
+    const m = /try again in ([\d.]+)s/i.exec(detalhe);
+    const diario = /per day|daily/i.test(detalhe);
+    return {
+      transitorio: true, marcar: true, code: "QUOTA", motivo: diario ? "rpd" : "rpm",
+      ateMs: diario ? agora + 6 * 3_600_000 : agora + (m ? Math.ceil(Number(m[1])) * 1000 + 2000 : 60_000),
+      mensagem: `QUOTA_EXCEEDED: limite da Groq atingido${diario ? " (cota DIÁRIA)" : ""}.`,
+    };
+  }
+  if (status === 401 || status === 403) {
+    // Chave inválida não volta sozinha: tirar de circulação por bastante tempo evita gastar
+    // uma tentativa nela em toda chamada.
+    return { transitorio: true, marcar: true, code: "AUTH", motivo: "chave inválida", ateMs: agora + 24 * 3_600_000,
+             mensagem: "Groq recusou a chave (401/403) — confira GROQ_API_KEYS." };
+  }
+  if (status === 404) {
+    return { transitorio: false, marcar: false, code: "MODEL", motivo: "modelo",
+             mensagem: `Groq não conhece o modelo "${GROQ_MODEL}" — ajuste GROQ_MODEL. Resposta: ${detalhe.slice(0, 200)}` };
+  }
+  if (status >= 500 || status === 408) {
+    return { transitorio: true, marcar: true, code: "UNAVAILABLE", motivo: "overload", ateMs: agora + 30_000,
+             mensagem: `Groq indisponível (${status}).` };
+  }
+  return { transitorio: false, marcar: false, code: "ERRO", motivo: "erro",
+           mensagem: `Groq respondeu ${status}: ${detalhe.slice(0, 300)}` };
+}
+
+/** Para o painel de chaves: quantas existem e qual modelo elas atendem. Nunca as chaves. */
+export const GROQ_KEY_COUNT = CHAVES.length;
+export const GROQ_MODELS = { chat: GROQ_MODEL };
 
 export const GROQ_MODELO_ATUAL = GROQ_MODEL;

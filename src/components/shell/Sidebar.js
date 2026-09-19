@@ -21,7 +21,7 @@ const ITEMS = [
   { href: "/test-mode", label: "MODO DE TESTES", glyph: "🧪" },
   { href: "/sync-status", label: "PROGRESSO DO SYNC", glyph: "📊" },
   { href: "/assistant", label: "ASSISTENTE", glyph: "◉" },
-  { href: "/gemini-keys", label: "CHAVES GEMINI", glyph: "🔑" },
+  { href: "/gemini-keys", label: "CHAVES DE IA", glyph: "🔑" },
 ];
 
 // A tela do iMac agora existe nos dois lugares, por caminhos diferentes: em casa ela é

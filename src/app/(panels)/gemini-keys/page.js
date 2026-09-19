@@ -6,6 +6,7 @@ import { drawDonut, drawLegend, drawLine, drawHBars } from "@/lib/arCanvasCharts
 import { CHART } from "@/lib/chartPalette.js";
 
 const POLL_MS = 20000;
+// Os papéis são os mesmos independentemente do provedor; a Groq só usa "chat" hoje.
 const MODEL_LABELS = { chat: "CHAT", tts: "VOZ (TTS)", embed: "EMBEDDINGS" };
 const REASON_LABELS = { rpd: "cota diária", rpm: "cota por minuto", overload: "sobrecarga", unsupported: "modelo indisponível", timeout: "tempo esgotado" };
 const MODEL_CHART_COLORS = { chat: CHART.categorical[0], tts: CHART.categorical[1], embed: CHART.categorical[2] };
@@ -67,6 +68,10 @@ export default function GeminiKeysPage() {
   const [usage, setUsage] = useState(null); // consumo (gráficos) — separado do status/cooldown acima
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Qual provedor a matriz está mostrando. O Gemini e a Groq têm pools de tamanhos
+  // diferentes e modelos diferentes, então não cabem na mesma tabela — cabem no mesmo
+  // painel, uma de cada vez.
+  const [provedorId, setProvedorId] = useState("gemini");
   const [now, setNow] = useState(Date.now());
 
   const load = useCallback(async () => {
@@ -96,8 +101,16 @@ export default function GeminiKeysPage() {
     return <div style={{ padding: "24px 28px", ...mono, fontSize: 11, color: OR }}>⚠ {error}</div>;
   }
 
-  const { keyCount, models, health } = data;
-  const modelKeys = Object.keys(models); // ["chat","tts","embed"]
+  const { health } = data;
+  // `provedores` é a forma nova da rota; o `keyCount`/`models` solto é a antiga. Aceitar as
+  // duas evita a tela em branco numa aba que ficou aberta durante um deploy.
+  const provedores = data.provedores?.length
+    ? data.provedores
+    : [{ id: "gemini", label: "GEMINI", keyCount: data.keyCount, models: data.models }];
+  const provedor = provedores.find((p) => p.id === provedorId) || provedores[0];
+  const keyCount = provedor.keyCount;
+  const models = provedor.models;
+  const modelKeys = Object.keys(models); // Gemini: ["chat","tts","embed"] · Groq: ["chat"]
 
   // saúde indexada por `${key_index}:${model}` pra lookup rápido na matriz
   const healthMap = new Map();
@@ -148,7 +161,27 @@ export default function GeminiKeysPage() {
   return (
     <div style={{ padding: "24px 28px", height: "100%", overflowY: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ CHAVES GEMINI · GESTÃO DO POOL</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ CHAVES · GESTÃO DO POOL</div>
+          {provedores.length > 1 && (
+            <div style={{ display: "flex", gap: 4 }}>
+              {provedores.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setProvedorId(p.id)}
+                  style={{
+                    ...mono, fontSize: 9, letterSpacing: 2, padding: "5px 11px", borderRadius: 3, cursor: "pointer",
+                    border: `1px solid ${p.id === provedor.id ? CY : "rgba(var(--accent-rgb),0.18)"}`,
+                    background: p.id === provedor.id ? "rgba(var(--accent-rgb),0.12)" : "transparent",
+                    color: p.id === provedor.id ? "#eafcff" : "rgba(207,239,251,0.55)",
+                  }}
+                >
+                  {p.label} <span style={{ opacity: 0.6 }}>{p.keyCount}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button
           onClick={load}
           style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff", cursor: "pointer" }}

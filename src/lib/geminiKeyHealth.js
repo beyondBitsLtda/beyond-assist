@@ -1,6 +1,11 @@
 import { supabase } from "@/lib/supabase.js";
 
-// ---- saúde das chaves do Gemini, por (chave × MODELO), com persistência real ----
+// ---- saúde das chaves de IA, por (chave × MODELO), com persistência real ----
+//
+// Apesar do nome do arquivo, este módulo serve a QUALQUER provedor: a Groq entrou depois
+// e usa o mesmo mecanismo. As linhas não colidem porque a chave da tabela é (índice,
+// modelo) — o índice 0 do Gemini e o índice 0 da Groq são linhas diferentes, já que o
+// modelo difere.
 // Cada MODELO tem cota própria — uma chave pode estar ótima pro chat e zerada pra voz ao
 // mesmo tempo (foi exatamente o que aconteceu: TTS free tier = 10/dia, chat/embeddings
 // bem mais folgados, na MESMA chave). E como a Vercel não garante que a função continue
@@ -73,9 +78,17 @@ function isAvailableNow(keyIndex, model) {
  * nesta MESMA chamada lógica) e preferindo as que não estão de cooldown — rodízio simples
  * entre as candidatas restantes. Se todas estiverem de cooldown, ainda assim devolve uma
  * (melhor tentar e deixar o próprio Gemini confirmar do que travar o app). */
-// Ponteiros separados por escopo: o rodízio da indexação não deve empurrar o da conversa,
-// senão o sync (que faz milhares de chamadas) decide sozinho onde a próxima pergunta começa.
-const ponteiros = { interativo: 0, ingestao: 0 };
+// Ponteiros separados por escopo E POR MODELO.
+//
+// Por escopo: o rodízio da indexação não deve empurrar o da conversa, senão o sync (que faz
+// milhares de chamadas) decide sozinho onde a próxima pergunta começa.
+//
+// Por modelo: este módulo passou a servir também às chaves da Groq, e os dois pools têm
+// TAMANHOS diferentes. Com um ponteiro só, 35 chamadas ao Gemini deixariam o ponteiro em 35, e
+// a próxima chamada à Groq (com 3 chaves) faria 35 % 3 — sempre a mesma chave, sempre. O
+// rodízio continuaria existindo no código e deixaria de existir na prática, sem erro nenhum.
+const ponteiros = new Map();
+const ponteiroDe = (escopo, model) => ponteiros.get(`${escopo}:${model}`) || 0;
 export async function pickKeyIndex(n, model, exclude = new Set(), { paraIngestao = false } = {}) {
   await ensureFreshCache();
   // A indexação enxerga só o começo do pool; o fim é a reserva interativa. O `max(1, ...)`
@@ -88,9 +101,10 @@ export async function pickKeyIndex(n, model, exclude = new Set(), { paraIngestao
   const available = pool.filter((i) => isAvailableNow(i, model));
   const finalPool = available.length ? available : pool;
   const escopo = paraIngestao ? "ingestao" : "interativo";
+  const inicio = ponteiroDe(escopo, model);
   for (let step = 0; step < limite; step++) {
-    const idx = (ponteiros[escopo] + step) % limite;
-    if (finalPool.includes(idx)) { ponteiros[escopo] = (idx + 1) % limite; return idx; }
+    const idx = (inicio + step) % limite;
+    if (finalPool.includes(idx)) { ponteiros.set(`${escopo}:${model}`, (idx + 1) % limite); return idx; }
   }
   return finalPool[0];
 }
