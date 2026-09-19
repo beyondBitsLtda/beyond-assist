@@ -32,7 +32,7 @@ let gen = 0;
 
 // Quanto esperar a rede por uma fala. Casa com a paciência do Assistente (SPEAK_TIMEOUT_MS):
 // do outro lado é a mesma rota, com o mesmo orçamento de 3 tentativas de 26s.
-const TETO_DE_REDE_MS = 85_000;
+const TETO_DE_REDE_MS = 70_000;
 
 /** Corta o áudio do Gemini que ESTE módulo tiver em reprodução (ou ainda esperando a rede) —
  * usado pelo stopSpeaking() do Assistente pra garantir que parar a fala pare TUDO, não só o

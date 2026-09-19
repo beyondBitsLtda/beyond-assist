@@ -27,11 +27,11 @@ const falha = (t, d = "") => { falhas++; console.log(`  FALHA ${t}${d ? ` — ${
 const conferir = (t, cond, d) => (cond ? ok(t) : falha(t, d));
 
 // Os números do orçamento, cada um no seu arquivo. Se algum mudar sozinho, o item 1 reprova.
-const SPEAK_TIMEOUT_MS = 85_000;      // src/app/(panels)/assistant/page.js
-const TETO_DE_REDE_MS = 85_000;       // src/lib/browserVoice.js
+const SPEAK_TIMEOUT_MS = 70_000;      // src/app/(panels)/assistant/page.js
+const TETO_DE_REDE_MS = 70_000;       // src/lib/browserVoice.js
 const TETO_POR_TENTATIVA_MS = 26_000; // TTS_TETO_POR_TENTATIVA_MS, src/lib/gemini.js
 const TENTATIVAS = 3;                 // synthesizeSpeech, src/lib/gemini.js
-const ESPERA_BASE_MS = 600;           // delayMs, que cresce: 600 na 1ª espera, 1200 na 2ª
+const HEDGE_MS = 16_000;              // TTS_HEDGE_MS, src/lib/gemini.js
 
 const BLOCO_DE_RADIO =
   "Boa tarde, Brayan! Aqui é a Lisa, e você está ouvindo a sua rádio pessoal. " +
@@ -45,8 +45,10 @@ const ler = (caminho) => fs.readFileSync(new URL(`../${caminho}`, import.meta.ur
 
 console.log("\n1) o orçamento do servidor cabe na paciência de quem espera");
 {
-  const esperas = Array.from({ length: TENTATIVAS - 1 }, (_, i) => ESPERA_BASE_MS * (i + 1)).reduce((a, b) => a + b, 0);
-  const piorCaso = TENTATIVAS * TETO_POR_TENTATIVA_MS + esperas;
+  // As tentativas agora SE SOBREPÕEM: a segunda começa 16s depois da primeira, não depois de
+  // ela desistir. O pior caso deixa de ser a soma dos tetos e passa a ser o instante em que a
+  // ÚLTIMA começa, mais o teto dela.
+  const piorCaso = (TENTATIVAS - 1) * HEDGE_MS + TETO_POR_TENTATIVA_MS;
   console.log(`        (pior caso do servidor: ${piorCaso / 1000}s)`);
   conferir(`cabe nos ${SPEAK_TIMEOUT_MS / 1000}s do Assistente`, piorCaso < SPEAK_TIMEOUT_MS,
            `estoura em ${(piorCaso - SPEAK_TIMEOUT_MS) / 1000}s`);
@@ -62,7 +64,8 @@ console.log("\n2) os números do teste batem com os do código");
 {
   // Sem isto o teste vira decoração: passaria feliz enquanto o código diz outra coisa.
   conferir("TTS_TETO_POR_TENTATIVA_MS", ler("src/lib/gemini.js").includes(`const TTS_TETO_POR_TENTATIVA_MS = ${TETO_POR_TENTATIVA_MS / 1000}_000;`));
-  conferir("attempts: 3", ler("src/lib/gemini.js").includes(`{ attempts: ${TENTATIVAS}, delayMs: ${ESPERA_BASE_MS} }`));
+  conferir("TTS_TENTATIVAS", ler("src/lib/gemini.js").includes(`const TTS_TENTATIVAS = ${TENTATIVAS};`));
+  conferir("TTS_HEDGE_MS", ler("src/lib/gemini.js").includes(`const TTS_HEDGE_MS = ${HEDGE_MS / 1000}_000;`));
   conferir("SPEAK_TIMEOUT_MS", ler("src/app/(panels)/assistant/page.js").includes(`const SPEAK_TIMEOUT_MS = ${SPEAK_TIMEOUT_MS};`));
   conferir("TETO_DE_REDE_MS", ler("src/lib/browserVoice.js").includes(`const TETO_DE_REDE_MS = ${TETO_DE_REDE_MS / 1000}_000;`));
 }
@@ -81,11 +84,22 @@ console.log("\n3) o teto por tentativa cobre uma chamada boa, com folga");
 console.log("\n4) três tentativas, e o porquê em números");
 {
   // Se uma tentativa pendura com probabilidade p, a fala só cai para a voz do navegador
-  // quando TODAS penduram. É a conta que deixei de fazer ao baixar para duas.
+  // quando TODAS penduram.
   const p = 0.48; // falha por tentativa medida em 16/09: 96 falhas em 201 chamadas de TTS
   const comDuas = p ** 2, comTres = p ** 3;
   conferir("três tentativas caem para o navegador menos da metade das vezes que duas",
            comTres < comDuas / 2, `duas: ${(comDuas * 100).toFixed(0)}% · três: ${(comTres * 100).toFixed(0)}%`);
+
+  // E o ganho do hedge, que é sobre TEMPO e não sobre taxa. Medido em 19/09: uma tentativa boa
+  // volta em ~13s, uma pendurada morre no teto. Em fila, duas penduradas custam 26+26 antes de
+  // a boa começar; sobrepostas, a terceira já está rodando aos 32s.
+  const BOA_MS = 13_000;
+  const emFila = 2 * TETO_POR_TENTATIVA_MS + BOA_MS;
+  const sobreposto = 2 * HEDGE_MS + BOA_MS;
+  conferir(`duas penduradas: ${emFila / 1000}s em fila contra ${sobreposto / 1000}s sobrepostas`,
+           sobreposto < emFila);
+  conferir("e o caso bom não paga nada pelo hedge", BOA_MS < HEDGE_MS,
+           "a primeira volta antes de a segunda ser disparada");
 }
 
 console.log("\n5) o corte NÃO é usado no caminho do Gemini");

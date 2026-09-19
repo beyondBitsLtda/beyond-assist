@@ -1953,14 +1953,17 @@ export default function AssistantPage() {
   // esse corte. Medido em produção depois da mudança, em dez amostras: 4, 4, 5, 13, 27, 28,
   // 39, 58, 69 e 112 segundos — duas de seis passavam de 45s e caíam pra voz do navegador.
   //
-  // O número abaixo NÃO é escolhido por gosto: ele cobre o pior caso do servidor. São 3
-  // tentativas de até 26s cada, com as esperas entre elas (ver TTS_TETO_POR_TENTATIVA_MS em
-  // src/lib/gemini.js), o que dá 79,8s. Os 85s aqui dão a margem de rede.
+  // O número abaixo NÃO é escolhido por gosto: ele cobre o pior caso do servidor. As três
+  // tentativas agora SE SOBREPÕEM (ver TTS_HEDGE_MS em src/lib/gemini.js) — a última começa
+  // aos 32s e morre no teto aos 58s. Os 70s aqui dão a margem de rede.
+  //
+  // Baixou de 85s justamente por causa do hedge: se as três já morreram aos 58s, esperar mais
+  // vinte e sete segundos não salva nenhuma chamada e só atrasa a voz de reserva.
   //
   // Mexer num sem mexer no outro reabre exatamente o problema que isto resolve: o navegador
   // desistindo antes de o servidor terminar de tentar. `npm run fala-check` confere a conta —
   // ela já se desencontrou duas vezes.
-  const SPEAK_TIMEOUT_MS = 85000;
+  const SPEAK_TIMEOUT_MS = 70000;
   // contador visível NA CONVERSA (não só no log de debug) enquanto espera — null = não está
   // esperando voz nenhuma; número = segundos decorridos desde que a chamada começou. Existe
   // pra deixar claro que a Lisa ainda está tentando a voz do Gemini (não travou), com quanto

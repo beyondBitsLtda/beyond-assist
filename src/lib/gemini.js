@@ -853,47 +853,115 @@ export const GEMINI_KEY_COUNT = KEYS.length;
 export const GEMINI_MODELS = { chat: CHAT_MODEL, tts: TTS_MODEL, embed: EMBED_MODEL };
 
 /**
+ * Quanto esperar por uma tentativa antes de disparar OUTRA em paralelo, numa chave diferente.
+ *
+ * Este número sai direto da medição de 19/09/2026, oito chamadas contra a nuvem:
+ *
+ *     12,7s · 13,6s · 14,1s · 14,7s · 14,7s · 13,9s   ← primeira tentativa deu certo
+ *     67,6s · 74,5s                                    ← primeira pendurou
+ *
+ * Uma tentativa boa volta em 13 a 15 segundos. Uma ruim não volta nunca — morre no teto de 26s
+ * e só então a seguinte começa, do zero. Foi assim que duas chamadas de 13 segundos viraram 67.
+ *
+ * Esperar 16 segundos separa os dois casos: as boas já voltaram, e as penduradas ganham uma
+ * concorrente enquanto ainda estão penduradas, em vez de dez segundos depois. A perdedora é
+ * abortada assim que a outra chega.
+ *
+ * O custo é chamada a mais quando a primeira demora. Contra uma API que pendura em metade das
+ * vezes, é troca boa: a alternativa é o usuário esperar 67 segundos ou ouvir a voz do navegador.
+ */
+const TTS_HEDGE_MS = 16_000;
+const TTS_TENTATIVAS = 3;
+
+/**
+ * Síntese com tentativas SOBREPOSTAS, e não em fila.
+ *
+ * A diferença em relação a withTransientRetry é essa: ali, a tentativa seguinte só começa
+ * depois de a anterior desistir. Aqui as tentativas convivem, e a primeira que responder ganha.
+ * Contra uma distribuição bimodal — ou volta rápido, ou nunca — é o que transforma o pior caso
+ * de "26s perdidos antes de começar de novo" em "16s até ter uma segunda chance rodando".
+ */
+async function sintetizarComHedge(text, voice) {
+  if (!KEYS.length) throw new Error("GEMINI_API_KEY (ou GEMINI_API_KEYS) não configurada.");
+
+  const tentadas = new Set();
+  const controladores = [];
+  const erros = [];
+  let jaVenceu = false;
+
+  const umaTentativa = async () => {
+    const indice = await pickKeyIndex(KEYS.length, TTS_MODEL, tentadas);
+    tentadas.add(indice);
+    const controlador = new AbortController();
+    controladores.push(controlador);
+    const relogio = setTimeout(() => controlador.abort(), TTS_TETO_POR_TENTATIVA_MS);
+    try {
+      const r = await clientFor(KEYS[indice]).models.generateContent({
+        model: TTS_MODEL,
+        contents: [{ parts: [{ text }] }],
+        config: {
+          responseModalities: ["AUDIO"],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+          abortSignal: controlador.signal,
+        },
+      });
+      await markOk(indice, TTS_MODEL);
+      return r;
+    } catch (err) {
+      // Uma tentativa abortada PORQUE outra ganhou não diz nada sobre a chave dela. Marcar
+      // cooldown aqui tiraria de circulação uma chave boa a cada chamada bem-sucedida — o
+      // pool inteiro entraria em castigo sem nenhuma falha real ter acontecido.
+      if (!jaVenceu) {
+        const classificado = classifyGeminiError(err);
+        if (classificado.transient) {
+          await markCooldown(indice, TTS_MODEL, {
+            untilMs: classificado.untilMs,
+            reason: classificado.reason,
+            error: err?.message || String(err),
+          });
+        }
+        erros.push({ err, indice, classificado });
+      }
+      throw err;
+    } finally {
+      clearTimeout(relogio);
+    }
+  };
+
+  const emVoo = [];
+  for (let i = 0; i < TTS_TENTATIVAS; i++) {
+    const p = umaTentativa();
+    p.catch(() => {}); // a perdedora rejeita ao ser abortada; sem isto vira rejeição não tratada
+    emVoo.push(p);
+
+    if (i === TTS_TENTATIVAS - 1) break;
+    const chegouAlguma = await Promise.race([
+      Promise.any(emVoo).then(() => true).catch(() => false),
+      new Promise((r) => setTimeout(() => r(false), TTS_HEDGE_MS)),
+    ]);
+    if (chegouAlguma) break;
+  }
+
+  try {
+    const res = await Promise.any(emVoo);
+    jaVenceu = true;
+    for (const c of controladores) { try { c.abort(); } catch { /* já terminou */ } }
+    return res;
+  } catch {
+    const primeiro = erros[0];
+    if (primeiro) throw rewriteError(primeiro.err, primeiro.indice, primeiro.classificado);
+    throw new Error("TTS: todas as tentativas falharam");
+  }
+}
+
+/**
  * Gera fala a partir de texto. `voiceName` (opcional) sobrescreve a voz padrão — vem do
  * seletor de voz do Assistente (guardado no navegador, ver src/app/api/speak/route.js).
- * Retorna { base64, sampleRate, mime } — áudio PCM cru (L16) que a rota
- * converte em WAV para o navegador tocar.
+ * Retorna { base64, sampleRate, mime } — áudio PCM cru (L16) que a rota converte em WAV.
  */
 export async function synthesizeSpeech(text, voiceName) {
   const voice = TTS_VOICES.some((v) => v.name === voiceName) ? voiceName : DEFAULT_TTS_VOICE;
-  // Fala AO VIVO durante a conversa — 2 tentativas, cada uma numa chave diferente do pool
-  // (a saúde por chave×modelo já evita repetir uma que sabidamente está zerada pra TTS).
-  const res = await withTransientRetry(
-    TTS_MODEL,
-    (client) => {
-      // Teto POR TENTATIVA. Sem ele o SDK espera indefinidamente, e a distribuição É bimodal:
-      // ou a chamada volta em ~16-20s, ou pendura. A leitura original estava certa; foi a
-      // minha releitura dela ("o que separa rápidas de lentas é o tamanho do texto") que
-      // estava errada, e a medição de 16/09/2026 a desmentiu.
-      const controlador = new AbortController();
-      const relogio = setTimeout(() => controlador.abort(), TTS_TETO_POR_TENTATIVA_MS);
-      return client.models
-        .generateContent({
-          model: TTS_MODEL,
-          contents: [{ parts: [{ text }] }],
-          config: {
-            responseModalities: ["AUDIO"],
-            speechConfig: {
-              voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
-            },
-            abortSignal: controlador.signal,
-          },
-        })
-        .finally(() => clearTimeout(relogio));
-    },
-    // TRÊS tentativas, e não duas. Isto é o que mais importa para a taxa de queda para a voz
-    // do navegador, e a conta é direta: se metade das tentativas pendura, duas tentativas
-    // falham juntas em 25% das vezes e três em 12,5%. Eu tinha baixado para duas ao alargar o
-    // teto, e foi isso que fez o Modo Rádio cair para o navegador com muito mais frequência.
-    //
-    // Cabe no orçamento: 3 × 26s + as esperas = 79,8s, contra os 85s que o navegador aguarda
-    // (ver SPEAK_TIMEOUT_MS no Assistente). `npm run fala-check` confere essa conta.
-    { attempts: 3, delayMs: 600 }
-  );
+  const res = await sintetizarComHedge(text, voice);
 
   const part = res?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
   const inline = part?.inlineData;
