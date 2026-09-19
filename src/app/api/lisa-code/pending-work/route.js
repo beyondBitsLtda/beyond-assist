@@ -1,6 +1,6 @@
 import { getCategoryData } from "@/lib/pendingWork.js";
 import { jsonResponse } from "@/lib/http.js";
-import { checkLisaCodeToken } from "@/lib/lisaCodeAuth.js";
+import { conferirTokenDaExtensao } from "@/lib/lisaCodeAuth.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +16,8 @@ const VALID_SOURCES = new Set(["trello", "delp", "sentinel", "thoughts"]);
  */
 export async function GET(req) {
   try {
-    if (!checkLisaCodeToken(req)) return jsonResponse({ ok: false, error: "token inválido ou LISA_EXTENSION_TOKEN não configurado no servidor" }, 401);
+    const acesso = conferirTokenDaExtensao(req);
+    if (!acesso.ok) return jsonResponse({ ok: false, error: acesso.motivo }, 401);
 
     const source = new URL(req.url).searchParams.get("source");
     if (!VALID_SOURCES.has(source)) return jsonResponse({ ok: false, error: "source inválido — use trello, delp, sentinel ou thoughts" }, 400);

@@ -30,8 +30,31 @@ function iguaisEmTempoConstante(a, b) {
  * não estiver configurada, nega por padrão (fail-closed) — melhor pedir pra configurar do que
  * deixar a rota aberta sem querer. */
 export function checkLisaCodeToken(req) {
+  return conferirTokenDaExtensao(req).ok;
+}
+
+/**
+ * Como acima, mas dizendo QUAL dos dois problemas aconteceu.
+ *
+ * A mensagem antiga era "token inválido ou LISA_EXTENSION_TOKEN não configurado no servidor" —
+ * dois problemas com consertos opostos numa frase só. Um se resolve no VS Code, o outro no
+ * servidor, e a frase não dizia para qual lado ir. Custou uma rodada inteira de investigação
+ * em 18/09/2026, olhando o lado errado.
+ *
+ * Distinguir os dois não vaza nada: "este servidor não tem token configurado" é uma verdade
+ * sobre a CONFIGURAÇÃO, não sobre o segredo. Quem não tem o token continua sem saber qual é.
+ */
+export function conferirTokenDaExtensao(req) {
   const expected = process.env.LISA_EXTENSION_TOKEN;
-  if (!expected) return false;
+  if (!expected) {
+    return { ok: false, motivo: "LISA_EXTENSION_TOKEN não está configurado NESTE servidor — configure lá, não no VS Code" };
+  }
   const got = req.headers.get("x-lisa-token") || "";
-  return iguaisEmTempoConstante(got, expected);
+  if (!got) {
+    return { ok: false, motivo: "a extensão não mandou token — rode \"Lisa Code: Configurar token pessoal\"" };
+  }
+  if (!iguaisEmTempoConstante(got, expected)) {
+    return { ok: false, motivo: "o token da extensão não bate com o deste servidor — rode \"Lisa Code: Configurar token pessoal\" com o valor certo" };
+  }
+  return { ok: true };
 }

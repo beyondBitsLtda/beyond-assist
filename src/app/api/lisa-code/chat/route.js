@@ -1,6 +1,6 @@
 import { runLisaCodeTurn } from "@/lib/gemini.js";
 import { jsonResponse } from "@/lib/http.js";
-import { checkLisaCodeToken } from "@/lib/lisaCodeAuth.js";
+import { conferirTokenDaExtensao } from "@/lib/lisaCodeAuth.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +15,8 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req) {
   try {
-    if (!checkLisaCodeToken(req)) return jsonResponse({ ok: false, error: "token inválido ou LISA_EXTENSION_TOKEN não configurado no servidor" }, 401);
+    const acesso = conferirTokenDaExtensao(req);
+    if (!acesso.ok) return jsonResponse({ ok: false, error: acesso.motivo }, 401);
 
     const { contents, provedor } = await req.json();
     if (!Array.isArray(contents) || !contents.length) return jsonResponse({ ok: false, error: "contents é obrigatório" }, 400);
