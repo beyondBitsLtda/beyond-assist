@@ -27,11 +27,18 @@ export function bindChatMessages(webview: vscode.Webview, client: LisaClient): C
       base: client.getCompareBase() || null,
       file: ed ? vscode.workspace.asRelativePath(ed.document.uri, false) : null,
       includeFile: client.getIncludeEditorContext(),
+      modelo: vscode.workspace.getConfiguration("lisaCode").get<string>("modelo", "gemini"),
     });
   };
 
   const disposables: vscode.Disposable[] = [
     vscode.window.onDidChangeActiveTextEditor(() => void postContext()),
+    // O modelo pode ser trocado por FORA, na tela de Configurações. Sem isto o chip ficaria
+    // mostrando o valor velho até alguém clicar nele — e um chip que mente sobre o estado é
+    // pior que nenhum chip.
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("lisaCode.modelo")) void postContext();
+    }),
   ];
 
   webview.onDidReceiveMessage(async (msg) => {
@@ -47,6 +54,17 @@ export function bindChatMessages(webview: vscode.Webview, client: LisaClient): C
       });
       if (picked === undefined) return;
       client.setCompareBase(picked === NO_BASE ? undefined : picked);
+      await postContext();
+      return;
+    }
+
+    if (msg?.type === "toggle-modelo") {
+      // Alterna e grava na MESMA configuração que a tela de Configurações edita — não existe
+      // um segundo lugar guardando isso. Quem trocar por lá vê o chip mudar, e vice-versa.
+      const cfg = vscode.workspace.getConfiguration("lisaCode");
+      const atual = cfg.get<string>("modelo", "gemini");
+      const novo = atual === "gemini" ? "groq" : "gemini";
+      await cfg.update("modelo", novo, vscode.ConfigurationTarget.Global);
       await postContext();
       return;
     }
@@ -237,6 +255,7 @@ export function getChatHtml(): string {
       <span class="chip" id="chipBranch" title="Branch em que você está agora">⎇ —</span>
       <span class="chip clickable off" id="chipCompare" title="Escolher branch de comparação — só referência pra Lisa, NÃO faz checkout">⇄ comparar…</span>
       <span class="chip clickable" id="chipFile" title="Incluir o arquivo aberto (e a seleção) no contexto da conversa">📄 —</span>
+      <span class="chip clickable" id="chipModelo" title="Qual modelo responde — clique pra alternar">◈ —</span>
     </div>
 
     <div id="progressWrap">
@@ -328,6 +347,8 @@ export function getChatHtml(): string {
   const chipFile = document.getElementById("chipFile");
   chipCompare.addEventListener("click", () => vscodeApi.postMessage({ type: "pick-branch" }));
   chipFile.addEventListener("click", () => vscodeApi.postMessage({ type: "toggle-file-context" }));
+  const chipModelo = document.getElementById("chipModelo");
+  chipModelo.addEventListener("click", () => vscodeApi.postMessage({ type: "toggle-modelo" }));
 
   function shortPath(p) {
     if (!p) return null;
@@ -342,6 +363,14 @@ export function getChatHtml(): string {
     chipCompare.textContent = ctx.base ? "⇄ vs " + ctx.base : "⇄ comparar…";
     chipCompare.classList.toggle("on", !!ctx.base);
     chipCompare.classList.toggle("off", !ctx.base);
+
+    // O chip fica sempre aceso: ao contrário dos outros, ele nunca está "desligado" — há
+    // sempre um modelo respondendo, e saber QUAL é a informação que ele existe para dar.
+    chipModelo.textContent = "◈ " + (ctx.modelo || "gemini");
+    chipModelo.classList.add("on");
+    chipModelo.title = ctx.modelo === "groq"
+      ? "Respondendo pela Groq — clique pra voltar ao Gemini"
+      : "Respondendo pelo Gemini — clique pra usar a Groq";
 
     chipFile.textContent = "📄 " + (shortPath(ctx.file) || "nenhum arquivo");
     chipFile.title = ctx.includeFile
