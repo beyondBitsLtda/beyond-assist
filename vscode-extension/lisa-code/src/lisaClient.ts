@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { gitSnapshot, gitHeadInfo, gitCreateBranch, gitStageAndCommit, gitPushCurrent } from "./gitContext";
 import { avaliarComando, PERMITIDOS_PADRAO } from "./comandosPermitidos";
+import { resumoDaDocumentacao } from "./documentacao";
 
 /** Arquivos que NUNCA deveriam entrar num commit sem uma olhada extra — o aviso aparece em
  * destaque no diálogo de confirmação (mesmo cuidado de sempre: conferir o que vai no commit
@@ -521,6 +522,61 @@ export class LisaClient {
    * e no git; um comando errado pode não ter volta. Quem quiser tudo liberado muda a
    * configuração `lisaCode.terminalSempreConfirma` conscientemente, e não de raspão.
    */
+  /**
+   * O que este arquivo exporta sem explicação nenhuma.
+   *
+   * Roda aqui, e não no servidor, porque o arquivo é do usuário e não precisa sair da máquina
+   * dele para esta pergunta ser respondida — mesma regra de todas as outras ferramentas.
+   */
+  private async execFindUndocumented(args: Record<string, unknown>): Promise<unknown> {
+    const relPath = String(args.path || "");
+    try {
+      const uri = this.resolveWorkspacePath(relPath);
+      const bytes = await vscode.workspace.fs.readFile(uri);
+      const resumo = resumoDaDocumentacao(Buffer.from(bytes).toString("utf8"));
+      return {
+        path: relPath,
+        total: resumo.total,
+        documentados: resumo.documentados,
+        faltando: resumo.itens,
+        // Dito por extenso para não depender de o modelo interpretar um zero corretamente —
+        // a diferença entre "está tudo documentado" e "não achei nada" muda a resposta dele.
+        nota: resumo.total === 0
+          ? "este arquivo não exporta nada"
+          : resumo.semDoc === 0
+            ? "tudo que este arquivo exporta já está explicado — não proponha mudança"
+            : `${resumo.semDoc} de ${resumo.total} exportações estão sem explicação`,
+      };
+    } catch (err) {
+      return { error: `não consegui ler ${relPath}: ${(err as Error).message}` };
+    }
+  }
+
+  /**
+   * Manda o servidor rodar, em vez de rodar aqui.
+   *
+   * Não é sandbox — é outro raio de alcance. O comando roda como o usuário do iMac, com tudo
+   * que ele pode fazer. O ganho é que o iMac se reconstrói numa tarde e o notebook de trabalho
+   * não. A rota do outro lado confere a lista de liberados de novo, por conta própria.
+   */
+  private async execRunCommandRemoto(comando: string): Promise<unknown> {
+    try {
+      const token = await this.getToken();
+      const baseUrl = this.getBaseUrl();
+      if (!token || !baseUrl) return { error: "token ou URL do Beyond Bits não configurados" };
+      const res = await fetch(`${baseUrl}/api/lisa-code/executar`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-lisa-token": token },
+        body: JSON.stringify({ comando }),
+      });
+      const data = (await res.json()) as Record<string, unknown>;
+      if (!data?.ok) return { error: String(data?.error || `HTTP ${res.status}`) };
+      return data;
+    } catch (err) {
+      return { error: `não consegui falar com o servidor: ${(err as Error).message}` };
+    }
+  }
+
   private async execRunCommand(args: Record<string, unknown>): Promise<unknown> {
     const comando = String(args.command || "").trim();
     const porque = String(args.explanation || "");
@@ -530,6 +586,11 @@ export class LisaClient {
     if (!cfg.get<boolean>("terminalEnabled", false)) {
       return { error: "execução no terminal está desligada (Configurações → Lisa Code → terminalEnabled)" };
     }
+
+    // "casa" manda para o servidor rodar. A confirmação NÃO se aplica ali: não há ninguém
+    // olhando a tela do servidor, então o que decide é só a lista de liberados, conferida lá
+    // de novo — a checagem daqui não protegeria uma chamada que não viesse desta extensão.
+    if (String(args.onde || "aqui") === "casa") return this.execRunCommandRemoto(comando);
 
     const permitidos = cfg.get<string[]>("comandosPermitidos") || PERMITIDOS_PADRAO;
     const sempreConfirma = cfg.get<boolean>("terminalSempreConfirma", false);
@@ -585,6 +646,7 @@ export class LisaClient {
     if (name === "create_branch") return this.execCreateBranch(args);
     if (name === "git_commit") return this.execCommit(args);
     if (name === "git_push") return this.execPush(args);
+    if (name === "find_undocumented") return this.execFindUndocumented(args);
     if (name === "run_command") return this.execRunCommand(args);
     if (name === "report_progress") return { ok: true }; // não executa nada de verdade — só um sinal de UI (ver send())
     return { error: `ferramenta desconhecida: ${name}` };

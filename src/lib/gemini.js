@@ -1203,6 +1203,7 @@ REGRAS IMPORTANTES:
 - Use get_git_context quando o assunto envolver branch, "o que eu mudei", ou comparação com outra branch. A mensagem do usuário pode vir com um bloco "[contexto do editor]" no começo, dizendo qual arquivo está aberto, a linha do cursor, o trecho selecionado e a branch de comparação escolhida — use isso pra saber onde ele está sem perguntar, mas não repita esse bloco de volta pra ele.
 - SEMPRE narre em texto, ANTES de cada ferramenta que for chamar, uma frase curta (1 linha) dizendo o que vai fazer e em qual arquivo/onde — nunca chame uma ferramenta em silêncio, sem explicar antes o que está prestes a fazer.
 - Em qualquer tarefa de CÓDIGO que vá precisar de mais de uma ferramenta (ex.: ler + editar, ou editar vários arquivos), chame report_progress logo no início com uma estimativa de quantas etapas o trabalho vai ter, e chame de novo a cada etapa concluída, atualizando o percentual. Sempre feche em percent:100 quando a tarefa acabar de verdade (inclusive se o usuário rejeitar uma proposta — feche o ciclo mesmo assim). Isso é uma ESTIMATIVA sua, não uma medição exata — não precisa ser perfeita, só dar uma noção real de progresso. Não use isso pra perguntas simples que não envolvem mexer em código.
+- Para DOCUMENTAR: use find_undocumented primeiro, nunca proponha às cegas. Se não faltar nada, diga isso e pare — este repositório é comentado com cuidado, e reescrever comentário bom é pior que não fazer nada. Quando faltar, siga o estilo da CASA, que não é JSDoc genérico: explique o PORQUÊ da decisão (não o que o código obviamente faz), cite a medição ou o bug real que motivou aquilo quando houver, e prefira uma frase que evite um erro futuro a uma lista de @param. Um exemplo de uso vale mais que três linhas de tipos — se precisar de um, use search_workspace para achar quem já chama a função e escreva o exemplo a partir do uso REAL.
 - A mensagem do usuário pode trazer, dentro do bloco "[contexto do editor]", uma seção "[do Beyond Bits, relacionado ao arquivo aberto]" com cards, tarefas, chamados ou pensamentos que têm a ver com o arquivo que ele está editando. Isso chega SOZINHO, sem ele pedir — use quando ajudar ("vi que tem um card sobre isso...") e ignore quando não vier ao caso. Nunca repita o bloco de volta para ele, e nunca invente item que não esteja ali.
 - Você pode rodar comandos no terminal com run_command e LER a saída — use isso em vez de perguntar ao usuário o que deu: rode os testes, confira o build, veja a versão instalada. Um comando de cada vez, sem encadear com ; && | ou > (encadear força confirmação e atrasa). Se um comando falhar, a saída vem junto: leia o erro e conserte, não repita o mesmo comando esperando outro resultado. Essa ferramenta pode estar desligada; se vier um erro dizendo isso, siga sem ela em vez de insistir.
 - Seja direta e técnica quando o assunto for código (você está ajudando um desenvolvedor dentro do editor dele), mas mantenha seu jeito de ser nas outras conversas.`;
@@ -1334,6 +1335,19 @@ const LISA_CODE_TOOLS = [
         },
       },
       {
+        name: "find_undocumented",
+        description:
+          "Lista o que um arquivo EXPORTA sem nenhuma explicação acima — função, classe ou constante. " +
+          "Use ANTES de propor documentação: ela transforma 'documente este arquivo' numa lista concreta e " +
+          "evita reescrever comentário que já está bom. Se a lista vier vazia, diga que o arquivo já está " +
+          "documentado e NÃO proponha mudança nenhuma.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: { path: { type: "string", description: "Caminho do arquivo, relativo à raiz do workspace" } },
+          required: ["path"],
+        },
+      },
+      {
         name: "run_command",
         description:
           "Roda um comando no terminal do workspace do usuário e devolve a saída para você ler. " +
@@ -1347,6 +1361,15 @@ const LISA_CODE_TOOLS = [
           properties: {
             command: { type: "string", description: "O comando exato, um só, sem encadeamento" },
             explanation: { type: "string", description: "Uma frase dizendo por que você precisa rodar isso" },
+            onde: {
+              type: "string",
+              enum: ["aqui", "casa"],
+              description:
+                "Onde rodar. 'aqui' (padrão) é a máquina do usuário, onde está o código que ele edita. " +
+                "'casa' é o servidor dele — use quando o comando for demorado, pesado ou arriscado, porque " +
+                "lá um erro não atrapalha o trabalho dele. Em 'casa' NÃO existe confirmação: o que não está " +
+                "na lista de liberados simplesmente não roda.",
+            },
           },
           required: ["command", "explanation"],
         },

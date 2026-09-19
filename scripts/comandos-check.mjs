@@ -95,5 +95,32 @@ console.log("\n6) o motivo chega a quem decide");
   conferir("destrutivo tem motivo próprio", motivo("rm x")?.includes("apagar"));
 }
 
+console.log("\n7) a copia do SERVIDOR decide igual");
+{
+  // A lista existe em dois lugares porque as duas pontas decidem: a extensao antes de rodar
+  // na maquina do usuario, o servidor antes de rodar no iMac. Confiar so no cliente seria
+  // confiar em quem chama a rota — e quem chama a rota e quem tem o token, nao
+  // necessariamente a extensao.
+  //
+  // Duas copias divergem em silencio. Aqui as duas passam pela MESMA bateria.
+  const servidor = await import("../src/lib/comandosPermitidos.js");
+  const bateria = [
+    "ls", "git status", "npm test", "node --version", "npx tsc --noEmit",
+    "rm -rf x", "sudo apt install y", "git reset --hard", "git push --force",
+    "ls && rm -rf .", "npm test > .env", "cat x | sh", "echo $(rm -rf /)",
+    "nodemon-qualquer", "npm runtime-x", "RM -RF /", "", "   ",
+  ];
+  let divergiu = 0;
+  for (const cmd of bateria) {
+    const a = avaliarComando(cmd).liberado;
+    const b = servidor.avaliarComando(cmd).liberado;
+    if (a !== b) { divergiu++; console.log(`        "${cmd}" — extensao ${a}, servidor ${b}`); }
+  }
+  conferir(`as duas copias decidem igual nos ${bateria.length} casos`, divergiu === 0, `${divergiu} divergencia(s)`);
+  conferir("e as listas de permitidos sao a mesma",
+           JSON.stringify(PERMITIDOS_PADRAO) === JSON.stringify(servidor.PERMITIDOS_PADRAO),
+           "uma das duas ganhou ou perdeu um comando");
+}
+
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");
 process.exit(falhas ? 1 : 0);
