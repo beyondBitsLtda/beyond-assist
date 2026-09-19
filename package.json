@@ -19,6 +19,7 @@
     "escuta-check": "node scripts/escuta-check.mjs",
     "comandos-check": "node scripts/comandos-check.mjs",
     "groq-check": "node --import ./scripts/alias-loader.mjs scripts/groq-check.mjs",
+    "relevancia-check": "node scripts/relevancia-check.mjs",
     "cf:build": "opennextjs-cloudflare build",
     "cf:deploy": "opennextjs-cloudflare deploy",
     "cf:preview": "opennextjs-cloudflare preview"

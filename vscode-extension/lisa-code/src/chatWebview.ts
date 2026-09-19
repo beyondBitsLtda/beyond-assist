@@ -32,7 +32,12 @@ export function bindChatMessages(webview: vscode.Webview, client: LisaClient): C
   };
 
   const disposables: vscode.Disposable[] = [
-    vscode.window.onDidChangeActiveTextEditor(() => void postContext()),
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      void postContext();
+      // Ao trocar de arquivo, já busca o que o Beyond Bits sabe sobre ele — assim a informação
+      // está pronta quando você escrever, em vez de atrasar a primeira mensagem.
+      void client.atualizarContextoDoArquivo();
+    }),
     // O modelo pode ser trocado por FORA, na tela de Configurações. Sem isto o chip ficaria
     // mostrando o valor velho até alguém clicar nele — e um chip que mente sobre o estado é
     // pior que nenhum chip.
@@ -77,6 +82,7 @@ export function bindChatMessages(webview: vscode.Webview, client: LisaClient): C
 
     if (msg?.type === "ready") {
       await postContext();
+      void client.atualizarContextoDoArquivo(); // o arquivo já aberto quando o painel abriu
       return;
     }
 

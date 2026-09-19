@@ -69,6 +69,10 @@ export class LisaClient {
    *  o cliente vive: fechar o painel devolve o comportamento de perguntar sempre, que é o
    *  padrão certo para algo que escreve no disco. */
   private aplicarTudoNaSessao = false;
+  /** O bloco do Beyond Bits sobre o arquivo aberto, e de qual arquivo ele é. Vazio é o
+   *  caso comum e correto: a maioria dos arquivos não tem card nenhum falando deles. */
+  private contextoDoArquivo = "";
+  private arquivoDoContexto = "";
 
   constructor(private context: vscode.ExtensionContext) {
     context.subscriptions.push(
@@ -109,7 +113,43 @@ export class LisaClient {
       parts.push(`trecho selecionado:\n${selected.length > MAX ? selected.slice(0, MAX) + "\n...(seleção truncada)" : selected}`);
     }
     if (this.compareBase) parts.push(`branch de comparação escolhida: ${this.compareBase}`);
+    // O que o Beyond Bits sabe sobre ESTE arquivo — cards, chamados, tarefas, pensamentos.
+    // Vem do cache preenchido ao trocar de arquivo; nunca bloqueia a mensagem esperando rede.
+    if (this.contextoDoArquivo) parts.push(this.contextoDoArquivo);
     return parts.join("\n") + "\n\n";
+  }
+
+  /**
+   * Busca no Beyond Bits o que tem a ver com o arquivo aberto, e guarda.
+   *
+   * Chamado quando você TROCA DE ARQUIVO, não a cada mensagem. A diferença importa: numa
+   * conversa de vinte mensagens sobre o mesmo arquivo isso é uma consulta em vez de vinte.
+   *
+   * Falhar aqui não pode atrapalhar nada: sem o contexto extra a Lisa responde como
+   * respondia antes desta funcionalidade existir. Por isso todo erro vira silêncio.
+   */
+  async atualizarContextoDoArquivo(): Promise<void> {
+    const ed = vscode.window.activeTextEditor;
+    const arquivo = ed ? vscode.workspace.asRelativePath(ed.document.uri, false) : "";
+    if (arquivo === this.arquivoDoContexto) return; // mesmo arquivo — o cache serve
+    this.arquivoDoContexto = arquivo;
+    this.contextoDoArquivo = "";
+    if (!arquivo) return;
+
+    try {
+      const token = await this.getToken();
+      const baseUrl = this.getBaseUrl();
+      if (!token || !baseUrl) return;
+      const res = await fetch(`${baseUrl}/api/lisa-code/contexto?file=${encodeURIComponent(arquivo)}`, {
+        headers: { "x-lisa-token": token },
+      });
+      const data = (await res.json()) as { ok?: boolean; bloco?: string };
+      // Só guarda se o arquivo ainda for o mesmo: numa troca rápida de abas, a resposta de
+      // uma consulta antiga pode chegar depois da nova e colar o contexto do arquivo errado.
+      if (data?.ok && this.arquivoDoContexto === arquivo) this.contextoDoArquivo = data.bloco || "";
+    } catch {
+      /* sem contexto extra — a conversa segue igual */
+    }
   }
 
   private async getToken(): Promise<string | undefined> {
