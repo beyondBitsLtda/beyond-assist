@@ -1203,6 +1203,7 @@ REGRAS IMPORTANTES:
 - Use get_git_context quando o assunto envolver branch, "o que eu mudei", ou comparação com outra branch. A mensagem do usuário pode vir com um bloco "[contexto do editor]" no começo, dizendo qual arquivo está aberto, a linha do cursor, o trecho selecionado e a branch de comparação escolhida — use isso pra saber onde ele está sem perguntar, mas não repita esse bloco de volta pra ele.
 - SEMPRE narre em texto, ANTES de cada ferramenta que for chamar, uma frase curta (1 linha) dizendo o que vai fazer e em qual arquivo/onde — nunca chame uma ferramenta em silêncio, sem explicar antes o que está prestes a fazer.
 - Em qualquer tarefa de CÓDIGO que vá precisar de mais de uma ferramenta (ex.: ler + editar, ou editar vários arquivos), chame report_progress logo no início com uma estimativa de quantas etapas o trabalho vai ter, e chame de novo a cada etapa concluída, atualizando o percentual. Sempre feche em percent:100 quando a tarefa acabar de verdade (inclusive se o usuário rejeitar uma proposta — feche o ciclo mesmo assim). Isso é uma ESTIMATIVA sua, não uma medição exata — não precisa ser perfeita, só dar uma noção real de progresso. Não use isso pra perguntas simples que não envolvem mexer em código.
+- Você pode rodar comandos no terminal com run_command e LER a saída — use isso em vez de perguntar ao usuário o que deu: rode os testes, confira o build, veja a versão instalada. Um comando de cada vez, sem encadear com ; && | ou > (encadear força confirmação e atrasa). Se um comando falhar, a saída vem junto: leia o erro e conserte, não repita o mesmo comando esperando outro resultado. Essa ferramenta pode estar desligada; se vier um erro dizendo isso, siga sem ela em vez de insistir.
 - Seja direta e técnica quando o assunto for código (você está ajudando um desenvolvedor dentro do editor dele), mas mantenha seu jeito de ser nas outras conversas.`;
 
 const LISA_CODE_TOOLS = [
@@ -1332,6 +1333,24 @@ const LISA_CODE_TOOLS = [
         },
       },
       {
+        name: "run_command",
+        description:
+          "Roda um comando no terminal do workspace do usuário e devolve a saída para você ler. " +
+          "Use para o que você não consegue saber de outro jeito: rodar os testes, conferir se o build passa, " +
+          "ver a versão de um pacote, listar arquivos de uma pasta grande. " +
+          "Comandos de rotina rodam direto; qualquer outro abre uma confirmação para o usuário, então NÃO tente " +
+          "contornar a lista encadeando comandos (; && | >) — isso força confirmação e atrasa o trabalho. " +
+          "Um comando que sai com erro devolve a saída normalmente: um teste que falhou é informação, não acidente.",
+        parametersJsonSchema: {
+          type: "object",
+          properties: {
+            command: { type: "string", description: "O comando exato, um só, sem encadeamento" },
+            explanation: { type: "string", description: "Uma frase dizendo por que você precisa rodar isso" },
+          },
+          required: ["command", "explanation"],
+        },
+      },
+      {
         name: "report_progress",
         description: "Atualiza o progresso estimado de uma tarefa de código com várias etapas — chame cedo com uma estimativa, e de novo a cada etapa concluída. Sempre termine em percent:100 quando a tarefa acabar. É a SUA estimativa, não uma medição exata.",
         parametersJsonSchema: {
@@ -1351,7 +1370,19 @@ const LISA_CODE_TOOLS = [
  * qualquer chamada/resposta de função de turnos anteriores) e devolve só o próximo turno cru do
  * modelo (texto e/ou chamadas de função). Quem gerencia o histórico e EXECUTA as ferramentas é
  * sempre quem chama (a extensão do VS Code) — este servidor nunca toca em arquivo nenhum. */
-export async function runLisaCodeTurn(contents) {
+export async function runLisaCodeTurn(contents, { provedor = "gemini" } = {}) {
+  // A extensão escolhe o provedor a cada turno (configuração lisaCode.modelo). Deixar a
+  // escolha vir do cliente, e não de uma variável do servidor, é o que permite trocar no meio
+  // de uma tarde sem republicar nada — foi o pedido.
+  //
+  // A conversa NÃO é traduzida de um lado para o outro no meio do caminho: o histórico vive
+  // no formato do Gemini, sempre, e a tradução acontece a cada turno. Trocar de provedor com
+  // uma conversa em andamento funciona por causa disso.
+  if (provedor === "groq") {
+    const { turnoNaGroq } = await import("./groq.js");
+    return turnoNaGroq(contents, { instrucao: LISA_CODE_INSTRUCTION, ferramentas: LISA_CODE_TOOLS });
+  }
+
   const res = await withTransientRetry(
     CHAT_MODEL,
     (client) =>

@@ -17,11 +17,14 @@ export async function POST(req) {
   try {
     if (!checkLisaCodeToken(req)) return jsonResponse({ ok: false, error: "token inválido ou LISA_EXTENSION_TOKEN não configurado no servidor" }, 401);
 
-    const { contents } = await req.json();
+    const { contents, provedor } = await req.json();
     if (!Array.isArray(contents) || !contents.length) return jsonResponse({ ok: false, error: "contents é obrigatório" }, 400);
 
-    const content = await runLisaCodeTurn(contents);
-    return jsonResponse({ ok: true, content });
+    // Só dois valores são aceitos, e qualquer outra coisa cai no Gemini. Sem essa trava, um
+    // valor com erro de digitação viraria "provedor desconhecido" num ponto bem mais fundo.
+    const escolhido = provedor === "groq" ? "groq" : "gemini";
+    const content = await runLisaCodeTurn(contents, { provedor: escolhido });
+    return jsonResponse({ ok: true, content, provedor: escolhido });
   } catch (err) {
     const keySuffix = err?.keyLabel ? ` [${err.keyLabel}]` : "";
     return jsonResponse({ ok: false, error: `${String(err?.message || err)}${keySuffix}` }, 500);

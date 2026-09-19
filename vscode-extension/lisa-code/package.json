@@ -40,6 +40,32 @@
           "type": "boolean",
           "default": true,
           "description": "Permite que a Lisa crie branch, commite e dê push (cada operação ainda pede sua confirmação). Desligue pra tirar essas ferramentas de circulação sem desinstalar a extensão."
+        },
+        "lisaCode.modelo": {
+          "type": "string",
+          "enum": ["gemini", "groq"],
+          "enumDescriptions": [
+            "Gemini — o padrão, com o pool de 35 chaves em rodízio.",
+            "Groq — muito mais rápido, camada gratuita própria. Exige GROQ_API_KEY no servidor da Lisa."
+          ],
+          "default": "gemini",
+          "description": "Qual modelo responde na Lisa Code. A troca vale já na próxima mensagem, mesmo no meio de uma conversa — o histórico é guardado num formato só e traduzido a cada turno."
+        },
+        "lisaCode.terminalEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Permite que a Lisa rode comandos no terminal e leia a saída. Nasce DESLIGADO de propósito: é a única ferramenta dela que pode fazer algo sem volta. Comandos de rotina (ver comandosPermitidos) rodam direto; o resto pede sua confirmação, mostrando o comando exato."
+        },
+        "lisaCode.terminalSempreConfirma": {
+          "type": "boolean",
+          "default": false,
+          "description": "Pedir confirmação em TODO comando, inclusive os da lista de permitidos. Mais seguro e mais cansativo — e o cansaço faz a gente clicar sem ler, que é o pior dos mundos."
+        },
+        "lisaCode.comandosPermitidos": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["ls", "dir", "pwd", "cat", "type", "head", "tail", "wc", "find", "grep", "rg", "which", "where", "git status", "git log", "git diff", "git branch", "git show", "git remote", "git stash list", "npm run", "npm test", "npm ci", "npm install", "npm list", "npx tsc", "node", "python", "python3", "pnpm", "yarn", "tsc", "jest", "vitest", "eslint", "prettier"],
+          "description": "Comandos que rodam sem perguntar. A comparação é por prefixo de palavra inteira, e nada com ; && | > $ passa direto, mesmo começando com um item desta lista."
         }
       }
     },
