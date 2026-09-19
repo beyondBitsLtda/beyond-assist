@@ -89,13 +89,22 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("lisaCode.setToken", async () => {
       const value = await vscode.window.showInputBox({
         title: "Lisa Code — token pessoal",
-        prompt: "Cole o mesmo valor configurado em LISA_EXTENSION_TOKEN no Vercel. Fica guardado só nesta máquina.",
+        prompt: "Cole o mesmo valor de LISA_EXTENSION_TOKEN configurado no servidor da Lisa. Fica guardado só nesta máquina.",
         password: true,
         ignoreFocusOut: true,
       });
       if (value === undefined) return;
-      await context.secrets.store(TOKEN_KEY, value);
-      vscode.window.showInformationMessage("Lisa Code: token salvo.");
+      // `trim()` porque colar de um arquivo traz a quebra de linha junto, e o campo é do tipo
+      // senha: os caracteres invisíveis não aparecem para conferir. O token ia para o servidor
+      // com uma quebra de linha no fim e era recusado, com a mensagem dizendo "não bate" —
+      // verdade, mas inútil, porque o que estava escrito na tela batia perfeitamente.
+      const limpo = value.trim();
+      if (!limpo) {
+        vscode.window.showWarningMessage("Lisa Code: token vazio — nada foi salvo.");
+        return;
+      }
+      await context.secrets.store(TOKEN_KEY, limpo);
+      vscode.window.showInformationMessage(`Lisa Code: token salvo (${limpo.length} caracteres).`);
     }),
 
     vscode.commands.registerCommand("lisaCode.setBaseUrl", async () => {

@@ -113,7 +113,10 @@ export class LisaClient {
   }
 
   private async getToken(): Promise<string | undefined> {
-    return this.context.secrets.get("lisaCode.token");
+    // Apara também na LEITURA: um token guardado antes desta correção continua com a quebra
+    // de linha dentro do cofre, e reconfigurar seria a única saída sem isto.
+    const guardado = await this.context.secrets.get("lisaCode.token");
+    return guardado?.trim();
   }
 
   private getBaseUrl(): string {
