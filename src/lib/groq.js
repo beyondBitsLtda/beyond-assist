@@ -32,9 +32,16 @@ const CHAVES = (process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || "")
   .map((k) => k.trim())
   .filter(Boolean);
 
-// Modelo padrão. Fica em variável porque os nomes na Groq mudam com alguma frequência, e um
-// nome morto aqui dentro daria "modelo não encontrado" sem explicar onde consertar.
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+// Modelo padrão. Fica em variável porque os nomes na Groq mudam com frequência — e não é
+// hipótese: o primeiro padrão que escrevi aqui, "llama-3.3-70b-versatile", já não existia no
+// catálogo 48 horas depois. É por isso que o erro de modelo desconhecido lista os disponíveis
+// em vez de mandar procurar na documentação.
+//
+// Escolhido entre os que a conta enxergava em 19/09/2026 por ser o maior com suporte a
+// ferramentas — que é o que a Lisa Code precisa para ler arquivo, propor edição e rodar
+// comando. Os outros candidatos eram openai/gpt-oss-20b (menor, mais rápido) e
+// qwen/qwen3.8-27b.
+const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 
 /** Converte o histórico do formato do Gemini para o formato de mensagens da OpenAI/Groq. */
 export function paraMensagensOpenAI(contents, instrucaoDeSistema) {
