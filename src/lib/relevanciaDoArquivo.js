@@ -61,7 +61,7 @@ const TRADUCOES = {
  * assim que são escritos num card: ninguém abre um card chamado "geminiKeyHealth", abre
  * "saúde das chaves do Gemini".
  */
-export function termosDoArquivo(caminho) {
+export function termosDoArquivo(caminho, conteudo = "") {
   // A separação de camelCase precisa acontecer ANTES de baixar a caixa — depois do toLowerCase
   // não há mais maiúscula para encontrar. Por isso o corte é feito no caminho ORIGINAL e a
   // normalização vem depois, e não o contrário.
@@ -78,7 +78,55 @@ export function termosDoArquivo(caminho) {
   // Cada termo entra também traduzido, quando há tradução. Os dois valem: o card pode estar
   // escrito de qualquer um dos lados.
   const comTraducao = uteis.flatMap((t) => (TRADUCOES[t] ? [t, TRADUCOES[t]] : [t]));
-  return [...new Set(comTraducao)];
+  return [...new Set([...comTraducao, ...termosDoConteudo(conteudo)])];
+}
+
+/**
+ * Os termos que o PRÓPRIO ARQUIVO declara sobre si.
+ *
+ * Eu tinha escrito aqui que ler o conteúdo traria palavras genéricas demais. Isso é verdade
+ * para o CORPO — `const`, `return`, `function` casam com tudo e com nada — e é falso para o
+ * CABEÇALHO, que é justamente onde o arquivo diz do que trata.
+ *
+ * O caso que me mostrou isso foi real: `cronograma/index.html` dá só o termo "cronograma", e o
+ * que aquele arquivo É está escrito no título dele — "Painel SEO · Montador de Móveis". O card
+ * que falava dele dizia "montador de móveis". Sem ler o título, nada casava, e a Lisa pedia o
+ * caminho do arquivo de volta para o usuário.
+ *
+ * Só entram lugares onde uma pessoa escreve o ASSUNTO. O corpo do código continua de fora.
+ */
+export function termosDoConteudo(conteudo, limite = 4000) {
+  const texto = String(conteudo || "").slice(0, limite);
+  if (!texto.trim()) return [];
+
+  const fontes = [];
+  const pegar = (re) => {
+    let m;
+    while ((m = re.exec(texto)) !== null) fontes.push(m[1] || "");
+  };
+
+  pegar(/<title[^>]*>([^<]{3,120})<\/title>/gi);
+  pegar(/<h1[^>]*>([^<]{3,120})<\/h1>/gi);
+  pegar(/^#\s+(.{3,120})$/gm);
+  pegar(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']{3,200})["']/gi);
+
+  // O comentário do TOPO do arquivo. Neste projeto é onde mora a explicação do que a coisa faz,
+  // e costuma nomear o assunto melhor que qualquer outro lugar.
+  const bloco = /^\s*\/\*\*?([\s\S]{10,600}?)\*\//.exec(texto);
+  if (bloco) fontes.push(bloco[1]);
+  const barras = /^\s*((?:\/\/[^\n]*\n){1,8})/.exec(texto);
+  if (barras) fontes.push(barras[1]);
+
+  const palavras = fontes
+    .join(" ")
+    .replace(/[*/]/g, " ")
+    .split(/[^\p{L}\p{N}]+/u)
+    .map(normalizar)
+    .filter((t) => t.length >= 4 && !RUIDO.has(t));
+
+  // Teto para o cabeçalho não afogar os termos do caminho, que continuam sendo os mais
+  // confiáveis: o caminho é escolhido com cuidado, o título às vezes é copiado de outro arquivo.
+  return [...new Set(palavras)].slice(0, 12);
 }
 
 /**

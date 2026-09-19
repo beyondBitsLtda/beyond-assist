@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/lisa-code/contexto?file=src/lib/gemini.js   headers: { "x-lisa-token": "..." }
+ * POST /api/lisa-code/contexto   headers: { "x-lisa-token": "..." }   body: { file, trecho }
  *
  * O que existe no Beyond Bits sobre o arquivo que você está editando — cards do Trello,
  * tarefas da Delp, chamados do Sentinela e pensamentos. A extensão chama isto quando você MUDA
@@ -24,13 +24,17 @@ export const dynamic = "force-dynamic";
  * a razão é a cota: um embedding por troca de arquivo foi o tipo de consumo que secou as 35
  * chaves num dia e fez a Lisa levar 98 segundos para responder.
  */
-export async function GET(req) {
+export async function POST(req) {
   try {
     const acesso = conferirTokenDaExtensao(req);
     if (!acesso.ok) return jsonResponse({ ok: false, error: acesso.motivo }, 401);
 
-    const arquivo = new URL(req.url).searchParams.get("file") || "";
-    const termos = termosDoArquivo(arquivo);
+    // POST, e não GET, porque agora vai junto um trecho do arquivo. O CAMINHO sozinho não
+    // bastava: `cronograma/index.html` dá o termo "cronograma", enquanto o assunto real —
+    // "Painel SEO · Montador de Móveis" — está no título, dentro do arquivo.
+    const { file, trecho } = await req.json().catch(() => ({}));
+    const arquivo = String(file || "");
+    const termos = termosDoArquivo(arquivo, String(trecho || ""));
     // Sem termo útil (um `index.js` dentro de `utils/`, por exemplo) não há o que procurar, e
     // sair buscando quatro fontes para descartar tudo depois é trabalho jogado fora.
     if (!termos.length) return jsonResponse({ ok: true, bloco: "", termos: [] });

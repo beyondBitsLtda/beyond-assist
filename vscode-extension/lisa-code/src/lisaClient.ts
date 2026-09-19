@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { gitSnapshot, gitHeadInfo, gitCreateBranch, gitStageAndCommit, gitPushCurrent } from "./gitContext";
 import { avaliarComando, PERMITIDOS_PADRAO } from "./comandosPermitidos";
 import { resumoDaDocumentacao } from "./documentacao";
+import { editorAtual } from "./editorAtual";
 
 /** Arquivos que NUNCA deveriam entrar num commit sem uma olhada extra — o aviso aparece em
  * destaque no diálogo de confirmação (mesmo cuidado de sempre: conferir o que vai no commit
@@ -103,7 +104,7 @@ export class LisaClient {
    * a mensagem com um arquivo inteiro selecionado por acidente). */
   private editorContextBlock(): string {
     if (!this.includeEditorContext) return "";
-    const ed = vscode.window.activeTextEditor;
+    const ed = editorAtual();
     if (!ed) return "";
     const file = vscode.workspace.asRelativePath(ed.document.uri, false);
     const line = ed.selection.active.line + 1;
@@ -130,7 +131,7 @@ export class LisaClient {
    * respondia antes desta funcionalidade existir. Por isso todo erro vira silêncio.
    */
   async atualizarContextoDoArquivo(): Promise<void> {
-    const ed = vscode.window.activeTextEditor;
+    const ed = editorAtual();
     const arquivo = ed ? vscode.workspace.asRelativePath(ed.document.uri, false) : "";
     if (arquivo === this.arquivoDoContexto) return; // mesmo arquivo — o cache serve
     this.arquivoDoContexto = arquivo;
@@ -141,8 +142,19 @@ export class LisaClient {
       const token = await this.getToken();
       const baseUrl = this.getBaseUrl();
       if (!token || !baseUrl) return;
-      const res = await fetch(`${baseUrl}/api/lisa-code/contexto?file=${encodeURIComponent(arquivo)}`, {
-        headers: { "x-lisa-token": token },
+      // Manda o COMEÇO do arquivo junto: é lá que mora o título, o cabeçalho e o comentário
+      // de topo — os lugares onde uma pessoa escreve do que a coisa trata. Quatro mil
+      // caracteres bastam para isso e não carregam o corpo do código para lugar nenhum.
+      let trecho = "";
+      try {
+        const bytes = await vscode.workspace.fs.readFile(ed!.document.uri);
+        trecho = Buffer.from(bytes).toString("utf8").slice(0, 4000);
+      } catch { /* sem o trecho, o caminho sozinho ainda vale */ }
+
+      const res = await fetch(`${baseUrl}/api/lisa-code/contexto`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-lisa-token": token },
+        body: JSON.stringify({ file: arquivo, trecho }),
       });
       const data = (await res.json()) as { ok?: boolean; bloco?: string };
       // Só guarda se o arquivo ainda for o mesmo: numa troca rápida de abas, a resposta de

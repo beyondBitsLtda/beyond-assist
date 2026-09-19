@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { LisaClient } from "./lisaClient";
 import { gitSnapshot } from "./gitContext";
+import { editorAtual, registrarEditorAtual } from "./editorAtual";
 
 export interface ChatHandle {
   clear(): void;
@@ -20,7 +21,7 @@ export function bindChatMessages(webview: vscode.Webview, client: LisaClient): C
    * de arquivo no editor. */
   const postContext = async () => {
     const snap = await gitSnapshot();
-    const ed = vscode.window.activeTextEditor;
+    const ed = editorAtual();
     post({
       type: "context",
       branch: snap.branch || null,
@@ -32,6 +33,9 @@ export function bindChatMessages(webview: vscode.Webview, client: LisaClient): C
   };
 
   const disposables: vscode.Disposable[] = [
+    // Precisa vir ANTES dos outros: é ele que lembra qual arquivo estava aberto quando o foco
+    // vai para o painel da Lisa e o VS Code passa a responder "nenhum editor ativo".
+    ...registrarEditorAtual(),
     vscode.window.onDidChangeActiveTextEditor(() => {
       void postContext();
       // Ao trocar de arquivo, já busca o que o Beyond Bits sabe sobre ele — assim a informação

@@ -5,7 +5,7 @@
 // funcionalidade morre sem nunca ter dado erro. Por isso metade deste arquivo testa o que ela
 // NÃO deve trazer.
 
-import { termosDoArquivo, pontuar, itensRelevantes, blocoDeContexto } from "../src/lib/relevanciaDoArquivo.js";
+import { termosDoArquivo, termosDoConteudo, pontuar, itensRelevantes, blocoDeContexto } from "../src/lib/relevanciaDoArquivo.js";
 
 let falhas = 0;
 const ok = (t) => console.log(`  ok    ${t}`);
@@ -110,6 +110,44 @@ console.log("\n6) o bloco que chega na conversa");
   conferir("sem itens, não inventa bloco", blocoDeContexto([{ rotulo: "Cards", itens: [] }]) === "");
   conferir("grupos vazios não quebram", blocoDeContexto([]) === "");
   conferir("nulo não quebra", blocoDeContexto(null) === "");
+}
+
+console.log("\n7) o arquivo diz de si o que o caminho nao diz");
+{
+  // O caso REAL que expos o limite: cronograma/index.html da so o termo "cronograma".
+  // O assunto do arquivo esta no titulo dele, e o card falava do titulo, nao do caminho.
+  const html = [
+    "<!DOCTYPE html><html lang=\"pt-BR\"><head>",
+    "<title>Painel SEO · Montador de Móveis</title>",
+    "</head><body><h1>Cronograma de publicacao</h1>",
+  ].join("");
+  const soCaminho = termosDoArquivo("cronograma/index.html");
+  const comConteudo = termosDoArquivo("cronograma/index.html", html);
+  conferir("so o caminho nao traz o assunto", !soCaminho.includes("montador"), JSON.stringify(soCaminho));
+  conferir("com o conteudo, traz", comConteudo.includes("montador") && comConteudo.includes("moveis"),
+           JSON.stringify(comConteudo));
+
+  const CARD = [{ title: "Estudo de mercado para o app do montador de moveis" }];
+  conferir("e agora o card e encontrado", itensRelevantes(comConteudo, CARD).length === 1,
+           "continuou sem achar");
+  conferir("enquanto so com o caminho nao seria", itensRelevantes(soCaminho, CARD).length === 0);
+}
+
+console.log("\n8) mas o CORPO do codigo continua de fora");
+{
+  // A razao de eu nao ler o conteudo inteiro continua valendo: palavras de codigo casam
+  // com tudo e com nada. So o cabecalho entra.
+  const codigo = "const resultado = await buscar(usuario);\nfunction processar(dados) { return dados; }";
+  conferir("corpo sem cabecalho nao vira termo", termosDoConteudo(codigo).length === 0,
+           JSON.stringify(termosDoConteudo(codigo)));
+
+  const comTopo = "// Painel de acompanhamento do montador de moveis.\nconst x = 1;";
+  conferir("mas o comentario de topo vira", termosDoConteudo(comTopo).includes("montador"),
+           JSON.stringify(termosDoConteudo(comTopo)));
+
+  conferir("conteudo vazio nao quebra", termosDoConteudo("").length === 0);
+  conferir("nulo nao quebra", termosDoConteudo(null).length === 0);
+  conferir("tem teto de 12 termos", termosDoConteudo("# " + Array.from({length:40},(_,i)=>`palavra${i}`).join(" ")).length <= 12);
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");
