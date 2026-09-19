@@ -170,6 +170,20 @@ export async function turnoNaGroq(contents, { instrucao, ferramentas } = {}) {
     }
 
     const detalhe = await res.text().catch(() => "");
+
+    // Modelo desconhecido é o erro mais provável desta integração, porque os identificadores da
+    // Groq mudam e um nome morto no código não avisa nada. Em vez de mandar a pessoa adivinhar,
+    // a mensagem traz A LISTA do que a chave dela enxerga agora — a resposta junto da pergunta.
+    if (res.status === 404) {
+      const disponiveis = await listarModelos(CHAVES[indice]);
+      throw new Error(
+        `Groq não conhece o modelo "${GROQ_MODEL}". ` +
+        (disponiveis.length
+          ? `Ajuste GROQ_MODEL para um destes: ${disponiveis.join(", ")}`
+          : `E não consegui listar os disponíveis. Resposta original: ${detalhe.slice(0, 200)}`)
+      );
+    }
+
     const classificado = classificarErroDaGroq(res.status, detalhe);
 
     if (!classificado.transitorio) {
@@ -184,6 +198,20 @@ export async function turnoNaGroq(contents, { instrucao, ferramentas } = {}) {
   }
 
   throw ultimoErro || new Error("Groq: todas as tentativas falharam");
+}
+
+/** Os modelos que ESTA chave enxerga. Usado só para montar a mensagem de erro de modelo
+ *  desconhecido — falhar aqui não pode piorar um erro que já aconteceu, então devolve lista
+ *  vazia em vez de levantar. */
+async function listarModelos(chave) {
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/models", { headers: { authorization: `Bearer ${chave}` } });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json?.data || []).map((m) => m?.id).filter(Boolean).sort();
+  } catch {
+    return [];
+  }
 }
 
 /** Traduz o status HTTP da Groq para a mesma linguagem de cooldown que o Gemini já usa. */
