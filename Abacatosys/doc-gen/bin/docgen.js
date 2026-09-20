@@ -114,10 +114,10 @@ async function main() {
     /* Linhas que so fazem sentido quando ha o que contar: um repositorio sem
        formularios nao precisa de "Formularios: 0" na saida. */
     if (s.datasets) console.log('  Consultas de dados : ' + s.datasets);
-    if (s.formularios) console.log('  Formularios        : ' + s.formularios);
+    if (s.formularios) console.log('  Telas              : ' + s.formularios);
     if (s.scriptsWf) console.log('  Scripts de processo: ' + s.scriptsWf);
-    if (s.modulosJs) console.log('  Modulos JS         : ' + s.modulosJs);
-    if (s.eventosForm) console.log('  Eventos de form.   : ' + s.eventosForm);
+    if (s.modulosJs) console.log('  Modulos de interface: ' + s.modulosJs);
+    if (s.eventosForm) console.log('  Eventos de tela    : ' + s.eventosForm);
     if (s.entidades) {
         console.log('  Entidades          : ' + s.entidades + ' (' + s.proprias + ' proprias)');
         console.log('  Esquema de dados   : ' + C.green + s.declaradas + ' declaradas' + C.reset +

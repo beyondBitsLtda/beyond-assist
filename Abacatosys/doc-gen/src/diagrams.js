@@ -265,15 +265,15 @@ function camadasArquitetura(modelo) {
     }
     if (temWidget) {
         add('integracao', 'Integracao (integre*)', COR.dado, porPapel(modelo, ['integracao']));
-        add('acesso-dados', 'Acesso a dados client (ds*)', COR.acao,
+        add('acesso-dados', 'Acesso a dados', COR.acao,
             porPapel(modelo, ['acesso-dados']).concat(nomesDatasetsClient(modelo)));
     } else {
-        add('acesso-dados', 'Acesso a dados client (ds*)', COR.acao, nomesDatasetsClient(modelo));
+        add('acesso-dados', 'Acesso a dados', COR.acao, nomesDatasetsClient(modelo));
     }
 
     add('workflow', 'Eventos do processo (workflow, server-side)', COR.processo, nomesWorkflow(modelo));
     if (I.usaDatasetFactory) {
-        add('factory', 'Fabrica de consultas da plataforma', COR.modulo, ['DatasetFactory', 'WKDataset']);
+        add('factory', 'Fabrica de consultas', COR.modulo, ['DatasetFactory', 'WKDataset']);
     }
     add('dataset', 'Datasets server-side (Rhino)', COR.modulo, nomesDatasets(modelo));
     add('procedures', 'Stored procedures', COR.alerta,
@@ -381,14 +381,14 @@ function fluxograma(modelo) {
 
     /* --------------------------------------------- coluna central por tipo */
     if (temWidget) {
-        passo('Usuario abre a widget', 'A plataforma monta a pagina', 'inicio', COR.neutro);
+        passo('Usuario abre a tela', 'A aplicacao monta a pagina', 'inicio', COR.neutro);
         if (ftl.length) passo(resumo(ftl), 'markup da tela (FreeMarker)', 'arquivo', COR.neutro, ftl.join(', '));
         if (boot.length) passo(resumo(boot), 'bootstrap: SuperWidget.bindings', 'arquivo', COR.tintaForte, boot.join(', '));
         if (ctrl.length) passo(resumo(ctrl), 'orquestra a tela e os eventos', 'arquivo', COR.tinta, ctrl.join(', '));
         if (integ.length) passo(resumo(integ), 'regra de integracao (' + integ.length + ')', 'arquivo', COR.dado, integ.join(', '));
         if (dsCli.length) passo(resumo(dsCli), 'acesso a dados client (' + dsCli.length + ')', 'arquivo', COR.acao, dsCli.join(', '));
     } else {
-        passo('Usuario abre a tarefa', 'A plataforma monta o cartao', 'inicio', COR.neutro);
+        passo('Usuario abre a tarefa', 'A aplicacao monta a tela', 'inicio', COR.neutro);
         if (cartoes.length) passo(resumo(cartoes), 'cartao do formulario (HTML)', 'arquivo', COR.neutro, cartoes.join(', '));
         if (evExibe.length) passo(resumo(evExibe), 'evento de exibicao do cartao (' + evExibe.length + ')', 'arquivo', COR.modulo, evExibe.join(', '));
         if (evOutros.length) passo(resumo(evOutros), 'demais scripts do cartao (' + evOutros.length + ')', 'arquivo', COR.tinta, evOutros.join(', '));
@@ -426,7 +426,7 @@ function fluxograma(modelo) {
     var blocos = [];
     if (temWidget && temForm && (cartoes.length || evExibe.length || evValida.length || evOutros.length)) {
         if (cartoes.length) {
-            blocos.push({ rot: 'Formularios (' + cartoes.length + ')', sub: 'cartao do processo', tit: cartoes.join(', '), cor: COR.processo });
+            blocos.push({ rot: 'Telas (' + cartoes.length + ')', sub: 'entrada pelo processo', tit: cartoes.join(', '), cor: COR.processo });
         }
         var todosEv = evExibe.concat(evOutros).concat(evValida);
         if (todosEv.length) {

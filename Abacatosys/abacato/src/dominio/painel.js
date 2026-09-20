@@ -47,6 +47,10 @@ export function painelDoQuadro(dadosDoQuadro, agora = new Date()) {
     pessoas: porPessoa(quadro, agora),
     semana: proximosDias(cards, agora, 14),
     atrasadosDetalhe: maisAtrasados(cards, agora, 8),
+    // Para quem acompanha de fora: o que está rodando, o que vem e o que saiu.
+    emAndamento: emAndamento(quadro, agora, 12),
+    proximasEntregas: proximasEntregas(cards, agora, 8),
+    entregues: entreguesRecentes(cards, 8),
   };
 }
 
@@ -141,6 +145,16 @@ export function proximosDias(cards, agora = new Date(), dias = 14) {
     // porque não dá nem para saber em qual acreditar.
     if (estado === "atrasado") { baldes[0].total++; continue; }
 
+    // E o balde de HOJE também. Esta linha faltava, e a contradição era a mesma de cima, só
+    // que um dia à frente: `estadoDoPrazo` chama de "hoje" o que vence dentro de 24 horas, e
+    // a agenda contava por dia do calendário. Um prazo marcado para daqui a três horas às
+    // 22h cai no dia seguinte — e o card aparecia como "hoje" nas pílulas e "amanhã" na
+    // agenda, na mesma tela.
+    //
+    // Quem manda é o ESTADO, porque é ele que as pílulas mostram. A alternativa seria mudar
+    // o significado de "hoje" no card, que é usado em toda parte.
+    if (estado === "hoje") { baldes[1].total++; continue; }
+
     const distancia = Math.round((soODia(c.fimEm).getTime() - hoje.getTime()) / DIA);
     if (distancia >= 0 && distancia < dias) baldes[distancia + 1].total++;
     // Além do horizonte não entra: um prazo para daqui a seis meses não é notícia hoje.
@@ -165,6 +179,150 @@ export function maisAtrasados(cards, agora = new Date(), quantos = 8) {
 }
 
 /** Junta os painéis de vários quadros num só. É o que a tela de Dashboards mostra no topo. */
+/* ==========================================================================================
+ * O QUE UM CLIENTE PRECISA SABER
+ *
+ * Contadores respondem "como vai?". Quem está do lado de fora tem três outras perguntas, e
+ * nenhuma delas é um número:
+ *
+ *   O que vocês estão fazendo AGORA?
+ *   O que vem a seguir, e quando?
+ *   O que já ficou pronto?
+ *
+ * As três funções abaixo respondem cada uma delas. Todas devolvem só título e data: sem id,
+ * sem responsável, sem descrição. O cliente precisa acompanhar o projeto, não a equipe — e
+ * cada campo a mais aqui é um campo que vaza por um link que não pede senha.
+ * ========================================================================================== */
+
+/**
+ * Palavras que denunciam uma coluna de ESPERA.
+ *
+ * A primeira coluna de um quadro quase sempre é a fila, mas "quase" não serve: num quadro
+ * real de CRM a fila era a SEGUNDA coluna, chamada "🎯 Alvos (Backlog da Semana)", e o painel
+ * do cliente anunciou doze itens de backlog como doze frentes em execução.
+ *
+ * Por isso o nome também conta. É heurística, e heurística erra — mas erra para o lado certo:
+ * na dúvida, uma coluna a menos em "andamento" é melhor que prometer trabalho que não começou.
+ */
+const NOMES_DE_FILA = [
+  "backlog", "a fazer", "afazer", "to do", "todo", "fila", "entrada", "ideias", "ideia",
+  "aguardando", "espera", "pendente", "planejad", "futuro", "proximos", "próximos", "alvos",
+];
+
+/**
+ * E as que denunciam uma coluna de TRABALHO TERMINADO.
+ *
+ * Um card pode estar numa coluna "Fechados" sem ter a marca de concluído — é muito comum:
+ * a pessoa arrasta o card para o fim e não clica em nada. Sem esta lista, um quadro de CRM
+ * anunciou ao cliente doze tickets FECHADOS como doze frentes em execução.
+ *
+ * As duas listas juntas dizem a mesma coisa por lados opostos: em andamento é o que não está
+ * esperando nem terminado.
+ */
+const NOMES_DE_PRONTO = [
+  "feito", "feitos", "concluid", "concluíd", "done", "pronto", "prontos", "finalizad",
+  "entregue", "entregues", "fechad", "encerrad", "arquivad", "cancelad", "aprovad",
+];
+
+function ehFila(nome) {
+  const limpo = String(nome || "").toLowerCase();
+  return NOMES_DE_FILA.some((p) => limpo.includes(p));
+}
+
+function ehPronto(nome) {
+  const limpo = String(nome || "").toLowerCase();
+  return NOMES_DE_PRONTO.some((p) => limpo.includes(p));
+}
+
+/**
+ * O que está em andamento.
+ *
+ * "Em andamento" é o card que NÃO está concluído e NÃO está numa coluna de espera. O que
+ * está na fila ainda não começou: mostrá-lo como andamento faria um quadro com duzentos itens
+ * de backlog parecer duzentas frentes abertas — e um cliente lendo isso acharia que a equipe
+ * está fazendo duzentas coisas ao mesmo tempo, o que não é elogio nenhum.
+ *
+ * Num quadro de uma coluna só não há fila, e aí tudo que está aberto está em andamento.
+ */
+export function emAndamento(quadro, agora = new Date(), quantos = 12) {
+  const colunas = quadro.colunas || [];
+  // POSIÇÃO só para a primeira coluna; o resto é pelo NOME.
+  //
+  // Eu tinha acrescentado "a última coluna também é pronto", e ela derrubou o caso de três
+  // colunas onde a última é trabalho de verdade — num quadro [Entrada, Backlog, Em contato]
+  // sobrava zero. A posição só é confiável na ponta de entrada: todo quadro começa por uma
+  // fila, mas nem todo quadro termina numa coluna de pronto.
+  const trabalho = colunas.length > 1
+    ? colunas.filter((c, i) => i !== 0 && !ehFila(c.nome) && !ehPronto(c.nome))
+    : colunas;
+
+  const itens = [];
+  for (const coluna of trabalho) {
+    for (const card of coluna.cards || []) {
+      if (card.concluido) continue;
+      itens.push({
+        titulo: card.titulo,
+        etapa: coluna.nome,
+        estado: card.estadoDoPrazo(agora),
+        fimEm: card.fimEm ? card.fimEm.toISOString() : null,
+      });
+    }
+  }
+
+  // Quem tem prazo vem primeiro, e o mais apertado na frente: é a ordem em que o cliente
+  // quer ler. Sem prazo vai para o fim, na ordem em que estava.
+  return itens
+    .sort((a, b) => {
+      if (a.fimEm && b.fimEm) return a.fimEm < b.fimEm ? -1 : 1;
+      if (a.fimEm) return -1;
+      if (b.fimEm) return 1;
+      return 0;
+    })
+    .slice(0, quantos);
+}
+
+/**
+ * As próximas entregas: o que tem prazo à frente, do mais próximo ao mais distante.
+ *
+ * Não inclui o que já venceu — isso é "atrasado", tem seção própria, e misturar os dois faria
+ * a próxima entrega aparecer como se ainda estivesse por vir.
+ */
+export function proximasEntregas(cards, agora = new Date(), quantos = 8) {
+  const hoje = soODia(agora);
+  return cards
+    .filter((c) => !c.concluido && c.fimEm && soODia(c.fimEm) >= hoje)
+    .sort((a, b) => a.fimEm - b.fimEm)
+    .slice(0, quantos)
+    .map((c) => ({
+      titulo: c.titulo,
+      fimEm: c.fimEm.toISOString(),
+      // Dias até vencer. 0 é hoje — e "hoje" é o que o cliente lê, não "em 0 dias".
+      emDias: Math.round((soODia(c.fimEm) - hoje) / DIA),
+      estado: c.estadoDoPrazo(agora),
+    }));
+}
+
+/**
+ * O que já foi entregue.
+ *
+ * Sem isto o painel só mostra dívida: atrasos, pendências, prazos vindo. Um acompanhamento que
+ * nunca mostra o que ficou pronto dá a impressão de que nada anda — e é a parte que o cliente
+ * mais gosta de ver.
+ */
+export function entreguesRecentes(cards, quantos = 8) {
+  return cards
+    .filter((c) => c.concluido)
+    // Os concluídos com prazo saem pelo prazo, do mais recente; os sem prazo vêm depois.
+    .sort((a, b) => {
+      if (a.fimEm && b.fimEm) return b.fimEm - a.fimEm;
+      if (a.fimEm) return -1;
+      if (b.fimEm) return 1;
+      return 0;
+    })
+    .slice(0, quantos)
+    .map((c) => ({ titulo: c.titulo, fimEm: c.fimEm ? c.fimEm.toISOString() : null }));
+}
+
 export function painelGeral(paineis) {
   const somar = (chave) => paineis.reduce((s, p) => s + p[chave], 0);
   const porEstado = { atrasado: 0, hoje: 0, proximo: 0, "no-prazo": 0, "sem-prazo": 0, concluido: 0 };

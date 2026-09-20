@@ -28,8 +28,8 @@ var ROTULO_TIPO = {
     'biblioteca': 'Biblioteca',
     'servico': 'Servico / API',
     'widget': 'Aplicacao de interface',
-    'widget-formulario': 'Interface + formulario de processo',
-    'formulario': 'Formulario de processo',
+    'widget-formulario': 'Interface com telas de processo',
+    'formulario': 'Telas de processo',
     'projeto': 'Projeto'
 };
 

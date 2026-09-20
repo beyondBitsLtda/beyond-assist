@@ -214,6 +214,93 @@
   font-variant-numeric: tabular-nums;
 }
 .abacato-atrasado__titulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ============================================================ a tarefa, para quem vê de fora */
+
+/* Três seções usam a mesma linha — em andamento, próximas entregas e entregue —
+   porque são a mesma leitura: um rótulo curto à esquerda, o que é no meio, quando
+   à direita. Três desenhos diferentes para a mesma coisa fariam o cliente parar
+   para entender o painel em vez de entender o projeto. */
+.abacato-linhas { display: flex; flex-direction: column; }
+
+.abacato-linha-tarefa {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--abacato-linha);
+}
+.abacato-linha-tarefa:last-child { border-bottom: 0; }
+
+.abacato-linha-tarefa__titulo {
+  flex: 1;
+  min-width: 0;
+  /* O título QUEBRA em vez de ser cortado. Numa lista de atrasados o corte é
+     aceitável — o que importa ali é o número de dias. Aqui o título é a
+     informação, e "Revisar o contrato de manut…" não diz o que foi revisado. */
+  overflow-wrap: anywhere;
+}
+
+/* O rótulo da etapa vem do quadro de quem usa, então pode ser "Fazendo",
+   "Em execução" ou qualquer nome — largura fixa cortaria os mais longos. */
+.abacato-linha-tarefa__etapa {
+  flex: 0 0 auto;
+  max-width: 130px;
+  padding: 3px 10px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta-2);
+  font-size: 11px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.abacato-linha-tarefa__quando {
+  flex: 0 0 auto;
+  min-width: 76px;
+  text-align: center;
+  padding: 3px 9px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-verde-claro);
+  color: var(--abacato-verde-fundo);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.abacato-linha-tarefa__quando--hoje { background: var(--abacato-atencao-fundo); color: var(--abacato-atencao); }
+.abacato-linha-tarefa__quando--atrasado { background: var(--abacato-alerta-fundo); color: var(--abacato-alerta); }
+
+.abacato-linha-tarefa__prazo {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--abacato-tinta-3);
+  font-variant-numeric: tabular-nums;
+}
+.abacato-linha-tarefa__prazo--atrasado { color: var(--abacato-alerta); font-weight: 700; }
+.abacato-linha-tarefa__prazo--hoje { color: var(--abacato-atencao); font-weight: 700; }
+
+.abacato-linha-tarefa__ok {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--abacato-verde-claro);
+  color: var(--abacato-verde-fundo);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 620px) {
+  /* No celular a linha vira duas: o rótulo e o prazo passam para baixo do título,
+     em vez de espremerem o texto que é a informação. */
+  .abacato-linha-tarefa { flex-wrap: wrap; gap: 7px; }
+  .abacato-linha-tarefa__titulo { flex: 1 0 100%; order: -1; }
+}
 .abacato-atrasado__etiquetas { display: flex; align-items: center; gap: 3px; flex: 0 0 auto; }
 
 /* ============================================================ o painel do cliente

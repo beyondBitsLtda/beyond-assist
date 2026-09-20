@@ -25,7 +25,8 @@
     "cf:deploy": "opennextjs-cloudflare deploy",
     "publicar": "npm run cf:build && wrangler deploy",
     "painel-check": "node scripts/painel-check.mjs",
-    "pessoas-check": "node --env-file=.env.local scripts/pessoas-check.mjs"
+    "pessoas-check": "node --env-file=.env.local scripts/pessoas-check.mjs",
+    "cliente-check": "node scripts/cliente-check.mjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.6",

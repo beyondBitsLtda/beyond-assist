@@ -117,10 +117,10 @@ function secVisaoGeral(m) {
 
     /* os KPIs seguem o tipo: "Modulos JS (widget)" num formulario e sempre 0 */
     var terceiroKpi = ehWidget(m)
-        ? kpi(qtd.widgetJs, 'Modulos JS (widget)')
-        : kpi(qtd.eventosForm, 'Eventos de formulario');
+        ? kpi(qtd.widgetJs, 'Modulos de interface')
+        : kpi(qtd.eventosForm, 'Eventos de tela');
     h += '<div class="dg-grid dg-grid--4" style="margin-bottom:24px">' +
-        kpi(qtd.datasets, 'Datasets') + kpi(qtd.forms, 'Formularios') +
+        kpi(qtd.datasets, 'Consultas de dados') + kpi(qtd.forms, 'Telas') +
         kpi(qtd.scripts, 'Scripts WF') + kpi(qtd.tabelas, 'Tabelas proprias') +
         terceiroKpi + kpi(qtd.procs, 'Procedures') +
         kpi(m.grafo.arestas.length, 'Chamadas mapeadas') + kpi(m.biblioteca.arquivos.length, 'Arquivos na biblioteca') +
@@ -173,14 +173,14 @@ function cartaoTipoApp(m) {
         '<div class="dg-h3" style="margin-top:0">Tipo de aplicacao: ' + esc(I.tipoRotulo || '—') + '</div>' +
         '<p class="dg-dica" style="margin:0 0 12px">' + (explic[I.tipo] || '') + '</p>' +
         '<p style="margin:0 0 12px">' +
-        badge(I.temWidget ? 'widget: sim' : 'widget: nao', I.temWidget ? 'green' : 'gray') + ' ' +
-        badge(I.temFormulario ? 'formulario: sim' : 'formulario: nao', I.temFormulario ? 'green' : 'gray') + ' ' +
+        badge(I.temWidget ? 'interface propria: sim' : 'interface propria: nao', I.temWidget ? 'green' : 'gray') + ' ' +
+        badge(I.temFormulario ? 'telas de processo: sim' : 'telas de processo: nao', I.temFormulario ? 'green' : 'gray') + ' ' +
         badge(I.temWorkflow ? 'workflow: sim' : 'workflow: nao', I.temWorkflow ? 'orange' : 'gray') + ' ' +
-        badge(I.temDatasets ? 'datasets: sim' : 'datasets: nao', I.temDatasets ? 'blue' : 'gray') + ' ' +
-        badge(I.usaDatasetFactory ? 'usa DatasetFactory' : 'sem DatasetFactory', I.usaDatasetFactory ? 'blue' : 'gray') +
+        badge(I.temDatasets ? 'consultas proprias: sim' : 'consultas proprias: nao', I.temDatasets ? 'blue' : 'gray') + ' ' +
+        badge(I.usaDatasetFactory ? 'usa fabrica de consultas' : 'sem fabrica de consultas', I.usaDatasetFactory ? 'blue' : 'gray') +
         '</p>';
-    var linhas = linha('Evidencia de widget', ev.widget) +
-        linha('Evidencia de formulario', ev.formulario) +
+    var linhas = linha('Evidencia de interface propria', ev.widget) +
+        linha('Evidencia de tela de processo', ev.formulario) +
         linha('Evidencia de workflow', ev.workflow) +
         linha('Nome da aplicacao', [(I.appCode || '') + '  —  ' + (I.origemNome || '')]);
     h += verTodos('Ver as evidencias que sustentam essa classificacao',
@@ -247,13 +247,24 @@ function secArquitetura(m) {
     var arq = D.arquitetura(m);
     var carga = D.camadasCarga(m);
 
+    /* Um texto por TIPO de projeto, e um padrao honesto para o resto.
+       -------------------------------------------------------------------------
+       Antes este mapa so conhecia os tres tipos de uma plataforma especifica, e
+       o padrao era o texto de "tela de processo". O efeito: o portal de uma
+       aplicacao web abria dizendo "como uma requisicao atravessa este formulario
+       de processo" — sobre um sistema que nao tem formulario nenhum. Documentar
+       uma arquitetura que nao existe e pior que nao documentar. */
     var leads = {
-        'widget': 'Como uma requisicao atravessa esta <b>widget</b>, do clique na tela ate a linha gravada no SQL Server.',
-        'widget-formulario': 'Como uma requisicao atravessa esta aplicacao. Ela tem <b>duas entradas</b>: a widget (caminho principal) e o cartao do formulario, aberto pelo processo BPMN.',
-        'formulario': 'Como uma requisicao atravessa este <b>formulario de processo</b>, da abertura do cartao pela plataforma ate a linha gravada no SQL Server. Nao ha camadas de widget aqui &mdash; nenhuma foi encontrada no repositorio.'
+        'aplicacao-web': 'Como um pedido atravessa esta aplicacao, da tela ate a linha gravada no banco.',
+        'biblioteca': 'Como esta biblioteca esta organizada por dentro: o que ela expoe, de que modulos depende e onde toca dados.',
+        'servico': 'Como um pedido atravessa este servico, da porta de entrada ate a linha gravada no banco.',
+        'projeto': 'Como as partes deste repositorio se ligam, da entrada ate os dados.',
+        'widget': 'Como um pedido atravessa esta aplicacao, do clique na tela ate a linha gravada no banco.',
+        'widget-formulario': 'Como um pedido atravessa esta aplicacao. Ela tem <b>duas entradas</b>: a interface propria (caminho principal) e a tela aberta pelo processo.',
+        'formulario': 'Como um pedido atravessa esta <b>tela de processo</b>, da abertura ate a linha gravada no banco.'
     };
     var h = section('arquitetura', 'Diagramas', 'Arquitetura do Sistema',
-        (leads[m.meta.tipoApp] || leads.formulario) +
+        (leads[m.meta.tipoApp] || leads.projeto) +
         ' As camadas desenhadas seguem o <b>tipo</b> desta aplicacao: bandas que nao existem nao aparecem. Os diagramas sao SVG nativo: abrem sem internet, imprimem e podem ser copiados para apresentacoes.');
 
     h += '<div class="dg-h3">Fluxo de execucao</div>';
@@ -310,7 +321,7 @@ function papelBadge(role) {
 function secChamadas(m) {
     var g = m.grafo;
     var h = section('chamadas', 'Diagramas', 'Mapa de Chamadas',
-        'Quem chama quem, arquivo por arquivo, organizado nas camadas da aplicacao. Cada seta tem evidencia no codigo: uma chamada a getDataset, um simbolo exportado por outro modulo, ou um acesso SQL a uma tabela.');
+        'Quem chama quem, arquivo por arquivo, organizado nas camadas da aplicacao. Cada seta tem evidencia no codigo: um import, uma consulta nomeada, um simbolo exportado por outro modulo, ou um acesso SQL a uma tabela.');
 
     if (!g || !g.nos.length) {
         h += '<p class="dg-vazio">Nenhuma ligacao entre arquivos pode ser detectada com seguranca.</p>';
@@ -324,7 +335,7 @@ function secChamadas(m) {
     h += '<div class="dg-grid dg-grid--4" style="margin-bottom:18px">' +
         kpiSimples(g.nos.length, 'Arquivos no mapa') +
         kpiSimples(g.arestas.length, 'Ligacoes') +
-        kpiSimples(porTipo.dataset || 0, 'Chamadas getDataset') +
+        kpiSimples(porTipo.dataset || 0, 'Consultas nomeadas') +
         kpiSimples((porTipo.le || 0) + (porTipo.grava || 0), 'Acessos a tabela') +
         '</div>';
 
@@ -336,13 +347,13 @@ function secChamadas(m) {
         '<span><i style="background:' + D.COR_ARESTA.le + '"></i>le tabela</span>' +
         '<span><i style="background:' + D.COR_ARESTA.grava + '"></i>grava tabela</span>' +
         '<span><i style="background:' + D.COR_ARESTA.simbolo + '"></i>- - usa simbolo de outro modulo</span>' +
-        '<span><i style="background:' + D.COR_ARESTA.par + '"></i>par HTML/JS do formulario</span>' +
+        '<span><i style="background:' + D.COR_ARESTA.par + '"></i>par marcacao/script da mesma tela</span>' +
         '</div>';
 
     /* tabela completa das ligacoes */
     var rotulo = {};
     g.nos.forEach(function (n) { rotulo[n.id] = n; });
-    var nomeTipo = { dataset: 'getDataset()', le: 'le tabela', grava: 'grava tabela', simbolo: 'usa simbolo', par: 'par HTML/JS' };
+    var nomeTipo = { import: 'importa', dataset: 'consulta nomeada', le: 'le tabela', grava: 'grava tabela', simbolo: 'usa simbolo', par: 'par da mesma tela' };
     var linhas = g.arestas.slice().sort(function (a, b) {
         if (a.de !== b.de) return a.de < b.de ? -1 : 1;
         return a.para < b.para ? -1 : 1;
@@ -561,8 +572,8 @@ function entidadeCard(e, nAcessos) {
 function secDatasets(m) {
     var ds = m.datasets.filter(function (d) { return !d.backup; });
     var bk = m.datasets.filter(function (d) { return d.backup; });
-    var h = section('datasets', 'Codigo', 'Datasets (server-side)',
-        'Datasets customizados executados no servidor (Rhino). Para cada um: acoes suportadas, tabelas lidas/gravadas, grupos de colunas de retorno, funcoes e historico.');
+    var h = section('consultas', 'Codigo', 'Consultas de Dados',
+        'Consultas que rodam no servidor. Para cada uma: acoes suportadas, tabelas lidas e gravadas, grupos de colunas de retorno, funcoes e historico de versao.');
 
     if (!ds.length && !bk.length) return '';
     if (!ds.length) { h += '<p class="dg-vazio">Nenhum dataset server-side encontrado.</p>'; return h + '</section>'; }
@@ -593,7 +604,7 @@ function secDatasets(m) {
                     '<span class="dg-dica">(' + g.colunas.length + ')</span>' + chipsVerTodos(g.colunas, 40, '', 'Ver todas as colunas') + '</div>';
             });
         }
-        if (d.chama.length) body += '<div style="margin-top:12px">' + rotulo('Chama datasets') + chips(d.chama) + '</div>';
+        if (d.chama.length) body += '<div style="margin-top:12px">' + rotulo('Chama outras consultas') + chips(d.chama) + '</div>';
         if (d.funcoes.length) {
             body += '<div class="dg-h3" style="font-size:13px;margin:18px 0 8px">Funcoes (' + d.funcoes.length + ')</div>' +
                 chipsVerTodos(d.funcoes.map(function (f) { return f.nome + '()'; }), 40, 'dg-chip--fn', 'Ver todas as funcoes');
@@ -621,11 +632,52 @@ function rotulo(t) {
     return '<div class="dg-dica" style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.5px;margin-bottom:6px">' + esc(t) + '</div>';
 }
 
+/* O nome do tipo de arquivo EM PORTUGUES, para quem le.
+   -----------------------------------------------------------------------------
+   Os identificadores internos (widget_js, form_event_js, dataset_server) vieram
+   de uma plataforma especifica e nao dizem nada a quem abre o portal de um
+   repositorio comum — pior, mentem: num projeto de modulos, "widget_js" era o
+   rotulo de TODO arquivo JavaScript, e a palavra aparecia noventa e cinco vezes
+   documentando um sistema que nao tem widget nenhuma.
+
+   Os identificadores continuam no codigo, porque trocar chave de mapa em oito
+   arquivos so para renomear um rotulo e risco sem retorno. O que a pessoa le
+   passa por aqui. */
+var NOME_DO_TIPO = {
+    app_info: 'manifesto',
+    eclipse_project: 'manifesto',
+    filetree: 'arvore de arquivos',
+    readme: 'documentacao',
+    manifesto: 'manifesto',
+    dataset_server: 'consulta (servidor)',
+    dataset_client: 'consulta (cliente)',
+    form_html: 'marcacao',
+    form_js: 'script de tela',
+    form_event_js: 'evento de tela',
+    form_aux_js: 'script auxiliar',
+    ftl: 'template',
+    css: 'estilo',
+    widget_js: 'modulo JS',
+    workflow_script: 'evento de processo',
+    workflow_process: 'desenho de processo',
+    workflow_process_svg: 'desenho de processo',
+    workflow_process_xml: 'desenho de processo',
+    sql: 'SQL',
+    properties: 'traducoes',
+    image: 'imagem',
+    codigo: 'codigo',
+    teste: 'teste',
+    config: 'configuracao',
+    dados: 'dados',
+    outro: 'outro'
+};
+function nomeDoTipo(t) { return NOME_DO_TIPO[t] || String(t || '').replace(/_/g, ' '); }
+
 /* -------------------------------------------------- 6. FORMULARIOS */
 function secFormularios(m) {
     if (!m.formularios.length) return '';
-    var h = section('formularios', 'Codigo', 'Formularios',
-        'Formularios da plataforma, um bloco por <b>pasta</b> em <code>forms/</code>. Cada bloco traz o cartao HTML, os eventos do cartao (displayFields, validacao), os scripts auxiliares, os campos referenciados e as atividades de workflow tratadas. Pastas diferentes sao formularios diferentes: nenhuma documentacao substitui a outra.');
+    var h = section('telas', 'Codigo', 'Telas',
+        'Uma tela por <b>pasta</b>. Cada bloco traz a marcacao, os eventos que rodam ao abrir e ao salvar, os scripts auxiliares, os campos referenciados e as etapas de processo tratadas. Pastas diferentes sao telas diferentes: nenhuma documentacao substitui a outra.');
 
     m.formularios.forEach(function (f) {
         /* uniao dos campos/elementos/funcoes de todos os scripts do cartao:
@@ -642,7 +694,7 @@ function secFormularios(m) {
         campos = unicoArr(campos); elementos = unicoArr(elementos);
 
         var head = '<code>' + esc(f.base) + '</code>' +
-            (f.idDataset ? ' ' + badge('dataset ' + f.idDataset, 'gray', 'codigo do formulario na plataforma') : '') +
+            (f.idDataset ? ' ' + badge('codigo ' + f.idDataset, 'gray', 'identificador da tela na plataforma de origem') : '') +
             (campos.length ? ' ' + badge(campos.length + ' campos', 'blue') : '') +
             (f.eventos && f.eventos.length ? ' ' + badge(f.eventos.length + ' eventos', 'orange') : '') +
             (atividades.length ? ' ' + badge(atividades.length + ' atividades', 'orange') : '');
@@ -719,7 +771,7 @@ function unicoArr(a) {
 /* -------------------------------------------------- 7. WORKFLOW */
 function secWorkflow(m) {
     if (!m.workflow.scripts.length && !m.workflow.processos.length && !m.workflow.svgProcesso.length) return '';
-    var h = section('workflow', 'Processo', 'Workflow',
+    var h = section('workflow', 'Processo', 'Processo',
         'Processo BPMN, scripts de evento (server-side) e literais de internacionalizacao do fluxo.');
 
     if (m.workflow.svgProcesso.length) {
@@ -753,7 +805,7 @@ function secWorkflow(m) {
             body += '<div>' + rotulo('Le (' + s.reads.length + ')') + chipsVerTodos(s.reads, 20, '', 'Ver todas') + '</div>';
             body += '<div>' + rotulo('Grava (' + s.writes.length + ')') + chipsVerTodos(s.writes, 20, '', 'Ver todas') + '</div></div>';
         }
-        if (s.chama.length) body += '<div style="margin-top:12px">' + rotulo('Chama datasets') + chips(s.chama) + '</div>';
+        if (s.chama.length) body += '<div style="margin-top:12px">' + rotulo('Chama outras consultas') + chips(s.chama) + '</div>';
         if (s.funcoes.length) {
             body += '<div class="dg-h3" style="font-size:13px;margin:16px 0 8px">Funcoes (' + s.funcoes.length + ')</div>' +
                 chipsVerTodos(s.funcoes.map(function (f) { return f.nome + '()'; }), 40, 'dg-chip--fn', 'Ver todas as funcoes');
@@ -777,8 +829,8 @@ function secWorkflow(m) {
 function secWidget(m) {
     /* sem widget nenhuma, a secao inteira sai do portal (e do menu) */
     if (!m.widget.js.length && !m.widget.css.length && !Object.keys(m.tokens || {}).length) return '';
-    var h = section('widget', 'Codigo', 'Widget &mdash; JS e CSS',
-        'Modulos client-side da widget: classes de dominio (POO), componentes de UI, orquestracao e o sistema de design (tokens CSS).');
+    var h = section('interface', 'Codigo', 'Widget &mdash; JS e CSS',
+        'Modulos que rodam no navegador: classes de dominio, componentes de interface, orquestracao e o sistema de design (tokens CSS).');
 
     if (m.widget.js.length) {
         h += '<div class="dg-h3">Modulos JavaScript (' + m.widget.js.length + ')</div>';
@@ -824,7 +876,7 @@ function secWidget(m) {
 function secI18n(m) {
     if (!m.i18n.length) return '';
     var h = section('i18n', 'Suporte', 'Internacionalizacao',
-        'Cobertura de idiomas dos arquivos .properties (widget e workflow).');
+        'Cobertura de idiomas dos arquivos de traducao.');
     var porLocale = {};
     m.i18n.forEach(function (x) { porLocale[x.locale] = (porLocale[x.locale] || 0) + x.total; });
     h += '<div class="dg-grid dg-grid--4" style="margin-bottom:20px">' +
@@ -839,7 +891,7 @@ function secI18n(m) {
 function secRastreabilidade(m) {
     var r = m.rastreabilidade;
     var h = section('rastreabilidade', 'Auditoria', 'Matriz de Rastreabilidade',
-        'Cruzamento tabela x modulo. Mostra, para cada tabela do banco, quais datasets, scripts de workflow e procedures a leem (R), gravam (W) ou ambos (RW). Base para analise de impacto, auditoria e controle do Data Book.');
+        'Cruzamento tabela x modulo. Mostra, para cada tabela do banco, quais modulos a leem (R), gravam (W) ou ambos (RW). E a resposta pronta para "se eu mexer nesta tabela, o que quebra?".');
 
     if (!r.tabelas.length || !r.modulos.length) {
         h += '<p class="dg-vazio">Sem dados suficientes para montar a matriz (nenhum acesso a tabela identificado no codigo).</p>';
@@ -992,7 +1044,7 @@ function secInventario(m) {
     Object.keys(porCtx).sort().forEach(function (ctx) {
         h += '<div class="dg-h3" style="font-size:13px">' + esc(ctx) + ' <span class="dg-dica">(' + porCtx[ctx].length + ')</span></div>';
         h += tabela(['Arquivo', 'Tipo', 'Tamanho'], porCtx[ctx].map(function (f) {
-            return '<tr><td>' + linkArquivo(f.nome) + '</td><td>' + badge(f.tipo) + '</td><td>' + fmtBytes(f.tamanho) + '</td></tr>';
+            return '<tr><td>' + linkArquivo(f.nome) + '</td><td>' + badge(nomeDoTipo(f.tipo)) + '</td><td>' + fmtBytes(f.tamanho) + '</td></tr>';
         }));
     });
     if (m.avisos.length) {
@@ -1028,13 +1080,13 @@ function sidebar(m) {
     add('arquitetura', 'Arquitetura do Sistema', C.dado);
     add('chamadas', 'Mapa de Chamadas', C.modulo, m.grafo.arestas.length);
     add('dados', 'Arquitetura de Dados', C.modulo, m.dataModel.entidades.length);
-    if (nDatasets) add('datasets', 'Datasets', C.acao, nDatasets);
-    if (m.formularios.length) add('formularios', 'Formularios', C.processo, m.formularios.length);
+    if (nDatasets) add('consultas', 'Consultas de dados', C.acao, nDatasets);
+    if (m.formularios.length) add('telas', 'Telas', C.processo, m.formularios.length);
     if (m.workflow.scripts.length || m.workflow.processos.length || m.workflow.svgProcesso.length) {
-        add('workflow', 'Workflow', C.processo, m.workflow.scripts.length);
+        add('workflow', 'Processo', C.processo, m.workflow.scripts.length);
     }
     if (m.widget.js.length || m.widget.css.length || Object.keys(m.tokens || {}).length) {
-        add('widget', 'Widget (JS/CSS)', C.modulo, m.widget.js.length);
+        add('interface', 'Interface (JS/CSS)', C.modulo, m.widget.js.length);
     }
     if (m.i18n.length) add('i18n', 'Internacionalizacao', C.neutro, m.i18n.length);
     add('rastreabilidade', 'Rastreabilidade', C.alerta, m.rastreabilidade.tabelas.length);
@@ -1044,7 +1096,7 @@ function sidebar(m) {
     var grupos = [
         { t: 'Visao', ids: ['overview'] },
         { t: 'Arquitetura', ids: ['arquitetura', 'chamadas', 'dados'] },
-        { t: 'Codigo', ids: ['datasets', 'formularios', 'workflow', 'widget'] },
+        { t: 'Codigo', ids: ['consultas', 'telas', 'workflow', 'interface'] },
         { t: 'Qualidade & Anexos', ids: ['i18n', 'rastreabilidade', 'biblioteca', 'inventario'] }
     ];
     var byId = {}; links.forEach(function (l) { byId[l.id] = l; });

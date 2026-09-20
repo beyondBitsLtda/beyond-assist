@@ -82,6 +82,28 @@ export async function GET(req, { params }) {
       atrasados: painel.com_titulos
         ? p.atrasadosDetalhe.map((c) => ({ titulo: c.titulo, diasAtrasado: c.diasAtrasado }))
         : [],
+
+      // As três perguntas de quem acompanha de fora: o que está rodando, o que vem, o que saiu.
+      //
+      // Todas atrás do MESMO interruptor dos atrasados. Um painel sem títulos é um painel de
+      // números — e quem escolheu escondê-los não pode ver os mesmos títulos voltarem por uma
+      // seção nova. O `com_titulos` governa tudo que é texto de card, sem exceção.
+      emAndamento: painel.com_titulos
+        ? p.emAndamento.map((c) => ({ titulo: c.titulo, etapa: c.etapa, estado: c.estado, fimEm: c.fimEm }))
+        : [],
+      proximasEntregas: painel.com_titulos
+        ? p.proximasEntregas.map((c) => ({ titulo: c.titulo, fimEm: c.fimEm, emDias: c.emDias }))
+        : [],
+      entregues: painel.com_titulos
+        ? p.entregues.map((c) => ({ titulo: c.titulo, fimEm: c.fimEm }))
+        : [],
+      // Quantos existem, mesmo sem os títulos: o número não identifica ninguém, e sem ele um
+      // painel de números não diz nem quantas frentes estão abertas.
+      contagens: {
+        emAndamento: p.emAndamento.length,
+        proximasEntregas: p.proximasEntregas.length,
+        entregues: p.entregues.length,
+      },
       mostraTitulos: painel.com_titulos,
     });
   } catch {
