@@ -202,6 +202,72 @@ console.log("\n6) versões — o que este sistema existe para fazer");
 
 // ------------------------------------------------------------------ fronteiras
 
+console.log("\n6.5) arrastar uma PASTA recria a árvore");
+{
+  // É o caso de uso de verdade: ninguém migra um repositório arquivo por arquivo. O que chega
+  // do navegador é uma lista de caminhos; o servidor precisa transformar isso em pastas.
+  const caminhos = [
+    ["Obra Delp", "Contratos"],
+    ["Obra Delp", "Contratos", "2026"],
+    ["Obra Delp", "Fotos"],
+    ["Obra Delp", "Fotos", "Semana 1"],
+  ];
+  const r = await precisa("criar a árvore", chamar(`/api/projetos/${pid}/arvore`, {
+    metodo: "POST", corpo: { caminhos },
+  }));
+  // CINCO, e não quatro: "Obra Delp" também é uma pasta. Os caminhos pedidos são quatro, mas
+  // a raiz comum precisa existir antes deles — e é justamente isso que a rota desdobra.
+  conferir("as cinco pastas nasceram", r.criadas === 5, `criou ${r.criadas}`);
+  conferir("e cada nivel devolveu um id", Object.keys(r.pastas).length === 5, `${Object.keys(r.pastas).length}`);
+
+  const arvore = await precisa("reabrir", chamar(`/api/projetos/${pid}`));
+  const porNome = new Map(arvore.pastas.map((p) => [p.nome, p]));
+  conferir("a subpasta aponta para a pasta certa",
+    porNome.get("2026")?.pai_id === porNome.get("Contratos")?.id);
+  conferir("e a pasta do meio aponta para a raiz da árvore",
+    porNome.get("Contratos")?.pai_id === porNome.get("Obra Delp")?.id);
+
+  // A MESMA pasta de novo: é o que acontece quando se arrasta a versão atualizada dela na
+  // semana seguinte. Duas "Contratos" lado a lado seria o pior resultado possível.
+  const denovo = await precisa("arrastar de novo", chamar(`/api/projetos/${pid}/arvore`, {
+    metodo: "POST", corpo: { caminhos },
+  }));
+  conferir("arrastar de novo não cria nada", denovo.criadas === 0, `criou ${denovo.criadas}`);
+  conferir("e devolve os MESMOS ids",
+    denovo.pastas["Obra Delp/Contratos/2026"] === r.pastas["Obra Delp/Contratos/2026"]);
+
+  // Maiúsculas não fazem uma pasta nova: "Contratos" e "contratos" são a mesma para quem olha.
+  const caixa = await precisa("mesmo nome em outra caixa", chamar(`/api/projetos/${pid}/arvore`, {
+    metodo: "POST", corpo: { caminhos: [["obra delp", "CONTRATOS"]] },
+  }));
+  conferir("maiúsculas não duplicam a pasta", caixa.criadas === 0, `criou ${caixa.criadas}`);
+
+  // Caminho montado para escapar da árvore.
+  await precisa("caminho com ..", chamar(`/api/projetos/${pid}/arvore`, {
+    metodo: "POST", corpo: { caminhos: [["..", "..", "fora"]] },
+  }));
+  const depoisDaFuga = await precisa("reabrir", chamar(`/api/projetos/${pid}`));
+  conferir("os .. são descartados e sobra só o nome",
+    depoisDaFuga.pastas.some((p) => p.nome === "fora" && !p.pai_id));
+
+  const demais = await chamar(`/api/projetos/${pid}/arvore`, {
+    metodo: "POST",
+    corpo: { caminhos: Array.from({ length: 400 }, (_, i) => [`pasta ${i}`]) },
+  });
+  conferir("uma árvore absurda é recusada", demais.status === 400, `deu ${demais.status}`);
+
+  // E os arquivos chegam DENTRO das pastas certas.
+  const form = new FormData();
+  form.append("arquivo", arquivoDe("medicao.txt", "medição de janeiro", "text/plain"));
+  form.append("pastaId", r.pastas["Obra Delp/Contratos/2026"]);
+  await precisa("enviar para dentro da subpasta", chamar(`/api/projetos/${pid}/documentos`, { metodo: "POST", form }));
+
+  const comArquivo = await precisa("reabrir", chamar(`/api/projetos/${pid}`));
+  const dentro = comArquivo.documentos.find((d) => d.nome === "medicao.txt");
+  conferir("o arquivo foi para a subpasta certa",
+    dentro?.pasta_id === r.pastas["Obra Delp/Contratos/2026"]);
+}
+
 console.log("\n7) o que um projeto não pode fazer com o outro");
 {
   const { projeto: outro } = await precisa("segundo projeto", chamar("/api/projetos", {

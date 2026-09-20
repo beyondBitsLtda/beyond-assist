@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { obter, criar, mudar, remover } from "@/lib/api.js";
 import { montarArvore, caminhoAte, selo, tamanhoEmPalavras, comoAbrir } from "@/dominio/documentos.js";
 import VisorDeDocumento from "@/componentes/documentos/VisorDeDocumento.js";
+import { lerArrastados, lerDoSeletor, caminhosDistintos } from "@/lib/pastasArrastadas.js";
 
 const ICONE = { html: "◫", proprio: "▤", texto: "≡", baixar: "⤓" };
 
@@ -50,7 +51,9 @@ export default function PaginaDoProjeto() {
   const [enviando, setEnviando] = useState(false);
   const [arrastando, setArrastando] = useState(false);
   const [aviso, setAviso] = useState("");
+  const [progresso, setProgresso] = useState(null);
   const campoArquivo = useRef(null);
+  const campoPasta = useRef(null);
 
   const carregar = useCallback(async () => {
     try { setDados(await obter(`/api/projetos/${id}`)); setErro(""); }
@@ -69,32 +72,78 @@ export default function PaginaDoProjeto() {
     return (dados?.documentos || []).filter((d) => d.pasta_id === pastaId).length;
   }, [dados]);
 
-  async function enviarArquivos(lista) {
-    const arquivos = [...(lista || [])];
-    if (!arquivos.length) return;
+  /**
+   * Envia uma lista de `{ file, caminho }` — recriando as pastas quando o caminho existir.
+   *
+   * Em LOTES, e não tudo de uma vez: uma pasta com cem arquivos viraria um único envio de
+   * centenas de megabytes atravessando o Worker, que tem memória limitada. Doze por vez cabe
+   * folgado, e dá para mostrar progresso em vez de uma tela parada.
+   */
+  async function enviarItens(itens, { cortou = false } = {}) {
+    if (!itens.length) return;
     setEnviando(true);
     setErro("");
     setAviso("");
-    try {
-      const form = new FormData();
-      for (const a of arquivos) form.append("arquivo", a);
-      if (pastaAtual) form.append("pastaId", pastaAtual);
+    setProgresso({ feitos: 0, total: itens.length });
 
-      const res = await fetch(`/api/projetos/${id}/documentos`, { method: "POST", body: form });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok || !d.ok) throw new Error(d.error || `falha ${res.status}`);
+    try {
+      // Primeiro a árvore inteira, de uma vez. Criar pasta durante o envio faria a mesma pasta
+      // nascer duas vezes quando dois lotes chegassem juntos.
+      let pastas = {};
+      const caminhos = caminhosDistintos(itens);
+      if (caminhos.length) {
+        const r = await criar(`/api/projetos/${id}/arvore`, { caminhos, paiId: pastaAtual });
+        pastas = r.pastas || {};
+      }
+
+      const LOTE = 12;
+      const naoEntraram = [];
+      let feitos = 0;
+
+      for (let i = 0; i < itens.length; i += LOTE) {
+        const fatia = itens.slice(i, i + LOTE);
+
+        // Um lote por PASTA de destino: a rota de envio recebe um `pastaId` só, e misturar
+        // destinos num envio jogaria tudo no mesmo lugar.
+        const porPasta = new Map();
+        for (const it of fatia) {
+          const destino = it.caminho.length ? pastas[it.caminho.join("/")] : (pastaAtual || "");
+          if (!porPasta.has(destino)) porPasta.set(destino, []);
+          porPasta.get(destino).push(it.file);
+        }
+
+        for (const [destino, arquivos] of porPasta) {
+          const form = new FormData();
+          for (const a of arquivos) form.append("arquivo", a);
+          if (destino) form.append("pastaId", destino);
+
+          const res = await fetch(`/api/projetos/${id}/documentos`, { method: "POST", body: form });
+          const d = await res.json().catch(() => ({}));
+          if (!res.ok || !d.ok) {
+            // Um lote ruim não pode derrubar os outros: os arquivos dele são relatados pelo
+            // nome, e o envio continua.
+            naoEntraram.push(...arquivos.map((a) => a.name));
+          } else if (d.falharam?.length) {
+            naoEntraram.push(...d.falharam.map((f) => f.nome));
+          }
+          feitos += arquivos.length;
+          setProgresso({ feitos, total: itens.length });
+        }
+      }
 
       await carregar();
-      if (d.falharam?.length) {
-        // O que não entrou é DITO com o nome. Um envio que diz "8 arquivos" quando eram 10 é
-        // um envio em que os dois que faltam só aparecem semanas depois.
-        setAviso(`${d.documentos.length} entrou(entraram). Não entraram: ${d.falharam.map((f) => f.nome).join(", ")}`);
-      }
+
+      const partes = [];
+      if (cortou) partes.push("parei no limite de 500 arquivos");
+      if (naoEntraram.length) partes.push(`não entraram: ${naoEntraram.slice(0, 8).join(", ")}${naoEntraram.length > 8 ? "…" : ""}`);
+      if (partes.length) setAviso(partes.join(" · "));
     } catch (e) {
       setErro(e.message);
     } finally {
       setEnviando(false);
+      setProgresso(null);
       if (campoArquivo.current) campoArquivo.current.value = "";
+      if (campoPasta.current) campoPasta.current.value = "";
     }
   }
 
@@ -124,11 +173,19 @@ export default function PaginaDoProjeto() {
             <button className="abacato-botao abacato-botao--fantasma" onClick={() => setNovaPasta(true)}>
               + Pasta
             </button>
+            <button className="abacato-botao abacato-botao--fantasma" onClick={() => campoPasta.current?.click()} disabled={enviando}>
+              + Pasta do computador
+            </button>
             <button className="abacato-botao" onClick={() => campoArquivo.current?.click()} disabled={enviando}>
-              {enviando ? "Enviando…" : "+ Documento"}
+              {enviando ? (progresso ? `${progresso.feitos}/${progresso.total}…` : "Enviando…") : "+ Documento"}
             </button>
             <input ref={campoArquivo} type="file" multiple hidden
-              onChange={(e) => enviarArquivos(e.target.files)} />
+              onChange={(e) => enviarItens([...e.target.files].map((file) => ({ file, caminho: [] })))} />
+            {/* `webkitdirectory` é o único jeito de ESCOLHER uma pasta por botão. O nome tem
+                prefixo de fabricante e funciona em todos os navegadores de hoje — não há
+                equivalente padronizado. */}
+            <input ref={campoPasta} type="file" hidden webkitdirectory="" directory=""
+              onChange={(e) => { const lido = lerDoSeletor(e.target.files); enviarItens(lido.itens, lido); }} />
           </div>
         )}
       </header>
@@ -188,11 +245,14 @@ export default function PaginaDoProjeto() {
           className={`abacato-arquivo__lista${arrastando ? " abacato-arquivo__lista--soltando" : ""}`}
           onDragOver={(e) => { if (poderes.criar) { e.preventDefault(); setArrastando(true); } }}
           onDragLeave={() => setArrastando(false)}
-          onDrop={(e) => {
+          onDrop={async (e) => {
             if (!poderes.criar) return;
             e.preventDefault();
             setArrastando(false);
-            enviarArquivos(e.dataTransfer.files);
+            // A leitura tem de começar AQUI, antes de qualquer espera: os itens do arrasto
+            // deixam de valer assim que este manipulador termina.
+            const lido = await lerArrastados(e.dataTransfer);
+            await enviarItens(lido.itens, lido);
           }}
         >
           <div className="abacato-migalhas">
@@ -227,7 +287,7 @@ export default function PaginaDoProjeto() {
           {documentos.length === 0 && (
             <div className="abacato-vazio">
               <p className="abacato-vazio__titulo">Nada nesta pasta</p>
-              <p>{poderes.criar ? "Solte arquivos aqui, ou use o botão “+ Documento”." : "Nenhum documento por aqui."}</p>
+              <p>{poderes.criar ? "Solte arquivos OU uma pasta inteira aqui — as subpastas vêm junto." : "Nenhum documento por aqui."}</p>
             </div>
           )}
 
