@@ -1,0 +1,270 @@
+/* Abacato System — os painéis e os gráficos.
+ *
+ * Todos os valores saem dos tokens do globals.css. É o que faz os gráficos trocarem de tema
+ * junto com o resto sem uma única regra a mais — e é a razão de não haver biblioteca de
+ * gráficos aqui: elas trazem paletas próprias que ignoram o tema da casa.
+ */
+
+/* ============================================================ o geral */
+
+.abacato-painel-geral {
+  display: flex;
+  align-items: center;
+  gap: var(--abacato-gap-2);
+  flex-wrap: wrap;
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio-grande);
+  padding: 20px 24px;
+  margin-bottom: var(--abacato-gap-2);
+}
+.abacato-painel-geral__lado { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 14px; }
+.abacato-painel-geral__linha { margin: 0; font-size: 15px; color: var(--abacato-tinta-2); }
+.abacato-painel-geral__linha strong { color: var(--abacato-tinta); font-size: 18px; }
+.abacato-vermelho { color: var(--abacato-alerta); font-weight: 600; }
+
+/* ============================================================ pílulas */
+
+.abacato-pilulas { display: flex; flex-wrap: wrap; gap: 8px; }
+.abacato-pilula {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 9px 14px;
+  border-radius: var(--abacato-raio);
+  background: var(--abacato-superficie-2);
+  min-width: 92px;
+}
+.abacato-pilula strong { font-size: 19px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.abacato-pilula span { font-size: 11px; color: var(--abacato-tinta-2); }
+.abacato-pilula--alerta { background: var(--abacato-alerta-fundo); }
+.abacato-pilula--alerta strong { color: var(--abacato-alerta); }
+.abacato-pilula--atencao { background: var(--abacato-atencao-fundo); }
+.abacato-pilula--atencao strong { color: var(--abacato-atencao); }
+.abacato-pilula--ok strong { color: var(--abacato-verde-fundo); }
+/* O zero fica, apagado. Sumir com ele faria a lista mudar de tamanho a cada atualização — e
+   "nenhum atrasado" é exatamente a informação que se quer ver. */
+.abacato-pilula--zero { opacity: 0.4; }
+
+/* ============================================================ rosca */
+
+.abacato-rosca { position: relative; width: 128px; height: 128px; flex: 0 0 auto; }
+.abacato-rosca svg { width: 100%; height: 100%; }
+.abacato-rosca__trilho { fill: none; stroke: var(--abacato-linha); stroke-width: 12; }
+.abacato-rosca__arco {
+  fill: none;
+  stroke: var(--abacato-verde);
+  stroke-width: 12;
+  /* Ponta arredondada: um arco cortado reto parece um erro de desenho quando está quase zerado. */
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.4s ease;
+}
+.abacato-rosca__centro {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+.abacato-rosca__centro strong { font-size: 26px; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.abacato-rosca__centro span { font-size: 11px; color: var(--abacato-tinta-2); }
+
+/* ============================================================ barras */
+
+.abacato-barras { display: flex; flex-direction: column; gap: 7px; }
+.abacato-barra { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+.abacato-barra__rotulo {
+  width: 40%;
+  max-width: 180px;
+  color: var(--abacato-tinta-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.abacato-barra__trilho {
+  flex: 1;
+  height: 16px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-superficie-2);
+  position: relative;
+  overflow: hidden;
+}
+.abacato-barra__preenchida {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--abacato-raio-pilula);
+  transition: width 0.3s ease;
+}
+/* Os atrasados ficam DENTRO da barra: eles são um pedaço daquele total, não outra medida. */
+.abacato-barra__atraso {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--abacato-alerta);
+  border-radius: var(--abacato-raio-pilula);
+}
+.abacato-barra__numero {
+  width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--abacato-tinta);
+  font-weight: 600;
+}
+
+/* ============================================================ agenda */
+
+.abacato-agenda {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  min-height: 130px;
+}
+.abacato-agenda__dia { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.abacato-agenda__coluna {
+  width: 100%;
+  height: 84px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.abacato-agenda__barra {
+  width: 100%;
+  max-width: 26px;
+  background: var(--abacato-verde);
+  border-radius: 5px 5px 0 0;
+  min-height: 0;
+  transition: height 0.3s ease;
+}
+.abacato-agenda__barra--atraso { background: var(--abacato-alerta); }
+.abacato-agenda__numero {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--abacato-tinta);
+  height: 14px;
+}
+.abacato-agenda__rotulo {
+  font-size: 10px;
+  color: var(--abacato-tinta-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.abacato-agenda__rotulo--fds { opacity: 0.5; }
+
+/* ============================================================ blocos por quadro */
+
+.abacato-quadro-painel {
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.abacato-quadro-painel__topo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.abacato-quadro-painel__nome {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--abacato-tinta);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+  padding: 0;
+  min-width: 0;
+}
+.abacato-quadro-painel__numeros { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.abacato-quadro-painel__corpo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--abacato-gap);
+  margin-top: var(--abacato-gap);
+}
+.abacato-bloco--largo { grid-column: 1 / -1; }
+
+.abacato-atrasado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--abacato-linha);
+}
+.abacato-atrasado:last-child { border-bottom: 0; }
+.abacato-atrasado__dias {
+  flex: 0 0 auto;
+  min-width: 38px;
+  text-align: center;
+  padding: 3px 7px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-alerta-fundo);
+  color: var(--abacato-alerta);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.abacato-atrasado__titulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.abacato-atrasado__etiquetas { display: flex; align-items: center; gap: 3px; flex: 0 0 auto; }
+
+/* ============================================================ o painel do cliente
+
+   Fora do sistema: sem barra lateral, sem menu, sem nada que leve para dentro. Quem abre isto
+   não faz parte do sistema e não deveria nem perceber que existe um por trás. */
+
+.abacato-publico {
+  min-height: 100dvh;
+  background: var(--abacato-fundo);
+  padding: clamp(16px, 5vw, 48px) 16px;
+}
+.abacato-publico__caixa {
+  width: min(920px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--abacato-gap);
+}
+.abacato-publico__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--abacato-gap);
+  flex-wrap: wrap;
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio-grande);
+  padding: 22px 26px;
+}
+.abacato-publico__titulo { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; }
+.abacato-publico__numeros { display: flex; flex-wrap: wrap; gap: 8px; }
+.abacato-publico__colunas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--abacato-gap);
+}
+.abacato-publico__rodape {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--abacato-tinta-3);
+  padding: 8px 0 4px;
+}
+
+/* ============================================================ celular */
+
+@media (max-width: 860px) {
+  .abacato-painel-geral { padding: 16px; gap: var(--abacato-gap); }
+  .abacato-quadro-painel__numeros { margin-left: 0; width: 100%; }
+  /* Catorze colunas numa tela de 390px dão 24px cada, com o rótulo ilegível. A agenda rola
+     para o lado em vez de espremer — e o que importa (os primeiros dias) já aparece. */
+  .abacato-agenda { overflow-x: auto; }
+  .abacato-agenda__dia { min-width: 32px; }
+}

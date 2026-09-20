@@ -244,7 +244,45 @@
 .abacato-card__etiquetas { display: flex; flex-wrap: wrap; gap: 4px; }
 .abacato-card__etiqueta { width: 30px; height: 7px; border-radius: 4px; display: inline-block; }
 
-.abacato-card__titulo { font-size: 13.5px; line-height: 1.4; color: var(--abacato-tinta); }
+.abacato-card__linha { display: flex; align-items: flex-start; gap: 8px; }
+.abacato-card__titulo { font-size: 13.5px; line-height: 1.4; color: var(--abacato-tinta); flex: 1; min-width: 0; }
+
+/* O círculo de concluir, dentro do card, sem abrir nada.
+ *
+ * Fica discreto até o mouse chegar perto: um visto forte em cada card competiria com as
+ * etiquetas e com o prazo, que é o que a coluna existe para mostrar de relance. */
+.abacato-card__concluir {
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid var(--abacato-tinta-3);
+  background: transparent;
+  color: transparent;
+  font-size: 11px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.12s ease, border-color 0.12s ease;
+}
+.abacato-card:hover .abacato-card__concluir { opacity: 1; }
+.abacato-card__concluir:hover { border-color: var(--abacato-verde); color: var(--abacato-verde); }
+.abacato-card__concluir--feito {
+  opacity: 1;
+  background: var(--abacato-verde);
+  border-color: var(--abacato-verde);
+  color: #06100A;
+  font-weight: 700;
+}
+
+/* No toque não existe "passar o mouse": o círculo precisa estar visível o tempo todo. */
+@media (pointer: coarse) {
+  .abacato-card__concluir { opacity: 1; }
+}
 
 .abacato-card__sinais {
   display: flex;

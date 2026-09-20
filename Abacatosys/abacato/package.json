@@ -23,7 +23,8 @@
     "trazer-do-trello": "node scripts/trazer-do-trello.mjs",
     "cf:build": "opennextjs-cloudflare build",
     "cf:deploy": "opennextjs-cloudflare deploy",
-    "publicar": "npm run cf:build && wrangler deploy"
+    "publicar": "npm run cf:build && wrangler deploy",
+    "painel-check": "node scripts/painel-check.mjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.6",

@@ -35,7 +35,7 @@ const ROTULO_DO_PRAZO = {
  * abre o card. Repetir aqui o que está no painel faria a coluna virar um paredão de texto em
  * que nada se destaca.
  */
-export default function CardMini({ dados, aoAbrir, aoIniciarArrasto, arrastando }) {
+export default function CardMini({ dados, aoAbrir, aoIniciarArrasto, arrastando, aoConcluir, podeEditar }) {
   const card = dados instanceof Card ? dados : new Card(dados);
   const prazo = card.estadoDoPrazo();
   const progresso = card.progressoDasChecklists;
@@ -76,9 +76,30 @@ export default function CardMini({ dados, aoAbrir, aoIniciarArrasto, arrastando 
         </div>
       )}
 
-      <div className="abacato-card__titulo">
-        {card.concluido && <span className="abacato-sinal--pronto" title="concluído">✓ </span>}
-        {card.titulo}
+      <div className="abacato-card__linha">
+        {/* Concluir SEM abrir o card.
+            `data-nao-arrasta` mantém o arrasto funcionando no resto do card, e o
+            `stopPropagation` impede que o clique também abra o painel — sem ele, marcar uma
+            tarefa como feita abriria a tarefa, que é o oposto de "só quero riscar isto". */}
+        {aoConcluir && podeEditar && (
+          <button
+            type="button"
+            data-nao-arrasta
+            className={`abacato-card__concluir${card.concluido ? " abacato-card__concluir--feito" : ""}`}
+            title={card.concluido
+              ? "concluído — clique para reabrir"
+              : card.recorrenciaRegra
+                ? "concluir e reprogramar para a próxima data"
+                : "marcar como concluído"}
+            aria-label={card.concluido ? "reabrir" : "concluir"}
+            aria-pressed={card.concluido}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); aoConcluir(card, !card.concluido); }}
+          >
+            {card.concluido ? "✓" : ""}
+          </button>
+        )}
+        <div className="abacato-card__titulo">{card.titulo}</div>
       </div>
 
       <div className="abacato-card__sinais">
@@ -97,7 +118,7 @@ export default function CardMini({ dados, aoAbrir, aoIniciarArrasto, arrastando 
         )}
         {card.descricao && <span className="abacato-sinal" title="tem descrição">≡</span>}
         {card.links.length > 0 && <span className="abacato-sinal" title="tem links">🔗 {card.links.length}</span>}
-        {card.origem === "recorrencia" && <span className="abacato-sinal" title="tarefa que se repete">↻</span>}
+        {card.recorrenciaRegra && <span className="abacato-sinal" title="esta tarefa se repete">↻</span>}
         {card.origem === "trello" && <span className="abacato-sinal" title="veio do Trello">⇤</span>}
 
         {card.responsaveis.length > 0 && (

@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase.js";
 import { exigir, respostaDeErro, ErroDeAcesso, tocarQuadro } from "@/lib/acesso.js";
 import { posicaoEntre } from "@/dominio/Quadro.js";
 import { lerRegra } from "@/dominio/recorrencia.js";
-import { gerarProximaOcorrencia } from "@/lib/cardRecorrente.js";
+import { reprogramarCard } from "@/lib/cardRecorrente.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,19 +81,21 @@ export async function PATCH(req, { params }) {
       .select("id, coluna_id, titulo, descricao, posicao, inicio_em, fim_em, capa, arquivado, concluido, recorrencia_regra").single();
     if (error) throw new ErroDeAcesso(500, error.message);
 
-    // CONCLUIR UM CARD QUE SE REPETE FAZ NASCER O PRÓXIMO.
+    // CONCLUIR UMA TAREFA QUE SE REPETE REPROGRAMA O PRÓPRIO CARD.
     //
-    // Acontece aqui, e não num relógio: é no instante em que você marca "concluído" que a
-    // próxima data faz sentido ser calculada, e é nesse instante que você está olhando a tela.
-    // Um card que só aparecesse na próxima sincronização pareceria que o sistema esqueceu.
-    let proxima = null;
+    // Ele volta a ficar aberto, com a data seguinte e as checklists desmarcadas. Acontece aqui,
+    // e não num relógio: é no instante em que você marca "concluído" que a próxima data faz
+    // sentido, e é nesse instante que você está olhando a tela.
+    let reprogramado = null;
     if (mudancas.concluido === true) {
-      proxima = await gerarProximaOcorrencia(id).catch(() => null);
-      // O `select` acima rodou ANTES de a proxima ocorrencia nascer, e ela tira a regra deste
-      // card — quem se repete agora e o novo. Sem esta linha a resposta devolveria a regra
-      // antiga, e a tela continuaria mostrando "esta tarefa se repete" marcada num card que
-      // acabou de passar o bastao.
-      if (proxima) data.recorrencia_regra = null;
+      reprogramado = await reprogramarCard(id).catch(() => null);
+      // O `select` acima rodou ANTES da reprogramação. Sem isto, a resposta diria que o card
+      // está concluído com a data velha — e a tela voltaria a marcá-lo riscado por um instante.
+      if (reprogramado) {
+        data.concluido = false;
+        data.fim_em = reprogramado.fim_em;
+        data.inicio_em = reprogramado.inicio_em;
+      }
     }
 
     await tocarQuadro(quadroId);
@@ -105,7 +107,7 @@ export async function PATCH(req, { params }) {
         arquivado: data.arquivado, concluido: data.concluido,
         recorrenciaRegra: data.recorrencia_regra,
       },
-      proxima,
+      reprogramado,
     });
   } catch (e) {
     return respostaDeErro(e);

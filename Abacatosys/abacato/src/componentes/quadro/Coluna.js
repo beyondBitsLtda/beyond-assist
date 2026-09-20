@@ -11,7 +11,7 @@ import CardMini from "./CardMini.js";
  * a cada uma obrigaria a cinco cliques a mais.
  */
 export default function Coluna({
-  coluna, alvo, arrasto, poderes, aoAbrirCard, aoIniciarArrasto,
+  coluna, alvo, arrasto, poderes, aoAbrirCard, aoIniciarArrasto, aoConcluirCard,
   aoCriarCard, aoRenomear, aoArquivar, aoMudarCapa,
 }) {
   const [escrevendo, setEscrevendo] = useState(false);
@@ -55,6 +55,8 @@ export default function Coluna({
           arrastando={arrasto?.tipo === "card" && arrasto.id === cards[i].id}
           aoAbrir={aoAbrirCard}
           aoIniciarArrasto={aoIniciarArrasto}
+          aoConcluir={aoConcluirCard}
+          podeEditar={poderes.editar}
         />
       );
     }

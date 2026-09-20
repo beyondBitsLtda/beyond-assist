@@ -1,6 +1,7 @@
 import "./globals.css";
 import "./quadro.css";
 import "./documentos.css";
+import "./painel.css";
 
 export const metadata = {
   title: "Abacato System",

@@ -25,6 +25,25 @@ function paraCampoDeData(valor) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+/**
+ * O caminho de volta: o que o campo devolve → uma data com FUSO.
+ *
+ * Esta função existe por causa de um defeito de três horas que não dava erro nenhum.
+ *
+ * O `datetime-local` devolve "2026-09-21T17:00", sem fuso. Quem interpreta essa string é quem
+ * a recebe — e o servidor é um Worker da Cloudflare, que roda em UTC. Um prazo marcado para as
+ * 17h aqui virava 17h UTC, ou seja, 14h no relógio de quem marcou. O card voltava da gravação
+ * com uma hora diferente da que foi digitada, e nada na tela explicava por quê.
+ *
+ * `new Date(valor)` no NAVEGADOR lê a string no fuso de quem está digitando, que é o certo, e
+ * `toISOString()` a fecha num instante absoluto que nenhum servidor reinterpreta.
+ */
+function doCampoParaISO(valor) {
+  if (!valor) return null;
+  const d = new Date(valor);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 export default function PainelDoCard({ card: dados, quadro, poderes, aoFechar, aoMudar, aoRecarregar }) {
   const card = dados instanceof Card ? dados : new Card(dados);
   const [salvando, setSalvando] = useState(false);
@@ -174,7 +193,7 @@ export default function PainelDoCard({ card: dados, quadro, poderes, aoFechar, a
                   disabled={!podeEditar}
                   defaultValue={paraCampoDeData(card.inicioEm)}
                   key={`i-${card.id}-${card.inicioEm}`}
-                  onChange={(e) => agir(() => mudar(`/api/cards/${card.id}`, { inicioEm: e.target.value || null }))}
+                  onChange={(e) => agir(() => mudar(`/api/cards/${card.id}`, { inicioEm: doCampoParaISO(e.target.value) }))}
                 />
               </label>
               <label className="abacato-campo">
@@ -185,7 +204,7 @@ export default function PainelDoCard({ card: dados, quadro, poderes, aoFechar, a
                   disabled={!podeEditar}
                   defaultValue={paraCampoDeData(card.fimEm)}
                   key={`f-${card.id}-${card.fimEm}`}
-                  onChange={(e) => agir(() => mudar(`/api/cards/${card.id}`, { fimEm: e.target.value || null }))}
+                  onChange={(e) => agir(() => mudar(`/api/cards/${card.id}`, { fimEm: doCampoParaISO(e.target.value) }))}
                 />
               </label>
             </div>

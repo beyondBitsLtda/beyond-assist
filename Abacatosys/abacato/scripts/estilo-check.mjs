@@ -70,6 +70,11 @@ for (const tela of telas) {
     const antes = codigo.slice(Math.max(0, achado.index - 60), achado.index);
     if (NAO_E_CLASSE.test(antes)) continue;
 
+    // `var(--abacato-verde)` é uma VARIÁVEL de cor, não uma classe. As telas usam variáveis
+    // direto em `style={{ background: "var(--abacato-verde)" }}`, e acusá-las como classe
+    // inexistente é o tipo de alarme falso que ensina a ignorar o verificador.
+    if (antes.endsWith("--")) continue;
+
     // Colado numa interpolação, é um COMEÇO de nome: `abacato-prazo--${estado}` nunca aparece
     // inteiro no código, e o nome completo só existe em tempo de execução.
     if (codigo.slice(achado.index + nome.length).startsWith("${")) {

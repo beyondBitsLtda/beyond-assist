@@ -127,6 +127,31 @@ export default function PaginaDoQuadro() {
 
   const { iniciar, arrasto, alvo } = useArrastar({ aoSoltarCard, aoSoltarColuna, refDoQuadro: faixa });
 
+  /** Concluir sem abrir o card. Se a tarefa se repete, ela já volta com a data nova. */
+  async function concluirCard(card, marcar) {
+    // Otimista: o visto aparece no clique. Uma ida ao banco de casa leva uns 300ms, e nesse
+    // tempo a pessoa clica de novo achando que não pegou.
+    mexerNaTela((colunas) => {
+      for (const col of colunas) {
+        const i = col.cards.findIndex((c) => c.id === card.id);
+        if (i >= 0) { col.cards[i] = { ...col.cards[i], concluido: marcar }; break; }
+      }
+      return colunas;
+    });
+
+    try {
+      const r = await mudar(`/api/cards/${card.id}`, { concluido: marcar });
+      if (r?.reprogramado) {
+        const quando = new Date(r.reprogramado.fim_em).toLocaleDateString("pt-BR");
+        setAviso(`"${card.titulo}" se repete — já reprogramada para ${quando}.`);
+      }
+      carregar(true);
+    } catch (e) {
+      setErro(e.message);
+      carregar(true);
+    }
+  }
+
   async function criarCard(colunaId, titulo) {
     try {
       const d = await criar(`/api/colunas/${colunaId}/cards`, { titulo });
@@ -242,6 +267,7 @@ export default function PaginaDoQuadro() {
             poderes={poderes}
             aoAbrirCard={setCardAberto}
             aoIniciarArrasto={iniciar}
+            aoConcluirCard={concluirCard}
             aoCriarCard={criarCard}
             aoRenomear={(colunaId, nome) => mudar(`/api/colunas/${colunaId}`, { nome }).then(() => carregar(true)).catch((e) => setErro(e.message))}
             aoMudarCapa={(colunaId, capa) => mudar(`/api/colunas/${colunaId}`, { capa }).then(() => carregar(true)).catch((e) => setErro(e.message))}
