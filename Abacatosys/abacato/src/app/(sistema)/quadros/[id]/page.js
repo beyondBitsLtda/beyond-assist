@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { Quadro } from "@/dominio/Quadro.js";
+import { Quadro, Usuario } from "@/dominio/Quadro.js";
 import { obter, criar, mudar, remover } from "@/lib/api.js";
 import { useArrastar } from "@/componentes/quadro/useArrastar.js";
 import Coluna from "@/componentes/quadro/Coluna.js";
@@ -223,6 +223,29 @@ export default function PaginaDoQuadro() {
           {resumo.porPrazo.hoje > 0 && (
             <span className="abacato-conta-pill abacato-conta-pill--atencao">{resumo.porPrazo.hoje} para hoje</span>
           )}
+          {/* Quem acessa fica À VISTA, e não dentro do menu `⋯`.
+              Um quadro é uma coisa dividida com gente: saber com quem, e poder mexer nisso, é
+              parte de abrir o quadro — não uma opção escondida atrás de três pontinhos. Os
+              avatares já respondem a pergunta sem abrir nada; o clique abre o painel. */}
+          <button
+            type="button"
+            className="abacato-quem"
+            onClick={() => setCompartilhar(true)}
+            title={`Quem acessa: ${(dados.quadro.membros || []).map((p) => p.nome).join(", ")}`}
+          >
+            <span className="abacato-quem__pilha">
+              {(dados.quadro.membros || []).slice(0, 3).map((p) => (
+                <span key={p.id} className="abacato-avatar abacato-avatar--pequeno">
+                  {new Usuario(p).iniciais}
+                </span>
+              ))}
+            </span>
+            {(dados.quadro.membros || []).length > 3 && (
+              <span className="abacato-quem__mais">+{dados.quadro.membros.length - 3}</span>
+            )}
+            <span className="abacato-quem__texto">Quem acessa</span>
+          </button>
+
           {poderes.criar && (
             <button type="button" className="abacato-botao abacato-botao--fantasma abacato-botao--pequeno" onClick={() => setRecorrencias(true)}>
               ↻ Recorrentes

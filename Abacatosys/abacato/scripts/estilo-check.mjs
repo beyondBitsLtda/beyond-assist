@@ -131,5 +131,55 @@ if (semUso.length) {
   console.log("  ok     nenhuma regra sobrando no CSS");
 }
 
+// ---------------------------------------------------------------- painel sem gatilho
+
+// Um painel ligado ao estado, renderizado, estilizado — e que nada na tela abre.
+//
+// Foi exatamente o que aconteceu com o "Quem acessa" do quadro: o componente importado, o
+// `useState` no lugar, o `{compartilhar && <Compartilhar …/>}` escrito, o CSS existindo, a API
+// passando 67 verificações. Faltava a única linha que chama `setCompartilhar(true)` — e o
+// recurso simplesmente não existia para quem usa. Nada reclama disso: compila, sobe, responde
+// 200, e o teste de HTTP passa porque a rota está certa.
+//
+// A regra: todo estado booleano que decide se um painel aparece precisa de algum jeito de
+// virar `true` no mesmo arquivo.
+const semGatilho = [];
+for (const tela of telas) {
+  const texto = fs.readFileSync(tela, "utf8");
+  const curto = path.relative(RAIZ, tela).replace(/\\/g, "/");
+
+  for (const achado of texto.matchAll(/const\s*\[\s*(\w+)\s*,\s*(set\w+)\s*\]\s*=\s*useState\(false\)/g)) {
+    const [, estado, setter] = achado;
+
+    // Só interessa o estado que comanda alguma coisa na tela: `{estado && <Algo`. Um booleano
+    // usado só em lógica (um `enviando`, um `carregando`) não é um painel.
+    const comanda = new RegExp(`\\{\\s*${estado}\\s*&&\\s*[\\(\\s]*<`).test(texto);
+    if (!comanda) continue;
+
+    // Vale como gatilho QUALQUER chamada ao setter cujo argumento não seja literalmente
+    // `false`, mais o setter entregue a um filho — que é livre para chamá-lo.
+    //
+    // A primeira versão desta regra exigia o literal `setX(true)` e acusou a lista de quadros,
+    // onde o painel de arquivados é aberto por `setVendoArquivados(Boolean(d.mostrando…))`.
+    // O botão estava lá e funcionava. Um verificador que grita onde não há defeito é pior que
+    // nenhum: ensina a ignorar o resultado.
+    const chamadas = [...texto.matchAll(new RegExp(`${setter}\\s*\\(([^)]*)`, "g"))]
+      .map((c) => c[1].trim());
+    const abre =
+      chamadas.some((arg) => arg !== "false") ||
+      new RegExp(`[=\\{\\(,]\\s*${setter}\\s*[\\}\\),]`).test(texto);
+
+    if (!abre) semGatilho.push(`${curto}: ${estado} — só existe ${setter}(false); nada o abre`);
+  }
+}
+
+if (semGatilho.length) {
+  falhas += 1;
+  console.log(`\n  FALHOU ${semGatilho.length} painel(éis) que a tela nunca abre:`);
+  semGatilho.forEach((s) => console.log(`         ${s}`));
+} else {
+  console.log("  ok     todo painel tem algo que o abre");
+}
+
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");
 process.exit(falhas ? 1 : 0);

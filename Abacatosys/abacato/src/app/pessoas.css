@@ -79,6 +79,46 @@
 .abacato-pessoa-cartao__meio strong { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 14px; }
 .abacato-pessoa-cartao__acoes { display: flex; gap: 6px; flex-wrap: wrap; }
 
+/* ============================================================ quem acessa, no topo do quadro */
+
+/* Os avatares empilhados respondem "quem acessa" sem abrir nada, e são o próprio botão que
+   abre o painel. Ficam à vista porque um quadro é uma coisa dividida com gente: esconder isso
+   atrás de um menu `⋯` foi o motivo de o recurso existir e ninguém achar. */
+.abacato-quem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 11px 4px 7px;
+  cursor: pointer;
+}
+.abacato-quem:hover { background: var(--abacato-superficie-2); border-color: var(--abacato-verde); }
+
+/* A margem negativa é o empilhamento; a borda da cor do fundo é o que separa um avatar do
+   outro. Sem ela, três iniciais em verde viram uma mancha verde só. */
+.abacato-quem__pilha { display: inline-flex; }
+.abacato-quem__pilha .abacato-avatar--pequeno + .abacato-avatar--pequeno { margin-left: -7px; }
+.abacato-avatar--pequeno {
+  width: 20px;
+  height: 20px;
+  font-size: 8.5px;
+  border: 1.5px solid var(--abacato-superficie);
+}
+.abacato-quem__mais { font-size: 11px; color: var(--abacato-tinta-3); }
+
+@media (max-width: 720px) {
+  /* No celular a barra do quadro é disputada. Os avatares seguem, o rótulo sai: eles já dizem
+     do que se trata, e o título do botão continua listando os nomes. */
+  .abacato-quem__texto { display: none; }
+  .abacato-quem { padding: 4px 7px; }
+}
+
 /* ============================================================ a senha que aparece uma vez */
 
 /* Verde e destacada: é uma coisa que acabou de acontecer e que precisa ser copiada AGORA —

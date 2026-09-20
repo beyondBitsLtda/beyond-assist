@@ -171,11 +171,17 @@ export default function PaginaDoProjeto() {
           }} />
           <h1 className="abacato-conteudo__titulo">{dados.projeto.nome}</h1>
         </div>
+        <div className="abacato-bloco__acoes">
+          {/* Fora do `poderes.criar`: saber com quem se divide um projeto é parte de trabalhar
+              nele, e não uma permissão de edição. O painel já se abre só para leitura para quem
+              não pode convidar — e a rota recusaria de qualquer jeito. */}
+          <button className="abacato-botao abacato-botao--fantasma" onClick={() => setCompartilhar(true)}>
+            Quem acessa
+          </button>
+        </div>
+
         {poderes.criar && (
           <div className="abacato-bloco__acoes">
-            <button className="abacato-botao abacato-botao--fantasma" onClick={() => setCompartilhar(true)}>
-              Quem acessa
-            </button>
             <button className="abacato-botao abacato-botao--fantasma" onClick={() => setNovaPasta(true)}>
               + Pasta
             </button>

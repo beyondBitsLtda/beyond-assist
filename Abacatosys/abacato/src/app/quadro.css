@@ -59,19 +59,42 @@
 }
 
 /* Com papel de parede o fundo vira escuro, e a tinta padrão é escura. Sem esta troca o nome do
-   quadro fica escrito em preto sobre preto: some da tela sem nenhum erro aparecer. */
+   quadro fica escrito em preto sobre preto: some da tela sem nenhum erro aparecer.
+
+   Cada seletor da lista vem ESCRITO POR INTEIRO, e isso não é preciosismo. Antes estava
+   `[data-parede="sim"], [data-parede="imagem"] .abacato-conta-pill` — uma vírgula que parece
+   agrupar os dois tipos de parede e na verdade agrupa "a tela com gradiente" com "a pílula
+   dentro da tela com imagem". O efeito: em quadro de gradiente, pílula, botão fantasma e
+   "adicionar coluna" continuavam com a cor do tema claro sobre um fundo escuro, e as
+   declarações erradas caíam no contêiner, onde só o `style` embutido as escondia. */
 .abacato-tela-do-quadro[data-parede="sim"],
 .abacato-tela-do-quadro[data-parede="imagem"] { color: #FFFFFF; }
-.abacato-tela-do-quadro[data-parede="sim"],
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-icone,
 .abacato-tela-do-quadro[data-parede="imagem"] .abacato-icone { color: rgba(255, 255, 255, 0.85); }
-.abacato-tela-do-quadro[data-parede="sim"],
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-icone:hover,
 .abacato-tela-do-quadro[data-parede="imagem"] .abacato-icone:hover { background: rgba(255, 255, 255, 0.18); color: #FFFFFF; }
-.abacato-tela-do-quadro[data-parede="sim"],
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-conta-pill,
 .abacato-tela-do-quadro[data-parede="imagem"] .abacato-conta-pill { background: rgba(255, 255, 255, 0.18); color: #FFFFFF; }
-.abacato-tela-do-quadro[data-parede="sim"],
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-botao--fantasma,
 .abacato-tela-do-quadro[data-parede="imagem"] .abacato-botao--fantasma { color: #FFFFFF; border-color: rgba(255, 255, 255, 0.45); }
-.abacato-tela-do-quadro[data-parede="sim"],
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-coluna__adicionar,
 .abacato-tela-do-quadro[data-parede="imagem"] .abacato-coluna__adicionar { background: rgba(255, 255, 255, 0.16); color: #FFFFFF; }
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-quem,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-quem {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #FFFFFF;
+}
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-quem:hover,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-quem:hover { background: rgba(255, 255, 255, 0.28); }
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-avatar--pequeno,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-avatar--pequeno { border-color: rgba(255, 255, 255, 0.55); }
 
 .abacato-conta-pill {
   font-size: 12px;
