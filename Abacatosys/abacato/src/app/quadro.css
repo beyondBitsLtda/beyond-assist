@@ -463,6 +463,11 @@ body.abacato-arrastando * { cursor: grabbing !important; }
   animation: abacato-entrar-da-direita 160ms ease-out;
 }
 .abacato-painel__caixa--estreita { width: min(480px, 100%); }
+/* O painel largo entra pela ESQUERDA-direita inteira, e nao encostado numa borda: um
+ * documento aberto ocupa a tela, e uma gaveta de 1180px encostada na direita deixaria
+ * uma faixa escura inutil do outro lado. */
+.abacato-painel--largo { justify-content: center; padding: 24px; }
+.abacato-painel--largo .abacato-painel__caixa { border-radius: var(--abacato-raio-grande); height: 100%; }
 
 @keyframes abacato-entrar-da-direita {
   from { transform: translateX(24px); opacity: 0; }

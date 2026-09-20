@@ -256,8 +256,41 @@ async function quadroDoItem(itemId) {
   };
 }
 
-/** De que tabela o id veio → como chegar ao quadro dele. */
+// ------------------------------------------- subir do filho ao PROJETO de documentacao
+
+async function projetoDaPasta(pastaId) {
+  const { data } = await supabase.from("abacato_pastas").select("id, projeto_id").eq("id", pastaId).maybeSingle();
+  if (!data) throw new ErroDeAcesso(404, "pasta não encontrada");
+  return { projetoId: data.projeto_id };
+}
+
+async function projetoDoDocumento(documentoId) {
+  const { data } = await supabase
+    .from("abacato_documentos").select("id, projeto_id, pasta_id").eq("id", documentoId).maybeSingle();
+  if (!data) throw new ErroDeAcesso(404, "documento não encontrado");
+  return { projetoId: data.projeto_id, pastaId: data.pasta_id };
+}
+
+async function projetoDaRevisao(revisaoId) {
+  const { data } = await supabase
+    .from("abacato_revisoes")
+    .select("id, documento_id, abacato_documentos ( projeto_id )")
+    .eq("id", revisaoId).maybeSingle();
+  if (!data) throw new ErroDeAcesso(404, "revisão não encontrada");
+  return { projetoId: data.abacato_documentos.projeto_id, documentoId: data.documento_id };
+}
+
+/** De que tabela o id veio → como chegar ao dono dele.
+ *
+ *  Duas famílias moram neste mapa: o que pertence a um QUADRO e o que pertence a um PROJETO de
+ *  documentação. Cada entrada devolve `quadroId` ou `projetoId`, e o `exigir` sabe em qual
+ *  tabela procurar o dono a partir disso. Um segundo `exigir` só para documentos seria a
+ *  segunda cópia da regra de permissão — e a segunda cópia é sempre a que fica desatualizada. */
 const SUBIDAS = {
+  projeto: async (id) => ({ projetoId: id }),
+  pasta: projetoDaPasta,
+  documento: projetoDoDocumento,
+  revisao: projetoDaRevisao,
   quadro: async (id) => ({ quadroId: id }),
   coluna: quadroDaColuna,
   card: quadroDoCard,
@@ -303,19 +336,23 @@ export async function exigir(req, tipo, id, acao) {
   if (!subir) throw new ErroDeAcesso(500, `tipo desconhecido: ${tipo}`);
   const alvo = await subir(id);
 
-  const { data: quadro } = await supabase
-    .from("abacato_quadros")
-    .select("id, dono_id, arquivado")
-    .eq("id", alvo.quadroId)
-    .maybeSingle();
-  if (!quadro) throw new ErroDeAcesso(404, "quadro não encontrado");
+  // Quadro ou projeto: a pergunta é a mesma ("quem é o dono, e eu sou membro?"), só muda em
+  // que tabela ela é feita.
+  const ehProjeto = alvo.projetoId != null;
+  const tabela = ehProjeto ? "abacato_projetos" : "abacato_quadros";
+  const tabelaDeMembros = ehProjeto ? "abacato_projeto_membros" : "abacato_membros";
+  const coluna = ehProjeto ? "projeto_id" : "quadro_id";
+  const donoDe = ehProjeto ? alvo.projetoId : alvo.quadroId;
 
-  let papel = quadro.dono_id === usuario.id ? "dono" : null;
+  const { data: raiz } = await supabase
+    .from(tabela).select("id, dono_id, arquivado").eq("id", donoDe).maybeSingle();
+  if (!raiz) throw new ErroDeAcesso(404, ehProjeto ? "projeto não encontrado" : "quadro não encontrado");
+
+  let papel = raiz.dono_id === usuario.id ? "dono" : null;
   if (!papel) {
     const { data: membro } = await supabase
-      .from("abacato_membros")
-      .select("papel")
-      .eq("quadro_id", quadro.id).eq("usuario_id", usuario.id)
+      .from(tabelaDeMembros).select("papel")
+      .eq(coluna, raiz.id).eq("usuario_id", usuario.id)
       .maybeSingle();
     papel = membro?.papel || null;
   }
@@ -324,7 +361,7 @@ export async function exigir(req, tipo, id, acao) {
   const poderes = poderesDo(papel);
   if (!poderes[acao]) throw new ErroDeAcesso(403, `seu papel (${papel}) não permite ${acao}`);
 
-  return { usuario, papel, poderes, quadroId: quadro.id, ...alvo };
+  return { usuario, papel, poderes, quadroId: ehProjeto ? null : raiz.id, projetoId: ehProjeto ? raiz.id : null, ...alvo };
 }
 
 /** Marca o quadro como tocado agora. Serve à ordenação da lista de quadros e, mais para

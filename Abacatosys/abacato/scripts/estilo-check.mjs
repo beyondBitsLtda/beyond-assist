@@ -9,7 +9,8 @@
 // que ele rodou e as duas eram falso alarme:
 //
 //   1. Nem todo texto com "abacato-" é classe. `localStorage.getItem("abacato-tema")` é uma
-//      chave de armazenamento, e acusá-la ensina a ignorar o resultado.
+//      chave de armazenamento e `<datalist id="abacato-categorias">` é um id — acusar os dois
+//      ensina a ignorar o resultado, que é o pior que pode acontecer com um verificador.
 //
 //   2. Metade das classes é montada na hora: `abacato-prazo--${estado}`. O nome completo não
 //      existe em lugar nenhum do código, só o começo dele — e a classe do CSS está em uso.
@@ -20,7 +21,8 @@ import path from "node:path";
 const RAIZ = path.join(import.meta.dirname, "..");
 
 // Contextos em que um texto "abacato-…" NÃO é classe.
-const NAO_E_CLASSE = /(localStorage|sessionStorage|setAttribute|getAttribute|dataset|\bkey\s*:|data-)[^;\n]{0,40}$/;
+const NAO_E_CLASSE =
+  /(localStorage|sessionStorage|setAttribute|getAttribute|dataset|\bkey\s*:|data-|\bid=|\blist=|\bhtmlFor=)[^;\n]{0,40}$/;
 
 function varrer(pasta, extensoes, achados = []) {
   for (const nome of fs.readdirSync(pasta)) {
