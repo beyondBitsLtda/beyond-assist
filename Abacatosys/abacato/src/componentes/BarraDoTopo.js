@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import SeletorDeTema from "./SeletorDeTema.js";
 
 /**
@@ -24,6 +25,10 @@ export default function BarraDoTopo() {
       </div>
 
       <div className="abacato-topo__direita">
+        <Link href="/conta" className="abacato-topo__sair" title="Minha conta">
+          <span aria-hidden="true">◔</span>
+          <span className="abacato-topo__sair-texto">Minha conta</span>
+        </Link>
         <SeletorDeTema />
         <button
           type="button"

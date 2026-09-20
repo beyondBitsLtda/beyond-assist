@@ -9,6 +9,7 @@ const ITENS = [
   { href: "/quadros", rotulo: "Quadros", icone: "▦" },
   { href: "/documentos", rotulo: "Documentos", icone: "🗂" },
   { href: "/dashboards", rotulo: "Dashboards", icone: "📊" },
+  { href: "/pessoas", rotulo: "Pessoas", icone: "👥" },
 ];
 
 export default function BarraLateral() {

@@ -7,6 +7,7 @@ import { obter, criar, mudar, remover } from "@/lib/api.js";
 import { montarArvore, caminhoAte, selo, tamanhoEmPalavras, comoAbrir } from "@/dominio/documentos.js";
 import VisorDeDocumento from "@/componentes/documentos/VisorDeDocumento.js";
 import { lerArrastados, lerDoSeletor, caminhosDistintos } from "@/lib/pastasArrastadas.js";
+import Compartilhar from "@/componentes/Compartilhar.js";
 
 const ICONE = { html: "◫", proprio: "▤", texto: "≡", baixar: "⤓" };
 
@@ -52,6 +53,7 @@ export default function PaginaDoProjeto() {
   const [arrastando, setArrastando] = useState(false);
   const [aviso, setAviso] = useState("");
   const [progresso, setProgresso] = useState(null);
+  const [compartilhar, setCompartilhar] = useState(false);
   const campoArquivo = useRef(null);
   const campoPasta = useRef(null);
 
@@ -171,6 +173,9 @@ export default function PaginaDoProjeto() {
         </div>
         {poderes.criar && (
           <div className="abacato-bloco__acoes">
+            <button className="abacato-botao abacato-botao--fantasma" onClick={() => setCompartilhar(true)}>
+              Quem acessa
+            </button>
             <button className="abacato-botao abacato-botao--fantasma" onClick={() => setNovaPasta(true)}>
               + Pasta
             </button>
@@ -332,6 +337,10 @@ export default function PaginaDoProjeto() {
           </div>
         </section>
       </div>
+
+      {compartilhar && (
+        <Compartilhar tipo="projeto" id={id} nome={dados.projeto.nome} aoFechar={() => setCompartilhar(false)} />
+      )}
 
       {documentoAberto && (
         <VisorDeDocumento

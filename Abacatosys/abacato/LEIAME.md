@@ -123,9 +123,44 @@ O número de iterações é uma **constante** no código, não um valor por usu�
 precisa dele antes de qualquer ida ao servidor. Mudá-lo obriga todo mundo a cadastrar a senha de
 novo.
 
+## Quem acessa o quê
+
+Duas perguntas diferentes, e o sistema não as mistura.
+
+**Ter conta** é entrar no Abacato, e só. Quem administra (`/pessoas`) cria contas, sorteia
+senhas, promove outros administradores e desliga quem saiu. Uma conta recém-criada não enxerga
+quadro nenhum — nem os que já existem.
+
+**Ter acesso a alguma coisa** é ser convidado para ela, uma a uma, pelo botão *Quem acessa*.
+Quadros e projetos de documentação têm listas **separadas** de gente: convidar alguém para o
+quadro do CRM não abre a documentação do CRM. Os papéis:
+
+| papel | vê | comenta | edita, cria, arquiva | convida | arquiva a coisa inteira |
+| --- | :-: | :-: | :-: | :-: | :-: |
+| dono | ✓ | ✓ | ✓ | ✓ | ✓ |
+| editor | ✓ | ✓ | ✓ | | |
+| comentarista | ✓ | ✓ | | | |
+| leitor | ✓ | | | | |
+
+Três decisões que valem a explicação:
+
+**Quem não foi convidado recebe 404, não 403.** Um 403 confirmaria que aquele quadro existe
+para quem só tinha um palpite de URL.
+
+**A permissão é conferida na subida, não na rota.** Um card não sabe quem pode editá-lo — isso
+depende do quadro, três tabelas acima. Esse caminho existe num lugar só (`src/lib/acesso.js`),
+porque bastaria *uma* rota esquecer de subir para o sistema inteiro ter um buraco — e seria a
+rota menos usada, que ninguém testa.
+
+**Ninguém se desliga nem rebaixa o último administrador.** Um Abacato sem ninguém que possa
+criar contas só volta pelo terminal do servidor. As duas travas ficam no servidor, não na tela.
+
+O sinalizador de administrador é lido do **banco** a cada pedido, nunca do cookie: o cookie vale
+uma semana, e tirar o acesso de alguém precisa valer no mesmo instante.
+
 ## Conferências
 
-As quatro primeiras rodam sem banco e sem rede. Todas falham alto:
+Todas falham alto. As sete primeiras rodam sem banco e sem rede:
 
 | comando | o que garante |
 | --- | --- |
@@ -133,18 +168,32 @@ As quatro primeiras rodam sem banco e sem rede. Todas falham alto:
 | `npm run dominio-check` | posições, prazos, checklists, papéis — papel desconhecido não ganha poder nenhum |
 | `npm run recorrencia-check` | regras de repetição e colagem de listas: dia 31 em fevereiro, ano bissexto, virada de ano |
 | `npm run trello-check` | a leitura da exportação do Trello: cores, arquivados, anexos, cards órfãos |
+| `npm run parede-check` | papéis de parede: gradiente, imagem e o valor torto que viraria CSS injetado |
+| `npm run arrastar-check` | a leitura de uma pasta arrastada do computador, com subpastas |
 | `npm run estilo-check` | toda classe `abacato-*` usada nas telas existe no CSS — o defeito que só aparece na tela |
 | `npm run login-check` | o caminho inteiro do login contra o banco de verdade (precisa do `.env.local`) |
 | `npm run quadro-check` | o quadro de ponta a ponta por HTTP: arrastar, copiar, permissões, fronteiras entre quadros |
 | `npm run importar-check` | a importação gravando de verdade — e reimportando sem duplicar |
+| `npm run documento-check` | projetos, pastas, revisões e como cada tipo de arquivo abre |
+| `npm run painel-check` | os números do painel e o link público do cliente, com as dez travas de vazamento |
+| `npm run pessoas-check` | contas, papéis e permissões: 67 pedidos feitos com a sessão de outra pessoa |
 
-Os dois últimos precisam do servidor no ar e criam quadros de teste, que eles mesmos arquivam
+Os cinco últimos precisam do servidor no ar, e criam coisas de teste que eles mesmos limpam
 no fim:
 
 ```bash
 ABACATO_URL=http://localhost:3000 npm run quadro-check
 ABACATO_URL=http://localhost:3000 npm run importar-check
+ABACATO_URL=http://localhost:3000 npm run documento-check
+ABACATO_URL=http://localhost:3000 npm run painel-check
+ABACATO_URL=http://localhost:3000 npm run pessoas-check
 ```
+
+O `pessoas-check` merece uma palavra: ele cria duas contas descartáveis, entra com cada uma e
+tenta fazer, com a sessão delas, o que aquele papel **não** deveria poder. Cada recusa está
+pareada com a mesma chamada dando certo sob outro papel — a leitora recebe 403 ao criar um
+card e a editora recebe 201 no mesmo endereço. É o que impede o teste de passar por engano,
+com um sistema que recusa tudo. No fim ele apaga as contas, o quadro e o projeto que criou.
 
 **Nunca rode `npm run build` com o `npm run dev` ligado.** Os dois escrevem na mesma pasta
 `.next/`, e o build apaga os arquivos que o servidor de desenvolvimento está usando — ele

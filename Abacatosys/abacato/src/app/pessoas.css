@@ -1,0 +1,101 @@
+/* Abacato System — pessoas, papéis e compartilhamento.
+ *
+ * Tudo em tokens, como o resto. Duas listas de gente — a de contas e a de quem acessa um
+ * quadro — compartilham a mesma linha, porque são a mesma leitura: avatar, nome, e-mail, o que
+ * dá para fazer com aquela pessoa.
+ */
+
+/* ============================================================ escolher o papel */
+
+.abacato-papeis { display: flex; gap: 8px; flex-wrap: wrap; }
+.abacato-papel {
+  flex: 1 1 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  border: 1px solid var(--abacato-linha);
+  border-radius: 12px;
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta-2);
+  padding: 10px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+.abacato-papel strong { font-size: 13px; color: var(--abacato-tinta); }
+.abacato-papel span { font-size: 11.5px; }
+.abacato-papel--ativo {
+  border-color: var(--abacato-verde);
+  background: var(--abacato-verde-claro);
+}
+
+/* ============================================================ uma linha de pessoa */
+
+.abacato-pessoa-linha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--abacato-tinta);
+  font: inherit;
+  text-align: left;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.abacato-pessoa-linha:hover { background: var(--abacato-superficie-2); border-color: var(--abacato-linha); }
+/* A linha de quem JÁ tem acesso não é clicável: ela tem controles próprios dentro, e um
+   contêiner clicável em volta de um seletor é o jeito de o clique cair no lugar errado. */
+.abacato-pessoa-linha--fixa { cursor: default; background: var(--abacato-superficie-2); }
+.abacato-pessoa-linha--fixa:hover { border-color: transparent; }
+.abacato-pessoa-linha__meio { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.abacato-pessoa-linha__meio strong {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================ a tela de pessoas */
+
+.abacato-pessoas { display: flex; flex-direction: column; gap: 8px; }
+
+.abacato-pessoa-cartao {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  padding: 14px 16px;
+}
+/* Conta desligada fica apagada, e não some. Sumir esconderia justamente a informação de que
+   aquela pessoa já teve acesso — e é ela que se procura ao reativar alguém. */
+.abacato-pessoa-cartao--fora { opacity: 0.55; }
+.abacato-pessoa-cartao__meio { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 180px; }
+.abacato-pessoa-cartao__meio strong { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 14px; }
+.abacato-pessoa-cartao__acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ============================================================ a senha que aparece uma vez */
+
+/* Verde e destacada: é uma coisa que acabou de acontecer e que precisa ser copiada AGORA —
+   depois de fechar, ninguém mais consegue lê-la, nem quem criou. */
+.abacato-senha-nova {
+  border-color: var(--abacato-verde);
+  background: var(--abacato-verde-claro);
+  margin-bottom: 16px;
+}
+.abacato-senha-nova__campo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  background: var(--abacato-superficie);
+}
+
+@media (max-width: 860px) {
+  .abacato-pessoa-cartao__acoes { width: 100%; }
+  .abacato-pessoa-cartao__acoes .abacato-botao { flex: 1; }
+}

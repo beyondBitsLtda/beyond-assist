@@ -13,6 +13,7 @@ import PainelDeRecorrencias from "@/componentes/quadro/PainelDeRecorrencias.js";
 import ColunasArquivadas from "@/componentes/quadro/ColunasArquivadas.js";
 import PapelDeParede from "@/componentes/quadro/PapelDeParede.js";
 import { urlDaParede } from "@/dominio/paredes.js";
+import Compartilhar from "@/componentes/Compartilhar.js";
 
 export default function PaginaDoQuadro() {
   const { id } = useParams();
@@ -24,6 +25,7 @@ export default function PaginaDoQuadro() {
   const [recorrencias, setRecorrencias] = useState(false);
   const [arquivadas, setArquivadas] = useState(false);
   const [parede, setParede] = useState(false);
+  const [compartilhar, setCompartilhar] = useState(false);
   const [novaColuna, setNovaColuna] = useState(false);
   const [aviso, setAviso] = useState("");
   const faixa = useRef(null);
@@ -322,6 +324,10 @@ export default function PaginaDoQuadro() {
           aoMudar={() => setDados((d) => ({ ...d }))}
           aoRecarregar={() => carregar(true)}
         />
+      )}
+
+      {compartilhar && (
+        <Compartilhar tipo="quadro" id={id} nome={dados.quadro.nome} aoFechar={() => setCompartilhar(false)} />
       )}
 
       {parede && (
