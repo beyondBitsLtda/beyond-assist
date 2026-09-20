@@ -133,10 +133,11 @@ export default function PaginaDoProjeto() {
 
       await carregar();
 
-      const partes = [];
+      const partes = [`${itens.length - naoEntraram.length} de ${itens.length} arquivo(s) entraram` +
+        (caminhos.length ? `, em ${Object.keys(pastas).length} pasta(s)` : "")];
       if (cortou) partes.push("parei no limite de 500 arquivos");
       if (naoEntraram.length) partes.push(`não entraram: ${naoEntraram.slice(0, 8).join(", ")}${naoEntraram.length > 8 ? "…" : ""}`);
-      if (partes.length) setAviso(partes.join(" · "));
+      setAviso(partes.join(" · "));
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -184,8 +185,12 @@ export default function PaginaDoProjeto() {
             {/* `webkitdirectory` é o único jeito de ESCOLHER uma pasta por botão. O nome tem
                 prefixo de fabricante e funciona em todos os navegadores de hoje — não há
                 equivalente padronizado. */}
-            <input ref={campoPasta} type="file" hidden webkitdirectory="" directory=""
-              onChange={(e) => { const lido = lerDoSeletor(e.target.files); enviarItens(lido.itens, lido); }} />
+            <input ref={campoPasta} type="file" hidden multiple webkitdirectory="" directory=""
+              onChange={(e) => {
+                const lido = lerDoSeletor(e.target.files);
+                if (!lido.itens.length) return setErro("nenhum arquivo veio dessa pasta.");
+                enviarItens(lido.itens, lido);
+              }} />
           </div>
         )}
       </header>
@@ -249,10 +254,24 @@ export default function PaginaDoProjeto() {
             if (!poderes.criar) return;
             e.preventDefault();
             setArrastando(false);
-            // A leitura tem de começar AQUI, antes de qualquer espera: os itens do arrasto
-            // deixam de valer assim que este manipulador termina.
-            const lido = await lerArrastados(e.dataTransfer);
-            await enviarItens(lido.itens, lido);
+            // O TRY NÃO É ZELO EXTRA: sem ele, uma exceção aqui dentro vira uma promessa
+            // rejeitada que ninguém escuta, e o arrasto simplesmente não faz nada — sem erro na
+            // tela, sem pista nenhuma. Foi exatamente assim que o primeiro defeito desta tela
+            // passou despercebido.
+            try {
+              // A leitura tem de começar AQUI, antes de qualquer espera: os itens do arrasto
+              // deixam de valer assim que este manipulador termina.
+              const lido = await lerArrastados(e.dataTransfer);
+              if (!lido.itens.length) {
+                setErro("não consegui ler nada do que você soltou. Tente pelo botão “+ Pasta do computador”.");
+                return;
+              }
+              await enviarItens(lido.itens, lido);
+            } catch (x) {
+              setErro(`falhou ao ler o que foi solto: ${x.message}`);
+              setEnviando(false);
+              setProgresso(null);
+            }
           }}
         >
           <div className="abacato-migalhas">

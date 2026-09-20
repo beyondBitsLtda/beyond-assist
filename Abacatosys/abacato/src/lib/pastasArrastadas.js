@@ -74,17 +74,23 @@ async function percorrer(entrada, caminho, saida, limite) {
  */
 export async function lerArrastados(dataTransfer, limite = TETO_DE_ARQUIVOS) {
   // SÍNCRONO, antes de qualquer `await`: depois que este trecho sai do ar, `items` está vazio.
+  //
+  // `Array.from`, e NÃO `[...items]`. Este foi o defeito que fez o arrastar não funcionar:
+  // `DataTransferItemList` tem `length` e índices, mas não é iterável — espalhar com `...`
+  // lança. E como o manipulador do `drop` é `async`, a exceção virava uma promessa rejeitada
+  // que ninguém escutava: nada acontecia, e nada aparecia na tela. `Array.from` lê qualquer
+  // coisa parecida com lista, iterável ou não.
   const entradas = [];
-  const itens = dataTransfer?.items ? [...dataTransfer.items] : [];
-  for (const item of itens) {
-    const entrada = item.webkitGetAsEntry?.();
+  const lista = dataTransfer?.items;
+  for (let i = 0; i < (lista?.length || 0); i++) {
+    const entrada = lista[i]?.webkitGetAsEntry?.();
     if (entrada) entradas.push(entrada);
   }
 
   if (!entradas.length) {
     // Navegador sem suporte, ou algo que não é arquivo (um texto, um link). Sobram os arquivos
     // soltos, que é o comportamento de sempre.
-    const soltos = [...(dataTransfer?.files || [])].slice(0, limite).map((file) => ({ file, caminho: [] }));
+    const soltos = Array.from(dataTransfer?.files || []).slice(0, limite).map((file) => ({ file, caminho: [] }));
     return { itens: soltos, estrutura: false, cortou: false };
   }
 
@@ -92,8 +98,7 @@ export async function lerArrastados(dataTransfer, limite = TETO_DE_ARQUIVOS) {
   for (const entrada of entradas) {
     // Um arquivo solto no meio de pastas não ganha caminho nenhum: ele fica onde a pessoa
     // estava, que é o que ela esperaria.
-    if (entrada.isFile) await percorrer(entrada, [], saida, limite);
-    else await percorrer(entrada, [], saida, limite);
+    await percorrer(entrada, [], saida, limite);
     if (saida.length >= limite) break;
   }
 
@@ -111,7 +116,7 @@ export async function lerArrastados(dataTransfer, limite = TETO_DE_ARQUIVOS) {
  * precisa sair, senão cada arquivo viraria uma pasta com o próprio nome.
  */
 export function lerDoSeletor(fileList, limite = TETO_DE_ARQUIVOS) {
-  const arquivos = [...(fileList || [])];
+  const arquivos = Array.from(fileList || []);
   const itens = [];
   for (const file of arquivos) {
     if (itens.length >= limite) break;

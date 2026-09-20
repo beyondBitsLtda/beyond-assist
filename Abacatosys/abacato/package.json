@@ -17,6 +17,7 @@
     "trello-check": "node scripts/trello-check.mjs",
     "parede-check": "node scripts/parede-check.mjs",
     "documento-check": "node scripts/documento-check.mjs",
+    "arrastar-check": "node scripts/arrastar-check.mjs",
     "importar-check": "node scripts/importar-check.mjs",
     "quadro-exemplo": "node scripts/quadro-exemplo.mjs",
     "trazer-do-trello": "node scripts/trazer-do-trello.mjs",
