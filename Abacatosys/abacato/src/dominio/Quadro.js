@@ -96,11 +96,13 @@ export class Checklist {
 export class Card {
   constructor({
     id, colunaId = null, titulo, descricao, posicao = 0, inicioEm = null, fimEm = null, capa = null,
-    arquivado = false, concluido = false, etiquetas = [], responsaveis = [], checklists = [], links = [],
+    arquivado = false, concluido = false, recorrenciaRegra = null,
+    etiquetas = [], responsaveis = [], checklists = [], links = [],
     origem = null, origemId = null,
   }) {
     this.colunaId = colunaId;
     this.concluido = Boolean(concluido);
+    this.recorrenciaRegra = recorrenciaRegra;
     this.id = id;
     this.titulo = titulo || "";
     this.descricao = descricao || "";

@@ -5,6 +5,7 @@ import { Card, Usuario } from "@/dominio/Quadro.js";
 import { CORES } from "@/dominio/cores.js";
 import { criar, mudar, definir, remover } from "@/lib/api.js";
 import { dataCurta } from "./CardMini.js";
+import { regraEmPalavras } from "@/dominio/recorrencia.js";
 
 /**
  * A prancheta de checklists.
@@ -32,6 +33,7 @@ export default function PainelDoCard({ card: dados, quadro, poderes, aoFechar, a
   const [editandoDescricao, setEditandoDescricao] = useState(false);
   const [novaChecklist, setNovaChecklist] = useState(false);
   const [novoLink, setNovoLink] = useState(false);
+  const [recado, setRecado] = useState("");
   const caixa = useRef(null);
 
   useEffect(() => { setDescricao(card.descricao || ""); }, [card.id, card.descricao]);
@@ -54,8 +56,9 @@ export default function PainelDoCard({ card: dados, quadro, poderes, aoFechar, a
     setSalvando(true);
     setErro("");
     try {
-      await oQueFazer();
+      const resultado = await oQueFazer();
       if (recarregar) await aoRecarregar();
+      return resultado;
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -200,13 +203,101 @@ export default function PainelDoCard({ card: dados, quadro, poderes, aoFechar, a
                 type="checkbox"
                 checked={card.concluido}
                 disabled={!podeEditar}
-                onChange={(e) => agir(() => mudar(`/api/cards/${card.id}`, { concluido: e.target.checked }))}
+                onChange={async (e) => {
+                  const marcando = e.target.checked;
+                  const r = await agir(() => mudar(`/api/cards/${card.id}`, { concluido: marcando }));
+                  // Concluir um card que se repete faz nascer o próximo. Dizer QUANDO ele vence
+                  // é o que fecha o ciclo na cabeça de quem clicou — sem isso, o card novo
+                  // aparece no quadro do nada.
+                  if (r?.proxima) {
+                    setRecado(`Pronto. O próximo já está no quadro, para ${dataCurta(r.proxima.fim_em)}.`);
+                  }
+                }}
               />
               Trabalho concluído
               {card.concluidoPelasChecklists && !card.concluido && (
                 <span className="abacato-dica">as checklists já estão todas completas</span>
               )}
             </label>
+
+            {recado && <p className="abacato-recado">↻ {recado}</p>}
+
+            {/* ---- repetir ----
+                A regra vive no PRÓPRIO card, e não numa lista à parte. Foi o que faltava: havia
+                um cadastro de tarefas recorrentes por coluna, e ninguém o encontrava — porque o
+                lugar onde se pensa "isto se repete toda semana" é o card, não um menu. */}
+            {podeEditar && (
+              <div className="abacato-repetir">
+                <label className="abacato-concluir">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(card.recorrenciaRegra)}
+                    onChange={(e) => agir(() => mudar(`/api/cards/${card.id}`, {
+                      recorrenciaRegra: e.target.checked ? "semanal:1" : null,
+                    }))}
+                  />
+                  Esta tarefa se repete
+                </label>
+
+                {card.recorrenciaRegra && (
+                  <>
+                    <div className="abacato-abas">
+                      {[["diaria", "Todo dia"], ["semanal:1", "Toda semana"], ["mensal:1", "Todo mês"]].map(([valor, rotulo]) => {
+                        const ativa = card.recorrenciaRegra.split(":")[0] === valor.split(":")[0];
+                        return (
+                          <button key={valor} type="button"
+                            className={`abacato-aba${ativa ? " abacato-aba--ativa" : ""}`}
+                            onClick={() => agir(() => mudar(`/api/cards/${card.id}`, { recorrenciaRegra: valor }))}>
+                            {rotulo}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {card.recorrenciaRegra.startsWith("semanal") && (
+                      <div className="abacato-dias">
+                        {[[1, "seg"], [2, "ter"], [3, "qua"], [4, "qui"], [5, "sex"], [6, "sáb"], [7, "dom"]].map(([n, curto]) => {
+                          const dias = (card.recorrenciaRegra.split(":")[1] || "").split(",").filter(Boolean).map(Number);
+                          const ativo = dias.includes(n);
+                          return (
+                            <button key={n} type="button" aria-pressed={ativo}
+                              className={`abacato-dia${ativo ? " abacato-dia--ativo" : ""}`}
+                              onClick={() => {
+                                const novos = ativo ? dias.filter((d) => d !== n) : [...dias, n];
+                                // Sem nenhum dia, a regra nunca dispararia — e uma tarefa que
+                                // se diz recorrente e nunca aparece é pior que nenhuma.
+                                if (!novos.length) return;
+                                agir(() => mudar(`/api/cards/${card.id}`, {
+                                  recorrenciaRegra: `semanal:${novos.sort((a, b) => a - b).join(",")}`,
+                                }));
+                              }}>{curto}</button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {card.recorrenciaRegra.startsWith("mensal") && (
+                      <label className="abacato-campo">
+                        <span className="abacato-campo__rotulo">Dia do mês</span>
+                        <input type="number" min={1} max={31} className="abacato-campo__entrada"
+                          defaultValue={card.recorrenciaRegra.split(":")[1] || 1}
+                          key={card.recorrenciaRegra}
+                          onBlur={(e) => {
+                            const dia = Math.max(1, Math.min(31, Number(e.target.value) || 1));
+                            agir(() => mudar(`/api/cards/${card.id}`, { recorrenciaRegra: `mensal:${dia}` }));
+                          }} />
+                      </label>
+                    )}
+
+                    <p className="abacato-resumo-da-regra">
+                      Repete <strong>{regraEmPalavras(card.recorrenciaRegra)}</strong>. Ao marcar
+                      como concluído, o próximo nasce sozinho com a data recalculada — e este
+                      fica no quadro, feito, como histórico.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
           </section>
 
           {/* ---------------------------------------------------------- descrição */}

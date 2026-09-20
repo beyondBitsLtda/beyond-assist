@@ -162,8 +162,9 @@ export default function Quadros() {
         <div className="abacato-grade">
           {quadros.map((q) => (
             <div key={q.id} className="abacato-quadro-cartao">
-              {/* A faixa de cima repete o papel de parede do quadro: é o que faz reconhecer o
-                  quadro certo de relance numa lista que vai crescer. */}
+              {/* A capa usa o MESMO valor do papel de parede do quadro — que pode ser um
+                  gradiente ou uma imagem. Os dois entram como `background` e o CSS resolve o
+                  enquadramento, sem a tela precisar saber qual dos dois veio. */}
               <span
                 className="abacato-quadro-cartao__faixa"
                 style={{ background: q.papel_de_parede || "linear-gradient(135deg, #0F2A1D, #1B4332)" }}

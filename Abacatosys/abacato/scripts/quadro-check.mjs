@@ -231,6 +231,46 @@ conferir("abrir de novo não duplica o card recorrente", terceiraVez === depois,
 
 // ------------------------------------------------------------------ fronteiras entre quadros
 
+console.log("\n9.5) um card que se repete");
+{
+  // O que faltava de verdade: a pessoa marca "concluido" e espera ver o proximo com a data
+  // recalculada. Havia um cadastro de recorrencias por COLUNA, que ninguem encontrava — porque
+  // o lugar onde se pensa "isto se repete toda semana" e o card.
+  const { card } = await precisa("criar card", chamar(`/api/colunas/${afazer.id}/cards`, {
+    metodo: "POST", corpo: { titulo: "Conferir os backups" },
+  }));
+  await precisa("por prazo e regra", chamar(`/api/cards/${card.id}`, {
+    metodo: "PATCH", corpo: { fimEm: "2026-09-21T09:00", recorrenciaRegra: "semanal:1" },
+  }));
+
+  const regraTorta = await chamar(`/api/cards/${card.id}`, {
+    metodo: "PATCH", corpo: { recorrenciaRegra: "quinzenal" },
+  });
+  conferir("regra invalida e recusada", regraTorta.status === 400, `deu ${regraTorta.status}`);
+
+  const feito = await precisa("concluir", chamar(`/api/cards/${card.id}`, {
+    metodo: "PATCH", corpo: { concluido: true },
+  }));
+  conferir("nasceu o proximo", Boolean(feito.proxima), JSON.stringify(feito.proxima));
+  conferir("com a data recalculada para a segunda seguinte",
+    feito.proxima?.fim_em?.startsWith("2026-09-28"), feito.proxima?.fim_em);
+  conferir("o card concluido continua concluido", feito.card.concluido === true);
+  conferir("e para de se repetir (quem repete agora e o novo)",
+    feito.card.recorrenciaRegra === null, String(feito.card.recorrenciaRegra));
+
+  const depois = await precisa("reabrir", chamar(`/api/quadros/${qid}`));
+  const dois = depois.quadro.colunas.flatMap((c) => c.cards).filter((c) => c.titulo === "Conferir os backups");
+  conferir("os DOIS existem — o feito e o proximo", dois.length === 2, `${dois.length}`);
+  conferir("o novo carrega a regra", dois.some((c) => c.recorrenciaRegra === "semanal:1"));
+
+  // Desmarcar e marcar de novo e um clique comum. Um terceiro card ali seria lixo permanente.
+  await precisa("desmarcar", chamar(`/api/cards/${card.id}`, { metodo: "PATCH", corpo: { concluido: false } }));
+  const denovo = await precisa("marcar de novo", chamar(`/api/cards/${card.id}`, {
+    metodo: "PATCH", corpo: { concluido: true },
+  }));
+  conferir("marcar de novo nao cria um terceiro", denovo.proxima === null, JSON.stringify(denovo.proxima));
+}
+
 console.log("\n10) o que um quadro não pode fazer com o outro");
 const { quadro: q2 } = await precisa("segundo quadro", chamar("/api/quadros", { metodo: "POST", corpo: { nome: `${marca} vizinho` } }));
 const estado2 = await precisa("abrir o vizinho", chamar(`/api/quadros/${q2.id}`));

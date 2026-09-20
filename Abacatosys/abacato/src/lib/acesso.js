@@ -49,7 +49,7 @@ export function respostaDeErro(e) {
 // mal; seis consultas paralelas por chave estrangeira indexada saem mais rápidas e são muito
 // mais fáceis de ler quando alguma vier errada.
 const CAMPOS_CARD =
-  "id, coluna_id, titulo, descricao, posicao, inicio_em, fim_em, capa, arquivado, concluido, origem, origem_id";
+  "id, coluna_id, titulo, descricao, posicao, inicio_em, fim_em, capa, arquivado, concluido, recorrencia_regra, origem, origem_id";
 
 /**
  * O quadro inteiro, montado como objetos de domínio.
@@ -150,6 +150,7 @@ export async function carregarQuadro(quadroId, usuarioId) {
     capa: c.capa,
     arquivado: c.arquivado,
     concluido: c.concluido,
+    recorrenciaRegra: c.recorrencia_regra,
     origem: c.origem,
     origemId: c.origem_id,
     etiquetas: (etiquetasDoCard.get(c.id) || []).map((x) => etiquetaPorId.get(x.etiqueta_id)).filter(Boolean),

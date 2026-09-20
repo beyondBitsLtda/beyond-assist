@@ -453,24 +453,27 @@ body.abacato-arrastando * { cursor: grabbing !important; }
 }
 .abacato-painel__caixa {
   position: relative;
-  width: min(620px, 100%);
-  height: 100%;
+  width: min(860px, 100%);
+  /* Altura pelo CONTEÚDO, até o teto da tela. Um card com três linhas não precisa de uma caixa
+     de tela cheia com um vazio embaixo. */
+  max-height: 100%;
   background: var(--abacato-fundo);
   color: var(--abacato-tinta);
   display: flex;
   flex-direction: column;
+  border-radius: var(--abacato-raio-grande);
+  overflow: hidden;
   box-shadow: var(--abacato-sombra-alta);
-  animation: abacato-entrar-da-direita 160ms ease-out;
+  animation: abacato-surgir 160ms ease-out;
 }
-.abacato-painel__caixa--estreita { width: min(480px, 100%); }
+.abacato-painel__caixa--estreita { width: min(560px, 100%); }
 /* O painel largo entra pela ESQUERDA-direita inteira, e nao encostado numa borda: um
  * documento aberto ocupa a tela, e uma gaveta de 1180px encostada na direita deixaria
  * uma faixa escura inutil do outro lado. */
-.abacato-painel--largo { justify-content: center; padding: 24px; }
-.abacato-painel--largo .abacato-painel__caixa { border-radius: var(--abacato-raio-grande); height: 100%; }
+.abacato-painel__caixa--larga { width: min(1180px, 100%); height: 100%; }
 
-@keyframes abacato-entrar-da-direita {
-  from { transform: translateX(24px); opacity: 0; }
+@keyframes abacato-surgir {
+  from { transform: scale(0.97); opacity: 0; }
   to { transform: none; opacity: 1; }
 }
 
@@ -478,7 +481,7 @@ body.abacato-arrastando * { cursor: grabbing !important; }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 16px var(--abacato-gap) 8px;
+  padding: 18px var(--abacato-gap-2) 10px;
   position: relative;
   flex: 0 0 auto;
 }
@@ -516,7 +519,7 @@ body.abacato-arrastando * { cursor: grabbing !important; }
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 0 var(--abacato-gap) 10px;
+  padding: 0 var(--abacato-gap-2) 12px;
   font-size: 12.5px;
   color: var(--abacato-tinta-2);
   flex: 0 0 auto;
@@ -525,7 +528,7 @@ body.abacato-arrastando * { cursor: grabbing !important; }
 .abacato-painel__corpo {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 4px var(--abacato-gap) var(--abacato-gap-2);
+  padding: 4px var(--abacato-gap-2) var(--abacato-gap-2);
   display: flex;
   flex-direction: column;
   gap: var(--abacato-gap);
@@ -536,7 +539,7 @@ body.abacato-arrastando * { cursor: grabbing !important; }
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 12px var(--abacato-gap);
+  padding: 14px var(--abacato-gap-2);
   border-top: 1px solid var(--abacato-linha);
   background: var(--abacato-superficie);
   flex: 0 0 auto;
@@ -855,6 +858,27 @@ body.abacato-arrastando * { cursor: grabbing !important; }
 }
 .abacato-concluir input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--abacato-verde); }
 
+.abacato-repetir {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--abacato-superficie-2);
+}
+
+/* O recado de "o próximo já está no quadro". Verde, e não cinza: é uma coisa boa que acabou
+ * de acontecer, e a pessoa precisa notar sem procurar. */
+.abacato-recado {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--abacato-tinta);
+  background: var(--abacato-verde-claro);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
 /* ============================================================ papel de parede */
 
 .abacato-paredes { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
@@ -910,6 +934,7 @@ body.abacato-arrastando * { cursor: grabbing !important; }
  * O quadro escreve em BRANCO sobre o papel de parede, e uma foto com um céu claro num canto
  * apaga o nome do quadro exatamente ali — sem erro nenhum, só texto branco sobre branco. O véu
  * é o que torna seguro deixar você escolher qualquer imagem. */
+.abacato-tela-do-quadro[data-parede="imagem"] { position: relative; }
 .abacato-tela-do-quadro[data-parede="imagem"]::before {
   content: "";
   position: absolute;
@@ -918,8 +943,23 @@ body.abacato-arrastando * { cursor: grabbing !important; }
   pointer-events: none;
   z-index: 0;
 }
-.abacato-tela-do-quadro[data-parede="imagem"] { position: relative; }
-.abacato-tela-do-quadro[data-parede="imagem"] > * { position: relative; z-index: 1; }
+
+/* AS PEÇAS SÃO NOMEADAS, e não `> *`.
+ *
+ * A versão com `> *` tinha especificidade maior que `.abacato-painel`, e anulava o
+ * `position: fixed` dele: abrir um card num quadro COM PAPEL DE PAREDE transformava o painel
+ * num item da coluna, empurrava a faixa de colunas para fora da tela e deixava só o card
+ * aberto por cima da imagem. As colunas não sumiam — elas eram espremidas até sumir.
+ *
+ * É a segunda vez que este mesmo erro aparece neste arquivo. O `> *` é sempre mais específico
+ * que a classe da peça que ele atinge sem querer. */
+.abacato-tela-do-quadro[data-parede="imagem"] > .abacato-quadro-topo,
+.abacato-tela-do-quadro[data-parede="imagem"] > .abacato-faixa,
+.abacato-tela-do-quadro[data-parede="imagem"] > .abacato-aviso,
+.abacato-tela-do-quadro[data-parede="imagem"] > .abacato-campo__erro--flutuante {
+  position: relative;
+  z-index: 1;
+}
 
 /* ============================================================ celular
 
@@ -932,8 +972,10 @@ body.abacato-arrastando * { cursor: grabbing !important; }
   .abacato-coluna { flex-basis: calc(100vw - 52px); max-width: calc(100vw - 52px); }
   .abacato-quadro-topo__nome { max-width: 100%; font-size: 18px; }
   .abacato-quadro-topo { padding: 10px var(--abacato-respiro-x); }
+  .abacato-painel { padding: 0; }
   .abacato-painel__caixa,
-  .abacato-painel__caixa--estreita { width: 100%; }
+  .abacato-painel__caixa--estreita,
+  .abacato-painel__caixa--larga { width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
 
   /* A faixa encaixa uma coluna por vez ao rolar. Sem isto, o dedo quase sempre para no meio de
      duas colunas — e ler um quadro de lado, meia coluna por vez, é cansativo. */

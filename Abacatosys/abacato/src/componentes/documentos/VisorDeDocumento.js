@@ -97,7 +97,7 @@ export default function VisorDeDocumento({ documentoId, poderes, aoFechar, aoMud
   const podeEditar = poderes?.editar;
 
   return (
-    <div className="abacato-painel abacato-painel--largo" role="dialog" aria-modal="true" aria-label={doc?.nome || "Documento"}>
+    <div className="abacato-painel" role="dialog" aria-modal="true" aria-label={doc?.nome || "Documento"}>
       <div className="abacato-painel__fundo" onClick={aoFechar} />
       <div className="abacato-painel__caixa abacato-painel__caixa--larga">
         <header className="abacato-painel__cabecalho">

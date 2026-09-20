@@ -448,7 +448,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 130px;
+  min-height: 180px;
   padding: 18px 20px;
   border-radius: var(--abacato-raio-grande);
   background: var(--abacato-superficie);
@@ -491,16 +491,28 @@ body {
  * normalmente e era recortado pela borda do cartão. Clicar nos três pontinhos parecia não
  * fazer nada — o menu estava lá, invisível. A faixa arredonda os próprios cantos, então o
  * `overflow` nunca foi necessário. */
-.abacato-quadro-cartao__menu { position: absolute; top: 12px; right: 10px; z-index: 2; }
+.abacato-quadro-cartao__menu { position: absolute; top: 10px; right: 10px; z-index: 2; }
 .abacato-quadro-cartao__menu .abacato-icone { background: rgba(0, 0, 0, 0.25); color: #FFFFFF; }
 .abacato-quadro-cartao__menu .abacato-icone:hover { background: rgba(0, 0, 0, 0.45); }
 /* A faixa herda o papel de parede do quadro. Numa lista que vai crescer, e em que todos os
  * cartões são brancos, ela é a única coisa que permite achar o quadro certo sem ler nome por
  * nome — o mesmo papel que a cor da capa cumpre dentro do quadro. */
+/* A CAPA do quadro, e não uma fita.
+ *
+ * Ela era uma faixa de 8px, e com papel de parede de IMAGEM o resultado foi uma foto espremida
+ * numa tira de oito pixels de altura — só uma linha de cor amassada, sem nada reconhecível.
+ * Pior: como o cartão deixou de ter `overflow: hidden` (que escondia o menu de opções), a
+ * margem negativa passou a vazar a imagem para fora do cartão, por cima do de cima.
+ *
+ * Agora ela é uma capa de verdade: 76px, cantos próprios e `background-size: cover`, que corta
+ * a foto em vez de esmagá-la. Não depende de `overflow` nenhum. */
 .abacato-quadro-cartao__faixa {
-  height: 8px;
-  margin: -18px -20px 4px;
+  height: 76px;
+  margin: -18px -20px 6px;
   border-radius: var(--abacato-raio-grande) var(--abacato-raio-grande) 0 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 .abacato-quadro-cartao__nome { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
 .abacato-quadro-cartao__descricao {

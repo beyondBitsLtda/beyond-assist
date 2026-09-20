@@ -2,6 +2,8 @@ import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { exigir, respostaDeErro, ErroDeAcesso, tocarQuadro } from "@/lib/acesso.js";
 import { posicaoEntre } from "@/dominio/Quadro.js";
+import { lerRegra } from "@/dominio/recorrencia.js";
+import { gerarProximaOcorrencia } from "@/lib/cardRecorrente.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +54,14 @@ export async function PATCH(req, { params }) {
     if (typeof corpo.arquivado === "boolean") mudancas.arquivado = corpo.arquivado;
     if (typeof corpo.concluido === "boolean") mudancas.concluido = corpo.concluido;
 
+    if ("recorrenciaRegra" in corpo) {
+      const regra = corpo.recorrenciaRegra || null;
+      // Uma regra inválida gravada vira uma tarefa que nunca se repete — e o pior é que a tela
+      // continua dizendo que ela se repete.
+      if (regra && !lerRegra(regra)) throw new ErroDeAcesso(400, "regra de repetição inválida");
+      mudancas.recorrencia_regra = regra ? String(regra).trim().toLowerCase() : null;
+    }
+
     if (corpo.mover?.colunaId) {
       // A coluna de destino tem de ser do MESMO quadro. Sem esta checagem, um `colunaId` de
       // outro quadro mudaria o dono do card na prática: ele sairia de um quadro e apareceria
@@ -68,8 +78,23 @@ export async function PATCH(req, { params }) {
     if (!Object.keys(mudancas).length) throw new ErroDeAcesso(400, "nada para mudar");
 
     const { data, error } = await supabase.from("abacato_cards").update(mudancas).eq("id", id)
-      .select("id, coluna_id, titulo, descricao, posicao, inicio_em, fim_em, capa, arquivado, concluido").single();
+      .select("id, coluna_id, titulo, descricao, posicao, inicio_em, fim_em, capa, arquivado, concluido, recorrencia_regra").single();
     if (error) throw new ErroDeAcesso(500, error.message);
+
+    // CONCLUIR UM CARD QUE SE REPETE FAZ NASCER O PRÓXIMO.
+    //
+    // Acontece aqui, e não num relógio: é no instante em que você marca "concluído" que a
+    // próxima data faz sentido ser calculada, e é nesse instante que você está olhando a tela.
+    // Um card que só aparecesse na próxima sincronização pareceria que o sistema esqueceu.
+    let proxima = null;
+    if (mudancas.concluido === true) {
+      proxima = await gerarProximaOcorrencia(id).catch(() => null);
+      // O `select` acima rodou ANTES de a proxima ocorrencia nascer, e ela tira a regra deste
+      // card — quem se repete agora e o novo. Sem esta linha a resposta devolveria a regra
+      // antiga, e a tela continuaria mostrando "esta tarefa se repete" marcada num card que
+      // acabou de passar o bastao.
+      if (proxima) data.recorrencia_regra = null;
+    }
 
     await tocarQuadro(quadroId);
     return json({
@@ -78,7 +103,9 @@ export async function PATCH(req, { params }) {
         id: data.id, colunaId: data.coluna_id, titulo: data.titulo, descricao: data.descricao,
         posicao: data.posicao, inicioEm: data.inicio_em, fimEm: data.fim_em, capa: data.capa,
         arquivado: data.arquivado, concluido: data.concluido,
+        recorrenciaRegra: data.recorrencia_regra,
       },
+      proxima,
     });
   } catch (e) {
     return respostaDeErro(e);
