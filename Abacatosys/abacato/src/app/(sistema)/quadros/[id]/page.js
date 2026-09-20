@@ -10,6 +10,7 @@ import Coluna from "@/componentes/quadro/Coluna.js";
 import CardMini from "@/componentes/quadro/CardMini.js";
 import PainelDoCard from "@/componentes/quadro/PainelDoCard.js";
 import PainelDeRecorrencias from "@/componentes/quadro/PainelDeRecorrencias.js";
+import ColunasArquivadas from "@/componentes/quadro/ColunasArquivadas.js";
 
 // Papéis de parede. Gradientes e não fotos: uma foto atrás de trinta cards brancos come o
 // contraste do texto, e a cor de fundo é a única coisa do quadro que não deveria disputar
@@ -31,6 +32,7 @@ export default function PaginaDoQuadro() {
   const [cardAberto, setCardAberto] = useState(null);
   const [menuDoQuadro, setMenuDoQuadro] = useState(false);
   const [recorrencias, setRecorrencias] = useState(false);
+  const [arquivadas, setArquivadas] = useState(false);
   const [novaColuna, setNovaColuna] = useState(false);
   const [aviso, setAviso] = useState("");
   const faixa = useRef(null);
@@ -215,6 +217,10 @@ export default function PaginaDoQuadro() {
                 <>
                   <div className="abacato-menu__fundo" onClick={() => setMenuDoQuadro(false)} />
                   <div className="abacato-menu__caixa abacato-menu__caixa--direita" role="menu">
+                    <button type="button" className="abacato-menu__item"
+                      onClick={() => { setMenuDoQuadro(false); setArquivadas(true); }}>
+                      Colunas arquivadas
+                    </button>
                     <div className="abacato-menu__titulo">Papel de parede</div>
                     {PAREDES.map((p) => (
                       <button
@@ -309,6 +315,15 @@ export default function PaginaDoQuadro() {
           aoFechar={() => setCardAberto(null)}
           aoMudar={() => setDados((d) => ({ ...d }))}
           aoRecarregar={() => carregar(true)}
+        />
+      )}
+
+      {arquivadas && (
+        <ColunasArquivadas
+          quadroId={id}
+          poderes={poderes}
+          aoFechar={() => setArquivadas(false)}
+          aoMudar={() => carregar(true)}
         />
       )}
 

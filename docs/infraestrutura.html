@@ -912,15 +912,101 @@
 <h3>Quarto de Guerra, Boards e Tarefas</h3>
 <h4>Em português</h4>
 <p>
-  São três vistas do mesmo Trello. O <b>Quarto de Guerra</b> é o kanban do quadro principal.
+  São três vistas dos mesmos quadros. O <b>Quarto de Guerra</b> é o kanban do quadro principal.
   <b>Boards</b> conta os cards de todos os outros quadros. <b>Tarefas</b> ignora quadros e lista
   por prazo: hoje, amanhã, semana, atrasados.
 </p>
 <h4>Por dentro</h4>
 <p>
-  Os três leem o Trello <b>ao vivo</b>, sem passar pelo SYNC e sem embeddings. É de propósito:
-  para prazo e contagem você quer o número exato de agora, não o que estava indexado na última
-  rodada. O custo é que, sem Trello, os três ficam vazios.
+  Os três leem <b>ao vivo</b>, sem passar pelo SYNC e sem embeddings. É de propósito: para prazo
+  e contagem você quer o número exato de agora, não o que estava indexado na última rodada.
+</p>
+
+<h3>A fonte dos quadros: Trello ou Abacato</h3>
+<h4>Em português</h4>
+<p>
+  As tarefas podem vir de dois lugares: do <b>Trello</b>, o serviço de fora, ou do
+  <b>Abacato</b>, o sistema da própria casa (<span class="mono">abacato.beyond.dev.br</span>).
+  Quem decide é um interruptor no painel <b>Quadros</b>. Ele mostra os dois lados antes de
+  deixar trocar — quantos quadros, quantos cards, quantos atrasados em cada um — porque trocar
+  a fonte das tarefas às cegas é o clique de que a gente se arrepende.
+</p>
+<p>
+  Virou a chave, muda tudo de uma vez: os três painéis acima, as notificações de card novo e
+  atrasado, o contexto do Lisa Code no VS Code, as ações do assistente (&ldquo;muda o prazo
+  disso pra sexta&rdquo;) e a busca por significado. Dá para voltar a qualquer momento, e nada
+  é apagado de nenhum dos dois lados.
+</p>
+
+<h4>Por dentro</h4>
+<p>
+  As nove telas e rotas que leem quadros chamam <code>loadAllCards()</code> em
+  <span class="mono">src/lib/liveQuadros.js</span> — o único arquivo do sistema que sabe que
+  existe mais de uma fonte possível. Ele devolve sempre a mesma forma de card, venha ela de
+  onde vier; foi o que permitiu acrescentar o Abacato sem tocar em nenhuma das nove.
+</p>
+<p>
+  A escolha mora na tabela <code>lisa_config</code> do Postgres, e <b>não</b> numa variável de
+  ambiente. O motivo é que a Lisa roda em dois lugares: o Worker da Cloudflare e o servidor de
+  casa. Uma variável precisaria ser mudada nos dois, na mão, e o dia em que elas discordassem
+  seria difícil de perceber — cada servidor estaria &ldquo;certo&rdquo; olhando só para si, e a
+  Lisa responderia uma coisa em casa e outra na rua.
+</p>
+
+<div class="rolo">
+<table>
+  <thead><tr><th>Pergunta</th><th>Resposta</th></tr></thead>
+  <tbody>
+    <tr><td>Onde troco?</td><td>Painel <b>Quadros</b>, no cartão &ldquo;Fonte das tarefas&rdquo;</td></tr>
+    <tr><td>Onde fica guardado?</td><td><span class="mono">lisa_config.fonte_dos_quadros</span></td></tr>
+    <tr><td>Vale para os dois servidores?</td><td>Sim, no mesmo instante — os dois leem a mesma tabela</td></tr>
+    <tr><td>E se o valor estiver corrompido?</td><td>Cai no Trello. O padrão de uma configuração quebrada é o comportamento antigo</td></tr>
+    <tr><td>Como a Lisa lê o Abacato?</td><td>Direto das tabelas <span class="mono">abacato_*</span>, no mesmo Postgres</td></tr>
+    <tr><td>Como confiro se ainda funciona?</td><td><span class="mono">npm run abacato-check</span> e <span class="mono">npm run quadros-check</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="aviso">
+  <span class="rot">Por que a Lisa lê o banco do Abacato direto</span>
+  <p>
+    Parece atalho e é a escolha certa: a Lisa já carrega a chave de serviço deste mesmo
+    Postgres — a chave-mestra, que abre inclusive as tabelas do Abacato. Uma rota HTTP no
+    Abacato acrescentaria um segredo novo, um salto de rede e uma dependência de o Worker do
+    Abacato estar no ar, sem proteger uma única coisa que a chave já não abrisse.
+  </p>
+  <p>
+    O preço é um contrato que nenhum compilador confere. Se uma coluna mudar de nome no
+    Abacato, a Lisa <b>não quebra com erro</b>: devolve lista vazia, e o painel de tarefas
+    simplesmente diz que não há nada a fazer. É a pior falha possível aqui — e é por isso que
+    existe o <span class="mono">npm run abacato-check</span>, que confere as colunas contra o
+    banco de verdade.
+  </p>
+</div>
+
+<div class="aviso cuidado">
+  <span class="rot">O que NÃO veio do Trello na migração</span>
+  <p>
+    A importação traz colunas, cards, descrições, datas, etiquetas, capas, checklists com o
+    estado de cada item e links externos. Traz também o que estava arquivado no Trello, já
+    arquivado aqui. Três coisas ficam para trás, e vale saber quais:
+  </p>
+  <p>
+    <b>O histórico de movimentos</b> — é o que faz uma exportação passar de cinquenta
+    megabytes, e é histórico de um sistema que está sendo abandonado.
+    <b>As pessoas</b> — os identificadores do Trello não são contas do Abacato; a importação diz
+    os nomes de quem estava nos cards para você atribuir depois.
+    <b>Os arquivos enviados ao Trello</b> — eles só abrem com a sessão do Trello, e trazer um
+    link quebrado seria pior que avisar. Na migração de setembro de 2026 foram 79 anexos, 77
+    deles no quadro CRM.
+  </p>
+</div>
+
+<p>
+  Reimportar o mesmo quadro <b>não duplica nada</b>: cria só o que falta e não mexe no que já
+  entrou. Um card movido de coluna aqui não volta; um item de checklist marcado aqui não
+  desmarca. Serve para terminar uma importação que falhou no meio ou buscar cards que entraram
+  no Trello depois — não para ressuscitar o Trello por cima do trabalho de cá.
 </p>
 
 <h3>Pensamentos</h3>
