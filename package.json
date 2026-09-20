@@ -13,6 +13,8 @@
     "world-check": "node scripts/world-check.mjs",
     "deploy-map": "node scripts/deploy-map.mjs",
     "cron-check": "node scripts/cron-check.mjs",
+    "abacato-check": "node --env-file=.env scripts/abacato-check.mjs",
+    "quadros-check": "node --env-file=.env --import ./scripts/alias-loader.mjs scripts/quadros-check.mjs",
     "auth-check": "node scripts/auth-check.mjs",
     "reserva-check": "node --import ./scripts/alias-loader.mjs scripts/reserva-check.mjs",
     "fala-check": "node scripts/fala-check.mjs",

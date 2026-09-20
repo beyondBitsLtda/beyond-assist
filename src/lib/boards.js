@@ -1,4 +1,4 @@
-import { loadAllTrelloCards } from "./liveTrello.js";
+import { loadAllCards } from "./liveQuadros.js";
 import { compareByListPos } from "./kanban.js";
 
 // Nome canônico do board principal — o painel Kanban padrão ("/") aponta pra ele.
@@ -9,7 +9,7 @@ export const QUARTO_DE_GUERRA = "Quarto de Guerra";
  * — direto do Trello (ao vivo, sem SYNC/embeddings).
  */
 export async function listBoards() {
-  const all = await loadAllTrelloCards();
+  const all = await loadAllCards();
 
   const seen = new Set();
   for (const card of all) {
@@ -26,7 +26,7 @@ export async function listBoards() {
  * visão geral (consulta enxuta, diferente de retrieveByBoard que é pensada pro RAG).
  */
 export async function summarizeBoard(boardName) {
-  const all = await loadAllTrelloCards();
+  const all = await loadAllCards();
   const lowerName = boardName.toLowerCase();
 
   const lists = new Map();

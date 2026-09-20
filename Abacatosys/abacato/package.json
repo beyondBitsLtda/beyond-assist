@@ -1,0 +1,33 @@
+{
+  "name": "abacato",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "//": "Mesmas versoes da Lisa de proposito: o que ja foi provado no workerd dela nao precisa ser descoberto de novo aqui.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "auth-check": "node scripts/auth-check.mjs",
+    "dominio-check": "node scripts/dominio-check.mjs",
+    "login-check": "node scripts/login-check.mjs",
+    "recorrencia-check": "node scripts/recorrencia-check.mjs",
+    "quadro-check": "node scripts/quadro-check.mjs",
+    "estilo-check": "node scripts/estilo-check.mjs",
+    "trello-check": "node scripts/trello-check.mjs",
+    "importar-check": "node scripts/importar-check.mjs",
+    "quadro-exemplo": "node scripts/quadro-exemplo.mjs",
+    "trazer-do-trello": "node scripts/trazer-do-trello.mjs",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:deploy": "opennextjs-cloudflare deploy",
+    "publicar": "npm run cf:build && wrangler deploy"
+  },
+  "dependencies": {
+    "@opennextjs/cloudflare": "^1.20.6",
+    "@supabase/supabase-js": "^2.45.0",
+    "next": "^15.5.25",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "wrangler": "^4.131.1"
+  }
+}

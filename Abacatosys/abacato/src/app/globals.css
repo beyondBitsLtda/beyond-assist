@@ -1,0 +1,436 @@
+/* Abacato System — design system.
+ *
+ * Os valores vêm do `design sistem.txt` e da referência visual: verde como cor de ação, barra
+ * lateral escura contra conteúdo claro, cantos generosos, sombra quase invisível.
+ *
+ * Duas decisões estruturais que valem explicar:
+ *
+ * 1. TUDO passa por token. Nenhuma cor literal fora do bloco `:root` — é o que faz o modo
+ *    escuro ser uma troca de valores, e não uma segunda folha de estilo que sai de sincronia.
+ *
+ * 2. A barra lateral é escura NOS DOIS MODOS. No claro, ela é o contraste que separa navegação
+ *    de conteúdo; no escuro, ela é o fundo. Inverter os dois teria feito o sistema perder a
+ *    identidade justamente no modo que ele mais vai ser usado à noite.
+ *
+ * Nomenclatura BEM: bloco__elemento--modificador. Sem aninhamento de seletor além do
+ * necessário — o nome já diz onde a coisa vive, e o aninhamento é o que faz a especificidade
+ * brigar consigo mesma depois.
+ */
+
+:root {
+  /* ---- verde: a cor de ação, e a identidade ---- */
+  --abacato-verde: #22C55E;
+  --abacato-verde-fundo: #10B981;
+  --abacato-verde-claro: #D8EBDD;
+  --abacato-verde-escuro: #111814;
+  --abacato-verde-escuro-2: #17201A;
+
+  /* ---- superfícies ---- */
+  --abacato-fundo: #F4F6F5;
+  --abacato-superficie: #FFFFFF;
+  --abacato-superficie-2: #F4F6F5;
+  --abacato-barra: var(--abacato-verde-escuro);
+  --abacato-barra-2: var(--abacato-verde-escuro-2);
+
+  /* ---- texto ---- */
+  --abacato-tinta: #1F2937;
+  --abacato-tinta-2: #6B7280;
+  --abacato-tinta-3: #9CA3AF;
+  --abacato-tinta-barra: #FFFFFF;
+  --abacato-tinta-barra-2: #9CA3AF;
+
+  /* ---- estados ---- */
+  --abacato-alerta: #EF4444;
+  --abacato-alerta-fundo: #FEE2E2;
+  --abacato-atencao: #F97316;
+  --abacato-atencao-fundo: #FFEDD5;
+  --abacato-linha: rgba(31, 41, 55, 0.08);
+
+  /* ---- forma ---- */
+  --abacato-raio: 16px;
+  --abacato-raio-grande: 24px;
+  --abacato-raio-pilula: 9999px;
+  --abacato-sombra: 0 4px 20px rgba(0, 0, 0, 0.03);
+  --abacato-sombra-alta: 0 8px 30px rgba(0, 0, 0, 0.08);
+
+  /* ---- espaço ---- */
+  --abacato-gap: 16px;
+  --abacato-gap-2: 24px;
+  --abacato-respiro-y: 26px;
+  --abacato-respiro-x: 30px;
+
+  color-scheme: light;
+}
+
+/* O modo escuro é uma troca de VALORES, não um segundo conjunto de regras. Cada linha aqui
+ * redefine um token que já existe acima — se uma cor precisar aparecer só aqui, é sinal de que
+ * faltou um token lá em cima. */
+:root[data-tema="escuro"] {
+  --abacato-fundo: #0D1310;
+  --abacato-superficie: #151E19;
+  --abacato-superficie-2: #1B2621;
+  --abacato-barra: #0A0F0C;
+  --abacato-barra-2: #111814;
+
+  --abacato-tinta: #E8EDEA;
+  --abacato-tinta-2: #9BA8A1;
+  --abacato-tinta-3: #6B7A73;
+
+  --abacato-verde-claro: #1E3A2A;
+  --abacato-alerta-fundo: #3B1A1A;
+  --abacato-atencao-fundo: #3A2416;
+  --abacato-linha: rgba(232, 237, 234, 0.10);
+  --abacato-sombra: 0 4px 20px rgba(0, 0, 0, 0.35);
+  --abacato-sombra-alta: 0 8px 30px rgba(0, 0, 0, 0.5);
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--abacato-fundo);
+  color: var(--abacato-tinta);
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Números em coluna precisam alinhar. Sem isto, "1.234" e "9.999" ficam de larguras
+ * diferentes e a tabela treme a cada atualização. */
+.abacato-numero {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================ botão */
+
+.abacato-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-verde);
+  color: #06140C;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.05s ease;
+}
+.abacato-botao:hover { filter: brightness(1.06); }
+.abacato-botao:active { transform: translateY(1px); }
+/* O foco visível não é enfeite: sem ele, quem navega por teclado não sabe onde está. */
+.abacato-botao:focus-visible,
+.abacato-campo__entrada:focus-visible {
+  outline: 2px solid var(--abacato-verde);
+  outline-offset: 2px;
+}
+
+.abacato-botao--fantasma {
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  border: 1px solid var(--abacato-linha);
+}
+.abacato-botao--fantasma:hover { color: var(--abacato-tinta); border-color: var(--abacato-tinta-3); }
+
+.abacato-botao--escuro {
+  background: var(--abacato-verde-escuro);
+  color: #FFFFFF;
+}
+
+.abacato-botao--pequeno { padding: 7px 13px; font-size: 12.5px; }
+
+/* O vermelho aqui é do TEXTO, não do fundo. Um botao inteiro vermelho puxa o olho para si e
+ * vira o destino natural do clique — justamente o contrário do que se quer num botão que
+ * arquiva alguma coisa. */
+.abacato-botao--perigo {
+  background: transparent;
+  color: var(--abacato-alerta);
+  border: 1px solid var(--abacato-alerta);
+}
+.abacato-botao--perigo:hover { background: var(--abacato-alerta-fundo); }
+
+/* ============================================================ cartão */
+
+.abacato-cartao {
+  background: var(--abacato-superficie);
+  border-radius: var(--abacato-raio-grande);
+  box-shadow: var(--abacato-sombra);
+  padding: 20px 22px;
+}
+.abacato-cartao--escuro {
+  background: var(--abacato-verde-escuro);
+  color: #FFFFFF;
+}
+.abacato-cartao--destaque {
+  background: var(--abacato-verde-claro);
+}
+.abacato-cartao__rotulo {
+  font-size: 12px;
+  color: var(--abacato-tinta-2);
+  margin: 0 0 6px;
+}
+.abacato-cartao--escuro .abacato-cartao__rotulo { color: var(--abacato-tinta-barra-2); }
+.abacato-cartao__numero {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================ etiqueta */
+
+.abacato-etiqueta {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--abacato-raio-pilula);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.abacato-etiqueta--atencao { background: var(--abacato-atencao-fundo); color: var(--abacato-atencao); }
+.abacato-etiqueta--alerta  { background: var(--abacato-alerta-fundo);  color: var(--abacato-alerta); }
+.abacato-etiqueta--ok      { background: var(--abacato-verde-claro);   color: var(--abacato-verde-fundo); }
+
+/* ============================================================ campo */
+
+.abacato-campo { display: flex; flex-direction: column; gap: 6px; }
+.abacato-campo__rotulo {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--abacato-tinta-2);
+}
+.abacato-campo__entrada {
+  padding: 11px 14px;
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+  font: inherit;
+  width: 100%;
+}
+.abacato-campo__entrada::placeholder { color: var(--abacato-tinta-3); }
+.abacato-campo__erro { font-size: 12.5px; color: var(--abacato-alerta); }
+
+/* ============================================================ estrutura */
+
+.abacato-quadro-geral {
+  display: grid;
+  grid-template-columns: 248px 1fr;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.abacato-barra-lateral {
+  background: var(--abacato-barra);
+  color: var(--abacato-tinta-barra);
+  padding: 22px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.abacato-barra-lateral__marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.abacato-barra-lateral__grupo { display: flex; flex-direction: column; gap: 2px; }
+.abacato-barra-lateral__titulo {
+  font-size: 10.5px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--abacato-tinta-barra-2);
+  margin-bottom: 8px;
+}
+.abacato-barra-lateral__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--abacato-raio);
+  color: var(--abacato-tinta-barra-2);
+  text-decoration: none;
+  font-weight: 500;
+}
+.abacato-barra-lateral__item:hover { background: var(--abacato-barra-2); color: #FFFFFF; }
+.abacato-barra-lateral__item--ativo {
+  background: var(--abacato-barra-2);
+  color: #FFFFFF;
+}
+.abacato-barra-lateral__item--ativo .abacato-barra-lateral__icone { color: var(--abacato-verde); }
+.abacato-barra-lateral__icone { width: 18px; text-align: center; }
+.abacato-barra-lateral__rodape { margin-top: auto; }
+
+.abacato-conteudo { padding: var(--abacato-respiro-y) var(--abacato-respiro-x); min-width: 0; overflow: auto; }
+.abacato-conteudo__cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: var(--abacato-gap-2);
+}
+.abacato-conteudo__titulo { font-size: 24px; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
+
+/* No celular a barra lateral vira uma faixa no rodapé: um menu de 248px numa tela de 390
+ * comeria dois terços da largura, e esconder atrás de um botão custa um toque a cada
+ * navegação. */
+@media (max-width: 860px) {
+  .abacato-quadro-geral {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  .abacato-barra-lateral {
+    order: 2;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding: 8px;
+    overflow-x: auto;
+    position: sticky;
+    bottom: 0;
+  }
+  .abacato-barra-lateral__marca,
+  .abacato-barra-lateral__titulo,
+  .abacato-barra-lateral__rodape { display: none; }
+  .abacato-barra-lateral__grupo { flex-direction: row; gap: 4px; }
+  .abacato-barra-lateral__item { flex-direction: column; gap: 2px; font-size: 10.5px; padding: 8px 12px; }
+  .abacato-conteudo { order: 1; --abacato-respiro-y: 18px; --abacato-respiro-x: 16px; }
+}
+
+/* ============================================================ entrar */
+
+.abacato-entrada {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  /* O verde do fundo é o mesmo da referência visual: escuro nas pontas, vivo no meio. */
+  background: radial-gradient(1200px 600px at 50% -10%, #1C6B3F 0%, var(--abacato-verde-escuro) 55%, #06100A 100%);
+}
+.abacato-entrada__cartao {
+  width: min(400px, 100%);
+  background: var(--abacato-superficie);
+  border-radius: var(--abacato-raio-grande);
+  box-shadow: var(--abacato-sombra-alta);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.abacato-entrada__marca {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.abacato-entrada__nome { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.abacato-entrada__sub { font-size: 13px; color: var(--abacato-tinta-2); margin: 0; }
+
+/* ============================================================ vazio */
+
+.abacato-vazio {
+  text-align: center;
+  padding: 56px 24px;
+  color: var(--abacato-tinta-2);
+}
+.abacato-vazio__titulo { font-size: 16px; font-weight: 600; color: var(--abacato-tinta); margin: 0 0 6px; }
+
+/* ============================================================ grade de quadros */
+
+.abacato-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: var(--abacato-gap);
+}
+.abacato-quadro-cartao {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 130px;
+  padding: 18px 20px;
+  border-radius: var(--abacato-raio-grande);
+  background: var(--abacato-superficie);
+  box-shadow: var(--abacato-sombra);
+  color: inherit;
+  text-decoration: none;
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+}
+.abacato-quadro-cartao:hover { box-shadow: var(--abacato-sombra-alta); transform: translateY(-2px); }
+
+/* O cartão deixou de ser um <a> e virou uma caixa: um <button> dentro de um <a> é HTML
+ * inválido, e o clique fica imprevisível. O link agora é uma camada por baixo, cobrindo o
+ * cartão inteiro, e o menu fica por cima dela. */
+.abacato-quadro-cartao { position: relative; }
+.abacato-quadro-cartao__area {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--abacato-raio-grande);
+  z-index: 0;
+}
+.abacato-quadro-cartao__area:focus-visible { outline: 2px solid var(--abacato-verde); outline-offset: 2px; }
+.abacato-quadro-cartao > *:not(.abacato-quadro-cartao__area) { position: relative; z-index: 1; }
+/* ...menos o que não deve capturar o clique: o texto do cartão é só texto, e interceptar o
+ * clique nele faria metade do cartão parar de abrir o quadro. */
+.abacato-quadro-cartao__nome,
+.abacato-quadro-cartao__descricao,
+.abacato-quadro-cartao__rodape { pointer-events: none; }
+
+.abacato-quadro-cartao__menu { position: absolute; top: 12px; right: 10px; z-index: 2; }
+.abacato-quadro-cartao__menu .abacato-icone { background: rgba(0, 0, 0, 0.25); color: #FFFFFF; }
+.abacato-quadro-cartao__menu .abacato-icone:hover { background: rgba(0, 0, 0, 0.45); }
+/* A faixa herda o papel de parede do quadro. Numa lista que vai crescer, e em que todos os
+ * cartões são brancos, ela é a única coisa que permite achar o quadro certo sem ler nome por
+ * nome — o mesmo papel que a cor da capa cumpre dentro do quadro. */
+.abacato-quadro-cartao__faixa {
+  height: 8px;
+  margin: -18px -20px 4px;
+  border-radius: var(--abacato-raio-grande) var(--abacato-raio-grande) 0 0;
+}
+.abacato-quadro-cartao__nome { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+.abacato-quadro-cartao__descricao {
+  font-size: 13px;
+  color: var(--abacato-tinta-2);
+  /* Duas linhas e corta: descrição longa não pode fazer um cartão ficar do tamanho de três. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.abacato-quadro-cartao__rodape {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--abacato-tinta-3);
+}
+
+.abacato-criar-quadro {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: var(--abacato-gap-2);
+  padding: 14px;
+  background: var(--abacato-superficie);
+  border-radius: var(--abacato-raio);
+  box-shadow: var(--abacato-sombra);
+}
+.abacato-criar-quadro .abacato-campo__entrada { flex: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

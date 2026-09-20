@@ -1,0 +1,878 @@
+/* Abacato System — a tela do quadro.
+ *
+ * Arquivo separado do globals.css de propósito: o design system (cores, botões, campos,
+ * moldura) serve ao sistema inteiro, e o quadro é uma tela só, com regras que não fazem
+ * sentido em nenhuma outra. Misturar os dois faria o arquivo de base crescer até ninguém mais
+ * conseguir dizer o que é fundação e o que é uma tela específica.
+ *
+ * Todos os valores saem dos tokens do globals.css — nenhuma cor literal aqui. É o que faz o
+ * modo escuro funcionar nesta tela sem uma única regra a mais.
+ */
+
+/* ============================================================ a moldura da tela
+
+   A tela do quadro anula o respiro do conteúdo e ocupa a área inteira. O motivo é a rolagem:
+   quem rola é a FAIXA de colunas, não a página. Com a página rolando, a barra lateral subiria
+   junto e sumiria no meio de um arrasto. */
+
+.abacato-tela-do-quadro {
+  margin: calc(-1 * var(--abacato-respiro-y)) calc(-1 * var(--abacato-respiro-x));
+  height: calc(100% + 2 * var(--abacato-respiro-y));
+  display: flex;
+  flex-direction: column;
+  background: var(--abacato-fundo);
+  min-width: 0;
+}
+
+.abacato-quadro-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px var(--abacato-respiro-x);
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+.abacato-quadro-topo__esquerda,
+.abacato-quadro-topo__direita { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.abacato-quadro-topo__direita { flex-wrap: wrap; justify-content: flex-end; }
+
+.abacato-quadro-topo__nome {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 4px 8px;
+  min-width: 0;
+  max-width: 46vw;
+  font-family: inherit;
+}
+.abacato-quadro-topo__nome:hover:not(:disabled) { border-color: var(--abacato-linha); }
+.abacato-quadro-topo__nome:focus {
+  outline: none;
+  background: var(--abacato-superficie);
+  border-color: var(--abacato-verde);
+  color: var(--abacato-tinta);
+}
+
+/* Com papel de parede o fundo vira escuro, e a tinta padrão é escura. Sem esta troca o nome do
+   quadro fica escrito em preto sobre preto: some da tela sem nenhum erro aparecer. */
+.abacato-tela-do-quadro[data-parede="sim"] { color: #FFFFFF; }
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-icone { color: rgba(255, 255, 255, 0.85); }
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-icone:hover { background: rgba(255, 255, 255, 0.18); color: #FFFFFF; }
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-conta-pill { background: rgba(255, 255, 255, 0.18); color: #FFFFFF; }
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-botao--fantasma { color: #FFFFFF; border-color: rgba(255, 255, 255, 0.45); }
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-coluna__adicionar { background: rgba(255, 255, 255, 0.16); color: #FFFFFF; }
+
+.abacato-conta-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.abacato-conta-pill--alerta { background: var(--abacato-alerta-fundo); color: var(--abacato-alerta); }
+.abacato-conta-pill--atencao { background: var(--abacato-atencao-fundo); color: var(--abacato-atencao); }
+
+.abacato-aviso {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 var(--abacato-respiro-x) 8px;
+  padding: 10px 14px;
+  border-radius: var(--abacato-raio);
+  background: var(--abacato-verde-claro);
+  color: var(--abacato-tinta);
+  font-size: 13px;
+  font-weight: 500;
+}
+.abacato-aviso .abacato-icone { margin-left: auto; }
+
+.abacato-campo__erro--flutuante {
+  margin: 0 var(--abacato-respiro-x) 8px;
+  padding: 10px 14px;
+  border-radius: var(--abacato-raio);
+  background: var(--abacato-alerta-fundo);
+}
+
+/* ============================================================ faixa e colunas */
+
+.abacato-faixa {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px var(--abacato-respiro-x) 18px;
+  scrollbar-width: thin;
+}
+
+.abacato-coluna {
+  flex: 0 0 288px;
+  max-width: 288px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--abacato-superficie-2);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  box-shadow: var(--abacato-sombra);
+}
+.abacato-coluna--fantasma { opacity: 0.4; }
+.abacato-coluna--nova {
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+  padding: 8px;
+}
+
+.abacato-coluna__cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px 8px 12px;
+  position: relative;
+  cursor: grab;
+}
+.abacato-coluna__capa {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 4px;
+  border-radius: 0 0 4px 4px;
+}
+.abacato-coluna__nome {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-weight: 650;
+  font-size: 14px;
+  color: var(--abacato-tinta);
+  text-align: left;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  min-width: 0;
+}
+.abacato-coluna__nome:hover { background: var(--abacato-superficie); }
+.abacato-coluna__conta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--abacato-tinta-3);
+  font-variant-numeric: tabular-nums;
+}
+.abacato-coluna__nome-campo {
+  flex: 1;
+  font: inherit;
+  font-weight: 650;
+  font-size: 14px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--abacato-verde);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+  min-width: 0;
+}
+
+.abacato-coluna__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+  min-height: 14px;
+  scrollbar-width: thin;
+}
+
+.abacato-coluna__adicionar {
+  margin: 0 8px 10px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.abacato-coluna__adicionar:hover { background: var(--abacato-superficie); color: var(--abacato-tinta); }
+
+/* ============================================================ o card na coluna */
+
+.abacato-card {
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  /* No toque, segurar o card é o gesto de arrastar. Sem isto o celular entende como seleção de
+     texto e abre a lupa com "copiar / selecionar" por cima do arrasto. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.abacato-card:hover { border-color: var(--abacato-tinta-3); }
+.abacato-card:focus-visible { outline: 2px solid var(--abacato-verde); outline-offset: 2px; }
+.abacato-card--fantasma { opacity: 0.32; }
+.abacato-card--com-capa { padding-top: 0; overflow: hidden; }
+.abacato-card__capa { height: 30px; margin: 0 -12px 4px; }
+
+.abacato-card__etiquetas { display: flex; flex-wrap: wrap; gap: 4px; }
+.abacato-card__etiqueta { width: 30px; height: 7px; border-radius: 4px; display: inline-block; }
+
+.abacato-card__titulo { font-size: 13.5px; line-height: 1.4; color: var(--abacato-tinta); }
+
+.abacato-card__sinais {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--abacato-tinta-2);
+}
+.abacato-card__pessoas { margin-left: auto; display: flex; gap: 3px; }
+
+.abacato-sinal {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.abacato-sinal--pronto { color: var(--abacato-verde-fundo); font-weight: 600; }
+
+.abacato-prazo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--abacato-raio-pilula);
+  font-weight: 600;
+  font-size: 11.5px;
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta-2);
+  margin: 0;
+}
+.abacato-prazo--atrasado { background: var(--abacato-alerta-fundo); color: var(--abacato-alerta); }
+.abacato-prazo--hoje,
+.abacato-prazo--proximo { background: var(--abacato-atencao-fundo); color: var(--abacato-atencao); }
+.abacato-prazo--concluido { background: var(--abacato-verde-claro); color: var(--abacato-verde-fundo); }
+
+.abacato-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--abacato-verde-fundo);
+  color: #FFFFFF;
+  font-size: 9.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+/* ============================================================ arrastar */
+
+/* O espaço que abre onde o card vai cair. Tracejado e não sólido: ele precisa ler como "aqui
+   ainda não tem nada", e um bloco cheio pareceria mais um card. */
+.abacato-reserva {
+  border: 2px dashed var(--abacato-verde);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--abacato-verde) 10%, transparent);
+  flex: 0 0 auto;
+}
+
+.abacato-fantasma {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  transform: rotate(2.5deg);
+  box-shadow: var(--abacato-sombra-alta);
+  border-radius: 12px;
+  opacity: 0.95;
+}
+
+body.abacato-arrastando { cursor: grabbing; }
+body.abacato-arrastando * { cursor: grabbing !important; }
+
+/* ============================================================ escrever um card novo */
+
+.abacato-novo-card {
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-verde);
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.abacato-novo-card__campo {
+  border: 0;
+  background: transparent;
+  resize: vertical;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--abacato-tinta);
+  outline: none;
+  min-height: 44px;
+}
+.abacato-novo-card__acoes { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.abacato-dica { font-size: 11.5px; color: var(--abacato-tinta-3); }
+.abacato-dica--bloco { display: block; line-height: 1.5; margin: 0 var(--abacato-gap) 4px; }
+
+/* ============================================================ menus suspensos */
+
+.abacato-menu { position: relative; }
+.abacato-menu__fundo { position: fixed; inset: 0; z-index: 40; }
+.abacato-menu__caixa {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 41;
+  min-width: 212px;
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  box-shadow: var(--abacato-sombra-alta);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--abacato-tinta);
+}
+.abacato-menu__caixa--direita { left: auto; right: 0; }
+.abacato-menu__titulo {
+  font-size: 10.5px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--abacato-tinta-3);
+  padding: 4px 8px;
+}
+.abacato-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--abacato-tinta);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+.abacato-menu__item:hover { background: var(--abacato-superficie-2); }
+.abacato-menu__item--ativo { background: var(--abacato-verde-claro); font-weight: 600; }
+.abacato-menu__item--perigo { color: var(--abacato-alerta); }
+.abacato-menu__item--perigo:hover { background: var(--abacato-alerta-fundo); }
+.abacato-menu__cores { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 6px 8px; }
+
+.abacato-amostra {
+  width: 22px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1px solid var(--abacato-linha);
+  flex: 0 0 auto;
+}
+
+.abacato-bolinha {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta-3);
+  cursor: pointer;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.abacato-bolinha--ativa {
+  border-color: var(--abacato-tinta);
+  box-shadow: 0 0 0 2px var(--abacato-superficie) inset;
+}
+
+.abacato-icone {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  cursor: pointer;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  flex: 0 0 auto;
+}
+.abacato-icone:hover { background: var(--abacato-superficie-2); color: var(--abacato-tinta); }
+
+/* ============================================================ o painel do card */
+
+.abacato-painel {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: flex-end;
+}
+.abacato-painel__fundo {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.42);
+}
+.abacato-painel__caixa {
+  position: relative;
+  width: min(620px, 100%);
+  height: 100%;
+  background: var(--abacato-fundo);
+  color: var(--abacato-tinta);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--abacato-sombra-alta);
+  animation: abacato-entrar-da-direita 160ms ease-out;
+}
+.abacato-painel__caixa--estreita { width: min(480px, 100%); }
+
+@keyframes abacato-entrar-da-direita {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.abacato-painel__cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px var(--abacato-gap) 8px;
+  position: relative;
+  flex: 0 0 auto;
+}
+.abacato-painel__capa {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+}
+.abacato-painel__titulo {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 6px 8px;
+  color: var(--abacato-tinta);
+  font-family: inherit;
+  min-width: 0;
+  margin: 0;
+}
+.abacato-painel__titulo--fixo { border: 0; padding-left: 8px; }
+.abacato-painel__titulo:hover:not(:disabled) { border-color: var(--abacato-linha); }
+.abacato-painel__titulo:focus {
+  outline: none;
+  background: var(--abacato-superficie);
+  border-color: var(--abacato-verde);
+}
+
+.abacato-painel__migalha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 var(--abacato-gap) 10px;
+  font-size: 12.5px;
+  color: var(--abacato-tinta-2);
+  flex: 0 0 auto;
+}
+
+.abacato-painel__corpo {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 4px var(--abacato-gap) var(--abacato-gap-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--abacato-gap);
+}
+
+.abacato-painel__rodape {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px var(--abacato-gap);
+  border-top: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie);
+  flex: 0 0 auto;
+}
+.abacato-painel__estado { margin-left: auto; font-size: 11.5px; color: var(--abacato-tinta-3); }
+
+.abacato-bloco {
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.abacato-bloco__titulo {
+  font-size: 10.5px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--abacato-tinta-3);
+  margin: 0;
+  font-weight: 700;
+}
+.abacato-bloco__linha { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.abacato-bloco__acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.abacato-etiquetas-lista { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+.abacato-etiqueta-botao {
+  border: 2px solid transparent;
+  border-radius: var(--abacato-raio-pilula);
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+  cursor: pointer;
+  /* A sombra interna escurece qualquer cor da paleta o bastante para o texto branco passar no
+     contraste — inclusive o amarelo, que sozinho não passaria. */
+  box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.18);
+}
+.abacato-etiqueta-botao--marcada { border-color: var(--abacato-tinta); box-shadow: none; }
+.abacato-etiqueta-botao:disabled { cursor: default; opacity: 0.7; }
+
+.abacato-pessoa-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta);
+  padding: 4px 12px 4px 4px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.abacato-pessoa-botao--marcada { border-color: var(--abacato-verde); background: var(--abacato-verde-claro); font-weight: 600; }
+
+.abacato-datas { display: flex; gap: 10px; flex-wrap: wrap; }
+.abacato-datas .abacato-campo { flex: 1 1 200px; }
+
+.abacato-selecao {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+}
+
+.abacato-vazio-clicavel {
+  text-align: left;
+  border: 1px dashed var(--abacato-linha);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--abacato-tinta-3);
+  padding: 14px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.abacato-vazio-clicavel:hover { border-color: var(--abacato-verde); color: var(--abacato-tinta-2); }
+
+.abacato-campo__entrada--alta { min-height: 110px; resize: vertical; line-height: 1.55; }
+
+.abacato-rapido { display: flex; gap: 6px; align-items: flex-start; }
+.abacato-rapido .abacato-campo__entrada { flex: 1; }
+
+.abacato-nova-etiqueta { display: flex; flex-direction: column; gap: 8px; }
+
+/* ============================================================ checklists */
+
+.abacato-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--abacato-superficie-2);
+}
+.abacato-checklist__cabecalho { display: flex; align-items: center; gap: 6px; }
+.abacato-checklist__titulo { flex: 1; font-size: 13.5px; min-width: 0; }
+.abacato-checklist__conta {
+  font-size: 11.5px;
+  color: var(--abacato-tinta-3);
+  font-variant-numeric: tabular-nums;
+}
+.abacato-checklist__adicionar {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 4px;
+  cursor: pointer;
+}
+.abacato-checklist__adicionar:hover { color: var(--abacato-verde-fundo); }
+
+.abacato-barra-progresso {
+  height: 6px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-linha);
+  overflow: hidden;
+}
+.abacato-barra-progresso > span {
+  display: block;
+  height: 100%;
+  background: var(--abacato-verde);
+  transition: width 140ms ease-out;
+}
+
+.abacato-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 4px 2px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.abacato-item:hover { background: var(--abacato-superficie); }
+.abacato-item__texto { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.abacato-item--feito .abacato-item__texto { text-decoration: line-through; color: var(--abacato-tinta-3); }
+.abacato-item input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--abacato-verde); flex: 0 0 auto; }
+
+.abacato-link { display: flex; align-items: center; gap: 6px; }
+.abacato-link__url {
+  flex: 1;
+  color: var(--abacato-verde-fundo);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* ============================================================ tarefas que se repetem */
+
+.abacato-abas { display: flex; gap: 6px; flex-wrap: wrap; }
+.abacato-aba {
+  border: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta-2);
+  border-radius: var(--abacato-raio-pilula);
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.abacato-aba--ativa {
+  background: var(--abacato-verde-claro);
+  border-color: var(--abacato-verde);
+  color: var(--abacato-tinta);
+  font-weight: 600;
+}
+
+.abacato-dias { display: flex; gap: 5px; flex-wrap: wrap; }
+.abacato-dia {
+  width: 44px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.abacato-dia--ativo {
+  background: var(--abacato-verde);
+  border-color: var(--abacato-verde);
+  color: #06100A;
+  font-weight: 700;
+}
+
+.abacato-resumo-da-regra {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--abacato-tinta-2);
+  background: var(--abacato-superficie-2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  line-height: 1.5;
+}
+
+.abacato-recorrencia {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--abacato-superficie-2);
+}
+.abacato-recorrencia > div:first-child { flex: 1; min-width: 0; }
+.abacato-recorrencia--pausada { opacity: 0.6; }
+.abacato-recorrencia__acoes { display: flex; gap: 2px; }
+
+/* ============================================================ importar do Trello
+
+   Mora aqui, e não num terceiro arquivo, porque a tela de importação é um painel: ela reusa
+   .abacato-painel, .abacato-bloco e .abacato-dica inteiros, e separar as três regras próprias
+   dela num arquivo à parte custaria mais para achar do que para manter. */
+
+.abacato-solte {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 20px;
+  border: 2px dashed var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta-2);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.abacato-solte:hover,
+.abacato-solte--ativo { border-color: var(--abacato-verde); background: var(--abacato-verde-claro); }
+.abacato-solte:focus-within { outline: 2px solid var(--abacato-verde); outline-offset: 2px; }
+.abacato-solte__icone { font-size: 26px; color: var(--abacato-verde-fundo); }
+
+/* O campo de arquivo some, mas continua sendo ele que recebe o clique e o foco do teclado.
+   Esconder com `display: none` tiraria os dois. */
+.abacato-solte__campo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.abacato-passos {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--abacato-tinta-2);
+}
+.abacato-passos strong { color: var(--abacato-tinta); }
+
+.abacato-previa__nome {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--abacato-tinta);
+}
+.abacato-previa {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 8px;
+}
+.abacato-previa__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--abacato-superficie-2);
+}
+/* Um zero fica apagado em vez de sumir. Sumir esconderia a informação mais útil da prévia:
+   "nenhum card tem prazo" é algo que você quer descobrir ANTES de importar. */
+.abacato-previa__item--zero { opacity: 0.45; }
+.abacato-previa__numero {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--abacato-tinta);
+}
+.abacato-previa__rotulo { font-size: 11px; color: var(--abacato-tinta-2); }
+
+.abacato-aviso-linha {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--abacato-tinta-2);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--abacato-atencao-fundo);
+}
+
+.abacato-vazio__acoes { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+/* O card marcado como concluído. O título riscado é o suficiente: um card concluído ainda
+   precisa ser lido, só não precisa ser feito. */
+.abacato-card--concluido .abacato-card__titulo { color: var(--abacato-tinta-3); text-decoration: line-through; }
+
+.abacato-concluir {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--abacato-tinta);
+}
+.abacato-concluir input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--abacato-verde); }
+
+/* ============================================================ celular
+
+   Abaixo de 860px a barra lateral já virou rodapé. Aqui o quadro se ajusta ao resto: colunas
+   quase da largura da tela, painel do card em tela cheia. Uma coluna de 288px num aparelho de
+   390px deixaria metade da segunda coluna aparecendo — o suficiente para parecer erro e não o
+   suficiente para ser útil. */
+
+@media (max-width: 860px) {
+  .abacato-coluna { flex-basis: calc(100vw - 52px); max-width: calc(100vw - 52px); }
+  .abacato-quadro-topo__nome { max-width: 100%; font-size: 18px; }
+  .abacato-quadro-topo { padding: 10px var(--abacato-respiro-x); }
+  .abacato-painel__caixa,
+  .abacato-painel__caixa--estreita { width: 100%; }
+
+  /* A faixa encaixa uma coluna por vez ao rolar. Sem isto, o dedo quase sempre para no meio de
+     duas colunas — e ler um quadro de lado, meia coluna por vez, é cansativo. */
+  .abacato-faixa { scroll-snap-type: x mandatory; }
+  .abacato-coluna { scroll-snap-align: start; }
+}
+
+/* Alvo de toque: o mínimo confortável é 44px. Nos ícones, o botão desenhado continua com 30px,
+   mas a área que responde ao dedo cresce por fora, sem mexer no desenho. */
+@media (pointer: coarse) {
+  .abacato-icone { position: relative; }
+  .abacato-icone::after { content: ""; position: absolute; inset: -7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .abacato-painel__caixa { animation: none; }
+  .abacato-barra-progresso > span { transition: none; }
+  .abacato-fantasma { transform: none; }
+}

@@ -1,6 +1,6 @@
 import { supabase } from "./supabase.js";
 import { listTickets } from "./sentinel.js";
-import { loadAllTrelloCards } from "./liveTrello.js";
+import { loadAllCards } from "./liveQuadros.js";
 
 // limiar de "perto de estourar o SLA" — chamado ainda não estourado mas dentro dessa janela
 const SLA_NEAR_MS = 2 * 60 * 60 * 1000; // 2h
@@ -166,7 +166,7 @@ async function checkSentinelTickets(isFirstRun) {
 // embeddings do Assistente em dia, não pra isso).
 
 async function checkTrelloCards(isFirstRun) {
-  const cards = await loadAllTrelloCards({ fresh: true });
+  const cards = await loadAllCards({ fresh: true });
 
   if (isFirstRun) {
     // 1ª execução: só marca os cards atuais como "já vistos", sem notificar nada

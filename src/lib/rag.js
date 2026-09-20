@@ -1,6 +1,7 @@
 import { embedOne } from "./gemini.js";
 import { supabase } from "./supabase.js";
-import { loadAllTrelloCards } from "./liveTrello.js";
+import { loadAllCards } from "./liveQuadros.js";
+import { fonteDosQuadros } from "./configLisa.js";
 import { getPersonaText } from "./persona.js";
 import { getContextDocsText } from "./context.js";
 
@@ -173,7 +174,16 @@ export async function retrieve(question, { filterSource = null, filterBoard = nu
   });
   if (error) throw new Error(`match_documents: ${error.message}`);
 
-  return (data || []).map((row) => ({
+  // O índice guarda documentos das DUAS fontes de quadro: quem usou o Trello e migrou para o
+  // Abacato tem as duas coisas indexadas, e apagar a antiga seria jogar fora a única cópia do
+  // que existia antes da migração. Então a fonte que não está valendo é descartada aqui, na
+  // leitura. Sem isto, a Lisa responderia misturando as tarefas de hoje com as de um sistema
+  // que ninguém usa mais — e nada na resposta diria qual é qual.
+  const inativa = (await fonteDosQuadros()) === "abacato" ? "TRELLO" : "ABACATO";
+
+  return (data || [])
+    .filter((row) => String(row.source || "").toUpperCase() !== inativa)
+    .map((row) => ({
     id: String(row.external_id || "").split("#")[0],
     source: (row.source || "").toUpperCase(),
     board: row.board || "",
@@ -250,7 +260,8 @@ export function detectBoard(question) {
  * Preciso e completo — traz o board inteiro, sempre atual.
  */
 export async function retrieveByBoard(boardName, { onlyOpen = false } = {}) {
-  const all = await loadAllTrelloCards();
+  const fonte = await fonteDosQuadros();
+  const all = await loadAllCards();
   const lowerName = boardName.toLowerCase();
 
   const seen = new Map();
@@ -259,7 +270,7 @@ export async function retrieveByBoard(boardName, { onlyOpen = false } = {}) {
     if (onlyOpen && card.due_complete) continue;
     seen.set(card.id, {
       id: card.id,
-      source: "TRELLO",
+      source: fonte.toUpperCase(),
       board: card.board,
       title: card.title,
       snippet: shorten(card.content, 180),
@@ -308,6 +319,7 @@ export function detectDateRange(question) {
  * sem SYNC/embeddings). Retorna no MESMO formato dos matches do RAG, p/ o HUD renderizar igual.
  */
 export async function retrieveByDate(range) {
+  const fonte = await fonteDosQuadros();
   const now = new Date();
   const spNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
   const y = spNow.getFullYear(), mo = spNow.getMonth(), d = spNow.getDate();
@@ -322,7 +334,7 @@ export async function retrieveByDate(range) {
   else if (range === "week") { lo = startToday; hi = endWeek; }
   else if (range === "overdue") { hi = startToday; onlyOpen = true; }
 
-  const all = await loadAllTrelloCards();
+  const all = await loadAllCards();
 
   const seen = new Map();
   for (const card of all) {
@@ -333,7 +345,7 @@ export async function retrieveByDate(range) {
     if (hi && due >= hi) continue;
     seen.set(card.id, {
       id: card.id,
-      source: "TRELLO",
+      source: fonte.toUpperCase(),
       board: card.board,
       title: card.title,
       snippet: shorten(card.content, 180),

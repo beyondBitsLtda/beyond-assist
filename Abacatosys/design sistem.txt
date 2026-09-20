@@ -1,0 +1,94 @@
+### Paleta de Cores
+
+A interface utiliza uma paleta de cores híbrida de alto contraste, baseada em tons de verde (remetendo a sustentabilidade e meio ambiente) com uma divisão clara entre o modo escuro (barra lateral) e modo claro (conteúdo principal).
+
+**Cores de Fundo (Backgrounds)**
+
+* **Branco Puro (`#FFFFFF`):** Usado como fundo principal da área do dashboard e na maioria dos cartões de dados.
+
+
+* **Verde Escuro Quase Preto (`#111814` a `#17201A`):** Fundo da barra lateral esquerda (navegação) e de cartões de destaque escuros (como "Air Pollution Level" e "Global pollution").
+
+
+* **Verde Claro Suave (`#D8EBDD` ou similar):** Usado no cartão de destaque grande ("99,681m TONS") para criar hierarquia visual sem pesar a tela.
+
+
+* **Cinza Muito Claro (`#F4F6F5`):** Fundo sutil para estados de *hover* ou cartões secundários na área clara.
+
+
+
+**Cores de Destaque (Accents)**
+
+* **Verde Neon/Esmeralda (`#22C55E` ou `#10B981`):** Cor primária de ação e dados positivos. Usada no logotipo, ícones ativos na barra lateral, botões de "New", barras de gráficos e indicadores de crescimento (ex: "+20% reduced CO2").
+
+
+* **Laranja Suave (`#FFEDD5` para fundo, `#F97316` para texto):** Usado em tags de categorização (ex: "Mechanical").
+
+
+* **Vermelho/Coral (`#EF4444`):** Usado para indicadores de alerta ou dados negativos (ex: "1.8% than last month" e gráficos de qualidade do ar).
+
+
+
+**Cores de Texto e Tipografia**
+
+* **Preto/Grafite (`#1F2937`):** Títulos principais e números em destaque na área clara.
+
+
+* **Cinza Médio (`#6B7280` ou `#9CA3AF`):** Rótulos de dados, subtítulos, eixos de gráficos e textos secundários na área clara.
+
+
+* **Branco (`#FFFFFF`):** Texto principal na barra lateral escura e nos cartões escuros.
+
+
+* **Cinza Claro Mudo (`#9CA3AF`):** Texto inativo ou secundário dentro das áreas escuras.
+
+
+
+---
+
+### Estilo da Interface e Sistema de Design
+
+O design segue um estilo **Moderno, Minimalista e Analítico**, focado em *Data Visualization* (Visualização de Dados) clara e legível.
+
+**1. Formas e Bordas (Border-Radius)**
+
+* **Cartões (Cards):** Arredondamento alto (aproximadamente `border-radius: 16px` a `24px`). Todos os painéis de dados possuem cantos bem suaves, o que traz um aspecto amigável e moderno.
+
+
+* **Botões e Tags:** Formato de pílula (*pill shape*, `border-radius: 9999px`). Visto no botão "Add Custom Widget", seletores de período ("2 month") e tags de status ("New", "Mechanical").
+
+
+* **Gráficos:** As barras dos gráficos possuem apenas os cantos superiores arredondados, mantendo a base reta.
+
+
+
+**2. Sombras e Profundidade (Elevation)**
+
+* **Área Clara:** Os cartões brancos sobre o fundo branco utilizam um *drop shadow* extremamente suave e difuso (ex: `box-shadow: 0 4px 20px rgba(0,0,0,0.03)`). Isso cria separação sem sujar a interface.
+
+
+* **Área Escura:** A barra lateral e os cartões escuros são majoritariamente *flat*, dependendo do alto contraste de cor para se separarem do fundo claro, em vez de sombras pesadas.
+
+
+* **Efeito de Vidro (Glassmorphism sutil):** O mapa escuro no canto inferior direito ("Global pollution") apresenta uma leve sobreposição translúcida nas caixas de informação internas ("Ukraine").
+
+
+
+**3. Tipografia**
+
+* **Família de Fontes:** Sans-serif geométrica e limpa (estilo Inter, Roboto ou Poppins).
+
+
+* **Hierarquia:** Contraste extremo de pesos e tamanhos. Números de métricas principais são enormes e em peso médio/negrito (ex: "99,681m"), enquanto os rótulos que os descrevem são pequenos e regulares.
+
+
+
+**4. Componentes de UI**
+
+* **Navegação Lateral (Sidebar):** Organizada por grupos ("Navigation", "User Account") com ícones sólidos acompanhando o texto. O item ativo recebe um fundo sutil com o ícone adotando a cor primária verde.
+
+
+* **Visualização de Dados:** Gráficos de barras limpos com linhas de grade horizontais tracejadas e muito discretas. Mini gráficos (*sparklines*) acompanham os números de resumo para contexto rápido sem ocupar espaço.
+
+
+* **Listas de Dados:** A tabela "Plastic Recycling by Region" remove as linhas de grade convencionais e usa espaçamento em branco (white space) e alinhamento perfeito para separar colunas.

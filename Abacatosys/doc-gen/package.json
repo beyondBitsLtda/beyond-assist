@@ -1,0 +1,20 @@
+{
+  "name": "delp-docgen",
+  "version": "1.0.0",
+  "description": "Gerador de documentacao tecnica (desenvolvimento, arquitetura de sistema e de dados) para widgets e formularios Fluig da DELP Engenharia. Le a pasta raiz de uma aplicacao Fluig e produz um portal HTML autocontido no padrao visual DELP.",
+  "main": "src/index.js",
+  "bin": {
+    "delp-docgen": "bin/delp-docgen.js"
+  },
+  "scripts": {
+    "start": "node bin/delp-docgen.js",
+    "gerar": "node bin/delp-docgen.js"
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "author": "DELP Engenharia - TI / Desenvolvimento Fluig",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {}
+}

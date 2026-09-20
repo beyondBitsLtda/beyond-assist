@@ -1,0 +1,16 @@
+# O .gitignore da raiz do beyond-assist ja cobre tudo isto hoje. Esta copia existe para o dia
+# em que o Abacato virar repositorio proprio: a pasta se defende sozinha desde o primeiro
+# `git init`, em vez de depender de alguem lembrar de recriar as regras.
+
+node_modules/
+.next/
+out/
+
+# Chaves de verdade. O .env.local tem a service_role do Postgres, que e a chave-mestra do banco.
+.env
+.env.local
+.env*.local
+
+# Artefatos do wrangler guardam segredos em texto puro. Ja foram parar num `git add -A` antes.
+.wrangler/
+.open-next/

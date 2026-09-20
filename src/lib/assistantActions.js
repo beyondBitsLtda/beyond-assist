@@ -1,5 +1,5 @@
-import { loadAllTrelloCards } from "./liveTrello.js";
-import { updateTrelloCard, getBoardLists } from "./ingest/trello.js";
+import { loadAllCards } from "./liveQuadros.js";
+import { atualizarCard, listasDoQuadro } from "./quadrosEscrita.js";
 
 /**
  * Ações que o Assistente pode propor e (depois de confirmadas) executar de verdade em
@@ -22,7 +22,7 @@ function fmtDatePt(iso) {
  * movido/arquivado/apagado desde a última leitura ao vivo).
  */
 export async function buildActionProposal({ card_id, field, new_value }) {
-  const all = await loadAllTrelloCards();
+  const all = await loadAllCards();
   const card = all.find((c) => c.id === card_id);
   if (!card) throw new Error("não encontrei mais esse card (pode ter sido movido ou arquivado)");
 
@@ -71,22 +71,22 @@ export async function executeAction(pending) {
   const { card_id, card_title, field, new_value } = pending;
 
   if (field === "due") {
-    await updateTrelloCard(card_id, { due: new_value || null });
+    await atualizarCard(card_id, { due: new_value || null });
     return `Prontinho — ${new_value ? `mudei o prazo de "${card_title}" pra ${fmtDatePt(new_value)}` : `removi o prazo de "${card_title}"`}.`;
   }
 
   if (field === "due_complete") {
     const done = new_value === "true";
-    await updateTrelloCard(card_id, { dueComplete: done });
+    await atualizarCard(card_id, { dueComplete: done });
     return `Prontinho — "${card_title}" ${done ? "marcado como concluído" : "reaberto"}.`;
   }
 
   if (field === "list") {
-    const all = await loadAllTrelloCards();
+    const all = await loadAllCards();
     const card = all.find((c) => c.id === card_id);
     if (!card?.board_id) throw new Error("não achei o board desse card pra resolver a lista de destino");
 
-    const lists = await getBoardLists(card.board_id);
+    const lists = await listasDoQuadro(card.board_id);
     const wanted = new_value.toLowerCase();
     const target =
       lists.find((l) => l.name.toLowerCase() === wanted) ||
@@ -95,7 +95,7 @@ export async function executeAction(pending) {
       throw new Error(`não encontrei uma lista parecida com "${new_value}" nesse board (listas existentes: ${lists.map((l) => l.name).join(", ")})`);
     }
 
-    await updateTrelloCard(card_id, { idList: target.id });
+    await atualizarCard(card_id, { idList: target.id });
     return `Prontinho — movi "${card_title}" pra "${target.name}".`;
   }
 

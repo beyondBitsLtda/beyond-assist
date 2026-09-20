@@ -1,6 +1,6 @@
 import { jsonResponse } from "@/lib/http.js";
 import { conferirTokenDaExtensao } from "@/lib/lisaCodeAuth.js";
-import { loadAllTrelloCards } from "@/lib/liveTrello.js";
+import { loadAllCards } from "@/lib/liveQuadros.js";
 import { listDelpTasks } from "@/lib/delpTasks.js";
 import { listTickets } from "@/lib/sentinel.js";
 import { listThoughts } from "@/lib/notes.js";
@@ -42,7 +42,7 @@ export async function POST(req) {
     // As quatro fontes em paralelo, e nenhuma delas pode derrubar as outras: se o Trello estiver
     // fora, os chamados e os pensamentos continuam valendo.
     const [cards, delp, chamados, pensamentos] = await Promise.all([
-      loadAllTrelloCards().catch(() => []),
+      loadAllCards().catch(() => []),
       listDelpTasks().catch(() => []),
       // listTickets não filtra por status — eu tinha passado `{ status: "open" }`, que seria
       // ignorado em silêncio e daria a impressão de um filtro que não existe.

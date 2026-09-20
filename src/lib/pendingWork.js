@@ -3,7 +3,7 @@
 // src/app/api/lisa-code/*). Extraído pra cá quando a segunda consumidora apareceu, pra não
 // duplicar o filtro de "o que já foi concluído não deve aparecer como pendente" (bug real já
 // visto e corrigido no rádio) em dois lugares.
-import { loadAllTrelloCards } from "./liveTrello.js";
+import { loadAllCards } from "./liveQuadros.js";
 import { listDelpTasks } from "./delpTasks.js";
 import { listTickets, summarizeTickets, STATUS_ORDER } from "./sentinel.js";
 import { listThoughts } from "./notes.js";
@@ -67,7 +67,7 @@ function pickVaried(pool, keyFn, excludeKeys, n) {
 export async function getCategoryData(category, excludeKeys = []) {
   try {
     if (category === "trello") {
-      const cards = await loadAllTrelloCards();
+      const cards = await loadAllCards();
       const pending = cards.filter((c) => !DONE_PATTERN.test(c.list || ""));
       const withDue = pending.filter((c) => c.due).sort((a, b) => new Date(a.due) - new Date(b.due));
       const pool = (withDue.length ? withDue : pending).slice(0, 25);

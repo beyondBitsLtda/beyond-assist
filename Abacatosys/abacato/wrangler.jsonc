@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "abacato",
+
+  // A conta onde isto mora — a mesma da Lisa (beyondbitsLisa).
+  //
+  // Precisa estar escrito aqui porque a credencial deste computador enxerga QUATRO contas da
+  // Cloudflare, e nesse caso o wrangler se recusa a adivinhar: ele para com "More than one
+  // account available" e não publica nada. Um id de conta não é segredo — é um endereço.
+  "account_id": "7e4b10d80b08fef1f2fcca583577bf2d",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-09-01",
+  // nodejs_compat: o adaptador precisa dos modulos do Node.
+  // global_fetch_strictly_public: sem isto, um fetch do Worker para o proprio dominio faz
+  // laco dentro da Cloudflare em vez de sair para a internet.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "workers_dev": true,
+  // Sem isto, todo `wrangler deploy` APAGA as variaveis configuradas no painel. Ja custou uma
+  // manha na Lisa: o deploy passava, e as chaves sumiam sem nenhum erro.
+  "keep_vars": true,
+  "observability": { "enabled": true },
+  "routes": [{ "pattern": "abacato.beyond.dev.br", "custom_domain": true }]
+}

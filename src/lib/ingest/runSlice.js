@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase.js";
 import { embedForIngest } from "@/lib/gemini.js";
 import { chunkText } from "@/lib/ingest/chunk.js";
 import { loadTrello } from "@/lib/ingest/trello.js";
+import { loadAbacato, listarQuadrosDoAbacato } from "@/lib/ingest/abacato.js";
+import { fonteDosQuadros } from "@/lib/configLisa.js";
 import { loadBrain } from "@/lib/ingest/brain.js";
 import { loadGithub, countEnabledRepos } from "@/lib/ingest/github.js";
 
@@ -36,10 +38,27 @@ const MAX_CHUNKS_PER_CALL = 60;
  * porque roda no cliente e não tem acesso a TRELLO_BOARD_IDS.)
  */
 export async function buildSyncSteps() {
-  const boardIds = (process.env.TRELLO_BOARD_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
   const repoCount = await countEnabledRepos().catch(() => 0); // tabela pode nem existir ainda em deploys antigos — trata como "0 repos" em vez de quebrar o resto do sync
+
+  // Os passos de quadro seguem o interruptor do painel. Indexar a fonte que não está valendo
+  // gastaria embedding (que é cota do Gemini, o recurso mais escasso aqui) para alimentar uma
+  // busca que o retrieve descarta na leitura.
+  const fonte = await fonteDosQuadros();
+  let passosDeQuadro = [];
+  if (fonte === "abacato") {
+    const quadros = await listarQuadrosDoAbacato().catch(() => []);
+    passosDeQuadro = quadros.map((q, i) => ({
+      source: "abacato", boardIndex: i, label: `quadro ${i + 1}/${quadros.length} (${q.nome})`,
+    }));
+  } else {
+    const boardIds = (process.env.TRELLO_BOARD_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
+    passosDeQuadro = boardIds.map((_, i) => ({
+      source: "trello", boardIndex: i, label: `board ${i + 1}/${boardIds.length}`,
+    }));
+  }
+
   return [
-    ...boardIds.map((_, i) => ({ source: "trello", boardIndex: i, label: `board ${i + 1}/${boardIds.length}` })),
+    ...passosDeQuadro,
     { source: "brain", boardIndex: null, label: "brain (notas)" },
     ...Array.from({ length: repoCount }, (_, i) => ({ source: "github", boardIndex: null, repoIndex: i, label: `github ${i + 1}/${repoCount}` })),
   ];
@@ -68,6 +87,19 @@ export async function ingestSlice({ source, boardIndex = null, repoIndex = null,
     if (!boardId) throw new Error("boardIndex fora do range");
     sources = await loadTrello({ boardIds: [boardId] });
     report.board = sources[0]?.board || boardId;
+  } else if (source === "abacato") {
+    if (boardIndex === null || boardIndex === undefined) throw new Error("boardIndex obrigatório p/ abacato");
+    const quadros = await listarQuadrosDoAbacato();
+    const quadro = quadros[Number(boardIndex)];
+    // O índice vem da lista do BANCO, que pode mudar entre um passo e o próximo se alguém
+    // criar ou arquivar um quadro no meio da sincronização. Quando isso acontece, o passo
+    // simplesmente não tem o que fazer — e a próxima sincronização já pega a lista nova.
+    if (!quadro) {
+      report.done = true;
+      return report;
+    }
+    sources = await loadAbacato({ quadroIds: [quadro.id] });
+    report.board = quadro.nome;
   } else if (source === "brain") {
     sources = await loadBrain();
   } else if (source === "github") {
@@ -87,7 +119,7 @@ export async function ingestSlice({ source, boardIndex = null, repoIndex = null,
     }
     sources = carga.docs;
   } else {
-    throw new Error("source obrigatório: trello|brain|github");
+    throw new Error("source obrigatório: trello|abacato|brain|github");
   }
   report.docs = sources.length;
 
