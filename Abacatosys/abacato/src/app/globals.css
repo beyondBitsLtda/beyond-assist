@@ -271,9 +271,92 @@ body {
 }
 .abacato-barra-lateral__item--ativo .abacato-barra-lateral__icone { color: var(--abacato-verde); }
 .abacato-barra-lateral__icone { width: 18px; text-align: center; }
-.abacato-barra-lateral__rodape { margin-top: auto; }
 
-.abacato-conteudo { padding: var(--abacato-respiro-y) var(--abacato-respiro-x); min-width: 0; overflow: auto; }
+/* A coluna da direita é uma pilha: faixa fina em cima, conteúdo ocupando o resto e rolando
+ * sozinho. A `min-height: 0` não é enfeite — sem ela um filho flexível se recusa a encolher
+ * abaixo do próprio conteúdo, e quem passa a rolar é a página inteira, levando a barra lateral
+ * e a faixa do topo embora. */
+.abacato-principal {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.abacato-topo {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 54px;
+  padding: 0 var(--abacato-respiro-x);
+  background: var(--abacato-superficie);
+  border-bottom: 1px solid var(--abacato-linha);
+}
+.abacato-topo__direita { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* A marca só no celular: no computador ela já está no alto da barra lateral. */
+.abacato-topo__marca { display: none; align-items: center; gap: 9px; font-weight: 700; font-size: 15px; }
+
+.abacato-topo__sair {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--abacato-linha);
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  border-radius: var(--abacato-raio-pilula);
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.abacato-topo__sair:hover { color: var(--abacato-alerta); border-color: var(--abacato-alerta); }
+
+/* ---- o seletor de tema, segmentado ----
+ *
+ * Três opções visíveis, e não um botão que cicla. O botão único tinha um defeito que só
+ * aparecia usando: de "escuro" para "sistema", com o computador no escuro, NADA mudava na
+ * tela — e ele parecia quebrado sem estar. */
+.abacato-tema {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--abacato-superficie-2);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio-pilula);
+}
+.abacato-tema__opcao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  border-radius: var(--abacato-raio-pilula);
+  padding: 6px 13px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.abacato-tema__opcao:hover { color: var(--abacato-tinta); }
+.abacato-tema__opcao--ativa {
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.abacato-tema__icone { font-size: 13px; }
+
+.abacato-conteudo {
+  flex: 1 1 auto;
+  padding: var(--abacato-respiro-y) var(--abacato-respiro-x);
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
 .abacato-conteudo__cabecalho {
   display: flex;
   align-items: center;
@@ -303,11 +386,17 @@ body {
     bottom: 0;
   }
   .abacato-barra-lateral__marca,
-  .abacato-barra-lateral__titulo,
-  .abacato-barra-lateral__rodape { display: none; }
+  .abacato-barra-lateral__titulo { display: none; }
+  .abacato-topo__marca { display: flex; }
+  /* Espaço é o que falta num telefone: o texto das opções de tema sai e ficam só os ícones,
+   * que continuam com área de toque inteira. */
+  .abacato-tema__texto { display: none; }
+  .abacato-tema__opcao { padding: 7px 11px; }
+  .abacato-topo__sair-texto { display: none; }
+  .abacato-topo { height: 50px; gap: 8px; }
   .abacato-barra-lateral__grupo { flex-direction: row; gap: 4px; }
   .abacato-barra-lateral__item { flex-direction: column; gap: 2px; font-size: 10.5px; padding: 8px 12px; }
-  .abacato-conteudo { order: 1; --abacato-respiro-y: 18px; --abacato-respiro-x: 16px; }
+  .abacato-principal { order: 1; --abacato-respiro-y: 18px; --abacato-respiro-x: 16px; }
 }
 
 /* ============================================================ entrar */
@@ -356,7 +445,6 @@ body {
   gap: var(--abacato-gap);
 }
 .abacato-quadro-cartao {
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -382,13 +470,27 @@ body {
   z-index: 0;
 }
 .abacato-quadro-cartao__area:focus-visible { outline: 2px solid var(--abacato-verde); outline-offset: 2px; }
-.abacato-quadro-cartao > *:not(.abacato-quadro-cartao__area) { position: relative; z-index: 1; }
-/* ...menos o que não deve capturar o clique: o texto do cartão é só texto, e interceptar o
- * clique nele faria metade do cartão parar de abrir o quadro. */
+
+/* Cada peça acima do link é nomeada, em vez de um `> *` genérico.
+ *
+ * A versao generica era `.abacato-quadro-cartao > *:not(.abacato-quadro-cartao__area)`, e ela
+ * tinha especificidade MAIOR que `.abacato-quadro-cartao__menu` — então o `position: absolute`
+ * do menu era anulado por um `position: relative` que nem falava do menu. O botão de opções
+ * saía do canto e ia parar no fim do cartão, onde ninguém procura.
+ *
+ * O texto não captura clique: interceptar o clique nele faria metade do cartão parar de abrir
+ * o quadro. */
+.abacato-quadro-cartao__faixa,
 .abacato-quadro-cartao__nome,
 .abacato-quadro-cartao__descricao,
-.abacato-quadro-cartao__rodape { pointer-events: none; }
+.abacato-quadro-cartao__rodape { position: relative; z-index: 1; pointer-events: none; }
 
+/* O cartão NÃO pode ter `overflow: hidden`.
+ *
+ * Ele tinha, para arredondar a faixa do topo, e o efeito foi este: o menu de opções abria
+ * normalmente e era recortado pela borda do cartão. Clicar nos três pontinhos parecia não
+ * fazer nada — o menu estava lá, invisível. A faixa arredonda os próprios cantos, então o
+ * `overflow` nunca foi necessário. */
 .abacato-quadro-cartao__menu { position: absolute; top: 12px; right: 10px; z-index: 2; }
 .abacato-quadro-cartao__menu .abacato-icone { background: rgba(0, 0, 0, 0.25); color: #FFFFFF; }
 .abacato-quadro-cartao__menu .abacato-icone:hover { background: rgba(0, 0, 0, 0.45); }

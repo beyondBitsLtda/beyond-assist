@@ -2,6 +2,7 @@ import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { exigir, carregarQuadro, quemEh, respostaDeErro, ErroDeAcesso } from "@/lib/acesso.js";
 import { materializarRecorrencias } from "@/lib/recorrenciaNoBanco.js";
+import { paredeValida } from "@/dominio/paredes.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +50,15 @@ export async function PATCH(req, { params }) {
     const mudancas = {};
     if (typeof corpo.nome === "string" && corpo.nome.trim()) mudancas.nome = corpo.nome.trim();
     if ("descricao" in corpo) mudancas.descricao = corpo.descricao || null;
-    if ("papelDeParede" in corpo) mudancas.papel_de_parede = corpo.papelDeParede || null;
+    if ("papelDeParede" in corpo) {
+      // Conferir, e não aceitar qualquer texto: o valor vai direto para o `style` da tela, e
+      // `url("https://servidor-de-alguem/x.png")` é CSS válido que o navegador BUSCA ao abrir
+      // o quadro — um aviso silencioso, para fora, toda vez que alguém olha o quadro.
+      if (!paredeValida(corpo.papelDeParede || null, process.env.SUPABASE_URL)) {
+        throw new ErroDeAcesso(400, "papel de parede inválido: use um dos prontos ou envie uma imagem");
+      }
+      mudancas.papel_de_parede = corpo.papelDeParede || null;
+    }
     if (typeof corpo.arquivado === "boolean") mudancas.arquivado = corpo.arquivado;
     if (!Object.keys(mudancas).length) return json({ ok: false, error: "nada para mudar" }, 400);
 

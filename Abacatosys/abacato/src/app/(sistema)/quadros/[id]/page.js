@@ -11,18 +11,8 @@ import CardMini from "@/componentes/quadro/CardMini.js";
 import PainelDoCard from "@/componentes/quadro/PainelDoCard.js";
 import PainelDeRecorrencias from "@/componentes/quadro/PainelDeRecorrencias.js";
 import ColunasArquivadas from "@/componentes/quadro/ColunasArquivadas.js";
-
-// Papéis de parede. Gradientes e não fotos: uma foto atrás de trinta cards brancos come o
-// contraste do texto, e a cor de fundo é a única coisa do quadro que não deveria disputar
-// atenção com o conteúdo.
-const PAREDES = [
-  { valor: null, nome: "Nenhum" },
-  { valor: "linear-gradient(135deg, #0F2A1D, #1B4332)", nome: "Mata" },
-  { valor: "linear-gradient(135deg, #12243F, #21456F)", nome: "Maré" },
-  { valor: "linear-gradient(135deg, #3A1F0B, #7C3F13)", nome: "Barro" },
-  { valor: "linear-gradient(135deg, #2B1B3F, #59307A)", nome: "Ameixa" },
-  { valor: "linear-gradient(135deg, #1F2937, #4B5563)", nome: "Grafite" },
-];
+import PapelDeParede from "@/componentes/quadro/PapelDeParede.js";
+import { urlDaParede } from "@/dominio/paredes.js";
 
 export default function PaginaDoQuadro() {
   const { id } = useParams();
@@ -33,6 +23,7 @@ export default function PaginaDoQuadro() {
   const [menuDoQuadro, setMenuDoQuadro] = useState(false);
   const [recorrencias, setRecorrencias] = useState(false);
   const [arquivadas, setArquivadas] = useState(false);
+  const [parede, setParede] = useState(false);
   const [novaColuna, setNovaColuna] = useState(false);
   const [aviso, setAviso] = useState("");
   const faixa = useRef(null);
@@ -177,7 +168,7 @@ export default function PaginaDoQuadro() {
     // em tinta escura sobre um gradiente escuro — some da tela sem nenhum erro aparecer.
     <div
       className="abacato-tela-do-quadro"
-      data-parede={dados.quadro.papelDeParede ? "sim" : "nao"}
+      data-parede={!dados.quadro.papelDeParede ? "nao" : urlDaParede(dados.quadro.papelDeParede) ? "imagem" : "sim"}
       style={dados.quadro.papelDeParede ? { background: dados.quadro.papelDeParede } : undefined}
     >
       <header className="abacato-quadro-topo">
@@ -221,21 +212,10 @@ export default function PaginaDoQuadro() {
                       onClick={() => { setMenuDoQuadro(false); setArquivadas(true); }}>
                       Colunas arquivadas
                     </button>
-                    <div className="abacato-menu__titulo">Papel de parede</div>
-                    {PAREDES.map((p) => (
-                      <button
-                        key={p.nome}
-                        type="button"
-                        className={`abacato-menu__item${dados.quadro.papelDeParede === p.valor ? " abacato-menu__item--ativo" : ""}`}
-                        onClick={() => {
-                          mudar(`/api/quadros/${id}`, { papelDeParede: p.valor }).then(() => carregar(true)).catch((e) => setErro(e.message));
-                          setMenuDoQuadro(false);
-                        }}
-                      >
-                        <span className="abacato-amostra" style={p.valor ? { background: p.valor } : undefined} />
-                        {p.nome}
-                      </button>
-                    ))}
+                    <button type="button" className="abacato-menu__item"
+                      onClick={() => { setMenuDoQuadro(false); setParede(true); }}>
+                      Papel de parede
+                    </button>
                   </div>
                 </>
               )}
@@ -315,6 +295,15 @@ export default function PaginaDoQuadro() {
           aoFechar={() => setCardAberto(null)}
           aoMudar={() => setDados((d) => ({ ...d }))}
           aoRecarregar={() => carregar(true)}
+        />
+      )}
+
+      {parede && (
+        <PapelDeParede
+          quadroId={id}
+          atual={dados.quadro.papelDeParede}
+          aoFechar={() => setParede(false)}
+          aoMudar={() => carregar(true)}
         />
       )}
 

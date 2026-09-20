@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import SeletorDeTema from "./SeletorDeTema.js";
 
 // A navegação inteira num lugar só. Acrescentar uma área do sistema é acrescentar uma linha
 // aqui — e não um item de menu em cada arquivo que por acaso desenha o menu.
@@ -42,20 +41,6 @@ export default function BarraLateral() {
         })}
       </nav>
 
-      <div className="abacato-barra-lateral__rodape">
-        <SeletorDeTema />
-        <button
-          type="button"
-          className="abacato-barra-lateral__item"
-          onClick={async () => {
-            await fetch("/api/auth/sair", { method: "POST" });
-            window.location.href = "/entrar";
-          }}
-        >
-          <span className="abacato-barra-lateral__icone">⏻</span>
-          Sair
-        </button>
-      </div>
     </aside>
   );
 }
