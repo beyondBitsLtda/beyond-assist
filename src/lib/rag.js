@@ -145,6 +145,29 @@ ${text}`;
 }
 
 /**
+ * A fonte que está valendo já tem alguma coisa indexada?
+ *
+ * Uma contagem por pergunta seria desperdício: a resposta muda uma vez por migração, e não a
+ * cada busca. Cinco minutos de cache é curto o bastante para a primeira fatia de indexação
+ * ligar o descarte quase na hora, e longo o bastante para o banco nem sentir.
+ */
+let _indiceDaFonte = null; // { em: number, fonte: string, tem: boolean }
+
+async function fonteAtivaTemIndice() {
+  const fonte = await fonteDosQuadros();
+  if (_indiceDaFonte && _indiceDaFonte.fonte === fonte && Date.now() - _indiceDaFonte.em < 300000) {
+    return _indiceDaFonte.tem;
+  }
+  const { count, error } = await supabase
+    .from("documents").select("id", { count: "exact", head: true }).eq("source", fonte);
+  // Banco arisco: na dúvida, NÃO descarta. Perder resultado por causa de uma consulta que
+  // falhou seria trocar um problema pequeno por um grande.
+  const tem = error ? true : (count || 0) > 0;
+  _indiceDaFonte = { em: Date.now(), fonte, tem };
+  return tem;
+}
+
+/**
  * Recupera os trechos mais parecidos com a pergunta.
  * Retorna um array já no formato dos cards do HUD.
  */
@@ -174,15 +197,21 @@ export async function retrieve(question, { filterSource = null, filterBoard = nu
   });
   if (error) throw new Error(`match_documents: ${error.message}`);
 
-  // O índice guarda documentos das DUAS fontes de quadro: quem usou o Trello e migrou para o
-  // Abacato tem as duas coisas indexadas, e apagar a antiga seria jogar fora a única cópia do
-  // que existia antes da migração. Então a fonte que não está valendo é descartada aqui, na
-  // leitura. Sem isto, a Lisa responderia misturando as tarefas de hoje com as de um sistema
-  // que ninguém usa mais — e nada na resposta diria qual é qual.
+  // O índice guarda documentos das DUAS fontes de quadro: quem migrou tem as duas coisas
+  // indexadas, e apagar a antiga seria jogar fora a única cópia do que existia antes. Então a
+  // fonte que não está valendo é descartada aqui, na leitura — senão a Lisa responderia
+  // misturando as tarefas de hoje com as de um sistema que ninguém usa mais.
+  //
+  // COM UMA EXCEÇÃO, e ela é o dia da migração. Indexar custa embedding, que é cota do Gemini
+  // e acaba: virar o interruptor de manhã e ficar sem cota até a meia-noite do Pacífico é
+  // normal. Se a fonte nova ainda não tem NADA indexado, descartar a antiga deixaria a busca
+  // por significado completamente cega — e um texto de ontem sobre a mesma tarefa é muito
+  // melhor que silêncio. O descarte só começa quando há o que descartar em favor de quê.
   const inativa = (await fonteDosQuadros()) === "abacato" ? "TRELLO" : "ABACATO";
+  const podeDescartar = await fonteAtivaTemIndice();
 
   return (data || [])
-    .filter((row) => String(row.source || "").toUpperCase() !== inativa)
+    .filter((row) => !podeDescartar || String(row.source || "").toUpperCase() !== inativa)
     .map((row) => ({
     id: String(row.external_id || "").split("#")[0],
     source: (row.source || "").toUpperCase(),
