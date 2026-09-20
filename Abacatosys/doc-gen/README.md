@@ -8,9 +8,38 @@ Sem dependências externas, sem build, sem rede. E, se você quiser, ele publica
 direto num projeto de documentação do **Abacato**, onde a equipe já procura documento.
 
 ```bash
-node bin/docgen.js ./meu-projeto
+node bin/docgen.js --tela              # abre a tela no navegador
 node bin/docgen.js ./meu-projeto --publicar
 ```
+
+## Por onde se usa
+
+**A tela.** No Windows, dois cliques em `docgen.cmd`; em qualquer sistema,
+`node bin/docgen.js --tela`. Abre no navegador: você navega até a pasta do repositório (as que
+parecem repositório vêm marcadas), marca se quer publicar, e clica em **Gerar documentação**.
+Os últimos repositórios ficam à mão como atalhos.
+
+**Arrastando.** Solte uma pasta em cima de `docgen.cmd` e ele gera e publica aquela pasta
+direto, sem abrir tela nenhuma.
+
+**Pelo terminal**, com as opções da tabela mais abaixo.
+
+> **Por que a tela é local, e não um botão dentro do Abacato**
+>
+> O Abacato roda na nuvem; o docgen precisa **ler a pasta do repositório**, que está no seu
+> computador. Nenhuma página da internet alcança o disco de quem a abre — e ainda bem: um site
+> que conseguisse ler suas pastas seria um problema bem maior que a comodidade de um botão.
+>
+> Então a tela roda na sua máquina, em `127.0.0.1`. O Abacato continua sendo o lugar onde a
+> documentação **fica**; a tela é o lugar de onde ela **sai**.
+>
+> Três travas, porque um servidor local que lê pastas e roda geração é uma porta aberta:
+> ele só escuta em `127.0.0.1`, exige uma **chave sorteada a cada execução** (que vai no
+> endereço impresso no terminal — sem ela, qualquer aba aberta no seu navegador poderia mandar
+> pedidos para o localhost pelas suas costas), e confere o cabeçalho `Host`, que é o que impede
+> um domínio de fora apontado para `127.0.0.1` de conversar com ele.
+>
+> A saída vai para `~/docgen-saida/`, nunca para dentro do repositório analisado.
 
 ## O que ele entende
 
@@ -92,6 +121,8 @@ de verdade**, em vez de adivinhadas pelo sufixo `_id`.
 | `--forcar` | sobrescreve um HTML que documenta **outro** projeto (sem isso, recusa) |
 | `--publicar` | envia para um projeto de documentação do Abacato |
 | `--config <arquivo>` | configuração da publicação (padrão: `~/.docgen-abacato.json`) |
+| `--tela` | abre a tela no navegador, nesta máquina |
+| `--porta <n>` | porta da tela (padrão: 4321) |
 
 Todo portal carrega `<meta name="dg-app">` com o projeto que ele documenta. Regerar o mesmo
 projeto sobrescreve sem perguntar; apontar `--out` para a documentação de outro projeto
@@ -132,6 +163,8 @@ como falha de teste e não como um 401 sem explicação no meio de uma publicaç
 |---|---|
 | `npm run estilo-check` | toda classe que o gerador escreve tem regra no tema, todo nome montado na hora casa com alguma regra, e toda cor usada nos diagramas existe na paleta |
 | `npm run publicar-check` | a derivação de senha daqui é idêntica à do Abacato |
+| `npm run tela-check` | as três travas da tela local, a navegação por pastas e a geração pelo botão |
+| `npm run publicado-check` | o caminho inteiro contra o Abacato de verdade |
 
 ## Limitações conhecidas
 

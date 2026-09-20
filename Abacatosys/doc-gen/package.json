@@ -10,7 +10,9 @@
     "gerar": "node bin/docgen.js",
     "estilo-check": "node scripts/estilo-check.mjs",
     "publicar-check": "node scripts/publicar-check.mjs",
-    "publicado-check": "node scripts/publicado-check.mjs"
+    "publicado-check": "node scripts/publicado-check.mjs",
+    "tela": "node bin/docgen.js --tela",
+    "tela-check": "node scripts/tela-check.mjs"
   },
   "engines": {
     "node": ">=18"

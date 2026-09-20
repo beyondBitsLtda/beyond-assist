@@ -36,14 +36,50 @@ function ajuda() {
     console.log('  --forcar           Sobrescreve um HTML que documenta OUTRO projeto (padrao: recusa)');
     console.log('  --publicar         Envia o portal para um projeto de documentacao do Abacato');
     console.log('  --config <arquivo> Configuracao da publicacao (padrao: ~/.docgen-abacato.json)');
+    console.log('  --tela             Abre a tela do docgen no navegador, nesta maquina');
+    console.log('  --porta <numero>   Porta da tela (padrao: 4321)');
     console.log('  --help             Mostra esta ajuda\n');
+    console.log('Tela:');
+    console.log('  node bin/docgen.js --tela');
+    console.log('  No Windows, docgen.cmd faz isso com dois cliques.\n');
     console.log('Publicar:');
     console.log('  Regerar o mesmo projeto cria uma REVISAO do documento que ja existe, e nao');
     console.log('  um documento novo — o endereco continua o mesmo e o historico fica guardado.\n');
 }
 
+/* Abre o navegador na pagina da tela. Cada sistema tem o seu comando, e nenhum
+   deles e critico: se falhar, o endereco ja esta impresso no terminal. */
+function abrirNavegador(url) {
+    var cmd = process.platform === 'win32' ? 'start ""'
+        : (process.platform === 'darwin' ? 'open' : 'xdg-open');
+    try {
+        require('child_process').exec(cmd + ' "' + url + '"');
+    } catch (e) { /* o endereco esta no terminal */ }
+}
+
 async function main() {
     if (tem('--help') || tem('-h')) { ajuda(); process.exit(0); }
+
+    /* ------------------------------------------------------------ a tela */
+    if (tem('--tela') || tem('--servidor')) {
+        var porta = Number(arg('--porta')) || 4321;
+        var s;
+        try {
+            s = await require('../src/servidor').subir({ porta: porta });
+        } catch (e) {
+            if (e && e.code === 'EADDRINUSE') {
+                console.error('\n' + C.red + 'A porta ' + porta + ' ja esta em uso.' + C.reset +
+                    ' Talvez o docgen ja esteja aberto — procure a aba no navegador.');
+                console.error('Para usar outra porta:  node bin/docgen.js --tela --porta 4322\n');
+                process.exit(1);
+            }
+            throw e;
+        }
+        console.log('\n' + C.green + '✓' + C.reset + ' docgen aberto em ' + C.bold + s.url + C.reset);
+        console.log(C.dim + '  So esta maquina alcanca esta tela. Feche com Ctrl+C.' + C.reset + '\n');
+        abrirNavegador(s.url);
+        return;                                  /* fica no ar ate o Ctrl+C */
+    }
 
     var root = process.argv[2];
     if (!root || root.charAt(0) === '-') {
