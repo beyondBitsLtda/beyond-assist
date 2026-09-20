@@ -144,7 +144,7 @@ function agora() {
     return new Date().toISOString().slice(0, 19).replace('T', ' ');
 }
 
-/* Bancos que o codigo da aplicacao menciona explicitamente (FLUIG.dbo.X). */
+/* Bancos que o codigo da aplicacao menciona explicitamente (APP.dbo.X). */
 function bancosAlvo(modelo) {
     var lista = (modelo.dataModel.bancos || [])
         .filter(function (b) { return b.identificado; })
@@ -156,7 +156,7 @@ function bancosAlvo(modelo) {
    UMA EXECUCAO PARA TODAS AS BASES
 
    O catalogo do SQL Server (sys.objects, sys.columns) e por banco, mas ele pode
-   ser lido de fora: [FLUIG].sys.objects responde de qualquer base da mesma
+   ser lido de fora: [APP].sys.objects responde de qualquer base da mesma
    instancia. E isso que permite UMA execucao so, cobrindo todas as bases, em vez
    de trocar a base na barra do SSMS e salvar um CSV por vez.
 
@@ -174,7 +174,7 @@ var COLUNAS_GRADE = ['tipo', 'banco', 'esquema', 'objeto', 'objeto_tipo', 'colun
     'tipo_dado', 'tamanho', 'precisao', 'escala', 'nulo', 'pk', 'identidade',
     'ref_banco', 'ref_esquema', 'ref_objeto', 'ref_coluna', 'restricao'];
 
-/* Bloco que le UMA base. {{DB}} vira [FLUIG], {{DBLIT}} vira 'FLUIG' e {{ALVO}}
+/* Bloco que le UMA base. {{DB}} vira [APP], {{DBLIT}} vira 'APP' e {{ALVO}}
    vira a lista de objetos - os tres substituidos em tempo de execucao. */
 function blocoPorBase() {
     return [
@@ -293,7 +293,7 @@ function scriptExtracao(modelo) {
     var L = [];
     L.push('/* =============================================================================');
     L.push('   ' + app + ' - EXTRACAO DO ESQUEMA REAL DO BANCO   (saida em CSV)');
-    L.push('   Gerado por delp-docgen em ' + agora());
+    L.push('   Gerado por docgen em ' + agora());
     L.push('   -----------------------------------------------------------------------------');
     L.push('   PARA QUE SERVE');
     L.push('     O docgen deduziu ' + inferidas.length + ' tabela(s) a partir do codigo-fonte.');
@@ -303,7 +303,7 @@ function scriptExtracao(modelo) {
     L.push('   UMA EXECUCAO SO, UM CSV SO - RODE EM QUALQUER BASE');
     L.push('     Nao e preciso escolher a base na barra do SSMS nem rodar duas vezes. O');
     L.push('     script le o catalogo de cada banco pelo nome qualificado');
-    L.push('     ([FLUIG].sys.objects), entao uma execucao ja traz todas as bases numa');
+    L.push('     ([APP].sys.objects), entao uma execucao ja traz todas as bases numa');
     L.push('     grade unica. Cada linha diz em qual banco ela foi encontrada.');
     if (bancos.length) {
         L.push('');
@@ -336,7 +336,7 @@ function scriptExtracao(modelo) {
     L.push('        > tipo "CSV" > salve DENTRO DESTA MESMA PASTA.');
     L.push('        O nome do arquivo nao importa. O cabecalho de colunas tambem e');
     L.push('        opcional ("Include column headers" ligado ou desligado).');
-    L.push('     4. Rode o delp-docgen de novo sobre a mesma pasta de saida. As tabelas');
+    L.push('     4. Rode o docgen de novo sobre a mesma pasta de saida. As tabelas');
     L.push('        deixam de aparecer como "inferido" e passam a constar como');
     L.push('        "declarado (banco)", cada uma na sua base.');
     L.push('');
@@ -389,7 +389,7 @@ function scriptExtracao(modelo) {
     L.push('FROM @alvo;');
     L.push('');
     L.push('/* ---------------------------------------------------------------------------');
-    L.push("   3. Bloco lido em cada base. {{DB}} vira [FLUIG], {{DBLIT}} vira 'FLUIG' e");
+    L.push("   3. Bloco lido em cada base. {{DB}} vira [APP], {{DBLIT}} vira 'APP' e");
     L.push('   {{ALVO}} vira a lista de objetos acima.');
     L.push('   --------------------------------------------------------------------------- */');
     L.push("DECLARE @tpl nvarchar(max) = CAST(N'' AS nvarchar(max));");
@@ -492,7 +492,7 @@ function ddlInferido(modelo) {
     var L = [];
     L.push('/* =============================================================================');
     L.push('   ' + (modelo.meta.appCode || 'aplicacao') + ' - DDL INFERIDO (RASCUNHO, NAO AUTORITATIVO)');
-    L.push('   Gerado por delp-docgen em ' + agora());
+    L.push('   Gerado por docgen em ' + agora());
     L.push('   -----------------------------------------------------------------------------');
     L.push('   ATENCAO: este arquivo foi DEDUZIDO do codigo-fonte (constantes de tabela,');
     L.push('   grupos de colunas e SQL embutido). Os TIPOS sao chute educado, nao verdade.');
@@ -581,7 +581,7 @@ function consolidado(modelo) {
     var L = [];
     L.push('/* =============================================================================');
     L.push('   ' + (modelo.meta.appCode || 'aplicacao') + ' - ESQUEMA CONSOLIDADO (somente o DECLARADO)');
-    L.push('   Gerado por delp-docgen em ' + agora());
+    L.push('   Gerado por docgen em ' + agora());
     L.push('   -----------------------------------------------------------------------------');
     L.push('   Reune tudo que tem fonte: DDL da pasta /sql da aplicacao + esquema extraido');
     L.push('   do banco e salvo nesta pasta. Nada aqui foi deduzido.');
@@ -671,11 +671,11 @@ function leiaMe(modelo, lidos) {
     L.push('');
     L.push('## Bases de dados desta aplicacao');
     L.push('');
-    L.push('Uma aplicacao Fluig raramente fala com um banco so: as tabelas proprias ficam');
-    L.push('no FLUIG e as de ERP no CORPORE, muitas vezes na mesma consulta.');
+    L.push('Uma aplicacao de baixo codigo raramente fala com um banco so: as tabelas proprias ficam');
+    L.push('num banco e as de ERP em outro, muitas vezes na mesma consulta.');
     L.push('');
     L.push('O `01-extrair-esquema.sql` le **todas as bases numa execucao so**: ele qualifica');
-    L.push('o catalogo pelo nome do banco (`[FLUIG].sys.objects`), o que funciona de');
+    L.push('o catalogo pelo nome do banco (`[APP].sys.objects`), o que funciona de');
     L.push('qualquer base da mesma instancia. Nao e preciso trocar a base na barra do SSMS');
     L.push('nem salvar um arquivo por vez.');
     L.push('');
@@ -693,7 +693,7 @@ function leiaMe(modelo, lidos) {
     var naoId = bancos.filter(function (b) { return !b.identificado; })[0];
     if (naoId) {
         L.push('> ' + naoId.tabelas + ' tabela(s) aparecem no codigo **sem o nome da base**');
-        L.push('> (`dbo.X` em vez de `FLUIG.dbo.X`). Elas entram na lista de todas as');
+        L.push('> (`dbo.X` em vez de `APP.dbo.X`). Elas entram na lista de todas as');
         L.push('> execucoes: a base em que forem encontradas passa a ser a base delas.');
         L.push('');
     }
@@ -720,7 +720,7 @@ function leiaMe(modelo, lidos) {
     L.push('   A base selecionada na barra **nao importa**.');
     L.push('2. O resultado sai em **uma grade so**, com todas as bases juntas.');
     L.push('3. Botao direito na grade > **Save Results As...** > salve **nesta pasta**.');
-    L.push('4. Rode o `delp-docgen` novamente sobre a mesma pasta de saida.');
+    L.push('4. Rode o `docgen` novamente sobre a mesma pasta de saida.');
     L.push('');
     L.push('> **Salve dentro desta pasta**, nao na pasta de outra aplicacao. E o motivo');
     L.push('> numero um de "salvei e continua inferido": o dialogo do SSMS reabre na');
@@ -766,7 +766,7 @@ function leiaMe(modelo, lidos) {
     L.push('| `02-ddl-inferido.sql` | Rascunho do DDL deduzido do codigo, separado por base. Tipos sao estimativa. | Nao (rascunho) |');
     L.push('| `03-esquema-consolidado.sql` | Tudo que ja tem fonte declarada, separado por base. | Nao (referencia) |');
     L.push('');
-    L.push('> Esses tres arquivos sao **reescritos a cada execucao** do delp-docgen.');
+    L.push('> Esses tres arquivos sao **reescritos a cada execucao** do docgen.');
     L.push('> Nao edite. Qualquer outro arquivo com outro nome e preservado e lido');
     L.push('> como esquema.');
     L.push('');

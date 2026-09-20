@@ -18,23 +18,31 @@
    Os TITULOS mudam com o tipo da aplicacao: chamar de "Bootstrap (SuperWidget)"
    uma camada de um projeto que nao tem widget nenhuma e documentar ficcao. */
 function camadasDe(tipo) {
+    var C = require('./diagrams').COR;
     var temWidget = tipo === 'widget' || tipo === 'widget-formulario';
+    var temForm = tipo === 'formulario' || tipo === 'widget-formulario';
+    /* Um projeto de modulos (aplicacao web, biblioteca, servico) nao tem cartao
+       nem processo; chamar suas camadas de "Formulario" e "Workflow" seria
+       documentar uma arquitetura que nao existe ali. */
+    var modulos = !temWidget && !temForm;
+
     return [
         {
-            id: 'apresentacao', cor: '#B0B0B0',
-            titulo: temWidget ? 'Apresentacao (FTL / HTML / CSS)' : 'Apresentacao (cartao HTML / CSS)'
+            id: 'apresentacao', cor: C.neutro,
+            titulo: modulos ? 'Apresentacao (telas, componentes, estilos)'
+                : (temWidget ? 'Apresentacao (template / HTML / CSS)' : 'Apresentacao (cartao HTML / CSS)')
         },
-        { id: 'formulario', titulo: 'Formulario (eventos do cartao)', cor: '#213D75' },
-        { id: 'bootstrap', titulo: 'Bootstrap (SuperWidget)', cor: '#000000' },
+        { id: 'formulario', titulo: 'Formulario (eventos do cartao)', cor: C.modulo },
+        { id: 'bootstrap', titulo: modulos ? 'Entrada (bootstrap)' : 'Bootstrap', cor: C.tintaForte },
         {
-            id: 'orquestracao', cor: '#1A1A1A',
-            titulo: temWidget ? 'Orquestracao (controller / dominio / componentes)' : 'Modulos JS auxiliares'
+            id: 'orquestracao', cor: C.tinta,
+            titulo: modulos ? 'Modulos e dominio' : 'Orquestracao (controller / dominio / componentes)'
         },
-        { id: 'integracao', titulo: 'Integracao (integre*)', cor: '#2362D3' },
-        { id: 'acesso-dados', titulo: 'Acesso a dados client (ds*)', cor: '#0B861D' },
-        { id: 'workflow', titulo: 'Workflow (eventos server-side)', cor: '#FF6B05' },
-        { id: 'dataset', titulo: 'Datasets server-side', cor: '#213D75' },
-        { id: 'persistencia', titulo: 'Persistencia (SQL Server / TOTVS RM)', cor: '#CC0F10' }
+        { id: 'integracao', titulo: 'Integracao com outros sistemas', cor: C.dado },
+        { id: 'acesso-dados', titulo: 'Acesso a dados', cor: C.acao },
+        { id: 'workflow', titulo: 'Processo (eventos server-side)', cor: C.processo },
+        { id: 'dataset', titulo: modulos ? 'Consultas' : 'Consultas server-side', cor: C.modulo },
+        { id: 'persistencia', titulo: 'Persistencia (banco de dados)', cor: C.alerta }
     ];
 }
 var CAMADAS = camadasDe('widget-formulario');
@@ -104,11 +112,25 @@ function simbolosDe(f) {
     return out;
 }
 
-/* Remove comentarios e strings para nao contar citacao em comentario como uso. */
-function corpoUtil(c) {
+/* Tira comentarios. Um import comentado nao e uma dependencia, e um nome de
+   funcao citado num comentario nao e uma chamada. */
+function semComentarios(c) {
     return String(c || '')
         .replace(/\/\*[\s\S]*?\*\//g, ' ')
-        .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ')
+        .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+}
+
+/* Tira comentarios E o CONTEUDO das strings.
+   -----------------------------------------------------------------------------
+   Serve a busca por simbolo: sem isso, a palavra "Controller" dentro de uma
+   mensagem de erro contaria como uso do modulo Controller.
+
+   Cuidado ao reusar: o caminho de um `import from './x.js'` E uma string, e
+   passa a ser '' aqui. Quem precisa do caminho usa semComentarios() — foi
+   exatamente este engano que deixou o mapa de chamadas de um projeto de modulos
+   com 36 ligacoes quando havia centenas. */
+function corpoUtil(c) {
+    return semComentarios(c)
         .replace(/'(?:\\.|[^'\\])*'/g, "''")
         .replace(/"(?:\\.|[^"\\])*"/g, '""');
 }
@@ -133,14 +155,64 @@ function tokensDe(corpo) {
     return { plain: plain, dotted: dotted };
 }
 
-/* Normaliza nome de tabela para a chave usada na rastreabilidade. */
+/* -------------------------------------------------------------- imports */
+
+function normalizar(p) { return String(p).replace(/\\/g, '/').replace(/^\.\//, ''); }
+
+/* Junta um caminho relativo com o do arquivo que importa, resolvendo . e .. */
+function juntar(base, rel) {
+    var partes = normalizar(base).split('/');
+    partes.pop();                                  /* sai o nome do arquivo */
+    normalizar(rel).split('/').forEach(function (p) {
+        if (p === '.' || p === '') return;
+        if (p === '..') partes.pop();
+        else partes.push(p);
+    });
+    return partes.join('/');
+}
+
+var EXTENSOES = ['', '.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.json', '.css',
+    '/index.js', '/index.jsx', '/index.ts', '/index.tsx'];
+
+/* De um especificador de import ao arquivo do repositorio, quando ele existir.
+   -----------------------------------------------------------------------------
+   Tres formas importam aqui:
+     './x'        relativo — resolve contra a pasta de quem importa
+     '@/lib/x'    apelido comum (Next.js, tsconfig paths) que aponta para src/
+     'react'      pacote de terceiro — NAO vira aresta: nao e codigo deste
+                  repositorio, e desenha-lo faria o mapa de chamadas do projeto
+                  virar um mapa do node_modules. */
+function resolverImport(spec, deRel, porCaminho) {
+    var s = String(spec || '');
+    var candidatos = [];
+
+    if (s.charAt(0) === '.') {
+        candidatos.push(juntar(deRel, s));
+    } else if (s.charAt(0) === '@' && s.charAt(1) === '/') {
+        var resto = s.slice(2);
+        candidatos.push('src/' + resto, resto, 'app/' + resto);
+    } else if (s.charAt(0) === '~' && s.charAt(1) === '/') {
+        candidatos.push('src/' + s.slice(2), s.slice(2));
+    } else {
+        return null;                                /* pacote de terceiro */
+    }
+
+    for (var i = 0; i < candidatos.length; i++) {
+        for (var j = 0; j < EXTENSOES.length; j++) {
+            var tentativa = candidatos[i] + EXTENSOES[j];
+            if (porCaminho[tentativa]) return porCaminho[tentativa];
+        }
+    }
+    return null;
+}
+
 function chaveTabela(t) { return String(t).split('.').pop().toUpperCase(); }
 
 function baseNome(n) { return String(n).replace(/\.(js|html|ftl|css|sql)$/i, ''); }
 
 function construir(modelo) {
     var camadas = camadasDe((modelo.meta && modelo.meta.tipoApp) || 'widget-formulario');
-    var preTab = (modelo.dataModel && modelo.dataModel.prefixoTabelas) || 'Z_DELP_';
+    var preTab = (modelo.dataModel && modelo.dataModel.prefixoTabelas) || '';
     var fontes = (modelo.fontes || []).filter(function (f) {
         return f.tipo !== 'image' && f.tipo !== 'outro' && f.tipo !== 'workflow_process_svg';
     });
@@ -179,7 +251,7 @@ function construir(modelo) {
         var no = {
             id: 'tabela:' + t,
             nome: t,
-            rotulo: preTab && t.indexOf(preTab) === 0 ? t.slice(preTab.length) : t.replace(/^Z_DELP_/, ''),
+            rotulo: preTab && t.indexOf(preTab) === 0 ? t.slice(preTab.length) : t,
             camada: 'persistencia',
             tipo: 'tabela',
             origem: ent ? ent.origem : 'externa',
@@ -224,6 +296,41 @@ function construir(modelo) {
     var cont = {};
     indice.forEach(function (x) { cont[x.sym] = (cont[x.sym] || 0) + 1; });
     indice = indice.filter(function (x) { return cont[x.sym] === 1; });
+
+    /* 1b) IMPORTS — a evidencia mais forte que existe num projeto JS/TS.
+       -------------------------------------------------------------------------
+       Um `import x from './y.js'` nao e heuristica: e o arquivo dizendo, por
+       escrito, de quem ele depende. Antes o grafo so tinha a busca por simbolo,
+       que funciona numa aplicacao de baixo codigo (onde os arquivos se enxergam
+       por variaveis globais) e quase nao acha nada num projeto de modulos, onde
+       o simbolo importado costuma ter o mesmo nome em varios arquivos e cai na
+       regra do "ambiguo nao serve de evidencia".
+
+       Por isso este passo vem ANTES: onde ha import, ele e a verdade. */
+    var porCaminho = {};
+    fontes.forEach(function (f) { porCaminho[normalizar(f.rel)] = f.rel; });
+
+    fontes.forEach(function (f) {
+        if (!f.conteudo || !/\.(js|jsx|mjs|cjs|ts|tsx)$/i.test(f.nome)) return;
+        if (/\.min\.js$/i.test(f.nome)) return;
+        var corpo = semComentarios(f.conteudo);
+        var specs = [];
+        var re, m;
+
+        re = /\bfrom\s*['"]([^'"]+)['"]/g;
+        while ((m = re.exec(corpo))) specs.push(m[1]);
+        re = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+        while ((m = re.exec(corpo))) specs.push(m[1]);
+        re = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+        while ((m = re.exec(corpo))) specs.push(m[1]);
+        re = /\bimport\s+['"]([^'"]+)['"]/g;      /* import './x.css' */
+        while ((m = re.exec(corpo))) specs.push(m[1]);
+
+        specs.forEach(function (spec) {
+            var alvo = resolverImport(spec, f.rel, porCaminho);
+            if (alvo) ligar(f.rel, alvo, 'import', spec);
+        });
+    });
 
     /* 2) varre cada arquivo procurando simbolos dos outros */
     fontes.forEach(function (f) {

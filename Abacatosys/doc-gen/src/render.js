@@ -21,11 +21,20 @@ function dataBR(d) {
         return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
     } catch (e) { return String(d); }
 }
+/* As cores dos selos sao pedidas pelo SIGNIFICADO nas chamadas ('green' para o
+   que esta bem, 'red' para escrita, 'gray' para ausencia). O mapa fica aqui, num
+   lugar so: trocar a paleta do portal nao pode exigir reescrever cinquenta
+   chamadas espalhadas por onze secoes. */
+var COR_DO_SELO = {
+    green: 'ok', blue: 'info', orange: 'atencao', warn: 'atencao',
+    red: 'alerta', gray: 'neutro'
+};
 function badge(txt, cor, titulo) {
-    return '<span class="dg-badge' + (cor ? ' dg-badge--' + cor : '') + '"' +
+    var classe = cor ? (COR_DO_SELO[cor] || cor) : '';
+    return '<span class="dg-selo' + (classe ? ' dg-selo--' + classe : '') + '"' +
         (titulo ? ' title="' + esc(titulo) + '"' : '') + '>' + esc(txt) + '</span>';
 }
-function vazio(txt) { return '<span class="dg-empty">' + esc(txt || 'nao identificado') + '</span>'; }
+function vazio(txt) { return '<span class="dg-vazio">' + esc(txt || 'nao identificado') + '</span>'; }
 function chips(arr, cls) {
     if (!arr || !arr.length) return vazio('nenhum');
     return '<div class="dg-chips">' + arr.map(function (a) {
@@ -41,11 +50,11 @@ function chipsVerTodos(arr, limite, cls, rotulo) {
         verTodos((rotulo || 'Ver todos') + ' (' + arr.length + ')', chips(arr, cls));
 }
 function verTodos(rotulo, conteudo) {
-    return '<details class="dg-det dg-det--sm"><summary>' + esc(rotulo) + '</summary>' +
-        '<div class="dg-det__body">' + conteudo + '</div></details>';
+    return '<details class="dg-det dg-det--fino"><summary>' + esc(rotulo) + '</summary>' +
+        '<div class="dg-det__corpo">' + conteudo + '</div></details>';
 }
 function timelineVersoes(vs) {
-    if (!vs || !vs.length) return '<p class="dg-note">Sem historico de versao no cabecalho.</p>';
+    if (!vs || !vs.length) return '<p class="dg-dica">Sem historico de versao no cabecalho.</p>';
     return '<ul class="dg-ver">' + vs.map(function (v) {
         return '<li><span class="dg-ver__v">v' + esc(v.versao) + '</span>' +
             (v.data ? '<span class="dg-ver__d">' + esc(v.data) + '</span>' : '') +
@@ -60,13 +69,20 @@ function fmtBytes(n) {
 }
 function trunc(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
 
-/* Indice nome-de-arquivo -> caminho relativo, para os links da biblioteca. */
+/* Indice nome-de-arquivo -> caminho relativo e indice, para os links da biblioteca. */
 var REL_POR_NOME = {};
+var IDX_POR_NOME = {};
+
+/* O link aponta direto para o bloco do arquivo (#arq-N), e nao mais para a secao
+   inteira com um data-abrir que so o script entendia. Dentro do visor do Abacato
+   nao ha script: aquele link levava a pessoa para o topo da biblioteca e nao
+   abria nada. Uma ancora comum funciona nos dois mundos. */
 function linkArquivo(nome, rotulo) {
     var rel = REL_POR_NOME[nome];
+    var idx = IDX_POR_NOME[nome];
     var txt = esc(rotulo || nome);
     if (!rel) return '<code>' + txt + '</code>';
-    return '<a class="dg-flink" href="#sec-biblioteca" data-abrir="' + esc(rel) + '" ' +
+    return '<a class="dg-flink" href="#arq-' + idx + '" data-abrir="' + esc(rel) + '" ' +
         'title="Ver o codigo de ' + esc(rel) + '"><code>' + txt + '</code></a>';
 }
 
@@ -97,7 +113,7 @@ function secVisaoGeral(m) {
     var readme = m.readmes.filter(function (r) { return r.tipo === 'readme'; })[0];
 
     var h = section('overview', 'Contexto', 'Visao Geral',
-        esc(m.meta.appDescription || 'Documentacao tecnica gerada automaticamente a partir do codigo-fonte da aplicacao Fluig.'));
+        esc(m.meta.appDescription || 'Documentacao tecnica gerada automaticamente a partir do codigo-fonte do repositorio analisado.'));
 
     /* os KPIs seguem o tipo: "Modulos JS (widget)" num formulario e sempre 0 */
     var terceiroKpi = ehWidget(m)
@@ -113,8 +129,8 @@ function secVisaoGeral(m) {
     h += cartaoTipoApp(m);
 
     h += '<div class="dg-grid dg-grid--2">';
-    h += '<div class="dg-card dg-card--accent"><div class="dg-h3" style="margin-top:0">Identificacao (application.info)</div>' +
-        '<table class="dg-table" style="box-shadow:none">' + metaRows.map(function (r) {
+    h += '<div class="dg-card dg-card--destaque"><div class="dg-h3" style="margin-top:0">Identificacao (application.info)</div>' +
+        '<table class="dg-tabela" style="box-shadow:none">' + metaRows.map(function (r) {
             return '<tr><td style="width:38%;color:#666;font-weight:600">' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>';
         }).join('') + '</table></div>';
 
@@ -144,8 +160,8 @@ function cartaoTipoApp(m) {
     var I = m.identidade || {};
     var ev = I.evidencias || {};
     var explic = {
-        'widget': 'Foram encontrados os arquivos e pastas de uma widget Fluig (application.info, FTL de view e recursos em resources/js), e nenhum formulario de processo. Os diagramas seguem o ciclo de vida de uma widget.',
-        'widget-formulario': 'Foram encontrados os arquivos de uma widget Fluig <b>e</b> de um formulario de processo. Os diagramas mostram a widget como caminho principal e o cartao do formulario como entrada alternativa pelo BPMN.',
+        'widget': 'Foram encontrados os arquivos e pastas de uma widget da plataforma (application.info, FTL de view e recursos em resources/js), e nenhum formulario de processo. Os diagramas seguem o ciclo de vida de uma widget.',
+        'widget-formulario': 'Foram encontrados os arquivos de uma widget da plataforma <b>e</b> de um formulario de processo. Os diagramas mostram a widget como caminho principal e o cartao do formulario como entrada alternativa pelo BPMN.',
         'formulario': 'Nao foi encontrada nenhuma pasta ou arquivo de widget (sem application.info de widget, sem FTL, sem resources/js). A aplicacao foi documentada como formulario de processo: cartao HTML mais eventos do cartao.'
     };
     var linha = function (rot, lista) {
@@ -153,9 +169,9 @@ function cartaoTipoApp(m) {
         return '<tr><td style="width:34%;color:#666;font-weight:600">' + esc(rot) + '</td><td>' +
             lista.map(function (x) { return '<code>' + esc(x) + '</code>'; }).join('<br>') + '</td></tr>';
     };
-    var h = '<div class="dg-card dg-card--accent" style="margin-bottom:24px">' +
+    var h = '<div class="dg-card dg-card--destaque" style="margin-bottom:24px">' +
         '<div class="dg-h3" style="margin-top:0">Tipo de aplicacao: ' + esc(I.tipoRotulo || '—') + '</div>' +
-        '<p class="dg-note" style="margin:0 0 12px">' + (explic[I.tipo] || '') + '</p>' +
+        '<p class="dg-dica" style="margin:0 0 12px">' + (explic[I.tipo] || '') + '</p>' +
         '<p style="margin:0 0 12px">' +
         badge(I.temWidget ? 'widget: sim' : 'widget: nao', I.temWidget ? 'green' : 'gray') + ' ' +
         badge(I.temFormulario ? 'formulario: sim' : 'formulario: nao', I.temFormulario ? 'green' : 'gray') + ' ' +
@@ -168,7 +184,7 @@ function cartaoTipoApp(m) {
         linha('Evidencia de workflow', ev.workflow) +
         linha('Nome da aplicacao', [(I.appCode || '') + '  —  ' + (I.origemNome || '')]);
     h += verTodos('Ver as evidencias que sustentam essa classificacao',
-        '<table class="dg-table" style="box-shadow:none">' + linhas + '</table>');
+        '<table class="dg-tabela" style="box-shadow:none">' + linhas + '</table>');
     return h + '</div>';
 }
 
@@ -180,8 +196,8 @@ function cartaoEsquema(m) {
     var pct = total ? Math.round(decl * 100 / total) : 0;
 
     var h = '<div class="dg-h3" style="margin-top:0">Procedencia do esquema de dados</div>';
-    h += '<div class="dg-meter"><div class="dg-meter__fill" style="width:' + pct + '%"></div></div>';
-    h += '<p class="dg-note" style="margin:8px 0 12px"><b>' + pct + '%</b> das ' + total +
+    h += '<div class="dg-medidor"><div class="dg-medidor__fill" style="width:' + pct + '%"></div></div>';
+    h += '<p class="dg-dica" style="margin:8px 0 12px"><b>' + pct + '%</b> das ' + total +
         ' tabelas tem esquema com fonte declarada (' + decl + ' declaradas, ' + inf + ' ainda inferidas do codigo).</p>';
 
     /* Todo arquivo aberto entra na tabela, inclusive o que nao deu em nada: e a
@@ -190,7 +206,7 @@ function cartaoEsquema(m) {
         h += '<p style="margin:0 0 10px">' + (m.esquemaBanco.ativo
             ? badge('esquema do banco carregado', 'green')
             : badge('arquivo lido, nada aproveitado', 'orange')) + '</p>';
-        h += '<div class="dg-table-wrap"><table class="dg-table"><thead><tr><th>Arquivo lido</th><th>Formato</th><th>Base(s)</th><th>Tabelas</th><th>FKs</th><th>Situacao</th></tr></thead><tbody>' +
+        h += '<div class="dg-tabela-wrap"><table class="dg-tabela"><thead><tr><th>Arquivo lido</th><th>Formato</th><th>Base(s)</th><th>Tabelas</th><th>FKs</th><th>Situacao</th></tr></thead><tbody>' +
             m.esquemaBanco.arquivos.map(function (a) {
                 var ok = (a.tabelas || a.fks) && !a.aviso;
                 return '<tr><td><code>' + esc(a.nome) + '</code></td>' +
@@ -199,21 +215,21 @@ function cartaoEsquema(m) {
                     '<td>' + a.tabelas + '</td><td>' + a.fks + '</td>' +
                     '<td>' + (ok ? badge('lido', 'green') : badge(a.aviso || 'nada reconhecido', 'orange')) + '</td></tr>';
             }).join('') + '</tbody></table></div>';
-        h += '<p class="dg-note" style="margin-top:10px">Origem: <code>' + esc(pastaCurta(m)) + '</code></p>';
+        h += '<p class="dg-dica" style="margin-top:10px">Origem: <code>' + esc(pastaCurta(m)) + '</code></p>';
     }
 
     if (!m.esquemaBanco.ativo) {
         var basesTxt = (m.dataModel.bancos || []).filter(function (b) { return b.identificado; })
             .map(function (b) { return '<code>' + esc(b.nome) + '</code>'; }).join(', ');
-        h += '<div class="dg-callout"><b>Como remover os selos de "inferido"</b>' +
+        h += '<div class="dg-nota"><b>Como remover os selos de "inferido"</b>' +
             '<ol style="margin:8px 0 0 18px;padding:0">' +
             '<li>Abra <code>' + esc(pastaCurta(m)) + '/01-extrair-esquema.sql</code> no SSMS e execute com <code>F5</code>. ' +
             'A base selecionada na barra <b>nao importa</b>: o script le ' + (basesTxt || 'todas as bases da lista') + ' numa execucao so.</li>' +
             '<li>Botao direito na grade &rsaquo; <b>Save Results As...</b>, salvando <b>dentro dessa mesma pasta</b>. ' +
             'Nome e extensao nao importam — o portal reconhece o arquivo pelo conteudo.</li>' +
-            '<li>Rode o delp-docgen de novo: as tabelas passam a constar como <b>declarado (banco)</b>, cada uma na sua base.</li>' +
+            '<li>Rode o docgen de novo: as tabelas passam a constar como <b>declarado (banco)</b>, cada uma na sua base.</li>' +
             '</ol>' +
-            '<p class="dg-note" style="margin:10px 0 0">Se continuar aparecendo <i>inferido</i> depois disso, ' +
+            '<p class="dg-dica" style="margin:10px 0 0">Se continuar aparecendo <i>inferido</i> depois disso, ' +
             'o motivo esta na secao de avisos no rodape deste portal.</p>' +
             '</div>';
     }
@@ -234,48 +250,48 @@ function secArquitetura(m) {
     var leads = {
         'widget': 'Como uma requisicao atravessa esta <b>widget</b>, do clique na tela ate a linha gravada no SQL Server.',
         'widget-formulario': 'Como uma requisicao atravessa esta aplicacao. Ela tem <b>duas entradas</b>: a widget (caminho principal) e o cartao do formulario, aberto pelo processo BPMN.',
-        'formulario': 'Como uma requisicao atravessa este <b>formulario de processo</b>, da abertura do cartao pelo Fluig ate a linha gravada no SQL Server. Nao ha camadas de widget aqui &mdash; nenhuma foi encontrada no repositorio.'
+        'formulario': 'Como uma requisicao atravessa este <b>formulario de processo</b>, da abertura do cartao pela plataforma ate a linha gravada no SQL Server. Nao ha camadas de widget aqui &mdash; nenhuma foi encontrada no repositorio.'
     };
     var h = section('arquitetura', 'Diagramas', 'Arquitetura do Sistema',
         (leads[m.meta.tipoApp] || leads.formulario) +
         ' As camadas desenhadas seguem o <b>tipo</b> desta aplicacao: bandas que nao existem nao aparecem. Os diagramas sao SVG nativo: abrem sem internet, imprimem e podem ser copiados para apresentacoes.');
 
     h += '<div class="dg-h3">Fluxo de execucao</div>';
-    h += '<p class="dg-note">Coluna central: caminho principal' +
+    h += '<p class="dg-dica">Coluna central: caminho principal' +
         (fluxo.temEntradaLateral ? '. A esquerda, a entrada alternativa pelo processo BPMN' : '') +
         '. A direita, o que e carregado como dependencia. Passe o mouse sobre qualquer caixa para ver os nomes completos dos arquivos.</p>';
-    h += '<div class="dg-diagram">' + fluxo.svg + '</div>';
-    h += '<div class="dg-legend">' +
-        '<span><i style="background:' + D.COR.red + '"></i>Fluxo principal</span>' +
-        '<span><i style="background:' + D.COR.industria + '"></i>Entrada pelo workflow</span>' +
-        '<span><i style="background:' + D.COR.gray1 + '"></i>- - dependencia carregada</span>' +
+    h += '<div class="dg-diagrama">' + fluxo.svg + '</div>';
+    h += '<div class="dg-legenda">' +
+        '<span><i style="background:' + D.COR.alerta + '"></i>Fluxo principal</span>' +
+        '<span><i style="background:' + D.COR.processo + '"></i>Entrada pelo workflow</span>' +
+        '<span><i style="background:' + D.COR.neutro + '"></i>- - dependencia carregada</span>' +
         '</div>';
 
     h += '<div class="dg-h3">Modulos por camada</div>';
-    h += '<p class="dg-note">' + arq.camadas.length + ' camadas identificadas para uma aplicacao do tipo <b>' +
+    h += '<p class="dg-dica">' + arq.camadas.length + ' camadas identificadas para uma aplicacao do tipo <b>' +
         esc(m.meta.tipoAppRotulo || '') + '</b>. Todos os modulos aparecem &mdash; nada foi cortado com "+N". ' +
         'Nomes longos ficam abreviados na caixa, mas o nome completo aparece no tooltip.</p>';
-    h += '<div class="dg-diagram">' + arq.svg + '</div>';
+    h += '<div class="dg-diagrama">' + arq.svg + '</div>';
     h += verTodos('Ver todos os modulos por camada em lista',
         arq.camadas.filter(function (c) { return c.itens.length; }).map(function (c) {
-            return '<div style="margin-top:12px"><div class="dg-note" style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.5px;margin-bottom:6px">' +
+            return '<div style="margin-top:12px"><div class="dg-dica" style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.5px;margin-bottom:6px">' +
                 esc(c.titulo) + ' (' + c.itens.length + ')</div>' + chips(c.itens) + '</div>';
         }).join(''));
 
     if (carga.svg) {
         h += '<div class="dg-h3">Camadas de carregamento (ordem no application.info)</div>';
-        h += '<p class="dg-note">Sequencia real em que o Fluig injeta os recursos: ' + carga.total +
+        h += '<p class="dg-dica">Sequencia real em que a plataforma injeta os recursos: ' + carga.total +
             ' arquivos, todos listados. Dependencias (dominio, componentes) carregam antes de quem as consome.</p>';
-        h += '<div class="dg-diagram">' + carga.svg + '</div>';
+        h += '<div class="dg-diagrama">' + carga.svg + '</div>';
     }
 
     if (m.recursos.js.length || m.recursos.css.length) {
         var linhas = m.recursos.js.map(function (r) {
             return '<tr><td>' + r.ordem + '</td><td>' + linkArquivo(r.nome) + '</td><td>' + papelBadge(r.role) +
-                '</td><td class="dg-note">' + esc(r.path || '') + '</td></tr>';
+                '</td><td class="dg-dica">' + esc(r.path || '') + '</td></tr>';
         }).concat(m.recursos.css.map(function (r) {
             return '<tr><td>css</td><td>' + linkArquivo(r.nome) + '</td><td>' + badge('estilo', 'red') +
-                '</td><td class="dg-note">' + esc(r.path || '') + '</td></tr>';
+                '</td><td class="dg-dica">' + esc(r.path || '') + '</td></tr>';
         }));
         h += '<div class="dg-h3">Recursos declarados (' + linhas.length + ')</div>';
         h += tabela(['#', 'Arquivo', 'Papel', 'Caminho'], linhas);
@@ -297,7 +313,7 @@ function secChamadas(m) {
         'Quem chama quem, arquivo por arquivo, organizado nas camadas da aplicacao. Cada seta tem evidencia no codigo: uma chamada a getDataset, um simbolo exportado por outro modulo, ou um acesso SQL a uma tabela.');
 
     if (!g || !g.nos.length) {
-        h += '<p class="dg-empty">Nenhuma ligacao entre arquivos pode ser detectada com seguranca.</p>';
+        h += '<p class="dg-vazio">Nenhuma ligacao entre arquivos pode ser detectada com seguranca.</p>';
         return h + '</section>';
     }
 
@@ -312,10 +328,11 @@ function secChamadas(m) {
         kpiSimples((porTipo.le || 0) + (porTipo.grava || 0), 'Acessos a tabela') +
         '</div>';
 
-    h += '<p class="dg-note" style="margin-bottom:10px"><b>Clique em uma caixa</b> para isolar as ligacoes dela. Clique de novo (ou no fundo) para voltar. O diagrama rola na horizontal.</p>';
-    h += '<div class="dg-diagram dg-diagram--grafo" id="dgGrafo">' + des.svg + '</div>';
-    h += '<div class="dg-legend">' +
-        '<span><i style="background:' + D.COR_ARESTA.dataset + '"></i>getDataset()</span>' +
+    h += '<p class="dg-dica" style="margin-bottom:10px"><b>Clique em uma caixa</b> para isolar as ligacoes dela. Clique de novo (ou no fundo) para voltar. O diagrama rola na horizontal.</p>';
+    h += '<div class="dg-diagrama dg-diagrama--grafo" id="dgGrafo">' + des.svg + '</div>';
+    h += '<div class="dg-legenda">' +
+        '<span><i style="background:' + D.COR_ARESTA.import + '"></i>importa</span>' +
+        '<span><i style="background:' + D.COR_ARESTA.dataset + '"></i>consulta nomeada</span>' +
         '<span><i style="background:' + D.COR_ARESTA.le + '"></i>le tabela</span>' +
         '<span><i style="background:' + D.COR_ARESTA.grava + '"></i>grava tabela</span>' +
         '<span><i style="background:' + D.COR_ARESTA.simbolo + '"></i>- - usa simbolo de outro modulo</span>' +
@@ -334,10 +351,10 @@ function secChamadas(m) {
         return '<tr><td>' + (de && de.tipo !== 'tabela' ? linkArquivo(de.nome, de.rotulo) : '<code>' + esc(de ? de.rotulo : a.de) + '</code>') + '</td>' +
             '<td>' + badge(nomeTipo[a.tipo] || a.tipo, a.tipo === 'grava' ? 'red' : (a.tipo === 'le' ? 'green' : 'blue')) + '</td>' +
             '<td>' + (para && para.tipo !== 'tabela' ? linkArquivo(para.nome, para.rotulo) : '<code>' + esc(para ? para.rotulo : a.para) + '</code>') + '</td>' +
-            '<td class="dg-note">' + esc(a.evidencias.join(', ')) + '</td></tr>';
+            '<td class="dg-dica">' + esc(a.evidencias.join(', ')) + '</td></tr>';
     });
     h += '<div class="dg-h3">Todas as ligacoes (' + linhas.length + ')</div>';
-    h += '<div class="dg-filtro"><input type="text" class="dg-input" id="dgFiltroChamadas" placeholder="filtrar por arquivo, tabela ou evidencia…"></div>';
+    h += '<div class="dg-filtro"><input type="text" class="dg-campo" id="dgFiltroChamadas" placeholder="filtrar por arquivo, tabela ou evidencia…"></div>';
     h += tabela(['De', 'Ligacao', 'Para', 'Evidencia'], linhas, 'dgTabChamadas');
 
     /* arquivos mais acoplados */
@@ -345,7 +362,7 @@ function secChamadas(m) {
         .sort(function (a, b) { return (b.entradas + b.saidas) - (a.entradas + a.saidas); }).slice(0, 12);
     if (top.length) {
         h += '<div class="dg-h3">Arquivos mais acoplados</div>';
-        h += '<p class="dg-note">Quem soma mais ligacoes de entrada e saida. Mudar esses arquivos afeta mais gente &mdash; e onde a revisao de codigo deve ser mais cuidadosa.</p>';
+        h += '<p class="dg-dica">Quem soma mais ligacoes de entrada e saida. Mudar esses arquivos afeta mais gente &mdash; e onde a revisao de codigo deve ser mais cuidadosa.</p>';
         h += tabela(['Arquivo', 'Camada', 'Chama', 'E chamado por', 'Total'], top.map(function (n) {
             return '<tr><td>' + linkArquivo(n.nome, n.rotulo) + '</td><td>' + badge(n.camada) + '</td><td>' + n.saidas +
                 '</td><td>' + n.entradas + '</td><td><b>' + (n.entradas + n.saidas) + '</b></td></tr>';
@@ -364,7 +381,7 @@ function secDados(m) {
 
     var ents = m.dataModel.entidades;
     if (!ents.length) {
-        h += '<p class="dg-empty">Nenhuma tabela identificada no codigo nem no DDL.</p>';
+        h += '<p class="dg-vazio">Nenhuma tabela identificada no codigo nem no DDL.</p>';
         return h + '</section>';
     }
 
@@ -389,7 +406,7 @@ function secDados(m) {
 
     /* --- indice de todas as tabelas --- */
     h += '<div class="dg-h3">Todas as tabelas (' + ents.length + ')</div>';
-    h += '<div class="dg-filtro"><input type="text" class="dg-input" id="dgFiltroTabelas" placeholder="filtrar tabela…"></div>';
+    h += '<div class="dg-filtro"><input type="text" class="dg-campo" id="dgFiltroTabelas" placeholder="filtrar tabela…"></div>';
     h += tabela(['Tabela', 'Base de dados', 'Origem', 'Fonte', 'Colunas', 'Modulos que acessam'], ents.map(function (e) {
         return '<tr><td><a class="dg-flink" href="#tab-' + esc(e.chave) + '"><code>' + esc(e.chave) + '</code></a></td>' +
             '<td>' + bancoBadge(e) + '</td>' +
@@ -403,13 +420,13 @@ function secDados(m) {
     h += '<div class="dg-h3">Estrutura das tabelas</div>';
     var grupos = [
         { t: 'Tabelas proprias da aplicacao', f: function (e) { return e.origem === 'propria'; } },
-        { t: 'Tabelas TOTVS RM / CORPORE', f: function (e) { return e.origem === 'rm'; } },
+        { t: 'Tabelas de ERP', f: function (e) { return e.origem === 'rm'; } },
         { t: 'Outras tabelas externas', f: function (e) { return e.origem === 'externa'; } }
     ];
     grupos.forEach(function (g) {
         var lista = ents.filter(g.f);
         if (!lista.length) return;
-        h += '<div class="dg-note" style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.6px;margin:18px 0 8px">' +
+        h += '<div class="dg-dica" style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.6px;margin:18px 0 8px">' +
             esc(g.t) + ' (' + lista.length + ')</div>';
         lista.forEach(function (e) { h += entidadeCard(e, acessos[e.chave] || 0); });
     });
@@ -417,7 +434,7 @@ function secDados(m) {
     /* --- relacionamentos --- */
     h += '<div class="dg-h3">Relacionamentos (' + m.dataModel.relacoes.length + ')</div>';
     if (m.dataModel.relacoes.length) {
-        h += '<p class="dg-note" style="margin-bottom:10px">Relacoes <b>declaradas</b> vem de foreign keys reais. As <b>inferidas</b> foram deduzidas do padrao de nome <code>XXX_ID</code> e servem como hipotese, nao como verdade.</p>';
+        h += '<p class="dg-dica" style="margin-bottom:10px">Relacoes <b>declaradas</b> vem de foreign keys reais. As <b>inferidas</b> foram deduzidas do padrao de nome <code>XXX_ID</code> e servem como hipotese, nao como verdade.</p>';
         h += tabela(['De', 'Coluna (FK)', 'Para', 'Coluna alvo', 'Cardinalidade', 'Fonte'],
             m.dataModel.relacoes.map(function (r) {
                 return '<tr><td><code>' + esc(r.de) + '</code></td><td><code>' + esc(r.deColuna) + '</code></td>' +
@@ -428,28 +445,28 @@ function secDados(m) {
                         : badge('inferido', 'gray')) + '</td></tr>';
             }));
     } else {
-        h += '<p class="dg-empty">Nenhuma relacao pode ser inferida com seguranca. Traga o esquema do banco (pasta esquema-sql) para obter as foreign keys reais.</p>';
+        h += '<p class="dg-vazio">Nenhuma relacao pode ser inferida com seguranca. Traga o esquema do banco (pasta esquema-sql) para obter as foreign keys reais.</p>';
     }
 
     /* --- procedures e alteracoes --- */
     if (m.sql.procedures.length) {
         h += '<div class="dg-h3">Stored Procedures (' + m.sql.procedures.length + ')</div>';
         h += tabela(['Procedure', 'Parametros', 'Origem'], m.sql.procedures.map(function (p) {
-            return '<tr><td><code>' + esc(p.nome) + '</code></td><td>' + chips(p.params) + '</td><td class="dg-note">' + esc(p.origem) + '</td></tr>';
+            return '<tr><td><code>' + esc(p.nome) + '</code></td><td>' + chips(p.params) + '</td><td class="dg-dica">' + esc(p.origem) + '</td></tr>';
         }));
     }
     if (m.sql.alters.length) {
         h += verTodos('Alteracoes de schema (ALTER TABLE) — ' + m.sql.alters.length,
             tabela(['Tabela', 'Mudanca'], m.sql.alters.map(function (a) {
-                return '<tr><td><code>' + esc(a.tabela) + '</code></td><td class="dg-note">' + esc(a.mudanca) + '</td></tr>';
+                return '<tr><td><code>' + esc(a.tabela) + '</code></td><td class="dg-dica">' + esc(a.mudanca) + '</td></tr>';
             })));
     }
 
     /* --- ponte com o banco --- */
     h += '<div class="dg-h3">Esquema SQL gerado</div>';
-    h += '<div class="dg-callout">' +
+    h += '<div class="dg-nota">' +
         '<p style="margin:0 0 8px">Ao lado deste portal existe a pasta <code>' + esc(pastaCurta(m)) + '</code> com:</p>' +
-        '<table class="dg-table" style="box-shadow:none;background:transparent">' +
+        '<table class="dg-tabela" style="box-shadow:none;background:transparent">' +
         '<tr><td><code>01-extrair-esquema.sql</code></td><td>Consulta o catalogo do SQL Server e devolve o esquema real. <b>Rode este — uma vez so, em qualquer base.</b></td></tr>' +
         '<tr><td><code>02-ddl-inferido.sql</code></td><td>Rascunho do DDL deduzido do codigo, separado por base. Tipos sao estimativa.</td></tr>' +
         '<tr><td><code>03-esquema-consolidado.sql</code></td><td>Tudo que ja tem fonte declarada, separado por base.</td></tr>' +
@@ -460,7 +477,7 @@ function secDados(m) {
 
     return h + '</section>';
 }
-/* Em qual BASE a tabela vive. Uma aplicacao Fluig atravessa FLUIG e CORPORE na
+/* Em qual BASE a tabela vive. Uma aplicacao de baixo codigo atravessa mais de uma base na
    mesma consulta; sem essa coluna, o portal daria a entender que tudo esta no
    mesmo lugar — e o script de extracao rodaria na base errada. */
 function bancoBadge(e) {
@@ -470,7 +487,7 @@ function bancoBadge(e) {
     }
     if (!e.bancoNome) {
         return badge('base nao identificada', 'gray',
-            'O codigo referencia esta tabela sem o prefixo do banco (dbo.X em vez de FLUIG.dbo.X).');
+            'O codigo referencia esta tabela sem o prefixo do banco (dbo.X em vez de APP.dbo.X).');
     }
     var cor = /CORPORE|RM|TOTVS/.test(e.bancoNome) ? 'orange' : 'blue';
     return badge(e.bancoNome, cor, 'Base de dados: ' + e.bancoNome +
@@ -485,10 +502,10 @@ function cartaoBases(m) {
     var extraidas = {};
     ((m.esquemaBanco && m.esquemaBanco.bancos) || []).forEach(function (b) { extraidas[b] = 1; });
 
-    var h = '<div class="dg-card dg-card--accent" style="margin-bottom:22px">' +
+    var h = '<div class="dg-card dg-card--destaque" style="margin-bottom:22px">' +
         '<div class="dg-h3" style="margin-top:0">Bases de dados que a aplicacao usa</div>' +
-        '<p class="dg-note" style="margin:0 0 12px">O <code>01-extrair-esquema.sql</code> le todas estas bases em ' +
-        '<b>uma execucao so</b>, qualificando o catalogo pelo nome do banco (<code>[FLUIG].sys.objects</code>) — ' +
+        '<p class="dg-dica" style="margin:0 0 12px">O <code>01-extrair-esquema.sql</code> le todas estas bases em ' +
+        '<b>uma execucao so</b>, qualificando o catalogo pelo nome do banco (<code>[APP].sys.objects</code>) — ' +
         'e o portal atribui cada tabela a base onde ela realmente esta.</p>';
     h += tabela(['Base', 'Tabelas', 'Com esquema declarado', 'Confirmadas no catalogo', 'Esquema ja extraido'],
         bancos.map(function (b) {
@@ -501,8 +518,8 @@ function cartaoBases(m) {
         }));
     var semBase = bancos.filter(function (b) { return !b.identificado; })[0];
     if (semBase) {
-        h += '<p class="dg-note" style="margin-top:10px">' + semBase.tabelas + ' tabela(s) sao referenciadas no codigo ' +
-            '<b>sem o prefixo do banco</b> (<code>dbo.X</code> em vez de <code>FLUIG.dbo.X</code>). ' +
+        h += '<p class="dg-dica" style="margin-top:10px">' + semBase.tabelas + ' tabela(s) sao referenciadas no codigo ' +
+            '<b>sem o prefixo do banco</b> (<code>dbo.X</code> em vez de <code>APP.dbo.X</code>). ' +
             'Elas entram na lista de todas as execucoes: a base em que forem encontradas passa a ser a base delas.</p>';
     }
     return h + '</div>';
@@ -510,7 +527,7 @@ function cartaoBases(m) {
 
 function origemBadge(o) {
     if (o === 'propria') return badge('propria', 'red');
-    if (o === 'rm') return badge('RM/CORPORE', 'orange');
+    if (o === 'rm') return badge('ERP', 'orange');
     return badge('externa', 'gray');
 }
 function fonteBadge(e) {
@@ -519,14 +536,14 @@ function fonteBadge(e) {
     return badge('inferido do codigo', 'gray', 'Deduzido do SQL embutido e dos grupos de colunas. Rode esquema-sql/01-extrair-esquema.sql para confirmar.');
 }
 function entidadeCard(e, nAcessos) {
-    var corDot = e.origem === 'propria' ? D.COR.red : (e.origem === 'rm' ? D.COR.industria : D.COR.gray1);
+    var corDot = e.origem === 'propria' ? D.COR.alerta : (e.origem === 'rm' ? D.COR.processo : D.COR.neutro);
     var head = '<span class="dg-dot" style="width:9px;height:9px;background:' + corDot + ';border-radius:2px"></span>' +
         '<code>' + esc(e.chave) + '</code> ' + bancoBadge(e) + ' ' + fonteBadge(e) +
         (e.ehView ? ' ' + badge('view', 'gray') : '') +
-        '<span class="dg-note" style="margin-left:auto">' + e.colunas.length + ' colunas · ' + nAcessos + ' modulo(s)</span>';
+        '<span class="dg-dica" style="margin-left:auto">' + e.colunas.length + ' colunas · ' + nAcessos + ' modulo(s)</span>';
     var body = '';
-    if (e.nome !== e.chave) body += '<p class="dg-note" style="margin-top:12px">Nome completo no codigo: <code>' + esc(e.nome) + '</code></p>';
-    if (e.fonteArquivo) body += '<p class="dg-note">Fonte: <code>' + esc(e.fonteArquivo) + '</code></p>';
+    if (e.nome !== e.chave) body += '<p class="dg-dica" style="margin-top:12px">Nome completo no codigo: <code>' + esc(e.nome) + '</code></p>';
+    if (e.fonteArquivo) body += '<p class="dg-dica">Fonte: <code>' + esc(e.fonteArquivo) + '</code></p>';
     if (e.colunas.length) {
         body += tabela(['Coluna', 'Tipo', 'Nulo', 'Chave'], e.colunas.map(function (c) {
             return '<tr><td><code>' + esc(c.nome) + '</code>' + (c.inferida ? ' ' + badge('inf', 'gray', 'coluna deduzida do codigo') : '') +
@@ -534,10 +551,10 @@ function entidadeCard(e, nAcessos) {
                 (c.pk ? badge('PK', 'red') : (c.fk ? badge('FK', 'blue') : '')) + '</td></tr>';
         }));
     } else {
-        body += '<p class="dg-empty" style="margin-top:12px">Colunas nao mapeadas a partir do codigo. Rode <code>esquema-sql/01-extrair-esquema.sql</code> para trazer a estrutura real.</p>';
+        body += '<p class="dg-vazio" style="margin-top:12px">Colunas nao mapeadas a partir do codigo. Rode <code>esquema-sql/01-extrair-esquema.sql</code> para trazer a estrutura real.</p>';
     }
     return '<details class="dg-det" id="tab-' + esc(e.chave) + '"><summary>' + head + '</summary>' +
-        '<div class="dg-det__body">' + body + '</div></details>';
+        '<div class="dg-det__corpo">' + body + '</div></details>';
 }
 
 /* -------------------------------------------------- 5. DATASETS */
@@ -548,7 +565,7 @@ function secDatasets(m) {
         'Datasets customizados executados no servidor (Rhino). Para cada um: acoes suportadas, tabelas lidas/gravadas, grupos de colunas de retorno, funcoes e historico.');
 
     if (!ds.length && !bk.length) return '';
-    if (!ds.length) { h += '<p class="dg-empty">Nenhum dataset server-side encontrado.</p>'; return h + '</section>'; }
+    if (!ds.length) { h += '<p class="dg-vazio">Nenhum dataset server-side encontrado.</p>'; return h + '</section>'; }
 
     ds.forEach(function (d) {
         var head = '<code>' + esc(d.nome) + '</code>' +
@@ -572,8 +589,8 @@ function secDatasets(m) {
         if (d.colunasGrupos.length) {
             body += '<div class="dg-h3" style="font-size:13px;margin:18px 0 8px">Grupos de colunas de retorno</div>';
             d.colunasGrupos.forEach(function (g) {
-                body += '<div style="margin-bottom:8px"><code style="color:' + D.COR.red + '">' + esc(g.nome) + '</code> ' +
-                    '<span class="dg-note">(' + g.colunas.length + ')</span>' + chipsVerTodos(g.colunas, 40, '', 'Ver todas as colunas') + '</div>';
+                body += '<div style="margin-bottom:8px"><code style="color:' + D.COR.alerta + '">' + esc(g.nome) + '</code> ' +
+                    '<span class="dg-dica">(' + g.colunas.length + ')</span>' + chipsVerTodos(g.colunas, 40, '', 'Ver todas as colunas') + '</div>';
             });
         }
         if (d.chama.length) body += '<div style="margin-top:12px">' + rotulo('Chama datasets') + chips(d.chama) + '</div>';
@@ -584,11 +601,11 @@ function secDatasets(m) {
         body += fonteDoArquivo(d.nome);
         body += '<div class="dg-h3" style="font-size:13px;margin:18px 0 8px">Historico</div>' + timelineVersoes(d.versoes);
 
-        h += '<details class="dg-det"><summary>' + head + '</summary><div class="dg-det__body">' + body + '</div></details>';
+        h += '<details class="dg-det"><summary>' + head + '</summary><div class="dg-det__corpo">' + body + '</div></details>';
     });
 
     if (bk.length) {
-        h += '<div class="dg-warns" style="margin-top:8px">Arquivos de backup/copia detectados (fora da documentacao principal): ' +
+        h += '<div class="dg-aviso" style="margin-top:8px">Arquivos de backup/copia detectados (fora da documentacao principal): ' +
             bk.map(function (d) { return '<code>' + esc(d.nome) + '</code>'; }).join(', ') +
             '. Recomenda-se remove-los do repositorio para evitar ambiguidade.</div>';
     }
@@ -598,17 +615,17 @@ function secDatasets(m) {
    la o clique tem de abrir e fechar o card). */
 function fonteDoArquivo(nome) {
     if (!REL_POR_NOME[nome]) return '';
-    return '<div class="dg-note" style="margin-top:14px">Codigo-fonte: ' + linkArquivo(nome) + '</div>';
+    return '<div class="dg-dica" style="margin-top:14px">Codigo-fonte: ' + linkArquivo(nome) + '</div>';
 }
 function rotulo(t) {
-    return '<div class="dg-note" style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.5px;margin-bottom:6px">' + esc(t) + '</div>';
+    return '<div class="dg-dica" style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.5px;margin-bottom:6px">' + esc(t) + '</div>';
 }
 
 /* -------------------------------------------------- 6. FORMULARIOS */
 function secFormularios(m) {
     if (!m.formularios.length) return '';
     var h = section('formularios', 'Codigo', 'Formularios',
-        'Formularios do Fluig, um bloco por <b>pasta</b> em <code>forms/</code>. Cada bloco traz o cartao HTML, os eventos do cartao (displayFields, validacao), os scripts auxiliares, os campos referenciados e as atividades de workflow tratadas. Pastas diferentes sao formularios diferentes: nenhuma documentacao substitui a outra.');
+        'Formularios da plataforma, um bloco por <b>pasta</b> em <code>forms/</code>. Cada bloco traz o cartao HTML, os eventos do cartao (displayFields, validacao), os scripts auxiliares, os campos referenciados e as atividades de workflow tratadas. Pastas diferentes sao formularios diferentes: nenhuma documentacao substitui a outra.');
 
     m.formularios.forEach(function (f) {
         /* uniao dos campos/elementos/funcoes de todos os scripts do cartao:
@@ -625,18 +642,18 @@ function secFormularios(m) {
         campos = unicoArr(campos); elementos = unicoArr(elementos);
 
         var head = '<code>' + esc(f.base) + '</code>' +
-            (f.idDataset ? ' ' + badge('dataset ' + f.idDataset, 'gray', 'codigo do formulario no Fluig') : '') +
+            (f.idDataset ? ' ' + badge('dataset ' + f.idDataset, 'gray', 'codigo do formulario na plataforma') : '') +
             (campos.length ? ' ' + badge(campos.length + ' campos', 'blue') : '') +
             (f.eventos && f.eventos.length ? ' ' + badge(f.eventos.length + ' eventos', 'orange') : '') +
             (atividades.length ? ' ' + badge(atividades.length + ' atividades', 'orange') : '');
         var body = '';
         var desc = scripts.filter(function (s) { return s.descricao; })[0];
         if (desc) body += '<p style="margin-top:12px">' + esc(desc.descricao) + '</p>';
-        body += '<p class="dg-note" style="margin:6px 0 0">Pasta no repositorio: <code>forms/' + esc(f.chave) + '</code></p>';
+        body += '<p class="dg-dica" style="margin:6px 0 0">Pasta no repositorio: <code>forms/' + esc(f.chave) + '</code></p>';
 
         if (f.eventos && f.eventos.length) {
             body += '<div class="dg-h3" style="font-size:13px;margin:16px 0 8px">Eventos do cartao (' + f.eventos.length + ')</div>';
-            body += '<p class="dg-note" style="margin-bottom:8px">Ordem aproximada de execucao no Fluig: exibicao do cartao primeiro, validacao no envio depois.</p>';
+            body += '<p class="dg-dica" style="margin-bottom:8px">Ordem aproximada de execucao na plataforma: exibicao do cartao primeiro, validacao no envio depois.</p>';
             body += tabela(['Arquivo', 'Evento', 'Campos', 'Le', 'Grava'], f.eventos.map(function (e) {
                 return '<tr><td>' + linkArquivo(e.nome) + '</td>' +
                     '<td>' + (e.evento && e.evento !== '(indefinido)' ? badge(e.evento, 'blue') : vazio('nao identificado')) + '</td>' +
@@ -649,7 +666,7 @@ function secFormularios(m) {
             body += '<div class="dg-h3" style="font-size:13px;margin:16px 0 8px">Scripts auxiliares do cartao (' + f.auxiliares.length + ')</div>';
             body += tabela(['Arquivo', 'Funcoes', 'Descricao'], f.auxiliares.map(function (e) {
                 return '<tr><td>' + linkArquivo(e.nome) + '</td><td>' + (e.funcoes || []).length +
-                    '</td><td class="dg-note">' + esc(e.descricao || '') + '</td></tr>';
+                    '</td><td class="dg-dica">' + esc(e.descricao || '') + '</td></tr>';
             }));
         }
         if (atividades.length) {
@@ -681,7 +698,7 @@ function secFormularios(m) {
                         (c.blocos.length ? chipsVerTodos(c.blocos, 20, '', 'Ver todos') : vazio('nenhum')) + '</td></tr>';
                 }));
         }
-        body += '<div class="dg-note" style="margin-top:14px">Arquivos: ' +
+        body += '<div class="dg-dica" style="margin-top:14px">Arquivos: ' +
             (f.html ? linkArquivo(f.html.nome) + ' ' : '') +
             (f.js ? linkArquivo(f.js.nome) : '') + '</div>';
         var comVersao = scripts.filter(function (s) { return s.versoes && s.versoes.length; })[0];
@@ -689,7 +706,7 @@ function secFormularios(m) {
             body += '<div class="dg-h3" style="font-size:13px;margin:16px 0 8px">Historico (' + esc(comVersao.nome) + ')</div>' +
                 timelineVersoes(comVersao.versoes);
         }
-        h += '<details class="dg-det"><summary>' + head + '</summary><div class="dg-det__body">' + body + '</div></details>';
+        h += '<details class="dg-det"><summary>' + head + '</summary><div class="dg-det__corpo">' + body + '</div></details>';
     });
     return h + '</section>';
 }
@@ -708,8 +725,8 @@ function secWorkflow(m) {
     if (m.workflow.svgProcesso.length) {
         h += '<div class="dg-h3">Diagrama do processo</div>';
         m.workflow.svgProcesso.forEach(function (s) {
-            h += '<div class="dg-diagram"><div style="max-width:100%;overflow:auto">' + s.svg + '</div></div>';
-            h += '<p class="dg-note">Fonte: <code>' + esc(s.nome) + '</code></p>';
+            h += '<div class="dg-diagrama"><div style="max-width:100%;overflow:auto">' + s.svg + '</div></div>';
+            h += '<p class="dg-dica">Fonte: <code>' + esc(s.nome) + '</code></p>';
         });
     }
 
@@ -725,7 +742,7 @@ function secWorkflow(m) {
     });
 
     h += '<div class="dg-h3">Scripts de evento</div>';
-    if (!m.workflow.scripts.length) h += '<p class="dg-empty">Nenhum script de workflow encontrado.</p>';
+    if (!m.workflow.scripts.length) h += '<p class="dg-vazio">Nenhum script de workflow encontrado.</p>';
     m.workflow.scripts.forEach(function (s) {
         var head = '<code>' + esc(s.nome) + '</code> ' + badge(s.evento, 'orange') +
             (s.writes.length ? ' ' + badge('grava', 'red') : (s.reads.length ? ' ' + badge('leitura', 'green') : ''));
@@ -743,7 +760,7 @@ function secWorkflow(m) {
         }
         body += fonteDoArquivo(s.nome);
         body += '<div class="dg-h3" style="font-size:13px;margin:16px 0 8px">Historico</div>' + timelineVersoes(s.versoes);
-        h += '<details class="dg-det"><summary>' + head + '</summary><div class="dg-det__body">' + body + '</div></details>';
+        h += '<details class="dg-det"><summary>' + head + '</summary><div class="dg-det__corpo">' + body + '</div></details>';
     });
 
     var lit = m.i18n.filter(function (x) { return x.escopo === 'workflow'; });
@@ -778,8 +795,8 @@ function secWidget(m) {
             }
             body += fonteDoArquivo(w.nome);
             if (w.versoes.length) body += '<div class="dg-h3" style="font-size:13px;margin:14px 0 8px">Historico</div>' + timelineVersoes(w.versoes);
-            if (!body) body = '<p class="dg-note" style="margin-top:12px">Sem metadados extraidos.</p>';
-            h += '<details class="dg-det"><summary>' + head + '</summary><div class="dg-det__body">' + body + '</div></details>';
+            if (!body) body = '<p class="dg-dica" style="margin-top:12px">Sem metadados extraidos.</p>';
+            h += '<details class="dg-det"><summary>' + head + '</summary><div class="dg-det__corpo">' + body + '</div></details>';
         });
     }
 
@@ -790,7 +807,7 @@ function secWidget(m) {
             var v = m.tokens[k];
             var isColor = /^#|rgb|hsl/.test(v);
             return '<div class="dg-token" title="' + esc(k + ': ' + v) + '">' + (isColor ? '<i style="background:' + esc(v) + '"></i>' : '') +
-                '<code>' + esc(k) + '</code><span class="dg-note">' + esc(trunc(v, 24)) + '</span></div>';
+                '<code>' + esc(k) + '</code><span class="dg-dica">' + esc(trunc(v, 24)) + '</span></div>';
         }).join('') + '</div>';
     }
     if (m.widget.css.length) {
@@ -825,18 +842,18 @@ function secRastreabilidade(m) {
         'Cruzamento tabela x modulo. Mostra, para cada tabela do banco, quais datasets, scripts de workflow e procedures a leem (R), gravam (W) ou ambos (RW). Base para analise de impacto, auditoria e controle do Data Book.');
 
     if (!r.tabelas.length || !r.modulos.length) {
-        h += '<p class="dg-empty">Sem dados suficientes para montar a matriz (nenhum acesso a tabela identificado no codigo).</p>';
+        h += '<p class="dg-vazio">Sem dados suficientes para montar a matriz (nenhum acesso a tabela identificado no codigo).</p>';
         return h + '</section>';
     }
 
     var mods = r.modulos.filter(function (mm) { return (mm.reads && mm.reads.length) || (mm.writes && mm.writes.length); });
 
-    h += '<div class="dg-legend" style="margin:0 0 12px">' +
-        '<span class="dg-cell-R" style="font-weight:700">R</span> leitura &nbsp; ' +
-        '<span class="dg-cell-W" style="font-weight:700">W</span> escrita &nbsp; ' +
-        '<span class="dg-cell-RW" style="font-weight:700">RW</span> ambos</div>';
+    h += '<div class="dg-legenda" style="margin:0 0 12px">' +
+        '<span class="dg-cel-R" style="font-weight:700">R</span> leitura &nbsp; ' +
+        '<span class="dg-cel-W" style="font-weight:700">W</span> escrita &nbsp; ' +
+        '<span class="dg-cel-RW" style="font-weight:700">RW</span> ambos</div>';
 
-    h += '<div class="dg-table-wrap"><table class="dg-table dg-matrix"><thead><tr><th>Tabela \\ Modulo</th>' +
+    h += '<div class="dg-tabela-wrap"><table class="dg-tabela dg-tabela--matriz"><thead><tr><th>Tabela \\ Modulo</th>' +
         mods.map(function (mm) {
             return '<th title="' + esc(mm.nome) + '">' + esc(mm.nome.replace(/\.js$/, '').replace(/^ds/, '')) + '</th>';
         }).join('') + '</tr></thead><tbody>';
@@ -844,12 +861,12 @@ function secRastreabilidade(m) {
         h += '<tr><td class="dg-l"><code>' + esc(t) + '</code></td>';
         mods.forEach(function (mm) {
             var v = r.matriz[t] && r.matriz[t][mm.nome];
-            h += '<td class="' + (v ? 'dg-cell-' + v : '') + '"' + (v ? ' title="' + esc(mm.nome + ' → ' + t + ' (' + v + ')') + '"' : '') + '>' + (v || '·') + '</td>';
+            h += '<td class="' + (v ? 'dg-cel-' + v : '') + '"' + (v ? ' title="' + esc(mm.nome + ' → ' + t + ' (' + v + ')') + '"' : '') + '>' + (v || '·') + '</td>';
         });
         h += '</tr>';
     });
     h += '</tbody></table></div>';
-    h += '<p class="dg-note" style="margin-top:10px">Acessos detectados por analise estatica de SQL no codigo. SQL montado dinamicamente pode nao aparecer &mdash; revise os modulos com concatenacao complexa.</p>';
+    h += '<p class="dg-dica" style="margin-top:10px">Acessos detectados por analise estatica de SQL no codigo. SQL montado dinamicamente pode nao aparecer &mdash; revise os modulos com concatenacao complexa.</p>';
     return h + '</section>';
 }
 
@@ -860,13 +877,13 @@ function secBiblioteca(m) {
         'Todo o codigo-fonte da aplicacao, indentado e colorido. Clique num arquivo para ler. Os nomes de arquivo espalhados pelo portal tambem levam para ca.');
 
     if (m._semCodigo) {
-        h += '<div class="dg-callout">Portal gerado com <code>--sem-codigo</code>: o codigo-fonte nao foi ' +
+        h += '<div class="dg-nota">Portal gerado com <code>--sem-codigo</code>: o codigo-fonte nao foi ' +
             'embutido, para manter o HTML leve. O restante da documentacao (incluindo o mapa de chamadas, que ' +
             'depende da analise do codigo) continua completo. Gere sem essa opcao para ter o visualizador.</div>';
         return h + '</section>';
     }
     if (!arqs.length) {
-        h += '<p class="dg-empty">Nenhum arquivo textual disponivel.</p>';
+        h += '<p class="dg-vazio">Nenhum arquivo textual disponivel.</p>';
         return h + '</section>';
     }
 
@@ -882,45 +899,73 @@ function secBiblioteca(m) {
     var porCtx = {};
     arqs.forEach(function (a) { (porCtx[a.contexto] = porCtx[a.contexto] || []).push(a); });
 
-    h += '<div class="dg-lib">';
-    h += '<div class="dg-lib__aside">' +
-        '<input type="text" class="dg-input dg-lib__search" id="dgLibBusca" placeholder="filtrar arquivo…" autocomplete="off">' +
-        '<div class="dg-lib__tree" id="dgLibTree">';
+    /* O codigo vem ESCRITO E COLORIDO no HTML, num <details> por arquivo.
+       -------------------------------------------------------------------------
+       Antes isto era um visualizador de dois paineis: a lista a esquerda, o
+       codigo a direita, tudo montado por script a partir de um blob JSON. Dentro
+       do visor do Abacato, que desenha o portal num <iframe sandbox=""> sem
+       permissao nenhuma, o script nao roda — e a biblioteca inteira aparecia
+       como um painel branco, sem erro e sem aviso.
+
+       Com <details> nao ha nada para dar errado: o navegador abre e fecha
+       sozinho, funciona impresso, e cada arquivo tem uma ancora propria para os
+       links espalhados pelo portal. O preco sao bytes, que este portal ja gasta. */
+    h += '<div class="dg-filtro"><input type="text" class="dg-campo" id="dgLibBusca" ' +
+        'placeholder="filtrar arquivo…" autocomplete="off"></div>';
+
+    var porFonte = {};
+    m.fontes.forEach(function (f) { porFonte[f.idx] = f; });
+
+    h += '<div class="dg-lib" id="dgLib">';
     Object.keys(porCtx).sort().forEach(function (ctx) {
-        h += '<div class="dg-lib__grupo">' + esc(ctx) + ' <span>' + porCtx[ctx].length + '</span></div>';
+        h += '<div class="dg-lib__grupo">' + esc(ctx) + ' · ' + porCtx[ctx].length + ' arquivo(s)</div>';
         porCtx[ctx].sort(function (a, b) { return a.nome < b.nome ? -1 : 1; }).forEach(function (a) {
-            h += '<button type="button" class="dg-lib__item" data-idx="' + a.idx + '" data-rel="' + esc(a.rel) + '" ' +
-                'title="' + esc(a.rel + '  ·  ' + a.linhas + ' linhas  ·  ' + fmtBytes(a.tamanho)) + '">' +
-                '<span class="dg-lib__ico dg-lib__ico--' + esc(extCls(a.ext)) + '">' + esc(extCurta(a.ext)) + '</span>' +
-                '<span class="dg-lib__nome">' + esc(a.nome) + '</span>' +
-                '<span class="dg-lib__ln">' + a.linhas + '</span></button>';
+            var f = porFonte[a.idx];
+            h += '<details class="dg-det dg-arq" data-rel="' + esc(a.rel) + '" data-nome="' + esc(a.nome.toLowerCase()) + '">' +
+                '<summary>' +
+                '<span class="dg-arq__ico dg-arq__ico--' + esc(extCls(a.ext)) + '">' + esc(extCurta(a.ext)) + '</span>' +
+                '<span id="arq-' + a.idx + '">' + esc(a.nome) + '</span>' +
+                '<span class="dg-arq__meta">' + esc(a.rel) + ' · ' + a.linhas + ' linhas · ' + fmtBytes(a.tamanho) + '</span>' +
+                '</summary>' +
+                '<div class="dg-det__corpo">' + blocoDeCodigo(f) + '</div>' +
+                '</details>';
         });
     });
-    h += '</div></div>';
-
-    h += '<div class="dg-lib__view">' +
-        '<div class="dg-lib__bar">' +
-        '<div class="dg-lib__titulo" id="dgLibTitulo">Selecione um arquivo</div>' +
-        '<div class="dg-lib__meta" id="dgLibMeta"></div>' +
-        '<button type="button" class="dg-lib__btn" id="dgLibCopiar" hidden>Copiar</button>' +
-        '<button type="button" class="dg-lib__btn" id="dgLibQuebra" hidden>Quebrar linha</button>' +
-        '</div>' +
-        '<div class="dg-code dg-vs" id="dgLibCodigo">' +
-        '<div class="dg-code__gutter" id="dgLibGutter"></div>' +
-        '<pre class="dg-code__pre" id="dgLibPre"><span class="dg-note" style="padding:14px;display:block">' +
-        'Escolha um arquivo na lista ao lado, ou clique no nome de qualquer arquivo citado no portal.</span></pre>' +
-        '</div></div>';
     h += '</div>';
 
     if (m.biblioteca.omitidos.length) {
         h += verTodos('Arquivos nao embutidos (' + m.biblioteca.omitidos.length + ')',
-            '<p class="dg-note" style="margin:12px 0">Binarios e arquivos acima do orcamento de tamanho do portal ficam de fora do visualizador, mas continuam no inventario.</p>' +
+            '<p class="dg-dica" style="margin:12px 0">Binarios e arquivos acima do orcamento de tamanho do portal ficam de fora do visualizador, mas continuam no inventario.</p>' +
             tabela(['Arquivo', 'Motivo', 'Tamanho'], m.biblioteca.omitidos.map(function (o) {
-                return '<tr><td><code>' + esc(o.rel) + '</code></td><td class="dg-note">' + esc(o.motivo) + '</td><td>' + fmtBytes(o.tamanho) + '</td></tr>';
+                return '<tr><td><code>' + esc(o.rel) + '</code></td><td class="dg-dica">' + esc(o.motivo) + '</td><td>' + fmtBytes(o.tamanho) + '</td></tr>';
             })));
     }
     return h + '</section>';
 }
+/* Um arquivo, com numeracao de linha e realce — tudo resolvido aqui, no gerador.
+   A numeracao e uma coluna de texto separada (e nao :before em cada linha) para
+   que selecionar e copiar o codigo NAO leve os numeros junto. */
+function blocoDeCodigo(f) {
+    if (!f) return '<p class="dg-vazio">codigo nao embutido</p>';
+    var codigo = String(f.conteudo || '');
+    var linhas = codigo.split('\n');
+    var gutter = [];
+    for (var i = 1; i <= linhas.length; i++) gutter.push(i);
+
+    var corpo = hl.realcar(codigo, f.lang);
+    var aviso = f.truncado
+        ? '<div class="dg-aviso" style="border-radius:0;border-left:0;border-right:0;border-top:0">' +
+          'Arquivo truncado: so o comeco foi embutido, para o portal nao virar um arquivo grande demais ' +
+          'para abrir. O original continua no repositorio.</div>'
+        : '';
+
+    return aviso +
+        '<div class="dg-code dg-vs">' +
+        '<div class="dg-code__gutter">' + gutter.join('\n') + '</div>' +
+        '<pre class="dg-code__pre">' + corpo + '</pre>' +
+        '</div>';
+}
+
 function extCurta(ext) {
     var e = String(ext || '').replace(/^\./, '').toUpperCase();
     if (e === 'PROPERTIES') return 'PRP';
@@ -929,7 +974,12 @@ function extCurta(ext) {
 }
 function extCls(ext) {
     var e = String(ext || '').replace(/^\./, '').toLowerCase();
-    if (['js', 'sql', 'css', 'html', 'ftl', 'md', 'xml', 'properties'].indexOf(e) >= 0) return e;
+    if (e === 'js' || e === 'jsx' || e === 'mjs' || e === 'cjs' || e === 'json') return 'js';
+    if (e === 'ts' || e === 'tsx') return 'ts';
+    if (e === 'sql') return 'sql';
+    if (e === 'css' || e === 'scss' || e === 'less') return 'css';
+    if (e === 'html' || e === 'htm' || e === 'ftl' || e === 'xml' || e === 'svg') return 'html';
+    if (e === 'md' || e === 'markdown') return 'md';
     return 'outro';
 }
 
@@ -940,29 +990,29 @@ function secInventario(m) {
     var porCtx = {};
     m.inventario.forEach(function (f) { (porCtx[f.contexto] = porCtx[f.contexto] || []).push(f); });
     Object.keys(porCtx).sort().forEach(function (ctx) {
-        h += '<div class="dg-h3" style="font-size:13px">' + esc(ctx) + ' <span class="dg-note">(' + porCtx[ctx].length + ')</span></div>';
+        h += '<div class="dg-h3" style="font-size:13px">' + esc(ctx) + ' <span class="dg-dica">(' + porCtx[ctx].length + ')</span></div>';
         h += tabela(['Arquivo', 'Tipo', 'Tamanho'], porCtx[ctx].map(function (f) {
             return '<tr><td>' + linkArquivo(f.nome) + '</td><td>' + badge(f.tipo) + '</td><td>' + fmtBytes(f.tamanho) + '</td></tr>';
         }));
     });
     if (m.avisos.length) {
         h += '<div class="dg-h3" style="font-size:13px">Avisos do gerador</div>';
-        h += '<div class="dg-warns">' + m.avisos.map(esc).join('<br>') + '</div>';
+        h += '<div class="dg-aviso">' + m.avisos.map(esc).join('<br>') + '</div>';
     }
     return h + '</section>';
 }
 
 /* ------------------------------------------------------------ helpers layout */
 function tabela(cols, linhas, id) {
-    if (!linhas || !linhas.length) return '<p class="dg-empty">Nada a listar.</p>';
-    return '<div class="dg-table-wrap"><table class="dg-table"' + (id ? ' id="' + id + '"' : '') + '><thead><tr>' +
+    if (!linhas || !linhas.length) return '<p class="dg-vazio">Nada a listar.</p>';
+    return '<div class="dg-tabela-wrap"><table class="dg-tabela"' + (id ? ' id="' + id + '"' : '') + '><thead><tr>' +
         cols.map(function (c) { return '<th>' + c + '</th>'; }).join('') +
         '</tr></thead><tbody>' + linhas.join('') + '</tbody></table></div>';
 }
 function section(id, eyebrow, titulo, lead) {
     return '<section class="dg-sec" id="sec-' + id + '">' +
-        '<div class="dg-sec__eyebrow">' + eyebrow + '</div>' +
-        '<h2 class="dg-sec__title">' + titulo + '</h2>' +
+        '<div class="dg-sec__olho">' + eyebrow + '</div>' +
+        '<h2 class="dg-sec__titulo">' + titulo + '</h2>' +
         (lead ? '<p class="dg-sec__lead">' + lead + '</p>' : '');
 }
 
@@ -974,22 +1024,22 @@ function sidebar(m) {
     var add = function (id, txt, cor, count) { links.push({ id: id, txt: txt, cor: cor, count: count }); };
 
     var nDatasets = m.datasets.filter(function (d) { return !d.backup; }).length;
-    add('overview', 'Visao Geral', C.red);
-    add('arquitetura', 'Arquitetura do Sistema', C.subsea);
-    add('chamadas', 'Mapa de Chamadas', C.mooring, m.grafo.arestas.length);
-    add('dados', 'Arquitetura de Dados', C.mooring, m.dataModel.entidades.length);
-    if (nDatasets) add('datasets', 'Datasets', C.servicos, nDatasets);
-    if (m.formularios.length) add('formularios', 'Formularios', C.industria, m.formularios.length);
+    add('overview', 'Visao Geral', C.alerta);
+    add('arquitetura', 'Arquitetura do Sistema', C.dado);
+    add('chamadas', 'Mapa de Chamadas', C.modulo, m.grafo.arestas.length);
+    add('dados', 'Arquitetura de Dados', C.modulo, m.dataModel.entidades.length);
+    if (nDatasets) add('datasets', 'Datasets', C.acao, nDatasets);
+    if (m.formularios.length) add('formularios', 'Formularios', C.processo, m.formularios.length);
     if (m.workflow.scripts.length || m.workflow.processos.length || m.workflow.svgProcesso.length) {
-        add('workflow', 'Workflow', C.industria, m.workflow.scripts.length);
+        add('workflow', 'Workflow', C.processo, m.workflow.scripts.length);
     }
     if (m.widget.js.length || m.widget.css.length || Object.keys(m.tokens || {}).length) {
-        add('widget', 'Widget (JS/CSS)', C.mooring, m.widget.js.length);
+        add('widget', 'Widget (JS/CSS)', C.modulo, m.widget.js.length);
     }
-    if (m.i18n.length) add('i18n', 'Internacionalizacao', C.gray1, m.i18n.length);
-    add('rastreabilidade', 'Rastreabilidade', C.red, m.rastreabilidade.tabelas.length);
-    add('biblioteca', 'Biblioteca de Codigo', C.servicos, m.biblioteca.arquivos.length);
-    add('inventario', 'Inventario', C.gray1, m.inventario.length);
+    if (m.i18n.length) add('i18n', 'Internacionalizacao', C.neutro, m.i18n.length);
+    add('rastreabilidade', 'Rastreabilidade', C.alerta, m.rastreabilidade.tabelas.length);
+    add('biblioteca', 'Biblioteca de Codigo', C.acao, m.biblioteca.arquivos.length);
+    add('inventario', 'Inventario', C.neutro, m.inventario.length);
 
     var grupos = [
         { t: 'Visao', ids: ['overview'] },
@@ -999,178 +1049,121 @@ function sidebar(m) {
     ];
     var byId = {}; links.forEach(function (l) { byId[l.id] = l; });
 
-    var html = '<aside class="dg-side" id="dgSide"><div class="dg-side__brand">' +
-        '<div class="dg-side__logo"><b>delp</b> docs</div>' +
-        '<div class="dg-side__sub">' + esc(m.meta.appCode || 'aplicacao fluig') + '</div></div>' +
+    /* A lateral leva o nome do PROJETO DOCUMENTADO, nao o do gerador. Quem abre
+       o portal quer saber de que sistema ele fala; a ferramenta que o produziu
+       cabe no rodape. */
+    var html = '<aside class="dg-side" id="dgSide"><div class="dg-side__marca">' +
+        '<div class="dg-side__logo"><span class="dg-side__ponto"></span>' +
+        esc(m.meta.appCode || 'Documentacao') + '</div>' +
+        '<div class="dg-side__sub">' + esc(m.meta.tipoAppRotulo || 'documentacao tecnica') + '</div></div>' +
         '<nav class="dg-side__nav">';
     grupos.forEach(function (g) {
         var itens = g.ids.filter(function (id) { return byId[id]; });
         if (!itens.length) return;
-        html += '<div class="dg-side__group">' + esc(g.t) + '</div>';
+        html += '<div class="dg-side__grupo">' + esc(g.t) + '</div>';
         itens.forEach(function (id) {
             var l = byId[id];
             html += '<a class="dg-side__link" href="#sec-' + id + '" data-sec="' + id + '">' + dot(l.cor) + esc(l.txt) +
-                (l.count != null ? '<span class="dg-side__count">' + l.count + '</span>' : '') + '</a>';
+                (l.count != null ? '<span class="dg-side__conta">' + l.count + '</span>' : '') + '</a>';
         });
     });
     html += '</nav></aside>';
     return html;
 }
 
-/* Codigo-fonte embutido para o visualizador. '<' vira \u003c: assim nenhum
-   conteudo consegue fechar a tag <script> por acidente. */
-function dadosFontes(m) {
-    if (m._semCodigo) return '<script type="application/json" id="dgFontes">[]</script>';
-    var dados = m.fontes.map(function (f) {
-        return { i: f.idx, n: f.nome, r: f.rel, e: f.ext, l: f.lang, t: f.truncado ? 1 : 0, ln: f.linhas, c: f.conteudo };
-    });
-    var json = JSON.stringify(dados)
-        .replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
-        .replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
-    return '<script type="application/json" id="dgFontes">' + json + '</script>';
-}
-
 function scriptRuntime() {
     return '<script>(' + runtimePortal.toString() + ')();</script>';
 }
 
-/* Runtime do portal: scroll-spy, menu, biblioteca, grafo e filtros.
+/* Runtime do portal — TUDO AQUI E ENFEITE.
+   -----------------------------------------------------------------------------
+   Nenhuma linha deste arquivo e necessaria para LER o portal. O realce de
+   sintaxe ja veio pronto do gerador, o codigo esta escrito no HTML, a navegacao
+   e ancora e as secoes abrem com <details>. O que este script acrescenta e o que
+   melhora a leitura quando ha JavaScript: filtro, foco no grafo, e abrir o
+   <details> certo quando a ancora aponta para dentro dele.
+
+   Isso importa porque o portal e lido em dois lugares muito diferentes: aberto
+   direto no navegador, onde tudo funciona, e dentro do visor de documentos do
+   Abacato, que o desenha num <iframe sandbox=""> onde nada disto roda.
+
    Serializado com toString(), portanto precisa ser autocontido. */
 function runtimePortal() {
-    /* ------------------------------------------------ navegacao lateral */
+    /* Revela o que so faz sentido com script. Sem esta classe os campos de
+       filtro ficam escondidos: um campo que nao filtra nada faz a pessoa digitar
+       e concluir que o portal esta quebrado. */
+    document.documentElement.className += ' dg-tem-js';
+
+    /* ------------------------------------------------ "voce esta aqui" */
+    var secs = [].slice.call(document.querySelectorAll('.dg-sec'));
     var links = [].slice.call(document.querySelectorAll('.dg-side__link'));
-    var secs = links.map(function (l) { return document.getElementById('sec-' + l.getAttribute('data-sec')); });
     function onScroll() {
-        var y = window.scrollY + 90, idx = 0;
-        for (var i = 0; i < secs.length; i++) { if (secs[i] && secs[i].offsetTop <= y) idx = i; }
-        links.forEach(function (l, i) { l.classList.toggle('is-active', i === idx); });
+        var y = window.scrollY + 90, atual = null;
+        secs.forEach(function (s) { if (s.offsetTop <= y) atual = s.id; });
+        links.forEach(function (l) {
+            var on = l.getAttribute('href') === '#' + atual;
+            l.style.background = on ? 'rgba(34,197,94,.14)' : '';
+            l.style.color = on ? '#fff' : '';
+        });
     }
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
 
-    var side = document.getElementById('dgSide');
-    var btn = document.getElementById('dgMenu');
-    if (btn) btn.addEventListener('click', function () { side.classList.toggle('is-open'); });
-    links.forEach(function (l) {
-        l.addEventListener('click', function () { if (window.innerWidth <= 920) side.classList.remove('is-open'); });
-    });
-
-    /* ------------------------------------------------ biblioteca de codigo */
-    var FONTES = [];
-    try {
-        var tag = document.getElementById('dgFontes');
-        if (tag) FONTES = JSON.parse(tag.textContent || tag.innerText || '[]');
-    } catch (e) { FONTES = []; }
-
-    var porRel = {}, porIdx = {};
-    FONTES.forEach(function (f) { porRel[f.r] = f; porIdx[f.i] = f; });
-
-    var elPre = document.getElementById('dgLibPre');
-    var elGut = document.getElementById('dgLibGutter');
-    var elTit = document.getElementById('dgLibTitulo');
-    var elMet = document.getElementById('dgLibMeta');
-    var elCop = document.getElementById('dgLibCopiar');
-    var elQbr = document.getElementById('dgLibQuebra');
-    var atual = null;
-
-    function abrir(f) {
-        if (!f || !elPre) return;
-        atual = f;
-        var codigo = f.c || '';
-        var lang = f.l || (window.dgLang ? window.dgLang(f.e) : '');
-        elPre.innerHTML = (window.dgHl && lang) ? window.dgHl(codigo, lang) : escapaHtml(codigo);
-        var n = codigo ? codigo.split(/\r\n|\r|\n/).length : 0;
-        var g = '';
-        for (var i = 1; i <= n; i++) g += i + '\n';
-        elGut.textContent = g;
-        elTit.textContent = f.n;
-        elMet.innerHTML = '<code>' + escapaHtml(f.r) + '</code> · ' + n + ' linhas' +
-            (f.t ? ' · <b style="color:#CC0F10">truncado</b>' : '');
-        elCop.hidden = false;
-        elQbr.hidden = false;
-        var tree = document.getElementById('dgLibTree');
-        if (tree) {
-            [].slice.call(tree.querySelectorAll('.dg-lib__item')).forEach(function (b) {
-                var on = b.getAttribute('data-rel') === f.r;
-                b.classList.toggle('is-active', on);
-                if (on && b.scrollIntoView) b.scrollIntoView({ block: 'nearest' });
-            });
+    /* ------------------------------------------------ ancoras para <details>
+       Ir para #arq-12 ou #tab-X tem de ABRIR o bloco, nao so rolar ate ele.
+       Sem script o navegador rola ate o <summary>, que fica visivel — e a
+       pessoa abre com um clique. */
+    function abrirAncora() {
+        var id = (location.hash || '').replace('#', '');
+        if (!id) return;
+        var alvo = document.getElementById(id);
+        if (!alvo) return;
+        var sobe = alvo;
+        while (sobe) {
+            if (sobe.tagName === 'DETAILS') sobe.open = true;
+            sobe = sobe.parentElement;
         }
-        document.getElementById('dgLibCodigo').scrollTop = 0;
+        if (alvo.scrollIntoView) alvo.scrollIntoView({ block: 'start' });
     }
-    function escapaHtml(s) {
-        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
+    window.addEventListener('hashchange', abrirAncora);
+    abrirAncora();
 
-    var tree = document.getElementById('dgLibTree');
-    if (tree) {
-        tree.addEventListener('click', function (ev) {
-            var b = ev.target.closest ? ev.target.closest('.dg-lib__item') : null;
-            if (b) abrir(porIdx[b.getAttribute('data-idx')]);
-        });
-    }
-
+    /* ------------------------------------------------ filtro da biblioteca */
     var busca = document.getElementById('dgLibBusca');
-    if (busca) {
+    var lib = document.getElementById('dgLib');
+    if (busca && lib) {
+        var arquivos = [].slice.call(lib.querySelectorAll('.dg-arq'));
+        var grupos = [].slice.call(lib.querySelectorAll('.dg-lib__grupo'));
         busca.addEventListener('input', function () {
             var q = busca.value.toLowerCase().trim();
-            var itens = [].slice.call(tree.querySelectorAll('.dg-lib__item'));
-            itens.forEach(function (b) {
-                var ok = !q || b.getAttribute('data-rel').toLowerCase().indexOf(q) >= 0;
-                b.style.display = ok ? '' : 'none';
+            arquivos.forEach(function (d) {
+                var casa = !q ||
+                    (d.getAttribute('data-nome') || '').indexOf(q) >= 0 ||
+                    (d.getAttribute('data-rel') || '').toLowerCase().indexOf(q) >= 0;
+                d.style.display = casa ? '' : 'none';
             });
-            [].slice.call(tree.querySelectorAll('.dg-lib__grupo')).forEach(function (g) {
-                var vis = false, n = g.nextElementSibling;
+            /* Um cabecalho de pasta sozinho, sem nenhum arquivo embaixo, parece
+               defeito. Some junto com os arquivos dele. */
+            grupos.forEach(function (g) {
+                var algum = false, n = g.nextElementSibling;
                 while (n && !n.classList.contains('dg-lib__grupo')) {
-                    if (n.style.display !== 'none') vis = true;
+                    if (n.classList.contains('dg-arq') && n.style.display !== 'none') algum = true;
                     n = n.nextElementSibling;
                 }
-                g.style.display = vis ? '' : 'none';
+                g.style.display = algum ? '' : 'none';
             });
         });
     }
-
-    if (elCop) {
-        elCop.addEventListener('click', function () {
-            if (!atual) return;
-            var txt = atual.c || '';
-            var ok = function () { elCop.textContent = 'Copiado'; setTimeout(function () { elCop.textContent = 'Copiar'; }, 1400); };
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(txt).then(ok, function () { copiaFallback(txt, ok); });
-            } else { copiaFallback(txt, ok); }
-        });
-    }
-    function copiaFallback(txt, ok) {
-        var ta = document.createElement('textarea');
-        ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); ok(); } catch (e) {}
-        document.body.removeChild(ta);
-    }
-    if (elQbr) {
-        elQbr.addEventListener('click', function () {
-            var box = document.getElementById('dgLibCodigo');
-            box.classList.toggle('is-wrap');
-            elQbr.classList.toggle('is-on');
-        });
-    }
-
-    /* links "ver o codigo" espalhados pelo portal */
-    document.addEventListener('click', function (ev) {
-        var a = ev.target.closest ? ev.target.closest('[data-abrir]') : null;
-        if (!a) return;
-        var f = porRel[a.getAttribute('data-abrir')];
-        if (!f) return;
-        ev.preventDefault();
-        var sec = document.getElementById('sec-biblioteca');
-        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        abrir(f);
-    });
 
     /* ------------------------------------------------ grafo de chamadas */
     var grafo = document.getElementById('dgGrafo');
     if (grafo) {
         var svgEl = grafo.querySelector('svg');
+        var limpar = function () {
+            [].slice.call(svgEl.querySelectorAll('.is-on,.is-alvo')).forEach(function (n) {
+                n.classList.remove('is-on'); n.classList.remove('is-alvo');
+            });
+        };
         grafo.addEventListener('click', function (ev) {
             var no = ev.target.closest ? ev.target.closest('.dg-gnode') : null;
             if (!no) { svgEl.classList.remove('is-focado'); limpar(); return; }
@@ -1184,38 +1177,13 @@ function runtimePortal() {
             var ligados = {};
             [].slice.call(svgEl.querySelectorAll('.dg-edge')).forEach(function (e) {
                 var de = e.getAttribute('data-de'), pa = e.getAttribute('data-para');
-                if (de === id || pa === id) {
-                    e.classList.add('is-on');
-                    ligados[de] = 1; ligados[pa] = 1;
-                }
+                if (de === id || pa === id) { e.classList.add('is-on'); ligados[de] = 1; ligados[pa] = 1; }
             });
             [].slice.call(svgEl.querySelectorAll('.dg-gnode')).forEach(function (n) {
                 if (ligados[n.getAttribute('data-no')]) n.classList.add('is-on');
             });
         });
-        function limpar() {
-            [].slice.call(svgEl.querySelectorAll('.is-on,.is-alvo')).forEach(function (n) {
-                n.classList.remove('is-on'); n.classList.remove('is-alvo');
-            });
-        }
     }
-
-    /* ------------------------------------------------ ancoras para <details>
-       Ir para #tab-Z_DELP_X tem de ABRIR o card da tabela, nao so rolar ate ele. */
-    function abrirAncora() {
-        var id = (location.hash || '').replace('#', '');
-        if (!id) return;
-        var alvo = document.getElementById(id);
-        if (!alvo) return;
-        while (alvo) {
-            if (alvo.tagName === 'DETAILS') alvo.open = true;
-            alvo = alvo.parentElement;
-        }
-        var d = document.getElementById(id);
-        if (d && d.scrollIntoView) d.scrollIntoView({ block: 'start' });
-    }
-    window.addEventListener('hashchange', abrirAncora);
-    abrirAncora();
 
     /* ------------------------------------------------ filtros de tabela */
     function filtro(inputId, tabelaId) {
@@ -1238,8 +1206,13 @@ function runtimePortal() {
 function render(m) {
     /* indice usado pelos links de "ver o codigo" */
     REL_POR_NOME = {};
+    IDX_POR_NOME = {};
     if (!m._semCodigo) {
-        m.fontes.forEach(function (f) { if (!REL_POR_NOME[f.nome]) REL_POR_NOME[f.nome] = f.rel; });
+        m.fontes.forEach(function (f) {
+            if (REL_POR_NOME[f.nome]) return;
+            REL_POR_NOME[f.nome] = f.rel;
+            IDX_POR_NOME[f.nome] = f.idx;
+        });
     }
 
     var body =
@@ -1256,24 +1229,26 @@ function render(m) {
         secBiblioteca(m) +
         secInventario(m);
 
+    /* Sem botao de menu: a barra lateral vira um bloco no topo em tela estreita,
+       por CSS. Um botao que so funciona com script seria um botao morto dentro
+       do visor do Abacato. */
     var top = '<div class="dg-top">' +
-        '<button class="dg-menu-btn" id="dgMenu" aria-label="Menu">☰</button>' +
-        '<div><div class="dg-top__title">' + esc(m.meta.appTitle || m.meta.appCode || 'Documentacao Tecnica') + '</div>' +
+        '<div><div class="dg-top__titulo">' + esc(m.meta.appTitle || m.meta.appCode || 'Documentacao Tecnica') + '</div>' +
         '<div class="dg-top__meta">' + esc(m.meta.appDescription ? trunc(m.meta.appDescription, 90) : 'Portal de documentacao tecnica') + '</div></div>' +
-        '<div class="dg-top__spacer"></div>' +
-        '<span class="dg-top__pill" title="' + esc(m.meta.tipoAppRotulo || '') + '">' +
-        esc(m.meta.tipoAppRotulo || m.meta.appType || 'fluig') + '</span>' +
+        '<div class="dg-top__espaco"></div>' +
+        '<span class="dg-top__pilula" title="' + esc(m.meta.tipoAppRotulo || '') + '">' +
+        esc(m.meta.tipoAppRotulo || m.meta.appType || 'projeto') + '</span>' +
         '<button class="dg-top__print" onclick="window.print()">Imprimir / PDF</button>' +
         '</div>';
 
-    var footer = '<footer class="dg-footer"><span><b style="color:var(--dg-red)">delp</b> docs</span>' +
+    var footer = '<footer class="dg-rodape">' +
+        '<span><b style="color:var(--dg-verde)">●</b> ' + esc(m.meta.ferramenta) + '</span>' +
         '<span>Gerado em ' + esc(dataBR(m.meta.geradoEm)) + '</span>' +
-        '<span>' + esc(m.meta.ferramenta) + '</span>' +
-        '<span style="margin-left:auto">Documentacao tecnica gerada automaticamente &mdash; revisar antes de uso como referencia oficial.</span></footer>';
+        '<span style="margin-left:auto">Documentacao gerada por leitura do codigo &mdash; revisar antes de usar como referencia oficial.</span></footer>';
 
     /* Marca de identidade: e o que permite ao gerador recusar sobrescrever a
-       documentacao de OUTRA aplicacao que por acaso esteja no mesmo caminho. */
-    var marca = '<meta name="dg-gerador" content="delp-docgen">' +
+       documentacao de OUTRO projeto que por acaso esteja no mesmo caminho. */
+    var marca = '<meta name="dg-gerador" content="docgen">' +
         '<meta name="dg-app" content="' + esc(m.meta.slug || '') + '">' +
         '<meta name="dg-app-code" content="' + esc(m.meta.appCode || '') + '">' +
         '<meta name="dg-app-tipo" content="' + esc(m.meta.tipoApp || '') + '">' +
@@ -1281,14 +1256,16 @@ function render(m) {
 
     return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">' +
         '<meta name="viewport" content="width=device-width,initial-scale=1">' + marca +
-        '<title>' + esc((m.meta.appCode || 'Aplicacao') + ' — Documentacao Tecnica DELP') + '</title>' +
+        '<title>' + esc((m.meta.appCode || 'Projeto') + ' — Documentacao Tecnica') + '</title>' +
         theme.fontLink() +
         '<style>' + theme.css() + hl.css() + '</style></head><body>' +
         '<div class="dg">' + sidebar(m) +
         '<div class="dg-main">' + top +
-        '<main class="dg-content">' + body + '</main>' + footer +
+        '<main class="dg-conteudo">' + body + '</main>' + footer +
         '</div></div>' +
-        dadosFontes(m) + hl.clientJs() + scriptRuntime() +
+        // O realce ja veio pronto do gerador; o que sobra de script e so enfeite
+        // (filtro, foco no grafo). Nada aqui e necessario para LER o portal.
+        scriptRuntime() +
         '</body></html>';
 }
 

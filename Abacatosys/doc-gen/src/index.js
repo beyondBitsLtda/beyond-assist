@@ -136,8 +136,8 @@ function checarConflito(saida, I, caminhoOrigem) {
         cabeca = buf.slice(0, n).toString('utf8');
     } catch (e) { return ''; }
 
-    if (cabeca.indexOf('name="dg-gerador" content="delp-docgen"') < 0) {
-        return 'O arquivo de destino ja existe e nao foi gerado pelo delp-docgen:\n  ' + saida +
+    if (cabeca.indexOf('name="dg-gerador" content="docgen"') < 0) {
+        return 'O arquivo de destino ja existe e nao foi gerado pelo docgen:\n  ' + saida +
             '\nNao sera sobrescrito. Use --out com outro caminho, ou --forcar se tiver certeza.';
     }
     var m = cabeca.match(/name="dg-app"\s+content="([^"]*)"/);

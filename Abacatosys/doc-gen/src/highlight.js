@@ -146,6 +146,30 @@ function clientJs() {
     return '<script>(' + runtime.toString() + ')();</script>';
 }
 
+/* O MESMO tokenizador, rodando aqui no Node, em tempo de geracao.
+   -----------------------------------------------------------------------------
+   Antes o codigo-fonte ia para a pagina cru, dentro de um blob JSON, e era
+   colorido pelo navegador. Isso deixou de servir quando o portal passou a ser
+   lido dentro do visor do Abacato: la ele abre num <iframe sandbox=""> sem
+   permissao nenhuma, o script nao roda, e a biblioteca de codigo aparecia VAZIA
+   — sem erro, sem aviso, so um painel em branco.
+
+   Colorir aqui resolve, e sem uma segunda copia do tokenizador: a funcao
+   `runtime` acima ja e autocontida (foi escrita para ser serializada), entao
+   basta dar a ela um `window` de mentira e pegar o que ela pendura la. Duas
+   implementacoes do mesmo realce divergiriam na primeira correcao. */
+var _realce = null;
+function realcar(codigo, lang) {
+    if (!_realce) {
+        var janelaAnterior = globalThis.window;
+        globalThis.window = globalThis.window || {};
+        runtime();
+        _realce = globalThis.window.dgHl;
+        if (janelaAnterior === undefined) delete globalThis.window;
+    }
+    return _realce(String(codigo == null ? '' : codigo), lang || '');
+}
+
 /* Paleta VS Code Dark+ para os tokens. */
 function css() {
     return [
@@ -181,4 +205,4 @@ function langDe(ext) {
     return '';
 }
 
-module.exports = { clientJs: clientJs, css: css, langDe: langDe };
+module.exports = { clientJs: clientJs, css: css, langDe: langDe, realcar: realcar };

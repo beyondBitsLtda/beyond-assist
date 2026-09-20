@@ -28,18 +28,30 @@ function chaveTabela(t) {
     return seg.toUpperCase();
 }
 
-/* Marca se a tabela pertence ao projeto, ao ERP ou a base do proprio Fluig.
+/* Marca se a tabela e do proprio projeto ou de um sistema de terceiro (ERP).
    Quando o nome qualificado diz o BANCO, ele decide: uma tabela em CORPORE e do
    RM mesmo que o nome nao pareca, e uma Z_* no FLUIG e da equipe mesmo sem o
-   prefixo Z_DELP_. Sem banco no nome, cai na heuristica pelo nome. */
+   prefixo . Sem banco no nome, cai na heuristica pelo nome. */
+/* Tabelas cujo CREATE TABLE esta NESTE repositorio. Preenchido antes de
+   classificar qualquer origem — ver `origemTabela`. */
+var DECLARADAS_AQUI = {};
+
 function origemTabela(t, banco) {
     var s = String(t).toUpperCase();
     var seg = s.split('.').pop();
     var b = String(banco || P.bancoDe(t) || '').toUpperCase();
 
+    /* A evidencia mais forte que existe: o repositorio CRIA esta tabela.
+       -------------------------------------------------------------------------
+       Vem antes de qualquer heuristica de nome. Sem isto, um projeto cujas
+       tabelas nao seguem a convencao de prefixo antiga aparecia com "0 tabelas
+       proprias" tendo o DDL de todas elas dentro de si — e o portal dizia que
+       o sistema nao tem dados proprios, que e o oposto da verdade. */
+    if (DECLARADAS_AQUI[seg]) return 'propria';
+
     if (b) {
         if (/CORPORE|RM|TOTVS/.test(b)) return 'rm';
-        if (/FLUIG|ECM/.test(b)) return /^Z_/.test(seg) ? 'propria' : 'externa';
+        if (/APP|ECM/.test(b)) return /^Z_/.test(seg) ? 'propria' : 'externa';
     }
     if (/^Z_/.test(seg)) return 'propria';
     if (/CORPORE|TOTVS|GCCUSTO|TMOV|FCFO/.test(s)) return 'rm';
@@ -47,10 +59,10 @@ function origemTabela(t, banco) {
 }
 
 /* Prefixo comum das tabelas proprias, descoberto nas proprias tabelas.
-   Antes isso era "Z_DELP_CAPEX_" fixo no codigo: em qualquer outra aplicacao o
+   Antes isso era "PREFIXO_" fixo no codigo: em qualquer outra aplicacao o
    casamento por sufixo simplesmente nao acontecia. */
 function prefixoTabelas(chaves) {
-    if (chaves.length < 2) return chaves.length === 1 && /^Z_DELP_/.test(chaves[0]) ? 'Z_DELP_' : '';
+    if (chaves.length < 2) return chaves.length === 1 && /^[A-Z]+_[A-Z]+_/.test(chaves[0]) ? chaves[0].split('_').slice(0, 2).join('_') + '_' : '';
     var pre = chaves[0];
     for (var i = 1; i < chaves.length; i++) {
         var j = 0;
@@ -65,12 +77,16 @@ function prefixoTabelas(chaves) {
 
 function build(root, arquivos, opts) {
     opts = opts || {};
+    /* Zera o que e de modulo: gerar dois projetos no mesmo processo faria o
+       segundo herdar as tabelas do primeiro e marcar como "propria" uma tabela
+       que ele nem conhece. */
+    DECLARADAS_AQUI = {};
     var I = opts.identidade || ident.derivar(root, arquivos);
     var modelo = {
         identidade: I,
         meta: {
             geradoEm: new Date(),
-            ferramenta: 'delp-docgen 1.0.0',
+            ferramenta: 'docgen 2.0.0',
             origem: root,
             appCode: '', appTitle: '', appDescription: '', appType: '', appCategory: '',
             renderer: '', developerCode: '', developerName: '', appVersion: '',
@@ -217,6 +233,13 @@ function build(root, arquivos, opts) {
                 }
                 case TIPO.SQL: {
                     var sql = P.parseSql(conteudo, a.nome);
+                    /* Toda tabela criada por um .sql DESTE repositorio e, por
+                       definicao, do proprio projeto. Registrar aqui, no momento
+                       da leitura, e o que permite `origemTabela` decidir sem
+                       depender de convencao de nome nenhuma. */
+                    sql.tabelas.forEach(function (t) {
+                        DECLARADAS_AQUI[String(t.nome).split('.').pop().toUpperCase()] = true;
+                    });
                     sql.tabelas.forEach(function (t) { t.origemArquivo = a.rel; });
                     sql.fks.forEach(function (f) { f.origemArquivo = a.rel; });
                     modelo.sql.tabelas = modelo.sql.tabelas.concat(sql.tabelas);
@@ -605,7 +628,7 @@ function construirDataModel(modelo) {
     var lista = Object.keys(entidades).map(function (k) { return entidades[k]; });
 
     /* --------------------------------------------------------- bancos de dados
-       Uma consulta so ja atravessa FLUIG e CORPORE. Atribuir cada tabela a sua
+       Uma consulta so ja atravessa mais de uma base. Atribuir cada tabela a sua
        base e o que permite gerar um script de extracao por banco - e o que evita
        tratar duas tabelas homonimas em bases distintas como se fossem uma. */
     lista.forEach(function (e) {
@@ -667,7 +690,7 @@ function construirDataModel(modelo) {
 
     var porSufixo = {};
     lista.forEach(function (e) {
-        var seg = pre && e.chave.indexOf(pre) === 0 ? e.chave.slice(pre.length) : e.chave.replace(/^Z_DELP_/, '');
+        var seg = pre && e.chave.indexOf(pre) === 0 ? e.chave.slice(pre.length) : e.chave;
         porSufixo[seg] = e.chave;
     });
     lista.forEach(function (e) {

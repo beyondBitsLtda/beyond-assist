@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 /* =============================================================================
-   delp-docgen - CLI
+   docgen - CLI
+   Le um repositorio e escreve um portal HTML de documentacao tecnica.
+
    Uso:
-     node bin/delp-docgen.js <caminho-da-pasta-raiz> [--out arquivo.html] [--json]
+     node bin/docgen.js <pasta-do-repositorio> [opcoes]
+
    Exemplos:
-     node bin/delp-docgen.js "z:\...\portalCapex"
-     node bin/delp-docgen.js ./portalCapex --out ./docs/portalCapex.html
+     node bin/docgen.js ./meu-projeto
+     node bin/docgen.js ./meu-projeto --out ./docs/meu-projeto.doc.html
+     node bin/docgen.js ./meu-projeto --publicar
 ============================================================================= */
 'use strict';
 
@@ -22,17 +26,20 @@ function arg(nome) {
 function tem(nome) { return process.argv.indexOf(nome) >= 0; }
 
 function ajuda() {
-    console.log('\n' + C.bold + 'delp-docgen' + C.reset + ' — gerador de documentacao tecnica de aplicacoes Fluig DELP\n');
+    console.log('\n' + C.bold + 'docgen' + C.reset + ' — documentacao tecnica lida do codigo de um repositorio\n');
     console.log('Uso:');
-    console.log('  node bin/delp-docgen.js <pasta-raiz> [opcoes]\n');
+    console.log('  node bin/docgen.js <pasta-do-repositorio> [opcoes]\n');
     console.log('Opcoes:');
-    console.log('  --out <arquivo>   Caminho do HTML de saida (padrao: <codigo-da-aplicacao>.doc.html)');
-    console.log('  --json            Grava tambem um <saida>.json com o modelo extraido');
-    console.log('  --sem-codigo      Nao embute o codigo-fonte (portal leve, sem a biblioteca)');
-    console.log('  --forcar          Sobrescreve um HTML que documenta OUTRA aplicacao (padrao: recusa)');
-    console.log('  --help            Mostra esta ajuda\n');
-    console.log('Exemplo:');
-    console.log('  node bin/delp-docgen.js "./portalCapex" --out "./docs/portalCapex.html"\n');
+    console.log('  --out <arquivo>    Caminho do HTML de saida (padrao: <nome-do-projeto>.doc.html)');
+    console.log('  --json             Grava tambem um <saida>.json com o modelo extraido');
+    console.log('  --sem-codigo       Nao embute o codigo-fonte (portal leve, sem a biblioteca)');
+    console.log('  --forcar           Sobrescreve um HTML que documenta OUTRO projeto (padrao: recusa)');
+    console.log('  --publicar         Envia o portal para um projeto de documentacao do Abacato');
+    console.log('  --config <arquivo> Configuracao da publicacao (padrao: ~/.docgen-abacato.json)');
+    console.log('  --help             Mostra esta ajuda\n');
+    console.log('Publicar:');
+    console.log('  Regerar o mesmo projeto cria uma REVISAO do documento que ja existe, e nao');
+    console.log('  um documento novo — o endereco continua o mesmo e o historico fica guardado.\n');
 }
 
 async function main() {
@@ -40,7 +47,7 @@ async function main() {
 
     var root = process.argv[2];
     if (!root || root.charAt(0) === '-') {
-        console.error(C.red + 'Erro:' + C.reset + ' informe a pasta raiz da aplicacao.');
+        console.error(C.red + 'Erro:' + C.reset + ' informe a pasta do repositorio.');
         ajuda();
         process.exit(1);
     }
@@ -53,7 +60,6 @@ async function main() {
 
     var r;
     try {
-        /* garante a pasta de saida */
         if (out) { try { fs.mkdirSync(path.dirname(out), { recursive: true }); } catch (e) {} }
         r = await gerar(root, { out: out, semCodigo: tem('--sem-codigo'), forcar: tem('--forcar') });
     } catch (e) {
@@ -64,20 +70,24 @@ async function main() {
     var s = r.resumo;
     var I = r.identidade;
     console.log(C.green + '✓' + C.reset + ' Portal gerado em ' + C.dim + r.ms + 'ms' + C.reset);
-    console.log('  Aplicacao          : ' + C.bold + I.appCode + C.reset + C.dim + '  (nome de: ' + I.origemNome + ')' + C.reset);
-    console.log('  Tipo detectado     : ' + C.cyan + I.tipoRotulo + C.reset);
+    console.log('  Projeto            : ' + C.bold + I.appCode + C.reset + C.dim + '  (nome de: ' + I.origemNome + ')' + C.reset);
+    console.log('  Tipo detectado     : ' + C.cyan + I.tipoRotulo + C.reset +
+        (I.ecossistema ? C.dim + '  ·  ' + I.ecossistema + C.reset : ''));
     console.log('  ' + C.dim + '────────────────────────────────' + C.reset);
     console.log('  Arquivos varridos  : ' + C.bold + s.arquivos + C.reset);
-    console.log('  Datasets           : ' + s.datasets);
-    console.log('  Formularios        : ' + s.formularios);
-    console.log('  Scripts workflow   : ' + s.scriptsWf);
-    console.log('  Modulos JS (widget): ' + s.modulosJs);
-    console.log('  Eventos de form.   : ' + s.eventosForm);
-    console.log('  Entidades          : ' + s.entidades + ' (' + s.proprias + ' proprias)');
-    console.log('  Esquema de dados   : ' + C.green + s.declaradas + ' declaradas' + C.reset +
-        (s.inferidas ? ' / ' + C.yellow + s.inferidas + ' inferidas' + C.reset : ''));
-    console.log('  Relacoes           : ' + s.relacoes);
-    console.log('  Tabelas rastreadas : ' + s.tabelasRastreadas);
+    /* Linhas que so fazem sentido quando ha o que contar: um repositorio sem
+       formularios nao precisa de "Formularios: 0" na saida. */
+    if (s.datasets) console.log('  Consultas de dados : ' + s.datasets);
+    if (s.formularios) console.log('  Formularios        : ' + s.formularios);
+    if (s.scriptsWf) console.log('  Scripts de processo: ' + s.scriptsWf);
+    if (s.modulosJs) console.log('  Modulos JS         : ' + s.modulosJs);
+    if (s.eventosForm) console.log('  Eventos de form.   : ' + s.eventosForm);
+    if (s.entidades) {
+        console.log('  Entidades          : ' + s.entidades + ' (' + s.proprias + ' proprias)');
+        console.log('  Esquema de dados   : ' + C.green + s.declaradas + ' declaradas' + C.reset +
+            (s.inferidas ? ' / ' + C.yellow + s.inferidas + ' inferidas' + C.reset : ''));
+        console.log('  Relacoes           : ' + s.relacoes);
+    }
     console.log('  Mapa de chamadas   : ' + s.arestasGrafo + ' ligacoes entre ' + s.nosGrafo + ' nos');
     console.log('  Biblioteca         : ' + s.biblioteca + ' arquivos (' + s.bibliotecaKb + ' KB de codigo)');
     console.log('  Portal HTML        : ' + s.htmlKb + ' KB');
@@ -85,11 +95,10 @@ async function main() {
     console.log('  ' + C.dim + '────────────────────────────────' + C.reset);
     console.log(C.green + '→' + C.reset + ' ' + C.bold + r.saida + C.reset);
 
-    /* pasta esquema-sql: a ponte entre o codigo e o banco */
-    console.log(C.green + '→' + C.reset + ' ' + r.esquemaDir + C.dim + '  (' + r.esquemaEscritos.length + ' arquivos)' + C.reset);
+    if (r.esquemaEscritos.length) {
+        console.log(C.green + '→' + C.reset + ' ' + r.esquemaDir + C.dim + '  (' + r.esquemaEscritos.length + ' arquivos)' + C.reset);
+    }
 
-    /* Um arquivo por linha, com o que saiu dele. "Lido" e "aproveitado" sao
-       coisas diferentes, e era a diferenca entre as duas que ficava invisivel. */
     var lidos = (r.modelo.esquemaBanco && r.modelo.esquemaBanco.arquivos) || [];
     if (lidos.length) {
         lidos.forEach(function (a) {
@@ -102,23 +111,19 @@ async function main() {
     } else if (s.inferidas) {
         console.log('  ' + C.yellow + s.inferidas + ' tabela(s) ainda inferidas.' + C.reset +
             ' Nenhum arquivo de esquema nessa pasta.');
-        console.log('  Rode o ' + C.bold + '01-extrair-esquema.sql' + C.reset +
-            ' (uma vez so, em qualquer base) e salve o resultado la.');
+        console.log('  Rode o ' + C.bold + '01-extrair-esquema.sql' + C.reset + ' e salve o resultado la.');
     }
 
-    /* Avisos que falam da ponte com o banco vem para o terminal: eles respondem
-       a pergunta "salvei a saida e continua inferido, por que?". */
     var doEsquema = (r.modelo.avisos || []).filter(function (a) {
         return /esquema-sql|01-extrair-esquema|inferid/i.test(a);
     });
     if (doEsquema.length) {
         console.log('');
-        doEsquema.forEach(function (a) {
-            console.log('  ' + C.yellow + '! ' + C.reset + a.replace(/\s+/g, ' '));
-        });
+        doEsquema.forEach(function (a) { console.log('  ' + C.yellow + '! ' + C.reset + a.replace(/\s+/g, ' ')); });
     }
     console.log('');
 
+    /* ------------------------------------------------------------- --json */
     if (tem('--json')) {
         var jsonPath = r.saida.replace(/\.html?$/i, '') + '.json';
         try {
@@ -137,6 +142,29 @@ async function main() {
             fs.writeFileSync(jsonPath, JSON.stringify(clean, null, 2), 'utf8');
             console.log(C.green + '→' + C.reset + ' modelo JSON: ' + jsonPath + '\n');
         } catch (e) { console.error('Nao foi possivel gravar o JSON: ' + e.message); }
+    }
+
+    /* --------------------------------------------------------- --publicar */
+    if (tem('--publicar')) {
+        var publicar = require('../src/publicar').publicar;
+        console.log(C.cyan + '›' + C.reset + ' Publicando no Abacato…');
+        try {
+            var p = await publicar(r.saida, {
+                config: arg('--config'),
+                nome: I.appCode + '.doc.html',
+                descricao: 'Documentacao tecnica de ' + I.appCode + ', gerada por leitura do codigo.',
+                aoPassar: function (t) { console.log('  ' + C.dim + t + C.reset); }
+            });
+            console.log(C.green + '✓' + C.reset + ' ' +
+                (p.acao === 'novo' ? 'Documento criado' : 'Revisao ' + p.numero + ' gravada') +
+                C.dim + '  (' + Math.round(p.bytes / 1024) + ' KB)' + C.reset);
+            console.log(C.green + '→' + C.reset + ' ' + C.bold + p.url + C.reset + '\n');
+        } catch (e) {
+            console.error(C.red + 'Nao publiquei:' + C.reset + ' ' + (e && e.message ? e.message : e) + '\n');
+            /* O portal FOI gerado; so a publicacao falhou. Sair com 0 mentiria,
+               sair com 2 diria que nada saiu. O 3 separa os dois casos. */
+            process.exit(3);
+        }
     }
 }
 

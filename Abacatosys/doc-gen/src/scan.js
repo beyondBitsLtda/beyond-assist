@@ -1,8 +1,8 @@
 /* =============================================================================
-   scan.js - Varredura e classificacao de arquivos de uma aplicacao Fluig DELP
+   scan.js - Varredura e classificacao de arquivos de uma aplicacao de baixo codigo 
    -----------------------------------------------------------------------------
    Objetivo: dado o caminho da pasta raiz, percorrer recursivamente e classificar
-   cada arquivo em um TIPO logico do dominio Fluig/DELP. Funciona tanto na
+   cada arquivo em um TIPO logico do dominio de baixo codigo. Funciona tanto na
    estrutura canonica (datasets/, forms/, wcm/widget/.../resources/js|css,
    workflow/diagrams|scripts|literals, sql/) quanto numa pasta "plana" (dump).
 
@@ -23,10 +23,30 @@ var path = require('path');
    segundos. Em disco local nao atrapalha. */
 var CONCORRENCIA = 24;
 
-/* Pastas e arquivos que nunca entram na documentacao (apenas inventario). */
-var IGNORAR_DIR = ['.git', 'node_modules', '.settings', 'META-INF', 'WEB-INF', 'target'];
+/* Pastas que nunca entram na documentacao.
+   -----------------------------------------------------------------------------
+   Nao e so economia de tempo: documentar node_modules ou .next seria documentar
+   codigo que ninguem deste repositorio escreveu, e o portal passaria a falar de
+   um sistema que nao e o analisado. Tudo aqui e ou dependencia de terceiro, ou
+   resultado de build, ou metadado de ferramenta. */
+var IGNORAR_DIR = [
+    '.git', '.svn', '.hg',
+    'node_modules', 'bower_components', 'vendor', 'packages',
+    '.next', '.nuxt', '.svelte-kit', '.output', '.open-next', '.wrangler',
+    'dist', 'build', 'out', 'target', 'bin', 'obj',
+    '.venv', 'venv', '__pycache__', '.pytest_cache', '.mypy_cache', '.tox',
+    'coverage', '.nyc_output', '.turbo', '.cache', '.parcel-cache',
+    '.idea', '.vscode', '.settings', 'META-INF', 'WEB-INF',
+];
 var IGNORAR_ARQ = ['.jsdtscope', '.ws.cache.bkp', 'org.eclipse.core.resources.prefs',
-    'Thumbs.db', '.DS_Store'];
+    'Thumbs.db', '.DS_Store', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
+    'composer.lock', 'Cargo.lock', 'poetry.lock'];
+
+/* Manifestos: o arquivo em que um projeto diz o proprio nome. Cada ecossistema
+   tem o seu, e e dai que sai o nome do portal quando nao ha nada melhor. */
+var MANIFESTOS = ['package.json', 'pyproject.toml', 'setup.py', 'go.mod', 'pom.xml',
+    'build.gradle', 'build.gradle.kts', 'cargo.toml', 'composer.json', 'gemfile',
+    'requirements.txt', 'application.info', 'application.info.txt'];
 
 /* Tipos logicos reconhecidos. */
 var TIPO = {
@@ -50,10 +70,42 @@ var TIPO = {
     SQL: 'sql',
     PROPERTIES: 'properties',
     IMAGE: 'image',
+    /* Tipos genericos, para qualquer repositorio: o que nao cai numa das
+       categorias acima ainda precisa ser reconhecido por PAPEL, e nao virar
+       "outro" — um portal cujo inventario diz "outro" 300 vezes nao documenta
+       nada. */
+    MANIFESTO: 'manifesto',
+    CODIGO: 'codigo',
+    TESTE: 'teste',
+    CONFIG: 'config',
+    DADOS: 'dados',
     OUTRO: 'outro'
 };
 
-/* Eventos de FORMULARIO do Fluig (executam no cartao, nao no processo).
+/* Extensoes de codigo-fonte por familia. A analise profunda (imports, simbolos,
+   chamadas) so existe para JS/TS e SQL; as outras entram no inventario, na
+   biblioteca e no realce, e e o que este gerador promete. */
+var EXT_CODIGO = {
+    '.js': 1, '.jsx': 1, '.mjs': 1, '.cjs': 1, '.ts': 1, '.tsx': 1,
+    '.py': 1, '.go': 1, '.java': 1, '.cs': 1, '.rb': 1, '.php': 1, '.rs': 1,
+    '.kt': 1, '.swift': 1, '.c': 1, '.h': 1, '.cpp': 1, '.hpp': 1, '.sh': 1, '.ps1': 1
+};
+var EXT_CONFIG = {
+    '.json': 1, '.yml': 1, '.yaml': 1, '.toml': 1, '.ini': 1, '.conf': 1,
+    '.cfg': 1, '.env': 1, '.editorconfig': 1, '.lock': 1
+};
+var EXT_DADOS = { '.csv': 1, '.tsv': 1, '.ndjson': 1, '.jsonl': 1 };
+
+/* Um arquivo de teste e codigo, mas nao e o sistema: separar os dois faz o
+   inventario dizer a verdade sobre o tamanho do que foi escrito. */
+function ehTeste(relPath, nome) {
+    var p = '/' + String(relPath).replace(/\\/g, '/').toLowerCase();
+    if (/\/(tests?|__tests__|spec|specs|e2e|cypress)\//.test(p)) return true;
+    return /\.(test|spec)\.[a-z]+$/i.test(nome) ||
+        /^test_.*\.py$/i.test(nome) || /_test\.(go|py|rb)$/i.test(nome);
+}
+
+/* Eventos de FORMULARIO da plataforma (executam no cartao, nao no processo).
    Sem esta lista, "beforeSendValidate.js" cai na regra de workflow e um
    formulario passa a ser documentado como se fosse um processo. */
 var EVENTOS_FORM = {
@@ -83,7 +135,7 @@ function classificarJs(nome, conteudo) {
     /* Dataset server-side custom: assinatura obrigatoria createDataset(...). */
     if (/function\s+createDataset\s*\(/.test(conteudo)) return TIPO.DATASET_SERVER;
 
-    /* Formulario: displayFields e a funcao que o Fluig chama ao abrir o cartao. */
+    /* Formulario: displayFields e a funcao que a plataforma chama ao abrir o cartao. */
     if (/function\s+displayFields\s*\(/.test(conteudo)) return TIPO.FORM_JS;
 
     /* Recursos de widget conhecidos por nome. */
@@ -139,7 +191,10 @@ function classificar(nome, relPath, conteudoGetter, ctx, formCtx) {
     if (lower === 'application.info' || lower === 'application.info.txt') return TIPO.APP_INFO;
     if (lower === '.project' || lower === '_project') return TIPO.ECLIPSE_PROJECT;
     if (lower === 'estrutura.md') return TIPO.FILETREE;
-    if (lower === 'readme.md') return TIPO.README;
+    if (/^readme(\.[a-z]+)?$/i.test(lower) || lower === 'readme.md') return TIPO.README;
+    /* O manifesto e como o projeto se apresenta. Vem antes de qualquer heuristica:
+       um package.json classificado como "config" perderia o nome do projeto. */
+    if (MANIFESTOS.indexOf(lower) >= 0 || /\.csproj$|\.sln$/i.test(lower)) return TIPO.MANIFESTO;
 
     /* o caminho decide antes de qualquer heuristica de nome/conteudo */
     var porCtx = classificarPorContexto(nome, relPath, ctx, conteudoGetter(), formCtx);
@@ -156,10 +211,20 @@ function classificar(nome, relPath, conteudoGetter, ctx, formCtx) {
     if (ext === '.html' || ext === '.htm') return TIPO.FORM_HTML;
     if (ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.gif' || ext === '.svg') return TIPO.IMAGE;
 
+    /* Teste vem ANTES da linguagem: um `.test.js` e teste, nao modulo. Trocar a
+       ordem faria a contagem de "codigo do sistema" incluir o codigo que so
+       existe para conferi-lo. */
+    if (ehTeste(relPath, nome)) return TIPO.TESTE;
+
     if (ext === '.js') return classificarJs(nome, conteudoGetter());
 
     /* .md soltos, .txt, .xml genericos, .metadata etc. */
     if (ext === '.md') return TIPO.README;
+
+    /* ------------------------------------------------ qualquer outro projeto */
+    if (EXT_CODIGO[ext]) return TIPO.CODIGO;
+    if (EXT_DADOS[ext]) return TIPO.DADOS;
+    if (EXT_CONFIG[ext] || /^\./.test(lower)) return TIPO.CONFIG;
     return TIPO.OUTRO;
 }
 

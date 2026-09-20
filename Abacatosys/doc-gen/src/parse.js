@@ -1,5 +1,5 @@
 /* =============================================================================
-   parse.js - Extratores de metadados por tipo de arquivo Fluig/DELP
+   parse.js - Extratores de metadados por tipo de arquivo de baixo codigo
    -----------------------------------------------------------------------------
    Cada funcao recebe o conteudo (string) e devolve um objeto estruturado.
    Regras de projeto (importantes para rastreabilidade/auditoria):
@@ -77,8 +77,8 @@ function unico(arr) {
 }
 
 /* ------------------------------------------------------- nome qualificado
-   Uma aplicacao Fluig da DELP quase nunca fala com um banco so: as tabelas
-   proprias ficam no FLUIG e as de ERP no CORPORE, na mesma consulta. O nome
+   Uma aplicacao de baixo codigo quase nunca fala com um banco so: as tabelas
+   proprias ficam num banco e as de ERP em outro, na mesma consulta. O nome
    qualificado (BANCO.esquema.objeto) e a unica coisa no codigo que diz em qual
    banco cada tabela vive - jogar fora essa parte e perder a informacao. */
 function partesTabela(nome) {
@@ -107,7 +107,7 @@ function bancoDe(nome) { return partesTabela(nome).banco; }
 function ehTabelaValida(t, varsConhecidas, ctes) {
     if (!t) return false;
     var seg = String(t).split('.').pop();
-    if (seg.charAt(seg.length - 1) === '_') return false;      /* prefixo tipo Z_DELP_CAPEX_ */
+    if (seg.charAt(seg.length - 1) === '_') return false;      /* prefixo tipo PREFIXO_ */
     var reservadas = { SELECT: 1, WHERE: 1, DUAL: 1, VALUES: 1, SET: 1, INTO: 1, ORDER: 1, GROUP: 1, ON: 1, AND: 1, OR: 1 };
     if (reservadas[t.toUpperCase()] || reservadas[seg.toUpperCase()]) return false;
     /* catalogo do proprio SQL Server nao e tabela de negocio */
@@ -161,6 +161,25 @@ function tabelasEmSql(conteudo) {
     while ((m = reIns.exec(conteudo))) writes.push(m[1]);
     while ((m = reUpd.exec(conteudo))) writes.push(m[1]);
     while ((m = reDel.exec(conteudo))) writes.push(m[1]);
+
+    /* Consultas encadeadas: `.from("tabela").select()` / `.insert()` / `.update()`.
+       -------------------------------------------------------------------------
+       E como praticamente todo projeto JS moderno fala com o banco — Supabase,
+       Knex, query builders em geral. Sem isto, um repositorio inteiro que acessa
+       vinte tabelas aparecia com ZERO no modelo de dados, porque o extrator so
+       procurava SQL escrito a mao.
+
+       O que vem depois do .from() decide se e leitura ou escrita: `.select()`
+       le, e `.insert/.update/.delete/.upsert` gravam. Olhar so o .from() faria
+       toda escrita ser documentada como leitura. */
+    var reEncadeada = /\.from\s*\(\s*["'`]([A-Za-z_][\w.]*)["'`]\s*\)([\s\S]{0,120})/g;
+    while ((m = reEncadeada.exec(conteudo))) {
+        var tabela = m[1];
+        var depois = m[2];
+        if (/\.\s*(insert|update|delete|upsert)\s*\(/i.test(depois)) writes.push(tabela);
+        else reads.push(tabela);
+    }
+
     var f = function (a) { return unico(a).filter(function (t) { return ehTabelaValida(t, vars, ctes); }); };
     return { reads: f(reads), writes: f(writes) };
 }
@@ -218,7 +237,7 @@ function relacoesPorJoin(conteudo) {
     return rels; /* aliases resolvidos no model, junto ao mapa global de tabelas */
 }
 
-/* Resolve nomes de variaveis de tabela (var TB = 'FLUIG.dbo.X') dentro do SQL. */
+/* Resolve nomes de variaveis de tabela (var TB = 'APP.dbo.X') dentro do SQL. */
 function resolverVarsTabela(conteudo) {
     var mapa = {};
     var re = /var\s+([A-Z_][A-Z0-9_]*)\s*=\s*['"]([A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*){0,2})['"]\s*;/g;
@@ -442,7 +461,7 @@ function parseFormEvento(conteudo, nome, tipo) {
 
 /* ------------------------------------------------------------- formulario HTML */
 function parseFormHtml(conteudo) {
-    /* ids de elementos e campos data-* do Fluig */
+    /* ids de elementos e campos data-* da plataforma */
     var ids = unico((conteudo.match(/id\s*=\s*["']([A-Za-z0-9_\-]+)["']/g) || [])
         .map(function (s) { return s.replace(/id\s*=\s*["']/, '').replace(/["']$/, ''); }));
     var campos = unico((conteudo.match(/name\s*=\s*["']([A-Za-z0-9_]+)["']/g) || [])
@@ -495,10 +514,16 @@ function parseFtl(conteudo, nome, ident) {
 
 /* ------------------------------------------------------------- SQL (DDL) */
 function parseSql(conteudo, nome) {
-    var tabelas = [], alters = [], procs = [];
+    var tabelas = [], alters = [], procs = [], fks = [];
 
-    /* CREATE TABLE nome ( ... ) */
-    var reCreate = /CREATE\s+TABLE\s+(?:\[?dbo\]?\.)?(?:\[?[\w]+\]?\.)?\[?([\w]+)\]?\s*\(([\s\S]*?)\)\s*(?:;|GO|$)/gi;
+    /* CREATE TABLE nome ( ... )
+       -------------------------------------------------------------------------
+       `IF NOT EXISTS` e opcional porque e assim que um script de migracao do
+       Postgres costuma ser escrito, e sem esta parte o leitor devolvia ZERO
+       tabelas num repositorio cheio de DDL — em silencio, com o portal inteiro
+       dizendo "inferido". O identificador tambem pode vir entre aspas duplas
+       ("minha tabela"), que e a forma do Postgres para o colchete do SQL Server. */
+    var reCreate = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[\["']?[\w]+[\]"']?\.){0,2}[\["']?([\w]+)[\]"']?\s*\(([\s\S]*?)\)\s*(?:;|GO|$)/gi;
     var m;
     while ((m = reCreate.exec(conteudo))) {
         var tab = m[1];
@@ -521,6 +546,27 @@ function parseSql(conteudo, nome) {
             }
         }
         tabelas.push({ nome: tab, colunas: colunas, origem: 'sql:' + nome });
+
+        /* CHAVE ESTRANGEIRA DECLARADA NA PROPRIA COLUNA:
+             usuario_id uuid not null references public.usuarios (id) on delete cascade
+           -------------------------------------------------------------------
+           E a forma normal no Postgres, e nenhuma delas casava com o leitor de
+           `CONSTRAINT ... FOREIGN KEY`, que so existe no dialeto com constraint
+           nomeada. O efeito era um modelo de dados com dezoito tabelas e UMA
+           relacao — um diagrama de caixas soltas que nao ajuda ninguem.
+           Estas FKs sao DECLARADAS, e nao adivinhadas pelo sufixo _id. */
+        var reRefCol = /(?:^|,)\s*[\["']?([\w]+)[\]"']?[^,]*?\breferences\s+(?:[\["']?[\w]+[\]"']?\.){0,2}[\["']?([\w]+)[\]"']?\s*(?:\(\s*([\w]+)\s*\))?/gi;
+        var mr;
+        while ((mr = reRefCol.exec(corpo))) {
+            fks.push({
+                constraint: '',
+                tabela: tab,
+                colunas: [mr[1]],
+                refTabela: mr[2],
+                refColunas: [mr[3] || 'id'],
+                origem: 'sql:' + nome
+            });
+        }
     }
 
     /* CHAVES PRIMARIAS declaradas fora do CREATE:
@@ -551,7 +597,7 @@ function parseSql(conteudo, nome) {
 
     /* CHAVES ESTRANGEIRAS -> viram relacionamentos DECLARADOS (a fonte mais forte).
        ALTER TABLE [dbo].[A] ADD CONSTRAINT [FK] FOREIGN KEY ([X_ID]) REFERENCES [dbo].[X] ([ID]); */
-    var fks = [];
+    /* declarado no topo: as FKs da propria coluna ja foram coletadas acima */
     var reFk = /(?:ALTER\s+TABLE\s+(?:\[?[\w]+\]?\.){0,2}\[?([\w]+)\]?\s+(?:WITH\s+(?:NO)?CHECK\s+)?ADD\s+)?CONSTRAINT\s+\[?([\w]+)\]?\s+FOREIGN\s+KEY\s*\(([^)]*)\)\s*REFERENCES\s+(?:\[?[\w]+\]?\.){0,2}\[?([\w]+)\]?\s*\(([^)]*)\)/gi;
     while ((m = reFk.exec(conteudo))) {
         var cols = m[3].split(',').map(function (s) { return s.trim().replace(/[\[\]"'`]/g, ''); }).filter(Boolean);
