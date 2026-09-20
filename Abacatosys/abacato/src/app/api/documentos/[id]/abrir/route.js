@@ -78,6 +78,13 @@ export async function GET(req, { params }) {
       // Sem isto, o arquivo salvo teria o nome sorteado do disco, e ninguém reconheceria
       // "003-a1b2c3d4-contrato.pdf" na pasta de downloads.
       urlBaixar: `${url}${url.includes("?") ? "&" : "?"}download=${encodeURIComponent(documento.nome)}`,
+      // Para HTML, o endereço que DESENHA a página. O armazenamento devolve `text/html` como
+      // `text/plain` (para ninguém hospedar ataque no domínio dele), e a moldura acabava
+      // mostrando o código-fonte. A rota /conteudo serve daqui com `CSP: sandbox`, que devolve
+      // a mesma proteção por outro caminho — ver o comentário longo lá.
+      urlConteudo: jeito === "html"
+        ? `/api/documentos/${id}/conteudo${pedida ? `?revisao=${encodeURIComponent(pedida)}` : ""}`
+        : null,
       nome: documento.nome,
       revisao: { id: revisao.id, numero: revisao.numero, tipo: revisao.tipo, tamanho: revisao.tamanho },
       conteudo,

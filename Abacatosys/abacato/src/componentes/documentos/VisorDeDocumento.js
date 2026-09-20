@@ -112,6 +112,18 @@ export default function VisorDeDocumento({ documentoId, poderes, aoFechar, aoMud
             }}
             onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
           />
+          {/* Abrir numa aba inteira.
+              A moldura aqui dentro serve para espiar; um portal de documentação
+              com barra lateral e tabelas largas precisa da tela toda. O endereço
+              aponta para o armazenamento, que é OUTRO domínio — abrir ali não dá
+              ao arquivo acesso nenhum ao Abacato, e `noopener` garante que a aba
+              nova também não alcance esta de volta. */}
+          {aberto && (aberto.jeito === "html" || aberto.jeito === "proprio") && (
+            <a className="abacato-botao abacato-botao--pequeno"
+               href={aberto.jeito === "html" ? aberto.urlConteudo : aberto.url}
+               target="_blank" rel="noopener noreferrer"
+               title="Abrir em outra aba, na tela inteira">↗ Abrir em outra aba</a>
+          )}
           {aberto && (
             <a className="abacato-botao abacato-botao--fantasma abacato-botao--pequeno"
                href={aberto.urlBaixar} download={doc?.nome}>⤓ Baixar</a>
@@ -139,12 +151,16 @@ export default function VisorDeDocumento({ documentoId, poderes, aoFechar, aoMud
             )}
 
             {aberto?.jeito === "html" && (
-              // `sandbox` sem nenhuma permissão: o HTML enviado é CÓDIGO de outra pessoa, e
-              // isto desliga o script dele. O endereço ainda aponta para outro domínio, então
-              // são duas travas — esta é a única parte do sistema que desenha conteúdo que
-              // alguém mandou.
+              // Duas travas, porque esta é a única parte do sistema que desenha conteúdo que
+              // alguém mandou: o `sandbox` aqui desliga o script, e a rota que serve o arquivo
+              // manda `Content-Security-Policy: sandbox`, que faz o mesmo do lado do servidor
+              // e continua valendo quando a pessoa abre numa aba inteira.
+              //
+              // O endereço é o do Abacato, e não o do armazenamento, porque o armazenamento
+              // se recusa a servir `text/html` — ele devolve `text/plain`, e a moldura mostrava
+              // o código-fonte em vez da página.
               <iframe
-                src={aberto.url}
+                src={aberto.urlConteudo}
                 className="abacato-visor__moldura"
                 sandbox=""
                 referrerPolicy="no-referrer"

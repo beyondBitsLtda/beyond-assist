@@ -169,6 +169,14 @@ var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 async function publicar(caminhoHtml, opts) {
     opts = opts || {};
     var cfg = lerConfig(opts.config);
+
+    /* O destino pode vir de fora da configuracao. A tela pergunta a cada geracao
+       para qual projeto e para qual pasta vai — o arquivo de configuracao passa a
+       ser so o padrao de quem usa pelo terminal, e nao uma amarra. */
+    if (opts.projeto) cfg.projeto = opts.projeto;
+    if (opts.pasta !== undefined) cfg.pasta = opts.pasta || '';
+    if (opts.categoria !== undefined) cfg.categoria = opts.categoria || '';
+
     var passos = [];
     var diga = function (t) { passos.push(t); if (opts.aoPassar) opts.aoPassar(t); };
 

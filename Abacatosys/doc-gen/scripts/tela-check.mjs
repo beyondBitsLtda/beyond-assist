@@ -78,6 +78,24 @@ try {
   const inexistente = await (await fetch(`${base}/api/pastas?caminho=${encodeURIComponent(path.join(os.homedir(), "nao-existe-mesmo-123"))}`, { headers: cab })).json();
   ok("pasta inexistente vira erro explicado, e nao queda", Boolean(inexistente.erro), inexistente.erro?.slice(0, 40));
 
+  // ------------------------------------------------------------- destinos
+  // Precisa do Abacato no ar e da configuracao de publicacao. Sem eles isto
+  // vira aviso, e nao falha: o resto da tela funciona sem publicar nada.
+  const destinos = await (await fetch(`${base}/api/destinos`, { headers: cab })).json();
+  if (!destinos.ok) {
+    console.log(`  aviso   nao consegui listar destinos (${destinos.erro}) — o resto segue`);
+  } else {
+    ok("lista os projetos de documentacao", (destinos.projetos || []).length > 0,
+      `${destinos.projetos.length} projeto(s)`);
+    ok("cada projeto traz as pastas dele",
+      destinos.projetos.every((p) => Array.isArray(p.pastas)));
+    ok("traz o destino padrao da configuracao", Boolean(destinos.padrao?.projeto),
+      `${destinos.padrao?.projeto} / ${destinos.padrao?.pasta || "(raiz)"}`);
+    // Uma arvore inteira num seletor nao ajuda a escolher: so o primeiro nivel.
+    ok("so pastas de primeiro nivel", destinos.projetos.every(
+      (p) => p.pastas.every((n) => typeof n === "string")));
+  }
+
   // ------------------------------------------------------------- gerar
   // Sem publicar: o teste nao pode depender de rede nem mexer no Abacato.
   const gerado = await (await fetch(`${base}/api/gerar`, {

@@ -71,18 +71,59 @@ ok("o arquivo e servido inteiro", resposta.status === 200 && html.length > 10000
 
 // ---------------------------------------------------------------- sem script
 // Cada uma destas foi um defeito real, ou seria um se o desenho mudasse.
-ok("o codigo-fonte esta escrito no HTML", html.includes("dg-code__gutter"));
-ok("o realce de sintaxe ja veio aplicado", html.includes('class="t-kw"'));
-ok("nao sobrou blob JSON para o navegador montar", !html.includes("dgFontes"));
-ok("o que abre e fecha e <details>", (html.match(/<details/g) || []).length > 20,
-  `${(html.match(/<details/g) || []).length} blocos`);
+// Um portal pode ter sido gerado com "portal leve" (--sem-codigo), e ai nao ha
+// biblioteca nenhuma para conferir. Exigir o codigo embutido de todo portal
+// fazia este teste reprovar uma opcao que a propria ferramenta oferece.
+// Procura a classe USADA (`class="dg-code__gutter"`), e nao a definida no CSS
+// (`.dg-code__gutter{`). O tema sempre traz a regra; so o portal com codigo
+// embutido traz o elemento.
+const temBiblioteca = html.includes('class="dg-code__gutter"');
+const blocos = (html.match(/<details/g) || []).length;
+if (temBiblioteca) {
+  ok("o codigo-fonte esta escrito no HTML", true);
+  ok("o realce de sintaxe ja veio aplicado", html.includes('class="t-kw"'));
+} else {
+  console.log("  (portal leve: gerado sem o codigo embutido)");
+  ok("o portal diz por que nao ha biblioteca", html.includes("sem-codigo"));
+}
+// O que importa e que ABRA SEM SCRIPT, e nao que sejam muitos. Um limiar de 20
+// reprovava o portal de um repositorio de quatro arquivos — que estava perfeito.
+ok("o que abre e fecha e <details>, e nao script", blocos > 0, `${blocos} blocos`);
 ok("a navegacao lateral e por ancora", html.includes('href="#sec-'));
 ok("o campo de filtro nasce escondido (so aparece com script)",
   html.includes(".dg-filtro{display:none"));
 
 // ---------------------------------------------------------------- de-marcado
-ok("nenhuma marca do gerador antigo na saida",
-  !/fluig|corpore|totvs\s+rm|delp-docgen|barlow/i.test(html));
+//
+// As provas daqui olham o que O GERADOR ESCREVE, e nao o arquivo inteiro.
+//
+// A primeira versao varria o HTML todo procurando "fluig", "dgFontes" e afins —
+// e acusou um portal legitimo. O documento em questao descreve uma aplicacao de
+// baixo codigo: o codigo-fonte dela, embutido na biblioteca, cita a plataforma
+// em cada arquivo, e ainda traz uma copia de um portal antigo com o blob JSON
+// dentro. Nada daquilo era saida do gerador; era o gerador mostrando fielmente
+// o repositorio, que e o trabalho dele.
+//
+// Um verificador que confunde "o que a ferramenta diz" com "o que a ferramenta
+// cita" ensina a ignorar o resultado — e o que ele acusaria primeiro seria
+// justamente a documentacao dos sistemas antigos, que e a que mais importa.
+// O <head> e onde o portal declara o que ELE e: a fonte que pede, os tokens do
+// tema, a marca do gerador. Qualquer string antiga que apareca depois dele esta
+// dentro de um <pre>, e texto num <pre> nao pinta nada — e so o portal mostrando
+// o repositorio, inclusive quando o repositorio guarda um portal antigo inteiro.
+const fimDaCabeca = html.indexOf("</head>");
+const cabeca = fimDaCabeca > 0 ? html.slice(0, fimDaCabeca) : html.slice(0, 200000);
+
+ok("a marca do gerador no <meta> e a nova",
+  cabeca.includes('name="dg-gerador" content="docgen"'));
+ok("o rodape nao traz a marca antiga",
+  !/>\s*delp\s*<\/b>\s*docs/i.test(html) && !html.includes("delp-docgen 1.0.0"));
+ok("a fonte pedida e a do Abacato, e nao a antiga",
+  cabeca.includes("family=Inter") && !cabeca.includes("family=Barlow"));
+ok("o codigo nao vai mais num blob para o navegador montar",
+  !html.includes('type="application/json" id="dgFontes">['));
+ok("a paleta do tema e a nova",
+  cabeca.includes("--dg-verde:#22C55E") && !cabeca.includes("--dg-red:#CC0F10"));
 
 console.log(falhas === 0 ? "\nTUDO PASSOU\n" : `\n${falhas} FALHA(S)\n`);
 process.exit(falhas === 0 ? 0 : 1);

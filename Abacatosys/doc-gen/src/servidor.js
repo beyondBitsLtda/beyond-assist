@@ -169,6 +169,15 @@ label.op{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
 .chip{font-size:12px;background:var(--superficie-2);border:1px solid var(--linha);
   border-radius:var(--pilula);padding:4px 11px;cursor:pointer;font-family:ui-monospace,Consolas,monospace}
 .chip:hover{border-color:var(--verde)}
+.campos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:620px){.campos{grid-template-columns:1fr}}
+.campo{display:flex;flex-direction:column;gap:5px}
+.campo>span{font-size:12px;color:var(--tinta-2);font-weight:600}
+.campo select,.campo input{font:inherit;font-size:13px;padding:9px 11px;border-radius:11px;
+  border:1px solid var(--linha-forte);background:var(--superficie);color:var(--tinta)}
+.campo select:focus,.campo input:focus{outline:none;border-color:var(--verde);
+  box-shadow:0 0 0 3px var(--verde-claro)}
+#destinos[hidden]{display:none}
 </style></head><body>
 <div class="wrap">
   <h1><i></i>docgen</h1>
@@ -183,9 +192,30 @@ label.op{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
   </div>
 
   <div class="bloco">
-    <h2>2 · Como gerar</h2>
+    <h2>2 · Para onde vai</h2>
+    <label class="op" style="margin-bottom:12px">
+      <input type="checkbox" id="publicar" checked> Publicar no Abacato quando terminar
+    </label>
+    <div id="destinos">
+      <div class="campos">
+        <label class="campo">
+          <span>Projeto de documentação</span>
+          <select id="projeto"><option>carregando…</option></select>
+        </label>
+        <label class="campo">
+          <span>Pasta dentro dele</span>
+          <input list="pastas" id="pasta" placeholder="(raiz do projeto)" autocomplete="off">
+          <datalist id="pastas"></datalist>
+        </label>
+      </div>
+      <p class="dica">Escreva um nome de pasta que ainda não existe e ela é criada. Deixe vazio
+        para o documento ficar na raiz do projeto.</p>
+    </div>
+  </div>
+
+  <div class="bloco">
+    <h2>3 · Gerar</h2>
     <div class="linha" style="margin-bottom:12px">
-      <label class="op"><input type="checkbox" id="publicar" checked> Publicar no Abacato quando terminar</label>
       <label class="op"><input type="checkbox" id="semCodigo"> Portal leve (sem o código-fonte embutido)</label>
     </div>
     <div class="linha">
@@ -249,6 +279,48 @@ pedir('/api/recentes').then(function (d) {
   });
 });
 
+/* ------------------------------------------------ para onde publicar */
+var DESTINOS = [];
+
+function pintarPastas() {
+  var proj = DESTINOS.filter(function (p) { return p.nome === document.getElementById('projeto').value; })[0];
+  var dl = document.getElementById('pastas');
+  dl.innerHTML = '';
+  (proj ? proj.pastas : []).forEach(function (nome) {
+    var o = document.createElement('option');
+    o.value = nome;
+    dl.appendChild(o);
+  });
+}
+
+pedir('/api/destinos').then(function (d) {
+  var sel = document.getElementById('projeto');
+  if (!d.ok) {
+    sel.innerHTML = '<option>—</option>';
+    document.getElementById('destinos').innerHTML =
+      '<div class="erro">Não consegui falar com o Abacato: ' + escapar(d.erro) + '</div>';
+    return;
+  }
+  DESTINOS = d.projetos || [];
+  sel.innerHTML = '';
+  DESTINOS.forEach(function (p) {
+    var o = document.createElement('option');
+    o.value = p.nome;
+    o.textContent = p.nome;
+    if (p.nome === d.padrao.projeto) o.selected = true;
+    sel.appendChild(o);
+  });
+  document.getElementById('pasta').value = d.padrao.pasta || '';
+  pintarPastas();
+  sel.onchange = pintarPastas;
+});
+
+/* Sem publicar, escolher destino nao quer dizer nada — e um par de campos que
+   nao faz efeito confunde mais do que ajuda. */
+document.getElementById('publicar').onchange = function () {
+  document.getElementById('destinos').hidden = !this.checked;
+};
+
 document.getElementById('gerar').onclick = function () {
   var botao = this;
   var res = document.getElementById('resultado');
@@ -259,7 +331,9 @@ document.getElementById('gerar').onclick = function () {
   pedir('/api/gerar', {
     caminho: atual,
     publicar: document.getElementById('publicar').checked,
-    semCodigo: document.getElementById('semCodigo').checked
+    semCodigo: document.getElementById('semCodigo').checked,
+    projeto: document.getElementById('projeto').value,
+    pasta: document.getElementById('pasta').value.trim()
   }).then(function (d) {
     botao.disabled = false;
     botao.textContent = 'Gerar documentação';
@@ -333,6 +407,43 @@ function subir(opts) {
         if (url.pathname === '/api/recentes') {
             return responder(200, { recentes: lerRecentes() });
         }
+
+        /* Para onde da para publicar: os projetos de documentacao e as pastas de
+           cada um. Sem isto a tela so sabia o destino fixo do arquivo de
+           configuracao, e tudo caia sempre na mesma pasta. */
+        if (url.pathname === '/api/destinos') {
+            try {
+                var pub = require('./publicar');
+                var cfg = pub.lerConfig();
+                var entrada = await fetch(cfg.url + '/api/auth/entrar', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ email: cfg.email, chave: pub.chaveDeLogin(cfg.email, cfg.senha) })
+                });
+                if (entrada.status !== 200) {
+                    return responder(200, { ok: false, erro: 'nao consegui entrar no Abacato (' + entrada.status + ')' });
+                }
+                var cookie = entrada.headers.get('set-cookie').split(';')[0];
+
+                var lista = await (await fetch(cfg.url + '/api/projetos', { headers: { cookie: cookie } })).json();
+                var projetos = [];
+                for (var i = 0; i < (lista.projetos || []).length; i++) {
+                    var p = lista.projetos[i];
+                    var dentro = await (await fetch(cfg.url + '/api/projetos/' + p.id, { headers: { cookie: cookie } })).json();
+                    projetos.push({
+                        id: p.id,
+                        nome: p.nome,
+                        /* So as pastas de primeiro nivel: uma arvore inteira num
+                           seletor nao ajuda a escolher, atrapalha. */
+                        pastas: (dentro.pastas || []).filter(function (f) { return !f.pai_id; })
+                            .map(function (f) { return f.nome; })
+                    });
+                }
+                return responder(200, { ok: true, projetos: projetos, padrao: { projeto: cfg.projeto, pasta: cfg.pasta || '' } });
+            } catch (e) {
+                return responder(200, { ok: false, erro: e && e.message ? e.message : String(e) });
+            }
+        }
         if (url.pathname === '/api/gerar' && req.method === 'POST') {
             var corpo = '';
             req.on('data', function (c) { corpo += c; });
@@ -375,6 +486,10 @@ function subir(opts) {
                 var p = await publicar(r.saida, {
                     nome: I.appCode + '.doc.html',
                     descricao: 'Documentacao tecnica de ' + I.appCode + ', gerada por leitura do codigo.',
+                    projeto: pedido.projeto || undefined,
+                    /* Pasta vazia e uma escolha valida — "na raiz do projeto" —
+                       e nao "use o padrao". Por isso o teste e por undefined. */
+                    pasta: pedido.pasta === undefined ? undefined : pedido.pasta,
                     aoPassar: function (t) { log.push('publicacao   : ' + t); }
                 });
                 return responder(200, {
