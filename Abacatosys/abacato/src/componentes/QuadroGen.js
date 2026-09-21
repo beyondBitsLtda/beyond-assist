@@ -31,16 +31,28 @@ export default function QuadroGen({ aoFechar }) {
   const [rascunho, setRascunho] = useState("");
   const [proposta, setProposta] = useState(null);
   const [avisos, setAvisos] = useState([]);
+  // Quantas vezes a proposta foi refeita. Sem isto, pedir uma mudança e receber um quadro
+  // parecido não dá NENHUM sinal de que a mudança foi aplicada — foi exatamente o que
+  // aconteceu: a pessoa pediu, a tela não se mexeu de forma visível, e ela ficou sem saber
+  // se a Lisa tinha entendido.
+  const [versao, setVersao] = useState(0);
   const [pensando, setPensando] = useState(false);
   const [criando, setCriando] = useState(false);
   const [erro, setErro] = useState("");
   const fim = useRef(null);
   const campo = useRef(null);
+  const previa = useRef(null);
 
   useEffect(() => { campo.current?.focus(); }, []);
   useEffect(() => {
     fim.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [mensagens, pensando]);
+
+  // Proposta refeita volta ao topo. Sem isto, quem pediu uma mudança na terceira coluna
+  // continuava olhando o meio da prévia anterior, sem sinal nenhum de que algo mudou.
+  useEffect(() => {
+    if (versao > 1) previa.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [versao]);
 
   useEffect(() => {
     const tecla = (e) => {
@@ -74,7 +86,11 @@ export default function QuadroGen({ aoFechar }) {
       if (!r.ok || !d.ok) throw new Error(d.error || "não consegui responder agora");
 
       setMensagens([...historico, { quem: "lisa", texto: d.texto }]);
-      if (d.proposta) { setProposta(d.proposta); setAvisos(d.avisos || []); }
+      if (d.proposta) {
+        setProposta(d.proposta);
+        setAvisos(d.avisos || []);
+        setVersao((v) => v + 1);
+      }
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -110,6 +126,9 @@ export default function QuadroGen({ aoFechar }) {
       }))
     : [];
   const corDaEtiqueta = new Map((proposta?.etiquetas || []).map((e) => [e.nome.toLowerCase(), e.cor]));
+  const resumo = proposta
+    ? `${proposta.colunas.length} coluna(s), ${proposta.cards.length} card(s)`
+    : "";
 
   return (
     <div className="abacato-painel" role="dialog" aria-modal="true" aria-label="Montar um quadro com a Lisa">
@@ -122,7 +141,7 @@ export default function QuadroGen({ aoFechar }) {
           <button type="button" className="abacato-icone" onClick={aoFechar} aria-label="fechar">✕</button>
         </header>
 
-        <div className="abacato-gen__corpo">
+        <div className={`abacato-gen__corpo${proposta ? " abacato-gen__corpo--com-previa" : ""}`}>
           {/* ------------------------------------------------ a conversa */}
           <div className="abacato-gen__conversa">
             {mensagens.length === 0 && (
@@ -157,9 +176,17 @@ export default function QuadroGen({ aoFechar }) {
 
           {/* ------------------------------------------------ a prévia */}
           {proposta && (
-            <div className="abacato-gen__previa">
+            <div className="abacato-gen__previa" ref={previa}>
               <div className="abacato-gen__previa-topo">
-                <strong>{proposta.nome}</strong>
+                <div className="abacato-gen__previa-nome">
+                  <strong>{proposta.nome}</strong>
+                  {/* O selo muda a cada versão: é o sinal de que o pedido foi atendido. */}
+                  {versao > 1 && (
+                    <span className="abacato-etiqueta abacato-etiqueta--ok">
+                      atualizada ({versao}ª versão)
+                    </span>
+                  )}
+                </div>
                 {proposta.descricao && <span className="abacato-dica">{proposta.descricao}</span>}
               </div>
 
@@ -203,18 +230,24 @@ export default function QuadroGen({ aoFechar }) {
                   {avisos.join(" · ")}
                 </div>
               )}
-
-              <div className="abacato-gen__acoes">
-                <span className="abacato-dica">
-                  Nada disso existe ainda. Peça mudanças na conversa, ou crie.
-                </span>
-                <button type="button" className="abacato-botao" onClick={criar} disabled={criando}>
-                  {criando ? "Criando…" : "Criar o quadro"}
-                </button>
-              </div>
             </div>
           )}
         </div>
+
+        {/* A BARRA DE CRIAR FICA FORA DA PRÉVIA, e presa embaixo.
+            Ela estava no fim da prévia, que rola — num quadro com nove cards o botão caía
+            abaixo do corte e a pessoa não via nem que ele existia. O que decide a tela não
+            pode depender de rolar até o fim para aparecer. */}
+        {proposta && (
+          <div className="abacato-gen__acoes">
+            <span className="abacato-dica">
+              {resumo} · nada disso existe ainda
+            </span>
+            <button type="button" className="abacato-botao" onClick={criar} disabled={criando || pensando}>
+              {criando ? "Criando…" : "Criar o quadro"}
+            </button>
+          </div>
+        )}
 
         <form className="abacato-lisa__barra" onSubmit={(e) => { e.preventDefault(); perguntar(rascunho); }}>
           <textarea

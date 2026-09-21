@@ -193,42 +193,65 @@
 
 /* ============================================================ Quadro Gen */
 
-/* A caixa e mais alta que a da Lisa: aqui cabe uma conversa E um quadro inteiro. */
-.abacato-gen { height: min(760px, 88vh); }
-.abacato-gen__etiquetas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+/* A caixa é mais alta que a da Lisa: aqui cabe uma conversa E um quadro inteiro. */
+.abacato-gen { height: min(780px, 90vh); }
 
-/* A conversa em cima, a prévia embaixo. Não lado a lado: a prévia é um quadro, e quadro se lê
-   na horizontal — espremê-lo em meia tela faria as colunas virarem tiras de 80px. */
+/* TRÊS FAIXAS QUE NÃO DISPUTAM ESPAÇO, e essa é a correção de um defeito real.
+ *
+ * Na primeira versão as três moravam dentro de um contêiner que rolava, e cada uma rolava
+ * por dentro também. O resultado: assim que a prévia aparecia, a conversa encolhia para uma
+ * tira de 40px com barra de rolagem — dava para ver meia mensagem — e o botão de criar,
+ * que ficava no fim da prévia, caía abaixo do corte. A pessoa pedia uma mudança, não via a
+ * resposta, e não achava o botão.
+ *
+ * Agora: a conversa tem altura PRÓPRIA e mínima, a prévia fica com o que sobra, e a barra
+ * de criar é presa embaixo. Nenhuma das três pode espremer a outra.
+ */
 .abacato-gen__corpo {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  /* Sem rolagem AQUI: quem rola são as faixas de dentro. Uma rolagem externa somada às
+     internas é o que fazia a conversa desaparecer. */
+  overflow: hidden;
 }
 
 .abacato-gen__conversa {
+  /* Não cresce, não encolhe: o tamanho é este. */
+  flex: 0 0 auto;
+  min-height: 130px;
+  max-height: 34vh;
+  overflow-y: auto;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* Encolhe quando a prévia aparece: a partir daí o que importa é o quadro, e a conversa
-     vira histórico. */
-  max-height: 46vh;
-  overflow-y: auto;
+}
+/* Sem proposta na tela, a conversa é a tela inteira.
+   A classe vem do componente, e não de um :has(): o layout inteiro depende desta regra, e
+   depender de um seletor que um navegador pode não entender é apostar a tela num detalhe. */
+.abacato-gen__corpo:not(.abacato-gen__corpo--com-previa) .abacato-gen__conversa {
+  flex: 1;
+  max-height: none;
 }
 .abacato-gen__vazio { margin: auto 0; }
 
 /* ------------------------------------------------ a prévia */
 
 .abacato-gen__previa {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   border-top: 1px solid var(--abacato-linha);
   background: var(--abacato-superficie-2);
   padding: 16px;
 }
-.abacato-gen__previa-topo { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
-.abacato-gen__previa-topo strong { font-size: 15px; }
+.abacato-gen__previa-topo { display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px; }
+.abacato-gen__previa-nome { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.abacato-gen__previa-nome strong { font-size: 15px; }
 
+.abacato-gen__etiquetas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .abacato-gen__etiqueta {
   font-size: 11px;
   font-weight: 700;
@@ -243,6 +266,7 @@
   display: flex;
   gap: 10px;
   overflow-x: auto;
+  align-items: flex-start;
   padding-bottom: 6px;
 }
 .abacato-gen__coluna {
@@ -275,19 +299,24 @@
 .abacato-gen__card-titulo { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .abacato-gen__marca { width: 4px; align-self: stretch; border-radius: 3px; flex-shrink: 0; }
 
+/* ------------------------------------------------ a barra de criar */
+
+/* Presa embaixo, fora da prévia que rola. É a decisão da tela: ela não pode depender de
+   rolar até o fim para aparecer. */
 .abacato-gen__acoes {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  margin-top: 14px;
-  padding-top: 14px;
+  padding: 12px 16px;
   border-top: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie);
 }
 .abacato-gen__acoes .abacato-botao { margin-left: auto; }
 
 @media (max-width: 620px) {
-  .abacato-gen__conversa { max-height: 38vh; }
+  .abacato-gen__conversa { min-height: 110px; max-height: 28vh; }
   .abacato-gen__coluna { flex-basis: 170px; }
   .abacato-gen__acoes .abacato-botao { margin-left: 0; width: 100%; }
 }
