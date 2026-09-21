@@ -26,7 +26,8 @@
     "publicar": "npm run cf:build && wrangler deploy",
     "painel-check": "node scripts/painel-check.mjs",
     "pessoas-check": "node --env-file=.env.local scripts/pessoas-check.mjs",
-    "cliente-check": "node scripts/cliente-check.mjs"
+    "cliente-check": "node scripts/cliente-check.mjs",
+    "lisa-check": "node --env-file=.env.local scripts/lisa-check.mjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.6",

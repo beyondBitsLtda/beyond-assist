@@ -37,8 +37,12 @@ export async function GET(req) {
     if (!ids.size) return json({ ok: true, geral: painelGeral([]), quadros: [] });
 
     const agora = new Date();
+    // O fuso de QUEM ESTÁ OLHANDO, mandado pela tela. Este servidor roda em UTC: sem isto,
+    // entre 21h e a meia-noite no Brasil toda contagem de dias sai errada por um, sem erro
+    // nenhum aparecer. Zero (UTC) é o padrão de quem não informou.
+    const fuso = Number(new URL(req.url).searchParams.get("fuso"));
     const quadros = await carregarQuadrosParaPainel([...ids]);
-    const paineis = quadros.map((q) => painelDoQuadro(q, agora));
+    const paineis = quadros.map((q) => painelDoQuadro(q, agora, Number.isFinite(fuso) ? fuso : 0));
 
     paineis.sort((a, b) => b.porEstado.atrasado - a.porEstado.atrasado || b.abertos - a.abertos);
     return json({ ok: true, geral: painelGeral(paineis), quadros: paineis });

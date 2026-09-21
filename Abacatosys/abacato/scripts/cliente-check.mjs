@@ -8,7 +8,7 @@
 // torcendo, e este teste precisa dizer "atrasado há 3 dias" com certeza.
 
 import { Quadro } from "../src/dominio/Quadro.js";
-import { emAndamento, proximasEntregas, entreguesRecentes, painelDoQuadro } from "../src/dominio/painel.js";
+import { emAndamento, proximasEntregas, entreguesRecentes, painelDoQuadro, maisAtrasados } from "../src/dominio/painel.js";
 
 const AGORA = new Date("2026-03-10T12:00:00Z");
 const dia = (n) => new Date(AGORA.getTime() + n * 86400000).toISOString();
@@ -179,7 +179,37 @@ console.log("\n4) o que o link público não entrega");
 
 // ---------------------------------------------------------------- quadro vazio
 
-console.log("\n5) um quadro vazio não inventa nada");
+console.log("\n5) a contagem de dias é a de quem OLHA, não a do servidor");
+{
+  // 2026-03-10T02:00Z já é dia 10 em UTC, mas ainda é dia 9 às 23h no Brasil (fuso 180).
+  // Este servidor roda em UTC: sem o fuso, entre 21h e a meia-noite TODA contagem de dias
+  // sai errada por um — e nada avisa, porque um número a menos continua parecendo um número.
+  const noite = new Date("2026-03-10T02:00:00Z");
+  const prazo = new Date("2026-03-20T15:00:00Z");
+  const card = [{ id: "x", titulo: "Entrega", fimEm: prazo.toISOString() }];
+  const quadroNoite = new Quadro({
+    id: "n", nome: "x", donoId: "u",
+    colunas: [{ id: "c", nome: "Fazendo", posicao: 1, cards: card }],
+  });
+  const cards = quadroNoite.todosOsCards();
+
+  const emUtc = proximasEntregas(cards, noite, 8, 0)[0];
+  const noBrasil = proximasEntregas(cards, noite, 8, 180)[0];
+
+  conferir("em UTC, o servidor conta 10 dias", emUtc.emDias === 10, String(emUtc.emDias));
+  conferir("para quem está no Brasil, são 11", noBrasil.emDias === 11, String(noBrasil.emDias));
+  conferir("e a diferença é exatamente um dia", noBrasil.emDias - emUtc.emDias === 1);
+
+  // O mesmo vale para o atraso: "atrasado há 10 dias" virava 11 depois das 21h.
+  const vencido = [{ id: "v", titulo: "Venceu", fimEm: new Date("2026-02-28T15:00:00Z").toISOString() }];
+  const q2 = new Quadro({ id: "v", nome: "x", donoId: "u", colunas: [{ id: "c", nome: "F", posicao: 1, cards: vencido }] });
+  const a0 = maisAtrasados(q2.todosOsCards(), noite, 8, 0)[0];
+  const a180 = maisAtrasados(q2.todosOsCards(), noite, 8, 180)[0];
+  conferir("o atraso também segue o fuso de quem olha",
+    a180.diasAtrasado === a0.diasAtrasado - 1, `${a0.diasAtrasado} em UTC, ${a180.diasAtrasado} no Brasil`);
+}
+
+console.log("\n6) um quadro vazio não inventa nada");
 {
   const vazio = new Quadro({ id: "v", nome: "Novo", donoId: "u", colunas: [] });
   const p = painelDoQuadro(vazio, AGORA);

@@ -101,7 +101,7 @@ ok("quadro montado", "7 cards em estados diferentes");
 // ------------------------------------------------------------------ o painel interno
 
 console.log("\n2) os números batem");
-const paineis = await precisa("painel", chamar("/api/paineis"));
+const paineis = await precisa("painel", chamar(`/api/paineis?fuso=${new Date().getTimezoneOffset()}`));
 const p = paineis.quadros.find((x) => x.id === qid);
 conferir("o quadro aparece no painel", Boolean(p));
 conferir("sete cards no total", p.total === 7, `${p.total}`);

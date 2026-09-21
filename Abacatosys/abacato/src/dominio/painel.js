@@ -11,9 +11,27 @@ import { Quadro } from "./Quadro.js";
 
 const DIA = 24 * 60 * 60 * 1000;
 
-/** Uma data sem hora, para comparar dias sem o fuso atrapalhar. */
-function soODia(d) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+/**
+ * O DIA de um instante, no fuso de quem está olhando.
+ *
+ * ------------------------------------------------------------------------------------------
+ * POR QUE O FUSO ENTRA AQUI, E NÃO É DETALHE
+ *
+ * Este código roda num servidor em UTC. Entre 21h e meia-noite no Brasil, o servidor já virou
+ * o dia e quem está na tela não — e aí TODA contagem de dias sai errada por um: "em 10 dias"
+ * vira "em 9", "atrasado há 10" vira "atrasado há 11". O painel não dá erro nenhum; ele só
+ * mente uma vez por noite, e ninguém desconfia de um número.
+ *
+ * `fusoMinutos` é o que `Date.prototype.getTimezoneOffset()` devolve no navegador de quem
+ * está lendo — 180 no horário de Brasília. Zero é UTC, que é o certo quando ninguém informou.
+ *
+ * Devolve um NÚMERO (o instante da meia-noite daquele dia, em UTC) porque o que se faz com
+ * isto é subtrair e comparar, nunca formatar.
+ * ------------------------------------------------------------------------------------------
+ */
+function soODia(d, fusoMinutos = 0) {
+  const local = new Date(d.getTime() - fusoMinutos * 60000);
+  return Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
 }
 
 /**
@@ -22,7 +40,7 @@ function soODia(d) {
  * `agora` entra por parâmetro para o teste poder fixar o dia — uma função que lê o relógio por
  * dentro só dá para testar torcendo.
  */
-export function painelDoQuadro(dadosDoQuadro, agora = new Date()) {
+export function painelDoQuadro(dadosDoQuadro, agora = new Date(), fuso = 0) {
   const quadro = dadosDoQuadro instanceof Quadro ? dadosDoQuadro : new Quadro(dadosDoQuadro);
   const cards = quadro.todosOsCards();
 
@@ -45,11 +63,11 @@ export function painelDoQuadro(dadosDoQuadro, agora = new Date()) {
     colunas: porColuna(quadro, agora),
     etiquetas: porEtiqueta(quadro, agora),
     pessoas: porPessoa(quadro, agora),
-    semana: proximosDias(cards, agora, 14),
-    atrasadosDetalhe: maisAtrasados(cards, agora, 8),
+    semana: proximosDias(cards, agora, 14, fuso),
+    atrasadosDetalhe: maisAtrasados(cards, agora, 8, fuso),
     // Para quem acompanha de fora: o que está rodando, o que vem e o que saiu.
     emAndamento: emAndamento(quadro, agora, 12),
-    proximasEntregas: proximasEntregas(cards, agora, 8),
+    proximasEntregas: proximasEntregas(cards, agora, 8, fuso),
     entregues: entreguesRecentes(cards, 8),
   };
 }
@@ -124,11 +142,11 @@ export function porPessoa(quadro, agora = new Date()) {
  * por dia o que já passou daria uma fila de barras de altura 1 que não ajuda ninguém a decidir
  * nada — o que importa do passado é o tamanho da dívida, não o formato dela.
  */
-export function proximosDias(cards, agora = new Date(), dias = 14) {
-  const hoje = soODia(agora);
+export function proximosDias(cards, agora = new Date(), dias = 14, fuso = 0) {
+  const hoje = soODia(agora, fuso);
   const baldes = [{ rotulo: "atrasado", dia: null, total: 0 }];
   for (let i = 0; i < dias; i++) {
-    const d = new Date(hoje.getTime() + i * DIA);
+    const d = new Date(hoje + i * DIA);
     baldes.push({ rotulo: i === 0 ? "hoje" : i === 1 ? "amanhã" : null, dia: d.toISOString().slice(0, 10), total: 0 });
   }
 
@@ -155,7 +173,7 @@ export function proximosDias(cards, agora = new Date(), dias = 14) {
     // o significado de "hoje" no card, que é usado em toda parte.
     if (estado === "hoje") { baldes[1].total++; continue; }
 
-    const distancia = Math.round((soODia(c.fimEm).getTime() - hoje.getTime()) / DIA);
+    const distancia = Math.round((soODia(c.fimEm, fuso) - hoje) / DIA);
     if (distancia >= 0 && distancia < dias) baldes[distancia + 1].total++;
     // Além do horizonte não entra: um prazo para daqui a seis meses não é notícia hoje.
   }
@@ -163,7 +181,7 @@ export function proximosDias(cards, agora = new Date(), dias = 14) {
 }
 
 /** Os que mais venceram, do mais antigo para o menos. É a lista que vira ação. */
-export function maisAtrasados(cards, agora = new Date(), quantos = 8) {
+export function maisAtrasados(cards, agora = new Date(), quantos = 8, fuso = 0) {
   return cards
     .filter((c) => c.estadoDoPrazo(agora) === "atrasado")
     .sort((a, b) => a.fimEm - b.fimEm)
@@ -172,7 +190,7 @@ export function maisAtrasados(cards, agora = new Date(), quantos = 8) {
       id: c.id,
       titulo: c.titulo,
       fimEm: c.fimEm.toISOString(),
-      diasAtrasado: Math.floor((soODia(agora) - soODia(c.fimEm)) / DIA),
+      diasAtrasado: Math.floor((soODia(agora, fuso) - soODia(c.fimEm, fuso)) / DIA),
       etiquetas: c.etiquetas.map((e) => ({ nome: e.nome, cor: e.cor })),
       responsaveis: c.responsaveis.map((u) => u.iniciais),
     }));
@@ -287,17 +305,17 @@ export function emAndamento(quadro, agora = new Date(), quantos = 12) {
  * Não inclui o que já venceu — isso é "atrasado", tem seção própria, e misturar os dois faria
  * a próxima entrega aparecer como se ainda estivesse por vir.
  */
-export function proximasEntregas(cards, agora = new Date(), quantos = 8) {
-  const hoje = soODia(agora);
+export function proximasEntregas(cards, agora = new Date(), quantos = 8, fuso = 0) {
+  const hoje = soODia(agora, fuso);
   return cards
-    .filter((c) => !c.concluido && c.fimEm && soODia(c.fimEm) >= hoje)
+    .filter((c) => !c.concluido && c.fimEm && soODia(c.fimEm, fuso) >= hoje)
     .sort((a, b) => a.fimEm - b.fimEm)
     .slice(0, quantos)
     .map((c) => ({
       titulo: c.titulo,
       fimEm: c.fimEm.toISOString(),
       // Dias até vencer. 0 é hoje — e "hoje" é o que o cliente lê, não "em 0 dias".
-      emDias: Math.round((soODia(c.fimEm) - hoje) / DIA),
+      emDias: Math.round((soODia(c.fimEm, fuso) - hoje) / DIA),
       estado: c.estadoDoPrazo(agora),
     }));
 }

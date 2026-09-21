@@ -50,7 +50,10 @@ export async function GET(req, { params }) {
     // quadro é como alguém desliga o acompanhamento.
     if (!quadro) return NAO_EXISTE;
 
-    const p = painelDoQuadro(quadro);
+    // O fuso do navegador do CLIENTE. Ele não tem conta, mas tem relógio — e "em 3 dias"
+    // precisa contar a partir do dia dele, não do dia do servidor.
+    const fuso = Number(new URL(req.url).searchParams.get("fuso"));
+    const p = painelDoQuadro(quadro, new Date(), Number.isFinite(fuso) ? fuso : 0);
 
     // Registrar a visita não pode atrasar nem derrubar a resposta: o cliente está esperando a
     // página, e uma contagem de acessos não vale um segundo de espera dele. Sem `await`, e com

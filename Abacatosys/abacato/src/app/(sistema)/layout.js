@@ -1,5 +1,6 @@
 import BarraLateral from "@/componentes/BarraLateral.js";
 import BarraDoTopo from "@/componentes/BarraDoTopo.js";
+import Lisa from "@/componentes/Lisa.js";
 
 /**
  * A moldura de tudo que exige login.
@@ -20,6 +21,10 @@ export default function LayoutDoSistema({ children }) {
         <BarraDoTopo />
         <main className="abacato-conteudo">{children}</main>
       </div>
+      {/* Fora da coluna que rola, e por isso flutua por cima de qualquer tela do sistema.
+          Fica só aqui dentro: as telas públicas não têm sessão, e uma assistente sem sessão
+          não teria o que ler nem em nome de quem agir. */}
+      <Lisa />
     </div>
   );
 }

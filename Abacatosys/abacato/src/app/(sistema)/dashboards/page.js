@@ -24,7 +24,7 @@ export default function Dashboards() {
   const [compartilhando, setCompartilhando] = useState(null);
 
   const carregar = useCallback(async () => {
-    try { setDados(await obter("/api/paineis")); setErro(""); }
+    try { setDados(await obter(`/api/paineis?fuso=${new Date().getTimezoneOffset()}`)); setErro(""); }
     catch (e) { setErro(e.message); }
   }, []);
 

@@ -31,7 +31,7 @@ export default function PainelPublico() {
 
   const carregar = useCallback(async () => {
     try {
-      const res = await fetch(`/api/publico/${token}`);
+      const res = await fetch(`/api/publico/${token}?fuso=${new Date().getTimezoneOffset()}`);
       const d = await res.json().catch(() => ({}));
       if (!res.ok || !d.ok) throw new Error(d.error || "não consegui abrir este painel");
       setDados(d);

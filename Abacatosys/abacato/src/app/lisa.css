@@ -1,0 +1,192 @@
+/* Abacato System — a Lisa.
+ *
+ * Um botão no canto e uma janela de conversa. O botão fica ACIMA de tudo mas fora do caminho:
+ * no celular ele sobe, porque embaixo mora a barra de navegação — um botão flutuante em cima
+ * dela é o jeito de a pessoa errar o alvo todas as vezes.
+ */
+
+/* ============================================================ o botão */
+
+.abacato-lisa-botao {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-verde);
+  color: #FFFFFF;
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: var(--abacato-sombra-alta);
+}
+.abacato-lisa-botao:hover { background: var(--abacato-verde-fundo); }
+
+/* O ponto pulsa devagar. É o único movimento da tela, e serve a uma coisa: dizer que ali há
+   alguém para responder. Some para quem pediu menos movimento. */
+.abacato-lisa-botao__ponto,
+.abacato-lisa__ponto {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  flex-shrink: 0;
+  animation: abacato-pulso 2.4s ease-in-out infinite;
+}
+.abacato-lisa__ponto { background: var(--abacato-verde); }
+
+@keyframes abacato-pulso {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .abacato-lisa-botao__ponto, .abacato-lisa__ponto { animation: none; }
+}
+
+/* ============================================================ a janela */
+
+.abacato-lisa {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 22px;
+}
+.abacato-lisa__fundo {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.abacato-lisa__caixa {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(460px, 100%);
+  height: min(640px, 82vh);
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio-grande);
+  box-shadow: var(--abacato-sombra-alta);
+  overflow: hidden;
+}
+
+.abacato-lisa__topo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--abacato-linha);
+  flex-shrink: 0;
+}
+.abacato-lisa__topo strong { font-size: 15px; }
+
+/* ============================================================ a conversa */
+
+.abacato-lisa__conversa {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.abacato-lisa__vazio { margin: auto 0; }
+.abacato-lisa__vazio-titulo { font-weight: 600; margin: 0 0 6px; }
+.abacato-lisa__sugestoes { display: flex; flex-direction: column; gap: 7px; margin-top: 16px; }
+.abacato-lisa__sugestao {
+  text-align: left;
+  border: 1px solid var(--abacato-linha);
+  border-radius: 12px;
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 13px;
+  padding: 9px 13px;
+  cursor: pointer;
+}
+.abacato-lisa__sugestao:hover { border-color: var(--abacato-verde); color: var(--abacato-tinta); }
+
+.abacato-fala { display: flex; flex-direction: column; gap: 6px; max-width: 88%; }
+.abacato-fala--pessoa { align-self: flex-end; align-items: flex-end; }
+.abacato-fala--lisa { align-self: flex-start; }
+
+.abacato-fala__texto {
+  border-radius: 16px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  /* A resposta pode trazer lista e quebra de linha; sem isto tudo vira um parágrafo só. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.abacato-fala--pessoa .abacato-fala__texto {
+  background: var(--abacato-verde);
+  color: #FFFFFF;
+  border-bottom-right-radius: 5px;
+}
+.abacato-fala--lisa .abacato-fala__texto {
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta);
+  border-bottom-left-radius: 5px;
+}
+.abacato-fala__pensando { color: var(--abacato-tinta-3); font-style: italic; }
+
+/* O que ela MEXEU, marcado. Uma assistente que altera dados sem dizer o que alterou
+   transforma cada resposta numa dúvida. */
+.abacato-fala__acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.abacato-fala__acao {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-verde-claro);
+  color: var(--abacato-verde-fundo);
+}
+
+/* ============================================================ a barra de baixo */
+
+.abacato-lisa__barra {
+  display: flex;
+  gap: 9px;
+  align-items: flex-end;
+  padding: 12px 14px;
+  border-top: 1px solid var(--abacato-linha);
+  flex-shrink: 0;
+}
+.abacato-lisa__campo {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  max-height: 120px;
+  padding: 10px 13px;
+  border: 1px solid var(--abacato-linha);
+  border-radius: 13px;
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta);
+}
+.abacato-lisa__campo:focus {
+  outline: none;
+  border-color: var(--abacato-verde);
+  background: var(--abacato-superficie);
+}
+
+@media (max-width: 620px) {
+  /* Embaixo mora a barra de navegação do celular: o botão sobe para não disputar o toque. */
+  .abacato-lisa-botao { bottom: 82px; right: 16px; padding: 11px 17px; }
+  .abacato-lisa { padding: 0; align-items: stretch; }
+  .abacato-lisa__caixa { width: 100%; height: 100%; border-radius: 0; border: 0; }
+}
