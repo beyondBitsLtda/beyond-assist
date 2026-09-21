@@ -6,6 +6,7 @@ import { CORES } from "@/dominio/cores.js";
 import { criar, mudar, definir, remover } from "@/lib/api.js";
 import { dataCurta } from "./CardMini.js";
 import { regraEmPalavras } from "@/dominio/recorrencia.js";
+import EscolherDestino from "./EscolherDestino.js";
 
 /**
  * A prancheta de checklists.
@@ -53,6 +54,8 @@ export default function PainelDoCard({ card: dados, quadro, poderes, aoFechar, a
   const [novaChecklist, setNovaChecklist] = useState(false);
   const [novoLink, setNovoLink] = useState(false);
   const [recado, setRecado] = useState("");
+  // "mover" | "copiar" | null — qual diálogo de destino está aberto.
+  const [destino, setDestino] = useState(null);
   const caixa = useRef(null);
 
   useEffect(() => { setDescricao(card.descricao || ""); }, [card.id, card.descricao]);
@@ -448,10 +451,16 @@ export default function PainelDoCard({ card: dados, quadro, poderes, aoFechar, a
         </div>
 
         <footer className="abacato-painel__rodape">
+          {poderes.editar && (
+            <button type="button" className="abacato-botao abacato-botao--fantasma" disabled={salvando}
+              onClick={() => setDestino("mover")}>
+              → Mover
+            </button>
+          )}
           {poderes.criar && (
             <button type="button" className="abacato-botao abacato-botao--fantasma" disabled={salvando}
-              onClick={() => agir(() => criar(`/api/cards/${card.id}/copiar`, {}))}>
-              ⎘ Copiar card
+              onClick={() => setDestino("copiar")}>
+              ⎘ Copiar para…
             </button>
           )}
           {poderes.apagar && (
@@ -471,6 +480,37 @@ export default function PainelDoCard({ card: dados, quadro, poderes, aoFechar, a
           <span className="abacato-painel__estado">{salvando ? "salvando…" : "tudo salvo"}</span>
         </footer>
       </div>
+
+      {destino && (
+        <EscolherDestino
+          titulo={destino === "mover" ? "Mover a tarefa" : "Copiar a tarefa"}
+          rotuloAcao={destino === "mover" ? "Mover" : "Copiar"}
+          quadroAtual={quadro?.id}
+          colunaAtual={card.colunaId}
+          aoFechar={() => setDestino(null)}
+          aoConfirmar={async ({ colunaId }) => {
+            const r = destino === "mover"
+              ? await criar(`/api/cards/${card.id}/mover`, { colunaId })
+              : await criar(`/api/cards/${card.id}/copiar`, { colunaId });
+
+            // O que a travessia custou, dito em voz alta. Uma etiqueta recriada e um
+            // responsável removido são mudanças de verdade, e sumir com elas faria a pessoa
+            // descobrir por acaso, dias depois.
+            const notas = [];
+            if (r.etiquetasCriadas?.length) notas.push(`etiqueta(s) criada(s) lá: ${r.etiquetasCriadas.join(", ")}`);
+            if (r.responsaveisRemovidos?.length) notas.push(`saiu dos responsáveis: ${r.responsaveisRemovidos.join(", ")}`);
+            setRecado(
+              (destino === "mover" ? "Movida." : "Copiada.") + (notas.length ? ` ${notas.join(" · ")}` : "")
+            );
+
+            setDestino(null);
+            await aoRecarregar?.();
+            // Mover para outro quadro tira o card DESTE quadro: o painel aberto passaria a
+            // mostrar uma tarefa que não está mais aqui.
+            if (destino === "mover" && r.mudouDeQuadro) aoFechar();
+          }}
+        />
+      )}
     </div>
   );
 }

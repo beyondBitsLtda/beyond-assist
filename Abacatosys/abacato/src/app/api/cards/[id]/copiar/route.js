@@ -2,6 +2,7 @@ import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { exigir, respostaDeErro, ErroDeAcesso, tocarQuadro } from "@/lib/acesso.js";
 import { posicaoEntre } from "@/dominio/Quadro.js";
+import { ajustarCardNoDestino } from "@/lib/mudarDeQuadro.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,13 +29,22 @@ export async function POST(req, { params }) {
       .eq("id", id).maybeSingle();
     if (!original) throw new ErroDeAcesso(404, "card não encontrado");
 
+    // A cópia pode ir para QUALQUER coluna que você possa preencher — inclusive de outro
+    // quadro. Diferente de mover, copiar não tira nada de lugar nenhum: o original continua
+    // onde estava, e por isso a travessia de quadro aqui é bem menos perigosa do que lá.
+    //
+    // A exigência continua sendo poder CRIAR no destino, conferida no destino em si.
     let colunaDestino = original.coluna_id;
+    let quadroDestino = quadroId;
     if (corpo.colunaId && corpo.colunaId !== original.coluna_id) {
       const { data: destino } = await supabase
-        .from("abacato_colunas").select("id, quadro_id").eq("id", corpo.colunaId).maybeSingle();
-      if (!destino || destino.quadro_id !== quadroId) throw new ErroDeAcesso(403, "essa coluna é de outro quadro");
+        .from("abacato_colunas").select("id, quadro_id, arquivada").eq("id", corpo.colunaId).maybeSingle();
+      if (!destino || destino.arquivada) throw new ErroDeAcesso(404, "coluna de destino não existe");
+      await exigir(req, "coluna", destino.id, "criar");
       colunaDestino = destino.id;
+      quadroDestino = destino.quadro_id;
     }
+    const mesmoQuadro = quadroDestino === quadroId;
 
     const { data: ultimo } = await supabase
       .from("abacato_cards").select("posicao").eq("coluna_id", colunaDestino).eq("arquivado", false)
@@ -59,11 +69,15 @@ export async function POST(req, { params }) {
     ]);
 
     const tarefas = [];
-    if (etiquetas.data?.length) {
+    // Dentro do mesmo quadro, etiqueta e responsável vão como estão. Atravessando a fronteira,
+    // eles precisam de tradução — o `etiqueta_id` do quadro de origem não existe no destino,
+    // e um responsável de lá pode não alcançar este quadro. A tradução acontece depois, com o
+    // card já criado.
+    if (mesmoQuadro && etiquetas.data?.length) {
       tarefas.push(supabase.from("abacato_card_etiquetas")
         .insert(etiquetas.data.map((e) => ({ card_id: novo.id, etiqueta_id: e.etiqueta_id }))));
     }
-    if (responsaveis.data?.length) {
+    if (mesmoQuadro && responsaveis.data?.length) {
       tarefas.push(supabase.from("abacato_card_responsaveis")
         .insert(responsaveis.data.map((r) => ({ card_id: novo.id, usuario_id: r.usuario_id }))));
     }
@@ -84,8 +98,28 @@ export async function POST(req, { params }) {
       }
     }
 
-    await tocarQuadro(quadroId);
-    return json({ ok: true, cardId: novo.id }, 201);
+    let ajuste = { etiquetasCriadas: [], responsaveisRemovidos: [] };
+    if (!mesmoQuadro) {
+      ajuste = await ajustarCardNoDestino(
+        novo.id,
+        (etiquetas.data || []).map((e) => e.etiqueta_id),
+        (responsaveis.data || []).map((r) => r.usuario_id),
+        quadroDestino
+      );
+    }
+
+    await Promise.all([
+      tocarQuadro(quadroId),
+      mesmoQuadro ? Promise.resolve() : tocarQuadro(quadroDestino),
+    ]);
+    return json({
+      ok: true,
+      cardId: novo.id,
+      colunaId: colunaDestino,
+      quadroId: quadroDestino,
+      mudouDeQuadro: !mesmoQuadro,
+      ...ajuste,
+    }, 201);
   } catch (e) {
     return respostaDeErro(e);
   }

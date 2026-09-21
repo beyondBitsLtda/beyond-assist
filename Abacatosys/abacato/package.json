@@ -28,7 +28,8 @@
     "pessoas-check": "node --env-file=.env.local scripts/pessoas-check.mjs",
     "cliente-check": "node scripts/cliente-check.mjs",
     "lisa-check": "node --env-file=.env.local scripts/lisa-check.mjs",
-    "migrar": "node --env-file=.env.local scripts/migrar.mjs"
+    "migrar": "node --env-file=.env.local scripts/migrar.mjs",
+    "mover-check": "node --env-file=.env.local scripts/mover-check.mjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.6",

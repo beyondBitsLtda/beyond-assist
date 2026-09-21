@@ -27,6 +27,10 @@ export default function PaginaDoQuadro() {
   const [parede, setParede] = useState(false);
   const [compartilhar, setCompartilhar] = useState(false);
   const [novaColuna, setNovaColuna] = useState(false);
+  // Etiquetas abertas (com o nome) ou fechadas (só a barrinha). Fica no navegador de quem
+  // olha, e não no quadro: é preferência de leitura, não configuração do quadro — duas
+  // pessoas podem querer coisas diferentes no mesmo quadro, ao mesmo tempo.
+  const [etiquetasAbertas, setEtiquetasAbertas] = useState(false);
   const [aviso, setAviso] = useState("");
   const faixa = useRef(null);
 
@@ -44,6 +48,22 @@ export default function PaginaDoQuadro() {
   }, [id]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // A preferência de etiqueta sobrevive ao recarregamento, como o tema. O `try` existe porque
+  // em janela anônima ou com armazenamento bloqueado o `localStorage` LANÇA ao ser lido — e
+  // uma preferência de leitura não pode derrubar o quadro.
+  useEffect(() => {
+    try { setEtiquetasAbertas(localStorage.getItem("abacato-etiquetas") === "abertas"); }
+    catch { /* segue fechada, que é o padrão */ }
+  }, []);
+
+  const alternarEtiquetas = useCallback(() => {
+    setEtiquetasAbertas((antes) => {
+      const agora = !antes;
+      try { localStorage.setItem("abacato-etiquetas", agora ? "abertas" : "fechadas"); } catch {}
+      return agora;
+    });
+  }, []);
 
   // `?card=<id>` abre o card direto. É o que faz um link da Lisa — "você tem a proposta do
   // cliente vencendo hoje" — cair NO CARD, e não numa coluna com trinta outros para procurar
@@ -291,9 +311,13 @@ export default function PaginaDoQuadro() {
             arrasto={arrasto}
             poderes={poderes}
             aoAbrirCard={setCardAberto}
+            quadroId={id}
             aoIniciarArrasto={iniciar}
             aoConcluirCard={concluirCard}
             aoCriarCard={criarCard}
+            aoRecarregar={() => carregar(true)}
+            etiquetasAbertas={etiquetasAbertas}
+            aoAlternarEtiquetas={alternarEtiquetas}
             aoRenomear={(colunaId, nome) => mudar(`/api/colunas/${colunaId}`, { nome }).then(() => carregar(true)).catch((e) => setErro(e.message))}
             aoMudarCapa={(colunaId, capa) => mudar(`/api/colunas/${colunaId}`, { capa }).then(() => carregar(true)).catch((e) => setErro(e.message))}
             aoArquivar={(colunaId) => remover(`/api/colunas/${colunaId}`).then(() => carregar(true)).catch((e) => setErro(e.message))}

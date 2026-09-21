@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import CardMini from "./CardMini.js";
+import EscolherDestino from "./EscolherDestino.js";
+import { criar } from "@/lib/api.js";
 
 /**
  * Uma coluna do quadro.
@@ -11,13 +13,15 @@ import CardMini from "./CardMini.js";
  * a cada uma obrigaria a cinco cliques a mais.
  */
 export default function Coluna({
-  coluna, alvo, arrasto, poderes, aoAbrirCard, aoIniciarArrasto, aoConcluirCard,
-  aoCriarCard, aoRenomear, aoArquivar, aoMudarCapa,
+  coluna, quadroId, alvo, arrasto, poderes, aoAbrirCard, aoIniciarArrasto, aoConcluirCard,
+  aoCriarCard, aoRenomear, aoArquivar, aoMudarCapa, aoRecarregar,
+  etiquetasAbertas, aoAlternarEtiquetas,
 }) {
   const [escrevendo, setEscrevendo] = useState(false);
   const [texto, setTexto] = useState("");
   const [editandoNome, setEditandoNome] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [mudandoDeQuadro, setMudandoDeQuadro] = useState(false);
   const campo = useRef(null);
   const fim = useRef(null);
 
@@ -57,6 +61,8 @@ export default function Coluna({
           aoIniciarArrasto={aoIniciarArrasto}
           aoConcluir={aoConcluirCard}
           podeEditar={poderes.editar}
+          etiquetasAbertas={etiquetasAbertas}
+          aoAlternarEtiquetas={aoAlternarEtiquetas}
         />
       );
     }
@@ -120,6 +126,10 @@ export default function Coluna({
                   <button type="button" className="abacato-menu__item" onClick={() => { setMenu(false); setEscrevendo(true); }}>
                     Adicionar card
                   </button>
+                  <button type="button" className="abacato-menu__item"
+                    onClick={() => { setMenu(false); setMudandoDeQuadro(true); }}>
+                    Mover para outro quadro
+                  </button>
                   <button
                     type="button"
                     className="abacato-menu__item abacato-menu__item--perigo"
@@ -176,6 +186,24 @@ export default function Coluna({
         <button type="button" className="abacato-coluna__adicionar" onClick={() => setEscrevendo(true)}>
           + Adicionar card
         </button>
+      )}
+
+      {mudandoDeQuadro && (
+        <EscolherDestino
+          titulo={`Mover a coluna "${coluna.nome}"`}
+          rotuloAcao="Mover a coluna"
+          // Só o quadro: uma coluna vai para o FIM do quadro de destino, e não para dentro de
+          // outra coluna.
+          modo="quadro"
+          quadroAtual={quadroId}
+          aoFechar={() => setMudandoDeQuadro(false)}
+          aoConfirmar={async ({ quadroId }) => {
+            await criar(`/api/colunas/${coluna.id}/mover`, { quadroId });
+            setMudandoDeQuadro(false);
+            // A coluna saiu deste quadro: a tela inteira precisa ser relida, e não só ela.
+            aoRecarregar?.();
+          }}
+        />
       )}
     </section>
   );

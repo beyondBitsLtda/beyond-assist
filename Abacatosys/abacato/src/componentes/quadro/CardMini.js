@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, Usuario } from "@/dominio/Quadro.js";
+import { tintaSobre } from "@/dominio/cores.js";
 
 /** Uma data como quem fala: "hoje", "ontem", "12 de set". O ano só aparece quando não é este —
  *  escrever 2026 em tudo gasta espaço para repetir o que já se sabe. */
@@ -35,7 +36,7 @@ const ROTULO_DO_PRAZO = {
  * abre o card. Repetir aqui o que está no painel faria a coluna virar um paredão de texto em
  * que nada se destaca.
  */
-export default function CardMini({ dados, aoAbrir, aoIniciarArrasto, arrastando, aoConcluir, podeEditar }) {
+export default function CardMini({ dados, aoAbrir, aoIniciarArrasto, arrastando, aoConcluir, podeEditar, etiquetasAbertas, aoAlternarEtiquetas }) {
   const card = dados instanceof Card ? dados : new Card(dados);
   const prazo = card.estadoDoPrazo();
   const progresso = card.progressoDasChecklists;
@@ -63,15 +64,28 @@ export default function CardMini({ dados, aoAbrir, aoIniciarArrasto, arrastando,
       {card.etiquetas.length > 0 && (
         <div className="abacato-card__etiquetas">
           {card.etiquetas.map((e) => (
-            // A cor sozinha não informa quem não distingue cores, e não informa ninguém que não
-            // decorou a legenda. O nome fica no `title` e no rótulo acessível.
-            <span
+            // Clicar numa etiqueta abre o NOME de todas as do quadro, e clicar de novo fecha.
+            // É o gesto do Trello, e ele resolve um problema real: a cor sozinha não informa
+            // quem não decorou a legenda — nem quem não distingue cores.
+            //
+            // O clique PARA AQUI. Sem o `stopPropagation` ele subiria até o card e abriria o
+            // painel, e quem só queria ler a etiqueta ganharia uma janela na cara.
+            //
+            // O arrasto não precisa de guarda: `useArrastar` já ignora qualquer <button>.
+            <button
               key={e.id}
-              className="abacato-card__etiqueta"
-              style={{ background: e.cor }}
+              type="button"
+              className={`abacato-card__etiqueta${etiquetasAbertas ? " abacato-card__etiqueta--aberta" : ""}`}
+              style={etiquetasAbertas
+                ? { background: e.cor, color: tintaSobre(e.cor) }
+                : { background: e.cor }}
               title={e.nome || "sem nome"}
-              aria-label={e.nome || "etiqueta sem nome"}
-            />
+              aria-label={`${e.nome || "etiqueta sem nome"} — ${etiquetasAbertas ? "esconder" : "mostrar"} os nomes das etiquetas`}
+              aria-pressed={Boolean(etiquetasAbertas)}
+              onClick={(ev) => { ev.stopPropagation(); aoAlternarEtiquetas?.(); }}
+            >
+              {etiquetasAbertas ? (e.nome || "sem nome") : ""}
+            </button>
           ))}
         </div>
       )}
