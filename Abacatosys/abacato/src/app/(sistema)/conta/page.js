@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { chaveDeLogin, guardarSenha } from "@/lib/abacatoAuth.js";
 import { mudar } from "@/lib/api.js";
+import MeuPlano from "@/componentes/MeuPlano.js";
 
 /**
  * Trocar a própria senha.
@@ -59,6 +60,13 @@ export default function MinhaConta() {
       <header className="abacato-conteudo__cabecalho">
         <h1 className="abacato-conteudo__titulo">Minha conta</h1>
       </header>
+
+      {/* O que a conta pode, antes de qualquer outra coisa. É a primeira pergunta de quem abre
+          esta tela — "quanto eu ainda tenho?" — e ela vinha sem resposta em lugar nenhum. */}
+      <section className="abacato-bloco" style={{ marginBottom: 20 }}>
+        <h3 className="abacato-bloco__titulo">Seu plano</h3>
+        <MeuPlano />
+      </section>
 
       <form className="abacato-bloco" onSubmit={trocar} style={{ maxWidth: 520 }}>
         <h3 className="abacato-bloco__titulo">Trocar a senha</h3>

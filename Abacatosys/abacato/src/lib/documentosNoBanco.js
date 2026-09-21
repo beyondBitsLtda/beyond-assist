@@ -6,6 +6,8 @@
 import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./acesso.js";
 import { nomeSeguro, extensaoDe } from "@/dominio/documentos.js";
+import { exigirCabeArquivo } from "./limites.js";
+import { anotar, anotarLimite, TIPOS_DE_EVENTO } from "./eventos.js";
 
 export const BUCKET = "abacato-documentos";
 export const TETO_DE_ARQUIVO = 50 * 1024 * 1024; // 50 MB — o mesmo do bucket
@@ -20,12 +22,31 @@ export const TETO_DE_ARQUIVO = 50 * 1024 * 1024; // 50 MB — o mesmo do bucket
  * O contrário, arquivo guardado sem linha, deixa um órfão ocupando espaço. É desperdício, não
  * defeito, e é o lado certo para errar.
  */
-export async function guardarRevisao({ documentoId, arquivo, nota, usuarioId }) {
+export async function guardarRevisao({ documentoId, arquivo, nota, usuarioId, projetoId }) {
   if (!arquivo || typeof arquivo === "string") throw new ErroDeAcesso(400, "faltou o arquivo");
   if (arquivo.size > TETO_DE_ARQUIVO) {
     throw new ErroDeAcesso(400, `o arquivo tem ${(arquivo.size / 1048576).toFixed(1)} MB — o limite é 50 MB`);
   }
   if (arquivo.size === 0) throw new ErroDeAcesso(400, "o arquivo está vazio");
+
+  // O espaço da conta, conferido ANTES de subir. Aqui, e não nas duas rotas que enviam
+  // arquivo, porque as duas passam por esta função — e a que esquecesse seria justamente a que
+  // deixaria o teto de 4 GB virar decoração. `projetoId` vem pronto quando quem chama já sabe;
+  // quando não, sai do documento, que é uma consulta a mais e nenhuma dúvida.
+  let projeto = projetoId;
+  if (!projeto) {
+    const { data } = await supabase
+      .from("abacato_documentos").select("projeto_id").eq("id", documentoId).maybeSingle();
+    projeto = data?.projeto_id;
+  }
+  if (projeto) {
+    try {
+      await exigirCabeArquivo(projeto, arquivo.size);
+    } catch (e) {
+      anotarLimite({ usuarioId, limite: "armazenamento", usado: arquivo.size });
+      throw e;
+    }
+  }
 
   const { data: ultima } = await supabase
     .from("abacato_revisoes").select("numero").eq("documento_id", documentoId)
@@ -62,6 +83,10 @@ export async function guardarRevisao({ documentoId, arquivo, nota, usuarioId }) 
     .update({ revisao_atual_id: revisao.id, atualizado_em: new Date().toISOString() })
     .eq("id", documentoId);
 
+  anotar({
+    usuarioId, tipo: TIPOS_DE_EVENTO.enviouDocumento, alvo: arquivo.name, alvoId: documentoId,
+    detalhe: { bytes: arquivo.size, revisao: numero },
+  });
   return revisao;
 }
 

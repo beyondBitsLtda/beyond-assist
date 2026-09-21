@@ -1,6 +1,9 @@
 import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { COOKIE_SESSAO, lerSessao } from "@/lib/abacatoAuth.js";
+import { respostaDeErro } from "@/lib/acesso.js";
+import { exigirPodeCriarQuadro } from "@/lib/limites.js";
+import { anotar, anotarLimite, TIPOS_DE_EVENTO } from "@/lib/eventos.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,6 +75,16 @@ export async function POST(req) {
   const { nome, descricao } = await req.json().catch(() => ({}));
   if (!nome || !String(nome).trim()) return json({ ok: false, error: "o quadro precisa de um nome" }, 400);
 
+  // O limite do plano é conferido AQUI, e não na tela. A tela esconde o botão quando o teto
+  // estourou; isso é conforto. Quem abre o inspetor e chama esta rota na mão encontra a
+  // mesma resposta.
+  try {
+    await exigirPodeCriarQuadro(usuario.id);
+  } catch (e) {
+    anotarLimite({ usuarioId: usuario.id, limite: "quadros" });
+    return respostaDeErro(e);
+  }
+
   const { data: quadro, error } = await supabase
     .from("abacato_quadros")
     .insert({ nome: String(nome).trim(), descricao: descricao || null, dono_id: usuario.id })
@@ -84,5 +97,6 @@ export async function POST(req) {
   }));
   await supabase.from("abacato_colunas").insert(colunas);
 
+  anotar({ usuarioId: usuario.id, tipo: TIPOS_DE_EVENTO.criouQuadro, alvo: quadro.nome, alvoId: quadro.id });
   return json({ ok: true, quadro: { ...quadro, papel: "dono" } }, 201);
 }

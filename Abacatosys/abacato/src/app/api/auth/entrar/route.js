@@ -1,6 +1,7 @@
 import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { COOKIE_SESSAO, conferirChave, criarSessao } from "@/lib/abacatoAuth.js";
+import { anotar, TIPOS_DE_EVENTO } from "@/lib/eventos.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export async function POST(req) {
 
   const { data: usuario } = await supabase
     .from("abacato_usuarios")
-    .select("id, email, nome, senha_hash, senha_sal, senha_iter, ativo")
+    .select("id, email, nome, senha_hash, senha_sal, senha_iter, ativo, aprovado, tipo")
     .ilike("email", String(email).trim())
     .maybeSingle();
 
@@ -58,8 +59,23 @@ export async function POST(req) {
     return json({ ok: false, error: "e-mail ou senha incorretos" }, 401);
   }
 
+  // Quem se cadastrou sozinho por um link não entra até alguém de dentro aprovar.
+  //
+  // Esta resposta é diferente das outras de propósito, e só aparece DEPOIS de a senha conferir:
+  // quem chegou até aqui já provou ser dono da conta, então dizer a ela que o cadastro está na
+  // fila não conta nada a um estranho. A alternativa seria "e-mail ou senha incorretos", que
+  // mandaria a pessoa tentar recuperar uma senha que está certa.
+  if (usuario.aprovado === false) {
+    return json({
+      ok: false,
+      error: "seu cadastro foi recebido e está aguardando aprovação. Você receberá um aviso quando a conta for liberada.",
+      aguardando: true,
+    }, 403);
+  }
+
   supabase.from("abacato_usuarios").update({ ultimo_login: new Date().toISOString() }).eq("id", usuario.id)
     .then(() => {}, () => {}); // registrar o login não pode atrasar nem derrubar a entrada
+  anotar({ usuarioId: usuario.id, tipo: TIPOS_DE_EVENTO.entrou, alvo: usuario.email });
 
   const cookie = await criarSessao(usuario, segredo);
   return json({ ok: true, usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email } }, 200, {

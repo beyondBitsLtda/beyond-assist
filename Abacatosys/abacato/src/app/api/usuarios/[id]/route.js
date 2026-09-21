@@ -2,6 +2,7 @@ import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { respostaDeErro, ErroDeAcesso } from "@/lib/acesso.js";
 import { exigirAdmin } from "@/lib/admin.js";
+import { anotar, TIPOS_DE_EVENTO } from "@/lib/eventos.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export async function PATCH(req, { params }) {
     const corpo = await req.json().catch(() => ({}));
 
     const { data: alvo } = await supabase
-      .from("abacato_usuarios").select("id, nome, email, ativo, admin, lisa").eq("id", id).maybeSingle();
+      .from("abacato_usuarios").select("id, nome, email, ativo, admin, lisa, tipo, aprovado").eq("id", id).maybeSingle();
     if (!alvo) throw new ErroDeAcesso(404, "pessoa não encontrada");
 
     const mudancas = {};
@@ -36,6 +37,16 @@ export async function PATCH(req, { params }) {
         throw new ErroDeAcesso(400, "você não pode desativar a própria conta");
       }
       mudancas.ativo = corpo.ativo;
+    }
+
+    // Aprovar (ou recusar) um cadastro que veio de fora. É a decisão que transforma um pedido
+    // em conta: antes dela a pessoa tem linha no banco e não consegue entrar.
+    if (typeof corpo.aprovado === "boolean" && corpo.aprovado !== alvo.aprovado) {
+      mudancas.aprovado = corpo.aprovado;
+      // Recusar é aprovado=false E ativo=false. Só o primeiro deixaria a conta num limbo em que
+      // o e-mail continua ocupado e a pessoa pode pedir de novo pelo mesmo link, para sempre.
+      if (!corpo.aprovado) mudancas.ativo = false;
+      else if (alvo.ativo === false) mudancas.ativo = true;
     }
 
     if (typeof corpo.admin === "boolean" && corpo.admin !== alvo.admin) {
@@ -54,6 +65,16 @@ export async function PATCH(req, { params }) {
     // administrador: um Abacato sem ninguém usando a Lisa continua sendo um Abacato inteiro.
     if (typeof corpo.lisa === "boolean") mudancas.lisa = corpo.lisa;
 
+    // Conta de cliente não fala com a assistente e não administra nada — nem por esta rota, que
+    // só quem administra alcança. O banco também recusa a primeira das duas (a constraint
+    // `abacato_usuarios_cliente_sem_lisa`); aqui a recusa vira uma frase em vez de um erro de
+    // banco, e cobre também o sinalizador de administrador, que o banco não vigia.
+    const tipoFinal = mudancas.tipo || alvo.tipo;
+    if (tipoFinal === "cliente") {
+      if (mudancas.lisa) throw new ErroDeAcesso(400, "contas de cliente não têm acesso à assistente");
+      if (mudancas.admin) throw new ErroDeAcesso(400, "uma conta de cliente não pode administrar o Abacato");
+    }
+
     // Trocar a senha de outra pessoa: o selo vem pronto do navegador de quem administra, que
     // sorteou a senha e a mostrou na tela uma vez. O servidor continua sem ver senha nenhuma.
     if (corpo.hash && corpo.sal && corpo.iteracoes) {
@@ -66,9 +87,16 @@ export async function PATCH(req, { params }) {
     if (!Object.keys(mudancas).length) throw new ErroDeAcesso(400, "nada para mudar");
 
     const { data, error } = await supabase.from("abacato_usuarios").update(mudancas).eq("id", id)
-      .select("id, nome, email, ativo, admin, lisa").single();
+      .select("id, nome, email, ativo, admin, lisa, tipo, aprovado").single();
     if (error) throw new ErroDeAcesso(500, error.message);
 
+    if (typeof mudancas.aprovado === "boolean") {
+      anotar({
+        usuarioId: admin.id,
+        tipo: mudancas.aprovado ? TIPOS_DE_EVENTO.aprovouConta : TIPOS_DE_EVENTO.recusouConta,
+        alvo: data.email, alvoId: data.id,
+      });
+    }
     return json({ ok: true, usuario: data });
   } catch (e) {
     return respostaDeErro(e);

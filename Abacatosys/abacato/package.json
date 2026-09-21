@@ -30,7 +30,8 @@
     "lisa-check": "node --env-file=.env.local scripts/lisa-check.mjs",
     "migrar": "node --env-file=.env.local scripts/migrar.mjs",
     "mover-check": "node --env-file=.env.local scripts/mover-check.mjs",
-    "quadro-gen-check": "node --env-file=.env.local scripts/quadro-gen-check.mjs"
+    "quadro-gen-check": "node --env-file=.env.local scripts/quadro-gen-check.mjs",
+    "cliente-limites-check": "node --env-file=.env.local scripts/cliente-limites-check.mjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.6",

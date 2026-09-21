@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { obter, criar, mudar, remover } from "@/lib/api.js";
 import ImportarDoTrello from "@/componentes/ImportarDoTrello.js";
 import QuadroGen from "@/componentes/QuadroGen.js";
+import AvisoDeLimite from "@/componentes/AvisoDeLimite.js";
 
 const PAPEL_EM_PALAVRAS = {
   dono: "seu",
@@ -130,6 +131,8 @@ export default function Quadros() {
           </div>
         )}
       </header>
+
+      <AvisoDeLimite qual="quadros" nome="quadros" />
 
       {criando && (
         <form className="abacato-criar-quadro" onSubmit={enviar}>

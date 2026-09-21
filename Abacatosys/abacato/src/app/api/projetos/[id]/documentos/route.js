@@ -2,6 +2,8 @@ import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { exigir, respostaDeErro, ErroDeAcesso } from "@/lib/acesso.js";
 import { guardarRevisao } from "@/lib/documentosNoBanco.js";
+import { exigirCabeArquivo } from "@/lib/limites.js";
+import { anotarLimite } from "@/lib/eventos.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +38,21 @@ export async function POST(req, { params }) {
       if (pasta.projeto_id !== id) throw new ErroDeAcesso(403, "essa pasta é de outro projeto");
     }
 
+    // O espaço da conta, conferido UMA VEZ e pela SOMA de tudo que veio neste envio.
+    //
+    // A conferência por arquivo continua existindo em guardarRevisao, e ela é a que protege a
+    // rota de versões. Aqui a soma é necessária por dois motivos: dez arquivos que cabem um a
+    // um podem não caber juntos; e o laço abaixo recolhe as falhas de cada arquivo numa lista,
+    // o que transformaria um "não cabe" (403) num "nenhum arquivo entrou" (400) — a mesma
+    // recusa, com o status errado e no meio de um texto sobre arquivo inválido.
+    const soma = arquivos.reduce((total, a) => total + (Number(a.size) || 0), 0);
+    try {
+      await exigirCabeArquivo(id, soma);
+    } catch (e) {
+      anotarLimite({ usuarioId: usuario.id, limite: "armazenamento", usado: soma });
+      throw e;
+    }
+
     const categoria = (form.get("categoria") || "").toString().trim() || null;
     const descricao = (form.get("descricao") || "").toString().trim() || null;
     const nomeDado = (form.get("nome") || "").toString().trim();
@@ -62,6 +79,7 @@ export async function POST(req, { params }) {
           arquivo,
           nota: "versão inicial",
           usuarioId: usuario.id,
+          projetoId: id,
         });
 
         criados.push({ ...documento, revisao, revisoes: 1 });

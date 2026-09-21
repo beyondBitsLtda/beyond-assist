@@ -18,11 +18,11 @@ export async function exigirAdmin(req) {
   if (!usuario) throw new ErroDeAcesso(401, "sem sessão");
 
   const { data } = await supabase
-    .from("abacato_usuarios").select("id, admin, ativo").eq("id", usuario.id).maybeSingle();
+    .from("abacato_usuarios").select("id, admin, ativo, aprovado").eq("id", usuario.id).maybeSingle();
 
   // Conta desativada derruba na hora, mesmo com sessão válida. É o que faz "desativar" querer
   // dizer alguma coisa antes de o cookie vencer.
-  if (!data?.ativo) throw new ErroDeAcesso(401, "sua conta não está mais ativa");
+  if (!data?.ativo || data.aprovado === false) throw new ErroDeAcesso(401, "sua conta não está mais ativa");
   if (!data.admin) throw new ErroDeAcesso(403, "só quem administra o Abacato pode fazer isso");
 
   return usuario;
@@ -34,9 +34,9 @@ export async function quemEhComAdmin(req) {
   const usuario = await quemEh(req);
   if (!usuario) return null;
   const { data } = await supabase
-    .from("abacato_usuarios").select("admin, ativo").eq("id", usuario.id).maybeSingle();
-  if (!data?.ativo) return null;
-  return { ...usuario, admin: Boolean(data.admin) };
+    .from("abacato_usuarios").select("admin, ativo, aprovado, tipo").eq("id", usuario.id).maybeSingle();
+  if (!data?.ativo || data.aprovado === false) return null;
+  return { ...usuario, admin: Boolean(data.admin), tipo: data.tipo };
 }
 
 /** Esta pessoa pode falar com a assistente?
@@ -47,9 +47,13 @@ export async function podeUsarLisa(req) {
   const usuario = await quemEh(req);
   if (!usuario) return { usuario: null, pode: false };
   const { data } = await supabase
-    .from("abacato_usuarios").select("ativo, lisa").eq("id", usuario.id).maybeSingle();
-  if (!data?.ativo) return { usuario: null, pode: false };
-  return { usuario, pode: Boolean(data.lisa) };
+    .from("abacato_usuarios").select("ativo, lisa, tipo, aprovado").eq("id", usuario.id).maybeSingle();
+  if (!data?.ativo || data.aprovado === false) return { usuario: null, pode: false };
+  // Duas condições, e a do tipo não é redundante: o sinalizador `lisa` é uma coluna que alguém
+  // pode ligar por engano numa tela futura, e o tipo da conta é a regra. A constraint do banco
+  // é a terceira barreira. Uma trava dessas custa uma linha; o vazamento custa a conversa
+  // inteira de outra empresa.
+  return { usuario, pode: Boolean(data.lisa) && data.tipo !== "cliente" };
 }
 
 /** A mesma pergunta, mas barrando. Para as rotas que só existem se a resposta for sim. */

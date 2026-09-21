@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { obter, criar, mudar, remover } from "@/lib/api.js";
 import { CORES } from "@/dominio/cores.js";
+import AvisoDeLimite from "@/componentes/AvisoDeLimite.js";
 
 const PAPEL_EM_PALAVRAS = { dono: "seu", editor: "pode editar", comentarista: "pode comentar", leitor: "só leitura" };
 
@@ -93,6 +94,8 @@ export default function Documentos() {
           </div>
         )}
       </header>
+
+      <AvisoDeLimite qual="projetos" nome="projetos de documentação" />
 
       {criando && (
         <form className="abacato-criar-quadro" onSubmit={enviar}>

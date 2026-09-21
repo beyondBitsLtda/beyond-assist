@@ -2,6 +2,8 @@ import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { quemEh, respostaDeErro, ErroDeAcesso } from "@/lib/acesso.js";
 import { corValida } from "@/dominio/cores.js";
+import { exigirPodeCriarProjeto } from "@/lib/limites.js";
+import { anotar, anotarLimite, TIPOS_DE_EVENTO } from "@/lib/eventos.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,6 +68,14 @@ export async function POST(req) {
     const { nome, descricao, cor } = await req.json().catch(() => ({}));
     if (!nome?.trim()) throw new ErroDeAcesso(400, "o projeto precisa de um nome");
 
+    // Mesmo desenho do quadro: quem decide é o servidor. A tela esconder o botão é conforto.
+    try {
+      await exigirPodeCriarProjeto(usuario.id);
+    } catch (e) {
+      anotarLimite({ usuarioId: usuario.id, limite: "projetos" });
+      throw e;
+    }
+
     const { data, error } = await supabase.from("abacato_projetos").insert({
       nome: nome.trim(),
       descricao: descricao?.trim() || null,
@@ -74,6 +84,7 @@ export async function POST(req) {
     }).select("id, nome, descricao, cor, criado_em").single();
     if (error) throw new ErroDeAcesso(500, error.message);
 
+    anotar({ usuarioId: usuario.id, tipo: TIPOS_DE_EVENTO.criouProjeto, alvo: data.nome, alvoId: data.id });
     return json({ ok: true, projeto: { ...data, papel: "dono", documentos: 0 } }, 201);
   } catch (e) {
     return respostaDeErro(e);

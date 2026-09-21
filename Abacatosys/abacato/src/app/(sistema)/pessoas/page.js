@@ -30,6 +30,13 @@ export default function Pessoas() {
   const [email, setEmail] = useState("");
   const [ehAdmin, setEhAdmin] = useState(false);
   const [comLisa, setComLisa] = useState(false);
+  const [tipo, setTipo] = useState("interno");
+  const [convites, setConvites] = useState(null);
+  const [rotuloDoConvite, setRotuloDoConvite] = useState("");
+  // O endereço do sistema, para montar o link inteiro que se copia. Vem de um efeito, e não de
+  // `window.location` direto: este componente também é desenhado no servidor, onde `window` não
+  // existe — e ler ali quebraria a hidratação além de estourar o render.
+  const [origem, setOrigem] = useState("");
   const [trabalhando, setTrabalhando] = useState(false);
   const [senhaNova, setSenhaNova] = useState(null);   // { nome, email, senha }
   const [copiado, setCopiado] = useState(false);
@@ -39,7 +46,15 @@ export default function Pessoas() {
     catch (e) { setErro(e.message); }
   }, []);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  // Os links de cadastro vêm numa chamada separada, e a falha dela não derruba a tela: sem
+  // convite ainda dá para criar contas à mão, que é como o sistema funcionou até aqui.
+  const carregarConvites = useCallback(async () => {
+    try { setConvites((await obter("/api/convites")).convites); }
+    catch { setConvites([]); }
+  }, []);
+
+  useEffect(() => { carregar(); carregarConvites(); }, [carregar, carregarConvites]);
+  useEffect(() => { setOrigem(window.location.origin); }, []);
 
   async function criarPessoa(e) {
     e?.preventDefault();
@@ -60,11 +75,14 @@ export default function Pessoas() {
         hash: guardada.hash,
         sal: guardada.sal,
         iteracoes: guardada.iteracoes,
-        admin: ehAdmin,
-        lisa: comLisa,
+        tipo,
+        // Conta de cliente não administra e não fala com a assistente. A trava real está no
+        // servidor e no banco; aqui é só não mandar o que seria recusado.
+        admin: tipo === "cliente" ? false : ehAdmin,
+        lisa: tipo === "cliente" ? false : comLisa,
       });
       setSenhaNova({ nome: nome.trim(), email: email.trim().toLowerCase(), senha });
-      setNome(""); setEmail(""); setEhAdmin(false); setComLisa(false); setCriando(false);
+      setNome(""); setEmail(""); setEhAdmin(false); setComLisa(false); setTipo("interno"); setCriando(false);
       await carregar();
     } catch (x) {
       setErro(x.message);
@@ -98,6 +116,39 @@ export default function Pessoas() {
     } catch (x) { setErro(x.message); }
   }
 
+  /** Aprovar ou recusar um cadastro que veio de fora. Recusar pede confirmação porque desliga a
+   *  conta junto — e a pessoa do outro lado já escolheu uma senha. */
+  async function decidir(pessoa, aprovado) {
+    if (!aprovado && !window.confirm(
+      `Recusar o cadastro de ${pessoa.nome} (${pessoa.email})?
+
+A conta fica desligada e a pessoa não consegue entrar.`
+    )) return;
+    setErro("");
+    try {
+      await mudar(`/api/usuarios/${pessoa.id}`, { aprovado });
+      await carregar();
+    } catch (x) { setErro(x.message); }
+  }
+
+  async function novoConvite(e) {
+    e?.preventDefault();
+    setErro("");
+    try {
+      await criar("/api/convites", { rotulo: rotuloDoConvite.trim() || null, tipo: "cliente" });
+      setRotuloDoConvite("");
+      await carregarConvites();
+    } catch (x) { setErro(x.message); }
+  }
+
+  async function ligarConvite(convite, ativo) {
+    setErro("");
+    try {
+      await mudar(`/api/convites/${convite.id}`, { ativo });
+      await carregarConvites();
+    } catch (x) { setErro(x.message); }
+  }
+
   if (erro && !dados) {
     return (
       <div className="abacato-vazio">
@@ -117,6 +168,11 @@ export default function Pessoas() {
     );
   }
 
+  // Quem pediu conta e ainda espera fica numa lista separada, e não misturado com quem já
+  // entra. Um cartão de "esperando" no meio de vinte contas ativas é um cartão que ninguém vê.
+  const aguardando = dados.usuarios.filter((p) => p.aprovado === false);
+  const jaEntram = dados.usuarios.filter((p) => p.aprovado !== false);
+
   return (
     <>
       <header className="abacato-conteudo__cabecalho">
@@ -127,6 +183,93 @@ export default function Pessoas() {
       </header>
 
       {erro && <div className="abacato-campo__erro" style={{ marginBottom: 14 }}>⚠ {erro}</div>}
+
+      {/* ----------------------------------------- quem se cadastrou e ainda não entra
+          Fica em PRIMEIRO na tela, e só aparece quando há alguém: é a única coisa aqui que
+          alguém do lado de fora está esperando. No meio da lista, passaria dias despercebida. */}
+      {aguardando.length > 0 && (
+        <section className="abacato-bloco" style={{ marginBottom: 16 }}>
+          <h3 className="abacato-bloco__titulo">
+            Aguardando aprovação ({aguardando.length})
+          </h3>
+          <p className="abacato-dica abacato-dica--bloco">
+            Estas pessoas se cadastraram por um link de convite e <strong>ainda não conseguem
+            entrar</strong>. Aprovar libera a entrada; não dá acesso a quadro nenhum.
+          </p>
+          <div className="abacato-pessoas">
+            {aguardando.map((p) => (
+              <div key={p.id} className="abacato-pessoa-cartao">
+                <span className="abacato-avatar">{new Usuario(p).iniciais}</span>
+                <div className="abacato-pessoa-cartao__meio">
+                  <strong>
+                    {p.nome}
+                    <span className={`abacato-selo abacato-selo--${p.tipo}`}>{p.tipo}</span>
+                  </strong>
+                  <span className="abacato-dica">{p.email} · pediu em {quando(p.criado_em)}</span>
+                </div>
+                <div className="abacato-pessoa-cartao__acoes">
+                  <button type="button" className="abacato-botao abacato-botao--pequeno"
+                    onClick={() => decidir(p, true)}>Aprovar</button>
+                  <button type="button" className="abacato-botao abacato-botao--perigo abacato-botao--pequeno"
+                    onClick={() => decidir(p, false)}>Recusar</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ----------------------------------------- os links de cadastro */}
+      <section className="abacato-bloco" style={{ marginBottom: 16 }}>
+        <h3 className="abacato-bloco__titulo">Links de cadastro</h3>
+        <p className="abacato-dica abacato-dica--bloco">
+          Um link deixa alguém de fora criar a própria conta de cliente — que nasce esperando a
+          sua aprovação e <strong>não alcança nada</strong> do que já existe aqui. Cada link vale
+          14 dias e 20 cadastros.
+        </p>
+
+        <form className="abacato-rapido" onSubmit={novoConvite}>
+          <input className="abacato-campo__entrada" value={rotuloDoConvite}
+            onChange={(e) => setRotuloDoConvite(e.target.value)}
+            placeholder="para que serve este link? ex.: clientes da obra Sul" />
+          <button className="abacato-botao abacato-botao--pequeno" type="submit">Gerar link</button>
+        </form>
+
+        {convites === null ? (
+          <p className="abacato-dica">carregando…</p>
+        ) : convites.length === 0 ? (
+          <p className="abacato-dica">Nenhum link ainda.</p>
+        ) : (
+          <div style={{ marginTop: 10 }}>
+            {convites.map((c) => {
+              const venceu = c.expira_em && new Date(c.expira_em) < new Date();
+              const gasto = c.usos >= c.max_usos;
+              const morto = !c.ativo || venceu || gasto;
+              const endereco = `${origem}/cadastro/${c.token}`;
+              return (
+                <div key={c.id} className={`abacato-convite${morto ? " abacato-convite__morto" : ""}`}>
+                  <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+                    <strong style={{ fontSize: 13 }}>{c.rotulo || "sem descrição"}</strong>
+                    <div className="abacato-dica">
+                      {c.usos} de {c.max_usos} usos ·{" "}
+                      {venceu ? "venceu" : `vale até ${quando(c.expira_em)}`}
+                      {!c.ativo && " · desligado"}
+                    </div>
+                  </div>
+                  <code className="abacato-convite__link">{endereco}</code>
+                  <button type="button" className="abacato-botao abacato-botao--fantasma abacato-botao--pequeno"
+                    onClick={() => navigator.clipboard?.writeText(endereco)}>Copiar</button>
+                  <button type="button"
+                    className={`abacato-botao abacato-botao--pequeno ${c.ativo ? "abacato-botao--perigo" : "abacato-botao--fantasma"}`}
+                    onClick={() => ligarConvite(c, !c.ativo)}>
+                    {c.ativo ? "Desligar" : "Religar"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* ------------------------------------------------ a senha, uma vez só */}
       {senhaNova && (
@@ -173,19 +316,39 @@ export default function Pessoas() {
             </label>
           </div>
 
-          <label className="abacato-concluir">
-            <input type="checkbox" checked={ehAdmin} onChange={(e) => setEhAdmin(e.target.checked)} />
-            Também administra o Abacato
+          <label className="abacato-campo">
+            <span className="abacato-campo__rotulo">Tipo de conta</span>
+            <select className="abacato-campo__entrada" value={tipo} onChange={(e) => setTipo(e.target.value)}>
+              <option value="interno">Interna — da casa, sem limites</option>
+              <option value="cliente">Cliente — de fora, com limites de uso</option>
+            </select>
           </label>
-          <label className="abacato-concluir">
-            <input type="checkbox" checked={comLisa} onChange={(e) => setComLisa(e.target.checked)} />
-            Pode conversar com a Lisa
-          </label>
-          <p className="abacato-dica">
-            Quem administra pode criar e desligar contas. Não dá acesso a quadro nenhum — isso
-            continua vindo de convite, um a um. A Lisa também não: ela só alcança o que a
-            própria pessoa alcança.
-          </p>
+
+          {tipo === "cliente" ? (
+            <p className="abacato-dica">
+              A conta de cliente cria até <strong>10 quadros</strong> e{" "}
+              <strong>10 projetos</strong>, compartilha <strong>3</strong> de cada com até{" "}
+              <strong>3 pessoas</strong>, e guarda até <strong>4 GB</strong> de arquivos. Não
+              administra o Abacato, não fala com a Lisa e não enxerga nenhum quadro que já
+              exista — só o que ela criar e o que alguém compartilhar com ela.
+            </p>
+          ) : (
+            <>
+              <label className="abacato-concluir">
+                <input type="checkbox" checked={ehAdmin} onChange={(e) => setEhAdmin(e.target.checked)} />
+                Também administra o Abacato
+              </label>
+              <label className="abacato-concluir">
+                <input type="checkbox" checked={comLisa} onChange={(e) => setComLisa(e.target.checked)} />
+                Pode conversar com a Lisa
+              </label>
+              <p className="abacato-dica">
+                Quem administra pode criar e desligar contas. Não dá acesso a quadro nenhum —
+                isso continua vindo de convite, um a um. A Lisa também não: ela só alcança o que
+                a própria pessoa alcança.
+              </p>
+            </>
+          )}
 
           <div className="abacato-rapido">
             <button className="abacato-botao" type="submit" disabled={trabalhando}>
@@ -199,7 +362,7 @@ export default function Pessoas() {
 
       {/* ------------------------------------------------ a lista */}
       <div className="abacato-pessoas">
-        {dados.usuarios.map((p) => {
+        {jaEntram.map((p) => {
           const u = new Usuario(p);
           const souEu = p.id === dados.eu;
           return (
@@ -209,6 +372,7 @@ export default function Pessoas() {
                 <strong>
                   {p.nome}
                   {souEu && <span className="abacato-etiqueta abacato-etiqueta--ok">você</span>}
+                  {p.tipo === "cliente" && <span className="abacato-selo abacato-selo--cliente">cliente</span>}
                   {p.admin && <span className="abacato-etiqueta">administra</span>}
                   {p.lisa && <span className="abacato-etiqueta abacato-etiqueta--ok">Lisa</span>}
                   {!p.ativo && <span className="abacato-etiqueta abacato-etiqueta--alerta">desativada</span>}
@@ -222,14 +386,19 @@ export default function Pessoas() {
                 {/* A Lisa se liga para QUALQUER pessoa, inclusive para si mesmo: diferente de
                     "administra", desligar a própria assistente não tranca ninguém para fora
                     de nada — é só uma ferramenta a menos. */}
-                <button type="button"
-                  className={`abacato-botao abacato-botao--pequeno ${p.lisa ? "abacato-botao--fantasma" : ""}`}
-                  onClick={() => alternar(p, "lisa")}
-                  title={p.lisa
-                    ? "Tirar o acesso à assistente desta conta"
-                    : "Liberar a assistente para esta conta"}>
-                  {p.lisa ? "Tirar a Lisa" : "Liberar a Lisa"}
-                </button>
+                {/* Conta de cliente não tem este botão: a assistente não é dela, e um botão que
+                    sempre devolve erro é pior que botão nenhum. O servidor recusa de qualquer
+                    jeito, e o banco também. */}
+                {p.tipo !== "cliente" && (
+                  <button type="button"
+                    className={`abacato-botao abacato-botao--pequeno ${p.lisa ? "abacato-botao--fantasma" : ""}`}
+                    onClick={() => alternar(p, "lisa")}
+                    title={p.lisa
+                      ? "Tirar o acesso à assistente desta conta"
+                      : "Liberar a assistente para esta conta"}>
+                    {p.lisa ? "Tirar a Lisa" : "Liberar a Lisa"}
+                  </button>
+                )}
                 <button type="button" className="abacato-botao abacato-botao--fantasma abacato-botao--pequeno"
                   disabled={trabalhando} onClick={() => novaSenhaPara(p)}>
                   Nova senha
@@ -239,10 +408,12 @@ export default function Pessoas() {
                     criar contas só volta pelo terminal do servidor. */}
                 {!souEu && (
                   <>
-                    <button type="button" className="abacato-botao abacato-botao--fantasma abacato-botao--pequeno"
-                      onClick={() => alternar(p, "admin")}>
-                      {p.admin ? "Tirar administração" : "Tornar administrador"}
-                    </button>
+                    {p.tipo !== "cliente" && (
+                      <button type="button" className="abacato-botao abacato-botao--fantasma abacato-botao--pequeno"
+                        onClick={() => alternar(p, "admin")}>
+                        {p.admin ? "Tirar administração" : "Tornar administrador"}
+                      </button>
+                    )}
                     <button type="button"
                       className={`abacato-botao abacato-botao--pequeno ${p.ativo ? "abacato-botao--perigo" : "abacato-botao--fantasma"}`}
                       onClick={() => alternar(p, "ativo")}>

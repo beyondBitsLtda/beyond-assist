@@ -1,6 +1,8 @@
 import { supabase } from "./supabase.js";
 import { exigir, ErroDeAcesso } from "./acesso.js";
 import { papelValido } from "@/dominio/papeis.js";
+import { exigirPodeCompartilhar } from "./limites.js";
+import { anotar, anotarLimite, TIPOS_DE_EVENTO } from "./eventos.js";
 
 /**
  * Quem participa de um quadro ou de um projeto, e com qual papel.
@@ -58,11 +60,14 @@ export async function porMembro(req, tipo, id, usuarioId, papel) {
   if (!papelValido(papel)) throw new ErroDeAcesso(400, "papel inválido");
 
   const { data: alvo } = await supabase
-    .from("abacato_usuarios").select("id, nome, email, ativo").eq("id", usuarioId).maybeSingle();
+    .from("abacato_usuarios").select("id, nome, email, ativo, aprovado").eq("id", usuarioId).maybeSingle();
   if (!alvo) throw new ErroDeAcesso(404, "pessoa não encontrada");
   // Convidar uma conta desligada cria um acesso que não funciona e parece que funciona — a
   // pessoa aparece na lista e nunca consegue entrar.
   if (!alvo.ativo) throw new ErroDeAcesso(400, "essa conta está desativada");
+  // Nem uma conta que ainda espera aprovação. Ela existe no banco e ainda não é ninguém aqui
+  // dentro; pôr essa pessoa num quadro seria aprová-la por um caminho lateral.
+  if (alvo.aprovado === false) throw new ErroDeAcesso(400, "essa conta ainda aguarda aprovação");
 
   const { data: raiz } = await supabase
     .from(t.dono.tabela).select(`${t.dono.campo}`).eq("id", id).maybeSingle();
@@ -70,10 +75,25 @@ export async function porMembro(req, tipo, id, usuarioId, papel) {
     throw new ErroDeAcesso(400, "essa pessoa é a dona — o papel dela não se muda por aqui");
   }
 
+  // Quantas pessoas cabem aqui e quantas coisas esta conta pode ter compartilhadas. Quem manda
+  // é o plano do DONO — e não o de quem está convidando, que pode ser um convidado com poder de
+  // convidar. É aqui, e não nas duas rotas, porque as duas passam por esta função: uma trava na
+  // rota se esquece na próxima rota que aparecer.
+  try {
+    await exigirPodeCompartilhar(tipo, id, usuarioId);
+  } catch (e) {
+    anotarLimite({ usuarioId: usuario.id, limite: tipo === "projeto" ? "projetosCompartilhados" : "quadrosCompartilhados" });
+    throw e;
+  }
+
   const { error } = await supabase.from(t.tabela)
     .upsert({ [t.coluna]: id, usuario_id: usuarioId, papel }, { onConflict: `${t.coluna},usuario_id` });
   if (error) throw new ErroDeAcesso(500, error.message);
 
+  anotar({
+    usuarioId: usuario.id, tipo: TIPOS_DE_EVENTO.compartilhou, alvo: alvo.email, alvoId: id,
+    detalhe: { tipo, papel },
+  });
   return { usuario, alvo, papel };
 }
 

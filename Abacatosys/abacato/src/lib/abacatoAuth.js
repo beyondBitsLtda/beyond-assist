@@ -297,6 +297,12 @@ export const LIVRES = [
   // existir, e por isso mora numa rota própria, separada de tudo que exige sessão.
   { prefixo: "/publico/", motivo: "dashboard compartilhado com cliente, sem conta" },
   { prefixo: "/api/publico/", motivo: "dados do dashboard compartilhado" },
+  // O cadastro por convite. Quem abre este endereço AINDA NÃO TEM CONTA — exigir login aqui
+  // seria exigir a conta que a pessoa está tentando criar. O que protege esta porta é o token
+  // sorteado do convite, e o fato de a conta nascer sem aprovação: ela não alcança nada até
+  // alguém de dentro liberar.
+  { prefixo: "/cadastro/", motivo: "criar a própria conta a partir de um convite" },
+  { prefixo: "/api/cadastro/", motivo: "conferir o convite e criar a conta que espera aprovação" },
 ];
 
 /** Comparação por palavra inteira, não por prefixo solto: `/entrarhack` não pode entrar por
