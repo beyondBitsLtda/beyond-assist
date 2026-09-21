@@ -127,7 +127,7 @@ export default function QuadroGen({ aoFechar }) {
     : [];
   const corDaEtiqueta = new Map((proposta?.etiquetas || []).map((e) => [e.nome.toLowerCase(), e.cor]));
   const resumo = proposta
-    ? `${proposta.colunas.length} coluna(s), ${proposta.cards.length} card(s)`
+    ? `${proposta.colunas.length} coluna(s), ${proposta.cards.length} card(s), ${proposta.cards.filter((c) => c.checklist?.length).length} com checklist`
     : "";
 
   return (
@@ -206,19 +206,32 @@ export default function QuadroGen({ aoFechar }) {
                     <div className="abacato-gen__coluna-nome">
                       {c.nome} <span className="abacato-dica">{c.cards.length}</span>
                     </div>
+                    {/* O card da prévia mostra a DESCRIÇÃO e os passos, e não só o título.
+                        Aprovar um quadro olhando quinze títulos é aprovar no escuro: o que
+                        se está conferindo aqui é justamente o conteúdo que a Lisa escreveu. */}
                     {c.cards.map((card, i) => (
-                      <div key={i} className="abacato-gen__card">
-                        {card.etiqueta && (
-                          <span className="abacato-gen__marca"
-                            style={{ background: corDaEtiqueta.get(card.etiqueta.toLowerCase()) }} />
-                        )}
-                        <span className="abacato-gen__card-titulo">{card.titulo}</span>
-                        {card.prazoEmDias != null && (
-                          <span className="abacato-dica">
-                            {card.prazoEmDias === 0 ? "hoje" : `${card.prazoEmDias}d`}
-                          </span>
-                        )}
-                      </div>
+                      <details key={i} className="abacato-gen__card">
+                        <summary className="abacato-gen__card-topo">
+                          {card.etiqueta && (
+                            <span className="abacato-gen__marca"
+                              style={{ background: corDaEtiqueta.get(card.etiqueta.toLowerCase()) }} />
+                          )}
+                          <span className="abacato-gen__card-titulo">{card.titulo}</span>
+                          {card.prazoEmDias != null && (
+                            <span className="abacato-dica">
+                              {card.prazoEmDias === 0 ? "hoje" : `${card.prazoEmDias}d`}
+                            </span>
+                          )}
+                        </summary>
+                        <div className="abacato-gen__card-corpo">
+                          {card.descricao && <p className="abacato-gen__card-desc">{card.descricao}</p>}
+                          {card.checklist?.length > 0 && (
+                            <ul className="abacato-gen__passos">
+                              {card.checklist.map((passo, j) => <li key={j}>{passo}</li>)}
+                            </ul>
+                          )}
+                        </div>
+                      </details>
                     ))}
                     {c.cards.length === 0 && <div className="abacato-dica">(vazia)</div>}
                   </div>

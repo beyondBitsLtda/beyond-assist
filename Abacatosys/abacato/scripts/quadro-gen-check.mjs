@@ -14,7 +14,7 @@ import os from "node:os";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { chaveDeLogin } from "../src/lib/abacatoAuth.js";
-import { validarProposta, resumirProposta, LIMITES } from "../src/dominio/quadroGen.js";
+import { validarProposta, resumirProposta, LIMITES, pareceEstudo, citaMaterial, cardsSemMaterial } from "../src/dominio/quadroGen.js";
 
 const base = (process.argv[2] || process.env.ABACATO_URL || "http://localhost:3000").replace(/\/$/, "");
 const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -77,10 +77,15 @@ try {
     conferir("a cor final é da paleta", /^#[0-9A-F]{6}$/i.test(corTorta.proposta.etiquetas[0].cor),
       corTorta.proposta.etiquetas[0].cor);
 
+    // Uma descrição válida, para os casos que testam OUTRA coisa. Sem ela, todo caso daqui
+    // para baixo falharia pela exigência de descrição em vez de pelo motivo que ele testa —
+    // e um teste que falha pelo motivo errado não prova nada.
+    const DESC = "Uma descrição de verdade, com o que é e como saber que terminou.";
+
     // Card apontando para coluna que não existe cai na primeira — a fila.
     const colunaTorta = validarProposta({
       nome: "X", colunas: [{ nome: "A fazer" }, { nome: "Feito" }],
-      cards: [{ titulo: "Solto", coluna: "Inventada" }],
+      cards: [{ titulo: "Solto", coluna: "Inventada", descricao: DESC }],
     });
     conferir("card em coluna inexistente vai para a primeira",
       colunaTorta.proposta.cards[0].coluna === "A fazer", colunaTorta.proposta.cards[0].coluna);
@@ -93,17 +98,63 @@ try {
 
     const gigante = validarProposta({
       nome: "X", colunas: [{ nome: "A" }],
-      cards: Array.from({ length: LIMITES.cards + 5 }, (_, i) => ({ titulo: `t${i}`, coluna: "A" })),
+      cards: Array.from({ length: LIMITES.cards + 5 }, (_, i) => ({ titulo: `t${i}`, coluna: "A", descricao: DESC })),
     });
     conferir("um quadro grande demais é recusado", !gigante.ok, gigante.erros.join("; "));
+
+    // DESCRIÇÃO É OBRIGATÓRIA, e o mínimo existe porque o modelo, pressionado a preencher,
+    // repete o título com outras palavras.
+    const semDesc = validarProposta({
+      nome: "X", colunas: [{ nome: "A" }],
+      cards: [{ titulo: "Arrays e métodos", coluna: "A" }],
+    });
+    conferir("card sem descrição é recusado", !semDesc.ok, semDesc.erros.join("; "));
+
+    const descCurta = validarProposta({
+      nome: "X", colunas: [{ nome: "A" }],
+      cards: [{ titulo: "Arrays e métodos", coluna: "A", descricao: "Arrays." }],
+    });
+    conferir("descrição que só repete o título também é recusada", !descCurta.ok);
+    conferir("e o erro diz QUAIS cards", descCurta.erros.join(";").includes("Arrays e métodos"),
+      descCurta.erros.join("; "));
 
     const boa = validarProposta({
       nome: "Obras", colunas: [{ nome: "A fazer" }, { nome: "Executando" }],
       etiquetas: [{ nome: "Urgente", cor: "#EF4444" }],
-      cards: [{ titulo: "Medir o terreno", coluna: "A fazer", etiqueta: "Urgente", prazoEmDias: 3 }],
+      cards: [{
+        titulo: "Medir o terreno", coluna: "A fazer", etiqueta: "Urgente", prazoEmDias: 3,
+        descricao: "Levantamento com trena a laser das divisas e desníveis. Sem isso o projeto " +
+          "não fecha. Pronto quando as medidas estiverem no croqui assinado.",
+        checklist: ["Agendar com o cliente", "Levar trena e nível", "Passar as medidas para o croqui"],
+      }],
     });
-    conferir("uma proposta boa passa", boa.ok, resumirProposta(boa.proposta));
+    conferir("uma proposta completa passa", boa.ok, resumirProposta(boa.proposta));
     conferir("e o prazo em dias sobrevive", boa.proposta.cards[0].prazoEmDias === 3);
+    conferir("a checklist sobrevive", boa.proposta.cards[0].checklist.length === 3);
+
+    const listaEnorme = validarProposta({
+      nome: "X", colunas: [{ nome: "A" }],
+      cards: [{
+        titulo: "T", coluna: "A",
+        descricao: "Uma descrição suficientemente longa para passar na conferência mínima.",
+        checklist: Array.from({ length: 30 }, (_, i) => `passo ${i}`),
+      }],
+    });
+    conferir("checklist gigante é cortada no limite, não recusada",
+      listaEnorme.ok && listaEnorme.proposta.cards[0].checklist.length === LIMITES.itensDeChecklist,
+      `${listaEnorme.proposta?.cards[0]?.checklist?.length}`);
+
+    // A regra de "quadro de estudo pede material" é heurística, e uma heurística que ninguém
+    // testa é uma heurística que ninguém sabe se funciona.
+    conferir("reconhece um quadro de estudo", pareceEstudo("Plano de estudos de JavaScript"));
+    conferir("reconhece por outras palavras", pareceEstudo("preparação para o concurso"));
+    conferir("e não chama de estudo o que não é", !pareceEstudo("Obras dos clientes"));
+
+    conferir("uma descrição com livro conta como material",
+      citaMaterial("Leia o capítulo 4 do livro Eloquent JavaScript."));
+    conferir("uma com documentação também", citaMaterial("Ver a referência de Array na MDN."));
+    conferir("e uma sem fonte nenhuma não conta",
+      !citaMaterial("Entenda bem como funcionam os arrays e pratique bastante."));
   }
 
   // ------------------------------------------------------- a porta
@@ -140,6 +191,16 @@ try {
       (r.dados?.texto || r.dados?.error || "").slice(0, 80));
     proposta = r.dados?.proposta;
     conferir("e veio uma proposta", Boolean(proposta), proposta ? resumirProposta(proposta) : "nenhuma");
+
+    // A exigência que o usuário pediu: card sem descrição não passa. A rota tem uma segunda
+    // chance embutida — se o modelo largar títulos soltos, ela devolve e pede de novo.
+    if (proposta) {
+      const curtas = proposta.cards.filter((c) => !c.descricao || c.descricao.length < 25);
+      conferir("TODO card veio com descrição", curtas.length === 0,
+        curtas.map((c) => c.titulo).join(", ") || `${proposta.cards.length} card(s) descritos`);
+      conferir("a descrição não é o título repetido",
+        proposta.cards.every((c) => c.descricao.toLowerCase().trim() !== c.titulo.toLowerCase().trim()));
+    }
 
     // ESTA É A VERIFICAÇÃO QUE MAIS IMPORTA DESTA TELA.
     const depois = await sb.from("abacato_quadros").select("id", { count: "exact", head: true });
@@ -189,6 +250,62 @@ try {
       conferir("as etiquetas existem", etiquetas?.length === proposta.etiquetas.length,
         `${etiquetas?.length}`);
     }
+
+    // As descrições e as checklists precisam chegar ao BANCO, e não só à prévia.
+    const comDescricao = (cards || []).filter((c) => c.titulo && c.id);
+    const { data: descritos } = await sb.from("abacato_cards")
+      .select("titulo, descricao").in("id", comDescricao.map((c) => c.id));
+    conferir("as descrições foram gravadas",
+      (descritos || []).every((c) => c.descricao && c.descricao.length >= 25),
+      (descritos || []).filter((c) => !c.descricao).map((c) => c.titulo).join(", ") || "todas");
+
+    const esperadas = proposta.cards.filter((c) => c.checklist?.length).length;
+    if (esperadas) {
+      const { data: listas } = await sb.from("abacato_checklists")
+        .select("id, card_id, titulo").in("card_id", comDescricao.map((c) => c.id));
+      conferir("as checklists foram criadas", listas?.length === esperadas,
+        `${listas?.length} de ${esperadas}`);
+
+      const { count: itens } = await sb.from("abacato_checklist_itens")
+        .select("id", { count: "exact", head: true })
+        .in("checklist_id", (listas || []).map((l) => l.id));
+      const esperadosItens = proposta.cards.reduce((n, c) => n + (c.checklist?.length || 0), 0);
+      conferir("com todos os passos dentro", itens === esperadosItens,
+        `${itens} de ${esperadosItens}`);
+
+      const { data: primeiro } = await sb.from("abacato_checklist_itens")
+        .select("feito").in("checklist_id", (listas || []).map((l) => l.id)).limit(5);
+      // Um passo já marcado faria o card nascer parecendo meio feito.
+      conferir("e todos desmarcados", (primeiro || []).every((i) => i.feito === false));
+    }
+  }
+
+  // ------------------------------------------------------- o caso de estudo
+  secao("Assunto de estudo aponta material concreto");
+  {
+    const r = await chamar(s, "POST", "/api/quadro-gen", {
+      mensagens: [{
+        quem: "pessoa",
+        texto: `Monte agora um quadro de estudos de JavaScript para quem está começando. ` +
+          `Etapas: A estudar, Estudando, Praticando, Dominado. Quatro tópicos iniciais. ` +
+          `Não me pergunte nada, proponha.`,
+      }],
+      fusoMinutos: 180,
+    });
+    const p = r.dados?.proposta;
+    conferir("propôs o quadro de estudos", Boolean(p), p ? resumirProposta(p) : r.dados?.texto?.slice(0, 70));
+
+    if (p) {
+      const texto = p.cards.map((c) => `${c.descricao}`).join(" \n ");
+      // Material concreto: nome de livro, de site de documentação, de curso. A busca é por
+      // sinais, e não por uma lista fechada — a ideia é que a descrição aponte para ALGO.
+      const citaMaterial = /MDN|livro|cap[íi]tulo|documenta|Eloquent|You Don'?t Know|curso|freeCodeCamp|JavaScript\.info|ECMA/i.test(texto);
+      conferir("as descrições apontam material concreto", citaMaterial,
+        texto.slice(0, 150).replace(/\s+/g, " "));
+
+      const comPassos = p.cards.filter((c) => c.checklist?.length).length;
+      conferir("e os cards trazem passos", comPassos > 0, `${comPassos} de ${p.cards.length}`);
+    }
   }
 
   // ------------------------------------------------------- a segunda conferência
@@ -220,7 +337,7 @@ try {
     const enorme = await chamar(s, "POST", "/api/quadro-gen/criar", {
       proposta: {
         nome: "Enorme", colunas: [{ nome: "A" }],
-        cards: Array.from({ length: 200 }, (_, i) => ({ titulo: `t${i}`, coluna: "A" })),
+        cards: Array.from({ length: 200 }, (_, i) => ({ titulo: `t${i}`, coluna: "A", descricao: "Uma descricao de verdade, com o que e e como saber que terminou." })),
       },
     });
     conferir("duzentos cards são recusados (400)", enorme.status === 400, `status ${enorme.status}`);

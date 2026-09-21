@@ -2,7 +2,7 @@ import { json } from "@/lib/http.js";
 import { respostaDeErro, ErroDeAcesso } from "@/lib/acesso.js";
 import { exigirLisa } from "@/lib/admin.js";
 import { conversar, textoDe, chamadasDe, temModelo } from "@/lib/gemini.js";
-import { validarProposta, LIMITES } from "@/dominio/quadroGen.js";
+import { validarProposta, LIMITES, pareceEstudo, cardsSemMaterial } from "@/dominio/quadroGen.js";
 import { CORES } from "@/dominio/cores.js";
 
 export const runtime = "nodejs";
@@ -52,11 +52,24 @@ const FERRAMENTA = {
           properties: {
             titulo: { type: "string" },
             coluna: { type: "string", description: "o NOME de uma das colunas acima" },
-            descricao: { type: "string", description: "opcional" },
+            descricao: {
+              type: "string",
+              description:
+                "OBRIGATÓRIA, e nunca o título repetido. Duas a quatro frases: o que é, por que importa, " +
+                "e como saber que terminou. Em assunto de estudo, cite material concreto — livro com autor, " +
+                "curso, documentação, capítulo.",
+            },
+            checklist: {
+              type: "array",
+              description:
+                "os passos para concluir este card, na ordem. Use sempre que houver mais de um passo. " +
+                "Frases curtas e verificáveis.",
+              items: { type: "string" },
+            },
             etiqueta: { type: "string", description: "o NOME de uma das etiquetas acima, opcional" },
             prazoEmDias: { type: "number", description: "prazo em dias a partir de hoje, opcional" },
           },
-          required: ["titulo", "coluna"],
+          required: ["titulo", "coluna", "descricao"],
         },
       },
     },
@@ -85,8 +98,19 @@ Pare de perguntar assim que der para montar algo útil. Um quadro imperfeito que
 QUANDO TIVER O BASTANTE
 Chame propor_quadro. Depois dela, escreva UMA frase curta dizendo o que montou e que é só conferir e confirmar. Não repita a lista de colunas e cards em texto — a tela já mostra tudo.
 
+TODO CARD LEVA DESCRIÇÃO E, QUANDO TIVER PASSOS, CHECKLIST
+
+Isto não é opcional. Um card só com título parece organizado e não ajuda ninguém: quem abre não sabe o que fazer nem quando aquilo está pronto — e preencher trinta descrições depois nunca acontece.
+
+A descrição tem duas a quatro frases e responde três coisas: o que é, por que importa, e como saber que terminou. Nunca repita o título com outras palavras.
+
+A checklist são os passos, na ordem, em frases curtas e verificáveis. Use sempre que o card tiver mais de um passo.
+
+SE O ASSUNTO FOR ESTUDO OU APRENDIZADO
+A descrição precisa apontar MATERIAL CONCRETO, com nome: livro e autor, curso, documentação oficial, capítulo. "Estude arrays" não serve; "Arrays e seus métodos — Eloquent JavaScript (Marijn Haverbeke), cap. 4, e a referência de Array no MDN" serve. Cite o que existe de verdade e é conhecido na área; se não tiver certeza de uma fonte, prefira a documentação oficial da linguagem ou ferramenta a inventar um título.
+
 LIMITES
-No máximo ${LIMITES.colunas} colunas, ${LIMITES.cards} cards e ${LIMITES.etiquetas} etiquetas. Um quadro de trinta cards não é um plano, é uma parede: proponha o que faz começar, não tudo que existirá um dia.
+No máximo ${LIMITES.colunas} colunas, ${LIMITES.cards} cards e ${LIMITES.etiquetas} etiquetas, e até ${LIMITES.itensDeChecklist} itens por checklist. Um quadro de trinta cards não é um plano, é uma parede: proponha o que faz começar, não tudo que existirá um dia.
 
 A primeira coluna é a fila de entrada ("A fazer", "Entrada", "Backlog"). A última é o fim ("Feito", "Entregue").
 
@@ -125,20 +149,72 @@ export async function POST(req) {
     const hoje = new Date(Date.now() - fuso * 60000).toISOString().slice(0, 10);
     const sistema = `${INSTRUCOES}\n\nQuem está montando: ${usuario.nome}.\nHoje é ${hoje}.`;
 
-    const resposta = await conversar({ contents, sistema, ferramentas: [FERRAMENTA] });
-    const chamadas = chamadasDe(resposta);
-    const proposta = chamadas.find((c) => c.nome === "propor_quadro");
+    let resposta = await conversar({ contents, sistema, ferramentas: [FERRAMENTA] });
+    let proposta = chamadasDe(resposta).find((c) => c.nome === "propor_quadro");
 
     if (!proposta) {
       // Ainda perguntando. É o caso mais comum, e é o que esta tela existe para fazer.
       return json({ ok: true, texto: textoDe(resposta) || "Me conte um pouco mais." });
     }
 
-    const conferida = validarProposta(proposta.args);
+    let conferida = validarProposta(proposta.args);
+
+    // Quadro de estudo sem material indicado é o outro erro que não pode passar. A conferência
+    // mora junto com a de estrutura para as duas usarem a MESMA segunda chance: duas idas ao
+    // modelo pelo mesmo motivo seriam o dobro do custo e da espera.
+    const doQueSeTrata = [
+      conferida.proposta?.nome,
+      conferida.proposta?.descricao,
+      mensagens.map((m) => m.texto).join(" "),
+    ];
+    if (conferida.ok && pareceEstudo(...doQueSeTrata)) {
+      const semMaterial = cardsSemMaterial(conferida.proposta);
+      if (semMaterial.length) {
+        conferida = {
+          ...conferida,
+          ok: false,
+          erros: [
+            `este é um quadro de estudo e ${semMaterial.length} card(s) não indicam material ` +
+            `(livro com autor, capítulo, documentação, curso): ${semMaterial.slice(0, 6).join(", ")}`,
+          ],
+        };
+      }
+    }
+
+    // UMA SEGUNDA CHANCE, E SÓ UMA.
+    //
+    // O erro mais comum é card sem descrição: o modelo se empolga com a estrutura e larga os
+    // títulos soltos. Devolver isso para a PESSOA gastaria a vez dela para corrigir um
+    // descuido que não foi dela — e ela responderia "põe as descrições", que é exatamente o
+    // que o servidor pode pedir sozinho.
+    //
+    // Uma só porque a segunda falha em geral é de limite (cards demais), e insistir nisso
+    // vira um laço caro que termina no mesmo lugar.
     if (!conferida.ok) {
-      // O modelo propôs algo que o sistema não aceita. Devolver o motivo para a PESSOA, e não
-      // para o modelo, é deliberado: mandar de volta para ele gastaria outra rodada e ele
-      // costuma repetir o mesmo erro. Uma frase e a conversa continua.
+      contents.push({ role: "model", parts: resposta.parts });
+      contents.push({
+        role: "user",
+        parts: [{
+          text:
+            `A proposta não passou na conferência do sistema: ${conferida.erros.join("; ")}.\n\n` +
+            `Refaça chamando propor_quadro de novo, corrigindo SÓ isso. ` +
+            `Lembre: toda descrição tem duas a quatro frases dizendo o que é, por que importa e ` +
+            `como saber que terminou — nunca o título repetido.`,
+        }],
+      });
+
+      resposta = await conversar({ contents, sistema, ferramentas: [FERRAMENTA] });
+      proposta = chamadasDe(resposta).find((c) => c.nome === "propor_quadro");
+      if (proposta) {
+        const segunda = validarProposta(proposta.args);
+        // Na segunda vez a falta de material não derruba mais: o quadro sai como veio, e
+        // insistir de novo custaria uma terceira chamada para, na prática, o mesmo texto.
+        if (segunda.ok) conferida = segunda;
+      }
+    }
+
+    if (!conferida.ok) {
+      // Insistiu no erro. Agora sim é assunto de quem está conversando.
       return json({
         ok: true,
         texto: `Montei uma proposta que não passou na conferência: ${conferida.erros.join("; ")}. Me diga como simplificar.`,

@@ -320,3 +320,38 @@
   .abacato-gen__coluna { flex-basis: 170px; }
   .abacato-gen__acoes .abacato-botao { margin-left: 0; width: 100%; }
 }
+
+/* O card da prévia abre com <details>: fechado mostra o título, aberto mostra a descrição e
+   os passos. Todos abertos de uma vez fariam a prévia virar um texto corrido de duas mil
+   palavras, e a forma do quadro — que é o que se confere primeiro — sumiria. */
+.abacato-gen__card { display: block; cursor: pointer; }
+.abacato-gen__card > summary { list-style: none; display: flex; align-items: center; gap: 7px; }
+.abacato-gen__card > summary::-webkit-details-marker { display: none; }
+.abacato-gen__card[open] > summary { margin-bottom: 7px; }
+.abacato-gen__card-topo { display: flex; align-items: center; gap: 7px; }
+.abacato-gen__card-corpo { border-top: 1px solid var(--abacato-linha); padding-top: 7px; }
+.abacato-gen__card-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--abacato-tinta-2);
+  overflow-wrap: anywhere;
+}
+.abacato-gen__passos {
+  margin: 7px 0 0;
+  padding-left: 18px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--abacato-tinta-2);
+}
+.abacato-gen__passos li { overflow-wrap: anywhere; }
+
+/* A seta some para quem pediu menos movimento; o triângulo é o único indício de que abre. */
+.abacato-gen__card > summary::after {
+  content: "▸";
+  margin-left: auto;
+  color: var(--abacato-tinta-3);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.abacato-gen__card[open] > summary::after { content: "▾"; }

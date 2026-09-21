@@ -31,7 +31,12 @@ export const LIMITES = {
   tamanhoNome: 80,
   tamanhoTitulo: 200,
   tamanhoDescricao: 2000,
+  itensDeChecklist: 12,
+  tamanhoItem: 200,
 };
+
+/** Uma descrição menor que isto não é descrição, é o título repetido. */
+const DESCRICAO_MINIMA = 25;
 
 function texto(valor, maximo) {
   return String(valor == null ? "" : valor).trim().slice(0, maximo);
@@ -104,6 +109,7 @@ export function validarProposta(bruta) {
   // -------------------------------------------------------------------- cards
   const cardsBrutos = Array.isArray(bruta.cards) ? bruta.cards : [];
   const cards = [];
+  const semDescricao = [];
   for (const c of cardsBrutos) {
     const titulo = texto(c?.titulo, LIMITES.tamanhoTitulo);
     if (!titulo) continue;
@@ -124,16 +130,43 @@ export function validarProposta(bruta) {
     // confiança, e "daqui a 7 dias" é o que ele consegue dizer sem errar.
     const dias = Number(c?.prazoEmDias);
 
+    // TODO CARD PRECISA DE DESCRIÇÃO, e isto é uma exigência, não um desejo.
+    //
+    // Um card que diz só "Arrays e métodos" não ajuda ninguém: quem abre não sabe o que
+    // fazer, nem quando considerar aquilo pronto. Um quadro cheio de títulos soltos parece
+    // organizado e não é — e o trabalho de preencher trinta descrições depois nunca acontece.
+    //
+    // O comprimento mínimo existe porque o modelo, pressionado a preencher, repete o título
+    // com outras palavras. Vinte e cinco caracteres não garantem qualidade, mas barram o
+    // "Arrays." que cumpriria a regra sem cumprir o propósito.
+    const descricao = texto(c?.descricao, LIMITES.tamanhoDescricao);
+    if (descricao.length < DESCRICAO_MINIMA) semDescricao.push(titulo);
+
+    // A checklist vem como lista de textos. Cada item é um passo, e passo é frase curta.
+    const checklist = (Array.isArray(c?.checklist) ? c.checklist : [])
+      .map((i) => texto(typeof i === "string" ? i : i?.texto, LIMITES.tamanhoItem))
+      .filter(Boolean)
+      .slice(0, LIMITES.itensDeChecklist);
+
     cards.push({
       titulo,
       coluna,
-      descricao: texto(c?.descricao, LIMITES.tamanhoDescricao) || null,
+      descricao: descricao || null,
+      checklist,
       etiqueta: temEtiqueta ? etiqueta : null,
       prazoEmDias: Number.isFinite(dias) && dias >= 0 && dias <= 730 ? Math.round(dias) : null,
     });
   }
   if (cards.length > LIMITES.cards) {
     erros.push(`${cards.length} cards é demais para um quadro novo (o limite é ${LIMITES.cards})`);
+  }
+  if (semDescricao.length) {
+    // Erro, e não aviso. A rota devolve isto ao modelo e pede de novo — uma vez. É o que
+    // faz "obrigatório" querer dizer obrigatório em vez de "pedimos com jeitinho".
+    erros.push(
+      `${semDescricao.length} card(s) sem descrição de verdade: ${semDescricao.slice(0, 6).join(", ")}` +
+      (semDescricao.length > 6 ? "…" : "")
+    );
   }
 
   if (erros.length) return { ok: false, erros, avisos, proposta: null };
@@ -150,6 +183,60 @@ export function validarProposta(bruta) {
       cards,
     },
   };
+}
+
+/* ==========================================================================================
+ * QUADRO DE ESTUDO PEDE MATERIAL COM NOME
+ *
+ * "Estude arrays" não é um plano de estudo: é o título repetido com um verbo na frente. O que
+ * faz um card de estudo servir é apontar ONDE estudar — o livro com autor, o capítulo, a
+ * documentação oficial, o curso.
+ *
+ * Pedir isso na instrução não bastou: medido contra o modelo de verdade, ele cumpria uma vez e
+ * esquecia na outra. Então vira conferência, e a rota devolve e pede de novo quando falta.
+ *
+ * As duas funções abaixo são HEURÍSTICA, e assumidamente. "Parece estudo" e "cita material"
+ * não são coisas que se decidem por regra — mas a alternativa é não conferir nada, e aí a
+ * exigência vale só nos dias em que o modelo está atento.
+ * ========================================================================================== */
+
+const PALAVRAS_DE_ESTUDO = [
+  "estud", "aprend", "curso", "formaç", "formac", "faculdade", "concurso", "certificaç",
+  "certificac", "prova", "materia", "matéria", "disciplina", "treinament", "capacitaç",
+  "leitura", "idioma", "ingl", "espanhol",
+];
+
+/** Este quadro é sobre aprender alguma coisa? */
+export function pareceEstudo(...textos) {
+  const tudo = textos.filter(Boolean).join(" ").toLowerCase();
+  return PALAVRAS_DE_ESTUDO.some((p) => tudo.includes(p));
+}
+
+/* Sinais de que uma descrição aponta para algo que existe fora dela. Não é a lista de fontes
+   do mundo — é a lista de palavras que aparecem quando alguém REALMENTE indica material. */
+const SINAIS_DE_MATERIAL = [
+  "livro", "autor", "capítulo", "capitulo", "cap.", "documentaç", "documentac", "docs",
+  "curso", "aula", "artigo", "vídeo", "video", "playlist", "apostila", "mdn", "w3c",
+  "manual", "referência", "referencia", "tutorial", "página oficial", "site oficial",
+];
+
+/** A descrição aponta para algum material concreto? */
+export function citaMaterial(texto) {
+  const t = String(texto || "").toLowerCase();
+  return SINAIS_DE_MATERIAL.some((s) => t.includes(s));
+}
+
+/**
+ * Quantos cards de um quadro de estudo ficaram sem indicar material.
+ *
+ * Devolve os títulos, para a mensagem de volta ao modelo poder dizer quais refazer em vez de
+ * mandá-lo reescrever o quadro inteiro.
+ */
+export function cardsSemMaterial(proposta) {
+  if (!proposta) return [];
+  return proposta.cards
+    .filter((c) => !citaMaterial(c.descricao))
+    .map((c) => c.titulo);
 }
 
 /** Um resumo em uma linha, para a conversa e para os testes. */

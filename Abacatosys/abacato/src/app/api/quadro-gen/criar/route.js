@@ -106,6 +106,41 @@ export async function POST(req) {
           if (etiquetaId) ligacoes.push({ card_id: card.id, etiqueta_id: etiquetaId });
         });
         if (ligacoes.length) await supabase.from("abacato_card_etiquetas").insert(ligacoes);
+
+        // ---------------------------------------------------------- checklists
+        //
+        // Uma checklist por card que tenha passos, com o nome do card como título — é o que
+        // o painel do card mostra, e "Passos" em quinze cards não distingue nada.
+        //
+        // As listas entram todas de uma vez e os itens também: um card com seis passos e
+        // dez cards com checklist dariam dezesseis idas ao banco, e o quadro nasceria devagar
+        // justo no momento em que a pessoa está olhando a tela esperando.
+        const comPassos = [];
+        (cards || []).forEach((card, i) => {
+          const passos = p.cards[i]?.checklist || [];
+          if (passos.length) comPassos.push({ cardId: card.id, titulo: p.cards[i].titulo, passos });
+        });
+
+        if (comPassos.length) {
+          const { data: listas, error: erroListas } = await supabase.from("abacato_checklists")
+            .insert(comPassos.map((c) => ({ card_id: c.cardId, titulo: c.titulo, posicao: 1024 })))
+            .select("id, card_id");
+          if (erroListas) throw new Error(erroListas.message);
+
+          const listaDoCard = new Map((listas || []).map((l) => [l.card_id, l.id]));
+          const itens = [];
+          for (const c of comPassos) {
+            const listaId = listaDoCard.get(c.cardId);
+            if (!listaId) continue;
+            c.passos.forEach((texto, n) => {
+              itens.push({ checklist_id: listaId, texto, feito: false, posicao: (n + 1) * 1024 });
+            });
+          }
+          if (itens.length) {
+            const { error: erroItens } = await supabase.from("abacato_checklist_itens").insert(itens);
+            if (erroItens) throw new Error(erroItens.message);
+          }
+        }
       }
 
       return json({
@@ -115,6 +150,7 @@ export async function POST(req) {
         colunas: (colunas || []).length,
         cards: p.cards.length,
         etiquetas: etiquetas.length,
+        checklists: p.cards.filter((c) => c.checklist?.length).length,
       }, 201);
     } catch (dentro) {
       // Desfaz. O `on delete cascade` leva colunas, cards e etiquetas junto — é uma linha só,
