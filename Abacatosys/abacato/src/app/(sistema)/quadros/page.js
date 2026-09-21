@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { obter, criar, mudar, remover } from "@/lib/api.js";
 import ImportarDoTrello from "@/componentes/ImportarDoTrello.js";
+import QuadroGen from "@/componentes/QuadroGen.js";
 
 const PAPEL_EM_PALAVRAS = {
   dono: "seu",
@@ -23,6 +24,8 @@ export default function Quadros() {
   const [nome, setNome] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [gerando, setGerando] = useState(false);
+  const [temLisa, setTemLisa] = useState(false);
   const [menuAberto, setMenuAberto] = useState(null);
   const campo = useRef(null);
   const router = useRouter();
@@ -40,6 +43,17 @@ export default function Quadros() {
   }, []);
 
   useEffect(() => { carregar(false); }, [carregar]);
+
+  // O Quadro Gen é a Lisa, então segue a mesma liberação dela. Esconder o botão é conforto:
+  // quem decide é a rota, que recusa com 403.
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/lisa")
+      .then((r) => (r.ok ? r.json() : { podeUsar: false }))
+      .then((d) => { if (vivo) setTemLisa(Boolean(d?.podeUsar)); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, []);
   useEffect(() => { if (criando) campo.current?.focus(); }, [criando]);
 
   async function enviar(e) {
@@ -101,6 +115,12 @@ export default function Quadros() {
                     Arquivados ({arquivados})
                   </button>
                 )}
+                {/* Só aparece para quem tem a assistente liberada — o Quadro Gen é ela. */}
+                {temLisa && (
+                  <button className="abacato-botao abacato-botao--fantasma" onClick={() => setGerando(true)}>
+                    ✦ Montar com a Lisa
+                  </button>
+                )}
                 <button className="abacato-botao abacato-botao--fantasma" onClick={() => setImportando(true)}>
                   Trazer do Trello
                 </button>
@@ -157,6 +177,8 @@ export default function Quadros() {
       {importando && (
         <ImportarDoTrello aoFechar={() => setImportando(false)} aoTerminar={() => carregar(false)} />
       )}
+
+      {gerando && <QuadroGen aoFechar={() => setGerando(false)} />}
 
       {quadros?.length > 0 && (
         <div className="abacato-grade">

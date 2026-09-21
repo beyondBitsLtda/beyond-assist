@@ -190,3 +190,104 @@
   .abacato-lisa { padding: 0; align-items: stretch; }
   .abacato-lisa__caixa { width: 100%; height: 100%; border-radius: 0; border: 0; }
 }
+
+/* ============================================================ Quadro Gen */
+
+/* A caixa e mais alta que a da Lisa: aqui cabe uma conversa E um quadro inteiro. */
+.abacato-gen { height: min(760px, 88vh); }
+.abacato-gen__etiquetas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+
+/* A conversa em cima, a prévia embaixo. Não lado a lado: a prévia é um quadro, e quadro se lê
+   na horizontal — espremê-lo em meia tela faria as colunas virarem tiras de 80px. */
+.abacato-gen__corpo {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.abacato-gen__conversa {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Encolhe quando a prévia aparece: a partir daí o que importa é o quadro, e a conversa
+     vira histórico. */
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.abacato-gen__vazio { margin: auto 0; }
+
+/* ------------------------------------------------ a prévia */
+
+.abacato-gen__previa {
+  border-top: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie-2);
+  padding: 16px;
+}
+.abacato-gen__previa-topo { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
+.abacato-gen__previa-topo strong { font-size: 15px; }
+
+.abacato-gen__etiqueta {
+  font-size: 11px;
+  font-weight: 700;
+  color: #FFFFFF;
+  padding: 2px 10px;
+  border-radius: var(--abacato-raio-pilula);
+}
+
+/* As colunas rolam na horizontal, como no quadro de verdade — é o que faz a prévia parecer
+   com o que vai ser criado, em vez de uma lista de listas. */
+.abacato-gen__colunas {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.abacato-gen__coluna {
+  flex: 0 0 200px;
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.abacato-gen__coluna-nome {
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.abacato-gen__card {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--abacato-superficie-2);
+  border-radius: 9px;
+  padding: 7px 9px;
+  font-size: 12.5px;
+}
+.abacato-gen__card-titulo { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.abacato-gen__marca { width: 4px; align-self: stretch; border-radius: 3px; flex-shrink: 0; }
+
+.abacato-gen__acoes {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--abacato-linha);
+}
+.abacato-gen__acoes .abacato-botao { margin-left: auto; }
+
+@media (max-width: 620px) {
+  .abacato-gen__conversa { max-height: 38vh; }
+  .abacato-gen__coluna { flex-basis: 170px; }
+  .abacato-gen__acoes .abacato-botao { margin-left: 0; width: 100%; }
+}
