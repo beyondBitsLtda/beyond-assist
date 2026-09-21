@@ -45,7 +45,7 @@ function disponiveis() {
  * `contents` é o histórico no formato do Gemini; `ferramentas` são as declarações de função.
  * Devolve a parte de conteúdo da primeira candidata — texto, chamadas de função, ou os dois.
  */
-export async function conversar({ contents, sistema, ferramentas }) {
+export async function conversar({ contents, sistema, ferramentas, maxTokens }) {
   const lista = disponiveis();
   if (!lista.length) {
     throw new Error("a assistente não está configurada neste servidor (falta GEMINI_API_KEYS)");
@@ -59,7 +59,14 @@ export async function conversar({ contents, sistema, ferramentas }) {
       // Baixa de propósito: esta assistente cria tarefas e muda prazos. Criatividade aqui não
       // é qualidade, é risco de inventar um id que não existe.
       temperature: 0.2,
-      maxOutputTokens: 2048,
+      // Quem chama diz de quanto precisa.
+      //
+      // O padrão serve a uma resposta de conversa. Quem devolve ESTRUTURA — um quadro com
+      // trinta cards, cada um com descrição e checklist — precisa de muito mais: com 2048 o
+      // modelo era cortado no meio da chamada de função e devolvia uma resposta vazia, que
+      // na tela virava "Me conte um pouco mais" a cada tentativa. A pessoa repetia o pedido
+      // e recebia a mesma frase, sem nada dizendo que o problema era tamanho.
+      maxOutputTokens: Number.isFinite(maxTokens) ? maxTokens : 2048,
     },
   };
 
@@ -91,14 +98,27 @@ export async function conversar({ contents, sistema, ferramentas }) {
       continue;
     }
 
-    const parte = dados?.candidates?.[0]?.content;
+    const candidata = dados?.candidates?.[0];
+    const parte = candidata?.content;
+    const motivo = candidata?.finishReason;
+
     if (!parte) {
-      // Resposta vazia costuma ser filtro de segurança do próprio modelo.
-      const motivo = dados?.candidates?.[0]?.finishReason;
-      throw new Error(motivo === "SAFETY"
-        ? "o modelo recusou responder a isso"
-        : "o modelo devolveu uma resposta vazia");
+      // Resposta vazia costuma ser filtro de segurança do próprio modelo — ou corte por
+      // tamanho, que é indistinguível daqui se não olharmos o motivo.
+      throw new Error(
+        motivo === "SAFETY" ? "o modelo recusou responder a isso"
+        : motivo === "MAX_TOKENS" ? "a resposta não coube no limite de tamanho"
+        : "o modelo devolveu uma resposta vazia"
+      );
     }
+
+    // POR QUE O MOTIVO VIAJA JUNTO COM O CONTEÚDO
+    //
+    // "Parou porque terminou" e "parou porque acabou o espaço" chegam aqui com a mesma cara:
+    // um objeto de conteúdo. Quem chamou precisa distinguir os dois para poder dizer a
+    // verdade — sem isto, uma chamada de função cortada no meio vira "resposta vazia" e a
+    // tela pede à pessoa que repita o que já disse.
+    parte.motivoDeParada = motivo || null;
     return parte;
   }
 

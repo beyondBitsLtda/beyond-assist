@@ -95,6 +95,10 @@ Não pergunte o que você pode deduzir. Se a pessoa disse "quadro de recrutament
 
 Pare de perguntar assim que der para montar algo útil. Um quadro imperfeito que a pessoa ajusta em dois cliques vale mais que dez perguntas.
 
+PROPONHA DE PRIMEIRA quando o pedido já vier detalhado. Se a pessoa disse o assunto, o ritmo, o nível e quantas tarefas quer, ela já respondeu tudo que importa: chame propor_quadro agora. Perguntar depois disso faz ela repetir o que acabou de escrever.
+
+E se ela disser "cria logo", "não me pergunte mais", "proponha" ou algo assim — PARE de perguntar e proponha na mesma hora, com o que tiver. Insistir depois de um pedido desses é ignorar o que ela falou.
+
 QUANDO TIVER O BASTANTE
 Chame propor_quadro. Depois dela, escreva UMA frase curta dizendo o que montou e que é só conferir e confirmar. Não repita a lista de colunas e cards em texto — a tela já mostra tudo.
 
@@ -110,7 +114,11 @@ SE O ASSUNTO FOR ESTUDO OU APRENDIZADO
 A descrição precisa apontar MATERIAL CONCRETO, com nome: livro e autor, curso, documentação oficial, capítulo. "Estude arrays" não serve; "Arrays e seus métodos — Eloquent JavaScript (Marijn Haverbeke), cap. 4, e a referência de Array no MDN" serve. Cite o que existe de verdade e é conhecido na área; se não tiver certeza de uma fonte, prefira a documentação oficial da linguagem ou ferramenta a inventar um título.
 
 LIMITES
-No máximo ${LIMITES.colunas} colunas, ${LIMITES.cards} cards e ${LIMITES.etiquetas} etiquetas, e até ${LIMITES.itensDeChecklist} itens por checklist. Um quadro de trinta cards não é um plano, é uma parede: proponha o que faz começar, não tudo que existirá um dia.
+No máximo ${LIMITES.colunas} colunas, ${LIMITES.cards} cards e ${LIMITES.etiquetas} etiquetas, e até ${LIMITES.itensDeChecklist} itens por checklist.
+
+SE A PESSOA DISSER QUANTOS CARDS QUER, FAÇA O QUE ELA PEDIU. "No mínimo 30 tarefas" quer dizer trinta, não oito. O teto de ${LIMITES.cards} é o limite do sistema, e não uma sugestão de tamanho — só recuse acima dele, e aí diga o porquê.
+
+Quando ela não disser um número, proponha o que faz começar — em geral entre oito e quinze — em vez de tudo que existirá um dia.
 
 A primeira coluna é a fila de entrada ("A fazer", "Entrada", "Backlog"). A última é o fim ("Feito", "Entregue").
 
@@ -149,12 +157,36 @@ export async function POST(req) {
     const hoje = new Date(Date.now() - fuso * 60000).toISOString().slice(0, 10);
     const sistema = `${INSTRUCOES}\n\nQuem está montando: ${usuario.nome}.\nHoje é ${hoje}.`;
 
-    let resposta = await conversar({ contents, sistema, ferramentas: [FERRAMENTA] });
+    /* UM QUADRO É UMA RESPOSTA GRANDE.
+     *
+     * Trinta cards, cada um com descrição de quatro frases e uma checklist, passam
+     * folgadamente de dez mil tokens de argumento. Com o teto padrão de 2048 o modelo era
+     * cortado no meio da chamada de função: a resposta voltava vazia, e a tela dizia "Me
+     * conte um pouco mais" — a cada tentativa, sem nada indicando que o problema era o
+     * tamanho. A pessoa respondia, e recebia a mesma frase de novo. */
+    const TETO = 16384;
+
+    let resposta = await conversar({ contents, sistema, ferramentas: [FERRAMENTA], maxTokens: TETO });
     let proposta = chamadasDe(resposta).find((c) => c.nome === "propor_quadro");
 
     if (!proposta) {
-      // Ainda perguntando. É o caso mais comum, e é o que esta tela existe para fazer.
-      return json({ ok: true, texto: textoDe(resposta) || "Me conte um pouco mais." });
+      const texto = textoDe(resposta);
+      if (texto) return json({ ok: true, texto });
+
+      // Sem texto E sem proposta. Dizer "me conte mais" aqui é empurrar para a pessoa um
+      // problema que não é dela.
+      if (resposta.motivoDeParada === "MAX_TOKENS") {
+        return json({
+          ok: true,
+          texto: "O quadro que eu estava montando ficou grande demais e foi cortado no meio. " +
+            "Peça menos cards de uma vez — dá para começar com quinze e acrescentar o resto depois.",
+        });
+      }
+      return json({
+        ok: true,
+        texto: "Não consegui montar uma resposta para isso. Tente dizer de outro jeito, " +
+          "ou comece pelas etapas: por onde o trabalho passa, do começo ao fim?",
+      });
     }
 
     let conferida = validarProposta(proposta.args);
@@ -203,7 +235,7 @@ export async function POST(req) {
         }],
       });
 
-      resposta = await conversar({ contents, sistema, ferramentas: [FERRAMENTA] });
+      resposta = await conversar({ contents, sistema, ferramentas: [FERRAMENTA], maxTokens: TETO });
       proposta = chamadasDe(resposta).find((c) => c.nome === "propor_quadro");
       if (proposta) {
         const segunda = validarProposta(proposta.args);

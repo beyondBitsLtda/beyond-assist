@@ -280,6 +280,44 @@ try {
     }
   }
 
+  // ------------------------------------------------------- o pedido grande
+  secao("Um pedido grande e detalhado é atendido de primeira");
+  {
+    // O caso que quebrou de verdade: trinta cards com descrição e checklist passam de dez
+    // mil tokens de argumento. Com o teto antigo (2048) o modelo era cortado no meio da
+    // chamada de função, voltava vazio, e a tela respondia "Me conte um pouco mais" — a cada
+    // tentativa, sem nada dizendo que o problema era tamanho.
+    const r = await chamar(s, "POST", "/api/quadro-gen", {
+      mensagens: [{
+        quem: "pessoa",
+        texto: `Quero um quadro sobre engenharia de software com estudos e práticas a cada dois ` +
+          `dias, indo do básico ao médio, em JavaScript. No mínimo 30 tarefas, com descrição e ` +
+          `checklist em cada card. Etapas: A estudar, Estudando, Praticando, Dominado. ` +
+          `Não me pergunte nada, crie logo o quadro.`,
+      }],
+      fusoMinutos: 180,
+    });
+
+    const p = r.dados?.proposta;
+    // A prova de que o corte acabou: antes, esta era a resposta a QUALQUER pedido grande.
+    conferir("não devolve 'me conte um pouco mais' para um pedido detalhado",
+      !/me conte um pouco mais/i.test(r.dados?.texto || ""), (r.dados?.texto || "").slice(0, 80));
+    conferir("propôs de primeira, sem perguntar", Boolean(p),
+      p ? resumirProposta(p) : (r.dados?.texto || "").slice(0, 90));
+
+    if (p) {
+      // "No mínimo 30" quer dizer trinta. A instrução antiga desencorajava justamente isso.
+      conferir("respeitou a quantidade pedida", p.cards.length >= 25, `${p.cards.length} cards`);
+      conferir("e todos com descrição", p.cards.every((c) => c.descricao?.length >= 25),
+        `${p.cards.filter((c) => !c.descricao || c.descricao.length < 25).length} sem`);
+      const comLista = p.cards.filter((c) => c.checklist?.length).length;
+      conferir("e com checklist", comLista >= p.cards.length * 0.8,
+        `${comLista} de ${p.cards.length}`);
+      conferir("apontando material, por ser estudo", cardsSemMaterial(p).length === 0,
+        cardsSemMaterial(p).slice(0, 3).join(", ") || "todos");
+    }
+  }
+
   // ------------------------------------------------------- o caso de estudo
   secao("Assunto de estudo aponta material concreto");
   {
