@@ -42,6 +42,9 @@ function descreverAcao(a) {
 }
 
 export default function Lisa() {
+  // `null` enquanto não se sabe. Começar em `true` faria o botão piscar na tela de quem não
+  // tem acesso; começar em `false` o faria aparecer atrasado para quem tem.
+  const [liberada, setLiberada] = useState(null);
   const [aberta, setAberta] = useState(false);
   const [mensagens, setMensagens] = useState([]);
   const [rascunho, setRascunho] = useState("");
@@ -49,6 +52,19 @@ export default function Lisa() {
   const [erro, setErro] = useState("");
   const fim = useRef(null);
   const campo = useRef(null);
+
+  // Esta conta pode falar com a Lisa? Uma pergunta só, ao carregar.
+  //
+  // Esconder o botão é conforto, não permissão: quem decide é a rota, que recusa com 403 e
+  // lê a liberação do banco a cada pedido. Aqui só se evita desenhar um botão que não abre.
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/lisa")
+      .then((r) => (r.ok ? r.json() : { podeUsar: false }))
+      .then((d) => { if (vivo) setLiberada(Boolean(d?.podeUsar)); })
+      .catch(() => { if (vivo) setLiberada(false); });
+    return () => { vivo = false; };
+  }, []);
 
   // Rolar para o fim a cada mensagem — numa conversa, o que importa é sempre a última linha.
   useEffect(() => {
@@ -106,6 +122,9 @@ export default function Lisa() {
       setPensando(false);
     }
   }, [mensagens, pensando]);
+
+  // Sem liberação (ou antes de saber), a Lisa não existe nesta tela.
+  if (!liberada) return null;
 
   if (!aberta) {
     return (

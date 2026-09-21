@@ -1,10 +1,27 @@
 import { json } from "@/lib/http.js";
-import { quemEh, respostaDeErro, ErroDeAcesso } from "@/lib/acesso.js";
+import { respostaDeErro, ErroDeAcesso } from "@/lib/acesso.js";
+import { exigirLisa, podeUsarLisa } from "@/lib/admin.js";
 import { conversar, textoDe, chamadasDe, temModelo } from "@/lib/gemini.js";
 import { FERRAMENTAS, QUE_MUDAM, executar } from "@/lib/lisaFerramentas.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * GET /api/lisa — esta conta pode falar com a assistente?
+ *
+ * A tela pergunta uma vez ao carregar, para não desenhar um botão que só dá 403 ao ser
+ * clicado. Quem decide de verdade é o POST — esconder um botão não é permissão.
+ */
+export async function GET(req) {
+  try {
+    const { usuario, pode } = await podeUsarLisa(req);
+    if (!usuario) throw new ErroDeAcesso(401, "sem sessão");
+    return json({ ok: true, podeUsar: pode && temModelo() });
+  } catch (e) {
+    return respostaDeErro(e);
+  }
+}
 
 /** Quantas rodadas de ferramenta antes de parar.
  *
@@ -57,8 +74,9 @@ Se a pergunta não for sobre o Abacato, responda normalmente, com o que você sa
  */
 export async function POST(req) {
   try {
-    const usuario = await quemEh(req);
-    if (!usuario) throw new ErroDeAcesso(401, "sem sessão");
+    // A liberação vem do BANCO, e é conferida antes de qualquer outra coisa: antes de gastar
+    // cota do modelo, antes de ler quadro nenhum.
+    const usuario = await exigirLisa(req);
 
     if (!temModelo()) {
       throw new ErroDeAcesso(503, "a assistente não está ligada neste servidor — falta a chave do modelo");

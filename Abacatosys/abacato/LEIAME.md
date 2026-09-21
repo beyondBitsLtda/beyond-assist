@@ -158,6 +158,44 @@ criar contas só volta pelo terminal do servidor. As duas travas ficam no servid
 O sinalizador de administrador é lido do **banco** a cada pedido, nunca do cookie: o cookie vale
 uma semana, e tirar o acesso de alguém precisa valer no mesmo instante.
 
+## A Lisa
+
+Um botão no canto de qualquer tela do sistema abre uma janela de conversa. Ela lê os quadros, os
+documentos e os prazos de quem está falando, e **cria tarefa, muda prazo, move de coluna, abre
+quadro, projeto e pasta** a partir da conversa. Toda ação aparece marcada na conversa.
+
+**A liberação é por pessoa**, em `/pessoas`. Uma conta nova nasce **sem** a assistente: cada
+conversa custa cota do modelo, e uma assistente ligada para todo mundo é uma conta que ninguém
+decidiu abrir. Ligar é um clique; descobrir que a cota acabou, não. O sinalizador é lido do
+banco a cada pedido — tirar vale na hora, sem esperar o cookie vencer.
+
+**Ela não tem poder próprio.** Toda ferramenta passa pelo mesmo `exigir()` das rotas normais,
+com a sessão de quem está conversando: se você não pode editar aquele quadro, pedir a ela também
+não edita. É por isso que o laço do agente roda **dentro do Abacato**, e não na Lisa de fora —
+executado lá, ele usaria a credencial do serviço e qualquer pessoa com acesso à assistente
+passaria a ter acesso a tudo.
+
+**E ela não apaga nada.** Não existe ferramenta de apagar, arquivar ou remover, nem de dar e
+tirar acesso. Criar e editar se desfaz olhando; apagar por engano, a partir de uma frase mal
+entendida, não.
+
+O modelo é falado pela API REST (a biblioteca do Google não roda no runtime da Cloudflare), com
+o mesmo pool de chaves da Lisa em `GEMINI_API_KEYS`. Sem essa variável o botão simplesmente não
+aparece.
+
+## Migrações
+
+Os arquivos em `db/` são aplicados por:
+
+```bash
+npm run migrar db/008-lisa.sql
+```
+
+Não é um sistema de migração: não guarda o que já rodou nem desfaz nada. Por isso **todo arquivo
+do `db/` é escrito para poder rodar duas vezes** (`add column if not exists`, `create table if
+not exists`). Ele usa o endpoint `/pg/query` do Supabase, que é o mesmo caminho do Studio e
+aceita DDL — coisa que a API REST não faz.
+
 ## Conferências
 
 Todas falham alto. As sete primeiras rodam sem banco e sem rede:
@@ -177,6 +215,8 @@ Todas falham alto. As sete primeiras rodam sem banco e sem rede:
 | `npm run documento-check` | projetos, pastas, revisões e como cada tipo de arquivo abre |
 | `npm run painel-check` | os números do painel e o link público do cliente, com as dez travas de vazamento |
 | `npm run pessoas-check` | contas, papéis e permissões: 67 pedidos feitos com a sessão de outra pessoa |
+| `npm run cliente-check` | o painel do cliente: o que ele vê e o que o link público nunca entrega |
+| `npm run lisa-check` | a assistente: quem pode usá-la, e que ela não alcança nem apaga nada além do seu |
 
 Os cinco últimos precisam do servidor no ar, e criam coisas de teste que eles mesmos limpam
 no fim:

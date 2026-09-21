@@ -25,7 +25,7 @@ export async function PATCH(req, { params }) {
     const corpo = await req.json().catch(() => ({}));
 
     const { data: alvo } = await supabase
-      .from("abacato_usuarios").select("id, nome, email, ativo, admin").eq("id", id).maybeSingle();
+      .from("abacato_usuarios").select("id, nome, email, ativo, admin, lisa").eq("id", id).maybeSingle();
     if (!alvo) throw new ErroDeAcesso(404, "pessoa não encontrada");
 
     const mudancas = {};
@@ -50,6 +50,10 @@ export async function PATCH(req, { params }) {
       mudancas.admin = corpo.admin;
     }
 
+    // Liberar ou tirar a assistente. Não tem trava de "última pessoa" como o sinalizador de
+    // administrador: um Abacato sem ninguém usando a Lisa continua sendo um Abacato inteiro.
+    if (typeof corpo.lisa === "boolean") mudancas.lisa = corpo.lisa;
+
     // Trocar a senha de outra pessoa: o selo vem pronto do navegador de quem administra, que
     // sorteou a senha e a mostrou na tela uma vez. O servidor continua sem ver senha nenhuma.
     if (corpo.hash && corpo.sal && corpo.iteracoes) {
@@ -62,7 +66,7 @@ export async function PATCH(req, { params }) {
     if (!Object.keys(mudancas).length) throw new ErroDeAcesso(400, "nada para mudar");
 
     const { data, error } = await supabase.from("abacato_usuarios").update(mudancas).eq("id", id)
-      .select("id, nome, email, ativo, admin").single();
+      .select("id, nome, email, ativo, admin, lisa").single();
     if (error) throw new ErroDeAcesso(500, error.message);
 
     return json({ ok: true, usuario: data });

@@ -38,3 +38,26 @@ export async function quemEhComAdmin(req) {
   if (!data?.ativo) return null;
   return { ...usuario, admin: Boolean(data.admin) };
 }
+
+/** Esta pessoa pode falar com a assistente?
+ *
+ *  Lido do BANCO a cada pedido, como o sinalizador de administrador e pelo mesmo motivo: o
+ *  cookie vale uma semana, e tirar o acesso de alguém precisa valer no mesmo instante. */
+export async function podeUsarLisa(req) {
+  const usuario = await quemEh(req);
+  if (!usuario) return { usuario: null, pode: false };
+  const { data } = await supabase
+    .from("abacato_usuarios").select("ativo, lisa").eq("id", usuario.id).maybeSingle();
+  if (!data?.ativo) return { usuario: null, pode: false };
+  return { usuario, pode: Boolean(data.lisa) };
+}
+
+/** A mesma pergunta, mas barrando. Para as rotas que só existem se a resposta for sim. */
+export async function exigirLisa(req) {
+  const { usuario, pode } = await podeUsarLisa(req);
+  if (!usuario) throw new ErroDeAcesso(401, "sem sessão");
+  if (!pode) {
+    throw new ErroDeAcesso(403, "a assistente não está liberada para a sua conta — peça a quem administra o Abacato");
+  }
+  return usuario;
+}

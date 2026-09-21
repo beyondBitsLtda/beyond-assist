@@ -29,6 +29,7 @@ export default function Pessoas() {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [ehAdmin, setEhAdmin] = useState(false);
+  const [comLisa, setComLisa] = useState(false);
   const [trabalhando, setTrabalhando] = useState(false);
   const [senhaNova, setSenhaNova] = useState(null);   // { nome, email, senha }
   const [copiado, setCopiado] = useState(false);
@@ -60,9 +61,10 @@ export default function Pessoas() {
         sal: guardada.sal,
         iteracoes: guardada.iteracoes,
         admin: ehAdmin,
+        lisa: comLisa,
       });
       setSenhaNova({ nome: nome.trim(), email: email.trim().toLowerCase(), senha });
-      setNome(""); setEmail(""); setEhAdmin(false); setCriando(false);
+      setNome(""); setEmail(""); setEhAdmin(false); setComLisa(false); setCriando(false);
       await carregar();
     } catch (x) {
       setErro(x.message);
@@ -175,9 +177,14 @@ export default function Pessoas() {
             <input type="checkbox" checked={ehAdmin} onChange={(e) => setEhAdmin(e.target.checked)} />
             Também administra o Abacato
           </label>
+          <label className="abacato-concluir">
+            <input type="checkbox" checked={comLisa} onChange={(e) => setComLisa(e.target.checked)} />
+            Pode conversar com a Lisa
+          </label>
           <p className="abacato-dica">
             Quem administra pode criar e desligar contas. Não dá acesso a quadro nenhum — isso
-            continua vindo de convite, um a um.
+            continua vindo de convite, um a um. A Lisa também não: ela só alcança o que a
+            própria pessoa alcança.
           </p>
 
           <div className="abacato-rapido">
@@ -203,6 +210,7 @@ export default function Pessoas() {
                   {p.nome}
                   {souEu && <span className="abacato-etiqueta abacato-etiqueta--ok">você</span>}
                   {p.admin && <span className="abacato-etiqueta">administra</span>}
+                  {p.lisa && <span className="abacato-etiqueta abacato-etiqueta--ok">Lisa</span>}
                   {!p.ativo && <span className="abacato-etiqueta abacato-etiqueta--alerta">desativada</span>}
                 </strong>
                 <span className="abacato-dica">
@@ -211,6 +219,17 @@ export default function Pessoas() {
               </div>
 
               <div className="abacato-pessoa-cartao__acoes">
+                {/* A Lisa se liga para QUALQUER pessoa, inclusive para si mesmo: diferente de
+                    "administra", desligar a própria assistente não tranca ninguém para fora
+                    de nada — é só uma ferramenta a menos. */}
+                <button type="button"
+                  className={`abacato-botao abacato-botao--pequeno ${p.lisa ? "abacato-botao--fantasma" : ""}`}
+                  onClick={() => alternar(p, "lisa")}
+                  title={p.lisa
+                    ? "Tirar o acesso à assistente desta conta"
+                    : "Liberar a assistente para esta conta"}>
+                  {p.lisa ? "Tirar a Lisa" : "Liberar a Lisa"}
+                </button>
                 <button type="button" className="abacato-botao abacato-botao--fantasma abacato-botao--pequeno"
                   disabled={trabalhando} onClick={() => novaSenhaPara(p)}>
                   Nova senha

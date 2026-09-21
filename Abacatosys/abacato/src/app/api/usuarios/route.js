@@ -29,7 +29,7 @@ export async function GET(req) {
     if (querTudo) await exigirAdmin(req);
 
     const campos = querTudo
-      ? "id, nome, email, ativo, admin, criado_em, ultimo_login"
+      ? "id, nome, email, ativo, admin, lisa, criado_em, ultimo_login"
       : "id, nome, email, ativo";
 
     const { data, error } = await supabase
@@ -58,7 +58,7 @@ export async function GET(req) {
 export async function POST(req) {
   try {
     const admin = await exigirAdmin(req);
-    const { email, nome, hash, sal, iteracoes, admin: ehAdmin } = await req.json().catch(() => ({}));
+    const { email, nome, hash, sal, iteracoes, admin: ehAdmin, lisa: podeLisa } = await req.json().catch(() => ({}));
 
     if (!emailValido(email)) throw new ErroDeAcesso(400, "e-mail inválido");
     if (!nome?.trim()) throw new ErroDeAcesso(400, "a pessoa precisa de um nome");
@@ -78,8 +78,9 @@ export async function POST(req) {
       senha_sal: sal,
       senha_iter: Number(iteracoes),
       admin: Boolean(ehAdmin),
+      lisa: Boolean(podeLisa),
       criado_por: admin.id,
-    }).select("id, nome, email, ativo, admin, criado_em").single();
+    }).select("id, nome, email, ativo, admin, lisa, criado_em").single();
     if (error) throw new ErroDeAcesso(500, error.message);
 
     return json({ ok: true, usuario: data }, 201);

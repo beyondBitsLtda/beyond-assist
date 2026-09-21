@@ -117,8 +117,48 @@ try {
     email: emailOutra, nome: "Lisa Check", hash: guardada.hash, sal: guardada.sal, iteracoes: guardada.iteracoes,
   });
   if (criada.status !== 201) throw new Error("não consegui criar a conta de teste");
-  lixo.usuarios.push(criada.dados.usuario.id);
+  const idOutra = criada.dados.usuario.id;
+  lixo.usuarios.push(idOutra);
   const outra = await entrar(emailOutra, senhaOutra);
+
+  // ------------------------------------------------------------ quem pode falar com ela
+  secao("Quem tem a Lisa liberada");
+  {
+    // Uma conta nasce SEM a assistente. Cada conversa custa cota do modelo, e uma assistente
+    // que nasce ligada para todo mundo é uma conta que ninguém decidiu abrir.
+    conferir("uma conta nova nasce sem a Lisa", criada.dados.usuario.lisa === false,
+      String(criada.dados.usuario.lisa));
+
+    const olhando = await chamar(outra.s, "GET", "/api/lisa");
+    conferir("a tela dela não desenha o botão", olhando.dados?.podeUsar === false,
+      String(olhando.dados?.podeUsar));
+
+    const tentou = await chamar(outra.s, "POST", "/api/lisa", {
+      mensagens: [{ quem: "pessoa", texto: "oi" }], fusoMinutos: 180,
+    });
+    // O que vale não é o botão escondido: é a rota recusar mesmo chamada na mão.
+    conferir("e a rota recusa mesmo chamada direto (403)", tentou.status === 403, `status ${tentou.status}`);
+
+    const liberar = await chamar(admin.s, "PATCH", `/api/usuarios/${idOutra}`, { lisa: true });
+    conferir("quem administra libera", liberar.status === 200 && liberar.dados?.usuario?.lisa === true,
+      String(liberar.dados?.usuario?.lisa));
+
+    const agoraSim = await chamar(outra.s, "GET", "/api/lisa");
+    conferir("e aí ela passa a ter o botão", agoraSim.dados?.podeUsar === true);
+
+    const tirar = await chamar(admin.s, "PATCH", `/api/usuarios/${idOutra}`, { lisa: false });
+    conferir("e tirar vale na hora, sem esperar o cookie vencer",
+      tirar.status === 200 &&
+      (await chamar(outra.s, "POST", "/api/lisa", { mensagens: [{ quem: "pessoa", texto: "oi" }] })).status === 403);
+
+    // Quem não administra não se libera sozinho.
+    const sozinha = await chamar(outra.s, "PATCH", `/api/usuarios/${idOutra}`, { lisa: true });
+    conferir("ninguém se libera sozinho (403)", sozinha.status === 403, `status ${sozinha.status}`);
+
+    // Para o resto do teste ela precisa da Lisa ligada — a fronteira de permissão de QUADRO
+    // é outra coisa, e tem de ser provada com a assistente funcionando.
+    await chamar(admin.s, "PATCH", `/api/usuarios/${idOutra}`, { lisa: true });
+  }
 
   // Um quadro que SÓ o administrador acessa.
   const marca = Date.now().toString(36);
