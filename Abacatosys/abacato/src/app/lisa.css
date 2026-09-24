@@ -5,6 +5,39 @@
  * dela é o jeito de a pessoa errar o alvo todas as vezes.
  */
 
+/* ============================================================ a cor da Lisa
+ *
+ * ROSA CHOQUE, E SÓ AQUI DENTRO.
+ *
+ * O Abacato inteiro é verde; a Lisa é a única coisa do sistema que não é o sistema — é alguém
+ * a quem se fala. Dar a ela uma cor própria faz o botão no canto e a janela serem reconhecidos
+ * antes de serem lidos, e é por isso que os tokens abaixo existem em vez de um `filter: hue-
+ * rotate` ou de uma troca no verde global: o verde continua sendo a cor de ação do Abacato, e
+ * o rosa vale exclusivamente dentro das regras deste arquivo.
+ *
+ * OS PARES FORAM MEDIDOS, NÃO ESCOLHIDOS NO OLHO, e o estilo-check remede a cada vez. O rosa
+ * de ação leva texto branco por cima, e essa dupla precisa passar no contraste mínimo: #E5007E
+ * com branco dá 4,53:1, acima do 4,5 exigido. Os rosas mais óbvios reprovam — #FC0FC0 (o
+ * "shocking pink" de catálogo) dá 3,52:1 e #FF69B4 dá 2,65:1: bonitos na paleta, ilegíveis no
+ * botão. O véu (fundo de selo) e a tinta que vai sobre ele são outro par, medido separadamente
+ * — 6,21:1 no claro, 7,96:1 no escuro.
+ *
+ * No escuro só o PAR DO VÉU troca. O rosa de ação continua o mesmo nos dois temas de propósito:
+ * ele aparece sempre com branco por cima, e um rosa mais claro no escuro derrubaria justamente
+ * o contraste que essa dupla precisa ter.
+ */
+:root {
+  --lisa-rosa: #E5007E;          /* a cor de ação: botão, balão de quem fala, foco */
+  --lisa-rosa-forte: #C2006B;    /* o mesmo rosa pressionado */
+  --lisa-sobre-rosa: #FFFFFF;    /* a única tinta que vai por cima do rosa de ação */
+  --lisa-veu: #FFE3F2;           /* fundo de selo: rosa lavado */
+  --lisa-tinta-veu: #A8005C;     /* e a tinta que vai sobre ele */
+}
+:root[data-tema="escuro"] {
+  --lisa-veu: #3B0A24;
+  --lisa-tinta-veu: #FF8FC5;
+}
+
 /* ============================================================ o botão */
 
 .abacato-lisa-botao {
@@ -18,15 +51,15 @@
   padding: 12px 20px;
   border: 0;
   border-radius: var(--abacato-raio-pilula);
-  background: var(--abacato-verde);
-  color: #FFFFFF;
+  background: var(--lisa-rosa);
+  color: var(--lisa-sobre-rosa);
   font: inherit;
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
   box-shadow: var(--abacato-sombra-alta);
 }
-.abacato-lisa-botao:hover { background: var(--abacato-verde-fundo); }
+.abacato-lisa-botao:hover { background: var(--lisa-rosa-forte); }
 
 /* O ponto pulsa devagar. É o único movimento da tela, e serve a uma coisa: dizer que ali há
    alguém para responder. Some para quem pediu menos movimento. */
@@ -35,11 +68,11 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #FFFFFF;
+  background: var(--lisa-sobre-rosa);
   flex-shrink: 0;
   animation: abacato-pulso 2.4s ease-in-out infinite;
 }
-.abacato-lisa__ponto { background: var(--abacato-verde); }
+.abacato-lisa__ponto { background: var(--lisa-rosa); }
 
 @keyframes abacato-pulso {
   0%, 100% { opacity: 1; }
@@ -115,7 +148,7 @@
   padding: 9px 13px;
   cursor: pointer;
 }
-.abacato-lisa__sugestao:hover { border-color: var(--abacato-verde); color: var(--abacato-tinta); }
+.abacato-lisa__sugestao:hover { border-color: var(--lisa-rosa); color: var(--abacato-tinta); }
 
 .abacato-fala { display: flex; flex-direction: column; gap: 6px; max-width: 88%; }
 .abacato-fala--pessoa { align-self: flex-end; align-items: flex-end; }
@@ -131,8 +164,8 @@
   overflow-wrap: anywhere;
 }
 .abacato-fala--pessoa .abacato-fala__texto {
-  background: var(--abacato-verde);
-  color: #FFFFFF;
+  background: var(--lisa-rosa);
+  color: var(--lisa-sobre-rosa);
   border-bottom-right-radius: 5px;
 }
 .abacato-fala--lisa .abacato-fala__texto {
@@ -150,8 +183,8 @@
   font-weight: 600;
   padding: 3px 10px;
   border-radius: var(--abacato-raio-pilula);
-  background: var(--abacato-verde-claro);
-  color: var(--abacato-verde-fundo);
+  background: var(--lisa-veu);
+  color: var(--lisa-tinta-veu);
 }
 
 /* ============================================================ a barra de baixo */
@@ -180,7 +213,7 @@
 }
 .abacato-lisa__campo:focus {
   outline: none;
-  border-color: var(--abacato-verde);
+  border-color: var(--lisa-rosa);
   background: var(--abacato-superficie);
 }
 
@@ -190,6 +223,61 @@
   .abacato-lisa { padding: 0; align-items: stretch; }
   .abacato-lisa__caixa { width: 100%; height: 100%; border-radius: 0; border: 0; }
 }
+
+/* ============================================================ o que a Lisa herda
+ *
+ * Botões, selos e o ícone de fechar vêm do sistema e nascem verdes. Aqui dentro eles viram
+ * rosa — porque um botão verde dentro de uma janela rosa não parece um botão do sistema, parece
+ * um botão que alguém esqueceu de pintar.
+ *
+ * O escopo é a janela, e não o botão: `.abacato-lisa` e `.abacato-gen` são os dois contêineres
+ * da assistente (a conversa e o Quadro Gen, que usa a moldura de painel e não a dela). Nada
+ * fora deles é tocado — é o que garante que o resto do Abacato siga verde.
+ *
+ * O `:not(--fantasma)` não é detalhe: sem ele, o botão fantasma — que é uma borda com fundo
+ * transparente — ganharia fundo rosa e viraria um botão principal, e a janela passaria a ter
+ * dois botões principais disputando o clique.
+ *
+ * A tinta é BRANCA, e não a tinta escura que o botão verde usa. Aquela tinta (#06140C) sobre
+ * este rosa dá 4,16:1 e reprova; o branco dá 4,53:1 e passa. É por isso que o botão não pode
+ * simplesmente trocar de fundo e herdar o resto.
+ */
+.abacato-lisa .abacato-botao:not(.abacato-botao--fantasma),
+.abacato-gen .abacato-botao:not(.abacato-botao--fantasma) {
+  background: var(--lisa-rosa);
+  color: var(--lisa-sobre-rosa);
+}
+
+.abacato-lisa .abacato-botao--fantasma:hover,
+.abacato-gen .abacato-botao--fantasma:hover {
+  color: var(--lisa-rosa);
+  border-color: var(--lisa-rosa);
+}
+
+.abacato-lisa .abacato-icone:hover,
+.abacato-gen .abacato-icone:hover { color: var(--lisa-rosa); }
+
+/* O selo de "pronto" dentro da janela — o contador de versão da prévia usa este. */
+.abacato-lisa .abacato-etiqueta--ok,
+.abacato-gen .abacato-etiqueta--ok {
+  background: var(--lisa-veu);
+  color: var(--lisa-tinta-veu);
+}
+
+/* O foco do teclado. O sistema desenha o anel com `outline: 2px solid var(--abacato-verde)`,
+   então sem esta regra navegar pela janela de teclado acenderia um anel verde numa janela rosa.
+   Os alvos são nomeados um a um de propósito: um `.abacato-lisa :focus-visible` genérico empata
+   em especificidade com a regra do sistema e só ganha por ser lido depois — e essa vitória some
+   no dia em que alguém trocar a ordem dos imports no layout. */
+.abacato-lisa .abacato-botao:focus-visible,
+.abacato-lisa .abacato-campo__entrada:focus-visible,
+.abacato-gen .abacato-botao:focus-visible,
+.abacato-gen .abacato-campo__entrada:focus-visible { outline-color: var(--lisa-rosa); }
+
+/* E o resto do que recebe foco aqui dentro (sugestões, campo de texto, ícone) usa o anel
+   padrão do navegador — este é o único lugar onde ele ganha a cor da Lisa. */
+.abacato-lisa :focus-visible,
+.abacato-gen :focus-visible { outline-color: var(--lisa-rosa); }
 
 /* ============================================================ Quadro Gen */
 
