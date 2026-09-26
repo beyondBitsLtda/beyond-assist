@@ -20,9 +20,12 @@ import {
  * Arquivos estáticos e imagens ficam de fora por desempenho: passar o editor Monaco inteiro
  * (15 MB) por uma checagem de assinatura a cada pedaço não protege nada e custa em tudo.
  * A regra de negócio — quais CAMINHOS são livres — mora em authSession.js, não aqui.
+ *
+ * `marca/` é a logo da tela de abertura: ela aparece ANTES do login, então o portão barrá-la
+ * trocaria a imagem pelo HTML da tela de login, e a abertura sairia sem marca nenhuma.
  */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|monaco|mediapipe|models|preview.html).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|monaco|mediapipe|models|preview.html|marca/).*)"],
 };
 
 function paraLogin(req, caminho) {

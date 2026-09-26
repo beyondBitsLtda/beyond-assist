@@ -1,4 +1,5 @@
 import "./globals.css";
+import Abertura, { SCRIPT_DA_ABERTURA } from "@/components/shell/Abertura.js";
 
 export const metadata = {
   title: "Beyond Bits",
@@ -15,7 +16,9 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="pt-BR">
+    // suppressHydrationWarning: o script da abertura põe `data-abertura` e a cor de destaque
+    // no <html> antes de o React hidratar — o servidor não tem como saber desses dois.
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
@@ -23,8 +26,13 @@ export default function RootLayout({ children }) {
           href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        <link rel="preload" href="/marca/lisa.png" as="image" />
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DA_ABERTURA }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <Abertura />
+        {children}
+      </body>
     </html>
   );
 }

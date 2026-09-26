@@ -79,3 +79,84 @@ input::placeholder { color: rgba(207,239,251,0.4); }
   /* mesmo auto-fit de sempre, só com mínimo menor pra não estourar largura em tela bem estreita */
   .bb-chart-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 }
+
+/* ============================================================
+   Tela de abertura (ver src/components/shell/Abertura.js).
+   Escondida por padrão: só aparece quando o script do <head> põe
+   data-abertura no <html>. Sem JavaScript, não há abertura presa
+   na tela. O estado de REPOUSO de cada peça é o final da animação,
+   e por isso o "reduzir movimento" desliga a animação sem sumir
+   com nada.
+   ============================================================ */
+.bb-abertura {
+  position: fixed; inset: 0; z-index: 10000;
+  display: none; align-items: center; justify-content: center;
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 44%, rgba(var(--accent-rgb), 0.11), transparent 70%),
+    #000;
+  transition: opacity .7s ease;
+}
+:root[data-abertura="ativa"] .bb-abertura,
+:root[data-abertura="saindo"] .bb-abertura { display: flex; }
+:root[data-abertura="saindo"] .bb-abertura { opacity: 0; pointer-events: none; }
+
+/* Linhas de varredura quase invisíveis e um vinhedo nas bordas: é o que liga a abertura ao
+   resto do HUD sem competir com a marca. */
+.bb-abertura::before, .bb-abertura::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.bb-abertura::before {
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 3px);
+}
+.bb-abertura::after { background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.65)); }
+
+.bb-abertura__centro {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; align-items: center;
+  transition: transform .7s ease, filter .7s ease;
+}
+:root[data-abertura="saindo"] .bb-abertura__centro { transform: scale(1.04); filter: blur(3px); }
+
+/* A marca é pintada pela máscara: o traço fica claro, e um feixe da cor de destaque passa
+   por ele de tempos em tempos. */
+.bb-abertura__marca {
+  width: min(190px, 46vw);
+  aspect-ratio: 480 / 691;
+  -webkit-mask: url(/marca/lisa.png) center / contain no-repeat;
+          mask: url(/marca/lisa.png) center / contain no-repeat;
+  background: linear-gradient(105deg, #eaf6fb 0 42%, var(--accent-hex) 50%, #eaf6fb 58% 100%);
+  background-size: 320% 100%;
+  background-position: 100% 0;
+  animation:
+    bb-abertura-surge 1s cubic-bezier(.2,.7,.2,1) both,
+    bb-abertura-feixe 2.8s ease-in-out .8s infinite;
+}
+
+.bb-abertura__trilho {
+  position: relative; overflow: hidden;
+  width: 180px; height: 1px; margin-top: 44px;
+  background: rgba(var(--accent-rgb), 0.16);
+  animation: bb-abertura-surge .9s .25s cubic-bezier(.2,.7,.2,1) both;
+}
+.bb-abertura__carga {
+  position: absolute; top: 0; left: 0; height: 100%; width: 36%;
+  background: linear-gradient(90deg, transparent, var(--accent-hex), transparent);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.8);
+  transform: translateX(89%);
+  animation: bb-abertura-carga 1.6s cubic-bezier(.6,0,.4,1) infinite;
+}
+
+.bb-abertura__texto {
+  margin-top: 16px; padding-left: .38em;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  letter-spacing: .38em; text-transform: uppercase;
+  color: rgba(207, 239, 251, 0.6);
+  animation: bb-abertura-surge .9s .4s cubic-bezier(.2,.7,.2,1) both;
+}
+.bb-abertura__cursor { color: var(--accent-hex); animation: bb-blink 1s infinite; }
+
+@keyframes bb-abertura-surge { from { opacity: 0; transform: translateY(12px) scale(.97); } }
+@keyframes bb-abertura-feixe { 0% { background-position: 100% 0; } 60%, 100% { background-position: 0 0; } }
+@keyframes bb-abertura-carga { from { transform: translateX(-100%); } to { transform: translateX(280%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .bb-abertura *, .bb-abertura__centro { animation: none !important; transition: none !important; }
+}
