@@ -33,8 +33,9 @@ export default function Abertura() {
  * Roda de forma síncrona no `<head>`, antes da primeira pintura. Sem JavaScript a abertura
  * simplesmente não aparece, em vez de ficar presa na tela para sempre.
  *
- * Aparece UMA vez por sessão do navegador: abrir a Lisa merece a cerimônia, um F5 no meio do
- * trabalho não.
+ * Aparece em TODO carregamento de página, inclusive no F5 — decisão do dono do produto: a marca
+ * é a assinatura da Lisa, e ela entra em cena sempre. Navegar entre painéis não recarrega a
+ * página, então não passa por aqui.
  *
  * Também aplica a cor de destaque salva, antes da pintura: sem isso a abertura sairia sempre em
  * ciano e trocaria de cor na cara da pessoa quando o Shell montasse.
@@ -53,11 +54,6 @@ export const SCRIPT_DA_ABERTURA = `
       html.style.setProperty("--accent-rgb", tema.rgb);
     }
   } catch (e) { /* sem armazenamento: fica o ciano padrão */ }
-
-  try {
-    if (sessionStorage.getItem("lisa-abertura")) return;
-    sessionStorage.setItem("lisa-abertura", "1");
-  } catch (e) { /* armazenamento bloqueado: mostra, que é o comportamento de primeira visita */ }
 
   var inicio = Date.now();
   var encerrada = false;

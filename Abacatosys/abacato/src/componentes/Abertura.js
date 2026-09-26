@@ -33,8 +33,8 @@ export default function Abertura() {
  * Roda de forma síncrona no `<head>`, antes da primeira pintura. Sem JavaScript a abertura
  * simplesmente não aparece, em vez de ficar presa na tela para sempre.
  *
- * Aparece UMA vez por sessão do navegador: abrir o sistema merece a cerimônia, um F5 no meio do
- * trabalho não.
+ * Aparece em TODO carregamento de página, inclusive no F5 — decisão do dono do produto: a marca
+ * entra em cena sempre. Navegar entre telas não recarrega a página, então não passa por aqui.
  *
  * O tempo mínimo existe porque, com cache quente, o `load` chega em menos de 200 ms e a
  * abertura piscaria — o que parece defeito, não acabamento. O teto de 8 s é o contrário: um
@@ -42,12 +42,6 @@ export default function Abertura() {
  */
 export const SCRIPT_DA_ABERTURA = `
 (function () {
-  try {
-    if (sessionStorage.getItem("abacato-abertura")) return;
-    sessionStorage.setItem("abacato-abertura", "1");
-  } catch (e) {
-    /* armazenamento bloqueado: mostra, que é o comportamento de primeira visita */
-  }
   var html = document.documentElement;
   var inicio = Date.now();
   var encerrada = false;
