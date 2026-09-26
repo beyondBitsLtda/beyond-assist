@@ -41,7 +41,8 @@ export default function Abertura() {
  * ciano e trocaria de cor na cara da pessoa quando o Shell montasse.
  *
  * O tempo mínimo existe porque, com cache quente, o `load` chega em menos de 200 ms e a
- * abertura piscaria — o que parece defeito, não acabamento. O teto de 8 s é o contrário: um
+ * abertura piscaria — o que parece defeito, não acabamento. São 3,5 s: a entrada da marca leva
+ * 1 s, e com 2 s ela mal terminava de aparecer e já saía. O teto de 8 s é o contrário: um
  * recurso pendurado na rede não pode segurar ninguém fora do sistema.
  */
 export const SCRIPT_DA_ABERTURA = `
@@ -65,7 +66,7 @@ export const SCRIPT_DA_ABERTURA = `
     setTimeout(function () {
       html.setAttribute("data-abertura", "saindo");
       setTimeout(function () { html.setAttribute("data-abertura", "fim"); }, 700);
-    }, Math.max(0, 2000 - (Date.now() - inicio)));
+    }, Math.max(0, 3500 - (Date.now() - inicio)));
   }
 
   if (document.readyState === "complete") encerrar();

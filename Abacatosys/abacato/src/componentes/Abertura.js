@@ -37,7 +37,8 @@ export default function Abertura() {
  * entra em cena sempre. Navegar entre telas não recarrega a página, então não passa por aqui.
  *
  * O tempo mínimo existe porque, com cache quente, o `load` chega em menos de 200 ms e a
- * abertura piscaria — o que parece defeito, não acabamento. O teto de 8 s é o contrário: um
+ * abertura piscaria — o que parece defeito, não acabamento. São 3,5 s: a entrada do mascote leva
+ * 1 s, e com 2 s ele mal terminava de aparecer e já saía. O teto de 8 s é o contrário: um
  * recurso pendurado na rede não pode segurar ninguém fora do sistema.
  */
 export const SCRIPT_DA_ABERTURA = `
@@ -53,7 +54,7 @@ export const SCRIPT_DA_ABERTURA = `
     setTimeout(function () {
       html.setAttribute("data-abertura", "saindo");
       setTimeout(function () { html.setAttribute("data-abertura", "fim"); }, 700);
-    }, Math.max(0, 2000 - (Date.now() - inicio)));
+    }, Math.max(0, 3500 - (Date.now() - inicio)));
   }
 
   if (document.readyState === "complete") encerrar();
