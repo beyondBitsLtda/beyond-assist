@@ -5,6 +5,8 @@ import "./painel.css";
 import "./pessoas.css";
 import "./lisa.css";
 import "./plano.css";
+import "./abertura.css";
+import Abertura, { SCRIPT_DA_ABERTURA } from "@/componentes/Abertura.js";
 
 export const metadata = {
   title: "Abacato System",
@@ -45,9 +47,14 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
         />
+        <link rel="preload" href="/marca/abacato.png" as="image" />
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_TEMA }} />
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DA_ABERTURA }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <Abertura />
+        {children}
+      </body>
     </html>
   );
 }

@@ -6,9 +6,12 @@ import { COOKIE_SESSAO, lerSessao, ehApi, ehLivre } from "@/lib/abacatoAuth.js";
  *
  * A conferência é LOCAL — assinatura com WebCrypto, sem ida ao banco. Perguntar ao Postgres a
  * cada clique custaria uma viagem até o iMac em toda navegação.
+ *
+ * `marca/` fica de fora porque é a logo da tela de abertura: ela aparece ANTES do login, e o
+ * portão barrá-la trocaria a imagem pelo HTML da tela de entrar — a abertura sairia sem marca.
  */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo.png).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo.png|marca/).*)"],
 };
 
 export async function middleware(req) {
