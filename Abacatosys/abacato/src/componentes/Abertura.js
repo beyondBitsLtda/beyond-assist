@@ -10,6 +10,11 @@
  * encontrar na hidratação uma árvore diferente da que o servidor mandou. O `<html>` já tem
  * `suppressHydrationWarning` por causa do tema, então mexer no atributo dele é seguro.
  *
+ * O atributo é VIGIADO, e não só posto uma vez. Um descompasso de hidratação em qualquer tela
+ * faz o React refazer a raiz, e ao refazer ele limpa todos os atributos do `<html>`. Na Lisa isso
+ * foi medido — a abertura entrava aos 0,5 s e sumia aos 0,6 s por causa de um relógio —, e aqui
+ * o mecanismo é o mesmo.
+ *
  * A marca é o `public/marca/abacato.png` usado como MÁSCARA, não como imagem: o desenho original
  * é preto sobre branco, e pintar pela máscara é o que deixa o traço claro no fundo escuro com o
  * verde do sistema passando por ele.
@@ -44,16 +49,26 @@ export default function Abertura() {
 export const SCRIPT_DA_ABERTURA = `
 (function () {
   var html = document.documentElement;
+  var fase = "ativa";
+  function aplicar() {
+    if (html.getAttribute("data-abertura") !== fase) html.setAttribute("data-abertura", fase);
+  }
+  var vigia = window.MutationObserver ? new MutationObserver(aplicar) : null;
+  if (vigia) vigia.observe(html, { attributes: true, attributeFilter: ["data-abertura"] });
+  aplicar();
+
   var inicio = Date.now();
   var encerrada = false;
-  html.setAttribute("data-abertura", "ativa");
 
   function encerrar() {
     if (encerrada) return;
     encerrada = true;
     setTimeout(function () {
-      html.setAttribute("data-abertura", "saindo");
-      setTimeout(function () { html.setAttribute("data-abertura", "fim"); }, 700);
+      fase = "saindo"; aplicar();
+      setTimeout(function () {
+        fase = "fim"; aplicar();
+        if (vigia) vigia.disconnect();
+      }, 700);
     }, Math.max(0, 3500 - (Date.now() - inicio)));
   }
 

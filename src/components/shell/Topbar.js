@@ -40,7 +40,10 @@ function urlBase64ToUint8Array(base64String) {
  */
 export default function Topbar({ onToggleSidebar }) {
   const { addLog } = useLog();
-  const [clock, setClock] = useState(fmtClock(new Date()));
+  // Começa neutro e só ganha a hora no navegador: o HTML é pré-renderizado no BUILD, e a hora
+  // do build nunca bate com a do cliente — o React descartava a hidratação e refazia a raiz
+  // inteira (erro #418), o que também apagava a tela de abertura.
+  const [clock, setClock] = useState("--:--:--");
   const [uptime, setUptime] = useState("00:00:00");
   const [conn, setConn] = useState({ supabase: null, trello: null, gemini: null, sentinel: null });
   const [ingesting, setIngesting] = useState(false);
@@ -69,6 +72,7 @@ export default function Topbar({ onToggleSidebar }) {
 
   // relógio + uptime
   useEffect(() => {
+    setClock(fmtClock(new Date()));
     const id = setInterval(() => {
       const d = new Date();
       const up = Math.floor((Date.now() - startRef.current) / 1000);

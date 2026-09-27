@@ -9,6 +9,11 @@
  * `data-abertura` do `<html>`. O elemento nunca sai do DOM: removê-lo por fora faria o React
  * encontrar na hidratação uma árvore diferente da que o servidor mandou.
  *
+ * O atributo é VIGIADO, e não só posto uma vez. Qualquer descompasso de hidratação em qualquer
+ * painel faz o React refazer a raiz, e ao refazer ele limpa todos os atributos do `<html>` —
+ * foi medido: a abertura entrava aos 0,5 s e sumia aos 0,6 s. Sem a vigia, a abertura dependeria
+ * de nenhum painel, nunca, ter um descompasso.
+ *
  * A marca é o `public/marca/lisa.png` usado como MÁSCARA, não como imagem: o arquivo original é
  * preto sobre branco, e pintar pela máscara é o que deixa o traço claro no fundo escuro e com a
  * cor de destaque que a pessoa escolheu passando por ele.
@@ -48,24 +53,36 @@ export default function Abertura() {
 export const SCRIPT_DA_ABERTURA = `
 (function () {
   var html = document.documentElement;
+  var tema = null;
   try {
-    var tema = JSON.parse(localStorage.getItem("accentTheme") || "null");
-    if (tema && tema.hex && tema.rgb) {
+    tema = JSON.parse(localStorage.getItem("accentTheme") || "null");
+    if (!tema || !tema.hex || !tema.rgb) tema = null;
+  } catch (e) { /* sem armazenamento: fica o ciano padrão */ }
+
+  var fase = "ativa";
+  function aplicar() {
+    if (html.getAttribute("data-abertura") !== fase) html.setAttribute("data-abertura", fase);
+    if (tema && html.style.getPropertyValue("--accent-hex") !== tema.hex) {
       html.style.setProperty("--accent-hex", tema.hex);
       html.style.setProperty("--accent-rgb", tema.rgb);
     }
-  } catch (e) { /* sem armazenamento: fica o ciano padrão */ }
+  }
+  var vigia = window.MutationObserver ? new MutationObserver(aplicar) : null;
+  if (vigia) vigia.observe(html, { attributes: true, attributeFilter: ["data-abertura", "style"] });
+  aplicar();
 
   var inicio = Date.now();
   var encerrada = false;
-  html.setAttribute("data-abertura", "ativa");
 
   function encerrar() {
     if (encerrada) return;
     encerrada = true;
     setTimeout(function () {
-      html.setAttribute("data-abertura", "saindo");
-      setTimeout(function () { html.setAttribute("data-abertura", "fim"); }, 700);
+      fase = "saindo"; aplicar();
+      setTimeout(function () {
+        fase = "fim"; aplicar();
+        if (vigia) vigia.disconnect();
+      }, 700);
     }, Math.max(0, 3500 - (Date.now() - inicio)));
   }
 
