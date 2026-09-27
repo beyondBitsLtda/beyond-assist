@@ -80,6 +80,18 @@ input::placeholder { color: rgba(207,239,251,0.4); }
   .bb-chart-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 }
 
+/* A marca da Lisa no canto da barra superior (ver Topbar.js). É o mesmo public/marca/lisa.png da
+   abertura, usado como máscara: o traço vai do claro do HUD para a cor de destaque escolhida, e
+   por isso acompanha o seletor de tema sem arquivo nenhum a mais. */
+.bb-marca {
+  display: block;
+  height: 38px;
+  aspect-ratio: 480 / 691;
+  -webkit-mask: url(/marca/lisa.png) center / contain no-repeat;
+          mask: url(/marca/lisa.png) center / contain no-repeat;
+  background: linear-gradient(180deg, #eafcff 30%, var(--accent-hex));
+}
+
 /* ============================================================
    Tela de abertura (ver src/components/shell/Abertura.js).
    Escondida por padrão: só aparece quando o script do <head> põe

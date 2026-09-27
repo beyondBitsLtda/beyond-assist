@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLog } from "./LogProvider.js";
 import { CY, OR, GR, PU, mono, dotColor } from "@/lib/theme.js";
@@ -243,6 +244,10 @@ export default function Topbar({ onToggleSidebar }) {
           <line x1="3" y1="18" x2="21" y2="18" />
         </svg>
       </button>
+
+      <Link href="/" aria-label="Lisa — início" style={{ display: "block", flex: "none" }}>
+        <span className="bb-marca" aria-hidden="true" />
+      </Link>
 
       <div className="bb-topbar-row" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flex: 1, ...mono, fontSize: 10, letterSpacing: 1 }}>
         <div style={{ textAlign: "right", marginRight: 8 }}>

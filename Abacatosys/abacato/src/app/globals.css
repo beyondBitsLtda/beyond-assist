@@ -249,11 +249,23 @@ body {
 .abacato-barra-lateral__marca {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-weight: 700;
-  font-size: 16px;
-  letter-spacing: -0.01em;
+  color: inherit;
+  text-decoration: none;
 }
+
+/* A marca: o desenho em traço (public/marca/abacato.png) usado como MÁSCARA e pintado com a cor
+ * do texto de onde estiver. Na barra lateral, que é escura nos dois temas, sai clara; na faixa
+ * do topo, sai na tinta do tema. Um arquivo só, e nenhuma cor escrita aqui. */
+.abacato-marca {
+  display: block;
+  aspect-ratio: 560 / 536;
+  background-color: currentColor;
+  -webkit-mask: url(/marca/abacato.png) center / contain no-repeat;
+          mask: url(/marca/abacato.png) center / contain no-repeat;
+}
+/* A logo traz o nome escrito embaixo do mascote: abaixo disto, as letras deixam de ser lidas. */
+.abacato-marca--lateral { height: 64px; }
+.abacato-marca--topo { height: 42px; }
 .abacato-barra-lateral__grupo { display: flex; flex-direction: column; gap: 2px; }
 .abacato-barra-lateral__titulo {
   font-size: 10.5px;
@@ -305,7 +317,7 @@ body {
 .abacato-topo__direita { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
 /* A marca só no celular: no computador ela já está no alto da barra lateral. */
-.abacato-topo__marca { display: none; align-items: center; gap: 9px; font-weight: 700; font-size: 15px; }
+.abacato-topo__marca { display: none; align-items: center; color: inherit; text-decoration: none; }
 
 .abacato-topo__sair {
   display: inline-flex;

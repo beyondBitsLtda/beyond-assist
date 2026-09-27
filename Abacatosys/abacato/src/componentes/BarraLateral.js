@@ -36,11 +36,10 @@ export default function BarraLateral() {
 
   return (
     <aside className="abacato-barra-lateral">
-      <div className="abacato-barra-lateral__marca">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="" width={28} height={28} style={{ borderRadius: 8 }} />
-        Abacato
-      </div>
+      {/* A logo já traz o nome escrito — por isso não há mais o texto "Abacato" ao lado. */}
+      <Link href="/quadros" className="abacato-barra-lateral__marca" aria-label="Abacato — início">
+        <span className="abacato-marca abacato-marca--lateral" aria-hidden="true" />
+      </Link>
 
       <nav className="abacato-barra-lateral__grupo">
         <div className="abacato-barra-lateral__titulo">Navegação</div>

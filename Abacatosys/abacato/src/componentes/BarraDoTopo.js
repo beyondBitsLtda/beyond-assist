@@ -18,11 +18,9 @@ export default function BarraDoTopo() {
     <header className="abacato-topo">
       {/* A marca aparece só no celular: no computador ela já está no alto da barra lateral, e
           repetir o nome do sistema duas vezes na mesma tela é ruído. */}
-      <div className="abacato-topo__marca">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="" width={24} height={24} style={{ borderRadius: 7 }} />
-        Abacato
-      </div>
+      <Link href="/quadros" className="abacato-topo__marca" aria-label="Abacato — início">
+        <span className="abacato-marca abacato-marca--topo" aria-hidden="true" />
+      </Link>
 
       <div className="abacato-topo__direita">
         <Link href="/conta" className="abacato-topo__sair" title="Minha conta">
