@@ -266,6 +266,7 @@ body {
 /* A logo traz o nome escrito embaixo do mascote: abaixo disto, as letras deixam de ser lidas. */
 .abacato-marca--lateral { height: 64px; }
 .abacato-marca--topo { height: 42px; }
+.abacato-marca--entrada { height: 104px; }
 .abacato-barra-lateral__grupo { display: flex; flex-direction: column; gap: 2px; }
 .abacato-barra-lateral__titulo {
   font-size: 10.5px;
@@ -439,13 +440,15 @@ body {
   flex-direction: column;
   gap: 18px;
 }
+/* O mascote, que já traz o nome, centralizado no alto do cartão, com a frase embaixo. */
 .abacato-entrada__marca {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 4px;
+  gap: 10px;
+  margin-bottom: 8px;
+  text-align: center;
 }
-.abacato-entrada__nome { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
 .abacato-entrada__sub { font-size: 13px; color: var(--abacato-tinta-2); margin: 0; }
 
 /* ============================================================ vazio */

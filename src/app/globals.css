@@ -91,6 +91,7 @@ input::placeholder { color: rgba(207,239,251,0.4); }
           mask: url(/marca/lisa.png) center / contain no-repeat;
   background: linear-gradient(180deg, #eafcff 30%, var(--accent-hex));
 }
+.bb-marca--login { height: 112px; }
 
 /* ============================================================
    Tela de abertura (ver src/components/shell/Abertura.js).

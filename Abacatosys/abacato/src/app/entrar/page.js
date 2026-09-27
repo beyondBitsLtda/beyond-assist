@@ -63,12 +63,8 @@ export default function Entrar() {
     <main className="abacato-entrada">
       <form className="abacato-entrada__cartao" onSubmit={entrar}>
         <div className="abacato-entrada__marca">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="" width={40} height={40} style={{ borderRadius: 10 }} />
-          <div>
-            <div className="abacato-entrada__nome">Abacato</div>
-            <p className="abacato-entrada__sub">Quadros, documentação e acompanhamento</p>
-          </div>
+          <span className="abacato-marca abacato-marca--entrada" role="img" aria-label="Abacato" />
+          <p className="abacato-entrada__sub">Quadros, documentação e acompanhamento</p>
         </div>
 
         <label className="abacato-campo">

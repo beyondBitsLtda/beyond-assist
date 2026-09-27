@@ -60,7 +60,11 @@ export default function Login() {
     <main style={estilos.tela}>
       <form onSubmit={entrar} style={estilos.caixa}>
         <div style={estilos.marca}>BEYOND BITS</div>
-        <h1 style={estilos.titulo}>LISA</h1>
+        {/* A logo já traz o nome escrito; o h1 continua sendo o título da página para quem lê
+            por leitor de tela. */}
+        <h1 style={estilos.titulo} aria-label="Lisa">
+          <span className="bb-marca bb-marca--login" aria-hidden="true" />
+        </h1>
         <p style={estilos.sub}>acesso restrito</p>
 
         <label htmlFor="email" style={estilos.rotulo}>E-MAIL</label>
@@ -128,13 +132,8 @@ const estilos = {
     color: "rgba(56,225,255,0.55)",
   },
   titulo: {
-    fontFamily: "Rajdhani, 'JetBrains Mono', monospace",
-    fontSize: 42,
-    lineHeight: 1,
-    letterSpacing: 8,
-    margin: "6px 0 2px",
-    color: "#eafcff",
-    fontWeight: 700,
+    margin: "12px 0 10px",
+    lineHeight: 0,
   },
   sub: {
     fontFamily: "'JetBrains Mono', monospace",
