@@ -1,0 +1,23 @@
+{
+  "id": "BEYOND-0002",
+  "titulo": "Jogo de lançar disco com a Nala não funciona",
+  "descricao": "Depois que trocamos para a hospedagem via cloudflare e alocamos o banoc e outros recursos no servidro caseiro o modulo de brincar com a Nlaa nõa funciona, mesmo na versão casa. ou na versão lisa.",
+  "tipo": "bug",
+  "prioridade": "baixa",
+  "status": "aberta",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-10-07",
+  "versaoAlvo": "0.1.0",
+  "criadaEm": "2026-09-27T05:16:52.307Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-09-27T05:16:52.307Z",
+  "comentarios": [],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-09-27T05:16:52.307Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    }
+  ]
+}
