@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.2.0-cloudflare-pages.1",
+  "versao": "0.2.0-cloudflare-pages.2",
   "atualizadoEm": "2026-09-27",
   "compilacao": {
-    "numero": 2,
+    "numero": 3,
     "data": "2026-09-27",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.2.0-cloudflare-pages.2",
+      "data": "2026-09-27",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Workspaces também nos Documentos, e o menu ⋯ dos cartões deixa de ficar atrás dos outros cartões.",
+      "itens": [
+        "Documentos: os projetos entram nos MESMOS workspaces dos quadros — o \"Delp\" é o mesmo nas duas listas. Seções por workspace, \"+ Projeto aqui\" e \"Mover para workspace\" no ⋯ do projeto.",
+        "Correção: o menu ⋯ de um cartão de quadro ou de projeto às vezes ficava atrás dos cartões vizinhos e não dava para clicar nas opções. Era o efeito de levantar o cartão ao passar o mouse, que prendia o menu dentro dele.",
+        "Banco: nova migração db/011-workspaces-documentos.sql (tabela abacato_workspace_projetos)."
+      ],
+      "issues": [
+        "BEYOND-0003"
+      ]
+    },
     {
       "versao": "0.2.0-cloudflare-pages.1",
       "data": "2026-09-27",

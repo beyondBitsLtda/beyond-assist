@@ -6,17 +6,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * PUT /api/quadros/:id/workspace   body: { workspaceId }   (null tira de qualquer workspace)
+ * PUT /api/projetos/:id/workspace   body: { workspaceId }   (null tira de qualquer workspace)
  *
- * Basta PODER VER o quadro. Organizar a própria lista não é mexer no quadro: um leitor também
- * tem o direito de guardá-lo na pasta que quiser, e isso não muda nada para mais ninguém.
+ * A mesma regra dos quadros: basta poder VER o projeto. Guardá-lo num workspace organiza a lista
+ * de quem guardou, e não muda nada para mais ninguém.
  */
 export async function PUT(req, { params }) {
   try {
     const { id } = await params;
-    const { usuario } = await exigir(req, "quadro", id, "ver");
+    const { usuario } = await exigir(req, "projeto", id, "ver");
     const { workspaceId } = await req.json().catch(() => ({}));
-    await porNoWorkspace(usuario.id, "quadro", id, workspaceId || null);
+    await porNoWorkspace(usuario.id, "projeto", id, workspaceId || null);
     return json({ ok: true, workspaceId: workspaceId || null });
   } catch (e) {
     return respostaDeErro(e);

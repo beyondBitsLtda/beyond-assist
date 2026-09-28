@@ -4,6 +4,7 @@ import { quemEh, respostaDeErro, ErroDeAcesso } from "@/lib/acesso.js";
 import { corValida } from "@/dominio/cores.js";
 import { exigirPodeCriarProjeto } from "@/lib/limites.js";
 import { anotar, anotarLimite, TIPOS_DE_EVENTO } from "@/lib/eventos.js";
+import { workspacesEOnde, workspaceDoDono, porNoWorkspace } from "@/lib/workspacesNoBanco.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,9 +50,13 @@ export async function GET(req) {
     }
 
     lista.sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+
+    // Os MESMOS workspaces da lista de quadros (ver db/011). Nunca derruba a lista.
+    const { workspaces, onde } = await workspacesEOnde(usuario.id, "projeto");
     return json({
       ok: true,
-      projetos: lista.map((p) => ({ ...p, documentos: contagem.get(p.id) || 0 })),
+      projetos: lista.map((p) => ({ ...p, documentos: contagem.get(p.id) || 0, workspace_id: onde.get(p.id) || null })),
+      workspaces,
       arquivados,
       mostrandoArquivados: querArquivados,
     });
@@ -60,12 +65,12 @@ export async function GET(req) {
   }
 }
 
-/** POST /api/projetos   body: { nome, descricao?, cor? } */
+/** POST /api/projetos   body: { nome, descricao?, cor?, workspaceId? } */
 export async function POST(req) {
   try {
     const usuario = await quemEh(req);
     if (!usuario) throw new ErroDeAcesso(401, "sem sessão");
-    const { nome, descricao, cor } = await req.json().catch(() => ({}));
+    const { nome, descricao, cor, workspaceId } = await req.json().catch(() => ({}));
     if (!nome?.trim()) throw new ErroDeAcesso(400, "o projeto precisa de um nome");
 
     // Mesmo desenho do quadro: quem decide é o servidor. A tela esconder o botão é conforto.
@@ -83,6 +88,12 @@ export async function POST(req) {
       dono_id: usuario.id,
     }).select("id, nome, descricao, cor, criado_em").single();
     if (error) throw new ErroDeAcesso(500, error.message);
+
+    // Criado de dentro de um workspace: já nasce nele. Workspace alheio é ignorado, e o projeto
+    // nasce solto, como sempre nasceu.
+    if (await workspaceDoDono(usuario.id, workspaceId)) {
+      await porNoWorkspace(usuario.id, "projeto", data.id, workspaceId).catch(() => {});
+    }
 
     anotar({ usuarioId: usuario.id, tipo: TIPOS_DE_EVENTO.criouProjeto, alvo: data.nome, alvoId: data.id });
     return json({ ok: true, projeto: { ...data, papel: "dono", documentos: 0 } }, 201);

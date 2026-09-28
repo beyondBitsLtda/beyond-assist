@@ -40,9 +40,10 @@ export async function PATCH(req, { params }) {
 /**
  * DELETE /api/workspaces/:id — apaga SÓ a pasta.
  *
- * Os quadros de dentro não vão junto: voltam para "Sem workspace", inteiros. É o `on delete
- * cascade` da tabela de ligação que desfaz o vínculo — o quadro em si nunca é tocado, porque
- * um workspace não é dono de nada.
+ * Os quadros e os projetos de documentação de dentro não vão junto: voltam para "Sem
+ * workspace", inteiros. É o `on delete cascade` das tabelas de ligação (db/010 e db/011) que
+ * desfaz o vínculo — o quadro e o projeto em si nunca são tocados, porque um workspace não é
+ * dono de nada.
  */
 export async function DELETE(req, { params }) {
   try {

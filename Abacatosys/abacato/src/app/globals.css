@@ -545,6 +545,16 @@ body {
 }
 .abacato-quadro-cartao:hover { box-shadow: var(--abacato-sombra-alta); transform: translateY(-2px); }
 
+/* Com o menu ⋯ ABERTO, o cartão sobe acima dos vizinhos e perde o `transform`.
+ *
+ * O defeito que isto corrige aparecia "às vezes": o `transform` do hover cria um contexto de
+ * empilhamento, e o menu (z-index 41) ficava preso DENTRO do cartão — os cartões seguintes eram
+ * desenhados por cima dele. Levar o mouse até o menu passava pelo cartão vizinho, o hover
+ * trocava de dono e o menu piscava entre a frente e o fundo. Pior: dentro de um elemento com
+ * `transform`, o `position: fixed` do fundo que fecha o menu passa a cobrir só o cartão, e
+ * clicar fora deixava de fechar. `:has()` resolve sem a tela precisar avisar nada. */
+.abacato-quadro-cartao:has(.abacato-menu__caixa) { transform: none; z-index: 30; }
+
 /* O cartão deixou de ser um <a> e virou uma caixa: um <button> dentro de um <a> é HTML
  * inválido, e o clique fica imprevisível. O link agora é uma camada por baixo, cobrindo o
  * cartão inteiro, e o menu fica por cima dela. */

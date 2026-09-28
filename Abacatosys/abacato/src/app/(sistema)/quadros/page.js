@@ -7,6 +7,7 @@ import { obter, criar, mudar, definir, remover } from "@/lib/api.js";
 import ImportarDoTrello from "@/componentes/ImportarDoTrello.js";
 import QuadroGen from "@/componentes/QuadroGen.js";
 import AvisoDeLimite from "@/componentes/AvisoDeLimite.js";
+import { useWorkspaces, NovoWorkspace, SecoesPorWorkspace, MoverParaWorkspace } from "@/componentes/Workspaces.js";
 
 const PAPEL_EM_PALAVRAS = {
   dono: "seu",
@@ -27,9 +28,6 @@ export default function Quadros() {
   const [workspaces, setWorkspaces] = useState([]);
   // Em qual workspace o quadro novo vai nascer; `null` = solto, em "Sem workspace".
   const [destinoDoNovo, setDestinoDoNovo] = useState(null);
-  const [novoWorkspace, setNovoWorkspace] = useState(false);
-  const [renomeando, setRenomeando] = useState(null);
-  const [menuDoWorkspace, setMenuDoWorkspace] = useState(null);
   const [arquivados, setArquivados] = useState(0);
   const [vendoArquivados, setVendoArquivados] = useState(false);
   const [erro, setErro] = useState("");
@@ -57,6 +55,7 @@ export default function Quadros() {
   }, []);
 
   useEffect(() => { carregar(false); }, [carregar]);
+  const ws = useWorkspaces({ aoMudar: () => carregar(false), aoErro: setErro });
 
   // O Quadro Gen é a Lisa, então segue a mesma liberação dela. Esconder o botão é conforto:
   // quem decide é a rota, que recusa com 403.
@@ -106,33 +105,6 @@ export default function Quadros() {
       await mudar(`/api/quadros/${quadro.id}`, { arquivado: false });
       await carregar(true);
     } catch (e) { setErro(e.message); }
-  }
-
-  async function criarWorkspace(nome) {
-    try {
-      await criar("/api/workspaces", { nome });
-      setNovoWorkspace(false);
-      await carregar(false);
-    } catch (e) { setErro(e.message); }
-  }
-
-  async function renomearWorkspace(ws, nome) {
-    setRenomeando(null);
-    if (!nome || nome === ws.nome) return;
-    try { await mudar(`/api/workspaces/${ws.id}`, { nome }); await carregar(false); }
-    catch (e) { setErro(e.message); }
-  }
-
-  async function apagarWorkspace(ws, quantos) {
-    setMenuDoWorkspace(null);
-    // O aviso diz o que NÃO se perde: "apagar" com quadros dentro assusta, e o que tira o susto
-    // é saber que os quadros ficam, inteiros.
-    const aviso = quantos
-      ? `Apagar o workspace "${ws.nome}"?\n\nOs ${quantos} quadro(s) dele não são apagados: voltam para "Sem workspace", inteiros.`
-      : `Apagar o workspace "${ws.nome}"?`;
-    if (!window.confirm(aviso)) return;
-    try { await remover(`/api/workspaces/${ws.id}`); await carregar(false); }
-    catch (e) { setErro(e.message); }
   }
 
   async function moverParaWorkspace(quadro, workspaceId) {
@@ -196,22 +168,9 @@ export default function Quadros() {
               <>
                 <div className="abacato-menu__fundo" onClick={() => setMenuAberto(null)} />
                 <div className="abacato-menu__caixa abacato-menu__caixa--direita" role="menu">
-                  {!vendoArquivados && workspaces.length > 0 && (
-                    <>
-                      <div className="abacato-menu__titulo">Mover para workspace</div>
-                      {workspaces.map((w) => (
-                        <button key={w.id} type="button" className="abacato-menu__item"
-                          disabled={q.workspace_id === w.id}
-                          onClick={() => moverParaWorkspace(q, w.id)}>
-                          {q.workspace_id === w.id ? "✓ " : ""}{w.nome}
-                        </button>
-                      ))}
-                      <button type="button" className="abacato-menu__item"
-                        disabled={!q.workspace_id}
-                        onClick={() => moverParaWorkspace(q, null)}>
-                        {!q.workspace_id ? "✓ " : ""}Sem workspace
-                      </button>
-                    </>
+                  {!vendoArquivados && (
+                    <MoverParaWorkspace workspaces={workspaces} atual={q.workspace_id}
+                      aoMover={(w) => moverParaWorkspace(q, w)} />
                   )}
                   {q.papel === "dono" && (vendoArquivados ? (
                     <button type="button" className="abacato-menu__item" onClick={() => restaurar(q)}>
@@ -260,7 +219,7 @@ export default function Quadros() {
                 <button className="abacato-botao abacato-botao--fantasma" onClick={() => setImportando(true)}>
                   Trazer do Trello
                 </button>
-                <button className="abacato-botao abacato-botao--fantasma" onClick={() => setNovoWorkspace(true)}>
+                <button className="abacato-botao abacato-botao--fantasma" onClick={() => ws.setNovo(true)}>
                   + Workspace
                 </button>
                 <button className="abacato-botao" onClick={() => abrirCriacao(null)}>+ Novo quadro</button>
@@ -293,28 +252,7 @@ export default function Quadros() {
         </form>
       )}
 
-      {novoWorkspace && (
-        <form
-          className="abacato-criar-quadro"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const t = e.currentTarget.elements.nome.value.trim();
-            if (t) criarWorkspace(t);
-          }}
-        >
-          <input
-            name="nome"
-            className="abacato-campo__entrada"
-            placeholder="Nome do workspace — ex.: Delp, Pessoal, Clientes"
-            maxLength={80}
-            autoFocus
-            onKeyDown={(e) => { if (e.key === "Escape") setNovoWorkspace(false); }}
-          />
-          <button className="abacato-botao" type="submit">Criar workspace</button>
-          <button type="button" className="abacato-icone" aria-label="cancelar"
-            onClick={() => setNovoWorkspace(false)}>✕</button>
-        </form>
-      )}
+      <NovoWorkspace ws={ws} />
 
       {erro && <div className="abacato-campo__erro" style={{ marginBottom: 16 }}>⚠ {erro}</div>}
 
@@ -351,88 +289,15 @@ export default function Quadros() {
       )}
 
       {quadros && agrupar && (
-        <>
-          {workspaces.map((w) => {
-            const dele = quadros.filter((q) => q.workspace_id === w.id);
-            return (
-              <section key={w.id} className="abacato-workspace">
-                <header className="abacato-workspace__cabecalho">
-                  <span className="abacato-workspace__icone" aria-hidden="true">{(w.nome[0] || "?").toUpperCase()}</span>
-                  {renomeando === w.id ? (
-                    <input
-                      className="abacato-workspace__campo"
-                      defaultValue={w.nome}
-                      autoFocus
-                      maxLength={80}
-                      onBlur={(e) => renomearWorkspace(w, e.target.value.trim())}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") e.target.blur();
-                        if (e.key === "Escape") setRenomeando(null);
-                      }}
-                    />
-                  ) : (
-                    <button type="button" className="abacato-workspace__nome" title="clique para renomear"
-                      onClick={() => setRenomeando(w.id)}>
-                      {w.nome}
-                    </button>
-                  )}
-                  <span className="abacato-workspace__conta">{dele.length}</span>
-
-                  <div className="abacato-workspace__acoes">
-                    <button type="button" className="abacato-botao abacato-botao--fantasma abacato-botao--pequeno"
-                      onClick={() => abrirCriacao(w.id)}>
-                      + Quadro aqui
-                    </button>
-                    <div className="abacato-menu">
-                      <button type="button" className="abacato-icone" aria-label={`opções do workspace ${w.nome}`}
-                        onClick={() => setMenuDoWorkspace(menuDoWorkspace === w.id ? null : w.id)}>⋯</button>
-                      {menuDoWorkspace === w.id && (
-                        <>
-                          <div className="abacato-menu__fundo" onClick={() => setMenuDoWorkspace(null)} />
-                          <div className="abacato-menu__caixa abacato-menu__caixa--direita" role="menu">
-                            <button type="button" className="abacato-menu__item"
-                              onClick={() => { setMenuDoWorkspace(null); setRenomeando(w.id); }}>
-                              Renomear
-                            </button>
-                            <button type="button" className="abacato-menu__item abacato-menu__item--perigo"
-                              onClick={() => apagarWorkspace(w, dele.length)}>
-                              Apagar workspace
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </header>
-
-                {dele.length ? (
-                  <div className="abacato-grade">{dele.map(cartao)}</div>
-                ) : (
-                  <p className="abacato-workspace__vazio">
-                    Nenhum quadro aqui ainda. Crie um com <strong>+ Quadro aqui</strong>, ou traga um que já
-                    existe pelo <strong>⋯</strong> do quadro, em <strong>Mover para workspace</strong>.
-                  </p>
-                )}
-              </section>
-            );
-          })}
-
-          {(() => {
-            const soltos = quadros.filter((q) => !q.workspace_id);
-            // "Sem workspace" vazio não aparece: quando tudo já está organizado, a seção só
-            // diria que não há nada ali.
-            if (!soltos.length) return null;
-            return (
-              <section className="abacato-workspace abacato-workspace--soltos">
-                <header className="abacato-workspace__cabecalho">
-                  <span className="abacato-workspace__nome abacato-workspace__nome--fixo">Sem workspace</span>
-                  <span className="abacato-workspace__conta">{soltos.length}</span>
-                </header>
-                <div className="abacato-grade">{soltos.map(cartao)}</div>
-              </section>
-            );
-          })()}
-        </>
+        <SecoesPorWorkspace
+          itens={quadros}
+          workspaces={workspaces}
+          cartao={cartao}
+          ws={ws}
+          oQue="quadro"
+          rotuloAqui="+ Quadro aqui"
+          aoCriarAqui={abrirCriacao}
+        />
       )}
     </>
   );

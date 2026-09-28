@@ -196,9 +196,11 @@ do `db/` é escrito para poder rodar duas vezes** (`add column if not exists`, `
 not exists`). Ele usa o endpoint `/pg/query` do Supabase, que é o mesmo caminho do Studio e
 aceita DDL — coisa que a API REST não faz.
 
-A mais recente é a `db/010-workspaces.sql` (BEYOND-0003): as pastas de quadros de cada pessoa.
-Elas organizam a lista de quem as criou e **não dão acesso a nada** — quem enxerga um quadro
-continua sendo decidido só em `abacato_membros`.
+As mais recentes são a `db/010-workspaces.sql` e a `db/011-workspaces-documentos.sql`
+(BEYOND-0003): os workspaces de cada pessoa, que agrupam **os quadros e os projetos de
+documentação** — o mesmo "Delp" nas duas listas. Eles organizam a lista de quem os criou e **não
+dão acesso a nada**: quem enxerga um quadro ou um projeto continua sendo decidido só nas tabelas
+de membros.
 
 ## Conferências
 

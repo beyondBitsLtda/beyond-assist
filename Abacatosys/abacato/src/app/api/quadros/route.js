@@ -4,6 +4,7 @@ import { COOKIE_SESSAO, lerSessao } from "@/lib/abacatoAuth.js";
 import { respostaDeErro } from "@/lib/acesso.js";
 import { exigirPodeCriarQuadro } from "@/lib/limites.js";
 import { anotar, anotarLimite, TIPOS_DE_EVENTO } from "@/lib/eventos.js";
+import { workspacesEOnde, workspaceDoDono, porNoWorkspace } from "@/lib/workspacesNoBanco.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,19 +54,10 @@ export async function GET(req) {
 
   lista.sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
 
-  // Em que workspace (desta pessoa) cada quadro está. Um erro aqui NÃO derruba a lista: sem a
-  // tabela — código novo publicado antes da migração, por exemplo — os quadros aparecem todos
-  // em "Sem workspace", que é exatamente como a lista era antes de existirem workspaces.
-  let workspaces = [];
-  const [ws, ligacoes] = await Promise.all([
-    supabase.from("abacato_workspaces").select("id, nome, posicao").eq("dono_id", usuario.id).order("posicao"),
-    supabase.from("abacato_workspace_quadros").select("workspace_id, quadro_id").eq("dono_id", usuario.id),
-  ]);
-  if (!ws.error && !ligacoes.error) {
-    workspaces = ws.data || [];
-    const onde = new Map((ligacoes.data || []).map((l) => [l.quadro_id, l.workspace_id]));
-    for (const q of lista) q.workspace_id = onde.get(q.id) || null;
-  }
+  // Em que workspace (desta pessoa) cada quadro está. Nunca derruba a lista — ver
+  // workspacesEOnde.
+  const { workspaces, onde } = await workspacesEOnde(usuario.id, "quadro");
+  for (const q of lista) q.workspace_id = onde.get(q.id) || null;
 
   // Quantos estão arquivados, sempre. É o que permite a tela oferecer "ver arquivados" só
   // quando existe algum — um link que leva a uma lista vazia é ruído permanente.
@@ -113,13 +105,8 @@ export async function POST(req) {
 
   // Criado de dentro de um workspace: já nasce nele. Só entra se o workspace for DESTA pessoa —
   // um id de workspace alheio é ignorado, e o quadro nasce solto, como sempre nasceu.
-  if (workspaceId) {
-    const { data: ws } = await supabase.from("abacato_workspaces")
-      .select("id").eq("id", workspaceId).eq("dono_id", usuario.id).maybeSingle();
-    if (ws) {
-      await supabase.from("abacato_workspace_quadros")
-        .insert({ workspace_id: ws.id, quadro_id: quadro.id, dono_id: usuario.id });
-    }
+  if (await workspaceDoDono(usuario.id, workspaceId)) {
+    await porNoWorkspace(usuario.id, "quadro", quadro.id, workspaceId).catch(() => {});
   }
 
   anotar({ usuarioId: usuario.id, tipo: TIPOS_DE_EVENTO.criouQuadro, alvo: quadro.nome, alvoId: quadro.id });
