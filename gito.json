@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.2.0-cloudflare-pages.2",
-  "atualizadoEm": "2026-09-27",
+  "versao": "0.2.0-cloudflare-pages.3",
+  "atualizadoEm": "2026-09-28",
   "compilacao": {
-    "numero": 3,
-    "data": "2026-09-27",
+    "numero": 4,
+    "data": "2026-09-28",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.2.0-cloudflare-pages.3",
+      "data": "2026-09-28",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Abacato ganha integrações por token: o Beyond-Lead passa a ler o quadro do CRM e criar os leads prospectados nele.",
+      "itens": [
+        "Abacato: novas rotas /api/integracoes/quadro (lê o quadro, sem responsáveis, membros, links nem anexos) e /api/integracoes/cards (cria card no fim da coluna de entrada, com conferência de duplicado no quadro inteiro).",
+        "O acesso é por token de integração (Authorization: Bearer abi_...) que abre UM quadro só; o banco guarda apenas o SHA-256 do token. A coluna onde o card nasce é fixada na integração, e não vem no pedido.",
+        "Novo script scripts/criar-integracao.mjs: sorteia o token, grava num arquivo da sua máquina e gera o SQL que liga a integração ao quadro e à coluna pelo nome.",
+        "Nova conferência npm run integracao-check (token, cabeçalho, portão de sessão e regra de duplicado, sem banco).",
+        "Banco: nova migração db/012-integracoes.sql (tabela abacato_integracoes)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.2.0-cloudflare-pages.2",
       "data": "2026-09-27",
@@ -206,6 +221,11 @@
         "nome": "Feeds de notícias",
         "descricao": "RSS de sites de tecnologia (Canaltech, Tecnoblog, Olhar Digital, TabNews e outros) no painel de notícias.",
         "url": ""
+      },
+      {
+        "nome": "Beyond-Lead",
+        "descricao": "Sistema de prospecção da Beyond Bits. Lê o quadro do CRM no Abacato para o dashboard de funil e cria nele os leads prospectados, pelas rotas /api/integracoes/* com token de integração (tabela abacato_integracoes). Revogar: desligar a integração (ativo = false).",
+        "url": "https://github.com/beyondBitsLtda/Beyond-Lead"
       }
     ],
     "links": [

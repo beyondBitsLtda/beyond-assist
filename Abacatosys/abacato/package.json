@@ -29,6 +29,7 @@
     "pessoas-check": "node --env-file=.env.local scripts/pessoas-check.mjs",
     "cliente-check": "node scripts/cliente-check.mjs",
     "lisa-check": "node --env-file=.env.local scripts/lisa-check.mjs",
+    "integracao-check": "node scripts/integracao-check.mjs",
     "migrar": "node --env-file=.env.local scripts/migrar.mjs",
     "mover-check": "node --env-file=.env.local scripts/mover-check.mjs",
     "quadro-gen-check": "node --env-file=.env.local scripts/quadro-gen-check.mjs",

@@ -183,6 +183,49 @@ O modelo é falado pela API REST (a biblioteca do Google não roda no runtime da
 o mesmo pool de chaves da Lisa em `GEMINI_API_KEYS`. Sem essa variável o botão simplesmente não
 aparece.
 
+## Integrações (Beyond-Lead)
+
+Outro **sistema** lendo um quadro e criando card nele — hoje, o Beyond-Lead, que prospecta
+empresas no Google Maps, manda cada uma como card para o quadro do **CRM** e lê o quadro de
+volta para montar o funil, as metas e o faturamento.
+
+Não é uma conta. É um **token que abre um quadro só**, e a coluna de entrada é o único lugar
+onde ele pode criar card (sem coluna de entrada, ele só lê). O banco guarda o SHA-256 do token,
+nunca o token: diferente do link público, ele abre descrições inteiras e cria cards, e um backup
+vazado não pode virar a chave de entrada.
+
+```bash
+npm run migrar db/012-integracoes.sql                              # uma vez
+node scripts/criar-integracao.mjs "Beyond-Lead" "CRM" "Alvos"     # token em ~/token-integracao-beyond-lead.txt
+npm run migrar ~/integracao-beyond-lead.sql
+```
+
+O SQL acha o quadro e a coluna **pelo nome** e recusa se achar zero ou mais de um.
+
+| rota | o que faz |
+| --- | --- |
+| `GET /api/integracoes/quadro` | o quadro inteiro: colunas, etiquetas e, de cada card, título, descrição, datas, etiquetas e checklists |
+| `POST /api/integracoes/cards` | cria card no fim da coluna de entrada; com `dedup`, confere o quadro inteiro antes |
+
+As duas pedem `Authorization: Bearer abi_...`. Ficam fora do portão de sessão (não há cookie),
+e por isso **toda rota em `/api/integracoes/` começa por `exigirIntegracao`**
+(`src/lib/integracoes.js`). O que **não** sai por ali: responsáveis, membros, e-mails de conta,
+links e anexos — um sistema de prospecção não precisa saber quem da equipe cuida de cada card.
+
+A coluna **não vem no pedido**: se viesse, o token do Beyond-Lead poderia jogar card em
+"Fechado" e inflar o faturamento do mês. O duplicado é procurado no quadro inteiro (mesmo
+placeId, mesmo título normalizado ou o site do lead na descrição), porque uma empresa que já
+está em "Proposta" não pode voltar para "Alvos" só por ter aparecido de novo numa busca.
+
+Revogar é desligar, não apagar — o `usado_em` responde se ainda está em uso:
+
+```sql
+update public.abacato_integracoes set ativo = false where nome = 'Beyond-Lead';
+```
+
+`npm run integracao-check` confere o token, o cabeçalho, o portão e a regra de duplicado, sem
+banco e sem rede.
+
 ## Migrações
 
 Os arquivos em `db/` são aplicados por:

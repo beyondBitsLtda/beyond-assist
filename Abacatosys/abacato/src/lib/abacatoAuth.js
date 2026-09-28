@@ -303,6 +303,10 @@ export const LIVRES = [
   // alguém de dentro liberar.
   { prefixo: "/cadastro/", motivo: "criar a própria conta a partir de um convite" },
   { prefixo: "/api/cadastro/", motivo: "conferir o convite e criar a conta que espera aprovação" },
+  // Outro SISTEMA chamando (o Beyond-Lead), sem cookie porque não é gente. Livre do portão de
+  // sessão, mas não livre: toda rota dali começa por `exigirIntegracao` (src/lib/integracoes.js),
+  // que confere o token e limita a um quadro só.
+  { prefixo: "/api/integracoes/", motivo: "sistemas integrados, autenticados por token na própria rota" },
 ];
 
 /** Comparação por palavra inteira, não por prefixo solto: `/entrarhack` não pode entrar por
