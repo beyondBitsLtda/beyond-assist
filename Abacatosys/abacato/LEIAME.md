@@ -196,14 +196,19 @@ do `db/` é escrito para poder rodar duas vezes** (`add column if not exists`, `
 not exists`). Ele usa o endpoint `/pg/query` do Supabase, que é o mesmo caminho do Studio e
 aceita DDL — coisa que a API REST não faz.
 
+A mais recente é a `db/010-workspaces.sql` (BEYOND-0003): as pastas de quadros de cada pessoa.
+Elas organizam a lista de quem as criou e **não dão acesso a nada** — quem enxerga um quadro
+continua sendo decidido só em `abacato_membros`.
+
 ## Conferências
 
-Todas falham alto. As sete primeiras rodam sem banco e sem rede:
+Todas falham alto. As oito primeiras rodam sem banco e sem rede:
 
 | comando | o que garante |
 | --- | --- |
 | `npm run auth-check` | senha, assinatura de sessão, payload forjado, rota livre vs. protegida |
 | `npm run dominio-check` | posições, prazos, checklists, papéis — papel desconhecido não ganha poder nenhum |
+| `npm run calendario-check` | o calendário do quadro: a grade do mês, em que dia cada card cai (hora local) e o prazo ao arrastar para outro dia |
 | `npm run recorrencia-check` | regras de repetição e colagem de listas: dia 31 em fevereiro, ano bissexto, virada de ano |
 | `npm run trello-check` | a leitura da exportação do Trello: cores, arquivados, anexos, cards órfãos |
 | `npm run parede-check` | papéis de parede: gradiente, imagem e o valor torto que viraria CSS injetado |

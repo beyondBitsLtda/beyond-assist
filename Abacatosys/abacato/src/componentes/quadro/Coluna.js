@@ -95,8 +95,10 @@ export default function Coluna({
           <button
             type="button"
             className="abacato-coluna__nome"
+            // Pega a coluna pelo nome, como no Trello: arrastar muda de lugar, clicar renomeia.
+            data-arrastavel
             onClick={() => poderes.editar && setEditandoNome(true)}
-            title={poderes.editar ? "clique para renomear" : undefined}
+            title={poderes.editar ? "clique para renomear · arraste para mudar de lugar" : undefined}
           >
             {coluna.nome}
             <span className="abacato-coluna__conta">{coluna.cards.length}</span>

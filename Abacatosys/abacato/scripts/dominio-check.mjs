@@ -5,7 +5,7 @@
 // coisa nas quatro, e a única forma de garantir isso é ter uma resposta só, testada aqui, em
 // vez de quatro implementações que concordam por enquanto.
 
-import { Quadro, Coluna, Card, Checklist, Usuario, posicaoEntre, poderesDo } from "../src/dominio/Quadro.js";
+import { Quadro, Coluna, Card, Checklist, Usuario, posicaoEntre, posicaoAoMover, poderesDo } from "../src/dominio/Quadro.js";
 
 let falhas = 0;
 const ok = (t) => console.log(`  ok    ${t}`);
@@ -161,6 +161,18 @@ console.log("\n9) iniciais do avatar");
   conferir("um nome só dá uma letra", new Usuario({ nome: "Bryan" }).iniciais === "B");
   conferir("sem nome, cai no e-mail", new Usuario({ nome: "", email: "abc@x.com" }).iniciais === "A");
   conferir("sem nada não quebra", typeof new Usuario({}).iniciais === "string");
+}
+
+console.log("\n10) reordenar um item da checklist arrastando");
+{
+  const pos = [1024, 2048, 3072, 4096]; // A B C D
+  conferir("levar o primeiro para o fim fica depois do último", posicaoAoMover(pos, 0, 3) > 4096);
+  conferir("levar o último para o começo fica antes do primeiro", posicaoAoMover(pos, 3, 0) < 1024);
+  // C (índice 2) solto no índice 1 da lista sem ele [A B D] = entre A e B.
+  const meio = posicaoAoMover(pos, 2, 1);
+  conferir("soltar entre A e B fica entre 1024 e 2048", meio > 1024 && meio < 2048, String(meio));
+  conferir("soltar onde já estava não grava nada", posicaoAoMover(pos, 1, 1) === null);
+  conferir("lista de um item só não se move", posicaoAoMover([1024], 0, 0) === null);
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");

@@ -1,23 +1,37 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { usePathname, useParams, useRouter, useSearchParams } from "next/navigation";
 import { Quadro, Usuario } from "@/dominio/Quadro.js";
 import { obter, criar, mudar, remover } from "@/lib/api.js";
 import { useArrastar } from "@/componentes/quadro/useArrastar.js";
 import Coluna from "@/componentes/quadro/Coluna.js";
 import CardMini from "@/componentes/quadro/CardMini.js";
 import PainelDoCard from "@/componentes/quadro/PainelDoCard.js";
+import Calendario from "@/componentes/quadro/Calendario.js";
 import PainelDeRecorrencias from "@/componentes/quadro/PainelDeRecorrencias.js";
 import ColunasArquivadas from "@/componentes/quadro/ColunasArquivadas.js";
 import PapelDeParede from "@/componentes/quadro/PapelDeParede.js";
 import { urlDaParede } from "@/dominio/paredes.js";
+import { prazoNoDia } from "@/dominio/calendario.js";
 import Compartilhar from "@/componentes/Compartilhar.js";
 
 export default function PaginaDoQuadro() {
   const { id } = useParams();
   const parametros = useSearchParams();
+  const router = useRouter();
+  const caminho = usePathname();
+  // A vista mora na URL (?modo=calendario), e não num estado: um link para o calendário do
+  // quadro abre o calendário, e o botão de voltar do navegador desfaz a troca de vista.
+  const modo = parametros.get("modo") === "calendario" ? "calendario" : "quadro";
+  const trocarModo = useCallback((novo) => {
+    const p = new URLSearchParams(parametros.toString());
+    if (novo === "calendario") p.set("modo", "calendario"); else p.delete("modo");
+    p.delete("card");
+    const q = p.toString();
+    router.replace(q ? `${caminho}?${q}` : caminho, { scroll: false });
+  }, [parametros, router, caminho]);
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [cardAberto, setCardAberto] = useState(null);
@@ -174,6 +188,29 @@ export default function PaginaDoQuadro() {
     }
   }
 
+  /** Arrastar no calendário muda a ENTREGA. Otimista pelo mesmo motivo do arrastar de coluna:
+   *  o card não pode voltar ao dia antigo por um instante a cada solta. */
+  async function mudarPrazo(cardId, fimEm) {
+    mexerNaTela((colunas) => {
+      for (const col of colunas) {
+        const i = col.cards.findIndex((c) => c.id === cardId);
+        if (i >= 0) { col.cards[i] = { ...col.cards[i], fimEm }; break; }
+      }
+      return colunas;
+    });
+    try { await mudar(`/api/cards/${cardId}`, { fimEm }); }
+    catch (e) { setErro(e.message); }
+    carregar(true);
+  }
+
+  async function criarNoDia(chave, titulo, colunaId) {
+    try {
+      const d = await criar(`/api/colunas/${colunaId}/cards`, { titulo });
+      await mudar(`/api/cards/${d.card.id}`, { fimEm: prazoNoDia(null, chave) });
+      await carregar(true);
+    } catch (e) { setErro(e.message); }
+  }
+
   async function criarCard(colunaId, titulo) {
     try {
       const d = await criar(`/api/colunas/${colunaId}/cards`, { titulo });
@@ -208,6 +245,13 @@ export default function PaginaDoQuadro() {
   const arrastandoCard = arrasto?.tipo === "card"
     ? quadro.todosOsCards().find((c) => c.id === arrasto.id)
     : null;
+  const arrastandoColuna = arrasto?.tipo === "coluna"
+    ? quadro.colunas.find((c) => c.id === arrasto.id)
+    : null;
+  const reservaDeColuna = arrastandoColuna ? alvo?.indiceDeColuna ?? null : null;
+  /** A posição da coluna `i` entre as colunas que NÃO estão sendo arrastadas. */
+  const indiceEntreAsOutras = (i) =>
+    quadro.colunas.slice(0, i).filter((c) => c.id !== arrasto?.id).length;
 
   return (
     // `data-parede` existe porque o papel de parede chega como estilo em linha, e o CSS não tem
@@ -231,6 +275,17 @@ export default function PaginaDoQuadro() {
             }}
             onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
           />
+          <div className="abacato-vistas" role="tablist" aria-label="como ver o quadro">
+            {[["quadro", "▦", "Quadro"], ["calendario", "▤", "Calendário"]].map(([valor, icone, rotulo]) => (
+              <button key={valor} type="button" role="tab" aria-selected={modo === valor}
+                aria-label={rotulo} title={rotulo}
+                className={`abacato-vistas__aba${modo === valor ? " abacato-vistas__aba--ativa" : ""}`}
+                onClick={() => trocarModo(valor)}>
+                <span aria-hidden="true">{icone}</span>
+                <span className="abacato-vistas__texto"> {rotulo}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="abacato-quadro-topo__direita">
@@ -302,8 +357,26 @@ export default function PaginaDoQuadro() {
       )}
       {erro && <div className="abacato-campo__erro abacato-campo__erro--flutuante">⚠ {erro}</div>}
 
+      {modo === "calendario" && (
+        <Calendario
+          quadro={quadro}
+          poderes={poderes}
+          aoAbrirCard={setCardAberto}
+          aoMudarPrazo={mudarPrazo}
+          aoCriarNoDia={criarNoDia}
+        />
+      )}
+
+      {modo === "quadro" && (
       <div className="abacato-faixa" ref={faixa}>
-        {quadro.colunas.map((coluna) => (
+        {quadro.colunas.map((coluna, i) => (
+          <Fragment key={coluna.id}>
+          {/* O espaço onde a coluna arrastada vai cair. O índice do alvo conta só as OUTRAS
+              colunas (a arrastada fica no lugar, apagada), e por isso a comparação é com o
+              índice entre as outras, e não com `i`. */}
+          {reservaDeColuna === indiceEntreAsOutras(i) && coluna.id !== arrasto?.id && (
+            <div className="abacato-reserva abacato-reserva--coluna" style={{ height: arrasto.altura }} />
+          )}
           <Coluna
             key={coluna.id}
             coluna={coluna}
@@ -322,7 +395,12 @@ export default function PaginaDoQuadro() {
             aoMudarCapa={(colunaId, capa) => mudar(`/api/colunas/${colunaId}`, { capa }).then(() => carregar(true)).catch((e) => setErro(e.message))}
             aoArquivar={(colunaId) => remover(`/api/colunas/${colunaId}`).then(() => carregar(true)).catch((e) => setErro(e.message))}
           />
+          </Fragment>
         ))}
+
+        {reservaDeColuna != null && reservaDeColuna === quadro.colunas.filter((c) => c.id !== arrasto?.id).length && (
+          <div className="abacato-reserva abacato-reserva--coluna" style={{ height: arrasto.altura }} />
+        )}
 
         {poderes.criar && (
           <div className="abacato-coluna abacato-coluna--nova">
@@ -350,6 +428,7 @@ export default function PaginaDoQuadro() {
           </div>
         )}
       </div>
+      )}
 
       {/* O card que está sendo arrastado, desenhado solto sob o ponteiro. Fica fora da coluna
           de propósito: dentro dela, o `overflow` da coluna cortaria o card na borda. */}
@@ -359,6 +438,24 @@ export default function PaginaDoQuadro() {
           style={{ left: arrasto.x - arrasto.dx, top: arrasto.y - arrasto.dy, width: arrasto.largura }}
         >
           <CardMini dados={arrastandoCard} />
+        </div>
+      )}
+
+      {/* A coluna arrastada, em miniatura: o nome e os primeiros cards bastam para saber o que
+          está na mão. Desenhar a coluna inteira, com trinta cards, pesaria a cada movimento. */}
+      {arrasto && arrastandoColuna && (
+        <div
+          className="abacato-fantasma abacato-fantasma--coluna"
+          style={{ left: arrasto.x - arrasto.dx, top: arrasto.y - arrasto.dy, width: arrasto.largura }}
+        >
+          <div className="abacato-fantasma__cabecalho">
+            {arrastandoColuna.nome}
+            <span className="abacato-coluna__conta">{arrastandoColuna.cards.length}</span>
+          </div>
+          {arrastandoColuna.cards.slice(0, 3).map((c) => <CardMini key={c.id} dados={c} />)}
+          {arrastandoColuna.cards.length > 3 && (
+            <div className="abacato-fantasma__mais">+ {arrastandoColuna.cards.length - 3} card(s)</div>
+          )}
         </div>
       )}
 

@@ -414,6 +414,30 @@
   opacity: 0.95;
 }
 
+/* Arrastar COLUNA: o espaço tem a largura de uma coluna, e o fantasma é uma coluna em
+   miniatura — o nome e os primeiros cards. */
+.abacato-reserva--coluna { flex: 0 0 288px; max-width: 288px; max-height: 100%; min-height: 120px; }
+.abacato-fantasma--coluna {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 8px 12px;
+  background: var(--abacato-superficie-2);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  transform: rotate(2deg);
+}
+.abacato-fantasma__cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--abacato-tinta);
+}
+.abacato-fantasma__mais { padding: 0 4px; font-size: 12px; color: var(--abacato-tinta-3); }
+
 body.abacato-arrastando { cursor: grabbing; }
 body.abacato-arrastando * { cursor: grabbing !important; }
 
@@ -583,13 +607,6 @@ body.abacato-arrastando * { cursor: grabbing !important; }
   position: relative;
   flex: 0 0 auto;
 }
-.abacato-painel__capa {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
-}
 .abacato-painel__titulo {
   flex: 1;
   font-size: 18px;
@@ -664,38 +681,6 @@ body.abacato-arrastando * { cursor: grabbing !important; }
 .abacato-bloco__linha { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .abacato-bloco__acoes { display: flex; gap: 6px; flex-wrap: wrap; }
 
-.abacato-etiquetas-lista { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-
-.abacato-etiqueta-botao {
-  border: 2px solid transparent;
-  border-radius: var(--abacato-raio-pilula);
-  padding: 5px 12px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: #FFFFFF;
-  cursor: pointer;
-  /* A sombra interna escurece qualquer cor da paleta o bastante para o texto branco passar no
-     contraste — inclusive o amarelo, que sozinho não passaria. */
-  box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.18);
-}
-.abacato-etiqueta-botao--marcada { border-color: var(--abacato-tinta); box-shadow: none; }
-.abacato-etiqueta-botao:disabled { cursor: default; opacity: 0.7; }
-
-.abacato-pessoa-botao {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--abacato-linha);
-  border-radius: var(--abacato-raio-pilula);
-  background: var(--abacato-superficie-2);
-  color: var(--abacato-tinta);
-  padding: 4px 12px 4px 4px;
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-.abacato-pessoa-botao--marcada { border-color: var(--abacato-verde); background: var(--abacato-verde-claro); font-weight: 600; }
 
 .abacato-datas { display: flex; gap: 10px; flex-wrap: wrap; }
 .abacato-datas .abacato-campo { flex: 1 1 200px; }
@@ -1067,7 +1052,8 @@ body.abacato-arrastando * { cursor: grabbing !important; }
    suficiente para ser útil. */
 
 @media (max-width: 860px) {
-  .abacato-coluna { flex-basis: calc(100vw - 52px); max-width: calc(100vw - 52px); }
+  .abacato-coluna,
+  .abacato-reserva--coluna { flex-basis: calc(100vw - 52px); max-width: calc(100vw - 52px); }
   .abacato-quadro-topo__nome { max-width: 100%; font-size: 18px; }
   .abacato-quadro-topo { padding: 10px var(--abacato-respiro-x); }
   .abacato-painel { padding: 0; }
@@ -1092,4 +1078,423 @@ body.abacato-arrastando * { cursor: grabbing !important; }
   .abacato-painel__caixa { animation: none; }
   .abacato-barra-progresso > span { transition: none; }
   .abacato-fantasma { transform: none; }
+  .abacato-janelinha { animation: none; }
+}
+
+/* ============================================================ o card aberto (BEYOND-0003) */
+
+/* Modal no CENTRO da tela, e não mais gaveta encostada na direita. A variante é só do card: os
+   outros painéis (compartilhar, documentos, recorrentes) continuam como eram. O modal começa um
+   pouco abaixo do topo e rola a PÁGINA quando o card é comprido — como no Trello —, em vez de
+   espremer tudo numa caixa com rolagem própria. */
+.abacato-painel--centro {
+  justify-content: center;
+  align-items: flex-start;
+  padding: 48px 16px;
+  overflow-y: auto;
+}
+.abacato-painel--centro .abacato-painel__fundo { position: fixed; }
+.abacato-cartao-aberto {
+  width: min(760px, 100%);
+  max-height: none;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+.abacato-cartao-aberto .abacato-painel__corpo { overflow: visible; gap: 22px; padding-top: 6px; }
+.abacato-cartao-aberto__capa {
+  height: 56px;
+  flex: 0 0 auto;
+  border-radius: var(--abacato-raio-grande) var(--abacato-raio-grande) 0 0;
+}
+.abacato-cartao-aberto__recado { margin: 0 var(--abacato-gap-2) 10px; }
+
+/* O círculo de concluído, ao lado do título. */
+.abacato-concluido {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 2px solid var(--abacato-tinta-3);
+  background: transparent;
+  color: transparent;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+.abacato-concluido:hover:not(:disabled) { border-color: var(--abacato-verde); color: var(--abacato-verde); }
+.abacato-concluido--feito,
+.abacato-concluido--feito:hover:not(:disabled) { background: var(--abacato-verde); border-color: var(--abacato-verde); color: #FFFFFF; }
+.abacato-concluido:disabled { cursor: default; }
+
+/* A faixa "Adicionar": botões baixos, discretos, que só abrem a janelinha. */
+.abacato-cartao-aberto__adicionar { display: flex; flex-wrap: wrap; gap: 6px; }
+.abacato-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 0;
+  border-radius: 8px;
+  /* Misturado com a tinta, e não o superficie-2 puro: o modal tem o fundo dessa mesma cor, e o
+     botão sumia — virava texto solto que não parecia clicável. */
+  background: color-mix(in srgb, var(--abacato-tinta) 7%, var(--abacato-superficie));
+  color: var(--abacato-tinta);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.abacato-chip:hover:not(:disabled),
+.abacato-chip--ativo { background: color-mix(in srgb, var(--abacato-tinta) 14%, var(--abacato-superficie)); }
+.abacato-chip:disabled { cursor: default; }
+
+/* O que o card TEM: etiquetas, membros, prazo e recorrência, cada um com o seu rótulo. */
+.abacato-cartao-aberto__resumo { display: flex; flex-wrap: wrap; gap: 14px 26px; }
+.abacato-resumo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.abacato-resumo__rotulo { font-size: 11.5px; font-weight: 600; color: var(--abacato-tinta-2); }
+.abacato-resumo__valor { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+
+.abacato-etiqueta-pilula {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  color: #FFFFFF;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  /* Mesma sombra interna da etiqueta de sempre: escurece qualquer cor da paleta o bastante para
+     o texto branco passar no contraste — inclusive o amarelo. */
+  box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.18);
+}
+.abacato-etiqueta-pilula:disabled { cursor: default; }
+.abacato-etiqueta-pilula--larga { flex: 1; min-width: 0; height: 32px; }
+
+.abacato-avatar--medio { width: 30px; height: 30px; font-size: 12px; border: 0; cursor: pointer; }
+.abacato-avatar--medio:disabled { cursor: default; }
+.abacato-prazo--botao { border: 0; font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 11px; border-radius: 8px; cursor: pointer; }
+.abacato-prazo--botao:disabled { cursor: default; }
+
+/* Seções do corpo: título com ícone, sem caixa em volta — como no Trello. */
+.abacato-secao { display: flex; flex-direction: column; gap: 8px; }
+.abacato-secao__titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--abacato-tinta);
+}
+.abacato-secao__icone { color: var(--abacato-tinta-2); font-size: 15px; }
+
+/* A janelinha de cada botão da faixa "Adicionar". Fica POR CIMA de tudo, na posição do botão
+   que a abriu, e rola por dentro quando o conteúdo (a recorrência, por exemplo) é comprido. */
+.abacato-janelinha__fundo { z-index: 72; }
+.abacato-janelinha {
+  position: fixed;
+  z-index: 73;
+  max-height: min(72dvh, 540px);
+  overflow-y: auto;
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  box-shadow: var(--abacato-sombra-alta);
+  animation: abacato-surgir 120ms ease-out;
+}
+.abacato-janelinha__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 4px 14px;
+  font-size: 13.5px;
+}
+.abacato-janelinha__corpo { display: flex; flex-direction: column; gap: 10px; padding: 6px 14px 14px; }
+.abacato-janelinha__lista { display: flex; flex-direction: column; gap: 3px; }
+.abacato-opcao {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--abacato-tinta);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.abacato-opcao:hover { background: var(--abacato-superficie-2); }
+.abacato-opcao--marcada { font-weight: 600; }
+.abacato-opcao__marca { width: 14px; flex: 0 0 auto; color: var(--abacato-verde-fundo); font-weight: 700; }
+.abacato-opcao__texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Checklist: nome e itens editáveis com um clique, itens reordenáveis pela alça. */
+.abacato-cartao-aberto .abacato-checklist { background: transparent; padding: 0; gap: 8px; }
+.abacato-cartao-aberto .abacato-checklist__cabecalho { gap: 8px; }
+.abacato-cartao-aberto .abacato-checklist__titulo {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--abacato-tinta);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: text;
+}
+.abacato-cartao-aberto .abacato-checklist__titulo:hover:not(:disabled) { border-color: var(--abacato-linha); }
+.abacato-cartao-aberto .abacato-checklist__titulo:disabled { cursor: default; }
+.abacato-checklist__campo-titulo { flex: 1; font-weight: 700; padding: 5px 8px; }
+.abacato-checklist__itens { display: flex; flex-direction: column; gap: 1px; }
+
+.abacato-cartao-aberto .abacato-item { gap: 6px; padding: 2px 4px; }
+.abacato-item__texto {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13.5px;
+  padding: 5px 4px;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+  cursor: text;
+}
+.abacato-item__texto:disabled { cursor: default; }
+.abacato-item--feito .abacato-item__texto { text-decoration: line-through; color: var(--abacato-tinta-3); }
+.abacato-item__campo { flex: 1; padding: 5px 8px; }
+.abacato-item__alca {
+  flex: 0 0 auto;
+  padding: 4px 2px;
+  color: var(--abacato-tinta-3);
+  font-size: 12px;
+  letter-spacing: -2px;
+  cursor: grab;
+  user-select: none;
+  /* A alça não rola nada: o dedo nela arrasta na hora, sem a espera de 220ms dos cards. */
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.abacato-item--na-mao {
+  background: var(--abacato-superficie);
+  box-shadow: var(--abacato-sombra-alta);
+  position: relative;
+  z-index: 1;
+}
+
+/* Ações secundárias aparecem ao passar o mouse, e não o tempo todo: um ✕ em cada linha de uma
+   checklist de vinte itens é uma coluna de ruído. No toque não existe "passar por cima", e
+   por isso lá elas ficam sempre visíveis. */
+.abacato-mostra-no-hover { opacity: 0; transition: opacity 120ms; }
+.abacato-item:hover .abacato-item__alca,
+.abacato-item--na-mao .abacato-item__alca,
+.abacato-item:hover .abacato-mostra-no-hover,
+.abacato-link:hover .abacato-mostra-no-hover,
+.abacato-mostra-no-hover:focus-visible { opacity: 1; }
+@media (hover: none) {
+  .abacato-item__alca,
+  .abacato-mostra-no-hover { opacity: 1; }
+}
+
+@media (max-width: 860px) {
+  .abacato-painel--centro { padding: 0; }
+  .abacato-cartao-aberto { min-height: 100%; border-radius: 0; }
+  .abacato-cartao-aberto__capa { border-radius: 0; }
+  /* No telefone a janelinha ocupa a largura toda: 320px presos à posição do botão sairiam da
+     tela ou cobririam só metade dela. */
+  .abacato-janelinha { left: 10px !important; right: 10px; width: auto !important; }
+}
+
+/* ============================================================ vista: quadro | calendário */
+
+.abacato-vistas {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 3px;
+  margin-left: 6px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-superficie-2);
+  border: 1px solid var(--abacato-linha);
+}
+.abacato-vistas__aba {
+  border: 0;
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 5px 12px;
+  border-radius: var(--abacato-raio-pilula);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.abacato-vistas__aba--ativa { background: var(--abacato-superficie); color: var(--abacato-tinta); font-weight: 600; box-shadow: var(--abacato-sombra); }
+.abacato-vistas__texto { white-space: nowrap; }
+
+/* ============================================================ o calendário */
+
+.abacato-calendario {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px var(--abacato-respiro-x) 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.abacato-calendario__topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.abacato-calendario__navegar { display: flex; align-items: center; gap: 6px; }
+.abacato-calendario__mes { margin: 0; min-width: 180px; text-align: center; font-size: 17px; font-weight: 700; }
+.abacato-calendario__mes::first-letter { text-transform: uppercase; }
+
+/* A grade é desenhada pelo FUNDO: 1px de vão entre casas com o fundo na cor da linha faz as
+   divisórias sem uma borda por casa — que dobraria de espessura onde duas se encostam. */
+.abacato-calendario__grade {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--abacato-linha);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.abacato-calendario__semana {
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 8px 10px;
+}
+.abacato-calendario__casa {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 112px;
+  padding: 6px;
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+  cursor: pointer;
+}
+.abacato-calendario__casa--fora { background: var(--abacato-superficie-2); }
+.abacato-calendario__casa--fora .abacato-calendario__numero { color: var(--abacato-tinta-3); }
+.abacato-calendario__casa--escolhida { box-shadow: inset 0 0 0 2px var(--abacato-verde); }
+.abacato-calendario__casa--alvo {
+  background: color-mix(in srgb, var(--abacato-verde) 14%, var(--abacato-superficie));
+  box-shadow: inset 0 0 0 2px var(--abacato-verde);
+}
+.abacato-calendario__numero {
+  align-self: flex-start;
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: var(--abacato-raio-pilula);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+/* Hoje ganha o fundo verde-claro, e não o verde de ação: o verde forte com número branco não
+   passa no contraste, e o dia de hoje precisa ser lido de relance. */
+.abacato-calendario__casa--hoje .abacato-calendario__numero { background: var(--abacato-verde-claro); color: var(--abacato-tinta); font-weight: 700; }
+.abacato-calendario__quantos { display: none; }
+.abacato-calendario__cards { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.abacato-calendario__mais { padding-left: 4px; font-size: 11.5px; color: var(--abacato-tinta-2); }
+
+.abacato-calendario__sem-data { display: flex; flex-wrap: wrap; gap: 6px; }
+.abacato-calendario__sem-data .abacato-cal-card { max-width: 260px; }
+
+.abacato-calendario__dia {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  flex: 0 0 auto;
+}
+.abacato-calendario__dia-titulo { margin: 0 0 4px; display: flex; align-items: center; justify-content: space-between; font-size: 14.5px; }
+.abacato-calendario__dia-titulo::first-letter { text-transform: uppercase; }
+.abacato-calendario__novo { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.abacato-calendario__novo .abacato-campo__entrada { flex: 1 1 220px; }
+
+/* Um card no calendário: a faixa à esquerda tem a cor do PRAZO, a mesma leitura do quadro. */
+.abacato-cal-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border-left: 3px solid var(--abacato-tinta-3);
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta);
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+}
+.abacato-cal-card:hover { background: color-mix(in srgb, var(--abacato-tinta) 8%, var(--abacato-superficie-2)); }
+.abacato-cal-card--atrasado { border-left-color: var(--abacato-alerta); }
+.abacato-cal-card--hoje,
+.abacato-cal-card--proximo { border-left-color: var(--abacato-atencao); }
+.abacato-cal-card--no-prazo { border-left-color: var(--abacato-verde); }
+.abacato-cal-card--concluido { border-left-color: var(--abacato-verde-fundo); }
+.abacato-cal-card--compacto { padding: 3px 6px; font-size: 11.5px; }
+.abacato-cal-card--fantasma { opacity: 0.35; }
+.abacato-cal-card--feito .abacato-cal-card__titulo { text-decoration: line-through; color: var(--abacato-tinta-3); }
+.abacato-cal-card__titulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.abacato-cal-card__hora { flex: 0 0 auto; font-size: 11.5px; color: var(--abacato-tinta-2); font-variant-numeric: tabular-nums; }
+.abacato-cal-card__etiquetas { display: flex; flex: 0 0 auto; gap: 2px; }
+.abacato-cal-card__etiquetas > span { width: 8px; height: 8px; border-radius: 50%; }
+.abacato-fantasma--calendario { transform: rotate(2deg); }
+
+/* No telefone, sete casas em 390px não comportam título de card: a casa mostra só quantos
+   há, e tocar no dia abre a lista dele embaixo da grade — que é onde se lê. */
+@media (max-width: 860px) {
+  .abacato-vistas { margin-left: 0; }
+  /* No telefone, só os ícones: com o texto, o alternador espremia o nome do quadro até sobrar
+     "Obra Delp –". O nome da vista continua no aria-label e na dica. */
+  .abacato-vistas__texto { display: none; }
+  .abacato-vistas__aba { padding: 5px 10px; }
+  .abacato-calendario { padding: 4px 10px 18px; }
+  .abacato-calendario__mes { min-width: 0; font-size: 15.5px; }
+  .abacato-calendario__semana { padding: 6px 2px; text-align: center; font-size: 10px; letter-spacing: 0; }
+  .abacato-calendario__casa { min-height: 58px; padding: 4px 2px; align-items: center; }
+  .abacato-calendario__numero { align-self: center; }
+  .abacato-calendario__cards { display: none; }
+  .abacato-calendario__quantos {
+    display: grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: var(--abacato-raio-pilula);
+    background: var(--abacato-verde-claro);
+    color: var(--abacato-tinta);
+    font-size: 11px;
+    font-weight: 700;
+  }
 }

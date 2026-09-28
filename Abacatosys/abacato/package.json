@@ -10,6 +10,7 @@
     "start": "next start",
     "auth-check": "node scripts/auth-check.mjs",
     "dominio-check": "node scripts/dominio-check.mjs",
+    "calendario-check": "node scripts/calendario-check.mjs",
     "login-check": "node scripts/login-check.mjs",
     "recorrencia-check": "node scripts/recorrencia-check.mjs",
     "quadro-check": "node scripts/quadro-check.mjs",

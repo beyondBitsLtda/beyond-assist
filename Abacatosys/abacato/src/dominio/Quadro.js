@@ -28,6 +28,21 @@ export function posicaoEntre(antes, depois) {
   return (antes + depois) / 2;
 }
 
+/**
+ * A posição nova de um item que sai do índice `de` e vai para o índice `para` da mesma lista.
+ *
+ * `para` é contado na lista SEM o item — é o que a tela mede ao arrastar, porque o item na mão
+ * não ocupa lugar entre os outros. `posicoes` vem em ordem. Devolve `null` quando o item cai
+ * onde já estava: gravar a mesma ordem seria uma ida ao banco para nada.
+ */
+export function posicaoAoMover(posicoes, de, para) {
+  const sem = posicoes.filter((_, i) => i !== de);
+  if (para === de) return null;
+  const antes = para > 0 ? sem[para - 1] ?? null : null;
+  const depois = sem[para] ?? null;
+  return posicaoEntre(antes, depois);
+}
+
 /** O que cada papel pode fazer. Um lugar só — espalhar isto pelas telas é como um botão acaba
  *  escondido para quem pode e visível para quem não pode. */
 const PODERES = {

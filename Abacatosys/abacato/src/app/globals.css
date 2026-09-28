@@ -460,6 +460,69 @@ body {
 }
 .abacato-vazio__titulo { font-size: 16px; font-weight: 600; color: var(--abacato-tinta); margin: 0 0 6px; }
 
+/* ============================================================ workspaces */
+
+/* Cada workspace é uma seção da lista de quadros: cabeçalho fino e a grade de sempre embaixo.
+ * Sem caixa em volta de propósito — uma moldura por workspace empilharia bordas dentro de
+ * bordas, porque cada quadro já é um cartão. */
+.abacato-workspace { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; }
+.abacato-workspace__cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--abacato-linha);
+}
+.abacato-workspace__icone {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 14px;
+  background: var(--abacato-verde-claro);
+  color: var(--abacato-tinta);
+}
+.abacato-workspace__nome {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--abacato-tinta);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: text;
+}
+.abacato-workspace__nome:hover { border-color: var(--abacato-linha); }
+.abacato-workspace__nome--fixo { cursor: default; padding-left: 0; color: var(--abacato-tinta-2); }
+.abacato-workspace__nome--fixo:hover { border-color: transparent; }
+.abacato-workspace__campo {
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--abacato-verde);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+  outline: none;
+  min-width: 0;
+}
+.abacato-workspace__conta {
+  font-size: 12px;
+  color: var(--abacato-tinta-3);
+  font-variant-numeric: tabular-nums;
+}
+.abacato-workspace__acoes { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.abacato-workspace__vazio { margin: 0; font-size: 13px; color: var(--abacato-tinta-2); }
+/* "Sem workspace" não é uma pasta, é o que sobrou: linha tracejada, para não parecer mais um
+   workspace que se pode renomear ou apagar. */
+.abacato-workspace--soltos .abacato-workspace__cabecalho { border-bottom-style: dashed; }
+
 /* ============================================================ grade de quadros */
 
 .abacato-grade {

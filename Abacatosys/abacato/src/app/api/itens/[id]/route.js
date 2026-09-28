@@ -5,7 +5,9 @@ import { exigir, respostaDeErro, ErroDeAcesso } from "@/lib/acesso.js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** PATCH /api/itens/:id   body: { feito?, texto? } — marcar e renomear um item de checklist. */
+/** PATCH /api/itens/:id   body: { feito?, texto?, posicao? } — marcar, renomear e reordenar um
+ *  item de checklist. A posição nova é calculada na tela (posicaoAoMover, em Quadro.js), entre
+ *  os dois vizinhos: uma linha alterada, e não a checklist inteira renumerada. */
 export async function PATCH(req, { params }) {
   try {
     const { id } = await params;
@@ -15,6 +17,7 @@ export async function PATCH(req, { params }) {
     const mudancas = {};
     if (typeof corpo.feito === "boolean") mudancas.feito = corpo.feito;
     if (typeof corpo.texto === "string" && corpo.texto.trim()) mudancas.texto = corpo.texto.trim();
+    if (Number.isFinite(corpo.posicao)) mudancas.posicao = corpo.posicao;
     if (!Object.keys(mudancas).length) throw new ErroDeAcesso(400, "nada para mudar");
 
     const { data, error } = await supabase.from("abacato_checklist_itens")
