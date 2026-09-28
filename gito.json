@@ -1,0 +1,221 @@
+{
+  "$gito": 1,
+  "aplicacao": {
+    "nome": "Beyond Bits — Lisa",
+    "codigo": "BEYOND",
+    "descricao": "Assistente pessoal com interface HUD (a Lisa) que responde, por texto e voz, sobre os quadros do Trello e do Abacato e as notas do Beyond Brain, para uso próprio do responsável.",
+    "tipo": "Aplicação web",
+    "situacao": "em produção",
+    "responsavel": "Brayan Rodrigues",
+    "equipe": "Beyond Bits"
+  },
+  "versao": "0.2.0-cloudflare-pages.1",
+  "atualizadoEm": "2026-09-27",
+  "compilacao": {
+    "numero": 2,
+    "data": "2026-09-27",
+    "artefato": ""
+  },
+  "historico": [
+    {
+      "versao": "0.2.0-cloudflare-pages.1",
+      "data": "2026-09-27",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Abacato ganha workspaces, colunas arrastáveis, card aberto no centro no estilo Trello, checklist editável e modo calendário.",
+      "itens": [
+        "Workspaces: cada pessoa cria pastas e organiza nelas os quadros que enxerga; não mudam quem acessa o quê.",
+        "Arrastar e soltar colunas pelo nome, com espaço reservado e miniatura da coluna.",
+        "O card abre num modal no centro da tela, e não mais numa gaveta à direita.",
+        "Card mais enxuto: etiquetas, membros, datas, checklist, repetir, link e capa ficam numa faixa \"Adicionar\"; o corpo mostra só o que o card tem.",
+        "Checklist: nome e itens renomeáveis com um clique, e itens reordenáveis arrastando pela alça.",
+        "Modo calendário do quadro: cards no dia da entrega, arrastar para outro dia muda o prazo, e dá para criar um card já num dia.",
+        "Banco: nova migração db/010-workspaces.sql (tabelas abacato_workspaces e abacato_workspace_quadros)."
+      ],
+      "issues": [
+        "BEYOND-0003"
+      ]
+    },
+    {
+      "versao": "0.1.0",
+      "data": "2026-09-26",
+      "branch": "main",
+      "tipo": "funcionalidade",
+      "resumo": "Primeiro registro no Gito: retrato da main como está hoje, depois de 211 commits desde 2026-08-02.",
+      "itens": [
+        "Assistente com busca semântica (RAG) sobre o Trello e o Beyond Brain, resposta em streaming e voz.",
+        "Painéis ao vivo: Kanban, Boards, Dashboard, Tarefas, Notícias, Clima e Map of Deploy.",
+        "SYNC automático do índice e notificações push em horários fixos.",
+        "Modos Observância (câmera) e Tela, painel em realidade aumentada e Mundo da Lisa.",
+        "Pair programming com editor compartilhado, tarefas de código no GitHub e a extensão Lisa Code para o VS Code.",
+        "Sentinela: painel de testes e chamados ligado a um segundo projeto Supabase."
+      ],
+      "issues": []
+    }
+  ],
+  "ficha": {
+    "escopo": {
+      "objetivo": "Centralizar numa só tela as tarefas, os projetos e as anotações do responsável, com uma assistente que responde sobre esses dados e avisa o que precisa de atenção.",
+      "inclui": [
+        "Perguntas livres sobre os cards do Trello (ou do Abacato) e as notas do Beyond Brain, por texto ou voz.",
+        "Leitura ao vivo dos quadros nos painéis, sem depender do índice.",
+        "Mover card de lista, mudar prazo e marcar como concluído no Trello.",
+        "Reindexação (SYNC) manual pelo botão e automática pelo relógio do servidor de casa.",
+        "Notificações push de card novo e de tarefa atrasada.",
+        "Kanban de tarefas da Delp a partir de planilha enviada pela tela.",
+        "Consulta a repositórios do GitHub, tarefas de código e pair programming.",
+        "Painel Sentinela de casos de teste e chamados."
+      ],
+      "naoInclui": [
+        "Não é multiusuário: o login existe, mas só para o responsável.",
+        "Não cria nem apaga cards no Trello.",
+        "Não guarda fotos da câmera nem capturas de tela: elas vão ao Gemini e são descartadas.",
+        "Não versiona a planilha da Delp; ela fica só no banco.",
+        "O Abacato mora neste repositório (Abacatosys/abacato), mas é outra aplicação, publicada à parte em abacato.beyond.dev.br."
+      ]
+    },
+    "stack": [
+      "Next.js 15 (App Router)",
+      "React 19",
+      "JavaScript (ES Modules)",
+      "Cloudflare Workers, com o adaptador @opennextjs/cloudflare e o wrangler",
+      "Supabase auto-hospedado em Docker (PostgreSQL 17.6 + pgvector, PostgREST, Auth)",
+      "Cloudflare Tunnel (cloudflared)",
+      "Google Gemini (gemini-2.5-flash, embeddings, TTS)",
+      "Groq (modelos de linguagem, em rodízio de chaves)",
+      "Three.js",
+      "MediaPipe Tasks Vision",
+      "Monaco Editor",
+      "ExcelJS",
+      "Extensão VS Code em TypeScript (Lisa Code)"
+    ],
+    "arquitetura": {
+      "resumo": "A Lisa é um app Next.js que roda como Worker na Cloudflare (plano gratuito): as páginas saem estáticas pelo CDN e as rotas de API rodam no Worker. Os dados moram num Supabase auto-hospedado no servidor de casa (iMac com Zorin OS), que a Lisa alcança por um túnel da Cloudflare (cloudflared) em banco.beyond.dev.br. O túnel é aberto de dentro da casa para fora, então nenhuma porta do roteador foi aberta. A Lisa nunca fala SQL direto: chama o PostgREST por HTTP. O agendamento (SYNC, notificações push e Map of Deploy) é feito pelo crontab do servidor de casa; o Worker lisa-cron continua publicado, sem horários, como reserva. O Sentinela continua num projeto Supabase da nuvem. O banco fica tão disponível quanto a casa: queda de luz ou de internet lá derruba os dados. Detalhes em docs/infraestrutura.html e servidor/README.md.",
+      "diagramas": [
+        {
+          "titulo": "Visão geral",
+          "mermaid": "flowchart LR\n  U[Navegador / celular] --> CF[Worker beyond-assist\\nlisa.beyond.dev.br]\n  EXT[Extensão Lisa Code] --> CF\n  subgraph Cloudflare\n    CF\n    T[Túnel\\nbanco.beyond.dev.br]\n  end\n  CF -->|HTTP / PostgREST| T\n  subgraph Casa [Servidor de casa - iMac]\n    CD[cloudflared] --> SB[(Supabase auto-hospedado\\nPostgreSQL 17.6 + pgvector)]\n    REL[Relógio - crontab] -->|SYNC, push, Map of Deploy| CF\n  end\n  T --- CD\n  CF -->|Sentinela| SN[(Supabase nuvem\\nBeyond Test)]\n  CF --> TR[Trello API]\n  CF --> GE[Google Gemini]\n  CF --> GQ[Groq]\n  CF --> GH[GitHub API]"
+        },
+        {
+          "titulo": "Infraestrutura completa",
+          "link": "https://github.com/beyondBitsLtda/beyond-assist/blob/cloudflare-pages/docs/infraestrutura.html"
+        }
+      ]
+    },
+    "hospedagem": [
+      {
+        "ambiente": "Produção",
+        "onde": "Cloudflare Workers (plano gratuito), conta beyondbitsLisa, Worker beyond-assist",
+        "url": "https://lisa.beyond.dev.br/",
+        "verificar": true
+      },
+      {
+        "ambiente": "Produção (endereço reserva)",
+        "onde": "Cloudflare Workers, mesmo Worker beyond-assist no endereço .workers.dev",
+        "url": "https://beyond-assist.beyondbitslisa.workers.dev/",
+        "verificar": true
+      },
+      {
+        "ambiente": "Servidor de casa",
+        "onde": "iMac com Zorin OS: Lisa local na porta 3000 atrás do Caddy, o banco e o relógio (crontab). Só abre de dentro da rede de casa.",
+        "url": "https://casa.beyond.dev.br/",
+        "verificar": false
+      }
+    ],
+    "bancoDeDados": [
+      {
+        "nome": "Banco da Lisa (servidor de casa)",
+        "tipo": "PostgreSQL 17.6 + pgvector, em Supabase auto-hospedado (Docker)",
+        "servidor": "banco.beyond.dev.br",
+        "porta": 443,
+        "base": "postgres",
+        "acesso": "",
+        "observacao": "Fica no iMac de casa e é publicado só pelo túnel da Cloudflare, em HTTPS (PostgREST). O Postgres não é exposto na internet. O Studio só abre no próprio iMac. Teste: https://banco.beyond.dev.br/ responder 401 é normal; 530 significa túnel fora (confira se o iMac está ligado)."
+      },
+      {
+        "nome": "Sentinela (Beyond Test)",
+        "tipo": "PostgreSQL (Supabase nuvem)",
+        "servidor": "wilxxkkqgoigmrdgufej.supabase.co",
+        "porta": 443,
+        "base": "postgres",
+        "acesso": "https://supabase.com/dashboard/project/wilxxkkqgoigmrdgufej",
+        "observacao": "Projeto separado, de propósito, para chamados e casos de teste do Sentinela. Não migrou para o servidor de casa."
+      },
+      {
+        "nome": "Supabase nuvem principal (plano B)",
+        "tipo": "PostgreSQL (Supabase nuvem) com pgvector",
+        "servidor": "wcwikmszduuqlytikjwq.supabase.co",
+        "porta": 443,
+        "base": "postgres",
+        "acesso": "https://supabase.com/dashboard/project/wcwikmszduuqlytikjwq",
+        "observacao": "Banco antigo, fora de uso e mantido intacto como reserva: voltar para ele é trocar SUPABASE_URL e a chave no painel da Cloudflare."
+      }
+    ],
+    "integracoes": [
+      {
+        "nome": "Trello",
+        "descricao": "Leitura dos quadros para os painéis, o SYNC e o Map of Deploy; atualização de prazo, lista e conclusão de cards.",
+        "url": "https://api.trello.com"
+      },
+      {
+        "nome": "Abacato",
+        "descricao": "Fonte alternativa de quadros: a Lisa pode ler o Abacato em vez do Trello.",
+        "url": "https://abacato.beyond.dev.br"
+      },
+      {
+        "nome": "Google Gemini",
+        "descricao": "Chat em streaming, embeddings, visão (câmera e tela) e voz (TTS).",
+        "url": "https://ai.google.dev"
+      },
+      {
+        "nome": "Groq",
+        "descricao": "Modelos de linguagem alternativos, com rodízio de chaves.",
+        "url": "https://api.groq.com"
+      },
+      {
+        "nome": "GitHub",
+        "descricao": "Leitura de repositórios; criação de branches e PRs nas tarefas de código e no pair programming.",
+        "url": "https://api.github.com"
+      },
+      {
+        "nome": "Web Push",
+        "descricao": "Notificações no navegador e no celular, com chaves VAPID, enviadas pelo relógio do servidor de casa.",
+        "url": ""
+      },
+      {
+        "nome": "Open-Meteo",
+        "descricao": "Previsão do tempo do painel de clima.",
+        "url": "https://api.open-meteo.com"
+      },
+      {
+        "nome": "Feeds de notícias",
+        "descricao": "RSS de sites de tecnologia (Canaltech, Tecnoblog, Olhar Digital, TabNews e outros) no painel de notícias.",
+        "url": ""
+      }
+    ],
+    "links": [
+      {
+        "titulo": "Repositório",
+        "url": "https://github.com/beyondBitsLtda/beyond-assist"
+      },
+      {
+        "titulo": "Produção",
+        "url": "https://lisa.beyond.dev.br/"
+      },
+      {
+        "titulo": "Documentação de infraestrutura",
+        "url": "https://github.com/beyondBitsLtda/beyond-assist/blob/cloudflare-pages/docs/infraestrutura.html"
+      },
+      {
+        "titulo": "Scripts do servidor de casa",
+        "url": "https://github.com/beyondBitsLtda/beyond-assist/tree/cloudflare-pages/servidor"
+      }
+    ],
+    "contatos": [
+      {
+        "papel": "Responsável técnico",
+        "nome": "Brayan Rodrigues"
+      }
+    ]
+  }
+}
