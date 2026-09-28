@@ -1,0 +1,52 @@
+{
+  "id": "BEYOND-0003",
+  "titulo": "Melhorias Abacato:",
+  "descricao": "-  Hoje eu quero poder ter o sistema de workspace ou seja criar um workspace e por neles os quadros que o compoe.\n\n- Dentro dos quadros:\na) Poder arrastar e soltar colunas\nb) o card eu nao queria que ele abrisse em uma janela lateral e sim um modal  flutuante no centro da tela\nc) o layput dos cards abertos tem coisas em exeção esconda parte das opeos como ediquetas e alguma souyrs coisas em opções de menu dntro do modal deixe mais refinado mais parecido com o trello.\nd) deve ter como renomear o nome dos checklist e dos itens do checklist, poder reordenar seguranod e arrastando os itens do checklist\ne) Fça um modo calendario para os quadros.",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-10-07",
+  "versaoAlvo": "0.1.0",
+  "criadaEm": "2026-09-28T01:16:36.007Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-09-28T02:16:35.253Z",
+  "comentarios": [
+    {
+      "quando": "2026-09-28T01:21:19.920Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "evidencias": [],
+      "texto": "Começando. Plano, na ordem: (1) workspaces — tabela nova no banco, tela para criar e mover quadros para dentro; (2) arrastar e soltar colunas; (3) card aberto como modal centralizado; (4) card mais enxuto no estilo Trello, com etiquetas e outras ações recolhidas num menu; (5) checklist com nome e itens renomeáveis e itens reordenáveis por arrasto; (6) modo calendário no quadro. O código fica na branch cloudflare-pages, que é de onde o Abacato é publicado."
+    },
+    {
+      "quando": "2026-09-28T01:54:22.340Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "evidencias": [],
+      "texto": "Feito e publicado em abacato.beyond.dev.br (versão 0.2.0-cloudflare-pages.1, commit 1d2036a na branch cloudflare-pages). Os cinco pontos:\n\n• Workspaces: botão \"+ Workspace\" na lista de quadros. Cada workspace vira uma seção, com \"+ Quadro aqui\", renomear (clique no nome) e apagar (os quadros voltam para \"Sem workspace\", inteiros). Um quadro existente entra pelo ⋯ dele, em \"Mover para workspace\". O workspace é da pessoa e não muda quem acessa o quadro. Banco: db/010-workspaces.sql, já aplicada.\na) Colunas: arraste pelo nome da coluna. O arrastar já existia mas quase não pegava — o nome é um botão e ocupava o cabeçalho inteiro. Agora tem espaço reservado e miniatura, e clicar sem arrastar continua renomeando.\nb) O card abre num modal no centro da tela.\nc) Card mais enxuto, no estilo Trello: círculo de concluído ao lado do título; faixa \"Adicionar\" (Etiquetas, Membros, Datas, Checklist, Repetir, Link, Capa) com janelinhas; o corpo mostra só o que o card tem; mover, copiar e arquivar foram para o ⋯ do cabeçalho.\nd) Checklist: clique no nome da checklist ou no texto do item para renomear; arraste pela alça ⋮⋮ para reordenar (mouse e dedo). A caixinha marca; o texto edita.\ne) Modo calendário: alternador \"Quadro | Calendário\" no topo do quadro. Os cards aparecem no dia da entrega; arrastar para outro dia muda o prazo e mantém o horário; tocar num dia lista os cards dele e permite criar um card já com entrega ali. No celular, a grade mostra a contagem por dia.\n\nConferido: 23 checagens de tela no Edge (lista, colunas, card, checklist, calendário e celular) com a API interceptada, sem gravar nada no banco; mais dominio-check, calendario-check, estilo-check e o build no runtime da Cloudflare.\nPara revisar: abra um quadro de verdade e teste arrastar uma coluna, renomear/reordenar um item de checklist e arrastar um card no calendário."
+    },
+    {
+      "quando": "2026-09-28T02:16:35.253Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "evidencias": [],
+      "texto": "Ajustes pedidos na revisão, publicados (versão 0.2.0-cloudflare-pages.2, commit fe42020):\n\n• Workspaces também nos Documentos: os projetos entram nos MESMOS workspaces dos quadros — o \"Delp\" é o mesmo nas duas listas. Seções por workspace, \"+ Projeto aqui\" e \"Mover para workspace\" no ⋯ do projeto. Banco: db/011-workspaces-documentos.sql, já aplicada.\n• Correção: o menu ⋯ de um cartão de quadro (e de projeto) às vezes abria atrás dos cartões vizinhos, e as opções não eram clicáveis. O efeito de levantar o cartão no hover prendia o menu dentro dele. Agora, com o menu aberto, o cartão fica acima dos vizinhos. Conferido no Edge: com a correção desligada o item cai sob o cartão de baixo; com ela, é clicável, e clicar fora fecha.\n\nContinua em revisão."
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-09-28T01:16:36.007Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-09-28T01:21:19.920Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "situação: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-09-28T01:54:22.340Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "situação: em-andamento → em-revisao"
+    }
+  ]
+}
