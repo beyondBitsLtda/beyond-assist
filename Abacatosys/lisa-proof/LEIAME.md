@@ -42,6 +42,21 @@ gasta a IA outra vez (`proof_desafios`, índice único em usuário + trilha + ti
 - Até 18 arquivos por projeto, para caber no limite de 50 chamadas de rede por requisição do
   Worker gratuito.
 
+## IA: sobrecarga não é cota
+
+`src/lib/gemini.js` (cópia do Abacato, com acréscimos) percorre as chaves de `GEMINI_API_KEYS`:
+
+| Resposta do Google | O que faz |
+|---|---|
+| 429 (cota) | põe a chave de castigo por 5 min **naquele modelo** e tenta a próxima |
+| 503/500/504 (sobrecarga) | não castiga; espera e tenta outra chave; após 2, vai para o **modelo reserva** |
+| 404 (modelo inexistente) | vai direto para o modelo reserva |
+
+Modelo principal: `GEMINI_CHAT_MODEL` (padrão `gemini-3.6-flash`). Reserva:
+`GEMINI_MODELO_RESERVA` (padrão `gemini-3.5-flash-lite`). No máximo 14 tentativas por chamada (o
+Worker aceita 50 chamadas de rede por requisição). Se um dia o reserva for desligado pelo Google
+(404), troque a variável — a lista de modelos ativos sai de `GET /v1beta/models`.
+
 ## Agenda
 
 A aba **Agenda** (`/agenda`, `GET /api/agenda?de=&ate=`) junta os compromissos de todas as trilhas

@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.2.0-cloudflare-pages.6",
+  "versao": "0.2.0-cloudflare-pages.7",
   "atualizadoEm": "2026-10-06",
   "compilacao": {
-    "numero": 6,
+    "numero": 7,
     "data": "2026-10-06",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.2.0-cloudflare-pages.7",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "A IA dizia \"a cota acabou\" quando o modelo do Google estava só sobrecarregado; agora tenta de novo e usa um modelo reserva.",
+      "itens": [
+        "Causa: o Google respondia 503 (modelo sobrecarregado, pico de demanda) e o código tratava isso como cota esgotada, punha a chave de castigo e desistia — com 35 chaves válidas e cota sobrando. Diagnóstico: 8 de 35 chaves com 503 e nenhuma com 429.",
+        "503/500/504 não castigam mais a chave: espera um pouco e tenta outra; depois de 2 sobrecargas passa para o modelo reserva (gemini-3.5-flash-lite, configurável em GEMINI_MODELO_RESERVA). Modelo inexistente (404) também vai direto para a reserva.",
+        "O castigo de cota (429) passou a valer por chave e por modelo, já que a cota do Google é por modelo.",
+        "Teto de 14 tentativas por chamada, para caber no limite de chamadas de rede do Worker.",
+        "Mensagem de erro honesta quando tudo falha: \"o modelo de IA está sobrecarregado agora (pico de uso no Google)\"."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.2.0-cloudflare-pages.6",
       "data": "2026-10-06",
