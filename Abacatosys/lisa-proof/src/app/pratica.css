@@ -1,0 +1,128 @@
+/* Prática: visão geral, quiz, exercício e projeto. */
+
+.pratica__neuro { display: flex; align-items: center; }
+
+.pratica__grade { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .pratica__grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.pratica__bloco {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 84px; text-align: left;
+  padding: 14px 16px; border-radius: var(--pf-raio); cursor: pointer;
+  background: var(--pf-superficie); color: var(--pf-tinta);
+  border: 2px solid var(--pf-linha); box-shadow: 0 4px 0 var(--pf-linha);
+  text-decoration: none; font: inherit;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.pratica__bloco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--pf-linha); }
+.pratica__bloco:disabled { cursor: progress; opacity: 0.75; }
+.pratica__bloco--feito { border-color: #EAB308; box-shadow: 0 4px 0 #CA8A04; }
+.pratica__bloco--andamento { border-color: var(--pf-verde); box-shadow: 0 4px 0 var(--pf-verde-forte); }
+.pratica__bloco--parcial { border-color: #F97316; box-shadow: 0 4px 0 #C2410C; }
+.pratica__icone { font-size: 30px; line-height: 1; flex: none; }
+.pratica__textos { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.pratica__textos small { color: var(--pf-tinta-2); font-size: 13px; }
+.pratica__pontos { color: var(--pf-verde-forte) !important; font-weight: 600; }
+.pratica__acao {
+  flex: none; padding: 6px 12px; border-radius: var(--pf-pilula);
+  background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); font-weight: 700; font-size: 13px;
+}
+
+/* ---- quiz ---- */
+.quiz { max-width: 680px; margin: 0 auto; display: grid; gap: 16px; }
+.quiz__topo { display: flex; align-items: center; gap: 12px; }
+.quiz__topo .pf-barra { margin-top: 0; height: 14px; background: var(--pf-calor-0); }
+.quiz__sair { font-size: 20px; color: var(--pf-tinta-3); text-decoration: none; padding: 6px; }
+.quiz__contador { font-weight: 700; color: var(--pf-tinta-2); font-variant-numeric: tabular-nums; }
+.quiz__neuro { display: flex; }
+.quiz__pergunta { font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.quiz__pergunta p { margin: 0 0 8px; }
+.quiz__pergunta pre, .desafio__texto pre {
+  margin: 8px 0; padding: 12px; border-radius: 10px; overflow-x: auto; font-size: 14px; font-weight: 400;
+  background: var(--pf-codigo-fundo); color: var(--pf-codigo-tinta);
+}
+.quiz__pergunta code, .quiz__opcao code, .desafio code { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 0.92em; }
+.quiz__pergunta :not(pre) > code, .quiz__opcao code, .desafio :not(pre) > code { background: var(--pf-linha); padding: 1px 5px; border-radius: 6px; }
+
+.quiz__opcoes { display: grid; gap: 10px; }
+.quiz__opcao {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; text-align: left;
+  padding: 12px 14px; border-radius: 14px; cursor: pointer; font-size: 15px;
+  background: var(--pf-superficie); color: var(--pf-tinta);
+  border: 2px solid var(--pf-linha); box-shadow: 0 4px 0 var(--pf-linha);
+}
+.quiz__opcao:hover:not(:disabled) { border-color: var(--pf-verde); }
+.quiz__opcao:disabled { cursor: default; }
+.quiz__letra {
+  flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  border: 2px solid var(--pf-linha); font-weight: 800; font-size: 13px; color: var(--pf-tinta-2);
+}
+.quiz__opcao--certa { border-color: var(--pf-verde); box-shadow: 0 4px 0 var(--pf-verde-forte); background: var(--pf-sucesso-fundo); }
+.quiz__opcao--certa .quiz__letra { background: var(--pf-verde); border-color: var(--pf-verde); color: #FFFFFF; }
+.quiz__opcao--errada { border-color: var(--pf-alerta); box-shadow: 0 4px 0 #991B1B; background: var(--pf-alerta-fundo); }
+.quiz__opcao--errada .quiz__letra { background: var(--pf-alerta); border-color: var(--pf-alerta); color: #FFFFFF; }
+
+.quiz__retorno {
+  position: sticky; bottom: calc(var(--pf-nav-altura) + 8px + env(safe-area-inset-bottom)); z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px; border-radius: var(--pf-raio); animation: neuro-balao 0.2s ease-out;
+}
+@media (min-width: 900px) { .quiz__retorno { bottom: 16px; } }
+.quiz__retorno p { margin: 4px 0 0; font-size: 14px; }
+.quiz__retorno div { flex: 1 1 240px; }
+.quiz__retorno--certo { background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
+.quiz__retorno--errado { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+.quiz__retorno--errado .pf-botao { background: var(--pf-alerta); color: #FFFFFF; }
+
+.quiz__fim { display: grid; justify-items: center; text-align: center; gap: 6px; padding: 24px 16px; }
+.quiz__placar { font-size: 56px; font-weight: 800; line-height: 1; }
+.quiz__placar small { font-size: 24px; color: var(--pf-tinta-2); }
+.quiz__revisao { display: grid; gap: 6px; }
+.quiz__lista-revisao { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.quiz__lista-revisao li { padding: 6px 10px; border-radius: 8px; }
+.quiz__ok { background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
+.quiz__erro { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+
+/* ---- exercício e projeto ---- */
+.desafio { display: grid; gap: 14px; max-width: 860px; }
+.desafio .pf-campo__rotulo { margin: 14px 0 6px; display: block; }
+.desafio__texto { font-size: 15px; }
+.desafio__texto h3 { font-size: 16px; margin: 12px 0 6px; }
+.desafio__texto p { margin: 0 0 8px; }
+.desafio__exemplo {
+  margin: 0; padding: 12px; border-radius: 10px; overflow-x: auto; white-space: pre-wrap;
+  background: var(--pf-superficie-2); font-family: ui-monospace, Consolas, monospace; font-size: 13px;
+}
+.desafio__dicas { display: grid; gap: 6px; margin-top: 12px; }
+.desafio__dicas details { background: var(--pf-superficie-2); border-radius: 10px; padding: 8px 12px; }
+.desafio__dicas summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.desafio__dicas p { margin: 6px 0 2px; font-size: 14px; }
+.desafio__requisitos { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+
+.entrega { display: grid; gap: 12px; }
+.entrega__codigo {
+  width: 100%; min-height: 260px; resize: vertical; padding: 14px; border-radius: 12px;
+  border: 1px solid var(--pf-linha); background: var(--pf-codigo-fundo); color: var(--pf-codigo-tinta);
+  font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 14px; line-height: 1.55; tab-size: 2;
+}
+
+.avaliacao { display: grid; gap: 10px; }
+.avaliacao__topo { display: flex; gap: 16px; align-items: flex-start; }
+.avaliacao__nota {
+  flex: none; width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 26px; font-weight: 800; border: 6px solid #F97316; color: #C2410C;
+}
+.avaliacao__nota--ok { border-color: var(--pf-verde); color: var(--pf-verde-forte); }
+.avaliacao__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.avaliacao__lista li { display: flex; gap: 10px; padding: 8px 10px; border-radius: 10px; font-size: 14px; }
+.avaliacao__lista small { display: block; color: var(--pf-tinta-2); margin-top: 2px; }
+.avaliacao__ok { background: var(--pf-sucesso-fundo); }
+.avaliacao__ok b { color: var(--pf-verde-forte); }
+.avaliacao__falta { background: var(--pf-alerta-fundo); }
+.avaliacao__falta b { color: var(--pf-alerta); }
+.avaliacao__simples { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
+.avaliacao .pf-campo__rotulo { margin: 6px 0 0; }
+
+/* ---- Hoje: o Neuro em destaque e a prática do dia ---- */
+.hoje__neuro { display: flex; align-items: center; margin-bottom: 16px; }
+.hoje__pratica { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .hoje__pratica { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -1,0 +1,139 @@
+/* O Neuro, o mascote, e o confete. Tudo em CSS: os humores são classes no elemento raiz e as
+ * partes do desenho que só existem num humor têm `v v-<humor>`. */
+
+.neuro {
+  --neuro-rosa: #F9A8D4;
+  --neuro-rosa-escuro: #BE185D;
+  --neuro-tinta: #831843;
+  display: inline-flex; align-items: center; gap: 12px; max-width: 100%;
+}
+.neuro--fala-cima { flex-direction: column-reverse; }
+.neuro--fala-esquerda { flex-direction: row-reverse; }
+
+.neuro__botao { flex: none; border: none; background: none; padding: 0; cursor: pointer; width: var(--neuro-tamanho); height: var(--neuro-tamanho); border-radius: 50%; }
+.neuro__svg { width: 100%; height: 100%; overflow: visible; display: block; }
+
+.neuro__sombra { fill: rgba(0, 0, 0, 0.14); }
+.neuro__traco { fill: none; stroke: var(--neuro-rosa-escuro); stroke-linecap: round; }
+.neuro__pe { fill: var(--neuro-rosa-escuro); }
+.neuro__mao { fill: var(--neuro-rosa); stroke: var(--neuro-rosa-escuro); stroke-width: 3; }
+.neuro__contorno circle { fill: var(--neuro-rosa-escuro); }
+.neuro__massa circle { fill: var(--neuro-rosa); }
+.neuro__dobras path { fill: none; stroke: #EC4899; stroke-width: 3.5; stroke-linecap: round; opacity: 0.55; }
+.neuro__brilho-pele { fill: #FFFFFF; opacity: 0.55; }
+.neuro__bochecha { fill: #F472B6; opacity: 0.75; }
+.neuro__olho { fill: #FFFFFF; stroke: var(--neuro-tinta); stroke-width: 2.5; }
+.neuro__pupila { fill: #1F2937; }
+.neuro__linha { fill: none; stroke: var(--neuro-tinta); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+.neuro__boca { fill: var(--neuro-tinta); }
+.neuro__lingua { fill: #F472B6; }
+.neuro__lagrima { fill: #60A5FA; }
+.neuro__estrelas path { fill: #EAB308; }
+.neuro__zzz text { fill: #9CA3AF; font: 700 16px Inter, system-ui, sans-serif; }
+.neuro__pensar circle { fill: #9CA3AF; }
+
+/* Só aparece o que é do humor atual. */
+.neuro .v { display: none; }
+.neuro--normal .v-normal, .neuro--feliz .v-feliz, .neuro--comemorando .v-comemorando,
+.neuro--triste .v-triste, .neuro--pensando .v-pensando, .neuro--dormindo .v-dormindo,
+.neuro--surpreso .v-surpreso { display: inline; }
+
+/* Pontos de giro em coordenadas do desenho. */
+.neuro__boneco { transform-box: view-box; transform-origin: 100px 182px; }
+.neuro__braco--esq { transform-box: view-box; transform-origin: 36px 118px; transition: transform 0.3s ease; }
+.neuro__braco--dir { transform-box: view-box; transform-origin: 164px 118px; transition: transform 0.3s ease; }
+.neuro__olhos { transform-box: view-box; transform-origin: 100px 100px; }
+.neuro__pupilas { transition: transform 0.3s ease; }
+
+/* ---- animações ---- */
+@keyframes neuro-respirar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes neuro-piscar { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+@keyframes neuro-pular {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-18px) scale(1.03, 0.97); }
+  55% { transform: translateY(0) scale(1.06, 0.92); }
+  75% { transform: translateY(-5px) scale(1); }
+}
+@keyframes neuro-festa {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  25% { transform: translateY(-16px) rotate(-6deg); }
+  50% { transform: translateY(0) rotate(0); }
+  75% { transform: translateY(-16px) rotate(6deg); }
+}
+@keyframes neuro-acenar { 0%, 100% { transform: rotate(-70deg); } 50% { transform: rotate(-110deg); } }
+@keyframes neuro-bracos-esq { 0%, 100% { transform: rotate(80deg); } 50% { transform: rotate(115deg); } }
+@keyframes neuro-bracos-dir { 0%, 100% { transform: rotate(-80deg); } 50% { transform: rotate(-115deg); } }
+@keyframes neuro-cutucar { 0% { transform: scale(1); } 30% { transform: scale(1.12, 0.84); } 60% { transform: scale(0.94, 1.08); } 100% { transform: scale(1); } }
+@keyframes neuro-cintilar { 0%, 100% { opacity: 0; transform: scale(0.6); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes neuro-zzz { 0% { opacity: 0; transform: translate(0, 6px); } 40% { opacity: 1; } 100% { opacity: 0; transform: translate(8px, -14px); } }
+@keyframes neuro-pontinhos { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+@keyframes neuro-tremer { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
+.neuro__boneco { animation: neuro-respirar 3.2s ease-in-out infinite; }
+.neuro__olhos { animation: neuro-piscar 4.6s infinite; }
+
+.neuro--feliz .neuro__boneco { animation: neuro-pular 0.7s ease-in-out 2, neuro-respirar 3.2s ease-in-out 1.4s infinite; }
+.neuro--feliz .neuro__braco--dir { animation: neuro-acenar 0.5s ease-in-out 4; transform: rotate(-70deg); }
+
+.neuro--comemorando .neuro__boneco { animation: neuro-festa 0.9s ease-in-out infinite; }
+.neuro--comemorando .neuro__braco--esq { animation: neuro-bracos-esq 0.45s ease-in-out infinite; }
+.neuro--comemorando .neuro__braco--dir { animation: neuro-bracos-dir 0.45s ease-in-out infinite; }
+.neuro__estrelas path { transform-box: fill-box; transform-origin: center; animation: neuro-cintilar 1.2s ease-in-out infinite; }
+.neuro__estrelas path:nth-child(2) { animation-delay: 0.3s; }
+.neuro__estrelas path:nth-child(3) { animation-delay: 0.6s; }
+.neuro__estrelas path:nth-child(4) { animation-delay: 0.9s; }
+
+.neuro--triste .neuro__boneco { animation: neuro-respirar 5s ease-in-out infinite; transform: translateY(3px); }
+.neuro--triste .neuro__braco--esq { transform: rotate(-12deg); }
+.neuro--triste .neuro__braco--dir { transform: rotate(12deg); }
+
+.neuro--pensando .neuro__pupilas { transform: translate(3px, -4px); }
+.neuro--pensando .neuro__braco--dir { transform: rotate(-125deg); }
+.neuro__pensar circle { animation: neuro-pontinhos 1.2s ease-in-out infinite; }
+.neuro__pensar circle:nth-child(2) { animation-delay: 0.2s; }
+.neuro__pensar circle:nth-child(3) { animation-delay: 0.4s; }
+
+.neuro--dormindo .neuro__boneco { animation: neuro-respirar 5.5s ease-in-out infinite; }
+.neuro--dormindo .neuro__olhos { animation: none; }
+.neuro__zzz text { animation: neuro-zzz 2.4s ease-in-out infinite; }
+.neuro__zzz text:nth-child(2) { animation-delay: 0.6s; }
+.neuro__zzz text:nth-child(3) { animation-delay: 1.2s; }
+
+.neuro--surpreso .neuro__boneco { animation: neuro-tremer 0.25s ease-in-out 3, neuro-respirar 3.2s ease-in-out 0.8s infinite; }
+.neuro--surpreso .neuro__braco--esq { transform: rotate(40deg); }
+.neuro--surpreso .neuro__braco--dir { transform: rotate(-40deg); }
+
+.neuro--cutucado .neuro__svg { animation: neuro-cutucar 0.45s ease-out; transform-origin: 50% 90%; }
+
+/* ---- balão de fala ---- */
+.neuro__fala {
+  position: relative; min-width: 0; max-width: 300px;
+  background: var(--pf-superficie); color: var(--pf-tinta);
+  border: 2px solid var(--pf-linha); border-radius: 18px;
+  padding: 10px 14px; font-size: 14px; font-weight: 600; line-height: 1.4;
+  box-shadow: var(--pf-sombra);
+  animation: neuro-balao 0.25s ease-out;
+}
+@keyframes neuro-balao { from { opacity: 0; transform: translateY(4px) scale(0.96); } to { opacity: 1; transform: none; } }
+.neuro--fala-direita .neuro__fala::before, .neuro--fala-esquerda .neuro__fala::before {
+  content: ""; position: absolute; top: 50%; width: 12px; height: 12px; background: inherit;
+  border: inherit; border-width: 0 0 2px 2px; transform: translateY(-50%) rotate(45deg);
+}
+.neuro--fala-direita .neuro__fala::before { left: -8px; }
+.neuro--fala-esquerda .neuro__fala::before { right: -8px; transform: translateY(-50%) rotate(-135deg); }
+
+/* ---- confete ---- */
+.confete { position: fixed; inset: 0; pointer-events: none; z-index: 60; overflow: hidden; }
+.confete__pedaco {
+  position: absolute; top: -12px; width: 9px; height: 14px; border-radius: 2px;
+  animation-name: confete-cair; animation-timing-function: cubic-bezier(0.25, 0.6, 0.4, 1); animation-fill-mode: forwards;
+}
+@keyframes confete-cair {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  100% { transform: translate(var(--deriva), 105vh) rotate(var(--giro)); opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neuro *, .neuro__svg, .neuro__fala { animation: none !important; transition: none !important; }
+  .confete { display: none; }
+}

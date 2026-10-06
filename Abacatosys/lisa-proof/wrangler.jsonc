@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lisa-proof",
+
+  // A mesma conta do Abacato e da Lisa (beyondbitsLisa). Precisa estar escrito porque a
+  // credencial deste computador enxerga mais de uma conta, e aí o wrangler se recusa a adivinhar.
+  "account_id": "7e4b10d80b08fef1f2fcca583577bf2d",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-09-01",
+  // nodejs_compat: o adaptador precisa dos módulos do Node.
+  // global_fetch_strictly_public: um fetch do Worker para o próprio domínio sai para a internet
+  // em vez de dar laço dentro da Cloudflare.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "workers_dev": true,
+  // Sem isto, todo `wrangler deploy` APAGA as variáveis configuradas no painel.
+  "keep_vars": true,
+  "observability": { "enabled": true },
+  "routes": [{ "pattern": "proof.beyond.dev.br", "custom_domain": true }]
+}

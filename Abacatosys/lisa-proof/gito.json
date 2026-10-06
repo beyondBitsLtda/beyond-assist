@@ -1,0 +1,173 @@
+{
+  "$gito": 1,
+  "aplicacao": {
+    "nome": "Lisa_Proof",
+    "codigo": "PROOF",
+    "descricao": "App de estudo de programação no estilo Duolingo: transforma os quadros STUDY do Abacato em trilhas com metas diárias, semanais e mensais, pontos e ofensiva de dias seguidos.",
+    "tipo": "Aplicação web",
+    "situacao": "em homologação",
+    "responsavel": "Brayan Rodrigues",
+    "equipe": "Beyond Bits"
+  },
+  "versao": "0.2.0-cloudflare-pages.3",
+  "atualizadoEm": "2026-10-06",
+  "compilacao": { "numero": 3, "data": "2026-10-06", "artefato": "" },
+  "historico": [
+    {
+      "versao": "0.2.0-cloudflare-pages.3",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Lembretes por notificação push e app instalável no celular.",
+      "itens": [
+        "Na tela Progresso, o botão Ativar lembretes inscreve o aparelho para receber notificações (com explicação para iPhone, onde só funciona com o app instalado).",
+        "O script scripts/lembretes.mjs, no relógio do iMac (meio-dia e 20h), avisa quando a ofensiva está em risco ou o quiz do dia está pendente, no máximo uma vez por tipo por dia, e apaga inscrições expiradas.",
+        "App instalável (manifesto e ícones): abre em tela cheia pela tela de início do celular.",
+        "A chave privada dos lembretes fica num arquivo próprio (.env.lembretes), usado só pelo script: não vai para o Worker."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.2",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Fases 2 e 3: parte prática (quiz e exercício diários, projetos da semana e do mês com GitHub), mapa da trilha no estilo Duolingo e o mascote Neuro.",
+      "itens": [
+        "Nova aba Prática: por trilha, o quiz e o exercício do dia e os projetos da semana e do mês, com a situação de cada um.",
+        "Quiz do dia: 5 perguntas de múltipla escolha geradas pela IA sobre o assunto atual, uma por vez, com retorno e explicação na hora. A correção é feita no servidor (o gabarito não vai para a tela antes da resposta).",
+        "Exercício do dia: enunciado, exemplo, dicas e critérios gerados pela IA; a pessoa escreve a solução num editor e a Lisa corrige lendo o código (nota, comentário, pontos fortes e melhorias). Até 3 tentativas, vale a melhor nota.",
+        "Projetos da semana e do mês: a IA monta o projeto com os assuntos do período; a entrega é o link de um repositório PÚBLICO do GitHub, que a Lisa lê e avalia requisito por requisito. Até 5 tentativas.",
+        "Pontos da prática: 5 por acerto no quiz (+10 se gabaritar), até 40 no exercício, até 150 no projeto da semana e até 400 no do mês. Tudo conta para a meta do dia e para a ofensiva.",
+        "Mapa da trilha no estilo Duolingo: caminho desenhado em zigue-zague, assuntos como paradas (feito, atual, atrasado, trancado), baú do projeto no fim de cada semana, troféu do projeto do mês e bandeira de chegada. Tocar numa parada abre o assunto com as tarefas para marcar ali mesmo.",
+        "Neuro, o mascote: um cérebro em vetor com sete humores animados (normal, feliz, comemorando, triste, pensando, dormindo, surpreso) que reage a tarefas marcadas, assuntos concluídos, meta batida, acertos e erros no quiz e avaliações; confete nas conquistas grandes.",
+        "Cobrança dentro do app: o Neuro avisa na tela Hoje e na Prática quando a ofensiva está em risco ou o quiz do dia está pendente.",
+        "Tela Hoje mostra a prática do dia de cada trilha; Progresso conta quizzes, exercícios e projetos."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.1.0-cloudflare-pages.1",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Primeira versão (fase 1): trilhas de estudo em cima dos quadros STUDY do Abacato, com a parte teórica, pontos, ofensiva e metas.",
+      "itens": [
+        "Login com a mesma conta do Abacato (e-mail e senha), com sessão própria da Lisa_Proof.",
+        "Lista os quadros do Abacato da pessoa cujo nome começa com STUDY; o nome sem o prefixo vira o tema.",
+        "Montagem da trilha: a IA (Gemini) ordena os cards do mais básico ao mais avançado, ignorando as colunas, e distribui nos dias de estudo escolhidos. Sem IA, segue a ordem do quadro.",
+        "Tela Hoje: assuntos do dia, atrasados e concluídos hoje, com as checklists marcáveis — marcar aqui marca o mesmo item no Abacato.",
+        "Assunto com todas as tarefas marcadas é concluído no Abacato; assunto sem tarefas pode ser concluído à mão.",
+        "A Lisa monta a checklist de teoria de um assunto (documentação, fórum, definição com a IA, resumo) e grava no card.",
+        "Explicar com a Lisa: definição, exemplo de código, erros comuns e perguntas de autoavaliação, guardadas para não gastar IA de novo.",
+        "Pontos: 10 por tarefa, 30 por assunto concluído e 20 de bônus ao bater a meta do dia; nível a cada 200 pontos.",
+        "Ofensiva de dias seguidos (com aviso de risco quando o dia ainda não teve estudo) e recorde.",
+        "Metas da semana e do mês em assuntos planejados, contando os atrasados.",
+        "Trilha completa por semana, replanejamento a partir de hoje (com ou sem IA) e ajuste dos dias de estudo.",
+        "Tela Progresso: mapa das últimas 16 semanas, nível, totais, atividade recente e escolha da meta diária.",
+        "Interface responsiva: barra lateral no computador e abas inferiores no celular."
+      ],
+      "issues": []
+    }
+  ],
+  "ficha": {
+    "escopo": {
+      "objetivo": "Criar o hábito de estudo diário de programação, usando como conteúdo os quadros de estudo que a pessoa já organiza no Abacato.",
+      "inclui": [
+        "Quadros do Abacato cujo nome começa com STUDY e que pertencem à pessoa logada (dono).",
+        "Trilha progressiva por quadro, montada pela IA ou pela ordem do quadro, com agenda nos dias de estudo escolhidos.",
+        "Parte teórica: marcar itens de checklist e concluir assuntos direto do app, refletindo no Abacato.",
+        "Checklist de teoria e explicação do assunto geradas pela IA.",
+        "Parte prática: quiz e exercício diários e projetos da semana e do mês, gerados e corrigidos pela IA.",
+        "Avaliação de projetos a partir de repositórios públicos do GitHub.",
+        "Pontos, nível, ofensiva de dias seguidos, meta diária e metas de semana e mês.",
+        "Mapa da trilha no estilo Duolingo e o mascote Neuro, com animações que reagem ao progresso.",
+        "Lembretes por notificação push (ofensiva em risco, quiz pendente), enviados pelo relógio do iMac.",
+        "Uso no computador e no celular, instalável como app."
+      ],
+      "naoInclui": [
+        "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
+        "Não lê repositórios privados do GitHub, nem com token configurado.",
+        "Lembretes dependem do iMac ligado: o envio roda no relógio (crontab) dele, não na Cloudflare.",
+        "Quadros em que a pessoa é só membro (não dona) não viram trilha.",
+        "Não cria nem apaga cards ou quadros: o conteúdo é organizado no Abacato.",
+        "Não conclui cards recorrentes do Abacato (o ciclo deles é do Abacato).",
+        "Não tem cadastro próprio: a conta é criada no Abacato."
+      ]
+    },
+    "stack": [
+      "Next.js 15 (App Router) e React 19, em JavaScript",
+      "Cloudflare Workers via @opennextjs/cloudflare",
+      "@supabase/supabase-js (PostgREST com a service role)",
+      "Google Gemini pela API REST, com rodízio de chaves e respostas em JSON com esquema",
+      "API do GitHub (leitura de repositórios públicos)",
+      "Web Push (VAPID) com a biblioteca web-push, no script de lembretes do iMac; service worker e manifesto de app",
+      "Animações em SVG e CSS, sem biblioteca (mascote Neuro e mapa da trilha)",
+      "PBKDF2 e HMAC via WebCrypto (login e sessão, mesmo esquema do Abacato)"
+    ],
+    "arquitetura": {
+      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
+      "diagramas": [
+        {
+          "titulo": "Visão geral",
+          "mermaid": "flowchart LR\n  U[Navegador / celular] --> W[Worker lisa-proof\\nproof.beyond.dev.br]\n  W -->|HTTP / PostgREST| T[Túnel\\nbanco.beyond.dev.br]\n  T --> PG[(Postgres do iMac\\ntabelas abacato_ e proof_)]\n  A[Abacato\\nabacato.beyond.dev.br] --> T\n  W --> G[Google Gemini]"
+        }
+      ]
+    },
+    "hospedagem": [
+      {
+        "ambiente": "Produção",
+        "onde": "Cloudflare Workers (plano gratuito), conta beyondbitsLisa, Worker lisa-proof, publicado com npm run publicar",
+        "url": "https://proof.beyond.dev.br/",
+        "verificar": true
+      },
+      {
+        "ambiente": "Produção (endereço reserva)",
+        "onde": "Cloudflare Workers, mesmo Worker lisa-proof no endereço .workers.dev",
+        "url": "https://lisa-proof.beyondbitslisa.workers.dev/",
+        "verificar": true
+      },
+      {
+        "ambiente": "Relógio dos lembretes",
+        "onde": "iMac do servidor de casa (Zorin OS), crontab ao meio-dia e às 20h rodando npm run lembretes na pasta lisa-proof",
+        "url": "",
+        "verificar": false
+      }
+    ],
+    "bancoDeDados": [
+      {
+        "nome": "Banco da Lisa (servidor de casa)",
+        "tipo": "PostgreSQL 17.6 em Supabase auto-hospedado (Docker)",
+        "servidor": "banco.beyond.dev.br",
+        "porta": 443,
+        "base": "postgres",
+        "acesso": "",
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001-proof.sql, db/002-pratica.sql e db/003-lembretes.sql). Acesso só pelo túnel da Cloudflare, em HTTPS."
+      }
+    ],
+    "integracoes": [
+      {
+        "nome": "Abacato",
+        "descricao": "Fonte dos quadros STUDY e das contas de usuário. A Lisa_Proof marca itens e conclui cards direto nas tabelas do Abacato.",
+        "url": "https://abacato.beyond.dev.br"
+      },
+      {
+        "nome": "Google Gemini",
+        "descricao": "Monta a ordem da trilha, gera checklists de teoria, explica os assuntos, gera quiz, exercício e projetos e corrige as entregas.",
+        "url": "https://ai.google.dev"
+      },
+      {
+        "nome": "GitHub",
+        "descricao": "Leitura de repositórios públicos entregues nos projetos da semana e do mês, para a avaliação da IA. GITHUB_TOKEN é opcional e só aumenta o limite de consultas.",
+        "url": "https://api.github.com"
+      }
+    ],
+    "links": [
+      { "titulo": "Repositório", "url": "https://github.com/beyondBitsLtda/beyond-assist/tree/cloudflare-pages/Abacatosys/lisa-proof" },
+      { "titulo": "Produção", "url": "https://proof.beyond.dev.br/" }
+    ],
+    "contatos": [
+      { "papel": "Responsável técnico", "nome": "Brayan Rodrigues" }
+    ]
+  }
+}
