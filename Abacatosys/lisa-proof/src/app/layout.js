@@ -3,6 +3,7 @@ import "./neuro.css";
 import "./mapa.css";
 import "./pratica.css";
 import "./festa.css";
+import "./agenda.css";
 
 export const metadata = {
   title: "Lisa_Proof",

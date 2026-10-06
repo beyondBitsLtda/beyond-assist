@@ -17,6 +17,7 @@ import {
 } from "../src/dominio/pratica.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
 import { assuntosParaODuracao, nomeDoQuadro, validarCurso, assuntosEmOrdem, resumoDoCurso } from "../src/dominio/curso.js";
+import { montarAgenda, itensDoDia, gradeDoMes, mesVizinho } from "../src/dominio/agenda.js";
 
 let passou = 0;
 function caso(nome, fn) {
@@ -291,6 +292,50 @@ caso("teto de 40 assuntos", () => {
   const muitos = Array.from({ length: 60 }, (_, i) => ({ titulo: `a${i}` }));
   const r = validarCurso({ tema: "X", modulos: [{ nome: "A", assuntos: muitos }] });
   assert.equal(assuntosEmOrdem(r.proposta).length, 40);
+});
+
+console.log("\nagenda");
+const agendaBase = {
+  trilhas: [{ id: "t", tema: "JS" }],
+  etapas: new Map([["t", [
+    { cardId: "a", titulo: "Antigo atrasado", inicio: "2026-09-21", fim: "2026-09-22", concluido: false },
+    { cardId: "b", titulo: "De três dias", inicio: "2026-10-06", fim: "2026-10-08", concluido: false },
+    { cardId: "c", titulo: "Feito", inicio: "2026-10-05", fim: "2026-10-05", concluido: true },
+  ]]]),
+  desafios: [
+    { id: "q1", trilhaId: "t", tipo: "quiz", periodo: "2026-10-05", status: "concluido", nota: 80 },
+    { id: "p1", trilhaId: "t", tipo: "projeto_semanal", periodo: "2026-09-21", status: "concluido", nota: 90 },
+  ],
+  hoje: "2026-10-07",
+};
+caso("agenda: atrasado de fora do período entra; assunto de 3 dias aparece em cada dia", () => {
+  const itens = montarAgenda({ ...agendaBase, de: "2026-10-05", ate: "2026-10-11" });
+  assert.ok(itens.some((x) => x.chave === "a-a" && x.situacao === "atrasado"));
+  for (const d of ["2026-10-06", "2026-10-07", "2026-10-08"]) assert.ok(itensDoDia(itens, d).some((x) => x.chave === "a-b"), d);
+  assert.ok(!itensDoDia(itens, "2026-10-09").some((x) => x.chave === "a-b"));
+});
+caso("agenda: projeto aparece só no dia da entrega, com a situação certa", () => {
+  const itens = montarAgenda({ ...agendaBase, de: "2026-09-21", ate: "2026-10-11" });
+  const semanais = itens.filter((x) => x.tipo === "projeto_semanal");
+  assert.deepEqual(semanais.map((x) => [x.fim, x.situacao]), [
+    ["2026-09-27", "feito"], ["2026-10-04", "atrasado"], ["2026-10-11", "agora"],
+  ]);
+  assert.equal(itensDoDia(itens, "2026-10-10").filter((x) => x.tipo === "projeto_semanal").length, 0);
+});
+caso("agenda: quiz de hoje aparece mesmo antes de ser gerado; o de outro dia vem do desafio", () => {
+  const itens = montarAgenda({ ...agendaBase, de: "2026-10-05", ate: "2026-10-11" });
+  assert.ok(itensDoDia(itens, "2026-10-07").some((x) => x.tipo === "quiz" && x.situacao === "agora" && x.href === "/pratica"));
+  assert.ok(itensDoDia(itens, "2026-10-05").some((x) => x.tipo === "quiz" && x.situacao === "feito"));
+});
+caso("agenda: o mais urgente primeiro no dia", () => {
+  const itens = montarAgenda({ ...agendaBase, de: "2026-10-05", ate: "2026-10-11" });
+  assert.equal(itensDoDia(itens, "2026-10-07")[0].situacao, "agora");
+});
+caso("grade do mês vai de segunda a domingo", () => {
+  const g = gradeDoMes("2026-10-15");
+  assert.deepEqual([g.de, g.ate, g.dias.length], ["2026-09-28", "2026-11-01", 35]);
+  assert.equal(mesVizinho("2026-12-10", 1), "2027-01-01");
+  assert.equal(mesVizinho("2026-01-10", -1), "2025-12-01");
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.2.0-cloudflare-pages.5",
+  "versao": "0.2.0-cloudflare-pages.6",
   "atualizadoEm": "2026-10-06",
   "compilacao": {
-    "numero": 5,
+    "numero": 6,
     "data": "2026-10-06",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.2.0-cloudflare-pages.6",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Agenda: todos os compromissos de todas as trilhas num calendário (mês) ou numa lista (atrasados e próximos 14 dias).",
+      "itens": [
+        "Nova aba Agenda (na barra lateral e nas abas do celular).",
+        "Modo Mês: calendário de segunda a domingo com os assuntos nos dias planejados, as entregas dos projetos (semana no domingo, mês no último dia), o quiz e o exercício do dia e o 🔥 nos dias estudados; tocar no dia mostra os detalhes. No celular, cada compromisso vira um tracinho colorido; no computador, uma etiqueta com o nome.",
+        "Modo Lista: os atrasados no topo (com o Neuro cobrando) e os próximos 14 dias agrupados por dia.",
+        "Cada trilha tem uma cor e dá para esconder trilhas pelo filtro; cada compromisso leva ao lugar certo (mapa da trilha, prática ou o desafio).",
+        "A agenda é montada a partir das etapas, dos desafios e dos eventos que já existem: não há tabela nova, e ela acompanha qualquer replanejamento."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.2.0-cloudflare-pages.5",
       "data": "2026-10-06",
@@ -118,6 +133,7 @@
         "Avaliação de projetos a partir de repositórios públicos do GitHub.",
         "Pontos, nível, ofensiva de dias seguidos, meta diária e metas de semana e mês.",
         "Conquistas da conta (valem pontos no total) e comemorações em tela cheia de ofensiva, meta e conquista.",
+        "Agenda com todos os compromissos das trilhas, em calendário mensal ou lista.",
         "Tema escuro (padrão) e claro.",
         "Mapa da trilha no estilo Duolingo e o mascote Neuro, com animações que reagem ao progresso.",
         "Lembretes por notificação push (ofensiva em risco, quiz pendente), enviados pelo relógio do iMac.",

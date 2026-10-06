@@ -42,6 +42,18 @@ gasta a IA outra vez (`proof_desafios`, índice único em usuário + trilha + ti
 - Até 18 arquivos por projeto, para caber no limite de 50 chamadas de rede por requisição do
   Worker gratuito.
 
+## Agenda
+
+A aba **Agenda** (`/agenda`, `GET /api/agenda?de=&ate=`) junta os compromissos de todas as trilhas
+ativas: assuntos nos dias planejados, entregas dos projetos (semana no domingo, mês no último
+dia), quiz e exercício do dia e os dias estudados (🔥). Dois modos: **Mês** (calendário; tocar no
+dia mostra os detalhes) e **Lista** (atrasados e próximos 14 dias).
+
+Não há tabela de agenda: `montarAgenda` (`src/dominio/agenda.js`) calcula tudo a partir das
+etapas, dos desafios e dos eventos — por isso ela já reflete qualquer replanejamento. Atrasado
+continua aparecendo até ser feito, mesmo fora do período pedido. A cor de cada trilha segue a
+ordem de criação, para não mudar entre visitas.
+
 ## Criar curso com a Lisa
 
 Em **Trilhas → Criar curso com a Lisa** (`/trilhas/novo`): tema, nível, objetivo opcional, duração

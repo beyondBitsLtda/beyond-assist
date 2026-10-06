@@ -1,0 +1,75 @@
+/* A agenda: calendário do mês, painel do dia e lista. */
+
+.agenda__modos { display: inline-flex; padding: 4px; gap: 4px; border-radius: 9999px; background: var(--pf-superficie-2); border: 1px solid var(--pf-linha); }
+.agenda__modo { border: none; background: none; color: var(--pf-tinta-2); font-weight: 700; padding: 8px 18px; border-radius: 9999px; cursor: pointer; min-height: 36px; }
+.agenda__modo[aria-selected="true"] { background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); }
+
+.agenda__filtros { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.agenda__filtro {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 12px;
+  border-radius: 9999px; border: 1px solid var(--pf-linha); background: var(--pf-superficie);
+  color: var(--pf-tinta); font-weight: 600; font-size: 13px; cursor: pointer;
+}
+.agenda__filtro[aria-pressed="false"] { opacity: 0.45; text-decoration: line-through; }
+.agenda__bolinha { width: 10px; height: 10px; border-radius: 50%; background: var(--cor); }
+
+.agenda__layout { display: grid; gap: 16px; }
+@media (min-width: 1440px) { .agenda__layout { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; } }
+.agenda__painel { display: grid; gap: 8px; }
+@media (min-width: 1440px) { .agenda__painel { position: sticky; top: 16px; } }
+
+.agenda__navegacao { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.agenda__mes-nome { flex: 1; text-align: center; font-size: 17px; }
+
+.agenda__mes { padding: 8px; }
+.agenda__grade { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.agenda__cabeca { text-align: center; font-size: 12px; font-weight: 700; color: var(--pf-tinta-2); padding: 4px 0; }
+
+.agenda__dia {
+  display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 0;
+  min-height: 58px; padding: 5px; border-radius: 10px; text-align: left; cursor: pointer;
+  border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta);
+}
+.agenda__dia:hover { border-color: var(--pf-verde); }
+.agenda__dia--fora { opacity: 0.45; }
+.agenda__dia--atrasado { background: var(--pf-alerta-fundo); }
+.agenda__dia--hoje { border: 2px solid var(--pf-verde); }
+.agenda__dia--selecionado { box-shadow: 0 0 0 3px var(--pf-verde) inset; }
+.agenda__numero { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; }
+.agenda__fogo { font-size: 11px; }
+
+/* No celular, cada compromisso vira um tracinho colorido; o texto fica no painel do dia. */
+.agenda__chips { display: flex; flex-wrap: wrap; gap: 2px; min-width: 0; }
+.agenda__chip { width: 14px; height: 5px; border-radius: 3px; background: var(--cor); }
+.agenda__chip--feito { opacity: 0.35; }
+.agenda__chip--atrasado { box-shadow: 0 0 0 1.5px var(--pf-alerta); }
+.agenda__chip-texto { display: none; }
+.agenda__mais { font-size: 10px; font-weight: 700; color: var(--pf-tinta-2); line-height: 5px; }
+
+@media (min-width: 760px) {
+  .agenda__dia { min-height: 108px; }
+  .agenda__chips { flex-direction: column; flex-wrap: nowrap; }
+  .agenda__chip {
+    width: auto; height: auto; padding: 2px 6px; border-radius: 6px; min-width: 0;
+    background: color-mix(in srgb, var(--cor) 18%, transparent); border-left: 3px solid var(--cor);
+  }
+  .agenda__chip-texto { display: block; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agenda__chip--feito .agenda__chip-texto { text-decoration: line-through; }
+  .agenda__mais { line-height: 1.2; padding-left: 4px; }
+}
+
+.agenda__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.agenda__item {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px;
+  text-decoration: none; color: var(--pf-tinta); background: var(--pf-superficie);
+  border: 1px solid var(--pf-linha); border-left: 5px solid var(--cor);
+}
+.agenda__item:hover { border-color: var(--cor); }
+.agenda__item--feito, .agenda__item--perdido { opacity: 0.6; }
+.agenda__item--feito strong, .agenda__item--perdido strong { text-decoration: line-through; }
+.agenda__icone { font-size: 22px; flex: none; }
+.agenda__textos { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.agenda__textos strong { font-size: 14px; line-height: 1.3; }
+.agenda__textos small { font-size: 12px; color: var(--pf-tinta-2); }
+.agenda__titulo-atrasado { color: var(--pf-alerta); }
+.agenda__neuro { display: flex; margin-bottom: 4px; }

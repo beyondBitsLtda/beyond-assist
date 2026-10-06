@@ -11,6 +11,10 @@ export const IconeTrilhas = () => (
   <svg {...base}><circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" /><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7" /></svg>
 );
 
+export const IconeAgenda = () => (
+  <svg {...base}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4M7.5 14h2M11 14h2M14.5 14h2M7.5 17.5h2" /></svg>
+);
+
 export const IconePratica = () => (
   <svg {...base}><path d="M13 2L4 14h7l-1 8 9-12h-7z" /></svg>
 );

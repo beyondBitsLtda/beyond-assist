@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconeHoje, IconeTrilhas, IconePratica, IconeProgresso, Marca } from "./Icones.js";
+import { IconeHoje, IconeTrilhas, IconeAgenda, IconePratica, IconeProgresso, Marca } from "./Icones.js";
 import { Confete } from "./Neuro.js";
 import Celebracao from "./Celebracao.js";
 import BotaoDeTema from "./BotaoDeTema.js";
@@ -10,6 +10,7 @@ import BotaoDeTema from "./BotaoDeTema.js";
 const ITENS = [
   { href: "/", rotulo: "Hoje", Icone: IconeHoje },
   { href: "/trilhas", rotulo: "Trilhas", Icone: IconeTrilhas },
+  { href: "/agenda", rotulo: "Agenda", Icone: IconeAgenda },
   { href: "/pratica", rotulo: "Prática", Icone: IconePratica },
   { href: "/progresso", rotulo: "Progresso", Icone: IconeProgresso },
 ];
