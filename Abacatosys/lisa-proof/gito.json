@@ -9,10 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.2.0-cloudflare-pages.3",
+  "versao": "0.2.0-cloudflare-pages.4",
   "atualizadoEm": "2026-10-06",
-  "compilacao": { "numero": 3, "data": "2026-10-06", "artefato": "" },
+  "compilacao": { "numero": 4, "data": "2026-10-06", "artefato": "" },
   "historico": [
+    {
+      "versao": "0.2.0-cloudflare-pages.4",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Tema escuro, comemorações em tela cheia (ofensiva, meta do dia, conquista) e conquistas da conta que somam pontos.",
+      "itens": [
+        "Tema escuro como padrão, com botão para trocar entre escuro, claro e o do sistema (na barra lateral e no topo do celular). O tema é aplicado antes da página pintar, sem piscar.",
+        "Comemoração em tela cheia quando a ofensiva sobe (chama animada, número que vira e a semana acendendo), quando a meta do dia é batida (anel que se completa) e quando uma conquista é desbloqueada (medalha que cai girando e brilha). Vêm em fila, com confete e o Neuro.",
+        "Conquistas da conta, independentes de quadro: ofensiva (3 a 100 dias), metas do dia batidas, dias estudados, tarefas, assuntos, quizzes, quizzes gabaritados, exercícios e projetos aprovados e trilhas concluídas (300 pontos por trilha). Cada uma vale pontos no total e no nível, uma vez só.",
+        "Vitrine de conquistas na tela Progresso, por categoria, com o progresso das que faltam.",
+        "Pontos de conquista não contam para a meta do dia (senão uma conquista bateria a meta sozinha)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.2.0-cloudflare-pages.3",
       "data": "2026-10-06",
@@ -81,6 +96,8 @@
         "Parte prática: quiz e exercício diários e projetos da semana e do mês, gerados e corrigidos pela IA.",
         "Avaliação de projetos a partir de repositórios públicos do GitHub.",
         "Pontos, nível, ofensiva de dias seguidos, meta diária e metas de semana e mês.",
+        "Conquistas da conta (valem pontos no total) e comemorações em tela cheia de ofensiva, meta e conquista.",
+        "Tema escuro (padrão) e claro.",
         "Mapa da trilha no estilo Duolingo e o mascote Neuro, com animações que reagem ao progresso.",
         "Lembretes por notificação push (ofensiva em risco, quiz pendente), enviados pelo relógio do iMac.",
         "Uso no computador e no celular, instalável como app."
@@ -142,7 +159,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001-proof.sql, db/002-pratica.sql e db/003-lembretes.sql). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/004). Acesso só pelo túnel da Cloudflare, em HTTPS."
       }
     ],
     "integracoes": [

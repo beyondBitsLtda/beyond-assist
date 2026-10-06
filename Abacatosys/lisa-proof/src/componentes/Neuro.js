@@ -28,10 +28,25 @@ export function comemorar(fala) {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("neuro-confete"));
 }
 
+/**
+ * Abre a comemoração em tela cheia (componente Celebracao, na moldura) para o que o servidor
+ * devolveu: ofensiva que subiu, meta batida, conquistas. Devolve se houve o que comemorar.
+ */
+export function celebrar(r) {
+  if (!r || typeof window === "undefined") return false;
+  const cartoes = [];
+  if (r.ofensivaAumentou && r.ofensiva) cartoes.push({ tipo: "ofensiva", dias: r.ofensiva });
+  if (r.metaBatida) cartoes.push({ tipo: "meta" });
+  for (const c of r.conquistas || []) cartoes.push({ tipo: "conquista", ...c });
+  if (!cartoes.length) return false;
+  window.dispatchEvent(new CustomEvent("proof-celebrar", { detail: { cartoes } }));
+  return true;
+}
+
 /** A reação certa para o resultado de marcar, responder ou entregar algo. */
 export function reagirAoResultado(r) {
   if (!r) return;
-  if (r.metaBatida) return comemorar(`Meta do dia batida! +${r.pontos} pontos 🎉`);
+  if (celebrar(r)) return reagir("comemorando", `+${r.pontos} pontos! 🎉`, 5000);
   if (r.cardConcluido && r.pontos > 0) return comemorar(`Assunto concluído! +${r.pontos} pontos`);
   if (r.pontos > 0) return reagir("feliz", `+${r.pontos}! Mandou bem!`);
   if (r.pontos < 0) return reagir("surpreso", "Desmarcou? Sem problema, os pontos voltam quando refizer.");

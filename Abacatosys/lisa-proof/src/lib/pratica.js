@@ -5,7 +5,8 @@
 import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
 import {
-  buscarEmLotes, registrarEvento, registrarOuMelhorar, conferirMetaDiaria, quadroDeEstudo, trilhaDoUsuario,
+  buscarEmLotes, registrarEvento, registrarOuMelhorar, quadroDeEstudo, trilhaDoUsuario,
+  estudouHoje, depoisDePontuar, resultadoDaPontuacao,
 } from "./estudo.js";
 import { temModelo } from "./ia.js";
 import { gerarQuiz, gerarExercicio, gerarProjeto, avaliarExercicio, avaliarProjeto } from "./iaPratica.js";
@@ -208,20 +209,21 @@ export async function responderQuiz({ usuarioId, id, indice, escolha }) {
   const acertos = Object.entries(escolhas).filter(([k, v]) => perguntas[Number(k)].correta === v).length;
   const terminou = respondidas === perguntas.length;
 
-  let pontos = 0;
-  let bonus = 0;
   const pontosDoDesafio = terminou ? pontosDoQuiz(acertos, perguntas.length) : 0;
+  const estudavaAntes = terminou ? await estudouHoje(usuarioId) : true;
   await salvar(d.id, {
     resposta: { escolhas },
     status: terminou ? "concluido" : "em_andamento",
     ...(terminou ? { nota: Math.round((acertos / perguntas.length) * 100), pontos: pontosDoDesafio } : {}),
   });
+
+  let pontuacao = resultadoDaPontuacao(0, { pontosExtras: 0, metaBatida: false, ofensivaAumentou: false, ofensiva: null, conquistas: [] });
   if (terminou) {
-    pontos = await registrarEvento({
+    const pontos = await registrarEvento({
       usuarioId, trilhaId: d.trilha_id, tipo: "quiz", chave: `pratica:${d.id}`, pontos: pontosDoDesafio,
       detalhe: { titulo: d.titulo, acertos, total: perguntas.length },
     });
-    bonus = await conferirMetaDiaria(usuarioId, d.trilha_id);
+    pontuacao = resultadoDaPontuacao(pontos, await depoisDePontuar({ usuarioId, trilhaId: d.trilha_id, estudavaAntes, ganhou: pontos }));
   }
 
   return {
@@ -231,8 +233,7 @@ export async function responderQuiz({ usuarioId, id, indice, escolha }) {
     terminou,
     acertos,
     total: perguntas.length,
-    pontos: pontos + bonus,
-    metaBatida: bonus > 0,
+    ...pontuacao,
   };
 }
 
@@ -250,6 +251,7 @@ async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
   const melhorNota = Math.max(d.nota ?? 0, avaliacao.nota);
   const pontosDoDesafio = pontosDaNota(d.tipo, melhorNota);
   const acabou = avaliacao.aprovado || tentativas >= TENTATIVAS[d.tipo];
+  const estudavaAntes = await estudouHoje(usuarioId);
 
   await salvar(d.id, {
     resposta,
@@ -264,7 +266,7 @@ async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
     usuarioId, trilhaId: d.trilha_id, tipo: d.tipo, chave: `pratica:${d.id}`, pontos: pontosDoDesafio,
     detalhe: { titulo: d.titulo, nota: melhorNota },
   });
-  const bonus = pontos > 0 ? await conferirMetaDiaria(usuarioId, d.trilha_id) : 0;
+  const extra = await depoisDePontuar({ usuarioId, trilhaId: d.trilha_id, estudavaAntes, ganhou: pontos });
 
   return {
     avaliacao,
@@ -272,8 +274,7 @@ async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
     tentativas,
     restantes: Math.max(0, TENTATIVAS[d.tipo] - tentativas),
     concluido: acabou,
-    pontos: pontos + bonus,
-    metaBatida: bonus > 0,
+    ...resultadoDaPontuacao(pontos, extra),
   };
 }
 

@@ -42,6 +42,26 @@ gasta a IA outra vez (`proof_desafios`, índice único em usuário + trilha + ti
 - Até 18 arquivos por projeto, para caber no limite de 50 chamadas de rede por requisição do
   Worker gratuito.
 
+## Conquistas e comemorações
+
+**Conquistas** são da conta, não do quadro (`src/dominio/conquistas.js`): ofensiva (3, 7, 14, 30,
+60, 100 dias), metas do dia batidas, dias estudados, tarefas, assuntos, quizzes, quizzes
+gabaritados, exercícios e projetos aprovados — mais uma por trilha concluída (300 pts). Cada uma
+vira um evento `conquista:<codigo>` em `proof_eventos`: soma no total e no nível, e a chave única
+garante que é desbloqueada uma vez só. Tudo é recalculado a partir dos eventos, sem contador
+guardado. Pontos de conquista **não** contam para a meta do dia.
+
+Depois de qualquer ponto ganho, `depoisDePontuar` (em `src/lib/estudo.js`) confere, num lugar só:
+bônus da meta, se a ofensiva subiu (primeiro evento do dia), trilha concluída e conquistas novas.
+A tela recebe isso e abre a **comemoração em tela cheia** (`src/componentes/Celebracao.js`): a
+chama com o número virando, o anel da meta e a medalha da conquista, em fila.
+
+## Tema
+
+Escuro por padrão; o botão da moldura alterna escuro → claro → sistema (guardado no aparelho).
+Quem aplica é um script no `<head>`, antes da primeira pintura; o CSS usa
+`:root[data-tema="escuro"]` para trocar os tokens.
+
 ## Lembretes (push)
 
 Mesmo desenho da Lisa: o Worker só **guarda** as inscrições (`/api/push`, tabela `proof_push`);
@@ -111,6 +131,7 @@ crontab -e
    npm run migrar -- db/001-proof.sql
    npm run migrar -- db/002-pratica.sql
    npm run migrar -- db/003-lembretes.sql
+   npm run migrar -- db/004-conquistas.sql
    ```
 
 2. **Worker**: crie as variáveis no painel da Cloudflare (Workers → `lisa-proof` → Settings →

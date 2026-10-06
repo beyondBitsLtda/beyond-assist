@@ -12,7 +12,8 @@ import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
 import { ehQuadroDeEstudo, temaDo } from "@/dominio/estudo.js";
 import { diaDe } from "@/dominio/datas.js";
-import { PONTOS, chaveDoEvento, META_DIARIA_PADRAO } from "@/dominio/pontos.js";
+import { PONTOS, chaveDoEvento, META_DIARIA_PADRAO, pontosDoDiaParaMeta } from "@/dominio/pontos.js";
+import { estatisticas, conquistasNovas, desbloqueadasDe, PONTOS_POR_TRILHA } from "@/dominio/conquistas.js";
 
 const NAO_ACHEI = "não encontrado entre os seus quadros de estudo";
 
@@ -276,12 +277,105 @@ export async function conferirMetaDiaria(usuarioId, trilhaId) {
   ]);
   const lista = eventos || [];
   if (lista.some((e) => e.tipo === "meta_diaria")) return 0;
-  const soma = lista.reduce((s, e) => s + e.pontos, 0);
+  const soma = pontosDoDiaParaMeta(lista);
   if (soma < perfil.metaDiaria) return 0;
   return registrarEvento({
     usuarioId, trilhaId, tipo: "meta_diaria", chave: chaveDoEvento.meta(hoje),
     pontos: PONTOS.meta_diaria, detalhe: { meta: perfil.metaDiaria },
   });
+}
+
+/** Já tinha estudado hoje? Perguntado ANTES de pontuar, para saber se este ponto acendeu o dia. */
+export async function estudouHoje(usuarioId) {
+  const { count } = await supabase
+    .from("proof_eventos").select("id", { count: "exact", head: true }).eq("usuario_id", usuarioId).eq("dia", diaDe());
+  return (count || 0) > 0;
+}
+
+/** Todos os assuntos da trilha concluídos? Então devolve a trilha, para a conquista dela. */
+async function trilhaConcluidaAgora(trilhaId) {
+  if (!trilhaId) return null;
+  const { data: etapas } = await supabase.from("proof_etapas").select("card_id").eq("trilha_id", trilhaId);
+  const cards = await buscarEmLotes("abacato_cards", "id, concluido, arquivado", "id", (etapas || []).map((e) => e.card_id));
+  const vivos = cards.filter((c) => !c.arquivado);
+  if (!vivos.length || vivos.some((c) => !c.concluido)) return null;
+  const { data: trilha } = await supabase.from("proof_trilhas").select("id, tema").eq("id", trilhaId).maybeSingle();
+  return trilha ? { trilhaId: trilha.id, tema: trilha.tema } : null;
+}
+
+/**
+ * Tudo que acontece DEPOIS de ganhar pontos, num lugar só — para o quiz, o exercício, o projeto e
+ * a tarefa celebrarem do mesmo jeito:
+ *
+ *   - bônus da meta do dia, se acabou de bater;
+ *   - a ofensiva subiu, se este foi o primeiro ponto do dia;
+ *   - trilha concluída (uma conquista por trilha);
+ *   - conquistas da conta que os números acabaram de alcançar.
+ *
+ * Conquistas são gravadas num lote só: com o limite de chamadas do Worker, uma pessoa antiga que
+ * desbloqueia oito de uma vez não pode custar oito idas ao banco.
+ */
+export async function depoisDePontuar({ usuarioId, trilhaId, estudavaAntes, ganhou, verTrilha = false }) {
+  const r = { pontosExtras: 0, metaBatida: false, ofensivaAumentou: false, ofensiva: null, conquistas: [] };
+  if (ganhou <= 0) return r;
+
+  const bonus = await conferirMetaDiaria(usuarioId, trilhaId);
+  r.pontosExtras += bonus;
+  r.metaBatida = bonus > 0;
+
+  const novas = [];
+  const trilha = verTrilha ? await trilhaConcluidaAgora(trilhaId) : null;
+  if (trilha) {
+    novas.push({
+      codigo: `trilha:${trilha.trilhaId}`, nome: `Trilha concluída: ${trilha.tema}`, icone: "🏆",
+      descricao: `Todos os assuntos de ${trilha.tema} concluídos`, pontos: PONTOS_POR_TRILHA,
+    });
+  }
+
+  const hoje = diaDe();
+  const eventos = await buscarTodas(() =>
+    supabase.from("proof_eventos").select("tipo, chave, dia, pontos, detalhe").eq("usuario_id", usuarioId).order("criado_em")
+  );
+  const stats = estatisticas(eventos, hoje);
+  // "Acendeu o dia" é: não havia evento hoje antes, e agora há. Só "ganhou pontos" não basta —
+  // melhorar a nota de um exercício antigo soma pontos num evento de outro dia.
+  if (!estudavaAntes && eventos.some((e) => e.dia === hoje)) {
+    r.ofensivaAumentou = true;
+    r.ofensiva = stats.ofensiva;
+  }
+  if (trilha) stats.trilhas++; // a de agora ainda não está nos eventos
+  novas.push(...conquistasNovas(stats, desbloqueadasDe(eventos)));
+  if (!novas.length) return r;
+
+  const { data, error } = await supabase
+    .from("proof_eventos")
+    .upsert(
+      novas.map((c) => ({
+        usuario_id: usuarioId, trilha_id: trilhaId || null, tipo: "conquista", chave: `conquista:${c.codigo}`,
+        pontos: c.pontos, dia: hoje, detalhe: { codigo: c.codigo, nome: c.nome, icone: c.icone, descricao: c.descricao },
+      })),
+      { onConflict: "usuario_id,chave", ignoreDuplicates: true }
+    )
+    .select("chave");
+  falhou(error, "conquistas");
+  const gravadas = new Set((data || []).map((e) => e.chave));
+  for (const c of novas) {
+    if (!gravadas.has(`conquista:${c.codigo}`)) continue;
+    r.pontosExtras += c.pontos;
+    r.conquistas.push({ codigo: c.codigo, nome: c.nome, icone: c.icone, descricao: c.descricao, pontos: c.pontos });
+  }
+  return r;
+}
+
+/** O que a tela recebe depois de pontuar. */
+export function resultadoDaPontuacao(pontos, extra) {
+  return {
+    pontos: pontos + extra.pontosExtras,
+    metaBatida: extra.metaBatida,
+    ofensivaAumentou: extra.ofensivaAumentou,
+    ofensiva: extra.ofensiva,
+    conquistas: extra.conquistas,
+  };
 }
 
 // ---------------------------------------------------------------- marcar
@@ -311,9 +405,11 @@ async function sincronizarConclusao({ usuarioId, card, trilhaId }) {
   return { concluido: completo, pontos };
 }
 
+const NADA_EXTRA = { pontosExtras: 0, metaBatida: false, ofensivaAumentou: false, ofensiva: null, conquistas: [] };
+
 export async function marcarItem({ usuarioId, itemId, feito }) {
   const { item, card, quadro } = await itemDeEstudo(itemId, usuarioId);
-  const trilhaId = await idDaTrilhaDoQuadro(quadro.id, usuarioId);
+  const [trilhaId, estudavaAntes] = await Promise.all([idDaTrilhaDoQuadro(quadro.id, usuarioId), estudouHoje(usuarioId)]);
 
   const { error } = await supabase.from("abacato_checklist_itens").update({ feito }).eq("id", item.id);
   falhou(error, "item");
@@ -328,10 +424,12 @@ export async function marcarItem({ usuarioId, itemId, feito }) {
 
   const conclusao = await sincronizarConclusao({ usuarioId, card, trilhaId });
   pontos += conclusao.pontos;
-  const bonus = feito ? await conferirMetaDiaria(usuarioId, trilhaId) : 0;
+  const extra = feito
+    ? await depoisDePontuar({ usuarioId, trilhaId, estudavaAntes, ganhou: pontos, verTrilha: conclusao.concluido && conclusao.pontos > 0 })
+    : NADA_EXTRA;
   tocarQuadro(quadro.id);
 
-  return { feito, cardConcluido: conclusao.concluido, pontos: pontos + bonus, metaBatida: bonus > 0 };
+  return { feito, cardConcluido: conclusao.concluido, ...resultadoDaPontuacao(pontos, extra) };
 }
 
 /** Concluir à mão vale só para assunto SEM tarefas — com tarefas, ele conclui sozinho. */
@@ -343,18 +441,19 @@ export async function marcarCard({ usuarioId, cardId, concluido }) {
   const { total } = contarItens((await checklistsDosCards([card.id])).get(card.id) || []);
   if (total) throw new ErroDeAcesso(400, "este assunto tem tarefas: ele é concluído quando todas forem marcadas");
 
-  const trilhaId = await idDaTrilhaDoQuadro(quadro.id, usuarioId);
+  const [trilhaId, estudavaAntes] = await Promise.all([idDaTrilhaDoQuadro(quadro.id, usuarioId), estudouHoje(usuarioId)]);
   const { error } = await supabase.from("abacato_cards").update({ concluido }).eq("id", card.id);
   falhou(error, "card");
 
   const chave = chaveDoEvento.card(card.id);
-  let pontos = concluido
+  const pontos = concluido
     ? await registrarEvento({ usuarioId, trilhaId, tipo: "card", chave, pontos: PONTOS.card, detalhe: { titulo: card.titulo } })
     : await desfazerEventoDeHoje(usuarioId, chave);
-  const bonus = concluido ? await conferirMetaDiaria(usuarioId, trilhaId) : 0;
-  pontos += bonus;
+  const extra = concluido
+    ? await depoisDePontuar({ usuarioId, trilhaId, estudavaAntes, ganhou: pontos, verTrilha: true })
+    : NADA_EXTRA;
   tocarQuadro(quadro.id);
-  return { cardConcluido: concluido, pontos, metaBatida: bonus > 0 };
+  return { cardConcluido: concluido, ...resultadoDaPontuacao(pontos, extra) };
 }
 
 // ---------------------------------------------------------------- escrever no quadro

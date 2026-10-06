@@ -6,15 +6,15 @@
   --mapa-bloqueado: #E5E7EB;
   --mapa-bloqueado-sombra: #C4C9C6;
   --mapa-bloqueado-icone: #9CA3AF;
+  --mapa-estrada-feita: #A7E3BC;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --mapa-estrada: #24302A;
-    --mapa-faixa: #3A4A41;
-    --mapa-bloqueado: #2A3530;
-    --mapa-bloqueado-sombra: #1B2621;
-    --mapa-bloqueado-icone: #6B7A72;
-  }
+:root[data-tema="escuro"] {
+  --mapa-estrada: #24302A;
+  --mapa-faixa: #3A4A41;
+  --mapa-bloqueado: #2A3530;
+  --mapa-bloqueado-sombra: #1B2621;
+  --mapa-bloqueado-icone: #6B7A72;
+  --mapa-estrada-feita: #14532D;
 }
 
 /* `clip`, e não `hidden`: corta o que passar da borda sem virar contêiner de rolagem — com
@@ -42,8 +42,7 @@
 
 .mapa__caminho { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .mapa__estrada { fill: none; stroke: var(--mapa-estrada); stroke-width: 22; stroke-linecap: round; }
-.mapa__estrada--feita { stroke: #A7E3BC; }
-@media (prefers-color-scheme: dark) { .mapa__estrada--feita { stroke: #14532D; } }
+.mapa__estrada--feita { stroke: var(--mapa-estrada-feita); }
 .mapa__faixa-central { fill: none; stroke: var(--mapa-faixa); stroke-width: 2.5; stroke-dasharray: 8 12; stroke-linecap: round; opacity: 0.9; }
 
 /* ---- paradas ---- */

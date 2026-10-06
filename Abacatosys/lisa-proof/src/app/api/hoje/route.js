@@ -6,7 +6,7 @@ import { resumoDaPratica } from "@/lib/pratica.js";
 import { diaDe } from "@/dominio/datas.js";
 import { calcularOfensiva } from "@/dominio/ofensiva.js";
 import { resumoDasMetas, tarefasDoDia } from "@/dominio/metas.js";
-import { nivelPorPontos } from "@/dominio/pontos.js";
+import { nivelPorPontos, pontosDoDiaParaMeta } from "@/dominio/pontos.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +33,9 @@ export async function GET(req) {
 
     const ofensiva = calcularOfensiva(eventos.map((e) => e.dia), hoje);
     const total = eventos.reduce((s, e) => s + e.pontos, 0);
-    const pontosHoje = eventos.filter((e) => e.dia === hoje).reduce((s, e) => s + e.pontos, 0);
+    // A mesma conta que o servidor usa para dar o bônus — senão a tela diria "meta batida" com
+    // pontos de conquista, e o bônus não viria.
+    const pontosHoje = pontosDoDiaParaMeta(eventos.filter((e) => e.dia === hoje));
     const concluidosHoje = new Set(
       eventos.filter((e) => e.dia === hoje && e.tipo === "card").map((e) => e.chave.replace(/^card:/, ""))
     );

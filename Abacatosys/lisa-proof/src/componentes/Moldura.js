@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { IconeHoje, IconeTrilhas, IconePratica, IconeProgresso, Marca } from "./Icones.js";
 import { Confete } from "./Neuro.js";
+import Celebracao from "./Celebracao.js";
+import BotaoDeTema from "./BotaoDeTema.js";
 
 const ITENS = [
   { href: "/", rotulo: "Hoje", Icone: IconeHoje },
@@ -53,7 +55,10 @@ export default function Moldura({ children }) {
             </Link>
           ))}
         </nav>
-        <button type="button" className="pf-lateral__sair" onClick={sair}>Sair</button>
+        <div className="pf-lateral__rodape">
+          <BotaoDeTema comTexto />
+          <button type="button" className="pf-lateral__sair" onClick={sair}>Sair</button>
+        </div>
       </aside>
 
       <header className="pf-topo">
@@ -61,7 +66,10 @@ export default function Moldura({ children }) {
           <Marca />
           Lisa_Proof
         </Link>
-        <button type="button" className="pf-topo__sair" onClick={sair}>Sair</button>
+        <div className="pf-topo__acoes">
+          <BotaoDeTema />
+          <button type="button" className="pf-topo__sair" onClick={sair}>Sair</button>
+        </div>
       </header>
 
       <main className="pf-principal">{children}</main>
@@ -79,6 +87,7 @@ export default function Moldura({ children }) {
           </Link>
         ))}
       </nav>
+      <Celebracao />
       <Confete />
     </div>
   );

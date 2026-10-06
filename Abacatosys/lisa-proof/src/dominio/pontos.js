@@ -16,6 +16,16 @@ export const chaveDoEvento = {
   meta: (dia) => `meta:${dia}`,
 };
 
+/**
+ * Os pontos que contam para a meta do dia: o que a pessoa FEZ hoje. O bônus da própria meta e os
+ * pontos de conquista ficam de fora — senão uma conquista desbloqueada "batia" a meta sozinha.
+ */
+export function pontosDoDiaParaMeta(eventosDoDia) {
+  return eventosDoDia
+    .filter((e) => e.tipo !== "meta_diaria" && e.tipo !== "conquista")
+    .reduce((s, e) => s + e.pontos, 0);
+}
+
 /** Nível a cada 200 pontos. Simples de propósito: o número que motiva é a ofensiva. */
 export const PONTOS_POR_NIVEL = 200;
 export function nivelPorPontos(total) {
@@ -35,4 +45,5 @@ export const NOMES_DOS_EVENTOS = {
   exercicio: "Exercício",
   projeto_semanal: "Projeto da semana",
   projeto_mensal: "Projeto do mês",
+  conquista: "Conquista",
 };

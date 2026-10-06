@@ -6,6 +6,7 @@ import { formatarDia } from "@/dominio/datas.js";
 import { METAS_DIARIAS } from "@/dominio/pontos.js";
 import { Barra } from "@/componentes/Pecas.js";
 import Lembretes from "@/componentes/Lembretes.js";
+import Conquistas from "@/componentes/Conquistas.js";
 
 /** Intensidade do quadradinho do mapa, relativa à meta do dia. */
 function nivelDoDia(pontos, meta) {
@@ -79,6 +80,8 @@ export default function Progresso() {
           </p>
         </div>
       </div>
+
+      <Conquistas lista={dados.conquistas} pontos={dados.pontosDeConquistas} />
 
       <section className="pf-secao">
         <h2 className="pf-secao__titulo">Últimas 16 semanas</h2>

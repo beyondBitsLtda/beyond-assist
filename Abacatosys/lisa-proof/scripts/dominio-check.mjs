@@ -15,6 +15,7 @@ import {
   periodoDe, periodoPermitido, pontosDoQuiz, pontosDaNota, validarQuiz, quizParaTela,
   validarAvaliacao, assuntoAtual, mapaDaTrilha,
 } from "../src/dominio/pratica.js";
+import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
 
 let passou = 0;
 function caso(nome, fn) {
@@ -223,6 +224,35 @@ caso("mapa: unidades por semana, baú da semana, troféu na virada do mês, cheg
     "unidade:", "assunto:bloqueado", "projeto_semanal:bloqueado", "projeto_mensal:disponivel",
     "chegada:bloqueado",
   ]);
+});
+
+console.log("\nconquistas");
+const eventosDeTeste = [
+  { tipo: "item", chave: "item:1", dia: "2026-10-04", pontos: 10 },
+  { tipo: "item", chave: "item:2", dia: "2026-10-05", pontos: 10 },
+  { tipo: "meta_diaria", chave: "meta:2026-10-05", dia: "2026-10-05", pontos: 20 },
+  { tipo: "quiz", chave: "pratica:q", dia: "2026-10-06", pontos: 35, detalhe: { acertos: 5, total: 5 } },
+  { tipo: "exercicio", chave: "pratica:e", dia: "2026-10-06", pontos: 20, detalhe: { nota: 50 } },
+  { tipo: "conquista", chave: "conquista:tarefas-1", dia: "2026-10-04", pontos: 10 },
+  { tipo: "conquista", chave: "conquista:trilha:t1", dia: "2026-10-06", pontos: 300, detalhe: { nome: "Trilha concluída: JS" } },
+];
+caso("estatísticas saem dos eventos (exercício reprovado não conta)", () => {
+  const s = estatisticas(eventosDeTeste, "2026-10-06");
+  assert.deepEqual(
+    [s.tarefas, s.metas, s.quizzes, s.quizzesPerfeitos, s.exercicios, s.trilhas, s.diasEstudados, s.ofensiva, s.maiorOfensiva],
+    [2, 1, 1, 1, 0, 1, 3, 3, 3]
+  );
+});
+caso("só desbloqueia o que alcançou e ainda não tem", () => {
+  const s = estatisticas(eventosDeTeste, "2026-10-06");
+  const novas = conquistasNovas(s, desbloqueadasDe(eventosDeTeste)).map((x) => x.codigo);
+  assert.deepEqual(novas.sort(), ["meta-1", "ofensiva-3", "quiz-1", "quiz-perfeito-1"].sort());
+});
+caso("vitrine traz o progresso e as trilhas concluídas", () => {
+  const v = vitrine(estatisticas(eventosDeTeste, "2026-10-06"), eventosDeTeste);
+  const sete = v.find((x) => x.codigo === "ofensiva-7");
+  assert.deepEqual([sete.atual, sete.alvo, sete.desbloqueada], [3, 7, false]);
+  assert.ok(v.some((x) => x.codigo === "trilha:t1" && x.desbloqueada));
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

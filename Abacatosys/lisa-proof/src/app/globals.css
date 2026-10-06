@@ -41,6 +41,9 @@
   --pf-calor-3: #16A34A;
 
   --pf-codigo-fundo: #111814;
+  /* Cartões de destaque escuros (ofensiva, pílula do tema). No tema escuro ficam mais verdes,
+   * senão sumiriam contra o fundo, que também é escuro. */
+  --pf-destaque-fundo: #111814;
   --pf-codigo-tinta: #E8EDEA;
 
   --pf-raio: 16px;
@@ -55,8 +58,10 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+/* O tema escuro é escolhido pelo atributo `data-tema` (botão na moldura; padrão escuro), aplicado
+ * por um script no <head> antes da primeira pintura. "Sistema" vira escuro ou claro ali mesmo. */
+:root[data-tema="escuro"] {
+    --pf-destaque-fundo: #1C3326;
     --pf-fundo: #0D1310;
     --pf-superficie: #151E19;
     --pf-superficie-2: #1B2621;
@@ -77,8 +82,8 @@
     --pf-calor-2: #15803D;
     --pf-calor-3: #22C55E;
     --pf-sombra: 0 4px 20px rgba(0, 0, 0, 0.25);
+    --pf-sombra-alta: 0 8px 30px rgba(0, 0, 0, 0.5);
     color-scheme: dark;
-  }
 }
 
 * { box-sizing: border-box; }
@@ -127,11 +132,22 @@ button { font: inherit; }
 .pf-nav__item--ativo svg { color: var(--pf-verde); }
 .pf-nav__item svg { width: 20px; height: 20px; flex: none; }
 
+.pf-lateral__rodape { margin-top: auto; display: grid; gap: 8px; }
 .pf-lateral__sair {
-  margin-top: auto; background: none; border: 1px solid rgba(255, 255, 255, 0.12);
+  background: none; border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--pf-tinta-barra-2); border-radius: var(--pf-pilula); padding: 8px 14px; cursor: pointer;
 }
 .pf-lateral__sair:hover { color: var(--pf-tinta-barra); }
+
+.pf-tema {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-width: 40px; min-height: 40px; padding: 6px 10px; border-radius: var(--pf-pilula);
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--pf-tinta-barra); cursor: pointer; font-size: 14px;
+}
+.pf-tema:hover { background: rgba(255, 255, 255, 0.12); }
+.pf-tema--texto { justify-content: flex-start; padding: 8px 14px; }
+.pf-topo__acoes { display: flex; align-items: center; gap: 6px; }
 
 .pf-topo {
   position: sticky; top: 0; z-index: 20;
@@ -197,7 +213,7 @@ button { font: inherit; }
 .pf-estat__valor small { font-size: 15px; font-weight: 500; color: var(--pf-tinta-2); }
 .pf-estat__nota { font-size: 13px; color: var(--pf-tinta-2); margin: 6px 0 0; }
 
-.pf-ofensiva { background: var(--pf-verde-escuro); color: #FFFFFF; border-color: transparent; }
+.pf-ofensiva { background: var(--pf-destaque-fundo); color: #FFFFFF; border-color: transparent; }
 .pf-ofensiva .pf-estat__rotulo, .pf-ofensiva .pf-estat__nota { color: #B9C7BF; }
 .pf-ofensiva--risco { background: linear-gradient(135deg, #3A1F0B, #7C3F13); }
 .pf-ofensiva__fogo { font-size: 26px; margin-right: 4px; }
@@ -218,7 +234,7 @@ button { font: inherit; }
 .pf-pilula--verde { background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
 .pf-pilula--alerta { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
 .pf-pilula--atencao { background: var(--pf-atencao-fundo); color: var(--pf-atencao); }
-.pf-pilula--tema { background: var(--pf-verde-escuro); color: #FFFFFF; }
+.pf-pilula--tema { background: var(--pf-destaque-fundo); color: #FFFFFF; }
 
 .pf-botao {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;

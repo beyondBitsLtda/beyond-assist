@@ -6,7 +6,7 @@ import { criar } from "@/lib/api.js";
 import { formatarDia } from "@/dominio/datas.js";
 import { NOTA_DE_APROVACAO } from "@/dominio/pratica.js";
 import Explicacao, { emLinha } from "./Explicacao.js";
-import Neuro, { reagir, comemorar } from "./Neuro.js";
+import Neuro, { reagir, comemorar, celebrar } from "./Neuro.js";
 import { Barra, useAviso } from "./Pecas.js";
 
 const LETRAS = ["A", "B", "C", "D"];
@@ -55,8 +55,11 @@ export function Quiz({ desafio }) {
     const proximo = indice + 1;
     setIndice(proximo);
     if (proximo >= perguntas.length && final) {
-      if (final.acertos === final.total) comemorar(`Gabaritou! +${final.pontos} pontos 🎉`);
-      else if (final.pontos > 0) avisar(`+${final.pontos} pontos`);
+      // Ofensiva, meta e conquistas abrem a festa em tela cheia; sem nada disso, a comemoração
+      // do gabarito (ou só os pontos) fica no próprio Neuro.
+      const festejou = celebrar(final);
+      if (!festejou && final.acertos === final.total) comemorar(`Gabaritou! +${final.pontos} pontos 🎉`);
+      else if (!festejou && final.pontos > 0) avisar(`+${final.pontos} pontos`);
     }
   }
 
@@ -212,6 +215,7 @@ function Entrega({ desafio, campo, rotulo, aoEnviar, conteudoInicial, placeholde
     try {
       const r = await aoEnviar(valor);
       setEstado({ status: r.concluido ? "concluido" : "em_andamento", nota: r.nota, tentativas: r.tentativas, avaliacao: r.avaliacao });
+      celebrar(r);
       if (r.avaliacao.aprovado) comemorar(`Aprovado com ${r.avaliacao.nota}! ${r.pontos > 0 ? `+${r.pontos} pontos` : ""}`);
       else reagir("triste", r.restantes ? `Faltou pouco! Você ainda tem ${r.restantes} tentativa(s).` : "Não foi dessa vez, mas olha quanta coisa boa na avaliação.", 6000);
       if (r.pontos > 0 && !r.avaliacao.aprovado) avisar(`+${r.pontos} pontos`);
