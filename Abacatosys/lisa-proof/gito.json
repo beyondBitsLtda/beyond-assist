@@ -9,10 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.2.0-cloudflare-pages.4",
+  "versao": "0.2.0-cloudflare-pages.5",
   "atualizadoEm": "2026-10-06",
-  "compilacao": { "numero": 4, "data": "2026-10-06", "artefato": "" },
+  "compilacao": {
+    "numero": 5,
+    "data": "2026-10-06",
+    "artefato": ""
+  },
   "historico": [
+    {
+      "versao": "0.2.0-cloudflare-pages.5",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Criar curso com a Lisa: a partir do tema e do nível, a IA propõe o curso e cria o quadro STUDY no Abacato com a trilha pronta.",
+      "itens": [
+        "Nova tela Trilhas → Criar curso com a Lisa: tema, nível (iniciante, intermediário, avançado), objetivo opcional, duração (2, 4, 8 ou 12 semanas), dias de estudo e data de início.",
+        "A Lisa propõe o curso em módulos, com assuntos, objetivo, nível, dias e 3 a 5 tarefas de teoria cada; a quantidade de assuntos acompanha a duração (até 40).",
+        "Prévia antes de criar: dá para tirar assuntos, mudar o nome do quadro, gerar outra proposta ou trocar tema e nível.",
+        "Ao confirmar, cria no Abacato o quadro STUDY (um módulo por coluna, assuntos como cards, checklists de teoria) e a trilha já na ordem do curso, abrindo o mapa. Se algo falhar no meio, o quadro é desfeito inteiro.",
+        "Respeita o limite de quadros da conta do Abacato (10 para clientes, sem limite para contas internas).",
+        "A proposta pede raciocínio baixo ao modelo: a geração caiu de cerca de 100 s para cerca de 12 s."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.2.0-cloudflare-pages.4",
       "data": "2026-10-06",
@@ -90,6 +110,7 @@
       "objetivo": "Criar o hábito de estudo diário de programação, usando como conteúdo os quadros de estudo que a pessoa já organiza no Abacato.",
       "inclui": [
         "Quadros do Abacato cujo nome começa com STUDY e que pertencem à pessoa logada (dono).",
+        "Criar curso com a Lisa: a IA propõe e, com a aprovação da pessoa, cria o quadro STUDY no Abacato com a trilha pronta.",
         "Trilha progressiva por quadro, montada pela IA ou pela ordem do quadro, com agenda nos dias de estudo escolhidos.",
         "Parte teórica: marcar itens de checklist e concluir assuntos direto do app, refletindo no Abacato.",
         "Checklist de teoria e explicação do assunto geradas pela IA.",
@@ -107,7 +128,7 @@
         "Não lê repositórios privados do GitHub, nem com token configurado.",
         "Lembretes dependem do iMac ligado: o envio roda no relógio (crontab) dele, não na Cloudflare.",
         "Quadros em que a pessoa é só membro (não dona) não viram trilha.",
-        "Não cria nem apaga cards ou quadros: o conteúdo é organizado no Abacato.",
+        "Não apaga quadros nem cards do Abacato; só cria quadros quando a pessoa aprova um curso proposto pela Lisa.",
         "Não conclui cards recorrentes do Abacato (o ciclo deles é do Abacato).",
         "Não tem cadastro próprio: a conta é criada no Abacato."
       ]
@@ -180,11 +201,20 @@
       }
     ],
     "links": [
-      { "titulo": "Repositório", "url": "https://github.com/beyondBitsLtda/beyond-assist/tree/cloudflare-pages/Abacatosys/lisa-proof" },
-      { "titulo": "Produção", "url": "https://proof.beyond.dev.br/" }
+      {
+        "titulo": "Repositório",
+        "url": "https://github.com/beyondBitsLtda/beyond-assist/tree/cloudflare-pages/Abacatosys/lisa-proof"
+      },
+      {
+        "titulo": "Produção",
+        "url": "https://proof.beyond.dev.br/"
+      }
     ],
     "contatos": [
-      { "papel": "Responsável técnico", "nome": "Brayan Rodrigues" }
+      {
+        "papel": "Responsável técnico",
+        "nome": "Brayan Rodrigues"
+      }
     ]
   }
 }

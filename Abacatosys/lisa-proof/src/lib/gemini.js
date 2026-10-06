@@ -45,7 +45,7 @@ function disponiveis() {
  * `contents` é o histórico no formato do Gemini; `ferramentas` são as declarações de função.
  * Devolve a parte de conteúdo da primeira candidata — texto, chamadas de função, ou os dois.
  */
-export async function conversar({ contents, sistema, ferramentas, maxTokens, esquema, temperatura }) {
+export async function conversar({ contents, sistema, ferramentas, maxTokens, esquema, temperatura, pensarPouco }) {
   const lista = disponiveis();
   if (!lista.length) {
     throw new Error("a assistente não está configurada neste servidor (falta GEMINI_API_KEYS)");
@@ -71,18 +71,29 @@ export async function conversar({ contents, sistema, ferramentas, maxTokens, esq
       // na tela virava "Me conte um pouco mais" a cada tentativa. A pessoa repetia o pedido
       // e recebia a mesma frase, sem nada dizendo que o problema era tamanho.
       maxOutputTokens: Number.isFinite(maxTokens) ? maxTokens : 2048,
+      // Acréscimo da Lisa_Proof: respostas GRANDES e bem especificadas (um curso inteiro) não
+      // ganham nada com o modelo "pensando" antes — e o raciocínio levava a geração de 30 s a
+      // mais de 100 s. Se o modelo não aceitar a opção, a chamada é refeita sem ela (abaixo).
+      ...(pensarPouco ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
     },
   };
+  const buscar = (chave) =>
+    fetch(`${BASE}/${MODELO}:generateContent?key=${encodeURIComponent(chave)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(corpo),
+    });
 
   let ultimoErro = null;
   for (const chave of lista) {
     let resposta;
     try {
-      resposta = await fetch(`${BASE}/${MODELO}:generateContent?key=${encodeURIComponent(chave)}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(corpo),
-      });
+      resposta = await buscar(chave);
+      // Modelo que não conhece o ajuste de raciocínio responde 400: tira a opção e tenta de novo.
+      if (resposta.status === 400 && corpo.generationConfig.thinkingConfig) {
+        delete corpo.generationConfig.thinkingConfig;
+        resposta = await buscar(chave);
+      }
     } catch (e) {
       ultimoErro = new Error(`não consegui falar com o modelo: ${e.message}`);
       continue;

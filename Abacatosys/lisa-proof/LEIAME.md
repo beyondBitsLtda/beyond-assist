@@ -42,6 +42,25 @@ gasta a IA outra vez (`proof_desafios`, índice único em usuário + trilha + ti
 - Até 18 arquivos por projeto, para caber no limite de 50 chamadas de rede por requisição do
   Worker gratuito.
 
+## Criar curso com a Lisa
+
+Em **Trilhas → Criar curso com a Lisa** (`/trilhas/novo`): tema, nível, objetivo opcional, duração
+e dias de estudo. A Lisa **propõe** (`/api/cursos/proposta`, nada é gravado) módulos e assuntos com
+objetivo, nível, dias e tarefas de teoria; a quantidade acompanha a duração
+(`assuntosParaODuracao`, até 40). A pessoa revisa — tira assuntos, muda o nome — e só então
+`/api/cursos` cria, conferindo a proposta de novo (`validarCurso`):
+
+- quadro `STUDY <nome>` no Abacato, um **módulo por coluna**, assuntos como cards, checklist
+  "Teoria" em cada um (origem `proof`);
+- a **trilha** já na ordem do curso (sem pedir outra ordenação à IA).
+
+Se algo falha no meio, o quadro é apagado (o cascade leva cards, checklists e trilha). O limite de
+quadros da conta do Abacato vale aqui também (`src/lib/cursos.js`, espelho de
+`abacato/src/dominio/planos.js` — se o número mudar lá, mude aqui).
+
+A proposta pede raciocínio baixo ao modelo (`pensarPouco`): de ~100 s para ~12 s, sem perda
+visível. Se o modelo não aceitar a opção, a chamada é refeita sem ela.
+
 ## Conquistas e comemorações
 
 **Conquistas** são da conta, não do quadro (`src/dominio/conquistas.js`): ofensiva (3, 7, 14, 30,

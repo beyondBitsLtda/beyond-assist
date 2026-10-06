@@ -122,6 +122,30 @@
 .avaliacao__simples { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
 .avaliacao .pf-campo__rotulo { margin: 6px 0 0; }
 
+/* ---- criar curso ---- */
+.curso__neuro { display: flex; align-items: center; margin-bottom: 14px; }
+.curso__form { display: grid; gap: 16px; max-width: 720px; }
+.curso__form textarea.pf-campo__entrada { resize: vertical; min-height: 64px; }
+.curso__resumo { display: grid; gap: 12px; }
+.curso__assuntos { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.curso__assunto { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; padding: 12px 14px; }
+.curso__tirar {
+  width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--pf-linha);
+  background: transparent; color: var(--pf-tinta-3); cursor: pointer;
+}
+.curso__tirar:hover { color: var(--pf-alerta); border-color: var(--pf-alerta); }
+.curso__tarefas { margin-top: 6px; font-size: 13px; }
+.curso__tarefas summary { cursor: pointer; color: var(--pf-tinta-2); font-weight: 600; }
+.curso__tarefas ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 2px; color: var(--pf-tinta-2); }
+.curso__confirmar { margin-top: 20px; position: sticky; bottom: calc(var(--pf-nav-altura) + 8px + env(safe-area-inset-bottom)); background: var(--pf-fundo); padding: 10px 0; }
+@media (min-width: 900px) { .curso__confirmar { bottom: 0; } }
+.trilhas__criar {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 16px; text-decoration: none; color: inherit;
+  border: 2px dashed var(--pf-verde); background: var(--pf-sucesso-fundo);
+}
+.trilhas__criar strong { display: block; font-size: 16px; }
+.trilhas__criar small { color: var(--pf-tinta-2); }
+
 /* ---- conquistas ---- */
 .conquistas { display: grid; gap: 18px; }
 .conquistas__grupo .pf-campo__rotulo { margin: 0 0 8px; }

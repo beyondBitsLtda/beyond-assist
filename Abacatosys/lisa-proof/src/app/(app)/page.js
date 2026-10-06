@@ -19,7 +19,7 @@ function falaDoNeuro(dados) {
   const pendentes = tarefas.filter((t) => t.situacao !== "feita").length;
   const quizPendente = pratica.some((p) => p.quiz?.status !== "concluido");
 
-  if (dados.trilhas === 0) return { humor: "surpreso", fala: "Oi, eu sou o Neuro! Crie um quadro STUDY no Abacato e monte sua trilha comigo." };
+  if (dados.trilhas === 0) return { humor: "surpreso", fala: "Oi, eu sou o Neuro! Me diz o que você quer aprender e a Lisa monta o curso inteiro." };
   if (o.emRisco) return { humor: "triste", fala: `Sua ofensiva de ${o.atual} ${o.atual === 1 ? "dia" : "dias"} está em risco! Bora estudar só um pouquinho?` };
   if (resumo.pontosHoje >= resumo.metaDiaria && !quizPendente && !pendentes) return { humor: "comemorando", fala: "Meta batida e tudo em dia. Você é demais! 🧠✨" };
   if (resumo.pontosHoje >= resumo.metaDiaria) return { humor: "feliz", fala: "Meta do dia batida! O que vier agora é bônus." };
@@ -171,10 +171,13 @@ export default function Hoje() {
           <div className="pf-cartao pf-vazio">
             <h2>Nenhuma trilha ainda</h2>
             <p>
-              Crie no Abacato um quadro com o nome começando por <strong>STUDY</strong> (ex.: “STUDY JavaScript”),
-              com um card por assunto. Depois monte a trilha dele aqui.
+              Peça para a Lisa criar um curso (ela monta o quadro e a trilha), ou crie no Abacato um quadro
+              com o nome começando por <strong>STUDY</strong> e monte a trilha dele aqui.
             </p>
-            <Link className="pf-botao" href="/trilhas">Montar uma trilha</Link>
+            <div className="pf-acoes" style={{ justifyContent: "center" }}>
+              <Link className="pf-botao" href="/trilhas/novo">✨ Criar curso com a Lisa</Link>
+              <Link className="pf-botao pf-botao--sec" href="/trilhas">Ver meus quadros STUDY</Link>
+            </div>
           </div>
         ) : tarefas.length === 0 ? (
           <div className="pf-cartao pf-vazio">

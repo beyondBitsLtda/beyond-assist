@@ -83,15 +83,28 @@ export default function Trilhas() {
         </a>
       </div>
 
+      {dados.iaDisponivel && (
+        <Link href="/trilhas/novo" className="pf-cartao trilhas__criar">
+          <span style={{ fontSize: 34 }} aria-hidden="true">✨</span>
+          <span>
+            <strong>Criar curso com a Lisa</strong>
+            <small>Diga o tema e o nível: ela monta o quadro STUDY no Abacato e a trilha pronta.</small>
+          </span>
+        </Link>
+      )}
+
       {dados.quadros.length === 0 ? (
         <div className="pf-cartao pf-vazio">
-          <h2>Nenhum quadro STUDY encontrado</h2>
+          <h2>Nenhum quadro STUDY ainda</h2>
           <p>
-            No Abacato, crie um quadro com o nome começando por <strong>STUDY</strong> — por exemplo
-            “STUDY JavaScript”. Cada card é um assunto (ex.: “Lógica de programação em JavaScript”) e
-            as checklists são as tarefas de teoria. As colunas podem ser as que você quiser.
+            Deixe a Lisa criar um curso para você, ou crie no Abacato um quadro com o nome começando
+            por <strong>STUDY</strong> — por exemplo “STUDY JavaScript”. Cada card é um assunto e as
+            checklists são as tarefas de teoria. As colunas podem ser as que você quiser.
           </p>
-          <a className="pf-botao" href={`${dados.abacato}/quadros`} target="_blank" rel="noreferrer">Criar no Abacato ↗</a>
+          <div className="pf-acoes" style={{ justifyContent: "center" }}>
+            {dados.iaDisponivel && <Link className="pf-botao" href="/trilhas/novo">✨ Criar curso com a Lisa</Link>}
+            <a className="pf-botao pf-botao--sec" href={`${dados.abacato}/quadros`} target="_blank" rel="noreferrer">Criar no Abacato ↗</a>
+          </div>
         </div>
       ) : (
         <div className="pf-quadros">

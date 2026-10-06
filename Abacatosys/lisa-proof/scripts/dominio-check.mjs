@@ -16,6 +16,7 @@ import {
   validarAvaliacao, assuntoAtual, mapaDaTrilha,
 } from "../src/dominio/pratica.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
+import { assuntosParaODuracao, nomeDoQuadro, validarCurso, assuntosEmOrdem, resumoDoCurso } from "../src/dominio/curso.js";
 
 let passou = 0;
 function caso(nome, fn) {
@@ -253,6 +254,43 @@ caso("vitrine traz o progresso e as trilhas concluídas", () => {
   const sete = v.find((x) => x.codigo === "ofensiva-7");
   assert.deepEqual([sete.atual, sete.alvo, sete.desbloqueada], [3, 7, false]);
   assert.ok(v.some((x) => x.codigo === "trilha:t1" && x.desbloqueada));
+});
+
+console.log("\ncurso criado pela Lisa");
+caso("quantos assuntos cabem na duração", () => {
+  assert.equal(assuntosParaODuracao(4, 5), 13);
+  assert.equal(assuntosParaODuracao(12, 7), 40); // teto
+  assert.equal(assuntosParaODuracao(1, 1), 4);   // piso
+});
+caso("nome do quadro sempre começa com STUDY, sem duplicar o prefixo", () => {
+  assert.equal(nomeDoQuadro("STUDY: SQL para dados", "SQL"), "STUDY SQL para dados");
+  assert.equal(nomeDoQuadro("", "React"), "STUDY React");
+  assert.ok(ehQuadroDeEstudo(nomeDoQuadro("Java do zero", "Java")));
+});
+caso("proposta: corrige dias e nível, descarta vazio, renomeia módulo repetido", () => {
+  const r = validarCurso({
+    tema: "JavaScript", nivel: "nivel-inventado",
+    modulos: [
+      { nome: "Base", assuntos: [{ titulo: "Variáveis", dias: 9, nivel: "x", tarefas: ["ler", "", "fazer"] }, { titulo: "" }] },
+      { nome: "Vazio", assuntos: [] },
+      { nome: "base", assuntos: [{ titulo: "Funções", dias: 2 }, { titulo: "Arrays" }] },
+    ],
+  });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.proposta.modulos.map((m) => m.nome), ["Base", "base (2)"]);
+  assert.deepEqual([r.proposta.modulos[0].assuntos[0].dias, r.proposta.modulos[0].assuntos[0].nivel], [5, "basico"]);
+  assert.deepEqual(r.proposta.modulos[0].assuntos[0].tarefas, ["ler", "fazer"]);
+  assert.equal(r.proposta.nivel, "iniciante");
+  assert.deepEqual(resumoDoCurso(r.proposta), { modulos: 2, assuntos: 3, tarefas: 2, dias: 8 });
+});
+caso("proposta com quase nada é recusada", () => {
+  const r = validarCurso({ tema: "X", modulos: [{ nome: "A", assuntos: [{ titulo: "um" }] }] });
+  assert.equal(r.ok, false);
+});
+caso("teto de 40 assuntos", () => {
+  const muitos = Array.from({ length: 60 }, (_, i) => ({ titulo: `a${i}` }));
+  const r = validarCurso({ tema: "X", modulos: [{ nome: "A", assuntos: muitos }] });
+  assert.equal(assuntosEmOrdem(r.proposta).length, 40);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);
