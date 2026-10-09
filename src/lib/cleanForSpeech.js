@@ -59,29 +59,19 @@ export function cleanForSpeech(input) {
 // ---- corte em pedaços faláveis ---------------------------------------------------------
 
 /**
- * Quebra o texto em pedaços faláveis. Hoje serve A UM ÚNICO propósito: a voz de reserva do
- * navegador.
+ * Quebra o texto em pedaços faláveis, respeitando fim de frase. Serve a dois propósitos:
  *
- * O `speechSynthesis` do Chrome interrompe sozinho uma fala longa, por volta de 15 segundos,
- * e não avisa. Cortar resolve isso.
+ *   - a voz de reserva do navegador: o `speechSynthesis` do Chrome interrompe sozinho uma fala
+ *     longa, por volta de 15 segundos, e não avisa;
+ *   - a voz do Gemini, via pedacosParaVoz (no fim deste arquivo).
  *
- * O que ela NÃO deve fazer é cortar o texto que vai para o Gemini, e vale registrar por quê,
- * porque a intuição aponta para o lado errado. Eu presumi que o tempo de síntese acompanhasse
- * a quantidade de áudio pedida e cortei por isso. A medição (16/09/2026, dez chamadas reais)
- * desmentiu:
- *
- *    76 caracteres  →  68s FALHA · 29s · 55s
- *   152 caracteres  →  51s · 68s FALHA · 15s
- *   304 caracteres  →  17s · 61s · 68s FALHA
- *   449 caracteres  →  43s · 43s · 19s · 16s · 18s   (cinco de cinco)
- *
- * O texto de 76 caracteres levou 55s; o de 304 levou 17s; e o maior de todos foi o único sem
- * nenhuma falha. Não há correlação com o tamanho: o que existe é uma taxa alta de chamadas
- * que penduram, independente do texto, e cada tentativa ou volta em ~16-20s ou estoura o teto.
- *
- * A consequência prática é o contrário do que parece: cortar em três MULTIPLICA por três as
- * chances de a fala cair para a voz do navegador, porque cada pedaço é um sorteio novo. Menos
- * chamadas, maiores, falham menos.
+ * HISTÓRICO, porque a decisão já virou duas vezes. Em 16/09/2026 dez chamadas pareceram mostrar
+ * que o tamanho não importava (76 caracteres em 55s, 449 em 16s) e o corte para o Gemini foi
+ * proibido: "cada pedaço é um sorteio novo contra uma API que pendura". Em 07/10/2026 (issue
+ * BEYOND-0001) uma medição maior, em três modelos, mostrou que aquilo era o modelo antigo
+ * pendurando ao acaso — por baixo, o tempo CRESCE com o texto (tabela em gemini.js). Com o
+ * modelo novo, que quase não pendura, o sorteio deixou de ser o problema e o tamanho passou a
+ * ser: a resposta inteira numa chamada só estourava o teto e caía para o navegador.
  */
 export function dividirParaFala(texto, alvo = 180) {
   const limpo = String(texto || "").trim();
@@ -119,4 +109,27 @@ export function dividirParaFala(texto, alvo = 180) {
   }
   if (atual.trim()) pedacos.push(atual.trim());
   return pedacos.filter(Boolean);
+}
+
+/** O primeiro pedaço é curto para a Lisa começar a falar em poucos segundos (~5s no 3.8). */
+export const ALVO_DO_PRIMEIRO_PEDACO = 150;
+/**
+ * Os seguintes são maiores: cada um é gerado enquanto o anterior toca, e o 3.8 gera mais
+ * rápido do que fala (~15s de síntese para ~38s de áudio), então a fila não esvazia. O pior
+ * pedaço possível (uma frase sozinha de até 1,6 × o alvo, ~450 caracteres) ainda cabe no
+ * orçamento de tempo — `npm run fala-check` confere a conta.
+ */
+export const ALVO_DOS_PEDACOS = 280;
+
+/**
+ * Os pedaços em que uma fala vai para o Gemini (BEYOND-0001). Texto curto vai inteiro; texto
+ * longo vira um pedaço curto na frente e pedaços maiores atrás.
+ */
+export function pedacosParaVoz(texto) {
+  const pedacos = dividirParaFala(texto, ALVO_DOS_PEDACOS);
+  if (pedacos.length === 0) return [];
+  const [primeiro, ...resto] = pedacos;
+  if (primeiro.length <= ALVO_DO_PRIMEIRO_PEDACO * 1.3) return pedacos;
+  const [cabeca, ...sobra] = dividirParaFala(primeiro, ALVO_DO_PRIMEIRO_PEDACO);
+  return [cabeca, ...(sobra.length ? [sobra.join(" ")] : []), ...resto];
 }

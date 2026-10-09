@@ -9,14 +9,46 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.2.0-cloudflare-pages.3",
-  "atualizadoEm": "2026-09-28",
+  "versao": "0.2.0-cloudflare-pages.5",
+  "atualizadoEm": "2026-10-09",
   "compilacao": {
-    "numero": 4,
-    "data": "2026-09-28",
+    "numero": 6,
+    "data": "2026-10-09",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.2.0-cloudflare-pages.5",
+      "data": "2026-10-09",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "O chat deixa de responder \"alta demanda\" quando o modelo do Google está sobrecarregado: passa para um modelo reserva.",
+      "itens": [
+        "Causa: o Google responde 503 quando o MODELO está sobrecarregado, com qualquer chave; o chat trocava de chave três vezes no mesmo modelo, castigando cada uma por 30s, e desistia — o painel ficava com \"sobrecarga\" em chaves boas.",
+        "Depois de duas sobrecargas no mesmo modelo, a chamada passa para o modelo reserva: gemini-3.5-flash e depois gemini-3.5-flash-lite (configurável em GEMINI_CHAT_RESERVAS). Vale também quando o modelo principal esgota a cota ou é desligado (404).",
+        "A sobrecarga tira a chave de circulação só por 5s (era 30s), porque a culpa não é da chave.",
+        "Vale para todas as 28 chamadas de chat da Lisa (respostas, ações, vigília, observação, rádio...). Embeddings e voz seguem com as regras próprias.",
+        "Testado: com o principal desligado, a resposta veio pela reserva em 3s; o caminho normal segue igual."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.4",
+      "data": "2026-10-07",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "A voz do Gemini deixa de cair para a do navegador em mensagens longas (BEYOND-0001).",
+      "itens": [
+        "Causa medida: o modelo de voz antigo (gemini-2.5-flash-preview-tts) pendurava com frequência, sobretudo em textos longos; e o tempo de síntese cresce com o texto — uma resposta inteira numa chamada só passava do teto de 26s, caía para o navegador e armava o disjuntor de 60s, levando as mensagens seguintes junto.",
+        "Modelo de voz novo: gemini-3.8-flash-tts (fora de preview) como principal e gemini-3.1-flash-tts-preview como reserva, com as tentativas sobrepostas alternando entre os dois (vence o que estiver saudável na hora). Configurável em GEMINI_TTS_MODEL e GEMINI_TTS_RESERVAS.",
+        "Teto e intervalo das tentativas proporcionais ao tamanho do texto, em vez de números fixos.",
+        "As respostas longas são faladas em pedaços (o primeiro curto), todos gerados em paralelo e tocados em ordem: a primeira voz sai em ~6s e não há silêncio entre os pedaços. Vale para o Assistente e para o speakText (rádio, vigília, avisos).",
+        "Testado de ponta a ponta com o código real: resposta de 733 caracteres em 5 pedaços, 3 de 3 rodadas inteiras na voz do Gemini. npm run fala-check reescrito com as medições de 07/10."
+      ],
+      "issues": [
+        "BEYOND-0001"
+      ]
+    },
     {
       "versao": "0.2.0-cloudflare-pages.3",
       "data": "2026-09-28",
@@ -111,7 +143,7 @@
       "Cloudflare Workers, com o adaptador @opennextjs/cloudflare e o wrangler",
       "Supabase auto-hospedado em Docker (PostgreSQL 17.6 + pgvector, PostgREST, Auth)",
       "Cloudflare Tunnel (cloudflared)",
-      "Google Gemini (gemini-2.5-flash, embeddings, TTS)",
+      "Google Gemini (chat gemini-3.6-flash, embeddings, voz gemini-3.8-flash-tts com reserva gemini-3.1-flash-tts-preview)",
       "Groq (modelos de linguagem, em rodízio de chaves)",
       "Three.js",
       "MediaPipe Tasks Vision",

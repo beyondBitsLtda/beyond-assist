@@ -156,6 +156,31 @@ function rewriteError(err, index, classified) {
  * padrão entre tentativas — usado por embedForIngest, que precisa respeitar um teto de
  * espera bem mais curto (função da Vercel tem limite de 60s).
  */
+/**
+ * MODELOS RESERVA DO CHAT — sobrecarga não é problema de chave.
+ *
+ * O Google responde 503 ("This model is currently experiencing high demand") quando o MODELO
+ * está sobrecarregado — para todo mundo, com qualquer chave. Antes, a resposta a isso era trocar
+ * de chave três vezes no mesmo modelo, pondo cada uma de castigo por 30s: num pico, as três
+ * falhavam juntas, o chat mostrava "alta demanda" e o painel de chaves ficava cheio de
+ * "sobrecarga" em chaves perfeitamente boas (visto em 09/10/2026: #1, #2 e #3).
+ *
+ * Agora, depois de duas sobrecargas no mesmo modelo, a chamada passa para o seguinte da lista.
+ * A sobrecarga também deixou de tirar a chave de circulação por 30s: fica só alguns segundos,
+ * o bastante para não insistir nela na mesma rajada e para aparecer no painel.
+ *
+ * Reservas escolhidas por medição: em 06/10, num pico, o 3.5-flash-lite foi o único "flash" que
+ * respondeu; em 09/10, com o 3.7 e o 3.8 sobrecarregados, o 3.5-flash e o 3.5-flash-lite
+ * responderam 4 de 4 em ~2s. Configurável em GEMINI_CHAT_RESERVAS (separadas por vírgula).
+ */
+const MODELOS_DE_CHAT = [...new Set([
+  CHAT_MODEL,
+  ...String(process.env.GEMINI_CHAT_RESERVAS || "gemini-3.5-flash,gemini-3.5-flash-lite")
+    .split(",").map((m) => m.trim()).filter(Boolean),
+])];
+const SOBRECARGAS_ANTES_DA_RESERVA = 2;
+const CASTIGO_DE_SOBRECARGA_MS = 5_000;
+
 async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, computeDelay = null, paraIngestao = false } = {}) {
   if (!KEYS.length) {
     throw new Error(
@@ -163,27 +188,43 @@ async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, com
       "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
     );
   }
-  const tried = new Set();
-  let lastErr;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    const index = await pickKeyIndex(KEYS.length, model, tried, { paraIngestao });
-    tried.add(index);
-    const client = clientFor(KEYS[index]);
-    try {
-      const result = await fn(client);
-      await markOk(index, model);
-      return result;
-    } catch (err) {
-      lastErr = err;
-      const classified = classifyGeminiError(err);
-      if (!classified.transient) throw err; // erro genuinamente não-transitório — não adianta repetir
-      await markCooldown(index, model, { untilMs: classified.untilMs, reason: classified.reason, error: err?.message || err });
-      if (attempt === attempts) throw rewriteError(err, index, classified);
-      const wait = computeDelay ? computeDelay(attempt, err) : delayMs * attempt;
-      await new Promise((r) => setTimeout(r, wait));
+  // Só o chat tem reservas; embeddings e o resto seguem no modelo pedido.
+  const modelos = model === CHAT_MODEL ? MODELOS_DE_CHAT : [model];
+  let ultimoErro;
+
+  for (let m = 0; m < modelos.length; m++) {
+    const modelo = modelos[m];
+    const haReserva = m < modelos.length - 1;
+    const tried = new Set();
+    let sobrecargas = 0;
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      const index = await pickKeyIndex(KEYS.length, modelo, tried, { paraIngestao });
+      tried.add(index);
+      const client = clientFor(KEYS[index]);
+      try {
+        const result = await fn(client, modelo);
+        await markOk(index, modelo);
+        return result;
+      } catch (err) {
+        const classified = classifyGeminiError(err);
+        if (!classified.transient) throw err; // erro genuinamente não-transitório — não adianta repetir
+        const sobrecarga = classified.code === "UNAVAILABLE";
+        await markCooldown(index, modelo, {
+          untilMs: sobrecarga ? Date.now() + CASTIGO_DE_SOBRECARGA_MS : classified.untilMs,
+          reason: classified.reason,
+          error: err?.message || err,
+        });
+        ultimoErro = rewriteError(err, index, classified);
+        if (sobrecarga && ++sobrecargas >= SOBRECARGAS_ANTES_DA_RESERVA && haReserva) break; // próximo modelo
+        if (classified.code === "UNSUPPORTED" && haReserva) break; // modelo desligado neste projeto
+        if (attempt === attempts) break;
+        const wait = computeDelay ? computeDelay(attempt, err) : delayMs * attempt;
+        await new Promise((r) => setTimeout(r, wait));
+      }
     }
   }
-  throw lastErr || new Error("withTransientRetry: unreachable");
+  throw ultimoErro || new Error("withTransientRetry: unreachable");
 }
 
 /**
@@ -197,7 +238,7 @@ export async function embed(texts, taskType = "RETRIEVAL_DOCUMENT") {
   const contents = Array.isArray(texts) ? texts : [texts];
   const res = await withTransientRetry(
     EMBED_MODEL,
-    (client) => client.models.embedContent({ model: EMBED_MODEL, contents, config: { outputDimensionality: EMBED_DIM, taskType } }),
+    (client, modelo) => client.models.embedContent({ model: EMBED_MODEL, contents, config: { outputDimensionality: EMBED_DIM, taskType } }),
     { attempts: 2, delayMs: 3000 } // menos tentativas e espera curta: falha rápido em vez de travar minutos
   );
   return res.embeddings.map((e) => e.values);
@@ -229,7 +270,7 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
   // numa disponível sem desistir cedo demais.
   const res = await withTransientRetry(
     EMBED_MODEL,
-    (client) => client.models.embedContent({ model: EMBED_MODEL, contents, config: { outputDimensionality: EMBED_DIM, taskType } }),
+    (client, modelo) => client.models.embedContent({ model: EMBED_MODEL, contents, config: { outputDimensionality: EMBED_DIM, taskType } }),
     {
       attempts: 4,
       // A indexação fica restrita ao começo do pool; o fim é reserva da conversa (ver
@@ -270,9 +311,9 @@ export async function* chatStream(prompt, systemInstruction, { tools, images } =
 
   // retry só na abertura do stream (antes de qualquer chunk chegar) — 429/503 costumam
   // se resolver em segundos; uma vez que o texto começou a chegar não há o que repetir.
-  const stream = await withTransientRetry(CHAT_MODEL, (client) =>
+  const stream = await withTransientRetry(CHAT_MODEL, (client, modelo) =>
     client.models.generateContentStream({
-      model: CHAT_MODEL,
+      model: modelo,
       contents,
       config: Object.keys(config).length ? config : undefined,
     })
@@ -352,9 +393,9 @@ Regras:
 
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: prompt,
         config: {
           systemInstruction,
@@ -412,9 +453,9 @@ máximo uns 6, em ordem de confiança.`;
 
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: prompt,
         config: {
           systemInstruction: "Você ajuda a decidir quais arquivos de um repositório são relevantes pra um pedido, só pelos nomes/caminhos dos arquivos, sem ver o conteúdo.",
@@ -470,9 +511,9 @@ Regras estritas:
 
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: prompt,
         config: {
           systemInstruction,
@@ -546,9 +587,9 @@ Regras:
 
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: prompt,
         config: {
           systemInstruction,
@@ -617,8 +658,8 @@ formatação, imports não relacionados). Se for um arquivo novo, escreva ele do
 consistente com o resto do pedido.`;
 
   // retry só na abertura do stream (antes de qualquer chunk chegar) — mesmo padrão de chatStream.
-  const stream = await withTransientRetry(CHAT_MODEL, (client) =>
-    client.models.generateContentStream({ model: CHAT_MODEL, contents: prompt, config: { systemInstruction } })
+  const stream = await withTransientRetry(CHAT_MODEL, (client, modelo) =>
+    client.models.generateContentStream({ model: modelo, contents: prompt, config: { systemInstruction } })
   );
   for await (const chunk of stream) {
     if (chunk.text) yield chunk.text;
@@ -652,8 +693,8 @@ conteúdo completo e corrigido do arquivo — nada de marcador, nada de explica�
 de código markdown (sem \`\`\`), nenhuma linha de comentário com o caminho do arquivo. A
 primeira linha da resposta já é a primeira linha real do arquivo.`;
 
-  const stream = await withTransientRetry(CHAT_MODEL, (client) =>
-    client.models.generateContentStream({ model: CHAT_MODEL, contents: prompt, config: { systemInstruction } })
+  const stream = await withTransientRetry(CHAT_MODEL, (client, modelo) =>
+    client.models.generateContentStream({ model: modelo, contents: prompt, config: { systemInstruction } })
   );
   for await (const chunk of stream) {
     if (chunk.text) yield chunk.text;
@@ -688,9 +729,9 @@ arquivos e da pasta — convenções comuns de projeto (ex.: "api" = rotas de ba
 
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: prompt,
         config: {
           systemInstruction: "Você documenta a arquitetura de um repositório de código, descrevendo áreas (pastas) só pelos caminhos dos arquivos dentro delas. Seja direto e específico — evite generalidades vagas tipo 'contém arquivos relacionados ao projeto'.",
@@ -727,9 +768,9 @@ centrais pelo nome. Tom direto, técnico, em português.`;
 
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: prompt,
         config: { systemInstruction: "Você escreve a introdução de uma documentação técnica de arquitetura de software, em português, direto ao ponto." },
       }),
@@ -757,9 +798,9 @@ sintaxe óbvia linha a linha; foque no PAPEL do arquivo no sistema como um todo.
 
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: prompt,
         config: { systemInstruction: "Você explica trechos de código-chave de um repositório pra documentação técnica, em português — direto, específico, sem parafrasear sintaxe óbvia." },
       }),
@@ -796,9 +837,9 @@ Com base nisso, produza:
 
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: prompt,
         config: {
           systemInstruction: "Você documenta o fluxo de uso e os casos de uso de uma aplicação de software pra documentação técnica, em português, com base no que já se sabe sobre as áreas do código.",
@@ -831,20 +872,49 @@ Com base nisso, produza:
 }
 
 // ---- TTS: gera áudio a partir de texto ----
-const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
+//
+// BEYOND-0001 — a voz caía para a do navegador, sobretudo em mensagens longas. Medição de
+// 07/10/2026 (nove chamadas por modelo, três tamanhos; tempo de síntese / segundos de áudio):
+//
+//   gemini-2.5-flash-preview-tts   ~120c 43s·12s·6s   ~250c 10s·13s·ERRO 500   ~520c 15s·PENDUROU·PENDUROU
+//   gemini-3.8-flash-tts           ~120c 22s·5s·5s    ~250c 10s·9s·9s          ~520c 16s·17s·14s
+//   gemini-3.1-flash-tts-preview   ~120c 18s·8s·8s    ~250c 12s·13s·15s        ~520c 23s·23s·43s
+//
+// Três conclusões, e a segunda desmente a anotação de 16/09 (que dizia "o tamanho não importa"):
+//
+//   1. O modelo antigo, ainda em preview, pendura com frequência — e mais nos textos longos.
+//   2. O tempo CRESCE com o texto (~5s para uma frase, ~15s para ~520 caracteres no 3.8). Em
+//      16/09 isso ficou escondido atrás da taxa de travamento do modelo antigo. Com um teto
+//      fixo de 26s, uma resposta longa (a rota aceitava 1.200 caracteres numa chamada só)
+//      estourava as três tentativas, caía para o navegador e armava o disjuntor de 60s do
+//      Assistente — levando as mensagens seguintes junto.
+//   3. A saúde de cada modelo VARIA ao longo do dia. Horas depois da tabela acima, ao meio-dia,
+//      o 3.8 pendurou 4 de 12 chamadas enquanto o 3.1 não pendurou nenhuma em 13. Nenhum modelo
+//      sozinho é confiável o dia inteiro.
+//
+// Por isso: o 3.8 (fora de preview) como principal e o 3.1 como reserva, com as tentativas
+// ALTERNANDO entre os dois e a segunda começando cedo — vence o que estiver saudável naquela
+// hora —; teto e hedge proporcionais ao tamanho; e quem chama (Assistente, speakText) fatiando
+// respostas longas em pedaços (pedacosParaVoz). O 2.5 saiu da lista: foi o mais instável e é
+// da geração que o Google já está desligando (o gemini-2.5-flash de texto responde 404).
+const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-3.8-flash-tts";
+const TTS_MODELOS = [...new Set([
+  TTS_MODEL,
+  ...String(process.env.GEMINI_TTS_RESERVAS || "gemini-3.1-flash-tts-preview")
+    .split(",").map((m) => m.trim()).filter(Boolean),
+])];
 
-// Quanto esperar UMA tentativa de síntese antes de trocar de chave.
-//
-// Número fixo, e de propósito. Eu já tentei fazê-lo acompanhar o tamanho do texto, presumindo
-// que gerar mais áudio levasse mais tempo. Medi dez chamadas reais em 16/09/2026 e a premissa
-// não se sustenta (as amostras estão escritas em dividirParaFala, cleanForSpeech.js): 76
-// caracteres levaram 55s numa amostra, 304 levaram 17s, e o maior texto testado — 449
-// caracteres — foi o ÚNICO sem nenhuma falha em cinco tentativas.
-//
-// O que a medição mostra é outra coisa: uma tentativa ou volta em ~16 a 20 segundos, ou
-// pendura até o teto. Daí 26s — folga de ~30% sobre a maior resposta boa observada (20,7s),
-// sem esperar à toa por uma chamada que já morreu.
-const TTS_TETO_POR_TENTATIVA_MS = 26_000;
+// Quanto esperar UMA tentativa de síntese: base fixa mais um tanto por caractere, porque gerar
+// mais áudio leva mais tempo (ver a tabela acima). Largo de propósito — 18s + 60ms/caractere —
+// para não cortar uma resposta BOA e lenta do 3.1 (picos de 27-29s num pedaço de ~185
+// caracteres). Quem resolve a chamada pendurada é o hedge, não o teto.
+const TTS_TETO_BASE_MS = 18_000;
+const TTS_TETO_POR_CARACTERE_MS = 60;
+const TTS_TETO_MINIMO_MS = 25_000;
+const TTS_TETO_MAXIMO_MS = 50_000;
+export function tetoDaTentativaDeVoz(caracteres) {
+  return Math.min(TTS_TETO_MAXIMO_MS, Math.max(TTS_TETO_MINIMO_MS, TTS_TETO_BASE_MS + caracteres * TTS_TETO_POR_CARACTERE_MS));
+}
 const DEFAULT_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
 
 // Pra o painel de status (/api/gemini-keys/status) montar a matriz chave×modelo sem nunca
@@ -853,24 +923,26 @@ export const GEMINI_KEY_COUNT = KEYS.length;
 export const GEMINI_MODELS = { chat: CHAT_MODEL, tts: TTS_MODEL, embed: EMBED_MODEL };
 
 /**
- * Quanto esperar por uma tentativa antes de disparar OUTRA em paralelo, numa chave diferente.
+ * Quanto esperar por uma tentativa antes de disparar OUTRA em paralelo — numa chave diferente E
+ * num modelo diferente (ver sintetizarComHedge).
  *
- * Este número sai direto da medição de 19/09/2026, oito chamadas contra a nuvem:
+ * A ideia vem da medição de 19/09/2026: uma tentativa boa volta num tempo previsível, uma ruim
+ * não volta nunca — morre no teto e só então a seguinte começaria, do zero. Disparar a seguinte
+ * enquanto a primeira ainda está pendurada transforma "teto + tudo de novo" em "uma segunda
+ * chance já rodando". A perdedora é abortada assim que a outra chega.
  *
- *     12,7s · 13,6s · 14,1s · 14,7s · 14,7s · 13,9s   ← primeira tentativa deu certo
- *     67,6s · 74,5s                                    ← primeira pendurou
- *
- * Uma tentativa boa volta em 13 a 15 segundos. Uma ruim não volta nunca — morre no teto de 26s
- * e só então a seguinte começa, do zero. Foi assim que duas chamadas de 13 segundos viraram 67.
- *
- * Esperar 16 segundos separa os dois casos: as boas já voltaram, e as penduradas ganham uma
- * concorrente enquanto ainda estão penduradas, em vez de dez segundos depois. A perdedora é
- * abortada assim que a outra chega.
- *
- * O custo é chamada a mais quando a primeira demora. Contra uma API que pendura em metade das
- * vezes, é troca boa: a alternativa é o usuário esperar 67 segundos ou ouvir a voz do navegador.
+ * Proporcional ao texto pelo mesmo motivo do teto: uma frase boa volta em ~5s, um pedaço de 400
+ * caracteres em ~12s no 3.8. Curto de propósito — 4s + 15ms/caractere —: com a saúde dos modelos
+ * variando ao longo do dia, a segunda tentativa (no OUTRO modelo) precisa começar cedo, e não
+ * depois que a primeira já desperdiçou meio minuto pendurada.
  */
-const TTS_HEDGE_MS = 16_000;
+const TTS_HEDGE_BASE_MS = 4_000;
+const TTS_HEDGE_POR_CARACTERE_MS = 15;
+const TTS_HEDGE_MINIMO_MS = 6_000;
+const TTS_HEDGE_MAXIMO_MS = 12_000;
+export function hedgeDaVoz(caracteres) {
+  return Math.min(TTS_HEDGE_MAXIMO_MS, Math.max(TTS_HEDGE_MINIMO_MS, TTS_HEDGE_BASE_MS + caracteres * TTS_HEDGE_POR_CARACTERE_MS));
+}
 const TTS_TENTATIVAS = 3;
 
 /**
@@ -888,16 +960,23 @@ async function sintetizarComHedge(text, voice) {
   const controladores = [];
   const erros = [];
   let jaVenceu = false;
+  const teto = tetoDaTentativaDeVoz(text.length);
+  const hedge = hedgeDaVoz(text.length);
 
+  // Cada tentativa num modelo diferente (principal, reserva, principal...): quando um modelo
+  // inteiro está sobrecarregado — o que acontece com o Google e não tem a ver com chave —, as
+  // três tentativas no mesmo modelo cairiam juntas.
+  let numero = 0;
   const umaTentativa = async () => {
-    const indice = await pickKeyIndex(KEYS.length, TTS_MODEL, tentadas);
+    const modelo = TTS_MODELOS[numero++ % TTS_MODELOS.length];
+    const indice = await pickKeyIndex(KEYS.length, modelo, tentadas);
     tentadas.add(indice);
     const controlador = new AbortController();
     controladores.push(controlador);
-    const relogio = setTimeout(() => controlador.abort(), TTS_TETO_POR_TENTATIVA_MS);
+    const relogio = setTimeout(() => controlador.abort(), teto);
     try {
       const r = await clientFor(KEYS[indice]).models.generateContent({
-        model: TTS_MODEL,
+        model: modelo,
         contents: [{ parts: [{ text }] }],
         config: {
           responseModalities: ["AUDIO"],
@@ -905,7 +984,7 @@ async function sintetizarComHedge(text, voice) {
           abortSignal: controlador.signal,
         },
       });
-      await markOk(indice, TTS_MODEL);
+      await markOk(indice, modelo);
       return r;
     } catch (err) {
       // Uma tentativa abortada PORQUE outra ganhou não diz nada sobre a chave dela. Marcar
@@ -914,7 +993,7 @@ async function sintetizarComHedge(text, voice) {
       if (!jaVenceu) {
         const classificado = classifyGeminiError(err);
         if (classificado.transient) {
-          await markCooldown(indice, TTS_MODEL, {
+          await markCooldown(indice, modelo, {
             untilMs: classificado.untilMs,
             reason: classificado.reason,
             error: err?.message || String(err),
@@ -937,7 +1016,7 @@ async function sintetizarComHedge(text, voice) {
     if (i === TTS_TENTATIVAS - 1) break;
     const chegouAlguma = await Promise.race([
       Promise.any(emVoo).then(() => true).catch(() => false),
-      new Promise((r) => setTimeout(() => r(false), TTS_HEDGE_MS)),
+      new Promise((r) => setTimeout(() => r(false), hedge)),
     ]);
     if (chegouAlguma) break;
   }
@@ -1056,9 +1135,9 @@ tocando SEMPRE merece um comentário, mesmo que curto/incerto. Quando falar, sej
 export async function describeAudioIfNotable(audio, systemInstruction = MIC_WATCH_INSTRUCTION) {
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: [{ role: "user", parts: [{ text: "Aqui está o áudio dos últimos segundos." }, { inlineData: { mimeType: audio.mimeType, data: audio.data } }] }],
         config: { systemInstruction },
       }),
@@ -1081,9 +1160,9 @@ export async function describeAudioIfNotable(audio, systemInstruction = MIC_WATC
 export async function describeScreenIfNotable(image, systemInstruction = SCREEN_WATCH_INSTRUCTION, label = "Aqui está a tela agora.") {
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: [{ role: "user", parts: [{ text: label }, { inlineData: { mimeType: image.mimeType, data: image.data } }] }],
         config: { systemInstruction },
       }),
@@ -1136,9 +1215,9 @@ avaliar o critério.`;
 
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: [{
           role: "user",
           parts: [
@@ -1190,9 +1269,9 @@ export async function answerAboutScreenHistory(question, rows, systemInstruction
     : "(nenhuma observação registrada ainda)";
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: [{ role: "user", parts: [{ text: `HISTÓRICO DE OBSERVAÇÕES DA TELA:\n${historyText}\n\nPERGUNTA: ${question}` }] }],
         config: { systemInstruction },
       }),
@@ -1214,9 +1293,9 @@ export async function summarizeNewScreenActivity(rows, systemInstruction = VIGIA
   const newText = rows.map((r) => `[${new Date(r.created_at).toLocaleString("pt-BR")}] ${r.comment}`).join("\n");
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: [{ role: "user", parts: [{ text: `NOVO DESDE A ÚLTIMA VEZ:\n${newText}` }] }],
         config: { systemInstruction },
       }),
@@ -1240,9 +1319,9 @@ NÃO repita a mensagem palavra por palavra como um robô lendo em voz alta — i
 export async function interpretVigiaChatMessage(text, systemInstruction = VIGIA_CAMERA_CHAT_INSTRUCTION) {
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: [{ role: "user", parts: [{ text: `MENSAGEM RECEBIDA: ${text}` }] }],
         config: { systemInstruction },
       }),
@@ -1477,9 +1556,9 @@ export async function runLisaCodeTurn(contents, { provedor = "gemini" } = {}) {
 
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents,
         config: { systemInstruction: LISA_CODE_INSTRUCTION, tools: LISA_CODE_TOOLS },
       }),
@@ -1520,9 +1599,9 @@ export async function generateQuizQuestion({ category, difficulty, avoid = [] })
   const avoidText = avoid.length ? `\n\nNÃO repita nenhuma destas perguntas já feitas:\n${avoid.map((q) => `- ${q}`).join("\n")}` : "";
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: `Assunto: ${label}\nDificuldade: ${difficulty}${avoidText}`,
         config: {
           systemInstruction: QUIZ_INSTRUCTION,
@@ -1567,9 +1646,9 @@ export async function generateQuizQuestion({ category, difficulty, avoid = [] })
 export async function commentQuizAnswer({ question, chosen, correct, wasCorrect, explanation, recommendation }) {
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: `Pergunta: ${question}\nEle marcou: ${chosen}\nCorreta: ${correct}\nAcertou? ${wasCorrect ? "sim" : "não"}\n\nExplicação técnica: ${explanation}\nRecomendação: ${recommendation}\n\nComente em no máximo 3 frases, no seu estilo: diga se acertou ou errou, POR QUÊ, e feche com o que estudar. Não repita a explicação palavra por palavra — reescreva do seu jeito.`,
         config: { systemInstruction: QUIZ_INSTRUCTION },
       }),
@@ -1592,9 +1671,9 @@ REGRAS:
 export async function proposePairFeature({ repo, level, fileList = [], description = "" }) {
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: `Repositório: ${repo}\nDescrição: ${description || "(sem descrição)"}\nNível pedido: ${level}\n\nAlguns arquivos do repositório:\n${fileList.slice(0, 120).join("\n") || "(não consegui listar)"}`,
         config: {
           systemInstruction: PAIR_INSTRUCTION,
@@ -1637,9 +1716,9 @@ REGRAS:
 export async function editCodeWithLisa({ path, content, instruction }) {
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: `Arquivo: ${path}\n\nPEDIDO: ${instruction}\n\nCONTEÚDO ATUAL:\n${content}`,
         config: {
           systemInstruction: PAIR_EDIT_INSTRUCTION,
@@ -1682,9 +1761,9 @@ export async function generateCompanionRemark({ category, data }) {
   const label = RADIO_CATEGORY_LABELS[category] || category;
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: [{ role: "user", parts: [{ text: `Você resolveu comentar algo sobre: ${label}\n\nDADOS REAIS (não invente além disso):\n${data?.trim() || "(nada por aqui agora)"}` }] }],
         config: { systemInstruction: COMPANION_INSTRUCTION },
       }),
@@ -1733,9 +1812,9 @@ export async function generateRadioTalkSegment({ category, data }, systemInstruc
     : "(nada disponível no momento)";
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: [{ role: "user", parts: [{ text: `Bloco de rádio sobre: ${label}\n\nDADOS REAIS — ${framing}. Não invente além disso:\n${data?.trim() || fallback}` }] }],
         config: { systemInstruction: effectiveInstruction },
       }),
@@ -1750,9 +1829,9 @@ export async function generateRadioTalkSegment({ category, data }, systemInstruc
 export async function introduceSteve(systemInstruction = RADIO_HOST_INSTRUCTION) {
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: [{ role: "user", parts: [{ text: `Anuncie (bem curto, 1 frase só, no seu estilo animado de rádio) que agora você vai passar a palavra pro Steve, o comentarista de tecnologia do programa, pra ele trazer as notícias de hoje.` }] }],
         config: { systemInstruction },
       }),
@@ -1767,9 +1846,9 @@ export async function introduceSteve(systemInstruction = RADIO_HOST_INSTRUCTION)
 export async function commentAfterSteve(steveText, systemInstruction = RADIO_HOST_INSTRUCTION) {
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: [{ role: "user", parts: [{ text: `O Steve acabou de comentar essas notícias de tecnologia no programa:\n"${steveText}"\n\nReaja rapidamente (1-2 frases, no seu estilo), como se estivesse ouvindo ele ao vivo — pode concordar, discordar, brincar, ou relacionar com o que for pertinente pro seu usuário, mas sem inventar fatos novos além do que ele já disse.` }] }],
         config: { systemInstruction },
       }),
@@ -1782,9 +1861,9 @@ export async function commentAfterSteve(steveText, systemInstruction = RADIO_HOS
 export async function announceRadioSong(title, systemInstruction = RADIO_HOST_INSTRUCTION) {
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: [{ role: "user", parts: [{ text: `Anuncie (bem curto, 1 frase só) a próxima música que vai tocar agora: "${title}"` }] }],
         config: { systemInstruction },
       }),
@@ -1798,9 +1877,9 @@ export async function announceRadioSong(title, systemInstruction = RADIO_HOST_IN
 export async function commentRadioSong(title, systemInstruction = RADIO_HOST_INSTRUCTION) {
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client) =>
+    (client, modelo) =>
       client.models.generateContent({
-        model: CHAT_MODEL,
+        model: modelo,
         contents: [{ role: "user", parts: [{ text: `Acabou de tocar "${title}". Comente rapidamente (1-2 frases, no seu estilo) sobre a música ou o artista.` }] }],
         config: { systemInstruction },
       }),

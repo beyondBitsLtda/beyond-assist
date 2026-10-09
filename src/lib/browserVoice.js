@@ -1,4 +1,4 @@
-import { dividirParaFala } from "./cleanForSpeech.js";
+import { dividirParaFala, pedacosParaVoz } from "./cleanForSpeech.js";
 
 // A Web Speech API do navegador NÃO expõe gênero da voz (SpeechSynthesisVoice só tem
 // name/lang/etc.) — só dá pra tentar adivinhar pelo NOME, que varia por navegador/SO/idioma
@@ -71,42 +71,58 @@ export async function speakText(text, { voiceName, browserOnly = false } = {}) {
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
   window.speechSynthesis?.cancel();
 
-  // O texto vai INTEIRO para o Gemini, numa chamada só.
-  //
-  // Eu cheguei a cortá-lo em pedaços aqui, achando que textos longos estouravam o tempo. A
-  // medição mostrou o contrário (ver dividirParaFala em cleanForSpeech.js): o bloco de 449
-  // caracteres foi o único que não falhou nenhuma vez em cinco. E cortar tem um custo que a
-  // intuição esconde — cada pedaço é um sorteio novo contra uma API que pendura com
-  // frequência, então três pedaços caem para a voz do navegador MUITO mais vezes que um.
+  // O que ainda falta falar se o Gemini falhar no meio — começa sendo o texto inteiro.
+  let restante = clean;
+
+  // BEYOND-0001: em PEDAÇOS (pedacosParaVoz), cada um gerado enquanto o anterior toca. Numa
+  // chamada só, um bloco longo (rádio, vigília) levava mais que o teto do servidor e caía
+  // inteiro para a voz do navegador. A objeção antiga a cortar ("cada pedaço é um sorteio contra
+  // uma API que pendura") era do modelo antigo — ver a medição em gemini.js.
   if (!browserOnly) {
-    const controlador = new AbortController();
-    // Teto de rede. Antes não havia nenhum: um pedido pendurado prendia a fala para sempre, e
-    // o que disfarçava isso era uma corrida de 120s escrita lá no Modo Rádio.
-    const relogio = setTimeout(() => controlador.abort(), TETO_DE_REDE_MS);
-    try {
-      const res = await fetch("/api/speak", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: clean, voice: voiceName }),
-        signal: controlador.signal,
-      });
-      if (!res.ok) throw new Error(`speak HTTP ${res.status}`);
-      const blob = await res.blob();
-      if (myGen !== gen) return; // uma fala mais nova assumiu enquanto esperávamos a rede
+    const pedacos = pedacosParaVoz(clean);
+    const sintetizar = async (texto) => {
+      const controlador = new AbortController();
+      // Teto de rede por pedaço. Sem nenhum, um pedido pendurado prendia a fala para sempre.
+      const relogio = setTimeout(() => controlador.abort(), TETO_DE_REDE_MS);
+      try {
+        const res = await fetch("/api/speak", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text: texto, voice: voiceName }),
+          signal: controlador.signal,
+        });
+        return res.ok ? await res.blob() : null;
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(relogio);
+      }
+    };
+    const tocar = (blob) => new Promise((resolve) => {
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       currentAudio = audio;
-      await new Promise((resolve) => {
-        audio.onended = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
-        audio.onerror = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
-        audio.play().catch(resolve);
-      });
-      return;
-    } catch {
-      // cai pra voz do navegador
-    } finally {
-      clearTimeout(relogio);
+      audio.onended = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
+      audio.onerror = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
+      audio.play().catch(resolve);
+    });
+
+    // Todos os pedaços começam a ser gerados JÁ, em paralelo, e tocam em ordem: um pedaço lento
+    // fica pronto enquanto os anteriores tocam, em vez de abrir silêncio no meio da fala
+    // (medido: gerando um de cada vez, um pedaço de 21s deixou 10s de silêncio).
+    const sinteses = pedacos.map((p) => sintetizar(p));
+    let i = 0;
+    for (; i < pedacos.length; i++) {
+      const blob = await sinteses[i];
+      if (myGen !== gen) return; // uma fala mais nova assumiu enquanto esperávamos a rede
+      if (!blob) break;          // o Gemini falhou neste pedaço: daqui em diante, navegador
+      await tocar(blob);
+      if (myGen !== gen) return;
     }
+    if (i === pedacos.length) return;
+    // Uma voz só do pedaço que falhou em diante: alternar Gemini e navegador a cada pedaço
+    // soaria como duas pessoas falando.
+    restante = pedacos.slice(i).join(" ");
   }
 
   if (myGen !== gen || !window.speechSynthesis) return;
@@ -118,7 +134,7 @@ export async function speakText(text, { voiceName, browserOnly = false } = {}) {
   // Alvo de 120, e não o padrão: o corte respeita fim de frase, então uma frase sozinha
   // pode passar do alvo em até 60%. Com 120 o pior caso fica em ~192 caracteres, abaixo
   // dos ~210 que o Chrome fala antes de interromper por conta própria.
-  for (const pedaco of dividirParaFala(clean, 120)) {
+  for (const pedaco of dividirParaFala(restante, 120)) {
     if (myGen !== gen) return;
     const u = new SpeechSynthesisUtterance(pedaco);
     u.lang = "pt-BR";

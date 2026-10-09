@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
+import { cleanForSpeech, pedacosParaVoz } from "@/lib/cleanForSpeech.js";
 import { detectarAcordar, interpretarComando, escolherMusica, normalizar } from "@/lib/escutaPorPalavra.js";
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
@@ -2005,8 +2005,8 @@ export default function AssistantPage() {
   // REPRODUÇÃO de propósito: decidir é rápido (só espera a resposta do /api/speak, não o
   // áudio tocar até o fim), então o próximo pedaço já pode começar a sintetizar enquanto o
   // atual ainda está sendo ouvido — é isso que fecha o gap sem reabrir a corrida de voz.
-  const resolveChunkEngine = useCallback(async (tryGemini, text) => {
-    const result = tryGemini ? await synthesizeChunk(text) : { url: null, skipped: true };
+  const resolveChunkEngine = useCallback(async (tryGemini, text, antecipada = null) => {
+    const result = tryGemini ? await (antecipada || synthesizeChunk(text)) : { url: null, skipped: true };
     if (result?.url) {
       speechEngineRef.current = "gemini";
       setGeminiVoiceStatus(true);
@@ -2061,15 +2061,27 @@ export default function AssistantPage() {
   }, [addLog]);
 
   const enfileirarPedaco = useCallback((clean, gen) => {
+    // SÍNTESE ANTECIPADA (BEYOND-0001): o áudio deste pedaço começa a ser gerado JÁ, em
+    // paralelo com os anteriores, e não só quando o anterior fica pronto. Medido com uma
+    // resposta de 733 caracteres em cinco pedaços: gerando um de cada vez, um pedaço lento
+    // (21s) abria 10s de silêncio no meio da fala; em paralelo, ele fica pronto muito antes
+    // de chegar a vez dele. Não custa chamada a mais — são as mesmas, só começam antes.
+    const podeTentarAgora = geminiVoiceEnabled && speechEngineRef.current !== "browser" && Date.now() >= geminiDownUntilRef.current;
+    const antecipada = podeTentarAgora ? synthesizeChunk(clean) : null;
+    // Se no fim a vez deste pedaço for de outro motor (um anterior falhou), o áudio gerado
+    // sobra: solta a memória dele.
+    const descartar = () => { antecipada?.then((r) => { if (r?.url) URL.revokeObjectURL(r.url); }); };
+
     // fila de DECISÃO: só decide se tenta o Gemini pra este pedaço depois que o pedaço
     // anterior já sabe o motor dele — fecha a corrida em que, numa resposta curta, o "resto"
     // decidia tentar o Gemini antes de saber se a "cabeça" tinha falhado (a chamada de TTS é
     // mais lenta que o streaming do texto, às vezes) — daí cabeça e resto saíam em vozes
     // diferentes. Rápido (não espera áudio tocar), então não reabre o gap que isso evita.
     const thisDecision = engineDecisionRef.current.then(() => {
-      if (gen !== speechGenRef.current) return { url: null, skipped: true };
+      if (gen !== speechGenRef.current) { descartar(); return { url: null, skipped: true }; }
       const tryGemini = geminiVoiceEnabled && speechEngineRef.current !== "browser" && Date.now() >= geminiDownUntilRef.current;
-      return resolveChunkEngine(tryGemini, clean);
+      if (!tryGemini) descartar();
+      return resolveChunkEngine(tryGemini, clean, tryGemini ? antecipada : null);
     });
     engineDecisionRef.current = thisDecision.catch(() => ({ url: null, skipped: true }));
 
@@ -2080,20 +2092,23 @@ export default function AssistantPage() {
       if (gen !== speechGenRef.current) return;
       return playResult(result, clean, gen);
     });
-  }, [resolveChunkEngine, playResult, geminiVoiceEnabled]);
+  }, [resolveChunkEngine, playResult, geminiVoiceEnabled, synthesizeChunk]);
 
   const enqueueSpeech = useCallback((text, gen) => {
     const bruto = (text || "").trim();
     if (!bruto) return;
 
-    // Uma chamada de TTS por resposta, e não uma por frase. Cortar parece melhor (a fala
-    // começaria antes) mas mede pior: cada pedaço é um sorteio novo contra uma API que
-    // pendura com frequência, e o primeiro que cai leva os seguintes junto para a voz do
-    // navegador. Ver a medição em dividirParaFala, cleanForSpeech.js.
+    // BEYOND-0001: a resposta vai em PEDAÇOS (pedacosParaVoz), não numa chamada só.
     //
-    // O streaming da resposta já chama isto várias vezes quando o texto chega em partes; é
-    // daí que vem o paralelismo entre sintetizar e tocar, sem multiplicar chamadas à toa.
-    enfileirarPedaco(bruto, gen);
+    // Numa chamada só, uma resposta longa levava mais que o teto do servidor para ser gerada,
+    // caía para a voz do navegador e armava o disjuntor — a issue inteira. Em pedaços, o
+    // primeiro (curto) começa a tocar em poucos segundos e cada seguinte é gerado enquanto o
+    // anterior toca: a fila de DECISÃO de enfileirarPedaco já sintetiza o próximo sem esperar o
+    // áudio do atual acabar. A antiga objeção ("cada pedaço é um sorteio contra uma API que
+    // pendura") era do modelo antigo — ver a medição em gemini.js e cleanForSpeech.js.
+    //
+    // O streaming da resposta ainda pode chamar isto várias vezes; cada chamada corta a sua parte.
+    for (const pedaco of pedacosParaVoz(cleanForSpeech(bruto))) enfileirarPedaco(pedaco, gen);
   }, [enfileirarPedaco]);
 
   // ---- escopo do assistente ----
