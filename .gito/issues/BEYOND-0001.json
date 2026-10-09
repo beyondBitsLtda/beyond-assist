@@ -4,20 +4,41 @@
   "descricao": "Por algum motivo a Lisa no modo chat falha muitas vezes ao usar a voz do Gemini, direto cai para a voz automática do navegador em especial em mensgaens longas.\n\n- Esse erro ocorre tanto na lisa.beyond como na casa.beyond.\n- Esse erro ocorre inclusive com as chaves de API todas disponivéis. ",
   "tipo": "bug",
   "prioridade": "media",
-  "status": "aberta",
+  "status": "em-revisao",
   "responsavel": "Brayan Rodrigues",
   "prazo": "2026-10-02",
   "versaoAlvo": "0.1.0.1",
   "criadaEm": "2026-09-27T05:14:05.760Z",
   "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
-  "atualizadaEm": "2026-09-27T05:14:05.760Z",
-  "comentarios": [],
+  "atualizadaEm": "2026-10-07T23:17:12.887Z",
+  "comentarios": [
+    {
+      "quando": "2026-10-07T22:58:55.743Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Investigando. Medição de hoje (07/10): o modelo de voz atual (gemini-2.5-flash-preview-tts, ainda preview) falhou em 3 de 9 chamadas e pendurou em 2 de 3 textos longos; o gemini-3.8-flash-tts (estável) não falhou nenhuma. Além disso, o tempo de síntese cresce com o tamanho do texto (~5s para frases curtas, ~15s para ~520 caracteres) e o servidor desiste de cada tentativa aos 26s — respostas longas (até 1.200 caracteres numa chamada só) estouravam as três tentativas e caíam para a voz do navegador, armando um disjuntor de 60s que levava as mensagens seguintes junto. Plano: trocar o modelo (com reservas), teto de espera proporcional ao tamanho e fatiar respostas longas em pedaços gerados enquanto o anterior toca."
+    },
+    {
+      "quando": "2026-10-07T23:17:12.887Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Corrigido na versão 0.2.0-cloudflare-pages.4 (branch cloudflare-pages). O que mudou: (1) modelo de voz gemini-3.8-flash-tts como principal e gemini-3.1-flash-tts-preview como reserva, com as tentativas sobrepostas alternando entre os dois — o 2.5-preview saiu; (2) teto e intervalo das tentativas proporcionais ao tamanho do texto; (3) respostas longas faladas em pedaços (o primeiro curto), todos gerados em paralelo e tocados em ordem, no Assistente e no speakText. Teste de ponta a ponta com o código real: resposta de 733 caracteres em 5 pedaços, 3 de 3 rodadas inteiras na voz do Gemini, primeira voz em ~6s e sem silêncio entre pedaços. npm run fala-check reescrito com as medições. Para conferir: depois de publicar (lisa.beyond) e da atualização do iMac (casa.beyond), pedir uma resposta longa no chat e ver no log [TTS] se aparece \"Gemini indisponível\"."
+    }
+  ],
   "evidencias": [],
   "historico": [
     {
       "quando": "2026-09-27T05:14:05.760Z",
       "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
       "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-10-07T22:58:55.743Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-10-07T23:17:12.887Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
     }
   ]
 }
