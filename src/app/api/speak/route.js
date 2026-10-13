@@ -1,6 +1,7 @@
 import { synthesizeSpeech } from "@/lib/gemini.js";
 import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { b64ParaBytes } from "@/lib/base64.js";
+import { pcmDoGemini } from "@/lib/audioDoGemini.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,9 @@ export const dynamic = "force-dynamic";
  * `voice` (opcional) — nome de uma das TTS_VOICES (src/lib/gemini.js); nomes desconhecidos
  * caem pro padrão do servidor, então esse parâmetro nunca pode quebrar a chamada.
  *
- * O Gemini devolve PCM cru (L16, 24kHz, mono). Aqui montamos o cabeçalho WAV.
+ * O Gemini devolve PCM cru (L16) OU um WAV pronto, conforme o modelo de voz — ver
+ * src/lib/audioDoGemini.js: tratar o WAV como PCM tocava o cabeçalho e o bloco C2PA como chiado.
+ * Aqui sai sempre um WAV limpo, montado só com as amostras.
  */
 export async function POST(req) {
   try {
@@ -23,9 +26,9 @@ export async function POST(req) {
     // limite de segurança: TTS é caro; corta textos muito longos
     const input = clean.length > 1200 ? clean.slice(0, 1200) : clean;
 
-    const { base64, sampleRate } = await synthesizeSpeech(input, voice);
-    const pcm = b64ParaBytes(base64);
-    const wav = pcmToWav(pcm, sampleRate, 1, 16);
+    const { base64, mime } = await synthesizeSpeech(input, voice);
+    const { pcm, sampleRate, canais, bits } = pcmDoGemini(b64ParaBytes(base64), mime);
+    const wav = pcmToWav(pcm, sampleRate, canais, bits);
 
     return new Response(wav, {
       headers: {

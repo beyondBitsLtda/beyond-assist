@@ -18,6 +18,7 @@
     "auth-check": "node scripts/auth-check.mjs",
     "reserva-check": "node --import ./scripts/alias-loader.mjs scripts/reserva-check.mjs",
     "fala-check": "node scripts/fala-check.mjs",
+    "audio-check": "node scripts/audio-check.mjs",
     "escuta-check": "node scripts/escuta-check.mjs",
     "comandos-check": "node scripts/comandos-check.mjs",
     "groq-check": "node --import ./scripts/alias-loader.mjs scripts/groq-check.mjs",

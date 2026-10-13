@@ -181,6 +181,45 @@ const MODELOS_DE_CHAT = [...new Set([
 const SOBRECARGAS_ANTES_DA_RESERVA = 2;
 const CASTIGO_DE_SOBRECARGA_MS = 5_000;
 
+/**
+ * O MODELO SOBRECARREGADO FICA LEMBRADO, E CADA TENTATIVA TEM TETO.
+ *
+ * Em 13/10/2026 o 3.6-flash e o 3.5-flash passaram a tarde em 503 em TODAS as 35 chaves, e
+ * algumas chamadas nem respondiam: ficavam penduradas mais de 25s. Como a abertura do stream
+ * não tinha teto, uma chamada pendurada travava a pergunta para sempre — a Lisa não mostrava
+ * texto, nem voz, nem erro. E cada pergunta nova repetia as mesmas tentativas no modelo caído
+ * antes de chegar ao lite, que respondia em menos de 1s.
+ *
+ * Agora: cada tentativa de chat tem TETO_DA_TENTATIVA_MS para começar a responder (estourou,
+ * conta como sobrecarga e passa para a próxima); e um modelo que esgotou as tentativas fica
+ * marcado por PAUSA_DO_MODELO_MS — as perguntas seguintes começam direto pela reserva. O último
+ * modelo da lista nunca é pulado: sem nenhum, a pergunta falharia sem nem tentar.
+ */
+const TETO_DA_TENTATIVA_MS = 12_000;
+const PAUSA_DO_MODELO_MS = 3 * 60_000;
+const modeloPausadoAte = new Map();
+
+/** Os modelos de chat na ordem em que vale tentar AGORA: os pausados vão para o fim. */
+export function modelosDeChatAgora(agora = Date.now()) {
+  const livres = MODELOS_DE_CHAT.filter((m) => !(modeloPausadoAte.get(m) > agora));
+  const pausados = MODELOS_DE_CHAT.filter((m) => modeloPausadoAte.get(m) > agora);
+  return [...livres, ...pausados];
+}
+
+/** Uma promessa com teto. Ao estourar, aborta a chamada (o `signal`) e rejeita com TETO. */
+function comTeto(promessa, controlador, ms) {
+  let relogio;
+  const teto = new Promise((_, rejeitar) => {
+    relogio = setTimeout(() => {
+      try { controlador.abort(); } catch { /* já terminou */ }
+      const e = new Error(`TETO: o modelo não começou a responder em ${ms / 1000}s`);
+      e.teto = true;
+      rejeitar(e);
+    }, ms);
+  });
+  return Promise.race([promessa, teto]).finally(() => clearTimeout(relogio));
+}
+
 async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, computeDelay = null, paraIngestao = false } = {}) {
   if (!KEYS.length) {
     throw new Error(
@@ -188,8 +227,9 @@ async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, com
       "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
     );
   }
-  // Só o chat tem reservas; embeddings e o resto seguem no modelo pedido.
-  const modelos = model === CHAT_MODEL ? MODELOS_DE_CHAT : [model];
+  // Só o chat tem reservas (e teto por tentativa); embeddings e o resto seguem no modelo pedido.
+  const ehChat = model === CHAT_MODEL;
+  const modelos = ehChat ? modelosDeChatAgora() : [model];
   let ultimoErro;
 
   for (let m = 0; m < modelos.length; m++) {
@@ -203,11 +243,19 @@ async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, com
       tried.add(index);
       const client = clientFor(KEYS[index]);
       try {
-        const result = await fn(client, modelo);
+        const controlador = ehChat ? new AbortController() : null;
+        const result = ehChat
+          ? await comTeto(fn(client, modelo, controlador.signal), controlador, TETO_DA_TENTATIVA_MS)
+          : await fn(client, modelo);
         await markOk(index, modelo);
+        modeloPausadoAte.delete(modelo);
         return result;
       } catch (err) {
-        const classified = classifyGeminiError(err);
+        // Teto estourado no chat: o MODELO não respondeu (com qualquer chave, como medido em
+        // 13/10) — conta como sobrecarga, sem castigar a chave por um minuto.
+        const classified = err?.teto
+          ? { transient: true, code: "UNAVAILABLE", reason: "timeout", untilMs: Date.now() + CASTIGO_DE_SOBRECARGA_MS }
+          : classifyGeminiError(err);
         if (!classified.transient) throw err; // erro genuinamente não-transitório — não adianta repetir
         const sobrecarga = classified.code === "UNAVAILABLE";
         await markCooldown(index, modelo, {
@@ -216,7 +264,10 @@ async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, com
           error: err?.message || err,
         });
         ultimoErro = rewriteError(err, index, classified);
-        if (sobrecarga && ++sobrecargas >= SOBRECARGAS_ANTES_DA_RESERVA && haReserva) break; // próximo modelo
+        if (sobrecarga && ++sobrecargas >= SOBRECARGAS_ANTES_DA_RESERVA && haReserva) {
+          if (ehChat) modeloPausadoAte.set(modelo, Date.now() + PAUSA_DO_MODELO_MS);
+          break; // próximo modelo
+        }
         if (classified.code === "UNSUPPORTED" && haReserva) break; // modelo desligado neste projeto
         if (attempt === attempts) break;
         const wait = computeDelay ? computeDelay(attempt, err) : delayMs * attempt;
@@ -311,11 +362,11 @@ export async function* chatStream(prompt, systemInstruction, { tools, images } =
 
   // retry só na abertura do stream (antes de qualquer chunk chegar) — 429/503 costumam
   // se resolver em segundos; uma vez que o texto começou a chegar não há o que repetir.
-  const stream = await withTransientRetry(CHAT_MODEL, (client, modelo) =>
+  const stream = await withTransientRetry(CHAT_MODEL, (client, modelo, abortSignal) =>
     client.models.generateContentStream({
       model: modelo,
       contents,
-      config: Object.keys(config).length ? config : undefined,
+      config: { ...config, ...(abortSignal ? { abortSignal } : {}) },
     })
   );
   for await (const chunk of stream) {
@@ -1036,7 +1087,8 @@ async function sintetizarComHedge(text, voice) {
 /**
  * Gera fala a partir de texto. `voiceName` (opcional) sobrescreve a voz padrão — vem do
  * seletor de voz do Assistente (guardado no navegador, ver src/app/api/speak/route.js).
- * Retorna { base64, sampleRate, mime } — áudio PCM cru (L16) que a rota converte em WAV.
+ * Retorna { base64, sampleRate, mime } — o áudio como o modelo mandou: PCM cru (L16) ou um WAV
+ * inteiro, conforme o modelo. Quem toca precisa passar por pcmDoGemini (src/lib/audioDoGemini.js).
  */
 export async function synthesizeSpeech(text, voiceName) {
   const voice = TTS_VOICES.some((v) => v.name === voiceName) ? voiceName : DEFAULT_TTS_VOICE;

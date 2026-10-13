@@ -9,14 +9,65 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.2.0-cloudflare-pages.5",
-  "atualizadoEm": "2026-10-09",
+  "versao": "0.2.0-cloudflare-pages.8",
+  "atualizadoEm": "2026-10-13",
   "compilacao": {
-    "numero": 6,
-    "data": "2026-10-09",
+    "numero": 9,
+    "data": "2026-10-13",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.2.0-cloudflare-pages.8",
+      "data": "2026-10-13",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "A Lisa deixa de ficar muda quando o modelo do Google está sobrecarregado, e acaba o chiado de rádio entre as falas.",
+      "itens": [
+        "Causa medida em 13/10: gemini-3.6-flash e gemini-3.5-flash em 503 em todas as 35 chaves, e algumas chamadas penduradas por mais de 25s; a abertura da resposta não tinha teto, então a pergunta travava sem texto, voz nem erro.",
+        "Cada tentativa de chat tem 12s para começar a responder; estourou, conta como sobrecarga e passa para o próximo modelo.",
+        "O modelo que esgotou as tentativas fica pausado por 3 minutos: as perguntas seguintes começam direto pela reserva que responde (medido: 1ª pergunta 17s, 2ª 0,9s).",
+        "Na Lisa de casa, enquanto a correção não chega por atualização, o gemini-3.5-flash-lite foi posto como modelo principal no .env (com as outras duas como reserva).",
+        "Chiado entre as falas: o gemini-3.8-flash-tts devolve um WAV inteiro (cabeçalho + bloco C2PA de ~6 KB no fim), que era tratado como PCM cru — o cabeçalho e o C2PA tocavam como som (fim de cada pedaço a -4 dB). Agora só o bloco de áudio é usado (src/lib/audioDoGemini.js): medido, o fim passou a -71 dB. Teste: npm run audio-check."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.7",
+      "data": "2026-10-12",
+      "branch": "cloudflare-pages",
+      "tipo": "infraestrutura",
+      "resumo": "Backup a cada 3 horas e semanal do banco de casa (Lisa, Abacato, Beyond Brain, Beyond Space) e do Storage, criptografado no Google Drive, com ensaio de restauração (BEYOND-0003).",
+      "itens": [
+        "A cada 3 horas (00h, 03h... 21h), guardando os 3 mais recentes — o 4º substitui o mais antigo, só depois que o novo subiu e conferiu; semanal toda segunda às 03:15, guardado na nuvem até alguém apagar.",
+        "Nome legível no Drive, com tipo, dia e hora (beyond-bkp-semanal_AAAA-MM-DD_HHhMM.tar), nas pastas 3horas/ e semanal/ de beyond-backup; só o conteúdo vai cifrado.",
+        "Cada pacote: bases do Postgres (pg_dump custom), papéis, arquivos do Storage e configuração do Supabase, com SHA-256 de cada arquivo; criptografado (rclone crypt) e conferido por hash depois do envio. Se a nuvem falhar, o pacote fica guardado no iMac.",
+        "restaurar.sh: ensaio num Postgres descartável, restauração em produção com confirmação, e recuperação de uma tabela só; acha o pacote por data ou tipo. Guia em scripts/backup/LEIA-ME.md.",
+        "Testado no iMac: pacote de 265 MB; ensaio restaurou 128 tabelas e 229 arquivos sem erro; envios ao Drive conferidos.",
+        "Pendente: client_id próprio do Google (o compartilhado do rclone será desligado em 2026) — scripts/backup/trocar-client-id-drive.sh."
+      ],
+      "issues": [
+        "BEYOND-0003"
+      ]
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.6",
+      "data": "2026-10-12",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Abacato: comentários nos cards, com imagens anexas por Ctrl+V ou pelo botão de anexar (BEYOND-0004).",
+      "itens": [
+        "Nova seção \"Comentários\" no card aberto do Abacato: escrever, editar o próprio e apagar; mostra autor e quando.",
+        "Imagens no comentário: Ctrl+V com o card aberto, botão \"Anexar imagem\" (arquivo do PC) ou arrastar o arquivo; até 6 por comentário, 10 MB cada. Prints grandes são reduzidos no navegador antes de enviar.",
+        "As imagens ficam num bucket PRIVADO do Storage (abacato-comentarios) e abrem por endereço assinado de 1 hora, só para quem enxerga o quadro.",
+        "Quem comenta: dono, editor e comentarista; o leitor só lê. Apagar: quem escreveu, ou dono e editor do quadro.",
+        "O espaço das imagens conta no armazenamento do plano do dono do quadro.",
+        "Banco: migração db/013-comentarios.sql (tabelas abacato_comentarios e abacato_comentario_anexos). Teste novo: npm run comentario-check (30 casos)."
+      ],
+      "issues": [
+        "BEYOND-0004"
+      ]
+    },
     {
       "versao": "0.2.0-cloudflare-pages.5",
       "data": "2026-10-09",
@@ -192,7 +243,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "Fica no iMac de casa e é publicado só pelo túnel da Cloudflare, em HTTPS (PostgREST). O Postgres não é exposto na internet. O Studio só abre no próprio iMac. Teste: https://banco.beyond.dev.br/ responder 401 é normal; 530 significa túnel fora (confira se o iMac está ligado)."
+        "observacao": "Fica no iMac de casa e é publicado só pelo túnel da Cloudflare, em HTTPS (PostgREST). O Postgres não é exposto na internet. O Studio só abre no próprio iMac. Teste: https://banco.beyond.dev.br/ responder 401 é normal; 530 significa túnel fora (confira se o iMac está ligado). Backup: a cada 3 horas (ficam os 3 últimos) e semanal (segunda 03:15, guardado até apagar), pelo cron do iMac (~/backup), com conteúdo criptografado, no Google Drive (pasta beyond-backup); restaurar com scripts/backup/restaurar.sh — ver scripts/backup/LEIA-ME.md."
       },
       {
         "nome": "Sentinela (Beyond Test)",
