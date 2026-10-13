@@ -7,6 +7,7 @@ import { criar, mudar, definir, remover } from "@/lib/api.js";
 import { dataCurta } from "./CardMini.js";
 import { regraEmPalavras } from "@/dominio/recorrencia.js";
 import EscolherDestino from "./EscolherDestino.js";
+import ComentariosDoCard from "./ComentariosDoCard.js";
 import { useReordenar } from "./useReordenar.js";
 
 /**
@@ -367,6 +368,9 @@ export default function PainelDoCard({ card: dados, quadro, poderes, aoFechar, a
               ))}
             </section>
           )}
+
+          {/* ---------------------------------------------------------- comentários */}
+          <ComentariosDoCard cardId={card.id} />
         </div>
       </div>
 

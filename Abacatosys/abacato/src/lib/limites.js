@@ -78,13 +78,34 @@ export async function quantosProjetosCompartilhados(usuarioId) {
 }
 
 /**
- * Quantos bytes os arquivos desta pessoa ocupam.
+ * Quantos bytes os arquivos desta pessoa ocupam: documentos e imagens de comentário.
  *
- * Soma TODAS as revisões, e não só a atual. Guardar dez versões de um arquivo de 300 MB ocupa
+ * Dos documentos, soma TODAS as revisões, e não só a atual. Guardar dez versões de um arquivo de 300 MB ocupa
  * três gigas de disco — cobrar só pela última seria cobrar pelo que se vê e pagar pelo que
  * está lá. Quem quiser espaço apaga as versões velhas, que é uma ação que existe na tela.
  */
 export async function bytesUsados(usuarioId) {
+  const [documentos, imagens] = await Promise.all([bytesDeDocumentos(usuarioId), bytesDeComentarios(usuarioId)]);
+  return documentos + imagens;
+}
+
+/** As imagens coladas nos comentários dos quadros desta pessoa. Contam no mesmo espaço dos
+ *  documentos: sem isso, colar print em card viraria o armazenamento ilimitado do plano. */
+async function bytesDeComentarios(usuarioId) {
+  const { data: quadros } = await supabase
+    .from("abacato_quadros").select("id").eq("dono_id", usuarioId);
+  if (!quadros?.length) return 0;
+  let total = 0;
+  const ids = quadros.map((q) => q.id);
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data: anexos } = await supabase
+      .from("abacato_comentario_anexos").select("tamanho").in("quadro_id", ids.slice(i, i + 200));
+    for (const a of anexos || []) total += Number(a.tamanho) || 0;
+  }
+  return total;
+}
+
+async function bytesDeDocumentos(usuarioId) {
   const { data: projetos } = await supabase
     .from("abacato_projetos").select("id").eq("dono_id", usuarioId);
   if (!projetos?.length) return 0;
@@ -242,6 +263,23 @@ export async function exigirCabeArquivo(projetoId, bytes) {
   if (semLimite(teto)) return;
 
   const usados = await bytesUsados(projeto.dono_id);
+  if (usados + Number(bytes || 0) > teto) {
+    throw new ErroDeAcesso(403, RECADOS.armazenamento(teto, usados));
+  }
+}
+
+/** O mesmo, para imagem de comentário: o espaço gasto é do dono do QUADRO. */
+export async function exigirCabeNoQuadro(quadroId, bytes) {
+  const { data: quadro } = await supabase
+    .from("abacato_quadros").select("dono_id").eq("id", quadroId).maybeSingle();
+  if (!quadro) throw new ErroDeAcesso(404, "quadro não encontrado");
+
+  const conta = await contaDe(quadro.dono_id);
+  if (!conta) throw new ErroDeAcesso(500, "não achei o dono deste quadro");
+  const teto = conta.plano.armazenamento;
+  if (semLimite(teto)) return;
+
+  const usados = await bytesUsados(quadro.dono_id);
   if (usados + Number(bytes || 0) > teto) {
     throw new ErroDeAcesso(403, RECADOS.armazenamento(teto, usados));
   }

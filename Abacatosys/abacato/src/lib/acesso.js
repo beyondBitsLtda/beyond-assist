@@ -318,6 +318,14 @@ const SUBIDAS = {
     if (!data) throw new ErroDeAcesso(404, "link não encontrado");
     return { quadroId: data.abacato_cards.abacato_colunas.quadro_id, cardId: data.card_id };
   },
+  comentario: async (id) => {
+    const { data } = await supabase
+      .from("abacato_comentarios")
+      .select("card_id, autor_id, abacato_cards ( abacato_colunas ( quadro_id ) )")
+      .eq("id", id).maybeSingle();
+    if (!data) throw new ErroDeAcesso(404, "comentário não encontrado");
+    return { quadroId: data.abacato_cards.abacato_colunas.quadro_id, cardId: data.card_id, autorId: data.autor_id };
+  },
 };
 
 /**
