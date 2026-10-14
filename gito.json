@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.3.0-revisao-visual.1",
+  "versao": "0.3.0-cloudflare-pages.9",
   "atualizadoEm": "2026-10-14",
   "compilacao": {
-    "numero": 10,
+    "numero": 11,
     "data": "2026-10-14",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.3.0-cloudflare-pages.9",
+      "data": "2026-10-14",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "Revisão visual (branch revisao-visual) junta na cloudflare-pages e vai ao ar na Lisa de casa e na da nuvem.",
+      "itens": [
+        "Mesmo conteúdo da 0.3.0-revisao-visual.1: esfera da voz, topo com Painéis e status, Modos e Ajustes do Assistente, celular e primeira passada nos painéis."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.3.0-revisao-visual.1",
       "data": "2026-10-14",
