@@ -445,7 +445,7 @@ export default function DashboardArPage() {
       )}
 
       {!active && phase === "landing" && (
-        <div style={{ position: "relative", zIndex: 2, height: "100%", overflowY: "auto", padding: "28px 24px", color: "#cfeffb", fontFamily: "'Rajdhani',sans-serif" }}>
+        <div style={{ position: "relative", zIndex: 2, height: "100%", overflowY: "auto", padding: "28px 24px", color: "#cfeffb", fontFamily: "var(--bb-fonte)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
             <div style={{ ...mono, fontSize: 12, letterSpacing: 3, color: CY }}>◈ DASHBOARD · MODO AR</div>
             <Link href="/dashboard" style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(207,239,251,0.6)", textDecoration: "none" }}>← voltar</Link>

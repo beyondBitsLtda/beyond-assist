@@ -1,9 +1,9 @@
-// Cores de destaque disponíveis pro seletor de tema (ver Topbar.js). Evita verde e laranja
+// Cores de destaque disponíveis pro seletor de tema (ver Topbar.js, no ponto de status). Evita verde e laranja
 // de propósito — essas já têm significado fixo no HUD (verde = ok/sucesso, laranja =
 // aviso/erro), então usá-las como destaque geral confundiria os status com o tema.
 export const ACCENT_THEMES = [
-  { name: "Ciano", hex: "#38e1ff", rgb: "56,225,255" }, // padrão original do HUD
-  { name: "Azul", hex: "#4f8cff", rgb: "79,140,255" },
+  { name: "Azul", hex: "#5aa9ff", rgb: "90,169,255" }, // padrão desde a revisão visual (out/2026)
+  { name: "Ciano", hex: "#38e1ff", rgb: "56,225,255" }, // o padrão original do HUD
   { name: "Roxo", hex: "#a78bfa", rgb: "167,139,250" },
   { name: "Rosa", hex: "#ff5ea8", rgb: "255,94,168" },
   { name: "Vermelho", hex: "#ff5c5c", rgb: "255,92,92" },

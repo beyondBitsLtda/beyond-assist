@@ -12,6 +12,10 @@ import { Highlight } from "prism-react-renderer";
 import { TTS_VOICES, STEVE_VOICE_NAME } from "@/lib/ttsVoices.js";
 import { pickBrowserVoice, speakText, stopBrowserVoiceAudio, isBrowserVoiceAudioPlaying } from "@/lib/browserVoice.js";
 import { useIsMobile } from "@/lib/useIsMobile.js";
+import TopoExtra from "@/components/shell/TopoExtra.js";
+import Suspenso, { GrupoDoMenu, ItemDoMenu, ChaveDoMenu, SegmentosDoMenu } from "@/components/shell/Suspenso.js";
+import RotuloDaVoz from "@/components/panels/RotuloDaVoz.js";
+import { acordarAudio, escutarElemento, nivelDaVoz, abrirMicrofone, fecharMicrofone, nivelDoMicrofone } from "@/lib/vozAnalisador.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
 import { getDeviceId, matchNavCommand } from "@/lib/deviceId.js";
 import { runFullSync } from "@/lib/sync.js";
@@ -35,6 +39,8 @@ import { loadGames } from "@/lib/gameHistory.js";
 
 // carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
 // realmente ligar a Visão 3D; desktop-only por decisão do usuário, nunca entra no bundle mobile.
+// a voz da Lisa como esfera de pontos (three.js) — aparência padrão desde a revisão visual
+const EsferaDaVoz = dynamic(() => import("@/components/panels/EsferaDaVoz.js"), { ssr: false, loading: () => null });
 const LisaAvatar3D = dynamic(() => import("@/components/panels/LisaAvatar3D.js"), {
   ssr: false,
   loading: () => null,
@@ -408,7 +414,8 @@ export default function AssistantPage() {
   // Visão do avatar: "traditional" (visualizador de onda de sempre) ou "3d" (corpo/modelo 3D,
   // ver LisaAvatar3D.js) — DESKTOP-ONLY de propósito (o toggle só existe no branch desktop
   // deste componente, então nunca aparece nem carrega no mobile).
-  const [avatarView, setAvatarView] = useState("traditional");
+  // "esfera" (padrão desde a revisão visual de out/2026, ver EsferaDaVoz.js) também vale.
+  const [avatarView, setAvatarView] = useState("esfera");
   // qual "corpo" 3D usar quando avatarView === "3d" — "cyborg" (original, sem esqueleto) ou
   // "ironman" (rigado, com gestos de verdade por modo, ver LisaAvatarIronMan.js)
   const [avatarSkin, setAvatarSkin] = useState("cyborg");
@@ -1734,7 +1741,7 @@ export default function AssistantPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = localStorage.getItem("avatarView");
-    if (saved === "3d" || saved === "traditional") setAvatarView(saved);
+    if (saved === "3d" || saved === "traditional" || saved === "esfera") setAvatarView(saved);
     const savedSkin = localStorage.getItem("avatarSkin");
     if (savedSkin === "cyborg" || savedSkin === "ironman") setAvatarSkin(savedSkin);
   }, []);
@@ -1924,7 +1931,7 @@ export default function AssistantPage() {
     };
     raf = requestAnimationFrame(draw);
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-  }, []);
+  }, [avatarView, isMobile, mobileView]);
 
   // ---- TTS em 2 pedaços: voz do Gemini, com voz do navegador como reserva (nunca alterna no meio) ----
 
@@ -2040,6 +2047,7 @@ export default function AssistantPage() {
 
       if (result?.url) {
         const audio = new Audio(result.url);
+        escutarElemento(audio); // a esfera mede o volume; se o áudio ainda não foi liberado, toca normal
         audioRef.current = audio;
         audio.onended = () => { URL.revokeObjectURL(result.url); audioRef.current = null; addLog("[TTS]", GR, "voz Gemini"); finish(); };
         audio.onerror = () => { URL.revokeObjectURL(result.url); audioRef.current = null; finish(); };
@@ -2650,7 +2658,7 @@ export default function AssistantPage() {
     recognitionRef.current = rec;
 
     let finalText = "";
-    rec.onstart = () => { setListening(true); addLog("[VOICE]", GR, "ouvindo…"); };
+    rec.onstart = () => { setListening(true); addLog("[VOICE]", GR, "ouvindo…"); abrirMicrofone(); };
     rec.onresult = (e) => {
       let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -2663,6 +2671,7 @@ export default function AssistantPage() {
     rec.onerror = (e) => { addLog("[VOICE]", OR, `mic: ${e.error}`); };
     rec.onend = () => {
       setListening(false);
+      fecharMicrofone();
       recognitionRef.current = null;
       const q = (finalText || "").trim();
       if (q) { addLog("[VOICE]", CY, `→ "${q}"`); setInput(""); ask(q); }
@@ -3366,6 +3375,21 @@ export default function AssistantPage() {
   // sonora no meio, como o modo de voz do ChatGPT). Reaproveita TODO o estado/lógica de cima
   // (ask, toggleMic, canvasRef, voz, escopo) — só a apresentação muda.
   // ==========================================================================================
+  // ---- revisão visual: gaveta aberta no desktop e o sinal que move a esfera ----
+  const [gaveta, setGaveta] = useState(null); // "registro" | "contexto" | null
+  const sinalDaEsferaRef = useRef({});
+  sinalDaEsferaRef.current = { listening, autoListening, mode };
+  // Lido a cada quadro pela esfera: "falando" vem do áudio tocando de verdade (o mode já voltou
+  // a "idle" quando a fala começa — ver ask()), "ouvindo" do microfone, "pensando" da busca.
+  const obterSinalDaEsfera = useCallback(() => {
+    const s = sinalDaEsferaRef.current;
+    const falando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
+    if (falando) return { estado: "falando", nivel: nivelDaVoz() };
+    if (s.listening || s.autoListening) return { estado: "ouvindo", nivel: nivelDoMicrofone() };
+    if (s.mode === "listening" || s.mode === "speaking") return { estado: "pensando", nivel: null };
+    return { estado: "pronta", nivel: null };
+  }, []);
+
   if (isMobile) {
     const autoSyncOk = autoSync?.ok && autoSync.status !== undefined;
     const autoSyncColor = !autoSync
@@ -3381,94 +3405,64 @@ export default function AssistantPage() {
       : "rgba(207,239,251,0.35)";
 
     return (
-      <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "#000" }}>
+      <div className="bb-painel bb-celular" style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "var(--bb-fundo)" }}>
         {fullscreenOverlay}
         {cameraVigiaMessageToast}
         {watchPreviews}
         {radioWidget}
-        {/* barra superior mínima */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(var(--accent-rgb),0.12)", flex: "none" }}>
-          <button
-            onClick={() => setMobileSettingsOpen(true)}
-            aria-label="Configurações"
-            style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(var(--accent-rgb),0.05)", color: CY, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+        {/* barra do topo — revisão visual: ajustes, marca, modo de conversa e painéis */}
+        <div className="bb-celular-topo">
+          <button type="button" className="bb-redondo" onClick={() => setMobileSettingsOpen(true)} aria-label="Ajustes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="14" y2="17" /></svg>
           </button>
-          <div style={{ ...mono, fontSize: 12, letterSpacing: 3, color: CY }}>◈ LISA</div>
-          <div style={{ display: "flex", gap: 4 }}>
-            <button
-              onClick={() => setMobileNavOpen(true)}
-              aria-label="Outros painéis"
-              title="Outros painéis (Dashboard, AR, Quarto de Guerra…)"
-              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(var(--accent-rgb),0.05)", color: CY, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
+          <div className="bb-celular-marca">Lisa</div>
+          <div className="bb-celular-modos" role="group" aria-label="Modo de conversa">
+            <button type="button" aria-pressed={mobileView === "chat"} onClick={() => setMobileView("chat")} title="Chat" aria-label="Chat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
             </button>
-            <button
-              onClick={() => setMobileView("chat")}
-              title="Modo chat"
-              style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${mobileView === "chat" ? CY : "rgba(var(--accent-rgb),0.2)"}`, background: mobileView === "chat" ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: mobileView === "chat" ? "#eafcff" : "rgba(207,239,251,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-            </button>
-            <button
-              onClick={() => setMobileView("voice")}
-              title="Modo voz"
-              style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${mobileView === "voice" ? CY : "rgba(var(--accent-rgb),0.2)"}`, background: mobileView === "voice" ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: mobileView === "voice" ? "#eafcff" : "rgba(207,239,251,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /></svg>
+            <button type="button" aria-pressed={mobileView === "voice"} onClick={() => setMobileView("voice")} title="Voz" aria-label="Voz">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3.5" /></svg>
             </button>
             {/* entrar/sair dessa view É ligar/desligar o modo — evita ficar com a câmera e o
                 laço rodando enquanto você está lendo o chat em outra aba */}
-            <button
-              onClick={() => setMobileView("companion")}
-              title="Modo interativo"
-              style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${mobileView === "companion" ? CY : "rgba(var(--accent-rgb),0.2)"}`, background: mobileView === "companion" ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: mobileView === "companion" ? "#eafcff" : "rgba(207,239,251,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}
-            >
-              🤖
+            <button type="button" aria-pressed={mobileView === "companion"} onClick={() => setMobileView("companion")} title="Modo interativo" aria-label="Modo interativo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3" /><path d="M12 3v4M9 13h.01M15 13h.01" /></svg>
             </button>
           </div>
+          <button type="button" className="bb-redondo" onClick={() => setMobileNavOpen(true)} aria-label="Outros painéis" title="Outros painéis">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" /></svg>
+          </button>
         </div>
 
         {mobileView === "companion" ? (
           // ---- MODO INTERATIVO: tela limpa, só a carinha dela (ver interactiveScreen) ----
           interactiveScreen
         ) : mobileView === "voice" ? (
-          // ---- MODO VOZ: tela escura, só a onda sonora, como o modo de voz do ChatGPT ----
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, padding: 20 }}>
-            <div style={{ position: "relative", width: "min(80vw,320px)", height: "min(80vw,320px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ position: "absolute", inset: "-6%", border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: "50%", borderTopColor: "rgba(var(--accent-rgb),0.45)", borderRightColor: "rgba(var(--accent-rgb),0.28)", animation: "bb-sweep 14s linear infinite" }} />
-              <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
-              <div style={{ position: "relative", textAlign: "center", pointerEvents: "none" }}>
-                <div style={{ ...mono, fontSize: 10, letterSpacing: 5, color: meta.color }}>{meta.label}</div>
-              </div>
+          // ---- MODO VOZ: a esfera da voz ocupando a tela, e o botão de segurar para falar ----
+          <div className="bb-celular-voz">
+            <div className="bb-celular-esfera">
+              <EsferaDaVoz obterSinal={obterSinalDaEsfera} ocupacao={0.86} />
+            </div>
+            <RotuloDaVoz obterSinal={obterSinalDaEsfera} />
+            <div className="bb-celular-fala">
+              {mode === "listening" ? `"${question}"` : mode === "speaking" ? "Respondendo…" : "Segure o microfone para falar"}
             </div>
             <button
-              onPointerDown={(e) => { e.preventDefault(); startMicHold(); }}
+              type="button"
+              className={`bb-botao-segurar${listening ? " bb-botao-segurar--ouvindo" : ""}`}
+              onPointerDown={(e) => { e.preventDefault(); acordarAudio(); startMicHold(); }}
               onPointerUp={stopMicHold}
               onPointerLeave={stopMicHold}
               onPointerCancel={stopMicHold}
               onContextMenu={(e) => e.preventDefault()}
               disabled={busy}
               title="Segure pra falar, solte pra enviar"
-              style={{
-                marginTop: 40, width: 76, height: 76, borderRadius: "50%",
-                border: `2px solid ${listening ? OR : CY}`,
-                background: listening ? "rgba(255,157,61,0.15)" : "rgba(var(--accent-rgb),0.08)",
-                color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer",
-                boxShadow: listening ? `0 0 24px ${OR}` : `0 0 20px rgba(var(--accent-rgb),0.4)`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                touchAction: "none", userSelect: "none", WebkitUserSelect: "none",
-              }}
+              aria-label="Segure para falar"
             >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="9" y="2.5" width="6" height="12" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
               </svg>
             </button>
-            <div style={{ ...mono, fontSize: 10, color: "rgba(207,239,251,0.4)", marginTop: 14, letterSpacing: 1, textAlign: "center", minHeight: 32, padding: "0 16px" }}>
-              {mode === "listening" ? `"${question}"` : mode === "speaking" ? "falando…" : "toque no microfone pra falar"}
-            </div>
           </div>
         ) : (
           // ---- MODO CHAT: bolhas de conversa, tipo Gemini/ChatGPT ----
@@ -3984,6 +3978,36 @@ export default function AssistantPage() {
     );
   }
 
+  // ---- DESKTOP — revisão visual (out/2026): a esfera no centro, a conversa embaixo dela e
+  // TODO o resto em menus discretos. Os controles são exatamente os de antes (mesmos estados e
+  // mesmas funções); só mudaram de lugar:
+  //   • "Modos" e "⚙" vão para o topo do app (TopoExtra) — eram a barra ESCOPO + cinco gavetas
+  //   • o escopo vai para dentro do campo de mensagem
+  //   • SYSTEM_LOGS e RETRIEVED_CONTEXT viram gavetas laterais, fechadas por padrão
+  //   • as prévias de câmera/tela ficam sempre montadas enquanto o modo estiver ligado (antes
+  //     sumiam ao fechar a gaveta — e a captura lê desses mesmos <video>)
+  const modosLigados = [
+    observanceMode, screenMode, micWatchMode && (screenMode || observanceMode), cameraVigiaMode,
+    vigiaMode, radioMode, escutaPalavra, codeMode, personaMode,
+  ].filter(Boolean).length;
+  const nomeDoEscopo = scopeMode === "general"
+    ? "Geral"
+    : scopePanel === TASKS_SCOPE ? "Tarefas"
+    : scopePanel === THOUGHTS_SCOPE ? "Pensamentos"
+    : scopePanel === SENTINEL_SCOPE ? "Sentinela"
+    : scopePanel === DELP_SCOPE ? "Tarefas Delp"
+    : scopePanel === CODE_SCOPE ? "Código"
+    : scopePanel || "Este painel";
+  const enviarPergunta = () => {
+    acordarAudio();
+    if (!busy && input.trim()) { ask(input); setInput(""); }
+  };
+  const estadoGeminiVoz = !geminiVoiceEnabled
+    ? "desligada — usando a voz do navegador"
+    : geminiVoiceStatus === true ? "funcionando"
+    : geminiVoiceStatus === false ? "a última tentativa falhou"
+    : "ainda sem tentativa nesta sessão";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {codeTaskModal}
@@ -3993,818 +4017,507 @@ export default function AssistantPage() {
       {radioWidget}
       {/* Modo Interativo no desktop: sobreposição de tela cheia por cima do painel inteiro */}
       {interactiveMode && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 240, display: "flex", flexDirection: "column", background: "#000" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", flex: "none" }}>
-            <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: CY }}>🤖 MODO INTERATIVO</div>
-            <button
-              onClick={() => setInteractiveMode(false)}
-              title="Sair do Modo Interativo"
-              style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "6px 12px", borderRadius: 4, border: "1px solid rgba(var(--accent-rgb),0.3)", background: "transparent", color: "rgba(207,239,251,0.7)", cursor: "pointer" }}
-            >
-              ✕ SAIR
+        <div style={{ position: "fixed", inset: 0, zIndex: 240, display: "flex", flexDirection: "column", background: "var(--bb-fundo)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", flex: "none" }}>
+            <div style={{ fontSize: 14, color: "var(--bb-texto-2)" }}>Modo interativo</div>
+            <button type="button" className="bb-menu-botao" onClick={() => setInteractiveMode(false)} title="Sair do Modo Interativo">
+              Sair
             </button>
           </div>
           {interactiveScreen}
         </div>
       )}
-      {/* ESCOPO DO ASSISTENTE */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flexWrap: "wrap" }}>
-        <span style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)" }}>ESCOPO</span>
-        <div style={{ display: "flex", gap: 4 }}>
-          {[{ key: "panel", label: "ESTE PAINEL" }, { key: "general", label: "GERAL" }].map((m) => (
-            <button
-              key={m.key}
-              onClick={() => setScopeMode(m.key)}
-              style={{
-                ...mono, fontSize: 9.5, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${scopeMode === m.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
-                background: scopeMode === m.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
-                color: scopeMode === m.key ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
+
+      <TopoExtra>
+        <Suspenso
+          titulo="Modos"
+          largura={340}
+          rotulo={
+            <>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2 5h7M12 5h2M2 11h2M7 11h7" /><circle cx="10.5" cy="5" r="1.6" /><circle cx="5.5" cy="11" r="1.6" /></svg>
+              <span className="bb-rotulo">Modos</span>
+              {modosLigados > 0 && <span className="bb-contador">{modosLigados}</span>}
+            </>
+          }
+        >
+          <GrupoDoMenu titulo="Percepção">
+            <ChaveDoMenu
+              ligado={observanceMode}
+              onChange={() => setObservanceMode((v) => !v)}
+              detalhe="A câmera tira uma foto a cada pergunta"
+              title={observanceMode ? "Modo Observância ligado — a câmera tira 1 foto por pergunta, nada fica salvo" : "Ligar a câmera pra Lisa poder ver o que você mostra (postura, roupa, gestos) ao responder"}
             >
-              {m.label}
-            </button>
-          ))}
-        </div>
-        {scopeMode === "panel" ? (
-          <select
-            value={scopePanel}
-            onChange={(e) => setScopePanel(e.target.value)}
-            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
-          >
-            {panelOptions.map((b) => <option key={b} value={b}>{b}</option>)}
-            <option value={TASKS_SCOPE}>Tarefas (por prazo)</option>
-            <option value={THOUGHTS_SCOPE}>Pensamentos</option>
-            <option value={SENTINEL_SCOPE}>Chamados (Sentinela)</option>
-            <option value={DELP_SCOPE}>Tarefas Delp</option>
-            <option value={CODE_SCOPE}>Código</option>
-          </select>
-        ) : null}
+              Observância
+            </ChaveDoMenu>
+            {observanceError && <div className="bb-erro-do-menu">{observanceError}</div>}
 
-        {/* projeto do Sentinela — só aparece com o escopo "Chamados (Sentinela)" selecionado,
-            pra Lisa saber exatamente de qual projeto de teste está falando */}
-        {scopeMode === "panel" && scopePanel === SENTINEL_SCOPE && (
-          <select
-            value={sentinelProjectId}
-            onChange={(e) => setSentinelProjectId(e.target.value)}
-            title="Projeto de teste (Sentinela) — força a resposta a considerar só esse projeto"
-            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: `1px solid ${OR}55`, background: "#08131a", color: "#eafcff" }}
-          >
-            <option value="all">Todos os projetos</option>
-            {sentinelProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        )}
-
-        {/* repositório/arquivo — só aparecem com o escopo "Código" selecionado */}
-        {scopeMode === "panel" && scopePanel === CODE_SCOPE && (
-          <select
-            value={codeRepo}
-            onChange={(e) => setCodeRepo(e.target.value)}
-            title="Repositório — força a resposta a considerar só esse repo"
-            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
-          >
-            <option value="all">Todos os repositórios</option>
-            {codeRepos.map((r) => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
-          </select>
-        )}
-        {scopeMode === "panel" && scopePanel === CODE_SCOPE && codeRepo !== "all" && (
-          <select
-            value={codeFile}
-            onChange={(e) => setCodeFile(e.target.value)}
-            title="Arquivo específico — sem escolher nenhum, busca no repositório inteiro"
-            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff", maxWidth: 220 }}
-          >
-            <option value="">repositório inteiro</option>
-            {codeFiles.map((f) => <option key={f} value={f}>{f}</option>)}
-          </select>
-        )}
-
-        {scopeMode === "general" && (
-          <span style={{ ...mono, fontSize: 9, color: PU }}>vê todos os painéis · pode buscar na web quando precisar</span>
-        )}
-
-        {/* categorias de recursos — colapsadas por padrão (ver openSettingsCategory). Antes
-            disto era uma FILEIRA ÚNICA com todo botão sempre visível ao mesmo tempo — virou
-            confuso de bater o olho ("um monte de toggle"). Agora só o "chip" da categoria
-            fica sempre visível (com uma bolinha ● indicando se algo dentro está ligado);
-            clique abre os controles daquela categoria numa linha própria abaixo. */}
-        <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
-          {[
-            { key: "appearance", label: "🎭 PERSONA", active: personaMode || avatarView === "3d" },
-            { key: "code", label: "🛠️ CÓDIGO", active: codeMode },
-            { key: "sensing", label: "👁 OBSERVAÇÃO", active: observanceMode || screenMode || micWatchMode },
-            { key: "vigia", label: "🕵️ VIGIA", active: vigiaMode },
-            { key: "radio", label: "📻 RÁDIO", active: radioMode },
-          ].map((cat) => (
-            <button
-              key={cat.key}
-              onClick={() => setOpenSettingsCategory((v) => (v === cat.key ? null : cat.key))}
-              title={cat.active ? `${cat.label} — algo ligado aqui dentro` : cat.label}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${openSettingsCategory === cat.key ? CY : cat.active ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: openSettingsCategory === cat.key ? "rgba(var(--accent-rgb),0.14)" : "transparent",
-                color: cat.active ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
+            <ChaveDoMenu
+              ligado={screenMode}
+              onChange={() => setScreenMode((v) => !v)}
+              detalhe="O navegador pede para escolher o que compartilhar"
+              title={screenMode ? "Modo Tela ligado — clique pra desligar" : "Compartilhar a tela pra Lisa poder ver o que está acontecendo nela"}
             >
-              {cat.label} {cat.active ? "●" : ""} {openSettingsCategory === cat.key ? "▲" : "▼"}
-            </button>
-          ))}
-          {/* Este é um interruptor direto, não um acordeão como os de cima: o Modo Interativo
-              abre uma tela cheia própria, não tem controle nenhum pra mostrar numa gaveta. */}
-          <button
-            onClick={() => setInteractiveMode((v) => !v)}
-            title="Modo Interativo — tela limpa com a carinha da Lisa; mostre ✌️ pra chamar ela"
-            style={{
-              ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-              border: `1px solid ${interactiveMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-              background: interactiveMode ? "rgba(123,216,143,0.12)" : "transparent",
-              color: interactiveMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-              cursor: "pointer",
-            }}
-          >
-            🤖 INTERATIVO {interactiveMode ? "●" : ""}
-          </button>
-        </div>
-
-        {openSettingsCategory === "appearance" && (
-          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
-            {/* Modo Persona — liga a personalidade de persona.md por cima das respostas */}
-            <button
-              onClick={togglePersonaMode}
-              title={personaMode ? "Modo Persona ligado (persona.md) — clique pra desligar" : "Modo Persona desligado (tom direto de sempre) — clique pra ligar"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${personaMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-                background: personaMode ? "rgba(201,166,255,0.12)" : "transparent",
-                color: personaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              🎭 PERSONA {personaMode ? "ON" : "OFF"}
-            </button>
-
-            {/* Visão do avatar: visualizador de onda de sempre × corpo em modelo 3D — desktop-only */}
-            <div style={{ display: "flex", gap: 4 }}>
-              {[{ key: "traditional", label: "◈ VISÃO TRADICIONAL" }, { key: "3d", label: "🧑 VISÃO 3D" }].map((v) => (
-                <button
-                  key={v.key}
-                  onClick={() => chooseAvatarView(v.key)}
-                  title={v.key === "3d" ? "Corpo em modelo 3D no lugar do visualizador — arraste/belisque pra ajustar o enquadramento" : "Visualizador de onda tradicional"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${avatarView === v.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: avatarView === v.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
-                    color: avatarView === v.key ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
+              Tela
+            </ChaveDoMenu>
+            {screenMode && (
+              <div className="bb-sub-do-menu">
+                <ChaveDoMenu
+                  ligado={screenAutoComment}
+                  onChange={() => setScreenAutoComment((v) => !v)}
+                  detalhe="Só fala quando achar algo digno de nota"
+                  title={screenAutoComment ? "Vigiando sozinha — clique pra desligar" : "Deixar a Lisa de olho na tela sozinha, comentando só quando achar algo relevante"}
                 >
-                  {v.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Aparência do corpo 3D — só faz sentido com a Visão 3D ligada */}
-            {avatarView === "3d" && (
-              <div style={{ display: "flex", gap: 4 }}>
-                {[{ key: "cyborg", label: "◈ CYBORG" }, { key: "ironman", label: "🤖 IRON MAN" }].map((s) => (
-                  <button
-                    key={s.key}
-                    onClick={() => chooseAvatarSkin(s.key)}
-                    title={s.key === "ironman" ? "Corpo rigado (esqueleto de verdade) — gestos reais por modo, se os clipes já tiverem sido enviados" : "Corpo original (sem esqueleto, só balanço/respiração)"}
-                    style={{
-                      ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                      border: `1px solid ${avatarSkin === s.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
-                      background: avatarSkin === s.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
-                      color: avatarSkin === s.key ? "#eafcff" : "rgba(207,239,251,0.55)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {s.label}
-                  </button>
-                ))}
+                  Comentar sozinha
+                </ChaveDoMenu>
+                {screenAutoComment && (
+                  <div className="bb-campo-do-menu">
+                    <select className="bb-select" value={screenIntervalMs} onChange={(e) => chooseScreenInterval(Number(e.target.value))} title="De quanto em quanto tempo ela verifica a tela sozinha">
+                      {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+                    </select>
+                    <input
+                      className="bb-input"
+                      value={screenFocus}
+                      onChange={(e) => updateScreenFocus(e.target.value)}
+                      placeholder="O que priorizar (ex.: avise se o build quebrar)"
+                      title="O que ela deve priorizar notar na tela — em branco, ela decide sozinha"
+                    />
+                  </div>
+                )}
+                <ChaveDoMenu
+                  ligado={transmissionMode}
+                  onChange={() => setTransmissionMode((v) => !v)}
+                  detalhe="Outro aparelho no Modo Vigia assiste ao vivo"
+                  cor={OR}
+                >
+                  Transmissão
+                </ChaveDoMenu>
               </div>
             )}
-          </div>
-        )}
+            {screenError && <div className="bb-erro-do-menu">{screenError}</div>}
 
-        {openSettingsCategory === "code" && (
-          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
-            {/* Modo Código — toda mensagem vira pedido de mudança de código (branch nova + PR) */}
-            <button
-              onClick={() => setCodeMode((v) => !v)}
-              title={codeMode ? "Modo Código ligado — toda mensagem vira pedido de mudança. Clique pra desligar" : "Ligar Modo Código — a Lisa passa a propor mudança de código (branch + PR) em vez de conversar"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${codeMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-                background: codeMode ? "rgba(201,166,255,0.12)" : "transparent",
-                color: codeMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
+            <ChaveDoMenu
+              ligado={micWatchMode && (screenMode || observanceMode)}
+              onChange={() => setMicWatchMode((v) => !v)}
+              disabled={!screenMode && !observanceMode}
+              detalhe={!screenMode && !observanceMode ? "Ligue a Tela ou a Observância primeiro" : "Microfone aberto, ouvindo o ambiente"}
             >
-              🛠️ CÓDIGO {codeMode ? "ON" : "OFF"}
-            </button>
-            {codeMode && (
-              <>
-                <select
-                  value={codeModeRepo}
-                  onChange={(e) => setCodeModeRepo(e.target.value)}
-                  style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
+              Escuta
+            </ChaveDoMenu>
+            {micWatchError && <div className="bb-erro-do-menu">{micWatchError}</div>}
+
+            <ChaveDoMenu
+              ligado={cameraVigiaMode}
+              onChange={() => setCameraVigiaMode((v) => !v)}
+              detalhe="Filma com câmera e áudio para outro aparelho assistir"
+            >
+              Câmera de vigia
+            </ChaveDoMenu>
+            {cameraVigiaMode && (
+              <div className="bb-sub-do-menu">
+                <ItemDoMenu fecharAoClicar={false} onClick={() => setCameraFacing((f) => (f === "user" ? "environment" : "user"))} detalhe="Para celular">
+                  Câmera {cameraFacing === "user" ? "frontal" : "traseira"} · trocar
+                </ItemDoMenu>
+              </div>
+            )}
+            {cameraVigiaError && <div className="bb-erro-do-menu">{cameraVigiaError}</div>}
+          </GrupoDoMenu>
+
+          <GrupoDoMenu titulo="Vigia">
+            <ChaveDoMenu
+              ligado={vigiaMode}
+              onChange={() => setVigiaMode((v) => !v)}
+              detalhe="Pergunte sobre o que a Lisa vem vendo na tela"
+              cor={OR}
+            >
+              Vigia
+            </ChaveDoMenu>
+            {vigiaMode && (
+              <div className="bb-sub-do-menu">
+                <ChaveDoMenu ligado={vigiaAutoOn} onChange={() => setVigiaAutoOn((v) => !v)} detalhe="Conta sozinha o que há de novo">
+                  Narrar sozinha
+                </ChaveDoMenu>
+                {vigiaAutoOn && (
+                  <div className="bb-campo-do-menu">
+                    <select className="bb-select" value={vigiaAutoIntervalMs} onChange={(e) => chooseVigiaAutoInterval(Number(e.target.value))} title="De quanto em quanto tempo ela verifica se há algo novo">
+                      {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+                    </select>
+                  </div>
+                )}
+                <ChaveDoMenu
+                  ligado={vigiaWatching}
+                  onChange={() => setVigiaWatching((v) => !v)}
+                  detalhe={vigiaWatching ? (vigiaWatchStatus === "connected" ? "Ao vivo — veja o canto da tela" : vigiaWatchStatus === "procurando" ? "Procurando…" : vigiaWatchStatus || "Conectando…") : "A tela de outro aparelho, ao vivo"}
                 >
-                  <option value="">repositório…</option>
+                  Assistir tela
+                </ChaveDoMenu>
+                <ChaveDoMenu
+                  ligado={cameraWatching}
+                  onChange={() => setCameraWatching((v) => !v)}
+                  detalhe={cameraWatching ? (cameraWatchStatus === "connected" ? "Ao vivo — veja o canto da tela" : cameraWatchStatus === "procurando" ? "Procurando…" : cameraWatchStatus || "Conectando…") : "A câmera de vigia de outro aparelho"}
+                >
+                  Assistir câmera
+                </ChaveDoMenu>
+                {cameraWatching && (
+                  <div className="bb-campo-do-menu bb-campo-do-menu--linha">
+                    <input
+                      className="bb-input"
+                      value={cameraChatText}
+                      onChange={(e) => setCameraChatText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") sendCameraChat(); }}
+                      placeholder="Mensagem para a Lisa ler lá"
+                      title="A Lisa lê essa mensagem em voz alta na tela de quem está com a Câmera de Vigia ligada"
+                    />
+                    <button type="button" className="bb-botao-pequeno" onClick={sendCameraChat}>Enviar</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </GrupoDoMenu>
+
+          <GrupoDoMenu titulo="Voz e rádio">
+            <ChaveDoMenu
+              ligado={radioMode}
+              onChange={() => { unlockAudioPlayback(); acordarAudio(); setRadioMode((v) => !v); }}
+              detalhe={radioMode ? "O player fica no canto inferior esquerdo" : "A Lisa vira apresentadora, com a sua playlist"}
+            >
+              Rádio
+            </ChaveDoMenu>
+            <ChaveDoMenu
+              ligado={escutaPalavra}
+              onChange={() => { unlockAudioPlayback(); acordarAudio(); setEscutaPalavra((v) => !v); }}
+              detalhe={escutaPalavra ? (escutaEstado === "acordada" ? "Ouvindo o comando…" : escutaEstado === "ocupada" ? "Respondendo…" : "Diga \"Lisa\" e o comando") : "Microfone aberto, reage quando você diz \"Lisa\""}
+            >
+              Palavra &quot;Lisa&quot;
+            </ChaveDoMenu>
+          </GrupoDoMenu>
+
+          <GrupoDoMenu titulo="Trabalho">
+            <ChaveDoMenu
+              ligado={codeMode}
+              onChange={() => setCodeMode((v) => !v)}
+              detalhe="Toda mensagem vira pedido de mudança (branch + PR)"
+              cor={PU}
+            >
+              Modo código
+            </ChaveDoMenu>
+            {codeMode && (
+              <div className="bb-campo-do-menu">
+                <select className="bb-select" value={codeModeRepo} onChange={(e) => setCodeModeRepo(e.target.value)}>
+                  <option value="">Repositório…</option>
                   {codeModeRepos.map((r) => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
                 </select>
                 {codeModeRepo && (
-                  <select
-                    value={codeModeBranch}
-                    onChange={(e) => setCodeModeBranch(e.target.value)}
-                    style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
-                  >
-                    <option value="">branch base…</option>
+                  <select className="bb-select" value={codeModeBranch} onChange={(e) => setCodeModeBranch(e.target.value)}>
+                    <option value="">Branch base…</option>
                     {codeModeBranches.map((b) => <option key={b} value={b}>{b}</option>)}
                   </select>
                 )}
                 {codeModeRepo && codeModeAvailableFiles.length > 0 && (
-                  <select
-                    multiple
-                    value={codeModeFiles}
-                    onChange={(e) => setCodeModeFiles(Array.from(e.target.selectedOptions).map((o) => o.value).slice(0, CODE_MODE_MAX_FILES))}
-                    title={`arquivos fixos (até ${CODE_MODE_MAX_FILES}, ctrl/cmd+clique pra marcar mais de um) — garantidos no contexto de toda pergunta enquanto o Modo Código estiver ligado`}
-                    style={{ ...mono, fontSize: 9, padding: "4px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff", width: 160, height: 60 }}
-                  >
-                    {codeModeAvailableFiles.map((f) => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {openSettingsCategory === "sensing" && (
-          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
-            {/* Modo Observância — liga a câmera, tira 1 foto no instante de cada pergunta e manda
-                junto pro Gemini (multimodal); nunca fica ligado sozinho entre recarregamentos. */}
-            <button
-              onClick={() => setObservanceMode((v) => !v)}
-              title={observanceMode ? "Modo Observância ligado — a câmera tira 1 foto por pergunta, nada fica salvo. Clique pra desligar" : "Ligar a câmera pra Lisa poder ver o que você mostra (postura, roupa, gestos) ao responder"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${observanceMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: observanceMode ? "rgba(123,216,143,0.12)" : "transparent",
-                color: observanceMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              👁 OBSERVÂNCIA {observanceMode ? "ON" : "OFF"}
-            </button>
-            {observanceMode && (
-              <video ref={observanceVideoRef} autoPlay playsInline muted title="o que a câmera vê agora — só uma foto disso é enviada, no instante de cada pergunta" style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
-            )}
-            {observanceError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {observanceError}</span>}
-
-            {/* Modo Tela — desktop-only ("enquanto mexo no PC"). Reativo (cada pergunta manda um
-                retrato da tela) + proativo opcional (vigia sozinha e só fala se achar algo digno de
-                nota, ver o useEffect de screenAutoComment acima). O navegador SEMPRE pede permissão
-                nativa pra escolher tela/janela/aba — isso não dá pra pular. */}
-            <button
-              onClick={() => setScreenMode((v) => !v)}
-              title={screenMode ? "Modo Tela ligado — o navegador pede pra você escolher o que compartilhar. Clique pra desligar" : "Compartilhar a tela pra Lisa poder ver o que está acontecendo nela"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${screenMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: screenMode ? "rgba(123,216,143,0.12)" : "transparent",
-                color: screenMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              🖵 TELA {screenMode ? "ON" : "OFF"}
-            </button>
-            {screenMode && (
-              <>
-                <video ref={screenVideoRef} autoPlay playsInline muted title="o que está sendo compartilhado — só um retrato disso é enviado por vez" style={{ width: 72, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
-                <button
-                  onClick={() => setScreenAutoComment((v) => !v)}
-                  title={screenAutoComment ? "Vigiando sozinha — só fala se achar algo digno de nota. Clique pra desligar" : "Deixar a Lisa de olho na tela sozinha, comentando só quando achar algo relevante (sem você perguntar)"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${screenAutoComment ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: screenAutoComment ? "rgba(201,166,255,0.12)" : "transparent",
-                    color: screenAutoComment ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
-                >
-                  💬 AUTO {screenAutoComment ? "ON" : "OFF"}
-                </button>
-                {screenAutoComment && (
                   <>
+                    <label>Arquivos fixos (até {CODE_MODE_MAX_FILES}; Ctrl+clique marca mais de um)</label>
                     <select
-                      value={screenIntervalMs}
-                      onChange={(e) => chooseScreenInterval(Number(e.target.value))}
-                      title="De quanto em quanto tempo ela verifica a tela sozinha"
-                      style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
+                      className="bb-select"
+                      multiple
+                      value={codeModeFiles}
+                      onChange={(e) => setCodeModeFiles(Array.from(e.target.selectedOptions).map((o) => o.value).slice(0, CODE_MODE_MAX_FILES))}
+                      style={{ height: 96 }}
                     >
-                      {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+                      {codeModeAvailableFiles.map((f) => <option key={f} value={f}>{f}</option>)}
                     </select>
-                    <input
-                      value={screenFocus}
-                      onChange={(e) => updateScreenFocus(e.target.value)}
-                      placeholder="direcionamento (ex.: avise se o build quebrar)"
-                      title="O que ela deve priorizar notar na tela — fica em branco pra ela decidir sozinha o que é relevante"
-                      style={{ ...mono, fontSize: 9, padding: "5px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff", width: 220 }}
-                    />
                   </>
                 )}
-                <button
-                  onClick={() => setTransmissionMode((v) => !v)}
-                  title={transmissionMode ? "Transmissão ligada — outro dispositivo com o Modo Vigia pode assistir sua tela AO VIVO agora. Clique pra desligar" : "Deixar outro dispositivo (ex.: seu celular, com o Modo Vigia) assistir esta tela AO VIVO"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${transmissionMode ? OR : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: transmissionMode ? "rgba(217,89,38,0.12)" : "transparent",
-                    color: transmissionMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
-                >
-                  📡 TRANSMISSÃO {transmissionMode ? "ON" : "OFF"}
-                </button>
-              </>
+              </div>
             )}
-            {screenError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {screenError}</span>}
+            <ChaveDoMenu ligado={personaMode} onChange={() => togglePersonaMode()} detalhe="Personalidade do persona.md por cima das respostas" cor={PU}>
+              Persona
+            </ChaveDoMenu>
+            <ItemDoMenu onClick={() => setInteractiveMode((v) => !v)} detalhe="Rosto da Lisa e jogos; mostre ✌️ para chamar">
+              Modo interativo
+            </ItemDoMenu>
+          </GrupoDoMenu>
+        </Suspenso>
 
-            {/* Modo Escuta — precisa do Modo Tela ou da Observância ligado (não roda sozinho, ver
-                useEffect de micWatchMode acima). Microfone REALMENTE aberto, diferente do
-                "segure pra falar" de sempre. */}
-            <button
-              onClick={() => setMicWatchMode((v) => !v)}
-              disabled={!screenMode && !observanceMode}
-              title={
-                !screenMode && !observanceMode
-                  ? "ligue o Modo Tela ou a Observância primeiro"
-                  : (micWatchMode ? "Modo Escuta ligado — microfone aberto de verdade, grava pedacinhos curtos e descarta. Clique pra desligar" : "Deixar o microfone aberto pra Lisa ir ouvindo (ex.: comentar se você estiver cantando)")
-              }
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${micWatchMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: micWatchMode ? "rgba(123,216,143,0.12)" : "transparent",
-                color: (!screenMode && !observanceMode) ? "rgba(207,239,251,0.3)" : (micWatchMode ? "#eafcff" : "rgba(207,239,251,0.55)"),
-                cursor: (!screenMode && !observanceMode) ? "not-allowed" : "pointer",
-              }}
+        <Suspenso
+          titulo="Ajustes do Assistente"
+          largura={310}
+          rotulo={<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2.2" /><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" /></svg>}
+        >
+          <GrupoDoMenu titulo="Aparência da Lisa">
+            <SegmentosDoMenu
+              rotulo="Aparência"
+              valor={avatarView}
+              onChange={chooseAvatarView}
+              opcoes={[
+                { valor: "esfera", rotulo: "Esfera", titulo: "Esfera de pontos que reage à voz" },
+                { valor: "traditional", rotulo: "Ondas", titulo: "Visualizador de onda tradicional" },
+                { valor: "3d", rotulo: "Avatar 3D", titulo: "Corpo em modelo 3D — arraste/belisque pra ajustar o enquadramento" },
+              ]}
+            />
+            {avatarView === "3d" && (
+              <SegmentosDoMenu
+                rotulo="Corpo 3D"
+                valor={avatarSkin}
+                onChange={chooseAvatarSkin}
+                opcoes={[
+                  { valor: "cyborg", rotulo: "Cyborg", titulo: "Corpo original (sem esqueleto, só balanço/respiração)" },
+                  { valor: "ironman", rotulo: "Iron Man", titulo: "Corpo rigado — gestos reais por modo" },
+                ]}
+              />
+            )}
+          </GrupoDoMenu>
+          <GrupoDoMenu titulo="Voz">
+            <ChaveDoMenu ligado={voiceOn} onChange={() => { if (voiceOn) stopSpeaking(); setVoiceOn((v) => !v); }} detalhe="A Lisa fala as respostas em voz alta">
+              Falar as respostas
+            </ChaveDoMenu>
+            <ChaveDoMenu
+              ligado={geminiVoiceEnabled}
+              onChange={() => setGeminiVoiceEnabled((v) => {
+                const next = !v;
+                if (next) geminiDownUntilRef.current = 0; // reativou na mão → tenta de novo já na próxima, não espera o disjuntor
+                return next;
+              })}
+              detalhe={estadoGeminiVoz}
+              cor={geminiVoiceStatus === false ? OR : undefined}
             >
-              🎙️ ESCUTA {micWatchMode && (screenMode || observanceMode) ? "ON" : "OFF"}
-            </button>
-            {micWatchError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {micWatchError}</span>}
+              Voz do Gemini
+            </ChaveDoMenu>
+            {geminiVoiceEnabled && (
+              <div className="bb-campo-do-menu">
+                <select
+                  className="bb-select"
+                  value={voiceName}
+                  onChange={(e) => {
+                    setVoiceName(e.target.value);
+                    if (typeof window !== "undefined") localStorage.setItem("voiceName", e.target.value);
+                  }}
+                  title="Voz do Gemini (a Google não documenta gênero — teste e escolha a que preferir)"
+                >
+                  {TTS_VOICES.map((v) => <option key={v.name} value={v.name}>{v.name} · {v.trait}</option>)}
+                </select>
+              </div>
+            )}
+          </GrupoDoMenu>
+        </Suspenso>
+      </TopoExtra>
 
-            {/* Câmera de Vigia — como o Modo Tela, só que filma com a câmera (áudio junto) em
-                vez da tela. Funciona em celular também. Quem assiste no Modo Vigia pode mandar
-                mensagens que a Lisa lê em voz alta e mostra aqui — tipo um interfone. */}
-            <button
-              onClick={() => setCameraVigiaMode((v) => !v)}
-              title={cameraVigiaMode ? "Câmera de Vigia ligada (com áudio) — outro dispositivo com o Modo Vigia pode assistir. Clique pra desligar" : "Filmar com a câmera (e microfone) pra outro dispositivo assistir ao vivo, tipo uma babá eletrônica"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${cameraVigiaMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: cameraVigiaMode ? "rgba(123,216,143,0.12)" : "transparent",
-                color: cameraVigiaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              📷 CÂMERA {cameraVigiaMode ? "ON" : "OFF"}
-            </button>
+      <main className="bb-palco">
+        <div className="bb-palco-visual">
+          {avatarView === "3d" ? (
+            <div style={{ position: "relative", width: "min(70vh,680px)", height: "min(70vh,680px)" }}>
+              {avatarSkin === "ironman" ? <LisaAvatarIronMan mode={mode} /> : <LisaAvatar3D mode={mode} />}
+              {avatarSkin !== "ironman" && (
+                <a
+                  href="https://sketchfab.com/3d-models/android-cyborg-anime-girl-5fda47ea8ca048f7939f78da94aea54f"
+                  target="_blank" rel="noreferrer"
+                  className="bb-credito"
+                >
+                  modelo: &quot;Android Cyborg Anime Girl&quot; por lawlietrecluze · CC-BY-4.0
+                </a>
+              )}
+            </div>
+          ) : avatarView === "traditional" ? (
+            <div style={{ position: "relative", width: "min(52vh,520px)", height: "min(52vh,520px)" }}>
+              <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+            </div>
+          ) : (
+            <EsferaDaVoz obterSinal={obterSinalDaEsfera} />
+          )}
+        </div>
+
+        <RotuloDaVoz obterSinal={obterSinalDaEsfera} />
+
+        {autoListening && <div className="bb-pode-falar">Pode falar</div>}
+
+        <section className="bb-conversa" aria-live="polite">
+          {(mode !== "idle" || answer) && question && <p className="bb-conversa-pergunta">{question}</p>}
+          <p className={`bb-conversa-resposta${!answer && mode === "idle" ? " bb-conversa-resposta--vazia" : ""}`}>
+            {mode === "speaking" || answer ? (answer || "…") : mode === "listening" ? "…" : "Pergunte alguma coisa, por texto ou pelo microfone."}
+          </p>
+          {ttsWaitSeconds !== null && (
+            <div className="bb-conversa-nota">Preparando a voz… {ttsWaitSeconds}s de {SPEAK_TIMEOUT_MS / 1000}s</div>
+          )}
+          {(liveCode || liveCodeDone.length > 0) && (
+            <div className="bb-codigo-ao-vivo">
+              {liveCodeDone.map((f) => <div key={f.path} style={{ color: "var(--bb-ok)", marginBottom: 6 }}>✓ {f.path}</div>)}
+              {liveCode && (
+                <div>
+                  <div style={{ color: PU, marginBottom: 4 }}>✎ {liveCode.path}</div>
+                  <pre>{liveCode.content.slice(-2500)}</pre>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* prévias do que a câmera e a tela estão vendo — sempre montadas enquanto o modo estiver
+            ligado: a captura de cada pergunta lê destes mesmos <video> */}
+        {(observanceMode || screenMode || cameraVigiaMode) && (
+          <div className="bb-previas">
+            {observanceMode && (
+              <figure>
+                <video ref={observanceVideoRef} autoPlay playsInline muted title="o que a câmera vê agora — só uma foto disso é enviada, no instante de cada pergunta" />
+                <figcaption>Câmera</figcaption>
+              </figure>
+            )}
+            {screenMode && (
+              <figure>
+                <video ref={screenVideoRef} autoPlay playsInline muted title="o que está sendo compartilhado — só um retrato disso é enviado por vez" />
+                <figcaption>Tela{transmissionMode ? " · ao vivo" : ""}</figcaption>
+              </figure>
+            )}
             {cameraVigiaMode && (
-              <>
+              <figure>
                 <video
                   ref={cameraVigiaVideoRef} autoPlay playsInline muted
                   onLoadedMetadata={(e) => addLog("[CÂMERA]", GR, `preview carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
                   onError={() => addLog("[CÂMERA]", OR, "preview: erro ao decodificar o vídeo")}
                   title="o que a câmera de vigia está vendo"
-                  style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }}
                 />
-                <button
-                  onClick={() => setCameraFacing((f) => (f === "user" ? "environment" : "user"))}
-                  title="Trocar entre câmera frontal e traseira (celular)"
-                  style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "transparent", color: "rgba(207,239,251,0.7)", cursor: "pointer" }}
-                >
-                  🔄 {cameraFacing === "user" ? "frontal" : "traseira"}
-                </button>
-              </>
-            )}
-            {cameraVigiaError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {cameraVigiaError}</span>}
-          </div>
-        )}
-
-        {openSettingsCategory === "vigia" && (
-          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
-            {/* Modo Vigia — pergunta (ou narra sozinha) sobre o HISTÓRICO de observações do Modo
-                Tela. NÃO depende de screenMode neste aparelho — funciona de qualquer
-                dispositivo, inclusive celular, contanto que outro aparelho esteja alimentando
-                a memória (Modo Tela ligado lá) e/ou transmitindo ao vivo (Transmissão lá). */}
-            <button
-              onClick={() => setVigiaMode((v) => !v)}
-              title={vigiaMode ? "Modo Vigia ligado — toda pergunta busca no histórico de observações da tela. Clique pra desligar" : "Perguntar sobre o que a Lisa vem observando na tela, de qualquer dispositivo"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${vigiaMode ? OR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: vigiaMode ? "rgba(217,89,38,0.12)" : "transparent",
-                color: vigiaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              👁️ VIGIA {vigiaMode ? "ON" : "OFF"}
-            </button>
-            {vigiaMode && (
-              <>
-                <button
-                  onClick={() => setVigiaAutoOn((v) => !v)}
-                  title={vigiaAutoOn ? "Narrando sozinha o que há de novo — clique pra desligar" : "Deixar a Lisa te contar sozinha, de tempos em tempos, o que há de novo na tela (não precisa perguntar)"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${vigiaAutoOn ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: vigiaAutoOn ? "rgba(201,166,255,0.12)" : "transparent",
-                    color: vigiaAutoOn ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
-                >
-                  💬 AUTO {vigiaAutoOn ? "ON" : "OFF"}
-                </button>
-                {vigiaAutoOn && (
-                  <select
-                    value={vigiaAutoIntervalMs}
-                    onChange={(e) => chooseVigiaAutoInterval(Number(e.target.value))}
-                    title="De quanto em quanto tempo ela verifica se há algo novo pra te contar"
-                    style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
-                  >
-                    {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
-                  </select>
-                )}
-                <button
-                  onClick={() => setVigiaWatching((v) => !v)}
-                  title={vigiaWatching ? "Assistindo ao vivo — clique pra parar" : "Ver AO VIVO a tela de outro dispositivo com Modo Tela + Transmissão ligados"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${vigiaWatching ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: vigiaWatching ? "rgba(123,216,143,0.12)" : "transparent",
-                    color: vigiaWatching ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
-                >
-                  📺 ASSISTIR {vigiaWatching ? "ON" : "OFF"}
-                </button>
-                {vigiaWatching && (
-                  <span style={{ ...mono, fontSize: 8.5, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
-                    {vigiaWatchStatus === "connected" ? "● ao vivo — veja o canto da tela" : vigiaWatchStatus === "procurando" ? "procurando…" : vigiaWatchStatus || "conectando…"}
-                  </span>
-                )}
-                <button
-                  onClick={() => setCameraWatching((v) => !v)}
-                  title={cameraWatching ? "Assistindo a câmera ao vivo — clique pra parar" : "Ver AO VIVO a câmera de outro dispositivo com Câmera de Vigia ligada"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${cameraWatching ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: cameraWatching ? "rgba(123,216,143,0.12)" : "transparent",
-                    color: cameraWatching ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
-                >
-                  📷 ASSISTIR CÂMERA {cameraWatching ? "ON" : "OFF"}
-                </button>
-                {cameraWatching && (
-                  <>
-                    <span style={{ ...mono, fontSize: 8.5, color: cameraWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
-                      {cameraWatchStatus === "connected" ? "● ao vivo — veja o canto da tela" : cameraWatchStatus === "procurando" ? "procurando…" : cameraWatchStatus || "conectando…"}
-                    </span>
-                    <input
-                      value={cameraChatText}
-                      onChange={(e) => setCameraChatText(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") sendCameraChat(); }}
-                      placeholder="mensagem pra Lisa ler lá"
-                      title="A Lisa lê essa mensagem em voz alta e mostra na tela de quem está com a Câmera de Vigia ligada"
-                      style={{ ...mono, fontSize: 9, padding: "5px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff", width: 180 }}
-                    />
-                    <button
-                      onClick={sendCameraChat}
-                      style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3, border: `1px solid ${GR}`, background: "rgba(123,216,143,0.12)", color: "#eafcff", cursor: "pointer" }}
-                    >
-                      ENVIAR
-                    </button>
-                  </>
-                )}
-              </>
+                <figcaption>Vigia</figcaption>
+              </figure>
             )}
           </div>
         )}
 
-        {openSettingsCategory === "radio" && (
-          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
-            {/* Modo Rádio — a Lisa incorpora uma apresentadora de rádio, alternando locução
-                (novidades reais) com música de verdade da playlist (radio/playlist.txt). Ver o
-                useEffect de radioMode acima e o widget flutuante (radioWidget). */}
-            <button
-              onClick={() => { unlockAudioPlayback(); setRadioMode((v) => !v); }}
-              title={radioMode ? "Modo Rádio ligado — veja o player no canto da tela. Clique pra desligar" : "Ligar o Modo Rádio: a Lisa vira apresentadora, intercalando novidades reais com música da sua playlist"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${radioMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-                background: radioMode ? "rgba(201,166,255,0.12)" : "transparent",
-                color: radioMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              📻 RÁDIO {radioMode ? "ON" : "OFF"}
-            </button>
-            {radioMode && (
-              <span style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.6)" }}>veja o player no canto inferior esquerdo</span>
-            )}
+        <button type="button" className="bb-aba-lateral bb-aba-lateral--esq" aria-expanded={gaveta === "registro"} onClick={() => setGaveta((g) => (g === "registro" ? null : "registro"))}>
+          Registro
+        </button>
+        <button type="button" className="bb-aba-lateral bb-aba-lateral--dir" aria-expanded={gaveta === "contexto"} onClick={() => setGaveta((g) => (g === "contexto" ? null : "contexto"))}>
+          Contexto{cards.length ? ` · ${cards.length}` : ""}
+        </button>
 
-            {/* Modo Escuta por palavra — a Lisa fica ouvindo e só reage depois de "Lisa".
-                Pensado para ficar aberto NO IMAC, que é quem tem microfone e caixas de som.
-                A decisão do que fazer com o que foi dito mora em src/lib/escutaPorPalavra.js. */}
-            <button
-              onClick={() => { unlockAudioPlayback(); setEscutaPalavra((v) => !v); }}
-              title={escutaPalavra
-                ? "Ouvindo. Diga \"Lisa\" e o comando — uma pergunta, ou \"toca ...\". Clique pra desligar"
-                : "Deixar o microfone aberto e reagir quando você disser \"Lisa\""}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${escutaPalavra ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: escutaPalavra ? "rgba(123,216,143,0.12)" : "transparent",
-                color: escutaPalavra ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              🎙️ &quot;LISA&quot; {escutaPalavra ? "ON" : "OFF"}
-            </button>
-            {escutaPalavra && (
-              <span style={{ ...mono, fontSize: 8.5, color: escutaEstado === "dormindo" ? "rgba(207,239,251,0.6)" : GR }}>
-                {escutaEstado === "acordada" ? "ouvindo o comando…" : escutaEstado === "ocupada" ? "respondendo…" : "diga \"Lisa\""}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* pisca bem visível só durante a janela de resposta automática (ver openReplyWindow)
-            — sinal claro de "agora é sua vez", além do bipe sonoro que toca junto. Fica fora
-            das categorias colapsáveis de propósito — é um aviso urgente, não uma configuração,
-            então precisa aparecer mesmo com tudo fechado. */}
-        {autoListening && (
-          <span style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3, border: `1px solid ${GR}`, background: "rgba(123,216,143,0.18)", color: "#eafcff", animation: "bb-dot 0.9s ease-in-out infinite" }}>
-            🎙️ PODE FALAR
-          </span>
-        )}
-      </div>
-
-      {/* abas — só aparecem no mobile (ver .bb-assistant-tabs em globals.css). No mobile o
-          chat abre direto (sem a coluna de contexto — ela some de vez, nem vira aba) */}
-      <div className="bb-assistant-tabs" style={{ gap: 4, padding: "8px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)" }}>
-        {[{ key: "visualizer", label: "CHAT" }, { key: "logs", label: "LOGS" }].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setMobileTab(t.key)}
-            style={{
-              ...mono, fontSize: 9.5, letterSpacing: 1, padding: "6px 12px", borderRadius: 3,
-              border: `1px solid ${mobileTab === t.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
-              background: mobileTab === t.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
-              color: mobileTab === t.key ? "#eafcff" : "rgba(207,239,251,0.55)",
-              cursor: "pointer",
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* MAIN GRID */}
-      <main className="bb-assistant-grid" style={{ position: "relative", flex: 1, display: "grid", gridTemplateColumns: "minmax(220px,320px) minmax(0,1fr) minmax(280px,360px)", minHeight: 0 }}>
-        {/* LEFT: LOGS */}
-        <aside className={`bb-assistant-pane${mobileTab === "logs" ? " bb-active" : ""}`} style={{ borderRight: "1px solid rgba(var(--accent-rgb),0.12)", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(90deg, rgba(6,18,24,0.35), transparent)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)" }}>
-            <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ SYSTEM_LOGS</div>
-            <div style={{ ...mono, fontSize: 9, color: "rgba(255,157,61,0.85)", animation: "bb-flicker 2s infinite" }}>● LIVE</div>
-          </div>
-          <div style={{ flex: 1, overflow: "hidden", padding: "12px 14px", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 7 }}>
-            {logs.map((log) => (
-              <div key={log.id} style={{ ...mono, fontSize: 10.5, lineHeight: 1.45, animation: "bb-slidein .35s ease" }}>
-                <span style={{ color: "rgba(255,255,255,0.32)" }}>{log.t}</span>
-                <span style={{ color: log.color, margin: "0 5px" }}>{log.tag}</span>
-                <span style={{ color: "#a9cede" }}>{log.msg}</span>
-              </div>
-            ))}
-            <div style={{ ...mono, fontSize: 10.5, color: CY }}>&gt;<span style={{ display: "inline-block", width: 7, height: 13, background: CY, marginLeft: 4, verticalAlign: "middle", animation: "bb-blink 1s step-end infinite" }} /></div>
-          </div>
-        </aside>
-
-        {/* CENTER: VISUALIZER */}
-        <section className={`bb-assistant-pane${mobileTab === "visualizer" ? " bb-active" : ""}`} style={{ position: "relative", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, minWidth: 0 }}>
-          {avatarView === "3d" ? (
-            <div style={{ position: "relative", width: "min(70vh,680px)", height: "min(70vh,680px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {avatarSkin === "ironman" ? <LisaAvatarIronMan mode={mode} /> : <LisaAvatar3D mode={mode} />}
-              <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, textAlign: "center", pointerEvents: "none" }}>
-                <div style={{ ...mono, fontSize: 10, letterSpacing: 4, color: meta.color }}>{meta.label}</div>
-              </div>
-              {avatarSkin !== "ironman" && (
-                <a
-                  href="https://sketchfab.com/3d-models/android-cyborg-anime-girl-5fda47ea8ca048f7939f78da94aea54f"
-                  target="_blank" rel="noreferrer"
-                  style={{ position: "absolute", bottom: -18, right: 0, ...mono, fontSize: 7.5, letterSpacing: 0.5, color: "rgba(207,239,251,0.3)", textDecoration: "none" }}
-                >
-                  modelo: "Android Cyborg Anime Girl" por lawlietrecluze · CC-BY-4.0
-                </a>
-              )}
-            </div>
-          ) : (
-            <div style={{ position: "relative", width: "min(52vh,520px)", height: "min(52vh,520px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ position: "absolute", inset: "-6%", border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: "50%", borderTopColor: "rgba(var(--accent-rgb),0.45)", borderRightColor: "rgba(var(--accent-rgb),0.28)", animation: "bb-sweep 14s linear infinite" }} />
-              <div style={{ position: "absolute", inset: "4%", border: "1px dashed rgba(255,157,61,0.18)", borderRadius: "50%", animation: "bb-sweep 22s linear infinite reverse" }} />
-              <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
-              <div style={{ position: "relative", textAlign: "center", pointerEvents: "none" }}>
-                <div style={{ ...mono, fontSize: 11, letterSpacing: 5, color: meta.color }}>{meta.label}</div>
-                <div style={{ fontSize: 13, letterSpacing: 2, color: "rgba(207,239,251,0.55)", marginTop: 6, ...mono }}>{meta.sub}</div>
-              </div>
-            </div>
-          )}
-          <div style={{ marginTop: 26, width: "min(80%,560px)", textAlign: "center" }}>
-            <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(var(--accent-rgb),0.5)", marginBottom: 8 }}>↳ INTENT INTERPRETATION</div>
-            <div style={{ fontSize: 19, lineHeight: 1.4, color: "#eafcff", fontWeight: 500, letterSpacing: 0.4, whiteSpace: "pre-wrap" }}>{transcript}</div>
-            {ttsWaitSeconds !== null && (
-              <div style={{ ...mono, fontSize: 10.5, letterSpacing: 1, color: CY, marginTop: 10 }}>
-                ⏳ aguardando voz do Gemini… {ttsWaitSeconds}s / {SPEAK_TIMEOUT_MS / 1000}s
-              </div>
-            )}
-            {(liveCode || liveCodeDone.length > 0) && (
-              <div style={{ ...mono, fontSize: 10.5, textAlign: "left", background: "#08131a", border: `1px solid ${PU}55`, borderRadius: 8, padding: "12px 14px", maxHeight: 280, overflowY: "auto", marginTop: 14 }}>
-                {liveCodeDone.map((f) => (
-                  <div key={f.path} style={{ color: GR, marginBottom: 6 }}>✓ {f.path}</div>
-                ))}
-                {liveCode && (
-                  <div>
-                    <div style={{ color: PU, marginBottom: 4 }}>✎ {liveCode.path}</div>
-                    <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all", color: "rgba(207,239,251,0.8)", fontSize: 10, lineHeight: 1.4 }}>{liveCode.content.slice(-2500)}</pre>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* RIGHT: CONTEXT — some de vez no mobile (não é aba, ver .bb-assistant-context em globals.css) */}
-        <aside className="bb-assistant-pane bb-assistant-context" style={{ borderLeft: "1px solid rgba(var(--accent-rgb),0.12)", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(270deg, rgba(6,18,24,0.35), transparent)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)" }}>
-            <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ RETRIEVED_CONTEXT</div>
-            <div style={{ ...mono, fontSize: 9, color: "rgba(var(--accent-rgb),0.5)" }}>pgvector · {cards.length} matches</div>
-          </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-            {cards.length === 0 && (
-              <div style={{ ...mono, fontSize: 10.5, color: "rgba(207,239,251,0.4)", padding: "6px 2px" }}>
-                aguardando primeira consulta…
-              </div>
-            )}
-            {cards.map((c, i) => {
-              const brain = c.source === "BRAIN";
-              const sentinel = c.source === "SENTINELA";
-              const accent = brain ? PU : sentinel ? OR : CY;
-              const edge = brain ? "rgba(201,166,255,0.32)" : sentinel ? "rgba(255,157,61,0.32)" : "rgba(var(--accent-rgb),0.3)";
-              return (
-                <div key={i} style={{ flex: "none", border: `1px solid ${edge}`, borderRadius: 6, padding: "13px 14px", background: "linear-gradient(160deg, rgba(var(--accent-rgb),0.05), rgba(0,0,0,0.2))", position: "relative", overflow: "hidden" }}>
-                  <div style={{ position: "absolute", top: 0, left: 0, width: 3, height: "100%", background: accent, boxShadow: `0 0 10px ${accent}` }} />
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ ...mono, fontSize: 8.5, letterSpacing: 2, padding: "3px 7px", border: `1px solid ${edge}`, borderRadius: 3, color: accent, background: "rgba(0,0,0,0.3)" }}>{c.source}</span>
-                    <span style={{ ...mono, fontSize: 9, color: "rgba(207,239,251,0.4)" }}>{c.board}</span>
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: "#eafcff", letterSpacing: 0.3, lineHeight: 1.25 }}>{c.title}</div>
-                  <div style={{ fontSize: 12.5, color: "rgba(169,206,222,0.8)", marginTop: 5, lineHeight: 1.4 }}>{c.snippet}</div>
-                  <div style={{ ...mono, fontSize: 9, color: "rgba(var(--accent-rgb),0.55)", marginTop: 9 }}>SIM {meterFor(c.pct)} {c.sim}</div>
-                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 9, paddingTop: 9, borderTop: "1px dashed rgba(var(--accent-rgb),0.14)" }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: OR, boxShadow: "0 0 7px #ff9d3d" }} />
-                    <span style={{ ...mono, fontSize: 9, letterSpacing: 1, color: "rgba(255,157,61,0.85)" }}>LAST_MODIFIED</span>
-                    <span style={{ ...mono, fontSize: 10, color: "#ffbe7a", marginLeft: "auto", whiteSpace: "nowrap" }}>{c.modified}</span>
-                  </div>
+        {gaveta === "registro" && (
+          <aside className="bb-gaveta bb-gaveta--esq" aria-label="Registro">
+            <header>Registro<button type="button" aria-label="Fechar registro" onClick={() => setGaveta(null)}>×</button></header>
+            <div className="bb-gaveta-registro">
+              {logs.map((log) => (
+                <div key={log.id} className="bb-registro-linha">
+                  <time>{log.t}</time>
+                  <span style={{ color: log.color }}>{log.tag}</span>
+                  <span>{log.msg}</span>
                 </div>
+              ))}
+              {logs.length === 0 && <div className="bb-gaveta-vazia">Nada registrado ainda.</div>}
+            </div>
+          </aside>
+        )}
+        {gaveta === "contexto" && (
+          <aside className="bb-gaveta bb-gaveta--dir" aria-label="Contexto da resposta">
+            <header>Contexto da resposta<button type="button" aria-label="Fechar contexto" onClick={() => setGaveta(null)}>×</button></header>
+            {cards.length === 0 && <div className="bb-gaveta-vazia">Os cards e notas usados na resposta aparecem aqui depois da primeira pergunta.</div>}
+            {cards.map((c, i) => {
+              const cor = c.source === "BRAIN" ? PU : c.source === "SENTINELA" ? OR : CY;
+              return (
+                <article key={i} className="bb-cartao-contexto">
+                  <div className="bb-cartao-contexto-topo">
+                    <span style={{ color: cor }}>{c.source}</span>
+                    <span>{c.board}</span>
+                  </div>
+                  <b>{c.title}</b>
+                  {c.snippet && <p>{c.snippet}</p>}
+                  <div className="bb-cartao-contexto-pe">
+                    <span title="similaridade com a pergunta">{c.sim}</span>
+                    <span>{c.modified}</span>
+                  </div>
+                </article>
               );
             })}
-          </div>
-        </aside>
+          </aside>
+        )}
       </main>
 
-      {/* BOTTOM COMMAND BAR */}
-      <footer className="bb-footer" style={{ position: "relative", display: "flex", alignItems: "center", gap: 18, padding: "14px 26px", borderTop: "1px solid rgba(var(--accent-rgb),0.16)", background: "linear-gradient(0deg, rgba(6,20,26,0.6), transparent)" }}>
-        <div className="bb-footer-hide" style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(var(--accent-rgb),0.5)" }}>STATE</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 5, border: `1px solid ${meta.color}`, color: meta.color }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: meta.color, boxShadow: `0 0 8px ${meta.color}` }} />
-          <span className="bb-footer-hide" style={{ fontWeight: 600, letterSpacing: 1.5, fontSize: 13 }}>{meta.label}</span>
-        </div>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid rgba(var(--accent-rgb),0.18)", borderRadius: 5, background: "rgba(var(--accent-rgb),0.03)", ...mono }}>
-          <span style={{ color: CY, fontSize: 13 }}>&gt;_</span>
+      <footer className="bb-pe">
+        <div className="bb-campo-de-mensagem">
+          <Suspenso
+            titulo="Perguntar sobre"
+            paraCima
+            lado="esquerda"
+            largura={300}
+            classeDoBotao="bb-escopo"
+            rotulo={<>{nomeDoEscopo}<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2 4l3 3 3-3" /></svg></>}
+          >
+            <GrupoDoMenu titulo="Perguntar sobre">
+              <SegmentosDoMenu
+                rotulo="Escopo"
+                valor={scopeMode}
+                onChange={setScopeMode}
+                opcoes={[{ valor: "panel", rotulo: "Um painel" }, { valor: "general", rotulo: "Geral" }]}
+              />
+              {scopeMode === "general" ? (
+                <div className="bb-nota-do-menu">Vê todos os painéis e pode buscar na web quando precisar.</div>
+              ) : (
+                <div className="bb-campo-do-menu">
+                  <select className="bb-select" value={scopePanel} onChange={(e) => setScopePanel(e.target.value)}>
+                    {panelOptions.map((b) => <option key={b} value={b}>{b}</option>)}
+                    <option value={TASKS_SCOPE}>Tarefas (por prazo)</option>
+                    <option value={THOUGHTS_SCOPE}>Pensamentos</option>
+                    <option value={SENTINEL_SCOPE}>Chamados (Sentinela)</option>
+                    <option value={DELP_SCOPE}>Tarefas Delp</option>
+                    <option value={CODE_SCOPE}>Código</option>
+                  </select>
+                  {scopePanel === SENTINEL_SCOPE && (
+                    <select className="bb-select" value={sentinelProjectId} onChange={(e) => setSentinelProjectId(e.target.value)} title="Projeto de teste (Sentinela) — força a resposta a considerar só esse projeto">
+                      <option value="all">Todos os projetos</option>
+                      {sentinelProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  )}
+                  {scopePanel === CODE_SCOPE && (
+                    <select className="bb-select" value={codeRepo} onChange={(e) => setCodeRepo(e.target.value)} title="Repositório — força a resposta a considerar só esse repo">
+                      <option value="all">Todos os repositórios</option>
+                      {codeRepos.map((r) => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
+                    </select>
+                  )}
+                  {scopePanel === CODE_SCOPE && codeRepo !== "all" && (
+                    <select className="bb-select" value={codeFile} onChange={(e) => setCodeFile(e.target.value)} title="Arquivo específico — sem escolher nenhum, busca no repositório inteiro">
+                      <option value="">Repositório inteiro</option>
+                      {codeFiles.map((f) => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  )}
+                </div>
+              )}
+            </GrupoDoMenu>
+          </Suspenso>
+
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !busy) { ask(input); setInput(""); }
-            }}
+            onKeyDown={(e) => { if (e.key === "Enter") enviarPergunta(); }}
             disabled={busy}
-            placeholder={busy ? "processando…" : (listening ? "ouvindo… fale agora" : 'pergunte ou clique no microfone…')}
-            style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#eafcff", fontSize: 12, letterSpacing: 0.5 }}
+            placeholder={busy ? "Pensando…" : listening ? "Ouvindo… pode falar" : "Pergunte alguma coisa para a Lisa"}
+            aria-label="Mensagem para a Lisa"
           />
-        </div>
 
-        {/* botão de microfone (STT) */}
-        <button
-          onClick={toggleMic}
-          disabled={busy}
-          title={listening ? "Parar de ouvir" : "Falar (microfone)"}
-          style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            width: 44, height: 44, borderRadius: "50%",
-            border: `1.5px solid ${listening ? OR : CY}`,
-            background: listening ? "rgba(255,157,61,0.15)" : "rgba(var(--accent-rgb),0.06)",
-            color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer",
-            boxShadow: listening ? `0 0 16px ${OR}` : "none",
-            animation: listening ? "bb-dot 1s ease-in-out infinite" : "none",
-            transition: "all .2s",
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="23" />
-            <line x1="8" y1="23" x2="16" y2="23" />
-          </svg>
-        </button>
-
-        {/* toggle de voz (TTS) */}
-        <button
-          onClick={() => { if (voiceOn) stopSpeaking(); setVoiceOn(v => !v); }}
-          title={voiceOn ? "Voz ligada (clique p/ mutar)" : "Voz desligada"}
-          style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            width: 40, height: 40, borderRadius: "50%",
-            border: `1px solid ${voiceOn ? CY : "rgba(207,239,251,0.3)"}`,
-            background: "rgba(var(--accent-rgb),0.04)", color: voiceOn ? CY : "rgba(207,239,251,0.4)",
-            cursor: "pointer", transition: "all .2s",
-          }}
-        >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-            {voiceOn
-              ? <><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></>
-              : <><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></>}
-          </svg>
-        </button>
-
-        {/* liga/desliga a voz do Gemini especificamente + mostra se ela tá disponível */}
-        <button
-          onClick={() => setGeminiVoiceEnabled((v) => {
-            const next = !v;
-            if (next) geminiDownUntilRef.current = 0; // reativou na mão → tenta de novo já na próxima, não espera o disjuntor
-            return next;
-          })}
-          title={
-            !geminiVoiceEnabled
-              ? "Voz Gemini desativada — usando só a voz do navegador (clique pra reativar)"
-              : geminiVoiceStatus === false
-              ? "Voz Gemini ativada, mas a última tentativa falhou (clique pra desativar e usar só a voz do navegador)"
-              : geminiVoiceStatus === true
-              ? "Voz Gemini ativada e funcionando (clique pra desativar)"
-              : "Voz Gemini ativada, ainda sem tentativa nesta sessão (clique pra desativar)"
-          }
-          style={{
-            display: "flex", alignItems: "center", gap: 7,
-            padding: "0 13px", height: 40, borderRadius: 20,
-            border: `1px solid ${geminiVoiceEnabled ? CY : "rgba(207,239,251,0.25)"}`,
-            background: geminiVoiceEnabled ? "rgba(var(--accent-rgb),0.04)" : "transparent",
-            color: geminiVoiceEnabled ? "#eafcff" : "rgba(207,239,251,0.45)",
-            cursor: "pointer", transition: "all .2s", ...mono, fontSize: 9.5, letterSpacing: 1.5,
-          }}
-        >
-          <span
-            style={{
-              width: 7, height: 7, borderRadius: "50%",
-              background: dotColor(geminiVoiceEnabled ? geminiVoiceStatus : null),
-              boxShadow: geminiVoiceEnabled && geminiVoiceStatus != null ? `0 0 8px ${dotColor(geminiVoiceStatus)}` : "none",
-            }}
-          />
-          <span className="bb-footer-hide">
-            VOZ GEMINI{!geminiVoiceEnabled ? " · OFF" : geminiVoiceStatus === true ? " · OK" : geminiVoiceStatus === false ? " · FALHOU" : ""}
-          </span>
-        </button>
-
-        {/* qual das 30 vozes do Gemini usar — a Google não documenta gênero, então teste e
-            escolha a que soar certa; a escolha fica salva neste navegador. */}
-        {geminiVoiceEnabled && (
-          <select
-            value={voiceName}
-            onChange={(e) => {
-              setVoiceName(e.target.value);
-              if (typeof window !== "undefined") localStorage.setItem("voiceName", e.target.value);
-            }}
-            title="Voz do Gemini (a Google não documenta gênero — teste e escolha a que preferir)"
-            style={{ ...mono, fontSize: 9.5, padding: "0 10px", height: 40, borderRadius: 20, border: "1px solid rgba(var(--accent-rgb),0.2)", background: "#08131a", color: "#eafcff" }}
+          <button
+            type="button"
+            className="bb-redondo"
+            onClick={() => { if (voiceOn) stopSpeaking(); setVoiceOn((v) => !v); }}
+            title={voiceOn ? "Voz ligada (clique para mutar)" : "Voz desligada (clique para ligar)"}
+            aria-pressed={voiceOn}
           >
-            {TTS_VOICES.map((v) => (
-              <option key={v.name} value={v.name}>{v.name} · {v.trait}</option>
-            ))}
-          </select>
-        )}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              {voiceOn
+                ? <><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></>
+                : <><line x1="22" y1="9" x2="16" y2="15" /><line x1="16" y1="9" x2="22" y2="15" /></>}
+            </svg>
+          </button>
+          <button
+            type="button"
+            className={`bb-redondo bb-redondo--mic${listening ? " bb-redondo--ouvindo" : ""}`}
+            onClick={() => { acordarAudio(); toggleMic(); }}
+            disabled={busy}
+            title={listening ? "Parar de ouvir" : "Falar (microfone)"}
+            aria-pressed={listening}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="9" y="2.5" width="6" height="12" rx="3" />
+              <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+            </svg>
+          </button>
+          <button type="button" className="bb-redondo bb-redondo--enviar" onClick={enviarPergunta} disabled={busy || !input.trim()} title="Enviar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
+          </button>
+        </div>
       </footer>
     </div>
   );

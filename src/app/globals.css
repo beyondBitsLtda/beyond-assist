@@ -1,22 +1,113 @@
-/* Cor de destaque do HUD — trocável pelo seletor de tema no Topbar (ver
-   src/lib/accentThemes.js). Ciano é o padrão original; o seletor sobrescreve essas duas
-   variáveis via JS (document.documentElement.style.setProperty). */
+/* ============================================================
+   Revisão visual (out/2026): fundo preto puro, superfícies quase pretas com um leve azul, texto
+   em três tons, Barlow para tudo e JetBrains Mono só para dados (horas, códigos, números).
+   A cor de destaque continua trocável pelo seletor (src/lib/accentThemes.js), que sobrescreve
+   --accent-hex e --accent-rgb via JS. Azul suave é o padrão novo.
+   ============================================================ */
 :root {
-  --accent-hex: #38e1ff;
-  --accent-rgb: 56, 225, 255;
+  --accent-hex: #5aa9ff;
+  --accent-rgb: 90, 169, 255;
+
+  --bb-fundo: #000;
+  --bb-superficie: #090c12;
+  --bb-superficie-2: #10141d;
+  --bb-superficie-3: #171c28;
+  --bb-linha: rgba(160, 180, 220, 0.11);
+  --bb-linha-forte: rgba(160, 180, 220, 0.2);
+  --bb-texto: #e7edf7;
+  --bb-texto-2: #9aa6bb;
+  --bb-texto-3: #5f6b80;
+  --bb-ok: #3fe0a0;
+  --bb-aviso: #ff9d3d;
+  --bb-fonte: "Barlow", Inter, system-ui, sans-serif;
+  --bb-mono: "JetBrains Mono", ui-monospace, monospace;
+  --bb-raio: 14px;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #000; }
+html, body { margin: 0; padding: 0; background: var(--bb-fundo); }
+body { font-family: var(--bb-fonte); color: var(--bb-texto); -webkit-font-smoothing: antialiased; }
+.bb-app { background: var(--bb-fundo); font-family: var(--bb-fonte); font-weight: 500; color: var(--bb-texto); }
 a { color: var(--accent-hex); text-decoration: none; }
-a:hover { color: #7febff; }
-::selection { background: rgba(var(--accent-rgb), 0.3); color: #eaffff; }
-::-webkit-scrollbar { width: 5px; height: 5px; }
+a:hover { color: var(--bb-texto); }
+::selection { background: rgba(var(--accent-rgb), 0.3); color: #fff; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb), 0.25); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--bb-linha-forte); border-radius: 3px; }
+* { scrollbar-width: thin; scrollbar-color: var(--bb-linha-forte) transparent; }
+button, input, select, textarea { font-family: inherit; }
+:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.7); outline-offset: 2px; }
 
-input { font-family: 'JetBrains Mono', monospace; }
-input::placeholder { color: rgba(207,239,251,0.4); }
+input::placeholder, textarea::placeholder { color: var(--bb-texto-3); }
+
+/* ------------------------------------------------------------ topo */
+.bb-topo {
+  position: relative; z-index: 30; flex: none;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px max(20px, env(safe-area-inset-right, 0px)) 12px max(20px, env(safe-area-inset-left, 0px));
+}
+.bb-topo-marca { display: flex; align-items: center; gap: 10px; color: var(--bb-texto); font-weight: 600; font-size: 17px; letter-spacing: 0.01em; }
+.bb-topo-marca:hover { color: #fff; }
+.bb-topo-onde { color: var(--bb-texto-3); font-size: 14px; padding-left: 12px; border-left: 1px solid var(--bb-linha); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.bb-topo-direita { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.bb-topo-extra { display: contents; }
+.bb-menu-botao {
+  border: 0; background: transparent; color: var(--bb-texto-2); cursor: pointer;
+  height: 34px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; gap: 7px;
+  font-size: 14px; font-weight: 500; transition: color .15s, background .15s;
+}
+.bb-menu-botao:hover, .bb-menu-botao[aria-expanded="true"] { color: var(--bb-texto); background: var(--bb-superficie-2); }
+.bb-menu-botao svg { width: 15px; height: 15px; opacity: .75; flex: none; }
+.bb-menu-botao--ativo { color: var(--bb-texto); }
+.bb-menu-botao .bb-ponto-ativo { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-hex); }
+.bb-status-botao { width: 34px; height: 34px; border-radius: 50%; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; }
+.bb-status-botao:hover, .bb-status-botao[aria-expanded="true"] { background: var(--bb-superficie-2); }
+.bb-status-botao i { width: 8px; height: 8px; border-radius: 50%; display: block; }
+
+/* ------------------------------------------------------------ menus suspensos (Suspenso.js) */
+.bb-suspenso {
+  position: absolute; z-index: 60; max-width: calc(100vw - 24px); max-height: min(72vh, 620px); overflow: auto;
+  background: rgba(9, 12, 18, 0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--bb-linha); border-radius: var(--bb-raio);
+  padding: 6px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  animation: bb-surgir .14s ease-out; color: var(--bb-texto); font-family: var(--bb-fonte); font-weight: 500; text-align: left;
+}
+@keyframes bb-surgir { from { opacity: 0; transform: translateY(-4px); } }
+.bb-grupo + .bb-grupo { border-top: 1px solid var(--bb-linha); margin-top: 6px; padding-top: 6px; }
+.bb-grupo-titulo { margin: 6px 10px 4px; font-size: 11px; color: var(--bb-texto-3); text-transform: uppercase; letter-spacing: 0.09em; }
+.bb-item {
+  width: 100%; border: 0; background: transparent; text-align: left; cursor: pointer;
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px;
+  color: var(--bb-texto-2); font-size: 14px; font-weight: 500; text-decoration: none;
+}
+.bb-item:hover:not(:disabled) { background: var(--bb-superficie-2); color: var(--bb-texto); }
+.bb-item:disabled { opacity: .45; cursor: default; }
+.bb-item--atual { color: var(--bb-texto); }
+.bb-item--atual::after { content: ""; margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-hex); flex: none; }
+.bb-item-texto { min-width: 0; }
+.bb-item-texto small { display: block; color: var(--bb-texto-3); font-size: 12px; font-weight: 400; line-height: 1.35; margin-top: 1px; }
+.bb-chave { margin-left: auto; width: 32px; height: 18px; border-radius: 999px; background: var(--bb-superficie-3); position: relative; flex: none; transition: background .15s; }
+.bb-chave::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--bb-texto-3); transition: transform .15s, background .15s; }
+.bb-item[aria-checked="true"] .bb-chave { background: rgba(var(--accent-rgb), 0.28); }
+.bb-item[aria-checked="true"] .bb-chave::after { transform: translateX(14px); background: var(--bb-chave-cor, var(--accent-hex)); }
+.bb-segmentos { display: flex; gap: 4px; padding: 4px 10px 8px; flex-wrap: wrap; }
+.bb-segmentos button { border: 1px solid var(--bb-linha); background: transparent; color: var(--bb-texto-2); border-radius: 999px; padding: 5px 11px; font-size: 13px; cursor: pointer; }
+.bb-segmentos button[aria-pressed="true"] { color: var(--bb-texto); border-color: rgba(var(--accent-rgb), 0.6); background: rgba(var(--accent-rgb), 0.12); }
+.bb-cores { display: flex; gap: 9px; padding: 6px 10px 10px; flex-wrap: wrap; }
+.bb-cores button { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.bb-cores button[aria-pressed="true"] { border-color: var(--bb-texto); }
+.bb-linha-de-status { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; color: var(--bb-texto-2); font-size: 14px; }
+.bb-linha-de-status em { font-style: normal; font-family: var(--bb-mono); font-size: 12px; }
+.bb-relogio { display: flex; justify-content: space-between; padding: 10px 10px 6px; border-top: 1px solid var(--bb-linha); margin-top: 6px; font-family: var(--bb-mono); font-size: 11px; color: var(--bb-texto-3); }
+.bb-campo-do-menu { padding: 4px 10px 8px; display: flex; flex-direction: column; gap: 6px; }
+.bb-campo-do-menu label { font-size: 12px; color: var(--bb-texto-3); }
+.bb-select, .bb-input {
+  width: 100%; background: var(--bb-superficie-2); border: 1px solid var(--bb-linha); border-radius: 9px;
+  color: var(--bb-texto); padding: 7px 10px; font-size: 13px; font-weight: 500; outline: 0;
+}
+.bb-select:focus, .bb-input:focus { border-color: rgba(var(--accent-rgb), 0.5); }
+.bb-select option { background: var(--bb-superficie); color: var(--bb-texto); }
 
 @keyframes bb-flicker { 0%,100%{opacity:.85} 50%{opacity:1} }
 @keyframes bb-blink   { 0%,49%{opacity:1} 50%,100%{opacity:0} }
@@ -31,38 +122,14 @@ input::placeholder { color: rgba(207,239,251,0.4); }
    Regras base primeiro, overrides do @media depois (cascata
    normal, sem precisar de !important em lugar nenhum).
    ============================================================ */
-.bb-sidebar { position: relative; width: 208px; flex: none; z-index: 2; }
-
-/* A lista de painéis já passa da altura da tela em notebook. Rola dentro da própria barra, com
-   uma barra de rolagem fina que só aparece no hover — a padrão do Windows é larga e branca e
-   brigaria com o resto do HUD. */
-.bb-sidebar-nav { scrollbar-width: thin; scrollbar-color: rgba(var(--accent-rgb),0.28) transparent; }
-.bb-sidebar-nav::-webkit-scrollbar { width: 6px; }
-.bb-sidebar-nav::-webkit-scrollbar-track { background: transparent; }
-.bb-sidebar-nav::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb),0.18); border-radius: 3px; }
-.bb-sidebar-nav:hover::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb),0.4); }
-.bb-sidebar-backdrop { display: none; }
-.bb-hamburger { display: none; }
 .bb-kanban-col { width: 280px; }
 .bb-chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
 .bb-assistant-tabs { display: none; }
 .bb-assistant-pane { display: flex; }
 
 @media (max-width: 768px) {
-  .bb-sidebar {
-    position: fixed; inset: 0 auto 0 0; width: 78vw; max-width: 280px; z-index: 45;
-    transform: translateX(-100%); transition: transform .25s ease;
-    box-shadow: 8px 0 30px rgba(0,0,0,0.55);
-  }
-  .bb-sidebar.bb-open { transform: translateX(0); }
-
-  .bb-sidebar-backdrop.bb-open {
-    display: block; position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,0.5);
-  }
-
-  .bb-hamburger { display: flex; }
-
-  .bb-topbar-row { flex-wrap: wrap; row-gap: 8px; }
+  .bb-topo .bb-rotulo { display: none; }
+  .bb-topo-onde { display: none; }
 
   .bb-assistant-tabs { display: flex; }
   .bb-assistant-grid { display: flex; flex-direction: column; }
@@ -86,12 +153,180 @@ input::placeholder { color: rgba(207,239,251,0.4); }
 .bb-marca {
   display: block;
   height: 38px;
+  flex: none;
   aspect-ratio: 480 / 691;
   -webkit-mask: url(/marca/lisa.png) center / contain no-repeat;
           mask: url(/marca/lisa.png) center / contain no-repeat;
   background: linear-gradient(180deg, #eafcff 30%, var(--accent-hex));
 }
 .bb-marca--login { height: 112px; }
+.bb-marca--topo { height: 26px; }
+
+/* ============================================================
+   Assistente — revisão visual (out/2026). A esfera ocupa o palco; a conversa fica logo
+   abaixo dela; o campo de mensagem é uma pílula no pé. Ver assistant/page.js (desktop).
+   ============================================================ */
+.bb-contador { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: rgba(var(--accent-rgb), 0.18); color: var(--bb-texto); font-size: 11px; display: grid; place-items: center; font-family: var(--bb-mono); }
+.bb-sub-do-menu { margin: 0 0 4px 12px; padding-left: 6px; border-left: 1px solid var(--bb-linha); }
+.bb-erro-do-menu { margin: 0 10px 6px; font-size: 12px; color: var(--bb-aviso); }
+.bb-nota-do-menu { margin: 0 10px 8px; font-size: 13px; color: var(--bb-texto-3); }
+.bb-campo-do-menu--linha { flex-direction: row; }
+.bb-botao-pequeno { border: 1px solid var(--bb-linha-forte); background: var(--bb-superficie-2); color: var(--bb-texto); border-radius: 9px; padding: 0 12px; font-size: 13px; cursor: pointer; flex: none; }
+.bb-botao-pequeno:hover { border-color: rgba(var(--accent-rgb), 0.5); }
+
+.bb-palco { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; overflow: hidden; }
+.bb-palco-visual { position: relative; flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+.bb-credito { position: absolute; bottom: -16px; right: 0; font-family: var(--bb-mono); font-size: 9px; color: var(--bb-texto-3); }
+.bb-estado-da-voz {
+  flex: none; margin-top: -6px; font-family: var(--bb-mono); font-size: 11px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--bb-texto-3); transition: color .3s;
+}
+.bb-estado-da-voz--ouvindo { color: #3fe0c5; }
+.bb-estado-da-voz--falando { color: #b07cff; }
+.bb-estado-da-voz--pensando { color: #8f8cff; }
+.bb-pode-falar {
+  position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+  padding: 6px 14px; border-radius: 999px; font-size: 13px;
+  background: rgba(63, 224, 197, 0.14); color: #3fe0c5; border: 1px solid rgba(63, 224, 197, 0.35);
+  animation: bb-dot 0.9s ease-in-out infinite;
+}
+.bb-conversa {
+  flex: none; width: 100%; max-width: 720px; max-height: 34vh; overflow-y: auto; text-align: center;
+  padding: 14px max(20px, env(safe-area-inset-right, 0px)) 10px max(20px, env(safe-area-inset-left, 0px));
+}
+.bb-conversa-pergunta { margin: 0 0 8px; color: var(--bb-texto-3); font-size: 15px; }
+.bb-conversa-resposta { margin: 0; color: var(--bb-texto); font-size: 19px; line-height: 1.55; white-space: pre-wrap; text-wrap: pretty; }
+.bb-conversa-resposta--vazia { color: var(--bb-texto-3); font-size: 16px; }
+.bb-conversa-nota { margin-top: 10px; font-family: var(--bb-mono); font-size: 11px; color: var(--bb-texto-3); }
+.bb-codigo-ao-vivo {
+  margin-top: 14px; text-align: left; background: var(--bb-superficie); border: 1px solid var(--bb-linha);
+  border-radius: 12px; padding: 12px 14px; max-height: 260px; overflow-y: auto; font-family: var(--bb-mono); font-size: 11px;
+}
+.bb-codigo-ao-vivo pre { margin: 0; white-space: pre-wrap; word-break: break-all; color: var(--bb-texto-2); font-size: 10.5px; line-height: 1.45; }
+
+.bb-previas { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: 12px; display: flex; gap: 8px; z-index: 5; }
+.bb-previas figure { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.bb-previas video { width: 96px; height: 64px; object-fit: cover; border-radius: 10px; border: 1px solid var(--bb-linha-forte); background: var(--bb-superficie); }
+.bb-previas figcaption { font-size: 11px; color: var(--bb-texto-3); }
+
+.bb-aba-lateral {
+  position: absolute; top: 50%; z-index: 6;
+  border: 1px solid var(--bb-linha); background: var(--bb-superficie); color: var(--bb-texto-3);
+  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; padding: 12px 6px; border-radius: 10px;
+  writing-mode: vertical-rl; cursor: pointer; transition: color .15s, border-color .15s;
+}
+.bb-aba-lateral:hover, .bb-aba-lateral[aria-expanded="true"] { color: var(--bb-texto); border-color: var(--bb-linha-forte); }
+.bb-aba-lateral--esq { left: max(10px, env(safe-area-inset-left, 0px)); transform: translateY(-50%) rotate(180deg); }
+.bb-aba-lateral--dir { right: max(10px, env(safe-area-inset-right, 0px)); transform: translateY(-50%); }
+.bb-gaveta {
+  position: absolute; top: 8px; bottom: 8px; width: min(360px, calc(100% - 32px)); z-index: 20;
+  background: rgba(9, 12, 18, 0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--bb-linha); border-radius: var(--bb-raio);
+  padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+  animation: bb-surgir .16s ease-out;
+}
+.bb-gaveta--esq { left: max(12px, env(safe-area-inset-left, 0px)); }
+.bb-gaveta--dir { right: max(12px, env(safe-area-inset-right, 0px)); }
+.bb-gaveta > header { display: flex; justify-content: space-between; align-items: center; color: var(--bb-texto-2); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+.bb-gaveta > header button { border: 0; background: transparent; color: var(--bb-texto-3); font-size: 20px; line-height: 1; cursor: pointer; }
+.bb-gaveta > header button:hover { color: var(--bb-texto); }
+.bb-gaveta-vazia { color: var(--bb-texto-3); font-size: 14px; }
+.bb-gaveta-registro { display: flex; flex-direction: column; gap: 6px; }
+.bb-registro-linha { display: flex; flex-wrap: wrap; gap: 0 8px; font-family: var(--bb-mono); font-size: 11.5px; line-height: 1.5; color: var(--bb-texto-2); }
+.bb-registro-linha time { color: var(--bb-texto-3); }
+.bb-cartao-contexto { border: 1px solid var(--bb-linha); border-radius: 12px; padding: 11px 13px; background: var(--bb-superficie-2); display: flex; flex-direction: column; gap: 5px; }
+.bb-cartao-contexto b { font-weight: 600; font-size: 14.5px; color: var(--bb-texto); line-height: 1.3; }
+.bb-cartao-contexto p { margin: 0; font-size: 13px; color: var(--bb-texto-2); line-height: 1.45; }
+.bb-cartao-contexto-topo, .bb-cartao-contexto-pe { display: flex; justify-content: space-between; gap: 10px; font-family: var(--bb-mono); font-size: 10.5px; color: var(--bb-texto-3); }
+.bb-cartao-contexto-topo span:first-child { letter-spacing: 0.08em; }
+
+.bb-pe {
+  flex: none; display: flex; justify-content: center;
+  padding: 6px max(16px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.bb-campo-de-mensagem {
+  width: 100%; max-width: 720px; display: flex; align-items: center; gap: 4px;
+  background: var(--bb-superficie); border: 1px solid var(--bb-linha); border-radius: 999px; padding: 6px;
+  transition: border-color .15s;
+}
+.bb-campo-de-mensagem:focus-within { border-color: rgba(var(--accent-rgb), 0.45); }
+.bb-campo-de-mensagem input { flex: 1; min-width: 0; border: 0; background: transparent; outline: 0; padding: 8px 8px; font-size: 15px; color: var(--bb-texto); font-family: var(--bb-fonte); font-weight: 500; }
+.bb-escopo {
+  border: 0; background: var(--bb-superficie-2); color: var(--bb-texto-2); border-radius: 999px;
+  height: 36px; padding: 0 12px; font-size: 13px; display: flex; gap: 6px; align-items: center; white-space: nowrap; cursor: pointer; max-width: 180px;
+}
+.bb-escopo:hover, .bb-escopo[aria-expanded="true"] { color: var(--bb-texto); }
+.bb-redondo { width: 38px; height: 38px; border-radius: 50%; border: 0; display: grid; place-items: center; flex: none; background: transparent; color: var(--bb-texto-2); cursor: pointer; transition: background .15s, color .15s; }
+.bb-redondo:hover:not(:disabled) { background: var(--bb-superficie-2); color: var(--bb-texto); }
+.bb-redondo:disabled { opacity: .4; cursor: default; }
+.bb-redondo svg { width: 18px; height: 18px; }
+.bb-redondo[aria-pressed="false"]:not(.bb-redondo--mic) { color: var(--bb-texto-3); }
+.bb-redondo--ouvindo { background: rgba(63, 224, 197, 0.16); color: #3fe0c5; animation: bb-dot 1.2s ease-in-out infinite; }
+.bb-redondo--enviar { background: var(--bb-texto); color: #000; }
+.bb-redondo--enviar:hover:not(:disabled) { background: #fff; color: #000; }
+
+@media (max-width: 768px) {
+  .bb-aba-lateral { display: none; }
+  .bb-previas video { width: 72px; height: 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bb-suspenso, .bb-gaveta { animation: none; }
+}
+
+/* ============================================================
+   Painéis — primeira passada da revisão visual (out/2026).
+   Os painéis foram escritos em estilo inline no visual de HUD: fonte monoespaçada em quase todo
+   rótulo, letras espaçadas (letterSpacing 1–3) e superfícies azul-petróleo. Em vez de reescrever
+   18 painéis de uma vez, esta camada (só dentro de .bb-painel, que o Shell põe no conteúdo de
+   todo painel menos o Assistente) troca a fonte para a do app, tira o espaçamento de HUD e leva
+   as superfícies para o preto novo. !important é inevitável aqui: é o único jeito de CSS vencer
+   estilo inline. Código, horários e números seguem monoespaçados.
+   ============================================================ */
+.bb-painel :where(div, span, p, a, button, label, li, td, th, h1, h2, h3, h4, small, strong, b, em, input, select, textarea, option, summary):not([class*="bb-"]) {
+  font-family: var(--bb-fonte) !important;
+  letter-spacing: normal !important;
+}
+.bb-painel :where(pre, code, kbd, samp, time, .bb-mono),
+.bb-painel :where(pre, code) * { font-family: var(--bb-mono) !important; }
+.bb-painel { font-variant-numeric: tabular-nums; }
+.bb-painel [style*="rgb(8, 19, 26)"], .bb-painel [style*="#08131a"] { background-color: var(--bb-superficie-2) !important; }
+.bb-painel [style*="rgba(6, 20, 26"], .bb-painel [style*="rgba(6, 18, 24"] { background-image: none !important; }
+.bb-painel select:not([class*="bb-"]), .bb-painel input:not([type=checkbox]):not([type=radio]):not([class*="bb-"]), .bb-painel textarea:not([class*="bb-"]) {
+  background-color: var(--bb-superficie-2) !important; border-color: var(--bb-linha) !important; color: var(--bb-texto) !important; border-radius: 9px !important;
+}
+.bb-painel button:not([class*="bb-"]) { border-radius: 9px; }
+/* Os tamanhos 8–11px eram para a fonte monoespaçada; na Barlow ficam miúdos. O estilo inline
+   chega ao DOM como texto ("font-size: 9px"), e é por ele que a camada acha cada caso. */
+.bb-painel :is([style*="font-size: 8px"], [style*="font-size:8px"], [style*="font-size: 8.5px"], [style*="font-size:8.5px"]) { font-size: 11px !important; }
+.bb-painel :is([style*="font-size: 9px"], [style*="font-size:9px"], [style*="font-size: 9.5px"], [style*="font-size:9.5px"], [style*="font-size: 10px"], [style*="font-size:10px"]) { font-size: 12px !important; }
+.bb-painel :is([style*="font-size: 10.5px"], [style*="font-size:10.5px"], [style*="font-size: 11px"], [style*="font-size:11px"]) { font-size: 12.5px !important; }
+/* No HUD, espaçamento 3+ marcava título de seção: vira título de verdade. 2 era rótulo pequeno. */
+.bb-painel :is([style*="letter-spacing: 3px"], [style*="letter-spacing:3px"], [style*="letter-spacing: 4px"], [style*="letter-spacing:4px"], [style*="letter-spacing: 5px"], [style*="letter-spacing:5px"]) {
+  font-size: 15px !important; font-weight: 600 !important; color: var(--bb-texto) !important; text-shadow: none !important;
+}
+.bb-painel [style*="letter-spacing: 2px"], [style*="letter-spacing:2px"] { color: var(--bb-texto-2) !important; }
+
+/* Assistente no celular — revisão visual (ver assistant/page.js, branch isMobile) */
+.bb-celular-topo {
+  flex: none; display: flex; align-items: center; gap: 6px;
+  padding: max(10px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 10px max(12px, env(safe-area-inset-left, 0px));
+}
+.bb-celular-marca { font-weight: 600; font-size: 17px; color: var(--bb-texto); margin-right: auto; padding-left: 4px; }
+.bb-celular-modos { display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--bb-superficie); border: 1px solid var(--bb-linha); }
+.bb-celular-modos button { width: 36px; height: 30px; border: 0; border-radius: 999px; background: transparent; color: var(--bb-texto-3); display: grid; place-items: center; cursor: pointer; }
+.bb-celular-modos button svg { width: 17px; height: 17px; }
+.bb-celular-modos button[aria-pressed="true"] { background: var(--bb-superficie-3); color: var(--bb-texto); }
+.bb-celular-voz { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; padding: 0 16px max(24px, env(safe-area-inset-bottom, 0px)); }
+.bb-celular-esfera { position: relative; flex: 1; min-height: 0; width: 100%; }
+.bb-celular-fala { margin: 10px 0 18px; min-height: 22px; text-align: center; color: var(--bb-texto-2); font-size: 15px; }
+.bb-botao-segurar {
+  width: 76px; height: 76px; border-radius: 50%; border: 1px solid var(--bb-linha-forte);
+  background: var(--bb-superficie-2); color: var(--bb-texto); display: grid; place-items: center; cursor: pointer;
+  touch-action: none; user-select: none; -webkit-user-select: none; transition: background .15s, color .15s, transform .15s;
+}
+.bb-botao-segurar svg { width: 28px; height: 28px; }
+.bb-botao-segurar--ouvindo { background: rgba(63, 224, 197, 0.18); color: #3fe0c5; border-color: rgba(63, 224, 197, 0.45); transform: scale(1.06); }
+.bb-botao-segurar:disabled { opacity: .45; }
 
 /* ============================================================
    Tela de abertura (ver src/components/shell/Abertura.js).

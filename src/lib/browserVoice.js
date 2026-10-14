@@ -1,3 +1,4 @@
+import { escutarElemento } from "./vozAnalisador.js";
 import { dividirParaFala, pedacosParaVoz } from "./cleanForSpeech.js";
 
 // A Web Speech API do navegador NÃO expõe gênero da voz (SpeechSynthesisVoice só tem
@@ -101,6 +102,7 @@ export async function speakText(text, { voiceName, browserOnly = false } = {}) {
     const tocar = (blob) => new Promise((resolve) => {
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      escutarElemento(audio); // a esfera do Assistente mede o volume (ver vozAnalisador.js)
       currentAudio = audio;
       audio.onended = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };
       audio.onerror = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; resolve(); };

@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.2.0-cloudflare-pages.8",
-  "atualizadoEm": "2026-10-13",
+  "versao": "0.3.0-revisao-visual.1",
+  "atualizadoEm": "2026-10-14",
   "compilacao": {
-    "numero": 9,
-    "data": "2026-10-13",
+    "numero": 10,
+    "data": "2026-10-14",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.3.0-revisao-visual.1",
+      "data": "2026-10-14",
+      "branch": "revisao-visual",
+      "tipo": "melhoria",
+      "resumo": "Revisão visual da Lisa: fundo preto, menus discretos e a voz como uma esfera de pontos 3D que reage ao som. Nenhuma função mudou.",
+      "itens": [
+        "Assistente: a esfera de pontos (three.js) ocupa o centro e se deforma com o volume real da voz da Lisa e do microfone; muda de cor ao ouvir, pensar e falar. Rosto/ondas e avatar 3D continuam em Ajustes.",
+        "Topo do app: marca, painel atual, menu \"Painéis\" agrupado (Trabalho, Conhecimento, Código e testes, Sistema) e um ponto de status com conexões, sincronização, notificações, cor de destaque e relógio. A barra lateral saiu.",
+        "Assistente: \"Modos\" (percepção, vigia, voz e rádio, trabalho) e Ajustes (aparência e voz) no topo; escopo dentro do campo de mensagem; registro e contexto viram gavetas laterais; prévias de câmera e tela sempre montadas enquanto o modo estiver ligado.",
+        "Celular: topo novo (ajustes, Chat/Voz/Interativo, painéis) e a esfera na tela de voz.",
+        "Painéis: primeira passada (fonte Barlow, sem espaçamento de HUD, tamanhos mínimos legíveis, superfícies no preto novo). Cor de destaque padrão passa a azul suave."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.2.0-cloudflare-pages.8",
       "data": "2026-10-13",

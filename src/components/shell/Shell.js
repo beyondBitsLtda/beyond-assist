@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { LogProvider } from "./LogProvider.js";
-import Sidebar from "./Sidebar.js";
 import Topbar from "./Topbar.js";
 import NotificationToasts from "./NotificationToasts.js";
 import RemoteCommandListener from "./RemoteCommandListener.js";
@@ -11,12 +10,13 @@ import { applyAccentTheme } from "@/lib/accentThemes.js";
 import { useIsMobile } from "@/lib/useIsMobile.js";
 
 /**
- * Casca compartilhada por todos os painéis: fundo com grid/glow + sidebar + topbar + conteúdo.
- * No mobile (ver globals.css), a sidebar vira um menu off-canvas controlado por `sidebarOpen`
- * — aberto pelo hambúrguer no Topbar, fechado clicando no fundo escurecido ou navegando.
+ * Casca compartilhada por todos os painéis: fundo preto, topo e conteúdo.
+ *
+ * Revisão visual (out/2026): saíram a barra lateral (os painéis agora ficam no menu "Painéis" do
+ * topo, agrupados — src/lib/navegacao.js), a grade de fundo e o brilho radial. Fundo preto puro,
+ * e o conteúdo ocupa a largura toda.
  */
 export default function Shell({ children }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -56,7 +56,7 @@ export default function Shell({ children }) {
   if (fullScreenNoChrome) {
     return (
       <LogProvider>
-        <div style={{ position: "fixed", inset: 0, background: "#000", fontFamily: "'Rajdhani',sans-serif", color: "#cfeffb", overflow: "hidden" }}>
+        <div className="bb-app" style={{ position: "fixed", inset: 0, overflow: "hidden" }}>
           {children}
           <NotificationToasts />
           <RemoteCommandListener />
@@ -67,20 +67,11 @@ export default function Shell({ children }) {
 
   return (
     <LogProvider>
-      <div style={{ position: "fixed", inset: 0, background: "#000", fontFamily: "'Rajdhani',sans-serif", color: "#cfeffb", overflow: "hidden", display: "flex" }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(var(--accent-rgb),0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--accent-rgb),0.035) 1px, transparent 1px)", backgroundSize: "44px 44px", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", top: "-25%", left: "50%", transform: "translateX(-50%)", width: 900, height: 900, borderRadius: "50%", background: "radial-gradient(circle, rgba(var(--accent-rgb),0.10), transparent 62%)", pointerEvents: "none" }} />
-
-        <div
-          className={`bb-sidebar-backdrop${sidebarOpen ? " bb-open" : ""}`}
-          onClick={() => setSidebarOpen(false)}
-        />
-        <Sidebar open={sidebarOpen} onNavigate={() => setSidebarOpen(false)} />
-
-        <div style={{ position: "relative", zIndex: 2, flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
-          <Topbar onToggleSidebar={() => setSidebarOpen((v) => !v)} />
-          <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>{children}</div>
-        </div>
+      <div className="bb-app" style={{ position: "fixed", inset: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <Topbar />
+        {/* bb-painel: a camada de revisão visual dos painéis (fonte, espaçamento, superfícies — ver
+            globals.css). O Assistente já nasceu no visual novo e fica de fora. */}
+        <div className={pathname === "/assistant" ? "bb-conteudo" : "bb-conteudo bb-painel"} style={{ flex: 1, minHeight: 0, overflow: "auto", position: "relative" }}>{children}</div>
         <NotificationToasts />
         <RemoteCommandListener />
       </div>

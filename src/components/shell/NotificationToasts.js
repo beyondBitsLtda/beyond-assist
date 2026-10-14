@@ -127,7 +127,7 @@ export default function NotificationToasts() {
               ✕
             </button>
           </div>
-          {t.body && <div style={{ fontSize: 10.5, color: "rgba(207,239,251,0.75)", marginTop: 6, fontFamily: "'Rajdhani',sans-serif" }}>{t.body}</div>}
+          {t.body && <div style={{ fontSize: 10.5, color: "rgba(207,239,251,0.75)", marginTop: 6, fontFamily: "var(--bb-fonte)" }}>{t.body}</div>}
         </div>
       ))}
     </div>

@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import Suspenso, { GrupoDoMenu, ItemDoMenu, ChaveDoMenu, LinkDoMenu } from "./Suspenso.js";
+import { GRUPOS_DE_PAINEIS, painelDe } from "@/lib/navegacao.js";
 import { useLog } from "./LogProvider.js";
-import { CY, OR, GR, PU, mono, dotColor } from "@/lib/theme.js";
+import { CY, OR, GR, dotColor } from "@/lib/theme.js";
 import { runFullSync } from "@/lib/sync.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
 
@@ -35,12 +38,18 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 /**
- * Barra superior compartilhada por todos os painéis: relógio/uptime, bolinhas de conexão
- * (Supabase/Trello/Gemini) e o botão SYNC (reindexação completa) — migrados de page.js,
- * porque agora são relevantes pra todos os painéis, não só o Assistente.
+ * Barra superior compartilhada por todos os painéis.
+ *
+ * Revisão visual (out/2026): era uma linha com relógio, quatro pílulas de conexão, AUTO-SYNC,
+ * SYNC, sino e sete bolinhas de cor — e uma barra lateral com 18 painéis soltos. Agora é a marca,
+ * o nome do painel atual, o menu "Painéis" (agrupado, em src/lib/navegacao.js) e UM ponto de
+ * status que abre conexões, sincronização, notificações, cor de destaque e o relógio. Nenhuma
+ * função saiu: só mudou de lugar. O espaço #bb-topo-extra recebe os menus próprios de cada
+ * painel (o Assistente põe "Modos" e os ajustes ali, ver TopoExtra.js).
  */
-export default function Topbar({ onToggleSidebar }) {
+export default function Topbar() {
   const { addLog } = useLog();
+  const pathname = usePathname();
   // Começa neutro e só ganha a hora no navegador: o HTML é pré-renderizado no BUILD, e a hora
   // do build nunca bate com a do cliente — o React descartava a hidratação e refazia a raiz
   // inteira (erro #418), o que também apagava a tela de abertura.
@@ -190,14 +199,14 @@ export default function Topbar({ onToggleSidebar }) {
   }, [ingesting, addLog]);
 
   const connList = [
-    { label: "SUPABASE", ok: conn.supabase },
-    { label: "TRELLO", ok: conn.trello },
-    { label: "GEMINI", ok: conn.gemini },
-    { label: "SENTINELA", ok: conn.sentinel },
+    { rotulo: "Banco", ok: conn.supabase },
+    { rotulo: "Trello", ok: conn.trello },
+    { rotulo: "Gemini", ok: conn.gemini },
+    { rotulo: "Sentinela", ok: conn.sentinel },
   ];
 
   // indicador do SYNC automático (cron do Supabase) — cor/texto conforme o estado atual
-  let autoSyncColor = "rgba(207,239,251,0.35)"; // dim: ainda sem dado (carregando ou nunca rodou)
+  let autoSyncColor = "var(--bb-texto-3)"; // dim: ainda sem dado (carregando ou nunca rodou)
   let autoSyncLabel = "…";
   let autoSyncTitle = "Carregando status do SYNC automático…";
   if (autoSync) {
@@ -206,7 +215,7 @@ export default function Topbar({ onToggleSidebar }) {
       autoSyncLabel = "não configurado";
       autoSyncTitle = `Ciclo automático não configurado — rode db/schema.sql e db/cron.sql no Supabase (ver README). Detalhe: ${autoSync.error || "tabela sync_progress não encontrada"}`;
     } else if (!autoSync.started_at) {
-      autoSyncColor = "rgba(207,239,251,0.35)";
+      autoSyncColor = "var(--bb-texto-3)";
       autoSyncLabel = "nunca rodou";
       autoSyncTitle = "Nenhum ciclo automático rodou ainda — confira se db/cron.sql foi executado no Supabase.";
     } else if (autoSync.last_error) {
@@ -224,98 +233,105 @@ export default function Topbar({ onToggleSidebar }) {
     }
   }
 
+  const algumFalhou = connList.some((c) => c.ok === false);
+  const tudoOk = connList.every((c) => c.ok === true);
+  const corDoStatus = ingesting ? CY : algumFalhou ? OR : tudoOk ? GR : "var(--bb-texto-3)";
+  const tituloDoStatus = ingesting
+    ? "Sincronizando…"
+    : algumFalhou
+    ? `Falha em: ${connList.filter((c) => c.ok === false).map((c) => c.rotulo).join(", ")}`
+    : tudoOk ? "Tudo conectado" : "Verificando conexões…";
+  const atual = painelDe(pathname);
+
   return (
-    <header
-      style={{
-        position: "relative", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-        padding: "14px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.16)",
-        background: "linear-gradient(180deg, rgba(6,20,26,0.6), transparent)",
-      }}
-    >
-      <button
-        className="bb-hamburger"
-        onClick={onToggleSidebar}
-        aria-label="Abrir menu"
-        style={{ alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(var(--accent-rgb),0.05)", color: CY, cursor: "pointer", flex: "none" }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <line x1="3" y1="18" x2="21" y2="18" />
-        </svg>
-      </button>
-
-      <Link href="/" aria-label="Lisa — início" style={{ display: "block", flex: "none" }}>
-        <span className="bb-marca" aria-hidden="true" />
+    <header className="bb-topo">
+      <Link href="/assistant" className="bb-topo-marca" aria-label="Lisa — Assistente">
+        <span className="bb-marca bb-marca--topo" aria-hidden="true" />
+        <span>Lisa</span>
       </Link>
+      {atual && atual.href !== "/assistant" && <span className="bb-topo-onde">{atual.rotulo}</span>}
 
-      <div className="bb-topbar-row" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flex: 1, ...mono, fontSize: 10, letterSpacing: 1 }}>
-        <div style={{ textAlign: "right", marginRight: 8 }}>
-          <div style={{ color: "#eafcff", fontSize: 15, letterSpacing: 2 }}>{clock}</div>
-          <div style={{ color: "rgba(var(--accent-rgb),0.5)", fontSize: 9, letterSpacing: 2 }}>SYS.UPTIME {uptime}</div>
-        </div>
-        {connList.map((c) => (
-          <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", border: "1px solid rgba(var(--accent-rgb),0.18)", borderRadius: 3, background: "rgba(var(--accent-rgb),0.03)" }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor(c.ok), boxShadow: `0 0 8px ${dotColor(c.ok)}`, animation: "bb-dot 1.8s ease-in-out infinite" }} />
-            <span style={{ color: "#bfe8f5" }}>{c.label}</span>
-          </div>
-        ))}
-        <div
-          title={autoSyncTitle}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", border: "1px solid rgba(var(--accent-rgb),0.18)", borderRadius: 3, background: "rgba(var(--accent-rgb),0.03)" }}
+      <div className="bb-topo-direita">
+        {/* menus próprios do painel aberto (ver TopoExtra.js) */}
+        <div id="bb-topo-extra" className="bb-topo-extra" />
+
+        <Suspenso
+          titulo="Painéis"
+          largura={290}
+          rotulo={
+            <>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1.2" /><rect x="9" y="2" width="5" height="5" rx="1.2" /><rect x="2" y="9" width="5" height="5" rx="1.2" /><rect x="9" y="9" width="5" height="5" rx="1.2" /></svg>
+              <span className="bb-rotulo">Painéis</span>
+            </>
+          }
         >
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: autoSyncColor, boxShadow: `0 0 8px ${autoSyncColor}`, animation: autoSync?.status === "running" ? "bb-dot 0.9s ease-in-out infinite" : "none" }} />
-          <span style={{ color: "#bfe8f5" }}>AUTO-SYNC</span>
-          <span style={{ color: "rgba(207,239,251,0.6)" }}>{autoSyncLabel}</span>
-        </div>
-        <button
-          onClick={reindex}
-          disabled={ingesting}
-          title="Reindexar Trello + Beyond Brain agora mesmo (botão manual — o AUTO-SYNC ao lado roda sozinho 1x/hora)"
-          style={{ ...mono, display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", border: `1px solid ${ingesting ? OR : CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: ingesting ? OR : "#eafcff", cursor: ingesting ? "wait" : "pointer", fontSize: 10, letterSpacing: 2 }}
-        >
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: ingesting ? OR : CY, boxShadow: `0 0 8px ${ingesting ? OR : CY}`, animation: ingesting ? "bb-dot 0.9s ease-in-out infinite" : "none" }} />
-          {ingesting ? "SYNCING…" : "◈ SYNC"}
-        </button>
-
-        {pushSupported && (
-          <button
-            onClick={toggleNotifications}
-            disabled={subBusy}
-            title={subscribed ? "Notificações ativadas (clique pra desativar)" : "Ativar notificações (chamado novo, reaberto, SLA, tarefa atrasada...)"}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 34, height: 34, borderRadius: "50%",
-              border: `1px solid ${subscribed ? PU : "rgba(207,239,251,0.3)"}`,
-              background: subscribed ? "rgba(201,166,255,0.08)" : "rgba(var(--accent-rgb),0.04)",
-              color: subscribed ? PU : "rgba(207,239,251,0.5)",
-              cursor: subBusy ? "wait" : "pointer", transition: "all .2s", flex: "none",
-            }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              {!subscribed && <line x1="3" y1="3" x2="21" y2="21" stroke={OR} />}
-            </svg>
-          </button>
-        )}
-
-        {/* cor de destaque do HUD — a escolha fica salva neste navegador */}
-        <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "0 8px", flex: "none" }} title="Cor de destaque">
-          {ACCENT_THEMES.map((t) => (
-            <button
-              key={t.name}
-              onClick={() => chooseAccent(t)}
-              title={t.name}
-              aria-label={`Tema ${t.name}`}
-              style={{
-                width: 16, height: 16, borderRadius: "50%", padding: 0, cursor: "pointer",
-                background: t.hex, border: `2px solid ${accentName === t.name ? "#eafcff" : "transparent"}`,
-                boxShadow: accentName === t.name ? `0 0 6px ${t.hex}` : "none",
-              }}
-            />
+          {GRUPOS_DE_PAINEIS.map((g) => (
+            <GrupoDoMenu key={g.titulo} titulo={g.titulo}>
+              {g.itens.map((i) => (
+                <LinkDoMenu key={i.href} href={i.href} detalhe={i.detalhe} atual={pathname === i.href}>{i.rotulo}</LinkDoMenu>
+              ))}
+            </GrupoDoMenu>
           ))}
-        </div>
+        </Suspenso>
+
+        <Suspenso
+          titulo={tituloDoStatus}
+          largura={290}
+          classeDoBotao="bb-status-botao"
+          rotulo={<i style={{ background: corDoStatus, boxShadow: `0 0 10px ${corDoStatus}`, animation: ingesting || autoSync?.status === "running" ? "bb-dot 0.9s ease-in-out infinite" : "none" }} />}
+        >
+          <GrupoDoMenu titulo="Conexões">
+            {connList.map((c) => (
+              <div key={c.rotulo} className="bb-linha-de-status">
+                <span>{c.rotulo}</span>
+                <em style={{ color: dotColor(c.ok) }}>{c.ok == null ? "…" : c.ok ? "ok" : "falhou"}</em>
+              </div>
+            ))}
+          </GrupoDoMenu>
+          <GrupoDoMenu titulo="Sincronização">
+            <div className="bb-linha-de-status" title={autoSyncTitle}>
+              <span>Automática</span>
+              <em style={{ color: autoSyncColor }}>{autoSyncLabel}</em>
+            </div>
+            <ItemDoMenu
+              onClick={reindex}
+              disabled={ingesting}
+              fecharAoClicar={false}
+              title="Reindexar Trello + Beyond Brain agora mesmo (a automática roda sozinha)"
+              detalhe="Trello e Beyond Brain"
+            >
+              {ingesting ? "Sincronizando…" : "Sincronizar agora"}
+            </ItemDoMenu>
+          </GrupoDoMenu>
+          {pushSupported && (
+            <GrupoDoMenu titulo="Avisos">
+              <ChaveDoMenu
+                ligado={subscribed}
+                onChange={() => toggleNotifications()}
+                disabled={subBusy}
+                detalhe="Chamado novo, SLA, tarefa atrasada…"
+              >
+                Notificações neste aparelho
+              </ChaveDoMenu>
+            </GrupoDoMenu>
+          )}
+          <GrupoDoMenu titulo="Cor de destaque">
+            <div className="bb-cores" role="group" aria-label="Cor de destaque">
+              {ACCENT_THEMES.map((th) => (
+                <button
+                  key={th.name}
+                  type="button"
+                  onClick={() => chooseAccent(th)}
+                  title={th.name}
+                  aria-label={th.name}
+                  aria-pressed={accentName === th.name}
+                  style={{ background: th.hex }}
+                />
+              ))}
+            </div>
+          </GrupoDoMenu>
+          <div className="bb-relogio"><span>{clock}</span><span>no ar há {uptime}</span></div>
+        </Suspenso>
       </div>
     </header>
   );
