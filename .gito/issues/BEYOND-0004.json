@@ -1,0 +1,56 @@
+{
+  "id": "BEYOND-0004",
+  "titulo": "comentarios no Abacato",
+  "descricao": "a) por campo de comentários nos cards do abacato\nb) deixar por incluive imagens de anexo nos comentarios seja com control v seja carregando arquivo do pc",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "em-revisao",
+  "responsavel": "",
+  "prazo": "",
+  "versaoAlvo": "0.2.0",
+  "criadaEm": "2026-10-13T01:17:34.497Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-10-13T01:44:19.586Z",
+  "comentarios": [
+    {
+      "quando": "2026-10-13T01:21:41.569Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou fazer no Abacato (branch cloudflare-pages): tabela de comentários por card, imagens anexas guardadas num bucket privado do Storage (até 10 MB cada), envio por Ctrl+V ou pelo botão de escolher arquivo, e a lista de comentários no painel do card. Quem é comentarista no quadro também pode comentar.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-10-13T01:44:19.586Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito e publicado em abacato.beyond.dev.br (versão 0.2.0-cloudflare-pages.6, branch cloudflare-pages).\n\n- Seção \"Comentários\" no card aberto: escrever, editar o próprio, apagar (autor, ou dono/editor do quadro); comentarista também comenta, leitor só lê.\n- Imagens: Ctrl+V com o card aberto, botão \"Anexar imagem\" (arquivo do PC) ou arrastar; até 6 por comentário, 10 MB cada; prints grandes são reduzidos para WEBP no navegador antes de enviar.\n- Imagens em bucket privado (abacato-comentarios), abertas por link assinado de 1 hora; contam no armazenamento do plano do dono do quadro.\n- Banco: migração db/013-comentarios.sql aplicada.\n- Testado: npm run comentario-check (30 casos) e teste de ponta a ponta com contas temporárias (dono, comentarista, leitor), incluindo a colagem de um print no navegador; dados de teste apagados.\n\nFalta conferir na sua conta e fechar a issue.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-10-13T01:17:34.497Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-10-13T01:21:41.569Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "situação: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-10-13T01:36:38.292Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-andamento → aberta"
+    },
+    {
+      "quando": "2026-10-13T01:44:19.586Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "situação: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-10-13T01:44:19.586Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "versão alvo: → 0.2.0"
+    }
+  ]
+}

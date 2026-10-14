@@ -4,13 +4,13 @@
   "descricao": "Por algum motivo a Lisa no modo chat falha muitas vezes ao usar a voz do Gemini, direto cai para a voz automática do navegador em especial em mensgaens longas.\n\n- Esse erro ocorre tanto na lisa.beyond como na casa.beyond.\n- Esse erro ocorre inclusive com as chaves de API todas disponivéis. ",
   "tipo": "bug",
   "prioridade": "media",
-  "status": "aberta",
+  "status": "concluida",
   "responsavel": "Brayan Rodrigues",
   "prazo": "2026-10-02",
   "versaoAlvo": "0.1.0.1",
   "criadaEm": "2026-09-27T05:14:05.760Z",
   "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
-  "atualizadaEm": "2026-09-27T05:14:05.760Z",
+  "atualizadaEm": "2026-10-13T00:49:43.887Z",
   "comentarios": [],
   "evidencias": [],
   "historico": [
@@ -18,6 +18,11 @@
       "quando": "2026-09-27T05:14:05.760Z",
       "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
       "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-10-13T00:49:43.887Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: aberta → concluida"
     }
   ]
 }

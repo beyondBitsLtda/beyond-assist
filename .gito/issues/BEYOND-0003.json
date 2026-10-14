@@ -1,0 +1,47 @@
+{
+  "id": "BEYOND-0003",
+  "titulo": "Rotina e mecanismo de bkp do banco da lisa e todas as aplicações que ela abriga (abacato, beyond brain, space.beyond etc e qualquer aplicação que ve da lisa)",
+  "descricao": "a) Criar backup semanal (toda segunda feira) de todo o banco de dados tudo\nb) o arquivo deve ser feito de uma forma que a recuperação seja facil do banco\nc) nao sei ainda onde salvar o bkps preciso da sua ajuda a ideia é salvar em algu serviço de nuvem de preferencia com uso gartuit e com a inetgraçao do bkp automatica.",
+  "tipo": "melhoria",
+  "prioridade": "critica",
+  "status": "em-andamento",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-10-12",
+  "versaoAlvo": "0.1.0",
+  "criadaEm": "2026-10-13T01:15:45.338Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-10-13T02:48:11.004Z",
+  "comentarios": [
+    {
+      "quando": "2026-10-13T02:08:44.588Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Plano: script no iMac (cron, toda segunda de madrugada) que gera um pacote com o banco inteiro (pg_dump formato custom de cada base + papéis), os arquivos do Storage e a configuração do Supabase; confere o dump, CRIPTOGRAFA e envia para a nuvem com rclone, mantendo as últimas semanas. Junto, um script de restauração com ensaio automático num Postgres descartável, para provar que o backup volta. Destino na nuvem a definir com o responsável (sugestão: Cloudflare R2, 10 GB grátis).",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-10-13T02:30:13.722Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Instalado no iMac e testado (versão 0.2.0-cloudflare-pages.7, scripts em scripts/backup/ na branch cloudflare-pages e em ~/backup no iMac):\n\n- Cron toda segunda às 03:15: pacote com as bases do Postgres, papéis, arquivos do Storage e configuração do Supabase, com SHA-256 de cada arquivo. Pacote atual: 265 MB, ~2 min.\n- Criptografia rclone crypt configurada; senhas em ~/backup/SENHAS-DO-BACKUP.txt (só o usuário lê).\n- Ensaio de restauração num Postgres descartável: 128 tabelas e 229 arquivos voltaram sem erro (ENSAIO OK).\n- Já existem 2 pacotes íntegros no iMac (~/backup/pacotes).\n\nFalta (responsável): 1) ativar o R2 na conta beyondbitsLisa, criar o bucket beyond-backup e um token R2 só dele; 2) rodar ~/backup/configurar-r2.sh no iMac; 3) copiar as duas senhas do SENHAS-DO-BACKUP.txt para o gerenciador de senhas e apagar o arquivo. A Sentinela fica fora (está no Supabase da nuvem).",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-10-13T02:48:11.004Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Destino trocado para o Google Drive (o R2 exige cartão). Primeiro envio feito em 12/10 às 23:46: pacote de 265 MB criptografado na pasta beyond-backup, conferido por hash (status ok, nuvem true).\n\nFalta: 1) criar o client_id próprio do Google e rodar ~/backup/trocar-client-id-drive.sh (o compartilhado do rclone é desligado em 2026 e aí o envio para); 2) guardar as senhas do SENHAS-DO-BACKUP.txt fora do iMac e apagar o arquivo.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-10-13T01:15:45.338Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-10-13T02:08:44.588Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "situação: aberta → em-andamento"
+    }
+  ]
+}
