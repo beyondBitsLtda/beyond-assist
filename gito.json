@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.4.0-cloudflare-pages.10",
+  "versao": "0.5.0-acoes-abacato.1",
   "atualizadoEm": "2026-10-15",
   "compilacao": {
-    "numero": 13,
+    "numero": 14,
     "data": "2026-10-15",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.5.0-acoes-abacato.1",
+      "data": "2026-10-15",
+      "branch": "acoes-abacato",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa cria, edita, conclui, reabre, move e exclui cards do Abacato em qualquer conversa, e passa a tratar o Abacato (não o Trello) como o sistema de tarefas.",
+      "itens": [
+        "Causa do \"não tenho permissão\": o fluxo de ações era do Trello (só via cards com fonte TRELLO — com os quadros no Abacato a lista vinha vazia), só sabia prazo/coluna/concluído, e as instruções diziam \"você NÃO tem o poder de mudar nada\".",
+        "Novo fluxo (src/lib/fluxoDeAcoesNoAbacato.js): o Gemini entende o pedido com a conversa, os cards candidatos e os quadros/colunas; toda gravação pede \"Confirma?\"; pedido ambíguo pergunta qual card; \"cria um card com esse texto\" usa a última resposta inteira dela.",
+        "Gravação direta nas tabelas do Abacato (src/lib/abacatoAcoes.js) com as regras do próprio Abacato: prazo \"dia 30\" = 30 às 23:59 em Brasília (antes virava 29 às 21h), concluir tarefa recorrente reprograma como na tela dele, excluir = arquivar (dá para recuperar).",
+        "Vale em qualquer modo: texto, voz, conversa livre, e também com o Modo Código ou o Vigia ligados.",
+        "Trello → Abacato no que a Lisa sabe e diz: instruções, persona, rádio, Lisa Code, títulos de notificação, luz de saúde (agora confere o Abacato) e textos das telas. O Mapa de deploy continua no Trello, como é de fato.",
+        "Testes: npm run acoes-abacato-check e acoes-abacato-e2e (Gemini + banco reais, quadro temporário apagado no fim; 17 cenários)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.4.0-cloudflare-pages.10",
       "data": "2026-10-15",

@@ -16,6 +16,7 @@ import TopoExtra from "@/components/shell/TopoExtra.js";
 import Suspenso, { GrupoDoMenu, ItemDoMenu, ChaveDoMenu, SegmentosDoMenu } from "@/components/shell/Suspenso.js";
 import RotuloDaVoz from "@/components/panels/RotuloDaVoz.js";
 import { adicionarTurno, conversaVigente, falaQueValePergunta } from "@/lib/conversa.js";
+import { pareceAcao } from "@/lib/acoesNoAbacato.js";
 import { acordarAudio, escutarElemento, nivelDaVoz, abrirMicrofone, fecharMicrofone, nivelDoMicrofone } from "@/lib/vozAnalisador.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
 import { getDeviceId, matchNavCommand } from "@/lib/deviceId.js";
@@ -445,7 +446,9 @@ export default function AssistantPage() {
   // assunto. Inclui o que ela comenta sozinha (tela, câmera, escuta) — "por quê?" logo depois
   // de um comentário dela precisa saber de qual comentário se trata.
   const conversaRef = useRef([]);
-  const lembrarDaLisa = (texto) => { conversaRef.current = adicionarTurno(conversaVigente(conversaRef.current), "lisa", texto); };
+  // A última fala INTEIRA dela (a memória corta cada fala): "cria um card com esse texto" usa esta.
+  const ultimaRespostaRef = useRef("");
+  const lembrarDaLisa = (texto) => { conversaRef.current = adicionarTurno(conversaVigente(conversaRef.current), "lisa", texto); ultimaRespostaRef.current = String(texto || ""); };
   const pendingActionRef = useRef(null);
   const audioRef = useRef(null);
   const currentAudioResolveRef = useRef(null);
@@ -546,11 +549,11 @@ export default function AssistantPage() {
   const [cameraVigiaIncomingMsg, setCameraVigiaIncomingMsg] = useState(null);
 
   // Modo Rádio: a Lisa incorpora uma apresentadora de rádio, alternando blocos de locução
-  // (novidades reais de Trello/Tarefas Delp/Sentinela/Pensamentos, categoria sorteada) com
+  // (novidades reais de Abacato/Tarefas Delp/Sentinela/Pensamentos, categoria sorteada) com
   // música de verdade da playlist (radio/playlist.txt, tocada via YouTube IFrame API — ver
   // src/lib/youtubePlayer.js). Ela anuncia a música antes de tocar e comenta depois que acaba.
   const RADIO_CATEGORIES = ["trello", "delp", "sentinel", "thoughts", "weather", "news"];
-  const RADIO_CATEGORY_LABELS = { trello: "Trello", delp: "Tarefas Delp", sentinel: "Sentinela", thoughts: "pensamentos", weather: "previsão do tempo", news: "notícias (com o Steve)" };
+  const RADIO_CATEGORY_LABELS = { trello: "Abacato", delp: "Tarefas Delp", sentinel: "Sentinela", thoughts: "pensamentos", weather: "previsão do tempo", news: "notícias (com o Steve)" };
   // Modo Interativo — a Lisa como robozinho de mesa: tela limpa, carinha de LED fazendo graça
   // sozinha (ver LisaPixelFace.js), e de vez em quando ela puxa assunto com algo REAL. A câmera
   // fica ligada só pelo gesto ✌️ de acordar, que já roda 100% local no navegador (MediaPipe em
@@ -2394,13 +2397,17 @@ export default function AssistantPage() {
       return;
     }
 
+    // Pedido de card no Abacato (criar, concluir, excluir…) vale em QUALQUER modo: no Modo Código
+    // ele viraria um pedido de código, e no Vigia uma pergunta sobre a tela.
+    const acaoNoAbacato = pareceAcao(q, ["abacato", "abacato_escolha"].includes(pendingActionRef.current?.type));
+
     // Modo Código ligado: a pergunta vira um pedido de mudança de código, não uma conversa —
     // ver askCodeMode acima.
-    if (codeMode) return askCodeMode(q);
+    if (codeMode && !acaoNoAbacato) return askCodeMode(q);
 
     // Modo Vigia ligado: a pergunta busca no histórico de observações do Modo Tela — ver
     // askVigiaMode acima.
-    if (vigiaMode) return askVigiaMode(q);
+    if (vigiaMode && !acaoNoAbacato) return askVigiaMode(q);
 
     const shown = displayText || q;
     setBusy(true);
@@ -2431,7 +2438,7 @@ export default function AssistantPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           question: q, scope: computeScope(), personaMode,
-          history: { ...(historyRef.current || {}), turnos: conversaVigente(conversaRef.current) },
+          history: { ...(historyRef.current || {}), turnos: conversaVigente(conversaRef.current), ultimaResposta: ultimaRespostaRef.current.slice(0, 8000) },
           pendingAction: pendingActionRef.current,
           images: images.length ? images : null,
         }),
@@ -2482,6 +2489,7 @@ export default function AssistantPage() {
       }
       historyRef.current = { question: q, cards: latestCards };
       conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", answerRef.current);
+      if (answerRef.current.trim()) ultimaRespostaRef.current = answerRef.current;
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: answerRef.current }]);
     } catch (err) {
       addLog("[ERR]", OR, err.message);
@@ -3971,7 +3979,7 @@ export default function AssistantPage() {
               </div>
 
               {/* Modo Rádio — a Lisa incorpora uma apresentadora de rádio, alternando locução
-                  (novidades reais de Trello/Tarefas Delp/Sentinela/Pensamentos) com música de
+                  (novidades reais de Abacato/Tarefas Delp/Sentinela/Pensamentos) com música de
                   verdade da playlist (radio/playlist.txt, tocada via YouTube). */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>MODO RÁDIO</div>
               <button
@@ -3981,7 +3989,7 @@ export default function AssistantPage() {
                 📻 Modo Rádio: {radioMode ? "ON" : "OFF"}
               </button>
               <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
-                A Lisa vira apresentadora: alterna blocos de novidades reais (Trello, Tarefas
+                A Lisa vira apresentadora: alterna blocos de novidades reais (Abacato, Tarefas
                 Delp, Sentinela, Pensamentos) com música da sua playlist — anuncia antes de
                 tocar e comenta depois. Veja o player no canto inferior esquerdo da tela.
               </div>

@@ -479,6 +479,114 @@ Regras:
 }
 
 /**
+ * Entende um pedido de AÇÃO nos cards do Abacato (BEYOND, out/2026): criar, editar, concluir,
+ * reabrir, mover ou arquivar — ou a resposta a uma ação que ela já propôs. Chamada separada,
+ * sem streaming, antes da resposta normal. Ver src/lib/acoesNoAbacato.js (regras) e
+ * src/lib/abacatoAcoes.js (gravação).
+ *
+ * `ultimaResposta` é a última fala inteira da Lisa: "cria um card com esse texto que você
+ * sugeriu" precisa dela — o modelo devolve usar_ultima_resposta e o servidor cola o texto.
+ */
+export async function detectarAcaoNoAbacato({ pergunta, hoje, conversa = "", ultimaResposta = "", candidatos = [], quadros = [], quadroPadrao = null, pendente = null }) {
+  const blocoCards = candidatos.length
+    ? candidatos.map((c) => `- id=${c.id} · "${c.title}" · quadro="${c.board || "—"}" · coluna="${c.list || "—"}" · prazo=${c.due || "sem prazo"} · concluído=${c.due_complete ? "sim" : "não"}`).join("\n")
+    : "(nenhum card candidato)";
+  const blocoQuadros = quadros.length
+    ? quadros.map((q) => `- quadro "${q.nome}" (id=${q.id}): ${q.colunas.map((c) => `"${c.nome}" (coluna_id=${c.id})`).join(", ") || "sem colunas"}`).join("\n")
+    : "(nenhum quadro)";
+  let blocoPendente = "Não há nenhuma ação pendente.";
+  if (pendente?.type === "abacato") blocoPendente = `Você PROPÔS esta ação e está esperando o "sim" do usuário: ${JSON.stringify(pendente)}`;
+  else if (pendente?.type === "abacato_escolha") {
+    blocoPendente = `Você PERGUNTOU qual destes cards o usuário quer (ação "${pendente.acao}"):\n${pendente.candidatos.map((c, i) => `  ${i + 1}. id=${c.id} · "${c.titulo}" (${c.quadro})`).join("\n")}`;
+  }
+
+  const prompt = `DATA DE HOJE: ${hoje}
+
+QUADRO PADRÃO (o que está aberto no Assistente, use se o usuário não disser outro): ${quadroPadrao || "nenhum"}
+
+QUADROS E COLUNAS DO ABACATO:
+${blocoQuadros}
+
+CARDS CANDIDATOS (da conversa recente e com título parecido com o pedido):
+${blocoCards}
+
+CONVERSA ATÉ AGORA:
+${conversa || "(sem conversa anterior)"}
+
+ÚLTIMA RESPOSTA INTEIRA DA LISA:
+${ultimaResposta ? ultimaResposta.slice(0, 3000) : "(nenhuma)"}
+
+AÇÃO PENDENTE:
+${blocoPendente}
+
+MENSAGEM DO USUÁRIO:
+${pergunta}`;
+
+  const systemInstruction = `Você é o módulo de AÇÕES da Lisa no Abacato, o sistema de tarefas do usuário (quadros, colunas e cards).
+A Lisa PODE criar, editar, concluir, reabrir, mover e excluir (arquivar) cards. Decida se a mensagem é
+um pedido desses, ou a resposta a uma ação já proposta, e devolva o JSON.
+
+intent:
+- "propor": o usuário pediu uma ação e você tem o necessário. Preencha "acao" e:
+  • criar: coluna_id (do quadro que o usuário citou; se não citou, do QUADRO PADRÃO; sem nada, o
+    primeiro quadro), titulo curto e claro (até ~80 caracteres), descricao se houver, prazo se
+    houver. Se o usuário pedir o texto que a Lisa sugeriu/escreveu ("esse texto", "o e-mail que
+    você fez"), marque usar_ultima_resposta=true e NÃO copie o texto em descricao; ainda assim
+    invente um titulo curto a partir do assunto.
+  • editar: card_id e só os campos que mudam (titulo, descricao e/ou prazo). prazo="remover" tira o prazo.
+  • concluir / reabrir / arquivar: card_id.
+  • mover: card_id e coluna_id de destino (mesmo quadro do card).
+  prazo: "AAAA-MM-DD", ou "AAAA-MM-DDTHH:MM" se o usuário disse a hora, calculado a partir de hoje
+  ("amanhã", "sexta", "dia 20"). "excluir", "apagar", "remover o card", "tirar do quadro" = arquivar.
+  "marcar como feito", "finalizei", "terminei" = concluir.
+- "esclarecer": a ação está clara mas DOIS ou mais cards combinam igualmente. Preencha acao, os
+  campos que mudam e candidatos_ids (2 a 4, do mais provável ao menos).
+- "selecionar": há uma pergunta "qual card" pendente e o usuário escolheu (número, posição ou nome).
+  Devolva card_id.
+- "confirmar" / "cancelar": há uma ação pendente proposta e o usuário concordou ou recusou.
+- "nenhuma": não é pedido de ação (perguntas, conversa, "quais tarefas tenho") ou não há card
+  algum que combine. Na dúvida entre ler e mudar, é "nenhuma".
+Use só ids que aparecem acima. Nunca invente ids.`;
+
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client, modelo, abortSignal) =>
+      client.models.generateContent({
+        model: modelo,
+        contents: prompt,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              intent: { type: "STRING", enum: ["nenhuma", "propor", "esclarecer", "selecionar", "confirmar", "cancelar"] },
+              acao: { type: "STRING", enum: ["criar", "editar", "concluir", "reabrir", "mover", "arquivar"] },
+              card_id: { type: "STRING" },
+              coluna_id: { type: "STRING" },
+              titulo: { type: "STRING" },
+              descricao: { type: "STRING" },
+              prazo: { type: "STRING" },
+              usar_ultima_resposta: { type: "BOOLEAN" },
+              candidatos_ids: { type: "ARRAY", items: { type: "STRING" } },
+            },
+            required: ["intent"],
+          },
+          ...(abortSignal ? { abortSignal } : {}),
+        },
+      }),
+    { attempts: 2, delayMs: 800 }
+  );
+
+  try {
+    const r = JSON.parse(res.text);
+    return r && typeof r === "object" ? r : { intent: "nenhuma" };
+  } catch {
+    return { intent: "nenhuma" };
+  }
+}
+
+/**
  * Decide quais arquivos são relevantes pra um pedido só pelos NOMES/CAMINHOS deles (sem ver
  * conteúdo ainda) — complementa a busca semântica (que falha em pedidos amplos tipo "mude o
  * tema", já que arquivo de config não se parece textualmente com o pedido). Chamada leve e
@@ -1390,7 +1498,7 @@ export async function interpretVigiaChatMessage(text, systemInstruction = VIGIA_
 // funcionalidades do Beyond Bits) via function calling nativo do Gemini, e devolve isso cru pro
 // cliente executar — quem mantém o histórico da conversa e executa as ferramentas é sempre a
 // extensão, nunca este módulo.
-export const LISA_CODE_INSTRUCTION = `Você é a Lisa, agora rodando como uma extensão dentro do VS Code do seu usuário — uma ferramenta PESSOAL dele, ninguém mais tem acesso a ela. Você pode ler e propor mudanças no código que ele está trabalhando, além de responder usando dados reais do Beyond Bits (Trello, Tarefas Delp, Sentinela, Pensamentos).
+export const LISA_CODE_INSTRUCTION = `Você é a Lisa, agora rodando como uma extensão dentro do VS Code do seu usuário — uma ferramenta PESSOAL dele, ninguém mais tem acesso a ela. Você pode ler e propor mudanças no código que ele está trabalhando, além de responder usando dados reais do Beyond Bits (Abacato, Tarefas Delp, Sentinela, Pensamentos).
 
 REGRAS IMPORTANTES:
 - Você NUNCA escreve, cria ou apaga um arquivo diretamente — sempre usa propose_edit, create_file ou delete_file, que mostram a mudança pro usuário aprovar ou rejeitar antes de qualquer coisa tocar o disco de verdade.
@@ -1836,7 +1944,7 @@ Quando o bloco for sobre tarefas/chamados, os dados já vêm filtrados só com o
 
 Quando um item tiver "ATRASADA há N dias", isso significa que o prazo JÁ PASSOU — fale disso como algo atrasado/urgente ("já venceu há X dias", "tá atrasada"), NUNCA como algo que "vai vencer" ou "está por vir". Quando tiver "vence em N dias" ou "vence HOJE", aí sim é um prazo futuro. Nunca troque um pelo outro — o rótulo já vem calculado certo, não tente calcular de novo por conta própria.`;
 
-const RADIO_CATEGORY_LABELS = { trello: "tarefas do Trello", delp: "tarefas da Delp", sentinel: "chamados do Sentinela", thoughts: "pensamentos registrados", weather: "previsão do tempo", news: "notícias de tecnologia" };
+const RADIO_CATEGORY_LABELS = { trello: "tarefas do Abacato", delp: "tarefas da Delp", sentinel: "chamados do Sentinela", thoughts: "pensamentos registrados", weather: "previsão do tempo", news: "notícias de tecnologia" };
 
 // Persona separada pro bloco de notícias do Modo Rádio — um segundo "locutor", o "Steve", com
 // voz masculina (ver STEVE_VOICE_NAME em src/lib/ttsVoices.js) e personalidade inspirada no

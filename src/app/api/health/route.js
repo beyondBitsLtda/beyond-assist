@@ -4,14 +4,20 @@ import { sentinelSupabase } from "@/lib/sentinelSupabase.js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** GET /api/health → { supabase, trello, gemini, sentinel } (true = ok) */
+/** GET /api/health → { supabase, abacato, trello, gemini, sentinel } (true = ok) */
 export async function GET() {
-  const status = { supabase: false, trello: false, gemini: false, sentinel: false };
+  const status = { supabase: false, abacato: false, trello: false, gemini: false, sentinel: false };
 
   // Supabase (Beyond Brain): conta linhas em documents
   try {
     const { error } = await supabase.from("documents").select("id", { count: "exact", head: true });
     status.supabase = !error;
+  } catch {}
+
+  // Abacato: o sistema de tarefas (mesmo banco, tabelas abacato_*)
+  try {
+    const { error } = await supabase.from("abacato_quadros").select("id", { count: "exact", head: true });
+    status.abacato = !error;
   } catch {}
 
   // Sentinela: projeto Supabase separado — conta linhas em support_tickets

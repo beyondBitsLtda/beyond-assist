@@ -69,7 +69,7 @@ export default function CodeReposPage() {
 
       <div style={{ fontSize: 11, color: "rgba(207,239,251,0.5)", marginBottom: 16, lineHeight: 1.5 }}>
         {repos ? `${enabledCount} de ${repos.length} repositórios habilitados` : "carregando…"} — os habilitados entram no
-        ciclo normal de SYNC (mesmo botão/cron do Trello e Beyond Brain), um passo por repositório.
+        ciclo normal de SYNC (mesmo botão/cron dos quadros e do Beyond Brain), um passo por repositório.
         Desligar um aqui só para de indexá-lo daqui pra frente; não apaga o que já foi indexado.
       </div>
 

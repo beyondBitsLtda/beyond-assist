@@ -6,6 +6,9 @@ import { buildActionProposal, buildClarifyPrompt, executeAction } from "@/lib/as
 import { hasDelpTasks, getDelpTasksForContext } from "@/lib/delpTasks.js";
 import { resolveScope } from "@/lib/scopeResolver.js";
 import { turnosValidos, blocoDaConversa, consultaDeBusca } from "@/lib/conversa.js";
+import { fonteDosQuadros } from "@/lib/configLisa.js";
+import { pareceAcao, pendenteValida } from "@/lib/acoesNoAbacato.js";
+import { tratarAcaoNoAbacato } from "@/lib/fluxoDeAcoesNoAbacato.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -142,7 +145,7 @@ export async function POST(req) {
           // nem sim nem não reconhecido — trata como uma pergunta NOVA (abandona o
           // consentimento pendente) em vez de travar esperando um formato de resposta que
           // talvez nunca venha
-        } else if (!pendingAction && looksLikeTasksQuestion(question, scope) && await hasDelpTasks()) {
+        } else if (!pendingAction && !pareceAcao(question) && looksLikeTasksQuestion(question, scope) && await hasDelpTasks()) {
           send(controller, "context", []);
           send(controller, "action", { pending: { type: "delp_consent", originalQuestion: question, scope, personaMode } });
           send(controller, "token", "Antes de continuar — quer que eu leve em conta também as tarefas da Delp?");
@@ -150,11 +153,40 @@ export async function POST(req) {
           return;
         }
 
-        // ---- ações no Trello: detecta ANTES do fluxo normal, só quando faz sentido tentar ----
-        const candidateCards = (history?.cards || []).filter((c) => c.source === "TRELLO" && c.id);
+        // ---- ações no Abacato (criar, editar, concluir, reabrir, mover, arquivar) ----
+        // Antes da resposta normal, em qualquer modo. Ver src/lib/fluxoDeAcoesNoAbacato.js.
+        const fonte = await fonteDosQuadros().catch(() => "abacato");
+        if (fonte === "abacato" && pendingAction?.type !== "delp_consent") {
+          const pendente = pendenteValida(pendingAction);
+          if (pareceAcao(question, !!pendente)) {
+            let r = { respondeu: false };
+            try {
+              r = await tratarAcaoNoAbacato({
+                pergunta: question,
+                history,
+                pendente,
+                quadroPadrao: scope?.mode === "panel" && scope?.board ? scope.board : null,
+              });
+            } catch (err) {
+              // O pedido de ação falhar não pode derrubar a conversa: segue para a resposta normal,
+              // mas avisa no registro o motivo de verdade.
+              send(controller, "action", { pending: null, debug: true, detectError: String(err?.message || err) });
+            }
+            if (r.respondeu) {
+              send(controller, "context", r.cards || []);
+              send(controller, "action", { pending: r.pending || null });
+              send(controller, "token", r.texto);
+              send(controller, "done", { ok: true });
+              return;
+            }
+          }
+        }
+
+        // ---- ações no Trello (só quando a fonte dos quadros é o Trello) ----
+        const candidateCards = fonte === "trello" ? (history?.cards || []).filter((c) => c.source === "TRELLO" && c.id) : [];
         // exclui explicitamente o consentimento da Delp (não é uma ação do Trello — evita
         // gastar uma chamada do Gemini tentando interpretar "sim"/"não" como ação de card)
-        const shouldCheckAction = pendingAction?.type !== "delp_consent" &&
+        const shouldCheckAction = fonte === "trello" && pendingAction?.type !== "delp_consent" &&
           (candidateCards.length || pendingAction) && mightBeAction(question, !!pendingAction);
         if (shouldCheckAction) {
           // se detectTrelloAction FALHAR (ex.: cota do Gemini), isso antes virava "none"

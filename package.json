@@ -20,6 +20,8 @@
     "fala-check": "node scripts/fala-check.mjs",
     "audio-check": "node scripts/audio-check.mjs",
     "conversa-check": "node scripts/conversa-check.mjs",
+    "acoes-abacato-check": "node scripts/acoes-abacato-check.mjs",
+    "acoes-abacato-e2e": "node --env-file=.env --import ./scripts/alias-loader.mjs scripts/acoes-abacato-e2e.mjs",
     "escuta-check": "node scripts/escuta-check.mjs",
     "comandos-check": "node scripts/comandos-check.mjs",
     "groq-check": "node --import ./scripts/alias-loader.mjs scripts/groq-check.mjs",

@@ -294,7 +294,7 @@ export default function DashboardPage() {
           <button
             onClick={load}
             disabled={loading}
-            title="Busca direto do Trello + Sentinela (ao vivo) — atualiza sozinho a cada 1 min também"
+            title="Busca direto do Abacato + Sentinela (ao vivo) — atualiza sozinho a cada 1 min também"
             style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
           >
             {loading ? "…" : "↻ ATUALIZAR"}

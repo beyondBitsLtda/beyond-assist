@@ -186,10 +186,10 @@ async function checkTrelloCards(isFirstRun) {
 
   for (const c of cards) {
     if (!notifiedNew.has(c.id)) {
-      events.push({ type: "trello_card_new", entityId: c.id, title: "Card novo no Trello", body: `${c.title} · ${c.board}`, url: "/" });
+      events.push({ type: "trello_card_new", entityId: c.id, title: "Card novo no Abacato", body: `${c.title} · ${c.board}`, url: "/" });
     }
     if (c.due && !c.due_complete && new Date(c.due).getTime() < now && !notifiedOverdue.has(c.id)) {
-      events.push({ type: "trello_task_overdue", entityId: c.id, title: "Tarefa atrasada no Trello", body: `${c.title} · ${c.board}`, url: "/tasks" });
+      events.push({ type: "trello_task_overdue", entityId: c.id, title: "Tarefa atrasada no Abacato", body: `${c.title} · ${c.board}`, url: "/tasks" });
     }
   }
 

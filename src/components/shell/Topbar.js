@@ -55,7 +55,7 @@ export default function Topbar() {
   // inteira (erro #418), o que também apagava a tela de abertura.
   const [clock, setClock] = useState("--:--:--");
   const [uptime, setUptime] = useState("00:00:00");
-  const [conn, setConn] = useState({ supabase: null, trello: null, gemini: null, sentinel: null });
+  const [conn, setConn] = useState({ supabase: null, abacato: null, gemini: null, sentinel: null });
   const [ingesting, setIngesting] = useState(false);
   const [autoSync, setAutoSync] = useState(null); // status do SYNC automático (pg_cron) — ver /api/sync-status
   const [pushSupported, setPushSupported] = useState(false);
@@ -200,7 +200,7 @@ export default function Topbar() {
 
   const connList = [
     { rotulo: "Banco", ok: conn.supabase },
-    { rotulo: "Trello", ok: conn.trello },
+    { rotulo: "Abacato", ok: conn.abacato },
     { rotulo: "Gemini", ok: conn.gemini },
     { rotulo: "Sentinela", ok: conn.sentinel },
   ];
@@ -297,8 +297,8 @@ export default function Topbar() {
               onClick={reindex}
               disabled={ingesting}
               fecharAoClicar={false}
-              title="Reindexar Trello + Beyond Brain agora mesmo (a automática roda sozinha)"
-              detalhe="Trello e Beyond Brain"
+              title="Reindexar os quadros e o Beyond Brain agora mesmo (a automática roda sozinha)"
+              detalhe="Quadros e Beyond Brain"
             >
               {ingesting ? "Sincronizando…" : "Sincronizar agora"}
             </ItemDoMenu>

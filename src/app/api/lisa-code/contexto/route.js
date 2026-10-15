@@ -51,7 +51,7 @@ export async function POST(req) {
     ]);
 
     const grupos = [
-      { rotulo: "Cards do Trello", itens: itensRelevantes(termos, cards) },
+      { rotulo: "Cards do Abacato", itens: itensRelevantes(termos, cards) },
       { rotulo: "Tarefas da Delp", itens: itensRelevantes(termos, delp) },
       { rotulo: "Chamados do Sentinela", itens: itensRelevantes(termos, chamados) },
       { rotulo: "Pensamentos", itens: itensRelevantes(termos, pensamentos) },
