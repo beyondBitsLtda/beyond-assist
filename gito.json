@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.5.0-acoes-abacato.1",
+  "versao": "0.5.0-cloudflare-pages.11",
   "atualizadoEm": "2026-10-15",
   "compilacao": {
-    "numero": 14,
+    "numero": 15,
     "data": "2026-10-15",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.5.0-cloudflare-pages.11",
+      "data": "2026-10-15",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Ações nos cards do Abacato (branch acoes-abacato) juntam na cloudflare-pages e vão ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.5.0-acoes-abacato.1: criar, editar, concluir, reabrir, mover e excluir cards do Abacato em qualquer conversa, e Abacato no lugar do Trello no que a Lisa sabe e diz."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.5.0-acoes-abacato.1",
       "data": "2026-10-15",
