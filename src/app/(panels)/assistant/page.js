@@ -15,7 +15,7 @@ import { useIsMobile } from "@/lib/useIsMobile.js";
 import TopoExtra from "@/components/shell/TopoExtra.js";
 import Suspenso, { GrupoDoMenu, ItemDoMenu, ChaveDoMenu, SegmentosDoMenu } from "@/components/shell/Suspenso.js";
 import RotuloDaVoz from "@/components/panels/RotuloDaVoz.js";
-import { adicionarTurno, conversaVigente, falaQueValePergunta } from "@/lib/conversa.js";
+import { adicionarTurno, conversaVigente, falaQueValePergunta, interrupcaoNaFala, marcarInterrompida } from "@/lib/conversa.js";
 import { pareceAcao } from "@/lib/acoesNoAbacato.js";
 import { acordarAudio, escutarElemento, nivelDaVoz, abrirMicrofone, fecharMicrofone, nivelDoMicrofone } from "@/lib/vozAnalisador.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
@@ -2690,6 +2690,65 @@ export default function AssistantPage() {
     const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
     abrirMicrofone(); // só para a esfera medir o volume da sua voz
 
+    // INTERROMPER: enquanto ela fala, um segundo reconhecimento fica atento só à palavra "Lisa".
+    // Ouviu → ela para NA HORA (a fala inteira, não só o pedaço tocando) e espera o resto da sua
+    // frase; "Lisa, não é esse, é o de vendas" já vira a próxima pergunta. Eco da própria voz dela
+    // (um trecho da fala que contém "Lisa") é ignorado — ver interrupcaoNaFala em conversa.js.
+    // Devolve { interrompida, resto } quando a fala acaba ou quando você a interrompe.
+    const ESPERA_PELA_CORRECAO_MS = 4000;
+    let ouvidoAtivo = null; // o reconhecimento da interrupção, para a limpeza do efeito fechar
+    const vigiarInterrupcao = () => new Promise((resolve) => {
+      const textoDela = ultimaRespostaRef.current || "";
+      let fim = false;
+      let interrompendo = false;
+      let ouvido = null;
+      let prazo = null;
+      const terminar = (r) => {
+        if (fim) return;
+        fim = true;
+        clearTimeout(prazo);
+        try { ouvido?.abort(); } catch { /* já parado */ }
+        if (ouvidoAtivo === ouvido) ouvidoAtivo = null;
+        resolve(r);
+      };
+      // a fala acabou sozinha: a fila inteira (pedaços que entram depois também) e o áudio tocando.
+      // Parar por interrupção também esvazia a fila — aí quem termina é o vigia, não isto.
+      (async () => {
+        let fila;
+        do { fila = speechQueueRef.current; await Promise.resolve(fila).catch(() => {}); } while (fila !== speechQueueRef.current);
+        while (!parado && !interrompendo && falandoAgora()) await esperar(250);
+        if (!interrompendo) terminar({ interrompida: false, resto: "" });
+      })();
+      const calar = () => {
+        interrompendo = true;
+        speechGenRef.current++; // os próximos pedaços desta resposta não tocam mais
+        stopSpeaking();
+        playListenBeep();
+        prazo = setTimeout(() => terminar({ interrompida: true, resto: "" }), ESPERA_PELA_CORRECAO_MS);
+      };
+      const abrir = () => {
+        if (fim || parado) return terminar({ interrompida: interrompendo, resto: "" });
+        ouvido = new SR();
+        ouvidoAtivo = ouvido;
+        ouvido.lang = "pt-BR";
+        ouvido.continuous = true;
+        ouvido.interimResults = true; // a palavra vem num resultado parcial: para antes de você terminar
+        ouvido.onresult = (ev) => {
+          for (let i = ev.resultIndex; i < ev.results.length; i++) {
+            const r = interrupcaoNaFala(ev.results[i][0].transcript, textoDela);
+            if (!r.interrompe) continue;
+            if (!interrompendo) { calar(); addLog("[CONVERSA]", PU, "interrompida — pode falar"); }
+            // a frase fechou: o que veio depois de "Lisa" é a correção
+            if (ev.results[i].isFinal) return terminar({ interrompida: true, resto: r.resto });
+          }
+        };
+        ouvido.onerror = () => { /* no-speech/aborted são rotina aqui */ };
+        ouvido.onend = () => { if (!fim) setTimeout(abrir, 150); };
+        try { ouvido.start(); } catch { /* já rodando */ }
+      };
+      abrir();
+    });
+
     const iniciar = () => {
       if (parado) return;
       rec = new SR();
@@ -2706,8 +2765,16 @@ export default function AssistantPage() {
         try { rec?.stop(); } catch { /* já parado */ }
         addLog("[CONVERSA]", CY, `→ "${dito}"`);
         try {
-          await askRef.current?.(dito);
-          await speechQueueRef.current?.catch?.(() => {}); // espera a resposta terminar de tocar
+          let pergunta = dito;
+          while (pergunta && !parado) {
+            await askRef.current?.(pergunta);
+            pergunta = null;
+            const r = await vigiarInterrupcao(); // espera a fala terminar — ou você dizer "Lisa"
+            if (r.interrompida) {
+              conversaRef.current = marcarInterrompida(conversaRef.current);
+              if (r.resto && falaQueValePergunta(r.resto)) { pergunta = r.resto; addLog("[CONVERSA]", CY, `→ "${r.resto}"`); }
+            }
+          }
           while (!parado && falandoAgora()) await esperar(250); // e qualquer outra fala dela
         } catch (err) {
           addLog("[CONVERSA]", OR, `falhou: ${err?.message || err}`);
@@ -2730,10 +2797,11 @@ export default function AssistantPage() {
       clearTimeout(religar);
       clearInterval(vigia);
       try { rec?.stop(); } catch { /* já parado */ }
+      try { ouvidoAtivo?.abort(); } catch { /* já parado */ }
       fecharMicrofone();
       setConversaEstado("desligada");
     };
-  }, [conversaAberta, addLog]);
+  }, [conversaAberta, addLog, stopSpeaking]);
 
   // ---- STT: ouvir microfone (Web Speech API) ----
   const toggleMic = useCallback(() => {
@@ -4288,7 +4356,7 @@ export default function AssistantPage() {
               ligado={conversaAberta}
               onChange={() => { unlockAudioPlayback(); acordarAudio(); setConversaAberta((v) => !v); }}
               detalhe={conversaAberta
-                ? (conversaEstado === "respondendo" ? "Respondendo…" : "Pode falar — ela continua o assunto")
+                ? (conversaEstado === "respondendo" ? "Respondendo… diga \"Lisa\" para interromper" : "Pode falar — ela continua o assunto")
                 : "Microfone aberto: fale quando quiser, ela responde continuando a conversa"}
               cor="#3fe0c5"
             >
@@ -4448,7 +4516,7 @@ export default function AssistantPage() {
         {autoListening && <div className="bb-pode-falar">Pode falar</div>}
         {conversaAberta && !autoListening && (
           <button type="button" className="bb-conversa-aberta" onClick={() => setConversaAberta(false)} title="Encerrar a conversa livre">
-            <i />{conversaEstado === "respondendo" ? "Respondendo…" : "Conversa aberta · pode falar"}<span>encerrar</span>
+            <i />{conversaEstado === "respondendo" ? "Respondendo · diga \"Lisa\" para interromper" : "Conversa aberta · pode falar"}<span>encerrar</span>
           </button>
         )}
 

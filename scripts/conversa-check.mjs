@@ -1,7 +1,7 @@
 // A memória da conversa e o Modo conversa (BEYOND-0006): o que entra no prompt e na busca.
 import {
   adicionarTurno, conversaVigente, turnosValidos, blocoDaConversa, consultaDeBusca, falaQueValePergunta,
-  secaoDaConversa, MAXIMO_DE_TURNOS, TETO_DO_BLOCO, VALIDADE_MS,
+  secaoDaConversa, interrupcaoNaFala, marcarInterrompida, MAXIMO_DE_TURNOS, TETO_DO_BLOCO, VALIDADE_MS,
 } from "../src/lib/conversa.js";
 
 let falhas = 0;
@@ -48,6 +48,19 @@ conferir("sem conversa, vai sozinha", consultaDeBusca("e ele?", []) === "e ele?"
 console.log("\nModo conversa: o que vira pergunta\n");
 conferir("frase de verdade vira pergunta", falaQueValePergunta("o que tem na minha tela agora?"));
 for (const ruido of ["ã", "é", "hmm", "uhum", "ah", "  ", "?."]) conferir(`"${ruido}" é ruído`, !falaQueValePergunta(ruido));
+
+console.log("\nInterromper a Lisa enquanto ela fala\n");
+const falaDela = "Oi, eu sou a Lisa e hoje você tem três tarefas no Quarto de Guerra, a primeira vence amanhã.";
+conferir("\"Lisa\" sozinho interrompe", interrupcaoNaFala("Lisa", falaDela).interrompe);
+const corr = interrupcaoNaFala("Lisa, não é esse, é o de vendas", falaDela);
+conferir("\"Lisa, ...\" interrompe e traz a correção", corr.interrompe && corr.resto === "nao e esse e o de vendas", corr.resto);
+conferir("eco da própria fala dela (com Lisa) não interrompe", !interrupcaoNaFala("eu sou a Lisa e hoje você tem", falaDela).interrompe);
+conferir("parcial curto do eco (\"a Lisa\") não interrompe", !interrupcaoNaFala("a Lisa", falaDela).interrompe);
+conferir("fala sem Lisa não interrompe", !interrupcaoNaFala("três tarefas no quarto de guerra", falaDela).interrompe);
+conferir("\"Lisa\" numa fala que não tem Lisa interrompe", interrupcaoNaFala("ô Lisa para aí", "Você tem três tarefas hoje.").interrompe);
+const marcados = marcarInterrompida([{ papel: "voce", texto: "a" }, { papel: "lisa", texto: "resposta longa" }]);
+conferir("a fala interrompida fica marcada para o modelo", marcados[1].texto.endsWith("[o usuário interrompeu esta fala]"));
+conferir("marcar duas vezes não duplica", marcarInterrompida(marcados)[1].texto === marcados[1].texto);
 
 console.log(falhas ? `\n${falhas} falha(s).\n` : "\nTudo certo.\n");
 process.exit(falhas ? 1 : 0);

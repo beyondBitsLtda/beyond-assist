@@ -5,6 +5,8 @@
 // Assistente guarda as últimas trocas e manda junto; o servidor põe no prompt como "conversa
 // até agora". Puro, sem rede nem navegador: testado em scripts/conversa-check.mjs.
 
+import { detectarAcordar, normalizar } from "./escutaPorPalavra.js";
+
 export const MAXIMO_DE_TURNOS = 10; // 5 trocas (você + Lisa)
 export const TETO_POR_TURNO = 700; // caracteres de cada fala no prompt
 export const TETO_DO_BLOCO = 4500; // caracteres da conversa inteira no prompt
@@ -73,4 +75,32 @@ export function falaQueValePergunta(dito) {
   const limpo = limpar(dito).replace(/[^\p{L}\p{N}\s]/gu, "");
   if (limpo.replace(/\s/g, "").length < 3) return false;
   return !/^(ã+|é+|hm+|uhum|aham|ah+|eh+|oh+)$/i.test(limpo);
+}
+
+/**
+ * Interromper a Lisa no meio da fala (Modo conversa): o que o microfone ouviu enquanto ela
+ * falava tem "Lisa"? Devolve { interrompe, resto } — resto é o que veio depois ("Lisa, não é
+ * esse, é o de vendas" → "nao e esse e o de vendas").
+ *
+ * O microfone também ouve a VOZ DELA pelas caixas de som. Se ela mesma estiver dizendo uma frase
+ * com "Lisa", o reconhecimento devolve um trecho da fala dela — e isso é eco, não você. A regra:
+ * quando o que foi ouvido é um pedaço do texto que ela está falando, ignora — só "Lisa" sozinho
+ * passa sempre (o parcial "a Lisa" de "eu sou a Lisa" já conta como eco).
+ */
+export function interrupcaoNaFala(transcricao, textoDela = "") {
+  const { acordou, resto } = detectarAcordar(transcricao);
+  if (!acordou) return { interrompe: false, resto: "" };
+  const ouvido = normalizar(transcricao);
+  const fala = normalizar(textoDela);
+  if (fala.includes("lisa") && ouvido.split(" ").length >= 2 && fala.includes(ouvido)) return { interrompe: false, resto: "" };
+  return { interrompe: true, resto };
+}
+
+/** Marca a última fala dela como interrompida — o modelo precisa saber que você não ouviu o resto. */
+export function marcarInterrompida(turnos) {
+  const i = turnos.map((t) => t.papel).lastIndexOf("lisa");
+  if (i < 0 || turnos[i].texto.endsWith("[o usuário interrompeu esta fala]")) return turnos;
+  const novo = [...turnos];
+  novo[i] = { ...novo[i], texto: `${novo[i].texto} [o usuário interrompeu esta fala]` };
+  return novo;
 }

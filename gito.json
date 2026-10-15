@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.5.0-cloudflare-pages.11",
+  "versao": "0.6.0-interromper.1",
   "atualizadoEm": "2026-10-15",
   "compilacao": {
-    "numero": 15,
+    "numero": 16,
     "data": "2026-10-15",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.6.0-interromper.1",
+      "data": "2026-10-15",
+      "branch": "interromper",
+      "tipo": "funcionalidade",
+      "resumo": "No Modo conversa, dizer \"Lisa\" enquanto ela fala a faz parar na hora e ouvir a correção.",
+      "itens": [
+        "Enquanto ela responde no Modo conversa, o microfone fica atento à palavra \"Lisa\": ao ouvir, ela para a fala inteira (não só o trecho que estava tocando) e dá o bipe de escuta.",
+        "\"Lisa, não é esse, é o de vendas\" já vira a próxima pergunta; dizer só \"Lisa\" e esperar também funciona — ela volta a ouvir normalmente.",
+        "A resposta interrompida fica marcada na memória da conversa, para ela saber que foi cortada e aceitar a correção.",
+        "A própria voz dela saindo pelas caixas de som não conta como interrupção, mesmo quando ela diz \"Lisa\".",
+        "O aviso do Modo conversa mostra \"diga Lisa para interromper\" enquanto ela responde."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.5.0-cloudflare-pages.11",
       "data": "2026-10-15",
