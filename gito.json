@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.4.0-conversa-livre.1",
+  "versao": "0.4.0-cloudflare-pages.10",
   "atualizadoEm": "2026-10-15",
   "compilacao": {
-    "numero": 12,
+    "numero": 13,
     "data": "2026-10-15",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.4.0-cloudflare-pages.10",
+      "data": "2026-10-15",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Conversa livre (branch conversa-livre) junta na cloudflare-pages e vai ao ar (BEYOND-0006).",
+      "itens": [
+        "Mesmo conteúdo da 0.4.0-conversa-livre.1: memória das últimas trocas e Modo conversa com microfone aberto."
+      ],
+      "issues": [
+        "BEYOND-0006"
+      ]
+    },
     {
       "versao": "0.4.0-conversa-livre.1",
       "data": "2026-10-15",
