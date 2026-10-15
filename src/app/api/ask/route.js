@@ -5,6 +5,7 @@ import { chatStream, detectTrelloAction } from "@/lib/gemini.js";
 import { buildActionProposal, buildClarifyPrompt, executeAction } from "@/lib/assistantActions.js";
 import { hasDelpTasks, getDelpTasksForContext } from "@/lib/delpTasks.js";
 import { resolveScope } from "@/lib/scopeResolver.js";
+import { turnosValidos, blocoDaConversa, consultaDeBusca } from "@/lib/conversa.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -251,7 +252,10 @@ export async function POST(req) {
         // roteamento de escopo (Tarefas/Boards/Sentinela/Delp/Brain/Geral) — extraído pra
         // src/lib/scopeResolver.js, reaproveitado também pelas falas agendadas (ver
         // src/lib/scheduledAnnouncements.js), pra nunca divergir entre os dois usos.
-        const { matches, systemInstruction, tools, promptNote } = await resolveScope(scope, question, { filterSource });
+        // A conversa até aqui (BEYOND-0006): vai no prompt, e uma continuação curta ("e o prazo
+        // dele?") busca contexto junto com a pergunta anterior — sozinha não acharia nada.
+        const turnos = turnosValidos(history?.turnos);
+        const { matches, systemInstruction, tools, promptNote } = await resolveScope(scope, consultaDeBusca(question, turnos), { filterSource });
 
         send(controller, "context", matches);
 
@@ -272,7 +276,7 @@ export async function POST(req) {
           : null;
         const combinedNote = [promptNote, imageNote, delpNote].filter(Boolean).join("\n\n") || null;
 
-        const prompt = buildPrompt(question, matches, combinedNote);
+        const prompt = buildPrompt(question, matches, combinedNote, blocoDaConversa(turnos));
         for await (const piece of chatStreamWithFallback(prompt, withContextDocs(withPersona(systemInstruction, personaMode)), tools, images)) {
           send(controller, "token", piece);
         }

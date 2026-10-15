@@ -15,6 +15,7 @@ import { useIsMobile } from "@/lib/useIsMobile.js";
 import TopoExtra from "@/components/shell/TopoExtra.js";
 import Suspenso, { GrupoDoMenu, ItemDoMenu, ChaveDoMenu, SegmentosDoMenu } from "@/components/shell/Suspenso.js";
 import RotuloDaVoz from "@/components/panels/RotuloDaVoz.js";
+import { adicionarTurno, conversaVigente, falaQueValePergunta } from "@/lib/conversa.js";
 import { acordarAudio, escutarElemento, nivelDaVoz, abrirMicrofone, fecharMicrofone, nivelDoMicrofone } from "@/lib/vozAnalisador.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
 import { getDeviceId, matchNavCommand } from "@/lib/deviceId.js";
@@ -440,6 +441,11 @@ export default function AssistantPage() {
   // backend a cada pergunta nova, pra ele saber a que card "reprograme pra amanhã" se refere
   // e se a mensagem atual está confirmando/cancelando uma ação (ver /api/ask).
   const historyRef = useRef(null);
+  // As últimas trocas (BEYOND-0006): vão junto com cada pergunta para a Lisa continuar o
+  // assunto. Inclui o que ela comenta sozinha (tela, câmera, escuta) — "por quê?" logo depois
+  // de um comentário dela precisa saber de qual comentário se trata.
+  const conversaRef = useRef([]);
+  const lembrarDaLisa = (texto) => { conversaRef.current = adicionarTurno(conversaVigente(conversaRef.current), "lisa", texto); };
   const pendingActionRef = useRef(null);
   const audioRef = useRef(null);
   const currentAudioResolveRef = useRef(null);
@@ -614,6 +620,14 @@ export default function AssistantPage() {
   // ---- Modo Escuta por palavra ("Lisa, ...") ----
   const [escutaPalavra, setEscutaPalavra] = useState(false);
   const [escutaEstado, setEscutaEstado] = useState("dormindo"); // dormindo | acordada | ocupada
+  // Modo conversa (BEYOND-0006): microfone aberto, ela responde quando você fala e fica quieta
+  // no silêncio. Exclusivo com a escuta por palavra — os dois abririam o microfone ao mesmo tempo.
+  const [conversaAberta, setConversaAberta] = useState(false);
+  const [conversaEstado, setConversaEstado] = useState("desligada"); // desligada | ouvindo | respondendo
+  const conversaAbertaRef = useRef(false);
+  conversaAbertaRef.current = conversaAberta;
+  useEffect(() => { if (conversaAberta) setEscutaPalavra(false); }, [conversaAberta]);
+  useEffect(() => { if (escutaPalavra) setConversaAberta(false); }, [escutaPalavra]);
   // Fila de UM pedido só. O laço do rádio a consome na próxima escolha de música, em vez
   // de sortear. Uma fila maior não ajudaria: pedir duas músicas de uma vez não é como
   // ninguém fala, e a segunda chegaria minutos depois, quando o pedido já não faz sentido.
@@ -1428,6 +1442,7 @@ export default function AssistantPage() {
   // silêncio de verdade) ou até a pessoa ficar quieta (aí volta a ser só a vigília normal).
   const MAX_REPLY_TURNS = 6;
   const openReplyWindow = useCallback(async (comment, logPrefix, turn = 1) => {
+    if (conversaAbertaRef.current) return; // o Modo conversa já está ouvindo
     if (!micWatchMode || listeningForWatchRef.current || busyForWatchRef.current) return;
     if (turn > MAX_REPLY_TURNS) { addLog(logPrefix, CY, "várias idas e voltas seguidas — parando a escuta automática por aqui (pode continuar na mão, segurando o microfone)."); return; }
 
@@ -1482,7 +1497,7 @@ export default function AssistantPage() {
         if (!data?.ok) { addLog("[TELA]", OR, `vigília falhou: ${data?.error || `HTTP ${res.status}`}`); return; }
         if (!data.comment) { addLog("[TELA]", CY, "vigília: nada digno de nota agora"); return; }
         addLog("[TELA]", PU, data.comment);
-        setMessages((m) => [...m, { id: `screen${Date.now()}`, role: "assistant", text: data.comment }]);
+        setMessages((m) => [...m, { id: `screen${Date.now()}`, role: "assistant", text: data.comment }]); lembrarDaLisa(data.comment);
         // tenta a voz do Gemini primeiro (com fallback automático pro navegador se falhar) —
         // antes era só navegador de propósito, pra poupar cota; agora que tem uma chave
         // prioritária com faturamento e folga de sobra, vale usar a voz de verdade aqui também.
@@ -1534,7 +1549,7 @@ export default function AssistantPage() {
         if (typeof data.latestId === "number") vigiaLastIdRef.current = data.latestId;
         if (!data.comment) { addLog("[VIGIA]", CY, "nada novo digno de nota agora"); return; }
         addLog("[VIGIA]", PU, data.comment);
-        setMessages((m) => [...m, { id: `vigia${Date.now()}`, role: "assistant", text: data.comment }]);
+        setMessages((m) => [...m, { id: `vigia${Date.now()}`, role: "assistant", text: data.comment }]); lembrarDaLisa(data.comment);
         const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || proactiveTurnRef.current || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
         if (jaFalando) addLog("[VIGIA]", CY, "narração achada, mas a Lisa já está falando — só no texto desta vez");
         else if (voiceOnForScreenRef.current) {
@@ -1580,7 +1595,7 @@ export default function AssistantPage() {
         if (!data?.ok) { addLog("[OBS]", OR, `saudação falhou: ${data?.error || `HTTP ${res.status}`}`); return; }
         if (!data.comment) { addLog("[OBS]", CY, "saudação: nada digno de nota agora"); return; }
         addLog("[OBS]", PU, data.comment);
-        setMessages((m) => [...m, { id: `obsgreet${Date.now()}`, role: "assistant", text: data.comment }]);
+        setMessages((m) => [...m, { id: `obsgreet${Date.now()}`, role: "assistant", text: data.comment }]); lembrarDaLisa(data.comment);
         // mesma regra de prioridade de voz da vigília do Modo Tela — nunca fala por cima de
         // uma fala já em andamento (resposta normal, ou saudação do gesto de acordar).
         const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || proactiveTurnRef.current || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
@@ -1723,7 +1738,7 @@ export default function AssistantPage() {
           if (!data?.ok) { addLog("[MIC]", OR, `escuta falhou: ${data?.error || `HTTP ${res.status}`}`); continue; }
           if (!data.comment) { addLog("[MIC]", CY, "escuta: nada digno de nota agora"); continue; }
           addLog("[MIC]", PU, data.comment);
-          setMessages((m) => [...m, { id: `mic${Date.now()}`, role: "assistant", text: data.comment }]);
+          setMessages((m) => [...m, { id: `mic${Date.now()}`, role: "assistant", text: data.comment }]); lembrarDaLisa(data.comment);
           const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
           if (jaFalando) addLog("[MIC]", CY, "escuta: comentário achado, mas a Lisa já está falando — só no texto desta vez");
           else if (voiceOnForScreenRef.current) speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
@@ -2416,7 +2431,8 @@ export default function AssistantPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           question: q, scope: computeScope(), personaMode,
-          history: historyRef.current, pendingAction: pendingActionRef.current,
+          history: { ...(historyRef.current || {}), turnos: conversaVigente(conversaRef.current) },
+          pendingAction: pendingActionRef.current,
           images: images.length ? images : null,
         }),
       });
@@ -2465,6 +2481,7 @@ export default function AssistantPage() {
         }
       }
       historyRef.current = { question: q, cards: latestCards };
+      conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", answerRef.current);
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: answerRef.current }]);
     } catch (err) {
       addLog("[ERR]", OR, err.message);
@@ -2636,8 +2653,84 @@ export default function AssistantPage() {
     };
   }, [escutaPalavra, radioMode, addLog, stopSpeaking]);
 
+  // ---- Modo conversa (BEYOND-0006) ----
+  //
+  // Microfone aberto o tempo todo, como na escuta por palavra, mas sem precisar dizer "Lisa":
+  // cada frase vira uma pergunta que CONTINUA a conversa (conversaRef vai junto). No silêncio,
+  // nada acontece. Enquanto ela responde e fala, o reconhecimento fica fechado — senão ela se
+  // ouve e responde a si mesma — e reabre quando a fala termina. Funciona junto com a Tela e a
+  // Observância: ask() já manda o retrato delas em cada pergunta.
+  useEffect(() => {
+    if (!conversaAberta) { setConversaEstado("desligada"); return; }
+    if (typeof window === "undefined") return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      addLog("[CONVERSA]", OR, "este navegador não reconhece fala — use o Chrome ou o Edge");
+      setConversaAberta(false);
+      return;
+    }
+
+    let parado = false;
+    let rec = null;
+    let religar = null;
+    let processando = false;
+    let ultimaFalaEm = 0;
+    const falandoAgora = () => !!audioRef.current || isBrowserVoiceAudioPlaying() || window.speechSynthesis?.speaking;
+    // Uma fala dela que termina gera, às vezes, um "resultado" atrasado com as próprias palavras
+    // dela: o que chega até 1,2 s depois de ela parar de falar é eco, não você.
+    const vigia = setInterval(() => { if (falandoAgora()) ultimaFalaEm = Date.now(); }, 200);
+    const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
+    abrirMicrofone(); // só para a esfera medir o volume da sua voz
+
+    const iniciar = () => {
+      if (parado) return;
+      rec = new SR();
+      rec.lang = "pt-BR";
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.onresult = async (ev) => {
+        if (parado || processando) return;
+        const dito = (ev.results[ev.results.length - 1]?.[0]?.transcript || "").trim();
+        if (!falaQueValePergunta(dito)) return;
+        if (falandoAgora() || Date.now() - ultimaFalaEm < 1200) return; // eco dela mesma
+        processando = true;
+        setConversaEstado("respondendo");
+        try { rec?.stop(); } catch { /* já parado */ }
+        addLog("[CONVERSA]", CY, `→ "${dito}"`);
+        try {
+          await askRef.current?.(dito);
+          await speechQueueRef.current?.catch?.(() => {}); // espera a resposta terminar de tocar
+          while (!parado && falandoAgora()) await esperar(250); // e qualquer outra fala dela
+        } catch (err) {
+          addLog("[CONVERSA]", OR, `falhou: ${err?.message || err}`);
+        }
+        processando = false;
+        if (!parado) { setConversaEstado("ouvindo"); iniciar(); }
+      };
+      rec.onerror = (ev) => {
+        if (ev?.error && !["no-speech", "aborted"].includes(ev.error)) addLog("[CONVERSA]", OR, `reconhecimento: ${ev.error}`);
+      };
+      // o reconhecimento do Chrome desiste sozinho de tempos em tempos: religa calado
+      rec.onend = () => { if (!parado && !processando) religar = setTimeout(iniciar, 300); };
+      try { rec.start(); setConversaEstado("ouvindo"); } catch { /* já estava rodando */ }
+    };
+
+    addLog("[CONVERSA]", PU, "conversa aberta — pode falar quando quiser");
+    iniciar();
+    return () => {
+      parado = true;
+      clearTimeout(religar);
+      clearInterval(vigia);
+      try { rec?.stop(); } catch { /* já parado */ }
+      fecharMicrofone();
+      setConversaEstado("desligada");
+    };
+  }, [conversaAberta, addLog]);
+
   // ---- STT: ouvir microfone (Web Speech API) ----
   const toggleMic = useCallback(() => {
+    // Com a conversa aberta o microfone já está ouvindo: o botão serve para encerrá-la.
+    if (conversaAbertaRef.current) { setConversaAberta(false); return; }
     if (typeof window === "undefined") return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { setVoiceSupported(false); addLog("[VOICE]", OR, "navegador sem suporte a microfone"); return; }
@@ -3144,6 +3237,14 @@ export default function AssistantPage() {
             <div style={{ height: 1, background: "rgba(var(--accent-rgb),0.15)", margin: "2px 0" }} />
 
             <button
+              onClick={() => { unlockAudioPlayback(); acordarAudio(); setConversaAberta((v) => !v); }}
+              title="Microfone aberto: fale quando quiser, ela responde continuando a conversa"
+              style={{ ...mono, fontSize: 10, letterSpacing: 1, padding: "7px 10px", borderRadius: 6, textAlign: "left", border: `1px solid ${conversaAberta ? GR : "rgba(var(--accent-rgb),0.18)"}`, background: conversaAberta ? "rgba(123,216,143,0.12)" : "transparent", color: "#eafcff", cursor: "pointer" }}
+            >
+              🗣️ Conversa livre: {conversaAberta ? (conversaEstado === "respondendo" ? "respondendo…" : "ouvindo") : "OFF"}
+            </button>
+
+            <button
               onClick={() => { unlockAudioPlayback(); setRadioMode((v) => !v); }}
               title="De fone, ela para de olhar o ambiente e reage à música"
               style={{ ...mono, fontSize: 10, letterSpacing: 1, padding: "7px 10px", borderRadius: 6, textAlign: "left", border: `1px solid ${radioMode ? GR : "rgba(var(--accent-rgb),0.18)"}`, background: radioMode ? "rgba(123,216,143,0.12)" : "transparent", color: "#eafcff", cursor: "pointer" }}
@@ -3378,14 +3479,14 @@ export default function AssistantPage() {
   // ---- revisão visual: gaveta aberta no desktop e o sinal que move a esfera ----
   const [gaveta, setGaveta] = useState(null); // "registro" | "contexto" | null
   const sinalDaEsferaRef = useRef({});
-  sinalDaEsferaRef.current = { listening, autoListening, mode };
+  sinalDaEsferaRef.current = { listening, autoListening, mode, conversaOuvindo: conversaEstado === "ouvindo" };
   // Lido a cada quadro pela esfera: "falando" vem do áudio tocando de verdade (o mode já voltou
   // a "idle" quando a fala começa — ver ask()), "ouvindo" do microfone, "pensando" da busca.
   const obterSinalDaEsfera = useCallback(() => {
     const s = sinalDaEsferaRef.current;
     const falando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
     if (falando) return { estado: "falando", nivel: nivelDaVoz() };
-    if (s.listening || s.autoListening) return { estado: "ouvindo", nivel: nivelDoMicrofone() };
+    if (s.listening || s.autoListening || s.conversaOuvindo) return { estado: "ouvindo", nivel: nivelDoMicrofone() };
     if (s.mode === "listening" || s.mode === "speaking") return { estado: "pensando", nivel: null };
     return { estado: "pronta", nivel: null };
   }, []);
@@ -4176,6 +4277,16 @@ export default function AssistantPage() {
 
           <GrupoDoMenu titulo="Voz e rádio">
             <ChaveDoMenu
+              ligado={conversaAberta}
+              onChange={() => { unlockAudioPlayback(); acordarAudio(); setConversaAberta((v) => !v); }}
+              detalhe={conversaAberta
+                ? (conversaEstado === "respondendo" ? "Respondendo…" : "Pode falar — ela continua o assunto")
+                : "Microfone aberto: fale quando quiser, ela responde continuando a conversa"}
+              cor="#3fe0c5"
+            >
+              Conversa livre
+            </ChaveDoMenu>
+            <ChaveDoMenu
               ligado={radioMode}
               onChange={() => { unlockAudioPlayback(); acordarAudio(); setRadioMode((v) => !v); }}
               detalhe={radioMode ? "O player fica no canto inferior esquerdo" : "A Lisa vira apresentadora, com a sua playlist"}
@@ -4327,6 +4438,11 @@ export default function AssistantPage() {
         <RotuloDaVoz obterSinal={obterSinalDaEsfera} />
 
         {autoListening && <div className="bb-pode-falar">Pode falar</div>}
+        {conversaAberta && !autoListening && (
+          <button type="button" className="bb-conversa-aberta" onClick={() => setConversaAberta(false)} title="Encerrar a conversa livre">
+            <i />{conversaEstado === "respondendo" ? "Respondendo…" : "Conversa aberta · pode falar"}<span>encerrar</span>
+          </button>
+        )}
 
         <section className="bb-conversa" aria-live="polite">
           {(mode !== "idle" || answer) && question && <p className="bb-conversa-pergunta">{question}</p>}
@@ -4503,11 +4619,11 @@ export default function AssistantPage() {
           </button>
           <button
             type="button"
-            className={`bb-redondo bb-redondo--mic${listening ? " bb-redondo--ouvindo" : ""}`}
+            className={`bb-redondo bb-redondo--mic${listening || conversaAberta ? " bb-redondo--ouvindo" : ""}`}
             onClick={() => { acordarAudio(); toggleMic(); }}
-            disabled={busy}
-            title={listening ? "Parar de ouvir" : "Falar (microfone)"}
-            aria-pressed={listening}
+            disabled={busy && !conversaAberta}
+            title={conversaAberta ? "Encerrar a conversa livre" : listening ? "Parar de ouvir" : "Falar (microfone)"}
+            aria-pressed={listening || conversaAberta}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="9" y="2.5" width="6" height="12" rx="3" />

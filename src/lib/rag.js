@@ -4,6 +4,7 @@ import { loadAllCards } from "./liveQuadros.js";
 import { fonteDosQuadros } from "./configLisa.js";
 import { getPersonaText } from "./persona.js";
 import { getContextDocsText } from "./context.js";
+import { secaoDaConversa } from "./conversa.js";
 
 const TOP_K = Number(process.env.RAG_TOP_K || 8);
 const MIN_SIM = Number(process.env.RAG_MIN_SIMILARITY || 0.55);
@@ -249,7 +250,7 @@ export function todayLabel() {
  * `note` (opcional) — linha extra de contexto ativo, ex.: qual projeto do Sentinela foi
  * selecionado manualmente no seletor de escopo (ver src/app/(panels)/assistant/page.js).
  */
-export function buildPrompt(question, matches, note = null) {
+export function buildPrompt(question, matches, note = null, conversa = "") {
   const hoje = todayLabel();
 
   const context = matches.length
@@ -263,7 +264,7 @@ export function buildPrompt(question, matches, note = null) {
 
   const noteBlock = note ? `\n\nCONTEXTO ATIVO: ${note}` : "";
 
-  return `DATA DE HOJE: ${hoje}${noteBlock}\n\nCONTEXTO RECUPERADO:\n${context}\n\nPERGUNTA DO USUÁRIO:\n${question}\n\nResponda usando o contexto acima.`;
+  return `DATA DE HOJE: ${hoje}${noteBlock}\n\nCONTEXTO RECUPERADO:\n${context}${secaoDaConversa(conversa)}\n\nPERGUNTA DO USUÁRIO:\n${question}\n\nResponda usando o contexto acima.`;
 }
 
 // ---------- roteamento por board/projeto ----------

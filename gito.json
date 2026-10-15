@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.3.0-cloudflare-pages.9",
-  "atualizadoEm": "2026-10-14",
+  "versao": "0.4.0-conversa-livre.1",
+  "atualizadoEm": "2026-10-15",
   "compilacao": {
-    "numero": 11,
-    "data": "2026-10-14",
+    "numero": 12,
+    "data": "2026-10-15",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.4.0-conversa-livre.1",
+      "data": "2026-10-15",
+      "branch": "conversa-livre",
+      "tipo": "funcionalidade",
+      "resumo": "Conversa mais livre com a Lisa: ela lembra das últimas trocas e continua o assunto, e o Modo conversa deixa o microfone aberto para falar quando quiser (BEYOND-0006).",
+      "itens": [
+        "Memória da conversa: o Assistente manda as últimas 5 trocas (até 30 min de pausa) junto com cada pergunta, e o prompt pede para continuar o assunto em vez de recomeçar. Inclui os comentários que ela faz sozinha da tela, câmera e escuta.",
+        "Continuações curtas (\"e o prazo dele?\") buscam contexto junto com a pergunta anterior, para achar o mesmo card ou nota de antes.",
+        "Modo conversa (Modos → Voz e rádio → Conversa livre; no celular, nos ajustes): microfone aberto, cada frase vira pergunta, o silêncio e ruídos curtos não disparam nada, o reconhecimento fecha enquanto ela fala (sem eco) e reabre depois. Funciona junto com Tela e Observância.",
+        "O botão do microfone encerra a conversa livre; a escuta por palavra e a janela de resposta automática não abrem um segundo microfone com ela ligada.",
+        "Teste novo: npm run conversa-check (31 casos)."
+      ],
+      "issues": [
+        "BEYOND-0006"
+      ]
+    },
     {
       "versao": "0.3.0-cloudflare-pages.9",
       "data": "2026-10-14",

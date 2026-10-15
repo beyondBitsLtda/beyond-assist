@@ -190,6 +190,15 @@ input::placeholder, textarea::placeholder { color: var(--bb-texto-3); }
   background: rgba(63, 224, 197, 0.14); color: #3fe0c5; border: 1px solid rgba(63, 224, 197, 0.35);
   animation: bb-dot 0.9s ease-in-out infinite;
 }
+.bb-conversa-aberta {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 6;
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; border-radius: 999px;
+  border: 1px solid rgba(63, 224, 197, 0.3); background: rgba(63, 224, 197, 0.08); color: #3fe0c5;
+  font-size: 13px; cursor: pointer;
+}
+.bb-conversa-aberta i { width: 7px; height: 7px; border-radius: 50%; background: #3fe0c5; animation: bb-dot 1.4s ease-in-out infinite; }
+.bb-conversa-aberta span { color: var(--bb-texto-3); font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--bb-superficie-2); }
+.bb-conversa-aberta:hover span { color: var(--bb-texto); }
 .bb-conversa {
   flex: none; width: 100%; max-width: 720px; max-height: 34vh; overflow-y: auto; text-align: center;
   padding: 14px max(20px, env(safe-area-inset-right, 0px)) 10px max(20px, env(safe-area-inset-left, 0px));
