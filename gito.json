@@ -9,14 +9,42 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.5.0-cloudflare-pages.11",
-  "atualizadoEm": "2026-10-15",
+  "versao": "0.6.0-interromper.2",
+  "atualizadoEm": "2026-10-16",
   "compilacao": {
-    "numero": 15,
-    "data": "2026-10-15",
+    "numero": 17,
+    "data": "2026-10-16",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.6.0-interromper.2",
+      "data": "2026-10-16",
+      "branch": "interromper",
+      "tipo": "correcao",
+      "resumo": "Resposta cortada no meio pelo Gemini sobrecarregado agora é retomada de onde parou, em vez de mostrar \"Incomplete JSON segment\".",
+      "itens": [
+        "Quando o Gemini fecha a resposta no meio (visto hoje com os modelos em alta demanda), a Lisa pede a outra chave ou modelo que continue exatamente do ponto onde parou; quem lê ou ouve não percebe o corte.",
+        "Se cortar de novo, aparece uma frase que se entende (\"o Gemini cortou a resposta no meio... pergunte de novo\") em vez do erro técnico.",
+        "Novo script scripts/medir-modelos.mjs para medir, na hora, a demora e as falhas de cada modelo de chat."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.6.0-interromper.1",
+      "data": "2026-10-15",
+      "branch": "interromper",
+      "tipo": "funcionalidade",
+      "resumo": "No Modo conversa, dizer \"Lisa\" enquanto ela fala a faz parar na hora e ouvir a correção.",
+      "itens": [
+        "Enquanto ela responde no Modo conversa, o microfone fica atento à palavra \"Lisa\": ao ouvir, ela para a fala inteira (não só o trecho que estava tocando) e dá o bipe de escuta.",
+        "\"Lisa, não é esse, é o de vendas\" já vira a próxima pergunta; dizer só \"Lisa\" e esperar também funciona — ela volta a ouvir normalmente.",
+        "A resposta interrompida fica marcada na memória da conversa, para ela saber que foi cortada e aceitar a correção.",
+        "A própria voz dela saindo pelas caixas de som não conta como interrupção, mesmo quando ela diz \"Lisa\".",
+        "O aviso do Modo conversa mostra \"diga Lisa para interromper\" enquanto ela responde."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.5.0-cloudflare-pages.11",
       "data": "2026-10-15",

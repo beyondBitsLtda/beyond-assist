@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { TTS_VOICES } from "./ttsVoices.js";
 import { pickKeyIndex, markCooldown, markOk } from "./geminiKeyHealth.js";
+import { streamComRetomada } from "./retomada.js";
 
 const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 // gemini-2.5-flash foi descontinuado pra projetos novos no Google Cloud (confirmado ao vivo:
@@ -360,19 +361,16 @@ export async function* chatStream(prompt, systemInstruction, { tools, images } =
     ? [{ role: "user", parts: [{ text: prompt }, ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } }))] }]
     : prompt;
 
-  // retry só na abertura do stream (antes de qualquer chunk chegar) — 429/503 costumam
-  // se resolver em segundos; uma vez que o texto começou a chegar não há o que repetir.
-  const stream = await withTransientRetry(CHAT_MODEL, (client, modelo, abortSignal) =>
+  // retry na abertura do stream (withTransientRetry — 429/503 costumam se resolver em
+  // segundos) e retomada se ele quebrar no meio (streamComRetomada, ver retomada.js).
+  const abrir = (c) => withTransientRetry(CHAT_MODEL, (client, modelo, abortSignal) =>
     client.models.generateContentStream({
       model: modelo,
-      contents,
+      contents: c,
       config: { ...config, ...(abortSignal ? { abortSignal } : {}) },
     })
   );
-  for await (const chunk of stream) {
-    const text = chunk.text;
-    if (text) yield text;
-  }
+  yield* streamComRetomada(abrir, contents);
 }
 
 /**
