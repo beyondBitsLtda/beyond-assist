@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.6.0-interromper.2",
+  "versao": "0.6.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-16",
   "compilacao": {
-    "numero": 17,
+    "numero": 18,
     "data": "2026-10-16",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.6.0-cloudflare-pages.1",
+      "data": "2026-10-16",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Interromper a Lisa dizendo \"Lisa\" no Modo conversa e retomada de respostas cortadas (branch interromper) juntam na cloudflare-pages e vão ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.6.0-interromper.1 e .2: dizer \"Lisa\" enquanto ela fala a faz parar e ouvir a correção; resposta cortada pelo Gemini é retomada de onde parou."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.6.0-interromper.2",
       "data": "2026-10-16",
