@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.6.0-interromper.1",
-  "atualizadoEm": "2026-10-15",
+  "versao": "0.6.0-interromper.2",
+  "atualizadoEm": "2026-10-16",
   "compilacao": {
-    "numero": 16,
-    "data": "2026-10-15",
+    "numero": 17,
+    "data": "2026-10-16",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.6.0-interromper.2",
+      "data": "2026-10-16",
+      "branch": "interromper",
+      "tipo": "correcao",
+      "resumo": "Resposta cortada no meio pelo Gemini sobrecarregado agora é retomada de onde parou, em vez de mostrar \"Incomplete JSON segment\".",
+      "itens": [
+        "Quando o Gemini fecha a resposta no meio (visto hoje com os modelos em alta demanda), a Lisa pede a outra chave ou modelo que continue exatamente do ponto onde parou; quem lê ou ouve não percebe o corte.",
+        "Se cortar de novo, aparece uma frase que se entende (\"o Gemini cortou a resposta no meio... pergunte de novo\") em vez do erro técnico.",
+        "Novo script scripts/medir-modelos.mjs para medir, na hora, a demora e as falhas de cada modelo de chat."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.6.0-interromper.1",
       "data": "2026-10-15",
