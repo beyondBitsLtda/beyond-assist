@@ -87,6 +87,7 @@ export function pendenteValida(p) {
         prazo: typeof p.mudancas.prazo === "string" ? p.mudancas.prazo.slice(0, 40) : undefined,
         coluna_id: typeof p.mudancas.coluna_id === "string" ? p.mudancas.coluna_id.slice(0, 64) : undefined,
         destino: typeof p.mudancas.destino === "string" ? p.mudancas.destino.slice(0, 300) : undefined,
+        texto_novo: p.mudancas.texto_novo === true || undefined,
       } : {},
     };
   }
@@ -103,21 +104,56 @@ export function prazoEmPalavras(prazo) {
   return hora ? `${base} às ${Number(hora)}h${minuto !== "00" ? minuto : ""}` : base;
 }
 
-/** A pergunta de confirmação, falada: curta, com o que vai mudar e onde. */
-export function resumoDaAcao(a) {
+// "um card COM um pitch de vendas", "com o e-mail para o cliente", "com um roteiro da reunião":
+// o pedido é de um TEXTO para a descrição. Rede de segurança para quando o modelo entende só um
+// título ("Pitch de vendas") e cria o card vazio — visto no teste de 18/10/2026.
+const PEDE_TEXTO = /\bcom\s+(?:um|uma|o|a|esse|essa|este|esta)?\s*(?:pitch|texto|e-?mail|roteiro|proposta|post|mensagem|resumo|script|apresenta[cç][ãa]o|passo\s+a\s+passo|discurso|argumento|carta|descri[cç][ãa]o\s+(?:de|do|da|com|sobre|explicando))\b/i;
+
+/** O pedido é para a Lisa escrever um texto que vai na descrição? */
+export function pedeTextoEscrito(texto) {
+  return PEDE_TEXTO.test(String(texto || ""));
+}
+
+/** O começo de um texto longo, cortado numa palavra: "Minha programação é baseada em…". */
+export function previaDoTexto(texto, max = 140) {
+  const t = String(texto || "").replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  const corte = t.slice(0, max);
+  return `${corte.slice(0, corte.lastIndexOf(" ") > 40 ? corte.lastIndexOf(" ") : max).replace(/[,;:.\s]+$/, "")}…`;
+}
+
+/**
+ * A pergunta de confirmação, falada: curta, com o que vai mudar e onde.
+ *
+ * A descrição aparece SEMPRE — antes, uma longa virava "com o texto completo na descrição", e um
+ * card foi criado com um texto sem relação nenhuma com o pedido sem que desse para perceber.
+ * `textoNovo`: a Lisa acabou de escrever a descrição (ninguém viu ainda) → mostra inteira.
+ */
+export function resumoDaAcao(a, { textoNovo = false } = {}) {
+  if (textoNovo && a.descricao && (a.acao === "criar" || a.acao === "editar")) {
+    const onde = a.acao === "criar"
+      ? `Vou criar o card "${a.titulo}" em ${a.destino || "o quadro escolhido"}`
+      : `Vou colocar na descrição de ${a.card_titulo ? `"${a.card_titulo}"` : "o card"}`;
+    const prazo = a.prazo === "remover" ? "sem prazo" : prazoEmPalavras(a.prazo);
+    return `Escrevi este texto para a descrição:\n\n${a.descricao}\n\n${onde}${a.acao === "criar" && prazo ? `, com prazo para ${prazo}` : ""}${a.acao === "criar" ? " com ele" : " este texto"}. Confirma?`;
+  }
+  return resumoCurto(a);
+}
+
+function resumoCurto(a) {
   const card = a.card_titulo ? `"${a.card_titulo}"` : "o card";
   const prazo = a.prazo === "remover" ? "sem prazo" : prazoEmPalavras(a.prazo);
   switch (a.acao) {
     case "criar": {
       const partes = [`Vou criar o card "${a.titulo}" em ${a.destino || "o quadro escolhido"}`];
-      if (a.descricao) partes.push(a.descricao.length > 160 ? "com o texto completo na descrição" : `com a descrição "${a.descricao}"`);
+      if (a.descricao) partes.push(`com a descrição "${previaDoTexto(a.descricao)}"`);
       if (prazo) partes.push(`e prazo para ${prazo}`);
       return `${partes.join(", ")}. Confirma?`;
     }
     case "editar": {
       const o = [];
       if (a.titulo) o.push(`o título para "${a.titulo}"`);
-      if (a.descricao) o.push(a.descricao.length > 160 ? "a descrição pelo texto completo" : `a descrição para "${a.descricao}"`);
+      if (a.descricao) o.push(`a descrição para "${previaDoTexto(a.descricao)}"`);
       if (prazo) o.push(a.prazo === "remover" ? "tirar o prazo" : `o prazo para ${prazo}`);
       return `Vou mudar ${o.join(", ") || "o card"} em ${card}. Confirma?`;
     }

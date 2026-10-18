@@ -1,7 +1,7 @@
 import {
-  detectDateRange, buildPrompt, todayLabel, withPersona, withContextDocs,
+  detectDateRange, buildPrompt, todayLabel, withPersona, withContextDocs, retrieve,
 } from "@/lib/rag.js";
-import { chatStream, detectTrelloAction } from "@/lib/gemini.js";
+import { chatStream, detectTrelloAction, escreverTextoDoCard } from "@/lib/gemini.js";
 import { buildActionProposal, buildClarifyPrompt, executeAction } from "@/lib/assistantActions.js";
 import { hasDelpTasks, getDelpTasksForContext } from "@/lib/delpTasks.js";
 import { resolveScope } from "@/lib/scopeResolver.js";
@@ -166,6 +166,13 @@ export async function POST(req) {
                 history,
                 pendente,
                 quadroPadrao: scope?.mode === "panel" && scope?.board ? scope.board : null,
+                // "cria um card com um pitch de vendas": escreve com o que ela sabe do assunto
+                escrever: async (pedido, conversa) => escreverTextoDoCard({
+                  pedido,
+                  conversa,
+                  hoje: todayLabel(),
+                  contexto: await retrieve(pedido, { topK: 12, minSim: 0.25 }).catch(() => []),
+                }),
               });
             } catch (err) {
               // O pedido de ação falhar não pode derrubar a conversa: segue para a resposta normal,
