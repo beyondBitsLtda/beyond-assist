@@ -10,7 +10,7 @@ const raiz = process.cwd();
 const imp = (p) => import(pathToFileURL(path.join(raiz, p)).href);
 const { tratarAcaoNoAbacato } = await imp("src/lib/fluxoDeAcoesNoAbacato.js");
 const { esquecerCache } = await imp("src/lib/liveQuadros.js");
-const { escreverTextoDoCard } = await imp("src/lib/gemini.js");
+const { MARCA_DO_RASCUNHO, falaSemRascunho } = await imp("src/lib/acoesNoAbacato.js");
 const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
 let falhas = 0;
@@ -23,13 +23,30 @@ const cards = {};
 
 const EMAIL = "Assunto: Indicação da equipe de atendimento sobre a presença digital da Imóveis Pro. Olá, Ricardo. A equipe de atendimento notou que os clientes chegam pelo Instagram procurando imóveis que já foram vendidos. Sugerimos revisar os anúncios toda segunda-feira e responder as mensagens em até duas horas. Fico à disposição. Brayan.";
 
-// o "escrever" de /api/ask, com um contexto fixo no lugar da busca no índice
-const SOBRE_A_BEYOND = [{ source: "BEYOND_BRAIN", board: "Notas", title: "Beyond Bits", content: "A Beyond Bits desenvolve sistemas sob medida para pequenas empresas: assistentes com IA, quadros de tarefas (Abacato) e automações. Atende imobiliárias e prestadores de serviço." }];
-const escrever = (pedido, conversa) => escreverTextoDoCard({ pedido, conversa, hoje: "hoje", contexto: SOBRE_A_BEYOND });
+// o "buscar" de /api/ask, com um contexto fixo no lugar da busca no índice
+const SOBRE_A_BEYOND = [{ source: "BEYOND_BRAIN", board: "Notas", title: "Beyond Bits", content: "A Beyond Bits desenvolve sistemas sob medida para pequenas empresas: assistentes com IA (a Lisa), quadros de tarefas (Abacato) e automações. Atende imobiliárias e prestadores de serviço." }];
+const buscar = async () => SOBRE_A_BEYOND;
 
 async function rodar(pergunta, { history = {}, pendente = null } = {}) {
   esquecerCache();
-  return tratarAcaoNoAbacato({ pergunta, history, pendente, quadroPadrao: NOME, escrever });
+  return tratarAcaoNoAbacato({ pergunta, history, pendente, quadroPadrao: NOME, buscar });
+}
+
+// Uma conversa de várias mensagens, como o navegador faz: guarda as falas e a ação pendente
+// (que só muda quando a Lisa responde por aqui — "fora" deixa a pendente como estava).
+function novoPapo(turnos = []) {
+  const estado = { turnos: [...turnos], pendente: null, ultima: turnos.filter((t) => t.papel === "lisa").at(-1)?.texto || "" };
+  return {
+    async dizer(texto) {
+      const r = await rodar(texto, { history: { turnos: estado.turnos, ultimaResposta: estado.ultima }, pendente: estado.pendente });
+      estado.turnos.push({ papel: "voce", texto });
+      console.log(`         você: ${texto}\n         lisa: ${r.respondeu ? falaSemRascunho(r.texto).replace(/\n/g, " ").slice(0, 240) : "(resposta normal)"}`);
+      if (r.respondeu) { estado.pendente = r.pending || null; estado.turnos.push({ papel: "lisa", texto: r.texto }); estado.ultima = r.texto; }
+      return r;
+    },
+    // a resposta normal (fora do fluxo de ações), simulada
+    lisa(texto, pendente) { estado.turnos.push({ papel: "lisa", texto }); estado.ultima = texto; estado.pendente = pendente; },
+  };
 }
 const doTeste = (p) => (p?.coluna_id ? Object.values(colunas).includes(p.coluna_id) : Object.values(cards).includes(p?.card_id));
 
@@ -73,16 +90,42 @@ try {
     conferir("o card proposto cai no quadro temporário (quadro padrão)", false, `coluna_id=${r.pending?.coluna_id} destino=${r.pending?.destino}`);
   }
 
-  // ---------------------------------------------------------------- 1b. o print de 16/10: pedir um texto NOVO
-  // A última resposta é sobre outro assunto (eleição): ela NÃO pode ir para o card.
+  // ---------------------------------------------------------------- 1b. o print de 16/10 + montar conversando
+  // A última resposta é sobre outro assunto (eleição): ela NÃO pode ir para o card. O card vira um
+  // RASCUNHO: ela pergunta o que falta, escreve, ajusta, e só grava no "pode criar".
   const PIADA = "Minha programação é baseada em lógica, dados estruturados e eficiência algorítmica, e não em preferências partidárias ou cartões de filiação.";
-  const hPitch = { turnos: [{ papel: "voce", texto: "em quem você votaria?" }, { papel: "lisa", texto: PIADA }], ultimaResposta: PIADA };
-  r = await rodar("cria um card com um pitch de vendas para a Beyond", { history: hPitch });
-  conferir("pitch → propõe criar card", r.respondeu && r.pending?.acao === "criar", r.texto?.slice(0, 120));
-  conferir("a descrição NÃO é a resposta anterior", r.pending?.descricao && !r.pending.descricao.includes("preferências partidárias"));
-  conferir("a descrição é um pitch escrito agora, sobre a Beyond", /beyond/i.test(r.pending?.descricao || "") && (r.pending?.descricao || "").length > 200, `${(r.pending?.descricao || "").length} letras`);
-  conferir("a confirmação mostra o texto inteiro", r.texto?.startsWith("Escrevi este texto") && r.texto.includes(r.pending?.descricao || "@@") && /Confirma\?$/.test(r.texto));
-  console.log(`\n      título: ${r.pending?.titulo}\n      ${(r.pending?.descricao || "").slice(0, 300).replace(/\n/g, "\n      ")}…\n`);
+  const papo = novoPapo([{ papel: "voce", texto: "em quem você votaria?" }, { papel: "lisa", texto: PIADA }]);
+  r = await papo.dizer("cria um card com um pitch de vendas para a Beyond");
+  conferir("pitch → abre um rascunho (não grava nem pede Confirma de cara)", r.respondeu && r.pending?.type === "abacato_rascunho" && r.pending.acao === "criar", r.texto?.slice(0, 160));
+  conferir("o rascunho cai no quadro temporário (quadro padrão)", doTeste(r.pending));
+  conferir("a resposta anterior (eleição) não entra no card", !String(r.pending?.descricao || "").includes("partidárias"));
+  // responde às perguntas dela até ter texto (no máximo 3 rodadas)
+  const respostas = [
+    "é para donos de imobiliária pequena, tom direto e confiante, destaca o Abacato e a Lisa",
+    "quero que eles marquem uma demonstração de 20 minutos",
+    "pode escrever com o que você já tem",
+  ];
+  for (const resp of respostas) {
+    if (r.pending?.descricao) break;
+    r = await papo.dizer(resp);
+  }
+  const v1 = String(r.pending?.descricao || "");
+  conferir("depois das respostas, o texto existe e é sobre a Beyond", v1.length > 150 && /beyond|abacato|lisa/i.test(v1), `${v1.length} letras`);
+  conferir("a resposta mostra o card na tela, e a voz fala só a fala", r.texto.includes(MARCA_DO_RASCUNHO) && !falaSemRascunho(r.texto).includes(v1.slice(0, 60)), falaSemRascunho(r.texto).slice(0, 140));
+  r = await papo.dizer("deixa bem mais curto, umas três frases, e põe prazo para sexta-feira");
+  const v2 = String(r.pending?.descricao || "");
+  conferir("ajuste: texto mais curto e prazo de sexta", v2.length > 0 && v2.length < v1.length && /^\d{4}-\d{2}-\d{2}/.test(r.pending?.prazo || ""), `${v1.length} → ${v2.length} letras, prazo=${r.pending?.prazo}`);
+  const guardado = r.pending;
+  r = await papo.dizer("aliás, quanto é 15% de 2400?");
+  conferir("outro assunto no meio → resposta normal, rascunho fica guardado", !r.respondeu);
+  papo.lisa("15% de 2400 é 360.", guardado);
+  if (doTeste(guardado)) {
+    r = await papo.dizer("perfeito, pode criar");
+    const { data: criados } = await db.from("abacato_cards").select("titulo, descricao, fim_em").eq("coluna_id", guardado.coluna_id).eq("origem", "lisa");
+    const novo = (criados || []).find((c) => c.descricao === v2);
+    conferir("\"pode criar\" grava o card com o texto e o prazo do rascunho", r.texto?.startsWith("Pronto") && !!novo && !!novo.fim_em, `${r.texto} | ${novo?.titulo}`);
+  }
+  console.log(`\n      título: ${guardado?.titulo}\n      ${v2.slice(0, 400).replace(/\n/g, "\n      ")}\n`);
 
   // ---------------------------------------------------------------- 2. concluir
   r = await rodar("marca o card de conferir o backup da madrugada como concluído");
@@ -131,6 +174,29 @@ try {
     await rodar("pode", { pendente: r.pending });
     const { data } = await db.from("abacato_cards").select("arquivado").eq("id", cards["Card de teste para excluir"]).single();
     conferir("\"pode\" arquiva no banco", data.arquivado === true);
+  }
+
+  // ---------------------------------------------------------------- 8. "me ajuda a montar" e desistir
+  const papo2 = novoPapo();
+  r = await papo2.dizer("me ajuda a montar um card para a reunião com o contador");
+  conferir("\"me ajuda a montar um card\" → rascunho", r.pending?.type === "abacato_rascunho", r.texto?.slice(0, 160));
+  r = await papo2.dizer("não, esquece esse card, deixa pra lá");
+  conferir("desistir → nada gravado, rascunho fecha", r.respondeu && !r.pending && /deixei|não gravei/i.test(r.texto), r.texto);
+
+  // ---------------------------------------------------------------- 9. melhorar o texto de um card que já existe
+  const papo3 = novoPapo();
+  r = await papo3.dizer("vamos melhorar a descrição do card Relatório mensal de vendas, quero um passo a passo de como montar o relatório");
+  conferir("editar com texto → rascunho de editar no card certo", r.pending?.type === "abacato_rascunho" && r.pending.acao === "editar" && r.pending.card_id === cards["Relatório mensal de vendas"], r.texto?.slice(0, 160));
+  for (const resp of ["os dados vêm do Abacato e de uma planilha de vendas, é para eu mesmo", "pode escrever"]) {
+    if (r.pending?.descricao) break;
+    r = await papo3.dizer(resp);
+  }
+  const passo = String(r.pending?.descricao || "");
+  conferir("o rascunho de editar tem o passo a passo", passo.length > 80, `${passo.length} letras`);
+  if (r.pending?.card_id === cards["Relatório mensal de vendas"]) {
+    r = await papo3.dizer("ficou bom, pode salvar");
+    const { data } = await db.from("abacato_cards").select("descricao").eq("id", cards["Relatório mensal de vendas"]).single();
+    conferir("\"pode salvar\" grava a descrição no card", r.texto?.startsWith("Pronto") && data.descricao === passo, r.texto);
   }
 
   // ---------------------------------------------------------------- 7. não é ação

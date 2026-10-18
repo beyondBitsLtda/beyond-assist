@@ -87,11 +87,100 @@ export function pendenteValida(p) {
         prazo: typeof p.mudancas.prazo === "string" ? p.mudancas.prazo.slice(0, 40) : undefined,
         coluna_id: typeof p.mudancas.coluna_id === "string" ? p.mudancas.coluna_id.slice(0, 64) : undefined,
         destino: typeof p.mudancas.destino === "string" ? p.mudancas.destino.slice(0, 300) : undefined,
-        texto_novo: p.mudancas.texto_novo === true || undefined,
+        rascunho: p.mudancas.rascunho === true || undefined,
+        pedido: typeof p.mudancas.pedido === "string" ? p.mudancas.pedido.slice(0, 2000) : undefined,
       } : {},
     };
   }
+  if (p.type === "abacato_rascunho") return rascunhoValido(p);
   return null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// RASCUNHO DO CARD: montar o card conversando.
+//
+// Em vez de escrever e pedir "Confirma?" de uma vez, a Lisa abre um rascunho: pergunta o que
+// falta (para quem é, objetivo, tom, prazo), escreve uma versão, ajusta a cada pedido ("deixa
+// mais curto", "fala do preço", "põe prazo sexta") e só grava quando você aprova ("pode criar").
+// O rascunho vive como ação pendente no navegador, como as outras — volta a cada mensagem e é
+// conferido aqui. Quem conduz a conversa é conduzirRascunho (gemini.js); o fluxo, em
+// fluxoDeAcoesNoAbacato.js.
+
+export const MAXIMO_DE_RODADAS = 30;
+
+/** O rascunho vindo do navegador, limpo; null se não serve. */
+export function rascunhoValido(p) {
+  if (!p || p.type !== "abacato_rascunho" || !["criar", "editar"].includes(p.acao)) return null;
+  const texto = (v, max) => (typeof v === "string" ? v.slice(0, max) : undefined);
+  const r = {
+    type: "abacato_rascunho",
+    acao: p.acao,
+    card_id: texto(p.card_id, 64),
+    card_titulo: texto(p.card_titulo, 300),
+    coluna_id: texto(p.coluna_id, 64),
+    destino: texto(p.destino, 300),
+    titulo: texto(p.titulo, 300),
+    descricao: texto(p.descricao, 8000),
+    prazo: texto(p.prazo, 40),
+    pedido: texto(p.pedido, 2000) || "",
+    rodadas: Math.max(0, Math.min(MAXIMO_DE_RODADAS, Number.parseInt(p.rodadas, 10) || 0)),
+  };
+  if (r.acao === "editar" && !r.card_id) return null;
+  return r;
+}
+
+// "me ajuda a montar um card", "vamos elaborar um card", "monta comigo", "me pergunta o que precisa"
+const ELABORAR = /\b(me\s+ajud\w*\s+a\s+(?:montar|criar|fazer|elaborar|pensar|escrever)|vamos\s+(?:montar|elaborar|pensar|criar|escrever)\b.*\b(?:juntos|card|cart[ãa]o|tarefa)|(?:monta|montar|elabora|elaborar|pensa|pensar|escreve|escrever)\s+(?:isso\s+|o\s+card\s+|um\s+card\s+)?comigo|me\s+pergunt\w*\s+o\s+que)/i;
+
+/** O pedido é para montar o card junto, conversando? */
+export function querElaborar(texto) {
+  return ELABORAR.test(String(texto || ""));
+}
+
+/**
+ * Um título que o modelo propôs no meio do rascunho serve? Visto no teste de 18/10/2026: ao
+ * encurtar o TEXTO, o modelo devolveu um título de 200 caracteres com um cliente inventado e a
+ * data ISO repetida duas vezes. Título bom é curto e sem data de máquina.
+ */
+export function tituloAceitavel(t) {
+  if (typeof t !== "string") return false;
+  const s = t.trim();
+  return s.length >= 2 && s.length <= 100 && !/\d{4}-\d{2}-\d{2}T?/.test(s);
+}
+
+/** A ação que o rascunho aprovado vira (passa por pendenteValida antes de executar). */
+export function acaoDoRascunho(r) {
+  const base = { type: "abacato", acao: r.acao, titulo: r.titulo, descricao: r.descricao, prazo: r.prazo };
+  return r.acao === "criar"
+    ? { ...base, coluna_id: r.coluna_id, destino: r.destino }
+    : { ...base, card_id: r.card_id, card_titulo: r.card_titulo };
+}
+
+// O que vem depois desta linha é o rascunho na tela; a voz para antes dela (falaSemRascunho).
+export const MARCA_DO_RASCUNHO = "── rascunho do card ──";
+
+/** A resposta da Lisa: a fala dela e, se pedido, o rascunho como está agora. */
+export function textoDoRascunho(r, fala, { mostrar = true } = {}) {
+  if (!mostrar || !(r.titulo || r.descricao)) return fala;
+  const linhas = [];
+  if (r.titulo) linhas.push(`Título: ${r.titulo}`);
+  if (r.acao === "criar" && r.destino) linhas.push(`Onde: ${r.destino}`);
+  if (r.acao === "editar" && r.card_titulo) linhas.push(`Card: ${r.card_titulo}`);
+  const prazo = r.prazo === "remover" ? "sem prazo" : prazoEmPalavras(r.prazo);
+  if (prazo) linhas.push(`Prazo: ${prazo}`);
+  return `${fala}\n\n${MARCA_DO_RASCUNHO}\n${linhas.join("\n")}${r.descricao ? `\n\n${r.descricao}` : ""}`;
+}
+
+/** Uma resposta separada em { fala, rascunho } — rascunho é "" quando não há. */
+export function separarRascunho(texto) {
+  const t = String(texto || "");
+  const i = t.indexOf(MARCA_DO_RASCUNHO);
+  return i < 0 ? { fala: t, rascunho: "" } : { fala: t.slice(0, i).trim(), rascunho: t.slice(i + MARCA_DO_RASCUNHO.length).trim() };
+}
+
+/** Só a parte falada de uma resposta (sem o rascunho, que é para ler na tela). */
+export function falaSemRascunho(texto) {
+  return separarRascunho(texto).fala;
 }
 
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -125,22 +214,11 @@ export function previaDoTexto(texto, max = 140) {
 /**
  * A pergunta de confirmação, falada: curta, com o que vai mudar e onde.
  *
- * A descrição aparece SEMPRE — antes, uma longa virava "com o texto completo na descrição", e um
- * card foi criado com um texto sem relação nenhuma com o pedido sem que desse para perceber.
- * `textoNovo`: a Lisa acabou de escrever a descrição (ninguém viu ainda) → mostra inteira.
+ * A descrição aparece SEMPRE (o começo dela) — antes, uma longa virava "com o texto completo na
+ * descrição", e um card foi criado com um texto sem relação nenhuma com o pedido sem que desse
+ * para perceber. Texto que a Lisa escreve na hora não passa por aqui: vai para o rascunho.
  */
-export function resumoDaAcao(a, { textoNovo = false } = {}) {
-  if (textoNovo && a.descricao && (a.acao === "criar" || a.acao === "editar")) {
-    const onde = a.acao === "criar"
-      ? `Vou criar o card "${a.titulo}" em ${a.destino || "o quadro escolhido"}`
-      : `Vou colocar na descrição de ${a.card_titulo ? `"${a.card_titulo}"` : "o card"}`;
-    const prazo = a.prazo === "remover" ? "sem prazo" : prazoEmPalavras(a.prazo);
-    return `Escrevi este texto para a descrição:\n\n${a.descricao}\n\n${onde}${a.acao === "criar" && prazo ? `, com prazo para ${prazo}` : ""}${a.acao === "criar" ? " com ele" : " este texto"}. Confirma?`;
-  }
-  return resumoCurto(a);
-}
-
-function resumoCurto(a) {
+export function resumoDaAcao(a) {
   const card = a.card_titulo ? `"${a.card_titulo}"` : "o card";
   const prazo = a.prazo === "remover" ? "sem prazo" : prazoEmPalavras(a.prazo);
   switch (a.acao) {

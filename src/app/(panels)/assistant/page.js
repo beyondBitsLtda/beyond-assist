@@ -16,7 +16,7 @@ import TopoExtra from "@/components/shell/TopoExtra.js";
 import Suspenso, { GrupoDoMenu, ItemDoMenu, ChaveDoMenu, SegmentosDoMenu } from "@/components/shell/Suspenso.js";
 import RotuloDaVoz from "@/components/panels/RotuloDaVoz.js";
 import { adicionarTurno, conversaVigente, falaQueValePergunta, interrupcaoNaFala, marcarInterrompida } from "@/lib/conversa.js";
-import { pareceAcao } from "@/lib/acoesNoAbacato.js";
+import { pareceAcao, falaSemRascunho, separarRascunho } from "@/lib/acoesNoAbacato.js";
 import { acordarAudio, escutarElemento, nivelDaVoz, abrirMicrofone, fecharMicrofone, nivelDoMicrofone } from "@/lib/vozAnalisador.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
 import { getDeviceId, matchNavCommand } from "@/lib/deviceId.js";
@@ -2399,7 +2399,7 @@ export default function AssistantPage() {
 
     // Pedido de card no Abacato (criar, concluir, excluir…) vale em QUALQUER modo: no Modo Código
     // ele viraria um pedido de código, e no Vigia uma pergunta sobre a tela.
-    const acaoNoAbacato = pareceAcao(q, ["abacato", "abacato_escolha"].includes(pendingActionRef.current?.type));
+    const acaoNoAbacato = pareceAcao(q, ["abacato", "abacato_escolha", "abacato_rascunho"].includes(pendingActionRef.current?.type));
 
     // Modo Código ligado: a pergunta vira um pedido de mudança de código, não uma conversa —
     // ver askCodeMode acima.
@@ -2500,7 +2500,8 @@ export default function AssistantPage() {
       setMode("idle");
       // fala a resposta INTEIRA de uma vez, só agora que terminou de chegar — 1 chamada de
       // TTS por resposta, nunca duas vozes diferentes na mesma fala (ver nota no topo do arquivo).
-      const full = answerRef.current.trim();
+      // O rascunho de um card (o texto inteiro dele) fica só na tela: ela fala o que mudou.
+      const full = falaSemRascunho(answerRef.current).trim();
       if (voiceEnabled && full) enqueueSpeech(full, gen);
     }
   }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode, vigiaMode, askVigiaMode]);
@@ -4523,8 +4524,14 @@ export default function AssistantPage() {
         <section className="bb-conversa" aria-live="polite">
           {(mode !== "idle" || answer) && question && <p className="bb-conversa-pergunta">{question}</p>}
           <p className={`bb-conversa-resposta${!answer && mode === "idle" ? " bb-conversa-resposta--vazia" : ""}`}>
-            {mode === "speaking" || answer ? (answer || "…") : mode === "listening" ? "…" : "Pergunte alguma coisa, por texto ou pelo microfone."}
+            {mode === "speaking" || answer ? (separarRascunho(answer).fala || "…") : mode === "listening" ? "…" : "Pergunte alguma coisa, por texto ou pelo microfone."}
           </p>
+          {separarRascunho(answer).rascunho && (
+            <div className="bb-rascunho">
+              <div className="bb-rascunho-cabeca">Rascunho do card · ainda não gravado</div>
+              <pre>{separarRascunho(answer).rascunho}</pre>
+            </div>
+          )}
           {ttsWaitSeconds !== null && (
             <div className="bb-conversa-nota">Preparando a voz… {ttsWaitSeconds}s de {SPEAK_TIMEOUT_MS / 1000}s</div>
           )}
