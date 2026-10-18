@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.7.0-elaborar-card.1",
+  "versao": "0.7.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-18",
   "compilacao": {
-    "numero": 21,
+    "numero": 22,
     "data": "2026-10-18",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.7.0-cloudflare-pages.1",
+      "data": "2026-10-18",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Montar um card conversando com a Lisa (branch elaborar-card) junta na cloudflare-pages e vai ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.7.0-elaborar-card.1: rascunho do card montado na conversa, com perguntas, ajustes e gravação só no \"pode criar\"."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.7.0-elaborar-card.1",
       "data": "2026-10-18",
