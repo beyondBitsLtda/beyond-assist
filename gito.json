@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.6.0-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-16",
+  "versao": "0.6.1-descricao-escrita.1",
+  "atualizadoEm": "2026-10-18",
   "compilacao": {
-    "numero": 18,
-    "data": "2026-10-16",
+    "numero": 19,
+    "data": "2026-10-18",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.6.1-descricao-escrita.1",
+      "data": "2026-10-18",
+      "branch": "descricao-escrita",
+      "tipo": "correcao",
+      "resumo": "Pedir um card \"com um pitch de vendas\" (ou e-mail, roteiro...) faz a Lisa escrever o texto, em vez de colar na descrição a última resposta dela sobre outro assunto.",
+      "itens": [
+        "Novo caminho no módulo de ações: quando o pedido é de um texto novo, a Lisa escreve com o que sabe do assunto (quadros e notas do Beyond Brain) e só então propõe o card.",
+        "A última resposta só vai para o card quando você se refere a ela (\"esse texto\", \"o e-mail que você fez\").",
+        "A confirmação passa a mostrar o texto: inteiro quando acabou de ser escrito, ou o começo dele quando é longo. Antes aparecia só \"com o texto completo na descrição\", e dava para confirmar sem ver.",
+        "Vale para criar e para editar a descrição de um card."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.6.0-cloudflare-pages.1",
       "data": "2026-10-16",

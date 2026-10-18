@@ -12,7 +12,7 @@
 import { detectarAcaoNoAbacato } from "./gemini.js";
 import { loadAllCards } from "./liveQuadros.js";
 import { quadrosEColunas, criarCard, mudarCard, arquivarCard } from "./abacatoAcoes.js";
-import { candidatosDoPedido, pendenteValida, respostaDeConfirmacao, resumoDaAcao, relatoDaAcao } from "./acoesNoAbacato.js";
+import { candidatosDoPedido, pendenteValida, respostaDeConfirmacao, resumoDaAcao, relatoDaAcao, pedeTextoEscrito } from "./acoesNoAbacato.js";
 import { turnosValidos, blocoDaConversa } from "./conversa.js";
 
 // "quarta-feira, 15 de outubro de 2026" em Brasília — a mesma de rag.js, sem puxar a persona junto.
@@ -22,10 +22,13 @@ const NADA = { respondeu: false };
 const responde = (texto, pending = null, cards = []) => ({ respondeu: true, texto, pending, cards });
 
 /**
+ * `escrever(pedido, conversa)` (opcional, vem de /api/ask) redige um texto novo para a descrição,
+ * com o que a Lisa sabe — "cria um card com um pitch de vendas". Sem ele, a ação pede o texto.
+ *
  * `pendente` já passou por pendenteValida. Devolve { respondeu:false } quando não é ação, ou
  * { respondeu:true, texto, pending, cards } com o que dizer e a nova ação pendente (ou null).
  */
-export async function tratarAcaoNoAbacato({ pergunta, history, pendente, quadroPadrao }) {
+export async function tratarAcaoNoAbacato({ pergunta, history, pendente, quadroPadrao, escrever = null }) {
   // "sim"/"não" a uma ação proposta: sem gastar o modelo.
   if (pendente?.type === "abacato") {
     const r = respostaDeConfirmacao(pergunta);
@@ -44,10 +47,11 @@ export async function tratarAcaoNoAbacato({ pergunta, history, pendente, quadroP
   const anterior = turnos.filter((t) => t.papel === "voce").at(-1)?.texto || "";
   const candidatos = candidatosDoPedido(`${pergunta} ${anterior}`, cards, recentes);
 
+  const conversa = blocoDaConversa(turnos);
   const d = await detectarAcaoNoAbacato({
     pergunta,
     hoje: todayLabel(),
-    conversa: blocoDaConversa(turnos),
+    conversa,
     ultimaResposta: typeof history?.ultimaResposta === "string" ? history.ultimaResposta : "",
     candidatos,
     quadros,
@@ -55,19 +59,24 @@ export async function tratarAcaoNoAbacato({ pergunta, history, pendente, quadroP
     pendente,
   });
 
+  // "cria um card com um pitch de vendas" que o modelo entendeu só como título: escreve o texto.
+  if (d.intent === "propor" && (d.acao === "criar" || d.acao === "editar") && !d.descricao && !d.escrever_descricao && !d.usar_ultima_resposta && pedeTextoEscrito(pergunta)) {
+    d.escrever_descricao = pergunta;
+  }
+
   if (d.intent === "confirmar" && pendente?.type === "abacato") return executar(pendente);
   if (d.intent === "cancelar" && pendente) return responde("Beleza, não mudei nada.");
 
   if (d.intent === "selecionar" && pendente?.type === "abacato_escolha") {
     const escolhido = pendente.candidatos.find((c) => c.id === d.card_id);
     if (!escolhido) return responde("Não entendi qual deles. Pode dizer o número ou o nome do card?", pendente);
-    return propor({ acao: pendente.acao, card_id: escolhido.id, ...pendente.mudancas }, { porId, quadros, history, quadroPadrao });
+    return propor({ acao: pendente.acao, card_id: escolhido.id, ...pendente.mudancas }, { porId, quadros, history, quadroPadrao, textoNovo: !!pendente.mudancas?.texto_novo });
   }
 
   if (d.intent === "esclarecer" && d.acao) {
     const opcoes = (d.candidatos_ids || []).map((id) => porId.get(id)).filter(Boolean).slice(0, 4);
     if (opcoes.length >= 2) {
-      const mudancas = await camposDaAcao(d, { quadros, history, porId });
+      const mudancas = await camposDaAcao(d, { quadros, history, escrever, conversa });
       const pending = pendenteValida({
         type: "abacato_escolha",
         acao: d.acao,
@@ -82,16 +91,25 @@ export async function tratarAcaoNoAbacato({ pergunta, history, pendente, quadroP
   }
 
   if (d.intent === "propor" || (d.intent === "esclarecer" && d.card_id)) {
-    return propor(d, { porId, quadros, history, quadroPadrao });
+    return propor(d, { porId, quadros, history, quadroPadrao, escrever, conversa });
   }
   return NADA;
 }
 
-/** Os campos que mudam, já resolvidos (texto da última resposta, coluna de destino). */
-async function camposDaAcao(d, { quadros, history }) {
-  const descricao = d.usar_ultima_resposta && typeof history?.ultimaResposta === "string"
-    ? history.ultimaResposta
-    : d.descricao;
+/**
+ * Os campos que mudam, já resolvidos: a descrição (escrita agora, colada da última resposta ou
+ * ditada) e a coluna de destino. `texto_novo` diz que a descrição acabou de ser escrita.
+ */
+async function camposDaAcao(d, { quadros, history, escrever, conversa }) {
+  let descricao = d.descricao;
+  let texto_novo = false;
+  // Pedido de texto novo vence "a última resposta": é o que ele pediu para escrever.
+  if (d.escrever_descricao && escrever) {
+    descricao = await escrever(d.escrever_descricao, conversa).catch(() => "");
+    texto_novo = !!descricao;
+  } else if (d.usar_ultima_resposta && typeof history?.ultimaResposta === "string") {
+    descricao = history.ultimaResposta;
+  }
   let destino;
   if (d.coluna_id) {
     for (const q of quadros) {
@@ -99,37 +117,42 @@ async function camposDaAcao(d, { quadros, history }) {
       if (c) destino = `${q.nome}, coluna ${c.nome}`;
     }
   }
-  return { titulo: d.titulo, descricao, prazo: d.prazo, coluna_id: d.coluna_id, destino };
+  return { titulo: d.titulo, descricao, prazo: d.prazo, coluna_id: d.coluna_id, destino, texto_novo };
 }
 
-async function propor(d, { porId, quadros, history, quadroPadrao }) {
-  const campos = await camposDaAcao(d, { quadros, history });
+async function propor(d, { porId, quadros, history, quadroPadrao, escrever, conversa, textoNovo = false }) {
+  // Vindo de uma escolha pendente, os campos já estão resolvidos (não escreve de novo).
+  const campos = textoNovo
+    ? { titulo: d.titulo, descricao: d.descricao, prazo: d.prazo, coluna_id: d.coluna_id, destino: d.destino, texto_novo: true }
+    : await camposDaAcao(d, { quadros, history, escrever, conversa });
+  if (d.escrever_descricao && !campos.descricao) return responde("Não consegui escrever o texto agora. Pode pedir de novo em instantes?");
+  const { texto_novo, ...semMarca } = campos;
   let base;
   if (d.acao === "criar") {
     // sem coluna válida: a primeira coluna do quadro padrão (ou do primeiro quadro)
-    if (!campos.destino) {
+    if (!semMarca.destino) {
       const q = quadros.find((x) => x.nome === quadroPadrao && x.colunas.length) || quadros.find((x) => x.colunas.length);
       const c = q?.colunas?.[0];
       if (!c) return responde("Não achei nenhum quadro com colunas no Abacato para criar o card.");
-      campos.coluna_id = c.id;
-      campos.destino = `${q.nome}, coluna ${c.nome}`;
+      semMarca.coluna_id = c.id;
+      semMarca.destino = `${q.nome}, coluna ${c.nome}`;
     }
-    if (!campos.titulo) return responde("Qual vai ser o título do card?");
-    base = { type: "abacato", acao: "criar", ...campos };
+    if (!semMarca.titulo) return responde("Qual vai ser o título do card?");
+    base = { type: "abacato", acao: "criar", ...semMarca };
   } else {
     const card = porId.get(d.card_id);
     if (!card) return responde("Não achei esse card no Abacato. Pode me dizer o nome dele?");
     if (d.acao === "mover") {
       const quadro = quadros.find((q) => q.id === card.board_id);
-      const coluna = quadro?.colunas.find((c) => c.id === campos.coluna_id);
+      const coluna = quadro?.colunas.find((c) => c.id === semMarca.coluna_id);
       if (!coluna) return responde(`Para qual coluna do ${card.board} eu movo "${card.title}"?`);
-      campos.destino = `a coluna ${coluna.nome}`;
+      semMarca.destino = `a coluna ${coluna.nome}`;
     }
-    base = { type: "abacato", acao: d.acao, card_id: card.id, card_titulo: card.title, ...campos };
+    base = { type: "abacato", acao: d.acao, card_id: card.id, card_titulo: card.title, ...semMarca };
   }
   const pending = pendenteValida(base);
   if (!pending) return responde("Não entendi direito o que mudar. Pode repetir de outro jeito?");
-  return responde(resumoDaAcao(pending), pending, d.card_id && porId.get(d.card_id) ? [porId.get(d.card_id)] : []);
+  return responde(resumoDaAcao(pending, { textoNovo: texto_novo }), pending, d.card_id && porId.get(d.card_id) ? [porId.get(d.card_id)] : []);
 }
 
 async function executar(p) {

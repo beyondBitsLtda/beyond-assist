@@ -10,6 +10,7 @@ const raiz = process.cwd();
 const imp = (p) => import(pathToFileURL(path.join(raiz, p)).href);
 const { tratarAcaoNoAbacato } = await imp("src/lib/fluxoDeAcoesNoAbacato.js");
 const { esquecerCache } = await imp("src/lib/liveQuadros.js");
+const { escreverTextoDoCard } = await imp("src/lib/gemini.js");
 const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
 let falhas = 0;
@@ -22,9 +23,13 @@ const cards = {};
 
 const EMAIL = "Assunto: Indicação da equipe de atendimento sobre a presença digital da Imóveis Pro. Olá, Ricardo. A equipe de atendimento notou que os clientes chegam pelo Instagram procurando imóveis que já foram vendidos. Sugerimos revisar os anúncios toda segunda-feira e responder as mensagens em até duas horas. Fico à disposição. Brayan.";
 
+// o "escrever" de /api/ask, com um contexto fixo no lugar da busca no índice
+const SOBRE_A_BEYOND = [{ source: "BEYOND_BRAIN", board: "Notas", title: "Beyond Bits", content: "A Beyond Bits desenvolve sistemas sob medida para pequenas empresas: assistentes com IA, quadros de tarefas (Abacato) e automações. Atende imobiliárias e prestadores de serviço." }];
+const escrever = (pedido, conversa) => escreverTextoDoCard({ pedido, conversa, hoje: "hoje", contexto: SOBRE_A_BEYOND });
+
 async function rodar(pergunta, { history = {}, pendente = null } = {}) {
   esquecerCache();
-  return tratarAcaoNoAbacato({ pergunta, history, pendente, quadroPadrao: NOME });
+  return tratarAcaoNoAbacato({ pergunta, history, pendente, quadroPadrao: NOME, escrever });
 }
 const doTeste = (p) => (p?.coluna_id ? Object.values(colunas).includes(p.coluna_id) : Object.values(cards).includes(p?.card_id));
 
@@ -67,6 +72,17 @@ try {
   } else {
     conferir("o card proposto cai no quadro temporário (quadro padrão)", false, `coluna_id=${r.pending?.coluna_id} destino=${r.pending?.destino}`);
   }
+
+  // ---------------------------------------------------------------- 1b. o print de 16/10: pedir um texto NOVO
+  // A última resposta é sobre outro assunto (eleição): ela NÃO pode ir para o card.
+  const PIADA = "Minha programação é baseada em lógica, dados estruturados e eficiência algorítmica, e não em preferências partidárias ou cartões de filiação.";
+  const hPitch = { turnos: [{ papel: "voce", texto: "em quem você votaria?" }, { papel: "lisa", texto: PIADA }], ultimaResposta: PIADA };
+  r = await rodar("cria um card com um pitch de vendas para a Beyond", { history: hPitch });
+  conferir("pitch → propõe criar card", r.respondeu && r.pending?.acao === "criar", r.texto?.slice(0, 120));
+  conferir("a descrição NÃO é a resposta anterior", r.pending?.descricao && !r.pending.descricao.includes("preferências partidárias"));
+  conferir("a descrição é um pitch escrito agora, sobre a Beyond", /beyond/i.test(r.pending?.descricao || "") && (r.pending?.descricao || "").length > 200, `${(r.pending?.descricao || "").length} letras`);
+  conferir("a confirmação mostra o texto inteiro", r.texto?.startsWith("Escrevi este texto") && r.texto.includes(r.pending?.descricao || "@@") && /Confirma\?$/.test(r.texto));
+  console.log(`\n      título: ${r.pending?.titulo}\n      ${(r.pending?.descricao || "").slice(0, 300).replace(/\n/g, "\n      ")}…\n`);
 
   // ---------------------------------------------------------------- 2. concluir
   r = await rodar("marca o card de conferir o backup da madrugada como concluído");

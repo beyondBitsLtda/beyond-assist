@@ -484,6 +484,11 @@ Regras:
  *
  * `ultimaResposta` é a última fala inteira da Lisa: "cria um card com esse texto que você
  * sugeriu" precisa dela — o modelo devolve usar_ultima_resposta e o servidor cola o texto.
+ *
+ * "Cria um card com um pitch de vendas" é OUTRA coisa: pede um texto que ainda não existe. Antes
+ * só havia as duas saídas acima, e o modelo colou a última resposta (sobre outro assunto) na
+ * descrição — visto em 16/10/2026. Agora ele devolve escrever_descricao com o que redigir, e o
+ * servidor escreve o texto (escreverTextoDoCard) antes de pedir a confirmação.
  */
 export async function detectarAcaoNoAbacato({ pergunta, hoje, conversa = "", ultimaResposta = "", candidatos = [], quadros = [], quadroPadrao = null, pendente = null }) {
   const blocoCards = candidatos.length
@@ -528,10 +533,22 @@ intent:
 - "propor": o usuário pediu uma ação e você tem o necessário. Preencha "acao" e:
   • criar: coluna_id (do quadro que o usuário citou; se não citou, do QUADRO PADRÃO; sem nada, o
     primeiro quadro), titulo curto e claro (até ~80 caracteres), descricao se houver, prazo se
-    houver. Se o usuário pedir o texto que a Lisa sugeriu/escreveu ("esse texto", "o e-mail que
-    você fez"), marque usar_ultima_resposta=true e NÃO copie o texto em descricao; ainda assim
-    invente um titulo curto a partir do assunto.
-  • editar: card_id e só os campos que mudam (titulo, descricao e/ou prazo). prazo="remover" tira o prazo.
+    houver. A descrição vem de UM destes três jeitos:
+      1. o usuário ditou o texto ("com a descrição: ligar às 10h") → copie em descricao;
+      2. o usuário pede para você REDIGIR um texto novo ("com um pitch de vendas para a Beyond",
+         "escreve um roteiro de reunião", "coloca um passo a passo de como publicar") → NÃO
+         escreva nada em descricao; ponha em escrever_descricao o que deve ser escrito, com todos
+         os detalhes que ele deu (assunto, público, tom, tamanho);
+      3. o usuário se refere a um texto que a Lisa JÁ escreveu nesta conversa ("esse texto", "o
+         e-mail que você fez", "o que você acabou de falar") E a ÚLTIMA RESPOSTA é esse texto →
+         marque usar_ultima_resposta=true e NÃO copie em descricao.
+    "Um card COM um pitch / e-mail / roteiro / proposta / texto / post / mensagem / resumo /
+    passo a passo" é o caso 2: o card leva esse texto escrito na descrição, não só no título.
+    Na dúvida entre 2 e 3, é 2. Nunca use a última resposta só porque ela existe: se ela fala
+    de outro assunto, ela não entra no card. Invente sempre um titulo curto a partir do assunto.
+  • editar: card_id e só os campos que mudam (titulo, descricao e/ou prazo). prazo="remover" tira o
+    prazo. A descrição segue as mesmas três regras de criar (descricao, escrever_descricao ou
+    usar_ultima_resposta).
   • concluir / reabrir / arquivar: card_id.
   • mover: card_id e coluna_id de destino (mesmo quadro do card).
   prazo: "AAAA-MM-DD", ou "AAAA-MM-DDTHH:MM" se o usuário disse a hora, calculado a partir de hoje
@@ -566,6 +583,7 @@ Use só ids que aparecem acima. Nunca invente ids.`;
               descricao: { type: "STRING" },
               prazo: { type: "STRING" },
               usar_ultima_resposta: { type: "BOOLEAN" },
+              escrever_descricao: { type: "STRING" },
               candidatos_ids: { type: "ARRAY", items: { type: "STRING" } },
             },
             required: ["intent"],
@@ -582,6 +600,47 @@ Use só ids que aparecem acima. Nunca invente ids.`;
   } catch {
     return { intent: "nenhuma" };
   }
+}
+
+/**
+ * Redige o texto que vai na descrição de um card ("um pitch de vendas para a Beyond"), com o que
+ * a Lisa sabe (`contexto`: trechos do índice — quadros e Beyond Brain) e a conversa recente.
+ * Devolve só o texto, pronto para colar: sem "Claro! Aqui está", sem markdown pesado.
+ */
+export async function escreverTextoDoCard({ pedido, contexto = [], conversa = "", hoje = "" }) {
+  const blocoContexto = contexto.length
+    ? contexto.map((m, i) => `[#${i + 1} · ${m.source} · ${m.board}] ${m.title}\n${String(m.content || "").slice(0, 1500)}`).join("\n\n---\n\n")
+    : "(nada encontrado no índice)";
+  const prompt = `DATA DE HOJE: ${hoje}
+
+O QUE ESCREVER:
+${pedido}
+
+O QUE A LISA SABE SOBRE O ASSUNTO (quadros e notas do usuário):
+${blocoContexto}
+
+CONVERSA RECENTE:
+${conversa || "(sem conversa)"}`;
+  const systemInstruction = `Você é a Lisa e vai escrever o texto da DESCRIÇÃO de um card no Abacato, o quadro
+de tarefas do usuário. Escreva em português do Brasil exatamente o que foi pedido, pronto para usar.
+- Use os fatos do contexto acima (nome da empresa, produtos, clientes, números). Não invente fatos:
+  onde faltar um dado importante, deixe um marcador entre colchetes, como [número de clientes].
+- Comece direto pelo texto. Nada de "Claro!", "Aqui está" ou comentário sobre o pedido.
+- Formatação simples, que funcione em texto puro: parágrafos curtos, listas com "- " se ajudarem.
+  Sem títulos com #, sem negrito com **.
+- Tamanho: o que o pedido pedir; sem indicação, entre 80 e 250 palavras.`;
+
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client, modelo, abortSignal) =>
+      client.models.generateContent({
+        model: modelo,
+        contents: prompt,
+        config: { systemInstruction, ...(abortSignal ? { abortSignal } : {}) },
+      }),
+    { attempts: 2, delayMs: 800 }
+  );
+  return String(res.text || "").replace(/\*\*/g, "").trim();
 }
 
 /**
