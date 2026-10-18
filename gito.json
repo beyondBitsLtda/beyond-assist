@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.6.1-descricao-escrita.1",
+  "versao": "0.6.1-cloudflare-pages.1",
   "atualizadoEm": "2026-10-18",
   "compilacao": {
-    "numero": 19,
+    "numero": 20,
     "data": "2026-10-18",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.6.1-cloudflare-pages.1",
+      "data": "2026-10-18",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Descrição escrita pela Lisa (branch descricao-escrita) junta na cloudflare-pages e vai ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.6.1-descricao-escrita.1: card \"com um pitch/e-mail/roteiro\" ganha o texto escrito na hora, mostrado inteiro na confirmação; a última resposta só entra quando você se refere a ela."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.6.1-descricao-escrita.1",
       "data": "2026-10-18",
