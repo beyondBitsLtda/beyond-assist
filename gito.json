@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.7.0-cloudflare-pages.1",
+  "versao": "0.7.1-rascunho-ajustes.1",
   "atualizadoEm": "2026-10-18",
   "compilacao": {
-    "numero": 22,
+    "numero": 23,
     "data": "2026-10-18",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.7.1-rascunho-ajustes.1",
+      "data": "2026-10-18",
+      "branch": "rascunho-ajustes",
+      "tipo": "correcao",
+      "resumo": "Correções no card montado na conversa, achadas ao tirar os prints do tour de demonstração.",
+      "itens": [
+        "\"Me ajuda a montar um card\", \"monta comigo\", \"vamos elaborar\" e \"faz um card\" agora chegam ao módulo de ações: antes, o filtro de entrada não reconhecia esses verbos e a Lisa respondia como conversa comum.",
+        "\"Move o relatório para Fazendo\" (sem dizer \"card\") também passa a ser entendido como pedido de mover.",
+        "O texto do rascunho não fica mais escondido atrás da barra de digitação: com um rascunho na tela, a conversa ganha espaço e a esfera encolhe.",
+        "O primeiro texto do rascunho não sai mais vazio: a instrução exige o texto quando o rascunho ainda não tem, e o servidor pede de novo, uma vez, se vier sem.",
+        "O teste de ponta a ponta passa pelo mesmo filtro da rota, para não deixar escapar esse tipo de falha de novo."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.7.0-cloudflare-pages.1",
       "data": "2026-10-18",

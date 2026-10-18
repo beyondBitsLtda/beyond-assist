@@ -667,6 +667,9 @@ Regras:
 - Primeira mensagem (rodadas 0, sem texto): pedido vago para um bom texto → perguntar; se já dá
   para escrever bem → atualizar com a primeira versão. Depois de 2 rodadas de perguntas sem texto,
   escreva uma versão com o que tiver.
+- Rascunho com "(ainda sem texto)": todo "atualizar" traz o campo descricao com o texto do card.
+  Dizer na fala que escreveu e não mandar o texto deixa o card vazio na tela.
+- Cada campo do JSON contém só o valor final: nada de comentário, dúvida ou raciocínio dentro dele.
 - "não" ou "sem prazo" respondendo a uma pergunta sua é resposta, não cancelamento.
 - Fatos só do contexto e da conversa. O que faltar vira marcador entre colchetes, como [preço].
 - O texto do card: português do Brasil, texto puro (sem #, sem **), parágrafos curtos, listas com

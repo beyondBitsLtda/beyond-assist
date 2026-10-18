@@ -195,7 +195,15 @@ async function abrirRascunho(d, pedido, { porId, quadros, quadroPadrao, conversa
 /** Uma rodada do rascunho: o modelo decide, e a resposta mostra o card como ficou. */
 async function continuarRascunho(r, mensagem, { conversa, quadros, buscar, primeira = false }) {
   const contexto = buscar ? await buscar(`${r.pedido} ${primeira ? "" : mensagem}`.trim()).catch(() => []) : [];
-  const d = await conduzirRascunho({ rascunho: r, mensagem, conversa, contexto, quadros, hoje: todayLabel() });
+  let d = await conduzirRascunho({ rascunho: r, mensagem, conversa, contexto, quadros, hoje: todayLabel() });
+  // "Montei a descrição" sem o campo descricao: visto em dois de dois testes no primeiro texto de
+  // um rascunho (18/10/2026) — a fala dizia que escreveu, e o card aparecia sem texto. Pede de
+  // novo, uma vez, lembrando do campo.
+  if (d.intent === "atualizar" && !String(d.descricao || "").trim() && !r.descricao) {
+    const lembrete = `${mensagem}\n\n(Lembrete do sistema: ao atualizar um rascunho ainda sem texto, devolva o texto completo do card no campo descricao.)`;
+    const de_novo = await conduzirRascunho({ rascunho: r, mensagem: lembrete, conversa, contexto, quadros, hoje: todayLabel() }).catch(() => null);
+    if (de_novo?.intent === "atualizar" && String(de_novo.descricao || "").trim()) d = de_novo;
+  }
 
   if (d.intent === "concluir") {
     const acao = pendenteValida(acaoDoRascunho(r));
