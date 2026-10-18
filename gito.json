@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.6.1-cloudflare-pages.1",
+  "versao": "0.7.0-elaborar-card.1",
   "atualizadoEm": "2026-10-18",
   "compilacao": {
-    "numero": 20,
+    "numero": 21,
     "data": "2026-10-18",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.7.0-elaborar-card.1",
+      "data": "2026-10-18",
+      "branch": "elaborar-card",
+      "tipo": "funcionalidade",
+      "resumo": "Montar um card conversando com a Lisa: ela pergunta o que falta, escreve, ajusta a cada pedido e só grava quando você aprova.",
+      "itens": [
+        "Pedir um card com texto (\"um card com um pitch de vendas\") ou dizer \"me ajuda a montar um card\" abre um rascunho em vez de gravar direto.",
+        "No rascunho, ela pergunta o que muda o texto (público, objetivo, tom, prazo), escreve uma versão e ajusta o que você pedir: \"deixa mais curto\", \"fala do preço\", \"põe prazo sexta\".",
+        "O card só é gravado no \"pode criar\" (ou \"pode salvar\", ao melhorar o texto de um card que já existe). \"Esquece esse card\" desiste sem gravar nada.",
+        "Uma pergunta de outro assunto no meio não perde o rascunho: ela responde e o card continua esperando.",
+        "Na tela, o rascunho aparece numa prévia do card, separada da fala; a voz fala só o que mudou, sem ler o texto inteiro.",
+        "Texto escrito na hora passa sempre pelo rascunho (substitui a confirmação com o texto inteiro da 0.6.1)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.6.1-cloudflare-pages.1",
       "data": "2026-10-18",

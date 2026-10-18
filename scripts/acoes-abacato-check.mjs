@@ -1,6 +1,8 @@
 // As regras das ações da Lisa no Abacato (src/lib/acoesNoAbacato.js). Sem rede nem banco.
 import {
   pareceAcao, respostaDeConfirmacao, candidatosDoPedido, pendenteValida, prazoEmPalavras, resumoDaAcao, relatoDaAcao, previaDoTexto, pedeTextoEscrito,
+  rascunhoValido, acaoDoRascunho, textoDoRascunho, falaSemRascunho, MARCA_DO_RASCUNHO, MAXIMO_DE_RODADAS,
+  querElaborar, tituloAceitavel,
 } from "../src/lib/acoesNoAbacato.js";
 
 let falhas = 0;
@@ -74,16 +76,38 @@ conferir("criar: título, destino, começo do texto e prazo, e pede confirmaçã
 const p = previaDoTexto(LONGO);
 conferir("a prévia corta numa palavra e termina em …", p.length <= 141 && p.endsWith("…") && !/\s…$/.test(p), p);
 conferir("texto curto não ganha …", previaDoTexto("ligar às 10h") === "ligar às 10h");
-const r1b = resumoDaAcao({ acao: "criar", titulo: "Pitch de vendas", destino: "Quarto de Guerra, coluna A fazer", descricao: LONGO }, { textoNovo: true });
-conferir("texto que ela acabou de escrever aparece inteiro antes do Confirma", r1b.startsWith("Escrevi este texto") && r1b.includes(LONGO) && r1b.endsWith("Confirma?"), r1b.slice(-90));
-const r1c = resumoDaAcao({ acao: "editar", card_titulo: "Pitch", descricao: LONGO }, { textoNovo: true });
-conferir("editar com texto novo também mostra o texto", r1c.includes(LONGO) && r1c.includes('"Pitch"'), r1c.slice(-70));
-const esc2 = pendenteValida({ type: "abacato_escolha", acao: "editar", candidatos: [{ id: "1", titulo: "A" }], mudancas: { descricao: "x", texto_novo: true, lixo: 1 } });
-conferir("escolha pendente lembra que o texto é novo (e só isso)", esc2.mudancas.texto_novo === true && !("lixo" in esc2.mudancas));
 const r2 = resumoDaAcao({ acao: "arquivar", card_titulo: "Teste" });
 conferir("excluir avisa que dá para recuperar", r2.includes("arquivado") && r2.endsWith("Confirma?"));
 const r3 = relatoDaAcao({ acao: "concluir", card_titulo: "Backup" }, { reprogramado: true, fim_em: "2026-10-22T02:59:59.000Z", titulo: "Backup" });
 conferir("concluir recorrente conta a próxima data", r3.includes("se repete"), r3);
+
+console.log("\nRascunho do card (montar conversando)\n");
+const rv = rascunhoValido({ type: "abacato_rascunho", acao: "criar", coluna_id: "c1", destino: "Quarto de Guerra, coluna A fazer", titulo: "Pitch", descricao: LONGO, pedido: "um pitch", rodadas: "2", lixo: 1 });
+conferir("rascunho vindo do navegador é aceito e limpo", rv?.type === "abacato_rascunho" && rv.rodadas === 2 && !("lixo" in rv));
+conferir("pendenteValida aceita o rascunho", pendenteValida(rv)?.type === "abacato_rascunho");
+conferir("rascunho de editar sem card é descartado", rascunhoValido({ type: "abacato_rascunho", acao: "editar" }) === null);
+conferir("rascunho de ação que não é texto é descartado", rascunhoValido({ type: "abacato_rascunho", acao: "arquivar", card_id: "1" }) === null);
+conferir("rodadas têm teto", rascunhoValido({ type: "abacato_rascunho", acao: "criar", rodadas: 9999 }).rodadas === MAXIMO_DE_RODADAS);
+const aprovado = pendenteValida(acaoDoRascunho(rv));
+conferir("rascunho aprovado vira a ação de criar, com o texto", aprovado?.acao === "criar" && aprovado.coluna_id === "c1" && aprovado.descricao === LONGO);
+conferir("rascunho sem título não vira ação (ainda falta)", pendenteValida(acaoDoRascunho({ ...rv, titulo: undefined })) === null);
+const ed = pendenteValida(acaoDoRascunho(rascunhoValido({ type: "abacato_rascunho", acao: "editar", card_id: "k9", card_titulo: "Pitch", titulo: "Pitch", descricao: "novo" })));
+conferir("rascunho de editar vira editar no card certo", ed?.acao === "editar" && ed.card_id === "k9" && ed.descricao === "novo");
+const tela = textoDoRascunho({ ...rv, prazo: "2026-10-24" }, "Deixei mais curto. Posso criar?");
+conferir("a resposta traz a fala e o card inteiro na tela", tela.startsWith("Deixei mais curto") && tela.includes(MARCA_DO_RASCUNHO) && tela.includes("Título: Pitch") && tela.includes("24 de outubro") && tela.endsWith(LONGO));
+conferir("a voz fala só a fala, não o card", falaSemRascunho(tela) === "Deixei mais curto. Posso criar?");
+conferir("resposta comum é falada inteira", falaSemRascunho("Bom dia! Hoje tem sol.") === "Bom dia! Hoje tem sol.");
+conferir("numa pergunta, o card não aparece", textoDoRascunho(rv, "Para quem é o pitch?", { mostrar: false }) === "Para quem é o pitch?");
+const esc3 = pendenteValida({ type: "abacato_escolha", acao: "editar", candidatos: [{ id: "1", titulo: "A" }], mudancas: { rascunho: true, pedido: "melhora o texto", lixo: 1 } });
+conferir("escolha de card lembra que vai para um rascunho", esc3.mudancas.rascunho === true && esc3.mudancas.pedido === "melhora o texto" && !("lixo" in esc3.mudancas));
+for (const f of ["me ajuda a montar um card para a reunião com o contador", "vamos montar juntos um card da viagem", "monta comigo o card do lançamento", "quero criar um card, me pergunta o que precisa"]) {
+  conferir(`montar junto: "${f}"`, querElaborar(f));
+}
+for (const f of ["cria um card de ligar para o contador", "me ajuda com o backup"]) conferir(`não é montar junto: "${f}"`, !querElaborar(f));
+conferir("título curto serve", tituloAceitavel("Pitch de vendas para imobiliárias"));
+const lixo = "Pitch de vendas para a Beyond - Imobiliárias pequenas (versão curta) Ferreira e Lima Ltda. - 2026-10-23T23:59:00.000Z - Pitch";
+conferir("título enorme com data de máquina não serve (o do teste de 18/10)", !tituloAceitavel(lixo));
+conferir("título vazio não serve", !tituloAceitavel("  ") && !tituloAceitavel(undefined));
 
 console.log(falhas ? `\n${falhas} falha(s).\n` : "\nTudo certo.\n");
 process.exit(falhas ? 1 : 0);

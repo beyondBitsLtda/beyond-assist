@@ -1,7 +1,7 @@
 import {
   detectDateRange, buildPrompt, todayLabel, withPersona, withContextDocs, retrieve,
 } from "@/lib/rag.js";
-import { chatStream, detectTrelloAction, escreverTextoDoCard } from "@/lib/gemini.js";
+import { chatStream, detectTrelloAction } from "@/lib/gemini.js";
 import { buildActionProposal, buildClarifyPrompt, executeAction } from "@/lib/assistantActions.js";
 import { hasDelpTasks, getDelpTasksForContext } from "@/lib/delpTasks.js";
 import { resolveScope } from "@/lib/scopeResolver.js";
@@ -166,18 +166,14 @@ export async function POST(req) {
                 history,
                 pendente,
                 quadroPadrao: scope?.mode === "panel" && scope?.board ? scope.board : null,
-                // "cria um card com um pitch de vendas": escreve com o que ela sabe do assunto
-                escrever: async (pedido, conversa) => escreverTextoDoCard({
-                  pedido,
-                  conversa,
-                  hoje: todayLabel(),
-                  contexto: await retrieve(pedido, { topK: 12, minSim: 0.25 }).catch(() => []),
-                }),
+                // o rascunho de um card ("um pitch de vendas") é escrito com o que ela sabe do assunto
+                buscar: (texto) => retrieve(texto, { topK: 12, minSim: 0.25 }),
               });
             } catch (err) {
               // O pedido de ação falhar não pode derrubar a conversa: segue para a resposta normal,
               // mas avisa no registro o motivo de verdade.
-              send(controller, "action", { pending: null, debug: true, detectError: String(err?.message || err) });
+              // Um rascunho aberto não se perde por uma falha (Gemini sobrecarregado): fica pendente.
+              send(controller, "action", { pending: pendente?.type === "abacato_rascunho" ? pendente : null, debug: true, detectError: String(err?.message || err) });
             }
             if (r.respondeu) {
               send(controller, "context", r.cards || []);

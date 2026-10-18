@@ -488,7 +488,8 @@ Regras:
  * "Cria um card com um pitch de vendas" é OUTRA coisa: pede um texto que ainda não existe. Antes
  * só havia as duas saídas acima, e o modelo colou a última resposta (sobre outro assunto) na
  * descrição — visto em 16/10/2026. Agora ele devolve escrever_descricao com o que redigir, e o
- * servidor escreve o texto (escreverTextoDoCard) antes de pedir a confirmação.
+ * card vira um RASCUNHO montado na conversa (conduzirRascunho, logo abaixo). "Me ajuda a montar
+ * um card" também abre o rascunho (elaborar=true).
  */
 export async function detectarAcaoNoAbacato({ pergunta, hoje, conversa = "", ultimaResposta = "", candidatos = [], quadros = [], quadroPadrao = null, pendente = null }) {
   const blocoCards = candidatos.length
@@ -538,7 +539,8 @@ intent:
       2. o usuário pede para você REDIGIR um texto novo ("com um pitch de vendas para a Beyond",
          "escreve um roteiro de reunião", "coloca um passo a passo de como publicar") → NÃO
          escreva nada em descricao; ponha em escrever_descricao o que deve ser escrito, com todos
-         os detalhes que ele deu (assunto, público, tom, tamanho);
+         os detalhes que ele deu (assunto, público, tom, tamanho). O texto é montado depois,
+         conversando com ele;
       3. o usuário se refere a um texto que a Lisa JÁ escreveu nesta conversa ("esse texto", "o
          e-mail que você fez", "o que você acabou de falar") E a ÚLTIMA RESPOSTA é esse texto →
          marque usar_ultima_resposta=true e NÃO copie em descricao.
@@ -546,9 +548,12 @@ intent:
     passo a passo" é o caso 2: o card leva esse texto escrito na descrição, não só no título.
     Na dúvida entre 2 e 3, é 2. Nunca use a última resposta só porque ela existe: se ela fala
     de outro assunto, ela não entra no card. Invente sempre um titulo curto a partir do assunto.
+    Se ele quer montar o card COM você, conversando ("me ajuda a montar um card", "vamos elaborar
+    um card de...", "quero criar um card, me pergunta o que precisa"), marque elaborar=true (o
+    titulo pode ser provisório).
   • editar: card_id e só os campos que mudam (titulo, descricao e/ou prazo). prazo="remover" tira o
     prazo. A descrição segue as mesmas três regras de criar (descricao, escrever_descricao ou
-    usar_ultima_resposta).
+    usar_ultima_resposta), e "vamos melhorar o texto do card X" também é elaborar=true.
   • concluir / reabrir / arquivar: card_id.
   • mover: card_id e coluna_id de destino (mesmo quadro do card).
   prazo: "AAAA-MM-DD", ou "AAAA-MM-DDTHH:MM" se o usuário disse a hora, calculado a partir de hoje
@@ -584,6 +589,7 @@ Use só ids que aparecem acima. Nunca invente ids.`;
               prazo: { type: "STRING" },
               usar_ultima_resposta: { type: "BOOLEAN" },
               escrever_descricao: { type: "STRING" },
+              elaborar: { type: "BOOLEAN" },
               candidatos_ids: { type: "ARRAY", items: { type: "STRING" } },
             },
             required: ["intent"],
@@ -603,32 +609,72 @@ Use só ids que aparecem acima. Nunca invente ids.`;
 }
 
 /**
- * Redige o texto que vai na descrição de um card ("um pitch de vendas para a Beyond"), com o que
- * a Lisa sabe (`contexto`: trechos do índice — quadros e Beyond Brain) e a conversa recente.
- * Devolve só o texto, pronto para colar: sem "Claro! Aqui está", sem markdown pesado.
+ * Conduz o RASCUNHO de um card — o card montado conversando (ver acoesNoAbacato.js). A cada
+ * mensagem decide: perguntar o que falta, atualizar o texto, gravar (aprovado), desistir, ou
+ * "fora" (a mensagem é outro assunto; o rascunho fica guardado). Escreve com o que a Lisa sabe
+ * (`contexto`: trechos do índice — quadros e Beyond Brain).
  */
-export async function escreverTextoDoCard({ pedido, contexto = [], conversa = "", hoje = "" }) {
+export async function conduzirRascunho({ rascunho, mensagem, conversa = "", contexto = [], quadros = [], hoje = "" }) {
+  const r = rascunho;
   const blocoContexto = contexto.length
     ? contexto.map((m, i) => `[#${i + 1} · ${m.source} · ${m.board}] ${m.title}\n${String(m.content || "").slice(0, 1500)}`).join("\n\n---\n\n")
     : "(nada encontrado no índice)";
+  const blocoQuadros = quadros.length
+    ? quadros.map((q) => `- quadro "${q.nome}": ${q.colunas.map((c) => `"${c.nome}" (coluna_id=${c.id})`).join(", ") || "sem colunas"}`).join("\n")
+    : "(nenhum quadro)";
   const prompt = `DATA DE HOJE: ${hoje}
 
-O QUE ESCREVER:
-${pedido}
+O PEDIDO QUE ABRIU O RASCUNHO:
+${r.pedido || "(não registrado)"}
+
+RASCUNHO ATUAL (${r.acao === "criar" ? "card novo" : `editando o card "${r.card_titulo || ""}"`}; rodadas de conversa até agora: ${r.rodadas}):
+Título: ${r.titulo || "(sem título ainda)"}
+${r.acao === "criar" ? `Onde: ${r.destino || "(não definido)"}\n` : ""}Prazo: ${r.prazo || "(sem prazo)"}
+Descrição:
+${r.descricao || "(ainda sem texto)"}
+
+QUADROS E COLUNAS DO ABACATO:
+${blocoQuadros}
 
 O QUE A LISA SABE SOBRE O ASSUNTO (quadros e notas do usuário):
 ${blocoContexto}
 
-CONVERSA RECENTE:
-${conversa || "(sem conversa)"}`;
-  const systemInstruction = `Você é a Lisa e vai escrever o texto da DESCRIÇÃO de um card no Abacato, o quadro
-de tarefas do usuário. Escreva em português do Brasil exatamente o que foi pedido, pronto para usar.
-- Use os fatos do contexto acima (nome da empresa, produtos, clientes, números). Não invente fatos:
-  onde faltar um dado importante, deixe um marcador entre colchetes, como [número de clientes].
-- Comece direto pelo texto. Nada de "Claro!", "Aqui está" ou comentário sobre o pedido.
-- Formatação simples, que funcione em texto puro: parágrafos curtos, listas com "- " se ajudarem.
-  Sem títulos com #, sem negrito com **.
-- Tamanho: o que o pedido pedir; sem indicação, entre 80 e 250 palavras.`;
+CONVERSA ATÉ AGORA:
+${conversa || "(sem conversa anterior)"}
+
+MENSAGEM DO USUÁRIO:
+${mensagem}`;
+
+  const systemInstruction = `Você é a Lisa montando um card do Abacato JUNTO com o usuário, numa conversa por texto
+ou por voz. O card só é gravado quando ele aprovar. A cada mensagem dele, escolha o intent:
+
+- "perguntar": falta informação que muda o texto (para quem é, objetivo, o que destacar, tom,
+  tamanho, prazo). Faça de 1 a 3 perguntas curtas, numa fala natural. Não pergunte o que dá para
+  deduzir do contexto ou da conversa. Não mexa no rascunho.
+- "atualizar": já dá para escrever, ele respondeu suas perguntas, ou pediu uma mudança. Devolva SÓ
+  os campos que mudaram: descricao sempre INTEIRA (o texto completo novo, não só o trecho mudado),
+  prazo ("AAAA-MM-DD", ou "AAAA-MM-DDTHH:MM" com hora; "remover" tira o prazo), coluna_id (só ids
+  da lista, e só em card novo) e titulo — este SÓ se ele pedir outro título ou se ainda não houver
+  um: curto (até 80 caracteres), sem data, sem nome de cliente que ele não citou. Em fala: 1 ou 2 frases dizendo o que você fez e, se valer,
+  UMA sugestão ou pergunta para melhorar; termine perguntando se quer mudar mais algo ou se pode
+  ${r.acao === "criar" ? "criar" : "salvar"}.
+- "concluir": ele aprovou ("pode criar", "tá ótimo", "salva", "manda", "isso, cria"). Se na mesma
+  mensagem ele pedir mais um ajuste, é "atualizar". fala vazia.
+- "cancelar": ele desistiu do card ("esquece o card", "deixa pra lá", "cancela").
+- "fora": a mensagem não tem a ver com o card (outra pergunta, outro assunto). fala vazia.
+
+Regras:
+- Primeira mensagem (rodadas 0, sem texto): pedido vago para um bom texto → perguntar; se já dá
+  para escrever bem → atualizar com a primeira versão. Depois de 2 rodadas de perguntas sem texto,
+  escreva uma versão com o que tiver.
+- "não" ou "sem prazo" respondendo a uma pergunta sua é resposta, não cancelamento.
+- Fatos só do contexto e da conversa. O que faltar vira marcador entre colchetes, como [preço].
+- O texto do card: português do Brasil, texto puro (sem #, sem **), parágrafos curtos, listas com
+  "- " quando ajudarem. Sem "Claro!" nem comentário sobre o pedido dentro do texto.
+- Card de tarefa simples (não pede texto): a descrição pode ficar curta ou vazia.
+- A fala é lida em voz alta: frases curtas, sem listas, e sem repetir o texto do card (ele aparece
+  na tela). Se ele pedir para ouvir o texto ("lê pra mim como ficou"), use "perguntar" e ponha o
+  texto na fala.`;
 
   const res = await withTransientRetry(
     CHAT_MODEL,
@@ -636,11 +682,34 @@ de tarefas do usuário. Escreva em português do Brasil exatamente o que foi ped
       client.models.generateContent({
         model: modelo,
         contents: prompt,
-        config: { systemInstruction, ...(abortSignal ? { abortSignal } : {}) },
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              intent: { type: "STRING", enum: ["perguntar", "atualizar", "concluir", "cancelar", "fora"] },
+              fala: { type: "STRING" },
+              titulo: { type: "STRING" },
+              descricao: { type: "STRING" },
+              prazo: { type: "STRING" },
+              coluna_id: { type: "STRING" },
+            },
+            required: ["intent", "fala"], // sem fala, o ajuste vinha mudo ("Ajustei.")
+          },
+          ...(abortSignal ? { abortSignal } : {}),
+        },
       }),
     { attempts: 2, delayMs: 800 }
   );
-  return String(res.text || "").replace(/\*\*/g, "").trim();
+  try {
+    const d = JSON.parse(res.text);
+    if (!d || typeof d !== "object") return { intent: "fora" };
+    if (typeof d.descricao === "string") d.descricao = d.descricao.replace(/\*\*/g, "").trim();
+    return d;
+  } catch {
+    return { intent: "fora" };
+  }
 }
 
 /**
