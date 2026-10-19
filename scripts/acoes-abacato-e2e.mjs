@@ -10,7 +10,7 @@ const raiz = process.cwd();
 const imp = (p) => import(pathToFileURL(path.join(raiz, p)).href);
 const { tratarAcaoNoAbacato } = await imp("src/lib/fluxoDeAcoesNoAbacato.js");
 const { esquecerCache } = await imp("src/lib/liveQuadros.js");
-const { MARCA_DO_RASCUNHO, falaSemRascunho } = await imp("src/lib/acoesNoAbacato.js");
+const { MARCA_DO_RASCUNHO, falaSemRascunho, pareceAcao, pendenteValida } = await imp("src/lib/acoesNoAbacato.js");
 const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
 let falhas = 0;
@@ -27,9 +27,13 @@ const EMAIL = "Assunto: Indicação da equipe de atendimento sobre a presença d
 const SOBRE_A_BEYOND = [{ source: "BEYOND_BRAIN", board: "Notas", title: "Beyond Bits", content: "A Beyond Bits desenvolve sistemas sob medida para pequenas empresas: assistentes com IA (a Lisa), quadros de tarefas (Abacato) e automações. Atende imobiliárias e prestadores de serviço." }];
 const buscar = async () => SOBRE_A_BEYOND;
 
+// Pelo MESMO caminho de /api/ask: o filtro pareceAcao vem antes do módulo. Sem ele, o teste
+// passava com "me ajuda a montar um card" enquanto a Lisa de verdade nem chegava ao módulo.
 async function rodar(pergunta, { history = {}, pendente = null } = {}) {
   esquecerCache();
-  return tratarAcaoNoAbacato({ pergunta, history, pendente, quadroPadrao: NOME, buscar });
+  const valida = pendenteValida(pendente);
+  if (!pareceAcao(pergunta, !!valida)) return { respondeu: false, barradoNoFiltro: true };
+  return tratarAcaoNoAbacato({ pergunta, history, pendente: valida, quadroPadrao: NOME, buscar });
 }
 
 // Uma conversa de várias mensagens, como o navegador faz: guarda as falas e a ação pendente

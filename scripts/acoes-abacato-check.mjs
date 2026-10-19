@@ -21,8 +21,18 @@ for (const f of [
   "move a tarefa do client id para Fazendo",
   "renomeia esse card para Publicar comentários",
   "adiciona uma tarefa de ligar para o contador amanhã",
+  // os do rascunho — passavam no módulo, mas o filtro de entrada barrava (18/10/2026)
+  "me ajuda a montar um card de retorno da visita da família Ribeiro",
+  "monta comigo o card do lançamento",
+  "vamos elaborar um card para a reunião",
+  "escreve um pitch de vendas num card novo",
+  "vamos melhorar a descrição do card Relatório mensal de vendas",
+  "faz um card com o roteiro da visita",
+  // mover sem dizer "card" — o filtro barrava (visto no teste de ponta a ponta, 18/10/2026)
+  "move o relatório mensal de vendas para Fazendo",
+  "passa a proposta da Vila Nova para Fechado",
 ]) conferir(`ação: "${f}"`, pareceAcao(f));
-for (const f of ["quais tarefas eu tenho hoje?", "me fala do card de backup", "o que você acha do meu dia?", "bom dia Lisa"]) {
+for (const f of ["quais tarefas eu tenho hoje?", "me fala do card de backup", "o que você acha do meu dia?", "bom dia Lisa", "o que mudou no mercado de imóveis?"]) {
   conferir(`não é ação: "${f}"`, !pareceAcao(f));
 }
 conferir("com ação pendente, qualquer resposta vale", pareceAcao("o segundo", true));

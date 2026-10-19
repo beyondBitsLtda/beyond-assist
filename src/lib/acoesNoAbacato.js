@@ -10,14 +10,21 @@ export const ACOES = ["criar", "editar", "concluir", "reabrir", "mover", "arquiv
 
 // Verbos e palavras de quem está pedindo para MEXER num card. Serve só para decidir se vale
 // gastar a chamada que entende o pedido — quem decide de verdade é o modelo.
-const PEDIDO = /\b(cri[ae]r?|cri[ae]|adicion\w*|inclu[ia]\w*|anot[ae]\w*|registr\w*|coloc\w*|bot[ae]|p[õo]e|p[ôo]r|renome\w*|t[íi]tulo|descri[cç][ãa]o|edit\w*|alter\w*|atualiz\w*|mud[ae]\w*|troc[ae]\w*|arquiv\w*|apag\w*|exclu\w*|remov\w*|delet\w*|tir[ae]\w*|conclu\w*|finaliz\w*|termin\w*|reabr\w*|desmarc\w*|marc[ae]\w*|mov[ae]\w*|pass[ae]|prazo|adi[ae]\w*|remarc\w*|reprogram\w*|vencimento)\b/i;
+//
+// Os de MONTAR o card (montar, elaborar, escrever, redigir, preparar, fazer, melhorar) entraram
+// com o rascunho: sem eles, "me ajuda a montar um card" nem chegava ao módulo de ações e virava
+// conversa comum — o teste de ponta a ponta chamava o módulo direto e não viu (18/10/2026).
+const PEDIDO = /\b(cri[ae]r?|cri[ae]|adicion\w*|inclu[ia]\w*|anot[ae]\w*|registr\w*|coloc\w*|bot[ae]|p[õo]e|p[ôo]r|renome\w*|t[íi]tulo|descri[cç][ãa]o|edit\w*|alter\w*|atualiz\w*|mud[ae]\w*|troc[ae]\w*|arquiv\w*|apag\w*|exclu\w*|remov\w*|delet\w*|tir[ae]\w*|conclu\w*|finaliz\w*|termin\w*|reabr\w*|desmarc\w*|marc[ae]\w*|mov[ae]\w*|pass[ae]|prazo|adi[ae]\w*|remarc\w*|reprogram\w*|vencimento|mont[ae]\w*|elabor\w*|escrev\w*|redig\w*|prepar\w*|fa[zç]\w*|melhor[ae]\w*)\b/i;
 const OBJETO = /\b(card|cards|cart[ãa]o|tarefa|tarefas|abacato|quadro|coluna|lista|prazo|item)\b/i;
+// "move o relatório mensal para Fazendo": quem move algo PARA algum lugar está mexendo num card,
+// mesmo sem dizer "card" — e não dizia nenhuma palavra de OBJETO, então nem chegava ao módulo.
+const MOVER_PARA = /\b(mov[ae]\w*|pass[ae])\b.+\bpara\b/i;
 
 /** Vale perguntar ao modelo se isto é um pedido de ação? (Sempre, se há uma ação pendente.) */
 export function pareceAcao(texto, haPendente = false) {
   if (haPendente) return true;
   const t = String(texto || "");
-  return PEDIDO.test(t) && OBJETO.test(t);
+  return (PEDIDO.test(t) && OBJETO.test(t)) || MOVER_PARA.test(t);
 }
 
 const sim = /^\s*(sim|s|pode|pode sim|pode fazer|pode criar|confirmo|confirma|confirmado|isso|isso mesmo|exato|claro|beleza|ok|okay|fechado|manda|faz|faça|vai|bora|positivo|certo)\b/i;

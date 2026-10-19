@@ -198,6 +198,20 @@ const CASTIGO_DE_SOBRECARGA_MS = 5_000;
  */
 const TETO_DA_TENTATIVA_MS = 12_000;
 const PAUSA_DO_MODELO_MS = 3 * 60_000;
+
+/**
+ * O TETO DE 12s É PARA COMEÇAR A RESPONDER — e só o chat começa cedo.
+ *
+ * No chat (streaming), 12s é o tempo para o PRIMEIRO pedaço chegar. Numa chamada sem streaming,
+ * o mesmo teto vale para a resposta INTEIRA — e a Lisa Code escrevendo um index.html, o plano
+ * de uma mudança de código ou o mapa de arquitetura levam bem mais que isso. Visto em 19/10/2026:
+ * toda edição grande da extensão estourava os 12s, contava como "sobrecarga", pausava o modelo
+ * do chat por 3 min e terminava em "UNAVAILABLE: alta demanda" — com 20 chaves livres no painel.
+ *
+ * As tarefas de resposta longa passam tetoMs: TETO_LONGO_MS. Estourar ESSE teto não pausa o
+ * modelo para os outros (a demora é da tarefa, não do Google) e o erro diz o que foi.
+ */
+const TETO_LONGO_MS = 75_000;
 const modeloPausadoAte = new Map();
 
 /** Os modelos de chat na ordem em que vale tentar AGORA: os pausados vão para o fim. */
@@ -221,7 +235,7 @@ function comTeto(promessa, controlador, ms) {
   return Promise.race([promessa, teto]).finally(() => clearTimeout(relogio));
 }
 
-async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, computeDelay = null, paraIngestao = false } = {}) {
+async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, computeDelay = null, paraIngestao = false, tetoMs = TETO_DA_TENTATIVA_MS } = {}) {
   if (!KEYS.length) {
     throw new Error(
       "GEMINI_API_KEY (ou GEMINI_API_KEYS) não configurada. " +
@@ -246,7 +260,7 @@ async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, com
       try {
         const controlador = ehChat ? new AbortController() : null;
         const result = ehChat
-          ? await comTeto(fn(client, modelo, controlador.signal), controlador, TETO_DA_TENTATIVA_MS)
+          ? await comTeto(fn(client, modelo, controlador.signal), controlador, tetoMs)
           : await fn(client, modelo);
         await markOk(index, modelo);
         modeloPausadoAte.delete(modelo);
@@ -265,8 +279,16 @@ async function withTransientRetry(model, fn, { attempts = 3, delayMs = 1200, com
           error: err?.message || err,
         });
         ultimoErro = rewriteError(err, index, classified);
+        // Estourou o teto: o erro diz isso, e não "alta demanda" — são problemas diferentes.
+        if (err?.teto) {
+          ultimoErro = new Error(`TEMPO: o Gemini não terminou de responder em ${Math.round(tetoMs / 1000)}s (tentei outras chaves e modelos). Tente de novo, ou peça uma parte menor de cada vez.`);
+          ultimoErro.code = "TEMPO";
+          ultimoErro.keyLabel = keyLabelFor(index);
+        }
         if (sobrecarga && ++sobrecargas >= SOBRECARGAS_ANTES_DA_RESERVA && haReserva) {
-          if (ehChat) modeloPausadoAte.set(modelo, Date.now() + PAUSA_DO_MODELO_MS);
+          // Uma tarefa longa que demorou não é o modelo caído: não pausa o modelo do chat.
+          const demoraDaTarefa = err?.teto && tetoMs > TETO_DA_TENTATIVA_MS;
+          if (ehChat && !demoraDaTarefa) modeloPausadoAte.set(modelo, Date.now() + PAUSA_DO_MODELO_MS);
           break; // próximo modelo
         }
         if (classified.code === "UNSUPPORTED" && haReserva) break; // modelo desligado neste projeto
@@ -667,6 +689,9 @@ Regras:
 - Primeira mensagem (rodadas 0, sem texto): pedido vago para um bom texto → perguntar; se já dá
   para escrever bem → atualizar com a primeira versão. Depois de 2 rodadas de perguntas sem texto,
   escreva uma versão com o que tiver.
+- Rascunho com "(ainda sem texto)": todo "atualizar" traz o campo descricao com o texto do card.
+  Dizer na fala que escreveu e não mandar o texto deixa o card vazio na tela.
+- Cada campo do JSON contém só o valor final: nada de comentário, dúvida ou raciocínio dentro dele.
 - "não" ou "sem prazo" respondendo a uma pergunta sua é resposta, não cancelamento.
 - Fatos só do contexto e da conversa. O que faltar vira marcador entre colchetes, como [preço].
 - O texto do card: português do Brasil, texto puro (sem #, sem **), parágrafos curtos, listas com
@@ -821,7 +846,7 @@ Regras estritas:
           },
         },
       }),
-    { attempts: 2, delayMs: 800 }
+    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
   );
 
   try {
@@ -890,7 +915,7 @@ Regras:
           },
         },
       }),
-    { attempts: 2, delayMs: 600 }
+    { attempts: 2, delayMs: 600, tetoMs: TETO_LONGO_MS }
   );
 
   try {
@@ -1024,7 +1049,7 @@ arquivos e da pasta — convenções comuns de projeto (ex.: "api" = rotas de ba
           responseSchema: { type: "OBJECT", properties: { summary: { type: "STRING" } }, required: ["summary"] },
         },
       }),
-    { attempts: 2, delayMs: 600 }
+    { attempts: 2, delayMs: 600, tetoMs: TETO_LONGO_MS }
   );
 
   try {
@@ -1059,7 +1084,7 @@ centrais pelo nome. Tom direto, técnico, em português.`;
         contents: prompt,
         config: { systemInstruction: "Você escreve a introdução de uma documentação técnica de arquitetura de software, em português, direto ao ponto." },
       }),
-    { attempts: 2, delayMs: 600 }
+    { attempts: 2, delayMs: 600, tetoMs: TETO_LONGO_MS }
   );
   return (res.text || "").trim();
 }
@@ -1089,7 +1114,7 @@ sintaxe óbvia linha a linha; foque no PAPEL do arquivo no sistema como um todo.
         contents: prompt,
         config: { systemInstruction: "Você explica trechos de código-chave de um repositório pra documentação técnica, em português — direto, específico, sem parafrasear sintaxe óbvia." },
       }),
-    { attempts: 2, delayMs: 600 }
+    { attempts: 2, delayMs: 600, tetoMs: TETO_LONGO_MS }
   );
   return (res.text || "").trim();
 }
@@ -1145,7 +1170,7 @@ Com base nisso, produza:
           },
         },
       }),
-    { attempts: 2, delayMs: 800 }
+    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
   );
 
   try {
@@ -1524,7 +1549,7 @@ avaliar o critério.`;
           },
         },
       }),
-    { attempts: 2, delayMs: 600 }
+    { attempts: 2, delayMs: 600, tetoMs: TETO_LONGO_MS }
   );
 
   try {
@@ -1842,13 +1867,13 @@ export async function runLisaCodeTurn(contents, { provedor = "gemini" } = {}) {
 
   const res = await withTransientRetry(
     CHAT_MODEL,
-    (client, modelo) =>
+    (client, modelo, abortSignal) =>
       client.models.generateContent({
         model: modelo,
         contents,
-        config: { systemInstruction: LISA_CODE_INSTRUCTION, tools: LISA_CODE_TOOLS },
+        config: { systemInstruction: LISA_CODE_INSTRUCTION, tools: LISA_CODE_TOOLS, ...(abortSignal ? { abortSignal } : {}) },
       }),
-    { attempts: 2, delayMs: 800 }
+    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
   );
   const candidate = res.candidates?.[0];
   return candidate?.content || { role: "model", parts: [{ text: res.text || "" }] };
@@ -1977,7 +2002,7 @@ export async function proposePairFeature({ repo, level, fileList = [], descripti
           },
         },
       }),
-    { attempts: 2, delayMs: 800 }
+    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
   );
   const parsed = JSON.parse(res.text);
   if (!parsed?.feature || !parsed?.branch) throw new Error("o modelo não devolveu feature/branch");
@@ -2020,7 +2045,7 @@ export async function editCodeWithLisa({ path, content, instruction }) {
           },
         },
       }),
-    { attempts: 2, delayMs: 800 }
+    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
   );
   const parsed = JSON.parse(res.text);
   if (typeof parsed?.newContent !== "string") throw new Error("o modelo não devolveu o conteúdo do arquivo");
