@@ -30,7 +30,10 @@ interface Content {
   parts: Part[];
 }
 
-const MAX_TOOL_ROUNDS = 10; // trava de segurança — evita loop infinito se o modelo insistir em chamar função (folga extra pro report_progress não roubar rodada de ferramenta de verdade)
+// Trava de segurança — evita loop infinito se o modelo insistir em chamar função. Era 10: uma
+// tarefa comum (ler app.js, style.css e index.html, editar, conferir) batia nela e parava no
+// meio (19/10/2026). 25 dá folga para o trabalho e ainda corta um laço de verdade.
+const MAX_TOOL_ROUNDS = 25;
 
 export type ChatEvent =
   | { type: "text"; text: string }
@@ -712,6 +715,6 @@ export class LisaClient {
       this.contents.push({ role: "user", parts: responseParts });
     }
 
-    yield { type: "error", message: "muitas chamadas de ferramenta em sequência — parei por segurança." };
+    yield { type: "error", message: `fiz ${MAX_TOOL_ROUNDS} passos seguidos e parei por segurança. Diga "siga" para eu continuar de onde parei.` };
   }
 }

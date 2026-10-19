@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.7.1-rascunho-ajustes.1",
-  "atualizadoEm": "2026-10-18",
+  "versao": "0.7.1-teto-longo.1",
+  "atualizadoEm": "2026-10-19",
   "compilacao": {
-    "numero": 23,
-    "data": "2026-10-18",
+    "numero": 24,
+    "data": "2026-10-19",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.7.1-teto-longo.1",
+      "data": "2026-10-19",
+      "branch": "teto-longo",
+      "tipo": "correcao",
+      "resumo": "A extensão Lisa Code parava com \"alta demanda\" em toda edição grande: o limite de 12s do chat valia também para tarefas que precisam de mais tempo.",
+      "itens": [
+        "Tarefas de resposta longa (Lisa Code, planejar e editar código, mapa de arquitetura, avaliação de testes) passam a ter até 75s por tentativa; o chat continua com 12s para começar a responder.",
+        "Quando uma tarefa longa demora, o modelo do chat não fica mais pausado por 3 minutos para todo mundo.",
+        "O erro de demora agora diz \"o Gemini não terminou de responder em Ns\", em vez de \"alta demanda\".",
+        "A chamada da Lisa Code que estoura o tempo é cancelada de verdade (não fica gastando cota).",
+        "Extensão Lisa Code 0.5.2: a trava de passos seguidos subiu de 10 para 25, e a mensagem diz para responder \"siga\" para continuar."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.7.1-rascunho-ajustes.1",
       "data": "2026-10-18",
