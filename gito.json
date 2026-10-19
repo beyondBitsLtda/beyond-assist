@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.7.1-teto-longo.1",
+  "versao": "0.7.1-cloudflare-pages.1",
   "atualizadoEm": "2026-10-19",
   "compilacao": {
-    "numero": 24,
+    "numero": 25,
     "data": "2026-10-19",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.7.1-cloudflare-pages.1",
+      "data": "2026-10-19",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Correções do rascunho do card e do tempo das tarefas longas (branches rascunho-ajustes e teto-longo) juntam na cloudflare-pages e vão ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.7.1-rascunho-ajustes.1 e da 0.7.1-teto-longo.1: \"me ajuda a montar um card\" funciona, o rascunho aparece inteiro e com texto, e a Lisa Code tem até 75s por tentativa sem pausar o chat."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.7.1-teto-longo.1",
       "data": "2026-10-19",
