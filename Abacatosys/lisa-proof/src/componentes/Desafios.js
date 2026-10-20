@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { criar } from "@/lib/api.js";
 import { formatarDia } from "@/dominio/datas.js";
 import { NOTA_DE_APROVACAO } from "@/dominio/pratica.js";
 import Explicacao, { emLinha } from "./Explicacao.js";
+import Codigo from "./codigo/Codigo.js";
+import EditorDeCodigo from "./codigo/EditorDeCodigo.js";
 import Neuro, { reagir, comemorar, celebrar } from "./Neuro.js";
 import { Barra, useAviso } from "./Pecas.js";
 
@@ -91,7 +93,8 @@ export function Quiz({ desafio }) {
             {perguntas.map((p, i) => (
               <div key={i} className="pf-cartao quiz__revisao">
                 <p className="pf-campo__rotulo">Pergunta {i + 1} · {p.escolha === p.correta ? "✓ acertou" : "✗ errou"}</p>
-                <Explicacao texto={p.pergunta} className="quiz__pergunta" />
+                <Explicacao texto={p.pergunta} className="quiz__pergunta" linguagem={p.linguagem || desafio.tema} />
+                {p.codigo && <Codigo texto={p.codigo} linguagem={p.linguagem || desafio.tema} />}
                 <ul className="quiz__lista-revisao">
                   {p.opcoes.map((o, j) => (
                     <li key={j} className={j === p.correta ? "quiz__ok" : j === p.escolha ? "quiz__erro" : ""}>
@@ -120,7 +123,14 @@ export function Quiz({ desafio }) {
 
       <div className="quiz__neuro"><Neuro humor="pensando" tamanho={84} ouvir lado="direita" /></div>
 
-      <Explicacao texto={p.pergunta} className="quiz__pergunta" />
+      <Explicacao texto={p.pergunta} className="quiz__pergunta" linguagem={p.linguagem || desafio.tema} />
+      {p.codigo && <Codigo texto={p.codigo} linguagem={p.linguagem || desafio.tema} />}
+      {p.faltouCodigo && (
+        <div className="pf-aviso pf-aviso--erro">
+          O código desta pergunta não chegou — foi uma falha da Lisa ao montar este quiz (já corrigida
+          para os próximos). Se quiser, use “Reportar problema”.
+        </div>
+      )}
 
       <div className="quiz__opcoes" role="group" aria-label="Opções">
         {p.opcoes.map((o, j) => {
@@ -197,12 +207,13 @@ export function Avaliacao({ avaliacao, nota }) {
   );
 }
 
-function Entrega({ desafio, campo, rotulo, aoEnviar, conteudoInicial, placeholder, multilinha }) {
+function Entrega({ desafio, campo, rotulo, aoEnviar, conteudoInicial, placeholder, multilinha, linguagem }) {
   const [valor, setValor] = useState(conteudoInicial || "");
   const [estado, setEstado] = useState({ status: desafio.status, nota: desafio.nota, tentativas: desafio.tentativas, avaliacao: desafio.avaliacao });
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [Aviso, avisar] = useAviso();
+  const formulario = useRef(null);
 
   const encerrado = estado.status === "concluido";
   const restantes = Math.max(0, (desafio.maxTentativas || 0) - estado.tentativas);
@@ -227,30 +238,27 @@ function Entrega({ desafio, campo, rotulo, aoEnviar, conteudoInicial, placeholde
     }
   }
 
-  function tecla(e) {
-    // Tab no editor escreve dois espaços em vez de pular para o próximo campo.
-    if (!multilinha || e.key !== "Tab") return;
-    e.preventDefault();
-    const el = e.target;
-    const { selectionStart: a, selectionEnd: b } = el;
-    const novo = `${valor.slice(0, a)}  ${valor.slice(b)}`;
-    setValor(novo);
-    requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = a + 2; });
+  // Ctrl+Enter no editor envia, como o botão
+  function enviarPeloAtalho() {
+    if (!encerrado && !enviando && valor.trim()) formulario.current?.requestSubmit();
   }
 
   return (
     <>
-      <form className="pf-cartao entrega" onSubmit={enviar}>
-        <label className="pf-campo">
-          <span className="pf-campo__rotulo">{rotulo}</span>
-          {multilinha ? (
-            <textarea className="entrega__codigo" value={valor} onChange={(e) => setValor(e.target.value)} onKeyDown={tecla}
-              placeholder={placeholder} spellCheck={false} disabled={encerrado || enviando} rows={14} />
-          ) : (
+      <form ref={formulario} className="pf-cartao entrega" onSubmit={enviar}>
+        {multilinha ? (
+          <div className="pf-campo">
+            <span className="pf-campo__rotulo">{rotulo}</span>
+            <EditorDeCodigo valor={valor} aoMudar={setValor} linguagem={linguagem} placeholder={placeholder}
+              desabilitado={encerrado || enviando} aoCtrlEnter={enviarPeloAtalho} rotulo={rotulo} />
+          </div>
+        ) : (
+          <label className="pf-campo">
+            <span className="pf-campo__rotulo">{rotulo}</span>
             <input className="pf-campo__entrada" type="url" value={valor} onChange={(e) => setValor(e.target.value)}
               placeholder={placeholder} disabled={encerrado || enviando} required />
-          )}
-        </label>
+          </label>
+        )}
         {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
         <div className="pf-acoes" style={{ alignItems: "center" }}>
           {!encerrado && (
@@ -282,7 +290,7 @@ export function Exercicio({ desafio }) {
           {c.linguagem && <span className="pf-pilula">{c.linguagem}</span>}
           <span className="pf-pilula">{formatarDia(desafio.periodo, { comSemana: true })}</span>
         </div>
-        <Explicacao texto={c.enunciado} className="desafio__texto" />
+        <Explicacao texto={c.enunciado} className="desafio__texto" linguagem={c.linguagem} />
         {c.exemplo && (
           <>
             <p className="pf-campo__rotulo">Exemplo</p>
@@ -307,6 +315,7 @@ export function Exercicio({ desafio }) {
         desafio={desafio}
         campo="codigo"
         multilinha
+        linguagem={c.linguagem || desafio.tema}
         rotulo="Sua solução"
         placeholder={`// escreva aqui a sua solução${c.linguagem ? ` em ${c.linguagem}` : ""}`}
         conteudoInicial={desafio.resposta?.codigo}

@@ -4,6 +4,7 @@ import "./mapa.css";
 import "./pratica.css";
 import "./festa.css";
 import "./agenda.css";
+import "./codigo.css";
 
 export const metadata = {
   title: "Lisa_Proof",

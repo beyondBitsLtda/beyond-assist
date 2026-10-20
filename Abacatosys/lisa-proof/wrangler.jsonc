@@ -16,5 +16,8 @@
   // Sem isto, todo `wrangler deploy` APAGA as variáveis configuradas no painel.
   "keep_vars": true,
   "observability": { "enabled": true },
+  // Quem recebe os chamados do "Reportar problema": a conta do Abacato com este e-mail (o mesmo de
+  // acesso da Lisa). Não é segredo — é o endereço de quem administra; segredo fica no painel.
+  "vars": { "PROOF_ADMIN_EMAIL": "bryan@beyond.dev.br" },
   "routes": [{ "pattern": "proof.beyond.dev.br", "custom_domain": true }]
 }
