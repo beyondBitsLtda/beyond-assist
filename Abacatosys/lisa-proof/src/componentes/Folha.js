@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Painel por cima da tela: sobe de baixo no celular (onde o polegar alcança) e aparece no centro
  * no computador. Fecha com Esc, com o X ou tocando fora.
+ *
+ * Nasce direto no <body> (portal), e não onde foi chamado. Chamado da barra lateral — que é
+ * `position: sticky` e por isso uma camada própria —, o painel ficava preso dentro dela, e
+ * qualquer coisa posicionada no conteúdo da página era desenhada por cima: o balão de fala do
+ * Neuro cobria o título do "Reportar problema" (chamado aberto pelo próprio botão, 20/10/2026).
  */
 export default function Folha({ aberta, aoFechar, titulo, children }) {
   const painel = useRef(null);
@@ -24,7 +30,7 @@ export default function Folha({ aberta, aoFechar, titulo, children }) {
   }, [aberta, aoFechar]);
 
   if (!aberta) return null;
-  return (
+  return createPortal(
     <div className="folha__fundo" onMouseDown={(e) => e.target === e.currentTarget && aoFechar()}>
       <div className="folha" role="dialog" aria-modal="true" aria-label={titulo} tabIndex={-1} ref={painel}>
         <div className="folha__topo">
@@ -33,6 +39,7 @@ export default function Folha({ aberta, aoFechar, titulo, children }) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
