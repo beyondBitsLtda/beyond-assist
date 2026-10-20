@@ -1,0 +1,90 @@
+/* ============================================================ Raio-X
+
+   Gráficos de UMA série: uma cor só, o verde forte (validado nos dois temas: #16A34A passa no
+   claro e o #1FB155 no escuro — o verde claro de sempre fica claro demais sobre o fundo escuro).
+   Texto nunca leva a cor do dado; o valor fica na ponta da barra, e o detalhe na dica (mouse ou
+   foco pelo teclado). As tabelas abaixo trazem os mesmos números. */
+
+:root { --rx-cor: #16A34A; --rx-trilho: rgba(31, 41, 55, 0.07); }
+:root[data-tema="escuro"] { --rx-cor: #1FB155; --rx-trilho: rgba(255, 255, 255, 0.06); }
+
+.rx-subtitulo { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--pf-tinta-2); }
+
+/* ------------------------------------------------------------ números principais */
+.rx-heroi { display: grid; gap: 16px; }
+@media (min-width: 900px) { .rx-heroi { grid-template-columns: minmax(220px, 1fr) 3fr; align-items: center; } }
+.rx-heroi__valor { font-size: 52px; font-weight: 700; line-height: 1.05; font-variant-numeric: proportional-nums; margin: 4px 0 10px; }
+.rx-heroi__nivel { display: grid; gap: 6px; font-weight: 600; }
+.rx-heroi__nivel small { color: var(--pf-tinta-2); font-weight: 400; }
+
+.rx-tiles { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 900px) { .rx-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 900px) { .rx-tiles--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.rx-heroi .rx-tile { background: var(--pf-superficie-2); box-shadow: none; }
+.rx-tile .pf-estat__valor { font-size: 24px; }
+.rx-tile .pf-estat__nota { margin-bottom: 0; }
+
+/* ------------------------------------------------------------ dica (tooltip) */
+.rx-dica {
+  position: absolute; z-index: 5; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
+  width: max-content; max-width: 260px; padding: 8px 10px; border-radius: 10px;
+  background: var(--pf-superficie); color: var(--pf-tinta); border: 1px solid var(--pf-linha);
+  box-shadow: var(--pf-sombra-alta); font-size: 13px; line-height: 1.35; text-align: left;
+  /* escondida = fora do layout: com opacity 0 ela ainda ocupava espaço além da borda e
+     alargava a página no celular */
+  display: none; pointer-events: none;
+}
+.rx-dica strong { display: block; font-size: 14px; }
+.rx-barras__linha:hover .rx-dica, .rx-barras__linha:focus .rx-dica,
+.rx-colunas__item:hover .rx-dica, .rx-colunas__item:focus .rx-dica { display: block; }
+/* nas pontas, a dica abre para dentro do gráfico */
+.rx-colunas__item:nth-child(-n+2) .rx-dica { left: 0; transform: none; }
+.rx-colunas__item:nth-last-child(-n+2) .rx-dica { left: auto; right: 0; transform: none; }
+
+/* ------------------------------------------------------------ barras deitadas */
+.rx-barras { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.rx-barras__linha {
+  position: relative; display: grid; grid-template-columns: minmax(110px, 0.9fr) 3fr; align-items: center; gap: 12px;
+  border-radius: 8px; padding: 2px 0; outline: none;
+}
+.rx-barras__linha:focus-visible { box-shadow: 0 0 0 2px var(--pf-verde); }
+.rx-barras__rotulo { font-size: 14px; color: var(--pf-tinta); }
+.rx-barras__trilho { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rx-barras__barra { display: block; height: 18px; background: var(--rx-cor); border-radius: 0 4px 4px 0; }
+.rx-barras__valor { font-size: 13px; font-weight: 600; color: var(--pf-tinta); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rx-barras__linha .rx-dica { left: 30%; }
+
+/* ------------------------------------------------------------ colunas */
+.rx-colunas { display: flex; align-items: stretch; gap: 2px; height: 180px; padding-top: 22px; border-bottom: 1px solid var(--pf-linha); }
+.rx-colunas__item { position: relative; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; outline: none; cursor: default; }
+.rx-colunas__item:focus-visible { box-shadow: 0 0 0 2px var(--pf-verde); border-radius: 6px; }
+.rx-colunas__area { position: relative; flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; background: var(--rx-trilho); border-radius: 4px 4px 0 0; }
+.rx-colunas__coluna { display: block; width: min(24px, 70%); background: var(--rx-cor); border-radius: 4px 4px 0 0; }
+.rx-colunas__item--destaque .rx-colunas__area { background: transparent; box-shadow: inset 0 0 0 1px var(--pf-linha); }
+.rx-colunas__valor { font-size: 12px; font-weight: 600; color: var(--pf-tinta); margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+.rx-colunas__rotulo { margin-top: 6px; font-size: 11px; color: var(--pf-tinta-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.rx-colunas .rx-dica { bottom: calc(100% - 14px); }
+@media (max-width: 520px) { .rx-colunas__rotulo { font-size: 10px; } }
+
+/* ------------------------------------------------------------ tabelas */
+.rx-rolagem { overflow-x: auto; padding: 0; }
+.rx-tabela { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rx-tabela th, .rx-tabela td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--pf-linha); vertical-align: middle; }
+.rx-tabela thead th { font-size: 12px; font-weight: 600; color: var(--pf-tinta-2); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+.rx-tabela tbody th { font-weight: 600; }
+.rx-tabela tbody tr:last-child th, .rx-tabela tbody tr:last-child td { border-bottom: 0; }
+.rx-tabela small { display: block; font-weight: 400; font-size: 12px; color: var(--pf-tinta-2); }
+.rx-num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rx-progresso { min-width: 150px; }
+.rx-nota { font-weight: 700; }
+.rx-nota--ok::after { content: " ✓"; color: var(--pf-verde-forte); }
+
+/* no celular, a trilha vai embaixo do nome em vez de ter coluna própria */
+.rx-so-celular { display: none; }
+@media (max-width: 640px) {
+  .rx-col-trilha { display: none; }
+  .rx-so-celular { display: inline; }
+  .rx-tabela th, .rx-tabela td { padding: 10px; }
+}
+
+.rx-filtros { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }

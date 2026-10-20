@@ -14,7 +14,7 @@ import { lerRepositorio, ErroDoGitHub } from "./github.js";
 import { diaDe, inicioDaSemana, inicioDoMes } from "@/dominio/datas.js";
 import {
   TIPOS_DE_DESAFIO, NOMES_DOS_DESAFIOS, TENTATIVAS, NOTA_DE_APROVACAO, periodoDe, fimDoPeriodo, periodoPermitido,
-  pontosDoQuiz, pontosDaNota, quizParaTela, assuntoAtual, assuntosDoPeriodo,
+  pontosDoQuiz, pontosDaNota, quizParaTela, podeReenviar, entregaConcluida, assuntoAtual, assuntosDoPeriodo,
 } from "@/dominio/pratica.js";
 
 const CAMPOS = "id, usuario_id, trilha_id, tipo, periodo, card_ids, titulo, conteudo, status, resposta, avaliacao, nota, pontos, tentativas, criado_em, atualizado_em";
@@ -99,7 +99,7 @@ export async function resumoDaPratica(usuarioId, trilhas, hoje = diaDe()) {
   const [etapas, desafiosR] = await Promise.all([
     etapasDasTrilhas(ids),
     supabase.from("proof_desafios")
-      .select("id, trilha_id, tipo, periodo, status, nota, pontos, titulo")
+      .select("id, trilha_id, tipo, periodo, status, nota, pontos, titulo, tentativas")
       .eq("usuario_id", usuarioId)
       .in("periodo", [...new Set([hoje, semana, mes])]),
   ]);
@@ -107,7 +107,7 @@ export async function resumoDaPratica(usuarioId, trilhas, hoje = diaDe()) {
 
   const achar = (trilhaId, tipo, periodo) =>
     (desafiosR.data || []).find((d) => d.trilha_id === trilhaId && d.tipo === tipo && d.periodo === periodo) || null;
-  const curto = (d) => (d ? { id: d.id, status: d.status, nota: d.nota, pontos: d.pontos, titulo: d.titulo } : null);
+  const curto = (d) => (d ? { id: d.id, status: d.status, nota: d.nota, pontos: d.pontos, titulo: d.titulo, tentativas: d.tentativas } : null);
 
   return trilhas.map((t) => {
     const atual = assuntoAtual(etapas.get(t.id) || [], hoje);
@@ -238,11 +238,9 @@ export async function responderQuiz({ usuarioId, id, indice, escolha }) {
 }
 
 function exigirReenvio(d) {
-  const maximo = TENTATIVAS[d.tipo];
-  if (d.status === "concluido") {
-    throw new ErroDeAcesso(409, d.nota >= NOTA_DE_APROVACAO ? "este desafio já foi aprovado" : "as tentativas deste desafio acabaram");
-  }
-  if (d.tentativas >= maximo) throw new ErroDeAcesso(409, "as tentativas deste desafio acabaram");
+  if (podeReenviar(d)) return;
+  if (d.tentativas >= TENTATIVAS[d.tipo]) throw new ErroDeAcesso(409, "as tentativas deste desafio acabaram");
+  throw new ErroDeAcesso(409, "este desafio já foi aprovado");
 }
 
 /** Fecha uma entrega avaliada: grava, pontua pela melhor nota e diz se ainda dá para reenviar. */
@@ -250,7 +248,7 @@ async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
   const tentativas = d.tentativas + 1;
   const melhorNota = Math.max(d.nota ?? 0, avaliacao.nota);
   const pontosDoDesafio = pontosDaNota(d.tipo, melhorNota);
-  const acabou = avaliacao.aprovado || tentativas >= TENTATIVAS[d.tipo];
+  const acabou = entregaConcluida({ tipo: d.tipo, melhorNota, tentativas });
   const estudavaAntes = await estudouHoje(usuarioId);
 
   await salvar(d.id, {
@@ -274,6 +272,7 @@ async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
     tentativas,
     restantes: Math.max(0, TENTATIVAS[d.tipo] - tentativas),
     concluido: acabou,
+    reenviar: podeReenviar({ tipo: d.tipo, tentativas, status: acabou ? "concluido" : "em_andamento" }),
     ...resultadoDaPontuacao(pontos, extra),
   };
 }

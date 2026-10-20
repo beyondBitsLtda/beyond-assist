@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { criar } from "@/lib/api.js";
 import { formatarDia } from "@/dominio/datas.js";
-import { NOTA_DE_APROVACAO } from "@/dominio/pratica.js";
+import { NOTA_DE_APROVACAO, podeReenviar } from "@/dominio/pratica.js";
 import Explicacao, { emLinha } from "./Explicacao.js";
 import Codigo from "./codigo/Codigo.js";
 import EditorDeCodigo from "./codigo/EditorDeCodigo.js";
@@ -215,7 +215,10 @@ function Entrega({ desafio, campo, rotulo, aoEnviar, conteudoInicial, placeholde
   const [Aviso, avisar] = useAviso();
   const formulario = useRef(null);
 
-  const encerrado = estado.status === "concluido";
+  // Encerrado = não dá mais para enviar. O exercício aprovado continua aberto enquanto sobrar
+  // tentativa (vale a melhor nota) — ver podeReenviar.
+  const encerrado = !podeReenviar({ tipo: desafio.tipo, tentativas: estado.tentativas, status: estado.status });
+  const aprovado = (estado.nota ?? 0) >= NOTA_DE_APROVACAO;
   const restantes = Math.max(0, (desafio.maxTentativas || 0) - estado.tentativas);
 
   async function enviar(e) {
@@ -227,7 +230,10 @@ function Entrega({ desafio, campo, rotulo, aoEnviar, conteudoInicial, placeholde
       const r = await aoEnviar(valor);
       setEstado({ status: r.concluido ? "concluido" : "em_andamento", nota: r.nota, tentativas: r.tentativas, avaliacao: r.avaliacao });
       celebrar(r);
-      if (r.avaliacao.aprovado) comemorar(`Aprovado com ${r.avaliacao.nota}! ${r.pontos > 0 ? `+${r.pontos} pontos` : ""}`);
+      if (r.avaliacao.aprovado) {
+        comemorar(`Aprovado com ${r.avaliacao.nota}! ${r.pontos > 0 ? `+${r.pontos} pontos` : ""}`);
+        if (r.reenviar && r.avaliacao.nota < 100) setTimeout(() => reagir("feliz", `Quer buscar uma nota maior? Ainda tem ${r.restantes} tentativa(s) — vale a melhor.`, 6000), 4200);
+      }
       else reagir("triste", r.restantes ? `Faltou pouco! Você ainda tem ${r.restantes} tentativa(s).` : "Não foi dessa vez, mas olha quanta coisa boa na avaliação.", 6000);
       if (r.pontos > 0 && !r.avaliacao.aprovado) avisar(`+${r.pontos} pontos`);
     } catch (falha) {
@@ -263,11 +269,13 @@ function Entrega({ desafio, campo, rotulo, aoEnviar, conteudoInicial, placeholde
         <div className="pf-acoes" style={{ alignItems: "center" }}>
           {!encerrado && (
             <button type="submit" className="pf-botao" disabled={enviando || !valor.trim()}>
-              {enviando ? "A Lisa está avaliando…" : estado.tentativas ? "Enviar de novo" : "Enviar para a Lisa avaliar"}
+              {enviando ? "A Lisa está avaliando…" : estado.tentativas ? (aprovado ? "Tentar uma nota maior" : "Enviar de novo") : "Enviar para a Lisa avaliar"}
             </button>
           )}
           <span className="pf-estat__nota" style={{ margin: 0 }}>
-            {encerrado ? "Desafio encerrado." : `Tentativa ${estado.tentativas + 1} de ${desafio.maxTentativas} · vale a melhor nota`}
+            {encerrado
+              ? (aprovado ? `Concluído com nota ${estado.nota}.` : "Desafio encerrado.")
+              : `${aprovado ? `Aprovado com ${estado.nota} · ` : ""}Tentativa ${estado.tentativas + 1} de ${desafio.maxTentativas} · vale a melhor nota`}
             {!encerrado && restantes <= 1 && estado.tentativas > 0 ? " · última chance!" : ""}
           </span>
         </div>

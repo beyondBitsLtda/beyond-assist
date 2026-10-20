@@ -13,11 +13,12 @@ import { resumoDasMetas, tarefasDoDia } from "../src/dominio/metas.js";
 import { nivelPorPontos } from "../src/dominio/pontos.js";
 import {
   periodoDe, periodoPermitido, pontosDoQuiz, pontosDaNota, validarQuiz, quizParaTela,
-  separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo,
+  separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo, podeReenviar, entregaConcluida,
   validarAvaliacao, assuntoAtual, mapaDaTrilha,
 } from "../src/dominio/pratica.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
 import { conferirChamado, tituloDoChamado, descricaoDoChamado } from "../src/dominio/chamado.js";
+import { montarRaioX, acertosDoQuiz, horaEmSaoPaulo } from "../src/dominio/raioX.js";
 import { assuntosParaODuracao, nomeDoQuadro, validarCurso, assuntosEmOrdem, resumoDoCurso } from "../src/dominio/curso.js";
 import { montarAgenda, itensDoDia, gradeDoMes, mesVizinho } from "../src/dominio/agenda.js";
 
@@ -229,6 +230,22 @@ caso("quiz salvo antes da correção: a tela recebe o código separado, ou o avi
   assert.deepEqual([t[0].codigo, t[0].linguagem, t[0].faltouCodigo], ["SELECT 1;", "sql", false]);
   assert.equal(t[1].faltouCodigo, true);
 });
+caso("exercício: aprovado ainda pode ser reenviado até a 3ª tentativa (20/10/2026)", () => {
+  assert.equal(podeReenviar({ tipo: "exercicio", tentativas: 1, status: "concluido" }), true);
+  assert.equal(podeReenviar({ tipo: "exercicio", tentativas: 2, status: "concluido" }), true);
+  assert.equal(podeReenviar({ tipo: "exercicio", tentativas: 3, status: "concluido" }), false);
+  assert.equal(podeReenviar({ tipo: "exercicio", tentativas: 0, status: null }), true);
+});
+caso("projeto: aprovado encerra; reprovado segue até as 5 tentativas", () => {
+  assert.equal(podeReenviar({ tipo: "projeto_semanal", tentativas: 1, status: "concluido" }), false);
+  assert.equal(podeReenviar({ tipo: "projeto_semanal", tentativas: 4, status: "em_andamento" }), true);
+  assert.equal(podeReenviar({ tipo: "projeto_mensal", tentativas: 5, status: "em_andamento" }), false);
+});
+caso("concluído vale pela melhor nota: reenviar e ir pior não desfaz o feito", () => {
+  assert.equal(entregaConcluida({ tipo: "exercicio", melhorNota: 70, tentativas: 2 }), true);
+  assert.equal(entregaConcluida({ tipo: "exercicio", melhorNota: 40, tentativas: 2 }), false);
+  assert.equal(entregaConcluida({ tipo: "exercicio", melhorNota: 40, tentativas: 3 }), true);
+});
 caso("gabarito só aparece depois de responder", () => {
   const t = quizParaTela({ perguntas: [{ pergunta: "p", opcoes: ["a", "b", "c", "d"], correta: 1, explicacao: "e" }, { pergunta: "q", opcoes: ["a", "b", "c", "d"], correta: 3, explicacao: "f" }] }, { escolhas: { 0: 2 } });
   assert.deepEqual([t[0].correta, t[0].escolha, t[1].correta, t[1].explicacao], [1, 2, null, null]);
@@ -393,6 +410,42 @@ caso("chamado: título curto da primeira frase e descrição com quem, onde e qu
   assert.ok(d.includes("Reportado por: Ana <ana@exemplo.invalid>"));
   assert.ok(d.includes("Quando: 20/10/2026 15:42 (Brasília)"));
   assert.ok(d.includes("Tela: /pratica/1") && d.includes("janela 1600×1000 · tema escuro · pt-BR") && d.endsWith("a pergunta 5 veio sem código"));
+});
+
+caso("raio-x: acertos do quiz pelo gabarito guardado", () => {
+  const d = { conteudo: { perguntas: [{ correta: 1 }, { correta: 2 }, { correta: 0 }] }, resposta: { escolhas: { 0: 1, 1: 3 } } };
+  assert.deepEqual(acertosDoQuiz(d), { total: 3, respondidas: 2, acertos: 1 });
+});
+caso("raio-x: hora em São Paulo, não em UTC", () => {
+  assert.equal(horaEmSaoPaulo("2026-10-20T01:30:00Z"), 22);
+});
+caso("raio-x: pontos por origem, por trilha, constância e entregas pela melhor nota", () => {
+  const eventos = [
+    { tipo: "item", pontos: 10, dia: "2026-10-19", trilha_id: "t1", criado_em: "2026-10-19T13:00:00Z" },
+    { tipo: "item", pontos: 10, dia: "2026-10-19", trilha_id: "t1", criado_em: "2026-10-19T13:05:00Z" },
+    { tipo: "exercicio", pontos: 32, dia: "2026-10-20", trilha_id: "t1", criado_em: "2026-10-20T14:00:00Z", detalhe: { titulo: "Média" } },
+    { tipo: "meta_diaria", pontos: 15, dia: "2026-10-20", trilha_id: null, criado_em: "2026-10-20T14:00:01Z" },
+  ];
+  const desafios = [
+    { id: "e1", tipo: "exercicio", periodo: "2026-10-20", nota: 80, tentativas: 2, pontos: 32, trilha_id: "t1", titulo: "Média" },
+    { id: "e2", tipo: "exercicio", periodo: "2026-10-21", nota: null, tentativas: 0, trilha_id: "t1" },
+    { id: "q1", tipo: "quiz", periodo: "2026-10-20", trilha_id: "t1", conteudo: { perguntas: [{ correta: 0 }, { correta: 1 }] }, resposta: { escolhas: { 0: 0, 1: 1 } } },
+  ];
+  const trilhas = [{ id: "t1", tema: "Python", status: "ativa", inicio_em: "2026-10-01", etapas: [{ concluido: true }, { concluido: false }] }];
+  const r = montarRaioX({ eventos, desafios, trilhas, metaDiaria: 30, hoje: "2026-10-20" });
+  assert.equal(r.resumo.pontos, 67);
+  assert.equal(r.resumo.diasEstudados, 2);
+  assert.equal(r.resumo.constancia, 100);
+  assert.equal(r.resumo.metasBatidas, 1);
+  assert.deepEqual(r.porOrigem.map((o) => o.tipo), ["exercicio", "item", "meta_diaria"]);
+  assert.equal(r.exercicios.feitos, 1); // o sem envio não conta
+  assert.equal(r.exercicios.notaMedia, 80);
+  assert.equal(r.quiz.gabaritos, 1);
+  assert.equal(r.porTrilha[0].progresso, 50);
+  assert.equal(r.porTrilha[0].pontos, 52);
+  assert.equal(r.historico[0].tipo, "meta_diaria");
+  assert.equal(r.semanas.length, 12);
+  assert.equal(r.semanas.at(-1).pontos, 67);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

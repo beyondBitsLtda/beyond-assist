@@ -26,6 +26,27 @@ export const PONTOS_DA_PRATICA = {
 export const NOTA_DE_APROVACAO = 60;
 export const TENTATIVAS = { exercicio: 3, projeto_semanal: 5, projeto_mensal: 5 };
 
+/**
+ * Ainda dá para mandar outra solução?
+ *
+ * Exercício do dia: enquanto houver tentativa — MESMO APROVADO. Vale a melhor nota, então tentar
+ * de novo só pode subir a nota, nunca derrubar (pedido de 20/10/2026: antes o exercício travava no
+ * primeiro aprovado, e quem tirou 70 não podia buscar o 100 com as tentativas que sobravam).
+ * Projetos: até serem aprovados ou acabarem as tentativas (cada envio relê o repositório inteiro).
+ */
+export function podeReenviar(desafio) {
+  const maximo = TENTATIVAS[desafio?.tipo] || 0;
+  if ((desafio?.tentativas || 0) >= maximo) return false;
+  if (desafio.tipo === "exercicio") return true;
+  return desafio.status !== "concluido";
+}
+
+/** Concluído (conta como feito nas metas, na agenda e nas conquistas): a MELHOR nota aprovou, ou
+ *  as tentativas acabaram. Pela melhor, e não pela última — reenviar e ir pior não desfaz o feito. */
+export function entregaConcluida({ tipo, melhorNota, tentativas }) {
+  return (Number(melhorNota) || 0) >= NOTA_DE_APROVACAO || tentativas >= (TENTATIVAS[tipo] || 0);
+}
+
 const limitar = (n, min, max) => Math.min(max, Math.max(min, n));
 
 function texto(valor, limite) {

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { obter, criar } from "@/lib/api.js";
 import { formatarDia } from "@/dominio/datas.js";
-import { NOTA_DE_APROVACAO, PONTOS_DA_PRATICA, fimDoPeriodo } from "@/dominio/pratica.js";
+import { NOTA_DE_APROVACAO, PONTOS_DA_PRATICA, TENTATIVAS, fimDoPeriodo } from "@/dominio/pratica.js";
 import Neuro, { reagir } from "@/componentes/Neuro.js";
 
 /** O que o Neuro diz ao abrir a prática: a cobrança do dia. */
@@ -22,7 +22,13 @@ function situacaoDoDiario(d, tipo) {
   if (!d?.status) return { texto: tipo === "quiz" ? "5 perguntas" : "10 a 20 minutos", acao: "Começar", classe: "" };
   if (d.status === "concluido") {
     const ok = (d.nota ?? 0) >= NOTA_DE_APROVACAO;
-    return { texto: `${tipo === "quiz" ? "Acertos" : "Nota"}: ${d.nota}% · +${d.pontos} pts`, acao: "Rever", classe: ok ? "pratica__bloco--feito" : "pratica__bloco--parcial" };
+    // exercício aprovado com tentativa sobrando: dá para buscar uma nota maior
+    const sobra = tipo === "exercicio" && (d.tentativas ?? 0) < TENTATIVAS.exercicio && (d.nota ?? 0) < 100;
+    return {
+      texto: `${tipo === "quiz" ? "Acertos" : "Nota"}: ${d.nota}% · +${d.pontos} pts${sobra ? ` · ${TENTATIVAS.exercicio - (d.tentativas ?? 0)} tentativa(s) para melhorar` : ""}`,
+      acao: sobra ? "Melhorar nota" : "Rever",
+      classe: ok ? "pratica__bloco--feito" : "pratica__bloco--parcial",
+    };
   }
   return { texto: tipo === "quiz" ? "Em andamento" : `Nota até agora: ${d.nota ?? "—"}`, acao: "Continuar", classe: "pratica__bloco--andamento" };
 }

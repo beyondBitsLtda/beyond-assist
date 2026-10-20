@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.3.1-cloudflare-pages.1",
+  "versao": "0.4.0-proof-tentativas-raiox.1",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 11,
+    "numero": 12,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.4.0-proof-tentativas-raiox.1",
+      "data": "2026-10-20",
+      "branch": "proof-tentativas-raiox",
+      "tipo": "funcionalidade",
+      "resumo": "Raio-X do estudante (todos os números num lugar só) e exercício do dia que pode ser refeito até a 3ª tentativa mesmo aprovado.",
+      "itens": [
+        "Exercício do dia: dá para enviar de novo enquanto houver tentativa, mesmo depois de aprovado — vale a melhor nota, então só pode subir. A Prática mostra \"Melhorar nota\" e quantas tentativas sobram; o botão vira \"Tentar uma nota maior\". O exercício continua contando como feito nas metas, na agenda e nas conquistas desde o primeiro aprovado. Projetos seguem como estavam.",
+        "Nova tela Raio-X (menu lateral e abas do celular): pontos no total, nível, ofensiva e recorde, dias de estudo e constância, média por dia, metas batidas, melhor dia e horário mais forte; de onde vêm os pontos; pontos por semana e por dia da semana; quiz (taxa de acerto, gabaritos); exercícios e projetos (nota média pela melhor de cada, tentativas, lista completa); cada trilha (progresso dos assuntos, pontos, acerto no quiz, notas); e todas as pontuações, com filtro por tipo.",
+        "A barra de abas do celular passa a caber qualquer quantidade de itens (eram 5 colunas fixas)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.3.1-cloudflare-pages.1",
       "data": "2026-10-20",
@@ -201,7 +214,8 @@
         "Lembretes por notificação push (ofensiva em risco, quiz pendente), enviados pelo relógio do iMac.",
         "Uso no computador e no celular, instalável como app.",
         "Reportar problema com print, que vira chamado no Abacato para quem administra",
-        "Editor de código no exercício e código colorido em todas as telas"
+        "Editor de código no exercício e código colorido em todas as telas",
+        "Raio-X do estudante: todos os pontos, notas, ritmo e trilhas num lugar só"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",

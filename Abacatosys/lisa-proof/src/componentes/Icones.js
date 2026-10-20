@@ -23,6 +23,11 @@ export const IconeProgresso = () => (
   <svg {...base}><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
 );
 
+// Raio-X: a silhueta de uma pessoa dentro do quadro de uma chapa
+export const IconeRaioX = () => (
+  <svg {...base}><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="12" cy="9" r="2.5" /><path d="M7.5 17.5c.8-2.4 2.5-3.5 4.5-3.5s3.7 1.1 4.5 3.5" /></svg>
+);
+
 export const IconeCerto = () => (
   <svg {...base} strokeWidth={3.5}><path d="M5 12.5l4.5 4.5L19 7" /></svg>
 );
