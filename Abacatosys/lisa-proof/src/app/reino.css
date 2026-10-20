@@ -220,3 +220,41 @@
 .rn-simulador__regras dl { margin: 0; display: grid; gap: 2px; font-size: 13px; }
 .rn-simulador__regras dt { font-weight: 700; margin-top: 8px; }
 .rn-simulador__regras dd { margin: 0; color: var(--pf-tinta-2); line-height: 1.45; }
+
+/* ------------------------------------------------------------ batalha em andamento (sobre a ilha) */
+.rn-mundo__alerta {
+  position: absolute; left: 50%; top: 12px; z-index: 4; transform: translateX(-50%);
+  display: grid; gap: 4px; justify-items: center; text-align: center;
+  width: min(92%, 520px); padding: 10px 16px 12px; border-radius: 16px; color: #FFFFFF;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); pointer-events: none;
+}
+.rn-mundo__alerta--defesa { background: rgba(153, 27, 27, 0.92); animation: rn-alerta 0.9s ease-in-out infinite; }
+.rn-mundo__alerta--ataque { background: rgba(30, 64, 175, 0.92); }
+.rn-mundo__alerta-titulo { font-size: 15px; font-weight: 800; letter-spacing: 0.04em; }
+.rn-mundo__alerta-texto { font-size: 14px; font-weight: 600; opacity: 0.95; }
+.rn-mundo__progresso { width: 100%; height: 5px; border-radius: 9999px; background: rgba(255, 255, 255, 0.25); overflow: hidden; margin-top: 4px; }
+.rn-mundo__progresso span { display: block; height: 100%; width: 0; background: #FFFFFF; animation: rn-progresso linear forwards; }
+@keyframes rn-progresso { from { width: 0; } to { width: 100%; } }
+@keyframes rn-alerta { 0%, 100% { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(239, 68, 68, 0.55); } 50% { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 0 10px rgba(239, 68, 68, 0); } }
+@media (max-width: 640px) { .rn-mundo__alerta { top: 8px; padding: 8px 12px 10px; } .rn-mundo__alerta-titulo { font-size: 13px; } .rn-mundo__alerta-texto { font-size: 12px; } }
+@media (prefers-reduced-motion: reduce) { .rn-mundo__alerta--defesa { animation: none; } }
+
+/* ------------------------------------------------------------ vales de moedas */
+.vale { display: grid; gap: 12px; justify-items: center; text-align: center; padding: 4px 8px 12px; }
+.vale__presente { font-size: 64px; line-height: 1; animation: vale-pulo 1.4s ease-in-out infinite; }
+.vale__titulo { margin: 0; font-size: 22px; }
+.vale__texto { margin: 0; color: var(--pf-tinta-2); font-size: 15px; line-height: 1.5; max-width: 420px; }
+.vale__acoes { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.vale__nota { margin: 0; font-size: 12px; color: var(--pf-tinta-2); }
+@keyframes vale-pulo { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-8px) rotate(-6deg); } }
+@media (prefers-reduced-motion: reduce) { .vale__presente { animation: none; } }
+
+.vale-cartao-lista { display: grid; gap: 8px; margin-bottom: 16px; }
+.vale-cartao { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; border: 2px dashed var(--pf-verde); background: var(--pf-sucesso-fundo); }
+.vale-cartao__icone { font-size: 34px; }
+.vale-cartao__texto { flex: 1; min-width: 200px; display: grid; gap: 2px; }
+.vale-cartao__texto span { font-size: 13px; color: var(--pf-tinta-2); }
+
+/* durante a batalha, os rótulos saem da frente do alerta e da cena */
+.rn-mundo--batalha .rn-mundo__rotulo { opacity: 0.3; pointer-events: none; transition: opacity 0.3s; }
+@media (max-width: 640px) { .rn-simulador .agenda__modos { border-radius: 16px; } .rn-simulador .agenda__modo { border-radius: 12px; } }

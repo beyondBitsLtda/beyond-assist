@@ -10,6 +10,7 @@ import { Confete } from "./Neuro.js";
 import Celebracao from "./Celebracao.js";
 import BotaoDeTema from "./BotaoDeTema.js";
 import ReportarProblema from "./ReportarProblema.js";
+import { AvisoDeVale } from "./Vales.js";
 
 const ITENS = [
   { href: "/", rotulo: "Hoje", Icone: IconeHoje },
@@ -105,6 +106,7 @@ export default function Moldura({ children }) {
       </nav>
       <Celebracao />
       <Confete />
+      <AvisoDeVale />
     </div>
   );
 }
