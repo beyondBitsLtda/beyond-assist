@@ -9,14 +9,26 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.7.0-proof-batalha-epica-vale.1",
+  "versao": "0.7.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 20,
+    "numero": 21,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.7.0-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.7.0: batalha épica no Reino e o vale de boas-vindas de 450 moedas.",
+      "itens": [
+        "Junta a branch proof-batalha-epica-vale (0.7.0-proof-batalha-epica-vale.1).",
+        "Migração db/006-vales.sql aplicada no banco antes do deploy."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.7.0-proof-batalha-epica-vale.1",
       "data": "2026-10-20",
