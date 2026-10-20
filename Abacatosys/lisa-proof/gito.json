@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.5.0-proof-reino-3d.1",
+  "versao": "0.5.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 16,
+    "numero": 17,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.5.0-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.5.0: Reino do Neuro em 3D com o Neuro de papel e o botão de invadir reinos à vista.",
+      "itens": [
+        "Junta a branch proof-reino-3d (0.5.0-proof-reino-3d.1). Sem migração de banco."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.5.0-proof-reino-3d.1",
       "data": "2026-10-20",
