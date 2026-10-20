@@ -130,3 +130,70 @@
 .pf-mais__menu a svg { width: 20px; height: 20px; }
 .pf-mais__menu a:hover, .pf-mais__menu a:focus-visible { background: var(--pf-superficie-2); }
 .pf-mais__menu a[aria-current="page"] { color: var(--pf-verde-forte); }
+
+/* ------------------------------------------------------------ reino: o mundo 3D */
+.rn-mundo {
+  position: relative; height: 380px; border-radius: var(--pf-raio-grande); overflow: hidden;
+  border: 1px solid var(--pf-linha); touch-action: pan-y; user-select: none;
+  background: linear-gradient(180deg, #BFE3F7 0%, #E4F3FB 70%, #F3FAF4 100%);
+}
+:root[data-tema="escuro"] .rn-mundo { background: linear-gradient(180deg, #0E1A2E 0%, #18294A 70%, #1D3150 100%); }
+@media (max-width: 640px) { .rn-mundo { height: 300px; } }
+.rn-mundo canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.rn-mundo canvas:active { cursor: grabbing; }
+.rn-mundo--carregando { display: grid; place-items: center; color: var(--pf-tinta-2); font-size: 14px; }
+
+.rn-mundo__rotulo {
+  position: absolute; left: 0; top: 0; z-index: 2; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 3px 10px;
+  border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(17, 24, 20, 0.82); color: #FFFFFF; font: inherit; font-size: 12px; font-weight: 700;
+  cursor: pointer; will-change: transform;
+}
+.rn-mundo__rotulo:hover { background: rgba(17, 24, 20, 0.95); }
+.rn-mundo__rotulo:focus-visible { outline: 2px solid var(--pf-verde); outline-offset: 2px; }
+.rn-mundo__rotulo--vazio { background: rgba(255, 255, 255, 0.88); color: #3A2A1E; border-color: rgba(0, 0, 0, 0.12); }
+
+.rn-mundo__fala {
+  position: absolute; left: 0; top: 0; z-index: 3; max-width: 220px; padding: 8px 12px; border-radius: 14px;
+  background: #FFFFFF; color: #1F2937; font-size: 13px; font-weight: 600; line-height: 1.3;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); pointer-events: none; opacity: 0; transition: opacity 0.2s;
+}
+.rn-mundo__fala::after {
+  content: ""; position: absolute; left: 50%; bottom: -6px; width: 12px; height: 12px;
+  background: #FFFFFF; transform: translateX(-50%) rotate(45deg);
+}
+.rn-mundo__fala--visivel { opacity: 1; }
+
+.rn-mundo__giro { position: absolute; right: 10px; bottom: 10px; z-index: 2; display: flex; gap: 6px; }
+.rn-mundo__giro button {
+  width: 36px; height: 36px; border-radius: 9999px; border: 1px solid var(--pf-linha); cursor: pointer;
+  background: var(--pf-superficie); color: var(--pf-tinta); font-size: 18px; line-height: 1; box-shadow: var(--pf-sombra);
+}
+.rn-mundo__giro button:focus-visible { outline: 2px solid var(--pf-verde); outline-offset: 2px; }
+.rn-mundo__dica {
+  position: absolute; left: 12px; bottom: 12px; z-index: 1; font-size: 12px; font-weight: 600;
+  padding: 3px 8px; border-radius: 9999px; background: rgba(255, 255, 255, 0.7); color: #3A4A40; pointer-events: none;
+}
+:root[data-tema="escuro"] .rn-mundo__dica { background: rgba(0, 0, 0, 0.4); color: #D5E0DA; }
+.rn-mundo__molde { position: absolute; left: -10000px; top: 0; width: 220px; height: 220px; pointer-events: none; }
+
+.rn-construcao--destaque { animation: rn-destaque 1.4s ease-out; }
+@keyframes rn-destaque {
+  0%, 30% { box-shadow: 0 0 0 3px var(--pf-verde), var(--pf-sombra); }
+  100% { box-shadow: 0 0 0 0 transparent, var(--pf-sombra); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rn-construcao--destaque { animation: none; box-shadow: 0 0 0 3px var(--pf-verde); }
+  .rn-mundo__fala { transition: none; }
+}
+
+/* ------------------------------------------------------------ atalho de invasão, abaixo do mundo */
+.rn-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 12px; }
+.rn-acoes__invadir { gap: 10px; }
+.rn-acoes__conta { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 9999px; background: rgba(0, 0, 0, 0.12); }
+.rn-acoes__nota { flex: 1; min-width: 160px; font-size: 13px; color: var(--pf-tinta-2); }
+.rn-acoes__ranking { margin-left: auto; }
+.rn-construcao:focus { outline: none; }
+#invadir { scroll-margin-top: 16px; }
+@media (max-width: 640px) { .rn-mundo__dica { display: none; } }

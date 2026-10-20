@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.4.1-cloudflare-pages.1",
+  "versao": "0.5.0-proof-reino-3d.1",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 15,
+    "numero": 16,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.5.0-proof-reino-3d.1",
+      "data": "2026-10-20",
+      "branch": "proof-reino-3d",
+      "tipo": "funcionalidade",
+      "resumo": "Reino do Neuro em 3D (ilha low poly com o Neuro de papel, estilo Paper Mario) e o botão de invadir reinos à vista.",
+      "itens": [
+        "A vista do reino virou um mundo 3D: uma ilha flutuante low poly com as 6 construções, cada uma crescendo com o nível (torres, cristais da mina, pilhas de moedas, tendas, trechos de muralha). Dia e noite seguem o tema do app, com as janelas acesas à noite.",
+        "O Neuro anda pela ilha como um recorte de papel 2D, sempre de frente para a câmera e \"virando a folha\" quando muda de lado. Muda de humor junto com o resto do app e dá um pulinho quando é tocado.",
+        "Arrastar ou os botões ⟲ ⟳ giram a ilha; tocar numa construção (ou no rótulo dela) leva até o cartão. Com \"reduzir movimento\", o Neuro fica parado. Sem WebGL, volta a vista plana.",
+        "Invadir reinos: botão logo abaixo do mundo, com quantas invasões restam e quantos reinos dá para invadir agora. A lista de alvos carrega sozinha (antes era preciso achar \"Procurar reinos\" no fim da tela) e explica quando todos estão com escudo e quando o primeiro abre."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.4.1-cloudflare-pages.1",
       "data": "2026-10-20",
@@ -259,7 +273,7 @@
         "Raio-X do estudante: todos os pontos, notas, ritmo e trilhas num lugar só",
         "Até 3 quizzes e 3 exercícios por dia por trilha (as rodadas extras valem metade dos pontos)",
         "Ranking mundial (pontos de sempre, da semana e troféus do Reino), com apelido ou anonimato",
-        "Reino do Neuro: moedas do estudo, construções, Neuro com níveis e invasões entre jogadores"
+        "Reino do Neuro: moedas do estudo, construções num mundo 3D, Neuro com níveis e invasões entre jogadores"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -282,7 +296,8 @@
       "Web Push (VAPID) com a biblioteca web-push, no script de lembretes do iMac; service worker e manifesto de app",
       "Animações em SVG e CSS, sem biblioteca (mascote Neuro e mapa da trilha)",
       "PBKDF2 e HMAC via WebCrypto (login e sessão, mesmo esquema do Abacato)",
-      "CodeMirror 6 (editor de código e cores por linguagem; cada linguagem é carregada só quando aparece)"
+      "CodeMirror 6 (editor de código e cores por linguagem; cada linguagem é carregada só quando aparece)",
+      "Three.js 0.170 (o mundo 3D do Reino, carregado só nessa tela)"
     ],
     "arquitetura": {
       "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e a sorte das batalhas é sorteada no servidor. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",

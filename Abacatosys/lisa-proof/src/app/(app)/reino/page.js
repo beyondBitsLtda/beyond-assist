@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { obter, criar } from "@/lib/api.js";
 import { useAviso } from "@/componentes/Pecas.js";
 import Neuro, { reagir, comemorar } from "@/componentes/Neuro.js";
@@ -9,6 +10,12 @@ import {
   ATAQUES_POR_DIA, FATIA_DO_SAQUE, TETO_DO_SAQUE, SORTE, ESCUDO_APOS_DERROTA_HORAS, ESCUDO_DE_NOVATO_HORAS,
   HORAS_ATE_ENCHER, TROFEUS,
 } from "@/dominio/reino.js";
+
+// O mundo 3D (Three.js) só baixa nesta tela, e só no navegador.
+const Mundo3D = dynamic(() => import("@/componentes/reino/Mundo3D.js"), {
+  ssr: false,
+  loading: () => <div className="rn-mundo rn-mundo--carregando"><span>Montando o reino…</span></div>,
+});
 
 const numero = (n) => new Intl.NumberFormat("pt-BR").format(n || 0);
 const hora = (iso) => new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -29,6 +36,7 @@ export default function Reino() {
 
   useEffect(() => {
     obter("/api/reino").then(setReino).catch((e) => setErro(e.message));
+    obter("/api/reino/alvos").then(setAlvos).catch(() => {});
   }, []);
 
   async function agir(chave, corpo, aoTerminar) {
@@ -77,6 +85,11 @@ export default function Reino() {
   }
 
   const restantes = reino.invasoes.porDia - reino.invasoes.feitasHoje;
+  const disponiveis = alvos ? alvos.alvos.filter((a) => a.pode).length : null;
+  const escudoMaisCurto = alvos?.alvos.filter((a) => a.escudoAte).map((a) => a.escudoAte).sort()[0] || null;
+  const irParaInvasoes = () => document.getElementById("invadir")?.scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start",
+  });
 
   return (
     <>
@@ -88,16 +101,21 @@ export default function Reino() {
       </div>
 
       {/* ------------------------------------------------------------ vista e números */}
-      <section className="rn-vista" aria-label="Vista do reino">
-        <div className="rn-vista__chao">
-          {reino.construcoes.filter((c) => c.chave !== "castelo").slice(0, 2).map((c) => <Predio key={c.chave} c={c} />)}
-          <div className="rn-vista__centro">
-            <Predio c={reino.construcoes.find((c) => c.chave === "castelo")} grande />
-            <div className="rn-vista__neuro"><Neuro tamanho={84} ouvir humor={reino.escudoAte ? "normal" : "feliz"} /></div>
-          </div>
-          {reino.construcoes.filter((c) => c.chave !== "castelo").slice(2).map((c) => <Predio key={c.chave} c={c} />)}
-        </div>
-      </section>
+      <VistaDoReino reino={reino} />
+
+      {/* o atalho para a briga: logo abaixo do mundo, com quantos alvos há agora */}
+      <div className="rn-acoes">
+        <button type="button" className="pf-botao rn-acoes__invadir" onClick={irParaInvasoes}>
+          ⚔️ Invadir reinos <span className="rn-acoes__conta">{restantes > 0 ? `${restantes} de ${reino.invasoes.porDia} hoje` : "acabaram as de hoje"}</span>
+        </button>
+        <span className="rn-acoes__nota">
+          {disponiveis == null ? "procurando reinos…"
+            : disponiveis > 0 ? `${disponiveis} reino(s) para invadir agora`
+            : alvos.alvos.length === 0 ? "ainda não há outros reinos"
+            : `todos estão com escudo${escudoMaisCurto ? ` · o primeiro abre ${hora(escudoMaisCurto)}` : ""}`}
+        </span>
+        <Link href="/ranking" className="pf-botao pf-botao--sec rn-acoes__ranking">🏆 Ranking</Link>
+      </div>
 
       <div className="rn-numeros">
         <Numero rotulo="Moedas" valor={<Moedas n={reino.saldo} />} nota={`${numero(reino.cofre.protege)} a salvo no cofre`} />
@@ -133,7 +151,7 @@ export default function Reino() {
         <h2 className="pf-secao__titulo">Construções <small>nenhuma passa do nível da Torre do Neuro</small></h2>
         <div className="rn-construcoes">
           {reino.construcoes.map((c) => (
-            <article key={c.chave} className="pf-cartao rn-construcao">
+            <article key={c.chave} id={`construcao-${c.chave}`} tabIndex={-1} className="pf-cartao rn-construcao">
               <div className="rn-construcao__topo">
                 <span className="rn-construcao__emoji" aria-hidden="true">{c.emoji}</span>
                 <div>
@@ -155,16 +173,19 @@ export default function Reino() {
       </section>
 
       {/* ------------------------------------------------------------ invasões */}
-      <section className="pf-secao">
+      <section className="pf-secao" id="invadir">
         <h2 className="pf-secao__titulo">Invadir outros reinos <small>{restantes > 0 ? `${restantes} de ${reino.invasoes.porDia} invasões hoje` : "as invasões de hoje acabaram"}</small></h2>
         {resultado && <ResultadoDaBatalha r={resultado} aoFechar={() => setResultado(null)} />}
-        {!alvos ? (
-          <div className="pf-cartao rn-procurar">
-            <p className="pf-estat__nota" style={{ marginTop: 0 }}>Os reinos com troféus parecidos com os seus aparecem primeiro. A defesa de cada um aparece em faixa — o número exato só se descobre na batalha.</p>
-            <button type="button" className="pf-botao" onClick={carregarAlvos}>Procurar reinos</button>
+        {alvos && alvos.alvos.length > 0 && disponiveis === 0 && (
+          <div className="pf-aviso" style={{ marginBottom: 12 }}>
+            Todos os reinos estão protegidos por escudo agora{escudoMaisCurto ? ` — o primeiro escudo acaba ${hora(escudoMaisCurto)}` : ""}.
+            Reino novo nasce com {ESCUDO_DE_NOVATO_HORAS} h de escudo e quem cai ganha {ESCUDO_APOS_DERROTA_HORAS} h.
           </div>
+        )}
+        {!alvos ? (
+          <div className="pf-cartao"><p className="pf-estat__nota" style={{ marginTop: 0 }}>Procurando reinos…</p></div>
         ) : alvos.alvos.length === 0 ? (
-          <div className="pf-cartao"><p className="pf-estat__nota" style={{ marginTop: 0 }}>Ainda não há outros reinos. Quando outras pessoas abrirem o Reino delas, elas aparecem aqui.</p></div>
+          <div className="pf-cartao"><p className="pf-estat__nota" style={{ marginTop: 0 }}>Ainda não há outros reinos. Um reino aparece aqui quando a pessoa abre a tela Reino pela primeira vez — chame quem estuda com você!</p></div>
         ) : (
           <div className="pf-cartao rk-tabela-caixa">
             <table className="rx-tabela rn-alvos">
@@ -220,6 +241,45 @@ export default function Reino() {
       <Regras />
       {Aviso}
     </>
+  );
+}
+
+/** Leva até o cartão da construção escolhida no mundo e dá uma piscada nele. */
+function irParaConstrucao(chave) {
+  const el = document.getElementById(`construcao-${chave}`);
+  if (!el) return;
+  const suave = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "center" });
+  el.classList.remove("rn-construcao--destaque");
+  void el.offsetWidth;
+  el.classList.add("rn-construcao--destaque");
+  (el.querySelector("button:not(:disabled)") || el).focus({ preventScroll: true });
+}
+
+/** O mundo 3D; se o aparelho não tiver WebGL, a vista plana de antes. */
+function VistaDoReino({ reino }) {
+  const [plana, setPlana] = useState(false);
+  const humor = reino.escudoAte ? "normal" : "feliz";
+  if (plana) return <VistaPlana reino={reino} humor={humor} />;
+  return (
+    <section aria-label="Vista do reino">
+      <Mundo3D construcoes={reino.construcoes} humor={humor} aoEscolher={irParaConstrucao} aoFalhar={() => setPlana(true)} />
+    </section>
+  );
+}
+
+function VistaPlana({ reino, humor }) {
+  return (
+    <section className="rn-vista" aria-label="Vista do reino">
+      <div className="rn-vista__chao">
+        {reino.construcoes.filter((c) => c.chave !== "castelo").slice(0, 2).map((c) => <Predio key={c.chave} c={c} />)}
+        <div className="rn-vista__centro">
+          <Predio c={reino.construcoes.find((c) => c.chave === "castelo")} grande />
+          <div className="rn-vista__neuro"><Neuro tamanho={84} ouvir humor={humor} /></div>
+        </div>
+        {reino.construcoes.filter((c) => c.chave !== "castelo").slice(2).map((c) => <Predio key={c.chave} c={c} />)}
+      </div>
+    </section>
   );
 }
 
