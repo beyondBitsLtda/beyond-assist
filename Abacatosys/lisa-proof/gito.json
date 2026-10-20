@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.3.0-cloudflare-pages.1",
+  "versao": "0.3.1-proof-chamado-balao.1",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 9,
+    "numero": 10,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.3.1-proof-chamado-balao.1",
+      "data": "2026-10-20",
+      "branch": "proof-chamado-balao",
+      "tipo": "correcao",
+      "resumo": "O balão de fala do Neuro (e qualquer coisa posicionada na página) ficava por cima da janela de \"Reportar problema\".",
+      "itens": [
+        "As janelas do Proof (Reportar problema, detalhes do mapa da trilha) passam a abrir direto na raiz da página. Abertas pela barra lateral ou pelo topo do celular, elas ficavam presas na camada da barra, e o balão do Neuro cobria o título e a dica — relatado pelo próprio Reportar problema no primeiro chamado."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.3.0-cloudflare-pages.1",
       "data": "2026-10-20",
