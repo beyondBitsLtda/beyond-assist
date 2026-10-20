@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.6.0-proof-simulador.1",
+  "versao": "0.6.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 18,
+    "numero": 19,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.6.0-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.6.0: modo simulação de batalha no Reino, com as regras explicadas.",
+      "itens": [
+        "Junta a branch proof-simulador (0.6.0-proof-simulador.1). Sem migração de banco."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.6.0-proof-simulador.1",
       "data": "2026-10-20",
