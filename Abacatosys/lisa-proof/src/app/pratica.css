@@ -176,3 +176,7 @@
 .hoje__neuro { display: flex; align-items: center; margin-bottom: 16px; }
 .hoje__pratica { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 640px) { .hoje__pratica { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* bloco do diário + o "mais um hoje" logo abaixo */
+.pratica__celula { display: grid; gap: 6px; align-content: start; }
+.pratica__mais { justify-self: start; }

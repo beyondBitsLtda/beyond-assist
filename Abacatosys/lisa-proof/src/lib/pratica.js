@@ -14,10 +14,11 @@ import { lerRepositorio, ErroDoGitHub } from "./github.js";
 import { diaDe, inicioDaSemana, inicioDoMes } from "@/dominio/datas.js";
 import {
   TIPOS_DE_DESAFIO, NOMES_DOS_DESAFIOS, TENTATIVAS, NOTA_DE_APROVACAO, periodoDe, fimDoPeriodo, periodoPermitido,
-  pontosDoQuiz, pontosDaNota, quizParaTela, assuntoAtual, assuntosDoPeriodo,
+  pontosDoQuiz, pontosDaNota, quizParaTela, podeReenviar, entregaConcluida, assuntoAtual, assuntosDoPeriodo,
+  RODADAS_POR_DIA, podeAbrirRodada, comFatorDaRodada,
 } from "@/dominio/pratica.js";
 
-const CAMPOS = "id, usuario_id, trilha_id, tipo, periodo, card_ids, titulo, conteudo, status, resposta, avaliacao, nota, pontos, tentativas, criado_em, atualizado_em";
+const CAMPOS = "id, usuario_id, trilha_id, tipo, periodo, rodada, card_ids, titulo, conteudo, status, resposta, avaliacao, nota, pontos, tentativas, criado_em, atualizado_em";
 
 function falhou(error, onde) {
   if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`);
@@ -65,6 +66,8 @@ export function desafioParaTela(d, tema) {
     tipo: d.tipo,
     nome: NOMES_DOS_DESAFIOS[d.tipo],
     periodo: d.periodo,
+    rodada: d.rodada || 1,
+    maxRodadas: RODADAS_POR_DIA[d.tipo] || 1,
     ate: fimDoPeriodo(d.tipo, d.periodo),
     titulo: d.titulo,
     status: d.status,
@@ -99,15 +102,31 @@ export async function resumoDaPratica(usuarioId, trilhas, hoje = diaDe()) {
   const [etapas, desafiosR] = await Promise.all([
     etapasDasTrilhas(ids),
     supabase.from("proof_desafios")
-      .select("id, trilha_id, tipo, periodo, status, nota, pontos, titulo")
+      .select("id, trilha_id, tipo, periodo, rodada, status, nota, pontos, titulo, tentativas")
       .eq("usuario_id", usuarioId)
       .in("periodo", [...new Set([hoje, semana, mes])]),
   ]);
   falhou(desafiosR.error, "desafios");
 
+  const doPeriodo = (trilhaId, tipo, periodo) =>
+    (desafiosR.data || []).filter((d) => d.trilha_id === trilhaId && d.tipo === tipo && d.periodo === periodo);
+  // a rodada mais recente é a que aparece; "feito" vale se QUALQUER rodada do dia foi concluída
   const achar = (trilhaId, tipo, periodo) =>
-    (desafiosR.data || []).find((d) => d.trilha_id === trilhaId && d.tipo === tipo && d.periodo === periodo) || null;
-  const curto = (d) => (d ? { id: d.id, status: d.status, nota: d.nota, pontos: d.pontos, titulo: d.titulo } : null);
+    doPeriodo(trilhaId, tipo, periodo).reduce((m, d) => (!m || (d.rodada || 1) > (m.rodada || 1) ? d : m), null);
+  const curto = (d) => (d ? { id: d.id, status: d.status, nota: d.nota, pontos: d.pontos, titulo: d.titulo, tentativas: d.tentativas, rodada: d.rodada || 1 } : null);
+  const diario = (trilhaId, tipo) => {
+    const lista = doPeriodo(trilhaId, tipo, hoje);
+    const atual = curto(achar(trilhaId, tipo, hoje));
+    if (!atual) return null;
+    return {
+      ...atual,
+      rodadas: lista.length,
+      maxRodadas: RODADAS_POR_DIA[tipo],
+      feito: lista.some((d) => d.status === "concluido"),
+      podeMais: podeAbrirRodada(tipo, lista).ok,
+      pontosDoDia: lista.reduce((s, d) => s + (d.pontos || 0), 0),
+    };
+  };
 
   return trilhas.map((t) => {
     const atual = assuntoAtual(etapas.get(t.id) || [], hoje);
@@ -115,8 +134,8 @@ export async function resumoDaPratica(usuarioId, trilhas, hoje = diaDe()) {
       trilhaId: t.id,
       tema: t.tema,
       assunto: atual ? { cardId: atual.cardId, titulo: atual.titulo } : null,
-      quiz: curto(achar(t.id, "quiz", hoje)),
-      exercicio: curto(achar(t.id, "exercicio", hoje)),
+      quiz: diario(t.id, "quiz"),
+      exercicio: diario(t.id, "exercicio"),
       projetoSemanal: { periodo: semana, ...(curto(achar(t.id, "projeto_semanal", semana)) || { status: null }) },
       projetoMensal: { periodo: mes, ...(curto(achar(t.id, "projeto_mensal", mes)) || { status: null }) },
     };
@@ -132,17 +151,27 @@ export async function resumoDaPratica(usuarioId, trilhas, hoje = diaDe()) {
  * fica se dois pedidos chegarem juntos: o segundo perde o insert e devolve o do primeiro. Gasta
  * uma chamada de IA à toa nesse caso raro, mas nunca cria dois quizzes do mesmo dia.
  */
-export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo }) {
+export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, novaRodada = false }) {
   if (!TIPOS_DE_DESAFIO.includes(tipo)) throw new ErroDeAcesso(400, "tipo de desafio inválido");
   const hoje = diaDe();
   const alvo = periodo || periodoDe(tipo, hoje);
   if (!periodoPermitido(tipo, alvo, hoje)) throw new ErroDeAcesso(400, "este período ainda não está liberado");
 
   const trilha = await trilhaDoUsuario(trilhaId, usuarioId);
-  const existente = await supabase.from("proof_desafios").select(CAMPOS)
-    .eq("usuario_id", usuarioId).eq("trilha_id", trilha.id).eq("tipo", tipo).eq("periodo", alvo).maybeSingle();
-  falhou(existente.error, "desafio");
-  if (existente.data) return { desafio: existente.data, tema: trilha.tema, novo: false };
+  const existentes = await supabase.from("proof_desafios").select(CAMPOS)
+    .eq("usuario_id", usuarioId).eq("trilha_id", trilha.id).eq("tipo", tipo).eq("periodo", alvo).order("rodada");
+  falhou(existentes.error, "desafio");
+  const doDia = existentes.data || [];
+
+  // Sem pedir rodada nova: devolve a mais recente (ou cria a primeira).
+  let rodada = 1;
+  if (!novaRodada || !RODADAS_POR_DIA[tipo]) {
+    if (doDia.length) return { desafio: doDia[doDia.length - 1], tema: trilha.tema, novo: false };
+  } else {
+    const pode = podeAbrirRodada(tipo, doDia);
+    if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
+    rodada = pode.rodada;
+  }
 
   await quadroDeEstudo(trilha.quadro_id, usuarioId); // o quadro ainda é desta pessoa e de estudo
   if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
@@ -151,13 +180,18 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo }
   const assuntos = assuntosPara(tipo, alvo, etapas, hoje);
   if (!assuntos.length) throw new ErroDeAcesso(400, "a trilha não tem assuntos para praticar");
 
+  // as rodadas de antes, para a IA não repetir pergunta nem exercício
+  const evitar = doDia.flatMap((d) => (tipo === "quiz"
+    ? (d.conteudo?.perguntas || []).map((p) => p.pergunta)
+    : [`${d.titulo}: ${String(d.conteudo?.enunciado || "").slice(0, 300)}`]));
+
   let conteudo, titulo;
   try {
     if (tipo === "quiz") {
-      conteudo = await gerarQuiz({ tema: trilha.tema, assunto: assuntos[0] });
-      titulo = `Quiz: ${assuntos[0].titulo}`;
+      conteudo = await gerarQuiz({ tema: trilha.tema, assunto: assuntos[0], evitar });
+      titulo = `Quiz${rodada > 1 ? ` ${rodada}` : ""}: ${assuntos[0].titulo}`;
     } else if (tipo === "exercicio") {
-      conteudo = await gerarExercicio({ tema: trilha.tema, assunto: assuntos[0] });
+      conteudo = await gerarExercicio({ tema: trilha.tema, assunto: assuntos[0], evitar });
       titulo = conteudo.titulo;
     } else {
       conteudo = await gerarProjeto({ tema: trilha.tema, tipo, assuntos });
@@ -168,13 +202,13 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo }
   }
 
   const { data, error } = await supabase.from("proof_desafios").insert({
-    usuario_id: usuarioId, trilha_id: trilha.id, tipo, periodo: alvo,
+    usuario_id: usuarioId, trilha_id: trilha.id, tipo, periodo: alvo, rodada,
     card_ids: assuntos.map((a) => a.cardId), titulo: String(titulo).slice(0, 200), conteudo,
   }).select(CAMPOS).single();
 
   if (error?.code === "23505") {
     const { data: ganhou } = await supabase.from("proof_desafios").select(CAMPOS)
-      .eq("usuario_id", usuarioId).eq("trilha_id", trilha.id).eq("tipo", tipo).eq("periodo", alvo).single();
+      .eq("usuario_id", usuarioId).eq("trilha_id", trilha.id).eq("tipo", tipo).eq("periodo", alvo).eq("rodada", rodada).single();
     return { desafio: ganhou, tema: trilha.tema, novo: false };
   }
   falhou(error, "desafio");
@@ -209,7 +243,7 @@ export async function responderQuiz({ usuarioId, id, indice, escolha }) {
   const acertos = Object.entries(escolhas).filter(([k, v]) => perguntas[Number(k)].correta === v).length;
   const terminou = respondidas === perguntas.length;
 
-  const pontosDoDesafio = terminou ? pontosDoQuiz(acertos, perguntas.length) : 0;
+  const pontosDoDesafio = terminou ? comFatorDaRodada(pontosDoQuiz(acertos, perguntas.length), d.rodada) : 0;
   const estudavaAntes = terminou ? await estudouHoje(usuarioId) : true;
   await salvar(d.id, {
     resposta: { escolhas },
@@ -238,19 +272,17 @@ export async function responderQuiz({ usuarioId, id, indice, escolha }) {
 }
 
 function exigirReenvio(d) {
-  const maximo = TENTATIVAS[d.tipo];
-  if (d.status === "concluido") {
-    throw new ErroDeAcesso(409, d.nota >= NOTA_DE_APROVACAO ? "este desafio já foi aprovado" : "as tentativas deste desafio acabaram");
-  }
-  if (d.tentativas >= maximo) throw new ErroDeAcesso(409, "as tentativas deste desafio acabaram");
+  if (podeReenviar(d)) return;
+  if (d.tentativas >= TENTATIVAS[d.tipo]) throw new ErroDeAcesso(409, "as tentativas deste desafio acabaram");
+  throw new ErroDeAcesso(409, "este desafio já foi aprovado");
 }
 
 /** Fecha uma entrega avaliada: grava, pontua pela melhor nota e diz se ainda dá para reenviar. */
 async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
   const tentativas = d.tentativas + 1;
   const melhorNota = Math.max(d.nota ?? 0, avaliacao.nota);
-  const pontosDoDesafio = pontosDaNota(d.tipo, melhorNota);
-  const acabou = avaliacao.aprovado || tentativas >= TENTATIVAS[d.tipo];
+  const pontosDoDesafio = comFatorDaRodada(pontosDaNota(d.tipo, melhorNota), d.rodada);
+  const acabou = entregaConcluida({ tipo: d.tipo, melhorNota, tentativas });
   const estudavaAntes = await estudouHoje(usuarioId);
 
   await salvar(d.id, {
@@ -274,6 +306,7 @@ async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
     tentativas,
     restantes: Math.max(0, TENTATIVAS[d.tipo] - tentativas),
     concluido: acabou,
+    reenviar: podeReenviar({ tipo: d.tipo, tentativas, status: acabou ? "concluido" : "em_andamento" }),
     ...resultadoDaPontuacao(pontos, extra),
   };
 }

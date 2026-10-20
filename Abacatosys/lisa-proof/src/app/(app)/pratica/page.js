@@ -5,14 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { obter, criar } from "@/lib/api.js";
 import { formatarDia } from "@/dominio/datas.js";
-import { NOTA_DE_APROVACAO, PONTOS_DA_PRATICA, fimDoPeriodo } from "@/dominio/pratica.js";
+import { NOTA_DE_APROVACAO, PONTOS_DA_PRATICA, TENTATIVAS, fimDoPeriodo } from "@/dominio/pratica.js";
 import Neuro, { reagir } from "@/componentes/Neuro.js";
 
 /** O que o Neuro diz ao abrir a prática: a cobrança do dia. */
 function falaDoNeuro(trilhas) {
   if (!trilhas.length) return { humor: "surpreso", fala: "Monte uma trilha primeiro, e aí eu preparo a prática para você!" };
-  const quizPendente = trilhas.filter((t) => t.quiz?.status !== "concluido").length;
-  const exercicioPendente = trilhas.filter((t) => t.exercicio?.status !== "concluido").length;
+  const quizPendente = trilhas.filter((t) => !t.quiz?.feito).length;
+  const exercicioPendente = trilhas.filter((t) => !t.exercicio?.feito).length;
   if (quizPendente) return { humor: "surpreso", fala: `Ei! ${quizPendente === 1 ? "O quiz de hoje está" : `${quizPendente} quizzes de hoje estão`} te esperando. São só 5 perguntas!` };
   if (exercicioPendente) return { humor: "feliz", fala: "Quiz feito! Que tal o exercício do dia para fechar com chave de ouro?" };
   return { humor: "comemorando", fala: "Prática do dia completa! Você está voando. 🚀" };
@@ -20,9 +20,19 @@ function falaDoNeuro(trilhas) {
 
 function situacaoDoDiario(d, tipo) {
   if (!d?.status) return { texto: tipo === "quiz" ? "5 perguntas" : "10 a 20 minutos", acao: "Começar", classe: "" };
+  // da 2ª rodada em diante, o bloco diz em qual está (e o "feito" do dia já vale)
+  if (d.rodada > 1 && d.status !== "concluido") {
+    return { texto: `Rodada ${d.rodada} de ${d.maxRodadas} · vale metade dos pontos`, acao: "Continuar", classe: "pratica__bloco--feito" };
+  }
   if (d.status === "concluido") {
     const ok = (d.nota ?? 0) >= NOTA_DE_APROVACAO;
-    return { texto: `${tipo === "quiz" ? "Acertos" : "Nota"}: ${d.nota}% · +${d.pontos} pts`, acao: "Rever", classe: ok ? "pratica__bloco--feito" : "pratica__bloco--parcial" };
+    // exercício aprovado com tentativa sobrando: dá para buscar uma nota maior
+    const sobra = tipo === "exercicio" && (d.tentativas ?? 0) < TENTATIVAS.exercicio && (d.nota ?? 0) < 100;
+    return {
+      texto: `${tipo === "quiz" ? "Acertos" : "Nota"}: ${d.nota}% · +${d.pontos} pts${sobra ? ` · ${TENTATIVAS.exercicio - (d.tentativas ?? 0)} tentativa(s) para melhorar` : ""}`,
+      acao: sobra ? "Melhorar nota" : "Rever",
+      classe: ok ? "pratica__bloco--feito" : "pratica__bloco--parcial",
+    };
   }
   return { texto: tipo === "quiz" ? "Em andamento" : `Nota até agora: ${d.nota ?? "—"}`, acao: "Continuar", classe: "pratica__bloco--andamento" };
 }
@@ -43,6 +53,16 @@ const ROTULOS = {
   projeto_semanal: { titulo: "Projeto da semana", icone: "🎁", pontos: `até ${PONTOS_DA_PRATICA.projeto_semanal} pts` },
   projeto_mensal: { titulo: "Projeto do mês", icone: "🏆", pontos: `até ${PONTOS_DA_PRATICA.projeto_mensal} pts` },
 };
+
+/** "Mais um quiz/exercício hoje": aparece quando a rodada atual acabou e ainda cabe outra. */
+function MaisUma({ tipo, d, ocupado, aoPedir }) {
+  if (!d?.podeMais) return null;
+  return (
+    <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno pratica__mais" onClick={aoPedir} disabled={ocupado}>
+      {ocupado ? "Preparando…" : `+ Mais ${tipo === "quiz" ? "um quiz" : "um exercício"} hoje (${d.rodadas + 1}/${d.maxRodadas}) · metade dos pontos`}
+    </button>
+  );
+}
 
 function Bloco({ tipo, situacao, ocupado, aoAbrir }) {
   const r = ROTULOS[tipo];
@@ -69,14 +89,14 @@ export default function Pratica() {
     obter("/api/pratica").then(setDados).catch((e) => setErro(e.message));
   }, []);
 
-  async function abrir(trilha, tipo, existente, periodo) {
-    if (existente?.id) return router.push(`/pratica/${existente.id}`);
-    const chave = `${trilha.trilhaId}:${tipo}`;
+  async function abrir(trilha, tipo, existente, periodo, novaRodada = false) {
+    if (existente?.id && !novaRodada) return router.push(`/pratica/${existente.id}`);
+    const chave = `${trilha.trilhaId}:${tipo}${novaRodada ? ":mais" : ""}`;
     setOcupado(chave);
     setErro("");
     reagir("pensando", tipo === "quiz" ? "Preparando perguntas fresquinhas…" : "Pensando num desafio do seu nível…", 30000);
     try {
-      const r = await criar("/api/desafios", { trilhaId: trilha.trilhaId, tipo, periodo });
+      const r = await criar("/api/desafios", { trilhaId: trilha.trilhaId, tipo, periodo, novaRodada });
       router.push(`/pratica/${r.desafio.id}`);
     } catch (e) {
       setErro(e.message);
@@ -121,10 +141,16 @@ export default function Pratica() {
               <small>{t.assunto ? `Assunto de hoje: ${t.assunto.titulo}` : ""}</small>
             </h2>
             <div className="pratica__grade">
-              <Bloco tipo="quiz" situacao={situacaoDoDiario(t.quiz, "quiz")} ocupado={ocupado === `${t.trilhaId}:quiz`}
-                aoAbrir={() => abrir(t, "quiz", t.quiz)} />
-              <Bloco tipo="exercicio" situacao={situacaoDoDiario(t.exercicio, "exercicio")} ocupado={ocupado === `${t.trilhaId}:exercicio`}
-                aoAbrir={() => abrir(t, "exercicio", t.exercicio)} />
+              <div className="pratica__celula">
+                <Bloco tipo="quiz" situacao={situacaoDoDiario(t.quiz, "quiz")} ocupado={ocupado === `${t.trilhaId}:quiz`}
+                  aoAbrir={() => abrir(t, "quiz", t.quiz)} />
+                <MaisUma tipo="quiz" d={t.quiz} ocupado={ocupado === `${t.trilhaId}:quiz:mais`} aoPedir={() => abrir(t, "quiz", t.quiz, undefined, true)} />
+              </div>
+              <div className="pratica__celula">
+                <Bloco tipo="exercicio" situacao={situacaoDoDiario(t.exercicio, "exercicio")} ocupado={ocupado === `${t.trilhaId}:exercicio`}
+                  aoAbrir={() => abrir(t, "exercicio", t.exercicio)} />
+                <MaisUma tipo="exercicio" d={t.exercicio} ocupado={ocupado === `${t.trilhaId}:exercicio:mais`} aoPedir={() => abrir(t, "exercicio", t.exercicio, undefined, true)} />
+              </div>
               <Bloco tipo="projeto_semanal" situacao={situacaoDoProjeto(t.projetoSemanal, "projeto_semanal")} ocupado={ocupado === `${t.trilhaId}:projeto_semanal`}
                 aoAbrir={() => abrir(t, "projeto_semanal", t.projetoSemanal, t.projetoSemanal.periodo)} />
               <Bloco tipo="projeto_mensal" situacao={situacaoDoProjeto(t.projetoMensal, "projeto_mensal")} ocupado={ocupado === `${t.trilhaId}:projeto_mensal`}

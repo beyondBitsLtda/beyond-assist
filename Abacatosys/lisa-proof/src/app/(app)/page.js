@@ -17,7 +17,7 @@ function falaDoNeuro(dados) {
   const { resumo, tarefas, pratica } = dados;
   const o = resumo.ofensiva;
   const pendentes = tarefas.filter((t) => t.situacao !== "feita").length;
-  const quizPendente = pratica.some((p) => p.quiz?.status !== "concluido");
+  const quizPendente = pratica.some((p) => !p.quiz?.feito);
 
   if (dados.trilhas === 0) return { humor: "surpreso", fala: "Oi, eu sou o Neuro! Me diz o que você quer aprender e a Lisa monta o curso inteiro." };
   if (o.emRisco) return { humor: "triste", fala: `Sua ofensiva de ${o.atual} ${o.atual === 1 ? "dia" : "dias"} está em risco! Bora estudar só um pouquinho?` };
@@ -144,9 +144,9 @@ export default function Hoje() {
           </h2>
           <div className="hoje__pratica">
             {dados.pratica.map((p) => {
-              const diarioFeito = p.quiz?.status === "concluido" && p.exercicio?.status === "concluido";
+              const diarioFeito = Boolean(p.quiz?.feito && p.exercicio?.feito);
               return (
-                <Link key={p.trilhaId} href="/pratica" className={`pratica__bloco${diarioFeito ? " pratica__bloco--feito" : p.quiz?.status === "concluido" ? " pratica__bloco--andamento" : ""}`}>
+                <Link key={p.trilhaId} href="/pratica" className={`pratica__bloco${diarioFeito ? " pratica__bloco--feito" : p.quiz?.feito ? " pratica__bloco--andamento" : ""}`}>
                   <span className="pratica__icone" aria-hidden="true">{diarioFeito ? "🏅" : "⚡"}</span>
                   <span className="pratica__textos">
                     <strong>{p.tema}</strong>

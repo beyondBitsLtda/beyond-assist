@@ -23,6 +23,26 @@ export const IconeProgresso = () => (
   <svg {...base}><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
 );
 
+// Raio-X: a silhueta de uma pessoa dentro do quadro de uma chapa
+export const IconeRaioX = () => (
+  <svg {...base}><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="12" cy="9" r="2.5" /><path d="M7.5 17.5c.8-2.4 2.5-3.5 4.5-3.5s3.7 1.1 4.5 3.5" /></svg>
+);
+
+// Ranking: o pódio
+export const IconeRanking = () => (
+  <svg {...base}><path d="M9 21V10h6v11M3 21v-6h6M15 21v-8h6v8M2 21h20M12 3l1 2 2 .3-1.5 1.4.4 2.1L12 7.8l-1.9 1 .4-2.1L9 5.3 11 5z" /></svg>
+);
+
+// Reino: o castelo
+export const IconeReino = () => (
+  <svg {...base}><path d="M4 21V9l2-1V5h2v2l2-1V4h4v2l2 1V5h2v3l2 1v12zM10 21v-4a2 2 0 0 1 4 0v4M2 21h20" /></svg>
+);
+
+// Mais: três pontos
+export const IconeMais = () => (
+  <svg {...base}><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>
+);
+
 export const IconeCerto = () => (
   <svg {...base} strokeWidth={3.5}><path d="M5 12.5l4.5 4.5L19 7" /></svg>
 );

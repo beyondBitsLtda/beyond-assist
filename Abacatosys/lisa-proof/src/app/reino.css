@@ -1,0 +1,132 @@
+/* ============================================================ Ranking e Reino do Neuro */
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ------------------------------------------------------------ ranking */
+.rk-eu { display: flex; align-items: center; gap: 16px; }
+.rk-eu__posicao {
+  flex: none; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 18px;
+  background: var(--pf-destaque-fundo); color: #FFFFFF; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.rk-tabela-caixa { padding: 0; overflow: hidden; }
+.rk-tabela td, .rk-tabela th { padding: 10px 12px; }
+.rk-col-pos { width: 48px; font-size: 15px; text-align: center !important; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rk-col-valor { text-align: right !important; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rk-sub { display: block; font-size: 12px; font-weight: 400; color: var(--pf-tinta-2); }
+.rk-voce { margin-left: 8px; vertical-align: middle; }
+.rk-linha--eu { background: var(--pf-sucesso-fundo); }
+.rk-tabela td.rk-col-pos:not(:empty) { font-size: 15px; }
+.rk-medalha { font-size: 22px; line-height: 1; }
+.rk-reticencias td { text-align: center; color: var(--pf-tinta-2); padding: 4px; }
+.rk-perfil { display: grid; gap: 12px; }
+.rk-perfil__linha { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+@media (max-width: 560px) { .rk-col-extra { display: none; } }
+
+/* ------------------------------------------------------------ reino: a vista */
+.rn-vista {
+  border-radius: var(--pf-raio-grande); overflow: hidden; border: 1px solid var(--pf-linha);
+  background: linear-gradient(180deg, #CFE8F7 0%, #E6F4EA 58%, #A7D7AF 58%, #8CC995 100%);
+  padding: 18px 12px 14px;
+}
+:root[data-tema="escuro"] .rn-vista { background: linear-gradient(180deg, #14233A 0%, #1B2B3F 58%, #1D3B27 58%, #163020 100%); }
+.rn-vista__chao { display: flex; align-items: flex-end; justify-content: center; gap: clamp(4px, 2vw, 18px); min-height: 150px; }
+.rn-vista__centro { display: flex; align-items: flex-end; gap: 2px; }
+.rn-vista__neuro { margin-bottom: -8px; }
+.rn-predio { display: grid; justify-items: center; gap: 2px; }
+/* o prédio cresce com o nível: um jeito de "ver" o reino evoluir sem desenhar 30 sprites */
+.rn-predio__emoji { font-size: calc(26px + var(--nivel, 0) * 5px); line-height: 1; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.18)); }
+.rn-predio--grande .rn-predio__emoji { font-size: calc(46px + var(--nivel, 1) * 7px); }
+.rn-predio--vazio .rn-predio__emoji { opacity: 0.55; font-size: 24px; }
+.rn-predio__nivel {
+  font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 9999px;
+  background: rgba(17, 24, 20, 0.78); color: #FFFFFF; white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .rn-vista { padding: 12px 6px 10px; }
+  .rn-vista__chao { gap: 3px; min-height: 110px; }
+  .rn-predio__nivel { font-size: 10px; padding: 1px 5px; }
+  .rn-vista__neuro .neuro { --neuro-tamanho: 62px !important; }
+}
+@media (max-width: 480px) { .rn-predio__emoji { font-size: calc(20px + var(--nivel, 0) * 3px); } .rn-predio--grande .rn-predio__emoji { font-size: calc(36px + var(--nivel, 1) * 5px); } }
+
+.rn-numeros { display: grid; gap: 12px; margin-top: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 900px) { .rn-numeros { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.rn-numero .pf-estat__valor { font-size: 20px; overflow-wrap: anywhere; }
+.rn-numero .pf-estat__nota { margin-bottom: 0; }
+.rn-moedas { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------ botões com motivo */
+.rn-botao { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+/* travado de verdade parece travado: cinza, não um verde apagado que lembra "carregando" */
+.rn-botao .pf-botao:disabled { cursor: not-allowed; opacity: 1; background: var(--pf-superficie-2); border-color: var(--pf-linha); color: var(--pf-tinta-2); }
+.rn-motivo { font-size: 12px; color: var(--pf-tinta-2); }
+
+/* ------------------------------------------------------------ construções */
+.rn-construcoes { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .rn-construcoes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .rn-construcoes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.rn-construcao { display: flex; flex-direction: column; }
+.rn-construcao .rn-botao { margin-top: auto; padding-top: 12px; }
+.rn-construcao__topo { display: flex; align-items: center; gap: 12px; }
+.rn-construcao__topo h3 { margin: 0 0 4px; font-size: 16px; }
+.rn-construcao__emoji { font-size: 34px; line-height: 1; }
+.rn-construcao__proximo { color: var(--pf-verde-forte); }
+.rn-niveis { display: inline-flex; gap: 4px; }
+.rn-niveis span { width: 14px; height: 6px; border-radius: 3px; background: var(--pf-superficie-2); border: 1px solid var(--pf-linha); }
+.rn-niveis .rn-niveis__cheio { background: var(--pf-verde-forte); border-color: var(--pf-verde-forte); }
+
+/* ------------------------------------------------------------ invasões */
+.rn-procurar { display: grid; gap: 12px; justify-items: start; }
+.rn-alvos td, .rn-alvos th { padding: 10px 12px; }
+.rn-col-acao { text-align: right !important; white-space: nowrap; }
+.rn-col-acao .rn-motivo { white-space: normal; display: inline-block; max-width: 180px; text-align: right; }
+@media (max-width: 560px) { .rn-col-info { display: none; } }
+.rn-faixa--fraca { background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
+.rn-faixa--media { background: var(--pf-atencao-fundo); color: var(--pf-atencao); }
+.rn-faixa--forte, .rn-faixa--fortissima { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+
+.rn-resultado { margin-bottom: 12px; display: grid; gap: 8px; justify-items: start; border-width: 2px; }
+.rn-resultado p { margin: 0; }
+.rn-resultado__titulo { font-size: 18px; font-weight: 800; }
+.rn-resultado__titulo small { font-weight: 500; color: var(--pf-tinta-2); font-size: 14px; }
+.rn-resultado--venceu { border-color: var(--pf-verde); background: var(--pf-sucesso-fundo); }
+.rn-resultado--perdeu { border-color: var(--pf-alerta-fundo); }
+
+.rn-batalhas { list-style: none; margin: 0; padding: 0; display: grid; }
+.rn-batalhas li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--pf-linha); }
+.rn-batalhas li:last-child { border-bottom: 0; }
+.rn-batalha__icone { font-size: 22px; }
+.rn-batalha__texto { flex: 1; min-width: 0; font-size: 14px; }
+.rn-batalha__texto small { display: block; color: var(--pf-tinta-2); font-size: 12px; margin-top: 2px; }
+.rn-batalha__saldo { font-weight: 700; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rn-batalha--perdi .rn-batalha__saldo { color: var(--pf-alerta); }
+.rn-batalha--ganhei .rn-batalha__saldo { color: var(--pf-verde-forte); }
+
+.rn-renomear { background: none; border: none; color: var(--pf-verde-forte); cursor: pointer; font: inherit; font-size: 13px; padding: 4px; }
+.rn-renomear__form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.rn-renomear__form .pf-campo__entrada { flex: 1; min-width: 180px; }
+
+.rn-regras { display: grid; gap: 4px; }
+.rn-regras details { border-bottom: 1px solid var(--pf-linha); padding: 8px 0; }
+.rn-regras details:last-child { border-bottom: 0; }
+.rn-regras summary { cursor: pointer; font-weight: 700; min-height: 32px; display: flex; align-items: center; }
+.rn-regras p { margin: 6px 0 4px; font-size: 14px; color: var(--pf-tinta-2); line-height: 1.5; }
+
+/* ------------------------------------------------------------ navegação: "Mais" no celular */
+.pf-mais { position: relative; display: flex; }
+.pf-mais > .pf-abas__item { width: 100%; background: none; border: none; font: inherit; font-size: 11px; font-weight: 500; cursor: pointer; }
+.pf-mais__menu {
+  position: fixed; right: 8px; bottom: calc(var(--pf-nav-altura) + env(safe-area-inset-bottom) + 8px); z-index: 30;
+  min-width: 200px; padding: 6px; border-radius: 16px; display: grid;
+  background: var(--pf-superficie); border: 1px solid var(--pf-linha); box-shadow: var(--pf-sombra-alta);
+}
+.pf-mais__menu a {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px;
+  color: var(--pf-tinta); text-decoration: none; font-weight: 600; font-size: 15px;
+}
+.pf-mais__menu a svg { width: 20px; height: 20px; }
+.pf-mais__menu a:hover, .pf-mais__menu a:focus-visible { background: var(--pf-superficie-2); }
+.pf-mais__menu a[aria-current="page"] { color: var(--pf-verde-forte); }

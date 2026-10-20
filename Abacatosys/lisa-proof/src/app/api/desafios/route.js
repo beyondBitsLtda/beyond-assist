@@ -21,6 +21,7 @@ export async function POST(req) {
       trilhaId: String(corpo.trilhaId),
       tipo: String(corpo.tipo),
       periodo: corpo.periodo ? String(corpo.periodo) : undefined,
+      novaRodada: corpo.novaRodada === true, // "mais um quiz/exercício hoje"
     });
     return json({ ok: true, novo, desafio: desafioParaTela(desafio, tema) }, novo ? 201 : 200);
   } catch (e) {
