@@ -16,6 +16,10 @@ import Neuro from "@/componentes/Neuro.js";
  * resto do app: `reagir("feliz", "...")` também chega aqui.
  *
  * Arrastar gira a ilha; clicar numa construção (ou no rótulo dela) chama `aoEscolher(chave)`.
+ * Modo simulação: o evento de janela "reino-simular" ({ tipo: "atacar" | "defender", venceu,
+ * quartel, torre, aoTerminar }) encena a batalha com soldadinhos, flechas e moedas. A conta da
+ * batalha não é feita aqui (é de src/dominio/reino.js); aqui é só o teatro. Quem aceita marca
+ * `detail.aceito = true` — sem mundo 3D (ou com "reduzir movimento"), a tela mostra o resultado direto.
  * Sem WebGL, chama `aoFalhar()` e a tela volta para a vista plana. Com "reduzir movimento", o
  * Neuro fica parado na praça e as nuvens não andam.
  */
@@ -582,6 +586,179 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
     tela.addEventListener("pointerup", aoSoltar);
     tela.addEventListener("pointercancel", () => { ponteiro.ativo = false; });
 
+    // ---- modo simulação: soldadinhos, flechas e moedas
+    const geo = {
+      corpo: new THREE.ConeGeometry(0.15, 0.38, 6),
+      cabeca: new THREE.IcosahedronGeometry(0.1, 0),
+      lanca: new THREE.CylinderGeometry(0.012, 0.012, 0.5, 4),
+      flecha: new THREE.CylinderGeometry(0.016, 0.016, 0.45, 4).rotateX(Math.PI / 2),
+      moeda: new THREE.CylinderGeometry(0.11, 0.11, 0.035, 10),
+    };
+    const v3 = ([x, z], y = 0) => new THREE.Vector3(x, y, z);
+    const BORDA = new THREE.Vector3(5.3, 0, 4.7);
+    const suave = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
+    const fase = (tt, de, ate) => suave((tt - de) / (ate - de));
+    let sim = null;
+
+    function soldado(cor) {
+      const g = new THREE.Group();
+      const corpo = new THREE.Mesh(geo.corpo, p.mat(cor)); corpo.position.y = 0.19;
+      const cabeca = new THREE.Mesh(geo.cabeca, p.mat("#f2d3b1")); cabeca.position.y = 0.45;
+      const lanca = new THREE.Mesh(geo.lanca, p.mat("#8a8f98")); lanca.position.set(0.15, 0.33, 0);
+      // o boneco por dentro, maior; o grupo de fora é o que a animação estica e encolhe
+      const boneco = new THREE.Group();
+      boneco.add(corpo, cabeca, lanca);
+      boneco.scale.setScalar(1.7);
+      g.add(boneco);
+      g.traverse((m) => { m.castShadow = true; });
+      return g;
+    }
+    const falar = (humor, fala) => window.dispatchEvent(new CustomEvent("neuro", { detail: { humor, fala, duracao: 2600 } }));
+
+    function encerrarSimulacao() {
+      if (!sim) return;
+      mundo.remove(sim.grupo);
+      const fim = sim.aoTerminar;
+      sim = null;
+      sujo = true;
+      fim?.();
+    }
+
+    function iniciarSimulacao({ tipo, venceu, quartel = 0, torre: nivelTorre = 0, aoTerminar }) {
+      if (sim) { const antigo = sim.aoTerminar; sim.aoTerminar = null; encerrarSimulacao(); antigo?.(); }
+      const grupo = new THREE.Group();
+      mundo.add(grupo);
+      const atacando = tipo === "atacar";
+      const qtd = atacando ? 3 + Math.min(5, quartel) : 6;
+      const cor = atacando ? "#2f6fd6" : "#c8332f";
+      const casa = atacando ? v3(LUGARES.quartel).add(new THREE.Vector3(-0.5, 0, -0.5)) : v3(LUGARES.castelo).add(new THREE.Vector3(0.3, 0, 1.1));
+      const lateral = new THREE.Vector3().subVectors(BORDA, casa).normalize().cross(new THREE.Vector3(0, 1, 0));
+      const soldados = Array.from({ length: qtd }, (_, i) => {
+        const g = soldado(cor);
+        const fila = Math.floor(i / 3), coluna = (i % 3) - 1;
+        g.userData.desvio = lateral.clone().multiplyScalar(coluna * 0.38).add(new THREE.Vector3().subVectors(BORDA, casa).normalize().multiplyScalar(-fila * 0.4));
+        g.scale.setScalar(0.001);
+        grupo.add(g);
+        return g;
+      });
+
+      // quem cai, e quando (a flecha sai meio segundo antes)
+      const morrem = atacando ? [] : (venceu ? [1, 4] : soldados.map((_, i) => i));
+      const mortes = new Map(morrem.map((i, k) => [i, venceu ? 1.5 + k * 0.8 : 1.0 + (k * 2.0) / Math.max(1, morrem.length - 1)]));
+      const atirador = nivelTorre > 0 ? v3(LUGARES.torre, 1.4 + 0.3 * nivelTorre) : v3(LUGARES.castelo, 2.0);
+      const flechas = [];
+      if (!atacando) {
+        for (const [i, quando] of mortes) flechas.push({ alvo: i, parte: quando - 0.5, acerta: true });
+        if (venceu) for (let k = 0; k < 3; k++) flechas.push({ alvo: [0, 2, 3][k], parte: 1.2 + k * 0.6, acerta: false });
+        for (const fl of flechas) { fl.malha = new THREE.Mesh(geo.flecha, p.mat(COR.madeiraEscura)); fl.malha.visible = false; grupo.add(fl.malha); }
+      }
+
+      // as moedas: do cofre para fora (defesa caiu) ou de fora para o cofre (ataque venceu)
+      const cofrePos = v3(LUGARES.cofre, 0.5);
+      const moedas = [];
+      const comMoedas = venceu;
+      if (comMoedas) {
+        for (let k = 0; k < 10; k++) {
+          const m = new THREE.Mesh(geo.moeda, p.mat(COR.ouro));
+          m.visible = false;
+          m.castShadow = true;
+          grupo.add(m);
+          moedas.push({ malha: m, atraso: k * 0.08, lado: (k % 5) * 0.25 - 0.5 });
+        }
+      }
+      const inicioMoedas = atacando ? 3.6 : 3.4;
+      const de = atacando ? BORDA.clone() : cofrePos;
+      const para = atacando ? cofrePos : BORDA.clone();
+      const voltam = atacando ? (venceu ? qtd : Math.max(1, Math.floor(qtd / 3))) : 0;
+      const duracao = atacando ? 5.4 : venceu ? 5.6 : 3.9;
+      const falas = new Set();
+      const umaVez = (chave, fn) => { if (!falas.has(chave)) { falas.add(chave); fn(); } };
+      const pos = new THREE.Vector3();
+
+      function atualizar(tt) {
+        soldados.forEach((g, i) => {
+          const d = g.userData.desvio;
+          if (atacando) {
+            if (tt < 2.2) {
+              pos.lerpVectors(casa, BORDA, fase(tt, 0.4, 2.2)).add(d);
+              g.scale.setScalar(Math.max(0.001, fase(tt, 0, 0.4)));
+              g.position.set(pos.x, Math.abs(Math.sin(tt * 10 + i)) * 0.06, pos.z);
+            } else if (tt < 2.8) {
+              const u = fase(tt, 2.2, 2.8); // pulam para fora da ilha, rumo ao outro reino
+              g.position.set(BORDA.x + d.x + u * 2.2, Math.sin(u * Math.PI) * 0.9 - u * 0.8, BORDA.z + d.z + u * 2.0);
+              g.scale.setScalar(Math.max(0.001, 1 - u));
+            } else if (tt >= 3.4 && i < voltam) {
+              const u = fase(tt, 3.4, 5.0); // os que voltaram
+              pos.lerpVectors(BORDA, casa, u).add(d);
+              g.scale.setScalar(Math.max(0.001, Math.min(fase(tt, 3.4, 3.7), 1 - fase(tt, 4.9, 5.3))));
+              g.position.set(pos.x, Math.abs(Math.sin(tt * 10 + i)) * 0.06, pos.z);
+            } else g.scale.setScalar(0.001);
+            return;
+          }
+          // defesa: marcham da beirada até a torre; quem leva flecha cai
+          const morte = mortes.get(i);
+          if (morte != null && tt >= morte) {
+            const u = fase(tt, morte, morte + 0.3);
+            g.rotation.z = (u * Math.PI) / 2;
+            g.scale.setScalar(Math.max(0.001, 1 - fase(tt, morte + 0.9, morte + 1.3)));
+            return;
+          }
+          if (tt < 3.2) {
+            pos.lerpVectors(BORDA, casa, fase(tt, 0.4, 3.2)).add(d);
+            g.position.set(pos.x, Math.abs(Math.sin(tt * 10 + i)) * 0.06, pos.z);
+            g.scale.setScalar(Math.max(0.001, fase(tt, 0, 0.4)));
+          } else {
+            pos.lerpVectors(casa, BORDA, fase(tt, 4.0, 5.2)).add(d); // levaram o saque e vão embora
+            g.position.set(pos.x, Math.abs(Math.sin(tt * 10 + i)) * 0.06, pos.z);
+            g.scale.setScalar(Math.max(0.001, 1 - fase(tt, 5.0, 5.4)));
+          }
+          g.rotation.y = Math.atan2(casa.x - BORDA.x, casa.z - BORDA.z);
+        });
+
+        for (const fl of flechas) {
+          const u = (tt - fl.parte) / 0.5;
+          fl.malha.visible = u > 0 && u < 1;
+          if (!fl.malha.visible) continue;
+          const alvo = soldados[fl.alvo];
+          const chegada = alvo.position.clone().add(new THREE.Vector3(fl.acerta ? 0 : 0.6, 0.25, fl.acerta ? 0 : -0.4));
+          const atual = new THREE.Vector3().lerpVectors(atirador, chegada, u);
+          atual.y += Math.sin(u * Math.PI) * 1.2;
+          const prox = new THREE.Vector3().lerpVectors(atirador, chegada, Math.min(1, u + 0.05));
+          prox.y += Math.sin(Math.min(1, u + 0.05) * Math.PI) * 1.2;
+          fl.malha.position.copy(atual);
+          fl.malha.lookAt(prox);
+        }
+
+        for (const m of moedas) {
+          const u = (tt - inicioMoedas - m.atraso) / 1.0;
+          m.malha.visible = u > 0 && u < 1;
+          if (!m.malha.visible) continue;
+          m.malha.position.lerpVectors(de, para, u);
+          m.malha.position.x += m.lado * Math.sin(u * Math.PI);
+          m.malha.position.y += Math.sin(u * Math.PI) * 1.6;
+          m.malha.rotation.set(tt * 6, tt * 4, 0);
+        }
+
+        if (atacando) {
+          if (tt > 2.3) umaVez("vao", () => falar("pensando", "Lá vão eles… ⚔️"));
+          if (tt > 3.5) umaVez("fim", () => (venceu ? falar("comemorando", "Vitória! Trouxemos moedas! 🪙") : falar("triste", "Perdemos dessa vez…")));
+        } else {
+          if (tt > 0.5) umaVez("vem", () => falar("surpreso", "Invasores! Às armas! 🏹"));
+          if (venceu && tt > 3.3) umaVez("fim", () => falar("triste", "Levaram moedas do reino…"));
+          if (!venceu && tt > 3.0) umaVez("fim", () => falar("comemorando", "Defendemos o reino! 🛡️"));
+        }
+        if (tt >= duracao) encerrarSimulacao();
+      }
+      sim = { grupo, inicio: performance.now(), atualizar, aoTerminar };
+    }
+
+    const aoSimular = (e) => {
+      if (semMovimento || !e.detail) return;
+      e.detail.aceito = true;
+      iniciarSimulacao(e.detail);
+    };
+    window.addEventListener("reino-simular", aoSimular);
+
     // o laço: só desenha com a tela visível
     const observaVisao = new IntersectionObserver(([e]) => { visivel = e.isIntersecting; });
     observaVisao.observe(el);
@@ -656,6 +833,11 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         if (!semMovimento) sujo = true;
       }
 
+      if (sim) {
+        sim.atualizar((agora - sim.inicio) / 1000);
+        sujo = true;
+      }
+
       if (sujo) {
         renderizador.render(cena, camera);
         posicionarRotulos();
@@ -681,6 +863,9 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
 
     return () => {
       cancelAnimationFrame(quadroId);
+      window.removeEventListener("reino-simular", aoSimular);
+      if (sim) { mundo.remove(sim.grupo); sim = null; }
+      for (const g of Object.values(geo)) g.dispose();
       observaTamanho.disconnect();
       observaVisao.disconnect();
       observaTema.disconnect();

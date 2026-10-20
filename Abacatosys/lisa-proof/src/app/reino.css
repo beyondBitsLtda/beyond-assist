@@ -197,3 +197,26 @@
 .rn-construcao:focus { outline: none; }
 #invadir { scroll-margin-top: 16px; }
 @media (max-width: 640px) { .rn-mundo__dica { display: none; } }
+
+/* ------------------------------------------------------------ modo simulação */
+.rn-simulador { margin-top: 12px; display: grid; gap: 20px; }
+@media (min-width: 1000px) { .rn-simulador { grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); align-items: start; } }
+.rn-simulador__principal { display: grid; gap: 14px; justify-items: start; min-width: 0; }
+.rn-simulador__principal > * { max-width: 100%; }
+.rn-simulador__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.rn-simulador__topo h2 { margin: 0; font-size: 18px; }
+.rn-simulador .agenda__modos { flex-wrap: wrap; }
+.rn-simulador__rivais { display: flex; flex-wrap: wrap; gap: 8px; }
+.rn-simulador__rival { display: grid; gap: 2px; text-align: left; padding: 8px 14px; min-height: 52px; }
+.rn-simulador__rival small { font-weight: 500; opacity: 0.85; }
+.rn-simulador__chance { width: 100%; }
+.rn-simulador__chance .pf-estat__rotulo strong { color: var(--pf-tinta); font-size: 15px; }
+.rn-simulacao { width: 100%; padding: 14px 16px; border-radius: var(--pf-raio); border-width: 2px; border-style: solid; }
+.rn-simulacao__acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.rn-passos { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; line-height: 1.5; }
+.rn-passos b { font-variant-numeric: tabular-nums; }
+.rn-simulador__regras { padding: 14px 16px; border-radius: var(--pf-raio); background: var(--pf-superficie-2); border: 1px solid var(--pf-linha); }
+.rn-simulador__regras h3 { margin: 0 0 8px; font-size: 15px; }
+.rn-simulador__regras dl { margin: 0; display: grid; gap: 2px; font-size: 13px; }
+.rn-simulador__regras dt { font-weight: 700; margin-top: 8px; }
+.rn-simulador__regras dd { margin: 0; color: var(--pf-tinta-2); line-height: 1.45; }

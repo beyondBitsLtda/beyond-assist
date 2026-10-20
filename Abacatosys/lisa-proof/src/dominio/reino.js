@@ -78,13 +78,16 @@ export function niveisDe(reino) {
   return { ...NIVEIS_INICIAIS, ...(reino?.construcoes || {}) };
 }
 
+/** Quanto cada coisa soma na força (as regras da tela leem daqui também). */
+export const PESOS = { base: 10, quartel: 14, neuroAtaque: 8, muralha: 12, torre: 10, neuroDefesa: 6 };
+
 /** Força de ataque e de defesa do reino. */
 export function poderDo(reino) {
   const n = niveisDe(reino);
   const neuro = reino?.neuro_nivel || 1;
   return {
-    ataque: 10 + n.quartel * 14 + neuro * 8,
-    defesa: 10 + n.muralha * 12 + n.torre * 10 + neuro * 6,
+    ataque: PESOS.base + n.quartel * PESOS.quartel + neuro * PESOS.neuroAtaque,
+    defesa: PESOS.base + n.muralha * PESOS.muralha + n.torre * PESOS.torre + neuro * PESOS.neuroDefesa,
   };
 }
 
@@ -150,7 +153,7 @@ export function podeInvadir({ atacanteId, defensor, ataquesHoje, jaAtacouHoje, a
 export function batalha({ atacante, defensor, saldoDoDefensor, sorteA, sorteD }) {
   const pa = poderDo(atacante);
   const pd = poderDo(defensor);
-  const fator = (s) => 1 - SORTE + 2 * SORTE * s;
+  const fator = fatorDaSorte;
   const ataque = Math.round(pa.ataque * fator(sorteA));
   const defesa = Math.round(pd.defesa * fator(sorteD));
   const venceu = ataque > defesa;
@@ -181,4 +184,57 @@ export function faixaDeDefesa(defesa) {
   if (defesa < 80) return "média";
   if (defesa < 130) return "forte";
   return "fortíssima";
+}
+
+// ------------------------------------------------------------------ modo simulação
+// Treino: as mesmas contas da invasão de verdade (batalha), contra um rival de mentira, sem
+// tocar no banco. Serve para a pessoa entender o jogo antes de arriscar moedas e troféus.
+
+export const RIVAIS_SIMULADOS = {
+  fraco: { nome: "Rival mais fraco", passo: -1 },
+  parelho: { nome: "Rival parelho", passo: 0 },
+  forte: { nome: "Rival mais forte", passo: 1 },
+};
+
+/** Um rival tirado do meu reino: um nível a menos/a mais nas construções de briga e no cofre. */
+export function rivalSimulado(base, forca = "parelho") {
+  const passo = RIVAIS_SIMULADOS[forca]?.passo ?? 0;
+  const n = niveisDe(base);
+  const ajustar = (v) => Math.max(0, Math.min(5, v + passo));
+  return {
+    construcoes: { ...n, quartel: ajustar(n.quartel), muralha: ajustar(n.muralha), torre: ajustar(n.torre), cofre: ajustar(n.cofre) },
+    neuro_nivel: Math.max(1, Math.min(10, (base?.neuro_nivel || 1) + passo * 2)),
+  };
+}
+
+/** Em quantas de cada 100 batalhas o atacante vence (sorteando a sorte de cada lado). */
+export function chanceDeVitoria(atacante, defensor, vezes = 2000, sortear = Math.random) {
+  let vitorias = 0;
+  for (let i = 0; i < vezes; i++) {
+    if (batalha({ atacante, defensor, saldoDoDefensor: 0, sorteA: sortear(), sorteD: sortear() }).venceu) vitorias++;
+  }
+  return Math.round((vitorias / vezes) * 100);
+}
+
+/** O fator de sorte que uma rolagem em [0, 1) aplicou (0,85 a 1,15). */
+export const fatorDaSorte = (rolagem) => 1 - SORTE + 2 * SORTE * rolagem;
+
+/**
+ * Uma batalha de treino, com o passo a passo para a tela. `tipo`: "atacar" (eu invado o rival)
+ * ou "defender" (o rival invade o meu reino). `saldoDoRival` é imaginário; no "defender" vale o
+ * meu saldo de verdade, para mostrar quanto eu perderia.
+ */
+export function simularBatalha({ tipo, eu, rival, meuSaldo, saldoDoRival = 500, sorteA, sorteD }) {
+  const atacante = tipo === "atacar" ? eu : rival;
+  const defensor = tipo === "atacar" ? rival : eu;
+  const saldoDoDefensor = tipo === "atacar" ? saldoDoRival : meuSaldo;
+  const r = batalha({ atacante, defensor, saldoDoDefensor, sorteA, sorteD });
+  return {
+    ...r, tipo, saldoDoDefensor,
+    poderAtacante: poderDo(atacante), poderDefensor: poderDo(defensor),
+    fatorA: fatorDaSorte(sorteA), fatorD: fatorDaSorte(sorteD),
+    euVenci: tipo === "atacar" ? r.venceu : !r.venceu,
+    meusTrofeus: tipo === "atacar" ? r.trofeusAtacante : r.trofeusDefensor,
+    minhasMoedas: tipo === "atacar" ? r.saque : r.saque ? -r.saque : 0,
+  };
 }
