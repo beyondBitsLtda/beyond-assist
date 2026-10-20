@@ -60,7 +60,9 @@ export default function Ranking() {
                 <div className="pf-estat__rotulo">A sua posição · {info.titulo.toLowerCase()}</div>
                 <div className="pf-estat__valor">{numero(dados.eu.valor)} <small>{info.unidade}</small></div>
                 <p className="pf-estat__nota">
-                  {dados.eu.posicao === 1 ? "Você está no topo do mundo! 👑" : `de ${numero(dados.total)} · aparece como “${dados.perfil.comoApareco}”`}
+                  {dados.eu.valor === 0
+                    ? (aba === "reino" ? "Ainda sem troféus — invada um reino para entrar no placar." : "Ainda sem pontos aqui — faça o quiz do dia para entrar no placar.")
+                    : dados.eu.posicao === 1 ? "Você está no topo do mundo! 👑" : `de ${numero(dados.total)} · aparece como “${dados.perfil.comoApareco}”`}
                 </p>
               </div>
             </section>

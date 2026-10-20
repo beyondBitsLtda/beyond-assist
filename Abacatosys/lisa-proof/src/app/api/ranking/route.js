@@ -40,6 +40,10 @@ export async function GET(req) {
       }));
     }
 
+    // quem ainda não pontuou (ou não abriu o reino) não tem linha nas somas, mas se vê no placar
+    if (!linhas.some((l) => l.usuarioId === usuario.id)) {
+      linhas.push({ usuarioId: usuario.id, valor: 0, extra: periodo === "reino" ? {} : { dias: 0, nivel: periodo === "total" ? 1 : null } });
+    }
     const { topo, eu, total } = posicionar(linhas, usuario.id, 50);
     const nomes = await nomesPublicos([...topo.map((l) => l.usuarioId), usuario.id]);
 

@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.4.0-cloudflare-pages.1",
+  "versao": "0.4.1-cloudflare-pages.1",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 14,
+    "numero": 15,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.4.1-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Ranking: quem ainda não pontuou também vê a própria posição.",
+      "itens": [
+        "No Ranking, quem ainda não tinha pontos (ou troféus, no placar dos reinos) não via o cartão \"A sua posição\". Agora aparece com 0 e um convite para entrar no placar."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.4.0-cloudflare-pages.1",
       "data": "2026-10-20",
