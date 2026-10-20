@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.2.0-cloudflare-pages.7",
-  "atualizadoEm": "2026-10-06",
+  "versao": "0.3.0-proof-chamados-codigo.1",
+  "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 7,
-    "data": "2026-10-06",
+    "numero": 8,
+    "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.3.0-proof-chamados-codigo.1",
+      "data": "2026-10-20",
+      "branch": "proof-chamados-codigo",
+      "tipo": "funcionalidade",
+      "resumo": "Reportar problema com print (vira chamado no Abacato), código sempre colorido e numerado, editor de verdade no exercício, e o quiz que dizia \"código abaixo\" sem código.",
+      "itens": [
+        "Botão \"Reportar problema\" (barra lateral e topo do celular): a pessoa conta o que aconteceu e junta um print — capturando a própria tela, anexando ou colando com Ctrl+V. Vira um card no quadro \"Chamados — Lisa Proof\" de quem administra (conta do Abacato com o e-mail PROOF_ADMIN_EMAIL), com etiqueta Bug, quem reportou, a tela, o aparelho, a versão e o print no comentário. Limite de 10 por pessoa a cada 24 horas.",
+        "Todo código mostrado (perguntas do quiz, explicações, enunciados) sai colorido pela linguagem e com número de linha, também quando a IA manda o bloco grudado numa linha só.",
+        "A caixa da solução do exercício virou um editor: números de linha, cores, linha atual destacada, fechamento de ( [ { e aspas, indentação automática, Tab, desfazer, busca (Ctrl+F), dobrar blocos e Ctrl+Enter para enviar.",
+        "Quiz: o código da pergunta vai num campo próprio; pergunta que fala de \"código abaixo\" sem trazer código é descartada, e o quiz é pedido de novo uma vez se faltar pergunta. Em quizzes já salvos sem o código, a tela avisa em vez de ficar muda."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.2.0-cloudflare-pages.7",
       "data": "2026-10-06",
@@ -152,7 +166,9 @@
         "Tema escuro (padrão) e claro.",
         "Mapa da trilha no estilo Duolingo e o mascote Neuro, com animações que reagem ao progresso.",
         "Lembretes por notificação push (ofensiva em risco, quiz pendente), enviados pelo relógio do iMac.",
-        "Uso no computador e no celular, instalável como app."
+        "Uso no computador e no celular, instalável como app.",
+        "Reportar problema com print, que vira chamado no Abacato para quem administra",
+        "Editor de código no exercício e código colorido em todas as telas"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -172,7 +188,8 @@
       "API do GitHub (leitura de repositórios públicos)",
       "Web Push (VAPID) com a biblioteca web-push, no script de lembretes do iMac; service worker e manifesto de app",
       "Animações em SVG e CSS, sem biblioteca (mascote Neuro e mapa da trilha)",
-      "PBKDF2 e HMAC via WebCrypto (login e sessão, mesmo esquema do Abacato)"
+      "PBKDF2 e HMAC via WebCrypto (login e sessão, mesmo esquema do Abacato)",
+      "CodeMirror 6 (editor de código e cores por linguagem; cada linguagem é carregada só quando aparece)"
     ],
     "arquitetura": {
       "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
@@ -217,7 +234,7 @@
     "integracoes": [
       {
         "nome": "Abacato",
-        "descricao": "Fonte dos quadros STUDY e das contas de usuário. A Lisa_Proof marca itens e conclui cards direto nas tabelas do Abacato.",
+        "descricao": "Fonte dos quadros STUDY e das contas de usuário. A Lisa_Proof marca itens e conclui cards direto nas tabelas do Abacato. Também recebe os chamados do \"Reportar problema\": um card por relato no quadro \"Chamados — Lisa Proof\" do administrador, com o print no bucket privado dos comentários.",
         "url": "https://abacato.beyond.dev.br"
       },
       {

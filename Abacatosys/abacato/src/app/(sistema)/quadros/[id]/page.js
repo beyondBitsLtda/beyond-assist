@@ -12,6 +12,7 @@ import PainelDoCard from "@/componentes/quadro/PainelDoCard.js";
 import Calendario from "@/componentes/quadro/Calendario.js";
 import PainelDeRecorrencias from "@/componentes/quadro/PainelDeRecorrencias.js";
 import ColunasArquivadas from "@/componentes/quadro/ColunasArquivadas.js";
+import CardsArquivados from "@/componentes/quadro/CardsArquivados.js";
 import PapelDeParede from "@/componentes/quadro/PapelDeParede.js";
 import { urlDaParede } from "@/dominio/paredes.js";
 import { prazoNoDia } from "@/dominio/calendario.js";
@@ -38,6 +39,7 @@ export default function PaginaDoQuadro() {
   const [menuDoQuadro, setMenuDoQuadro] = useState(false);
   const [recorrencias, setRecorrencias] = useState(false);
   const [arquivadas, setArquivadas] = useState(false);
+  const [cardsArquivados, setCardsArquivados] = useState(false);
   const [parede, setParede] = useState(false);
   const [compartilhar, setCompartilhar] = useState(false);
   const [novaColuna, setNovaColuna] = useState(false);
@@ -334,6 +336,10 @@ export default function PaginaDoQuadro() {
                   <div className="abacato-menu__fundo" onClick={() => setMenuDoQuadro(false)} />
                   <div className="abacato-menu__caixa abacato-menu__caixa--direita" role="menu">
                     <button type="button" className="abacato-menu__item"
+                      onClick={() => { setMenuDoQuadro(false); setCardsArquivados(true); }}>
+                      Cards arquivados
+                    </button>
+                    <button type="button" className="abacato-menu__item"
                       onClick={() => { setMenuDoQuadro(false); setArquivadas(true); }}>
                       Colunas arquivadas
                     </button>
@@ -479,6 +485,15 @@ export default function PaginaDoQuadro() {
           quadroId={id}
           atual={dados.quadro.papelDeParede}
           aoFechar={() => setParede(false)}
+          aoMudar={() => carregar(true)}
+        />
+      )}
+
+      {cardsArquivados && (
+        <CardsArquivados
+          quadroId={id}
+          poderes={poderes}
+          aoFechar={() => setCardsArquivados(false)}
           aoMudar={() => carregar(true)}
         />
       )}

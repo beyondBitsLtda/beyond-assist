@@ -88,7 +88,7 @@ export default function ColunasArquivadas({ quadroId, poderes, aoFechar, aoMudar
                 <div className="abacato-recorrencia__acoes">
                   <button
                     type="button"
-                    className="abacato-botao abacato-botao--fantasma abacato-botao--pequeno"
+                    className="abacato-botao abacato-botao--pequeno"
                     disabled={trabalhando === c.id}
                     onClick={() => restaurar(c)}
                   >

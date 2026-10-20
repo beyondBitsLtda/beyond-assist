@@ -13,9 +13,11 @@ import { resumoDasMetas, tarefasDoDia } from "../src/dominio/metas.js";
 import { nivelPorPontos } from "../src/dominio/pontos.js";
 import {
   periodoDe, periodoPermitido, pontosDoQuiz, pontosDaNota, validarQuiz, quizParaTela,
+  separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo,
   validarAvaliacao, assuntoAtual, mapaDaTrilha,
 } from "../src/dominio/pratica.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
+import { conferirChamado, tituloDoChamado, descricaoDoChamado } from "../src/dominio/chamado.js";
 import { assuntosParaODuracao, nomeDoQuadro, validarCurso, assuntosEmOrdem, resumoDoCurso } from "../src/dominio/curso.js";
 import { montarAgenda, itensDoDia, gradeDoMes, mesVizinho } from "../src/dominio/agenda.js";
 
@@ -196,6 +198,37 @@ caso("quiz: pergunta torta sai; menos de 3 boas derruba", () => {
   assert.equal(q.perguntas.length, 3);
   assert.throws(() => validarQuiz({ perguntas: [boa, boa] }));
 });
+caso("quiz: o código vai para o campo próprio, mesmo grudado numa linha (20/10/2026)", () => {
+  const s = separarCodigoDaPergunta("Analise o código a seguir: ```javascript let pontos = 10; console.log(pontos);``` Qual será o resultado?");
+  assert.deepEqual([s.linguagem, s.codigo], ["javascript", "let pontos = 10; console.log(pontos);"]);
+  assert.equal(s.texto, "Analise o código a seguir: Qual será o resultado?");
+  const m = separarCodigoDaPergunta("O que imprime?\n```c\n#include <stdio.h>\nint main() {\n    printf(\"10\");\n}\n```");
+  assert.equal(m.codigo, "#include <stdio.h>\nint main() {\n    printf(\"10\");\n}");
+  assert.equal(separarCodigoDaPergunta("```let x = 1;``` e então?").codigo, "let x = 1;");
+  assert.equal(textoDeCodigo("```python\n  print(1)\n```", 100), "  print(1)");
+});
+caso("quiz: pergunta que pede código e não traz código é descartada", () => {
+  const boa = { opcoes: ["a", "b", "c", "d"], correta: 2, explicacao: "x" };
+  assert.ok(perguntaPedeCodigo("Observe o bloco de código C abaixo. O que será impresso?"));
+  assert.ok(perguntaPedeCodigo("Analise o trecho a seguir e diga o resultado"));
+  assert.ok(!perguntaPedeCodigo("Qual das seguintes opções é um tipo primitivo?"));
+  const q = validarQuiz({ perguntas: [
+    { ...boa, pergunta: "Observe o bloco de código C abaixo. O que será impresso?" },
+    { ...boa, pergunta: "Observe o bloco de código C abaixo. O que será impresso?", codigo: "int main(){ return 0; }", linguagem: "c" },
+    { ...boa, pergunta: "Qual tipo é primitivo?" },
+    { ...boa, pergunta: "Qual laço repete enquanto a condição for verdadeira?" },
+  ] });
+  assert.equal(q.perguntas.length, 3);
+  assert.equal(q.perguntas[0].codigo, "int main(){ return 0; }");
+});
+caso("quiz salvo antes da correção: a tela recebe o código separado, ou o aviso de que faltou", () => {
+  const t = quizParaTela({ perguntas: [
+    { pergunta: "Veja: ```sql SELECT 1;``` o que faz?", opcoes: ["a", "b", "c", "d"], correta: 0, explicacao: "" },
+    { pergunta: "Observe o código abaixo. O que sai?", opcoes: ["a", "b", "c", "d"], correta: 0, explicacao: "" },
+  ] }, {});
+  assert.deepEqual([t[0].codigo, t[0].linguagem, t[0].faltouCodigo], ["SELECT 1;", "sql", false]);
+  assert.equal(t[1].faltouCodigo, true);
+});
 caso("gabarito só aparece depois de responder", () => {
   const t = quizParaTela({ perguntas: [{ pergunta: "p", opcoes: ["a", "b", "c", "d"], correta: 1, explicacao: "e" }, { pergunta: "q", opcoes: ["a", "b", "c", "d"], correta: 3, explicacao: "f" }] }, { escolhas: { 0: 2 } });
   assert.deepEqual([t[0].correta, t[0].escolha, t[1].correta, t[1].explicacao], [1, 2, null, null]);
@@ -336,6 +369,30 @@ caso("grade do mês vai de segunda a domingo", () => {
   assert.deepEqual([g.de, g.ate, g.dias.length], ["2026-09-28", "2026-11-01", 35]);
   assert.equal(mesVizinho("2026-12-10", 1), "2027-01-01");
   assert.equal(mesVizinho("2026-01-10", -1), "2025-12-01");
+});
+
+caso("chamado: relato curto, longo demais ou print de tipo errado é recusado", () => {
+  assert.equal(conferirChamado({ texto: "oi" }).ok, false);
+  assert.equal(conferirChamado({ texto: "x".repeat(4001) }).ok, false);
+  assert.equal(conferirChamado({ texto: "deu erro no quiz", imagem: { tipo: "image/gif", tamanho: 10 } }).ok, false);
+  assert.equal(conferirChamado({ texto: "deu erro no quiz", imagem: { tipo: "image/jpeg", tamanho: 7 * 1024 * 1024 } }).ok, false);
+  assert.equal(conferirChamado({ texto: "deu erro no quiz", imagem: { tipo: "image/jpeg", tamanho: 1000 } }).ok, true);
+});
+caso("chamado: a página vai sem parâmetros e só se for caminho do próprio app", () => {
+  assert.equal(conferirChamado({ texto: "deu erro aqui", pagina: "/pratica/abc?token=123#x" }).pagina, "/pratica/abc");
+  assert.equal(conferirChamado({ texto: "deu erro aqui", pagina: "https://outro.site/x" }).pagina, "");
+});
+caso("chamado: título curto da primeira frase e descrição com quem, onde e quando", () => {
+  assert.equal(tituloDoChamado("A pergunta 5 veio sem código. O resto ok."), "🐞 A pergunta 5 veio sem código.");
+  assert.ok(tituloDoChamado("x ".repeat(100)).length <= 84);
+  const d = descricaoDoChamado({
+    texto: "a pergunta 5 veio sem código", pagina: "/pratica/1",
+    contexto: { navegador: "Edge", tela: "1600×1000", tema: "escuro", idioma: "pt-BR" },
+    usuario: { nome: "Ana", email: "ana@exemplo.invalid" }, instante: new Date("2026-10-20T18:42:00Z"), versao: "0.3.0",
+  });
+  assert.ok(d.includes("Reportado por: Ana <ana@exemplo.invalid>"));
+  assert.ok(d.includes("Quando: 20/10/2026 15:42 (Brasília)"));
+  assert.ok(d.includes("Tela: /pratica/1") && d.includes("janela 1600×1000 · tema escuro · pt-BR") && d.endsWith("a pergunta 5 veio sem código"));
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

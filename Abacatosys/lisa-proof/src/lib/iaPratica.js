@@ -34,6 +34,8 @@ const ESQUEMA_DO_QUIZ = {
         type: "OBJECT",
         properties: {
           pergunta: { type: "STRING" },
+          codigo: { type: "STRING" },
+          linguagem: { type: "STRING" },
           opcoes: { type: "ARRAY", items: { type: "STRING" } },
           correta: { type: "INTEGER" },
           explicacao: { type: "STRING" },
@@ -45,9 +47,21 @@ const ESQUEMA_DO_QUIZ = {
   required: ["perguntas"],
 };
 
-/** 5 perguntas de múltipla escolha sobre o assunto do dia. */
+/** 5 perguntas de múltipla escolha sobre o assunto do dia. Se a conferência descartar perguntas
+ *  (ex.: "observe o código abaixo" sem código), pede mais uma vez e fica com o melhor dos dois. */
 export async function gerarQuiz({ tema, assunto }) {
-  const bruto = await gerarJson({
+  const pedir = async () => validarQuiz(await pedirQuiz({ tema, assunto }));
+  let quiz = await pedir().catch((e) => ({ erro: e }));
+  if (!quiz.perguntas || quiz.perguntas.length < 5) {
+    const outro = await pedir().catch(() => null);
+    if (outro && outro.perguntas.length > (quiz.perguntas?.length || 0)) quiz = outro;
+  }
+  if (quiz.erro) throw quiz.erro;
+  return quiz;
+}
+
+async function pedirQuiz({ tema, assunto }) {
+  return gerarJson({
     sistema: PERSONA,
     esquema: ESQUEMA_DO_QUIZ,
     maxTokens: 6144,
@@ -59,12 +73,14 @@ export async function gerarQuiz({ tema, assunto }) {
       "Crie um quiz rápido de 5 perguntas de múltipla escolha sobre este assunto.",
       "- Exatamente 4 opções por pergunta, todas plausíveis e diferentes; `correta` é o índice (0 a 3) da certa.",
       "- Varie a posição da resposta certa entre as perguntas.",
-      "- Misture conceito e leitura de código curto (código em bloco ``` com a linguagem).",
+      "- Misture conceito e leitura de código curto.",
+      "- Pergunta sobre código: o código vai INTEIRO no campo `codigo` (com as quebras de linha de verdade, indentado, completo o bastante para a pergunta fazer sentido) e a linguagem em `linguagem` (ex.: javascript, c, python, sql).",
+      "- A `pergunta` nunca contém código nem crases ```. Se ela disser \"código abaixo\", \"trecho a seguir\" ou \"observe o programa\", o campo `codigo` é obrigatório — pergunta assim sem código é descartada.",
+      "- Pergunta só de conceito: deixe `codigo` vazio.",
       "- `explicacao`: 1 ou 2 frases dizendo por que a certa é a certa.",
       "- Dificuldade progressiva: as primeiras mais fáceis.",
     ].filter(Boolean).join("\n"),
   });
-  return validarQuiz(bruto);
 }
 
 // ---------------------------------------------------------------- exercício

@@ -9,14 +9,40 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.7.1-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-19",
+  "versao": "0.8.0-cards-arquivados.2",
+  "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 25,
-    "data": "2026-10-19",
+    "numero": 27,
+    "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.8.0-cards-arquivados.2",
+      "data": "2026-10-20",
+      "branch": "cards-arquivados",
+      "tipo": "correcao",
+      "resumo": "Abacato: o menu \"⋯\" do quadro abria por baixo das colunas em quadros com foto de papel de parede.",
+      "itens": [
+        "Em quadros com foto de papel de parede, \"Colunas arquivadas\", \"Papel de parede\" (e agora \"Cards arquivados\") ficavam debaixo do \"+ Adicionar coluna\", impossíveis de clicar. O topo do quadro passa a ficar uma camada acima das colunas."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.8.0-cards-arquivados.1",
+      "data": "2026-10-20",
+      "branch": "cards-arquivados",
+      "tipo": "funcionalidade",
+      "resumo": "Abacato: ver os cards arquivados de um quadro e trazê-los de volta.",
+      "itens": [
+        "No menu \"⋯\" do quadro, novo item \"Cards arquivados\": lista os cards que saíram do quadro (pela tela ou pela Lisa), com a coluna de onde vieram, o prazo, se estavam concluídos e o começo da descrição.",
+        "\"↩ Restaurar\" devolve o card à coluna dele, no mesmo lugar, com descrição, checklist, comentários e anexos. Se a coluna também estiver arquivada, o card vai para o topo da primeira coluna ativa e a tela avisa.",
+        "Busca pelo título; em quadros com mais de 300 arquivados, a busca é feita no banco.",
+        "As cópias de histórico das tarefas que se repetem não aparecem na lista (restaurar uma duplicaria a tarefa).",
+        "Corrigido: em quadros com papel de parede, os botões e ícones dos painéis (card aberto, Recorrentes, Colunas arquivadas, Quem acessa) ficavam brancos sobre fundo claro. O botão Restaurar passa a ser verde cheio."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.7.1-cloudflare-pages.1",
       "data": "2026-10-19",

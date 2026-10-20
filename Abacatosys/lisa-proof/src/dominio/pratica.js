@@ -74,16 +74,69 @@ export function pontosDaNota(tipo, nota) {
 
 // ---------------------------------------------------------------- o que a IA devolve
 
+// ---------------------------------------------------------------- o código das perguntas
+//
+// O código de uma pergunta mora num campo próprio (`codigo` + `linguagem`), e não dentro do
+// texto. Antes ele vinha numa cerca ``` dentro da pergunta, e de dois jeitos dava errado (vistos
+// em 20/10/2026): o modelo escrevia "Observe o bloco de código C abaixo" e não mandava código
+// nenhum; ou mandava a cerca grudada numa linha só, e a tela mostrava as crases cruas.
+
+/** Texto de código: tira só as bordas em branco (a indentação da primeira linha fica) e uma
+ *  cerca ``` que o modelo tenha posto em volta. */
+export function textoDeCodigo(valor, limite) {
+  let t = String(valor ?? "").replace(/\r\n/g, "\n");
+  const cerca = /^\s*```[A-Za-z][\w#+.-]*[ \t]*\n?([\s\S]*?)\n?```\s*$/.exec(t) || /^\s*```\n?([\s\S]*?)\n?```\s*$/.exec(t);
+  if (cerca) t = cerca[1];
+  t = t.replace(/^\s*\n/, "").replace(/\s+$/, "");
+  return t.length > limite ? t.slice(0, limite) : t;
+}
+
+/** Tira de dentro do texto o primeiro bloco ``` (inteiro ou grudado numa linha só) e devolve
+ *  { texto, codigo, linguagem }. Sem bloco, devolve o texto como veio. */
+export function separarCodigoDaPergunta(pergunta) {
+  const t = String(pergunta ?? "");
+  const m = /```([A-Za-z][\w#+.-]*)?[ \t]*\n?([\s\S]*?)```/.exec(t);
+  if (!m) return { texto: t.trim(), codigo: "", linguagem: "" };
+  let linguagem = m[1] || "";
+  let codigo = m[2];
+  // "```let x" sem nome de linguagem: o regex leu "let" como linguagem
+  if (linguagem && !/^(js|jsx|ts|tsx|javascript|typescript|python|py|java|c|cpp|c\+\+|cs|csharp|c#|sql|html|css|php|json|go|golang|rust|rs|kotlin|kt|dart|bash|sh|shell|ruby|rb|swift|xml|mysql|postgresql)$/i.test(linguagem)) {
+    codigo = `${linguagem} ${codigo}`;
+    linguagem = "";
+  }
+  const texto = `${t.slice(0, m.index)} ${t.slice(m.index + m[0].length)}`.replace(/[ \t]{2,}/g, " ").replace(/\s*\n\s*/g, " ").trim();
+  return { texto, codigo: textoDeCodigo(codigo, 3000), linguagem };
+}
+
+// "Observe o código abaixo", "analise o trecho a seguir", "o que o programa seguinte imprime":
+// a pergunta só faz sentido com o código na tela.
+const PEDE_CODIGO = /\b(c[oó]digo|trecho|bloco|programa|fun[cç][aã]o|script|consulta|comando|snippet|exemplo)\b[^.?!:]{0,40}\b(abaixo|a seguir|seguinte)\b|\b(seguinte|abaixo:?)\s+(c[oó]digo|trecho|bloco|programa|consulta)\b|\b(observe|analise|considere|veja|leia)\s+(o|este|esse|a|esta|essa)\s+(c[oó]digo|trecho|bloco|programa|consulta|fun[cç][aã]o|script)\b/i;
+export function perguntaPedeCodigo(texto) {
+  return PEDE_CODIGO.test(String(texto || ""));
+}
+
+/** A pergunta com o código no lugar certo — também para quizzes antigos, salvos com a cerca
+ *  dentro do texto. */
+export function normalizarPergunta(p) {
+  const sep = separarCodigoDaPergunta(p?.pergunta);
+  const codigo = textoDeCodigo(p?.codigo, 3000) || sep.codigo;
+  return { pergunta: sep.texto, codigo, linguagem: String(p?.linguagem || "").trim().slice(0, 30) || sep.linguagem };
+}
+
 /** Quiz de múltipla escolha: 3 a 6 perguntas, 4 opções, uma certa. Pergunta torta é descartada,
- *  e menos de 3 boas derruba o quiz inteiro (melhor pedir de novo que dar um quiz de uma pergunta). */
+ *  e menos de 3 boas derruba o quiz inteiro (melhor pedir de novo que dar um quiz de uma pergunta).
+ *  "Torta" inclui a que pede para ler um código que não veio. */
 export function validarQuiz(bruto) {
   const perguntas = (Array.isArray(bruto?.perguntas) ? bruto.perguntas : [])
     .map((p) => {
       const opcoes = listaDeTextos(p?.opcoes, 300, 4);
       const correta = Number.parseInt(p?.correta, 10);
       if (opcoes.length !== 4 || !(correta >= 0 && correta <= 3) || new Set(opcoes).size !== 4) return null;
-      const pergunta = texto(p?.pergunta, 1200);
-      return pergunta ? { pergunta, opcoes, correta, explicacao: texto(p?.explicacao, 800) } : null;
+      const { pergunta: textoDaPergunta, codigo, linguagem } = normalizarPergunta(p);
+      const pergunta = texto(textoDaPergunta, 1200);
+      if (!pergunta) return null;
+      if (!codigo && perguntaPedeCodigo(pergunta)) return null; // "observe o código abaixo" — e não há código
+      return { pergunta, codigo, linguagem, opcoes, correta, explicacao: texto(p?.explicacao, 800) };
     })
     .filter(Boolean)
     .slice(0, 6);
@@ -146,8 +199,13 @@ export function quizParaTela(conteudo, resposta) {
   return conteudo.perguntas.map((p, i) => {
     const escolha = escolhas[i];
     const respondida = escolha !== undefined && escolha !== null;
+    const { pergunta, codigo, linguagem } = normalizarPergunta(p);
     return {
-      pergunta: p.pergunta,
+      pergunta,
+      codigo,
+      linguagem,
+      // quiz salvo antes da correção, com a pergunta pedindo um código que a IA não mandou
+      faltouCodigo: !codigo && perguntaPedeCodigo(pergunta),
       opcoes: p.opcoes,
       respondida,
       escolha: respondida ? escolha : null,

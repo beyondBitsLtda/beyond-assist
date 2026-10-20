@@ -149,6 +149,28 @@ button { font: inherit; }
 .pf-tema--texto { justify-content: flex-start; padding: 8px 14px; }
 .pf-topo__acoes { display: flex; align-items: center; gap: 6px; }
 
+/* "Reportar problema": mesma cara do botão de tema, na barra lateral e no topo do celular. */
+.pf-reportar {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-width: 40px; min-height: 40px; padding: 6px 10px; border-radius: var(--pf-pilula);
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--pf-tinta-barra); cursor: pointer; font: inherit; font-size: 14px; justify-content: center;
+}
+.pf-reportar:hover { background: rgba(255, 255, 255, 0.12); }
+.pf-reportar:focus-visible { outline: 2px solid var(--pf-verde); outline-offset: 2px; }
+.pf-lateral__rodape .pf-reportar { justify-content: flex-start; padding: 8px 14px; }
+
+.pf-reporte { display: grid; gap: 12px; padding: 0 4px 8px; }
+.pf-reporte__titulo { margin: 0; font-size: 20px; }
+.pf-reporte__dica { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
+.pf-reporte__texto { min-height: 110px; resize: vertical; }
+.pf-reporte__print { display: grid; gap: 6px; }
+.pf-reporte__previa { margin: 0; display: grid; gap: 8px; justify-items: start; }
+.pf-reporte__previa img {
+  max-width: 100%; max-height: 220px; border-radius: 10px; border: 1px solid var(--pf-linha); object-fit: contain;
+  background: var(--pf-superficie-2);
+}
+
 .pf-topo {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between;

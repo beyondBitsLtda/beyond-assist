@@ -1,0 +1,134 @@
+/* ============================================================ código colorido e editor
+
+   O bloco de código é escuro nos DOIS temas (--pf-codigo-fundo), como num editor de verdade —
+   então a paleta das cores é uma só, pensada para esse fundo, no estilo das IDEs escuras.
+   As classes tok-* saem do classHighlighter do @lezer/highlight, e são as mesmas no <Codigo>
+   (leitura) e no <EditorDeCodigo> (escrita). */
+
+.pf-codigo {
+  --pf-cod-numero: #5C6B63;
+  margin: 8px 0 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--pf-codigo-fundo);
+  color: var(--pf-codigo-tinta);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: left;
+}
+.pf-codigo__linguagem {
+  padding: 6px 12px;
+  font: 600 11px/1 ui-monospace, "JetBrains Mono", Consolas, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9CA3AF;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+/* `.pf-codigo pre.` e não só a classe: as regras antigas `.quiz__pergunta pre` e `.pf-explicacao pre`
+   davam padding e fundo próprios e eram mais específicas. */
+.pf-codigo pre.pf-codigo__corpo {
+  margin: 0;
+  padding: 10px 0;
+  overflow-x: auto;
+  background: transparent;
+  font: 400 14px/1.6 ui-monospace, "JetBrains Mono", Consolas, monospace;
+  tab-size: 2;
+}
+.pf-codigo__corpo:focus-visible { outline: 2px solid var(--pf-verde); outline-offset: -2px; }
+.pf-codigo__corpo code { display: grid; min-width: max-content; font: inherit; background: none; padding: 0; }
+.pf-codigo__linha { display: grid; grid-template-columns: 3.2em 1fr; }
+.pf-codigo__numero {
+  padding-right: 14px;
+  text-align: right;
+  color: var(--pf-cod-numero);
+  user-select: none;
+}
+.pf-codigo__texto { white-space: pre; padding-right: 16px; }
+
+/* ------------------------------------------------------------ editor */
+
+.pf-editor {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--pf-linha);
+  background: var(--pf-codigo-fundo);
+}
+.pf-editor--travado { opacity: 0.75; }
+.pf-editor__barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font: 500 12px/1.2 ui-monospace, "JetBrains Mono", Consolas, monospace;
+  color: #9CA3AF;
+}
+.pf-editor__bolinhas { display: inline-flex; gap: 5px; }
+.pf-editor__bolinhas i { width: 9px; height: 9px; border-radius: 50%; background: #3A4540; }
+.pf-editor__nome { color: #D1D5DB; }
+.pf-editor__atalhos { margin-left: auto; font-size: 11px; }
+@media (max-width: 560px) { .pf-editor__atalhos { display: none; } }
+
+.pf-editor__area .cm-editor {
+  min-height: 300px;
+  max-height: 70vh;
+  background: transparent;
+  color: var(--pf-codigo-tinta);
+  font: 400 14px/1.6 ui-monospace, "JetBrains Mono", Consolas, monospace;
+}
+.pf-editor__area .cm-editor.cm-focused { outline: none; }
+.pf-editor:focus-within { border-color: var(--pf-verde); box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18); }
+.pf-editor__area .cm-scroller { font-family: inherit; line-height: inherit; }
+.pf-editor__area .cm-content { padding: 10px 0; caret-color: #E8EDEA; }
+.pf-editor__area .cm-line { padding: 0 16px 0 6px; }
+.pf-editor__area .cm-gutters { background: transparent; border-right: 1px solid rgba(255, 255, 255, 0.06); color: #5C6B63; }
+.pf-editor__area .cm-lineNumbers .cm-gutterElement { padding: 0 10px 0 14px; min-width: 2.4em; }
+.pf-editor__area .cm-activeLine { background: rgba(255, 255, 255, 0.04); }
+.pf-editor__area .cm-activeLineGutter { background: rgba(255, 255, 255, 0.04); color: #C9D1CC; }
+.pf-editor__area .cm-cursor { border-left-color: #E8EDEA; border-left-width: 2px; }
+.pf-editor__area .cm-selectionBackground,
+.pf-editor__area .cm-focused .cm-selectionBackground,
+.pf-editor__area .cm-content ::selection { background: rgba(34, 197, 94, 0.28) !important; }
+.pf-editor__area .cm-matchingBracket { background: rgba(255, 255, 255, 0.12); outline: 1px solid rgba(255, 255, 255, 0.25); color: inherit; }
+.pf-editor__area .cm-selectionMatch { background: rgba(255, 255, 255, 0.08); }
+.pf-editor__area .cm-placeholder { color: #5C6B63; font-style: italic; }
+.pf-editor__area .cm-foldGutter .cm-gutterElement { color: #5C6B63; cursor: pointer; }
+.pf-editor__area .cm-tooltip { background: #17201A; border: 1px solid rgba(255, 255, 255, 0.1); color: #E8EDEA; border-radius: 8px; overflow: hidden; }
+.pf-editor__area .cm-tooltip-autocomplete ul li[aria-selected] { background: rgba(34, 197, 94, 0.28); color: #FFFFFF; }
+.pf-editor__area .cm-panels { background: #17201A; color: #E8EDEA; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+.pf-editor__area .cm-panels input, .pf-editor__area .cm-panels button { font: inherit; }
+.pf-editor__area .cm-searchMatch { background: rgba(250, 204, 21, 0.25); }
+
+/* ------------------------------------------------------------ cores (leitura e editor) */
+
+.pf-codigo .tok-keyword, .pf-editor .tok-keyword { color: #C586C0; }
+.pf-codigo .tok-bool, .pf-editor .tok-bool,
+.pf-codigo .tok-null, .pf-editor .tok-null,
+.pf-codigo .tok-atom, .pf-editor .tok-atom,
+.pf-codigo .tok-self, .pf-editor .tok-self { color: #569CD6; }
+.pf-codigo .tok-string, .pf-editor .tok-string,
+.pf-codigo .tok-string2, .pf-editor .tok-string2 { color: #CE9178; }
+.pf-codigo .tok-number, .pf-editor .tok-number { color: #B5CEA8; }
+.pf-codigo .tok-comment, .pf-editor .tok-comment { color: #6A9955; font-style: italic; }
+.pf-codigo .tok-variableName, .pf-editor .tok-variableName { color: #9CDCFE; }
+.pf-codigo .tok-definition, .pf-editor .tok-definition { color: #4FC1FF; }
+.pf-codigo .tok-function, .pf-editor .tok-function { color: #DCDCAA; }
+.pf-codigo .tok-typeName, .pf-editor .tok-typeName,
+.pf-codigo .tok-className, .pf-editor .tok-className,
+.pf-codigo .tok-namespace, .pf-editor .tok-namespace { color: #4EC9B0; }
+.pf-codigo .tok-propertyName, .pf-editor .tok-propertyName,
+.pf-codigo .tok-attributeName, .pf-editor .tok-attributeName { color: #9CDCFE; }
+.pf-codigo .tok-tagName, .pf-editor .tok-tagName { color: #569CD6; }
+.pf-codigo .tok-operator, .pf-editor .tok-operator { color: #D4D4D4; }
+.pf-codigo .tok-punctuation, .pf-editor .tok-punctuation { color: #A9B1AD; }
+.pf-codigo .tok-meta, .pf-editor .tok-meta,
+.pf-codigo .tok-macroName, .pf-editor .tok-macroName,
+.pf-codigo .tok-processingInstruction, .pf-editor .tok-processingInstruction { color: #C586C0; }
+.pf-codigo .tok-regexp, .pf-editor .tok-regexp,
+.pf-codigo .tok-escape, .pf-editor .tok-escape { color: #D16969; }
+.pf-codigo .tok-labelName, .pf-editor .tok-labelName { color: #C8C8C8; }
+.pf-codigo .tok-invalid, .pf-editor .tok-invalid { color: #F44747; text-decoration: underline wavy; }
+.pf-codigo .tok-heading, .pf-editor .tok-heading { color: #569CD6; font-weight: 700; }
+.pf-codigo .tok-link, .pf-editor .tok-link,
+.pf-codigo .tok-url, .pf-editor .tok-url { color: #4FC1FF; text-decoration: underline; }
