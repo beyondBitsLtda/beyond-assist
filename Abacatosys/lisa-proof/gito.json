@@ -9,14 +9,26 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.4.0-proof-tentativas-raiox.2",
+  "versao": "0.4.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 13,
+    "numero": 14,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.4.0-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.4.0: Raio-X do estudante, exercício com 5 tentativas, até 3 quizzes e exercícios por dia, ranking mundial e o Reino do Neuro.",
+      "itens": [
+        "Junta a branch proof-tentativas-raiox (versões 0.4.0-proof-tentativas-raiox.1 e .2).",
+        "Exige a migração db/005-rodadas-ranking-reino.sql aplicada no banco antes do deploy."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.4.0-proof-tentativas-raiox.2",
       "data": "2026-10-20",
