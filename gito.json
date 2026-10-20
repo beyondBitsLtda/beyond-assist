@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.8.0-cards-arquivados.1",
+  "versao": "0.8.0-cards-arquivados.2",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 26,
+    "numero": 27,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.8.0-cards-arquivados.2",
+      "data": "2026-10-20",
+      "branch": "cards-arquivados",
+      "tipo": "correcao",
+      "resumo": "Abacato: o menu \"⋯\" do quadro abria por baixo das colunas em quadros com foto de papel de parede.",
+      "itens": [
+        "Em quadros com foto de papel de parede, \"Colunas arquivadas\", \"Papel de parede\" (e agora \"Cards arquivados\") ficavam debaixo do \"+ Adicionar coluna\", impossíveis de clicar. O topo do quadro passa a ficar uma camada acima das colunas."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.8.0-cards-arquivados.1",
       "data": "2026-10-20",
