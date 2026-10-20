@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.3.0-proof-chamados-codigo.1",
+  "versao": "0.3.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 8,
+    "numero": 9,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.3.0-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Reportar problema, código colorido, editor de código e quiz com código garantido (branch proof-chamados-codigo) vão ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.3.0-proof-chamados-codigo.1."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.3.0-proof-chamados-codigo.1",
       "data": "2026-10-20",

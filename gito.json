@@ -9,14 +9,25 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.8.0-cards-arquivados.2",
+  "versao": "0.8.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 27,
+    "numero": 28,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.8.0-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Abacato: cards arquivados com restauração e menu do quadro clicável com foto de parede (branch cards-arquivados) vão ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.8.0-cards-arquivados.1 e .2: \"Cards arquivados\" no menu do quadro com Restaurar, botões dos painéis legíveis em quadros com papel de parede e o menu \"⋯\" acima das colunas."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.8.0-cards-arquivados.2",
       "data": "2026-10-20",
