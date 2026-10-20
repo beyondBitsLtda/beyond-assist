@@ -85,6 +85,11 @@ export function Quiz({ desafio }) {
               <button type="button" className="pf-botao pf-botao--sec" onClick={() => setRevendo(true)}>Ver respostas</button>
               <Link className="pf-botao" href="/pratica">Voltar à prática</Link>
             </div>
+            {(desafio.rodada || 1) < (desafio.maxRodadas || 1) && (
+              <p className="pf-estat__nota" style={{ textAlign: "center" }}>
+                Quer mais? Na Prática dá para fazer mais {(desafio.maxRodadas || 1) - (desafio.rodada || 1)} quiz(zes) hoje, valendo metade dos pontos.
+              </p>
+            )}
           </div>
         )}
         {revendo && (

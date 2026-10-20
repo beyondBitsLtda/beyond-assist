@@ -37,11 +37,11 @@ export async function GET(req) {
       // Projetos de qualquer período: um projeto antigo entregue não pode aparecer como atrasado
       // só porque está fora da janela pedida.
       ids.length
-        ? supabase.from("proof_desafios").select("id, trilha_id, tipo, periodo, status, nota, titulo")
+        ? supabase.from("proof_desafios").select("id, trilha_id, tipo, periodo, rodada, status, nota, titulo")
             .eq("usuario_id", usuario.id).in("tipo", ["projeto_semanal", "projeto_mensal"])
         : { data: [] },
       ids.length
-        ? supabase.from("proof_desafios").select("id, trilha_id, tipo, periodo, status, nota, titulo")
+        ? supabase.from("proof_desafios").select("id, trilha_id, tipo, periodo, rodada, status, nota, titulo")
             .eq("usuario_id", usuario.id).in("tipo", ["quiz", "exercicio"]).gte("periodo", de).lte("periodo", ate)
         : { data: [] },
       buscarTodas(() => supabase.from("proof_eventos").select("dia").eq("usuario_id", usuario.id).gte("dia", de).lte("dia", ate)),
@@ -49,7 +49,7 @@ export async function GET(req) {
     if (projetos.error || diarios.error) throw new ErroDeAcesso(500, (projetos.error || diarios.error).message);
 
     const desafios = [...(projetos.data || []), ...(diarios.data || [])].map((d) => ({
-      id: d.id, trilhaId: d.trilha_id, tipo: d.tipo, periodo: d.periodo, status: d.status, nota: d.nota, titulo: d.titulo,
+      id: d.id, trilhaId: d.trilha_id, tipo: d.tipo, periodo: d.periodo, rodada: d.rodada, status: d.status, nota: d.nota, titulo: d.titulo,
     }));
 
     return json({

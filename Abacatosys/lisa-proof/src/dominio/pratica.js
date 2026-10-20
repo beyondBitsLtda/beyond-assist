@@ -24,7 +24,29 @@ export const PONTOS_DA_PRATICA = {
 };
 
 export const NOTA_DE_APROVACAO = 60;
-export const TENTATIVAS = { exercicio: 3, projeto_semanal: 5, projeto_mensal: 5 };
+// Exercício: 5 tentativas (eram 3 — pedido de 20/10/2026).
+export const TENTATIVAS = { exercicio: 5, projeto_semanal: 5, projeto_mensal: 5 };
+
+// ---------------------------------------------------------------- rodadas extras do dia
+//
+// Quem quiser pode fazer até 3 quizzes e 3 exercícios por dia, em cada trilha (pedido de
+// 20/10/2026). Cada rodada é um desafio novo sobre o assunto do dia, sem repetir as perguntas
+// das anteriores. A 2ª e a 3ª valem METADE dos pontos (e das moedas do reino): praticar mais
+// sempre compensa, mas repetir quiz fácil não sobe o ranking como estudar o assunto seguinte.
+export const RODADAS_POR_DIA = { quiz: 3, exercicio: 3 };
+export const fatorDaRodada = (rodada) => ((Number(rodada) || 1) <= 1 ? 1 : 0.5);
+export const comFatorDaRodada = (pontos, rodada) => Math.round((pontos || 0) * fatorDaRodada(rodada));
+
+/** Dá para abrir mais uma rodada hoje? `doDia`: os desafios deste tipo, trilha e dia. */
+export function podeAbrirRodada(tipo, doDia) {
+  const maximo = RODADAS_POR_DIA[tipo] || 1;
+  const lista = doDia || [];
+  if (!lista.length) return { ok: true, rodada: 1 };
+  const ultima = lista.reduce((m, d) => ((d.rodada || 1) > (m.rodada || 1) ? d : m));
+  if ((ultima.rodada || 1) >= maximo) return { ok: false, motivo: `hoje você já fez as ${maximo} rodadas — amanhã tem mais` };
+  if (ultima.status !== "concluido") return { ok: false, motivo: "termine a rodada atual antes de abrir outra" };
+  return { ok: true, rodada: (ultima.rodada || 1) + 1 };
+}
 
 /**
  * Ainda dá para mandar outra solução?

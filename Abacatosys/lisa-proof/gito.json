@@ -9,14 +9,32 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.4.0-proof-tentativas-raiox.1",
+  "versao": "0.4.0-proof-tentativas-raiox.2",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 12,
+    "numero": 13,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.4.0-proof-tentativas-raiox.2",
+      "data": "2026-10-20",
+      "branch": "proof-tentativas-raiox",
+      "tipo": "funcionalidade",
+      "resumo": "Ranking mundial, até 3 quizzes e 3 exercícios por dia, exercício com 5 tentativas e o Reino do Neuro: estudar dá moedas para construir um reino, treinar o Neuro e invadir outros jogadores.",
+      "itens": [
+        "Exercício do dia: as tentativas passam de 3 para 5 (vale a melhor nota).",
+        "Prática: depois de terminar o quiz ou o exercício do dia, dá para fazer mais um, até 3 de cada por dia e por trilha. As rodadas extras valem metade dos pontos e a IA evita repetir o que a pessoa já fez no dia. A agenda mostra um item por dia, mesmo com várias rodadas.",
+        "Nova tela Ranking: placar mundial de pontos de todos os tempos, dos últimos 7 dias e de troféus do Reino, com o top 50 e a posição da pessoa mesmo fora do top. Só aparece o nome público (apelido ou primeiro nome com a inicial do sobrenome); dá para escolher um apelido ou aparecer como \"Estudante anônimo\". Nome completo e e-mail nunca aparecem.",
+        "Nova tela Reino do Neuro: cada ponto de estudo vale uma moeda (os pontos do ranking nunca diminuem). Com as moedas, a pessoa constrói e melhora 6 construções (Torre do Neuro, Mina, Cofre, Muralha, Torre de Arqueiros, Quartel, até o nível 5, limitadas pelo nível da Torre) e treina o Neuro (até o dobro do nível da Torre).",
+        "Invasões: 3 por dia, uma por reino. Ganha quem tiver mais força, com sorte de ±15% e empate da defesa; quem vence leva 15% das moedas fora do cofre (até 250) e troféus. Reino que cai ganha escudo de 8 h, reino novo nasce com 48 h de escudo e atacar tira o próprio escudo. Relatório das últimas batalhas na tela.",
+        "Os limites de invasão ficam garantidos também no banco (índices únicos), e toda compra usa trava de versão do reino para nenhum clique duplo gastar moeda em dobro.",
+        "Navegação: Reino e Ranking no menu; no celular as abas viram Hoje, Trilhas, Prática, Reino e um \"Mais\" com Agenda, Progresso, Ranking e Raio-X.",
+        "Migração db/005-rodadas-ranking-reino.sql (só acrescenta: coluna rodada nos desafios, apelido e no_ranking no perfil, visões do ranking e as tabelas proof_reinos, proof_reino_movimentos e proof_invasoes)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.4.0-proof-tentativas-raiox.1",
       "data": "2026-10-20",
@@ -215,7 +233,10 @@
         "Uso no computador e no celular, instalável como app.",
         "Reportar problema com print, que vira chamado no Abacato para quem administra",
         "Editor de código no exercício e código colorido em todas as telas",
-        "Raio-X do estudante: todos os pontos, notas, ritmo e trilhas num lugar só"
+        "Raio-X do estudante: todos os pontos, notas, ritmo e trilhas num lugar só",
+        "Até 3 quizzes e 3 exercícios por dia por trilha (as rodadas extras valem metade dos pontos)",
+        "Ranking mundial (pontos de sempre, da semana e troféus do Reino), com apelido ou anonimato",
+        "Reino do Neuro: moedas do estudo, construções, Neuro com níveis e invasões entre jogadores"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -224,7 +245,9 @@
         "Quadros em que a pessoa é só membro (não dona) não viram trilha.",
         "Não apaga quadros nem cards do Abacato; só cria quadros quando a pessoa aprova um curso proposto pela Lisa.",
         "Não conclui cards recorrentes do Abacato (o ciclo deles é do Abacato).",
-        "Não tem cadastro próprio: a conta é criada no Abacato."
+        "Não tem cadastro próprio: a conta é criada no Abacato.",
+        "Moedas do Reino não se compram nem se trocam por dinheiro: só vêm do estudo, da mina e dos saques.",
+        "O ranking não mostra nome completo nem e-mail de ninguém."
       ]
     },
     "stack": [
@@ -239,7 +262,7 @@
       "CodeMirror 6 (editor de código e cores por linguagem; cada linguagem é carregada só quando aparece)"
     ],
     "arquitetura": {
-      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
+      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e a sorte das batalhas é sorteada no servidor. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
       "diagramas": [
         {
           "titulo": "Visão geral",
@@ -275,7 +298,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/004). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/005). Acesso só pelo túnel da Cloudflare, em HTTPS."
       }
     ],
     "integracoes": [

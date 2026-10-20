@@ -49,8 +49,8 @@ const ESQUEMA_DO_QUIZ = {
 
 /** 5 perguntas de múltipla escolha sobre o assunto do dia. Se a conferência descartar perguntas
  *  (ex.: "observe o código abaixo" sem código), pede mais uma vez e fica com o melhor dos dois. */
-export async function gerarQuiz({ tema, assunto }) {
-  const pedir = async () => validarQuiz(await pedirQuiz({ tema, assunto }));
+export async function gerarQuiz({ tema, assunto, evitar = [] }) {
+  const pedir = async () => validarQuiz(await pedirQuiz({ tema, assunto, evitar }));
   let quiz = await pedir().catch((e) => ({ erro: e }));
   if (!quiz.perguntas || quiz.perguntas.length < 5) {
     const outro = await pedir().catch(() => null);
@@ -60,7 +60,7 @@ export async function gerarQuiz({ tema, assunto }) {
   return quiz;
 }
 
-async function pedirQuiz({ tema, assunto }) {
+async function pedirQuiz({ tema, assunto, evitar = [] }) {
   return gerarJson({
     sistema: PERSONA,
     esquema: ESQUEMA_DO_QUIZ,
@@ -79,6 +79,7 @@ async function pedirQuiz({ tema, assunto }) {
       "- Pergunta só de conceito: deixe `codigo` vazio.",
       "- `explicacao`: 1 ou 2 frases dizendo por que a certa é a certa.",
       "- Dificuldade progressiva: as primeiras mais fáceis.",
+      evitar.length ? `\nEste é um quiz EXTRA do dia: não repita nem reformule estas perguntas, que a pessoa já respondeu hoje — cubra outros aspectos do assunto:\n${evitar.slice(0, 15).map((p) => `- ${corte(p, 200)}`).join("\n")}` : "",
     ].filter(Boolean).join("\n"),
   });
 }
@@ -99,7 +100,7 @@ const ESQUEMA_DO_EXERCICIO = {
 };
 
 /** Um exercício prático de 10 a 20 minutos sobre o assunto do dia. */
-export async function gerarExercicio({ tema, assunto }) {
+export async function gerarExercicio({ tema, assunto, evitar = [] }) {
   const bruto = await gerarJson({
     sistema: PERSONA,
     esquema: ESQUEMA_DO_EXERCICIO,
@@ -114,6 +115,7 @@ export async function gerarExercicio({ tema, assunto }) {
       "- `exemplo`: entrada e saída esperadas, em texto.",
       "- `dicas`: 2 ou 3 dicas que não entreguem a resposta.",
       "- `criterios`: 3 a 5 critérios objetivos que serão usados na correção.",
+      evitar.length ? `\nEste é um exercício EXTRA do dia: faça um problema DIFERENTE destes, que a pessoa já fez hoje:\n${evitar.slice(0, 3).map((p) => `- ${corte(p, 300)}`).join("\n")}` : "",
     ].filter(Boolean).join("\n"),
   });
   return validarExercicio(bruto);

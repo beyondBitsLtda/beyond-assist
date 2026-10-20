@@ -14,8 +14,13 @@ import { nivelPorPontos } from "../src/dominio/pontos.js";
 import {
   periodoDe, periodoPermitido, pontosDoQuiz, pontosDaNota, validarQuiz, quizParaTela,
   separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo, podeReenviar, entregaConcluida,
-  validarAvaliacao, assuntoAtual, mapaDaTrilha,
+  validarAvaliacao, assuntoAtual, mapaDaTrilha, TENTATIVAS, RODADAS_POR_DIA, podeAbrirRodada, fatorDaRodada, comFatorDaRodada,
 } from "../src/dominio/pratica.js";
+import { nomePublico, apelidoValido, posicionar, ANONIMO } from "../src/dominio/ranking.js";
+import {
+  podeMelhorar, podeSubirNeuro, poderDo, producaoAcumulada, podeInvadir, batalha, saldoDe, somarTrofeus,
+  faixaDeDefesa, estagioDoNeuro, ATAQUES_POR_DIA, TETO_DO_SAQUE, TROFEUS,
+} from "../src/dominio/reino.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
 import { conferirChamado, tituloDoChamado, descricaoDoChamado } from "../src/dominio/chamado.js";
 import { montarRaioX, acertosDoQuiz, horaEmSaoPaulo } from "../src/dominio/raioX.js";
@@ -230,10 +235,10 @@ caso("quiz salvo antes da correção: a tela recebe o código separado, ou o avi
   assert.deepEqual([t[0].codigo, t[0].linguagem, t[0].faltouCodigo], ["SELECT 1;", "sql", false]);
   assert.equal(t[1].faltouCodigo, true);
 });
-caso("exercício: aprovado ainda pode ser reenviado até a 3ª tentativa (20/10/2026)", () => {
+caso("exercício: aprovado ainda pode ser reenviado até a 5ª tentativa (20/10/2026)", () => {
   assert.equal(podeReenviar({ tipo: "exercicio", tentativas: 1, status: "concluido" }), true);
-  assert.equal(podeReenviar({ tipo: "exercicio", tentativas: 2, status: "concluido" }), true);
-  assert.equal(podeReenviar({ tipo: "exercicio", tentativas: 3, status: "concluido" }), false);
+  assert.equal(podeReenviar({ tipo: "exercicio", tentativas: 4, status: "concluido" }), true);
+  assert.equal(podeReenviar({ tipo: "exercicio", tentativas: 5, status: "concluido" }), false);
   assert.equal(podeReenviar({ tipo: "exercicio", tentativas: 0, status: null }), true);
 });
 caso("projeto: aprovado encerra; reprovado segue até as 5 tentativas", () => {
@@ -244,7 +249,8 @@ caso("projeto: aprovado encerra; reprovado segue até as 5 tentativas", () => {
 caso("concluído vale pela melhor nota: reenviar e ir pior não desfaz o feito", () => {
   assert.equal(entregaConcluida({ tipo: "exercicio", melhorNota: 70, tentativas: 2 }), true);
   assert.equal(entregaConcluida({ tipo: "exercicio", melhorNota: 40, tentativas: 2 }), false);
-  assert.equal(entregaConcluida({ tipo: "exercicio", melhorNota: 40, tentativas: 3 }), true);
+  assert.equal(entregaConcluida({ tipo: "exercicio", melhorNota: 40, tentativas: 4 }), false);
+  assert.equal(entregaConcluida({ tipo: "exercicio", melhorNota: 40, tentativas: 5 }), true);
 });
 caso("gabarito só aparece depois de responder", () => {
   const t = quizParaTela({ perguntas: [{ pergunta: "p", opcoes: ["a", "b", "c", "d"], correta: 1, explicacao: "e" }, { pergunta: "q", opcoes: ["a", "b", "c", "d"], correta: 3, explicacao: "f" }] }, { escolhas: { 0: 2 } });
@@ -446,6 +452,143 @@ caso("raio-x: pontos por origem, por trilha, constância e entregas pela melhor 
   assert.equal(r.historico[0].tipo, "meta_diaria");
   assert.equal(r.semanas.length, 12);
   assert.equal(r.semanas.at(-1).pontos, 67);
+});
+
+// ---------------------------------------------------------------- rodadas extras (20/10/2026)
+caso("rodadas: até 3 por dia, só depois de terminar a anterior, valendo metade", () => {
+  assert.deepEqual(podeAbrirRodada("quiz", []), { ok: true, rodada: 1 });
+  assert.equal(podeAbrirRodada("quiz", [{ rodada: 1, status: "pendente" }]).ok, false);
+  assert.deepEqual(podeAbrirRodada("quiz", [{ rodada: 1, status: "concluido" }]), { ok: true, rodada: 2 });
+  assert.deepEqual(podeAbrirRodada("exercicio", [{ rodada: 2, status: "concluido" }, { rodada: 1, status: "concluido" }]), { ok: true, rodada: 3 });
+  assert.equal(podeAbrirRodada("quiz", [{ rodada: 3, status: "concluido" }]).ok, false);
+  assert.equal(podeAbrirRodada("projeto_semanal", [{ rodada: 1, status: "concluido" }]).ok, false);
+  assert.equal(RODADAS_POR_DIA.quiz, 3);
+  assert.equal(TENTATIVAS.exercicio, 5);
+  assert.equal(fatorDaRodada(1), 1);
+  assert.equal(fatorDaRodada(2), 0.5);
+  assert.equal(comFatorDaRodada(25, 1), 25);
+  assert.equal(comFatorDaRodada(25, 3), 13);
+});
+caso("agenda: 3 rodadas do mesmo dia viram um item só, o concluído", () => {
+  const r = montarAgenda({
+    trilhas: [{ id: "t1", tema: "Python" }],
+    etapas: new Map([["t1", [{ cardId: "c1", titulo: "A", inicio: "2026-10-20", fim: "2026-10-22", concluido: false }]]]),
+    desafios: [
+      { id: "d1", trilhaId: "t1", tipo: "quiz", periodo: "2026-10-20", rodada: 1, status: "concluido" },
+      { id: "d2", trilhaId: "t1", tipo: "quiz", periodo: "2026-10-20", rodada: 2, status: "pendente" },
+    ],
+    hoje: "2026-10-20", de: "2026-10-20", ate: "2026-10-20",
+  });
+  const quizzes = r.filter((i) => i.tipo === "quiz");
+  assert.equal(quizzes.length, 1);
+  assert.equal(quizzes[0].situacao, "feito");
+});
+
+// ---------------------------------------------------------------- ranking
+caso("ranking: nome público nunca é o nome completo", () => {
+  assert.equal(nomePublico({ nome: "Marina Alves Souza" }), "Marina S.");
+  assert.equal(nomePublico({ nome: "Rafael" }), "Rafael");
+  assert.equal(nomePublico({ nome: "Marina Alves", apelido: "Dev Noturna" }), "Dev Noturna");
+  assert.equal(nomePublico({ nome: "Marina Alves", apelido: "Dev Noturna", noRanking: false }), ANONIMO);
+  assert.equal(nomePublico({ nome: "" }), ANONIMO);
+});
+caso("ranking: apelido sem e-mail, sem link, de 3 a 24", () => {
+  assert.deepEqual(apelidoValido("  Dev   da Madrugada "), { ok: true, apelido: "Dev da Madrugada" });
+  assert.deepEqual(apelidoValido(""), { ok: true, apelido: "" });
+  assert.equal(apelidoValido("ab").ok, false);
+  assert.equal(apelidoValido("x".repeat(25)).ok, false);
+  assert.equal(apelidoValido("eu@empresa.com").ok, false);
+  assert.equal(apelidoValido("www.meusite").ok, false);
+  assert.equal(apelidoValido("<script>").ok, false);
+});
+caso("ranking: empate divide a posição e eu apareço mesmo fora do topo", () => {
+  const linhas = [
+    { usuarioId: "a", valor: 50 }, { usuarioId: "b", valor: 80 }, { usuarioId: "c", valor: 50 },
+    { usuarioId: "d", valor: 10 }, { usuarioId: "z", valor: 0 }, { usuarioId: "eu", valor: 0 },
+  ];
+  const r = posicionar(linhas, "eu", 3);
+  assert.deepEqual(r.topo.map((l) => l.posicao), [1, 2, 2]);
+  assert.equal(r.total, 5); // quem tem zero fica de fora, menos eu
+  assert.equal(r.eu.posicao, 5);
+  assert.equal(r.eu.souEu, true);
+});
+
+// ---------------------------------------------------------------- Reino do Neuro
+const reinoBase = (extra = {}) => ({
+  usuario_id: "eu", neuro_nivel: 1, trofeus: 0, construcoes: { castelo: 1, mina: 1 }, coletado_em: "2026-10-20T00:00:00Z", ...extra,
+});
+caso("reino: nenhuma construção passa do nível da torre", () => {
+  const r = reinoBase();
+  assert.deepEqual(podeMelhorar(r, "cofre", 1000), { ok: true, custo: 80 });
+  assert.equal(podeMelhorar(r, "mina", 1000).ok, false); // mina 1 → 2 pede torre 2
+  assert.match(podeMelhorar(r, "mina", 1000).motivo, /Torre do Neuro para o nível 2/);
+  assert.deepEqual(podeMelhorar(r, "castelo", 300), { ok: true, custo: 300 });
+  assert.match(podeMelhorar(r, "castelo", 299).motivo, /faltam 1 moeda/);
+  assert.equal(podeMelhorar(reinoBase({ construcoes: { castelo: 5 } }), "castelo", 99999).ok, false);
+  assert.equal(podeMelhorar(r, "dragao", 99999).ok, false);
+});
+caso("reino: o Neuro vai até o dobro da torre e custa 100 × nível", () => {
+  assert.deepEqual(podeSubirNeuro(reinoBase(), 100), { ok: true, custo: 100 });
+  assert.equal(podeSubirNeuro(reinoBase({ neuro_nivel: 2 }), 1000).ok, false);
+  assert.deepEqual(podeSubirNeuro(reinoBase({ neuro_nivel: 2, construcoes: { castelo: 2 } }), 200), { ok: true, custo: 200 });
+  assert.equal(estagioDoNeuro(1), "Filhote");
+  assert.equal(estagioDoNeuro(3), "Aprendiz");
+  assert.equal(estagioDoNeuro(10), "Lendário");
+});
+caso("reino: força sai das construções e do Neuro", () => {
+  assert.deepEqual(poderDo(reinoBase()), { ataque: 18, defesa: 16 });
+  assert.deepEqual(poderDo(reinoBase({ neuro_nivel: 3, construcoes: { castelo: 3, quartel: 2, muralha: 1, torre: 3 } })), { ataque: 62, defesa: 70 });
+});
+caso("reino: a mina produz por hora e para quando enche", () => {
+  const r = reinoBase({ construcoes: { castelo: 2, mina: 2 }, coletado_em: "2026-10-20T00:00:00Z" });
+  assert.equal(producaoAcumulada(r, new Date("2026-10-20T03:30:00Z")), 7);
+  assert.equal(producaoAcumulada(r, new Date("2026-10-22T00:00:00Z")), 24); // teto: 2/h × 12 h
+  assert.equal(producaoAcumulada(r, new Date("2026-10-19T00:00:00Z")), 0);
+});
+caso("reino: invasão — limites do dia, por alvo, escudo e o próprio reino", () => {
+  const agora = new Date("2026-10-20T12:00:00Z");
+  const alvo = reinoBase({ usuario_id: "outro" });
+  assert.equal(podeInvadir({ atacanteId: "eu", defensor: alvo, ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, true);
+  assert.equal(podeInvadir({ atacanteId: "eu", defensor: alvo, ataquesHoje: ATAQUES_POR_DIA, jaAtacouHoje: false, agora }).ok, false);
+  assert.equal(podeInvadir({ atacanteId: "eu", defensor: alvo, ataquesHoje: 1, jaAtacouHoje: true, agora }).ok, false);
+  assert.equal(podeInvadir({ atacanteId: "eu", defensor: { ...alvo, escudo_ate: "2026-10-20T13:00:00Z" }, ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, false);
+  assert.equal(podeInvadir({ atacanteId: "eu", defensor: { ...alvo, escudo_ate: "2026-10-20T11:00:00Z" }, ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, true);
+  assert.equal(podeInvadir({ atacanteId: "eu", defensor: reinoBase(), ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, false);
+  assert.equal(podeInvadir({ atacanteId: "eu", defensor: null, ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, false);
+});
+caso("reino: batalha — sorte de ±15%, empate é da defesa, saque com cofre e teto", () => {
+  const forte = reinoBase({ neuro_nivel: 4, construcoes: { castelo: 3, quartel: 3 } }); // ataque 10+42+32 = 84
+  const fraco = reinoBase({ usuario_id: "outro", construcoes: { castelo: 1, cofre: 1 } }); // defesa 16, cofre 150
+  const v = batalha({ atacante: forte, defensor: fraco, saldoDoDefensor: 1150, sorteA: 0, sorteD: 0.999 });
+  assert.equal(v.venceu, true);
+  assert.equal(v.ataque, Math.round(84 * 0.85));
+  assert.equal(v.protegido, 150);
+  assert.equal(v.saque, 150); // 15% de 1000 expostos
+  assert.equal(v.trofeusAtacante, TROFEUS.vitoriaAtacante);
+  assert.equal(v.escudoDoDefensorHoras, 8);
+  assert.equal(batalha({ atacante: forte, defensor: fraco, saldoDoDefensor: 99999, sorteA: 0.5, sorteD: 0.5 }).saque, TETO_DO_SAQUE);
+  assert.equal(batalha({ atacante: forte, defensor: fraco, saldoDoDefensor: 100, sorteA: 0.5, sorteD: 0.5 }).saque, 0); // tudo no cofre
+  // defesa maior com a mesma sorte: a defesa segura
+  const segura = batalha({ atacante: reinoBase(), defensor: reinoBase({ usuario_id: "outro", neuro_nivel: 2 }), saldoDoDefensor: 0, sorteA: 0.5, sorteD: 0.5 });
+  assert.equal(segura.ataque, 18);
+  assert.equal(segura.defesa, 22);
+  assert.equal(segura.venceu, false);
+  assert.equal(segura.trofeusDefensor, TROFEUS.defesaVencida);
+  assert.equal(segura.escudoDoDefensorHoras, 0);
+  // empate exato: a defesa vence
+  const atacante = reinoBase({ construcoes: { castelo: 1, quartel: 0 } }); // ataque 18
+  const defensor = reinoBase({ usuario_id: "outro", construcoes: { castelo: 1 } }); // defesa 16
+  const empate = batalha({ atacante, defensor, saldoDoDefensor: 0, sorteA: 0, sorteD: 0.5 + (18 * 0.85 / 16 - 1) / 0.3 });
+  assert.equal(empate.ataque, empate.defesa);
+  assert.equal(empate.venceu, false);
+});
+caso("reino: saldo = pontos + livro-caixa, e troféus nunca negativos", () => {
+  assert.equal(saldoDe({ pontosDeEstudo: 500, movimentos: [{ valor: -300 }, { valor: 24 }, { valor: -50 }] }), 174);
+  assert.equal(saldoDe({ pontosDeEstudo: 0, movimentos: [] }), 0);
+  assert.equal(somarTrofeus(2, -5), 0);
+  assert.equal(somarTrofeus(10, 10), 20);
+  assert.equal(faixaDeDefesa(16), "fraca");
+  assert.equal(faixaDeDefesa(150), "fortíssima");
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

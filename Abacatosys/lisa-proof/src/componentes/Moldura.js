@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { IconeHoje, IconeTrilhas, IconeAgenda, IconePratica, IconeProgresso, IconeRaioX, Marca } from "./Icones.js";
+import {
+  IconeHoje, IconeTrilhas, IconeAgenda, IconePratica, IconeProgresso, IconeRaioX, IconeRanking, IconeReino, IconeMais, Marca,
+} from "./Icones.js";
 import { Confete } from "./Neuro.js";
 import Celebracao from "./Celebracao.js";
 import BotaoDeTema from "./BotaoDeTema.js";
@@ -14,8 +17,15 @@ const ITENS = [
   { href: "/agenda", rotulo: "Agenda", Icone: IconeAgenda },
   { href: "/pratica", rotulo: "Prática", Icone: IconePratica },
   { href: "/progresso", rotulo: "Progresso", Icone: IconeProgresso },
+  { href: "/reino", rotulo: "Reino", Icone: IconeReino },
+  { href: "/ranking", rotulo: "Ranking", Icone: IconeRanking },
   { href: "/raio-x", rotulo: "Raio-X", Icone: IconeRaioX },
 ];
+
+// No celular cabem 5 abas: as 4 do dia a dia e um "Mais" com o resto.
+const NAS_ABAS = ["/", "/trilhas", "/pratica", "/reino"];
+const ABAS = ITENS.filter((i) => NAS_ABAS.includes(i.href));
+const NO_MAIS = ITENS.filter((i) => !NAS_ABAS.includes(i.href));
 
 function ativo(caminho, href) {
   return href === "/" ? caminho === "/" : caminho === href || caminho.startsWith(href + "/");
@@ -80,7 +90,7 @@ export default function Moldura({ children }) {
       <main className="pf-principal">{children}</main>
 
       <nav className="pf-abas" aria-label="Navegação principal">
-        {ITENS.map(({ href, rotulo, Icone }) => (
+        {ABAS.map(({ href, rotulo, Icone }) => (
           <Link
             key={href}
             href={href}
@@ -91,9 +101,47 @@ export default function Moldura({ children }) {
             {rotulo}
           </Link>
         ))}
+        <Mais caminho={caminho} />
       </nav>
       <Celebracao />
       <Confete />
+    </div>
+  );
+}
+
+/** A 5ª aba do celular: abre um menu com Agenda, Progresso, Ranking e Raio-X. */
+function Mais({ caminho }) {
+  const [aberto, setAberto] = useState(false);
+  const caixa = useRef(null);
+  const algumAtivo = NO_MAIS.some((i) => ativo(caminho, i.href));
+
+  useEffect(() => setAberto(false), [caminho]);
+  useEffect(() => {
+    if (!aberto) return;
+    const fora = (e) => { if (!caixa.current?.contains(e.target)) setAberto(false); };
+    const esc = (e) => { if (e.key === "Escape") setAberto(false); };
+    document.addEventListener("pointerdown", fora);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("pointerdown", fora); document.removeEventListener("keydown", esc); };
+  }, [aberto]);
+
+  return (
+    <div className="pf-mais" ref={caixa}>
+      <button type="button" className={`pf-abas__item${algumAtivo ? " pf-abas__item--ativo" : ""}`}
+        aria-expanded={aberto} aria-haspopup="true" onClick={() => setAberto((a) => !a)}>
+        <IconeMais />
+        Mais
+      </button>
+      {aberto && (
+        <div className="pf-mais__menu">
+          {NO_MAIS.map(({ href, rotulo, Icone }) => (
+            <Link key={href} href={href} aria-current={ativo(caminho, href) ? "page" : undefined}>
+              <Icone />
+              {rotulo}
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

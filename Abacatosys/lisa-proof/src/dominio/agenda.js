@@ -101,7 +101,16 @@ export function montarAgenda({ trilhas, etapas, desafios, hoje, de, ate }) {
 
     // ---- prática do dia: o que já existiu no período, e o de hoje (mesmo se ainda não gerado)
     for (const tipo of ["quiz", "exercicio"]) {
-      for (const d of desafios.filter((x) => x.trilhaId === t.id && x.tipo === tipo && x.periodo >= de && x.periodo <= ate)) {
+      // até 3 rodadas no mesmo dia viram UM item: o concluído, se houver, senão o mais recente
+      const porDia = new Map();
+      for (const x of desafios.filter((x) => x.trilhaId === t.id && x.tipo === tipo && x.periodo >= de && x.periodo <= ate)) {
+        const atual = porDia.get(x.periodo);
+        const melhor = !atual
+          || (x.status === "concluido" && atual.status !== "concluido")
+          || (x.status === atual.status && (x.rodada || 1) > (atual.rodada || 1));
+        if (melhor) porDia.set(x.periodo, x);
+      }
+      for (const d of porDia.values()) {
         itens.push({
           ...base, chave: `${tipo}-${d.id}`, tipo, titulo: ROTULOS_DA_AGENDA[tipo], inicio: d.periodo, fim: d.periodo,
           exibir: "prazo", situacao: d.status === "concluido" ? "feito" : d.periodo < hoje ? "perdido" : "agora",
