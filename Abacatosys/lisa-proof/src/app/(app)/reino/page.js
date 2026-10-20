@@ -5,6 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { obter, criar } from "@/lib/api.js";
 import { useAviso, Barra } from "@/componentes/Pecas.js";
+import { CartaoDeVale } from "@/componentes/Vales.js";
 import Neuro, { reagir, comemorar } from "@/componentes/Neuro.js";
 import {
   ATAQUES_POR_DIA, FATIA_DO_SAQUE, TETO_DO_SAQUE, SORTE, ESCUDO_APOS_DERROTA_HORAS, ESCUDO_DE_NOVATO_HORAS,
@@ -38,6 +39,9 @@ export default function Reino() {
   useEffect(() => {
     obter("/api/reino").then(setReino).catch((e) => setErro(e.message));
     obter("/api/reino/alvos").then(setAlvos).catch(() => {});
+    const aoResgatar = () => obter("/api/reino").then(setReino).catch(() => {});
+    window.addEventListener("proof-vale-resgatado", aoResgatar);
+    return () => window.removeEventListener("proof-vale-resgatado", aoResgatar);
   }, []);
 
   async function agir(chave, corpo, aoTerminar) {
@@ -69,14 +73,23 @@ export default function Reino() {
     reagir("pensando", "Avançar! ⚔️", 2000);
     try {
       const r = await criar("/api/reino/invadir", { alvo: alvo.id });
-      setReino(r.reino);
-      setResultado(r.resultado);
-      if (r.resultado.venceu) comemorar(r.resultado.saque ? `Vitória! +${r.resultado.saque} moedas` : "Vitória!");
-      else reagir("triste", "Eles se defenderam bem… da próxima vamos mais fortes!");
-      carregarAlvos();
+      const mostrar = () => {
+        setReino(r.reino);
+        setResultado(r.resultado);
+        if (r.resultado.venceu) comemorar(r.resultado.saque ? `Vitória! +${r.resultado.saque} moedas` : "Vitória!");
+        else reagir("triste", "Eles se defenderam bem… da próxima vamos mais fortes!");
+        carregarAlvos();
+        setOcupado("");
+        document.getElementById("invadir")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      };
+      const suave = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      document.querySelector(".rn-mundo")?.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "center" });
+      const quartel = reino.construcoes.find((c) => c.chave === "quartel")?.nivel || 0;
+      const detail = { tipo: "atacar", venceu: r.resultado.venceu, quartel, aoTerminar: mostrar };
+      window.dispatchEvent(new CustomEvent("reino-simular", { detail }));
+      if (!detail.aceito) mostrar();
     } catch (e) {
       avisar(e.message);
-    } finally {
       setOcupado("");
     }
   }
@@ -100,6 +113,8 @@ export default function Reino() {
           <p>Estude, ganhe moedas, construa — e defenda o seu reino. <NomeDoReino atual={reino.nome} ocupado={ocupado === "nome"} aoSalvar={(nome) => agir("nome", { acao: "nome", nome }, () => avisar("Reino renomeado"))} /></p>
         </div>
       </div>
+
+      <CartaoDeVale />
 
       {/* ------------------------------------------------------------ vista e números */}
       <VistaDoReino reino={reino} />

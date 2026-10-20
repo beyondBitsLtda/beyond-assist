@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.6.0-cloudflare-pages.1",
+  "versao": "0.7.0-proof-batalha-epica-vale.1",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 19,
+    "numero": 20,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.7.0-proof-batalha-epica-vale.1",
+      "data": "2026-10-20",
+      "branch": "proof-batalha-epica-vale",
+      "tipo": "funcionalidade",
+      "resumo": "Batalha épica (~10 s, com navios, alerta e efeitos) e o vale de boas-vindas de 450 moedas para todos os usuários, novos e antigos.",
+      "itens": [
+        "Batalha mais longa e encenada: navio voador traz os invasores (ou leva as suas tropas), desembarque com fumaça, rajadas de flechas, golpes no portão com faíscas, tremor e zoom da câmera, saque do Cofre e fuga; no ataque, a batalha acontece ao longe com clarões e o navio volta vitorioso ou avariado. Fogos sobre a torre quando a defesa vence.",
+        "Alerta grande sobre a ilha durante a batalha: \"⚠️ SEU REINO ESTÁ SENDO ATACADO!\" (pulsando, em vermelho) ou \"⚔️ BATALHA EM ANDAMENTO\" (azul), com a legenda de cada fase e uma barra de progresso.",
+        "Tropas com elmo, escudo, porta-bandeira, passo de marcha e corrida na carga; quem cai tomba para trás e some numa nuvem de fumaça.",
+        "As invasões de verdade também são encenadas na ilha; o resultado aparece quando a batalha termina.",
+        "Vale de boas-vindas: 450 moedas do Reino para todos (novos e antigos). Assim que a pessoa entra, abre uma janela com o presente e o botão Resgatar; \"Depois\" deixa o vale esperando na tela do Reino. Cada pessoa resgata uma vez só.",
+        "O vale vira moeda do Reino, não ponto de estudo: não conta como dia estudado nem bate a meta do dia.",
+        "Migração db/006-vales.sql (só acrescenta: tabelas proof_vales e proof_vales_resgates, o tipo \"vale\" no livro-caixa e o vale de boas-vindas)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.6.0-cloudflare-pages.1",
       "data": "2026-10-20",
@@ -311,7 +328,8 @@
         "Até 3 quizzes e 3 exercícios por dia por trilha (as rodadas extras valem metade dos pontos)",
         "Ranking mundial (pontos de sempre, da semana e troféus do Reino), com apelido ou anonimato",
         "Reino do Neuro: moedas do estudo, construções num mundo 3D, Neuro com níveis e invasões entre jogadores",
-        "Simulação de batalha no Reino (treino sem efeito real), com as regras explicadas"
+        "Simulação de batalha no Reino (treino sem efeito real), com as regras explicadas",
+        "Vales de moedas para resgatar (o de boas-vindas: 450 moedas para todos)"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -374,7 +392,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/005). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/006). Acesso só pelo túnel da Cloudflare, em HTTPS."
       }
     ],
     "integracoes": [
