@@ -20,6 +20,7 @@ import { nomePublico, apelidoValido, posicionar, ANONIMO } from "../src/dominio/
 import {
   podeMelhorar, podeSubirNeuro, poderDo, producaoAcumulada, podeInvadir, batalha, saldoDe, somarTrofeus,
   faixaDeDefesa, estagioDoNeuro, ATAQUES_POR_DIA, TETO_DO_SAQUE, TROFEUS,
+  rivalSimulado, chanceDeVitoria, simularBatalha, fatorDaSorte,
 } from "../src/dominio/reino.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
 import { conferirChamado, tituloDoChamado, descricaoDoChamado } from "../src/dominio/chamado.js";
@@ -589,6 +590,47 @@ caso("reino: saldo = pontos + livro-caixa, e troféus nunca negativos", () => {
   assert.equal(somarTrofeus(10, 10), 20);
   assert.equal(faixaDeDefesa(16), "fraca");
   assert.equal(faixaDeDefesa(150), "fortíssima");
+});
+
+// ---------------------------------------------------------------- modo simulação
+caso("simulação: rival tirado do meu reino, um nível abaixo ou acima", () => {
+  const base = { construcoes: { castelo: 2, quartel: 2, muralha: 1, torre: 0, cofre: 1 }, neuro_nivel: 3 };
+  const fraco = rivalSimulado(base, "fraco");
+  assert.deepEqual([fraco.construcoes.quartel, fraco.construcoes.muralha, fraco.construcoes.torre, fraco.construcoes.cofre, fraco.neuro_nivel], [1, 0, 0, 0, 1]);
+  const forte = rivalSimulado(base, "forte");
+  assert.deepEqual([forte.construcoes.quartel, forte.construcoes.muralha, forte.construcoes.torre, forte.construcoes.cofre, forte.neuro_nivel], [3, 2, 1, 2, 5]);
+  assert.deepEqual(rivalSimulado(base, "parelho").construcoes, { ...base.construcoes, mina: 1 }); // a mina já nasce no nível 1
+  const teto = rivalSimulado({ construcoes: { quartel: 5 }, neuro_nivel: 10 }, "forte");
+  assert.equal(teto.construcoes.quartel, 5);
+  assert.equal(teto.neuro_nivel, 10);
+});
+caso("simulação: chance de vitória sai da mesma batalha de verdade", () => {
+  const forte = { construcoes: { quartel: 5 }, neuro_nivel: 10 };
+  const fraco = { construcoes: {}, neuro_nivel: 1 };
+  let i = 0;
+  const sequencia = () => [0.1, 0.9, 0.5, 0.3][i++ % 4];
+  assert.equal(chanceDeVitoria(forte, fraco, 100, sequencia), 100);
+  assert.equal(chanceDeVitoria(fraco, forte, 100, sequencia), 0);
+  assert.equal(fatorDaSorte(0), 0.85);
+  assert.equal(fatorDaSorte(0.5), 1);
+});
+caso("simulação: o passo a passo do lado de quem joga", () => {
+  const forte = { construcoes: { castelo: 3, quartel: 3 }, neuro_nivel: 4 };
+  const fraco = { construcoes: { castelo: 1 }, neuro_nivel: 1 };
+  const atk = simularBatalha({ tipo: "atacar", eu: forte, rival: fraco, meuSaldo: 50, saldoDoRival: 500, sorteA: 0.5, sorteD: 0.5 });
+  assert.equal(atk.euVenci, true);
+  assert.equal(atk.minhasMoedas, 75); // 15% de 500, rival sem cofre
+  assert.equal(atk.meusTrofeus, TROFEUS.vitoriaAtacante);
+  assert.equal(atk.saldoDoDefensor, 500);
+  const def = simularBatalha({ tipo: "defender", eu: fraco, rival: forte, meuSaldo: 1000, saldoDoRival: 500, sorteA: 0.5, sorteD: 0.5 });
+  assert.equal(def.euVenci, false);
+  assert.equal(def.minhasMoedas, -150); // o MEU saldo é que conta na defesa
+  assert.equal(def.meusTrofeus, TROFEUS.derrotaDefensor);
+  assert.equal(def.poderAtacante.ataque, 84);
+  const segura = simularBatalha({ tipo: "defender", eu: forte, rival: fraco, meuSaldo: 1000, sorteA: 0.5, sorteD: 0.5 });
+  assert.equal(segura.euVenci, true);
+  assert.equal(segura.minhasMoedas, 0);
+  assert.equal(segura.meusTrofeus, TROFEUS.defesaVencida);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

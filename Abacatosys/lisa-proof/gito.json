@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.5.0-cloudflare-pages.1",
+  "versao": "0.6.0-proof-simulador.1",
   "atualizadoEm": "2026-10-20",
   "compilacao": {
-    "numero": 17,
+    "numero": 18,
     "data": "2026-10-20",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.6.0-proof-simulador.1",
+      "data": "2026-10-20",
+      "branch": "proof-simulador",
+      "tipo": "funcionalidade",
+      "resumo": "Modo simulação no Reino: treinar um ataque ou uma defesa contra um rival de mentira, com a batalha encenada na ilha 3D e as regras explicadas.",
+      "itens": [
+        "Botão \"🎮 Simular batalha\" abaixo do mundo: escolhe \"Eu ataco\" ou \"Meu reino é atacado\" e um rival mais fraco, parelho ou mais forte (tirado do próprio reino). Nada muda de verdade: moedas, troféus e escudo ficam como estão.",
+        "A ilha encena a batalha: no ataque, os soldados saem do Quartel, pulam para o outro reino e voltam (com moedas, se vencer); na defesa, os invasores marcham até a torre, os Arqueiros atiram e, se o reino cair, as moedas saem voando do Cofre. O Neuro comenta cada momento.",
+        "Passo a passo com a mesma conta da invasão de verdade: força de cada lado (com a fórmula), a sorte rolada, moedas expostas e saque, troféus e escudo. Mostra também a chance de vitória contra aquele rival e o que melhorar para subir.",
+        "Quadro \"Regras da batalha\" ao lado do simulador, com as fórmulas e os números do jogo lidos do próprio código das regras.",
+        "Sem 3D ou com \"reduzir movimento\", o resultado aparece direto, sem animação."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.5.0-cloudflare-pages.1",
       "data": "2026-10-20",
@@ -284,7 +299,8 @@
         "Raio-X do estudante: todos os pontos, notas, ritmo e trilhas num lugar só",
         "Até 3 quizzes e 3 exercícios por dia por trilha (as rodadas extras valem metade dos pontos)",
         "Ranking mundial (pontos de sempre, da semana e troféus do Reino), com apelido ou anonimato",
-        "Reino do Neuro: moedas do estudo, construções num mundo 3D, Neuro com níveis e invasões entre jogadores"
+        "Reino do Neuro: moedas do estudo, construções num mundo 3D, Neuro com níveis e invasões entre jogadores",
+        "Simulação de batalha no Reino (treino sem efeito real), com as regras explicadas"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",

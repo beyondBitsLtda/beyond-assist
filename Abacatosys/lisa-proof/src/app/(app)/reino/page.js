@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { obter, criar } from "@/lib/api.js";
-import { useAviso } from "@/componentes/Pecas.js";
+import { useAviso, Barra } from "@/componentes/Pecas.js";
 import Neuro, { reagir, comemorar } from "@/componentes/Neuro.js";
 import {
   ATAQUES_POR_DIA, FATIA_DO_SAQUE, TETO_DO_SAQUE, SORTE, ESCUDO_APOS_DERROTA_HORAS, ESCUDO_DE_NOVATO_HORAS,
-  HORAS_ATE_ENCHER, TROFEUS,
+  HORAS_ATE_ENCHER, TROFEUS, PESOS, RIVAIS_SIMULADOS, rivalSimulado, chanceDeVitoria, simularBatalha, protecaoDoCofre, poderDo,
 } from "@/dominio/reino.js";
 
 // O mundo 3D (Three.js) só baixa nesta tela, e só no navegador.
@@ -32,6 +32,7 @@ export default function Reino() {
   const [ocupado, setOcupado] = useState("");
   const [alvos, setAlvos] = useState(null);
   const [resultado, setResultado] = useState(null);
+  const [simulando, setSimulando] = useState(false);
   const [Aviso, avisar] = useAviso();
 
   useEffect(() => {
@@ -114,8 +115,12 @@ export default function Reino() {
             : alvos.alvos.length === 0 ? "ainda não há outros reinos"
             : `todos estão com escudo${escudoMaisCurto ? ` · o primeiro abre ${hora(escudoMaisCurto)}` : ""}`}
         </span>
+        <button type="button" className="pf-botao pf-botao--sec" aria-expanded={simulando} aria-controls="simulador" onClick={() => setSimulando((s) => !s)}>
+          🎮 {simulando ? "Fechar simulação" : "Simular batalha"}
+        </button>
         <Link href="/ranking" className="pf-botao pf-botao--sec rn-acoes__ranking">🏆 Ranking</Link>
       </div>
+      {simulando && <Simulador reino={reino} aoFechar={() => setSimulando(false)} />}
 
       <div className="rn-numeros">
         <Numero rotulo="Moedas" valor={<Moedas n={reino.saldo} />} nota={`${numero(reino.cofre.protege)} a salvo no cofre`} />
@@ -280,6 +285,169 @@ function VistaPlana({ reino, humor }) {
         {reino.construcoes.filter((c) => c.chave !== "castelo").slice(2).map((c) => <Predio key={c.chave} c={c} />)}
       </div>
     </section>
+  );
+}
+
+// ------------------------------------------------------------------ modo simulação
+const pct = (f) => `×${f.toFixed(2).replace(".", ",")}`;
+
+/**
+ * Treino de batalha: a mesma conta da invasão de verdade (simularBatalha, do domínio) contra um
+ * rival de mentira tirado do próprio reino. A ilha 3D encena; o passo a passo explica. Não grava
+ * nada — moedas, troféus e escudo de verdade não mudam.
+ */
+function Simulador({ reino, aoFechar }) {
+  const [tipo, setTipo] = useState("atacar");
+  const [forca, setForca] = useState("parelho");
+  const [rodando, setRodando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const caixaDoResultado = useRef(null);
+
+  const eu = useMemo(() => ({
+    construcoes: Object.fromEntries(reino.construcoes.map((c) => [c.chave, c.nivel])),
+    neuro_nivel: reino.neuro.nivel,
+  }), [reino]);
+  const rivais = useMemo(() => Object.fromEntries(Object.keys(RIVAIS_SIMULADOS).map((k) => [k, rivalSimulado(eu, k)])), [eu]);
+  const rival = rivais[forca];
+  const chance = useMemo(() => (tipo === "atacar" ? chanceDeVitoria(eu, rival) : 100 - chanceDeVitoria(rival, eu)), [eu, rival, tipo]);
+
+  useEffect(() => {
+    if (resultado) caixaDoResultado.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [resultado]);
+
+  function simular() {
+    const r = simularBatalha({ tipo, eu, rival, meuSaldo: reino.saldo, saldoDoRival: 500, sorteA: Math.random(), sorteD: Math.random() });
+    setResultado(null);
+    setRodando(true);
+    const suave = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.querySelector(".rn-mundo")?.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "center" });
+    const detail = {
+      tipo, venceu: r.venceu, quartel: eu.construcoes.quartel, torre: eu.construcoes.torre,
+      aoTerminar: () => { setRodando(false); setResultado(r); },
+    };
+    window.dispatchEvent(new CustomEvent("reino-simular", { detail }));
+    if (!detail.aceito) { setRodando(false); setResultado(r); } // sem 3D: o resultado vem direto
+  }
+
+  return (
+    <section id="simulador" className="pf-cartao rn-simulador" aria-label="Simulação de batalha">
+      <div className="rn-simulador__principal">
+        <div className="rn-simulador__topo">
+          <h2>🎮 Simulação de batalha</h2>
+          <span className="pf-pilula">treino · nada muda de verdade</span>
+        </div>
+
+        <div className="agenda__modos" role="tablist" aria-label="O que simular">
+          <button type="button" role="tab" aria-selected={tipo === "atacar"} className="agenda__modo" onClick={() => { setTipo("atacar"); setResultado(null); }}>⚔️ Eu ataco</button>
+          <button type="button" role="tab" aria-selected={tipo === "defender"} className="agenda__modo" onClick={() => { setTipo("defender"); setResultado(null); }}>🛡️ Meu reino é atacado</button>
+        </div>
+
+        <div className="rn-simulador__rivais" role="group" aria-label="Contra quem">
+          {Object.entries(RIVAIS_SIMULADOS).map(([k, r]) => {
+            const pr = poderDo(rivais[k]);
+            return (
+              <button key={k} type="button" className="pf-dia rn-simulador__rival" aria-pressed={forca === k} onClick={() => { setForca(k); setResultado(null); }}>
+                <strong>{r.nome}</strong>
+                <small>⚔️ {pr.ataque} · 🛡️ {pr.defesa}</small>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="rn-simulador__chance">
+          <div className="pf-estat__rotulo">
+            {tipo === "atacar" ? "Chance de a sua invasão dar certo" : "Chance de o seu reino resistir"}: <strong>{chance}%</strong>
+          </div>
+          <Barra valor={chance} total={100} rotulo="Chance de vitória" />
+          <p className="pf-estat__nota">
+            {tipo === "atacar"
+              ? `Seu ataque ⚔️ ${poderDo(eu).ataque} contra a defesa dele 🛡️ ${poderDo(rival).defesa}. ${chance < 50 ? "Para subir: Quartel (+" + PESOS.quartel + " por nível) ou treinar o Neuro (+" + PESOS.neuroAtaque + ")." : ""}`
+              : `O ataque dele ⚔️ ${poderDo(rival).ataque} contra a sua defesa 🛡️ ${poderDo(eu).defesa}. ${chance < 50 ? "Para subir: Muralha (+" + PESOS.muralha + "), Arqueiros (+" + PESOS.torre + ") ou Neuro (+" + PESOS.neuroDefesa + ")." : ""}`}
+          </p>
+        </div>
+
+        <button type="button" className="pf-botao" onClick={simular} disabled={rodando}>
+          {rodando ? "Assistindo à batalha…" : "▶ Simular batalha"}
+        </button>
+
+        {resultado && (
+          <div ref={caixaDoResultado} className={`rn-resultado rn-simulacao ${resultado.euVenci ? "rn-resultado--venceu" : "rn-resultado--perdeu"}`} role="status">
+            <div className="rn-resultado__titulo">
+              {resultado.tipo === "atacar"
+                ? (resultado.euVenci ? "🏆 A invasão deu certo!" : "💥 A invasão falhou")
+                : (resultado.euVenci ? "🛡️ O reino resistiu!" : "💥 O reino caiu")}
+              <small> · simulação</small>
+            </div>
+            <PassoAPasso r={resultado} eu={eu} rival={rival} />
+            <div className="rn-simulacao__acoes">
+              <button type="button" className="pf-botao pf-botao--pequeno" onClick={simular} disabled={rodando}>Simular de novo</button>
+              <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={aoFechar}>Fechar</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <RegrasDaBatalha />
+    </section>
+  );
+}
+
+function PassoAPasso({ r, eu, rival }) {
+  const atacante = r.tipo === "atacar" ? eu : rival;
+  const defensor = r.tipo === "atacar" ? rival : eu;
+  const quemAtaca = r.tipo === "atacar" ? "Seu ataque" : "O ataque do rival";
+  const quemDefende = r.tipo === "atacar" ? "a defesa do rival" : "a sua defesa";
+  const na = atacante.construcoes, nd = defensor.construcoes;
+  const cofre = protecaoDoCofre(nd.cofre || 0);
+  return (
+    <ol className="rn-passos">
+      <li>
+        <strong>Força.</strong> {quemAtaca}: {PESOS.base} + {na.quartel || 0}×{PESOS.quartel} (Quartel) + {atacante.neuro_nivel}×{PESOS.neuroAtaque} (Neuro) = <b>{r.poderAtacante.ataque}</b>.
+        {" "}{quemDefende[0].toUpperCase() + quemDefende.slice(1)}: {PESOS.base} + {nd.muralha || 0}×{PESOS.muralha} (Muralha) + {nd.torre || 0}×{PESOS.torre} (Arqueiros) + {defensor.neuro_nivel}×{PESOS.neuroDefesa} (Neuro) = <b>{r.poderDefensor.defesa}</b>.
+      </li>
+      <li>
+        <strong>Sorte.</strong> O ataque rolou {pct(r.fatorA)} e ficou em <b>{r.ataque}</b>; a defesa rolou {pct(r.fatorD)} e ficou em <b>{r.defesa}</b>.
+        {" "}{r.ataque > r.defesa ? "O ataque passou." : r.ataque === r.defesa ? "Empate — e empate é da defesa." : "A defesa segurou."}
+      </li>
+      <li>
+        <strong>Moedas.</strong> O defensor tinha 🪙 {numero(r.saldoDoDefensor)}{r.tipo === "atacar" ? " (imaginando um rival com 500)" : " (o seu saldo de agora)"}; o cofre guarda {numero(cofre)}, então {numero(r.exposto)} estavam expostas.
+        {" "}{r.venceu ? <>O saque é {Math.round(FATIA_DO_SAQUE * 100)}% disso, no máximo {TETO_DO_SAQUE}: <b>🪙 {numero(r.saque)}</b> {r.tipo === "atacar" ? "para você" : "saem do seu reino"}.</> : "Como o ataque falhou, ninguém perde moeda."}
+      </li>
+      <li>
+        <strong>Troféus.</strong> Você {r.meusTrofeus >= 0 ? "ganharia" : "perderia"} <b>{Math.abs(r.meusTrofeus)} 🏆</b> (troféus nunca ficam abaixo de zero).
+      </li>
+      <li>
+        <strong>Escudo.</strong> {r.tipo === "atacar"
+          ? <>Atacar tira o seu escudo.{r.venceu ? ` O reino invadido ganharia ${ESCUDO_APOS_DERROTA_HORAS} h de escudo.` : ""}</>
+          : r.venceu ? `O seu reino ganharia ${ESCUDO_APOS_DERROTA_HORAS} h de escudo para ninguém invadir de novo em seguida.` : "Defesa vencida não dá escudo — mas rende troféus."}
+      </li>
+    </ol>
+  );
+}
+
+function RegrasDaBatalha() {
+  return (
+    <aside className="rn-simulador__regras" aria-label="Regras da batalha">
+      <h3>📜 Regras da batalha</h3>
+      <dl>
+        <dt>⚔️ Força de ataque</dt>
+        <dd>{PESOS.base} + {PESOS.quartel} por nível do Quartel + {PESOS.neuroAtaque} por nível do Neuro</dd>
+        <dt>🛡️ Força de defesa</dt>
+        <dd>{PESOS.base} + {PESOS.muralha} por nível da Muralha + {PESOS.torre} por nível dos Arqueiros + {PESOS.neuroDefesa} por nível do Neuro</dd>
+        <dt>🎲 Sorte</dt>
+        <dd>Cada lado multiplica a força por um valor entre {pct(1 - SORTE)} e {pct(1 + SORTE)}. Vence quem ficar maior; empate é da defesa.</dd>
+        <dt>🪙 Saque</dt>
+        <dd>{Math.round(FATIA_DO_SAQUE * 100)}% das moedas fora do cofre, no máximo {TETO_DO_SAQUE}. O Cofre guarda {protecaoDoCofre(1)} moedas por nível.</dd>
+        <dt>🏆 Troféus</dt>
+        <dd>Invasão vencida +{TROFEUS.vitoriaAtacante}, invasão falha {TROFEUS.ataqueFalho}, defesa vencida +{TROFEUS.defesaVencida}, reino caiu {TROFEUS.derrotaDefensor}.</dd>
+        <dt>🛡️ Escudo</dt>
+        <dd>Reino novo: {ESCUDO_DE_NOVATO_HORAS} h. Reino que cai: {ESCUDO_APOS_DERROTA_HORAS} h. Atacar tira o seu escudo.</dd>
+        <dt>📅 Limites</dt>
+        <dd>{ATAQUES_POR_DIA} invasões por dia, uma por reino. A sorte é sorteada no servidor.</dd>
+        <dt>📚 Pontos</dt>
+        <dd>Moeda vem do estudo (1 ponto = 1 moeda). Perder moeda numa invasão nunca tira pontos do ranking.</dd>
+      </dl>
+    </aside>
   );
 }
 
