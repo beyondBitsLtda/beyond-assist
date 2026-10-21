@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.10.0-cloudflare-pages.1",
+  "versao": "0.11.0-proof-acampamento-papel.1",
   "atualizadoEm": "2026-10-21",
   "compilacao": {
-    "numero": 28,
+    "numero": 29,
     "data": "2026-10-21",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.11.0-proof-acampamento-papel.1",
+      "data": "2026-10-21",
+      "branch": "proof-acampamento-papel",
+      "tipo": "funcionalidade",
+      "resumo": "As tropas ganham uma ilhota própria, o Acampamento, e viram desenhos de papel como o Neuro.",
+      "itens": [
+        "Nova construção ⛺ Acampamento: uma ilhota ao lado do reino, ligada por uma ponte, onde todas as tropas ficam à vista fora da batalha (exército na frente, tropas de defesa atrás).",
+        "A lotação (exército + defesa) agora cresce com o nível do Acampamento: 40, 65, 90 e 115 de espaço. Antes dependia do Terreno.",
+        "As tropas só aparecem no reino durante as batalhas; na invasão a outro reino, a ilhota some do quadro.",
+        "Todas as tropas viraram recortes 2D com borda de adesivo, nas cores do time, sempre de frente para a câmera, nas batalhas e no Acampamento.",
+        "Enquadramento da câmera refeito: cabe o reino e o Acampamento em qualquer ângulo de giro.",
+        "Sem migração de banco: reinos antigos começam com o Acampamento no nível 1."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.10.0-cloudflare-pages.1",
       "data": "2026-10-21",
@@ -445,6 +461,7 @@
         "Vales de moedas para resgatar (o de boas-vindas: 450 moedas para todos)",
         "Combate no estilo Clash of Clans no Reino: tropas, tropas de defesa, defesas com vida, estrelas e replay das batalhas",
         "Terreno do Reino (a ilha cresce) e visual por nível nas construções",
+        "Acampamento do Reino: ilhota onde as tropas ficam à vista, com a lotação crescendo por nível; tropas desenhadas como recortes de papel",
         "Minha conta: trocar a senha (vale no Proof, no Abacato e na Lisa)",
         "Personagens do Neuro comprados com moedas, usados em todo o app"
       ],

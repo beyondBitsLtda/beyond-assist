@@ -26,7 +26,7 @@ import {
 } from "../src/dominio/reino.js";
 import { montarCombate, passo as passoDoCombate, resultadoDo, resolverCombate, raioDaIlha } from "../src/dominio/combate.js";
 import {
-  capacidadeDoExercito, capacidadeDaGuarnicao, podeTreinar, espacoUsado, somarTropas, contagens, totalDeTropas, lotacaoDaIlha,
+  capacidadeDoExercito, capacidadeDaGuarnicao, podeTreinar, espacoUsado, somarTropas, contagens, totalDeTropas, lotacaoDoAcampamento,
 } from "../src/dominio/tropas.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
 import { conferirChamado, tituloDoChamado, descricaoDoChamado } from "../src/dominio/chamado.js";
@@ -798,14 +798,15 @@ caso("personagens: o Clássico é de todos; comprar cobra, vestir o que já tem 
   assert.equal(podeEscolherPersonagem({ id: "dragao", possui: [], saldo: 9999 }).ok, false);
 });
 
-caso("lotação da ilha: exército + defesa juntos; ilha cheia pede mais Terreno", () => {
-  assert.deepEqual([lotacaoDaIlha(0), lotacaoDaIlha(1), lotacaoDaIlha(3)], [40, 65, 115]);
-  const niveis = { quartel: 5, castelo: 5, terreno: 0 };
+caso("lotação do Acampamento: exército + defesa juntos; lotado pede Acampamento maior", () => {
+  assert.deepEqual([lotacaoDoAcampamento(1), lotacaoDoAcampamento(2), lotacaoDoAcampamento(4)], [40, 65, 115]);
+  assert.equal(lotacaoDoAcampamento(undefined), 40); // reino antigo, sem o campo, nasce com o nível 1
+  const niveis = { quartel: 5, castelo: 5, acampamento: 1 };
   const reservas = { exercito: { guerreiro: 30 }, guarnicao: { arqueira: 8 } }; // 38 de 40
   assert.equal(podeTreinar({ tropa: "guerreiro", quantidade: 2, destino: "exercito", niveis, reservas, saldo: 999 }).ok, true);
-  assert.match(podeTreinar({ tropa: "guerreiro", quantidade: 3, destino: "exercito", niveis, reservas, saldo: 999 }).motivo, /ilha está lotada \(38 de 40\).*Terreno/);
-  assert.match(podeTreinar({ tropa: "arqueira", quantidade: 3, destino: "guarnicao", niveis, reservas, saldo: 999 }).motivo, /lotada/);
-  assert.equal(podeTreinar({ tropa: "guerreiro", quantidade: 3, destino: "exercito", niveis: { ...niveis, terreno: 1 }, reservas, saldo: 999 }).ok, true);
+  assert.match(podeTreinar({ tropa: "guerreiro", quantidade: 3, destino: "exercito", niveis, reservas, saldo: 999 }).motivo, /Acampamento está lotado \(38 de 40\).*aumente o Acampamento/);
+  assert.match(podeTreinar({ tropa: "arqueira", quantidade: 3, destino: "guarnicao", niveis, reservas, saldo: 999 }).motivo, /lotado/);
+  assert.equal(podeTreinar({ tropa: "guerreiro", quantidade: 3, destino: "exercito", niveis: { ...niveis, acampamento: 2 }, reservas, saldo: 999 }).ok, true);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

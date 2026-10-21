@@ -20,7 +20,7 @@
 
 import { PREDIOS_EM_COMBATE, resolverCombate, raioDaIlha } from "./combate.js";
 import {
-  capacidadeDoExercito, capacidadeDaGuarnicao, contagens, totalDeTropas, danoPorSegundo, espacoUsado, TROPAS,
+  capacidadeDoExercito, capacidadeDaGuarnicao, contagens, totalDeTropas, danoPorSegundo, espacoUsado, TROPAS, lotacaoDoAcampamento,
 } from "./tropas.js";
 
 const def = (chave) => PREDIOS_EM_COMBATE[chave].defesa;
@@ -89,6 +89,12 @@ export const CONSTRUCOES = {
     custos: [900, 1800, 3200, 5000, 8000],
     efeito: (n) => `${def("torreRaio")(n).dano} de dano a cada ${virgula(def("torreRaio")(n).intervalo)} s num alvo só · alcance ${virgula(def("torreRaio")(n).alcance)} · chão e ar · ❤️ ${PREDIOS_EM_COMBATE.torreRaio.vida(n)}`,
   },
+  acampamento: {
+    nome: "Acampamento", emoji: "⛺", max: 4,
+    // a ilhota das tropas, ao lado do reino: fora da batalha, todas as tropas ficam à vista lá
+    custos: [0, 500, 1300, 3000],
+    efeito: (n) => `a ilhota das tropas: cabem ${lotacaoDoAcampamento(n)} de espaço (exército + defesa), todas à vista`,
+  },
   quartel: {
     nome: "Quartel", emoji: "⚔️", max: 5,
     custos: [120, 280, 600, 1200, 2400],
@@ -97,11 +103,11 @@ export const CONSTRUCOES = {
 };
 export const ORDEM_DAS_CONSTRUCOES = [
   "castelo", "terreno", "mina", "biblioteca", "cofre", "muralha", "torre", "canhao",
-  "defesaAerea", "morteiro", "torreMagica", "torreRaio", "quartel",
+  "defesaAerea", "morteiro", "torreMagica", "torreRaio", "quartel", "acampamento",
 ];
 export const NIVEIS_INICIAIS = {
   castelo: 1, terreno: 0, mina: 1, biblioteca: 0, cofre: 0, muralha: 0, torre: 0, canhao: 0,
-  defesaAerea: 0, morteiro: 0, torreMagica: 0, torreRaio: 0, quartel: 0,
+  defesaAerea: 0, morteiro: 0, torreMagica: 0, torreRaio: 0, quartel: 0, acampamento: 1,
 };
 
 export const HORAS_ATE_ENCHER = 12;
