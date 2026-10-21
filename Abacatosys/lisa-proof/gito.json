@@ -9,14 +9,26 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.10.0-proof-tropas-na-ilha.1",
+  "versao": "0.10.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-21",
   "compilacao": {
-    "numero": 27,
+    "numero": 28,
     "data": "2026-10-21",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.10.0-cloudflare-pages.1",
+      "data": "2026-10-21",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.10.0: tropas à vista na ilha, lotação da ilha e os lotes da terra nova sem flutuar.",
+      "itens": [
+        "Junta a branch proof-tropas-na-ilha (0.10.0-proof-tropas-na-ilha.1). Sem migração de banco.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.10.0-proof-tropas-na-ilha.1",
       "data": "2026-10-21",
