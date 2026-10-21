@@ -2,7 +2,7 @@
 import {
   pareceAcao, respostaDeConfirmacao, candidatosDoPedido, pendenteValida, prazoEmPalavras, resumoDaAcao, relatoDaAcao, previaDoTexto, pedeTextoEscrito,
   rascunhoValido, acaoDoRascunho, textoDoRascunho, falaSemRascunho, MARCA_DO_RASCUNHO, MAXIMO_DE_RODADAS,
-  querElaborar, tituloAceitavel,
+  querElaborar, tituloAceitavel, pedeMudarTexto,
 } from "../src/lib/acoesNoAbacato.js";
 
 let falhas = 0;
@@ -43,8 +43,13 @@ for (const f of [
   "cria um card com o e-mail de cobrança para o cliente",
   "adiciona uma tarefa com um roteiro da reunião de segunda",
   "cria um card com um passo a passo de como publicar a Lisa",
+  "cria um card com a estrutura que você acha ideal pro perfil da Beyond no GitHub, descrevendo todo o texto seção por seção",
+  "quero que você crie um card com o que você acha ideal para o perfil do GitHub da Beyond",
+  "cria um card com um plano de conteúdo para o Instagram da Beyond",
+  "adiciona um card com ideias de post para novembro",
+  "cria um card do onboarding de cliente, detalhando cada etapa",
 ]) conferir(`pede texto: "${f}"`, pedeTextoEscrito(f));
-for (const f of ["cria um card para revisar o pitch de vendas", "cria um card de ligar para o contador"]) {
+for (const f of ["cria um card para revisar o pitch de vendas", "cria um card de ligar para o contador", "cria um card com prazo sexta para pagar o aluguel", "move o card do relatório para Fazendo", "cria um card de comprar toner amanhã"]) {
   conferir(`não pede texto: "${f}"`, !pedeTextoEscrito(f));
 }
 
@@ -86,6 +91,8 @@ conferir("criar: título, destino, começo do texto e prazo, e pede confirmaçã
 const p = previaDoTexto(LONGO);
 conferir("a prévia corta numa palavra e termina em …", p.length <= 141 && p.endsWith("…") && !/\s…$/.test(p), p);
 conferir("texto curto não ganha …", previaDoTexto("ligar às 10h") === "ligar às 10h");
+const semTexto = resumoDaAcao({ acao: "criar", titulo: "Ligar para o contador", destino: "Quarto de Guerra, coluna A fazer", prazo: "2026-10-22T10:00" });
+conferir("criar sem texto avisa \"sem descrição\" (o card vazio de 21/10 passou num \"confirma\")", semTexto.includes("sem descrição") && semTexto.includes("22 de outubro às 10h"), semTexto);
 const r2 = resumoDaAcao({ acao: "arquivar", card_titulo: "Teste" });
 conferir("excluir avisa que dá para recuperar", r2.includes("arquivado") && r2.endsWith("Confirma?"));
 const r3 = relatoDaAcao({ acao: "concluir", card_titulo: "Backup" }, { reprogramado: true, fim_em: "2026-10-22T02:59:59.000Z", titulo: "Backup" });
@@ -114,6 +121,12 @@ for (const f of ["me ajuda a montar um card para a reunião com o contador", "va
   conferir(`montar junto: "${f}"`, querElaborar(f));
 }
 for (const f of ["cria um card de ligar para o contador", "me ajuda com o backup"]) conferir(`não é montar junto: "${f}"`, !querElaborar(f));
+
+console.log("\nPedido de mudar o texto do rascunho\n");
+for (const f of ["deixa bem mais curto, umas três frases, e põe prazo para sexta-feira", "reescreve num tom mais formal", "tira a parte do preço", "acrescenta um parágrafo sobre o suporte"]) {
+  conferir(`muda texto: "${f}"`, pedeMudarTexto(f));
+}
+for (const f of ["põe prazo para sexta", "pode criar", "muda para a coluna Fazendo"]) conferir(`não muda texto: "${f}"`, !pedeMudarTexto(f));
 conferir("título curto serve", tituloAceitavel("Pitch de vendas para imobiliárias"));
 const lixo = "Pitch de vendas para a Beyond - Imobiliárias pequenas (versão curta) Ferreira e Lima Ltda. - 2026-10-23T23:59:00.000Z - Pitch";
 conferir("título enorme com data de máquina não serve (o do teste de 18/10)", !tituloAceitavel(lixo));

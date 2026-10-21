@@ -203,6 +203,18 @@ try {
     conferir("\"pode salvar\" grava a descrição no card", r.texto?.startsWith("Pronto") && data.descricao === passo, r.texto);
   }
 
+  // ---------------------------------------------------------------- 10. o print de 21/10: "a estrutura que você acha ideal"
+  // Virava um card VAZIO: o modelo punha o assunto no título e o "confirma" gravava sem texto.
+  // Agora abre o rascunho e já escreve a proposta (pediu a opinião dela), sem interrogatório.
+  const papo4 = novoPapo();
+  r = await papo4.dizer("cria um card com a estrutura que você acha ideal pro perfil da Beyond no GitHub, descrevendo todo o texto seção por seção e os elementos gráficos");
+  const proposta = String(r.pending?.descricao || "");
+  conferir("\"a estrutura que você acha ideal\" → rascunho (não card vazio)", r.pending?.type === "abacato_rascunho" && r.pending.acao === "criar", r.texto?.slice(0, 160));
+  conferir("a primeira resposta já traz o texto, seção por seção", proposta.length > 300 && (proposta.match(/\n/g) || []).length >= 4, `${proposta.length} letras`);
+  const { count: nadaGravado } = await db.from("abacato_cards").select("id", { count: "exact", head: true }).eq("titulo", r.pending?.titulo || "-").eq("origem", "lisa");
+  conferir("nada é gravado antes do \"pode criar\"", !nadaGravado);
+  console.log(`\n      título: ${r.pending?.titulo}\n      ${proposta.slice(0, 700).replace(/\n/g, "\n      ")}\n`);
+
   // ---------------------------------------------------------------- 7. não é ação
   r = await rodar("quais tarefas eu tenho no quadro de testes?");
   conferir("pergunta comum não vira ação", !r.respondeu);

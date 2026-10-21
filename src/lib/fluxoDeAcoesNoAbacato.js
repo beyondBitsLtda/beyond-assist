@@ -21,7 +21,7 @@ import { detectarAcaoNoAbacato, conduzirRascunho } from "./gemini.js";
 import { loadAllCards } from "./liveQuadros.js";
 import { quadrosEColunas, cardDoAbacato, criarCard, mudarCard, arquivarCard } from "./abacatoAcoes.js";
 import {
-  candidatosDoPedido, pendenteValida, respostaDeConfirmacao, resumoDaAcao, relatoDaAcao, pedeTextoEscrito, querElaborar, tituloAceitavel,
+  candidatosDoPedido, pendenteValida, respostaDeConfirmacao, resumoDaAcao, relatoDaAcao, pedeTextoEscrito, querElaborar, tituloAceitavel, pedeMudarTexto,
   rascunhoValido, acaoDoRascunho, textoDoRascunho, MAXIMO_DE_RODADAS,
 } from "./acoesNoAbacato.js";
 import { turnosValidos, blocoDaConversa } from "./conversa.js";
@@ -77,6 +77,9 @@ export async function tratarAcaoNoAbacato({ pergunta, history, pendente, quadroP
     pendente,
   });
 
+  // A origem que o modelo decidiu (campo obrigatório) manda; os campos soltos ficam como antes.
+  if (d.origem_da_descricao === "escrever" && !d.escrever_descricao) d.escrever_descricao = pergunta;
+  if (d.origem_da_descricao === "ultima_resposta" && !d.descricao) d.usar_ultima_resposta = true;
   // "cria um card com um pitch de vendas" que o modelo entendeu só como título: é texto a escrever.
   if (d.intent === "propor" && (d.acao === "criar" || d.acao === "editar") && !d.descricao && !d.escrever_descricao && !d.usar_ultima_resposta && pedeTextoEscrito(pergunta)) {
     d.escrever_descricao = pergunta;
@@ -203,6 +206,15 @@ async function continuarRascunho(r, mensagem, { conversa, quadros, buscar, prime
     const lembrete = `${mensagem}\n\n(Lembrete do sistema: ao atualizar um rascunho ainda sem texto, devolva o texto completo do card no campo descricao.)`;
     const de_novo = await conduzirRascunho({ rascunho: r, mensagem: lembrete, conversa, contexto, quadros, hoje: todayLabel() }).catch(() => null);
     if (de_novo?.intent === "atualizar" && String(de_novo.descricao || "").trim()) d = de_novo;
+  }
+  // Pediu para mudar o texto (e talvez mais coisas) e o texto voltou igual ou sumiu: pede de novo,
+  // uma vez, lembrando de aplicar tudo. Os outros campos da 1ª resposta (prazo...) não se perdem.
+  const textoIgual = !String(d.descricao || "").trim() || String(d.descricao).trim() === String(r.descricao || "").trim();
+  if (d.intent === "atualizar" && r.descricao && textoIgual && pedeMudarTexto(mensagem)) {
+    const lembrete = `${mensagem}\n\n(Lembrete do sistema: esta mensagem pede mudança no TEXTO do card. Aplique todos os pedidos dela e devolva o texto completo novo no campo descricao.)`;
+    const de_novo = await conduzirRascunho({ rascunho: r, mensagem: lembrete, conversa, contexto, quadros, hoje: todayLabel() }).catch(() => null);
+    const novoTexto = String(de_novo?.descricao || "").trim();
+    if (de_novo?.intent === "atualizar" && novoTexto && novoTexto !== String(r.descricao).trim()) d = { ...d, ...de_novo, prazo: de_novo.prazo || d.prazo };
   }
 
   if (d.intent === "concluir") {

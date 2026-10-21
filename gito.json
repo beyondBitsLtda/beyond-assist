@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.8.0-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-20",
+  "versao": "0.8.1-lisa-card-com-conteudo.1",
+  "atualizadoEm": "2026-10-21",
   "compilacao": {
-    "numero": 28,
-    "data": "2026-10-20",
+    "numero": 29,
+    "data": "2026-10-21",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.8.1-lisa-card-com-conteudo.1",
+      "data": "2026-10-21",
+      "branch": "lisa-card-com-conteudo",
+      "tipo": "correcao",
+      "resumo": "A Lisa criava card vazio quando o pedido era para ela elaborar o conteúdo (\"cria um card com a estrutura que você acha ideal…\").",
+      "itens": [
+        "Pedidos de conteúdo (estrutura, plano, lista, ideias, \"o que você acha ideal\", \"descrevendo seção por seção\") agora abrem o rascunho, e a Lisa já escreve a proposta antes de criar o card. No teste, 8 de 8 pedidos assim viravam card vazio; agora 8 de 8 vão para o rascunho.",
+        "O módulo de ações é obrigado a decidir de onde vem o texto do card (nenhum, ditado, escrever ou a última resposta), em vez de um campo opcional que o modelo ignorava.",
+        "A confirmação avisa quando o card vai sair sem descrição (\"…sem descrição. Confirma?\").",
+        "Prazo dito no pedido (\"amanhã às 10h\") não se perde mais: antes saía em cerca de metade das vezes; no teste, 6 de 6.",
+        "No rascunho, um pedido com várias mudanças (\"deixa mais curto e põe prazo sexta\") aplica todas, não só o prazo."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.8.0-cloudflare-pages.1",
       "data": "2026-10-20",

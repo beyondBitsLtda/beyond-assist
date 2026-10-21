@@ -139,6 +139,16 @@ export function rascunhoValido(p) {
 // "me ajuda a montar um card", "vamos elaborar um card", "monta comigo", "me pergunta o que precisa"
 const ELABORAR = /\b(me\s+ajud\w*\s+a\s+(?:montar|criar|fazer|elaborar|pensar|escrever)|vamos\s+(?:montar|elaborar|pensar|criar|escrever)\b.*\b(?:juntos|card|cart[ãa]o|tarefa)|(?:monta|montar|elabora|elaborar|pensa|pensar|escreve|escrever)\s+(?:isso\s+|o\s+card\s+|um\s+card\s+)?comigo|me\s+pergunt\w*\s+o\s+que)/i;
 
+// "deixa mais curto", "reescreve", "tira a parte do preço", "acrescenta um parágrafo": a mensagem
+// pede mudança no TEXTO do rascunho. Visto no teste de 21/10/2026: "deixa bem mais curto, umas três
+// frases, e põe prazo para sexta" mudou só o prazo — o texto voltou igual.
+const MUDA_TEXTO = /\b(?:curt[oa]|menor|enxut[oa]|resum\w*|long[oa]|maior|detalh\w*|reescrev\w*|reformul\w*|refaz\w*|refa[çc]a|melhor[ae]\w*|simplific\w*|tir[ae]\w*|remov\w*|acrescent\w*|adicion\w*|inclu[ia]\w*|troc[ae]\w*|mud[ae]\w*\s+(?:o|a)\s+(?:texto|tom|parte|frase|par[áa]grafo|come[çc]o|final)|tom|formal|informal|frases?|par[áa]grafos?|t[óo]picos?)\b/i;
+
+/** A mensagem pede para mudar o texto do rascunho? */
+export function pedeMudarTexto(texto) {
+  return MUDA_TEXTO.test(String(texto || ""));
+}
+
 /** O pedido é para montar o card junto, conversando? */
 export function querElaborar(texto) {
   return ELABORAR.test(String(texto || ""));
@@ -203,11 +213,17 @@ export function prazoEmPalavras(prazo) {
 // "um card COM um pitch de vendas", "com o e-mail para o cliente", "com um roteiro da reunião":
 // o pedido é de um TEXTO para a descrição. Rede de segurança para quando o modelo entende só um
 // título ("Pitch de vendas") e cria o card vazio — visto no teste de 18/10/2026.
-const PEDE_TEXTO = /\bcom\s+(?:um|uma|o|a|esse|essa|este|esta)?\s*(?:pitch|texto|e-?mail|roteiro|proposta|post|mensagem|resumo|script|apresenta[cç][ãa]o|passo\s+a\s+passo|discurso|argumento|carta|descri[cç][ãa]o\s+(?:de|do|da|com|sobre|explicando))\b/i;
+const PEDE_TEXTO = /\bcom\s+(?:um|uma|o|a|os|as|esse|essa|este|esta|seu|sua)?\s*(?:pitch|texto|e-?mail|roteiro|proposta|post|mensagem|resumo|script|apresenta[cç][ãa]o|passo\s+a\s+passo|discurso|argumento|carta|estrutura|plano|planejamento|lista|checklist|ideias?|sugest[ãa]o|sugest[õo]es|conte[úu]do|t[óo]picos|an[áa]lise|estrat[ée]gia|esbo[cç]o|modelo|cronograma|briefing|descri[cç][ãa]o\s+(?:de|do|da|com|sobre|explicando))\b/i;
+// "…descrevendo seção por seção", "o que você acha ideal", "na sua opinião": quem pede assim quer
+// o CONTEÚDO que a Lisa propõe, não só um card com o assunto no título. Visto em 21/10/2026: "cria
+// um card com a estrutura que você acha ideal pro perfil da Beyond no GitHub, descrevendo todo o
+// texto seção por seção" virou um card vazio.
+const PEDE_ELABORACAO = /\b(?:descrevendo|detalhando|explicando|listando|escrevendo|elaborando|redigindo|sugerindo|estruturando|resumindo|propondo)\b|\b(?:se[çc][ãa]o\s+por\s+se[çc][ãa]o|t[óo]pico\s+por\s+t[óo]pico|item\s+por\s+item|parte\s+por\s+parte)\b|\b(?:que|como)\s+(?:voc[êe]|vc)\s+(?:acha|sugere|recomenda|indica|faria|montaria)\b|\bna\s+sua\s+(?:opini[ãa]o|vis[ãa]o)\b/i;
 
-/** O pedido é para a Lisa escrever um texto que vai na descrição? */
+/** O pedido é para a Lisa escrever (ou elaborar) o conteúdo que vai na descrição? */
 export function pedeTextoEscrito(texto) {
-  return PEDE_TEXTO.test(String(texto || ""));
+  const t = String(texto || "");
+  return PEDE_TEXTO.test(t) || PEDE_ELABORACAO.test(t);
 }
 
 /** O começo de um texto longo, cortado numa palavra: "Minha programação é baseada em…". */
@@ -231,7 +247,8 @@ export function resumoDaAcao(a) {
   switch (a.acao) {
     case "criar": {
       const partes = [`Vou criar o card "${a.titulo}" em ${a.destino || "o quadro escolhido"}`];
-      if (a.descricao) partes.push(`com a descrição "${previaDoTexto(a.descricao)}"`);
+      // sem descrição, diz — "confirma" num card que sairia vazio foi o que criou um card seco
+      partes.push(a.descricao ? `com a descrição "${previaDoTexto(a.descricao)}"` : "sem descrição");
       if (prazo) partes.push(`e prazo para ${prazo}`);
       return `${partes.join(", ")}. Confirma?`;
     }

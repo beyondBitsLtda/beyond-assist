@@ -555,31 +555,41 @@ um pedido desses, ou a resposta a uma ação já proposta, e devolva o JSON.
 intent:
 - "propor": o usuário pediu uma ação e você tem o necessário. Preencha "acao" e:
   • criar: coluna_id (do quadro que o usuário citou; se não citou, do QUADRO PADRÃO; sem nada, o
-    primeiro quadro), titulo curto e claro (até ~80 caracteres), descricao se houver, prazo se
-    houver. A descrição vem de UM destes três jeitos:
-      1. o usuário ditou o texto ("com a descrição: ligar às 10h") → copie em descricao;
-      2. o usuário pede para você REDIGIR um texto novo ("com um pitch de vendas para a Beyond",
-         "escreve um roteiro de reunião", "coloca um passo a passo de como publicar") → NÃO
-         escreva nada em descricao; ponha em escrever_descricao o que deve ser escrito, com todos
-         os detalhes que ele deu (assunto, público, tom, tamanho). O texto é montado depois,
-         conversando com ele;
-      3. o usuário se refere a um texto que a Lisa JÁ escreveu nesta conversa ("esse texto", "o
-         e-mail que você fez", "o que você acabou de falar") E a ÚLTIMA RESPOSTA é esse texto →
-         marque usar_ultima_resposta=true e NÃO copie em descricao.
-    "Um card COM um pitch / e-mail / roteiro / proposta / texto / post / mensagem / resumo /
-    passo a passo" é o caso 2: o card leva esse texto escrito na descrição, não só no título.
-    Na dúvida entre 2 e 3, é 2. Nunca use a última resposta só porque ela existe: se ela fala
-    de outro assunto, ela não entra no card. Invente sempre um titulo curto a partir do assunto.
+    primeiro quadro), titulo curto e claro (até ~80 caracteres), prazo se houver, e SEMPRE
+    origem_da_descricao — de onde vem o texto do card:
+      "nenhuma": tarefa simples, que o título já diz tudo ("cria um card de ligar para o
+         contador amanhã às 10h" → titulo "Ligar para o contador" e prazo do dia seguinte às
+         10:00; "anota: comprar toner"; "card para revisar o site sexta" → prazo da sexta);
+      "ditada": o usuário ditou o texto ("com a descrição: ligar às 10h") → copie em descricao;
+      "escrever": o card precisa de um CONTEÚDO que VOCÊ tem que produzir — um texto, uma
+         estrutura, um plano, uma lista, um passo a passo, ideias, sugestões, uma análise, um
+         roteiro, um modelo. Sinais: "com um pitch / e-mail / roteiro / proposta / post / plano /
+         estrutura / lista / checklist / ideias", "o que você acha ideal", "a estrutura que você
+         recomenda", "sugira", "monte", "elabore", "descrevendo", "detalhando", "explicando",
+         "seção por seção", "item por item". Ex.: "cria um card com a estrutura que você acha
+         ideal pro perfil da Beyond no GitHub, descrevendo seção por seção" → "escrever": o
+         assunto vai no título e o CONTEÚDO (a estrutura, seção por seção) é o que o card leva.
+         NÃO escreva nada em descricao; ponha em escrever_descricao o que deve ser escrito, com
+         todos os detalhes que ele deu (assunto, seções, público, tom, tamanho). O texto é
+         montado depois, conversando com ele;
+      "ultima_resposta": o usuário se refere a um texto que a Lisa JÁ escreveu nesta conversa
+         ("esse texto", "o e-mail que você fez", "o que você acabou de falar") E a ÚLTIMA
+         RESPOSTA é esse texto → marque também usar_ultima_resposta=true e NÃO copie em descricao.
+    O erro mais caro é criar um card VAZIO quando ele pediu um conteúdo: se o pedido descreve o
+    que o card deve CONTER além do assunto, não é "nenhuma". Na dúvida entre "escrever" e
+    "ultima_resposta", é "escrever". Nunca use a última resposta só porque ela existe: se ela
+    fala de outro assunto, ela não entra no card. Invente sempre um titulo curto a partir do assunto.
     Se ele quer montar o card COM você, conversando ("me ajuda a montar um card", "vamos elaborar
     um card de...", "quero criar um card, me pergunta o que precisa"), marque elaborar=true (o
     titulo pode ser provisório).
   • editar: card_id e só os campos que mudam (titulo, descricao e/ou prazo). prazo="remover" tira o
-    prazo. A descrição segue as mesmas três regras de criar (descricao, escrever_descricao ou
-    usar_ultima_resposta), e "vamos melhorar o texto do card X" também é elaborar=true.
+    prazo. A descrição segue as mesmas regras de criar (origem_da_descricao: "nenhuma" se o texto
+    não muda), e "vamos melhorar o texto do card X" também é elaborar=true.
   • concluir / reabrir / arquivar: card_id.
   • mover: card_id e coluna_id de destino (mesmo quadro do card).
   prazo: "AAAA-MM-DD", ou "AAAA-MM-DDTHH:MM" se o usuário disse a hora, calculado a partir de hoje
-  ("amanhã", "sexta", "dia 20"). "excluir", "apagar", "remover o card", "tirar do quadro" = arquivar.
+  ("amanhã", "sexta", "dia 20"). Se a mensagem cita QUALQUER data ou hora para o card, preencha
+  prazo — em qualquer origem_da_descricao; esquecer o prazo é perder o que ele pediu. "excluir", "apagar", "remover o card", "tirar do quadro" = arquivar.
   "marcar como feito", "finalizei", "terminei" = concluir.
 - "esclarecer": a ação está clara mas DOIS ou mais cards combinam igualmente. Preencha acao, os
   campos que mudam e candidatos_ids (2 a 4, do mais provável ao menos).
@@ -608,13 +618,18 @@ Use só ids que aparecem acima. Nunca invente ids.`;
               coluna_id: { type: "STRING" },
               titulo: { type: "STRING" },
               descricao: { type: "STRING" },
-              prazo: { type: "STRING" },
+              prazo: { type: "STRING", description: "AAAA-MM-DD ou AAAA-MM-DDTHH:MM sempre que a mensagem citar data ou hora (amanhã, sexta, dia 20, às 10h); 'remover' tira o prazo" },
               usar_ultima_resposta: { type: "BOOLEAN" },
+              // obrigatório: decidir de onde vem o texto. Opcional, o modelo nunca marcava
+              // escrever_descricao e "cria um card com a estrutura que você acha ideal…" virava
+              // um card vazio, só com o título (8 de 8 no teste de 21/10/2026)
+              origem_da_descricao: { type: "STRING", enum: ["nenhuma", "ditada", "escrever", "ultima_resposta"] },
               escrever_descricao: { type: "STRING" },
               elaborar: { type: "BOOLEAN" },
               candidatos_ids: { type: "ARRAY", items: { type: "STRING" } },
             },
-            required: ["intent"],
+            required: ["intent", "origem_da_descricao"],
+            propertyOrdering: ["intent", "acao", "card_id", "coluna_id", "titulo", "prazo", "origem_da_descricao", "descricao", "escrever_descricao", "usar_ultima_resposta", "elaborar", "candidatos_ids"],
           },
           ...(abortSignal ? { abortSignal } : {}),
         },
@@ -687,10 +702,15 @@ ou por voz. O card só é gravado quando ele aprovar. A cada mensagem dele, esco
 
 Regras:
 - Primeira mensagem (rodadas 0, sem texto): pedido vago para um bom texto → perguntar; se já dá
-  para escrever bem → atualizar com a primeira versão. Depois de 2 rodadas de perguntas sem texto,
+  para escrever bem → atualizar com a primeira versão. Se ele pediu a SUA proposta ("o que você
+  acha ideal", "a estrutura que você recomenda", "sugira", "monte", "descrevendo seção por
+  seção"), escreva a primeira versão completa já (atualizar), sem perguntar antes: ele quer ver
+  o que você propõe para ajustar em cima. Depois de 2 rodadas de perguntas sem texto,
   escreva uma versão com o que tiver.
 - Rascunho com "(ainda sem texto)": todo "atualizar" traz o campo descricao com o texto do card.
   Dizer na fala que escreveu e não mandar o texto deixa o card vazio na tela.
+- Mensagem com VÁRIOS pedidos ("deixa mais curto e põe prazo sexta"): aplique TODOS no mesmo
+  "atualizar" — o texto novo em descricao E o prazo. Fazer só um deles é ignorar o que ele pediu.
 - Cada campo do JSON contém só o valor final: nada de comentário, dúvida ou raciocínio dentro dele.
 - "não" ou "sem prazo" respondendo a uma pergunta sua é resposta, não cancelamento.
 - Fatos só do contexto e da conversa. O que faltar vira marcador entre colchetes, como [preço].
