@@ -9,14 +9,26 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.8.0-proof-combate.1",
+  "versao": "0.8.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-21",
   "compilacao": {
-    "numero": 22,
+    "numero": 23,
     "data": "2026-10-21",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.8.0-cloudflare-pages.1",
+      "data": "2026-10-21",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.8.0: combate no estilo Clash of Clans no Reino do Neuro.",
+      "itens": [
+        "Junta a branch proof-combate (0.8.0-proof-combate.1).",
+        "Migração db/007-combate.sql aplicada no banco antes do deploy."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.8.0-proof-combate.1",
       "data": "2026-10-21",
