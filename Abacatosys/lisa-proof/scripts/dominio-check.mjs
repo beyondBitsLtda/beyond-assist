@@ -15,7 +15,9 @@ import {
   periodoDe, periodoPermitido, pontosDoQuiz, pontosDaNota, validarQuiz, quizParaTela,
   separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo, podeReenviar, entregaConcluida,
   validarAvaliacao, assuntoAtual, mapaDaTrilha, TENTATIVAS, RODADAS_POR_DIA, podeAbrirRodada, fatorDaRodada, comFatorDaRodada,
+  perguntaRepetida, perguntasNovas, exercicioRepetido,
 } from "../src/dominio/pratica.js";
+import { PERSONAGENS, personagensDe, podeEscolherPersonagem } from "../src/dominio/personagens.js";
 import { nomePublico, apelidoValido, posicionar, ANONIMO } from "../src/dominio/ranking.js";
 import {
   podeMelhorar, podeSubirNeuro, producaoAcumulada, podeInvadir, batalha, saldoDe, somarTrofeus,
@@ -748,5 +750,52 @@ caso("simulação: rival sem Terreno não ganha construção da terra nova", () 
   assert.equal(fraco.construcoes.defesaAerea, 0);
 });
 
+
+// ---------------------------------------------------------------- chamados de 20/10/2026
+// as perguntas reais do chamado: a rodada 2 reformulava a 1, e a rodada 3 saiu IGUAL à 2
+const rodada1 = [
+  "Quem é considerado o criador da linguagem de programação C?",
+  "Qual é a principal função do compilador GCC no desenvolvimento em C?",
+  "Qual das seguintes etapas NÃO faz parte do ciclo padrão de execução de um programa em C?",
+  "Analise o código abaixo. Qual é a função da biblioteca #include <stdio.h>?",
+  "Observe o bloco de código C abaixo. O que será impresso no terminal após a compilação e execução?",
+].map((pergunta) => ({ pergunta }));
+const rodada2 = [
+  "Em que década a linguagem C foi desenvolvida por Dennis Ritchie nos laboratórios da Bell?",
+  "Qual é a principal função do compilador GCC no desenvolvimento em C?",
+  "Qual das seguintes etapas NÃO faz parte do ciclo padrão de compilação e execução de um programa em C?",
+  "Analise o código abaixo. Qual é o papel principal da biblioteca incluída na primeira linha?",
+  "Observe o bloco de código C abaixo. O que será impresso no terminal após a execução?",
+].map((pergunta) => ({ pergunta }));
+caso("quiz do dia: rodada copiada ou reformulada é barrada; pergunta nova passa", () => {
+  assert.equal(perguntasNovas(rodada2, [...rodada1, ...rodada2]).length, 0); // a rodada 3 do chamado
+  assert.equal(perguntaRepetida(rodada2[1], rodada1[1]), true);              // idêntica
+  assert.equal(perguntaRepetida(rodada2[2], rodada1[2]), true);              // só trocou palavras
+  const codigo = '#include <stdio.h>\nint main() {\n  printf("Ola");\n  return 0;\n}';
+  assert.equal(perguntaRepetida({ ...rodada1[3], codigo }, { ...rodada2[3], codigo }), true); // mesmo código
+  const novas = [
+    "Qual a diferença entre usar %d e %f dentro de um printf?",
+    "O que acontece se você esquecer o ponto e vírgula no fim de uma instrução em C?",
+    "Para que serve o comando return 0 no final da função main?",
+  ].map((pergunta) => ({ pergunta }));
+  assert.equal(perguntasNovas(novas, [...rodada1, ...rodada2]).length, 3);
+  // e dentro do mesmo quiz também não repete
+  assert.equal(perguntasNovas([novas[0], novas[0], novas[1]]).length, 2);
+});
+caso("exercício do dia: o mesmo exercício de novo é barrado", () => {
+  const antes = [{ titulo: "Calculadora de média", enunciado: "Escreva uma função que recebe três notas e devolve a média." }];
+  assert.equal(exercicioRepetido({ titulo: "Calculadora de média", enunciado: "Escreva uma função que recebe três notas e devolve a média aritmética." }, antes), true);
+  assert.equal(exercicioRepetido({ titulo: "Contador de vogais", enunciado: "Conte quantas vogais existem numa palavra digitada." }, antes), false);
+});
+caso("personagens: o Clássico é de todos; comprar cobra, vestir o que já tem é de graça", () => {
+  assert.equal(Object.keys(PERSONAGENS).length, 6);
+  assert.deepEqual(personagensDe([]), ["neuro"]);
+  assert.deepEqual(personagensDe(["ninja", "inventado", "ninja"]), ["neuro", "ninja"]);
+  assert.deepEqual(podeEscolherPersonagem({ id: "ninja", possui: [], saldo: 300 }), { ok: true, compra: true, custo: 300 });
+  assert.match(podeEscolherPersonagem({ id: "robo", possui: [], saldo: 100 }).motivo, /faltam 1900/);
+  assert.deepEqual(podeEscolherPersonagem({ id: "ninja", possui: ["ninja"], saldo: 0 }), { ok: true, compra: false, custo: 0 });
+  assert.deepEqual(podeEscolherPersonagem({ id: "neuro", possui: [], saldo: 0 }), { ok: true, compra: false, custo: 0 });
+  assert.equal(podeEscolherPersonagem({ id: "dragao", possui: [], saldo: 9999 }).ok, false);
+});
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

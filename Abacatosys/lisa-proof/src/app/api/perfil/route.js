@@ -3,9 +3,20 @@ import { supabase } from "@/lib/supabase.js";
 import { exigirUsuario, respostaDeErro, corpoDe, ErroDeAcesso } from "@/lib/sessao.js";
 import { METAS_DIARIAS } from "@/dominio/pontos.js";
 import { apelidoValido } from "@/dominio/ranking.js";
+import { personagemDe } from "@/lib/reino.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** GET /api/perfil — nome, e-mail e o personagem do Neuro de quem está logado. */
+export async function GET(req) {
+  try {
+    const usuario = await exigirUsuario(req);
+    return json({ ok: true, nome: usuario.nome || "", email: usuario.email || "", personagem: await personagemDe(usuario.id) });
+  } catch (e) {
+    return respostaDeErro(e);
+  }
+}
 
 /**
  * PATCH /api/perfil   body: qualquer um destes, sozinho ou junto

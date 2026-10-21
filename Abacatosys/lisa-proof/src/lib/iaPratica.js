@@ -2,7 +2,7 @@
 // Tudo que sai daqui passa pelas conferências de src/dominio/pratica.js.
 
 import { PERSONA, corte, gerarJson } from "./ia.js";
-import { validarQuiz, validarExercicio, validarProjeto, validarAvaliacao } from "@/dominio/pratica.js";
+import { validarQuiz, validarExercicio, validarProjeto, validarAvaliacao, perguntasNovas, exercicioRepetido, FOCO_DA_RODADA } from "@/dominio/pratica.js";
 
 const PERSONA_AVALIADORA =
   PERSONA +
@@ -49,19 +49,33 @@ const ESQUEMA_DO_QUIZ = {
 
 /** 5 perguntas de múltipla escolha sobre o assunto do dia. Se a conferência descartar perguntas
  *  (ex.: "observe o código abaixo" sem código), pede mais uma vez e fica com o melhor dos dois. */
-export async function gerarQuiz({ tema, assunto, evitar = [] }) {
-  const pedir = async () => validarQuiz(await pedirQuiz({ tema, assunto, evitar }));
-  let quiz = await pedir().catch((e) => ({ erro: e }));
-  if (!quiz.perguntas || quiz.perguntas.length < 5) {
-    const outro = await pedir().catch(() => null);
-    if (outro && outro.perguntas.length > (quiz.perguntas?.length || 0)) quiz = outro;
+/**
+ * O quiz do dia. Nas rodadas extras, `anteriores` são as perguntas que a pessoa já respondeu hoje
+ * nesta trilha ({ pergunta, codigo }): o que vier repetido (ou só reformulado) é descartado e a IA
+ * é chamada de novo, até juntar 5 perguntas novas (no máximo 3 pedidos). Com menos de 3 novas, o
+ * quiz não é criado — melhor um erro claro que um quiz requentado.
+ */
+export async function gerarQuiz({ tema, assunto, anteriores = [], rodada = 1 }) {
+  const extra = rodada > 1 || anteriores.length > 0;
+  let juntas = [], base = null, ultimoErro = null;
+  for (let tentativa = 0; tentativa < (extra ? 3 : 2) && juntas.length < 5; tentativa++) {
+    const ja = [...anteriores, ...juntas];
+    try {
+      const quiz = validarQuiz(await pedirQuiz({ tema, assunto, evitar: ja.map((p) => p.pergunta), rodada, temperatura: extra ? 0.9 : undefined }));
+      base = base || quiz;
+      juntas = [...juntas, ...perguntasNovas(quiz.perguntas, ja)].slice(0, 5);
+    } catch (e) {
+      ultimoErro = e;
+    }
   }
-  if (quiz.erro) throw quiz.erro;
-  return quiz;
+  if (juntas.length >= (extra ? 3 : 1)) return { ...base, perguntas: juntas };
+  if (ultimoErro && !base) throw ultimoErro;
+  throw new Error("não consegui montar um quiz com perguntas diferentes das que você já fez hoje — tente de novo em instantes");
 }
 
-async function pedirQuiz({ tema, assunto, evitar = [] }) {
+async function pedirQuiz({ tema, assunto, evitar = [], rodada = 1, temperatura }) {
   return gerarJson({
+    temperatura,
     sistema: PERSONA,
     esquema: ESQUEMA_DO_QUIZ,
     maxTokens: 6144,
@@ -79,7 +93,8 @@ async function pedirQuiz({ tema, assunto, evitar = [] }) {
       "- Pergunta só de conceito: deixe `codigo` vazio.",
       "- `explicacao`: 1 ou 2 frases dizendo por que a certa é a certa.",
       "- Dificuldade progressiva: as primeiras mais fáceis.",
-      evitar.length ? `\nEste é um quiz EXTRA do dia: não repita nem reformule estas perguntas, que a pessoa já respondeu hoje — cubra outros aspectos do assunto:\n${evitar.slice(0, 15).map((p) => `- ${corte(p, 200)}`).join("\n")}` : "",
+      evitar.length || rodada > 1 ? `\nEste é um quiz EXTRA do dia (rodada ${rodada}): ${FOCO_DA_RODADA[rodada] || FOCO_DA_RODADA[3]}.` : "",
+      evitar.length ? `PROIBIDO repetir, reformular ou trocar só as palavras destas perguntas, que a pessoa já respondeu hoje (use outros conceitos e OUTROS códigos):\n${evitar.slice(0, 20).map((p) => `- ${corte(p, 160)}`).join("\n")}` : "",
     ].filter(Boolean).join("\n"),
   });
 }
@@ -100,8 +115,18 @@ const ESQUEMA_DO_EXERCICIO = {
 };
 
 /** Um exercício prático de 10 a 20 minutos sobre o assunto do dia. */
-export async function gerarExercicio({ tema, assunto, evitar = [] }) {
+export async function gerarExercicio({ tema, assunto, evitar = [], anteriores = [], rodada = 1 }) {
+  const extra = rodada > 1 || anteriores.length > 0;
+  let ex = await pedirExercicio({ tema, assunto, evitar, rodada, temperatura: extra ? 0.9 : undefined });
+  // rodada extra que voltou com o mesmo exercício: pede outro, mais solto
+  if (extra && exercicioRepetido(ex, anteriores)) ex = await pedirExercicio({ tema, assunto, evitar, rodada, temperatura: 1.0 });
+  if (extra && exercicioRepetido(ex, anteriores)) throw new Error("não consegui montar um exercício diferente dos de hoje — tente de novo em instantes");
+  return ex;
+}
+
+async function pedirExercicio({ tema, assunto, evitar = [], rodada = 1, temperatura }) {
   const bruto = await gerarJson({
+    temperatura,
     sistema: PERSONA,
     esquema: ESQUEMA_DO_EXERCICIO,
     pedido: [

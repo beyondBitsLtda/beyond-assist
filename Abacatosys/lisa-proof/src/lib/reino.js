@@ -25,8 +25,9 @@ import {
   TROPAS, ORDEM_DAS_TROPAS, RESERVAS, contagens, espacoUsado, capacidadeDoExercito, capacidadeDaGuarnicao,
   podeTreinar, somarTropas, heroiNeuro,
 } from "@/dominio/tropas.js";
+import { PERSONAGENS, ORDEM_DOS_PERSONAGENS, personagensDe, podeEscolherPersonagem } from "@/dominio/personagens.js";
 
-const CAMPOS = "usuario_id, nome, neuro_nivel, construcoes, exercito, guarnicao, coletado_em, escudo_ate, trofeus, versao, criado_em";
+const CAMPOS = "usuario_id, nome, neuro_nivel, construcoes, exercito, guarnicao, personagem, personagens, coletado_em, escudo_ate, trofeus, versao, criado_em";
 const HORA = 3_600_000;
 
 function falhou(error, onde) {
@@ -143,6 +144,11 @@ export async function estadoDoReino(usuarioId) {
     exercito: reservaParaTela("exercito", reino, n, saldo),
     guarnicao: reservaParaTela("guarnicao", reino, n, saldo),
     heroi: { ataque: heroiNeuro(reino.neuro_nivel, "ataque"), defesa: heroiNeuro(reino.neuro_nivel, "defesa") },
+    personagem: PERSONAGENS[reino.personagem] ? reino.personagem : "neuro",
+    personagens: ORDEM_DOS_PERSONAGENS.map((id) => {
+      const pode = podeEscolherPersonagem({ id, possui: reino.personagens, saldo });
+      return { id, ...PERSONAGENS[id], tem: personagensDe(reino.personagens).includes(id), pode: pode.ok, motivo: pode.ok ? "" : pode.motivo };
+    }),
     batalhas: batalhas.map((b) => {
       const ataquei = b.atacante_id === usuarioId;
       return {
@@ -265,6 +271,24 @@ export async function treinarTropas(usuarioId, { tropa, quantidade, destino }) {
   const nova = somarTropas(reino[destino], { [tropa]: pode.quantidade });
   await lancarEGravar(reino, [{ tipo: "treino", valor: -pode.custo, detalhe: { tropa, quantidade: pode.quantidade, destino } }], { [destino]: nova });
   return { tropa, quantidade: pode.quantidade, destino: RESERVAS[destino], custo: pode.custo };
+}
+
+/** Vestir um personagem que já é seu, ou comprar (com moedas) e vestir. */
+export async function escolherPersonagem(usuarioId, id) {
+  const reino = await obterReino(usuarioId);
+  const saldo = await saldoDoUsuario(usuarioId);
+  const pode = podeEscolherPersonagem({ id, possui: reino.personagens, saldo });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  const mudancas = { personagem: id, personagens: personagensDe([...(reino.personagens || []), id]) };
+  const lancamentos = pode.compra ? [{ tipo: "personagem", valor: -pode.custo, detalhe: { personagem: id } }] : [];
+  await lancarEGravar(reino, lancamentos, mudancas);
+  return { personagem: id, comprou: pode.compra, custo: pode.custo, nome: PERSONAGENS[id].nome };
+}
+
+/** Só ler qual personagem a pessoa usa (sem criar reino para quem ainda não abriu o Reino). */
+export async function personagemDe(usuarioId) {
+  const { data } = await supabase.from("proof_reinos").select("personagem").eq("usuario_id", usuarioId).maybeSingle();
+  return PERSONAGENS[data?.personagem] ? data.personagem : "neuro";
 }
 
 export async function coletarMina(usuarioId) {

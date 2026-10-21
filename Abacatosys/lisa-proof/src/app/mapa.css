@@ -110,6 +110,9 @@
 .mapa__rotulo--atual { color: var(--pf-tinta); font-weight: 700; }
 
 .mapa__neuro { position: absolute; z-index: 4; transform: translateX(-50%); }
+/* Chamado de 20/10/2026: o balão de fala passava por baixo da faixa "Semana" (que gruda no topo
+   com z-index 6). Enquanto o Neuro fala, ele sobe acima da faixa; calado, volta para baixo dela. */
+.mapa__neuro:has(.neuro__fala) { z-index: 7; }
 .mapa__neuro .neuro { flex-direction: column-reverse; }
 .mapa__neuro .neuro__fala { max-width: 180px; font-size: 13px; }
 

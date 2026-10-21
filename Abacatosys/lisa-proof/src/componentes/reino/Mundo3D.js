@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import Neuro from "@/componentes/Neuro.js";
+import Neuro, { usePersonagem } from "@/componentes/Neuro.js";
 import { LUGARES, PRACA, RAIO_DA_MURALHA, montarCombate, passo as passoDoCombate, resultadoDo, DT, DURACAO_MAXIMA, raioDaIlha } from "@/dominio/combate.js";
 import { CONSTRUCOES } from "@/dominio/reino.js";
 
@@ -587,6 +587,7 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
   const legendaRef = useRef(null);
   legendaRef.current = setLegenda;
   const humorAtual = reacao?.humor || humor;
+  const personagem = usePersonagem(); // trocou de personagem no Reino: a folha de papel é redesenhada
   const construcoesRef = useRef(construcoes);
   construcoesRef.current = construcoes;
   const aoEscolherRef = useRef(aoEscolher);
@@ -1439,7 +1440,7 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
       } catch { /* sem a folha nova, fica a anterior */ }
     });
     return () => { cancelado = true; cancelAnimationFrame(id); };
-  }, [humorAtual]);
+  }, [humorAtual, personagem]);
 
   // ---- reações vindas de qualquer tela: reagir("feliz", "+10!")
   useEffect(() => {

@@ -16,13 +16,14 @@ export function corte(valor, limite) {
   return t.length > limite ? `${t.slice(0, limite)}…` : t;
 }
 
-export async function gerarJson({ sistema, pedido, esquema, maxTokens = 4096, pensarPouco = false }) {
+export async function gerarJson({ sistema, pedido, esquema, maxTokens = 4096, pensarPouco = false, temperatura }) {
   const parte = await conversar({
     contents: [{ role: "user", parts: [{ text: pedido }] }],
     sistema,
     esquema,
     maxTokens,
     pensarPouco,
+    temperatura,
   });
   try {
     return JSON.parse(textoDe(parte));
