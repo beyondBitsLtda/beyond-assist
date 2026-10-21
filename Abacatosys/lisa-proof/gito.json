@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.9.0-proof-reino-expansao.2",
+  "versao": "0.9.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-21",
   "compilacao": {
-    "numero": 25,
+    "numero": 26,
     "data": "2026-10-21",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.9.0-cloudflare-pages.1",
+      "data": "2026-10-21",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.9.0: Reino maior (Terreno, visual por nível, construções e tropas novas) e os 4 chamados de 20/10 resolvidos.",
+      "itens": [
+        "Junta a branch proof-reino-expansao (0.9.0-proof-reino-expansao.1 e .2).",
+        "Migração db/008-personagens.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte desde 21/10/2026)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.9.0-proof-reino-expansao.2",
       "data": "2026-10-21",
