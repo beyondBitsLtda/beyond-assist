@@ -25,7 +25,8 @@
       "resumo": "Publicação da 0.8.0: combate no estilo Clash of Clans no Reino do Neuro.",
       "itens": [
         "Junta a branch proof-combate (0.8.0-proof-combate.1).",
-        "Migração db/007-combate.sql aplicada no banco antes do deploy."
+        "Migração db/007-combate.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare feito com --dangerouslyUseUnsupportedNextVersion: o Next.js 15 saiu do suporte oficial em 21/10/2026 e o OpenNext passou a recusá-lo. É a mesma versão do Next que já estava no ar; planejar a atualização para o Next 16."
       ],
       "issues": []
     },
