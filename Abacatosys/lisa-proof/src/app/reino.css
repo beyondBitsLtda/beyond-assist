@@ -332,3 +332,8 @@
 .rn-personagem__desc { font-size: 12px; color: var(--pf-tinta-2); line-height: 1.4; min-height: 3.6em; }
 .rn-personagem .rn-botao { justify-content: center; }
 #personagens { scroll-margin-top: 16px; }
+
+/* lotação da ilha (as tropas ficam à vista no chão) */
+.rn-lotacao { display: grid; gap: 8px; margin-top: 28px; }
+@media (min-width: 760px) { .rn-lotacao { grid-template-columns: minmax(240px, 1fr) 2fr; align-items: center; gap: 16px; } }
+.rn-lotacao .pf-estat__nota { margin: 0; }

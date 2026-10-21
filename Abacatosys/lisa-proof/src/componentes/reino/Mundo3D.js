@@ -575,7 +575,7 @@ function recorteDePapel(img) {
 }
 
 // ------------------------------------------------------------------ o componente
-export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoFalhar }) {
+export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscolher, aoFalhar }) {
   const caixa = useRef(null);
   const molde = useRef(null);
   const rotulos = useRef({});
@@ -650,9 +650,16 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
     const descartar = (o) => o.traverse((m) => m.geometry?.dispose());
     let girando = [];
     function atualizarConstrucoes(lista, animar = true) {
+      const terrenoDaLista = lista.find((c) => c.chave === "terreno")?.nivel ?? ilhaAtual.terreno;
       for (const { chave, nivel } of lista) {
         if (chave === "terreno") { definirTerreno(nivel); continue; }
         if (!CONSTRUTORES[chave]) continue;
+        // construção da terra nova sem a terra comprada: nem lote vazio (ele ficava flutuando no ar)
+        if ((CONSTRUCOES[chave]?.terreno || 0) > terrenoDaLista) {
+          const velho = predios.get(chave);
+          if (velho) { camadaPredios.remove(velho.grupo); descartar(velho.grupo); predios.delete(chave); }
+          continue;
+        }
         const atual = predios.get(chave);
         if (atual && atual.nivel === nivel) continue;
         if (atual) { camadaPredios.remove(atual.grupo); descartar(atual.grupo); }
@@ -1069,6 +1076,7 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
       for (const info of predios.values()) info.grupo.visible = true;
       if (sim.ilhaTrocada) atualizarConstrucoes(construcoesRef.current, false);
       neuro.visible = true;
+      acampamento.visible = true;
       const fim = sim.aoTerminar;
       sim = null;
       zoomAlvo = 1;
@@ -1093,6 +1101,7 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
       }
       pontosDaIlha(entrada.defensor.construcoes.terreno || 0);
       neuro.visible = false;
+      acampamento.visible = false;
       const barco = navio(souAtacante ? AZUL : VERMELHO);
       grupo.add(barco);
       const corpos = new Map();   // id da unidade → { malha, barra, x, z }
@@ -1274,6 +1283,86 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
     const aoPular = () => sim?.pular?.();
     window.addEventListener("reino-combate-pular", aoPular);
 
+    // ---- as tropas em casa: o exército acampado perto do Quartel, as tropas de defesa em volta da
+    // Torre do Neuro (dentro da muralha). Um boneco por tropa; quem voa fica pairando. Somem
+    // durante a batalha (a batalha tem os bonecos dela) e voltam depois.
+    const acampamento = new THREE.Group();
+    mundo.add(acampamento);
+    let emCasa = [];
+    const COR_DA_DEFESA = "#2e7d4f";
+    const ORDEM_EM_CASA = ["gigante", "balao", "dragao", "curandeira", "mago", "bombardeiro", "arqueira", "guerreiro"];
+    function livre(x, z, R) {
+      if (Math.hypot(x, z) > R - 0.55) return false;
+      if (Math.hypot(x - PRACA[0], z - PRACA[1]) < 0.7) return false; // o meio da praça é do Neuro
+      for (const chave of predios.keys()) {
+        const [lx, lz] = chave === "muralha" ? LUGARES.castelo : LUGARES[chave];
+        const folga = chave === "castelo" || chave === "muralha" ? 2.6 : 1.05; // em volta da Torre fica a guarda
+        if (Math.hypot(x - lx, z - lz) < folga) return false;
+      }
+      return true;
+    }
+    /**
+     * Vagas em FILEIRAS (uma grade virada para a praça), das mais perto do ponto para as mais
+     * longe, sem pisar em construção nem sair da ilha — o exército fica arrumado como acampamento.
+     */
+    function vagasEmFileiras(cx, cz, quantas, R, frente) {
+      const passo = 0.62;
+      const lado = [-frente[1], frente[0]];
+      const pontos = [];
+      for (let i = -14; i <= 14; i++) for (let j = -14; j <= 14; j++) {
+        const x = cx + frente[0] * i * passo + lado[0] * j * passo;
+        const z = cz + frente[1] * i * passo + lado[1] * j * passo;
+        pontos.push([x, z, Math.abs(i) * 1.15 + Math.abs(j)]); // fileiras largas, pouco fundas
+      }
+      pontos.sort((a, b) => a[2] - b[2]);
+      const vagas = [];
+      for (const [x, z] of pontos) {
+        if (vagas.length >= quantas) break;
+        if (livre(x, z, R)) vagas.push([x, z]);
+      }
+      return vagas;
+    }
+    function mostrarTropas(tropas) {
+      for (const m of [...acampamento.children]) acampamento.remove(m);
+      emCasa = [];
+      const R = raioDaIlha(ilhaAtual.terreno);
+      const [qx, qz] = LUGARES.quartel;
+      const lista = (reserva) => ORDEM_EM_CASA.flatMap((tipo) => Array.from({ length: Math.max(0, tropas?.[reserva]?.[tipo] || 0) }, () => tipo));
+      // exército: começa ao lado do Quartel, virado para a praça
+      const doExercito = lista("exercito");
+      const ancora = [qx + (PRACA[0] - qx) * 0.42, qz + (PRACA[1] - qz) * 0.42];
+      const dq = Math.hypot(PRACA[0] - qx, PRACA[1] - qz) || 1;
+      const frente = [(PRACA[0] - qx) / dq, (PRACA[1] - qz) / dq];
+      const olhando = Math.atan2(frente[0], frente[1]);
+      vagasEmFileiras(ancora[0], ancora[1], doExercito.length, R, frente).forEach(([x, z], i) => {
+        const m = boneco(doExercito[i], AZUL);
+        m.position.set(x, 0, z);
+        m.rotation.y = olhando; // todos virados para o mesmo lado, como tropa em forma
+        acampamento.add(m);
+        emCasa.push({ malha: m, fase: i * 0.7 });
+      });
+      // tropas de defesa: de guarda logo do lado de fora da muralha, começando pelo lado da praça
+      // (o que a câmera vê) e abrindo para os dois lados; se der a volta, um segundo anel
+      const daDefesa = lista("guarnicao");
+      const [cx, cz] = LUGARES.castelo;
+      const paraPraca = Math.atan2(PRACA[1] - cz, PRACA[0] - cx);
+      daDefesa.forEach((tipo, i) => {
+        const anel = Math.floor(i / 24);
+        const k = i % 24;
+        const lado = k % 2 ? -1 : 1;
+        const a = paraPraca + lado * Math.ceil(k / 2) * ((Math.PI * 2) / 24);
+        const r = 2.25 + anel * 0.6;
+        const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+        if (Math.hypot(x, z) > R - 0.5) return;
+        const m = boneco(tipo, COR_DA_DEFESA);
+        m.position.set(x, 0, z);
+        m.rotation.y = Math.atan2(Math.cos(a), Math.sin(a)); // de costas para a Torre, de olho em quem chega
+        acampamento.add(m);
+        emCasa.push({ malha: m, fase: i * 0.9 });
+      });
+      sujo = true;
+    }
+
     // o laço: só desenha com a tela visível
     const observaVisao = new IntersectionObserver(([e]) => { visivel = e.isIntersecting; });
     observaVisao.observe(el);
@@ -1364,6 +1453,17 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         sujo = true;
       }
       if (!semMovimento && girando.length) for (const o of girando) o.rotation.y += dt * 1.6;
+      if (!semMovimento && !sim && emCasa.length) {
+        const t = agora / 1000;
+        for (const u of emCasa) {
+          const b = u.malha.userData.boneco;
+          if (!b) continue;
+          if (b.userData.altura) {
+            b.position.y = b.userData.altura + Math.sin(t * 2 + u.fase) * 0.08;
+            for (const asa of b.userData.asas || []) asa.rotation.z = Math.sin(t * 6 + u.fase) * 0.4 * (asa.position.x > 0 ? 1 : -1);
+          } else b.rotation.z = Math.sin(t * 1.5 + u.fase) * 0.04;
+        }
+      }
 
       if (sim) {
         sim.atualizar((agora - sim.inicio) / 1000, dt);
@@ -1391,6 +1491,7 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         sujo = true;
       },
       girar(delta) { vista.alvoAzimute += delta; },
+      mostrarTropas,
     };
 
     return () => {
@@ -1423,10 +1524,12 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- níveis das construções
+  // ---- níveis das construções (e as tropas em volta delas, que dependem de onde elas estão)
+  const chaveDasTropas = JSON.stringify(tropas || {});
   useEffect(() => {
     api.current?.atualizarConstrucoes(construcoes);
-  }, [construcoes]);
+    api.current?.mostrarTropas(JSON.parse(chaveDasTropas));
+  }, [construcoes, chaveDasTropas]);
 
   // ---- o Neuro: redesenha a folha quando o humor muda
   useEffect(() => {

@@ -186,6 +186,15 @@ export default function Reino() {
         })} />
 
       {/* ------------------------------------------------------------ tropas */}
+      {reino.lotacao && (
+        <div className="pf-cartao rn-lotacao">
+          <div>
+            <div className="pf-estat__rotulo">🏝️ Lotação da ilha: {reino.lotacao.usado} de {reino.lotacao.capacidade} de espaço</div>
+            <Barra valor={reino.lotacao.usado} total={Math.max(1, reino.lotacao.capacidade)} rotulo="Lotação da ilha" />
+          </div>
+          <p className="pf-estat__nota">Todas as tropas (exército + defesa) ficam à vista na ilha. Ilha lotada? Compre mais 🗺️ Terreno: cada expansão abre +25 de espaço.</p>
+        </div>
+      )}
       <Reserva destino="exercito" dados={reino.exercito} heroi={reino.heroi.ataque} ocupado={ocupado} aoTreinar={treinar} />
       <Reserva destino="guarnicao" dados={reino.guarnicao} heroi={reino.heroi.defesa} ocupado={ocupado} aoTreinar={treinar} />
 
@@ -307,7 +316,7 @@ function VistaDoReino({ reino }) {
   if (plana) return <VistaPlana reino={reino} humor={humor} />;
   return (
     <section aria-label="Vista do reino">
-      <Mundo3D construcoes={reino.construcoes} humor={humor} aoEscolher={irParaConstrucao} aoFalhar={() => setPlana(true)} />
+      <Mundo3D construcoes={reino.construcoes} tropas={{ exercito: reino.exercito.tropas, guarnicao: reino.guarnicao.tropas }} humor={humor} aoEscolher={irParaConstrucao} aoFalhar={() => setPlana(true)} />
     </section>
   );
 }
