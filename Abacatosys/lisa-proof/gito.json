@@ -9,14 +9,26 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.11.0-proof-acampamento-papel.1",
+  "versao": "0.11.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-21",
   "compilacao": {
-    "numero": 29,
+    "numero": 30,
     "data": "2026-10-21",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.11.0-cloudflare-pages.1",
+      "data": "2026-10-21",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.11.0: a ilhota do Acampamento com as tropas à vista e as tropas desenhadas como recortes de papel.",
+      "itens": [
+        "Junta a branch proof-acampamento-papel (0.11.0-proof-acampamento-papel.1). Sem migração de banco.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.11.0-proof-acampamento-papel.1",
       "data": "2026-10-21",
