@@ -70,6 +70,9 @@ export function heroiNeuro(nivel, lado = "ataque") {
 
 export const capacidadeDoExercito = (nivelDoQuartel) => (nivelDoQuartel > 0 ? 10 + 10 * nivelDoQuartel : 0);
 export const capacidadeDaGuarnicao = (nivelDaTorre) => 4 + 4 * Math.max(0, nivelDaTorre);
+/** Quanto cabe na ILHA (exército + tropas de defesa juntos): as tropas ficam à vista no chão, e
+ *  ilha lotada pede mais Terreno. 40 na ilha original, +25 por expansão. */
+export const lotacaoDaIlha = (terreno) => 40 + 25 * Math.max(0, Math.min(3, terreno || 0));
 
 /** Contagens limpas: só tropas conhecidas, inteiros ≥ 0. */
 export function contagens(valor) {
@@ -108,6 +111,11 @@ export function podeTreinar({ tropa, quantidade, destino, niveis, reservas, sald
   const capacidade = destino === "exercito" ? capacidadeDoExercito(nivel) : capacidadeDaGuarnicao(nivel);
   const livre = capacidade - espacoUsado(reservas?.[destino]);
   if (qtd * def.espaco > livre) return { ok: false, motivo: livre > 0 ? `só cabe mais ${livre} de espaço` : "a reserva está cheia" };
+  const lotacao = lotacaoDaIlha(niveis?.terreno);
+  const naIlha = espacoUsado(reservas?.exercito) + espacoUsado(reservas?.guarnicao);
+  if (naIlha + qtd * def.espaco > lotacao) {
+    return { ok: false, motivo: `a ilha está lotada (${naIlha} de ${lotacao}) — compre mais Terreno para caber mais tropas` };
+  }
   const custo = qtd * def.custo;
   if (saldo < custo) return { ok: false, custo, motivo: `faltam ${custo - saldo} moeda(s)` };
   return { ok: true, custo, quantidade: qtd };

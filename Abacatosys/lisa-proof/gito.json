@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.9.0-cloudflare-pages.1",
+  "versao": "0.10.0-proof-tropas-na-ilha.1",
   "atualizadoEm": "2026-10-21",
   "compilacao": {
-    "numero": 26,
+    "numero": 27,
     "data": "2026-10-21",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.10.0-proof-tropas-na-ilha.1",
+      "data": "2026-10-21",
+      "branch": "proof-tropas-na-ilha",
+      "tipo": "funcionalidade",
+      "resumo": "As tropas ficam à vista na ilha, a ilha tem lotação (mais tropas pedem mais Terreno) e os lotes da terra nova não flutuam mais.",
+      "itens": [
+        "Correção: os lotes vazios das construções da terra nova (Biblioteca, Defesa Aérea, Morteiro, Torre Mágica e Torre do Raio) apareciam boiando fora da ilha antes de comprar o Terreno. Agora só aparecem quando a terra deles existe.",
+        "Tropas à vista: o exército fica acampado em fileiras perto do Quartel (um boneco por tropa, do Guerreiro ao Gigante; Dragão, Balão e Curandeira pairando) e as tropas de defesa ficam de guarda em volta da Torre do Neuro, do lado de fora da muralha. Somem durante a batalha e voltam depois.",
+        "Lotação da ilha: exército + tropas de defesa juntos cabem em 40 de espaço na ilha original, +25 por expansão do Terreno (65, 90, 115). Ilha lotada, o treino avisa para comprar mais Terreno. A tela do Reino mostra a lotação."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.9.0-cloudflare-pages.1",
       "data": "2026-10-21",

@@ -23,7 +23,7 @@ import {
 } from "@/dominio/reino.js";
 import {
   TROPAS, ORDEM_DAS_TROPAS, RESERVAS, contagens, espacoUsado, capacidadeDoExercito, capacidadeDaGuarnicao,
-  podeTreinar, somarTropas, heroiNeuro,
+  podeTreinar, somarTropas, heroiNeuro, lotacaoDaIlha,
 } from "@/dominio/tropas.js";
 import { PERSONAGENS, ORDEM_DOS_PERSONAGENS, personagensDe, podeEscolherPersonagem } from "@/dominio/personagens.js";
 
@@ -141,6 +141,7 @@ export async function estadoDoReino(usuarioId) {
       };
     }),
     invasoes: { feitasHoje: hoje.length, porDia: ATAQUES_POR_DIA },
+    lotacao: { usado: espacoUsado(reino.exercito) + espacoUsado(reino.guarnicao), capacidade: lotacaoDaIlha(n.terreno) },
     exercito: reservaParaTela("exercito", reino, n, saldo),
     guarnicao: reservaParaTela("guarnicao", reino, n, saldo),
     heroi: { ataque: heroiNeuro(reino.neuro_nivel, "ataque"), defesa: heroiNeuro(reino.neuro_nivel, "defesa") },
