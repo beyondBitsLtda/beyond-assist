@@ -9,14 +9,26 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.8.1-lisa-card-com-conteudo.1",
+  "versao": "0.8.1-cloudflare-pages.1",
   "atualizadoEm": "2026-10-21",
   "compilacao": {
-    "numero": 29,
+    "numero": 30,
     "data": "2026-10-21",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.8.1-cloudflare-pages.1",
+      "data": "2026-10-21",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Publicação da 0.8.1: a Lisa escreve o conteúdo quando o pedido é para elaborar o card (antes criava o card vazio).",
+      "itens": [
+        "Mesmo conteúdo da 0.8.1-lisa-card-com-conteudo.1. Sem migração de banco.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.8.1-lisa-card-com-conteudo.1",
       "data": "2026-10-21",
