@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import Neuro from "@/componentes/Neuro.js";
-import { LUGARES, PRACA, RAIO_DA_MURALHA, montarCombate, passo as passoDoCombate, resultadoDo, DT, DURACAO_MAXIMA } from "@/dominio/combate.js";
+import { LUGARES, PRACA, RAIO_DA_MURALHA, montarCombate, passo as passoDoCombate, resultadoDo, DT, DURACAO_MAXIMA, raioDaIlha } from "@/dominio/combate.js";
+import { CONSTRUCOES } from "@/dominio/reino.js";
 
 /**
  * O Reino em 3D: uma ilha flutuante low poly com as construções, e o Neuro como um recorte de
@@ -48,6 +49,11 @@ function criarPecas() {
     if (!materiais.has(cor)) materiais.set(cor, new THREE.MeshStandardMaterial({ color: cor, flatShading: true, roughness: 0.92, metalness: 0 }));
     return materiais.get(cor);
   };
+  const brilho = (cor) => {
+    const chave = `brilho:${cor}`;
+    if (!materiais.has(chave)) materiais.set(chave, new THREE.MeshStandardMaterial({ color: cor, emissive: cor, emissiveIntensity: 0.9, flatShading: true, roughness: 0.4 }));
+    return materiais.get(chave);
+  };
   const malha = (geo, cor, x = 0, y = 0, z = 0) => {
     const m = new THREE.Mesh(geo, typeof cor === "string" ? mat(cor) : cor);
     m.position.set(x, y, z);
@@ -62,10 +68,37 @@ function criarPecas() {
     g.add(cilindro(0.025, 0.025, 0.6, 5, COR.madeiraEscura, x, y + 0.3, z));
     g.add(caixa(0.34, 0.2, 0.02, cor, x + 0.18, y + 0.5, z));
   };
-  return { materiais, janela, mat, malha, caixa, cilindro, cone, bandeira };
+  return { materiais, janela, mat, brilho, malha, caixa, cilindro, cone, bandeira };
 }
 
 // ------------------------------------------------------------------ construções (nível 0 a 5)
+// Cada nível tem um ACABAMENTO próprio, igual para todas as construções — dá para ver de longe o
+// nível de cada uma: madeira e palha (1), pedra e telha vermelha (2), pedra clara com bandeiras
+// (3), pedra reforçada, telhado azul e ouro (4), mármore, telhado dourado e cristal que brilha (5).
+// Em cima disso, cada construção ganha peças próprias a cada nível.
+const ACABAMENTOS = [
+  null,
+  { parede: "#b07a45", clara: "#c99560", telhado: "#d9b26f", detalhe: "#6e4a2a", metal: "#7a7f87", bandeira: "#c8332f" },
+  { parede: "#cfc7b8", clara: "#e2dccf", telhado: "#c0392b", detalhe: "#8a7f6f", metal: "#7a7f87", bandeira: "#c8332f" },
+  { parede: "#e8e2d6", clara: "#f4f0e8", telhado: "#2e7d4f", detalhe: "#a89b84", metal: "#9aa3ad", bandeira: "#2f6fd6" },
+  { parede: "#8f96a3", clara: "#aab1bd", telhado: "#2f4f9e", detalhe: "#f0be45", metal: "#f0be45", bandeira: "#7c4dff" },
+  { parede: "#f7f4ee", clara: "#ffffff", telhado: "#f0be45", detalhe: "#f0be45", metal: "#f0be45", bandeira: "#7c4dff", brilho: "#8be9ff" },
+];
+const A = (n) => ACABAMENTOS[Math.max(1, Math.min(5, n || 1))];
+
+/** Os enfeites do nível: bandeira (3+), faixa de ouro (4+), cristal flutuando (5). */
+function enfeitar(p, g, n, topo, largura = 1) {
+  const a = A(n);
+  if (n >= 3) p.bandeira(g, 0, topo, 0, a.bandeira);
+  if (n >= 4) g.add(p.cilindro(0.55 * largura, 0.55 * largura, 0.05, 10, COR.ouro, 0, Math.max(0.3, topo * 0.45), 0));
+  if (n >= 5) {
+    const c = p.malha(new THREE.OctahedronGeometry(0.16, 0), p.brilho(a.brilho), 0, topo + 0.95, 0);
+    c.scale.y = 1.6;
+    c.userData.gira = true;
+    g.add(c);
+  }
+}
+
 function terrenoVazio(p) {
   const g = new THREE.Group();
   g.add(p.caixa(1.5, 0.05, 1.5, "#b48b5a", 0, 0.025, 0));
@@ -77,13 +110,16 @@ function terrenoVazio(p) {
 
 function castelo(p, n) {
   const g = new THREE.Group();
+  const a = A(n);
   const h = 0.9 + 0.32 * n;
-  const telhado = n >= 5 ? COR.ouro : COR.telhado;
-  g.add(p.caixa(1.7, h, 1.5, COR.pedra, 0, h / 2, 0));
+  g.add(p.caixa(1.7, h, 1.5, a.parede, 0, h / 2, 0));
   for (const [x, z] of [[-0.7, -0.62], [0, -0.62], [0.7, -0.62], [-0.7, 0.62], [0, 0.62], [0.7, 0.62], [-0.7, 0], [0.7, 0]]) {
-    g.add(p.caixa(0.26, 0.22, 0.26, COR.pedra, x, h + 0.11, z));
+    // nível 1 é paliçada de madeira: estacas pontudas em vez de ameias
+    if (n === 1) g.add(p.cone(0.12, 0.3, 5, a.detalhe, x, h + 0.15, z));
+    else g.add(p.caixa(0.26, 0.22, 0.26, a.parede, x, h + 0.11, z));
   }
   g.add(p.caixa(0.44, 0.64, 0.06, COR.porta, 0, 0.32, 0.76));
+  if (n >= 2) g.add(p.caixa(0.56, 0.08, 0.08, a.detalhe, 0, 0.68, 0.78));
   for (let i = 0; i < Math.min(3, n); i++) {
     g.add(p.caixa(0.18, 0.24, 0.05, p.janela, -0.5 + i * 0.5, h * 0.66, 0.76));
     g.add(p.caixa(0.05, 0.24, 0.18, p.janela, 0.86, h * 0.66, -0.4 + i * 0.4));
@@ -91,33 +127,41 @@ function castelo(p, n) {
   const cantos = [[0.85, 0.75], [-0.85, 0.75], [0.85, -0.75], [-0.85, -0.75]].slice(0, Math.min(4, n + 1));
   for (const [x, z] of cantos) {
     const ht = h + 0.45;
-    g.add(p.cilindro(0.3, 0.34, ht, 7, COR.pedraClara, x, ht / 2, z));
-    g.add(p.cone(0.44, 0.75, 7, telhado, x, ht + 0.37, z));
+    g.add(p.cilindro(0.3, 0.34, ht, 7, a.clara, x, ht / 2, z));
+    g.add(p.cone(0.44, 0.75, 7, a.telhado, x, ht + 0.37, z));
   }
   if (n >= 3) {
-    g.add(p.cilindro(0.38, 0.42, 0.7, 8, COR.pedraClara, 0, h + 0.35, 0));
-    g.add(p.cone(0.56, 1.0, 8, telhado, 0, h + 1.2, 0));
-    p.bandeira(g, 0, h + 1.65, 0, n >= 5 ? COR.ouro : COR.vermelho);
+    g.add(p.cilindro(0.38, 0.42, 0.7, 8, a.clara, 0, h + 0.35, 0));
+    g.add(p.cone(0.56, 1.0, 8, a.telhado, 0, h + 1.2, 0));
+  }
+  if (n >= 4) g.add(p.caixa(1.76, 0.07, 1.56, COR.ouro, 0, h - 0.05, 0));
+  if (n >= 3) p.bandeira(g, 0, h + 1.65, 0, a.bandeira);
+  if (n >= 5) {
+    const c = p.malha(new THREE.OctahedronGeometry(0.2, 0), p.brilho(a.brilho), 0, h + 2.6, 0);
+    c.scale.y = 1.6; c.userData.gira = true;
+    g.add(c);
   }
   return g;
 }
 
 function mina(p, n) {
   const g = new THREE.Group();
+  const a = A(n);
   const morro = p.malha(new THREE.DodecahedronGeometry(1, 0), COR.rocha, 0, 0.42, 0);
   morro.scale.set(1.25, 0.8, 1.05);
   g.add(morro);
   g.add(p.caixa(0.5, 0.55, 0.3, COR.entrada, 0, 0.28, 0.86));
-  g.add(p.caixa(0.09, 0.68, 0.09, COR.madeira, -0.3, 0.34, 1.0));
-  g.add(p.caixa(0.09, 0.68, 0.09, COR.madeira, 0.3, 0.34, 1.0));
-  g.add(p.caixa(0.74, 0.1, 0.12, COR.madeira, 0, 0.68, 1.0));
+  g.add(p.caixa(0.09, 0.68, 0.09, a.parede, -0.3, 0.34, 1.0));
+  g.add(p.caixa(0.09, 0.68, 0.09, a.parede, 0.3, 0.34, 1.0));
+  g.add(p.caixa(0.74, 0.1, 0.12, a.detalhe, 0, 0.68, 1.0));
   g.add(p.caixa(0.05, 0.03, 1.1, COR.trilho, -0.13, 0.02, 1.55));
   g.add(p.caixa(0.05, 0.03, 1.1, COR.trilho, 0.13, 0.02, 1.55));
-  g.add(p.caixa(0.42, 0.26, 0.32, COR.madeiraEscura, 0, 0.18, 1.8));
+  g.add(p.caixa(0.42, 0.26, 0.32, a.detalhe, 0, 0.18, 1.8));
   g.add(p.caixa(0.34, 0.08, 0.24, COR.ouro, 0, 0.34, 1.8));
+  if (n >= 3) { g.add(p.cilindro(0.04, 0.04, 0.9, 5, a.detalhe, 0.55, 1.1, 0.4)); g.add(p.caixa(0.5, 0.05, 0.05, a.detalhe, 0.35, 1.5, 0.4)); } // guindaste
   const cristais = [[-0.6, 0.78, 0.35], [0.55, 0.82, 0.3], [0, 1.08, -0.15], [-0.4, 0.62, -0.62], [0.72, 0.5, -0.4]];
   cristais.slice(0, n).forEach(([x, y, z], i) => {
-    const c = p.malha(new THREE.OctahedronGeometry(0.17, 0), COR.ouro, x, y, z);
+    const c = p.malha(new THREE.OctahedronGeometry(0.17, 0), n >= 5 ? p.brilho("#ffd34d") : COR.ouro, x, y, z);
     c.rotation.set(0.3 * i, 0.7 * i, 0.2);
     c.scale.y = 1.5;
     g.add(c);
@@ -128,33 +172,35 @@ function mina(p, n) {
 
 function cofre(p, n) {
   const g = new THREE.Group();
-  g.add(p.caixa(1.3, 0.85, 1.1, "#efe4cc", 0, 0.425, 0));
-  g.add(p.caixa(1.38, 0.1, 1.18, COR.ouro, 0, 0.86, 0));
-  g.add(p.malha(new THREE.SphereGeometry(0.5, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), COR.ouro, 0, 0.9, 0));
-  g.add(p.caixa(0.34, 0.5, 0.05, "#8a6a1f", 0, 0.25, 0.56));
-  for (const x of [-0.45, 0.45]) g.add(p.cilindro(0.07, 0.07, 0.8, 6, "#f6efe0", x, 0.4, 0.6));
+  const a = A(n);
+  g.add(p.caixa(1.3, 0.85, 1.1, a.clara, 0, 0.425, 0));
+  g.add(p.caixa(1.38, 0.1, 1.18, a.metal, 0, 0.86, 0));
+  g.add(p.malha(new THREE.SphereGeometry(0.5, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), n >= 4 ? COR.ouro : a.telhado, 0, 0.9, 0));
+  g.add(p.caixa(0.34, 0.5, 0.05, a.metal, 0, 0.25, 0.56));
+  for (const x of [-0.45, 0.45]) g.add(p.cilindro(0.07, 0.07, 0.8, 6, a.parede, x, 0.4, 0.6));
   const pilhas = [[0.9, 0.4], [1.08, 0.02], [0.92, -0.36], [-0.9, 0.38], [-1.05, -0.05]];
   pilhas.slice(0, n).forEach(([x, z], i) => {
     const hh = 0.08 * (2 + i);
     g.add(p.cilindro(0.14, 0.14, hh, 8, COR.ouro, x, hh / 2, z));
   });
+  if (n >= 5) { const c = p.malha(new THREE.OctahedronGeometry(0.14, 0), p.brilho(a.brilho), 0, 1.75, 0); c.scale.y = 1.6; c.userData.gira = true; g.add(c); }
   g.scale.setScalar(0.85 + 0.05 * n);
   return g;
 }
 
 function torre(p, n) {
   const g = new THREE.Group();
+  const a = A(n);
   const h = 1.1 + 0.3 * n;
-  g.add(p.cilindro(0.56, 0.62, 0.32, 6, COR.pedra, 0, 0.16, 0));
-  g.add(p.cilindro(0.42, 0.52, h, 6, COR.madeira, 0, h / 2, 0));
-  g.add(p.cilindro(0.74, 0.74, 0.12, 6, COR.madeiraEscura, 0, h + 0.06, 0));
+  g.add(p.cilindro(0.56, 0.62, 0.32, 6, a.clara, 0, 0.16, 0));
+  g.add(p.cilindro(0.42, 0.52, h, 6, a.parede, 0, h / 2, 0));
+  g.add(p.cilindro(0.74, 0.74, 0.12, 6, a.detalhe, 0, h + 0.06, 0));
   for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2;
-    g.add(p.caixa(0.06, 0.32, 0.06, COR.madeiraEscura, Math.cos(a) * 0.64, h + 0.28, Math.sin(a) * 0.64));
+    const ang = (i / 6) * Math.PI * 2;
+    g.add(p.caixa(0.06, 0.32, 0.06, a.detalhe, Math.cos(ang) * 0.64, h + 0.28, Math.sin(ang) * 0.64));
   }
-  if (n >= 2) g.add(p.cone(0.86, 0.75, 6, COR.telhadoVerde, 0, h + 0.82, 0));
-  if (n >= 4) p.bandeira(g, 0, h + 1.15, 0, COR.vermelho);
-  // o alvo de treino ao lado
+  if (n >= 2) g.add(p.cone(0.86, 0.75, 6, a.telhado, 0, h + 0.82, 0));
+  enfeitar(p, g, n, h + 1.15, 0.9);
   g.add(p.caixa(0.05, 0.5, 0.05, COR.madeira, 0.95, 0.25, 0.35));
   const alvo = p.cilindro(0.24, 0.24, 0.05, 12, "#f4f1ea", 0.95, 0.55, 0.38);
   alvo.rotation.x = Math.PI / 2;
@@ -167,34 +213,38 @@ function torre(p, n) {
 
 function quartel(p, n) {
   const g = new THREE.Group();
+  const a = A(n);
   const tendas = [[0, 0], [-0.9, -0.55], [0.85, -0.6]].slice(0, Math.min(3, Math.ceil(n / 2)));
   tendas.forEach(([x, z], i) => {
-    const t = p.cone(0.62, 0.95, 4, i % 2 ? COR.vermelho : COR.lona, x, 0.475, z);
+    const t = p.cone(0.62, 0.95, 4, i % 2 ? a.bandeira : a.clara, x, 0.475, z);
     t.rotation.y = Math.PI / 4;
     g.add(t);
     g.add(p.caixa(0.22, 0.34, 0.04, COR.porta, x, 0.17, z + 0.44));
   });
-  g.add(p.cilindro(0.03, 0.03, 1.7, 6, COR.madeiraEscura, 0.85, 0.85, 0.6));
-  g.add(p.caixa(0.46, 0.28, 0.03, COR.vermelho, 1.09, 1.52, 0.6));
+  g.add(p.cilindro(0.03, 0.03, 1.7, 6, a.detalhe, 0.85, 0.85, 0.6));
+  g.add(p.caixa(0.46, 0.28, 0.03, a.bandeira, 1.09, 1.52, 0.6));
   if (n >= 2) {
     g.add(p.cilindro(0.07, 0.07, 0.7, 6, COR.madeira, -0.85, 0.35, 0.7));
     g.add(p.caixa(0.5, 0.07, 0.07, COR.madeira, -0.85, 0.52, 0.7));
     g.add(p.malha(new THREE.IcosahedronGeometry(0.14, 0), COR.placa, -0.85, 0.82, 0.7));
   }
+  if (n >= 3) for (let i = 0; i < 7; i++) g.add(p.cone(0.06, 0.4, 4, a.detalhe, -1.2 + i * 0.4, 0.2, -1.05)); // paliçada
   if (n >= 4) {
-    g.add(p.caixa(0.7, 0.08, 0.1, COR.madeiraEscura, 0, 0.5, 0.95));
-    for (let i = 0; i < 4; i++) g.add(p.cilindro(0.02, 0.02, 0.9, 4, "#9aa3ad", -0.27 + i * 0.18, 0.45, 0.98));
+    g.add(p.caixa(0.7, 0.08, 0.1, a.detalhe, 0, 0.5, 0.95));
+    for (let i = 0; i < 4; i++) g.add(p.cilindro(0.02, 0.02, 0.9, 4, a.metal, -0.27 + i * 0.18, 0.45, 0.98));
   }
+  if (n >= 5) { const c = p.malha(new THREE.OctahedronGeometry(0.16, 0), p.brilho(a.brilho), 0.85, 2.0, 0.6); c.scale.y = 1.6; c.userData.gira = true; g.add(c); }
   return g;
 }
 
-/** A muralha cerca a Torre do Neuro: um anel completo, mais alto e com mais torres a cada nível. */
+/** A muralha cerca a Torre do Neuro: paliçada de madeira no nível 1, depois pedra cada vez mais alta. */
 function muralha(p, n) {
   const g = new THREE.Group();
+  const a = A(n);
   const [cx, cz] = LUGARES.castelo;
   const trechos = 16;
   const passoA = (Math.PI * 2) / trechos;
-  const pos = (a) => [cx + Math.cos(a) * RAIO_DA_MURALHA, cz + Math.sin(a) * RAIO_DA_MURALHA];
+  const pos = (ang) => [cx + Math.cos(ang) * RAIO_DA_MURALHA, cz + Math.sin(ang) * RAIO_DA_MURALHA];
   if (n === 0) {
     for (let i = 0; i < trechos; i += 2) {
       const [x, z] = pos(i * passoA);
@@ -205,37 +255,42 @@ function muralha(p, n) {
   const h = 0.35 + 0.1 * n;
   const comprimento = 2 * RAIO_DA_MURALHA * Math.sin(passoA / 2) + 0.05;
   for (let i = 0; i < trechos; i++) {
-    const a = (i + 0.5) * passoA;
-    const [x, z] = pos(a);
-    const trecho = p.caixa(comprimento, h, 0.3, COR.pedra, x, h / 2, z);
-    trecho.rotation.y = -a + Math.PI / 2;
+    const ang = (i + 0.5) * passoA;
+    const [x, z] = pos(ang);
+    const trecho = p.caixa(comprimento, h, 0.3, a.parede, x, h / 2, z);
+    trecho.rotation.y = -ang + Math.PI / 2;
     g.add(trecho);
-    if (i % 2 === 0) {
-      const ameia = p.caixa(comprimento * 0.4, 0.14, 0.32, COR.pedra, x, h + 0.07, z);
+    if (n === 1) g.add(p.cone(0.09, 0.22, 4, a.detalhe, x, h + 0.11, z));
+    else if (i % 2 === 0) {
+      const ameia = p.caixa(comprimento * 0.4, 0.14, 0.32, a.parede, x, h + 0.07, z);
       ameia.rotation.y = trecho.rotation.y;
       g.add(ameia);
     }
+    if (n >= 4 && i % 4 === 0) { const faixa = p.caixa(comprimento, 0.05, 0.32, COR.ouro, x, h * 0.6, z); faixa.rotation.y = trecho.rotation.y; g.add(faixa); }
   }
   const torres = n >= 3 ? 4 : 2;
   for (let i = 0; i < torres; i++) {
     const [x, z] = pos((i / torres) * Math.PI * 2 + Math.PI / 4);
-    g.add(p.cilindro(0.24, 0.28, h + 0.35, 6, COR.pedraClara, x, (h + 0.35) / 2, z));
-    g.add(p.cone(0.34, 0.45, 6, COR.telhado, x, h + 0.58, z));
+    g.add(p.cilindro(0.24, 0.28, h + 0.35, 6, a.clara, x, (h + 0.35) / 2, z));
+    g.add(p.cone(0.34, 0.45, 6, a.telhado, x, h + 0.58, z));
   }
   return g;
 }
 
-/** O Canhão: base de pedra e um cano que vira para o alvo durante a batalha. */
+/** O Canhão: base que muda com o nível e um cano que vira para o alvo durante a batalha. */
 function canhao(p, n) {
   const g = new THREE.Group();
-  g.add(p.cilindro(0.5, 0.6, 0.3, 8, COR.pedra, 0, 0.15, 0));
+  const a = A(n);
+  g.add(p.cilindro(0.5, 0.6, 0.3, 8, a.clara, 0, 0.15, 0));
+  if (n >= 3) g.add(p.cilindro(0.62, 0.62, 0.06, 8, a.detalhe, 0, 0.31, 0));
   const cano = new THREE.Group();
   cano.position.y = 0.42;
-  const tubo = p.cilindro(0.12 + 0.01 * n, 0.16 + 0.01 * n, 0.85, 8, n >= 5 ? COR.ouro : "#3a3f47", 0, 0.12, 0.28);
+  const corDoTubo = n >= 4 ? a.metal : "#3a3f47";
+  const tubo = p.cilindro(0.12 + 0.01 * n, 0.16 + 0.01 * n, 0.85, 8, corDoTubo, 0, 0.12, 0.28);
   tubo.rotation.x = Math.PI / 2.4;
-  cano.add(p.caixa(0.36, 0.22, 0.4, COR.madeiraEscura, 0, 0, 0), tubo);
+  cano.add(p.caixa(0.36, 0.22, 0.4, a.detalhe, 0, 0, 0), tubo);
   if (n >= 3) {
-    const tubo2 = p.cilindro(0.1, 0.13, 0.75, 8, "#3a3f47", 0.2, 0.1, 0.24);
+    const tubo2 = p.cilindro(0.1, 0.13, 0.75, 8, corDoTubo, 0.2, 0.1, 0.24);
     tubo2.rotation.x = Math.PI / 2.4;
     cano.add(tubo2);
     tubo.position.x = -0.12;
@@ -243,10 +298,119 @@ function canhao(p, n) {
   g.add(cano);
   g.userData.cano = cano;
   for (let i = 0; i < Math.min(4, n + 1); i++) g.add(p.malha(new THREE.SphereGeometry(0.08, 6, 4), "#30343b", 0.45 - i * 0.12, 0.06, -0.45));
+  if (n >= 5) { const c = p.malha(new THREE.OctahedronGeometry(0.12, 0), p.brilho(a.brilho), 0, 1.3, 0); c.scale.y = 1.6; c.userData.gira = true; g.add(c); }
   return g;
 }
 
-const CONSTRUTORES = { castelo, mina, cofre, torre, canhao, quartel, muralha };
+/** Biblioteca: produz moedas. Um andar a mais no nível 3, cúpula no 4, livros mágicos no 5. */
+function biblioteca(p, n) {
+  const g = new THREE.Group();
+  const a = A(n);
+  const h = 0.8 + (n >= 3 ? 0.5 : 0);
+  g.add(p.caixa(1.3, h, 1.0, a.clara, 0, h / 2, 0));
+  const telhado = p.cone(0.95, 0.6, 4, a.telhado, 0, h + 0.3, 0);
+  telhado.rotation.y = Math.PI / 4;
+  telhado.scale.set(1, 1, 0.8);
+  g.add(telhado);
+  for (const x of [-0.45, -0.15, 0.15, 0.45]) g.add(p.cilindro(0.05, 0.05, h * 0.85, 6, a.parede, x, h * 0.43, 0.55));
+  g.add(p.caixa(0.3, 0.45, 0.05, COR.porta, 0, 0.23, 0.51));
+  const cores = ["#c0392b", "#2f6fd6", "#2e7d4f", "#7c4dff", "#f0be45"];
+  for (let i = 0; i < n + 1; i++) g.add(p.caixa(0.32, 0.08, 0.22, cores[i % 5], 0.95, 0.04 + i * 0.085, 0.2));
+  if (n >= 4) g.add(p.malha(new THREE.SphereGeometry(0.32, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), COR.ouro, 0, h + 0.55, 0));
+  if (n >= 5) for (let i = 0; i < 3; i++) { const l = p.caixa(0.2, 0.05, 0.14, p.brilho(cores[i + 2]), -0.5 + i * 0.5, h + 1.1 + (i % 2) * 0.15, 0); l.userData.gira = true; g.add(l); }
+  return g;
+}
+
+/** Defesa Aérea: torre de lançadores, mais tubos a cada nível; radar no 3. */
+function defesaAerea(p, n) {
+  const g = new THREE.Group();
+  const a = A(n);
+  g.add(p.cilindro(0.55, 0.62, 0.35, 6, a.clara, 0, 0.17, 0));
+  g.add(p.cilindro(0.3, 0.4, 0.5, 6, a.parede, 0, 0.6, 0));
+  const lancador = new THREE.Group();
+  lancador.position.y = 0.95;
+  lancador.add(p.caixa(0.5, 0.25, 0.4, a.detalhe, 0, 0, 0));
+  const tubos = Math.min(4, 1 + n);
+  for (let i = 0; i < tubos; i++) {
+    const tubo = p.cilindro(0.06, 0.06, 0.6, 6, n >= 4 ? a.metal : "#e8e8e8", -0.18 + (i % 2) * 0.36, 0.25, -0.05 + Math.floor(i / 2) * 0.18);
+    tubo.rotation.x = -0.5;
+    lancador.add(tubo);
+    lancador.add(p.cone(0.06, 0.12, 6, COR.vermelho, tubo.position.x, 0.58, tubo.position.z - 0.17));
+  }
+  g.add(lancador);
+  g.userData.cano = lancador;
+  if (n >= 3) {
+    const radar = p.malha(new THREE.SphereGeometry(0.22, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), "#d8dde3", 0.5, 0.75, -0.35);
+    radar.rotation.x = Math.PI / 1.4;
+    g.add(radar);
+  }
+  enfeitar(p, g, n, 1.25, 0.9);
+  return g;
+}
+
+/** Morteiro: sacos de areia, um tubo largo apontando para o céu e bombas empilhadas. */
+function morteiro(p, n) {
+  const g = new THREE.Group();
+  const a = A(n);
+  for (let i = 0; i < 10; i++) {
+    const ang = (i / 10) * Math.PI * 2;
+    g.add(p.malha(new THREE.SphereGeometry(0.17, 6, 4), n >= 3 ? a.parede : "#c9b38a", Math.cos(ang) * 0.6, 0.12, Math.sin(ang) * 0.6));
+  }
+  if (n >= 3) for (let i = 0; i < 10; i++) { const ang = ((i + 0.5) / 10) * Math.PI * 2; g.add(p.malha(new THREE.SphereGeometry(0.15, 6, 4), a.clara, Math.cos(ang) * 0.6, 0.3, Math.sin(ang) * 0.6)); }
+  const cano = new THREE.Group();
+  cano.position.y = 0.3;
+  const tubo = p.cilindro(0.2 + 0.015 * n, 0.25 + 0.015 * n, 0.55, 10, n >= 4 ? a.metal : "#3a3f47", 0, 0.2, 0.05);
+  tubo.rotation.x = -0.35;
+  cano.add(p.cilindro(0.3, 0.3, 0.12, 8, a.detalhe, 0, 0, 0), tubo);
+  g.add(cano);
+  g.userData.cano = cano;
+  for (let i = 0; i < Math.min(5, n + 1); i++) g.add(p.malha(new THREE.SphereGeometry(0.1, 6, 4), "#22252a", -0.35 + (i % 3) * 0.12, 0.1 + Math.floor(i / 3) * 0.16, -0.35));
+  enfeitar(p, g, n, 0.9, 1.1);
+  return g;
+}
+
+/** Torre Mágica: torre fina com um orbe roxo flutuando e anéis que aumentam com o nível. */
+function torreMagica(p, n) {
+  const g = new THREE.Group();
+  const a = A(n);
+  const h = 1.3 + 0.25 * n;
+  g.add(p.cilindro(0.5, 0.58, 0.3, 8, a.clara, 0, 0.15, 0));
+  g.add(p.cilindro(0.28, 0.4, h, 8, a.parede, 0, h / 2, 0));
+  g.add(p.cone(0.5, 0.7, 8, "#5b3fa8", 0, h + 0.35, 0));
+  const orbe = p.malha(new THREE.IcosahedronGeometry(0.2, 1), p.brilho("#b388ff"), 0, h + 1.05, 0);
+  orbe.userData.gira = true;
+  g.add(orbe);
+  for (let i = 0; i < Math.min(3, Math.ceil(n / 2)); i++) {
+    const anel = p.malha(new THREE.TorusGeometry(0.32 + i * 0.08, 0.02, 4, 16), p.brilho("#d1b3ff"), 0, h + 1.05, 0);
+    anel.rotation.x = Math.PI / 2 + i * 0.5;
+    anel.userData.gira = true;
+    g.add(anel);
+  }
+  if (n >= 4) g.add(p.cilindro(0.42, 0.42, 0.05, 8, COR.ouro, 0, h * 0.6, 0));
+  if (n >= 3) p.bandeira(g, 0.35, h - 0.2, 0, a.bandeira);
+  return g;
+}
+
+/** Torre do Raio: torre escura com bobinas e uma ponta que brilha. */
+function torreRaio(p, n) {
+  const g = new THREE.Group();
+  const a = A(n);
+  const h = 1.6 + 0.25 * n;
+  g.add(p.cilindro(0.55, 0.65, 0.35, 6, a.clara, 0, 0.17, 0));
+  g.add(p.cilindro(0.22, 0.34, h, 6, "#3a3f47", 0, h / 2, 0));
+  for (let i = 0; i < 2 + n; i++) {
+    const bobina = p.malha(new THREE.TorusGeometry(0.3 - i * 0.025, 0.04, 4, 12), a.metal === "#7a7f87" ? "#b87333" : a.metal, 0, 0.5 + i * ((h - 0.6) / (2 + n)), 0);
+    bobina.rotation.x = Math.PI / 2;
+    g.add(bobina);
+  }
+  const ponta = p.malha(new THREE.OctahedronGeometry(0.18, 0), p.brilho("#ffe066"), 0, h + 0.2, 0);
+  ponta.userData.gira = true;
+  g.add(ponta);
+  if (n >= 3) p.bandeira(g, 0.3, h - 0.4, 0, a.bandeira);
+  return g;
+}
+
+const CONSTRUTORES = { castelo, mina, cofre, torre, canhao, quartel, muralha, biblioteca, defesaAerea, morteiro, torreMagica, torreRaio };
 
 function construir(p, chave, nivel) {
   const g = nivel > 0 || chave === "muralha" ? CONSTRUTORES[chave](p, nivel) : terrenoVazio(p);
@@ -268,8 +432,11 @@ function ancoraDe(chave, grupo) {
 }
 
 // ------------------------------------------------------------------ a ilha
-function ilha(p) {
+/** A ilha do tamanho do Terreno: chão, praça, caminhos até as construções que cabem nela, árvores na beirada. */
+function ilha(p, terreno = 0) {
   const g = new THREE.Group();
+  const R = raioDaIlha(terreno);
+  const cabe = (chave) => (CONSTRUCOES[chave]?.terreno || 0) <= terreno;
   const ondular = (geo) => {
     const pos = geo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
@@ -282,15 +449,17 @@ function ilha(p) {
     geo.computeVertexNormals();
     return geo;
   };
-  const grama = p.malha(ondular(new THREE.CylinderGeometry(7.1, 7.1, 0.25, 11)), COR.grama, 0, -0.125, 0);
-  const terra = p.malha(ondular(new THREE.CylinderGeometry(7.0, 6.3, 1.0, 11)), COR.terra, 0, -0.75, 0);
-  const fundo = p.malha(ondular(new THREE.ConeGeometry(6.3, 3.2, 11)), COR.rochaEscura, 0, -2.85, 0);
+  const lados = 11 + 2 * terreno;
+  const grama = p.malha(ondular(new THREE.CylinderGeometry(R + 0.1, R + 0.1, 0.25, lados)), COR.grama, 0, -0.125, 0);
+  const terra = p.malha(ondular(new THREE.CylinderGeometry(R, R - 0.7, 1.0, lados)), COR.terra, 0, -0.75, 0);
+  const fundo = p.malha(ondular(new THREE.ConeGeometry(R - 0.7, 3.2 + 0.3 * terreno, lados)), COR.rochaEscura, 0, -2.85 - 0.15 * terreno, 0);
   fundo.rotation.x = Math.PI;
   g.add(grama, terra, fundo);
 
   // praça e pedrinhas até cada construção
   g.add(p.cilindro(1.3, 1.3, 0.06, 9, COR.praca, PRACA[0], 0.03, PRACA[1]));
-  for (const [x, z] of Object.values(LUGARES)) {
+  for (const [chave, [x, z]] of Object.entries(LUGARES)) {
+    if (!cabe(chave)) continue;
     for (let t = 0.3; t < 0.75; t += 0.15) {
       const px = PRACA[0] + (x - PRACA[0]) * t, pz = PRACA[1] + (z - PRACA[1]) * t;
       g.add(p.cilindro(0.17, 0.17, 0.04, 6, COR.praca, px, 0.02, pz));
@@ -304,15 +473,17 @@ function ilha(p) {
     g.add(p.cone(0.48 * s, 0.75 * s, 6, COR.folha, x, 0.75 * s, z));
     g.add(p.cone(0.36 * s, 0.6 * s, 6, COR.folhaEscura, x, 1.12 * s, z));
   };
-  for (let i = 0; i < 9; i++) {
-    const a = (i < 5 ? Math.PI * (0.55 + r() * 0.3) : Math.PI * (1.75 + r() * 0.35)) + (r() - 0.5) * 0.1;
-    const raio = 5.3 + r() * 1.3;
-    arvore(Math.cos(a) * raio, Math.sin(a) * raio, 0.85 + r() * 0.5);
-  }
-  for (let i = 0; i < 7; i++) {
-    const a = r() * Math.PI * 2, raio = 2 + r() * 4.6;
+  const longeDasConstrucoes = (x, z, folga) => Object.entries(LUGARES).every(([chave, [lx, lz]]) => !cabe(chave) || Math.hypot(lx - x, lz - z) > folga);
+  for (let i = 0; i < 9 + 5 * terreno; i++) {
+    const a = (i % 2 ? Math.PI * (0.55 + r() * 0.3) : Math.PI * (1.6 + r() * 0.6)) + (r() - 0.5) * 0.2;
+    const raio = R - 1.7 + r() * 1.3;
     const x = Math.cos(a) * raio, z = Math.sin(a) * raio;
-    const longe = Object.values(LUGARES).every(([lx, lz]) => Math.hypot(lx - x, lz - z) > 1.5) && Math.hypot(PRACA[0] - x, PRACA[1] - z) > 1.6;
+    if (longeDasConstrucoes(x, z, 1.4)) arvore(x, z, 0.85 + r() * 0.5);
+  }
+  for (let i = 0; i < 7 + 3 * terreno; i++) {
+    const a = r() * Math.PI * 2, raio = 2 + r() * (R - 2.4);
+    const x = Math.cos(a) * raio, z = Math.sin(a) * raio;
+    const longe = longeDasConstrucoes(x, z, 1.5) && Math.hypot(PRACA[0] - x, PRACA[1] - z) > 1.6;
     if (!longe) continue;
     const pedra = p.malha(new THREE.DodecahedronGeometry(0.18 + r() * 0.16, 0), i % 2 ? COR.rocha : COR.gramaEscura, x, 0.08, z);
     pedra.scale.y = 0.7;
@@ -334,7 +505,8 @@ function nuvens(p) {
       n.add(b);
     }
     const a = (i / 5) * Math.PI * 2 + r();
-    n.userData = { a, raio: 9 + r() * 2.5, y: 2.6 + r() * 1.8 };
+    n.userData = { a, raioBase: 9 + r() * 2.5, raio: 0, y: 2.6 + r() * 1.8 };
+    n.userData.raio = n.userData.raioBase;
     n.position.set(Math.cos(a) * n.userData.raio, n.userData.y, Math.sin(a) * n.userData.raio);
     g.add(n);
   }
@@ -452,8 +624,22 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
     cena.add(ceu, sol);
 
     const mundo = new THREE.Group();
-    mundo.add(ilha(p));
+    const ilhaAtual = { grupo: ilha(p, 0), terreno: 0 };
+    mundo.add(ilhaAtual.grupo);
     const grupoNuvens = nuvens(p);
+    /** Troca a ilha quando o Terreno muda (o meu, ou o do rival durante a minha invasão). */
+    function definirTerreno(terreno) {
+      const tt = Math.max(0, Math.min(3, terreno || 0));
+      if (tt === ilhaAtual.terreno) return;
+      mundo.remove(ilhaAtual.grupo);
+      ilhaAtual.grupo.traverse((m) => m.geometry?.dispose());
+      ilhaAtual.grupo = ilha(p, tt);
+      ilhaAtual.terreno = tt;
+      mundo.add(ilhaAtual.grupo);
+      for (const n of grupoNuvens.children) n.userData.raio = n.userData.raioBase + 1.3 * tt;
+      if (typeof enquadrar === "function") enquadrar();
+      sujo = true;
+    }
     cena.add(mundo, grupoNuvens);
 
     // construções
@@ -461,8 +647,11 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
     const camadaPredios = new THREE.Group();
     mundo.add(camadaPredios);
     const descartar = (o) => o.traverse((m) => m.geometry?.dispose());
+    let girando = [];
     function atualizarConstrucoes(lista, animar = true) {
       for (const { chave, nivel } of lista) {
+        if (chave === "terreno") { definirTerreno(nivel); continue; }
+        if (!CONSTRUTORES[chave]) continue;
         const atual = predios.get(chave);
         if (atual && atual.nivel === nivel) continue;
         if (atual) { camadaPredios.remove(atual.grupo); descartar(atual.grupo); }
@@ -470,6 +659,8 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         camadaPredios.add(grupo);
         predios.set(chave, { grupo, nivel, ancora: ancoraDe(chave, grupo), nasceu: atual && animar ? performance.now() : 0 });
       }
+      girando = [];
+      for (const info of predios.values()) info.grupo.traverse((o) => { if (o.userData.gira) girando.push(o); });
       sujo = true;
     }
 
@@ -509,7 +700,8 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
       const w = el.clientWidth || 1, h = el.clientHeight || 1;
       const aspecto = w / h;
       const cantos = [];
-      for (const x of [-7.4, 7.4]) for (const y of [-2.0, 3.6]) for (const z of [-7.4, 7.4]) cantos.push(new THREE.Vector3(x, y, z));
+      const R = raioDaIlha(ilhaAtual.terreno) + 0.4;
+      for (const x of [-R, R]) for (const y of [-2.0, 3.6]) for (const z of [-R, R]) cantos.push(new THREE.Vector3(x, y, z));
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       const guardado = vista.azimute;
       for (let i = 0; i < 12; i++) {
@@ -638,6 +830,10 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
       vela: new THREE.BoxGeometry(0.05, 0.75, 0.9),
       balao: new THREE.SphereGeometry(0.62, 8, 6),
       heroi: new THREE.PlaneGeometry(1.3, 1.3),
+      aureola: new THREE.TorusGeometry(0.09, 0.015, 4, 12),
+      chapeu: new THREE.ConeGeometry(0.12, 0.3, 6),
+      missil: new THREE.CylinderGeometry(0.035, 0.05, 0.36, 6).rotateX(Math.PI / 2),
+      feixe: new THREE.CylinderGeometry(0.03, 0.03, 1, 5).rotateX(Math.PI / 2),
     };
     const matBarra = {
       fundo: new THREE.SpriteMaterial({ color: "#111814", opacity: 0.7, transparent: true, depthTest: false }),
@@ -647,11 +843,16 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
     };
     const matFogo = new THREE.MeshStandardMaterial({ color: "#ff7a1a", emissive: "#ff5a00", emissiveIntensity: 1.2, flatShading: true });
     const AZUL = "#2f6fd6", VERMELHO = "#c8332f";
-    const BORDA = new THREE.Vector3(5.3, 0, 4.7);
-    const FORA = BORDA.clone().normalize();
+    const FORA = new THREE.Vector3(5.3, 0, 4.7).normalize();
     const LADO = new THREE.Vector3(-FORA.z, 0, FORA.x);
-    const DOCA = BORDA.clone().addScaledVector(FORA, 1.1).setY(0.9);
-    const LONGE = DOCA.clone().addScaledVector(FORA, 11).addScaledVector(LADO, 3).setY(4.5);
+    let BORDA, DOCA, LONGE;
+    function pontosDaIlha(terreno) {
+      const escala = (raioDaIlha(terreno) - 0.1) / 7.1;
+      BORDA = new THREE.Vector3(5.3 * escala, 0, 4.7 * escala);
+      DOCA = BORDA.clone().addScaledVector(FORA, 1.1).setY(0.9);
+      LONGE = DOCA.clone().addScaledVector(FORA, 11).addScaledVector(LADO, 3).setY(4.5);
+    }
+    pontosDaIlha(0);
     const VELOCIDADE = 2.5;     // segundos de batalha por segundo de tela
     const INTRO = 2.2;          // o navio chegando
     const suave = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
@@ -684,7 +885,27 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
       const b = new THREE.Group();
       g.add(b);
       g.userData.boneco = b;
-      if (tipo === "dragao") {
+      if (tipo === "balao") {
+        const bola = new THREE.Mesh(geo.corpoDragao, p.mat(cor)); bola.scale.set(1.5, 1.7, 1.5); bola.position.y = 0.45;
+        const cesta = new THREE.Mesh(geo.livro, p.mat(COR.madeira)); cesta.scale.set(1.4, 3, 1.8); cesta.position.y = -0.15;
+        const bomba = new THREE.Mesh(geo.bala, p.mat("#22252a")); bomba.position.y = -0.32;
+        b.add(bola, cesta, bomba);
+        b.scale.setScalar(1.1);
+        b.position.y = 2.0;
+        b.userData.altura = 2.0;
+      } else if (tipo === "curandeira") {
+        const corpo = new THREE.Mesh(geo.corpo, p.mat("#f4f1ea")); corpo.position.y = 0.19;
+        const cabeca = new THREE.Mesh(geo.cabeca, p.mat("#f2d3b1")); cabeca.position.y = 0.45;
+        const aureola = new THREE.Mesh(geo.aureola, p.brilho("#ffe066")); aureola.position.y = 0.62; aureola.rotation.x = Math.PI / 2;
+        const asaE = new THREE.Mesh(geo.asa, p.mat("#ffffff")); asaE.scale.set(0.6, 1, 0.8); asaE.position.set(-0.22, 0.32, -0.08);
+        const asaD = new THREE.Mesh(geo.asa, p.mat("#ffffff")); asaD.scale.set(0.6, 1, 0.8); asaD.position.set(0.22, 0.32, -0.08);
+        const faixa = new THREE.Mesh(geo.escudo, p.mat(cor)); faixa.position.set(0, 0.22, 0.12);
+        b.add(corpo, cabeca, aureola, asaE, asaD, faixa);
+        b.userData.asas = [asaE, asaD];
+        b.scale.setScalar(1.8);
+        b.position.y = 1.6;
+        b.userData.altura = 1.6;
+      } else if (tipo === "dragao") {
         const corpo = new THREE.Mesh(geo.corpoDragao, p.mat(cor)); corpo.scale.set(1.0, 0.9, 1.7);
         const focinho = new THREE.Mesh(geo.focinho, p.mat(cor)); focinho.position.set(0, 0.08, 0.6);
         const cauda = new THREE.Mesh(geo.cauda, p.mat(cor)); cauda.position.set(0, 0, -0.65);
@@ -694,6 +915,7 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         b.userData.asas = [asaE, asaD];
         b.scale.setScalar(1.15);
         b.position.y = 1.7;
+        b.userData.altura = 1.7;
       } else if (tipo === "gigante") {
         const corpo = new THREE.Mesh(geo.corpo, p.mat(cor)); corpo.position.y = 0.19;
         const cabeca = new THREE.Mesh(geo.cabeca, p.mat("#e9c39a")); cabeca.position.y = 0.45;
@@ -705,7 +927,23 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         const corpo = new THREE.Mesh(geo.corpo, p.mat(cor)); corpo.position.y = 0.19;
         const cabeca = new THREE.Mesh(geo.cabeca, p.mat("#f2d3b1")); cabeca.position.y = 0.45;
         b.add(corpo, cabeca);
-        if (tipo === "arqueira") {
+        if (tipo === "mago") {
+          corpo.material = p.mat("#5b3fa8");
+          const chapeu = new THREE.Mesh(geo.chapeu, p.mat("#3b2a7a")); chapeu.position.y = 0.6;
+          const cajado = new THREE.Mesh(geo.lanca, p.mat(COR.madeiraEscura)); cajado.position.set(0.15, 0.3, 0);
+          const orbe = new THREE.Mesh(geo.cabeca, p.brilho("#b388ff")); orbe.scale.setScalar(0.7); orbe.position.set(0.15, 0.6, 0);
+          const capa = new THREE.Mesh(geo.escudo, p.mat(cor)); capa.position.set(0, 0.3, -0.1); capa.scale.set(1.5, 1.5, 1.5);
+          b.add(chapeu, cajado, orbe, capa);
+        } else if (tipo === "bombardeiro") {
+          corpo.material = p.mat(cor);
+          const bomba = new THREE.Mesh(geo.bala, p.mat("#22252a")); bomba.scale.setScalar(1.6); bomba.position.set(0, 0.72, 0);
+          const pavio = new THREE.Mesh(geo.lanca, p.brilho("#ffb347")); pavio.scale.set(1, 0.25, 1); pavio.position.set(0, 0.92, 0);
+          b.add(bomba, pavio);
+          b.scale.setScalar(1.5);
+          g.add(b);
+          g.traverse((m) => { m.castShadow = true; });
+          return g;
+        } else if (tipo === "arqueira") {
           const cabelo = new THREE.Mesh(geo.cabelo, p.mat("#7a3b1f")); cabelo.position.set(0, 0.49, -0.03); cabelo.scale.set(1, 0.8, 1.1);
           const arco = new THREE.Mesh(geo.arco, p.mat(COR.madeiraEscura)); arco.position.set(0.15, 0.3, 0.05); arco.rotation.set(0, Math.PI / 2, Math.PI / 2);
           b.add(cabelo, arco);
@@ -769,7 +1007,11 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         const d = m.userData;
         d.idade += dt;
         const u = d.idade / d.vida;
-        if (u >= 1) { m.parent?.remove(m); if (d.proprio) m.material.dispose(); return false; }
+        if (u >= 1) {
+          if (d.tipo === "tiro" && d.area) { faiscas(d.grupo, d.para.clone().setY(0.25), 10, d.area, 2.2); fumaca(d.grupo, d.para.clone(), 2, "#bdbdbd"); }
+          m.parent?.remove(m); if (d.proprio) m.material.dispose(); return false;
+        }
+        if (d.tipo === "feixe") return true;
         if (d.tipo === "tiro") {
           const a = Math.min(1, u);
           m.position.lerpVectors(d.de, d.para, a);
@@ -785,12 +1027,33 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         return true;
       });
     }
+    const TIROS = {
+      flecha: { geo: () => geo.flecha, mat: () => p.mat(COR.madeiraEscura), vida: 0.26, arco: 0.6, mira: true },
+      bala: { geo: () => geo.bala, mat: () => p.mat("#30343b"), vida: 0.32, arco: 0.35 },
+      fogo: { geo: () => geo.fogo, mat: () => matFogo, vida: 0.26, arco: 0 },
+      livro: { geo: () => geo.livro, mat: () => p.mat("#7c4dff"), vida: 0.26, arco: 0.5 },
+      missil: { geo: () => geo.missil, mat: () => p.mat("#e8e8e8"), vida: 0.35, arco: 0.9, mira: true, rastro: true },
+      morteiro: { geo: () => geo.bala, mat: () => p.mat("#22252a"), vida: 0.7, arco: 3.0, area: "#ffb347" },
+      magia: { geo: () => geo.fogo, mat: () => p.brilho("#b388ff"), vida: 0.3, arco: 0.2, area: "#d1b3ff" },
+      bomba: { geo: () => geo.bala, mat: () => p.mat("#22252a"), vida: 0.3, arco: 0, area: "#ffb347" },
+    };
+    function feixe(grupo, de, para) {
+      const m = new THREE.Mesh(geo.feixe, p.brilho("#ffe066"));
+      m.position.lerpVectors(de, para, 0.5);
+      m.scale.set(1, 1, de.distanceTo(para));
+      m.lookAt(para);
+      m.userData = { tipo: "feixe", idade: 0, vida: 0.12, vel: new THREE.Vector3() };
+      grupo.add(m);
+      sim.efeitos.push(m);
+    }
     function tiro(grupo, armaDoTiro, de, para) {
-      const g = armaDoTiro === "flecha" ? geo.flecha : armaDoTiro === "bala" ? geo.bala : armaDoTiro === "fogo" ? geo.fogo : geo.livro;
-      const mat = armaDoTiro === "fogo" ? matFogo : armaDoTiro === "bala" ? p.mat("#30343b") : armaDoTiro === "livro" ? p.mat("#7c4dff") : p.mat(COR.madeiraEscura);
+      if (armaDoTiro === "raio") { feixe(grupo, de, para); faiscas(grupo, para, 4, "#ffe066", 1.5); return; }
+      const d = TIROS[armaDoTiro] || TIROS.flecha;
+      const g = d.geo();
+      const mat = d.mat();
       const m = new THREE.Mesh(g, mat);
       m.position.copy(de);
-      m.userData = { tipo: "tiro", idade: 0, vida: armaDoTiro === "bala" ? 0.32 : 0.26, de: de.clone(), para: para.clone(), arco: armaDoTiro === "flecha" ? 0.6 : armaDoTiro === "bala" ? 0.35 : armaDoTiro === "livro" ? 0.5 : 0, mira: armaDoTiro === "flecha" };
+      m.userData = { tipo: "tiro", idade: 0, vida: d.vida, de: de.clone(), para: para.clone(), arco: d.arco, mira: Boolean(d.mira), area: d.area || null, grupo };
       grupo.add(m);
       sim.efeitos.push(m);
     }
@@ -825,8 +1088,9 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
       const ilhaTrocada = souAtacante;
       if (ilhaTrocada) {
         const n = entrada.defensor.construcoes;
-        atualizarConstrucoes(Object.keys(CONSTRUTORES).map((chave) => ({ chave, nivel: n[chave] || 0 })), false);
+        atualizarConstrucoes([{ chave: "terreno", nivel: n.terreno || 0 }, ...Object.keys(CONSTRUTORES).map((chave) => ({ chave, nivel: n[chave] || 0 }))], false);
       }
+      pontosDaIlha(entrada.defensor.construcoes.terreno || 0);
       neuro.visible = false;
       const barco = navio(souAtacante ? AZUL : VERMELHO);
       grupo.add(barco);
@@ -853,7 +1117,7 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         }
         const c = corpos.get(id);
         const u = e.unidades.find((o) => o.id === id);
-        return new THREE.Vector3(c ? c.malha.position.x : u?.x || 0, (u?.voa ? 1.9 : 0.4), c ? c.malha.position.z : u?.z || 0);
+        return new THREE.Vector3(c ? c.malha.position.x : u?.x || 0, u?.tipo === "balao" ? 2.0 : u?.voa ? 1.9 : 0.4, c ? c.malha.position.z : u?.z || 0);
       };
 
       function aplicar(ev) {
@@ -881,8 +1145,18 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
               const c = corpos.get(x.de);
               if (c) c.golpe = 0.12;
               faiscas(grupo, para.clone().setY(0.5), 3, "#ffe08a", 1.4);
+            } else if (x.arma === "explosao") {
+              faiscas(grupo, para.clone().setY(0.4), 22, "#ff7a1a", 3.5);
+              fumaca(grupo, para.clone(), 6, "#9a9a9a");
+              tremor = Math.max(tremor, 0.45);
             } else tiro(grupo, x.arma, de.clone().setY(de.y + 0.2), para);
-            if (x.de === "p-canhao") { const c = predios.get("canhao")?.grupo; if (c?.userData.cano) c.userData.cano.rotation.y = Math.atan2(para.x - c.position.x, para.z - c.position.z) - c.rotation.y; }
+            if (x.de.startsWith("p-")) {
+              const c = predios.get(x.de.slice(2))?.grupo;
+              if (c?.userData.cano) c.userData.cano.rotation.y = Math.atan2(para.x - c.position.x, para.z - c.position.z) - c.rotation.y;
+            }
+          } else if (x.tipo === "cura") {
+            const c = corpos.get(x.de);
+            if (c) faiscas(grupo, c.malha.position.clone().setY(1.2), 6, "#7cfc9a", 1.2);
           } else if (x.tipo === "caiu") {
             const c = corpos.get(x.id);
             if (c) { c.caiu = 0.001; fumaca(grupo, c.malha.position.clone(), 2, "#d9d9d9"); }
@@ -964,7 +1238,7 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
           if (m.userData.folha) { m.userData.folha.rotation.y = vista.azimute; m.userData.folha.position.y = 0.55 + (anda ? Math.abs(Math.sin(tt * 10)) * 0.08 : 0); }
           if (b) {
             if (anda) m.rotation.y = Math.atan2(dx, dz);
-            if (u.tipo === "dragao") { for (const asa of b.userData.asas) asa.rotation.z = Math.sin(tt * 9) * 0.5 * (asa.position.x > 0 ? 1 : -1); b.position.y = 1.7 + Math.sin(tt * 3) * 0.1; }
+            if (u.voa) { for (const asa of b.userData.asas || []) asa.rotation.z = Math.sin(tt * 9) * 0.5 * (asa.position.x > 0 ? 1 : -1); b.position.y = (b.userData.altura || 1.7) + Math.sin(tt * 3 + u.x) * 0.1; }
             else { b.rotation.z = anda ? Math.sin(tt * 12 + u.x) * 0.12 : 0; m.position.y = anda ? Math.abs(Math.sin(tt * 12 + u.z)) * 0.06 : 0; }
             if (c.golpe > 0) { c.golpe -= dt; b.position.z = c.golpe > 0 ? 0.12 : 0; if (b.userData.lanca) b.userData.lanca.rotation.x = c.golpe > 0 ? 0.8 : 0; }
           }
@@ -975,7 +1249,7 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
             c.barra.visible = false;
             continue;
           }
-          const alto = u.voa ? 2.5 : u.tipo === "gigante" ? 1.6 : u.tipo === "heroi" ? 1.35 : 0.95;
+          const alto = u.tipo === "balao" ? 3.4 : u.voa ? 2.6 : u.tipo === "gigante" ? 1.6 : u.tipo === "heroi" ? 1.35 : 0.95;
           posicionarBarra(c.barra, m.position.x, alto, m.position.z, u.vida / u.vidaMax, u.lado === meuLado ? matBarra.aliado : matBarra.inimigo);
         }
         // barras das construções (só aparecem quando apanham)
@@ -1088,6 +1362,8 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         }
         sujo = true;
       }
+      if (!semMovimento && girando.length) for (const o of girando) o.rotation.y += dt * 1.6;
+
       if (sim) {
         sim.atualizar((agora - sim.inicio) / 1000, dt);
         sujo = true;
@@ -1181,7 +1457,7 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
 
   return (
     <div className={`rn-mundo${legenda ? " rn-mundo--batalha" : ""}`} ref={caixa}>
-      {construcoes.map((c) => (
+      {construcoes.filter((c) => c.chave !== "terreno" && (!CONSTRUCOES[c.chave]?.terreno || (construcoes.find((x) => x.chave === "terreno")?.nivel || 0) >= CONSTRUCOES[c.chave].terreno)).map((c) => (
         <button key={c.chave} type="button" className={`rn-mundo__rotulo${c.nivel === 0 ? " rn-mundo__rotulo--vazio" : ""}`}
           ref={(n) => { rotulos.current[c.chave] = n; }}
           onClick={() => aoEscolher?.(c.chave)}

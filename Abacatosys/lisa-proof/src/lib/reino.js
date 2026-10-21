@@ -19,7 +19,7 @@ import {
   CONSTRUCOES, ORDEM_DAS_CONSTRUCOES, NIVEIS_INICIAIS, ATAQUES_POR_DIA, ESCUDO_DE_NOVATO_HORAS,
   niveisDe, poderDo, podeMelhorar, podeSubirNeuro, producaoAcumulada, producaoPorHora, capacidadeDaMina,
   protecaoDoCofre, temEscudo, podeInvadir, batalha, somarTrofeus, saldoDe, faixaDeDefesa,
-  custoDoNeuro, nivelMaximoDoNeuro, estagioDoNeuro,
+  custoDoNeuro, nivelMaximoDoNeuro, estagioDoNeuro, taxaDeProducao, HORAS_ATE_ENCHER,
 } from "@/dominio/reino.js";
 import {
   TROPAS, ORDEM_DAS_TROPAS, RESERVAS, contagens, espacoUsado, capacidadeDoExercito, capacidadeDaGuarnicao,
@@ -124,8 +124,8 @@ export async function estadoDoReino(usuarioId) {
     },
     mina: {
       paraColetar: producaoAcumulada(reino, agora),
-      porHora: producaoPorHora(n.mina),
-      capacidade: capacidadeDaMina(n.mina),
+      porHora: taxaDeProducao(n),
+      capacidade: taxaDeProducao(n) * HORAS_ATE_ENCHER,
     },
     cofre: { protege: protecaoDoCofre(n.cofre) },
     construcoes: ORDEM_DAS_CONSTRUCOES.map((chave) => {
@@ -235,7 +235,7 @@ export async function melhorarConstrucao(usuarioId, chave) {
   const mudancas = { construcoes: { ...n, [chave]: (n[chave] || 0) + 1 } };
   // A mina melhorada produz mais por hora: o que ela já tinha juntado é coletado antes, para o
   // nível novo não valer para trás.
-  if (chave === "mina") {
+  if (chave === "mina" || chave === "biblioteca") {
     const juntado = producaoAcumulada(reino);
     if (juntado > 0) lancamentos.push({ tipo: "coleta", valor: juntado, detalhe: { automatica: true } });
     mudancas.coletado_em = new Date().toISOString();

@@ -299,3 +299,24 @@
   .rn-mundo--batalha .rn-mundo__progresso { margin-top: 2px; height: 4px; }
   .rn-mundo__pular { margin-top: 3px; padding: 2px 10px; font-size: 11px; }
 }
+
+/* ------------------------------------------------------------ aviso da batalha: faixa fina no topo
+   (no meio da ilha ele tapava a luta). Título e texto numa linha, barra de progresso na borda de
+   baixo da faixa, "pular" à direita. A ilha cresce durante a batalha. */
+.rn-mundo--batalha { height: 470px; }
+.rn-mundo__alerta {
+  left: 0; right: 0; top: 0; transform: none; width: auto; max-width: none;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 2px 10px;
+  padding: 6px 12px 8px; border-radius: 0; text-align: left; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+.rn-mundo__alerta-titulo { font-size: 13px; letter-spacing: 0.03em; }
+.rn-mundo__alerta-texto { font-size: 13px; flex: 1; min-width: 160px; }
+.rn-mundo__progresso { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; margin: 0; border-radius: 0; }
+.rn-mundo__pular { margin: 0; padding: 2px 10px; font-size: 11px; }
+.rn-mundo--batalha .rn-mundo__rotulo { opacity: 0; }
+.rn-mundo--batalha .rn-mundo__dica { display: none; }
+@media (max-width: 640px) {
+  .rn-mundo--batalha { height: 420px; }
+  .rn-mundo--batalha .rn-mundo__alerta { width: auto; top: 0; padding: 5px 10px 7px; }
+  .rn-mundo__alerta-titulo, .rn-mundo__alerta-texto { font-size: 12px; }
+}

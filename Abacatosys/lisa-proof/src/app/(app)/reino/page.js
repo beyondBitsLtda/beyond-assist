@@ -199,7 +199,7 @@ export default function Reino() {
               {c.nivel < c.max ? (
                 <Botao ok={c.pode} motivo={c.motivo} ocupado={ocupado === c.chave}
                   aoClicar={() => agir(c.chave, { acao: "melhorar", chave: c.chave }, (r) => reagir("comemorando", `${c.nome} nível ${r.nivel}! 🎉`))}>
-                  {c.nivel === 0 ? "Construir" : "Melhorar"} · <Moedas n={c.custo} />
+                  {c.chave === "terreno" ? (c.nivel === 0 ? "Comprar terra" : "Expandir de novo") : c.nivel === 0 ? "Construir" : "Melhorar"} · <Moedas n={c.custo} />
                 </Botao>
               ) : <span className="pf-pilula pf-pilula--verde">Nível máximo</span>}
             </article>
