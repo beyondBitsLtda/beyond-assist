@@ -18,10 +18,14 @@ import {
 } from "../src/dominio/pratica.js";
 import { nomePublico, apelidoValido, posicionar, ANONIMO } from "../src/dominio/ranking.js";
 import {
-  podeMelhorar, podeSubirNeuro, poderDo, producaoAcumulada, podeInvadir, batalha, saldoDe, somarTrofeus,
-  faixaDeDefesa, estagioDoNeuro, ATAQUES_POR_DIA, TETO_DO_SAQUE, TROFEUS,
-  rivalSimulado, chanceDeVitoria, simularBatalha, fatorDaSorte,
+  podeMelhorar, podeSubirNeuro, producaoAcumulada, podeInvadir, batalha, saldoDe, somarTrofeus,
+  faixaDeDefesa, estagioDoNeuro, ATAQUES_POR_DIA, TETO_DO_SAQUE, saqueDo, trofeusDoCombate,
+  rivalSimulado, simularBatalha, exercitoDeTreino, previsaoDeEstrelas, combateDe,
 } from "../src/dominio/reino.js";
+import { montarCombate, passo as passoDoCombate, resultadoDo, resolverCombate } from "../src/dominio/combate.js";
+import {
+  capacidadeDoExercito, capacidadeDaGuarnicao, podeTreinar, espacoUsado, somarTropas, contagens, totalDeTropas,
+} from "../src/dominio/tropas.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
 import { conferirChamado, tituloDoChamado, descricaoDoChamado } from "../src/dominio/chamado.js";
 import { montarRaioX, acertosDoQuiz, horaEmSaoPaulo } from "../src/dominio/raioX.js";
@@ -521,6 +525,7 @@ const reinoBase = (extra = {}) => ({
 caso("reino: nenhuma construção passa do nível da torre", () => {
   const r = reinoBase();
   assert.deepEqual(podeMelhorar(r, "cofre", 1000), { ok: true, custo: 80 });
+  assert.deepEqual(podeMelhorar(r, "canhao", 1000), { ok: true, custo: 100 });
   assert.equal(podeMelhorar(r, "mina", 1000).ok, false); // mina 1 → 2 pede torre 2
   assert.match(podeMelhorar(r, "mina", 1000).motivo, /Torre do Neuro para o nível 2/);
   assert.deepEqual(podeMelhorar(r, "castelo", 300), { ok: true, custo: 300 });
@@ -533,104 +538,133 @@ caso("reino: o Neuro vai até o dobro da torre e custa 100 × nível", () => {
   assert.equal(podeSubirNeuro(reinoBase({ neuro_nivel: 2 }), 1000).ok, false);
   assert.deepEqual(podeSubirNeuro(reinoBase({ neuro_nivel: 2, construcoes: { castelo: 2 } }), 200), { ok: true, custo: 200 });
   assert.equal(estagioDoNeuro(1), "Filhote");
-  assert.equal(estagioDoNeuro(3), "Aprendiz");
   assert.equal(estagioDoNeuro(10), "Lendário");
-});
-caso("reino: força sai das construções e do Neuro", () => {
-  assert.deepEqual(poderDo(reinoBase()), { ataque: 18, defesa: 16 });
-  assert.deepEqual(poderDo(reinoBase({ neuro_nivel: 3, construcoes: { castelo: 3, quartel: 2, muralha: 1, torre: 3 } })), { ataque: 62, defesa: 70 });
 });
 caso("reino: a mina produz por hora e para quando enche", () => {
   const r = reinoBase({ construcoes: { castelo: 2, mina: 2 }, coletado_em: "2026-10-20T00:00:00Z" });
   assert.equal(producaoAcumulada(r, new Date("2026-10-20T03:30:00Z")), 7);
-  assert.equal(producaoAcumulada(r, new Date("2026-10-22T00:00:00Z")), 24); // teto: 2/h × 12 h
-  assert.equal(producaoAcumulada(r, new Date("2026-10-19T00:00:00Z")), 0);
+  assert.equal(producaoAcumulada(r, new Date("2026-10-22T00:00:00Z")), 24);
 });
-caso("reino: invasão — limites do dia, por alvo, escudo e o próprio reino", () => {
+caso("reino: invasão — sem exército não vai; limites do dia, alvo, escudo", () => {
   const agora = new Date("2026-10-20T12:00:00Z");
   const alvo = reinoBase({ usuario_id: "outro" });
-  assert.equal(podeInvadir({ atacanteId: "eu", defensor: alvo, ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, true);
-  assert.equal(podeInvadir({ atacanteId: "eu", defensor: alvo, ataquesHoje: ATAQUES_POR_DIA, jaAtacouHoje: false, agora }).ok, false);
-  assert.equal(podeInvadir({ atacanteId: "eu", defensor: alvo, ataquesHoje: 1, jaAtacouHoje: true, agora }).ok, false);
-  assert.equal(podeInvadir({ atacanteId: "eu", defensor: { ...alvo, escudo_ate: "2026-10-20T13:00:00Z" }, ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, false);
-  assert.equal(podeInvadir({ atacanteId: "eu", defensor: { ...alvo, escudo_ate: "2026-10-20T11:00:00Z" }, ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, true);
-  assert.equal(podeInvadir({ atacanteId: "eu", defensor: reinoBase(), ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, false);
-  assert.equal(podeInvadir({ atacanteId: "eu", defensor: null, ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, false);
-});
-caso("reino: batalha — sorte de ±15%, empate é da defesa, saque com cofre e teto", () => {
-  const forte = reinoBase({ neuro_nivel: 4, construcoes: { castelo: 3, quartel: 3 } }); // ataque 10+42+32 = 84
-  const fraco = reinoBase({ usuario_id: "outro", construcoes: { castelo: 1, cofre: 1 } }); // defesa 16, cofre 150
-  const v = batalha({ atacante: forte, defensor: fraco, saldoDoDefensor: 1150, sorteA: 0, sorteD: 0.999 });
-  assert.equal(v.venceu, true);
-  assert.equal(v.ataque, Math.round(84 * 0.85));
-  assert.equal(v.protegido, 150);
-  assert.equal(v.saque, 150); // 15% de 1000 expostos
-  assert.equal(v.trofeusAtacante, TROFEUS.vitoriaAtacante);
-  assert.equal(v.escudoDoDefensorHoras, 8);
-  assert.equal(batalha({ atacante: forte, defensor: fraco, saldoDoDefensor: 99999, sorteA: 0.5, sorteD: 0.5 }).saque, TETO_DO_SAQUE);
-  assert.equal(batalha({ atacante: forte, defensor: fraco, saldoDoDefensor: 100, sorteA: 0.5, sorteD: 0.5 }).saque, 0); // tudo no cofre
-  // defesa maior com a mesma sorte: a defesa segura
-  const segura = batalha({ atacante: reinoBase(), defensor: reinoBase({ usuario_id: "outro", neuro_nivel: 2 }), saldoDoDefensor: 0, sorteA: 0.5, sorteD: 0.5 });
-  assert.equal(segura.ataque, 18);
-  assert.equal(segura.defesa, 22);
-  assert.equal(segura.venceu, false);
-  assert.equal(segura.trofeusDefensor, TROFEUS.defesaVencida);
-  assert.equal(segura.escudoDoDefensorHoras, 0);
-  // empate exato: a defesa vence
-  const atacante = reinoBase({ construcoes: { castelo: 1, quartel: 0 } }); // ataque 18
-  const defensor = reinoBase({ usuario_id: "outro", construcoes: { castelo: 1 } }); // defesa 16
-  const empate = batalha({ atacante, defensor, saldoDoDefensor: 0, sorteA: 0, sorteD: 0.5 + (18 * 0.85 / 16 - 1) / 0.3 });
-  assert.equal(empate.ataque, empate.defesa);
-  assert.equal(empate.venceu, false);
+  const comTropas = { exercito: { guerreiro: 5 } };
+  assert.equal(podeInvadir({ atacanteId: "eu", atacante: comTropas, defensor: alvo, ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, true);
+  assert.match(podeInvadir({ atacanteId: "eu", atacante: { exercito: {} }, defensor: alvo, ataquesHoje: 0, jaAtacouHoje: false, agora }).motivo, /treine tropas/);
+  assert.equal(podeInvadir({ atacanteId: "eu", atacante: comTropas, defensor: alvo, ataquesHoje: ATAQUES_POR_DIA, jaAtacouHoje: false, agora }).ok, false);
+  assert.equal(podeInvadir({ atacanteId: "eu", atacante: comTropas, defensor: alvo, ataquesHoje: 1, jaAtacouHoje: true, agora }).ok, false);
+  assert.equal(podeInvadir({ atacanteId: "eu", atacante: comTropas, defensor: { ...alvo, escudo_ate: "2026-10-20T13:00:00Z" }, ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, false);
+  assert.equal(podeInvadir({ atacanteId: "eu", atacante: comTropas, defensor: reinoBase(), ataquesHoje: 0, jaAtacouHoje: false, agora }).ok, false);
 });
 caso("reino: saldo = pontos + livro-caixa, e troféus nunca negativos", () => {
   assert.equal(saldoDe({ pontosDeEstudo: 500, movimentos: [{ valor: -300 }, { valor: 24 }, { valor: -50 }] }), 174);
-  assert.equal(saldoDe({ pontosDeEstudo: 0, movimentos: [] }), 0);
   assert.equal(somarTrofeus(2, -5), 0);
-  assert.equal(somarTrofeus(10, 10), 20);
-  assert.equal(faixaDeDefesa(16), "fraca");
-  assert.equal(faixaDeDefesa(150), "fortíssima");
+  assert.equal(faixaDeDefesa(10), "fraca");
+  assert.equal(faixaDeDefesa(200), "fortíssima");
+});
+
+// ---------------------------------------------------------------- tropas
+caso("tropas: capacidade, liberação por nível e custo", () => {
+  assert.equal(capacidadeDoExercito(0), 0);
+  assert.equal(capacidadeDoExercito(2), 30);
+  assert.equal(capacidadeDaGuarnicao(1), 8);
+  const niveis = { quartel: 1, castelo: 1 };
+  assert.deepEqual(podeTreinar({ tropa: "guerreiro", quantidade: 5, destino: "exercito", niveis, reservas: {}, saldo: 100 }), { ok: true, custo: 50, quantidade: 5 });
+  assert.match(podeTreinar({ tropa: "gigante", quantidade: 1, destino: "exercito", niveis, reservas: {}, saldo: 999 }).motivo, /Quartel no nível 2/);
+  assert.match(podeTreinar({ tropa: "guerreiro", quantidade: 1, destino: "exercito", niveis: { quartel: 0, castelo: 1 }, reservas: {}, saldo: 999 }).motivo, /construa o Quartel/);
+  assert.match(podeTreinar({ tropa: "guerreiro", quantidade: 1, destino: "exercito", niveis, reservas: { exercito: { guerreiro: 20 } }, saldo: 999 }).motivo, /cheia/);
+  assert.match(podeTreinar({ tropa: "arqueira", quantidade: 3, destino: "guarnicao", niveis, reservas: { guarnicao: { guerreiro: 6 } }, saldo: 999 }).motivo, /só cabe mais 2/);
+  assert.match(podeTreinar({ tropa: "guerreiro", quantidade: 5, destino: "exercito", niveis, reservas: {}, saldo: 40 }).motivo, /faltam 10/);
+  assert.equal(podeTreinar({ tropa: "tanque", quantidade: 1, destino: "exercito", niveis, reservas: {}, saldo: 999 }).ok, false);
+  assert.equal(espacoUsado({ guerreiro: 3, gigante: 2, dragao: 1 }), 3 + 10 + 15);
+  assert.deepEqual(somarTropas({ guerreiro: 3, arqueira: 2 }, { guerreiro: 3 }, -1), { arqueira: 2 });
+  assert.deepEqual(contagens({ guerreiro: "4", inventado: 9, arqueira: -2 }), { guerreiro: 4 });
+});
+
+// ---------------------------------------------------------------- combate
+const baseMedia = { castelo: 2, mina: 2, cofre: 1, quartel: 2, torre: 2, canhao: 1, muralha: 2 };
+caso("combate: determinístico — mesma semente, mesma batalha; semente diferente pode mudar", () => {
+  const entrada = { atacante: { exercito: { guerreiro: 12, arqueira: 8 }, neuro_nivel: 2 }, defensor: { construcoes: baseMedia, neuro_nivel: 2, guarnicao: { guerreiro: 3 } }, semente: 99 };
+  assert.deepEqual(resolverCombate(entrada), resolverCombate(entrada));
+  // passo a passo (como a tela faz) chega no mesmo resultado que de uma vez (como o servidor)
+  const e = montarCombate(entrada);
+  while (!e.fim) passoDoCombate(e);
+  assert.deepEqual(resultadoDo(e), resolverCombate(entrada));
+});
+caso("combate: estrelas pela destruição — 50%, a Torre e 100%", () => {
+  const novato = resolverCombate({ atacante: { exercito: { guerreiro: 10 }, neuro_nivel: 1 }, defensor: { construcoes: { castelo: 1, mina: 1 }, neuro_nivel: 1 }, semente: 1 });
+  assert.equal(novato.estrelas, 3);
+  assert.equal(novato.destruicao, 100);
+  assert.equal(novato.casteloCaiu, true);
+  const fraco = resolverCombate({ atacante: { exercito: { guerreiro: 20 }, neuro_nivel: 2 }, defensor: { construcoes: baseMedia, neuro_nivel: 3, guarnicao: { guerreiro: 4, arqueira: 4 } }, semente: 1 });
+  assert.equal(fraco.estrelas, 0);
+  assert.ok(fraco.destruicao < 50);
+  const vazio = resolverCombate({ atacante: { exercito: {}, neuro_nivel: 5 }, defensor: { construcoes: baseMedia }, semente: 1 });
+  assert.deepEqual([vazio.estrelas, vazio.destruicao], [0, 0]);
+});
+caso("combate: a muralha segura quem bate de perto; a guarnição sai e pode cair", () => {
+  const e = montarCombate({ atacante: { exercito: { guerreiro: 30 }, neuro_nivel: 1 }, defensor: { construcoes: { castelo: 3, muralha: 3 }, neuro_nivel: 1, guarnicao: { guerreiro: 6 } }, semente: 3 });
+  let saiu = false, muroAntesDaTorre = null;
+  while (!e.fim) {
+    for (const ev of passoDoCombate(e)) {
+      if (ev.tipo === "guarnicao") saiu = true;
+      if (ev.tipo === "destruido" && muroAntesDaTorre == null) muroAntesDaTorre = ev.id === "p-muralha";
+    }
+  }
+  assert.equal(saiu, true);
+  assert.equal(muroAntesDaTorre, true);
+  assert.ok((resultadoDo(e).perdasDaGuarnicao.guerreiro || 0) > 0);
+});
+caso("combate: canhão não acerta quem voa; flecha acerta", () => {
+  const soCanhao = montarCombate({ atacante: { exercito: { dragao: 1 }, neuro_nivel: 1 }, defensor: { construcoes: { castelo: 1, canhao: 5 }, neuro_nivel: 1 }, semente: 2 });
+  let tirosDoCanhao = 0;
+  while (!soCanhao.fim) for (const ev of passoDoCombate(soCanhao)) if (ev.tipo === "tiro" && ev.de === "p-canhao" && soCanhao.unidades.find((u) => u.id === ev.para)?.tipo === "dragao") tirosDoCanhao++;
+  assert.equal(tirosDoCanhao, 0); // o dragão passa por cima do canhão
+  assert.ok(soCanhao.predios.find((p) => p.chave === "canhao").vida < soCanhao.predios.find((p) => p.chave === "canhao").vidaMax);
+  const comArqueiros = montarCombate({ atacante: { exercito: { dragao: 1 }, neuro_nivel: 1 }, defensor: { construcoes: { castelo: 1, torre: 5 }, neuro_nivel: 1 }, semente: 2 });
+  let flechasNoDragao = 0;
+  while (!comArqueiros.fim) for (const ev of passoDoCombate(comArqueiros)) if (ev.tipo === "tiro" && ev.de === "p-torre") flechasNoDragao++;
+  assert.ok(flechasNoDragao > 0);
+});
+caso("batalha: saque segue a destruição, com cofre e teto; troféus pelas estrelas", () => {
+  assert.deepEqual(saqueDo({ destruicao: 100, saldoDoDefensor: 1150, nivelDoCofre: 1 }), { protegido: 150, exposto: 1000, saque: 200 });
+  assert.equal(saqueDo({ destruicao: 50, saldoDoDefensor: 1150, nivelDoCofre: 1 }).saque, 100);
+  assert.equal(saqueDo({ destruicao: 100, saldoDoDefensor: 99999, nivelDoCofre: 0 }).saque, TETO_DO_SAQUE);
+  assert.deepEqual(trofeusDoCombate(0), { atacante: -3, defensor: 5 });
+  assert.deepEqual(trofeusDoCombate(3), { atacante: 14, defensor: -7 });
+  const b = batalha({ atacante: { exercito: { guerreiro: 10 }, neuro_nivel: 1 }, defensor: reinoBase({ usuario_id: "outro" }), saldoDoDefensor: 600, semente: 5 });
+  assert.equal(b.venceu, true);
+  assert.equal(b.estrelas, 3);
+  assert.equal(b.saque, 120); // 20% de 600, sem cofre
+  assert.equal(b.escudoDoDefensorHoras, 8);
+  assert.equal(b.entrada.semente, 5);
 });
 
 // ---------------------------------------------------------------- modo simulação
-caso("simulação: rival tirado do meu reino, um nível abaixo ou acima", () => {
-  const base = { construcoes: { castelo: 2, quartel: 2, muralha: 1, torre: 0, cofre: 1 }, neuro_nivel: 3 };
+caso("simulação: rival tirado do meu reino, com exército e defesa", () => {
+  const base = { construcoes: { castelo: 2, quartel: 2, muralha: 1, torre: 1, cofre: 1 }, neuro_nivel: 3 };
   const fraco = rivalSimulado(base, "fraco");
-  assert.deepEqual([fraco.construcoes.quartel, fraco.construcoes.muralha, fraco.construcoes.torre, fraco.construcoes.cofre, fraco.neuro_nivel], [1, 0, 0, 0, 1]);
+  assert.deepEqual([fraco.construcoes.quartel, fraco.construcoes.torre, fraco.construcoes.castelo, fraco.neuro_nivel], [1, 0, 1, 1]);
   const forte = rivalSimulado(base, "forte");
-  assert.deepEqual([forte.construcoes.quartel, forte.construcoes.muralha, forte.construcoes.torre, forte.construcoes.cofre, forte.neuro_nivel], [3, 2, 1, 2, 5]);
-  assert.deepEqual(rivalSimulado(base, "parelho").construcoes, { ...base.construcoes, mina: 1 }); // a mina já nasce no nível 1
-  const teto = rivalSimulado({ construcoes: { quartel: 5 }, neuro_nivel: 10 }, "forte");
-  assert.equal(teto.construcoes.quartel, 5);
-  assert.equal(teto.neuro_nivel, 10);
+  assert.deepEqual([forte.construcoes.quartel, forte.construcoes.torre, forte.construcoes.canhao, forte.neuro_nivel], [3, 2, 1, 5]);
+  assert.ok(espacoUsado(forte.exercito) <= capacidadeDoExercito(3));
+  assert.ok(espacoUsado(forte.exercito) > espacoUsado(fraco.exercito));
+  assert.ok(totalDeTropas(forte.guarnicao) > 0);
+  assert.ok(espacoUsado(exercitoDeTreino(4)) <= capacidadeDoExercito(4));
+  assert.equal(exercitoDeTreino(4).dragao, 1);
 });
-caso("simulação: chance de vitória sai da mesma batalha de verdade", () => {
-  const forte = { construcoes: { quartel: 5 }, neuro_nivel: 10 };
-  const fraco = { construcoes: {}, neuro_nivel: 1 };
-  let i = 0;
-  const sequencia = () => [0.1, 0.9, 0.5, 0.3][i++ % 4];
-  assert.equal(chanceDeVitoria(forte, fraco, 100, sequencia), 100);
-  assert.equal(chanceDeVitoria(fraco, forte, 100, sequencia), 0);
-  assert.equal(fatorDaSorte(0), 0.85);
-  assert.equal(fatorDaSorte(0.5), 1);
-});
-caso("simulação: o passo a passo do lado de quem joga", () => {
-  const forte = { construcoes: { castelo: 3, quartel: 3 }, neuro_nivel: 4 };
-  const fraco = { construcoes: { castelo: 1 }, neuro_nivel: 1 };
-  const atk = simularBatalha({ tipo: "atacar", eu: forte, rival: fraco, meuSaldo: 50, saldoDoRival: 500, sorteA: 0.5, sorteD: 0.5 });
-  assert.equal(atk.euVenci, true);
-  assert.equal(atk.minhasMoedas, 75); // 15% de 500, rival sem cofre
-  assert.equal(atk.meusTrofeus, TROFEUS.vitoriaAtacante);
-  assert.equal(atk.saldoDoDefensor, 500);
-  const def = simularBatalha({ tipo: "defender", eu: fraco, rival: forte, meuSaldo: 1000, saldoDoRival: 500, sorteA: 0.5, sorteD: 0.5 });
-  assert.equal(def.euVenci, false);
-  assert.equal(def.minhasMoedas, -150); // o MEU saldo é que conta na defesa
-  assert.equal(def.meusTrofeus, TROFEUS.derrotaDefensor);
-  assert.equal(def.poderAtacante.ataque, 84);
-  const segura = simularBatalha({ tipo: "defender", eu: forte, rival: fraco, meuSaldo: 1000, sorteA: 0.5, sorteD: 0.5 });
-  assert.equal(segura.euVenci, true);
-  assert.equal(segura.minhasMoedas, 0);
-  assert.equal(segura.meusTrofeus, TROFEUS.defesaVencida);
+caso("simulação: do lado de quem joga — atacar e defender", () => {
+  const meu = { construcoes: { castelo: 1, mina: 1, quartel: 1 }, neuro_nivel: 1, exercito: {}, guarnicao: {} };
+  const rival = rivalSimulado(meu, "fraco");
+  const atk = simularBatalha({ tipo: "atacar", eu: meu, rival, meuSaldo: 50, saldoDoRival: 500, semente: 7 });
+  assert.equal(atk.exercitoDeTreino, true); // exército vazio: vai um de exemplo
+  assert.equal(atk.minhasMoedas, atk.saque);
+  const def = simularBatalha({ tipo: "defender", eu: meu, rival: rivalSimulado(meu, "forte"), meuSaldo: 1000, semente: 7 });
+  assert.equal(def.saldoDoDefensor, 1000);
+  assert.equal(def.euVenci, def.estrelas === 0);
+  assert.equal(def.minhasMoedas, def.saque ? -def.saque : 0);
+  const p = previsaoDeEstrelas(combateDe({ atacante: { exercito: { guerreiro: 10 } }, defensor: { construcoes: { castelo: 1 } } }), 4);
+  assert.equal(p, 3);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import Neuro from "@/componentes/Neuro.js";
+import { LUGARES, PRACA, RAIO_DA_MURALHA, montarCombate, passo as passoDoCombate, resultadoDo, DT, DURACAO_MAXIMA } from "@/dominio/combate.js";
 
 /**
  * O Reino em 3D: uma ilha flutuante low poly com as construções, e o Neuro como um recorte de
@@ -16,10 +17,10 @@ import Neuro from "@/componentes/Neuro.js";
  * resto do app: `reagir("feliz", "...")` também chega aqui.
  *
  * Arrastar gira a ilha; clicar numa construção (ou no rótulo dela) chama `aoEscolher(chave)`.
- * Modo simulação: o evento de janela "reino-simular" ({ tipo: "atacar" | "defender", venceu,
- * quartel, torre, aoTerminar }) encena a batalha com soldadinhos, flechas e moedas. A conta da
- * batalha não é feita aqui (é de src/dominio/reino.js); aqui é só o teatro. Quem aceita marca
- * `detail.aceito = true` — sem mundo 3D (ou com "reduzir movimento"), a tela mostra o resultado direto.
+ * Batalha: o evento de janela "reino-combate" ({ entrada, papel: "atacante" | "defensor",
+ * resultado, titulo, aoTerminar }) roda na ilha o mesmo motor do servidor (src/dominio/combate.js)
+ * e desenha cada passo. Quem ataca vê a ilha do rival. Quem aceita marca `detail.aceito = true` —
+ * sem mundo 3D (ou com "reduzir movimento"), a tela mostra o resultado direto.
  * Sem WebGL, chama `aoFalhar()` e a tela volta para a vista plana. Com "reduzir movimento", o
  * Neuro fica parado na praça e as nuvens não andam.
  */
@@ -32,11 +33,6 @@ const COR = {
   praca: "#e2d3ae", porta: "#3a2a1e", entrada: "#2a2420", trilho: "#6b6b6b", placa: "#e2c58f", telhadoVerde: "#3f8f5a",
 };
 
-const LUGARES = {
-  castelo: [-0.6, -1.9], mina: [-4.3, -0.7], cofre: [4.1, -0.9], torre: [-3.2, 3.0], quartel: [3.4, 2.9],
-};
-const PRACA = [0.5, 1.3];
-const MURO = { raio: 6.0, meio: Math.PI * 1.25, passo: Math.PI * 0.075 };
 const FALAS = ["Faz cócegas! 😆", "Esse reino tá ficando lindo!", "Bora estudar pra construir mais? 🧠", "Ei! Eu sou de papel, cuidado! 📄", "Vamos invadir alguém hoje? ⚔️"];
 
 function aleatorio(semente) {
@@ -192,45 +188,65 @@ function quartel(p, n) {
   return g;
 }
 
-/** O muro contorna a parte de trás da ilha: mais trechos e torres a cada nível. */
+/** A muralha cerca a Torre do Neuro: um anel completo, mais alto e com mais torres a cada nível. */
 function muralha(p, n) {
   const g = new THREE.Group();
-  const trechos = n === 0 ? 6 : 2 + n * 2;
-  const inicio = MURO.meio - (trechos * MURO.passo) / 2;
-  const pos = (a) => [Math.cos(a) * MURO.raio, Math.sin(a) * MURO.raio];
+  const [cx, cz] = LUGARES.castelo;
+  const trechos = 16;
+  const passoA = (Math.PI * 2) / trechos;
+  const pos = (a) => [cx + Math.cos(a) * RAIO_DA_MURALHA, cz + Math.sin(a) * RAIO_DA_MURALHA];
   if (n === 0) {
-    for (let i = 0; i <= trechos; i++) {
-      const [x, z] = pos(inicio + i * MURO.passo);
-      g.add(p.caixa(0.07, 0.36, 0.07, COR.madeira, x, 0.18, z));
+    for (let i = 0; i < trechos; i += 2) {
+      const [x, z] = pos(i * passoA);
+      g.add(p.caixa(0.07, 0.32, 0.07, COR.madeira, x, 0.16, z));
     }
-    const [x, z] = pos(MURO.meio);
-    g.add(p.caixa(0.06, 0.5, 0.06, COR.madeira, x * 0.92, 0.25, z * 0.92));
-    g.add(p.caixa(0.44, 0.26, 0.04, COR.placa, x * 0.92, 0.5, z * 0.92));
     return g;
   }
-  const h = 0.45 + 0.12 * n;
-  const comprimento = 2 * MURO.raio * Math.sin(MURO.passo / 2) + 0.04;
+  const h = 0.35 + 0.1 * n;
+  const comprimento = 2 * RAIO_DA_MURALHA * Math.sin(passoA / 2) + 0.05;
   for (let i = 0; i < trechos; i++) {
-    const a = inicio + (i + 0.5) * MURO.passo;
+    const a = (i + 0.5) * passoA;
     const [x, z] = pos(a);
-    const t = p.caixa(comprimento, h, 0.36, COR.pedra, x, h / 2, z);
-    t.rotation.y = -a + Math.PI / 2;
-    g.add(t);
-    const ameia = p.caixa(comprimento * 0.4, 0.16, 0.38, COR.pedra, x, h + 0.08, z);
-    ameia.rotation.y = t.rotation.y;
-    g.add(ameia);
+    const trecho = p.caixa(comprimento, h, 0.3, COR.pedra, x, h / 2, z);
+    trecho.rotation.y = -a + Math.PI / 2;
+    g.add(trecho);
+    if (i % 2 === 0) {
+      const ameia = p.caixa(comprimento * 0.4, 0.14, 0.32, COR.pedra, x, h + 0.07, z);
+      ameia.rotation.y = trecho.rotation.y;
+      g.add(ameia);
+    }
   }
-  const torres = [0, trechos];
-  if (n >= 3) for (let i = 4; i < trechos; i += 4) torres.push(i);
-  for (const i of torres) {
-    const [x, z] = pos(inicio + i * MURO.passo);
-    g.add(p.cilindro(0.3, 0.34, h + 0.4, 6, COR.pedraClara, x, (h + 0.4) / 2, z));
-    g.add(p.cone(0.42, 0.55, 6, COR.telhado, x, h + 0.68, z));
+  const torres = n >= 3 ? 4 : 2;
+  for (let i = 0; i < torres; i++) {
+    const [x, z] = pos((i / torres) * Math.PI * 2 + Math.PI / 4);
+    g.add(p.cilindro(0.24, 0.28, h + 0.35, 6, COR.pedraClara, x, (h + 0.35) / 2, z));
+    g.add(p.cone(0.34, 0.45, 6, COR.telhado, x, h + 0.58, z));
   }
   return g;
 }
 
-const CONSTRUTORES = { castelo, mina, cofre, torre, quartel, muralha };
+/** O Canhão: base de pedra e um cano que vira para o alvo durante a batalha. */
+function canhao(p, n) {
+  const g = new THREE.Group();
+  g.add(p.cilindro(0.5, 0.6, 0.3, 8, COR.pedra, 0, 0.15, 0));
+  const cano = new THREE.Group();
+  cano.position.y = 0.42;
+  const tubo = p.cilindro(0.12 + 0.01 * n, 0.16 + 0.01 * n, 0.85, 8, n >= 5 ? COR.ouro : "#3a3f47", 0, 0.12, 0.28);
+  tubo.rotation.x = Math.PI / 2.4;
+  cano.add(p.caixa(0.36, 0.22, 0.4, COR.madeiraEscura, 0, 0, 0), tubo);
+  if (n >= 3) {
+    const tubo2 = p.cilindro(0.1, 0.13, 0.75, 8, "#3a3f47", 0.2, 0.1, 0.24);
+    tubo2.rotation.x = Math.PI / 2.4;
+    cano.add(tubo2);
+    tubo.position.x = -0.12;
+  }
+  g.add(cano);
+  g.userData.cano = cano;
+  for (let i = 0; i < Math.min(4, n + 1); i++) g.add(p.malha(new THREE.SphereGeometry(0.08, 6, 4), "#30343b", 0.45 - i * 0.12, 0.06, -0.45));
+  return g;
+}
+
+const CONSTRUTORES = { castelo, mina, cofre, torre, canhao, quartel, muralha };
 
 function construir(p, chave, nivel) {
   const g = nivel > 0 || chave === "muralha" ? CONSTRUTORES[chave](p, nivel) : terrenoVazio(p);
@@ -246,7 +262,7 @@ function construir(p, chave, nivel) {
 
 function ancoraDe(chave, grupo) {
   const topo = new THREE.Box3().setFromObject(grupo).max.y;
-  if (chave === "muralha") return new THREE.Vector3(Math.cos(MURO.meio) * MURO.raio, topo + 0.35, Math.sin(MURO.meio) * MURO.raio);
+  if (chave === "muralha") return new THREE.Vector3(LUGARES.castelo[0] + 1.24, Math.max(topo, 0.6) + 0.35, LUGARES.castelo[1] + 1.24);
   const [x, z] = LUGARES[chave];
   return new THREE.Vector3(x, topo + 0.35, z);
 }
@@ -399,6 +415,8 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
   const legendaRef = useRef(null);
   legendaRef.current = setLegenda;
   const humorAtual = reacao?.humor || humor;
+  const construcoesRef = useRef(construcoes);
+  construcoesRef.current = construcoes;
   const aoEscolherRef = useRef(aoEscolher);
   aoEscolherRef.current = aoEscolher;
 
@@ -443,14 +461,14 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
     const camadaPredios = new THREE.Group();
     mundo.add(camadaPredios);
     const descartar = (o) => o.traverse((m) => m.geometry?.dispose());
-    function atualizarConstrucoes(lista) {
+    function atualizarConstrucoes(lista, animar = true) {
       for (const { chave, nivel } of lista) {
         const atual = predios.get(chave);
         if (atual && atual.nivel === nivel) continue;
         if (atual) { camadaPredios.remove(atual.grupo); descartar(atual.grupo); }
         const grupo = construir(p, chave, nivel);
         camadaPredios.add(grupo);
-        predios.set(chave, { grupo, nivel, ancora: ancoraDe(chave, grupo), nasceu: atual ? performance.now() : 0 });
+        predios.set(chave, { grupo, nivel, ancora: ancoraDe(chave, grupo), nasceu: atual && animar ? performance.now() : 0 });
       }
       sujo = true;
     }
@@ -589,61 +607,119 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
     tela.addEventListener("pointerup", aoSoltar);
     tela.addEventListener("pointercancel", () => { ponteiro.ativo = false; });
 
-    // ---- modo simulação: a batalha encenada (~10 s). A conta é do domínio; aqui é só o teatro.
+    const v3 = ([x, z], y = 0) => new THREE.Vector3(x, y, z);
+    // ---- a batalha na ilha: roda o MESMO motor do servidor (src/dominio/combate.js) e desenha
+    // cada passo — tropas andando, flechas, balas de canhão, fogo de dragão, barras de vida e
+    // construções virando ruína. Como o motor é determinístico, a luta é a mesma que o servidor
+    // decidiu; o placar final que aparece é sempre o do servidor (`resultado`).
     const geo = {
       corpo: new THREE.ConeGeometry(0.15, 0.38, 6),
       cabeca: new THREE.IcosahedronGeometry(0.1, 0),
       elmo: new THREE.ConeGeometry(0.1, 0.12, 6),
+      cabelo: new THREE.IcosahedronGeometry(0.11, 0),
       lanca: new THREE.CylinderGeometry(0.012, 0.012, 0.55, 4),
       escudo: new THREE.CylinderGeometry(0.11, 0.11, 0.03, 8).rotateZ(Math.PI / 2),
-      mastro: new THREE.CylinderGeometry(0.012, 0.012, 0.75, 4),
-      pano: new THREE.BoxGeometry(0.02, 0.18, 0.28),
+      arco: new THREE.TorusGeometry(0.14, 0.014, 4, 10, Math.PI),
+      punho: new THREE.IcosahedronGeometry(0.1, 0),
+      asa: new THREE.BoxGeometry(0.62, 0.03, 0.3),
+      corpoDragao: new THREE.SphereGeometry(0.3, 8, 6),
+      focinho: new THREE.ConeGeometry(0.12, 0.32, 6).rotateX(Math.PI / 2),
+      cauda: new THREE.ConeGeometry(0.1, 0.5, 5).rotateX(-Math.PI / 2),
       flecha: new THREE.CylinderGeometry(0.016, 0.016, 0.45, 4).rotateX(Math.PI / 2),
-      moeda: new THREE.CylinderGeometry(0.11, 0.11, 0.035, 10),
+      bala: new THREE.SphereGeometry(0.1, 8, 6),
+      fogo: new THREE.IcosahedronGeometry(0.17, 0),
+      livro: new THREE.BoxGeometry(0.18, 0.05, 0.13),
       fumaca: new THREE.IcosahedronGeometry(0.26, 0),
       faisca: new THREE.OctahedronGeometry(0.07, 0),
+      entulho: new THREE.DodecahedronGeometry(0.22, 0),
       casco: new THREE.CylinderGeometry(0.5, 0.3, 0.42, 6),
       conves: new THREE.BoxGeometry(1.7, 0.08, 0.62),
       mastroNavio: new THREE.CylinderGeometry(0.035, 0.035, 1.3, 5),
       vela: new THREE.BoxGeometry(0.05, 0.75, 0.9),
       balao: new THREE.SphereGeometry(0.62, 8, 6),
-      corda: new THREE.CylinderGeometry(0.01, 0.01, 0.75, 3),
+      heroi: new THREE.PlaneGeometry(1.3, 1.3),
     };
-    const v3 = ([x, z], y = 0) => new THREE.Vector3(x, y, z);
+    const matBarra = {
+      fundo: new THREE.SpriteMaterial({ color: "#111814", opacity: 0.7, transparent: true, depthTest: false }),
+      aliado: new THREE.SpriteMaterial({ color: "#22c55e", depthTest: false }),
+      inimigo: new THREE.SpriteMaterial({ color: "#ef4444", depthTest: false }),
+      predio: new THREE.SpriteMaterial({ color: "#f59e0b", depthTest: false }),
+    };
+    const matFogo = new THREE.MeshStandardMaterial({ color: "#ff7a1a", emissive: "#ff5a00", emissiveIntensity: 1.2, flatShading: true });
+    const AZUL = "#2f6fd6", VERMELHO = "#c8332f";
     const BORDA = new THREE.Vector3(5.3, 0, 4.7);
     const FORA = BORDA.clone().normalize();
     const LADO = new THREE.Vector3(-FORA.z, 0, FORA.x);
-    // a doca fica no alto: a beirada da frente é a parte de baixo do quadro, e o navio sumia ali
     const DOCA = BORDA.clone().addScaledVector(FORA, 1.1).setY(0.9);
     const LONGE = DOCA.clone().addScaledVector(FORA, 11).addScaledVector(LADO, 3).setY(4.5);
+    const VELOCIDADE = 2.5;     // segundos de batalha por segundo de tela
+    const INTRO = 2.2;          // o navio chegando
     const suave = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
-    const fase = (tt, de, ate) => suave((tt - de) / (ate - de));
     let sim = null;
     let tremor = 0;
     let zoomAlvo = 1;
 
-    function soldado(cor, portaBandeira) {
+    function barra(largura) {
       const g = new THREE.Group();
-      const boneco = new THREE.Group();
-      const corpo = new THREE.Mesh(geo.corpo, p.mat(cor)); corpo.position.y = 0.19;
-      const cabeca = new THREE.Mesh(geo.cabeca, p.mat("#f2d3b1")); cabeca.position.y = 0.45;
-      const elmo = new THREE.Mesh(geo.elmo, p.mat("#9aa3ad")); elmo.position.y = 0.55;
-      const escudo = new THREE.Mesh(geo.escudo, p.mat(cor)); escudo.position.set(-0.15, 0.22, 0.05);
-      boneco.add(corpo, cabeca, elmo, escudo);
-      if (portaBandeira) {
-        const mastro = new THREE.Mesh(geo.mastro, p.mat(COR.madeiraEscura)); mastro.position.set(0.15, 0.45, 0);
-        const pano = new THREE.Mesh(geo.pano, p.mat(cor)); pano.position.set(0.15, 0.72, 0.14);
-        boneco.add(mastro, pano);
-        boneco.userData.pano = pano;
+      const fundo = new THREE.Sprite(matBarra.fundo); fundo.center.set(0, 0.5); fundo.scale.set(largura, 0.09, 1);
+      const cheio = new THREE.Sprite(matBarra.aliado); cheio.center.set(0, 0.5); cheio.scale.set(largura, 0.07, 1);
+      fundo.renderOrder = 10; cheio.renderOrder = 11;
+      g.add(fundo, cheio);
+      g.userData = { cheio, largura };
+      g.visible = false;
+      return g;
+    }
+    const direitaDaCamera = new THREE.Vector3();
+    function posicionarBarra(b, x, y, z, fracao, material) {
+      b.visible = fracao < 1 && fracao > 0;
+      if (!b.visible) return;
+      const L = b.userData.largura;
+      b.position.set(x - direitaDaCamera.x * (L / 2), y, z - direitaDaCamera.z * (L / 2));
+      b.userData.cheio.scale.x = Math.max(0.001, L * fracao);
+      b.userData.cheio.material = material;
+    }
+
+    function boneco(tipo, cor) {
+      const g = new THREE.Group();
+      const b = new THREE.Group();
+      g.add(b);
+      g.userData.boneco = b;
+      if (tipo === "dragao") {
+        const corpo = new THREE.Mesh(geo.corpoDragao, p.mat(cor)); corpo.scale.set(1.0, 0.9, 1.7);
+        const focinho = new THREE.Mesh(geo.focinho, p.mat(cor)); focinho.position.set(0, 0.08, 0.6);
+        const cauda = new THREE.Mesh(geo.cauda, p.mat(cor)); cauda.position.set(0, 0, -0.65);
+        const asaE = new THREE.Mesh(geo.asa, p.mat("#3b2a4a")); asaE.position.set(-0.42, 0.12, 0);
+        const asaD = new THREE.Mesh(geo.asa, p.mat("#3b2a4a")); asaD.position.set(0.42, 0.12, 0);
+        b.add(corpo, focinho, cauda, asaE, asaD);
+        b.userData.asas = [asaE, asaD];
+        b.scale.setScalar(1.15);
+        b.position.y = 1.7;
+      } else if (tipo === "gigante") {
+        const corpo = new THREE.Mesh(geo.corpo, p.mat(cor)); corpo.position.y = 0.19;
+        const cabeca = new THREE.Mesh(geo.cabeca, p.mat("#e9c39a")); cabeca.position.y = 0.45;
+        const pe = new THREE.Mesh(geo.punho, p.mat("#e9c39a")); pe.position.set(-0.17, 0.2, 0.06);
+        const pd = new THREE.Mesh(geo.punho, p.mat("#e9c39a")); pd.position.set(0.17, 0.2, 0.06);
+        b.add(corpo, cabeca, pe, pd);
+        b.scale.setScalar(3.0);
       } else {
-        const lanca = new THREE.Mesh(geo.lanca, p.mat("#8a8f98")); lanca.position.set(0.15, 0.33, 0);
-        boneco.add(lanca);
-        boneco.userData.lanca = lanca;
+        const corpo = new THREE.Mesh(geo.corpo, p.mat(cor)); corpo.position.y = 0.19;
+        const cabeca = new THREE.Mesh(geo.cabeca, p.mat("#f2d3b1")); cabeca.position.y = 0.45;
+        b.add(corpo, cabeca);
+        if (tipo === "arqueira") {
+          const cabelo = new THREE.Mesh(geo.cabelo, p.mat("#7a3b1f")); cabelo.position.set(0, 0.49, -0.03); cabelo.scale.set(1, 0.8, 1.1);
+          const arco = new THREE.Mesh(geo.arco, p.mat(COR.madeiraEscura)); arco.position.set(0.15, 0.3, 0.05); arco.rotation.set(0, Math.PI / 2, Math.PI / 2);
+          b.add(cabelo, arco);
+          corpo.scale.set(0.85, 1, 0.85);
+        } else {
+          const elmo = new THREE.Mesh(geo.elmo, p.mat("#9aa3ad")); elmo.position.y = 0.55;
+          const escudo = new THREE.Mesh(geo.escudo, p.mat(cor)); escudo.position.set(-0.15, 0.22, 0.05);
+          const lanca = new THREE.Mesh(geo.lanca, p.mat("#8a8f98")); lanca.position.set(0.15, 0.33, 0);
+          b.add(elmo, escudo, lanca);
+          b.userData.lanca = lanca;
+        }
+        b.scale.setScalar(1.7);
       }
-      boneco.scale.setScalar(1.7);
-      g.add(boneco);
       g.traverse((m) => { m.castShadow = true; });
-      g.userData.boneco = boneco;
       return g;
     }
 
@@ -655,28 +731,19 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
       const vela = new THREE.Mesh(geo.vela, p.mat(corDaVela)); vela.position.set(0.05, 0.95, 0); vela.rotation.y = Math.PI / 2;
       const balao = new THREE.Mesh(geo.balao, p.mat(corDaVela)); balao.position.y = 2.0; balao.scale.set(1.4, 0.85, 0.9);
       g.add(casco, conves, mastro, vela, balao);
-      for (const [x, z] of [[-0.6, 0.2], [0.6, 0.2], [-0.6, -0.2], [0.6, -0.2]]) {
-        const c = new THREE.Mesh(geo.corda, p.mat("#c9b38a"));
-        c.position.set(x * 0.8, 1.55, z);
-        c.rotation.z = x > 0 ? -0.35 : 0.35;
-        g.add(c);
-      }
       g.traverse((m) => { m.castShadow = true; });
       g.scale.setScalar(1.05);
       return g;
     }
-
-    /** O navio voa de `de` para `para` (u de 0 a 1), olhando para onde vai, balançando. */
-    function voar(n, de, para, u, tt, inclinado = 0) {
+    function voar(n, de, para, u, tt) {
       const a = suave(u);
       n.position.lerpVectors(de, para, a);
       n.position.y += Math.sin(a * Math.PI) * 1.2 + Math.sin(tt * 2.5) * 0.06;
       const frente = new THREE.Vector3().subVectors(para, de).setY(0);
       if (frente.lengthSq() > 0.001) n.rotation.y = Math.atan2(frente.x, frente.z) - Math.PI / 2;
-      n.rotation.z = Math.sin(tt * 2) * 0.04 + inclinado;
+      n.rotation.z = Math.sin(tt * 2) * 0.04;
     }
 
-    // efeitos de vida curta: fumaça, faíscas, moedas
     function fumaca(grupo, onde, n = 6, cor = "#ffffff") {
       for (let k = 0; k < n; k++) {
         const m = new THREE.Mesh(geo.fumaca, new THREE.MeshStandardMaterial({ color: cor, flatShading: true, transparent: true, opacity: 0.85, roughness: 1, emissive: cor, emissiveIntensity: 0.25 }));
@@ -686,12 +753,12 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         sim.efeitos.push(m);
       }
     }
-    function faiscas(grupo, onde, n = 14, cor = "#ffd34d", forca = 3) {
+    function faiscas(grupo, onde, n = 10, cor = "#ffd34d", forca = 3) {
       const mat = p.mat(cor);
       for (let k = 0; k < n; k++) {
         const m = new THREE.Mesh(geo.faisca, mat);
         const a = Math.random() * Math.PI * 2;
-        m.userData = { idade: 0, vida: 0.6 + Math.random() * 0.4, vel: new THREE.Vector3(Math.cos(a) * forca * Math.random(), forca * (0.5 + Math.random()), Math.sin(a) * forca * Math.random()), tipo: "faisca" };
+        m.userData = { idade: 0, vida: 0.5 + Math.random() * 0.4, vel: new THREE.Vector3(Math.cos(a) * forca * Math.random(), forca * (0.5 + Math.random()), Math.sin(a) * forca * Math.random()), tipo: "faisca" };
         m.position.copy(onde);
         grupo.add(m);
         sim.efeitos.push(m);
@@ -702,10 +769,15 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         const d = m.userData;
         d.idade += dt;
         const u = d.idade / d.vida;
-        if (u >= 1) {
-          m.parent?.remove(m);
-          if (d.proprio) m.material.dispose();
-          return false;
+        if (u >= 1) { m.parent?.remove(m); if (d.proprio) m.material.dispose(); return false; }
+        if (d.tipo === "tiro") {
+          const a = Math.min(1, u);
+          m.position.lerpVectors(d.de, d.para, a);
+          m.position.y += Math.sin(a * Math.PI) * d.arco;
+          const prox = new THREE.Vector3().lerpVectors(d.de, d.para, Math.min(1, a + 0.05));
+          prox.y += Math.sin(Math.min(1, a + 0.05) * Math.PI) * d.arco;
+          if (d.mira) m.lookAt(prox); else m.rotation.x += dt * 10;
+          return true;
         }
         m.position.addScaledVector(d.vel, dt);
         if (d.tipo === "faisca") { d.vel.y -= 9 * dt; m.scale.setScalar(1 - u); m.rotation.x += dt * 8; }
@@ -713,15 +785,26 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
         return true;
       });
     }
+    function tiro(grupo, armaDoTiro, de, para) {
+      const g = armaDoTiro === "flecha" ? geo.flecha : armaDoTiro === "bala" ? geo.bala : armaDoTiro === "fogo" ? geo.fogo : geo.livro;
+      const mat = armaDoTiro === "fogo" ? matFogo : armaDoTiro === "bala" ? p.mat("#30343b") : armaDoTiro === "livro" ? p.mat("#7c4dff") : p.mat(COR.madeiraEscura);
+      const m = new THREE.Mesh(g, mat);
+      m.position.copy(de);
+      m.userData = { tipo: "tiro", idade: 0, vida: armaDoTiro === "bala" ? 0.32 : 0.26, de: de.clone(), para: para.clone(), arco: armaDoTiro === "flecha" ? 0.6 : armaDoTiro === "bala" ? 0.35 : armaDoTiro === "livro" ? 0.5 : 0, mira: armaDoTiro === "flecha" };
+      grupo.add(m);
+      sim.efeitos.push(m);
+    }
 
     const falar = (humor, fala) => window.dispatchEvent(new CustomEvent("neuro", { detail: { humor, fala, duracao: 3000 } }));
+    const estrelasTexto = (n) => (n ? "⭐".repeat(n) : "nenhuma estrela");
 
     function encerrarSimulacao() {
       if (!sim) return;
       mundo.remove(sim.grupo);
       sim.grupo.traverse((m) => { if (m.userData?.proprio) m.material.dispose(); });
-      const castelo = predios.get("castelo")?.grupo;
-      if (castelo) castelo.position.set(LUGARES.castelo[0], 0, LUGARES.castelo[1]);
+      for (const info of predios.values()) info.grupo.visible = true;
+      if (sim.ilhaTrocada) atualizarConstrucoes(construcoesRef.current, false);
+      neuro.visible = true;
       const fim = sim.aoTerminar;
       sim = null;
       zoomAlvo = 1;
@@ -731,234 +814,190 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
       fim?.();
     }
 
-    function iniciarSimulacao({ tipo, venceu, quartel = 0, torre: nivelTorre = 0, aoTerminar }) {
+    function iniciarCombate({ entrada, papel, resultado, titulo, aoTerminar }) {
       if (sim) { const antigo = sim.aoTerminar; sim.aoTerminar = null; encerrarSimulacao(); antigo?.(); }
+      const souAtacante = papel === "atacante";
+      const meuLado = souAtacante ? "ataque" : "defesa";
       const grupo = new THREE.Group();
       mundo.add(grupo);
-      const atacando = tipo === "atacar";
-      const cor = atacando ? "#2f6fd6" : "#c8332f";
-      const qtd = atacando ? 4 + Math.min(4, quartel) : 7;
-      const casa = atacando ? v3(LUGARES.quartel).add(new THREE.Vector3(-0.5, 0, -0.5)) : v3(LUGARES.castelo).add(new THREE.Vector3(0.3, 0, 1.15));
-      const caminho = new THREE.Vector3().subVectors(casa, BORDA).normalize();
-      const lateral = new THREE.Vector3(-caminho.z, 0, caminho.x);
-      const soldados = Array.from({ length: qtd }, (_, i) => {
-        const g = soldado(cor, i === 0);
-        const fila = Math.floor(i / 3), coluna = (i % 3) - 1;
-        g.userData.desvio = lateral.clone().multiplyScalar(coluna * 0.42).addScaledVector(caminho, -fila * 0.45);
-        g.scale.setScalar(0.001);
-        grupo.add(g);
-        return g;
-      });
-      const barco = navio(cor);
-      barco.visible = false;
+      const e = montarCombate(entrada);
+      // quem ataca vê a ilha do rival: troca as construções pelas dele durante a batalha
+      const ilhaTrocada = souAtacante;
+      if (ilhaTrocada) {
+        const n = entrada.defensor.construcoes;
+        atualizarConstrucoes(Object.keys(CONSTRUTORES).map((chave) => ({ chave, nivel: n[chave] || 0 })), false);
+      }
+      neuro.visible = false;
+      const barco = navio(souAtacante ? AZUL : VERMELHO);
       grupo.add(barco);
+      const corpos = new Map();   // id da unidade → { malha, barra, x, z }
+      const barrasDePredio = new Map(); // id do prédio → barra
+      for (const pr of [...e.predios, ...(e.muralha ? [e.muralha] : [])]) { const b = barra(1.1); grupo.add(b); barrasDePredio.set(pr.id, b); }
+      const fala = { ultima: "" };
+      const legenda = (t, texto) => {
+        const chave = t + texto;
+        if (chave === fala.ultima) return;
+        fala.ultima = chave;
+        legendaRef.current?.({ alerta: souAtacante ? "ataque" : "defesa", titulo: t, texto, duracao: INTRO + DURACAO_MAXIMA / VELOCIDADE, pular: true });
+      };
+      const tituloBase = titulo || (souAtacante ? "⚔️ INVASÃO EM ANDAMENTO" : "⚠️ SEU REINO ESTÁ SENDO ATACADO!");
+      legenda(tituloBase, souAtacante ? "O navio leva as suas tropas ao reino rival…" : "Um navio inimigo se aproxima…");
+      zoomAlvo = 0.9;
 
-      // quem cai, e quando; as flechas saem dos Arqueiros (ou da Torre do Neuro, sem arqueiros)
-      const mortos = atacando ? [] : venceu ? [2, 5] : soldados.map((_, i) => i);
-      const mortes = new Map(mortos.map((i, k) => [i, venceu ? 4.0 + k * 1.0 : 3.5 + (k * 2.3) / Math.max(1, mortos.length - 1)]));
-      const atirador = nivelTorre > 0 ? v3(LUGARES.torre, 1.5 + 0.3 * nivelTorre) : v3(LUGARES.castelo, 2.1);
-      const flechas = [];
-      if (!atacando) {
-        for (const [i, quando] of mortes) flechas.push({ alvo: i, parte: quando - 0.55, acerta: true });
-        const rajadas = 3 + Math.min(4, nivelTorre); // mais arqueiros, mais flechas no céu
-        for (let k = 0; k < rajadas * 2; k++) flechas.push({ alvo: k % qtd, parte: 3.0 + (k * 2.8) / (rajadas * 2), acerta: false, erro: new THREE.Vector3((Math.random() - 0.5) * 1.4, 0, (Math.random() - 0.5) * 1.4) });
-        for (const fl of flechas) { fl.malha = new THREE.Mesh(geo.flecha, p.mat(COR.madeiraEscura)); fl.malha.visible = false; grupo.add(fl.malha); }
-      }
+      const posDe = (id) => {
+        if (id.startsWith("p-")) {
+          const chave = id.slice(2);
+          if (chave === "muralha") return new THREE.Vector3(e.castelo.x + 1.2, 0.6, e.castelo.z + 1.2);
+          const [x, z] = LUGARES[chave];
+          return new THREE.Vector3(x, chave === "torre" ? 1.6 : chave === "castelo" ? 1.8 : chave === "canhao" ? 0.6 : 0.6, z);
+        }
+        const c = corpos.get(id);
+        const u = e.unidades.find((o) => o.id === id);
+        return new THREE.Vector3(c ? c.malha.position.x : u?.x || 0, (u?.voa ? 1.9 : 0.4), c ? c.malha.position.z : u?.z || 0);
+      };
 
-      const cofrePos = v3(LUGARES.cofre, 0.5);
-      const moedas = [];
-      if (venceu) {
-        for (let k = 0; k < 16; k++) {
-          const m = new THREE.Mesh(geo.moeda, p.mat(COR.ouro));
-          m.visible = false;
-          m.castShadow = true;
-          grupo.add(m);
-          moedas.push({ malha: m, atraso: k * 0.07, lado: (k % 5) * 0.25 - 0.5 });
+      function aplicar(ev) {
+        for (const x of ev) {
+          if (x.tipo === "entrou") {
+            const u = e.unidades.find((o) => o.id === x.id);
+            const cor = u.lado === meuLado ? AZUL : VERMELHO;
+            let malha;
+            if (u.tipo === "heroi") {
+              malha = new THREE.Group();
+              const folhaHeroi = new THREE.Mesh(geo.heroi, folha.material);
+              folhaHeroi.position.y = 0.55;
+              malha.add(folhaHeroi);
+              malha.userData.folha = folhaHeroi;
+            } else malha = boneco(u.tipo, cor);
+            malha.position.set(u.x, 0, u.z);
+            grupo.add(malha);
+            const b = barra(u.tipo === "gigante" || u.tipo === "dragao" ? 0.9 : 0.55);
+            grupo.add(b);
+            corpos.set(u.id, { malha, barra: b, x: u.x, z: u.z, golpe: 0 });
+            if (u.lado === "ataque") fumaca(grupo, new THREE.Vector3(u.x, 0, u.z), 1);
+          } else if (x.tipo === "golpe" || x.tipo === "tiro") {
+            const de = posDe(x.de), para = posDe(x.para);
+            if (x.arma === "golpe") {
+              const c = corpos.get(x.de);
+              if (c) c.golpe = 0.12;
+              faiscas(grupo, para.clone().setY(0.5), 3, "#ffe08a", 1.4);
+            } else tiro(grupo, x.arma, de.clone().setY(de.y + 0.2), para);
+            if (x.de === "p-canhao") { const c = predios.get("canhao")?.grupo; if (c?.userData.cano) c.userData.cano.rotation.y = Math.atan2(para.x - c.position.x, para.z - c.position.z) - c.rotation.y; }
+          } else if (x.tipo === "caiu") {
+            const c = corpos.get(x.id);
+            if (c) { c.caiu = 0.001; fumaca(grupo, c.malha.position.clone(), 2, "#d9d9d9"); }
+          } else if (x.tipo === "destruido") {
+            const chave = x.id.slice(2);
+            const info = predios.get(chave);
+            const onde = chave === "muralha" ? new THREE.Vector3(e.castelo.x, 0, e.castelo.z) : v3(LUGARES[chave]);
+            if (info) info.grupo.visible = false;
+            for (let k = 0; k < (chave === "castelo" ? 9 : 5); k++) {
+              const pedra = new THREE.Mesh(geo.entulho, p.mat(k % 2 ? "#6f6a63" : "#8b857c"));
+              const raio = chave === "muralha" ? 1.75 : 0.5;
+              const a = (k / 5) * Math.PI * 2;
+              pedra.position.set(onde.x + Math.cos(a) * raio * (0.5 + Math.random() * 0.5), 0.1, onde.z + Math.sin(a) * raio * (0.5 + Math.random() * 0.5));
+              pedra.rotation.set(Math.random() * 3, Math.random() * 3, 0);
+              pedra.castShadow = true;
+              grupo.add(pedra);
+            }
+            fumaca(grupo, onde, chave === "castelo" ? 14 : 8, "#bdbdbd");
+            faiscas(grupo, onde.clone().setY(0.8), 12, "#ffb347", 3);
+            tremor = chave === "castelo" ? 1.0 : 0.5;
+            if (chave === "castelo") {
+              legenda(tituloBase, "A Torre do Neuro caiu! ⭐");
+              falar(souAtacante ? "comemorando" : "triste", souAtacante ? "Derrubamos a Torre deles! ⭐" : "Nossa Torre caiu…");
+            }
+          } else if (x.tipo === "guarnicao") {
+            legenda(tituloBase, "As tropas de defesa saíram da Torre do Neuro!");
+            if (!souAtacante) falar("surpreso", "Guarnição, ao ataque! 🛡️");
+          }
         }
       }
-      const inicioMoedas = atacando ? 9.0 : 7.0;
-      const moedasDe = atacando ? DOCA.clone().setY(0.6) : cofrePos;
-      const moedasPara = atacando ? cofrePos : DOCA.clone().setY(0.6);
-      const voltam = atacando ? (venceu ? qtd : Math.max(1, Math.floor(qtd / 3))) : 0;
-      const duracao = atacando ? 11.0 : venceu ? 10.8 : 8.2;
-      const marcos = new Set();
-      const umaVez = (chave, fn) => { if (!marcos.has(chave)) { marcos.add(chave); fn(); } };
-      const legenda = (titulo, texto) => legendaRef.current?.({ alerta: atacando ? "ataque" : "defesa", titulo, texto, duracao });
-      const pos = new THREE.Vector3();
-      const castelo = () => predios.get("castelo")?.grupo;
+      sim = { grupo, inicio: performance.now(), aoTerminar, efeitos: [], ilhaTrocada, acumulado: 0, fimEm: null };
 
-      function marchar(g, de, para, u, tt, i, correndo = false) {
-        const d = g.userData.desvio;
-        const a = suave(u);
-        pos.lerpVectors(de, para, a).add(d);
-        const anda = u > 0 && u < 1;
-        const ritmo = correndo ? 17 : 11;
-        g.position.set(pos.x, anda ? Math.abs(Math.sin(tt * ritmo + i * 0.7)) * 0.08 : 0, pos.z);
-        g.rotation.y = Math.atan2(para.x - de.x, para.z - de.z);
-        const b = g.userData.boneco;
-        b.rotation.z = anda ? Math.sin(tt * ritmo + i * 0.7) * 0.12 : 0;
-        b.rotation.x = correndo && anda ? 0.3 : 0;
-        if (b.userData.pano) b.userData.pano.rotation.y = Math.sin(tt * 6) * 0.3;
+      function terminar() {
+        if (sim.fimEm != null) return;
+        const r = resultado || resultadoDo(e);
+        sim.fimEm = (performance.now() - sim.inicio) / 1000;
+        const venceuQuemJoga = souAtacante ? r.estrelas > 0 : r.estrelas === 0;
+        legendaRef.current?.({
+          alerta: venceuQuemJoga ? "vitoria" : "derrota",
+          titulo: souAtacante ? (r.estrelas ? `${estrelasTexto(r.estrelas)} VITÓRIA!` : "💥 A INVASÃO FALHOU") : (r.estrelas ? `💥 O REINO CAIU · ${estrelasTexto(r.estrelas)}` : "🛡️ VITÓRIA! O REINO RESISTIU"),
+          texto: `${r.destruicao}% destruído${r.saque ? ` · ${souAtacante ? "saque" : "perdemos"} 🪙 ${r.saque}` : ""}`,
+          duracao: 2.6,
+        });
+        falar(venceuQuemJoga ? "comemorando" : "triste", venceuQuemJoga ? (souAtacante ? "Vitória! 🏆" : "Defendemos o reino! 🛡️") : (souAtacante ? "Não deu dessa vez…" : "Levaram moedas…"));
+        if (venceuQuemJoga) for (let k = 0; k < 4; k++) faiscas(grupo, new THREE.Vector3((Math.random() - 0.5) * 4, 3 + Math.random(), (Math.random() - 0.5) * 4), 16, k % 2 ? "#ffd34d" : "#7cc46a", 3.5);
+        zoomAlvo = 1;
       }
-      const aparecer = (g, tt, de) => g.scale.setScalar(Math.max(0.001, fase(tt, de, de + 0.35)));
+      sim.pular = () => { while (!e.fim) aplicar(passoDoCombate(e)); terminar(); };
 
-      function atualizar(tt, dt) {
+      sim.atualizar = (tt, dt) => {
         atualizarEfeitos(dt);
-        if (atacando) roteiroDeAtaque(tt); else roteiroDeDefesa(tt);
-        for (const m of moedas) {
-          const u = (tt - inicioMoedas - m.atraso) / 1.1;
-          m.malha.visible = u > 0 && u < 1;
-          if (!m.malha.visible) continue;
-          m.malha.position.lerpVectors(moedasDe, moedasPara, u);
-          m.malha.position.addScaledVector(LADO, m.lado * Math.sin(u * Math.PI));
-          m.malha.position.y += Math.sin(u * Math.PI) * 1.8;
-          m.malha.rotation.set(tt * 7, tt * 5, 0);
-        }
-        if (tt >= duracao) encerrarSimulacao();
-      }
+        direitaDaCamera.set(Math.cos(vista.azimute), 0, -Math.sin(vista.azimute));
+        // o navio: chega, espera e vai embora no fim
+        // depois de desembarcar, o navio sai de cena (parado na frente, ele tapava a luta)
+        if (tt < INTRO) voar(barco, LONGE, DOCA, tt / INTRO, tt);
+        else if (tt < INTRO + 2.6) voar(barco, DOCA, LONGE, (tt - INTRO) / 2.6, tt);
+        else barco.visible = false;
 
-      // ---------------- defesa: navio inimigo, desembarque, flechas, portão, saque, fuga
-      function roteiroDeDefesa(tt) {
-        umaVez("alerta", () => { legenda("⚠️ SEU REINO ESTÁ SENDO ATACADO!", "Um navio inimigo se aproxima…"); zoomAlvo = 0.88; });
-        barco.visible = true;
-        if (tt < 2.4) voar(barco, LONGE, DOCA, fase(tt, 0.2, 2.4), tt);
-        else if (!venceu ? tt < 6.2 : tt < 9.4) voar(barco, DOCA, DOCA, 1, tt);
-        else voar(barco, DOCA, LONGE, fase(tt, venceu ? 9.4 : 6.2, venceu ? 10.8 : 8.0), tt);
-
-        if (tt > 2.4) umaVez("desembarque", () => {
-          legenda("⚠️ SEU REINO ESTÁ SENDO ATACADO!", "Os invasores desembarcaram!");
-          falar("surpreso", "Invasores! Às armas! 🏹");
-          fumaca(grupo, BORDA, 8);
-        });
-        if (tt > 3.0) umaVez("flechas", () => legenda("⚠️ SEU REINO ESTÁ SENDO ATACADO!", nivelTorre > 0 ? "Os Arqueiros abrem fogo! 🏹" : "A Torre do Neuro atira flechas! 🏹"));
-
-        soldados.forEach((g, i) => {
-          const morte = mortes.get(i);
-          if (morte != null && tt >= morte) {
-            const u = fase(tt, morte, morte + 0.3);
-            g.userData.boneco.rotation.x = (-u * Math.PI) / 2;
-            if (tt > morte + 0.9) umaVez(`poof${i}`, () => fumaca(grupo, g.position, 3, "#d9d9d9"));
-            g.scale.setScalar(Math.max(0.001, 1 - fase(tt, morte + 0.9, morte + 1.2)));
-            return;
-          }
-          if (tt < 2.4) { g.scale.setScalar(0.001); return; }
-          if (tt < 2.9) { // pulam do navio para a ilha
-            const u = fase(tt, 2.4, 2.9);
-            pos.lerpVectors(DOCA, BORDA, u).add(g.userData.desvio);
-            g.position.set(pos.x, Math.sin(u * Math.PI) * 0.5 + DOCA.y * (1 - u), pos.z);
-            aparecer(g, tt, 2.4);
-            return;
-          }
-          g.scale.setScalar(1);
-          if (tt < 6.0) { marchar(g, BORDA, casa, (tt - 2.9) / 3.1, tt, i, tt > 5.0); return; }
-          if (tt < 8.2) { // no portão: golpes de lança
-            marchar(g, BORDA, casa, 1, tt, i);
-            const b = g.userData.boneco;
-            if (b.userData.lanca) b.userData.lanca.position.z = Math.max(0, Math.sin(tt * 14 + i)) * 0.15;
-            return;
-          }
-          marchar(g, casa, BORDA, (tt - 8.2) / 1.0, tt, i, true); // fogem com o saque
-          if (tt > 9.2) { const u = fase(tt, 9.2, 9.5); pos.lerpVectors(BORDA, DOCA, u); g.position.set(pos.x + g.userData.desvio.x, DOCA.y * u + Math.sin(u * Math.PI) * 0.5, pos.z + g.userData.desvio.z); g.scale.setScalar(Math.max(0.001, 1 - u)); }
-        });
-
-        for (const fl of flechas) {
-          const u = (tt - fl.parte) / 0.55;
-          fl.malha.visible = u > 0 && u < 1;
-          if (!fl.malha.visible) continue;
-          const alvo = soldados[fl.alvo];
-          const chegada = alvo.position.clone().add(fl.acerta ? new THREE.Vector3(0, 0.3, 0) : fl.erro);
-          const atual = new THREE.Vector3().lerpVectors(atirador, chegada, u);
-          atual.y += Math.sin(u * Math.PI) * 1.4;
-          const prox = new THREE.Vector3().lerpVectors(atirador, chegada, Math.min(1, u + 0.05));
-          prox.y += Math.sin(Math.min(1, u + 0.05) * Math.PI) * 1.4;
-          fl.malha.position.copy(atual);
-          fl.malha.lookAt(prox);
-          if (!fl.acerta && u > 0.95) umaVez(`chao${fl.parte}`, () => faiscas(grupo, chegada.clone().setY(0.05), 4, "#c9b38a", 1.2));
+        if (tt >= INTRO && !e.fim) {
+          if (!sim.desembarcou) { sim.desembarcou = true; legenda(tituloBase, "As tropas desembarcaram!"); zoomAlvo = 1.15; }
+          sim.acumulado += dt * VELOCIDADE;
+          let passos = 0;
+          while (sim.acumulado >= DT && !e.fim && passos < 8) { aplicar(passoDoCombate(e)); sim.acumulado -= DT; passos++; }
+          const r = resultadoDo(e);
+          legenda(tituloBase, `${estrelasTexto(r.estrelas)} · ${r.destruicao}% destruído · ${Math.ceil(e.t)} s`);
+          if (e.fim) terminar();
         }
 
-        if (venceu) {
-          if (tt > 6.0) umaVez("portao", () => {
-            legenda("⚠️ SEU REINO ESTÁ SENDO ATACADO!", "Os invasores chegaram aos portões!");
-            tremor = 0.9; zoomAlvo = 1.12;
-          });
-          if (tt > 6.0 && tt < 7.4) {
-            umaVez(`faisca${Math.floor(tt * 5)}`, () => faiscas(grupo, casa.clone().setY(0.4), 8));
-            const c = castelo();
-            if (c) c.position.set(LUGARES.castelo[0] + Math.sin(tt * 40) * 0.04, 0, LUGARES.castelo[1] + Math.cos(tt * 37) * 0.04);
-          } else if (castelo()) castelo().position.set(LUGARES.castelo[0], 0, LUGARES.castelo[1]);
-          if (tt > 7.0) umaVez("saque", () => { legenda("💥 O REINO CAIU", "Estão saqueando o Cofre! 🪙"); falar("triste", "Levaram moedas do reino…"); zoomAlvo = 0.92; });
-          if (tt > 8.2) umaVez("fuga", () => legenda("💥 O REINO CAIU", "Eles fogem com o saque…"));
-        } else {
-          if (tt > 5.9) umaVez("vitoria", () => {
-            legenda("🛡️ VITÓRIA! O REINO RESISTIU", "O último invasor caiu. O navio foge vazio!");
-            falar("comemorando", "Defendemos o reino! 🛡️");
-            zoomAlvo = 1;
-          });
-          for (const [k, quando] of [[0, 6.1], [1, 6.5], [2, 6.9], [3, 7.3]]) {
-            if (tt > quando) umaVez(`fogos${k}`, () => faiscas(grupo, v3(LUGARES.castelo, 3.2 + k * 0.2).addScaledVector(LADO, (k - 1.5) * 0.6), 18, k % 2 ? "#ffd34d" : "#7cc46a", 3.5));
+        // tropas: andam até a posição do motor, balançam, golpeiam, caem
+        for (const u of e.unidades) {
+          const c = corpos.get(u.id);
+          if (!c) continue;
+          const m = c.malha;
+          const dx = u.x - m.position.x, dz = u.z - m.position.z;
+          const anda = Math.abs(dx) + Math.abs(dz) > 0.004;
+          m.position.x += dx * Math.min(1, dt * 12);
+          m.position.z += dz * Math.min(1, dt * 12);
+          const b = m.userData.boneco;
+          if (m.userData.folha) { m.userData.folha.rotation.y = vista.azimute; m.userData.folha.position.y = 0.55 + (anda ? Math.abs(Math.sin(tt * 10)) * 0.08 : 0); }
+          if (b) {
+            if (anda) m.rotation.y = Math.atan2(dx, dz);
+            if (u.tipo === "dragao") { for (const asa of b.userData.asas) asa.rotation.z = Math.sin(tt * 9) * 0.5 * (asa.position.x > 0 ? 1 : -1); b.position.y = 1.7 + Math.sin(tt * 3) * 0.1; }
+            else { b.rotation.z = anda ? Math.sin(tt * 12 + u.x) * 0.12 : 0; m.position.y = anda ? Math.abs(Math.sin(tt * 12 + u.z)) * 0.06 : 0; }
+            if (c.golpe > 0) { c.golpe -= dt; b.position.z = c.golpe > 0 ? 0.12 : 0; if (b.userData.lanca) b.userData.lanca.rotation.x = c.golpe > 0 ? 0.8 : 0; }
           }
+          if (c.caiu) {
+            c.caiu += dt;
+            if (b) b.rotation.x = -Math.min(1, c.caiu / 0.3) * (Math.PI / 2);
+            m.scale.setScalar(Math.max(0.001, 1 - Math.max(0, c.caiu - 0.7) / 0.35));
+            c.barra.visible = false;
+            continue;
+          }
+          const alto = u.voa ? 2.5 : u.tipo === "gigante" ? 1.6 : u.tipo === "heroi" ? 1.35 : 0.95;
+          posicionarBarra(c.barra, m.position.x, alto, m.position.z, u.vida / u.vidaMax, u.lado === meuLado ? matBarra.aliado : matBarra.inimigo);
         }
-      }
-
-      // ---------------- ataque: formação, embarque, viagem, batalha ao longe, volta, saque
-      function roteiroDeAtaque(tt) {
-        umaVez("alerta", () => { legenda("⚔️ BATALHA EM ANDAMENTO", "Tropas, formar!"); zoomAlvo = 0.88; soldados.forEach((g) => fumaca(grupo, casa.clone().add(g.userData.desvio), 1)); });
-        barco.visible = true;
-        const subida = DOCA.clone().setY(-2.6);
-        if (tt < 3.4) voar(barco, subida, DOCA, fase(tt, 0, 1.2), tt);
-        else if (tt < 5.2) voar(barco, DOCA, LONGE, fase(tt, 3.4, 5.2), tt);
-        else if (tt < 7.2) { voar(barco, LONGE, LONGE, 1, tt); barco.visible = false; }
-        else if (tt < 10.0) voar(barco, LONGE, DOCA, fase(tt, 7.2, 8.8), tt, venceu ? 0 : 0.35);
-        else voar(barco, DOCA, subida, fase(tt, 10.0, 10.9), tt);
-
-        if (tt > 0.8) umaVez("marcha", () => legenda("⚔️ BATALHA EM ANDAMENTO", "As tropas marcham para o navio"));
-        if (tt > 3.4) umaVez("parte", () => { legenda("⚔️ BATALHA EM ANDAMENTO", "Rumo ao reino rival! ⛵"); falar("pensando", "Lá vão eles… ⚔️"); });
-        if (tt > 5.2) umaVez("longe", () => legenda("⚔️ BATALHA EM ANDAMENTO", "A batalha está acontecendo no reino rival…"));
-        if (tt > 5.2 && tt < 7.2) {
-          umaVez(`clarao${Math.floor(tt * 4)}`, () => {
-            const onde = LONGE.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.6, -1.5 + Math.random(), (Math.random() - 0.5) * 1.6));
-            faiscas(grupo, onde, 10, Math.random() > 0.5 ? "#ffb347" : "#ffd34d", 2.5);
-            if (Math.random() > 0.5) fumaca(grupo, onde, 2, "#9a9a9a");
-          });
+        // barras das construções (só aparecem quando apanham)
+        for (const pr of [...e.predios, ...(e.muralha ? [e.muralha] : [])]) {
+          const b = barrasDePredio.get(pr.id);
+          if (!pr.vivo) { b.visible = false; continue; }
+          const pos = pr.chave === "muralha" ? new THREE.Vector3(e.castelo.x + 1.24, 0, e.castelo.z + 1.24) : v3(LUGARES[pr.chave]);
+          const topo = predios.get(pr.chave)?.ancora?.y ?? 1.5;
+          posicionarBarra(b, pos.x, (pr.chave === "muralha" ? 1.1 : topo) + 0.1, pos.z, pr.vida / pr.vidaMax, souAtacante ? matBarra.inimigo : matBarra.predio);
         }
-        if (tt > 7.2) umaVez("volta", () => legenda("⚔️ BATALHA EM ANDAMENTO", venceu ? "O navio está voltando… vitorioso!" : "O navio está voltando… avariado"));
-        if (!venceu && tt > 7.2 && tt < 8.8) umaVez(`rastro${Math.floor(tt * 5)}`, () => fumaca(grupo, barco.position.clone().add(new THREE.Vector3(0, 0.4, 0)), 1, "#6b6b6b"));
-        if (tt > 9.0) umaVez("fim", () => {
-          if (venceu) { legenda("🏆 VITÓRIA!", "Trouxemos o saque para o Cofre! 🪙"); falar("comemorando", "Vitória! Trouxemos moedas! 🪙"); faiscas(grupo, cofrePos.clone().setY(1.6), 20, "#ffd34d", 3); }
-          else { legenda("💥 DERROTA", "A defesa deles segurou… voltaram poucos."); falar("triste", "Perdemos dessa vez…"); }
-        });
-
-        soldados.forEach((g, i) => {
-          if (tt < 2.8) { aparecer(g, tt, 0.1 + i * 0.05); marchar(g, casa, BORDA, (tt - 0.6) / 2.2, tt, i); return; }
-          if (tt < 3.3) { // embarcam
-            const u = fase(tt, 2.8, 3.3);
-            pos.lerpVectors(BORDA, DOCA, u).add(g.userData.desvio);
-            g.position.set(pos.x, DOCA.y * u + Math.sin(u * Math.PI) * 0.5, pos.z);
-            g.scale.setScalar(Math.max(0.001, 1 - u));
-            return;
-          }
-          if (tt < 8.8 || i >= voltam) { g.scale.setScalar(0.001); return; }
-          if (tt < 9.2) { // desembarcam os que voltaram
-            const u = fase(tt, 8.8, 9.2);
-            pos.lerpVectors(DOCA, BORDA, u).add(g.userData.desvio);
-            g.position.set(pos.x, DOCA.y * (1 - u) + Math.sin(u * Math.PI) * 0.5, pos.z);
-            g.scale.setScalar(Math.max(0.001, u));
-            return;
-          }
-          g.scale.setScalar(Math.max(0.001, 1 - fase(tt, 10.6, 10.95)));
-          marchar(g, BORDA, casa, (tt - 9.2) / 1.4, tt, i);
-        });
-      }
-
-      sim = { grupo, inicio: performance.now(), atualizar, aoTerminar, efeitos: [] };
+        if (sim.fimEm != null && tt - sim.fimEm > 2.8) encerrarSimulacao();
+      };
     }
 
-    const aoSimular = (e) => {
+    const aoCombate = (e) => {
       if (semMovimento || !e.detail) return;
       e.detail.aceito = true;
-      iniciarSimulacao(e.detail);
+      iniciarCombate(e.detail);
     };
-    window.addEventListener("reino-simular", aoSimular);
+    window.addEventListener("reino-combate", aoCombate);
+    const aoPular = () => sim?.pular?.();
+    window.addEventListener("reino-combate-pular", aoPular);
 
     // o laço: só desenha com a tela visível
     const observaVisao = new IntersectionObserver(([e]) => { visivel = e.isIntersecting; });
@@ -1079,13 +1118,16 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
 
     return () => {
       cancelAnimationFrame(quadroId);
-      window.removeEventListener("reino-simular", aoSimular);
+      window.removeEventListener("reino-combate", aoCombate);
+      window.removeEventListener("reino-combate-pular", aoPular);
       if (sim) {
         mundo.remove(sim.grupo);
         sim.grupo.traverse((m) => { if (m.userData?.proprio) m.material.dispose(); });
         sim = null;
       }
       for (const g of Object.values(geo)) g.dispose();
+      for (const m of Object.values(matBarra)) m.dispose();
+      matFogo.dispose();
       observaTamanho.disconnect();
       observaVisao.disconnect();
       observaTema.disconnect();
@@ -1154,6 +1196,9 @@ export default function Mundo3D({ construcoes, humor = "normal", aoEscolher, aoF
           <span className="rn-mundo__progresso" aria-hidden="true">
             <span key={legenda.alerta + legenda.duracao} style={{ animationDuration: `${legenda.duracao}s` }} />
           </span>
+          {legenda.pular && (
+            <button type="button" className="rn-mundo__pular" onClick={() => window.dispatchEvent(new CustomEvent("reino-combate-pular"))}>⏭ Pular para o resultado</button>
+          )}
         </div>
       )}
       <div ref={fala} className={`rn-mundo__fala${texto ? " rn-mundo__fala--visivel" : ""}`} role="status">{texto}</div>

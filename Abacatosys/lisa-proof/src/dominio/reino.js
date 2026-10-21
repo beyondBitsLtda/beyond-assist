@@ -1,65 +1,80 @@
-// O REINO DO NEURO: as regras do jogo (pedido de 20/10/2026). Puro — o banco mora em src/lib/reino.js.
+// O REINO DO NEURO: as regras do jogo (pedido de 20/10/2026; combate no estilo Clash em 21/10).
+// Puro — o banco mora em src/lib/reino.js; a batalha passo a passo, em src/dominio/combate.js; as
+// tropas, em src/dominio/tropas.js.
 //
-// A ideia em uma frase: estudar dá moedas; moedas constroem e melhoram o reino e sobem o Neuro;
-// o reino pode invadir e ser invadido por outros jogadores.
+// A ideia em uma frase: estudar dá moedas; moedas constroem o reino, treinam tropas e sobem o
+// Neuro; o reino invade e é invadido por outros jogadores.
 //
-//   MOEDAS   — cada ponto de estudo vale 1 moeda (quiz, exercício, projetos, tarefas, metas,
-//              conquistas). Mais a mina, os saques e menos os gastos. Pontos NÃO se gastam: o
-//              ranking de pontos nunca cai por causa do reino.
-//   TORRE    — o coração do reino. O nível dela é o teto das outras construções, e o do Neuro é
-//              o dobro dela.
-//   MINA     — produz moedas sozinha, devagar (ela ajuda, não substitui o estudo), até encher.
-//   COFRE    — guarda moedas que nenhuma invasão leva.
-//   MURALHA e TORRE DE ARQUEIROS — defesa.   QUARTEL — ataque.   NEURO — ataque e defesa.
-//   INVASÃO  — 3 por dia. Força contra força, com uma sorte de ±15%. Quem vence leva 15% das
-//              moedas que estão fora do cofre (até 250) e troféus; quem perde a defesa ganha um
-//              escudo de 8 horas. Reino novo nasce com escudo de 48 horas. Atacar tira o
-//              próprio escudo.
+//   MOEDAS    — cada ponto de estudo vale 1 moeda. Mais a mina, os saques e os vales, menos os
+//               gastos. Pontos NÃO se gastam: o ranking de pontos nunca cai por causa do reino.
+//   TORRE     — o coração do reino: o nível dela é o teto das outras construções, o do Neuro é o
+//               dobro dela, e nela mora a guarnição (tropas de defesa).
+//   MINA      — produz moedas sozinha, devagar, até encher.   COFRE — guarda moedas do saque.
+//   DEFESAS   — Torre de Arqueiros (chão e ar), Canhão (só chão), Muralha (cerca a Torre).
+//   QUARTEL   — treina o exército e define quantas tropas cabem nele.
+//   INVASÃO   — 3 por dia, uma por reino, com o exército inteiro (que é gasto). Estrelas pela
+//               destruição; o saque e os troféus seguem as estrelas. Quem cai ganha 8 h de escudo;
+//               reino novo nasce com 48 h; atacar tira o próprio escudo.
+
+import { PREDIOS_EM_COMBATE, resolverCombate } from "./combate.js";
+import {
+  capacidadeDoExercito, capacidadeDaGuarnicao, contagens, totalDeTropas, danoPorSegundo, espacoUsado, TROPAS,
+} from "./tropas.js";
+
+const def = (chave) => PREDIOS_EM_COMBATE[chave].defesa;
+const virgula = (x) => String(x).replace(".", ",");
 
 export const CONSTRUCOES = {
   castelo: {
     nome: "Torre do Neuro", emoji: "🏰", max: 5,
     // custo para CHEGAR a cada nível (índice 0 = nível 1). A torre já nasce no nível 1.
     custos: [0, 300, 700, 1500, 3000],
-    efeito: (n) => `limite das construções: nível ${n} · Neuro até o nível ${n * 2}`,
+    efeito: (n) => `limite das construções: nível ${n} · Neuro até o ${n * 2} · ${capacidadeDaGuarnicao(n)} de espaço para tropas de defesa · ❤️ ${PREDIOS_EM_COMBATE.castelo.vida(n)}`,
   },
   mina: {
     nome: "Mina de Moedas", emoji: "⛏️", max: 5,
     custos: [0, 120, 280, 600, 1200],
-    efeito: (n) => `${producaoPorHora(n)} moeda(s) por hora · enche em ${HORAS_ATE_ENCHER} h (${capacidadeDaMina(n)})`,
+    efeito: (n) => `${producaoPorHora(n)} moeda(s) por hora · enche em ${HORAS_ATE_ENCHER} h (${capacidadeDaMina(n)}) · ❤️ ${PREDIOS_EM_COMBATE.mina.vida(n)}`,
   },
   cofre: {
     nome: "Cofre", emoji: "🏦", max: 5,
     custos: [80, 200, 450, 900, 1800],
-    efeito: (n) => `${protecaoDoCofre(n)} moedas a salvo de invasões`,
+    efeito: (n) => `${protecaoDoCofre(n)} moedas a salvo de invasões · ❤️ ${PREDIOS_EM_COMBATE.cofre.vida(n)}`,
   },
   muralha: {
     nome: "Muralha", emoji: "🧱", max: 5,
     custos: [100, 240, 520, 1000, 2000],
-    efeito: (n) => `+${n * 12} de defesa`,
+    efeito: (n) => `cerca a Torre do Neuro: quem ataca de perto, por terra, precisa derrubá-la antes · ❤️ ${PREDIOS_EM_COMBATE.muralha.vida(n)}`,
   },
   torre: {
     nome: "Torre de Arqueiros", emoji: "🏹", max: 5,
     custos: [120, 280, 600, 1200, 2400],
-    efeito: (n) => `+${n * 10} de defesa`,
+    efeito: (n) => `${def("torre")(n).dano} de dano a cada ${virgula(def("torre")(n).intervalo)} s · alcance ${virgula(def("torre")(n).alcance)} · acerta no chão e no ar · ❤️ ${PREDIOS_EM_COMBATE.torre.vida(n)}`,
+  },
+  canhao: {
+    nome: "Canhão", emoji: "💣", max: 5,
+    custos: [100, 250, 550, 1100, 2200],
+    efeito: (n) => `${def("canhao")(n).dano} de dano a cada ${virgula(def("canhao")(n).intervalo)} s · alcance ${virgula(def("canhao")(n).alcance)} · só tropas no chão · ❤️ ${PREDIOS_EM_COMBATE.canhao.vida(n)}`,
   },
   quartel: {
     nome: "Quartel", emoji: "⚔️", max: 5,
     custos: [120, 280, 600, 1200, 2400],
-    efeito: (n) => `+${n * 14} de ataque`,
+    efeito: (n) => `exército de ${capacidadeDoExercito(n)} de espaço · libera ${Object.values(TROPAS).filter((t) => t.nivelMinimo <= n).map((t) => t.nome).join(", ")} · ❤️ ${PREDIOS_EM_COMBATE.quartel.vida(n)}`,
   },
 };
-export const ORDEM_DAS_CONSTRUCOES = ["castelo", "mina", "cofre", "muralha", "torre", "quartel"];
-export const NIVEIS_INICIAIS = { castelo: 1, mina: 1, cofre: 0, muralha: 0, torre: 0, quartel: 0 };
+export const ORDEM_DAS_CONSTRUCOES = ["castelo", "mina", "cofre", "muralha", "torre", "canhao", "quartel"];
+export const NIVEIS_INICIAIS = { castelo: 1, mina: 1, cofre: 0, muralha: 0, torre: 0, canhao: 0, quartel: 0 };
 
 export const HORAS_ATE_ENCHER = 12;
 export const ATAQUES_POR_DIA = 3;
-export const FATIA_DO_SAQUE = 0.15;
-export const TETO_DO_SAQUE = 250;
-export const SORTE = 0.15;
+export const FATIA_DO_SAQUE = 0.2;   // de tudo o que está fora do cofre, se destruir 100%
+export const TETO_DO_SAQUE = 300;
 export const ESCUDO_APOS_DERROTA_HORAS = 8;
 export const ESCUDO_DE_NOVATO_HORAS = 48;
-export const TROFEUS = { vitoriaAtacante: 10, derrotaDefensor: -5, defesaVencida: 5, ataqueFalho: -3 };
+/** Troféus por estrelas: quem ataca ganha 4 por estrela + 2 (ou perde 3 com zero); quem defende perde 2 por estrela + 1 (ou ganha 5). */
+export function trofeusDoCombate(estrelas) {
+  return estrelas > 0 ? { atacante: 4 * estrelas + 2, defensor: -(2 * estrelas + 1) } : { atacante: -3, defensor: 5 };
+}
 
 export const producaoPorHora = (nivelDaMina) => Math.max(0, nivelDaMina);
 export const capacidadeDaMina = (nivelDaMina) => producaoPorHora(nivelDaMina) * HORAS_ATE_ENCHER;
@@ -78,16 +93,22 @@ export function niveisDe(reino) {
   return { ...NIVEIS_INICIAIS, ...(reino?.construcoes || {}) };
 }
 
-/** Quanto cada coisa soma na força (as regras da tela leem daqui também). */
-export const PESOS = { base: 10, quartel: 14, neuroAtaque: 8, muralha: 12, torre: 10, neuroDefesa: 6 };
-
-/** Força de ataque e de defesa do reino. */
+/**
+ * Força para a tela comparar: ataque = dano por segundo do exército + Neuro; defesa = dano por
+ * segundo das defesas e da guarnição, mais um tanto pela vida das construções.
+ */
 export function poderDo(reino) {
   const n = niveisDe(reino);
-  const neuro = reino?.neuro_nivel || 1;
+  let defesas = 0, vida = 0;
+  for (const chave of ["castelo", "mina", "cofre", "quartel", "torre", "canhao", "muralha"]) {
+    if ((n[chave] || 0) < 1) continue;
+    const est = PREDIOS_EM_COMBATE[chave];
+    vida += est.vida(n[chave]);
+    if (est.defesa) { const d = est.defesa(n[chave]); defesas += d.dano / d.intervalo; }
+  }
   return {
-    ataque: PESOS.base + n.quartel * PESOS.quartel + neuro * PESOS.neuroAtaque,
-    defesa: PESOS.base + n.muralha * PESOS.muralha + n.torre * PESOS.torre + neuro * PESOS.neuroDefesa,
+    ataque: danoPorSegundo(reino?.exercito, reino?.neuro_nivel || 1, "ataque"),
+    defesa: Math.round(defesas + danoPorSegundo(reino?.guarnicao, reino?.neuro_nivel || 1, "defesa") + vida / 100),
   };
 }
 
@@ -96,12 +117,12 @@ export function poderDo(reino) {
  * Regra do teto: nenhuma construção passa do nível da Torre do Neuro.
  */
 export function podeMelhorar(reino, chave, saldo) {
-  const def = CONSTRUCOES[chave];
-  if (!def) return { ok: false, motivo: "construção desconhecida" };
+  const d = CONSTRUCOES[chave];
+  if (!d) return { ok: false, motivo: "construção desconhecida" };
   const n = niveisDe(reino);
   const atual = n[chave] || 0;
-  if (atual >= def.max) return { ok: false, motivo: "já está no nível máximo" };
-  const custo = def.custos[atual];
+  if (atual >= d.max) return { ok: false, motivo: "já está no nível máximo" };
+  const custo = d.custos[atual];
   if (chave !== "castelo" && atual + 1 > n.castelo) {
     return { ok: false, custo, motivo: `melhore a ${CONSTRUCOES.castelo.nome} para o nível ${atual + 1} primeiro` };
   }
@@ -137,36 +158,47 @@ export function temEscudo(reino, agora = new Date()) {
  * Pode invadir `defensor`? `ataquesHoje` são as invasões do atacante no dia; `jaAtacouHoje` diz se
  * ele já atacou ESTE defensor hoje (uma vez por alvo por dia: ninguém vira saco de pancada).
  */
-export function podeInvadir({ atacanteId, defensor, ataquesHoje, jaAtacouHoje, agora = new Date() }) {
+export function podeInvadir({ atacanteId, atacante, defensor, ataquesHoje, jaAtacouHoje, agora = new Date() }) {
   if (!defensor) return { ok: false, motivo: "esse reino não existe" };
   if (defensor.usuario_id === atacanteId) return { ok: false, motivo: "não dá para invadir o próprio reino" };
+  if (atacante && totalDeTropas(atacante.exercito) === 0) return { ok: false, motivo: "treine tropas no Quartel antes de invadir" };
   if (ataquesHoje >= ATAQUES_POR_DIA) return { ok: false, motivo: `você já fez as ${ATAQUES_POR_DIA} invasões de hoje — amanhã tem mais` };
   if (jaAtacouHoje) return { ok: false, motivo: "você já invadiu esse reino hoje" };
   if (temEscudo(defensor, agora)) return { ok: false, motivo: "esse reino está com escudo" };
   return { ok: true };
 }
 
-/**
- * A batalha. `sorteA`/`sorteD` são números em [0, 1) (o servidor sorteia; o teste fixa).
- * Cada lado rola a sua força com ±SORTE. Empate é da defesa.
- */
-export function batalha({ atacante, defensor, saldoDoDefensor, sorteA, sorteD }) {
-  const pa = poderDo(atacante);
-  const pd = poderDo(defensor);
-  const fator = fatorDaSorte;
-  const ataque = Math.round(pa.ataque * fator(sorteA));
-  const defesa = Math.round(pd.defesa * fator(sorteD));
-  const venceu = ataque > defesa;
-
-  const protegido = protecaoDoCofre(niveisDe(defensor).cofre);
+/** O saque segue a destruição: 20% do que está fora do cofre se destruir tudo, até 300. */
+export function saqueDo({ destruicao, saldoDoDefensor, nivelDoCofre }) {
+  const protegido = protecaoDoCofre(nivelDoCofre);
   const exposto = Math.max(0, (saldoDoDefensor || 0) - protegido);
-  const saque = venceu ? Math.min(TETO_DO_SAQUE, Math.floor(exposto * FATIA_DO_SAQUE)) : 0;
+  const saque = Math.min(TETO_DO_SAQUE, Math.floor((exposto * FATIA_DO_SAQUE * destruicao) / 100));
+  return { protegido, exposto, saque };
+}
 
+/**
+ * A batalha de verdade: roda o combate e transforma estrelas em saque, troféus e escudo.
+ * `atacante`: { exercito, neuro_nivel }; `defensor`: o reino ({ construcoes, neuro_nivel, guarnicao }).
+ */
+export function batalha({ atacante, defensor, saldoDoDefensor, semente }) {
+  const entrada = combateDe({ atacante, defensor, semente });
+  const r = resolverCombate(entrada);
+  const venceu = r.estrelas > 0;
+  const { protegido, exposto, saque } = saqueDo({ destruicao: r.destruicao, saldoDoDefensor, nivelDoCofre: niveisDe(defensor).cofre });
+  const t = trofeusDoCombate(r.estrelas);
   return {
-    ataque, defesa, venceu, saque, protegido, exposto,
-    trofeusAtacante: venceu ? TROFEUS.vitoriaAtacante : TROFEUS.ataqueFalho,
-    trofeusDefensor: venceu ? TROFEUS.derrotaDefensor : TROFEUS.defesaVencida,
+    ...r, venceu, saque: venceu ? saque : 0, protegido, exposto, entrada,
+    trofeusAtacante: t.atacante, trofeusDefensor: t.defensor,
     escudoDoDefensorHoras: venceu ? ESCUDO_APOS_DERROTA_HORAS : 0,
+  };
+}
+
+/** O que o motor de combate precisa (e o que a tela guarda para mostrar a batalha de novo). */
+export function combateDe({ atacante, defensor, semente }) {
+  return {
+    semente: semente >>> 0 || 1,
+    atacante: { exercito: contagens(atacante?.exercito), neuro_nivel: atacante?.neuro_nivel || 1 },
+    defensor: { construcoes: niveisDe(defensor), neuro_nivel: defensor?.neuro_nivel || 1, guarnicao: contagens(defensor?.guarnicao) },
   };
 }
 
@@ -180,61 +212,85 @@ export function saldoDe({ pontosDeEstudo, movimentos }) {
 
 /** Para a lista de alvos: um retrato aproximado da defesa (o número exato só aparece na batalha). */
 export function faixaDeDefesa(defesa) {
-  if (defesa < 40) return "fraca";
+  if (defesa < 35) return "fraca";
   if (defesa < 80) return "média";
-  if (defesa < 130) return "forte";
+  if (defesa < 140) return "forte";
   return "fortíssima";
 }
 
 // ------------------------------------------------------------------ modo simulação
-// Treino: as mesmas contas da invasão de verdade (batalha), contra um rival de mentira, sem
-// tocar no banco. Serve para a pessoa entender o jogo antes de arriscar moedas e troféus.
+// Treino: a mesma batalha da invasão de verdade, contra um rival de mentira, sem tocar no banco.
 
 export const RIVAIS_SIMULADOS = {
-  fraco: { nome: "Rival mais fraco", passo: -1 },
-  parelho: { nome: "Rival parelho", passo: 0 },
-  forte: { nome: "Rival mais forte", passo: 1 },
+  fraco: { nome: "Rival mais fraco", passo: -1, enchimento: 0.4 },
+  parelho: { nome: "Rival parelho", passo: 0, enchimento: 0.7 },
+  forte: { nome: "Rival mais forte", passo: 1, enchimento: 1 },
 };
 
-/** Um rival tirado do meu reino: um nível a menos/a mais nas construções de briga e no cofre. */
+/**
+ * Um exército que enche `fracao` do Quartel: um dragão se o Quartel deixar, um quarto do espaço
+ * em gigantes, e o resto dividido entre guerreiros e arqueiras.
+ */
+export function exercitoDeTreino(nivelDoQuartel, fracao = 1) {
+  const q = Math.max(1, nivelDoQuartel || 0);
+  let livre = Math.floor(capacidadeDoExercito(q) * fracao);
+  const ex = {};
+  if (q >= TROPAS.dragao.nivelMinimo && livre >= 40) { ex.dragao = 1; livre -= TROPAS.dragao.espaco; }
+  if (q >= TROPAS.gigante.nivelMinimo) { const g = Math.floor((livre * 0.25) / TROPAS.gigante.espaco); if (g) { ex.gigante = g; livre -= g * TROPAS.gigante.espaco; } }
+  ex.guerreiro = Math.ceil(livre * 0.6);
+  ex.arqueira = Math.max(0, livre - ex.guerreiro);
+  return contagens(ex);
+}
+
+/** Tropas de defesa que enchem `fracao` da guarnição (metade guerreiros, metade arqueiras). */
+export function guarnicaoDeTreino(nivelDaTorre, fracao = 1) {
+  const livre = Math.floor(capacidadeDaGuarnicao(nivelDaTorre) * fracao);
+  return contagens({ guerreiro: Math.ceil(livre / 2), arqueira: Math.floor(livre / 2) });
+}
+
+/** Um rival tirado do meu reino: tudo um nível abaixo/acima, com exército e guarnição. */
 export function rivalSimulado(base, forca = "parelho") {
-  const passo = RIVAIS_SIMULADOS[forca]?.passo ?? 0;
+  const { passo, enchimento } = RIVAIS_SIMULADOS[forca] || RIVAIS_SIMULADOS.parelho;
   const n = niveisDe(base);
-  const ajustar = (v) => Math.max(0, Math.min(5, v + passo));
+  const construcoes = {};
+  for (const chave of ORDEM_DAS_CONSTRUCOES) {
+    construcoes[chave] = Math.max(chave === "castelo" || chave === "mina" ? 1 : 0, Math.min(5, (n[chave] || 0) + passo));
+  }
+  // um rival de treino sempre tem alguma defesa e algum exército, para a batalha ter graça
+  if (forca !== "fraco") { construcoes.torre = Math.max(1, construcoes.torre); construcoes.quartel = Math.max(1, construcoes.quartel); }
+  const neuro = Math.max(1, Math.min(10, (base?.neuro_nivel || 1) + passo * 2));
   return {
-    construcoes: { ...n, quartel: ajustar(n.quartel), muralha: ajustar(n.muralha), torre: ajustar(n.torre), cofre: ajustar(n.cofre) },
-    neuro_nivel: Math.max(1, Math.min(10, (base?.neuro_nivel || 1) + passo * 2)),
+    construcoes, neuro_nivel: neuro,
+    exercito: exercitoDeTreino(construcoes.quartel, enchimento),
+    guarnicao: guarnicaoDeTreino(construcoes.castelo, enchimento * 0.6),
   };
 }
 
-/** Em quantas de cada 100 batalhas o atacante vence (sorteando a sorte de cada lado). */
-export function chanceDeVitoria(atacante, defensor, vezes = 2000, sortear = Math.random) {
-  let vitorias = 0;
-  for (let i = 0; i < vezes; i++) {
-    if (batalha({ atacante, defensor, saldoDoDefensor: 0, sorteA: sortear(), sorteD: sortear() }).venceu) vitorias++;
-  }
-  return Math.round((vitorias / vezes) * 100);
-}
-
-/** O fator de sorte que uma rolagem em [0, 1) aplicou (0,85 a 1,15). */
-export const fatorDaSorte = (rolagem) => 1 - SORTE + 2 * SORTE * rolagem;
-
 /**
- * Uma batalha de treino, com o passo a passo para a tela. `tipo`: "atacar" (eu invado o rival)
- * ou "defender" (o rival invade o meu reino). `saldoDoRival` é imaginário; no "defender" vale o
- * meu saldo de verdade, para mostrar quanto eu perderia.
+ * Uma batalha de treino, do lado de quem joga. `tipo`: "atacar" (eu invado o rival, com o meu
+ * exército — ou um de treino, se o meu estiver vazio) ou "defender" (o rival invade o meu reino).
  */
-export function simularBatalha({ tipo, eu, rival, meuSaldo, saldoDoRival = 500, sorteA, sorteD }) {
-  const atacante = tipo === "atacar" ? eu : rival;
+export function simularBatalha({ tipo, eu, rival, meuSaldo, saldoDoRival = 500, semente }) {
+  const meuExercito = totalDeTropas(eu.exercito) ? eu.exercito : exercitoDeTreino(niveisDe(eu).quartel, 1);
+  const atacante = tipo === "atacar" ? { exercito: meuExercito, neuro_nivel: eu.neuro_nivel } : { exercito: rival.exercito, neuro_nivel: rival.neuro_nivel };
   const defensor = tipo === "atacar" ? rival : eu;
   const saldoDoDefensor = tipo === "atacar" ? saldoDoRival : meuSaldo;
-  const r = batalha({ atacante, defensor, saldoDoDefensor, sorteA, sorteD });
+  const r = batalha({ atacante, defensor, saldoDoDefensor, semente });
   return {
     ...r, tipo, saldoDoDefensor,
-    poderAtacante: poderDo(atacante), poderDefensor: poderDo(defensor),
-    fatorA: fatorDaSorte(sorteA), fatorD: fatorDaSorte(sorteD),
+    exercitoDeTreino: tipo === "atacar" && !totalDeTropas(eu.exercito),
+    exercitoUsado: atacante.exercito,
     euVenci: tipo === "atacar" ? r.venceu : !r.venceu,
     meusTrofeus: tipo === "atacar" ? r.trofeusAtacante : r.trofeusDefensor,
     minhasMoedas: tipo === "atacar" ? r.saque : r.saque ? -r.saque : 0,
   };
 }
+
+/** Quantas estrelas em média (de 0 a 3) em `vezes` batalhas com sementes diferentes. */
+export function previsaoDeEstrelas(entrada, vezes = 8) {
+  let soma = 0;
+  for (let i = 1; i <= vezes; i++) soma += resolverCombate({ ...entrada, semente: i * 7919 }).estrelas;
+  return Math.round((soma / vezes) * 10) / 10;
+}
+
+export { espacoUsado };
