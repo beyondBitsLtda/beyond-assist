@@ -21,8 +21,12 @@ import {
   protecaoDoCofre, temEscudo, podeInvadir, batalha, somarTrofeus, saldoDe, faixaDeDefesa,
   custoDoNeuro, nivelMaximoDoNeuro, estagioDoNeuro,
 } from "@/dominio/reino.js";
+import {
+  TROPAS, ORDEM_DAS_TROPAS, RESERVAS, contagens, espacoUsado, capacidadeDoExercito, capacidadeDaGuarnicao,
+  podeTreinar, somarTropas, heroiNeuro,
+} from "@/dominio/tropas.js";
 
-const CAMPOS = "usuario_id, nome, neuro_nivel, construcoes, coletado_em, escudo_ate, trofeus, versao, criado_em";
+const CAMPOS = "usuario_id, nome, neuro_nivel, construcoes, exercito, guarnicao, coletado_em, escudo_ate, trofeus, versao, criado_em";
 const HORA = 3_600_000;
 
 function falhou(error, onde) {
@@ -31,10 +35,10 @@ function falhou(error, onde) {
 
 const conflito = () => new ErroDeAcesso(409, "o reino mudou enquanto você mexia — tente de novo");
 
-/** Um número em [0, 1) de sorteio de verdade (não Math.random: é ele que decide batalhas). */
-function sorteio() {
+/** A semente da batalha: um sorteio de verdade (não Math.random), que decide a luta inteira. */
+function semente() {
   const [n] = crypto.getRandomValues(new Uint32Array(1));
-  return n / 2 ** 32;
+  return n || 1;
 }
 
 // ---------------------------------------------------------------- leitura
@@ -95,7 +99,7 @@ export async function estadoDoReino(usuarioId) {
     saldoDoUsuario(usuarioId),
     invasoesDeHoje(usuarioId),
     supabase.from("proof_invasoes")
-      .select("id, atacante_id, defensor_id, ataque, defesa, venceu, saque, trofeus_atacante, trofeus_defensor, criado_em")
+      .select("id, atacante_id, defensor_id, ataque, defesa, venceu, saque, trofeus_atacante, trofeus_defensor, estrelas, destruicao, combate, criado_em")
       .or(`atacante_id.eq.${usuarioId},defensor_id.eq.${usuarioId}`)
       .order("criado_em", { ascending: false }).limit(15),
   ]);
@@ -136,6 +140,9 @@ export async function estadoDoReino(usuarioId) {
       };
     }),
     invasoes: { feitasHoje: hoje.length, porDia: ATAQUES_POR_DIA },
+    exercito: reservaParaTela("exercito", reino, n, saldo),
+    guarnicao: reservaParaTela("guarnicao", reino, n, saldo),
+    heroi: { ataque: heroiNeuro(reino.neuro_nivel, "ataque"), defesa: heroiNeuro(reino.neuro_nivel, "defesa") },
     batalhas: batalhas.map((b) => {
       const ataquei = b.atacante_id === usuarioId;
       return {
@@ -146,6 +153,32 @@ export async function estadoDoReino(usuarioId) {
         ganhei: ataquei ? b.venceu : !b.venceu,
         moedas: b.saque ? (ataquei ? b.saque : -b.saque) : 0,
         trofeus: ataquei ? b.trofeus_atacante : b.trofeus_defensor,
+        estrelas: b.estrelas, destruicao: b.destruicao,
+        // a receita da batalha (só as novas têm): a tela roda a mesma simulação e mostra a luta
+        combate: b.combate || null,
+        resultado: b.combate ? { estrelas: b.estrelas, destruicao: b.destruicao, venceu: b.venceu, saque: b.saque } : null,
+      };
+    }),
+  };
+}
+
+/** Exército ou guarnição: o que tem, quanto cabe e o que dá para treinar agora. */
+function reservaParaTela(destino, reino, n, saldo) {
+  const tropas = contagens(reino[destino]);
+  const nivel = destino === "exercito" ? n.quartel : n.castelo;
+  const capacidade = destino === "exercito" ? capacidadeDoExercito(nivel) : capacidadeDaGuarnicao(nivel);
+  const reservas = { exercito: reino.exercito, guarnicao: reino.guarnicao };
+  return {
+    tropas, capacidade, usado: espacoUsado(tropas),
+    catalogo: ORDEM_DAS_TROPAS.map((chave) => {
+      const def = TROPAS[chave];
+      const um = podeTreinar({ tropa: chave, quantidade: 1, destino, niveis: n, reservas, saldo });
+      const cinco = podeTreinar({ tropa: chave, quantidade: 5, destino, niveis: n, reservas, saldo });
+      return {
+        chave, nome: def.nome, emoji: def.emoji, espaco: def.espaco, custo: def.custo, vida: def.vida, dano: def.dano,
+        intervalo: def.intervalo, alcance: def.alcance, voa: def.voa, acertaAr: def.acertaAr, descricao: def.descricao,
+        nivelMinimo: def.nivelMinimo, liberada: nivel >= def.nivelMinimo && (destino === "guarnicao" || nivel > 0),
+        tem: tropas[chave] || 0, podeUm: um.ok, podeCinco: cinco.ok, motivo: um.ok ? "" : um.motivo,
       };
     }),
   };
@@ -222,6 +255,18 @@ export async function subirNeuro(usuarioId) {
   return { nivel, custo: pode.custo, estagio: estagioDoNeuro(nivel) };
 }
 
+/** Treinar tropas para o exército (Quartel) ou para a guarnição (Torre do Neuro). */
+export async function treinarTropas(usuarioId, { tropa, quantidade, destino }) {
+  const reino = await obterReino(usuarioId);
+  const saldo = await saldoDoUsuario(usuarioId);
+  const n = niveisDe(reino);
+  const pode = podeTreinar({ tropa, quantidade, destino, niveis: n, reservas: { exercito: reino.exercito, guarnicao: reino.guarnicao }, saldo });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  const nova = somarTropas(reino[destino], { [tropa]: pode.quantidade });
+  await lancarEGravar(reino, [{ tipo: "treino", valor: -pode.custo, detalhe: { tropa, quantidade: pode.quantidade, destino } }], { [destino]: nova });
+  return { tropa, quantidade: pode.quantidade, destino: RESERVAS[destino], custo: pode.custo };
+}
+
 export async function coletarMina(usuarioId) {
   const reino = await obterReino(usuarioId);
   const agora = new Date();
@@ -262,7 +307,7 @@ export async function alvosDe(usuarioId) {
     invasoes: { feitasHoje: hoje.length, porDia: ATAQUES_POR_DIA },
     meuAtaque: poderDo(eu).ataque,
     alvos: perto.map((r) => {
-      const pode = podeInvadir({ atacanteId: usuarioId, defensor: r, ataquesHoje: hoje.length, jaAtacouHoje: jaAtaquei.has(r.usuario_id), agora });
+      const pode = podeInvadir({ atacanteId: usuarioId, atacante: eu, defensor: r, ataquesHoje: hoje.length, jaAtacouHoje: jaAtaquei.has(r.usuario_id), agora });
       return {
         id: r.usuario_id,
         dono: nomes.get(r.usuario_id) || "Estudante anônimo",
@@ -287,18 +332,21 @@ export async function invadir(usuarioId, defensorId) {
   const [hoje, saldoDoAlvo] = await Promise.all([invasoesDeHoje(usuarioId), alvo ? saldoDoUsuario(defensorId) : 0]);
 
   const pode = podeInvadir({
-    atacanteId: usuarioId, defensor: alvo, ataquesHoje: hoje.length,
+    atacanteId: usuarioId, atacante: eu, defensor: alvo, ataquesHoje: hoje.length,
     jaAtacouHoje: hoje.some((i) => i.defensor_id === defensorId),
   });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
 
-  const r = batalha({ atacante: eu, defensor: alvo, saldoDoDefensor: saldoDoAlvo, sorteA: sorteio(), sorteD: sorteio() });
+  const exercitoUsado = contagens(eu.exercito);
+  const r = batalha({ atacante: { exercito: exercitoUsado, neuro_nivel: eu.neuro_nivel }, defensor: alvo, saldoDoDefensor: saldoDoAlvo, semente: semente() });
+  const forca = { ataque: poderDo({ ...eu, exercito: exercitoUsado }).ataque, defesa: poderDo(alvo).defesa };
 
   // 1. a invasão em si — os índices únicos barram a 4ª do dia e a 2ª no mesmo alvo
   const ins = await supabase.from("proof_invasoes").insert({
     atacante_id: usuarioId, defensor_id: defensorId, dia: diaDe(), numero: hoje.length + 1,
-    ataque: r.ataque, defesa: r.defesa, venceu: r.venceu, saque: r.saque,
+    ataque: forca.ataque, defesa: forca.defesa, venceu: r.venceu, saque: r.saque,
     trofeus_atacante: r.trofeusAtacante, trofeus_defensor: r.trofeusDefensor,
+    estrelas: r.estrelas, destruicao: r.destruicao, combate: r.entrada,
   }).select("id").single();
   if (ins.error?.code === "23505") throw new ErroDeAcesso(409, "essa invasão já foi feita — atualize a tela");
   falhou(ins.error, "invasão");
@@ -311,7 +359,8 @@ export async function invadir(usuarioId, defensorId) {
       ids.push(await lancar(defensorId, "saque_perdido", -r.saque, { invasao: invasaoId }));
       ids.push(await lancar(usuarioId, "saque_ganho", r.saque, { invasao: invasaoId }));
     }
-    const mudancasDoAlvo = { trofeus: somarTrofeus(alvo.trofeus, r.trofeusDefensor) };
+    // a guarnição que caiu precisa ser treinada de novo
+    const mudancasDoAlvo = { trofeus: somarTrofeus(alvo.trofeus, r.trofeusDefensor), guarnicao: somarTropas(alvo.guarnicao, r.perdasDaGuarnicao, -1) };
     if (r.escudoDoDefensorHoras) mudancasDoAlvo.escudo_ate = new Date(Date.now() + r.escudoDoDefensorHoras * HORA).toISOString();
     if (!(await gravarReino(alvo, mudancasDoAlvo))) throw conflito();
   } catch (e) {
@@ -320,18 +369,20 @@ export async function invadir(usuarioId, defensorId) {
     throw e;
   }
 
-  // 3. o meu reino: troféus e o fim do meu escudo (quem ataca perde a proteção). Aqui não há
-  // dinheiro em jogo, então em vez de desfazer tudo tenta de novo com o reino relido.
+  // 3. o meu reino: troféus, o fim do meu escudo (quem ataca perde a proteção) e o exército, que
+  // foi gasto na batalha. Sem dinheiro em jogo: em vez de desfazer, tenta de novo com o reino relido.
   let atual = eu;
   for (let i = 0; i < 4; i++) {
-    if (await gravarReino(atual, { trofeus: somarTrofeus(atual.trofeus, r.trofeusAtacante), escudo_ate: null })) break;
+    const mudancas = { trofeus: somarTrofeus(atual.trofeus, r.trofeusAtacante), escudo_ate: null, exercito: somarTropas(atual.exercito, exercitoUsado, -1) };
+    if (await gravarReino(atual, mudancas)) break;
     atual = await obterReino(usuarioId);
   }
 
   const nomes = await nomesPublicos([defensorId]);
   return {
-    venceu: r.venceu, ataque: r.ataque, defesa: r.defesa, saque: r.saque,
-    trofeus: r.trofeusAtacante, protegido: r.protegido,
+    venceu: r.venceu, estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque,
+    trofeus: r.trofeusAtacante, protegido: r.protegido, destruidos: r.destruidos,
+    combate: r.entrada,
     alvo: { dono: nomes.get(defensorId) || "Estudante anônimo", reino: alvo.nome },
   };
 }

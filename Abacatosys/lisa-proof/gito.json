@@ -9,14 +9,32 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.7.0-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-20",
+  "versao": "0.8.0-proof-combate.1",
+  "atualizadoEm": "2026-10-21",
   "compilacao": {
-    "numero": 21,
-    "data": "2026-10-20",
+    "numero": 22,
+    "data": "2026-10-21",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.8.0-proof-combate.1",
+      "data": "2026-10-21",
+      "branch": "proof-combate",
+      "tipo": "funcionalidade",
+      "resumo": "Combate no estilo Clash of Clans: tropas treinadas, tropas de defesa, defesas com vida e alcance, estrelas pela destruição e replay das batalhas.",
+      "itens": [
+        "Tropas (inspiradas no Clash, com nomes próprios): Guerreiro, Arqueira, Gigante e Dragão, treinadas com moedas e liberadas pelo nível do Quartel. O exército vai inteiro em cada invasão e é gasto nela. O Neuro vai junto como herói e fica mais forte a cada nível.",
+        "Tropas de defesa: uma guarnição treinada na Torre do Neuro (capacidade pelo nível dela), que sai quando o inimigo chega perto, junto com o Neuro do reino. Só as que caem precisam ser treinadas de novo.",
+        "Defesas com vida, dano e alcance: Torre de Arqueiros (chão e ar), Canhão novo (só chão, dano alto) e a Torre do Neuro, que também atira. A Muralha agora cerca a Torre do Neuro: quem ataca de perto, por terra, precisa derrubá-la antes. Todas as construções têm vida.",
+        "A batalha é uma simulação de verdade (src/dominio/combate.js): cada tropa anda até o alvo e bate, cada defesa mira a tropa mais perto. Estrelas como no Clash: 50% destruído, a Torre do Neuro no chão e 100%. O saque e os troféus seguem as estrelas.",
+        "A simulação é determinística: o servidor decide a invasão e guarda a receita (semente e as forças); a ilha 3D roda a mesma luta passo a passo, com barras de vida, flechas, balas de canhão, fogo de dragão, construções virando ruína e placar ao vivo. Quem ataca vê a ilha do rival. Botão para pular para o resultado.",
+        "Batalhas recentes ganham \"▶ Assistir\": dá para ver de novo uma invasão sua ou quando o seu reino foi invadido.",
+        "Simulador refeito com o motor novo: rival fraco, parelho ou forte (com exército e defesa), previsão de estrelas em 8 batalhas e passo a passo da destruição, saque, troféus e tropas.",
+        "Migração db/007-combate.sql (só acrescenta: exército e guarnição no reino, o tipo \"treino\" no livro-caixa, e estrelas, destruição e a receita da batalha nas invasões)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.7.0-cloudflare-pages.1",
       "data": "2026-10-20",
@@ -341,7 +359,8 @@
         "Ranking mundial (pontos de sempre, da semana e troféus do Reino), com apelido ou anonimato",
         "Reino do Neuro: moedas do estudo, construções num mundo 3D, Neuro com níveis e invasões entre jogadores",
         "Simulação de batalha no Reino (treino sem efeito real), com as regras explicadas",
-        "Vales de moedas para resgatar (o de boas-vindas: 450 moedas para todos)"
+        "Vales de moedas para resgatar (o de boas-vindas: 450 moedas para todos)",
+        "Combate no estilo Clash of Clans no Reino: tropas, tropas de defesa, defesas com vida, estrelas e replay das batalhas"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -368,7 +387,7 @@
       "Three.js 0.170 (o mundo 3D do Reino, carregado só nessa tela)"
     ],
     "arquitetura": {
-      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e a sorte das batalhas é sorteada no servidor. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
+      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
       "diagramas": [
         {
           "titulo": "Visão geral",
@@ -404,7 +423,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/006). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/007). Acesso só pelo túnel da Cloudflare, em HTTPS."
       }
     ],
     "integracoes": [

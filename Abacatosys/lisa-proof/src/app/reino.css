@@ -258,3 +258,44 @@
 /* durante a batalha, os rótulos saem da frente do alerta e da cena */
 .rn-mundo--batalha .rn-mundo__rotulo { opacity: 0.3; pointer-events: none; transition: opacity 0.3s; }
 @media (max-width: 640px) { .rn-simulador .agenda__modos { border-radius: 16px; } .rn-simulador .agenda__modo { border-radius: 12px; } }
+
+/* ------------------------------------------------------------ combate: tropas, replay e placar */
+.rn-reserva { display: grid; gap: 14px; }
+.rn-reserva__topo { display: grid; gap: 6px; }
+@media (min-width: 760px) { .rn-reserva__topo { grid-template-columns: minmax(220px, 1fr) 2fr; align-items: center; gap: 16px; } }
+.rn-reserva__topo .pf-estat__nota { margin: 0; }
+.rn-tropas { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .rn-tropas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.rn-tropa {
+  display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: start;
+  padding: 12px; border-radius: 14px; border: 1px solid var(--pf-linha); background: var(--pf-superficie-2);
+}
+.rn-tropa--heroi { border-color: var(--pf-verde); }
+.rn-tropa--bloqueada { opacity: 0.7; }
+.rn-tropa__emoji { font-size: 30px; line-height: 1; grid-row: span 2; }
+.rn-tropa__texto { display: grid; gap: 3px; min-width: 0; }
+.rn-tropa__texto strong { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rn-tropa__texto strong small { font-weight: 500; color: var(--pf-tinta-2); font-size: 12px; }
+.rn-tropa__dados { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--pf-tinta); }
+.rn-tropa__desc { font-size: 12px; color: var(--pf-tinta-2); line-height: 1.4; }
+.rn-tropa__acoes { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.rn-tropa__acoes .pf-botao:disabled { cursor: not-allowed; opacity: 1; background: var(--pf-superficie); border-color: var(--pf-linha); color: var(--pf-tinta-2); }
+.rn-batalha__ver { flex: none; }
+
+.rn-mundo__alerta--vitoria { background: rgba(21, 128, 61, 0.94); }
+.rn-mundo__alerta--derrota { background: rgba(55, 65, 81, 0.94); }
+.rn-mundo__pular {
+  pointer-events: auto; margin-top: 6px; padding: 4px 12px; border-radius: 9999px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.5); background: rgba(255, 255, 255, 0.15); color: #FFFFFF; font: inherit; font-size: 12px; font-weight: 700;
+}
+.rn-mundo__pular:hover { background: rgba(255, 255, 255, 0.28); }
+.rn-mundo__pular:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
+
+/* batalha no celular: alerta compacto, ilha mais alta e fora do alcance do topo fixo */
+.rn-mundo { scroll-margin-top: 72px; }
+@media (max-width: 640px) {
+  .rn-mundo--batalha { height: 400px; }
+  .rn-mundo--batalha .rn-mundo__alerta { width: calc(100% - 16px); top: 6px; padding: 6px 10px 8px; gap: 2px; }
+  .rn-mundo--batalha .rn-mundo__progresso { margin-top: 2px; height: 4px; }
+  .rn-mundo__pular { margin-top: 3px; padding: 2px 10px; font-size: 11px; }
+}

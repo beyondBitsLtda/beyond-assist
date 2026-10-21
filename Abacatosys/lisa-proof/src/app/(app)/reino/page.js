@@ -8,9 +8,11 @@ import { useAviso, Barra } from "@/componentes/Pecas.js";
 import { CartaoDeVale } from "@/componentes/Vales.js";
 import Neuro, { reagir, comemorar } from "@/componentes/Neuro.js";
 import {
-  ATAQUES_POR_DIA, FATIA_DO_SAQUE, TETO_DO_SAQUE, SORTE, ESCUDO_APOS_DERROTA_HORAS, ESCUDO_DE_NOVATO_HORAS,
-  HORAS_ATE_ENCHER, TROFEUS, PESOS, RIVAIS_SIMULADOS, rivalSimulado, chanceDeVitoria, simularBatalha, protecaoDoCofre, poderDo,
+  ATAQUES_POR_DIA, FATIA_DO_SAQUE, TETO_DO_SAQUE, ESCUDO_APOS_DERROTA_HORAS, ESCUDO_DE_NOVATO_HORAS, HORAS_ATE_ENCHER,
+  CONSTRUCOES, RIVAIS_SIMULADOS, rivalSimulado, simularBatalha, protecaoDoCofre, poderDo, combateDe, previsaoDeEstrelas,
+  exercitoDeTreino,
 } from "@/dominio/reino.js";
+import { TROPAS, ORDEM_DAS_TROPAS, totalDeTropas } from "@/dominio/tropas.js";
 
 // O mundo 3D (Three.js) só baixa nesta tela, e só no navegador.
 const Mundo3D = dynamic(() => import("@/componentes/reino/Mundo3D.js"), {
@@ -59,6 +61,17 @@ export default function Reino() {
     }
   }
 
+  const treinar = (destino, tropa, quantidade) => agir(`treinar:${destino}:${tropa.chave}`, { acao: "treinar", tropa: tropa.chave, quantidade, destino },
+    (r) => reagir("feliz", `+${r.quantidade} ${tropa.emoji} ${tropa.nome}${r.quantidade > 1 ? "s" : ""} ${destino === "exercito" ? "no exército" : "na defesa"}!`));
+
+  function assistir(b) {
+    const ok = assistirNaIlha({
+      entrada: b.combate, papel: b.ataquei ? "atacante" : "defensor", resultado: b.resultado,
+      titulo: b.ataquei ? `▶ REPLAY · VOCÊ INVADIU ${String(b.outro).toUpperCase()}` : `▶ REPLAY · ${String(b.outro).toUpperCase()} INVADIU VOCÊ`,
+    });
+    if (!ok) avisar("O replay precisa do mundo 3D (e do movimento ligado).");
+  }
+
   async function carregarAlvos() {
     try {
       setAlvos(await obter("/api/reino/alvos"));
@@ -82,12 +95,10 @@ export default function Reino() {
         setOcupado("");
         document.getElementById("invadir")?.scrollIntoView({ behavior: "smooth", block: "start" });
       };
-      const suave = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      document.querySelector(".rn-mundo")?.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "center" });
-      const quartel = reino.construcoes.find((c) => c.chave === "quartel")?.nivel || 0;
-      const detail = { tipo: "atacar", venceu: r.resultado.venceu, quartel, aoTerminar: mostrar };
-      window.dispatchEvent(new CustomEvent("reino-simular", { detail }));
-      if (!detail.aceito) mostrar();
+      assistirNaIlha({
+        entrada: r.resultado.combate, papel: "atacante", resultado: r.resultado,
+        titulo: `⚔️ INVADINDO ${String(r.resultado.alvo.reino).toUpperCase()}`, aoTerminar: mostrar,
+      });
     } catch (e) {
       avisar(e.message);
       setOcupado("");
@@ -140,7 +151,7 @@ export default function Reino() {
       <div className="rn-numeros">
         <Numero rotulo="Moedas" valor={<Moedas n={reino.saldo} />} nota={`${numero(reino.cofre.protege)} a salvo no cofre`} />
         <Numero rotulo="Troféus" valor={`🏆 ${numero(reino.trofeus)}`} nota={<Link href="/ranking">ver ranking dos reinos</Link>} />
-        <Numero rotulo="Ataque · Defesa" valor={`⚔️ ${reino.poder.ataque} · 🛡️ ${reino.poder.defesa}`} nota="sobe com quartel, muralha, arqueiros e Neuro" />
+        <Numero rotulo="Ataque · Defesa" valor={`⚔️ ${reino.poder.ataque}/s · 🛡️ ${reino.poder.defesa}`} nota={`exército: ${totalDeTropas(reino.exercito.tropas)} tropa(s) · defesa: ${totalDeTropas(reino.guarnicao.tropas)}`} />
         <Numero rotulo="Escudo" valor={reino.escudoAte ? "🛡️ Ativo" : "Sem escudo"} nota={reino.escudoAte ? `até ${hora(reino.escudoAte)} · atacar tira o escudo` : "o seu reino pode ser invadido"} />
       </div>
 
@@ -149,7 +160,7 @@ export default function Reino() {
         <section className="pf-cartao rn-neuro">
           <div className="pf-estat__rotulo">O seu Neuro</div>
           <div className="pf-estat__valor">Nível {reino.neuro.nivel} <small>· {reino.neuro.estagio}</small></div>
-          <p className="pf-estat__nota">Cada nível dá +8 de ataque e +6 de defesa. Máximo agora: nível {reino.neuro.maximo} (sobe com a Torre do Neuro).</p>
+          <p className="pf-estat__nota">O herói do reino: vai em toda invasão (❤️ {reino.heroi.ataque.vida} · 💥 {reino.heroi.ataque.dano}) e defende a Torre. Máximo agora: nível {reino.neuro.maximo} (sobe com a Torre do Neuro).</p>
           <Botao ok={reino.neuro.ok} motivo={reino.neuro.motivo} ocupado={ocupado === "neuro"}
             aoClicar={() => agir("neuro", { acao: "neuro" }, (r) => comemorar(`Neuro nível ${r.nivel}! ${r.estagio} 🧠`))}>
             Treinar Neuro · <Moedas n={reino.neuro.custo} />
@@ -165,6 +176,10 @@ export default function Reino() {
           </Botao>
         </section>
       </div>
+
+      {/* ------------------------------------------------------------ tropas */}
+      <Reserva destino="exercito" dados={reino.exercito} heroi={reino.heroi.ataque} ocupado={ocupado} aoTreinar={treinar} />
+      <Reserva destino="guarnicao" dados={reino.guarnicao} heroi={reino.heroi.defesa} ocupado={ocupado} aoTreinar={treinar} />
 
       {/* ------------------------------------------------------------ construções */}
       <section className="pf-secao">
@@ -245,8 +260,9 @@ export default function Reino() {
                   <span className="rn-batalha__texto">
                     <strong>{b.ataquei ? `Você invadiu ${b.outro}` : `${b.outro} invadiu você`}</strong>
                     {" — "}{b.ganhei ? (b.ataquei ? "vitória" : "defesa vencida") : (b.ataquei ? "derrota" : "o reino caiu")}
-                    <small>⚔️ {b.ataque} contra 🛡️ {b.defesa} · {hora(b.quando)}</small>
+                    <small>{b.estrelas != null ? `${estrelas(b.estrelas)} · ${b.destruicao}% destruído` : `⚔️ ${b.ataque} contra 🛡️ ${b.defesa}`} · {hora(b.quando)}</small>
                   </span>
+                  {b.combate && <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno rn-batalha__ver" onClick={() => assistir(b)}>▶ Assistir</button>}
                   <span className="rn-batalha__saldo">
                     {b.moedas ? <>{b.moedas > 0 ? "+" : "−"}🪙{numero(Math.abs(b.moedas))} </> : null}
                     {b.trofeus ? `${b.trofeus > 0 ? "+" : "−"}🏆${Math.abs(b.trofeus)}` : ""}
@@ -303,13 +319,89 @@ function VistaPlana({ reino, humor }) {
   );
 }
 
-// ------------------------------------------------------------------ modo simulação
-const pct = (f) => `×${f.toFixed(2).replace(".", ",")}`;
+// ------------------------------------------------------------------ batalha na ilha
+const virgula = (x) => String(x).replace(".", ",");
+const estrelas = (n) => (n ? "⭐".repeat(n) : "☆");
+const NOMES_DOS_PREDIOS = Object.fromEntries(Object.entries(CONSTRUCOES).map(([k, v]) => [k, v.nome]));
+
+/** "12 🗡️ Guerreiros, 3 🪨 Gigantes" */
+function descreverTropas(tropas) {
+  const partes = ORDEM_DAS_TROPAS.filter((t) => tropas?.[t]).map((t) => `${tropas[t]} ${TROPAS[t].emoji} ${TROPAS[t].nome}${tropas[t] > 1 ? "s" : ""}`);
+  return partes.length ? partes.join(", ") : "nenhuma";
+}
 
 /**
- * Treino de batalha: a mesma conta da invasão de verdade (simularBatalha, do domínio) contra um
- * rival de mentira tirado do próprio reino. A ilha 3D encena; o passo a passo explica. Não grava
- * nada — moedas, troféus e escudo de verdade não mudam.
+ * Manda a ilha 3D mostrar a batalha (o mesmo motor do servidor, passo a passo). Sem 3D, o
+ * resultado aparece direto. `aoTerminar` roda quando a luta acaba (ou logo, sem 3D).
+ */
+function assistirNaIlha({ entrada, papel, resultado, titulo, aoTerminar }) {
+  const suave = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.querySelector(".rn-mundo")?.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "center" });
+  const detail = { entrada, papel, resultado, titulo, aoTerminar };
+  window.dispatchEvent(new CustomEvent("reino-combate", { detail }));
+  if (!detail.aceito) aoTerminar?.();
+  return Boolean(detail.aceito);
+}
+
+/** Exército (Quartel) ou tropas de defesa (Torre do Neuro): o que tem e o que dá para treinar. */
+function Reserva({ destino, dados, heroi, ocupado, aoTreinar }) {
+  const exercito = destino === "exercito";
+  return (
+    <section className="pf-secao" id={exercito ? "exercito" : "guarnicao"}>
+      <h2 className="pf-secao__titulo">
+        {exercito ? "⚔️ Exército" : "🛡️ Tropas de defesa"}
+        <small>{exercito ? "treinado no Quartel · vai inteiro em cada invasão e é gasto nela" : "moram na Torre do Neuro · saem quando o inimigo chega perto"}</small>
+      </h2>
+      <div className="pf-cartao rn-reserva">
+        <div className="rn-reserva__topo">
+          <div>
+            <div className="pf-estat__rotulo">{dados.usado} de {dados.capacidade} de espaço</div>
+            <Barra valor={dados.usado} total={Math.max(1, dados.capacidade)} rotulo={exercito ? "Espaço do exército" : "Espaço das tropas de defesa"} />
+          </div>
+          <p className="pf-estat__nota">{dados.capacidade === 0 ? "Construa o Quartel para treinar o exército." : `Agora: ${descreverTropas(dados.tropas)}.`}</p>
+        </div>
+        <div className="rn-tropas">
+          <article className="rn-tropa rn-tropa--heroi">
+            <span className="rn-tropa__emoji" aria-hidden="true">🧠</span>
+            <div className="rn-tropa__texto">
+              <strong>Neuro <small>herói · sempre junto</small></strong>
+              <span className="rn-tropa__dados">❤️ {heroi.vida} · 💥 {heroi.dano} a cada {virgula(heroi.intervalo)} s · 📏 {virgula(heroi.alcance)}{heroi.acertaAr ? " · acerta quem voa" : ""}</span>
+              <span className="rn-tropa__desc">{exercito ? "Luta corpo a corpo em toda invasão. Fica mais forte a cada nível — sem treino." : "Defende a Torre atirando livros de longe."}</span>
+            </div>
+          </article>
+          {dados.catalogo.map((t) => (
+            <article key={t.chave} className={`rn-tropa${t.liberada ? "" : " rn-tropa--bloqueada"}`}>
+              <span className="rn-tropa__emoji" aria-hidden="true">{t.emoji}</span>
+              <div className="rn-tropa__texto">
+                <strong>{t.nome} {t.tem > 0 && <span className="pf-pilula pf-pilula--verde">×{t.tem}</span>}</strong>
+                <span className="rn-tropa__dados">❤️ {t.vida} · 💥 {t.dano} a cada {virgula(t.intervalo)} s · 📏 {virgula(t.alcance)} · {t.voa ? "🪽 voa" : "🦶 chão"} · espaço {t.espaco}</span>
+                <span className="rn-tropa__desc">{t.descricao}</span>
+              </div>
+              <div className="rn-tropa__acoes">
+                {t.liberada ? (
+                  <>
+                    <button type="button" className="pf-botao pf-botao--pequeno" disabled={!t.podeUm || Boolean(ocupado)} onClick={() => aoTreinar(destino, t, 1)}>
+                      +1 · <Moedas n={t.custo} />
+                    </button>
+                    <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" disabled={!t.podeCinco || Boolean(ocupado)} onClick={() => aoTreinar(destino, t, 5)}>
+                      +5 · <Moedas n={t.custo * 5} />
+                    </button>
+                    {!t.podeUm && <span className="rn-motivo">{t.motivo}</span>}
+                  </>
+                ) : <span className="rn-motivo">🔒 {exercito ? "Quartel" : "Torre do Neuro"} no nível {t.nivelMinimo}</span>}
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ------------------------------------------------------------------ modo simulação
+/**
+ * Treino de batalha: o mesmo motor da invasão de verdade, contra um rival de mentira tirado do
+ * próprio reino. A ilha mostra a luta; o passo a passo explica. Não grava nada.
  */
 function Simulador({ reino, aoFechar }) {
   const [tipo, setTipo] = useState("atacar");
@@ -320,30 +412,37 @@ function Simulador({ reino, aoFechar }) {
 
   const eu = useMemo(() => ({
     construcoes: Object.fromEntries(reino.construcoes.map((c) => [c.chave, c.nivel])),
-    neuro_nivel: reino.neuro.nivel,
+    neuro_nivel: reino.neuro.nivel, exercito: reino.exercito.tropas, guarnicao: reino.guarnicao.tropas,
   }), [reino]);
   const rivais = useMemo(() => Object.fromEntries(Object.keys(RIVAIS_SIMULADOS).map((k) => [k, rivalSimulado(eu, k)])), [eu]);
   const rival = rivais[forca];
-  const chance = useMemo(() => (tipo === "atacar" ? chanceDeVitoria(eu, rival) : 100 - chanceDeVitoria(rival, eu)), [eu, rival, tipo]);
+  const exercitoVazio = totalDeTropas(eu.exercito) === 0;
+  const atacanteDaVez = tipo === "atacar"
+    ? { exercito: exercitoVazio ? exercitoDeTreino(eu.construcoes.quartel) : eu.exercito, neuro_nivel: eu.neuro_nivel }
+    : { exercito: rival.exercito, neuro_nivel: rival.neuro_nivel };
+  const previsao = useMemo(
+    () => previsaoDeEstrelas(combateDe({ atacante: atacanteDaVez, defensor: tipo === "atacar" ? rival : eu, semente: 1 }), 8),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [eu, rival, tipo],
+  );
 
   useEffect(() => {
     if (resultado) caixaDoResultado.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [resultado]);
 
   function simular() {
-    const r = simularBatalha({ tipo, eu, rival, meuSaldo: reino.saldo, saldoDoRival: 500, sorteA: Math.random(), sorteD: Math.random() });
+    const semente = (Math.floor(Math.random() * 4294967295) >>> 0) || 1;
+    const r = simularBatalha({ tipo, eu, rival, meuSaldo: reino.saldo, saldoDoRival: 500, semente });
     setResultado(null);
     setRodando(true);
-    const suave = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    document.querySelector(".rn-mundo")?.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "center" });
-    const detail = {
-      tipo, venceu: r.venceu, quartel: eu.construcoes.quartel, torre: eu.construcoes.torre,
+    assistirNaIlha({
+      entrada: r.entrada, papel: tipo === "atacar" ? "atacante" : "defensor", resultado: r,
+      titulo: tipo === "atacar" ? "🎮 TREINO · INVASÃO EM ANDAMENTO" : "🎮 TREINO · SEU REINO ESTÁ SENDO ATACADO!",
       aoTerminar: () => { setRodando(false); setResultado(r); },
-    };
-    window.dispatchEvent(new CustomEvent("reino-simular", { detail }));
-    if (!detail.aceito) { setRodando(false); setResultado(r); } // sem 3D: o resultado vem direto
+    });
   }
 
+  const fraseDaPrevisao = previsao >= 2.5 ? "vitória esmagadora" : previsao >= 1.5 ? "boa chance" : previsao >= 0.8 ? "batalha apertada" : "muito difícil";
   return (
     <section id="simulador" className="pf-cartao rn-simulador" aria-label="Simulação de batalha">
       <div className="rn-simulador__principal">
@@ -363,37 +462,37 @@ function Simulador({ reino, aoFechar }) {
             return (
               <button key={k} type="button" className="pf-dia rn-simulador__rival" aria-pressed={forca === k} onClick={() => { setForca(k); setResultado(null); }}>
                 <strong>{r.nome}</strong>
-                <small>⚔️ {pr.ataque} · 🛡️ {pr.defesa}</small>
+                <small>⚔️ {pr.ataque}/s · 🛡️ {pr.defesa}</small>
               </button>
             );
           })}
         </div>
 
         <div className="rn-simulador__chance">
-          <div className="pf-estat__rotulo">
-            {tipo === "atacar" ? "Chance de a sua invasão dar certo" : "Chance de o seu reino resistir"}: <strong>{chance}%</strong>
-          </div>
-          <Barra valor={chance} total={100} rotulo="Chance de vitória" />
-          <p className="pf-estat__nota">
+          <p className="pf-estat__nota" style={{ marginTop: 0 }}>
             {tipo === "atacar"
-              ? `Seu ataque ⚔️ ${poderDo(eu).ataque} contra a defesa dele 🛡️ ${poderDo(rival).defesa}. ${chance < 50 ? "Para subir: Quartel (+" + PESOS.quartel + " por nível) ou treinar o Neuro (+" + PESOS.neuroAtaque + ")." : ""}`
-              : `O ataque dele ⚔️ ${poderDo(rival).ataque} contra a sua defesa 🛡️ ${poderDo(eu).defesa}. ${chance < 50 ? "Para subir: Muralha (+" + PESOS.muralha + "), Arqueiros (+" + PESOS.torre + ") ou Neuro (+" + PESOS.neuroDefesa + ")." : ""}`}
+              ? <>Vão as suas tropas: <strong>{descreverTropas(atacanteDaVez.exercito)}</strong> + o Neuro.{exercitoVazio && " (Seu exército está vazio: no treino vai um exército de exemplo.)"}</>
+              : <>Vem o rival com <strong>{descreverTropas(rival.exercito)}</strong> + o Neuro dele, contra as suas defesas e {totalDeTropas(eu.guarnicao) ? descreverTropas(eu.guarnicao) : "nenhuma tropa de defesa"}.</>}
           </p>
+          <div className="pf-estat__rotulo">
+            Previsão em 8 batalhas: <strong>{virgula(previsao)} ⭐ {tipo === "atacar" ? "para você" : "para o rival"}</strong> · {tipo === "atacar" ? fraseDaPrevisao : previsao < 0.8 ? "seu reino aguenta bem" : previsao < 1.5 ? "defesa apertada" : "seu reino sofre"}
+          </div>
+          <Barra valor={Math.round(previsao * 10)} total={30} rotulo="Estrelas previstas" />
         </div>
 
         <button type="button" className="pf-botao" onClick={simular} disabled={rodando}>
-          {rodando ? "Assistindo à batalha…" : "▶ Simular batalha"}
+          {rodando ? "Batalha em andamento…" : "▶ Simular batalha"}
         </button>
 
         {resultado && (
           <div ref={caixaDoResultado} className={`rn-resultado rn-simulacao ${resultado.euVenci ? "rn-resultado--venceu" : "rn-resultado--perdeu"}`} role="status">
             <div className="rn-resultado__titulo">
               {resultado.tipo === "atacar"
-                ? (resultado.euVenci ? "🏆 A invasão deu certo!" : "💥 A invasão falhou")
-                : (resultado.euVenci ? "🛡️ O reino resistiu!" : "💥 O reino caiu")}
+                ? (resultado.euVenci ? `${estrelas(resultado.estrelas)} A invasão deu certo!` : "💥 A invasão falhou")
+                : (resultado.euVenci ? "🛡️ O reino resistiu!" : `💥 O reino caiu · ${estrelas(resultado.estrelas)}`)}
               <small> · simulação</small>
             </div>
-            <PassoAPasso r={resultado} eu={eu} rival={rival} />
+            <PassoAPasso r={resultado} />
             <div className="rn-simulacao__acoes">
               <button type="button" className="pf-botao pf-botao--pequeno" onClick={simular} disabled={rodando}>Simular de novo</button>
               <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={aoFechar}>Fechar</button>
@@ -407,58 +506,63 @@ function Simulador({ reino, aoFechar }) {
   );
 }
 
-function PassoAPasso({ r, eu, rival }) {
-  const atacante = r.tipo === "atacar" ? eu : rival;
-  const defensor = r.tipo === "atacar" ? rival : eu;
-  const quemAtaca = r.tipo === "atacar" ? "Seu ataque" : "O ataque do rival";
-  const quemDefende = r.tipo === "atacar" ? "a defesa do rival" : "a sua defesa";
-  const na = atacante.construcoes, nd = defensor.construcoes;
-  const cofre = protecaoDoCofre(nd.cofre || 0);
+function PassoAPasso({ r }) {
+  const ataque = r.tipo === "atacar";
+  const perdas = descreverTropas(r.perdasDaGuarnicao);
   return (
     <ol className="rn-passos">
       <li>
-        <strong>Força.</strong> {quemAtaca}: {PESOS.base} + {na.quartel || 0}×{PESOS.quartel} (Quartel) + {atacante.neuro_nivel}×{PESOS.neuroAtaque} (Neuro) = <b>{r.poderAtacante.ataque}</b>.
-        {" "}{quemDefende[0].toUpperCase() + quemDefende.slice(1)}: {PESOS.base} + {nd.muralha || 0}×{PESOS.muralha} (Muralha) + {nd.torre || 0}×{PESOS.torre} (Arqueiros) + {defensor.neuro_nivel}×{PESOS.neuroDefesa} (Neuro) = <b>{r.poderDefensor.defesa}</b>.
+        <strong>Quem lutou.</strong> {ataque ? "Você atacou" : "O rival atacou"} com {descreverTropas(r.exercitoUsado)} + o Neuro.
+        {" "}A batalha durou {virgula(r.duracao)} s.
       </li>
       <li>
-        <strong>Sorte.</strong> O ataque rolou {pct(r.fatorA)} e ficou em <b>{r.ataque}</b>; a defesa rolou {pct(r.fatorD)} e ficou em <b>{r.defesa}</b>.
-        {" "}{r.ataque > r.defesa ? "O ataque passou." : r.ataque === r.defesa ? "Empate — e empate é da defesa." : "A defesa segurou."}
+        <strong>Destruição: {r.destruicao}%.</strong> {r.destruidos.length ? `Caíram: ${r.destruidos.map((c) => NOMES_DOS_PREDIOS[c]).join(", ")}.` : "Nenhuma construção caiu."}
+        {r.muralhaCaiu ? " A Muralha também caiu." : ""}
       </li>
       <li>
-        <strong>Moedas.</strong> O defensor tinha 🪙 {numero(r.saldoDoDefensor)}{r.tipo === "atacar" ? " (imaginando um rival com 500)" : " (o seu saldo de agora)"}; o cofre guarda {numero(cofre)}, então {numero(r.exposto)} estavam expostas.
-        {" "}{r.venceu ? <>O saque é {Math.round(FATIA_DO_SAQUE * 100)}% disso, no máximo {TETO_DO_SAQUE}: <b>🪙 {numero(r.saque)}</b> {r.tipo === "atacar" ? "para você" : "saem do seu reino"}.</> : "Como o ataque falhou, ninguém perde moeda."}
+        <strong>Estrelas: {estrelas(r.estrelas)}</strong> — {r.destruicao >= 50 ? "⭐ por passar de 50%" : "faltou chegar a 50%"}; {r.casteloCaiu ? "⭐ pela Torre do Neuro" : "a Torre do Neuro ficou de pé"}; {r.destruicao === 100 ? "⭐ por 100%" : "não chegou a 100%"}.
       </li>
       <li>
-        <strong>Troféus.</strong> Você {r.meusTrofeus >= 0 ? "ganharia" : "perderia"} <b>{Math.abs(r.meusTrofeus)} 🏆</b> (troféus nunca ficam abaixo de zero).
+        <strong>Moedas.</strong> O defensor tinha 🪙 {numero(r.saldoDoDefensor)}{ataque ? " (imaginando um rival com 500)" : " (o seu saldo de agora)"}; o cofre guarda {numero(r.protegido)}, então {numero(r.exposto)} estavam expostas.
+        {" "}{r.venceu ? <>Saque: {Math.round(FATIA_DO_SAQUE * 100)}% × {r.destruicao}% de destruição, no máximo {TETO_DO_SAQUE} = <b>🪙 {numero(r.saque)}</b> {ataque ? "para você" : "saem do seu reino"}.</> : "Sem nenhuma estrela, ninguém perde moeda."}
       </li>
       <li>
-        <strong>Escudo.</strong> {r.tipo === "atacar"
-          ? <>Atacar tira o seu escudo.{r.venceu ? ` O reino invadido ganharia ${ESCUDO_APOS_DERROTA_HORAS} h de escudo.` : ""}</>
-          : r.venceu ? `O seu reino ganharia ${ESCUDO_APOS_DERROTA_HORAS} h de escudo para ninguém invadir de novo em seguida.` : "Defesa vencida não dá escudo — mas rende troféus."}
+        <strong>Troféus.</strong> Você {r.meusTrofeus >= 0 ? "ganharia" : "perderia"} <b>{Math.abs(r.meusTrofeus)} 🏆</b>.
+      </li>
+      <li>
+        <strong>Tropas.</strong> {ataque
+          ? "Numa invasão de verdade, o exército inteiro é gasto — treine de novo no Quartel."
+          : `As suas tropas de defesa que caíram (${perdas}) teriam de ser treinadas de novo.`}
+        {r.escudoDoDefensorHoras ? ` ${ataque ? "O reino invadido" : "O seu reino"} ganharia ${ESCUDO_APOS_DERROTA_HORAS} h de escudo.` : ""}
       </li>
     </ol>
   );
 }
 
 function RegrasDaBatalha() {
+  const t = CONSTRUCOES;
   return (
     <aside className="rn-simulador__regras" aria-label="Regras da batalha">
       <h3>📜 Regras da batalha</h3>
       <dl>
-        <dt>⚔️ Força de ataque</dt>
-        <dd>{PESOS.base} + {PESOS.quartel} por nível do Quartel + {PESOS.neuroAtaque} por nível do Neuro</dd>
-        <dt>🛡️ Força de defesa</dt>
-        <dd>{PESOS.base} + {PESOS.muralha} por nível da Muralha + {PESOS.torre} por nível dos Arqueiros + {PESOS.neuroDefesa} por nível do Neuro</dd>
-        <dt>🎲 Sorte</dt>
-        <dd>Cada lado multiplica a força por um valor entre {pct(1 - SORTE)} e {pct(1 + SORTE)}. Vence quem ficar maior; empate é da defesa.</dd>
+        <dt>⚔️ Como é a luta</dt>
+        <dd>As tropas desembarcam na beirada da ilha e cada uma vai sozinha atrás do alvo mais perto — o Gigante só atrás de defesas. Cada defesa mira a tropa mais perto que alcança. Tudo tem vida: quem chega a zero cai.</dd>
+        <dt>🏹 Torre de Arqueiros</dt>
+        <dd>{t.torre.efeito(1)} (nível 1).</dd>
+        <dt>💣 Canhão</dt>
+        <dd>{t.canhao.efeito(1)} (nível 1). Dragão passa por cima.</dd>
+        <dt>🧱 Muralha</dt>
+        <dd>Cerca a Torre do Neuro: quem bate de perto, por terra, precisa derrubá-la antes. Arqueiras atiram por cima; Dragão voa por cima.</dd>
+        <dt>🛡️ Tropas de defesa</dt>
+        <dd>Moram na Torre do Neuro e saem quando um inimigo chega perto, junto com o Neuro do reino. As que caem precisam ser treinadas de novo.</dd>
+        <dt>⭐ Estrelas</dt>
+        <dd>Uma por destruir 50% das construções, uma por derrubar a Torre do Neuro e uma por 100%. A Muralha não conta na porcentagem.</dd>
         <dt>🪙 Saque</dt>
-        <dd>{Math.round(FATIA_DO_SAQUE * 100)}% das moedas fora do cofre, no máximo {TETO_DO_SAQUE}. O Cofre guarda {protecaoDoCofre(1)} moedas por nível.</dd>
+        <dd>{Math.round(FATIA_DO_SAQUE * 100)}% das moedas fora do cofre, vezes a destruição, até {TETO_DO_SAQUE}. O Cofre guarda {protecaoDoCofre(1)} moedas por nível.</dd>
         <dt>🏆 Troféus</dt>
-        <dd>Invasão vencida +{TROFEUS.vitoriaAtacante}, invasão falha {TROFEUS.ataqueFalho}, defesa vencida +{TROFEUS.defesaVencida}, reino caiu {TROFEUS.derrotaDefensor}.</dd>
-        <dt>🛡️ Escudo</dt>
-        <dd>Reino novo: {ESCUDO_DE_NOVATO_HORAS} h. Reino que cai: {ESCUDO_APOS_DERROTA_HORAS} h. Atacar tira o seu escudo.</dd>
-        <dt>📅 Limites</dt>
-        <dd>{ATAQUES_POR_DIA} invasões por dia, uma por reino. A sorte é sorteada no servidor.</dd>
+        <dd>Quem ataca: +6, +10 ou +14 por 1, 2 ou 3 estrelas (−3 sem estrela). Quem defende: −3, −5 ou −7 (+5 se segurar tudo).</dd>
+        <dt>🛡️ Escudo e limites</dt>
+        <dd>Reino que cai ganha {ESCUDO_APOS_DERROTA_HORAS} h de escudo; reino novo nasce com {ESCUDO_DE_NOVATO_HORAS} h; atacar tira o seu escudo. {ATAQUES_POR_DIA} invasões por dia, uma por reino. O exército é gasto em cada invasão.</dd>
         <dt>📚 Pontos</dt>
         <dd>Moeda vem do estudo (1 ponto = 1 moeda). Perder moeda numa invasão nunca tira pontos do ranking.</dd>
       </dl>
@@ -511,12 +615,13 @@ function Predio({ c, grande = false }) {
 function ResultadoDaBatalha({ r, aoFechar }) {
   return (
     <div className={`pf-cartao rn-resultado ${r.venceu ? "rn-resultado--venceu" : "rn-resultado--perdeu"}`} role="status">
-      <div className="rn-resultado__titulo">{r.venceu ? "🏆 Vitória!" : "💥 Derrota"} — {r.alvo.reino} <small>({r.alvo.dono})</small></div>
+      <div className="rn-resultado__titulo">{r.venceu ? `${estrelas(r.estrelas)} Vitória!` : "💥 A invasão falhou"} — {r.alvo.reino} <small>({r.alvo.dono})</small></div>
       <p>
-        Seu ataque: <strong>⚔️ {r.ataque}</strong> contra a defesa deles: <strong>🛡️ {r.defesa}</strong>.{" "}
+        {r.destruicao}% destruído{r.destruidos?.length ? ` (${r.destruidos.map((c) => NOMES_DOS_PREDIOS[c]).join(", ")})` : ""}.{" "}
         {r.venceu
-          ? (r.saque ? `Você saqueou 🪙 ${numero(r.saque)} moedas e ganhou ${r.trofeus} troféus.` : `Ganhou ${r.trofeus} troféus — mas o cofre deles guardava tudo, nada para saquear.`)
-          : `Você perdeu ${Math.abs(r.trofeus)} troféus. Fortaleça o Quartel e o Neuro e tente outro reino.`}
+          ? (r.saque ? `Você saqueou 🪙 ${numero(r.saque)} moedas e ganhou ${r.trofeus} troféus.` : `Ganhou ${r.trofeus} troféus — mas o cofre deles guardava tudo.`)
+          : `Você perdeu ${Math.abs(r.trofeus)} troféus. Treine um exército maior (Gigantes seguram as defesas) e tente de novo.`}
+        {" "}O exército foi gasto na batalha.
       </p>
       <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={aoFechar}>Ok</button>
     </div>
@@ -545,15 +650,15 @@ function Regras() {
       <div className="pf-cartao rn-regras">
         <details open>
           <summary>🪙 Moedas</summary>
-          <p>Cada ponto de estudo vale uma moeda: quiz, exercício, projetos, tarefas, metas e conquistas. A mina e os saques somam; construir e treinar o Neuro gastam. <strong>Os pontos do ranking nunca diminuem</strong> — gastar moedas no reino não tira você do placar.</p>
+          <p>Cada ponto de estudo vale uma moeda: quiz, exercício, projetos, tarefas, metas e conquistas. A mina, os saques e os vales somam; construir, treinar tropas e treinar o Neuro gastam. <strong>Os pontos do ranking nunca diminuem</strong> — gastar moedas no reino não tira você do placar.</p>
         </details>
         <details>
           <summary>🏰 Construções e Neuro</summary>
-          <p>A Torre do Neuro é o coração do reino: nenhuma construção passa do nível dela, e o Neuro chega no máximo ao dobro. A Mina produz moedas sozinha até encher ({HORAS_ATE_ENCHER} h); o Cofre guarda moedas que nenhuma invasão leva; Muralha e Torre de Arqueiros defendem; o Quartel ataca; o Neuro ajuda nos dois.</p>
+          <p>A Torre do Neuro é o coração do reino: nenhuma construção passa do nível dela, o Neuro chega no máximo ao dobro e nela moram as tropas de defesa. A Mina produz moedas sozinha até encher ({HORAS_ATE_ENCHER} h); o Cofre guarda moedas que nenhuma invasão leva; Torre de Arqueiros, Canhão e Muralha defendem; o Quartel treina o exército.</p>
         </details>
         <details>
           <summary>⚔️ Invasões</summary>
-          <p>{ATAQUES_POR_DIA} invasões por dia, uma por reino. Vence quem tiver mais força na hora — cada lado tem uma sorte de ±{Math.round(SORTE * 100)}% e empate é da defesa. Quem vence leva {Math.round(FATIA_DO_SAQUE * 100)}% das moedas que estão fora do cofre (até {TETO_DO_SAQUE}) e +{TROFEUS.vitoriaAtacante} troféus; quem ataca e perde, {TROFEUS.ataqueFalho}. Defender bem vale +{TROFEUS.defesaVencida}; cair, {TROFEUS.derrotaDefensor}.</p>
+          <p>{ATAQUES_POR_DIA} invasões por dia, uma por reino, com o exército inteiro (que é gasto). A batalha é de verdade: cada tropa e cada defesa luta sozinha, e você assiste na ilha. Estrelas: 50% destruído, a Torre do Neuro no chão e 100%. O saque é {Math.round(FATIA_DO_SAQUE * 100)}% das moedas fora do cofre vezes a destruição (até {TETO_DO_SAQUE}); os troféus seguem as estrelas. Toda batalha fica na lista para assistir de novo.</p>
         </details>
         <details>
           <summary>🛡️ Escudos</summary>
