@@ -189,10 +189,10 @@ export default function Reino() {
       {reino.lotacao && (
         <div className="pf-cartao rn-lotacao">
           <div>
-            <div className="pf-estat__rotulo">🏝️ Lotação da ilha: {reino.lotacao.usado} de {reino.lotacao.capacidade} de espaço</div>
-            <Barra valor={reino.lotacao.usado} total={Math.max(1, reino.lotacao.capacidade)} rotulo="Lotação da ilha" />
+            <div className="pf-estat__rotulo">⛺ Lotação do Acampamento: {reino.lotacao.usado} de {reino.lotacao.capacidade} de espaço</div>
+            <Barra valor={reino.lotacao.usado} total={Math.max(1, reino.lotacao.capacidade)} rotulo="Lotação do Acampamento" />
           </div>
-          <p className="pf-estat__nota">Todas as tropas (exército + defesa) ficam à vista na ilha. Ilha lotada? Compre mais 🗺️ Terreno: cada expansão abre +25 de espaço.</p>
+          <p className="pf-estat__nota">Fora da batalha, todas as tropas (exército + defesa) ficam à vista na ilhota do Acampamento, ao lado do reino. Lotado? Aumente o ⛺ Acampamento: cada nível abre +25 de espaço.</p>
         </div>
       )}
       <Reserva destino="exercito" dados={reino.exercito} heroi={reino.heroi.ataque} ocupado={ocupado} aoTreinar={treinar} />

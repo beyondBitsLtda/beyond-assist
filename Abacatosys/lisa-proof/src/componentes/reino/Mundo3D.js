@@ -5,6 +5,7 @@ import * as THREE from "three";
 import Neuro, { usePersonagem } from "@/componentes/Neuro.js";
 import { LUGARES, PRACA, RAIO_DA_MURALHA, montarCombate, passo as passoDoCombate, resultadoDo, DT, DURACAO_MAXIMA, raioDaIlha } from "@/dominio/combate.js";
 import { CONSTRUCOES } from "@/dominio/reino.js";
+import { svgDaTropa, TAMANHO_DO_PAPEL, ALTURA_DE_VOO } from "./tropasDePapel.js";
 
 /**
  * O Reino em 3D: uma ilha flutuante low poly com as construções, e o Neuro como um recorte de
@@ -492,6 +493,78 @@ function ilha(p, terreno = 0) {
   return g;
 }
 
+// ------------------------------------------------------------------ a ilhota do Acampamento
+// Ao lado do reino, ligada por uma ponte: lá ficam todas as tropas fora da batalha. Cresce com o
+// nível do Acampamento (a lotação dele também).
+const raioDoAcampamento = (nivel) => 2.4 + 0.65 * (Math.max(1, Math.min(4, nivel || 1)) - 1);
+const PARA_A_CAMERA = [Math.SQRT1_2, Math.SQRT1_2];   // de onde a câmera olha, no começo
+const PARA_O_LADO = [Math.SQRT1_2, -Math.SQRT1_2];    // a direita da tela, no começo
+const VAO_DA_PONTE = 1.3;
+
+function ilhaDoAcampamento(p, nivel) {
+  const g = new THREE.Group();
+  const r = raioDoAcampamento(nivel);
+  const grama = p.malha(new THREE.CylinderGeometry(r + 0.08, r + 0.08, 0.22, 10), COR.grama, 0, -0.11, 0);
+  const terra = p.malha(new THREE.CylinderGeometry(r, r - 0.5, 0.8, 10), COR.terra, 0, -0.62, 0);
+  const fundo = p.malha(new THREE.ConeGeometry(r - 0.5, 2.2, 10), COR.rochaEscura, 0, -2.12, 0);
+  fundo.rotation.x = Math.PI;
+  g.add(grama, terra, fundo);
+  g.add(p.cilindro(r - 0.3, r - 0.3, 0.03, 10, "#c9b38a", 0, 0.015, 0)); // chão batido do acampamento
+  // fogueira e estandarte no fundo (do lado oposto à câmera), barracas na beirada de trás
+  const fundoX = -PARA_A_CAMERA[0] * (r - 0.7), fundoZ = -PARA_A_CAMERA[1] * (r - 0.7);
+  for (let i = 0; i < 4; i++) {
+    const tora = p.caixa(0.7, 0.1, 0.1, COR.madeiraEscura, fundoX, 0.06, fundoZ);
+    tora.rotation.y = (i * Math.PI) / 4;
+    g.add(tora);
+  }
+  const chama = p.malha(new THREE.OctahedronGeometry(0.22, 0), p.brilho("#ff8a1f"), fundoX, 0.3, fundoZ);
+  chama.scale.y = 1.6;
+  chama.userData.gira = true;
+  g.add(chama);
+  g.add(p.cilindro(0.03, 0.03, 1.6, 5, COR.madeiraEscura, fundoX + 0.6, 0.8, fundoZ - 0.2));
+  g.add(p.caixa(0.5, 0.32, 0.03, "#2f6fd6", fundoX + 0.85, 1.42, fundoZ - 0.2));
+  const barracas = 2 + (nivel || 1);
+  for (let i = 0; i < barracas; i++) {
+    const a = Math.atan2(-PARA_A_CAMERA[1], -PARA_A_CAMERA[0]) + (i - (barracas - 1) / 2) * 0.55;
+    const tenda = p.cone(0.42, 0.7, 4, i % 2 ? COR.vermelho : COR.lona, Math.cos(a) * (r - 0.45), 0.35, Math.sin(a) * (r - 0.45));
+    tenda.rotation.y = Math.PI / 4;
+    g.add(tenda);
+  }
+  // cerquinha na beirada, com a abertura da ponte
+  const aPonte = Math.atan2(-PARA_O_LADO[1], -PARA_O_LADO[0]);
+  for (let i = 0; i < 28; i++) {
+    const a = (i / 28) * Math.PI * 2;
+    if (Math.abs(Math.atan2(Math.sin(a - aPonte), Math.cos(a - aPonte))) < 0.35) continue;
+    g.add(p.caixa(0.06, 0.26, 0.06, COR.madeira, Math.cos(a) * (r - 0.08), 0.13, Math.sin(a) * (r - 0.08)));
+  }
+  g.traverse((o) => { o.userData.chave = "acampamento"; });
+  g.userData.raio = r;
+  return g;
+}
+
+/** A ponte de tábuas entre a beirada do reino e a do Acampamento. */
+function ponte(p, de, ate) {
+  const g = new THREE.Group();
+  const dx = ate[0] - de[0], dz = ate[1] - de[1];
+  const L = Math.hypot(dx, dz);
+  const ang = Math.atan2(dx, dz);
+  const n = Math.max(3, Math.round(L / 0.22));
+  for (let i = 0; i <= n; i++) {
+    const u = i / n;
+    const tabua = p.caixa(0.75, 0.06, 0.18, i % 2 ? COR.madeira : COR.madeiraEscura, de[0] + dx * u, -0.02 - Math.sin(u * Math.PI) * 0.12, de[1] + dz * u);
+    tabua.rotation.y = ang;
+    g.add(tabua);
+  }
+  for (const lado of [-1, 1]) {
+    for (let i = 0; i <= 4; i++) {
+      const u = i / 4;
+      const px = de[0] + dx * u + Math.cos(ang) * lado * 0.36, pz = de[1] + dz * u - Math.sin(ang) * lado * 0.36;
+      g.add(p.caixa(0.05, 0.3, 0.05, COR.madeiraEscura, px, 0.12 - Math.sin(u * Math.PI) * 0.12, pz));
+    }
+  }
+  return g;
+}
+
 function nuvens(p) {
   const g = new THREE.Group();
   // um pouco de brilho próprio: na sombra, nuvem branca virava pedra cinza
@@ -627,6 +700,8 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
     const mundo = new THREE.Group();
     const ilhaAtual = { grupo: ilha(p, 0), terreno: 0 };
     mundo.add(ilhaAtual.grupo);
+    // a ilhota do Acampamento e a ponte (montadas por definirAcampamento)
+    const ilhota = { grupo: null, ponte: null, nivel: 0, centro: [0, 0], raio: 0 };
     const grupoNuvens = nuvens(p);
     /** Troca a ilha quando o Terreno muda (o meu, ou o do rival durante a minha invasão). */
     function definirTerreno(terreno) {
@@ -638,6 +713,7 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
       ilhaAtual.terreno = tt;
       mundo.add(ilhaAtual.grupo);
       for (const n of grupoNuvens.children) n.userData.raio = n.userData.raioBase + 1.3 * tt;
+      if (ilhota.nivel) definirAcampamento(ilhota.nivel, true);
       if (typeof enquadrar === "function") enquadrar();
       sujo = true;
     }
@@ -653,6 +729,7 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
       const terrenoDaLista = lista.find((c) => c.chave === "terreno")?.nivel ?? ilhaAtual.terreno;
       for (const { chave, nivel } of lista) {
         if (chave === "terreno") { definirTerreno(nivel); continue; }
+        if (chave === "acampamento") { definirAcampamento(nivel); continue; }
         if (!CONSTRUTORES[chave]) continue;
         // construção da terra nova sem a terra comprada: nem lote vazio (ele ficava flutuando no ar)
         if ((CONSTRUCOES[chave]?.terreno || 0) > terrenoDaLista) {
@@ -697,37 +774,42 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
     // câmera: orbita em volta do centro; o enquadramento cabe a ilha em qualquer ângulo
     const vista = { azimute: Math.PI / 4, alvoAzimute: Math.PI / 4, elevacao: 0.56, distancia: 30 };
     const centro = new THREE.Vector3(0, 0.2, 0);
-    let enquadre = { meiaL: 8, meiaA: 5, cy: 0 };
     function posicionarCamera() {
       const { azimute: a, elevacao: e, distancia: d } = vista;
       camera.position.set(Math.sin(a) * Math.cos(e) * d, Math.sin(e) * d, Math.cos(a) * Math.cos(e) * d).add(centro);
       camera.lookAt(centro);
       camera.updateMatrixWorld();
+      ajustarFrustum();
     }
-    function enquadrar() {
+    /**
+     * Cabe o reino (e a ilhota do Acampamento, quando aparece) no quadro, para o ângulo de agora.
+     * Mede contornos das ilhas no espaço da câmera e centraliza — girar muda um pouco o enquadre.
+     */
+    const pontoDoContorno = new THREE.Vector3();
+    function ajustarFrustum() {
       const w = el.clientWidth || 1, h = el.clientHeight || 1;
       const aspecto = w / h;
-      const cantos = [];
-      const R = raioDaIlha(ilhaAtual.terreno) + 0.4;
-      for (const x of [-R, R]) for (const y of [-2.0, 3.6]) for (const z of [-R, R]) cantos.push(new THREE.Vector3(x, y, z));
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      const guardado = vista.azimute;
-      for (let i = 0; i < 12; i++) {
-        vista.azimute = (i / 12) * Math.PI * 2;
-        posicionarCamera();
-        for (const c of cantos) {
-          const v = c.clone().applyMatrix4(camera.matrixWorldInverse);
-          minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
+      const medir = (cx, cz, r, y0, y1) => {
+        for (let i = 0; i < 24; i++) {
+          const a = (i / 24) * Math.PI * 2;
+          for (const y of [y0, y1]) {
+            pontoDoContorno.set(cx + Math.cos(a) * r, y, cz + Math.sin(a) * r).applyMatrix4(camera.matrixWorldInverse);
+            minX = Math.min(minX, pontoDoContorno.x); maxX = Math.max(maxX, pontoDoContorno.x);
+            minY = Math.min(minY, pontoDoContorno.y); maxY = Math.max(maxY, pontoDoContorno.y);
+          }
         }
-      }
-      vista.azimute = guardado;
-      let meiaL = ((maxX - minX) / 2) * 0.68; // a ilha é redonda: as quinas da caixa sobram
-      let meiaA = ((maxY - minY) / 2) * 0.68;
+      };
+      medir(0, 0, raioDaIlha(ilhaAtual.terreno) + 0.2, -1.4, 3.2);
+      if (ilhota.grupo?.visible) medir(ilhota.centro[0], ilhota.centro[1], ilhota.raio + 0.2, -1.0, 2.6);
+      let meiaL = ((maxX - minX) / 2) * 1.04, meiaA = ((maxY - minY) / 2) * 1.06;
       if (meiaL / meiaA > aspecto) meiaA = meiaL / aspecto; else meiaL = meiaA * aspecto;
-      enquadre = { meiaL, meiaA, cy: (maxY + minY) / 2 };
-      Object.assign(camera, { left: -meiaL, right: meiaL, top: meiaA + enquadre.cy, bottom: -meiaA + enquadre.cy });
+      const cx = (maxX + minX) / 2, cy = (maxY + minY) / 2;
+      Object.assign(camera, { left: cx - meiaL, right: cx + meiaL, top: cy + meiaA, bottom: cy - meiaA });
       camera.updateProjectionMatrix();
-      renderizador.setSize(w, h, false);
+    }
+    function enquadrar() {
+      renderizador.setSize(el.clientWidth || 1, el.clientHeight || 1, false);
       posicionarCamera();
       sujo = true;
     }
@@ -761,6 +843,12 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
         const [x, y] = projetar(info.ancora);
         r.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
       }
+      const rAcamp = rotulos.current.acampamento;
+      if (rAcamp && ilhota.grupo) {
+        const r = ilhota.raio - 0.7;
+        const [x, y] = projetar(new THREE.Vector3(ilhota.centro[0] - PARA_A_CAMERA[0] * r, 1.9, ilhota.centro[1] - PARA_A_CAMERA[1] * r));
+        rAcamp.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+      }
       if (fala.current) {
         const [x, y] = projetar(new THREE.Vector3(neuro.position.x, 1.85, neuro.position.z));
         fala.current.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
@@ -774,7 +862,7 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
       const r = renderizador.domElement.getBoundingClientRect();
       const v = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
       raio.setFromCamera(v, camera);
-      const hit = raio.intersectObjects([folha, ...camadaPredios.children], true)[0];
+      const hit = raio.intersectObjects([folha, ...camadaPredios.children, ...(ilhota.grupo ? [ilhota.grupo] : [])], true)[0];
       if (!hit) return null;
       if (hit.object.userData.neuro) return { neuro: true };
       return hit.object.userData.chave ? { chave: hit.object.userData.chave } : null;
@@ -849,6 +937,24 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
       inimigo: new THREE.SpriteMaterial({ color: "#ef4444", depthTest: false }),
       predio: new THREE.SpriteMaterial({ color: "#f59e0b", depthTest: false }),
     };
+    const geoPapel = new THREE.PlaneGeometry(1, 1);
+    const geoSombraDaTropa = new THREE.CircleGeometry(0.5, 14);
+    const matSombraDaTropa = new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.2, depthWrite: false });
+    const materiaisDasTropas = new Map(); // "tipo:cor" → material (com a textura de papel)
+    /** O recorte de papel de uma tropa, na cor do time (carrega uma vez, depois reaproveita). */
+    function materialDaTropa(tipo, cor) {
+      const chave = `${tipo}:${cor}`;
+      if (materiaisDasTropas.has(chave)) return materiaisDasTropas.get(chave);
+      const tex = new THREE.CanvasTexture(document.createElement("canvas"));
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.35, side: THREE.DoubleSide });
+      mat.visible = false;
+      const img = new Image();
+      img.onload = () => { tex.image = recorteDePapel(img); tex.needsUpdate = true; mat.visible = true; sujo = true; };
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgDaTropa(tipo, cor));
+      materiaisDasTropas.set(chave, mat);
+      return mat;
+    }
     const matFogo = new THREE.MeshStandardMaterial({ color: "#ff7a1a", emissive: "#ff5a00", emissiveIntensity: 1.2, flatShading: true });
     const AZUL = "#2f6fd6", VERMELHO = "#c8332f";
     const FORA = new THREE.Vector3(5.3, 0, 4.7).normalize();
@@ -888,85 +994,39 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
       b.userData.cheio.material = material;
     }
 
+    /**
+     * Uma tropa: recorte de papel 2D (como o Neuro), sempre de frente para a câmera, com sombrinha.
+     * `g` anda; `b` vira para a câmera (e tomba ao cair); `papel` vira a folha ao mudar de lado.
+     */
     function boneco(tipo, cor) {
       const g = new THREE.Group();
       const b = new THREE.Group();
+      b.rotation.order = "YXZ";
       g.add(b);
       g.userData.boneco = b;
-      if (tipo === "balao") {
-        const bola = new THREE.Mesh(geo.corpoDragao, p.mat(cor)); bola.scale.set(1.5, 1.7, 1.5); bola.position.y = 0.45;
-        const cesta = new THREE.Mesh(geo.livro, p.mat(COR.madeira)); cesta.scale.set(1.4, 3, 1.8); cesta.position.y = -0.15;
-        const bomba = new THREE.Mesh(geo.bala, p.mat("#22252a")); bomba.position.y = -0.32;
-        b.add(bola, cesta, bomba);
-        b.scale.setScalar(1.1);
-        b.position.y = 2.0;
-        b.userData.altura = 2.0;
-      } else if (tipo === "curandeira") {
-        const corpo = new THREE.Mesh(geo.corpo, p.mat("#f4f1ea")); corpo.position.y = 0.19;
-        const cabeca = new THREE.Mesh(geo.cabeca, p.mat("#f2d3b1")); cabeca.position.y = 0.45;
-        const aureola = new THREE.Mesh(geo.aureola, p.brilho("#ffe066")); aureola.position.y = 0.62; aureola.rotation.x = Math.PI / 2;
-        const asaE = new THREE.Mesh(geo.asa, p.mat("#ffffff")); asaE.scale.set(0.6, 1, 0.8); asaE.position.set(-0.22, 0.32, -0.08);
-        const asaD = new THREE.Mesh(geo.asa, p.mat("#ffffff")); asaD.scale.set(0.6, 1, 0.8); asaD.position.set(0.22, 0.32, -0.08);
-        const faixa = new THREE.Mesh(geo.escudo, p.mat(cor)); faixa.position.set(0, 0.22, 0.12);
-        b.add(corpo, cabeca, aureola, asaE, asaD, faixa);
-        b.userData.asas = [asaE, asaD];
-        b.scale.setScalar(1.8);
-        b.position.y = 1.6;
-        b.userData.altura = 1.6;
-      } else if (tipo === "dragao") {
-        const corpo = new THREE.Mesh(geo.corpoDragao, p.mat(cor)); corpo.scale.set(1.0, 0.9, 1.7);
-        const focinho = new THREE.Mesh(geo.focinho, p.mat(cor)); focinho.position.set(0, 0.08, 0.6);
-        const cauda = new THREE.Mesh(geo.cauda, p.mat(cor)); cauda.position.set(0, 0, -0.65);
-        const asaE = new THREE.Mesh(geo.asa, p.mat("#3b2a4a")); asaE.position.set(-0.42, 0.12, 0);
-        const asaD = new THREE.Mesh(geo.asa, p.mat("#3b2a4a")); asaD.position.set(0.42, 0.12, 0);
-        b.add(corpo, focinho, cauda, asaE, asaD);
-        b.userData.asas = [asaE, asaD];
-        b.scale.setScalar(1.15);
-        b.position.y = 1.7;
-        b.userData.altura = 1.7;
-      } else if (tipo === "gigante") {
-        const corpo = new THREE.Mesh(geo.corpo, p.mat(cor)); corpo.position.y = 0.19;
-        const cabeca = new THREE.Mesh(geo.cabeca, p.mat("#e9c39a")); cabeca.position.y = 0.45;
-        const pe = new THREE.Mesh(geo.punho, p.mat("#e9c39a")); pe.position.set(-0.17, 0.2, 0.06);
-        const pd = new THREE.Mesh(geo.punho, p.mat("#e9c39a")); pd.position.set(0.17, 0.2, 0.06);
-        b.add(corpo, cabeca, pe, pd);
-        b.scale.setScalar(3.0);
-      } else {
-        const corpo = new THREE.Mesh(geo.corpo, p.mat(cor)); corpo.position.y = 0.19;
-        const cabeca = new THREE.Mesh(geo.cabeca, p.mat("#f2d3b1")); cabeca.position.y = 0.45;
-        b.add(corpo, cabeca);
-        if (tipo === "mago") {
-          corpo.material = p.mat("#5b3fa8");
-          const chapeu = new THREE.Mesh(geo.chapeu, p.mat("#3b2a7a")); chapeu.position.y = 0.6;
-          const cajado = new THREE.Mesh(geo.lanca, p.mat(COR.madeiraEscura)); cajado.position.set(0.15, 0.3, 0);
-          const orbe = new THREE.Mesh(geo.cabeca, p.brilho("#b388ff")); orbe.scale.setScalar(0.7); orbe.position.set(0.15, 0.6, 0);
-          const capa = new THREE.Mesh(geo.escudo, p.mat(cor)); capa.position.set(0, 0.3, -0.1); capa.scale.set(1.5, 1.5, 1.5);
-          b.add(chapeu, cajado, orbe, capa);
-        } else if (tipo === "bombardeiro") {
-          corpo.material = p.mat(cor);
-          const bomba = new THREE.Mesh(geo.bala, p.mat("#22252a")); bomba.scale.setScalar(1.6); bomba.position.set(0, 0.72, 0);
-          const pavio = new THREE.Mesh(geo.lanca, p.brilho("#ffb347")); pavio.scale.set(1, 0.25, 1); pavio.position.set(0, 0.92, 0);
-          b.add(bomba, pavio);
-          b.scale.setScalar(1.5);
-          g.add(b);
-          g.traverse((m) => { m.castShadow = true; });
-          return g;
-        } else if (tipo === "arqueira") {
-          const cabelo = new THREE.Mesh(geo.cabelo, p.mat("#7a3b1f")); cabelo.position.set(0, 0.49, -0.03); cabelo.scale.set(1, 0.8, 1.1);
-          const arco = new THREE.Mesh(geo.arco, p.mat(COR.madeiraEscura)); arco.position.set(0.15, 0.3, 0.05); arco.rotation.set(0, Math.PI / 2, Math.PI / 2);
-          b.add(cabelo, arco);
-          corpo.scale.set(0.85, 1, 0.85);
-        } else {
-          const elmo = new THREE.Mesh(geo.elmo, p.mat("#9aa3ad")); elmo.position.y = 0.55;
-          const escudo = new THREE.Mesh(geo.escudo, p.mat(cor)); escudo.position.set(-0.15, 0.22, 0.05);
-          const lanca = new THREE.Mesh(geo.lanca, p.mat("#8a8f98")); lanca.position.set(0.15, 0.33, 0);
-          b.add(elmo, escudo, lanca);
-          b.userData.lanca = lanca;
-        }
-        b.scale.setScalar(1.7);
-      }
-      g.traverse((m) => { m.castShadow = true; });
+      const lado = TAMANHO_DO_PAPEL[tipo] || 1;
+      const papel = new THREE.Mesh(geoPapel, materialDaTropa(tipo, cor));
+      papel.scale.set(lado, lado, 1);
+      papel.position.y = lado * 0.47;
+      papel.userData.lado = lado;
+      b.add(papel);
+      b.userData.papel = papel;
+      b.userData.vira = 1;
+      if (ALTURA_DE_VOO[tipo]) { b.position.y = ALTURA_DE_VOO[tipo]; b.userData.altura = ALTURA_DE_VOO[tipo]; }
+      const sombra = new THREE.Mesh(geoSombraDaTropa, matSombraDaTropa);
+      sombra.rotation.x = -Math.PI / 2;
+      sombra.position.y = 0.03;
+      sombra.scale.setScalar(lado * (ALTURA_DE_VOO[tipo] ? 0.45 : 0.6));
+      g.add(sombra);
       return g;
+    }
+    /** Papel de frente para a câmera; vira a folha quando anda para o outro lado da tela. */
+    function orientarPapel(b, dx, dz, dt) {
+      b.rotation.y = vista.azimute;
+      const lado = dx * Math.cos(vista.azimute) - dz * Math.sin(vista.azimute);
+      if (Math.abs(lado) > 0.003) b.userData.vira = lado > 0 ? 1 : -1;
+      const papel = b.userData.papel;
+      papel.scale.x += (b.userData.vira * papel.userData.lado - papel.scale.x) * Math.min(1, dt * 8);
     }
 
     function navio(corDaVela) {
@@ -1077,6 +1137,7 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
       if (sim.ilhaTrocada) atualizarConstrucoes(construcoesRef.current, false);
       neuro.visible = true;
       acampamento.visible = true;
+      if (ilhota.grupo) { ilhota.grupo.visible = true; ilhota.ponte.visible = true; posicionarCamera(); }
       const fim = sim.aoTerminar;
       sim = null;
       zoomAlvo = 1;
@@ -1102,6 +1163,7 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
       pontosDaIlha(entrada.defensor.construcoes.terreno || 0);
       neuro.visible = false;
       acampamento.visible = false;
+      if (ilhaTrocada && ilhota.grupo) { ilhota.grupo.visible = false; ilhota.ponte.visible = false; posicionarCamera(); }
       const barco = navio(souAtacante ? AZUL : VERMELHO);
       grupo.add(barco);
       const corpos = new Map();   // id da unidade → { malha, barra, x, z }
@@ -1127,7 +1189,8 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
         }
         const c = corpos.get(id);
         const u = e.unidades.find((o) => o.id === id);
-        return new THREE.Vector3(c ? c.malha.position.x : u?.x || 0, u?.tipo === "balao" ? 2.0 : u?.voa ? 1.9 : 0.4, c ? c.malha.position.z : u?.z || 0);
+        const meio = (ALTURA_DE_VOO[u?.tipo] || 0) + (TAMANHO_DO_PAPEL[u?.tipo] || 0.9) * 0.45;
+        return new THREE.Vector3(c ? c.malha.position.x : u?.x || 0, meio, c ? c.malha.position.z : u?.z || 0);
       };
 
       function aplicar(ev) {
@@ -1247,10 +1310,11 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
           const b = m.userData.boneco;
           if (m.userData.folha) { m.userData.folha.rotation.y = vista.azimute; m.userData.folha.position.y = 0.55 + (anda ? Math.abs(Math.sin(tt * 10)) * 0.08 : 0); }
           if (b) {
-            if (anda) m.rotation.y = Math.atan2(dx, dz);
-            if (u.voa) { for (const asa of b.userData.asas || []) asa.rotation.z = Math.sin(tt * 9) * 0.5 * (asa.position.x > 0 ? 1 : -1); b.position.y = (b.userData.altura || 1.7) + Math.sin(tt * 3 + u.x) * 0.1; }
-            else { b.rotation.z = anda ? Math.sin(tt * 12 + u.x) * 0.12 : 0; m.position.y = anda ? Math.abs(Math.sin(tt * 12 + u.z)) * 0.06 : 0; }
-            if (c.golpe > 0) { c.golpe -= dt; b.position.z = c.golpe > 0 ? 0.12 : 0; if (b.userData.lanca) b.userData.lanca.rotation.x = c.golpe > 0 ? 0.8 : 0; }
+            orientarPapel(b, dx, dz, dt);
+            const papel = b.userData.papel;
+            if (b.userData.altura) { b.position.y = b.userData.altura + Math.sin(tt * 3 + u.x) * 0.1; papel.scale.y = papel.userData.lado * (1 + Math.sin(tt * 8 + u.z) * 0.04); }
+            else { papel.rotation.z = anda ? Math.sin(tt * 12 + u.x) * 0.08 : 0; b.position.y = anda ? Math.abs(Math.sin(tt * 12 + u.z)) * 0.08 : 0; }
+            if (c.golpe > 0) { c.golpe -= dt; papel.rotation.z = c.golpe > 0 ? -0.35 * b.userData.vira : 0; }
           }
           if (c.caiu) {
             c.caiu += dt;
@@ -1259,7 +1323,7 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
             c.barra.visible = false;
             continue;
           }
-          const alto = u.tipo === "balao" ? 3.4 : u.voa ? 2.6 : u.tipo === "gigante" ? 1.6 : u.tipo === "heroi" ? 1.35 : 0.95;
+          const alto = u.tipo === "heroi" ? 1.35 : (ALTURA_DE_VOO[u.tipo] || 0) + (TAMANHO_DO_PAPEL[u.tipo] || 1) * 0.98 + 0.08;
           posicionarBarra(c.barra, m.position.x, alto, m.position.z, u.vida / u.vidaMax, u.lado === meuLado ? matBarra.aliado : matBarra.inimigo);
         }
         // barras das construções (só aparecem quando apanham)
@@ -1283,84 +1347,109 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
     const aoPular = () => sim?.pular?.();
     window.addEventListener("reino-combate-pular", aoPular);
 
-    // ---- as tropas em casa: o exército acampado perto do Quartel, as tropas de defesa em volta da
-    // Torre do Neuro (dentro da muralha). Um boneco por tropa; quem voa fica pairando. Somem
-    // durante a batalha (a batalha tem os bonecos dela) e voltam depois.
+    // ---- as tropas em casa: TODAS na ilhota do Acampamento, à vista — o exército na metade da
+    // frente (de cara para a câmera), as tropas de defesa na de trás. Na batalha elas somem (a
+    // batalha tem os bonecos dela) e voltam depois.
     const acampamento = new THREE.Group();
     mundo.add(acampamento);
     let emCasa = [];
+    let ultimasTropas = null;
     const COR_DA_DEFESA = "#2e7d4f";
-    const ORDEM_EM_CASA = ["gigante", "balao", "dragao", "curandeira", "mago", "bombardeiro", "arqueira", "guerreiro"];
-    function livre(x, z, R) {
-      if (Math.hypot(x, z) > R - 0.55) return false;
-      if (Math.hypot(x - PRACA[0], z - PRACA[1]) < 0.7) return false; // o meio da praça é do Neuro
-      for (const chave of predios.keys()) {
-        const [lx, lz] = chave === "muralha" ? LUGARES.castelo : LUGARES[chave];
-        const folga = chave === "castelo" || chave === "muralha" ? 2.6 : 1.05; // em volta da Torre fica a guarda
-        if (Math.hypot(x - lx, z - lz) < folga) return false;
-      }
-      return true;
+    const ORDEM_EM_CASA = ["gigante", "dragao", "balao", "curandeira", "mago", "bombardeiro", "arqueira", "guerreiro"];
+
+    function definirAcampamento(nivel, forcar = false) {
+      const n = Math.max(1, Math.min(4, nivel || 1));
+      if (!forcar && n === ilhota.nivel && ilhota.grupo) return;
+      for (const g of [ilhota.grupo, ilhota.ponte]) if (g) { mundo.remove(g); g.traverse((m) => m.geometry?.dispose()); }
+      const R = raioDaIlha(ilhaAtual.terreno);
+      const r = raioDoAcampamento(n);
+      const dist = R + VAO_DA_PONTE + r;
+      ilhota.centro = [PARA_O_LADO[0] * dist, PARA_O_LADO[1] * dist];
+      ilhota.raio = r;
+      ilhota.nivel = n;
+      ilhota.grupo = ilhaDoAcampamento(p, n);
+      ilhota.grupo.position.set(ilhota.centro[0], 0, ilhota.centro[1]);
+      ilhota.ponte = ponte(p, [PARA_O_LADO[0] * (R - 0.2), PARA_O_LADO[1] * (R - 0.2)], [PARA_O_LADO[0] * (R + VAO_DA_PONTE + 0.2), PARA_O_LADO[1] * (R + VAO_DA_PONTE + 0.2)]);
+      mundo.add(ilhota.grupo, ilhota.ponte);
+      girando = girando.filter((o) => o.parent);
+      ilhota.grupo.traverse((o) => { if (o.userData.gira) girando.push(o); });
+      if (ultimasTropas) mostrarTropas(ultimasTropas);
+      if (typeof enquadrar === "function") enquadrar();
     }
+
     /**
-     * Vagas em FILEIRAS (uma grade virada para a praça), das mais perto do ponto para as mais
-     * longe, sem pisar em construção nem sair da ilha — o exército fica arrumado como acampamento.
+     * A grade do acampamento, alinhada à câmera: `i` é a fileira (positivo = mais perto da câmera),
+     * `j` a posição na fileira. Fora fica a beirada, as barracas e a fogueira.
      */
-    function vagasEmFileiras(cx, cz, quantas, R, frente) {
-      const passo = 0.62;
-      const lado = [-frente[1], frente[0]];
-      const pontos = [];
-      for (let i = -14; i <= 14; i++) for (let j = -14; j <= 14; j++) {
-        const x = cx + frente[0] * i * passo + lado[0] * j * passo;
-        const z = cz + frente[1] * i * passo + lado[1] * j * passo;
-        pontos.push([x, z, Math.abs(i) * 1.15 + Math.abs(j)]); // fileiras largas, pouco fundas
-      }
-      pontos.sort((a, b) => a[2] - b[2]);
-      const vagas = [];
-      for (const [x, z] of pontos) {
-        if (vagas.length >= quantas) break;
-        if (livre(x, z, R)) vagas.push([x, z]);
+    const PASSO_LATERAL = 0.56, PASSO_FILEIRA = 0.62;
+    function gradeDoAcampamento(aperto) {
+      const [cx, cz] = ilhota.centro;
+      const r = ilhota.raio - 0.55;
+      const fundo = [cx - PARA_A_CAMERA[0] * (ilhota.raio - 0.7), cz - PARA_A_CAMERA[1] * (ilhota.raio - 0.7)];
+      const vagas = new Map();
+      for (let i = -20; i <= 20; i++) for (let j = -20; j <= 20; j++) {
+        const x = cx + PARA_A_CAMERA[0] * i * PASSO_FILEIRA * aperto + PARA_O_LADO[0] * j * PASSO_LATERAL * aperto;
+        const z = cz + PARA_A_CAMERA[1] * i * PASSO_FILEIRA * aperto + PARA_O_LADO[1] * j * PASSO_LATERAL * aperto;
+        if (Math.hypot(x - cx, z - cz) > r) continue;
+        if (Math.hypot(x - fundo[0], z - fundo[1]) < 1.1) continue;
+        vagas.set(`${i},${j}`, { i, j, x, z });
       }
       return vagas;
     }
+
     function mostrarTropas(tropas) {
+      ultimasTropas = tropas;
       for (const m of [...acampamento.children]) acampamento.remove(m);
       emCasa = [];
-      const R = raioDaIlha(ilhaAtual.terreno);
-      const [qx, qz] = LUGARES.quartel;
-      const lista = (reserva) => ORDEM_EM_CASA.flatMap((tipo) => Array.from({ length: Math.max(0, tropas?.[reserva]?.[tipo] || 0) }, () => tipo));
-      // exército: começa ao lado do Quartel, virado para a praça
-      const doExercito = lista("exercito");
-      const ancora = [qx + (PRACA[0] - qx) * 0.42, qz + (PRACA[1] - qz) * 0.42];
-      const dq = Math.hypot(PRACA[0] - qx, PRACA[1] - qz) || 1;
-      const frente = [(PRACA[0] - qx) / dq, (PRACA[1] - qz) / dq];
-      const olhando = Math.atan2(frente[0], frente[1]);
-      vagasEmFileiras(ancora[0], ancora[1], doExercito.length, R, frente).forEach(([x, z], i) => {
-        const m = boneco(doExercito[i], AZUL);
+      if (!ilhota.grupo) return;
+      // os pequenos na frente e os grandes atrás (não tampam ninguém); o exército ocupa da beirada da
+      // frente para o meio, a defesa do meio para o fundo — e quem não couber na sua metade, usa a outra
+      const lista = (reserva) => ORDEM_EM_CASA.flatMap((tipo) => Array.from({ length: Math.max(0, tropas?.[reserva]?.[tipo] || 0) }, () => tipo)).reverse();
+      const exercito = lista("exercito"), guarnicao = lista("guarnicao");
+      let lugares = [];
+      for (const aperto of [1, 0.88, 0.76, 0.66, 0.56]) {
+        lugares = distribuir(gradeDoAcampamento(aperto), exercito, guarnicao);
+        if (lugares.length >= exercito.length + guarnicao.length) break;
+      }
+      lugares.forEach(({ tipo, cor, x, z }, n) => {
+        const m = boneco(tipo, cor);
         m.position.set(x, 0, z);
-        m.rotation.y = olhando; // todos virados para o mesmo lado, como tropa em forma
         acampamento.add(m);
-        emCasa.push({ malha: m, fase: i * 0.7 });
-      });
-      // tropas de defesa: de guarda logo do lado de fora da muralha, começando pelo lado da praça
-      // (o que a câmera vê) e abrindo para os dois lados; se der a volta, um segundo anel
-      const daDefesa = lista("guarnicao");
-      const [cx, cz] = LUGARES.castelo;
-      const paraPraca = Math.atan2(PRACA[1] - cz, PRACA[0] - cx);
-      daDefesa.forEach((tipo, i) => {
-        const anel = Math.floor(i / 24);
-        const k = i % 24;
-        const lado = k % 2 ? -1 : 1;
-        const a = paraPraca + lado * Math.ceil(k / 2) * ((Math.PI * 2) / 24);
-        const r = 2.25 + anel * 0.6;
-        const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-        if (Math.hypot(x, z) > R - 0.5) return;
-        const m = boneco(tipo, COR_DA_DEFESA);
-        m.position.set(x, 0, z);
-        m.rotation.y = Math.atan2(Math.cos(a), Math.sin(a)); // de costas para a Torre, de olho em quem chega
-        acampamento.add(m);
-        emCasa.push({ malha: m, fase: i * 0.9 });
+        emCasa.push({ malha: m, fase: n * 0.7 });
       });
       sujo = true;
+    }
+
+    function distribuir(vagas, exercito, guarnicao) {
+      const lugares = [];
+      const todas = [...vagas.values()];
+      const meio = (a, b) => Math.abs(a.j) - Math.abs(b.j);
+      const daFrente = todas.filter((v) => v.i >= 0).sort((a, b) => b.i - a.i || meio(a, b));
+      const doFundo = todas.filter((v) => v.i < 0).sort((a, b) => b.i - a.i || meio(a, b));
+      const usadas = new Set();
+      const chave = (v) => `${v.i},${v.j}`;
+      const colocar = (tipo, ordem, cor) => {
+        const grande = (TAMANHO_DO_PAPEL[tipo] || 1) > 1.4;
+        for (const v of ordem) {
+          if (usadas.has(chave(v))) continue;
+          let x = v.x, z = v.z;
+          if (grande) {
+            // ocupa duas vagas lado a lado, e a fileira de trás delas
+            const lado = [`${v.i},${v.j + 1}`, `${v.i - 1},${v.j}`, `${v.i - 1},${v.j + 1}`];
+            if (!lado.every((k) => vagas.has(k) && !usadas.has(k))) continue;
+            for (const k of lado) usadas.add(k);
+            const o = vagas.get(lado[2]);
+            x = (v.x + o.x) / 2; z = (v.z + o.z) / 2;
+          }
+          usadas.add(chave(v));
+          lugares.push({ tipo, cor, x, z });
+          return true;
+        }
+        return false;
+      };
+      for (const tipo of exercito) colocar(tipo, daFrente, AZUL) || colocar(tipo, doFundo, AZUL);
+      for (const tipo of guarnicao) colocar(tipo, doFundo, COR_DA_DEFESA) || colocar(tipo, [...daFrente].reverse(), COR_DA_DEFESA);
+      return lugares;
     }
 
     // o laço: só desenha com a tela visível
@@ -1453,15 +1542,18 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
         sujo = true;
       }
       if (!semMovimento && girando.length) for (const o of girando) o.rotation.y += dt * 1.6;
+      if (semMovimento && emCasa.length && sujo) for (const u of emCasa) if (u.malha.userData.boneco) orientarPapel(u.malha.userData.boneco, 0, 0, 1);
       if (!semMovimento && !sim && emCasa.length) {
         const t = agora / 1000;
         for (const u of emCasa) {
           const b = u.malha.userData.boneco;
           if (!b) continue;
+          orientarPapel(b, 0, 0, dt);
+          const papel = b.userData.papel;
           if (b.userData.altura) {
             b.position.y = b.userData.altura + Math.sin(t * 2 + u.fase) * 0.08;
-            for (const asa of b.userData.asas || []) asa.rotation.z = Math.sin(t * 6 + u.fase) * 0.4 * (asa.position.x > 0 ? 1 : -1);
-          } else b.rotation.z = Math.sin(t * 1.5 + u.fase) * 0.04;
+            papel.scale.y = papel.userData.lado * (1 + Math.sin(t * 6 + u.fase) * 0.03);
+          } else papel.rotation.z = Math.sin(t * 1.5 + u.fase) * 0.04;
         }
       }
 
@@ -1505,6 +1597,8 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
       }
       for (const g of Object.values(geo)) g.dispose();
       for (const m of Object.values(matBarra)) m.dispose();
+      for (const m of materiaisDasTropas.values()) { m.map?.dispose(); m.dispose(); }
+      geoPapel.dispose(); geoSombraDaTropa.dispose(); matSombraDaTropa.dispose();
       matFogo.dispose();
       observaTamanho.disconnect();
       observaVisao.disconnect();
@@ -1561,7 +1655,7 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
 
   return (
     <div className={`rn-mundo${legenda ? " rn-mundo--batalha" : ""}`} ref={caixa}>
-      {construcoes.filter((c) => c.chave !== "terreno" && (!CONSTRUCOES[c.chave]?.terreno || (construcoes.find((x) => x.chave === "terreno")?.nivel || 0) >= CONSTRUCOES[c.chave].terreno)).map((c) => (
+      {construcoes.filter((c) => c.chave !== "terreno" && (c.chave === "acampamento" || !CONSTRUCOES[c.chave]?.terreno || (construcoes.find((x) => x.chave === "terreno")?.nivel || 0) >= CONSTRUCOES[c.chave].terreno)).map((c) => (
         <button key={c.chave} type="button" className={`rn-mundo__rotulo${c.nivel === 0 ? " rn-mundo__rotulo--vazio" : ""}`}
           ref={(n) => { rotulos.current[c.chave] = n; }}
           onClick={() => aoEscolher?.(c.chave)}
