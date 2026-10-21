@@ -10,31 +10,53 @@
 // mais forte a cada nível.
 //
 // Números por golpe: `dano` a cada `intervalo` segundos. Distâncias na unidade da ilha (ela tem
-// raio 7).
+// raio 7, e cresce com o Terreno). `area` = raio do dano em área; `suicida` = explode no golpe;
+// `cura` = vida devolvida às tropas aliadas em volta, a cada `intervalo`. `defende` = pode
+// morar na guarnição (tropas de defesa).
 
 export const TROPAS = {
   guerreiro: {
-    nome: "Guerreiro", emoji: "🗡️", espaco: 1, custo: 10, vida: 70, dano: 8, intervalo: 1.0,
-    alcance: 0.6, velocidade: 1.6, voa: false, acertaAr: false, alvo: "qualquer", nivelMinimo: 1,
+    nome: "Guerreiro", emoji: "🗡️", espaco: 1, custo: 10, vida: 70, dano: 10, intervalo: 1.0,
+    alcance: 0.6, velocidade: 1.6, voa: false, acertaAr: false, alvo: "qualquer", nivelMinimo: 1, defende: true,
     descricao: "Corpo a corpo, barato e valente. Ataca o que estiver mais perto.",
   },
   arqueira: {
-    nome: "Arqueira", emoji: "🏹", espaco: 1, custo: 20, vida: 32, dano: 7, intervalo: 1.0,
-    alcance: 3.0, velocidade: 1.7, voa: false, acertaAr: true, alvo: "qualquer", nivelMinimo: 1,
+    nome: "Arqueira", emoji: "🏹", espaco: 1, custo: 20, vida: 32, dano: 9, intervalo: 1.0,
+    alcance: 3.0, velocidade: 1.7, voa: false, acertaAr: true, alvo: "qualquer", nivelMinimo: 1, defende: true,
     descricao: "Atira de longe, por cima da muralha, e acerta quem voa. Frágil de perto.",
   },
+  bombardeiro: {
+    nome: "Bombardeiro", emoji: "💥", espaco: 2, custo: 60, vida: 30, dano: 30, intervalo: 1.0, contraMuralha: 12,
+    alcance: 0.5, velocidade: 2.2, voa: false, acertaAr: false, alvo: "muralha", suicida: true, nivelMinimo: 3,
+    descricao: "Corre direto para a Muralha e explode: estrago enorme nela (12×). Some na explosão.",
+  },
   gigante: {
-    nome: "Gigante", emoji: "🪨", espaco: 5, custo: 100, vida: 600, dano: 18, intervalo: 1.5,
-    alcance: 0.8, velocidade: 1.0, voa: false, acertaAr: false, alvo: "defesa", nivelMinimo: 2,
+    nome: "Gigante", emoji: "🪨", espaco: 5, custo: 100, vida: 650, dano: 22, intervalo: 1.5,
+    alcance: 0.8, velocidade: 1.0, voa: false, acertaAr: false, alvo: "defesa", nivelMinimo: 2, defende: true,
     descricao: "Aguenta muito dano e só vai atrás das defesas — o escudo das outras tropas.",
   },
+  mago: {
+    nome: "Mago", emoji: "🧙", espaco: 4, custo: 120, vida: 75, dano: 32, intervalo: 1.5, area: 0.8,
+    alcance: 2.6, velocidade: 1.5, voa: false, acertaAr: true, alvo: "qualquer", nivelMinimo: 3, defende: true,
+    descricao: "Lança bolas de energia de longe, com dano em área — ótimo contra tropas juntas.",
+  },
+  balao: {
+    nome: "Balão", emoji: "🎈", espaco: 5, custo: 150, vida: 340, dano: 90, intervalo: 2.5,
+    alcance: 0.5, velocidade: 0.9, voa: true, acertaAr: false, alvo: "defesa", nivelMinimo: 4,
+    descricao: "Voa devagar e solta bombas pesadas, só nas defesas. Defesa Aérea é o pesadelo dele.",
+  },
   dragao: {
-    nome: "Dragão", emoji: "🐉", espaco: 15, custo: 380, vida: 1100, dano: 55, intervalo: 1.25,
-    alcance: 1.5, velocidade: 1.3, voa: true, acertaAr: true, alvo: "qualquer", nivelMinimo: 4,
-    descricao: "Voa por cima de tudo e cospe fogo. Canhão não o alcança; só flechas.",
+    nome: "Dragão", emoji: "🐉", espaco: 15, custo: 380, vida: 1100, dano: 65, intervalo: 1.25,
+    alcance: 1.5, velocidade: 1.3, voa: true, acertaAr: true, alvo: "qualquer", nivelMinimo: 4, defende: true,
+    descricao: "Voa por cima de tudo e cospe fogo. Canhão não o alcança; só flechas e magia.",
+  },
+  curandeira: {
+    nome: "Curandeira", emoji: "🧚", espaco: 14, custo: 400, vida: 450, dano: 0, cura: 30, intervalo: 1.0,
+    alcance: 2.5, velocidade: 1.4, voa: true, acertaAr: false, alvo: "aliado", nivelMinimo: 5,
+    descricao: "Voa atrás do exército e cura as tropas em volta. Não ataca — proteja-a das flechas.",
   },
 };
-export const ORDEM_DAS_TROPAS = ["guerreiro", "arqueira", "gigante", "dragao"];
+export const ORDEM_DAS_TROPAS = ["guerreiro", "arqueira", "bombardeiro", "gigante", "mago", "balao", "dragao", "curandeira"];
 export const RESERVAS = { exercito: "exército", guarnicao: "tropas de defesa" };
 
 /** O herói Neuro. No ataque luta corpo a corpo; na defesa atira livros de longe (e acerta quem voa). */
@@ -79,6 +101,7 @@ export function podeTreinar({ tropa, quantidade, destino, niveis, reservas, sald
   const casa = destino === "exercito" ? "quartel" : "castelo";
   const nivel = niveis?.[casa] || 0;
   if (destino === "exercito" && nivel < 1) return { ok: false, motivo: "construa o Quartel para treinar tropas" };
+  if (destino === "guarnicao" && !def.defende) return { ok: false, motivo: `${def.nome} não serve para defesa` };
   if (nivel < def.nivelMinimo) {
     return { ok: false, motivo: `${def.nome} pede ${destino === "exercito" ? "Quartel" : "Torre do Neuro"} no nível ${def.nivelMinimo}` };
   }
@@ -103,7 +126,7 @@ export function somarTropas(a, b, sinal = 1) {
 /** Força de ataque por segundo de um grupo (para a tela comparar exércitos). */
 export function danoPorSegundo(valor, nivelDoNeuro = 0, lado = "ataque") {
   const c = contagens(valor);
-  let total = ORDEM_DAS_TROPAS.reduce((s, t) => s + (c[t] || 0) * (TROPAS[t].dano / TROPAS[t].intervalo), 0);
+  let total = ORDEM_DAS_TROPAS.reduce((s, t) => s + (c[t] || 0) * (TROPAS[t].dano / TROPAS[t].intervalo) * (TROPAS[t].area ? 1.5 : 1), 0);
   if (nivelDoNeuro > 0) { const h = heroiNeuro(nivelDoNeuro, lado); total += h.dano / h.intervalo; }
   return Math.round(total);
 }

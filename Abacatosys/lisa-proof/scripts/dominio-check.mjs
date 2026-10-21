@@ -15,14 +15,16 @@ import {
   periodoDe, periodoPermitido, pontosDoQuiz, pontosDaNota, validarQuiz, quizParaTela,
   separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo, podeReenviar, entregaConcluida,
   validarAvaliacao, assuntoAtual, mapaDaTrilha, TENTATIVAS, RODADAS_POR_DIA, podeAbrirRodada, fatorDaRodada, comFatorDaRodada,
+  perguntaRepetida, perguntasNovas, exercicioRepetido,
 } from "../src/dominio/pratica.js";
+import { PERSONAGENS, personagensDe, podeEscolherPersonagem } from "../src/dominio/personagens.js";
 import { nomePublico, apelidoValido, posicionar, ANONIMO } from "../src/dominio/ranking.js";
 import {
   podeMelhorar, podeSubirNeuro, producaoAcumulada, podeInvadir, batalha, saldoDe, somarTrofeus,
   faixaDeDefesa, estagioDoNeuro, ATAQUES_POR_DIA, TETO_DO_SAQUE, saqueDo, trofeusDoCombate,
-  rivalSimulado, simularBatalha, exercitoDeTreino, previsaoDeEstrelas, combateDe,
+  rivalSimulado, simularBatalha, exercitoDeTreino, previsaoDeEstrelas, combateDe, taxaDeProducao,
 } from "../src/dominio/reino.js";
-import { montarCombate, passo as passoDoCombate, resultadoDo, resolverCombate } from "../src/dominio/combate.js";
+import { montarCombate, passo as passoDoCombate, resultadoDo, resolverCombate, raioDaIlha } from "../src/dominio/combate.js";
 import {
   capacidadeDoExercito, capacidadeDaGuarnicao, podeTreinar, espacoUsado, somarTropas, contagens, totalDeTropas,
 } from "../src/dominio/tropas.js";
@@ -665,6 +667,135 @@ caso("simulação: do lado de quem joga — atacar e defender", () => {
   assert.equal(def.minhasMoedas, def.saque ? -def.saque : 0);
   const p = previsaoDeEstrelas(combateDe({ atacante: { exercito: { guerreiro: 10 } }, defensor: { construcoes: { castelo: 1 } } }), 4);
   assert.equal(p, 3);
+});
+
+// ---------------------------------------------------------------- terreno e construções novas (21/10/2026)
+caso("terreno: a ilha cresce e libera construções novas", () => {
+  const r = reinoBase({ construcoes: { castelo: 3, mina: 1 } });
+  assert.match(podeMelhorar(r, "defesaAerea", 99999).motivo, /expansão 1 do Terreno/);
+  assert.deepEqual(podeMelhorar(r, "terreno", 600), { ok: true, custo: 600 });
+  assert.equal(podeMelhorar(reinoBase({ construcoes: { castelo: 1, terreno: 1 } }), "terreno", 99999).ok, false); // teto da torre
+  const comTerra = reinoBase({ construcoes: { castelo: 3, terreno: 2 } });
+  assert.equal(podeMelhorar(comTerra, "morteiro", 99999).ok, true);
+  assert.match(podeMelhorar(comTerra, "torreRaio", 99999).motivo, /expansão 3/);
+  assert.equal(raioDaIlha(0), 7);
+  assert.equal(raioDaIlha(3), 10.6);
+});
+caso("biblioteca: produz junto com a mina", () => {
+  assert.equal(taxaDeProducao({ mina: 2, biblioteca: 3 }), 8);
+  const r = reinoBase({ construcoes: { castelo: 3, mina: 2, biblioteca: 3 }, coletado_em: "2026-10-20T00:00:00Z" });
+  assert.equal(producaoAcumulada(r, new Date("2026-10-20T02:00:00Z")), 16);
+  assert.equal(producaoAcumulada(r, new Date("2026-10-23T00:00:00Z")), 96); // teto: 8/h × 12 h
+});
+caso("tropas novas: liberação, guarnição só com quem defende", () => {
+  const niveis = { quartel: 5, castelo: 5 };
+  assert.equal(podeTreinar({ tropa: "curandeira", quantidade: 1, destino: "exercito", niveis, reservas: {}, saldo: 9999 }).ok, true);
+  assert.match(podeTreinar({ tropa: "curandeira", quantidade: 1, destino: "guarnicao", niveis, reservas: {}, saldo: 9999 }).motivo, /não serve para defesa/);
+  assert.match(podeTreinar({ tropa: "bombardeiro", quantidade: 1, destino: "exercito", niveis: { quartel: 2 }, reservas: {}, saldo: 9999 }).motivo, /nível 3/);
+  assert.equal(podeTreinar({ tropa: "mago", quantidade: 1, destino: "guarnicao", niveis, reservas: {}, saldo: 9999 }).ok, true);
+});
+caso("combate: bombardeiro explode na muralha; curandeira cura", () => {
+  const b = montarCombate({ atacante: { exercito: { bombardeiro: 2 }, neuro_nivel: 0 }, defensor: { construcoes: { castelo: 2, muralha: 2 } }, semente: 1 }); // sem o herói, só os bombardeiros batem
+  let explosoes = 0;
+  while (!b.fim) for (const ev of passoDoCombate(b)) if (ev.explodiu) explosoes++;
+  assert.equal(explosoes, 2);
+  assert.equal(b.muralha.vida, b.muralha.vidaMax - 2 * 30 * 12); // 12× contra a muralha
+  const c = montarCombate({ atacante: { exercito: { guerreiro: 10, curandeira: 1 }, neuro_nivel: 1 }, defensor: { construcoes: { castelo: 1, torre: 3 } }, semente: 1 });
+  let curas = 0;
+  while (!c.fim) for (const ev of passoDoCombate(c)) if (ev.tipo === "cura") curas++;
+  assert.ok(curas > 0);
+  // só curandeira não segura a batalha aberta
+  const so = resolverCombate({ atacante: { exercito: { curandeira: 1 }, neuro_nivel: 0 }, defensor: { construcoes: { castelo: 1 } }, semente: 1 });
+  assert.ok(so.duracao < 1);
+});
+caso("combate: defesa aérea só no ar, morteiro tem alcance mínimo e dano em área", () => {
+  const aerea = montarCombate({ atacante: { exercito: { guerreiro: 4, balao: 2 }, neuro_nivel: 1 }, defensor: { construcoes: { castelo: 2, terreno: 1, defesaAerea: 2 } }, semente: 1 });
+  const voam = new Set();
+  let tirosNoChao = 0, tirosNoAr = 0;
+  while (!aerea.fim) {
+    for (const u of aerea.unidades) if (u.voa) voam.add(u.id);
+    for (const ev of passoDoCombate(aerea)) if (ev.tipo === "tiro" && ev.de === "p-defesaAerea") (voam.has(ev.para) ? tirosNoAr++ : tirosNoChao++);
+  }
+  assert.ok(tirosNoAr > 0);
+  assert.equal(tirosNoChao, 0);
+  const mort = montarCombate({ atacante: { exercito: { guerreiro: 12 }, neuro_nivel: 0 }, defensor: { construcoes: { castelo: 3, terreno: 2, morteiro: 3 } }, semente: 2 });
+  const morteiro = mort.predios.find((p) => p.chave === "morteiro");
+  let perto = 0, atingidosNumTiro = 0;
+  while (!mort.fim) {
+    const vidas = new Map(mort.unidades.map((u) => [u.id, u.vida]));
+    const ev = passoDoCombate(mort);
+    for (const x of ev) {
+      if (x.tipo !== "tiro" || x.de !== "p-morteiro") continue;
+      const alvo = mort.unidades.find((u) => u.id === x.para);
+      if (Math.sqrt((alvo.x - morteiro.x) ** 2 + (alvo.z - morteiro.z) ** 2) < 1.6) perto++;
+      atingidosNumTiro = Math.max(atingidosNumTiro, mort.unidades.filter((u) => vidas.has(u.id) && u.vida < vidas.get(u.id)).length);
+    }
+  }
+  assert.equal(perto, 0);
+  assert.ok(atingidosNumTiro >= 2); // pegou mais de um de uma vez
+});
+caso("combate: ilha maior estica o desembarque até a beirada nova", () => {
+  const pequena = montarCombate({ atacante: { exercito: { guerreiro: 1 } }, defensor: { construcoes: { castelo: 1 } }, semente: 1 });
+  const grande = montarCombate({ atacante: { exercito: { guerreiro: 1 } }, defensor: { construcoes: { castelo: 3, terreno: 3 } }, semente: 1 });
+  assert.equal(pequena.entradas[0].ponto[0], 6.525);
+  assert.ok(grande.entradas[0].ponto[0] > 9.5);
+});
+caso("simulação: rival sem Terreno não ganha construção da terra nova", () => {
+  const base = { construcoes: { castelo: 3, terreno: 1, defesaAerea: 1, morteiro: 0 }, neuro_nivel: 3 };
+  const forte = rivalSimulado(base, "forte");
+  assert.equal(forte.construcoes.terreno, 2);
+  assert.equal(forte.construcoes.morteiro, 1);
+  const fraco = rivalSimulado(base, "fraco");
+  assert.equal(fraco.construcoes.terreno, 0);
+  assert.equal(fraco.construcoes.defesaAerea, 0);
+});
+
+
+// ---------------------------------------------------------------- chamados de 20/10/2026
+// as perguntas reais do chamado: a rodada 2 reformulava a 1, e a rodada 3 saiu IGUAL à 2
+const rodada1 = [
+  "Quem é considerado o criador da linguagem de programação C?",
+  "Qual é a principal função do compilador GCC no desenvolvimento em C?",
+  "Qual das seguintes etapas NÃO faz parte do ciclo padrão de execução de um programa em C?",
+  "Analise o código abaixo. Qual é a função da biblioteca #include <stdio.h>?",
+  "Observe o bloco de código C abaixo. O que será impresso no terminal após a compilação e execução?",
+].map((pergunta) => ({ pergunta }));
+const rodada2 = [
+  "Em que década a linguagem C foi desenvolvida por Dennis Ritchie nos laboratórios da Bell?",
+  "Qual é a principal função do compilador GCC no desenvolvimento em C?",
+  "Qual das seguintes etapas NÃO faz parte do ciclo padrão de compilação e execução de um programa em C?",
+  "Analise o código abaixo. Qual é o papel principal da biblioteca incluída na primeira linha?",
+  "Observe o bloco de código C abaixo. O que será impresso no terminal após a execução?",
+].map((pergunta) => ({ pergunta }));
+caso("quiz do dia: rodada copiada ou reformulada é barrada; pergunta nova passa", () => {
+  assert.equal(perguntasNovas(rodada2, [...rodada1, ...rodada2]).length, 0); // a rodada 3 do chamado
+  assert.equal(perguntaRepetida(rodada2[1], rodada1[1]), true);              // idêntica
+  assert.equal(perguntaRepetida(rodada2[2], rodada1[2]), true);              // só trocou palavras
+  const codigo = '#include <stdio.h>\nint main() {\n  printf("Ola");\n  return 0;\n}';
+  assert.equal(perguntaRepetida({ ...rodada1[3], codigo }, { ...rodada2[3], codigo }), true); // mesmo código
+  const novas = [
+    "Qual a diferença entre usar %d e %f dentro de um printf?",
+    "O que acontece se você esquecer o ponto e vírgula no fim de uma instrução em C?",
+    "Para que serve o comando return 0 no final da função main?",
+  ].map((pergunta) => ({ pergunta }));
+  assert.equal(perguntasNovas(novas, [...rodada1, ...rodada2]).length, 3);
+  // e dentro do mesmo quiz também não repete
+  assert.equal(perguntasNovas([novas[0], novas[0], novas[1]]).length, 2);
+});
+caso("exercício do dia: o mesmo exercício de novo é barrado", () => {
+  const antes = [{ titulo: "Calculadora de média", enunciado: "Escreva uma função que recebe três notas e devolve a média." }];
+  assert.equal(exercicioRepetido({ titulo: "Calculadora de média", enunciado: "Escreva uma função que recebe três notas e devolve a média aritmética." }, antes), true);
+  assert.equal(exercicioRepetido({ titulo: "Contador de vogais", enunciado: "Conte quantas vogais existem numa palavra digitada." }, antes), false);
+});
+caso("personagens: o Clássico é de todos; comprar cobra, vestir o que já tem é de graça", () => {
+  assert.equal(Object.keys(PERSONAGENS).length, 6);
+  assert.deepEqual(personagensDe([]), ["neuro"]);
+  assert.deepEqual(personagensDe(["ninja", "inventado", "ninja"]), ["neuro", "ninja"]);
+  assert.deepEqual(podeEscolherPersonagem({ id: "ninja", possui: [], saldo: 300 }), { ok: true, compra: true, custo: 300 });
+  assert.match(podeEscolherPersonagem({ id: "robo", possui: [], saldo: 100 }).motivo, /faltam 1900/);
+  assert.deepEqual(podeEscolherPersonagem({ id: "ninja", possui: ["ninja"], saldo: 0 }), { ok: true, compra: false, custo: 0 });
+  assert.deepEqual(podeEscolherPersonagem({ id: "neuro", possui: [], saldo: 0 }), { ok: true, compra: false, custo: 0 });
+  assert.equal(podeEscolherPersonagem({ id: "dragao", possui: [], saldo: 9999 }).ok, false);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

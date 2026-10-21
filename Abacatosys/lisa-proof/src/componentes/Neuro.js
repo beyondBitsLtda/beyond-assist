@@ -17,6 +17,36 @@ import { useEffect, useRef, useState } from "react";
 
 export const HUMORES = ["normal", "feliz", "comemorando", "triste", "pensando", "dormindo", "surpreso"];
 
+// ---- personagens (visuais do Neuro comprados no Reino: src/dominio/personagens.js)
+// O personagem que a pessoa usa mora no atributo data-personagem do <html> (a moldura põe, ao
+// abrir o app); todo Neuro da tela segue ele, a não ser que receba `personagem` (as vitrines).
+const GUARDADO = "proof-personagem";
+
+/** Veste o Neuro de todas as telas com um personagem (e lembra neste navegador). */
+export function definirPersonagem(id) {
+  if (typeof document === "undefined") return;
+  document.documentElement.dataset.personagem = id || "neuro";
+  try { localStorage.setItem(GUARDADO, id || "neuro"); } catch { /* sem armazenamento: vale só nesta visita */ }
+  window.dispatchEvent(new CustomEvent("proof-personagem", { detail: id }));
+}
+
+/** O personagem que a pessoa usa, atualizado quando ela troca. */
+export function usePersonagem() {
+  const [id, setId] = useState("neuro");
+  useEffect(() => {
+    let guardado = document.documentElement.dataset.personagem;
+    if (!guardado) {
+      try { guardado = localStorage.getItem(GUARDADO); } catch { /* nada */ }
+      if (guardado) document.documentElement.dataset.personagem = guardado;
+    }
+    setId(guardado || "neuro");
+    const aoTrocar = (e) => setId(e.detail || "neuro");
+    window.addEventListener("proof-personagem", aoTrocar);
+    return () => window.removeEventListener("proof-personagem", aoTrocar);
+  }, []);
+  return id;
+}
+
 export function reagir(humor, fala, duracao = 3800) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent("neuro", { detail: { humor, fala, duracao } }));
@@ -62,7 +92,9 @@ const CUTUCADAS = [
   "Faz cócegas! 😆",
 ];
 
-export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvir = false, lado = "direita", className = "" }) {
+export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvir = false, lado = "direita", className = "", personagem }) {
+  const doApp = usePersonagem();
+  const visual = personagem || doApp;
   const [reacao, setReacao] = useState(null);
   const [cutucado, setCutucado] = useState(false);
   const timer = useRef(null);
@@ -97,6 +129,7 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
   return (
     <div
       className={`neuro neuro--${atual} neuro--fala-${lado}${cutucado ? " neuro--cutucado" : ""} ${className}`}
+      data-personagem={visual}
       style={{ "--neuro-tamanho": `${tamanho}px` }}
     >
       <button type="button" className="neuro__botao" onClick={cutucar} onAnimationEnd={() => setCutucado(false)} aria-label="Neuro, o mascote. Toque para ele falar.">
@@ -173,6 +206,43 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
 
             {/* extras por humor */}
             <path className="v v-triste neuro__lagrima" d="M131 106 q5 8 0 11 q-5 -3 0 -11 z" />
+
+            {/* acessórios dos personagens: só o do personagem atual aparece (src/app/neuro.css) */}
+            <g className="acc acc-ninja">
+              <path d="M27 72 Q100 46 173 72 L173 86 Q100 60 27 86 Z" fill="#DC2626" />
+              <circle cx="170" cy="79" r="6" fill="#B91C1C" />
+              <path d="M172 77 q18 -6 27 4 q-13 1 -23 6 z" fill="#DC2626" />
+              <path d="M172 82 q15 8 18 20 q-9 -7 -21 -12 z" fill="#B91C1C" />
+            </g>
+            <g className="acc acc-astronauta">
+              <path d="M100 22 V4" stroke="#94A3B8" strokeWidth="4" strokeLinecap="round" />
+              <circle cx="100" cy="2" r="6" fill="#EF4444" />
+              <circle cx="100" cy="94" r="84" fill="rgba(186, 230, 253, 0.22)" stroke="#E0F2FE" strokeWidth="5" />
+              <path d="M44 52 q14 -24 42 -32" fill="none" stroke="#FFFFFF" strokeWidth="6" strokeLinecap="round" opacity="0.8" />
+              <ellipse cx="100" cy="166" rx="46" ry="9" fill="#E2E8F0" stroke="#94A3B8" strokeWidth="3" />
+            </g>
+            <g className="acc acc-mago">
+              <path d="M50 46 L104 -40 L150 46 Z" fill="#5B21B6" />
+              <ellipse cx="100" cy="46" rx="64" ry="12" fill="#4C1D95" />
+              <path d="M92 6 l3 6 6 2 -6 2 -3 6 -3 -6 -6 -2 6 -2 z" fill="#FDE047" />
+              <path d="M116 26 l2 4 4 1.5 -4 1.5 -2 4 -2 -4 -4 -1.5 4 -1.5 z" fill="#FDE047" />
+              <path d="M78 30 l1.6 3.4 3.4 1.6 -3.4 1.6 -1.6 3.4 -1.6 -3.4 -3.4 -1.6 3.4 -1.6 z" fill="#FEF08A" />
+            </g>
+            <g className="acc acc-pirata">
+              <path d="M34 50 Q100 -14 166 50 Q100 28 34 50 Z" fill="#111827" />
+              <path d="M40 48 Q100 30 160 48" fill="none" stroke="#F59E0B" strokeWidth="4" />
+              <circle cx="100" cy="24" r="7" fill="#F9FAFB" />
+              <path d="M96 28 h8" stroke="#111827" strokeWidth="2" />
+              <path d="M58 84 L144 88" stroke="#111827" strokeWidth="3.5" />
+              <ellipse cx="86" cy="101" rx="13" ry="14" fill="#111827" />
+            </g>
+            <g className="acc acc-robo">
+              <path d="M100 24 V2" stroke="#94A3B8" strokeWidth="5" strokeLinecap="round" />
+              <circle cx="100" cy="-2" r="8" fill="#22D3EE" stroke="#0891B2" strokeWidth="3" />
+              <circle cx="27" cy="104" r="8" fill="#94A3B8" stroke="#475569" strokeWidth="3" />
+              <circle cx="173" cy="104" r="8" fill="#94A3B8" stroke="#475569" strokeWidth="3" />
+              <path d="M62 60 h76 M70 146 h60" stroke="#64748B" strokeWidth="3" strokeLinecap="round" opacity="0.7" />
+            </g>
           </g>
 
           <g className="v v-comemorando v-feliz neuro__estrelas">

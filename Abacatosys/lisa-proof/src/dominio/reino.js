@@ -12,11 +12,13 @@
 //   MINA      — produz moedas sozinha, devagar, até encher.   COFRE — guarda moedas do saque.
 //   DEFESAS   — Torre de Arqueiros (chão e ar), Canhão (só chão), Muralha (cerca a Torre).
 //   QUARTEL   — treina o exército e define quantas tropas cabem nele.
+//   TERRENO   — compra terra: a ilha cresce e ganha espaço para construções novas (Biblioteca,
+//               Defesa Aérea, Morteiro, Torre Mágica, Torre do Raio).
 //   INVASÃO   — 3 por dia, uma por reino, com o exército inteiro (que é gasto). Estrelas pela
 //               destruição; o saque e os troféus seguem as estrelas. Quem cai ganha 8 h de escudo;
 //               reino novo nasce com 48 h; atacar tira o próprio escudo.
 
-import { PREDIOS_EM_COMBATE, resolverCombate } from "./combate.js";
+import { PREDIOS_EM_COMBATE, resolverCombate, raioDaIlha } from "./combate.js";
 import {
   capacidadeDoExercito, capacidadeDaGuarnicao, contagens, totalDeTropas, danoPorSegundo, espacoUsado, TROPAS,
 } from "./tropas.js";
@@ -56,14 +58,51 @@ export const CONSTRUCOES = {
     custos: [100, 250, 550, 1100, 2200],
     efeito: (n) => `${def("canhao")(n).dano} de dano a cada ${virgula(def("canhao")(n).intervalo)} s · alcance ${virgula(def("canhao")(n).alcance)} · só tropas no chão · ❤️ ${PREDIOS_EM_COMBATE.canhao.vida(n)}`,
   },
+  terreno: {
+    nome: "Terreno", emoji: "🗺️", max: 3,
+    // cada expansão aumenta a ilha e libera construções novas nos espaços novos
+    custos: [600, 1500, 3500],
+    efeito: (n) => `ilha com raio ${virgula(raioDaIlha(n))} · libera: ${Object.values(CONSTRUCOES).filter((c) => c.terreno && c.terreno <= n).map((c) => c.nome).join(", ") || "—"}`,
+  },
+  biblioteca: {
+    nome: "Biblioteca", emoji: "📚", max: 5, terreno: 1,
+    custos: [250, 500, 900, 1600, 3000],
+    efeito: (n) => `+${2 * n} moedas por hora junto com a Mina (coletadas juntas) · ❤️ ${PREDIOS_EM_COMBATE.biblioteca.vida(n)}`,
+  },
+  defesaAerea: {
+    nome: "Defesa Aérea", emoji: "🚀", max: 5, terreno: 1,
+    custos: [300, 650, 1200, 2200, 4000],
+    efeito: (n) => `${def("defesaAerea")(n).dano} de dano a cada ${virgula(def("defesaAerea")(n).intervalo)} s · alcance ${virgula(def("defesaAerea")(n).alcance)} · SÓ quem voa · ❤️ ${PREDIOS_EM_COMBATE.defesaAerea.vida(n)}`,
+  },
+  morteiro: {
+    nome: "Morteiro", emoji: "🎯", max: 5, terreno: 2,
+    custos: [500, 1000, 1800, 3000, 5000],
+    efeito: (n) => `${def("morteiro")(n).dano} de dano em área a cada ${virgula(def("morteiro")(n).intervalo)} s · alcance ${virgula(def("morteiro")(n).minimo)} a ${virgula(def("morteiro")(n).alcance)} · só chão · ❤️ ${PREDIOS_EM_COMBATE.morteiro.vida(n)}`,
+  },
+  torreMagica: {
+    nome: "Torre Mágica", emoji: "🔮", max: 5, terreno: 2,
+    custos: [550, 1100, 2000, 3400, 5500],
+    efeito: (n) => `${def("torreMagica")(n).dano} de dano em área a cada ${virgula(def("torreMagica")(n).intervalo)} s · alcance ${virgula(def("torreMagica")(n).alcance)} · chão e ar · ❤️ ${PREDIOS_EM_COMBATE.torreMagica.vida(n)}`,
+  },
+  torreRaio: {
+    nome: "Torre do Raio", emoji: "⚡", max: 5, terreno: 3,
+    custos: [900, 1800, 3200, 5000, 8000],
+    efeito: (n) => `${def("torreRaio")(n).dano} de dano a cada ${virgula(def("torreRaio")(n).intervalo)} s num alvo só · alcance ${virgula(def("torreRaio")(n).alcance)} · chão e ar · ❤️ ${PREDIOS_EM_COMBATE.torreRaio.vida(n)}`,
+  },
   quartel: {
     nome: "Quartel", emoji: "⚔️", max: 5,
     custos: [120, 280, 600, 1200, 2400],
     efeito: (n) => `exército de ${capacidadeDoExercito(n)} de espaço · libera ${Object.values(TROPAS).filter((t) => t.nivelMinimo <= n).map((t) => t.nome).join(", ")} · ❤️ ${PREDIOS_EM_COMBATE.quartel.vida(n)}`,
   },
 };
-export const ORDEM_DAS_CONSTRUCOES = ["castelo", "mina", "cofre", "muralha", "torre", "canhao", "quartel"];
-export const NIVEIS_INICIAIS = { castelo: 1, mina: 1, cofre: 0, muralha: 0, torre: 0, canhao: 0, quartel: 0 };
+export const ORDEM_DAS_CONSTRUCOES = [
+  "castelo", "terreno", "mina", "biblioteca", "cofre", "muralha", "torre", "canhao",
+  "defesaAerea", "morteiro", "torreMagica", "torreRaio", "quartel",
+];
+export const NIVEIS_INICIAIS = {
+  castelo: 1, terreno: 0, mina: 1, biblioteca: 0, cofre: 0, muralha: 0, torre: 0, canhao: 0,
+  defesaAerea: 0, morteiro: 0, torreMagica: 0, torreRaio: 0, quartel: 0,
+};
 
 export const HORAS_ATE_ENCHER = 12;
 export const ATAQUES_POR_DIA = 3;
@@ -77,6 +116,8 @@ export function trofeusDoCombate(estrelas) {
 }
 
 export const producaoPorHora = (nivelDaMina) => Math.max(0, nivelDaMina);
+/** Moedas por hora do reino inteiro: a Mina mais a Biblioteca (2 por nível). */
+export const taxaDeProducao = (niveis) => producaoPorHora(niveis?.mina || 0) + 2 * Math.max(0, niveis?.biblioteca || 0);
 export const capacidadeDaMina = (nivelDaMina) => producaoPorHora(nivelDaMina) * HORAS_ATE_ENCHER;
 export const protecaoDoCofre = (nivelDoCofre) => 150 * Math.max(0, nivelDoCofre);
 export const custoDoNeuro = (nivelAtual) => 100 * nivelAtual;
@@ -100,7 +141,7 @@ export function niveisDe(reino) {
 export function poderDo(reino) {
   const n = niveisDe(reino);
   let defesas = 0, vida = 0;
-  for (const chave of ["castelo", "mina", "cofre", "quartel", "torre", "canhao", "muralha"]) {
+  for (const chave of Object.keys(PREDIOS_EM_COMBATE)) {
     if ((n[chave] || 0) < 1) continue;
     const est = PREDIOS_EM_COMBATE[chave];
     vida += est.vida(n[chave]);
@@ -123,6 +164,9 @@ export function podeMelhorar(reino, chave, saldo) {
   const atual = n[chave] || 0;
   if (atual >= d.max) return { ok: false, motivo: "já está no nível máximo" };
   const custo = d.custos[atual];
+  if (d.terreno && (n.terreno || 0) < d.terreno) {
+    return { ok: false, custo, motivo: `compre a expansão ${d.terreno} do Terreno primeiro` };
+  }
   if (chave !== "castelo" && atual + 1 > n.castelo) {
     return { ok: false, custo, motivo: `melhore a ${CONSTRUCOES.castelo.nome} para o nível ${atual + 1} primeiro` };
   }
@@ -146,7 +190,8 @@ export function producaoAcumulada(reino, agora = new Date()) {
   const n = niveisDe(reino);
   const desde = new Date(reino?.coletado_em || agora).getTime();
   const horas = Math.max(0, (agora.getTime() - desde) / 3_600_000);
-  return Math.min(capacidadeDaMina(n.mina), Math.floor(horas * producaoPorHora(n.mina)));
+  const taxa = taxaDeProducao(n);
+  return Math.min(taxa * HORAS_ATE_ENCHER, Math.floor(horas * taxa));
 }
 
 /** O escudo protege até `escudo_ate`. */
@@ -237,6 +282,8 @@ export function exercitoDeTreino(nivelDoQuartel, fracao = 1) {
   const ex = {};
   if (q >= TROPAS.dragao.nivelMinimo && livre >= 40) { ex.dragao = 1; livre -= TROPAS.dragao.espaco; }
   if (q >= TROPAS.gigante.nivelMinimo) { const g = Math.floor((livre * 0.25) / TROPAS.gigante.espaco); if (g) { ex.gigante = g; livre -= g * TROPAS.gigante.espaco; } }
+  if (q >= TROPAS.bombardeiro.nivelMinimo) { ex.bombardeiro = 2; livre -= 2 * TROPAS.bombardeiro.espaco; }
+  if (q >= TROPAS.mago.nivelMinimo) { const m = Math.floor((livre * 0.2) / TROPAS.mago.espaco); if (m) { ex.mago = m; livre -= m * TROPAS.mago.espaco; } }
   ex.guerreiro = Math.ceil(livre * 0.6);
   ex.arqueira = Math.max(0, livre - ex.guerreiro);
   return contagens(ex);
@@ -258,6 +305,11 @@ export function rivalSimulado(base, forca = "parelho") {
   }
   // um rival de treino sempre tem alguma defesa e algum exército, para a batalha ter graça
   if (forca !== "fraco") { construcoes.torre = Math.max(1, construcoes.torre); construcoes.quartel = Math.max(1, construcoes.quartel); }
+  // construção da terra nova só existe se o rival tiver o Terreno
+  construcoes.terreno = Math.min(3, construcoes.terreno, construcoes.castelo);
+  for (const chave of ORDEM_DAS_CONSTRUCOES) {
+    if (CONSTRUCOES[chave].terreno && construcoes.terreno < CONSTRUCOES[chave].terreno) construcoes[chave] = 0;
+  }
   const neuro = Math.max(1, Math.min(10, (base?.neuro_nivel || 1) + passo * 2));
   return {
     construcoes, neuro_nivel: neuro,

@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { obter, criar } from "@/lib/api.js";
 import { useAviso, Barra } from "@/componentes/Pecas.js";
 import { CartaoDeVale } from "@/componentes/Vales.js";
-import Neuro, { reagir, comemorar } from "@/componentes/Neuro.js";
+import Neuro, { reagir, comemorar, definirPersonagem } from "@/componentes/Neuro.js";
 import {
   ATAQUES_POR_DIA, FATIA_DO_SAQUE, TETO_DO_SAQUE, ESCUDO_APOS_DERROTA_HORAS, ESCUDO_DE_NOVATO_HORAS, HORAS_ATE_ENCHER,
   CONSTRUCOES, RIVAIS_SIMULADOS, rivalSimulado, simularBatalha, protecaoDoCofre, poderDo, combateDe, previsaoDeEstrelas,
@@ -177,6 +177,14 @@ export default function Reino() {
         </section>
       </div>
 
+      {/* ------------------------------------------------------------ personagens */}
+      <Personagens lista={reino.personagens} atual={reino.personagem} ocupado={ocupado}
+        aoEscolher={(p) => agir(`personagem:${p.id}`, { acao: "personagem", id: p.id }, (r) => {
+          definirPersonagem(r.personagem);
+          if (r.comprou) comemorar(`${r.nome} é seu! 🎭`);
+          else reagir("feliz", `Agora eu sou o ${r.nome}!`);
+        })} />
+
       {/* ------------------------------------------------------------ tropas */}
       <Reserva destino="exercito" dados={reino.exercito} heroi={reino.heroi.ataque} ocupado={ocupado} aoTreinar={treinar} />
       <Reserva destino="guarnicao" dados={reino.guarnicao} heroi={reino.heroi.defesa} ocupado={ocupado} aoTreinar={treinar} />
@@ -199,7 +207,7 @@ export default function Reino() {
               {c.nivel < c.max ? (
                 <Botao ok={c.pode} motivo={c.motivo} ocupado={ocupado === c.chave}
                   aoClicar={() => agir(c.chave, { acao: "melhorar", chave: c.chave }, (r) => reagir("comemorando", `${c.nome} nível ${r.nivel}! 🎉`))}>
-                  {c.nivel === 0 ? "Construir" : "Melhorar"} · <Moedas n={c.custo} />
+                  {c.chave === "terreno" ? (c.nivel === 0 ? "Comprar terra" : "Expandir de novo") : c.nivel === 0 ? "Construir" : "Melhorar"} · <Moedas n={c.custo} />
                 </Botao>
               ) : <span className="pf-pilula pf-pilula--verde">Nível máximo</span>}
             </article>
@@ -393,6 +401,38 @@ function Reserva({ destino, dados, heroi, ocupado, aoTreinar }) {
             </article>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+/** Os personagens do Neuro: cada um aparece de verdade (o próprio Neuro, vestido). */
+function Personagens({ lista, atual, ocupado, aoEscolher }) {
+  return (
+    <section className="pf-secao" id="personagens">
+      <h2 className="pf-secao__titulo">🎭 Personagens <small>o Neuro de todas as telas (e da ilha) veste o que você escolher</small></h2>
+      <div className="rn-personagens">
+        {lista.map((p) => {
+          const usando = p.id === atual;
+          return (
+            <article key={p.id} className={`pf-cartao rn-personagem${usando ? " rn-personagem--usando" : ""}`}>
+              <div className="rn-personagem__vitrine" aria-hidden="true"><Neuro personagem={p.id} humor={usando ? "feliz" : "normal"} tamanho={96} /></div>
+              <strong>{p.emoji} {p.nome}</strong>
+              <span className="rn-personagem__desc">{p.descricao}</span>
+              {usando ? <span className="pf-pilula pf-pilula--verde">Em uso</span>
+                : p.tem ? (
+                  <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" disabled={Boolean(ocupado)} onClick={() => aoEscolher(p)}>Usar</button>
+                ) : (
+                  <div className="rn-botao" style={{ marginTop: 0 }}>
+                    <button type="button" className="pf-botao pf-botao--pequeno" disabled={!p.pode || Boolean(ocupado)} onClick={() => aoEscolher(p)}>
+                      Comprar · <Moedas n={p.preco} />
+                    </button>
+                    {!p.pode && <span className="rn-motivo">{p.motivo}</span>}
+                  </div>
+                )}
+            </article>
+          );
+        })}
       </div>
     </section>
   );

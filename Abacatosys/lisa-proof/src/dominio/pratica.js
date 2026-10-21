@@ -37,6 +37,64 @@ export const RODADAS_POR_DIA = { quiz: 3, exercicio: 3 };
 export const fatorDaRodada = (rodada) => ((Number(rodada) || 1) <= 1 ? 1 : 0.5);
 export const comFatorDaRodada = (pontos, rodada) => Math.round((pontos || 0) * fatorDaRodada(rodada));
 
+// ---------------------------------------------------------------- perguntas repetidas
+// Chamado de 20/10/2026: nas rodadas extras do quiz, a IA devolvia as mesmas perguntas (às vezes
+// idênticas, às vezes só reformuladas). O pedido já dizia "não repita"; agora o código confere.
+// Duas perguntas são "a mesma" se as palavras que importam se sobrepõem muito, ou se o código
+// delas é praticamente o mesmo (a mesma pergunta sobre o mesmo programa, com outras palavras).
+
+// palavras que não dizem nada do conteúdo (e o "Analise o código abaixo" de toda pergunta)
+const VAZIAS = new Set((
+  "a o as os e de do da dos das um uma uns umas que qual quais quem como onde quando porque por para pra " +
+  "com sem em no na nos nas ao aos se ser sera esta este essa esse isso isto ha tem mais menos ou nao sim " +
+  "sobre entre apos depois antes pode podem deve devem seguinte seguintes seguir abaixo acima trecho codigo " +
+  "programa analise observe considere veja exemplo resultado saida exibido impresso exibida impressa valor " +
+  "opcao opcoes alternativa correta corretamente principal the of to in is and"
+).split(" "));
+
+export function palavrasDe(texto) {
+  return new Set(String(texto || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, " ").split(" ").filter((p) => p.length > 2 && !VAZIAS.has(p)));
+}
+const sobreposicao = (a, b) => {
+  if (!a.size || !b.size) return 0;
+  let comum = 0;
+  for (const p of a) if (b.has(p)) comum++;
+  return comum / Math.min(a.size, b.size);
+};
+const tokensDoCodigo = (codigo) => new Set(String(codigo || "").replace(/s+/g, " ").split(/[^A-Za-z0-9_]+/).filter((p) => p.length > 1));
+
+/** A pergunta `p` é repetição de `q`? (`{ pergunta, codigo }` nos dois) */
+export function perguntaRepetida(p, q) {
+  const a = palavrasDe(p?.pergunta), b = palavrasDe(q?.pergunta);
+  if (sobreposicao(a, b) >= 0.6 && Math.min(a.size, b.size) >= 2) return true;
+  const ca = tokensDoCodigo(p?.codigo), cb = tokensDoCodigo(q?.codigo);
+  if (ca.size >= 3 && cb.size >= 3 && sobreposicao(ca, cb) >= 0.8) return true;
+  return String(p?.pergunta || "").trim().toLowerCase() === String(q?.pergunta || "").trim().toLowerCase();
+}
+
+/** As perguntas que não repetem nenhuma de `anteriores` nem uma da outra, na ordem em que vieram. */
+export function perguntasNovas(perguntas, anteriores = []) {
+  const aceitas = [];
+  for (const p of perguntas || []) {
+    if (anteriores.some((q) => perguntaRepetida(p, q)) || aceitas.some((q) => perguntaRepetida(p, q))) continue;
+    aceitas.push(p);
+  }
+  return aceitas;
+}
+
+/** O exercício novo repete um de antes? (mesmo título, ou enunciado quase igual) */
+export function exercicioRepetido(novo, anteriores = []) {
+  const t = palavrasDe(`${novo?.titulo || ""} ${String(novo?.enunciado || "").slice(0, 400)}`);
+  return anteriores.some((a) => sobreposicao(t, palavrasDe(`${a.titulo || ""} ${String(a.enunciado || "").slice(0, 400)}`)) >= 0.7);
+}
+
+/** O foco de cada rodada extra, para a IA ir por outro caminho (e não só "não repita"). */
+export const FOCO_DA_RODADA = {
+  2: "foque em APLICAÇÃO: situações práticas, casos de uso do dia a dia e erros comuns de iniciante",
+  3: "foque em DESAFIO: leitura de código um pouco mais longo, pegadinhas, comparações entre duas formas de fazer e \"o que acontece se…\"",
+};
+
 /** Dá para abrir mais uma rodada hoje? `doDia`: os desafios deste tipo, trilha e dia. */
 export function podeAbrirRodada(tipo, doDia) {
   const maximo = RODADAS_POR_DIA[tipo] || 1;

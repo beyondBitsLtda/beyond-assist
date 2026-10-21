@@ -9,14 +9,46 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.8.0-cloudflare-pages.1",
+  "versao": "0.9.0-proof-reino-expansao.2",
   "atualizadoEm": "2026-10-21",
   "compilacao": {
-    "numero": 23,
+    "numero": 25,
     "data": "2026-10-21",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.9.0-proof-reino-expansao.2",
+      "data": "2026-10-21",
+      "branch": "proof-reino-expansao",
+      "tipo": "correcao",
+      "resumo": "Os 4 chamados abertos pelos usuários no Proof: quiz extra repetindo perguntas, balão do Neuro atrás da faixa da semana, troca de senha e personagens novos.",
+      "itens": [
+        "Quiz do dia (chamado de 20/10, sério): as rodadas extras repetiam as perguntas — às vezes reformuladas, às vezes idênticas (a 3ª rodada saía igual à 2ª). A IA era chamada com temperatura 0,2 e recebia as perguntas de antes no pedido, que acabava copiando. Agora o código confere: toda pergunta nova é comparada (palavras e código) com as que a pessoa já fez no dia na trilha; repetida ou reformulada é descartada e a IA é chamada de novo (até 3 vezes) até juntar 5 novas. Rodadas extras usam temperatura 0,9 e um foco próprio (aplicação na 2ª, desafio na 3ª). Exercício extra repetido também é barrado.",
+        "Mapa da trilha (chamado de 20/10): o balão de fala do Neuro passava por baixo da faixa \"Semana\" que gruda no topo. Enquanto o Neuro fala, ele sobe acima da faixa.",
+        "Minha conta (chamado de 20/10, \"não consigo alterar minha senha\"): botão na barra lateral e no topo do celular, com nome, e-mail e troca de senha (exige a senha atual; pelo menos 10 caracteres). A conta é a do Abacato: a senha nova vale no Proof, no Abacato e na Lisa. O servidor nunca vê a senha, só as chaves (mesmo cálculo do login).",
+        "Personagens (chamado de 20/10, \"quero mais opções de personagem, quero comprar\"): 5 novos visuais do Neuro comprados com moedas no Reino — Ninja (300), Astronauta (500), Mago (800), Pirata (1.200) e Robô (2.000); o Clássico continua grátis. Cada um tem cores e acessório próprios, funciona com todos os humores e aparece em todas as telas, inclusive no boneco de papel da ilha 3D.",
+        "Migração db/008-personagens.sql (só acrescenta: personagem e personagens no reino e o tipo \"personagem\" no livro-caixa)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.9.0-proof-reino-expansao.1",
+      "data": "2026-10-21",
+      "branch": "proof-reino-expansao",
+      "tipo": "funcionalidade",
+      "resumo": "Reino maior e mais variado: visual próprio para cada nível, Terreno para aumentar a ilha, 5 construções e 4 tropas novas, e o aviso da batalha fora do caminho.",
+      "itens": [
+        "Cada nível tem um acabamento visível em todas as construções: madeira e palha (1), pedra e telha vermelha (2), pedra clara com bandeiras (3), pedra reforçada, telhado azul e ouro (4), mármore, telhado dourado e cristal que brilha (5). A Muralha nível 1 é paliçada; o Quartel ganha paliçada; a Mina ganha guindaste.",
+        "Terreno (🗺️): 3 expansões compradas com moedas. A ilha cresce de verdade (no 3D e na batalha, com o desembarque na beirada nova) e libera construções novas nos espaços novos.",
+        "Construções novas: Biblioteca (produz moedas junto com a Mina), Defesa Aérea (só acerta quem voa, dano alto), Morteiro (dano em área de longe, com alcance mínimo), Torre Mágica (dano em área, chão e ar) e Torre do Raio (dano altíssimo num alvo só).",
+        "Tropas novas: Bombardeiro (corre para a Muralha e explode, 12× de dano nela), Mago (dano em área de longe), Balão (voa e bombardeia só defesas) e Curandeira (voa e cura as tropas em volta). Mago também pode ser tropa de defesa.",
+        "Equilíbrio refeito com batalhas medidas: batalha de até 60 s, tropas um pouco mais fortes e Morteiro e Torre Mágica mais leves.",
+        "Aviso da batalha virou uma faixa fina no topo da ilha (antes ficava no meio e tapava a luta); a ilha fica mais alta durante a batalha e os rótulos somem para não atrapalhar.",
+        "Sem migração de banco: construções e tropas novas cabem nos campos que já existem."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.8.0-cloudflare-pages.1",
       "data": "2026-10-21",
@@ -373,7 +405,10 @@
         "Reino do Neuro: moedas do estudo, construções num mundo 3D, Neuro com níveis e invasões entre jogadores",
         "Simulação de batalha no Reino (treino sem efeito real), com as regras explicadas",
         "Vales de moedas para resgatar (o de boas-vindas: 450 moedas para todos)",
-        "Combate no estilo Clash of Clans no Reino: tropas, tropas de defesa, defesas com vida, estrelas e replay das batalhas"
+        "Combate no estilo Clash of Clans no Reino: tropas, tropas de defesa, defesas com vida, estrelas e replay das batalhas",
+        "Terreno do Reino (a ilha cresce) e visual por nível nas construções",
+        "Minha conta: trocar a senha (vale no Proof, no Abacato e na Lisa)",
+        "Personagens do Neuro comprados com moedas, usados em todo o app"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -436,7 +471,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/007). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/008). Acesso só pelo túnel da Cloudflare, em HTTPS."
       }
     ],
     "integracoes": [

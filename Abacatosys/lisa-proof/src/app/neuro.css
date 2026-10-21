@@ -137,3 +137,29 @@
   .neuro *, .neuro__svg, .neuro__fala { animation: none !important; transition: none !important; }
   .confete { display: none; }
 }
+
+/* ---- personagens (src/dominio/personagens.js): outras cores e um acessório por cima ---- */
+.neuro .acc { display: none; }
+.neuro[data-personagem="ninja"] .acc-ninja, .neuro[data-personagem="astronauta"] .acc-astronauta,
+.neuro[data-personagem="mago"] .acc-mago, .neuro[data-personagem="pirata"] .acc-pirata,
+.neuro[data-personagem="robo"] .acc-robo { display: inline; }
+
+.neuro[data-personagem="ninja"] { --neuro-rosa: #64748B; --neuro-rosa-escuro: #1E293B; --neuro-tinta: #0F172A; }
+.neuro[data-personagem="ninja"] .neuro__dobras path { stroke: #94A3B8; }
+.neuro[data-personagem="ninja"] .neuro__bochecha { fill: #F87171; opacity: 0.5; }
+
+.neuro[data-personagem="astronauta"] { --neuro-rosa: #E0F2FE; --neuro-rosa-escuro: #0369A1; --neuro-tinta: #0C4A6E; }
+.neuro[data-personagem="astronauta"] .neuro__dobras path { stroke: #7DD3FC; }
+
+.neuro[data-personagem="mago"] { --neuro-rosa: #C4B5FD; --neuro-rosa-escuro: #6D28D9; --neuro-tinta: #3B0764; }
+.neuro[data-personagem="mago"] .neuro__dobras path { stroke: #8B5CF6; }
+.neuro[data-personagem="mago"] .neuro__bochecha { fill: #F0ABFC; }
+
+.neuro[data-personagem="pirata"] { --neuro-rosa: #FDBA74; --neuro-rosa-escuro: #C2410C; --neuro-tinta: #431407; }
+.neuro[data-personagem="pirata"] .neuro__dobras path { stroke: #F97316; }
+.neuro[data-personagem="pirata"] .neuro__bochecha { fill: #FCA5A5; }
+
+.neuro[data-personagem="robo"] { --neuro-rosa: #CBD5E1; --neuro-rosa-escuro: #475569; --neuro-tinta: #1E293B; }
+.neuro[data-personagem="robo"] .neuro__dobras path { stroke: #94A3B8; }
+.neuro[data-personagem="robo"] .neuro__bochecha { fill: #67E8F9; opacity: 0.6; }
+.neuro[data-personagem="robo"] .neuro__pupila { fill: #0891B2; }

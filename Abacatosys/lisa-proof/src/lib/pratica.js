@@ -180,18 +180,19 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, 
   const assuntos = assuntosPara(tipo, alvo, etapas, hoje);
   if (!assuntos.length) throw new ErroDeAcesso(400, "a trilha não tem assuntos para praticar");
 
-  // as rodadas de antes, para a IA não repetir pergunta nem exercício
-  const evitar = doDia.flatMap((d) => (tipo === "quiz"
-    ? (d.conteudo?.perguntas || []).map((p) => p.pergunta)
-    : [`${d.titulo}: ${String(d.conteudo?.enunciado || "").slice(0, 300)}`]));
+  // as rodadas de antes, para não repetir pergunta nem exercício (a IA é avisada E o código confere)
+  const anteriores = tipo === "quiz"
+    ? doDia.flatMap((d) => (d.conteudo?.perguntas || []).map((p) => ({ pergunta: p.pergunta, codigo: p.codigo })))
+    : doDia.map((d) => ({ titulo: d.titulo, enunciado: d.conteudo?.enunciado }));
+  const evitar = tipo === "quiz" ? [] : anteriores.map((a) => `${a.titulo}: ${String(a.enunciado || "").slice(0, 300)}`);
 
   let conteudo, titulo;
   try {
     if (tipo === "quiz") {
-      conteudo = await gerarQuiz({ tema: trilha.tema, assunto: assuntos[0], evitar });
+      conteudo = await gerarQuiz({ tema: trilha.tema, assunto: assuntos[0], anteriores, rodada });
       titulo = `Quiz${rodada > 1 ? ` ${rodada}` : ""}: ${assuntos[0].titulo}`;
     } else if (tipo === "exercicio") {
-      conteudo = await gerarExercicio({ tema: trilha.tema, assunto: assuntos[0], evitar });
+      conteudo = await gerarExercicio({ tema: trilha.tema, assunto: assuntos[0], evitar, anteriores, rodada });
       titulo = conteudo.titulo;
     } else {
       conteudo = await gerarProjeto({ tema: trilha.tema, tipo, assuntos });
