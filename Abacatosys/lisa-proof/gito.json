@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.16.0-proof-paz.2",
+  "versao": "0.16.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-22",
   "compilacao": {
-    "numero": 42,
+    "numero": 43,
     "data": "2026-10-22",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.16.0-cloudflare-pages.1",
+      "data": "2026-10-22",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.16.0: a paz entre os reinos por votação no lugar da aliança, com voto só para quem tem 3+ dias de ofensiva.",
+      "itens": [
+        "Junta a branch proof-paz (0.16.0-proof-paz.2).",
+        "Migração db/012-paz.sql: aplicar no banco antes do deploy (remove a tabela da aliança).",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.16.0-proof-paz.2",
       "data": "2026-10-22",
