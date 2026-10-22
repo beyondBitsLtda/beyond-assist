@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.15.0-cloudflare-pages.1",
+  "versao": "0.16.0-proof-paz.1",
   "atualizadoEm": "2026-10-22",
   "compilacao": {
-    "numero": 40,
+    "numero": 41,
     "data": "2026-10-22",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.16.0-proof-paz.1",
+      "data": "2026-10-22",
+      "branch": "proof-paz",
+      "tipo": "funcionalidade",
+      "resumo": "A aliança entre dois reinos saiu; no lugar dela, a paz entre todos os reinos, decidida por votação (100% dos votos).",
+      "itens": [
+        "Aliança desfeita: sem convites, reforços nem mina em dobro entre dois reinos (a tabela proof_aliancas sai na migração 012).",
+        "Paz por votação: qualquer jogador propõe a paz (3, 7, 14 ou 30 dias) e todos os reinos votam; o voto de quem propôs já é sim. A paz começa com 100% de sim; um único não derruba a proposta; a votação fica aberta 3 dias; uma proposta por vez.",
+        "Durante a paz: nenhum reino invade outro; todos os reinos aparecem como vizinhos no 3D (até 6 ilhas em volta, com pontes); a mina de cada reino rende × o número de reinos; quando alguém saqueia uma expedição, cada um dos outros reinos ganha 20% do saque.",
+        "Mantido: na invasão, só as tropas que caem se perdem.",
+        "Modal de novidades atualizado (edição nova).",
+        "Migração db/012-paz.sql: tabelas proof_pazes e proof_paz_votos, tipo paz_expedicao no livro-caixa e remoção de proof_aliancas."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.15.0-cloudflare-pages.1",
       "data": "2026-10-22",
@@ -622,7 +638,7 @@
         "Expedições do Reino contra a CPU, de graça (nenhuma tropa se perde), 3 por dia, cada uma com dificuldade, recompensa e terreno 3D próprios, e monstros desenhados em 2D",
         "Guerra entre jogadores com o mesmo reino só a cada 48 h por quem ataca, revanche liberada para quem foi atacado, e só as tropas que caem se perdem",
         "Modal de novidades na entrada, uma vez por edição",
-        "Alianças entre reinos: convite com dias de paz, mina em dobro, reforços nas invasões, ver o reino do aliado e reinos vizinhos no 3D"
+        "Paz entre os reinos por votação (100% dos votos): sem guerra, todos vizinhos no 3D, mina × o número de reinos e expedições repartidas"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -685,7 +701,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/011). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/012). Acesso só pelo túnel da Cloudflare, em HTTPS."
       }
     ],
     "integracoes": [

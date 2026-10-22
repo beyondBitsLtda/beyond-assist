@@ -18,7 +18,8 @@
 //               Só as tropas que CAEM se perdem; as que sobrevivem voltam (22/10/2026 — antes o
 //               exército inteiro era gasto). Estrelas pela destruição; o saque e os
 //               troféus seguem as estrelas.
-//   ALIANÇA   — paz, mina em dobro, reforços e reinos vizinhos: ver alianca.js. Quem cai ganha 8 h de escudo; reino novo nasce com
+//   PAZ       — proposta por um jogador, votada por todos (100%): sem guerra, todos vizinhos,
+//               mina ×N e expedições repartidas — ver paz.js. Quem cai ganha 8 h de escudo; reino novo nasce com
 //               48 h; atacar tira o próprio escudo.
 //   EXPEDIÇÃO — contra a CPU (vilas, florestas, bosques, acampamentos de monstros): ver monstros.js.
 
@@ -237,10 +238,10 @@ export function esperaAte(quando, agora = new Date()) {
  * conta o seu, então quem foi atacado pode revidar). `jaAtacouHoje` continua valendo (o banco tem
  * a mesma trava por dia).
  */
-export function podeInvadir({ atacanteId, atacante, defensor, ataquesHoje, jaAtacouHoje = false, ultimoAtaqueAoAlvo = null, aliados = false, agora = new Date() }) {
+export function podeInvadir({ atacanteId, atacante, defensor, ataquesHoje, jaAtacouHoje = false, ultimoAtaqueAoAlvo = null, emPaz = false, agora = new Date() }) {
   if (!defensor) return { ok: false, motivo: "esse reino não existe" };
   if (defensor.usuario_id === atacanteId) return { ok: false, motivo: "não dá para invadir o próprio reino" };
-  if (aliados) return { ok: false, motivo: "vocês são aliados — não dá para invadir durante a paz" };
+  if (emPaz) return { ok: false, motivo: "o mundo está em paz — nenhum reino pode invadir outro" };
   if (atacante && totalDeTropas(atacante.exercito) === 0) return { ok: false, motivo: "treine tropas no Quartel antes de invadir" };
   if (ataquesHoje >= ATAQUES_POR_DIA) return { ok: false, motivo: `você já fez as ${ATAQUES_POR_DIA} invasões de hoje — amanhã tem mais` };
   const proximo = proximoAtaqueAoReino(ultimoAtaqueAoAlvo);
@@ -305,6 +306,14 @@ export function batalhaDeExpedicao({ atacante, expedicao, semente }) {
     if (caiu > 0) caidas[tipo] = caiu;
   }
   return { ...r, venceu: r.estrelas > 0, saque: saqueDaExpedicao(expedicao, r), caidas, entrada };
+}
+
+/** As tropas que caíram no ataque: as que foram, menos as que ficaram de pé. Só elas se perdem. */
+export function caidasNoAtaque(foram, sobreviventes) {
+  const f = contagens(foram), s = contagens(sobreviventes);
+  const c = {};
+  for (const [t, n] of Object.entries(f)) if (n - (s[t] || 0) > 0) c[t] = n - (s[t] || 0);
+  return c;
 }
 
 /** O que o motor de combate precisa (e o que a tela guarda para mostrar a batalha de novo). */

@@ -506,6 +506,7 @@ const raioDoAcampamento = (nivel) => 2.4 + 0.65 * (Math.max(1, Math.min(4, nivel
 const PARA_A_CAMERA = [Math.SQRT1_2, Math.SQRT1_2];   // de onde a câmera olha, no começo
 const PARA_O_LADO = [Math.SQRT1_2, -Math.SQRT1_2];    // a direita da tela, no começo
 const VAO_DA_PONTE = 1.3;
+const MAXIMO_DE_VIZINHOS = 6; // na paz, quantas ilhas vizinhas cabem em volta do reino
 
 function ilhaDoAcampamento(p, nivel) {
   const g = new THREE.Group();
@@ -654,7 +655,7 @@ function recorteDePapel(img) {
 }
 
 // ------------------------------------------------------------------ o componente
-export default function Mundo3D({ construcoes, tropas, vizinho = null, humor = "normal", aoEscolher, aoFalhar }) {
+export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "normal", aoEscolher, aoFalhar }) {
   const caixa = useRef(null);
   const molde = useRef(null);
   const rotulos = useRef({});
@@ -709,8 +710,8 @@ export default function Mundo3D({ construcoes, tropas, vizinho = null, humor = "
     mundo.add(ilhaAtual.grupo);
     // a ilhota do Acampamento e a ponte (montadas por definirAcampamento)
     const ilhota = { grupo: null, ponte: null, nivel: 0, centro: [0, 0], raio: 0 };
-    // o reino do aliado (aliança): a ilha dele, menor, do outro lado de uma ponte (definirVizinho)
-    const vizinhanca = { grupo: null, ponte: null, centro: [0, 0], raio: 0, dados: null };
+    // na paz, os outros reinos: ilhas menores em volta da minha, cada uma com a sua ponte (definirVizinhos)
+    const vizinhanca = { ilhas: [], dados: null };
     const grupoNuvens = nuvens(p);
     /** Troca a ilha quando o Terreno muda (o meu, ou o do rival durante a minha invasão). */
     function definirTerreno(terreno) {
@@ -725,7 +726,7 @@ export default function Mundo3D({ construcoes, tropas, vizinho = null, humor = "
       mundo.add(ilhaAtual.grupo);
       for (const n of grupoNuvens.children) n.userData.raio = n.userData.raioBase + 1.3 * tt;
       if (ilhota.nivel) definirAcampamento(ilhota.nivel, true);
-      if (vizinhanca.dados) definirVizinho(vizinhanca.dados);
+      if (vizinhanca.dados) definirVizinhos(vizinhanca.dados);
       if (typeof enquadrar === "function") enquadrar();
       sujo = true;
     }
@@ -815,7 +816,7 @@ export default function Mundo3D({ construcoes, tropas, vizinho = null, humor = "
       };
       medir(0, 0, raioDaIlha(ilhaAtual.terreno) + 0.2, -1.4, 3.2);
       if (ilhota.grupo?.visible) medir(ilhota.centro[0], ilhota.centro[1], ilhota.raio + 0.2, -1.0, 2.6);
-      if (vizinhanca.grupo?.visible) medir(vizinhanca.centro[0], vizinhanca.centro[1], vizinhanca.raio + 0.15, -0.8, 1.8);
+      for (const v of vizinhanca.ilhas) if (v.grupo.visible) medir(v.centro[0], v.centro[1], v.raio + 0.15, -0.8, 1.8);
       let meiaL = ((maxX - minX) / 2) * 1.04, meiaA = ((maxY - minY) / 2) * 1.06;
       if (meiaL / meiaA > aspecto) meiaA = meiaL / aspecto; else meiaL = meiaA * aspecto;
       const cx = (maxX + minX) / 2, cy = (maxY + minY) / 2;
@@ -870,17 +871,18 @@ export default function Mundo3D({ construcoes, tropas, vizinho = null, humor = "
         const [x, y] = projetar(new THREE.Vector3(ilhota.centro[0] - PARA_A_CAMERA[0] * r, 1.9, ilhota.centro[1] - PARA_A_CAMERA[1] * r));
         rAcamp.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
       }
-      const rViz = rotulos.current.__vizinho;
-      if (rViz) {
-        if (vizinhanca.grupo?.visible) {
-          const [px, y] = projetar(new THREE.Vector3(vizinhanca.centro[0], 1.7, vizinhanca.centro[1]));
-          // a ilha vizinha fica na beirada do quadro: o rótulo não pode sair para fora dele
-          const meio = (rViz.offsetWidth || 120) / 2 + 6;
+      vizinhanca.ilhas.forEach((v, i) => {
+        const rViz = rotulos.current[`__vizinho${i}`];
+        if (!rViz) return;
+        if (v.grupo.visible) {
+          const [px, y] = projetar(new THREE.Vector3(v.centro[0], 1.5, v.centro[1]));
+          // as ilhas vizinhas ficam na beirada do quadro: o rótulo não pode sair para fora dele
+          const meio = (rViz.offsetWidth || 100) / 2 + 6;
           const x = Math.max(meio, Math.min((el.clientWidth || 0) - meio, px));
           rViz.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
           rViz.style.visibility = "visible";
         } else rViz.style.visibility = "hidden";
-      }
+      });
       if (fala.current) {
         const [x, y] = projetar(new THREE.Vector3(neuro.position.x, 1.85, neuro.position.z));
         fala.current.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
@@ -1172,7 +1174,7 @@ export default function Mundo3D({ construcoes, tropas, vizinho = null, humor = "
       if (eraExpedicao) { delete el.dataset.cenario; aplicarTema(); }
       neuro.visible = true;
       acampamento.visible = true;
-      if (vizinhanca.grupo) { vizinhanca.grupo.visible = true; vizinhanca.ponte.visible = true; }
+      for (const v of vizinhanca.ilhas) { v.grupo.visible = true; v.ponte.visible = true; }
       if (ilhota.grupo) { ilhota.grupo.visible = true; ilhota.ponte.visible = true; posicionarCamera(); }
       const fim = sim.aoTerminar;
       sim = null;
@@ -1210,7 +1212,7 @@ export default function Mundo3D({ construcoes, tropas, vizinho = null, humor = "
       pontosDaIlha(entrada.defensor.construcoes.terreno || 0);
       neuro.visible = false;
       acampamento.visible = false;
-      if (ilhaTrocada && vizinhanca.grupo) { vizinhanca.grupo.visible = false; vizinhanca.ponte.visible = false; }
+      if (ilhaTrocada) for (const v of vizinhanca.ilhas) { v.grupo.visible = false; v.ponte.visible = false; }
       if (ilhaTrocada && ilhota.grupo) { ilhota.grupo.visible = false; ilhota.ponte.visible = false; posicionarCamera(); }
       const barco = navio(souAtacante ? AZUL : VERMELHO);
       grupo.add(barco);
@@ -1405,15 +1407,18 @@ export default function Mundo3D({ construcoes, tropas, vizinho = null, humor = "
     const COR_DA_DEFESA = "#2e7d4f";
     const ORDEM_EM_CASA = ["gigante", "dragao", "balao", "curandeira", "mago", "bombardeiro", "arqueira", "guerreiro"];
 
-    // ---- o reino vizinho: na aliança, a ilha do aliado (com as construções dele) aparece do outro
-    // lado do reino, em tamanho menor, ligada por uma ponte. Não dá para clicar nas construções dele.
-    const ESCALA_DO_VIZINHO = 0.5;
-    function definirVizinho(v) {
-      for (const g of [vizinhanca.grupo, vizinhanca.ponte]) if (g) { mundo.remove(g); g.traverse((m) => m.geometry?.dispose()); }
-      vizinhanca.grupo = null;
-      vizinhanca.ponte = null;
-      vizinhanca.dados = v?.construcoes ? v : null;
-      if (vizinhanca.dados) {
+    // ---- os reinos vizinhos: na paz, as ilhas dos outros reinos (com as construções deles) aparecem
+    // em volta da minha — atrás e à esquerda (à direita fica o Acampamento; na frente, a câmera) —,
+    // menores, cada uma ligada por uma ponte. Não dá para clicar nas construções delas.
+    const ESCALA_DO_VIZINHO = 0.42;
+    function definirVizinhos(lista) {
+      for (const v of vizinhanca.ilhas) for (const g of [v.grupo, v.ponte]) { mundo.remove(g); g.traverse((m) => m.geometry?.dispose()); }
+      vizinhanca.ilhas = [];
+      vizinhanca.dados = (lista || []).filter((v) => v?.construcoes).slice(0, MAXIMO_DE_VIZINHOS);
+      const R = raioDaIlha(ilhaAtual.terreno);
+      const emBatalha = Boolean(sim?.ilhaTrocada);
+      const k = vizinhanca.dados.length;
+      vizinhanca.dados.forEach((v, i) => {
         const n = v.construcoes;
         const terreno = Math.max(0, Math.min(3, n.terreno || 0));
         const g = new THREE.Group();
@@ -1425,20 +1430,20 @@ export default function Mundo3D({ construcoes, tropas, vizinho = null, humor = "
         }
         g.traverse((o) => { delete o.userData.chave; });
         g.scale.setScalar(ESCALA_DO_VIZINHO);
-        const R = raioDaIlha(ilhaAtual.terreno);
+        // ângulo no plano da câmera: 0 = direita da tela (o Acampamento), 90° = fundo, 180° = esquerda
+        const ang = ((k === 1 ? 150 : 40 + (170 * i) / (k - 1)) * Math.PI) / 180;
+        const dir = [Math.cos(ang) * PARA_O_LADO[0] - Math.sin(ang) * PARA_A_CAMERA[0], Math.cos(ang) * PARA_O_LADO[1] - Math.sin(ang) * PARA_A_CAMERA[1]];
         const rv = raioDaIlha(terreno) * ESCALA_DO_VIZINHO;
         const dist = R + VAO_DA_PONTE + rv;
-        vizinhanca.centro = [-PARA_O_LADO[0] * dist, -PARA_O_LADO[1] * dist];
-        vizinhanca.raio = rv;
-        g.position.set(vizinhanca.centro[0], 0, vizinhanca.centro[1]);
-        vizinhanca.grupo = g;
-        vizinhanca.ponte = ponte(p, [-PARA_O_LADO[0] * (R - 0.2), -PARA_O_LADO[1] * (R - 0.2)], [-PARA_O_LADO[0] * (R + VAO_DA_PONTE + 0.25), -PARA_O_LADO[1] * (R + VAO_DA_PONTE + 0.25)]);
-        const emBatalha = Boolean(sim?.ilhaTrocada);
+        const centro = [dir[0] * dist, dir[1] * dist];
+        g.position.set(centro[0], 0, centro[1]);
+        const ponteDaIlha = ponte(p, [dir[0] * (R - 0.2), dir[1] * (R - 0.2)], [dir[0] * (R + VAO_DA_PONTE + 0.25), dir[1] * (R + VAO_DA_PONTE + 0.25)]);
         g.visible = !emBatalha;
-        vizinhanca.ponte.visible = !emBatalha;
-        mundo.add(g, vizinhanca.ponte);
+        ponteDaIlha.visible = !emBatalha;
+        mundo.add(g, ponteDaIlha);
         g.traverse((o) => { if (o.userData.gira) girando.push(o); });
-      }
+        vizinhanca.ilhas.push({ grupo: g, ponte: ponteDaIlha, centro, raio: rv });
+      });
       if (typeof enquadrar === "function") enquadrar();
       sujo = true;
     }
@@ -1670,7 +1675,7 @@ export default function Mundo3D({ construcoes, tropas, vizinho = null, humor = "
       },
       girar(delta) { vista.alvoAzimute += delta; },
       mostrarTropas,
-      definirVizinho,
+      definirVizinhos,
     };
 
     return () => {
@@ -1712,11 +1717,12 @@ export default function Mundo3D({ construcoes, tropas, vizinho = null, humor = "
     api.current?.mostrarTropas(JSON.parse(chaveDasTropas));
   }, [construcoes, chaveDasTropas]);
 
-  // ---- o reino vizinho (aliança)
-  const chaveDoVizinho = JSON.stringify(vizinho?.construcoes ? { nome: vizinho.nome, construcoes: vizinho.construcoes } : null);
+  // ---- os reinos vizinhos (paz)
+  const mostrados = (vizinhos || []).filter((v) => v?.construcoes).slice(0, MAXIMO_DE_VIZINHOS);
+  const chaveDosVizinhos = JSON.stringify(mostrados.map((v) => ({ nome: v.nome, construcoes: v.construcoes })));
   useEffect(() => {
-    api.current?.definirVizinho(JSON.parse(chaveDoVizinho));
-  }, [chaveDoVizinho]);
+    api.current?.definirVizinhos(JSON.parse(chaveDosVizinhos));
+  }, [chaveDosVizinhos]);
 
   // ---- o Neuro: redesenha a folha quando o humor muda
   useEffect(() => {
@@ -1756,11 +1762,11 @@ export default function Mundo3D({ construcoes, tropas, vizinho = null, humor = "
           <span aria-hidden="true">{c.emoji}</span> {c.nivel ? `nv ${c.nivel}` : "construir"}
         </button>
       ))}
-      {vizinho?.construcoes && (
-        <span className="rn-mundo__rotulo rn-mundo__rotulo--vizinho" ref={(n) => { rotulos.current.__vizinho = n; }} aria-hidden="true">
-          🤝 {vizinho.nome}
+      {mostrados.map((v, i) => (
+        <span key={i} className="rn-mundo__rotulo rn-mundo__rotulo--vizinho" ref={(n) => { rotulos.current[`__vizinho${i}`] = n; }} aria-hidden="true">
+          🕊️ {v.nome}
         </span>
-      )}
+      ))}
       {legenda && (
         <div className={`rn-mundo__alerta rn-mundo__alerta--${legenda.alerta}`} role="alert">
           <strong className="rn-mundo__alerta-titulo">{legenda.titulo}</strong>

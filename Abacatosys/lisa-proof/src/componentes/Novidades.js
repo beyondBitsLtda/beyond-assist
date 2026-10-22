@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoMonstro } from "./reino/monstrosDePapel.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-22-aliancas";
+export const EDICAO_DAS_NOVIDADES = "2026-10-22-paz";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,7 +28,7 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🤝", titulo: "Alianças entre reinos", texto: "Convide um reino e escolha os dias de paz: a mina dos dois rende em dobro, um ajuda o outro nas invasões, cada um vê o reino do outro e as ilhas viram vizinhas.", destaque: true },
+  { icone: "🕊️", titulo: "Paz por votação", texto: "Proponha a paz e todos os reinos votam. Com 100% de sim: ninguém invade ninguém, todos viram vizinhos, a mina rende × o número de reinos e as expedições repartem o saque.", destaque: true },
   { icone: "🗺️", titulo: "Expedições contra monstros", texto: "Ataque vilas, florestas, bosques e acampamentos de monstros para saquear moedas — de graça, 3 vezes por dia. Cada lugar tem a sua dificuldade, a sua recompensa e o seu cenário." },
   { icone: "⚔️", titulo: "Guerra mais justa", texto: "As tropas que sobrevivem voltam para casa. O mesmo reino só a cada 2 dias — e quem foi atacado pode revidar na hora." },
   { icone: "💡", titulo: "Dicas da Lisa", texto: "Nos projetos da semana e do mês: um passo a passo para começar, sem entregar a resposta." },
@@ -77,8 +77,8 @@ export default function Novidades() {
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">Alianças e Expedições!</h2>
-          <p className="novidades__sub">Junte forças com outro reino, enfrente monstros e leve o saque — e mais coisa nova para estudar melhor.</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">Paz e Expedições!</h2>
+          <p className="novidades__sub">Vote pela paz entre os reinos, enfrente monstros e leve o saque — e mais coisa nova para estudar melhor.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -88,7 +88,7 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/reino#alianca" className="pf-botao novidades__principal" onClick={fechar}>🤝 Ver as alianças</Link>
+            <Link ref={principal} href="/reino#paz" className="pf-botao novidades__principal" onClick={fechar}>🕊️ Ver a paz entre os reinos</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>

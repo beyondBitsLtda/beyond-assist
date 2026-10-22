@@ -409,7 +409,7 @@ button.rn-exp__arte:disabled { cursor: progress; }
 .rn-exp__tropa { margin-bottom: 12px; }
 .rn-exp__tropa--emprestada { border-left: 4px solid #f59e0b; }
 
-/* ---------------------------------------------------------------- aliança */
+/* ---------------------------------------------------------------- paz entre os reinos (proposta, votação, termos) */
 .rn-convite { display: grid; gap: 10px; border: 2px solid #f59e0b; background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(124, 58, 237, 0.06)); margin-bottom: 12px; }
 .rn-convite__topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .rn-convite__selo { justify-self: start; display: inline-block; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #fff; background: linear-gradient(90deg, #b45309, #7c3aed); }
@@ -432,6 +432,12 @@ button.rn-exp__arte:disabled { cursor: progress; }
 .rn-dias { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .rn-dias__opcao { min-height: 44px; border-radius: 10px; border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; font-weight: 700; cursor: pointer; }
 .rn-dias__opcao--atual { border-color: var(--pf-verde); background: var(--pf-sucesso-fundo); box-shadow: inset 0 0 0 1px var(--pf-verde); }
-.rn-convidar { margin-right: 6px; }
 .rn-mina-x2 { margin-left: 6px; font-size: 11px; vertical-align: middle; }
 .rn-mundo__rotulo--vizinho { pointer-events: none; background: #15803d; color: #fff; }
+.rn-convite__selo--paz { background: linear-gradient(90deg, #0e7490, #15803d); }
+.rn-paz { display: grid; gap: 10px; margin-bottom: 12px; }
+.rn-paz--vigente { border-left: 4px solid #0e7490; }
+.rn-paz--vazia { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.rn-paz--vazia .pf-estat__nota { flex: 1 1 320px; margin: 0; }
+.rn-paz__placar { display: grid; gap: 6px; font-size: 14px; }
+.rn-paz__meu-voto { margin: 0; font-weight: 700; color: var(--pf-verde-forte); }
