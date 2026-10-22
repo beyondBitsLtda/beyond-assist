@@ -23,6 +23,10 @@ import {
   HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, exercitoDaExpedicao,
 } from "@/dominio/reino.js";
 import {
+  DIAS_DE_PAZ, FATOR_DA_MINA_NA_ALIANCA, termosDaAlianca, aliancaVigente, convitePendente, outroDa, podeConvidar, podeResponder,
+  expiracaoDoConvite, periodoDaAlianca, reforcoDeDefesa, reforcoDeAtaque, juntarComReforco, perdasProprias, caidasNoAtaque,
+} from "@/dominio/alianca.js";
+import {
   EXPEDICOES, EXPEDICOES_POR_DIA, TIPOS_DE_LUGAR, MONSTROS, DIFICULDADES, expedicaoPorId, podeExpedicionar, contagensDeMonstros,
 } from "@/dominio/monstros.js";
 import {
@@ -117,17 +121,143 @@ async function invasoesRecentes(usuarioId) {
   return { ataquei: ultimo(minhas.data, "defensor_id"), meAtacaram: ultimo(contraMim.data, "atacante_id") };
 }
 
+// ---------------------------------------------------------------- alianças
+
+const CAMPOS_DA_ALIANCA = "id, de_id, para_id, dias, status, criado_em, expira_em, respondido_em, inicio, fim";
+
+/** As alianças vigentes de várias pessoas: `Map<usuarioId, alianca>`. */
+async function aliancasVigentes(ids) {
+  const unicos = [...new Set(ids.filter(Boolean))];
+  if (!unicos.length) return new Map();
+  const agora = new Date().toISOString();
+  const lista = unicos.join(",");
+  const { data, error } = await supabase.from("proof_aliancas").select(CAMPOS_DA_ALIANCA)
+    .eq("status", "aceita").gt("fim", agora).or(`de_id.in.(${lista}),para_id.in.(${lista})`);
+  falhou(error, "alianças");
+  const mapa = new Map();
+  for (const a of data || []) { mapa.set(a.de_id, a); mapa.set(a.para_id, a); }
+  return mapa;
+}
+const aliancaDe = async (usuarioId) => (await aliancasVigentes([usuarioId])).get(usuarioId) || null;
+
+/** Os convites que ainda esperam resposta, mandados ou recebidos por `usuarioId`. */
+async function convitesPendentes(usuarioId) {
+  const { data, error } = await supabase.from("proof_aliancas").select(CAMPOS_DA_ALIANCA)
+    .eq("status", "pendente").gt("expira_em", new Date().toISOString()).or(`de_id.eq.${usuarioId},para_id.eq.${usuarioId}`);
+  falhou(error, "convites");
+  return data || [];
+}
+
+/** O reino do aliado como a tela mostra (é ver o reino do outro: construções, tropas, Neuro). */
+async function reinoDoAliado(a, usuarioId) {
+  const outroId = outroDa(a, usuarioId);
+  const { data: outro, error } = await supabase.from("proof_reinos").select(CAMPOS).eq("usuario_id", outroId).maybeSingle();
+  falhou(error, "reino do aliado");
+  if (!outro) return null;
+  const nomes = await nomesPublicos([outroId]);
+  const n = niveisDe(outro);
+  return {
+    id: a.id, comId: outroId, dias: a.dias, inicio: a.inicio, ate: a.fim,
+    dono: nomes.get(outroId) || "Estudante anônimo", reino: outro.nome,
+    vizinho: {
+      nome: outro.nome, dono: nomes.get(outroId) || "Estudante anônimo", trofeus: outro.trofeus, neuro: outro.neuro_nivel,
+      construcoes: Object.fromEntries(ORDEM_DAS_CONSTRUCOES.map((c) => [c, n[c] || 0])),
+      lista: ORDEM_DAS_CONSTRUCOES.filter((c) => (n[c] || 0) > 0).map((c) => ({ chave: c, nome: CONSTRUCOES[c].nome, emoji: CONSTRUCOES[c].emoji, nivel: n[c] })),
+      exercito: contagens(outro.exercito), guarnicao: contagens(outro.guarnicao),
+    },
+    // o que cada um recebe do outro numa invasão
+    reforcoDeDefesa: reforcoDeDefesa(outro),
+    reforcoDeAtaque: reforcoDeAtaque(outro),
+  };
+}
+
+/** Os convites como a tela mostra: quem, quantos dias, até quando responder — e os termos. */
+async function convitesParaTela(usuarioId) {
+  const pendentes = await convitesPendentes(usuarioId);
+  const outros = pendentes.map((c) => outroDa(c, usuarioId));
+  const [nomes, reinosR] = await Promise.all([
+    nomesPublicos(outros),
+    outros.length ? supabase.from("proof_reinos").select("usuario_id, nome").in("usuario_id", outros) : { data: [] },
+  ]);
+  const nomeDoReino = new Map((reinosR.data || []).map((r) => [r.usuario_id, r.nome]));
+  const paraTela = (c) => {
+    const outro = outroDa(c, usuarioId);
+    return { id: c.id, comId: outro, dono: nomes.get(outro) || "Estudante anônimo", reino: nomeDoReino.get(outro) || "Reino", dias: c.dias, expira: c.expira_em, termos: termosDaAlianca(c.dias) };
+  };
+  return {
+    recebidos: pendentes.filter((c) => c.para_id === usuarioId).map(paraTela),
+    enviados: pendentes.filter((c) => c.de_id === usuarioId).map(paraTela),
+  };
+}
+
+/** Convida `paraId` para uma aliança de `dias` dias de paz. */
+export async function convidarParaAlianca(usuarioId, paraId, dias) {
+  if (!paraId || typeof paraId !== "string") throw new ErroDeAcesso(400, "qual reino?");
+  const { data: alvo } = await supabase.from("proof_reinos").select("usuario_id").eq("usuario_id", paraId).maybeSingle();
+  const agora = new Date();
+  // convites vencidos entre os dois saem do caminho (senão o índice de "um pendente por par" barraria)
+  await supabase.from("proof_aliancas").update({ status: "expirada" }).eq("status", "pendente").lt("expira_em", agora.toISOString())
+    .or(`and(de_id.eq.${usuarioId},para_id.eq.${paraId}),and(de_id.eq.${paraId},para_id.eq.${usuarioId})`);
+  const [vigentes, pendentes] = await Promise.all([aliancasVigentes([usuarioId, paraId]), convitesPendentes(usuarioId)]);
+  const pode = podeConvidar({
+    deId: usuarioId, paraId: alvo ? paraId : null, dias: Number(dias),
+    minhaAlianca: vigentes.get(usuarioId), aliancaDele: vigentes.get(paraId),
+    pendenteEntreNos: pendentes.find((c) => outroDa(c, usuarioId) === paraId), agora,
+  });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  const { error } = await supabase.from("proof_aliancas").insert({ de_id: usuarioId, para_id: paraId, dias: Number(dias), expira_em: expiracaoDoConvite(agora) });
+  if (error?.code === "23505") throw new ErroDeAcesso(409, "já tem um convite entre vocês esperando resposta");
+  falhou(error, "convite");
+  return { convidou: true };
+}
+
+/** Aceita ou recusa um convite recebido. */
+export async function responderConvite(usuarioId, conviteId, aceitar) {
+  const { data: convite, error } = await supabase.from("proof_aliancas").select(CAMPOS_DA_ALIANCA).eq("id", String(conviteId || "")).maybeSingle();
+  falhou(error, "convite");
+  const agora = new Date();
+  const vigentes = convite ? await aliancasVigentes([usuarioId, convite.de_id]) : new Map();
+  const pode = podeResponder({ convite, usuarioId, aceitar, minhaAlianca: vigentes.get(usuarioId), aliancaDoOutro: vigentes.get(convite?.de_id), agora });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  const mudancas = aceitar
+    ? { status: "aceita", respondido_em: agora.toISOString(), ...periodoDaAlianca(convite.dias, agora) }
+    : { status: "recusada", respondido_em: agora.toISOString() };
+  // só muda se ainda estiver pendente (dois cliques não aceitam duas vezes)
+  const { data, error: e2 } = await supabase.from("proof_aliancas").update(mudancas).eq("id", convite.id).eq("status", "pendente").select("id");
+  falhou(e2, "convite");
+  if (!(data || []).length) throw new ErroDeAcesso(409, "esse convite já foi respondido");
+  if (aceitar) {
+    // os outros convites pendentes dos dois saem: uma aliança por vez
+    await supabase.from("proof_aliancas").update({ status: "cancelada" }).eq("status", "pendente").neq("id", convite.id)
+      .or(`de_id.in.(${usuarioId},${convite.de_id}),para_id.in.(${usuarioId},${convite.de_id})`);
+  }
+  return { aceitou: Boolean(aceitar) };
+}
+
+/** Quem convidou desiste do convite (enquanto ninguém respondeu). */
+export async function cancelarConvite(usuarioId, conviteId) {
+  const { data, error } = await supabase.from("proof_aliancas").update({ status: "cancelada" })
+    .eq("id", String(conviteId || "")).eq("de_id", usuarioId).eq("status", "pendente").select("id");
+  falhou(error, "convite");
+  if (!(data || []).length) throw new ErroDeAcesso(400, "esse convite não está mais esperando resposta");
+  return { cancelou: true };
+}
+
 /** Tudo o que a tela do reino precisa. */
 export async function estadoDoReino(usuarioId) {
   const reino = await obterReino(usuarioId);
-  const [saldo, hoje, batalhasR] = await Promise.all([
+  const [saldo, hoje, batalhasR, minhaAlianca, convites] = await Promise.all([
     saldoDoUsuario(usuarioId),
     invasoesDeHoje(usuarioId),
     supabase.from("proof_invasoes")
       .select("id, atacante_id, defensor_id, ataque, defesa, venceu, saque, trofeus_atacante, trofeus_defensor, estrelas, destruicao, combate, criado_em")
       .or(`atacante_id.eq.${usuarioId},defensor_id.eq.${usuarioId}`)
       .order("criado_em", { ascending: false }).limit(15),
+    aliancaDe(usuarioId),
+    convitesParaTela(usuarioId),
   ]);
+  const alianca = minhaAlianca ? await reinoDoAliado(minhaAlianca, usuarioId) : null;
+  const fatorDaMina = alianca ? FATOR_DA_MINA_NA_ALIANCA : 1;
   falhou(batalhasR.error, "batalhas");
   const batalhas = batalhasR.data || [];
   const nomes = await nomesPublicos(batalhas.flatMap((b) => [b.atacante_id, b.defensor_id]));
@@ -148,10 +278,14 @@ export async function estadoDoReino(usuarioId) {
       ...podeSubirNeuro(reino, saldo),
     },
     mina: {
-      paraColetar: producaoAcumulada(reino, agora),
-      porHora: taxaDeProducao(n),
-      capacidade: taxaDeProducao(n) * HORAS_ATE_ENCHER,
+      paraColetar: producaoAcumulada(reino, agora, fatorDaMina),
+      porHora: taxaDeProducao(n) * fatorDaMina,
+      capacidade: taxaDeProducao(n) * fatorDaMina * HORAS_ATE_ENCHER,
+      dobrada: fatorDaMina > 1,
     },
+    alianca,
+    convites,
+    diasDePaz: DIAS_DE_PAZ,
     cofre: { protege: protecaoDoCofre(n.cofre) },
     construcoes: ORDEM_DAS_CONSTRUCOES.map((chave) => {
       const def = CONSTRUCOES[chave];
@@ -319,7 +453,7 @@ export async function personagemDe(usuarioId) {
 export async function coletarMina(usuarioId) {
   const reino = await obterReino(usuarioId);
   const agora = new Date();
-  const valor = producaoAcumulada(reino, agora);
+  const valor = producaoAcumulada(reino, agora, (await aliancaDe(usuarioId)) ? FATOR_DA_MINA_NA_ALIANCA : 1);
   if (valor <= 0) throw new ErroDeAcesso(400, "a mina ainda não juntou nenhuma moeda inteira");
   await lancarEGravar(reino, [{ tipo: "coleta", valor }], { coletado_em: agora.toISOString() });
   return { coletou: valor };
@@ -342,16 +476,18 @@ export async function renomearReino(usuarioId, nome) {
  */
 export async function alvosDe(usuarioId) {
   const eu = await obterReino(usuarioId);
-  const [todos, hoje, recentes] = await Promise.all([
+  const [todos, hoje, recentes, pendentes] = await Promise.all([
     buscarTodas(() => supabase.from("proof_reinos").select(CAMPOS).neq("usuario_id", usuarioId).order("usuario_id")),
     invasoesDeHoje(usuarioId),
     invasoesRecentes(usuarioId),
+    convitesPendentes(usuarioId),
   ]);
   const jaAtaquei = new Set(hoje.map((i) => i.defensor_id));
   const perto = todos
     .sort((a, b) => Math.abs(a.trofeus - eu.trofeus) - Math.abs(b.trofeus - eu.trofeus))
     .slice(0, 30);
-  const nomes = await nomesPublicos(perto.map((r) => r.usuario_id));
+  const [nomes, vigentes] = await Promise.all([nomesPublicos(perto.map((r) => r.usuario_id)), aliancasVigentes([usuarioId, ...perto.map((r) => r.usuario_id)])]);
+  const minha = vigentes.get(usuarioId) || null;
   const agora = new Date();
   return {
     invasoes: { feitasHoje: hoje.length, porDia: ATAQUES_POR_DIA },
@@ -361,6 +497,11 @@ export async function alvosDe(usuarioId) {
       const pode = podeInvadir({
         atacanteId: usuarioId, atacante: eu, defensor: r, ataquesHoje: hoje.length, jaAtacouHoje: jaAtaquei.has(r.usuario_id),
         ultimoAtaqueAoAlvo: recentes.ataquei.get(r.usuario_id) || null, agora,
+        aliados: Boolean(minha && outroDa(minha, usuarioId) === r.usuario_id),
+      });
+      const convite = podeConvidar({
+        deId: usuarioId, paraId: r.usuario_id, minhaAlianca: minha, aliancaDele: vigentes.get(r.usuario_id),
+        pendenteEntreNos: pendentes.find((c) => outroDa(c, usuarioId) === r.usuario_id), agora,
       });
       return {
         id: r.usuario_id,
@@ -376,6 +517,9 @@ export async function alvosDe(usuarioId) {
         liberaEm: pode.liberaEm || null,
         // me atacou nas últimas 48 h: dá para revidar (a conta das 48 h é de cada lado)
         revanche: recentes.meAtacaram.has(r.usuario_id),
+        aliado: Boolean(minha && outroDa(minha, usuarioId) === r.usuario_id),
+        podeConvidar: convite.ok,
+        motivoDoConvite: convite.ok ? "" : convite.motivo,
       };
     }),
   };
@@ -386,18 +530,35 @@ export async function invadir(usuarioId, defensorId) {
   const eu = await obterReino(usuarioId);
   const { data: alvo, error } = await supabase.from("proof_reinos").select(CAMPOS).eq("usuario_id", defensorId).maybeSingle();
   falhou(error, "reino do alvo");
-  const [hoje, saldoDoAlvo, recentes] = await Promise.all([invasoesDeHoje(usuarioId), alvo ? saldoDoUsuario(defensorId) : 0, invasoesRecentes(usuarioId)]);
+  const [hoje, saldoDoAlvo, recentes, vigentes] = await Promise.all([
+    invasoesDeHoje(usuarioId), alvo ? saldoDoUsuario(defensorId) : 0, invasoesRecentes(usuarioId), aliancasVigentes([usuarioId, defensorId]),
+  ]);
+  const minha = vigentes.get(usuarioId) || null;
+  const dele = vigentes.get(defensorId) || null;
 
   const pode = podeInvadir({
     atacanteId: usuarioId, atacante: eu, defensor: alvo, ataquesHoje: hoje.length,
     jaAtacouHoje: hoje.some((i) => i.defensor_id === defensorId),
     ultimoAtaqueAoAlvo: recentes.ataquei.get(defensorId) || null,
+    aliados: Boolean(minha && outroDa(minha, usuarioId) === defensorId),
   });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
 
+  // a ajuda dos aliados: o meu manda reforço de ataque; o do defensor, reforço de defesa
+  const lerReino = async (id) => (id ? (await supabase.from("proof_reinos").select(CAMPOS).eq("usuario_id", id).maybeSingle()).data : null);
+  const [meuAliado, aliadoDele] = await Promise.all([lerReino(minha && outroDa(minha, usuarioId)), lerReino(dele && outroDa(dele, defensorId))]);
+  const reforcoAtaque = meuAliado ? reforcoDeAtaque(meuAliado) : {};
+  const reforcoDefesa = aliadoDele ? reforcoDeDefesa(aliadoDele) : {};
+
   const exercitoUsado = contagens(eu.exercito);
-  const r = batalha({ atacante: { exercito: exercitoUsado, neuro_nivel: eu.neuro_nivel }, defensor: alvo, saldoDoDefensor: saldoDoAlvo, semente: semente() });
-  const forca = { ataque: poderDo({ ...eu, exercito: exercitoUsado }).ataque, defesa: poderDo(alvo).defesa };
+  const exercitoNaBatalha = juntarComReforco(exercitoUsado, reforcoAtaque);
+  const guarnicaoNaBatalha = juntarComReforco(alvo.guarnicao, reforcoDefesa);
+  const r = batalha({ atacante: { exercito: exercitoNaBatalha, neuro_nivel: eu.neuro_nivel }, defensor: { ...alvo, guarnicao: guarnicaoNaBatalha }, saldoDoDefensor: saldoDoAlvo, semente: semente() });
+  r.entrada.reforcos = { ataque: reforcoAtaque, defesa: reforcoDefesa }; // só para a tela: o motor não lê
+  const forca = { ataque: poderDo({ ...eu, exercito: exercitoNaBatalha }).ataque, defesa: poderDo({ ...alvo, guarnicao: guarnicaoNaBatalha }).defesa };
+  // só quem cai se perde — e das tropas que caíram, só a parte de cada um (o reforço não custa nada)
+  const minhasPerdas = perdasProprias(exercitoUsado, reforcoAtaque, caidasNoAtaque(exercitoNaBatalha, r.sobreviventes));
+  const perdasDaGuarnicao = perdasProprias(alvo.guarnicao, reforcoDefesa, r.perdasDaGuarnicao);
 
   // 1. a invasão em si — os índices únicos barram a 4ª do dia e a 2ª no mesmo alvo
   const ins = await supabase.from("proof_invasoes").insert({
@@ -418,7 +579,7 @@ export async function invadir(usuarioId, defensorId) {
       ids.push(await lancar(usuarioId, "saque_ganho", r.saque, { invasao: invasaoId }));
     }
     // a guarnição que caiu precisa ser treinada de novo
-    const mudancasDoAlvo = { trofeus: somarTrofeus(alvo.trofeus, r.trofeusDefensor), guarnicao: somarTropas(alvo.guarnicao, r.perdasDaGuarnicao, -1) };
+    const mudancasDoAlvo = { trofeus: somarTrofeus(alvo.trofeus, r.trofeusDefensor), guarnicao: somarTropas(alvo.guarnicao, perdasDaGuarnicao, -1) };
     if (r.escudoDoDefensorHoras) mudancasDoAlvo.escudo_ate = new Date(Date.now() + r.escudoDoDefensorHoras * HORA).toISOString();
     if (!(await gravarReino(alvo, mudancasDoAlvo))) throw conflito();
   } catch (e) {
@@ -427,11 +588,12 @@ export async function invadir(usuarioId, defensorId) {
     throw e;
   }
 
-  // 3. o meu reino: troféus, o fim do meu escudo (quem ataca perde a proteção) e o exército, que
-  // foi gasto na batalha. Sem dinheiro em jogo: em vez de desfazer, tenta de novo com o reino relido.
+  // 3. o meu reino: troféus, o fim do meu escudo (quem ataca perde a proteção) e o exército: só as
+  // tropas que caíram saem (as que sobreviveram voltam para casa). Sem dinheiro em jogo: em vez de
+  // desfazer, tenta de novo com o reino relido.
   let atual = eu;
   for (let i = 0; i < 4; i++) {
-    const mudancas = { trofeus: somarTrofeus(atual.trofeus, r.trofeusAtacante), escudo_ate: null, exercito: somarTropas(atual.exercito, exercitoUsado, -1) };
+    const mudancas = { trofeus: somarTrofeus(atual.trofeus, r.trofeusAtacante), escudo_ate: null, exercito: somarTropas(atual.exercito, minhasPerdas, -1) };
     if (await gravarReino(atual, mudancas)) break;
     atual = await obterReino(usuarioId);
   }
@@ -440,7 +602,8 @@ export async function invadir(usuarioId, defensorId) {
   return {
     venceu: r.venceu, estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque,
     trofeus: r.trofeusAtacante, protegido: r.protegido, destruidos: r.destruidos,
-    combate: r.entrada,
+    combate: r.entrada, perdas: minhasPerdas, voltaram: somarTropas(exercitoUsado, minhasPerdas, -1),
+    reforcos: { ataque: reforcoAtaque, defesa: reforcoDefesa },
     alvo: { dono: nomes.get(defensorId) || "Estudante anônimo", reino: alvo.nome },
   };
 }

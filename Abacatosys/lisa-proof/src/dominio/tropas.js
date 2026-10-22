@@ -1,8 +1,9 @@
 // As tropas do Reino do Neuro (inspiradas no Clash of Clans, com nomes e números nossos). Puro.
 //
 // Duas reservas, com o mesmo catálogo:
-//   EXÉRCITO  — treinado no Quartel, vai junto em cada invasão e é GASTO nela (como no Clash:
-//               tropa que foi para a batalha não volta). A capacidade cresce com o Quartel.
+//   EXÉRCITO  — treinado no Quartel, vai junto em cada invasão. Só as tropas que CAEM se perdem; as
+//               que sobrevivem voltam para casa (22/10/2026 — antes, como no Clash, o exército
+//               inteiro era gasto, mesmo vencendo). A capacidade cresce com o Quartel.
 //   GUARNIÇÃO — as tropas de defesa, que moram na Torre do Neuro e saem quando o inimigo chega
 //               perto. Só as que caem precisam ser treinadas de novo. A capacidade cresce com a
 //               Torre do Neuro.

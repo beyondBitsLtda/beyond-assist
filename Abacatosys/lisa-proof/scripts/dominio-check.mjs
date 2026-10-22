@@ -24,9 +24,13 @@ import { nomePublico, apelidoValido, posicionar, ANONIMO } from "../src/dominio/
 import {
   podeMelhorar, podeSubirNeuro, producaoAcumulada, podeInvadir, batalha, saldoDe, somarTrofeus,
   faixaDeDefesa, estagioDoNeuro, ATAQUES_POR_DIA, TETO_DO_SAQUE, saqueDo, trofeusDoCombate,
-  rivalSimulado, simularBatalha, exercitoDeTreino, previsaoDeEstrelas, combateDe, taxaDeProducao,
+  rivalSimulado, simularBatalha, exercitoDeTreino, previsaoDeEstrelas, combateDe, taxaDeProducao, guarnicaoDeTreino,
   proximoAtaqueAoReino, esperaAte, HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, CONSTRUCOES, exercitoDaExpedicao,
 } from "../src/dominio/reino.js";
+import {
+  DIAS_DE_PAZ, termosDaAlianca, aliancaVigente, convitePendente, podeConvidar, podeResponder, periodoDaAlianca,
+  reforcoDeDefesa, reforcoDeAtaque, perdasProprias, caidasNoAtaque, juntarComReforco,
+} from "../src/dominio/alianca.js";
 import {
   MONSTROS, EXPEDICOES, EXPEDICOES_POR_DIA, podeExpedicionar, saqueDaExpedicao, defensorDaExpedicao, expedicaoPorId, contagensDeMonstros,
 } from "../src/dominio/monstros.js";
@@ -1016,6 +1020,71 @@ caso("expedições: os dois primeiros lugares são vencíveis por quem acabou de
     for (let i = 1; i <= 6; i++) soma += batalhaDeExpedicao({ atacante: { exercito: exercitoDeTreino(x.torreMinima, 1), neuro_nivel: x.torreMinima * 2 }, expedicao: x, semente: i * 7919 }).estrelas;
     assert.ok(soma / 6 >= 2, `${id}: média de ${soma / 6} estrelas`);
   }
+});
+
+caso("aliança: o convite traz todos os termos (paz, mina em dobro, ajuda, ver o reino, vizinhos)", () => {
+  const termos = termosDaAlianca(7);
+  assert.equal(termos.length, 5);
+  assert.match(termos[0].titulo, /7 dias de paz/);
+  assert.ok(termos.some((x) => /Mina em dobro/.test(x.titulo)));
+  assert.ok(termos.some((x) => /Ajuda nas invasões/.test(x.titulo)));
+  assert.ok(termos.some((x) => /Ver o reino/.test(x.titulo)));
+  assert.ok(termos.some((x) => /vizinhos/i.test(x.titulo)));
+  assert.deepEqual(DIAS_DE_PAZ, [3, 7, 14, 30]);
+});
+
+caso("aliança: convidar e responder — uma por vez, um convite por par, só quem recebeu responde", () => {
+  const agora = new Date("2026-10-22T12:00:00Z");
+  const vigente = { status: "aceita", fim: "2026-10-25T12:00:00Z" };
+  const vencida = { status: "aceita", fim: "2026-10-21T12:00:00Z" };
+  assert.equal(aliancaVigente(vigente, agora), true);
+  assert.equal(aliancaVigente(vencida, agora), false);
+  const base = { deId: "a", paraId: "b", dias: 7, agora };
+  assert.equal(podeConvidar(base).ok, true);
+  assert.match(podeConvidar({ ...base, paraId: "a" }).motivo, /próprio reino/);
+  assert.match(podeConvidar({ ...base, dias: 5 }).motivo, /3, 7, 14, 30/);
+  assert.match(podeConvidar({ ...base, minhaAlianca: vigente }).motivo, /uma por vez/);
+  assert.equal(podeConvidar({ ...base, minhaAlianca: vencida }).ok, true);
+  assert.match(podeConvidar({ ...base, aliancaDele: vigente }).motivo, /já tem um aliado/);
+  const pendente = { status: "pendente", expira_em: "2026-10-23T12:00:00Z", de_id: "b", para_id: "a" };
+  assert.match(podeConvidar({ ...base, pendenteEntreNos: pendente }).motivo, /esperando resposta/);
+  assert.equal(convitePendente({ ...pendente, expira_em: "2026-10-22T11:00:00Z" }, agora), false);
+  const convite = { status: "pendente", expira_em: "2026-10-24T12:00:00Z", de_id: "a", para_id: "b", dias: 7 };
+  assert.equal(podeResponder({ convite, usuarioId: "b", aceitar: true, agora }).ok, true);
+  assert.match(podeResponder({ convite, usuarioId: "a", aceitar: true, agora }).motivo, /não é para você/);
+  assert.match(podeResponder({ convite, usuarioId: "b", aceitar: true, minhaAlianca: vigente, agora }).motivo, /uma por vez/);
+  assert.equal(podeResponder({ convite, usuarioId: "b", aceitar: false, minhaAlianca: vigente, agora }).ok, true); // recusar sempre pode
+  assert.deepEqual(periodoDaAlianca(7, agora), { inicio: "2026-10-22T12:00:00.000Z", fim: "2026-10-29T12:00:00.000Z" });
+});
+
+caso("aliança: reforço é metade das tropas do aliado (ou um básico da Torre dele) e só as minhas perdas contam", () => {
+  assert.deepEqual(reforcoDeDefesa({ construcoes: { castelo: 2 }, guarnicao: { guerreiro: 5, arqueira: 2 } }), { guerreiro: 3, arqueira: 1 });
+  assert.deepEqual(reforcoDeDefesa({ construcoes: { castelo: 2 }, guarnicao: {} }), guarnicaoDeTreino(2, 0.5));
+  assert.deepEqual(reforcoDeAtaque({ construcoes: { castelo: 3 }, exercito: { gigante: 3 } }), { gigante: 2 });
+  assert.deepEqual(reforcoDeAtaque({ construcoes: { castelo: 3 }, exercito: {} }), exercitoDeTreino(3, 0.3));
+  assert.deepEqual(reforcoDeAtaque(null), {});
+  // 10 guerreiros meus + 10 do aliado; caíram 6: 3 eram meus
+  assert.deepEqual(perdasProprias({ guerreiro: 10 }, { guerreiro: 10 }, { guerreiro: 6 }), { guerreiro: 3 });
+  // sem reforço, todas as que caíram são minhas; tipo que só o aliado mandou não me custa nada
+  assert.deepEqual(perdasProprias({ guerreiro: 4 }, { arqueira: 3 }, { guerreiro: 2, arqueira: 3 }), { guerreiro: 2 });
+  assert.deepEqual(caidasNoAtaque({ guerreiro: 8, arqueira: 4 }, { guerreiro: 5, arqueira: 4 }), { guerreiro: 3 });
+  assert.deepEqual(juntarComReforco({ guerreiro: 1 }, { guerreiro: 2, mago: 1 }), { guerreiro: 3, mago: 1 });
+});
+
+caso("invasão: aliados não se invadem e a mina rende em dobro na aliança", () => {
+  const agora = new Date("2026-10-22T12:00:00Z");
+  const r = podeInvadir({ atacanteId: "a", atacante: { exercito: { guerreiro: 3 } }, defensor: { usuario_id: "b" }, ataquesHoje: 0, aliados: true, agora });
+  assert.match(r.motivo, /aliados/);
+  const reino = { construcoes: { mina: 2 }, coletado_em: "2026-10-22T08:00:00Z" };
+  assert.equal(producaoAcumulada(reino, agora, 2), 2 * producaoAcumulada(reino, agora, 1));
+});
+
+caso("invasão: só as tropas que caem se perdem (as sobreviventes voltam)", () => {
+  const exercito = { guerreiro: 10, arqueira: 6, gigante: 2 };
+  const r = batalha({ atacante: { exercito, neuro_nivel: 3 }, defensor: { construcoes: { castelo: 1, torre: 1, mina: 1 }, neuro_nivel: 1, guarnicao: {} }, saldoDoDefensor: 0, semente: 99 });
+  const perdas = perdasProprias(exercito, {}, caidasNoAtaque(exercito, r.sobreviventes));
+  for (const [t, n] of Object.entries(exercito)) assert.equal((perdas[t] || 0) + (r.sobreviventes[t] || 0), n);
+  assert.ok(Object.values(r.sobreviventes).reduce((a, b) => a + b, 0) > 0, "contra um reino fraco, alguém sobrevive");
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);
