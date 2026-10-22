@@ -28,7 +28,7 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🗺️", titulo: "Expedições contra monstros", texto: "Ataque vilas, florestas, bosques e acampamentos de monstros para saquear moedas. É contra a CPU: ninguém perde nada.", destaque: true },
+  { icone: "🗺️", titulo: "Expedições contra monstros", texto: "Ataque vilas, florestas, bosques e acampamentos de monstros para saquear moedas — de graça, 3 vezes por dia. Cada lugar tem a sua dificuldade, a sua recompensa e o seu cenário.", destaque: true },
   { icone: "⚔️", titulo: "Guerra a cada 2 dias", texto: "Você invade o mesmo reino uma vez a cada 2 dias. Foi atacado? A revanche fica liberada na hora." },
   { icone: "💡", titulo: "Dicas da Lisa", texto: "Nos projetos da semana e do mês: um passo a passo para começar, sem entregar a resposta." },
   { icone: "▶️", titulo: "Rode o seu código", texto: "Todo exercício do dia ganhou o botão Rodar: veja o resultado antes de enviar." },

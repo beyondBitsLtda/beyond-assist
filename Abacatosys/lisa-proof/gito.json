@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.13.0-cloudflare-pages.1",
+  "versao": "0.14.0-proof-expedicoes-gratis.1",
   "atualizadoEm": "2026-10-22",
   "compilacao": {
-    "numero": 34,
+    "numero": 35,
     "data": "2026-10-22",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.14.0-proof-expedicoes-gratis.1",
+      "data": "2026-10-22",
+      "branch": "proof-expedicoes-gratis",
+      "tipo": "funcionalidade",
+      "resumo": "Expedições de graça (nenhuma tropa se perde), 3 por dia em qualquer lugar, com dificuldade e recompensa próprias e um terreno 3D com estruturas personalizadas para cada uma.",
+      "itens": [
+        "Expedição não custa nada: o exército inteiro volta para casa, então não há tropa para treinar de novo nem moeda gasta.",
+        "3 expedições por dia, em qualquer lugar — dá para repetir o mesmo (a trava de uma vez por lugar saiu; migração db/010-expedicoes-repetir.sql).",
+        "Cada lugar mostra a dificuldade (Fácil, Médio, Difícil, Muito difícil, Lendário) e a recompensa. As recompensas ficaram menores (60 a 320) porque agora não há perda de tropas.",
+        "Cada uma das 8 expedições tem o seu terreno 3D: chão, céu, luz e enfeites próprios (cogumelos coloridos, vila de goblins, floresta nevada, acampamento orc, vila de areia dos bandidos, bosque assombrado com lápides, floresta sombria com teias e o covil vulcânico do Cérbero).",
+        "Estruturas personalizadas na ilha da expedição: torre de vigia, catapulta, tesouro, carroça do saque, cabana ou tenda, paliçada (de madeira, osso ou pedra vulcânica), pedra rúnica, balista, caldeirão, totem e obelisco, nas cores de cada lugar, mais um covil diferente para cada chefe.",
+        "Na ilha da expedição não aparecem as árvores nem o lote vazio do reino; depois da luta, o reino volta inteiro."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.13.0-cloudflare-pages.1",
       "data": "2026-10-22",
@@ -536,7 +552,7 @@
         "Dicas da Lisa nos projetos: passo a passo básico, dicas e o que revisar, sem entregar a solução",
         "Projetos com pontos por requisito, entregas parciais que somam e complexidade ajustável (mais simples sem perder pontos, desafiador valendo 1,5x)",
         "Botão Rodar nos exercícios do dia: JavaScript e SQL no navegador; C, Python, PHP, Java e outras num compilador on-line",
-        "Expedições do Reino contra a CPU (vilas, florestas, bosques e acampamentos de monstros), com monstros desenhados em 2D e saque por destruição",
+        "Expedições do Reino contra a CPU, de graça (nenhuma tropa se perde), 3 por dia, cada uma com dificuldade, recompensa e terreno 3D próprios, e monstros desenhados em 2D",
         "Guerra entre jogadores com o mesmo reino só a cada 48 h por quem ataca, e revanche liberada para quem foi atacado",
         "Modal de novidades na entrada, uma vez por edição"
       ],
@@ -601,7 +617,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/009). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/010). Acesso só pelo túnel da Cloudflare, em HTTPS."
       }
     ],
     "integracoes": [

@@ -939,12 +939,12 @@ caso("expedições: o catálogo respeita as regras do reino (terra nova pede Ter
   assert.deepEqual(contagensDeMonstros({ goblin: 2.7, dragao: 3, cerbero: -1 }), { goblin: 2 });
 });
 
-caso("expedições: torre, uma vez por dia por lugar, 3 por dia, e tropas para partir", () => {
+caso("expedições: torre, 3 por dia em qualquer lugar (repetir vale), e tropas para partir", () => {
   const x = expedicaoPorId("floresta-lobos"); // Torre 2
-  const ok = { expedicao: x, nivelDaTorre: 2, temExercito: true, feitasHoje: 0, jaFezHoje: false };
+  const ok = { expedicao: x, nivelDaTorre: 2, temExercito: true, feitasHoje: 0 };
   assert.equal(podeExpedicionar(ok).ok, true);
+  assert.equal(podeExpedicionar({ ...ok, feitasHoje: 2 }).ok, true); // o mesmo lugar de novo
   assert.match(podeExpedicionar({ ...ok, nivelDaTorre: 1 }).motivo, /Torre do Neuro no nível 2/);
-  assert.match(podeExpedicionar({ ...ok, jaFezHoje: true }).motivo, /voltam amanhã/);
   assert.match(podeExpedicionar({ ...ok, feitasHoje: EXPEDICOES_POR_DIA }).motivo, /expedições de hoje/);
   assert.match(podeExpedicionar({ ...ok, temExercito: false }).motivo, /treine tropas/);
   assert.equal(podeExpedicionar({ ...ok, expedicao: null }).ok, false);
@@ -958,15 +958,26 @@ caso("expedições: o saque segue a destruição, mesmo sem estrela, e ⭐⭐⭐
   assert.equal(saqueDaExpedicao(x, { destruicao: 0, estrelas: 0 }), 0);
 });
 
-caso("expedições: monstros soltos desde o começo, batalha determinística, sobreviventes voltam", () => {
+caso("expedições: cada lugar tem dificuldade de 1 a 5 e recompensa que cresce com ela", () => {
+  let antes = 0;
+  for (const x of EXPEDICOES) {
+    assert.ok(x.dificuldade >= 1 && x.dificuldade <= 5, x.id);
+    assert.ok(x.recompensa > antes, `${x.id}: a recompensa precisa crescer`);
+    antes = x.recompensa;
+  }
+  assert.equal(expedicaoPorId("covil-cerbero").dificuldade, 5);
+  assert.equal(defensorDaExpedicao(expedicaoPorId("vila-bandidos")).cenario, "vila-bandidos");
+});
+
+caso("expedições: monstros soltos desde o começo, batalha determinística, nada se gasta", () => {
   const x = expedicaoPorId("vila-goblins");
   const atacante = { exercito: { guerreiro: 8, arqueira: 6 }, neuro_nivel: 2 };
   const a = batalhaDeExpedicao({ atacante, expedicao: x, semente: 4242 });
   const b = batalhaDeExpedicao({ atacante, expedicao: x, semente: 4242 });
   assert.deepEqual({ ...a, entrada: null }, { ...b, entrada: null });
   assert.deepEqual(a.entrada.defensor, defensorDaExpedicao(x));
-  // as perdas + os sobreviventes fecham com o exército que foi
-  for (const [t, n] of Object.entries(atacante.exercito)) assert.equal((a.perdas[t] || 0) + (a.sobreviventes[t] || 0), n);
+  // quem caiu + quem ficou de pé fecham com o exército (é só o placar: ninguém se perde)
+  for (const [t, n] of Object.entries(atacante.exercito)) assert.equal((a.caidas[t] || 0) + (a.sobreviventes[t] || 0), n);
   // no primeiro passo os monstros já estão na ilha, do lado da defesa
   const e = montarCombate(a.entrada);
   const ev = passoDoCombate(e);
