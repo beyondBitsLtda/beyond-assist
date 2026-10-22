@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.15.0-proof-alianca.1",
+  "versao": "0.15.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-22",
   "compilacao": {
-    "numero": 39,
+    "numero": 40,
     "data": "2026-10-22",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.15.0-cloudflare-pages.1",
+      "data": "2026-10-22",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.15.0: alianças entre reinos e, na invasão, só as tropas que caem se perdem.",
+      "itens": [
+        "Junta a branch proof-alianca (0.15.0-proof-alianca.1).",
+        "Migração db/011-aliancas.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.15.0-proof-alianca.1",
       "data": "2026-10-22",
