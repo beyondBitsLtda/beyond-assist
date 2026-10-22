@@ -6,6 +6,7 @@ import Neuro, { usePersonagem } from "@/componentes/Neuro.js";
 import { LUGARES, PRACA, RAIO_DA_MURALHA, montarCombate, passo as passoDoCombate, resultadoDo, DT, DURACAO_MAXIMA, raioDaIlha } from "@/dominio/combate.js";
 import { CONSTRUCOES } from "@/dominio/reino.js";
 import { svgDaTropa, TAMANHO_DO_PAPEL, ALTURA_DE_VOO } from "./tropasDePapel.js";
+import { cenarioDe, estruturaDaExpedicao, terrenoDaExpedicao } from "./cenariosDasExpedicoes.js";
 
 /**
  * O Reino em 3D: uma ilha flutuante low poly com as construções, e o Neuro como um recorte de
@@ -413,164 +414,12 @@ function torreRaio(p, n) {
 
 const CONSTRUTORES = { castelo, mina, cofre, torre, canhao, quartel, muralha, biblioteca, defesaAerea, morteiro, torreMagica, torreRaio };
 
-// ------------------------------------------------------------------ expedições: o covil e o cenário
-// Na ilha de uma expedição (vila, floresta, bosque ou acampamento de monstros), a Torre do Neuro
-// vira o covil do chefe e o chão ganha o cenário do lugar. O resto das defesas é o de sempre.
-const CHAO_DO_TEMA = { vila: "#9cc46a", floresta: "#4f8f45", bosque: "#8fd07a", acampamento: "#a88a5b" };
-
-function covil(p, tema) {
-  const g = new THREE.Group();
-  if (tema === "vila") {
-    // a casa do chefe: madeira, telhado de palha e chaminé
-    g.add(p.caixa(1.5, 0.9, 1.3, "#b07a46", 0, 0.45, 0));
-    const telhado = p.cone(1.25, 0.9, 4, "#d9b44a", 0, 1.35, 0);
-    telhado.rotation.y = Math.PI / 4;
-    g.add(telhado);
-    g.add(p.caixa(0.36, 0.56, 0.06, COR.porta, 0, 0.28, 0.66));
-    g.add(p.caixa(0.2, 0.55, 0.2, COR.rocha, 0.42, 1.5, -0.22));
-    g.add(p.caixa(0.3, 0.24, 0.04, "#fde68a", -0.45, 0.55, 0.66));
-    p.bandeira(g, -0.6, 0.9, -0.5, "#16a34a");
-  } else if (tema === "floresta") {
-    // a árvore-toca: tronco largo com a porta escura e uma copa enorme
-    g.add(p.cilindro(0.55, 0.78, 1.6, 7, COR.madeiraEscura, 0, 0.8, 0));
-    g.add(p.caixa(0.42, 0.58, 0.12, "#1f140c", 0, 0.3, 0.62));
-    g.add(p.malha(new THREE.DodecahedronGeometry(1.05, 0), "#2f6b3a", 0, 2.05, 0));
-    g.add(p.malha(new THREE.DodecahedronGeometry(0.7, 0), COR.folhaEscura, 0.75, 1.75, 0.2));
-    g.add(p.malha(new THREE.DodecahedronGeometry(0.65, 0), COR.folha, -0.7, 1.8, -0.15));
-  } else if (tema === "bosque") {
-    // o cogumelo gigante com portinha
-    g.add(p.cilindro(0.36, 0.46, 1.2, 8, "#f3e3c3", 0, 0.6, 0));
-    const chapeu = p.malha(new THREE.SphereGeometry(1.05, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), "#e53935", 0, 1.05, 0);
-    chapeu.scale.y = 0.75;
-    g.add(chapeu);
-    for (const [x, y, z] of [[0.45, 1.6, 0.55], [-0.55, 1.55, 0.35], [0.1, 1.8, -0.4], [-0.2, 1.75, 0.75], [0.75, 1.35, -0.3]]) {
-      g.add(p.malha(new THREE.SphereGeometry(0.13, 6, 4), "#ffffff", x, y, z));
-    }
-    g.add(p.caixa(0.28, 0.42, 0.06, "#7c4a2d", 0, 0.22, 0.44));
-  } else {
-    // a tenda do chefe, com totem de caveira e estacas
-    g.add(p.cone(1.15, 1.7, 6, "#8b2e2e", 0, 0.85, 0));
-    g.add(p.caixa(0.4, 0.62, 0.05, "#1f140c", 0, 0.31, 0.92));
-    g.add(p.cilindro(0.06, 0.06, 1.9, 5, COR.madeiraEscura, 1.0, 0.95, 0.55));
-    g.add(p.malha(new THREE.SphereGeometry(0.17, 8, 6), "#f1efe6", 1.0, 1.98, 0.55));
-    for (let i = 0; i < 7; i++) {
-      const a = (i / 7) * Math.PI * 2;
-      const estaca = p.cone(0.06, 0.5, 4, COR.madeira, Math.cos(a) * 1.35, 0.22, Math.sin(a) * 1.35);
-      estaca.rotation.z = Math.cos(a) * 0.35;
-      estaca.rotation.x = -Math.sin(a) * 0.35;
-      g.add(estaca);
-    }
-  }
-  return g;
-}
-
-/** Os enfeites do cenário, sempre nos mesmos lugares, longe das construções e da praia de desembarque. */
-function cenarioDoTema(p, tema, construcoes) {
-  const g = new THREE.Group();
-  const terreno = construcoes?.terreno || 0;
-  const R = raioDaIlha(terreno);
-  const disco = p.cilindro(R * 0.92, R * 0.92, 0.02, 24, CHAO_DO_TEMA[tema] || COR.grama, 0, 0.012, 0);
-  disco.receiveShadow = true;
-  g.add(disco);
-  const r = aleatorio(tema.length * 977 + terreno);
-  const ocupado = Object.entries(LUGARES).filter(([chave]) => (construcoes?.[chave] || 0) > 0).map(([, l]) => l);
-  const livre = (x, z, folga) => ocupado.every(([lx, lz]) => Math.hypot(lx - x, lz - z) > folga) && Math.hypot(PRACA[0] - x, PRACA[1] - z) > 1.5;
-  // a frente-direita da ilha (de onde o navio chega) fica limpa
-  const naPraia = (a) => { const b = ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2); return b > 0.05 && b < 1.55; };
-  const lugares = (n, de, ate, folga) => {
-    const lista = [];
-    for (let i = 0; i < n * 4 && lista.length < n; i++) {
-      const a = r() * Math.PI * 2;
-      if (naPraia(a)) continue;
-      const raio = de + r() * (ate - de);
-      const x = Math.cos(a) * raio, z = Math.sin(a) * raio;
-      if (livre(x, z, folga)) lista.push([x, z, 0.8 + r() * 0.5]);
-    }
-    return lista;
-  };
-  const pinheiro = (x, z, s, cor = "#2f6b3a") => {
-    g.add(p.cilindro(0.07 * s, 0.1 * s, 0.4 * s, 5, COR.madeiraEscura, x, 0.2 * s, z));
-    g.add(p.cone(0.5 * s, 0.9 * s, 6, cor, x, 0.75 * s, z));
-    g.add(p.cone(0.36 * s, 0.7 * s, 6, "#24563a", x, 1.2 * s, z));
-  };
-  const cogumelo = (x, z, s) => {
-    g.add(p.cilindro(0.06 * s, 0.08 * s, 0.28 * s, 6, "#f3e3c3", x, 0.14 * s, z));
-    const c = p.malha(new THREE.SphereGeometry(0.2 * s, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), r() > 0.3 ? "#e53935" : "#f59e0b", x, 0.26 * s, z);
-    c.scale.y = 0.7;
-    g.add(c);
-  };
-  if (tema === "floresta") {
-    for (const [x, z, s] of lugares(26, R - 2.2, R - 0.5, 1.2)) pinheiro(x, z, s * 1.15);
-    for (const [x, z] of lugares(4, 2, R - 1.5, 1.4)) {
-      const tora = p.cilindro(0.12, 0.12, 0.8, 6, COR.madeiraEscura, x, 0.12, z);
-      tora.rotation.z = Math.PI / 2;
-      tora.rotation.y = r() * Math.PI;
-      g.add(tora);
-    }
-  } else if (tema === "bosque") {
-    for (const [x, z, s] of lugares(12, R - 2.0, R - 0.5, 1.2)) {
-      g.add(p.cilindro(0.07 * s, 0.1 * s, 0.5 * s, 5, COR.madeiraEscura, x, 0.25 * s, z));
-      g.add(p.malha(new THREE.DodecahedronGeometry(0.45 * s, 0), r() > 0.5 ? "#6fbf5a" : "#4fae63", x, 0.8 * s, z));
-    }
-    for (const [x, z, s] of lugares(16, 1.6, R - 0.6, 1.1)) cogumelo(x, z, s * 1.3);
-    for (const [x, z] of lugares(8, 1.5, R - 0.8, 0.9)) {
-      const luz = p.malha(new THREE.OctahedronGeometry(0.06, 0), p.brilho("#d9f99d"), x, 0.6 + r() * 0.6, z);
-      luz.userData.gira = true;
-      g.add(luz);
-    }
-  } else if (tema === "vila") {
-    for (const [x, z, s] of lugares(6, R - 2.3, R - 0.9, 1.6)) {
-      const casa = new THREE.Group();
-      casa.add(p.caixa(0.7 * s, 0.5 * s, 0.6 * s, "#c99560", 0, 0.25 * s, 0));
-      const t = p.cone(0.6 * s, 0.45 * s, 4, r() > 0.5 ? "#c0392b" : "#d9b44a", 0, 0.72 * s, 0);
-      t.rotation.y = Math.PI / 4;
-      casa.add(t);
-      casa.add(p.caixa(0.16 * s, 0.26 * s, 0.03, COR.porta, 0, 0.13 * s, 0.31 * s));
-      casa.position.set(x, 0, z);
-      casa.rotation.y = Math.atan2(-x, -z);
-      g.add(casa);
-    }
-    for (const [x, z] of lugares(5, 2, R - 1.2, 1.3)) {
-      g.add(p.cilindro(0.22, 0.26, 0.3, 8, "#e7c86b", x, 0.15, z));
-      g.add(p.cone(0.24, 0.18, 8, "#d9b44a", x, 0.39, z));
-    }
-    for (const [x, z] of lugares(8, R - 1.0, R - 0.5, 1.0)) {
-      const cerca = p.caixa(0.6, 0.18, 0.05, COR.madeira, x, 0.2, z);
-      cerca.rotation.y = Math.atan2(x, z) + Math.PI / 2;
-      g.add(cerca);
-    }
-  } else {
-    for (const [x, z, s] of lugares(6, R - 2.2, R - 0.9, 1.5)) {
-      g.add(p.cone(0.45 * s, 0.75 * s, 5, r() > 0.5 ? "#7f1d1d" : "#a16207", x, 0.37 * s, z));
-    }
-    for (const [x, z] of lugares(5, 1.8, R - 1.0, 1.3)) {
-      g.add(p.cilindro(0.05, 0.05, 1.2, 5, COR.madeiraEscura, x, 0.6, z));
-      g.add(p.malha(new THREE.SphereGeometry(0.13, 8, 6), "#f1efe6", x, 1.3, z));
-    }
-    for (const [x, z] of lugares(10, 1.5, R - 0.6, 0.9)) {
-      const osso = p.cilindro(0.03, 0.03, 0.3, 5, "#f1efe6", x, 0.04, z);
-      osso.rotation.z = Math.PI / 2;
-      osso.rotation.y = r() * Math.PI;
-      g.add(osso);
-    }
-    for (const [x, z] of lugares(2, 2, R - 1.5, 1.6)) {
-      for (let i = 0; i < 3; i++) {
-        const tora = p.caixa(0.5, 0.08, 0.08, COR.madeiraEscura, x, 0.05, z);
-        tora.rotation.y = (i * Math.PI) / 3;
-        g.add(tora);
-      }
-      const chama = p.malha(new THREE.OctahedronGeometry(0.16, 0), p.brilho("#ff8a1f"), x, 0.24, z);
-      chama.scale.y = 1.6;
-      chama.userData.gira = true;
-      g.add(chama);
-    }
-  }
-  return g;
-}
-
-function construir(p, chave, nivel, tema = null) {
-  const g = tema && chave === "castelo" && nivel > 0 ? covil(p, tema)
-    : nivel > 0 || chave === "muralha" ? CONSTRUTORES[chave](p, nivel) : terrenoVazio(p);
+// ------------------------------------------------------------------ expedições
+// Cada expedição tem o seu terreno e as suas estruturas (cenariosDasExpedicoes.js): na ilha dela,
+// toda construção ganha o desenho do lugar, e o que não existe lá nem aparece.
+function construir(p, chave, nivel, cenario = null) {
+  const g = estruturaDaExpedicao(p, chave, nivel, cenario)
+    || (nivel > 0 || chave === "muralha" ? CONSTRUTORES[chave](p, nivel) : terrenoVazio(p));
   if (chave !== "muralha") {
     const [x, z] = LUGARES[chave];
     g.position.set(x, 0, z);
@@ -590,7 +439,7 @@ function ancoraDe(chave, grupo) {
 
 // ------------------------------------------------------------------ a ilha
 /** A ilha do tamanho do Terreno: chão, praça, caminhos até as construções que cabem nela, árvores na beirada. */
-function ilha(p, terreno = 0) {
+function ilha(p, terreno = 0, enfeites = true) {
   const g = new THREE.Group();
   const R = raioDaIlha(terreno);
   const cabe = (chave) => (CONSTRUCOES[chave]?.terreno || 0) <= terreno;
@@ -623,7 +472,8 @@ function ilha(p, terreno = 0) {
     }
   }
 
-  // árvores, pedras e arbustos, sempre no mesmo lugar
+  // árvores, pedras e arbustos, sempre no mesmo lugar (a ilha de uma expedição traz os dela)
+  if (!enfeites) return g;
   const r = aleatorio(42);
   const arvore = (x, z, s) => {
     g.add(p.cilindro(0.08 * s, 0.11 * s, 0.45 * s, 5, COR.madeiraEscura, x, 0.22 * s, z));
@@ -854,7 +704,8 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
     cena.add(ceu, sol);
 
     const mundo = new THREE.Group();
-    const ilhaAtual = { grupo: ilha(p, 0), terreno: 0 };
+    const ilhaAtual = { grupo: ilha(p, 0), terreno: 0, enfeites: true };
+    let cenarioDaIlha = null;  // numa expedição: o cenário dela (terreno, estruturas, céu e luz)
     mundo.add(ilhaAtual.grupo);
     // a ilhota do Acampamento e a ponte (montadas por definirAcampamento)
     const ilhota = { grupo: null, ponte: null, nivel: 0, centro: [0, 0], raio: 0 };
@@ -862,11 +713,13 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
     /** Troca a ilha quando o Terreno muda (o meu, ou o do rival durante a minha invasão). */
     function definirTerreno(terreno) {
       const tt = Math.max(0, Math.min(3, terreno || 0));
-      if (tt === ilhaAtual.terreno) return;
+      const enfeites = !cenarioDaIlha; // numa expedição, só o chão: os enfeites são os do lugar
+      if (tt === ilhaAtual.terreno && enfeites === ilhaAtual.enfeites) return;
       mundo.remove(ilhaAtual.grupo);
       ilhaAtual.grupo.traverse((m) => m.geometry?.dispose());
-      ilhaAtual.grupo = ilha(p, tt);
+      ilhaAtual.grupo = ilha(p, tt, enfeites);
       ilhaAtual.terreno = tt;
+      ilhaAtual.enfeites = enfeites;
       mundo.add(ilhaAtual.grupo);
       for (const n of grupoNuvens.children) n.userData.raio = n.userData.raioBase + 1.3 * tt;
       if (ilhota.nivel) definirAcampamento(ilhota.nivel, true);
@@ -876,8 +729,7 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
     cena.add(mundo, grupoNuvens);
 
     // construções
-    const predios = new Map(); // chave → { grupo, nivel, tema, ancora, nasceu }
-    let temaDaIlha = null;     // numa expedição: "vila", "floresta", "bosque" ou "acampamento"
+    const predios = new Map(); // chave → { grupo, nivel, cenario, ancora, nasceu }
     const camadaPredios = new THREE.Group();
     mundo.add(camadaPredios);
     const descartar = (o) => o.traverse((m) => m.geometry?.dispose());
@@ -895,12 +747,12 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
           continue;
         }
         const atual = predios.get(chave);
-        const tema = chave === "castelo" ? temaDaIlha : null;
-        if (atual && atual.nivel === nivel && atual.tema === tema) continue;
+        const cenario = cenarioDaIlha?.id || null;
+        if (atual && atual.nivel === nivel && atual.cenario === cenario) continue;
         if (atual) { camadaPredios.remove(atual.grupo); descartar(atual.grupo); }
-        const grupo = construir(p, chave, nivel, tema);
+        const grupo = construir(p, chave, nivel, cenarioDaIlha);
         camadaPredios.add(grupo);
-        predios.set(chave, { grupo, nivel, tema, ancora: ancoraDe(chave, grupo), nasceu: atual && animar ? performance.now() : 0 });
+        predios.set(chave, { grupo, nivel, cenario, ancora: ancoraDe(chave, grupo), nasceu: atual && animar ? performance.now() : 0 });
       }
       girando = [];
       for (const info of predios.values()) info.grupo.traverse((o) => { if (o.userData.gira) girando.push(o); });
@@ -983,6 +835,13 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
       p.janela.color.set(noite ? "#ffcf6b" : "#3b3b4f");
       p.janela.emissive.set(noite ? "#ffb347" : "#000000");
       p.janela.emissiveIntensity = noite ? 0.9 : 0;
+      const luz = cenarioDaIlha?.luz;
+      if (luz) {
+        ceu.color.set(luz.ceu);
+        ceu.groundColor.set(luz.chao);
+        sol.color.set(luz.sol);
+        sol.intensity = luz.forca;
+      }
       sujo = true;
     }
     const observaTema = new MutationObserver(aplicarTema);
@@ -1292,8 +1151,10 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
       mundo.remove(sim.grupo);
       sim.grupo.traverse((m) => { if (m.userData?.proprio) m.material.dispose(); });
       for (const info of predios.values()) info.grupo.visible = true;
-      temaDaIlha = null;
+      const eraExpedicao = Boolean(cenarioDaIlha);
+      cenarioDaIlha = null;
       if (sim.ilhaTrocada) atualizarConstrucoes(construcoesRef.current, false);
+      if (eraExpedicao) { delete el.dataset.cenario; aplicarTema(); }
       neuro.visible = true;
       acampamento.visible = true;
       if (ilhota.grupo) { ilhota.grupo.visible = true; ilhota.ponte.visible = true; posicionarCamera(); }
@@ -1315,17 +1176,20 @@ export default function Mundo3D({ construcoes, tropas, humor = "normal", aoEscol
       const e = montarCombate(entrada);
       // quem ataca vê a ilha do rival: troca as construções pelas dele durante a batalha
       const ilhaTrocada = souAtacante;
-      // expedição (contra a CPU): a ilha ganha o cenário do lugar e o covil do chefe
-      const tema = souAtacante && CHAO_DO_TEMA[entrada.defensor?.tema] ? entrada.defensor.tema : null;
+      // expedição (contra a CPU): a ilha ganha o terreno, as estruturas, o céu e a luz do lugar
+      const cenario = souAtacante ? cenarioDe(entrada.defensor) : null;
+      const tema = cenario?.id || null;
       if (ilhaTrocada) {
         const n = entrada.defensor.construcoes;
-        temaDaIlha = tema;
+        cenarioDaIlha = cenario;
         atualizarConstrucoes([{ chave: "terreno", nivel: n.terreno || 0 }, ...Object.keys(CONSTRUTORES).map((chave) => ({ chave, nivel: n[chave] || 0 }))], false);
       }
-      if (tema) {
-        const cenario = cenarioDoTema(p, tema, entrada.defensor.construcoes);
-        grupo.add(cenario);
-        cenario.traverse((o) => { if (o.userData.gira) girando.push(o); });
+      if (cenario) {
+        const terreno = terrenoDaExpedicao(p, cenario, entrada.defensor.construcoes);
+        grupo.add(terreno);
+        terreno.traverse((o) => { if (o.userData.gira) girando.push(o); });
+        el.dataset.cenario = cenario.id;
+        aplicarTema();
       }
       pontosDaIlha(entrada.defensor.construcoes.terreno || 0);
       neuro.visible = false;

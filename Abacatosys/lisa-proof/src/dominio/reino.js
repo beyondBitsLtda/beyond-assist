@@ -275,7 +275,7 @@ export function batalha({ atacante, defensor, saldoDoDefensor, semente }) {
 
 /**
  * Uma expedição contra a CPU: o mesmo motor, com a ilha dos monstros. O saque segue a destruição
- * (mesmo sem estrela) e as tropas que sobrevivem voltam para casa.
+ * (mesmo sem estrela). `caidas` é só o placar da luta: a expedição não gasta tropa nenhuma.
  */
 export function batalhaDeExpedicao({ atacante, expedicao, semente }) {
   const entrada = {
@@ -284,12 +284,12 @@ export function batalhaDeExpedicao({ atacante, expedicao, semente }) {
     defensor: defensorDaExpedicao(expedicao),
   };
   const r = resolverCombate(entrada);
-  const perdas = {};
+  const caidas = {};
   for (const [tipo, n] of Object.entries(entrada.atacante.exercito)) {
     const caiu = n - (r.sobreviventes[tipo] || 0);
-    if (caiu > 0) perdas[tipo] = caiu;
+    if (caiu > 0) caidas[tipo] = caiu;
   }
-  return { ...r, venceu: r.estrelas > 0, saque: saqueDaExpedicao(expedicao, r), perdas, entrada };
+  return { ...r, venceu: r.estrelas > 0, saque: saqueDaExpedicao(expedicao, r), caidas, entrada };
 }
 
 /** O que o motor de combate precisa (e o que a tela guarda para mostrar a batalha de novo). */

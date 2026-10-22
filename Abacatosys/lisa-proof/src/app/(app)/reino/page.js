@@ -726,8 +726,9 @@ function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoA
         🗺️ Expedições <small>contra a CPU · {restantes == null ? "abrindo o mapa…" : restantes > 0 ? `${restantes} de ${mapa.expedicoes.porDia} hoje` : "as de hoje acabaram"}</small>
       </h2>
       <p className="pf-estat__nota rn-exp__intro">
-        Vilas, florestas, bosques e acampamentos de monstros para saquear. Ninguém perde nada aqui: o saque é proporcional à
-        destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%), as tropas que sobrevivem voltam para casa e cada lugar pode ser saqueado uma vez por dia.
+        Vilas, florestas, bosques e acampamentos de monstros para saquear. <strong>É de graça:</strong> nenhuma tropa se perde e nenhuma moeda sai.
+        São {EXPEDICOES_POR_DIA} expedições por dia, em qualquer lugar (pode repetir). Cada lugar tem a sua dificuldade, a sua recompensa e o seu
+        cenário; o saque é proporcional à destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%).
       </p>
       {resultado && <ResultadoDaExpedicao r={resultado} aoFechar={aoFecharResultado} />}
       {!mapa ? (
@@ -744,7 +745,13 @@ function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoA
               </div>
               <div className="rn-exp__info">
                 <span className="rn-exp__tipo">{x.emoji} {x.lugar} · Torre {x.torreMinima}+</span>
-                <h3>{x.nome}</h3>
+                <h3>{x.nome}{x.vezesHoje > 0 && <span className="rn-exp__vezes">{x.vezesHoje}× hoje</span>}</h3>
+                <div className="rn-exp__nivel">
+                  <span className={`rn-exp__dif rn-exp__dif--${x.dificuldade}`} title={`Dificuldade ${x.dificuldade} de 5`}>
+                    <span aria-hidden="true">{"💀".repeat(x.dificuldade)}</span> {x.nomeDaDificuldade}
+                  </span>
+                  <span className="rn-exp__premio">Recompensa <Moedas n={x.recompensa} /></span>
+                </div>
                 <p className="pf-estat__nota">{x.descricao}</p>
                 <ul className="rn-exp__monstros" aria-label="Monstros">
                   {x.monstros.map((m) => (
@@ -752,12 +759,12 @@ function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoA
                   ))}
                 </ul>
                 <div className="rn-exp__rodape">
-                  <span className="rn-exp__saque"><Moedas n={x.recompensa} /> <small>em 100%</small></span>
+                  <span className="rn-exp__saque"><small>100% destruído · ⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%</small></span>
                   {x.pode ? (
                     <button type="button" className="pf-botao pf-botao--pequeno" disabled={Boolean(ocupado)} onClick={() => aoPartir(x)}>
                       {ocupado === `exp:${x.id}` ? "Partindo…" : "⚔️ Atacar"}
                     </button>
-                  ) : <span className="rn-motivo">{x.liberada ? (x.feitaHoje ? "✅ saqueado hoje · volta amanhã" : x.motivo) : `🔒 libera com a Torre nível ${x.torreMinima}`}</span>}
+                  ) : <span className="rn-motivo">{x.liberada ? x.motivo : `🔒 libera com a Torre nível ${x.torreMinima}`}</span>}
                 </div>
               </div>
             </article>
@@ -787,15 +794,12 @@ function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoA
 }
 
 function ResultadoDaExpedicao({ r, aoFechar }) {
-  const algum = (t) => Object.values(t || {}).some((n) => n > 0);
-  const perdas = algum(r.perdas) ? descreverTropas(r.perdas) : "";
-  const voltaram = algum(r.sobreviventes) ? descreverTropas(r.sobreviventes) : "";
   return (
     <div className={`pf-cartao rn-resultado ${r.saque ? "rn-resultado--venceu" : "rn-resultado--perdeu"}`} role="status">
       <div className="rn-resultado__titulo">{r.estrelas ? `${estrelas(r.estrelas)} Vitória!` : "💥 A expedição recuou"} — {r.expedicao.nome}</div>
       <p>
         {r.destruicao}% destruído. {r.saque ? `Você saqueou 🪙 ${numero(r.saque)} moedas.` : "Nada de saque desta vez."}{" "}
-        {voltaram ? `Voltaram para casa: ${voltaram}.` : "Nenhuma tropa voltou."}{perdas ? ` Ficaram no campo: ${perdas}.` : ""}
+        Todas as tropas voltaram para casa: expedição não gasta tropa nem moeda.
       </p>
       <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={aoFechar}>Ok</button>
     </div>
@@ -852,7 +856,7 @@ function Regras() {
         </details>
         <details>
           <summary>🗺️ Expedições</summary>
-          <p>Vilas, florestas, bosques e acampamentos de monstros, contra a CPU — ninguém perde moedas nem troféus. Os lugares liberam com a Torre do Neuro. O saque é proporcional à destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%), as tropas que sobrevivem voltam para casa e cada lugar pode ser saqueado uma vez por dia, até {EXPEDICOES_POR_DIA} expedições por dia.</p>
+          <p>Vilas, florestas, bosques e acampamentos de monstros, contra a CPU — ninguém perde moedas nem troféus. <strong>É de graça:</strong> todas as tropas voltam para casa, então não há nada para treinar de novo. Os lugares liberam com a Torre do Neuro; cada um tem a sua dificuldade (de 💀 Fácil a 💀💀💀💀💀 Lendário), a sua recompensa e o seu cenário. O saque é proporcional à destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%). São {EXPEDICOES_POR_DIA} expedições por dia, em qualquer lugar — pode repetir o mesmo.</p>
         </details>
         <details>
           <summary>🛡️ Escudos</summary>

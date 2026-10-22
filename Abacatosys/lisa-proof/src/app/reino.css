@@ -372,3 +372,26 @@
 }
 .rn-revanche { margin-left: 6px; font-size: 11px; vertical-align: middle; }
 .rn-acoes__conta--sec { margin-left: 6px; background: var(--pf-superficie-2); color: var(--pf-tinta); }
+
+/* dificuldade e recompensa de cada expedição */
+.rn-exp__vezes { display: inline-block; white-space: nowrap; margin-left: 8px; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 700; vertical-align: middle; background: var(--pf-superficie-2); color: var(--pf-tinta-2); }
+.rn-exp__nivel { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rn-exp__dif { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 800; }
+.rn-exp__dif span { font-size: 11px; letter-spacing: -1px; }
+.rn-exp__dif--1 { background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
+.rn-exp__dif--2 { background: var(--pf-atencao-fundo); color: var(--pf-atencao); }
+.rn-exp__dif--3 { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+.rn-exp__dif--4 { background: #ede9fe; color: #6d28d9; }
+.rn-exp__dif--5 { background: #1f1414; color: #fdba74; box-shadow: inset 0 0 0 1px #f97316; }
+:root[data-tema="escuro"] .rn-exp__dif--4 { background: #2e1065; color: #c4b5fd; }
+.rn-exp__premio { font-size: 13px; font-weight: 700; color: var(--pf-tinta); }
+
+/* expedições: o céu de cada lugar (o Mundo3D marca data-cenario no quadro durante a luta) */
+:root .rn-mundo[data-cenario="bosque-cogumelos"] { background: linear-gradient(180deg, #fbe3ef 0%, #e9f7df 70%, #f6fbef 100%); }
+:root .rn-mundo[data-cenario="vila-goblins"] { background: linear-gradient(180deg, #bfe3f7 0%, #e8f5d6 75%, #f4f9e8 100%); }
+:root .rn-mundo[data-cenario="floresta-lobos"] { background: linear-gradient(180deg, #b9cde2 0%, #e2ebf4 70%, #f8fafc 100%); }
+:root .rn-mundo[data-cenario="acampamento-orc"] { background: linear-gradient(180deg, #e8914a 0%, #f6c690 65%, #fbe6c8 100%); }
+:root .rn-mundo[data-cenario="vila-bandidos"] { background: linear-gradient(180deg, #f2b45a 0%, #fbdca0 65%, #fff4dc 100%); }
+:root .rn-mundo[data-cenario="bosque-assombrado"] { background: linear-gradient(180deg, #1b1430 0%, #3b2a5c 65%, #5b4483 100%); }
+:root .rn-mundo[data-cenario="floresta-sombria"] { background: linear-gradient(180deg, #08140e 0%, #15301f 65%, #23452f 100%); }
+:root .rn-mundo[data-cenario="covil-cerbero"] { background: linear-gradient(180deg, #1c0505 0%, #5c1010 55%, #b4380f 100%); }

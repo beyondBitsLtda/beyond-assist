@@ -23,7 +23,7 @@ import {
   HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao,
 } from "@/dominio/reino.js";
 import {
-  EXPEDICOES, EXPEDICOES_POR_DIA, TIPOS_DE_LUGAR, MONSTROS, expedicaoPorId, podeExpedicionar, contagensDeMonstros,
+  EXPEDICOES, EXPEDICOES_POR_DIA, TIPOS_DE_LUGAR, MONSTROS, DIFICULDADES, expedicaoPorId, podeExpedicionar, contagensDeMonstros,
 } from "@/dominio/monstros.js";
 import {
   TROPAS, ORDEM_DAS_TROPAS, RESERVAS, contagens, espacoUsado, capacidadeDoExercito, capacidadeDaGuarnicao,
@@ -453,7 +453,7 @@ async function expedicoesDeHoje(usuarioId) {
   return data || [];
 }
 
-/** O mapa das expedições: o que está liberado, o que já foi saqueado hoje e as melhores estrelas. */
+/** O mapa das expedições: o que está liberado, quantas vezes cada lugar foi feito hoje e as melhores estrelas. */
 export async function expedicoesDe(usuarioId) {
   const eu = await obterReino(usuarioId);
   const [hoje, historico] = await Promise.all([
@@ -465,19 +465,21 @@ export async function expedicoesDe(usuarioId) {
   const todas = historico.data || [];
   const melhor = new Map();
   for (const x of todas) melhor.set(x.expedicao, Math.max(melhor.get(x.expedicao) || 0, x.estrelas));
-  const feitas = new Set(hoje.map((x) => x.expedicao));
+  const vezesHoje = new Map();
+  for (const x of hoje) vezesHoje.set(x.expedicao, (vezesHoje.get(x.expedicao) || 0) + 1);
   const torre = niveisDe(eu).castelo;
   const temExercito = totalDeTropas(eu.exercito) > 0;
   return {
     expedicoes: { feitasHoje: hoje.length, porDia: EXPEDICOES_POR_DIA },
     lugares: EXPEDICOES.map((x) => {
-      const pode = podeExpedicionar({ expedicao: x, nivelDaTorre: torre, temExercito, feitasHoje: hoje.length, jaFezHoje: feitas.has(x.id) });
+      const pode = podeExpedicionar({ expedicao: x, nivelDaTorre: torre, temExercito, feitasHoje: hoje.length });
       return {
         id: x.id, nome: x.nome, tipo: x.tipo, lugar: TIPOS_DE_LUGAR[x.tipo].nome, emoji: TIPOS_DE_LUGAR[x.tipo].emoji,
         descricao: x.descricao, torreMinima: x.torreMinima, recompensa: x.recompensa, chefe: x.chefe,
+        dificuldade: x.dificuldade, nomeDaDificuldade: DIFICULDADES[x.dificuldade]?.nome || "",
         monstros: Object.entries(contagensDeMonstros(x.monstros)).map(([tipo, quantidade]) => ({ tipo, nome: MONSTROS[tipo].nome, quantidade })),
         melhorEstrelas: melhor.get(x.id) || 0,
-        feitaHoje: feitas.has(x.id),
+        vezesHoje: vezesHoje.get(x.id) || 0,
         liberada: torre >= x.torreMinima,
         pode: pode.ok,
         motivo: pode.ok ? "" : pode.motivo,
@@ -493,9 +495,8 @@ export async function expedicoesDe(usuarioId) {
 
 /**
  * Parte numa expedição. Como na invasão, o resultado é decidido aqui (com um sorteio de verdade)
- * e a tela roda a mesma simulação para mostrar a luta. Ordem: registra a expedição (os índices
- * únicos barram a 4ª do dia e o mesmo lugar duas vezes), lança o saque e devolve ao Acampamento
- * só as tropas que sobreviveram.
+ * e a tela roda a mesma simulação para mostrar a luta. Ordem: registra a expedição (o índice único
+ * barra a 4ª do dia) e lança o saque. O exército não muda: expedição não gasta tropa nem moeda.
  */
 export async function atacarExpedicao(usuarioId, expedicaoId) {
   const expedicao = expedicaoPorId(String(expedicaoId || ""));
@@ -503,8 +504,7 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
   const eu = await obterReino(usuarioId);
   const hoje = await expedicoesDeHoje(usuarioId);
   const pode = podeExpedicionar({
-    expedicao, nivelDaTorre: niveisDe(eu).castelo, temExercito: totalDeTropas(eu.exercito) > 0,
-    feitasHoje: hoje.length, jaFezHoje: hoje.some((x) => x.expedicao === expedicao.id),
+    expedicao, nivelDaTorre: niveisDe(eu).castelo, temExercito: totalDeTropas(eu.exercito) > 0, feitasHoje: hoje.length,
   });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
 
@@ -513,7 +513,7 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
 
   const ins = await supabase.from("proof_expedicoes").insert({
     usuario_id: usuarioId, expedicao: expedicao.id, dia: diaDe(), numero: hoje.length + 1,
-    estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque, perdas: r.perdas, combate: r.entrada,
+    estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque, perdas: r.caidas, combate: r.entrada,
   }).select("id").single();
   if (ins.error?.code === "23505") throw new ErroDeAcesso(409, "essa expedição já foi feita — atualize a tela");
   falhou(ins.error, "expedição");
@@ -525,17 +525,9 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
     throw e;
   }
 
-  // o exército: só quem caiu sai (os sobreviventes voltam). Sem dinheiro em jogo: em vez de
-  // desfazer, tenta de novo com o reino relido.
-  let atual = eu;
-  for (let i = 0; i < 4; i++) {
-    if (await gravarReino(atual, { exercito: somarTropas(atual.exercito, r.perdas, -1) })) break;
-    atual = await obterReino(usuarioId);
-  }
-
   return {
     venceu: r.venceu, estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque,
-    perdas: r.perdas, sobreviventes: r.sobreviventes, combate: r.entrada,
-    expedicao: { id: expedicao.id, nome: expedicao.nome, tipo: expedicao.tipo, chefe: expedicao.chefe },
+    caidas: r.caidas, combate: r.entrada,
+    expedicao: { id: expedicao.id, nome: expedicao.nome, tipo: expedicao.tipo, chefe: expedicao.chefe, dificuldade: expedicao.dificuldade },
   };
 }
