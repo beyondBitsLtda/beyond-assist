@@ -112,13 +112,14 @@ export function podeAbrirRodada(tipo, doDia) {
  * Exercício do dia: enquanto houver tentativa — MESMO APROVADO. Vale a melhor nota, então tentar
  * de novo só pode subir a nota, nunca derrubar (pedido de 20/10/2026: antes o exercício travava no
  * primeiro aprovado, e quem tirou 70 não podia buscar o 100 com as tentativas que sobravam).
- * Projetos: até serem aprovados ou acabarem as tentativas (cada envio relê o repositório inteiro).
+ * Projetos: entregam em PARTES (pedido de 21/10/2026) — dá para mandar de novo enquanto faltar algum
+ * requisito ou extra (`completo`) e sobrar tentativa. O que já foi cumprido fica garantido.
  */
 export function podeReenviar(desafio) {
   const maximo = TENTATIVAS[desafio?.tipo] || 0;
   if ((desafio?.tentativas || 0) >= maximo) return false;
   if (desafio.tipo === "exercicio") return true;
-  return desafio.status !== "concluido";
+  return !desafio.completo;
 }
 
 /** Concluído (conta como feito nas metas, na agenda e nas conquistas): a MELHOR nota aprovou, ou
@@ -171,6 +172,87 @@ export function pontosDoQuiz(acertos, total) {
 
 export function pontosDaNota(tipo, nota) {
   return Math.round((limitar(Number(nota) || 0, 0, 100) / 100) * (PONTOS_DA_PRATICA[tipo] || 0));
+}
+
+// ---------------------------------------------------------------- projetos: pontos por parte e complexidade
+//
+// Pedido de 21/10/2026: pontuação CLARA para entregas parciais, e complexidade ajustável. Cada
+// requisito obrigatório tem um valor visível (a base do projeto dividida entre eles) e cada extra
+// soma um bônus. Entregar em partes soma: o que uma entrega cumpriu fica garantido, e a próxima só
+// acrescenta o que for novo. A complexidade pode CAIR sem perder pontos (quem está começando não é
+// punido por isso) e SUBIR valendo mais. Só dá para trocar antes da primeira entrega.
+
+export const COMPLEXIDADES = {
+  simples: { nome: "Mais simples", fator: 1 },
+  padrao: { nome: "Padrão", fator: 1 },
+  desafiador: { nome: "Desafiador", fator: 1.5 },
+};
+export const ORDEM_DAS_COMPLEXIDADES = ["simples", "padrao", "desafiador"];
+export const TROCAS_DE_COMPLEXIDADE = 3;
+export const BONUS_POR_EXTRA = 0.1; // cada extra vale 10% da base
+
+export const complexidadeDe = (conteudo) => (COMPLEXIDADES[conteudo?.complexidade] ? conteudo.complexidade : "padrao");
+
+/** Quanto vale cada parte do projeto. A divisão sobra no máximo 1 ponto, que vai para os primeiros. */
+export function tabelaDePontos(tipo, conteudo) {
+  const base = Math.round((PONTOS_DA_PRATICA[tipo] || 0) * COMPLEXIDADES[complexidadeDe(conteudo)].fator);
+  const n = (conteudo?.requisitos || []).length;
+  const cada = n ? Math.floor(base / n) : 0;
+  const resto = n ? base - cada * n : 0;
+  const bonus = Math.round(base * BONUS_POR_EXTRA);
+  const extras = (conteudo?.extras || []).map(() => bonus);
+  return {
+    base,
+    requisitos: Array.from({ length: n }, (_, i) => cada + (i < resto ? 1 : 0)),
+    extras,
+    maximo: base + extras.reduce((s, v) => s + v, 0),
+  };
+}
+
+/** As partes que a avaliação deu como cumpridas: posições (0, 1, …) dos requisitos e dos extras.
+ *  A IA numera cada item (1 = o primeiro); sem número, vale a ordem em que veio. */
+export function cumpridosNaAvaliacao(avaliacao, conteudo) {
+  const pegar = (itens, total) => {
+    const ok = new Set();
+    (Array.isArray(itens) ? itens : []).forEach((r, i) => {
+      if (!r?.atendido) return;
+      const n = Number.isInteger(r.numero) && r.numero >= 1 ? r.numero - 1 : i;
+      if (n < total) ok.add(n);
+    });
+    return [...ok].sort((a, b) => a - b);
+  };
+  return {
+    requisitos: pegar(avaliacao?.requisitos, (conteudo?.requisitos || []).length),
+    extras: pegar(avaliacao?.extras, (conteudo?.extras || []).length),
+  };
+}
+
+/** O que já estava garantido mais o desta entrega: entregar em partes soma, nunca tira. */
+export function juntarCumpridos(antes, agora) {
+  const unir = (a, b) => [...new Set([...(a || []), ...(b || [])])].sort((x, y) => x - y);
+  return { requisitos: unir(antes?.requisitos, agora?.requisitos), extras: unir(antes?.extras, agora?.extras) };
+}
+
+export function pontosDoProjeto(tabela, cumpridos) {
+  const somar = (valores, posicoes) => (posicoes || []).reduce((s, i) => s + (valores[i] || 0), 0);
+  return somar(tabela.requisitos, cumpridos?.requisitos) + somar(tabela.extras, cumpridos?.extras);
+}
+
+/** Tudo cumprido (requisitos e extras): não há mais o que entregar. */
+export function projetoCompleto(tabela, cumpridos) {
+  return tabela.requisitos.length > 0
+    && (cumpridos?.requisitos || []).length >= tabela.requisitos.length
+    && (cumpridos?.extras || []).length >= tabela.extras.length;
+}
+
+/** Dá para trocar a complexidade? Só antes da primeira entrega, e no máximo TROCAS_DE_COMPLEXIDADE vezes. */
+export function podeTrocarComplexidade({ tipo, tentativas, conteudo }, nivel) {
+  if (tipo !== "projeto_semanal" && tipo !== "projeto_mensal") return { ok: false, motivo: "só os projetos têm complexidade" };
+  if (!COMPLEXIDADES[nivel]) return { ok: false, motivo: "complexidade inválida" };
+  if ((tentativas || 0) > 0) return { ok: false, motivo: "a complexidade fica fixa depois da primeira entrega" };
+  if (complexidadeDe(conteudo) === nivel) return { ok: false, motivo: "o projeto já está nessa complexidade" };
+  if ((conteudo?.trocas || 0) >= TROCAS_DE_COMPLEXIDADE) return { ok: false, motivo: `as ${TROCAS_DE_COMPLEXIDADE} trocas de complexidade deste projeto já foram usadas` };
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------- o que a IA devolve
@@ -272,9 +354,35 @@ export function validarProjeto(bruto) {
 }
 
 /**
+ * As "Dicas da Lisa" de um projeto, conferidas: o passo a passo básico (em ordem), dicas soltas e o
+ * que vale revisar antes. Sem passo a passo não serve — é o coração do guia.
+ */
+export function validarGuia(bruto) {
+  const passos = listaDeTextos(bruto?.passos, 400, 10);
+  if (passos.length < 3) throw new Error("a Lisa não conseguiu montar o passo a passo — tente de novo");
+  return {
+    passos,
+    dicas: listaDeTextos(bruto?.dicas, 300, 6),
+    estudar: listaDeTextos(bruto?.estudar, 120, 6),
+  };
+}
+
+/**
  * A avaliação da IA, conferida. `aprovado` sai da NOTA, não do que o modelo disse: um "aprovado"
  * com nota 40 (ou o contrário) é contradição que a tela não teria como explicar.
  */
+function itensAvaliados(lista) {
+  return (Array.isArray(lista) ? lista : []).slice(0, 12).map((r) => {
+    const numero = Math.round(Number(r?.numero));
+    return {
+      ...(numero >= 1 && numero <= 12 ? { numero } : {}),
+      requisito: texto(r?.requisito, 300),
+      atendido: Boolean(r?.atendido),
+      observacao: texto(r?.observacao, 400),
+    };
+  }).filter((r) => r.requisito);
+}
+
 export function validarAvaliacao(bruto) {
   const nota = limitar(Math.round(Number(bruto?.nota) || 0), 0, 100);
   return {
@@ -283,11 +391,8 @@ export function validarAvaliacao(bruto) {
     comentario: texto(bruto?.comentario, 2000),
     pontosFortes: listaDeTextos(bruto?.pontosFortes, 300, 6),
     melhorias: listaDeTextos(bruto?.melhorias, 300, 6),
-    requisitos: (Array.isArray(bruto?.requisitos) ? bruto.requisitos : []).slice(0, 12).map((r) => ({
-      requisito: texto(r?.requisito, 300),
-      atendido: Boolean(r?.atendido),
-      observacao: texto(r?.observacao, 400),
-    })).filter((r) => r.requisito),
+    requisitos: itensAvaliados(bruto?.requisitos),
+    extras: itensAvaliados(bruto?.extras).slice(0, 5),
   };
 }
 

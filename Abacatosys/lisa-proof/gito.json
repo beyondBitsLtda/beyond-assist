@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.11.0-cloudflare-pages.1",
+  "versao": "0.12.0-proof-dicas-da-lisa.1",
   "atualizadoEm": "2026-10-21",
   "compilacao": {
-    "numero": 30,
+    "numero": 31,
     "data": "2026-10-21",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.12.0-proof-dicas-da-lisa.1",
+      "data": "2026-10-21",
+      "branch": "proof-dicas-da-lisa",
+      "tipo": "funcionalidade",
+      "resumo": "Dicas da Lisa nos projetos, pontos por parte com entregas parciais, complexidade ajustável e o botão Rodar nos exercícios do dia.",
+      "itens": [
+        "Dicas da Lisa nos projetos da semana e do mês: com um clique, a Lisa monta um passo a passo básico (com os passos para ir marcando), dicas e o que revisar, sem entregar a solução. Gera uma vez e fica guardado.",
+        "Pontuação clara por parte: cada requisito do projeto mostra quanto vale, e cada extra vale um bônus de 10% da base. Entregar em partes soma: o que já foi cumprido fica garantido, e a próxima entrega só acrescenta o que for novo. O projeto aceita novas entregas até ficar completo ou acabarem as 5 tentativas.",
+        "Complexidade do projeto: Mais simples (mesmos pontos), Padrão ou Desafiador (1,5x os pontos). A Lisa reescreve o projeto no nível escolhido; dá para trocar até 3 vezes, antes da primeira entrega.",
+        "Botão Rodar em todo exercício do dia: JavaScript e SQL rodam no navegador (o SQL no SQLite em WebAssembly, com as tabelas de resultado); C, Python, PHP, Java, C# e outras rodam num compilador on-line (Wandbox), com entrada do teclado opcional. Laço infinito para sozinho em 5 s.",
+        "A avaliação dos projetos passa a numerar cada requisito e a avaliar os extras separadamente.",
+        "Sem migração de banco: as dicas, a complexidade e as entregas ficam nos campos conteudo e resposta do desafio."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.11.0-cloudflare-pages.1",
       "data": "2026-10-21",
@@ -475,7 +491,10 @@
         "Terreno do Reino (a ilha cresce) e visual por nível nas construções",
         "Acampamento do Reino: ilhota onde as tropas ficam à vista, com a lotação crescendo por nível; tropas desenhadas como recortes de papel",
         "Minha conta: trocar a senha (vale no Proof, no Abacato e na Lisa)",
-        "Personagens do Neuro comprados com moedas, usados em todo o app"
+        "Personagens do Neuro comprados com moedas, usados em todo o app",
+        "Dicas da Lisa nos projetos: passo a passo básico, dicas e o que revisar, sem entregar a solução",
+        "Projetos com pontos por requisito, entregas parciais que somam e complexidade ajustável (mais simples sem perder pontos, desafiador valendo 1,5x)",
+        "Botão Rodar nos exercícios do dia: JavaScript e SQL no navegador; C, Python, PHP, Java e outras num compilador on-line"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -556,6 +575,16 @@
         "nome": "GitHub",
         "descricao": "Leitura de repositórios públicos entregues nos projetos da semana e do mês, para a avaliação da IA. GITHUB_TOKEN é opcional e só aumenta o limite de consultas.",
         "url": "https://api.github.com"
+      },
+      {
+        "nome": "Wandbox",
+        "descricao": "Compilador on-line gratuito (sem chave) usado pelo botão Rodar dos exercícios em C, Python, PHP, Java, C# e outras linguagens. O servidor do Proof envia só o código e a entrada digitada; há um freio de 30 execuções a cada 10 minutos por pessoa.",
+        "url": "https://wandbox.org"
+      },
+      {
+        "nome": "jsDelivr (sql.js)",
+        "descricao": "De onde o navegador baixa o SQLite em WebAssembly (sql.js 1.10.3) na primeira vez que alguém roda um exercício de SQL.",
+        "url": "https://www.jsdelivr.com/package/npm/sql.js"
       }
     ],
     "links": [

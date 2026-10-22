@@ -9,19 +9,45 @@ import {
   estudouHoje, depoisDePontuar, resultadoDaPontuacao,
 } from "./estudo.js";
 import { temModelo } from "./ia.js";
-import { gerarQuiz, gerarExercicio, gerarProjeto, avaliarExercicio, avaliarProjeto } from "./iaPratica.js";
+import { gerarQuiz, gerarExercicio, gerarProjeto, gerarGuiaDoProjeto, ajustarComplexidadeDoProjeto, avaliarExercicio, avaliarProjeto } from "./iaPratica.js";
 import { lerRepositorio, ErroDoGitHub } from "./github.js";
 import { diaDe, inicioDaSemana, inicioDoMes } from "@/dominio/datas.js";
 import {
   TIPOS_DE_DESAFIO, NOMES_DOS_DESAFIOS, TENTATIVAS, NOTA_DE_APROVACAO, periodoDe, fimDoPeriodo, periodoPermitido,
   pontosDoQuiz, pontosDaNota, quizParaTela, podeReenviar, entregaConcluida, assuntoAtual, assuntosDoPeriodo,
   RODADAS_POR_DIA, podeAbrirRodada, comFatorDaRodada,
+  tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto,
+  complexidadeDe, podeTrocarComplexidade, TROCAS_DE_COMPLEXIDADE,
 } from "@/dominio/pratica.js";
 
 const CAMPOS = "id, usuario_id, trilha_id, tipo, periodo, rodada, card_ids, titulo, conteudo, status, resposta, avaliacao, nota, pontos, tentativas, criado_em, atualizado_em";
 
 function falhou(error, onde) {
   if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`);
+}
+
+// ---------------------------------------------------------------- projetos: pontos por parte
+
+const eProjeto = (tipo) => tipo === "projeto_semanal" || tipo === "projeto_mensal";
+const NADA_CUMPRIDO = { requisitos: [], extras: [] };
+
+/** O que o projeto já tem garantido. Projeto entregue antes da pontuação por parte (sem
+ *  `resposta.cumpridos`) é lido da última avaliação, na ordem dos requisitos. */
+function cumpridosDe(d) {
+  return d.resposta?.cumpridos || (d.avaliacao ? cumpridosNaAvaliacao(d.avaliacao, d.conteudo) : NADA_CUMPRIDO);
+}
+
+/** A pontuação do projeto como a tela mostra: quanto vale cada parte e o que já foi garantido. */
+function pontuacaoDoProjeto(d) {
+  const tabela = tabelaDePontos(d.tipo, d.conteudo);
+  const cumpridos = cumpridosDe(d);
+  return {
+    tabela,
+    cumpridos,
+    garantidos: pontosDoProjeto(tabela, cumpridos),
+    completo: projetoCompleto(tabela, cumpridos),
+    entregas: d.resposta?.entregas || [],
+  };
 }
 
 /** Etapas vivas de várias trilhas, com título e situação do card: `Map<trilhaId, etapa[]>`. */
@@ -79,6 +105,15 @@ export function desafioParaTela(d, tema) {
   };
   if (d.tipo === "quiz") {
     return { ...base, perguntas: quizParaTela(d.conteudo, d.resposta) };
+  }
+  if (eProjeto(d.tipo)) {
+    const { original, ...conteudo } = d.conteudo || {}; // a versão padrão guardada não vai para a tela
+    const pontuacao = pontuacaoDoProjeto(d);
+    return {
+      ...base, conteudo, resposta: d.resposta || {}, pontuacao, completo: pontuacao.completo,
+      complexidade: complexidadeDe(d.conteudo),
+      trocasRestantes: Math.max(0, TROCAS_DE_COMPLEXIDADE - (d.conteudo?.trocas || 0)),
+    };
   }
   return { ...base, conteudo: d.conteudo, resposta: d.resposta || {} };
 }
@@ -273,24 +308,45 @@ export async function responderQuiz({ usuarioId, id, indice, escolha }) {
 }
 
 function exigirReenvio(d) {
-  if (podeReenviar(d)) return;
+  const alvo = eProjeto(d.tipo) ? { ...d, completo: pontuacaoDoProjeto(d).completo } : d;
+  if (podeReenviar(alvo)) return;
   if (d.tentativas >= TENTATIVAS[d.tipo]) throw new ErroDeAcesso(409, "as tentativas deste desafio acabaram");
-  throw new ErroDeAcesso(409, "este desafio já foi aprovado");
+  throw new ErroDeAcesso(409, eProjeto(d.tipo) ? "este projeto já está completo — tudo entregue!" : "este desafio já foi aprovado");
 }
 
 /** Fecha uma entrega avaliada: grava, pontua pela melhor nota e diz se ainda dá para reenviar. */
 async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
   const tentativas = d.tentativas + 1;
   const melhorNota = Math.max(d.nota ?? 0, avaliacao.nota);
-  const pontosDoDesafio = comFatorDaRodada(pontosDaNota(d.tipo, melhorNota), d.rodada);
-  const acabou = entregaConcluida({ tipo: d.tipo, melhorNota, tentativas });
+  let pontosDoDesafio = comFatorDaRodada(pontosDaNota(d.tipo, melhorNota), d.rodada);
+  let acabou = entregaConcluida({ tipo: d.tipo, melhorNota, tentativas });
+  let pontuacao = null;
+
+  // Projeto: pontos POR PARTE (21/10/2026). O que esta entrega cumpriu junta com o que já estava
+  // garantido; a entrega registra só o que foi novo, para a tela mostrar "+60 nesta entrega".
+  if (eProjeto(d.tipo)) {
+    const tabela = tabelaDePontos(d.tipo, d.conteudo);
+    const antes = cumpridosDe(d);
+    const cumpridos = juntarCumpridos(antes, cumpridosNaAvaliacao(avaliacao, d.conteudo));
+    pontosDoDesafio = pontosDoProjeto(tabela, cumpridos);
+    const novos = {
+      requisitos: cumpridos.requisitos.filter((i) => !antes.requisitos.includes(i)),
+      extras: cumpridos.extras.filter((i) => !antes.extras.includes(i)),
+    };
+    const entregas = [...(d.resposta?.entregas || []), {
+      em: new Date().toISOString(), tentativa: tentativas, ...novos, pontos: pontosDoDesafio - pontosDoProjeto(tabela, antes),
+    }].slice(-TENTATIVAS[d.tipo]);
+    resposta = { ...resposta, cumpridos, entregas };
+    acabou = acabou || cumpridos.requisitos.length >= tabela.requisitos.length;
+    pontuacao = pontuacaoDoProjeto({ ...d, resposta });
+  }
   const estudavaAntes = await estudouHoje(usuarioId);
 
   await salvar(d.id, {
     resposta,
     avaliacao,
     nota: melhorNota,
-    pontos: pontosDoDesafio,
+    pontos: Math.max(d.pontos || 0, pontosDoDesafio),
     tentativas,
     status: acabou ? "concluido" : "em_andamento",
   });
@@ -307,7 +363,8 @@ async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
     tentativas,
     restantes: Math.max(0, TENTATIVAS[d.tipo] - tentativas),
     concluido: acabou,
-    reenviar: podeReenviar({ tipo: d.tipo, tentativas, status: acabou ? "concluido" : "em_andamento" }),
+    reenviar: podeReenviar({ tipo: d.tipo, tentativas, status: acabou ? "concluido" : "em_andamento", completo: pontuacao?.completo }),
+    ...(pontuacao ? { pontuacao, completo: pontuacao.completo } : {}),
     ...resultadoDaPontuacao(pontos, extra),
   };
 }
@@ -328,6 +385,57 @@ export async function enviarExercicio({ usuarioId, id, codigo }) {
     throw new ErroDeAcesso(502, e.message);
   }
   return fecharEntrega({ usuarioId, d, avaliacao, resposta: { codigo: texto } });
+}
+
+/**
+ * Troca a complexidade do projeto (antes da primeira entrega). "Padrão" volta para a versão
+ * original sem chamar a IA; as outras são reescritas a partir dela. As dicas da Lisa, que falavam
+ * dos requisitos antigos, são descartadas.
+ */
+export async function mudarComplexidade({ usuarioId, id, nivel }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  const pode = podeTrocarComplexidade(d, nivel);
+  if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+
+  const { guia, original, trocas = 0, complexidade, ...atual } = d.conteudo || {};
+  const padrao = original || atual;
+  let novo = padrao;
+  if (nivel !== "padrao") {
+    if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+    try {
+      novo = await ajustarComplexidadeDoProjeto({ tema: trilha.tema, tipo: d.tipo, projeto: padrao, nivel });
+    } catch (e) {
+      throw new ErroDeAcesso(502, e.message);
+    }
+  }
+  const conteudo = { ...novo, complexidade: nivel, trocas: trocas + 1, original: padrao };
+  const titulo = String(novo.titulo || d.titulo).slice(0, 200);
+  await salvar(d.id, { conteudo, titulo });
+  return desafioParaTela({ ...d, conteudo, titulo }, trilha.tema);
+}
+
+/**
+ * As "Dicas da Lisa" de um projeto (semana ou mês). Geradas uma vez e guardadas no próprio desafio
+ * (`conteudo.guia`): abrir de novo, ou clicar duas vezes, não gasta outra chamada da IA.
+ */
+export async function guiaDoProjeto({ usuarioId, id }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (d.tipo !== "projeto_semanal" && d.tipo !== "projeto_mensal") {
+    throw new ErroDeAcesso(400, "as dicas da Lisa são para os projetos da semana e do mês");
+  }
+  if (d.conteudo?.guia) return d.conteudo.guia;
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  let guia;
+  try {
+    guia = await gerarGuiaDoProjeto({ tema: trilha.tema, tipo: d.tipo, projeto: d.conteudo });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  await salvar(d.id, { conteudo: { ...d.conteudo, guia } });
+  return guia;
 }
 
 export async function enviarProjeto({ usuarioId, id, repo }) {

@@ -15,8 +15,10 @@ import {
   periodoDe, periodoPermitido, pontosDoQuiz, pontosDaNota, validarQuiz, quizParaTela,
   separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo, podeReenviar, entregaConcluida,
   validarAvaliacao, assuntoAtual, mapaDaTrilha, TENTATIVAS, RODADAS_POR_DIA, podeAbrirRodada, fatorDaRodada, comFatorDaRodada,
-  perguntaRepetida, perguntasNovas, exercicioRepetido,
+  perguntaRepetida, perguntasNovas, exercicioRepetido, validarGuia,
+  tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto, podeTrocarComplexidade,
 } from "../src/dominio/pratica.js";
+import { execucaoDoExercicio, prepararParaCompilador, resultadoDoServidor } from "../src/dominio/execucao.js";
 import { PERSONAGENS, personagensDe, podeEscolherPersonagem } from "../src/dominio/personagens.js";
 import { nomePublico, apelidoValido, posicionar, ANONIMO } from "../src/dominio/ranking.js";
 import {
@@ -248,8 +250,10 @@ caso("exercício: aprovado ainda pode ser reenviado até a 5ª tentativa (20/10/
   assert.equal(podeReenviar({ tipo: "exercicio", tentativas: 5, status: "concluido" }), false);
   assert.equal(podeReenviar({ tipo: "exercicio", tentativas: 0, status: null }), true);
 });
-caso("projeto: aprovado encerra; reprovado segue até as 5 tentativas", () => {
-  assert.equal(podeReenviar({ tipo: "projeto_semanal", tentativas: 1, status: "concluido" }), false);
+caso("projeto: completo encerra; incompleto segue (entrega em partes) até as 5 tentativas", () => {
+  // projetos entregam em partes (21/10/2026): aprovado e incompleto ainda pode mandar o resto
+  assert.equal(podeReenviar({ tipo: "projeto_semanal", tentativas: 1, status: "concluido", completo: true }), false);
+  assert.equal(podeReenviar({ tipo: "projeto_semanal", tentativas: 1, status: "concluido", completo: false }), true);
   assert.equal(podeReenviar({ tipo: "projeto_semanal", tentativas: 4, status: "em_andamento" }), true);
   assert.equal(podeReenviar({ tipo: "projeto_mensal", tentativas: 5, status: "em_andamento" }), false);
 });
@@ -807,6 +811,87 @@ caso("lotação do Acampamento: exército + defesa juntos; lotado pede Acampamen
   assert.match(podeTreinar({ tropa: "guerreiro", quantidade: 3, destino: "exercito", niveis, reservas, saldo: 999 }).motivo, /Acampamento está lotado \(38 de 40\).*aumente o Acampamento/);
   assert.match(podeTreinar({ tropa: "arqueira", quantidade: 3, destino: "guarnicao", niveis, reservas, saldo: 999 }).motivo, /lotado/);
   assert.equal(podeTreinar({ tropa: "guerreiro", quantidade: 3, destino: "exercito", niveis: { ...niveis, acampamento: 2 }, reservas, saldo: 999 }).ok, true);
+});
+
+caso("dicas da Lisa: o guia do projeto precisa de passo a passo; o resto é limpo e limitado", () => {
+  const guia = validarGuia({ passos: ["Crie o repositório", " ", "Monte as pastas", "Implemente o requisito 1"], dicas: ["Teste cada rota", 42], estudar: ["HTTP", "x".repeat(300)] });
+  assert.deepEqual(guia.passos, ["Crie o repositório", "Monte as pastas", "Implemente o requisito 1"]);
+  assert.deepEqual(guia.dicas, ["Teste cada rota", "42"]);
+  assert.ok(guia.estudar[1].length <= 121);
+  assert.equal(validarGuia({ passos: Array.from({ length: 20 }, (_, i) => `passo ${i}`) }).passos.length, 10);
+  assert.throws(() => validarGuia({ passos: ["só um", "dois"] }), /passo a passo/);
+  assert.throws(() => validarGuia(null), /passo a passo/);
+});
+
+caso("projeto: cada requisito tem valor claro, os extras são bônus e a soma fecha com a base", () => {
+  const conteudo = { requisitos: ["a", "b", "c", "d", "e", "f", "g"], extras: ["x", "y"] };
+  const t = tabelaDePontos("projeto_semanal", conteudo);
+  assert.equal(t.base, 150);
+  assert.equal(t.requisitos.reduce((s, v) => s + v, 0), 150);
+  assert.deepEqual(t.requisitos, [22, 22, 22, 21, 21, 21, 21]);
+  assert.deepEqual(t.extras, [15, 15]);
+  assert.equal(t.maximo, 180);
+  // mais simples NÃO tira pontos; desafiador vale 1,5×
+  assert.equal(tabelaDePontos("projeto_mensal", { ...conteudo, complexidade: "simples" }).base, 400);
+  assert.equal(tabelaDePontos("projeto_mensal", { ...conteudo, complexidade: "desafiador" }).base, 600);
+  assert.equal(tabelaDePontos("projeto_mensal", { ...conteudo, complexidade: "inventada" }).base, 400);
+});
+
+caso("projeto: entregas parciais somam o que é novo e nunca tiram o que já foi garantido", () => {
+  const conteudo = { requisitos: ["a", "b", "c", "d", "e"], extras: ["x"] };
+  const t = tabelaDePontos("projeto_semanal", conteudo); // 30 cada, extra 15
+  const e1 = cumpridosNaAvaliacao({ requisitos: [{ numero: 1, atendido: true }, { numero: 2, atendido: true }, { numero: 3, atendido: false }] }, conteudo);
+  assert.deepEqual(e1, { requisitos: [0, 1], extras: [] });
+  assert.equal(pontosDoProjeto(t, e1), 60);
+  // a 2ª entrega quebrou o requisito 2 mas fez o 3 e o 4 e o extra: o 2 continua garantido
+  const e2 = cumpridosNaAvaliacao({ requisitos: [{ numero: 1, atendido: true }, { numero: 2, atendido: false }, { numero: 3, atendido: true }, { numero: 4, atendido: true }], extras: [{ numero: 1, atendido: true }] }, conteudo);
+  const juntos = juntarCumpridos(e1, e2);
+  assert.deepEqual(juntos, { requisitos: [0, 1, 2, 3], extras: [0] });
+  assert.equal(pontosDoProjeto(t, juntos), 135);
+  assert.equal(projetoCompleto(t, juntos), false);
+  assert.equal(projetoCompleto(t, juntarCumpridos(juntos, { requisitos: [4] })), true);
+  // sem número, vale a ordem; número fora do projeto é ignorado
+  assert.deepEqual(cumpridosNaAvaliacao({ requisitos: [{ atendido: true }, { atendido: false }, { numero: 9, atendido: true }] }, conteudo).requisitos, [0]);
+});
+
+caso("projeto: a complexidade só muda antes da 1ª entrega, até 3 vezes", () => {
+  const p = { tipo: "projeto_semanal", tentativas: 0, conteudo: { requisitos: ["a"] } };
+  assert.equal(podeTrocarComplexidade(p, "simples").ok, true);
+  assert.match(podeTrocarComplexidade(p, "padrao").motivo, /já está/);
+  assert.match(podeTrocarComplexidade({ ...p, tentativas: 1 }, "desafiador").motivo, /primeira entrega/);
+  assert.match(podeTrocarComplexidade({ ...p, conteudo: { trocas: 3 } }, "desafiador").motivo, /trocas/);
+  assert.equal(podeTrocarComplexidade({ ...p, tipo: "exercicio" }, "simples").ok, false);
+  assert.equal(podeTrocarComplexidade(p, "facil-demais").ok, false);
+});
+
+caso("avaliação: os itens guardam o número do requisito e os extras vêm separados", () => {
+  const a = validarAvaliacao({ nota: 70, requisitos: [{ numero: 2, requisito: "rota", atendido: true }, { numero: 99, requisito: "x", atendido: false }], extras: [{ numero: 1, requisito: "csv", atendido: true }] });
+  assert.equal(a.requisitos[0].numero, 2);
+  assert.equal("numero" in a.requisitos[1], false);
+  assert.equal(a.extras.length, 1);
+  assert.deepEqual(validarAvaliacao({ nota: 50 }).extras, []);
+});
+
+caso("rodar o código: JavaScript e SQL no navegador; C, Python e os outros no compilador do servidor", () => {
+  assert.equal(execucaoDoExercicio("JavaScript").onde, "navegador");
+  assert.equal(execucaoDoExercicio("", "JavaScript do Zero").chave, "javascript");
+  assert.equal(execucaoDoExercicio("sql").onde, "navegador");
+  assert.equal(execucaoDoExercicio("", "SQL e Supabase do Zero").chave, "sql");
+  assert.equal(execucaoDoExercicio("C").compilador, "gcc-13.2.0-c");
+  assert.equal(execucaoDoExercicio("", "Aprenda Programação em C do Zero").chave, "c");
+  assert.equal(execucaoDoExercicio("c++").compilador, "gcc-13.2.0");
+  assert.equal(execucaoDoExercicio("Python 3").onde, "servidor");
+  assert.equal(execucaoDoExercicio("", "PHP Básico para Integração com IA").chave, "php");
+  assert.equal(execucaoDoExercicio("", "Dominando o Microsoft Entra ID"), null);
+  assert.equal(execucaoDoExercicio("", "Java para iniciantes").chave, "java");
+  assert.equal(execucaoDoExercicio("", "JavaScript para iniciantes").chave, "javascript");
+  assert.equal(execucaoDoExercicio("", "Estudos de Ciência da Computação e JS - Nível 1").chave, "javascript");
+  assert.equal(prepararParaCompilador("php", "echo 1;"), "<?php\necho 1;");
+  assert.equal(prepararParaCompilador("php", "<?php echo 1;"), "<?php echo 1;");
+  assert.equal(prepararParaCompilador("java", "public class Main {\n public static void main(String[] a) {} }"), "class Main {\n public static void main(String[] a) {} }");
+  const r = resultadoDoServidor({ status: "1", compiler_error: "prog.c:2: erro", program_output: "" });
+  assert.equal(r.falhouNaCompilacao, true);
+  assert.equal(resultadoDoServidor({ status: "0", program_output: "oi\n" }).saida, "oi\n");
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);
