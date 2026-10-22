@@ -5,6 +5,7 @@ import Link from "next/link";
 import { obter, criar } from "@/lib/api.js";
 import Folha from "./Folha.js";
 import { comemorar } from "./Neuro.js";
+import { novidadesPendentes } from "./Novidades.js";
 
 /**
  * Vales de moedas (src/lib/vales.js). Dois jeitos de aparecer:
@@ -46,16 +47,24 @@ export async function resgatar(vale) {
 export function AvisoDeVale() {
   const vales = useVales();
   const [aberto, setAberto] = useState(null);
+  // com o modal de novidades na tela, o vale espera ele fechar (os dois juntos brigavam pela tela)
+  const [liberado, setLiberado] = useState(() => typeof window === "undefined" || !novidadesPendentes());
+  useEffect(() => {
+    if (liberado) return undefined;
+    const soltar = () => setLiberado(true);
+    window.addEventListener("proof-novidades-fechou", soltar);
+    return () => window.removeEventListener("proof-novidades-fechou", soltar);
+  }, [liberado]);
   const [ocupado, setOcupado] = useState(false);
   const [feito, setFeito] = useState(null);
   const [erro, setErro] = useState("");
 
   useEffect(() => {
-    if (!vales || aberto || feito) return;
+    if (!liberado || !vales || aberto || feito) return;
     const adiados = lerAdiados();
     const proximo = vales.find((v) => !adiados.includes(v.id));
     if (proximo) setAberto(proximo);
-  }, [vales, aberto, feito]);
+  }, [liberado, vales, aberto, feito]);
 
   const fechar = useCallback(() => {
     if (aberto && !feito) adiar(aberto.id);

@@ -14,11 +14,14 @@
 //   QUARTEL   — treina o exército e define quantas tropas cabem nele.
 //   TERRENO   — compra terra: a ilha cresce e ganha espaço para construções novas (Biblioteca,
 //               Defesa Aérea, Morteiro, Torre Mágica, Torre do Raio).
-//   INVASÃO   — 3 por dia, uma por reino, com o exército inteiro (que é gasto). Estrelas pela
-//               destruição; o saque e os troféus seguem as estrelas. Quem cai ganha 8 h de escudo;
-//               reino novo nasce com 48 h; atacar tira o próprio escudo.
+//   INVASÃO   — 3 por dia; o mesmo reino só a cada 48 h (cada lado conta o seu: dá para revidar),
+//               com o exército inteiro (que é gasto). Estrelas pela destruição; o saque e os
+//               troféus seguem as estrelas. Quem cai ganha 8 h de escudo; reino novo nasce com
+//               48 h; atacar tira o próprio escudo.
+//   EXPEDIÇÃO — contra a CPU (vilas, florestas, bosques, acampamentos de monstros): ver monstros.js.
 
 import { PREDIOS_EM_COMBATE, resolverCombate, raioDaIlha } from "./combate.js";
+import { defensorDaExpedicao, saqueDaExpedicao } from "./monstros.js";
 import {
   capacidadeDoExercito, capacidadeDaGuarnicao, contagens, totalDeTropas, danoPorSegundo, espacoUsado, TROPAS, lotacaoDoAcampamento,
 } from "./tropas.js";
@@ -116,6 +119,9 @@ export const FATIA_DO_SAQUE = 0.2;   // de tudo o que está fora do cofre, se de
 export const TETO_DO_SAQUE = 300;
 export const ESCUDO_APOS_DERROTA_HORAS = 8;
 export const ESCUDO_DE_NOVATO_HORAS = 48;
+// A guerra entre jogadores (pedido de 22/10/2026): cada um pode invadir o MESMO reino uma vez a
+// cada 48 h, contadas do ataque. A conta é por direção — quem foi atacado pode revidar na hora.
+export const HORAS_ENTRE_ATAQUES_AO_MESMO_REINO = 48;
 /** Troféus por estrelas: quem ataca ganha 4 por estrela + 2 (ou perde 3 com zero); quem defende perde 2 por estrela + 1 (ou ganha 5). */
 export function trofeusDoCombate(estrelas) {
   return estrelas > 0 ? { atacante: 4 * estrelas + 2, defensor: -(2 * estrelas + 1) } : { atacante: -3, defensor: 5 };
@@ -205,15 +211,38 @@ export function temEscudo(reino, agora = new Date()) {
   return Boolean(reino?.escudo_ate) && new Date(reino.escudo_ate).getTime() > agora.getTime();
 }
 
+/** Quando eu posso invadir de novo o reino que ataquei em `ultimoAtaque` (null = já posso). */
+export function proximoAtaqueAoReino(ultimoAtaque) {
+  if (!ultimoAtaque) return null;
+  const t = new Date(ultimoAtaque).getTime();
+  return Number.isFinite(t) ? new Date(t + HORAS_ENTRE_ATAQUES_AO_MESMO_REINO * 3_600_000) : null;
+}
+
+/** "em 1 dia e 5 h", "em 3 h", "em 20 min": quanto falta até `quando`. */
+export function esperaAte(quando, agora = new Date()) {
+  const min = Math.max(1, Math.ceil((new Date(quando).getTime() - agora.getTime()) / 60_000));
+  if (min < 60) return `em ${min} min`;
+  const horas = Math.ceil(min / 60);
+  if (horas < 24) return `em ${horas} h`;
+  const dias = Math.floor(horas / 24), resto = horas % 24;
+  return `em ${dias} dia${dias > 1 ? "s" : ""}${resto ? ` e ${resto} h` : ""}`;
+}
+
 /**
- * Pode invadir `defensor`? `ataquesHoje` são as invasões do atacante no dia; `jaAtacouHoje` diz se
- * ele já atacou ESTE defensor hoje (uma vez por alvo por dia: ninguém vira saco de pancada).
+ * Pode invadir `defensor`? `ataquesHoje` são as invasões do atacante no dia; `ultimoAtaqueAoAlvo`
+ * é quando ele atacou ESTE defensor pela última vez (o mesmo reino só a cada 48 h — e cada lado
+ * conta o seu, então quem foi atacado pode revidar). `jaAtacouHoje` continua valendo (o banco tem
+ * a mesma trava por dia).
  */
-export function podeInvadir({ atacanteId, atacante, defensor, ataquesHoje, jaAtacouHoje, agora = new Date() }) {
+export function podeInvadir({ atacanteId, atacante, defensor, ataquesHoje, jaAtacouHoje = false, ultimoAtaqueAoAlvo = null, agora = new Date() }) {
   if (!defensor) return { ok: false, motivo: "esse reino não existe" };
   if (defensor.usuario_id === atacanteId) return { ok: false, motivo: "não dá para invadir o próprio reino" };
   if (atacante && totalDeTropas(atacante.exercito) === 0) return { ok: false, motivo: "treine tropas no Quartel antes de invadir" };
   if (ataquesHoje >= ATAQUES_POR_DIA) return { ok: false, motivo: `você já fez as ${ATAQUES_POR_DIA} invasões de hoje — amanhã tem mais` };
+  const proximo = proximoAtaqueAoReino(ultimoAtaqueAoAlvo);
+  if (proximo && proximo.getTime() > agora.getTime()) {
+    return { ok: false, motivo: `você já invadiu esse reino — libera de novo ${esperaAte(proximo, agora)}`, liberaEm: proximo.toISOString() };
+  }
   if (jaAtacouHoje) return { ok: false, motivo: "você já invadiu esse reino hoje" };
   if (temEscudo(defensor, agora)) return { ok: false, motivo: "esse reino está com escudo" };
   return { ok: true };
@@ -242,6 +271,25 @@ export function batalha({ atacante, defensor, saldoDoDefensor, semente }) {
     trofeusAtacante: t.atacante, trofeusDefensor: t.defensor,
     escudoDoDefensorHoras: venceu ? ESCUDO_APOS_DERROTA_HORAS : 0,
   };
+}
+
+/**
+ * Uma expedição contra a CPU: o mesmo motor, com a ilha dos monstros. O saque segue a destruição
+ * (mesmo sem estrela) e as tropas que sobrevivem voltam para casa.
+ */
+export function batalhaDeExpedicao({ atacante, expedicao, semente }) {
+  const entrada = {
+    semente: semente >>> 0 || 1,
+    atacante: { exercito: contagens(atacante?.exercito), neuro_nivel: atacante?.neuro_nivel || 1 },
+    defensor: defensorDaExpedicao(expedicao),
+  };
+  const r = resolverCombate(entrada);
+  const perdas = {};
+  for (const [tipo, n] of Object.entries(entrada.atacante.exercito)) {
+    const caiu = n - (r.sobreviventes[tipo] || 0);
+    if (caiu > 0) perdas[tipo] = caiu;
+  }
+  return { ...r, venceu: r.estrelas > 0, saque: saqueDaExpedicao(expedicao, r), perdas, entrada };
 }
 
 /** O que o motor de combate precisa (e o que a tela guarda para mostrar a batalha de novo). */

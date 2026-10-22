@@ -20,10 +20,14 @@ import {
   niveisDe, poderDo, podeMelhorar, podeSubirNeuro, producaoAcumulada, producaoPorHora, capacidadeDaMina,
   protecaoDoCofre, temEscudo, podeInvadir, batalha, somarTrofeus, saldoDe, faixaDeDefesa,
   custoDoNeuro, nivelMaximoDoNeuro, estagioDoNeuro, taxaDeProducao, HORAS_ATE_ENCHER,
+  HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao,
 } from "@/dominio/reino.js";
 import {
+  EXPEDICOES, EXPEDICOES_POR_DIA, TIPOS_DE_LUGAR, MONSTROS, expedicaoPorId, podeExpedicionar, contagensDeMonstros,
+} from "@/dominio/monstros.js";
+import {
   TROPAS, ORDEM_DAS_TROPAS, RESERVAS, contagens, espacoUsado, capacidadeDoExercito, capacidadeDaGuarnicao,
-  podeTreinar, somarTropas, heroiNeuro, lotacaoDoAcampamento,
+  podeTreinar, somarTropas, heroiNeuro, lotacaoDoAcampamento, totalDeTropas,
 } from "@/dominio/tropas.js";
 import { PERSONAGENS, ORDEM_DOS_PERSONAGENS, personagensDe, podeEscolherPersonagem } from "@/dominio/personagens.js";
 
@@ -91,6 +95,26 @@ async function invasoesDeHoje(usuarioId) {
     .eq("atacante_id", usuarioId).eq("dia", diaDe());
   falhou(error, "invasões");
   return data || [];
+}
+
+/**
+ * As invasões das últimas 48 h, para a regra "o mesmo reino só a cada dois dias": as que EU fiz
+ * (alvo → último ataque) e as que ME fizeram (atacante → último ataque, para a revanche).
+ */
+async function invasoesRecentes(usuarioId) {
+  const desde = new Date(Date.now() - HORAS_ENTRE_ATAQUES_AO_MESMO_REINO * HORA).toISOString();
+  const [minhas, contraMim] = await Promise.all([
+    supabase.from("proof_invasoes").select("defensor_id, criado_em").eq("atacante_id", usuarioId).gte("criado_em", desde),
+    supabase.from("proof_invasoes").select("atacante_id, criado_em").eq("defensor_id", usuarioId).gte("criado_em", desde),
+  ]);
+  falhou(minhas.error, "invasões recentes");
+  falhou(contraMim.error, "invasões recentes");
+  const ultimo = (lista, chave) => {
+    const m = new Map();
+    for (const i of lista || []) if (!m.has(i[chave]) || i.criado_em > m.get(i[chave])) m.set(i[chave], i.criado_em);
+    return m;
+  };
+  return { ataquei: ultimo(minhas.data, "defensor_id"), meAtacaram: ultimo(contraMim.data, "atacante_id") };
 }
 
 /** Tudo o que a tela do reino precisa. */
@@ -318,9 +342,10 @@ export async function renomearReino(usuarioId, nome) {
  */
 export async function alvosDe(usuarioId) {
   const eu = await obterReino(usuarioId);
-  const [todos, hoje] = await Promise.all([
+  const [todos, hoje, recentes] = await Promise.all([
     buscarTodas(() => supabase.from("proof_reinos").select(CAMPOS).neq("usuario_id", usuarioId).order("usuario_id")),
     invasoesDeHoje(usuarioId),
+    invasoesRecentes(usuarioId),
   ]);
   const jaAtaquei = new Set(hoje.map((i) => i.defensor_id));
   const perto = todos
@@ -331,8 +356,12 @@ export async function alvosDe(usuarioId) {
   return {
     invasoes: { feitasHoje: hoje.length, porDia: ATAQUES_POR_DIA },
     meuAtaque: poderDo(eu).ataque,
+    horasEntreAtaques: HORAS_ENTRE_ATAQUES_AO_MESMO_REINO,
     alvos: perto.map((r) => {
-      const pode = podeInvadir({ atacanteId: usuarioId, atacante: eu, defensor: r, ataquesHoje: hoje.length, jaAtacouHoje: jaAtaquei.has(r.usuario_id), agora });
+      const pode = podeInvadir({
+        atacanteId: usuarioId, atacante: eu, defensor: r, ataquesHoje: hoje.length, jaAtacouHoje: jaAtaquei.has(r.usuario_id),
+        ultimoAtaqueAoAlvo: recentes.ataquei.get(r.usuario_id) || null, agora,
+      });
       return {
         id: r.usuario_id,
         dono: nomes.get(r.usuario_id) || "Estudante anônimo",
@@ -344,6 +373,9 @@ export async function alvosDe(usuarioId) {
         escudoAte: temEscudo(r, agora) ? r.escudo_ate : null,
         pode: pode.ok,
         motivo: pode.ok ? "" : pode.motivo,
+        liberaEm: pode.liberaEm || null,
+        // me atacou nas últimas 48 h: dá para revidar (a conta das 48 h é de cada lado)
+        revanche: recentes.meAtacaram.has(r.usuario_id),
       };
     }),
   };
@@ -354,11 +386,12 @@ export async function invadir(usuarioId, defensorId) {
   const eu = await obterReino(usuarioId);
   const { data: alvo, error } = await supabase.from("proof_reinos").select(CAMPOS).eq("usuario_id", defensorId).maybeSingle();
   falhou(error, "reino do alvo");
-  const [hoje, saldoDoAlvo] = await Promise.all([invasoesDeHoje(usuarioId), alvo ? saldoDoUsuario(defensorId) : 0]);
+  const [hoje, saldoDoAlvo, recentes] = await Promise.all([invasoesDeHoje(usuarioId), alvo ? saldoDoUsuario(defensorId) : 0, invasoesRecentes(usuarioId)]);
 
   const pode = podeInvadir({
     atacanteId: usuarioId, atacante: eu, defensor: alvo, ataquesHoje: hoje.length,
     jaAtacouHoje: hoje.some((i) => i.defensor_id === defensorId),
+    ultimoAtaqueAoAlvo: recentes.ataquei.get(defensorId) || null,
   });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
 
@@ -409,5 +442,100 @@ export async function invadir(usuarioId, defensorId) {
     trofeus: r.trofeusAtacante, protegido: r.protegido, destruidos: r.destruidos,
     combate: r.entrada,
     alvo: { dono: nomes.get(defensorId) || "Estudante anônimo", reino: alvo.nome },
+  };
+}
+
+// ---------------------------------------------------------------- expedições (contra a CPU)
+
+async function expedicoesDeHoje(usuarioId) {
+  const { data, error } = await supabase.from("proof_expedicoes").select("expedicao, numero").eq("usuario_id", usuarioId).eq("dia", diaDe());
+  falhou(error, "expedições");
+  return data || [];
+}
+
+/** O mapa das expedições: o que está liberado, o que já foi saqueado hoje e as melhores estrelas. */
+export async function expedicoesDe(usuarioId) {
+  const eu = await obterReino(usuarioId);
+  const [hoje, historico] = await Promise.all([
+    expedicoesDeHoje(usuarioId),
+    supabase.from("proof_expedicoes").select("id, expedicao, estrelas, destruicao, saque, combate, criado_em")
+      .eq("usuario_id", usuarioId).order("criado_em", { ascending: false }).limit(300),
+  ]);
+  falhou(historico.error, "expedições");
+  const todas = historico.data || [];
+  const melhor = new Map();
+  for (const x of todas) melhor.set(x.expedicao, Math.max(melhor.get(x.expedicao) || 0, x.estrelas));
+  const feitas = new Set(hoje.map((x) => x.expedicao));
+  const torre = niveisDe(eu).castelo;
+  const temExercito = totalDeTropas(eu.exercito) > 0;
+  return {
+    expedicoes: { feitasHoje: hoje.length, porDia: EXPEDICOES_POR_DIA },
+    lugares: EXPEDICOES.map((x) => {
+      const pode = podeExpedicionar({ expedicao: x, nivelDaTorre: torre, temExercito, feitasHoje: hoje.length, jaFezHoje: feitas.has(x.id) });
+      return {
+        id: x.id, nome: x.nome, tipo: x.tipo, lugar: TIPOS_DE_LUGAR[x.tipo].nome, emoji: TIPOS_DE_LUGAR[x.tipo].emoji,
+        descricao: x.descricao, torreMinima: x.torreMinima, recompensa: x.recompensa, chefe: x.chefe,
+        monstros: Object.entries(contagensDeMonstros(x.monstros)).map(([tipo, quantidade]) => ({ tipo, nome: MONSTROS[tipo].nome, quantidade })),
+        melhorEstrelas: melhor.get(x.id) || 0,
+        feitaHoje: feitas.has(x.id),
+        liberada: torre >= x.torreMinima,
+        pode: pode.ok,
+        motivo: pode.ok ? "" : pode.motivo,
+      };
+    }),
+    recentes: todas.slice(0, 6).map((x) => ({
+      id: x.id, expedicao: x.expedicao, nome: expedicaoPorId(x.expedicao)?.nome || x.expedicao, quando: x.criado_em,
+      estrelas: x.estrelas, destruicao: x.destruicao, saque: x.saque, combate: x.combate || null,
+      resultado: { estrelas: x.estrelas, destruicao: x.destruicao, saque: x.saque, venceu: x.estrelas > 0 },
+    })),
+  };
+}
+
+/**
+ * Parte numa expedição. Como na invasão, o resultado é decidido aqui (com um sorteio de verdade)
+ * e a tela roda a mesma simulação para mostrar a luta. Ordem: registra a expedição (os índices
+ * únicos barram a 4ª do dia e o mesmo lugar duas vezes), lança o saque e devolve ao Acampamento
+ * só as tropas que sobreviveram.
+ */
+export async function atacarExpedicao(usuarioId, expedicaoId) {
+  const expedicao = expedicaoPorId(String(expedicaoId || ""));
+  if (!expedicao) throw new ErroDeAcesso(400, "essa expedição não existe");
+  const eu = await obterReino(usuarioId);
+  const hoje = await expedicoesDeHoje(usuarioId);
+  const pode = podeExpedicionar({
+    expedicao, nivelDaTorre: niveisDe(eu).castelo, temExercito: totalDeTropas(eu.exercito) > 0,
+    feitasHoje: hoje.length, jaFezHoje: hoje.some((x) => x.expedicao === expedicao.id),
+  });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+
+  const exercitoUsado = contagens(eu.exercito);
+  const r = batalhaDeExpedicao({ atacante: { exercito: exercitoUsado, neuro_nivel: eu.neuro_nivel }, expedicao, semente: semente() });
+
+  const ins = await supabase.from("proof_expedicoes").insert({
+    usuario_id: usuarioId, expedicao: expedicao.id, dia: diaDe(), numero: hoje.length + 1,
+    estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque, perdas: r.perdas, combate: r.entrada,
+  }).select("id").single();
+  if (ins.error?.code === "23505") throw new ErroDeAcesso(409, "essa expedição já foi feita — atualize a tela");
+  falhou(ins.error, "expedição");
+
+  try {
+    if (r.saque > 0) await lancar(usuarioId, "expedicao", r.saque, { expedicao: expedicao.id, registro: ins.data.id });
+  } catch (e) {
+    await supabase.from("proof_expedicoes").delete().eq("id", ins.data.id);
+    throw e;
+  }
+
+  // o exército: só quem caiu sai (os sobreviventes voltam). Sem dinheiro em jogo: em vez de
+  // desfazer, tenta de novo com o reino relido.
+  let atual = eu;
+  for (let i = 0; i < 4; i++) {
+    if (await gravarReino(atual, { exercito: somarTropas(atual.exercito, r.perdas, -1) })) break;
+    atual = await obterReino(usuarioId);
+  }
+
+  return {
+    venceu: r.venceu, estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque,
+    perdas: r.perdas, sobreviventes: r.sobreviventes, combate: r.entrada,
+    expedicao: { id: expedicao.id, nome: expedicao.nome, tipo: expedicao.tipo, chefe: expedicao.chefe },
   };
 }

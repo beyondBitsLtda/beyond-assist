@@ -2,6 +2,10 @@
 // pintado com a cor do time (azul = minhas, vermelho = inimigas, verde = de defesa). O mundo 3D
 // transforma cada SVG em textura, põe a borda branca de adesivo e mostra sempre de frente para a
 // câmera. Desenho em 200×200, pés perto de y = 190, contorno escuro grosso de papel recortado.
+// Os monstros das expedições (monstrosDePapel.js) passam por aqui também: o mundo 3D pede o papel
+// de qualquer "tipo" e não precisa saber quem é tropa e quem é monstro.
+
+import { ehMonstroDePapel, svgDoMonstro, TAMANHO_DOS_MONSTROS, VOO_DOS_MONSTROS } from "./monstrosDePapel.js";
 
 /** Escurece (ou clareia, com fator > 1) uma cor #rrggbb. */
 function tom(hex, fator) {
@@ -111,10 +115,11 @@ const DESENHOS = {
 
 /** O SVG de uma tropa na cor do time. */
 export function svgDaTropa(tipo, cor) {
+  if (ehMonstroDePapel(tipo)) return svgDoMonstro(tipo);
   const desenho = DESENHOS[tipo] || DESENHOS.guerreiro;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -12 212 212" width="424" height="424"><g ${TRACO}>${desenho(cor, tom(cor, 0.62))}</g></svg>`;
 }
 
 /** Tamanho do recorte (lado do quadrado, na unidade da ilha) e altura de voo de quem voa. */
-export const TAMANHO_DO_PAPEL = { guerreiro: 0.95, arqueira: 0.95, bombardeiro: 0.9, mago: 1.05, gigante: 1.8, balao: 1.6, dragao: 1.9, curandeira: 1.15 };
-export const ALTURA_DE_VOO = { balao: 1.5, dragao: 1.35, curandeira: 1.2 };
+export const TAMANHO_DO_PAPEL = { guerreiro: 0.95, arqueira: 0.95, bombardeiro: 0.9, mago: 1.05, gigante: 1.8, balao: 1.6, dragao: 1.9, curandeira: 1.15, ...TAMANHO_DOS_MONSTROS };
+export const ALTURA_DE_VOO = { balao: 1.5, dragao: 1.35, curandeira: 1.2, ...VOO_DOS_MONSTROS };

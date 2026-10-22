@@ -12,6 +12,7 @@ import BotaoDeTema from "./BotaoDeTema.js";
 import ReportarProblema from "./ReportarProblema.js";
 import MinhaConta from "./MinhaConta.js";
 import { AvisoDeVale } from "./Vales.js";
+import Novidades from "./Novidades.js";
 
 const ITENS = [
   { href: "/", rotulo: "Hoje", Icone: IconeHoje },
@@ -110,6 +111,7 @@ export default function Moldura({ children }) {
       <Celebracao />
       <Confete />
       <AvisoDeVale />
+      <Novidades />
     </div>
   );
 }
