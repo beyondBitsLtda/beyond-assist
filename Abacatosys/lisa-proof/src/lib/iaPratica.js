@@ -2,7 +2,7 @@
 // Tudo que sai daqui passa pelas conferências de src/dominio/pratica.js.
 
 import { PERSONA, corte, gerarJson } from "./ia.js";
-import { validarQuiz, validarExercicio, validarProjeto, validarAvaliacao, perguntasNovas, exercicioRepetido, FOCO_DA_RODADA } from "@/dominio/pratica.js";
+import { validarQuiz, validarExercicio, validarProjeto, validarGuia, validarAvaliacao, perguntasNovas, exercicioRepetido, FOCO_DA_RODADA } from "@/dominio/pratica.js";
 
 const PERSONA_AVALIADORA =
   PERSONA +
@@ -184,6 +184,84 @@ export async function gerarProjeto({ tema, tipo, assuntos }) {
   return validarProjeto(bruto);
 }
 
+/**
+ * O mesmo projeto numa complexidade diferente (pedido de 21/10/2026): mais simples para quem está
+ * começando, ou desafiador para quem quer mais pontos. Parte sempre da versão padrão, para trocar de
+ * nível várias vezes sem o projeto ir "derivando".
+ */
+export async function ajustarComplexidadeDoProjeto({ tema, tipo, projeto, nivel }) {
+  const mensal = tipo === "projeto_mensal";
+  const simples = nivel === "simples";
+  const bruto = await gerarJson({
+    sistema: PERSONA,
+    esquema: ESQUEMA_DO_PROJETO,
+    pedido: [
+      `Tema: ${tema}`,
+      `Projeto atual (${mensal ? "projeto do mês" : "projeto da semana"}, complexidade padrão): ${projeto.titulo}`,
+      projeto.contexto ? `Contexto: ${projeto.contexto}` : "",
+      `Requisitos:\n- ${projeto.requisitos.join("\n- ")}`,
+      projeto.extras?.length ? `Extras:\n- ${projeto.extras.join("\n- ")}` : "",
+      "",
+      simples
+        ? `Reescreva este projeto numa versão MAIS SIMPLES, para quem está começando: o MESMO cenário e o mesmo tema, com ${mensal ? "4 a 6" : "3 a 4"} requisitos diretos (um passo de cada vez, sem partes avançadas) e linguagem bem clara. Tempo estimado: ${mensal ? "4 a 8 horas" : "1 a 2 horas"}.`
+        : `Reescreva este projeto numa versão DESAFIADORA: o MESMO cenário e o mesmo tema, com ${mensal ? "8 a 10" : "6 a 8"} requisitos, incluindo partes mais avançadas (validação, organização em módulos, tratamento de erros, testes — o que fizer sentido no tema). Tempo estimado: ${mensal ? "15 a 25 horas" : "4 a 6 horas"}.`,
+      "- `contexto`: o cenário, como um pedido de cliente.",
+      "- `requisitos`: obrigatórios, verificáveis lendo o código.",
+      "- `extras`: 1 a 3 desafios opcionais.",
+      "- `entrega`: um repositório PÚBLICO no GitHub, com README explicando como rodar.",
+      "- `criterios`: como o código será avaliado.",
+    ].filter(Boolean).join("\n"),
+  });
+  return validarProjeto(bruto);
+}
+
+// ---------------------------------------------------------------- dicas da Lisa (projetos)
+
+const ESQUEMA_DO_GUIA = {
+  type: "OBJECT",
+  properties: {
+    passos: { type: "ARRAY", items: { type: "STRING" } },
+    dicas: { type: "ARRAY", items: { type: "STRING" } },
+    estudar: { type: "ARRAY", items: { type: "STRING" } },
+  },
+  required: ["passos", "dicas", "estudar"],
+};
+
+/**
+ * As "Dicas da Lisa" para um projeto: um passo a passo básico de como fazer, dicas e o que revisar.
+ * É mentoria — guia o caminho, mas não entrega a solução (o projeto continua valendo nota).
+ */
+export async function gerarGuiaDoProjeto({ tema, tipo, projeto }) {
+  const mensal = tipo === "projeto_mensal";
+  const bruto = await gerarJson({
+    sistema: PERSONA + " Aqui você é mentora de um estudante: mostra o caminho e encoraja, mas não faz o trabalho por ele.",
+    esquema: ESQUEMA_DO_GUIA,
+    pedido: [
+      `Tema: ${tema}`,
+      `${mensal ? "Projeto do mês" : "Projeto da semana"}: ${projeto.titulo}`,
+      projeto.contexto ? `Contexto: ${projeto.contexto}` : "",
+      `Requisitos obrigatórios:\n${projeto.requisitos.map((r, i) => `${i + 1}. ${r}`).join("\n")}`,
+      projeto.extras?.length ? `Extras opcionais:\n- ${projeto.extras.join("\n- ")}` : "",
+      projeto.entrega ? `Entrega: ${projeto.entrega}` : "",
+      projeto.criterios?.length ? `Como será avaliado:\n- ${projeto.criterios.join("\n- ")}` : "",
+      "",
+      "O estudante não sabe por onde começar. Monte as DICAS DA LISA para ele:",
+      `- \`passos\`: ${mensal ? "7 a 10" : "5 a 8"} passos EM ORDEM, do zero até a entrega: preparar o projeto e o repositório,`,
+      "  montar a estrutura, implementar os requisitos numa ordem que faça sentido (cite o número entre parênteses,",
+      "  ex.: \"(requisito 2)\"), testar, escrever o README e publicar no GitHub público. Cada passo: uma ação",
+      "  concreta começando por verbo, em 1 ou 2 frases.",
+      "- `dicas`: 3 a 5 dicas práticas — o erro mais comum neste tipo de projeto, um recurso do tema que ajuda",
+      "  (nome entre crases), como conferir se um requisito está pronto, o que a correção mais observa.",
+      "- `estudar`: 2 a 4 conceitos para revisar antes de começar, bem curtos (só o nome do conceito).",
+      "",
+      "Regras: NÃO entregue a solução. Nada de código pronto: no máximo nomes de funções, comandos curtos ou",
+      "trechos de UMA linha entre crases. Fale direto com o estudante (\"você\"), em português do Brasil,",
+      "frases curtas, sem markdown além das crases.",
+    ].filter(Boolean).join("\n"),
+  });
+  return validarGuia(bruto);
+}
+
 // ---------------------------------------------------------------- avaliação
 
 const ESQUEMA_DA_AVALIACAO = {
@@ -197,8 +275,17 @@ const ESQUEMA_DA_AVALIACAO = {
       type: "ARRAY",
       items: {
         type: "OBJECT",
-        properties: { requisito: { type: "STRING" }, atendido: { type: "BOOLEAN" }, observacao: { type: "STRING" } },
+        properties: { numero: { type: "INTEGER" }, requisito: { type: "STRING" }, atendido: { type: "BOOLEAN" }, observacao: { type: "STRING" } },
         required: ["requisito", "atendido", "observacao"],
+      },
+    },
+    // os extras opcionais do projeto, cada um com o número dele (o exercício não tem)
+    extras: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: { numero: { type: "INTEGER" }, requisito: { type: "STRING" }, atendido: { type: "BOOLEAN" }, observacao: { type: "STRING" } },
+        required: ["numero", "requisito", "atendido"],
       },
     },
   },
@@ -245,8 +332,8 @@ export async function avaliarProjeto({ tema, projeto, repositorio }) {
       `Tema: ${tema}`,
       `Projeto: ${projeto.titulo}`,
       projeto.contexto ? `Contexto: ${projeto.contexto}` : "",
-      `Requisitos obrigatórios:\n- ${projeto.requisitos.join("\n- ")}`,
-      projeto.extras.length ? `Extras opcionais:\n- ${projeto.extras.join("\n- ")}` : "",
+      `Requisitos obrigatórios:\n${projeto.requisitos.map((r, i) => `${i + 1}. ${r}`).join("\n")}`,
+      projeto.extras.length ? `Extras opcionais:\n${projeto.extras.map((r, i) => `${i + 1}. ${r}`).join("\n")}` : "",
       projeto.criterios.length ? `Critérios:\n- ${projeto.criterios.join("\n- ")}` : "",
       "",
       `Repositório: ${repositorio.url} (branch ${repositorio.branch}).`,
@@ -254,7 +341,10 @@ export async function avaliarProjeto({ tema, projeto, repositorio }) {
         ? `${repositorio.ignorados} arquivo(s) ficaram de fora por tamanho: não penalize o que não foi mostrado se o README indicar que existe.`
         : "",
       "Avalie lendo o código (ele não foi executado).",
-      "- `requisitos`: um item por requisito OBRIGATÓRIO, dizendo se foi atendido e onde.",
+      "- `requisitos`: um item por requisito OBRIGATÓRIO, na ordem, com `numero` (o número dele acima), dizendo se foi",
+      "  atendido e onde. Entregas PARCIAIS são esperadas: cada requisito vale pontos por si — avalie o que existe e marque",
+      "  como atendido só o que está feito de verdade.",
+      projeto.extras.length ? "- `extras`: um item por extra opcional, com `numero`, dizendo se foi feito." : "",
       "- `nota` de 0 a 100, proporcional aos requisitos atendidos e à qualidade; extras podem somar até 10.",
       "- `comentario`: 3 a 5 frases, falando direto com o estudante.",
       "",

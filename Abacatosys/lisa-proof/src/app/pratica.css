@@ -98,6 +98,69 @@
 .desafio__dicas p { margin: 6px 0 2px; font-size: 14px; }
 .desafio__requisitos { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
 
+/* Projeto: complexidade, valor de cada parte e o placar das entregas parciais */
+.complexidade { display: grid; gap: 6px; margin: 4px 0 6px; }
+.complexidade__opcoes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.complexidade__opcao {
+  display: grid; gap: 2px; justify-items: center; min-height: 48px; padding: 6px 8px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; font-weight: 600; font-size: 14px;
+}
+.complexidade__opcao small { font-weight: 500; font-size: 12px; color: var(--pf-tinta-2); }
+.complexidade__opcao--atual { border-color: var(--pf-verde); background: var(--pf-sucesso-fundo); box-shadow: inset 0 0 0 1px var(--pf-verde); }
+.complexidade__opcao:disabled { cursor: not-allowed; opacity: .55; }
+.complexidade__opcao--atual:disabled { opacity: 1; }
+.complexidade__nota { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
+.projeto__parte { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.projeto__parte > span:first-child { min-width: 0; }
+.projeto__valor {
+  flex: none; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  background: var(--pf-pilula); color: var(--pf-tinta);
+}
+.projeto__valor--feito { background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
+.projeto__parte--feita > .projeto__parte > span:first-child { color: var(--pf-tinta-2); }
+.projeto__placar { display: grid; gap: 8px; margin-top: 14px; padding: 12px; border-radius: 12px; background: var(--pf-superficie-2); }
+.projeto__placar-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.projeto__nota { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
+.projeto__entregas { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13px; }
+
+/* Rodar o código do exercício */
+.rodar { display: grid; gap: 8px; margin-top: 8px; }
+.rodar__barra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rodar__onde { font-size: 13px; color: var(--pf-tinta-2); }
+.rodar__link { background: none; border: 0; padding: 4px 0; color: var(--pf-verde-forte); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.rodar__entrada { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 14px; resize: vertical; }
+.rodar__saida { border-radius: 12px; overflow: hidden; background: var(--pf-codigo-fundo); color: var(--pf-codigo-tinta); }
+.rodar__topo { display: flex; justify-content: space-between; padding: 6px 12px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .75; }
+.rodar__linha {
+  margin: 0; padding: 2px 12px; white-space: pre-wrap; word-break: break-word; font-size: 13.5px; line-height: 1.5;
+  font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
+}
+.rodar__linha:last-child { padding-bottom: 10px; }
+.rodar__linha--erro { color: #ff8a80; }
+.rodar__linha--aviso { color: #ffd479; }
+.rodar__linha--info { opacity: .8; font-style: italic; }
+.rodar__tabela-caixa { overflow-x: auto; padding: 0 12px 10px; }
+.rodar__tabela { border-collapse: collapse; font-size: 13px; font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; }
+.rodar__tabela th, .rodar__tabela td { border: 1px solid rgba(255, 255, 255, .18); padding: 4px 10px; text-align: left; white-space: nowrap; }
+.rodar__tabela th { font-weight: 700; }
+.rodar__nota { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
+.rodar__saida .rodar__nota { color: inherit; opacity: .75; padding-top: 6px; }
+
+/* Dicas da Lisa (projetos): o passo a passo dá para ir marcando */
+.dicas-lisa { display: grid; gap: 10px; }
+.dicas-lisa__topo { display: flex; align-items: center; gap: 12px; }
+.dicas-lisa__topo > :first-child { flex: none; }
+.dicas-lisa__titulo { margin: 0; font-weight: 700; font-size: 17px; color: var(--pf-tinta); }
+.dicas-lisa__sub { margin: 2px 0 0; font-size: 14px; color: var(--pf-tinta-2); }
+.dicas-lisa .pf-campo__rotulo { margin: 4px 0 0; }
+.dicas-lisa__passos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dicas-lisa__passo label {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer; min-height: 40px;
+  background: var(--pf-superficie-2); border-radius: 10px; padding: 9px 12px; font-size: 14px; line-height: 1.5;
+}
+.dicas-lisa__passo input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--pf-verde); }
+.dicas-lisa__passo--feito span { color: var(--pf-tinta-2); text-decoration: line-through; }
+
 .entrega { display: grid; gap: 12px; }
 .entrega__codigo {
   width: 100%; min-height: 260px; resize: vertical; padding: 14px; border-radius: 12px;
