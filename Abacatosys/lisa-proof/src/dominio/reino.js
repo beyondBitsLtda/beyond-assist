@@ -274,6 +274,17 @@ export function batalha({ atacante, defensor, saldoDoDefensor, semente }) {
 }
 
 /**
+ * O exército de uma expedição: o seu, se tiver tropas; senão a TROPA DA EXPEDIÇÃO — emprestada e
+ * de graça, do tamanho da Torre do Neuro (como se o Quartel estivesse no nível dela). Visto em
+ * 22/10/2026: ninguém tinha Quartel nem tropas, e o botão de atacar nem aparecia — a expedição
+ * "de graça" pedia moedas para treinar o exército antes.
+ */
+export function exercitoDaExpedicao(exercito, nivelDaTorre) {
+  if (totalDeTropas(exercito) > 0) return { exercito: contagens(exercito), emprestado: false };
+  return { exercito: exercitoDeTreino(Math.max(1, nivelDaTorre || 1), 1), emprestado: true };
+}
+
+/**
  * Uma expedição contra a CPU: o mesmo motor, com a ilha dos monstros. O saque segue a destruição
  * (mesmo sem estrela). `caidas` é só o placar da luta: a expedição não gasta tropa nenhuma.
  */

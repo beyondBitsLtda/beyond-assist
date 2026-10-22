@@ -395,3 +395,16 @@
 :root .rn-mundo[data-cenario="bosque-assombrado"] { background: linear-gradient(180deg, #1b1430 0%, #3b2a5c 65%, #5b4483 100%); }
 :root .rn-mundo[data-cenario="floresta-sombria"] { background: linear-gradient(180deg, #08140e 0%, #15301f 65%, #23452f 100%); }
 :root .rn-mundo[data-cenario="covil-cerbero"] { background: linear-gradient(180deg, #1c0505 0%, #5c1010 55%, #b4380f 100%); }
+
+/* a arte do chefe é um botão: clicar nela parte na expedição (ou mostra por que ainda não dá) */
+button.rn-exp__arte { border: 0; padding: 0; font: inherit; cursor: pointer; transition: transform 0.15s ease; }
+button.rn-exp__arte:hover:not(:disabled) { transform: translateY(-2px) scale(1.03); }
+button.rn-exp__arte:focus-visible { outline: 3px solid var(--pf-verde); outline-offset: 2px; }
+button.rn-exp__arte:disabled { cursor: progress; }
+.rn-exp__lugar--bloqueada button.rn-exp__arte { cursor: not-allowed; }
+.rn-exp__clique {
+  position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--pf-verde); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); font-size: 14px;
+}
+.rn-exp__tropa { margin-bottom: 12px; }
+.rn-exp__tropa--emprestada { border-left: 4px solid #f59e0b; }

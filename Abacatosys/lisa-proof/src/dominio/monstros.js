@@ -134,13 +134,13 @@ export function defensorDaExpedicao(expedicao) {
 
 /**
  * Dá para partir nessa expedição agora? `feitasHoje`: as expedições do dia (de qualquer lugar —
- * dá para repetir o mesmo). As tropas só precisam existir: a expedição não gasta nenhuma.
+ * dá para repetir o mesmo). Não pede tropa: quem não tem exército vai com a Tropa da Expedição
+ * (emprestada, de graça — ver exercitoDaExpedicao em reino.js).
  */
-export function podeExpedicionar({ expedicao, nivelDaTorre, temExercito, feitasHoje }) {
+export function podeExpedicionar({ expedicao, nivelDaTorre, feitasHoje }) {
   if (!expedicao) return { ok: false, motivo: "essa expedição não existe" };
   if ((nivelDaTorre || 0) < expedicao.torreMinima) return { ok: false, motivo: `libera com a Torre do Neuro no nível ${expedicao.torreMinima}` };
   if ((feitasHoje || 0) >= EXPEDICOES_POR_DIA) return { ok: false, motivo: `você já fez as ${EXPEDICOES_POR_DIA} expedições de hoje — amanhã tem mais` };
-  if (!temExercito) return { ok: false, motivo: "treine tropas no Quartel antes de partir (na expedição elas não se perdem)" };
   return { ok: true };
 }
 

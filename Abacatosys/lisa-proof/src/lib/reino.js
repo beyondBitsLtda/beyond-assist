@@ -20,7 +20,7 @@ import {
   niveisDe, poderDo, podeMelhorar, podeSubirNeuro, producaoAcumulada, producaoPorHora, capacidadeDaMina,
   protecaoDoCofre, temEscudo, podeInvadir, batalha, somarTrofeus, saldoDe, faixaDeDefesa,
   custoDoNeuro, nivelMaximoDoNeuro, estagioDoNeuro, taxaDeProducao, HORAS_ATE_ENCHER,
-  HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao,
+  HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, exercitoDaExpedicao,
 } from "@/dominio/reino.js";
 import {
   EXPEDICOES, EXPEDICOES_POR_DIA, TIPOS_DE_LUGAR, MONSTROS, DIFICULDADES, expedicaoPorId, podeExpedicionar, contagensDeMonstros,
@@ -468,11 +468,13 @@ export async function expedicoesDe(usuarioId) {
   const vezesHoje = new Map();
   for (const x of hoje) vezesHoje.set(x.expedicao, (vezesHoje.get(x.expedicao) || 0) + 1);
   const torre = niveisDe(eu).castelo;
-  const temExercito = totalDeTropas(eu.exercito) > 0;
+  const tropa = exercitoDaExpedicao(eu.exercito, torre);
   return {
     expedicoes: { feitasHoje: hoje.length, porDia: EXPEDICOES_POR_DIA },
+    // com que exército a pessoa parte: o dela, ou a Tropa da Expedição (emprestada, de graça)
+    tropa: { emprestada: tropa.emprestado, tropas: tropa.exercito },
     lugares: EXPEDICOES.map((x) => {
-      const pode = podeExpedicionar({ expedicao: x, nivelDaTorre: torre, temExercito, feitasHoje: hoje.length });
+      const pode = podeExpedicionar({ expedicao: x, nivelDaTorre: torre, feitasHoje: hoje.length });
       return {
         id: x.id, nome: x.nome, tipo: x.tipo, lugar: TIPOS_DE_LUGAR[x.tipo].nome, emoji: TIPOS_DE_LUGAR[x.tipo].emoji,
         descricao: x.descricao, torreMinima: x.torreMinima, recompensa: x.recompensa, chefe: x.chefe,
@@ -503,13 +505,12 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
   if (!expedicao) throw new ErroDeAcesso(400, "essa expedição não existe");
   const eu = await obterReino(usuarioId);
   const hoje = await expedicoesDeHoje(usuarioId);
-  const pode = podeExpedicionar({
-    expedicao, nivelDaTorre: niveisDe(eu).castelo, temExercito: totalDeTropas(eu.exercito) > 0, feitasHoje: hoje.length,
-  });
+  const torre = niveisDe(eu).castelo;
+  const pode = podeExpedicionar({ expedicao, nivelDaTorre: torre, feitasHoje: hoje.length });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
 
-  const exercitoUsado = contagens(eu.exercito);
-  const r = batalhaDeExpedicao({ atacante: { exercito: exercitoUsado, neuro_nivel: eu.neuro_nivel }, expedicao, semente: semente() });
+  const tropa = exercitoDaExpedicao(eu.exercito, torre);
+  const r = batalhaDeExpedicao({ atacante: { exercito: tropa.exercito, neuro_nivel: eu.neuro_nivel }, expedicao, semente: semente() });
 
   const ins = await supabase.from("proof_expedicoes").insert({
     usuario_id: usuarioId, expedicao: expedicao.id, dia: diaDe(), numero: hoje.length + 1,
@@ -527,7 +528,7 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
 
   return {
     venceu: r.venceu, estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque,
-    caidas: r.caidas, combate: r.entrada,
+    caidas: r.caidas, combate: r.entrada, emprestado: tropa.emprestado,
     expedicao: { id: expedicao.id, nome: expedicao.nome, tipo: expedicao.tipo, chefe: expedicao.chefe, dificuldade: expedicao.dificuldade },
   };
 }

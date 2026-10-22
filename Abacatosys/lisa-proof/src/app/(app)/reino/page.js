@@ -273,7 +273,7 @@ export default function Reino() {
 
       {/* ------------------------------------------------------------ expedições (contra a CPU) */}
       <Expedicoes mapa={mapa} ocupado={ocupado} resultado={resultadoExp} aoFecharResultado={() => setResultadoExp(null)}
-        aoPartir={partir} aoAssistir={assistirExpedicao} />
+        aoPartir={partir} aoAssistir={assistirExpedicao} aoBloqueado={(x) => avisar(x.liberada ? x.motivo : `${x.nome} libera com a Torre do Neuro no nível ${x.torreMinima}`)} />
 
       {/* ------------------------------------------------------------ invasões */}
       <section className="pf-secao" id="invadir">
@@ -718,7 +718,7 @@ function Predio({ c, grande = false }) {
 }
 
 /** O mapa das expedições: um cartão por lugar, com o chefe, os monstros, as estrelas e o saque. */
-function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoAssistir }) {
+function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoAssistir, aoBloqueado }) {
   const restantes = mapa ? mapa.expedicoes.porDia - mapa.expedicoes.feitasHoje : null;
   return (
     <section className="pf-secao" id="expedicoes">
@@ -730,6 +730,13 @@ function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoA
         São {EXPEDICOES_POR_DIA} expedições por dia, em qualquer lugar (pode repetir). Cada lugar tem a sua dificuldade, a sua recompensa e o seu
         cenário; o saque é proporcional à destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%).
       </p>
+      {mapa?.tropa && (
+        <div className={`pf-aviso rn-exp__tropa${mapa.tropa.emprestada ? " rn-exp__tropa--emprestada" : ""}`}>
+          {mapa.tropa.emprestada
+            ? <>🎒 <strong>Seu exército está vazio, então você parte com a Tropa da Expedição:</strong> {descreverTropas(mapa.tropa.tropas)} + o Neuro. Emprestada e de graça — não precisa treinar nada.</>
+            : <>⚔️ <strong>Você parte com o seu exército:</strong> {descreverTropas(mapa.tropa.tropas)} + o Neuro. Nenhuma tropa se perde.</>}
+        </div>
+      )}
       {resultado && <ResultadoDaExpedicao r={resultado} aoFechar={aoFecharResultado} />}
       {!mapa ? (
         <div className="pf-cartao"><p className="pf-estat__nota" style={{ marginTop: 0 }}>Abrindo o mapa…</p></div>
@@ -737,12 +744,15 @@ function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoA
         <div className="rn-exp">
           {mapa.lugares.map((x) => (
             <article key={x.id} className={`pf-cartao rn-exp__lugar rn-exp__lugar--${x.tipo}${x.liberada ? "" : " rn-exp__lugar--bloqueada"}`}>
-              <div className="rn-exp__arte">
+              <button type="button" className="rn-exp__arte" disabled={Boolean(ocupado)}
+                aria-label={x.pode ? `Atacar ${x.nome}` : `${x.nome}: ${x.liberada ? x.motivo : `libera com a Torre nível ${x.torreMinima}`}`}
+                onClick={() => (x.pode ? aoPartir(x) : aoBloqueado(x))}>
                 <img src={urlDoMonstro(x.chefe)} alt="" width="104" height="104" />
                 <span className="rn-exp__estrelas" aria-label={`${x.melhorEstrelas} de 3 estrelas conquistadas`}>
                   {[1, 2, 3].map((n) => <span key={n} className={n <= x.melhorEstrelas ? "rn-exp__estrela--ok" : ""} aria-hidden="true">★</span>)}
                 </span>
-              </div>
+                {x.pode && <span className="rn-exp__clique" aria-hidden="true">⚔️</span>}
+              </button>
               <div className="rn-exp__info">
                 <span className="rn-exp__tipo">{x.emoji} {x.lugar} · Torre {x.torreMinima}+</span>
                 <h3>{x.nome}{x.vezesHoje > 0 && <span className="rn-exp__vezes">{x.vezesHoje}× hoje</span>}</h3>
@@ -799,7 +809,7 @@ function ResultadoDaExpedicao({ r, aoFechar }) {
       <div className="rn-resultado__titulo">{r.estrelas ? `${estrelas(r.estrelas)} Vitória!` : "💥 A expedição recuou"} — {r.expedicao.nome}</div>
       <p>
         {r.destruicao}% destruído. {r.saque ? `Você saqueou 🪙 ${numero(r.saque)} moedas.` : "Nada de saque desta vez."}{" "}
-        Todas as tropas voltaram para casa: expedição não gasta tropa nem moeda.
+        {r.emprestado ? "A Tropa da Expedição voltou inteira para o próximo desafio" : "Todas as tropas voltaram para casa"}: expedição não gasta tropa nem moeda.
       </p>
       <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={aoFechar}>Ok</button>
     </div>

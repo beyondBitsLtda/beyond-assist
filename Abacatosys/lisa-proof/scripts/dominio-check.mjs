@@ -25,7 +25,7 @@ import {
   podeMelhorar, podeSubirNeuro, producaoAcumulada, podeInvadir, batalha, saldoDe, somarTrofeus,
   faixaDeDefesa, estagioDoNeuro, ATAQUES_POR_DIA, TETO_DO_SAQUE, saqueDo, trofeusDoCombate,
   rivalSimulado, simularBatalha, exercitoDeTreino, previsaoDeEstrelas, combateDe, taxaDeProducao,
-  proximoAtaqueAoReino, esperaAte, HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, CONSTRUCOES,
+  proximoAtaqueAoReino, esperaAte, HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, CONSTRUCOES, exercitoDaExpedicao,
 } from "../src/dominio/reino.js";
 import {
   MONSTROS, EXPEDICOES, EXPEDICOES_POR_DIA, podeExpedicionar, saqueDaExpedicao, defensorDaExpedicao, expedicaoPorId, contagensDeMonstros,
@@ -941,13 +941,29 @@ caso("expedições: o catálogo respeita as regras do reino (terra nova pede Ter
 
 caso("expedições: torre, 3 por dia em qualquer lugar (repetir vale), e tropas para partir", () => {
   const x = expedicaoPorId("floresta-lobos"); // Torre 2
-  const ok = { expedicao: x, nivelDaTorre: 2, temExercito: true, feitasHoje: 0 };
+  const ok = { expedicao: x, nivelDaTorre: 2, feitasHoje: 0 };
   assert.equal(podeExpedicionar(ok).ok, true);
   assert.equal(podeExpedicionar({ ...ok, feitasHoje: 2 }).ok, true); // o mesmo lugar de novo
   assert.match(podeExpedicionar({ ...ok, nivelDaTorre: 1 }).motivo, /Torre do Neuro no nível 2/);
   assert.match(podeExpedicionar({ ...ok, feitasHoje: EXPEDICOES_POR_DIA }).motivo, /expedições de hoje/);
-  assert.match(podeExpedicionar({ ...ok, temExercito: false }).motivo, /treine tropas/);
+  // sem exército também parte (vai a Tropa da Expedição)
+  assert.equal(podeExpedicionar({ ...ok, temExercito: false }).ok, true);
   assert.equal(podeExpedicionar({ ...ok, expedicao: null }).ok, false);
+});
+
+caso("expedições: sem exército, vai a Tropa da Expedição (emprestada, do tamanho da Torre)", () => {
+  const vazio = exercitoDaExpedicao({}, 2);
+  assert.equal(vazio.emprestado, true);
+  assert.ok(Object.values(vazio.exercito).reduce((s, n) => s + n, 0) > 0);
+  assert.deepEqual(vazio.exercito, exercitoDeTreino(2, 1));
+  // Torre 0 (reino novo) ainda leva a tropa do nível 1
+  assert.deepEqual(exercitoDaExpedicao(null, 0).exercito, exercitoDeTreino(1, 1));
+  // quem tem exército vai com o dele
+  assert.deepEqual(exercitoDaExpedicao({ guerreiro: 3 }, 5), { exercito: { guerreiro: 3 }, emprestado: false });
+  // e a Tropa da Expedição vence o primeiro lugar com folga
+  const x = expedicaoPorId("bosque-cogumelos");
+  const r = batalhaDeExpedicao({ atacante: { exercito: exercitoDaExpedicao({}, 1).exercito, neuro_nivel: 1 }, expedicao: x, semente: 7 });
+  assert.ok(r.estrelas >= 2, `${r.estrelas} estrelas`);
 });
 
 caso("expedições: o saque segue a destruição, mesmo sem estrela, e ⭐⭐⭐ dá +25%", () => {

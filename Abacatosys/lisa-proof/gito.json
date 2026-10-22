@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.14.0-cloudflare-pages.1",
+  "versao": "0.14.1-proof-expedicoes-tropa.1",
   "atualizadoEm": "2026-10-22",
   "compilacao": {
-    "numero": 36,
+    "numero": 37,
     "data": "2026-10-22",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.14.1-proof-expedicoes-tropa.1",
+      "data": "2026-10-22",
+      "branch": "proof-expedicoes-tropa",
+      "tipo": "correcao",
+      "resumo": "Ninguém conseguia iniciar uma expedição: todos estavam sem Quartel e sem tropas, e o botão de atacar nem aparecia.",
+      "itens": [
+        "Sem exército, a pessoa parte com a Tropa da Expedição: emprestada, de graça e do tamanho da Torre do Neuro (quem tem exército vai com o dele). Nenhuma moeda e nenhuma tropa saem.",
+        "A arte do monstro de cada lugar virou um botão: clicar nela inicia a expedição (ou mostra, em destaque, por que ainda não dá).",
+        "Aviso no topo das expedições dizendo com que exército você vai partir."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.14.0-cloudflare-pages.1",
       "data": "2026-10-22",
