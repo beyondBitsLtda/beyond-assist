@@ -7,6 +7,7 @@ import "./agenda.css";
 import "./codigo.css";
 import "./raiox.css";
 import "./reino.css";
+import "./novidades.css";
 
 export const metadata = {
   title: "Lisa_Proof",

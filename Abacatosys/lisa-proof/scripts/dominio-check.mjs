@@ -25,7 +25,11 @@ import {
   podeMelhorar, podeSubirNeuro, producaoAcumulada, podeInvadir, batalha, saldoDe, somarTrofeus,
   faixaDeDefesa, estagioDoNeuro, ATAQUES_POR_DIA, TETO_DO_SAQUE, saqueDo, trofeusDoCombate,
   rivalSimulado, simularBatalha, exercitoDeTreino, previsaoDeEstrelas, combateDe, taxaDeProducao,
+  proximoAtaqueAoReino, esperaAte, HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, CONSTRUCOES,
 } from "../src/dominio/reino.js";
+import {
+  MONSTROS, EXPEDICOES, EXPEDICOES_POR_DIA, podeExpedicionar, saqueDaExpedicao, defensorDaExpedicao, expedicaoPorId, contagensDeMonstros,
+} from "../src/dominio/monstros.js";
 import { montarCombate, passo as passoDoCombate, resultadoDo, resolverCombate, raioDaIlha } from "../src/dominio/combate.js";
 import {
   capacidadeDoExercito, capacidadeDaGuarnicao, podeTreinar, espacoUsado, somarTropas, contagens, totalDeTropas, lotacaoDoAcampamento,
@@ -892,6 +896,99 @@ caso("rodar o código: JavaScript e SQL no navegador; C, Python e os outros no c
   const r = resultadoDoServidor({ status: "1", compiler_error: "prog.c:2: erro", program_output: "" });
   assert.equal(r.falhouNaCompilacao, true);
   assert.equal(resultadoDoServidor({ status: "0", program_output: "oi\n" }).saida, "oi\n");
+});
+
+caso("guerra: o mesmo reino só a cada 48 h, contadas do ataque (e cada lado conta o seu)", () => {
+  const agora = new Date("2026-10-22T12:00:00Z");
+  const comTropas = { exercito: { guerreiro: 5 } };
+  const alvo = { usuario_id: "ele", escudo_ate: null };
+  const base = { atacanteId: "eu", atacante: comTropas, defensor: alvo, ataquesHoje: 0, agora };
+  assert.equal(HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, 48);
+  // ataquei há 10 h: bloqueado, com a hora em que libera
+  const r = podeInvadir({ ...base, ultimoAtaqueAoAlvo: "2026-10-22T02:00:00Z" });
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /libera de novo em 1 dia e 14 h/);
+  assert.equal(r.liberaEm, "2026-10-24T02:00:00.000Z");
+  // há 49 h: liberado (mesmo sendo "outro dia" faz tempo)
+  assert.equal(podeInvadir({ ...base, ultimoAtaqueAoAlvo: "2026-10-20T11:00:00Z" }).ok, true);
+  // nunca ataquei (ele me atacou — isso é do lado dele): posso revidar
+  assert.equal(podeInvadir({ ...base, ultimoAtaqueAoAlvo: null }).ok, true);
+  assert.equal(proximoAtaqueAoReino(null), null);
+  assert.equal(esperaAte(new Date("2026-10-22T12:20:00Z"), agora), "em 20 min");
+  assert.equal(esperaAte(new Date("2026-10-22T15:00:00Z"), agora), "em 3 h");
+  assert.equal(esperaAte(new Date("2026-10-24T12:00:00Z"), agora), "em 2 dias");
+});
+
+caso("expedições: o catálogo respeita as regras do reino (terra nova pede Terreno, chefe é um dos monstros)", () => {
+  const ids = new Set();
+  let anterior = 0;
+  for (const x of EXPEDICOES) {
+    assert.equal(ids.has(x.id), false, x.id);
+    ids.add(x.id);
+    assert.ok(x.torreMinima >= anterior, `${x.id} fora de ordem`);
+    anterior = x.torreMinima;
+    assert.ok(MONSTROS[x.chefe] && x.monstros[x.chefe] > 0, `${x.id}: o chefe precisa estar entre os monstros`);
+    for (const t of Object.keys(x.monstros)) assert.ok(MONSTROS[t], `${x.id}: monstro desconhecido ${t}`);
+    for (const [chave, nivel] of Object.entries(x.construcoes)) {
+      assert.ok(CONSTRUCOES[chave], `${x.id}: construção ${chave}`);
+      if (nivel > 0 && CONSTRUCOES[chave].terreno) assert.ok((x.construcoes.terreno || 0) >= CONSTRUCOES[chave].terreno, `${x.id}: ${chave} sem Terreno`);
+    }
+  }
+  assert.equal(expedicaoPorId("covil-cerbero").chefe, "cerbero");
+  assert.equal(expedicaoPorId("nao-existe"), null);
+  assert.deepEqual(contagensDeMonstros({ goblin: 2.7, dragao: 3, cerbero: -1 }), { goblin: 2 });
+});
+
+caso("expedições: torre, uma vez por dia por lugar, 3 por dia, e tropas para partir", () => {
+  const x = expedicaoPorId("floresta-lobos"); // Torre 2
+  const ok = { expedicao: x, nivelDaTorre: 2, temExercito: true, feitasHoje: 0, jaFezHoje: false };
+  assert.equal(podeExpedicionar(ok).ok, true);
+  assert.match(podeExpedicionar({ ...ok, nivelDaTorre: 1 }).motivo, /Torre do Neuro no nível 2/);
+  assert.match(podeExpedicionar({ ...ok, jaFezHoje: true }).motivo, /voltam amanhã/);
+  assert.match(podeExpedicionar({ ...ok, feitasHoje: EXPEDICOES_POR_DIA }).motivo, /expedições de hoje/);
+  assert.match(podeExpedicionar({ ...ok, temExercito: false }).motivo, /treine tropas/);
+  assert.equal(podeExpedicionar({ ...ok, expedicao: null }).ok, false);
+});
+
+caso("expedições: o saque segue a destruição, mesmo sem estrela, e ⭐⭐⭐ dá +25%", () => {
+  const x = { recompensa: 200 };
+  assert.equal(saqueDaExpedicao(x, { destruicao: 40, estrelas: 0 }), 80);
+  assert.equal(saqueDaExpedicao(x, { destruicao: 100, estrelas: 2 }), 200);
+  assert.equal(saqueDaExpedicao(x, { destruicao: 100, estrelas: 3 }), 250);
+  assert.equal(saqueDaExpedicao(x, { destruicao: 0, estrelas: 0 }), 0);
+});
+
+caso("expedições: monstros soltos desde o começo, batalha determinística, sobreviventes voltam", () => {
+  const x = expedicaoPorId("vila-goblins");
+  const atacante = { exercito: { guerreiro: 8, arqueira: 6 }, neuro_nivel: 2 };
+  const a = batalhaDeExpedicao({ atacante, expedicao: x, semente: 4242 });
+  const b = batalhaDeExpedicao({ atacante, expedicao: x, semente: 4242 });
+  assert.deepEqual({ ...a, entrada: null }, { ...b, entrada: null });
+  assert.deepEqual(a.entrada.defensor, defensorDaExpedicao(x));
+  // as perdas + os sobreviventes fecham com o exército que foi
+  for (const [t, n] of Object.entries(atacante.exercito)) assert.equal((a.perdas[t] || 0) + (a.sobreviventes[t] || 0), n);
+  // no primeiro passo os monstros já estão na ilha, do lado da defesa
+  const e = montarCombate(a.entrada);
+  const ev = passoDoCombate(e);
+  const monstros = e.unidades.filter((u) => MONSTROS[u.tipo]);
+  assert.equal(monstros.length, 8);
+  assert.ok(monstros.every((u) => u.lado === "defesa" && u.guarda));
+  assert.ok(ev.filter((x) => x.tipo === "entrou").length >= 8);
+  // e ficam dentro da ilha
+  assert.ok(monstros.every((u) => Math.hypot(u.x, u.z) <= raioDaIlha(0)));
+  // invasão entre jogadores continua sem monstro nenhum
+  const pvp = montarCombate({ semente: 1, atacante, defensor: { construcoes: { castelo: 1, torre: 1 }, neuro_nivel: 1, guarnicao: {} } });
+  passoDoCombate(pvp);
+  assert.equal(pvp.unidades.some((u) => MONSTROS[u.tipo]), false);
+});
+
+caso("expedições: os dois primeiros lugares são vencíveis por quem acabou de liberar (exército de treino)", () => {
+  for (const id of ["bosque-cogumelos", "vila-goblins"]) {
+    const x = expedicaoPorId(id);
+    let soma = 0;
+    for (let i = 1; i <= 6; i++) soma += batalhaDeExpedicao({ atacante: { exercito: exercitoDeTreino(x.torreMinima, 1), neuro_nivel: x.torreMinima * 2 }, expedicao: x, semente: i * 7919 }).estrelas;
+    assert.ok(soma / 6 >= 2, `${id}: média de ${soma / 6} estrelas`);
+  }
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

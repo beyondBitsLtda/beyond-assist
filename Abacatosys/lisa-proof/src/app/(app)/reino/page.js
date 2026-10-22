@@ -13,6 +13,9 @@ import {
   exercitoDeTreino,
 } from "@/dominio/reino.js";
 import { TROPAS, ORDEM_DAS_TROPAS, totalDeTropas } from "@/dominio/tropas.js";
+import { EXPEDICOES_POR_DIA, BONUS_DE_TRES_ESTRELAS } from "@/dominio/monstros.js";
+import { HORAS_ENTRE_ATAQUES_AO_MESMO_REINO } from "@/dominio/reino.js";
+import { urlDoMonstro } from "@/componentes/reino/monstrosDePapel.js";
 
 // O mundo 3D (Three.js) só baixa nesta tela, e só no navegador.
 const Mundo3D = dynamic(() => import("@/componentes/reino/Mundo3D.js"), {
@@ -36,15 +39,24 @@ export default function Reino() {
   const [alvos, setAlvos] = useState(null);
   const [resultado, setResultado] = useState(null);
   const [simulando, setSimulando] = useState(false);
+  const [mapa, setMapa] = useState(null);
+  const [resultadoExp, setResultadoExp] = useState(null);
   const [Aviso, avisar] = useAviso();
 
   useEffect(() => {
     obter("/api/reino").then(setReino).catch((e) => setErro(e.message));
     obter("/api/reino/alvos").then(setAlvos).catch(() => {});
+    obter("/api/reino/expedicoes").then(setMapa).catch(() => {});
     const aoResgatar = () => obter("/api/reino").then(setReino).catch(() => {});
     window.addEventListener("proof-vale-resgatado", aoResgatar);
     return () => window.removeEventListener("proof-vale-resgatado", aoResgatar);
   }, []);
+
+  // chegou pelo atalho das novidades (/reino#expedicoes): a seção só existe depois que tudo carrega
+  const pronto = Boolean(reino && mapa);
+  useEffect(() => {
+    if (pronto && window.location.hash === "#expedicoes") document.getElementById("expedicoes")?.scrollIntoView({ block: "start" });
+  }, [pronto]);
 
   async function agir(chave, corpo, aoTerminar) {
     setOcupado(chave);
@@ -105,6 +117,38 @@ export default function Reino() {
     }
   }
 
+  /** Expedição contra a CPU: o servidor decide, a ilha mostra a luta e, no fim, o resultado. */
+  async function partir(x) {
+    setOcupado(`exp:${x.id}`);
+    setResultadoExp(null);
+    reagir("pensando", "Rumo à aventura! 🗺️", 2000);
+    try {
+      const r = await criar("/api/reino/expedicoes", { id: x.id });
+      const mostrar = () => {
+        setReino(r.reino);
+        setMapa(r.mapa);
+        setResultadoExp(r.resultado);
+        if (r.resultado.saque) comemorar(`+${r.resultado.saque} moedas de saque! 🪙`);
+        else reagir("triste", "Os monstros resistiram… volte mais forte!");
+        if (alvos) carregarAlvos();
+        setOcupado("");
+        document.getElementById("expedicoes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      };
+      assistirNaIlha({
+        entrada: r.resultado.combate, papel: "atacante", resultado: r.resultado,
+        titulo: `🗺️ EXPEDIÇÃO · ${String(r.resultado.expedicao.nome).toUpperCase()}`, aoTerminar: mostrar,
+      });
+    } catch (e) {
+      avisar(e.message);
+      setOcupado("");
+    }
+  }
+
+  function assistirExpedicao(x) {
+    const ok = assistirNaIlha({ entrada: x.combate, papel: "atacante", resultado: x.resultado, titulo: `▶ REPLAY · ${String(x.nome).toUpperCase()}` });
+    if (!ok) avisar("O replay precisa do mundo 3D (e do movimento ligado).");
+  }
+
   if (!reino) {
     return erro ? <div className="pf-aviso pf-aviso--erro">{erro}</div> : <div className="pf-carregando">Abrindo os portões do reino…</div>;
   }
@@ -141,6 +185,9 @@ export default function Reino() {
             : alvos.alvos.length === 0 ? "ainda não há outros reinos"
             : `todos estão com escudo${escudoMaisCurto ? ` · o primeiro abre ${hora(escudoMaisCurto)}` : ""}`}
         </span>
+        <button type="button" className="pf-botao pf-botao--sec" onClick={() => document.getElementById("expedicoes")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+          🗺️ Expedições{mapa ? <span className="rn-acoes__conta rn-acoes__conta--sec">{mapa.expedicoes.porDia - mapa.expedicoes.feitasHoje} hoje</span> : null}
+        </button>
         <button type="button" className="pf-botao pf-botao--sec" aria-expanded={simulando} aria-controls="simulador" onClick={() => setSimulando((s) => !s)}>
           🎮 {simulando ? "Fechar simulação" : "Simular batalha"}
         </button>
@@ -224,9 +271,13 @@ export default function Reino() {
         </div>
       </section>
 
+      {/* ------------------------------------------------------------ expedições (contra a CPU) */}
+      <Expedicoes mapa={mapa} ocupado={ocupado} resultado={resultadoExp} aoFecharResultado={() => setResultadoExp(null)}
+        aoPartir={partir} aoAssistir={assistirExpedicao} />
+
       {/* ------------------------------------------------------------ invasões */}
       <section className="pf-secao" id="invadir">
-        <h2 className="pf-secao__titulo">Invadir outros reinos <small>{restantes > 0 ? `${restantes} de ${reino.invasoes.porDia} invasões hoje` : "as invasões de hoje acabaram"}</small></h2>
+        <h2 className="pf-secao__titulo">Invadir outros reinos <small>{restantes > 0 ? `${restantes} de ${reino.invasoes.porDia} invasões hoje` : "as invasões de hoje acabaram"} · o mesmo reino só a cada 2 dias</small></h2>
         {resultado && <ResultadoDaBatalha r={resultado} aoFechar={() => setResultado(null)} />}
         {alvos && alvos.alvos.length > 0 && disponiveis === 0 && (
           <div className="pf-aviso" style={{ marginBottom: 12 }}>
@@ -247,7 +298,11 @@ export default function Reino() {
               <tbody>
                 {alvos.alvos.map((a) => (
                   <tr key={a.id}>
-                    <th scope="row">{a.reino}<span className="rk-sub">{a.dono} · 🏆 {numero(a.trofeus)}</span></th>
+                    <th scope="row">
+                      {a.reino}
+                      {a.revanche && <span className="pf-pilula pf-pilula--alerta rn-revanche" title="Esse reino atacou você nos últimos 2 dias">↩️ revanche</span>}
+                      <span className="rk-sub">{a.dono} · 🏆 {numero(a.trofeus)}</span>
+                    </th>
                     <td className="rn-col-info">{a.torre} · {a.neuro}</td>
                     <td><span className={`pf-pilula rn-faixa rn-faixa--${a.defesa.replace("í", "i").replace("é", "e")}`}>{a.defesa}</span></td>
                     <td className="rn-col-acao">
@@ -342,8 +397,9 @@ const estrelas = (n) => (n ? "⭐".repeat(n) : "☆");
 const NOMES_DOS_PREDIOS = Object.fromEntries(Object.entries(CONSTRUCOES).map(([k, v]) => [k, v.nome]));
 
 /** "12 🗡️ Guerreiros, 3 🪨 Gigantes" */
+const plural = (nome) => (nome.endsWith("ão") ? `${nome.slice(0, -2)}ões` : `${nome}s`); // Balão → Balões, Dragão → Dragões
 function descreverTropas(tropas) {
-  const partes = ORDEM_DAS_TROPAS.filter((t) => tropas?.[t]).map((t) => `${tropas[t]} ${TROPAS[t].emoji} ${TROPAS[t].nome}${tropas[t] > 1 ? "s" : ""}`);
+  const partes = ORDEM_DAS_TROPAS.filter((t) => tropas?.[t]).map((t) => `${tropas[t]} ${TROPAS[t].emoji} ${tropas[t] > 1 ? plural(TROPAS[t].nome) : TROPAS[t].nome}`);
   return partes.length ? partes.join(", ") : "nenhuma";
 }
 
@@ -611,7 +667,7 @@ function RegrasDaBatalha() {
         <dt>🏆 Troféus</dt>
         <dd>Quem ataca: +6, +10 ou +14 por 1, 2 ou 3 estrelas (−3 sem estrela). Quem defende: −3, −5 ou −7 (+5 se segurar tudo).</dd>
         <dt>🛡️ Escudo e limites</dt>
-        <dd>Reino que cai ganha {ESCUDO_APOS_DERROTA_HORAS} h de escudo; reino novo nasce com {ESCUDO_DE_NOVATO_HORAS} h; atacar tira o seu escudo. {ATAQUES_POR_DIA} invasões por dia, uma por reino. O exército é gasto em cada invasão.</dd>
+        <dd>Reino que cai ganha {ESCUDO_APOS_DERROTA_HORAS} h de escudo; reino novo nasce com {ESCUDO_DE_NOVATO_HORAS} h; atacar tira o seu escudo. {ATAQUES_POR_DIA} invasões por dia; o mesmo reino só a cada {HORAS_ENTRE_ATAQUES_AO_MESMO_REINO / 24} dias (quem foi atacado pode revidar). O exército é gasto em cada invasão.</dd>
         <dt>📚 Pontos</dt>
         <dd>Moeda vem do estudo (1 ponto = 1 moeda). Perder moeda numa invasão nunca tira pontos do ranking.</dd>
       </dl>
@@ -657,6 +713,91 @@ function Predio({ c, grande = false }) {
       <span className="rn-predio__emoji" aria-hidden="true">{vazio ? "🚧" : c.emoji}</span>
       <span className="rn-predio__nivel">{vazio ? "—" : `nv ${c.nivel}`}</span>
       <span className="sr-only">{c.nome}, nível {c.nivel}</span>
+    </div>
+  );
+}
+
+/** O mapa das expedições: um cartão por lugar, com o chefe, os monstros, as estrelas e o saque. */
+function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoAssistir }) {
+  const restantes = mapa ? mapa.expedicoes.porDia - mapa.expedicoes.feitasHoje : null;
+  return (
+    <section className="pf-secao" id="expedicoes">
+      <h2 className="pf-secao__titulo">
+        🗺️ Expedições <small>contra a CPU · {restantes == null ? "abrindo o mapa…" : restantes > 0 ? `${restantes} de ${mapa.expedicoes.porDia} hoje` : "as de hoje acabaram"}</small>
+      </h2>
+      <p className="pf-estat__nota rn-exp__intro">
+        Vilas, florestas, bosques e acampamentos de monstros para saquear. Ninguém perde nada aqui: o saque é proporcional à
+        destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%), as tropas que sobrevivem voltam para casa e cada lugar pode ser saqueado uma vez por dia.
+      </p>
+      {resultado && <ResultadoDaExpedicao r={resultado} aoFechar={aoFecharResultado} />}
+      {!mapa ? (
+        <div className="pf-cartao"><p className="pf-estat__nota" style={{ marginTop: 0 }}>Abrindo o mapa…</p></div>
+      ) : (
+        <div className="rn-exp">
+          {mapa.lugares.map((x) => (
+            <article key={x.id} className={`pf-cartao rn-exp__lugar rn-exp__lugar--${x.tipo}${x.liberada ? "" : " rn-exp__lugar--bloqueada"}`}>
+              <div className="rn-exp__arte">
+                <img src={urlDoMonstro(x.chefe)} alt="" width="104" height="104" />
+                <span className="rn-exp__estrelas" aria-label={`${x.melhorEstrelas} de 3 estrelas conquistadas`}>
+                  {[1, 2, 3].map((n) => <span key={n} className={n <= x.melhorEstrelas ? "rn-exp__estrela--ok" : ""} aria-hidden="true">★</span>)}
+                </span>
+              </div>
+              <div className="rn-exp__info">
+                <span className="rn-exp__tipo">{x.emoji} {x.lugar} · Torre {x.torreMinima}+</span>
+                <h3>{x.nome}</h3>
+                <p className="pf-estat__nota">{x.descricao}</p>
+                <ul className="rn-exp__monstros" aria-label="Monstros">
+                  {x.monstros.map((m) => (
+                    <li key={m.tipo} title={m.nome}><img src={urlDoMonstro(m.tipo)} alt="" width="30" height="30" /><span>{m.quantidade}× {m.nome}</span></li>
+                  ))}
+                </ul>
+                <div className="rn-exp__rodape">
+                  <span className="rn-exp__saque"><Moedas n={x.recompensa} /> <small>em 100%</small></span>
+                  {x.pode ? (
+                    <button type="button" className="pf-botao pf-botao--pequeno" disabled={Boolean(ocupado)} onClick={() => aoPartir(x)}>
+                      {ocupado === `exp:${x.id}` ? "Partindo…" : "⚔️ Atacar"}
+                    </button>
+                  ) : <span className="rn-motivo">{x.liberada ? (x.feitaHoje ? "✅ saqueado hoje · volta amanhã" : x.motivo) : `🔒 libera com a Torre nível ${x.torreMinima}`}</span>}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+      {mapa?.recentes?.length > 0 && (
+        <div className="pf-cartao rn-exp__recentes">
+          <p className="pf-campo__rotulo" style={{ marginTop: 0 }}>Últimas expedições</p>
+          <ul className="rn-batalhas">
+            {mapa.recentes.map((x) => (
+              <li key={x.id} className={x.estrelas ? "rn-batalha--ganhei" : "rn-batalha--perdi"}>
+                <span className="rn-batalha__icone" aria-hidden="true">{x.estrelas ? "🗺️" : "💥"}</span>
+                <span className="rn-batalha__texto">
+                  <strong>{x.nome}</strong> — {x.estrelas ? `${estrelas(x.estrelas)}` : "recuou"}
+                  <small>{x.destruicao}% destruído · {hora(x.quando)}</small>
+                </span>
+                {x.combate && <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno rn-batalha__ver" onClick={() => aoAssistir(x)}>▶ Assistir</button>}
+                <span className="rn-batalha__saldo">{x.saque ? <>+🪙{numero(x.saque)}</> : null}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ResultadoDaExpedicao({ r, aoFechar }) {
+  const algum = (t) => Object.values(t || {}).some((n) => n > 0);
+  const perdas = algum(r.perdas) ? descreverTropas(r.perdas) : "";
+  const voltaram = algum(r.sobreviventes) ? descreverTropas(r.sobreviventes) : "";
+  return (
+    <div className={`pf-cartao rn-resultado ${r.saque ? "rn-resultado--venceu" : "rn-resultado--perdeu"}`} role="status">
+      <div className="rn-resultado__titulo">{r.estrelas ? `${estrelas(r.estrelas)} Vitória!` : "💥 A expedição recuou"} — {r.expedicao.nome}</div>
+      <p>
+        {r.destruicao}% destruído. {r.saque ? `Você saqueou 🪙 ${numero(r.saque)} moedas.` : "Nada de saque desta vez."}{" "}
+        {voltaram ? `Voltaram para casa: ${voltaram}.` : "Nenhuma tropa voltou."}{perdas ? ` Ficaram no campo: ${perdas}.` : ""}
+      </p>
+      <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={aoFechar}>Ok</button>
     </div>
   );
 }
@@ -707,7 +848,11 @@ function Regras() {
         </details>
         <details>
           <summary>⚔️ Invasões</summary>
-          <p>{ATAQUES_POR_DIA} invasões por dia, uma por reino, com o exército inteiro (que é gasto). A batalha é de verdade: cada tropa e cada defesa luta sozinha, e você assiste na ilha. Estrelas: 50% destruído, a Torre do Neuro no chão e 100%. O saque é {Math.round(FATIA_DO_SAQUE * 100)}% das moedas fora do cofre vezes a destruição (até {TETO_DO_SAQUE}); os troféus seguem as estrelas. Toda batalha fica na lista para assistir de novo.</p>
+          <p>{ATAQUES_POR_DIA} invasões por dia, com o exército inteiro (que é gasto). Cada reino só pode ser invadido por você uma vez a cada {HORAS_ENTRE_ATAQUES_AO_MESMO_REINO / 24} dias, contando do ataque — e a conta é de cada lado: se alguém invadiu você, você pode revidar na hora. A batalha é de verdade: cada tropa e cada defesa luta sozinha, e você assiste na ilha. Estrelas: 50% destruído, a Torre do Neuro no chão e 100%. O saque é {Math.round(FATIA_DO_SAQUE * 100)}% das moedas fora do cofre vezes a destruição (até {TETO_DO_SAQUE}); os troféus seguem as estrelas. Toda batalha fica na lista para assistir de novo.</p>
+        </details>
+        <details>
+          <summary>🗺️ Expedições</summary>
+          <p>Vilas, florestas, bosques e acampamentos de monstros, contra a CPU — ninguém perde moedas nem troféus. Os lugares liberam com a Torre do Neuro. O saque é proporcional à destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%), as tropas que sobrevivem voltam para casa e cada lugar pode ser saqueado uma vez por dia, até {EXPEDICOES_POR_DIA} expedições por dia.</p>
         </details>
         <details>
           <summary>🛡️ Escudos</summary>

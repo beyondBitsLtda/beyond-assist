@@ -1,0 +1,79 @@
+/* O modal de novidades (componentes/Novidades.js): um palco de aventura com os monstros das
+   expedições e o Neuro comemorando, e a lista do que mudou. */
+.novidades {
+  position: fixed; inset: 0; z-index: 60; display: flex; padding: 16px; overflow-y: auto;
+  background: rgba(6, 12, 9, 0.62); backdrop-filter: blur(4px);
+  animation: novidades-fundo 0.25s ease-out both;
+}
+.novidades__caixa {
+  /* margin auto: centraliza quando cabe e começa do topo quando é mais alta que a tela (no celular) */
+  margin: auto; width: min(580px, 100%); border-radius: 24px; overflow: hidden; background: var(--pf-superficie);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); animation: novidades-entrar 0.45s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+
+/* o palco: céu de fim de tarde, estrelas, morro verde e a turma */
+.novidades__palco {
+  position: relative; height: 176px; overflow: hidden;
+  background: linear-gradient(180deg, #1e1b4b 0%, #5b21b6 48%, #ea580c 100%);
+}
+.novidades__estrelas {
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 18%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 30% 35%, #fde68a 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 52% 12%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 68% 28%, #fff 50%, transparent 51%),
+    radial-gradient(2px 2px at 84% 14%, #fde68a 50%, transparent 51%), radial-gradient(1px 1px at 92% 40%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 44% 44%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 6% 46%, #fff 50%, transparent 51%);
+  opacity: 0.9; animation: novidades-piscar 2.4s ease-in-out infinite alternate;
+}
+.novidades__chao {
+  position: absolute; left: -10%; right: -10%; bottom: -22px; height: 58px;
+  background: #3f8f4a; border-radius: 50%; box-shadow: inset 0 6px 0 #57a85f;
+}
+.novidades__bicho { position: absolute; z-index: 1; filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.25)); }
+.novidades__bicho--cerbero { width: 142px; left: 3%; bottom: 8px; animation: novidades-boiar 2.8s ease-in-out infinite; }
+.novidades__bicho--goblin { width: 74px; right: 9%; bottom: 16px; animation: novidades-boiar 2.2s 0.4s ease-in-out infinite; }
+.novidades__bicho--cogumelo { width: 54px; right: 27%; bottom: 18px; animation: novidades-pular 1.6s ease-in-out infinite; }
+.novidades__bicho--morcego { width: 62px; right: 5%; top: 14px; animation: novidades-voar 3.2s ease-in-out infinite; }
+.novidades__neuro { position: absolute; z-index: 2; left: 50%; bottom: 10px; transform: translateX(-50%); }
+
+.novidades__corpo { display: grid; gap: 10px; padding: 18px 22px 22px; }
+.novidades__selo {
+  justify-self: start; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #fff; background: linear-gradient(90deg, #7c3aed, #ea580c);
+}
+.novidades__titulo { margin: 0; font-size: 27px; font-weight: 800; line-height: 1.15; color: var(--pf-tinta); }
+.novidades__sub { margin: 0; color: var(--pf-tinta-2); font-size: 15px; }
+.novidades__lista { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 560px) { .novidades__lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.novidades__item {
+  display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 14px;
+  background: var(--pf-superficie-2); font-size: 13.5px; line-height: 1.4;
+}
+.novidades__item strong { display: block; font-size: 14.5px; color: var(--pf-tinta); }
+.novidades__item > span:last-child > span { color: var(--pf-tinta-2); }
+.novidades__item--destaque {
+  grid-column: 1 / -1; border: 2px solid #f59e0b;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(234, 88, 12, 0.14));
+}
+.novidades__icone {
+  flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; font-size: 21px;
+  background: var(--pf-superficie); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.novidades__acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.novidades__principal { flex: 1 1 220px; justify-content: center; text-align: center; font-size: 16px; box-shadow: 0 5px 0 #15803d; }
+
+@keyframes novidades-fundo { from { opacity: 0; } }
+@keyframes novidades-entrar { from { opacity: 0; transform: translateY(24px) scale(0.94); } }
+@keyframes novidades-piscar { to { opacity: 0.45; } }
+@keyframes novidades-boiar { 50% { transform: translateY(-6px); } }
+@keyframes novidades-pular { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-14px) rotate(-6deg); } }
+@keyframes novidades-voar { 0%, 100% { transform: translate(0, 0) rotate(-4deg); } 50% { transform: translate(-18px, 10px) rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .novidades, .novidades__caixa, .novidades__estrelas, .novidades__bicho { animation: none; }
+}
+@media (max-width: 420px) {
+  .novidades__palco { height: 150px; }
+  .novidades__bicho--cerbero { width: 112px; }
+  .novidades__titulo { font-size: 23px; }
+  .novidades__corpo { padding: 16px 16px 18px; }
+}

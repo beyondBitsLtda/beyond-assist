@@ -15,6 +15,7 @@
 // O servidor decide a invasão; a tela roda a mesma simulação para mostrar a luta.
 
 import { TROPAS, contagens, heroiNeuro } from "./tropas.js";
+import { MONSTROS, ORDEM_DOS_MONSTROS, contagensDeMonstros } from "./monstros.js";
 
 export const DT = 0.1;              // segundos por passo
 export const DURACAO_MAXIMA = 60;   // segundos de batalha, no máximo
@@ -62,6 +63,10 @@ const ORDEM_DE_ENTRADA = ["gigante", "balao", "bombardeiro", "guerreiro", "arque
 const PREDIOS_DA_BATALHA = ["castelo", "mina", "cofre", "quartel", "torre", "canhao", "biblioteca", "defesaAerea", "morteiro", "torreMagica", "torreRaio"];
 // lugares em volta da Torre do Neuro de onde a guarnição sai
 const SAIDAS_DA_GUARNICAO = [[0.9, 1.2], [1.3, 0.5], [0.3, 1.4], [1.4, -0.2], [-0.4, 1.3], [1.0, 0.9], [0.0, 1.0], [1.5, 0.9]];
+// Expedições (22/10/2026): os monstros já começam soltos, espalhados em volta das construções, e
+// guardam o pedaço deles — só correm atrás de quem chega a RAIO_DE_GUARDA.
+const ANEL_DOS_MONSTROS = [[1.0, 0.5], [-0.9, 0.7], [0.4, -1.0], [-0.7, -0.9], [1.2, -0.4], [-1.2, -0.1], [0.1, 1.2], [0.9, 1.1]];
+export const RAIO_DE_GUARDA = 4.5;
 
 function sorteio(semente) {
   let a = (semente >>> 0) || 1;
@@ -73,7 +78,7 @@ function sorteio(semente) {
   };
 }
 const distancia = (ax, az, bx, bz) => { const dx = ax - bx, dz = az - bz; return Math.sqrt(dx * dx + dz * dz); };
-const ARMAS = { arqueira: "flecha", dragao: "fogo", mago: "magia", balao: "bomba", bombardeiro: "explosao" };
+const ARMAS = { arqueira: "flecha", dragao: "fogo", mago: "magia", balao: "bomba", bombardeiro: "explosao", bandido: "flecha", aranha: "magia", cerbero: "fogo" };
 const arma = (u) => (u.tipo === "heroi" ? (u.lado === "defesa" ? "livro" : "golpe") : ARMAS[u.tipo] || "golpe");
 
 /**
@@ -114,20 +119,27 @@ export function montarCombate({ atacante, defensor, semente = 1 }) {
   for (const t of ORDEM_DE_ENTRADA) for (let i = 0; i < (gu[t] || 0); i++) guarnicao.push(t);
   if (defensor?.neuro_nivel && castelo) guarnicao.push("heroi");
 
+  // os monstros de uma expedição (os grandes primeiro: o primeiro fica perto da Torre, o covil)
+  const mo = contagensDeMonstros(defensor?.monstros);
+  const monstros = [];
+  for (const t of ORDEM_DOS_MONSTROS) for (let i = 0; i < (mo[t] || 0); i++) monstros.push(t);
+
   return {
     t: 0, passos: 0, rand, predios, muralha, castelo, unidades: [], entradas, guarnicao,
+    monstros, monstrosSoltos: false, raio: raioDaIlha(niveis.terreno),
     guarnicaoSaiu: false, seq: 0, fim: false, totalPredios: predios.length,
     neuro: { ataque: atacante?.neuro_nivel || 0, defesa: defensor?.neuro_nivel || 0 },
   };
 }
 
 function criarUnidade(e, tipo, lado, x, z) {
-  const base = tipo === "heroi" ? heroiNeuro(lado === "ataque" ? e.neuro.ataque : e.neuro.defesa, lado) : TROPAS[tipo];
+  const base = tipo === "heroi" ? heroiNeuro(lado === "ataque" ? e.neuro.ataque : e.neuro.defesa, lado) : TROPAS[tipo] || MONSTROS[tipo];
   e.seq += 1;
   return {
     id: `u${e.seq}`, tipo, lado, x, z, vida: base.vida, vidaMax: base.vida, dano: base.dano, intervalo: base.intervalo,
     alcance: base.alcance, velocidade: base.velocidade, voa: base.voa, acertaAr: base.acertaAr, alvoTipo: base.alvo,
     area: base.area || 0, suicida: Boolean(base.suicida), contraMuralha: base.contraMuralha || 1, cura: base.cura || 0,
+    guarda: Boolean(MONSTROS[tipo]),
     alvo: null, recarga: e.rand() * 0.4, viva: true,
   };
 }
@@ -228,7 +240,8 @@ function agirUnidade(e, u, ev) {
       if (alvo?.chave === "castelo" && e.muralha?.vivo && !u.voa && u.alcance < 2) alvo = e.muralha;
     }
   } else {
-    alvo = inimigoMaisPerto(e, u, "ataque", 99);
+    // monstro guarda o pedaço dele; tropa de defesa (e o Neuro) vai atrás de qualquer um
+    alvo = inimigoMaisPerto(e, u, "ataque", u.guarda ? RAIO_DE_GUARDA : 99);
   }
   u.alvo = alvo ? { id: alvo.id } : null;
   if (!alvo) return;
@@ -282,6 +295,23 @@ export function passo(e) {
     const u = criarUnidade(e, en.tipo, "ataque", en.ponto[0] + (e.rand() - 0.5) * 0.5, en.ponto[1] + (e.rand() - 0.5) * 0.5);
     e.unidades.push(u);
     ev.push({ tipo: "entrou", id: u.id });
+  }
+
+  // monstros: soltos desde o primeiro instante, em volta das construções (sem sorteio: a
+  // posição é sempre a mesma para a mesma expedição)
+  if (!e.monstrosSoltos && e.monstros.length) {
+    e.monstrosSoltos = true;
+    const limite = e.raio - 0.7;
+    e.monstros.forEach((tipo, i) => {
+      const p = e.predios.length ? e.predios[(i * 5) % e.predios.length] : { x: 0, z: 0, raio: 0 };
+      const [dx, dz] = ANEL_DOS_MONSTROS[(i + Math.floor(i / Math.max(1, e.predios.length))) % ANEL_DOS_MONSTROS.length];
+      let x = p.x + dx * (p.raio + 0.5), z = p.z + dz * (p.raio + 0.5);
+      const d = distancia(x, z, 0, 0);
+      if (d > limite) { x = (x / d) * limite; z = (z / d) * limite; }
+      const u = criarUnidade(e, tipo, "defesa", x, z);
+      e.unidades.push(u);
+      ev.push({ tipo: "entrou", id: u.id });
+    });
   }
 
   if (!e.guarnicaoSaiu && e.castelo && e.guarnicao.length) {

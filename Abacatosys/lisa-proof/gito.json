@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.12.0-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-21",
+  "versao": "0.13.0-proof-expedicoes.1",
+  "atualizadoEm": "2026-10-22",
   "compilacao": {
-    "numero": 32,
-    "data": "2026-10-21",
+    "numero": 33,
+    "data": "2026-10-22",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.13.0-proof-expedicoes.1",
+      "data": "2026-10-22",
+      "branch": "proof-expedicoes",
+      "tipo": "funcionalidade",
+      "resumo": "Expedições contra a CPU (vilas, florestas, bosques e acampamentos de monstros), guerra entre jogadores a cada 2 dias com revanche, e o modal de novidades.",
+      "itens": [
+        "Expedições: 8 lugares contra a CPU (Bosque dos Cogumelos, Vila dos Goblins, Floresta dos Lobos, Acampamento Orc, Vila dos Bandidos, Bosque Assombrado, Floresta Sombria e Covil do Cérbero), liberados pela Torre do Neuro. Saque proporcional à destruição (3 estrelas dá +25%), tropas sobreviventes voltam para casa, cada lugar uma vez por dia e até 3 expedições por dia. Sem troféus e sem tirar moedas de ninguém.",
+        "12 monstros desenhados em 2D de papel, como as tropas e o Neuro: cogumelo, gosma, goblin, bandido, lobo, aranha, morcego, esqueleto, orc, ent, ogro e o Cérbero (chefe). Eles já começam soltos na ilha e guardam o pedaço deles.",
+        "A ilha da expedição ganha o cenário do lugar (chão, pinheiros, cogumelos, casinhas, tendas, totens) e o covil do chefe no lugar da Torre do Neuro. Dá para assistir de novo às últimas expedições.",
+        "Guerra entre jogadores: o mesmo reino só pode ser invadido por você uma vez a cada 48 h, contadas do ataque. A conta é de cada lado: quem foi atacado pode revidar na hora (selo de revanche na lista de alvos).",
+        "Modal de novidades caprichado, que aparece uma vez assim que a pessoa entra (o aviso de vale espera ele fechar).",
+        "Migração db/009-expedicoes.sql: tabela proof_expedicoes, índice das invasões por data e o tipo expedicao no livro-caixa."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.12.0-cloudflare-pages.1",
       "data": "2026-10-21",
@@ -506,7 +522,10 @@
         "Personagens do Neuro comprados com moedas, usados em todo o app",
         "Dicas da Lisa nos projetos: passo a passo básico, dicas e o que revisar, sem entregar a solução",
         "Projetos com pontos por requisito, entregas parciais que somam e complexidade ajustável (mais simples sem perder pontos, desafiador valendo 1,5x)",
-        "Botão Rodar nos exercícios do dia: JavaScript e SQL no navegador; C, Python, PHP, Java e outras num compilador on-line"
+        "Botão Rodar nos exercícios do dia: JavaScript e SQL no navegador; C, Python, PHP, Java e outras num compilador on-line",
+        "Expedições do Reino contra a CPU (vilas, florestas, bosques e acampamentos de monstros), com monstros desenhados em 2D e saque por destruição",
+        "Guerra entre jogadores com o mesmo reino só a cada 48 h por quem ataca, e revanche liberada para quem foi atacado",
+        "Modal de novidades na entrada, uma vez por edição"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -569,7 +588,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/008). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/009). Acesso só pelo túnel da Cloudflare, em HTTPS."
       }
     ],
     "integracoes": [
