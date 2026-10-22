@@ -9,14 +9,26 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.12.0-proof-dicas-da-lisa.1",
+  "versao": "0.12.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-21",
   "compilacao": {
-    "numero": 31,
+    "numero": 32,
     "data": "2026-10-21",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.12.0-cloudflare-pages.1",
+      "data": "2026-10-21",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.12.0: Dicas da Lisa nos projetos, pontos por parte com entregas parciais, complexidade ajustável e botão Rodar nos exercícios.",
+      "itens": [
+        "Junta a branch proof-dicas-da-lisa (0.12.0-proof-dicas-da-lisa.1). Sem migração de banco.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.12.0-proof-dicas-da-lisa.1",
       "data": "2026-10-21",
