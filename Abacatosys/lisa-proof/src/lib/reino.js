@@ -13,19 +13,20 @@
 import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
 import { buscarTodas, buscarEmLotes } from "./estudo.js";
-import { diaDe } from "@/dominio/datas.js";
+import { diaDe, somarDias } from "@/dominio/datas.js";
+import { calcularOfensiva } from "@/dominio/ofensiva.js";
 import { nomePublico, textoPublicoValido } from "@/dominio/ranking.js";
 import {
   CONSTRUCOES, ORDEM_DAS_CONSTRUCOES, NIVEIS_INICIAIS, ATAQUES_POR_DIA, ESCUDO_DE_NOVATO_HORAS,
   niveisDe, poderDo, podeMelhorar, podeSubirNeuro, producaoAcumulada, producaoPorHora, capacidadeDaMina,
   protecaoDoCofre, temEscudo, podeInvadir, batalha, somarTrofeus, saldoDe, faixaDeDefesa,
   custoDoNeuro, nivelMaximoDoNeuro, estagioDoNeuro, taxaDeProducao, HORAS_ATE_ENCHER,
-  HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, exercitoDaExpedicao,
+  HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, exercitoDaExpedicao, caidasNoAtaque,
 } from "@/dominio/reino.js";
 import {
-  DIAS_DE_PAZ, FATOR_DA_MINA_NA_ALIANCA, termosDaAlianca, aliancaVigente, convitePendente, outroDa, podeConvidar, podeResponder,
-  expiracaoDoConvite, periodoDaAlianca, reforcoDeDefesa, reforcoDeAtaque, juntarComReforco, perdasProprias, caidasNoAtaque,
-} from "@/dominio/alianca.js";
+  DIAS_DE_PAZ, PARTE_DA_EXPEDICAO, OFENSIVA_PARA_VOTAR, termosDaPaz, pazVigente, votacaoAberta, podeProporPaz, podeVotar,
+  podeVotarComOfensiva, eleitoresDaVotacao, resultadoDaVotacao, fimDaVotacao, periodoDaPaz, fatorDaMinaNaPaz, parteDaExpedicao,
+} from "@/dominio/paz.js";
 import {
   EXPEDICOES, EXPEDICOES_POR_DIA, TIPOS_DE_LUGAR, MONSTROS, DIFICULDADES, expedicaoPorId, podeExpedicionar, contagensDeMonstros,
 } from "@/dominio/monstros.js";
@@ -121,143 +122,184 @@ async function invasoesRecentes(usuarioId) {
   return { ataquei: ultimo(minhas.data, "defensor_id"), meAtacaram: ultimo(contraMim.data, "atacante_id") };
 }
 
-// ---------------------------------------------------------------- alianças
+// ---------------------------------------------------------------- a paz entre os reinos
 
-const CAMPOS_DA_ALIANCA = "id, de_id, para_id, dias, status, criado_em, expira_em, respondido_em, inicio, fim";
+const CAMPOS_DA_PAZ = "id, proposta_por, dias, status, criado_em, expira_em, inicio, fim, total_reinos";
 
-/** As alianças vigentes de várias pessoas: `Map<usuarioId, alianca>`. */
-async function aliancasVigentes(ids) {
-  const unicos = [...new Set(ids.filter(Boolean))];
-  if (!unicos.length) return new Map();
+/** A paz que vale agora (ou null) e a proposta em votação (ou null). */
+async function pazDeAgora() {
   const agora = new Date().toISOString();
-  const lista = unicos.join(",");
-  const { data, error } = await supabase.from("proof_aliancas").select(CAMPOS_DA_ALIANCA)
-    .eq("status", "aceita").gt("fim", agora).or(`de_id.in.(${lista}),para_id.in.(${lista})`);
-  falhou(error, "alianças");
-  const mapa = new Map();
-  for (const a of data || []) { mapa.set(a.de_id, a); mapa.set(a.para_id, a); }
-  return mapa;
-}
-const aliancaDe = async (usuarioId) => (await aliancasVigentes([usuarioId])).get(usuarioId) || null;
-
-/** Os convites que ainda esperam resposta, mandados ou recebidos por `usuarioId`. */
-async function convitesPendentes(usuarioId) {
-  const { data, error } = await supabase.from("proof_aliancas").select(CAMPOS_DA_ALIANCA)
-    .eq("status", "pendente").gt("expira_em", new Date().toISOString()).or(`de_id.eq.${usuarioId},para_id.eq.${usuarioId}`);
-  falhou(error, "convites");
-  return data || [];
-}
-
-/** O reino do aliado como a tela mostra (é ver o reino do outro: construções, tropas, Neuro). */
-async function reinoDoAliado(a, usuarioId) {
-  const outroId = outroDa(a, usuarioId);
-  const { data: outro, error } = await supabase.from("proof_reinos").select(CAMPOS).eq("usuario_id", outroId).maybeSingle();
-  falhou(error, "reino do aliado");
-  if (!outro) return null;
-  const nomes = await nomesPublicos([outroId]);
-  const n = niveisDe(outro);
-  return {
-    id: a.id, comId: outroId, dias: a.dias, inicio: a.inicio, ate: a.fim,
-    dono: nomes.get(outroId) || "Estudante anônimo", reino: outro.nome,
-    vizinho: {
-      nome: outro.nome, dono: nomes.get(outroId) || "Estudante anônimo", trofeus: outro.trofeus, neuro: outro.neuro_nivel,
-      construcoes: Object.fromEntries(ORDEM_DAS_CONSTRUCOES.map((c) => [c, n[c] || 0])),
-      lista: ORDEM_DAS_CONSTRUCOES.filter((c) => (n[c] || 0) > 0).map((c) => ({ chave: c, nome: CONSTRUCOES[c].nome, emoji: CONSTRUCOES[c].emoji, nivel: n[c] })),
-      exercito: contagens(outro.exercito), guarnicao: contagens(outro.guarnicao),
-    },
-    // o que cada um recebe do outro numa invasão
-    reforcoDeDefesa: reforcoDeDefesa(outro),
-    reforcoDeAtaque: reforcoDeAtaque(outro),
-  };
-}
-
-/** Os convites como a tela mostra: quem, quantos dias, até quando responder — e os termos. */
-async function convitesParaTela(usuarioId) {
-  const pendentes = await convitesPendentes(usuarioId);
-  const outros = pendentes.map((c) => outroDa(c, usuarioId));
-  const [nomes, reinosR] = await Promise.all([
-    nomesPublicos(outros),
-    outros.length ? supabase.from("proof_reinos").select("usuario_id, nome").in("usuario_id", outros) : { data: [] },
+  const [vigente, votacao] = await Promise.all([
+    supabase.from("proof_pazes").select(CAMPOS_DA_PAZ).eq("status", "aprovada").gt("fim", agora).order("fim", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("proof_pazes").select(CAMPOS_DA_PAZ).eq("status", "votacao").order("criado_em", { ascending: false }).limit(1).maybeSingle(),
   ]);
-  const nomeDoReino = new Map((reinosR.data || []).map((r) => [r.usuario_id, r.nome]));
-  const paraTela = (c) => {
-    const outro = outroDa(c, usuarioId);
-    return { id: c.id, comId: outro, dono: nomes.get(outro) || "Estudante anônimo", reino: nomeDoReino.get(outro) || "Reino", dias: c.dias, expira: c.expira_em, termos: termosDaAlianca(c.dias) };
-  };
-  return {
-    recebidos: pendentes.filter((c) => c.para_id === usuarioId).map(paraTela),
-    enviados: pendentes.filter((c) => c.de_id === usuarioId).map(paraTela),
-  };
-}
-
-/** Convida `paraId` para uma aliança de `dias` dias de paz. */
-export async function convidarParaAlianca(usuarioId, paraId, dias) {
-  if (!paraId || typeof paraId !== "string") throw new ErroDeAcesso(400, "qual reino?");
-  const { data: alvo } = await supabase.from("proof_reinos").select("usuario_id").eq("usuario_id", paraId).maybeSingle();
-  const agora = new Date();
-  // convites vencidos entre os dois saem do caminho (senão o índice de "um pendente por par" barraria)
-  await supabase.from("proof_aliancas").update({ status: "expirada" }).eq("status", "pendente").lt("expira_em", agora.toISOString())
-    .or(`and(de_id.eq.${usuarioId},para_id.eq.${paraId}),and(de_id.eq.${paraId},para_id.eq.${usuarioId})`);
-  const [vigentes, pendentes] = await Promise.all([aliancasVigentes([usuarioId, paraId]), convitesPendentes(usuarioId)]);
-  const pode = podeConvidar({
-    deId: usuarioId, paraId: alvo ? paraId : null, dias: Number(dias),
-    minhaAlianca: vigentes.get(usuarioId), aliancaDele: vigentes.get(paraId),
-    pendenteEntreNos: pendentes.find((c) => outroDa(c, usuarioId) === paraId), agora,
-  });
-  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
-  const { error } = await supabase.from("proof_aliancas").insert({ de_id: usuarioId, para_id: paraId, dias: Number(dias), expira_em: expiracaoDoConvite(agora) });
-  if (error?.code === "23505") throw new ErroDeAcesso(409, "já tem um convite entre vocês esperando resposta");
-  falhou(error, "convite");
-  return { convidou: true };
-}
-
-/** Aceita ou recusa um convite recebido. */
-export async function responderConvite(usuarioId, conviteId, aceitar) {
-  const { data: convite, error } = await supabase.from("proof_aliancas").select(CAMPOS_DA_ALIANCA).eq("id", String(conviteId || "")).maybeSingle();
-  falhou(error, "convite");
-  const agora = new Date();
-  const vigentes = convite ? await aliancasVigentes([usuarioId, convite.de_id]) : new Map();
-  const pode = podeResponder({ convite, usuarioId, aceitar, minhaAlianca: vigentes.get(usuarioId), aliancaDoOutro: vigentes.get(convite?.de_id), agora });
-  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
-  const mudancas = aceitar
-    ? { status: "aceita", respondido_em: agora.toISOString(), ...periodoDaAlianca(convite.dias, agora) }
-    : { status: "recusada", respondido_em: agora.toISOString() };
-  // só muda se ainda estiver pendente (dois cliques não aceitam duas vezes)
-  const { data, error: e2 } = await supabase.from("proof_aliancas").update(mudancas).eq("id", convite.id).eq("status", "pendente").select("id");
-  falhou(e2, "convite");
-  if (!(data || []).length) throw new ErroDeAcesso(409, "esse convite já foi respondido");
-  if (aceitar) {
-    // os outros convites pendentes dos dois saem: uma aliança por vez
-    await supabase.from("proof_aliancas").update({ status: "cancelada" }).eq("status", "pendente").neq("id", convite.id)
-      .or(`de_id.in.(${usuarioId},${convite.de_id}),para_id.in.(${usuarioId},${convite.de_id})`);
+  falhou(vigente.error, "paz");
+  falhou(votacao.error, "votação da paz");
+  const v = votacao.data;
+  // votação vencida: fecha agora (ninguém mais vota nela)
+  if (v && !votacaoAberta(v)) {
+    await supabase.from("proof_pazes").update({ status: "expirada" }).eq("id", v.id).eq("status", "votacao");
+    return { paz: vigente.data || null, votacao: null };
   }
-  return { aceitou: Boolean(aceitar) };
+  return { paz: vigente.data || null, votacao: v || null };
 }
 
-/** Quem convidou desiste do convite (enquanto ninguém respondeu). */
-export async function cancelarConvite(usuarioId, conviteId) {
-  const { data, error } = await supabase.from("proof_aliancas").update({ status: "cancelada" })
-    .eq("id", String(conviteId || "")).eq("de_id", usuarioId).eq("status", "pendente").select("id");
-  falhou(error, "convite");
-  if (!(data || []).length) throw new ErroDeAcesso(400, "esse convite não está mais esperando resposta");
+async function totalDeReinos() {
+  const { count, error } = await supabase.from("proof_reinos").select("usuario_id", { count: "exact", head: true });
+  falhou(error, "reinos");
+  return count || 0;
+}
+
+/**
+ * A ofensiva de agora de cada pessoa, para a regra do voto. Só olha os últimos dias que a regra
+ * precisa (OFENSIVA_PARA_VOTAR + ontem), então o número sai cortado ali — serve para "tem ou não
+ * tem", e para mostrar quanto falta a quem ainda não chegou lá.
+ */
+async function ofensivasDe(ids) {
+  const hoje = diaDe();
+  const desde = somarDias(hoje, -OFENSIVA_PARA_VOTAR);
+  const unicos = [...new Set(ids.filter(Boolean))];
+  const diasDe = new Map(unicos.map((id) => [id, []]));
+  for (let i = 0; i < unicos.length; i += 80) {
+    const lote = unicos.slice(i, i + 80);
+    const eventos = await buscarTodas(() =>
+      supabase.from("proof_eventos").select("usuario_id, dia").in("usuario_id", lote).gte("dia", desde).order("criado_em")
+    );
+    for (const e of eventos) diasDe.get(e.usuario_id)?.push(e.dia);
+  }
+  return new Map([...diasDe].map(([id, d]) => [id, calcularOfensiva(d, hoje).atual]));
+}
+
+/** O placar de uma votação: os votos, os reinos, quem pode votar agora (ofensiva em dia) e o resultado. */
+async function placarDa(votacao) {
+  const [votosR, reinos] = await Promise.all([
+    supabase.from("proof_paz_votos").select("usuario_id, voto").eq("paz_id", votacao.id),
+    buscarTodas(() => supabase.from("proof_reinos").select("usuario_id").order("usuario_id")),
+  ]);
+  falhou(votosR.error, "votos");
+  const votos = votosR.data || [];
+  const ids = reinos.map((r) => r.usuario_id);
+  const ofensivas = await ofensivasDe(ids);
+  const aptos = ids.filter((id) => podeVotarComOfensiva(ofensivas.get(id)));
+  const eleitores = eleitoresDaVotacao({ aptos, votantes: votos.map((v) => v.usuario_id) });
+  return { votos, totalDeReinos: ids.length, ofensivas, eleitores, resultado: resultadoDaVotacao(votos.map((v) => v.voto), eleitores.length) };
+}
+
+/** A paz como a tela mostra: a vigente (com os vizinhos) ou a votação aberta (com o placar). */
+async function pazParaTela(usuarioId, apurou = false) {
+  const { paz, votacao } = await pazDeAgora();
+  if (paz) {
+    const total = await totalDeReinos();
+    const { data: outros } = await supabase.from("proof_reinos").select("usuario_id, nome, construcoes, trofeus").neq("usuario_id", usuarioId).order("trofeus", { ascending: false }).limit(12);
+    const nomes = await nomesPublicos((outros || []).map((r) => r.usuario_id));
+    return {
+      vigente: {
+        id: paz.id, dias: paz.dias, inicio: paz.inicio, ate: paz.fim, reinos: paz.total_reinos, fatorDaMina: fatorDaMinaNaPaz(paz),
+        parteDaExpedicao: PARTE_DA_EXPEDICAO,
+        vizinhos: (outros || []).map((r) => {
+          const n = niveisDe(r);
+          return { nome: r.nome, dono: nomes.get(r.usuario_id) || "Estudante anônimo", construcoes: Object.fromEntries(ORDEM_DAS_CONSTRUCOES.map((c) => [c, n[c] || 0])) };
+        }),
+      },
+      votacao: null, podePropor: false, motivo: "o mundo já está em paz", totalDeReinos: total,
+    };
+  }
+  if (votacao) {
+    const placar = await placarDa(votacao);
+    // a ofensiva de alguém que não votou acabou e todo o resto já disse sim: a paz começa agora
+    if (placar.resultado !== "aberta" && !apurou) {
+      await apurar(votacao, placar);
+      return pazParaTela(usuarioId, true);
+    }
+    const { votos, ofensivas, eleitores, totalDeReinos: total } = placar;
+    const nomes = await nomesPublicos([votacao.proposta_por, ...votos.map((v) => v.usuario_id)]);
+    const meu = votos.find((v) => v.usuario_id === usuarioId);
+    const voto = podeVotar({ paz: votacao, jaVotou: Boolean(meu), ofensiva: ofensivas.get(usuarioId) });
+    return {
+      vigente: null,
+      votacao: {
+        id: votacao.id, dias: votacao.dias, expira: votacao.expira_em, propostaPor: nomes.get(votacao.proposta_por) || "Estudante anônimo",
+        souQuemPropos: votacao.proposta_por === usuarioId, totalDeReinos: total,
+        eleitores: eleitores.length, semVoto: Math.max(0, total - eleitores.length),
+        sims: votos.filter((v) => v.voto).length, meuVoto: meu ? meu.voto : null,
+        podeVotar: voto.ok, motivoDoVoto: voto.ok ? "" : voto.motivo,
+        votaram: votos.filter((v) => v.voto).map((v) => nomes.get(v.usuario_id) || "Estudante anônimo"),
+        termos: termosDaPaz(votacao.dias, total),
+      },
+      podePropor: false, motivo: "já tem uma proposta de paz em votação", totalDeReinos: total, ofensivaParaVotar: OFENSIVA_PARA_VOTAR,
+    };
+  }
+  const [total, ofensivas] = await Promise.all([totalDeReinos(), ofensivasDe([usuarioId])]);
+  const pode = podeProporPaz({ ofensiva: ofensivas.get(usuarioId) });
+  return { vigente: null, votacao: null, podePropor: pode.ok, motivo: pode.ok ? "" : pode.motivo, totalDeReinos: total, ofensivaParaVotar: OFENSIVA_PARA_VOTAR };
+}
+
+/**
+ * Fecha a votação se ela já tem o resultado: um "não" rejeita; todos os eleitores com "sim"
+ * aprovam. A paz aprovada vale para todos os reinos — o fator da mina é o total de reinos.
+ */
+async function apurar(votacao, placar) {
+  const { resultado, totalDeReinos: total } = placar || (await placarDa(votacao));
+  if (resultado === "rejeitada") await supabase.from("proof_pazes").update({ status: "rejeitada" }).eq("id", votacao.id).eq("status", "votacao");
+  if (resultado === "aprovada") {
+    await supabase.from("proof_pazes").update({ status: "aprovada", total_reinos: total, ...periodoDaPaz(votacao.dias) }).eq("id", votacao.id).eq("status", "votacao");
+  }
+  return resultado;
+}
+
+/** Um jogador propõe a paz por `dias` dias; o voto dele já conta como sim. Precisa da ofensiva em dia. */
+export async function proporPaz(usuarioId, dias) {
+  const [{ paz, votacao }, ofensivas] = await Promise.all([pazDeAgora(), ofensivasDe([usuarioId])]);
+  const pode = podeProporPaz({ dias: Number(dias), votacaoAtual: votacao, pazAtual: paz, ofensiva: ofensivas.get(usuarioId) });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  await obterReino(usuarioId); // quem propõe tem reino (e conta como um dos votantes)
+  const { data, error } = await supabase.from("proof_pazes").insert({ proposta_por: usuarioId, dias: Number(dias), expira_em: fimDaVotacao() }).select(CAMPOS_DA_PAZ).single();
+  if (error?.code === "23505") throw new ErroDeAcesso(409, "já tem uma proposta de paz em votação");
+  falhou(error, "proposta de paz");
+  const { error: e2 } = await supabase.from("proof_paz_votos").insert({ paz_id: data.id, usuario_id: usuarioId, voto: true });
+  falhou(e2, "voto");
+  return { resultado: await apurar(data) };
+}
+
+/** O voto de um reino: sim ou não. Só vota quem tem a ofensiva em dia. */
+export async function votarNaPaz(usuarioId, pazId, voto) {
+  const { data: votacao, error } = await supabase.from("proof_pazes").select(CAMPOS_DA_PAZ).eq("id", String(pazId || "")).maybeSingle();
+  falhou(error, "votação");
+  const [{ data: meu }, ofensivas] = await Promise.all([
+    votacao ? supabase.from("proof_paz_votos").select("voto").eq("paz_id", votacao.id).eq("usuario_id", usuarioId).maybeSingle() : { data: null },
+    ofensivasDe([usuarioId]),
+  ]);
+  const pode = podeVotar({ paz: votacao, jaVotou: Boolean(meu), ofensiva: ofensivas.get(usuarioId) });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  await obterReino(usuarioId);
+  const { error: e2 } = await supabase.from("proof_paz_votos").insert({ paz_id: votacao.id, usuario_id: usuarioId, voto: Boolean(voto) });
+  if (e2?.code === "23505") throw new ErroDeAcesso(409, "você já votou");
+  falhou(e2, "voto");
+  return { resultado: await apurar(votacao) };
+}
+
+/** Quem propôs desiste da proposta (enquanto a votação está aberta). */
+export async function cancelarPaz(usuarioId, pazId) {
+  const { data, error } = await supabase.from("proof_pazes").update({ status: "cancelada" })
+    .eq("id", String(pazId || "")).eq("proposta_por", usuarioId).eq("status", "votacao").select("id");
+  falhou(error, "proposta de paz");
+  if (!(data || []).length) throw new ErroDeAcesso(400, "essa proposta não está mais em votação");
   return { cancelou: true };
 }
 
 /** Tudo o que a tela do reino precisa. */
 export async function estadoDoReino(usuarioId) {
   const reino = await obterReino(usuarioId);
-  const [saldo, hoje, batalhasR, minhaAlianca, convites] = await Promise.all([
+  const [saldo, hoje, batalhasR, paz] = await Promise.all([
     saldoDoUsuario(usuarioId),
     invasoesDeHoje(usuarioId),
     supabase.from("proof_invasoes")
       .select("id, atacante_id, defensor_id, ataque, defesa, venceu, saque, trofeus_atacante, trofeus_defensor, estrelas, destruicao, combate, criado_em")
       .or(`atacante_id.eq.${usuarioId},defensor_id.eq.${usuarioId}`)
       .order("criado_em", { ascending: false }).limit(15),
-    aliancaDe(usuarioId),
-    convitesParaTela(usuarioId),
+    pazParaTela(usuarioId),
   ]);
-  const alianca = minhaAlianca ? await reinoDoAliado(minhaAlianca, usuarioId) : null;
-  const fatorDaMina = alianca ? FATOR_DA_MINA_NA_ALIANCA : 1;
+  const fatorDaMina = paz.vigente?.fatorDaMina || 1;
   falhou(batalhasR.error, "batalhas");
   const batalhas = batalhasR.data || [];
   const nomes = await nomesPublicos(batalhas.flatMap((b) => [b.atacante_id, b.defensor_id]));
@@ -283,8 +325,7 @@ export async function estadoDoReino(usuarioId) {
       capacidade: taxaDeProducao(n) * fatorDaMina * HORAS_ATE_ENCHER,
       dobrada: fatorDaMina > 1,
     },
-    alianca,
-    convites,
+    paz,
     diasDePaz: DIAS_DE_PAZ,
     cofre: { protege: protecaoDoCofre(n.cofre) },
     construcoes: ORDEM_DAS_CONSTRUCOES.map((chave) => {
@@ -453,7 +494,7 @@ export async function personagemDe(usuarioId) {
 export async function coletarMina(usuarioId) {
   const reino = await obterReino(usuarioId);
   const agora = new Date();
-  const valor = producaoAcumulada(reino, agora, (await aliancaDe(usuarioId)) ? FATOR_DA_MINA_NA_ALIANCA : 1);
+  const valor = producaoAcumulada(reino, agora, fatorDaMinaNaPaz((await pazDeAgora()).paz, agora));
   if (valor <= 0) throw new ErroDeAcesso(400, "a mina ainda não juntou nenhuma moeda inteira");
   await lancarEGravar(reino, [{ tipo: "coleta", valor }], { coletado_em: agora.toISOString() });
   return { coletou: valor };
@@ -476,32 +517,29 @@ export async function renomearReino(usuarioId, nome) {
  */
 export async function alvosDe(usuarioId) {
   const eu = await obterReino(usuarioId);
-  const [todos, hoje, recentes, pendentes] = await Promise.all([
+  const [todos, hoje, recentes, { paz }] = await Promise.all([
     buscarTodas(() => supabase.from("proof_reinos").select(CAMPOS).neq("usuario_id", usuarioId).order("usuario_id")),
     invasoesDeHoje(usuarioId),
     invasoesRecentes(usuarioId),
-    convitesPendentes(usuarioId),
+    pazDeAgora(),
   ]);
+  const emPaz = pazVigente(paz);
   const jaAtaquei = new Set(hoje.map((i) => i.defensor_id));
   const perto = todos
     .sort((a, b) => Math.abs(a.trofeus - eu.trofeus) - Math.abs(b.trofeus - eu.trofeus))
     .slice(0, 30);
-  const [nomes, vigentes] = await Promise.all([nomesPublicos(perto.map((r) => r.usuario_id)), aliancasVigentes([usuarioId, ...perto.map((r) => r.usuario_id)])]);
-  const minha = vigentes.get(usuarioId) || null;
+  const nomes = await nomesPublicos(perto.map((r) => r.usuario_id));
   const agora = new Date();
   return {
     invasoes: { feitasHoje: hoje.length, porDia: ATAQUES_POR_DIA },
     meuAtaque: poderDo(eu).ataque,
     horasEntreAtaques: HORAS_ENTRE_ATAQUES_AO_MESMO_REINO,
+    emPaz,
+    pazAte: emPaz ? paz.fim : null,
     alvos: perto.map((r) => {
       const pode = podeInvadir({
         atacanteId: usuarioId, atacante: eu, defensor: r, ataquesHoje: hoje.length, jaAtacouHoje: jaAtaquei.has(r.usuario_id),
-        ultimoAtaqueAoAlvo: recentes.ataquei.get(r.usuario_id) || null, agora,
-        aliados: Boolean(minha && outroDa(minha, usuarioId) === r.usuario_id),
-      });
-      const convite = podeConvidar({
-        deId: usuarioId, paraId: r.usuario_id, minhaAlianca: minha, aliancaDele: vigentes.get(r.usuario_id),
-        pendenteEntreNos: pendentes.find((c) => outroDa(c, usuarioId) === r.usuario_id), agora,
+        ultimoAtaqueAoAlvo: recentes.ataquei.get(r.usuario_id) || null, agora, emPaz,
       });
       return {
         id: r.usuario_id,
@@ -517,9 +555,6 @@ export async function alvosDe(usuarioId) {
         liberaEm: pode.liberaEm || null,
         // me atacou nas últimas 48 h: dá para revidar (a conta das 48 h é de cada lado)
         revanche: recentes.meAtacaram.has(r.usuario_id),
-        aliado: Boolean(minha && outroDa(minha, usuarioId) === r.usuario_id),
-        podeConvidar: convite.ok,
-        motivoDoConvite: convite.ok ? "" : convite.motivo,
       };
     }),
   };
@@ -530,35 +565,24 @@ export async function invadir(usuarioId, defensorId) {
   const eu = await obterReino(usuarioId);
   const { data: alvo, error } = await supabase.from("proof_reinos").select(CAMPOS).eq("usuario_id", defensorId).maybeSingle();
   falhou(error, "reino do alvo");
-  const [hoje, saldoDoAlvo, recentes, vigentes] = await Promise.all([
-    invasoesDeHoje(usuarioId), alvo ? saldoDoUsuario(defensorId) : 0, invasoesRecentes(usuarioId), aliancasVigentes([usuarioId, defensorId]),
+  const [hoje, saldoDoAlvo, recentes, { paz }] = await Promise.all([
+    invasoesDeHoje(usuarioId), alvo ? saldoDoUsuario(defensorId) : 0, invasoesRecentes(usuarioId), pazDeAgora(),
   ]);
-  const minha = vigentes.get(usuarioId) || null;
-  const dele = vigentes.get(defensorId) || null;
 
   const pode = podeInvadir({
     atacanteId: usuarioId, atacante: eu, defensor: alvo, ataquesHoje: hoje.length,
     jaAtacouHoje: hoje.some((i) => i.defensor_id === defensorId),
     ultimoAtaqueAoAlvo: recentes.ataquei.get(defensorId) || null,
-    aliados: Boolean(minha && outroDa(minha, usuarioId) === defensorId),
+    emPaz: pazVigente(paz),
   });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
 
-  // a ajuda dos aliados: o meu manda reforço de ataque; o do defensor, reforço de defesa
-  const lerReino = async (id) => (id ? (await supabase.from("proof_reinos").select(CAMPOS).eq("usuario_id", id).maybeSingle()).data : null);
-  const [meuAliado, aliadoDele] = await Promise.all([lerReino(minha && outroDa(minha, usuarioId)), lerReino(dele && outroDa(dele, defensorId))]);
-  const reforcoAtaque = meuAliado ? reforcoDeAtaque(meuAliado) : {};
-  const reforcoDefesa = aliadoDele ? reforcoDeDefesa(aliadoDele) : {};
-
   const exercitoUsado = contagens(eu.exercito);
-  const exercitoNaBatalha = juntarComReforco(exercitoUsado, reforcoAtaque);
-  const guarnicaoNaBatalha = juntarComReforco(alvo.guarnicao, reforcoDefesa);
-  const r = batalha({ atacante: { exercito: exercitoNaBatalha, neuro_nivel: eu.neuro_nivel }, defensor: { ...alvo, guarnicao: guarnicaoNaBatalha }, saldoDoDefensor: saldoDoAlvo, semente: semente() });
-  r.entrada.reforcos = { ataque: reforcoAtaque, defesa: reforcoDefesa }; // só para a tela: o motor não lê
-  const forca = { ataque: poderDo({ ...eu, exercito: exercitoNaBatalha }).ataque, defesa: poderDo({ ...alvo, guarnicao: guarnicaoNaBatalha }).defesa };
-  // só quem cai se perde — e das tropas que caíram, só a parte de cada um (o reforço não custa nada)
-  const minhasPerdas = perdasProprias(exercitoUsado, reforcoAtaque, caidasNoAtaque(exercitoNaBatalha, r.sobreviventes));
-  const perdasDaGuarnicao = perdasProprias(alvo.guarnicao, reforcoDefesa, r.perdasDaGuarnicao);
+  const r = batalha({ atacante: { exercito: exercitoUsado, neuro_nivel: eu.neuro_nivel }, defensor: alvo, saldoDoDefensor: saldoDoAlvo, semente: semente() });
+  const forca = { ataque: poderDo({ ...eu, exercito: exercitoUsado }).ataque, defesa: poderDo(alvo).defesa };
+  // só quem cai se perde: as tropas que sobreviveram voltam para casa
+  const minhasPerdas = caidasNoAtaque(exercitoUsado, r.sobreviventes);
+  const perdasDaGuarnicao = r.perdasDaGuarnicao;
 
   // 1. a invasão em si — os índices únicos barram a 4ª do dia e a 2ª no mesmo alvo
   const ins = await supabase.from("proof_invasoes").insert({
@@ -603,7 +627,6 @@ export async function invadir(usuarioId, defensorId) {
     venceu: r.venceu, estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque,
     trofeus: r.trofeusAtacante, protegido: r.protegido, destruidos: r.destruidos,
     combate: r.entrada, perdas: minhasPerdas, voltaram: somarTropas(exercitoUsado, minhasPerdas, -1),
-    reforcos: { ataque: reforcoAtaque, defesa: reforcoDefesa },
     alvo: { dono: nomes.get(defensorId) || "Estudante anônimo", reino: alvo.nome },
   };
 }
@@ -689,9 +712,22 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
     throw e;
   }
 
+  // na paz, a expedição reparte: cada um dos outros reinos ganha uma parte do saque (moeda nova)
+  let repartido = 0;
+  const parte = parteDaExpedicao(r.saque);
+  if (parte > 0 && pazVigente((await pazDeAgora()).paz)) {
+    const { data: outros } = await supabase.from("proof_reinos").select("usuario_id").neq("usuario_id", usuarioId);
+    if (outros?.length) {
+      const { error } = await supabase.from("proof_reino_movimentos").insert(outros.map((o) => ({
+        usuario_id: o.usuario_id, tipo: "paz_expedicao", valor: parte, detalhe: { expedicao: expedicao.id, registro: ins.data.id, de: usuarioId },
+      })));
+      if (!error) repartido = parte;
+    }
+  }
+
   return {
     venceu: r.venceu, estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque,
-    caidas: r.caidas, combate: r.entrada, emprestado: tropa.emprestado,
+    caidas: r.caidas, combate: r.entrada, emprestado: tropa.emprestado, repartido,
     expedicao: { id: expedicao.id, nome: expedicao.nome, tipo: expedicao.tipo, chefe: expedicao.chefe, dificuldade: expedicao.dificuldade },
   };
 }

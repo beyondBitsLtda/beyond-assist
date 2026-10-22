@@ -16,7 +16,7 @@ import { TROPAS, ORDEM_DAS_TROPAS, totalDeTropas } from "@/dominio/tropas.js";
 import { EXPEDICOES_POR_DIA, BONUS_DE_TRES_ESTRELAS } from "@/dominio/monstros.js";
 import { HORAS_ENTRE_ATAQUES_AO_MESMO_REINO } from "@/dominio/reino.js";
 import { urlDoMonstro } from "@/componentes/reino/monstrosDePapel.js";
-import { termosDaAlianca, DIAS_DE_PAZ } from "@/dominio/alianca.js";
+import { termosDaPaz, DIAS_DE_PAZ, OFENSIVA_PARA_VOTAR } from "@/dominio/paz.js";
 import Folha from "@/componentes/Folha.js";
 
 // O mundo 3D (Three.js) só baixa nesta tela, e só no navegador.
@@ -42,7 +42,7 @@ export default function Reino() {
   const [resultado, setResultado] = useState(null);
   const [simulando, setSimulando] = useState(false);
   const [mapa, setMapa] = useState(null);
-  const [convidando, setConvidando] = useState(null); // o reino que vai receber o convite de aliança
+  const [propondo, setPropondo] = useState(false); // a folha da proposta de paz
   const [resultadoExp, setResultadoExp] = useState(null);
   const [Aviso, avisar] = useAviso();
 
@@ -58,7 +58,7 @@ export default function Reino() {
   // chegou pelo atalho das novidades (/reino#expedicoes): a seção só existe depois que tudo carrega
   const pronto = Boolean(reino && mapa);
   useEffect(() => {
-    const alvo = ["#expedicoes", "#alianca"].includes(window.location.hash) ? window.location.hash.slice(1) : null;
+    const alvo = ["#expedicoes", "#paz"].includes(window.location.hash) ? window.location.hash.slice(1) : null;
     if (pronto && alvo) document.getElementById(alvo)?.scrollIntoView({ block: "start" });
   }, [pronto]);
 
@@ -121,11 +121,11 @@ export default function Reino() {
     }
   }
 
-  /** Aliança: convidar, aceitar, recusar ou cancelar — o servidor devolve o reino atualizado. */
-  async function agirAlianca(corpo, aoTerminar) {
-    setOcupado(`alianca:${corpo.acao}:${corpo.id || corpo.alvo || ""}`);
+  /** Paz: propor, votar ou cancelar — o servidor devolve o reino atualizado. */
+  async function agirPaz(corpo, aoTerminar) {
+    setOcupado(`paz:${corpo.acao}`);
     try {
-      const r = await criar("/api/reino/alianca", corpo);
+      const r = await criar("/api/reino/paz", corpo);
       setReino(r.reino);
       carregarAlvos();
       aoTerminar?.(r);
@@ -202,6 +202,7 @@ export default function Reino() {
           {disponiveis == null ? "procurando reinos…"
             : disponiveis > 0 ? `${disponiveis} reino(s) para invadir agora`
             : alvos.alvos.length === 0 ? "ainda não há outros reinos"
+            : alvos.emPaz ? "🕊️ o mundo está em paz"
             : `todos estão com escudo${escudoMaisCurto ? ` · o primeiro abre ${hora(escudoMaisCurto)}` : ""}`}
         </span>
         <button type="button" className="pf-botao pf-botao--sec" onClick={() => document.getElementById("expedicoes")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
@@ -221,8 +222,8 @@ export default function Reino() {
         <Numero rotulo="Escudo" valor={reino.escudoAte ? "🛡️ Ativo" : "Sem escudo"} nota={reino.escudoAte ? `até ${hora(reino.escudoAte)} · atacar tira o escudo` : "o seu reino pode ser invadido"} />
       </div>
 
-      {/* ------------------------------------------------------------ aliança */}
-      <Alianca reino={reino} ocupado={ocupado} aoAgir={agirAlianca} />
+      {/* ------------------------------------------------------------ a paz entre os reinos */}
+      <Paz reino={reino} ocupado={ocupado} aoAgir={agirPaz} aoPropor={() => setPropondo(true)} />
 
       {/* ------------------------------------------------------------ Neuro e mina */}
       <div className="pf-grade pf-grade--2 pf-secao">
@@ -236,7 +237,7 @@ export default function Reino() {
           </Botao>
         </section>
         <section className="pf-cartao">
-          <div className="pf-estat__rotulo">⛏️ Mina de Moedas {reino.mina.dobrada && <span className="pf-pilula pf-pilula--verde rn-mina-x2">×2 aliança</span>}</div>
+          <div className="pf-estat__rotulo">⛏️ Mina de Moedas {reino.paz?.vigente && <span className="pf-pilula pf-pilula--verde rn-mina-x2">×{reino.paz.vigente.fatorDaMina} paz</span>}</div>
           <div className="pf-estat__valor"><Moedas n={reino.mina.paraColetar} /> <small>de {reino.mina.capacidade}</small></div>
           <p className="pf-estat__nota">Produz {reino.mina.porHora} moeda(s) por hora e para quando enche ({HORAS_ATE_ENCHER} h). Colete sempre que passar por aqui.</p>
           <Botao ok={reino.mina.paraColetar > 0} motivo="nada para coletar ainda" ocupado={ocupado === "coletar"}
@@ -300,8 +301,9 @@ export default function Reino() {
       {/* ------------------------------------------------------------ invasões */}
       <section className="pf-secao" id="invadir">
         <h2 className="pf-secao__titulo">Invadir outros reinos <small>{restantes > 0 ? `${restantes} de ${reino.invasoes.porDia} invasões hoje` : "as invasões de hoje acabaram"} · o mesmo reino só a cada 2 dias</small></h2>
+        {alvos?.emPaz && <div className="pf-aviso rn-paz__aviso" style={{ marginBottom: 12 }}>🕊️ O mundo está em paz até {hora(alvos.pazAte)}: nenhum reino pode invadir outro.</div>}
         {resultado && <ResultadoDaBatalha r={resultado} aoFechar={() => setResultado(null)} />}
-        {alvos && alvos.alvos.length > 0 && disponiveis === 0 && (
+        {alvos && alvos.alvos.length > 0 && disponiveis === 0 && !alvos.emPaz && (
           <div className="pf-aviso" style={{ marginBottom: 12 }}>
             Todos os reinos estão protegidos por escudo agora{escudoMaisCurto ? ` — o primeiro escudo acaba ${hora(escudoMaisCurto)}` : ""}.
             Reino novo nasce com {ESCUDO_DE_NOVATO_HORAS} h de escudo e quem cai ganha {ESCUDO_APOS_DERROTA_HORAS} h.
@@ -323,21 +325,16 @@ export default function Reino() {
                     <th scope="row">
                       {a.reino}
                       {a.revanche && <span className="pf-pilula pf-pilula--alerta rn-revanche" title="Esse reino atacou você nos últimos 2 dias">↩️ revanche</span>}
-                      {a.aliado && <span className="pf-pilula pf-pilula--verde rn-revanche">🤝 aliado</span>}
                       <span className="rk-sub">{a.dono} · 🏆 {numero(a.trofeus)}</span>
                     </th>
                     <td className="rn-col-info">{a.torre} · {a.neuro}</td>
                     <td><span className={`pf-pilula rn-faixa rn-faixa--${a.defesa.replace("í", "i").replace("é", "e")}`}>{a.defesa}</span></td>
                     <td className="rn-col-acao">
-                      {a.podeConvidar && (
-                        <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno rn-convidar" disabled={Boolean(ocupado)}
-                          onClick={() => setConvidando(a)} title="Propor aliança" aria-label={`Propor aliança a ${a.reino}`}>🤝</button>
-                      )}
                       {a.pode ? (
                         <button type="button" className="pf-botao pf-botao--pequeno" disabled={Boolean(ocupado)} onClick={() => invadirReino(a)}>
                           {ocupado === `invadir:${a.id}` ? "Atacando…" : "⚔️ Invadir"}
                         </button>
-                      ) : <span className="rn-motivo">{a.aliado ? "🕊️ em paz" : a.escudoAte ? `🛡️ escudo até ${hora(a.escudoAte)}` : a.motivo}</span>}
+                      ) : <span className="rn-motivo">{alvos.emPaz ? "🕊️ em paz" : a.escudoAte ? `🛡️ escudo até ${hora(a.escudoAte)}` : a.motivo}</span>}
                     </td>
                   </tr>
                 ))}
@@ -374,8 +371,12 @@ export default function Reino() {
       </section>
 
       <Regras />
-      <ConviteDeAlianca alvo={convidando} ocupado={ocupado} aoFechar={() => setConvidando(null)}
-        aoEnviar={(dias) => agirAlianca({ acao: "convidar", alvo: convidando.id, dias }, () => { setConvidando(null); reagir("feliz", "Convite de aliança enviado! 📜", 4000); })} />
+      <PropostaDePaz aberta={propondo} totalDeReinos={reino.paz?.totalDeReinos || 1} ocupado={ocupado} aoFechar={() => setPropondo(false)}
+        aoEnviar={(dias) => agirPaz({ acao: "propor", dias }, (r) => {
+          setPropondo(false);
+          if (r.resultado?.resultado === "aprovada") comemorar("A paz foi aprovada! 🕊️");
+          else reagir("feliz", "Proposta de paz levada para votação! 🗳️", 4000);
+        })} />
       {Aviso}
     </>
   );
@@ -400,7 +401,7 @@ function VistaDoReino({ reino }) {
   if (plana) return <VistaPlana reino={reino} humor={humor} />;
   return (
     <section aria-label="Vista do reino">
-      <Mundo3D construcoes={reino.construcoes} tropas={{ exercito: reino.exercito.tropas, guarnicao: reino.guarnicao.tropas }} vizinho={reino.alianca?.vizinho || null} humor={humor} aoEscolher={irParaConstrucao} aoFalhar={() => setPlana(true)} />
+      <Mundo3D construcoes={reino.construcoes} tropas={{ exercito: reino.exercito.tropas, guarnicao: reino.guarnicao.tropas }} vizinhos={reino.paz?.vigente?.vizinhos || []} humor={humor} aoEscolher={irParaConstrucao} aoFalhar={() => setPlana(true)} />
     </section>
   );
 }
@@ -746,7 +747,7 @@ function Predio({ c, grande = false }) {
   );
 }
 
-/** Os termos da aliança, do jeito que aparecem no convite. */
+/** Os termos (da paz), do jeito que aparecem na proposta. */
 function Termos({ termos }) {
   return (
     <ul className="rn-termos">
@@ -760,95 +761,95 @@ function Termos({ termos }) {
   );
 }
 
-/** A aliança: convites recebidos (com todos os termos), o aliado de agora e os convites enviados. */
-function Alianca({ reino, ocupado, aoAgir }) {
-  const [vendo, setVendo] = useState(false);
-  const { alianca, convites } = reino;
-  const recebidos = convites?.recebidos || [], enviados = convites?.enviados || [];
-  if (!alianca && !recebidos.length && !enviados.length) {
-    return (
-      <section className="pf-secao" id="alianca">
-        <h2 className="pf-secao__titulo">🤝 Aliança <small>nenhuma por enquanto</small></h2>
-        <div className="pf-cartao">
-          <p className="pf-estat__nota" style={{ marginTop: 0 }}>
-            Convide um reino pela lista de invasões (botão 🤝): aliados ficam em paz, a mina rende em dobro, um ajuda o outro nas
-            invasões, cada um vê o reino do outro e as ilhas viram vizinhas.
-          </p>
-        </div>
-      </section>
-    );
-  }
+/** A paz entre os reinos: a paz que vale agora, a votação aberta (com o placar e o voto) ou o convite para propor. */
+function Paz({ reino, ocupado, aoAgir, aoPropor }) {
+  const paz = reino.paz || {};
+  const v = paz.vigente, vt = paz.votacao;
   return (
-    <section className="pf-secao" id="alianca">
-      <h2 className="pf-secao__titulo">🤝 Aliança {alianca && <small>em paz até {hora(alianca.ate)}</small>}</h2>
-      {recebidos.map((c) => (
-        <article key={c.id} className="pf-cartao rn-convite" aria-label={`Convite de aliança de ${c.reino}`}>
-          <div className="rn-convite__topo">
-            <span className="rn-convite__selo">📜 Convite de aliança</span>
-            <span className="rn-motivo">responda até {hora(c.expira)}</span>
-          </div>
-          <h3 className="rn-convite__titulo"><strong>{c.reino}</strong> <small>({c.dono})</small> quer uma aliança com você</h3>
-          <Termos termos={c.termos} />
-          <div className="pf-acoes">
-            <button type="button" className="pf-botao" disabled={Boolean(ocupado)}
-              onClick={() => aoAgir({ acao: "aceitar", id: c.id }, () => comemorar(`Aliança com ${c.reino}! 🤝`))}>🤝 Aceitar a aliança</button>
-            <button type="button" className="pf-botao pf-botao--sec" disabled={Boolean(ocupado)}
-              onClick={() => aoAgir({ acao: "recusar", id: c.id }, () => reagir("normal", "Convite recusado.", 3000))}>Recusar</button>
-          </div>
-        </article>
-      ))}
-      {alianca && (
-        <article className="pf-cartao rn-aliado">
-          <span className="rn-convite__selo rn-convite__selo--aliado">🤝 Aliados</span>
-          <h3 className="rn-convite__titulo">{alianca.reino} <small>· {alianca.dono}</small></h3>
-          <p className="pf-estat__nota" style={{ margin: 0 }}>Paz de {alianca.dias} dias, até {hora(alianca.ate)}. A ilha de {alianca.dono.split(" ")[0]} está ao lado da sua, no mundo lá em cima.</p>
+    <section className="pf-secao" id="paz">
+      <h2 className="pf-secao__titulo">
+        🕊️ Paz entre os reinos{" "}
+        <small>{v ? `em paz até ${hora(v.ate)}` : vt ? `votação aberta até ${hora(vt.expira)}` : `${paz.totalDeReinos || 0} reinos · decidida por votação`}</small>
+      </h2>
+      {v && (
+        <article className="pf-cartao rn-paz rn-paz--vigente">
+          <span className="rn-convite__selo rn-convite__selo--paz">🕊️ O mundo está em paz</span>
+          <h3 className="rn-convite__titulo">{v.reinos} reinos em paz por {v.dias} dias, até {hora(v.ate)}</h3>
           <ul className="rn-aliado__beneficios">
-            <li>🕊️ <span>Paz: nenhum dos dois invade o outro</span></li>
-            <li>⛏️ <span>Sua mina rende em dobro: {reino.mina.porHora} moeda(s) por hora</span></li>
-            <li>🛡️ <span>Se você for invadido, chega reforço de defesa: {descreverTropas(alianca.reforcoDeDefesa)}</span></li>
-            <li>⚔️ <span>Quando você invadir, vai junto reforço de ataque: {descreverTropas(alianca.reforcoDeAtaque)}</span></li>
+            <li>⚔️ <span>Sem guerra: nenhum reino pode invadir outro</span></li>
+            <li>⛏️ <span>A sua mina rende ×{v.fatorDaMina}: {reino.mina.porHora} moeda(s) por hora</span></li>
+            <li>🗺️ <span>Expedições repartem: quando alguém saqueia, cada um dos outros reinos ganha {Math.round(v.parteDaExpedicao * 100)}% do saque</span></li>
+            <li>🏝️ <span>Todos vizinhos: {v.vizinhos.map((x) => x.nome).join(", ") || "—"}</span></li>
           </ul>
-          <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" aria-expanded={vendo} onClick={() => setVendo((v) => !v)}>
-            👀 {vendo ? "Esconder" : "Ver"} o reino de {alianca.dono}
-          </button>
-          {vendo && <ReinoDoAliado v={alianca.vizinho} />}
         </article>
       )}
-      {enviados.map((c) => (
-        <div key={c.id} className="pf-cartao rn-convite rn-convite--enviado">
-          <span>📨 Convite enviado para <strong>{c.reino}</strong> ({c.dono}) · {c.dias} dias de paz · esperando resposta até {hora(c.expira)}</span>
-          <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" disabled={Boolean(ocupado)}
-            onClick={() => aoAgir({ acao: "cancelar", id: c.id }, () => reagir("normal", "Convite cancelado.", 3000))}>Cancelar</button>
+      {vt && (
+        <article className="pf-cartao rn-convite rn-paz" aria-label="Proposta de paz em votação">
+          <div className="rn-convite__topo">
+            <span className="rn-convite__selo">🗳️ Proposta de paz</span>
+            <span className="rn-motivo">vota até {hora(vt.expira)}</span>
+          </div>
+          <h3 className="rn-convite__titulo"><strong>{vt.propostaPor}</strong> propõe {vt.dias} dias de paz para todos os reinos</h3>
+          <div className="rn-paz__placar">
+            <Barra valor={vt.sims} total={Math.max(1, vt.eleitores)} rotulo="Votos a favor da paz" />
+            <span><strong>{vt.sims} de {vt.eleitores}</strong> {vt.eleitores === 1 ? "eleitor votou" : "eleitores votaram"} sim — a paz precisa de todos{vt.votaram.length ? ` · já votaram: ${vt.votaram.join(", ")}` : ""}</span>
+            <span className="rn-motivo">
+              🔥 Votam os reinos com {paz.ofensivaParaVotar}+ dias de ofensiva de estudo.
+              {vt.semVoto > 0 && ` ${vt.semVoto} ${vt.semVoto === 1 ? "reino ainda não pode votar e ganha" : "reinos ainda não podem votar e ganham"} a paz do mesmo jeito.`}
+            </span>
+          </div>
+          <Termos termos={vt.termos} />
+          {vt.meuVoto === null && vt.podeVotar ? (
+            <div className="pf-acoes">
+              <button type="button" className="pf-botao" disabled={Boolean(ocupado)}
+                onClick={() => aoAgir({ acao: "votar", id: vt.id, voto: true }, (r) => (r.resultado?.resultado === "aprovada" ? comemorar("Todos votaram: a paz começou! 🕊️") : reagir("feliz", "Voto registrado. Faltam os outros eleitores 🕊️", 4000)))}>
+                🕊️ Votar SIM pela paz
+              </button>
+              <button type="button" className="pf-botao pf-botao--sec" disabled={Boolean(ocupado)}
+                onClick={() => aoAgir({ acao: "votar", id: vt.id, voto: false }, () => reagir("normal", "Voto registrado: não. A proposta caiu.", 4000))}>
+                Votar NÃO
+              </button>
+            </div>
+          ) : vt.meuVoto === null ? (
+            <div className="rn-paz__sem-voto">
+              <p>🔥 Você ainda não pode votar: {vt.motivoDoVoto.replace(/^para votar, /, "")}.</p>
+              <Link href="/" className="pf-botao pf-botao--sec pf-botao--pequeno">Estudar agora</Link>
+            </div>
+          ) : (
+            <p className="rn-paz__meu-voto">{vt.meuVoto ? "✅ Você votou sim. Falta o voto dos outros eleitores." : "Você votou não."}</p>
+          )}
+          {vt.souQuemPropos && (
+            <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" disabled={Boolean(ocupado)}
+              onClick={() => aoAgir({ acao: "cancelar", id: vt.id }, () => reagir("normal", "Proposta de paz cancelada.", 3000))}>Cancelar a proposta</button>
+          )}
+        </article>
+      )}
+      {!v && !vt && (
+        <div className="pf-cartao rn-paz rn-paz--vazia">
+          <p className="pf-estat__nota" style={{ marginTop: 0 }}>
+            Cansado da guerra? Proponha a paz: votam os reinos com <strong>{paz.ofensivaParaVotar}+ dias de ofensiva de estudo</strong> e, se todos eles votarem sim,
+            ninguém invade ninguém, todos viram vizinhos, a mina de cada um rende ×{paz.totalDeReinos || 1} e as expedições repartem o saque —
+            para os {paz.totalDeReinos || 0} reinos, inclusive quem não votou.
+          </p>
+          <div className="rn-paz__propor">
+            <button type="button" className="pf-botao" disabled={Boolean(ocupado) || !paz.podePropor} onClick={aoPropor}>🕊️ Propor a paz</button>
+            {!paz.podePropor && paz.motivo && <span className="rn-motivo">🔥 {paz.motivo}</span>}
+          </div>
         </div>
-      ))}
+      )}
     </section>
   );
 }
 
-/** "Ver o reino do outro": construções, tropas, Neuro e troféus do aliado. */
-function ReinoDoAliado({ v }) {
-  if (!v) return null;
-  const algum = (t) => Object.values(t || {}).some((n) => n > 0);
-  return (
-    <div className="rn-aliado__reino">
-      <p className="pf-estat__nota" style={{ margin: 0 }}>🏆 {numero(v.trofeus)} troféus · 🧠 Neuro nível {v.neuro}</p>
-      <div className="rn-aliado__predios">
-        {v.lista.map((c) => <span key={c.chave} className="pf-pilula"><span aria-hidden="true">{c.emoji}</span> {c.nome} · nv {c.nivel}</span>)}
-      </div>
-      <p className="pf-estat__nota" style={{ margin: 0 }}>Exército: {algum(v.exercito) ? descreverTropas(v.exercito) : "nenhuma tropa"} · Defesa: {algum(v.guarnicao) ? descreverTropas(v.guarnicao) : "nenhuma tropa"}</p>
-    </div>
-  );
-}
-
-/** O convite de aliança: quem convida escolhe os dias de paz e vê todos os termos antes de enviar. */
-function ConviteDeAlianca({ alvo, ocupado, aoFechar, aoEnviar }) {
+/** A proposta de paz: quem propõe escolhe os dias e vê o que a paz traz antes de levar para votação. */
+function PropostaDePaz({ aberta, totalDeReinos, ocupado, aoFechar, aoEnviar }) {
   const [dias, setDias] = useState(7);
   return (
-    <Folha aberta={Boolean(alvo)} aoFechar={aoFechar} titulo="Convite de aliança">
-      {alvo && (
+    <Folha aberta={aberta} aoFechar={aoFechar} titulo="Propor a paz">
+      {aberta && (
         <div className="rn-convite-novo">
-          <span className="rn-convite__selo">📜 Convite de aliança</span>
-          <h2 className="rn-convite__titulo">Aliança com <strong>{alvo.reino}</strong> <small>({alvo.dono})</small></h2>
+          <span className="rn-convite__selo">🗳️ Proposta de paz</span>
+          <h2 className="rn-convite__titulo">Paz para todos os reinos</h2>
           <p className="pf-campo__rotulo" style={{ marginBottom: 6 }}>Quantos dias de paz?</p>
           <div className="rn-dias" role="radiogroup" aria-label="Dias de paz">
             {DIAS_DE_PAZ.map((d) => (
@@ -857,15 +858,15 @@ function ConviteDeAlianca({ alvo, ocupado, aoFechar, aoEnviar }) {
               </button>
             ))}
           </div>
-          <p className="pf-campo__rotulo" style={{ margin: "12px 0 6px" }}>O que o convite promete (se {alvo.dono.split(" ")[0]} aceitar)</p>
-          <Termos termos={termosDaAlianca(dias)} />
+          <p className="pf-campo__rotulo" style={{ margin: "12px 0 6px" }}>O que a paz traz (se todos os eleitores votarem sim)</p>
+          <Termos termos={termosDaPaz(dias, totalDeReinos)} />
           <div className="pf-acoes">
             <button type="button" className="pf-botao" disabled={Boolean(ocupado)} onClick={() => aoEnviar(dias)}>
-              {ocupado.startsWith("alianca:convidar") ? "Enviando…" : "📜 Enviar convite"}
+              {ocupado.startsWith("paz:propor") ? "Enviando…" : "🗳️ Levar para votação"}
             </button>
             <button type="button" className="pf-botao pf-botao--sec" onClick={aoFechar}>Agora não</button>
           </div>
-          <p className="rn-motivo">O convite espera 3 dias pela resposta. Uma aliança por vez.</p>
+          <p className="rn-motivo">O seu voto já conta como sim. Votam os reinos com {OFENSIVA_PARA_VOTAR}+ dias de ofensiva de estudo; a votação fica aberta 3 dias e um único não derruba a proposta.</p>
         </div>
       )}
     </Folha>
@@ -965,6 +966,7 @@ function ResultadoDaExpedicao({ r, aoFechar }) {
       <p>
         {r.destruicao}% destruído. {r.saque ? `Você saqueou 🪙 ${numero(r.saque)} moedas.` : "Nada de saque desta vez."}{" "}
         {r.emprestado ? "A Tropa da Expedição voltou inteira para o próximo desafio" : "Todas as tropas voltaram para casa"}: expedição não gasta tropa nem moeda.
+        {r.repartido ? ` 🕊️ Como o mundo está em paz, cada um dos outros reinos também ganhou 🪙 ${numero(r.repartido)}.` : ""}
       </p>
       <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={aoFechar}>Ok</button>
     </div>
@@ -982,7 +984,6 @@ function ResultadoDaBatalha({ r, aoFechar }) {
           : `Você perdeu ${Math.abs(r.trofeus)} troféus. Treine um exército maior (Gigantes seguram as defesas) e tente de novo.`}
         {" "}{r.voltaram && Object.keys(r.voltaram).length ? `Voltaram para casa: ${descreverTropas(r.voltaram)}.` : "Nenhuma tropa sua voltou."}
         {r.perdas && Object.keys(r.perdas).length ? ` Caíram (treine de novo): ${descreverTropas(r.perdas)}.` : ""}
-        {r.reforcos?.ataque && Object.keys(r.reforcos.ataque).length ? ` 🤝 O seu aliado mandou reforço: ${descreverTropas(r.reforcos.ataque)}.` : ""}
       </p>
       <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={aoFechar}>Ok</button>
     </div>
@@ -1026,8 +1027,8 @@ function Regras() {
           <p>Vilas, florestas, bosques e acampamentos de monstros, contra a CPU — ninguém perde moedas nem troféus. <strong>É de graça:</strong> todas as tropas voltam para casa, então não há nada para treinar de novo. Os lugares liberam com a Torre do Neuro; cada um tem a sua dificuldade (de 💀 Fácil a 💀💀💀💀💀 Lendário), a sua recompensa e o seu cenário. O saque é proporcional à destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%). São {EXPEDICOES_POR_DIA} expedições por dia, em qualquer lugar — pode repetir o mesmo.</p>
         </details>
         <details>
-          <summary>🤝 Alianças</summary>
-          <p>Convide um reino pela lista de invasões (botão 🤝) e escolha os dias de paz ({DIAS_DE_PAZ.join(", ")}). Se ele aceitar, enquanto a aliança vale: ninguém invade ninguém, a mina dos dois rende em dobro, quem for invadido recebe reforço de defesa do aliado e quem invadir leva reforço de ataque (sem custo para quem manda), cada um vê o reino do outro e as ilhas ficam vizinhas. Uma aliança por vez; o convite espera 3 dias pela resposta.</p>
+          <summary>🕊️ Paz entre os reinos</summary>
+          <p>Qualquer jogador pode propor a paz e escolher quantos dias ela dura ({DIAS_DE_PAZ.join(", ")}). Votam (e propõem) os reinos com {OFENSIVA_PARA_VOTAR}+ dias seguidos de ofensiva de estudo, conferidos na hora do voto; o voto de quem propôs já conta como sim. A paz só começa com 100% dos eleitores a favor — um único não derruba a proposta — e a votação fica aberta 3 dias. A paz vale para todos os reinos, inclusive os que não votaram. Durante a paz: nenhum reino invade outro, todos viram vizinhos no mundo 3D, a mina de cada reino rende vezes o número de reinos e, quando alguém saqueia uma expedição, cada um dos outros reinos ganha 20% do saque.</p>
         </details>
         <details>
           <summary>🛡️ Escudos</summary>
