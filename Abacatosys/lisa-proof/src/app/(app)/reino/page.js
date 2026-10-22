@@ -16,7 +16,7 @@ import { TROPAS, ORDEM_DAS_TROPAS, totalDeTropas } from "@/dominio/tropas.js";
 import { EXPEDICOES_POR_DIA, BONUS_DE_TRES_ESTRELAS } from "@/dominio/monstros.js";
 import { HORAS_ENTRE_ATAQUES_AO_MESMO_REINO } from "@/dominio/reino.js";
 import { urlDoMonstro } from "@/componentes/reino/monstrosDePapel.js";
-import { termosDaPaz, DIAS_DE_PAZ } from "@/dominio/paz.js";
+import { termosDaPaz, DIAS_DE_PAZ, OFENSIVA_PARA_VOTAR } from "@/dominio/paz.js";
 import Folha from "@/componentes/Folha.js";
 
 // O mundo 3D (Three.js) só baixa nesta tela, e só no navegador.
@@ -791,14 +791,18 @@ function Paz({ reino, ocupado, aoAgir, aoPropor }) {
           </div>
           <h3 className="rn-convite__titulo"><strong>{vt.propostaPor}</strong> propõe {vt.dias} dias de paz para todos os reinos</h3>
           <div className="rn-paz__placar">
-            <Barra valor={vt.sims} total={Math.max(1, vt.totalDeReinos)} rotulo="Votos a favor da paz" />
-            <span><strong>{vt.sims} de {vt.totalDeReinos}</strong> reinos votaram sim — a paz precisa de todos{vt.votaram.length ? ` · já votaram: ${vt.votaram.join(", ")}` : ""}</span>
+            <Barra valor={vt.sims} total={Math.max(1, vt.eleitores)} rotulo="Votos a favor da paz" />
+            <span><strong>{vt.sims} de {vt.eleitores}</strong> {vt.eleitores === 1 ? "eleitor votou" : "eleitores votaram"} sim — a paz precisa de todos{vt.votaram.length ? ` · já votaram: ${vt.votaram.join(", ")}` : ""}</span>
+            <span className="rn-motivo">
+              🔥 Votam os reinos com {paz.ofensivaParaVotar}+ dias de ofensiva de estudo.
+              {vt.semVoto > 0 && ` ${vt.semVoto} ${vt.semVoto === 1 ? "reino ainda não pode votar e ganha" : "reinos ainda não podem votar e ganham"} a paz do mesmo jeito.`}
+            </span>
           </div>
           <Termos termos={vt.termos} />
-          {vt.meuVoto === null ? (
+          {vt.meuVoto === null && vt.podeVotar ? (
             <div className="pf-acoes">
               <button type="button" className="pf-botao" disabled={Boolean(ocupado)}
-                onClick={() => aoAgir({ acao: "votar", id: vt.id, voto: true }, (r) => (r.resultado?.resultado === "aprovada" ? comemorar("Todos votaram: a paz começou! 🕊️") : reagir("feliz", "Voto registrado. Faltam os outros reinos 🕊️", 4000)))}>
+                onClick={() => aoAgir({ acao: "votar", id: vt.id, voto: true }, (r) => (r.resultado?.resultado === "aprovada" ? comemorar("Todos votaram: a paz começou! 🕊️") : reagir("feliz", "Voto registrado. Faltam os outros eleitores 🕊️", 4000)))}>
                 🕊️ Votar SIM pela paz
               </button>
               <button type="button" className="pf-botao pf-botao--sec" disabled={Boolean(ocupado)}
@@ -806,8 +810,13 @@ function Paz({ reino, ocupado, aoAgir, aoPropor }) {
                 Votar NÃO
               </button>
             </div>
+          ) : vt.meuVoto === null ? (
+            <div className="rn-paz__sem-voto">
+              <p>🔥 Você ainda não pode votar: {vt.motivoDoVoto.replace(/^para votar, /, "")}.</p>
+              <Link href="/" className="pf-botao pf-botao--sec pf-botao--pequeno">Estudar agora</Link>
+            </div>
           ) : (
-            <p className="rn-paz__meu-voto">{vt.meuVoto ? "✅ Você votou sim. Falta o voto dos outros reinos." : "Você votou não."}</p>
+            <p className="rn-paz__meu-voto">{vt.meuVoto ? "✅ Você votou sim. Falta o voto dos outros eleitores." : "Você votou não."}</p>
           )}
           {vt.souQuemPropos && (
             <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" disabled={Boolean(ocupado)}
@@ -818,10 +827,14 @@ function Paz({ reino, ocupado, aoAgir, aoPropor }) {
       {!v && !vt && (
         <div className="pf-cartao rn-paz rn-paz--vazia">
           <p className="pf-estat__nota" style={{ marginTop: 0 }}>
-            Cansado da guerra? Proponha a paz: se <strong>todos os {paz.totalDeReinos || 0} reinos</strong> votarem sim, ninguém invade ninguém,
-            todos viram vizinhos, a mina de cada um rende ×{paz.totalDeReinos || 1} e as expedições repartem o saque.
+            Cansado da guerra? Proponha a paz: votam os reinos com <strong>{paz.ofensivaParaVotar}+ dias de ofensiva de estudo</strong> e, se todos eles votarem sim,
+            ninguém invade ninguém, todos viram vizinhos, a mina de cada um rende ×{paz.totalDeReinos || 1} e as expedições repartem o saque —
+            para os {paz.totalDeReinos || 0} reinos, inclusive quem não votou.
           </p>
-          <button type="button" className="pf-botao" disabled={Boolean(ocupado) || !paz.podePropor} onClick={aoPropor}>🕊️ Propor a paz</button>
+          <div className="rn-paz__propor">
+            <button type="button" className="pf-botao" disabled={Boolean(ocupado) || !paz.podePropor} onClick={aoPropor}>🕊️ Propor a paz</button>
+            {!paz.podePropor && paz.motivo && <span className="rn-motivo">🔥 {paz.motivo}</span>}
+          </div>
         </div>
       )}
     </section>
@@ -845,7 +858,7 @@ function PropostaDePaz({ aberta, totalDeReinos, ocupado, aoFechar, aoEnviar }) {
               </button>
             ))}
           </div>
-          <p className="pf-campo__rotulo" style={{ margin: "12px 0 6px" }}>O que a paz traz (se todos votarem sim)</p>
+          <p className="pf-campo__rotulo" style={{ margin: "12px 0 6px" }}>O que a paz traz (se todos os eleitores votarem sim)</p>
           <Termos termos={termosDaPaz(dias, totalDeReinos)} />
           <div className="pf-acoes">
             <button type="button" className="pf-botao" disabled={Boolean(ocupado)} onClick={() => aoEnviar(dias)}>
@@ -853,7 +866,7 @@ function PropostaDePaz({ aberta, totalDeReinos, ocupado, aoFechar, aoEnviar }) {
             </button>
             <button type="button" className="pf-botao pf-botao--sec" onClick={aoFechar}>Agora não</button>
           </div>
-          <p className="rn-motivo">O seu voto já conta como sim. A votação fica aberta 3 dias; um único não derruba a proposta.</p>
+          <p className="rn-motivo">O seu voto já conta como sim. Votam os reinos com {OFENSIVA_PARA_VOTAR}+ dias de ofensiva de estudo; a votação fica aberta 3 dias e um único não derruba a proposta.</p>
         </div>
       )}
     </Folha>
@@ -1015,7 +1028,7 @@ function Regras() {
         </details>
         <details>
           <summary>🕊️ Paz entre os reinos</summary>
-          <p>Qualquer jogador pode propor a paz e escolher quantos dias ela dura ({DIAS_DE_PAZ.join(", ")}). Todos os reinos votam, e o voto de quem propôs já conta como sim. A paz só começa com 100% dos votos a favor — um único não derruba a proposta — e a votação fica aberta 3 dias. Durante a paz: nenhum reino invade outro, todos viram vizinhos no mundo 3D, a mina de cada reino rende vezes o número de reinos e, quando alguém saqueia uma expedição, cada um dos outros reinos ganha 20% do saque.</p>
+          <p>Qualquer jogador pode propor a paz e escolher quantos dias ela dura ({DIAS_DE_PAZ.join(", ")}). Votam (e propõem) os reinos com {OFENSIVA_PARA_VOTAR}+ dias seguidos de ofensiva de estudo, conferidos na hora do voto; o voto de quem propôs já conta como sim. A paz só começa com 100% dos eleitores a favor — um único não derruba a proposta — e a votação fica aberta 3 dias. A paz vale para todos os reinos, inclusive os que não votaram. Durante a paz: nenhum reino invade outro, todos viram vizinhos no mundo 3D, a mina de cada reino rende vezes o número de reinos e, quando alguém saqueia uma expedição, cada um dos outros reinos ganha 20% do saque.</p>
         </details>
         <details>
           <summary>🛡️ Escudos</summary>

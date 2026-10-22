@@ -13,7 +13,7 @@ create table if not exists public.proof_pazes (
   expira_em     timestamptz not null,           -- a votação fica aberta até aqui
   inicio        timestamptz,                    -- a paz aprovada vale de inicio a fim
   fim           timestamptz,
-  total_reinos  integer                         -- quantos reinos votaram sim (o fator da mina)
+  total_reinos  integer                         -- quantos reinos havia na aprovação (o fator da mina)
 );
 -- uma proposta em votação por vez (dois cliques não viram duas)
 create unique index if not exists proof_pazes_uma_votacao on public.proof_pazes ((true)) where status = 'votacao';

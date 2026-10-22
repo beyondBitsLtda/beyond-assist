@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.16.0-proof-paz.1",
+  "versao": "0.16.0-proof-paz.2",
   "atualizadoEm": "2026-10-22",
   "compilacao": {
-    "numero": 41,
+    "numero": 42,
     "data": "2026-10-22",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.16.0-proof-paz.2",
+      "data": "2026-10-22",
+      "branch": "proof-paz",
+      "tipo": "funcionalidade",
+      "resumo": "Só vota (e só propõe) a paz quem tem 3+ dias de ofensiva de estudo; a paz continua valendo para todos os reinos.",
+      "itens": [
+        "Votar e propor a paz exigem 3 ou mais dias seguidos de ofensiva de estudo, conferidos na hora do voto.",
+        "Os 100% contam só os eleitores: os reinos aptos agora mais quem já votou. Quem não pode votar ganha a paz do mesmo jeito (sem guerra, vizinhos, mina × o número de reinos e parte das expedições).",
+        "Se a ofensiva de alguém que ainda não votou acaba e todos os outros eleitores já disseram sim, a paz começa na próxima leitura do reino.",
+        "Tela: placar \"X de Y eleitores\", aviso de quantos reinos não podem votar, e para quem não pode votar ou propor, o motivo com a ofensiva atual e um atalho para estudar.",
+        "Regras, termos da proposta e modal de novidades atualizados."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.16.0-proof-paz.1",
       "data": "2026-10-22",
@@ -638,7 +653,7 @@
         "Expedições do Reino contra a CPU, de graça (nenhuma tropa se perde), 3 por dia, cada uma com dificuldade, recompensa e terreno 3D próprios, e monstros desenhados em 2D",
         "Guerra entre jogadores com o mesmo reino só a cada 48 h por quem ataca, revanche liberada para quem foi atacado, e só as tropas que caem se perdem",
         "Modal de novidades na entrada, uma vez por edição",
-        "Paz entre os reinos por votação (100% dos votos): sem guerra, todos vizinhos no 3D, mina × o número de reinos e expedições repartidas"
+        "Paz entre os reinos por votação (100% dos eleitores; vota quem tem 3+ dias de ofensiva de estudo, e a paz vale para todos): sem guerra, todos vizinhos no 3D, mina × o número de reinos e expedições repartidas"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",

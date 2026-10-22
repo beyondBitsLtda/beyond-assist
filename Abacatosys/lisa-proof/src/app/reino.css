@@ -441,3 +441,7 @@ button.rn-exp__arte:disabled { cursor: progress; }
 .rn-paz--vazia .pf-estat__nota { flex: 1 1 320px; margin: 0; }
 .rn-paz__placar { display: grid; gap: 6px; font-size: 14px; }
 .rn-paz__meu-voto { margin: 0; font-weight: 700; color: var(--pf-verde-forte); }
+.rn-paz__sem-voto { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px; background: var(--pf-fundo); }
+.rn-paz__sem-voto p { margin: 0; flex: 1 1 260px; font-size: 14px; }
+.rn-paz__propor { display: grid; justify-items: start; gap: 6px; }
+.rn-paz__propor .rn-motivo { max-width: 260px; }

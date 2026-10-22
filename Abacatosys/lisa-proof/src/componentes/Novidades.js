@@ -28,7 +28,7 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🕊️", titulo: "Paz por votação", texto: "Proponha a paz e todos os reinos votam. Com 100% de sim: ninguém invade ninguém, todos viram vizinhos, a mina rende × o número de reinos e as expedições repartem o saque.", destaque: true },
+  { icone: "🕊️", titulo: "Paz por votação", texto: "Proponha a paz: votam os reinos com 3+ dias de ofensiva de estudo. Com 100% de sim, a paz vale para todos — ninguém invade ninguém, todos viram vizinhos, a mina rende × o número de reinos e as expedições repartem o saque.", destaque: true },
   { icone: "🗺️", titulo: "Expedições contra monstros", texto: "Ataque vilas, florestas, bosques e acampamentos de monstros para saquear moedas — de graça, 3 vezes por dia. Cada lugar tem a sua dificuldade, a sua recompensa e o seu cenário." },
   { icone: "⚔️", titulo: "Guerra mais justa", texto: "As tropas que sobrevivem voltam para casa. O mesmo reino só a cada 2 dias — e quem foi atacado pode revidar na hora." },
   { icone: "💡", titulo: "Dicas da Lisa", texto: "Nos projetos da semana e do mês: um passo a passo para começar, sem entregar a resposta." },

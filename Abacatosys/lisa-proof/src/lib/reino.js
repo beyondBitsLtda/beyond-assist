@@ -13,7 +13,8 @@
 import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
 import { buscarTodas, buscarEmLotes } from "./estudo.js";
-import { diaDe } from "@/dominio/datas.js";
+import { diaDe, somarDias } from "@/dominio/datas.js";
+import { calcularOfensiva } from "@/dominio/ofensiva.js";
 import { nomePublico, textoPublicoValido } from "@/dominio/ranking.js";
 import {
   CONSTRUCOES, ORDEM_DAS_CONSTRUCOES, NIVEIS_INICIAIS, ATAQUES_POR_DIA, ESCUDO_DE_NOVATO_HORAS,
@@ -23,8 +24,8 @@ import {
   HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, exercitoDaExpedicao, caidasNoAtaque,
 } from "@/dominio/reino.js";
 import {
-  DIAS_DE_PAZ, PARTE_DA_EXPEDICAO, termosDaPaz, pazVigente, votacaoAberta, podeProporPaz, podeVotar, resultadoDaVotacao,
-  fimDaVotacao, periodoDaPaz, fatorDaMinaNaPaz, parteDaExpedicao,
+  DIAS_DE_PAZ, PARTE_DA_EXPEDICAO, OFENSIVA_PARA_VOTAR, termosDaPaz, pazVigente, votacaoAberta, podeProporPaz, podeVotar,
+  podeVotarComOfensiva, eleitoresDaVotacao, resultadoDaVotacao, fimDaVotacao, periodoDaPaz, fatorDaMinaNaPaz, parteDaExpedicao,
 } from "@/dominio/paz.js";
 import {
   EXPEDICOES, EXPEDICOES_POR_DIA, TIPOS_DE_LUGAR, MONSTROS, DIFICULDADES, expedicaoPorId, podeExpedicionar, contagensDeMonstros,
@@ -149,11 +150,46 @@ async function totalDeReinos() {
   return count || 0;
 }
 
+/**
+ * A ofensiva de agora de cada pessoa, para a regra do voto. Só olha os últimos dias que a regra
+ * precisa (OFENSIVA_PARA_VOTAR + ontem), então o número sai cortado ali — serve para "tem ou não
+ * tem", e para mostrar quanto falta a quem ainda não chegou lá.
+ */
+async function ofensivasDe(ids) {
+  const hoje = diaDe();
+  const desde = somarDias(hoje, -OFENSIVA_PARA_VOTAR);
+  const unicos = [...new Set(ids.filter(Boolean))];
+  const diasDe = new Map(unicos.map((id) => [id, []]));
+  for (let i = 0; i < unicos.length; i += 80) {
+    const lote = unicos.slice(i, i + 80);
+    const eventos = await buscarTodas(() =>
+      supabase.from("proof_eventos").select("usuario_id, dia").in("usuario_id", lote).gte("dia", desde).order("criado_em")
+    );
+    for (const e of eventos) diasDe.get(e.usuario_id)?.push(e.dia);
+  }
+  return new Map([...diasDe].map(([id, d]) => [id, calcularOfensiva(d, hoje).atual]));
+}
+
+/** O placar de uma votação: os votos, os reinos, quem pode votar agora (ofensiva em dia) e o resultado. */
+async function placarDa(votacao) {
+  const [votosR, reinos] = await Promise.all([
+    supabase.from("proof_paz_votos").select("usuario_id, voto").eq("paz_id", votacao.id),
+    buscarTodas(() => supabase.from("proof_reinos").select("usuario_id").order("usuario_id")),
+  ]);
+  falhou(votosR.error, "votos");
+  const votos = votosR.data || [];
+  const ids = reinos.map((r) => r.usuario_id);
+  const ofensivas = await ofensivasDe(ids);
+  const aptos = ids.filter((id) => podeVotarComOfensiva(ofensivas.get(id)));
+  const eleitores = eleitoresDaVotacao({ aptos, votantes: votos.map((v) => v.usuario_id) });
+  return { votos, totalDeReinos: ids.length, ofensivas, eleitores, resultado: resultadoDaVotacao(votos.map((v) => v.voto), eleitores.length) };
+}
+
 /** A paz como a tela mostra: a vigente (com os vizinhos) ou a votação aberta (com o placar). */
-async function pazParaTela(usuarioId) {
+async function pazParaTela(usuarioId, apurou = false) {
   const { paz, votacao } = await pazDeAgora();
-  const total = await totalDeReinos();
   if (paz) {
+    const total = await totalDeReinos();
     const { data: outros } = await supabase.from("proof_reinos").select("usuario_id, nome, construcoes, trofeus").neq("usuario_id", usuarioId).order("trofeus", { ascending: false }).limit(12);
     const nomes = await nomesPublicos((outros || []).map((r) => r.usuario_id));
     return {
@@ -169,33 +205,41 @@ async function pazParaTela(usuarioId) {
     };
   }
   if (votacao) {
-    const { data: votos, error } = await supabase.from("proof_paz_votos").select("usuario_id, voto").eq("paz_id", votacao.id);
-    falhou(error, "votos");
-    const nomes = await nomesPublicos([votacao.proposta_por, ...(votos || []).map((v) => v.usuario_id)]);
-    const meu = (votos || []).find((v) => v.usuario_id === usuarioId);
+    const placar = await placarDa(votacao);
+    // a ofensiva de alguém que não votou acabou e todo o resto já disse sim: a paz começa agora
+    if (placar.resultado !== "aberta" && !apurou) {
+      await apurar(votacao, placar);
+      return pazParaTela(usuarioId, true);
+    }
+    const { votos, ofensivas, eleitores, totalDeReinos: total } = placar;
+    const nomes = await nomesPublicos([votacao.proposta_por, ...votos.map((v) => v.usuario_id)]);
+    const meu = votos.find((v) => v.usuario_id === usuarioId);
+    const voto = podeVotar({ paz: votacao, jaVotou: Boolean(meu), ofensiva: ofensivas.get(usuarioId) });
     return {
       vigente: null,
       votacao: {
         id: votacao.id, dias: votacao.dias, expira: votacao.expira_em, propostaPor: nomes.get(votacao.proposta_por) || "Estudante anônimo",
         souQuemPropos: votacao.proposta_por === usuarioId, totalDeReinos: total,
-        sims: (votos || []).filter((v) => v.voto).length, meuVoto: meu ? meu.voto : null,
-        votaram: (votos || []).filter((v) => v.voto).map((v) => nomes.get(v.usuario_id) || "Estudante anônimo"),
+        eleitores: eleitores.length, semVoto: Math.max(0, total - eleitores.length),
+        sims: votos.filter((v) => v.voto).length, meuVoto: meu ? meu.voto : null,
+        podeVotar: voto.ok, motivoDoVoto: voto.ok ? "" : voto.motivo,
+        votaram: votos.filter((v) => v.voto).map((v) => nomes.get(v.usuario_id) || "Estudante anônimo"),
         termos: termosDaPaz(votacao.dias, total),
       },
-      podePropor: false, motivo: "já tem uma proposta de paz em votação", totalDeReinos: total,
+      podePropor: false, motivo: "já tem uma proposta de paz em votação", totalDeReinos: total, ofensivaParaVotar: OFENSIVA_PARA_VOTAR,
     };
   }
-  return { vigente: null, votacao: null, podePropor: true, motivo: "", totalDeReinos: total };
+  const [total, ofensivas] = await Promise.all([totalDeReinos(), ofensivasDe([usuarioId])]);
+  const pode = podeProporPaz({ ofensiva: ofensivas.get(usuarioId) });
+  return { vigente: null, votacao: null, podePropor: pode.ok, motivo: pode.ok ? "" : pode.motivo, totalDeReinos: total, ofensivaParaVotar: OFENSIVA_PARA_VOTAR };
 }
 
-/** Fecha a votação se ela já tem o resultado: um "não" rejeita; todos os reinos com "sim" aprovam. */
-async function apurar(votacao) {
-  const [{ data: votos, error }, total] = await Promise.all([
-    supabase.from("proof_paz_votos").select("voto").eq("paz_id", votacao.id),
-    totalDeReinos(),
-  ]);
-  falhou(error, "votos");
-  const resultado = resultadoDaVotacao((votos || []).map((v) => v.voto), total);
+/**
+ * Fecha a votação se ela já tem o resultado: um "não" rejeita; todos os eleitores com "sim"
+ * aprovam. A paz aprovada vale para todos os reinos — o fator da mina é o total de reinos.
+ */
+async function apurar(votacao, placar) {
+  const { resultado, totalDeReinos: total } = placar || (await placarDa(votacao));
   if (resultado === "rejeitada") await supabase.from("proof_pazes").update({ status: "rejeitada" }).eq("id", votacao.id).eq("status", "votacao");
   if (resultado === "aprovada") {
     await supabase.from("proof_pazes").update({ status: "aprovada", total_reinos: total, ...periodoDaPaz(votacao.dias) }).eq("id", votacao.id).eq("status", "votacao");
@@ -203,10 +247,10 @@ async function apurar(votacao) {
   return resultado;
 }
 
-/** Um jogador propõe a paz por `dias` dias; o voto dele já conta como sim. */
+/** Um jogador propõe a paz por `dias` dias; o voto dele já conta como sim. Precisa da ofensiva em dia. */
 export async function proporPaz(usuarioId, dias) {
-  const { paz, votacao } = await pazDeAgora();
-  const pode = podeProporPaz({ dias: Number(dias), votacaoAtual: votacao, pazAtual: paz });
+  const [{ paz, votacao }, ofensivas] = await Promise.all([pazDeAgora(), ofensivasDe([usuarioId])]);
+  const pode = podeProporPaz({ dias: Number(dias), votacaoAtual: votacao, pazAtual: paz, ofensiva: ofensivas.get(usuarioId) });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
   await obterReino(usuarioId); // quem propõe tem reino (e conta como um dos votantes)
   const { data, error } = await supabase.from("proof_pazes").insert({ proposta_por: usuarioId, dias: Number(dias), expira_em: fimDaVotacao() }).select(CAMPOS_DA_PAZ).single();
@@ -217,12 +261,15 @@ export async function proporPaz(usuarioId, dias) {
   return { resultado: await apurar(data) };
 }
 
-/** O voto de um reino: sim ou não. */
+/** O voto de um reino: sim ou não. Só vota quem tem a ofensiva em dia. */
 export async function votarNaPaz(usuarioId, pazId, voto) {
   const { data: votacao, error } = await supabase.from("proof_pazes").select(CAMPOS_DA_PAZ).eq("id", String(pazId || "")).maybeSingle();
   falhou(error, "votação");
-  const { data: meu } = votacao ? await supabase.from("proof_paz_votos").select("voto").eq("paz_id", votacao.id).eq("usuario_id", usuarioId).maybeSingle() : { data: null };
-  const pode = podeVotar({ paz: votacao, jaVotou: Boolean(meu) });
+  const [{ data: meu }, ofensivas] = await Promise.all([
+    votacao ? supabase.from("proof_paz_votos").select("voto").eq("paz_id", votacao.id).eq("usuario_id", usuarioId).maybeSingle() : { data: null },
+    ofensivasDe([usuarioId]),
+  ]);
+  const pode = podeVotar({ paz: votacao, jaVotou: Boolean(meu), ofensiva: ofensivas.get(usuarioId) });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
   await obterReino(usuarioId);
   const { error: e2 } = await supabase.from("proof_paz_votos").insert({ paz_id: votacao.id, usuario_id: usuarioId, voto: Boolean(voto) });

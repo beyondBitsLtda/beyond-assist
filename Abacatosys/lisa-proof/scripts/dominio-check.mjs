@@ -29,6 +29,7 @@ import {
 } from "../src/dominio/reino.js";
 import {
   DIAS_DE_PAZ, termosDaPaz, pazVigente, votacaoAberta, podeProporPaz, podeVotar, resultadoDaVotacao, periodoDaPaz,
+  OFENSIVA_PARA_VOTAR, podeVotarComOfensiva, eleitoresDaVotacao,
   fatorDaMinaNaPaz, parteDaExpedicao,
 } from "../src/dominio/paz.js";
 import {
@@ -1043,14 +1044,36 @@ caso("paz: só com 100% dos votos; um não derruba; uma proposta por vez", () =>
   const vigente = { status: "aprovada", fim: "2026-10-29T12:00:00Z", total_reinos: 5 };
   assert.equal(votacaoAberta(aberta, agora), true);
   assert.equal(votacaoAberta({ ...aberta, expira_em: "2026-10-22T11:00:00Z" }, agora), false);
-  assert.equal(podeProporPaz({ dias: 7, agora }).ok, true);
-  assert.match(podeProporPaz({ dias: 7, votacaoAtual: aberta, agora }).motivo, /em votação/);
-  assert.match(podeProporPaz({ dias: 7, pazAtual: vigente, agora }).motivo, /já está em paz/);
-  assert.match(podeProporPaz({ dias: 5, agora }).motivo, /3, 7, 14, 30/);
-  assert.equal(podeVotar({ paz: aberta, jaVotou: false, agora }).ok, true);
-  assert.match(podeVotar({ paz: aberta, jaVotou: true, agora }).motivo, /já votou/);
-  assert.match(podeVotar({ paz: { ...aberta, status: "rejeitada" }, jaVotou: false, agora }).motivo, /terminou/);
+  assert.equal(podeProporPaz({ dias: 7, ofensiva: 3, agora }).ok, true);
+  assert.match(podeProporPaz({ dias: 7, ofensiva: 3, votacaoAtual: aberta, agora }).motivo, /em votação/);
+  assert.match(podeProporPaz({ dias: 7, ofensiva: 3, pazAtual: vigente, agora }).motivo, /já está em paz/);
+  assert.match(podeProporPaz({ dias: 5, ofensiva: 3, agora }).motivo, /3, 7, 14, 30/);
+  assert.equal(podeVotar({ paz: aberta, jaVotou: false, ofensiva: 4, agora }).ok, true);
+  assert.match(podeVotar({ paz: aberta, jaVotou: true, ofensiva: 4, agora }).motivo, /já votou/);
+  assert.match(podeVotar({ paz: { ...aberta, status: "rejeitada" }, jaVotou: false, ofensiva: 4, agora }).motivo, /terminou/);
   assert.deepEqual(periodoDaPaz(7, agora), { inicio: "2026-10-22T12:00:00.000Z", fim: "2026-10-29T12:00:00.000Z" });
+});
+
+caso("paz: só vota (e propõe) quem tem 3+ dias de ofensiva; os 100% contam só os eleitores", () => {
+  const agora = new Date("2026-10-22T12:00:00Z");
+  const aberta = { status: "votacao", expira_em: "2026-10-24T12:00:00Z" };
+  assert.equal(OFENSIVA_PARA_VOTAR, 3);
+  assert.equal(podeVotarComOfensiva(3), true);
+  assert.equal(podeVotarComOfensiva(2), false);
+  assert.equal(podeVotarComOfensiva(undefined), false);
+  const semOfensiva = podeVotar({ paz: aberta, jaVotou: false, ofensiva: 2, agora });
+  assert.equal(semOfensiva.ok, false);
+  assert.match(semOfensiva.motivo, /3 dias seguidos \(sua ofensiva: 2 dias\)/);
+  assert.match(semOfensiva.motivo, /a paz vale para você do mesmo jeito/);
+  assert.match(podeVotar({ paz: aberta, jaVotou: false, ofensiva: 1, agora }).motivo, /sua ofensiva: 1 dia\)/);
+  assert.match(podeProporPaz({ dias: 7, ofensiva: 0, agora }).motivo, /para propor a paz, estude 3 dias seguidos/);
+  assert.match(podeProporPaz({ dias: 7, agora }).motivo, /sua ofensiva: 0 dias/); // sem ofensiva conhecida = 0
+  // 5 reinos: só a e b estão aptos; c já votou (votou quando ainda estava apto) → 3 eleitores
+  const eleitores = eleitoresDaVotacao({ aptos: ["a", "b"], votantes: ["a", "c"] });
+  assert.deepEqual(eleitores.sort(), ["a", "b", "c"]);
+  assert.equal(resultadoDaVotacao([true, true], eleitores.length), "aberta"); // falta b
+  assert.equal(resultadoDaVotacao([true, true, true], eleitores.length), "aprovada"); // d e e não votam e ganham a paz
+  assert.ok(termosDaPaz(7, 5).some((x) => /3\+ dias de ofensiva/.test(x.texto) && /ganha a paz do mesmo jeito/.test(x.texto)));
 });
 
 caso("paz: mina × o número de reinos, expedição reparte 20% e ninguém invade ninguém", () => {
