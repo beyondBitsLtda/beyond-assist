@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.13.0-proof-expedicoes.1",
+  "versao": "0.13.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-22",
   "compilacao": {
-    "numero": 33,
+    "numero": 34,
     "data": "2026-10-22",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.13.0-cloudflare-pages.1",
+      "data": "2026-10-22",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.13.0: expedições contra monstros, guerra entre jogadores a cada 2 dias com revanche e o modal de novidades.",
+      "itens": [
+        "Junta a branch proof-expedicoes (0.13.0-proof-expedicoes.1).",
+        "Migração db/009-expedicoes.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.13.0-proof-expedicoes.1",
       "data": "2026-10-22",
