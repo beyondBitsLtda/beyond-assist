@@ -14,9 +14,11 @@
 //   QUARTEL   — treina o exército e define quantas tropas cabem nele.
 //   TERRENO   — compra terra: a ilha cresce e ganha espaço para construções novas (Biblioteca,
 //               Defesa Aérea, Morteiro, Torre Mágica, Torre do Raio).
-//   INVASÃO   — 3 por dia; o mesmo reino só a cada 48 h (cada lado conta o seu: dá para revidar),
-//               com o exército inteiro (que é gasto). Estrelas pela destruição; o saque e os
-//               troféus seguem as estrelas. Quem cai ganha 8 h de escudo; reino novo nasce com
+//   INVASÃO   — 3 por dia; o mesmo reino só a cada 48 h (cada lado conta o seu: dá para revidar).
+//               Só as tropas que CAEM se perdem; as que sobrevivem voltam (22/10/2026 — antes o
+//               exército inteiro era gasto). Estrelas pela destruição; o saque e os
+//               troféus seguem as estrelas.
+//   ALIANÇA   — paz, mina em dobro, reforços e reinos vizinhos: ver alianca.js. Quem cai ganha 8 h de escudo; reino novo nasce com
 //               48 h; atacar tira o próprio escudo.
 //   EXPEDIÇÃO — contra a CPU (vilas, florestas, bosques, acampamentos de monstros): ver monstros.js.
 
@@ -198,11 +200,12 @@ export function podeSubirNeuro(reino, saldo) {
 }
 
 /** Quanto a mina tem para coletar agora (inteiro), dado o último `coletado_em`. */
-export function producaoAcumulada(reino, agora = new Date()) {
+/** O que a mina juntou desde a última coleta. `fator`: 2 durante uma aliança (mina em dobro). */
+export function producaoAcumulada(reino, agora = new Date(), fator = 1) {
   const n = niveisDe(reino);
   const desde = new Date(reino?.coletado_em || agora).getTime();
   const horas = Math.max(0, (agora.getTime() - desde) / 3_600_000);
-  const taxa = taxaDeProducao(n);
+  const taxa = taxaDeProducao(n) * fator;
   return Math.min(taxa * HORAS_ATE_ENCHER, Math.floor(horas * taxa));
 }
 
@@ -234,9 +237,10 @@ export function esperaAte(quando, agora = new Date()) {
  * conta o seu, então quem foi atacado pode revidar). `jaAtacouHoje` continua valendo (o banco tem
  * a mesma trava por dia).
  */
-export function podeInvadir({ atacanteId, atacante, defensor, ataquesHoje, jaAtacouHoje = false, ultimoAtaqueAoAlvo = null, agora = new Date() }) {
+export function podeInvadir({ atacanteId, atacante, defensor, ataquesHoje, jaAtacouHoje = false, ultimoAtaqueAoAlvo = null, aliados = false, agora = new Date() }) {
   if (!defensor) return { ok: false, motivo: "esse reino não existe" };
   if (defensor.usuario_id === atacanteId) return { ok: false, motivo: "não dá para invadir o próprio reino" };
+  if (aliados) return { ok: false, motivo: "vocês são aliados — não dá para invadir durante a paz" };
   if (atacante && totalDeTropas(atacante.exercito) === 0) return { ok: false, motivo: "treine tropas no Quartel antes de invadir" };
   if (ataquesHoje >= ATAQUES_POR_DIA) return { ok: false, motivo: `você já fez as ${ATAQUES_POR_DIA} invasões de hoje — amanhã tem mais` };
   const proximo = proximoAtaqueAoReino(ultimoAtaqueAoAlvo);

@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoMonstro } from "./reino/monstrosDePapel.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-22";
+export const EDICAO_DAS_NOVIDADES = "2026-10-22-aliancas";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,12 +28,12 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🗺️", titulo: "Expedições contra monstros", texto: "Ataque vilas, florestas, bosques e acampamentos de monstros para saquear moedas — de graça, 3 vezes por dia. Cada lugar tem a sua dificuldade, a sua recompensa e o seu cenário.", destaque: true },
-  { icone: "⚔️", titulo: "Guerra a cada 2 dias", texto: "Você invade o mesmo reino uma vez a cada 2 dias. Foi atacado? A revanche fica liberada na hora." },
+  { icone: "🤝", titulo: "Alianças entre reinos", texto: "Convide um reino e escolha os dias de paz: a mina dos dois rende em dobro, um ajuda o outro nas invasões, cada um vê o reino do outro e as ilhas viram vizinhas.", destaque: true },
+  { icone: "🗺️", titulo: "Expedições contra monstros", texto: "Ataque vilas, florestas, bosques e acampamentos de monstros para saquear moedas — de graça, 3 vezes por dia. Cada lugar tem a sua dificuldade, a sua recompensa e o seu cenário." },
+  { icone: "⚔️", titulo: "Guerra mais justa", texto: "As tropas que sobrevivem voltam para casa. O mesmo reino só a cada 2 dias — e quem foi atacado pode revidar na hora." },
   { icone: "💡", titulo: "Dicas da Lisa", texto: "Nos projetos da semana e do mês: um passo a passo para começar, sem entregar a resposta." },
   { icone: "▶️", titulo: "Rode o seu código", texto: "Todo exercício do dia ganhou o botão Rodar: veja o resultado antes de enviar." },
   { icone: "🧩", titulo: "Projetos em partes", texto: "Cada requisito vale pontos e você entrega aos poucos. Escolha a complexidade: desafiador vale 1,5×." },
-  { icone: "⛺", titulo: "Acampamento das tropas", texto: "Suas tropas, desenhadas no papel como o Neuro, numa ilhota só delas ao lado do reino." },
 ];
 
 export default function Novidades() {
@@ -77,8 +77,8 @@ export default function Novidades() {
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">Chegaram as Expedições!</h2>
-          <p className="novidades__sub">Monstros para enfrentar, saque para levar — e um monte de coisa nova para estudar melhor.</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">Alianças e Expedições!</h2>
+          <p className="novidades__sub">Junte forças com outro reino, enfrente monstros e leve o saque — e mais coisa nova para estudar melhor.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -88,7 +88,7 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/reino#expedicoes" className="pf-botao novidades__principal" onClick={fechar}>⚔️ Partir para as Expedições</Link>
+            <Link ref={principal} href="/reino#alianca" className="pf-botao novidades__principal" onClick={fechar}>🤝 Ver as alianças</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>

@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.14.1-cloudflare-pages.1",
+  "versao": "0.15.0-proof-alianca.1",
   "atualizadoEm": "2026-10-22",
   "compilacao": {
-    "numero": 38,
+    "numero": 39,
     "data": "2026-10-22",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.15.0-proof-alianca.1",
+      "data": "2026-10-22",
+      "branch": "proof-alianca",
+      "tipo": "funcionalidade",
+      "resumo": "Alianças entre reinos (convite com dias de paz, mina em dobro, reforços, ver o reino do outro e reinos vizinhos) e, na invasão, só as tropas que caem se perdem.",
+      "itens": [
+        "Invasão: as tropas que sobrevivem voltam para casa; só as que caem precisam ser treinadas de novo (antes o exército inteiro era gasto, mesmo vencendo). O resultado mostra quem voltou e quem caiu.",
+        "Convite de aliança pela lista de invasões (botão 🤝): quem convida escolhe 3, 7, 14 ou 30 dias de paz, e o convite mostra todos os termos. Vale 3 dias para ser respondido; uma aliança por vez.",
+        "Enquanto a aliança vale: um não invade o outro; a mina dos dois rende em dobro; quem é invadido recebe reforço de defesa do aliado e quem invade leva reforço de ataque (metade das tropas do aliado, ou um básico do tamanho da Torre dele, sem custo para quem manda); cada um vê o reino do outro.",
+        "Reinos vizinhos: a ilha do aliado aparece ao lado da sua no 3D, ligada por uma ponte, com as construções dele.",
+        "Modal de novidades atualizado (edição nova, aparece de novo uma vez).",
+        "Migração db/011-aliancas.sql: tabela proof_aliancas."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.14.1-cloudflare-pages.1",
       "data": "2026-10-22",
@@ -591,8 +607,9 @@
         "Projetos com pontos por requisito, entregas parciais que somam e complexidade ajustável (mais simples sem perder pontos, desafiador valendo 1,5x)",
         "Botão Rodar nos exercícios do dia: JavaScript e SQL no navegador; C, Python, PHP, Java e outras num compilador on-line",
         "Expedições do Reino contra a CPU, de graça (nenhuma tropa se perde), 3 por dia, cada uma com dificuldade, recompensa e terreno 3D próprios, e monstros desenhados em 2D",
-        "Guerra entre jogadores com o mesmo reino só a cada 48 h por quem ataca, e revanche liberada para quem foi atacado",
-        "Modal de novidades na entrada, uma vez por edição"
+        "Guerra entre jogadores com o mesmo reino só a cada 48 h por quem ataca, revanche liberada para quem foi atacado, e só as tropas que caem se perdem",
+        "Modal de novidades na entrada, uma vez por edição",
+        "Alianças entre reinos: convite com dias de paz, mina em dobro, reforços nas invasões, ver o reino do aliado e reinos vizinhos no 3D"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -655,7 +672,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/010). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/011). Acesso só pelo túnel da Cloudflare, em HTTPS."
       }
     ],
     "integracoes": [
