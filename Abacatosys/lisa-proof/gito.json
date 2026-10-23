@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.17.0-proof-veiculos.1",
+  "versao": "0.17.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 44,
+    "numero": 45,
     "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.17.0-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.17.0: veículos e combustível, expedições novas e planetoides, Mina de Ouro com aluguel de operários, Bolsa do Reino, tela cheia, visitas e o Neuro Abacate.",
+      "itens": [
+        "Junta a branch proof-veiculos (0.17.0-proof-veiculos.1).",
+        "Migração db/013-veiculos-ouro-bolsa.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.17.0-proof-veiculos.1",
       "data": "2026-10-23",
