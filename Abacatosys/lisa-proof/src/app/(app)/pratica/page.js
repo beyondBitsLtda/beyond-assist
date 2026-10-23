@@ -127,7 +127,7 @@ export default function Pratica() {
       <div className="pf-cabecalho">
         <div>
           <h1>Prática</h1>
-          <p>Quiz e exercício todo dia sobre o assunto da vez, e um projeto no fim de cada semana do plano. O quiz aprovado conclui o assunto; o projeto aprovado abre a semana seguinte — e o da última semana é o projeto final da trilha.</p>
+          <p>Quiz e exercício todo dia sobre o assunto da vez, e um projeto no fim de cada semana do curso. O quiz aprovado conclui o assunto; o projeto aprovado abre a semana seguinte — e o da última semana é o projeto final da trilha.</p>
         </div>
       </div>
 
@@ -181,6 +181,14 @@ export default function Pratica() {
                   )}
                 </div>
               )}
+              {/* começados numa semana dispensada (concluída antes das regras novas): opcionais, mas não somem */}
+              {(t.opcionais || []).map((p) => (
+                <div key={p.id} className="pratica__celula">
+                  <Bloco tipo={p.tipo} titulo={`Projeto da semana ${p.numero} · opcional`}
+                    situacao={{ texto: `${p.nota != null ? `nota ${p.nota} · ` : ""}semana já concluída: vale pontos, não trava nada`, acao: "Continuar", classe: "pratica__bloco--andamento" }}
+                    ocupado={false} aoAbrir={() => abrir(t, p.tipo, p)} />
+                </div>
+              ))}
             </div>
           </section>
         ))

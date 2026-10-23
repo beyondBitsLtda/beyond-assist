@@ -23,7 +23,7 @@ import {
   tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto,
   complexidadeDe, podeTrocarComplexidade, TROCAS_DE_COMPLEXIDADE, podeTrocarProjeto, projetoAntigo,
 } from "@/dominio/pratica.js";
-import { semanaDoProjeto, semanaDoDesafio, pedidoDoProjeto, podeGerarProjeto, valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
+import { semanaDoProjeto, semanaDoDesafio, pedidoDoProjeto, projetosOpcionais, podeGerarProjeto, valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
 import { avancoDasTrilhas, avancoDaTrilhaDoUsuario } from "./avanco.js";
 
 const CAMPOS = "id, usuario_id, trilha_id, tipo, periodo, rodada, card_ids, titulo, conteudo, status, resposta, avaliacao, nota, pontos, tentativas, criado_em, atualizado_em";
@@ -91,8 +91,9 @@ export function desafioParaTela(d, tema, unidade = null) {
     titulo: d.titulo,
     // o projeto da semana do curso e o final guardam a semana e as datas dela; os antigos, só o calendário
     semana,
+    // `dispensada`: a semana foi concluída antes das regras novas — o projeto dela é opcional
     semanaDoCurso: semana && d.tipo !== "projeto_mensal"
-      ? { numero: semana, de: d.conteudo?.de || unidade?.de || null, ate: d.conteudo?.ate || unidade?.ate || null }
+      ? { numero: semana, de: d.conteudo?.de || unidade?.de || null, ate: d.conteudo?.ate || unidade?.ate || null, dispensada: Boolean(unidade?.dispensada) }
       : null,
     status: d.status,
     nota: d.nota,
@@ -190,6 +191,8 @@ export async function resumoDaPratica(usuarioId, trilhas, hoje = diaDe(), avanco
       quiz: diario(t.id, "quiz"),
       exercicio: diario(t.id, "exercicio"),
       projeto: avanco ? projetoDaVezParaTela(avanco) : null,
+      // começados em semanas dispensadas: opcionais (valem pontos, não travam nada), mas não somem
+      opcionais: projetosOpcionais(avanco).map((u) => ({ id: u.projeto.id, tipo: u.tipo, numero: u.numero, titulo: u.projeto.titulo, status: u.projeto.status, nota: u.projeto.nota })),
     };
   });
 }
@@ -337,6 +340,7 @@ export async function trocarProjeto({ usuarioId, id }) {
   const { trilha, avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
   const unidade = semanaDoDesafio(avanco, d);
   if (!unidade) throw new ErroDeAcesso(409, "este projeto não é de nenhuma semana da trilha agora");
+  if (unidade.dispensada) throw new ErroDeAcesso(409, "esta semana foi concluída antes das regras novas — o projeto dela é opcional");
   await quadroDeEstudo(trilha.quadro_id, usuarioId);
   if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
 

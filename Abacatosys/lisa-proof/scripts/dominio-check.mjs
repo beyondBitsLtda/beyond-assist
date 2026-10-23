@@ -59,7 +59,7 @@ import {
 import { centavos, formatarMoedas, faltam } from "../src/dominio/moedas.js";
 import {
   semanasDoPlano, avancoDaTrilha, mapaDaTrilha, valorDoProjetoFinal, podeGerarProjeto, semanaDoProjeto, periodoDaSemana, PROJETOS_POR_SEMANA,
-  semanaDoDesafio, pedidoDoProjeto,
+  semanaDoDesafio, pedidoDoProjeto, projetosOpcionais,
 } from "../src/dominio/avanco.js";
 import {
   MONSTROS, EXPEDICOES, EXPEDICOES_POR_DIA, podeExpedicionar, saqueDaExpedicao, defensorDaExpedicao, expedicaoPorId, contagensDeMonstros,
@@ -363,6 +363,21 @@ caso("projeto da semana: sai dos assuntos DA semana do curso, sabe o que veio an
   assert.equal(semanaDoDesafio(av, antigo)?.numero, 1);
   assert.equal(semanaDoDesafio(av, { id: "outro", tipo: "projeto_semanal", periodo: periodoDaSemana(BASE, 2) })?.numero, 2);
   assert.equal(semanaDoDesafio(av, { id: "x", tipo: "projeto_mensal", periodo: "2026-10-01" }), null);
+});
+caso("projeto começado numa semana dispensada não some: fica opcional (vale pontos, não trava nada)", () => {
+  // a semana 1 foi concluída antes das regras novas (dispensada); o projeto dela estava em andamento
+  const lista = [et("a", 1, 1, "2026-10-05", { semana: 1, teoria: true, dispensa: true }), et("b", 2, 1, "2026-10-06", { semana: 1, teoria: true, dispensa: true }),
+    et("c", 3, 1, "2026-10-12", { semana: 2 }), et("d", 4, 1, "2026-10-19", { semana: 3 })];
+  const comecado = { id: "p1", tipo: "projeto_semanal", periodo: periodoDaSemana(BASE, 1), status: "pendente", card_ids: ["a", "b"] };
+  const av = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-13", projetos: [comecado] });
+  assert.equal(av.unidades[0].dispensada, true);
+  assert.equal(av.semanaDaVez.numero, 2, "a semana dispensada não trava: a da vez é a 2");
+  assert.deepEqual(projetosOpcionais(av).map((u) => [u.numero, u.projeto.id]), [[1, "p1"]]);
+  // terminado, ou numa semana que não foi dispensada: não é "opcional"
+  const terminado = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-13", projetos: [{ ...comecado, status: "concluido", nota: 80 }] });
+  assert.deepEqual(projetosOpcionais(terminado), []);
+  const naoDispensada = lista.map((e) => ({ ...e, dispensa: false, teoria: false }));
+  assert.deepEqual(projetosOpcionais(avancoDaTrilha({ etapas: naoDispensada, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-13", projetos: [comecado] })), []);
 });
 caso("projeto da semana: cada requisito diz o assunto que pratica; dá para trocar o projeto antes da 1ª entrega", () => {
   const bruto = { titulo: "T", contexto: "C", requisitos: ["r1", "", "r2", "r3"], assuntoDeCada: [1, 9, 2, 1], extras: [], entrega: "", criterios: [] };
