@@ -18,6 +18,7 @@ import {
   validarAvaliacao, assuntoAtual, TENTATIVAS, RODADAS_POR_DIA, podeAbrirRodada, fatorDaRodada, comFatorDaRodada,
   perguntaRepetida, perguntasNovas, exercicioRepetido, validarGuia,
   tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto, podeTrocarComplexidade,
+  validarProjeto, podeTrocarProjeto, projetoAntigo, TROCAS_DE_PROJETO,
 } from "../src/dominio/pratica.js";
 import { execucaoDoExercicio, prepararParaCompilador, resultadoDoServidor } from "../src/dominio/execucao.js";
 import { PERSONAGENS, ORDEM_DOS_PERSONAGENS, personagensDe, podeEscolherPersonagem } from "../src/dominio/personagens.js";
@@ -58,6 +59,7 @@ import {
 import { centavos, formatarMoedas, faltam } from "../src/dominio/moedas.js";
 import {
   semanasDoPlano, avancoDaTrilha, mapaDaTrilha, valorDoProjetoFinal, podeGerarProjeto, semanaDoProjeto, periodoDaSemana, PROJETOS_POR_SEMANA,
+  semanaDoDesafio, pedidoDoProjeto,
 } from "../src/dominio/avanco.js";
 import {
   MONSTROS, EXPEDICOES, EXPEDICOES_POR_DIA, podeExpedicionar, saqueDaExpedicao, defensorDaExpedicao, expedicaoPorId, contagensDeMonstros,
@@ -342,6 +344,45 @@ caso("avanço: as semanas do plano são as semanas do curso (as do mapa e da age
   assert.equal(valorDoProjetoFinal(3), 450);
   assert.equal(valorDoProjetoFinal(9), 600);
   assert.equal(tabelaDePontos("projeto_final", { requisitos: ["x", "y"], extras: [], valor: 250 }).base, 250);
+});
+caso("projeto da semana: sai dos assuntos DA semana do curso, sabe o que veio antes e o que ainda não pode cair", () => {
+  // pedido de 23/10/2026: "o projeto da semana 1 não tem nada a ver com a semana 1"
+  const lista = [et("a", 1, 2, "2026-10-05", { semana: 1 }), et("b", 2, 2, "2026-10-07", { semana: 1 }),
+    et("c", 3, 2, "2026-10-12", { semana: 2 }), et("d", 4, 2, "2026-10-14", { semana: 2 }), et("e", 5, 2, "2026-10-19", { semana: 3 })];
+  const antigo = { id: "p1", tipo: "projeto_semanal", periodo: periodoDaSemana(BASE, 1), status: "pendente", card_ids: ["a", "b"] };
+  const av = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-08", projetos: [antigo] });
+  const [s1, s2] = av.unidades;
+  // a semana 2: os assuntos dela; a 1 pode ser usada; a 3 (o final) ainda não
+  assert.deepEqual(pedidoDoProjeto(av, "projeto_semanal", s2).assuntos.map((e) => e.cardId), ["c", "d"]);
+  assert.deepEqual(pedidoDoProjeto(av, "projeto_semanal", s2).antes, ["a", "b"]);
+  assert.deepEqual(pedidoDoProjeto(av, "projeto_semanal", s2).depois, ["e"]);
+  assert.deepEqual(pedidoDoProjeto(av, "projeto_semanal", s1).antes, []);
+  // o final junta a trilha inteira
+  assert.deepEqual(pedidoDoProjeto(av, "projeto_final", av.unidades[2]).assuntos.map((e) => e.cardId), ["a", "b", "c", "d", "e"]);
+  // a semana de um projeto que já existe: a que o tem como projeto, ou a da chave dele
+  assert.equal(semanaDoDesafio(av, antigo)?.numero, 1);
+  assert.equal(semanaDoDesafio(av, { id: "outro", tipo: "projeto_semanal", periodo: periodoDaSemana(BASE, 2) })?.numero, 2);
+  assert.equal(semanaDoDesafio(av, { id: "x", tipo: "projeto_mensal", periodo: "2026-10-01" }), null);
+});
+caso("projeto da semana: cada requisito diz o assunto que pratica; dá para trocar o projeto antes da 1ª entrega", () => {
+  const bruto = { titulo: "T", contexto: "C", requisitos: ["r1", "", "r2", "r3"], assuntoDeCada: [1, 9, 2, 1], extras: [], entrega: "", criterios: [] };
+  // o requisito vazio sai junto com o número dele: o mapa continua alinhado
+  assert.deepEqual(validarProjeto(bruto, 2).assuntoDeCada, [1, 2, 1]);
+  assert.deepEqual(validarProjeto(bruto, 2).requisitos, ["r1", "r2", "r3"]);
+  // número fora da lista, faltando, ou sem a lista de assuntos: o mapa fica de fora (o projeto vale igual)
+  assert.equal(validarProjeto({ ...bruto, assuntoDeCada: [1, 9, 3, 1] }, 2).assuntoDeCada, undefined);
+  assert.equal(validarProjeto({ ...bruto, assuntoDeCada: [1] }, 2).assuntoDeCada, undefined);
+  assert.equal(validarProjeto(bruto).assuntoDeCada, undefined);
+  // trocar o projeto: só o da semana e o final, antes da primeira entrega, até TROCAS_DE_PROJETO vezes
+  assert.deepEqual(podeTrocarProjeto({ tipo: "projeto_semanal", tentativas: 0, conteudo: {} }), { ok: true, restantes: TROCAS_DE_PROJETO });
+  assert.equal(podeTrocarProjeto({ tipo: "projeto_final", tentativas: 0, conteudo: { novos: 1 } }).restantes, TROCAS_DE_PROJETO - 1);
+  assert.equal(podeTrocarProjeto({ tipo: "projeto_semanal", tentativas: 1, conteudo: {} }).ok, false);
+  assert.equal(podeTrocarProjeto({ tipo: "projeto_semanal", tentativas: 0, conteudo: { novos: TROCAS_DE_PROJETO } }).ok, false);
+  assert.equal(podeTrocarProjeto({ tipo: "projeto_mensal", tentativas: 0, conteudo: {} }).ok, false);
+  assert.equal(podeTrocarProjeto({ tipo: "quiz", tentativas: 0, conteudo: {} }).ok, false);
+  // o projeto de antes das semanas do curso não guarda os assuntos
+  assert.equal(projetoAntigo({ titulo: "T", requisitos: [] }), true);
+  assert.equal(projetoAntigo({ titulo: "T", requisitos: [], assuntos: ["a"] }), false);
 });
 caso("avanço: o assunto só conclui com a teoria E um quiz dele aprovado (60%+); o de antes das regras, dispensado", () => {
   const lista = [

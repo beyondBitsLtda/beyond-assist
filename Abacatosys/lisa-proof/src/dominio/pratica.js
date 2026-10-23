@@ -268,6 +268,23 @@ export function podeTrocarComplexidade({ tipo, tentativas, conteudo }, nivel) {
   return { ok: true };
 }
 
+/**
+ * Trocar o projeto da semana (ou o final) por outro, gerado de novo dos assuntos da semana do curso
+ * (pedido de 23/10/2026: "o projeto da semana 1 não tem nada a ver com a semana 1"). Só antes da
+ * primeira entrega, e no máximo TROCAS_DE_PROJETO vezes.
+ */
+export const TROCAS_DE_PROJETO = 3;
+export function podeTrocarProjeto({ tipo, tentativas, conteudo }) {
+  if (tipo !== "projeto_semanal" && tipo !== "projeto_final") return { ok: false, motivo: "só o projeto da semana e o final podem ser trocados" };
+  if ((tentativas || 0) > 0) return { ok: false, motivo: "o projeto fica fixo depois da primeira entrega" };
+  const usados = conteudo?.novos || 0;
+  if (usados >= TROCAS_DE_PROJETO) return { ok: false, motivo: `os ${TROCAS_DE_PROJETO} projetos novos já foram gerados` };
+  return { ok: true, restantes: TROCAS_DE_PROJETO - usados };
+}
+
+/** Gerado antes das semanas do curso (23/10/2026): o projeto não guarda de quais assuntos da semana ele é. */
+export const projetoAntigo = (conteudo) => !Array.isArray(conteudo?.assuntos);
+
 // ---------------------------------------------------------------- o que a IA devolve
 
 // ---------------------------------------------------------------- o código das perguntas
@@ -353,13 +370,25 @@ export function validarExercicio(bruto) {
   };
 }
 
-export function validarProjeto(bruto) {
-  const requisitos = listaDeTextos(bruto?.requisitos, 300, 10);
+/**
+ * O projeto que a IA devolveu, conferido. Com `nAssuntos` (quantos assuntos o pedido numerou),
+ * `assuntoDeCada` diz qual assunto (1..n) cada requisito pratica — a tela mostra a ligação com a
+ * semana do curso. Torto ou incompleto, o mapa fica de fora (o projeto vale do mesmo jeito).
+ */
+export function validarProjeto(bruto, nAssuntos = 0) {
+  const pares = (Array.isArray(bruto?.requisitos) ? bruto.requisitos : [])
+    .map((r, i) => ({ texto: texto(r, 300), assunto: Number(Array.isArray(bruto?.assuntoDeCada) ? bruto.assuntoDeCada[i] : NaN) }))
+    .filter((p) => p.texto)
+    .slice(0, 10);
+  const requisitos = pares.map((p) => p.texto);
   if (requisitos.length < 2) throw new Error("a IA não devolveu requisitos suficientes — tente de novo");
+  const mapa = pares.map((p) => p.assunto);
+  const temMapa = nAssuntos > 0 && mapa.every((n) => Number.isInteger(n) && n >= 1 && n <= nAssuntos);
   return {
     titulo: texto(bruto?.titulo, 120) || "Projeto",
     contexto: texto(bruto?.contexto, 2000),
     requisitos,
+    ...(temMapa ? { assuntoDeCada: mapa } : {}),
     extras: listaDeTextos(bruto?.extras, 300, 5),
     entrega: texto(bruto?.entrega, 600),
     criterios: listaDeTextos(bruto?.criterios, 240, 6),

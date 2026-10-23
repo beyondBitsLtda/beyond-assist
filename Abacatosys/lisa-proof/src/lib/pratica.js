@@ -21,9 +21,9 @@ import {
   pontosDoQuiz, pontosDaNota, quizParaTela, podeReenviar, entregaConcluida, ehProjeto,
   RODADAS_POR_DIA, podeAbrirRodada, comFatorDaRodada,
   tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto,
-  complexidadeDe, podeTrocarComplexidade, TROCAS_DE_COMPLEXIDADE,
+  complexidadeDe, podeTrocarComplexidade, TROCAS_DE_COMPLEXIDADE, podeTrocarProjeto, projetoAntigo,
 } from "@/dominio/pratica.js";
-import { semanaDoProjeto, podeGerarProjeto, valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
+import { semanaDoProjeto, semanaDoDesafio, pedidoDoProjeto, podeGerarProjeto, valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
 import { avancoDasTrilhas, avancoDaTrilhaDoUsuario } from "./avanco.js";
 
 const CAMPOS = "id, usuario_id, trilha_id, tipo, periodo, rodada, card_ids, titulo, conteudo, status, resposta, avaliacao, nota, pontos, tentativas, criado_em, atualizado_em";
@@ -72,21 +72,28 @@ function projetoDaVezParaTela(avanco) {
 
 // ---------------------------------------------------------------- ler
 
-/** O desafio como a tela pode ver (o quiz sem o gabarito das perguntas não respondidas). */
-export function desafioParaTela(d, tema) {
+/**
+ * O desafio como a tela pode ver (o quiz sem o gabarito das perguntas não respondidas). `unidade`: a
+ * semana do curso do projeto (do avanço) — os projetos de antes das semanas do curso não a guardam.
+ */
+export function desafioParaTela(d, tema, unidade = null) {
+  const semana = d.conteudo?.semana || (eProjeto(d.tipo) ? unidade?.numero : null) || null;
   const base = {
     id: d.id,
     trilhaId: d.trilha_id,
     tema: tema || "",
     tipo: d.tipo,
-    nome: d.tipo === "projeto_semanal" && d.conteudo?.semana ? `Projeto da semana ${d.conteudo.semana}` : NOMES_DOS_DESAFIOS[d.tipo],
+    nome: d.tipo === "projeto_semanal" && semana ? `Projeto da semana ${semana}` : NOMES_DOS_DESAFIOS[d.tipo],
     periodo: d.periodo,
     rodada: d.rodada || 1,
     maxRodadas: RODADAS_POR_DIA[d.tipo] || 1,
-    ate: d.conteudo?.ate || fimDoPeriodo(d.tipo, d.periodo),
+    ate: d.conteudo?.ate || unidade?.ate || fimDoPeriodo(d.tipo, d.periodo),
     titulo: d.titulo,
-    // o projeto da semana do plano e o final guardam a semana e o prazo dela; os antigos, o do calendário
-    semana: d.conteudo?.semana || null,
+    // o projeto da semana do curso e o final guardam a semana e as datas dela; os antigos, só o calendário
+    semana,
+    semanaDoCurso: semana && d.tipo !== "projeto_mensal"
+      ? { numero: semana, de: d.conteudo?.de || unidade?.de || null, ate: d.conteudo?.ate || unidade?.ate || null }
+      : null,
     status: d.status,
     nota: d.nota,
     pontos: d.pontos,
@@ -100,13 +107,29 @@ export function desafioParaTela(d, tema) {
   if (eProjeto(d.tipo)) {
     const { original, ...conteudo } = d.conteudo || {}; // a versão padrão guardada não vai para a tela
     const pontuacao = pontuacaoDoProjeto(d);
+    const antigo = projetoAntigo(d.conteudo);
     return {
       ...base, conteudo, resposta: d.resposta || {}, pontuacao, completo: pontuacao.completo,
       complexidade: complexidadeDe(d.conteudo),
       trocasRestantes: Math.max(0, TROCAS_DE_COMPLEXIDADE - (d.conteudo?.trocas || 0)),
+      // os assuntos que o projeto pratica; num antigo, os da semana do curso dele (o que ele DEVIA praticar)
+      antigo,
+      assuntos: !antigo ? d.conteudo.assuntos : (unidade?.etapas || []).map((e) => e.titulo),
+      troca: podeTrocarProjeto(d),
     };
   }
   return { ...base, conteudo: d.conteudo, resposta: d.resposta || {} };
+}
+
+/** Um desafio para abrir na tela; o projeto vem com a semana do curso dele (a do avanço da trilha). */
+export async function desafioParaAbrir(id, usuarioId) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (d.tipo === "projeto_semanal" || d.tipo === "projeto_final") {
+    const { trilha, avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
+    return desafioParaTela(d, trilha.tema, semanaDoDesafio(avanco, d));
+  }
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  return desafioParaTela(d, trilha.tema);
 }
 
 export async function desafioDoUsuario(id, usuarioId) {
@@ -240,43 +263,35 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, 
   await quadroDeEstudo(trilha.quadro_id, usuarioId); // o quadro ainda é desta pessoa e de estudo
   if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
 
-  const semanas = avanco.unidades.length;
-  const assuntos = assuntoPedido
-    ? [assuntoPedido]
-    : !projeto
-    ? (avanco.assuntoDaPratica ? [avanco.assuntoDaPratica] : [])
-    : tipo === "projeto_final" && semanas > 1
-      ? avanco.etapas.filter((e) => e.inicio).slice(0, 15) // o final junta a trilha inteira
-      : unidade.etapas.slice(0, 12);
-  if (!assuntos.length) throw new ErroDeAcesso(400, "a trilha não tem assuntos para praticar");
-
   // as rodadas de antes, para não repetir pergunta nem exercício (a IA é avisada E o código confere)
   const anteriores = tipo === "quiz"
     ? doDia.flatMap((d) => (d.conteudo?.perguntas || []).map((p) => ({ pergunta: p.pergunta, codigo: p.codigo })))
-    : doDia.map((d) => ({ titulo: d.titulo, enunciado: d.conteudo?.enunciado }));
+    : doDia.map((d) => ({ titulo: d.titulo, enunciado: d.conteudo?.enunciado || d.conteudo?.contexto }));
   const evitar = tipo === "quiz" ? [] : anteriores.map((a) => `${a.titulo}: ${String(a.enunciado || "").slice(0, 300)}`);
 
-  let conteudo, titulo;
-  try {
-    if (tipo === "quiz") {
-      conteudo = await gerarQuiz({ tema: trilha.tema, assunto: assuntos[0], anteriores, rodada });
-      titulo = `Quiz${rodada > 1 ? ` ${rodada}` : ""}: ${assuntos[0].titulo}`;
-    } else if (tipo === "exercicio") {
-      conteudo = await gerarExercicio({ tema: trilha.tema, assunto: assuntos[0], evitar, anteriores, rodada });
-      titulo = conteudo.titulo;
-    } else {
-      conteudo = await gerarProjeto({ tema: trilha.tema, tipo, assuntos, semanas, numero: unidade.numero });
-      titulo = conteudo.titulo;
-      // a semana do plano e o prazo dela (o fim do que foi agendado); o final guarda o valor dele
-      conteudo = { ...conteudo, semana: unidade.numero, ate: unidade.ate, ...(tipo === "projeto_final" ? { valor: valorDoProjetoFinal(semanas), semanas } : {}) };
+  let conteudo, titulo, cardIds;
+  if (projeto) {
+    ({ conteudo, titulo, cardIds } = await gerarConteudoDoProjeto({ trilha, avanco, tipo, unidade, evitar }));
+  } else {
+    const assuntos = assuntoPedido ? [assuntoPedido] : avanco.assuntoDaPratica ? [avanco.assuntoDaPratica] : [];
+    if (!assuntos.length) throw new ErroDeAcesso(400, "a trilha não tem assuntos para praticar");
+    try {
+      if (tipo === "quiz") {
+        conteudo = await gerarQuiz({ tema: trilha.tema, assunto: assuntos[0], anteriores, rodada });
+        titulo = `Quiz${rodada > 1 ? ` ${rodada}` : ""}: ${assuntos[0].titulo}`;
+      } else {
+        conteudo = await gerarExercicio({ tema: trilha.tema, assunto: assuntos[0], evitar, anteriores, rodada });
+        titulo = conteudo.titulo;
+      }
+    } catch (e) {
+      throw new ErroDeAcesso(502, e.message);
     }
-  } catch (e) {
-    throw new ErroDeAcesso(502, e.message);
+    cardIds = assuntos.map((a) => a.cardId);
   }
 
   const { data, error } = await supabase.from("proof_desafios").insert({
     usuario_id: usuarioId, trilha_id: trilha.id, tipo, periodo: alvo, rodada,
-    card_ids: assuntos.map((a) => a.cardId), titulo: String(titulo).slice(0, 200), conteudo,
+    card_ids: cardIds, titulo: String(titulo).slice(0, 200), conteudo,
   }).select(CAMPOS).single();
 
   if (error?.code === "23505") {
@@ -286,6 +301,50 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, 
   }
   falhou(error, "desafio");
   return { desafio: data, tema: trilha.tema, novo: true };
+}
+
+/**
+ * O enunciado do projeto de uma semana do curso (ou do final), gerado pela IA a partir dos assuntos
+ * dela (src/dominio/avanco.js: pedidoDoProjeto). A semana, as datas e os assuntos vão junto no
+ * conteúdo: a tela mostra o que o projeto pratica, requisito por requisito.
+ */
+async function gerarConteudoDoProjeto({ trilha, avanco, tipo, unidade, evitar = [] }) {
+  const { assuntos, semanas, antes, depois } = pedidoDoProjeto(avanco, tipo, unidade);
+  if (!assuntos.length) throw new ErroDeAcesso(400, "a trilha não tem assuntos para praticar");
+  let gerado;
+  try {
+    gerado = await gerarProjeto({ tema: trilha.tema, tipo, assuntos, semanas, numero: unidade.numero, antes, depois, evitar });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  const conteudo = {
+    ...gerado,
+    semana: unidade.numero, de: unidade.de, ate: unidade.ate, assuntos: assuntos.map((a) => a.titulo),
+    ...(tipo === "projeto_final" ? { valor: valorDoProjetoFinal(semanas), semanas } : {}),
+  };
+  return { conteudo, titulo: String(gerado.titulo).slice(0, 200), cardIds: assuntos.map((a) => a.cardId) };
+}
+
+/**
+ * Trocar o projeto da semana (ou o final) por outro, antes da primeira entrega (pedido de 23/10/2026:
+ * "o projeto da semana 1 não tem nada a ver com a semana 1"). O novo sai dos assuntos da semana do
+ * curso; o desafio continua o mesmo (mesma semana, mesma rodada) — só o enunciado muda.
+ */
+export async function trocarProjeto({ usuarioId, id }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  const pode = podeTrocarProjeto(d);
+  if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
+  const { trilha, avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
+  const unidade = semanaDoDesafio(avanco, d);
+  if (!unidade) throw new ErroDeAcesso(409, "este projeto não é de nenhuma semana da trilha agora");
+  await quadroDeEstudo(trilha.quadro_id, usuarioId);
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+
+  const evitar = [`${d.titulo}: ${String(d.conteudo?.contexto || "").slice(0, 300)}`];
+  const { conteudo: novo, titulo, cardIds } = await gerarConteudoDoProjeto({ trilha, avanco, tipo: d.tipo, unidade, evitar });
+  const conteudo = { ...novo, novos: (d.conteudo?.novos || 0) + 1 };
+  await salvar(d.id, { conteudo, titulo, card_ids: cardIds });
+  return desafioParaTela({ ...d, conteudo, titulo, card_ids: cardIds }, trilha.tema, unidade);
 }
 
 // ---------------------------------------------------------------- responder e entregar
@@ -456,17 +515,21 @@ export async function mudarComplexidade({ usuarioId, id, nivel }) {
   const d = await desafioDoUsuario(id, usuarioId);
   const pode = podeTrocarComplexidade(d, nivel);
   if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
-  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  const { trilha, avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
+  const unidade = semanaDoDesafio(avanco, d);
 
   const { guia, original, trocas = 0, complexidade, ...atual } = d.conteudo || {};
-  // a semana do plano, o prazo e o valor do projeto final não mudam com a complexidade
-  const meta = Object.fromEntries(["semana", "ate", "valor", "semanas"].filter((k) => atual[k] != null).map((k) => [k, atual[k]]));
+  // a semana do curso (número, datas e assuntos), o valor do projeto final e as trocas de projeto
+  // não mudam com a complexidade
+  const meta = Object.fromEntries(["semana", "de", "ate", "assuntos", "valor", "semanas", "novos"].filter((k) => atual[k] != null).map((k) => [k, atual[k]]));
   const padrao = original || atual;
   let novo = padrao;
   if (nivel !== "padrao") {
     if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+    // a versão desafiadora também não pode exigir o que a trilha ainda não ensinou
+    const depois = unidade && d.tipo === "projeto_semanal" ? pedidoDoProjeto(avanco, d.tipo, unidade).depois : [];
     try {
-      novo = await ajustarComplexidadeDoProjeto({ tema: trilha.tema, tipo: d.tipo, projeto: padrao, nivel });
+      novo = await ajustarComplexidadeDoProjeto({ tema: trilha.tema, tipo: d.tipo, projeto: padrao, nivel, depois });
     } catch (e) {
       throw new ErroDeAcesso(502, e.message);
     }
@@ -474,7 +537,7 @@ export async function mudarComplexidade({ usuarioId, id, nivel }) {
   const conteudo = { ...novo, ...meta, complexidade: nivel, trocas: trocas + 1, original: padrao };
   const titulo = String(novo.titulo || d.titulo).slice(0, 200);
   await salvar(d.id, { conteudo, titulo });
-  return desafioParaTela({ ...d, conteudo, titulo }, trilha.tema);
+  return desafioParaTela({ ...d, conteudo, titulo }, trilha.tema, unidade);
 }
 
 /**

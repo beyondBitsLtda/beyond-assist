@@ -618,7 +618,76 @@ function PlacarDoProjeto({ pontuacao }) {
   );
 }
 
-export function Projeto({ desafio: inicial }) {
+/**
+ * Os assuntos da semana do curso que o projeto pratica (pedido de 23/10/2026: "o projeto da semana 1
+ * não tem nada a ver com a semana 1"). No projeto antigo (de antes das semanas do curso), os assuntos
+ * da semana dele — o que ele devia praticar — e o convite para gerar um novo.
+ */
+function AssuntosDoProjeto({ desafio }) {
+  const lista = desafio.assuntos || [];
+  if (!lista.length) return null;
+  const final = desafio.tipo === "projeto_final";
+  const semana = desafio.semanaDoCurso?.numero;
+  return (
+    <div className="projeto__assuntos">
+      <span className="pf-campo__rotulo">
+        {final ? "📚 Os assuntos da trilha que o projeto final junta"
+          : desafio.antigo ? `📚 Os assuntos da semana ${semana} do curso`
+          : `📚 Os assuntos da semana ${semana} que este projeto pratica`}
+      </span>
+      <ol className="projeto__assuntos-lista">
+        {lista.map((t, i) => <li key={i}><span className="projeto__assunto-n">{i + 1}</span>{t}</li>)}
+      </ol>
+    </div>
+  );
+}
+
+/** Gerar outro projeto da semana (ou outro final), só dos assuntos dela — antes da primeira entrega. */
+function TrocarProjeto({ desafio, aoTrocar }) {
+  const [trocando, setTrocando] = useState(false);
+  const [erro, setErro] = useState("");
+  if (!desafio.troca || desafio.tentativas > 0) return null;
+  const final = desafio.tipo === "projeto_final";
+  const qual = final ? "outro projeto final" : `um projeto novo da semana ${desafio.semanaDoCurso?.numero ?? ""}`;
+
+  async function trocar() {
+    if (trocando) return;
+    if (!window.confirm(`Gerar ${qual}? O enunciado de agora some (nada foi entregue ainda, então não perde pontos).`)) return;
+    setTrocando(true);
+    setErro("");
+    reagir("pensando", "Montando um projeto com os assuntos da semana…", 60000);
+    try {
+      const r = await criar(`/api/desafios/${desafio.id}/trocar`, {});
+      aoTrocar(r.desafio);
+      reagir("feliz", "Projeto novo pronto! Cada requisito diz qual assunto ele pratica.", 5000);
+    } catch (falha) {
+      setErro(falha.message);
+      reagir("surpreso", "Não consegui gerar outro projeto agora.");
+    } finally {
+      setTrocando(false);
+    }
+  }
+
+  return (
+    <div className={`projeto__trocar${desafio.antigo ? " projeto__trocar--antigo" : ""}`}>
+      <p>
+        {desafio.antigo
+          ? `⚠️ Este projeto foi gerado antes das semanas do curso e pode não bater com os assuntos acima. Gere um novo, feito só dos assuntos da semana ${desafio.semanaDoCurso?.numero ?? ""}.`
+          : "Este projeto não te convenceu? Dá para gerar outro sobre os mesmos assuntos, antes da primeira entrega."}
+      </p>
+      <div className="projeto__trocar-acao">
+        <button type="button" className={`pf-botao pf-botao--pequeno${desafio.antigo ? "" : " pf-botao--sec"}`}
+          disabled={!desafio.troca.ok || trocando} onClick={trocar}>
+          {trocando ? "gerando…" : `🔄 Gerar ${qual}`}
+        </button>
+        <small>{desafio.troca.ok ? `${desafio.troca.restantes} troca(s) restante(s)` : desafio.troca.motivo}</small>
+      </div>
+      {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+    </div>
+  );
+}
+
+export function Projeto({ desafio: inicial, aoMudar }) {
   const [desafio, setDesafio] = useState(inicial);
   const [pontuacao, setPontuacao] = useState(inicial.pontuacao || null);
   const c = desafio.conteudo;
@@ -628,6 +697,13 @@ export function Projeto({ desafio: inicial }) {
   const valor = (pts, feito, bonus) => (
     <span className={`projeto__valor${feito ? " projeto__valor--feito" : ""}`}>{feito ? "✓ " : "+"}{pts ?? 0} pts{bonus ? " bônus" : ""}</span>
   );
+  // o projeto mudou (complexidade ou um projeto novo): a tela inteira acompanha (o título lá em cima também)
+  const mudou = (d) => { setDesafio(d); setPontuacao(d.pontuacao || null); aoMudar?.(d); };
+  const semana = desafio.semanaDoCurso;
+  const assuntoDe = (i) => {
+    const n = c.assuntoDeCada?.[i];
+    return n && desafio.assuntos?.[n - 1] ? { n, titulo: desafio.assuntos[n - 1] } : null;
+  };
 
   return (
     <div className="desafio">
@@ -635,11 +711,20 @@ export function Projeto({ desafio: inicial }) {
         <div className="pf-assunto__chips">
           <span className="pf-pilula pf-pilula--tema">{desafio.tema}</span>
           <span className="pf-pilula">{desafio.nome}</span>
-          <span className="pf-pilula pf-pilula--atencao">até {formatarDia(desafio.ate, { comSemana: true })}</span>
+          {semana
+            ? (
+              <span className="pf-pilula">
+                📅 {desafio.tipo === "projeto_final" ? "Reta final da trilha" : `Semana ${semana.numero} do curso`}
+                {semana.de && semana.ate ? ` · ${formatarDia(semana.de)} a ${formatarDia(semana.ate)}` : ""}
+              </span>
+            )
+            : <span className="pf-pilula pf-pilula--atencao">até {formatarDia(desafio.ate, { comSemana: true })}</span>}
           {tabela.maximo > 0 && <span className="pf-pilula pf-pilula--verde">vale até {tabela.maximo} pontos</span>}
         </div>
+        <AssuntosDoProjeto desafio={desafio} />
+        {desafio.antigo && <TrocarProjeto desafio={desafio} aoTrocar={mudou} />}
         {desafio.complexidade && (
-          <Complexidade desafio={desafio} aoMudar={(d) => { setDesafio(d); setPontuacao(d.pontuacao || null); }} />
+          <Complexidade desafio={desafio} aoMudar={mudou} />
         )}
         {c.contexto && <Explicacao texto={c.contexto} className="desafio__texto" />}
         <p className="pf-campo__rotulo">Requisitos · cada um vale os pontos dele</p>
@@ -647,6 +732,11 @@ export function Projeto({ desafio: inicial }) {
           {c.requisitos.map((t, i) => (
             <li key={i} className={feitos.has(i) ? "projeto__parte--feita" : undefined}>
               <div className="projeto__parte"><span>{emLinha(t)}</span>{valor(tabela.requisitos[i], feitos.has(i))}</div>
+              {assuntoDe(i) && (
+                <span className="projeto__assunto-tag" title={assuntoDe(i).titulo}>
+                  <span className="projeto__assunto-n">{assuntoDe(i).n}</span><span className="projeto__assunto-texto">{assuntoDe(i).titulo}</span>
+                </span>
+              )}
             </li>
           ))}
         </ol>
@@ -675,11 +765,12 @@ export function Projeto({ desafio: inicial }) {
           </>
         )}
         <PlacarDoProjeto pontuacao={pontuacao} />
+        {!desafio.antigo && <TrocarProjeto desafio={desafio} aoTrocar={mudou} />}
         {(desafio.tipo === "projeto_semanal" || desafio.tipo === "projeto_final") && (
           <p className="pf-estat__nota projeto__trava">
             {desafio.tipo === "projeto_final"
               ? `🏆 Projeto final da trilha: aprovado (nota ${NOTA_DE_APROVACAO}+), a trilha está concluída.`
-              : `🔓 Fecha a semana ${desafio.semana || ""} do plano: aprovado (nota ${NOTA_DE_APROVACAO}+), a semana seguinte abre.`}
+              : `🔓 Fecha a semana ${desafio.semana || ""} do curso: aprovado (nota ${NOTA_DE_APROVACAO}+), a semana seguinte abre.`}
           </p>
         )}
       </div>
