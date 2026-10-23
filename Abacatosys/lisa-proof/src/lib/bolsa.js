@@ -20,7 +20,7 @@ import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
 import { buscarTodas } from "./estudo.js";
 import { gerarJson, temModelo, PERSONA } from "./ia.js";
-import { obterReino, saldoDoUsuario } from "./reino.js";
+import { obterReino, saldoDoUsuario, modoDeTesteLigado } from "./reino.js";
 import { diaDe, somarDias } from "@/dominio/datas.js";
 import { horaEmSaoPaulo } from "@/dominio/raioX.js";
 import {
@@ -230,10 +230,12 @@ export async function pregaoDeHoje() {
  * curva do dia (hora a hora), as velas dos últimos dias e o volume negociado hoje, e a minha
  * carteira ao preço desta hora.
  */
-export async function estadoDaBolsa(usuarioId) {
+export async function estadoDaBolsa(usuarioId, { hora: horaPedida } = {}) {
   const pregao = await pregaoDeHoje();
   const dia = diaDe();
-  const hora = horaAgora();
+  // modo de teste: ver o pregão de hoje numa hora qualquer (negociar continua na hora de verdade)
+  const simulada = modoDeTesteLigado() && Number.isInteger(horaPedida) && horaPedida >= 0 && horaPedida <= 23;
+  const hora = simulada ? horaPedida : horaAgora();
   const inicioDoDia = `${dia}T00:00:00-03:00`;
   const [ativas, posicoesR, ordensR, saidasR, saldo, volumeR] = await Promise.all([
     acoesAtivas(),
@@ -280,7 +282,8 @@ export async function estadoDaBolsa(usuarioId) {
   const proxima = new Date();
   proxima.setMinutes(60, 0, 0);
   return {
-    pregao: { dia: pregao.dia, manchete: pregao.manchete, geradoPor: pregao.gerado_por, abrindo: pregao.abrindo, hora, proximaAtualizacao: proxima.toISOString() },
+    pregao: { dia: pregao.dia, manchete: pregao.manchete, geradoPor: pregao.gerado_por, abrindo: pregao.abrindo, hora, horaDeVerdade: horaAgora(), simulada, proximaAtualizacao: proxima.toISOString() },
+    modoDeTeste: modoDeTesteLigado(),
     regras: { taxa: TAXA_DA_CORRETAGEM, variacaoMaxima: VARIACAO_MAXIMA, precoMinimo: PRECO_MINIMO, maximoDeAcoes: MAXIMO_DE_ACOES, maximoPorOrdem: MAXIMO_POR_ORDEM, novasPorDia: NOVAS_POR_DIA },
     saldo, indice, acoes,
     carteira: { valor: carteiraValor, custo: carteiraCusto, lucro: carteiraValor - carteiraCusto },
@@ -361,4 +364,31 @@ export async function venderAcao(usuarioId, id, quantidade) {
   await supabase.from("proof_bolsa_ordens").insert({ usuario_id: usuarioId, acao_id: acao.id, tipo: "venda", quantidade: pode.quantidade, preco: acao.preco, taxa: pode.taxa, total: pode.total });
   const lucro = pode.total - (antes.custo - depois.custo);
   return { acao: acao.id, nome: acao.nome, quantidade: pode.quantidade, preco: acao.preco, taxa: pode.taxa, total: pode.total, lucro };
+}
+
+/**
+ * Modo de teste: pede à Lisa o pregão de AMANHÃ com as ações de agora e devolve SEM aplicar (nada
+ * muda para ninguém) — para ver as notícias, as variações e as empresas novas que ela inventaria.
+ */
+export async function previaDoPregao() {
+  if (!modoDeTesteLigado()) throw new ErroDeAcesso(403, "o modo de teste está desligado");
+  const dia = somarDias(diaDe(), 1);
+  const ativas = await acoesAtivas();
+  const { data: todas } = await supabase.from("proof_bolsa_acoes").select("id");
+  const existentes = (todas || []).map((a) => a.id);
+  const novas = ativas.length ? NOVAS_POR_DIA : ACOES_DO_PRIMEIRO_DIA;
+  let pregao, geradoPor = "lisa";
+  try {
+    if (!temModelo()) throw new Error("sem IA configurada");
+    const historico = await historicoDe(ativas.map((a) => a.id), somarDias(dia, -6));
+    pregao = validarPregao(await pedirPregaoALisa({ dia, ativas, historico, novas, acontecimentos: await acontecimentosDe(dia) }), ativas, { novas, existentes });
+  } catch {
+    pregao = pregaoDeReserva(dia, ativas, { novas, existentes });
+    geradoPor = "reserva";
+  }
+  return {
+    dia, geradoPor, manchete: pregao.manchete,
+    movimentos: pregao.movimentos.map((m) => { const a = ativas.find((x) => x.id === m.acao); return { ...m, nome: a?.nome, de: a?.preco, para: a ? precoDepois(a.preco, m.variacao) : null }; }),
+    novas: pregao.novas,
+  };
 }

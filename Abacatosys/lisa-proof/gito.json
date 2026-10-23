@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.18.0-proof-bolsa-ouro.1",
+  "versao": "0.18.0-proof-bolsa-ouro.2",
   "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 46,
+    "numero": 47,
     "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.18.0-proof-bolsa-ouro.2",
+      "data": "2026-10-23",
+      "branch": "proof-bolsa-ouro",
+      "tipo": "funcionalidade",
+      "resumo": "Modo de teste liberado para todos (por enquanto): botões para testar o Reino e a Bolsa sem esperar.",
+      "itens": [
+        "Modo de teste no Reino (e no menu da tela cheia): +1.000 moedas de teste, encher os tanques, todos os veículos, tudo no nível máximo, exército completo, adiantar 24 h das minas, Mina de Ouro lotada e tirar as moedas de teste. Cada botão mexe só no reino de quem aperta.",
+        "Na Bolsa: ver o pregão de hoje em qualquer hora (a boleta fica travada na simulação) e a prévia do pregão de amanhã pela Lisa, sem aplicar nada.",
+        "As moedas de teste entram no livro-caixa com o tipo \"teste\" (saem todas de uma vez); o combustível de teste é uma carga de 0 moeda marcada.",
+        "Desliga com a variável PROOF_MODO_TESTE=0 na hospedagem."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.18.0-proof-bolsa-ouro.1",
       "data": "2026-10-23",
@@ -726,7 +740,8 @@
         "Mina de Ouro com operários (3 de início) cavando no 3D, chance de diamantes, contratação e aluguel de operários entre jogadores",
         "Bolsa do Reino em tela própria (/bolsa), estilo home broker: ações iguais para todos, cotações de hora em hora, gráficos e velas, pregão diário decidido pela Lisa (IA), compra e venda com corretagem",
         "Tela cheia do Reino com menus suspensos e visita completa aos reinos vizinhos durante a paz",
-        "Neuro Abacate (mascote do Abacato), personagem gratuito para todos"
+        "Neuro Abacate (mascote do Abacato), personagem gratuito para todos",
+        "Modo de teste do Reino e da Bolsa (liberado para todos por enquanto; desliga com PROOF_MODO_TESTE=0)"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",

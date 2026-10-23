@@ -12,3 +12,11 @@ update public.proof_bolsa_precos
  where abertura is null;
 
 alter table public.proof_bolsa_ordens alter column preco type numeric(10, 2) using preco::numeric(10, 2);
+
+-- o MODO DE TESTE (liberado para todos por enquanto): as moedas de teste têm tipo próprio no
+-- livro-caixa, para sair todas de uma vez quando o teste acabar
+alter table public.proof_reino_movimentos drop constraint if exists proof_reino_movimentos_tipo_check;
+alter table public.proof_reino_movimentos add constraint proof_reino_movimentos_tipo_check
+  check (tipo in ('construcao', 'neuro', 'coleta', 'saque_ganho', 'saque_perdido', 'vale', 'treino', 'personagem', 'expedicao', 'paz_expedicao',
+                  'veiculo', 'combustivel', 'operario', 'ouro', 'aluguel_pago', 'aluguel_recebido', 'bolsa_compra', 'bolsa_venda', 'bolsa_resgate',
+                  'teste'));

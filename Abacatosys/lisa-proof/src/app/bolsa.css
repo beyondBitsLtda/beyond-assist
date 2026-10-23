@@ -218,3 +218,14 @@
 .bx-resumo__lista li strong { color: var(--bx-amarelo); }
 .bx-resumo__lista li span { white-space: nowrap; }
 .bx-resumo__abrir { max-width: 320px; }
+
+/* ---- o modo de teste na bolsa */
+.bx-teste { margin: 0 16px 12px; padding: 10px 12px; border-radius: 12px; border: 2px dashed #a855f7; background: rgba(168, 85, 247, 0.1); }
+.bx-teste__linha { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.bx-teste__hora { display: flex; align-items: center; gap: 8px; font-size: 13px; flex: 1 1 260px; }
+.bx-teste__hora input { flex: 1; accent-color: #a855f7; }
+.bx-teste__botao { border: 1px solid rgba(168, 85, 247, 0.6); background: var(--bx-painel); color: var(--bx-texto); border-radius: 9px; padding: 6px 10px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.bx-teste__botao:disabled { opacity: 0.6; cursor: default; }
+.bx-teste__previa { margin-top: 10px; font-size: 13px; }
+.bx-teste__previa p { margin: 0 0 6px; }
+.bx-teste__previa ul { margin: 0 0 8px; padding-left: 18px; display: grid; gap: 3px; }

@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req) {
   try {
     const usuario = await exigirUsuario(req);
-    return json({ ok: true, ...(await estadoDaBolsa(usuario.id)) });
+    const hora = new URL(req.url).searchParams.get("hora");
+    return json({ ok: true, ...(await estadoDaBolsa(usuario.id, { hora: hora == null || hora === "" ? undefined : Number(hora) })) });
   } catch (e) {
     return respostaDeErro(e);
   }

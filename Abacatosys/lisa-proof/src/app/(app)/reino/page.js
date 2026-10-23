@@ -27,6 +27,7 @@ import MinaDeOuro from "@/componentes/reino/MinaDeOuro.js";
 import ResumoDaBolsa from "@/componentes/bolsa/Resumo.js";
 import Visita from "@/componentes/reino/Visita.js";
 import TelaCheia from "@/componentes/reino/TelaCheia.js";
+import ModoDeTeste from "@/componentes/reino/ModoDeTeste.js";
 import { urlDoVeiculo } from "@/componentes/reino/veiculosDePapel.js";
 
 // O mundo 3D (Three.js) só baixa nesta tela, e só no navegador.
@@ -161,6 +162,23 @@ export default function Reino() {
     (r) => avisar(r.quantidade ? `Oferta salva: ${r.quantidade} operário(s) a 🪙 ${r.preco} cada` : "Oferta retirada"));
   const coletarMina = () => agir("coletar", { acao: "coletar" }, (r) => reagir("feliz", `+${r.coletou} moedas da mina!`));
   const verExpedicoes = (id) => { setVeiculoDoMapa(id); mostrarSecao("expedicoes"); };
+
+  /** O modo de teste: a ação mexe só no meu reino; depois atualiza o que ela pode ter mudado. */
+  async function testar(acao) {
+    setOcupado(`teste:${acao}`);
+    try {
+      const r = await criar("/api/reino/teste", { acao });
+      setReino(r.reino);
+      avisar(`🧪 ${r.resultado.mensagem}`);
+      carregarMapa();
+      if (acao === "moedas" || acao === "limpar") carregarBolsa();
+      if (acao === "operarios") carregarMercado();
+    } catch (e) {
+      avisar(e.message);
+    } finally {
+      setOcupado("");
+    }
+  }
 
   async function alugar(oferta, quantidade) {
     setOcupado(`alugar:${oferta.dono}`);
@@ -378,6 +396,12 @@ export default function Reino() {
         aoBloqueado={(x) => avisar(x.liberada ? x.motivo : `${x.nome} libera com a Torre do Neuro no nível ${x.torreMinima}`)} />
     ),
     bolsa: () => <ResumoDaBolsa bolsa={bolsa} />,
+    teste: () => (
+      <section className="pf-secao" id="teste">
+        <h2 className="pf-secao__titulo">🧪 Modo de teste <small>liberado para todos por enquanto</small></h2>
+        <ModoDeTeste ocupado={ocupado} aoAgir={testar} />
+      </section>
+    ),
     invadir: () => (
       <>
         <section className="pf-secao" id="invadir">
@@ -469,7 +493,7 @@ export default function Reino() {
       <VistaDoReino reino={reino} visita={visita} telaCheia={telaCheia} aoTelaCheia={entrarNaTelaCheia}
         aoEscolher={escolherConstrucao} aoVisitar={visitar} aoVoltarDaVisita={() => setVisita(null)}>
         {telaCheia && (
-          <TelaCheia reino={reino} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} ocupado={ocupado}
+          <TelaCheia reino={reino} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} ocupado={ocupado} comTeste={reino.modoDeTeste}
             aoColetarMina={coletarMina} aoColetarOuro={coletarOuro}>
             {painel && secoes[painel]?.()}
           </TelaCheia>
@@ -501,6 +525,12 @@ export default function Reino() {
             <Link href="/ranking" className="pf-botao pf-botao--sec rn-acoes__ranking">🏆 Ranking</Link>
           </div>
           {simulando && <Simulador reino={reino} aoFechar={() => setSimulando(false)} />}
+          {reino.modoDeTeste && (
+            <details className="rn-teste__caixa">
+              <summary>🧪 Modo de teste <small>moedas, combustível, veículos, construções, exército, minas — liberado para todos por enquanto</small></summary>
+              <ModoDeTeste ocupado={ocupado} aoAgir={testar} />
+            </details>
+          )}
 
           <div className="rn-numeros">
             <Numero rotulo="Moedas" valor={<Moedas n={reino.saldo} />} nota={`${numero(reino.cofre.protege)} a salvo no cofre (e todas podem ser gastas)`} />

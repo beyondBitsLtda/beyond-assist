@@ -26,9 +26,12 @@ export default function Terminal() {
   const [ordem, setOrdem] = useState("altas");
   const [ocupado, setOcupado] = useState(false);
   const [agora, setAgora] = useState(() => Date.now());
+  const [horaDeTeste, setHoraDeTeste] = useState(null); // modo de teste: ver o pregão numa hora qualquer
+  const [previa, setPrevia] = useState(null);           // modo de teste: o pregão de amanhã pela Lisa, sem aplicar
   const [Aviso, avisar] = useAviso();
 
-  const carregar = useCallback(() => obter("/api/reino/bolsa").then((b) => { setBolsa(b); setErro(""); }).catch((e) => setErro(e.message)), []);
+  const carregar = useCallback(() => obter(horaDeTeste == null ? "/api/reino/bolsa" : `/api/reino/bolsa?hora=${horaDeTeste}`)
+    .then((b) => { setBolsa(b); setErro(""); }).catch((e) => setErro(e.message)), [horaDeTeste]);
   useEffect(() => {
     carregar();
     // confere de minuto em minuto (o preço muda na virada da hora); com a aba escondida, para
@@ -101,12 +104,12 @@ export default function Terminal() {
           <h1>📈 Bolsa do Reino</h1>
           <span className={`bx-status${bolsa.pregao.abrindo ? " bx-status--abrindo" : ""}`}>
             <span className="bx-status__luz" aria-hidden="true" />
-            {bolsa.pregao.abrindo ? "A Lisa está abrindo o pregão…" : `Pregão aberto · ${horaCurta(bolsa.pregao.hora)}`}
+            {bolsa.pregao.abrindo ? "A Lisa está abrindo o pregão…" : `Pregão aberto · ${horaCurta(bolsa.pregao.hora)}${bolsa.pregao.simulada ? " (simulação)" : ""}`}
           </span>
         </div>
         <div className="bx-topo__relogio">
           <strong>{relogio}</strong>
-          <small>próxima cotação às {horaCurta((bolsa.pregao.hora + 1) % 24)} · em {faltaMin} min</small>
+          <small>próxima cotação às {horaCurta(((bolsa.pregao.horaDeVerdade ?? bolsa.pregao.hora) + 1) % 24)} · em {faltaMin} min</small>
         </div>
         <div className="bx-indice">
           <div>
@@ -120,6 +123,10 @@ export default function Terminal() {
 
       {bolsa.pregao.manchete && (
         <p className="bx-manchete"><span>🎙️ LISA AO VIVO</span> {bolsa.pregao.manchete}</p>
+      )}
+
+      {bolsa.modoDeTeste && (
+        <BarraDeTeste bolsa={bolsa} hora={horaDeTeste} aoHora={setHoraDeTeste} previa={previa} aoPrevia={setPrevia} avisar={avisar} />
       )}
 
       <div className="bx-grade-principal">
@@ -175,7 +182,7 @@ export default function Terminal() {
           </section>
         )}
 
-        {acao && <Boleta acao={acao} saldo={bolsa.saldo} regras={bolsa.regras} ocupado={ocupado} pregaoAbrindo={bolsa.pregao.abrindo} aoEnviar={negociar} />}
+        {acao && <Boleta acao={acao} saldo={bolsa.saldo} regras={bolsa.regras} ocupado={ocupado} pregaoAbrindo={bolsa.pregao.abrindo} simulada={bolsa.pregao.simulada} aoEnviar={negociar} />}
       </div>
 
       <div className="bx-grade-baixo">
@@ -211,7 +218,7 @@ function Letreiro({ acoes }) {
 }
 
 /** A boleta: comprar ou vender a ação escolhida, ao preço desta hora. */
-function Boleta({ acao, saldo, regras, ocupado, pregaoAbrindo, aoEnviar }) {
+function Boleta({ acao, saldo, regras, ocupado, pregaoAbrindo, simulada, aoEnviar }) {
   const [tipo, setTipo] = useState("comprar");
   const [qtd, setQtd] = useState(1);
   const tem = acao.minha?.quantidade || 0;
@@ -246,7 +253,8 @@ function Boleta({ acao, saldo, regras, ocupado, pregaoAbrindo, aoEnviar }) {
         <dt><strong>{tipo === "comprar" ? "Você paga" : "Você recebe"}</strong></dt><dd><strong>🪙 {moedas(total)}</strong></dd>
       </dl>
       {falta && <p className="bx-alerta">Faltam 🪙 {moedas(total - saldo)}.</p>}
-      <button type="button" className={`bx-enviar bx-enviar--${tipo}`} disabled={ocupado || pregaoAbrindo || falta || (tipo === "vender" && !tem)} onClick={() => aoEnviar(tipo, q)}>
+      {simulada && <p className="bx-alerta">🧪 Você está vendo uma hora simulada — volte para “agora” para negociar (a ordem usa sempre o preço da hora de verdade).</p>}
+      <button type="button" className={`bx-enviar bx-enviar--${tipo}`} disabled={ocupado || pregaoAbrindo || simulada || falta || (tipo === "vender" && !tem)} onClick={() => aoEnviar(tipo, q)}>
         {ocupado ? "Enviando a ordem…" : tipo === "comprar" ? `Comprar ${q} ${acao.id}` : `Vender ${q} ${acao.id}`}
       </button>
       <p className="bx-boleta__saldo">Saldo para investir: <strong>🪙 {moedas(saldo)}</strong></p>
@@ -333,6 +341,51 @@ function Mural({ bolsa, aoEscolher }) {
           <li key={s.id} className="bx-mural__saida">{s.emoji} <strong>{s.nome}</strong> {s.status === "falida" ? "faliu — as ações viraram pó" : `fechou o capital e pagou 🪙 ${preco(s.preco)} por ação`} ({diaCurto(s.dia)})</li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+/**
+ * O modo de teste na bolsa: ver o pregão de hoje numa hora qualquer (o caminho do preço é o mesmo
+ * para todos, então dá para ver como o dia anda) e pedir à Lisa a prévia do pregão de amanhã.
+ */
+function BarraDeTeste({ bolsa, hora, aoHora, previa, aoPrevia, avisar }) {
+  const [pedindo, setPedindo] = useState(false);
+  const vendo = hora == null ? bolsa.pregao.horaDeVerdade : hora;
+  async function pedirPrevia() {
+    setPedindo(true);
+    try {
+      const r = await criar("/api/reino/teste", { acao: "pregao" });
+      aoPrevia(r.previa);
+    } catch (e) {
+      avisar(e.message);
+    } finally {
+      setPedindo(false);
+    }
+  }
+  return (
+    <section className="bx-teste" aria-label="Modo de teste da bolsa">
+      <div className="bx-teste__linha">
+        <strong>🧪 Modo de teste</strong>
+        <label className="bx-teste__hora">
+          <span>Ver o pregão às <b>{horaCurta(vendo)}</b>{hora == null ? " (agora)" : " (simulação)"}</span>
+          <input type="range" min={0} max={23} step={1} value={vendo} onChange={(e) => aoHora(Number(e.target.value))} aria-label="Hora do pregão" />
+        </label>
+        {hora != null && <button type="button" className="bx-teste__botao" onClick={() => aoHora(null)}>⟲ Agora</button>}
+        <button type="button" className="bx-teste__botao" disabled={pedindo} onClick={pedirPrevia}>{pedindo ? "A Lisa está pensando…" : "🎙️ Prévia do pregão de amanhã"}</button>
+      </div>
+      {previa && (
+        <div className="bx-teste__previa">
+          <p><strong>Prévia de {diaCurto(previa.dia)}</strong> ({previa.geradoPor === "lisa" ? "a Lisa decidiu" : "sorteio automático"} · nada foi aplicado): {previa.manchete}</p>
+          <ul>
+            {previa.movimentos.map((m) => (
+              <li key={m.acao}><strong>{m.acao}</strong> {preco(m.de)} → {preco(m.para)} <span className={`bx-txt--${rumo(m.variacao)}`}>{seta(m.variacao)} {pct(m.variacao)}</span> · {m.noticia}</li>
+            ))}
+            {previa.novas.map((n) => <li key={n.id}>✨ <strong>{n.id}</strong> {n.emoji} {n.nome} estrearia a {preco(n.preco)} · {n.descricao}</li>)}
+          </ul>
+          <button type="button" className="bx-teste__botao" onClick={() => aoPrevia(null)}>Fechar a prévia</button>
+        </div>
+      )}
     </section>
   );
 }
