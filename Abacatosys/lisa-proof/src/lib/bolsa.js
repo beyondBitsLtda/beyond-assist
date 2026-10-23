@@ -8,6 +8,11 @@
 // MINUTOS_PARA_RETOMAR; aplicar de novo não dobra nada, porque o preço de cada ação no dia tem
 // chave própria (acao, dia).
 //
+// HORA A HORA (23/10/2026): o pregão grava, para cada ação, a ABERTURA (o fechamento de ontem) e o
+// FECHAMENTO que a Lisa decidiu; o preço de cada hora sai do caminho entre os dois (caminhoDoDia,
+// em src/dominio/bolsa.js), calculado na hora em que alguém olha — o mesmo para todo mundo. Quem
+// sai da bolsa (falência, fechamento de capital) sai na abertura, pelo fechamento de ontem.
+//
 // Dinheiro: comprar segue a ordem do reino (lança, grava o reino com a versão, desfaz se perder a
 // corrida); vender tira as ações primeiro (só se a posição ainda for a que eu li) e depois paga.
 
@@ -15,17 +20,23 @@ import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
 import { buscarTodas } from "./estudo.js";
 import { gerarJson, temModelo, PERSONA } from "./ia.js";
-import { obterReino, saldoDoUsuario } from "./reino.js";
+import { obterReino, saldoDoUsuario, modoDeTesteLigado } from "./reino.js";
 import { diaDe, somarDias } from "@/dominio/datas.js";
+import { horaEmSaoPaulo } from "@/dominio/raioX.js";
 import {
   SETORES, VARIACAO_MAXIMA, PRECO_MINIMO, PRECO_INICIAL, TAXA_DA_CORRETAGEM, NOVAS_POR_DIA, ACOES_DO_PRIMEIRO_DIA,
   MAXIMO_POR_ORDEM, MAXIMO_DE_ACOES, precoDepois, variacaoReal, podeComprarAcao, podeVenderAcao, posicaoDepois,
-  resumoDaCarteira, validarPregao, pregaoDeReserva, saidasDaBolsa,
+  validarPregao, pregaoDeReserva, saidasDaBolsa, caminhoDoDia, velaDe, sementeDaAcao, valorDaVenda,
 } from "@/dominio/bolsa.js";
 
 const MINUTOS_PARA_RETOMAR = 3;
 const DIAS_DE_HISTORICO = 14;
 const CAMPOS_DA_ACAO = "id, nome, setor, emoji, descricao, preco, preco_inicial, status, criada_em, saiu_em";
+
+/** O caminho de uma ação num dia (linha de proof_bolsa_precos): da abertura ao fechamento. */
+const caminhoDa = (linha) => caminhoDoDia({ abertura: linha.abertura ?? linha.preco, fechamento: linha.preco, semente: sementeDaAcao(linha.acao_id, linha.dia) });
+/** A hora do pregão agora: 0 a 23, em São Paulo. */
+const horaAgora = () => horaEmSaoPaulo(new Date());
 
 function falhou(error, onde) {
   if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`);
@@ -109,7 +120,7 @@ async function acoesAtivas() {
 
 async function historicoDe(ids, desde) {
   if (!ids.length) return new Map();
-  const linhas = await buscarTodas(() => supabase.from("proof_bolsa_precos").select("acao_id, dia, preco, variacao, noticia").in("acao_id", ids).gte("dia", desde).order("dia").order("acao_id"));
+  const linhas = await buscarTodas(() => supabase.from("proof_bolsa_precos").select("acao_id, dia, abertura, preco, variacao, noticia").in("acao_id", ids).gte("dia", desde).order("dia").order("acao_id"));
   const m = new Map();
   for (const l of linhas) { if (!m.has(l.acao_id)) m.set(l.acao_id, []); m.get(l.acao_id).push({ ...l, variacao: Number(l.variacao) }); }
   return m;
@@ -131,38 +142,39 @@ async function retirarDaBolsa(acao, motivo, dia) {
 }
 
 async function aplicarPregao(dia, pregao, ativas) {
-  // 1) o preço de cada ação no dia — a chave (acao, dia) não deixa aplicar duas vezes
-  const linhas = pregao.movimentos.map((m) => {
-    const a = ativas.find((x) => x.id === m.acao);
+  // 1) quem sai da bolsa sai na abertura, pelo fechamento de ONTEM (o de hoje ainda vai andar o dia todo)
+  const { faliram, fecham } = saidasDaBolsa(ativas, pregao.novas.length);
+  for (const a of ativas) {
+    if (faliram.includes(a.id)) await retirarDaBolsa(a, "falida", dia);
+    else if (fecham.includes(a.id)) await retirarDaBolsa(a, "fechada", dia);
+  }
+  const ficam = ativas.filter((a) => !faliram.includes(a.id) && !fecham.includes(a.id));
+  // 2) o dia de cada ação: abre no fechamento de ontem e fecha onde a Lisa decidiu — a chave
+  //    (acao, dia) não deixa aplicar duas vezes
+  const linhas = pregao.movimentos.filter((m) => ficam.some((a) => a.id === m.acao)).map((m) => {
+    const a = ficam.find((x) => x.id === m.acao);
     const preco = precoDepois(a.preco, m.variacao);
-    return { acao_id: a.id, dia, preco, variacao: variacaoReal(a.preco, preco), noticia: m.noticia };
+    return { acao_id: a.id, dia, abertura: a.preco, preco, variacao: variacaoReal(a.preco, preco), noticia: m.noticia };
   });
   if (linhas.length) {
     const { error } = await supabase.from("proof_bolsa_precos").upsert(linhas, { onConflict: "acao_id,dia", ignoreDuplicates: true });
     falhou(error, "preços do dia");
   }
-  // 2) o preço atual = o do dia (mesmo se uma tentativa anterior caiu no meio)
+  // 3) o preço guardado da ação = o fechamento do dia (é a abertura de amanhã; o da hora sai do caminho)
   const { data: doDia, error } = await supabase.from("proof_bolsa_precos").select("acao_id, preco").eq("dia", dia);
   falhou(error, "preços do dia");
   const precoDoDia = new Map((doDia || []).map((l) => [l.acao_id, l.preco]));
-  for (const a of ativas) {
+  for (const a of ficam) {
     const p = precoDoDia.get(a.id);
     if (p != null && p !== a.preco) await supabase.from("proof_bolsa_acoes").update({ preco: p }).eq("id", a.id);
   }
-  // 3) quem faliu e quem fecha o capital
-  const depois = ativas.map((a) => ({ ...a, preco: precoDoDia.get(a.id) ?? a.preco }));
-  const { faliram, fecham } = saidasDaBolsa(depois, pregao.novas.length);
-  for (const a of depois) {
-    if (faliram.includes(a.id)) await retirarDaBolsa(a, "falida", dia);
-    else if (fecham.includes(a.id)) await retirarDaBolsa(a, "fechada", dia);
-  }
-  // 4) as empresas novas estreiam
+  // 4) as empresas novas estreiam: o dia delas balança em volta do preço de lançamento
   if (pregao.novas.length) {
     const { error: e1 } = await supabase.from("proof_bolsa_acoes").upsert(pregao.novas.map((n) => ({
       id: n.id, nome: n.nome, setor: n.setor, emoji: n.emoji, descricao: n.descricao, preco: n.preco, preco_inicial: n.preco, status: "ativa", criada_em: dia,
     })), { onConflict: "id", ignoreDuplicates: true });
     falhou(e1, "ações novas");
-    await supabase.from("proof_bolsa_precos").upsert(pregao.novas.map((n) => ({ acao_id: n.id, dia, preco: n.preco, variacao: 0, noticia: `Estreia na bolsa: ${n.descricao}`.slice(0, 160) })),
+    await supabase.from("proof_bolsa_precos").upsert(pregao.novas.map((n) => ({ acao_id: n.id, dia, abertura: n.preco, preco: n.preco, variacao: 0, noticia: `Estreia na bolsa: ${n.descricao}`.slice(0, 160) })),
       { onConflict: "acao_id,dia", ignoreDuplicates: true });
   }
 }
@@ -213,41 +225,70 @@ export async function pregaoDeHoje() {
 
 // ---------------------------------------------------------------- a tela
 
-/** A bolsa como a tela mostra: o pregão, as ações (com o gráfico dos últimos dias) e a minha carteira. */
-export async function estadoDaBolsa(usuarioId) {
+/**
+ * A bolsa como a tela mostra: o pregão, o Índice do Reino, cada ação com o preço desta hora, a
+ * curva do dia (hora a hora), as velas dos últimos dias e o volume negociado hoje, e a minha
+ * carteira ao preço desta hora.
+ */
+export async function estadoDaBolsa(usuarioId, { hora: horaPedida } = {}) {
   const pregao = await pregaoDeHoje();
   const dia = diaDe();
-  const [ativas, posicoesR, ordensR, saidasR, saldo] = await Promise.all([
+  // modo de teste: ver o pregão de hoje numa hora qualquer (negociar continua na hora de verdade)
+  const simulada = modoDeTesteLigado() && Number.isInteger(horaPedida) && horaPedida >= 0 && horaPedida <= 23;
+  const hora = simulada ? horaPedida : horaAgora();
+  const inicioDoDia = `${dia}T00:00:00-03:00`;
+  const [ativas, posicoesR, ordensR, saidasR, saldo, volumeR] = await Promise.all([
     acoesAtivas(),
     supabase.from("proof_bolsa_posicoes").select("acao_id, quantidade, custo").eq("usuario_id", usuarioId).gt("quantidade", 0),
     supabase.from("proof_bolsa_ordens").select("acao_id, tipo, quantidade, preco, taxa, total, criado_em").eq("usuario_id", usuarioId).order("criado_em", { ascending: false }).limit(10),
     supabase.from("proof_bolsa_acoes").select(CAMPOS_DA_ACAO).neq("status", "ativa").gte("saiu_em", somarDias(dia, -3)).order("saiu_em", { ascending: false }),
     saldoDoUsuario(usuarioId),
+    supabase.from("proof_bolsa_ordens").select("acao_id, quantidade").in("tipo", ["compra", "venda"]).gte("criado_em", inicioDoDia).limit(5000),
   ]);
   falhou(posicoesR.error, "carteira");
   const historico = await historicoDe(ativas.map((a) => a.id), somarDias(dia, -(DIAS_DE_HISTORICO - 1)));
-  const posicoes = posicoesR.data || [];
-  const minha = new Map(posicoes.map((p) => [p.acao_id, p]));
-  const precoDe = (id) => ativas.find((a) => a.id === id)?.preco || 0;
+  const volume = new Map();
+  for (const o of volumeR.data || []) volume.set(o.acao_id, (volume.get(o.acao_id) || 0) + o.quantidade);
+  const minha = new Map((posicoesR.data || []).map((p) => [p.acao_id, p]));
   const nomeDe = new Map([...ativas, ...(saidasR.data || [])].map((a) => [a.id, a.nome]));
+  const pct = (de, para) => (de > 0 ? Math.round(((para - de) / de) * 1000) / 10 : 0);
+
+  const acoes = ativas.map((a) => {
+    const h = historico.get(a.id) || [];
+    const linhaDeHoje = h.find((x) => x.dia === dia);
+    const caminho = linhaDeHoje ? caminhoDa(linhaDeHoje) : null;
+    // sem pregão hoje ainda, o preço é o fechamento de ontem, parado
+    const doDia = caminho ? caminho.slice(0, hora + 1) : [a.preco];
+    const agora = doDia[doDia.length - 1];
+    const abertura = doDia[0];
+    const p = minha.get(a.id);
+    const valor = p ? valorDaVenda(agora, p.quantidade) : 0;
+    return {
+      id: a.id, nome: a.nome, setor: a.setor, emoji: a.emoji, descricao: a.descricao, precoInicial: a.preco_inicial,
+      preco: agora, abertura, maxima: Math.max(...doDia), minima: Math.min(...doDia),
+      variacao: pct(abertura, agora), estreia: a.criada_em === dia, noticia: linhaDeHoje?.noticia || "",
+      volume: volume.get(a.id) || 0,
+      horas: doDia.map((preco, i) => ({ hora: i, preco })),
+      velas: h.map((l) => ({ dia: l.dia, ...(l.dia === dia ? velaDe(caminhoDa(l), hora) : velaDe(caminhoDa(l))) })),
+      minha: p ? { quantidade: p.quantidade, custo: p.custo, valor, lucro: valor - p.custo, precoMedio: Math.round((p.custo / p.quantidade) * 100) / 100 } : null,
+    };
+  });
+  // o Índice do Reino: a soma dos preços de todas as ações, hora a hora (como um índice de bolsa)
+  const serie = Array.from({ length: hora + 1 }, (_, i) => ({ hora: i, valor: Math.round(acoes.reduce((s, x) => s + (x.horas[i]?.preco ?? x.preco), 0) * 100) / 100 }));
+  const indice = { valor: serie[serie.length - 1]?.valor || 0, abertura: serie[0]?.valor || 0, serie };
+  indice.variacao = pct(indice.abertura, indice.valor);
+  const carteiraValor = acoes.reduce((s, x) => s + (x.minha?.valor || 0), 0);
+  const carteiraCusto = acoes.reduce((s, x) => s + (x.minha?.custo || 0), 0);
+  const proxima = new Date();
+  proxima.setMinutes(60, 0, 0);
   return {
-    pregao: { dia: pregao.dia, manchete: pregao.manchete, geradoPor: pregao.gerado_por, abrindo: pregao.abrindo },
+    pregao: { dia: pregao.dia, manchete: pregao.manchete, geradoPor: pregao.gerado_por, abrindo: pregao.abrindo, hora, horaDeVerdade: horaAgora(), simulada, proximaAtualizacao: proxima.toISOString() },
+    modoDeTeste: modoDeTesteLigado(),
     regras: { taxa: TAXA_DA_CORRETAGEM, variacaoMaxima: VARIACAO_MAXIMA, precoMinimo: PRECO_MINIMO, maximoDeAcoes: MAXIMO_DE_ACOES, maximoPorOrdem: MAXIMO_POR_ORDEM, novasPorDia: NOVAS_POR_DIA },
-    saldo,
-    acoes: ativas.map((a) => {
-      const h = historico.get(a.id) || [];
-      const hoje = h.find((x) => x.dia === dia);
-      const p = minha.get(a.id);
-      return {
-        id: a.id, nome: a.nome, setor: a.setor, emoji: a.emoji, descricao: a.descricao, preco: a.preco, precoInicial: a.preco_inicial,
-        estreia: a.criada_em === dia, variacao: hoje ? hoje.variacao : 0, noticia: hoje?.noticia || "",
-        historico: h.map((x) => ({ dia: x.dia, preco: x.preco })),
-        minha: p ? { quantidade: p.quantidade, custo: p.custo, valor: p.quantidade * a.preco, lucro: p.quantidade * a.preco - p.custo } : null,
-      };
-    }),
-    carteira: resumoDaCarteira(posicoes, precoDe),
+    saldo, indice, acoes,
+    carteira: { valor: carteiraValor, custo: carteiraCusto, lucro: carteiraValor - carteiraCusto },
     saidas: (saidasR.data || []).map((a) => ({ id: a.id, nome: a.nome, emoji: a.emoji, status: a.status, preco: a.preco, dia: a.saiu_em })),
-    ordens: (ordensR.data || []).map((o) => ({ ...o, nome: nomeDe.get(o.acao_id) || o.acao_id })),
+    ordens: (ordensR.data || []).map((o) => ({ ...o, preco: Number(o.preco), nome: nomeDe.get(o.acao_id) || o.acao_id })),
   };
 }
 
@@ -258,7 +299,10 @@ async function acaoParaNegociar(id) {
   if (pregao.abrindo) throw new ErroDeAcesso(409, "a Lisa está abrindo o pregão de hoje — tente de novo em alguns segundos");
   const { data, error } = await supabase.from("proof_bolsa_acoes").select(CAMPOS_DA_ACAO).eq("id", String(id || "").toUpperCase()).maybeSingle();
   falhou(error, "ação");
-  return data;
+  if (!data) return null;
+  // o preço desta hora (com centavos); sem pregão hoje para ela, o fechamento guardado
+  const { data: hoje } = await supabase.from("proof_bolsa_precos").select("acao_id, dia, abertura, preco").eq("acao_id", data.id).eq("dia", diaDe()).maybeSingle();
+  return { ...data, preco: hoje ? caminhoDa(hoje)[horaAgora()] : data.preco };
 }
 
 async function posicaoDe(usuarioId, acaoId) {
@@ -320,4 +364,31 @@ export async function venderAcao(usuarioId, id, quantidade) {
   await supabase.from("proof_bolsa_ordens").insert({ usuario_id: usuarioId, acao_id: acao.id, tipo: "venda", quantidade: pode.quantidade, preco: acao.preco, taxa: pode.taxa, total: pode.total });
   const lucro = pode.total - (antes.custo - depois.custo);
   return { acao: acao.id, nome: acao.nome, quantidade: pode.quantidade, preco: acao.preco, taxa: pode.taxa, total: pode.total, lucro };
+}
+
+/**
+ * Modo de teste: pede à Lisa o pregão de AMANHÃ com as ações de agora e devolve SEM aplicar (nada
+ * muda para ninguém) — para ver as notícias, as variações e as empresas novas que ela inventaria.
+ */
+export async function previaDoPregao() {
+  if (!modoDeTesteLigado()) throw new ErroDeAcesso(403, "o modo de teste está desligado");
+  const dia = somarDias(diaDe(), 1);
+  const ativas = await acoesAtivas();
+  const { data: todas } = await supabase.from("proof_bolsa_acoes").select("id");
+  const existentes = (todas || []).map((a) => a.id);
+  const novas = ativas.length ? NOVAS_POR_DIA : ACOES_DO_PRIMEIRO_DIA;
+  let pregao, geradoPor = "lisa";
+  try {
+    if (!temModelo()) throw new Error("sem IA configurada");
+    const historico = await historicoDe(ativas.map((a) => a.id), somarDias(dia, -6));
+    pregao = validarPregao(await pedirPregaoALisa({ dia, ativas, historico, novas, acontecimentos: await acontecimentosDe(dia) }), ativas, { novas, existentes });
+  } catch {
+    pregao = pregaoDeReserva(dia, ativas, { novas, existentes });
+    geradoPor = "reserva";
+  }
+  return {
+    dia, geradoPor, manchete: pregao.manchete,
+    movimentos: pregao.movimentos.map((m) => { const a = ativas.find((x) => x.id === m.acao); return { ...m, nome: a?.nome, de: a?.preco, para: a ? precoDepois(a.preco, m.variacao) : null }; }),
+    novas: pregao.novas,
+  };
 }

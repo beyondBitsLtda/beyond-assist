@@ -8,6 +8,7 @@ import "./codigo.css";
 import "./raiox.css";
 import "./reino.css";
 import "./novidades.css";
+import "./bolsa.css";
 
 export const metadata = {
   title: "Lisa_Proof",

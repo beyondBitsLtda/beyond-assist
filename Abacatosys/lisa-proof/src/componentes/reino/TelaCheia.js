@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { numero } from "./pecas.js";
+import { Ouro, Diamante } from "./icones.js";
 
 /** Os menus da tela cheia, na ordem do dock. */
 export const PAINEIS = [
@@ -22,7 +23,8 @@ export const PAINEIS = [
  * dock de baixo, que abre um painel flutuante com a parte escolhida da página. Esc fecha o painel;
  * Esc de novo sai da tela cheia.
  */
-export default function TelaCheia({ reino, painel, aoPainel, aoSair, ocupado, aoColetarMina, aoColetarOuro, children }) {
+export default function TelaCheia({ reino, painel, aoPainel, aoSair, ocupado, aoColetarMina, aoColetarOuro, comTeste = false, children }) {
+  const paineis = comTeste ? [...PAINEIS, { id: "teste", emoji: "🧪", rotulo: "Teste" }] : PAINEIS;
   useEffect(() => {
     const tecla = (e) => {
       if (e.key !== "Escape" || document.querySelector(".folha__fundo")) return; // a folha aberta fecha primeiro
@@ -33,7 +35,7 @@ export default function TelaCheia({ reino, painel, aoPainel, aoSair, ocupado, ao
     return () => document.removeEventListener("keydown", tecla);
   }, [painel, aoPainel, aoSair]);
 
-  const atual = PAINEIS.find((p) => p.id === painel);
+  const atual = paineis.find((p) => p.id === painel);
   return (
     <>
       <div className="rn-hud__topo">
@@ -48,7 +50,9 @@ export default function TelaCheia({ reino, painel, aoPainel, aoSair, ocupado, ao
             <button type="button" className="rn-hud__botao" disabled={Boolean(ocupado)} onClick={aoColetarMina}>⛏️ +{numero(reino.mina.paraColetar)}</button>
           )}
           {reino.ouro?.moedas > 0 && (
-            <button type="button" className="rn-hud__botao" disabled={Boolean(ocupado)} onClick={aoColetarOuro}>⚒️ +{numero(reino.ouro.moedas)}</button>
+            <button type="button" className="rn-hud__botao" disabled={Boolean(ocupado)} onClick={aoColetarOuro} aria-label={`Coletar o ouro: ${reino.ouro.moedas} moedas`}>
+              {reino.ouro.diamantes ? <Diamante tamanho={16} /> : <Ouro tamanho={16} />} +{numero(reino.ouro.moedas)}
+            </button>
           )}
           <button type="button" className="rn-hud__botao rn-hud__sair" onClick={aoSair} aria-label="Sair da tela cheia">✕ <span>Sair</span></button>
         </div>
@@ -63,7 +67,7 @@ export default function TelaCheia({ reino, painel, aoPainel, aoSair, ocupado, ao
         </aside>
       )}
       <nav className="rn-hud__dock" aria-label="Menus do reino">
-        {PAINEIS.map((p) => (
+        {paineis.map((p) => (
           <button key={p.id} type="button" className={`rn-hud__item${painel === p.id ? " rn-hud__item--atual" : ""}`} aria-pressed={painel === p.id}
             onClick={() => aoPainel(painel === p.id ? null : p.id)}>
             <span aria-hidden="true">{p.emoji}</span><small>{p.rotulo}</small>

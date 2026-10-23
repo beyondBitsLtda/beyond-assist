@@ -42,11 +42,12 @@ import {
 import {
   OPERARIOS_INICIAIS, vagasDaMina, ouroAcumulado, horasTrabalhadas, equipeDeAgora, precoDoOperario, podeComprarOperario,
   podeOfertar, podeAlugar, periodoDoAluguel, moedasPorOperarioPorDia,
+  diamantesEntre, chanceDeDiamante, sementeDaMina, VALOR_DO_DIAMANTE, VALOR_DA_PEPITA,
 } from "../src/dominio/ouro.js";
 import {
   precoDepois, variacaoReal, corretagem, podeComprarAcao, podeVenderAcao, posicaoDepois, resumoDaCarteira, validarPregao,
   pregaoDeReserva, saidasDaBolsa, PRECO_MINIMO, PRECO_INICIAL, VARIACAO_MAXIMA, SETORES, NOVAS_POR_DIA, ACOES_DO_PRIMEIRO_DIA,
-  MAXIMO_DE_ACOES, MAXIMO_POR_ORDEM,
+  MAXIMO_DE_ACOES, MAXIMO_POR_ORDEM, caminhoDoDia, velaDe, sementeDaAcao, PASSOS_DO_DIA, valorDaCompra, valorDaVenda,
 } from "../src/dominio/bolsa.js";
 import {
   MONSTROS, EXPEDICOES, EXPEDICOES_POR_DIA, podeExpedicionar, saqueDaExpedicao, defensorDaExpedicao, expedicaoPorId, contagensDeMonstros,
@@ -1203,11 +1204,12 @@ caso("mina de ouro: todo reino nasce com ela e com o pelotão de 3 operários; 1
   assert.deepEqual([1, 2, 5].map(vagasDaMina), [3, 5, 11]);
   const desde = "2026-10-23T00:00:00Z";
   // 3 operários por 8 h = 3 pepitas = 18 moedas
-  assert.deepEqual(ouroAcumulado({ nivel: 1, operarios: 3, desde, agora: new Date("2026-10-23T08:00:00Z") }), { pepitas: 3, moedas: 18, capacidade: 9, cheia: false });
+  const semDiamante = [...Array(2000).keys()].map((i) => i + 1).find((sem) => diamantesEntre(9, 1, sem) === 0);
+  assert.deepEqual(ouroAcumulado({ nivel: 1, semente: semDiamante, operarios: 3, desde, agora: new Date("2026-10-23T08:00:00Z") }), { pepitas: 3, ouro: 3, diamantes: 0, moedas: 18, capacidade: 9, cheia: false });
   // 7 h ainda não deu pepita
   assert.equal(ouroAcumulado({ nivel: 1, operarios: 3, desde, agora: new Date("2026-10-23T07:59:00Z") }).pepitas, 2);
   // enche (3 pepitas por vaga) e para
-  assert.deepEqual(ouroAcumulado({ nivel: 1, operarios: 3, desde, agora: new Date("2026-10-26T00:00:00Z") }), { pepitas: 9, moedas: 54, capacidade: 9, cheia: true });
+  assert.deepEqual(ouroAcumulado({ nivel: 1, semente: semDiamante, operarios: 3, desde, agora: new Date("2026-10-26T00:00:00Z") }), { pepitas: 9, ouro: 9, diamantes: 0, moedas: 54, capacidade: 9, cheia: true });
   // vale mais que a Mina de Moedas do mesmo nível
   assert.ok(3 * moedasPorOperarioPorDia() > 24 * producaoPorHora(1));
 });
@@ -1312,6 +1314,55 @@ caso("bolsa: quem chega ao preço mínimo vai à falência; acima do teto, a mai
   // 12 na bolsa, 1 faliu → 11; com 2 novas seriam 13: a mais antiga fecha
   assert.deepEqual(saidasDaBolsa(depois, 2), { faliram: [depois[5].id], fecham: [depois[0].id] });
   assert.deepEqual(saidasDaBolsa(depois.slice(0, 4), 2), { faliram: [], fecham: [] });
+});
+
+caso("mina de ouro: diamantes saem por sorte (mais na mina funda), fixos por rodada e valem mais", () => {
+  assert.deepEqual([1, 3, 5].map((n) => Math.round(chanceDeDiamante(n) * 100)), [4, 6, 8]);
+  assert.ok(VALOR_DO_DIAMANTE > 5 * VALOR_DA_PEPITA);
+  // a mesma semente sempre dá os mesmos diamantes; mais pedras nunca "desfazem" um diamante
+  const sem = sementeDaMina("u1", "2026-10-23T10:00:00.000Z");
+  assert.equal(sem, sementeDaMina("u1", "2026-10-23T10:00:00.000Z"));
+  assert.notEqual(sem, sementeDaMina("u1", "2026-10-23T18:00:00.000Z"));
+  let antes = 0;
+  for (let pedras = 0; pedras <= 40; pedras++) { const d = diamantesEntre(pedras, 3, sem); assert.ok(d >= antes && d - antes <= 1); antes = d; }
+  // em muitas rodadas, a proporção bate com a chance
+  let total = 0;
+  for (let i = 1; i <= 2000; i++) total += diamantesEntre(10, 5, i * 7919);
+  assert.ok(Math.abs(total / 20000 - chanceDeDiamante(5)) < 0.01, `proporção ${total / 20000}`);
+  const comDiamante = [...Array(5000).keys()].map((i) => i + 1).find((x) => diamantesEntre(3, 1, x) === 1);
+  const r = ouroAcumulado({ nivel: 1, semente: comDiamante, operarios: 3, desde: "2026-10-23T00:00:00Z", agora: new Date("2026-10-23T08:00:00Z") });
+  assert.deepEqual([r.pepitas, r.ouro, r.diamantes, r.moedas], [3, 2, 1, 2 * VALOR_DA_PEPITA + VALOR_DO_DIAMANTE]);
+});
+
+caso("bolsa: o preço anda hora a hora da abertura ao fechamento da Lisa (o mesmo para todos)", () => {
+  const semente = sementeDaAcao("PEPT", "2026-10-23");
+  const c = caminhoDoDia({ abertura: 40, fechamento: 46, semente });
+  assert.equal(c.length, PASSOS_DO_DIA + 1);
+  assert.equal(c[0], 40);
+  assert.equal(c[PASSOS_DO_DIA], 46);
+  assert.deepEqual(c, caminhoDoDia({ abertura: 40, fechamento: 46, semente })); // todo mundo vê o mesmo
+  assert.notDeepEqual(c, caminhoDoDia({ abertura: 40, fechamento: 46, semente: sementeDaAcao("PEPT", "2026-10-24") }));
+  assert.ok(c.every((p) => p >= 1 && Math.round(p * 100) === Math.round(p * 100 + 1e-9)), "centavos");
+  assert.ok(new Set(c).size > 15, "o preço mexe de verdade ao longo do dia");
+  const mexidas = c.slice(1).map((p, i) => Math.abs(p / c[i] - 1));
+  assert.ok(Math.max(...mexidas) < 0.08, `nenhuma hora pula demais (${Math.max(...mexidas)})`);
+  const v = velaDe(c, 10);
+  assert.deepEqual([v.abertura, v.fechamento], [40, c[10]]);
+  assert.equal(v.maxima, Math.max(...c.slice(0, 11)));
+  assert.equal(v.minima, Math.min(...c.slice(0, 11)));
+  // um dia sem variação ainda balança, e volta ao mesmo preço
+  const parado = caminhoDoDia({ abertura: 20, fechamento: 20, semente: 5 });
+  assert.equal(parado[0], 20);
+  assert.equal(parado[PASSOS_DO_DIA], 20);
+});
+
+caso("bolsa: com centavos, a compra arredonda para cima e a venda para baixo", () => {
+  assert.equal(valorDaCompra(23.45, 3), 71);   // 70,35 → 71
+  assert.equal(valorDaVenda(23.45, 3), 70);    // 70,35 → 70
+  assert.equal(valorDaCompra(20, 3), 60);
+  const acao = { id: "PEPT", preco: 23.45, status: "ativa" };
+  assert.deepEqual(podeComprarAcao({ acao, quantidade: 3, saldo: 100 }), { ok: true, quantidade: 3, valor: 71, taxa: 1, total: 72 });
+  assert.deepEqual(podeVenderAcao({ acao, posicao: { quantidade: 3 }, quantidade: 3 }), { ok: true, quantidade: 3, valor: 70, taxa: 1, total: 69 });
 });
 
 caso("invasão: só as tropas que caem se perdem (as sobreviventes voltam)", () => {

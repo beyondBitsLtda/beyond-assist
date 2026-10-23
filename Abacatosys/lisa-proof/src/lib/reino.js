@@ -22,6 +22,7 @@ import {
   protecaoDoCofre, temEscudo, podeInvadir, batalha, somarTrofeus, saldoDe, faixaDeDefesa,
   custoDoNeuro, nivelMaximoDoNeuro, estagioDoNeuro, taxaDeProducao, HORAS_ATE_ENCHER,
   HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, exercitoDaExpedicao, caidasNoAtaque,
+  exercitoDeTreino, guarnicaoDeTreino,
 } from "@/dominio/reino.js";
 import {
   DIAS_DE_PAZ, PARTE_DA_EXPEDICAO, OFENSIVA_PARA_VOTAR, termosDaPaz, pazVigente, votacaoAberta, podeProporPaz, podeVotar,
@@ -35,7 +36,7 @@ import { planetoideDa, sementeDoPlanetoide, RACAS } from "@/dominio/planetoides.
 import {
   OPERARIOS_INICIAIS, HORAS_POR_PEPITA, VALOR_DA_PEPITA, HORAS_DE_ALUGUEL, PRECO_MINIMO_DO_ALUGUEL, PRECO_MAXIMO_DO_ALUGUEL,
   vagasDaMina, ouroAcumulado, horasTrabalhadas, equipeDeAgora, podeComprarOperario, podeOfertar, podeAlugar, periodoDoAluguel,
-  moedasPorOperarioPorDia,
+  moedasPorOperarioPorDia, sementeDaMina, chanceDeDiamante, VALOR_DO_DIAMANTE,
 } from "@/dominio/ouro.js";
 import {
   TROPAS, ORDEM_DAS_TROPAS, RESERVAS, contagens, espacoUsado, capacidadeDoExercito, capacidadeDaGuarnicao,
@@ -336,6 +337,7 @@ export async function estadoDoReino(usuarioId) {
     },
     paz,
     diasDePaz: DIAS_DE_PAZ,
+    modoDeTeste: modoDeTesteLigado(),
     garagem: garagemParaTela(reino, saldo, tanques),
     ouro: await ouroParaTela(reino, saldo, ouro),
     cofre: { protege: protecaoDoCofre(n.cofre) },
@@ -840,7 +842,9 @@ async function ouroDe(reino, agora = new Date()) {
   const operarios = reino.operarios ?? OPERARIOS_INICIAIS;
   const trabalho = { operarios, desde, agora, alugadosParaFora: alugueis.paraFora, alugadosDeFora: alugueis.deFora };
   const equipe = equipeDeAgora(trabalho);
-  return { nivel, operarios, desde, alugueis, equipe, ouro: ouroAcumulado({ nivel, ...trabalho }), horas: horasTrabalhadas(trabalho) };
+  // a semente da rodada: a pessoa e a última coleta — os diamantes não mudam até coletar
+  const semente = sementeDaMina(reino.usuario_id, new Date(desde).toISOString());
+  return { nivel, operarios, desde, alugueis, equipe, ouro: ouroAcumulado({ nivel, semente, ...trabalho }), horas: horasTrabalhadas(trabalho) };
 }
 
 /**
@@ -864,8 +868,10 @@ async function ouroParaTela(reino, saldo, info) {
   return {
     nivel: info.nivel, vagas, operarios: info.operarios, equipe: info.equipe,
     vagasLivres: Math.max(0, vagas - info.equipe.emCasa - info.equipe.alugadosDeFora),
-    pepitas: info.ouro.pepitas, moedas: info.ouro.moedas, capacidade: info.ouro.capacidade, cheia: info.ouro.cheia,
+    pepitas: info.ouro.pepitas, pepitasDeOuro: info.ouro.ouro, diamantes: info.ouro.diamantes,
+    moedas: info.ouro.moedas, capacidade: info.ouro.capacidade, cheia: info.ouro.cheia,
     horasPorPepita: HORAS_POR_PEPITA, valorDaPepita: VALOR_DA_PEPITA,
+    valorDoDiamante: VALOR_DO_DIAMANTE, chanceDeDiamante: Math.round(chanceDeDiamante(info.nivel) * 100),
     moedasPorDia: Math.round(info.equipe.trabalhando * moedasPorOperarioPorDia()),
     comprar: { ok: compra.ok, custo: compra.custo, motivo: compra.ok ? "" : compra.motivo },
     oferta: oferta?.quantidade > 0 ? { quantidade: oferta.quantidade, preco: oferta.preco } : null,
@@ -881,8 +887,8 @@ export async function coletarOuro(usuarioId) {
   const agora = new Date();
   const info = await ouroDe(reino, agora);
   if (info.ouro.pepitas <= 0) throw new ErroDeAcesso(400, `a Mina de Ouro ainda não juntou nenhuma pepita — cada operário tira 1 a cada ${HORAS_POR_PEPITA} h`);
-  await lancarEGravar(reino, [{ tipo: "ouro", valor: info.ouro.moedas, detalhe: { pepitas: info.ouro.pepitas } }], { ouro_coletado_em: relogioDepoisDaColeta(info, agora) });
-  return { pepitas: info.ouro.pepitas, coletou: info.ouro.moedas };
+  await lancarEGravar(reino, [{ tipo: "ouro", valor: info.ouro.moedas, detalhe: { pepitas: info.ouro.pepitas, diamantes: info.ouro.diamantes } }], { ouro_coletado_em: relogioDepoisDaColeta(info, agora) });
+  return { pepitas: info.ouro.pepitas, ouro: info.ouro.ouro, diamantes: info.ouro.diamantes, coletou: info.ouro.moedas };
 }
 
 /** Contratar um operário (o ouro que já juntou é coletado antes: o novo não trabalha para trás). */
@@ -893,7 +899,7 @@ export async function comprarOperario(usuarioId) {
   const pode = podeComprarOperario({ operarios: info.operarios, nivel: info.nivel, saldo });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
   const lancamentos = [];
-  if (info.ouro.moedas > 0) lancamentos.push({ tipo: "ouro", valor: info.ouro.moedas, detalhe: { pepitas: info.ouro.pepitas, automatica: true } });
+  if (info.ouro.moedas > 0) lancamentos.push({ tipo: "ouro", valor: info.ouro.moedas, detalhe: { pepitas: info.ouro.pepitas, diamantes: info.ouro.diamantes, automatica: true } });
   lancamentos.push({ tipo: "operario", valor: -pode.custo, detalhe: { operarios: info.operarios + 1 } });
   await lancarEGravar(reino, lancamentos, { operarios: info.operarios + 1, ouro_coletado_em: agora.toISOString() });
   return { operarios: info.operarios + 1, custo: pode.custo, coletou: info.ouro.moedas };
@@ -1011,4 +1017,67 @@ export async function visitarReino(usuarioId, alvoId) {
     ouro: { nivel: info.nivel, operarios: info.operarios, trabalhando: info.equipe.trabalhando },
     personagens: personagensDe(alvo.personagens).length,
   };
+}
+
+// ---------------------------------------------------------------- o MODO DE TESTE (23/10/2026)
+// Pedido: "uma função de debug para eu testar as expedições, as ações, todas as funções — pode
+// deixar liberada para todos por hora". Cada ação mexe só no reino de quem usa. Desliga com
+// PROOF_MODO_TESTE=0 na hospedagem. As moedas de teste entram no livro-caixa com o tipo "teste"
+// (dá para tirar todas de uma vez: a ação "limpar", ou um delete por tipo no banco); o combustível
+// de teste é uma carga de 0 moeda marcada com { teste: true }.
+
+export const modoDeTesteLigado = () => process.env.PROOF_MODO_TESTE !== "0";
+export const MOEDAS_DE_TESTE = 1000;
+
+export async function acaoDeTeste(usuarioId, acao) {
+  if (!modoDeTesteLigado()) throw new ErroDeAcesso(403, "o modo de teste está desligado");
+  const reino = await obterReino(usuarioId);
+  const n = niveisDe(reino);
+  const gravar = async (mudancas) => { if (!(await gravarReino(reino, mudancas))) throw conflito(); };
+  switch (acao) {
+    case "moedas":
+      await lancar(usuarioId, "teste", MOEDAS_DE_TESTE, { acao });
+      return { mensagem: `+${MOEDAS_DE_TESTE} moedas de teste` };
+    case "tanques": {
+      // cargas de 0 moeda até cada veículo ter 3 expedições no tanque de novo
+      const tanques = await tanquesDeHoje(usuarioId);
+      const linhas = [];
+      for (const v of veiculosDe(reino.veiculos)) {
+        const t = tanques.tanque(v);
+        for (let i = t.restantes; i < 3; i++) linhas.push({ usuario_id: usuarioId, tipo: "combustivel", valor: 0, detalhe: { veiculo: v, dia: diaDe(), teste: true } });
+      }
+      if (linhas.length) { const { error } = await supabase.from("proof_reino_movimentos").insert(linhas); falhou(error, "combustível de teste"); }
+      return { mensagem: "tanques cheios (3 expedições em cada veículo)" };
+    }
+    case "veiculos":
+      await gravar({ veiculos: [...ORDEM_DOS_VEICULOS] });
+      return { mensagem: "todos os veículos na garagem" };
+    case "construcoes": {
+      const tudo = Object.fromEntries(ORDEM_DAS_CONSTRUCOES.map((c) => [c, CONSTRUCOES[c].max]));
+      await gravar({ construcoes: tudo, neuro_nivel: nivelMaximoDoNeuro(CONSTRUCOES.castelo.max) });
+      return { mensagem: "todas as construções e o Neuro no nível máximo" };
+    }
+    case "exercito": {
+      const quartel = Math.max(1, n.quartel || 0), torre = Math.max(1, n.castelo || 1);
+      await gravar({ exercito: exercitoDeTreino(quartel, 1), guarnicao: guarnicaoDeTreino(torre, 1) });
+      return { mensagem: "exército e defesa completos (do tamanho do Quartel e da Torre)" };
+    }
+    case "minas": {
+      const voltar = (iso, horas) => new Date(new Date(iso || Date.now()).getTime() - horas * HORA).toISOString();
+      await gravar({ ouro_coletado_em: voltar(reino.ouro_coletado_em, 24), coletado_em: voltar(reino.coletado_em, 12) });
+      return { mensagem: "as minas adiantaram 24 h de trabalho" };
+    }
+    case "operarios": {
+      const vagas = vagasDaMina(n.minaDeOuro || 1);
+      await gravar({ operarios: Math.max(reino.operarios ?? OPERARIOS_INICIAIS, vagas) });
+      return { mensagem: `a Mina de Ouro com as ${vagas} vagas cheias` };
+    }
+    case "limpar": {
+      const { data, error } = await supabase.from("proof_reino_movimentos").delete().eq("usuario_id", usuarioId).eq("tipo", "teste").select("id");
+      falhou(error, "moedas de teste");
+      return { mensagem: `${(data || []).length} lançamento(s) de moedas de teste retirado(s)` };
+    }
+    default:
+      throw new ErroDeAcesso(400, "ação de teste desconhecida");
+  }
 }

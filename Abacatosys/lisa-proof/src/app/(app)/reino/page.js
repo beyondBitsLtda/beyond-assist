@@ -24,9 +24,10 @@ import Folha from "@/componentes/Folha.js";
 import { numero, hora, Moedas, Botao } from "@/componentes/reino/pecas.js";
 import Garagem, { Tanque } from "@/componentes/reino/Garagem.js";
 import MinaDeOuro from "@/componentes/reino/MinaDeOuro.js";
-import Bolsa from "@/componentes/reino/Bolsa.js";
+import ResumoDaBolsa from "@/componentes/bolsa/Resumo.js";
 import Visita from "@/componentes/reino/Visita.js";
 import TelaCheia from "@/componentes/reino/TelaCheia.js";
+import ModoDeTeste from "@/componentes/reino/ModoDeTeste.js";
 import { urlDoVeiculo } from "@/componentes/reino/veiculosDePapel.js";
 
 // O mundo 3D (Three.js) só baixa nesta tela, e só no navegador.
@@ -153,12 +154,31 @@ export default function Reino() {
     (r) => reagir("feliz", `+${r.quantidade} ${tropa.emoji} ${tropa.nome}${r.quantidade > 1 ? "s" : ""} ${destino === "exercito" ? "no exército" : "na defesa"}!`));
   const comprarVeiculo = (v) => agir(`veiculo:${v.id}`, { acao: "veiculo", id: v.id }, (r) => { comemorar(`${r.nome} na garagem! 🚗`); setVeiculoDoMapa(v.id); carregarMapa(); });
   const abastecerVeiculo = (v) => agir(`abastecer:${v.id}`, { acao: "abastecer", id: v.id }, (r) => { reagir("feliz", `⛽ Mais uma carga no ${r.nome}!`, 3000); carregarMapa(); });
-  const coletarOuro = () => agir("ouro", { acao: "ouro" }, (r) => reagir("comemorando", `+${r.coletou} moedas de ouro! ⚒️`, 3500));
+  const coletarOuro = () => agir("ouro", { acao: "ouro" }, (r) => (r.diamantes
+    ? comemorar(`💎 ${r.diamantes > 1 ? `${r.diamantes} diamantes` : "Um diamante"}! +${r.coletou} moedas`)
+    : reagir("comemorando", `+${r.coletou} moedas de ouro! ⚒️`, 3500)));
   const contratar = () => agir("operario", { acao: "operario" }, (r) => comemorar(`Operário contratado! Agora são ${r.operarios} 👷`));
   const ofertar = ({ quantidade, preco }) => agir("ofertar", { acao: "ofertar", quantidade, preco },
     (r) => avisar(r.quantidade ? `Oferta salva: ${r.quantidade} operário(s) a 🪙 ${r.preco} cada` : "Oferta retirada"));
   const coletarMina = () => agir("coletar", { acao: "coletar" }, (r) => reagir("feliz", `+${r.coletou} moedas da mina!`));
   const verExpedicoes = (id) => { setVeiculoDoMapa(id); mostrarSecao("expedicoes"); };
+
+  /** O modo de teste: a ação mexe só no meu reino; depois atualiza o que ela pode ter mudado. */
+  async function testar(acao) {
+    setOcupado(`teste:${acao}`);
+    try {
+      const r = await criar("/api/reino/teste", { acao });
+      setReino(r.reino);
+      avisar(`🧪 ${r.resultado.mensagem}`);
+      carregarMapa();
+      if (acao === "moedas" || acao === "limpar") carregarBolsa();
+      if (acao === "operarios") carregarMercado();
+    } catch (e) {
+      avisar(e.message);
+    } finally {
+      setOcupado("");
+    }
+  }
 
   async function alugar(oferta, quantidade) {
     setOcupado(`alugar:${oferta.dono}`);
@@ -170,26 +190,6 @@ export default function Reino() {
     } catch (e) {
       avisar(e.message);
       carregarMercado();
-    } finally {
-      setOcupado("");
-    }
-  }
-
-  /** Bolsa: comprar ou vender — o servidor devolve a bolsa atualizada; o saldo do reino vem junto. */
-  async function negociar(corpo, aoTerminar) {
-    setOcupado("bolsa");
-    try {
-      const r = await criar("/api/reino/bolsa", corpo);
-      setBolsa(r.bolsa);
-      obter("/api/reino").then(setReino).catch(() => {});
-      const x = r.resultado;
-      if (corpo.acao === "comprar") reagir("feliz", `🛒 ${x.quantidade} ação(ões) de ${x.nome} por 🪙 ${numero(x.total)}`, 4000);
-      else if (x.lucro > 0) comemorar(`💰 Vendeu com lucro de 🪙 ${numero(x.lucro)}!`);
-      else reagir(x.lucro < 0 ? "triste" : "feliz", `💰 Vendeu ${x.quantidade} ${x.nome} por 🪙 ${numero(x.total)}`, 4000);
-      aoTerminar?.();
-    } catch (e) {
-      avisar(e.message);
-      carregarBolsa();
     } finally {
       setOcupado("");
     }
@@ -395,7 +395,13 @@ export default function Reino() {
         aoPartir={partir} aoAssistir={assistirExpedicao} aoAbastecer={abastecerVeiculo} aoGaragem={() => mostrarSecao("garagem")}
         aoBloqueado={(x) => avisar(x.liberada ? x.motivo : `${x.nome} libera com a Torre do Neuro no nível ${x.torreMinima}`)} />
     ),
-    bolsa: () => <Bolsa bolsa={bolsa} ocupado={ocupado} aoNegociar={negociar} aoRecarregar={carregarBolsa} />,
+    bolsa: () => <ResumoDaBolsa bolsa={bolsa} />,
+    teste: () => (
+      <section className="pf-secao" id="teste">
+        <h2 className="pf-secao__titulo">🧪 Modo de teste <small>liberado para todos por enquanto</small></h2>
+        <ModoDeTeste ocupado={ocupado} aoAgir={testar} />
+      </section>
+    ),
     invadir: () => (
       <>
         <section className="pf-secao" id="invadir">
@@ -487,7 +493,7 @@ export default function Reino() {
       <VistaDoReino reino={reino} visita={visita} telaCheia={telaCheia} aoTelaCheia={entrarNaTelaCheia}
         aoEscolher={escolherConstrucao} aoVisitar={visitar} aoVoltarDaVisita={() => setVisita(null)}>
         {telaCheia && (
-          <TelaCheia reino={reino} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} ocupado={ocupado}
+          <TelaCheia reino={reino} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} ocupado={ocupado} comTeste={reino.modoDeTeste}
             aoColetarMina={coletarMina} aoColetarOuro={coletarOuro}>
             {painel && secoes[painel]?.()}
           </TelaCheia>
@@ -519,6 +525,12 @@ export default function Reino() {
             <Link href="/ranking" className="pf-botao pf-botao--sec rn-acoes__ranking">🏆 Ranking</Link>
           </div>
           {simulando && <Simulador reino={reino} aoFechar={() => setSimulando(false)} />}
+          {reino.modoDeTeste && (
+            <details className="rn-teste__caixa">
+              <summary>🧪 Modo de teste <small>moedas, combustível, veículos, construções, exército, minas — liberado para todos por enquanto</small></summary>
+              <ModoDeTeste ocupado={ocupado} aoAgir={testar} />
+            </details>
+          )}
 
           <div className="rn-numeros">
             <Numero rotulo="Moedas" valor={<Moedas n={reino.saldo} />} nota={`${numero(reino.cofre.protege)} a salvo no cofre (e todas podem ser gastas)`} />
@@ -579,6 +591,7 @@ function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, aoEscolher, aoVis
           tropas={vendo ? vendo.tropas : { exercito: reino.exercito.tropas, guarnicao: reino.guarnicao.tropas }}
           vizinhos={vendo ? [] : reino.paz?.vigente?.vizinhos || []}
           personagem={vendo ? vendo.personagem : undefined} soLeitura={Boolean(vendo)}
+          mineiros={vendo ? vendo.ouro?.trabalhando || 0 : reino.ouro?.equipe?.trabalhando || 0} diamantes={vendo ? 0 : reino.ouro?.diamantes || 0}
           humor={humor} aoEscolher={vendo ? undefined : aoEscolher} aoVisitar={aoVisitar} aoFalhar={() => setPlana(true)} />
       )}
       {!telaCheia && !vendo && <button type="button" className="rn-vista3d__cheia" onClick={aoTelaCheia}>⛶ Tela cheia</button>}

@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoMonstro } from "./reino/monstrosDePapel.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-23-veiculos";
+export const EDICAO_DAS_NOVIDADES = "2026-10-23-bolsa";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,11 +28,11 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🚀", titulo: "Veículos e mapas novos", texto: "Compre na garagem o Submarino (fundo do mar), o Dirigível (montanhas geladas), o Tanque de Magma (reinos de fogo) e a Nave Estelar: cada viagem cai num planetoide com aliens de força e tesouro sorteados.", destaque: true },
-  { icone: "⛽", titulo: "Combustível", texto: "Cada veículo faz 3 expedições por dia. Acabou? Abasteça com moedas e siga explorando." },
-  { icone: "⚒️", titulo: "Mina de Ouro", texto: "Todo reino ganhou uma mina e 3 operários: eles tiram pepitas que valem mais moedas. Contrate mais — e alugue os seus para outros reinos (ou alugue os deles)." },
-  { icone: "📈", titulo: "Bolsa do Reino", texto: "Invista as suas moedas em ações. Todo dia a Lisa abre o pregão, decide quem sobe e quem cai e lança empresas novas — a mesma bolsa para todos." },
-  { icone: "⛶", titulo: "Tela cheia e visitas", texto: "Veja o reino em tela cheia, com os menus flutuando por cima. Na paz, toque numa ilha vizinha para ver aquele reino inteiro." },
+  { icone: "📈", titulo: "A Bolsa ganhou tela própria", texto: "Um pregão de verdade: letreiro de cotações, Índice do Reino, gráfico hora a hora com mira, velas de 14 dias, boleta de compra e venda e o mural de notícias da Lisa. No menu: Bolsa.", destaque: true },
+  { icone: "⏰", titulo: "Cotações de hora em hora", texto: "A Lisa decide onde cada ação fecha o dia; o preço anda de hora em hora até lá — acompanhe o movimento nos gráficos." },
+  { icone: "💎", titulo: "Diamantes na Mina de Ouro", texto: "Cada pedra que os operários tiram pode ser um diamante, que vale bem mais que ouro. Quanto mais funda a mina, mais sorte." },
+  { icone: "⛏️", titulo: "Operários cavando", texto: "Os seus operários agora aparecem no mundo 3D, de picareta na mão, em volta da Mina de Ouro." },
+  { icone: "🚀", titulo: "Veículos e mapas novos", texto: "Submarino, Dirigível, Tanque de Magma e Nave Estelar — com fundo do mar, montanhas, vulcões e planetoides sorteados. Cada veículo faz 3 expedições por dia; depois, é só abastecer." },
   { icone: "🥑", titulo: "Neuro Abacate, de graça", texto: "O Neuro vestido de mascote do Abacato: já é de todo mundo — é só vestir em Personagens." },
 ];
 
@@ -77,8 +77,8 @@ export default function Novidades() {
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">Veículos, Ouro e Bolsa!</h2>
-          <p className="novidades__sub">Explore o fundo do mar, as montanhas, os vulcões e o espaço; tire ouro com os seus operários; e invista na bolsa que a Lisa comanda.</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">Bolsa ao vivo e diamantes!</h2>
+          <p className="novidades__sub">O pregão ganhou tela de home broker e cotações de hora em hora; e a Mina de Ouro agora pode dar diamantes.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -88,7 +88,7 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/reino#garagem" className="pf-botao novidades__principal" onClick={fechar}>🚗 Ver a garagem</Link>
+            <Link ref={principal} href="/bolsa" className="pf-botao novidades__principal" onClick={fechar}>📈 Abrir a Bolsa</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>

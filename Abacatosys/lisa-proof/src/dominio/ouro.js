@@ -7,6 +7,12 @@
 // VALOR_DA_PEPITA moedas na coleta (a venda é automática). A mina guarda até PEPITAS_POR_VAGA
 // pepitas por vaga — cheia, para de juntar, como a Mina de Moedas.
 //
+// DIAMANTES (23/10/2026): cada pedra que um operário tira tem uma chance de ser um diamante
+// (chanceDeDiamante, maior quanto mais funda — maior o nível — a mina), que vale VALOR_DO_DIAMANTE.
+// O sorteio é fixo por coleta (a semente é a pessoa e a hora da última coleta) e não muda quando
+// mais pedras saem: a 3ª pedra é diamante ou não é, para sempre — recarregar a tela não sorteia
+// de novo; só coletar começa uma rodada nova.
+//
 // Quem trabalha na minha mina: os meus operários (menos os que estão alugados para alguém) mais os
 // que eu aluguei de outros reinos — até as vagas da mina (vagasDaMina). O aluguel dura
 // HORAS_DE_ALUGUEL: quem aluga paga na hora, direto ao dono, o preço por operário × a quantidade;
@@ -19,6 +25,9 @@ export const PEPITAS_POR_VAGA = 3;
 export const HORAS_DE_ALUGUEL = 24;
 export const PRECO_MINIMO_DO_ALUGUEL = 5;
 export const PRECO_MAXIMO_DO_ALUGUEL = 40;
+export const VALOR_DO_DIAMANTE = 45;
+/** A chance de uma pedra ser diamante: 4% no nível 1, +1% a cada nível (8% no 5). */
+export const chanceDeDiamante = (nivel) => 0.03 + 0.01 * Math.max(1, Math.min(5, nivel || 1));
 const HORA = 3_600_000;
 const instante = (x) => new Date(x).getTime();
 
@@ -47,11 +56,40 @@ export function horasTrabalhadas({ operarios, desde, agora = new Date(), alugado
   return Math.max(0, h);
 }
 
-/** O ouro que a mina juntou desde a última coleta: pepitas inteiras, até encher. */
-export function ouroAcumulado({ nivel, ...trabalho }) {
+function sorteio(semente) {
+  let a = (semente >>> 0) || 1;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/** A semente da rodada de uma mina: a pessoa e a hora da última coleta. */
+export function sementeDaMina(usuarioId, coletadoEm) {
+  let h = 0x811c9dc5;
+  for (const ch of `${usuarioId}|${coletadoEm}`) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+/** Quantas das `pedras` são diamante (as mesmas, sempre, para a mesma semente). */
+export function diamantesEntre(pedras, nivel, semente) {
+  const r = sorteio(semente);
+  const chance = chanceDeDiamante(nivel);
+  let n = 0;
+  for (let i = 0; i < pedras; i++) if (r() < chance) n++;
+  return n;
+}
+
+/**
+ * O que a mina juntou desde a última coleta: pedras inteiras (`pepitas`), até encher — algumas
+ * podem ser diamantes (`diamantes`, com a `semente` da rodada); o resto é ouro (`ouro`).
+ */
+export function ouroAcumulado({ nivel, semente = 1, ...trabalho }) {
   const capacidade = capacidadeEmPepitas(nivel);
   const pepitas = Math.min(capacidade, Math.floor(horasTrabalhadas(trabalho) / HORAS_POR_PEPITA));
-  return { pepitas, moedas: pepitas * VALOR_DA_PEPITA, capacidade, cheia: pepitas >= capacidade };
+  const diamantes = diamantesEntre(pepitas, nivel, semente);
+  const ouro = pepitas - diamantes;
+  return { pepitas, ouro, diamantes, moedas: ouro * VALOR_DA_PEPITA + diamantes * VALOR_DO_DIAMANTE, capacidade, cheia: pepitas >= capacidade };
 }
 
 /** Quem está na mina agora: os meus, os que estão fora (alugados) e os que vieram de fora. */

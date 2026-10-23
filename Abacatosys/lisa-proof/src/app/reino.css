@@ -646,3 +646,33 @@ button.rn-exp__arte:disabled { cursor: progress; }
   .rn-hud__painel { max-height: 52vh; }
   .rn-visita { max-height: 48%; left: 8px; right: 8px; width: auto; }
 }
+
+/* ---- o tesouro da mina: barra de ouro e diamante (23/10/2026) */
+.rn-icone-ouro, .rn-icone-diamante { display: inline-block; vertical-align: -0.2em; flex: none; }
+.rn-ouro__tesouro { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.rn-ouro__tesouro > span { display: inline-flex; align-items: center; gap: 4px; }
+.rn-ouro__diamantes { opacity: 0.55; }
+.rn-ouro__diamantes--tem { opacity: 1; animation: rn-brilho-diamante 1.6s ease-in-out infinite; }
+@keyframes rn-brilho-diamante { 50% { filter: drop-shadow(0 0 6px rgba(125, 211, 252, 0.95)); } }
+@media (prefers-reduced-motion: reduce) { .rn-ouro__diamantes--tem { animation: none; } }
+.rn-hud__botao { display: inline-flex; align-items: center; gap: 4px; }
+
+/* ---- o modo de teste (23/10/2026, liberado para todos por enquanto) */
+.rn-teste__caixa { margin-top: 12px; border: 2px dashed #a855f7; border-radius: var(--pf-raio); background: var(--pf-superficie); padding: 0 14px; }
+.rn-teste__caixa summary { cursor: pointer; padding: 12px 0; font-weight: 800; }
+.rn-teste__caixa summary small { font-weight: 600; color: var(--pf-tinta-2); margin-left: 6px; }
+.rn-teste { display: grid; gap: 10px; padding-bottom: 14px; }
+.rn-teste__aviso { margin: 0; font-size: 14px; padding: 10px 12px; border-radius: 12px; background: rgba(168, 85, 247, 0.12); }
+.rn-teste__grade { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.rn-teste__botao {
+  display: flex; gap: 10px; align-items: center; text-align: left; padding: 10px 12px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--pf-linha); background: var(--pf-fundo); color: var(--pf-tinta); font: inherit;
+}
+.rn-teste__botao:hover { border-color: #a855f7; }
+.rn-teste__botao:disabled { opacity: 0.6; cursor: default; }
+.rn-teste__botao:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; }
+.rn-teste__botao span:last-child { display: grid; }
+.rn-teste__botao small { color: var(--pf-tinta-2); font-size: 12px; }
+.rn-teste__botao--limpar { border-style: dashed; }
+.rn-teste__emoji { font-size: 22px; }
+.rn-teste__dica { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
