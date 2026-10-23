@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.21.0-proof-trilha-amarrada.1",
+  "versao": "0.21.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 53,
+    "numero": 54,
     "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.21.0-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.21.0: a trilha amarrada à prática (quiz conclui o assunto, projeto abre a semana seguinte, projeto final do tamanho do plano), o planetoide em esfera e o fundo do mar de verdade.",
+      "itens": [
+        "Junta a branch proof-trilha-amarrada (0.21.0-proof-trilha-amarrada.1).",
+        "Migração db/017-trilha-amarrada.sql aplicada no banco logo antes do deploy (a dispensa do quiz grava o que estava concluído naquela hora).",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.21.0-proof-trilha-amarrada.1",
       "data": "2026-10-23",
