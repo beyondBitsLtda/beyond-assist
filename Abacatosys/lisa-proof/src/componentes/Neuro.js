@@ -265,6 +265,58 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
               <circle cx="173" cy="104" r="8" fill="#94A3B8" stroke="#475569" strokeWidth="3" />
               <path d="M62 60 h76 M70 146 h60" stroke="#64748B" strokeWidth="3" strokeLinecap="round" opacity="0.7" />
             </g>
+            {/* os dos ambientes das expedições (23/10/2026) */}
+            <g className="acc acc-cogumelo">
+              <path d="M14 72 C 14 -14, 186 -14, 186 72 Q 100 52, 14 72 Z" fill="#DC2626" stroke="#7F1D1D" strokeWidth="3" strokeLinejoin="round" />
+              <circle cx="60" cy="38" r="9" fill="#FFFFFF" /><circle cx="100" cy="24" r="8" fill="#FFFFFF" />
+              <circle cx="140" cy="38" r="9" fill="#FFFFFF" /><circle cx="100" cy="48" r="5.5" fill="#FFFFFF" />
+              <circle cx="34" cy="60" r="5" fill="#FFFFFF" /><circle cx="166" cy="60" r="5" fill="#FFFFFF" />
+              <path d="M38 30 q16 -18 40 -22" fill="none" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" opacity="0.35" />
+            </g>
+            <g className="acc acc-mergulhador">
+              <path d="M26 98 H68 M132 98 H174" stroke="#1E293B" strokeWidth="7" strokeLinecap="round" />
+              <rect x="68" y="84" width="64" height="32" rx="14" fill="rgba(165, 243, 252, 0.35)" stroke="#1E293B" strokeWidth="5" />
+              <path d="M75 93 q4 -4 10 -4" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" opacity="0.85" />
+              <path d="M116 126 H138 Q148 126 148 116 V40" fill="none" stroke="#FB923C" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M148 40 v-6" stroke="#1E293B" strokeWidth="9" strokeLinecap="round" />
+              <circle cx="156" cy="22" r="4.5" fill="none" stroke="#22D3EE" strokeWidth="2.5" />
+              <circle cx="146" cy="12" r="3.2" fill="none" stroke="#22D3EE" strokeWidth="2.5" />
+              <circle cx="155" cy="4" r="2.3" fill="none" stroke="#22D3EE" strokeWidth="2" />
+            </g>
+            <g className="acc acc-yeti">
+              <path d="M58 50 C 40 42, 32 24, 40 6 C 46 22, 58 32, 76 38 Z" fill="#E7E5E4" stroke="#78716C" strokeWidth="3" strokeLinejoin="round" />
+              <path d="M142 50 C 160 42, 168 24, 160 6 C 154 22, 142 32, 124 38 Z" fill="#E7E5E4" stroke="#78716C" strokeWidth="3" strokeLinejoin="round" />
+              <path d="M30 84 L16 90 L26 96 L12 104 L25 108 L14 118 L30 118 Z" fill="#F8FAFC" stroke="#94A3B8" strokeWidth="2.5" strokeLinejoin="round" />
+              <path d="M170 84 L184 90 L174 96 L188 104 L175 108 L186 118 L170 118 Z" fill="#F8FAFC" stroke="#94A3B8" strokeWidth="2.5" strokeLinejoin="round" />
+              <path d="M18 34 v14 M12 37.5 l12 7 M12 44.5 l12 -7 M184 52 v12 M179 55 l10 6 M179 61 l10 -6" stroke="#38BDF8" strokeWidth="2.5" strokeLinecap="round" />
+            </g>
+            <g className="acc acc-magma">
+              <g transform="translate(66 48) scale(0.62) translate(-100 -30)">
+                <path d="M100 30 C 82 22, 86 2, 98 -12 C 98 2, 106 4, 110 -4 C 120 12, 116 26, 100 30 Z" fill="#F97316" stroke="#9A3412" strokeWidth="3" strokeLinejoin="round" />
+                <path d="M100 25 C 92 19, 94 9, 100 1 C 102 9, 107 11, 108 7 C 112 15, 108 23, 100 25 Z" fill="#FACC15" />
+              </g>
+              <g transform="translate(134 48) scale(0.62) translate(-100 -30)">
+                <path d="M100 30 C 82 22, 86 2, 98 -12 C 98 2, 106 4, 110 -4 C 120 12, 116 26, 100 30 Z" fill="#F97316" stroke="#9A3412" strokeWidth="3" strokeLinejoin="round" />
+                <path d="M100 25 C 92 19, 94 9, 100 1 C 102 9, 107 11, 108 7 C 112 15, 108 23, 100 25 Z" fill="#FACC15" />
+              </g>
+              <g transform="translate(0 12)">
+                <path d="M100 30 C 82 22, 86 2, 98 -12 C 98 2, 106 4, 110 -4 C 120 12, 116 26, 100 30 Z" fill="#F97316" stroke="#9A3412" strokeWidth="3" strokeLinejoin="round" />
+                <path d="M100 25 C 92 19, 94 9, 100 1 C 102 9, 107 11, 108 7 C 112 15, 108 23, 100 25 Z" fill="#FACC15" />
+              </g>
+              <circle cx="40" cy="38" r="3" fill="#FB923C" /><circle cx="164" cy="28" r="2.5" fill="#FB923C" /><circle cx="152" cy="10" r="2" fill="#FACC15" />
+            </g>
+            <g className="acc acc-alienigena">
+              <path d="M84 30 Q 76 16, 62 10 M116 30 Q 124 16, 138 10" fill="none" stroke="#3F6212" strokeWidth="4" strokeLinecap="round" />
+              <circle cx="60" cy="9" r="7" fill="#F0ABFC" stroke="#86198F" strokeWidth="3" />
+              <circle cx="140" cy="9" r="7" fill="#F0ABFC" stroke="#86198F" strokeWidth="3" />
+              {/* o terceiro olho segue o humor como os outros dois: aberto, fechado de alegria ou dormindo */}
+              <g className="v v-normal v-triste v-surpreso v-pensando">
+                <ellipse cx="100" cy="68" rx="8" ry="9" fill="#FFFFFF" stroke="#1A2E05" strokeWidth="2.5" />
+                <circle cx="100" cy="70" r="4" fill="#1F2937" />
+              </g>
+              <path className="v v-feliz v-comemorando" d="M92 70 q8 -9 16 0" fill="none" stroke="#1A2E05" strokeWidth="3.5" strokeLinecap="round" />
+              <path className="v v-dormindo" d="M92 68 q8 6 16 0" fill="none" stroke="#1A2E05" strokeWidth="3.5" strokeLinecap="round" />
+            </g>
           </g>
 
           <g className="v v-comemorando v-feliz neuro__estrelas">

@@ -6,9 +6,10 @@
 //
 //   1. ASSUNTO concluído = a teoria (a checklist do card no Abacato) E um quiz dele aprovado (60%+).
 //      A ordem não importa: dá para fazer o quiz antes de terminar a checklist.
-//   2. A trilha anda em SEMANAS DO PLANO: blocos de uma semana de estudo (a soma dos dias de cada
-//      assunto cabe nos dias de estudo da semana), na ordem da trilha — não a semana do calendário.
-//      Cada semana termina num PROJETO, e a semana seguinte só abre com ele aprovado (nota 60+).
+//   2. A trilha anda nas SEMANAS DO CURSO — as mesmas do mapa e da agenda: a semana em que cada
+//      assunto foi agendado, contada do início da trilha (pedido de 23/10/2026: "a tarefa semanal
+//      tem que ser a da semana do curso"). Cada semana termina num PROJETO sobre os assuntos dela, e
+//      a semana seguinte só abre com ele aprovado (nota 60+).
 //   3. O projeto da última semana é o PROJETO FINAL, do tamanho da trilha inteira. Um plano de uma
 //      semana (5 dias, por exemplo) tem só ele. O projeto do mês deixou de existir.
 //
@@ -20,7 +21,7 @@
 // antes não pede projeto, e um projeto da semana antigo (da semana do calendário) vale para a semana
 // do plano que tem os mesmos assuntos. Puro, como o resto de src/dominio.
 
-import { somarDias, diasEntre, formatarDia } from "./datas.js";
+import { somarDias, diasEntre, formatarDia, inicioDaSemana } from "./datas.js";
 import { NOTA_DE_APROVACAO } from "./pratica.js";
 
 export const PROJETOS_POR_SEMANA = 3;
@@ -31,8 +32,12 @@ export const aprovado = (d) => (Number(d?.nota) || 0) >= NOTA_DE_APROVACAO && (d
 /** Quantos dias de estudo cabem numa semana do plano: os dias da semana escolhidos para estudar. */
 export const diasPorSemana = (diasDeEstudo) => Math.max(1, Math.min(7, (Array.isArray(diasDeEstudo) ? diasDeEstudo.length : 0) || 5));
 
-/** A chave (período) do projeto da semana N do plano, e a do projeto final: datas fixas a partir do início da trilha. */
-export const periodoDaSemana = (base, numero) => somarDias(base, 7 * (numero - 1));
+/**
+ * A chave (período) do projeto da semana N do curso: a segunda-feira dela, contada da semana em que a
+ * trilha começou — a mesma chave dos projetos da semana de antes (que eram da segunda do calendário).
+ * O projeto final tem a chave dele: o dia em que a trilha começou.
+ */
+export const periodoDaSemana = (base, numero) => somarDias(inicioDaSemana(base), 7 * (numero - 1));
 export const periodoDoFinal = (base) => base;
 
 /** O projeto final vale mais quanto maior a trilha: 250 pontos numa semana, até 600. */
@@ -45,37 +50,36 @@ export function assuntosComQuizAprovado(quizzes) {
   return ok;
 }
 
-/**
- * As semanas do plano: os assuntos agendados, na ordem da trilha, em blocos que cabem numa semana de
- * estudo (pela soma dos dias de cada um). Assunto maior que a semana fica sozinho na dele.
- */
-export function semanasDoPlano(etapas, diasDeEstudo) {
-  const cabe = diasPorSemana(diasDeEstudo);
-  const semanas = [];
-  let atual = null;
-  let soma = 0;
-  for (const e of [...etapas].filter((x) => x.inicio).sort((a, b) => a.ordem - b.ordem)) {
-    const d = Math.max(1, Number(e.dias) || 1);
-    if (!atual || (soma + d > cabe && atual.length)) {
-      atual = [];
-      semanas.push(atual);
-      soma = 0;
-    }
-    atual.push(e);
-    soma += d;
-  }
-  return semanas;
+/** A semana do curso de um assunto: a gravada no agendamento, ou contada da data dele (a partir da semana do início). */
+export function semanaDoAssunto(e, base) {
+  const n = Number(e.semana);
+  if (Number.isInteger(n) && n >= 1) return n;
+  return Math.floor(diasEntre(inicioDaSemana(base), inicioDaSemana(e.inicio)) / 7) + 1;
 }
 
-/** Os projetos de uma semana: os da chave dela; sem nenhum, o projeto antigo (da semana do calendário)
- *  que mais cobre os assuntos dela. */
-function projetosDaSemana(lista, cardIds, periodo, usados) {
+/**
+ * As semanas do curso: os assuntos agendados agrupados pela semana em que caem (a "Semana N" do mapa
+ * e da agenda), em ordem. Cada uma vem como `{ numero, etapas }`, as etapas na ordem da trilha.
+ */
+export function semanasDoPlano(etapas, base) {
+  const porSemana = new Map();
+  for (const e of [...etapas].filter((x) => x.inicio).sort((a, b) => a.ordem - b.ordem)) {
+    const n = semanaDoAssunto(e, base);
+    if (!porSemana.has(n)) porSemana.set(n, []);
+    porSemana.get(n).push(e);
+  }
+  return [...porSemana.keys()].sort((a, b) => a - b).map((numero) => ({ numero, etapas: porSemana.get(numero) }));
+}
+
+/** Os projetos de uma semana: os da chave dela; sem nenhum, o projeto antigo que mais cobre os assuntos
+ *  dela — menos os que têm a chave de OUTRA semana (esses são daquela semana, não desta). */
+function projetosDaSemana(lista, cardIds, periodo, usados, chaves) {
   const daChave = lista.filter((p) => p.periodo === periodo);
   if (daChave.length) return daChave;
   let melhor = null;
   let comum = 0;
   for (const p of lista) {
-    if (usados.has(p.id)) continue;
+    if (usados.has(p.id) || chaves.has(p.periodo)) continue;
     const n = (p.card_ids || []).filter((id) => cardIds.has(String(id))).length;
     if (n > comum) { melhor = p; comum = n; }
   }
@@ -116,19 +120,20 @@ export function avancoDaTrilha({ etapas, diasDeEstudo, base, hoje, quizzes = [],
     return { ...e, teoria, quiz, dispensa, concluido, faltaQuiz: teoria && !concluido, bloqueada: false, unidade: null, motivo: "" };
   }).sort((a, b) => a.ordem - b.ordem);
 
-  const blocos = semanasDoPlano(todas, diasDeEstudo);
+  const blocos = semanasDoPlano(todas, base);
   const semanais = projetos.filter((p) => p.tipo === "projeto_semanal");
   const finais = projetos.filter((p) => p.tipo === "projeto_final" && p.periodo === periodoDoFinal(base));
   const usados = new Set();
+  const chaves = new Set(blocos.map((b) => periodoDaSemana(base, b.numero)));
   const unidades = [];
   let aberta = true; // a semana 1 sempre abre
-  blocos.forEach((lista, i) => {
-    const numero = i + 1;
-    const final = numero === blocos.length;
+  blocos.forEach(({ numero, etapas: lista }, i) => {
+    const final = i === blocos.length - 1;
+    const seguinte = blocos[i + 1]?.numero ?? null;
     const tipo = final ? "projeto_final" : "projeto_semanal";
     const periodo = final ? periodoDoFinal(base) : periodoDaSemana(base, numero);
     const ids = new Set(lista.map((e) => String(e.cardId)));
-    const doProjeto = final ? finais : projetosDaSemana(semanais, ids, periodo, usados);
+    const doProjeto = final ? finais : projetosDaSemana(semanais, ids, periodo, usados, chaves);
     for (const p of doProjeto) usados.add(p.id);
     const s = situacaoDosProjetos(doProjeto);
     const feitos = lista.filter((e) => e.concluido).length;
@@ -137,13 +142,14 @@ export function avancoDaTrilha({ etapas, diasDeEstudo, base, hoje, quizzes = [],
     const passou = s.aprovado || dispensada || s.esgotou;
     const de = lista.reduce((m, e) => (e.inicio < m ? e.inicio : m), lista[0].inicio);
     const ate = lista.reduce((m, e) => ((e.fim || e.inicio) > m ? (e.fim || e.inicio) : m), lista[0].fim || lista[0].inicio);
+    const anterior = blocos[i - 1]?.numero;
     for (const e of lista) {
       e.unidade = numero;
       e.bloqueada = !aberta;
-      e.motivo = aberta ? "" : `abre quando o projeto da semana ${numero - 1} for aprovado`;
+      e.motivo = aberta ? "" : `abre quando o projeto da semana ${anterior} for aprovado`;
     }
     unidades.push({
-      numero, final, tipo, periodo, de, ate, etapas: lista, cardIds: [...ids], feitos, total: lista.length, tudoFeito,
+      numero, final, seguinte, anterior: anterior ?? null, tipo, periodo, de, ate, etapas: lista, cardIds: [...ids], feitos, total: lista.length, tudoFeito,
       aberta, dispensada, passou, aprovado: s.aprovado, esgotou: s.esgotou,
       projeto: s.projeto, rodadas: s.rodadas, podeOutroProjeto: aberta && s.podeOutro,
       // o projeto libera quando a semana está aberta e começou (ou já teve todos os assuntos concluídos)

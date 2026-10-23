@@ -16,8 +16,17 @@ export const PERSONAGENS = {
   mago: { nome: "Neuro Mago", emoji: "🧙", preco: 800, descricao: "Chapéu de estrelas e um tom lilás de quem conhece todos os feitiços (e os algoritmos)." },
   pirata: { nome: "Neuro Pirata", emoji: "🏴‍☠️", preco: 1200, descricao: "Chapéu de três pontas e tapa-olho, caçando tesouros de conhecimento." },
   robo: { nome: "Neuro Robô", emoji: "🤖", preco: 2000, descricao: "Metálico, com parafusos e uma antena que brilha. Processa qualquer matéria." },
+  // os dos ambientes das expedições (23/10/2026: "pode estrear novos personagens, baseados inclusive
+  // nos ambientes de exploração") — bosque, fundo do mar, montanhas geladas, lava e planetoides
+  cogumelo: { nome: "Neuro Cogumelo", emoji: "🍄", preco: 1000, descricao: "Saiu do Bosque dos Cogumelos com o chapéu vermelho de bolinhas e nunca mais tirou." },
+  mergulhador: { nome: "Neuro Mergulhador", emoji: "🤿", preco: 1500, descricao: "Máscara, snorkel e bolhas: mergulha fundo em qualquer assunto, como no recife dos tritões." },
+  yeti: { nome: "Neuro Yeti", emoji: "❄️", preco: 1800, descricao: "Peludo, de chifres e bochecha vermelha de frio, direto da trilha das montanhas geladas." },
+  magma: { nome: "Neuro Magma", emoji: "🌋", preco: 2500, descricao: "Pedra vulcânica com as dobras em brasa e uma coroa de fogo. Forjado no rio de magma." },
+  alienigena: { nome: "Neuro Alienígena", emoji: "👽", preco: 3000, descricao: "Verde, de antenas e um terceiro olho: chegou de um planetoide para estudar com você." },
 };
-export const ORDEM_DOS_PERSONAGENS = ["neuro", "abacato", "ninja", "astronauta", "mago", "pirata", "robo"];
+export const ORDEM_DOS_PERSONAGENS = [
+  "neuro", "abacato", "ninja", "astronauta", "mago", "cogumelo", "pirata", "mergulhador", "yeti", "robo", "magma", "alienigena",
+];
 
 /** Os de graça: todo mundo tem, mesmo que a lista guardada não diga. */
 export const PERSONAGENS_DE_TODOS = ["neuro", "abacato"];

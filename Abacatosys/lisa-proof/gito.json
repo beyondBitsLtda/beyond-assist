@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.21.0-cloudflare-pages.1",
+  "versao": "0.22.0-proof-semana-do-curso.1",
   "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 54,
+    "numero": 55,
     "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.22.0-proof-semana-do-curso.1",
+      "data": "2026-10-23",
+      "branch": "proof-semana-do-curso",
+      "tipo": "funcionalidade",
+      "resumo": "O projeto semanal passa a ser o da semana do curso (a mesma do mapa e da agenda), o Reino ganha 5 personagens das expedições e os cartões do Reino ficam com tamanhos iguais por linha.",
+      "itens": [
+        "As semanas da prática são as semanas do curso: os assuntos se agrupam pela semana em que foram agendados (a \"Semana N\" do mapa e da agenda), e não mais em blocos pelos dias de estudo. A semana seguinte continua só abrindo com o projeto da semana aprovado.",
+        "A chave do projeto de cada semana é a segunda-feira da semana do curso; os projetos já feitos continuam valendo e não são reaproveitados por outra semana.",
+        "Textos da trilha, do mapa e da prática dizem qual semana o projeto abre (\"Semana 2 de 5 do curso · o projeto dela abre a semana 3\").",
+        "5 personagens novos do Neuro, inspirados nos ambientes das expedições: Cogumelo (1.000), Mergulhador (1.500), Yeti (1.800), Magma (2.500) e Alienígena (3.000). Funcionam em todos os humores, em todas as telas e no Neuro de papel da ilha 3D.",
+        "Cartões do Reino arrumados: personagens em 6, 4, 3 ou 2 por linha, garagem com os 5 veículos lado a lado na tela larga, expedições, construções e tropas com o botão sempre no pé do cartão e a mesma altura por linha.",
+        "Novidades: edição nova (semana do curso, personagens novos e cartões)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.21.0-cloudflare-pages.1",
       "data": "2026-10-23",
@@ -809,7 +825,7 @@
         "Trilha progressiva por quadro, montada pela IA ou pela ordem do quadro, com agenda nos dias de estudo escolhidos.",
         "Parte teórica: marcar itens de checklist e concluir assuntos direto do app, refletindo no Abacato.",
         "Checklist de teoria e explicação do assunto geradas pela IA.",
-        "Parte prática amarrada à trilha: quiz e exercício diários sobre o assunto da vez (o quiz com 60%+ conclui o assunto junto com a teoria), um projeto no fim de cada semana do plano (aprovado, abre a semana seguinte) e o projeto final da trilha, do tamanho do plano, tudo gerado e corrigido pela IA",
+        "Parte prática amarrada à trilha: quiz e exercício diários sobre o assunto da vez (o quiz com 60%+ conclui o assunto junto com a teoria), um projeto no fim de cada semana do curso, a mesma semana do mapa e da agenda (aprovado, abre a semana seguinte) e o projeto final da trilha, do tamanho do plano, tudo gerado e corrigido pela IA",
         "Avaliação de projetos a partir de repositórios públicos do GitHub.",
         "Pontos, nível, ofensiva de dias seguidos, meta diária e metas de semana e mês.",
         "Conquistas da conta (valem pontos no total) e comemorações em tela cheia de ofensiva, meta e conquista.",
@@ -830,7 +846,7 @@
         "Terreno do Reino (a ilha cresce) e visual por nível nas construções",
         "Acampamento do Reino: ilhota onde as tropas ficam à vista, com a lotação crescendo por nível; tropas desenhadas como recortes de papel",
         "Minha conta: trocar a senha (vale no Proof, no Abacato e na Lisa)",
-        "Personagens do Neuro comprados com moedas, usados em todo o app",
+        "Personagens do Neuro comprados com moedas, usados em todo o app: 12 no total, 5 deles inspirados nos ambientes das expedições (Cogumelo, Mergulhador, Yeti, Magma e Alienígena)",
         "Dicas da Lisa nos projetos: passo a passo básico, dicas e o que revisar, sem entregar a solução",
         "Projetos com pontos por requisito, entregas parciais que somam e complexidade ajustável (mais simples sem perder pontos, desafiador valendo 1,5x)",
         "Botão Rodar nos exercícios do dia: JavaScript e SQL no navegador; C, Python, PHP, Java e outras num compilador on-line",
@@ -873,7 +889,7 @@
       "Three.js 0.170 (o mundo 3D do Reino, carregado só nessa tela)"
     ],
     "arquitetura": {
-      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do plano, o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
+      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do curso (a semana de cada assunto no agendamento, a mesma do mapa e da agenda), o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
       "diagramas": [
         {
           "titulo": "Visão geral",

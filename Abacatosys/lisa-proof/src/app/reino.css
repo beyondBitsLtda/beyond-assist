@@ -703,3 +703,60 @@ button.rn-exp__arte:disabled { cursor: progress; }
 .rn-entrada-teste__ir { font-weight: 800; color: #7e22ce; white-space: nowrap; }
 :root[data-tema="escuro"] .rn-entrada-teste__ir { color: #d8b4fe; }
 #teste.pf-secao { margin-top: 12px; }
+
+/* ---- os cartões do Reino com o pé no lugar (23/10/2026: "o tamanho desses cartões fica estranho,
+   mal feito, com tamanhos quebrados"). Numa linha, todo cartão tem a mesma altura e o botão (ou o
+   selo) fica no pé, alinhado com os vizinhos; e as grades contam colunas que fecham as linhas
+   (a do cartão sobra sozinha numa linha). Contadas pela largura da SEÇÃO (container queries): a
+   mesma seção também aparece estreita, no painel da tela cheia. */
+
+/* construções: o selo "Nível máximo" no pé, como o botão de melhorar */
+.rn-construcao > .pf-pilula { margin-top: auto; align-self: flex-start; }
+
+/* personagens: 6, 4, 3 ou 2 por linha (12 personagens fecham todas as linhas) */
+#personagens { container-type: inline-size; container-name: personagens; }
+.rn-personagens { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container personagens (min-width: 540px) { .rn-personagens { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container personagens (min-width: 760px) { .rn-personagens { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container personagens (min-width: 1080px) { .rn-personagens { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.rn-personagem { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.rn-personagem > strong { text-wrap: balance; }
+.rn-personagem__desc { min-height: 0; }
+.rn-personagem > :last-child { margin-top: auto; padding-top: 4px; }
+
+/* expedições: o rodapé (o saque e o Atacar) no pé do cartão; as abas dos veículos quebram a linha */
+.rn-exp__lugar { align-items: stretch; }
+.rn-exp__arte { align-self: start; }
+.rn-exp__info { display: flex; flex-direction: column; gap: 6px; }
+.rn-exp__rodape { margin-top: auto; padding-top: 4px; }
+.rn-exp__abas { flex-wrap: wrap; overflow: visible; padding-bottom: 0; }
+
+/* garagem: os 5 veículos lado a lado na tela larga; em 2 colunas, o último ocupa a linha toda */
+#garagem { container-type: inline-size; container-name: garagem; }
+.rn-garagem { grid-template-columns: minmax(0, 1fr); }
+.rn-veiculo { align-items: stretch; }
+.rn-veiculo__arte { align-self: start; }
+.rn-veiculo__info { display: flex; flex-direction: column; }
+.rn-veiculo__rodape { margin-top: auto; }
+@container garagem (min-width: 620px) {
+  .rn-garagem { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rn-garagem > .rn-veiculo:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+@container garagem (min-width: 1150px) {
+  .rn-garagem { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .rn-garagem > .rn-veiculo:last-child:nth-child(odd) { grid-column: auto; }
+  /* a arte não estica: a sobra de altura fica no texto, e os títulos ficam na mesma linha */
+  .rn-veiculo { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; text-align: center; }
+  .rn-veiculo__arte { justify-self: center; }
+  .rn-veiculo__rodape { justify-content: center; }
+}
+
+/* tropas: os botões de treinar no pé do cartão */
+.rn-tropa { grid-template-rows: auto 1fr; }
+.rn-tropa__acoes { align-self: end; }
+
+/* as ferramentas do Reino de Teste: 4 por linha (8 ferramentas, duas linhas cheias) */
+#teste { container-type: inline-size; container-name: ferramentas; }
+.rn-teste__grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container ferramentas (min-width: 880px) { .rn-teste__grade { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container ferramentas (max-width: 420px) { .rn-teste__grade { grid-template-columns: minmax(0, 1fr); } }

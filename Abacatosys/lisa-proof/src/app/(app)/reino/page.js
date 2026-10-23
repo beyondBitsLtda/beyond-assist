@@ -748,7 +748,7 @@ function Personagens({ lista, atual, ocupado, aoEscolher }) {
                 : p.tem ? (
                   <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" disabled={Boolean(ocupado)} onClick={() => aoEscolher(p)}>Usar</button>
                 ) : (
-                  <div className="rn-botao" style={{ marginTop: 0 }}>
+                  <div className="rn-botao">
                     <button type="button" className="pf-botao pf-botao--pequeno" disabled={!p.pode || Boolean(ocupado)} onClick={() => aoEscolher(p)}>
                       Comprar · <Moedas n={p.preco} />
                     </button>

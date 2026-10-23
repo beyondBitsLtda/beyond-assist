@@ -63,7 +63,7 @@ function projetoDaVezParaTela(avanco) {
   if (!u) return null;
   const d = u.projeto;
   return {
-    tipo: u.tipo, periodo: u.periodo, numero: u.numero, final: u.final, semanas: avanco.unidades.length,
+    tipo: u.tipo, periodo: u.periodo, numero: u.numero, seguinte: u.seguinte, final: u.final, semanas: avanco.unidades.length,
     de: u.de, ate: u.ate, aberta: u.aberta, liberado: u.projetoLiberado, aprovado: u.aprovado, passou: u.passou,
     podeOutro: u.podeOutroProjeto, rodadas: u.rodadas,
     ...(d ? { id: d.id, status: d.status, nota: d.nota, titulo: d.titulo } : { status: null }),
@@ -161,7 +161,7 @@ export async function resumoDaPratica(usuarioId, trilhas, hoje = diaDe(), avanco
       tema: t.tema,
       // o assunto da prática: o quiz aprovado dele conclui o assunto (se a teoria também estiver feita)
       assunto: atual ? { cardId: atual.cardId, titulo: atual.titulo, teoria: atual.teoria, concluido: atual.concluido, faltaQuiz: atual.faltaQuiz } : null,
-      semana: semana ? { numero: semana.numero, total: avanco.unidades.length, final: semana.final } : null,
+      semana: semana ? { numero: semana.numero, total: avanco.unidades.at(-1).numero, final: semana.final } : null,
       progresso: avanco?.progresso || { feitos: 0, total: 0 },
       concluida: Boolean(avanco?.concluida),
       quiz: diario(t.id, "quiz"),
@@ -407,7 +407,7 @@ async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
     const { avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
     const u = avanco.unidades.find((x) => x.projeto?.id === d.id);
     if (u) {
-      const proxima = avanco.unidades.find((x) => x.numero === u.numero + 1);
+      const proxima = avanco.unidades.find((x) => x.numero === u.seguinte);
       semana = {
         numero: u.numero, final: u.final, aprovado: u.aprovado, podeOutro: u.podeOutroProjeto,
         liberou: u.passou && proxima ? proxima.numero : null, trilhaConcluida: avanco.concluida,

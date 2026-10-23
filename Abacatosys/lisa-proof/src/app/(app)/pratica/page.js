@@ -47,11 +47,11 @@ function situacaoDoDiario(d, tipo) {
  */
 function situacaoDoProjeto(p) {
   const prazo = `até ${formatarDia(p.ate, { comSemana: true })}`;
-  const abre = p.final ? "conclui a trilha" : `abre a semana ${p.numero + 1}`;
+  const abre = p.final ? "conclui a trilha" : `abre a semana ${p.seguinte}`;
   if (!p.aberta) return { texto: "trancado — falta o projeto da semana anterior", acao: "Trancado", classe: "pratica__bloco--trancado", desativado: true };
   if (!p.liberado) return { texto: `libera em ${formatarDia(p.de)} (ou concluindo os assuntos da semana)`, acao: "Em breve", classe: "", desativado: true };
   if (!p.status) return { texto: `${prazo} · nota ${NOTA_DE_APROVACAO}+ ${abre}`, acao: "Ver projeto", classe: "" };
-  if (p.aprovado) return { texto: `Nota ${p.nota} · aprovado: ${p.final ? "trilha concluída" : `semana ${p.numero + 1} aberta`}`, acao: "Rever", classe: "pratica__bloco--feito" };
+  if (p.aprovado) return { texto: `Nota ${p.nota} · aprovado: ${p.final ? "trilha concluída" : `semana ${p.seguinte} aberta`}`, acao: "Rever", classe: "pratica__bloco--feito" };
   if (p.status === "concluido") {
     return { texto: `Nota ${p.nota} · abaixo de ${NOTA_DE_APROVACAO}${p.podeOutro ? ` · dá para um projeto novo (${p.rodadas}/${PROJETOS_POR_SEMANA})` : ""}`, acao: "Rever", classe: "pratica__bloco--parcial" };
   }
