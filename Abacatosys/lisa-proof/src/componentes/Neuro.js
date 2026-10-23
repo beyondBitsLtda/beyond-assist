@@ -171,6 +171,15 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
             </g>
             <ellipse cx="72" cy="54" rx="11" ry="5" transform="rotate(-25 72 54)" className="neuro__brilho-pele" />
 
+            {/* o Neuro Abacate (mascote do Abacato, 23/10/2026): a casca e o caroço ficam ATRÁS do rosto */}
+            <g className="acc acc-abacato-fundo">
+              <path d="M100 6 C 56 6, 38 44, 31 76 C 23 108, 14 128, 20 150 C 28 175, 66 182, 100 182 C 134 182, 172 175, 180 150 C 186 128, 177 108, 169 76 C 162 44, 144 6, 100 6 Z" fill="#3F6212" />
+              <path d="M100 17 C 63 17, 47 50, 40 80 C 33 110, 25 130, 30 149 C 37 169, 70 173, 100 173 C 130 173, 163 169, 170 149 C 175 130, 167 110, 160 80 C 153 50, 137 17, 100 17 Z" fill="#D9F99D" />
+              <circle cx="100" cy="112" r="44" fill="#B45309" />
+              <circle cx="100" cy="112" r="38" fill="#F2C48D" />
+              <ellipse cx="78" cy="96" rx="9" ry="5" transform="rotate(-30 78 96)" fill="#FFFFFF" opacity="0.6" />
+            </g>
+
             {/* rosto */}
             <ellipse cx="73" cy="119" rx="8" ry="5" className="neuro__bochecha" />
             <ellipse cx="127" cy="119" rx="8" ry="5" className="neuro__bochecha" />
@@ -235,6 +244,17 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
               <path d="M96 28 h8" stroke="#111827" strokeWidth="2" />
               <path d="M58 84 L144 88" stroke="#111827" strokeWidth="3.5" />
               <ellipse cx="86" cy="101" rx="13" ry="14" fill="#111827" />
+            </g>
+            <g className="acc acc-abacato">
+              {/* luvas brancas de desenho animado, uma fazendo o sinal da paz */}
+              <path d="M10 132 l-4 -26 a4 4 0 0 1 8 -1 l4 20 M18 128 l2 -26 a4 4 0 0 1 8 1 l-2 26" fill="#FFFFFF" stroke="#1F2937" strokeWidth="3" strokeLinejoin="round" />
+              <circle cx="16" cy="140" r="11" fill="#FFFFFF" stroke="#1F2937" strokeWidth="3" />
+              <circle cx="184" cy="140" r="11" fill="#FFFFFF" stroke="#1F2937" strokeWidth="3" />
+              <path d="M178 144 q6 4 12 0 M182 134 v6" stroke="#1F2937" strokeWidth="2" fill="none" strokeLinecap="round" />
+              {/* tênis */}
+              <path d="M70 176 q2 -9 14 -9 q12 0 14 9 q0 6 -6 6 h-18 q-4 0 -4 -6 z" fill="#FFFFFF" stroke="#1F2937" strokeWidth="3" />
+              <path d="M102 176 q2 -9 14 -9 q12 0 14 9 q0 6 -6 6 h-18 q-4 0 -4 -6 z" fill="#FFFFFF" stroke="#1F2937" strokeWidth="3" />
+              <path d="M70 180 h28 M102 180 h28" stroke="#16A34A" strokeWidth="3" strokeLinecap="round" />
             </g>
             <g className="acc acc-robo">
               <path d="M100 24 V2" stroke="#94A3B8" strokeWidth="5" strokeLinecap="round" />

@@ -78,7 +78,11 @@ function sorteio(semente) {
   };
 }
 const distancia = (ax, az, bx, bz) => { const dx = ax - bx, dz = az - bz; return Math.sqrt(dx * dx + dz * dz); };
-const ARMAS = { arqueira: "flecha", dragao: "fogo", mago: "magia", balao: "bomba", bombardeiro: "explosao", bandido: "flecha", aranha: "magia", cerbero: "fogo" };
+const ARMAS = {
+  arqueira: "flecha", dragao: "fogo", mago: "magia", balao: "bomba", bombardeiro: "explosao", bandido: "flecha", aranha: "magia", cerbero: "fogo",
+  tritao: "flecha", kraken: "magia", harpia: "flecha", salamandra: "fogo", diabrete: "fogo", dragaoDeLava: "fogo",
+  zorg: "raio", ciborgue: "missil", polvoEstelar: "magia", disco: "raio", rainhaAlien: "raio",
+};
 const arma = (u) => (u.tipo === "heroi" ? (u.lado === "defesa" ? "livro" : "golpe") : ARMAS[u.tipo] || "golpe");
 
 /**
@@ -127,6 +131,8 @@ export function montarCombate({ atacante, defensor, semente = 1 }) {
   return {
     t: 0, passos: 0, rand, predios, muralha, castelo, unidades: [], entradas, guarnicao,
     monstros, monstrosSoltos: false, raio: raioDaIlha(niveis.terreno),
+    // planetoides (23/10/2026): a força sorteada multiplica a vida e o dano dos monstros
+    forca: Number(defensor?.forca) > 0 ? Number(defensor.forca) : 1,
     guarnicaoSaiu: false, seq: 0, fim: false, totalPredios: predios.length,
     neuro: { ataque: atacante?.neuro_nivel || 0, defesa: defensor?.neuro_nivel || 0 },
   };
@@ -134,9 +140,12 @@ export function montarCombate({ atacante, defensor, semente = 1 }) {
 
 function criarUnidade(e, tipo, lado, x, z) {
   const base = tipo === "heroi" ? heroiNeuro(lado === "ataque" ? e.neuro.ataque : e.neuro.defesa, lado) : TROPAS[tipo] || MONSTROS[tipo];
+  const f = MONSTROS[tipo] && e.forca !== 1 ? e.forca : 1;
+  const vida = f === 1 ? base.vida : Math.round(base.vida * f);
+  const dano = f === 1 ? base.dano : Math.round(base.dano * f);
   e.seq += 1;
   return {
-    id: `u${e.seq}`, tipo, lado, x, z, vida: base.vida, vidaMax: base.vida, dano: base.dano, intervalo: base.intervalo,
+    id: `u${e.seq}`, tipo, lado, x, z, vida, vidaMax: vida, dano, intervalo: base.intervalo,
     alcance: base.alcance, velocidade: base.velocidade, voa: base.voa, acertaAr: base.acertaAr, alvoTipo: base.alvo,
     area: base.area || 0, suicida: Boolean(base.suicida), contraMuralha: base.contraMuralha || 1, cura: base.cura || 0,
     guarda: Boolean(MONSTROS[tipo]),

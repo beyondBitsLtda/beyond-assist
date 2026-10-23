@@ -412,7 +412,58 @@ function torreRaio(p, n) {
   return g;
 }
 
-const CONSTRUTORES = { castelo, mina, cofre, torre, canhao, quartel, muralha, biblioteca, defesaAerea, morteiro, torreMagica, torreRaio };
+/**
+ * A Mina de Ouro (23/10/2026): um poço na terra com o castelete de madeira e a roda da polia, o
+ * carrinho de pepitas nos trilhos e montinhos de ouro que crescem com o nível. Não entra na
+ * batalha (fica debaixo da terra): é só do reino.
+ */
+function minaDeOuro(p, n) {
+  const g = new THREE.Group();
+  const a = A(n);
+  // a boca do poço: pedras em volta e o buraco escuro
+  g.add(p.cilindro(0.62, 0.7, 0.14, 9, COR.rocha, 0, 0.07, 0));
+  g.add(p.cilindro(0.46, 0.46, 0.16, 9, COR.entrada, 0, 0.09, 0));
+  // o castelete: quatro pernas inclinadas e a roda da polia no alto
+  for (const [x, z] of [[-0.42, -0.42], [0.42, -0.42], [-0.42, 0.42], [0.42, 0.42]]) {
+    const perna = p.caixa(0.08, 1.35, 0.08, a.detalhe, x * 0.75, 0.66, z * 0.75);
+    perna.rotation.z = -x * 0.22;
+    perna.rotation.x = z * 0.22;
+    g.add(perna);
+  }
+  g.add(p.caixa(0.7, 0.08, 0.08, a.detalhe, 0, 1.3, 0));
+  const roda = p.cilindro(0.28, 0.28, 0.06, 12, a.metal, 0, 1.42, 0);
+  roda.rotation.x = Math.PI / 2;
+  roda.userData.gira = true;
+  g.add(roda);
+  g.add(p.cilindro(0.012, 0.012, 1.25, 4, "#3a2a1e", 0.2, 0.8, 0));
+  g.add(p.caixa(0.22, 0.18, 0.22, a.detalhe, 0.2, 0.3, 0)); // o balde subindo
+  // trilhos e o carrinho de pepitas
+  g.add(p.caixa(0.05, 0.03, 1.2, COR.trilho, -0.15, 0.02, 1.15));
+  g.add(p.caixa(0.05, 0.03, 1.2, COR.trilho, 0.15, 0.02, 1.15));
+  g.add(p.caixa(0.46, 0.26, 0.34, "#6b6b6b", 0, 0.2, 1.35));
+  for (const [x, z] of [[-0.12, 1.3], [0.1, 1.42], [0.02, 1.28], [-0.05, 1.45]]) g.add(p.malha(new THREE.DodecahedronGeometry(0.09, 0), COR.ouro, x, 0.38, z));
+  // os montinhos de ouro: um por nível
+  const montes = [[-0.95, 0.5], [0.95, 0.45], [-0.8, -0.75], [0.85, -0.7], [0, -1.05]];
+  montes.slice(0, n).forEach(([x, z], i) => {
+    g.add(p.cone(0.24, 0.22, 7, COR.ouro, x, 0.11, z));
+    if (n >= 4 || i === 0) {
+      const c = p.malha(new THREE.OctahedronGeometry(0.08, 0), n >= 5 ? p.brilho("#ffd34d") : COR.ouro, x, 0.3, z);
+      c.userData.gira = n >= 5;
+      g.add(c);
+    }
+  });
+  // lampião na entrada
+  g.add(p.cilindro(0.025, 0.025, 0.7, 5, COR.madeiraEscura, 0.62, 0.35, 0.45));
+  g.add(p.malha(new THREE.OctahedronGeometry(0.07, 0), p.brilho("#ffcf6b"), 0.62, 0.74, 0.45));
+  if (n >= 3) p.bandeira(g, -0.55, 1.0, 0.55, a.bandeira);
+  g.scale.setScalar(0.85 + 0.06 * n);
+  return g;
+}
+
+const CONSTRUTORES = { castelo, mina, minaDeOuro, cofre, torre, canhao, quartel, muralha, biblioteca, defesaAerea, morteiro, torreMagica, torreRaio };
+// Onde cada construção fica na ilha: os lugares do motor de combate e a Mina de Ouro, que não
+// entra na batalha (fica debaixo da terra) — num canto livre, longe da praia de desembarque.
+const LUGARES_DO_MUNDO = { ...LUGARES, minaDeOuro: [1.3, -4.5] };
 
 // ------------------------------------------------------------------ expedições
 // Cada expedição tem o seu terreno e as suas estruturas (cenariosDasExpedicoes.js): na ilha dela,
@@ -421,7 +472,7 @@ function construir(p, chave, nivel, cenario = null) {
   const g = estruturaDaExpedicao(p, chave, nivel, cenario)
     || (nivel > 0 || chave === "muralha" ? CONSTRUTORES[chave](p, nivel) : terrenoVazio(p));
   if (chave !== "muralha") {
-    const [x, z] = LUGARES[chave];
+    const [x, z] = LUGARES_DO_MUNDO[chave];
     g.position.set(x, 0, z);
     g.rotation.y = Math.atan2(PRACA[0] - x, PRACA[1] - z) * 0.5; // vira um pouco para a praça
   }
@@ -433,7 +484,7 @@ function construir(p, chave, nivel, cenario = null) {
 function ancoraDe(chave, grupo) {
   const topo = new THREE.Box3().setFromObject(grupo).max.y;
   if (chave === "muralha") return new THREE.Vector3(LUGARES.castelo[0] + 1.24, Math.max(topo, 0.6) + 0.35, LUGARES.castelo[1] + 1.24);
-  const [x, z] = LUGARES[chave];
+  const [x, z] = LUGARES_DO_MUNDO[chave];
   return new THREE.Vector3(x, topo + 0.35, z);
 }
 
@@ -464,7 +515,7 @@ function ilha(p, terreno = 0, enfeites = true) {
 
   // praça e pedrinhas até cada construção
   g.add(p.cilindro(1.3, 1.3, 0.06, 9, COR.praca, PRACA[0], 0.03, PRACA[1]));
-  for (const [chave, [x, z]] of Object.entries(LUGARES)) {
+  for (const [chave, [x, z]] of Object.entries(LUGARES_DO_MUNDO)) {
     if (!cabe(chave)) continue;
     for (let t = 0.3; t < 0.75; t += 0.15) {
       const px = PRACA[0] + (x - PRACA[0]) * t, pz = PRACA[1] + (z - PRACA[1]) * t;
@@ -480,7 +531,7 @@ function ilha(p, terreno = 0, enfeites = true) {
     g.add(p.cone(0.48 * s, 0.75 * s, 6, COR.folha, x, 0.75 * s, z));
     g.add(p.cone(0.36 * s, 0.6 * s, 6, COR.folhaEscura, x, 1.12 * s, z));
   };
-  const longeDasConstrucoes = (x, z, folga) => Object.entries(LUGARES).every(([chave, [lx, lz]]) => !cabe(chave) || Math.hypot(lx - x, lz - z) > folga);
+  const longeDasConstrucoes = (x, z, folga) => Object.entries(LUGARES_DO_MUNDO).every(([chave, [lx, lz]]) => !cabe(chave) || Math.hypot(lx - x, lz - z) > folga);
   for (let i = 0; i < 9 + 5 * terreno; i++) {
     const a = (i % 2 ? Math.PI * (0.55 + r() * 0.3) : Math.PI * (1.6 + r() * 0.6)) + (r() - 0.5) * 0.2;
     const raio = R - 1.7 + r() * 1.3;
@@ -655,7 +706,7 @@ function recorteDePapel(img) {
 }
 
 // ------------------------------------------------------------------ o componente
-export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "normal", aoEscolher, aoFalhar }) {
+export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "normal", personagem: personagemFixo, soLeitura = false, aoEscolher, aoVisitar, aoFalhar }) {
   const caixa = useRef(null);
   const molde = useRef(null);
   const rotulos = useRef({});
@@ -667,11 +718,14 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
   const legendaRef = useRef(null);
   legendaRef.current = setLegenda;
   const humorAtual = reacao?.humor || humor;
-  const personagem = usePersonagem(); // trocou de personagem no Reino: a folha de papel é redesenhada
+  const doApp = usePersonagem(); // trocou de personagem no Reino: a folha de papel é redesenhada
+  const personagem = personagemFixo || doApp; // numa visita, o Neuro do dono do reino
   const construcoesRef = useRef(construcoes);
   construcoesRef.current = construcoes;
   const aoEscolherRef = useRef(aoEscolher);
   aoEscolherRef.current = aoEscolher;
+  const aoVisitarRef = useRef(aoVisitar);
+  aoVisitarRef.current = aoVisitar;
 
   // ---- a cena: monta uma vez
   useEffect(() => {
@@ -781,7 +835,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
     neuro.position.set(PRACA[0], 0, PRACA[1]);
     mundo.add(neuro);
 
-    const destinos = Object.values(LUGARES).map(([x, z]) => [PRACA[0] + (x - PRACA[0]) * 0.55, PRACA[1] + (z - PRACA[1]) * 0.55]);
+    const destinos = Object.values(LUGARES_DO_MUNDO).map(([x, z]) => [PRACA[0] + (x - PRACA[0]) * 0.55, PRACA[1] + (z - PRACA[1]) * 0.55]);
     destinos.push(PRACA);
     const andar = { destino: null, espera: 1.5, viradoPara: 1, pulo: 0, vy: 0 };
 
@@ -896,9 +950,11 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       const r = renderizador.domElement.getBoundingClientRect();
       const v = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
       raio.setFromCamera(v, camera);
-      const hit = raio.intersectObjects([folha, ...camadaPredios.children, ...(ilhota.grupo ? [ilhota.grupo] : [])], true)[0];
+      const ilhasVizinhas = sim ? [] : vizinhanca.ilhas.filter((v) => v.grupo.visible).map((v) => v.grupo);
+      const hit = raio.intersectObjects([folha, ...camadaPredios.children, ...(ilhota.grupo ? [ilhota.grupo] : []), ...ilhasVizinhas], true)[0];
       if (!hit) return null;
       if (hit.object.userData.neuro) return { neuro: true };
+      if (hit.object.userData.vizinho != null) return aoVisitarRef.current ? { vizinho: hit.object.userData.vizinho } : null;
       return hit.object.userData.chave ? { chave: hit.object.userData.chave } : null;
     }
     const tela = renderizador.domElement;
@@ -918,7 +974,8 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       ponteiro.ativo = false;
       if (ponteiro.moveu > 4) return;
       const alvo = alvoNoPonto(ev);
-      if (alvo?.chave) aoEscolherRef.current?.(alvo.chave);
+      if (alvo?.vizinho != null) aoVisitarRef.current?.(vizinhanca.dados[alvo.vizinho]);
+      else if (alvo?.chave) aoEscolherRef.current?.(alvo.chave);
       else if (alvo?.neuro) {
         andar.vy = 4.2;
         window.dispatchEvent(new CustomEvent("neuro", { detail: { humor: "feliz", fala: FALAS[Math.floor(Math.random() * FALAS.length)], duracao: 2600 } }));
@@ -1075,6 +1132,85 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       g.scale.setScalar(1.05);
       return g;
     }
+    /**
+     * O veículo que leva as tropas (23/10/2026): o barco voador de sempre, ou o veículo da
+     * expedição — submarino, dirigível, tanque de magma ou nave. A frente de todos é +X (o voar()
+     * vira o modelo para onde ele vai). Feitos de peças simples, como o resto do mundo.
+     */
+    function veiculoDaBatalha(id, cor) {
+      if (!id || id === "barco") return navio(cor);
+      const g = new THREE.Group();
+      if (id === "submarino") {
+        const corpo = p.malha(new THREE.SphereGeometry(0.5, 12, 8), "#facc15");
+        corpo.scale.set(2.0, 0.85, 0.85);
+        g.add(corpo);
+        g.add(p.caixa(0.5, 0.42, 0.34, "#eab308", -0.1, 0.5, 0));
+        g.add(p.cilindro(0.03, 0.03, 0.45, 5, "#475569", 0.05, 0.9, 0));
+        g.add(p.caixa(0.2, 0.05, 0.05, "#475569", 0.14, 1.1, 0));
+        for (const x of [-0.45, 0, 0.45]) {
+          for (const z of [-0.41, 0.41]) { const vidro = p.cilindro(0.11, 0.11, 0.04, 10, "#7dd3fc", x, 0.05, z); vidro.rotation.x = Math.PI / 2; g.add(vidro); }
+        }
+        const helice = p.caixa(0.04, 0.5, 0.12, "#a16207", -1.05, 0, 0);
+        helice.userData.gira = true;
+        g.add(helice);
+        g.add(p.cone(0.2, 0.3, 6, "#a16207", -0.95, 0, 0).rotateZ(Math.PI / 2));
+      } else if (id === "dirigivel") {
+        const balao = p.malha(new THREE.SphereGeometry(0.6, 14, 10), "#f97316");
+        balao.scale.set(2.1, 0.95, 0.95);
+        balao.position.y = 1.1;
+        g.add(balao);
+        for (const [y, z, rz, rx] of [[1.55, 0, 0, 0], [0.65, 0, 0, 0], [1.1, 0.5, 0, Math.PI / 2], [1.1, -0.5, 0, Math.PI / 2]]) {
+          const aleta = p.caixa(0.45, 0.35, 0.04, "#c2410c", -1.25, y, z);
+          aleta.rotation.set(rx, 0, rz);
+          g.add(aleta);
+        }
+        g.add(p.caixa(0.9, 0.32, 0.4, COR.madeira, 0, 0.18, 0));
+        for (const x of [-0.25, 0.1]) g.add(p.caixa(0.16, 0.12, 0.42, "#7dd3fc", x, 0.22, 0));
+        for (const x of [-0.35, 0.35]) g.add(p.cilindro(0.015, 0.015, 0.6, 4, COR.madeiraEscura, x, 0.6, 0));
+        const helice = p.caixa(0.04, 0.4, 0.1, COR.madeiraEscura, -0.55, 0.2, 0);
+        helice.userData.gira = true;
+        g.add(helice);
+      } else if (id === "tanque") {
+        for (const z of [-0.36, 0.36]) g.add(p.caixa(1.5, 0.3, 0.26, "#374151", 0, 0.15, z));
+        for (const z of [-0.36, 0.36]) for (const x of [-0.5, -0.17, 0.17, 0.5]) { const r = p.cilindro(0.1, 0.1, 0.28, 8, "#9ca3af", x, 0.15, z); r.rotation.x = Math.PI / 2; g.add(r); }
+        g.add(p.caixa(1.3, 0.32, 0.62, "#b91c1c", 0, 0.45, 0));
+        g.add(p.cilindro(0.3, 0.34, 0.28, 8, "#dc2626", -0.1, 0.75, 0));
+        const cano = p.cilindro(0.06, 0.06, 0.9, 6, "#4b5563", 0.45, 0.78, 0);
+        cano.rotation.z = Math.PI / 2;
+        g.add(cano);
+        // os foguetes que fazem o tanque voar até o reino de fogo
+        for (const z of [-0.36, 0.36]) {
+          const fogo = p.malha(new THREE.ConeGeometry(0.12, 0.4, 6), p.brilho("#ff8a1f"), -0.85, 0.2, z);
+          fogo.rotation.z = Math.PI / 2;
+          g.add(fogo);
+        }
+      } else if (id === "nave") {
+        const corpo = p.cilindro(0.32, 0.36, 1.4, 12, "#e5e7eb", 0, 0, 0);
+        corpo.rotation.z = Math.PI / 2;
+        g.add(corpo);
+        const nariz = p.cone(0.32, 0.6, 12, "#e5e7eb", 1.0, 0, 0);
+        nariz.rotation.z = -Math.PI / 2;
+        g.add(nariz);
+        const janela = p.cilindro(0.14, 0.14, 0.05, 12, "#38bdf8", 0.35, 0.3, 0);
+        g.add(janela);
+        for (const [y, z] of [[0.38, 0], [-0.38, 0], [0, 0.38], [0, -0.38]]) {
+          const aleta = p.caixa(0.45, Math.abs(y) ? 0.32 : 0.04, Math.abs(z) ? 0.32 : 0.04, "#7c3aed", -0.6, y, z);
+          g.add(aleta);
+        }
+        const fogo = p.malha(new THREE.ConeGeometry(0.22, 0.7, 8), p.brilho("#ff8a1f"), -1.0, 0, 0);
+        fogo.rotation.z = Math.PI / 2;
+        fogo.userData.gira = true;
+        g.add(fogo);
+        g.position.y = 0.4;
+      } else return navio(cor);
+      g.traverse((m) => { m.castShadow = true; });
+      const casca = new THREE.Group();
+      casca.add(g);
+      casca.scale.setScalar(1.05);
+      return casca;
+    }
+    const NOME_DO_VEICULO = { barco: "O navio", submarino: "O submarino", dirigivel: "O dirigível", tanque: "O tanque de magma", nave: "A nave" };
+
     function voar(n, de, para, u, tt) {
       const a = suave(u);
       n.position.lerpVectors(de, para, a);
@@ -1214,7 +1350,8 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       acampamento.visible = false;
       if (ilhaTrocada) for (const v of vizinhanca.ilhas) { v.grupo.visible = false; v.ponte.visible = false; }
       if (ilhaTrocada && ilhota.grupo) { ilhota.grupo.visible = false; ilhota.ponte.visible = false; posicionarCamera(); }
-      const barco = navio(souAtacante ? AZUL : VERMELHO);
+      const barco = veiculoDaBatalha(entrada.defensor?.veiculo, souAtacante ? AZUL : VERMELHO);
+      const quemLeva = NOME_DO_VEICULO[entrada.defensor?.veiculo] || "O navio";
       grupo.add(barco);
       const corpos = new Map();   // id da unidade → { malha, barra, x, z }
       const barrasDePredio = new Map(); // id do prédio → barra
@@ -1227,7 +1364,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
         legendaRef.current?.({ alerta: souAtacante ? "ataque" : "defesa", titulo: t, texto, duracao: INTRO + DURACAO_MAXIMA / VELOCIDADE, pular: true });
       };
       const tituloBase = titulo || (souAtacante ? "⚔️ INVASÃO EM ANDAMENTO" : "⚠️ SEU REINO ESTÁ SENDO ATACADO!");
-      legenda(tituloBase, souAtacante ? (tema ? "O navio leva as suas tropas até o covil dos monstros…" : "O navio leva as suas tropas ao reino rival…") : "Um navio inimigo se aproxima…");
+      legenda(tituloBase, souAtacante ? (tema ? `${quemLeva} leva as suas tropas até o covil dos monstros…` : "O navio leva as suas tropas ao reino rival…") : "Um navio inimigo se aproxima…");
       zoomAlvo = 0.9;
 
       const posDe = (id) => {
@@ -1428,7 +1565,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
           if (nivel <= 0 || (CONSTRUCOES[chave]?.terreno || 0) > terreno) continue;
           g.add(construir(p, chave, nivel));
         }
-        g.traverse((o) => { delete o.userData.chave; });
+        g.traverse((o) => { delete o.userData.chave; o.userData.vizinho = i; }); // tocar visita o reino (Reino → visitar)
         g.scale.setScalar(ESCALA_DO_VIZINHO);
         // ângulo no plano da câmera: 0 = direita da tela (o Acampamento), 90° = fundo, 180° = esquerda
         const ang = ((k === 1 ? 150 : 40 + (170 * i) / (k - 1)) * Math.PI) / 180;
@@ -1719,7 +1856,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
 
   // ---- os reinos vizinhos (paz)
   const mostrados = (vizinhos || []).filter((v) => v?.construcoes).slice(0, MAXIMO_DE_VIZINHOS);
-  const chaveDosVizinhos = JSON.stringify(mostrados.map((v) => ({ nome: v.nome, construcoes: v.construcoes })));
+  const chaveDosVizinhos = JSON.stringify(mostrados.map((v) => ({ id: v.id, nome: v.nome, construcoes: v.construcoes })));
   useEffect(() => {
     api.current?.definirVizinhos(JSON.parse(chaveDosVizinhos));
   }, [chaveDosVizinhos]);
@@ -1754,7 +1891,8 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
 
   return (
     <div className={`rn-mundo${legenda ? " rn-mundo--batalha" : ""}`} ref={caixa}>
-      {construcoes.filter((c) => c.chave !== "terreno" && (c.chave === "acampamento" || !CONSTRUCOES[c.chave]?.terreno || (construcoes.find((x) => x.chave === "terreno")?.nivel || 0) >= CONSTRUCOES[c.chave].terreno)).map((c) => (
+      {/* numa visita (soLeitura), só os rótulos do que existe: "construir" no reino dos outros não faz sentido */}
+      {construcoes.filter((c) => c.chave !== "terreno" && (!soLeitura || c.nivel > 0) && (c.chave === "acampamento" || !CONSTRUCOES[c.chave]?.terreno || (construcoes.find((x) => x.chave === "terreno")?.nivel || 0) >= CONSTRUCOES[c.chave].terreno)).map((c) => (
         <button key={c.chave} type="button" className={`rn-mundo__rotulo${c.nivel === 0 ? " rn-mundo__rotulo--vazio" : ""}`}
           ref={(n) => { rotulos.current[c.chave] = n; }}
           onClick={() => aoEscolher?.(c.chave)}
@@ -1763,9 +1901,10 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
         </button>
       ))}
       {mostrados.map((v, i) => (
-        <span key={i} className="rn-mundo__rotulo rn-mundo__rotulo--vizinho" ref={(n) => { rotulos.current[`__vizinho${i}`] = n; }} aria-hidden="true">
-          🕊️ {v.nome}
-        </span>
+        <button key={i} type="button" className="rn-mundo__rotulo rn-mundo__rotulo--vizinho" ref={(n) => { rotulos.current[`__vizinho${i}`] = n; }}
+          onClick={() => aoVisitar?.(v)} aria-label={`Visitar o ${v.nome}`}>
+          🕊️ {v.nome} <span aria-hidden="true">👁️</span>
+        </button>
       ))}
       {legenda && (
         <div className={`rn-mundo__alerta rn-mundo__alerta--${legenda.alerta}`} role="alert">
@@ -1787,7 +1926,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       <span className="rn-mundo__dica" aria-hidden="true">arraste para girar · toque numa construção</span>
       {/* o molde do Neuro de papel: fora da tela, sem foco, só para copiar o desenho */}
       <div className="rn-mundo__molde" ref={molde} inert aria-hidden="true">
-        <Neuro humor={humorAtual} tamanho={200} />
+        <Neuro humor={humorAtual} tamanho={200} personagem={personagem} />
       </div>
     </div>
   );

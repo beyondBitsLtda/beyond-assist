@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoMonstro } from "./reino/monstrosDePapel.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-22-paz";
+export const EDICAO_DAS_NOVIDADES = "2026-10-23-veiculos";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,12 +28,12 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🕊️", titulo: "Paz por votação", texto: "Proponha a paz: votam os reinos com 3+ dias de ofensiva de estudo. Com 100% de sim, a paz vale para todos — ninguém invade ninguém, todos viram vizinhos, a mina rende × o número de reinos e as expedições repartem o saque.", destaque: true },
-  { icone: "🗺️", titulo: "Expedições contra monstros", texto: "Ataque vilas, florestas, bosques e acampamentos de monstros para saquear moedas — de graça, 3 vezes por dia. Cada lugar tem a sua dificuldade, a sua recompensa e o seu cenário." },
-  { icone: "⚔️", titulo: "Guerra mais justa", texto: "As tropas que sobrevivem voltam para casa. O mesmo reino só a cada 2 dias — e quem foi atacado pode revidar na hora." },
-  { icone: "💡", titulo: "Dicas da Lisa", texto: "Nos projetos da semana e do mês: um passo a passo para começar, sem entregar a resposta." },
-  { icone: "▶️", titulo: "Rode o seu código", texto: "Todo exercício do dia ganhou o botão Rodar: veja o resultado antes de enviar." },
-  { icone: "🧩", titulo: "Projetos em partes", texto: "Cada requisito vale pontos e você entrega aos poucos. Escolha a complexidade: desafiador vale 1,5×." },
+  { icone: "🚀", titulo: "Veículos e mapas novos", texto: "Compre na garagem o Submarino (fundo do mar), o Dirigível (montanhas geladas), o Tanque de Magma (reinos de fogo) e a Nave Estelar: cada viagem cai num planetoide com aliens de força e tesouro sorteados.", destaque: true },
+  { icone: "⛽", titulo: "Combustível", texto: "Cada veículo faz 3 expedições por dia. Acabou? Abasteça com moedas e siga explorando." },
+  { icone: "⚒️", titulo: "Mina de Ouro", texto: "Todo reino ganhou uma mina e 3 operários: eles tiram pepitas que valem mais moedas. Contrate mais — e alugue os seus para outros reinos (ou alugue os deles)." },
+  { icone: "📈", titulo: "Bolsa do Reino", texto: "Invista as suas moedas em ações. Todo dia a Lisa abre o pregão, decide quem sobe e quem cai e lança empresas novas — a mesma bolsa para todos." },
+  { icone: "⛶", titulo: "Tela cheia e visitas", texto: "Veja o reino em tela cheia, com os menus flutuando por cima. Na paz, toque numa ilha vizinha para ver aquele reino inteiro." },
+  { icone: "🥑", titulo: "Neuro Abacate, de graça", texto: "O Neuro vestido de mascote do Abacato: já é de todo mundo — é só vestir em Personagens." },
 ];
 
 export default function Novidades() {
@@ -68,17 +68,17 @@ export default function Novidades() {
       <div className="novidades__caixa">
         <div className="novidades__palco" aria-hidden="true">
           <span className="novidades__estrelas" />
-          <img className="novidades__bicho novidades__bicho--cerbero" src={urlDoMonstro("cerbero")} alt="" />
-          <img className="novidades__bicho novidades__bicho--goblin" src={urlDoMonstro("goblin")} alt="" />
-          <img className="novidades__bicho novidades__bicho--cogumelo" src={urlDoMonstro("cogumelo")} alt="" />
-          <img className="novidades__bicho novidades__bicho--morcego" src={urlDoMonstro("morcego")} alt="" />
-          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} /></div>
+          <img className="novidades__bicho novidades__bicho--cerbero" src={urlDoMonstro("kraken")} alt="" />
+          <img className="novidades__bicho novidades__bicho--goblin" src={urlDoMonstro("zorg")} alt="" />
+          <img className="novidades__bicho novidades__bicho--cogumelo" src={urlDoMonstro("diabrete")} alt="" />
+          <img className="novidades__bicho novidades__bicho--morcego" src={urlDoMonstro("disco")} alt="" />
+          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} personagem="abacato" /></div>
           <span className="novidades__chao" />
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">Paz e Expedições!</h2>
-          <p className="novidades__sub">Vote pela paz entre os reinos, enfrente monstros e leve o saque — e mais coisa nova para estudar melhor.</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">Veículos, Ouro e Bolsa!</h2>
+          <p className="novidades__sub">Explore o fundo do mar, as montanhas, os vulcões e o espaço; tire ouro com os seus operários; e invista na bolsa que a Lisa comanda.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -88,7 +88,7 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/reino#paz" className="pf-botao novidades__principal" onClick={fechar}>🕊️ Ver a paz entre os reinos</Link>
+            <Link ref={principal} href="/reino#garagem" className="pf-botao novidades__principal" onClick={fechar}>🚗 Ver a garagem</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>

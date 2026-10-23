@@ -445,3 +445,204 @@ button.rn-exp__arte:disabled { cursor: progress; }
 .rn-paz__sem-voto p { margin: 0; flex: 1 1 260px; font-size: 14px; }
 .rn-paz__propor { display: grid; justify-items: start; gap: 6px; }
 .rn-paz__propor .rn-motivo { max-width: 260px; }
+
+/* ============================================================ 23/10/2026: veículos, ouro, bolsa, tela cheia e visita */
+
+/* ---- o quadro do 3D: o botão de tela cheia e a tela cheia */
+.rn-vista3d { position: relative; }
+.rn-vista3d__cheia {
+  position: absolute; left: 12px; top: 12px; z-index: 3; border: none; cursor: pointer;
+  padding: 6px 12px; border-radius: 9999px; font: inherit; font-size: 13px; font-weight: 700;
+  background: rgba(17, 24, 20, 0.78); color: #fff;
+}
+.rn-vista3d__cheia:hover { background: rgba(17, 24, 20, 0.95); }
+.rn-vista3d__cheia:focus-visible { outline: 2px solid var(--pf-verde); outline-offset: 2px; }
+.rn-sem-rolagem, .rn-sem-rolagem body { overflow: hidden; }
+.rn-tela-cheia { position: fixed; inset: 0; z-index: 35; background: var(--pf-fundo); }
+.rn-tela-cheia .rn-mundo { height: 100%; border-radius: 0; border: none; }
+.rn-tela-cheia .rn-mundo__dica { bottom: 86px; }
+.rn-tela-cheia .rn-mundo__giro { bottom: 86px; }
+
+.rn-hud__topo {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 5; display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 8px; padding: calc(10px + env(safe-area-inset-top)) 12px 0; pointer-events: none;
+}
+.rn-hud__reino, .rn-hud__rapido { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; pointer-events: auto; }
+.rn-hud__reino > * {
+  padding: 6px 10px; border-radius: 9999px; background: rgba(17, 24, 20, 0.8); color: #fff; font-size: 13px; font-weight: 700;
+}
+.rn-hud__reino strong { font-size: 14px; }
+.rn-hud__botao {
+  border: none; cursor: pointer; font: inherit; font-size: 13px; font-weight: 800; padding: 7px 12px; border-radius: 9999px;
+  background: var(--pf-verde); color: var(--pf-tinta-sobre-verde);
+}
+.rn-hud__botao:disabled { opacity: 0.6; cursor: default; }
+.rn-hud__botao:focus-visible, .rn-hud__item:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.rn-hud__sair { background: rgba(17, 24, 20, 0.85); color: #fff; }
+@media (max-width: 640px) { .rn-hud__sair span { display: none; } .rn-hud__reino > span:nth-child(4) { display: none; } }
+
+.rn-hud__dock {
+  position: absolute; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 6;
+  display: flex; gap: 4px; padding: 6px; border-radius: 20px; max-width: calc(100% - 16px); overflow-x: auto;
+  background: rgba(17, 24, 20, 0.86); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35); scrollbar-width: none;
+}
+.rn-hud__dock::-webkit-scrollbar { display: none; }
+.rn-hud__item {
+  flex: none; display: grid; justify-items: center; gap: 2px; min-width: 62px; padding: 6px 8px; border: none; cursor: pointer;
+  border-radius: 14px; background: transparent; color: #e8ede9; font: inherit; font-size: 20px; line-height: 1;
+}
+.rn-hud__item small { font-size: 11px; font-weight: 700; }
+.rn-hud__item:hover { background: rgba(255, 255, 255, 0.1); }
+.rn-hud__item--atual { background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); }
+
+.rn-hud__painel {
+  position: absolute; z-index: 5; right: 12px; top: calc(58px + env(safe-area-inset-top)); bottom: 86px; width: min(460px, calc(100% - 24px));
+  display: flex; flex-direction: column; border-radius: 20px; overflow: hidden;
+  background: var(--pf-fundo); box-shadow: var(--pf-sombra-alta); border: 1px solid var(--pf-linha);
+  animation: folha-subir 0.2s ease-out;
+}
+.rn-hud__painel-topo { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--pf-linha); background: var(--pf-superficie); }
+.rn-hud__painel-corpo { overflow-y: auto; padding: 0 14px 16px; overscroll-behavior: contain; }
+.rn-hud__painel-corpo > :first-child { margin-top: 12px; }
+.rn-hud__painel-corpo .pf-grade--2 { grid-template-columns: minmax(0, 1fr); }
+.rn-hud__painel-corpo .rn-exp, .rn-hud__painel-corpo .rn-bolsa, .rn-hud__painel-corpo .rn-garagem, .rn-hud__painel-corpo .rn-construcoes { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 640px) {
+  .rn-hud__painel { left: 8px; right: 8px; width: auto; top: auto; bottom: 84px; max-height: 62vh; border-radius: 20px; }
+}
+
+/* ---- a visita a um reino vizinho */
+.rn-mundo__rotulo--vizinho { pointer-events: auto; cursor: pointer; border: none; font: inherit; }
+.rn-mundo__rotulo--vizinho:hover { background: #166534; }
+.rn-visita {
+  position: absolute; left: 12px; bottom: 12px; z-index: 4; width: min(420px, calc(100% - 24px)); max-height: calc(100% - 24px); overflow-y: auto;
+  padding: 12px 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.95); color: var(--pf-tinta); box-shadow: var(--pf-sombra-alta);
+}
+:root[data-tema="escuro"] .rn-visita { background: rgba(21, 30, 25, 0.95); }
+.rn-tela-cheia .rn-visita { bottom: 86px; }
+.rn-visita--carregando { font-weight: 700; }
+.rn-visita__topo { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.rn-visita__topo h3 { margin: 2px 0; font-size: 17px; }
+.rn-visita__topo small { color: var(--pf-tinta-2); }
+.rn-visita__selo { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--pf-verde-forte); }
+.rn-visita__botoes { display: flex; gap: 6px; }
+.rn-visita__corpo { margin-top: 8px; display: grid; gap: 6px; }
+.rn-visita__linha { margin: 0; font-size: 13px; }
+.rn-visita__predios { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; font-size: 13px; }
+
+/* ---- a garagem e o tanque */
+.rn-garagem { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 700px) { .rn-garagem { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .rn-garagem { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.rn-veiculo { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: start; }
+.rn-veiculo:not(.rn-veiculo--meu) .rn-veiculo__arte { filter: grayscale(0.55); opacity: 0.85; }
+.rn-veiculo--meu { box-shadow: inset 0 0 0 2px var(--pf-verde); }
+.rn-veiculo__info h3 { margin: 0; font-size: 16px; }
+.rn-veiculo__destino { font-size: 12px; font-weight: 700; color: var(--pf-verde-forte); }
+.rn-veiculo__info .pf-estat__nota { margin: 4px 0 8px; }
+.rn-veiculo__rodape { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.rn-tanque { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 700; color: var(--pf-tinta); }
+.rn-tanque__carga { width: 12px; height: 16px; border-radius: 3px; border: 2px solid var(--pf-tinta-2); background: transparent; }
+.rn-tanque__carga--cheia { background: var(--pf-atencao); border-color: var(--pf-atencao); }
+.rn-tanque small { margin-left: 4px; color: var(--pf-tinta-2); }
+.rn-tanque--compacto { font-size: 12px; }
+.rn-tanque--compacto .rn-tanque__carga { width: 7px; height: 11px; border-width: 1.5px; border-radius: 2px; }
+
+/* ---- expedições: as abas dos veículos e o radar */
+.rn-exp__abas { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; scrollbar-width: thin; }
+.rn-exp__aba {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 9999px; cursor: pointer;
+  border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; font-size: 14px; font-weight: 700;
+}
+.rn-exp__aba--atual { background: var(--pf-destaque-fundo); color: #fff; border-color: transparent; }
+.rn-exp__aba--atual .rn-tanque, .rn-exp__aba--atual .rn-tanque small { color: #fff; }
+.rn-exp__aba--trancada { opacity: 0.8; }
+.rn-exp__aba:focus-visible { outline: 2px solid var(--pf-verde); outline-offset: 2px; }
+.rn-exp__trancado { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.rn-exp__trancado p { flex: 1 1 260px; margin: 0; font-size: 14px; }
+.rn-exp__tanque { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.rn-exp__forca { display: inline-flex; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 800; background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
+.rn-exp__forca--forte { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+.rn-exp__lugar--planetoide { background: linear-gradient(135deg, var(--pf-superficie) 60%, rgba(124, 58, 237, 0.12)); }
+
+/* ---- a mina de ouro */
+.rn-ouro { display: grid; gap: 8px; align-content: start; }
+.rn-ouro .pf-estat__valor small { font-size: 14px; font-weight: 600; color: var(--pf-tinta-2); }
+.rn-ouro__alugueis { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.rn-ouro__campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rn-mercado { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rn-mercado li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: var(--pf-fundo); }
+.rn-mercado__quem { flex: 1 1 160px; display: grid; }
+.rn-mercado__quem small { color: var(--pf-tinta-2); }
+.rn-mercado__preco small { color: var(--pf-tinta-2); font-size: 12px; }
+
+/* ---- a bolsa */
+.rn-bolsa__manchete { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; border-left: 4px solid var(--pf-verde); }
+.rn-bolsa__manchete span { font-size: 22px; }
+.rn-bolsa__manchete p { margin: 0; }
+.rn-bolsa__abrindo { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; margin-bottom: 12px; }
+.rn-bolsa__carteira { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 12px; }
+@media (max-width: 640px) { .rn-bolsa__carteira { grid-template-columns: minmax(0, 1fr); } }
+.rn-hud__painel-corpo .rn-bolsa__carteira { grid-template-columns: minmax(0, 1fr); }
+.rn-bolsa { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 700px) { .rn-bolsa { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .rn-bolsa { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.rn-acao { display: grid; gap: 8px; align-content: start; }
+.rn-acao__topo { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.rn-acao__emoji { font-size: 28px; }
+.rn-acao__nome h3 { margin: 0; font-size: 15px; }
+.rn-acao__nome small { color: var(--pf-tinta-2); font-size: 12px; }
+.rn-acao__preco { display: grid; justify-items: end; gap: 2px; font-weight: 800; }
+.rn-acao__noticia { margin: 0; }
+.rn-acao__minha { margin: 0; font-size: 13px; }
+.rn-acao__acoes { margin-top: 0; }
+.rn-var { display: inline-flex; padding: 1px 8px; border-radius: 9999px; font-size: 12px; font-weight: 800; }
+.rn-var--sobe { color: var(--pf-verde-forte); }
+.rn-var--cai { color: var(--pf-alerta); }
+.rn-var--igual { color: var(--pf-tinta-2); }
+.rn-var.rn-var--sobe { background: var(--pf-sucesso-fundo); }
+.rn-var.rn-var--cai { background: var(--pf-alerta-fundo); }
+.rn-var.rn-var--igual { background: var(--pf-fundo); }
+.rn-var--estreia { background: var(--pf-atencao-fundo); color: var(--pf-atencao); }
+.rn-grafico { display: grid; gap: 2px; }
+.rn-grafico__svg { width: 100%; height: 48px; display: block; touch-action: pan-y; }
+.rn-grafico__linha { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.rn-grafico__svg--sobe { color: var(--pf-verde-forte); }
+.rn-grafico__svg--cai { color: var(--pf-alerta); }
+.rn-grafico__linha, .rn-grafico__ponto { stroke: currentColor; }
+.rn-grafico__ponto { fill: var(--pf-superficie); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.rn-grafico__ponto--foco { fill: currentColor; }
+.rn-grafico__guia { stroke: var(--pf-tinta-2); stroke-width: 1; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
+.rn-grafico__dica { font-size: 11px; color: var(--pf-tinta-2); }
+.rn-bolsa__saidas, .rn-bolsa__ordens { margin-top: 12px; }
+.rn-bolsa__saidas ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.rn-negociar { display: grid; gap: 12px; }
+.rn-negociar h2 small { display: block; font-size: 13px; font-weight: 600; color: var(--pf-tinta-2); }
+.rn-negociar .rn-dias { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rn-negociar__qtd { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rn-negociar__qtd input { width: 100px; }
+.rn-negociar__conta { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--pf-superficie); }
+.rn-negociar__conta dt, .rn-negociar__conta dd { margin: 0; font-size: 14px; }
+.rn-negociar__conta dd { text-align: right; }
+
+/* ---- o céu dos lugares novos (o Mundo3D marca data-cenario no quadro durante a luta) */
+:root .rn-mundo[data-cenario="recife-tritoes"] { background: linear-gradient(180deg, #0b6fa4 0%, #34b3df 60%, #a5e8fb 100%); }
+:root .rn-mundo[data-cenario="cidade-afundada"] { background: linear-gradient(180deg, #08476e 0%, #1c86b8 60%, #6fcbe8 100%); }
+:root .rn-mundo[data-cenario="fossa-kraken"] { background: linear-gradient(180deg, #020617 0%, #0b1f45 60%, #1e3a8a 100%); }
+:root .rn-mundo[data-cenario="trilha-yetis"] { background: linear-gradient(180deg, #a9c9ea 0%, #dbe9f7 65%, #ffffff 100%); }
+:root .rn-mundo[data-cenario="ninho-harpias"] { background: linear-gradient(180deg, #7fb2e8 0%, #c5dcf5 60%, #fff7ed 100%); }
+:root .rn-mundo[data-cenario="pico-gigante"] { background: linear-gradient(180deg, #5e8fd6 0%, #a9c9f2 60%, #eaf3ff 100%); }
+:root .rn-mundo[data-cenario="forja-diabretes"] { background: linear-gradient(180deg, #2a0d06 0%, #7a2a0f 55%, #e0742a 100%); }
+:root .rn-mundo[data-cenario="rio-de-magma"] { background: linear-gradient(180deg, #160604 0%, #5c1a08 55%, #d9541a 100%); }
+:root .rn-mundo[data-cenario="trono-dragao"] { background: linear-gradient(180deg, #120303 0%, #6b0f0f 55%, #e4361b 100%); }
+:root .rn-mundo[data-cenario="planetoide-0"] { background: radial-gradient(circle at 80% 15%, #f5d0fe 0 3%, transparent 4%), linear-gradient(180deg, #0b0420 0%, #2a0f5c 60%, #5b3a9e 100%); }
+:root .rn-mundo[data-cenario="planetoide-1"] { background: radial-gradient(circle at 20% 20%, #bbf7d0 0 4%, transparent 5%), linear-gradient(180deg, #02120a 0%, #0b3a24 60%, #2f7d55 100%); }
+:root .rn-mundo[data-cenario="planetoide-2"] { background: radial-gradient(circle at 75% 20%, #fde68a 0 5%, transparent 6%), linear-gradient(180deg, #1a0602 0%, #5a1f0c 60%, #c2622d 100%); }
+:root .rn-mundo[data-cenario="planetoide-3"] { background: radial-gradient(circle at 30% 15%, #e0e7ff 0 3%, transparent 4%), linear-gradient(180deg, #030616 0%, #1b2257 60%, #4f5fa8 100%); }
+
+/* ajustes do teste visual (23/10/2026) */
+.rn-veiculo__rodape .pf-botao, .rn-exp__tanque .pf-botao { white-space: nowrap; }
+.rn-vista3d:has(.rn-mundo--batalha) .rn-vista3d__cheia { display: none; }
+@media (max-width: 640px) {
+  .rn-hud__painel { max-height: 52vh; }
+  .rn-visita { max-height: 48%; left: 8px; right: 8px; width: auto; }
+}

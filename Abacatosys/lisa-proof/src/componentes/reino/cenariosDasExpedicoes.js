@@ -57,9 +57,68 @@ export const CENARIOS = {
     chao: "#3b2b2b", paleta: { madeira: "#2a1c1c", escura: "#140d0d", telhado: "#7f1d1d", pedra: "#3f3a3a", tecido: "#450a0a", brilho: "#f97316" },
     cabana: "tenda", estaca: "pedra", lava: true, luz: { ceu: "#ff9a6b", chao: "#2a0f0a", sol: "#ffb27a", forca: 1.2 },
   },
+  // ---- o fundo do mar (Submarino, 23/10/2026): areia, corais, bolhas e luz azulada
+  "recife-tritoes": {
+    chao: "#f1dca4", paleta: { madeira: "#f472b6", escura: "#9d174d", telhado: "#22d3ee", pedra: "#fde68a", tecido: "#0ea5e9", brilho: "#a5f3fc" },
+    cabana: "casa", estaca: "pedra", mar: true, luz: { ceu: "#9be7ff", chao: "#0e7490", sol: "#e0f7ff", forca: 1.3 },
+  },
+  "cidade-afundada": {
+    chao: "#c9b88f", paleta: { madeira: "#64748b", escura: "#334155", telhado: "#0f766e", pedra: "#a7b3c2", tecido: "#155e75", brilho: "#67e8f9" },
+    cabana: "casa", estaca: "pedra", mar: true, luz: { ceu: "#5cc4f2", chao: "#0c4a6e", sol: "#c7ecff", forca: 1.15 },
+  },
+  "fossa-kraken": {
+    chao: "#26334a", paleta: { madeira: "#334155", escura: "#0f172a", telhado: "#5b21b6", pedra: "#4b5a70", tecido: "#1e1b4b", brilho: "#22d3ee" },
+    cabana: "tenda", estaca: "osso", mar: true, luz: { ceu: "#3b5bb5", chao: "#020617", sol: "#9fc3ff", forca: 0.95 },
+  },
+  // ---- as montanhas geladas (Dirigível)
+  "trilha-yetis": {
+    chao: "#f1f5f9", paleta: { madeira: "#78716c", escura: "#44403c", telhado: "#e2e8f0", pedra: "#94a3b8", tecido: "#0369a1", brilho: "#bae6fd" },
+    cabana: "casa", estaca: "madeira", neve: true, luz: { ceu: "#e0f2fe", chao: "#cbd5e1", sol: "#f8fafc", forca: 1.6 },
+  },
+  "ninho-harpias": {
+    chao: "#d6d3d1", paleta: { madeira: "#a16207", escura: "#57534e", telhado: "#f8fafc", pedra: "#a8a29e", tecido: "#7c2d12", brilho: "#fde047" },
+    cabana: "tenda", estaca: "pedra", neve: true, luz: { ceu: "#c7ddff", chao: "#a8a29e", sol: "#fff7ed", forca: 1.6 },
+  },
+  "pico-gigante": {
+    chao: "#e0f2fe", paleta: { madeira: "#64748b", escura: "#1e293b", telhado: "#bae6fd", pedra: "#7dd3fc", tecido: "#1e40af", brilho: "#e0f2fe" },
+    cabana: "casa", estaca: "pedra", neve: true, luz: { ceu: "#9cc8ff", chao: "#bfdbfe", sol: "#eff6ff", forca: 1.45 },
+  },
+  // ---- os reinos de fogo e lava (Tanque de Magma)
+  "forja-diabretes": {
+    chao: "#4a332b", paleta: { madeira: "#57534e", escura: "#1c1917", telhado: "#b91c1c", pedra: "#78716c", tecido: "#7f1d1d", brilho: "#f97316" },
+    cabana: "casa", estaca: "pedra", lava: true, luz: { ceu: "#fdba74", chao: "#431407", sol: "#fed7aa", forca: 1.3 },
+  },
+  "rio-de-magma": {
+    chao: "#2e2724", paleta: { madeira: "#44403c", escura: "#0c0a09", telhado: "#9a3412", pedra: "#3f3f46", tecido: "#7c2d12", brilho: "#fb923c" },
+    cabana: "tenda", estaca: "pedra", lava: true, luz: { ceu: "#fb923c", chao: "#1c0a05", sol: "#ffb27a", forca: 1.2 },
+  },
+  "trono-dragao": {
+    chao: "#211b19", paleta: { madeira: "#292524", escura: "#0c0a09", telhado: "#7f1d1d", pedra: "#2f2b2e", tecido: "#450a0a", brilho: "#facc15" },
+    cabana: "tenda", estaca: "osso", lava: true, luz: { ceu: "#ef6a4a", chao: "#1a0503", sol: "#fcb3a0", forca: 1.15 },
+  },
+  // ---- os planetoides (Nave Estelar): a paleta é sorteada junto com o planetoide (planetoides.js)
+  "planetoide-0": {
+    chao: "#6d5a8a", paleta: { madeira: "#64748b", escura: "#334155", telhado: "#a78bfa", pedra: "#8b7fa8", tecido: "#4c1d95", brilho: "#a3e635" },
+    cabana: "tenda", estaca: "pedra", espaco: true, luz: { ceu: "#c4b5fd", chao: "#2e1065", sol: "#e9d5ff", forca: 1.05 },
+  },
+  "planetoide-1": {
+    chao: "#4d7c4a", paleta: { madeira: "#475569", escura: "#1e293b", telhado: "#22c55e", pedra: "#6b8f71", tecido: "#14532d", brilho: "#f0abfc" },
+    cabana: "tenda", estaca: "pedra", espaco: true, luz: { ceu: "#bbf7d0", chao: "#052e16", sol: "#dcfce7", forca: 1.1 },
+  },
+  "planetoide-2": {
+    chao: "#b4532a", paleta: { madeira: "#57534e", escura: "#292524", telhado: "#f97316", pedra: "#c2410c", tecido: "#7c2d12", brilho: "#67e8f9" },
+    cabana: "tenda", estaca: "pedra", espaco: true, luz: { ceu: "#fed7aa", chao: "#431407", sol: "#ffedd5", forca: 1.2 },
+  },
+  "planetoide-3": {
+    chao: "#93a7c9", paleta: { madeira: "#475569", escura: "#1e293b", telhado: "#38bdf8", pedra: "#a5b4fc", tecido: "#312e81", brilho: "#fde047" },
+    cabana: "tenda", estaca: "pedra", espaco: true, luz: { ceu: "#c7d2fe", chao: "#1e1b4b", sol: "#e0e7ff", forca: 1.1 },
+  },
 };
 /** Replays antigos guardavam só o tipo do lugar: cada tipo tem um cenário padrão. */
-const PADRAO_DO_TIPO = { bosque: "bosque-cogumelos", vila: "vila-goblins", floresta: "floresta-lobos", acampamento: "acampamento-orc" };
+const PADRAO_DO_TIPO = {
+  bosque: "bosque-cogumelos", vila: "vila-goblins", floresta: "floresta-lobos", acampamento: "acampamento-orc",
+  submerso: "recife-tritoes", montanha: "trilha-yetis", vulcao: "forja-diabretes", planetoide: "planetoide-0",
+};
 export function cenarioDe(defensor) {
   const id = CENARIOS[defensor?.cenario] ? defensor.cenario : PADRAO_DO_TIPO[defensor?.tema] || null;
   return id ? { id, ...CENARIOS[id] } : null;
@@ -368,8 +427,121 @@ function covil(p, cen) {
       g.add(chama);
       break;
     }
+    case "recife-tritoes": {
+      // o palácio de concha: uma concha em espiral, corais em volta e a pérola brilhando
+      for (let i = 0; i < 5; i++) g.add(p.cilindro(0.95 - i * 0.17, 1.0 - i * 0.17, 0.42, 10, i % 2 ? c.madeira : "#fbcfe8", 0, 0.21 + i * 0.4, 0));
+      g.add(p.cone(0.18, 0.5, 8, c.madeira, 0, 2.25, 0));
+      g.add(p.malha(new THREE.SphereGeometry(0.22, 10, 8), p.brilho(c.brilho), 0, 0.5, 0.95));
+      for (const [x, z, cor] of [[-0.95, 0.6, "#fb7185"], [0.95, 0.5, "#f59e0b"], [0.7, -0.8, "#a78bfa"]]) g.add(p.cone(0.18, 0.9, 5, cor, x, 0.45, z));
+      break;
+    }
+    case "cidade-afundada": {
+      // o templo afundado: colunas (uma tombada), o frontão rachado e algas
+      for (const x of [-0.75, -0.25, 0.25, 0.75]) g.add(p.cilindro(0.13, 0.15, 1.5, 8, c.pedra, x, 0.75, 0.3));
+      const tombada = p.cilindro(0.13, 0.15, 1.5, 8, c.pedra, 1.2, 0.15, -0.5);
+      tombada.rotation.z = Math.PI / 2.2;
+      g.add(tombada);
+      g.add(p.caixa(1.9, 0.22, 0.7, c.pedra, 0, 1.6, 0.3));
+      const frontao = p.cone(1.05, 0.5, 3, c.pedra, 0, 1.95, 0.3);
+      frontao.rotation.set(Math.PI / 2, 0, 0);
+      frontao.scale.set(1, 0.3, 1);
+      g.add(frontao);
+      g.add(p.caixa(1.4, 1.1, 0.5, c.madeira, 0, 0.55, -0.35));
+      for (const x of [-0.95, 0.95]) g.add(p.cilindro(0.03, 0.05, 1.1, 4, "#16a34a", x, 0.55, 0.75));
+      break;
+    }
+    case "fossa-kraken": {
+      // a toca do Kraken: um arco de pedra escura, tentáculos saindo e dois olhos acesos
+      for (const x of [-0.7, 0.7]) g.add(p.caixa(0.45, 1.5, 0.55, c.pedra, x, 0.75, 0));
+      g.add(p.caixa(1.85, 0.45, 0.6, c.pedra, 0, 1.65, 0));
+      g.add(p.caixa(0.9, 1.25, 0.08, ESCURO, 0, 0.63, 0.05));
+      for (const x of [-0.18, 0.18]) g.add(p.malha(new THREE.SphereGeometry(0.08, 8, 6), p.brilho("#facc15"), x, 0.95, 0.12));
+      for (const [x, z, rz] of [[-1.1, 0.5, 0.5], [1.1, 0.4, -0.5], [-0.6, 0.95, 0.3], [0.65, 0.95, -0.3]]) {
+        const tentaculo = p.cone(0.12, 1.3, 6, c.telhado, x, 0.55, z);
+        tentaculo.rotation.z = rz;
+        g.add(tentaculo);
+      }
+      break;
+    }
+    case "trilha-yetis": {
+      // a caverna de gelo: um morro de neve com a boca escura e pingentes de gelo
+      const morro = p.malha(new THREE.DodecahedronGeometry(1.05, 1), "#f8fafc", 0, 0.55, 0);
+      morro.scale.set(1.2, 0.8, 1.1);
+      g.add(morro);
+      const boca = p.malha(new THREE.SphereGeometry(0.42, 10, 6, 0, Math.PI), ESCURO, 0, 0.05, 0.82);
+      boca.rotation.x = -Math.PI / 2;
+      g.add(boca);
+      for (const x of [-0.3, -0.1, 0.1, 0.3]) { const gelo = p.cone(0.05, 0.25, 4, "#bae6fd", x, 0.38, 0.85); gelo.rotation.x = Math.PI; g.add(gelo); }
+      for (const [x, z] of [[0.7, 0.7], [-0.7, 0.75]]) g.add(p.malha(new THREE.OctahedronGeometry(0.16, 0), p.brilho(c.brilho), x, 0.25, z));
+      break;
+    }
+    case "ninho-harpias": {
+      // o ninho no alto do pico: uma agulha de pedra com o ninho e os ovos de ouro
+      g.add(p.cilindro(0.35, 0.8, 1.6, 7, c.pedra, 0, 0.8, 0));
+      const ninho = p.malha(new THREE.TorusGeometry(0.62, 0.2, 6, 12), c.madeira, 0, 1.72, 0);
+      ninho.rotation.x = Math.PI / 2;
+      g.add(ninho);
+      for (const [x, z] of [[-0.18, 0.05], [0.18, -0.05], [0, 0.2]]) { const ovo = p.malha(new THREE.SphereGeometry(0.16, 8, 6), OURO, x, 1.8, z); ovo.scale.y = 1.3; g.add(ovo); }
+      g.add(p.cone(0.35, 0.3, 7, "#f8fafc", 0, 0.08, 0));
+      break;
+    }
+    case "pico-gigante": {
+      // o trono de gelo do Gigante: blocos de gelo, o espaldar alto e a coroa congelada
+      const gelo = new THREE.MeshStandardMaterial({ color: "#bae6fd", flatShading: true, roughness: 0.3, transparent: true, opacity: 0.85 });
+      const bloco = (w, h, d, x, y, z) => { const m = p.malha(new THREE.BoxGeometry(w, h, d), gelo, x, y, z); m.userData.proprio = true; g.add(m); };
+      bloco(1.6, 0.5, 1.2, 0, 0.25, 0);
+      bloco(1.6, 1.6, 0.35, 0, 1.05, -0.45);
+      bloco(0.35, 0.9, 1.0, -0.65, 0.7, 0);
+      bloco(0.35, 0.9, 1.0, 0.65, 0.7, 0);
+      for (let i = 0; i < 5; i++) g.add(p.cone(0.07, 0.25, 4, OURO, -0.3 + i * 0.15, 2.0, -0.45));
+      g.add(p.malha(new THREE.OctahedronGeometry(0.15, 0), p.brilho(c.brilho), 0, 1.5, -0.25));
+      break;
+    }
+    case "forja-diabretes": {
+      // a forja: o forno com a boca em brasa, a chaminé fumegando e a bigorna na frente
+      g.add(p.caixa(1.4, 1.1, 1.1, c.pedra, 0, 0.55, -0.1));
+      g.add(p.caixa(0.6, 0.45, 0.06, p.brilho(c.brilho), 0, 0.35, 0.47));
+      g.add(p.cilindro(0.22, 0.28, 1.2, 7, c.escura, 0.4, 1.6, -0.3));
+      g.add(p.caixa(0.5, 0.2, 0.25, "#52525b", 0, 0.42, 1.0));
+      g.add(p.caixa(0.3, 0.3, 0.18, "#3f3f46", 0, 0.2, 1.0));
+      const chama = p.malha(new THREE.OctahedronGeometry(0.2, 0), p.brilho("#fde047"), 0.4, 2.35, -0.3);
+      chama.scale.y = 1.6;
+      chama.userData.gira = true;
+      g.add(chama);
+      break;
+    }
+    case "rio-de-magma": {
+      // a ponte de obsidiana sobre a lava, com o portal do Golem
+      g.add(p.caixa(2.2, 0.08, 1.2, p.brilho(c.brilho), 0, 0.04, 0));
+      g.add(p.caixa(2.4, 0.22, 0.7, "#18181b", 0, 0.32, 0));
+      for (const x of [-0.9, 0.9]) g.add(p.caixa(0.35, 1.4, 0.45, "#27272a", x, 1.0, 0));
+      g.add(p.caixa(2.1, 0.32, 0.5, "#27272a", 0, 1.8, 0));
+      for (const x of [-0.5, 0, 0.5]) g.add(p.cone(0.12, 0.45, 4, "#09090b", x, 2.15, 0));
+      break;
+    }
+    case "trono-dragao": {
+      // o vulcão do Dragão: o cone com a cratera em brasa e a caveira de dragão na entrada
+      g.add(p.cone(1.3, 1.9, 8, c.pedra, 0, 0.95, 0));
+      g.add(p.cilindro(0.4, 0.4, 0.1, 8, p.brilho(c.brilho), 0, 1.86, 0));
+      g.add(p.caixa(0.55, 0.7, 0.1, p.brilho("#f97316"), 0, 0.35, 1.05));
+      g.add(p.malha(new THREE.SphereGeometry(0.26, 8, 6), OSSO, 0, 0.85, 1.1));
+      for (const lado of [-1, 1]) { const chifre = p.cone(0.07, 0.4, 5, OSSO, lado * 0.25, 1.1, 1.05); chifre.rotation.z = -lado * 0.7; g.add(chifre); }
+      break;
+    }
     default:
-      g.add(p.cone(1.1, 1.6, 6, c.tecido, 0, 0.8, 0));
+      if (cen.espaco) {
+        // a base alienígena: a cúpula de vidro, o anel de luzes e a antena
+        const cupula = new THREE.MeshStandardMaterial({ color: c.brilho, flatShading: true, roughness: 0.2, transparent: true, opacity: 0.55 });
+        const dome = p.malha(new THREE.SphereGeometry(0.95, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), cupula, 0, 0.25, 0);
+        dome.userData.proprio = true;
+        g.add(dome);
+        g.add(p.cilindro(1.05, 1.1, 0.25, 14, c.pedra, 0, 0.12, 0));
+        for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; g.add(p.malha(new THREE.OctahedronGeometry(0.07, 0), p.brilho(c.telhado), Math.cos(a) * 1.05, 0.28, Math.sin(a) * 1.05)); }
+        g.add(p.cilindro(0.03, 0.03, 1.0, 5, c.escura, 0, 1.6, 0));
+        const ponta = p.malha(new THREE.OctahedronGeometry(0.12, 0), p.brilho(c.telhado), 0, 2.15, 0);
+        ponta.userData.gira = true;
+        g.add(ponta);
+      } else g.add(p.cone(1.1, 1.6, 6, c.tecido, 0, 0.8, 0));
   }
   return g;
 }
@@ -503,6 +675,32 @@ export function terrenoDaExpedicao(p, cen, construcoes) {
     m.scale.y = 0.7;
     g.add(m);
   };
+  const coral = (x, z, s, cor) => {
+    for (let k = 0; k < 3; k++) {
+      const ramo = p.cone(0.09 * s, (0.5 + r() * 0.4) * s, 5, cor, x + (k - 1) * 0.12 * s, 0.25 * s, z + (r() - 0.5) * 0.15);
+      ramo.rotation.z = (k - 1) * 0.35;
+      g.add(ramo);
+    }
+  };
+  const alga = (x, z, s) => { for (let k = 0; k < 3; k++) g.add(p.cilindro(0.025 * s, 0.04 * s, (0.7 + r() * 0.6) * s, 4, k % 2 ? "#16a34a" : "#15803d", x + k * 0.08, 0.4 * s, z)); };
+  const bolha = (x, z) => {
+    const m = p.malha(new THREE.SphereGeometry(0.05 + r() * 0.06, 8, 6), new THREE.MeshStandardMaterial({ color: "#e0f7ff", transparent: true, opacity: 0.55, roughness: 0.1 }), x, 0.5 + r() * 1.6, z);
+    m.userData.proprio = true;
+    g.add(m);
+  };
+  const estrela = (x, z) => { const m = p.malha(new THREE.OctahedronGeometry(0.14, 0), "#fb923c", x, 0.04, z); m.scale.y = 0.25; m.rotation.y = r() * Math.PI; g.add(m); };
+  const cristalDeGelo = (x, z, s) => { const m = p.malha(new THREE.OctahedronGeometry(0.16 * s, 0), p.brilho("#bae6fd"), x, 0.22 * s, z); m.scale.y = 1.8; g.add(m); };
+  const poca = (x, z) => g.add(p.cilindro(0.45 + r() * 0.3, 0.45, 0.05, 9, p.brilho(c.brilho), x, 0.03, z));
+  const cratera = (x, z, s) => {
+    const borda = p.malha(new THREE.TorusGeometry(0.35 * s, 0.08 * s, 5, 10), c.pedra, x, 0.03, z);
+    borda.rotation.x = Math.PI / 2;
+    g.add(borda);
+    g.add(p.cilindro(0.3 * s, 0.3 * s, 0.02, 10, c.escura, x, 0.015, z));
+  };
+  const plantaAlien = (x, z, s) => {
+    g.add(p.cilindro(0.03 * s, 0.05 * s, 0.8 * s, 5, c.tecido, x, 0.4 * s, z));
+    g.add(p.malha(new THREE.SphereGeometry(0.12 * s, 8, 6), p.brilho(c.telhado), x, 0.85 * s, z));
+  };
   const vagalume = (x, z, cor) => {
     const l = p.malha(new THREE.OctahedronGeometry(0.06, 0), p.brilho(cor), x, 0.6 + r() * 0.6, z);
     l.userData.gira = true;
@@ -576,7 +774,50 @@ export function terrenoDaExpedicao(p, cen, construcoes) {
       for (const [x, z] of lugares(10, 1.5, R - 0.6, 0.9)) ossos(x, z);
       for (const [x, z, s] of lugares(6, R - 1.4, R - 0.5, 1.2)) g.add(p.cone(0.2 * s, 0.9 * s, 5, "#1c1917", x, 0.45 * s, z));
       break;
+    case "recife-tritoes":
+    case "cidade-afundada":
+    case "fossa-kraken": {
+      const fundo = cen.id === "fossa-kraken";
+      const corais = fundo ? ["#5b21b6", "#0e7490", "#334155"] : ["#fb7185", "#f59e0b", "#a78bfa", "#f472b6", "#34d399"];
+      for (const [x, z, s] of lugares(fundo ? 10 : 18, 1.6, R - 0.5, 1.0)) coral(x, z, s, corais[Math.floor(r() * corais.length)]);
+      for (const [x, z, s] of lugares(14, R - 2.0, R - 0.4, 0.9)) alga(x, z, s);
+      for (const [x, z] of lugares(16, 1.5, R - 0.5, 0.7)) bolha(x, z);
+      for (const [x, z] of lugares(6, 1.8, R - 0.8, 1.0)) estrela(x, z);
+      if (cen.id === "cidade-afundada") for (const [x, z, s] of lugares(6, 2, R - 1.0, 1.4)) { g.add(p.cilindro(0.12 * s, 0.14 * s, 0.6 * s, 7, c.pedra, x, 0.3 * s, z)); pedra(x + 0.3, z, s, c.pedra); }
+      if (fundo) for (const [x, z] of lugares(10, 1.6, R - 0.6, 0.9)) vagalume(x, z, c.brilho);
+      break;
+    }
+    case "trilha-yetis":
+    case "ninho-harpias":
+    case "pico-gigante": {
+      for (const [x, z, s] of lugares(cen.id === "ninho-harpias" ? 10 : 22, R - 2.3, R - 0.5, 1.1)) pinheiro(x, z, s * 1.1, "#2f6b3a", true);
+      for (const [x, z, s] of lugares(10, 1.8, R - 0.8, 1.1)) { pedra(x, z, s * 1.4, c.pedra); g.add(p.malha(new THREE.SphereGeometry(0.16 * s, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), "#f8fafc", x, 0.12 * s, z)); }
+      for (const [x, z, s] of lugares(cen.id === "pico-gigante" ? 12 : 5, 1.6, R - 0.8, 1.0)) cristalDeGelo(x, z, s);
+      if (cen.id === "ninho-harpias") for (const [x, z, s] of lugares(6, R - 1.6, R - 0.5, 1.4)) g.add(p.cone(0.35 * s, 1.4 * s, 6, c.pedra, x, 0.7 * s, z));
+      break;
+    }
+    case "forja-diabretes":
+    case "rio-de-magma":
+    case "trono-dragao": {
+      for (const [x, z, s] of lugares(12, 1.6, R - 0.6, 1.1)) pedra(x, z, s * 1.4, r() > 0.5 ? c.pedra : "#1c1917");
+      for (const [x, z] of lugares(cen.id === "rio-de-magma" ? 16 : 10, 1.6, R - 0.7, 1.0)) {
+        const rach = p.caixa(0.08, 0.02, 0.6 + r() * 0.6, p.brilho(c.brilho), x, 0.03, z);
+        rach.rotation.y = r() * Math.PI;
+        g.add(rach);
+      }
+      for (const [x, z] of lugares(cen.id === "rio-de-magma" ? 5 : 3, 2, R - 1.4, 1.6)) poca(x, z);
+      for (const [x, z] of lugares(3, 2, R - 1.4, 1.5)) fogueira(x, z);
+      for (const [x, z, s] of lugares(7, R - 1.4, R - 0.5, 1.2)) g.add(p.cone(0.2 * s, 0.9 * s, 5, "#18181b", x, 0.45 * s, z));
+      if (cen.id === "trono-dragao") for (const [x, z] of lugares(8, 1.5, R - 0.6, 0.9)) ossos(x, z);
+      break;
+    }
     default:
+      if (cen.espaco) {
+        for (const [x, z, s] of lugares(9, 1.8, R - 0.8, 1.2)) cratera(x, z, s);
+        for (const [x, z, s] of lugares(12, 1.6, R - 0.6, 1.0)) g.add(p.malha(new THREE.OctahedronGeometry(0.14 * s, 0), p.brilho(c.brilho), x, 0.18 * s, z));
+        for (const [x, z, s] of lugares(10, R - 2.0, R - 0.5, 1.0)) plantaAlien(x, z, s);
+        for (const [x, z, s] of lugares(8, 1.6, R - 0.8, 1.0)) pedra(x, z, s * 1.2, c.pedra);
+      }
       break;
   }
   return g;

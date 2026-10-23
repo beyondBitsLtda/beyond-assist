@@ -10,6 +10,8 @@
 //   TORRE     — o coração do reino: o nível dela é o teto das outras construções, o do Neuro é o
 //               dobro dela, e nela mora a guarnição (tropas de defesa).
 //   MINA      — produz moedas sozinha, devagar, até encher.   COFRE — guarda moedas do saque.
+//   OURO      — a Mina de Ouro: operários tiram pepitas, que valem mais moedas — e podem ser
+//               alugados de/para outros reinos (ouro.js). Não entra na batalha (fica debaixo da terra).
 //   DEFESAS   — Torre de Arqueiros (chão e ar), Canhão (só chão), Muralha (cerca a Torre).
 //   QUARTEL   — treina o exército e define quantas tropas cabem nele.
 //   TERRENO   — compra terra: a ilha cresce e ganha espaço para construções novas (Biblioteca,
@@ -25,6 +27,7 @@
 
 import { PREDIOS_EM_COMBATE, resolverCombate, raioDaIlha } from "./combate.js";
 import { defensorDaExpedicao, saqueDaExpedicao } from "./monstros.js";
+import { vagasDaMina, capacidadeEmPepitas, HORAS_POR_PEPITA, VALOR_DA_PEPITA } from "./ouro.js";
 import {
   capacidadeDoExercito, capacidadeDaGuarnicao, contagens, totalDeTropas, danoPorSegundo, espacoUsado, TROPAS, lotacaoDoAcampamento,
 } from "./tropas.js";
@@ -43,6 +46,12 @@ export const CONSTRUCOES = {
     nome: "Mina de Moedas", emoji: "⛏️", max: 5,
     custos: [0, 120, 280, 600, 1200],
     efeito: (n) => `${producaoPorHora(n)} moeda(s) por hora · enche em ${HORAS_ATE_ENCHER} h (${capacidadeDaMina(n)}) · ❤️ ${PREDIOS_EM_COMBATE.mina.vida(n)}`,
+  },
+  minaDeOuro: {
+    nome: "Mina de Ouro", emoji: "⚒️", max: 5,
+    // todo reino já nasce com ela no nível 1 (e com o pelotão inicial de operários)
+    custos: [0, 250, 600, 1200, 2400],
+    efeito: (n) => `${vagasDaMina(n)} vagas de operário · cada um tira 1 pepita (🪙 ${VALOR_DA_PEPITA}) a cada ${HORAS_POR_PEPITA} h · guarda ${capacidadeEmPepitas(n)} pepitas`,
   },
   cofre: {
     nome: "Cofre", emoji: "🏦", max: 5,
@@ -108,11 +117,11 @@ export const CONSTRUCOES = {
   },
 };
 export const ORDEM_DAS_CONSTRUCOES = [
-  "castelo", "terreno", "mina", "biblioteca", "cofre", "muralha", "torre", "canhao",
+  "castelo", "terreno", "mina", "minaDeOuro", "biblioteca", "cofre", "muralha", "torre", "canhao",
   "defesaAerea", "morteiro", "torreMagica", "torreRaio", "quartel", "acampamento",
 ];
 export const NIVEIS_INICIAIS = {
-  castelo: 1, terreno: 0, mina: 1, biblioteca: 0, cofre: 0, muralha: 0, torre: 0, canhao: 0,
+  castelo: 1, terreno: 0, mina: 1, minaDeOuro: 1, biblioteca: 0, cofre: 0, muralha: 0, torre: 0, canhao: 0,
   defesaAerea: 0, morteiro: 0, torreMagica: 0, torreRaio: 0, quartel: 0, acampamento: 1,
 };
 
