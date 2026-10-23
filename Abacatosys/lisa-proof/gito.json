@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.20.0-proof-reino-de-teste.1",
+  "versao": "0.20.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 51,
+    "numero": 52,
     "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.20.0-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.20.0: o Reino de Teste à parte (o teste não mexe mais no reino de verdade) e a Bolsa das 07:00 às 17:00.",
+      "itens": [
+        "Junta a branch proof-reino-de-teste (0.20.0-proof-reino-de-teste.1).",
+        "Migração db/016-mundo-de-teste.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.20.0-proof-reino-de-teste.1",
       "data": "2026-10-23",
