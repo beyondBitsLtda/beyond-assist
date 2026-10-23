@@ -168,7 +168,7 @@ export default function Terminal() {
               <div><dt>Abertura</dt><dd>{preco(acao.abertura)}</dd></div>
               <div><dt>Máxima</dt><dd>{preco(acao.maxima)}</dd></div>
               <div><dt>Mínima</dt><dd>{preco(acao.minima)}</dd></div>
-              <div><dt>Volume hoje</dt><dd>{moedas(acao.volume)} ações</dd></div>
+              <div><dt>Volume hoje</dt><dd>{Number(acao.volume || 0).toLocaleString("pt-BR")} ações</dd></div>
             </dl>
             <div className="bx-abas" role="tablist" aria-label="Período do gráfico">
               <button type="button" role="tab" aria-selected={modo === "hoje"} className={modo === "hoje" ? "bx-aba bx-aba--atual" : "bx-aba"} onClick={() => setModo("hoje")}>Hoje · hora a hora</button>

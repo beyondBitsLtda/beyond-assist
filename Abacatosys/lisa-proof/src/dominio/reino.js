@@ -28,6 +28,7 @@
 import { PREDIOS_EM_COMBATE, resolverCombate, raioDaIlha } from "./combate.js";
 import { defensorDaExpedicao, saqueDaExpedicao } from "./monstros.js";
 import { vagasDaMina, capacidadeEmPepitas, HORAS_POR_PEPITA, VALOR_DA_PEPITA } from "./ouro.js";
+import { centavos, faltam } from "./moedas.js";
 import {
   capacidadeDoExercito, capacidadeDaGuarnicao, contagens, totalDeTropas, danoPorSegundo, espacoUsado, TROPAS, lotacaoDoAcampamento,
 } from "./tropas.js";
@@ -194,7 +195,7 @@ export function podeMelhorar(reino, chave, saldo) {
   if (chave !== "castelo" && atual + 1 > n.castelo) {
     return { ok: false, custo, motivo: `melhore a ${CONSTRUCOES.castelo.nome} para o nível ${atual + 1} primeiro` };
   }
-  if (saldo < custo) return { ok: false, custo, motivo: `faltam ${custo - saldo} moeda(s)` };
+  if (saldo < custo) return { ok: false, custo, motivo: faltam(custo, saldo) };
   return { ok: true, custo };
 }
 
@@ -205,7 +206,7 @@ export function podeSubirNeuro(reino, saldo) {
   if (nivel >= nivelMaximoDoNeuro(n.castelo)) {
     return { ok: false, custo, motivo: `o Neuro chega no máximo ao nível ${nivelMaximoDoNeuro(n.castelo)} com a torre no nível ${n.castelo}` };
   }
-  if (saldo < custo) return { ok: false, custo, motivo: `faltam ${custo - saldo} moeda(s)` };
+  if (saldo < custo) return { ok: false, custo, motivo: faltam(custo, saldo) };
   return { ok: true, custo };
 }
 
@@ -337,9 +338,9 @@ export function combateDe({ atacante, defensor, semente }) {
 /** Troféus nunca ficam negativos. */
 export const somarTrofeus = (atual, delta) => Math.max(0, (atual || 0) + delta);
 
-/** Saldo de moedas: pontos de estudo + movimentos do livro-caixa (gastos já vêm negativos). */
+/** Saldo de moedas, com centavos: pontos de estudo + movimentos do livro-caixa (gastos já vêm negativos). */
 export function saldoDe({ pontosDeEstudo, movimentos }) {
-  return (pontosDeEstudo || 0) + (movimentos || []).reduce((s, m) => s + (m.valor || 0), 0);
+  return centavos((pontosDeEstudo || 0) + (movimentos || []).reduce((s, m) => s + (Number(m.valor) || 0), 0));
 }
 
 /** Para a lista de alvos: um retrato aproximado da defesa (o número exato só aparece na batalha). */

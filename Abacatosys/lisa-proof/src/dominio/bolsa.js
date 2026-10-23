@@ -13,13 +13,15 @@
 // gráficos"): a Lisa decide onde cada ação FECHA o dia; ao longo do dia o preço anda hora a hora
 // da abertura até lá, com o sobe-e-desce do mercado no meio (caminhoDoDia: uma ponte aleatória
 // com semente fixa — a ação e o dia —, então todo mundo vê o mesmo preço na mesma hora, e nada
-// precisa de relógio no servidor). O preço da hora tem centavos; o total de uma ordem é em
-// moedas inteiras (a compra arredonda para cima, a venda para baixo).
+// precisa de relógio no servidor). O preço da hora tem centavos — e o dinheiro também (moedas.js):
+// o total de uma ordem, a corretagem e o custo da carteira são contados centavo por centavo.
 //
 // Comprar e vender custa a corretagem (TAXA_DA_CORRETAGEM, no mínimo 1 moeda), então comprar e
 // vender no mesmo dia nunca dá lucro: o preço só muda no pregão seguinte. Empresa que chega a
 // PRECO_MINIMO vai à FALÊNCIA (as ações dela viram pó). Com mais de MAXIMO_DE_ACOES na bolsa, a
 // mais antiga FECHA O CAPITAL: quem tem ações dela recebe o preço do dia por cada uma.
+
+import { centavos, faltam } from "./moedas.js";
 
 export const VARIACAO_MAXIMA = 30;        // % por pregão, para cima ou para baixo
 export const PRECO_MINIMO = 2;            // chegou aqui: falência
@@ -39,8 +41,8 @@ export const SETORES = [
 const inteiro = (x) => Math.round(Number(x) || 0);
 const limitar = (x, a, b) => Math.max(a, Math.min(b, x));
 
-/** A corretagem de uma ordem: 1% do valor, no mínimo 1 moeda. */
-export const corretagem = (valor) => Math.max(1, Math.ceil(Math.max(0, valor) * TAXA_DA_CORRETAGEM));
+/** A corretagem de uma ordem: 1% do valor (em centavos, para cima), no mínimo 1 moeda. */
+export const corretagem = (valor) => Math.max(1, Math.ceil(Math.max(0, valor) * TAXA_DA_CORRETAGEM * 100 - 1e-9) / 100);
 
 /** O preço depois do pregão: a variação limitada a ±30%, em moedas inteiras, nunca abaixo do mínimo. */
 export function precoDepois(preco, variacao) {
@@ -49,9 +51,9 @@ export function precoDepois(preco, variacao) {
 }
 export const variacaoReal = (de, para) => (de > 0 ? Math.round(((para - de) / de) * 1000) / 10 : 0);
 
-/** O valor de `quantidade` ações ao preço da hora (com centavos): a compra arredonda para cima, a venda para baixo. */
-export const valorDaCompra = (preco, quantidade) => Math.ceil(preco * quantidade - 1e-9);
-export const valorDaVenda = (preco, quantidade) => Math.floor(preco * quantidade + 1e-9);
+/** O valor de `quantidade` ações ao preço da hora, centavo por centavo (comprar e vender: a mesma conta). */
+export const valorDaCompra = (preco, quantidade) => centavos(preco * quantidade);
+export const valorDaVenda = (preco, quantidade) => centavos(preco * quantidade);
 
 /** Comprar `quantidade` ações a `preco`: o total, a corretagem e se dá com o saldo. */
 export function podeComprarAcao({ acao, quantidade, saldo }) {
@@ -61,8 +63,8 @@ export function podeComprarAcao({ acao, quantidade, saldo }) {
   if (q > MAXIMO_POR_ORDEM) return { ok: false, motivo: `no máximo ${MAXIMO_POR_ORDEM} ações por ordem` };
   const valor = valorDaCompra(acao.preco, q);
   const taxa = corretagem(valor);
-  const total = valor + taxa;
-  if ((saldo || 0) < total) return { ok: false, valor, taxa, total, motivo: `faltam ${total - (saldo || 0)} moeda(s)` };
+  const total = centavos(valor + taxa);
+  if ((saldo || 0) < total) return { ok: false, valor, taxa, total, motivo: faltam(total, saldo) };
   return { ok: true, quantidade: q, valor, taxa, total };
 }
 
@@ -75,7 +77,7 @@ export function podeVenderAcao({ acao, posicao, quantidade }) {
   if (q > tem) return { ok: false, motivo: tem ? `você tem ${tem} ação(ões) dessa empresa` : "você não tem ações dessa empresa" };
   const valor = valorDaVenda(acao.preco, q);
   const taxa = Math.min(valor, corretagem(valor));
-  return { ok: true, quantidade: q, valor, taxa, total: valor - taxa };
+  return { ok: true, quantidade: q, valor, taxa, total: centavos(valor - taxa) };
 }
 
 /**
@@ -83,10 +85,10 @@ export function podeVenderAcao({ acao, posicao, quantidade }) {
  * tem (para o preço médio e o lucro); vender tira o custo proporcional.
  */
 export function posicaoDepois(posicao, { tipo, quantidade, total }) {
-  const q = posicao?.quantidade || 0, c = posicao?.custo || 0;
-  if (tipo === "compra") return { quantidade: q + quantidade, custo: c + total };
+  const q = Number(posicao?.quantidade) || 0, c = Number(posicao?.custo) || 0;
+  if (tipo === "compra") return { quantidade: q + quantidade, custo: centavos(c + total) };
   const resta = Math.max(0, q - quantidade);
-  return { quantidade: resta, custo: resta ? Math.round((c * resta) / q) : 0 };
+  return { quantidade: resta, custo: resta ? centavos((c * resta) / q) : 0 };
 }
 
 /** A carteira: quanto vale hoje, quanto custou e o lucro (ou prejuízo). */
@@ -95,9 +97,9 @@ export function resumoDaCarteira(posicoes, precoDe) {
   for (const p of posicoes || []) {
     if (!(p.quantidade > 0)) continue;
     valor += p.quantidade * (precoDe(p.acao_id) || 0);
-    custo += p.custo || 0;
+    custo += Number(p.custo) || 0;
   }
-  return { valor, custo, lucro: valor - custo };
+  return { valor: centavos(valor), custo: centavos(custo), lucro: centavos(valor - custo) };
 }
 
 // ------------------------------------------------------------------ o preço hora a hora

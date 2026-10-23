@@ -23,6 +23,7 @@ import { gerarJson, temModelo, PERSONA } from "./ia.js";
 import { obterReino, saldoDoUsuario, modoDeTesteLigado } from "./reino.js";
 import { diaDe, somarDias } from "@/dominio/datas.js";
 import { horaEmSaoPaulo } from "@/dominio/raioX.js";
+import { centavos } from "@/dominio/moedas.js";
 import {
   SETORES, VARIACAO_MAXIMA, PRECO_MINIMO, PRECO_INICIAL, TAXA_DA_CORRETAGEM, NOVAS_POR_DIA, ACOES_DO_PRIMEIRO_DIA,
   MAXIMO_POR_ORDEM, MAXIMO_DE_ACOES, precoDepois, variacaoReal, podeComprarAcao, podeVenderAcao, posicaoDepois,
@@ -249,7 +250,7 @@ export async function estadoDaBolsa(usuarioId, { hora: horaPedida } = {}) {
   const historico = await historicoDe(ativas.map((a) => a.id), somarDias(dia, -(DIAS_DE_HISTORICO - 1)));
   const volume = new Map();
   for (const o of volumeR.data || []) volume.set(o.acao_id, (volume.get(o.acao_id) || 0) + o.quantidade);
-  const minha = new Map((posicoesR.data || []).map((p) => [p.acao_id, p]));
+  const minha = new Map((posicoesR.data || []).map((p) => [p.acao_id, { ...p, custo: Number(p.custo) || 0 }]));
   const nomeDe = new Map([...ativas, ...(saidasR.data || [])].map((a) => [a.id, a.nome]));
   const pct = (de, para) => (de > 0 ? Math.round(((para - de) / de) * 1000) / 10 : 0);
 
@@ -270,15 +271,15 @@ export async function estadoDaBolsa(usuarioId, { hora: horaPedida } = {}) {
       volume: volume.get(a.id) || 0,
       horas: doDia.map((preco, i) => ({ hora: i, preco })),
       velas: h.map((l) => ({ dia: l.dia, ...(l.dia === dia ? velaDe(caminhoDa(l), hora) : velaDe(caminhoDa(l))) })),
-      minha: p ? { quantidade: p.quantidade, custo: p.custo, valor, lucro: valor - p.custo, precoMedio: Math.round((p.custo / p.quantidade) * 100) / 100 } : null,
+      minha: p ? { quantidade: p.quantidade, custo: p.custo, valor, lucro: centavos(valor - p.custo), precoMedio: centavos(p.custo / p.quantidade) } : null,
     };
   });
   // o Índice do Reino: a soma dos preços de todas as ações, hora a hora (como um índice de bolsa)
   const serie = Array.from({ length: hora + 1 }, (_, i) => ({ hora: i, valor: Math.round(acoes.reduce((s, x) => s + (x.horas[i]?.preco ?? x.preco), 0) * 100) / 100 }));
   const indice = { valor: serie[serie.length - 1]?.valor || 0, abertura: serie[0]?.valor || 0, serie };
   indice.variacao = pct(indice.abertura, indice.valor);
-  const carteiraValor = acoes.reduce((s, x) => s + (x.minha?.valor || 0), 0);
-  const carteiraCusto = acoes.reduce((s, x) => s + (x.minha?.custo || 0), 0);
+  const carteiraValor = centavos(acoes.reduce((s, x) => s + (x.minha?.valor || 0), 0));
+  const carteiraCusto = centavos(acoes.reduce((s, x) => s + (x.minha?.custo || 0), 0));
   const proxima = new Date();
   proxima.setMinutes(60, 0, 0);
   return {
@@ -286,9 +287,9 @@ export async function estadoDaBolsa(usuarioId, { hora: horaPedida } = {}) {
     modoDeTeste: modoDeTesteLigado(),
     regras: { taxa: TAXA_DA_CORRETAGEM, variacaoMaxima: VARIACAO_MAXIMA, precoMinimo: PRECO_MINIMO, maximoDeAcoes: MAXIMO_DE_ACOES, maximoPorOrdem: MAXIMO_POR_ORDEM, novasPorDia: NOVAS_POR_DIA },
     saldo, indice, acoes,
-    carteira: { valor: carteiraValor, custo: carteiraCusto, lucro: carteiraValor - carteiraCusto },
+    carteira: { valor: carteiraValor, custo: carteiraCusto, lucro: centavos(carteiraValor - carteiraCusto) },
     saidas: (saidasR.data || []).map((a) => ({ id: a.id, nome: a.nome, emoji: a.emoji, status: a.status, preco: a.preco, dia: a.saiu_em })),
-    ordens: (ordensR.data || []).map((o) => ({ ...o, preco: Number(o.preco), nome: nomeDe.get(o.acao_id) || o.acao_id })),
+    ordens: (ordensR.data || []).map((o) => ({ ...o, preco: Number(o.preco), taxa: Number(o.taxa), total: Number(o.total), nome: nomeDe.get(o.acao_id) || o.acao_id })),
   };
 }
 
@@ -308,7 +309,7 @@ async function acaoParaNegociar(id) {
 async function posicaoDe(usuarioId, acaoId) {
   const { data, error } = await supabase.from("proof_bolsa_posicoes").select("quantidade, custo").eq("usuario_id", usuarioId).eq("acao_id", acaoId).maybeSingle();
   falhou(error, "carteira");
-  return data;
+  return data ? { quantidade: data.quantidade, custo: Number(data.custo) || 0 } : null;
 }
 
 /** Grava a posição só se ela ainda for a que eu li (ou cria, se eu não tinha). Devolve se gravou. */
@@ -362,7 +363,7 @@ export async function venderAcao(usuarioId, id, quantidade) {
     falhou(error, "livro-caixa");
   }
   await supabase.from("proof_bolsa_ordens").insert({ usuario_id: usuarioId, acao_id: acao.id, tipo: "venda", quantidade: pode.quantidade, preco: acao.preco, taxa: pode.taxa, total: pode.total });
-  const lucro = pode.total - (antes.custo - depois.custo);
+  const lucro = centavos(pode.total - (antes.custo - depois.custo));
   return { acao: acao.id, nome: acao.nome, quantidade: pode.quantidade, preco: acao.preco, taxa: pode.taxa, total: pode.total, lucro };
 }
 

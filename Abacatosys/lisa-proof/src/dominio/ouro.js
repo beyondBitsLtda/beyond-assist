@@ -18,6 +18,8 @@
 // HORAS_DE_ALUGUEL: quem aluga paga na hora, direto ao dono, o preço por operário × a quantidade;
 // enquanto dura, o operário trabalha (e junta ouro) na mina de quem alugou.
 
+import { faltam } from "./moedas.js";
+
 export const OPERARIOS_INICIAIS = 3;
 export const HORAS_POR_PEPITA = 8;
 export const VALOR_DA_PEPITA = 6;
@@ -106,7 +108,7 @@ export function podeComprarOperario({ operarios, nivel, saldo }) {
   const vagas = vagasDaMina(nivel);
   const custo = precoDoOperario(operarios);
   if ((operarios || 0) >= vagas) return { ok: false, custo, motivo: `a Mina de Ouro no nível ${nivel || 1} tem ${vagas} vagas — melhore a mina para contratar mais` };
-  if ((saldo || 0) < custo) return { ok: false, custo, motivo: `faltam ${custo - (saldo || 0)} moeda(s)` };
+  if ((saldo || 0) < custo) return { ok: false, custo, motivo: faltam(custo, saldo) };
   return { ok: true, custo };
 }
 
@@ -135,7 +137,7 @@ export function podeAlugar({ souODono, oferta, jaAlugados = 0, quantidade, vagas
   if (q > disponiveis) return { ok: false, motivo: disponiveis ? `só ${disponiveis} operário(s) disponível(is) agora` : "os operários desse reino já estão todos alugados" };
   if (q > (vagasLivres || 0)) return { ok: false, motivo: vagasLivres ? `a sua Mina de Ouro só tem ${vagasLivres} vaga(s) livre(s)` : "a sua Mina de Ouro está lotada — melhore a mina para caber mais" };
   const custo = q * oferta.preco;
-  if ((saldo || 0) < custo) return { ok: false, custo, motivo: `faltam ${custo - (saldo || 0)} moeda(s)` };
+  if ((saldo || 0) < custo) return { ok: false, custo, motivo: faltam(custo, saldo) };
   return { ok: true, custo, quantidade: q };
 }
 

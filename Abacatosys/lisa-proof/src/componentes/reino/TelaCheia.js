@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { numero } from "./pecas.js";
+import { formatarMoedas } from "@/dominio/moedas.js";
 import { Ouro, Diamante } from "./icones.js";
 
 /** Os menus da tela cheia, na ordem do dock. */
@@ -41,7 +42,7 @@ export default function TelaCheia({ reino, painel, aoPainel, aoSair, ocupado, ao
       <div className="rn-hud__topo">
         <div className="rn-hud__reino">
           <strong>{reino.nome}</strong>
-          <span>🪙 {numero(reino.saldo)}</span>
+          <span>🪙 {formatarMoedas(reino.saldo, { sempreComCentavos: true })}</span>
           <span>🏆 {numero(reino.trofeus)}</span>
           {reino.paz?.vigente ? <span>🕊️ paz</span> : reino.escudoAte ? <span>🛡️ escudo</span> : null}
         </div>

@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.18.0-cloudflare-pages.1",
+  "versao": "0.19.0-proof-centavos.1",
   "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 48,
+    "numero": 49,
     "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.19.0-proof-centavos.1",
+      "data": "2026-10-23",
+      "branch": "proof-centavos",
+      "tipo": "melhoria",
+      "resumo": "As moedas do Reino ganharam centavos (a venda de ações devolve centavo por centavo) e o Reino e a Bolsa passaram a usar a tela larga sem cartões encavalados.",
+      "itens": [
+        "Centavos no dinheiro: o saldo, o livro-caixa, o total e a corretagem das ordens e o custo da carteira têm duas casas; a compra e a venda de ações contam centavo por centavo (antes arredondavam para moeda inteira).",
+        "O saldo aparece com centavos (412,35) no Reino, na tela cheia e na Bolsa; os motivos \"faltam X moedas\" também.",
+        "Layout: o Reino e a Bolsa usam até 1480 px de largura; as grades do Reino contam colunas pelo espaço de verdade (não pela janela) — os cartões de personagem não encavalam mais; a Bolsa conta as colunas pela largura do terminal.",
+        "O mundo 3D fica mais alto em telas largas.",
+        "Migração db/015-moedas-com-centavos.sql: as colunas de dinheiro passam a numéricas com duas casas (nenhum saldo muda)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.18.0-cloudflare-pages.1",
       "data": "2026-10-23",
