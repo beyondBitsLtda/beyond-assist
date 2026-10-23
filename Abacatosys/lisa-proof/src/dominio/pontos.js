@@ -44,6 +44,7 @@ export const NOMES_DOS_EVENTOS = {
   quiz: "Quiz",
   exercicio: "Exercício",
   projeto_semanal: "Projeto da semana",
+  projeto_final: "Projeto final",
   projeto_mensal: "Projeto do mês",
   conquista: "Conquista",
 };

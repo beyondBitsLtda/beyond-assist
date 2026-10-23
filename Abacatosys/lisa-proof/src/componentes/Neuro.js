@@ -77,6 +77,8 @@ export function celebrar(r) {
 export function reagirAoResultado(r) {
   if (!r) return;
   if (celebrar(r)) return reagir("comemorando", `+${r.pontos} pontos! 🎉`, 5000);
+  // a teoria terminou, mas o assunto só conclui com o quiz dele (23/10/2026)
+  if (r.cardConcluido && r.faltaQuiz) return reagir("feliz", "Teoria feita! Agora é só passar no quiz do assunto. 🧠", 5000);
   if (r.cardConcluido && r.pontos > 0) return comemorar(`Assunto concluído! +${r.pontos} pontos`);
   if (r.pontos > 0) return reagir("feliz", `+${r.pontos}! Mandou bem!`);
   if (r.pontos < 0) return reagir("surpreso", "Desmarcou? Sem problema, os pontos voltam quando refizer.");

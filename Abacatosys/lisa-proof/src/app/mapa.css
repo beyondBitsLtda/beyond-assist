@@ -148,3 +148,20 @@
 }
 @keyframes folha-surgir { from { opacity: 0; } to { opacity: 1; } }
 @keyframes folha-subir { from { transform: translateY(40px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+
+/* ---- a trilha amarrada (23/10/2026): a teoria feita esperando o quiz, o assunto para mais tarde,
+   a semana trancada pelo projeto e o projeto final (o troféu) */
+.mapa__no--quiz { --cor: #06B6D4; --cor-sombra: #0E7490; }
+.mapa__no--futuro { --cor: #BBF7D0; --cor-sombra: #86EFAC; --cor-icone: #15803D; }
+.mapa__no--projeto_semanal.mapa__no--dispensado,
+.mapa__no--projeto_semanal.mapa__no--liberado { --cor: #EAB308; --cor-sombra: #A16207; }
+.mapa__no--projeto_semanal.mapa__no--futuro { --cor: #E9D5FF; --cor-sombra: #C4B5FD; --cor-icone: #7E22CE; }
+.mapa__no--projeto_final { width: 96px; height: 88px; border-radius: 30px; }
+.mapa__no--projeto_final svg { width: 40px; height: 40px; }
+.mapa__no--projeto_final.mapa__no--disponivel,
+.mapa__no--projeto_final.mapa__no--em_andamento { --cor: #2362D3; --cor-sombra: #1E3A8A; }
+.mapa__no--projeto_final.mapa__no--entregue { --cor: #93C5FD; --cor-sombra: #2362D3; }
+.mapa__no--projeto_final.mapa__no--futuro { --cor: #BFDBFE; --cor-sombra: #93C5FD; --cor-icone: #1E3A8A; }
+.mapa__no--projeto_final.mapa__no--dispensado,
+.mapa__no--projeto_final.mapa__no--liberado { --cor: #EAB308; --cor-sombra: #A16207; }
+.mapa__faixa--trancada { background: var(--mapa-bloqueado); box-shadow: 0 4px 0 var(--mapa-bloqueado-sombra); color: var(--pf-tinta-2); }

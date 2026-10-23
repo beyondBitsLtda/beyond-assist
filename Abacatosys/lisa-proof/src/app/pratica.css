@@ -243,3 +243,7 @@
 /* bloco do diário + o "mais um hoje" logo abaixo */
 .pratica__celula { display: grid; gap: 6px; align-content: start; }
 .pratica__mais { justify-self: start; }
+
+/* o projeto da semana seguinte, trancado até o da semana anterior ser aprovado (23/10/2026) */
+.pratica__bloco--trancado { opacity: 0.6; }
+.pratica__bloco:disabled { cursor: default; }

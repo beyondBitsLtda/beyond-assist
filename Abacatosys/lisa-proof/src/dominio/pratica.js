@@ -1,16 +1,22 @@
-// A parte prática: quiz e exercício do dia, projeto da semana e do mês.
+// A parte prática: quiz e exercício do dia, o projeto de cada semana do plano e o projeto final.
 //
-// Puro, como o resto de src/dominio: períodos, pontuação, conferência do que a IA devolve e o
-// desenho do mapa da trilha. Tudo testado por `npm run dominio-check`.
+// Puro, como o resto de src/dominio: períodos, pontuação e conferência do que a IA devolve. O
+// avanço na trilha (o quiz que conclui o assunto, o projeto que abre a semana seguinte, o mapa) mora
+// em src/dominio/avanco.js. Tudo testado por `npm run dominio-check`.
 
-import { somarDias, inicioDaSemana, fimDaSemana, inicioDoMes, fimDoMes, diaValido, diaDaSemana } from "./datas.js";
+import { inicioDaSemana, fimDaSemana, inicioDoMes, fimDoMes, diaValido, diaDaSemana } from "./datas.js";
 
-export const TIPOS_DE_DESAFIO = ["quiz", "exercicio", "projeto_semanal", "projeto_mensal"];
+// "projeto_mensal" ficou só para a história: desde 23/10/2026 a última semana do plano termina no
+// PROJETO FINAL, do tamanho da trilha (src/dominio/avanco.js), e ninguém gera projeto do mês novo.
+export const TIPOS_DE_DESAFIO = ["quiz", "exercicio", "projeto_semanal", "projeto_final", "projeto_mensal"];
+export const TIPOS_DE_PROJETO = ["projeto_semanal", "projeto_final", "projeto_mensal"];
+export const ehProjeto = (tipo) => TIPOS_DE_PROJETO.includes(tipo);
 
 export const NOMES_DOS_DESAFIOS = {
   quiz: "Quiz do dia",
   exercicio: "Exercício do dia",
   projeto_semanal: "Projeto da semana",
+  projeto_final: "Projeto final",
   projeto_mensal: "Projeto do mês",
 };
 
@@ -20,12 +26,13 @@ export const PONTOS_DA_PRATICA = {
   quizPerfeito: 10,       // bônus por acertar todas
   exercicio: 40,          // nota 100 = 40 pontos
   projeto_semanal: 150,
+  projeto_final: 400,     // o padrão; o de cada trilha cresce com ela (valorDoProjetoFinal, em avanco.js)
   projeto_mensal: 400,
 };
 
 export const NOTA_DE_APROVACAO = 60;
 // Exercício: 5 tentativas (eram 3 — pedido de 20/10/2026).
-export const TENTATIVAS = { exercicio: 5, projeto_semanal: 5, projeto_mensal: 5 };
+export const TENTATIVAS = { exercicio: 5, projeto_semanal: 5, projeto_final: 5, projeto_mensal: 5 };
 
 // ---------------------------------------------------------------- rodadas extras do dia
 //
@@ -154,10 +161,14 @@ export function fimDoPeriodo(tipo, periodo) {
   return periodo;
 }
 
-/** O período pedido existe e não está no futuro? Projeto de semana que ainda não chegou fica
- *  trancado — senão o mapa inteiro viraria uma lista de projetos para fazer de uma vez. */
+/**
+ * O período pedido existe e não está no futuro? Quiz e exercício são só de hoje. Os projetos da
+ * semana do plano e o final são conferidos pelo avanço da trilha (src/dominio/avanco.js: a semana
+ * precisa estar aberta); aqui fica só a regra antiga, da semana e do mês do calendário.
+ */
 export function periodoPermitido(tipo, periodo, hoje) {
   if (!TIPOS_DE_DESAFIO.includes(tipo) || !diaValido(periodo)) return false;
+  if (tipo === "projeto_final") return true;
   if (tipo === "projeto_semanal" && diaDaSemana(periodo) !== 1) return false;
   if (tipo === "projeto_mensal" && !periodo.endsWith("-01")) return false;
   if (tipo === "quiz" || tipo === "exercicio") return periodo === hoje;
@@ -193,9 +204,11 @@ export const BONUS_POR_EXTRA = 0.1; // cada extra vale 10% da base
 
 export const complexidadeDe = (conteudo) => (COMPLEXIDADES[conteudo?.complexidade] ? conteudo.complexidade : "padrao");
 
-/** Quanto vale cada parte do projeto. A divisão sobra no máximo 1 ponto, que vai para os primeiros. */
+/** Quanto vale cada parte do projeto. A divisão sobra no máximo 1 ponto, que vai para os primeiros.
+ *  O projeto final guarda o valor dele (`conteudo.valor`): cresce com o tamanho da trilha. */
 export function tabelaDePontos(tipo, conteudo) {
-  const base = Math.round((PONTOS_DA_PRATICA[tipo] || 0) * COMPLEXIDADES[complexidadeDe(conteudo)].fator);
+  const valor = Number(conteudo?.valor) > 0 ? Number(conteudo.valor) : PONTOS_DA_PRATICA[tipo] || 0;
+  const base = Math.round(valor * COMPLEXIDADES[complexidadeDe(conteudo)].fator);
   const n = (conteudo?.requisitos || []).length;
   const cada = n ? Math.floor(base / n) : 0;
   const resto = n ? base - cada * n : 0;
@@ -247,7 +260,7 @@ export function projetoCompleto(tabela, cumpridos) {
 
 /** Dá para trocar a complexidade? Só antes da primeira entrega, e no máximo TROCAS_DE_COMPLEXIDADE vezes. */
 export function podeTrocarComplexidade({ tipo, tentativas, conteudo }, nivel) {
-  if (tipo !== "projeto_semanal" && tipo !== "projeto_mensal") return { ok: false, motivo: "só os projetos têm complexidade" };
+  if (!ehProjeto(tipo)) return { ok: false, motivo: "só os projetos têm complexidade" };
   if (!COMPLEXIDADES[nivel]) return { ok: false, motivo: "complexidade inválida" };
   if ((tentativas || 0) > 0) return { ok: false, motivo: "a complexidade fica fixa depois da primeira entrega" };
   if (complexidadeDe(conteudo) === nivel) return { ok: false, motivo: "o projeto já está nessa complexidade" };
@@ -446,78 +459,4 @@ export function assuntosDoPeriodo(etapas, de, ate) {
   return [...etapas]
     .filter((e) => e.inicio && e.inicio <= ate && e.fim >= de)
     .sort((a, b) => a.ordem - b.ordem);
-}
-
-// ---------------------------------------------------------------- o mapa da trilha
-
-function estadoDoAssunto(e, atualId, hoje) {
-  if (e.concluido) return "feito";
-  if (e.cardId === atualId) return e.fim && e.fim < hoje ? "atrasado" : "atual";
-  if (!e.inicio) return "bloqueado";
-  if (e.fim < hoje) return "atrasado";
-  if (e.inicio <= hoje) return "disponivel";
-  return "bloqueado";
-}
-
-function estadoDoProjeto(desafio, tipo, periodo, hoje) {
-  if (periodo > periodoDe(tipo, hoje)) return "bloqueado";
-  if (!desafio) return "disponivel";
-  if (desafio.status === "concluido") return desafio.nota >= NOTA_DE_APROVACAO ? "feito" : "entregue";
-  return "em_andamento";
-}
-
-/**
- * Os nós do mapa, na ordem em que aparecem de cima para baixo.
- *
- * Cada semana da trilha vira uma "unidade": um cabeçalho, os assuntos dela e, no fim, o baú do
- * projeto da semana. Quando o mês vira, entra o troféu do projeto do mês. A bandeira de chegada
- * fecha o caminho. Assuntos já concluídos antes de a trilha existir abrem o mapa.
- *
- * @param etapas    `{ cardId, ordem, semana, inicio, fim, concluido, titulo }`
- * @param desafios  `{ tipo, periodo, status, nota, id }` (só projetos interessam aqui)
- * @param base      início da trilha (a semana 1 é a semana dele)
- */
-export function mapaDaTrilha({ etapas, desafios = [], hoje, base }) {
-  const atual = assuntoAtual(etapas, hoje);
-  const atualId = atual && !atual.concluido ? atual.cardId : null;
-  const projeto = new Map(desafios.map((d) => [`${d.tipo}@${d.periodo}`, d]));
-  const nos = [];
-
-  const antes = etapas.filter((e) => !e.inicio).sort((a, b) => a.ordem - b.ordem);
-  if (antes.length) {
-    nos.push({ tipo: "unidade", chave: "antes", titulo: "Já concluídos", de: null, ate: null });
-    for (const e of antes) nos.push({ tipo: "assunto", chave: e.cardId, etapa: e, estado: estadoDoAssunto(e, atualId, hoje) });
-  }
-
-  const semanas = new Map();
-  for (const e of etapas.filter((x) => x.inicio)) {
-    if (!semanas.has(e.semana)) semanas.set(e.semana, []);
-    semanas.get(e.semana).push(e);
-  }
-  const ordem = [...semanas.keys()].sort((a, b) => a - b);
-  const semanaBase = inicioDaSemana(base);
-
-  ordem.forEach((n, i) => {
-    const de = somarDias(semanaBase, (n - 1) * 7);
-    const ate = somarDias(de, 6);
-    nos.push({ tipo: "unidade", chave: `semana-${n}`, titulo: `Semana ${n}`, numero: n, de, ate });
-    for (const e of semanas.get(n).sort((a, b) => a.ordem - b.ordem)) {
-      nos.push({ tipo: "assunto", chave: e.cardId, etapa: e, estado: estadoDoAssunto(e, atualId, hoje) });
-    }
-    const d = projeto.get(`projeto_semanal@${de}`);
-    nos.push({ tipo: "projeto_semanal", chave: `ps-${de}`, periodo: de, desafio: d || null, estado: estadoDoProjeto(d, "projeto_semanal", de, hoje) });
-
-    // O troféu do mês entra na última semana que termina naquele mês.
-    const mes = inicioDoMes(ate);
-    const proxima = ordem[i + 1];
-    const mesDaProxima = proxima ? inicioDoMes(somarDias(semanaBase, (proxima - 1) * 7 + 6)) : null;
-    if (mesDaProxima !== mes) {
-      const m = projeto.get(`projeto_mensal@${mes}`);
-      nos.push({ tipo: "projeto_mensal", chave: `pm-${mes}`, periodo: mes, desafio: m || null, estado: estadoDoProjeto(m, "projeto_mensal", mes, hoje) });
-    }
-  });
-
-  const tudoFeito = etapas.length > 0 && etapas.every((e) => e.concluido);
-  nos.push({ tipo: "chegada", chave: "chegada", estado: tudoFeito ? "feito" : "bloqueado" });
-  return nos;
 }

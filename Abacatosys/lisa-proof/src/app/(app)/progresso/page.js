@@ -76,7 +76,7 @@ export default function Progresso() {
           <div className="pf-estat__valor">{dados.contagem.card || 0}</div>
           <p className="pf-estat__nota">
             {dados.contagem.item || 0} tarefa(s) · {dados.contagem.quiz || 0} quiz(zes) · {dados.contagem.exercicio || 0} exercício(s) ·{" "}
-            {(dados.contagem.projeto_semanal || 0) + (dados.contagem.projeto_mensal || 0)} projeto(s)
+            {(dados.contagem.projeto_semanal || 0) + (dados.contagem.projeto_final || 0) + (dados.contagem.projeto_mensal || 0)} projeto(s)
           </p>
         </div>
       </div>

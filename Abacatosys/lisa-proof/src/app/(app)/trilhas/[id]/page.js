@@ -39,10 +39,9 @@ export default function Trilha() {
     carregar();
   }, [carregar]);
 
-  // Trilha terminada: festa uma vez por sessão, não a cada visita.
+  // Trilha terminada (assuntos e projeto final): festa uma vez por sessão, não a cada visita.
   useEffect(() => {
-    const p = dados?.progresso;
-    if (!p || festejou.current || p.total === 0 || p.feitos !== p.total) return;
+    if (!dados?.avanco?.concluida || festejou.current) return;
     festejou.current = true;
     const chave = `proof-festa-${id}`;
     try {
@@ -83,8 +82,10 @@ export default function Trilha() {
     return erro ? <div className="pf-aviso pf-aviso--erro">{erro}</div> : <div className="pf-carregando">Desenhando a trilha…</div>;
   }
 
-  const { trilha, etapas, projetos, progresso } = dados;
-  const terminou = progresso.total > 0 && progresso.feitos === progresso.total;
+  const { trilha, avanco, progresso } = dados;
+  const terminou = avanco.concluida;
+  const semanas = avanco.unidades.length;
+  const daVez = avanco.semanaDaVez;
 
   return (
     <>
@@ -108,6 +109,16 @@ export default function Trilha() {
           {progresso.feitos}<small>/{progresso.total} assuntos{terminou ? " · concluída 🏆" : ""}</small>
         </div>
         <Barra valor={progresso.feitos} total={progresso.total} rotulo="Progresso da trilha" />
+        {semanas > 0 && (
+          <p className="pf-estat__nota" style={{ marginTop: 8 }}>
+            {terminou
+              ? `${semanas === 1 ? "Plano de uma semana" : `${semanas} semanas de plano`} · trilha concluída com o projeto final`
+              : daVez
+                ? `Semana ${daVez.numero} de ${semanas}${daVez.final ? " (a última: termina no projeto final)" : ` · o projeto dela abre a semana ${daVez.numero + 1}`}`
+                : `${semanas} semana(s) de plano`}
+            {" · o assunto conclui com a teoria e o quiz dele (60%+)"}
+          </p>
+        )}
         {trilha.resumo && <p className="pf-estat__nota" style={{ marginTop: 12 }}>{trilha.resumo}</p>}
 
         <details className="pf-ajuste" style={{ marginTop: 8 }}>
@@ -133,7 +144,7 @@ export default function Trilha() {
         </details>
       </div>
 
-      <MapaDaTrilha trilha={trilha} etapas={etapas} projetos={projetos} aoMudar={carregar} />
+      <MapaDaTrilha trilha={trilha} avanco={avanco} aoMudar={carregar} />
     </>
   );
 }

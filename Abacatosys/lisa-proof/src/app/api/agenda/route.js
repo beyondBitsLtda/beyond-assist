@@ -1,7 +1,7 @@
 import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { exigirUsuario, respostaDeErro, ErroDeAcesso } from "@/lib/sessao.js";
-import { etapasDasTrilhas } from "@/lib/pratica.js";
+import { avancoDasTrilhas } from "@/lib/avanco.js";
 import { buscarTodas } from "@/lib/estudo.js";
 import { diaDe, diaValido, diasEntre } from "@/dominio/datas.js";
 import { montarAgenda, corDaTrilha } from "@/dominio/agenda.js";
@@ -27,28 +27,25 @@ export async function GET(req) {
 
     // A ordem de criação fixa a cor de cada trilha: a mesma trilha não muda de cor entre visitas.
     const { data: trilhas, error } = await supabase
-      .from("proof_trilhas").select("id, tema").eq("usuario_id", usuario.id).eq("status", "ativa").order("criada_em");
+      .from("proof_trilhas").select("id, tema, inicio_em, dias_de_estudo").eq("usuario_id", usuario.id).eq("status", "ativa").order("criada_em");
     if (error) throw new ErroDeAcesso(500, error.message);
     const lista = trilhas || [];
     const ids = lista.map((t) => t.id);
 
-    const [etapas, projetos, diarios, eventos] = await Promise.all([
-      etapasDasTrilhas(ids),
-      // Projetos de qualquer período: um projeto antigo entregue não pode aparecer como atrasado
-      // só porque está fora da janela pedida.
-      ids.length
-        ? supabase.from("proof_desafios").select("id, trilha_id, tipo, periodo, rodada, status, nota, titulo")
-            .eq("usuario_id", usuario.id).in("tipo", ["projeto_semanal", "projeto_mensal"])
-        : { data: [] },
+    const [avancos, diarios, eventos] = await Promise.all([
+      // as etapas (com o assunto concluído pela teoria + quiz) e as semanas do plano com os projetos delas
+      avancoDasTrilhas(lista, hoje),
       ids.length
         ? supabase.from("proof_desafios").select("id, trilha_id, tipo, periodo, rodada, status, nota, titulo")
             .eq("usuario_id", usuario.id).in("tipo", ["quiz", "exercicio"]).gte("periodo", de).lte("periodo", ate)
         : { data: [] },
       buscarTodas(() => supabase.from("proof_eventos").select("dia").eq("usuario_id", usuario.id).gte("dia", de).lte("dia", ate)),
     ]);
-    if (projetos.error || diarios.error) throw new ErroDeAcesso(500, (projetos.error || diarios.error).message);
+    if (diarios.error) throw new ErroDeAcesso(500, diarios.error.message);
+    const etapas = new Map(lista.map((t) => [t.id, avancos.get(t.id)?.etapas || []]));
+    const semanas = new Map(lista.map((t) => [t.id, avancos.get(t.id)?.unidades || []]));
 
-    const desafios = [...(projetos.data || []), ...(diarios.data || [])].map((d) => ({
+    const desafios = (diarios.data || []).map((d) => ({
       id: d.id, trilhaId: d.trilha_id, tipo: d.tipo, periodo: d.periodo, rodada: d.rodada, status: d.status, nota: d.nota, titulo: d.titulo,
     }));
 
@@ -58,7 +55,7 @@ export async function GET(req) {
       de,
       ate,
       trilhas: lista.map((t, i) => ({ id: t.id, tema: t.tema, cor: corDaTrilha(i) })),
-      itens: montarAgenda({ trilhas: lista, etapas, desafios, hoje, de, ate }),
+      itens: montarAgenda({ trilhas: lista, etapas, semanas, desafios, hoje, de, ate }),
       diasEstudados: [...new Set(eventos.map((e) => e.dia))],
     });
   } catch (e) {

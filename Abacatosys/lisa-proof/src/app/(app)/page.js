@@ -151,7 +151,7 @@ export default function Hoje() {
                   <span className="pratica__textos">
                     <strong>{p.tema}</strong>
                     <small>{linhaDaPratica("Quiz", p.quiz, "❓")} · {linhaDaPratica("Exercício", p.exercicio, "⌨️")}</small>
-                    <small>{linhaDaPratica("Projeto da semana", p.projetoSemanal, "🎁")}</small>
+                    {p.projeto && <small>{linhaDaPratica(p.projeto.final ? "Projeto final" : `Projeto da semana ${p.projeto.numero}`, p.projeto, p.projeto.final ? "🏆" : "🎁")}</small>}
                   </span>
                   <span className="pratica__acao">{diarioFeito ? "Rever" : "Praticar"}</span>
                 </Link>

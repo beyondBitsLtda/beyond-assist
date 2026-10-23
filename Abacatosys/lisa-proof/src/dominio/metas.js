@@ -38,7 +38,10 @@ const PESO = { atrasada: 0, hoje: 1, adiantar: 2, feita: 3 };
  * - `adiantar`: a trilha não tem nada para hoje (fim de semana, ou tudo em dia), então o próximo
  *   assunto aparece para quem quiser adiantar.
  *
- * @param etapas  `{ trilhaId, ordem, inicio, fim, concluido, concluidoHoje }`
+ * Assunto de uma semana do plano ainda trancada (`bloqueada`: o projeto da semana anterior não foi
+ * aprovado) não entra no dia — nem para adiantar.
+ *
+ * @param etapas  `{ trilhaId, ordem, inicio, fim, concluido, concluidoHoje, bloqueada }`
  */
 export function tarefasDoDia(etapas, hoje) {
   const lista = [];
@@ -52,6 +55,7 @@ export function tarefasDoDia(etapas, hoje) {
     const ordenadas = [...doTrilha].sort((a, b) => a.ordem - b.ordem);
     let temPendenteHoje = false;
     for (const e of ordenadas) {
+      if (e.bloqueada) continue;
       if (e.concluidoHoje) {
         lista.push({ ...e, situacao: "feita" });
       } else if (!e.concluido && e.inicio && e.inicio <= hoje) {
@@ -60,7 +64,7 @@ export function tarefasDoDia(etapas, hoje) {
       }
     }
     if (!temPendenteHoje) {
-      const proxima = ordenadas.find((e) => !e.concluido && e.inicio && e.inicio > hoje);
+      const proxima = ordenadas.find((e) => !e.concluido && !e.bloqueada && e.inicio && e.inicio > hoje);
       if (proxima) lista.push({ ...proxima, situacao: "adiantar" });
     }
   }

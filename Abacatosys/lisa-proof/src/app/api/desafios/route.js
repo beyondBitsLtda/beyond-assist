@@ -6,7 +6,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/desafios   body: { trilhaId, tipo, periodo? }
+ * POST /api/desafios   body: { trilhaId, tipo, periodo?, novaRodada?, cardId? }
+ *   cardId (só quiz): o quiz daquele assunto — o quiz aprovado conclui o assunto
  *
  * Devolve o desafio do período — o que já existe, ou um novo gerado pela IA. Pedir de novo não
  * gera outro: é seguro chamar sempre que a tela abrir.
@@ -21,7 +22,8 @@ export async function POST(req) {
       trilhaId: String(corpo.trilhaId),
       tipo: String(corpo.tipo),
       periodo: corpo.periodo ? String(corpo.periodo) : undefined,
-      novaRodada: corpo.novaRodada === true, // "mais um quiz/exercício hoje"
+      novaRodada: corpo.novaRodada === true, // "mais um quiz/exercício hoje" (e o projeto novo depois de um reprovado)
+      cardId: corpo.cardId ? String(corpo.cardId) : null,
     });
     return json({ ok: true, novo, desafio: desafioParaTela(desafio, tema) }, novo ? 201 : 200);
   } catch (e) {

@@ -19,6 +19,7 @@ export const ROTULOS_DA_AGENDA = {
   quiz: NOMES_DOS_DESAFIOS.quiz,
   exercicio: NOMES_DOS_DESAFIOS.exercicio,
   projeto_semanal: "Entrega do projeto da semana",
+  projeto_final: "Entrega do projeto final",
   projeto_mensal: "Entrega do projeto do mês",
 };
 
@@ -31,10 +32,13 @@ export const ROTULOS_DA_SITUACAO = {
   perdido: "Não feito",
 };
 
-function situacaoDoProjeto(desafio, inicio, prazo, hoje) {
-  if (desafio?.status === "concluido") return (desafio.nota ?? 0) >= NOTA_DE_APROVACAO ? "feito" : "entregue";
-  if (prazo < hoje) return "atrasado";
-  if (inicio > hoje) return "futuro";
+/** A entrega do projeto de uma semana do plano (src/dominio/avanco.js): feita, entregue abaixo da nota,
+ *  ainda trancada (futuro), atrasada ou para agora. */
+function situacaoDaEntrega(u, hoje) {
+  if (u.aprovado || u.esgotou) return "feito";
+  if (u.projeto?.status === "concluido") return (u.projeto.nota ?? 0) >= NOTA_DE_APROVACAO ? "feito" : "entregue";
+  if (!u.aberta || !u.projetoLiberado) return "futuro";
+  if (u.ate < hoje) return "atrasado";
   return "agora";
 }
 
@@ -49,9 +53,10 @@ function situacaoDoProjeto(desafio, inicio, prazo, hoje) {
  *
  * @param trilhas   `{ id, tema }`, na ordem das cores
  * @param etapas    `Map<trilhaId, { cardId, titulo, inicio, fim, concluido }[]>`
- * @param desafios  `{ id, trilhaId, tipo, periodo, status, nota, titulo }`
+ * @param semanas   `Map<trilhaId, semanas do plano>` (src/dominio/avanco.js): cada uma com o projeto dela
+ * @param desafios  `{ id, trilhaId, tipo, periodo, status, nota, titulo }` (quiz e exercício)
  */
-export function montarAgenda({ trilhas, etapas, desafios, hoje, de, ate }) {
+export function montarAgenda({ trilhas, etapas, semanas = new Map(), desafios, hoje, de, ate }) {
   const itens = [];
   const achar = (trilhaId, tipo, periodo) =>
     desafios.find((d) => d.trilhaId === trilhaId && d.tipo === tipo && d.periodo === periodo) || null;
@@ -74,28 +79,16 @@ export function montarAgenda({ trilhas, etapas, desafios, hoje, de, ate }) {
     }
     if (!lista.length) return;
 
-    // ---- projetos: uma entrega por semana e por mês em que a trilha tem estudo planejado
-    const primeiro = lista.reduce((m, e) => (e.inicio < m ? e.inicio : m), lista[0].inicio);
-    const ultimo = lista.reduce((m, e) => (e.fim > m ? e.fim : m), lista[0].fim);
-
-    for (let s = inicioDaSemana(primeiro); s <= inicioDaSemana(ultimo); s = somarDias(s, 7)) {
-      const prazo = fimDaSemana(s);
-      const d = achar(t.id, "projeto_semanal", s);
-      const situacao = situacaoDoProjeto(d, s, prazo, hoje);
-      if ((prazo < de || prazo > ate) && situacao !== "atrasado") continue;
+    // ---- projetos: uma entrega por semana do plano (a da última é o projeto final), no fim dela
+    for (const u of semanas.get(t.id) || []) {
+      if (u.dispensada) continue;
+      const situacao = situacaoDaEntrega(u, hoje);
+      if ((u.ate < de || u.ate > ate) && situacao !== "atrasado") continue;
+      const d = u.projeto;
       itens.push({
-        ...base, chave: `ps-${t.id}-${s}`, tipo: "projeto_semanal", titulo: d?.titulo || ROTULOS_DA_AGENDA.projeto_semanal,
-        inicio: s, fim: prazo, exibir: "prazo", situacao, href: d ? `/pratica/${d.id}` : "/pratica",
-      });
-    }
-    for (let m = inicioDoMes(primeiro); m <= inicioDoMes(ultimo); m = inicioDoMes(somarDias(fimDoMes(m), 1))) {
-      const prazo = fimDoMes(m);
-      const d = achar(t.id, "projeto_mensal", m);
-      const situacao = situacaoDoProjeto(d, m, prazo, hoje);
-      if ((prazo < de || prazo > ate) && situacao !== "atrasado") continue;
-      itens.push({
-        ...base, chave: `pm-${t.id}-${m}`, tipo: "projeto_mensal", titulo: d?.titulo || ROTULOS_DA_AGENDA.projeto_mensal,
-        inicio: m, fim: prazo, exibir: "prazo", situacao, href: d ? `/pratica/${d.id}` : "/pratica",
+        ...base, chave: `${u.tipo}-${t.id}-${u.periodo}`, tipo: u.tipo,
+        titulo: d?.titulo || (u.final ? ROTULOS_DA_AGENDA.projeto_final : `${ROTULOS_DA_AGENDA.projeto_semanal} ${u.numero}`),
+        inicio: u.de, fim: u.ate, exibir: "prazo", situacao, href: d ? `/pratica/${d.id}` : `/trilhas/${t.id}`,
       });
     }
 
@@ -130,7 +123,7 @@ export function montarAgenda({ trilhas, etapas, desafios, hoje, de, ate }) {
 }
 
 const PESO = { atrasado: 0, agora: 1, perdido: 2, futuro: 3, entregue: 4, feito: 5 };
-const PESO_DO_TIPO = { projeto_mensal: 0, projeto_semanal: 1, assunto: 2, quiz: 3, exercicio: 4 };
+const PESO_DO_TIPO = { projeto_final: 0, projeto_mensal: 0, projeto_semanal: 1, assunto: 2, quiz: 3, exercicio: 4 };
 
 /** Os itens que aparecem num dia do calendário, mais urgentes primeiro. */
 export function itensDoDia(itens, dia) {
@@ -162,5 +155,5 @@ export function nomeDoMes(dia) {
 
 /** O texto da etiqueta no calendário: curto, porque a célula é estreita. */
 export function textoDaEtiqueta(item) {
-  return { assunto: item.titulo, projeto_semanal: "Entrega", projeto_mensal: "Entrega do mês", quiz: "Quiz", exercicio: "Exercício" }[item.tipo] || item.titulo;
+  return { assunto: item.titulo, projeto_semanal: "Entrega", projeto_final: "Projeto final", projeto_mensal: "Entrega do mês", quiz: "Quiz", exercicio: "Exercício" }[item.tipo] || item.titulo;
 }

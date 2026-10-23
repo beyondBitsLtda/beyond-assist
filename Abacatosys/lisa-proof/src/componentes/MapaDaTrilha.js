@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { criar } from "@/lib/api.js";
 import { diaDe, formatarDia } from "@/dominio/datas.js";
-import { mapaDaTrilha, NOTA_DE_APROVACAO, fimDoPeriodo } from "@/dominio/pratica.js";
+import { NOTA_DE_APROVACAO } from "@/dominio/pratica.js";
+import { mapaDaTrilha, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
 import Neuro, { reagir, reagirAoResultado } from "./Neuro.js";
 import Folha from "./Folha.js";
 import Assunto from "./Assunto.js";
@@ -21,6 +22,7 @@ const ICONES = {
   bau: <path d="M3 10h18v10H3zM3 10a9 5 0 0 1 18 0M12 13v3M3 14h18" />,
   trofeu: <path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M9 17h6v4H9z" />,
   bandeira: <path d="M5 21V4M5 4h11l-2 4 2 4H5" />,
+  quiz: <path d="M9.2 9a3 3 0 1 1 4.3 2.7c-.9.5-1.5 1.1-1.5 2.1v.7M12 18h.01" />,
 };
 
 function Icone({ nome }) {
@@ -32,17 +34,35 @@ function Icone({ nome }) {
 }
 
 function iconeDo(no) {
-  if (no.tipo === "projeto_semanal") return no.estado === "bloqueado" ? "cadeado" : "bau";
-  if (no.tipo === "projeto_mensal") return no.estado === "bloqueado" ? "cadeado" : "trofeu";
+  if (no.tipo === "projeto_semanal") return no.estado === "bloqueado" ? "cadeado" : no.estado === "feito" || no.estado === "dispensado" || no.estado === "liberado" ? "feito" : "bau";
+  if (no.tipo === "projeto_final") return no.estado === "bloqueado" ? "cadeado" : "trofeu";
   if (no.tipo === "chegada") return "bandeira";
-  return { feito: "feito", atrasado: "alerta", bloqueado: "cadeado" }[no.estado] || "livro";
+  return { feito: "feito", atrasado: "alerta", bloqueado: "cadeado", quiz: "quiz" }[no.estado] || "livro";
 }
 
 function rotuloDo(no) {
   if (no.tipo === "assunto") return no.etapa.titulo;
-  if (no.tipo === "projeto_semanal") return no.desafio?.titulo || "Projeto da semana";
-  if (no.tipo === "projeto_mensal") return no.desafio?.titulo || "Projeto do mês";
+  if (no.tipo === "projeto_semanal") return no.desafio?.titulo || `Projeto da semana ${no.unidade.numero}`;
+  if (no.tipo === "projeto_final") return no.desafio?.titulo || "Projeto final";
   return no.estado === "feito" ? "Trilha concluída!" : "Chegada";
+}
+
+/** O que a folha de um projeto diz, em cada estado. */
+function textoDoProjeto(no) {
+  const u = no.unidade;
+  const qual = u.final ? "o projeto final" : `o projeto da semana ${u.numero}`;
+  switch (no.estado) {
+    case "bloqueado": return `Trancado: abre quando o projeto da semana ${u.numero - 1} for aprovado.`;
+    case "futuro": return `Libera em ${formatarDia(u.de)}, quando a semana começa — ou antes, se você concluir todos os assuntos dela.`;
+    case "dispensado": return "Esta semana foi concluída antes das regras novas: não precisa de projeto.";
+    case "liberado": return `Os ${PROJETOS_POR_SEMANA} projetos desta semana acabaram sem aprovação — a semana foi liberada assim mesmo.`;
+    case "feito": return u.final ? "Aprovado! Com ele, a trilha está concluída. 🏆" : `Aprovado! A semana ${u.numero + 1} está liberada.`;
+    case "entregue": return `As entregas acabaram abaixo de ${NOTA_DE_APROVACAO}. Veja o que a Lisa sugeriu${u.podeOutroProjeto ? " e tente um projeto novo" : ""}.`;
+    case "em_andamento": return `Em andamento. Entregue o link do repositório no GitHub: aprovado (nota ${NOTA_DE_APROVACAO}+), ${u.final ? "a trilha termina" : "a semana seguinte abre"}.`;
+    default: return u.final
+      ? `A Lisa monta ${qual}: um projeto do tamanho da trilha inteira (${u.numero} semana(s) de estudo). Aprovado, a trilha termina.`
+      : `A Lisa monta ${qual} com os assuntos dela. Aprovado (nota ${NOTA_DE_APROVACAO}+), a semana ${u.numero + 1} abre.`;
+  }
 }
 
 /** Caminho suave pelos pontos: curvas com controles na vertical, como uma estrada de mapa. */
@@ -91,14 +111,14 @@ function useEscalaDaOnda() {
 
 const limitarX = (x) => Math.min(84, Math.max(16, x));
 
-const SITUACAO_DO_ESTADO = { feito: "concluida", atual: "hoje", disponivel: "disponivel", atrasado: "atrasada", bloqueado: "futuro" };
+const SITUACAO_DO_ESTADO = { feito: "concluida", atual: "hoje", disponivel: "disponivel", atrasado: "atrasada", bloqueado: "trancada", futuro: "futuro", quiz: "quiz" };
 
 function Unidade({ unidade, aoEscolher, temNeuro }) {
   const { cabecalho, paradas } = unidade;
   const altura = paradas.length * LINHA + 40;
   const pontos = paradas.map((p, i) => ({ x: 50 + p.onda, y: i * LINHA + 56 }));
   let feitos = 0;
-  while (feitos < paradas.length && paradas[feitos].estado === "feito") feitos++;
+  while (feitos < paradas.length && ["feito", "dispensado", "liberado"].includes(paradas[feitos].estado)) feitos++;
 
   const assuntos = paradas.filter((p) => p.tipo === "assunto");
   const assuntosFeitos = assuntos.filter((p) => p.estado === "feito").length;
@@ -107,9 +127,9 @@ function Unidade({ unidade, aoEscolher, temNeuro }) {
   return (
     <section className="mapa__unidade">
       {cabecalho && (
-        <header className={`mapa__faixa${completa ? " mapa__faixa--completa" : ""}`}>
+        <header className={`mapa__faixa${completa ? " mapa__faixa--completa" : ""}${cabecalho.bloqueada ? " mapa__faixa--trancada" : ""}`}>
           <div>
-            <strong>{cabecalho.titulo}</strong>
+            <strong>{cabecalho.bloqueada ? "🔒 " : ""}{cabecalho.titulo}</strong>
             {cabecalho.de && <span>{formatarDia(cabecalho.de)} – {formatarDia(cabecalho.ate)}</span>}
           </div>
           {assuntos.length > 0 && <span className="mapa__faixa-conta">{completa ? "✓ " : ""}{assuntosFeitos}/{assuntos.length}</span>}
@@ -159,13 +179,14 @@ function Unidade({ unidade, aoEscolher, temNeuro }) {
 
 /**
  * O mapa da trilha, no espírito do Duolingo: um caminho desenhado que desce em zigue-zague, com
- * cada assunto como uma parada, o baú do projeto no fim de cada semana, o troféu do mês e a
- * bandeira de chegada. O Neuro fica parado no assunto de agora.
+ * cada assunto como uma parada, o baú do projeto no fim de cada semana do plano, o troféu do projeto
+ * final e a bandeira de chegada. O Neuro fica parado no assunto de agora. A semana seguinte fica
+ * trancada até o projeto da anterior ser aprovado (src/dominio/avanco.js).
  *
  * Tocar numa parada abre a folha com o conteúdo dela: o assunto (com as tarefas para marcar ali
- * mesmo) ou o projeto.
+ * mesmo e o quiz que o conclui) ou o projeto.
  */
-export default function MapaDaTrilha({ trilha, etapas, projetos, aoMudar }) {
+export default function MapaDaTrilha({ trilha, avanco, aoMudar }) {
   const router = useRouter();
   const hoje = diaDe();
   const [aberta, setAberta] = useState(null);
@@ -173,10 +194,8 @@ export default function MapaDaTrilha({ trilha, etapas, projetos, aoMudar }) {
   const [erro, setErro] = useState("");
 
   const escala = useEscalaDaOnda();
-  const unidades = useMemo(
-    () => emUnidades(mapaDaTrilha({ etapas, desafios: projetos, hoje, base: trilha.inicioEm }), escala),
-    [etapas, projetos, hoje, trilha.inicioEm, escala]
-  );
+  const etapas = avanco.etapas;
+  const unidades = useMemo(() => emUnidades(mapaDaTrilha(avanco, hoje), escala), [avanco, hoje, escala]);
   const temAtual = unidades.some((u) => u.paradas.some((p) => p.estado === "atual" || (p.tipo === "chegada" && p.estado === "feito")));
 
   // Estável entre renderizações: a Folha usa isto como dependência para ouvir o Esc.
@@ -185,13 +204,13 @@ export default function MapaDaTrilha({ trilha, etapas, projetos, aoMudar }) {
     setErro("");
   }, []);
 
-  async function abrirProjeto(no) {
-    if (no.desafio?.id) return router.push(`/pratica/${no.desafio.id}`);
+  async function abrirProjeto(no, novaRodada = false) {
+    if (no.desafio?.id && !novaRodada) return router.push(`/pratica/${no.desafio.id}`);
     setPreparando(true);
     setErro("");
     reagir("pensando", "Deixa eu pensar num projeto bem legal pra você…", 20000);
     try {
-      const r = await criar("/api/desafios", { trilhaId: trilha.id, tipo: no.tipo, periodo: no.periodo });
+      const r = await criar("/api/desafios", { trilhaId: trilha.id, tipo: no.tipo, periodo: no.periodo, novaRodada });
       router.push(`/pratica/${r.desafio.id}`);
     } catch (e) {
       setErro(e.message);
@@ -215,6 +234,7 @@ export default function MapaDaTrilha({ trilha, etapas, projetos, aoMudar }) {
             key={`${etapaAberta.cardId}:${etapaAberta.checklists.map((c) => c.id).join(",")}`}
             tarefa={{
               ...etapaAberta,
+              trilhaId: trilha.id,
               tema: trilha.tema,
               situacao: SITUACAO_DO_ESTADO[aberta.estado] || "disponivel",
               temExplicacao: false,
@@ -226,33 +246,28 @@ export default function MapaDaTrilha({ trilha, etapas, projetos, aoMudar }) {
           />
         )}
 
-        {(aberta?.tipo === "projeto_semanal" || aberta?.tipo === "projeto_mensal") && (
+        {(aberta?.tipo === "projeto_semanal" || aberta?.tipo === "projeto_final") && (
           <div className="folha__conteudo">
-            <span className="pf-pilula">{aberta.tipo === "projeto_semanal" ? "Projeto da semana" : "Projeto do mês"}</span>
+            <span className="pf-pilula">{aberta.tipo === "projeto_final" ? "🏆 Projeto final" : `🎁 Projeto da semana ${aberta.unidade.numero}`}</span>
             <h2>{rotuloDo(aberta)}</h2>
             <p className="pf-estat__nota">
-              {formatarDia(aberta.periodo)} a {formatarDia(fimDoPeriodo(aberta.tipo, aberta.periodo))}
+              Semana {aberta.unidade.numero}: {formatarDia(aberta.unidade.de)} a {formatarDia(aberta.unidade.ate)}
               {aberta.desafio?.nota != null ? ` · nota ${aberta.desafio.nota}` : ""}
             </p>
-            {aberta.estado === "bloqueado" ? (
-              <p>Trancado. Libera em {formatarDia(aberta.periodo)}, quando o período começar.</p>
-            ) : (
-              <>
-                <p>
-                  {aberta.estado === "feito"
-                    ? "Aprovado! Você pode rever a avaliação da Lisa."
-                    : aberta.estado === "entregue"
-                      ? `Entregue, mas abaixo de ${NOTA_DE_APROVACAO}. Veja o que a Lisa sugeriu.`
-                      : aberta.desafio
-                        ? "Projeto em andamento. Entregue o link do repositório no GitHub para a Lisa avaliar."
-                        : "A Lisa monta um projeto com os assuntos deste período. Você entrega pelo GitHub e ela avalia."}
-                </p>
-                {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+            <p>{textoDoProjeto(aberta)}</p>
+            {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+            <div className="pf-acoes">
+              {(aberta.desafio || ["disponivel", "em_andamento"].includes(aberta.estado)) && !["bloqueado", "futuro", "dispensado"].includes(aberta.estado) && (
                 <button type="button" className="pf-botao" onClick={() => abrirProjeto(aberta)} disabled={preparando}>
                   {preparando ? "A Lisa está preparando…" : aberta.desafio ? "Abrir projeto" : "Gerar projeto"}
                 </button>
-              </>
-            )}
+              )}
+              {aberta.estado === "entregue" && aberta.unidade.podeOutroProjeto && (
+                <button type="button" className="pf-botao pf-botao--sec" onClick={() => abrirProjeto(aberta, true)} disabled={preparando}>
+                  Novo projeto ({aberta.unidade.rodadas + 1} de {PROJETOS_POR_SEMANA})
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -262,13 +277,13 @@ export default function MapaDaTrilha({ trilha, etapas, projetos, aoMudar }) {
             <h2>{aberta.estado === "feito" ? "Trilha concluída! 🏆" : "A chegada"}</h2>
             <p>
               {aberta.estado === "feito"
-                ? `Você terminou todos os assuntos de ${trilha.tema}. Que orgulho!`
-                : "Conclua todos os assuntos da trilha para chegar aqui."}
+                ? `Você terminou todos os assuntos de ${trilha.tema} e o projeto final. Que orgulho!`
+                : "Conclua todos os assuntos (teoria e quiz) e o projeto final para chegar aqui."}
             </p>
           </div>
         )}
 
-        {aberta?.tipo === "assunto" && aberta.estado === "bloqueado" && (
+        {aberta?.tipo === "assunto" && aberta.estado === "futuro" && (
           <p className="pf-estat__nota" style={{ marginTop: 12 }}>
             Este assunto está planejado para {formatarDia(aberta.etapa.inicio)}. Dá para adiantar, se quiser.
           </p>

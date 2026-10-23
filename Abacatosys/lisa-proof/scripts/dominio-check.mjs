@@ -15,7 +15,7 @@ import { nivelPorPontos } from "../src/dominio/pontos.js";
 import {
   periodoDe, periodoPermitido, pontosDoQuiz, pontosDaNota, validarQuiz, quizParaTela,
   separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo, podeReenviar, entregaConcluida,
-  validarAvaliacao, assuntoAtual, mapaDaTrilha, TENTATIVAS, RODADAS_POR_DIA, podeAbrirRodada, fatorDaRodada, comFatorDaRodada,
+  validarAvaliacao, assuntoAtual, TENTATIVAS, RODADAS_POR_DIA, podeAbrirRodada, fatorDaRodada, comFatorDaRodada,
   perguntaRepetida, perguntasNovas, exercicioRepetido, validarGuia,
   tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto, podeTrocarComplexidade,
 } from "../src/dominio/pratica.js";
@@ -56,6 +56,9 @@ import {
   ABRE_AS, FECHA_AS, pregaoAberto, passosAte, precoNaHora, horaDoPasso, proximaVirada,
 } from "../src/dominio/bolsa.js";
 import { centavos, formatarMoedas, faltam } from "../src/dominio/moedas.js";
+import {
+  semanasDoPlano, avancoDaTrilha, mapaDaTrilha, valorDoProjetoFinal, podeGerarProjeto, semanaDoProjeto, periodoDaSemana, PROJETOS_POR_SEMANA,
+} from "../src/dominio/avanco.js";
 import {
   MONSTROS, EXPEDICOES, EXPEDICOES_POR_DIA, podeExpedicionar, saqueDaExpedicao, defensorDaExpedicao, expedicaoPorId, contagensDeMonstros,
   veiculoDa,
@@ -309,24 +312,122 @@ caso("assunto atual: atrasado primeiro; trilha acabada devolve o último", () =>
   assert.equal(assuntoAtual(etapas.map((e) => ({ ...e, cardId: `c${e.ordem}` })), hoje).cardId, "c1");
   assert.equal(assuntoAtual([{ cardId: "x", ordem: 1, concluido: true }, { cardId: "y", ordem: 2, concluido: true }], hoje).cardId, "y");
 });
-caso("mapa: unidades por semana, baú da semana, troféu na virada do mês, chegada", () => {
-  const nos = mapaDaTrilha({
-    hoje: "2026-10-07",
-    base: "2026-09-28",
-    etapas: [
-      { cardId: "a", ordem: 1, semana: 1, inicio: "2026-09-29", fim: "2026-09-29", concluido: true },
-      { cardId: "b", ordem: 2, semana: 2, inicio: "2026-10-06", fim: "2026-10-08", concluido: false },
-      { cardId: "c", ordem: 3, semana: 3, inicio: "2026-10-13", fim: "2026-10-13", concluido: false },
-    ],
-    desafios: [{ tipo: "projeto_semanal", periodo: "2026-09-28", status: "concluido", nota: 90 }],
-  });
-  // A semana 28/09–04/10 termina em outubro: conta para outubro, e setembro não ganha troféu.
-  assert.deepEqual(nos.map((n) => `${n.tipo}:${n.estado || ""}`), [
-    "unidade:", "assunto:feito", "projeto_semanal:feito",
-    "unidade:", "assunto:atual", "projeto_semanal:disponivel",
-    "unidade:", "assunto:bloqueado", "projeto_semanal:bloqueado", "projeto_mensal:disponivel",
+// ---- a trilha amarrada (23/10/2026): src/dominio/avanco.js
+const BASE = "2026-10-05";
+const et = (cardId, ordem, dias, inicio, extra = {}) => ({ cardId, ordem, dias, inicio, fim: inicio, titulo: cardId, teoria: false, ...extra });
+caso("avanço: as semanas do plano somam os dias de cada assunto (não a semana do calendário)", () => {
+  const lista = [et("a", 1, 2, "2026-10-05"), et("b", 2, 2, "2026-10-07"), et("c", 3, 1, "2026-10-09"), et("d", 4, 3, "2026-10-12"), et("e", 5, 1, "2026-10-15"), et("f", 6, 2, "2026-10-16")];
+  assert.deepEqual(semanasDoPlano(lista, [1, 2, 3, 4, 5]).map((u) => u.map((e) => e.cardId).join("")), ["abc", "de", "f"]);
+  // um plano de 5 dias (5 assuntos de 1 dia, de segunda a sexta) é UMA semana — e ela termina no projeto final
+  const curto = ["a", "b", "c", "d", "e"].map((id, i) => et(id, i + 1, 1, `2026-10-0${5 + i}`));
+  const av = avancoDaTrilha({ etapas: curto, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-05" });
+  assert.equal(av.unidades.length, 1);
+  assert.equal(av.unidades[0].tipo, "projeto_final");
+  // dias de estudo diferentes mudam o tamanho da semana: 3 dias por semana
+  assert.deepEqual(semanasDoPlano(lista, [1, 3, 5]).map((u) => u.map((e) => e.cardId).join("")), ["a", "bc", "d", "ef"]);
+  assert.equal(valorDoProjetoFinal(1), 250);
+  assert.equal(valorDoProjetoFinal(3), 450);
+  assert.equal(valorDoProjetoFinal(9), 600);
+  assert.equal(tabelaDePontos("projeto_final", { requisitos: ["x", "y"], extras: [], valor: 250 }).base, 250);
+});
+caso("avanço: o assunto só conclui com a teoria E um quiz dele aprovado (60%+); o de antes das regras, dispensado", () => {
+  const lista = [
+    et("a", 1, 1, "2026-10-05", { teoria: true }),
+    et("b", 2, 1, "2026-10-06", { teoria: true }),
+    et("c", 3, 1, "2026-10-07", { teoria: true, dispensa: true }),
+    et("d", 4, 1, "2026-10-08"),
+    et("z", 0, 1, null, { teoria: true }), // concluído antes de a trilha existir
+  ];
+  const quizzes = [
+    { card_ids: ["a"], status: "concluido", nota: 80 },
+    { card_ids: ["b"], status: "concluido", nota: 40 },   // reprovado
+    { card_ids: ["d"], status: "em_andamento", nota: 100 }, // ainda não terminou
+  ];
+  const av = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-08", quizzes });
+  const por = Object.fromEntries(av.etapas.map((e) => [e.cardId, e]));
+  assert.deepEqual([por.a.concluido, por.b.concluido, por.c.concluido, por.d.concluido, por.z.concluido], [true, false, true, false, true]);
+  assert.equal(por.b.faltaQuiz, true);
+  assert.equal(av.assuntoAtual.cardId, "b", "o assunto de agora é o primeiro pendente: o que só falta o quiz");
+  assert.deepEqual(av.antes.map((e) => e.cardId), ["z"]);
+  assert.deepEqual(av.progresso, { feitos: 3, total: 5 });
+});
+caso("avanço: o projeto da semana aprovado abre a semana seguinte; até lá a prática fica na semana aberta", () => {
+  const lista = [
+    et("a", 1, 3, "2026-10-05", { teoria: true }), et("b", 2, 2, "2026-10-08", { teoria: true }), // semana 1
+    et("c", 3, 3, "2026-10-12"), et("d", 4, 2, "2026-10-15"),                                      // semana 2 (a final)
+  ];
+  const quizzes = [{ card_ids: ["a"], status: "concluido", nota: 100 }, { card_ids: ["b"], status: "concluido", nota: 60 }];
+  const sem = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-13", quizzes });
+  assert.deepEqual(sem.unidades.map((u) => [u.numero, u.tipo, u.aberta]), [[1, "projeto_semanal", true], [2, "projeto_final", false]]);
+  assert.ok(sem.etapas.find((e) => e.cardId === "c").bloqueada, "a semana 2 fica trancada sem o projeto da 1");
+  assert.match(sem.etapas.find((e) => e.cardId === "c").motivo, /projeto da semana 1/);
+  assert.equal(sem.assuntoAtual, null, "nada pendente nas semanas abertas");
+  assert.ok(["a", "b"].includes(sem.assuntoDaPratica.cardId), "a prática revisa um assunto da semana aberta");
+  assert.equal(sem.semanaDaVez.numero, 1);
+  assert.equal(sem.unidades[0].periodo, periodoDaSemana(BASE, 1));
+  assert.ok(podeGerarProjeto(sem.unidades[0], "2026-10-13").ok);
+  assert.ok(!podeGerarProjeto(sem.unidades[1], "2026-10-13").ok);
+
+  const projetos = [{ id: "p1", tipo: "projeto_semanal", periodo: BASE, rodada: 1, status: "concluido", nota: 75, card_ids: ["a", "b"] }];
+  const com = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-13", quizzes, projetos });
+  assert.ok(com.unidades[1].aberta, "aprovado: a semana 2 abre");
+  assert.equal(com.assuntoAtual.cardId, "c");
+  assert.equal(com.concluida, false);
+  assert.equal(semanaDoProjeto(com, "projeto_final", BASE).numero, 2);
+});
+caso("avanço: a trilha só termina com o projeto final aprovado", () => {
+  const lista = [et("a", 1, 1, "2026-10-05", { teoria: true })];
+  const quizzes = [{ card_ids: ["a"], status: "concluido", nota: 100 }];
+  const sem = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-06", quizzes });
+  assert.equal(sem.concluida, false);
+  const com = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-06", quizzes,
+    projetos: [{ id: "f1", tipo: "projeto_final", periodo: BASE, status: "concluido", nota: 90 }] });
+  assert.equal(com.concluida, true);
+});
+caso("avanço: o que veio antes das regras continua valendo (semana concluída antes, projeto da semana do calendário)", () => {
+  // semana 1 inteira concluída antes das regras: não pede projeto
+  const lista = [et("a", 1, 3, "2026-10-05", { teoria: true, dispensa: true }), et("b", 2, 2, "2026-10-08", { teoria: true, dispensa: true }), et("c", 3, 3, "2026-10-12")];
+  const av = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-12" });
+  assert.ok(av.unidades[0].dispensada && av.unidades[1].aberta);
+  // o projeto antigo (chave = a segunda da semana do calendário) vale para a semana do plano com os mesmos assuntos
+  const base2 = "2026-10-07"; // a trilha começou numa quarta: as chaves novas não batem com as segundas
+  const lista2 = [et("a", 1, 3, "2026-10-07", { teoria: true }), et("b", 2, 2, "2026-10-12"), et("c", 3, 3, "2026-10-14")];
+  const antigo = { id: "velho", tipo: "projeto_semanal", periodo: "2026-10-05", rodada: 1, status: "concluido", nota: 70, card_ids: ["a", "b"] };
+  const av2 = avancoDaTrilha({ etapas: lista2, diasDeEstudo: [1, 2, 3, 4, 5], base: base2, hoje: "2026-10-14", projetos: [antigo] });
+  assert.equal(av2.unidades[0].projeto.id, "velho");
+  assert.ok(av2.unidades[1].aberta);
+});
+caso("avanço: projeto reprovado dá lugar a outro; reprovado em todos, a semana libera assim mesmo", () => {
+  const lista = [et("a", 1, 5, "2026-10-05", { teoria: true }), et("b", 2, 1, "2026-10-12")];
+  const reprovado = (rodada) => ({ id: `r${rodada}`, tipo: "projeto_semanal", periodo: BASE, rodada, status: "concluido", nota: 30, card_ids: ["a"] });
+  const um = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-12", projetos: [reprovado(1)] });
+  assert.ok(um.unidades[0].podeOutroProjeto && !um.unidades[1].aberta);
+  const todos = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-12",
+    projetos: Array.from({ length: PROJETOS_POR_SEMANA }, (_, i) => reprovado(i + 1)) });
+  assert.ok(todos.unidades[0].esgotou && todos.unidades[1].aberta);
+});
+caso("mapa da trilha: semanas do plano, o quiz que falta, a semana trancada, o troféu do final e a chegada", () => {
+  const lista = [
+    et("z", 0, 1, null, { teoria: true }),
+    et("a", 1, 3, "2026-10-05", { teoria: true }), et("b", 2, 2, "2026-10-08", { teoria: true }),
+    et("c", 3, 3, "2026-10-12"),
+  ];
+  const av = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-08",
+    quizzes: [{ card_ids: ["a"], status: "concluido", nota: 100 }] });
+  assert.deepEqual(mapaDaTrilha(av, "2026-10-08").map((n) => `${n.tipo}:${n.estado || ""}`), [
+    "unidade:", "assunto:feito",
+    "unidade:", "assunto:feito", "assunto:quiz", "projeto_semanal:disponivel",
+    "unidade:", "assunto:bloqueado", "projeto_final:bloqueado",
     "chegada:bloqueado",
   ]);
+  assert.equal(mapaDaTrilha(av, "2026-10-08")[2].titulo, "Semana 1");
+});
+caso("hoje: assunto de semana trancada não entra no dia (nem para adiantar)", () => {
+  const t = tarefasDoDia([
+    { trilhaId: "t", ordem: 1, inicio: "2026-10-10", fim: "2026-10-10", concluido: false, bloqueada: true },
+    { trilhaId: "t", ordem: 2, inicio: "2026-10-12", fim: "2026-10-12", concluido: false, bloqueada: true },
+  ], "2026-10-10");
+  assert.equal(t.length, 0);
 });
 
 console.log("\nconquistas");
@@ -415,13 +516,15 @@ caso("agenda: atrasado de fora do período entra; assunto de 3 dias aparece em c
   for (const d of ["2026-10-06", "2026-10-07", "2026-10-08"]) assert.ok(itensDoDia(itens, d).some((x) => x.chave === "a-b"), d);
   assert.ok(!itensDoDia(itens, "2026-10-09").some((x) => x.chave === "a-b"));
 });
-caso("agenda: projeto aparece só no dia da entrega, com a situação certa", () => {
-  const itens = montarAgenda({ ...agendaBase, de: "2026-09-21", ate: "2026-10-11" });
-  const semanais = itens.filter((x) => x.tipo === "projeto_semanal");
-  assert.deepEqual(semanais.map((x) => [x.fim, x.situacao]), [
-    ["2026-09-27", "feito"], ["2026-10-04", "atrasado"], ["2026-10-11", "agora"],
-  ]);
-  assert.equal(itensDoDia(itens, "2026-10-10").filter((x) => x.tipo === "projeto_semanal").length, 0);
+caso("agenda: a entrega de cada semana do plano aparece no fim dela; a da semana trancada fica para depois", () => {
+  const av = avancoDaTrilha({
+    etapas: [et("a", 1, 3, "2026-09-21", { fim: "2026-09-23", teoria: true }), et("b", 2, 2, "2026-09-24", { fim: "2026-09-25", teoria: true }), et("c", 3, 5, "2026-10-05", { fim: "2026-10-09" })],
+    diasDeEstudo: [1, 2, 3, 4, 5], base: "2026-09-21", hoje: "2026-10-07",
+  });
+  const itens = montarAgenda({ ...agendaBase, semanas: new Map([["t", av.unidades]]), de: "2026-09-21", ate: "2026-10-11" });
+  const projetos = itens.filter((x) => x.tipo === "projeto_semanal" || x.tipo === "projeto_final");
+  assert.deepEqual(projetos.map((x) => [x.tipo, x.fim, x.situacao]), [["projeto_semanal", "2026-09-25", "atrasado"], ["projeto_final", "2026-10-09", "futuro"]]);
+  assert.equal(itensDoDia(itens, "2026-09-25").filter((x) => x.tipo === "projeto_semanal").length, 1);
 });
 caso("agenda: quiz de hoje aparece mesmo antes de ser gerado; o de outro dia vem do desafio", () => {
   const itens = montarAgenda({ ...agendaBase, de: "2026-10-05", ate: "2026-10-11" });

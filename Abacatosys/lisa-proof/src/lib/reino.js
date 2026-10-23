@@ -548,6 +548,11 @@ export async function renomearReino(usuarioId, nome) {
  */
 export async function alvosDe(usuarioId) {
   const eu = await obterReino(usuarioId);
+  // no Reino de Teste, os rivais-robô estão sempre lá (se alguém os apagou, nascem de novo aqui)
+  if (emTeste()) {
+    const { count } = await db.from("proof_reinos").select("usuario_id", { count: "exact", head: true }).in("usuario_id", RIVAIS_DE_TESTE.map((r) => r.id));
+    if ((count || 0) < RIVAIS_DE_TESTE.length) await garantirRivais();
+  }
   const [todos, hoje, recentes, { paz }] = await Promise.all([
     buscarTodas(() => db.from("proof_reinos").select(CAMPOS).neq("usuario_id", usuarioId).order("usuario_id")),
     invasoesDeHoje(usuarioId),

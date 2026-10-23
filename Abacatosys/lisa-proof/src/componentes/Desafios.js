@@ -62,7 +62,8 @@ export function Quiz({ desafio }) {
       // Ofensiva, meta e conquistas abrem a festa em tela cheia; sem nada disso, a comemoração
       // do gabarito (ou só os pontos) fica no próprio Neuro.
       const festejou = celebrar(final);
-      if (!festejou && final.acertos === final.total) comemorar(`Gabaritou! +${final.pontos} pontos 🎉`);
+      if (!festejou && final.assunto?.concluido) comemorar(`Assunto concluído: ${final.assunto.titulo}! ✅`);
+      else if (!festejou && final.acertos === final.total) comemorar(`Gabaritou! +${final.pontos} pontos 🎉`);
       else if (!festejou && final.pontos > 0) avisar(`+${final.pontos} pontos`);
     }
   }
@@ -83,6 +84,9 @@ export function Quiz({ desafio }) {
             />
             <div className="quiz__placar">{acertos}<small>/{perguntas.length}</small></div>
             <p className="pf-estat__nota">acertos · {final ? final.pontos : desafio.pontos} pontos</p>
+            {final?.assunto?.concluido && <div className="pf-aviso pf-aviso--ok">✅ Assunto concluído: <strong>{final.assunto.titulo}</strong> — teoria e quiz em dia.</div>}
+            {final?.assunto?.faltaTeoria && <div className="pf-aviso">Quiz aprovado! Agora termine a teoria (as tarefas) de <strong>{final.assunto.titulo}</strong> para concluir o assunto.</div>}
+            {final?.assunto?.reprovado && <div className="pf-aviso">Para concluir o assunto, o quiz precisa de {final.assunto.precisa}% de acertos. Dá para tentar outra rodada hoje (na Prática) ou amanhã.</div>}
             <div className="pf-acoes" style={{ justifyContent: "center" }}>
               <button type="button" className="pf-botao pf-botao--sec" onClick={() => setRevendo(true)}>Ver respostas</button>
               <Link className="pf-botao" href="/pratica">Voltar à prática</Link>
@@ -260,6 +264,10 @@ function Entrega({ desafio, campo, rotulo, aoEnviar, aoAvaliar, conteudoInicial,
       }
       else reagir("triste", r.restantes ? `Faltou pouco! Você ainda tem ${r.restantes} tentativa(s).` : "Não foi dessa vez, mas olha quanta coisa boa na avaliação.", 6000);
       if (r.pontos > 0 && !r.avaliacao.aprovado) avisar(`+${r.pontos} pontos`);
+      // a trilha amarrada: o projeto aprovado abre a semana seguinte; o final fecha a trilha
+      if (r.semana?.trilhaConcluida) setTimeout(() => comemorar("Trilha concluída! 🏆"), 4400);
+      else if (r.semana?.liberou) setTimeout(() => comemorar(`Semana ${r.semana.liberou} liberada! 🔓`), 4400);
+      else if (r.semana?.podeOutro) setTimeout(() => reagir("pensando", "As entregas acabaram sem aprovação — na trilha dá para gerar um projeto novo para esta semana.", 7000), 4400);
     } catch (falha) {
       setErro(falha.message);
       reagir("surpreso", "Ops, algo deu errado no envio.");
@@ -667,6 +675,13 @@ export function Projeto({ desafio: inicial }) {
           </>
         )}
         <PlacarDoProjeto pontuacao={pontuacao} />
+        {(desafio.tipo === "projeto_semanal" || desafio.tipo === "projeto_final") && (
+          <p className="pf-estat__nota projeto__trava">
+            {desafio.tipo === "projeto_final"
+              ? `🏆 Projeto final da trilha: aprovado (nota ${NOTA_DE_APROVACAO}+), a trilha está concluída.`
+              : `🔓 Fecha a semana ${desafio.semana || ""} do plano: aprovado (nota ${NOTA_DE_APROVACAO}+), a semana seguinte abre.`}
+          </p>
+        )}
       </div>
       <DicasDaLisa key={`dicas-${desafio.complexidade}-${desafio.titulo}`} desafio={desafio} />
       <Entrega

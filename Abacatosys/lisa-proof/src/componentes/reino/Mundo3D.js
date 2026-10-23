@@ -6,7 +6,8 @@ import Neuro, { usePersonagem } from "@/componentes/Neuro.js";
 import { LUGARES, PRACA, RAIO_DA_MURALHA, montarCombate, passo as passoDoCombate, resultadoDo, DT, DURACAO_MAXIMA, raioDaIlha } from "@/dominio/combate.js";
 import { CONSTRUCOES } from "@/dominio/reino.js";
 import { svgDaTropa, TAMANHO_DO_PAPEL, ALTURA_DE_VOO } from "./tropasDePapel.js";
-import { cenarioDe, estruturaDaExpedicao, terrenoDaExpedicao } from "./cenariosDasExpedicoes.js";
+import { cenarioDe, estruturaDaExpedicao, terrenoDaExpedicao, raioDoPlanetoide } from "./cenariosDasExpedicoes.js";
+import { uniformeDaCurva, curvarTudo, curvarPonto } from "./curvatura.js";
 import { svgDoOperario } from "./operariosDePapel.js";
 
 /**
@@ -27,6 +28,10 @@ import { svgDoOperario } from "./operariosDePapel.js";
  * sem mundo 3D (ou com "reduzir movimento"), a tela mostra o resultado direto.
  * Sem WebGL, chama `aoFalhar()` e a tela volta para a vista plana. Com "reduzir movimento", o
  * Neuro fica parado na praça e as nuvens não andam.
+ *
+ * Expedição ao PLANETOIDE (23/10/2026): a ilha some e o mundo curva (curvatura.js) — o chão vira uma
+ * esfera e a batalha anda em volta dela, como no Mario Galaxy. Expedição ao FUNDO DO MAR: a ilha
+ * flutuante e as nuvens somem, entra o leito de areia, a névoa azul da água e as bolhas.
  */
 
 // ------------------------------------------------------------------ cores do mundo
@@ -841,7 +846,8 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
     const andar = { destino: null, espera: 1.5, viradoPara: 1, pulo: 0, vy: 0 };
 
     // câmera: orbita em volta do centro; o enquadramento cabe a ilha em qualquer ângulo
-    const vista = { azimute: Math.PI / 4, alvoAzimute: Math.PI / 4, elevacao: 0.56, distancia: 30 };
+    const ELEVACAO_DO_REINO = 0.56, ELEVACAO_NO_PLANETA = 0.9;
+    const vista = { azimute: Math.PI / 4, alvoAzimute: Math.PI / 4, elevacao: ELEVACAO_DO_REINO, distancia: 30 };
     const centro = new THREE.Vector3(0, 0.2, 0);
     function posicionarCamera() {
       const { azimute: a, elevacao: e, distancia: d } = vista;
@@ -855,6 +861,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
      * Mede contornos das ilhas no espaço da câmera e centraliza — girar muda um pouco o enquadre.
      */
     const pontoDoContorno = new THREE.Vector3();
+    const planeta = { raio: 0 }; // numa expedição ao planetoide: o raio dele (0 = a ilha de sempre)
     function ajustarFrustum() {
       const w = el.clientWidth || 1, h = el.clientHeight || 1;
       const aspecto = w / h;
@@ -869,7 +876,14 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
           }
         }
       };
-      medir(0, 0, raioDaIlha(ilhaAtual.terreno) + 0.2, -1.4, 3.2);
+      if (planeta.raio) {
+        // o planetoide inteiro: uma esfera (centro (0, -R, 0)) com as construções em pé por cima
+        pontoDoContorno.set(0, -planeta.raio, 0).applyMatrix4(camera.matrixWorldInverse);
+        const r = planeta.raio + 1.8;
+        minX = pontoDoContorno.x - r; maxX = pontoDoContorno.x + r;
+        // folga em cima: a faixa da legenda da batalha fica por cima do quadro
+        minY = pontoDoContorno.y - r; maxY = pontoDoContorno.y + r + 1.1;
+      } else medir(0, 0, raioDaIlha(ilhaAtual.terreno) + 0.2, -1.4, 3.2);
       if (ilhota.grupo?.visible) medir(ilhota.centro[0], ilhota.centro[1], ilhota.raio + 0.2, -1.0, 2.6);
       for (const v of vizinhanca.ilhas) if (v.grupo.visible) medir(v.centro[0], v.centro[1], v.raio + 0.15, -0.8, 1.8);
       let meiaL = ((maxX - minX) / 2) * 1.04, meiaA = ((maxY - minY) / 2) * 1.06;
@@ -1048,15 +1062,21 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       return mat;
     }
     const matFogo = new THREE.MeshStandardMaterial({ color: "#ff7a1a", emissive: "#ff5a00", emissiveIntensity: 1.2, flatShading: true });
+    const geoBolha = new THREE.SphereGeometry(0.07, 8, 6);
+    const matBolha = new THREE.MeshStandardMaterial({ color: "#e0f7ff", transparent: true, opacity: 0.6, roughness: 0.1, emissive: "#9fe7ff", emissiveIntensity: 0.25 });
     const AZUL = "#2f6fd6", VERMELHO = "#c8332f";
     const FORA = new THREE.Vector3(5.3, 0, 4.7).normalize();
     const LADO = new THREE.Vector3(-FORA.z, 0, FORA.x);
     let BORDA, DOCA, LONGE;
-    function pontosDaIlha(terreno) {
+    function pontosDaIlha(terreno, noPlaneta = false) {
       const escala = (raioDaIlha(terreno) - 0.1) / 7.1;
       BORDA = new THREE.Vector3(5.3 * escala, 0, 4.7 * escala);
       DOCA = BORDA.clone().addScaledVector(FORA, 1.1).setY(0.9);
       LONGE = DOCA.clone().addScaledVector(FORA, 11).addScaledVector(LADO, 3).setY(4.5);
+      if (noPlaneta) {
+        const R = raioDaIlha(terreno), a = Math.atan2(FORA.z, FORA.x) + 0.8;
+        LONGE = new THREE.Vector3(Math.cos(a) * R * 0.55, 10, Math.sin(a) * R * 0.55);
+      }
     }
     pontosDaIlha(0);
     const VELOCIDADE = 2.5;     // segundos de batalha por segundo de tela
@@ -1148,11 +1168,13 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       return g;
     }
     const direitaDaCamera = new THREE.Vector3();
+    const pontoDaBarra = new THREE.Vector3();
     function posicionarBarra(b, x, y, z, fracao, material) {
       b.visible = fracao < 1 && fracao > 0;
       if (!b.visible) return;
       const L = b.userData.largura;
-      b.position.set(x - direitaDaCamera.x * (L / 2), y, z - direitaDaCamera.z * (L / 2));
+      curvarPonto(pontoDaBarra.set(x, y, z), pontoDaBarra); // no planetoide, a barra acompanha a curva
+      b.position.set(pontoDaBarra.x - direitaDaCamera.x * (L / 2), pontoDaBarra.y, pontoDaBarra.z - direitaDaCamera.z * (L / 2));
       b.userData.cheio.scale.x = Math.max(0.001, L * fracao);
       b.userData.cheio.material = material;
     }
@@ -1312,6 +1334,17 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
         sim.efeitos.push(m);
       }
     }
+    /** Bolhas subindo (no fundo do mar): do submarino, das tropas andando. */
+    function bolhas(grupo, onde, n = 1) {
+      for (let k = 0; k < n; k++) {
+        const m = new THREE.Mesh(geoBolha, matBolha);
+        m.userData = { tipo: "bolha", idade: 0, vida: 1.4 + Math.random() * 0.8, fase: Math.random() * 6, vel: new THREE.Vector3((Math.random() - 0.5) * 0.25, 1.1 + Math.random() * 0.6, (Math.random() - 0.5) * 0.25) };
+        m.position.copy(onde).add(new THREE.Vector3((Math.random() - 0.5) * 0.25, 0, (Math.random() - 0.5) * 0.25));
+        m.scale.setScalar(0.6 + Math.random() * 0.9);
+        grupo.add(m);
+        sim.efeitos.push(m);
+      }
+    }
     function atualizarEfeitos(dt) {
       sim.efeitos = sim.efeitos.filter((m) => {
         const d = m.userData;
@@ -1322,6 +1355,12 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
           m.parent?.remove(m); if (d.proprio) m.material.dispose(); return false;
         }
         if (d.tipo === "feixe") return true;
+        if (d.tipo === "bolha") {
+          m.position.addScaledVector(d.vel, dt);
+          m.position.x += Math.sin(d.idade * 6 + d.fase) * 0.006;
+          m.scale.multiplyScalar(1 + dt * 0.25);
+          return true;
+        }
         if (d.tipo === "tiro") {
           const a = Math.min(1, u);
           m.position.lerpVectors(d.de, d.para, a);
@@ -1378,12 +1417,21 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       for (const info of predios.values()) info.grupo.visible = true;
       const eraExpedicao = Boolean(cenarioDaIlha);
       cenarioDaIlha = null;
+      // o planetoide e o fundo do mar mexeram no mundo inteiro: tudo volta ao reino de sempre
+      uniformeDaCurva.value = 0;
+      planeta.raio = 0;
+      vista.elevacao = ELEVACAO_DO_REINO;
+      sol.castShadow = true;
+      cena.fog = null;
+      ilhaAtual.grupo.visible = true;
+      grupoNuvens.visible = true;
       if (sim.ilhaTrocada) atualizarConstrucoes(construcoesRef.current, false);
       if (eraExpedicao) { delete el.dataset.cenario; aplicarTema(); }
       neuro.visible = true;
       acampamento.visible = true;
       for (const v of vizinhanca.ilhas) { v.grupo.visible = true; v.ponte.visible = true; }
-      if (ilhota.grupo) { ilhota.grupo.visible = true; ilhota.ponte.visible = true; posicionarCamera(); }
+      if (ilhota.grupo) { ilhota.grupo.visible = true; ilhota.ponte.visible = true; }
+      posicionarCamera();
       const fim = sim.aoTerminar;
       sim = null;
       zoomAlvo = 1;
@@ -1410,14 +1458,29 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
         cenarioDaIlha = cenario;
         atualizarConstrucoes([{ chave: "terreno", nivel: n.terreno || 0 }, ...Object.keys(CONSTRUTORES).map((chave) => ({ chave, nivel: n[chave] || 0 }))], false);
       }
+      let animarTerreno = null;
       if (cenario) {
         const terreno = terrenoDaExpedicao(p, cenario, entrada.defensor.construcoes);
         grupo.add(terreno);
         terreno.traverse((o) => { if (o.userData.gira) girando.push(o); });
+        animarTerreno = terreno.userData.animar || null;
         el.dataset.cenario = cenario.id;
         aplicarTema();
       }
-      pontosDaIlha(entrada.defensor.construcoes.terreno || 0);
+      // planetoide: a ilha some, o mundo curva sobre a esfera e a sombra desliga (ela não curva)
+      // fundo do mar: a ilha flutuante e as nuvens somem; a água é a névoa azul
+      const noPlaneta = Boolean(cenario?.espaco);
+      const submerso = Boolean(cenario?.mar);
+      if (noPlaneta || submerso) { ilhaAtual.grupo.visible = false; grupoNuvens.visible = false; }
+      if (noPlaneta) {
+        planeta.raio = raioDoPlanetoide(entrada.defensor.construcoes.terreno || 0);
+        uniformeDaCurva.value = 1 / planeta.raio;
+        sol.castShadow = false;
+        // a câmera mais alta: a área da batalha (o topo do planeta) fica de frente
+        vista.elevacao = ELEVACAO_NO_PLANETA;
+      }
+      if (submerso) cena.fog = new THREE.Fog(cenario.agua || "#1b86b4", 19, 50);
+      pontosDaIlha(entrada.defensor.construcoes.terreno || 0, noPlaneta);
       neuro.visible = false;
       acampamento.visible = false;
       if (ilhaTrocada) for (const v of vizinhanca.ilhas) { v.grupo.visible = false; v.ponte.visible = false; }
@@ -1519,7 +1582,8 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
           }
         }
       }
-      sim = { grupo, inicio: performance.now(), aoTerminar, efeitos: [], ilhaTrocada, acumulado: 0, fimEm: null };
+      sim = { grupo, inicio: performance.now(), aoTerminar, efeitos: [], ilhaTrocada, acumulado: 0, fimEm: null, submerso, animarTerreno };
+      if (noPlaneta) { curvarTudo(mundo); posicionarCamera(); }
 
       function terminar() {
         if (sim.fimEm != null) return;
@@ -1540,6 +1604,9 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
 
       sim.atualizar = (tt, dt) => {
         atualizarEfeitos(dt);
+        sim.animarTerreno?.(performance.now() / 1000, dt);
+        // no fundo do mar: o submarino deixa um rastro de bolhas
+        if (sim.submerso && barco.visible && Math.random() < dt * 16) bolhas(grupo, barco.localToWorld(new THREE.Vector3(-1.1, 0.1, 0)), 1);
         direitaDaCamera.set(Math.cos(vista.azimute), 0, -Math.sin(vista.azimute));
         // o navio: chega, espera e vai embora no fim
         // depois de desembarcar, o navio sai de cena (parado na frente, ele tapava a luta)
@@ -1583,6 +1650,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
             continue;
           }
           const alto = u.tipo === "heroi" ? 1.35 : (ALTURA_DE_VOO[u.tipo] || 0) + (TAMANHO_DO_PAPEL[u.tipo] || 1) * 0.98 + 0.08;
+          if (sim.submerso && Math.random() < dt * 0.6) bolhas(grupo, new THREE.Vector3(m.position.x, alto - 0.2, m.position.z), 1);
           posicionarBarra(c.barra, m.position.x, alto, m.position.z, u.vida / u.vidaMax, u.lado === meuLado ? matBarra.aliado : matBarra.inimigo);
         }
         // barras das construções (só aparecem quando apanham)
@@ -1865,6 +1933,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       }
 
       if (sujo) {
+        if (uniformeDaCurva.value > 0) curvarTudo(mundo);
         renderizador.render(cena, camera);
         posicionarRotulos();
         sujo = false;
@@ -1904,6 +1973,8 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       for (const m of materiaisDasTropas.values()) { m.map?.dispose(); m.dispose(); }
       geoPapel.dispose(); geoSombraDaTropa.dispose(); matSombraDaTropa.dispose();
       matFogo.dispose();
+      geoBolha.dispose(); matBolha.dispose();
+      uniformeDaCurva.value = 0;
       for (const m of matMineiro) { m.map?.dispose(); m.dispose(); }
       matDiamante.dispose();
       observaTamanho.disconnect();
