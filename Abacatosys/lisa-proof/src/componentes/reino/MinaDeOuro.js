@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Barra } from "@/componentes/Pecas.js";
 import { Moedas, Botao, hora, numero } from "./pecas.js";
+import { Ouro, Diamante } from "./icones.js";
 
 /**
  * A Mina de Ouro: as pepitas que os operários juntaram (viram moedas na coleta), a equipe, o
@@ -13,18 +14,22 @@ export default function MinaDeOuro({ ouro, mercado, ocupado, aoColetar, aoContra
   const e = ouro.equipe;
   return (
     <section className="pf-secao" id="mina-de-ouro">
-      <h2 className="pf-secao__titulo">⚒️ Mina de Ouro <small>nível {ouro.nivel} · {ouro.vagas} vagas · 1 pepita = 🪙 {ouro.valorDaPepita}</small></h2>
+      <h2 className="pf-secao__titulo">⚒️ Mina de Ouro <small>nível {ouro.nivel} · {ouro.vagas} vagas · <Ouro tamanho={14} /> = 🪙 {ouro.valorDaPepita} · <Diamante tamanho={14} /> = 🪙 {ouro.valorDoDiamante}</small></h2>
       <div className="pf-grade pf-grade--2">
         <article className="pf-cartao rn-ouro">
-          <div className="pf-estat__rotulo">Pepitas para coletar {ouro.cheia && <span className="pf-pilula pf-pilula--alerta">cheia</span>}</div>
-          <div className="pf-estat__valor">🟡 {ouro.pepitas} <small>de {ouro.capacidade} · vale <Moedas n={ouro.moedas} /></small></div>
-          <Barra valor={ouro.pepitas} total={Math.max(1, ouro.capacidade)} rotulo="Pepitas na mina" />
+          <div className="pf-estat__rotulo">Tesouro para coletar {ouro.cheia && <span className="pf-pilula pf-pilula--alerta">cheia</span>}</div>
+          <div className="pf-estat__valor rn-ouro__tesouro">
+            <span title="barras de ouro"><Ouro tamanho={26} /> {ouro.pepitasDeOuro}</span>
+            <span className={ouro.diamantes ? "rn-ouro__diamantes rn-ouro__diamantes--tem" : "rn-ouro__diamantes"} title="diamantes"><Diamante tamanho={26} /> {ouro.diamantes}</span>
+            <small>{ouro.pepitas} de {ouro.capacidade} pedras · vale <Moedas n={ouro.moedas} /></small>
+          </div>
+          <Barra valor={ouro.pepitas} total={Math.max(1, ouro.capacidade)} rotulo="Pedras na mina" />
           <p className="pf-estat__nota">
-            {e.trabalhando} operário(s) trabalhando: cada um tira 1 pepita a cada {ouro.horasPorPepita} h — cerca de <Moedas n={ouro.moedasPorDia} /> por dia.
-            Demora mais que a Mina de Moedas, mas vale bem mais. Cheia, para de juntar.
+            {e.trabalhando} operário(s) cavando: cada um tira 1 pedra a cada {ouro.horasPorPepita} h — ouro (🪙 {ouro.valorDaPepita}) ou, com {ouro.chanceDeDiamante}% de sorte, um diamante (🪙 {ouro.valorDoDiamante}).
+            Quanto mais funda a mina (o nível), mais diamantes. Cheia, para de juntar.
           </p>
           <Botao ok={ouro.pepitas > 0} motivo="nenhuma pepita inteira ainda" ocupado={ocupado === "ouro"} aoClicar={aoColetar}>
-            Coletar ouro{ouro.moedas ? <> · <Moedas n={ouro.moedas} /></> : null}
+            Coletar{ouro.diamantes ? " ouro e diamantes" : " ouro"}{ouro.moedas ? <> · <Moedas n={ouro.moedas} /></> : null}
           </Botao>
         </article>
         <article className="pf-cartao rn-ouro">

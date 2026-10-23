@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { numero } from "./pecas.js";
+import { Ouro, Diamante } from "./icones.js";
 
 /** Os menus da tela cheia, na ordem do dock. */
 export const PAINEIS = [
@@ -48,7 +49,9 @@ export default function TelaCheia({ reino, painel, aoPainel, aoSair, ocupado, ao
             <button type="button" className="rn-hud__botao" disabled={Boolean(ocupado)} onClick={aoColetarMina}>⛏️ +{numero(reino.mina.paraColetar)}</button>
           )}
           {reino.ouro?.moedas > 0 && (
-            <button type="button" className="rn-hud__botao" disabled={Boolean(ocupado)} onClick={aoColetarOuro}>⚒️ +{numero(reino.ouro.moedas)}</button>
+            <button type="button" className="rn-hud__botao" disabled={Boolean(ocupado)} onClick={aoColetarOuro} aria-label={`Coletar o ouro: ${reino.ouro.moedas} moedas`}>
+              {reino.ouro.diamantes ? <Diamante tamanho={16} /> : <Ouro tamanho={16} />} +{numero(reino.ouro.moedas)}
+            </button>
           )}
           <button type="button" className="rn-hud__botao rn-hud__sair" onClick={aoSair} aria-label="Sair da tela cheia">✕ <span>Sair</span></button>
         </div>

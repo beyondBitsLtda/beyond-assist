@@ -9,14 +9,33 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.17.0-cloudflare-pages.1",
+  "versao": "0.18.0-proof-bolsa-ouro.1",
   "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 45,
+    "numero": 46,
     "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.18.0-proof-bolsa-ouro.1",
+      "data": "2026-10-23",
+      "branch": "proof-bolsa-ouro",
+      "tipo": "funcionalidade",
+      "resumo": "A Bolsa do Reino ganhou tela própria de home broker e cotações de hora em hora; a Mina de Ouro pode dar diamantes e os operários aparecem cavando no 3D.",
+      "itens": [
+        "Tela /bolsa (no menu): letreiro de cotações, Índice do Reino, lista de ações com minigráfico, gráfico hora a hora com mira, velas de 14 dias, boleta de compra e venda, carteira, destaques e o mural de notícias da Lisa; atualiza sozinha na virada da hora.",
+        "Cotações de hora em hora: a Lisa decide o fechamento do dia e o preço anda hora a hora da abertura até ele (o mesmo para todos, sem relógio no servidor); preço com centavos; a compra arredonda o total para cima e a venda para baixo.",
+        "Falência e fechamento de capital passam a valer na abertura do pregão, pelo fechamento de ontem.",
+        "Diamantes na Mina de Ouro: cada pedra tem 4% (nível 1) a 8% (nível 5) de chance de ser diamante (45 moedas, contra 6 do ouro); o sorteio é fixo por rodada de coleta.",
+        "Ícones novos de barra de ouro e diamante no lugar da bolinha amarela.",
+        "Operários de papel cavando com picareta em volta da Mina de Ouro no mundo 3D (até 6), e os diamantes achados brilhando ao lado.",
+        "No Reino, a Bolsa virou um resumo (índice, destaques, carteira) com o botão para a tela do pregão.",
+        "Modal de novidades novo.",
+        "Migração db/014-bolsa-hora-a-hora.sql: a abertura de cada dia e o preço das ordens com centavos."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.17.0-cloudflare-pages.1",
       "data": "2026-10-23",
@@ -704,8 +723,8 @@
         "Paz entre os reinos por votação (100% dos eleitores; vota quem tem 3+ dias de ofensiva de estudo, e a paz vale para todos): sem guerra, todos vizinhos no 3D, mina × o número de reinos e expedições repartidas",
         "Veículos e combustível no Reino: Barco, Submarino, Dirigível, Tanque de Magma e Nave Estelar, cada um com o seu mapa de expedições e 3 expedições por dia (mais com combustível pago)",
         "Planetoides sorteados para a Nave Estelar: raça alienígena, força e tesouro aleatórios",
-        "Mina de Ouro com operários (3 de início), contratação e aluguel de operários entre jogadores",
-        "Bolsa do Reino: ações iguais para todos, pregão diário decidido pela Lisa (IA), compra e venda com corretagem",
+        "Mina de Ouro com operários (3 de início) cavando no 3D, chance de diamantes, contratação e aluguel de operários entre jogadores",
+        "Bolsa do Reino em tela própria (/bolsa), estilo home broker: ações iguais para todos, cotações de hora em hora, gráficos e velas, pregão diário decidido pela Lisa (IA), compra e venda com corretagem",
         "Tela cheia do Reino com menus suspensos e visita completa aos reinos vizinhos durante a paz",
         "Neuro Abacate (mascote do Abacato), personagem gratuito para todos"
       ],

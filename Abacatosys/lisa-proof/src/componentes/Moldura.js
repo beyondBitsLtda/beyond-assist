@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
-  IconeHoje, IconeTrilhas, IconeAgenda, IconePratica, IconeProgresso, IconeRaioX, IconeRanking, IconeReino, IconeMais, Marca,
+  IconeHoje, IconeTrilhas, IconeAgenda, IconePratica, IconeProgresso, IconeRaioX, IconeRanking, IconeReino, IconeBolsa, IconeMais, Marca,
 } from "./Icones.js";
 import { Confete } from "./Neuro.js";
 import Celebracao from "./Celebracao.js";
@@ -21,6 +21,7 @@ const ITENS = [
   { href: "/pratica", rotulo: "Prática", Icone: IconePratica },
   { href: "/progresso", rotulo: "Progresso", Icone: IconeProgresso },
   { href: "/reino", rotulo: "Reino", Icone: IconeReino },
+  { href: "/bolsa", rotulo: "Bolsa", Icone: IconeBolsa },
   { href: "/ranking", rotulo: "Ranking", Icone: IconeRanking },
   { href: "/raio-x", rotulo: "Raio-X", Icone: IconeRaioX },
 ];
@@ -116,7 +117,7 @@ export default function Moldura({ children }) {
   );
 }
 
-/** A 5ª aba do celular: abre um menu com Agenda, Progresso, Ranking e Raio-X. */
+/** A 5ª aba do celular: abre um menu com Agenda, Progresso, Bolsa, Ranking e Raio-X. */
 function Mais({ caminho }) {
   const [aberto, setAberto] = useState(false);
   const caixa = useRef(null);

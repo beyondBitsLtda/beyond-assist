@@ -35,7 +35,7 @@ import { planetoideDa, sementeDoPlanetoide, RACAS } from "@/dominio/planetoides.
 import {
   OPERARIOS_INICIAIS, HORAS_POR_PEPITA, VALOR_DA_PEPITA, HORAS_DE_ALUGUEL, PRECO_MINIMO_DO_ALUGUEL, PRECO_MAXIMO_DO_ALUGUEL,
   vagasDaMina, ouroAcumulado, horasTrabalhadas, equipeDeAgora, podeComprarOperario, podeOfertar, podeAlugar, periodoDoAluguel,
-  moedasPorOperarioPorDia,
+  moedasPorOperarioPorDia, sementeDaMina, chanceDeDiamante, VALOR_DO_DIAMANTE,
 } from "@/dominio/ouro.js";
 import {
   TROPAS, ORDEM_DAS_TROPAS, RESERVAS, contagens, espacoUsado, capacidadeDoExercito, capacidadeDaGuarnicao,
@@ -840,7 +840,9 @@ async function ouroDe(reino, agora = new Date()) {
   const operarios = reino.operarios ?? OPERARIOS_INICIAIS;
   const trabalho = { operarios, desde, agora, alugadosParaFora: alugueis.paraFora, alugadosDeFora: alugueis.deFora };
   const equipe = equipeDeAgora(trabalho);
-  return { nivel, operarios, desde, alugueis, equipe, ouro: ouroAcumulado({ nivel, ...trabalho }), horas: horasTrabalhadas(trabalho) };
+  // a semente da rodada: a pessoa e a última coleta — os diamantes não mudam até coletar
+  const semente = sementeDaMina(reino.usuario_id, new Date(desde).toISOString());
+  return { nivel, operarios, desde, alugueis, equipe, ouro: ouroAcumulado({ nivel, semente, ...trabalho }), horas: horasTrabalhadas(trabalho) };
 }
 
 /**
@@ -864,8 +866,10 @@ async function ouroParaTela(reino, saldo, info) {
   return {
     nivel: info.nivel, vagas, operarios: info.operarios, equipe: info.equipe,
     vagasLivres: Math.max(0, vagas - info.equipe.emCasa - info.equipe.alugadosDeFora),
-    pepitas: info.ouro.pepitas, moedas: info.ouro.moedas, capacidade: info.ouro.capacidade, cheia: info.ouro.cheia,
+    pepitas: info.ouro.pepitas, pepitasDeOuro: info.ouro.ouro, diamantes: info.ouro.diamantes,
+    moedas: info.ouro.moedas, capacidade: info.ouro.capacidade, cheia: info.ouro.cheia,
     horasPorPepita: HORAS_POR_PEPITA, valorDaPepita: VALOR_DA_PEPITA,
+    valorDoDiamante: VALOR_DO_DIAMANTE, chanceDeDiamante: Math.round(chanceDeDiamante(info.nivel) * 100),
     moedasPorDia: Math.round(info.equipe.trabalhando * moedasPorOperarioPorDia()),
     comprar: { ok: compra.ok, custo: compra.custo, motivo: compra.ok ? "" : compra.motivo },
     oferta: oferta?.quantidade > 0 ? { quantidade: oferta.quantidade, preco: oferta.preco } : null,
@@ -881,8 +885,8 @@ export async function coletarOuro(usuarioId) {
   const agora = new Date();
   const info = await ouroDe(reino, agora);
   if (info.ouro.pepitas <= 0) throw new ErroDeAcesso(400, `a Mina de Ouro ainda não juntou nenhuma pepita — cada operário tira 1 a cada ${HORAS_POR_PEPITA} h`);
-  await lancarEGravar(reino, [{ tipo: "ouro", valor: info.ouro.moedas, detalhe: { pepitas: info.ouro.pepitas } }], { ouro_coletado_em: relogioDepoisDaColeta(info, agora) });
-  return { pepitas: info.ouro.pepitas, coletou: info.ouro.moedas };
+  await lancarEGravar(reino, [{ tipo: "ouro", valor: info.ouro.moedas, detalhe: { pepitas: info.ouro.pepitas, diamantes: info.ouro.diamantes } }], { ouro_coletado_em: relogioDepoisDaColeta(info, agora) });
+  return { pepitas: info.ouro.pepitas, ouro: info.ouro.ouro, diamantes: info.ouro.diamantes, coletou: info.ouro.moedas };
 }
 
 /** Contratar um operário (o ouro que já juntou é coletado antes: o novo não trabalha para trás). */
@@ -893,7 +897,7 @@ export async function comprarOperario(usuarioId) {
   const pode = podeComprarOperario({ operarios: info.operarios, nivel: info.nivel, saldo });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
   const lancamentos = [];
-  if (info.ouro.moedas > 0) lancamentos.push({ tipo: "ouro", valor: info.ouro.moedas, detalhe: { pepitas: info.ouro.pepitas, automatica: true } });
+  if (info.ouro.moedas > 0) lancamentos.push({ tipo: "ouro", valor: info.ouro.moedas, detalhe: { pepitas: info.ouro.pepitas, diamantes: info.ouro.diamantes, automatica: true } });
   lancamentos.push({ tipo: "operario", valor: -pode.custo, detalhe: { operarios: info.operarios + 1 } });
   await lancarEGravar(reino, lancamentos, { operarios: info.operarios + 1, ouro_coletado_em: agora.toISOString() });
   return { operarios: info.operarios + 1, custo: pode.custo, coletou: info.ouro.moedas };

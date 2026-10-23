@@ -7,6 +7,7 @@ import { LUGARES, PRACA, RAIO_DA_MURALHA, montarCombate, passo as passoDoCombate
 import { CONSTRUCOES } from "@/dominio/reino.js";
 import { svgDaTropa, TAMANHO_DO_PAPEL, ALTURA_DE_VOO } from "./tropasDePapel.js";
 import { cenarioDe, estruturaDaExpedicao, terrenoDaExpedicao } from "./cenariosDasExpedicoes.js";
+import { svgDoOperario } from "./operariosDePapel.js";
 
 /**
  * O Reino em 3D: uma ilha flutuante low poly com as construções, e o Neuro como um recorte de
@@ -706,7 +707,7 @@ function recorteDePapel(img) {
 }
 
 // ------------------------------------------------------------------ o componente
-export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "normal", personagem: personagemFixo, soLeitura = false, aoEscolher, aoVisitar, aoFalhar }) {
+export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "normal", personagem: personagemFixo, soLeitura = false, mineiros = 0, diamantes = 0, aoEscolher, aoVisitar, aoFalhar }) {
   const caixa = useRef(null);
   const molde = useRef(null);
   const rotulos = useRef({});
@@ -1064,6 +1065,77 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
     let sim = null;
     let tremor = 0;
     let zoomAlvo = 1;
+
+    // ---- os operários cavando em volta da Mina de Ouro (23/10/2026): recortes de papel com dois
+    // quadros (picareta no alto / batendo), trocados no ritmo de cada um; e, quando a rodada da mina
+    // já achou diamante, os diamantes brilhando ao lado do carrinho.
+    // na frente da mina (o lado que a câmera vê no começo), um pouco espalhados, sem tapar a entrada
+    const LUGAR_DOS_MINEIROS = [[1.25, 0.25], [0.25, 1.3], [1.35, -0.75], [-0.75, 1.25], [1.0, 1.05], [1.95, 0.5]];
+    const TAMANHO_DO_MINEIRO = 1.25;
+    const MAXIMO_DE_MINEIROS = LUGAR_DOS_MINEIROS.length;
+    const mineiros = new THREE.Group();
+    const joias = new THREE.Group();
+    mundo.add(mineiros, joias);
+    const matMineiro = [0, 1].map((q) => {
+      const tex = new THREE.CanvasTexture(document.createElement("canvas"));
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.35, side: THREE.DoubleSide });
+      mat.visible = false;
+      const img = new Image();
+      img.onload = () => { tex.image = recorteDePapel(img); tex.needsUpdate = true; mat.visible = true; sujo = true; };
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgDoOperario(q));
+      return mat;
+    });
+    const geoDiamante = new THREE.OctahedronGeometry(0.13, 0);
+    const matDiamante = new THREE.MeshStandardMaterial({ color: "#7dd3fc", emissive: "#38bdf8", emissiveIntensity: 0.9, flatShading: true, roughness: 0.15, metalness: 0.2 });
+    function definirMineiros(quantos, diamantes) {
+      for (const m of [...mineiros.children]) mineiros.remove(m);
+      for (const j of [...joias.children]) joias.remove(j);
+      const [mx, mz] = LUGARES_DO_MUNDO.minaDeOuro;
+      const n = Math.max(0, Math.min(MAXIMO_DE_MINEIROS, Math.floor(quantos || 0)));
+      for (let i = 0; i < n; i++) {
+        const [dx, dz] = LUGAR_DOS_MINEIROS[i];
+        const papel = new THREE.Mesh(geoPapel, matMineiro[0]);
+        papel.scale.set(TAMANHO_DO_MINEIRO, TAMANHO_DO_MINEIRO, 1);
+        papel.position.set(mx + dx, TAMANHO_DO_MINEIRO / 2, mz + dz);
+        papel.userData = { fase: (i * 0.37) % 1, ritmo: 1.3 + (i % 3) * 0.18, dx, dz };
+        const sombra = new THREE.Mesh(geoSombraDaTropa, matSombraDaTropa);
+        sombra.rotation.x = -Math.PI / 2;
+        sombra.scale.setScalar(0.62);
+        sombra.position.set(mx + dx, 0.03, mz + dz);
+        mineiros.add(papel, sombra);
+      }
+      const d = Math.max(0, Math.min(3, Math.floor(diamantes || 0)));
+      for (let i = 0; i < d; i++) {
+        const gema = new THREE.Mesh(geoDiamante, matDiamante);
+        gema.position.set(mx + 0.55 + i * 0.22, 0.32 + (i % 2) * 0.08, mz + 1.05 - i * 0.12);
+        gema.scale.y = 1.5;
+        gema.userData.giro = i * 0.8;
+        gema.userData.y = gema.position.y;
+        joias.add(gema);
+      }
+      sujo = true;
+    }
+    function animarMineiros(t) {
+      const temMina = !sim && (predios.get("minaDeOuro")?.nivel || 0) > 0;
+      mineiros.visible = temMina;
+      joias.visible = temMina;
+      if (!temMina) return;
+      const dirX = Math.cos(vista.azimute), dirZ = -Math.sin(vista.azimute);
+      for (const m of mineiros.children) {
+        if (m.userData.ritmo == null) continue;
+        m.rotation.y = vista.azimute; // de frente para a câmera, como todo papel
+        // olha para a mina: quem está à direita dela (na tela) vira a folha
+        const lado = m.userData.dx * dirX + m.userData.dz * dirZ;
+        m.scale.x = TAMANHO_DO_MINEIRO * (lado > 0 ? -1 : 1);
+        if (semMovimento) { m.material = matMineiro[0]; continue; }
+        const ciclo = (t * m.userData.ritmo + m.userData.fase) % 1;
+        m.material = matMineiro[ciclo < 0.55 ? 0 : 1];
+        m.position.y = TAMANHO_DO_MINEIRO / 2 + (ciclo >= 0.55 && ciclo < 0.65 ? -0.04 : 0);
+      }
+      if (!semMovimento) for (const j of joias.children) { j.rotation.y = t * 1.6 + j.userData.giro; j.position.y = j.userData.y + Math.sin(t * 3 + j.userData.giro) * 0.04; }
+    }
+
 
     function barra(largura) {
       const g = new THREE.Group();
@@ -1708,6 +1780,8 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
         sujo = true;
       }
 
+      animarMineiros(agora / 1000);
+
       if (folha.visible) {
         // o papel sempre de frente para a câmera
         folha.rotation.y = vista.azimute;
@@ -1813,6 +1887,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       girar(delta) { vista.alvoAzimute += delta; },
       mostrarTropas,
       definirVizinhos,
+      definirMineiros,
     };
 
     return () => {
@@ -1829,6 +1904,8 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       for (const m of materiaisDasTropas.values()) { m.map?.dispose(); m.dispose(); }
       geoPapel.dispose(); geoSombraDaTropa.dispose(); matSombraDaTropa.dispose();
       matFogo.dispose();
+      for (const m of matMineiro) { m.map?.dispose(); m.dispose(); }
+      matDiamante.dispose();
       observaTamanho.disconnect();
       observaVisao.disconnect();
       observaTema.disconnect();
@@ -1853,6 +1930,11 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
     api.current?.atualizarConstrucoes(construcoes);
     api.current?.mostrarTropas(JSON.parse(chaveDasTropas));
   }, [construcoes, chaveDasTropas]);
+
+  // ---- os operários cavando na Mina de Ouro (e os diamantes achados nesta rodada)
+  useEffect(() => {
+    api.current?.definirMineiros(mineiros, diamantes);
+  }, [mineiros, diamantes]);
 
   // ---- os reinos vizinhos (paz)
   const mostrados = (vizinhos || []).filter((v) => v?.construcoes).slice(0, MAXIMO_DE_VIZINHOS);

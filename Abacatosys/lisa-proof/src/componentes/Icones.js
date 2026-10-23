@@ -33,6 +33,11 @@ export const IconeRanking = () => (
   <svg {...base}><path d="M9 21V10h6v11M3 21v-6h6M15 21v-8h6v8M2 21h20M12 3l1 2 2 .3-1.5 1.4.4 2.1L12 7.8l-1.9 1 .4-2.1L9 5.3 11 5z" /></svg>
 );
 
+// Bolsa: as velas de um gráfico de cotações
+export const IconeBolsa = () => (
+  <svg {...base}><path d="M3 3v18h18M7 14v3M7 9v2M12 7v9M12 4v2M17 11v4M17 6v3" /><rect x="5.5" y="11" width="3" height="3" rx=".5" /><rect x="10.5" y="6" width="3" height="5" rx=".5" /><rect x="15.5" y="9" width="3" height="3" rx=".5" /></svg>
+);
+
 // Reino: o castelo
 export const IconeReino = () => (
   <svg {...base}><path d="M4 21V9l2-1V5h2v2l2-1V4h4v2l2 1V5h2v3l2 1v12zM10 21v-4a2 2 0 0 1 4 0v4M2 21h20" /></svg>

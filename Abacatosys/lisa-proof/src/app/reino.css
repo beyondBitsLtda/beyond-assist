@@ -646,3 +646,13 @@ button.rn-exp__arte:disabled { cursor: progress; }
   .rn-hud__painel { max-height: 52vh; }
   .rn-visita { max-height: 48%; left: 8px; right: 8px; width: auto; }
 }
+
+/* ---- o tesouro da mina: barra de ouro e diamante (23/10/2026) */
+.rn-icone-ouro, .rn-icone-diamante { display: inline-block; vertical-align: -0.2em; flex: none; }
+.rn-ouro__tesouro { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.rn-ouro__tesouro > span { display: inline-flex; align-items: center; gap: 4px; }
+.rn-ouro__diamantes { opacity: 0.55; }
+.rn-ouro__diamantes--tem { opacity: 1; animation: rn-brilho-diamante 1.6s ease-in-out infinite; }
+@keyframes rn-brilho-diamante { 50% { filter: drop-shadow(0 0 6px rgba(125, 211, 252, 0.95)); } }
+@media (prefers-reduced-motion: reduce) { .rn-ouro__diamantes--tem { animation: none; } }
+.rn-hud__botao { display: inline-flex; align-items: center; gap: 4px; }

@@ -9,6 +9,13 @@
 // de cada uma e lança empresas novas. Sem a IA, um sorteio do dia faz o mesmo (pregaoDeReserva) —
 // o mercado nunca trava.
 //
+// HORA A HORA (23/10/2026, "deixe as ações variarem de hora em hora para ver o movimento nos
+// gráficos"): a Lisa decide onde cada ação FECHA o dia; ao longo do dia o preço anda hora a hora
+// da abertura até lá, com o sobe-e-desce do mercado no meio (caminhoDoDia: uma ponte aleatória
+// com semente fixa — a ação e o dia —, então todo mundo vê o mesmo preço na mesma hora, e nada
+// precisa de relógio no servidor). O preço da hora tem centavos; o total de uma ordem é em
+// moedas inteiras (a compra arredonda para cima, a venda para baixo).
+//
 // Comprar e vender custa a corretagem (TAXA_DA_CORRETAGEM, no mínimo 1 moeda), então comprar e
 // vender no mesmo dia nunca dá lucro: o preço só muda no pregão seguinte. Empresa que chega a
 // PRECO_MINIMO vai à FALÊNCIA (as ações dela viram pó). Com mais de MAXIMO_DE_ACOES na bolsa, a
@@ -22,6 +29,8 @@ export const MAXIMO_DE_ACOES = 12;
 export const NOVAS_POR_DIA = 2;
 export const ACOES_DO_PRIMEIRO_DIA = 6;
 export const MAXIMO_POR_ORDEM = 500;      // ações numa compra ou venda
+export const PASSOS_DO_DIA = 24;           // um preço novo por hora
+export const VOLATILIDADE_DA_HORA = 0.012; // o tamanho típico do sobe-e-desce de uma hora (1,2%)
 export const SETORES = [
   "Mineração", "Armas e defesas", "Transportes", "Alimentos", "Magia", "Tecnologia",
   "Construção", "Turismo", "Tesouros do mar", "Energia vulcânica", "Exploração espacial", "Educação",
@@ -40,13 +49,17 @@ export function precoDepois(preco, variacao) {
 }
 export const variacaoReal = (de, para) => (de > 0 ? Math.round(((para - de) / de) * 1000) / 10 : 0);
 
+/** O valor de `quantidade` ações ao preço da hora (com centavos): a compra arredonda para cima, a venda para baixo. */
+export const valorDaCompra = (preco, quantidade) => Math.ceil(preco * quantidade - 1e-9);
+export const valorDaVenda = (preco, quantidade) => Math.floor(preco * quantidade + 1e-9);
+
 /** Comprar `quantidade` ações a `preco`: o total, a corretagem e se dá com o saldo. */
 export function podeComprarAcao({ acao, quantidade, saldo }) {
   if (!acao || acao.status !== "ativa") return { ok: false, motivo: "essa ação não está na bolsa" };
   const q = Number(quantidade);
   if (!Number.isInteger(q) || q < 1) return { ok: false, motivo: "escolha quantas ações quer comprar" };
   if (q > MAXIMO_POR_ORDEM) return { ok: false, motivo: `no máximo ${MAXIMO_POR_ORDEM} ações por ordem` };
-  const valor = acao.preco * q;
+  const valor = valorDaCompra(acao.preco, q);
   const taxa = corretagem(valor);
   const total = valor + taxa;
   if ((saldo || 0) < total) return { ok: false, valor, taxa, total, motivo: `faltam ${total - (saldo || 0)} moeda(s)` };
@@ -60,7 +73,7 @@ export function podeVenderAcao({ acao, posicao, quantidade }) {
   const tem = posicao?.quantidade || 0;
   if (!Number.isInteger(q) || q < 1) return { ok: false, motivo: "escolha quantas ações quer vender" };
   if (q > tem) return { ok: false, motivo: tem ? `você tem ${tem} ação(ões) dessa empresa` : "você não tem ações dessa empresa" };
-  const valor = acao.preco * q;
+  const valor = valorDaVenda(acao.preco, q);
   const taxa = Math.min(valor, corretagem(valor));
   return { ok: true, quantidade: q, valor, taxa, total: valor - taxa };
 }
@@ -85,6 +98,41 @@ export function resumoDaCarteira(posicoes, precoDe) {
     custo += p.custo || 0;
   }
   return { valor, custo, lucro: valor - custo };
+}
+
+// ------------------------------------------------------------------ o preço hora a hora
+
+/** A semente do caminho de uma ação num dia (o mesmo para todo mundo). */
+export function sementeDaAcao(ticker, dia) {
+  let h = 0x811c9dc5;
+  for (const ch of `${ticker}|${dia}`) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+
+/**
+ * O caminho do preço no dia, hora a hora: PASSOS_DO_DIA + 1 pontos, de 0 h (a abertura) a 24 h (o
+ * fechamento, que vira a abertura de amanhã). No meio, o sobe-e-desce do mercado: um passeio
+ * aleatório "amarrado" nas duas pontas (ponte), sobre a linha que leva da abertura ao fechamento.
+ */
+export function caminhoDoDia({ abertura, fechamento, semente }) {
+  const r = sorteio(semente);
+  const n = PASSOS_DO_DIA;
+  const a = Math.max(1, abertura || 1), f = Math.max(1, fechamento || 1);
+  const passeio = [0];
+  // soma de 3 sorteios: quase normal, sem seno nem logaritmo
+  for (let i = 1; i <= n; i++) passeio.push(passeio[i - 1] + (r() + r() + r() - 1.5) * 2 * VOLATILIDADE_DA_HORA);
+  const fim = passeio[n];
+  return passeio.map((w, i) => {
+    const ponte = w - (i / n) * fim;
+    const linha = a * Math.pow(f / a, i / n);
+    return Math.max(1, Math.round(linha * (1 + ponte) * 100) / 100);
+  });
+}
+
+/** A vela (candle) de um pedaço do caminho: abertura, máxima, mínima e o preço em `ate`. */
+export function velaDe(caminho, ate = caminho.length - 1) {
+  const parte = caminho.slice(0, Math.max(1, ate + 1));
+  return { abertura: parte[0], maxima: Math.max(...parte), minima: Math.min(...parte), fechamento: parte[parte.length - 1] };
 }
 
 // ------------------------------------------------------------------ o pregão
