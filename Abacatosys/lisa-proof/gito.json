@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.18.0-proof-bolsa-ouro.2",
+  "versao": "0.18.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 47,
+    "numero": 48,
     "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.18.0-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.18.0: Bolsa em tela própria e hora a hora, diamantes e operários cavando no 3D, e o modo de teste liberado para todos.",
+      "itens": [
+        "Junta a branch proof-bolsa-ouro (0.18.0-proof-bolsa-ouro.2).",
+        "Migração db/014-bolsa-hora-a-hora.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.18.0-proof-bolsa-ouro.2",
       "data": "2026-10-23",
