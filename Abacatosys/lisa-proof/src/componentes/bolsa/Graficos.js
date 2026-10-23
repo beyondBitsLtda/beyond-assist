@@ -6,6 +6,10 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { preco, pct, horaCurta, diaCurto, rumo } from "./formatos.js";
+import { ABRE_AS, FECHA_AS, PASSOS_DO_DIA } from "@/dominio/bolsa.js";
+
+/** Onde fica a hora `h` no eixo do pregão (0 = abertura, 1 = fechamento). */
+const noPregao = (h) => (h - ABRE_AS) / PASSOS_DO_DIA;
 
 /** A largura do quadro, acompanhando a tela. */
 function useLargura(minimo = 280) {
@@ -31,8 +35,8 @@ function marcas(min, max, n = 4) {
 }
 
 /**
- * O dia hora a hora: a linha do preço desde a abertura (0 h) até agora, sobre o eixo do dia todo
- * (0 h a 24 h), com a abertura tracejada e o ponto de agora pulsando.
+ * O dia hora a hora: a linha do preço desde a abertura (07h) até agora, sobre o eixo do pregão
+ * todo (07h a 17h), com a abertura tracejada e o ponto de agora pulsando.
  */
 export function GraficoDoDia({ horas, abertura, altura = 260, rotulo }) {
   const [ref, L] = useLargura();
@@ -44,7 +48,7 @@ export function GraficoDoDia({ horas, abertura, altura = 260, rotulo }) {
   let min = Math.min(abertura, ...precos), max = Math.max(abertura, ...precos);
   const folga = (max - min || max * 0.02 || 1) * 0.15;
   min -= folga; max += folga;
-  const x = (h) => m.esq + (h / 24) * (L - m.esq - m.dir);
+  const x = (h) => m.esq + noPregao(h) * (L - m.esq - m.dir);
   const y = (p) => m.cima + ((max - p) / (max - min)) * (A - m.cima - m.baixo);
   const ultimo = horas[horas.length - 1];
   const tom = rumo(ultimo.preco - abertura);
@@ -53,8 +57,8 @@ export function GraficoDoDia({ horas, abertura, altura = 260, rotulo }) {
   const f = foco != null ? horas[foco] : null;
   const mover = (ev) => {
     const r = ev.currentTarget.getBoundingClientRect();
-    const h = ((ev.clientX - r.left - m.esq) / (L - m.esq - m.dir)) * 24;
-    setFoco(Math.max(0, Math.min(horas.length - 1, Math.round(h))));
+    const passo = ((ev.clientX - r.left - m.esq) / (L - m.esq - m.dir)) * PASSOS_DO_DIA;
+    setFoco(Math.max(0, Math.min(horas.length - 1, Math.round(passo))));
   };
   return (
     <div ref={ref} className="bx-grafico">
@@ -73,8 +77,8 @@ export function GraficoDoDia({ horas, abertura, altura = 260, rotulo }) {
               <text className="bx-eixo" x={L - m.dir + 6} y={y(v) + 4}>{preco(v)}</text>
             </g>
           ))}
-          {(L < 520 ? [0, 6, 12, 18, 24] : [0, 3, 6, 9, 12, 15, 18, 21, 24]).map((h) => (
-            <text key={h} className="bx-eixo" x={x(h)} y={A - 8} textAnchor={h === 0 ? "start" : h === 24 ? "end" : "middle"}>{horaCurta(h)}</text>
+          {(L < 520 ? [ABRE_AS, 12, FECHA_AS] : [ABRE_AS, 9, 11, 13, 15, FECHA_AS]).map((h) => (
+            <text key={h} className="bx-eixo" x={x(h)} y={A - 8} textAnchor={h === ABRE_AS ? "start" : h === FECHA_AS ? "end" : "middle"}>{horaCurta(h)}</text>
           ))}
           <line className="bx-abertura" x1={m.esq} x2={L - m.dir} y1={y(abertura)} y2={y(abertura)} />
           <text className="bx-eixo bx-eixo--abertura" x={m.esq + 4} y={y(abertura) - 5}>abertura {preco(abertura)}</text>
@@ -159,7 +163,7 @@ export function GraficoDeVelas({ velas, altura = 260, rotulo }) {
 export function Mini({ horas, abertura, largura = 84, altura = 30 }) {
   const precos = horas.map((h) => h.preco);
   const min = Math.min(abertura, ...precos), max = Math.max(abertura, ...precos);
-  const x = (h) => 2 + (h / 24) * (largura - 4);
+  const x = (h) => 2 + noPregao(h) * (largura - 4);
   const y = (p) => 2 + (max === min ? (altura - 4) / 2 : ((max - p) / (max - min)) * (altura - 4));
   const tom = rumo(precos[precos.length - 1] - abertura);
   return (

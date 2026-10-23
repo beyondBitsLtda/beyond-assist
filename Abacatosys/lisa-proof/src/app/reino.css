@@ -650,7 +650,7 @@ button.rn-exp__arte:disabled { cursor: progress; }
 @media (prefers-reduced-motion: reduce) { .rn-ouro__diamantes--tem { animation: none; } }
 .rn-hud__botao { display: inline-flex; align-items: center; gap: 4px; }
 
-/* ---- o modo de teste (23/10/2026, liberado para todos por enquanto) */
+/* ---- as ferramentas do Reino de Teste (23/10/2026) */
 .rn-teste__caixa { margin-top: 12px; border: 2px dashed #a855f7; border-radius: var(--pf-raio); background: var(--pf-superficie); padding: 0 14px; }
 .rn-teste__caixa summary { cursor: pointer; padding: 12px 0; font-weight: 800; }
 .rn-teste__caixa summary small { font-weight: 600; color: var(--pf-tinta-2); margin-left: 6px; }
@@ -678,3 +678,25 @@ button.rn-exp__arte:disabled { cursor: progress; }
 
 /* com o Reino mais largo, o mundo 3D também cresce um pouco na altura */
 @media (min-width: 1400px) { .rn-mundo { height: 460px; } }
+
+/* ---- o Reino de Teste, um mundo à parte (23/10/2026): a faixa que avisa onde a pessoa está e a
+   entrada a partir do reino de verdade. O roxo é a cor do teste em todo o app. */
+.rn-faixa-teste {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; padding: 12px 14px;
+  border: 2px dashed #a855f7; border-radius: var(--pf-raio); background: rgba(168, 85, 247, 0.1); font-size: 14px;
+}
+.rn-faixa-teste > span:nth-child(2) { flex: 1 1 320px; min-width: 0; }
+.rn-faixa-teste__selo { font-weight: 900; letter-spacing: 0.06em; color: #7e22ce; white-space: nowrap; }
+:root[data-tema="escuro"] .rn-faixa-teste__selo { color: #d8b4fe; }
+.rn-entrada-teste {
+  display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 14px; border-radius: var(--pf-raio);
+  border: 2px dashed #a855f7; background: var(--pf-superficie); color: var(--pf-tinta); text-decoration: none;
+}
+.rn-entrada-teste:hover { background: rgba(168, 85, 247, 0.08); }
+.rn-entrada-teste:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; }
+.rn-entrada-teste > span:nth-child(2) { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.rn-entrada-teste small { color: var(--pf-tinta-2); font-size: 13px; }
+.rn-entrada-teste__emoji { font-size: 26px; }
+.rn-entrada-teste__ir { font-weight: 800; color: #7e22ce; white-space: nowrap; }
+:root[data-tema="escuro"] .rn-entrada-teste__ir { color: #d8b4fe; }
+#teste.pf-secao { margin-top: 12px; }

@@ -1,12 +1,13 @@
 import { json } from "@/lib/http.js";
 import { exigirUsuario, respostaDeErro, corpoDe } from "@/lib/sessao.js";
+import { rotaDoMundo } from "@/lib/mundo.js";
 import { invadir, estadoDoReino } from "@/lib/reino.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** POST /api/reino/invadir   body: { alvo } — o id do dono do reino. A sorte é sorteada aqui. */
-export async function POST(req) {
+export const POST = rotaDoMundo(async (req) => {
   try {
     const usuario = await exigirUsuario(req);
     const corpo = await corpoDe(req);
@@ -15,4 +16,4 @@ export async function POST(req) {
   } catch (e) {
     return respostaDeErro(e);
   }
-}
+});

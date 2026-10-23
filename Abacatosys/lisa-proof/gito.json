@@ -9,14 +9,32 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.19.0-cloudflare-pages.1",
+  "versao": "0.20.0-proof-reino-de-teste.1",
   "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 50,
+    "numero": 51,
     "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.20.0-proof-reino-de-teste.1",
+      "data": "2026-10-23",
+      "branch": "proof-reino-de-teste",
+      "tipo": "funcionalidade",
+      "resumo": "O modo de teste virou o Reino de Teste, um mundo à parte que nunca mexe no reino de verdade, e a Bolsa passou a negociar só das 07:00 às 17:00.",
+      "itens": [
+        "Correção: o modo de teste antigo dava veículos e combustível no reino de verdade (deu 14 expedições num dia). Ele saiu do reino de verdade, e o servidor recusa as ferramentas de teste fora do Reino de Teste.",
+        "Reino de Teste (/reino/teste): um reino à parte para cada pessoa, que nasce com tudo liberado e 100.000 moedas, com as mesmas regras do jogo. Expedições, invasões, paz, operários e carteira da bolsa ficam só nele e não entram no ranking.",
+        "Rivais de teste: cinco reinos-robô (do Robô Lata ao Robô Titânio) para invadir, alugar operários e visitar na paz. Os reinos de teste de outras pessoas também podem ser atacados.",
+        "Ferramentas do Reino de Teste: +10.000 moedas, recomeçar o dia (tanques e invasões de novo), restaurar os rivais, um rival invade você (com replay), adiantar as minas, acabar com a paz, tudo liberado de novo e recomeçar do zero.",
+        "Bolsa de Teste (/bolsa/teste): o mesmo mercado com a carteira do mundo de teste. Negocia a qualquer hora, inclusive numa hora simulada, e mostra a prévia do pregão de amanhã pela Lisa.",
+        "Bolsa com horário: compra e venda só das 07:00 às 17:00 (horário de Brasília). O preço anda de hora em hora nesse intervalo, da abertura ao fechamento decidido pela Lisa. Fora dele, a tela mostra \"pregão fechado\" e a boleta fica travada.",
+        "Migração db/016-mundo-de-teste.sql: 10 tabelas gêmeas proof_teste_* (vazias), com as mesmas regras e sem chaves estrangeiras (os robôs não são pessoas).",
+        "Limpeza autorizada do que o modo de teste antigo deixou num reino de verdade: 4 veículos não comprados, 3 cargas de combustível grátis e 1 expedição de Submarino (com o saque dela e as partes repartidas pela paz)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.19.0-cloudflare-pages.1",
       "data": "2026-10-23",
@@ -779,10 +797,10 @@
         "Veículos e combustível no Reino: Barco, Submarino, Dirigível, Tanque de Magma e Nave Estelar, cada um com o seu mapa de expedições e 3 expedições por dia (mais com combustível pago)",
         "Planetoides sorteados para a Nave Estelar: raça alienígena, força e tesouro aleatórios",
         "Mina de Ouro com operários (3 de início) cavando no 3D, chance de diamantes, contratação e aluguel de operários entre jogadores",
-        "Bolsa do Reino em tela própria (/bolsa), estilo home broker: ações iguais para todos, cotações de hora em hora, gráficos e velas, pregão diário decidido pela Lisa (IA), compra e venda com corretagem",
+        "Bolsa do Reino em tela própria (/bolsa), estilo home broker: ações iguais para todos, pregão das 07:00 às 17:00 (horário de Brasília) com cotações de hora em hora, gráficos e velas, pregão diário decidido pela Lisa (IA), compra e venda com corretagem",
         "Tela cheia do Reino com menus suspensos e visita completa aos reinos vizinhos durante a paz",
         "Neuro Abacate (mascote do Abacato), personagem gratuito para todos",
-        "Modo de teste do Reino e da Bolsa (liberado para todos por enquanto; desliga com PROOF_MODO_TESTE=0)"
+        "Reino de Teste (/reino/teste e /bolsa/teste): um mundo à parte com tudo liberado, rivais-robô e ferramentas para zerar os limites do dia e recomeçar; nada dele vale no jogo de verdade (liberado para todos por enquanto; desliga com PROOF_MODO_TESTE=0)"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -793,7 +811,8 @@
         "Não conclui cards recorrentes do Abacato (o ciclo deles é do Abacato).",
         "Não tem cadastro próprio: a conta é criada no Abacato.",
         "Moedas do Reino não se compram nem se trocam por dinheiro: só vêm do estudo, da mina e dos saques.",
-        "O ranking não mostra nome completo nem e-mail de ninguém."
+        "O ranking não mostra nome completo nem e-mail de ninguém.",
+        "O Reino de Teste não passa nada para o reino de verdade (moedas, tropas, veículos, carteira) e não entra no ranking."
       ]
     },
     "stack": [
@@ -809,7 +828,7 @@
       "Three.js 0.170 (o mundo 3D do Reino, carregado só nessa tela)"
     ],
     "arquitetura": {
-      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
+      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
       "diagramas": [
         {
           "titulo": "Visão geral",
@@ -845,7 +864,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/012). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/016; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS."
       }
     ],
     "integracoes": [

@@ -1,5 +1,6 @@
 import { json } from "@/lib/http.js";
 import { exigirUsuario, respostaDeErro, corpoDe, ErroDeAcesso } from "@/lib/sessao.js";
+import { rotaDoMundo } from "@/lib/mundo.js";
 import {
   estadoDoReino, melhorarConstrucao, subirNeuro, coletarMina, renomearReino, treinarTropas, escolherPersonagem,
   comprarVeiculo, abastecer, comprarOperario, coletarOuro, ofertarOperarios,
@@ -8,15 +9,18 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** GET /api/reino — o reino de quem está logado (nasce na primeira visita). */
-export async function GET(req) {
+/**
+ * GET /api/reino — o reino de quem está logado (nasce na primeira visita). Todas as rotas do reino
+ * aceitam ?mundo=teste: aí tudo acontece no Reino de Teste (src/lib/mundo.js), à parte do de verdade.
+ */
+export const GET = rotaDoMundo(async (req) => {
   try {
     const usuario = await exigirUsuario(req);
     return json({ ok: true, ...(await estadoDoReino(usuario.id)) });
   } catch (e) {
     return respostaDeErro(e);
   }
-}
+});
 
 /**
  * POST /api/reino   body: { acao, ... }
@@ -33,7 +37,7 @@ export async function GET(req) {
  *   { acao: "ofertar", quantidade, preco }  põe operários para alugar (0 tira a oferta)
  * Devolve o resultado da ação e o reino já atualizado.
  */
-export async function POST(req) {
+export const POST = rotaDoMundo(async (req) => {
   try {
     const usuario = await exigirUsuario(req);
     const corpo = await corpoDe(req);
@@ -56,4 +60,4 @@ export async function POST(req) {
   } catch (e) {
     return respostaDeErro(e);
   }
-}
+});

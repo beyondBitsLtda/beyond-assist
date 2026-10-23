@@ -2,16 +2,19 @@
 
 import Link from "next/link";
 import { Mini } from "./Graficos.js";
-import { preco, moedas, pct, seta, rumo } from "./formatos.js";
+import { preco, moedas, pct, seta, rumo, horaCurta } from "./formatos.js";
 
 /**
  * A Bolsa dentro do Reino (e no menu da tela cheia): o Índice do Reino, as maiores altas e baixas
- * desta hora e a minha carteira — e o botão para a tela do pregão (/bolsa), onde se negocia.
+ * desta hora e a minha carteira — e o botão para a tela do pregão (/bolsa), onde se negocia. No
+ * Reino de Teste, o botão leva à Bolsa de Teste (`href`).
  */
-export default function ResumoDaBolsa({ bolsa }) {
+export default function ResumoDaBolsa({ bolsa, href = "/bolsa" }) {
+  const p = bolsa?.pregao;
+  const horario = p ? `pregão das ${horaCurta(p.abreAs)} às ${horaCurta(p.fechaAs)}${p.aberto ? " · aberto agora" : " · fechado agora"}` : "";
   return (
     <section className="pf-secao" id="bolsa">
-      <h2 className="pf-secao__titulo">📈 Bolsa do Reino <small>a mesma para todos · as cotações mudam de hora em hora</small></h2>
+      <h2 className="pf-secao__titulo">📈 Bolsa do Reino <small>a mesma para todos · as cotações mudam de hora em hora{horario ? ` · ${horario}` : ""}</small></h2>
       <div className="bx bx--resumo">
         {!bolsa ? <p className="bx-vazio">Abrindo o pregão…</p> : (
           <>
@@ -41,7 +44,7 @@ export default function ResumoDaBolsa({ bolsa }) {
                 </li>
               ))}
             </ul>
-            <Link href="/bolsa" className="bx-enviar bx-enviar--comprar bx-resumo__abrir">📈 Abrir o pregão</Link>
+            <Link href={href} className="bx-enviar bx-enviar--comprar bx-resumo__abrir">{href === "/bolsa" ? "📈 Abrir o pregão" : "🧪 Abrir a Bolsa de Teste"}</Link>
           </>
         )}
       </div>

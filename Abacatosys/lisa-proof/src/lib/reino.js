@@ -9,8 +9,12 @@
 //   4. se o passo 3 não pegou linha nenhuma, alguém mexeu antes: apaga o movimento e devolve 409.
 // Lançar ANTES de gravar faz qualquer leitura concorrente ver o saldo já descontado; o pior caso
 // é ela subestimar o saldo por um instante, nunca gastar o que não existe.
+//
+// DOIS MUNDOS (23/10/2026): tudo aqui fala com o banco por `db` (src/lib/mundo.js), que no Reino de
+// Teste grava nas tabelas gêmeas proof_teste_*. As poucas diferenças do mundo de teste (o reino que
+// nasce liberado, os rivais-robô, o saldo sem os pontos de estudo) estão marcadas com emTeste().
 
-import { supabase } from "./supabase.js";
+import { db, tabela, emTeste, mundoAtual, modoDeTesteLigado } from "./mundo.js";
 import { ErroDeAcesso } from "./sessao.js";
 import { buscarTodas, buscarEmLotes } from "./estudo.js";
 import { diaDe, somarDias } from "@/dominio/datas.js";
@@ -43,6 +47,11 @@ import {
   podeTreinar, somarTropas, heroiNeuro, lotacaoDoAcampamento, totalDeTropas,
 } from "@/dominio/tropas.js";
 import { PERSONAGENS, ORDEM_DOS_PERSONAGENS, personagensDe, podeEscolherPersonagem } from "@/dominio/personagens.js";
+import {
+  MOEDAS_INICIAIS_DE_TESTE, MOEDAS_DE_TESTE, SALDO_DOS_RIVAIS, NOME_DO_REINO_DE_TESTE, RIVAIS_DE_TESTE, FERRAMENTAS_DE_TESTE,
+  rivalDeTeste, ehRivalDeTeste, reinoDoRival, reinoLiberado, reinoNovoDeTeste,
+} from "@/dominio/mundoDeTeste.js";
+import { centavos } from "@/dominio/moedas.js";
 
 const CAMPOS = "usuario_id, nome, neuro_nivel, construcoes, exercito, guarnicao, personagem, personagens, coletado_em, escudo_ate, trofeus, versao, criado_em, veiculos, operarios, ouro_coletado_em";
 const HORA = 3_600_000;
@@ -63,26 +72,30 @@ function semente() {
 
 /** O reino da pessoa; na primeira visita ele nasce, com escudo de novato. */
 export async function obterReino(usuarioId) {
-  const { data, error } = await supabase.from("proof_reinos").select(CAMPOS).eq("usuario_id", usuarioId).maybeSingle();
+  const { data, error } = await db.from("proof_reinos").select(CAMPOS).eq("usuario_id", usuarioId).maybeSingle();
   falhou(error, "reino");
   if (data) return data;
+  if (emTeste()) return criarReinoDeTeste(usuarioId);
 
-  const novo = await supabase.from("proof_reinos").upsert({
+  const novo = await db.from("proof_reinos").upsert({
     usuario_id: usuarioId,
     construcoes: NIVEIS_INICIAIS,
     escudo_ate: new Date(Date.now() + ESCUDO_DE_NOVATO_HORAS * HORA).toISOString(),
   }, { onConflict: "usuario_id", ignoreDuplicates: true });
   falhou(novo.error, "criar reino");
-  const { data: criado, error: e2 } = await supabase.from("proof_reinos").select(CAMPOS).eq("usuario_id", usuarioId).single();
+  const { data: criado, error: e2 } = await db.from("proof_reinos").select(CAMPOS).eq("usuario_id", usuarioId).single();
   falhou(e2, "reino");
   return criado;
 }
 
-/** Moedas de agora: todos os pontos de estudo (1 ponto = 1 moeda) + o livro-caixa do reino. */
+/**
+ * Moedas de agora: todos os pontos de estudo (1 ponto = 1 moeda) + o livro-caixa do reino. No Reino
+ * de Teste, só o livro-caixa do teste (os pontos de estudo são do mundo de verdade).
+ */
 export async function saldoDoUsuario(usuarioId) {
   const [pontos, movimentos] = await Promise.all([
-    supabase.from("proof_ranking_total").select("pontos").eq("usuario_id", usuarioId).maybeSingle(),
-    buscarTodas(() => supabase.from("proof_reino_movimentos").select("valor").eq("usuario_id", usuarioId).order("criado_em")),
+    emTeste() ? { data: null } : db.from("proof_ranking_total").select("pontos").eq("usuario_id", usuarioId).maybeSingle(),
+    buscarTodas(() => db.from("proof_reino_movimentos").select("valor").eq("usuario_id", usuarioId).order("criado_em")),
   ]);
   falhou(pontos.error, "pontos");
   return saldoDe({ pontosDeEstudo: pontos.data?.pontos || 0, movimentos });
@@ -97,14 +110,16 @@ export async function nomesPublicos(ids) {
     buscarEmLotes("proof_perfis", "usuario_id, apelido, no_ranking", "usuario_id", unicos),
   ]);
   const perfil = new Map(perfis.map((p) => [p.usuario_id, p]));
-  return new Map(usuarios.map((u) => {
+  const nomes = new Map(usuarios.map((u) => {
     const p = perfil.get(u.id);
     return [u.id, nomePublico({ nome: u.nome, apelido: p?.apelido, noRanking: p?.no_ranking })];
   }));
+  if (emTeste()) for (const id of unicos) if (ehRivalDeTeste(id)) nomes.set(id, rivalDeTeste(id).dono);
+  return nomes;
 }
 
 async function invasoesDeHoje(usuarioId) {
-  const { data, error } = await supabase.from("proof_invasoes").select("defensor_id, numero")
+  const { data, error } = await db.from("proof_invasoes").select("defensor_id, numero")
     .eq("atacante_id", usuarioId).eq("dia", diaDe());
   falhou(error, "invasões");
   return data || [];
@@ -117,8 +132,8 @@ async function invasoesDeHoje(usuarioId) {
 async function invasoesRecentes(usuarioId) {
   const desde = new Date(Date.now() - HORAS_ENTRE_ATAQUES_AO_MESMO_REINO * HORA).toISOString();
   const [minhas, contraMim] = await Promise.all([
-    supabase.from("proof_invasoes").select("defensor_id, criado_em").eq("atacante_id", usuarioId).gte("criado_em", desde),
-    supabase.from("proof_invasoes").select("atacante_id, criado_em").eq("defensor_id", usuarioId).gte("criado_em", desde),
+    db.from("proof_invasoes").select("defensor_id, criado_em").eq("atacante_id", usuarioId).gte("criado_em", desde),
+    db.from("proof_invasoes").select("atacante_id, criado_em").eq("defensor_id", usuarioId).gte("criado_em", desde),
   ]);
   falhou(minhas.error, "invasões recentes");
   falhou(contraMim.error, "invasões recentes");
@@ -138,22 +153,22 @@ const CAMPOS_DA_PAZ = "id, proposta_por, dias, status, criado_em, expira_em, ini
 async function pazDeAgora() {
   const agora = new Date().toISOString();
   const [vigente, votacao] = await Promise.all([
-    supabase.from("proof_pazes").select(CAMPOS_DA_PAZ).eq("status", "aprovada").gt("fim", agora).order("fim", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("proof_pazes").select(CAMPOS_DA_PAZ).eq("status", "votacao").order("criado_em", { ascending: false }).limit(1).maybeSingle(),
+    db.from("proof_pazes").select(CAMPOS_DA_PAZ).eq("status", "aprovada").gt("fim", agora).order("fim", { ascending: false }).limit(1).maybeSingle(),
+    db.from("proof_pazes").select(CAMPOS_DA_PAZ).eq("status", "votacao").order("criado_em", { ascending: false }).limit(1).maybeSingle(),
   ]);
   falhou(vigente.error, "paz");
   falhou(votacao.error, "votação da paz");
   const v = votacao.data;
   // votação vencida: fecha agora (ninguém mais vota nela)
   if (v && !votacaoAberta(v)) {
-    await supabase.from("proof_pazes").update({ status: "expirada" }).eq("id", v.id).eq("status", "votacao");
+    await db.from("proof_pazes").update({ status: "expirada" }).eq("id", v.id).eq("status", "votacao");
     return { paz: vigente.data || null, votacao: null };
   }
   return { paz: vigente.data || null, votacao: v || null };
 }
 
 async function totalDeReinos() {
-  const { count, error } = await supabase.from("proof_reinos").select("usuario_id", { count: "exact", head: true });
+  const { count, error } = await db.from("proof_reinos").select("usuario_id", { count: "exact", head: true });
   falhou(error, "reinos");
   return count || 0;
 }
@@ -164,6 +179,8 @@ async function totalDeReinos() {
  * tem", e para mostrar quanto falta a quem ainda não chegou lá.
  */
 async function ofensivasDe(ids) {
+  // no Reino de Teste a paz não depende do estudo: todo testador vota; os robôs nunca votam
+  if (emTeste()) return new Map(ids.filter(Boolean).map((id) => [id, ehRivalDeTeste(id) ? 0 : OFENSIVA_PARA_VOTAR]));
   const hoje = diaDe();
   const desde = somarDias(hoje, -OFENSIVA_PARA_VOTAR);
   const unicos = [...new Set(ids.filter(Boolean))];
@@ -171,7 +188,7 @@ async function ofensivasDe(ids) {
   for (let i = 0; i < unicos.length; i += 80) {
     const lote = unicos.slice(i, i + 80);
     const eventos = await buscarTodas(() =>
-      supabase.from("proof_eventos").select("usuario_id, dia").in("usuario_id", lote).gte("dia", desde).order("criado_em")
+      db.from("proof_eventos").select("usuario_id, dia").in("usuario_id", lote).gte("dia", desde).order("criado_em")
     );
     for (const e of eventos) diasDe.get(e.usuario_id)?.push(e.dia);
   }
@@ -181,8 +198,8 @@ async function ofensivasDe(ids) {
 /** O placar de uma votação: os votos, os reinos, quem pode votar agora (ofensiva em dia) e o resultado. */
 async function placarDa(votacao) {
   const [votosR, reinos] = await Promise.all([
-    supabase.from("proof_paz_votos").select("usuario_id, voto").eq("paz_id", votacao.id),
-    buscarTodas(() => supabase.from("proof_reinos").select("usuario_id").order("usuario_id")),
+    db.from("proof_paz_votos").select("usuario_id, voto").eq("paz_id", votacao.id),
+    buscarTodas(() => db.from("proof_reinos").select("usuario_id").order("usuario_id")),
   ]);
   falhou(votosR.error, "votos");
   const votos = votosR.data || [];
@@ -198,7 +215,7 @@ async function pazParaTela(usuarioId, apurou = false) {
   const { paz, votacao } = await pazDeAgora();
   if (paz) {
     const total = await totalDeReinos();
-    const { data: outros } = await supabase.from("proof_reinos").select("usuario_id, nome, construcoes, trofeus").neq("usuario_id", usuarioId).order("trofeus", { ascending: false }).limit(12);
+    const { data: outros } = await db.from("proof_reinos").select("usuario_id, nome, construcoes, trofeus").neq("usuario_id", usuarioId).order("trofeus", { ascending: false }).limit(12);
     const nomes = await nomesPublicos((outros || []).map((r) => r.usuario_id));
     return {
       vigente: {
@@ -248,9 +265,9 @@ async function pazParaTela(usuarioId, apurou = false) {
  */
 async function apurar(votacao, placar) {
   const { resultado, totalDeReinos: total } = placar || (await placarDa(votacao));
-  if (resultado === "rejeitada") await supabase.from("proof_pazes").update({ status: "rejeitada" }).eq("id", votacao.id).eq("status", "votacao");
+  if (resultado === "rejeitada") await db.from("proof_pazes").update({ status: "rejeitada" }).eq("id", votacao.id).eq("status", "votacao");
   if (resultado === "aprovada") {
-    await supabase.from("proof_pazes").update({ status: "aprovada", total_reinos: total, ...periodoDaPaz(votacao.dias) }).eq("id", votacao.id).eq("status", "votacao");
+    await db.from("proof_pazes").update({ status: "aprovada", total_reinos: total, ...periodoDaPaz(votacao.dias) }).eq("id", votacao.id).eq("status", "votacao");
   }
   return resultado;
 }
@@ -261,26 +278,26 @@ export async function proporPaz(usuarioId, dias) {
   const pode = podeProporPaz({ dias: Number(dias), votacaoAtual: votacao, pazAtual: paz, ofensiva: ofensivas.get(usuarioId) });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
   await obterReino(usuarioId); // quem propõe tem reino (e conta como um dos votantes)
-  const { data, error } = await supabase.from("proof_pazes").insert({ proposta_por: usuarioId, dias: Number(dias), expira_em: fimDaVotacao() }).select(CAMPOS_DA_PAZ).single();
+  const { data, error } = await db.from("proof_pazes").insert({ proposta_por: usuarioId, dias: Number(dias), expira_em: fimDaVotacao() }).select(CAMPOS_DA_PAZ).single();
   if (error?.code === "23505") throw new ErroDeAcesso(409, "já tem uma proposta de paz em votação");
   falhou(error, "proposta de paz");
-  const { error: e2 } = await supabase.from("proof_paz_votos").insert({ paz_id: data.id, usuario_id: usuarioId, voto: true });
+  const { error: e2 } = await db.from("proof_paz_votos").insert({ paz_id: data.id, usuario_id: usuarioId, voto: true });
   falhou(e2, "voto");
   return { resultado: await apurar(data) };
 }
 
 /** O voto de um reino: sim ou não. Só vota quem tem a ofensiva em dia. */
 export async function votarNaPaz(usuarioId, pazId, voto) {
-  const { data: votacao, error } = await supabase.from("proof_pazes").select(CAMPOS_DA_PAZ).eq("id", String(pazId || "")).maybeSingle();
+  const { data: votacao, error } = await db.from("proof_pazes").select(CAMPOS_DA_PAZ).eq("id", String(pazId || "")).maybeSingle();
   falhou(error, "votação");
   const [{ data: meu }, ofensivas] = await Promise.all([
-    votacao ? supabase.from("proof_paz_votos").select("voto").eq("paz_id", votacao.id).eq("usuario_id", usuarioId).maybeSingle() : { data: null },
+    votacao ? db.from("proof_paz_votos").select("voto").eq("paz_id", votacao.id).eq("usuario_id", usuarioId).maybeSingle() : { data: null },
     ofensivasDe([usuarioId]),
   ]);
   const pode = podeVotar({ paz: votacao, jaVotou: Boolean(meu), ofensiva: ofensivas.get(usuarioId) });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
   await obterReino(usuarioId);
-  const { error: e2 } = await supabase.from("proof_paz_votos").insert({ paz_id: votacao.id, usuario_id: usuarioId, voto: Boolean(voto) });
+  const { error: e2 } = await db.from("proof_paz_votos").insert({ paz_id: votacao.id, usuario_id: usuarioId, voto: Boolean(voto) });
   if (e2?.code === "23505") throw new ErroDeAcesso(409, "você já votou");
   falhou(e2, "voto");
   return { resultado: await apurar(votacao) };
@@ -288,7 +305,7 @@ export async function votarNaPaz(usuarioId, pazId, voto) {
 
 /** Quem propôs desiste da proposta (enquanto a votação está aberta). */
 export async function cancelarPaz(usuarioId, pazId) {
-  const { data, error } = await supabase.from("proof_pazes").update({ status: "cancelada" })
+  const { data, error } = await db.from("proof_pazes").update({ status: "cancelada" })
     .eq("id", String(pazId || "")).eq("proposta_por", usuarioId).eq("status", "votacao").select("id");
   falhou(error, "proposta de paz");
   if (!(data || []).length) throw new ErroDeAcesso(400, "essa proposta não está mais em votação");
@@ -301,7 +318,7 @@ export async function estadoDoReino(usuarioId) {
   const [saldo, hoje, batalhasR, paz, tanques, ouro] = await Promise.all([
     saldoDoUsuario(usuarioId),
     invasoesDeHoje(usuarioId),
-    supabase.from("proof_invasoes")
+    db.from("proof_invasoes")
       .select("id, atacante_id, defensor_id, ataque, defesa, venceu, saque, trofeus_atacante, trofeus_defensor, estrelas, destruicao, combate, criado_em")
       .or(`atacante_id.eq.${usuarioId},defensor_id.eq.${usuarioId}`)
       .order("criado_em", { ascending: false }).limit(15),
@@ -337,6 +354,7 @@ export async function estadoDoReino(usuarioId) {
     },
     paz,
     diasDePaz: DIAS_DE_PAZ,
+    mundo: mundoAtual(),
     modoDeTeste: modoDeTesteLigado(),
     garagem: garagemParaTela(reino, saldo, tanques),
     ouro: await ouroParaTela(reino, saldo, ouro),
@@ -406,7 +424,7 @@ function reservaParaTela(destino, reino, n, saldo) {
 // ---------------------------------------------------------------- escrita
 
 async function lancar(usuarioId, tipo, valor, detalhe = {}) {
-  const { data, error } = await supabase.from("proof_reino_movimentos")
+  const { data, error } = await db.from("proof_reino_movimentos")
     .insert({ usuario_id: usuarioId, tipo, valor, detalhe }).select("id").single();
   falhou(error, "livro-caixa");
   return data.id;
@@ -414,12 +432,12 @@ async function lancar(usuarioId, tipo, valor, detalhe = {}) {
 
 async function desfazerLancamentos(ids) {
   const vivos = ids.filter(Boolean);
-  if (vivos.length) await supabase.from("proof_reino_movimentos").delete().in("id", vivos);
+  if (vivos.length) await db.from("proof_reino_movimentos").delete().in("id", vivos);
 }
 
 /** Grava o reino só se ninguém mexeu desde a leitura. Devolve se gravou. */
 async function gravarReino(reino, mudancas) {
-  const { data, error } = await supabase.from("proof_reinos")
+  const { data, error } = await db.from("proof_reinos")
     .update({ ...mudancas, versao: reino.versao + 1, atualizado_em: new Date().toISOString() })
     .eq("usuario_id", reino.usuario_id).eq("versao", reino.versao)
     .select("usuario_id");
@@ -500,7 +518,7 @@ export async function escolherPersonagem(usuarioId, id) {
 
 /** Só ler qual personagem a pessoa usa (sem criar reino para quem ainda não abriu o Reino). */
 export async function personagemDe(usuarioId) {
-  const { data } = await supabase.from("proof_reinos").select("personagem").eq("usuario_id", usuarioId).maybeSingle();
+  const { data } = await db.from("proof_reinos").select("personagem").eq("usuario_id", usuarioId).maybeSingle();
   return PERSONAGENS[data?.personagem] ? data.personagem : "neuro";
 }
 
@@ -531,7 +549,7 @@ export async function renomearReino(usuarioId, nome) {
 export async function alvosDe(usuarioId) {
   const eu = await obterReino(usuarioId);
   const [todos, hoje, recentes, { paz }] = await Promise.all([
-    buscarTodas(() => supabase.from("proof_reinos").select(CAMPOS).neq("usuario_id", usuarioId).order("usuario_id")),
+    buscarTodas(() => db.from("proof_reinos").select(CAMPOS).neq("usuario_id", usuarioId).order("usuario_id")),
     invasoesDeHoje(usuarioId),
     invasoesRecentes(usuarioId),
     pazDeAgora(),
@@ -576,7 +594,7 @@ export async function alvosDe(usuarioId) {
 export async function invadir(usuarioId, defensorId) {
   if (!defensorId || typeof defensorId !== "string") throw new ErroDeAcesso(400, "qual reino?");
   const eu = await obterReino(usuarioId);
-  const { data: alvo, error } = await supabase.from("proof_reinos").select(CAMPOS).eq("usuario_id", defensorId).maybeSingle();
+  const { data: alvo, error } = await db.from("proof_reinos").select(CAMPOS).eq("usuario_id", defensorId).maybeSingle();
   falhou(error, "reino do alvo");
   const [hoje, saldoDoAlvo, recentes, { paz }] = await Promise.all([
     invasoesDeHoje(usuarioId), alvo ? saldoDoUsuario(defensorId) : 0, invasoesRecentes(usuarioId), pazDeAgora(),
@@ -598,7 +616,7 @@ export async function invadir(usuarioId, defensorId) {
   const perdasDaGuarnicao = r.perdasDaGuarnicao;
 
   // 1. a invasão em si — os índices únicos barram a 4ª do dia e a 2ª no mesmo alvo
-  const ins = await supabase.from("proof_invasoes").insert({
+  const ins = await db.from("proof_invasoes").insert({
     atacante_id: usuarioId, defensor_id: defensorId, dia: diaDe(), numero: hoje.length + 1,
     ataque: forca.ataque, defesa: forca.defesa, venceu: r.venceu, saque: r.saque,
     trofeus_atacante: r.trofeusAtacante, trofeus_defensor: r.trofeusDefensor,
@@ -621,7 +639,7 @@ export async function invadir(usuarioId, defensorId) {
     if (!(await gravarReino(alvo, mudancasDoAlvo))) throw conflito();
   } catch (e) {
     await desfazerLancamentos(ids);
-    await supabase.from("proof_invasoes").delete().eq("id", invasaoId);
+    await db.from("proof_invasoes").delete().eq("id", invasaoId);
     throw e;
   }
 
@@ -653,8 +671,8 @@ export async function invadir(usuarioId, defensorId) {
 async function tanquesDeHoje(usuarioId) {
   const dia = diaDe();
   const [exp, comb] = await Promise.all([
-    supabase.from("proof_expedicoes").select("veiculo, expedicao, numero").eq("usuario_id", usuarioId).eq("dia", dia),
-    supabase.from("proof_reino_movimentos").select("detalhe").eq("usuario_id", usuarioId).eq("tipo", "combustivel").eq("detalhe->>dia", dia),
+    db.from("proof_expedicoes").select("veiculo, expedicao, numero").eq("usuario_id", usuarioId).eq("dia", dia),
+    db.from("proof_reino_movimentos").select("detalhe").eq("usuario_id", usuarioId).eq("tipo", "combustivel").eq("detalhe->>dia", dia),
   ]);
   falhou(exp.error, "expedições");
   falhou(comb.error, "combustível");
@@ -688,7 +706,7 @@ export async function expedicoesDe(usuarioId) {
   const eu = await obterReino(usuarioId);
   const [tanques, historico, saldo] = await Promise.all([
     tanquesDeHoje(usuarioId),
-    supabase.from("proof_expedicoes").select("id, expedicao, veiculo, estrelas, destruicao, saque, combate, detalhe, criado_em")
+    db.from("proof_expedicoes").select("id, expedicao, veiculo, estrelas, destruicao, saque, combate, detalhe, criado_em")
       .eq("usuario_id", usuarioId).order("criado_em", { ascending: false }).limit(300),
     saldoDoUsuario(usuarioId),
   ]);
@@ -761,7 +779,7 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
   const tropa = exercitoDaExpedicao(eu.exercito, torre);
   const r = batalhaDeExpedicao({ atacante: { exercito: tropa.exercito, neuro_nivel: eu.neuro_nivel }, expedicao, semente: semente() });
 
-  const ins = await supabase.from("proof_expedicoes").insert({
+  const ins = await db.from("proof_expedicoes").insert({
     usuario_id: usuarioId, expedicao: expedicao.id, dia: diaDe(), veiculo, numero: tanque.usadas + 1,
     estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque, perdas: r.caidas, combate: r.entrada,
     detalhe: expedicao.forca ? { nome: expedicao.nome, raca: expedicao.raca, forca: expedicao.forca, recompensa: expedicao.recompensa, dificuldade: expedicao.dificuldade } : {},
@@ -772,7 +790,7 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
   try {
     if (r.saque > 0) await lancar(usuarioId, "expedicao", r.saque, { expedicao: expedicao.id, registro: ins.data.id });
   } catch (e) {
-    await supabase.from("proof_expedicoes").delete().eq("id", ins.data.id);
+    await db.from("proof_expedicoes").delete().eq("id", ins.data.id);
     throw e;
   }
 
@@ -780,9 +798,9 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
   let repartido = 0;
   const parte = parteDaExpedicao(r.saque);
   if (parte > 0 && pazVigente((await pazDeAgora()).paz)) {
-    const { data: outros } = await supabase.from("proof_reinos").select("usuario_id").neq("usuario_id", usuarioId);
+    const { data: outros } = await db.from("proof_reinos").select("usuario_id").neq("usuario_id", usuarioId);
     if (outros?.length) {
-      const { error } = await supabase.from("proof_reino_movimentos").insert(outros.map((o) => ({
+      const { error } = await db.from("proof_reino_movimentos").insert(outros.map((o) => ({
         usuario_id: o.usuario_id, tipo: "paz_expedicao", valor: parte, detalhe: { expedicao: expedicao.id, registro: ins.data.id, de: usuarioId },
       })));
       if (!error) repartido = parte;
@@ -826,8 +844,8 @@ const CAMPOS_DO_ALUGUEL = "id, dono_id, inquilino_id, quantidade, preco, total, 
 /** Os aluguéis que tocam o período desde `desde` (os meus para fora e os que eu aluguei de fora). */
 async function alugueisDe(usuarioId, desde) {
   const [fora, dentro] = await Promise.all([
-    supabase.from("proof_alugueis").select(CAMPOS_DO_ALUGUEL).eq("dono_id", usuarioId).gt("fim", desde),
-    supabase.from("proof_alugueis").select(CAMPOS_DO_ALUGUEL).eq("inquilino_id", usuarioId).gt("fim", desde),
+    db.from("proof_alugueis").select(CAMPOS_DO_ALUGUEL).eq("dono_id", usuarioId).gt("fim", desde),
+    db.from("proof_alugueis").select(CAMPOS_DO_ALUGUEL).eq("inquilino_id", usuarioId).gt("fim", desde),
   ]);
   falhou(fora.error, "aluguéis");
   falhou(dentro.error, "aluguéis");
@@ -858,7 +876,7 @@ function relogioDepoisDaColeta(info, agora) {
 }
 
 async function ouroParaTela(reino, saldo, info) {
-  const { data: oferta } = await supabase.from("proof_operarios_ofertas").select("quantidade, preco").eq("dono_id", reino.usuario_id).maybeSingle();
+  const { data: oferta } = await db.from("proof_operarios_ofertas").select("quantidade, preco").eq("dono_id", reino.usuario_id).maybeSingle();
   const agora = Date.now();
   const ativos = (lista) => lista.filter((a) => new Date(a.inicio).getTime() <= agora && new Date(a.fim).getTime() > agora);
   const fora = ativos(info.alugueis.paraFora), dentro = ativos(info.alugueis.deFora);
@@ -910,7 +928,7 @@ export async function ofertarOperarios(usuarioId, { quantidade, preco }) {
   const reino = await obterReino(usuarioId);
   const pode = podeOfertar({ quantidade: Number(quantidade), preco: Number(preco), operarios: reino.operarios ?? OPERARIOS_INICIAIS });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
-  const { error } = await supabase.from("proof_operarios_ofertas").upsert(
+  const { error } = await db.from("proof_operarios_ofertas").upsert(
     { dono_id: usuarioId, quantidade: pode.quantidade, preco: pode.preco, atualizado_em: new Date().toISOString() }, { onConflict: "dono_id" },
   );
   falhou(error, "oferta de operários");
@@ -920,7 +938,7 @@ export async function ofertarOperarios(usuarioId, { quantidade, preco }) {
 /** Quantos operários de cada dono estão alugados agora (para qualquer pessoa). */
 async function alugadosAgoraDe(donos) {
   const agora = new Date().toISOString();
-  const linhas = await buscarEmLotes("proof_alugueis", "dono_id, quantidade", "dono_id", donos, (q) => q.gt("fim", agora).lte("inicio", agora));
+  const linhas = await buscarEmLotes(tabela("proof_alugueis"), "dono_id, quantidade", "dono_id", donos, (q) => q.gt("fim", agora).lte("inicio", agora));
   const m = new Map();
   for (const a of linhas) m.set(a.dono_id, (m.get(a.dono_id) || 0) + a.quantidade);
   return m;
@@ -928,13 +946,13 @@ async function alugadosAgoraDe(donos) {
 
 /** O mercado de operários: quem tem operários para alugar agora (menos eu), do mais barato ao mais caro. */
 export async function mercadoDeOperarios(usuarioId) {
-  const { data: ofertas, error } = await supabase.from("proof_operarios_ofertas").select("dono_id, quantidade, preco")
+  const { data: ofertas, error } = await db.from("proof_operarios_ofertas").select("dono_id, quantidade, preco")
     .gt("quantidade", 0).neq("dono_id", usuarioId).order("preco").limit(60);
   falhou(error, "ofertas de operários");
   const donos = (ofertas || []).map((o) => o.dono_id);
   const [alugados, reinos, nomes] = await Promise.all([
     alugadosAgoraDe(donos),
-    buscarEmLotes("proof_reinos", "usuario_id, nome, operarios", "usuario_id", donos),
+    buscarEmLotes(tabela("proof_reinos"), "usuario_id, nome, operarios", "usuario_id", donos),
     nomesPublicos(donos),
   ]);
   const reinoDe = new Map(reinos.map((r) => [r.usuario_id, r]));
@@ -956,8 +974,8 @@ export async function alugarOperarios(usuarioId, donoId, quantidade) {
   const agora = new Date();
   const [saldo, info, ofertaR, donoR, alugados] = await Promise.all([
     saldoDoUsuario(usuarioId), ouroDe(eu, agora),
-    supabase.from("proof_operarios_ofertas").select("quantidade, preco").eq("dono_id", donoId).maybeSingle(),
-    supabase.from("proof_reinos").select("usuario_id, nome, operarios").eq("usuario_id", donoId).maybeSingle(),
+    db.from("proof_operarios_ofertas").select("quantidade, preco").eq("dono_id", donoId).maybeSingle(),
+    db.from("proof_reinos").select("usuario_id, nome, operarios").eq("usuario_id", donoId).maybeSingle(),
     alugadosAgoraDe([donoId]),
   ]);
   falhou(ofertaR.error, "oferta de operários");
@@ -968,12 +986,12 @@ export async function alugarOperarios(usuarioId, donoId, quantidade) {
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
 
   const periodo = periodoDoAluguel(agora);
-  const ins = await supabase.from("proof_alugueis").insert({
+  const ins = await db.from("proof_alugueis").insert({
     dono_id: donoId, inquilino_id: usuarioId, quantidade: pode.quantidade, preco: oferta.preco, total: pode.custo, ...periodo,
   }).select("id").single();
   falhou(ins.error, "aluguel");
   const desfazer = async (ids = []) => {
-    await supabase.from("proof_alugueis").delete().eq("id", ins.data.id);
+    await db.from("proof_alugueis").delete().eq("id", ins.data.id);
     await desfazerLancamentos(ids);
   };
   const depois = (await alugadosAgoraDe([donoId])).get(donoId) || 0;
@@ -1001,7 +1019,7 @@ export async function visitarReino(usuarioId, alvoId) {
   if (alvoId === usuarioId) throw new ErroDeAcesso(400, "esse é o seu reino");
   const { paz } = await pazDeAgora();
   if (!pazVigente(paz)) throw new ErroDeAcesso(403, "só dá para visitar os outros reinos durante a paz — aí todos viram vizinhos");
-  const { data: alvo, error } = await supabase.from("proof_reinos").select(CAMPOS).eq("usuario_id", alvoId).maybeSingle();
+  const { data: alvo, error } = await db.from("proof_reinos").select(CAMPOS).eq("usuario_id", alvoId).maybeSingle();
   falhou(error, "reino vizinho");
   if (!alvo) throw new ErroDeAcesso(404, "esse reino não existe");
   const [nomes, info] = await Promise.all([nomesPublicos([alvoId]), ouroDe(alvo)]);
@@ -1019,65 +1037,168 @@ export async function visitarReino(usuarioId, alvoId) {
   };
 }
 
-// ---------------------------------------------------------------- o MODO DE TESTE (23/10/2026)
-// Pedido: "uma função de debug para eu testar as expedições, as ações, todas as funções — pode
-// deixar liberada para todos por hora". Cada ação mexe só no reino de quem usa. Desliga com
-// PROOF_MODO_TESTE=0 na hospedagem. As moedas de teste entram no livro-caixa com o tipo "teste"
-// (dá para tirar todas de uma vez: a ação "limpar", ou um delete por tipo no banco); o combustível
-// de teste é uma carga de 0 moeda marcada com { teste: true }.
+// ---------------------------------------------------------------- o REINO DE TESTE (23/10/2026)
+// O reino de cada pessoa no mundo de teste (src/lib/mundo.js): nasce com tudo liberado e
+// MOEDAS_INICIAIS_DE_TESTE moedas, e os rivais-robô nascem junto. As ferramentas abaixo só
+// funcionam DENTRO do mundo de teste — no de verdade, recusam (o modo de teste antigo, que dava
+// veículos e combustível no reino de verdade, deixou de existir).
 
-export const modoDeTesteLigado = () => process.env.PROOF_MODO_TESTE !== "0";
-export const MOEDAS_DE_TESTE = 1000;
+/** O reino de teste nasce (liberado ou do zero, sem escudo de novato) e ganha as moedas de teste — uma vez só. */
+async function criarReinoDeTeste(usuarioId, { liberado = true } = {}) {
+  if (ehRivalDeTeste(usuarioId)) {
+    await garantirRivais();
+  } else {
+    const { data: nasceu, error } = await db.from("proof_reinos").upsert(
+      { usuario_id: usuarioId, nome: NOME_DO_REINO_DE_TESTE, ...(liberado ? reinoLiberado() : reinoNovoDeTeste()), escudo_ate: null },
+      { onConflict: "usuario_id", ignoreDuplicates: true },
+    ).select("usuario_id");
+    falhou(error, "criar o reino de teste");
+    // só quem criou de fato ganha as moedas (dois pedidos ao mesmo tempo não dobram nada)
+    if ((nasceu || []).length) await lancar(usuarioId, "teste", MOEDAS_INICIAIS_DE_TESTE, { nasceu: liberado ? "liberado" : "do zero" });
+    // os rivais, sempre: a tela pede o reino e os alvos juntos, e o pedido que perde a corrida da
+    // criação também precisa achar os robôs prontos (visto em 23/10/2026: "ainda não há outros reinos")
+    await garantirRivais();
+  }
+  const { data, error: e2 } = await db.from("proof_reinos").select(CAMPOS).eq("usuario_id", usuarioId).single();
+  falhou(e2, "reino de teste");
+  return data;
+}
 
+/** Os reinos-robô existem: os que faltarem nascem inteiros, com o cofre cheio e a oferta de operários. */
+async function garantirRivais() {
+  const { data: novos, error } = await db.from("proof_reinos").upsert(
+    RIVAIS_DE_TESTE.map((r) => ({ usuario_id: r.id, ...reinoDoRival(r) })),
+    { onConflict: "usuario_id", ignoreDuplicates: true },
+  ).select("usuario_id");
+  falhou(error, "rivais de teste");
+  for (const { usuario_id: id } of novos || []) await prepararRival(rivalDeTeste(id));
+}
+
+/** O cofre do robô cheio de novo e a oferta de operários dele no mercado. */
+async function prepararRival(rival) {
+  const saldo = await saldoDoUsuario(rival.id);
+  if (saldo < SALDO_DOS_RIVAIS) await lancar(rival.id, "teste", centavos(SALDO_DOS_RIVAIS - saldo), { rival: true });
+  if (rival.oferta) {
+    const { error } = await db.from("proof_operarios_ofertas").upsert(
+      { dono_id: rival.id, ...rival.oferta, atualizado_em: new Date().toISOString() }, { onConflict: "dono_id" },
+    );
+    falhou(error, "oferta do rival");
+  }
+}
+
+/** Trava a mais: o que apaga ou dá coisas de graça só roda com as tabelas de teste na mão. */
+function exigirMundoDeTeste() {
+  if (!emTeste() || tabela("proof_reinos") !== "proof_teste_reinos") {
+    throw new ErroDeAcesso(403, "as ferramentas de teste só funcionam no Reino de Teste — o seu reino de verdade não muda por elas");
+  }
+}
+
+/** Apaga tudo o que é meu no mundo de teste (para recomeçar do zero). */
+async function apagarReinoDeTeste(usuarioId) {
+  exigirMundoDeTeste();
+  const apagados = await Promise.all([
+    db.from("proof_reino_movimentos").delete().eq("usuario_id", usuarioId),
+    db.from("proof_expedicoes").delete().eq("usuario_id", usuarioId),
+    db.from("proof_invasoes").delete().or(`atacante_id.eq.${usuarioId},defensor_id.eq.${usuarioId}`),
+    db.from("proof_bolsa_posicoes").delete().eq("usuario_id", usuarioId),
+    db.from("proof_bolsa_ordens").delete().eq("usuario_id", usuarioId),
+    db.from("proof_operarios_ofertas").delete().eq("dono_id", usuarioId),
+    db.from("proof_alugueis").delete().or(`dono_id.eq.${usuarioId},inquilino_id.eq.${usuarioId}`),
+    db.from("proof_paz_votos").delete().eq("usuario_id", usuarioId),
+  ]);
+  for (const r of apagados) falhou(r.error, "apagar o reino de teste");
+  const { error } = await db.from("proof_reinos").delete().eq("usuario_id", usuarioId);
+  falhou(error, "apagar o reino de teste");
+}
+
+/** As ferramentas do Reino de Teste (FERRAMENTAS_DE_TESTE, em src/dominio/mundoDeTeste.js). */
 export async function acaoDeTeste(usuarioId, acao) {
-  if (!modoDeTesteLigado()) throw new ErroDeAcesso(403, "o modo de teste está desligado");
+  exigirMundoDeTeste();
+  if (!FERRAMENTAS_DE_TESTE.some((f) => f.id === acao)) throw new ErroDeAcesso(400, "ferramenta de teste desconhecida");
   const reino = await obterReino(usuarioId);
-  const n = niveisDe(reino);
   const gravar = async (mudancas) => { if (!(await gravarReino(reino, mudancas))) throw conflito(); };
+  const contar = (r) => { falhou(r.error, "ferramenta de teste"); return (r.data || []).length; };
   switch (acao) {
     case "moedas":
       await lancar(usuarioId, "teste", MOEDAS_DE_TESTE, { acao });
-      return { mensagem: `+${MOEDAS_DE_TESTE} moedas de teste` };
-    case "tanques": {
-      // cargas de 0 moeda até cada veículo ter 3 expedições no tanque de novo
-      const tanques = await tanquesDeHoje(usuarioId);
-      const linhas = [];
-      for (const v of veiculosDe(reino.veiculos)) {
-        const t = tanques.tanque(v);
-        for (let i = t.restantes; i < 3; i++) linhas.push({ usuario_id: usuarioId, tipo: "combustivel", valor: 0, detalhe: { veiculo: v, dia: diaDe(), teste: true } });
+      return { mensagem: `+${MOEDAS_DE_TESTE.toLocaleString("pt-BR")} moedas de teste` };
+
+    case "dia": {
+      // os limites do dia voltam: tanques cheios, as 3 invasões e o "mesmo reino só a cada 48 h"
+      const dia = diaDe();
+      const desde = new Date(Date.now() - HORAS_ENTRE_ATAQUES_AO_MESMO_REINO * HORA).toISOString();
+      const robos = RIVAIS_DE_TESTE.map((r) => r.id);
+      const [exp, comb, minhas, dosRobos] = await Promise.all([
+        db.from("proof_expedicoes").delete().eq("usuario_id", usuarioId).eq("dia", dia).select("id"),
+        db.from("proof_reino_movimentos").delete().eq("usuario_id", usuarioId).eq("tipo", "combustivel").eq("detalhe->>dia", dia).select("id"),
+        db.from("proof_invasoes").delete().eq("atacante_id", usuarioId).gte("criado_em", desde).select("id"),
+        db.from("proof_invasoes").delete().eq("defensor_id", usuarioId).in("atacante_id", robos).gte("criado_em", desde).select("id"),
+      ]);
+      return { mensagem: `dia recomeçado: ${contar(exp)} expedição(ões), ${contar(comb)} carga(s) e ${contar(minhas) + contar(dosRobos)} batalha(s) apagadas — tanques cheios e invasões de novo` };
+    }
+
+    case "rivais": {
+      await garantirRivais();
+      const agora = new Date().toISOString();
+      for (const r of RIVAIS_DE_TESTE) {
+        const { error } = await db.from("proof_reinos").update({ ...reinoDoRival(r), coletado_em: agora, atualizado_em: agora }).eq("usuario_id", r.id);
+        falhou(error, "restaurar o rival");
+        await prepararRival(r);
       }
-      if (linhas.length) { const { error } = await supabase.from("proof_reino_movimentos").insert(linhas); falhou(error, "combustível de teste"); }
-      return { mensagem: "tanques cheios (3 expedições em cada veículo)" };
+      // ninguém do mundo de teste fica de escudo
+      const { error } = await db.from("proof_reinos").update({ escudo_ate: null }).not("escudo_ate", "is", null);
+      falhou(error, "escudos do mundo de teste");
+      return { mensagem: "os rivais estão inteiros de novo, com o cofre cheio — e ninguém do mundo de teste está de escudo" };
     }
-    case "veiculos":
-      await gravar({ veiculos: [...ORDEM_DOS_VEICULOS] });
-      return { mensagem: "todos os veículos na garagem" };
-    case "construcoes": {
-      const tudo = Object.fromEntries(ORDEM_DAS_CONSTRUCOES.map((c) => [c, CONSTRUCOES[c].max]));
-      await gravar({ construcoes: tudo, neuro_nivel: nivelMaximoDoNeuro(CONSTRUCOES.castelo.max) });
-      return { mensagem: "todas as construções e o Neuro no nível máximo" };
+
+    case "invasao": {
+      // o robô mais forte que ainda pode atacar hoje invade o meu reino (o meu escudo sai antes)
+      if (pazVigente((await pazDeAgora()).paz)) throw new ErroDeAcesso(400, "o mundo de teste está em paz — use “Acabar com a paz” antes");
+      if (temEscudo(reino)) await gravar({ escudo_ate: null });
+      await garantirRivais();
+      let motivo = "";
+      for (const r of [...RIVAIS_DE_TESTE].reverse()) {
+        try {
+          const invasao = await invadir(r.id, usuarioId);
+          return {
+            mensagem: invasao.venceu
+              ? `${r.dono} invadiu o seu reino: ${invasao.estrelas}★, ${invasao.destruicao}% destruído${invasao.saque ? ` e levou 🪙 ${invasao.saque}` : ""}`
+              : `Você defendeu o reino contra ${r.dono}!`,
+            invasao: { ...invasao, atacante: r.dono, reinoDoAtacante: r.nome },
+          };
+        } catch (e) {
+          if (!(e instanceof ErroDeAcesso) || e.status >= 500) throw e;
+          motivo = e.message;
+        }
+      }
+      throw new ErroDeAcesso(400, `nenhum rival conseguiu invadir agora (${motivo}) — use “Recomeçar o dia” ou “Restaurar os rivais”`);
     }
-    case "exercito": {
-      const quartel = Math.max(1, n.quartel || 0), torre = Math.max(1, n.castelo || 1);
-      await gravar({ exercito: exercitoDeTreino(quartel, 1), guarnicao: guarnicaoDeTreino(torre, 1) });
-      return { mensagem: "exército e defesa completos (do tamanho do Quartel e da Torre)" };
-    }
+
     case "minas": {
       const voltar = (iso, horas) => new Date(new Date(iso || Date.now()).getTime() - horas * HORA).toISOString();
       await gravar({ ouro_coletado_em: voltar(reino.ouro_coletado_em, 24), coletado_em: voltar(reino.coletado_em, 12) });
       return { mensagem: "as minas adiantaram 24 h de trabalho" };
     }
-    case "operarios": {
-      const vagas = vagasDaMina(n.minaDeOuro || 1);
-      await gravar({ operarios: Math.max(reino.operarios ?? OPERARIOS_INICIAIS, vagas) });
-      return { mensagem: `a Mina de Ouro com as ${vagas} vagas cheias` };
+
+    case "guerra": {
+      const agora = new Date().toISOString();
+      const [paz, votacao] = await Promise.all([
+        db.from("proof_pazes").update({ fim: agora }).eq("status", "aprovada").gt("fim", agora).select("id"),
+        db.from("proof_pazes").update({ status: "cancelada" }).eq("status", "votacao").select("id"),
+      ]);
+      return { mensagem: contar(paz) + contar(votacao) ? "a paz do mundo de teste acabou — dá para invadir de novo" : "o mundo de teste já estava em guerra" };
     }
-    case "limpar": {
-      const { data, error } = await supabase.from("proof_reino_movimentos").delete().eq("usuario_id", usuarioId).eq("tipo", "teste").select("id");
-      falhou(error, "moedas de teste");
-      return { mensagem: `${(data || []).length} lançamento(s) de moedas de teste retirado(s)` };
-    }
+
+    case "liberado":
+      await gravar({ ...reinoLiberado(), escudo_ate: null });
+      return { mensagem: "tudo liberado: construções, Neuro, veículos, personagens, tropas e operários no máximo" };
+
+    case "zerar":
+      await apagarReinoDeTeste(usuarioId);
+      await criarReinoDeTeste(usuarioId, { liberado: false });
+      return { mensagem: `Reino de Teste novo em folha (só o Barco, níveis iniciais) com ${MOEDAS_INICIAIS_DE_TESTE.toLocaleString("pt-BR")} moedas` };
+
     default:
-      throw new ErroDeAcesso(400, "ação de teste desconhecida");
+      throw new ErroDeAcesso(400, "ferramenta de teste desconhecida");
   }
 }

@@ -2,6 +2,7 @@
 // Uso:  npm run dominio-check
 
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { diaDe, somarDias, diaDaSemana, inicioDaSemana, fimDoMes, diaValido, formatarDia } from "../src/dominio/datas.js";
 import { calcularOfensiva } from "../src/dominio/ofensiva.js";
 import { ehQuadroDeEstudo, temaDo } from "../src/dominio/estudo.js";
@@ -26,8 +27,11 @@ import {
   faixaDeDefesa, estagioDoNeuro, ATAQUES_POR_DIA, TETO_DO_SAQUE, saqueDo, trofeusDoCombate,
   rivalSimulado, simularBatalha, exercitoDeTreino, previsaoDeEstrelas, combateDe, taxaDeProducao, guarnicaoDeTreino,
   proximoAtaqueAoReino, esperaAte, HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, CONSTRUCOES, exercitoDaExpedicao, caidasNoAtaque,
-  NIVEIS_INICIAIS, producaoPorHora,
+  NIVEIS_INICIAIS, producaoPorHora, ORDEM_DAS_CONSTRUCOES, poderDo,
 } from "../src/dominio/reino.js";
+import {
+  RIVAIS_DE_TESTE, FERRAMENTAS_DE_TESTE, reinoDoRival, reinoLiberado, reinoNovoDeTeste, urlNoMundo, ehRivalDeTeste,
+} from "../src/dominio/mundoDeTeste.js";
 import {
   DIAS_DE_PAZ, termosDaPaz, pazVigente, votacaoAberta, podeProporPaz, podeVotar, resultadoDaVotacao, periodoDaPaz,
   OFENSIVA_PARA_VOTAR, podeVotarComOfensiva, eleitoresDaVotacao,
@@ -35,6 +39,7 @@ import {
 } from "../src/dominio/paz.js";
 import {
   VEICULOS, veiculosDe, podeComprarVeiculo, precoDaCarga, tanqueDoDia, podeAbastecer, CARGAS_POR_DIA, EXTRAS_POR_DIA,
+  ORDEM_DOS_VEICULOS,
 } from "../src/dominio/veiculos.js";
 import {
   planetoideDa, sementeDoPlanetoide, ORDEM_DAS_RACAS, FORCA_MINIMA, FORCA_MAXIMA, RECOMPENSA_MINIMA, RECOMPENSA_MAXIMA,
@@ -48,6 +53,7 @@ import {
   precoDepois, variacaoReal, corretagem, podeComprarAcao, podeVenderAcao, posicaoDepois, resumoDaCarteira, validarPregao,
   pregaoDeReserva, saidasDaBolsa, PRECO_MINIMO, PRECO_INICIAL, VARIACAO_MAXIMA, SETORES, NOVAS_POR_DIA, ACOES_DO_PRIMEIRO_DIA,
   MAXIMO_DE_ACOES, MAXIMO_POR_ORDEM, caminhoDoDia, velaDe, sementeDaAcao, PASSOS_DO_DIA, valorDaCompra, valorDaVenda,
+  ABRE_AS, FECHA_AS, pregaoAberto, passosAte, precoNaHora, horaDoPasso, proximaVirada,
 } from "../src/dominio/bolsa.js";
 import { centavos, formatarMoedas, faltam } from "../src/dominio/moedas.js";
 import {
@@ -1345,7 +1351,7 @@ caso("bolsa: o preço anda hora a hora da abertura ao fechamento da Lisa (o mesm
   assert.deepEqual(c, caminhoDoDia({ abertura: 40, fechamento: 46, semente })); // todo mundo vê o mesmo
   assert.notDeepEqual(c, caminhoDoDia({ abertura: 40, fechamento: 46, semente: sementeDaAcao("PEPT", "2026-10-24") }));
   assert.ok(c.every((p) => p >= 1 && Math.round(p * 100) === Math.round(p * 100 + 1e-9)), "centavos");
-  assert.ok(new Set(c).size > 15, "o preço mexe de verdade ao longo do dia");
+  assert.ok(new Set(c).size > PASSOS_DO_DIA - 2, "o preço mexe de verdade ao longo do dia");
   const mexidas = c.slice(1).map((p, i) => Math.abs(p / c[i] - 1));
   assert.ok(Math.max(...mexidas) < 0.08, `nenhuma hora pula demais (${Math.max(...mexidas)})`);
   const v = velaDe(c, 10);
@@ -1356,6 +1362,92 @@ caso("bolsa: o preço anda hora a hora da abertura ao fechamento da Lisa (o mesm
   const parado = caminhoDoDia({ abertura: 20, fechamento: 20, semente: 5 });
   assert.equal(parado[0], 20);
   assert.equal(parado[PASSOS_DO_DIA], 20);
+});
+
+caso("bolsa: o pregão negocia das 07:00 às 17:00 e o preço anda só nesse horário", () => {
+  assert.deepEqual([ABRE_AS, FECHA_AS, PASSOS_DO_DIA], [7, 17, 10]);
+  assert.deepEqual([0, 6, 7, 12, 16, 17, 23].map(pregaoAberto), [false, false, true, true, true, false, false]);
+  assert.deepEqual([0, 6, 7, 8, 16, 17, 23].map(passosAte), [0, 0, 0, 1, 9, 10, 10]);
+  const c = caminhoDoDia({ abertura: 30, fechamento: 36, semente: sementeDaAcao("OURO", "2026-10-23") });
+  assert.equal(precoNaHora(c, 3), 30, "de madrugada: o fechamento de ontem, parado");
+  assert.equal(precoNaHora(c, 7), 30, "abre no fechamento de ontem");
+  assert.equal(precoNaHora(c, 12), c[5]);
+  assert.equal(precoNaHora(c, 17), 36, "às 17:00 chega ao fechamento da Lisa");
+  assert.equal(precoNaHora(c, 22), 36, "e fica lá até amanhã");
+  assert.deepEqual([horaDoPasso(0), horaDoPasso(PASSOS_DO_DIA)], [7, 17]);
+  // quando o preço (ou o pregão) muda de novo
+  assert.equal(proximaVirada("2026-10-23", 5), "2026-10-23T07:00:00-03:00");
+  assert.equal(proximaVirada("2026-10-23", 9), "2026-10-23T10:00:00-03:00");
+  assert.equal(proximaVirada("2026-10-23", 16), "2026-10-23T17:00:00-03:00");
+  assert.equal(proximaVirada("2026-10-23", 17), "2026-10-24T07:00:00-03:00");
+  assert.equal(proximaVirada("2026-10-31", 23), "2026-11-01T07:00:00-03:00");
+});
+
+caso("Reino de Teste: nasce com tudo liberado (e cabe tudo no acampamento)", () => {
+  const r = reinoLiberado();
+  for (const c of ORDEM_DAS_CONSTRUCOES) {
+    assert.equal(r.construcoes[c], CONSTRUCOES[c].max, c);
+    assert.equal(podeMelhorar(r, c, 1e9).motivo, "já está no nível máximo");
+  }
+  assert.deepEqual(r.veiculos, ORDEM_DOS_VEICULOS);
+  assert.deepEqual(personagensDe(r.personagens).sort(), Object.keys(PERSONAGENS).sort());
+  assert.ok(espacoUsado(r.exercito) <= capacidadeDoExercito(r.construcoes.quartel));
+  assert.ok(espacoUsado(r.guarnicao) <= capacidadeDaGuarnicao(r.construcoes.castelo));
+  assert.ok(espacoUsado(r.exercito) + espacoUsado(r.guarnicao) <= lotacaoDoAcampamento(r.construcoes.acampamento));
+  assert.equal(r.operarios, vagasDaMina(r.construcoes.minaDeOuro));
+  // do zero: como um reino novo de verdade
+  const novo = reinoNovoDeTeste();
+  assert.deepEqual(novo.construcoes, NIVEIS_INICIAIS);
+  assert.deepEqual(novo.veiculos, ["barco"]);
+  assert.equal(totalDeTropas(novo.exercito), 0);
+});
+
+caso("Reino de Teste: os rivais-robô são reinos válidos, do mais fraco ao mais forte", () => {
+  const ids = RIVAIS_DE_TESTE.map((r) => r.id);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const id of ids) assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+  assert.ok(ehRivalDeTeste(ids[0]) && !ehRivalDeTeste("63624d00-0000-4000-8000-000000000000"));
+  let defesaAntes = -1;
+  for (const rival of RIVAIS_DE_TESTE) {
+    const r = reinoDoRival(rival);
+    for (const c of ORDEM_DAS_CONSTRUCOES) {
+      const n = r.construcoes[c];
+      assert.ok(n >= (NIVEIS_INICIAIS[c] || 0) && n <= CONSTRUCOES[c].max, `${rival.nome}: ${c} ${n}`);
+      if (CONSTRUCOES[c].terreno && r.construcoes.terreno < CONSTRUCOES[c].terreno) assert.equal(n, 0, `${rival.nome}: ${c} sem terreno`);
+    }
+    assert.ok(espacoUsado(r.exercito) <= capacidadeDoExercito(r.construcoes.quartel), `${rival.nome}: exército`);
+    assert.ok(espacoUsado(r.guarnicao) <= capacidadeDaGuarnicao(r.construcoes.castelo), `${rival.nome}: guarnição`);
+    assert.ok(espacoUsado(r.exercito) + espacoUsado(r.guarnicao) <= lotacaoDoAcampamento(r.construcoes.acampamento), `${rival.nome}: acampamento`);
+    assert.ok(totalDeTropas(r.exercito) > 0, "todo robô pode invadir (a ferramenta “Um rival invade você”)");
+    if (rival.oferta) assert.ok(podeOfertar({ ...rival.oferta, operarios: r.operarios }).ok, `${rival.nome}: oferta`);
+    const defesa = poderDo(r).defesa;
+    assert.ok(defesa > defesaAntes, `${rival.nome} mais forte que o anterior`);
+    defesaAntes = defesa;
+  }
+});
+
+caso("Reino de Teste: a tela chama o servidor no mundo certo, e as ferramentas são únicas", () => {
+  assert.equal(urlNoMundo("/api/reino", "teste"), "/api/reino?mundo=teste");
+  assert.equal(urlNoMundo("/api/reino/bolsa?hora=3", "teste"), "/api/reino/bolsa?hora=3&mundo=teste");
+  assert.equal(urlNoMundo("/api/reino", "real"), "/api/reino");
+  const ferramentas = FERRAMENTAS_DE_TESTE.map((x) => x.id);
+  assert.equal(new Set(ferramentas).size, ferramentas.length);
+  assert.ok(!ferramentas.includes("limpar") && !ferramentas.includes("tanques"), "o modo de teste antigo (no reino de verdade) saiu");
+});
+
+caso("Reino de Teste: o código do reino e da bolsa só fala com o banco pelo mundo (nada vaza para o de verdade)", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const mundo = ler("../src/lib/mundo.js");
+  const tabelas = [...mundo.match(/TABELAS_DO_MUNDO = \[([\s\S]*?)\]/)[1].matchAll(/"(proof_[a-z_]+)"/g)].map((m) => m[1]);
+  assert.ok(tabelas.length >= 10 && tabelas.includes("proof_reinos") && tabelas.includes("proof_bolsa_posicoes"));
+  for (const arquivo of ["../src/lib/reino.js", "../src/lib/bolsa.js"]) {
+    const src = ler(arquivo);
+    assert.ok(!/\bsupabase\./.test(src), `${arquivo}: fala com o banco direto (use db.from)`);
+    for (const t of tabelas) assert.ok(!src.includes(`buscarEmLotes("${t}"`), `${arquivo}: buscarEmLotes("${t}") sem tabela()`);
+  }
+  // cada tabela do jogo tem a gêmea de teste na migração
+  const migracao = ler("../db/016-mundo-de-teste.sql");
+  for (const t of tabelas) assert.ok(migracao.includes(`${t.replace(/^proof_/, "proof_teste_")} `) && migracao.includes(`like public.${t} `), `gêmea de ${t}`);
 });
 
 caso("moedas com centavos: a bolsa conta centavo por centavo, e a venda devolve os centavos", () => {

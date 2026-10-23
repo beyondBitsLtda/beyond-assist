@@ -20,8 +20,14 @@
 // vender no mesmo dia nunca dá lucro: o preço só muda no pregão seguinte. Empresa que chega a
 // PRECO_MINIMO vai à FALÊNCIA (as ações dela viram pó). Com mais de MAXIMO_DE_ACOES na bolsa, a
 // mais antiga FECHA O CAPITAL: quem tem ações dela recebe o preço do dia por cada uma.
+//
+// O HORÁRIO DO PREGÃO (23/10/2026: "na bolsa de valores deixe aberta entre as 07:00 e as 17:00"):
+// compra e venda só das ABRE_AS às FECHA_AS (horário de Brasília). O preço anda de hora em hora só
+// dentro do pregão: às 07:00 ele é a abertura (o fechamento de ontem) e às 17:00 chega ao fechamento
+// que a Lisa decidiu. Fora do horário dá para acompanhar, mas não negociar.
 
 import { centavos, faltam } from "./moedas.js";
+import { somarDias } from "./datas.js";
 
 export const VARIACAO_MAXIMA = 30;        // % por pregão, para cima ou para baixo
 export const PRECO_MINIMO = 2;            // chegou aqui: falência
@@ -31,8 +37,10 @@ export const MAXIMO_DE_ACOES = 12;
 export const NOVAS_POR_DIA = 2;
 export const ACOES_DO_PRIMEIRO_DIA = 6;
 export const MAXIMO_POR_ORDEM = 500;      // ações numa compra ou venda
-export const PASSOS_DO_DIA = 24;           // um preço novo por hora
-export const VOLATILIDADE_DA_HORA = 0.012; // o tamanho típico do sobe-e-desce de uma hora (1,2%)
+export const ABRE_AS = 7;                  // o pregão abre às 07:00...
+export const FECHA_AS = 17;                // ...e fecha às 17:00 (horário de Brasília)
+export const PASSOS_DO_DIA = FECHA_AS - ABRE_AS; // um preço novo por hora de pregão
+export const VOLATILIDADE_DA_HORA = 0.018; // o tamanho típico do sobe-e-desce de uma hora (1,8%)
 export const SETORES = [
   "Mineração", "Armas e defesas", "Transportes", "Alimentos", "Magia", "Tecnologia",
   "Construção", "Turismo", "Tesouros do mar", "Energia vulcânica", "Exploração espacial", "Educação",
@@ -112,9 +120,10 @@ export function sementeDaAcao(ticker, dia) {
 }
 
 /**
- * O caminho do preço no dia, hora a hora: PASSOS_DO_DIA + 1 pontos, de 0 h (a abertura) a 24 h (o
- * fechamento, que vira a abertura de amanhã). No meio, o sobe-e-desce do mercado: um passeio
- * aleatório "amarrado" nas duas pontas (ponte), sobre a linha que leva da abertura ao fechamento.
+ * O caminho do preço no dia, hora a hora: PASSOS_DO_DIA + 1 pontos, das ABRE_AS (a abertura) às
+ * FECHA_AS (o fechamento, que vira a abertura de amanhã). No meio, o sobe-e-desce do mercado: um
+ * passeio aleatório "amarrado" nas duas pontas (ponte), sobre a linha que leva da abertura ao
+ * fechamento.
  */
 export function caminhoDoDia({ abertura, fechamento, semente }) {
   const r = sorteio(semente);
@@ -135,6 +144,28 @@ export function caminhoDoDia({ abertura, fechamento, semente }) {
 export function velaDe(caminho, ate = caminho.length - 1) {
   const parte = caminho.slice(0, Math.max(1, ate + 1));
   return { abertura: parte[0], maxima: Math.max(...parte), minima: Math.min(...parte), fechamento: parte[parte.length - 1] };
+}
+
+/** O pregão está aberto nesta hora (0 a 23, em Brasília)? Das 07:00 às 16:59. */
+export const pregaoAberto = (hora) => hora >= ABRE_AS && hora < FECHA_AS;
+
+/** Quantos passos do caminho já andaram na hora `hora`: nenhum antes de abrir, todos depois de fechar. */
+export const passosAte = (hora) => limitar(Math.floor(Number(hora) || 0) - ABRE_AS, 0, PASSOS_DO_DIA);
+
+/** O preço do caminho na hora `hora` (antes de abrir, a abertura; depois de fechar, o fechamento). */
+export const precoNaHora = (caminho, hora) => caminho[Math.min(caminho.length - 1, passosAte(hora))];
+
+/** A hora do relógio de cada ponto do caminho (o ponto 0 é a abertura, às ABRE_AS). */
+export const horaDoPasso = (i) => ABRE_AS + i;
+
+/**
+ * Quando o preço (ou o pregão) muda de novo: antes de abrir, na abertura; no pregão, na hora
+ * seguinte (às FECHA_AS ele fecha); depois de fechar, na abertura de amanhã. Devolve o instante
+ * em ISO, no fuso de Brasília.
+ */
+export function proximaVirada(dia, hora) {
+  const v = hora < ABRE_AS ? { dia, hora: ABRE_AS } : hora < FECHA_AS ? { dia, hora: hora + 1 } : { dia: somarDias(dia, 1), hora: ABRE_AS };
+  return `${v.dia}T${String(v.hora).padStart(2, "0")}:00:00-03:00`;
 }
 
 // ------------------------------------------------------------------ o pregão

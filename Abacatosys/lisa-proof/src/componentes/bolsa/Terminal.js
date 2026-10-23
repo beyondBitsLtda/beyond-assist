@@ -6,6 +6,10 @@
 // (hora a hora ou velas de 14 dias) da ação escolhida, a boleta para comprar e vender, a carteira,
 // os destaques e o mural de notícias da Lisa. Os preços mudam de hora em hora (o mesmo para todos);
 // a tela confere de minuto em minuto e avisa quando vem a próxima hora.
+//
+// O pregão negocia das 07:00 às 17:00 (src/dominio/bolsa.js); fora disso, a tela mostra as cotações e
+// a boleta fica travada. Em /bolsa/teste (mundo="teste") é a Bolsa do Reino de Teste: o mesmo
+// mercado, com a carteira e as moedas do mundo de teste, negociando a qualquer hora.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -13,12 +17,20 @@ import { obter, criar } from "@/lib/api.js";
 import { useAviso } from "@/componentes/Pecas.js";
 import { reagir, comemorar } from "@/componentes/Neuro.js";
 import { corretagem, valorDaCompra, valorDaVenda } from "@/dominio/bolsa.js";
+import { MUNDO_DE_TESTE, urlNoMundo } from "@/dominio/mundoDeTeste.js";
 import { GraficoDoDia, GraficoDeVelas, Mini } from "./Graficos.js";
 import { preco, moedas, pct, seta, rumo, horaCurta, diaCurto } from "./formatos.js";
 
 const ORDENS = { altas: "Maiores altas", baixas: "Maiores baixas", nome: "A–Z", volume: "Mais negociadas" };
 
-export default function Terminal() {
+/** Quanto falta até `ms`: "em 12 min" ou "em 3 h 20 min". */
+function emQuanto(ms) {
+  const min = Math.max(0, Math.ceil(ms / 60_000));
+  return min < 60 ? `em ${min} min` : `em ${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ""}`;
+}
+
+export default function Terminal({ mundo = "real" }) {
+  const teste = mundo === MUNDO_DE_TESTE;
   const [bolsa, setBolsa] = useState(null);
   const [erro, setErro] = useState("");
   const [escolhida, setEscolhida] = useState(null);
@@ -26,12 +38,12 @@ export default function Terminal() {
   const [ordem, setOrdem] = useState("altas");
   const [ocupado, setOcupado] = useState(false);
   const [agora, setAgora] = useState(() => Date.now());
-  const [horaDeTeste, setHoraDeTeste] = useState(null); // modo de teste: ver o pregão numa hora qualquer
-  const [previa, setPrevia] = useState(null);           // modo de teste: o pregão de amanhã pela Lisa, sem aplicar
+  const [horaDeTeste, setHoraDeTeste] = useState(null); // Bolsa de Teste: ver (e negociar) o pregão numa hora qualquer
+  const [previa, setPrevia] = useState(null);           // Bolsa de Teste: o pregão de amanhã pela Lisa, sem aplicar
   const [Aviso, avisar] = useAviso();
 
-  const carregar = useCallback(() => obter(horaDeTeste == null ? "/api/reino/bolsa" : `/api/reino/bolsa?hora=${horaDeTeste}`)
-    .then((b) => { setBolsa(b); setErro(""); }).catch((e) => setErro(e.message)), [horaDeTeste]);
+  const carregar = useCallback(() => obter(urlNoMundo(horaDeTeste == null ? "/api/reino/bolsa" : `/api/reino/bolsa?hora=${horaDeTeste}`, mundo))
+    .then((b) => { setBolsa(b); setErro(""); }).catch((e) => setErro(e.message)), [horaDeTeste, mundo]);
   useEffect(() => {
     carregar();
     // confere de minuto em minuto (o preço muda na virada da hora); com a aba escondida, para
@@ -68,7 +80,7 @@ export default function Terminal() {
   async function negociar(tipo, quantidade) {
     setOcupado(true);
     try {
-      const r = await criar("/api/reino/bolsa", { acao: tipo, id: acao.id, quantidade });
+      const r = await criar(urlNoMundo("/api/reino/bolsa", mundo), { acao: tipo, id: acao.id, quantidade, ...(teste && horaDeTeste != null ? { hora: horaDeTeste } : {}) });
       setBolsa(r.bolsa);
       const x = r.resultado;
       if (tipo === "comprar") reagir("feliz", `🛒 ${x.quantidade} ${x.nome} a 🪙 ${preco(x.preco)}`, 4000);
@@ -91,25 +103,34 @@ export default function Terminal() {
     );
   }
 
-  const faltaMin = Math.max(0, Math.ceil((new Date(bolsa.pregao.proximaAtualizacao).getTime() - agora) / 60_000));
+  const p = bolsa.pregao;
+  const proxima = new Date(p.proximaAtualizacao);
+  const horaDaProxima = proxima.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
   const relogio = new Date(agora).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const idx = bolsa.indice;
+  // o status do pregão: abrindo (a Lisa), aberto, fechado (antes das 07:00) ou encerrado (depois das 17:00)
+  const status = p.abrindo ? "A Lisa está abrindo o pregão…"
+    : teste ? `Bolsa de teste · ${horaCurta(p.hora)}${p.simulada ? " (simulação)" : ""}`
+    : p.aberto ? `Pregão aberto · ${horaCurta(p.hora)}`
+    : p.horaDeVerdade < p.abreAs ? `Pregão fechado · abre às ${horaCurta(p.abreAs)}`
+    : `Pregão encerrado · abre amanhã às ${horaCurta(p.abreAs)}`;
+  const fechado = !p.abrindo && !p.aberto;
   return (
-    <div className="bx">
+    <div className={`bx${teste ? " bx--teste" : ""}`}>
       <Letreiro acoes={bolsa.acoes} />
 
       <header className="bx-topo">
         <div className="bx-topo__marca">
-          <Link href="/reino" className="bx-voltar">← Reino</Link>
-          <h1>📈 Bolsa do Reino</h1>
-          <span className={`bx-status${bolsa.pregao.abrindo ? " bx-status--abrindo" : ""}`}>
+          <Link href={teste ? "/reino/teste" : "/reino"} className="bx-voltar">{teste ? "← Reino de Teste" : "← Reino"}</Link>
+          <h1>{teste ? "🧪 Bolsa de Teste" : "📈 Bolsa do Reino"}</h1>
+          <span className={`bx-status${p.abrindo ? " bx-status--abrindo" : fechado && !teste ? " bx-status--fechado" : ""}`}>
             <span className="bx-status__luz" aria-hidden="true" />
-            {bolsa.pregao.abrindo ? "A Lisa está abrindo o pregão…" : `Pregão aberto · ${horaCurta(bolsa.pregao.hora)}${bolsa.pregao.simulada ? " (simulação)" : ""}`}
+            {status}
           </span>
         </div>
         <div className="bx-topo__relogio">
           <strong>{relogio}</strong>
-          <small>próxima cotação às {horaCurta(((bolsa.pregao.horaDeVerdade ?? bolsa.pregao.hora) + 1) % 24)} · em {faltaMin} min</small>
+          <small>{p.aberto ? "próxima cotação" : "o pregão abre"} às {horaDaProxima} · {emQuanto(proxima.getTime() - agora)}</small>
         </div>
         <div className="bx-indice">
           <div>
@@ -125,8 +146,11 @@ export default function Terminal() {
         <p className="bx-manchete"><span>🎙️ LISA AO VIVO</span> {bolsa.pregao.manchete}</p>
       )}
 
-      {bolsa.modoDeTeste && (
-        <BarraDeTeste bolsa={bolsa} hora={horaDeTeste} aoHora={setHoraDeTeste} previa={previa} aoPrevia={setPrevia} avisar={avisar} />
+      {teste && (
+        <BarraDeTeste bolsa={bolsa} mundo={mundo} hora={horaDeTeste} aoHora={setHoraDeTeste} previa={previa} aoPrevia={setPrevia} avisar={avisar} />
+      )}
+      {!teste && fechado && (
+        <p className="bx-fechado">🔒 A bolsa negocia das <strong>{horaCurta(p.abreAs)}</strong> às <strong>{horaCurta(p.fechaAs)}</strong> (horário de Brasília). Fora desse horário dá para acompanhar as cotações, mas não comprar nem vender.</p>
       )}
 
       <div className="bx-grade-principal">
@@ -182,7 +206,7 @@ export default function Terminal() {
           </section>
         )}
 
-        {acao && <Boleta acao={acao} saldo={bolsa.saldo} regras={bolsa.regras} ocupado={ocupado} pregaoAbrindo={bolsa.pregao.abrindo} simulada={bolsa.pregao.simulada} aoEnviar={negociar} />}
+        {acao && <Boleta acao={acao} saldo={bolsa.saldo} regras={bolsa.regras} ocupado={ocupado} pregao={p} teste={teste} aoEnviar={negociar} />}
       </div>
 
       <div className="bx-grade-baixo">
@@ -191,8 +215,9 @@ export default function Terminal() {
         <Mural bolsa={bolsa} aoEscolher={setEscolhida} />
       </div>
       <p className="bx-rodape">
-        Uma bolsa só, a mesma para todos. Todo dia a Lisa decide onde cada ação fecha; o preço anda hora a hora até lá. Corretagem de {Math.round(bolsa.regras.taxa * 100)}% (mín. 1 moeda) por ordem;
+        Uma bolsa só, a mesma para todos. O pregão negocia das {horaCurta(p.abreAs)} às {horaCurta(p.fechaAs)}: todo dia a Lisa decide onde cada ação fecha, e o preço anda hora a hora até lá. Corretagem de {Math.round(bolsa.regras.taxa * 100)}% (mín. 1 moeda) por ordem;
         empresa que chega a {bolsa.regras.precoMinimo} moedas vai à falência; com mais de {bolsa.regras.maximoDeAcoes} empresas, a mais antiga fecha o capital e paga quem tem ações dela.
+        {teste ? " Aqui é a Bolsa de Teste: a carteira e as moedas são do Reino de Teste e não valem no jogo de verdade." : bolsa.modoDeTeste ? <> <Link href="/bolsa/teste">🧪 Testar na Bolsa de Teste</Link>.</> : null}
       </p>
       {Aviso}
     </div>
@@ -217,8 +242,8 @@ function Letreiro({ acoes }) {
   );
 }
 
-/** A boleta: comprar ou vender a ação escolhida, ao preço desta hora. */
-function Boleta({ acao, saldo, regras, ocupado, pregaoAbrindo, simulada, aoEnviar }) {
+/** A boleta: comprar ou vender a ação escolhida, ao preço desta hora (só com o pregão aberto). */
+function Boleta({ acao, saldo, regras, ocupado, pregao, teste, aoEnviar }) {
   const [tipo, setTipo] = useState("comprar");
   const [qtd, setQtd] = useState(1);
   const tem = acao.minha?.quantidade || 0;
@@ -253,9 +278,10 @@ function Boleta({ acao, saldo, regras, ocupado, pregaoAbrindo, simulada, aoEnvia
         <dt><strong>{tipo === "comprar" ? "Você paga" : "Você recebe"}</strong></dt><dd><strong>🪙 {moedas(total)}</strong></dd>
       </dl>
       {falta && <p className="bx-alerta">Faltam 🪙 {moedas(total - saldo)}.</p>}
-      {simulada && <p className="bx-alerta">🧪 Você está vendo uma hora simulada — volte para “agora” para negociar (a ordem usa sempre o preço da hora de verdade).</p>}
-      <button type="button" className={`bx-enviar bx-enviar--${tipo}`} disabled={ocupado || pregaoAbrindo || simulada || falta || (tipo === "vender" && !tem)} onClick={() => aoEnviar(tipo, q)}>
-        {ocupado ? "Enviando a ordem…" : tipo === "comprar" ? `Comprar ${q} ${acao.id}` : `Vender ${q} ${acao.id}`}
+      {teste && pregao.simulada && <p className="bx-nota-teste">🧪 Negociando no preço das {horaCurta(pregao.hora)} (hora simulada).</p>}
+      {!pregao.podeNegociar && <p className="bx-alerta">🔒 Pregão fechado: compra e venda das {horaCurta(pregao.abreAs)} às {horaCurta(pregao.fechaAs)}.</p>}
+      <button type="button" className={`bx-enviar bx-enviar--${tipo}`} disabled={ocupado || pregao.abrindo || !pregao.podeNegociar || falta || (tipo === "vender" && !tem)} onClick={() => aoEnviar(tipo, q)}>
+        {ocupado ? "Enviando a ordem…" : !pregao.podeNegociar ? "Pregão fechado" : tipo === "comprar" ? `Comprar ${q} ${acao.id}` : `Vender ${q} ${acao.id}`}
       </button>
       <p className="bx-boleta__saldo">Saldo para investir: <strong>🪙 {moedas(saldo)}</strong></p>
       {m && (
@@ -346,16 +372,17 @@ function Mural({ bolsa, aoEscolher }) {
 }
 
 /**
- * O modo de teste na bolsa: ver o pregão de hoje numa hora qualquer (o caminho do preço é o mesmo
- * para todos, então dá para ver como o dia anda) e pedir à Lisa a prévia do pregão de amanhã.
+ * As ferramentas da Bolsa de Teste: ver e negociar o pregão de hoje numa hora qualquer (o caminho do
+ * preço é o mesmo para todos, então dá para ver como o dia anda) e pedir à Lisa a prévia do pregão
+ * de amanhã.
  */
-function BarraDeTeste({ bolsa, hora, aoHora, previa, aoPrevia, avisar }) {
+function BarraDeTeste({ bolsa, mundo, hora, aoHora, previa, aoPrevia, avisar }) {
   const [pedindo, setPedindo] = useState(false);
   const vendo = hora == null ? bolsa.pregao.horaDeVerdade : hora;
   async function pedirPrevia() {
     setPedindo(true);
     try {
-      const r = await criar("/api/reino/teste", { acao: "pregao" });
+      const r = await criar(urlNoMundo("/api/reino/teste", mundo), { acao: "pregao" });
       aoPrevia(r.previa);
     } catch (e) {
       avisar(e.message);
@@ -366,9 +393,9 @@ function BarraDeTeste({ bolsa, hora, aoHora, previa, aoPrevia, avisar }) {
   return (
     <section className="bx-teste" aria-label="Modo de teste da bolsa">
       <div className="bx-teste__linha">
-        <strong>🧪 Modo de teste</strong>
+        <strong>🧪 Bolsa de Teste</strong>
         <label className="bx-teste__hora">
-          <span>Ver o pregão às <b>{horaCurta(vendo)}</b>{hora == null ? " (agora)" : " (simulação)"}</span>
+          <span>Ver e negociar às <b>{horaCurta(vendo)}</b>{hora == null ? " (agora)" : " (simulação)"}</span>
           <input type="range" min={0} max={23} step={1} value={vendo} onChange={(e) => aoHora(Number(e.target.value))} aria-label="Hora do pregão" />
         </label>
         {hora != null && <button type="button" className="bx-teste__botao" onClick={() => aoHora(null)}>⟲ Agora</button>}
