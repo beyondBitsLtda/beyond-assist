@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.23.0-proof-projeto-da-semana.1",
+  "versao": "0.23.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 57,
+    "numero": 58,
     "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.23.0-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Publicação da 0.23.0: o projeto da semana ligado aos assuntos da semana do curso, com o assunto de cada requisito e a opção de gerar outro.",
+      "itens": [
+        "Junta a branch proof-projeto-da-semana (0.23.0-proof-projeto-da-semana.1).",
+        "Sem migração de banco: a semana, as datas e os assuntos ficam no conteúdo do próprio projeto.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.23.0-proof-projeto-da-semana.1",
       "data": "2026-10-23",
