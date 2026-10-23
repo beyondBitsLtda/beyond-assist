@@ -52,16 +52,16 @@ function textoDoProjeto(no) {
   const u = no.unidade;
   const qual = u.final ? "o projeto final" : `o projeto da semana ${u.numero}`;
   switch (no.estado) {
-    case "bloqueado": return `Trancado: abre quando o projeto da semana ${u.numero - 1} for aprovado.`;
+    case "bloqueado": return `Trancado: abre quando o projeto da semana ${u.anterior} for aprovado.`;
     case "futuro": return `Libera em ${formatarDia(u.de)}, quando a semana começa — ou antes, se você concluir todos os assuntos dela.`;
     case "dispensado": return "Esta semana foi concluída antes das regras novas: não precisa de projeto.";
     case "liberado": return `Os ${PROJETOS_POR_SEMANA} projetos desta semana acabaram sem aprovação — a semana foi liberada assim mesmo.`;
-    case "feito": return u.final ? "Aprovado! Com ele, a trilha está concluída. 🏆" : `Aprovado! A semana ${u.numero + 1} está liberada.`;
+    case "feito": return u.final ? "Aprovado! Com ele, a trilha está concluída. 🏆" : `Aprovado! A semana ${u.seguinte} está liberada.`;
     case "entregue": return `As entregas acabaram abaixo de ${NOTA_DE_APROVACAO}. Veja o que a Lisa sugeriu${u.podeOutroProjeto ? " e tente um projeto novo" : ""}.`;
     case "em_andamento": return `Em andamento. Entregue o link do repositório no GitHub: aprovado (nota ${NOTA_DE_APROVACAO}+), ${u.final ? "a trilha termina" : "a semana seguinte abre"}.`;
     default: return u.final
-      ? `A Lisa monta ${qual}: um projeto do tamanho da trilha inteira (${u.numero} semana(s) de estudo). Aprovado, a trilha termina.`
-      : `A Lisa monta ${qual} com os assuntos dela. Aprovado (nota ${NOTA_DE_APROVACAO}+), a semana ${u.numero + 1} abre.`;
+      ? `A Lisa monta ${qual}: um projeto do tamanho da trilha inteira. Aprovado, a trilha termina.`
+      : `A Lisa monta ${qual} com os assuntos dela. Aprovado (nota ${NOTA_DE_APROVACAO}+), a semana ${u.seguinte} abre.`;
   }
 }
 

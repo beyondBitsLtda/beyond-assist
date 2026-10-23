@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoMonstro } from "./reino/monstrosDePapel.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-23-trilha-amarrada";
+export const EDICAO_DAS_NOVIDADES = "2026-10-23-semana-do-curso";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,12 +28,11 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🔗", titulo: "A prática agora move a trilha", texto: "O assunto conclui com a teoria E o quiz dele (60% ou mais). Cada semana do plano termina num projeto — aprovado, a semana seguinte abre.", destaque: true },
-  { icone: "🏆", titulo: "Projeto final, do tamanho do seu plano", texto: "O projeto do mês virou o projeto final da trilha: num plano de 5 dias é um projeto só, pequeno e completo; numa trilha longa, junta tudo. O que você já tinha concluído continua valendo." },
-  { icone: "🪐", titulo: "Planetoides de verdade", texto: "As expedições da Nave agora são numa esfera: tropas, monstros e construções andam em volta do planeta, estilo Mario Galaxy." },
-  { icone: "🌊", titulo: "Fundo do mar de verdade", texto: "Nada de nuvem embaixo d'água: areia até o horizonte, algas balançando, cardumes, raios de luz e bolhas subindo." },
-  { icone: "🧪", titulo: "Reino de Teste", texto: "Um reino à parte, com tudo liberado e reinos-robô para atacar: teste tudo sem mexer no seu reino de verdade." },
-  { icone: "⏰", titulo: "A Bolsa abre das 07h às 17h", texto: "O pregão negocia das 07:00 às 17:00 (horário de Brasília), e o preço anda de hora em hora nesse intervalo. Fora dele, dá para acompanhar as cotações, mas não comprar nem vender." },
+  { icone: "📅", titulo: "O projeto semanal é o da semana do curso", texto: "A Semana 1 do projeto é a Semana 1 da sua trilha (a mesma do mapa e da agenda), sobre os assuntos dela. A semana seguinte só abre com o projeto aprovado.", destaque: true },
+  { icone: "🎭", titulo: "5 personagens novos", texto: "Direto das expedições: Neuro Cogumelo, Mergulhador, Yeti, Magma e Alienígena. Estão no Reino, em Personagens." },
+  { icone: "🃏", titulo: "Cartões do Reino arrumados", texto: "Personagens, garagem, expedições e construções com tamanhos iguais por linha e os botões sempre no pé do cartão, no computador e no celular." },
+  { icone: "🔗", titulo: "A prática move a trilha", texto: "O assunto conclui com a teoria E o quiz dele (60% ou mais), e a trilha termina num projeto final do tamanho do seu plano." },
+  { icone: "🪐", titulo: "Planetoides e fundo do mar de verdade", texto: "As expedições da Nave são numa esfera, estilo Mario Galaxy; as do Submarino, no fundo do mar, com cardumes e bolhas." },
 ];
 
 export default function Novidades() {
@@ -72,13 +71,13 @@ export default function Novidades() {
           <img className="novidades__bicho novidades__bicho--goblin" src={urlDoMonstro("zorg")} alt="" />
           <img className="novidades__bicho novidades__bicho--cogumelo" src={urlDoMonstro("diabrete")} alt="" />
           <img className="novidades__bicho novidades__bicho--morcego" src={urlDoMonstro("disco")} alt="" />
-          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} personagem="abacato" /></div>
+          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} personagem="alienigena" /></div>
           <span className="novidades__chao" />
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">Trilha e prática juntas!</h2>
-          <p className="novidades__sub">O quiz conclui o assunto, o projeto abre a semana seguinte e o projeto final fecha a trilha. E as expedições ganharam planetoides esféricos e um fundo do mar de verdade.</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">A semana do curso manda!</h2>
+          <p className="novidades__sub">O projeto semanal agora é o da semana da sua trilha, e a semana só anda com ele aprovado. E o Reino ganhou 5 personagens das expedições e cartões arrumados.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>

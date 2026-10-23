@@ -85,6 +85,7 @@ export default function Trilha() {
   const { trilha, avanco, progresso } = dados;
   const terminou = avanco.concluida;
   const semanas = avanco.unidades.length;
+  const ultimaSemana = avanco.unidades.at(-1)?.numero || semanas;
   const daVez = avanco.semanaDaVez;
 
   return (
@@ -114,7 +115,7 @@ export default function Trilha() {
             {terminou
               ? `${semanas === 1 ? "Plano de uma semana" : `${semanas} semanas de plano`} · trilha concluída com o projeto final`
               : daVez
-                ? `Semana ${daVez.numero} de ${semanas}${daVez.final ? " (a última: termina no projeto final)" : ` · o projeto dela abre a semana ${daVez.numero + 1}`}`
+                ? `Semana ${daVez.numero} de ${ultimaSemana} do curso${daVez.final ? " (a última: termina no projeto final)" : ` · o projeto dela abre a semana ${daVez.seguinte}`}`
                 : `${semanas} semana(s) de plano`}
             {" · o assunto conclui com a teoria e o quiz dele (60%+)"}
           </p>

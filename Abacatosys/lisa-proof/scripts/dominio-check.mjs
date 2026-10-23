@@ -20,7 +20,7 @@ import {
   tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto, podeTrocarComplexidade,
 } from "../src/dominio/pratica.js";
 import { execucaoDoExercicio, prepararParaCompilador, resultadoDoServidor } from "../src/dominio/execucao.js";
-import { PERSONAGENS, personagensDe, podeEscolherPersonagem } from "../src/dominio/personagens.js";
+import { PERSONAGENS, ORDEM_DOS_PERSONAGENS, personagensDe, podeEscolherPersonagem } from "../src/dominio/personagens.js";
 import { nomePublico, apelidoValido, posicionar, ANONIMO } from "../src/dominio/ranking.js";
 import {
   podeMelhorar, podeSubirNeuro, producaoAcumulada, podeInvadir, batalha, saldoDe, somarTrofeus,
@@ -315,16 +315,29 @@ caso("assunto atual: atrasado primeiro; trilha acabada devolve o último", () =>
 // ---- a trilha amarrada (23/10/2026): src/dominio/avanco.js
 const BASE = "2026-10-05";
 const et = (cardId, ordem, dias, inicio, extra = {}) => ({ cardId, ordem, dias, inicio, fim: inicio, titulo: cardId, teoria: false, ...extra });
-caso("avanço: as semanas do plano somam os dias de cada assunto (não a semana do calendário)", () => {
-  const lista = [et("a", 1, 2, "2026-10-05"), et("b", 2, 2, "2026-10-07"), et("c", 3, 1, "2026-10-09"), et("d", 4, 3, "2026-10-12"), et("e", 5, 1, "2026-10-15"), et("f", 6, 2, "2026-10-16")];
-  assert.deepEqual(semanasDoPlano(lista, [1, 2, 3, 4, 5]).map((u) => u.map((e) => e.cardId).join("")), ["abc", "de", "f"]);
-  // um plano de 5 dias (5 assuntos de 1 dia, de segunda a sexta) é UMA semana — e ela termina no projeto final
+caso("avanço: as semanas do plano são as semanas do curso (as do mapa e da agenda)", () => {
+  // a semana gravada no agendamento manda (é a "Semana N" que a pessoa vê)
+  const lista = [et("a", 1, 2, "2026-10-05", { semana: 1 }), et("b", 2, 2, "2026-10-07", { semana: 1 }), et("c", 3, 1, "2026-10-09", { semana: 1 }),
+    et("d", 4, 3, "2026-10-12", { semana: 2 }), et("e", 5, 1, "2026-10-15", { semana: 2 }), et("f", 6, 2, "2026-10-16", { semana: 2 }), et("g", 7, 2, "2026-10-26", { semana: 4 })];
+  assert.deepEqual(semanasDoPlano(lista, BASE).map((u) => `${u.numero}:${u.etapas.map((e) => e.cardId).join("")}`), ["1:abc", "2:def", "4:g"]);
+  // sem a semana gravada: conta pela data, a partir da semana em que a trilha começou
+  const semGravar = lista.map(({ semana, ...e }) => e);
+  assert.deepEqual(semanasDoPlano(semGravar, BASE).map((u) => u.numero), [1, 2, 4]);
+  const av = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-09" });
+  assert.deepEqual(av.unidades.map((u) => [u.numero, u.tipo, u.seguinte, u.anterior]), [[1, "projeto_semanal", 2, null], [2, "projeto_semanal", 4, 1], [4, "projeto_final", null, 2]]);
+  // o projeto da semana N cobre os assuntos da semana N do curso; a chave é a segunda-feira dela
+  assert.deepEqual(av.unidades[1].cardIds, ["d", "e", "f"]);
+  assert.equal(av.unidades[1].periodo, "2026-10-12");
+  assert.equal(periodoDaSemana("2026-10-07", 1), "2026-10-05", "trilha que começou numa quarta: a semana 1 é a da segunda 05/10");
+  // o projeto com a data (chave) de uma semana é só dela: não "empresta" para outra pelos assuntos
+  const daSemana4 = { id: "p4", tipo: "projeto_semanal", periodo: periodoDaSemana(BASE, 4), status: "em_andamento", card_ids: ["d", "e", "g"] };
+  const comProjeto = avancoDaTrilha({ etapas: lista, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-09", projetos: [daSemana4] });
+  assert.equal(comProjeto.unidades[1].projeto, null);
+  // um plano de 5 dias (de segunda a sexta) é UMA semana do curso — e ela termina no projeto final
   const curto = ["a", "b", "c", "d", "e"].map((id, i) => et(id, i + 1, 1, `2026-10-0${5 + i}`));
-  const av = avancoDaTrilha({ etapas: curto, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-05" });
-  assert.equal(av.unidades.length, 1);
-  assert.equal(av.unidades[0].tipo, "projeto_final");
-  // dias de estudo diferentes mudam o tamanho da semana: 3 dias por semana
-  assert.deepEqual(semanasDoPlano(lista, [1, 3, 5]).map((u) => u.map((e) => e.cardId).join("")), ["a", "bc", "d", "ef"]);
+  const so = avancoDaTrilha({ etapas: curto, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-05" });
+  assert.equal(so.unidades.length, 1);
+  assert.equal(so.unidades[0].tipo, "projeto_final");
   assert.equal(valorDoProjetoFinal(1), 250);
   assert.equal(valorDoProjetoFinal(3), 450);
   assert.equal(valorDoProjetoFinal(9), 600);
@@ -929,7 +942,13 @@ caso("exercício do dia: o mesmo exercício de novo é barrado", () => {
   assert.equal(exercicioRepetido({ titulo: "Contador de vogais", enunciado: "Conte quantas vogais existem numa palavra digitada." }, antes), false);
 });
 caso("personagens: o Clássico é de todos; comprar cobra, vestir o que já tem é de graça", () => {
-  assert.equal(Object.keys(PERSONAGENS).length, 7);
+  // 12 (os 5 dos ambientes das expedições estrearam em 23/10/2026): a vitrine fecha as linhas de 6, 4, 3 e 2
+  assert.equal(Object.keys(PERSONAGENS).length, 12);
+  // a vitrine mostra todos, uma vez cada, do mais barato ao mais caro
+  assert.deepEqual([...ORDEM_DOS_PERSONAGENS].sort(), Object.keys(PERSONAGENS).sort());
+  const precos = ORDEM_DOS_PERSONAGENS.map((id) => PERSONAGENS[id].preco);
+  assert.deepEqual(precos, [...precos].sort((a, b) => a - b));
+  for (const id of ["cogumelo", "mergulhador", "yeti", "magma", "alienigena"]) assert.ok(PERSONAGENS[id].preco > 0, id);
   assert.deepEqual(personagensDe([]), ["neuro", "abacato"]);
   assert.deepEqual(personagensDe(["ninja", "inventado", "ninja"]), ["neuro", "abacato", "ninja"]);
   // o Neuro Abacate (mascote do Abacato) é de graça e de todo mundo
