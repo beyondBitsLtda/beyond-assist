@@ -46,7 +46,8 @@ export const CONQUISTAS = [
 
   c("Projetos", "semanais", "semanal-1", "Primeiro projeto", "Ser aprovado num projeto da semana", "🎁", 1, 100),
   c("Projetos", "semanais", "semanal-4", "Quatro semanas construindo", "Ser aprovado em 4 projetos da semana", "🧰", 4, 300),
-  c("Projetos", "mensais", "mensal-1", "Projeto do mês", "Ser aprovado num projeto do mês", "🏆", 1, 300),
+  // desde 23/10/2026 o projeto grande é o FINAL de cada trilha (o do mês ficou só para a história): os dois contam aqui
+  c("Projetos", "mensais", "mensal-1", "Projeto final", "Ser aprovado num projeto final de trilha (ou num projeto do mês)", "🏆", 1, 300),
   c("Projetos", "trilhas", "trilhas-3", "Tricampeão", "Concluir 3 trilhas", "🥇", 3, 300),
 ];
 
@@ -71,7 +72,7 @@ export function estatisticas(eventos, hoje) {
       if (d.total > 0 && d.acertos === d.total) s.quizzesPerfeitos++;
     } else if (e.tipo === "exercicio" && d.nota >= NOTA_DE_APROVACAO) s.exercicios++;
     else if (e.tipo === "projeto_semanal" && d.nota >= NOTA_DE_APROVACAO) s.semanais++;
-    else if (e.tipo === "projeto_mensal" && d.nota >= NOTA_DE_APROVACAO) s.mensais++;
+    else if ((e.tipo === "projeto_final" || e.tipo === "projeto_mensal") && d.nota >= NOTA_DE_APROVACAO) s.mensais++;
     else if (e.tipo === "conquista" && String(e.chave).startsWith("conquista:trilha:")) s.trilhas++;
   }
   const o = calcularOfensiva(dias, hoje);

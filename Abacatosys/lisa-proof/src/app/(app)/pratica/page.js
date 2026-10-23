@@ -5,12 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { obter, criar } from "@/lib/api.js";
 import { formatarDia } from "@/dominio/datas.js";
-import { NOTA_DE_APROVACAO, PONTOS_DA_PRATICA, TENTATIVAS, fimDoPeriodo } from "@/dominio/pratica.js";
+import { NOTA_DE_APROVACAO, PONTOS_DA_PRATICA, TENTATIVAS } from "@/dominio/pratica.js";
+import { valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
 import Neuro, { reagir } from "@/componentes/Neuro.js";
 
 /** O que o Neuro diz ao abrir a prática: a cobrança do dia. */
 function falaDoNeuro(trilhas) {
   if (!trilhas.length) return { humor: "surpreso", fala: "Monte uma trilha primeiro, e aí eu preparo a prática para você!" };
+  // o quiz que ficou abaixo de 60% não conclui o assunto: o Neuro chama para mais uma rodada
+  const reprovado = trilhas.find((t) => t.quiz?.feito && (t.quiz.nota ?? 0) < NOTA_DE_APROVACAO && !t.assunto?.concluido && t.quiz.podeMais);
+  if (reprovado) return { humor: "pensando", fala: `O quiz de ${reprovado.assunto?.titulo || "hoje"} ficou abaixo de ${NOTA_DE_APROVACAO}%. Mais uma rodada para concluir o assunto?` };
   const quizPendente = trilhas.filter((t) => !t.quiz?.feito).length;
   const exercicioPendente = trilhas.filter((t) => !t.exercicio?.feito).length;
   if (quizPendente) return { humor: "surpreso", fala: `Ei! ${quizPendente === 1 ? "O quiz de hoje está" : `${quizPendente} quizzes de hoje estão`} te esperando. São só 5 perguntas!` };
@@ -37,21 +41,28 @@ function situacaoDoDiario(d, tipo) {
   return { texto: tipo === "quiz" ? "Em andamento" : `Nota até agora: ${d.nota ?? "—"}`, acao: "Continuar", classe: "pratica__bloco--andamento" };
 }
 
-function situacaoDoProjeto(p, tipo) {
-  const prazo = `até ${formatarDia(fimDoPeriodo(tipo, p.periodo), { comSemana: true })}`;
-  if (!p?.status) return { texto: prazo, acao: "Ver projeto", classe: "" };
+/**
+ * O projeto da vez (a semana do plano, ou o final): trancado, para mais tarde, para fazer, aprovado.
+ * O aprovado abre a semana seguinte (src/dominio/avanco.js).
+ */
+function situacaoDoProjeto(p) {
+  const prazo = `até ${formatarDia(p.ate, { comSemana: true })}`;
+  const abre = p.final ? "conclui a trilha" : `abre a semana ${p.numero + 1}`;
+  if (!p.aberta) return { texto: "trancado — falta o projeto da semana anterior", acao: "Trancado", classe: "pratica__bloco--trancado", desativado: true };
+  if (!p.liberado) return { texto: `libera em ${formatarDia(p.de)} (ou concluindo os assuntos da semana)`, acao: "Em breve", classe: "", desativado: true };
+  if (!p.status) return { texto: `${prazo} · nota ${NOTA_DE_APROVACAO}+ ${abre}`, acao: "Ver projeto", classe: "" };
+  if (p.aprovado) return { texto: `Nota ${p.nota} · aprovado: ${p.final ? "trilha concluída" : `semana ${p.numero + 1} aberta`}`, acao: "Rever", classe: "pratica__bloco--feito" };
   if (p.status === "concluido") {
-    const ok = (p.nota ?? 0) >= NOTA_DE_APROVACAO;
-    return { texto: `Nota ${p.nota} · +${p.pontos} pts`, acao: "Rever", classe: ok ? "pratica__bloco--feito" : "pratica__bloco--parcial" };
+    return { texto: `Nota ${p.nota} · abaixo de ${NOTA_DE_APROVACAO}${p.podeOutro ? ` · dá para um projeto novo (${p.rodadas}/${PROJETOS_POR_SEMANA})` : ""}`, acao: "Rever", classe: "pratica__bloco--parcial" };
   }
   return { texto: `${prazo} · ${p.nota != null ? `nota ${p.nota}` : "aguardando entrega"}`, acao: "Continuar", classe: "pratica__bloco--andamento" };
 }
 
 const ROTULOS = {
-  quiz: { titulo: "Quiz do dia", icone: "❓", pontos: `até ${5 * PONTOS_DA_PRATICA.acertoNoQuiz + PONTOS_DA_PRATICA.quizPerfeito} pts` },
+  quiz: { titulo: "Quiz do assunto", icone: "❓", pontos: `até ${5 * PONTOS_DA_PRATICA.acertoNoQuiz + PONTOS_DA_PRATICA.quizPerfeito} pts · ${NOTA_DE_APROVACAO}%+ conclui o assunto` },
   exercicio: { titulo: "Exercício do dia", icone: "⌨️", pontos: `até ${PONTOS_DA_PRATICA.exercicio} pts` },
   projeto_semanal: { titulo: "Projeto da semana", icone: "🎁", pontos: `até ${PONTOS_DA_PRATICA.projeto_semanal} pts` },
-  projeto_mensal: { titulo: "Projeto do mês", icone: "🏆", pontos: `até ${PONTOS_DA_PRATICA.projeto_mensal} pts` },
+  projeto_final: { titulo: "Projeto final", icone: "🏆", pontos: "do tamanho da trilha" },
 };
 
 /** "Mais um quiz/exercício hoje": aparece quando a rodada atual acabou e ainda cabe outra. */
@@ -64,15 +75,15 @@ function MaisUma({ tipo, d, ocupado, aoPedir }) {
   );
 }
 
-function Bloco({ tipo, situacao, ocupado, aoAbrir }) {
+function Bloco({ tipo, situacao, ocupado, aoAbrir, titulo, pontos }) {
   const r = ROTULOS[tipo];
   return (
-    <button type="button" className={`pratica__bloco ${situacao.classe}`} onClick={aoAbrir} disabled={ocupado}>
+    <button type="button" className={`pratica__bloco ${situacao.classe}`} onClick={aoAbrir} disabled={ocupado || situacao.desativado}>
       <span className="pratica__icone" aria-hidden="true">{r.icone}</span>
       <span className="pratica__textos">
-        <strong>{r.titulo}</strong>
+        <strong>{titulo || r.titulo}</strong>
         <small>{situacao.texto}</small>
-        <small className="pratica__pontos">{r.pontos}</small>
+        <small className="pratica__pontos">{pontos || r.pontos}</small>
       </span>
       <span className="pratica__acao">{ocupado ? "Preparando…" : situacao.acao}</span>
     </button>
@@ -116,7 +127,7 @@ export default function Pratica() {
       <div className="pf-cabecalho">
         <div>
           <h1>Prática</h1>
-          <p>Quiz e exercício todo dia, projeto toda semana e todo mês. A Lisa corrige tudo.</p>
+          <p>Quiz e exercício todo dia sobre o assunto da vez, e um projeto no fim de cada semana do plano. O quiz aprovado conclui o assunto; o projeto aprovado abre a semana seguinte — e o da última semana é o projeto final da trilha.</p>
         </div>
       </div>
 
@@ -138,7 +149,12 @@ export default function Pratica() {
           <section key={t.trilhaId} className="pf-secao">
             <h2 className="pf-secao__titulo">
               {t.tema}
-              <small>{t.assunto ? `Assunto de hoje: ${t.assunto.titulo}` : ""}</small>
+              <small>
+                {t.concluida ? "trilha concluída 🏆" : [
+                  t.semana ? (t.semana.total === 1 ? "plano de uma semana" : `semana ${t.semana.numero} de ${t.semana.total}`) : "",
+                  t.assunto ? `assunto: ${t.assunto.titulo}${t.assunto.faltaQuiz ? " (falta só o quiz)" : ""}` : "",
+                ].filter(Boolean).join(" · ")}
+              </small>
             </h2>
             <div className="pratica__grade">
               <div className="pratica__celula">
@@ -151,10 +167,20 @@ export default function Pratica() {
                   aoAbrir={() => abrir(t, "exercicio", t.exercicio)} />
                 <MaisUma tipo="exercicio" d={t.exercicio} ocupado={ocupado === `${t.trilhaId}:exercicio:mais`} aoPedir={() => abrir(t, "exercicio", t.exercicio, undefined, true)} />
               </div>
-              <Bloco tipo="projeto_semanal" situacao={situacaoDoProjeto(t.projetoSemanal, "projeto_semanal")} ocupado={ocupado === `${t.trilhaId}:projeto_semanal`}
-                aoAbrir={() => abrir(t, "projeto_semanal", t.projetoSemanal, t.projetoSemanal.periodo)} />
-              <Bloco tipo="projeto_mensal" situacao={situacaoDoProjeto(t.projetoMensal, "projeto_mensal")} ocupado={ocupado === `${t.trilhaId}:projeto_mensal`}
-                aoAbrir={() => abrir(t, "projeto_mensal", t.projetoMensal, t.projetoMensal.periodo)} />
+              {t.projeto && (
+                <div className="pratica__celula">
+                  <Bloco tipo={t.projeto.tipo} situacao={situacaoDoProjeto(t.projeto)} ocupado={ocupado === `${t.trilhaId}:${t.projeto.tipo}`}
+                    titulo={t.projeto.final ? "Projeto final" : `Projeto da semana ${t.projeto.numero}`}
+                    pontos={t.projeto.final ? `até ${valorDoProjetoFinal(t.projeto.semanas)} pts · conclui a trilha` : undefined}
+                    aoAbrir={() => abrir(t, t.projeto.tipo, t.projeto, t.projeto.periodo)} />
+                  {t.projeto.podeOutro && (
+                    <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno pratica__mais" disabled={ocupado === `${t.trilhaId}:${t.projeto.tipo}:mais`}
+                      onClick={() => abrir(t, t.projeto.tipo, t.projeto, t.projeto.periodo, true)}>
+                      + Projeto novo para esta semana ({t.projeto.rodadas + 1}/{PROJETOS_POR_SEMANA})
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </section>
         ))

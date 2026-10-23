@@ -9,14 +9,32 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.20.0-cloudflare-pages.1",
+  "versao": "0.21.0-proof-trilha-amarrada.1",
   "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 52,
+    "numero": 53,
     "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.21.0-proof-trilha-amarrada.1",
+      "data": "2026-10-23",
+      "branch": "proof-trilha-amarrada",
+      "tipo": "funcionalidade",
+      "resumo": "A trilha ficou amarrada à prática (o quiz conclui o assunto, o projeto abre a semana seguinte, o projeto final fecha a trilha, tudo no tamanho do plano), e as expedições ganharam planetoides esféricos e um fundo do mar de verdade.",
+      "itens": [
+        "Assunto concluído = a teoria (a checklist do card) E um quiz dele com 60% ou mais. O painel do assunto mostra \"falta o quiz\" e tem o botão \"Fazer o quiz\", que gera o quiz daquele assunto.",
+        "Semanas do plano: a trilha anda em blocos de uma semana de estudo, pela ordem da trilha e pelos dias de cada assunto, e não pela semana do calendário. Cada semana termina num projeto, e a semana seguinte só abre com ele aprovado (nota 60+). Os assuntos de semana trancada não entram no dia nem se marcam.",
+        "Projeto final: o projeto da última semana é o projeto final, do tamanho da trilha (um plano de 5 dias tem só ele; vale de 250 a 600 pontos). O projeto do mês deixou de ser gerado. Projeto reprovado dá lugar a outro, até 3 por semana; reprovados os 3, a semana libera assim mesmo.",
+        "O que já estava concluído continua concluído: os assuntos concluídos até a migração ficam dispensados do quiz, a semana inteira concluída antes não pede projeto, e o projeto da semana antigo vale para a semana do plano com os mesmos assuntos.",
+        "A prática (quiz e exercício) fica no assunto da vez das semanas abertas. A tela de hoje, a agenda, o mapa, o Raio-X e a conquista da trilha usam a regra nova (src/dominio/avanco.js e src/lib/avanco.js).",
+        "Planetoide em esfera: na expedição da Nave, o mundo curva (shader em src/componentes/reino/curvatura.js). O chão vira um planeta e tropas, monstros, tiros e construções andam em volta dele, no estilo Mario Galaxy. Tem duas luas em órbita, estrelas no fundo e a câmera mais alta durante a batalha.",
+        "Fundo do mar de verdade: nas expedições do Submarino, a ilha flutuante e as nuvens somem. Entram o leito de areia até o horizonte, as florestas de algas balançando, os cardumes, os raios de luz, as cáusticas, as bolhas subindo (inclusive do submarino e das tropas) e a névoa azul da água.",
+        "Migração db/017-trilha-amarrada.sql: grava quais assuntos já estavam concluídos (dispensa do quiz) e aceita o tipo projeto_final."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.20.0-cloudflare-pages.1",
       "data": "2026-10-23",
@@ -778,7 +796,7 @@
         "Trilha progressiva por quadro, montada pela IA ou pela ordem do quadro, com agenda nos dias de estudo escolhidos.",
         "Parte teórica: marcar itens de checklist e concluir assuntos direto do app, refletindo no Abacato.",
         "Checklist de teoria e explicação do assunto geradas pela IA.",
-        "Parte prática: quiz e exercício diários e projetos da semana e do mês, gerados e corrigidos pela IA.",
+        "Parte prática amarrada à trilha: quiz e exercício diários sobre o assunto da vez (o quiz com 60%+ conclui o assunto junto com a teoria), um projeto no fim de cada semana do plano (aprovado, abre a semana seguinte) e o projeto final da trilha, do tamanho do plano, tudo gerado e corrigido pela IA",
         "Avaliação de projetos a partir de repositórios públicos do GitHub.",
         "Pontos, nível, ofensiva de dias seguidos, meta diária e metas de semana e mês.",
         "Conquistas da conta (valem pontos no total) e comemorações em tela cheia de ofensiva, meta e conquista.",
@@ -808,7 +826,7 @@
         "Modal de novidades na entrada, uma vez por edição",
         "Paz entre os reinos por votação (100% dos eleitores; vota quem tem 3+ dias de ofensiva de estudo, e a paz vale para todos): sem guerra, todos vizinhos no 3D, mina × o número de reinos e expedições repartidas",
         "Veículos e combustível no Reino: Barco, Submarino, Dirigível, Tanque de Magma e Nave Estelar, cada um com o seu mapa de expedições e 3 expedições por dia (mais com combustível pago)",
-        "Planetoides sorteados para a Nave Estelar: raça alienígena, força e tesouro aleatórios",
+        "Planetoides sorteados para a Nave Estelar (raça alienígena, força e tesouro aleatórios), com a batalha numa esfera, estilo Mario Galaxy; e o fundo do mar de verdade nas expedições do Submarino",
         "Mina de Ouro com operários (3 de início) cavando no 3D, chance de diamantes, contratação e aluguel de operários entre jogadores",
         "Bolsa do Reino em tela própria (/bolsa), estilo home broker: ações iguais para todos, pregão das 07:00 às 17:00 (horário de Brasília) com cotações de hora em hora, gráficos e velas, pregão diário decidido pela Lisa (IA), compra e venda com corretagem",
         "Tela cheia do Reino com menus suspensos e visita completa aos reinos vizinhos durante a paz",
@@ -825,7 +843,8 @@
         "Não tem cadastro próprio: a conta é criada no Abacato.",
         "Moedas do Reino não se compram nem se trocam por dinheiro: só vêm do estudo, da mina e dos saques.",
         "O ranking não mostra nome completo nem e-mail de ninguém.",
-        "O Reino de Teste não passa nada para o reino de verdade (moedas, tropas, veículos, carteira) e não entra no ranking."
+        "O Reino de Teste não passa nada para o reino de verdade (moedas, tropas, veículos, carteira) e não entra no ranking.",
+        "O projeto do mês não é mais gerado: deu lugar ao projeto final de cada trilha. Os que já existiam continuam no histórico."
       ]
     },
     "stack": [
@@ -841,7 +860,7 @@
       "Three.js 0.170 (o mundo 3D do Reino, carregado só nessa tela)"
     ],
     "arquitetura": {
-      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
+      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do plano, o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
       "diagramas": [
         {
           "titulo": "Visão geral",
@@ -877,7 +896,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/016; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/017; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS."
       }
     ],
     "integracoes": [

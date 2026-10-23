@@ -8,11 +8,22 @@
 // a sua luz, os seus enfeites e o covil do chefe no lugar da Torre do Neuro.
 //
 // `p` são as peças do Mundo3D (malha, caixa, cilindro, cone, brilho, bandeira).
+//
+// 23/10/2026 ("o reino do espaço tem que ser um planetoide, uma esfera mesmo; e os reinos de baixo
+// da água devem ser realmente debaixo da água — hoje tem até nuvem"): o PLANETOIDE é um disco bem
+// dividido que o mundo curvo (curvatura.js) dobra até virar a esfera inteira, com relevo, crateras e
+// cristais em volta e luas em órbita; o FUNDO DO MAR troca a ilha flutuante por um leito de areia
+// que vai até o horizonte, com dunas, florestas de algas que balançam, raios de luz da superfície,
+// cardumes, bolhas subindo e o brilho da água no chão (a névoa azul e o sumiço das nuvens ficam no
+// Mundo3D). O que se mexe pede `userData.animar(t, dt)` no grupo do terreno.
 
 import * as THREE from "three";
 import { LUGARES, PRACA, RAIO_DA_MURALHA, raioDaIlha } from "@/dominio/combate.js";
 
 const OURO = "#f0be45", OSSO = "#f1efe6", ESCURO = "#1f140c";
+
+/** O raio do planetoide: a ilha da batalha cobre a parte de cima dele (uns 75° a partir do polo). */
+export const raioDoPlanetoide = (terreno = 0) => raioDaIlha(terreno) / 1.3;
 
 function aleatorio(semente) {
   let a = semente;
@@ -60,15 +71,15 @@ export const CENARIOS = {
   // ---- o fundo do mar (Submarino, 23/10/2026): areia, corais, bolhas e luz azulada
   "recife-tritoes": {
     chao: "#f1dca4", paleta: { madeira: "#f472b6", escura: "#9d174d", telhado: "#22d3ee", pedra: "#fde68a", tecido: "#0ea5e9", brilho: "#a5f3fc" },
-    cabana: "casa", estaca: "pedra", mar: true, luz: { ceu: "#9be7ff", chao: "#0e7490", sol: "#e0f7ff", forca: 1.3 },
+    cabana: "casa", estaca: "pedra", mar: true, agua: "#1b86b4", luz: { ceu: "#9be7ff", chao: "#0e7490", sol: "#e0f7ff", forca: 1.3 },
   },
   "cidade-afundada": {
     chao: "#c9b88f", paleta: { madeira: "#64748b", escura: "#334155", telhado: "#0f766e", pedra: "#a7b3c2", tecido: "#155e75", brilho: "#67e8f9" },
-    cabana: "casa", estaca: "pedra", mar: true, luz: { ceu: "#5cc4f2", chao: "#0c4a6e", sol: "#c7ecff", forca: 1.15 },
+    cabana: "casa", estaca: "pedra", mar: true, agua: "#12668f", luz: { ceu: "#5cc4f2", chao: "#0c4a6e", sol: "#c7ecff", forca: 1.15 },
   },
   "fossa-kraken": {
     chao: "#26334a", paleta: { madeira: "#334155", escura: "#0f172a", telhado: "#5b21b6", pedra: "#4b5a70", tecido: "#1e1b4b", brilho: "#22d3ee" },
-    cabana: "tenda", estaca: "osso", mar: true, luz: { ceu: "#3b5bb5", chao: "#020617", sol: "#9fc3ff", forca: 0.95 },
+    cabana: "tenda", estaca: "osso", mar: true, agua: "#0a1f44", luz: { ceu: "#3b5bb5", chao: "#020617", sol: "#9fc3ff", forca: 0.95 },
   },
   // ---- as montanhas geladas (Dirigível)
   "trilha-yetis": {
@@ -578,6 +589,155 @@ export function estruturaDaExpedicao(p, chave, nivel, cen) {
   }
 }
 
+// ------------------------------------------------------------------ o planetoide e o fundo do mar
+
+/**
+ * O corpo do planetoide: um disco plano, bem dividido, que vai do polo de cima ao de baixo (π·R de
+ * raio) — o mundo curvo dobra ele até virar a esfera. Fora da área da batalha ganha um relevo leve.
+ * As luas já são esferas no espaço: não curvam (`semCurva`) e giram em volta do centro do planeta.
+ */
+function corpoDoPlanetoide(p, cen, R, Rp, animacoes) {
+  const g = new THREE.Group();
+  const c = cen.paleta;
+  const alcance = Math.PI * Rp * 0.995;
+  const geo = new THREE.RingGeometry(0.001, alcance, 64, 44);
+  geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    const fora = Math.min(1, Math.max(0, (Math.hypot(x, z) - R - 0.4) / 1.5));
+    pos.setY(i, fora * (Math.sin(x * 1.3) * Math.cos(z * 1.1) * 0.16 + Math.sin((x + z) * 0.7) * 0.1));
+  }
+  geo.computeVertexNormals();
+  g.add(p.malha(geo, cen.chao, 0, -0.03, 0));
+
+  const luas = [];
+  for (const [raio, dist, vel, cor, incl, fase] of [[0.75, Rp + 6, 0.12, c.pedra, 0.45, 0.6], [0.42, Rp + 4, -0.2, c.telhado, -0.35, 2.4]]) {
+    const lua = new THREE.Mesh(new THREE.IcosahedronGeometry(raio, 1), new THREE.MeshStandardMaterial({ color: cor, flatShading: true, roughness: 0.9 }));
+    lua.userData = { semCurva: true, proprio: true, dist, vel, incl, fase };
+    luas.push(lua);
+    g.add(lua);
+  }
+  animacoes.push((t) => {
+    for (const l of luas) {
+      const { dist, vel, incl, fase } = l.userData;
+      const a = fase + t * vel;
+      // a órbita passa por trás e pelos lados do planeta (o centro dele é (0, -Rp, 0) no mundo curvo)
+      l.position.set(Math.cos(a) * dist, -Rp + Math.sin(a) * dist * Math.sin(incl), -Math.abs(Math.sin(a)) * dist * Math.cos(incl) - 1);
+      l.rotation.y = t * 0.3;
+    }
+  });
+  return g;
+}
+
+/** Um cardume de peixinhos de pedaços simples, nadando em roda (a frente de cada um é +X). */
+function cardume(p, cores, n, raio, altura, vel, fase, r) {
+  const g = new THREE.Group();
+  const peixes = [];
+  for (let k = 0; k < n; k++) {
+    const cor = cores[k % cores.length];
+    const peixe = new THREE.Group();
+    const corpo = p.malha(new THREE.SphereGeometry(0.16, 7, 5), cor);
+    corpo.scale.set(1.6, 0.85, 0.55);
+    const rabo = p.cone(0.13, 0.22, 4, cor, -0.3, 0, 0);
+    rabo.rotation.z = Math.PI / 2;
+    const olho = p.malha(new THREE.SphereGeometry(0.03, 5, 4), "#0b1020", 0.17, 0.04, 0.07);
+    peixe.add(corpo, rabo, olho);
+    peixe.userData = { dx: (r() - 0.5) * 1.1, dy: (r() - 0.5) * 0.6, dz: (r() - 0.5) * 1.1, rabo, fase: r() * 6 };
+    peixes.push(peixe);
+    g.add(peixe);
+  }
+  const passo = (t) => {
+    const a = fase + t * vel;
+    const cx = Math.cos(a) * raio, cz = Math.sin(a) * raio;
+    // a direção em que o cardume anda: a tangente do círculo
+    const tx = -Math.sin(a) * Math.sign(vel), tz = Math.cos(a) * Math.sign(vel);
+    for (const peixe of peixes) {
+      const d = peixe.userData;
+      peixe.position.set(cx + d.dx, altura + d.dy + Math.sin(t * 2 + d.fase) * 0.08, cz + d.dz);
+      peixe.rotation.y = Math.atan2(-tz, tx);
+      d.rabo.rotation.y = Math.sin(t * 12 + d.fase) * 0.5;
+    }
+  };
+  return { g, passo };
+}
+
+/**
+ * O leito do mar: areia até o horizonte (com dunas fora da área da batalha), os raios de luz que
+ * descem da superfície, os cardumes e o brilho da água dançando no chão (as cáusticas).
+ */
+function leitoDoMar(p, cen, R, animacoes) {
+  const g = new THREE.Group();
+  const r = aleatorio(cen.id.length * 313 + Math.round(R * 7));
+  const fundo = cen.id === "fossa-kraken";
+  const L = R * 9;
+  const geo = new THREE.PlaneGeometry(L, L, 80, 80);
+  geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    const fora = Math.min(1, Math.max(0, (Math.hypot(x, z) - R - 0.3) / 2.5));
+    pos.setY(i, fora * (0.38 * Math.sin(x * 0.45) * Math.cos(z * 0.38) + 0.24 * Math.sin((x - z) * 0.23) + 0.2));
+  }
+  geo.computeVertexNormals();
+  g.add(p.malha(geo, cen.chao, 0, -0.02, 0));
+
+  // o brilho da água no chão: uma rede de luz (cáusticas) desenhada uma vez e correndo devagar
+  if (typeof document !== "undefined") {
+    const tela = document.createElement("canvas");
+    tela.width = tela.height = 256;
+    const x2 = tela.getContext("2d");
+    x2.strokeStyle = "#ffffff";
+    x2.lineWidth = 2.2;
+    for (let i = 0; i < 70; i++) {
+      const cx = r() * 256, cy = r() * 256, raio = 8 + r() * 26, achatado = 0.6 + r() * 0.5, giro = r() * Math.PI, alfa = 0.25 + r() * 0.35;
+      for (const [ox, oy] of [[0, 0], [256, 0], [-256, 0], [0, 256], [0, -256]]) {
+        x2.globalAlpha = alfa;
+        x2.beginPath();
+        x2.ellipse(cx + ox, cy + oy, raio, raio * achatado, giro, 0, Math.PI * 2);
+        x2.stroke();
+      }
+    }
+    const tex = new THREE.CanvasTexture(tela);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(L / 10, L / 10);
+    const matDoBrilho = new THREE.MeshBasicMaterial({ map: tex, color: fundo ? "#5eead4" : "#d6f6ff", transparent: true, opacity: fundo ? 0.12 : 0.2, blending: THREE.AdditiveBlending, depthWrite: false });
+    const brilho = new THREE.Mesh(new THREE.PlaneGeometry(L * 0.5, L * 0.5).rotateX(-Math.PI / 2), matDoBrilho);
+    brilho.position.y = 0.035;
+    brilho.userData = { proprio: true };
+    g.add(brilho);
+    animacoes.push((t) => { tex.offset.set(t * 0.015, Math.sin(t * 0.25) * 0.04); });
+  }
+
+  // os raios de luz que descem da superfície (cada um com o seu material, para pulsar no seu tempo)
+  const raios = [];
+  for (let k = 0; k < 7; k++) {
+    const mat = new THREE.MeshBasicMaterial({ color: fundo ? "#93c5fd" : "#e0f8ff", transparent: true, opacity: 0.06, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+    const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.35 + r() * 0.4, 1.3 + r() * 0.9, 16, 10, 1, true), mat);
+    const a = r() * Math.PI * 2, d = r() * R * 1.1;
+    cone.position.set(Math.cos(a) * d, 7, Math.sin(a) * d);
+    cone.rotation.set(0.12 * (r() - 0.5), 0, 0.25 + r() * 0.1);
+    cone.userData = { proprio: true, fase: r() * 6 };
+    raios.push(cone);
+    g.add(cone);
+  }
+  animacoes.push((t) => {
+    for (const raio of raios) {
+      raio.material.opacity = (fundo ? 0.03 : 0.042) + Math.sin(t * 0.7 + raio.userData.fase) * 0.018;
+      raio.rotation.y = Math.sin(t * 0.15 + raio.userData.fase) * 0.2;
+    }
+  });
+
+  // os cardumes, em volta da área da batalha
+  const cores = fundo ? [["#22d3ee", "#a78bfa"], ["#5eead4"], ["#818cf8", "#22d3ee"]] : [["#fb923c", "#facc15"], ["#38bdf8", "#f472b6"], ["#facc15", "#34d399"]];
+  cores.forEach((cs, i) => {
+    const { g: grupo, passo } = cardume(p, cs, 5 + i, R + 0.6 + i * 1.1, 1.8 + i * 0.7, (i % 2 ? -1 : 1) * (0.18 + i * 0.05), i * 2.1, r);
+    g.add(grupo);
+    animacoes.push(passo);
+  });
+  return g;
+}
+
 // ------------------------------------------------------------------ o terreno e os enfeites
 
 /** O chão e os enfeites do lugar, longe das construções e da praia de desembarque. */
@@ -586,20 +746,26 @@ export function terrenoDaExpedicao(p, cen, construcoes) {
   const c = cen.paleta;
   const terreno = construcoes?.terreno || 0;
   const R = raioDaIlha(terreno);
-  // o chão do lugar cobre a grama da ilha inteira, borda incluída: mesmo número de lados e a mesma
-  // ondulação da ilha do Mundo3D (função ilha), um tiquinho maior e mais alto
-  const lados = 11 + 2 * terreno;
-  const geo = new THREE.CylinderGeometry(R + 0.115, R + 0.115, 0.262, lados);
-  const pos = geo.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), z = pos.getZ(i);
-    const a = Math.atan2(z, x);
-    const f = 1 + 0.04 * Math.sin(a * 3 + 1) + 0.03 * Math.sin(a * 5);
-    pos.setX(i, x * f);
-    pos.setZ(i, z * f);
+  const animacoes = [];
+  g.userData.animar = (t, dt) => { for (const f of animacoes) f(t, dt); };
+  if (cen.espaco) g.add(corpoDoPlanetoide(p, cen, R, raioDoPlanetoide(terreno), animacoes));
+  else if (cen.mar) g.add(leitoDoMar(p, cen, R, animacoes));
+  else {
+    // o chão do lugar cobre a grama da ilha inteira, borda incluída: mesmo número de lados e a mesma
+    // ondulação da ilha do Mundo3D (função ilha), um tiquinho maior e mais alto
+    const lados = 11 + 2 * terreno;
+    const geo = new THREE.CylinderGeometry(R + 0.115, R + 0.115, 0.262, lados);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      const a = Math.atan2(z, x);
+      const f = 1 + 0.04 * Math.sin(a * 3 + 1) + 0.03 * Math.sin(a * 5);
+      pos.setX(i, x * f);
+      pos.setZ(i, z * f);
+    }
+    geo.computeVertexNormals();
+    g.add(p.malha(geo, cen.chao, 0, -0.119, 0));
   }
-  geo.computeVertexNormals();
-  g.add(p.malha(geo, cen.chao, 0, -0.119, 0));
   const r = aleatorio(cen.id.length * 977 + terreno * 31);
   const ocupado = Object.entries(LUGARES).filter(([chave]) => (construcoes?.[chave] || 0) > 0).map(([, l]) => l);
   const livre = (x, z, folga) => ocupado.every(([lx, lz]) => Math.hypot(lx - x, lz - z) > folga) && Math.hypot(PRACA[0] - x, PRACA[1] - z) > 1.5
@@ -682,12 +848,35 @@ export function terrenoDaExpedicao(p, cen, construcoes) {
       g.add(ramo);
     }
   };
-  const alga = (x, z, s) => { for (let k = 0; k < 3; k++) g.add(p.cilindro(0.025 * s, 0.04 * s, (0.7 + r() * 0.6) * s, 4, k % 2 ? "#16a34a" : "#15803d", x + k * 0.08, 0.4 * s, z)); };
+  const algas = [];
+  const alga = (x, z, s) => {
+    for (let k = 0; k < 3; k++) {
+      const h = (0.7 + r() * 0.6) * s;
+      const pe = new THREE.Group();
+      pe.position.set(x + k * 0.08, 0, z);
+      pe.add(p.cilindro(0.025 * s, 0.04 * s, h, 4, k % 2 ? "#16a34a" : "#15803d", 0, h / 2, 0));
+      pe.userData.fase = r() * 6;
+      algas.push(pe);
+      g.add(pe);
+    }
+  };
+  if (cen.mar) animacoes.push((t) => { for (const a of algas) { a.rotation.z = Math.sin(t * 1.3 + a.userData.fase) * 0.18; a.rotation.x = Math.cos(t * 1.1 + a.userData.fase) * 0.1; } });
+  // as bolhas sobem do fundo, somem lá em cima e nascem de novo embaixo
+  const matDaBolha = new THREE.MeshStandardMaterial({ color: "#e0f7ff", transparent: true, opacity: 0.55, roughness: 0.1, emissive: "#9fe7ff", emissiveIntensity: 0.2 });
+  const bolhas = [];
   const bolha = (x, z) => {
-    const m = p.malha(new THREE.SphereGeometry(0.05 + r() * 0.06, 8, 6), new THREE.MeshStandardMaterial({ color: "#e0f7ff", transparent: true, opacity: 0.55, roughness: 0.1 }), x, 0.5 + r() * 1.6, z);
-    m.userData.proprio = true;
+    const m = p.malha(new THREE.SphereGeometry(0.05 + r() * 0.06, 8, 6), matDaBolha, x, 0, z);
+    m.userData = { proprio: bolhas.length === 0, fase: r(), x, z, vel: 0.12 + r() * 0.12 };
+    bolhas.push(m);
     g.add(m);
   };
+  animacoes.push((t) => {
+    for (const b of bolhas) {
+      const u = (t * b.userData.vel + b.userData.fase) % 1;
+      b.position.set(b.userData.x + Math.sin(t * 2 + b.userData.fase * 9) * 0.08, 0.2 + u * 5.5, b.userData.z);
+      b.scale.setScalar(0.7 + u * 0.8);
+    }
+  });
   const estrela = (x, z) => { const m = p.malha(new THREE.OctahedronGeometry(0.14, 0), "#fb923c", x, 0.04, z); m.scale.y = 0.25; m.rotation.y = r() * Math.PI; g.add(m); };
   const cristalDeGelo = (x, z, s) => { const m = p.malha(new THREE.OctahedronGeometry(0.16 * s, 0), p.brilho("#bae6fd"), x, 0.22 * s, z); m.scale.y = 1.8; g.add(m); };
   const poca = (x, z) => g.add(p.cilindro(0.45 + r() * 0.3, 0.45, 0.05, 9, p.brilho(c.brilho), x, 0.03, z));
@@ -782,6 +971,14 @@ export function terrenoDaExpedicao(p, cen, construcoes) {
       for (const [x, z, s] of lugares(fundo ? 10 : 18, 1.6, R - 0.5, 1.0)) coral(x, z, s, corais[Math.floor(r() * corais.length)]);
       for (const [x, z, s] of lugares(14, R - 2.0, R - 0.4, 0.9)) alga(x, z, s);
       for (const [x, z] of lugares(16, 1.5, R - 0.5, 0.7)) bolha(x, z);
+      // fora da área da batalha: florestas de algas altas e corais grandes, até o horizonte
+      for (let i = 0; i < 70; i++) {
+        const a = r() * Math.PI * 2, d = R + 0.8 + r() * R * 2.2;
+        const x = Math.cos(a) * d, z = Math.sin(a) * d;
+        if (r() < 0.6) alga(x, z, 1.6 + r() * 1.6);
+        else coral(x, z, 1.4 + r() * 1.2, corais[Math.floor(r() * corais.length)]);
+      }
+      for (let i = 0; i < 14; i++) { const a = r() * Math.PI * 2, d = R + 1 + r() * R * 1.6; bolha(Math.cos(a) * d, Math.sin(a) * d); }
       for (const [x, z] of lugares(6, 1.8, R - 0.8, 1.0)) estrela(x, z);
       if (cen.id === "cidade-afundada") for (const [x, z, s] of lugares(6, 2, R - 1.0, 1.4)) { g.add(p.cilindro(0.12 * s, 0.14 * s, 0.6 * s, 7, c.pedra, x, 0.3 * s, z)); pedra(x + 0.3, z, s, c.pedra); }
       if (fundo) for (const [x, z] of lugares(10, 1.6, R - 0.6, 0.9)) vagalume(x, z, c.brilho);
@@ -817,6 +1014,16 @@ export function terrenoDaExpedicao(p, cen, construcoes) {
         for (const [x, z, s] of lugares(12, 1.6, R - 0.6, 1.0)) g.add(p.malha(new THREE.OctahedronGeometry(0.14 * s, 0), p.brilho(c.brilho), x, 0.18 * s, z));
         for (const [x, z, s] of lugares(10, R - 2.0, R - 0.5, 1.0)) plantaAlien(x, z, s);
         for (const [x, z, s] of lugares(8, 1.6, R - 0.8, 1.0)) pedra(x, z, s * 1.2, c.pedra);
+        // o resto do planeta, até o polo de baixo: o mundo curvo leva tudo para a volta da esfera
+        const alcance = Math.PI * raioDoPlanetoide(terreno) * 0.9;
+        for (let i = 0; i < 60; i++) {
+          const a = r() * Math.PI * 2, d = R + 0.5 + r() * (alcance - R - 0.5);
+          const x = Math.cos(a) * d, z = Math.sin(a) * d, s = 1 + r() * 1.4, tipo = r();
+          if (tipo < 0.35) cratera(x, z, s * 1.3);
+          else if (tipo < 0.6) { const m = p.malha(new THREE.OctahedronGeometry(0.18 * s, 0), p.brilho(r() > 0.5 ? c.brilho : c.telhado), x, 0.25 * s, z); m.scale.y = 1.8; g.add(m); }
+          else if (tipo < 0.8) plantaAlien(x, z, s);
+          else pedra(x, z, s * 1.5, r() > 0.5 ? c.pedra : c.escura);
+        }
       }
       break;
   }

@@ -14,6 +14,7 @@ import { ehQuadroDeEstudo, temaDo } from "@/dominio/estudo.js";
 import { diaDe } from "@/dominio/datas.js";
 import { PONTOS, chaveDoEvento, META_DIARIA_PADRAO, pontosDoDiaParaMeta } from "@/dominio/pontos.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, PONTOS_POR_TRILHA } from "@/dominio/conquistas.js";
+import { avancoDaTrilhaDoUsuario, avancoDoQuadro } from "./avanco.js";
 
 const NAO_ACHEI = "não encontrado entre os seus quadros de estudo";
 
@@ -292,15 +293,14 @@ export async function estudouHoje(usuarioId) {
   return (count || 0) > 0;
 }
 
-/** Todos os assuntos da trilha concluídos? Então devolve a trilha, para a conquista dela. */
-async function trilhaConcluidaAgora(trilhaId) {
+/**
+ * A trilha terminou? Todos os assuntos concluídos (teoria e quiz) E o projeto final aprovado
+ * (src/dominio/avanco.js). Então devolve a trilha, para a conquista dela.
+ */
+async function trilhaConcluidaAgora(trilhaId, usuarioId) {
   if (!trilhaId) return null;
-  const { data: etapas } = await supabase.from("proof_etapas").select("card_id").eq("trilha_id", trilhaId);
-  const cards = await buscarEmLotes("abacato_cards", "id, concluido, arquivado", "id", (etapas || []).map((e) => e.card_id));
-  const vivos = cards.filter((c) => !c.arquivado);
-  if (!vivos.length || vivos.some((c) => !c.concluido)) return null;
-  const { data: trilha } = await supabase.from("proof_trilhas").select("id, tema").eq("id", trilhaId).maybeSingle();
-  return trilha ? { trilhaId: trilha.id, tema: trilha.tema } : null;
+  const { trilha, avanco } = await avancoDaTrilhaDoUsuario(trilhaId, usuarioId).catch(() => ({}));
+  return trilha && avanco?.concluida ? { trilhaId: trilha.id, tema: trilha.tema } : null;
 }
 
 /**
@@ -324,7 +324,7 @@ export async function depoisDePontuar({ usuarioId, trilhaId, estudavaAntes, ganh
   r.metaBatida = bonus > 0;
 
   const novas = [];
-  const trilha = verTrilha ? await trilhaConcluidaAgora(trilhaId) : null;
+  const trilha = verTrilha ? await trilhaConcluidaAgora(trilhaId, usuarioId) : null;
   if (trilha) {
     novas.push({
       codigo: `trilha:${trilha.trilhaId}`, nome: `Trilha concluída: ${trilha.tema}`, icone: "🏆",
@@ -407,8 +407,27 @@ async function sincronizarConclusao({ usuarioId, card, trilhaId }) {
 
 const NADA_EXTRA = { pontosExtras: 0, metaBatida: false, ofensivaAumentou: false, ofensiva: null, conquistas: [] };
 
+/**
+ * A trilha amarrada (23/10/2026): o assunto de uma semana trancada (o projeto da semana anterior
+ * ainda não foi aprovado) não se estuda pelo Proof. Devolve a etapa do card no avanço da trilha.
+ */
+async function exigirAssuntoAberto(quadroId, cardId, usuarioId) {
+  const r = await avancoDoQuadro(quadroId, usuarioId);
+  const etapa = r?.avanco.etapas.find((e) => String(e.cardId) === String(cardId)) || null;
+  if (etapa?.bloqueada) throw new ErroDeAcesso(409, `este assunto ${etapa.motivo}`);
+  return etapa;
+}
+
+/** Depois de marcar: o assunto concluiu de vez, ou a teoria acabou e falta o quiz? */
+async function situacaoDoAssunto(quadroId, cardId, usuarioId) {
+  const r = await avancoDoQuadro(quadroId, usuarioId);
+  const etapa = r?.avanco.etapas.find((e) => String(e.cardId) === String(cardId));
+  return { assuntoConcluido: Boolean(etapa?.concluido), faltaQuiz: Boolean(etapa?.faltaQuiz) };
+}
+
 export async function marcarItem({ usuarioId, itemId, feito }) {
   const { item, card, quadro } = await itemDeEstudo(itemId, usuarioId);
+  await exigirAssuntoAberto(quadro.id, card.id, usuarioId);
   const [trilhaId, estudavaAntes] = await Promise.all([idDaTrilhaDoQuadro(quadro.id, usuarioId), estudouHoje(usuarioId)]);
 
   const { error } = await supabase.from("abacato_checklist_itens").update({ feito }).eq("id", item.id);
@@ -428,8 +447,9 @@ export async function marcarItem({ usuarioId, itemId, feito }) {
     ? await depoisDePontuar({ usuarioId, trilhaId, estudavaAntes, ganhou: pontos, verTrilha: conclusao.concluido && conclusao.pontos > 0 })
     : NADA_EXTRA;
   tocarQuadro(quadro.id);
+  const assunto = conclusao.concluido ? await situacaoDoAssunto(quadro.id, card.id, usuarioId) : { assuntoConcluido: false, faltaQuiz: false };
 
-  return { feito, cardConcluido: conclusao.concluido, ...resultadoDaPontuacao(pontos, extra) };
+  return { feito, cardConcluido: conclusao.concluido, ...assunto, ...resultadoDaPontuacao(pontos, extra) };
 }
 
 /** Concluir à mão vale só para assunto SEM tarefas — com tarefas, ele conclui sozinho. */
@@ -440,6 +460,7 @@ export async function marcarCard({ usuarioId, cardId, concluido }) {
   }
   const { total } = contarItens((await checklistsDosCards([card.id])).get(card.id) || []);
   if (total) throw new ErroDeAcesso(400, "este assunto tem tarefas: ele é concluído quando todas forem marcadas");
+  await exigirAssuntoAberto(quadro.id, card.id, usuarioId);
 
   const [trilhaId, estudavaAntes] = await Promise.all([idDaTrilhaDoQuadro(quadro.id, usuarioId), estudouHoje(usuarioId)]);
   const { error } = await supabase.from("abacato_cards").update({ concluido }).eq("id", card.id);
@@ -453,7 +474,8 @@ export async function marcarCard({ usuarioId, cardId, concluido }) {
     ? await depoisDePontuar({ usuarioId, trilhaId, estudavaAntes, ganhou: pontos, verTrilha: true })
     : NADA_EXTRA;
   tocarQuadro(quadro.id);
-  return { cardConcluido: concluido, ...resultadoDaPontuacao(pontos, extra) };
+  const assunto = concluido ? await situacaoDoAssunto(quadro.id, card.id, usuarioId) : { assuntoConcluido: false, faltaQuiz: false };
+  return { cardConcluido: concluido, ...assunto, ...resultadoDaPontuacao(pontos, extra) };
 }
 
 // ---------------------------------------------------------------- escrever no quadro

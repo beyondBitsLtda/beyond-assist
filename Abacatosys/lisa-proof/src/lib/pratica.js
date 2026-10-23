@@ -1,24 +1,30 @@
 // A parte prática no banco: gerar (ou reaproveitar) o desafio do período, responder, entregar e
 // pontuar. A regra de cada coisa mora em src/dominio/pratica.js; aqui é só o caminho até o banco,
 // a IA e o GitHub.
+//
+// AMARRADA À TRILHA (23/10/2026, src/dominio/avanco.js): o quiz e o exercício são do assunto da vez
+// (o das semanas abertas do plano); o quiz aprovado conclui o assunto; cada semana do plano tem o
+// seu projeto, a última tem o projeto final, e o projeto aprovado abre a semana seguinte.
 
 import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
 import {
-  buscarEmLotes, registrarEvento, registrarOuMelhorar, quadroDeEstudo, trilhaDoUsuario,
+  registrarEvento, registrarOuMelhorar, quadroDeEstudo, trilhaDoUsuario,
   estudouHoje, depoisDePontuar, resultadoDaPontuacao,
 } from "./estudo.js";
 import { temModelo } from "./ia.js";
 import { gerarQuiz, gerarExercicio, gerarProjeto, gerarGuiaDoProjeto, ajustarComplexidadeDoProjeto, avaliarExercicio, avaliarProjeto } from "./iaPratica.js";
 import { lerRepositorio, ErroDoGitHub } from "./github.js";
-import { diaDe, inicioDaSemana, inicioDoMes } from "@/dominio/datas.js";
+import { diaDe } from "@/dominio/datas.js";
 import {
-  TIPOS_DE_DESAFIO, NOMES_DOS_DESAFIOS, TENTATIVAS, NOTA_DE_APROVACAO, periodoDe, fimDoPeriodo, periodoPermitido,
-  pontosDoQuiz, pontosDaNota, quizParaTela, podeReenviar, entregaConcluida, assuntoAtual, assuntosDoPeriodo,
+  TIPOS_DE_DESAFIO, NOMES_DOS_DESAFIOS, TENTATIVAS, NOTA_DE_APROVACAO, fimDoPeriodo,
+  pontosDoQuiz, pontosDaNota, quizParaTela, podeReenviar, entregaConcluida, ehProjeto,
   RODADAS_POR_DIA, podeAbrirRodada, comFatorDaRodada,
   tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto,
   complexidadeDe, podeTrocarComplexidade, TROCAS_DE_COMPLEXIDADE,
 } from "@/dominio/pratica.js";
+import { semanaDoProjeto, podeGerarProjeto, valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
+import { avancoDasTrilhas, avancoDaTrilhaDoUsuario } from "./avanco.js";
 
 const CAMPOS = "id, usuario_id, trilha_id, tipo, periodo, rodada, card_ids, titulo, conteudo, status, resposta, avaliacao, nota, pontos, tentativas, criado_em, atualizado_em";
 
@@ -28,7 +34,7 @@ function falhou(error, onde) {
 
 // ---------------------------------------------------------------- projetos: pontos por parte
 
-const eProjeto = (tipo) => tipo === "projeto_semanal" || tipo === "projeto_mensal";
+const eProjeto = ehProjeto;
 const NADA_CUMPRIDO = { requisitos: [], extras: [] };
 
 /** O que o projeto já tem garantido. Projeto entregue antes da pontuação por parte (sem
@@ -50,35 +56,18 @@ function pontuacaoDoProjeto(d) {
   };
 }
 
-/** Etapas vivas de várias trilhas, com título e situação do card: `Map<trilhaId, etapa[]>`. */
-export async function etapasDasTrilhas(trilhaIds) {
-  const etapas = await buscarEmLotes(
-    "proof_etapas", "trilha_id, card_id, ordem, semana, inicio, fim", "trilha_id", trilhaIds
-  );
-  const cards = await buscarEmLotes(
-    "abacato_cards", "id, titulo, descricao, concluido, arquivado", "id", etapas.map((e) => e.card_id)
-  );
-  const cardPorId = new Map(cards.map((c) => [c.id, c]));
-  const porTrilha = new Map(trilhaIds.map((id) => [id, []]));
-  for (const e of etapas) {
-    const c = cardPorId.get(e.card_id);
-    if (!c || c.arquivado) continue;
-    porTrilha.get(e.trilha_id)?.push({
-      cardId: e.card_id, ordem: e.ordem, semana: e.semana, inicio: e.inicio, fim: e.fim,
-      concluido: Boolean(c.concluido), titulo: c.titulo, descricao: c.descricao || "",
-    });
-  }
-  return porTrilha;
-}
-
-/** Os assuntos que o desafio cobre. Projeto sem assunto planejado no período (trilha que começou
- *  depois, semana sem estudo) cai no assunto atual — melhor um projeto pequeno que nenhum. */
-function assuntosPara(tipo, periodo, etapas, hoje) {
-  const atual = assuntoAtual(etapas, hoje);
-  if (tipo === "quiz" || tipo === "exercicio") return atual ? [atual] : [];
-  const doPeriodo = assuntosDoPeriodo(etapas, periodo, fimDoPeriodo(tipo, periodo));
-  if (doPeriodo.length) return doPeriodo.slice(0, 12);
-  return atual ? [atual] : [];
+/** O projeto da vez de uma trilha, como a tela mostra: a semana do plano (ou o final), se está
+ *  liberado e o desafio dele (se já existe). */
+function projetoDaVezParaTela(avanco) {
+  const u = avanco.semanaDaVez || avanco.unidades.at(-1) || null;
+  if (!u) return null;
+  const d = u.projeto;
+  return {
+    tipo: u.tipo, periodo: u.periodo, numero: u.numero, final: u.final, semanas: avanco.unidades.length,
+    de: u.de, ate: u.ate, aberta: u.aberta, liberado: u.projetoLiberado, aprovado: u.aprovado, passou: u.passou,
+    podeOutro: u.podeOutroProjeto, rodadas: u.rodadas,
+    ...(d ? { id: d.id, status: d.status, nota: d.nota, titulo: d.titulo } : { status: null }),
+  };
 }
 
 // ---------------------------------------------------------------- ler
@@ -90,12 +79,14 @@ export function desafioParaTela(d, tema) {
     trilhaId: d.trilha_id,
     tema: tema || "",
     tipo: d.tipo,
-    nome: NOMES_DOS_DESAFIOS[d.tipo],
+    nome: d.tipo === "projeto_semanal" && d.conteudo?.semana ? `Projeto da semana ${d.conteudo.semana}` : NOMES_DOS_DESAFIOS[d.tipo],
     periodo: d.periodo,
     rodada: d.rodada || 1,
     maxRodadas: RODADAS_POR_DIA[d.tipo] || 1,
-    ate: fimDoPeriodo(d.tipo, d.periodo),
+    ate: d.conteudo?.ate || fimDoPeriodo(d.tipo, d.periodo),
     titulo: d.titulo,
+    // o projeto da semana do plano e o final guardam a semana e o prazo dela; os antigos, o do calendário
+    semana: d.conteudo?.semana || null,
     status: d.status,
     nota: d.nota,
     pontos: d.pontos,
@@ -129,17 +120,15 @@ export async function desafioDoUsuario(id, usuarioId) {
  * O resumo da prática de cada trilha ativa: o assunto atual e a situação do quiz e do exercício
  * de hoje e dos projetos da semana e do mês. É o que alimenta a cobrança na tela.
  */
-export async function resumoDaPratica(usuarioId, trilhas, hoje = diaDe()) {
+export async function resumoDaPratica(usuarioId, trilhas, hoje = diaDe(), avancosProntos = null) {
   if (!trilhas.length) return [];
-  const ids = trilhas.map((t) => t.id);
-  const semana = inicioDaSemana(hoje);
-  const mes = inicioDoMes(hoje);
-  const [etapas, desafiosR] = await Promise.all([
-    etapasDasTrilhas(ids),
+  const [avancos, desafiosR] = await Promise.all([
+    avancosProntos || avancoDasTrilhas(trilhas, hoje),
     supabase.from("proof_desafios")
       .select("id, trilha_id, tipo, periodo, rodada, status, nota, pontos, titulo, tentativas")
       .eq("usuario_id", usuarioId)
-      .in("periodo", [...new Set([hoje, semana, mes])]),
+      .eq("periodo", hoje)
+      .in("tipo", ["quiz", "exercicio"]),
   ]);
   falhou(desafiosR.error, "desafios");
 
@@ -164,15 +153,20 @@ export async function resumoDaPratica(usuarioId, trilhas, hoje = diaDe()) {
   };
 
   return trilhas.map((t) => {
-    const atual = assuntoAtual(etapas.get(t.id) || [], hoje);
+    const avanco = avancos.get(t.id);
+    const atual = avanco?.assuntoDaPratica || null;
+    const semana = avanco?.semanaDaVez;
     return {
       trilhaId: t.id,
       tema: t.tema,
-      assunto: atual ? { cardId: atual.cardId, titulo: atual.titulo } : null,
+      // o assunto da prática: o quiz aprovado dele conclui o assunto (se a teoria também estiver feita)
+      assunto: atual ? { cardId: atual.cardId, titulo: atual.titulo, teoria: atual.teoria, concluido: atual.concluido, faltaQuiz: atual.faltaQuiz } : null,
+      semana: semana ? { numero: semana.numero, total: avanco.unidades.length, final: semana.final } : null,
+      progresso: avanco?.progresso || { feitos: 0, total: 0 },
+      concluida: Boolean(avanco?.concluida),
       quiz: diario(t.id, "quiz"),
       exercicio: diario(t.id, "exercicio"),
-      projetoSemanal: { periodo: semana, ...(curto(achar(t.id, "projeto_semanal", semana)) || { status: null }) },
-      projetoMensal: { periodo: mes, ...(curto(achar(t.id, "projeto_mensal", mes)) || { status: null }) },
+      projeto: avanco ? projetoDaVezParaTela(avanco) : null,
     };
   });
 }
@@ -186,21 +180,56 @@ export async function resumoDaPratica(usuarioId, trilhas, hoje = diaDe()) {
  * fica se dois pedidos chegarem juntos: o segundo perde o insert e devolve o do primeiro. Gasta
  * uma chamada de IA à toa nesse caso raro, mas nunca cria dois quizzes do mesmo dia.
  */
-export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, novaRodada = false }) {
+export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, novaRodada = false, cardId = null }) {
   if (!TIPOS_DE_DESAFIO.includes(tipo)) throw new ErroDeAcesso(400, "tipo de desafio inválido");
+  if (tipo === "projeto_mensal") throw new ErroDeAcesso(400, "o projeto do mês deu lugar ao projeto final da trilha");
   const hoje = diaDe();
-  const alvo = periodo || periodoDe(tipo, hoje);
-  if (!periodoPermitido(tipo, alvo, hoje)) throw new ErroDeAcesso(400, "este período ainda não está liberado");
+  const { trilha, avanco } = await avancoDaTrilhaDoUsuario(trilhaId, usuarioId, hoje);
+  const projeto = eProjeto(tipo);
 
-  const trilha = await trilhaDoUsuario(trilhaId, usuarioId);
+  // quiz e exercício: de hoje, sobre o assunto da vez. Projeto: a semana do plano pedida (ou a da vez).
+  let alvo = hoje;
+  let unidade = null;
+  if (projeto) {
+    alvo = periodo || (avanco.semanaDaVez?.tipo === tipo ? avanco.semanaDaVez.periodo : null);
+    unidade = alvo ? semanaDoProjeto(avanco, tipo, alvo) : null;
+    if (!unidade) throw new ErroDeAcesso(400, tipo === "projeto_final" ? "esta trilha não tem projeto final agora" : "esta semana do plano não existe");
+  } else if (periodo && periodo !== hoje) {
+    throw new ErroDeAcesso(400, "quiz e exercício são só de hoje");
+  }
+
   const existentes = await supabase.from("proof_desafios").select(CAMPOS)
     .eq("usuario_id", usuarioId).eq("trilha_id", trilha.id).eq("tipo", tipo).eq("periodo", alvo).order("rodada");
   falhou(existentes.error, "desafio");
   const doDia = existentes.data || [];
 
-  // Sem pedir rodada nova: devolve a mais recente (ou cria a primeira).
   let rodada = 1;
-  if (!novaRodada || !RODADAS_POR_DIA[tipo]) {
+  // o quiz de UM assunto (o painel do assunto: "fazer o quiz deste assunto"): o de hoje dele, ou uma
+  // rodada nova — se o quiz de hoje foi de outro assunto, conta como mais uma rodada do dia
+  let assuntoPedido = null;
+  if (tipo === "quiz" && cardId) {
+    assuntoPedido = avanco.etapas.find((e) => String(e.cardId) === String(cardId)) || null;
+    if (!assuntoPedido) throw new ErroDeAcesso(404, "este assunto não está na trilha");
+    if (assuntoPedido.bloqueada) throw new ErroDeAcesso(409, `este assunto ${assuntoPedido.motivo}`);
+    const dele = doDia.filter((d) => (d.card_ids || []).map(String).includes(String(cardId)));
+    if (dele.length && !novaRodada) return { desafio: dele[dele.length - 1], tema: trilha.tema, novo: false };
+    if (doDia.length) {
+      const pode = podeAbrirRodada(tipo, doDia);
+      if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
+      rodada = pode.rodada;
+    }
+  } else if (projeto) {
+    // o projeto da semana que já existe (inclusive um antigo, da semana do calendário, que vale para ela)
+    const vale = unidade.projeto ? await desafioDoUsuario(unidade.projeto.id, usuarioId).catch(() => null) : doDia.at(-1) || null;
+    if (vale && !novaRodada) return { desafio: vale, tema: trilha.tema, novo: false };
+    if (novaRodada) {
+      if (!unidade.podeOutroProjeto) throw new ErroDeAcesso(409, `só dá para um projeto novo quando o anterior acabou sem aprovação (até ${PROJETOS_POR_SEMANA} por semana)`);
+      rodada = Math.max(0, ...doDia.map((d) => d.rodada || 1)) + 1;
+    }
+    const pode = podeGerarProjeto(unidade, hoje);
+    if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
+  } else if (!novaRodada || !RODADAS_POR_DIA[tipo]) {
+    // sem pedir rodada nova: devolve a mais recente (ou cria a primeira)
     if (doDia.length) return { desafio: doDia[doDia.length - 1], tema: trilha.tema, novo: false };
   } else {
     const pode = podeAbrirRodada(tipo, doDia);
@@ -211,8 +240,14 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, 
   await quadroDeEstudo(trilha.quadro_id, usuarioId); // o quadro ainda é desta pessoa e de estudo
   if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
 
-  const etapas = (await etapasDasTrilhas([trilha.id])).get(trilha.id) || [];
-  const assuntos = assuntosPara(tipo, alvo, etapas, hoje);
+  const semanas = avanco.unidades.length;
+  const assuntos = assuntoPedido
+    ? [assuntoPedido]
+    : !projeto
+    ? (avanco.assuntoDaPratica ? [avanco.assuntoDaPratica] : [])
+    : tipo === "projeto_final" && semanas > 1
+      ? avanco.etapas.filter((e) => e.inicio).slice(0, 15) // o final junta a trilha inteira
+      : unidade.etapas.slice(0, 12);
   if (!assuntos.length) throw new ErroDeAcesso(400, "a trilha não tem assuntos para praticar");
 
   // as rodadas de antes, para não repetir pergunta nem exercício (a IA é avisada E o código confere)
@@ -230,8 +265,10 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, 
       conteudo = await gerarExercicio({ tema: trilha.tema, assunto: assuntos[0], evitar, anteriores, rodada });
       titulo = conteudo.titulo;
     } else {
-      conteudo = await gerarProjeto({ tema: trilha.tema, tipo, assuntos });
+      conteudo = await gerarProjeto({ tema: trilha.tema, tipo, assuntos, semanas, numero: unidade.numero });
       titulo = conteudo.titulo;
+      // a semana do plano e o prazo dela (o fim do que foi agendado); o final guarda o valor dele
+      conteudo = { ...conteudo, semana: unidade.numero, ate: unidade.ate, ...(tipo === "projeto_final" ? { valor: valorDoProjetoFinal(semanas), semanas } : {}) };
     }
   } catch (e) {
     throw new ErroDeAcesso(502, e.message);
@@ -288,15 +325,24 @@ export async function responderQuiz({ usuarioId, id, indice, escolha }) {
   });
 
   let pontuacao = resultadoDaPontuacao(0, { pontosExtras: 0, metaBatida: false, ofensivaAumentou: false, ofensiva: null, conquistas: [] });
+  let assunto = null;
   if (terminou) {
+    // o quiz aprovado conclui o assunto (se a teoria também estiver feita): a trilha pode ter acabado
+    const nota = Math.round((acertos / perguntas.length) * 100);
+    if (nota >= NOTA_DE_APROVACAO) {
+      const { avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
+      const etapa = avanco.etapas.find((e) => (d.card_ids || []).map(String).includes(String(e.cardId)));
+      if (etapa) assunto = { titulo: etapa.titulo, concluido: etapa.concluido, faltaTeoria: !etapa.teoria };
+    } else assunto = { reprovado: true, precisa: NOTA_DE_APROVACAO };
     const pontos = await registrarEvento({
       usuarioId, trilhaId: d.trilha_id, tipo: "quiz", chave: `pratica:${d.id}`, pontos: pontosDoDesafio,
       detalhe: { titulo: d.titulo, acertos, total: perguntas.length },
     });
-    pontuacao = resultadoDaPontuacao(pontos, await depoisDePontuar({ usuarioId, trilhaId: d.trilha_id, estudavaAntes, ganhou: pontos }));
+    pontuacao = resultadoDaPontuacao(pontos, await depoisDePontuar({ usuarioId, trilhaId: d.trilha_id, estudavaAntes, ganhou: pontos, verTrilha: Boolean(assunto?.concluido) }));
   }
 
   return {
+    assunto,
     acertou: perguntas[i].correta === e,
     correta: perguntas[i].correta,
     explicacao: perguntas[i].explicacao,
@@ -355,7 +401,20 @@ async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
     usuarioId, trilhaId: d.trilha_id, tipo: d.tipo, chave: `pratica:${d.id}`, pontos: pontosDoDesafio,
     detalhe: { titulo: d.titulo, nota: melhorNota },
   });
-  const extra = await depoisDePontuar({ usuarioId, trilhaId: d.trilha_id, estudavaAntes, ganhou: pontos });
+  // o projeto da semana do plano aprovado abre a semana seguinte; o final, aprovado, fecha a trilha
+  let semana = null;
+  if (d.tipo === "projeto_semanal" || d.tipo === "projeto_final") {
+    const { avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
+    const u = avanco.unidades.find((x) => x.projeto?.id === d.id);
+    if (u) {
+      const proxima = avanco.unidades.find((x) => x.numero === u.numero + 1);
+      semana = {
+        numero: u.numero, final: u.final, aprovado: u.aprovado, podeOutro: u.podeOutroProjeto,
+        liberou: u.passou && proxima ? proxima.numero : null, trilhaConcluida: avanco.concluida,
+      };
+    }
+  }
+  const extra = await depoisDePontuar({ usuarioId, trilhaId: d.trilha_id, estudavaAntes, ganhou: pontos, verTrilha: Boolean(semana?.trilhaConcluida) });
 
   return {
     avaliacao,
@@ -365,6 +424,7 @@ async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
     concluido: acabou,
     reenviar: podeReenviar({ tipo: d.tipo, tentativas, status: acabou ? "concluido" : "em_andamento", completo: pontuacao?.completo }),
     ...(pontuacao ? { pontuacao, completo: pontuacao.completo } : {}),
+    semana,
     ...resultadoDaPontuacao(pontos, extra),
   };
 }
@@ -399,6 +459,8 @@ export async function mudarComplexidade({ usuarioId, id, nivel }) {
   const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
 
   const { guia, original, trocas = 0, complexidade, ...atual } = d.conteudo || {};
+  // a semana do plano, o prazo e o valor do projeto final não mudam com a complexidade
+  const meta = Object.fromEntries(["semana", "ate", "valor", "semanas"].filter((k) => atual[k] != null).map((k) => [k, atual[k]]));
   const padrao = original || atual;
   let novo = padrao;
   if (nivel !== "padrao") {
@@ -409,7 +471,7 @@ export async function mudarComplexidade({ usuarioId, id, nivel }) {
       throw new ErroDeAcesso(502, e.message);
     }
   }
-  const conteudo = { ...novo, complexidade: nivel, trocas: trocas + 1, original: padrao };
+  const conteudo = { ...novo, ...meta, complexidade: nivel, trocas: trocas + 1, original: padrao };
   const titulo = String(novo.titulo || d.titulo).slice(0, 200);
   await salvar(d.id, { conteudo, titulo });
   return desafioParaTela({ ...d, conteudo, titulo }, trilha.tema);
@@ -421,9 +483,7 @@ export async function mudarComplexidade({ usuarioId, id, nivel }) {
  */
 export async function guiaDoProjeto({ usuarioId, id }) {
   const d = await desafioDoUsuario(id, usuarioId);
-  if (d.tipo !== "projeto_semanal" && d.tipo !== "projeto_mensal") {
-    throw new ErroDeAcesso(400, "as dicas da Lisa são para os projetos da semana e do mês");
-  }
+  if (!eProjeto(d.tipo)) throw new ErroDeAcesso(400, "as dicas da Lisa são para os projetos");
   if (d.conteudo?.guia) return d.conteudo.guia;
   if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
 
@@ -440,7 +500,7 @@ export async function guiaDoProjeto({ usuarioId, id }) {
 
 export async function enviarProjeto({ usuarioId, id, repo }) {
   const d = await desafioDoUsuario(id, usuarioId);
-  if (d.tipo !== "projeto_semanal" && d.tipo !== "projeto_mensal") throw new ErroDeAcesso(400, "este desafio não é um projeto");
+  if (!eProjeto(d.tipo)) throw new ErroDeAcesso(400, "este desafio não é um projeto");
   exigirReenvio(d);
 
   const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);

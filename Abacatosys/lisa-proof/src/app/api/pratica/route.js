@@ -8,12 +8,12 @@ import { diaDe } from "@/dominio/datas.js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** GET /api/pratica — por trilha ativa: assunto atual, quiz e exercício de hoje, projetos. */
+/** GET /api/pratica — por trilha ativa: o assunto da vez, quiz e exercício de hoje e o projeto da semana do plano (ou o final). */
 export async function GET(req) {
   try {
     const usuario = await exigirUsuario(req);
     const { data: trilhas, error } = await supabase
-      .from("proof_trilhas").select("id, tema").eq("usuario_id", usuario.id).eq("status", "ativa").order("tema");
+      .from("proof_trilhas").select("id, tema, inicio_em, dias_de_estudo").eq("usuario_id", usuario.id).eq("status", "ativa").order("tema");
     if (error) throw new ErroDeAcesso(500, error.message);
     const hoje = diaDe();
     return json({ ok: true, hoje, iaDisponivel: temModelo(), trilhas: await resumoDaPratica(usuario.id, trilhas || [], hoje) });

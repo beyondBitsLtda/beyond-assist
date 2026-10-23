@@ -161,21 +161,53 @@ const ESQUEMA_DO_PROJETO = {
   required: ["titulo", "contexto", "requisitos", "extras", "entrega", "criterios"],
 };
 
-/** O projeto da semana (algumas horas) ou do mês (um projeto completo que junta os assuntos). */
-export async function gerarProjeto({ tema, tipo, assuntos }) {
-  const mensal = tipo === "projeto_mensal";
+/**
+ * O tamanho de cada projeto (23/10/2026): o da semana do plano (algumas horas), o FINAL — do tamanho
+ * da trilha: numa trilha de uma semana (um plano de 5 dias), um projeto pequeno e completo; numa
+ * trilha longa, uma aplicação que junta tudo — e o antigo do mês (só para os que já existiam).
+ */
+function tamanhoDoProjeto(tipo, semanas = 1) {
+  const n = Math.max(1, Number(semanas) || 1);
+  if (tipo === "projeto_final") {
+    const curta = n === 1;
+    return {
+      nome: "projeto final da trilha",
+      pedido: curta
+        ? "Crie o PROJETO FINAL desta trilha curta (uma semana de estudo): uma aplicação pequena e completa (3 a 5 horas) que use os assuntos estudados num caso realista."
+        : `Crie o PROJETO FINAL da trilha (${n} semanas de estudo): uma aplicação completa (${n <= 2 ? "5 a 8" : n <= 4 ? "8 a 15" : "12 a 20"} horas) que junte os principais assuntos da trilha inteira num caso realista.`,
+      requisitos: curta ? "4 a 6" : "6 a 9",
+      simples: { requisitos: curta ? "3 a 4" : "4 a 6", horas: curta ? "2 a 3 horas" : "4 a 8 horas" },
+      desafiador: { requisitos: curta ? "6 a 8" : "8 a 10", horas: curta ? "5 a 8 horas" : "15 a 25 horas" },
+      passos: curta ? "5 a 8" : "7 a 10",
+    };
+  }
+  if (tipo === "projeto_mensal") {
+    return {
+      nome: "projeto do mês",
+      pedido: "Crie o PROJETO DO MÊS: uma aplicação pequena porém completa (8 a 15 horas) que junte vários destes assuntos num caso realista.",
+      requisitos: "6 a 9", simples: { requisitos: "4 a 6", horas: "4 a 8 horas" }, desafiador: { requisitos: "8 a 10", horas: "15 a 25 horas" }, passos: "7 a 10",
+    };
+  }
+  return {
+    nome: "projeto da semana",
+    pedido: "Crie o PROJETO DA SEMANA: uma implementação prática (2 a 4 horas) que aplique os assuntos desta semana do plano de estudo.",
+    requisitos: "4 a 6", simples: { requisitos: "3 a 4", horas: "1 a 2 horas" }, desafiador: { requisitos: "6 a 8", horas: "4 a 6 horas" }, passos: "5 a 8",
+  };
+}
+
+/** O projeto da semana do plano (algumas horas) ou o final (do tamanho da trilha). */
+export async function gerarProjeto({ tema, tipo, assuntos, semanas = 1 }) {
+  const tamanho = tamanhoDoProjeto(tipo, semanas);
   const bruto = await gerarJson({
     sistema: PERSONA,
     esquema: ESQUEMA_DO_PROJETO,
     pedido: [
       `Tema: ${tema}`,
-      `Assuntos do período:\n${descreverAssuntos(assuntos)}`,
+      `${tipo === "projeto_final" ? "Assuntos da trilha" : "Assuntos da semana"}:\n${descreverAssuntos(assuntos)}`,
       "",
-      mensal
-        ? "Crie o PROJETO DO MÊS: uma aplicação pequena porém completa (8 a 15 horas) que junte vários destes assuntos num caso realista."
-        : "Crie o PROJETO DA SEMANA: uma implementação prática (2 a 4 horas) que aplique os assuntos desta semana.",
+      tamanho.pedido,
       "- `contexto`: o cenário do projeto, como um pedido de cliente.",
-      `- \`requisitos\`: ${mensal ? "6 a 9" : "4 a 6"} requisitos obrigatórios, verificáveis lendo o código.`,
+      `- \`requisitos\`: ${tamanho.requisitos} requisitos obrigatórios, verificáveis lendo o código.`,
       "- `extras`: 1 a 3 desafios opcionais.",
       "- `entrega`: como entregar — um repositório PÚBLICO no GitHub, com README explicando como rodar.",
       "- `criterios`: como o código será avaliado (funcionamento, organização, boas práticas do tema).",
@@ -190,21 +222,21 @@ export async function gerarProjeto({ tema, tipo, assuntos }) {
  * nível várias vezes sem o projeto ir "derivando".
  */
 export async function ajustarComplexidadeDoProjeto({ tema, tipo, projeto, nivel }) {
-  const mensal = tipo === "projeto_mensal";
+  const tamanho = tamanhoDoProjeto(tipo, projeto?.semanas);
   const simples = nivel === "simples";
   const bruto = await gerarJson({
     sistema: PERSONA,
     esquema: ESQUEMA_DO_PROJETO,
     pedido: [
       `Tema: ${tema}`,
-      `Projeto atual (${mensal ? "projeto do mês" : "projeto da semana"}, complexidade padrão): ${projeto.titulo}`,
+      `Projeto atual (${tamanho.nome}, complexidade padrão): ${projeto.titulo}`,
       projeto.contexto ? `Contexto: ${projeto.contexto}` : "",
       `Requisitos:\n- ${projeto.requisitos.join("\n- ")}`,
       projeto.extras?.length ? `Extras:\n- ${projeto.extras.join("\n- ")}` : "",
       "",
       simples
-        ? `Reescreva este projeto numa versão MAIS SIMPLES, para quem está começando: o MESMO cenário e o mesmo tema, com ${mensal ? "4 a 6" : "3 a 4"} requisitos diretos (um passo de cada vez, sem partes avançadas) e linguagem bem clara. Tempo estimado: ${mensal ? "4 a 8 horas" : "1 a 2 horas"}.`
-        : `Reescreva este projeto numa versão DESAFIADORA: o MESMO cenário e o mesmo tema, com ${mensal ? "8 a 10" : "6 a 8"} requisitos, incluindo partes mais avançadas (validação, organização em módulos, tratamento de erros, testes — o que fizer sentido no tema). Tempo estimado: ${mensal ? "15 a 25 horas" : "4 a 6 horas"}.`,
+        ? `Reescreva este projeto numa versão MAIS SIMPLES, para quem está começando: o MESMO cenário e o mesmo tema, com ${tamanho.simples.requisitos} requisitos diretos (um passo de cada vez, sem partes avançadas) e linguagem bem clara. Tempo estimado: ${tamanho.simples.horas}.`
+        : `Reescreva este projeto numa versão DESAFIADORA: o MESMO cenário e o mesmo tema, com ${tamanho.desafiador.requisitos} requisitos, incluindo partes mais avançadas (validação, organização em módulos, tratamento de erros, testes — o que fizer sentido no tema). Tempo estimado: ${tamanho.desafiador.horas}.`,
       "- `contexto`: o cenário, como um pedido de cliente.",
       "- `requisitos`: obrigatórios, verificáveis lendo o código.",
       "- `extras`: 1 a 3 desafios opcionais.",
@@ -232,13 +264,13 @@ const ESQUEMA_DO_GUIA = {
  * É mentoria — guia o caminho, mas não entrega a solução (o projeto continua valendo nota).
  */
 export async function gerarGuiaDoProjeto({ tema, tipo, projeto }) {
-  const mensal = tipo === "projeto_mensal";
+  const tamanho = tamanhoDoProjeto(tipo, projeto?.semanas);
   const bruto = await gerarJson({
     sistema: PERSONA + " Aqui você é mentora de um estudante: mostra o caminho e encoraja, mas não faz o trabalho por ele.",
     esquema: ESQUEMA_DO_GUIA,
     pedido: [
       `Tema: ${tema}`,
-      `${mensal ? "Projeto do mês" : "Projeto da semana"}: ${projeto.titulo}`,
+      `${tamanho.nome[0].toUpperCase()}${tamanho.nome.slice(1)}: ${projeto.titulo}`,
       projeto.contexto ? `Contexto: ${projeto.contexto}` : "",
       `Requisitos obrigatórios:\n${projeto.requisitos.map((r, i) => `${i + 1}. ${r}`).join("\n")}`,
       projeto.extras?.length ? `Extras opcionais:\n- ${projeto.extras.join("\n- ")}` : "",
@@ -246,7 +278,7 @@ export async function gerarGuiaDoProjeto({ tema, tipo, projeto }) {
       projeto.criterios?.length ? `Como será avaliado:\n- ${projeto.criterios.join("\n- ")}` : "",
       "",
       "O estudante não sabe por onde começar. Monte as DICAS DA LISA para ele:",
-      `- \`passos\`: ${mensal ? "7 a 10" : "5 a 8"} passos EM ORDEM, do zero até a entrega: preparar o projeto e o repositório,`,
+      `- \`passos\`: ${tamanho.passos} passos EM ORDEM, do zero até a entrega: preparar o projeto e o repositório,`,
       "  montar a estrutura, implementar os requisitos numa ordem que faça sentido (cite o número entre parênteses,",
       "  ex.: \"(requisito 2)\"), testar, escrever o README e publicar no GitHub público. Cada passo: uma ação",
       "  concreta começando por verbo, em 1 ou 2 frases.",

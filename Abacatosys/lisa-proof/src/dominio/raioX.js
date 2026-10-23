@@ -11,7 +11,7 @@ import { NOMES_DOS_DESAFIOS, NOTA_DE_APROVACAO, TENTATIVAS } from "./pratica.js"
 
 export const SEMANAS_DO_RAIO_X = 12;
 const DIAS_DA_SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-const ORIGENS = ["item", "card", "meta_diaria", "quiz", "exercicio", "projeto_semanal", "projeto_mensal", "conquista"];
+const ORIGENS = ["item", "card", "meta_diaria", "quiz", "exercicio", "projeto_semanal", "projeto_final", "projeto_mensal", "conquista"];
 
 const media = (xs) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null);
 const umaCasa = (x) => (x == null ? null : Math.round(x * 10) / 10);
@@ -131,7 +131,7 @@ export function montarRaioX({ eventos = [], desafios = [], trilhas = [], metaDia
     lista: [...lista].sort((a, b) => String(b.periodo).localeCompare(String(a.periodo))).map(linha),
   });
   const exercicios = resumoDe(entregues(["exercicio"]));
-  const projetos = resumoDe(entregues(["projeto_semanal", "projeto_mensal"]));
+  const projetos = resumoDe(entregues(["projeto_semanal", "projeto_final", "projeto_mensal"]));
 
   // ------------------------------------------------------------ por trilha
   const porTrilha = trilhas.map((t) => {
@@ -139,7 +139,7 @@ export function montarRaioX({ eventos = [], desafios = [], trilhas = [], metaDia
     const dela = (lista) => lista.filter((d) => d.trilha_id === t.id);
     const qz = quizzes.filter((q) => q.d.trilha_id === t.id);
     const ex = dela(entregues(["exercicio"]));
-    const pj = dela(entregues(["projeto_semanal", "projeto_mensal"]));
+    const pj = dela(entregues(["projeto_semanal", "projeto_final", "projeto_mensal"]));
     const pq = qz.reduce((s, q) => s + q.respondidas, 0);
     return {
       id: t.id,

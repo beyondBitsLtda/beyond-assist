@@ -2,6 +2,7 @@ import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { exigirUsuario, respostaDeErro, ErroDeAcesso } from "@/lib/sessao.js";
 import { perfilDe, buscarTodas } from "@/lib/estudo.js";
+import { avancoDasTrilhas } from "@/lib/avanco.js";
 import { diaDe } from "@/dominio/datas.js";
 import { montarRaioX } from "@/dominio/raioX.js";
 
@@ -23,25 +24,16 @@ export async function GET(req) {
         .select("tipo, pontos, dia, detalhe, criado_em, trilha_id").eq("usuario_id", usuario.id).order("criado_em")),
       buscarTodas(() => supabase.from("proof_desafios")
         .select("id, tipo, periodo, status, nota, pontos, tentativas, titulo, trilha_id, conteudo, resposta").eq("usuario_id", usuario.id).order("periodo")),
-      supabase.from("proof_trilhas").select("id, tema, status, inicio_em").eq("usuario_id", usuario.id).order("criada_em"),
+      supabase.from("proof_trilhas").select("id, tema, status, inicio_em, dias_de_estudo").eq("usuario_id", usuario.id).order("criada_em"),
     ]);
     if (trilhasR.error) throw new ErroDeAcesso(500, trilhasR.error.message);
     const trilhas = trilhasR.data || [];
 
-    // o progresso de cada trilha: as etapas e se o card de cada uma está concluído no Abacato
-    let etapas = [];
-    if (trilhas.length) {
-      etapas = await buscarTodas(() => supabase.from("proof_etapas").select("trilha_id, card_id").in("trilha_id", trilhas.map((t) => t.id)));
-    }
-    const concluidos = new Set();
-    const ids = [...new Set(etapas.map((e) => e.card_id))];
-    for (let i = 0; i < ids.length; i += 300) {
-      const { data } = await supabase.from("abacato_cards").select("id, concluido").in("id", ids.slice(i, i + 300));
-      for (const c of data || []) if (c.concluido) concluidos.add(c.id);
-    }
+    // o progresso de cada trilha: o assunto concluído é a teoria E o quiz dele (src/dominio/avanco.js)
+    const avancos = await avancoDasTrilhas(trilhas, hoje);
     const comEtapas = trilhas.map((t) => ({
       ...t,
-      etapas: etapas.filter((e) => e.trilha_id === t.id).map((e) => ({ concluido: concluidos.has(e.card_id) })),
+      etapas: (avancos.get(t.id)?.etapas || []).map((e) => ({ concluido: e.concluido })),
     }));
 
     return json({

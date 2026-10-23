@@ -422,3 +422,9 @@ details.pf-ajuste > summary { cursor: pointer; font-weight: 600; min-height: 44p
 .pf-entrada__marca h1 { margin: 0; font-size: 22px; }
 .pf-entrada__marca p { margin: 0; color: var(--pf-tinta-2); font-size: 14px; }
 .pf-entrada__nota { margin: 0; text-align: center; font-size: 13px; color: var(--pf-tinta-2); }
+
+/* ---- a trilha amarrada (23/10/2026): o aviso do assunto trancado e o "falta o quiz" */
+.pf-assunto__aviso { margin: 10px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.pf-assunto__aviso span { flex: 1 1 220px; }
+.pf-assunto__aviso--quiz { background: rgba(6, 182, 212, 0.12); color: var(--pf-tinta); }
+.projeto__trava { margin: 12px 0 0; font-weight: 600; }

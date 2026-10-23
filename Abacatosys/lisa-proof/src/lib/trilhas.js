@@ -4,9 +4,9 @@
 import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
 import {
-  quadroDeEstudo, conteudoDoQuadro, trilhaDoUsuario, buscarEmLotes, checklistsDosCards,
-  contarItens, linkDoAbacato,
+  quadroDeEstudo, conteudoDoQuadro, trilhaDoUsuario, checklistsDosCards, contarItens, linkDoAbacato,
 } from "./estudo.js";
+import { avancoDaTrilhaDoUsuario } from "./avanco.js";
 import { planejarTrilha, temModelo } from "./ia.js";
 import { planoPadrao, planoDoReplanejamento, montarEtapas, normalizarDiasDeEstudo } from "@/dominio/plano.js";
 import { diaDe, diaValido } from "@/dominio/datas.js";
@@ -171,54 +171,26 @@ export async function apagarTrilha({ usuarioId, trilhaId }) {
   falhou(error, "trilha");
 }
 
-/** A trilha inteira para a tela: etapas na ordem de estudo, com título e progresso de cada uma. */
+/**
+ * A trilha inteira para a tela: o avanço (src/dominio/avanco.js) — as semanas do plano, cada uma com
+ * os assuntos e o projeto dela, o assunto de agora —, e cada assunto com as checklists para marcar.
+ */
 export async function detalheDaTrilha({ usuarioId, trilhaId }) {
-  const trilha = await trilhaDoUsuario(trilhaId, usuarioId);
-  const { data: etapas, error } = await supabase
-    .from("proof_etapas")
-    .select("id, card_id, ordem, semana, inicio, fim, dias, nivel, objetivo")
-    .eq("trilha_id", trilha.id)
-    .order("ordem");
-  falhou(error, "etapas");
-
-  const ids = (etapas || []).map((e) => e.card_id);
-  const [cards, checklists, projetos] = await Promise.all([
-    buscarEmLotes("abacato_cards", "id, titulo, descricao, concluido, arquivado, recorrencia_regra", "id", ids),
-    checklistsDosCards(ids),
-    // Só os projetos: são os baús e troféus do mapa. Quiz e exercício são do dia, não do mapa.
-    supabase.from("proof_desafios")
-      .select("id, tipo, periodo, status, nota, titulo")
-      .eq("trilha_id", trilha.id)
-      .in("tipo", ["projeto_semanal", "projeto_mensal"]),
-  ]);
-  falhou(projetos.error, "projetos");
-  const cardPorId = new Map(cards.map((c) => [c.id, c]));
-
-  const lista = (etapas || [])
-    .map((e) => {
-      const card = cardPorId.get(e.card_id);
-      if (!card || card.arquivado) return null; // saiu do quadro; some no próximo replanejamento
-      const lista = checklists.get(e.card_id) || [];
-      const { total, feitos } = contarItens(lista);
-      return {
-        id: e.id, cardId: e.card_id, ordem: e.ordem, semana: e.semana, inicio: e.inicio, fim: e.fim,
-        dias: e.dias, nivel: e.nivel, objetivo: e.objetivo,
-        titulo: card.titulo, descricao: String(card.descricao || "").slice(0, 600),
-        concluido: Boolean(card.concluido), recorrente: Boolean(card.recorrencia_regra),
-        checklists: lista, itens: total, itensFeitos: feitos,
-        link: linkDoAbacato(trilha.quadro_id, e.card_id),
-      };
-    })
-    .filter(Boolean);
-
+  const { trilha, avanco } = await avancoDaTrilhaDoUsuario(trilhaId, usuarioId);
+  const checklists = await checklistsDosCards(avanco.etapas.map((e) => e.cardId));
+  // as etapas das semanas são os mesmos objetos: completar aqui completa lá também
+  for (const e of avanco.etapas) {
+    const lista = checklists.get(e.cardId) || [];
+    const { total, feitos } = contarItens(lista);
+    Object.assign(e, { checklists: lista, itens: total, itensFeitos: feitos, link: linkDoAbacato(trilha.quadro_id, e.cardId) });
+  }
   return {
     trilha: {
       id: trilha.id, tema: trilha.tema, quadroId: trilha.quadro_id, inicioEm: trilha.inicio_em,
       diasDeEstudo: trilha.dias_de_estudo, resumo: trilha.resumo, geradaPor: trilha.gerada_por,
       link: linkDoAbacato(trilha.quadro_id),
     },
-    etapas: lista,
-    projetos: projetos.data || [],
-    progresso: { feitos: lista.filter((e) => e.concluido).length, total: lista.length },
+    avanco,
+    progresso: avanco.progresso,
   };
 }

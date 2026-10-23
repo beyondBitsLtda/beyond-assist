@@ -1,8 +1,9 @@
 import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { exigirUsuario, respostaDeErro, ErroDeAcesso } from "@/lib/sessao.js";
-import { perfilDe, buscarTodas, buscarEmLotes, checklistsDosCards, linkDoAbacato } from "@/lib/estudo.js";
+import { perfilDe, buscarTodas, checklistsDosCards, linkDoAbacato } from "@/lib/estudo.js";
 import { resumoDaPratica } from "@/lib/pratica.js";
+import { avancoDasTrilhas } from "@/lib/avanco.js";
 import { diaDe } from "@/dominio/datas.js";
 import { calcularOfensiva } from "@/dominio/ofensiva.js";
 import { resumoDasMetas, tarefasDoDia } from "@/dominio/metas.js";
@@ -22,7 +23,7 @@ export async function GET(req) {
 
     const [perfil, trilhasR, eventos] = await Promise.all([
       perfilDe(usuario.id),
-      supabase.from("proof_trilhas").select("id, quadro_id, tema").eq("usuario_id", usuario.id).eq("status", "ativa"),
+      supabase.from("proof_trilhas").select("id, quadro_id, tema, inicio_em, dias_de_estudo").eq("usuario_id", usuario.id).eq("status", "ativa"),
       buscarTodas(() =>
         supabase.from("proof_eventos").select("dia, pontos, tipo, chave").eq("usuario_id", usuario.id).order("criado_em")
       ),
@@ -36,32 +37,23 @@ export async function GET(req) {
     // A mesma conta que o servidor usa para dar o bônus — senão a tela diria "meta batida" com
     // pontos de conquista, e o bônus não viria.
     const pontosHoje = pontosDoDiaParaMeta(eventos.filter((e) => e.dia === hoje));
-    const concluidosHoje = new Set(
-      eventos.filter((e) => e.dia === hoje && e.tipo === "card").map((e) => e.chave.replace(/^card:/, ""))
+    // concluído hoje: a teoria (o card) ou o quiz que faltava, hoje — e o assunto concluído de vez
+    const mexidosHoje = new Set(
+      eventos.filter((e) => e.dia === hoje && (e.tipo === "card" || e.tipo === "quiz")).map((e) => e.chave)
     );
+    const { data: quizzesDeHoje } = await supabase.from("proof_desafios").select("id, card_ids")
+      .eq("usuario_id", usuario.id).eq("tipo", "quiz").eq("periodo", hoje).eq("status", "concluido");
+    const comQuizHoje = new Set((quizzesDeHoje || []).filter((q) => mexidosHoje.has(`pratica:${q.id}`)).flatMap((q) => q.card_ids || []).map(String));
 
-    const etapas = await buscarEmLotes(
-      "proof_etapas", "id, trilha_id, card_id, ordem, inicio, fim, nivel, objetivo", "trilha_id", trilhas.map((t) => t.id)
-    );
-    const cards = await buscarEmLotes(
-      "abacato_cards", "id, titulo, descricao, concluido, arquivado, recorrencia_regra", "id", etapas.map((e) => e.card_id)
-    );
-    const cardPorId = new Map(cards.map((c) => [c.id, c]));
-
-    const vivas = etapas
-      .filter((e) => cardPorId.get(e.card_id) && !cardPorId.get(e.card_id).arquivado)
-      .map((e) => ({
-        id: e.id,
-        trilhaId: e.trilha_id,
-        cardId: e.card_id,
-        ordem: e.ordem,
-        inicio: e.inicio,
-        fim: e.fim,
-        nivel: e.nivel,
-        objetivo: e.objetivo,
-        concluido: Boolean(cardPorId.get(e.card_id).concluido),
-        concluidoHoje: concluidosHoje.has(e.card_id),
-      }));
+    // o avanço de cada trilha: assunto concluído = teoria + quiz; a semana trancada (projeto da
+    // semana anterior sem aprovação) não entra no dia
+    const avancos = await avancoDasTrilhas(trilhas, hoje);
+    const vivas = trilhas.flatMap((t) => (avancos.get(t.id)?.etapas || []).map((e) => ({
+      ...e,
+      trilhaId: t.id,
+      concluidoHoje: e.concluido && (mexidosHoje.has(`card:${e.cardId}`) || comQuizHoje.has(String(e.cardId))),
+    })));
+    const cardPorId = new Map(vivas.map((e) => [e.cardId, e]));
 
     const tarefas = tarefasDoDia(vivas, hoje);
     const ids = tarefas.map((t) => t.cardId);
@@ -72,7 +64,7 @@ export async function GET(req) {
         : { data: [] },
     ]);
     const comExplicacao = new Set((explicadas.data || []).map((e) => e.card_id));
-    const pratica = await resumoDaPratica(usuario.id, trilhas, hoje);
+    const pratica = await resumoDaPratica(usuario.id, trilhas, hoje, avancos);
 
     return json({
       ok: true,
@@ -96,7 +88,7 @@ export async function GET(req) {
           tema: trilha?.tema || "",
           titulo: card.titulo,
           descricao: String(card.descricao || "").slice(0, 600),
-          recorrente: Boolean(card.recorrencia_regra),
+          recorrente: Boolean(card.recorrente),
           checklists: checklists.get(t.cardId) || [],
           temExplicacao: comExplicacao.has(t.cardId),
           link: linkDoAbacato(trilha?.quadro_id, t.cardId),

@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoMonstro } from "./reino/monstrosDePapel.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-23-reino-de-teste";
+export const EDICAO_DAS_NOVIDADES = "2026-10-23-trilha-amarrada";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,13 +28,12 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🧪", titulo: "Reino de Teste", texto: "Um reino à parte, com tudo liberado e reinos-robô para atacar: teste expedições, invasões, paz, operários e a bolsa sem mexer no seu reino de verdade. O modo de teste saiu do seu reino — nada do teste vale no jogo.", destaque: true },
+  { icone: "🔗", titulo: "A prática agora move a trilha", texto: "O assunto conclui com a teoria E o quiz dele (60% ou mais). Cada semana do plano termina num projeto — aprovado, a semana seguinte abre.", destaque: true },
+  { icone: "🏆", titulo: "Projeto final, do tamanho do seu plano", texto: "O projeto do mês virou o projeto final da trilha: num plano de 5 dias é um projeto só, pequeno e completo; numa trilha longa, junta tudo. O que você já tinha concluído continua valendo." },
+  { icone: "🪐", titulo: "Planetoides de verdade", texto: "As expedições da Nave agora são numa esfera: tropas, monstros e construções andam em volta do planeta, estilo Mario Galaxy." },
+  { icone: "🌊", titulo: "Fundo do mar de verdade", texto: "Nada de nuvem embaixo d'água: areia até o horizonte, algas balançando, cardumes, raios de luz e bolhas subindo." },
+  { icone: "🧪", titulo: "Reino de Teste", texto: "Um reino à parte, com tudo liberado e reinos-robô para atacar: teste tudo sem mexer no seu reino de verdade." },
   { icone: "⏰", titulo: "A Bolsa abre das 07h às 17h", texto: "O pregão negocia das 07:00 às 17:00 (horário de Brasília), e o preço anda de hora em hora nesse intervalo. Fora dele, dá para acompanhar as cotações, mas não comprar nem vender." },
-  { icone: "📈", titulo: "A Bolsa ganhou tela própria", texto: "Um pregão de verdade: letreiro de cotações, Índice do Reino, gráfico hora a hora com mira, velas de 14 dias, boleta de compra e venda e o mural de notícias da Lisa. No menu: Bolsa." },
-  { icone: "💎", titulo: "Diamantes na Mina de Ouro", texto: "Cada pedra que os operários tiram pode ser um diamante, que vale bem mais que ouro. Quanto mais funda a mina, mais sorte." },
-  { icone: "⛏️", titulo: "Operários cavando", texto: "Os seus operários agora aparecem no mundo 3D, de picareta na mão, em volta da Mina de Ouro." },
-  { icone: "🚀", titulo: "Veículos e mapas novos", texto: "Submarino, Dirigível, Tanque de Magma e Nave Estelar — com fundo do mar, montanhas, vulcões e planetoides sorteados. Cada veículo faz 3 expedições por dia; depois, é só abastecer." },
-  { icone: "🥑", titulo: "Neuro Abacate, de graça", texto: "O Neuro vestido de mascote do Abacato: já é de todo mundo — é só vestir em Personagens." },
 ];
 
 export default function Novidades() {
@@ -78,8 +77,8 @@ export default function Novidades() {
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">Reino de Teste e Bolsa com horário!</h2>
-          <p className="novidades__sub">Agora dá para testar tudo num reino à parte, sem mexer no seu; e a Bolsa negocia das 07h às 17h.</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">Trilha e prática juntas!</h2>
+          <p className="novidades__sub">O quiz conclui o assunto, o projeto abre a semana seguinte e o projeto final fecha a trilha. E as expedições ganharam planetoides esféricos e um fundo do mar de verdade.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -89,7 +88,7 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/reino/teste" className="pf-botao novidades__principal" onClick={fechar}>🧪 Abrir o Reino de Teste</Link>
+            <Link ref={principal} href="/trilhas" className="pf-botao novidades__principal" onClick={fechar}>🗺️ Ver as minhas trilhas</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>

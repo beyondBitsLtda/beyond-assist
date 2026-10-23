@@ -7,7 +7,7 @@ import { diaDe, somarDias, formatarDia, NOMES_DOS_DIAS, diaDaSemana } from "@/do
 import { itensDoDia, gradeDoMes, mesVizinho, nomeDoMes, textoDaEtiqueta, ROTULOS_DA_AGENDA, ROTULOS_DA_SITUACAO } from "@/dominio/agenda.js";
 import Neuro from "@/componentes/Neuro.js";
 
-const ICONES = { assunto: "📘", quiz: "❓", exercicio: "⌨️", projeto_semanal: "🎁", projeto_mensal: "🏆" };
+const ICONES = { assunto: "📘", quiz: "❓", exercicio: "⌨️", projeto_semanal: "🎁", projeto_final: "🏆", projeto_mensal: "🏆" };
 const CLASSE_DA_SITUACAO = {
   feito: "pf-pilula--verde", agora: "pf-pilula--atencao", atrasado: "pf-pilula--alerta",
   entregue: "pf-pilula--atencao", futuro: "", perdido: "",
