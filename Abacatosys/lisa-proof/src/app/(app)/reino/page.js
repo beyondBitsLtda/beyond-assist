@@ -13,11 +13,21 @@ import {
   exercitoDeTreino,
 } from "@/dominio/reino.js";
 import { TROPAS, ORDEM_DAS_TROPAS, totalDeTropas } from "@/dominio/tropas.js";
-import { EXPEDICOES_POR_DIA, BONUS_DE_TRES_ESTRELAS } from "@/dominio/monstros.js";
+import { BONUS_DE_TRES_ESTRELAS } from "@/dominio/monstros.js";
+import { CARGAS_POR_DIA, EXTRAS_POR_DIA } from "@/dominio/veiculos.js";
+import { HORAS_POR_PEPITA, VALOR_DA_PEPITA, OPERARIOS_INICIAIS, HORAS_DE_ALUGUEL } from "@/dominio/ouro.js";
+import { VARIACAO_MAXIMA, TAXA_DA_CORRETAGEM, PRECO_MINIMO, MAXIMO_DE_ACOES } from "@/dominio/bolsa.js";
 import { HORAS_ENTRE_ATAQUES_AO_MESMO_REINO } from "@/dominio/reino.js";
 import { urlDoMonstro } from "@/componentes/reino/monstrosDePapel.js";
 import { termosDaPaz, DIAS_DE_PAZ, OFENSIVA_PARA_VOTAR } from "@/dominio/paz.js";
 import Folha from "@/componentes/Folha.js";
+import { numero, hora, Moedas, Botao } from "@/componentes/reino/pecas.js";
+import Garagem, { Tanque } from "@/componentes/reino/Garagem.js";
+import MinaDeOuro from "@/componentes/reino/MinaDeOuro.js";
+import Bolsa from "@/componentes/reino/Bolsa.js";
+import Visita from "@/componentes/reino/Visita.js";
+import TelaCheia from "@/componentes/reino/TelaCheia.js";
+import { urlDoVeiculo } from "@/componentes/reino/veiculosDePapel.js";
 
 // O mundo 3D (Three.js) só baixa nesta tela, e só no navegador.
 const Mundo3D = dynamic(() => import("@/componentes/reino/Mundo3D.js"), {
@@ -25,9 +35,6 @@ const Mundo3D = dynamic(() => import("@/componentes/reino/Mundo3D.js"), {
   loading: () => <div className="rn-mundo rn-mundo--carregando"><span>Montando o reino…</span></div>,
 });
 
-const numero = (n) => new Intl.NumberFormat("pt-BR").format(n || 0);
-const hora = (iso) => new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-const Moedas = ({ n }) => <span className="rn-moedas">🪙 {numero(n)}</span>;
 
 /**
  * O Reino do Neuro. Estudar dá moedas (1 ponto = 1 moeda); moedas constroem o reino e sobem o
@@ -44,23 +51,88 @@ export default function Reino() {
   const [mapa, setMapa] = useState(null);
   const [propondo, setPropondo] = useState(false); // a folha da proposta de paz
   const [resultadoExp, setResultadoExp] = useState(null);
+  const [bolsa, setBolsa] = useState(null);
+  const [mercado, setMercado] = useState(null); // operários dos outros reinos para alugar
+  const [veiculoDoMapa, setVeiculoDoMapa] = useState("barco");
+  const [telaCheia, setTelaCheia] = useState(false);
+  const [painel, setPainel] = useState(null); // o menu aberto na tela cheia
+  const [visita, setVisita] = useState(null); // o reino vizinho que estou visitando (na paz)
+  const telaCheiaRef = useRef(false);
+  telaCheiaRef.current = telaCheia;
+  const pediuTelaCheiaDeVerdade = useRef(false);
+  const montado = useRef(true);
   const [Aviso, avisar] = useAviso();
 
+  const carregarMapa = () => obter("/api/reino/expedicoes").then(setMapa).catch(() => {});
+  const carregarMercado = () => obter("/api/reino/operarios").then((r) => setMercado(r.ofertas)).catch(() => {});
+  /** A bolsa: no primeiro acesso do dia a Lisa abre o pregão; enquanto ela abre, confere de novo. */
+  function carregarBolsa() {
+    obter("/api/reino/bolsa").then((b) => {
+      if (!montado.current) return;
+      setBolsa(b);
+      if (b.pregao?.abrindo) setTimeout(() => montado.current && carregarBolsa(), 5000);
+    }).catch(() => {});
+  }
+
   useEffect(() => {
+    montado.current = true;
     obter("/api/reino").then(setReino).catch((e) => setErro(e.message));
     obter("/api/reino/alvos").then(setAlvos).catch(() => {});
-    obter("/api/reino/expedicoes").then(setMapa).catch(() => {});
+    carregarMapa();
+    carregarMercado();
+    carregarBolsa();
     const aoResgatar = () => obter("/api/reino").then(setReino).catch(() => {});
     window.addEventListener("proof-vale-resgatado", aoResgatar);
-    return () => window.removeEventListener("proof-vale-resgatado", aoResgatar);
+    return () => { montado.current = false; window.removeEventListener("proof-vale-resgatado", aoResgatar); };
+    // carrega uma vez
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // chegou pelo atalho das novidades (/reino#expedicoes): a seção só existe depois que tudo carrega
   const pronto = Boolean(reino && mapa);
   useEffect(() => {
-    const alvo = ["#expedicoes", "#paz"].includes(window.location.hash) ? window.location.hash.slice(1) : null;
+    const alvo = ["#expedicoes", "#paz", "#garagem", "#mina-de-ouro", "#bolsa"].includes(window.location.hash) ? window.location.hash.slice(1) : null;
     if (pronto && alvo) document.getElementById(alvo)?.scrollIntoView({ block: "start" });
   }, [pronto]);
+
+  // ---- tela cheia: a página some, o mundo ocupa tudo; o navegador vai para a tela cheia de verdade quando deixa
+  useEffect(() => {
+    document.documentElement.classList.toggle("rn-sem-rolagem", telaCheia);
+    return () => document.documentElement.classList.remove("rn-sem-rolagem");
+  }, [telaCheia]);
+  useEffect(() => {
+    const aoMudar = () => {
+      if (!document.fullscreenElement && pediuTelaCheiaDeVerdade.current && telaCheiaRef.current) {
+        pediuTelaCheiaDeVerdade.current = false;
+        setTelaCheia(false);
+        setPainel(null);
+      }
+    };
+    document.addEventListener("fullscreenchange", aoMudar);
+    return () => document.removeEventListener("fullscreenchange", aoMudar);
+  }, []);
+  function entrarNaTelaCheia() {
+    setTelaCheia(true);
+    setPainel(null);
+    const raiz = document.documentElement;
+    if (raiz.requestFullscreen && !document.fullscreenElement) {
+      raiz.requestFullscreen().then(() => { pediuTelaCheiaDeVerdade.current = true; }).catch(() => {});
+    }
+  }
+  function sairDaTelaCheia() {
+    setTelaCheia(false);
+    setPainel(null);
+    if (document.fullscreenElement) { pediuTelaCheiaDeVerdade.current = false; document.exitFullscreen?.().catch(() => {}); }
+  }
+  /** Mostra uma parte do reino: na tela cheia abre o menu dela; fora, rola até a seção. */
+  function mostrarSecao(id, idDaSecao = id) {
+    if (telaCheiaRef.current) setPainel(id);
+    else document.getElementById(idDaSecao)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }
+  function escolherConstrucao(chave) {
+    if (telaCheiaRef.current) { setPainel("construcoes"); setTimeout(() => irParaConstrucao(chave), 80); }
+    else irParaConstrucao(chave);
+  }
 
   async function agir(chave, corpo, aoTerminar) {
     setOcupado(chave);
@@ -79,8 +151,67 @@ export default function Reino() {
 
   const treinar = (destino, tropa, quantidade) => agir(`treinar:${destino}:${tropa.chave}`, { acao: "treinar", tropa: tropa.chave, quantidade, destino },
     (r) => reagir("feliz", `+${r.quantidade} ${tropa.emoji} ${tropa.nome}${r.quantidade > 1 ? "s" : ""} ${destino === "exercito" ? "no exército" : "na defesa"}!`));
+  const comprarVeiculo = (v) => agir(`veiculo:${v.id}`, { acao: "veiculo", id: v.id }, (r) => { comemorar(`${r.nome} na garagem! 🚗`); setVeiculoDoMapa(v.id); carregarMapa(); });
+  const abastecerVeiculo = (v) => agir(`abastecer:${v.id}`, { acao: "abastecer", id: v.id }, (r) => { reagir("feliz", `⛽ Mais uma carga no ${r.nome}!`, 3000); carregarMapa(); });
+  const coletarOuro = () => agir("ouro", { acao: "ouro" }, (r) => reagir("comemorando", `+${r.coletou} moedas de ouro! ⚒️`, 3500));
+  const contratar = () => agir("operario", { acao: "operario" }, (r) => comemorar(`Operário contratado! Agora são ${r.operarios} 👷`));
+  const ofertar = ({ quantidade, preco }) => agir("ofertar", { acao: "ofertar", quantidade, preco },
+    (r) => avisar(r.quantidade ? `Oferta salva: ${r.quantidade} operário(s) a 🪙 ${r.preco} cada` : "Oferta retirada"));
+  const coletarMina = () => agir("coletar", { acao: "coletar" }, (r) => reagir("feliz", `+${r.coletou} moedas da mina!`));
+  const verExpedicoes = (id) => { setVeiculoDoMapa(id); mostrarSecao("expedicoes"); };
+
+  async function alugar(oferta, quantidade) {
+    setOcupado(`alugar:${oferta.dono}`);
+    try {
+      const r = await criar("/api/reino/operarios", { dono: oferta.dono, quantidade });
+      setReino(r.reino);
+      setMercado(r.ofertas);
+      comemorar(`+${r.resultado.quantidade} operário(s) de ${r.resultado.reino} na sua mina! 👷`);
+    } catch (e) {
+      avisar(e.message);
+      carregarMercado();
+    } finally {
+      setOcupado("");
+    }
+  }
+
+  /** Bolsa: comprar ou vender — o servidor devolve a bolsa atualizada; o saldo do reino vem junto. */
+  async function negociar(corpo, aoTerminar) {
+    setOcupado("bolsa");
+    try {
+      const r = await criar("/api/reino/bolsa", corpo);
+      setBolsa(r.bolsa);
+      obter("/api/reino").then(setReino).catch(() => {});
+      const x = r.resultado;
+      if (corpo.acao === "comprar") reagir("feliz", `🛒 ${x.quantidade} ação(ões) de ${x.nome} por 🪙 ${numero(x.total)}`, 4000);
+      else if (x.lucro > 0) comemorar(`💰 Vendeu com lucro de 🪙 ${numero(x.lucro)}!`);
+      else reagir(x.lucro < 0 ? "triste" : "feliz", `💰 Vendeu ${x.quantidade} ${x.nome} por 🪙 ${numero(x.total)}`, 4000);
+      aoTerminar?.();
+    } catch (e) {
+      avisar(e.message);
+      carregarBolsa();
+    } finally {
+      setOcupado("");
+    }
+  }
+
+  /** Na paz, tocar numa ilha vizinha abre a visão completa daquele reino. */
+  async function visitar(v) {
+    if (!v?.id) return;
+    setVisita({ carregando: true, nome: v.nome });
+    try {
+      const r = await obter(`/api/reino/visitar?id=${encodeURIComponent(v.id)}`);
+      setVisita(r.reino);
+      reagir("surpreso", `Que reino bonito, ${r.reino.dono}! 👀`, 3000);
+    } catch (e) {
+      setVisita(null);
+      avisar(e.message);
+    }
+  }
 
   function assistir(b) {
+    if (telaCheiaRef.current) setPainel(null);
+    setVisita(null);
     const ok = assistirNaIlha({
       entrada: b.combate, papel: b.ataquei ? "atacante" : "defensor", resultado: b.resultado,
       titulo: b.ataquei ? `▶ REPLAY · VOCÊ INVADIU ${String(b.outro).toUpperCase()}` : `▶ REPLAY · ${String(b.outro).toUpperCase()} INVADIU VOCÊ`,
@@ -99,6 +230,8 @@ export default function Reino() {
   async function invadirReino(alvo) {
     setOcupado(`invadir:${alvo.id}`);
     setResultado(null);
+    setVisita(null);
+    if (telaCheiaRef.current) setPainel(null);
     reagir("pensando", "Avançar! ⚔️", 2000);
     try {
       const r = await criar("/api/reino/invadir", { alvo: alvo.id });
@@ -109,7 +242,7 @@ export default function Reino() {
         else reagir("triste", "Eles se defenderam bem… da próxima vamos mais fortes!");
         carregarAlvos();
         setOcupado("");
-        document.getElementById("invadir")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        mostrarSecao("invadir");
       };
       assistirNaIlha({
         entrada: r.resultado.combate, papel: "atacante", resultado: r.resultado,
@@ -140,7 +273,9 @@ export default function Reino() {
   async function partir(x) {
     setOcupado(`exp:${x.id}`);
     setResultadoExp(null);
-    reagir("pensando", "Rumo à aventura! 🗺️", 2000);
+    setVisita(null);
+    if (telaCheiaRef.current) setPainel(null);
+    reagir("pensando", x.id === "planetoide" ? "Rumo às estrelas! 🚀" : "Rumo à aventura! 🗺️", 2000);
     try {
       const r = await criar("/api/reino/expedicoes", { id: x.id });
       const mostrar = () => {
@@ -151,11 +286,11 @@ export default function Reino() {
         else reagir("triste", "Os monstros resistiram… volte mais forte!");
         if (alvos) carregarAlvos();
         setOcupado("");
-        document.getElementById("expedicoes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        mostrarSecao("expedicoes");
       };
       assistirNaIlha({
         entrada: r.resultado.combate, papel: "atacante", resultado: r.resultado,
-        titulo: `🗺️ EXPEDIÇÃO · ${String(r.resultado.expedicao.nome).toUpperCase()}`, aoTerminar: mostrar,
+        titulo: `${x.id === "planetoide" ? "🚀" : "🗺️"} EXPEDIÇÃO · ${String(r.resultado.expedicao.nome).toUpperCase()}`, aoTerminar: mostrar,
       });
     } catch (e) {
       avisar(e.message);
@@ -164,6 +299,8 @@ export default function Reino() {
   }
 
   function assistirExpedicao(x) {
+    if (telaCheiaRef.current) setPainel(null);
+    setVisita(null);
     const ok = assistirNaIlha({ entrada: x.combate, papel: "atacante", resultado: x.resultado, titulo: `▶ REPLAY · ${String(x.nome).toUpperCase()}` });
     if (!ok) avisar("O replay precisa do mundo 3D (e do movimento ligado).");
   }
@@ -175,101 +312,59 @@ export default function Reino() {
   const restantes = reino.invasoes.porDia - reino.invasoes.feitasHoje;
   const disponiveis = alvos ? alvos.alvos.filter((a) => a.pode).length : null;
   const escudoMaisCurto = alvos?.alvos.filter((a) => a.escudoAte).map((a) => a.escudoAte).sort()[0] || null;
-  const irParaInvasoes = () => document.getElementById("invadir")?.scrollIntoView({
-    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start",
-  });
 
-  return (
-    <>
-      <div className="pf-cabecalho">
-        <div>
-          <h1>{reino.nome}</h1>
-          <p>Estude, ganhe moedas, construa — e defenda o seu reino. <NomeDoReino atual={reino.nome} ocupado={ocupado === "nome"} aoSalvar={(nome) => agir("nome", { acao: "nome", nome }, () => avisar("Reino renomeado"))} /></p>
+  // ---- as partes do reino: a página mostra todas, uma embaixo da outra; a tela cheia, uma por vez num menu
+  const secoes = {
+    paz: () => <Paz reino={reino} ocupado={ocupado} aoAgir={agirPaz} aoPropor={() => setPropondo(true)} />,
+    minas: () => (
+      <>
+        <div className="pf-grade pf-grade--2 pf-secao">
+          <section className="pf-cartao rn-neuro">
+            <div className="pf-estat__rotulo">O seu Neuro</div>
+            <div className="pf-estat__valor">Nível {reino.neuro.nivel} <small>· {reino.neuro.estagio}</small></div>
+            <p className="pf-estat__nota">O herói do reino: vai em toda invasão (❤️ {reino.heroi.ataque.vida} · 💥 {reino.heroi.ataque.dano}) e defende a Torre. Máximo agora: nível {reino.neuro.maximo} (sobe com a Torre do Neuro).</p>
+            <Botao ok={reino.neuro.ok} motivo={reino.neuro.motivo} ocupado={ocupado === "neuro"}
+              aoClicar={() => agir("neuro", { acao: "neuro" }, (r) => comemorar(`Neuro nível ${r.nivel}! ${r.estagio} 🧠`))}>
+              Treinar Neuro · <Moedas n={reino.neuro.custo} />
+            </Botao>
+          </section>
+          <section className="pf-cartao">
+            <div className="pf-estat__rotulo">⛏️ Mina de Moedas {reino.paz?.vigente && <span className="pf-pilula pf-pilula--verde rn-mina-x2">×{reino.paz.vigente.fatorDaMina} paz</span>}</div>
+            <div className="pf-estat__valor"><Moedas n={reino.mina.paraColetar} /> <small>de {reino.mina.capacidade}</small></div>
+            <p className="pf-estat__nota">Produz {reino.mina.porHora} moeda(s) por hora e para quando enche ({HORAS_ATE_ENCHER} h). Colete sempre que passar por aqui.</p>
+            <Botao ok={reino.mina.paraColetar > 0} motivo="nada para coletar ainda" ocupado={ocupado === "coletar"} aoClicar={coletarMina}>
+              Coletar
+            </Botao>
+          </section>
         </div>
-      </div>
-
-      <CartaoDeVale />
-
-      {/* ------------------------------------------------------------ vista e números */}
-      <VistaDoReino reino={reino} />
-
-      {/* o atalho para a briga: logo abaixo do mundo, com quantos alvos há agora */}
-      <div className="rn-acoes">
-        <button type="button" className="pf-botao rn-acoes__invadir" onClick={irParaInvasoes}>
-          ⚔️ Invadir reinos <span className="rn-acoes__conta">{restantes > 0 ? `${restantes} de ${reino.invasoes.porDia} hoje` : "acabaram as de hoje"}</span>
-        </button>
-        <span className="rn-acoes__nota">
-          {disponiveis == null ? "procurando reinos…"
-            : disponiveis > 0 ? `${disponiveis} reino(s) para invadir agora`
-            : alvos.alvos.length === 0 ? "ainda não há outros reinos"
-            : alvos.emPaz ? "🕊️ o mundo está em paz"
-            : `todos estão com escudo${escudoMaisCurto ? ` · o primeiro abre ${hora(escudoMaisCurto)}` : ""}`}
-        </span>
-        <button type="button" className="pf-botao pf-botao--sec" onClick={() => document.getElementById("expedicoes")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
-          🗺️ Expedições{mapa ? <span className="rn-acoes__conta rn-acoes__conta--sec">{mapa.expedicoes.porDia - mapa.expedicoes.feitasHoje} hoje</span> : null}
-        </button>
-        <button type="button" className="pf-botao pf-botao--sec" aria-expanded={simulando} aria-controls="simulador" onClick={() => setSimulando((s) => !s)}>
-          🎮 {simulando ? "Fechar simulação" : "Simular batalha"}
-        </button>
-        <Link href="/ranking" className="pf-botao pf-botao--sec rn-acoes__ranking">🏆 Ranking</Link>
-      </div>
-      {simulando && <Simulador reino={reino} aoFechar={() => setSimulando(false)} />}
-
-      <div className="rn-numeros">
-        <Numero rotulo="Moedas" valor={<Moedas n={reino.saldo} />} nota={`${numero(reino.cofre.protege)} a salvo no cofre`} />
-        <Numero rotulo="Troféus" valor={`🏆 ${numero(reino.trofeus)}`} nota={<Link href="/ranking">ver ranking dos reinos</Link>} />
-        <Numero rotulo="Ataque · Defesa" valor={`⚔️ ${reino.poder.ataque}/s · 🛡️ ${reino.poder.defesa}`} nota={`exército: ${totalDeTropas(reino.exercito.tropas)} tropa(s) · defesa: ${totalDeTropas(reino.guarnicao.tropas)}`} />
-        <Numero rotulo="Escudo" valor={reino.escudoAte ? "🛡️ Ativo" : "Sem escudo"} nota={reino.escudoAte ? `até ${hora(reino.escudoAte)} · atacar tira o escudo` : "o seu reino pode ser invadido"} />
-      </div>
-
-      {/* ------------------------------------------------------------ a paz entre os reinos */}
-      <Paz reino={reino} ocupado={ocupado} aoAgir={agirPaz} aoPropor={() => setPropondo(true)} />
-
-      {/* ------------------------------------------------------------ Neuro e mina */}
-      <div className="pf-grade pf-grade--2 pf-secao">
-        <section className="pf-cartao rn-neuro">
-          <div className="pf-estat__rotulo">O seu Neuro</div>
-          <div className="pf-estat__valor">Nível {reino.neuro.nivel} <small>· {reino.neuro.estagio}</small></div>
-          <p className="pf-estat__nota">O herói do reino: vai em toda invasão (❤️ {reino.heroi.ataque.vida} · 💥 {reino.heroi.ataque.dano}) e defende a Torre. Máximo agora: nível {reino.neuro.maximo} (sobe com a Torre do Neuro).</p>
-          <Botao ok={reino.neuro.ok} motivo={reino.neuro.motivo} ocupado={ocupado === "neuro"}
-            aoClicar={() => agir("neuro", { acao: "neuro" }, (r) => comemorar(`Neuro nível ${r.nivel}! ${r.estagio} 🧠`))}>
-            Treinar Neuro · <Moedas n={reino.neuro.custo} />
-          </Botao>
-        </section>
-        <section className="pf-cartao">
-          <div className="pf-estat__rotulo">⛏️ Mina de Moedas {reino.paz?.vigente && <span className="pf-pilula pf-pilula--verde rn-mina-x2">×{reino.paz.vigente.fatorDaMina} paz</span>}</div>
-          <div className="pf-estat__valor"><Moedas n={reino.mina.paraColetar} /> <small>de {reino.mina.capacidade}</small></div>
-          <p className="pf-estat__nota">Produz {reino.mina.porHora} moeda(s) por hora e para quando enche ({HORAS_ATE_ENCHER} h). Colete sempre que passar por aqui.</p>
-          <Botao ok={reino.mina.paraColetar > 0} motivo="nada para coletar ainda" ocupado={ocupado === "coletar"}
-            aoClicar={() => agir("coletar", { acao: "coletar" }, (r) => reagir("feliz", `+${r.coletou} moedas da mina!`))}>
-            Coletar
-          </Botao>
-        </section>
-      </div>
-
-      {/* ------------------------------------------------------------ personagens */}
+        <MinaDeOuro ouro={reino.ouro} mercado={mercado} ocupado={ocupado} aoColetar={coletarOuro} aoContratar={contratar} aoOfertar={ofertar} aoAlugar={alugar} />
+      </>
+    ),
+    personagens: () => (
       <Personagens lista={reino.personagens} atual={reino.personagem} ocupado={ocupado}
         aoEscolher={(p) => agir(`personagem:${p.id}`, { acao: "personagem", id: p.id }, (r) => {
           definirPersonagem(r.personagem);
           if (r.comprou) comemorar(`${r.nome} é seu! 🎭`);
           else reagir("feliz", `Agora eu sou o ${r.nome}!`);
         })} />
-
-      {/* ------------------------------------------------------------ tropas */}
-      {reino.lotacao && (
-        <div className="pf-cartao rn-lotacao">
-          <div>
-            <div className="pf-estat__rotulo">⛺ Lotação do Acampamento: {reino.lotacao.usado} de {reino.lotacao.capacidade} de espaço</div>
-            <Barra valor={reino.lotacao.usado} total={Math.max(1, reino.lotacao.capacidade)} rotulo="Lotação do Acampamento" />
+    ),
+    tropas: () => (
+      <>
+        {reino.lotacao && (
+          <div className="pf-cartao rn-lotacao">
+            <div>
+              <div className="pf-estat__rotulo">⛺ Lotação do Acampamento: {reino.lotacao.usado} de {reino.lotacao.capacidade} de espaço</div>
+              <Barra valor={reino.lotacao.usado} total={Math.max(1, reino.lotacao.capacidade)} rotulo="Lotação do Acampamento" />
+            </div>
+            <p className="pf-estat__nota">Fora da batalha, todas as tropas (exército + defesa) ficam à vista na ilhota do Acampamento, ao lado do reino. Lotado? Aumente o ⛺ Acampamento: cada nível abre +25 de espaço.</p>
           </div>
-          <p className="pf-estat__nota">Fora da batalha, todas as tropas (exército + defesa) ficam à vista na ilhota do Acampamento, ao lado do reino. Lotado? Aumente o ⛺ Acampamento: cada nível abre +25 de espaço.</p>
-        </div>
-      )}
-      <Reserva destino="exercito" dados={reino.exercito} heroi={reino.heroi.ataque} ocupado={ocupado} aoTreinar={treinar} />
-      <Reserva destino="guarnicao" dados={reino.guarnicao} heroi={reino.heroi.defesa} ocupado={ocupado} aoTreinar={treinar} />
-
-      {/* ------------------------------------------------------------ construções */}
-      <section className="pf-secao">
+        )}
+        <Reserva destino="exercito" dados={reino.exercito} heroi={reino.heroi.ataque} ocupado={ocupado} aoTreinar={treinar} />
+        <Reserva destino="guarnicao" dados={reino.guarnicao} heroi={reino.heroi.defesa} ocupado={ocupado} aoTreinar={treinar} />
+      </>
+    ),
+    construcoes: () => (
+      <section className="pf-secao" id="construcoes">
         <h2 className="pf-secao__titulo">Construções <small>nenhuma passa do nível da Torre do Neuro</small></h2>
         <div className="rn-construcoes">
           {reino.construcoes.map((c) => (
@@ -293,84 +388,158 @@ export default function Reino() {
           ))}
         </div>
       </section>
-
-      {/* ------------------------------------------------------------ expedições (contra a CPU) */}
-      <Expedicoes mapa={mapa} ocupado={ocupado} resultado={resultadoExp} aoFecharResultado={() => setResultadoExp(null)}
-        aoPartir={partir} aoAssistir={assistirExpedicao} aoBloqueado={(x) => avisar(x.liberada ? x.motivo : `${x.nome} libera com a Torre do Neuro no nível ${x.torreMinima}`)} />
-
-      {/* ------------------------------------------------------------ invasões */}
-      <section className="pf-secao" id="invadir">
-        <h2 className="pf-secao__titulo">Invadir outros reinos <small>{restantes > 0 ? `${restantes} de ${reino.invasoes.porDia} invasões hoje` : "as invasões de hoje acabaram"} · o mesmo reino só a cada 2 dias</small></h2>
-        {alvos?.emPaz && <div className="pf-aviso rn-paz__aviso" style={{ marginBottom: 12 }}>🕊️ O mundo está em paz até {hora(alvos.pazAte)}: nenhum reino pode invadir outro.</div>}
-        {resultado && <ResultadoDaBatalha r={resultado} aoFechar={() => setResultado(null)} />}
-        {alvos && alvos.alvos.length > 0 && disponiveis === 0 && !alvos.emPaz && (
-          <div className="pf-aviso" style={{ marginBottom: 12 }}>
-            Todos os reinos estão protegidos por escudo agora{escudoMaisCurto ? ` — o primeiro escudo acaba ${hora(escudoMaisCurto)}` : ""}.
-            Reino novo nasce com {ESCUDO_DE_NOVATO_HORAS} h de escudo e quem cai ganha {ESCUDO_APOS_DERROTA_HORAS} h.
-          </div>
-        )}
-        {!alvos ? (
-          <div className="pf-cartao"><p className="pf-estat__nota" style={{ marginTop: 0 }}>Procurando reinos…</p></div>
-        ) : alvos.alvos.length === 0 ? (
-          <div className="pf-cartao"><p className="pf-estat__nota" style={{ marginTop: 0 }}>Ainda não há outros reinos. Um reino aparece aqui quando a pessoa abre a tela Reino pela primeira vez — chame quem estuda com você!</p></div>
-        ) : (
-          <div className="pf-cartao rk-tabela-caixa">
-            <table className="rx-tabela rn-alvos">
-              <thead>
-                <tr><th scope="col">Reino</th><th scope="col" className="rn-col-info">Torre · Neuro</th><th scope="col">Defesa</th><th scope="col"><span className="sr-only">Ação</span></th></tr>
-              </thead>
-              <tbody>
-                {alvos.alvos.map((a) => (
-                  <tr key={a.id}>
-                    <th scope="row">
-                      {a.reino}
-                      {a.revanche && <span className="pf-pilula pf-pilula--alerta rn-revanche" title="Esse reino atacou você nos últimos 2 dias">↩️ revanche</span>}
-                      <span className="rk-sub">{a.dono} · 🏆 {numero(a.trofeus)}</span>
-                    </th>
-                    <td className="rn-col-info">{a.torre} · {a.neuro}</td>
-                    <td><span className={`pf-pilula rn-faixa rn-faixa--${a.defesa.replace("í", "i").replace("é", "e")}`}>{a.defesa}</span></td>
-                    <td className="rn-col-acao">
-                      {a.pode ? (
-                        <button type="button" className="pf-botao pf-botao--pequeno" disabled={Boolean(ocupado)} onClick={() => invadirReino(a)}>
-                          {ocupado === `invadir:${a.id}` ? "Atacando…" : "⚔️ Invadir"}
-                        </button>
-                      ) : <span className="rn-motivo">{alvos.emPaz ? "🕊️ em paz" : a.escudoAte ? `🛡️ escudo até ${hora(a.escudoAte)}` : a.motivo}</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* ------------------------------------------------------------ batalhas */}
-      <section className="pf-secao">
-        <h2 className="pf-secao__titulo">Batalhas recentes</h2>
-        <div className="pf-cartao">
-          {reino.batalhas.length === 0 ? <p className="pf-estat__nota" style={{ marginTop: 0 }}>Nenhuma batalha ainda.</p> : (
-            <ul className="rn-batalhas">
-              {reino.batalhas.map((b) => (
-                <li key={b.id} className={b.ganhei ? "rn-batalha--ganhei" : "rn-batalha--perdi"}>
-                  <span className="rn-batalha__icone" aria-hidden="true">{b.ganhei ? "🏆" : "💥"}</span>
-                  <span className="rn-batalha__texto">
-                    <strong>{b.ataquei ? `Você invadiu ${b.outro}` : `${b.outro} invadiu você`}</strong>
-                    {" — "}{b.ganhei ? (b.ataquei ? "vitória" : "defesa vencida") : (b.ataquei ? "derrota" : "o reino caiu")}
-                    <small>{b.estrelas != null ? `${estrelas(b.estrelas)} · ${b.destruicao}% destruído` : `⚔️ ${b.ataque} contra 🛡️ ${b.defesa}`} · {hora(b.quando)}</small>
-                  </span>
-                  {b.combate && <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno rn-batalha__ver" onClick={() => assistir(b)}>▶ Assistir</button>}
-                  <span className="rn-batalha__saldo">
-                    {b.moedas ? <>{b.moedas > 0 ? "+" : "−"}🪙{numero(Math.abs(b.moedas))} </> : null}
-                    {b.trofeus ? `${b.trofeus > 0 ? "+" : "−"}🏆${Math.abs(b.trofeus)}` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
+    ),
+    garagem: () => <Garagem garagem={reino.garagem} ocupado={ocupado} aoComprar={comprarVeiculo} aoAbastecer={abastecerVeiculo} aoVerExpedicoes={verExpedicoes} />,
+    expedicoes: () => (
+      <Expedicoes mapa={mapa} veiculo={veiculoDoMapa} aoVeiculo={setVeiculoDoMapa} ocupado={ocupado} resultado={resultadoExp} aoFecharResultado={() => setResultadoExp(null)}
+        aoPartir={partir} aoAssistir={assistirExpedicao} aoAbastecer={abastecerVeiculo} aoGaragem={() => mostrarSecao("garagem")}
+        aoBloqueado={(x) => avisar(x.liberada ? x.motivo : `${x.nome} libera com a Torre do Neuro no nível ${x.torreMinima}`)} />
+    ),
+    bolsa: () => <Bolsa bolsa={bolsa} ocupado={ocupado} aoNegociar={negociar} aoRecarregar={carregarBolsa} />,
+    invadir: () => (
+      <>
+        <section className="pf-secao" id="invadir">
+          <h2 className="pf-secao__titulo">Invadir outros reinos <small>{restantes > 0 ? `${restantes} de ${reino.invasoes.porDia} invasões hoje` : "as invasões de hoje acabaram"} · o mesmo reino só a cada 2 dias</small></h2>
+          {alvos?.emPaz && <div className="pf-aviso rn-paz__aviso" style={{ marginBottom: 12 }}>🕊️ O mundo está em paz até {hora(alvos.pazAte)}: nenhum reino pode invadir outro — mas dá para visitar os vizinhos (toque numa ilha vizinha no mundo 3D).</div>}
+          {resultado && <ResultadoDaBatalha r={resultado} aoFechar={() => setResultado(null)} />}
+          {alvos && alvos.alvos.length > 0 && disponiveis === 0 && !alvos.emPaz && (
+            <div className="pf-aviso" style={{ marginBottom: 12 }}>
+              Todos os reinos estão protegidos por escudo agora{escudoMaisCurto ? ` — o primeiro escudo acaba ${hora(escudoMaisCurto)}` : ""}.
+              Reino novo nasce com {ESCUDO_DE_NOVATO_HORAS} h de escudo e quem cai ganha {ESCUDO_APOS_DERROTA_HORAS} h.
+            </div>
           )}
-        </div>
-      </section>
+          {!alvos ? (
+            <div className="pf-cartao"><p className="pf-estat__nota" style={{ marginTop: 0 }}>Procurando reinos…</p></div>
+          ) : alvos.alvos.length === 0 ? (
+            <div className="pf-cartao"><p className="pf-estat__nota" style={{ marginTop: 0 }}>Ainda não há outros reinos. Um reino aparece aqui quando a pessoa abre a tela Reino pela primeira vez — chame quem estuda com você!</p></div>
+          ) : (
+            <div className="pf-cartao rk-tabela-caixa">
+              <table className="rx-tabela rn-alvos">
+                <thead>
+                  <tr><th scope="col">Reino</th><th scope="col" className="rn-col-info">Torre · Neuro</th><th scope="col">Defesa</th><th scope="col"><span className="sr-only">Ação</span></th></tr>
+                </thead>
+                <tbody>
+                  {alvos.alvos.map((a) => (
+                    <tr key={a.id}>
+                      <th scope="row">
+                        {a.reino}
+                        {a.revanche && <span className="pf-pilula pf-pilula--alerta rn-revanche" title="Esse reino atacou você nos últimos 2 dias">↩️ revanche</span>}
+                        <span className="rk-sub">{a.dono} · 🏆 {numero(a.trofeus)}</span>
+                      </th>
+                      <td className="rn-col-info">{a.torre} · {a.neuro}</td>
+                      <td><span className={`pf-pilula rn-faixa rn-faixa--${a.defesa.replace("í", "i").replace("é", "e")}`}>{a.defesa}</span></td>
+                      <td className="rn-col-acao">
+                        {a.pode ? (
+                          <button type="button" className="pf-botao pf-botao--pequeno" disabled={Boolean(ocupado)} onClick={() => invadirReino(a)}>
+                            {ocupado === `invadir:${a.id}` ? "Atacando…" : "⚔️ Invadir"}
+                          </button>
+                        ) : <span className="rn-motivo">{alvos.emPaz ? "🕊️ em paz" : a.escudoAte ? `🛡️ escudo até ${hora(a.escudoAte)}` : a.motivo}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+        <section className="pf-secao">
+          <h2 className="pf-secao__titulo">Batalhas recentes</h2>
+          <div className="pf-cartao">
+            {reino.batalhas.length === 0 ? <p className="pf-estat__nota" style={{ marginTop: 0 }}>Nenhuma batalha ainda.</p> : (
+              <ul className="rn-batalhas">
+                {reino.batalhas.map((b) => (
+                  <li key={b.id} className={b.ganhei ? "rn-batalha--ganhei" : "rn-batalha--perdi"}>
+                    <span className="rn-batalha__icone" aria-hidden="true">{b.ganhei ? "🏆" : "💥"}</span>
+                    <span className="rn-batalha__texto">
+                      <strong>{b.ataquei ? `Você invadiu ${b.outro}` : `${b.outro} invadiu você`}</strong>
+                      {" — "}{b.ganhei ? (b.ataquei ? "vitória" : "defesa vencida") : (b.ataquei ? "derrota" : "o reino caiu")}
+                      <small>{b.estrelas != null ? `${estrelas(b.estrelas)} · ${b.destruicao}% destruído` : `⚔️ ${b.ataque} contra 🛡️ ${b.defesa}`} · {hora(b.quando)}</small>
+                    </span>
+                    {b.combate && <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno rn-batalha__ver" onClick={() => assistir(b)}>▶ Assistir</button>}
+                    <span className="rn-batalha__saldo">
+                      {b.moedas ? <>{b.moedas > 0 ? "+" : "−"}🪙{numero(Math.abs(b.moedas))} </> : null}
+                      {b.trofeus ? `${b.trofeus > 0 ? "+" : "−"}🏆${Math.abs(b.trofeus)}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+      </>
+    ),
+  };
 
-      <Regras />
+  return (
+    <>
+      {!telaCheia && (
+        <div className="pf-cabecalho">
+          <div>
+            <h1>{reino.nome}</h1>
+            <p>Estude, ganhe moedas, construa — e defenda o seu reino. <NomeDoReino atual={reino.nome} ocupado={ocupado === "nome"} aoSalvar={(nome) => agir("nome", { acao: "nome", nome }, () => avisar("Reino renomeado"))} /></p>
+          </div>
+        </div>
+      )}
+
+      {!telaCheia && <CartaoDeVale />}
+
+      {/* ------------------------------------------------------------ vista (e a tela cheia, por cima de tudo) */}
+      <VistaDoReino reino={reino} visita={visita} telaCheia={telaCheia} aoTelaCheia={entrarNaTelaCheia}
+        aoEscolher={escolherConstrucao} aoVisitar={visitar} aoVoltarDaVisita={() => setVisita(null)}>
+        {telaCheia && (
+          <TelaCheia reino={reino} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} ocupado={ocupado}
+            aoColetarMina={coletarMina} aoColetarOuro={coletarOuro}>
+            {painel && secoes[painel]?.()}
+          </TelaCheia>
+        )}
+      </VistaDoReino>
+
+      {!telaCheia && (
+        <>
+          {/* o atalho para a briga: logo abaixo do mundo, com quantos alvos há agora */}
+          <div className="rn-acoes">
+            <button type="button" className="pf-botao rn-acoes__invadir" onClick={() => mostrarSecao("invadir")}>
+              ⚔️ Invadir reinos <span className="rn-acoes__conta">{restantes > 0 ? `${restantes} de ${reino.invasoes.porDia} hoje` : "acabaram as de hoje"}</span>
+            </button>
+            <span className="rn-acoes__nota">
+              {disponiveis == null ? "procurando reinos…"
+                : disponiveis > 0 ? `${disponiveis} reino(s) para invadir agora`
+                : alvos.alvos.length === 0 ? "ainda não há outros reinos"
+                : alvos.emPaz ? "🕊️ o mundo está em paz"
+                : `todos estão com escudo${escudoMaisCurto ? ` · o primeiro abre ${hora(escudoMaisCurto)}` : ""}`}
+            </span>
+            <button type="button" className="pf-botao pf-botao--sec" onClick={() => mostrarSecao("expedicoes")}>
+              🗺️ Expedições{mapa ? <span className="rn-acoes__conta rn-acoes__conta--sec">{mapa.expedicoes.restantes} hoje</span> : null}
+            </button>
+            <button type="button" className="pf-botao pf-botao--sec" onClick={() => mostrarSecao("bolsa")}>📈 Bolsa</button>
+            <button type="button" className="pf-botao pf-botao--sec" onClick={entrarNaTelaCheia}>⛶ Tela cheia</button>
+            <button type="button" className="pf-botao pf-botao--sec" aria-expanded={simulando} aria-controls="simulador" onClick={() => setSimulando((s) => !s)}>
+              🎮 {simulando ? "Fechar simulação" : "Simular batalha"}
+            </button>
+            <Link href="/ranking" className="pf-botao pf-botao--sec rn-acoes__ranking">🏆 Ranking</Link>
+          </div>
+          {simulando && <Simulador reino={reino} aoFechar={() => setSimulando(false)} />}
+
+          <div className="rn-numeros">
+            <Numero rotulo="Moedas" valor={<Moedas n={reino.saldo} />} nota={`${numero(reino.cofre.protege)} a salvo no cofre (e todas podem ser gastas)`} />
+            <Numero rotulo="Troféus" valor={`🏆 ${numero(reino.trofeus)}`} nota={<Link href="/ranking">ver ranking dos reinos</Link>} />
+            <Numero rotulo="Ataque · Defesa" valor={`⚔️ ${reino.poder.ataque}/s · 🛡️ ${reino.poder.defesa}`} nota={`exército: ${totalDeTropas(reino.exercito.tropas)} tropa(s) · defesa: ${totalDeTropas(reino.guarnicao.tropas)}`} />
+            <Numero rotulo="Escudo" valor={reino.escudoAte ? "🛡️ Ativo" : "Sem escudo"} nota={reino.escudoAte ? `até ${hora(reino.escudoAte)} · atacar tira o escudo` : "o seu reino pode ser invadido"} />
+          </div>
+
+          {secoes.paz()}
+          {secoes.minas()}
+          {secoes.personagens()}
+          {secoes.tropas()}
+          {secoes.construcoes()}
+          {secoes.garagem()}
+          {secoes.expedicoes()}
+          {secoes.bolsa()}
+          {secoes.invadir()}
+          <Regras />
+        </>
+      )}
+
       <PropostaDePaz aberta={propondo} totalDeReinos={reino.paz?.totalDeReinos || 1} ocupado={ocupado} aoFechar={() => setPropondo(false)}
         aoEnviar={(dias) => agirPaz({ acao: "propor", dias }, (r) => {
           setPropondo(false);
@@ -394,14 +563,27 @@ function irParaConstrucao(chave) {
   (el.querySelector("button:not(:disabled)") || el).focus({ preventScroll: true });
 }
 
-/** O mundo 3D; se o aparelho não tiver WebGL, a vista plana de antes. */
-function VistaDoReino({ reino }) {
+/**
+ * O mundo 3D; se o aparelho não tiver WebGL, a vista plana de antes. Na tela cheia, a mesma
+ * seção ocupa a tela toda (o mundo não é montado de novo) e os menus vêm em `children`. Numa
+ * visita (na paz), o mundo mostra a ilha do vizinho.
+ */
+function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, aoEscolher, aoVisitar, aoVoltarDaVisita, children }) {
   const [plana, setPlana] = useState(false);
   const humor = reino.escudoAte ? "normal" : "feliz";
-  if (plana) return <VistaPlana reino={reino} humor={humor} />;
+  const vendo = visita && !visita.carregando ? visita : null;
   return (
-    <section aria-label="Vista do reino">
-      <Mundo3D construcoes={reino.construcoes} tropas={{ exercito: reino.exercito.tropas, guarnicao: reino.guarnicao.tropas }} vizinhos={reino.paz?.vigente?.vizinhos || []} humor={humor} aoEscolher={irParaConstrucao} aoFalhar={() => setPlana(true)} />
+    <section aria-label={vendo ? `Vista do ${vendo.nome}` : "Vista do reino"} className={`rn-vista3d${telaCheia ? " rn-tela-cheia" : ""}${vendo ? " rn-vista3d--visita" : ""}`}>
+      {plana ? <VistaPlana reino={reino} humor={humor} /> : (
+        <Mundo3D construcoes={vendo ? vendo.construcoes : reino.construcoes}
+          tropas={vendo ? vendo.tropas : { exercito: reino.exercito.tropas, guarnicao: reino.guarnicao.tropas }}
+          vizinhos={vendo ? [] : reino.paz?.vigente?.vizinhos || []}
+          personagem={vendo ? vendo.personagem : undefined} soLeitura={Boolean(vendo)}
+          humor={humor} aoEscolher={vendo ? undefined : aoEscolher} aoVisitar={aoVisitar} aoFalhar={() => setPlana(true)} />
+      )}
+      {!telaCheia && !vendo && <button type="button" className="rn-vista3d__cheia" onClick={aoTelaCheia}>⛶ Tela cheia</button>}
+      <Visita visita={visita} aoVoltar={aoVoltarDaVisita} />
+      {children}
     </section>
   );
 }
@@ -715,18 +897,6 @@ function Numero({ rotulo, valor, nota }) {
   );
 }
 
-/** Botão que, quando não pode, diz o porquê em vez de só ficar cinza. */
-function Botao({ ok, motivo, ocupado, aoClicar, children }) {
-  return (
-    <div className="rn-botao">
-      <button type="button" className="pf-botao pf-botao--pequeno" disabled={!ok || ocupado} onClick={aoClicar}>
-        {ocupado ? "Um instante…" : children}
-      </button>
-      {!ok && motivo && <span className="rn-motivo">{motivo}</span>}
-    </div>
-  );
-}
-
 function Niveis({ nivel, max }) {
   return (
     <span className="rn-niveis" role="img" aria-label={`nível ${nivel} de ${max}`}>
@@ -873,19 +1043,53 @@ function PropostaDePaz({ aberta, totalDeReinos, ocupado, aoFechar, aoEnviar }) {
   );
 }
 
-/** O mapa das expedições: um cartão por lugar, com o chefe, os monstros, as estrelas e o saque. */
-function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoAssistir, aoBloqueado }) {
-  const restantes = mapa ? mapa.expedicoes.porDia - mapa.expedicoes.feitasHoje : null;
+/**
+ * O mapa das expedições, por veículo: uma aba para cada um (com o tanque de hoje), e os lugares
+ * aonde ele leva — um cartão por lugar, com o chefe, os monstros, as estrelas e o saque. A Nave
+ * mostra o radar: o planetoide sorteado para a próxima viagem.
+ */
+function Expedicoes({ mapa, veiculo, aoVeiculo, ocupado, resultado, aoFecharResultado, aoPartir, aoAssistir, aoBloqueado, aoAbastecer, aoGaragem }) {
+  const v = mapa?.veiculos?.find((x) => x.id === veiculo) || mapa?.veiculos?.[0];
+  const lugares = mapa && v ? mapa.lugares.filter((x) => x.veiculo === v.id) : [];
   return (
     <section className="pf-secao" id="expedicoes">
       <h2 className="pf-secao__titulo">
-        🗺️ Expedições <small>contra a CPU · {restantes == null ? "abrindo o mapa…" : restantes > 0 ? `${restantes} de ${mapa.expedicoes.porDia} hoje` : "as de hoje acabaram"}</small>
+        🗺️ Expedições <small>contra a CPU · {!mapa ? "abrindo o mapa…" : mapa.expedicoes.restantes > 0 ? `${mapa.expedicoes.restantes} com o combustível de hoje` : "os tanques de hoje acabaram"}</small>
       </h2>
       <p className="pf-estat__nota rn-exp__intro">
-        Vilas, florestas, bosques e acampamentos de monstros para saquear. <strong>É de graça:</strong> nenhuma tropa se perde e nenhuma moeda sai.
-        São {EXPEDICOES_POR_DIA} expedições por dia, em qualquer lugar (pode repetir). Cada lugar tem a sua dificuldade, a sua recompensa e o seu
-        cenário; o saque é proporcional à destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%).
+        Monstros e tesouros para saquear. <strong>É de graça:</strong> nenhuma tropa se perde. Cada veículo leva a um tipo de lugar e faz
+        {" "}{CARGAS_POR_DIA} expedições por dia (pode repetir o mesmo lugar); acabou o combustível, dá para abastecer com moedas.
+        O saque é proporcional à destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%).
       </p>
+      {mapa?.veiculos && (
+        <div className="rn-exp__abas" role="tablist" aria-label="Veículos">
+          {mapa.veiculos.map((x) => (
+            <button key={x.id} type="button" role="tab" aria-selected={x.id === v?.id} className={`rn-exp__aba${x.id === v?.id ? " rn-exp__aba--atual" : ""}${x.tem ? "" : " rn-exp__aba--trancada"}`}
+              onClick={() => aoVeiculo(x.id)}>
+              <span aria-hidden="true">{x.emoji}</span> {x.nome}
+              {x.tem ? <Tanque tanque={x.tanque} compacto /> : <span className="rn-exp__cadeado" aria-label="ainda não é seu">🔒</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      {v && !v.tem && (
+        <div className="pf-cartao rn-exp__trancado">
+          <img src={urlDoVeiculo(v.id)} alt="" width="72" height="72" />
+          <p><strong>{v.emoji} {v.nome}</strong> leva a: {v.destino}. {v.descricao} Compre na garagem por <Moedas n={v.preco} /> (Torre {v.torreMinima}+).</p>
+          <button type="button" className="pf-botao pf-botao--pequeno" onClick={aoGaragem}>🚗 Ir à garagem</button>
+        </div>
+      )}
+      {v?.tem && (
+        <div className="rn-exp__tanque">
+          <Tanque tanque={v.tanque} />
+          <span className="rn-motivo">{v.tanque.restantes ? `${v.tanque.restantes} expedição(ões) de ${v.nome} hoje` : `tanque vazio${v.tanque.extras ? ` (já abasteceu ${v.tanque.extras}×)` : ""}`}</span>
+          {!v.tanque.restantes && v.abastecer && (
+            <Botao ok={v.abastecer.ok} motivo={v.abastecer.motivo} ocupado={ocupado === `abastecer:${v.id}`} aoClicar={() => aoAbastecer(v)}>
+              ⛽ Abastecer +1 · <Moedas n={v.abastecer.custo} />
+            </Botao>
+          )}
+        </div>
+      )}
       {mapa?.tropa && (
         <div className={`pf-aviso rn-exp__tropa${mapa.tropa.emprestada ? " rn-exp__tropa--emprestada" : ""}`}>
           {mapa.tropa.emprestada
@@ -898,8 +1102,8 @@ function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoA
         <div className="pf-cartao"><p className="pf-estat__nota" style={{ marginTop: 0 }}>Abrindo o mapa…</p></div>
       ) : (
         <div className="rn-exp">
-          {mapa.lugares.map((x) => (
-            <article key={x.id} className={`pf-cartao rn-exp__lugar rn-exp__lugar--${x.tipo}${x.liberada ? "" : " rn-exp__lugar--bloqueada"}`}>
+          {lugares.map((x) => (
+            <article key={x.id} className={`pf-cartao rn-exp__lugar rn-exp__lugar--${x.tipo}${x.liberada && x.temVeiculo ? "" : " rn-exp__lugar--bloqueada"}`}>
               <button type="button" className="rn-exp__arte" disabled={Boolean(ocupado)}
                 aria-label={x.pode ? `Atacar ${x.nome}` : `${x.nome}: ${x.liberada ? x.motivo : `libera com a Torre nível ${x.torreMinima}`}`}
                 onClick={() => (x.pode ? aoPartir(x) : aoBloqueado(x))}>
@@ -910,15 +1114,16 @@ function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoA
                 {x.pode && <span className="rn-exp__clique" aria-hidden="true">⚔️</span>}
               </button>
               <div className="rn-exp__info">
-                <span className="rn-exp__tipo">{x.emoji} {x.lugar} · Torre {x.torreMinima}+</span>
-                <h3>{x.nome}{x.vezesHoje > 0 && <span className="rn-exp__vezes">{x.vezesHoje}× hoje</span>}</h3>
+                <span className="rn-exp__tipo">{x.id === "planetoide" ? "📡 Radar da Nave · a próxima viagem" : `${x.emoji} ${x.lugar} · Torre ${x.torreMinima}+`}</span>
+                <h3>{x.nome}{x.vezesHoje > 0 && x.id !== "planetoide" && <span className="rn-exp__vezes">{x.vezesHoje}× hoje</span>}</h3>
                 <div className="rn-exp__nivel">
                   <span className={`rn-exp__dif rn-exp__dif--${x.dificuldade}`} title={`Dificuldade ${x.dificuldade} de 5`}>
                     <span aria-hidden="true">{"💀".repeat(x.dificuldade)}</span> {x.nomeDaDificuldade}
                   </span>
+                  {x.forca && <span className={`rn-exp__forca${x.forca > 1 ? " rn-exp__forca--forte" : ""}`}>{x.emojiDaRaca} {x.nomeDaRaca} · força ×{String(x.forca).replace(".", ",")}</span>}
                   <span className="rn-exp__premio">Recompensa <Moedas n={x.recompensa} /></span>
                 </div>
-                <p className="pf-estat__nota">{x.descricao}</p>
+                <p className="pf-estat__nota">{x.descricao}{x.id === "planetoide" ? " Cada viagem cai num planetoide diferente — a raça, a força e o tesouro são sorteados." : ""}</p>
                 <ul className="rn-exp__monstros" aria-label="Monstros">
                   {x.monstros.map((m) => (
                     <li key={m.tipo} title={m.nome}><img src={urlDoMonstro(m.tipo)} alt="" width="30" height="30" /><span>{m.quantidade}× {m.nome}</span></li>
@@ -928,7 +1133,7 @@ function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoA
                   <span className="rn-exp__saque"><small>100% destruído · ⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%</small></span>
                   {x.pode ? (
                     <button type="button" className="pf-botao pf-botao--pequeno" disabled={Boolean(ocupado)} onClick={() => aoPartir(x)}>
-                      {ocupado === `exp:${x.id}` ? "Partindo…" : "⚔️ Atacar"}
+                      {ocupado === `exp:${x.id}` ? "Partindo…" : x.id === "planetoide" ? "🚀 Decolar" : "⚔️ Atacar"}
                     </button>
                   ) : <span className="rn-motivo">{x.liberada ? x.motivo : `🔒 libera com a Torre nível ${x.torreMinima}`}</span>}
                 </div>
@@ -943,7 +1148,7 @@ function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoA
           <ul className="rn-batalhas">
             {mapa.recentes.map((x) => (
               <li key={x.id} className={x.estrelas ? "rn-batalha--ganhei" : "rn-batalha--perdi"}>
-                <span className="rn-batalha__icone" aria-hidden="true">{x.estrelas ? "🗺️" : "💥"}</span>
+                <span className="rn-batalha__icone" aria-hidden="true">{x.estrelas ? (x.expedicao === "planetoide" ? "🪐" : "🗺️") : "💥"}</span>
                 <span className="rn-batalha__texto">
                   <strong>{x.nome}</strong> — {x.estrelas ? `${estrelas(x.estrelas)}` : "recuou"}
                   <small>{x.destruicao}% destruído · {hora(x.quando)}</small>
@@ -962,7 +1167,7 @@ function Expedicoes({ mapa, ocupado, resultado, aoFecharResultado, aoPartir, aoA
 function ResultadoDaExpedicao({ r, aoFechar }) {
   return (
     <div className={`pf-cartao rn-resultado ${r.saque ? "rn-resultado--venceu" : "rn-resultado--perdeu"}`} role="status">
-      <div className="rn-resultado__titulo">{r.estrelas ? `${estrelas(r.estrelas)} Vitória!` : "💥 A expedição recuou"} — {r.expedicao.nome}</div>
+      <div className="rn-resultado__titulo">{r.estrelas ? `${estrelas(r.estrelas)} Vitória!` : "💥 A expedição recuou"} — {r.expedicao.nome}{r.expedicao.forca && r.expedicao.forca !== 1 ? <small> (força ×{String(r.expedicao.forca).replace(".", ",")})</small> : null}</div>
       <p>
         {r.destruicao}% destruído. {r.saque ? `Você saqueou 🪙 ${numero(r.saque)} moedas.` : "Nada de saque desta vez."}{" "}
         {r.emprestado ? "A Tropa da Expedição voltou inteira para o próximo desafio" : "Todas as tropas voltaram para casa"}: expedição não gasta tropa nem moeda.
@@ -1016,7 +1221,7 @@ function Regras() {
         </details>
         <details>
           <summary>🏰 Construções e Neuro</summary>
-          <p>A Torre do Neuro é o coração do reino: nenhuma construção passa do nível dela, o Neuro chega no máximo ao dobro e nela moram as tropas de defesa. A Mina produz moedas sozinha até encher ({HORAS_ATE_ENCHER} h); o Cofre guarda moedas que nenhuma invasão leva; Torre de Arqueiros, Canhão e Muralha defendem; o Quartel treina o exército.</p>
+          <p>A Torre do Neuro é o coração do reino: nenhuma construção passa do nível dela, o Neuro chega no máximo ao dobro e nela moram as tropas de defesa. A Mina produz moedas sozinha até encher ({HORAS_ATE_ENCHER} h); a Mina de Ouro rende pepitas com os operários; o Cofre protege moedas que nenhuma invasão leva (e todas continuam podendo ser gastas); Torre de Arqueiros, Canhão e Muralha defendem; o Quartel treina o exército.</p>
         </details>
         <details>
           <summary>⚔️ Invasões</summary>
@@ -1024,11 +1229,23 @@ function Regras() {
         </details>
         <details>
           <summary>🗺️ Expedições</summary>
-          <p>Vilas, florestas, bosques e acampamentos de monstros, contra a CPU — ninguém perde moedas nem troféus. <strong>É de graça:</strong> todas as tropas voltam para casa, então não há nada para treinar de novo. Os lugares liberam com a Torre do Neuro; cada um tem a sua dificuldade (de 💀 Fácil a 💀💀💀💀💀 Lendário), a sua recompensa e o seu cenário. O saque é proporcional à destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%). São {EXPEDICOES_POR_DIA} expedições por dia, em qualquer lugar — pode repetir o mesmo.</p>
+          <p>Contra a CPU — ninguém perde moedas nem troféus. <strong>É de graça:</strong> todas as tropas voltam para casa, então não há nada para treinar de novo. Os lugares liberam com a Torre do Neuro; cada um tem a sua dificuldade (de 💀 Fácil a 💀💀💀💀💀 Lendário), a sua recompensa e o seu cenário. O saque é proporcional à destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%). Cada veículo leva a um tipo de lugar: o Barco Voador às vilas, florestas, bosques e acampamentos; o Submarino ao fundo do mar; o Dirigível às montanhas geladas; o Tanque de Magma aos reinos de fogo e lava; e a Nave Estelar a planetoides sorteados, com raças alienígenas de força e tesouro aleatórios.</p>
+        </details>
+        <details>
+          <summary>🚗 Veículos e combustível</summary>
+          <p>O Barco Voador é de todo mundo; os outros veículos se compram na garagem (cada um pede a Torre do Neuro num nível). Cada veículo tem o seu tanque: {CARGAS_POR_DIA} expedições por dia, e o tanque enche sozinho na virada do dia. Acabou? Abasteça com moedas — cada carga extra do dia custa um pouco mais, até {EXTRAS_POR_DIA} por veículo.</p>
+        </details>
+        <details>
+          <summary>⚒️ Mina de Ouro e operários</summary>
+          <p>Todo reino tem uma Mina de Ouro e nasce com {OPERARIOS_INICIAIS} operários. Cada operário tira 1 pepita a cada {HORAS_POR_PEPITA} h, e cada pepita vale {VALOR_DA_PEPITA} moedas na coleta — demora mais que a Mina de Moedas, mas vale mais. Contrate mais operários (cabem mais quanto maior a mina) e, se sobrar, ponha para alugar: quem aluga paga na hora e o operário trabalha {HORAS_DE_ALUGUEL} h na mina de quem alugou.</p>
+        </details>
+        <details>
+          <summary>📈 Bolsa do Reino</summary>
+          <p>Uma bolsa só, a mesma para todos. Todo dia, no primeiro acesso depois da meia-noite, a Lisa abre o pregão: decide quanto cada ação sobe ou cai (até {VARIACAO_MAXIMA}%), conta a notícia de cada uma e lança empresas novas. Compre e venda com as suas moedas; cada ordem paga {Math.round(TAXA_DA_CORRETAGEM * 100)}% de corretagem (no mínimo 1). Empresa que chega a {PRECO_MINIMO} moedas vai à falência e as ações viram pó; com mais de {MAXIMO_DE_ACOES} empresas, a mais antiga fecha o capital e paga o preço do dia a quem tem ações dela.</p>
         </details>
         <details>
           <summary>🕊️ Paz entre os reinos</summary>
-          <p>Qualquer jogador pode propor a paz e escolher quantos dias ela dura ({DIAS_DE_PAZ.join(", ")}). Votam (e propõem) os reinos com {OFENSIVA_PARA_VOTAR}+ dias seguidos de ofensiva de estudo, conferidos na hora do voto; o voto de quem propôs já conta como sim. A paz só começa com 100% dos eleitores a favor — um único não derruba a proposta — e a votação fica aberta 3 dias. A paz vale para todos os reinos, inclusive os que não votaram. Durante a paz: nenhum reino invade outro, todos viram vizinhos no mundo 3D, a mina de cada reino rende vezes o número de reinos e, quando alguém saqueia uma expedição, cada um dos outros reinos ganha 20% do saque.</p>
+          <p>Qualquer jogador pode propor a paz e escolher quantos dias ela dura ({DIAS_DE_PAZ.join(", ")}). Votam (e propõem) os reinos com {OFENSIVA_PARA_VOTAR}+ dias seguidos de ofensiva de estudo, conferidos na hora do voto; o voto de quem propôs já conta como sim. A paz só começa com 100% dos eleitores a favor — um único não derruba a proposta — e a votação fica aberta 3 dias. A paz vale para todos os reinos, inclusive os que não votaram. Durante a paz: nenhum reino invade outro, todos viram vizinhos no mundo 3D (toque numa ilha vizinha para ver o reino inteiro), a mina de cada reino rende vezes o número de reinos e, quando alguém saqueia uma expedição, cada um dos outros reinos ganha 20% do saque.</p>
         </details>
         <details>
           <summary>🛡️ Escudos</summary>

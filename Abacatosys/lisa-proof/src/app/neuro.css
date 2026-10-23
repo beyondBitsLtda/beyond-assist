@@ -142,7 +142,8 @@
 .neuro .acc { display: none; }
 .neuro[data-personagem="ninja"] .acc-ninja, .neuro[data-personagem="astronauta"] .acc-astronauta,
 .neuro[data-personagem="mago"] .acc-mago, .neuro[data-personagem="pirata"] .acc-pirata,
-.neuro[data-personagem="robo"] .acc-robo { display: inline; }
+.neuro[data-personagem="robo"] .acc-robo,
+.neuro[data-personagem="abacato"] .acc-abacato, .neuro[data-personagem="abacato"] .acc-abacato-fundo { display: inline; }
 
 .neuro[data-personagem="ninja"] { --neuro-rosa: #64748B; --neuro-rosa-escuro: #1E293B; --neuro-tinta: #0F172A; }
 .neuro[data-personagem="ninja"] .neuro__dobras path { stroke: #94A3B8; }
@@ -159,6 +160,10 @@
 .neuro[data-personagem="pirata"] .neuro__dobras path { stroke: #F97316; }
 .neuro[data-personagem="pirata"] .neuro__bochecha { fill: #FCA5A5; }
 
+/* o Neuro Abacate: verde de abacate, rosto no caroço, braços e pernas pretos como os do mascote */
+.neuro[data-personagem="abacato"] { --neuro-rosa: #D9F99D; --neuro-rosa-escuro: #1F2937; --neuro-tinta: #1F2937; }
+.neuro[data-personagem="abacato"] .neuro__dobras, .neuro[data-personagem="abacato"] .neuro__brilho-pele { display: none; }
+.neuro[data-personagem="abacato"] .neuro__bochecha { fill: #FB7185; opacity: 0.55; }
 .neuro[data-personagem="robo"] { --neuro-rosa: #CBD5E1; --neuro-rosa-escuro: #475569; --neuro-tinta: #1E293B; }
 .neuro[data-personagem="robo"] .neuro__dobras path { stroke: #94A3B8; }
 .neuro[data-personagem="robo"] .neuro__bochecha { fill: #67E8F9; opacity: 0.6; }

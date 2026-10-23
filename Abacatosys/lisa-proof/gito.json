@@ -9,14 +9,36 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.16.0-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-22",
+  "versao": "0.17.0-proof-veiculos.1",
+  "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 43,
-    "data": "2026-10-22",
+    "numero": 44,
+    "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.17.0-proof-veiculos.1",
+      "data": "2026-10-23",
+      "branch": "proof-veiculos",
+      "tipo": "funcionalidade",
+      "resumo": "Veículos com combustível e expedições novas (fundo do mar, montanhas, lava e planetoides sorteados), Mina de Ouro com operários e aluguel, Bolsa do Reino comandada pela Lisa, tela cheia com menus, visita aos vizinhos e o Neuro Abacate.",
+      "itens": [
+        "Garagem: Barco Voador (de todos), Submarino, Dirigível das Montanhas, Tanque de Magma e Nave Estelar, comprados com moedas e liberados pela Torre do Neuro.",
+        "Combustível: cada veículo faz 3 expedições por dia; com o tanque vazio, dá para abastecer com moedas (20, 35, 50... até 5 cargas extras por dia).",
+        "9 expedições novas, 3 por veículo, um lugar por nível: Recife dos Tritões, Cidade Afundada, Fossa do Kraken; Trilha dos Yetis, Ninho das Harpias, Pico do Gigante de Gelo; Forja dos Diabretes, Rio de Magma, Trono do Dragão de Lava — cada uma com terreno, estruturas, céu e covil próprios no 3D.",
+        "Nave Estelar: cada viagem cai num planetoide sorteado (raça alienígena, força de ×0,6 a ×1,8 sobre vida e dano, tesouro de 80 a 520 moedas); o radar mostra o planetoide antes de decolar.",
+        "22 monstros novos desenhados em papel (mar, montanha, lava e 7 raças alienígenas) e o veículo de cada expedição chegando na batalha.",
+        "Mina de Ouro em todo reino, com 3 operários de início: cada operário tira 1 pepita (6 moedas) a cada 8 h; contratar mais; pôr operários para alugar e alugar os de outros reinos (24 h, pagamento na hora ao dono).",
+        "Bolsa do Reino: as mesmas ações para todos; no primeiro acesso do dia a Lisa abre o pregão (variações de até ±30%, notícias ligadas ao jogo e empresas novas); sem a IA, um sorteio do dia. Compra e venda com 1% de corretagem; falência a 2 moedas; acima de 12 empresas, a mais antiga fecha o capital e paga quem tem ações.",
+        "Tela cheia do reino com barra de moedas e coletas rápidas, dock de menus e painel flutuante com cada parte da página.",
+        "Na paz, tocar numa ilha vizinha abre a visão completa daquele reino (construções, tropas, veículos, operários e o Neuro do dono).",
+        "Neuro Abacate: o mascote do Abacato como personagem, de graça para todos.",
+        "Modal de novidades novo e regras do jogo atualizadas.",
+        "Migração db/013-veiculos-ouro-bolsa.sql: veículos e operários no reino, expedições por veículo, aluguéis, ofertas e as tabelas da bolsa."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.16.0-cloudflare-pages.1",
       "data": "2026-10-22",
@@ -666,7 +688,13 @@
         "Expedições do Reino contra a CPU, de graça (nenhuma tropa se perde), 3 por dia, cada uma com dificuldade, recompensa e terreno 3D próprios, e monstros desenhados em 2D",
         "Guerra entre jogadores com o mesmo reino só a cada 48 h por quem ataca, revanche liberada para quem foi atacado, e só as tropas que caem se perdem",
         "Modal de novidades na entrada, uma vez por edição",
-        "Paz entre os reinos por votação (100% dos eleitores; vota quem tem 3+ dias de ofensiva de estudo, e a paz vale para todos): sem guerra, todos vizinhos no 3D, mina × o número de reinos e expedições repartidas"
+        "Paz entre os reinos por votação (100% dos eleitores; vota quem tem 3+ dias de ofensiva de estudo, e a paz vale para todos): sem guerra, todos vizinhos no 3D, mina × o número de reinos e expedições repartidas",
+        "Veículos e combustível no Reino: Barco, Submarino, Dirigível, Tanque de Magma e Nave Estelar, cada um com o seu mapa de expedições e 3 expedições por dia (mais com combustível pago)",
+        "Planetoides sorteados para a Nave Estelar: raça alienígena, força e tesouro aleatórios",
+        "Mina de Ouro com operários (3 de início), contratação e aluguel de operários entre jogadores",
+        "Bolsa do Reino: ações iguais para todos, pregão diário decidido pela Lisa (IA), compra e venda com corretagem",
+        "Tela cheia do Reino com menus suspensos e visita completa aos reinos vizinhos durante a paz",
+        "Neuro Abacate (mascote do Abacato), personagem gratuito para todos"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -740,7 +768,7 @@
       },
       {
         "nome": "Google Gemini",
-        "descricao": "Monta a ordem da trilha, gera checklists de teoria, explica os assuntos, gera quiz, exercício e projetos e corrige as entregas.",
+        "descricao": "Monta a ordem da trilha, gera checklists de teoria, explica os assuntos, gera quiz, exercício e projetos e corrige as entregas; abre o pregão diário da Bolsa do Reino.",
         "url": "https://ai.google.dev"
       },
       {

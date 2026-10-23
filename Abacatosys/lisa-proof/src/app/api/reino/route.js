@@ -1,6 +1,9 @@
 import { json } from "@/lib/http.js";
 import { exigirUsuario, respostaDeErro, corpoDe, ErroDeAcesso } from "@/lib/sessao.js";
-import { estadoDoReino, melhorarConstrucao, subirNeuro, coletarMina, renomearReino, treinarTropas, escolherPersonagem } from "@/lib/reino.js";
+import {
+  estadoDoReino, melhorarConstrucao, subirNeuro, coletarMina, renomearReino, treinarTropas, escolherPersonagem,
+  comprarVeiculo, abastecer, comprarOperario, coletarOuro, ofertarOperarios,
+} from "@/lib/reino.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +26,11 @@ export async function GET(req) {
  *   { acao: "nome", nome }        renomeia o reino
  *   { acao: "treinar", tropa, quantidade, destino: "exercito" | "guarnicao" }
  *   { acao: "personagem", id }  compra (se precisar) e veste um personagem do Neuro
+ *   { acao: "veiculo", id }       compra um veículo na garagem
+ *   { acao: "abastecer", id }     compra mais uma carga de combustível para hoje
+ *   { acao: "operario" }          contrata um operário para a Mina de Ouro
+ *   { acao: "ouro" }              coleta o ouro (as pepitas viram moedas)
+ *   { acao: "ofertar", quantidade, preco }  põe operários para alugar (0 tira a oferta)
  * Devolve o resultado da ação e o reino já atualizado.
  */
 export async function POST(req) {
@@ -36,6 +44,11 @@ export async function POST(req) {
       case "coletar": resultado = await coletarMina(usuario.id); break;
       case "nome": resultado = await renomearReino(usuario.id, corpo.nome); break;
       case "personagem": resultado = await escolherPersonagem(usuario.id, String(corpo.id || "")); break;
+      case "veiculo": resultado = await comprarVeiculo(usuario.id, String(corpo.id || "")); break;
+      case "abastecer": resultado = await abastecer(usuario.id, String(corpo.id || "")); break;
+      case "operario": resultado = await comprarOperario(usuario.id); break;
+      case "ouro": resultado = await coletarOuro(usuario.id); break;
+      case "ofertar": resultado = await ofertarOperarios(usuario.id, { quantidade: corpo.quantidade, preco: corpo.preco }); break;
       case "treinar": resultado = await treinarTropas(usuario.id, { tropa: String(corpo.tropa || ""), quantidade: corpo.quantidade, destino: String(corpo.destino || "") }); break;
       default: throw new ErroDeAcesso(400, "ação desconhecida");
     }

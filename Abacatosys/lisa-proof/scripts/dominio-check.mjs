@@ -26,6 +26,7 @@ import {
   faixaDeDefesa, estagioDoNeuro, ATAQUES_POR_DIA, TETO_DO_SAQUE, saqueDo, trofeusDoCombate,
   rivalSimulado, simularBatalha, exercitoDeTreino, previsaoDeEstrelas, combateDe, taxaDeProducao, guarnicaoDeTreino,
   proximoAtaqueAoReino, esperaAte, HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, CONSTRUCOES, exercitoDaExpedicao, caidasNoAtaque,
+  NIVEIS_INICIAIS, producaoPorHora,
 } from "../src/dominio/reino.js";
 import {
   DIAS_DE_PAZ, termosDaPaz, pazVigente, votacaoAberta, podeProporPaz, podeVotar, resultadoDaVotacao, periodoDaPaz,
@@ -33,7 +34,23 @@ import {
   fatorDaMinaNaPaz, parteDaExpedicao,
 } from "../src/dominio/paz.js";
 import {
+  VEICULOS, veiculosDe, podeComprarVeiculo, precoDaCarga, tanqueDoDia, podeAbastecer, CARGAS_POR_DIA, EXTRAS_POR_DIA,
+} from "../src/dominio/veiculos.js";
+import {
+  planetoideDa, sementeDoPlanetoide, ORDEM_DAS_RACAS, FORCA_MINIMA, FORCA_MAXIMA, RECOMPENSA_MINIMA, RECOMPENSA_MAXIMA,
+} from "../src/dominio/planetoides.js";
+import {
+  OPERARIOS_INICIAIS, vagasDaMina, ouroAcumulado, horasTrabalhadas, equipeDeAgora, precoDoOperario, podeComprarOperario,
+  podeOfertar, podeAlugar, periodoDoAluguel, moedasPorOperarioPorDia,
+} from "../src/dominio/ouro.js";
+import {
+  precoDepois, variacaoReal, corretagem, podeComprarAcao, podeVenderAcao, posicaoDepois, resumoDaCarteira, validarPregao,
+  pregaoDeReserva, saidasDaBolsa, PRECO_MINIMO, PRECO_INICIAL, VARIACAO_MAXIMA, SETORES, NOVAS_POR_DIA, ACOES_DO_PRIMEIRO_DIA,
+  MAXIMO_DE_ACOES, MAXIMO_POR_ORDEM,
+} from "../src/dominio/bolsa.js";
+import {
   MONSTROS, EXPEDICOES, EXPEDICOES_POR_DIA, podeExpedicionar, saqueDaExpedicao, defensorDaExpedicao, expedicaoPorId, contagensDeMonstros,
+  veiculoDa,
 } from "../src/dominio/monstros.js";
 import { montarCombate, passo as passoDoCombate, resultadoDo, resolverCombate, raioDaIlha } from "../src/dominio/combate.js";
 import {
@@ -801,9 +818,12 @@ caso("exercício do dia: o mesmo exercício de novo é barrado", () => {
   assert.equal(exercicioRepetido({ titulo: "Contador de vogais", enunciado: "Conte quantas vogais existem numa palavra digitada." }, antes), false);
 });
 caso("personagens: o Clássico é de todos; comprar cobra, vestir o que já tem é de graça", () => {
-  assert.equal(Object.keys(PERSONAGENS).length, 6);
-  assert.deepEqual(personagensDe([]), ["neuro"]);
-  assert.deepEqual(personagensDe(["ninja", "inventado", "ninja"]), ["neuro", "ninja"]);
+  assert.equal(Object.keys(PERSONAGENS).length, 7);
+  assert.deepEqual(personagensDe([]), ["neuro", "abacato"]);
+  assert.deepEqual(personagensDe(["ninja", "inventado", "ninja"]), ["neuro", "abacato", "ninja"]);
+  // o Neuro Abacate (mascote do Abacato) é de graça e de todo mundo
+  assert.equal(PERSONAGENS.abacato.preco, 0);
+  assert.deepEqual(podeEscolherPersonagem({ id: "abacato", possui: [], saldo: 0 }), { ok: true, compra: false, custo: 0 });
   assert.deepEqual(podeEscolherPersonagem({ id: "ninja", possui: [], saldo: 300 }), { ok: true, compra: true, custo: 300 });
   assert.match(podeEscolherPersonagem({ id: "robo", possui: [], saldo: 100 }).motivo, /faltam 1900/);
   assert.deepEqual(podeEscolherPersonagem({ id: "ninja", possui: ["ninja"], saldo: 0 }), { ok: true, compra: false, custo: 0 });
@@ -926,12 +946,15 @@ caso("guerra: o mesmo reino só a cada 48 h, contadas do ataque (e cada lado con
 
 caso("expedições: o catálogo respeita as regras do reino (terra nova pede Terreno, chefe é um dos monstros)", () => {
   const ids = new Set();
-  let anterior = 0;
+  const anterior = {};
   for (const x of EXPEDICOES) {
     assert.equal(ids.has(x.id), false, x.id);
     ids.add(x.id);
-    assert.ok(x.torreMinima >= anterior, `${x.id} fora de ordem`);
-    anterior = x.torreMinima;
+    const v = veiculoDa(x);
+    assert.ok(VEICULOS[v], `${x.id}: veículo ${v}`);
+    assert.ok(x.torreMinima >= (anterior[v] || 0), `${x.id} fora de ordem`);
+    assert.ok(x.torreMinima >= VEICULOS[v].torreMinima, `${x.id}: abre antes do veículo`);
+    anterior[v] = x.torreMinima;
     assert.ok(MONSTROS[x.chefe] && x.monstros[x.chefe] > 0, `${x.id}: o chefe precisa estar entre os monstros`);
     for (const t of Object.keys(x.monstros)) assert.ok(MONSTROS[t], `${x.id}: monstro desconhecido ${t}`);
     for (const [chave, nivel] of Object.entries(x.construcoes)) {
@@ -944,16 +967,24 @@ caso("expedições: o catálogo respeita as regras do reino (terra nova pede Ter
   assert.deepEqual(contagensDeMonstros({ goblin: 2.7, dragao: 3, cerbero: -1 }), { goblin: 2 });
 });
 
-caso("expedições: torre, 3 por dia em qualquer lugar (repetir vale), e tropas para partir", () => {
-  const x = expedicaoPorId("floresta-lobos"); // Torre 2
-  const ok = { expedicao: x, nivelDaTorre: 2, feitasHoje: 0 };
-  assert.equal(podeExpedicionar(ok).ok, true);
-  assert.equal(podeExpedicionar({ ...ok, feitasHoje: 2 }).ok, true); // o mesmo lugar de novo
+caso("expedições: torre, veículo e combustível no tanque (repetir vale), e tropas para partir", () => {
+  const x = expedicaoPorId("floresta-lobos"); // Torre 2, de Barco
+  const ok = { expedicao: x, nivelDaTorre: 2, veiculos: [], tanque: tanqueDoDia({ feitas: 0 }) };
+  assert.equal(podeExpedicionar(ok).ok, true); // o Barco é de todo mundo
+  assert.equal(podeExpedicionar({ ...ok, tanque: tanqueDoDia({ feitas: 2 }) }).ok, true); // o mesmo lugar de novo
   assert.match(podeExpedicionar({ ...ok, nivelDaTorre: 1 }).motivo, /Torre do Neuro no nível 2/);
-  assert.match(podeExpedicionar({ ...ok, feitasHoje: EXPEDICOES_POR_DIA }).motivo, /expedições de hoje/);
+  const vazio = podeExpedicionar({ ...ok, tanque: tanqueDoDia({ feitas: EXPEDICOES_POR_DIA }) });
+  assert.equal(vazio.semCombustivel, true);
+  assert.match(vazio.motivo, /tanque do Barco Voador está vazio/);
+  // abasteceu: mais uma
+  assert.equal(podeExpedicionar({ ...ok, tanque: tanqueDoDia({ feitas: 3, extras: 1 }) }).ok, true);
   // sem exército também parte (vai a Tropa da Expedição)
   assert.equal(podeExpedicionar({ ...ok, temExercito: false }).ok, true);
   assert.equal(podeExpedicionar({ ...ok, expedicao: null }).ok, false);
+  // as do fundo do mar pedem o Submarino
+  const recife = expedicaoPorId("recife-tritoes");
+  assert.match(podeExpedicionar({ ...ok, expedicao: recife }).motivo, /precisa do Submarino/);
+  assert.equal(podeExpedicionar({ ...ok, expedicao: recife, veiculos: ["submarino"] }).ok, true);
 });
 
 caso("expedições: sem exército, vai a Tropa da Expedição (emprestada, do tamanho da Torre)", () => {
@@ -980,11 +1011,18 @@ caso("expedições: o saque segue a destruição, mesmo sem estrela, e ⭐⭐⭐
 });
 
 caso("expedições: cada lugar tem dificuldade de 1 a 5 e recompensa que cresce com ela", () => {
-  let antes = 0;
+  const antes = {};
   for (const x of EXPEDICOES) {
+    const v = veiculoDa(x);
     assert.ok(x.dificuldade >= 1 && x.dificuldade <= 5, x.id);
-    assert.ok(x.recompensa > antes, `${x.id}: a recompensa precisa crescer`);
-    antes = x.recompensa;
+    assert.ok(x.recompensa > (antes[v] || 0), `${x.id}: a recompensa precisa crescer`);
+    antes[v] = x.recompensa;
+  }
+  // os veículos novos: três lugares cada, um por nível
+  for (const v of ["submarino", "dirigivel", "tanque"]) {
+    const lugares = EXPEDICOES.filter((x) => veiculoDa(x) === v);
+    assert.equal(lugares.length, 3, v);
+    assert.equal(new Set(lugares.map((x) => x.dificuldade)).size, 3, `${v}: um lugar por nível`);
   }
   assert.equal(expedicaoPorId("covil-cerbero").dificuldade, 5);
   assert.equal(defensorDaExpedicao(expedicaoPorId("vila-bandidos")).cenario, "vila-bandidos");
@@ -1089,6 +1127,191 @@ caso("paz: mina × o número de reinos, expedição reparte 20% e ninguém invad
   assert.match(r.motivo, /em paz/);
   const reino = { construcoes: { mina: 2 }, coletado_em: "2026-10-22T08:00:00Z" };
   assert.equal(producaoAcumulada(reino, agora, 5), 5 * producaoAcumulada(reino, agora, 1));
+});
+
+caso("veículos: o Barco é de todos; os outros pedem Torre e moedas", () => {
+  assert.deepEqual(veiculosDe([]), ["barco"]);
+  assert.deepEqual(veiculosDe(["nave", "inventado", "submarino"]), ["barco", "submarino", "nave"]); // na ordem da garagem
+  assert.equal(VEICULOS.barco.preco, 0);
+  assert.match(podeComprarVeiculo({ id: "barco", possui: [], nivelDaTorre: 5, saldo: 0 }).motivo, /já é seu/);
+  assert.match(podeComprarVeiculo({ id: "tanque", possui: [], nivelDaTorre: 2, saldo: 99999 }).motivo, /Torre do Neuro no nível 3/);
+  assert.match(podeComprarVeiculo({ id: "submarino", possui: [], nivelDaTorre: 2, saldo: 100 }).motivo, /faltam 500/);
+  assert.deepEqual(podeComprarVeiculo({ id: "submarino", possui: [], nivelDaTorre: 2, saldo: 600 }), { ok: true, custo: 600 });
+  assert.equal(podeComprarVeiculo({ id: "foguete", possui: [], nivelDaTorre: 5, saldo: 9999 }).ok, false);
+});
+
+caso("combustível: 3 cargas por dia por veículo; abastecer só com o tanque vazio, mais caro a cada vez", () => {
+  assert.equal(CARGAS_POR_DIA, 3);
+  assert.deepEqual(tanqueDoDia({ feitas: 1 }), { cargas: 3, usadas: 1, restantes: 2, extras: 0, extrasPossiveis: EXTRAS_POR_DIA });
+  assert.deepEqual([0, 1, 2, 3, 4].map(precoDaCarga), [20, 35, 50, 65, 80]);
+  const base = { id: "barco", possui: [], saldo: 1000 };
+  assert.match(podeAbastecer({ ...base, feitas: 1 }).motivo, /ainda tem 2 carga/);
+  assert.deepEqual(podeAbastecer({ ...base, feitas: 3 }), { ok: true, custo: 20 });
+  assert.deepEqual(podeAbastecer({ ...base, feitas: 4, extras: 1 }), { ok: true, custo: 35 });
+  assert.match(podeAbastecer({ ...base, feitas: 3 + EXTRAS_POR_DIA, extras: EXTRAS_POR_DIA }).motivo, /amanhã o tanque enche/);
+  assert.match(podeAbastecer({ ...base, feitas: 3, saldo: 5 }).motivo, /faltam 15/);
+  assert.match(podeAbastecer({ ...base, id: "nave", feitas: 3 }).motivo, /ainda não é seu/);
+});
+
+caso("planetoides: sorteio fixo por pessoa, dia e viagem; força e recompensa variam dentro dos limites", () => {
+  const s1 = sementeDoPlanetoide("u1", "2026-10-23", 1);
+  assert.equal(s1, sementeDoPlanetoide("u1", "2026-10-23", 1));
+  assert.notEqual(s1, sementeDoPlanetoide("u1", "2026-10-23", 2));
+  assert.notEqual(s1, sementeDoPlanetoide("u2", "2026-10-23", 1));
+  assert.deepEqual(planetoideDa(s1), planetoideDa(s1)); // o radar mostra o mesmo que a batalha usa
+  const racas = new Set(), forcas = [], recompensas = [], dificuldades = new Set();
+  for (let i = 1; i <= 400; i++) {
+    const p = planetoideDa(sementeDoPlanetoide("u", "2026-10-23", i));
+    racas.add(p.raca); forcas.push(p.forca); recompensas.push(p.recompensa); dificuldades.add(p.dificuldade);
+    assert.ok(p.forca >= FORCA_MINIMA && p.forca <= FORCA_MAXIMA, `força ${p.forca}`);
+    assert.ok(p.recompensa >= RECOMPENSA_MINIMA && p.recompensa <= RECOMPENSA_MAXIMA, `recompensa ${p.recompensa}`);
+    assert.ok(MONSTROS[p.chefe] && p.monstros[p.chefe] > 0, "o chefe está entre os aliens");
+    for (const t of Object.keys(p.monstros)) assert.ok(MONSTROS[t], t);
+    assert.equal(p.veiculo, "nave");
+    for (const [chave, nivel] of Object.entries(p.construcoes)) {
+      if (nivel > 0 && CONSTRUCOES[chave].terreno) assert.ok((p.construcoes.terreno || 0) >= CONSTRUCOES[chave].terreno, `${chave} sem Terreno`);
+    }
+  }
+  assert.equal(racas.size, ORDEM_DAS_RACAS.length, "todas as raças aparecem");
+  assert.ok(Math.max(...forcas) - Math.min(...forcas) > 0.9, "a força varia de verdade");
+  assert.ok(Math.max(...recompensas) - Math.min(...recompensas) > 200, "a recompensa varia de verdade");
+  assert.ok(dificuldades.size >= 3, "planetoides fáceis e difíceis");
+  // a força vai para o motor: monstros mais fortes, mesma batalha determinística
+  const p = planetoideDa(s1);
+  const defensor = defensorDaExpedicao({ ...p, forca: 1.5 });
+  assert.equal(defensor.forca, 1.5);
+  assert.equal(defensor.veiculo, "nave");
+  const fraco = montarCombate({ atacante: { exercito: { guerreiro: 1 } }, defensor: { ...defensor, forca: 1 }, semente: 3 });
+  const forte = montarCombate({ atacante: { exercito: { guerreiro: 1 } }, defensor, semente: 3 });
+  assert.equal(forte.forca, 1.5);
+  assert.equal(fraco.forca, 1);
+});
+
+caso("planetoides: a força deixa os aliens mais fortes no combate (vida e dano)", () => {
+  const entrada = (forca) => ({ semente: 9, atacante: { exercito: { guerreiro: 6, arqueira: 4 }, neuro_nivel: 2 },
+    defensor: { construcoes: { castelo: 2, mina: 1 }, neuro_nivel: 0, guarnicao: {}, monstros: { zorg: 4 }, ...(forca ? { forca } : {}) } });
+  const normal = resolverCombate(entrada(null));
+  assert.deepEqual(resolverCombate(entrada(1)), normal); // força 1 = sem força nenhuma
+  const forte = resolverCombate(entrada(1.8));
+  const fraco = resolverCombate(entrada(0.6));
+  assert.ok(fraco.destruicao >= normal.destruicao && normal.destruicao >= forte.destruicao, `${fraco.destruicao} ≥ ${normal.destruicao} ≥ ${forte.destruicao}`);
+});
+
+caso("mina de ouro: todo reino nasce com ela e com o pelotão de 3 operários; 1 pepita a cada 8 h", () => {
+  assert.equal(NIVEIS_INICIAIS.minaDeOuro, 1);
+  assert.equal(OPERARIOS_INICIAIS, 3);
+  assert.deepEqual([1, 2, 5].map(vagasDaMina), [3, 5, 11]);
+  const desde = "2026-10-23T00:00:00Z";
+  // 3 operários por 8 h = 3 pepitas = 18 moedas
+  assert.deepEqual(ouroAcumulado({ nivel: 1, operarios: 3, desde, agora: new Date("2026-10-23T08:00:00Z") }), { pepitas: 3, moedas: 18, capacidade: 9, cheia: false });
+  // 7 h ainda não deu pepita
+  assert.equal(ouroAcumulado({ nivel: 1, operarios: 3, desde, agora: new Date("2026-10-23T07:59:00Z") }).pepitas, 2);
+  // enche (3 pepitas por vaga) e para
+  assert.deepEqual(ouroAcumulado({ nivel: 1, operarios: 3, desde, agora: new Date("2026-10-26T00:00:00Z") }), { pepitas: 9, moedas: 54, capacidade: 9, cheia: true });
+  // vale mais que a Mina de Moedas do mesmo nível
+  assert.ok(3 * moedasPorOperarioPorDia() > 24 * producaoPorHora(1));
+});
+
+caso("mina de ouro: alugados para fora não trabalham para mim; os que aluguei de fora trabalham", () => {
+  const desde = "2026-10-23T00:00:00Z", agora = new Date("2026-10-23T16:00:00Z");
+  const fora = [{ quantidade: 2, inicio: "2026-10-23T08:00:00Z", fim: "2026-10-24T08:00:00Z" }];
+  const deFora = [{ quantidade: 1, inicio: "2026-10-22T20:00:00Z", fim: "2026-10-23T04:00:00Z" }];
+  // 3 × 16 h − 2 × 8 h (fora desde as 8 h) + 1 × 4 h (o alugado, até as 4 h) = 48 − 16 + 4 = 36 h
+  assert.equal(horasTrabalhadas({ operarios: 3, desde, agora, alugadosParaFora: fora, alugadosDeFora: deFora }), 36);
+  assert.deepEqual(equipeDeAgora({ operarios: 3, alugadosParaFora: fora, alugadosDeFora: deFora, agora }), { proprios: 3, alugadosParaFora: 2, alugadosDeFora: 0, emCasa: 1, trabalhando: 1 });
+  assert.equal(periodoDoAluguel(new Date("2026-10-23T10:00:00Z")).fim, "2026-10-24T10:00:00.000Z");
+});
+
+caso("operários: comprar cabe nas vagas; pôr para alugar e alugar de outro reino", () => {
+  assert.deepEqual([3, 4, 5].map(precoDoOperario), [120, 160, 200]);
+  assert.deepEqual(podeComprarOperario({ operarios: 3, nivel: 2, saldo: 500 }), { ok: true, custo: 120 });
+  assert.match(podeComprarOperario({ operarios: 3, nivel: 1, saldo: 500 }).motivo, /3 vagas — melhore a mina/);
+  assert.match(podeComprarOperario({ operarios: 4, nivel: 2, saldo: 100 }).motivo, /faltam 60/);
+  assert.deepEqual(podeOfertar({ quantidade: 2, preco: 10, operarios: 3 }), { ok: true, quantidade: 2, preco: 10 });
+  assert.deepEqual(podeOfertar({ quantidade: 0, preco: 0, operarios: 3 }), { ok: true, quantidade: 0, preco: 0 }); // tirar a oferta
+  assert.match(podeOfertar({ quantidade: 5, preco: 10, operarios: 3 }).motivo, /você tem 3/);
+  assert.match(podeOfertar({ quantidade: 1, preco: 99, operarios: 3 }).motivo, /de 5 a 40/);
+  const oferta = { quantidade: 3, preco: 12 };
+  assert.deepEqual(podeAlugar({ souODono: false, oferta, jaAlugados: 1, quantidade: 2, vagasLivres: 2, saldo: 100 }), { ok: true, custo: 24, quantidade: 2 });
+  assert.match(podeAlugar({ souODono: true, oferta, quantidade: 1, vagasLivres: 5, saldo: 100 }).motivo, /já são seus/);
+  assert.match(podeAlugar({ souODono: false, oferta, jaAlugados: 3, quantidade: 1, vagasLivres: 5, saldo: 100 }).motivo, /todos alugados/);
+  assert.match(podeAlugar({ souODono: false, oferta, jaAlugados: 1, quantidade: 3, vagasLivres: 5, saldo: 100 }).motivo, /só 2 operário/);
+  assert.match(podeAlugar({ souODono: false, oferta, quantidade: 2, vagasLivres: 1, saldo: 100 }).motivo, /só tem 1 vaga/);
+  assert.match(podeAlugar({ souODono: false, oferta, quantidade: 2, vagasLivres: 0, saldo: 100 }).motivo, /lotada/);
+  assert.match(podeAlugar({ souODono: false, oferta, quantidade: 2, vagasLivres: 5, saldo: 10 }).motivo, /faltam 14/);
+  assert.match(podeAlugar({ souODono: false, oferta: { quantidade: 0, preco: 0 }, quantidade: 1, vagasLivres: 5, saldo: 100 }).motivo, /não tem operários/);
+});
+
+caso("bolsa: preço do pregão limitado a ±30%, nunca abaixo do mínimo; corretagem de 1% (mínimo 1)", () => {
+  assert.equal(precoDepois(100, 12), 112);
+  assert.equal(precoDepois(100, -80), 70); // a variação para em −30%
+  assert.equal(precoDepois(100, 99), 130);
+  assert.equal(precoDepois(3, -30), PRECO_MINIMO);
+  assert.equal(precoDepois(2, -30), PRECO_MINIMO);
+  assert.deepEqual([corretagem(10), corretagem(250), corretagem(1000)], [1, 3, 10]);
+  assert.equal(variacaoReal(100, 112), 12);
+});
+
+caso("bolsa: comprar cobra preço + corretagem; vender paga preço − corretagem; preço médio na carteira", () => {
+  const acao = { id: "PEPT", preco: 25, status: "ativa" };
+  assert.deepEqual(podeComprarAcao({ acao, quantidade: 4, saldo: 200 }), { ok: true, quantidade: 4, valor: 100, taxa: 1, total: 101 });
+  assert.match(podeComprarAcao({ acao, quantidade: 4, saldo: 100 }).motivo, /faltam 1/);
+  assert.match(podeComprarAcao({ acao, quantidade: 0, saldo: 100 }).motivo, /quantas/);
+  assert.match(podeComprarAcao({ acao, quantidade: MAXIMO_POR_ORDEM + 1, saldo: 1e9 }).motivo, /no máximo/);
+  assert.match(podeComprarAcao({ acao: { ...acao, status: "falida" }, quantidade: 1, saldo: 100 }).motivo, /não está na bolsa/);
+  assert.deepEqual(podeVenderAcao({ acao, posicao: { quantidade: 4, custo: 101 }, quantidade: 2 }), { ok: true, quantidade: 2, valor: 50, taxa: 1, total: 49 });
+  assert.match(podeVenderAcao({ acao, posicao: { quantidade: 1 }, quantidade: 2 }).motivo, /você tem 1/);
+  assert.match(podeVenderAcao({ acao, posicao: null, quantidade: 1 }).motivo, /não tem ações/);
+  const comprou = posicaoDepois(null, { tipo: "compra", quantidade: 4, total: 101 });
+  assert.deepEqual(comprou, { quantidade: 4, custo: 101 });
+  assert.deepEqual(posicaoDepois(comprou, { tipo: "venda", quantidade: 2 }), { quantidade: 2, custo: 51 });
+  assert.deepEqual(posicaoDepois(comprou, { tipo: "venda", quantidade: 4 }), { quantidade: 0, custo: 0 });
+  assert.deepEqual(resumoDaCarteira([{ acao_id: "PEPT", quantidade: 4, custo: 101 }], () => 30), { valor: 120, custo: 101, lucro: 19 });
+  // comprar e vender no mesmo dia nunca dá lucro (o preço só muda no pregão)
+  const c = podeComprarAcao({ acao, quantidade: 10, saldo: 1e6 }), v = podeVenderAcao({ acao, posicao: { quantidade: 10 }, quantidade: 10 });
+  assert.ok(v.total < c.total);
+});
+
+caso("bolsa: o pregão da Lisa é conferido (toda ação ganha variação, tickers únicos, faixa de preço)", () => {
+  const ativas = [{ id: "PEPT", preco: 20 }, { id: "BARC", preco: 40 }];
+  const p = validarPregao({
+    manchete: "  Dia agitado no reino!  ",
+    movimentos: [{ ticker: "pept", variacao: 55, noticia: "Ouro em alta" }, { ticker: "XXXX", variacao: -5, noticia: "?" }],
+    novas: [
+      { ticker: "BARC", nome: "Repetida", setor: "Transportes", emoji: "⛵", descricao: "x", preco: 30 },     // já existe
+      { ticker: "FALI", nome: "Já faliu", setor: "Magia", emoji: "🪄", descricao: "x", preco: 30 },           // saiu da bolsa antes
+      { ticker: "ab", nome: "Curta", setor: "Magia", emoji: "🪄", descricao: "x", preco: 30 },               // ticker inválido
+      { ticker: "NOVA", nome: "Nova Empresa", setor: "Inventado", emoji: "", descricao: "", preco: 9999 },
+      { ticker: "OUTR", nome: "Outra", setor: "Magia", emoji: "🪄", descricao: "y", preco: 1 },
+      { ticker: "TERC", nome: "Terceira", setor: "Magia", emoji: "🪄", descricao: "z", preco: 20 },
+    ],
+  }, ativas, { novas: 2, existentes: ["FALI"] });
+  assert.equal(p.manchete, "Dia agitado no reino!");
+  assert.deepEqual(p.movimentos.map((m) => [m.acao, m.variacao]), [["PEPT", VARIACAO_MAXIMA], ["BARC", 0]]); // BARC sem resposta: 0%
+  assert.deepEqual(p.novas.map((n) => n.id), ["NOVA", "OUTR"]);
+  assert.equal(p.novas[0].setor, SETORES[0]);         // setor fora da lista vira o primeiro
+  assert.equal(p.novas[0].preco, PRECO_INICIAL[1]);   // preço dentro da faixa
+  assert.equal(p.novas[1].preco, PRECO_INICIAL[0]);
+});
+
+caso("bolsa: sem a IA, o sorteio do dia move o mercado (o mesmo para todos) e lança empresas", () => {
+  const ativas = [{ id: "PEPT", preco: 20 }, { id: "BARC", preco: 40 }, { id: "FORJ", preco: 60 }];
+  const a = pregaoDeReserva("2026-10-23", ativas), b = pregaoDeReserva("2026-10-23", ativas), c = pregaoDeReserva("2026-10-24", ativas);
+  assert.deepEqual(a, b);
+  assert.notDeepEqual(a.movimentos, c.movimentos);
+  assert.equal(a.movimentos.length, 3);
+  assert.ok(a.movimentos.every((m) => Math.abs(m.variacao) <= 12));
+  assert.equal(a.novas.length, NOVAS_POR_DIA);
+  assert.ok(a.novas.every((n) => !["PEPT", "BARC", "FORJ"].includes(n.id)));
+  assert.equal(pregaoDeReserva("2026-10-23", [], { novas: ACOES_DO_PRIMEIRO_DIA }).novas.length, ACOES_DO_PRIMEIRO_DIA);
+});
+
+caso("bolsa: quem chega ao preço mínimo vai à falência; acima do teto, a mais antiga fecha o capital", () => {
+  const depois = Array.from({ length: MAXIMO_DE_ACOES }, (_, i) => ({ id: `A${String.fromCharCode(65 + i)}C`, preco: 30, criada_em: `2026-10-${String(10 + i).padStart(2, "0")}` }));
+  depois[5].preco = PRECO_MINIMO;
+  // 12 na bolsa, 1 faliu → 11; com 2 novas seriam 13: a mais antiga fecha
+  assert.deepEqual(saidasDaBolsa(depois, 2), { faliram: [depois[5].id], fecham: [depois[0].id] });
+  assert.deepEqual(saidasDaBolsa(depois.slice(0, 4), 2), { faliram: [], fecham: [] });
 });
 
 caso("invasão: só as tropas que caem se perdem (as sobreviventes voltam)", () => {

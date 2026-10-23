@@ -28,15 +28,22 @@ import {
   podeVotarComOfensiva, eleitoresDaVotacao, resultadoDaVotacao, fimDaVotacao, periodoDaPaz, fatorDaMinaNaPaz, parteDaExpedicao,
 } from "@/dominio/paz.js";
 import {
-  EXPEDICOES, EXPEDICOES_POR_DIA, TIPOS_DE_LUGAR, MONSTROS, DIFICULDADES, expedicaoPorId, podeExpedicionar, contagensDeMonstros,
+  EXPEDICOES, TIPOS_DE_LUGAR, MONSTROS, DIFICULDADES, expedicaoPorId, podeExpedicionar, contagensDeMonstros, veiculoDa,
 } from "@/dominio/monstros.js";
+import { VEICULOS, ORDEM_DOS_VEICULOS, veiculosDe, podeComprarVeiculo, tanqueDoDia, podeAbastecer } from "@/dominio/veiculos.js";
+import { planetoideDa, sementeDoPlanetoide, RACAS } from "@/dominio/planetoides.js";
+import {
+  OPERARIOS_INICIAIS, HORAS_POR_PEPITA, VALOR_DA_PEPITA, HORAS_DE_ALUGUEL, PRECO_MINIMO_DO_ALUGUEL, PRECO_MAXIMO_DO_ALUGUEL,
+  vagasDaMina, ouroAcumulado, horasTrabalhadas, equipeDeAgora, podeComprarOperario, podeOfertar, podeAlugar, periodoDoAluguel,
+  moedasPorOperarioPorDia,
+} from "@/dominio/ouro.js";
 import {
   TROPAS, ORDEM_DAS_TROPAS, RESERVAS, contagens, espacoUsado, capacidadeDoExercito, capacidadeDaGuarnicao,
   podeTreinar, somarTropas, heroiNeuro, lotacaoDoAcampamento, totalDeTropas,
 } from "@/dominio/tropas.js";
 import { PERSONAGENS, ORDEM_DOS_PERSONAGENS, personagensDe, podeEscolherPersonagem } from "@/dominio/personagens.js";
 
-const CAMPOS = "usuario_id, nome, neuro_nivel, construcoes, exercito, guarnicao, personagem, personagens, coletado_em, escudo_ate, trofeus, versao, criado_em";
+const CAMPOS = "usuario_id, nome, neuro_nivel, construcoes, exercito, guarnicao, personagem, personagens, coletado_em, escudo_ate, trofeus, versao, criado_em, veiculos, operarios, ouro_coletado_em";
 const HORA = 3_600_000;
 
 function falhou(error, onde) {
@@ -198,7 +205,7 @@ async function pazParaTela(usuarioId, apurou = false) {
         parteDaExpedicao: PARTE_DA_EXPEDICAO,
         vizinhos: (outros || []).map((r) => {
           const n = niveisDe(r);
-          return { nome: r.nome, dono: nomes.get(r.usuario_id) || "Estudante anônimo", construcoes: Object.fromEntries(ORDEM_DAS_CONSTRUCOES.map((c) => [c, n[c] || 0])) };
+          return { id: r.usuario_id, nome: r.nome, dono: nomes.get(r.usuario_id) || "Estudante anônimo", construcoes: Object.fromEntries(ORDEM_DAS_CONSTRUCOES.map((c) => [c, n[c] || 0])) };
         }),
       },
       votacao: null, podePropor: false, motivo: "o mundo já está em paz", totalDeReinos: total,
@@ -290,7 +297,7 @@ export async function cancelarPaz(usuarioId, pazId) {
 /** Tudo o que a tela do reino precisa. */
 export async function estadoDoReino(usuarioId) {
   const reino = await obterReino(usuarioId);
-  const [saldo, hoje, batalhasR, paz] = await Promise.all([
+  const [saldo, hoje, batalhasR, paz, tanques, ouro] = await Promise.all([
     saldoDoUsuario(usuarioId),
     invasoesDeHoje(usuarioId),
     supabase.from("proof_invasoes")
@@ -298,6 +305,8 @@ export async function estadoDoReino(usuarioId) {
       .or(`atacante_id.eq.${usuarioId},defensor_id.eq.${usuarioId}`)
       .order("criado_em", { ascending: false }).limit(15),
     pazParaTela(usuarioId),
+    tanquesDeHoje(usuarioId),
+    ouroDe(reino),
   ]);
   const fatorDaMina = paz.vigente?.fatorDaMina || 1;
   falhou(batalhasR.error, "batalhas");
@@ -327,6 +336,8 @@ export async function estadoDoReino(usuarioId) {
     },
     paz,
     diasDePaz: DIAS_DE_PAZ,
+    garagem: garagemParaTela(reino, saldo, tanques),
+    ouro: await ouroParaTela(reino, saldo, ouro),
     cofre: { protege: protecaoDoCofre(n.cofre) },
     construcoes: ORDEM_DAS_CONSTRUCOES.map((chave) => {
       const def = CONSTRUCOES[chave];
@@ -633,48 +644,94 @@ export async function invadir(usuarioId, defensorId) {
 
 // ---------------------------------------------------------------- expedições (contra a CPU)
 
-async function expedicoesDeHoje(usuarioId) {
-  const { data, error } = await supabase.from("proof_expedicoes").select("expedicao, numero").eq("usuario_id", usuarioId).eq("dia", diaDe());
-  falhou(error, "expedições");
-  return data || [];
+/**
+ * O tanque de cada veículo hoje: as expedições feitas com ele e as cargas extras compradas
+ * (lançamentos "combustivel" do dia no livro-caixa).
+ */
+async function tanquesDeHoje(usuarioId) {
+  const dia = diaDe();
+  const [exp, comb] = await Promise.all([
+    supabase.from("proof_expedicoes").select("veiculo, expedicao, numero").eq("usuario_id", usuarioId).eq("dia", dia),
+    supabase.from("proof_reino_movimentos").select("detalhe").eq("usuario_id", usuarioId).eq("tipo", "combustivel").eq("detalhe->>dia", dia),
+  ]);
+  falhou(exp.error, "expedições");
+  falhou(comb.error, "combustível");
+  const feitas = {}, extras = {};
+  for (const x of exp.data || []) feitas[x.veiculo || "barco"] = (feitas[x.veiculo || "barco"] || 0) + 1;
+  for (const m of comb.data || []) { const v = m.detalhe?.veiculo; if (VEICULOS[v]) extras[v] = (extras[v] || 0) + 1; }
+  return { lista: exp.data || [], feitas, extras, tanque: (v) => tanqueDoDia({ feitas: feitas[v] || 0, extras: extras[v] || 0 }) };
 }
 
-/** O mapa das expedições: o que está liberado, quantas vezes cada lugar foi feito hoje e as melhores estrelas. */
+/** O planetoide da próxima viagem da Nave hoje (o radar mostra o mesmo que a batalha vai usar). */
+const planetoideDaVez = (usuarioId, tanques) => planetoideDa(sementeDoPlanetoide(usuarioId, diaDe(), (tanques.feitas.nave || 0) + 1));
+
+/** A garagem: cada veículo, se é seu, o preço e o tanque de hoje (com o abastecer). */
+function garagemParaTela(reino, saldo, tanques) {
+  const meus = veiculosDe(reino.veiculos);
+  const torre = niveisDe(reino).castelo;
+  return ORDEM_DOS_VEICULOS.map((id) => {
+    const tem = meus.includes(id);
+    const compra = tem ? null : podeComprarVeiculo({ id, possui: reino.veiculos, nivelDaTorre: torre, saldo });
+    const tanque = tanques.tanque(id);
+    const ab = tem ? podeAbastecer({ id, possui: reino.veiculos, feitas: tanque.usadas, extras: tanque.extras, saldo }) : null;
+    return {
+      id, ...VEICULOS[id], tem, pode: Boolean(compra?.ok), motivo: compra && !compra.ok ? compra.motivo : "",
+      tanque, abastecer: ab ? { ok: ab.ok, custo: ab.custo, motivo: ab.ok ? "" : ab.motivo } : null,
+    };
+  });
+}
+
+/** O mapa das expedições: por veículo, com o tanque de cada um, o planetoide da vez e as melhores estrelas. */
 export async function expedicoesDe(usuarioId) {
   const eu = await obterReino(usuarioId);
-  const [hoje, historico] = await Promise.all([
-    expedicoesDeHoje(usuarioId),
-    supabase.from("proof_expedicoes").select("id, expedicao, estrelas, destruicao, saque, combate, criado_em")
+  const [tanques, historico, saldo] = await Promise.all([
+    tanquesDeHoje(usuarioId),
+    supabase.from("proof_expedicoes").select("id, expedicao, veiculo, estrelas, destruicao, saque, combate, detalhe, criado_em")
       .eq("usuario_id", usuarioId).order("criado_em", { ascending: false }).limit(300),
+    saldoDoUsuario(usuarioId),
   ]);
   falhou(historico.error, "expedições");
   const todas = historico.data || [];
   const melhor = new Map();
   for (const x of todas) melhor.set(x.expedicao, Math.max(melhor.get(x.expedicao) || 0, x.estrelas));
   const vezesHoje = new Map();
-  for (const x of hoje) vezesHoje.set(x.expedicao, (vezesHoje.get(x.expedicao) || 0) + 1);
+  for (const x of tanques.lista) vezesHoje.set(x.expedicao, (vezesHoje.get(x.expedicao) || 0) + 1);
   const torre = niveisDe(eu).castelo;
   const tropa = exercitoDaExpedicao(eu.exercito, torre);
+  const meus = veiculosDe(eu.veiculos);
+  const planetoide = planetoideDaVez(usuarioId, tanques);
+  const garagem = garagemParaTela(eu, saldo, tanques);
   return {
-    expedicoes: { feitasHoje: hoje.length, porDia: EXPEDICOES_POR_DIA },
+    // somando os tanques dos veículos que a pessoa tem (para o atalho lá em cima)
+    expedicoes: {
+      feitasHoje: meus.reduce((s, v) => s + tanques.tanque(v).usadas, 0),
+      porDia: meus.reduce((s, v) => s + tanques.tanque(v).cargas, 0),
+      restantes: meus.reduce((s, v) => s + tanques.tanque(v).restantes, 0),
+    },
+    veiculos: garagem,
     // com que exército a pessoa parte: o dela, ou a Tropa da Expedição (emprestada, de graça)
     tropa: { emprestada: tropa.emprestado, tropas: tropa.exercito },
-    lugares: EXPEDICOES.map((x) => {
-      const pode = podeExpedicionar({ expedicao: x, nivelDaTorre: torre, feitasHoje: hoje.length });
+    lugares: [...EXPEDICOES, planetoide].map((x) => {
+      const veiculo = veiculoDa(x);
+      const pode = podeExpedicionar({ expedicao: x, nivelDaTorre: torre, veiculos: eu.veiculos, tanque: tanques.tanque(veiculo) });
       return {
         id: x.id, nome: x.nome, tipo: x.tipo, lugar: TIPOS_DE_LUGAR[x.tipo].nome, emoji: TIPOS_DE_LUGAR[x.tipo].emoji,
         descricao: x.descricao, torreMinima: x.torreMinima, recompensa: x.recompensa, chefe: x.chefe,
         dificuldade: x.dificuldade, nomeDaDificuldade: DIFICULDADES[x.dificuldade]?.nome || "",
+        veiculo, temVeiculo: meus.includes(veiculo),
+        ...(x.forca ? { forca: x.forca, raca: x.raca, nomeDaRaca: RACAS[x.raca]?.nome || "", emojiDaRaca: RACAS[x.raca]?.emoji || "" } : {}),
         monstros: Object.entries(contagensDeMonstros(x.monstros)).map(([tipo, quantidade]) => ({ tipo, nome: MONSTROS[tipo].nome, quantidade })),
         melhorEstrelas: melhor.get(x.id) || 0,
         vezesHoje: vezesHoje.get(x.id) || 0,
         liberada: torre >= x.torreMinima,
         pode: pode.ok,
+        semCombustivel: Boolean(pode.semCombustivel),
         motivo: pode.ok ? "" : pode.motivo,
       };
     }),
     recentes: todas.slice(0, 6).map((x) => ({
-      id: x.id, expedicao: x.expedicao, nome: expedicaoPorId(x.expedicao)?.nome || x.expedicao, quando: x.criado_em,
+      id: x.id, expedicao: x.expedicao, veiculo: x.veiculo || "barco",
+      nome: x.detalhe?.nome || expedicaoPorId(x.expedicao)?.nome || x.expedicao, quando: x.criado_em,
       estrelas: x.estrelas, destruicao: x.destruicao, saque: x.saque, combate: x.combate || null,
       resultado: { estrelas: x.estrelas, destruicao: x.destruicao, saque: x.saque, venceu: x.estrelas > 0 },
     })),
@@ -687,20 +744,25 @@ export async function expedicoesDe(usuarioId) {
  * barra a 4ª do dia) e lança o saque. O exército não muda: expedição não gasta tropa nem moeda.
  */
 export async function atacarExpedicao(usuarioId, expedicaoId) {
-  const expedicao = expedicaoPorId(String(expedicaoId || ""));
-  if (!expedicao) throw new ErroDeAcesso(400, "essa expedição não existe");
   const eu = await obterReino(usuarioId);
-  const hoje = await expedicoesDeHoje(usuarioId);
+  const tanques = await tanquesDeHoje(usuarioId);
+  const id = String(expedicaoId || "");
+  // o planetoide é sorteado pela viagem: o mesmo que o radar mostrou
+  const expedicao = id === "planetoide" ? planetoideDaVez(usuarioId, tanques) : expedicaoPorId(id);
+  if (!expedicao) throw new ErroDeAcesso(400, "essa expedição não existe");
+  const veiculo = veiculoDa(expedicao);
+  const tanque = tanques.tanque(veiculo);
   const torre = niveisDe(eu).castelo;
-  const pode = podeExpedicionar({ expedicao, nivelDaTorre: torre, feitasHoje: hoje.length });
+  const pode = podeExpedicionar({ expedicao, nivelDaTorre: torre, veiculos: eu.veiculos, tanque });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
 
   const tropa = exercitoDaExpedicao(eu.exercito, torre);
   const r = batalhaDeExpedicao({ atacante: { exercito: tropa.exercito, neuro_nivel: eu.neuro_nivel }, expedicao, semente: semente() });
 
   const ins = await supabase.from("proof_expedicoes").insert({
-    usuario_id: usuarioId, expedicao: expedicao.id, dia: diaDe(), numero: hoje.length + 1,
+    usuario_id: usuarioId, expedicao: expedicao.id, dia: diaDe(), veiculo, numero: tanque.usadas + 1,
     estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque, perdas: r.caidas, combate: r.entrada,
+    detalhe: expedicao.forca ? { nome: expedicao.nome, raca: expedicao.raca, forca: expedicao.forca, recompensa: expedicao.recompensa, dificuldade: expedicao.dificuldade } : {},
   }).select("id").single();
   if (ins.error?.code === "23505") throw new ErroDeAcesso(409, "essa expedição já foi feita — atualize a tela");
   falhou(ins.error, "expedição");
@@ -728,6 +790,225 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
   return {
     venceu: r.venceu, estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque,
     caidas: r.caidas, combate: r.entrada, emprestado: tropa.emprestado, repartido,
-    expedicao: { id: expedicao.id, nome: expedicao.nome, tipo: expedicao.tipo, chefe: expedicao.chefe, dificuldade: expedicao.dificuldade },
+    expedicao: { id: expedicao.id, nome: expedicao.nome, tipo: expedicao.tipo, chefe: expedicao.chefe, dificuldade: expedicao.dificuldade, veiculo, forca: expedicao.forca || 1 },
+  };
+}
+
+// ---------------------------------------------------------------- veículos e combustível
+
+/** Comprar um veículo na garagem. */
+export async function comprarVeiculo(usuarioId, id) {
+  const reino = await obterReino(usuarioId);
+  const saldo = await saldoDoUsuario(usuarioId);
+  const pode = podeComprarVeiculo({ id, possui: reino.veiculos, nivelDaTorre: niveisDe(reino).castelo, saldo });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  await lancarEGravar(reino, [{ tipo: "veiculo", valor: -pode.custo, detalhe: { veiculo: id } }], { veiculos: veiculosDe([...(reino.veiculos || []), id]) });
+  return { veiculo: id, nome: VEICULOS[id].nome, custo: pode.custo };
+}
+
+/** Abastecer: mais uma carga no tanque de hoje (a versão do reino trava dois cliques ao mesmo tempo). */
+export async function abastecer(usuarioId, id) {
+  const reino = await obterReino(usuarioId);
+  const [saldo, tanques] = await Promise.all([saldoDoUsuario(usuarioId), tanquesDeHoje(usuarioId)]);
+  const tanque = tanques.tanque(id);
+  const pode = podeAbastecer({ id, possui: reino.veiculos, feitas: tanque.usadas, extras: tanque.extras, saldo });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  await lancarEGravar(reino, [{ tipo: "combustivel", valor: -pode.custo, detalhe: { veiculo: id, dia: diaDe(), carga: tanque.extras + 1 } }], {});
+  return { veiculo: id, nome: VEICULOS[id].nome, custo: pode.custo };
+}
+
+// ---------------------------------------------------------------- a Mina de Ouro e os operários
+
+const CAMPOS_DO_ALUGUEL = "id, dono_id, inquilino_id, quantidade, preco, total, inicio, fim";
+
+/** Os aluguéis que tocam o período desde `desde` (os meus para fora e os que eu aluguei de fora). */
+async function alugueisDe(usuarioId, desde) {
+  const [fora, dentro] = await Promise.all([
+    supabase.from("proof_alugueis").select(CAMPOS_DO_ALUGUEL).eq("dono_id", usuarioId).gt("fim", desde),
+    supabase.from("proof_alugueis").select(CAMPOS_DO_ALUGUEL).eq("inquilino_id", usuarioId).gt("fim", desde),
+  ]);
+  falhou(fora.error, "aluguéis");
+  falhou(dentro.error, "aluguéis");
+  return { paraFora: fora.data || [], deFora: dentro.data || [] };
+}
+
+/** O que a Mina de Ouro juntou e quem está trabalhando nela agora. */
+async function ouroDe(reino, agora = new Date()) {
+  const desde = reino.ouro_coletado_em || reino.criado_em || agora.toISOString();
+  const alugueis = await alugueisDe(reino.usuario_id, desde);
+  const nivel = niveisDe(reino).minaDeOuro || 1;
+  const operarios = reino.operarios ?? OPERARIOS_INICIAIS;
+  const trabalho = { operarios, desde, agora, alugadosParaFora: alugueis.paraFora, alugadosDeFora: alugueis.deFora };
+  const equipe = equipeDeAgora(trabalho);
+  return { nivel, operarios, desde, alugueis, equipe, ouro: ouroAcumulado({ nivel, ...trabalho }), horas: horasTrabalhadas(trabalho) };
+}
+
+/**
+ * Depois de coletar, o relógio volta só o que sobrou para a próxima pepita (com quem está
+ * trabalhando agora): quem coleta sempre não perde o pedaço de pepita que já estava saindo.
+ */
+function relogioDepoisDaColeta(info, agora) {
+  if (info.ouro.cheia || !info.equipe.trabalhando) return agora.toISOString();
+  const resto = Math.max(0, info.horas - info.ouro.pepitas * HORAS_POR_PEPITA);
+  return new Date(agora.getTime() - (resto / info.equipe.trabalhando) * HORA).toISOString();
+}
+
+async function ouroParaTela(reino, saldo, info) {
+  const { data: oferta } = await supabase.from("proof_operarios_ofertas").select("quantidade, preco").eq("dono_id", reino.usuario_id).maybeSingle();
+  const agora = Date.now();
+  const ativos = (lista) => lista.filter((a) => new Date(a.inicio).getTime() <= agora && new Date(a.fim).getTime() > agora);
+  const fora = ativos(info.alugueis.paraFora), dentro = ativos(info.alugueis.deFora);
+  const nomes = await nomesPublicos([...fora.map((a) => a.inquilino_id), ...dentro.map((a) => a.dono_id)]);
+  const vagas = vagasDaMina(info.nivel);
+  const compra = podeComprarOperario({ operarios: info.operarios, nivel: info.nivel, saldo });
+  return {
+    nivel: info.nivel, vagas, operarios: info.operarios, equipe: info.equipe,
+    vagasLivres: Math.max(0, vagas - info.equipe.emCasa - info.equipe.alugadosDeFora),
+    pepitas: info.ouro.pepitas, moedas: info.ouro.moedas, capacidade: info.ouro.capacidade, cheia: info.ouro.cheia,
+    horasPorPepita: HORAS_POR_PEPITA, valorDaPepita: VALOR_DA_PEPITA,
+    moedasPorDia: Math.round(info.equipe.trabalhando * moedasPorOperarioPorDia()),
+    comprar: { ok: compra.ok, custo: compra.custo, motivo: compra.ok ? "" : compra.motivo },
+    oferta: oferta?.quantidade > 0 ? { quantidade: oferta.quantidade, preco: oferta.preco } : null,
+    precoDoAluguel: { minimo: PRECO_MINIMO_DO_ALUGUEL, maximo: PRECO_MAXIMO_DO_ALUGUEL, horas: HORAS_DE_ALUGUEL, sugerido: Math.round(moedasPorOperarioPorDia() * 0.6) },
+    alugadosParaFora: fora.map((a) => ({ id: a.id, quantidade: a.quantidade, total: a.total, fim: a.fim, com: nomes.get(a.inquilino_id) || "Estudante anônimo" })),
+    alugadosDeFora: dentro.map((a) => ({ id: a.id, quantidade: a.quantidade, total: a.total, fim: a.fim, com: nomes.get(a.dono_id) || "Estudante anônimo" })),
+  };
+}
+
+/** Coletar o ouro: as pepitas viram moedas na hora. */
+export async function coletarOuro(usuarioId) {
+  const reino = await obterReino(usuarioId);
+  const agora = new Date();
+  const info = await ouroDe(reino, agora);
+  if (info.ouro.pepitas <= 0) throw new ErroDeAcesso(400, `a Mina de Ouro ainda não juntou nenhuma pepita — cada operário tira 1 a cada ${HORAS_POR_PEPITA} h`);
+  await lancarEGravar(reino, [{ tipo: "ouro", valor: info.ouro.moedas, detalhe: { pepitas: info.ouro.pepitas } }], { ouro_coletado_em: relogioDepoisDaColeta(info, agora) });
+  return { pepitas: info.ouro.pepitas, coletou: info.ouro.moedas };
+}
+
+/** Contratar um operário (o ouro que já juntou é coletado antes: o novo não trabalha para trás). */
+export async function comprarOperario(usuarioId) {
+  const reino = await obterReino(usuarioId);
+  const agora = new Date();
+  const [saldo, info] = await Promise.all([saldoDoUsuario(usuarioId), ouroDe(reino, agora)]);
+  const pode = podeComprarOperario({ operarios: info.operarios, nivel: info.nivel, saldo });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  const lancamentos = [];
+  if (info.ouro.moedas > 0) lancamentos.push({ tipo: "ouro", valor: info.ouro.moedas, detalhe: { pepitas: info.ouro.pepitas, automatica: true } });
+  lancamentos.push({ tipo: "operario", valor: -pode.custo, detalhe: { operarios: info.operarios + 1 } });
+  await lancarEGravar(reino, lancamentos, { operarios: info.operarios + 1, ouro_coletado_em: agora.toISOString() });
+  return { operarios: info.operarios + 1, custo: pode.custo, coletou: info.ouro.moedas };
+}
+
+/** Pôr operários para alugar (quantidade 0 tira a oferta). Quem já está alugado continua até o fim. */
+export async function ofertarOperarios(usuarioId, { quantidade, preco }) {
+  const reino = await obterReino(usuarioId);
+  const pode = podeOfertar({ quantidade: Number(quantidade), preco: Number(preco), operarios: reino.operarios ?? OPERARIOS_INICIAIS });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  const { error } = await supabase.from("proof_operarios_ofertas").upsert(
+    { dono_id: usuarioId, quantidade: pode.quantidade, preco: pode.preco, atualizado_em: new Date().toISOString() }, { onConflict: "dono_id" },
+  );
+  falhou(error, "oferta de operários");
+  return { quantidade: pode.quantidade, preco: pode.preco };
+}
+
+/** Quantos operários de cada dono estão alugados agora (para qualquer pessoa). */
+async function alugadosAgoraDe(donos) {
+  const agora = new Date().toISOString();
+  const linhas = await buscarEmLotes("proof_alugueis", "dono_id, quantidade", "dono_id", donos, (q) => q.gt("fim", agora).lte("inicio", agora));
+  const m = new Map();
+  for (const a of linhas) m.set(a.dono_id, (m.get(a.dono_id) || 0) + a.quantidade);
+  return m;
+}
+
+/** O mercado de operários: quem tem operários para alugar agora (menos eu), do mais barato ao mais caro. */
+export async function mercadoDeOperarios(usuarioId) {
+  const { data: ofertas, error } = await supabase.from("proof_operarios_ofertas").select("dono_id, quantidade, preco")
+    .gt("quantidade", 0).neq("dono_id", usuarioId).order("preco").limit(60);
+  falhou(error, "ofertas de operários");
+  const donos = (ofertas || []).map((o) => o.dono_id);
+  const [alugados, reinos, nomes] = await Promise.all([
+    alugadosAgoraDe(donos),
+    buscarEmLotes("proof_reinos", "usuario_id, nome, operarios", "usuario_id", donos),
+    nomesPublicos(donos),
+  ]);
+  const reinoDe = new Map(reinos.map((r) => [r.usuario_id, r]));
+  return (ofertas || []).map((o) => {
+    const r = reinoDe.get(o.dono_id);
+    const oferecidos = Math.min(o.quantidade, r?.operarios ?? OPERARIOS_INICIAIS);
+    return { dono: o.dono_id, reino: r?.nome || "Reino", nome: nomes.get(o.dono_id) || "Estudante anônimo", preco: o.preco, disponiveis: Math.max(0, oferecidos - (alugados.get(o.dono_id) || 0)) };
+  }).filter((o) => o.disponiveis > 0);
+}
+
+/**
+ * Alugar operários de outro reino por 24 h. Ordem: registra o aluguel e confere de novo se o dono
+ * ainda tinha esses operários (dois inquilinos ao mesmo tempo não pegam os mesmos); paga — a
+ * versão do meu reino trava o meu saldo —; e só então o dono recebe. Qualquer falha desfaz tudo.
+ */
+export async function alugarOperarios(usuarioId, donoId, quantidade) {
+  if (!donoId || typeof donoId !== "string") throw new ErroDeAcesso(400, "de qual reino?");
+  const eu = await obterReino(usuarioId);
+  const agora = new Date();
+  const [saldo, info, ofertaR, donoR, alugados] = await Promise.all([
+    saldoDoUsuario(usuarioId), ouroDe(eu, agora),
+    supabase.from("proof_operarios_ofertas").select("quantidade, preco").eq("dono_id", donoId).maybeSingle(),
+    supabase.from("proof_reinos").select("usuario_id, nome, operarios").eq("usuario_id", donoId).maybeSingle(),
+    alugadosAgoraDe([donoId]),
+  ]);
+  falhou(ofertaR.error, "oferta de operários");
+  if (!donoR.data) throw new ErroDeAcesso(404, "esse reino não existe");
+  const oferta = ofertaR.data ? { quantidade: Math.min(ofertaR.data.quantidade, donoR.data.operarios ?? OPERARIOS_INICIAIS), preco: ofertaR.data.preco } : null;
+  const vagasLivres = Math.max(0, vagasDaMina(info.nivel) - info.equipe.emCasa - info.equipe.alugadosDeFora);
+  const pode = podeAlugar({ souODono: donoId === usuarioId, oferta, jaAlugados: alugados.get(donoId) || 0, quantidade: Number(quantidade), vagasLivres, saldo });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+
+  const periodo = periodoDoAluguel(agora);
+  const ins = await supabase.from("proof_alugueis").insert({
+    dono_id: donoId, inquilino_id: usuarioId, quantidade: pode.quantidade, preco: oferta.preco, total: pode.custo, ...periodo,
+  }).select("id").single();
+  falhou(ins.error, "aluguel");
+  const desfazer = async (ids = []) => {
+    await supabase.from("proof_alugueis").delete().eq("id", ins.data.id);
+    await desfazerLancamentos(ids);
+  };
+  const depois = (await alugadosAgoraDe([donoId])).get(donoId) || 0;
+  if (depois > oferta.quantidade) {
+    await desfazer();
+    throw new ErroDeAcesso(409, "alguém alugou esses operários agora há pouco — atualize a tela");
+  }
+  const ids = [];
+  try {
+    ids.push(await lancar(usuarioId, "aluguel_pago", -pode.custo, { aluguel: ins.data.id, dono: donoId, quantidade: pode.quantidade }));
+    if (!(await gravarReino(eu, {}))) throw conflito();
+    ids.push(await lancar(donoId, "aluguel_recebido", pode.custo, { aluguel: ins.data.id, inquilino: usuarioId, quantidade: pode.quantidade }));
+  } catch (e) {
+    await desfazer(ids);
+    throw e;
+  }
+  return { quantidade: pode.quantidade, custo: pode.custo, ate: periodo.fim, reino: donoR.data.nome };
+}
+
+// ---------------------------------------------------------------- visitar um reino vizinho (na paz)
+
+/** A visão completa de outro reino: só na paz, quando todos os reinos são vizinhos. */
+export async function visitarReino(usuarioId, alvoId) {
+  if (!alvoId || typeof alvoId !== "string") throw new ErroDeAcesso(400, "qual reino?");
+  if (alvoId === usuarioId) throw new ErroDeAcesso(400, "esse é o seu reino");
+  const { paz } = await pazDeAgora();
+  if (!pazVigente(paz)) throw new ErroDeAcesso(403, "só dá para visitar os outros reinos durante a paz — aí todos viram vizinhos");
+  const { data: alvo, error } = await supabase.from("proof_reinos").select(CAMPOS).eq("usuario_id", alvoId).maybeSingle();
+  falhou(error, "reino vizinho");
+  if (!alvo) throw new ErroDeAcesso(404, "esse reino não existe");
+  const [nomes, info] = await Promise.all([nomesPublicos([alvoId]), ouroDe(alvo)]);
+  const n = niveisDe(alvo);
+  return {
+    id: alvoId, nome: alvo.nome, dono: nomes.get(alvoId) || "Estudante anônimo", trofeus: alvo.trofeus,
+    neuro: { nivel: alvo.neuro_nivel, estagio: estagioDoNeuro(alvo.neuro_nivel) },
+    personagem: PERSONAGENS[alvo.personagem] ? alvo.personagem : "neuro",
+    poder: poderDo(alvo),
+    construcoes: ORDEM_DAS_CONSTRUCOES.map((chave) => ({ chave, nome: CONSTRUCOES[chave].nome, emoji: CONSTRUCOES[chave].emoji, nivel: n[chave] || 0, max: CONSTRUCOES[chave].max })),
+    tropas: { exercito: contagens(alvo.exercito), guarnicao: contagens(alvo.guarnicao) },
+    veiculos: veiculosDe(alvo.veiculos).map((id) => ({ id, nome: VEICULOS[id].nome, emoji: VEICULOS[id].emoji })),
+    ouro: { nivel: info.nivel, operarios: info.operarios, trabalhando: info.equipe.trabalhando },
+    personagens: personagensDe(alvo.personagens).length,
   };
 }
