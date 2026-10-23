@@ -1,22 +1,23 @@
 import { json } from "@/lib/http.js";
 import { exigirUsuario, respostaDeErro, corpoDe } from "@/lib/sessao.js";
+import { rotaDoMundo } from "@/lib/mundo.js";
 import { mercadoDeOperarios, alugarOperarios, estadoDoReino } from "@/lib/reino.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** GET /api/reino/operarios — o mercado: quem tem operários para alugar agora. */
-export async function GET(req) {
+export const GET = rotaDoMundo(async (req) => {
   try {
     const usuario = await exigirUsuario(req);
     return json({ ok: true, ofertas: await mercadoDeOperarios(usuario.id) });
   } catch (e) {
     return respostaDeErro(e);
   }
-}
+});
 
 /** POST /api/reino/operarios   body: { dono, quantidade } — aluga operários de outro reino por 24 h. */
-export async function POST(req) {
+export const POST = rotaDoMundo(async (req) => {
   try {
     const usuario = await exigirUsuario(req);
     const corpo = await corpoDe(req);
@@ -26,4 +27,4 @@ export async function POST(req) {
   } catch (e) {
     return respostaDeErro(e);
   }
-}
+});

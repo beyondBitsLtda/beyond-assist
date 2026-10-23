@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { obter, criar } from "@/lib/api.js";
 import { useAviso, Barra } from "@/componentes/Pecas.js";
@@ -28,6 +29,7 @@ import ResumoDaBolsa from "@/componentes/bolsa/Resumo.js";
 import Visita from "@/componentes/reino/Visita.js";
 import TelaCheia from "@/componentes/reino/TelaCheia.js";
 import ModoDeTeste from "@/componentes/reino/ModoDeTeste.js";
+import { MUNDO_DE_TESTE, FERRAMENTAS_DE_TESTE, urlNoMundo } from "@/dominio/mundoDeTeste.js";
 import { urlDoVeiculo } from "@/componentes/reino/veiculosDePapel.js";
 
 // O mundo 3D (Three.js) só baixa nesta tela, e só no navegador.
@@ -41,8 +43,15 @@ const Mundo3D = dynamic(() => import("@/componentes/reino/Mundo3D.js"), {
  * O Reino do Neuro. Estudar dá moedas (1 ponto = 1 moeda); moedas constroem o reino e sobem o
  * Neuro; o reino invade e é invadido por outros jogadores. As regras estão em
  * src/dominio/reino.js e a explicação para a pessoa, no fim desta tela.
+ *
+ * A mesma tela serve ao REINO DE TESTE (/reino/teste): um mundo à parte, com tudo liberado, onde
+ * nada vale no jogo de verdade (src/lib/mundo.js). Toda chamada ao servidor passa por `api()`, que
+ * leva o mundo da página.
  */
 export default function Reino() {
+  const mundo = usePathname()?.startsWith("/reino/teste") ? MUNDO_DE_TESTE : "real";
+  const teste = mundo === MUNDO_DE_TESTE;
+  const api = (url) => urlNoMundo(url, mundo);
   const [reino, setReino] = useState(null);
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState("");
@@ -64,11 +73,11 @@ export default function Reino() {
   const montado = useRef(true);
   const [Aviso, avisar] = useAviso();
 
-  const carregarMapa = () => obter("/api/reino/expedicoes").then(setMapa).catch(() => {});
-  const carregarMercado = () => obter("/api/reino/operarios").then((r) => setMercado(r.ofertas)).catch(() => {});
+  const carregarMapa = () => obter(api("/api/reino/expedicoes")).then(setMapa).catch(() => {});
+  const carregarMercado = () => obter(api("/api/reino/operarios")).then((r) => setMercado(r.ofertas)).catch(() => {});
   /** A bolsa: no primeiro acesso do dia a Lisa abre o pregão; enquanto ela abre, confere de novo. */
   function carregarBolsa() {
-    obter("/api/reino/bolsa").then((b) => {
+    obter(api("/api/reino/bolsa")).then((b) => {
       if (!montado.current) return;
       setBolsa(b);
       if (b.pregao?.abrindo) setTimeout(() => montado.current && carregarBolsa(), 5000);
@@ -77,12 +86,12 @@ export default function Reino() {
 
   useEffect(() => {
     montado.current = true;
-    obter("/api/reino").then(setReino).catch((e) => setErro(e.message));
-    obter("/api/reino/alvos").then(setAlvos).catch(() => {});
+    obter(api("/api/reino")).then(setReino).catch((e) => setErro(e.message));
+    obter(api("/api/reino/alvos")).then(setAlvos).catch(() => {});
     carregarMapa();
     carregarMercado();
     carregarBolsa();
-    const aoResgatar = () => obter("/api/reino").then(setReino).catch(() => {});
+    const aoResgatar = () => obter(api("/api/reino")).then(setReino).catch(() => {});
     window.addEventListener("proof-vale-resgatado", aoResgatar);
     return () => { montado.current = false; window.removeEventListener("proof-vale-resgatado", aoResgatar); };
     // carrega uma vez
@@ -138,7 +147,7 @@ export default function Reino() {
   async function agir(chave, corpo, aoTerminar) {
     setOcupado(chave);
     try {
-      const r = await criar("/api/reino", corpo);
+      const r = await criar(api("/api/reino"), corpo);
       setReino(r.reino);
       aoTerminar?.(r.resultado);
       if (alvos) carregarAlvos(); // o meu ataque mudou: as faixas e os botões também
@@ -163,19 +172,33 @@ export default function Reino() {
   const coletarMina = () => agir("coletar", { acao: "coletar" }, (r) => reagir("feliz", `+${r.coletou} moedas da mina!`));
   const verExpedicoes = (id) => { setVeiculoDoMapa(id); mostrarSecao("expedicoes"); };
 
-  /** O modo de teste: a ação mexe só no meu reino; depois atualiza o que ela pode ter mudado. */
+  /** As ferramentas do Reino de Teste: mexem só no mundo de teste; depois tudo é recarregado. */
   async function testar(acao) {
+    const ferramenta = FERRAMENTAS_DE_TESTE.find((x) => x.id === acao);
+    if (ferramenta?.confirmar && !window.confirm(ferramenta.confirmar)) return;
     setOcupado(`teste:${acao}`);
     try {
-      const r = await criar("/api/reino/teste", { acao });
-      setReino(r.reino);
-      avisar(`🧪 ${r.resultado.mensagem}`);
-      carregarMapa();
-      if (acao === "moedas" || acao === "limpar") carregarBolsa();
-      if (acao === "operarios") carregarMercado();
+      const r = await criar(api("/api/reino/teste"), { acao });
+      const terminar = () => {
+        setReino(r.reino);
+        avisar(`🧪 ${r.resultado.mensagem}`);
+        carregarMapa();
+        carregarMercado();
+        carregarBolsa();
+        carregarAlvos();
+        setOcupado("");
+      };
+      const inv = r.resultado.invasao;
+      if (inv?.combate) {
+        if (telaCheiaRef.current) setPainel(null);
+        setVisita(null);
+        assistirNaIlha({
+          entrada: inv.combate, papel: "defensor", resultado: inv,
+          titulo: `🛡️ ${String(inv.atacante).toUpperCase()} INVADIU VOCÊ`, aoTerminar: terminar,
+        });
+      } else terminar();
     } catch (e) {
       avisar(e.message);
-    } finally {
       setOcupado("");
     }
   }
@@ -183,7 +206,7 @@ export default function Reino() {
   async function alugar(oferta, quantidade) {
     setOcupado(`alugar:${oferta.dono}`);
     try {
-      const r = await criar("/api/reino/operarios", { dono: oferta.dono, quantidade });
+      const r = await criar(api("/api/reino/operarios"), { dono: oferta.dono, quantidade });
       setReino(r.reino);
       setMercado(r.ofertas);
       comemorar(`+${r.resultado.quantidade} operário(s) de ${r.resultado.reino} na sua mina! 👷`);
@@ -200,7 +223,7 @@ export default function Reino() {
     if (!v?.id) return;
     setVisita({ carregando: true, nome: v.nome });
     try {
-      const r = await obter(`/api/reino/visitar?id=${encodeURIComponent(v.id)}`);
+      const r = await obter(api(`/api/reino/visitar?id=${encodeURIComponent(v.id)}`));
       setVisita(r.reino);
       reagir("surpreso", `Que reino bonito, ${r.reino.dono}! 👀`, 3000);
     } catch (e) {
@@ -221,7 +244,7 @@ export default function Reino() {
 
   async function carregarAlvos() {
     try {
-      setAlvos(await obter("/api/reino/alvos"));
+      setAlvos(await obter(api("/api/reino/alvos")));
     } catch (e) {
       avisar(e.message);
     }
@@ -234,7 +257,7 @@ export default function Reino() {
     if (telaCheiaRef.current) setPainel(null);
     reagir("pensando", "Avançar! ⚔️", 2000);
     try {
-      const r = await criar("/api/reino/invadir", { alvo: alvo.id });
+      const r = await criar(api("/api/reino/invadir"), { alvo: alvo.id });
       const mostrar = () => {
         setReino(r.reino);
         setResultado(r.resultado);
@@ -258,7 +281,7 @@ export default function Reino() {
   async function agirPaz(corpo, aoTerminar) {
     setOcupado(`paz:${corpo.acao}`);
     try {
-      const r = await criar("/api/reino/paz", corpo);
+      const r = await criar(api("/api/reino/paz"), corpo);
       setReino(r.reino);
       carregarAlvos();
       aoTerminar?.(r);
@@ -277,7 +300,7 @@ export default function Reino() {
     if (telaCheiaRef.current) setPainel(null);
     reagir("pensando", x.id === "planetoide" ? "Rumo às estrelas! 🚀" : "Rumo à aventura! 🗺️", 2000);
     try {
-      const r = await criar("/api/reino/expedicoes", { id: x.id });
+      const r = await criar(api("/api/reino/expedicoes"), { id: x.id });
       const mostrar = () => {
         setReino(r.reino);
         setMapa(r.mapa);
@@ -395,10 +418,10 @@ export default function Reino() {
         aoPartir={partir} aoAssistir={assistirExpedicao} aoAbastecer={abastecerVeiculo} aoGaragem={() => mostrarSecao("garagem")}
         aoBloqueado={(x) => avisar(x.liberada ? x.motivo : `${x.nome} libera com a Torre do Neuro no nível ${x.torreMinima}`)} />
     ),
-    bolsa: () => <ResumoDaBolsa bolsa={bolsa} />,
+    bolsa: () => <ResumoDaBolsa bolsa={bolsa} href={teste ? "/bolsa/teste" : "/bolsa"} />,
     teste: () => (
       <section className="pf-secao" id="teste">
-        <h2 className="pf-secao__titulo">🧪 Modo de teste <small>liberado para todos por enquanto</small></h2>
+        <h2 className="pf-secao__titulo">🧪 Ferramentas do Reino de Teste <small>mexem só neste mundo — o seu reino de verdade não muda</small></h2>
         <ModoDeTeste ocupado={ocupado} aoAgir={testar} />
       </section>
     ),
@@ -478,22 +501,29 @@ export default function Reino() {
 
   return (
     <>
+      {!telaCheia && teste && (
+        <div className="rn-faixa-teste" role="note">
+          <span className="rn-faixa-teste__selo">🧪 REINO DE TESTE</span>
+          <span>Um mundo à parte, com tudo liberado: moedas, expedições, invasões, paz, operários e bolsa daqui <strong>não valem no jogo de verdade</strong>. Os rivais são reinos-robô e os reinos de teste de outras pessoas.</span>
+          <Link href="/reino" className="pf-botao pf-botao--sec pf-botao--pequeno">← Voltar ao meu reino</Link>
+        </div>
+      )}
       {!telaCheia && (
         <div className="pf-cabecalho">
           <div>
-            <h1>{reino.nome}</h1>
-            <p>Estude, ganhe moedas, construa — e defenda o seu reino. <NomeDoReino atual={reino.nome} ocupado={ocupado === "nome"} aoSalvar={(nome) => agir("nome", { acao: "nome", nome }, () => avisar("Reino renomeado"))} /></p>
+            <h1>{teste ? `🧪 ${reino.nome}` : reino.nome}</h1>
+            <p>{teste ? "Teste tudo à vontade — nada daqui chega ao seu reino de verdade." : "Estude, ganhe moedas, construa — e defenda o seu reino."} <NomeDoReino atual={reino.nome} ocupado={ocupado === "nome"} aoSalvar={(nome) => agir("nome", { acao: "nome", nome }, () => avisar("Reino renomeado"))} /></p>
           </div>
         </div>
       )}
 
-      {!telaCheia && <CartaoDeVale />}
+      {!telaCheia && !teste && <CartaoDeVale />}
 
       {/* ------------------------------------------------------------ vista (e a tela cheia, por cima de tudo) */}
       <VistaDoReino reino={reino} visita={visita} telaCheia={telaCheia} aoTelaCheia={entrarNaTelaCheia}
         aoEscolher={escolherConstrucao} aoVisitar={visitar} aoVoltarDaVisita={() => setVisita(null)}>
         {telaCheia && (
-          <TelaCheia reino={reino} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} ocupado={ocupado} comTeste={reino.modoDeTeste}
+          <TelaCheia reino={reino} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} ocupado={ocupado} comTeste={teste}
             aoColetarMina={coletarMina} aoColetarOuro={coletarOuro}>
             {painel && secoes[painel]?.()}
           </TelaCheia>
@@ -522,19 +552,24 @@ export default function Reino() {
             <button type="button" className="pf-botao pf-botao--sec" aria-expanded={simulando} aria-controls="simulador" onClick={() => setSimulando((s) => !s)}>
               🎮 {simulando ? "Fechar simulação" : "Simular batalha"}
             </button>
-            <Link href="/ranking" className="pf-botao pf-botao--sec rn-acoes__ranking">🏆 Ranking</Link>
+            {!teste && <Link href="/ranking" className="pf-botao pf-botao--sec rn-acoes__ranking">🏆 Ranking</Link>}
           </div>
           {simulando && <Simulador reino={reino} aoFechar={() => setSimulando(false)} />}
-          {reino.modoDeTeste && (
-            <details className="rn-teste__caixa">
-              <summary>🧪 Modo de teste <small>moedas, combustível, veículos, construções, exército, minas — liberado para todos por enquanto</small></summary>
-              <ModoDeTeste ocupado={ocupado} aoAgir={testar} />
-            </details>
+          {teste && secoes.teste()}
+          {!teste && reino.modoDeTeste && (
+            <Link href="/reino/teste" className="rn-entrada-teste">
+              <span className="rn-entrada-teste__emoji" aria-hidden="true">🧪</span>
+              <span>
+                <strong>Reino de Teste</strong>
+                <small>Um reino à parte, com tudo liberado e rivais-robô para atacar — para testar expedições, invasões, paz, operários e a bolsa sem mexer no seu reino de verdade.</small>
+              </span>
+              <span className="rn-entrada-teste__ir" aria-hidden="true">Entrar →</span>
+            </Link>
           )}
 
           <div className="rn-numeros">
             <Numero rotulo="Moedas" valor={<Moedas n={reino.saldo} centavos />} nota={`${numero(reino.cofre.protege)} a salvo no cofre (e todas podem ser gastas)`} />
-            <Numero rotulo="Troféus" valor={`🏆 ${numero(reino.trofeus)}`} nota={<Link href="/ranking">ver ranking dos reinos</Link>} />
+            <Numero rotulo="Troféus" valor={`🏆 ${numero(reino.trofeus)}`} nota={teste ? "troféus do mundo de teste (não entram no ranking)" : <Link href="/ranking">ver ranking dos reinos</Link>} />
             <Numero rotulo="Ataque · Defesa" valor={`⚔️ ${reino.poder.ataque}/s · 🛡️ ${reino.poder.defesa}`} nota={`exército: ${totalDeTropas(reino.exercito.tropas)} tropa(s) · defesa: ${totalDeTropas(reino.guarnicao.tropas)}`} />
             <Numero rotulo="Escudo" valor={reino.escudoAte ? "🛡️ Ativo" : "Sem escudo"} nota={reino.escudoAte ? `até ${hora(reino.escudoAte)} · atacar tira o escudo` : "o seu reino pode ser invadido"} />
           </div>

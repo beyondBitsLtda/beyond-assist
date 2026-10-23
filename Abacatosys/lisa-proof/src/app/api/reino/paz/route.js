@@ -1,5 +1,6 @@
 import { json } from "@/lib/http.js";
 import { exigirUsuario, respostaDeErro, corpoDe, ErroDeAcesso } from "@/lib/sessao.js";
+import { rotaDoMundo } from "@/lib/mundo.js";
 import { proporPaz, votarNaPaz, cancelarPaz, estadoDoReino } from "@/lib/reino.js";
 
 export const runtime = "nodejs";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
  *   { acao: "cancelar", id }        — quem propôs desiste da proposta
  * Devolve o reino atualizado (com a paz ou a votação).
  */
-export async function POST(req) {
+export const POST = rotaDoMundo(async (req) => {
   try {
     const usuario = await exigirUsuario(req);
     const corpo = await corpoDe(req);
@@ -25,4 +26,4 @@ export async function POST(req) {
   } catch (e) {
     return respostaDeErro(e);
   }
-}
+});

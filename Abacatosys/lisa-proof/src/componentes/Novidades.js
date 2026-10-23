@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoMonstro } from "./reino/monstrosDePapel.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-23-bolsa";
+export const EDICAO_DAS_NOVIDADES = "2026-10-23-reino-de-teste";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,8 +28,9 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "📈", titulo: "A Bolsa ganhou tela própria", texto: "Um pregão de verdade: letreiro de cotações, Índice do Reino, gráfico hora a hora com mira, velas de 14 dias, boleta de compra e venda e o mural de notícias da Lisa. No menu: Bolsa.", destaque: true },
-  { icone: "⏰", titulo: "Cotações de hora em hora", texto: "A Lisa decide onde cada ação fecha o dia; o preço anda de hora em hora até lá — acompanhe o movimento nos gráficos." },
+  { icone: "🧪", titulo: "Reino de Teste", texto: "Um reino à parte, com tudo liberado e reinos-robô para atacar: teste expedições, invasões, paz, operários e a bolsa sem mexer no seu reino de verdade. O modo de teste saiu do seu reino — nada do teste vale no jogo.", destaque: true },
+  { icone: "⏰", titulo: "A Bolsa abre das 07h às 17h", texto: "O pregão negocia das 07:00 às 17:00 (horário de Brasília), e o preço anda de hora em hora nesse intervalo. Fora dele, dá para acompanhar as cotações, mas não comprar nem vender." },
+  { icone: "📈", titulo: "A Bolsa ganhou tela própria", texto: "Um pregão de verdade: letreiro de cotações, Índice do Reino, gráfico hora a hora com mira, velas de 14 dias, boleta de compra e venda e o mural de notícias da Lisa. No menu: Bolsa." },
   { icone: "💎", titulo: "Diamantes na Mina de Ouro", texto: "Cada pedra que os operários tiram pode ser um diamante, que vale bem mais que ouro. Quanto mais funda a mina, mais sorte." },
   { icone: "⛏️", titulo: "Operários cavando", texto: "Os seus operários agora aparecem no mundo 3D, de picareta na mão, em volta da Mina de Ouro." },
   { icone: "🚀", titulo: "Veículos e mapas novos", texto: "Submarino, Dirigível, Tanque de Magma e Nave Estelar — com fundo do mar, montanhas, vulcões e planetoides sorteados. Cada veículo faz 3 expedições por dia; depois, é só abastecer." },
@@ -77,8 +78,8 @@ export default function Novidades() {
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">Bolsa ao vivo e diamantes!</h2>
-          <p className="novidades__sub">O pregão ganhou tela de home broker e cotações de hora em hora; e a Mina de Ouro agora pode dar diamantes.</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">Reino de Teste e Bolsa com horário!</h2>
+          <p className="novidades__sub">Agora dá para testar tudo num reino à parte, sem mexer no seu; e a Bolsa negocia das 07h às 17h.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -88,7 +89,7 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/bolsa" className="pf-botao novidades__principal" onClick={fechar}>📈 Abrir a Bolsa</Link>
+            <Link ref={principal} href="/reino/teste" className="pf-botao novidades__principal" onClick={fechar}>🧪 Abrir o Reino de Teste</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>
