@@ -15,6 +15,7 @@
 // `cura` = vida devolvida às tropas aliadas em volta, a cada `intervalo`. `defende` = pode
 // morar na guarnição (tropas de defesa).
 
+import { faltam } from "./moedas.js";
 export const TROPAS = {
   guerreiro: {
     nome: "Guerreiro", emoji: "🗡️", espaco: 1, custo: 10, vida: 70, dano: 10, intervalo: 1.0,
@@ -119,7 +120,7 @@ export function podeTreinar({ tropa, quantidade, destino, niveis, reservas, sald
     return { ok: false, motivo: `o Acampamento está lotado (${naIlha} de ${lotacao}) — aumente o Acampamento para caber mais tropas` };
   }
   const custo = qtd * def.custo;
-  if (saldo < custo) return { ok: false, custo, motivo: `faltam ${custo - saldo} moeda(s)` };
+  if (saldo < custo) return { ok: false, custo, motivo: faltam(custo, saldo) };
   return { ok: true, custo, quantidade: qtd };
 }
 

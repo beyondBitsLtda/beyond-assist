@@ -7,6 +7,8 @@
 // virada do dia. Quer mais? Abasteça: cada carga extra custa moedas, um pouco mais cara a cada
 // uma do mesmo dia, até EXTRAS_POR_DIA cargas extras por veículo.
 
+import { faltam } from "./moedas.js";
+
 export const VEICULOS = {
   barco: {
     nome: "Barco Voador", emoji: "⛵", preco: 0, torreMinima: 1, destino: "Vilas, florestas, bosques e acampamentos",
@@ -45,7 +47,7 @@ export function podeComprarVeiculo({ id, possui, nivelDaTorre, saldo }) {
   if (!def) return { ok: false, motivo: "veículo desconhecido" };
   if (veiculosDe(possui).includes(id)) return { ok: false, motivo: "esse veículo já é seu" };
   if ((nivelDaTorre || 0) < def.torreMinima) return { ok: false, custo: def.preco, motivo: `libera com a Torre do Neuro no nível ${def.torreMinima}` };
-  if ((saldo || 0) < def.preco) return { ok: false, custo: def.preco, motivo: `faltam ${def.preco - (saldo || 0)} moeda(s)` };
+  if ((saldo || 0) < def.preco) return { ok: false, custo: def.preco, motivo: faltam(def.preco, saldo) };
   return { ok: true, custo: def.preco };
 }
 
@@ -66,6 +68,6 @@ export function podeAbastecer({ id, possui, feitas = 0, extras = 0, saldo }) {
   const custo = precoDaCarga(extras);
   if (tanque.restantes > 0) return { ok: false, custo, motivo: `ainda tem ${tanque.restantes} carga(s) no tanque` };
   if (extras >= EXTRAS_POR_DIA) return { ok: false, custo, motivo: `já abasteceu ${EXTRAS_POR_DIA} vezes hoje — amanhã o tanque enche de novo` };
-  if ((saldo || 0) < custo) return { ok: false, custo, motivo: `faltam ${custo - (saldo || 0)} moeda(s)` };
+  if ((saldo || 0) < custo) return { ok: false, custo, motivo: faltam(custo, saldo) };
   return { ok: true, custo };
 }

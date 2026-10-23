@@ -49,6 +49,7 @@ import {
   pregaoDeReserva, saidasDaBolsa, PRECO_MINIMO, PRECO_INICIAL, VARIACAO_MAXIMA, SETORES, NOVAS_POR_DIA, ACOES_DO_PRIMEIRO_DIA,
   MAXIMO_DE_ACOES, MAXIMO_POR_ORDEM, caminhoDoDia, velaDe, sementeDaAcao, PASSOS_DO_DIA, valorDaCompra, valorDaVenda,
 } from "../src/dominio/bolsa.js";
+import { centavos, formatarMoedas, faltam } from "../src/dominio/moedas.js";
 import {
   MONSTROS, EXPEDICOES, EXPEDICOES_POR_DIA, podeExpedicionar, saqueDaExpedicao, defensorDaExpedicao, expedicaoPorId, contagensDeMonstros,
   veiculoDa,
@@ -826,7 +827,8 @@ caso("personagens: o Clássico é de todos; comprar cobra, vestir o que já tem 
   assert.equal(PERSONAGENS.abacato.preco, 0);
   assert.deepEqual(podeEscolherPersonagem({ id: "abacato", possui: [], saldo: 0 }), { ok: true, compra: false, custo: 0 });
   assert.deepEqual(podeEscolherPersonagem({ id: "ninja", possui: [], saldo: 300 }), { ok: true, compra: true, custo: 300 });
-  assert.match(podeEscolherPersonagem({ id: "robo", possui: [], saldo: 100 }).motivo, /faltam 1900/);
+  assert.match(podeEscolherPersonagem({ id: "robo", possui: [], saldo: 100 }).motivo, /faltam 1.900 moeda/);
+  assert.match(podeEscolherPersonagem({ id: "ninja", possui: [], saldo: 12.35 }).motivo, /faltam 287,65 moeda/); // com centavos
   assert.deepEqual(podeEscolherPersonagem({ id: "ninja", possui: ["ninja"], saldo: 0 }), { ok: true, compra: false, custo: 0 });
   assert.deepEqual(podeEscolherPersonagem({ id: "neuro", possui: [], saldo: 0 }), { ok: true, compra: false, custo: 0 });
   assert.equal(podeEscolherPersonagem({ id: "dragao", possui: [], saldo: 9999 }).ok, false);
@@ -1250,7 +1252,7 @@ caso("bolsa: preço do pregão limitado a ±30%, nunca abaixo do mínimo; corret
   assert.equal(precoDepois(100, 99), 130);
   assert.equal(precoDepois(3, -30), PRECO_MINIMO);
   assert.equal(precoDepois(2, -30), PRECO_MINIMO);
-  assert.deepEqual([corretagem(10), corretagem(250), corretagem(1000)], [1, 3, 10]);
+  assert.deepEqual([corretagem(10), corretagem(250), corretagem(1000), corretagem(1234.5)], [1, 2.5, 10, 12.35]); // centavo por centavo, mínimo 1
   assert.equal(variacaoReal(100, 112), 12);
 });
 
@@ -1266,7 +1268,7 @@ caso("bolsa: comprar cobra preço + corretagem; vender paga preço − corretage
   assert.match(podeVenderAcao({ acao, posicao: null, quantidade: 1 }).motivo, /não tem ações/);
   const comprou = posicaoDepois(null, { tipo: "compra", quantidade: 4, total: 101 });
   assert.deepEqual(comprou, { quantidade: 4, custo: 101 });
-  assert.deepEqual(posicaoDepois(comprou, { tipo: "venda", quantidade: 2 }), { quantidade: 2, custo: 51 });
+  assert.deepEqual(posicaoDepois(comprou, { tipo: "venda", quantidade: 2 }), { quantidade: 2, custo: 50.5 });
   assert.deepEqual(posicaoDepois(comprou, { tipo: "venda", quantidade: 4 }), { quantidade: 0, custo: 0 });
   assert.deepEqual(resumoDaCarteira([{ acao_id: "PEPT", quantidade: 4, custo: 101 }], () => 30), { valor: 120, custo: 101, lucro: 19 });
   // comprar e vender no mesmo dia nunca dá lucro (o preço só muda no pregão)
@@ -1356,13 +1358,19 @@ caso("bolsa: o preço anda hora a hora da abertura ao fechamento da Lisa (o mesm
   assert.equal(parado[PASSOS_DO_DIA], 20);
 });
 
-caso("bolsa: com centavos, a compra arredonda para cima e a venda para baixo", () => {
-  assert.equal(valorDaCompra(23.45, 3), 71);   // 70,35 → 71
-  assert.equal(valorDaVenda(23.45, 3), 70);    // 70,35 → 70
-  assert.equal(valorDaCompra(20, 3), 60);
+caso("moedas com centavos: a bolsa conta centavo por centavo, e a venda devolve os centavos", () => {
+  assert.equal(valorDaCompra(23.45, 3), 70.35);
+  assert.equal(valorDaVenda(23.45, 3), 70.35);
+  assert.equal(valorDaCompra(0.1, 3), 0.3); // sem o lixo do ponto flutuante
   const acao = { id: "PEPT", preco: 23.45, status: "ativa" };
-  assert.deepEqual(podeComprarAcao({ acao, quantidade: 3, saldo: 100 }), { ok: true, quantidade: 3, valor: 71, taxa: 1, total: 72 });
-  assert.deepEqual(podeVenderAcao({ acao, posicao: { quantidade: 3 }, quantidade: 3 }), { ok: true, quantidade: 3, valor: 70, taxa: 1, total: 69 });
+  assert.deepEqual(podeComprarAcao({ acao, quantidade: 3, saldo: 100 }), { ok: true, quantidade: 3, valor: 70.35, taxa: 1, total: 71.35 });
+  assert.deepEqual(podeVenderAcao({ acao, posicao: { quantidade: 3 }, quantidade: 3 }), { ok: true, quantidade: 3, valor: 70.35, taxa: 1, total: 69.35 });
+  assert.match(podeComprarAcao({ acao, quantidade: 3, saldo: 71.3 }).motivo, /faltam 0,05 moeda/);
+  // o saldo soma os centavos do livro-caixa (os números do banco podem vir como texto)
+  assert.equal(saldoDe({ pontosDeEstudo: 100, movimentos: [{ valor: "69.35" }, { valor: -0.2 }, { valor: 0.1 }] }), 169.25);
+  assert.deepEqual([formatarMoedas(412), formatarMoedas(412.5), formatarMoedas(1234.56), formatarMoedas(412, { sempreComCentavos: true })], ["412", "412,50", "1.234,56", "412,00"]);
+  assert.equal(centavos(0.1 + 0.2), 0.3);
+  assert.equal(faltam(300, 12.35), "faltam 287,65 moeda(s)");
 });
 
 caso("invasão: só as tropas que caem se perdem (as sobreviventes voltam)", () => {

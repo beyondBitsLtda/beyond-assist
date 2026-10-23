@@ -5,6 +5,8 @@
 // src/componentes/Neuro.js e src/app/neuro.css), então funciona com todos os humores, em todas
 // as telas e no boneco de papel do Reino em 3D. O Neuro Clássico e o Neuro Abacate são de todo mundo, de graça.
 
+import { faltam } from "./moedas.js";
+
 export const PERSONAGENS = {
   neuro: { nome: "Neuro Clássico", emoji: "🧠", preco: 0, descricao: "O Neuro de sempre, rosa e curioso." },
   // o mascote do Abacato (23/10/2026): de graça, e todo mundo já tem
@@ -34,6 +36,6 @@ export function podeEscolherPersonagem({ id, possui, saldo }) {
   const def = PERSONAGENS[id];
   if (!def) return { ok: false, motivo: "personagem desconhecido" };
   if (personagensDe(possui).includes(id)) return { ok: true, compra: false, custo: 0 };
-  if (saldo < def.preco) return { ok: false, compra: true, custo: def.preco, motivo: `faltam ${def.preco - saldo} moeda(s)` };
+  if (saldo < def.preco) return { ok: false, compra: true, custo: def.preco, motivo: faltam(def.preco, saldo) };
   return { ok: true, compra: true, custo: def.preco };
 }

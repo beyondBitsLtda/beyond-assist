@@ -15,6 +15,7 @@
   --bx-amarelo: #facc15;
   background: var(--bx-fundo); color: var(--bx-texto); border-radius: 20px; overflow: hidden;
   font-variant-numeric: tabular-nums; padding-bottom: 14px;
+  container-type: inline-size; container-name: bolsa;
 }
 .bx h1, .bx h2, .bx h3 { color: var(--bx-texto); }
 .bx--carregando { padding: 40px 20px; text-align: center; color: var(--bx-texto-2); }
@@ -53,11 +54,11 @@
 .bx-indice { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 12px; background: var(--bx-painel); border: 1px solid var(--bx-linha); }
 .bx-indice > div { display: grid; }
 .bx-indice strong { font-size: 20px; }
-@media (max-width: 900px) {
+@container bolsa (max-width: 760px) {
   .bx-topo { grid-template-columns: minmax(0, 1fr) auto; }
   .bx-indice { grid-column: 1 / -1; justify-content: space-between; }
 }
-@media (max-width: 560px) {
+@container bolsa (max-width: 520px) {
   .bx-topo { grid-template-columns: minmax(0, 1fr); }
   .bx-topo__relogio { justify-items: start; }
   .bx-topo__relogio strong { font-size: 18px; }
@@ -69,12 +70,12 @@
 
 /* ---- a grade: lista | ação | boleta */
 .bx-grade-principal { display: grid; gap: 12px; padding: 0 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "acao" "boleta" "lista"; }
-@media (min-width: 900px) {
+@container bolsa (min-width: 760px) {
   .bx-grade-principal { grid-template-columns: 290px minmax(0, 1fr); grid-template-areas: "lista acao" "lista boleta"; }
 }
-/* três colunas só em tela bem larga: antes disso, a boleta vai embaixo do gráfico (que fica largo) */
-@media (min-width: 1600px) {
-  .bx-grade-principal { grid-template-columns: 290px minmax(0, 1fr) 320px; grid-template-areas: "lista acao boleta"; }
+/* três colunas quando o terminal é largo: antes disso, a boleta vai embaixo do gráfico (que fica largo) */
+@container bolsa (min-width: 1180px) {
+  .bx-grade-principal { grid-template-columns: 300px minmax(0, 1fr) 330px; grid-template-areas: "lista acao boleta"; }
 }
 .bx-lista { grid-area: lista; }
 .bx-acao { grid-area: acao; }
@@ -182,7 +183,7 @@
 
 /* ---- embaixo: carteira, destaques e notícias */
 .bx-grade-baixo { display: grid; gap: 12px; padding: 12px 16px 0; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 1100px) { .bx-grade-baixo { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr); } }
+@container bolsa (min-width: 1000px) { .bx-grade-baixo { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr); } }
 .bx-carteira__total { margin: 0 0 8px; font-size: 14px; color: var(--bx-texto-2); }
 .bx-carteira__total strong { color: var(--bx-texto); }
 .bx-tabela { width: 100%; border-collapse: collapse; font-size: 13px; }

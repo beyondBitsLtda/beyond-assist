@@ -52,8 +52,7 @@
 }
 @media (max-width: 480px) { .rn-predio__emoji { font-size: calc(20px + var(--nivel, 0) * 3px); } .rn-predio--grande .rn-predio__emoji { font-size: calc(36px + var(--nivel, 1) * 5px); } }
 
-.rn-numeros { display: grid; gap: 12px; margin-top: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (min-width: 900px) { .rn-numeros { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.rn-numeros { display: grid; gap: 12px; margin-top: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
 .rn-numero .pf-estat__valor { font-size: 20px; overflow-wrap: anywhere; }
 .rn-numero .pf-estat__nota { margin-bottom: 0; }
 .rn-moedas { white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -65,9 +64,9 @@
 .rn-motivo { font-size: 12px; color: var(--pf-tinta-2); }
 
 /* ------------------------------------------------------------ construções */
-.rn-construcoes { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 640px) { .rn-construcoes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1000px) { .rn-construcoes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* as grades do Reino contam colunas pelo espaço que existe, não pela largura da janela (com o
+   conteúdo limitado, a conta pela janela abria colunas demais e os cartões encavalavam) */
+.rn-construcoes { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
 .rn-construcao { display: flex; flex-direction: column; }
 .rn-construcao .rn-botao { margin-top: auto; padding-top: 12px; }
 .rn-construcao__topo { display: flex; align-items: center; gap: 12px; }
@@ -264,8 +263,7 @@
 .rn-reserva__topo { display: grid; gap: 6px; }
 @media (min-width: 760px) { .rn-reserva__topo { grid-template-columns: minmax(220px, 1fr) 2fr; align-items: center; gap: 16px; } }
 .rn-reserva__topo .pf-estat__nota { margin: 0; }
-.rn-tropas { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 900px) { .rn-tropas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.rn-tropas { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
 .rn-tropa {
   display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: start;
   padding: 12px; border-radius: 14px; border: 1px solid var(--pf-linha); background: var(--pf-superficie-2);
@@ -322,9 +320,7 @@
 }
 
 /* ------------------------------------------------------------ personagens do Neuro */
-.rn-personagens { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (min-width: 760px) { .rn-personagens { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 1500px) { .rn-personagens { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.rn-personagens { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); }
 .rn-personagem .pf-botao { white-space: nowrap; }
 .rn-personagem { display: grid; gap: 6px; justify-items: center; text-align: center; align-content: start; }
 .rn-personagem--usando { border: 2px solid var(--pf-verde); }
@@ -340,8 +336,7 @@
 
 /* ---------------------------------------------------------------- expedições (contra a CPU) */
 .rn-exp__intro { margin: -4px 0 12px; }
-.rn-exp { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 700px) { .rn-exp { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.rn-exp { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); }
 .rn-exp__lugar { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: start; position: relative; overflow: hidden; }
 .rn-exp__lugar::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--rn-exp-cor, var(--pf-verde)); }
 .rn-exp__lugar--vila { --rn-exp-cor: #d9a441; --rn-exp-fundo: radial-gradient(circle at 50% 40%, #fdf1cf 0%, #e9c77b 100%); }
@@ -530,9 +525,7 @@ button.rn-exp__arte:disabled { cursor: progress; }
 .rn-visita__predios { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; font-size: 13px; }
 
 /* ---- a garagem e o tanque */
-.rn-garagem { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 700px) { .rn-garagem { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1100px) { .rn-garagem { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.rn-garagem { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); }
 .rn-veiculo { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: start; }
 .rn-veiculo:not(.rn-veiculo--meu) .rn-veiculo__arte { filter: grayscale(0.55); opacity: 0.85; }
 .rn-veiculo--meu { box-shadow: inset 0 0 0 2px var(--pf-verde); }
@@ -676,3 +669,12 @@ button.rn-exp__arte:disabled { cursor: progress; }
 .rn-teste__botao--limpar { border-style: dashed; }
 .rn-teste__emoji { font-size: 22px; }
 .rn-teste__dica { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
+
+/* ---- ajustes de layout (23/10/2026): nada sai do cartão */
+.rn-personagem { min-width: 0; overflow-wrap: anywhere; }
+.rn-personagem .rn-botao { flex-wrap: wrap; }
+.rn-personagem .rn-motivo { overflow-wrap: anywhere; }
+.rn-construcao, .rn-veiculo, .rn-exp__lugar, .rn-tropa, .rn-ouro { min-width: 0; }
+
+/* com o Reino mais largo, o mundo 3D também cresce um pouco na altura */
+@media (min-width: 1400px) { .rn-mundo { height: 460px; } }

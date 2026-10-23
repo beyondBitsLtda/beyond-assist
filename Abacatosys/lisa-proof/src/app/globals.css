@@ -198,6 +198,8 @@ button { font: inherit; }
   width: 100%; max-width: 1080px; margin: 0 auto;
   padding: 20px 16px calc(var(--pf-nav-altura) + 32px + env(safe-area-inset-bottom));
 }
+/* o Reino (o mundo 3D e muitos cartões) e a Bolsa (o terminal) aproveitam a tela larga */
+.pf-principal:has(.rn-vista3d), .pf-principal:has(.bx-grade-principal) { max-width: 1480px; }
 
 @media (min-width: 900px) {
   .pf-moldura { display: grid; grid-template-columns: 240px 1fr; }
