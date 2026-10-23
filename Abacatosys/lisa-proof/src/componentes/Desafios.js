@@ -646,7 +646,8 @@ function AssuntosDoProjeto({ desafio }) {
 function TrocarProjeto({ desafio, aoTrocar }) {
   const [trocando, setTrocando] = useState(false);
   const [erro, setErro] = useState("");
-  if (!desafio.troca || desafio.tentativas > 0) return null;
+  // numa semana dispensada o projeto é opcional: não tem por que gerar outro
+  if (!desafio.troca || desafio.tentativas > 0 || desafio.semanaDoCurso?.dispensada) return null;
   const final = desafio.tipo === "projeto_final";
   const qual = final ? "outro projeto final" : `um projeto novo da semana ${desafio.semanaDoCurso?.numero ?? ""}`;
 
@@ -768,7 +769,9 @@ export function Projeto({ desafio: inicial, aoMudar }) {
         {!desafio.antigo && <TrocarProjeto desafio={desafio} aoTrocar={mudou} />}
         {(desafio.tipo === "projeto_semanal" || desafio.tipo === "projeto_final") && (
           <p className="pf-estat__nota projeto__trava">
-            {desafio.tipo === "projeto_final"
+            {desafio.semanaDoCurso?.dispensada
+              ? `✅ A semana ${desafio.semana || ""} foi concluída antes das regras novas: este projeto é opcional — vale pontos, mas não trava nada.`
+              : desafio.tipo === "projeto_final"
               ? `🏆 Projeto final da trilha: aprovado (nota ${NOTA_DE_APROVACAO}+), a trilha está concluída.`
               : `🔓 Fecha a semana ${desafio.semana || ""} do curso: aprovado (nota ${NOTA_DE_APROVACAO}+), a semana seguinte abre.`}
           </p>

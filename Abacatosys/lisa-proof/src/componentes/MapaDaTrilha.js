@@ -54,7 +54,9 @@ function textoDoProjeto(no) {
   switch (no.estado) {
     case "bloqueado": return `Trancado: abre quando o projeto da semana ${u.anterior} for aprovado.`;
     case "futuro": return `Libera em ${formatarDia(u.de)}, quando a semana começa — ou antes, se você concluir todos os assuntos dela.`;
-    case "dispensado": return "Esta semana foi concluída antes das regras novas: não precisa de projeto.";
+    case "dispensado": return no.desafio
+      ? "Esta semana foi concluída antes das regras novas: o projeto dela é opcional — vale pontos, mas não trava nada."
+      : "Esta semana foi concluída antes das regras novas: não precisa de projeto.";
     case "liberado": return `Os ${PROJETOS_POR_SEMANA} projetos desta semana acabaram sem aprovação — a semana foi liberada assim mesmo.`;
     case "feito": return u.final ? "Aprovado! Com ele, a trilha está concluída. 🏆" : `Aprovado! A semana ${u.seguinte} está liberada.`;
     case "entregue": return `As entregas acabaram abaixo de ${NOTA_DE_APROVACAO}. Veja o que a Lisa sugeriu${u.podeOutroProjeto ? " e tente um projeto novo" : ""}.`;
@@ -257,7 +259,9 @@ export default function MapaDaTrilha({ trilha, avanco, aoMudar }) {
             <p>{textoDoProjeto(aberta)}</p>
             {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
             <div className="pf-acoes">
-              {(aberta.desafio || ["disponivel", "em_andamento"].includes(aberta.estado)) && !["bloqueado", "futuro", "dispensado"].includes(aberta.estado) && (
+              {/* semana dispensada: não gera projeto, mas o que já foi começado continua abrível */}
+              {(aberta.desafio || ["disponivel", "em_andamento"].includes(aberta.estado))
+                && (!["bloqueado", "futuro", "dispensado"].includes(aberta.estado) || (aberta.estado === "dispensado" && aberta.desafio)) && (
                 <button type="button" className="pf-botao" onClick={() => abrirProjeto(aberta)} disabled={preparando}>
                   {preparando ? "A Lisa está preparando…" : aberta.desafio ? "Abrir projeto" : "Gerar projeto"}
                 </button>

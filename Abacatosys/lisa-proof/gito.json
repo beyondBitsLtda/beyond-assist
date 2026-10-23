@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.23.0-cloudflare-pages.1",
+  "versao": "0.23.1-proof-projeto-opcional.1",
   "atualizadoEm": "2026-10-23",
   "compilacao": {
-    "numero": 58,
+    "numero": 59,
     "data": "2026-10-23",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.23.1-proof-projeto-opcional.1",
+      "data": "2026-10-23",
+      "branch": "proof-projeto-opcional",
+      "tipo": "correcao",
+      "resumo": "O projeto começado numa semana dispensada (concluída antes das regras novas) não some mais: fica abrível como opcional.",
+      "itens": [
+        "Mapa da trilha: numa semana dispensada que já tem projeto, o botão \"Abrir projeto\" volta, com o aviso de que ele é opcional (vale pontos, não trava nada).",
+        "Prática: o projeto começado numa semana dispensada aparece como \"Projeto da semana N · opcional\", ao lado do projeto da vez.",
+        "Tela do projeto: explica que ele é opcional e não oferece gerar outro (e o servidor também recusa).",
+        "Correção de dados (23/10/2026, na conta que pediu): o projeto que a pessoa já fazia na Prática (LogSphere) voltou a ser o projeto da semana 1, e o gerado em 06/10, nunca aberto, saiu da semana 1 (guardado)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.23.0-cloudflare-pages.1",
       "data": "2026-10-23",

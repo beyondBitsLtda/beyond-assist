@@ -187,6 +187,15 @@ export function semanaDoProjeto(avanco, tipo, periodo) {
   return avanco.unidades.find((u) => u.tipo === tipo && u.periodo === periodo) || null;
 }
 
+/**
+ * Os projetos começados em semanas dispensadas (concluídas antes das regras de 23/10/2026) e ainda
+ * não terminados: continuam abríveis e valem pontos, mas não travam nada (pedido de 23/10/2026 —
+ * o projeto em andamento não pode sumir da tela).
+ */
+export function projetosOpcionais(avanco) {
+  return (avanco?.unidades || []).filter((u) => u.dispensada && u.projeto && u.projeto.status !== "concluido");
+}
+
 /** A semana do curso de um projeto que já existe: a que o tem como projeto ou, senão, a da chave dele. */
 export function semanaDoDesafio(avanco, d) {
   if (!avanco || !d) return null;
