@@ -123,6 +123,30 @@
 .projeto__nota { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
 .projeto__entregas { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13px; }
 
+/* Projeto ligado à semana do curso (23/10/2026): os assuntos que ele pratica, requisito por requisito */
+.projeto__assuntos { display: grid; gap: 6px; margin: 4px 0 8px; padding: 10px 12px; border-radius: 12px; background: var(--pf-superficie-2); }
+.projeto__assuntos-lista { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.projeto__assuntos-lista li {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 4px 10px 4px 4px; border-radius: 999px;
+  background: var(--pf-pilula); font-size: 13px; font-weight: 600;
+}
+.projeto__assunto-n {
+  flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--pf-verde); color: #FFFFFF; font-size: 11px; font-weight: 800;
+}
+.projeto__assunto-tag {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; margin-top: 4px; padding: 2px 10px 2px 2px; border-radius: 999px;
+  background: var(--pf-pilula); color: var(--pf-tinta-2); font-size: 12px; font-weight: 600;
+}
+.projeto__assunto-texto { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.projeto__assunto-tag .projeto__assunto-n { width: 18px; height: 18px; font-size: 10px; }
+.projeto__trocar { display: grid; gap: 8px; margin: 12px 0 4px; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--pf-linha); }
+.projeto__trocar p { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
+.projeto__trocar--antigo { border: 1px solid var(--pf-atencao); background: var(--pf-atencao-fundo); }
+.projeto__trocar--antigo p { color: var(--pf-tinta); font-weight: 600; }
+.projeto__trocar-acao { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.projeto__trocar-acao small { font-size: 12px; color: var(--pf-tinta-2); }
+
 /* Rodar o código do exercício */
 .rodar { display: grid; gap: 8px; margin-top: 8px; }
 .rodar__barra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

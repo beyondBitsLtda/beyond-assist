@@ -17,9 +17,9 @@ function codigoParaPrompt(codigo, limite) {
   return (t.length > limite ? `${t.slice(0, limite)}\n/* … cortado … */` : t).replace(/```/g, "'''");
 }
 
-function descreverAssuntos(assuntos) {
+function descreverAssuntos(assuntos, { comObjetivo = false } = {}) {
   return assuntos
-    .map((a, i) => `${i + 1}. ${corte(a.titulo, 160)}${a.descricao ? ` — ${corte(a.descricao, 240)}` : ""}`)
+    .map((a, i) => `${i + 1}. ${corte(a.titulo, 160)}${comObjetivo && a.objetivo ? ` (objetivo: ${corte(a.objetivo, 200)})` : ""}${a.descricao ? ` — ${corte(a.descricao, 240)}` : ""}`)
     .join("\n");
 }
 
@@ -157,9 +157,18 @@ const ESQUEMA_DO_PROJETO = {
     extras: { type: "ARRAY", items: { type: "STRING" } },
     entrega: { type: "STRING" },
     criterios: { type: "ARRAY", items: { type: "STRING" } },
+    // para cada requisito (na mesma ordem), o número do assunto que ele pratica (a tela mostra a ligação)
+    assuntoDeCada: { type: "ARRAY", items: { type: "INTEGER" } },
   },
   required: ["titulo", "contexto", "requisitos", "extras", "entrega", "criterios"],
 };
+
+/** O que a semana ainda não ensinou: a IA não pode exigir (nem precisar) disso no projeto. */
+function linhaDoQueNaoPode(depois) {
+  return depois?.length
+    ? `Ainda NÃO estudados — vêm nas próximas semanas; o projeto NÃO pode exigir nem depender deles: ${corte(depois.join("; "), 900)}`
+    : "";
+}
 
 /**
  * O tamanho de cada projeto (23/10/2026): o da semana do plano (algumas horas), o FINAL — do tamanho
@@ -195,25 +204,39 @@ function tamanhoDoProjeto(tipo, semanas = 1) {
   };
 }
 
-/** O projeto da semana do plano (algumas horas) ou o final (do tamanho da trilha). */
-export async function gerarProjeto({ tema, tipo, assuntos, semanas = 1 }) {
+/**
+ * O projeto da semana N do curso (algumas horas) ou o final (do tamanho da trilha). Pedido de
+ * 23/10/2026 ("o projeto da semana 1 não tem nada a ver com a semana 1"): o da semana é o exercício
+ * DELA — pratica cada assunto da semana, pode usar o que veio antes e não exige o que vem depois —, e
+ * cada requisito volta marcado com o assunto que pratica (`assuntoDeCada`).
+ */
+export async function gerarProjeto({ tema, tipo, assuntos, semanas = 1, numero = null, antes = [], depois = [], evitar = [] }) {
   const tamanho = tamanhoDoProjeto(tipo, semanas);
+  const final = tipo === "projeto_final";
   const bruto = await gerarJson({
     sistema: PERSONA,
     esquema: ESQUEMA_DO_PROJETO,
     pedido: [
       `Tema: ${tema}`,
-      `${tipo === "projeto_final" ? "Assuntos da trilha" : "Assuntos da semana"}:\n${descreverAssuntos(assuntos)}`,
+      `${final ? "Assuntos da trilha" : `Assuntos da SEMANA ${numero ?? ""} do curso`} (numerados):\n${descreverAssuntos(assuntos, { comObjetivo: true })}`,
+      antes.length ? `Já estudados nas semanas anteriores (pode usar como base): ${corte(antes.join("; "), 900)}` : "",
+      linhaDoQueNaoPode(depois),
+      evitar.length ? `Não repita estes projetos (faça um diferente):\n- ${evitar.map((e) => corte(e, 320)).join("\n- ")}` : "",
       "",
       tamanho.pedido,
-      "- `contexto`: o cenário do projeto, como um pedido de cliente.",
+      final
+        ? "- O projeto junta os assuntos da trilha: quem ler o título e o contexto tem que reconhecer o que foi estudado."
+        : `- Este projeto é o exercício da semana ${numero ?? ""}: ele tem que praticar os assuntos DESTA semana, cada um em pelo menos um requisito, e quem ler o título e o contexto tem que reconhecer o que a semana ensinou.`,
+      "- `titulo`: curto, deixando claro o que se pratica (não só o nome do cenário).",
+      "- `contexto`: comece com uma frase dizendo o que o projeto põe em prática; depois, o cenário, como um pedido de cliente.",
       `- \`requisitos\`: ${tamanho.requisitos} requisitos obrigatórios, verificáveis lendo o código.`,
+      "- `assuntoDeCada`: para cada requisito, NA MESMA ORDEM, o número do assunto da lista acima que ele pratica.",
       "- `extras`: 1 a 3 desafios opcionais.",
       "- `entrega`: como entregar — um repositório PÚBLICO no GitHub, com README explicando como rodar.",
       "- `criterios`: como o código será avaliado (funcionamento, organização, boas práticas do tema).",
-    ].join("\n"),
+    ].filter((l) => l !== null).join("\n").replace(/\n{3,}/g, "\n\n"),
   });
-  return validarProjeto(bruto);
+  return validarProjeto(bruto, assuntos.length);
 }
 
 /**
@@ -221,14 +244,18 @@ export async function gerarProjeto({ tema, tipo, assuntos, semanas = 1 }) {
  * começando, ou desafiador para quem quer mais pontos. Parte sempre da versão padrão, para trocar de
  * nível várias vezes sem o projeto ir "derivando".
  */
-export async function ajustarComplexidadeDoProjeto({ tema, tipo, projeto, nivel }) {
+export async function ajustarComplexidadeDoProjeto({ tema, tipo, projeto, nivel, depois = [] }) {
   const tamanho = tamanhoDoProjeto(tipo, projeto?.semanas);
   const simples = nivel === "simples";
+  // os assuntos da semana que o projeto pratica (os gerados depois de 23/10/2026 guardam a lista)
+  const assuntos = Array.isArray(projeto?.assuntos) ? projeto.assuntos : [];
   const bruto = await gerarJson({
     sistema: PERSONA,
     esquema: ESQUEMA_DO_PROJETO,
     pedido: [
       `Tema: ${tema}`,
+      assuntos.length ? `Assuntos que o projeto pratica (numerados):\n${assuntos.map((t, i) => `${i + 1}. ${corte(t, 160)}`).join("\n")}` : "",
+      linhaDoQueNaoPode(depois),
       `Projeto atual (${tamanho.nome}, complexidade padrão): ${projeto.titulo}`,
       projeto.contexto ? `Contexto: ${projeto.contexto}` : "",
       `Requisitos:\n- ${projeto.requisitos.join("\n- ")}`,
@@ -236,15 +263,16 @@ export async function ajustarComplexidadeDoProjeto({ tema, tipo, projeto, nivel 
       "",
       simples
         ? `Reescreva este projeto numa versão MAIS SIMPLES, para quem está começando: o MESMO cenário e o mesmo tema, com ${tamanho.simples.requisitos} requisitos diretos (um passo de cada vez, sem partes avançadas) e linguagem bem clara. Tempo estimado: ${tamanho.simples.horas}.`
-        : `Reescreva este projeto numa versão DESAFIADORA: o MESMO cenário e o mesmo tema, com ${tamanho.desafiador.requisitos} requisitos, incluindo partes mais avançadas (validação, organização em módulos, tratamento de erros, testes — o que fizer sentido no tema). Tempo estimado: ${tamanho.desafiador.horas}.`,
+        : `Reescreva este projeto numa versão DESAFIADORA: o MESMO cenário e o mesmo tema, com ${tamanho.desafiador.requisitos} requisitos, incluindo partes mais avançadas (validação, tratamento de erros, casos difíceis — o que fizer sentido nos assuntos, sem sair deles). Tempo estimado: ${tamanho.desafiador.horas}.`,
       "- `contexto`: o cenário, como um pedido de cliente.",
       "- `requisitos`: obrigatórios, verificáveis lendo o código.",
+      assuntos.length ? "- `assuntoDeCada`: para cada requisito, NA MESMA ORDEM, o número do assunto da lista acima que ele pratica." : "",
       "- `extras`: 1 a 3 desafios opcionais.",
       "- `entrega`: um repositório PÚBLICO no GitHub, com README explicando como rodar.",
       "- `criterios`: como o código será avaliado.",
     ].filter(Boolean).join("\n"),
   });
-  return validarProjeto(bruto);
+  return validarProjeto(bruto, assuntos.length);
 }
 
 // ---------------------------------------------------------------- dicas da Lisa (projetos)

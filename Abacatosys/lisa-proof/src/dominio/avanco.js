@@ -187,6 +187,30 @@ export function semanaDoProjeto(avanco, tipo, periodo) {
   return avanco.unidades.find((u) => u.tipo === tipo && u.periodo === periodo) || null;
 }
 
+/** A semana do curso de um projeto que já existe: a que o tem como projeto ou, senão, a da chave dele. */
+export function semanaDoDesafio(avanco, d) {
+  if (!avanco || !d) return null;
+  return avanco.unidades.find((u) => u.projeto?.id === d.id) || semanaDoProjeto(avanco, d.tipo, d.periodo);
+}
+
+/**
+ * O que a IA precisa saber para o projeto de uma semana do curso: os assuntos DELA, os das semanas
+ * de antes (pode usar) e os das seguintes (ainda não estudados — não pode exigir). O final junta a
+ * trilha inteira (numa trilha de uma semana só, é a própria semana).
+ */
+export function pedidoDoProjeto(avanco, tipo, unidade) {
+  const semanas = avanco.unidades.length;
+  const final = tipo === "projeto_final";
+  const assuntos = final && semanas > 1 ? avanco.etapas.filter((e) => e.inicio).slice(0, 15) : unidade.etapas.slice(0, 12);
+  const titulos = (lista) => lista.flatMap((u) => u.etapas.map((e) => e.titulo));
+  return {
+    assuntos,
+    semanas,
+    antes: final ? [] : titulos(avanco.unidades.filter((u) => u.numero < unidade.numero)),
+    depois: final ? [] : titulos(avanco.unidades.filter((u) => u.numero > unidade.numero)),
+  };
+}
+
 /** Dá para gerar (ou abrir) o projeto desta semana agora? */
 export function podeGerarProjeto(unidade, hoje) {
   if (!unidade) return { ok: false, motivo: "esta semana não existe na trilha" };

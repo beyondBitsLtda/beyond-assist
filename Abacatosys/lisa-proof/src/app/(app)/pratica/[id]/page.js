@@ -33,7 +33,7 @@ export default function Desafio() {
       )}
       {desafio.tipo === "quiz" && <Quiz desafio={desafio} />}
       {desafio.tipo === "exercicio" && <Exercicio desafio={desafio} />}
-      {(desafio.tipo === "projeto_semanal" || desafio.tipo === "projeto_final" || desafio.tipo === "projeto_mensal") && <Projeto desafio={desafio} />}
+      {(desafio.tipo === "projeto_semanal" || desafio.tipo === "projeto_final" || desafio.tipo === "projeto_mensal") && <Projeto desafio={desafio} aoMudar={setDesafio} />}
     </>
   );
 }
