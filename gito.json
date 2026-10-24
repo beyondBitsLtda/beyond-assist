@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.12.0-lisa-modos-graficos.1",
+  "versao": "0.12.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-24",
   "compilacao": {
-    "numero": 37,
+    "numero": 38,
     "data": "2026-10-24",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.12.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.12.0: os visuais Lente, Orbe de vidro, Plasma e Anel de partículas e o painel Visual da Lisa.",
+      "itens": [
+        "Junta a branch lisa-modos-graficos (0.12.0-lisa-modos-graficos.1).",
+        "Sem migração de banco.",
+        "Deploy com a conta beyondbitsLisa indicada no comando (CLOUDFLARE_ACCOUNT_ID)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.12.0-lisa-modos-graficos.1",
       "data": "2026-10-24",
