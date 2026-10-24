@@ -67,6 +67,41 @@ export default function PaginaDaTorre() {
   const [vendo, setVendo] = useState(null);
   const [semTela, setSemTela] = useState(false);
   const [Aviso, avisar] = useAviso();
+  const [telaCheia, setTelaCheia] = useState(false);
+  const [painel, setPainel] = useState(null);
+  const telaCheiaRef = useRef(false);
+  telaCheiaRef.current = telaCheia;
+  const pediuTelaCheiaDeVerdade = useRef(false);
+
+  // ---- tela cheia: a torre ocupa tudo; o navegador vai para a tela cheia de verdade quando deixa
+  useEffect(() => {
+    document.documentElement.classList.toggle("rn-sem-rolagem", telaCheia);
+    return () => document.documentElement.classList.remove("rn-sem-rolagem");
+  }, [telaCheia]);
+  useEffect(() => {
+    const aoMudar = () => {
+      if (!document.fullscreenElement && pediuTelaCheiaDeVerdade.current && telaCheiaRef.current) {
+        pediuTelaCheiaDeVerdade.current = false;
+        setTelaCheia(false);
+        setPainel(null);
+      }
+    };
+    document.addEventListener("fullscreenchange", aoMudar);
+    return () => document.removeEventListener("fullscreenchange", aoMudar);
+  }, []);
+  const entrarNaTelaCheia = useCallback(() => {
+    setTelaCheia(true);
+    setPainel(null);
+    const raiz = document.documentElement;
+    if (raiz.requestFullscreen && !document.fullscreenElement) {
+      raiz.requestFullscreen().then(() => { pediuTelaCheiaDeVerdade.current = true; }).catch(() => {});
+    }
+  }, []);
+  const sairDaTelaCheia = useCallback(() => {
+    setTelaCheia(false);
+    setPainel(null);
+    if (document.fullscreenElement) { pediuTelaCheiaDeVerdade.current = false; document.exitFullscreen?.().catch(() => {}); }
+  }, []);
 
   const carregar = useCallback(async () => {
     try {
@@ -127,6 +162,7 @@ export default function PaginaDaTorre() {
     // o chefão cai (ou o Neuro recua), o Neuro sai da sala e, vencendo, a torre recarrega e ele sobe a escada
     setTimeout(() => setNaSala(false), 1800);
     setTimeout(carregar, 2400);
+    if (telaCheiaRef.current) setTimeout(() => setPainel("resultado"), 2900);
     return undefined;
   }, [terminou, luta, carregar]);
   useEffect(() => { if (!luta) setNaSala(false); }, [luta]);
@@ -145,9 +181,20 @@ export default function PaginaDaTorre() {
   async function entregar() {
     const r = await agir("entregar", () => criar(`/api/dominio/${id}/entregar`, {}));
     if (!r) return;
-    document.querySelector(".dm-torre")?.scrollIntoView({ behavior: semMovimento ? "auto" : "smooth", block: "center" });
+    if (telaCheiaRef.current) setPainel(null);
+    else document.querySelector(".dm-torre")?.scrollIntoView({ behavior: semMovimento ? "auto" : "smooth", block: "center" });
     setNaSala(!semMovimento);
     setLuta({ resultado: r.resultado, passo: semMovimento ? 999 : 0 });
+  }
+
+  async function salvarBranch(repo, branch) {
+    const r = await agir("branch", () => criar(`/api/dominio/${id}/entrega`, { repo, branch }));
+    if (r) { setTorre(r.torre); avisar("Branch conferida! ✅"); }
+  }
+
+  async function abrirDesafio() {
+    const r = await agir("desafio", () => criar(`/api/dominio/${id}/desafio`, {}));
+    if (r) setTorre(r.torre);
   }
 
   async function desistir() {
@@ -184,7 +231,7 @@ export default function PaginaDaTorre() {
       ) : (
         <>
           <div className="dm-palco">
-            <div className="dm-palco__mundo">
+            <div className={`dm-palco__mundo${telaCheia ? " dm-tela-cheia" : ""}`}>
               {semTela ? <TorrePlana torre={torre} /> : (
                 <TorreDoDominio
                   andares={torre.andaresDaTorre}
@@ -194,6 +241,8 @@ export default function PaginaDaTorre() {
                   golpe={golpe}
                   lutando={naSala}
                   humor={luta ? (terminou ? (luta.resultado.venceu ? "comemorando" : "triste") : "surpreso") : "normal"}
+                  telaCheia={telaCheia}
+                  aoTelaCheia={telaCheia ? sairDaTelaCheia : entrarNaTelaCheia}
                   aoEscolher={(n) => setVendo(n)}
                   aoFalhar={() => setSemTela(true)}
                 >
@@ -202,6 +251,19 @@ export default function PaginaDaTorre() {
               )}
               {semTela && luta && <Placar luta={luta} ultimo={ultimo} terminou={terminou} plano />}
               {vendo && <AndarVisto torre={torre} numero={vendo} aoFechar={() => setVendo(null)} />}
+              {telaCheia && (
+                <HudDaTorre torre={torre} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} temResultado={Boolean(luta && terminou)}>
+                  {painel === "desafio" && (
+                    <AndarAtual torre={torre} ocupado={ocupado} lutando={Boolean(luta && !terminou)} aoAbrir={abrirDesafio} aoEntregar={entregar} />
+                  )}
+                  {painel === "branch" && <PrepararBranch torre={torre} ocupado={ocupado} aoSalvar={salvarBranch} />}
+                  {painel === "resultado" && luta && terminou && <ResultadoDaEntrega resultado={luta.resultado} aoFechar={() => setPainel(null)} />}
+                  {painel === "neuro" && <AtributosDoNeuro torre={torre} />}
+                  {painel === "premios" && <TrilhaDePremios torre={torre} />}
+                  {painel === "andares" && <ListaDeAndares torre={torre} aberta />}
+                  {painel === "certificado" && <Certificado torre={torre} avisar={avisar} />}
+                </HudDaTorre>
+              )}
             </div>
             <AtributosDoNeuro torre={torre} />
           </div>
@@ -210,16 +272,8 @@ export default function PaginaDaTorre() {
 
           {torre.status === "concluido" ? <Certificado torre={torre} avisar={avisar} /> : (
             <>
-              <PrepararBranch torre={torre} ocupado={ocupado} aoSalvar={async (repo, branch) => {
-                const r = await agir("branch", () => criar(`/api/dominio/${id}/entrega`, { repo, branch }));
-                if (r) { setTorre(r.torre); avisar("Branch conferida! ✅"); }
-              }} />
-              <AndarAtual torre={torre} ocupado={ocupado} lutando={Boolean(luta && !terminou)}
-                aoAbrir={async () => {
-                  const r = await agir("desafio", () => criar(`/api/dominio/${id}/desafio`, {}));
-                  if (r) setTorre(r.torre);
-                }}
-                aoEntregar={entregar} />
+              <PrepararBranch torre={torre} ocupado={ocupado} aoSalvar={salvarBranch} />
+              <AndarAtual torre={torre} ocupado={ocupado} lutando={Boolean(luta && !terminou)} aoAbrir={abrirDesafio} aoEntregar={entregar} />
             </>
           )}
 
@@ -228,6 +282,67 @@ export default function PaginaDaTorre() {
         </>
       )}
     </div>
+  );
+}
+
+// ------------------------------------------------------------------ a tela cheia
+
+/**
+ * A tela cheia da torre (pedido de 24/10/2026), no desenho da do Reino: a barra de cima (a torre e o
+ * andar), o dock de baixo e um painel flutuante com a parte escolhida da página. Esc fecha o painel;
+ * Esc de novo sai da tela cheia.
+ */
+function HudDaTorre({ torre, painel, aoPainel, aoSair, temResultado, children }) {
+  const concluida = torre.status === "concluido";
+  const itens = [
+    ...(concluida
+      ? [{ id: "certificado", emoji: "📜", rotulo: "Certificado" }]
+      : [{ id: "desafio", emoji: "⚔️", rotulo: "Desafio" }, { id: "branch", emoji: "🌿", rotulo: "Branch" }]),
+    ...(temResultado ? [{ id: "resultado", emoji: "📝", rotulo: "Resultado" }] : []),
+    { id: "neuro", emoji: "🧠", rotulo: "Neuro" },
+    { id: "premios", emoji: "🎁", rotulo: "Prêmios" },
+    { id: "andares", emoji: "🗼", rotulo: "Andares" },
+  ];
+  useEffect(() => {
+    const tecla = (e) => {
+      if (e.key !== "Escape") return;
+      if (painel) aoPainel(null);
+      else aoSair();
+    };
+    document.addEventListener("keydown", tecla);
+    return () => document.removeEventListener("keydown", tecla);
+  }, [painel, aoPainel, aoSair]);
+  const atual = itens.find((p) => p.id === painel);
+  return (
+    <>
+      <div className="rn-hud__topo">
+        <div className="rn-hud__reino">
+          <strong>🗼 {torre.repo}</strong>
+          <span>{concluida ? "🏆 conquistada" : `Andar ${torre.andarAtual} de ${torre.andares}`}</span>
+          <span>Nível {torre.nivel}</span>
+        </div>
+        <div className="rn-hud__rapido">
+          <button type="button" className="rn-hud__botao rn-hud__sair" onClick={aoSair} aria-label="Sair da tela cheia">✕ <span>Sair</span></button>
+        </div>
+      </div>
+      {atual && (
+        <aside className="rn-hud__painel dm-hud__painel" aria-label={atual.rotulo}>
+          <div className="rn-hud__painel-topo">
+            <strong>{atual.emoji} {atual.rotulo}</strong>
+            <button type="button" className="folha__fechar" onClick={() => aoPainel(null)} aria-label="Fechar o painel">✕</button>
+          </div>
+          <div className="rn-hud__painel-corpo">{children}</div>
+        </aside>
+      )}
+      <nav className="rn-hud__dock" aria-label="Menus da torre">
+        {itens.map((p) => (
+          <button key={p.id} type="button" className={`rn-hud__item${painel === p.id ? " rn-hud__item--atual" : ""}`} aria-pressed={painel === p.id}
+            onClick={() => aoPainel(painel === p.id ? null : p.id)}>
+            <span aria-hidden="true">{p.emoji}</span><small>{p.rotulo}</small>
+          </button>
+        ))}
+      </nav>
+    </>
   );
 }
 

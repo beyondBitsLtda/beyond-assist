@@ -261,3 +261,15 @@
 .dm-conferencia__dados dd { margin: 2px 0 0; font-weight: 700; overflow-wrap: anywhere; }
 .dm-conferencia__guardiao { display: flex; align-items: center; gap: 10px; }
 .dm-conferencia__assuntos { margin: 0; padding-left: 20px; display: grid; gap: 3px; font-size: 14px; }
+
+/* ---- a tela cheia da torre (24/10/2026): a torre ocupa tudo; a barra, o dock e os painéis são os do Reino */
+.dm-tela-cheia { position: fixed; inset: 0; z-index: 35; background: var(--pf-fundo); display: block; }
+.dm-tela-cheia .dm-torre { height: 100%; border-radius: 0; border: none; }
+.dm-tela-cheia .dm-placar { top: calc(58px + env(safe-area-inset-top)); left: 64px; right: 12px; }
+.dm-tela-cheia .dm-torre__controles { right: auto; left: 12px; }
+.dm-tela-cheia .dm-visto { position: absolute; z-index: 6; left: 64px; bottom: calc(92px + env(safe-area-inset-bottom)); max-width: min(440px, calc(100% - 80px)); }
+.dm-hud__painel .pf-secao { margin-top: 12px; }
+.dm-hud__painel .dm-andar { grid-template-columns: minmax(0, 1fr); }
+.dm-hud__painel .dm-neuro, .dm-hud__painel .dm-resultado, .dm-hud__painel .dm-branch { margin-top: 12px; box-shadow: none; }
+.dm-hud__painel .dm-premios { grid-template-columns: minmax(0, 1fr); }
+.dm-hud__painel .dm-certificado__cartao, .dm-hud__painel .dm-resultado__listas, .dm-hud__painel .dm-branch__form { grid-template-columns: minmax(0, 1fr); }

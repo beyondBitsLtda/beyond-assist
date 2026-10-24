@@ -19,8 +19,10 @@ import { svgComoImagem, recorteDePapel } from "@/componentes/reino/papel.js";
  * (recorte de papel dos monstros do Reino). Cada andar se enfeita com o tema do seu chefão: gelo,
  * lava, cipós, neon, braseiros, conchas, tábuas ou pedras.
  *
- * A sala do andar de agora fica acesa (uma luz de tocha que tremula); as de cima ficam escuras, com o
- * chefão em silhueta. Andar vencido ganha a bandeira verde na sacada. O Neuro (o recorte de papel do
+ * Cada chefão ainda não vencido monta guarda na PORTA do seu andar — dá para ver de fora todos os
+ * inimigos da subida (os de cima um pouco apagados). A sala do andar de agora fica acesa (uma luz de
+ * tocha que tremula). Andar vencido ganha a bandeira verde na sacada. Na luta, o chefão recua da porta
+ * para o centro da sala e o Neuro entra atrás dele. O Neuro (o recorte de papel do
  * mascote, com o personagem da pessoa) espera na sacada; na luta (`lutando`), ele ENTRA na sala e a
  * câmera entra junto. Cada golpe do roteiro chega pela prop `golpe` ({ k, quem, especial } ou
  * { k, fim: true, venceu }). Quando `atual` sobe, o Neuro sai da sala e sobe a escada até a próxima.
@@ -186,9 +188,9 @@ function construirAndar(P, { i, n, forma, chefao, vencido, atual, concluida, det
     // a montanha: a porta é a boca de uma caverna, cercada de pedregulhos
     for (let k = 0; k <= 6; k++) {
       const f = (k / 6) * Math.PI;
-      const c = d.clone().multiplyScalar(R + 0.12).addScaledVector(t, Math.cos(f) * (PORTA_L / 2 + 0.3));
-      const tam = 0.3 + r() * 0.2;
-      P.por("pedra", new THREE.DodecahedronGeometry(tam, 0), variar("#77706a", r, 0.1), V(c, yChao + Math.sin(f) * (PORTA_A + 0.22) + 0.05, { ry: r() * 6, rx: r() * 6, sy: 0.8 + r() * 0.4 }));
+      const c = d.clone().multiplyScalar(R + 0.16).addScaledVector(t, Math.cos(f) * (PORTA_L / 2 + 0.42));
+      const tam = 0.2 + r() * 0.12;
+      P.por("pedra", new THREE.DodecahedronGeometry(tam, 0), variar("#77706a", r, 0.1), V(c, yChao + Math.sin(f) * (PORTA_A + 0.32) + 0.04, { ry: r() * 6, rx: r() * 6, sy: 0.8 + r() * 0.4 }));
     }
     // a rocha bruta por fora — só no trecho da parede entre a escada que chega (de baixo) e a que
     // sai do andar de cima, para nenhuma pedra invadir um degrau
@@ -464,7 +466,7 @@ function construirTopoEBase(P, { n, forma, concluida }) {
 
 // ------------------------------------------------------------------ o componente
 
-export default function TorreDoDominio({ andares = [], atual = 1, concluida = false, semente = 1, golpe = null, lutando = false, humor = "normal", aoEscolher, aoFalhar, children }) {
+export default function TorreDoDominio({ andares = [], atual = 1, concluida = false, semente = 1, golpe = null, lutando = false, humor = "normal", telaCheia = false, aoTelaCheia, aoEscolher, aoFalhar, children }) {
   const caixa = useRef(null);
   const molde = useRef(null);
   const api = useRef(null);
@@ -579,9 +581,11 @@ export default function TorreDoDominio({ andares = [], atual = 1, concluida = fa
       const a = anguloDaPorta(i), d = direcao(a), t = tangente(a), yChao = base(i) + LAJE;
       return {
         a, d, t, yChao,
-        sacada: d.clone().multiplyScalar(R(i) + 0.55).setY(yChao + NEURO / 2),
+        // na sacada, um pouco de lado: o chefão de guarda na porta fica à vista
+        sacada: d.clone().multiplyScalar(R(i) + 0.5).addScaledVector(t, -0.82).setY(yChao + NEURO / 2),
         dentro: d.clone().multiplyScalar(0.95).addScaledVector(t, 0.55).setY(yChao + NEURO / 2),
         chefao: d.clone().multiplyScalar(-0.55).addScaledVector(t, -0.12),
+        porta: d.clone().multiplyScalar(R(i) - 0.1),
       };
     }
     function degraus(i) {
@@ -636,6 +640,7 @@ export default function TorreDoDominio({ andares = [], atual = 1, concluida = fa
       papeis.push(neuro);
       estado.chefaoAtual = null;
       estado.matChefaoAtual = null;
+      estado.chefaoCaiu = false;
       const foco = andarDoFoco();
       for (let i = 1; i <= estado.n; i++) {
         const dados = estado.andares[i - 1] || {};
@@ -646,15 +651,17 @@ export default function TorreDoDominio({ andares = [], atual = 1, concluida = fa
           placa.position.copy(L.d.clone().multiplyScalar(R(i) + 1.3).addScaledVector(L.t, -0.75)).setY(L.yChao + 0.2);
           moveis.add(placa);
         }
-        const mostrar = !dados.vencido && dados.chefao && (ehAtual || (i > estado.atual && i <= estado.atual + 12) || i === estado.n);
+        const mostrar = !dados.vencido && dados.chefao && (ehAtual || (i > estado.atual && i <= estado.atual + 14) || i === estado.n);
         if (!mostrar) continue;
-        const tamanho = Math.min(i === estado.n ? 2.0 : 1.85, (TAMANHO_DOS_MONSTROS[dados.chefao] || 1.6) * (i === estado.n ? 0.95 : 0.78));
+        // na arena (a luta, dentro da sala) ele tem o tamanho dele; na porta, cabe no vão
+        const naArena = Math.min(i === estado.n ? 2.0 : 1.85, (TAMANHO_DOS_MONSTROS[dados.chefao] || 1.6) * (i === estado.n ? 0.95 : 0.78));
+        const naPorta = Math.min(1.45, naArena);
         const mat = materialDoChefao(dados.chefao);
-        if (!ehAtual) mat.color.set("#34343f");
+        if (!ehAtual) mat.color.set("#c9c9d6");
         const s = new THREE.Mesh(geoPapel, mat);
-        s.scale.set(tamanho, tamanho, 1);
-        s.position.copy(L.chefao).setY(L.yChao + tamanho / 2 - tamanho * 0.05);
-        s.userData.numero = i;
+        s.scale.set(naPorta, naPorta, 1);
+        s.position.copy(L.porta).setY(L.yChao + naPorta / 2 - naPorta * 0.05);
+        s.userData = { numero: i, naPorta, naArena };
         moveis.add(s);
         papeis.push(s);
         if (ehAtual) { estado.chefaoAtual = s; estado.matChefaoAtual = mat; estado.chefaoBase.copy(s.position); }
@@ -700,11 +707,14 @@ export default function TorreDoDominio({ andares = [], atual = 1, concluida = fa
         saida.fov = 62;
         return;
       }
-      const recuo = camera.aspect < 0.8 ? 1.5 : camera.aspect < 1.3 ? 1.18 : 1;
-      saida.ang = a + 0.24 + estado.desvioAngulo;
+      // tela estreita (celular em pé): a câmera recua e fica mais de frente, para a porta caber no meio
+      const recuo = camera.aspect < 0.6 ? 2.1 : camera.aspect < 0.8 ? 1.55 : camera.aspect < 1.3 ? 1.18 : 1;
+      const deLado = camera.aspect < 0.8 ? 0.1 : 0.24;
+      saida.ang = a + deLado + estado.desvioAngulo;
       saida.dist = (rI + 9.5) * recuo;
       saida.y = yChao + 1.9 + estado.desvioY;
-      saida.olhar.set(Math.sin(saida.ang) * rI * 0.25, yChao + 1.0 + estado.desvioY, Math.cos(saida.ang) * rI * 0.25);
+      const mira = a + estado.desvioAngulo;
+      saida.olhar.set(Math.sin(mira) * rI * 0.45, yChao + 1.0 + estado.desvioY, Math.cos(mira) * rI * 0.45);
       saida.fov = 40;
     }
 
@@ -717,6 +727,20 @@ export default function TorreDoDominio({ andares = [], atual = 1, concluida = fa
       const para = sim ? L.dentro : L.sacada;
       estado.neuroBase.copy(para);
       animar(850, (k) => { neuro.position.lerpVectors(de, para, k); neuro.position.y = para.y + Math.abs(Math.sin(k * Math.PI * 4)) * 0.08; });
+      const chefao = estado.chefaoAtual;
+      if (chefao && !estado.chefaoCaiu) {
+        const { naPorta, naArena } = chefao.userData;
+        const tam = sim ? naArena : naPorta;
+        const deC = chefao.position.clone();
+        const paraC = (sim ? L.chefao.clone() : L.porta.clone()).setY(L.yChao + tam / 2 - tam * 0.05);
+        const s0 = chefao.scale.x;
+        estado.chefaoBase.copy(paraC);
+        animar(800, (k) => {
+          chefao.position.lerpVectors(deC, paraC, k);
+          const e = s0 + (tam - s0) * k;
+          chefao.scale.set(e, e, 1);
+        });
+      }
     }
 
     function golpear(g) {
@@ -724,6 +748,7 @@ export default function TorreDoDominio({ andares = [], atual = 1, concluida = fa
       if (!chefao || !g) return;
       if (g.fim) {
         if (g.venceu) {
+          estado.chefaoCaiu = true;
           const base0 = chefao.scale.x;
           animar(900, (k) => {
             chefao.rotation.z = k * 1.5;
@@ -973,6 +998,9 @@ export default function TorreDoDominio({ andares = [], atual = 1, concluida = fa
   return (
     <div className="dm-torre" ref={caixa}>
       <div className="dm-torre__controles">
+        {aoTelaCheia && (
+          <button type="button" className="dm-torre__botao" aria-label={telaCheia ? "Sair da tela cheia" : "Tela cheia"} title={telaCheia ? "Sair da tela cheia" : "Tela cheia"} onClick={aoTelaCheia}>{telaCheia ? "✕" : "⛶"}</button>
+        )}
         <button type="button" className="dm-torre__botao" aria-label="Ver mais acima" onClick={() => api.current?.mover(3)}>▲</button>
         <button type="button" className="dm-torre__botao" aria-label="Voltar ao andar de agora" onClick={() => api.current?.centralizar()}>📍</button>
         <button type="button" className="dm-torre__botao" aria-label="Ver mais abaixo" onClick={() => api.current?.mover(-3)}>▼</button>

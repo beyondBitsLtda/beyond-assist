@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.25.0-cloudflare-pages.1",
+  "versao": "0.26.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-24",
   "compilacao": {
-    "numero": 63,
+    "numero": 64,
     "data": "2026-10-24",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.26.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Modo Domínio: os chefões ficam de guarda na porta de cada andar (dá para ver todos os inimigos da subida) e a torre ganhou tela cheia.",
+      "itens": [
+        "Correção: numa torre-montanha não dava para ver nenhum inimigo — a sala fica no fundo da rocha e as pedras da boca da caverna fechavam a porta; nos andares de cima o chefão ficava em silhueta numa sala apagada.",
+        "Agora todo chefão ainda não vencido monta guarda na porta do seu andar, visível de fora (os de cima um pouco apagados); na luta ele recua para o centro da sala e o Neuro entra atrás dele.",
+        "Boca da caverna da montanha mais aberta; o Neuro espera de lado na sacada, sem cobrir o chefão.",
+        "Tela cheia da torre (botão ⛶ junto dos controles), no desenho da do Reino: barra com a torre e o andar, dock com Desafio, Branch, Resultado, Neuro, Prêmios e Andares (Certificado na torre conquistada) e painel flutuante; Esc fecha o painel e depois sai.",
+        "No celular em pé, a câmera recua e fica de frente para a porta do andar."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.25.0-cloudflare-pages.1",
       "data": "2026-10-24",
