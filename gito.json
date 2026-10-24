@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.11.0-lisa-editor-destacado.1",
+  "versao": "0.11.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-24",
   "compilacao": {
-    "numero": 35,
+    "numero": 36,
     "data": "2026-10-24",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.11.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.11.0: o editor numa janela separada (outro monitor) e o README com blocos dentro numa aba só.",
+      "itens": [
+        "Junta a branch lisa-editor-destacado (0.11.0-lisa-editor-destacado.1).",
+        "Sem migração de banco.",
+        "Deploy com a conta beyondbitsLisa indicada no comando (CLOUDFLARE_ACCOUNT_ID)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.11.0-lisa-editor-destacado.1",
       "data": "2026-10-24",
