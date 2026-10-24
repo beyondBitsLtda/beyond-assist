@@ -2,8 +2,12 @@
 // blocos da resposta — inclusive pela metade, durante o streaming —, a explicação de cada passo,
 // a tela de conversa sem as crases, a ordem da digitação e a voz, que nunca lê código.
 
-import { trechosDaResposta, respostaSemCodigo, digitacao, passoDaDigitacao, linguagemDe, CODIGO_NA_TELA, comCodigoNaTela } from "../src/lib/codigoNaResposta.js";
+import {
+  trechosDaResposta, respostaSemCodigo, digitacao, passoDaDigitacao, linguagemDe, CODIGO_NA_TELA, comCodigoNaTela,
+  codigoDaConversa, secaoDoCodigoDaConversa, TETO_DO_CODIGO,
+} from "../src/lib/codigoNaResposta.js";
 import { cleanForSpeech } from "../src/lib/cleanForSpeech.js";
+import { caixaInicial, moverCaixa, redimensionarCaixa, caixaGuardada, MINIMO } from "../src/lib/janelaFlutuante.js";
 
 let falhas = 0;
 const ok = (t) => console.log(`  ok    ${t}`);
@@ -84,6 +88,48 @@ console.log("instrução da Lisa");
 conferir("pede o código em blocos quando o assunto é código", /três crases/i.test(CODIGO_NA_TELA) && /arquivo/i.test(CODIGO_NA_TELA));
 conferir("e lembra que o código não é lido em voz alta", /voz alta/i.test(CODIGO_NA_TELA));
 conferir("entra por cima da instrução base, sem apagar nada", comCodigoNaTela("BASE").startsWith("BASE") && comCodigoNaTela("BASE").includes(CODIGO_NA_TELA));
+
+console.log("o código da conversa (para a Lisa ver o todo)");
+{
+  const colado = "Meu código:\n```js filtrarLog.js\nfunction filtrarLog(logs, nivel) { return logs.filter((l) => l.level === nivel); }\n```";
+  const textos = [colado, resposta, "Valeu!", "```js traduzirLog.js\n// versão nova\nfunction traduzirLog(l) {}\n```"];
+  const c = codigoDaConversa(textos);
+  conferir("junta o que a pessoa colou e o que a Lisa mostrou", c.includes("### filtrarLog.js") && c.includes("traduzirLog(logFiltrado)"));
+  conferir("bloco sem nome de arquivo entra também, identificado", c.includes("### trecho sem nome de arquivo (javascript)"));
+  conferir("de cada arquivo, fica só a versão mais recente", c.includes("// versão nova") && !c.includes("NIVEIS[log.level]") && c.split("### traduzirLog.js").length === 2);
+  conferir("o mais recente fica por último", c.trim().endsWith("function traduzirLog(l) {}\n```"));
+  const grande = Array.from({ length: 10 }, (_, i) => `\`\`\`js arq${i}.js\n${"x".repeat(2000)}\n\`\`\``);
+  const cortado = codigoDaConversa(grande);
+  conferir("passando do teto, saem os mais antigos", cortado.length <= TETO_DO_CODIGO && cortado.includes("arq9.js") && !cortado.includes("arq0.js"));
+  conferir("um arquivo maior que o teto vai cortado, mas vai", codigoDaConversa([`\`\`\`js enorme.js\n${"y".repeat(20000)}\n\`\`\``]).length === TETO_DO_CODIGO);
+  conferir("sem código na conversa, nada", codigoDaConversa(["Bom dia", "Oi!"]) === "" && secaoDoCodigoDaConversa("") === "");
+  conferir("a seção do prompt avisa para ler o todo", /leia o todo/.test(secaoDoCodigoDaConversa(c)) && secaoDoCodigoDaConversa(c).includes("### filtrarLog.js"));
+  conferir("o que vem do navegador é conferido (tipo e tamanho)", secaoDoCodigoDaConversa({ x: 1 }) === "" && secaoDoCodigoDaConversa("z".repeat(50000)).length < TETO_DO_CODIGO + 700);
+  conferir("a regra pede para ver o todo e pedir o que falta", /entenda o TODO/.test(CODIGO_NA_TELA) && /PEÇA essa parte/.test(CODIGO_NA_TELA) && /Nunca invente/.test(CODIGO_NA_TELA));
+}
+
+console.log("janela do editor: arrastar e redimensionar");
+{
+  const tela = { w: 1600, h: 1000 };
+  const c0 = caixaInicial(tela);
+  conferir("nasce no canto direito, do tamanho padrão", c0.w === 640 && c0.h === 480 && c0.x === 1600 - 640 - 24 && c0.y === 84);
+  conferir("no celular, quase a largura toda", caixaInicial({ w: 390, h: 844 }).w === 374);
+  conferir("arrasta para qualquer lugar da tela", JSON.stringify(moverCaixa(c0, -900, 400, tela)) === JSON.stringify({ ...c0, x: c0.x - 900, y: c0.y + 400 }));
+  const fora = moverCaixa(c0, 5000, 5000, tela);
+  conferir("pode sair em parte da tela, mas um pedaço e a barra de título ficam à vista", fora.x === 1600 - 80 && fora.y === 1000 - 36);
+  conferir("nem por cima nem pela esquerda some de vez", moverCaixa(c0, -5000, -5000, tela).x === 80 - 640 && moverCaixa(c0, 0, -5000, tela).y === 0);
+  const se = redimensionarCaixa(c0, "se", 200, 150, tela);
+  conferir("o canto de baixo à direita aumenta largura e altura", se.w === 840 && se.h === 630 && se.x === c0.x && se.y === c0.y);
+  const w = redimensionarCaixa(c0, "w", -300, 0, tela);
+  conferir("puxar a borda esquerda aumenta sem mexer na direita", w.w === 940 && w.x + w.w === c0.x + c0.w);
+  const n = redimensionarCaixa(c0, "n", 0, -50, tela);
+  conferir("puxar a borda de cima aumenta sem mexer na de baixo", n.h === 530 && n.y + n.h === c0.y + c0.h);
+  const pequena = redimensionarCaixa(c0, "nw", 5000, 5000, tela);
+  conferir("não fica menor que o mínimo, e a borda oposta continua parada", pequena.w === MINIMO.w && pequena.h === MINIMO.h && pequena.x + pequena.w === c0.x + c0.w && pequena.y + pequena.h === c0.y + c0.h);
+  conferir("não fica maior que a tela", redimensionarCaixa(c0, "se", 9000, 9000, tela).w === 1600);
+  conferir("a caixa guardada volta, ajustada à tela de agora", JSON.stringify(caixaGuardada({ x: 3000, y: 50, w: 700, h: 400 }, tela)) === JSON.stringify({ x: 1520, y: 50, w: 700, h: 400 }));
+  conferir("caixa guardada estragada: volta para o canto", JSON.stringify(caixaGuardada({ x: "a" }, tela)) === JSON.stringify(c0) && JSON.stringify(caixaGuardada(null, tela)) === JSON.stringify(c0));
+}
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");
 process.exit(falhas ? 1 : 0);

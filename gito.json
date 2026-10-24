@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.9.0-cloudflare-pages.1",
+  "versao": "0.10.0-lisa-janela-livre.1",
   "atualizadoEm": "2026-10-24",
   "compilacao": {
-    "numero": 32,
+    "numero": 33,
     "data": "2026-10-24",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.10.0-lisa-janela-livre.1",
+      "data": "2026-10-24",
+      "branch": "lisa-janela-livre",
+      "tipo": "funcionalidade",
+      "resumo": "O editor da Lisa vira uma janela livre (arrasta e redimensiona) com uma aba por resposta, e a Lisa passa a ver o código inteiro da conversa antes de propor uma correção.",
+      "itens": [
+        "Janela livre: arrasta para qualquer lugar pela barra de título, aumenta e diminui por qualquer borda ou canto (com a marquinha no canto de baixo à direita) e abre de novo onde e do tamanho que ficou (guardado no navegador).",
+        "Uma janela para a conversa inteira: cada resposta com código vira uma aba (#1, #2…, com a pergunta no título); perguntar de novo não apaga nada, e uma resposta sem código não fecha o editor. Dá para fechar uma aba e voltar às anteriores.",
+        "Ver o todo: o código que já apareceu na conversa (o que você colou em bloco e o que a Lisa mostrou) vai inteiro junto da pergunta, na versão mais recente de cada arquivo, até 12 mil caracteres — antes ele chegava cortado em 700 caracteres por fala.",
+        "A regra da Lisa agora pede para entender o fluxo inteiro antes de corrigir (de onde vêm os dados, quem chama), pedir a parte que falta em vez de inventar e mostrar a função ou o arquivo completo que muda.",
+        "Testes novos em npm run codigo-check: geometria da janela e o código da conversa."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.9.0-cloudflare-pages.1",
       "data": "2026-10-24",
@@ -485,7 +500,7 @@
         "Notificações push de card novo e de tarefa atrasada.",
         "Kanban de tarefas da Delp a partir de planilha enviada pela tela.",
         "Consulta a repositórios do GitHub, tarefas de código e pair programming.",
-        "Editor de código na tela em qualquer modo: quando a conversa é sobre código, a Lisa mostra o código e uma janela de editor (realce de sintaxe, número de linha, abas por arquivo) digita trecho por trecho com a explicação de cada passo; a voz fala só a explicação.",
+        "Editor de código na tela em qualquer modo: quando a conversa é sobre código, a Lisa mostra o código e uma janela de editor (realce de sintaxe, número de linha) digita trecho por trecho com a explicação de cada passo; uma aba por resposta (as anteriores ficam), abas por arquivo, janela que arrasta para qualquer lugar e redimensiona pelas bordas e cantos, lembrando onde ficou; a voz fala só a explicação. Antes de corrigir, a Lisa recebe o código que já apareceu na conversa (versão mais recente de cada arquivo) e pede o que falta em vez de inventar.",
         "Painel Sentinela de casos de teste e chamados."
       ],
       "naoInclui": [

@@ -258,8 +258,10 @@ export function todayLabel() {
  * Monta o prompt final: bloco de contexto + pergunta + data de hoje.
  * `note` (opcional) — linha extra de contexto ativo, ex.: qual projeto do Sentinela foi
  * selecionado manualmente no seletor de escopo (ver src/app/(panels)/assistant/page.js).
+ * `extra` (opcional) — uma seção pronta que entra antes da pergunta, ex.: o código da conversa
+ * (secaoDoCodigoDaConversa em src/lib/codigoNaResposta.js).
  */
-export function buildPrompt(question, matches, note = null, conversa = "") {
+export function buildPrompt(question, matches, note = null, conversa = "", extra = "") {
   const hoje = todayLabel();
 
   const context = matches.length
@@ -273,7 +275,7 @@ export function buildPrompt(question, matches, note = null, conversa = "") {
 
   const noteBlock = note ? `\n\nCONTEXTO ATIVO: ${note}` : "";
 
-  return `DATA DE HOJE: ${hoje}${noteBlock}\n\nCONTEXTO RECUPERADO:\n${context}${secaoDaConversa(conversa)}\n\nPERGUNTA DO USUÁRIO:\n${question}\n\nResponda usando o contexto acima.`;
+  return `DATA DE HOJE: ${hoje}${noteBlock}\n\nCONTEXTO RECUPERADO:\n${context}${secaoDaConversa(conversa)}${extra || ""}\n\nPERGUNTA DO USUÁRIO:\n${question}\n\nResponda usando o contexto acima.`;
 }
 
 // ---------- roteamento por board/projeto ----------

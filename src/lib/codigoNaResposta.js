@@ -26,8 +26,16 @@ enquanto você explica. Então MOSTRE o código — em vez de só descrever a co
 - Se forem partes diferentes (a função corrigida, depois o uso dela no index.js), um bloco por
   parte, cada um com a sua explicação antes.
 - Comentários curtos dentro do código, nas linhas importantes, explicam o passo a passo.
-- Mostre só o necessário para entender e resolver: o trecho que muda e o que está em volta dele,
-  não o projeto inteiro.
+- ANTES de propor qualquer correção, entenda o TODO, não só o trecho do erro: o código que já
+  apareceu na conversa (a seção CÓDIGO DA CONVERSA traz a versão mais recente de cada arquivo),
+  de onde vêm os dados, quem chama a função, o que cada parte recebe e devolve. A solução tem que
+  funcionar no fluxo inteiro — uma correção que conserta a linha do erro e quebra quem chama é
+  uma solução ruim.
+- Se faltar uma parte que muda a resposta (a função que chama, o formato dos dados, o arquivo do
+  erro), PEÇA essa parte antes de propor a correção, ou diga com todas as letras a suposição que
+  você fez. Nunca invente o código que você não viu.
+- Mostre a função (ou o arquivo) completa que muda, não um pedaço solto — e cada outro arquivo
+  que precisa mudar junto, em blocos separados.
 - O código NÃO é lido em voz alta: o texto fora dos blocos segue as regras de fala (frases
   curtas, sem outro markdown) e não repete o código palavra por palavra — diga "olha no editor".
 - Os blocos de código são a ÚNICA exceção à regra de não usar markdown. Sem código no assunto,
@@ -36,6 +44,50 @@ enquanto você explica. Então MOSTRE o código — em vez de só descrever a co
 /** A instrução de sistema com a regra do código na tela por cima. */
 export function comCodigoNaTela(instrucao) {
   return `${instrucao}\n\n---\n${CODIGO_NA_TELA}`;
+}
+
+/** Quanto do código da conversa vai para o prompt (caracteres). */
+export const TETO_DO_CODIGO = 12000;
+
+/**
+ * O código que já apareceu na conversa — o que a pessoa colou em bloco e o que a Lisa mostrou —
+ * para ela enxergar o TODO antes de propor uma correção (pedido de 24/10/2026). A conversa vai
+ * para o prompt cortada em 700 caracteres por fala (src/lib/conversa.js), e o corte pega
+ * justamente o código. Fica a versão mais recente de cada arquivo (o mesmo nome numa resposta
+ * nova substitui o antigo); passando do teto, saem os mais antigos.
+ * `textos`: as falas da conversa, da mais antiga para a mais nova.
+ */
+export function codigoDaConversa(textos, teto = TETO_DO_CODIGO) {
+  const porArquivo = new Map();
+  (textos || []).forEach((texto, i) => {
+    trechosDaResposta(texto).trechos.forEach((t, j) => {
+      if (!t.codigo.trim()) return;
+      const chave = t.arquivo || `trecho ${i + 1}.${j + 1}`;
+      porArquivo.delete(chave); // reinsere no fim: no Map, o mais recente fica por último
+      porArquivo.set(chave, t);
+    });
+  });
+  const blocos = [...porArquivo.values()].map((t) =>
+    `### ${t.arquivo || "trecho sem nome de arquivo"}${t.linguagem ? ` (${t.linguagem})` : ""}\n\`\`\`\n${t.codigo}\n\`\`\``);
+  const escolhidos = [];
+  let total = 0;
+  for (let k = blocos.length - 1; k >= 0; k--) {
+    if (total + blocos[k].length > teto) {
+      if (!escolhidos.length) escolhidos.unshift(blocos[k].slice(0, teto)); // um arquivo enorme: vai cortado
+      break;
+    }
+    escolhidos.unshift(blocos[k]);
+    total += blocos[k].length;
+  }
+  return escolhidos.join("\n\n");
+}
+
+/** A seção do prompt com o código da conversa ("" sem código). Confere o que veio do navegador. */
+export function secaoDoCodigoDaConversa(codigo) {
+  const c = typeof codigo === "string" ? codigo.slice(0, TETO_DO_CODIGO + 500).trim() : "";
+  return c
+    ? `\n\nCÓDIGO DA CONVERSA (a versão mais recente de cada arquivo que já apareceu aqui — leia o todo antes de propor uma correção):\n${c}`
+    : "";
 }
 
 // apelidos de linguagem → o nome da gramática no prism-react-renderer (as que ele traz prontas;
