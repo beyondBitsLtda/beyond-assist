@@ -89,6 +89,39 @@ conferir("pede o código em blocos quando o assunto é código", /três crases/i
 conferir("e lembra que o código não é lido em voz alta", /voz alta/i.test(CODIGO_NA_TELA));
 conferir("entra por cima da instrução base, sem apagar nada", comCodigoNaTela("BASE").startsWith("BASE") && comCodigoNaTela("BASE").includes(CODIGO_NA_TELA));
 
+console.log("README com blocos dentro (24/10/2026: saía quebrado em dois)");
+{
+  const readme = (cerca) => [
+    "Olha no editor, o README inteiro:",
+    `${cerca}markdown README.md`,
+    "# LogSphere",
+    "## Como rodar",
+    "```bash",
+    "npm install",
+    "node index.js",
+    "```",
+    "## Como a Lisa vai avaliar",
+    "- Uso correto de map, filter e reduce",
+    cerca,
+    "Qualquer dúvida, me chama.",
+  ].join("\n");
+  for (const [nome, cerca] of [["três crases (bloco de dentro com linguagem)", "```"], ["quatro crases", "````"]]) {
+    const r = trechosDaResposta(readme(cerca));
+    conferir(`${nome}: o README vira UM bloco só`, r.trechos.length === 1 && r.trechos[0].rotulo === "README.md" && r.trechos[0].completo, JSON.stringify(r.trechos.map((t) => t.rotulo)));
+    conferir(`${nome}: com o bloco de comando dentro e o resto do arquivo`, r.trechos[0].codigo.includes("```bash") && r.trechos[0].codigo.includes("node index.js") && r.trechos[0].codigo.endsWith("map, filter e reduce"));
+    conferir(`${nome}: o texto de depois fica fora do código`, r.depois === "Qualquer dúvida, me chama.");
+    conferir(`${nome}: a conversa mostra um aviso só`, respostaSemCodigo(readme(cerca)) === "Olha no editor, o README inteiro:\n⟨ código no editor: README.md ⟩\nQualquer dúvida, me chama.");
+    const fala = cleanForSpeech(readme(cerca));
+    conferir(`${nome}: a voz não lê o README`, !/npm install|LogSphere|Como rodar/.test(fala) && fala.includes("Qualquer dúvida"), fala);
+  }
+  // um README ainda chegando, parado dentro do bloco de comando: continua um bloco só
+  const meio = readme("```").split("node index.js")[0];
+  const r = trechosDaResposta(meio);
+  conferir("README chegando, no meio do bloco de dentro: um bloco só, incompleto", r.trechos.length === 1 && !r.trechos[0].completo);
+  conferir("em código que não é markdown, três crases sozinhas fecham o bloco", trechosDaResposta("```js\nconst a = 1;\n```\n```js\nconst b = 2;\n```").trechos.length === 2);
+  conferir("a regra pede um arquivo inteiro num bloco só, com quatro crases se precisar", /ARQUIVO INTEIRO/.test(CODIGO_NA_TELA) && /QUATRO crases/.test(CODIGO_NA_TELA));
+}
+
 console.log("o código da conversa (para a Lisa ver o todo)");
 {
   const colado = "Meu código:\n```js filtrarLog.js\nfunction filtrarLog(logs, nivel) { return logs.filter((l) => l.level === nivel); }\n```";

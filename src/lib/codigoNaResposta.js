@@ -24,7 +24,11 @@ enquanto você explica. Então MOSTRE o código — em vez de só descrever a co
 - O código vai entre três crases, com a linguagem na linha de abertura; se o código é de um
   arquivo, ponha o nome dele logo depois da linguagem: \`\`\`javascript traduzirLog.js
 - Se forem partes diferentes (a função corrigida, depois o uso dela no index.js), um bloco por
-  parte, cada um com a sua explicação antes.
+  parte, cada um com a sua explicação antes. Mas um ARQUIVO INTEIRO que você escreve (um README,
+  um package.json, um componente) vai num bloco só, do começo ao fim — nunca quebrado em dois.
+- Se o conteúdo do bloco tiver três crases dentro (um README com exemplos de comando, por
+  exemplo), abra e feche o bloco de fora com QUATRO crases: \`\`\`\`markdown README.md … \`\`\`\`.
+  Assim os blocos de dentro não fecham o de fora.
 - Comentários curtos dentro do código, nas linhas importantes, explicam o passo a passo.
 - ANTES de propor qualquer correção, entenda o TODO, não só o trecho do erro: o código que já
   apareceu na conversa (a seção CÓDIGO DA CONVERSA traz a versão mais recente de cada arquivo),
@@ -118,8 +122,59 @@ export function linguagemDe(apelido, arquivo = "") {
   return arquivo && LINGUAGENS[ext] ? LINGUAGENS[ext] : null;
 }
 
-const ABRE = /^\s*```\s*([^\s`]*)\s*(.*?)\s*$/;
-const FECHA = /^\s*```\s*$/;
+// a cerca de abertura: 3 ou mais crases, a linguagem e (opcional) o arquivo
+const ABRE = /^\s*(`{3,})\s*([^\s`]*)\s*(.*?)\s*$/;
+// a de fechamento: só crases (fecha o bloco se tiver pelo menos tantas quanto a que abriu)
+const SO_CRASES = /^\s*(`{3,})\s*$/;
+
+/**
+ * A resposta em pedaços, na ordem: texto ou bloco de código. Um só leitor para tudo (os trechos
+ * do editor, a conversa sem o código e a voz), para os três nunca discordarem.
+ *
+ * As cercas seguem o Markdown: um bloco aberto com N crases só fecha com N ou mais — por isso um
+ * README com blocos de três crases dentro vai num bloco de QUATRO (a regra pede isso à Lisa).
+ * E se ela abrir o README com três mesmo, dentro de um bloco de markdown uma cerca COM linguagem
+ * ("```bash") abre um bloco de dentro, e a próxima cerca só de crases fecha esse, não o de fora
+ * (pedido de 24/10/2026: o README saía quebrado em dois, com metade na caixa de texto).
+ */
+export function pedacosDaResposta(texto) {
+  const linhas = String(texto || "").replace(/\r\n/g, "\n").split("\n");
+  const pedacos = [];
+  let textoAtual = [];
+  let bloco = null;
+  const fecharTexto = () => { if (textoAtual.length) pedacos.push({ tipo: "texto", texto: textoAtual.join("\n") }); textoAtual = []; };
+  for (const linha of linhas) {
+    if (!bloco) {
+      const m = linha.match(ABRE);
+      if (m) {
+        fecharTexto();
+        const [, cerca, apelido, resto] = m;
+        // "```javascript traduzirLog.js" — o que vem depois da linguagem é o arquivo (se parece um)
+        const arquivo = /[\w-]+\.[\w]+$|\//.test(resto) ? resto.replace(/^[(\[]|[)\]]$/g, "") : "";
+        bloco = { tipo: "codigo", cerca: cerca.length, apelido, arquivo, linhas: [], dentro: 0, completo: false };
+        pedacos.push(bloco);
+      } else {
+        textoAtual.push(linha);
+      }
+      continue;
+    }
+    const so = linha.match(SO_CRASES);
+    const markdown = linguagemDe(bloco.apelido, bloco.arquivo) === "markdown";
+    if (so && so[1].length >= bloco.cerca && bloco.dentro === 0) {
+      bloco.completo = true;
+      bloco = null;
+      continue;
+    }
+    if (markdown && bloco.cerca === 3) {
+      const abreDentro = linha.match(ABRE);
+      if (so && bloco.dentro > 0) bloco.dentro--;
+      else if (abreDentro && !so && abreDentro[2]) bloco.dentro++;
+    }
+    bloco.linhas.push(linha);
+  }
+  fecharTexto();
+  return pedacos;
+}
 
 /**
  * A resposta em trechos de código, cada um com a fala que vem antes dele (a explicação daquele
@@ -127,61 +182,40 @@ const FECHA = /^\s*```\s*$/;
  * `depois` é o que vem depois do último bloco.
  */
 export function trechosDaResposta(texto) {
-  const linhas = String(texto || "").replace(/\r\n/g, "\n").split("\n");
   const trechos = [];
-  let fala = [];
-  let aberto = null;
-  for (const linha of linhas) {
-    if (!aberto) {
-      const m = linha.match(ABRE);
-      if (m) {
-        const [apelido, resto] = [m[1], m[2]];
-        // "```javascript traduzirLog.js" — o que vem depois da linguagem é o arquivo (se parece um)
-        const arquivo = /[\w-]+\.[\w]+$|\//.test(resto) ? resto.replace(/^[(\[]|[)\]]$/g, "") : "";
-        aberto = { fala: fala.join("\n").trim(), linhas: [], apelido, arquivo };
-        fala = [];
-      } else {
-        fala.push(linha);
-      }
-    } else if (FECHA.test(linha)) {
-      trechos.push(fechar(aberto, true, trechos.length));
-      aberto = null;
-    } else {
-      aberto.linhas.push(linha);
-    }
+  let fala = "";
+  for (const p of pedacosDaResposta(texto)) {
+    if (p.tipo === "texto") { fala = p.texto; continue; }
+    const linguagem = linguagemDe(p.apelido, p.arquivo);
+    const rotulo = p.arquivo ? p.arquivo.split("/").pop() : `${NOMES[linguagem] || "código"} ${trechos.length + 1}`;
+    trechos.push({ fala: fala.trim(), codigo: p.linhas.join("\n"), linguagem, arquivo: p.arquivo, rotulo, completo: p.completo });
+    fala = "";
   }
-  if (aberto) trechos.push(fechar(aberto, false, trechos.length));
-  return { trechos, depois: aberto ? "" : fala.join("\n").trim(), temCodigo: trechos.length > 0 };
+  return { trechos, depois: fala.trim(), temCodigo: trechos.length > 0 };
 }
 
-function fechar(aberto, completo, i) {
-  const linguagem = linguagemDe(aberto.apelido, aberto.arquivo);
-  const nome = aberto.arquivo ? aberto.arquivo.split("/").pop() : `${NOMES[linguagem] || "código"} ${i + 1}`;
-  return { fala: aberto.fala, codigo: aberto.linhas.join("\n"), linguagem, arquivo: aberto.arquivo, rotulo: nome, completo };
+/**
+ * A resposta sem os blocos de código: cada bloco vira `aviso(rotulo)` (ou some, com aviso vazio).
+ * Um bloco ainda chegando também é tirado — nada de crases soltas na tela nem na voz.
+ */
+export function semBlocosDeCodigo(texto, aviso = () => "") {
+  const pedacos = pedacosDaResposta(texto);
+  if (!pedacos.some((p) => p.tipo === "codigo")) return String(texto || "");
+  const { trechos } = trechosDaResposta(texto);
+  let n = 0;
+  return pedacos
+    .map((p) => (p.tipo === "texto" ? p.texto : aviso(trechos[n++]?.rotulo || "código")))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /**
  * A resposta para a tela de conversa, com cada bloco de código trocado por um aviso curto — o
- * código em si está no editor. Um bloco ainda chegando também vira o aviso (nada de crases soltas).
+ * código em si está no editor.
  */
 export function respostaSemCodigo(texto) {
-  const { trechos } = trechosDaResposta(texto);
-  if (!trechos.length) return String(texto || "");
-  const saida = [];
-  let dentro = false;
-  let n = 0;
-  for (const linha of String(texto).replace(/\r\n/g, "\n").split("\n")) {
-    if (!dentro && ABRE.test(linha)) {
-      dentro = true;
-      saida.push(`⟨ código no editor: ${trechos[n]?.rotulo || "código"} ⟩`);
-      n++;
-    } else if (dentro && FECHA.test(linha)) {
-      dentro = false;
-    } else if (!dentro) {
-      saida.push(linha);
-    }
-  }
-  return saida.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return semBlocosDeCodigo(texto, (rotulo) => `⟨ código no editor: ${rotulo} ⟩`);
 }
 
 /**

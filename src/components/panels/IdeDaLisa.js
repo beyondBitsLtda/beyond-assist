@@ -14,10 +14,13 @@
 // src/lib/codigoNaResposta.js, testada por `npm run codigo-check`. Aqui fica só o que precisa do
 // navegador: a digitação no tempo, a janela e os botões. A janela é como a de um sistema: arrasta
 // para qualquer lugar pela barra de título, aumenta e diminui por qualquer borda ou canto, e abre
-// de novo onde e do tamanho que ficou (a geometria mora em src/lib/janelaFlutuante.js). A voz não
+// de novo onde e do tamanho que ficou (a geometria mora em src/lib/janelaFlutuante.js). Para ir
+// para OUTRO MONITOR, o botão "⧉ destacar" leva o editor para uma janela de verdade do sistema
+// (prepararJanelaSeparada, abaixo); fechando ela, o editor volta para a página. A voz não
 // lê o código (cleanForSpeech tira os blocos) — ela fala a explicação enquanto o editor digita.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CY, OR, GR, PU, mono } from "@/lib/theme.js";
 import { trechosDaResposta, digitacao, passoDaDigitacao } from "@/lib/codigoNaResposta.js";
 import { LinhasDoCodigo } from "./TextoComCodigo.js";
@@ -45,6 +48,33 @@ const ALCAS = [
 const BOTAO = { ...mono, fontSize: 10, padding: "3px 9px", borderRadius: 5, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "transparent", color: "#cfeffb", cursor: "pointer" };
 
 /**
+ * A janela separada (pedido de 24/10/2026: "não posso arrastar a janela para outra tela"): uma
+ * janela de verdade do sistema, que vai para outro monitor, maximiza e fica atrás ou na frente
+ * como qualquer outra. Ela abre vazia (about:blank, mesma origem) e o editor é desenhado lá
+ * dentro por um portal do React — o mesmo componente, o mesmo estado, então as respostas novas
+ * continuam chegando nela. Aqui ela recebe os estilos e as cores do tema da página.
+ */
+function prepararJanelaSeparada(win) {
+  const d = win.document;
+  d.title = "Editor da Lisa";
+  d.head.querySelectorAll("link, style").forEach((e) => e.remove());
+  for (const el of document.querySelectorAll('link[rel="stylesheet"], style')) {
+    const copia = el.cloneNode(true);
+    if (el.tagName === "LINK") copia.href = el.href; // endereço completo: a janela nova é about:blank
+    d.head.appendChild(copia);
+  }
+  // a cor de destaque do tema é posta por JS no <html> da página (accentThemes.js): vai junto
+  d.documentElement.setAttribute("style", document.documentElement.getAttribute("style") || "");
+  d.documentElement.className = document.documentElement.className;
+  d.body.className = document.body.className;
+  d.body.style.cssText = "margin:0;background:#050b10;overflow:hidden;";
+  d.body.replaceChildren();
+  const raiz = d.createElement("div");
+  d.body.appendChild(raiz);
+  return raiz;
+}
+
+/**
  * `interacoes`: as respostas da conversa, da mais antiga para a mais nova — [{ id, pergunta, texto }].
  * A última pode estar chegando ainda (`chegando`). As que não têm código não viram aba.
  */
@@ -70,8 +100,13 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
   const [caixa, setCaixa] = useState(null); // { x, y, w, h } — onde está e o tamanho (src/lib/janelaFlutuante.js)
   const [mexendo, setMexendo] = useState(false); // arrastando ou redimensionando agora
   const [copiado, setCopiado] = useState(false);
+  const [separada, setSeparada] = useState(null); // { win, raiz } — o editor numa janela do sistema
+  const [podeSeparar, setPodeSeparar] = useState(false); // só no computador (no celular, janela é aba)
+  const [avisoSeparar, setAvisoSeparar] = useState("");
   const corpoRef = useRef(null);
   const gesto = useRef(null);
+  const separadaRef = useRef(null);
+  separadaRef.current = separada;
 
   // a digitação é só da resposta mais nova; as de antes aparecem inteiras
   const pulouUltima = semAnimacao || (ultima && puladas.has(ultima.id));
@@ -128,6 +163,22 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
     return () => window.removeEventListener("resize", ajustar);
   }, []);
 
+  // janela separada só no computador: no celular, uma "janela" nova é só outra aba
+  useEffect(() => {
+    setPodeSeparar(!window.matchMedia?.("(pointer: coarse)").matches && window.innerWidth >= 700);
+  }, []);
+
+  // a janela separada fechou (pelo X do sistema ou pelo botão): o editor volta para a página. E se
+  // a página da Lisa fechar ou recarregar, a janela separada fecha junto (sem ela, ficaria vazia).
+  useEffect(() => {
+    if (!separada) return undefined;
+    const vigia = setInterval(() => { if (separada.win.closed) setSeparada(null); }, 600);
+    const fecharJunto = () => { try { separada.win.close(); } catch { /* já fechou */ } };
+    window.addEventListener("pagehide", fecharJunto);
+    return () => { clearInterval(vigia); window.removeEventListener("pagehide", fecharJunto); };
+  }, [separada]);
+  useEffect(() => () => { try { separadaRef.current?.win.close(); } catch { /* já fechou */ } }, []);
+
   // a resposta e o arquivo que estão na tela
   const vista = (escolhida && lista.find((it) => it.id === escolhida)) || ultima;
   const ehUltima = Boolean(vista && ultima && vista.id === ultima.id);
@@ -144,7 +195,7 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
 
   if (!ultima || !caixa) return null;
 
-  if (fechada) {
+  if (fechada && !separada) {
     return (
       <button
         type="button"
@@ -191,10 +242,31 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
 
   const copiar = async () => {
     try {
-      await navigator.clipboard.writeText(trecho.codigo);
+      // da janela onde o editor está (a separada tem o foco quando o botão é clicado lá)
+      const onde = corpoRef.current?.ownerDocument?.defaultView || window;
+      await onde.navigator.clipboard.writeText(trecho.codigo);
       setCopiado(true);
       setTimeout(() => setCopiado(false), 1500);
     } catch { /* sem permissão de área de transferência: o código continua na tela para selecionar */ }
+  };
+
+  // leva o editor para uma janela do sistema, no mesmo lugar e tamanho em que ele está na página
+  const separar = () => {
+    const borda = Math.max(0, window.outerHeight - window.innerHeight); // a barra do navegador
+    const win = window.open("", "lisa-editor",
+      `popup=yes,width=${Math.round(caixa.w)},height=${Math.round(caixa.h)},left=${Math.round(window.screenX + caixa.x)},top=${Math.round(window.screenY + borda + caixa.y)}`);
+    if (!win) {
+      setAvisoSeparar("O navegador bloqueou a janela nova. Libere os pop-ups da Lisa e tente de novo.");
+      return;
+    }
+    setAvisoSeparar("");
+    setMaximizada(false);
+    setMinimizada(false);
+    setSeparada({ win, raiz: prepararJanelaSeparada(win) });
+  };
+  const juntar = () => {
+    try { separada?.win.close(); } catch { /* já fechou */ }
+    setSeparada(null);
   };
 
   const escolher = (id) => { setEscolhida(id === ultima.id ? null : id); setAba(null); };
@@ -220,13 +292,16 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
     </div>
   );
   const cursor = digitandoEste ? <span className="ide-lisa__cursor" aria-hidden="true" /> : null;
+  // na página: janela flutuante com alças; separada: ocupa a janela do sistema inteira (quem move
+  // e redimensiona é o próprio sistema)
+  const naPagina = !separada;
 
-  return (
+  const janela = (
     <div
       role="dialog"
       aria-label="Editor da Lisa: o código desta conversa"
       className="bb-ide"
-      style={{
+      style={naPagina ? {
         position: "fixed", zIndex: 190,
         left: maximizada ? "3vw" : caixa.x, top: maximizada ? "5vh" : caixa.y,
         width: maximizada ? "94vw" : caixa.w,
@@ -236,14 +311,17 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
         boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,0,0,0.4)", ...mono,
         // enquanto arrasta ou redimensiona, nada de selecionar texto sem querer
         userSelect: mexendo ? "none" : undefined,
+      } : {
+        position: "fixed", inset: 0, display: "flex", flexDirection: "column", overflow: "hidden",
+        background: "#050b10", color: "#cfeffb", ...mono,
       }}
     >
       {/* as alças de redimensionar: puxe qualquer borda ou canto (o de baixo à direita tem a marquinha) */}
-      {!maximizada && !minimizada && ALCAS.map(([direcao, lugar]) => (
+      {naPagina && !maximizada && !minimizada && ALCAS.map(([direcao, lugar]) => (
         <div key={direcao} aria-hidden="true" onPointerDown={(e) => comecarGesto(e, direcao)}
           style={{ position: "absolute", zIndex: 3, touchAction: "none", ...lugar }} />
       ))}
-      {!maximizada && !minimizada && (
+      {naPagina && !maximizada && !minimizada && (
         <span aria-hidden="true" style={{
           position: "absolute", right: 3, bottom: 3, width: 10, height: 10, zIndex: 2, pointerEvents: "none",
           background: "linear-gradient(135deg, transparent 0 45%, rgba(207,239,251,0.45) 45% 55%, transparent 55% 70%, rgba(207,239,251,0.45) 70% 80%, transparent 80%)",
@@ -256,32 +334,51 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
         @media (prefers-reduced-motion: reduce) { .ide-lisa__cursor { animation: none; } }
       `}</style>
 
-      {/* barra de título — arrastável; bolinhas de fechar, minimizar e maximizar */}
+      {/* barra de título — arrastável na página; bolinhas de fechar, minimizar e maximizar */}
       <div
-        onPointerDown={(e) => comecarGesto(e, "mover")}
-        onDoubleClick={() => setMaximizada((v) => !v)}
+        onPointerDown={naPagina ? (e) => comecarGesto(e, "mover") : undefined}
+        onDoubleClick={naPagina ? () => setMaximizada((v) => !v) : undefined}
         style={{
           display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", flex: "none",
           background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(var(--accent-rgb),0.18)",
-          cursor: maximizada ? "default" : mexendo ? "grabbing" : "grab", userSelect: "none", touchAction: "none",
+          cursor: !naPagina || maximizada ? "default" : mexendo ? "grabbing" : "grab", userSelect: "none", touchAction: "none",
         }}
       >
-        <div style={{ display: "flex", gap: 7, flex: "none" }}>
-          <span onPointerDown={(e) => e.stopPropagation()} onClick={() => setFechada(true)} title="fechar"
-            style={{ width: 11, height: 11, borderRadius: "50%", background: OR, cursor: "pointer", opacity: 0.8 }} />
-          <span onPointerDown={(e) => e.stopPropagation()} onClick={() => setMinimizada((v) => !v)} title="minimizar"
-            style={{ width: 11, height: 11, borderRadius: "50%", background: "rgba(207,239,251,0.4)", cursor: "pointer" }} />
-          <span onPointerDown={(e) => e.stopPropagation()} onClick={() => setMaximizada((v) => !v)} title="maximizar"
-            style={{ width: 11, height: 11, borderRadius: "50%", background: GR, cursor: "pointer", opacity: 0.8 }} />
-        </div>
+        {naPagina ? (
+          <div style={{ display: "flex", gap: 7, flex: "none" }}>
+            <span onPointerDown={(e) => e.stopPropagation()} onClick={() => setFechada(true)} title="fechar"
+              style={{ width: 11, height: 11, borderRadius: "50%", background: OR, cursor: "pointer", opacity: 0.8 }} />
+            <span onPointerDown={(e) => e.stopPropagation()} onClick={() => setMinimizada((v) => !v)} title="minimizar"
+              style={{ width: 11, height: 11, borderRadius: "50%", background: "rgba(207,239,251,0.4)", cursor: "pointer" }} />
+            <span onPointerDown={(e) => e.stopPropagation()} onClick={() => setMaximizada((v) => !v)} title="maximizar"
+              style={{ width: 11, height: 11, borderRadius: "50%", background: GR, cursor: "pointer", opacity: 0.8 }} />
+          </div>
+        ) : (
+          <button type="button" onClick={juntar} title="trazer o editor de volta para a página da Lisa" style={{ ...BOTAO, flex: "none" }}>
+            ↩ voltar para a página
+          </button>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1, justifyContent: "center" }}>
           <span style={{ fontSize: 10.5, letterSpacing: 1.5, color: CY, flex: "none" }}>⌨ EDITOR DA LISA</span>
           <span style={{ fontSize: 9.5, color: (ehUltima ? estado.terminou && !chegando : true) ? GR : "rgba(207,239,251,0.55)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             — {situacao}
           </span>
         </div>
-        <div style={{ width: 54, flex: "none" }} />
+        <div style={{ minWidth: 54, flex: "none", display: "flex", justifyContent: "flex-end" }}>
+          {naPagina && podeSeparar && (
+            <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={separar}
+              title="abrir o editor numa janela separada — dá para levar para outro monitor, maximizar e deixar ao lado"
+              style={{ ...BOTAO, flex: "none" }}>
+              ⧉ destacar
+            </button>
+          )}
+        </div>
       </div>
+      {avisoSeparar && (
+        <div role="alert" onClick={() => setAvisoSeparar("")} style={{ padding: "6px 12px", fontSize: 11, color: OR, background: "rgba(255,157,61,0.08)", borderBottom: "1px solid rgba(255,157,61,0.25)", cursor: "pointer", flex: "none" }}>
+          {avisoSeparar}
+        </div>
+      )}
 
       {!minimizada && (
         <>
@@ -376,5 +473,25 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
         </>
       )}
     </div>
+  );
+
+  if (!separada) return janela;
+  // separada: o editor é desenhado na janela do sistema; na página fica só o aviso de onde ele está
+  return (
+    <>
+      {createPortal(janela, separada.raiz)}
+      <button
+        type="button"
+        onClick={juntar}
+        title="fechar a janela separada e trazer o editor de volta para cá"
+        style={{
+          position: "fixed", right: 20, bottom: 88, zIndex: 190, ...mono, fontSize: 11.5, letterSpacing: 0.5,
+          padding: "9px 14px", borderRadius: 999, border: `1px solid ${CY}`, background: "rgba(5,11,16,0.92)",
+          color: "#eafcff", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+        }}
+      >
+        ⧉ editor numa janela separada · trazer de volta
+      </button>
+    </>
   );
 }

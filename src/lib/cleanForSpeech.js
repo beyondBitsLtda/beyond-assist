@@ -1,12 +1,16 @@
 // Limpa o texto para o TTS (voz) não ler símbolos literalmente.
 // A tela continua mostrando o texto original; isto afeta SÓ a fala.
 
+import { semBlocosDeCodigo } from "./codigoNaResposta.js";
+
 export function cleanForSpeech(input) {
   if (!input) return "";
   let t = String(input);
 
-  // remove blocos de código inteiros (não faz sentido falar código)
-  t = t.replace(/```[\s\S]*?```/g, " ");
+  // remove blocos de código inteiros (não faz sentido falar código) — com o mesmo leitor do
+  // editor da Lisa, que entende blocos de quatro crases e blocos dentro de um README
+  t = semBlocosDeCodigo(t, () => " ");
+  t = t.replace(/```[\s\S]*?```/g, " "); // sobra de cerca solta, se houver
   t = t.replace(/`([^`]+)`/g, "$1");
 
   // markdown de ênfase: **negrito**, *itálico*, __x__, _x_

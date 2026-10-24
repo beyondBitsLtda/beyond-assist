@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.10.0-cloudflare-pages.1",
+  "versao": "0.11.0-lisa-editor-destacado.1",
   "atualizadoEm": "2026-10-24",
   "compilacao": {
-    "numero": 34,
+    "numero": 35,
     "data": "2026-10-24",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.11.0-lisa-editor-destacado.1",
+      "data": "2026-10-24",
+      "branch": "lisa-editor-destacado",
+      "tipo": "funcionalidade",
+      "resumo": "O editor da Lisa vai para uma janela separada (outro monitor), e um README com blocos dentro deixa de sair quebrado.",
+      "itens": [
+        "Botão \"⧉ destacar\" no editor: abre o editor numa janela de verdade do sistema, que vai para outro monitor, maximiza e continua recebendo as respostas novas; \"voltar para a página\" (ou fechar a janela) traz o editor de volta. Só no computador.",
+        "Correção: um arquivo com blocos de código dentro (um README com o comando de rodar) saía quebrado em dois, com metade na caixa de texto e uma aba vazia. O leitor dos blocos agora segue o Markdown (bloco de quatro crases só fecha com quatro) e entende blocos dentro de um markdown.",
+        "A regra da Lisa pede um arquivo inteiro num bloco só, com quatro crases quando ele tem blocos dentro.",
+        "A voz usa o mesmo leitor do editor: não lê o README nem o código de dentro dele."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.10.0-cloudflare-pages.1",
       "data": "2026-10-24",
@@ -513,7 +527,7 @@
         "Notificações push de card novo e de tarefa atrasada.",
         "Kanban de tarefas da Delp a partir de planilha enviada pela tela.",
         "Consulta a repositórios do GitHub, tarefas de código e pair programming.",
-        "Editor de código na tela em qualquer modo: quando a conversa é sobre código, a Lisa mostra o código e uma janela de editor (realce de sintaxe, número de linha) digita trecho por trecho com a explicação de cada passo; uma aba por resposta (as anteriores ficam), abas por arquivo, janela que arrasta para qualquer lugar e redimensiona pelas bordas e cantos, lembrando onde ficou; a voz fala só a explicação. Antes de corrigir, a Lisa recebe o código que já apareceu na conversa (versão mais recente de cada arquivo) e pede o que falta em vez de inventar.",
+        "Editor de código na tela em qualquer modo: quando a conversa é sobre código, a Lisa mostra o código e uma janela de editor (realce de sintaxe, número de linha) digita trecho por trecho com a explicação de cada passo; uma aba por resposta (as anteriores ficam), abas por arquivo, janela que arrasta para qualquer lugar e redimensiona pelas bordas e cantos, lembrando onde ficou, e o botão \"destacar\" leva o editor para uma janela separada do sistema (outro monitor); a voz fala só a explicação. Antes de corrigir, a Lisa recebe o código que já apareceu na conversa (versão mais recente de cada arquivo) e pede o que falta em vez de inventar.",
         "Painel Sentinela de casos de teste e chamados."
       ],
       "naoInclui": [
