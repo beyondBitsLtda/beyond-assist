@@ -19,6 +19,7 @@
     "reserva-check": "node --import ./scripts/alias-loader.mjs scripts/reserva-check.mjs",
     "fala-check": "node scripts/fala-check.mjs",
     "codigo-check": "node scripts/codigo-check.mjs",
+    "visuais-check": "node scripts/visuais-check.mjs",
     "audio-check": "node scripts/audio-check.mjs",
     "conversa-check": "node scripts/conversa-check.mjs",
     "acoes-abacato-check": "node scripts/acoes-abacato-check.mjs",

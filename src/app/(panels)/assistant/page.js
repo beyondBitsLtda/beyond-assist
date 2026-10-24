@@ -15,7 +15,7 @@ import { TTS_VOICES, STEVE_VOICE_NAME } from "@/lib/ttsVoices.js";
 import { pickBrowserVoice, speakText, stopBrowserVoiceAudio, isBrowserVoiceAudioPlaying } from "@/lib/browserVoice.js";
 import { useIsMobile } from "@/lib/useIsMobile.js";
 import TopoExtra from "@/components/shell/TopoExtra.js";
-import Suspenso, { GrupoDoMenu, ItemDoMenu, ChaveDoMenu, SegmentosDoMenu } from "@/components/shell/Suspenso.js";
+import Suspenso, { GrupoDoMenu, ItemDoMenu, ChaveDoMenu, SegmentosDoMenu, LinkDoMenu } from "@/components/shell/Suspenso.js";
 import RotuloDaVoz from "@/components/panels/RotuloDaVoz.js";
 import { adicionarTurno, conversaVigente, falaQueValePergunta, interrupcaoNaFala, marcarInterrompida } from "@/lib/conversa.js";
 import { pareceAcao, falaSemRascunho, separarRascunho } from "@/lib/acoesNoAbacato.js";
@@ -44,7 +44,9 @@ import { loadGames } from "@/lib/gameHistory.js";
 // carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
 // realmente ligar a Visão 3D; desktop-only por decisão do usuário, nunca entra no bundle mobile.
 // a voz da Lisa como esfera de pontos (three.js) — aparência padrão desde a revisão visual
-const EsferaDaVoz = dynamic(() => import("@/components/panels/EsferaDaVoz.js"), { ssr: false, loading: () => null });
+// o visual do centro (Esfera de pontos, Lente, Orbe, Plasma, Anel) — escolhido no painel /visual
+import VisualDaLisa, { usarVisualEscolhido } from "@/components/panels/visuais/VisualDaLisa.js";
+import { VISUAIS, escolherVisual } from "@/lib/visuaisDaLisa.js";
 // o editor que abre quando a resposta traz código (qualquer modo — ver IdeDaLisa.js)
 const IdeDaLisa = dynamic(() => import("@/components/panels/IdeDaLisa.js"), { ssr: false, loading: () => null });
 const LisaAvatar3D = dynamic(() => import("@/components/panels/LisaAvatar3D.js"), {
@@ -438,6 +440,9 @@ export default function AssistantPage() {
   // deste componente, então nunca aparece nem carrega no mobile).
   // "esfera" (padrão desde a revisão visual de out/2026, ver EsferaDaVoz.js) também vale.
   const [avatarView, setAvatarView] = useState("esfera");
+  // com avatarView "esfera": QUAL visual reage à voz (Esfera de pontos, Lente, Orbe, Plasma ou
+  // Anel — src/lib/visuaisDaLisa.js), escolhido no painel /visual ou no menu de aparência
+  const visualDaLisa = usarVisualEscolhido();
   // qual "corpo" 3D usar quando avatarView === "3d" — "cyborg" (original, sem esqueleto) ou
   // "ironman" (rigado, com gestos de verdade por modo, ver LisaAvatarIronMan.js)
   const [avatarSkin, setAvatarSkin] = useState("cyborg");
@@ -3655,7 +3660,7 @@ export default function AssistantPage() {
           // ---- MODO VOZ: a esfera da voz ocupando a tela, e o botão de segurar para falar ----
           <div className="bb-celular-voz">
             <div className="bb-celular-esfera">
-              <EsferaDaVoz obterSinal={obterSinalDaEsfera} ocupacao={0.86} />
+              <VisualDaLisa modo={visualDaLisa} obterSinal={obterSinalDaEsfera} ocupacao={0.86} />
             </div>
             <RotuloDaVoz obterSinal={obterSinalDaEsfera} />
             <div className="bb-celular-fala">
@@ -4474,11 +4479,23 @@ export default function AssistantPage() {
               valor={avatarView}
               onChange={chooseAvatarView}
               opcoes={[
-                { valor: "esfera", rotulo: "Esfera", titulo: "Esfera de pontos que reage à voz" },
+                { valor: "esfera", rotulo: "Visual", titulo: "Um visual que reage à voz (Esfera de pontos, Lente, Orbe, Plasma ou Anel)" },
                 { valor: "traditional", rotulo: "Ondas", titulo: "Visualizador de onda tradicional" },
                 { valor: "3d", rotulo: "Avatar 3D", titulo: "Corpo em modelo 3D — arraste/belisque pra ajustar o enquadramento" },
               ]}
             />
+            {avatarView === "esfera" && (
+              <div className="bb-campo-do-menu">
+                <select className="bb-select" value={visualDaLisa} onChange={(e) => escolherVisual(e.target.value)} title="O visual que fica no centro e reage à voz">
+                  {VISUAIS.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+                </select>
+              </div>
+            )}
+            {avatarView === "esfera" && (
+              <LinkDoMenu href="/visual" detalhe="Prévia ao vivo de cada visual, falando, ouvindo e pensando">
+                Ver os visuais da Lisa
+              </LinkDoMenu>
+            )}
             {avatarView === "3d" && (
               <SegmentosDoMenu
                 rotulo="Corpo 3D"
@@ -4546,7 +4563,7 @@ export default function AssistantPage() {
               <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
             </div>
           ) : (
-            <EsferaDaVoz obterSinal={obterSinalDaEsfera} />
+            <VisualDaLisa modo={visualDaLisa} obterSinal={obterSinalDaEsfera} />
           )}
         </div>
 

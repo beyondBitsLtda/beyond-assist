@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.11.0-cloudflare-pages.1",
+  "versao": "0.12.0-lisa-modos-graficos.1",
   "atualizadoEm": "2026-10-24",
   "compilacao": {
-    "numero": 36,
+    "numero": 37,
     "data": "2026-10-24",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.12.0-lisa-modos-graficos.1",
+      "data": "2026-10-24",
+      "branch": "lisa-modos-graficos",
+      "tipo": "funcionalidade",
+      "resumo": "Quatro visuais novos para o centro do Assistente (Lente, Orbe de vidro, Plasma e Anel de partículas) e o painel \"Visual da Lisa\" para ver e escolher.",
+      "itens": [
+        "Lente: disco de vidro escuro com aro de arco-íris, anéis com aberração cromática e reflexo em crescente que acende com a voz.",
+        "Orbe de vidro: esfera translúcida com fitas iridescentes (roxo, azul, dourado) que se cruzam e giram por dentro.",
+        "Plasma: formas onduladas feitas de linhas finas, rosa, roxo e azul, com o núcleo claro que acende quando ela fala.",
+        "Anel de partículas: milhares de pontos do azul ao magenta que respiram, giram pensando e ondulam falando.",
+        "Todos reagem ao mesmo sinal da Esfera de pontos (pronta, ouvindo, pensando, falando, com o volume real quando há) e mudam de cor por estado.",
+        "Painel /visual (em Painéis › Conversa): prévia grande e galeria ao vivo, simulador de estado e o botão \"Usar este visual\"; o menu Aparência da Lisa também troca o visual. A escolha vale na hora, inclusive em outra aba aberta.",
+        "Teste novo: npm run visuais-check."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.11.0-cloudflare-pages.1",
       "data": "2026-10-24",
@@ -541,6 +558,7 @@
         "Kanban de tarefas da Delp a partir de planilha enviada pela tela.",
         "Consulta a repositórios do GitHub, tarefas de código e pair programming.",
         "Editor de código na tela em qualquer modo: quando a conversa é sobre código, a Lisa mostra o código e uma janela de editor (realce de sintaxe, número de linha) digita trecho por trecho com a explicação de cada passo; uma aba por resposta (as anteriores ficam), abas por arquivo, janela que arrasta para qualquer lugar e redimensiona pelas bordas e cantos, lembrando onde ficou, e o botão \"destacar\" leva o editor para uma janela separada do sistema (outro monitor); a voz fala só a explicação. Antes de corrigir, a Lisa recebe o código que já apareceu na conversa (versão mais recente de cada arquivo) e pede o que falta em vez de inventar.",
+        "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma e Anel de partículas; o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador).",
         "Painel Sentinela de casos de teste e chamados."
       ],
       "naoInclui": [
