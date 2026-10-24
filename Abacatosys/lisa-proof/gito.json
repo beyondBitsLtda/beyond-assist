@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.24.0-proof-modo-dominio.1",
+  "versao": "0.24.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-24",
   "compilacao": {
-    "numero": 61,
+    "numero": 62,
     "data": "2026-10-24",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.24.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.24.0: o Modo Domínio no ar (torre de um repositório público, chefões, prêmios para o Reino e certificado em PDF).",
+      "itens": [
+        "Junta a branch proof-modo-dominio (0.24.0-proof-modo-dominio.1).",
+        "Migração db/018-modo-dominio.sql aplicada no banco antes da publicação.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.24.0-proof-modo-dominio.1",
       "data": "2026-10-24",
