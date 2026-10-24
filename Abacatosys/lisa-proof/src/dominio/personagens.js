@@ -6,6 +6,7 @@
 // as telas e no boneco de papel do Reino em 3D. O Neuro Clássico e o Neuro Abacate são de todo mundo, de graça.
 
 import { faltam } from "./moedas.js";
+import { CHEFOES_FINAIS, personagemDoChefao } from "./modoDominio.js";
 
 export const PERSONAGENS = {
   neuro: { nome: "Neuro Clássico", emoji: "🧠", preco: 0, descricao: "O Neuro de sempre, rosa e curioso." },
@@ -28,6 +29,17 @@ export const ORDEM_DOS_PERSONAGENS = [
   "neuro", "abacato", "ninja", "astronauta", "mago", "cogumelo", "pirata", "mergulhador", "yeti", "robo", "magma", "alienigena",
 ];
 
+// Os chefões do Modo Domínio (24/10/2026): "os avatares aqui vão ser os chefões". Não se compram —
+// quem vence o topo de uma torre de nível Mestre ganha o chefão de lá. O desenho é o monstro de
+// papel dele (src/componentes/reino/monstrosDePapel.js), no lugar do Neuro.
+for (const c of CHEFOES_FINAIS) {
+  PERSONAGENS[personagemDoChefao(c.id)] = {
+    nome: c.nome, emoji: c.emoji, preco: null, chefao: c.id,
+    descricao: `${c.descricao} Guardião do topo de uma torre Mestre do Modo Domínio.`,
+  };
+}
+export const ORDEM_DOS_CHEFOES = CHEFOES_FINAIS.map((c) => personagemDoChefao(c.id));
+
 /** Os de graça: todo mundo tem, mesmo que a lista guardada não diga. */
 export const PERSONAGENS_DE_TODOS = ["neuro", "abacato"];
 
@@ -45,6 +57,7 @@ export function podeEscolherPersonagem({ id, possui, saldo }) {
   const def = PERSONAGENS[id];
   if (!def) return { ok: false, motivo: "personagem desconhecido" };
   if (personagensDe(possui).includes(id)) return { ok: true, compra: false, custo: 0 };
+  if (def.chefao) return { ok: false, compra: false, custo: 0, motivo: "chefão não se compra: vença o topo de uma torre Mestre no Modo Domínio" };
   if (saldo < def.preco) return { ok: false, compra: true, custo: def.preco, motivo: faltam(def.preco, saldo) };
   return { ok: true, compra: true, custo: def.preco };
 }

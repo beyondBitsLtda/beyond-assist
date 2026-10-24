@@ -364,7 +364,7 @@ export default function Reino() {
       </>
     ),
     personagens: () => (
-      <Personagens lista={reino.personagens} atual={reino.personagem} ocupado={ocupado}
+      <Personagens lista={reino.personagens} chefoes={reino.chefoes || []} atual={reino.personagem} ocupado={ocupado}
         aoEscolher={(p) => agir(`personagem:${p.id}`, { acao: "personagem", id: p.id }, (r) => {
           definirPersonagem(r.personagem);
           if (r.comprou) comemorar(`${r.nome} é seu! 🎭`);
@@ -732,10 +732,33 @@ function Reserva({ destino, dados, heroi, ocupado, aoTreinar }) {
 }
 
 /** Os personagens do Neuro: cada um aparece de verdade (o próprio Neuro, vestido). */
-function Personagens({ lista, atual, ocupado, aoEscolher }) {
+function Personagens({ lista, chefoes = [], atual, ocupado, aoEscolher }) {
   return (
     <section className="pf-secao" id="personagens">
       <h2 className="pf-secao__titulo">🎭 Personagens <small>o Neuro de todas as telas (e da ilha) veste o que você escolher</small></h2>
+      {chefoes.length > 0 && (
+        <div className="rn-chefoes">
+          <h3 className="rn-chefoes__titulo">🗼 Chefões do Modo Domínio <small>não se compram: o guardião do topo de uma torre Mestre vira seu avatar</small></h3>
+          <div className="rn-personagens">
+            {chefoes.map((p) => {
+              const usando = p.id === atual;
+              return (
+                <article key={p.id} className={`pf-cartao rn-personagem${usando ? " rn-personagem--usando" : ""}${p.tem ? "" : " rn-personagem--trancado"}`}>
+                  <div className="rn-personagem__vitrine" aria-hidden="true"><Neuro personagem={p.id} humor="normal" tamanho={96} /></div>
+                  <strong>{p.emoji} {p.nome}</strong>
+                  <span className="rn-personagem__desc">{p.descricao}</span>
+                  {usando ? <span className="pf-pilula pf-pilula--verde">Em uso</span>
+                    : p.tem ? (
+                      <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" disabled={Boolean(ocupado)} onClick={() => aoEscolher(p)}>Usar</button>
+                    ) : (
+                      <Link href="/dominio" className="pf-botao pf-botao--sec pf-botao--pequeno">🔒 Escalar uma torre</Link>
+                    )}
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div className="rn-personagens">
         {lista.map((p) => {
           const usando = p.id === atual;

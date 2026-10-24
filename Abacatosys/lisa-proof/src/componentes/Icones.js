@@ -44,6 +44,11 @@ export const IconeReino = () => (
 );
 
 // Mais: três pontos
+// Domínio (24/10/2026): a torre a escalar, com ameias e a porta embaixo
+export const IconeDominio = () => (
+  <svg {...base}><path d="M6 21V10h12v11M6 10V5h2.5v2h2V5h3v2h2V5H18v5M10.5 21v-3.5a1.5 1.5 0 0 1 3 0V21M4 21h16" /></svg>
+);
+
 export const IconeMais = () => (
   <svg {...base}><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>
 );

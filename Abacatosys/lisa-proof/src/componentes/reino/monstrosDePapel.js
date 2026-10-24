@@ -422,10 +422,18 @@ function cabecaDeCao(cx, cy, s) {
 export const ORDEM_DOS_DESENHOS = Object.keys(DESENHOS);
 export const ehMonstroDePapel = (tipo) => Boolean(DESENHOS[tipo]);
 
+/** A moldura de todo desenho de monstro. */
+export const VIEWBOX_DOS_MONSTROS = "-6 -12 212 212";
+
+/** Só o miolo do desenho (sem o <svg>): o chefão-avatar do Modo Domínio entra no SVG do Neuro. */
+export function desenhoDoMonstro(tipo) {
+  const desenho = DESENHOS[tipo] || DESENHOS.goblin;
+  return `<g stroke="#1f2937" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">${desenho()}</g>`;
+}
+
 /** O SVG de um monstro (as cores são dele; não usa a cor do time). */
 export function svgDoMonstro(tipo) {
-  const desenho = DESENHOS[tipo] || DESENHOS.goblin;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -12 212 212" width="424" height="424"><g stroke="#1f2937" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">${desenho()}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEWBOX_DOS_MONSTROS}" width="424" height="424">${desenhoDoMonstro(tipo)}</svg>`;
 }
 
 /** O desenho como URL de imagem, para usar fora do 3D (cartões das expedições, novidades). */

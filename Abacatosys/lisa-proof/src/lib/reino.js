@@ -14,7 +14,7 @@
 // Teste grava nas tabelas gêmeas proof_teste_*. As poucas diferenças do mundo de teste (o reino que
 // nasce liberado, os rivais-robô, o saldo sem os pontos de estudo) estão marcadas com emTeste().
 
-import { db, tabela, emTeste, mundoAtual, modoDeTesteLigado } from "./mundo.js";
+import { db, tabela, emTeste, mundoAtual, modoDeTesteLigado, noMundo } from "./mundo.js";
 import { ErroDeAcesso } from "./sessao.js";
 import { buscarTodas, buscarEmLotes } from "./estudo.js";
 import { diaDe, somarDias } from "@/dominio/datas.js";
@@ -46,7 +46,8 @@ import {
   TROPAS, ORDEM_DAS_TROPAS, RESERVAS, contagens, espacoUsado, capacidadeDoExercito, capacidadeDaGuarnicao,
   podeTreinar, somarTropas, heroiNeuro, lotacaoDoAcampamento, totalDeTropas,
 } from "@/dominio/tropas.js";
-import { PERSONAGENS, ORDEM_DOS_PERSONAGENS, personagensDe, podeEscolherPersonagem } from "@/dominio/personagens.js";
+import { PERSONAGENS, ORDEM_DOS_PERSONAGENS, ORDEM_DOS_CHEFOES, personagensDe, podeEscolherPersonagem } from "@/dominio/personagens.js";
+import { encaixarTropas, veiculoDoPremio, valorDasTropas, MOEDAS_NO_LUGAR } from "@/dominio/modoDominio.js";
 import {
   MOEDAS_INICIAIS_DE_TESTE, MOEDAS_DE_TESTE, SALDO_DOS_RIVAIS, NOME_DO_REINO_DE_TESTE, RIVAIS_DE_TESTE, FERRAMENTAS_DE_TESTE,
   rivalDeTeste, ehRivalDeTeste, reinoDoRival, reinoLiberado, reinoNovoDeTeste,
@@ -380,6 +381,8 @@ export async function estadoDoReino(usuarioId) {
       const pode = podeEscolherPersonagem({ id, possui: reino.personagens, saldo });
       return { id, ...PERSONAGENS[id], tem: personagensDe(reino.personagens).includes(id), pode: pode.ok, motivo: pode.ok ? "" : pode.motivo };
     }),
+    // os chefões do Modo Domínio: não se compram, se ganham no topo de uma torre Mestre
+    chefoes: ORDEM_DOS_CHEFOES.map((id) => ({ id, ...PERSONAGENS[id], tem: personagensDe(reino.personagens).includes(id) })),
     batalhas: batalhas.map((b) => {
       const ataquei = b.atacante_id === usuarioId;
       return {
@@ -817,6 +820,73 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
     caidas: r.caidas, combate: r.entrada, emprestado: tropa.emprestado, repartido,
     expedicao: { id: expedicao.id, nome: expedicao.nome, tipo: expedicao.tipo, chefe: expedicao.chefe, dificuldade: expedicao.dificuldade, veiculo, forca: expedicao.forca || 1 },
   };
+}
+
+// ---------------------------------------------------------------- prêmios do Modo Domínio
+
+/**
+ * Os prêmios de um marco do Modo Domínio (src/dominio/modoDominio.js) chegando ao Reino: tropas no
+ * exército, defesas na guarnição, o próximo veículo da garagem e o chefão como avatar. O que não
+ * tem onde entrar (reserva cheia, sem Quartel, veículo ou avatar que já é seu) vira moedas, para o
+ * prêmio nunca se perder. Sempre no mundo de verdade. Devolve o que foi entregue, para a tela contar.
+ */
+export async function premiarDoDominio(usuarioId, premios, origem = {}) {
+  const doReino = (premios || []).filter((p) => ["tropas", "defesas", "veiculo", "avatar"].includes(p.tipo));
+  if (!doReino.length) return [];
+  return noMundo("real", async () => {
+    for (let tentativa = 1; ; tentativa++) {
+      try {
+        return await aplicarPremios(usuarioId, doReino, origem);
+      } catch (e) {
+        // o reino mudou no meio (a pessoa treinou tropas ao mesmo tempo): lê de novo e refaz a conta
+        if (!(e instanceof ErroDeAcesso && e.status === 409) || tentativa >= 3) throw e;
+      }
+    }
+  });
+}
+
+async function aplicarPremios(usuarioId, premios, origem) {
+  const reino = await obterReino(usuarioId);
+  const n = niveisDe(reino);
+  const reservas = { exercito: contagens(reino.exercito), guarnicao: contagens(reino.guarnicao) };
+  let veiculos = veiculosDe(reino.veiculos);
+  let personagens = personagensDe(reino.personagens);
+  const mudancas = {};
+  const entregues = [];
+  let moedas = 0;
+  for (const p of premios) {
+    if (p.tipo === "tropas" || p.tipo === "defesas") {
+      const destino = p.tipo === "tropas" ? "exercito" : "guarnicao";
+      const { cabem, sobram } = encaixarTropas({ pacote: p.tropas, destino, niveis: n, ...reservas });
+      reservas[destino] = somarTropas(reservas[destino], cabem);
+      if (Object.keys(cabem).length) mudancas[destino] = reservas[destino];
+      const troco = valorDasTropas(sobram);
+      moedas += troco;
+      entregues.push({ tipo: p.tipo, tropas: cabem, moedas: troco });
+    } else if (p.tipo === "veiculo") {
+      const v = veiculoDoPremio(veiculos);
+      if (v) {
+        veiculos = veiculosDe([...veiculos, v]);
+        mudancas.veiculos = veiculos;
+        entregues.push({ tipo: "veiculo", veiculo: v, nome: VEICULOS[v].nome });
+      } else {
+        moedas += MOEDAS_NO_LUGAR.veiculo;
+        entregues.push({ tipo: "veiculo", moedas: MOEDAS_NO_LUGAR.veiculo });
+      }
+    } else if (p.tipo === "avatar") {
+      if (PERSONAGENS[p.personagem] && !personagens.includes(p.personagem)) {
+        personagens = personagensDe([...personagens, p.personagem]);
+        mudancas.personagens = personagens;
+        entregues.push({ tipo: "avatar", personagem: p.personagem, nome: PERSONAGENS[p.personagem].nome });
+      } else {
+        moedas += MOEDAS_NO_LUGAR.avatar;
+        entregues.push({ tipo: "avatar", personagem: p.personagem, moedas: MOEDAS_NO_LUGAR.avatar });
+      }
+    }
+  }
+  const lancamentos = moedas > 0 ? [{ tipo: "dominio", valor: moedas, detalhe: { ...origem, troco: true } }] : [];
+  if (lancamentos.length || Object.keys(mudancas).length) await lancarEGravar(reino, lancamentos, mudancas);
+  return entregues;
 }
 
 // ---------------------------------------------------------------- veículos e combustível

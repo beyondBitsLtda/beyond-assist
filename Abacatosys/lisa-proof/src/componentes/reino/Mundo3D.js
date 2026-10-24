@@ -9,6 +9,7 @@ import { svgDaTropa, TAMANHO_DO_PAPEL, ALTURA_DE_VOO } from "./tropasDePapel.js"
 import { cenarioDe, estruturaDaExpedicao, terrenoDaExpedicao, raioDoPlanetoide } from "./cenariosDasExpedicoes.js";
 import { uniformeDaCurva, curvarTudo, curvarPonto } from "./curvatura.js";
 import { svgDoOperario } from "./operariosDePapel.js";
+import { svgComoImagem, recorteDePapel } from "./papel.js";
 
 /**
  * O Reino em 3D: uma ilha flutuante low poly com as construções, e o Neuro como um recorte de
@@ -652,64 +653,7 @@ function nuvens(p) {
 }
 
 // ------------------------------------------------------------------ o Neuro de papel
-/** Copia o SVG do Neuro (com as cores calculadas pelo CSS) para uma imagem. */
-function svgComoImagem(svg) {
-  const copia = svg.cloneNode(true);
-  const originais = svg.querySelectorAll("*");
-  const copias = copia.querySelectorAll("*");
-  originais.forEach((el, i) => {
-    const cs = getComputedStyle(el);
-    const c = copias[i];
-    for (const prop of ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "opacity", "display"]) {
-      const v = cs.getPropertyValue(prop);
-      if (v) c.setAttribute(prop, v);
-    }
-    if (el.classList.contains("neuro__sombra")) c.setAttribute("display", "none");
-    c.removeAttribute("class");
-    c.removeAttribute("style");
-  });
-  copia.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-  copia.setAttribute("width", "400");
-  copia.setAttribute("height", "400");
-  copia.removeAttribute("class");
-  const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(copia));
-  return new Promise((ok, erro) => {
-    const img = new Image();
-    img.onload = () => ok(img);
-    img.onerror = erro;
-    img.src = url;
-  });
-}
-
-/** A imagem com borda branca de adesivo e uma sombrinha de papel. */
-function recorteDePapel(img) {
-  const T = 512, margem = 30, lado = T - margem * 2;
-  const silhueta = (cor) => {
-    const c = document.createElement("canvas");
-    c.width = c.height = T;
-    const x = c.getContext("2d");
-    x.drawImage(img, margem, margem, lado, lado);
-    x.globalCompositeOperation = "source-in";
-    x.fillStyle = cor;
-    x.fillRect(0, 0, T, T);
-    return c;
-  };
-  const c = document.createElement("canvas");
-  c.width = c.height = T;
-  const ctx = c.getContext("2d");
-  const sombra = silhueta("rgba(0,0,0,0.18)");
-  const branca = silhueta("#ffffff");
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2;
-    ctx.drawImage(sombra, Math.cos(a) * 11 + 2, Math.sin(a) * 11 + 5);
-  }
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2;
-    ctx.drawImage(branca, Math.cos(a) * 10, Math.sin(a) * 10);
-  }
-  ctx.drawImage(img, margem, margem, lado, lado);
-  return c;
-}
+// svgComoImagem e recorteDePapel moram em ./papel.js (a torre do Modo Domínio usa as mesmas)
 
 // ------------------------------------------------------------------ o componente
 export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "normal", personagem: personagemFixo, soLeitura = false, mineiros = 0, diamantes = 0, aoEscolher, aoVisitar, aoFalhar }) {

@@ -760,3 +760,9 @@ button.rn-exp__arte:disabled { cursor: progress; }
 .rn-teste__grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @container ferramentas (min-width: 880px) { .rn-teste__grade { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @container ferramentas (max-width: 420px) { .rn-teste__grade { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---- os chefões do Modo Domínio (24/10/2026): avatares que se ganham no topo de uma torre Mestre */
+.rn-chefoes { display: grid; gap: 10px; margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px dashed var(--pf-linha); }
+.rn-chefoes__titulo { margin: 0; font-size: 15px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.rn-chefoes__titulo small { font-weight: 400; color: var(--pf-tinta-2); font-size: 12px; }
+.rn-personagem--trancado .rn-personagem__vitrine { filter: grayscale(1) brightness(0.55); opacity: 0.8; }

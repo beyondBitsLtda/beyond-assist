@@ -303,6 +303,10 @@ export const LIVRES = [
   { prefixo: "/entrar", motivo: "a própria tela de login" },
   { prefixo: "/api/auth/", motivo: "entrar e sair" },
   { prefixo: "/api/saude", motivo: "checagem de saúde — monitoramento que exige login não monitora" },
+  // Modo Domínio (24/10/2026): quem recebe o PDF do certificado confere pelo código, sem conta.
+  // Mostra só o nome público, o repositório e as notas — nada de e-mail nem nome completo.
+  { prefixo: "/certificado", motivo: "a página de conferência de um certificado do Modo Domínio" },
+  { prefixo: "/api/certificado/", motivo: "os dados da conferência de um certificado (só leitura, por código)" },
   // Não há cadastro aqui: a conta é criada no Abacato.
 ];
 

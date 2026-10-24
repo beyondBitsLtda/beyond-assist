@@ -56,14 +56,17 @@ function relevancia(caminho) {
  * Os arquivos de código do repositório, cortados para caber na avaliação.
  *
  * Devolve `{ dono, repo, branch, url, arquivos: [{ caminho, conteudo }], ignorados }`.
+ *
+ * `ref` (Modo Domínio, 24/10/2026): lê num commit (ou branch) específico, no lugar do que vem no
+ * link — o link não carrega branch com barra ("dominio/repo"), e um sha não tem esse problema.
  */
-export async function lerRepositorio(endereco) {
+export async function lerRepositorio(endereco, { ref } = {}) {
   const alvo = lerEnderecoDoRepo(endereco);
   if (!alvo) throw new ErroDoGitHub("link inválido — use https://github.com/usuario/repositorio");
 
   const info = await api(`/repos/${alvo.dono}/${alvo.repo}`);
   if (info.private) throw new ErroDoGitHub("o repositório é privado — a Lisa só avalia repositórios públicos");
-  const branch = alvo.branch || info.default_branch;
+  const branch = ref || alvo.branch || info.default_branch;
 
   const arvore = await api(`/repos/${alvo.dono}/${alvo.repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`);
   const candidatos = (arvore.tree || [])

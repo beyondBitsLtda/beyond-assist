@@ -21,7 +21,7 @@ import {
   validarProjeto, podeTrocarProjeto, projetoAntigo, TROCAS_DE_PROJETO,
 } from "../src/dominio/pratica.js";
 import { execucaoDoExercicio, prepararParaCompilador, resultadoDoServidor } from "../src/dominio/execucao.js";
-import { PERSONAGENS, ORDEM_DOS_PERSONAGENS, personagensDe, podeEscolherPersonagem } from "../src/dominio/personagens.js";
+import { PERSONAGENS, ORDEM_DOS_PERSONAGENS, ORDEM_DOS_CHEFOES, personagensDe, podeEscolherPersonagem } from "../src/dominio/personagens.js";
 import { nomePublico, apelidoValido, posicionar, ANONIMO } from "../src/dominio/ranking.js";
 import {
   podeMelhorar, podeSubirNeuro, producaoAcumulada, podeInvadir, batalha, saldoDe, somarTrofeus,
@@ -74,6 +74,16 @@ import { conferirChamado, tituloDoChamado, descricaoDoChamado } from "../src/dom
 import { montarRaioX, acertosDoQuiz, horaEmSaoPaulo } from "../src/dominio/raioX.js";
 import { assuntosParaODuracao, nomeDoQuadro, validarCurso, assuntosEmOrdem, resumoDoCurso } from "../src/dominio/curso.js";
 import { montarAgenda, itensDoDia, gradeDoMes, mesVizinho } from "../src/dominio/agenda.js";
+import {
+  MIN_ANDARES, NOTA_PARA_VENCER, CHEFOES, CHEFOES_FINAIS, ATRIBUTOS, andaresPermitidos, andaresEscolhidos, dificuldadeEsperada,
+  chefoesDaTorre, nomeDoChefao, sementeDe, pontosDoAndar, pontosDoTopo, atributosDoNeuro, roteiroDaLuta, marcosDaTorre,
+  premiosDaTorre, premiosDoAndar, encaixarTropas, veiculoDoPremio, valorDasTropas, MOEDAS_NO_LUGAR, blocosDaTorre,
+  assuntosDoBloco, mediaDasNotas, branchSugerida, branchValida, codigoDoCertificado, codigoValido, validarAnalise,
+  validarTorre, validarDesafio, validarAvaliacaoDoAndar, personagemDoChefao, chefaoDoPersonagem, dificuldadeSempreSobe,
+} from "../src/dominio/modoDominio.js";
+import { lerEnderecoDoRepo, linkDoCommit } from "../src/dominio/enderecoDoRepo.js";
+import { pdfDeJpeg } from "../src/dominio/pdf.js";
+import { ehLivre } from "../src/lib/auth.js";
 
 let passou = 0;
 function caso(nome, fn) {
@@ -998,10 +1008,12 @@ caso("exercício do dia: o mesmo exercício de novo é barrado", () => {
   assert.equal(exercicioRepetido({ titulo: "Contador de vogais", enunciado: "Conte quantas vogais existem numa palavra digitada." }, antes), false);
 });
 caso("personagens: o Clássico é de todos; comprar cobra, vestir o que já tem é de graça", () => {
-  // 12 (os 5 dos ambientes das expedições estrearam em 23/10/2026): a vitrine fecha as linhas de 6, 4, 3 e 2
-  assert.equal(Object.keys(PERSONAGENS).length, 12);
-  // a vitrine mostra todos, uma vez cada, do mais barato ao mais caro
-  assert.deepEqual([...ORDEM_DOS_PERSONAGENS].sort(), Object.keys(PERSONAGENS).sort());
+  // 12 na loja (os 5 dos ambientes das expedições estrearam em 23/10/2026): a vitrine fecha as linhas de 6, 4, 3 e 2.
+  // Os chefões do Modo Domínio (24/10/2026) não se compram: ficam fora da loja.
+  const daLoja = Object.keys(PERSONAGENS).filter((id) => !PERSONAGENS[id].chefao);
+  assert.equal(daLoja.length, 12);
+  // a vitrine mostra todos os da loja, uma vez cada, do mais barato ao mais caro
+  assert.deepEqual([...ORDEM_DOS_PERSONAGENS].sort(), daLoja.sort());
   const precos = ORDEM_DOS_PERSONAGENS.map((id) => PERSONAGENS[id].preco);
   assert.deepEqual(precos, [...precos].sort((a, b) => a - b));
   for (const id of ["cogumelo", "mergulhador", "yeti", "magma", "alienigena"]) assert.ok(PERSONAGENS[id].preco > 0, id);
@@ -1649,6 +1661,247 @@ caso("invasão: só as tropas que caem se perdem (as sobreviventes voltam)", () 
   const perdas = caidasNoAtaque(exercito, r.sobreviventes);
   for (const [t, n] of Object.entries(exercito)) assert.equal((perdas[t] || 0) + (r.sobreviventes[t] || 0), n);
   assert.ok(Object.values(r.sobreviventes).reduce((a, b) => a + b, 0) > 0, "contra um reino fraco, alguém sobrevive");
+});
+
+// ---------------------------------------------------------------- Modo Domínio (24/10/2026)
+
+caso("Modo Domínio: o nível manda no tamanho da torre; a dificuldade só sobe", () => {
+  assert.deepEqual(andaresPermitidos(1), { min: 10, max: 15 });
+  assert.deepEqual(andaresPermitidos(5), { min: 10, max: 100 });
+  assert.equal(andaresEscolhidos(200, 3), 50);
+  assert.equal(andaresEscolhidos(3, 5), MIN_ANDARES);
+  assert.equal(andaresEscolhidos("muitos", 1), null);
+  assert.equal(dificuldadeEsperada(1, 10), 1);
+  assert.equal(dificuldadeEsperada(10, 10), 5);
+  for (const n of [10, 37, 100]) {
+    const lista = Array.from({ length: n }, (_, i) => dificuldadeEsperada(i + 1, n));
+    assert.ok(lista.every((d, i) => i === 0 || d >= lista[i - 1]), `sobe em ${n}`);
+  }
+});
+
+caso("Modo Domínio: os chefões ficam mais fortes, o do topo é um dos quatro e a semente repete", () => {
+  const ordem = CHEFOES.map((c) => c.id);
+  const finais = CHEFOES_FINAIS.map((c) => c.id);
+  assert.equal(finais.length, 4);
+  for (const n of [10, 37, 100]) {
+    for (const s of [1, 7, 12345, sementeDe("dono/repo")]) {
+      const lista = chefoesDaTorre(n, s);
+      assert.equal(lista.length, n);
+      assert.ok(finais.includes(lista.at(-1)), "o do topo é dos quatro mais fortes");
+      assert.ok(lista.slice(0, -1).every((c) => c !== lista.at(-1)), "o guardião do topo só aparece no topo");
+      assert.deepEqual(chefoesDaTorre(n, s), lista, "a mesma semente sorteia igual");
+      const media = (xs) => xs.reduce((a, c) => a + ordem.indexOf(c), 0) / xs.length;
+      const q = Math.max(2, Math.floor(n / 4));
+      assert.ok(media(lista.slice(0, q)) < media(lista.slice(-q - 1, -1)), "o começo é mais fraco que o fim");
+    }
+  }
+  assert.equal(nomeDoChefao("golem", "do Callback"), "Golem do Callback");
+  assert.equal(nomeDoChefao("golem", ""), "Golem");
+  assert.equal(chefaoDoPersonagem(personagemDoChefao("kraken")), "kraken");
+  assert.equal(chefaoDoPersonagem("ninja"), null);
+});
+
+caso("Modo Domínio: pontos do andar (dificuldade × nível × nota) e do topo", () => {
+  assert.equal(pontosDoAndar(100, 5, 5), Math.round(65 * 1.75));
+  assert.equal(pontosDoAndar(100, 1, 1), 25);
+  assert.equal(pontosDoAndar(0, 5, 5), 0);
+  assert.equal(pontosDoAndar(150, 1, 1), 25, "nota acima de 100 não vale mais");
+  assert.equal(pontosDoTopo(1, 10), 40);
+  assert.equal(pontosDoTopo(5, 100), Math.round(200 * Math.sqrt(10)));
+});
+
+caso("Modo Domínio: a luta — 60 vence, sem sorte; as vidas fecham certinho", () => {
+  for (const nota of [0, 30, 59, 60, 75, 100]) {
+    for (let s = 1; s <= 25; s++) {
+      const r = roteiroDaLuta({ nota, atributos: { logica: 80, testes: 20 }, dificuldade: 1 + (s % 5), semente: s });
+      assert.equal(r.venceu, nota >= NOTA_PARA_VENCER);
+      assert.equal(r.golpes[0].quem, "neuro");
+      r.golpes.forEach((g, i) => { if (i) assert.notEqual(g.quem, r.golpes[i - 1].quem, "os golpes se alternam"); assert.ok(g.dano >= 1); });
+      const fim = r.golpes.at(-1);
+      if (r.venceu) { assert.equal(fim.vidaChefao, 0); assert.ok(fim.vidaNeuro > 0); assert.equal(fim.quem, "neuro"); }
+      else { assert.equal(fim.vidaNeuro, 0); assert.ok(fim.vidaChefao > 0); }
+      assert.deepEqual(roteiroDaLuta({ nota, atributos: { logica: 80, testes: 20 }, dificuldade: 1 + (s % 5), semente: s }), r);
+    }
+  }
+  // quanto maior a nota, mais rápido o chefão cai
+  const golpesDoNeuro = (nota) => roteiroDaLuta({ nota, semente: 3 }).golpes.filter((g) => g.quem === "neuro").length;
+  assert.ok(golpesDoNeuro(100) <= golpesDoNeuro(61));
+  // o golpe especial é o melhor atributo
+  const r = roteiroDaLuta({ nota: 90, atributos: { testes: 95, logica: 40 }, semente: 5 });
+  assert.equal(r.golpes.filter((g) => g.quem === "neuro").at(-1).especial, "testes");
+});
+
+caso("Modo Domínio: os atributos do Neuro pesam a dificuldade; o nível sobe com a experiência", () => {
+  const zero = atributosDoNeuro([]);
+  assert.equal(zero.nivel, 1);
+  assert.ok(ATRIBUTOS.every((a) => zero.valores[a.id] === 0));
+  const r = atributosDoNeuro([{ atributos: { logica: 100 }, dificuldade: 1 }, { atributos: { logica: 0 }, dificuldade: 3 }]);
+  assert.equal(r.valores.logica, 25);
+  assert.equal(r.experiencia, 4);
+  assert.equal(atributosDoNeuro(Array.from({ length: 3 }, () => ({ atributos: {}, dificuldade: 5 }))).nivel, 2);
+});
+
+caso("Modo Domínio: os prêmios dos marcos dependem do nível do repositório", () => {
+  assert.deepEqual(marcosDaTorre(10), [3, 5, 8, 10]);
+  assert.deepEqual(marcosDaTorre(100), [25, 50, 75, 100]);
+  const tipos = (lista) => lista.flatMap((m) => m.premios.map((p) => p.tipo));
+  const n1 = premiosDaTorre(10, 1, "kraken");
+  assert.deepEqual([...new Set(tipos(n1))].sort(), ["certificado", "pontos"]);
+  const n5 = premiosDaTorre(100, 5, "kraken");
+  const topo = n5.at(-1).premios;
+  assert.ok(topo.some((p) => p.tipo === "veiculo"));
+  assert.ok(topo.some((p) => p.tipo === "avatar" && p.personagem === "chefao-kraken"));
+  assert.ok(topo.some((p) => p.tipo === "certificado"));
+  assert.ok(n5[0].premios.some((p) => p.tipo === "tropas"));
+  assert.ok(n5[1].premios.some((p) => p.tipo === "defesas"));
+  assert.ok(!tipos(premiosDaTorre(50, 4, "kraken")).includes("avatar"), "avatar só no nível Mestre");
+  assert.deepEqual(premiosDoAndar(8, 10, 5, "kraken"), premiosDaTorre(10, 5, "kraken")[2].premios);
+  assert.deepEqual(premiosDoAndar(4, 10, 5, "kraken"), []);
+  // os pontos dos marcos crescem até o topo
+  const pontos = n5.map((m) => m.premios.find((p) => p.tipo === "pontos").pontos);
+  assert.ok(pontos.every((p, i) => i === 0 || p > pontos[i - 1]));
+});
+
+caso("Modo Domínio: prêmio no Reino — o que não cabe (ou não é liberado) vira moedas", () => {
+  const vazio = { exercito: {}, guarnicao: {} };
+  assert.deepEqual(encaixarTropas({ pacote: { guerreiro: 8 }, destino: "exercito", niveis: { quartel: 0, acampamento: 1 }, ...vazio }), { cabem: {}, sobram: { guerreiro: 8 } });
+  assert.equal(valorDasTropas({ guerreiro: 8 }), 80);
+  assert.deepEqual(
+    encaixarTropas({ pacote: { guerreiro: 8 }, destino: "exercito", niveis: { quartel: 1, acampamento: 1 }, exercito: { guerreiro: 15 }, guarnicao: {} }),
+    { cabem: { guerreiro: 5 }, sobram: { guerreiro: 3 } },
+  );
+  // mago pede a Torre do Neuro no nível 3
+  assert.deepEqual(encaixarTropas({ pacote: { mago: 1 }, destino: "guarnicao", niveis: { castelo: 1, acampamento: 4 }, ...vazio }).sobram, { mago: 1 });
+  // a lotação do Acampamento vale para as duas reservas juntas
+  const r = encaixarTropas({ pacote: { arqueira: 6 }, destino: "guarnicao", niveis: { castelo: 3, acampamento: 1 }, exercito: { guerreiro: 30 }, guarnicao: { arqueira: 7 } });
+  assert.deepEqual(r, { cabem: { arqueira: 3 }, sobram: { arqueira: 3 } });
+  // o que cabe sempre respeita o treino de verdade
+  const n = { quartel: 2, castelo: 2, acampamento: 2 };
+  const e = encaixarTropas({ pacote: { gigante: 2, guerreiro: 8 }, destino: "exercito", niveis: n, ...vazio });
+  for (const [t, q] of Object.entries(e.cabem)) assert.ok(podeTreinar({ tropa: t, quantidade: q, destino: "exercito", niveis: n, reservas: vazio, saldo: 1e9 }).ok, t);
+  assert.equal(veiculoDoPremio([]), "submarino");
+  assert.equal(veiculoDoPremio(["submarino", "dirigivel"]), "tanque");
+  assert.equal(veiculoDoPremio(["barco", "submarino", "dirigivel", "tanque", "nave"]), null);
+  assert.ok(MOEDAS_NO_LUGAR.veiculo > 0 && MOEDAS_NO_LUGAR.avatar > 0);
+});
+
+caso("Modo Domínio: a torre grande sai em blocos, cada um com a sua fatia de assuntos", () => {
+  assert.deepEqual(blocosDaTorre(10), [{ inicio: 1, fim: 10 }]);
+  assert.deepEqual(blocosDaTorre(30), [{ inicio: 1, fim: 25 }, { inicio: 26, fim: 30 }]);
+  assert.equal(blocosDaTorre(100).length, 4);
+  assert.equal(blocosDaTorre(100).reduce((s, b) => s + b.fim - b.inicio + 1, 0), 100);
+  const assuntos = Array.from({ length: 20 }, (_, i) => `a${i + 1}`);
+  const fim = assuntosDoBloco(assuntos, { inicio: 76, fim: 100 }, 100);
+  assert.ok(fim.includes("a20") && !fim.includes("a1"));
+  const comeco = assuntosDoBloco(assuntos, { inicio: 1, fim: 25 }, 100);
+  assert.ok(comeco.includes("a1") && !comeco.includes("a20"));
+  assert.deepEqual(assuntosDoBloco(assuntos, { inicio: 1, fim: 20 }, 20), assuntos);
+  // o trecho é numerado e a dificuldade segue a torre inteira
+  const trecho = validarTorre({ andares: Array.from({ length: 5 }, () => ({ titulo: "x", dificuldade: 5 })) }, 5, { inicio: 1, total: 100 });
+  assert.deepEqual(trecho.map((a) => a.numero), [1, 2, 3, 4, 5]);
+  assert.ok(trecho.every((a) => a.dificuldade === 2), "no começo de 100 andares, dificuldade 5 desce para 2");
+  const alto = validarTorre({ andares: Array.from({ length: 3 }, () => ({ titulo: "y", dificuldade: 1 })) }, 3, { inicio: 98, total: 100 });
+  assert.deepEqual(alto.map((a) => [a.numero, a.dificuldade]), [[98, 4], [99, 4], [100, 4]]);
+  assert.throws(() => validarTorre({ andares: [{}, {}] }, 3), /só 2 de 3/);
+  // juntando os blocos, a dificuldade nunca desce
+  assert.deepEqual(dificuldadeSempreSobe([4, 4, 3, 5, 4].map((dificuldade, i) => ({ numero: i + 1, dificuldade }))).map((a) => a.dificuldade), [4, 4, 4, 5, 5]);
+});
+
+caso("Modo Domínio: as conferências do que a IA devolve", () => {
+  const a = validarAnalise({ apto: true, complexidade: 9, andaresSugeridos: 500, tecnologias: Array.from({ length: 20 }, (_, i) => `t${i}`) });
+  assert.equal(a.complexidade, 5);
+  assert.equal(a.andaresSugeridos, 100);
+  assert.equal(a.tecnologias.length, 12);
+  assert.equal(validarAnalise({ apto: true, complexidade: 0 }).apto, false);
+  assert.equal(validarAnalise({ apto: true, complexidade: 2 }).andaresSugeridos, 30, "sem sugestão, vale o teto do nível");
+  assert.throws(() => validarDesafio({ requisitos: ["só um"] }), /requisitos/);
+  const d = validarDesafio({ enunciado: "faça", requisitos: ["a", "b", "c"], arquivos: Array(20).fill("x.js") });
+  assert.equal(d.arquivos.length, 8);
+  const av = validarAvaliacaoDoAndar({ nota: 150, atributos: { logica: 30, testes: "abc" } });
+  assert.equal(av.nota, 100);
+  assert.equal(av.venceu, true);
+  assert.equal(av.atributos.logica, 30);
+  assert.equal(av.atributos.testes, 100, "atributo ilegível vale a nota geral");
+  assert.equal(validarAvaliacaoDoAndar({ nota: 59 }).venceu, false);
+  assert.equal(mediaDasNotas([{ vencido: true, melhorNota: 80 }, { vencido: true, melhorNota: 61 }, { vencido: false, melhorNota: 30 }]), 71);
+});
+
+caso("Modo Domínio: a branch sugerida e o código do certificado", () => {
+  assert.equal(branchSugerida("Meu Repositório Ação"), "dominio/meu-repositorio-acao");
+  assert.equal(branchSugerida("dono/lisa.proof"), "dominio/lisa.proof");
+  for (const b of ["dominio/x", "feature/a-b_c.1"]) assert.ok(branchValida(b), b);
+  for (const b of ["", "../x", "a..b", "a b", "x.lock", "/x", "x/", "a;rm"]) assert.ok(!branchValida(b), b);
+  const codigo = codigoDoCertificado(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 250, 255]));
+  assert.match(codigo, /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+  assert.ok(codigoValido(codigo));
+  assert.ok(!/[01OIL]/.test(codigo.replace(/-/g, "")), "sem as letras que se confundem");
+  assert.ok(!codigoValido("ABCD-EFGH-IJKL"));
+  assert.ok(!codigoValido(`${codigo}X`));
+  assert.throws(() => codigoDoCertificado([1, 2, 3]));
+});
+
+caso("Modo Domínio: o endereço do repositório (GitHub e GitLab, só os públicos de verdade)", () => {
+  assert.deepEqual(lerEnderecoDoRepo("https://github.com/dono/repo/tree/main"), { provedor: "github", caminho: "dono/repo", nome: "repo", branch: "main", url: "https://github.com/dono/repo" });
+  assert.equal(lerEnderecoDoRepo("github.com/dono/repo.git").caminho, "dono/repo");
+  const gl = lerEnderecoDoRepo("https://gitlab.com/grupo/sub/projeto/-/tree/dev/x?ref=1");
+  assert.deepEqual([gl.provedor, gl.caminho, gl.nome, gl.branch], ["gitlab", "grupo/sub/projeto", "projeto", "dev/x"]);
+  assert.equal(lerEnderecoDoRepo("https://gitlab.com/grupo/projeto/-/blob/main/a.js").branch, null);
+  assert.equal(lerEnderecoDoRepo("https://gitlab.com/grupo/projeto.git").caminho, "grupo/projeto");
+  for (const ruim of ["https://gitlab.com.evil.com/a/b", "https://evil.com/github.com/a/b", "https://gitlab.com/so-um", "https://gitlab.exemplo.com/a/b", "ftp://github.com/a/b", ""]) {
+    assert.equal(lerEnderecoDoRepo(ruim), null, ruim);
+  }
+  assert.equal(linkDoCommit("https://gitlab.com/g/p", "abc"), "https://gitlab.com/g/p/-/commit/abc");
+  assert.equal(linkDoCommit("https://github.com/d/r", "abc"), "https://github.com/d/r/commit/abc");
+});
+
+caso("Modo Domínio: o PDF do certificado é um PDF de verdade (xref batendo com os objetos)", () => {
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 0xff, 0xd9]);
+  const pdf = pdfDeJpeg(jpeg, 20, 14, { titulo: "Certificado de Domínio — ação (teste)" });
+  const texto = new TextDecoder("latin1").decode(pdf);
+  assert.ok(texto.startsWith("%PDF-1.4"));
+  assert.ok(texto.trimEnd().endsWith("%%EOF"));
+  const inicioDoXref = Number(/startxref\s+(\d+)/.exec(texto)[1]);
+  assert.equal(texto.slice(inicioDoXref, inicioDoXref + 4), "xref");
+  const entradas = [...texto.slice(inicioDoXref).matchAll(/^(\d{10}) 00000 n ?\r?$/gm)].map((m) => Number(m[1]));
+  assert.ok(entradas.length >= 5, `entradas: ${entradas.length}`);
+  entradas.forEach((pos, i) => assert.ok(texto.startsWith(`${i + 1} 0 obj`, pos), `objeto ${i + 1}`));
+  const titulo = /\/Title \(([^)]*)\)/.exec(texto)?.[1] || "";
+  assert.ok(titulo.startsWith("Certificado de Dominio"), titulo);
+  assert.ok(!/[^\x20-\x7e]/.test(titulo), "título só em ASCII");
+  assert.throws(() => pdfDeJpeg(new Uint8Array([1, 2, 3]), 1, 1), /JPEG/);
+});
+
+caso("Modo Domínio: chefão-avatar não se compra, e o certificado público é a única porta sem login", () => {
+  assert.equal(ORDEM_DOS_CHEFOES.length, 4);
+  for (const id of ORDEM_DOS_CHEFOES) {
+    assert.ok(PERSONAGENS[id]?.chefao, id);
+    assert.ok(!ORDEM_DOS_PERSONAGENS.includes(id), "não aparece na loja");
+    assert.equal(podeEscolherPersonagem({ id, possui: [], saldo: 1e9 }).ok, false);
+    assert.deepEqual(podeEscolherPersonagem({ id, possui: [id], saldo: 0 }), { ok: true, compra: false, custo: 0 });
+    assert.ok(personagensDe([id]).includes(id));
+  }
+  assert.ok(ehLivre("/certificado/ABCD-2345-EFGH"));
+  assert.ok(ehLivre("/api/certificado/ABCD-2345-EFGH"));
+  for (const fechado of ["/certificados", "/dominio", "/api/dominio", "/api/certificadoX", "/api/dominio/1/entregar"]) assert.ok(!ehLivre(fechado), fechado);
+});
+
+caso("Modo Domínio: a migração só acrescenta tipos (nenhum tipo antigo some)", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const tiposDe = (sql, restricao) => {
+    const trechos = [...sql.matchAll(new RegExp(`${restricao}[\\s\\S]*?check \\(tipo in \\(([\\s\\S]*?)\\)\\)`, "g"))];
+    return trechos.length ? [...trechos.at(-1)[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]) : null;
+  };
+  const novos = ler("../db/018-modo-dominio.sql");
+  for (const restricao of ["proof_reino_movimentos_tipo_check", "proof_eventos_tipo_check"]) {
+    const agora = tiposDe(novos, restricao);
+    assert.ok(agora?.includes("dominio"), `${restricao} aceita dominio`);
+    let antes = null;
+    for (const f of fs.readdirSync(new URL("../db/", import.meta.url)).filter((x) => /^\d{3}-.*\.sql$/.test(x) && x < "018").sort()) {
+      antes = tiposDe(ler(`../db/${f}`), restricao) || antes;
+    }
+    assert.ok(antes, `achei a regra antiga de ${restricao}`);
+    for (const t of antes) assert.ok(agora.includes(t), `${restricao}: o tipo ${t} continua`);
+  }
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);
