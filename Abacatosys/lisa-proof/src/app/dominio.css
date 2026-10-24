@@ -1,0 +1,258 @@
+/* Modo Domínio (24/10/2026): a lista de torres, a torre 3D, a luta, o desafio e o certificado. */
+
+.dm { --dm-ouro: #C9A227; --dm-ceu-1: #bfe0ff; --dm-ceu-2: #eef7ff; display: grid; gap: 0; min-width: 0; }
+:root[data-tema="escuro"] .dm { --dm-ceu-1: #12223a; --dm-ceu-2: #22324d; }
+.dm a { color: var(--pf-verde-forte); }
+:root[data-tema="escuro"] .dm a { color: var(--pf-verde); }
+.dm-nota { color: var(--pf-tinta-2); font-size: 13px; margin: 8px 0 0; }
+.dm-voltar { font-size: 14px; text-decoration: none; margin-bottom: 8px; display: inline-block; }
+.dm-titulo { overflow-wrap: anywhere; }
+
+/* ---- chips */
+.dm-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.dm-chip {
+  display: inline-flex; align-items: center; padding: 3px 10px; border-radius: var(--pf-pilula);
+  background: var(--pf-superficie-2); border: 1px solid var(--pf-linha); color: var(--pf-tinta); font-size: 12px; font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.dm-chip--arquivo { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 500; }
+
+/* ---- a entrada: colar o link */
+.dm-novo { display: grid; gap: 16px; align-items: center; padding: 18px; }
+@media (min-width: 720px) { .dm-novo { grid-template-columns: auto minmax(0, 1fr); } }
+.dm-novo__neuro { display: flex; justify-content: center; }
+.dm-novo__form { display: grid; gap: 12px; min-width: 0; }
+.dm-novo__acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.dm-novo__acoes small { color: var(--pf-tinta-2); flex: 1 1 260px; }
+.dm-recusa { margin-top: 12px; padding: 16px; border-left: 4px solid var(--pf-atencao); }
+.dm-recusa p { margin: 6px 0; }
+.dm-recusa small { color: var(--pf-tinta-2); }
+
+/* ---- a lista de torres */
+.dm-lista { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+.dm-cartao { display: flex; gap: 12px; align-items: center; padding: 14px; text-decoration: none; color: var(--pf-tinta); min-width: 0; }
+.dm-cartao:hover { border-color: var(--pf-verde); }
+.dm-cartao--concluido { border: 2px solid var(--dm-ouro); }
+.dm-cartao__arte { flex: none; width: 64px; height: 64px; display: grid; place-items: center; font-size: 36px; }
+.dm-cartao__textos { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.dm-cartao__repo { overflow-wrap: anywhere; }
+.dm-cartao__selo { justify-self: start; margin-bottom: 2px; }
+.dm-cartao__meta, .dm-cartao__textos small { color: var(--pf-tinta-2); font-size: 13px; }
+
+/* ---- como funciona */
+.dm-como { display: grid; gap: 16px; }
+@media (min-width: 900px) { .dm-como { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; } }
+.dm-como ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; line-height: 1.5; }
+.dm-niveis { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--pf-superficie); border-radius: var(--pf-raio); overflow: hidden; }
+.dm-niveis caption { text-align: left; font-weight: 600; padding: 0 0 8px; }
+.dm-niveis th, .dm-niveis td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--pf-linha); vertical-align: top; }
+.dm-niveis th { color: var(--pf-tinta-2); font-weight: 600; }
+
+/* ---- montar a torre */
+.dm-montar { display: grid; gap: 14px; }
+@media (min-width: 980px) { .dm-montar { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; } }
+.dm-analise { display: grid; gap: 14px; padding: 18px; }
+@media (min-width: 640px) { .dm-analise { grid-template-columns: auto minmax(0, 1fr); } }
+.dm-analise h2, .dm-escolha h2 { margin: 0 0 6px; font-size: 18px; }
+.dm-analise p { margin: 0 0 8px; line-height: 1.5; }
+.dm-analise__motivo { color: var(--pf-tinta-2); font-size: 14px; }
+.dm-analise__neuro { display: flex; justify-content: center; }
+.dm-assuntos { margin-top: 10px; }
+.dm-assuntos summary { cursor: pointer; font-weight: 600; }
+.dm-assuntos ol { margin: 8px 0 0; padding-left: 22px; display: grid; gap: 3px; font-size: 14px; }
+.dm-escolha { display: grid; gap: 12px; padding: 18px; }
+.dm-escolha p { margin: 0; color: var(--pf-tinta-2); }
+.dm-escolha__controle { display: flex; align-items: center; gap: 14px; }
+.dm-escolha__controle input { flex: 1; accent-color: var(--pf-verde); min-width: 0; }
+.dm-escolha__numero { font-size: 34px; font-weight: 700; min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
+.dm-escolha__final { display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 12px; background: var(--pf-superficie-2); }
+.dm-escolha__final div { display: grid; gap: 2px; }
+.dm-escolha__final small { color: var(--pf-tinta-2); }
+.dm-marcos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.dm-marcos li { padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--pf-linha); overflow-wrap: anywhere; }
+.dm-marcos__andar { font-weight: 700; margin-right: 6px; }
+
+/* ---- o palco: a torre 3D e o Neuro */
+.dm-palco { display: grid; gap: 14px; }
+@media (min-width: 1000px) { .dm-palco { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; } }
+.dm-palco__mundo { position: relative; min-width: 0; display: grid; gap: 10px; }
+.dm-torre {
+  position: relative; height: 380px; border-radius: var(--pf-raio-grande); overflow: hidden; isolation: isolate;
+  background: linear-gradient(180deg, var(--dm-ceu-1), var(--dm-ceu-2)); border: 1px solid var(--pf-linha);
+  touch-action: pan-y;
+}
+@media (min-width: 900px) { .dm-torre { height: 480px; } }
+.dm-torre--carregando { display: grid; place-items: center; color: var(--pf-tinta-2); }
+.dm-torre__tela { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.dm-torre__tela:active { cursor: grabbing; }
+.dm-torre__controles { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: grid; gap: 6px; z-index: 2; }
+.dm-torre__botao {
+  width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--pf-linha); cursor: pointer;
+  background: var(--pf-superficie); color: var(--pf-tinta); font-size: 15px; box-shadow: var(--pf-sombra);
+}
+.dm-torre__botao:focus-visible { outline: 3px solid var(--pf-verde); outline-offset: 2px; }
+.dm-torre__molde { position: absolute; left: -9999px; top: 0; width: 200px; height: 200px; pointer-events: none; }
+
+/* ---- o placar da luta (por cima da torre) */
+.dm-placar {
+  position: absolute; left: 10px; right: 58px; top: 10px; z-index: 3;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr); gap: 10px; align-items: center;
+  padding: 10px 12px; border-radius: 14px; background: rgba(17, 24, 20, 0.82); color: #fff; font-size: 13px;
+}
+.dm-placar--plano { position: static; }
+@media (max-width: 620px) { .dm-placar { grid-template-columns: 1fr 1fr; right: 10px; } .dm-placar__fala { grid-column: 1 / -1; order: 3; } }
+.dm-placar__lado { display: grid; gap: 4px; min-width: 0; }
+.dm-placar__lado span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.dm-placar__lado--chefao { text-align: right; }
+.dm-placar__fala { text-align: center; font-weight: 700; font-size: 14px; }
+.dm-vida { height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
+.dm-vida__cheio { height: 100%; border-radius: inherit; transition: width 0.45s ease; }
+.dm-vida__cheio--neuro { background: #22C55E; }
+.dm-vida__cheio--chefao { background: #EF4444; margin-left: auto; }
+@media (prefers-reduced-motion: reduce) { .dm-vida__cheio { transition: none; } }
+
+/* ---- o andar clicado na torre */
+.dm-visto { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; position: relative; }
+.dm-visto div { display: grid; gap: 2px; min-width: 0; padding-right: 26px; }
+.dm-visto small { color: var(--pf-tinta-2); }
+.dm-visto p { margin: 4px 0 0; font-size: 14px; }
+.dm-fechar { position: absolute; top: 8px; right: 8px; border: 0; background: transparent; color: var(--pf-tinta-2); font-size: 16px; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
+.dm-fechar:hover { background: var(--pf-superficie-2); }
+
+/* ---- o Neuro e os atributos */
+.dm-neuro { display: grid; gap: 14px; padding: 16px; }
+.dm-neuro__topo { display: flex; gap: 10px; align-items: center; }
+.dm-neuro__topo div { display: grid; gap: 2px; }
+.dm-neuro__topo small { color: var(--pf-tinta-2); font-size: 12px; }
+.dm-neuro__barras, .dm-atributos-da-entrega { display: grid; gap: 8px; }
+.dm-atributo { display: grid; grid-template-columns: minmax(0, 11em) minmax(0, 1fr) 2.6em; gap: 8px; align-items: center; font-size: 13px; }
+.dm-atributo span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-atributo b { text-align: right; font-variant-numeric: tabular-nums; }
+.dm-atributo .pf-barra, .dm-neuro__progresso .pf-barra { margin: 0; }
+.dm-neuro__progresso { display: grid; gap: 6px; font-size: 13px; }
+.dm-neuro__progresso small { color: var(--pf-tinta-2); }
+
+/* ---- o resultado da entrega */
+.dm-resultado { margin-top: 14px; padding: 18px; display: grid; gap: 14px; position: relative; border-left: 5px solid var(--pf-atencao); }
+.dm-resultado--venceu { border-left-color: var(--pf-verde); }
+.dm-resultado__topo { display: flex; gap: 16px; align-items: flex-start; padding-right: 30px; }
+.dm-resultado__topo h2 { margin: 0 0 6px; font-size: 19px; }
+.dm-resultado__topo p { margin: 0; line-height: 1.5; }
+.dm-resultado__nota { flex: none; width: 84px; height: 84px; border-radius: 50%; display: grid; place-content: center; text-align: center; background: var(--pf-superficie-2); border: 4px solid var(--pf-atencao); }
+.dm-resultado--venceu .dm-resultado__nota { border-color: var(--pf-verde); }
+.dm-resultado__nota strong { font-size: 28px; line-height: 1; }
+.dm-resultado__nota small { color: var(--pf-tinta-2); }
+.dm-resultado__pontos { color: var(--pf-verde-forte); font-weight: 700; margin-top: 6px !important; }
+.dm-resultado__listas { display: grid; gap: 12px; }
+@media (min-width: 720px) { .dm-resultado__listas { grid-template-columns: 1fr 1fr; } }
+.dm-resultado h3 { margin: 0 0 6px; font-size: 15px; }
+.dm-resultado ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; line-height: 1.45; }
+.dm-resultado__premios { padding: 12px; border-radius: 12px; background: var(--pf-sucesso-fundo); }
+.dm-resultado__commit { color: var(--pf-tinta-2); }
+
+/* ---- a trilha de prêmios */
+.dm-premios { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); }
+.dm-premio { padding: 12px 14px; display: grid; gap: 6px; align-content: start; }
+.dm-premio--recebido { border: 2px solid var(--pf-verde); }
+.dm-premio__andar { font-weight: 700; }
+.dm-premio ul { margin: 0; padding-left: 18px; font-size: 13px; display: grid; gap: 3px; align-content: start; overflow-wrap: anywhere; }
+
+/* ---- a branch */
+.dm-branch { margin-top: 14px; padding: 16px 18px; display: grid; gap: 10px; }
+.dm-branch h2 { margin: 0; font-size: 18px; }
+.dm-branch p { margin: 0; line-height: 1.5; }
+.dm-branch--pronta { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }
+.dm-branch--pronta div { display: grid; gap: 4px; min-width: 0; }
+.dm-branch--pronta small { color: var(--pf-tinta-2); overflow-wrap: anywhere; }
+.dm-branch__form { display: grid; gap: 10px; }
+@media (min-width: 760px) { .dm-branch__form { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); } .dm-branch__acoes, .dm-branch__form > small { grid-column: 1 / -1; } }
+.dm-branch__acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.dm-comandos {
+  margin: 0; padding: 12px 14px; border-radius: 12px; overflow-x: auto; font-size: 13px; line-height: 1.6;
+  background: var(--pf-codigo-fundo); color: var(--pf-codigo-tinta);
+}
+.dm code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* ---- o andar de agora e o desafio */
+.dm-andar { display: grid; gap: 16px; padding: 18px; }
+@media (min-width: 760px) { .dm-andar { grid-template-columns: 170px minmax(0, 1fr); } }
+.dm-andar__chefao { display: grid; gap: 4px; justify-items: center; text-align: center; align-content: start; }
+.dm-andar__chefao small { color: var(--pf-tinta-2); font-size: 12px; }
+.dm-andar__corpo { min-width: 0; display: grid; gap: 8px; align-content: start; }
+.dm-andar__corpo h3 { margin: 0; font-size: 19px; }
+.dm-andar__corpo > .dm-chip { justify-self: start; }
+.dm-andar__objetivo { margin: 0; color: var(--pf-tinta-2); line-height: 1.5; }
+.dm-andar__abrir { display: grid; gap: 6px; justify-items: start; margin-top: 8px; }
+.dm-andar__abrir small { color: var(--pf-tinta-2); }
+.dm-desafio { display: grid; gap: 6px; margin-top: 8px; }
+.dm-desafio__enunciado { margin: 0; line-height: 1.6; }
+.dm-desafio h4 { margin: 8px 0 0; font-size: 14px; }
+.dm-desafio ol, .dm-desafio ul { margin: 0; padding-left: 22px; display: grid; gap: 4px; line-height: 1.5; }
+.dm-dica { margin-top: 6px; }
+.dm-dica summary { cursor: pointer; font-weight: 600; }
+.dm-dica p { margin: 6px 0 0; }
+.dm-entregar { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--pf-linha); justify-items: start; }
+.dm-entregar small { color: var(--pf-tinta-2); }
+.dm-entregar .dm-comandos { width: 100%; }
+.dm-entregar__botao { font-size: 16px; padding-inline: 22px; }
+.dm-entregas { margin-top: 14px; }
+.dm-entregas h3 { font-size: 15px; margin: 0 0 8px; }
+.dm-entregas h3 small { color: var(--pf-tinta-2); font-weight: 400; }
+.dm-entregas ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.dm-entrega { padding: 12px 14px; border-left: 4px solid var(--pf-atencao); }
+.dm-entrega--venceu { border-left-color: var(--pf-verde); }
+.dm-entrega__topo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.dm-entrega__topo small { color: var(--pf-tinta-2); }
+.dm-entrega p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; }
+.dm-entrega details { margin-top: 6px; font-size: 14px; }
+.dm-entrega summary { cursor: pointer; }
+
+/* ---- todos os andares */
+.dm-andares > summary { list-style: none; cursor: pointer; }
+.dm-andares > summary::-webkit-details-marker { display: none; }
+.dm-andares > summary .pf-secao__titulo { justify-content: flex-start; }
+.dm-andares > summary .pf-secao__titulo small { margin-left: auto; }
+.dm-andares > summary .pf-secao__titulo::before { content: "▸ "; }
+.dm-andares[open] > summary .pf-secao__titulo::before { content: "▾ "; }
+.dm-andares__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dm-andares__item {
+  display: grid; grid-template-columns: 36px 2.4em minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  padding: 8px 12px; border-radius: 12px; background: var(--pf-superficie); border: 1px solid var(--pf-linha);
+}
+.dm-andares__item--vencido { opacity: 0.8; }
+.dm-andares__item--atual { border: 2px solid var(--dm-ouro); }
+.dm-andares__num { font-weight: 700; color: var(--pf-tinta-2); font-variant-numeric: tabular-nums; }
+.dm-andares__texto { display: grid; min-width: 0; }
+.dm-andares__texto strong, .dm-andares__texto small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dm-andares__texto small { color: var(--pf-tinta-2); }
+.dm-andares__estado { font-size: 13px; white-space: nowrap; }
+
+/* ---- sem WebGL: a torre plana */
+.dm-plana { display: grid; gap: 6px; padding: 14px; border-radius: var(--pf-raio-grande); background: linear-gradient(180deg, var(--dm-ceu-1), var(--dm-ceu-2)); }
+.dm-plana__andar { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-radius: 12px; background: var(--pf-superficie); border: 1px solid var(--pf-linha); min-height: 52px; }
+.dm-plana__andar span:first-child { font-weight: 700; width: 2.4em; }
+.dm-plana__andar--atual { border: 2px solid var(--dm-ouro); }
+.dm-plana__andar--vencido { opacity: 0.75; }
+
+/* ---- o certificado */
+.dm-certificado__cartao { display: grid; gap: 16px; padding: 16px; }
+@media (min-width: 900px) { .dm-certificado__cartao { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: center; } }
+.dm-certificado__previa { width: 100%; height: auto; aspect-ratio: 2000 / 1414; border-radius: 10px; box-shadow: var(--pf-sombra-alta); background: #FBF7EE; }
+.dm-certificado__acoes { display: grid; gap: 10px; justify-items: start; }
+.dm-certificado__acoes small { color: var(--pf-tinta-2); }
+
+/* ---- a conferência pública do certificado */
+.dm-conferencia { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--pf-fundo); color: var(--pf-tinta); }
+.dm-conferencia__cartao { width: min(100%, 640px); padding: 24px; display: grid; gap: 10px; }
+.dm-conferencia__cartao h1 { margin: 0; font-size: 24px; }
+.dm-conferencia__cartao h2 { margin: 8px 0 0; font-size: 16px; }
+.dm-conferencia__cartao p { margin: 0; line-height: 1.5; }
+.dm-conferencia__marca { color: var(--pf-verde-forte); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 12px; }
+.dm-conferencia__repo { font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+.dm-conferencia__repo a { color: var(--pf-verde-forte); }
+.dm-conferencia__dados { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 6px 0; }
+.dm-conferencia__dados div { padding: 10px; border-radius: 12px; background: var(--pf-superficie-2); }
+.dm-conferencia__dados dt { font-size: 12px; color: var(--pf-tinta-2); }
+.dm-conferencia__dados dd { margin: 2px 0 0; font-weight: 700; overflow-wrap: anywhere; }
+.dm-conferencia__guardiao { display: flex; align-items: center; gap: 10px; }
+.dm-conferencia__assuntos { margin: 0; padding-left: 20px; display: grid; gap: 3px; font-size: 14px; }

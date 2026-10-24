@@ -9,14 +9,36 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.23.1-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-23",
+  "versao": "0.24.0-proof-modo-dominio.1",
+  "atualizadoEm": "2026-10-24",
   "compilacao": {
-    "numero": 60,
-    "data": "2026-10-23",
+    "numero": 61,
+    "data": "2026-10-24",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.24.0-proof-modo-dominio.1",
+      "data": "2026-10-24",
+      "branch": "proof-modo-dominio",
+      "tipo": "funcionalidade",
+      "resumo": "Modo Domínio: escalar a torre de um repositório público (GitHub ou GitLab), andar por andar, até dominar o código — com chefões, prêmios para o Reino e certificado em PDF.",
+      "itens": [
+        "Nova tela Domínio (menu): a pessoa cola o link de um repositório público do GitHub ou do GitLab e a Lisa lê o código, diz se ele aguenta um desafio e dá o nível (1 a 5).",
+        "A pessoa escolhe de 10 até o teto do nível (15, 30, 50, 75 ou 100) andares; a Lisa monta a torre do básico ao difícil, um desafio prático por andar (a torre grande sai em blocos de 25 pedidos ao mesmo tempo).",
+        "Torre 3D (torre de pedra ou montanha, sorteada por repositório), com os chefões de papel do Reino em cada andar e o Neuro no andar de agora.",
+        "A pessoa cria uma branch para a torre; a cada andar faz commit e push e clica em Entregar: a Lisa lê o que mudou desde o começo do andar, dá a nota e mede lógica, arquitetura, testes, qualidade e domínio da stack.",
+        "O Neuro luta com o chefão do andar (60 ou mais vence e sobe; abaixo disso, commit novo e outra tentativa); os atributos de cada entrega formam os atributos do Neuro na torre.",
+        "Pontos por andar (dificuldade × nível × nota) contam como moedas, ranking e ofensiva do dia; refazer só sobe a melhor nota.",
+        "Marcos a 25%, 50%, 75% e no topo pagam bônus de pontos e, conforme o nível do repositório, tropas, defesas, o próximo veículo e (no nível Mestre) o chefão do topo como avatar; o que não cabe no Reino vira moedas.",
+        "Chefões do Modo Domínio na seção Personagens do Reino: não se compram, ficam trancados até serem ganhos; vestidos, aparecem no lugar do Neuro em todas as telas e no 3D.",
+        "No topo, certificado personalizado (nome, repositório, nível, média, tecnologias e assuntos) desenhado na tela e baixado em PDF, com código de conferência.",
+        "Página pública /certificado/<código> para conferir a autenticidade, mostrando só o nome público.",
+        "Migração db/018-modo-dominio.sql: tabelas proof_dominios e proof_dominio_andares e o tipo 'dominio' no livro de pontos e no livro-caixa do Reino.",
+        "Novidades do Proof com a edição do Modo Domínio."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.23.1-cloudflare-pages.1",
       "data": "2026-10-23",
@@ -929,11 +951,13 @@
         "Bolsa do Reino em tela própria (/bolsa), estilo home broker: ações iguais para todos, pregão das 07:00 às 17:00 (horário de Brasília) com cotações de hora em hora, gráficos e velas, pregão diário decidido pela Lisa (IA), compra e venda com corretagem",
         "Tela cheia do Reino com menus suspensos e visita completa aos reinos vizinhos durante a paz",
         "Neuro Abacate (mascote do Abacato), personagem gratuito para todos",
-        "Reino de Teste (/reino/teste e /bolsa/teste): um mundo à parte com tudo liberado, rivais-robô e ferramentas para zerar os limites do dia e recomeçar; nada dele vale no jogo de verdade (liberado para todos por enquanto; desliga com PROOF_MODO_TESTE=0)"
+        "Reino de Teste (/reino/teste e /bolsa/teste): um mundo à parte com tudo liberado, rivais-robô e ferramentas para zerar os limites do dia e recomeçar; nada dele vale no jogo de verdade (liberado para todos por enquanto; desliga com PROOF_MODO_TESTE=0)",
+        "Modo Domínio (/dominio): torre de 10 a 100 andares para dominar um repositório público do GitHub ou do GitLab; desafio por andar, entrega por commit numa branch, avaliação da IA, luta do Neuro com o chefão, prêmios para o Reino e certificado em PDF com página pública de conferência (/certificado/<código>)",
+        "Chefões do Modo Domínio como avatares (personagens que não se compram, ganhos no topo de uma torre Mestre)"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
-        "Não lê repositórios privados do GitHub, nem com token configurado.",
+        "Não lê repositórios privados do GitHub nem do GitLab, nem com token configurado; do GitLab, só gitlab.com (instâncias próprias ficam de fora).",
         "Lembretes dependem do iMac ligado: o envio roda no relógio (crontab) dele, não na Cloudflare.",
         "Quadros em que a pessoa é só membro (não dona) não viram trilha.",
         "Não apaga quadros nem cards do Abacato; só cria quadros quando a pessoa aprova um curso proposto pela Lisa.",
@@ -942,7 +966,9 @@
         "Moedas do Reino não se compram nem se trocam por dinheiro: só vêm do estudo, da mina e dos saques.",
         "O ranking não mostra nome completo nem e-mail de ninguém.",
         "O Reino de Teste não passa nada para o reino de verdade (moedas, tropas, veículos, carteira) e não entra no ranking.",
-        "O projeto do mês não é mais gerado: deu lugar ao projeto final de cada trilha. Os que já existiam continuam no histórico."
+        "O projeto do mês não é mais gerado: deu lugar ao projeto final de cada trilha. Os que já existiam continuam no histórico.",
+        "No Modo Domínio, a Lisa não roda o código nem faz commits: lê o que mudou na branch da pessoa e avalia.",
+        "A página de conferência do certificado não mostra nome completo nem e-mail (só o nome público)."
       ]
     },
     "stack": [
@@ -950,15 +976,16 @@
       "Cloudflare Workers via @opennextjs/cloudflare",
       "@supabase/supabase-js (PostgREST com a service role)",
       "Google Gemini pela API REST, com rodízio de chaves e respostas em JSON com esquema",
-      "API do GitHub (leitura de repositórios públicos)",
+      "APIs do GitHub e do GitLab (leitura de repositórios públicos, ponta de branch e comparação de commits)",
       "Web Push (VAPID) com a biblioteca web-push, no script de lembretes do iMac; service worker e manifesto de app",
       "Animações em SVG e CSS, sem biblioteca (mascote Neuro e mapa da trilha)",
       "PBKDF2 e HMAC via WebCrypto (login e sessão, mesmo esquema do Abacato)",
       "CodeMirror 6 (editor de código e cores por linguagem; cada linguagem é carregada só quando aparece)",
-      "Three.js 0.170 (o mundo 3D do Reino, carregado só nessa tela)"
+      "Three.js 0.170 (o mundo 3D do Reino, carregado só nessa tela)",
+      "PDF do certificado montado à mão no navegador (src/dominio/pdf.js), sem biblioteca de PDF"
     ],
     "arquitetura": {
-      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do curso (a semana de cada assunto no agendamento, a mesma do mapa e da agenda), o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check.",
+      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do curso (a semana de cada assunto no agendamento, a mesma do mapa e da agenda), o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check. O Modo Domínio (db/018) guarda a torre em proof_dominios e cada andar em proof_dominio_andares; as regras (níveis, chefões, pontos, luta, prêmios, conferência da IA) são puras em src/dominio/modoDominio.js, a IA em src/lib/iaDominio.js, o GitHub e o GitLab em src/lib/repositorios.js (só github.com e gitlab.com) e o caminho até o banco em src/lib/dominio.js. Cada passo que gasta IA tem trava contra clique duplo (gravação condicional ao estado lido), e só quem move a torre de andar paga o prêmio do marco. Os prêmios entram no Reino de verdade por premiarDoDominio (src/lib/reino.js), respeitando as capacidades das reservas. O certificado é desenhado num canvas e embrulhado em PDF no navegador; /certificado e /api/certificado são as únicas rotas novas sem login.",
       "diagramas": [
         {
           "titulo": "Visão geral",
@@ -994,7 +1021,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/017; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/018; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS."
       }
     ],
     "integracoes": [
@@ -1010,7 +1037,7 @@
       },
       {
         "nome": "GitHub",
-        "descricao": "Leitura de repositórios públicos entregues nos projetos da semana e do mês, para a avaliação da IA. GITHUB_TOKEN é opcional e só aumenta o limite de consultas.",
+        "descricao": "Leitura de repositórios públicos entregues nos projetos da semana e do mês, e no Modo Domínio (código, ponta da branch do desafio e comparação de commits). GITHUB_TOKEN é opcional e só aumenta o limite de consultas.",
         "url": "https://api.github.com"
       },
       {
@@ -1022,6 +1049,11 @@
         "nome": "jsDelivr (sql.js)",
         "descricao": "De onde o navegador baixa o SQLite em WebAssembly (sql.js 1.10.3) na primeira vez que alguém roda um exercício de SQL.",
         "url": "https://www.jsdelivr.com/package/npm/sql.js"
+      },
+      {
+        "nome": "GitLab",
+        "descricao": "Modo Domínio: leitura de projetos públicos do gitlab.com (código, ponta da branch e comparação de commits), sem token.",
+        "url": "https://gitlab.com/api/v4"
       }
     ],
     "links": [

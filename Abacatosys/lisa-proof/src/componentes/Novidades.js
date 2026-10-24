@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoMonstro } from "./reino/monstrosDePapel.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-23-semana-do-curso";
+export const EDICAO_DAS_NOVIDADES = "2026-10-24-modo-dominio";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,11 +28,10 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "📅", titulo: "O projeto semanal é o da semana do curso", texto: "A Semana 1 do projeto é a Semana 1 da sua trilha (a mesma do mapa e da agenda), sobre os assuntos dela. A semana seguinte só abre com o projeto aprovado.", destaque: true },
-  { icone: "🎭", titulo: "5 personagens novos", texto: "Direto das expedições: Neuro Cogumelo, Mergulhador, Yeti, Magma e Alienígena. Estão no Reino, em Personagens." },
-  { icone: "🃏", titulo: "Cartões do Reino arrumados", texto: "Personagens, garagem, expedições e construções com tamanhos iguais por linha e os botões sempre no pé do cartão, no computador e no celular." },
-  { icone: "🔗", titulo: "A prática move a trilha", texto: "O assunto conclui com a teoria E o quiz dele (60% ou mais), e a trilha termina num projeto final do tamanho do seu plano." },
-  { icone: "🪐", titulo: "Planetoides e fundo do mar de verdade", texto: "As expedições da Nave são numa esfera, estilo Mario Galaxy; as do Submarino, no fundo do mar, com cardumes e bolhas." },
+  { icone: "🗼", titulo: "Modo Domínio", texto: "Traga um repositório público (GitHub ou GitLab): a Lisa monta uma torre de 10 a 100 andares, do básico ao difícil, para você dominar o código e as tecnologias dele.", destaque: true },
+  { icone: "⚔️", titulo: "Cada andar é uma luta", texto: "Você entrega um commit na branch do desafio, a Lisa dá a nota e o Neuro enfrenta o chefão do andar: 60 ou mais vence e sobe. Cada entrega dá atributos ao Neuro." },
+  { icone: "🎁", titulo: "Prêmios para o Reino", texto: "Os marcos da torre dão pontos, tropas, defesas, veículo e, no nível Mestre, o chefão do topo como avatar. Os pontos contam para a ofensiva." },
+  { icone: "📜", titulo: "Certificado em PDF", texto: "No topo, um certificado com o seu nome, o repositório e os assuntos dominados, com um código para quem receber conferir." },
 ];
 
 export default function Novidades() {
@@ -67,17 +66,17 @@ export default function Novidades() {
       <div className="novidades__caixa">
         <div className="novidades__palco" aria-hidden="true">
           <span className="novidades__estrelas" />
-          <img className="novidades__bicho novidades__bicho--cerbero" src={urlDoMonstro("kraken")} alt="" />
-          <img className="novidades__bicho novidades__bicho--goblin" src={urlDoMonstro("zorg")} alt="" />
-          <img className="novidades__bicho novidades__bicho--cogumelo" src={urlDoMonstro("diabrete")} alt="" />
-          <img className="novidades__bicho novidades__bicho--morcego" src={urlDoMonstro("disco")} alt="" />
-          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} personagem="alienigena" /></div>
+          <img className="novidades__bicho novidades__bicho--cerbero" src={urlDoMonstro("dragaoDeLava")} alt="" />
+          <img className="novidades__bicho novidades__bicho--goblin" src={urlDoMonstro("golem")} alt="" />
+          <img className="novidades__bicho novidades__bicho--cogumelo" src={urlDoMonstro("ent")} alt="" />
+          <img className="novidades__bicho novidades__bicho--morcego" src={urlDoMonstro("kraken")} alt="" />
+          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} /></div>
           <span className="novidades__chao" />
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">A semana do curso manda!</h2>
-          <p className="novidades__sub">O projeto semanal agora é o da semana da sua trilha, e a semana só anda com ele aprovado. E o Reino ganhou 5 personagens das expedições e cartões arrumados.</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">Chegou o Modo Domínio!</h2>
+          <p className="novidades__sub">Escale a torre de um repositório de verdade, andar por andar, até dominar o código — com chefões, prêmios para o Reino e certificado no topo.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -87,7 +86,7 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/trilhas" className="pf-botao novidades__principal" onClick={fechar}>🗺️ Ver as minhas trilhas</Link>
+            <Link ref={principal} href="/dominio" className="pf-botao novidades__principal" onClick={fechar}>🗼 Escalar uma torre</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>

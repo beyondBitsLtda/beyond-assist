@@ -11,7 +11,7 @@
 
 import { CONSTRUCOES, ORDEM_DAS_CONSTRUCOES, NIVEIS_INICIAIS, exercitoDeTreino, guarnicaoDeTreino, nivelMaximoDoNeuro } from "./reino.js";
 import { ORDEM_DOS_VEICULOS } from "./veiculos.js";
-import { ORDEM_DOS_PERSONAGENS, PERSONAGENS_DE_TODOS } from "./personagens.js";
+import { ORDEM_DOS_PERSONAGENS, ORDEM_DOS_CHEFOES, PERSONAGENS_DE_TODOS } from "./personagens.js";
 import { OPERARIOS_INICIAIS, vagasDaMina } from "./ouro.js";
 
 export const MUNDO_DE_TESTE = "teste";
@@ -81,7 +81,7 @@ export function reinoLiberado() {
     construcoes,
     neuro_nivel: nivelMaximoDoNeuro(construcoes.castelo),
     veiculos: [...ORDEM_DOS_VEICULOS],
-    personagens: [...ORDEM_DOS_PERSONAGENS],
+    personagens: [...ORDEM_DOS_PERSONAGENS, ...ORDEM_DOS_CHEFOES], // tudo liberado: até os chefões do Modo Domínio
     exercito: exercitoDeTreino(construcoes.quartel, 1),
     guarnicao: guarnicaoDeTreino(construcoes.castelo, 1),
     operarios: vagasDaMina(construcoes.minaDeOuro),

@@ -47,4 +47,5 @@ export const NOMES_DOS_EVENTOS = {
   projeto_final: "Projeto final",
   projeto_mensal: "Projeto do mês",
   conquista: "Conquista",
+  dominio: "Modo Domínio",
 };

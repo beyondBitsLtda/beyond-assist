@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { chefaoDoPersonagem } from "@/dominio/modoDominio.js";
+import { desenhoDoMonstro, VIEWBOX_DOS_MONSTROS } from "./reino/monstrosDePapel.js";
 
 /**
  * O Neuro — o mascote da Lisa_Proof. Um cérebro desenhado em SVG, animado só com CSS
@@ -127,6 +129,8 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
 
   const atual = HUMORES.includes(reacao?.humor) ? reacao.humor : HUMORES.includes(humor) ? humor : "normal";
   const texto = reacao ? reacao.fala : fala;
+  // o chefão do Modo Domínio como avatar: o monstro de papel dele no lugar do cérebro
+  const chefao = chefaoDoPersonagem(visual);
 
   return (
     <div
@@ -135,9 +139,12 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
       style={{ "--neuro-tamanho": `${tamanho}px` }}
     >
       <button type="button" className="neuro__botao" onClick={cutucar} onAnimationEnd={() => setCutucado(false)} aria-label="Neuro, o mascote. Toque para ele falar.">
-        <svg className="neuro__svg" viewBox="0 0 200 200" aria-hidden="true">
+        <svg className="neuro__svg" viewBox={chefao ? VIEWBOX_DOS_MONSTROS : "0 0 200 200"} aria-hidden="true">
           <ellipse className="neuro__sombra" cx="100" cy="190" rx="44" ry="6" />
 
+          {chefao ? (
+            <g className="neuro__boneco neuro__chefao" dangerouslySetInnerHTML={{ __html: desenhoDoMonstro(chefao) }} />
+          ) : (<>
           <g className="neuro__boneco">
             {/* pernas */}
             <path d="M86 150 v24 M114 150 v24" className="neuro__traco" strokeWidth="7" />
@@ -331,6 +338,7 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
           <g className="v v-pensando neuro__pensar">
             <circle cx="152" cy="46" r="4" /><circle cx="164" cy="34" r="5.5" /><circle cx="180" cy="20" r="7" />
           </g>
+          </>)}
         </svg>
       </button>
       {texto ? <div className="neuro__fala" role="status" aria-live="polite">{texto}</div> : null}
