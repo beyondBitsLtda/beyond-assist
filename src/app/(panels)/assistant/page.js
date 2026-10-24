@@ -8,6 +8,8 @@ import { detectarAcordar, interpretarComando, escolherMusica, normalizar } from 
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 import { langForPath } from "@/lib/highlightCode.js";
+import { respostaSemCodigo } from "@/lib/codigoNaResposta.js";
+import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
 import { Highlight } from "prism-react-renderer";
 import { TTS_VOICES, STEVE_VOICE_NAME } from "@/lib/ttsVoices.js";
 import { pickBrowserVoice, speakText, stopBrowserVoiceAudio, isBrowserVoiceAudioPlaying } from "@/lib/browserVoice.js";
@@ -43,6 +45,8 @@ import { loadGames } from "@/lib/gameHistory.js";
 // realmente ligar a Visão 3D; desktop-only por decisão do usuário, nunca entra no bundle mobile.
 // a voz da Lisa como esfera de pontos (three.js) — aparência padrão desde a revisão visual
 const EsferaDaVoz = dynamic(() => import("@/components/panels/EsferaDaVoz.js"), { ssr: false, loading: () => null });
+// o editor que abre quando a resposta traz código (qualquer modo — ver IdeDaLisa.js)
+const IdeDaLisa = dynamic(() => import("@/components/panels/IdeDaLisa.js"), { ssr: false, loading: () => null });
 const LisaAvatar3D = dynamic(() => import("@/components/panels/LisaAvatar3D.js"), {
   ssr: false,
   loading: () => null,
@@ -216,6 +220,9 @@ export default function AssistantPage() {
   // mostra o código de cada arquivo sendo escrito ao vivo (liveCode), não só o PR pronto no
   // final. Nunca commita na branch escolhida — sempre cria uma branch nova e abre um PR.
   const [codeMode, setCodeMode] = useState(false);
+  // o editor da resposta com código (IdeDaLisa): cada pergunta nova é uma rodada nova — a
+  // digitação recomeça e, se a janela tinha sido fechada, ela volta quando vier código de novo
+  const [ideRodada, setIdeRodada] = useState(0);
 
   // Modo Vigia: com isso ligado, toda pergunta busca no HISTÓRICO de observações do Modo Tela
   // (tabela screen_observations, ver src/lib/screenWatch.js) em vez de conversar normalmente
@@ -2331,6 +2338,7 @@ export default function AssistantPage() {
     setBusy(true);
     setQuestion(q);
     setAnswer("");
+    setIdeRodada((n) => n + 1);
     answerRef.current = "";
     setMode("listening");
     setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: q, vigiaMode: true }]);
@@ -2413,6 +2421,7 @@ export default function AssistantPage() {
     setBusy(true);
     setQuestion(shown);
     setAnswer("");
+    setIdeRodada((n) => n + 1);
     answerRef.current = "";
     setCards([]);
     setMode("listening");
@@ -2871,9 +2880,10 @@ export default function AssistantPage() {
   }, [isMobile, mobileView, messages, answer]);
 
   const meta = MODE_META[mode];
+  // o código da resposta vai para o editor (IdeDaLisa); aqui fica só o aviso no lugar dele
   const transcript =
     mode === "speaking" || answer
-      ? answer || "…"
+      ? respostaSemCodigo(answer) || "…"
       : mode === "listening"
       ? `"${question}"`
       : 'Standby. Digite uma pergunta abaixo e pressione Enter. Eu sou a Lisa.';
@@ -2911,6 +2921,10 @@ export default function AssistantPage() {
     setCodeModalInput("");
     askCodeMode(q);
   };
+
+  // Editor da resposta com código, em qualquer modo (o Modo Código tem a janela dele, acima).
+  // `key` muda a cada pergunta: a digitação recomeça e a janela fechada volta.
+  const ideDaLisa = !codeMode && <IdeDaLisa key={ideRodada} texto={answer} chegando={busy} />;
 
   const codeTaskModal = codeModalOpen && (
     <div
@@ -3662,12 +3676,12 @@ export default function AssistantPage() {
                     fontSize: 14.5, lineHeight: 1.45, color: "#eafcff", whiteSpace: "pre-wrap", userSelect: "text",
                   }}
                 >
-                  {m.text}
+                  {m.role === "assistant" ? <TextoComCodigo texto={m.text} /> : m.text}
                 </div>
               ))}
               {busy && answer && (
                 <div style={{ alignSelf: "flex-start", maxWidth: "82%", padding: "10px 14px", borderRadius: "14px 14px 14px 3px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", fontSize: 14.5, lineHeight: 1.45, color: "#eafcff", whiteSpace: "pre-wrap", userSelect: "text" }}>
-                  {answer}
+                  {respostaSemCodigo(answer)}
                 </div>
               )}
               {busy && !answer && (
@@ -4152,6 +4166,7 @@ export default function AssistantPage() {
           </div>
         )}
         {codeTaskModal}
+        {ideDaLisa}
       </div>
     );
   }
@@ -4189,6 +4204,7 @@ export default function AssistantPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {codeTaskModal}
+      {ideDaLisa}
       {fullscreenOverlay}
       {cameraVigiaMessageToast}
       {watchPreviews}
@@ -4524,7 +4540,7 @@ export default function AssistantPage() {
         <section className="bb-conversa" aria-live="polite">
           {(mode !== "idle" || answer) && question && <p className="bb-conversa-pergunta">{question}</p>}
           <p className={`bb-conversa-resposta${!answer && mode === "idle" ? " bb-conversa-resposta--vazia" : ""}`}>
-            {mode === "speaking" || answer ? (separarRascunho(answer).fala || "…") : mode === "listening" ? "…" : "Pergunte alguma coisa, por texto ou pelo microfone."}
+            {mode === "speaking" || answer ? (respostaSemCodigo(separarRascunho(answer).fala) || "…") : mode === "listening" ? "…" : "Pergunte alguma coisa, por texto ou pelo microfone."}
           </p>
           {separarRascunho(answer).rascunho && (
             <div className="bb-rascunho">

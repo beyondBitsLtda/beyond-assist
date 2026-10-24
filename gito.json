@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.8.1-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-21",
+  "versao": "0.9.0-lisa-ide-do-codigo.1",
+  "atualizadoEm": "2026-10-24",
   "compilacao": {
-    "numero": 30,
-    "data": "2026-10-21",
+    "numero": 31,
+    "data": "2026-10-24",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.9.0-lisa-ide-do-codigo.1",
+      "data": "2026-10-24",
+      "branch": "lisa-ide-do-codigo",
+      "tipo": "funcionalidade",
+      "resumo": "Quando a conversa é sobre código, a Lisa abre um editor na tela e digita o código explicando cada passo, em qualquer modo.",
+      "itens": [
+        "A instrução da Lisa ganhou a regra do código na tela: quando o assunto é código, ela mostra o código em blocos (com a linguagem e o arquivo), com a explicação de cada trecho antes dele; a voz continua sem ler código.",
+        "Janela de editor (IdeDaLisa): abre sozinha quando a resposta traz código, digita trecho por trecho com cursor, realce de sintaxe e número de linha, abas por arquivo e a explicação do passo atual em cima; botões de pular, copiar, minimizar, maximizar e fechar, e arrasta pela barra de título.",
+        "Fechada, vira o botão \"ver o código da Lisa\" para reabrir; cada pergunta nova recomeça a digitação.",
+        "Na conversa, o bloco de código vira o aviso \"código no editor\"; no histórico do chat (celular) o código aparece num bloco com realce.",
+        "Não é um modo novo: vale em qualquer modo do Assistente (o Modo Código continua com a janela dele).",
+        "Teste novo: npm run codigo-check."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.8.1-cloudflare-pages.1",
       "data": "2026-10-21",
@@ -456,6 +472,7 @@
         "Notificações push de card novo e de tarefa atrasada.",
         "Kanban de tarefas da Delp a partir de planilha enviada pela tela.",
         "Consulta a repositórios do GitHub, tarefas de código e pair programming.",
+        "Editor de código na tela em qualquer modo: quando a conversa é sobre código, a Lisa mostra o código e uma janela de editor (realce de sintaxe, número de linha, abas por arquivo) digita trecho por trecho com a explicação de cada passo; a voz fala só a explicação.",
         "Painel Sentinela de casos de teste e chamados."
       ],
       "naoInclui": [
