@@ -8,7 +8,7 @@ import { detectarAcordar, interpretarComando, escolherMusica, normalizar } from 
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 import { langForPath } from "@/lib/highlightCode.js";
-import { respostaSemCodigo } from "@/lib/codigoNaResposta.js";
+import { respostaSemCodigo, trechosDaResposta, codigoDaConversa } from "@/lib/codigoNaResposta.js";
 import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
 import { Highlight } from "prism-react-renderer";
 import { TTS_VOICES, STEVE_VOICE_NAME } from "@/lib/ttsVoices.js";
@@ -220,9 +220,22 @@ export default function AssistantPage() {
   // mostra o código de cada arquivo sendo escrito ao vivo (liveCode), não só o PR pronto no
   // final. Nunca commita na branch escolhida — sempre cria uma branch nova e abre um PR.
   const [codeMode, setCodeMode] = useState(false);
-  // o editor da resposta com código (IdeDaLisa): cada pergunta nova é uma rodada nova — a
-  // digitação recomeça e, se a janela tinha sido fechada, ela volta quando vier código de novo
-  const [ideRodada, setIdeRodada] = useState(0);
+  // o editor de código (IdeDaLisa): as respostas desta conversa que trouxeram código, uma aba
+  // cada — perguntar de novo não apaga nada. `ideViva` é a resposta chegando agora (o texto dela
+  // é o `answer`); quando termina, ela entra no histórico (se tiver código) com o mesmo id.
+  const [ideHistorico, setIdeHistorico] = useState([]);
+  const [ideViva, setIdeViva] = useState(null); // { id, pergunta }
+  const abrirNaIde = useCallback((pergunta) => {
+    const id = `r${Date.now()}`;
+    setIdeViva({ id, pergunta });
+    return id;
+  }, []);
+  const guardarNaIde = useCallback((id, pergunta, texto) => {
+    setIdeViva((v) => (v?.id === id ? null : v));
+    if (trechosDaResposta(texto).temCodigo) setIdeHistorico((h) => [...h, { id, pergunta, texto }].slice(-30));
+  }, []);
+  // as mensagens da conversa, para mandar o código que já apareceu nela junto da pergunta
+  const mensagensRef = useRef([]);
 
   // Modo Vigia: com isso ligado, toda pergunta busca no HISTÓRICO de observações do Modo Tela
   // (tabela screen_observations, ver src/lib/screenWatch.js) em vez de conversar normalmente
@@ -2338,7 +2351,7 @@ export default function AssistantPage() {
     setBusy(true);
     setQuestion(q);
     setAnswer("");
-    setIdeRodada((n) => n + 1);
+    const idDaIde = abrirNaIde(q);
     answerRef.current = "";
     setMode("listening");
     setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: q, vigiaMode: true }]);
@@ -2371,8 +2384,9 @@ export default function AssistantPage() {
     } finally {
       setBusy(false);
       setMode("idle");
+      guardarNaIde(idDaIde, q, answerRef.current);
     }
-  }, [personaMode, addLog, voiceOn, stopSpeaking, enqueueSpeech]);
+  }, [personaMode, addLog, voiceOn, stopSpeaking, enqueueSpeech, abrirNaIde, guardarNaIde]);
 
   // ---- pergunta real ao backend (SSE) ----
   // `displayText` (opcional) — o que aparece no chat/log, quando diferente do `q` de verdade
@@ -2421,7 +2435,7 @@ export default function AssistantPage() {
     setBusy(true);
     setQuestion(shown);
     setAnswer("");
-    setIdeRodada((n) => n + 1);
+    const idDaIde = abrirNaIde(shown);
     answerRef.current = "";
     setCards([]);
     setMode("listening");
@@ -2448,6 +2462,9 @@ export default function AssistantPage() {
         body: JSON.stringify({
           question: q, scope: computeScope(), personaMode,
           history: { ...(historyRef.current || {}), turnos: conversaVigente(conversaRef.current), ultimaResposta: ultimaRespostaRef.current.slice(0, 8000) },
+          // o código que já apareceu na conversa, inteiro (a conversa vai cortada por fala): para a
+          // Lisa ver o todo antes de propor uma correção. Conversa vencida (30 min parada) não leva.
+          codigo: conversaVigente(conversaRef.current).length ? codigoDaConversa(mensagensRef.current.slice(-24).map((m) => m.text)) : "",
           pendingAction: pendingActionRef.current,
           images: images.length ? images : null,
         }),
@@ -2507,13 +2524,15 @@ export default function AssistantPage() {
     } finally {
       setBusy(false);
       setMode("idle");
+      // a resposta com código vira uma aba do editor e fica lá (a próxima pergunta não apaga)
+      guardarNaIde(idDaIde, shown, answerRef.current);
       // fala a resposta INTEIRA de uma vez, só agora que terminou de chegar — 1 chamada de
       // TTS por resposta, nunca duas vozes diferentes na mesma fala (ver nota no topo do arquivo).
       // O rascunho de um card (o texto inteiro dele) fica só na tela: ela fala o que mudou.
       const full = falaSemRascunho(answerRef.current).trim();
       if (voiceEnabled && full) enqueueSpeech(full, gen);
     }
-  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode, vigiaMode, askVigiaMode]);
+  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode, vigiaMode, askVigiaMode, abrirNaIde, guardarNaIde]);
   askRef.current = ask; // ver comentário no askRef acima — mantém sempre a versão mais recente pros efeitos de vigília chamarem
 
   // ---- Modo Escuta por palavra: "Lisa, ..." ----
@@ -2922,9 +2941,12 @@ export default function AssistantPage() {
     askCodeMode(q);
   };
 
-  // Editor da resposta com código, em qualquer modo (o Modo Código tem a janela dele, acima).
-  // `key` muda a cada pergunta: a digitação recomeça e a janela fechada volta.
-  const ideDaLisa = !codeMode && <IdeDaLisa key={ideRodada} texto={answer} chegando={busy} />;
+  // Editor das respostas com código, em qualquer modo (o Modo Código tem a janela dele, acima):
+  // uma janela só para a conversa inteira, uma aba por resposta — a que está chegando entra viva.
+  mensagensRef.current = messages;
+  const ideDaLisa = !codeMode && (
+    <IdeDaLisa interacoes={ideViva ? [...ideHistorico, { ...ideViva, texto: answer }] : ideHistorico} chegando={busy} />
+  );
 
   const codeTaskModal = codeModalOpen && (
     <div

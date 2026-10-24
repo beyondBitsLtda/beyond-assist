@@ -9,7 +9,7 @@ import { turnosValidos, blocoDaConversa, consultaDeBusca } from "@/lib/conversa.
 import { fonteDosQuadros } from "@/lib/configLisa.js";
 import { pareceAcao, pendenteValida } from "@/lib/acoesNoAbacato.js";
 import { tratarAcaoNoAbacato } from "@/lib/fluxoDeAcoesNoAbacato.js";
-import { comCodigoNaTela } from "@/lib/codigoNaResposta.js";
+import { comCodigoNaTela, secaoDoCodigoDaConversa } from "@/lib/codigoNaResposta.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -312,7 +312,9 @@ export async function POST(req) {
           : null;
         const combinedNote = [promptNote, imageNote, delpNote].filter(Boolean).join("\n\n") || null;
 
-        const prompt = buildPrompt(question, matches, combinedNote, blocoDaConversa(turnos));
+        // o código que já apareceu na conversa vai inteiro (a conversa em si vai cortada por fala),
+        // para a Lisa ver o todo antes de propor uma correção
+        const prompt = buildPrompt(question, matches, combinedNote, blocoDaConversa(turnos), secaoDoCodigoDaConversa(body.codigo));
         // em qualquer modo: quando o assunto é código, a resposta traz o código em blocos e a tela
         // abre o editor que digita (src/lib/codigoNaResposta.js, src/components/panels/IdeDaLisa.js)
         const instrucao = withContextDocs(withPersona(comCodigoNaTela(systemInstruction), personaMode));
