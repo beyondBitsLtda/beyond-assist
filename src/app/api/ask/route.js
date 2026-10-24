@@ -9,6 +9,7 @@ import { turnosValidos, blocoDaConversa, consultaDeBusca } from "@/lib/conversa.
 import { fonteDosQuadros } from "@/lib/configLisa.js";
 import { pareceAcao, pendenteValida } from "@/lib/acoesNoAbacato.js";
 import { tratarAcaoNoAbacato } from "@/lib/fluxoDeAcoesNoAbacato.js";
+import { comCodigoNaTela } from "@/lib/codigoNaResposta.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -312,7 +313,10 @@ export async function POST(req) {
         const combinedNote = [promptNote, imageNote, delpNote].filter(Boolean).join("\n\n") || null;
 
         const prompt = buildPrompt(question, matches, combinedNote, blocoDaConversa(turnos));
-        for await (const piece of chatStreamWithFallback(prompt, withContextDocs(withPersona(systemInstruction, personaMode)), tools, images)) {
+        // em qualquer modo: quando o assunto é código, a resposta traz o código em blocos e a tela
+        // abre o editor que digita (src/lib/codigoNaResposta.js, src/components/panels/IdeDaLisa.js)
+        const instrucao = withContextDocs(withPersona(comCodigoNaTela(systemInstruction), personaMode));
+        for await (const piece of chatStreamWithFallback(prompt, instrucao, tools, images)) {
           send(controller, "token", piece);
         }
 
