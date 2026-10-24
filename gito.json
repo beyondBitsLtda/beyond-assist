@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.9.0-lisa-ide-do-codigo.1",
+  "versao": "0.9.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-24",
   "compilacao": {
-    "numero": 31,
+    "numero": 32,
     "data": "2026-10-24",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.9.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.9.0: o editor de código que a Lisa abre e digita quando a conversa é sobre código.",
+      "itens": [
+        "Junta a branch lisa-ide-do-codigo (0.9.0-lisa-ide-do-codigo.1).",
+        "Sem migração de banco.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.9.0-lisa-ide-do-codigo.1",
       "data": "2026-10-24",
