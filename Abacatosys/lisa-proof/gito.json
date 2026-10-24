@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.24.0-cloudflare-pages.1",
+  "versao": "0.25.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-24",
   "compilacao": {
-    "numero": 62,
+    "numero": 63,
     "data": "2026-10-24",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.25.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "Modo Domínio: cada chefão agora é um andar-sala da torre em que o Neuro entra para lutar, com muito mais relevo; e a tela de análise/montagem não espreme mais o texto.",
+      "itens": [
+        "Torre 3D refeita: cada andar é uma sala com porta em arco, sacada e escada por fora até o andar de cima; parede com pilastras, frisos, dentículos, janelas acesas e pedras salientes (na montanha, rocha bruta e boca de caverna).",
+        "Cada andar se enfeita com o tema do seu chefão, por fora e por dentro: gelo, lava, cipós, neon, braseiros, conchas, caixotes ou pedras; faixas na cor do chefão dos lados da porta.",
+        "A sala por dentro: colunas, frisos, lajotas, tapete, lustre de velas, tochas, tapeçaria e seteiras; a sala do andar de agora fica acesa e o chefão aparece pela porta; as de cima ficam escuras, com o chefão em silhueta.",
+        "Na luta, o Neuro entra na sala do chefão e a câmera entra junto (luta de lado); vencendo, ele sai e sobe a escada por fora até a sacada do andar de cima, com a câmera contornando a torre.",
+        "Telhado com ameias e anéis, pico nevado na montanha, ilha com pinheiros, pedras e caminho até a primeira porta; sombras do sol perto da vista.",
+        "Desempenho: as peças fixas são fundidas em poucos blocos por grupo de andares (o que está fora da vista não é desenhado).",
+        "Correção: enquanto a Lisa lia o repositório ou montava a torre, o balão de fala do Neuro espremia o texto da análise numa coluna estreita; agora a coluna do Neuro tem largura fixa e o aviso de espera fica junto do botão."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.24.0-cloudflare-pages.1",
       "data": "2026-10-24",

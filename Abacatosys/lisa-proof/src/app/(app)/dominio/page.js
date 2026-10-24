@@ -52,7 +52,7 @@ export default function PaginaDoDominio() {
 
       <section className="pf-cartao dm-novo">
         <div className="dm-novo__neuro" aria-hidden="true">
-          <Neuro humor={lendo ? "pensando" : "feliz"} tamanho={110} fala={lendo ? "Lendo o código… isso leva uns 30 segundos." : ""} />
+          <Neuro humor={lendo ? "pensando" : "feliz"} tamanho={100} />
         </div>
         <form className="dm-novo__form" onSubmit={analisar}>
           <label className="pf-campo">
@@ -64,6 +64,7 @@ export default function PaginaDoDominio() {
             <button type="submit" className="pf-botao" disabled={lendo || !repo.trim()}>{lendo ? "A Lisa está lendo…" : "Analisar repositório"}</button>
             <small>A Lisa lê o código, diz se ele aguenta um desafio e de que nível ele é. Só repositórios públicos: nenhum código privado passa pela IA.</small>
           </div>
+          {lendo && <p className="dm-espera" role="status"><span className="dm-espera__ponto" aria-hidden="true" />Lendo o código do repositório — leva uns 30 segundos.</p>}
         </form>
       </section>
 

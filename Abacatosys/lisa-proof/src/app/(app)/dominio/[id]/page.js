@@ -63,6 +63,7 @@ export default function PaginaDaTorre() {
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState("");
   const [luta, setLuta] = useState(null); // { resultado, passo }
+  const [naSala, setNaSala] = useState(false); // o Neuro (e a câmera) dentro da sala do chefão
   const [vendo, setVendo] = useState(null);
   const [semTela, setSemTela] = useState(false);
   const [Aviso, avisar] = useAviso();
@@ -109,7 +110,7 @@ export default function PaginaDaTorre() {
     if (!luta) return undefined;
     const golpes = luta.resultado.entrega.golpes || [];
     if (luta.passo > golpes.length) return undefined;
-    const t = setTimeout(() => setLuta((l) => (l ? { ...l, passo: l.passo + 1 } : l)), luta.passo === 0 ? 600 : PAUSA_DO_GOLPE);
+    const t = setTimeout(() => setLuta((l) => (l ? { ...l, passo: l.passo + 1 } : l)), luta.passo === 0 ? 1500 : PAUSA_DO_GOLPE); // o primeiro espera o Neuro entrar na sala
     return () => clearTimeout(t);
   }, [luta]);
   const terminou = luta && luta.passo > (luta.resultado.entrega.golpes || []).length;
@@ -123,9 +124,12 @@ export default function PaginaDaTorre() {
       else if (r.venceu) comemorar(`Chefão derrotado! +${r.pontos} pontos`);
       else reagir("triste", `Nota ${r.entrega.nota}. Melhore e tente de novo — ${NOTA_PARA_VENCER} vence!`, 6000);
     }
-    const t = setTimeout(carregar, 1100);
-    return () => clearTimeout(t);
+    // o chefão cai (ou o Neuro recua), o Neuro sai da sala e, vencendo, a torre recarrega e ele sobe a escada
+    setTimeout(() => setNaSala(false), 1800);
+    setTimeout(carregar, 2400);
+    return undefined;
   }, [terminou, luta, carregar]);
+  useEffect(() => { if (!luta) setNaSala(false); }, [luta]);
 
   if (!torre) {
     return erro ? <div className="pf-aviso pf-aviso--erro">{erro} · <Link href="/dominio">voltar</Link></div> : <div className="pf-carregando">Subindo as escadas…</div>;
@@ -142,6 +146,7 @@ export default function PaginaDaTorre() {
     const r = await agir("entregar", () => criar(`/api/dominio/${id}/entregar`, {}));
     if (!r) return;
     document.querySelector(".dm-torre")?.scrollIntoView({ behavior: semMovimento ? "auto" : "smooth", block: "center" });
+    setNaSala(!semMovimento);
     setLuta({ resultado: r.resultado, passo: semMovimento ? 999 : 0 });
   }
 
@@ -187,6 +192,7 @@ export default function PaginaDaTorre() {
                   concluida={torre.status === "concluido"}
                   semente={sementeDe(torre.id)}
                   golpe={golpe}
+                  lutando={naSala}
                   humor={luta ? (terminou ? (luta.resultado.venceu ? "comemorando" : "triste") : "surpreso") : "normal"}
                   aoEscolher={(n) => setVendo(n)}
                   aoFalhar={() => setSemTela(true)}
@@ -245,7 +251,7 @@ function MontarTorre({ torre, ocupado, aoMontar }) {
     <section className="dm-montar">
       <div className="pf-cartao dm-analise">
         <div className="dm-analise__neuro" aria-hidden="true">
-          <Neuro humor={montando ? "pensando" : "feliz"} tamanho={100} fala={montando ? `Desenhando ${n} andares… pode levar até um minuto.` : ""} />
+          <Neuro humor={montando ? "pensando" : "feliz"} tamanho={96} />
         </div>
         <div className="dm-analise__textos">
           <h2>O que a Lisa viu</h2>
@@ -284,6 +290,7 @@ function MontarTorre({ torre, ocupado, aoMontar }) {
         <button type="button" className="pf-botao" disabled={montando} onClick={() => aoMontar(n)}>
           {montando ? "A Lisa está montando a torre…" : `Montar a torre de ${n} andares`}
         </button>
+        {montando && <p className="dm-espera" role="status"><span className="dm-espera__ponto" aria-hidden="true" />A Lisa está desenhando os {n} andares — pode levar até um minuto. Pode ficar nesta tela.</p>}
       </div>
     </section>
   );
