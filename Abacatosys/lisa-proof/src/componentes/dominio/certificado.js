@@ -8,6 +8,7 @@
 import { pdfDeJpeg } from "@/dominio/pdf.js";
 import { urlDoMonstro } from "@/componentes/reino/monstrosDePapel.js";
 import { chefaoPorId } from "@/dominio/modoDominio.js";
+import { retanguloRedondo } from "./canvas.js";
 
 const L = 2000, A = 1414; // proporção do A4
 const TINTA = "#111814", VERDE = "#16A34A", OURO = "#C9A227", CINZA = "#4B5563", FUNDO = "#FBF7EE";
@@ -121,7 +122,7 @@ export async function desenharCertificado(canvas, d) {
     let cx = L / 2 - total / 2;
     for (const i of linha) {
       x.fillStyle = TINTA;
-      x.beginPath(); x.roundRect(cx, y, larguras[i], 52, 26); x.fill();
+      retanguloRedondo(x, cx, y, larguras[i], 52, 26); x.fill();
       x.fillStyle = "#FFFFFF"; x.textAlign = "center";
       x.fillText(selos[i], cx + larguras[i] / 2, y + 36);
       cx += larguras[i] + 16;

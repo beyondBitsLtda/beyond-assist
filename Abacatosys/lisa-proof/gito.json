@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.26.0-cloudflare-pages.1",
+  "versao": "0.26.1-cloudflare-pages.1",
   "atualizadoEm": "2026-10-24",
   "compilacao": {
-    "numero": 64,
+    "numero": 65,
     "data": "2026-10-24",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.26.1-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Modo Domínio: andares da torre ainda apareciam vazios — agora todos os chefões ainda não vencidos aparecem, inclusive em navegadores sem roundRect.",
+      "itens": [
+        "As plaquinhas dos andares usavam roundRect, que navegadores mais antigos não têm (Firefox antes da 112, Chrome antes do 99, Safari antes do 16): a primeira plaquinha dava erro e nenhum chefão aparecia. Agora o retângulo arredondado é desenhado à mão quando o recurso falta (também no certificado).",
+        "Cada andar é montado por conta própria: se uma peça falhar, os outros andares (e o Neuro) continuam aparecendo.",
+        "Todos os chefões ainda não vencidos da torre ficam de guarda nas portas — antes só os 14 andares acima do atual."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.26.0-cloudflare-pages.1",
       "data": "2026-10-24",

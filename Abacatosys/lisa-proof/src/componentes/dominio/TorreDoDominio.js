@@ -6,6 +6,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import Neuro, { usePersonagem } from "@/componentes/Neuro.js";
 import { urlDoMonstro, TAMANHO_DOS_MONSTROS } from "@/componentes/reino/monstrosDePapel.js";
 import { svgComoImagem, recorteDePapel } from "@/componentes/reino/papel.js";
+import { retanguloRedondo } from "./canvas.js";
 
 /**
  * A torre do Modo Domínio em 3D (24/10/2026). Pedidos: "um mapa 3D igual o do Reino, porém sempre
@@ -19,8 +20,8 @@ import { svgComoImagem, recorteDePapel } from "@/componentes/reino/papel.js";
  * (recorte de papel dos monstros do Reino). Cada andar se enfeita com o tema do seu chefão: gelo,
  * lava, cipós, neon, braseiros, conchas, tábuas ou pedras.
  *
- * Cada chefão ainda não vencido monta guarda na PORTA do seu andar — dá para ver de fora todos os
- * inimigos da subida (os de cima um pouco apagados). A sala do andar de agora fica acesa (uma luz de
+ * Cada chefão ainda não vencido monta guarda na PORTA do seu andar — dá para ver de fora TODOS os
+ * inimigos da torre (os de cima um pouco apagados). A sala do andar de agora fica acesa (uma luz de
  * tocha que tremula). Andar vencido ganha a bandeira verde na sacada. Na luta, o chefão recua da porta
  * para o centro da sala e o Neuro entra atrás dele. O Neuro (o recorte de papel do
  * mascote, com o personagem da pessoa) espera na sacada; na luta (`lutando`), ele ENTRA na sala e a
@@ -123,7 +124,7 @@ function plaquinha(texto, destaque) {
   c.width = 96; c.height = 48;
   const x = c.getContext("2d");
   x.fillStyle = destaque ? "#f5c542" : "rgba(17,24,20,0.8)";
-  x.beginPath(); x.roundRect(4, 6, 88, 36, 12); x.fill();
+  retanguloRedondo(x, 4, 6, 88, 36, 12); x.fill();
   x.fillStyle = destaque ? "#111814" : "#ffffff";
   x.font = "700 24px Inter, system-ui, sans-serif";
   x.textAlign = "center"; x.textBaseline = "middle";
@@ -641,18 +642,28 @@ export default function TorreDoDominio({ andares = [], atual = 1, concluida = fa
       estado.chefaoAtual = null;
       estado.matChefaoAtual = null;
       estado.chefaoCaiu = false;
-      const foco = andarDoFoco();
       for (let i = 1; i <= estado.n; i++) {
-        const dados = estado.andares[i - 1] || {};
-        const L = lugares(i);
-        const ehAtual = i === estado.atual && !estado.concluida;
-        if (Math.abs(i - foco) <= 14) {
-          const placa = plaquinha(String(i), ehAtual);
-          placa.position.copy(L.d.clone().multiplyScalar(R(i) + 1.3).addScaledVector(L.t, -0.75)).setY(L.yChao + 0.2);
-          moveis.add(placa);
+        try {
+          montarAndarMovel(i);
+        } catch (e) {
+          // uma peça que falha (um navegador sem algum recurso) não pode apagar os outros andares
+          console.error(`torre: andar ${i}`, e);
         }
-        const mostrar = !dados.vencido && dados.chefao && (ehAtual || (i > estado.atual && i <= estado.atual + 14) || i === estado.n);
-        if (!mostrar) continue;
+      }
+      // a luz da sala de agora, na cor do tema
+      const L = lugares(Math.min(estado.n, estado.atual));
+      const tema = TEMAS[estado.andares[Math.min(estado.n, estado.atual) - 1]?.chefao] || TEMAS.golem;
+      luzDaSala.color.set(tema.luz);
+      luzDaSala.position.copy(L.d.clone().multiplyScalar(0.3)).setY(L.yChao + 1.6);
+      luzDaSala.visible = !estado.concluida;
+    }
+
+    /** A plaquinha do número e o chefão (de guarda na porta, se ainda não foi vencido) de um andar. */
+    function montarAndarMovel(i) {
+      const dados = estado.andares[i - 1] || {};
+      const L = lugares(i);
+      const ehAtual = i === estado.atual && !estado.concluida;
+      if (!dados.vencido && dados.chefao) {
         // na arena (a luta, dentro da sala) ele tem o tamanho dele; na porta, cabe no vão
         const naArena = Math.min(i === estado.n ? 2.0 : 1.85, (TAMANHO_DOS_MONSTROS[dados.chefao] || 1.6) * (i === estado.n ? 0.95 : 0.78));
         const naPorta = Math.min(1.45, naArena);
@@ -666,12 +677,14 @@ export default function TorreDoDominio({ andares = [], atual = 1, concluida = fa
         papeis.push(s);
         if (ehAtual) { estado.chefaoAtual = s; estado.matChefaoAtual = mat; estado.chefaoBase.copy(s.position); }
       }
-      // a luz da sala de agora, na cor do tema
-      const L = lugares(Math.min(estado.n, estado.atual));
-      const tema = TEMAS[estado.andares[Math.min(estado.n, estado.atual) - 1]?.chefao] || TEMAS.golem;
-      luzDaSala.color.set(tema.luz);
-      luzDaSala.position.copy(L.d.clone().multiplyScalar(0.3)).setY(L.yChao + 1.6);
-      luzDaSala.visible = !estado.concluida;
+      // a plaquinha vem depois e por conta própria: se ela falhar, o chefão continua de guarda
+      try {
+        const placa = plaquinha(String(i), ehAtual);
+        placa.position.copy(L.d.clone().multiplyScalar(R(i) + 1.3).addScaledVector(L.t, -0.75)).setY(L.yChao + 0.2);
+        moveis.add(placa);
+      } catch (e) {
+        console.error(`torre: plaquinha do andar ${i}`, e);
+      }
     }
 
     /** O Neuro na sacada do andar de agora (ou na sacada do topo, se a torre foi conquistada). */
@@ -921,8 +934,8 @@ export default function TorreDoDominio({ andares = [], atual = 1, concluida = fa
         estado.atual = Math.max(1, Math.min(lista.length || 1, agora));
         estado.concluida = fim;
         estado.forma = forma;
-        montarFixos();
-        montarMoveis();
+        try { montarFixos(); } catch (e) { console.error("torre: peças fixas", e); }
+        try { montarMoveis(); } catch (e) { console.error("torre: chefões", e); }
         if (!animacoes.length) posicionarNeuro();
       },
       definirAtual(i) {
