@@ -7,7 +7,10 @@
 export const GRUPOS_DE_PAINEIS = [
   {
     titulo: "Conversa",
-    itens: [{ href: "/assistant", rotulo: "Assistente" }],
+    itens: [
+      { href: "/assistant", rotulo: "Assistente" },
+      { href: "/visual", rotulo: "Visual da Lisa", detalhe: "Esfera, Lente, Orbe, Plasma ou Anel" },
+    ],
   },
   {
     titulo: "Trabalho",

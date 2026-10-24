@@ -427,3 +427,44 @@ input::placeholder, textarea::placeholder { color: var(--bb-texto-3); }
 @media (prefers-reduced-motion: reduce) {
   .bb-abertura *, .bb-abertura__centro { animation: none !important; transition: none !important; }
 }
+
+/* ============================================================
+   Painel "Visual da Lisa" (/visual, 24/10/2026): a prévia grande, o simulador de estado e a
+   galeria com todos os visuais ao vivo (src/components/panels/visuais/).
+   ============================================================ */
+.bb-visuais { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; display: grid; gap: 20px; }
+.bb-visuais h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: normal; }
+.bb-visuais header p { margin: 6px 0 0; color: var(--bb-texto-2); max-width: 70ch; line-height: 1.5; }
+.bb-visuais-simulador { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bb-visuais-simulador span { color: var(--bb-texto-3); font-size: 13px; margin-right: 4px; }
+.bb-visuais-simulador button { border: 1px solid var(--bb-linha); background: transparent; color: var(--bb-texto-2); border-radius: 999px; padding: 6px 13px; font-size: 13px; cursor: pointer; }
+.bb-visuais-simulador button[aria-pressed="true"] { color: var(--bb-texto); border-color: rgba(var(--accent-rgb), 0.6); background: rgba(var(--accent-rgb), 0.12); }
+.bb-visuais-palco { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 28px; align-items: center; background: var(--bb-superficie); border: 1px solid var(--bb-linha); border-radius: var(--bb-raio); padding: 20px; }
+.bb-visuais-tela { position: relative; display: block; width: 100%; aspect-ratio: 1; padding: 0; border-radius: 12px; background: #000; border: 1px solid var(--bb-linha); overflow: hidden; cursor: pointer; }
+.bb-visuais-tela--grande { max-width: 540px; justify-self: center; cursor: default; }
+.bb-visuais-info { display: grid; gap: 10px; align-content: center; }
+.bb-visuais-info h2 { margin: 0; font-size: 22px; font-weight: 600; }
+.bb-visuais-info p { margin: 0; color: var(--bb-texto-2); line-height: 1.55; }
+.bb-visuais-estado { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--bb-texto-2); font-family: var(--bb-mono); }
+.bb-visuais-estado i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-hex); box-shadow: 0 0 8px var(--accent-hex); }
+.bb-visuais-paleta { display: grid; gap: 6px; margin-top: 4px; }
+.bb-visuais-paleta-linha { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--bb-texto-3); opacity: 0.7; }
+.bb-visuais-paleta-linha span { width: 72px; }
+.bb-visuais-paleta-linha i { width: 22px; height: 12px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.12); }
+.bb-visuais-paleta-linha--agora { color: var(--bb-texto); opacity: 1; }
+.bb-visuais-acoes { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
+.bb-visuais-usar { border: 1px solid rgba(var(--accent-rgb), 0.6); background: rgba(var(--accent-rgb), 0.16); color: var(--bb-texto); border-radius: 999px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+.bb-visuais-usar:hover { background: rgba(var(--accent-rgb), 0.26); }
+.bb-visuais-usar--pequeno { padding: 4px 12px; font-size: 12px; }
+.bb-visuais-em-uso { font-size: 13px; color: var(--bb-ok); }
+.bb-visuais-link { font-size: 13px; }
+.bb-visuais-galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.bb-visuais-cartao { display: grid; gap: 10px; padding: 10px; background: var(--bb-superficie); border: 1px solid var(--bb-linha); border-radius: var(--bb-raio); }
+.bb-visuais-cartao--foco { border-color: rgba(var(--accent-rgb), 0.6); box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.3); }
+.bb-visuais-cartao-pe { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
+.bb-visuais-cartao-pe strong { font-size: 14px; font-weight: 600; }
+@media (max-width: 760px) {
+  .bb-visuais { padding: 18px 16px 40px; }
+  .bb-visuais-palco { grid-template-columns: 1fr; padding: 14px; }
+  .bb-visuais-galeria { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
