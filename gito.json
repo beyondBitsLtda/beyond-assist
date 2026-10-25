@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.12.0-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-24",
+  "versao": "0.13.0-cloudflare-pages.1",
+  "atualizadoEm": "2026-10-25",
   "compilacao": {
-    "numero": 38,
-    "data": "2026-10-24",
+    "numero": 39,
+    "data": "2026-10-25",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.13.0-cloudflare-pages.1",
+      "data": "2026-10-25",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Contexto da conversa: o + da barra anexa imagens (do computador, com Ctrl+V ou arrastando) e vincula repositórios do GitHub, que a Lisa lê e relaciona com a tela, a câmera e a conversa.",
+      "itens": [
+        "Botão + na barra de mensagem (computador e celular), em qualquer modo e escopo, com \"Imagem do computador\" e \"Vincular repositório\".",
+        "Imagem colada com Ctrl+V ou arrastada para a tela também vira anexo; até 6 por vez, reduzidas a 1600 px no navegador antes de ir para a Lisa.",
+        "Repositório vinculado pelo link do GitHub, por dono/repo ou dono/repo@branch (a branch é opcional); colar o link na mensagem também vincula. Até 3 por conversa, lembrados no navegador.",
+        "A cada pergunta a Lisa lê a árvore do repositório, a IA escolhe até 8 arquivos olhando a pergunta, a conversa e as imagens (tela, câmera, prints) e lê esses arquivos, mais o README e o manifesto. A resposta cita os caminhos e diz de qual arquivo vem o código que aparece na tela.",
+        "Faixa \"Contexto\" acima da barra com as miniaturas, os repositórios e quantos arquivos foram lidos; cada item sai no ×, ou tudo de uma vez em \"limpar\".",
+        "Se o GitHub recusar o token da Lisa, ela continua lendo os repositórios públicos sem ele, e nunca pede token nem senha na conversa.",
+        "Sem migração de banco. Teste novo: npm run contexto-check."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.12.0-cloudflare-pages.1",
       "data": "2026-10-24",
@@ -571,13 +588,15 @@
         "Kanban de tarefas da Delp a partir de planilha enviada pela tela.",
         "Consulta a repositórios do GitHub, tarefas de código e pair programming.",
         "Editor de código na tela em qualquer modo: quando a conversa é sobre código, a Lisa mostra o código e uma janela de editor (realce de sintaxe, número de linha) digita trecho por trecho com a explicação de cada passo; uma aba por resposta (as anteriores ficam), abas por arquivo, janela que arrasta para qualquer lugar e redimensiona pelas bordas e cantos, lembrando onde ficou, e o botão \"destacar\" leva o editor para uma janela separada do sistema (outro monitor); a voz fala só a explicação. Antes de corrigir, a Lisa recebe o código que já apareceu na conversa (versão mais recente de cada arquivo) e pede o que falta em vez de inventar.",
+        "Contexto da conversa em qualquer modo: o + da barra anexa imagens (do computador, com Ctrl+V ou arrastando) e vincula até 3 repositórios do GitHub; a cada pergunta a Lisa lê os arquivos do repositório que interessam, escolhidos pela pergunta, pela conversa e pelo que aparece na tela, na câmera e nos prints, e responde relacionando tudo, com o caminho de cada arquivo.",
         "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma e Anel de partículas; o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador).",
         "Painel Sentinela de casos de teste e chamados."
       ],
       "naoInclui": [
         "Não é multiusuário: o login existe, mas só para o responsável.",
         "Não cria nem apaga cards no Trello.",
-        "Não guarda fotos da câmera nem capturas de tela: elas vão ao Gemini e são descartadas.",
+        "Não guarda fotos da câmera, capturas de tela nem imagens anexadas: elas vão ao Gemini e são descartadas (a miniatura de um anexo fica só na aba aberta).",
+        "Não altera os repositórios vinculados à conversa: só lê. Mudar código continua sendo pelas tarefas de código, com branch e PR.",
         "Não versiona a planilha da Delp; ela fica só no banco.",
         "O Abacato mora neste repositório (Abacatosys/abacato), mas é outra aplicação, publicada à parte em abacato.beyond.dev.br."
       ]
@@ -682,7 +701,7 @@
       },
       {
         "nome": "GitHub",
-        "descricao": "Leitura de repositórios; criação de branches e PRs nas tarefas de código e no pair programming.",
+        "descricao": "Leitura de repositórios (painel de repositórios e contexto da conversa: a árvore e os arquivos dos repositórios vinculados, só leitura); criação de branches e PRs nas tarefas de código e no pair programming. Com o token recusado, lê só os repositórios públicos.",
         "url": "https://api.github.com"
       },
       {

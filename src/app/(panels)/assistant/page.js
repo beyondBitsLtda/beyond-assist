@@ -47,6 +47,11 @@ import { loadGames } from "@/lib/gameHistory.js";
 // o visual do centro (Esfera de pontos, Lente, Orbe, Plasma, Anel) — escolhido no painel /visual
 import VisualDaLisa, { usarVisualEscolhido } from "@/components/panels/visuais/VisualDaLisa.js";
 import { VISUAIS, escolherVisual } from "@/lib/visuaisDaLisa.js";
+// o contexto da conversa (25/10/2026): imagens anexadas (o +, Ctrl+V, arrastar) e repositórios vinculados
+import { BotaoMais, FaixaDoContexto } from "@/components/panels/ContextoDaConversa.js";
+import { imagemParaAnexo, imagensDaColagem, imagensSoltas } from "@/lib/anexosDaConversa.js";
+import { MAX_ANEXOS } from "@/lib/contextoDaConversa.js";
+import { reposNoTexto, vinculosValidos } from "@/lib/enderecoDoRepositorio.js";
 // o editor que abre quando a resposta traz código (qualquer modo — ver IdeDaLisa.js)
 const IdeDaLisa = dynamic(() => import("@/components/panels/IdeDaLisa.js"), { ssr: false, loading: () => null });
 const LisaAvatar3D = dynamic(() => import("@/components/panels/LisaAvatar3D.js"), {
@@ -475,6 +480,85 @@ export default function AssistantPage() {
   const ultimaRespostaRef = useRef("");
   const lembrarDaLisa = (texto) => { conversaRef.current = adicionarTurno(conversaVigente(conversaRef.current), "lisa", texto); ultimaRespostaRef.current = String(texto || ""); };
   const pendingActionRef = useRef(null);
+
+  // ---- o contexto da conversa (25/10/2026): imagens anexadas e repositórios vinculados ----
+  // Pedido: "ponha um + na barra de conversa e deixe eu colar imagens lá, tanto do PC como do
+  // Ctrl+C/Ctrl+V; além disso, a função de eu vincular repositórios — além da conversa e do que
+  // ela estiver vendo em tela e câmera, ela usa essas informações de contexto, inclusive
+  // conseguindo correlacioná-las". Não é um modo nem um escopo: vale em qualquer conversa e vai
+  // junto de cada pergunta até a pessoa tirar. Os repositórios ficam guardados neste navegador
+  // (sobrevivem ao recarregar); as imagens, só nesta visita (são grandes).
+  const [anexos, setAnexos] = useState([]);
+  const [preparandoAnexos, setPreparandoAnexos] = useState(0);
+  const [reposVinculados, setReposVinculados] = useState([]);
+  const [leituraDosRepos, setLeituraDosRepos] = useState(null);
+  const anexosRef = useRef([]);
+  anexosRef.current = anexos;
+  const reposRef = useRef([]);
+  reposRef.current = reposVinculados;
+  useEffect(() => {
+    try { setReposVinculados(vinculosValidos(JSON.parse(localStorage.getItem("lisa-repos-vinculados") || "[]"))); } catch { /* nada guardado */ }
+  }, []);
+  const guardarRepos = useCallback((lista) => {
+    reposRef.current = lista;
+    setReposVinculados(lista);
+    try { localStorage.setItem("lisa-repos-vinculados", JSON.stringify(lista)); } catch { /* sem armazenamento: vale só nesta visita */ }
+  }, []);
+  const anexarImagens = useCallback(async (arquivos) => {
+    const cabem = Math.max(0, MAX_ANEXOS - anexosRef.current.length);
+    const lista = (arquivos || []).slice(0, cabem);
+    if ((arquivos || []).length > cabem) addLog("[ANEXO]", OR, `no máximo ${MAX_ANEXOS} imagens no contexto — tire alguma para pôr outra`);
+    if (!lista.length) return;
+    setPreparandoAnexos((n) => n + lista.length);
+    for (const arquivo of lista) {
+      try {
+        const a = await imagemParaAnexo(arquivo);
+        setAnexos((atual) => (atual.length >= MAX_ANEXOS ? atual : [...atual, a]));
+        addLog("[ANEXO]", GR, `${a.nome} · ${a.largura}×${a.altura} no contexto`);
+      } catch (err) {
+        addLog("[ANEXO]", OR, err.message);
+      } finally {
+        setPreparandoAnexos((n) => Math.max(0, n - 1));
+      }
+    }
+  }, [addLog]);
+  const vincularRepo = useCallback((r) => {
+    // o mais novo primeiro: passando do limite, sai o mais antigo
+    guardarRepos(vinculosValidos([r, ...reposRef.current.filter((x) => x.repo.toLowerCase() !== r.repo.toLowerCase())]));
+    setLeituraDosRepos(null);
+    addLog("[REPO]", PU, `vinculado: ${r.repo}${r.branch ? `@${r.branch}` : ""} — a Lisa lê o código a cada pergunta`);
+  }, [guardarRepos, addLog]);
+  const desvincularRepo = useCallback((repo) => {
+    guardarRepos(reposRef.current.filter((x) => x.repo.toLowerCase() !== repo.toLowerCase()));
+    addLog("[REPO]", PU, `desvinculado: ${repo}`);
+  }, [guardarRepos, addLog]);
+  const limparContexto = useCallback(() => {
+    setAnexos([]);
+    guardarRepos([]);
+    setLeituraDosRepos(null);
+  }, [guardarRepos]);
+  // Ctrl+V com imagem e arrastar imagem para a tela: viram anexos (texto colado segue normal)
+  useEffect(() => {
+    const colar = (e) => { const imgs = imagensDaColagem(e); if (!imgs.length) return; e.preventDefault(); anexarImagens(imgs); };
+    const sobre = (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) e.preventDefault(); };
+    const soltar = (e) => { const imgs = imagensSoltas(e); if (!imgs.length) return; e.preventDefault(); anexarImagens(imgs); };
+    document.addEventListener("paste", colar);
+    window.addEventListener("dragover", sobre);
+    window.addEventListener("drop", soltar);
+    return () => {
+      document.removeEventListener("paste", colar);
+      window.removeEventListener("dragover", sobre);
+      window.removeEventListener("drop", soltar);
+    };
+  }, [anexarImagens]);
+  const faixaDoContexto = (
+    <FaixaDoContexto
+      anexos={anexos} repos={reposVinculados} leitura={leituraDosRepos} preparando={preparandoAnexos}
+      aoRemoverAnexo={(id) => setAnexos((atual) => atual.filter((a) => a.id !== id))}
+      aoDesvincular={desvincularRepo} aoLimpar={limparContexto}
+    />
+  );
+
   const audioRef = useRef(null);
   const currentAudioResolveRef = useRef(null);
 
@@ -2444,7 +2528,7 @@ export default function AssistantPage() {
     answerRef.current = "";
     setCards([]);
     setMode("listening");
-    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown, anexos: anexosRef.current.map((a) => ({ id: a.id, previa: a.previa, nome: a.nome })) }]);
 
     stopSpeaking(); // corta qualquer fala de uma resposta anterior
     const gen = ++speechGenRef.current;
@@ -2456,9 +2540,21 @@ export default function AssistantPage() {
 
     let latestCards = [];
 
-    // câmera (Observância) e/ou tela (Modo Tela) — cada uma só entra se estiver ligada e
-    // conseguir tirar o retrato; nenhuma das duas depende da outra.
-    const images = [observanceMode && captureObservanceFrame(), screenMode && captureScreenFrame()].filter(Boolean);
+    // um link de repositório do GitHub na mensagem já vincula ele à conversa
+    const linkados = reposNoTexto(q);
+    if (linkados.length) {
+      guardarRepos(vinculosValidos([...linkados.map((l) => ({ repo: l.repo, branch: l.branch })), ...reposRef.current]));
+      addLog("[REPO]", PU, `vinculado pelo link: ${linkados.map((l) => l.repo).join(", ")}`);
+    }
+
+    // as imagens, na ordem que a nota do servidor explica: as anexadas pela pessoa, a tela (Modo
+    // Tela) e a câmera (Observância) — cada uma só entra se existir; nenhuma depende da outra.
+    const comOrigem = (img, origem) => (img ? { ...img, origem } : null);
+    const images = [
+      ...anexosRef.current.map((a) => ({ mimeType: a.mimeType, data: a.data, origem: "anexo", nome: a.nome })),
+      screenMode && comOrigem(captureScreenFrame(), "tela"),
+      observanceMode && comOrigem(captureObservanceFrame(), "camera"),
+    ].filter(Boolean);
 
     try {
       const res = await fetch("/api/ask", {
@@ -2472,6 +2568,8 @@ export default function AssistantPage() {
           codigo: conversaVigente(conversaRef.current).length ? codigoDaConversa(mensagensRef.current.slice(-24).map((m) => m.text)) : "",
           pendingAction: pendingActionRef.current,
           images: images.length ? images : null,
+          // os repositórios vinculados: a Lisa lê o código que importa para a pergunta
+          repos: reposRef.current.length ? reposRef.current : null,
         }),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
@@ -2508,6 +2606,10 @@ export default function AssistantPage() {
             else if (payload?.debug) addLog("[ACTION]", PU, `nenhuma ação detectada (intent=${payload.checkedIntent})`);
             else if (pendingActionRef.current) addLog("[ACTION]", PU, "aguardando confirmação…");
             else addLog("[ACTION]", PU, "resolvida");
+          } else if (event === "repos") {
+            setLeituraDosRepos(payload);
+            addLog("[REPO]", PU, `${payload?.lidos?.length || 0} arquivo(s) lido(s): ${(payload?.lidos || []).map((l) => l.path).join(", ") || "—"}`);
+            for (const aviso of payload?.avisos || []) addLog("[REPO]", OR, aviso);
           } else if (event === "token") {
             setAnswer((a) => { const na = a + payload; answerRef.current = na; return na; });
           } else if (event === "error") {
@@ -2537,7 +2639,7 @@ export default function AssistantPage() {
       const full = falaSemRascunho(answerRef.current).trim();
       if (voiceEnabled && full) enqueueSpeech(full, gen);
     }
-  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode, vigiaMode, askVigiaMode, abrirNaIde, guardarNaIde]);
+  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode, vigiaMode, askVigiaMode, abrirNaIde, guardarNaIde, guardarRepos]);
   askRef.current = ask; // ver comentário no askRef acima — mantém sempre a versão mais recente pros efeitos de vigília chamarem
 
   // ---- Modo Escuta por palavra: "Lisa, ..." ----
@@ -3703,7 +3805,12 @@ export default function AssistantPage() {
                     fontSize: 14.5, lineHeight: 1.45, color: "#eafcff", whiteSpace: "pre-wrap", userSelect: "text",
                   }}
                 >
-                  {m.role === "assistant" ? <TextoComCodigo texto={m.text} /> : m.text}
+                  {m.role === "assistant" ? <TextoComCodigo texto={m.text} /> : (
+                    <>
+                      {m.anexos?.length ? <span className="bb-balao-anexos">{m.anexos.map((a) => <img key={a.id} src={a.previa} alt={a.nome} />)}</span> : null}
+                      {m.text}
+                    </>
+                  )}
                 </div>
               ))}
               {busy && answer && (
@@ -3737,9 +3844,12 @@ export default function AssistantPage() {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* o contexto da conversa: imagens anexadas e repositórios vinculados */}
+            <div className="bb-contexto-celular">{faixaDoContexto}</div>
             {/* barra de entrada */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderTop: "1px solid rgba(var(--accent-rgb),0.12)" }}>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", padding: "10px 14px", border: "1px solid rgba(var(--accent-rgb),0.2)", borderRadius: 22, background: "rgba(255,255,255,0.04)" }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, padding: "6px 14px 6px 6px", border: "1px solid rgba(var(--accent-rgb),0.2)", borderRadius: 22, background: "rgba(255,255,255,0.04)" }}>
+                <BotaoMais aoEscolherImagens={anexarImagens} aoVincular={vincularRepo} desabilitado={busy} classeDoBotao="bb-redondo bb-redondo--mais-celular" />
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -4681,7 +4791,10 @@ export default function AssistantPage() {
       </main>
 
       <footer className="bb-pe">
+        <div className="bb-pe__coluna">
+        {faixaDoContexto}
         <div className="bb-campo-de-mensagem">
+          <BotaoMais aoEscolherImagens={anexarImagens} aoVincular={vincularRepo} desabilitado={busy} />
           <Suspenso
             titulo="Perguntar sobre"
             paraCima
@@ -4771,6 +4884,7 @@ export default function AssistantPage() {
           <button type="button" className="bb-redondo bb-redondo--enviar" onClick={enviarPergunta} disabled={busy || !input.trim()} title="Enviar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
           </button>
+        </div>
         </div>
       </footer>
     </div>

@@ -10,6 +10,8 @@ import { fonteDosQuadros } from "@/lib/configLisa.js";
 import { pareceAcao, pendenteValida } from "@/lib/acoesNoAbacato.js";
 import { tratarAcaoNoAbacato } from "@/lib/fluxoDeAcoesNoAbacato.js";
 import { comCodigoNaTela, secaoDoCodigoDaConversa } from "@/lib/codigoNaResposta.js";
+import { contextoDosRepositorios } from "@/lib/repositorioNaConversa.js";
+import { notaDasImagens, imagensValidas } from "@/lib/contextoDaConversa.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -112,9 +114,10 @@ export async function POST(req) {
   // usuário respondeu à pergunta de consentimento, não fez uma pergunta nova de verdade.
   let { question, scope = null, personaMode = false } = body;
   let delpConsent = false; // só vira true se o usuário confirmar explicitamente nesta troca
-  // uma ou mais imagens: câmera (Modo Observância) e/ou captura de tela (Modo Tela) — cada
-  // uma valida sozinha, entradas malformadas simplesmente não entram na lista.
-  const images = Array.isArray(rawImages) ? rawImages.filter((img) => img?.data && img?.mimeType) : [];
+  // uma ou mais imagens: as que a pessoa anexou (o + da barra, ou Ctrl+V), a câmera (Modo
+  // Observância) e/ou a captura de tela (Modo Tela) — cada uma valida sozinha, entradas
+  // malformadas simplesmente não entram na lista. Cada uma diz de onde veio (`origem`).
+  const images = imagensValidas(rawImages);
 
   if (!question || typeof question !== "string") {
     return new Response(JSON.stringify({ error: "question é obrigatório" }), {
@@ -298,13 +301,9 @@ export async function POST(req) {
         // Modo Observância (câmera) e/ou Modo Tela (captura de tela) — ver assistant/page.js:
         // avisa o Gemini que há imagem(ns) anexada(s) e pra que servem, senão ele não sabe
         // que pode/deve olhar pra elas ao responder.
-        const imageNote = images.length
-          ? "Há " + (images.length > 1 ? "IMAGENS anexadas" : "uma IMAGEM anexada") + ", tiradas agora mesmo: " +
-            "pode ser uma foto da câmera do usuário (postura, roupa, gesto, expressão — Modo Observância) " +
-            "e/ou uma captura da tela do computador dele (Modo Tela). Se a pergunta for sobre o que você " +
-            "vê nelas, descreva com base NAS IMAGENS de verdade — não invente. Se a pergunta não tiver " +
-            "nada a ver com isso, ignore-as e responda normalmente."
-          : null;
+        // (a nota diz o que é cada imagem, na ordem: anexadas pela pessoa, tela, câmera — ver
+        // src/lib/contextoDaConversa.js)
+        const imageNote = notaDasImagens(images);
         // Tarefas da Delp — só entra se o usuário CONFIRMOU no fluxo de consentimento acima;
         // nunca é buscado/incluído de graça.
         const delpNote = delpConsent
@@ -314,7 +313,17 @@ export async function POST(req) {
 
         // o código que já apareceu na conversa vai inteiro (a conversa em si vai cortada por fala),
         // para a Lisa ver o todo antes de propor uma correção
-        const prompt = buildPrompt(question, matches, combinedNote, blocoDaConversa(turnos), secaoDoCodigoDaConversa(body.codigo));
+        // os repositórios VINCULADOS à conversa (o + da barra, ou um link do GitHub na mensagem): a
+        // Lisa lê os arquivos que importam para a pergunta — escolhidos também pelo que está na
+        // tela — e responde com o código real (ver src/lib/repositorioNaConversa.js)
+        let secaoDosRepos = "";
+        if (Array.isArray(body.repos) && body.repos.length) {
+          const r = await contextoDosRepositorios({ vinculos: body.repos, pergunta: question, conversa: blocoDaConversa(turnos), imagens: images })
+            .catch((err) => ({ secao: "", lidos: [], avisos: [String(err?.message || err)] }));
+          secaoDosRepos = r.secao;
+          send(controller, "repos", { lidos: r.lidos, repos: r.repos || [], avisos: r.avisos });
+        }
+        const prompt = buildPrompt(question, matches, combinedNote, blocoDaConversa(turnos), secaoDoCodigoDaConversa(body.codigo) + secaoDosRepos);
         // em qualquer modo: quando o assunto é código, a resposta traz o código em blocos e a tela
         // abre o editor que digita (src/lib/codigoNaResposta.js, src/components/panels/IdeDaLisa.js)
         const instrucao = withContextDocs(withPersona(comCodigoNaTela(systemInstruction), personaMode));

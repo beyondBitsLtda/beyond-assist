@@ -805,6 +805,69 @@ máximo uns 6, em ordem de confiança.`;
   }
 }
 
+/**
+ * Os arquivos que a Lisa lê de um repositório VINCULADO à conversa (25/10/2026 — ver
+ * src/lib/repositorioNaConversa.js), escolhidos pelos caminhos E pelo que ela vê: as imagens
+ * (a tela no Modo Tela, a câmera, os prints anexados) vão junto, para ela achar na árvore o
+ * arquivo que aparece na tela. `repos`: [{ repo, caminhos }]. Devolve [{ repo, path }].
+ */
+export async function escolherArquivosDaConversa({ pergunta, conversa = "", repos = [], imagens = [], max = 8 }) {
+  const comCaminhos = repos.filter((r) => r.caminhos?.length);
+  if (!comCaminhos.length) return [];
+  const prompt = `REPOSITÓRIOS VINCULADOS À CONVERSA (só os caminhos dos arquivos — o conteúdo vem depois):
+${comCaminhos.map((r) => `### ${r.repo}\n${r.caminhos.join("\n")}`).join("\n\n")}
+${conversa ? `\nA CONVERSA ATÉ AGORA:\n${conversa}\n` : ""}
+PERGUNTA DO USUÁRIO:
+"${pergunta}"
+${imagens.length ? `\nHá ${imagens.length} imagem(ns) anexada(s): a tela do computador do usuário, a câmera e/ou prints que ele colou. Se mostrarem código, um erro, uma tela do sistema ou um nome de arquivo, ache na lista acima o(s) arquivo(s) de onde isso vem — é o mais importante.\n` : ""}
+Quais arquivos a Lisa precisa LER para responder bem? Pense: o que aparece nas imagens, o que a
+pergunta cita (nomes, telas, rotas, funções, erros), os arquivos que esses usam ou que os usam, e
+os de configuração quando o assunto pedir. No máximo ${max}, do mais importante para o menos.
+Devolva cada um com o repositório e o caminho exatamente como estão na lista.`;
+
+  const conteudo = imagens.length
+    ? [{ role: "user", parts: [{ text: prompt }, ...imagens.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } }))] }]
+    : prompt;
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client, modelo) =>
+      client.models.generateContent({
+        model: modelo,
+        contents: conteudo,
+        config: {
+          systemInstruction: "Você escolhe quais arquivos de repositórios de código precisam ser lidos para responder a uma pergunta, pelos caminhos dos arquivos e pelo que aparece nas imagens anexadas.",
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              arquivos: { type: "ARRAY", items: { type: "OBJECT", properties: { repo: { type: "STRING" }, path: { type: "STRING" } }, required: ["repo", "path"] } },
+            },
+            required: ["arquivos"],
+          },
+        },
+      }),
+    { attempts: 2, delayMs: 500 }
+  );
+
+  try {
+    const parsed = JSON.parse(res.text);
+    // nunca confia cegamente — só aceita caminho que existe de verdade naquele repositório
+    const validos = new Map(comCaminhos.map((r) => [r.repo.toLowerCase(), new Set(r.caminhos)]));
+    const vistos = new Set();
+    const saida = [];
+    for (const a of parsed.arquivos || []) {
+      const repo = comCaminhos.find((r) => r.repo.toLowerCase() === String(a.repo || "").toLowerCase())?.repo;
+      if (!repo || !validos.get(repo.toLowerCase())?.has(a.path) || vistos.has(`${repo}:${a.path}`)) continue;
+      vistos.add(`${repo}:${a.path}`);
+      saida.push({ repo, path: a.path });
+      if (saida.length >= max) break;
+    }
+    return saida;
+  } catch {
+    return [];
+  }
+}
+
 // ---- Tarefas de código: a Lisa PROPÕE mudança de arquivo (nunca aplica sozinha — ver
 // src/lib/codeTasks.js, que cria a branch/commit/PR a partir disto) ----
 export async function planCodeChanges({ instruction, contextFiles = [], repo }) {
