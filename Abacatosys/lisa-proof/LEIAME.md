@@ -112,6 +112,12 @@ em lotes (`proof_livro_paginas`); se a aba fechar no meio, o leitor termina quan
 novo. Limites: 50 MB por PDF (o teto do Storage do iMac) e 2 GB por pessoa
 (`LIMITES_DA_BIBLIOTECA`). Para ler, o servidor assina um endereço de 3 h.
 
+**Estante virtual** (`src/componentes/biblioteca/Estante.js`, `src/app/estante.css`): a vista padrão
+da Biblioteca (a lista continua no botão "Lista"). Cada livro é uma caixa em CSS 3D — sem WebGL — com
+lombada, capa, contracapa, topo e corte das páginas; a espessura vem do número de páginas, e a cor da
+lombada vem da capa (ou da paleta, quando a capa é branca). As contas moram em `src/dominio/estante.js`.
+Cuidado: animar `opacity` (ou pôr `filter`/`overflow`) num elemento 3D faz o navegador achatá-lo.
+
 **Leitor** (`src/componentes/biblioteca/LeitorDePdf.js`): só as páginas perto da tela são
 desenhadas. As marcações guardam retângulos em fração da página (certos em qualquer zoom). A camada
 de texto do pdf.js precisa das regras `.textLayer` copiadas em `src/app/biblioteca.css`. PDF

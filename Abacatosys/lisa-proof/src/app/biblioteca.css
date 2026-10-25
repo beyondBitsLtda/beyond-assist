@@ -13,6 +13,10 @@
 /* ------------------------------------------------------------ estante */
 
 .bb-biblioteca { position: relative; min-height: 60vh; }
+.bb-visao { display: inline-flex; border: 1px solid var(--pf-linha); border-radius: var(--pf-pilula); overflow: hidden; }
+.bb-visao button { padding: 8px 14px; border: none; background: var(--pf-superficie); color: var(--pf-tinta-2); font-weight: 600; font-size: 14px; font-family: inherit; cursor: pointer; }
+.bb-visao button + button { border-left: 1px solid var(--pf-linha); }
+.bb-visao button[aria-pressed="true"] { background: var(--pf-verde-claro); color: var(--pf-tinta); }
 .bb-espaco { display: grid; gap: 6px; max-width: 520px; margin-bottom: 16px; font-size: 13px; color: var(--pf-tinta-2); }
 .bb-espaco__barra { height: 6px; border-radius: 6px; background: var(--pf-calor-0); overflow: hidden; }
 .bb-espaco__barra i { display: block; height: 100%; background: var(--pf-verde); border-radius: 6px; }

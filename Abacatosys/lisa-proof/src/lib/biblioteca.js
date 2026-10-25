@@ -56,15 +56,24 @@ export async function listarLivros(usuarioId) {
   const { data, error } = await supabase.from("proof_livros").select(CAMPOS_DO_LIVRO.replace(", sumario", "")).eq("usuario_id", usuarioId).order("lido_em", { ascending: false, nullsFirst: false }).order("criado_em", { ascending: false });
   falhou(error, "livros");
   let marcacoes = [];
+  let trilhas = [];
   if (data.length) {
-    const r = await supabase.from("proof_marcacoes").select("livro_id").in("livro_id", data.map((l) => l.id));
+    const ids = data.map((l) => l.id);
+    const [r, t] = await Promise.all([
+      supabase.from("proof_marcacoes").select("livro_id").in("livro_id", ids),
+      supabase.from("proof_trilhas").select("livro_id").eq("usuario_id", usuarioId).in("livro_id", ids),
+    ]);
     falhou(r.error, "marcações");
+    falhou(t.error, "cursos");
     marcacoes = r.data;
+    trilhas = t.data;
   }
-  const porLivro = marcacoes.reduce((m, x) => m.set(x.livro_id, (m.get(x.livro_id) || 0) + 1), new Map());
+  const contar = (lista) => lista.reduce((m, x) => m.set(x.livro_id, (m.get(x.livro_id) || 0) + 1), new Map());
+  const porLivro = contar(marcacoes);
+  const cursosPorLivro = contar(trilhas); // os cursos feitos a partir do livro (o 🎓 da lombada)
   const usado = data.reduce((s, l) => s + Number(l.tamanho || 0), 0);
   return {
-    livros: data.map((l) => livroParaTela(l, { marcacoes: porLivro.get(l.id) || 0 })),
+    livros: data.map((l) => livroParaTela(l, { marcacoes: porLivro.get(l.id) || 0, cursos: cursosPorLivro.get(l.id) || 0 })),
     espaco: { usado, total: LIMITES_DA_BIBLIOTECA.total, arquivo: LIMITES_DA_BIBLIOTECA.arquivo },
   };
 }

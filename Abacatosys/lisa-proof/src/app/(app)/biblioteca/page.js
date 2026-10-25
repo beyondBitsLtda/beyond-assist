@@ -5,8 +5,10 @@ import Link from "next/link";
 import { obter, criar, remover } from "@/lib/api.js";
 import { formatarTamanho, tituloDoArquivo, LIMITES_DA_BIBLIOTECA } from "@/dominio/biblioteca.js";
 import { abrirPdf, sumarioDoPdf, metadadosDoPdf, capaDoPdf, enviarTextoDoLivro, enviarArquivo } from "@/componentes/biblioteca/pdf.js";
+import Estante from "@/componentes/biblioteca/Estante.js";
 
 const ETAPAS = { lendo: "Lendo o PDF", enviando: "Enviando", texto: "Guardando o texto", pronto: "Pronto", erro: "Falhou" };
+const VISAO = "proof-biblioteca-visao";
 
 /**
  * A biblioteca (25/10/2026): os PDFs da pessoa numa estante. Subir é escolher (ou arrastar) o
@@ -18,8 +20,17 @@ export default function Biblioteca() {
   const [erro, setErro] = useState("");
   const [envios, setEnvios] = useState([]); // [{ chave, nome, etapa, progresso, erro, livroId }]
   const [arrastando, setArrastando] = useState(false);
+  const [visao, setVisao] = useState("estante"); // estante (3D) | lista
   const entrada = useRef(null);
   const ocupado = envios.some((e) => e.etapa !== "pronto" && e.etapa !== "erro");
+
+  useEffect(() => {
+    try { if (localStorage.getItem(VISAO) === "lista") setVisao("lista"); } catch { /* sem armazenamento: estante */ }
+  }, []);
+  const mudarVisao = (v) => {
+    setVisao(v);
+    try { localStorage.setItem(VISAO, v); } catch { /* vale nesta visita */ }
+  };
 
   const carregar = useCallback(() => obter("/api/biblioteca").then(setDados).catch((e) => setErro(e.message)), []);
   useEffect(() => { carregar(); }, [carregar]);
@@ -95,6 +106,10 @@ export default function Biblioteca() {
           <p>Seus livros em PDF: leia, marque, mande trechos para o caderno e gere cursos a partir deles.</p>
         </div>
         <div className="pf-acoes">
+          <div className="bb-visao" role="group" aria-label="Como ver a biblioteca">
+            <button type="button" aria-pressed={visao === "estante"} onClick={() => mudarVisao("estante")}>📚 Estante</button>
+            <button type="button" aria-pressed={visao === "lista"} onClick={() => mudarVisao("lista")}>☰ Lista</button>
+          </div>
           <input ref={entrada} type="file" accept="application/pdf,.pdf" multiple hidden onChange={(e) => { const l = [...(e.target.files || [])]; e.target.value = ""; if (l.length) subirVarios(l); }} />
           <button type="button" className="pf-botao" onClick={() => entrada.current?.click()} disabled={ocupado}>＋ Subir PDF</button>
         </div>
@@ -123,7 +138,10 @@ export default function Biblioteca() {
       )}
 
       {!dados && !erro && <div className="pf-carregando">Arrumando a estante…</div>}
-      {dados && !livros.length && !envios.length && (
+      {dados && visao === "estante" && (
+        <Estante livros={livros} aoSubir={() => entrada.current?.click()} aoApagar={apagar} />
+      )}
+      {dados && visao === "lista" && !livros.length && !envios.length && (
         <button type="button" className="pf-cartao bb-vazia" onClick={() => entrada.current?.click()}>
           <span className="bb-vazia__icone" aria-hidden="true">📚</span>
           <strong>A estante está vazia</strong>
@@ -131,7 +149,7 @@ export default function Biblioteca() {
         </button>
       )}
 
-      {livros.length > 0 && (
+      {visao === "lista" && livros.length > 0 && (
         <ul className="bb-estante">
           {livros.map((l) => (
             <li key={l.id} className="bb-livro">

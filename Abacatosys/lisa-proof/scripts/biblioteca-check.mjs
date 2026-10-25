@@ -19,6 +19,10 @@ import {
   cotasDoMaterial, materialDoCurso, tarefaDeLeitura, assuntosParaOLivro, validarCursoDoLivro, leiturasDoCurso, paginaDoAssunto,
 } from "../src/dominio/cursoDoLivro.js";
 import { validarCurso, assuntosEmOrdem } from "../src/dominio/curso.js";
+import {
+  dimensoesDoLivro, corDaLombada, estiloDaLombada, corDoTextoDaLombada, contraste, corMediaDosPixels, arrumarPrateleiras,
+  situacaoNaLombada, descricaoDoLivro, CORES_DE_LOMBADA,
+} from "../src/dominio/estante.js";
 
 let passou = 0;
 function caso(nome, fn) {
@@ -287,6 +291,45 @@ caso("leituras e página do caderno do curso", () => {
   const pagina = paginaDoAssunto({ assunto: { titulo: "Closures", objetivo: "entender escopo", paginas: { de: 50, ate: 58 } }, livro: LIVRO });
   assert.match(pagina, /^# Closures/);
   assert.match(pagina, new RegExp(`\\(/biblioteca/${ID}\\?pagina=50\\)`));
+});
+
+console.log("\nestante virtual");
+caso("o mesmo livro tem sempre o mesmo tamanho; a espessura acompanha as páginas", () => {
+  const a = dimensoesDoLivro({ id: ID, paginas: 12 });
+  assert.deepEqual(a, dimensoesDoLivro({ id: ID, paginas: 12 }));
+  assert.equal(a.espessura, 24);
+  assert.ok(dimensoesDoLivro({ id: ID, paginas: 600 }).espessura > dimensoesDoLivro({ id: ID, paginas: 200 }).espessura);
+  assert.equal(dimensoesDoLivro({ id: ID, paginas: 5000 }).espessura, 78);
+  assert.ok(a.altura >= 196 && a.altura <= 236);
+  assert.equal(dimensoesDoLivro({ id: ID, paginas: 12 }, 0.5).altura, Math.round(a.altura / 2));
+});
+caso("cor e estilo da lombada são estáveis e da paleta", () => {
+  assert.equal(corDaLombada("x"), corDaLombada("x"));
+  assert.ok(CORES_DE_LOMBADA.includes(corDaLombada("Clean Code")));
+  assert.deepEqual(estiloDaLombada("a"), estiloDaLombada("a"));
+});
+caso("o texto da lombada tem contraste AA com toda cor da paleta", () => {
+  for (const c of CORES_DE_LOMBADA) assert.ok(contraste(c, corDoTextoDaLombada(c)) >= 4.5, `${c}: ${contraste(c, corDoTextoDaLombada(c)).toFixed(2)}`);
+  assert.equal(corDoTextoDaLombada("#F5E6A0"), "#1E1A16");
+});
+caso("a cor média da capa ignora papel e tinta; capa branca não dá cor", () => {
+  const px = (cor, n) => Array.from({ length: n }, () => [...cor, 255]).flat();
+  assert.equal(corMediaDosPixels(px([255, 255, 255], 90).concat(px([0, 0, 0], 10))), null);
+  const azul = corMediaDosPixels(px([30, 80, 200], 60).concat(px([255, 255, 255], 40)));
+  assert.match(azul, /^#[0-9A-F]{6}$/);
+  assert.ok(Number.parseInt(azul.slice(5, 7), 16) > Number.parseInt(azul.slice(1, 3), 16), "continua azul");
+});
+caso("prateleiras: enche até não caber, na ordem; livro largo demais fica sozinho", () => {
+  const itens = [30, 30, 30, 50, 100].map((espessura, i) => ({ i, espessura }));
+  assert.deepEqual(arrumarPrateleiras(itens, 100, { vao: 2 }).map((p) => p.map((x) => x.i)), [[0, 1, 2], [3], [4]]);
+  assert.deepEqual(arrumarPrateleiras([], 100), []);
+  assert.deepEqual(arrumarPrateleiras([{ espessura: 300 }], 100).length, 1);
+});
+caso("o que a lombada mostra", () => {
+  assert.deepEqual(situacaoNaLombada({ status: "pronto", progresso: 40, ultimaPagina: 40, paginas: 100, cursos: 1 }), { preparando: false, lendo: true, lido: false, curso: true });
+  assert.equal(situacaoNaLombada({ status: "pronto", progresso: 100, ultimaPagina: 100, paginas: 100 }).lido, true);
+  assert.equal(situacaoNaLombada({ status: "lendo" }).preparando, true);
+  assert.equal(descricaoDoLivro({ titulo: "SICP", paginas: 600, progresso: 25, marcacoes: 1 }), "SICP, 600 páginas, 25% lido, 1 marcação");
 });
 
 console.log("\nmigração");

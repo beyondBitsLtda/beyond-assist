@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.27.0-cloudflare-pages.1",
+  "versao": "0.28.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-25",
   "compilacao": {
-    "numero": 67,
+    "numero": 68,
     "data": "2026-10-25",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.28.0-cloudflare-pages.1",
+      "data": "2026-10-25",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Biblioteca virou uma estante virtual: livros em 3D, em pé nas prateleiras de madeira, com lombada, capa e corte das páginas.",
+      "itens": [
+        "Cada livro é uma caixa 3D (em CSS, sem WebGL): a espessura vem do número de páginas, a altura varia de livro para livro, e a cor da lombada sai da capa (ou de uma paleta de encadernação, quando a capa é branca), com o texto em contraste AA.",
+        "Na lombada: o título de cima para baixo (como manda a ABNT), o autor, filetes dourados ou faixas, o marcador de página saindo do topo no livro que está sendo lido, o selo dourado do livro lido até o fim e 🎓 quando o livro virou curso.",
+        "Passar o mouse (ou o foco do teclado) puxa o livro da prateleira e gira mostrando a capa; tocar abre o destaque, com a capa em 3D, o progresso, as marcações, os cursos e os botões Ler/Continuar, Gerar curso e Apagar.",
+        "As prateleiras se arrumam pela largura da tela (o celular usa livros menores); no fim da última, o espaço do ＋ para subir PDF. O botão Estante/Lista troca a vista, lembrada no aparelho."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.27.0-cloudflare-pages.1",
       "data": "2026-10-25",
@@ -1045,7 +1059,8 @@
         "Cadernos de anotação (/cadernos) no estilo Notepad++: módulos e páginas, cor de sintaxe por linguagem (Markdown, JavaScript, Python, SQL e outras), abas, buscar e substituir, prévia, gravação automática com proteção contra sobrescrita",
         "Vínculos do caderno (inteiro, módulo ou página) com trilhas e cursos, assuntos, torres e andares do Modo Domínio e livros (até a página), com o bloco “📓 Anotações” e o “Anotar aqui” em cada um desses lugares",
         "Biblioteca de PDFs (/biblioteca) com leitor: destaque em cores, sublinhado, notas, marcação de área, marcador de página, sumário, miniaturas, busca no texto, temas de leitura e trechos mandados para o caderno",
-        "Cursos gerados a partir de um livro da biblioteca, seguindo os capítulos, com as páginas de cada assunto; a explicação, o quiz e o exercício do assunto usam o trecho do livro"
+        "Cursos gerados a partir de um livro da biblioteca, seguindo os capítulos, com as páginas de cada assunto; a explicação, o quiz e o exercício do assunto usam o trecho do livro",
+        "Estante virtual da Biblioteca: livros em 3D nas prateleiras, com lombada (cor da capa, título, marcador de leitura, selo de lido, 🎓 de curso), capa ao puxar e destaque com as ações"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",

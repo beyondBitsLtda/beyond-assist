@@ -1,0 +1,283 @@
+/* ============================================================ a estante virtual (25/10/2026)
+
+   Os livros são caixas em CSS 3D (sem WebGL): seis faces posicionadas a partir do centro do
+   livro, com --t (espessura), --h (altura) e --w (largura da capa). Na prateleira, o livro recua
+   metade da largura, para todas as lombadas ficarem alinhadas na frente da tábua. Prefixo `es-`. */
+
+.es-estante { margin-top: 4px; }
+
+.es-moldura {
+  position: relative;
+  padding: 26px 34px 12px;
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(255, 214, 150, 0.14), transparent 62%),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.09) 0 2px, transparent 2px 9px, rgba(255, 255, 255, 0.02) 9px 10px, transparent 10px 17px),
+    linear-gradient(180deg, #3A2615, #22160C);
+  box-shadow:
+    inset 0 0 0 12px #5A3A20,
+    inset 0 0 0 14px #3D2614,
+    inset 0 26px 44px rgba(0, 0, 0, 0.55),
+    0 24px 50px rgba(0, 0, 0, 0.35);
+}
+
+.es-prateleira { perspective: 1300px; perspective-origin: 50% 12%; margin-bottom: 20px; }
+.es-prateleira:last-child { margin-bottom: 6px; }
+.es-livros {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  min-height: 260px;
+  padding: 22px 12px 0;
+  transform-style: preserve-3d;
+}
+
+/* a tábua: a frente com a luz de cima, e o tampo recuando para o fundo */
+.es-tabua {
+  position: relative;
+  height: 18px;
+  margin: 0 -12px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #A87648 0%, #7A4E2B 55%, #57361C 100%);
+  box-shadow: 0 16px 18px -6px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.es-tabua::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 100%;
+  height: 26px;
+  background: linear-gradient(0deg, #8A5A33, #4E3119);
+  transform-origin: 50% 100%;
+  transform: perspective(420px) rotateX(64deg);
+}
+
+/* ------------------------------------------------------------ o livro */
+
+.es-livro {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: var(--t);
+  height: var(--h);
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transform-style: preserve-3d;
+  transform: translateZ(calc(var(--w) / -2));
+  transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+.es-livro:hover, .es-livro:focus-visible {
+  transform: translateZ(calc(var(--w) / -2 + 46px)) translateY(-16px) rotateY(-36deg);
+  outline: none;
+}
+.es-livro:focus-visible .es-lombada { outline: 3px solid #FFD54F; outline-offset: 2px; }
+.es-livro--preparando .es-lombada { filter: saturate(0.4) brightness(0.8); }
+
+.es-face { position: absolute; left: 50%; top: 50%; display: block; backface-visibility: hidden; }
+
+/* lombada: luz de cilindro (escuro nas bordas, brilho perto do meio) */
+.es-lombada {
+  width: var(--t);
+  height: var(--h);
+  margin: calc(var(--h) / -2) 0 0 calc(var(--t) / -2);
+  transform: translateZ(calc(var(--w) / 2));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 0 8px;
+  border-radius: 3px 3px 2px 2px;
+  color: var(--texto);
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.38) 0%, rgba(0, 0, 0, 0) 16%, rgba(255, 255, 255, 0.17) 38%, rgba(255, 255, 255, 0) 60%, rgba(0, 0, 0, 0.3) 100%),
+    var(--cor);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+.es-lombada__titulo {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: 100%;
+  writing-mode: vertical-rl; /* de cima para baixo, como a lombada dos livros no Brasil (ABNT) */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(10px, calc(var(--t) * 0.36), 15px);
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.es-livro--serif .es-lombada__titulo { font-family: Georgia, "Times New Roman", serif; }
+.es-livro--sans .es-lombada__titulo { font-family: inherit; text-transform: uppercase; letter-spacing: 0.08em; font-size: clamp(9px, calc(var(--t) * 0.3), 13px); }
+.es-lombada__autor {
+  flex: 0 1 auto;
+  max-height: 32%;
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(8px, calc(var(--t) * 0.24), 11px);
+  opacity: 0.82;
+}
+.es-lombada__selos { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: clamp(9px, calc(var(--t) * 0.32), 13px); }
+.es-selo--lido {
+  display: grid; place-items: center; width: 1.5em; height: 1.5em; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #F7DD8A, #C99A2E); color: #4A3410; font-weight: 800; font-size: 0.85em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* filetes: dourados, faixas escuras, um só ou nenhum */
+.es-lombada__filete { flex: 0 0 auto; width: 100%; }
+.es-lombada--nenhum .es-lombada__filete { display: none; }
+.es-lombada--dourados .es-lombada__filete { height: 7px; border-top: 1.5px solid #D9B45A; border-bottom: 1.5px solid #D9B45A; }
+.es-lombada--escuros .es-lombada__filete { height: 15px; background: var(--cor-escura); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.3); }
+.es-lombada--um .es-lombada__filete { height: 0; border-top: 2px solid var(--cor-clara); }
+
+/* o marcador de página saindo de cima do livro que está sendo lido */
+.es-marcador {
+  position: absolute;
+  top: -15px;
+  right: 22%;
+  width: 7px;
+  height: 26px;
+  background: linear-gradient(90deg, #A51D24, #D4343C 60%, #A51D24);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+  z-index: -1;
+}
+
+/* capa (o lado direito do livro em pé), contracapa, topo das páginas, corte e base */
+.es-capa, .es-contracapa {
+  width: var(--w);
+  height: var(--h);
+  margin: calc(var(--h) / -2) 0 0 calc(var(--w) / -2);
+  overflow: hidden;
+  background: var(--cor);
+}
+.es-capa { transform: rotateY(90deg) translateZ(calc(var(--t) / 2)); border-radius: 0 3px 3px 0; }
+.es-contracapa { transform: rotateY(-90deg) translateZ(calc(var(--t) / 2)); background: var(--cor-escura); border-radius: 3px 0 0 3px; }
+.es-capa img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; background: #FFFFFF; }
+.es-capa__titulo { display: block; padding: 18px 14px; color: var(--texto); font: 700 15px/1.25 Georgia, "Times New Roman", serif; }
+.es-capa__brilho {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 7%, rgba(255, 255, 255, 0.1) 55%, rgba(0, 0, 0, 0.12) 100%);
+}
+.es-topo, .es-base {
+  width: var(--t);
+  height: var(--w);
+  margin: calc(var(--w) / -2) 0 0 calc(var(--t) / -2);
+  background:
+    linear-gradient(90deg, var(--cor) 0 2px, transparent 2px calc(100% - 2px), var(--cor) calc(100% - 2px)),
+    repeating-linear-gradient(90deg, #EADFC8 0 1px, #F8F1E2 1px 3px);
+}
+.es-topo { transform: rotateX(90deg) translateZ(calc(var(--h) / 2)); }
+.es-base { transform: rotateX(-90deg) translateZ(calc(var(--h) / 2)); }
+.es-corte {
+  width: var(--t);
+  height: var(--h);
+  margin: calc(var(--h) / -2) 0 0 calc(var(--t) / -2);
+  transform: rotateY(180deg) translateZ(calc(var(--w) / 2));
+  background:
+    linear-gradient(90deg, var(--cor) 0 2px, transparent 2px calc(100% - 2px), var(--cor) calc(100% - 2px)),
+    repeating-linear-gradient(90deg, #E6DAC1 0 1px, #F6EEDC 1px 3px);
+}
+
+/* o "livro fantasma" no fim da última prateleira: subir PDF */
+.es-fantasma {
+  flex: 0 0 auto;
+  margin-left: 56px; /* a capa do livro ao lado, vista de lado (longe do centro da perspectiva), não cobre o ＋ */
+  width: var(--t);
+  height: var(--h);
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(255, 228, 190, 0.45);
+  border-radius: 4px;
+  background: #2C1C10;
+  color: rgba(255, 228, 190, 0.8);
+  font-size: 22px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.es-fantasma:hover, .es-fantasma:focus-visible { background: rgba(255, 228, 190, 0.14); border-color: #FFD54F; outline: none; }
+
+/* ------------------------------------------------------------ o livro em destaque */
+
+.es-destaque {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(12, 9, 6, 0.72);
+  backdrop-filter: blur(3px);
+  animation: es-aparecer 0.2s ease;
+}
+.es-destaque__caixa {
+  position: relative;
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 30px;
+  align-items: center;
+  width: min(800px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  padding: 26px 30px;
+  border-radius: 22px;
+  background: var(--pf-superficie);
+  color: var(--pf-tinta);
+  box-shadow: var(--pf-sombra-alta);
+}
+.es-destaque__fechar {
+  position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid var(--pf-linha); background: var(--pf-superficie-2); color: var(--pf-tinta); cursor: pointer;
+}
+.es-destaque__palco { position: relative; display: grid; place-items: center; height: 390px; perspective: 1200px; }
+.es-destaque__palco .es-livro {
+  cursor: default;
+  transform: rotateY(-58deg);
+  animation: es-tirar 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both, es-flutuar 5s ease-in-out 0.9s infinite alternate;
+}
+.es-destaque__sombra {
+  position: absolute; bottom: 14px; left: 50%; width: 200px; height: 22px; transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.35), transparent 70%);
+}
+.es-destaque__info h2 { margin: 0 0 4px; font-size: 22px; line-height: 1.25; padding-right: 30px; }
+.es-destaque__autor { margin: 0 0 6px; color: var(--pf-tinta-2); }
+.es-destaque__meta { margin: 0 0 14px; color: var(--pf-tinta-2); font-size: 14px; }
+.es-destaque__progresso { display: grid; gap: 5px; margin-bottom: 14px; }
+.es-destaque__progresso span { height: 7px; border-radius: 7px; background: var(--pf-calor-0); overflow: hidden; }
+.es-destaque__progresso i { display: block; height: 100%; background: var(--pf-verde); border-radius: 7px; }
+.es-destaque__progresso small { color: var(--pf-tinta-2); font-size: 13px; }
+.es-destaque__info .pf-pilula { display: inline-block; margin: 0 0 12px; }
+.es-destaque__acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+@keyframes es-aparecer { from { opacity: 0; } to { opacity: 1; } }
+/* só transform: animar a opacidade de um elemento 3D faz o Chrome achatá-lo (a capa sumia) */
+@keyframes es-tirar {
+  0% { transform: translateZ(-160px) translateY(30px) rotateY(0deg); }
+  100% { transform: rotateY(-58deg); }
+}
+@keyframes es-flutuar {
+  from { transform: rotateY(-58deg) translateY(0); }
+  to { transform: rotateY(-50deg) translateY(-8px); }
+}
+
+@media (max-width: 640px) {
+  .es-moldura { padding: 20px 22px 8px; }
+  .es-livros { min-height: 210px; padding-top: 18px; }
+  .es-destaque__caixa { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 20px; }
+  .es-destaque__palco { height: 290px; }
+  .es-destaque__sombra { width: 150px; bottom: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .es-livro { transition: none; }
+  .es-destaque__palco .es-livro { animation: none; }
+  .es-destaque { animation: none; }
+}
