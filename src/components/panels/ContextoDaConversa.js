@@ -105,6 +105,7 @@ function FormDoRepositorio({ aoVincular, aoVoltar }) {
 /** O que a Lisa leu de cada repositório na última pergunta ("6 arquivos lidos"), ou o aviso de erro. */
 function situacaoDoRepo(r, leitura) {
   if (!leitura) return "será lido na próxima pergunta";
+  if (leitura.lendo) return "lendo o repositório…";
   const aviso = (leitura.avisos || []).find((a) => a.toLowerCase().includes(r.repo.toLowerCase()));
   if (aviso) return `⚠ ${aviso.replace(/^Não consegui ler [^:]+: /, "")}`;
   const lidos = (leitura.lidos || []).filter((l) => l.repo.toLowerCase() === r.repo.toLowerCase());

@@ -2556,6 +2556,32 @@ export default function AssistantPage() {
       observanceMode && comOrigem(captureObservanceFrame(), "camera"),
     ].filter(Boolean);
 
+    // Os repositórios vinculados são lidos ANTES, num pedido só deles: dentro do /api/ask, as
+    // chamadas ao GitHub somavam com as da pergunta e estouravam o limite de 50 chamadas de rede
+    // por pedido do Worker ("Too many subrequests", 25/10/2026). A seção pronta vai na pergunta.
+    let contextoDosRepos = null;
+    if (reposRef.current.length) {
+      setLeituraDosRepos({ lendo: true });
+      addLog("[REPO]", PU, `lendo ${reposRef.current.map((r) => r.repo).join(", ")}…`);
+      try {
+        const r = await fetch("/api/repos/contexto", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ repos: reposRef.current, question: q, turnos: conversaVigente(conversaRef.current), images: images.length ? images : null }),
+        });
+        const leitura = await r.json().catch(() => ({}));
+        if (!r.ok || leitura.ok === false) throw new Error(leitura.error || `HTTP ${r.status}`);
+        contextoDosRepos = { secao: leitura.secao || "" };
+        setLeituraDosRepos(leitura);
+        addLog("[REPO]", PU, `${leitura.lidos?.length || 0} arquivo(s) lido(s): ${(leitura.lidos || []).map((l) => l.path).join(", ") || "—"}`);
+        for (const aviso of leitura.avisos || []) addLog("[REPO]", OR, aviso);
+      } catch (err) {
+        // sem a leitura, a pergunta segue assim mesmo (a Lisa avisa que não viu o código)
+        setLeituraDosRepos({ lidos: [], repos: [], avisos: reposRef.current.map((r) => `Não consegui ler ${r.repo}: ${err.message}`) });
+        addLog("[REPO]", OR, `a leitura do repositório falhou: ${err.message}`);
+      }
+    }
+
     try {
       const res = await fetch("/api/ask", {
         method: "POST",
@@ -2568,8 +2594,8 @@ export default function AssistantPage() {
           codigo: conversaVigente(conversaRef.current).length ? codigoDaConversa(mensagensRef.current.slice(-24).map((m) => m.text)) : "",
           pendingAction: pendingActionRef.current,
           images: images.length ? images : null,
-          // os repositórios vinculados: a Lisa lê o código que importa para a pergunta
-          repos: reposRef.current.length ? reposRef.current : null,
+          // o código dos repositórios vinculados, já lido acima (/api/repos/contexto)
+          contextoDosRepos,
         }),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);

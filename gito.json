@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.13.0-cloudflare-pages.1",
+  "versao": "0.13.1-cloudflare-pages.1",
   "atualizadoEm": "2026-10-25",
   "compilacao": {
-    "numero": 39,
+    "numero": 40,
     "data": "2026-10-25",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.13.1-cloudflare-pages.1",
+      "data": "2026-10-25",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Pergunta com repositório vinculado dava \"Too many subrequests\": a leitura do repositório agora roda num pedido próprio, antes da pergunta.",
+      "itens": [
+        "O Worker gratuito aceita 50 chamadas de rede por pedido. A leitura do repositório (árvore, a IA escolhendo os arquivos, um pedido por arquivo) somava com as da pergunta (banco, memória, Gemini com as tentativas e o registro de uso das chaves) e passava do limite.",
+        "Nova rota /api/repos/contexto: a tela lê os repositórios primeiro (a faixa mostra \"lendo o repositório…\") e manda a seção pronta na pergunta; cada pedido tem o limite inteiro.",
+        "Se o limite estourar por outro motivo, a Lisa explica com uma frase em vez de mostrar o erro cru da Cloudflare."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.13.0-cloudflare-pages.1",
       "data": "2026-10-25",

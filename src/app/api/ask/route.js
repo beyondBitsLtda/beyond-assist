@@ -316,8 +316,14 @@ export async function POST(req) {
         // os repositórios VINCULADOS à conversa (o + da barra, ou um link do GitHub na mensagem): a
         // Lisa lê os arquivos que importam para a pergunta — escolhidos também pelo que está na
         // tela — e responde com o código real (ver src/lib/repositorioNaConversa.js)
+        // A tela lê os repositórios ANTES, num pedido próprio (/api/repos/contexto), e manda a seção
+        // pronta: lida aqui, a leitura somava as chamadas dela com as desta pergunta e estourava o
+        // limite de 50 chamadas de rede por pedido do Worker. `repos` cru continua valendo para uma
+        // aba antiga, ainda com o código de antes.
         let secaoDosRepos = "";
-        if (Array.isArray(body.repos) && body.repos.length) {
+        if (typeof body.contextoDosRepos?.secao === "string") {
+          secaoDosRepos = body.contextoDosRepos.secao.slice(0, 170_000);
+        } else if (Array.isArray(body.repos) && body.repos.length) {
           const r = await contextoDosRepositorios({ vinculos: body.repos, pergunta: question, conversa: blocoDaConversa(turnos), imagens: images })
             .catch((err) => ({ secao: "", lidos: [], avisos: [String(err?.message || err)] }));
           secaoDosRepos = r.secao;
@@ -344,6 +350,8 @@ export async function POST(req) {
             ? `⚠️ Quota do Gemini cheia${keySuffix}. Aguarde cerca de 1 minuto e pergunte de novo. (Dica: evite clicar em SYNC logo antes de perguntar.)`
             : err?.code === "UNAVAILABLE"
             ? `⚠️ O Gemini está com alta demanda no momento${keySuffix} (já tentei de novo automaticamente). Espere um instante e pergunte de novo.`
+            : /too many subrequests/i.test(String(err?.message || err))
+            ? "⚠️ Esta pergunta precisou de mais chamadas de rede do que o servidor deixa fazer de uma vez (o Gemini pode ter pedido várias tentativas). Pergunte de novo; se repetir, tire uma imagem do contexto."
             : String(err?.message || err);
         send(controller, "error", { message: friendly });
       } finally {
