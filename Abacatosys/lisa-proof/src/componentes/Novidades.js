@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoMonstro } from "./reino/monstrosDePapel.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-24-modo-dominio";
+export const EDICAO_DAS_NOVIDADES = "2026-10-25-cadernos-e-biblioteca";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,10 +28,10 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🗼", titulo: "Modo Domínio", texto: "Traga um repositório público (GitHub ou GitLab): a Lisa monta uma torre de 10 a 100 andares, do básico ao difícil, para você dominar o código e as tecnologias dele.", destaque: true },
-  { icone: "⚔️", titulo: "Cada andar é uma luta", texto: "Você entrega um commit na branch do desafio, a Lisa dá a nota e o Neuro enfrenta o chefão do andar: 60 ou mais vence e sobe. Cada entrega dá atributos ao Neuro." },
-  { icone: "🎁", titulo: "Prêmios para o Reino", texto: "Os marcos da torre dão pontos, tropas, defesas, veículo e, no nível Mestre, o chefão do topo como avatar. Os pontos contam para a ofensiva." },
-  { icone: "📜", titulo: "Certificado em PDF", texto: "No topo, um certificado com o seu nome, o repositório e os assuntos dominados, com um código para quem receber conferir." },
+  { icone: "📓", titulo: "Cadernos", texto: "Anote como num editor de código: vários cadernos, módulos e páginas, cor de sintaxe em Markdown, JavaScript, Python, SQL e outras, abas, buscar e substituir, prévia e gravação automática.", destaque: true },
+  { icone: "🔗", titulo: "Ligados ao seu estudo", texto: "Vincule um caderno, um módulo ou uma página a uma trilha, um curso, um assunto, uma torre, um andar ou a página de um livro — e o “📓 Anotações” aparece lá, com o caminho de volta." },
+  { icone: "📚", titulo: "Biblioteca de PDFs", texto: "Suba seus livros em PDF e leia com destaque em cores, sublinhado, notas, marcação de área, marcador de página, sumário, miniaturas, busca e temas sépia e escuro. Mande trechos para o caderno." },
+  { icone: "🎓", titulo: "Cursos a partir de um livro", texto: "Escolha o livro e os capítulos: a Lisa lê o texto e monta o curso seguindo o livro, com as páginas de cada assunto — e o quiz e o exercício cobram o que o livro ensina." },
 ];
 
 export default function Novidades() {
@@ -75,8 +75,8 @@ export default function Novidades() {
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">Chegou o Modo Domínio!</h2>
-          <p className="novidades__sub">Escale a torre de um repositório de verdade, andar por andar, até dominar o código — com chefões, prêmios para o Reino e certificado no topo.</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">Cadernos e Biblioteca!</h2>
+          <p className="novidades__sub">Um caderno de código para anotar enquanto estuda, uma biblioteca para ler e marcar seus PDFs — e cursos montados a partir dos seus livros.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -86,7 +86,8 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/dominio" className="pf-botao novidades__principal" onClick={fechar}>🗼 Escalar uma torre</Link>
+            <Link ref={principal} href="/biblioteca" className="pf-botao novidades__principal" onClick={fechar}>📚 Abrir a biblioteca</Link>
+            <Link href="/cadernos" className="pf-botao pf-botao--sec" onClick={fechar}>📓 Cadernos</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>

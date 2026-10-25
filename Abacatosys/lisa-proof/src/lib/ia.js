@@ -145,7 +145,7 @@ export async function tarefasDeTeoria({ tema, card }) {
 // ---------------------------------------------------------------- explicação
 
 /** A "definição com a IA" do conteúdo teórico: texto curto, com exemplo de código. */
-export async function explicarAssunto({ tema, card }) {
+export async function explicarAssunto({ tema, card, trecho = "" }) {
   const parte = await conversar({
     sistema: PERSONA,
     maxTokens: 4096,
@@ -157,6 +157,7 @@ export async function explicarAssunto({ tema, card }) {
           `Tema: ${tema}`,
           `Assunto: ${card.titulo}`,
           card.descricao ? `Contexto do card: ${corte(card.descricao, 600)}` : "",
+          trecho, // curso a partir de um livro: o trecho das páginas do assunto (src/lib/leituras.js)
           "",
           "Explique este assunto para quem está estudando, em até 450 palavras, nesta ordem:",
           "1. O que é (definição em 2 ou 3 frases).",

@@ -62,7 +62,7 @@ export function validarCurso(bruto) {
       const titulo = texto(a?.titulo, 200);
       if (!titulo) continue;
       const dias = Number.parseInt(a?.dias, 10);
-      assuntos.push({
+      const assunto = {
         titulo,
         descricao: texto(a?.descricao, 1500),
         objetivo: texto(a?.objetivo, 240),
@@ -70,7 +70,15 @@ export function validarCurso(bruto) {
         dias: Number.isFinite(dias) ? limitar(dias, 1, MAXIMO_DE_DIAS_POR_ETAPA) : 1,
         tarefas: (Array.isArray(a?.tarefas) ? a.tarefas : [])
           .map((t) => texto(t, 200)).filter(Boolean).slice(0, LIMITES_DO_CURSO.tarefas),
-      });
+      };
+      // curso a partir de um livro (src/dominio/cursoDoLivro.js): as páginas que o assunto cobre
+      const de = Number.parseInt(a?.paginas?.de, 10);
+      const ate = Number.parseInt(a?.paginas?.ate, 10);
+      if (Number.isFinite(de) && Number.isFinite(ate) && de >= 1) {
+        assunto.paginas = { de: Math.min(de, ate), ate: Math.max(de, ate) };
+        assunto.secao = texto(a?.secao, 200);
+      }
+      assuntos.push(assunto);
       total++;
     }
     if (assuntos.length) modulos.push({ nome: texto(m?.nome, 80) || `Módulo ${modulos.length + 1}`, assuntos });
@@ -97,6 +105,10 @@ export function validarCurso(bruto) {
       resumo: texto(bruto.resumo, 1200),
       nivel: NIVEIS_DO_CURSO[bruto.nivel] ? bruto.nivel : "iniciante",
       modulos,
+      // o livro de onde o curso saiu (quem cria confere de novo que o livro é da pessoa)
+      ...(/^[0-9a-f-]{36}$/i.test(String(bruto.livro?.id || ""))
+        ? { livro: { id: String(bruto.livro.id).toLowerCase(), titulo: texto(bruto.livro.titulo, 200) } }
+        : {}),
     },
   };
 }

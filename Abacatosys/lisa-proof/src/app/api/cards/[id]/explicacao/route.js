@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase.js";
 import { exigirUsuario, respostaDeErro, ErroDeAcesso } from "@/lib/sessao.js";
 import { cardDeEstudo } from "@/lib/estudo.js";
 import { explicarAssunto, temModelo } from "@/lib/ia.js";
+import { trechoDoAssunto, blocoDoTrecho } from "@/lib/leituras.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export async function POST(req, { params }) {
     const { card, quadro } = await cardDeEstudo(id, usuario.id);
     if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
 
-    const texto = await explicarAssunto({ tema: quadro.tema, card });
+    const texto = await explicarAssunto({ tema: quadro.tema, card, trecho: blocoDoTrecho(await trechoDoAssunto(card.id)) });
     const { error } = await supabase.from("proof_explicacoes").upsert(
       { usuario_id: usuario.id, card_id: card.id, texto, criada_em: new Date().toISOString() },
       { onConflict: "usuario_id,card_id" }

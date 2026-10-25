@@ -9,14 +9,32 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.26.2-cloudflare-pages.1",
+  "versao": "0.27.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-25",
   "compilacao": {
-    "numero": 66,
+    "numero": 67,
     "data": "2026-10-25",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.27.0-cloudflare-pages.1",
+      "data": "2026-10-25",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Cadernos de anotação no estilo Notepad++, Biblioteca de PDFs com leitor e marcações, e cursos gerados a partir dos livros — tudo ligado às trilhas, aos assuntos e às torres.",
+      "itens": [
+        "Cadernos (/cadernos): vários cadernos com módulos e páginas; editor com cor de sintaxe (Markdown com os blocos de código coloridos, JavaScript, Python, SQL, Java, C#, Go, YAML e outras), abas, números de linha, buscar e substituir, quebra de linha, tamanho da letra, espaços visíveis, prévia ao lado, tela cheia, baixar a página como arquivo e gravação automática.",
+        "Gravação segura: cada página guarda a versão; se ela mudou em outra aba ou no celular, a gravação é recusada e a tela pergunta o que fazer, em vez de apagar em silêncio.",
+        "Vínculos: o caderno inteiro, um módulo ou uma página ligados a uma trilha (ou curso), a um assunto, a uma torre do Modo Domínio, a um andar ou a um livro (e à página do livro). O bloco “📓 Anotações” aparece na trilha, em cada assunto, na torre e no leitor, com “Anotar aqui”, que cria a página já vinculada.",
+        "Biblioteca (/biblioteca): subir PDF (até 50 MB, 2 GB por pessoa); o navegador lê o PDF e manda o arquivo direto para o armazenamento privado, e guarda o texto de cada página para a busca e os cursos.",
+        "Leitor de PDF: rolagem contínua, zoom (largura, página, Ctrl+roda), temas claro, sépia e escuro, sumário, miniaturas, busca no livro, marcador de página, lembrar onde parou; destaque em 5 cores, sublinhado, nota, marcação de área (para figuras e PDF escaneado), copiar e mandar o trecho para o caderno com o link que volta à página; exportar as marcações para um caderno.",
+        "Curso a partir de um livro: escolher o livro e os capítulos; a Lisa lê o texto e monta o curso seguindo o livro (módulo = capítulo, cada assunto com as páginas que cobre e a leitura como primeira tarefa), com a opção de criar o caderno do curso já vinculado.",
+        "A explicação, o quiz e o exercício de um assunto de curso feito de um livro leem o trecho das páginas dele (e citam a página).",
+        "Migração db/019-cadernos-e-biblioteca.sql (só acrescenta: 7 tabelas, uma coluna em proof_trilhas, 2 funções fechadas para a chave anônima e o bucket privado proof-biblioteca). Testes novos: npm run biblioteca-check."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.26.2-cloudflare-pages.1",
       "data": "2026-10-25",
@@ -1023,7 +1041,11 @@
         "Neuro Abacate (mascote do Abacato), personagem gratuito para todos",
         "Reino de Teste (/reino/teste e /bolsa/teste): um mundo à parte com tudo liberado, rivais-robô e ferramentas para zerar os limites do dia e recomeçar; nada dele vale no jogo de verdade (liberado para todos por enquanto; desliga com PROOF_MODO_TESTE=0)",
         "Modo Domínio (/dominio): torre de 10 a 100 andares para dominar um repositório público do GitHub ou do GitLab; desafio por andar, entrega por commit numa branch, avaliação da IA, luta do Neuro com o chefão, prêmios para o Reino e certificado em PDF com página pública de conferência (/certificado/<código>)",
-        "Chefões do Modo Domínio como avatares (personagens que não se compram, ganhos no topo de uma torre Mestre)"
+        "Chefões do Modo Domínio como avatares (personagens que não se compram, ganhos no topo de uma torre Mestre)",
+        "Cadernos de anotação (/cadernos) no estilo Notepad++: módulos e páginas, cor de sintaxe por linguagem (Markdown, JavaScript, Python, SQL e outras), abas, buscar e substituir, prévia, gravação automática com proteção contra sobrescrita",
+        "Vínculos do caderno (inteiro, módulo ou página) com trilhas e cursos, assuntos, torres e andares do Modo Domínio e livros (até a página), com o bloco “📓 Anotações” e o “Anotar aqui” em cada um desses lugares",
+        "Biblioteca de PDFs (/biblioteca) com leitor: destaque em cores, sublinhado, notas, marcação de área, marcador de página, sumário, miniaturas, busca no texto, temas de leitura e trechos mandados para o caderno",
+        "Cursos gerados a partir de um livro da biblioteca, seguindo os capítulos, com as páginas de cada assunto; a explicação, o quiz e o exercício do assunto usam o trecho do livro"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -1038,7 +1060,10 @@
         "O Reino de Teste não passa nada para o reino de verdade (moedas, tropas, veículos, carteira) e não entra no ranking.",
         "O projeto do mês não é mais gerado: deu lugar ao projeto final de cada trilha. Os que já existiam continuam no histórico.",
         "No Modo Domínio, a Lisa não roda o código nem faz commits: lê o que mudou na branch da pessoa e avalia.",
-        "A página de conferência do certificado não mostra nome completo nem e-mail (só o nome público)."
+        "A página de conferência do certificado não mostra nome completo nem e-mail (só o nome público).",
+        "PDF escaneado (só imagem, sem texto) dá para ler e marcar por área, mas não serve de base para gerar curso nem para a busca: o Proof não faz OCR.",
+        "Os PDFs não são compartilhados entre contas: a biblioteca é de quem subiu; o limite é de 50 MB por arquivo e 2 GB por pessoa (o disco é o do servidor de casa).",
+        "Cadernos não são editados por mais de uma pessoa ao mesmo tempo nem guardam histórico de versões: a versão serve só para não apagar o que outra aba gravou."
       ]
     },
     "stack": [
@@ -1052,10 +1077,13 @@
       "PBKDF2 e HMAC via WebCrypto (login e sessão, mesmo esquema do Abacato)",
       "CodeMirror 6 (editor de código e cores por linguagem; cada linguagem é carregada só quando aparece)",
       "Three.js 0.170 (o mundo 3D do Reino, carregado só nessa tela)",
-      "PDF do certificado montado à mão no navegador (src/dominio/pdf.js), sem biblioteca de PDF"
+      "PDF do certificado montado à mão no navegador (src/dominio/pdf.js); a leitura de PDF da biblioteca usa o pdf.js",
+      "pdf.js (pdfjs-dist 5.7.284) no navegador: leitor, camada de texto selecionável, sumário, capa e extração do texto ao subir",
+      "@codemirror/lang-markdown 6.5.2 (Markdown no caderno, com os blocos de código coloridos pela linguagem)",
+      "Supabase Storage (bucket privado proof-biblioteca) com endereços assinados de envio e de leitura"
     ],
     "arquitetura": {
-      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do curso (a semana de cada assunto no agendamento, a mesma do mapa e da agenda), o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check. O Modo Domínio (db/018) guarda a torre em proof_dominios e cada andar em proof_dominio_andares; as regras (níveis, chefões, pontos, luta, prêmios, conferência da IA) são puras em src/dominio/modoDominio.js, a IA em src/lib/iaDominio.js, o GitHub e o GitLab em src/lib/repositorios.js (só github.com e gitlab.com) e o caminho até o banco em src/lib/dominio.js. Cada passo que gasta IA tem trava contra clique duplo (gravação condicional ao estado lido), e só quem move a torre de andar paga o prêmio do marco. Os prêmios entram no Reino de verdade por premiarDoDominio (src/lib/reino.js), respeitando as capacidades das reservas. O certificado é desenhado num canvas e embrulhado em PDF no navegador; /certificado e /api/certificado são as únicas rotas novas sem login.",
+      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do curso (a semana de cada assunto no agendamento, a mesma do mapa e da agenda), o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check. O Modo Domínio (db/018) guarda a torre em proof_dominios e cada andar em proof_dominio_andares; as regras (níveis, chefões, pontos, luta, prêmios, conferência da IA) são puras em src/dominio/modoDominio.js, a IA em src/lib/iaDominio.js, o GitHub e o GitLab em src/lib/repositorios.js (só github.com e gitlab.com) e o caminho até o banco em src/lib/dominio.js. Cada passo que gasta IA tem trava contra clique duplo (gravação condicional ao estado lido), e só quem move a torre de andar paga o prêmio do marco. Os prêmios entram no Reino de verdade por premiarDoDominio (src/lib/reino.js), respeitando as capacidades das reservas. O certificado é desenhado num canvas e embrulhado em PDF no navegador; /certificado e /api/certificado são as únicas rotas novas sem login. A biblioteca guarda os PDFs no Storage do mesmo Supabase (bucket privado proof-biblioteca, no disco do iMac): o servidor confere o dono e assina endereços de vida curta, e o navegador envia e lê o arquivo direto, sem o PDF passar pelo Worker. O texto de cada página fica em proof_livro_paginas, e o corte dos trechos (curso, quiz, explicação) e a busca rodam em funções do Postgres, para caber no processamento curto do Worker gratuito.",
       "diagramas": [
         {
           "titulo": "Visão geral",
@@ -1091,7 +1119,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/018; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/019; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
       }
     ],
     "integracoes": [
@@ -1124,6 +1152,11 @@
         "nome": "GitLab",
         "descricao": "Modo Domínio: leitura de projetos públicos do gitlab.com (código, ponta da branch e comparação de commits), sem token.",
         "url": "https://gitlab.com/api/v4"
+      },
+      {
+        "nome": "Supabase Storage",
+        "descricao": "Os PDFs da biblioteca (bucket privado proof-biblioteca): envio e leitura por endereço assinado pelo servidor, depois de conferir o dono.",
+        "url": ""
       }
     ],
     "links": [

@@ -88,6 +88,42 @@ quadros da conta do Abacato vale aqui também (`src/lib/cursos.js`, espelho de
 A proposta pede raciocínio baixo ao modelo (`pensarPouco`): de ~100 s para ~12 s, sem perda
 visível. Se o modelo não aceitar a opção, a chamada é refeita sem ela.
 
+## Cadernos, Biblioteca e cursos a partir de livros
+
+Pedido de 25/10/2026. Migração `db/019-cadernos-e-biblioteca.sql`; regras puras em
+`src/dominio/cadernos.js`, `biblioteca.js`, `cursoDoLivro.js` e `markdown.js` (testadas por
+`npm run biblioteca-check`).
+
+**Cadernos** (`/cadernos`): cada caderno tem módulos e páginas (um nível só). O editor
+(`src/componentes/caderno/EditorDoCaderno.js`) é o CodeMirror com a linguagem da página — a extensão
+do nome escolhe a cor (`rotas.py` vira Python) — e o Markdown colore os blocos ```` ```js ```` de
+dentro. Grava 1,2 s depois de parar de digitar (ou Ctrl+S). Cada gravação manda a `versao` que a aba
+tem; se outra aba ou o celular gravou antes, o servidor responde 409 e a tela pergunta o que fazer.
+
+**Vínculos** (`proof_vinculos`): o caderno, um módulo ou uma página ligados a uma trilha (os cursos
+são trilhas), um assunto (card), uma torre, um andar ou um livro (com a página). Todo alvo é
+conferido no servidor (`src/lib/vinculos.js`): só se vincula ao que é da própria pessoa. O bloco
+`<AnotacoesDoAlvo>` aparece na trilha, no assunto, na torre e no leitor, com o "Anotar aqui".
+
+**Biblioteca** (`/biblioteca`): o navegador lê o PDF com o pdf.js (páginas, sumário, capa), o servidor
+cria o livro e assina um endereço de envio no bucket privado `proof-biblioteca`, e o arquivo vai
+direto para o Storage — o PDF não passa pelo Worker. Depois o navegador manda o texto de cada página
+em lotes (`proof_livro_paginas`); se a aba fechar no meio, o leitor termina quando o livro abre de
+novo. Limites: 50 MB por PDF (o teto do Storage do iMac) e 2 GB por pessoa
+(`LIMITES_DA_BIBLIOTECA`). Para ler, o servidor assina um endereço de 3 h.
+
+**Leitor** (`src/componentes/biblioteca/LeitorDePdf.js`): só as páginas perto da tela são
+desenhadas. As marcações guardam retângulos em fração da página (certos em qualquer zoom). A camada
+de texto do pdf.js precisa das regras `.textLayer` copiadas em `src/app/biblioteca.css`. PDF
+escaneado (sem texto) lê e marca por área, mas não gera curso nem entra na busca (não há OCR).
+
+**Curso a partir de um livro** (`/trilhas/novo?livro=`): a rota de proposta junta as seções
+escolhidas do sumário e pede ao banco o começo do texto de cada uma
+(`proof_trechos_do_livro`, que corta no Postgres para caber no processamento do Worker). A IA monta
+módulos = capítulos e assuntos = trechos de páginas; `validarCursoDoLivro` confere as páginas e põe a
+leitura como primeira tarefa. Ao criar, `proof_leituras` guarda as páginas de cada card, e a
+explicação, o quiz e o exercício do assunto leem esse trecho (`src/lib/leituras.js`).
+
 ## Conquistas e comemorações
 
 **Conquistas** são da conta, não do quadro (`src/dominio/conquistas.js`): ofensiva (3, 7, 14, 30,

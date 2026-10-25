@@ -8,6 +8,7 @@ import { formatarDia } from "@/dominio/datas.js";
 import { NOMES_DOS_NIVEIS } from "@/dominio/plano.js";
 import { IconeCerto } from "./Icones.js";
 import Explicacao from "./Explicacao.js";
+import { AnotacoesDoAlvo } from "./caderno/Vinculos.js";
 
 const SITUACOES = {
   atrasada: { texto: "Atrasado", classe: "pf-pilula--alerta" },
@@ -190,6 +191,11 @@ export default function Assunto({ tarefa, aoMudar }) {
 
       {explicacao !== null && <Explicacao texto={explicacao} />}
       {erro && <div className="pf-aviso pf-aviso--erro" style={{ marginTop: 12 }}>{erro}</div>}
+
+      {/* o caderno (e, no curso de um livro, a leitura das páginas do assunto) */}
+      {tarefa.trilhaId && tarefa.cardId && (
+        <AnotacoesDoAlvo alvo={{ tipo: "assunto", id: tarefa.cardId }} titulo="Anotações" compacto nomeDoAlvo={tarefa.titulo} />
+      )}
 
       <div className="pf-assunto__rodape">
         {!itens.length && !concluido && (

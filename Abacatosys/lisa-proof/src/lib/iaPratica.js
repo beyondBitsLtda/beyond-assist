@@ -83,6 +83,7 @@ async function pedirQuiz({ tema, assunto, evitar = [], rodada = 1, temperatura }
       `Tema: ${tema}`,
       `Assunto do dia: ${assunto.titulo}`,
       assunto.descricao ? `Descrição: ${corte(assunto.descricao, 500)}` : "",
+      assunto.trecho || "", // curso a partir de um livro: o trecho das páginas do assunto (src/lib/leituras.js)
       "",
       "Crie um quiz rápido de 5 perguntas de múltipla escolha sobre este assunto.",
       "- Exatamente 4 opções por pergunta, todas plausíveis e diferentes; `correta` é o índice (0 a 3) da certa.",
@@ -133,6 +134,7 @@ async function pedirExercicio({ tema, assunto, evitar = [], rodada = 1, temperat
       `Tema: ${tema}`,
       `Assunto do dia: ${assunto.titulo}`,
       assunto.descricao ? `Descrição: ${corte(assunto.descricao, 500)}` : "",
+      assunto.trecho || "", // curso a partir de um livro: o trecho das páginas do assunto (src/lib/leituras.js)
       "",
       "Crie UM exercício prático de programação, curto (10 a 20 minutos), que treine exatamente este assunto.",
       "- `enunciado`: o problema, claro e autocontido, dizendo o que a função ou o programa deve fazer.",

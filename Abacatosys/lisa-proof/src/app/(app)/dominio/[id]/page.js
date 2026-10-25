@@ -14,6 +14,7 @@ import {
   pontosDoTopo, dificuldadeEsperada,
 } from "@/dominio/modoDominio.js";
 import { baixarCertificado, desenharCertificado } from "@/componentes/dominio/certificado.js";
+import { AnotacoesDoAlvo } from "@/componentes/caderno/Vinculos.js";
 
 const TorreDoDominio = dynamic(() => import("@/componentes/dominio/TorreDoDominio.js"), {
   ssr: false,
@@ -72,6 +73,16 @@ export default function PaginaDaTorre() {
   const telaCheiaRef = useRef(false);
   telaCheiaRef.current = telaCheia;
   const pediuTelaCheiaDeVerdade = useRef(false);
+
+  // ?andar=N (o link de um vínculo do caderno): mostra o andar, uma vez, quando a torre chega
+  useEffect(() => {
+    if (!torre?.andaresDaTorre?.length) return;
+    const n = Number(new URLSearchParams(window.location.search).get("andar"));
+    if (n >= 1 && n <= torre.andaresDaTorre.length) setVendo(n);
+    if (n) window.history.replaceState(null, "", window.location.pathname);
+    // só quando a torre chega
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [torre?.id]);
 
   // ---- tela cheia: a torre ocupa tudo; o navegador vai para a tela cheia de verdade quando deixa
   useEffect(() => {
@@ -277,6 +288,7 @@ export default function PaginaDaTorre() {
             </>
           )}
 
+          <AnotacoesDoAlvo alvo={{ tipo: "torre", id: torre.id }} titulo="Anotações da torre" nomeDoAlvo={torre.repo} />
           <TrilhaDePremios torre={torre} />
           <ListaDeAndares torre={torre} aberta={semTela} />
         </>

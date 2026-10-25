@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   IconeHoje, IconeTrilhas, IconeAgenda, IconePratica, IconeProgresso, IconeRaioX, IconeRanking, IconeReino, IconeDominio, IconeBolsa, IconeMais, Marca,
+  IconeCaderno, IconeBiblioteca,
 } from "./Icones.js";
 import { Confete } from "./Neuro.js";
 import Celebracao from "./Celebracao.js";
@@ -19,6 +20,8 @@ const ITENS = [
   { href: "/trilhas", rotulo: "Trilhas", Icone: IconeTrilhas },
   { href: "/agenda", rotulo: "Agenda", Icone: IconeAgenda },
   { href: "/pratica", rotulo: "Prática", Icone: IconePratica },
+  { href: "/cadernos", rotulo: "Cadernos", Icone: IconeCaderno },
+  { href: "/biblioteca", rotulo: "Biblioteca", Icone: IconeBiblioteca },
   { href: "/progresso", rotulo: "Progresso", Icone: IconeProgresso },
   { href: "/reino", rotulo: "Reino", Icone: IconeReino },
   { href: "/dominio", rotulo: "Domínio", Icone: IconeDominio },
@@ -118,7 +121,7 @@ export default function Moldura({ children }) {
   );
 }
 
-/** A 5ª aba do celular: abre um menu com Agenda, Progresso, Bolsa, Ranking e Raio-X. */
+/** A 5ª aba do celular: abre um menu com o resto (Agenda, Cadernos, Biblioteca, Progresso, Domínio, Bolsa, Ranking, Raio-X). */
 function Mais({ caminho }) {
   const [aberto, setAberto] = useState(false);
   const caixa = useRef(null);

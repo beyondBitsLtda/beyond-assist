@@ -10,6 +10,8 @@ import "./reino.css";
 import "./novidades.css";
 import "./bolsa.css";
 import "./dominio.css";
+import "./caderno.css";
+import "./biblioteca.css";
 
 export const metadata = {
   title: "Lisa_Proof",

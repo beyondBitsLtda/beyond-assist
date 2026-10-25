@@ -7,6 +7,7 @@ import { formatarDia, NOMES_DOS_DIAS } from "@/dominio/datas.js";
 import { Barra, DiasDeEstudo } from "@/componentes/Pecas.js";
 import MapaDaTrilha from "@/componentes/MapaDaTrilha.js";
 import { comemorar } from "@/componentes/Neuro.js";
+import { AnotacoesDoAlvo } from "@/componentes/caderno/Vinculos.js";
 
 export default function Trilha() {
   const { id } = useParams();
@@ -144,6 +145,8 @@ export default function Trilha() {
           </div>
         </details>
       </div>
+
+      <AnotacoesDoAlvo alvo={{ tipo: "trilha", id }} titulo="Anotações da trilha" nomeDoAlvo={trilha.tema} />
 
       <MapaDaTrilha trilha={trilha} avanco={avanco} aoMudar={carregar} />
     </>

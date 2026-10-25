@@ -25,6 +25,7 @@ import {
 } from "@/dominio/pratica.js";
 import { semanaDoProjeto, semanaDoDesafio, pedidoDoProjeto, projetosOpcionais, podeGerarProjeto, valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
 import { avancoDasTrilhas, avancoDaTrilhaDoUsuario } from "./avanco.js";
+import { trechoDoAssunto, blocoDoTrecho } from "./leituras.js";
 
 const CAMPOS = "id, usuario_id, trilha_id, tipo, periodo, rodada, card_ids, titulo, conteudo, status, resposta, avaliacao, nota, pontos, tentativas, criado_em, atualizado_em";
 
@@ -278,6 +279,9 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, 
   } else {
     const assuntos = assuntoPedido ? [assuntoPedido] : avanco.assuntoDaPratica ? [avanco.assuntoDaPratica] : [];
     if (!assuntos.length) throw new ErroDeAcesso(400, "a trilha não tem assuntos para praticar");
+    // assunto de um curso feito a partir de um livro: a prática cobra o que o trecho do livro ensina
+    const trecho = await trechoDoAssunto(assuntos[0].cardId, 16_000);
+    if (trecho) assuntos[0] = { ...assuntos[0], trecho: blocoDoTrecho(trecho) };
     try {
       if (tipo === "quiz") {
         conteudo = await gerarQuiz({ tema: trilha.tema, assunto: assuntos[0], anteriores, rodada });

@@ -200,6 +200,17 @@ export default function MapaDaTrilha({ trilha, avanco, aoMudar }) {
   const unidades = useMemo(() => emUnidades(mapaDaTrilha(avanco, hoje), escala), [avanco, hoje, escala]);
   const temAtual = unidades.some((u) => u.paradas.some((p) => p.estado === "atual" || (p.tipo === "chegada" && p.estado === "feito")));
 
+  // ?assunto=<card> (o link de um vínculo do caderno): abre o assunto direto, uma vez
+  useEffect(() => {
+    const cardId = new URLSearchParams(window.location.search).get("assunto");
+    if (!cardId) return;
+    const parada = unidades.flatMap((u) => u.paradas).find((p) => p.tipo === "assunto" && p.etapa?.cardId === cardId);
+    if (parada) setAberta(parada);
+    window.history.replaceState(null, "", window.location.pathname);
+    // só na chegada
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Estável entre renderizações: a Folha usa isto como dependência para ouvir o Esc.
   const fechar = useCallback(() => {
     setAberta(null);
