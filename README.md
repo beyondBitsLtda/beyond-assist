@@ -249,7 +249,37 @@ beyond-bits/
 └─ scripts/{ingest,ask}.mjs
 ```
 
-## Próximas fases
+# Mapeamento do Rotas
 
-- **Fase 4 — Voz:** wake word "Lisa" (Picovoice), STT e TTS; máquina de estados real.
-- **Fase 6 — Produção:** webhook do Trello para reindexar em tempo real, auth, hardening.
+ Está seção mapeia a estrutura de rotas, componentes e o fluxo de dados do projeto, cobrindo desde a interface visual até o servidor, RAG e integração com o Supabase.
+
+ O projeto utiliza Next.js com App Router, integrando uma interface HUD em tempo real com um cérebro de RAG baseado em embeddings gerados pelo Gemini e persistência vetorial no Supabase.
+
+## Mapa de Rotas e API Endpoints
+
+- `/` (src/app/page.js): Interface principal do HUD estilo J.A.R.V.I.S., contendo o chat em streaming, 
+painéis e seletor de escopo.
+
+Esse arquivo carrega a tela que está no arquivo KanbanBoard.js , ou seja esse arquivo
+nada mais é que a forma de inicializar o arquivo pelo modulo correto, incluisve com a constante 
+QUARTO_DE_GUERRA, que é o quadro que por padrão é aberto ao inicializar o Sistema.
+
+- `/api/ask` (src/app/api/ask/route.js): Rota principal de chat em Server-Sent Events (SSE). Recebe a pergunta, busca o contexto via RAG e processa ações do Trello ou respostas gerais.
+- `/mundo` (src/app/mundo/page.js): Janela dedicada do ambiente virtual da Lisa.
+- `/pair` (src/app/pair/page.js): Janela do ambiente de Pair Programming.
+- `/api/ask` (src/app/api/ask/route.js): Rota principal de chat em Server-Sent Events (SSE). Recebe a pergunta, busca o contexto via RAG e processa ações do Trello ou respostas gerais.
+- `/api/ingest` (src/app/api/ingest/route.js): Endpoint responsável por processar fatias de sincronização e indexação de dados.
+- `/api/health` (src/app/api/health/route.js): Verifica a saúde e a conectividade dos serviços essenciais.
+
+## Fluxo de Requisição e Dados (End-to-End)
+
+1. Entrada do Usuário: O usuário digita uma pergunta ou comando na interface.
+2. Envio para a API: O cliente faz uma requisição POST para `/api/ask` enviando a pergunta e o escopo ativo.
+3. Recuperação de Contexto (RAG): O servidor gera o embedding da pergunta via Gemini (`src/lib/gemini.js`) e executa a função RPC `match_documents` no Supabase (`src/lib/supabase.js`) para resgatar os trechos mais relevantes.
+4. Processamento de LLM: O prompt enriquecido com o contexto recuperado é enviado para o modelo de chat em streaming.
+5. Resposta em Tempo Real: Os tokens gerados são devolvidos via SSE para o cliente, que os exibe na interface enquanto a assistente Lisa processa a resposta.
+
+
+
+
+
