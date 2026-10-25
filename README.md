@@ -249,37 +249,98 @@ beyond-bits/
 └─ scripts/{ingest,ask}.mjs
 ```
 
-# Mapeamento do Rotas
+## Mapeamento das rotas
 
- Está seção mapeia a estrutura de rotas, componentes e o fluxo de dados do projeto, cobrindo desde a interface visual até o servidor, RAG e integração com o Supabase.
+Esta seção mapeia como o projeto se organiza no Next.js: as rotas (telas e endpoints), os
+componentes que elas carregam e o caminho que uma pergunta percorre — da interface ao servidor,
+passando pelo RAG no Supabase, até a resposta da Lisa chegar em tempo real.
 
- O projeto utiliza Next.js com App Router, integrando uma interface HUD em tempo real com um cérebro de RAG baseado em embeddings gerados pelo Gemini e persistência vetorial no Supabase.
+O projeto usa o **App Router do Next.js 15**: uma interface HUD em tempo real ligada a um cérebro
+RAG, com embeddings gerados pelo Gemini e busca vetorial (pgvector) no Supabase.
 
-## Mapa de Rotas e API Endpoints
+### Como o App Router organiza as pastas
 
-- `/` (src/app/page.js): Interface principal do HUD estilo J.A.R.V.I.S., contendo o chat em streaming, 
-painéis e seletor de escopo.
+No App Router, **a pasta é o endereço**: cada pasta dentro de `src/app` vira um trecho da URL, e o
+arquivo dentro dela diz o que aquele endereço é.
 
-Esse arquivo carrega a tela que está no arquivo KanbanBoard.js , ou seja esse arquivo
-nada mais é que a forma de inicializar o arquivo pelo modulo correto, incluisve com a constante 
-QUARTO_DE_GUERRA, que é o quadro que por padrão é aberto ao inicializar o Sistema.
+| Arquivo | Papel |
+|---|---|
+| `page.js` | uma **tela** (o que aparece no navegador naquele endereço) |
+| `route.js` | um **endpoint HTTP** (roda só no servidor e responde JSON ou um stream) |
+| `layout.js` | a **moldura** que envolve todas as telas daquela pasta e das de dentro |
 
-- `/api/ask` (src/app/api/ask/route.js): Rota principal de chat em Server-Sent Events (SSE). Recebe a pergunta, busca o contexto via RAG e processa ações do Trello ou respostas gerais.
-- `/mundo` (src/app/mundo/page.js): Janela dedicada do ambiente virtual da Lisa.
-- `/pair` (src/app/pair/page.js): Janela do ambiente de Pair Programming.
-- `/api/ask` (src/app/api/ask/route.js): Rota principal de chat em Server-Sent Events (SSE). Recebe a pergunta, busca o contexto via RAG e processa ações do Trello ou respostas gerais.
-- `/api/ingest` (src/app/api/ingest/route.js): Endpoint responsável por processar fatias de sincronização e indexação de dados.
-- `/api/health` (src/app/api/health/route.js): Verifica a saúde e a conectividade dos serviços essenciais.
+- `src/app/layout.js` — o layout raiz: `<html>`, `<body>`, título e viewport de todas as páginas.
+- `src/app/(panels)/` — um **grupo de rotas**: os parênteses organizam as pastas, mas **não entram
+  na URL** (`(panels)/tasks/page.js` responde em `/tasks`). Todas as telas do grupo dividem o
+  `(panels)/layout.js`, que as envolve no `Shell` (`src/components/shell/Shell.js`): o fundo com
+  grid, a barra lateral, a barra de topo e, no celular, o menu que abre pelo hambúrguer.
+- `src/app/mundo/` e `src/app/pair/` — ficam **fora** do grupo de propósito: abrem como janelas
+  próprias, sem barra lateral nem de topo, e cada uma tem um `layout.js` que define o título da
+  janela.
+- `src/app/api/**/route.js` — os endpoints; cada um declara `runtime = "nodejs"`.
 
-## Fluxo de Requisição e Dados (End-to-End)
+### Telas (`page.js`)
 
-1. Entrada do Usuário: O usuário digita uma pergunta ou comando na interface.
-2. Envio para a API: O cliente faz uma requisição POST para `/api/ask` enviando a pergunta e o escopo ativo.
-3. Recuperação de Contexto (RAG): O servidor gera o embedding da pergunta via Gemini (`src/lib/gemini.js`) e executa a função RPC `match_documents` no Supabase (`src/lib/supabase.js`) para resgatar os trechos mais relevantes.
-4. Processamento de LLM: O prompt enriquecido com o contexto recuperado é enviado para o modelo de chat em streaming.
-5. Resposta em Tempo Real: Os tokens gerados são devolvidos via SSE para o cliente, que os exibe na interface enquanto a assistente Lisa processa a resposta.
+| Rota | Arquivo | O que é |
+|---|---|---|
+| `/` | `src/app/(panels)/page.js` | a tela inicial: o Kanban do quadro padrão |
+| `/assistant` | `src/app/(panels)/assistant/page.js` | o HUD da Lisa: chat em streaming, voz, câmera, tela e seletor de escopo — é quem chama o `/api/ask` |
+| `/mundo` | `src/app/mundo/page.js` | o ambiente virtual da Lisa, em janela dedicada |
+| `/pair` | `src/app/pair/page.js` | o ambiente de pair programming, em janela dedicada |
 
+A tela inicial (`/`) é só um ponto de entrada: ela não desenha nada sozinha, carrega o componente
+`KanbanBoard` (`src/components/panels/KanbanBoard.js`) já apontado para o quadro certo — a constante
+`QUARTO_DE_GUERRA` (de `src/lib/boards.js`), o quadro que abre por padrão quando o sistema inicia.
 
+```js
+export default function WarRoomPage() {
+  return <KanbanBoard board={QUARTO_DE_GUERRA} />;
+}
+```
 
+Os outros painéis seguem a mesma regra (uma pasta = uma rota, todos dentro do `Shell`): `/boards`,
+`/tasks`, `/dashboard` (e `/dashboard/ar`), `/delp-tasks`, `/sentinel`, `/map-of-deploy`, `/news`,
+`/sync-status`, `/code-repos`, `/code-tasks`, `/gemini-keys`, `/scheduled-announcements`,
+`/test-mode`, `/thoughts` e `/arch-docs`.
 
+### Endpoints principais (`route.js`)
 
+| Endpoint | Arquivo | O que faz |
+|---|---|---|
+| `POST /api/ask` | `src/app/api/ask/route.js` | a rota do chat, em **Server-Sent Events (SSE)**: recebe a pergunta, o escopo e o histórico; trata pedidos de ação nos cards do Trello (propõe e só aplica depois da confirmação); busca o contexto via RAG e transmite a resposta. Eventos: `context`, `action`, `token`, `done` (e `error`) |
+| `GET/POST /api/ingest` | `src/app/api/ingest/route.js` | processa **uma fatia** da reindexação (fonte `trello`, `brain` ou `github`); é chamada em loop pelo botão SYNC e, sozinha, pelo `/api/cron/sync` (pg_cron do Supabase). Exige o `INGEST_SECRET` quando ele está configurado |
+| `GET /api/health` | `src/app/api/health/route.js` | a saúde dos serviços — `{ supabase, trello, gemini, sentinel }`, `true` = ok — que acende as bolinhas de conexão da interface |
+
+### O caminho de uma pergunta (ponta a ponta)
+
+1. **Entrada:** a pessoa digita (ou fala) a pergunta no HUD, em `/assistant`.
+2. **Envio:** o cliente faz um `POST /api/ask` com a pergunta, o escopo ativo e o histórico da conversa.
+3. **Ação ou pergunta?** Se a mensagem pede uma mudança num card (mover, mudar prazo, concluir), o
+   `detectTrelloAction` reconhece a intenção e a rota devolve uma proposta (evento `action`) — nada
+   muda sem a confirmação da pessoa. Senão, segue para a resposta.
+4. **Recuperação de contexto (RAG):** o `resolveScope` (`src/lib/scopeResolver.js`) escolhe a busca
+   certa para o escopo; o `retrieve` (`src/lib/rag.js`) gera o embedding da pergunta com o
+   `embedOne` (`src/lib/gemini.js`) e chama a função `match_documents` no Supabase — a busca
+   vetorial que devolve os trechos mais parecidos. Esses trechos vão para a tela no evento `context`.
+5. **Geração:** o `buildPrompt` junta a pergunta e o contexto, e o `chatStream` envia ao Gemini, que
+   responde em streaming.
+6. **Resposta em tempo real:** cada pedaço da resposta chega ao cliente como um evento `token` —
+   a interface mostra (e a voz lê) enquanto o texto ainda está sendo gerado — e o evento `done`
+   encerra o stream.
+
+```mermaid
+sequenceDiagram
+  participant U as HUD (/assistant)
+  participant A as /api/ask
+  participant G as Gemini
+  participant S as Supabase (pgvector)
+  U->>A: POST pergunta + escopo + histórico
+  A->>G: embedOne(pergunta)
+  G-->>A: embedding da pergunta
+  A->>S: rpc match_documents
+  S-->>A: trechos mais parecidos
+  A-->>U: event: context
+  A->>G: chatStream(prompt com o contexto)
+  G-->>A: pedaços da resposta
+  A-->>U: event: token (vários) … event: done
+```
