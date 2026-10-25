@@ -9,14 +9,26 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.26.1-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-24",
+  "versao": "0.26.2-cloudflare-pages.1",
+  "atualizadoEm": "2026-10-25",
   "compilacao": {
-    "numero": 65,
-    "data": "2026-10-24",
+    "numero": 66,
+    "data": "2026-10-25",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.26.2-cloudflare-pages.1",
+      "data": "2026-10-25",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "O modal de novidades ficou mais largo no computador, ocupando mais espaço da tela.",
+      "itens": [
+        "No computador, o modal vai até ~980 px de largura (antes 580), com o palco mais alto, a turma maior e a lista das novidades em três colunas.",
+        "Em tela larga e baixa (notebook), o palco encolhe para os botões caberem sem rolar; no celular, nada muda."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.26.1-cloudflare-pages.1",
       "data": "2026-10-24",
