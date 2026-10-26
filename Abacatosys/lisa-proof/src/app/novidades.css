@@ -104,3 +104,13 @@
   .novidades__titulo { font-size: 23px; }
   .novidades__corpo { padding: 16px 16px 18px; }
 }
+
+/* 26/10/2026: os consultores da Bolsa no palco, três de cada lado do Neuro */
+.novidades__retratos { position: absolute; z-index: 1; left: 3%; right: 3%; bottom: 14px; display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none; }
+.novidades__retratos > span { display: flex; gap: 8px; align-items: flex-end; }
+.novidades__retrato { width: clamp(44px, 9vw, 92px); height: auto; filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.25)); animation: novidades-boiar 2.6s ease-in-out infinite; }
+.novidades__retratos > span > .novidades__retrato:nth-child(odd) { rotate: -5deg; }
+.novidades__retratos > span > .novidades__retrato:nth-child(even) { rotate: 4deg; margin-bottom: 10px; animation-delay: 0.5s; }
+.novidades__retratos > span > .novidades__retrato:nth-child(3) { animation-delay: 1s; }
+@media (max-width: 520px) { .novidades__retratos > span { gap: 4px; } .novidades__retratos > span > .novidades__retrato:nth-child(2) { display: none; } }
+@media (prefers-reduced-motion: reduce) { .novidades__retrato { animation: none; } }

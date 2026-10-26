@@ -202,6 +202,40 @@ ficam como estavam, e o ponto já ganho continua como foi gravado. Projeto final
 - Metas de semana e mês contam **assuntos** planejados para terminar no período, mais os atrasados
   de antes.
 
+## Bolsa: a Mesa dos Consultores
+
+Seis personagens projetam onde cada ação da Bolsa do Reino fecha hoje (às 17h). Cada um tem
+retrato, história, personalidade, método e uma "faixa de erro" que **diz** ter. A margem de erro de
+verdade é segredo e muda todo dia.
+
+| Consultor | Jeito de errar |
+|---|---|
+| Madame Ametista, a vidente | Exagera o movimento. Tem dias de visão clara e dias de neblina. Diz ±1% e quase nunca acerta a faixa. |
+| Barão Baltazar Cifrão, o banqueiro | Acha que o mercado anda pouco. Acerta o lado com frequência e erra o tamanho. |
+| Luna "Foguete" Estrela, a influenciadora | Vê alta em tudo, principalmente em tecnologia e viagem espacial. |
+| Professor Corvo, o estatístico | É o mais constante. De vez em quando "o modelo quebra" e ele erra feio. |
+| Dona Zuleica, a feirante | Muito irregular. Arredonda tudo e entende de comida. |
+| Gorgo, o Urso, o pessimista | Vê crise em tudo. |
+
+Como funciona:
+
+- **Cálculo.** A Lisa decide o fechamento do dia logo no primeiro acesso, e ele fica no servidor.
+  Cada projeção sai de `exagero × variação de verdade + viés + ruído`. O tamanho do ruído, o
+  exagero e o viés são sorteados por consultor e por dia. Tudo usa semente: todos veem a mesma
+  projeção, e nada é gravado no banco.
+- **Placar.** O placar dos pregões passados é recalculado a partir dos preços. Por isso, mudar os
+  números de `src/dominio/projecoes.js` muda também as projeções antigas.
+- **Segredo.** Antes das 17h, `/api/reino/bolsa/consultores` só entrega a projeção, a faixa
+  declarada e a fala. Depois das 17h, entrega também o fechamento, o erro de cada um e o placar do
+  dia, com nota = 10 − erro médio em pontos percentuais. No Reino de Teste, isso vale para a hora
+  simulada.
+- **Estreias.** A empresa que estreia no dia fica de fora, porque abre e fecha no preço de
+  lançamento.
+- **Servidor e navegador.** `src/dominio/projecoes.js` (o segredo) só pode ser importado pelo
+  servidor; o `dominio-check` barra o import em qualquer tela. O que a tela mostra de cada
+  personagem está em `src/dominio/consultores.js`. Os retratos de papel estão em
+  `src/componentes/bolsa/consultoresDePapel.js`.
+
 ## Onde as coisas moram
 
 | Caminho | O quê |

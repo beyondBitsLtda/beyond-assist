@@ -10,6 +10,10 @@
 // O pregão negocia das 07:00 às 17:00 (src/dominio/bolsa.js); fora disso, a tela mostra as cotações e
 // a boleta fica travada. Em /bolsa/teste (mundo="teste") é a Bolsa do Reino de Teste: o mesmo
 // mercado, com a carteira e as moedas do mundo de teste, negociando a qualquer hora.
+//
+// A MESA DOS CONSULTORES (26/10/2026): seis personagens projetam o fechamento de cada ação, cada um
+// errando do seu jeito (Consultores.js). A tela busca a mesa à parte, quando muda o dia, quando o
+// pregão termina de abrir e quando ele fecha (aí vem o placar de hoje).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -19,6 +23,7 @@ import { reagir, comemorar } from "@/componentes/Neuro.js";
 import { corretagem, valorDaCompra, valorDaVenda } from "@/dominio/bolsa.js";
 import { MUNDO_DE_TESTE, urlNoMundo } from "@/dominio/mundoDeTeste.js";
 import { GraficoDoDia, GraficoDeVelas, Mini } from "./Graficos.js";
+import { MesaDosConsultores, OpinioesDaAcao } from "./Consultores.js";
 import { preco, moedas, pct, seta, rumo, horaCurta, diaCurto } from "./formatos.js";
 
 const ORDENS = { altas: "Maiores altas", baixas: "Maiores baixas", nome: "A–Z", volume: "Mais negociadas" };
@@ -40,6 +45,8 @@ export default function Terminal({ mundo = "real" }) {
   const [agora, setAgora] = useState(() => Date.now());
   const [horaDeTeste, setHoraDeTeste] = useState(null); // Bolsa de Teste: ver (e negociar) o pregão numa hora qualquer
   const [previa, setPrevia] = useState(null);           // Bolsa de Teste: o pregão de amanhã pela Lisa, sem aplicar
+  const [mesa, setMesa] = useState(null);               // a Mesa dos Consultores
+  const [erroDaMesa, setErroDaMesa] = useState("");
   const [Aviso, avisar] = useAviso();
 
   const carregar = useCallback(() => obter(urlNoMundo(horaDeTeste == null ? "/api/reino/bolsa" : `/api/reino/bolsa?hora=${horaDeTeste}`, mundo))
@@ -66,6 +73,18 @@ export default function Terminal({ mundo = "real" }) {
     const t = setTimeout(carregar, Math.max(2000, falta));
     return () => clearTimeout(t);
   }, [bolsa?.pregao?.proximaAtualizacao, carregar]);
+
+  // a mesa muda quando muda o dia, quando o pregão termina de abrir e quando ele fecha (o placar de hoje)
+  const p0 = bolsa?.pregao;
+  const chaveDaMesa = p0 ? `${p0.dia}|${p0.abrindo ? 1 : 0}|${p0.hora >= p0.fechaAs ? 1 : 0}|${horaDeTeste ?? ""}` : "";
+  useEffect(() => {
+    if (!chaveDaMesa) return undefined;
+    let vale = true;
+    obter(urlNoMundo(horaDeTeste == null ? "/api/reino/bolsa/consultores" : `/api/reino/bolsa/consultores?hora=${horaDeTeste}`, mundo))
+      .then((m) => { if (vale) { setMesa(m); setErroDaMesa(""); } })
+      .catch((e) => { if (vale) setErroDaMesa(e.message); });
+    return () => { vale = false; };
+  }, [chaveDaMesa, horaDeTeste, mundo]);
 
   const lista = useMemo(() => {
     const acoes = [...(bolsa?.acoes || [])];
@@ -202,11 +221,17 @@ export default function Terminal({ mundo = "real" }) {
               ? <GraficoDoDia horas={acao.horas} abertura={acao.abertura} rotulo={`${acao.nome} hoje: abriu a ${preco(acao.abertura)}, agora ${preco(acao.preco)}`} />
               : <GraficoDeVelas velas={acao.velas} rotulo={`${acao.nome} nos últimos ${acao.velas.length} dias`} />}
             {acao.noticia && <p className="bx-noticia"><span>📰</span> {acao.noticia}</p>}
+            <OpinioesDaAcao mesa={mesa} acao={acao} />
             <p className="bx-descricao">{acao.descricao}</p>
           </section>
         )}
 
         {acao && <Boleta acao={acao} saldo={bolsa.saldo} regras={bolsa.regras} ocupado={ocupado} pregao={p} teste={teste} aoEnviar={negociar} />}
+      </div>
+
+      <div className="bx-mesa-faixa">
+        <MesaDosConsultores mesa={mesa} erro={erroDaMesa} acoes={bolsa.acoes}
+          aoEscolherAcao={(id) => { setEscolhida(id); document.getElementById("bx-acao")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />
       </div>
 
       <div className="bx-grade-baixo">

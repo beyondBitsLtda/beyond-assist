@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.29.0-cloudflare-pages.1",
+  "versao": "0.30.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-26",
   "compilacao": {
-    "numero": 69,
+    "numero": 70,
     "data": "2026-10-26",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.30.0-cloudflare-pages.1",
+      "data": "2026-10-26",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Bolsa do Reino: a Mesa dos Consultores — seis personagens projetam o fechamento de cada ação, cada um com uma margem de erro secreta que muda todo dia.",
+      "itens": [
+        "Seis consultores com retrato em papel recortado, cenário, história, personalidade, método, bordão e a faixa de erro que dizem ter: Madame Ametista (vidente), Barão Baltazar Cifrão (banqueiro), Luna “Foguete” (influenciadora), Professor Corvo (estatístico), Dona Zuleica (feirante) e Gorgo, o Urso (pessimista).",
+        "Cada um erra do seu jeito: a margem de erro muda todo dia e ninguém vê; a Madame exagera, o Barão acha que tudo anda pouco, a Luna vê alta em tudo, o Gorgo vê crise, o Corvo é o mais constante (com dias em que o modelo quebra) e a Zuleica arredonda tudo e entende de comida.",
+        "Na ação escolhida, “O que os consultores dizem”: uma régua com o rosto de cada um no preço projetado, o preço de agora, a fala de cada consultor e a mediana da mesa.",
+        "Ficha de cada consultor com as projeções de hoje (preço, faixa declarada e fala), a aposta do dia e o retrospecto dos últimos pregões.",
+        "Placar: depois das 17h, o fechamento, o erro de cada projeção e quem chegou mais perto (nota = 10 − erro médio); o placar do último pregão aparece sempre.",
+        "O fechamento de hoje nunca vai para a tela antes das 17h: as projeções são calculadas no servidor (GET /api/reino/bolsa/consultores), com semente, sem gravar nada no banco.",
+        "A janela de Novidades anuncia os consultores e as recompensas em triplo."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.29.0-cloudflare-pages.1",
       "data": "2026-10-26",
@@ -1067,6 +1084,7 @@
         "Planetoides sorteados para a Nave Estelar (raça alienígena, força e tesouro aleatórios), com a batalha numa esfera, estilo Mario Galaxy; e o fundo do mar de verdade nas expedições do Submarino",
         "Mina de Ouro com operários (3 de início) cavando no 3D, chance de diamantes, contratação e aluguel de operários entre jogadores",
         "Bolsa do Reino em tela própria (/bolsa), estilo home broker: ações iguais para todos, pregão das 07:00 às 17:00 (horário de Brasília) com cotações de hora em hora, gráficos e velas, pregão diário decidido pela Lisa (IA), compra e venda com corretagem",
+        "Mesa dos Consultores na Bolsa: seis personagens projetam o fechamento de cada ação, com margem de erro secreta que muda todo dia, placar depois das 17h e retrospecto dos últimos pregões",
         "Tela cheia do Reino com menus suspensos e visita completa aos reinos vizinhos durante a paz",
         "Neuro Abacate (mascote do Abacato), personagem gratuito para todos",
         "Reino de Teste (/reino/teste e /bolsa/teste): um mundo à parte com tudo liberado, rivais-robô e ferramentas para zerar os limites do dia e recomeçar; nada dele vale no jogo de verdade (liberado para todos por enquanto; desliga com PROOF_MODO_TESTE=0)",

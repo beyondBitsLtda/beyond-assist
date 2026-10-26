@@ -56,6 +56,9 @@ import {
   MAXIMO_DE_ACOES, MAXIMO_POR_ORDEM, caminhoDoDia, velaDe, sementeDaAcao, PASSOS_DO_DIA, valorDaCompra, valorDaVenda,
   ABRE_AS, FECHA_AS, pregaoAberto, passosAte, precoNaHora, horaDoPasso, proximaVirada,
 } from "../src/dominio/bolsa.js";
+import { CONSULTORES, IDS_DOS_CONSULTORES, consultorPorId } from "../src/dominio/consultores.js";
+import { projetar, humorDoDia, avaliar, relatorioDaMesa, notaPeloErro, pctDaFala, rumoDaFala } from "../src/dominio/projecoes.js";
+import { svgDoConsultor } from "../src/componentes/bolsa/consultoresDePapel.js";
 import { centavos, formatarMoedas, faltam } from "../src/dominio/moedas.js";
 import {
   semanasDoPlano, avancoDaTrilha, mapaDaTrilha, valorDoProjetoFinal, podeGerarProjeto, semanaDoProjeto, periodoDaSemana, PROJETOS_POR_SEMANA,
@@ -1914,6 +1917,167 @@ caso("Modo Domínio: a migração só acrescenta tipos (nenhum tipo antigo some)
     }
     assert.ok(antes, `achei a regra antiga de ${restricao}`);
     for (const t of antes) assert.ok(agora.includes(t), `${restricao}: o tipo ${t} continua`);
+  }
+});
+
+// ---------------------------------------------------------------- a Mesa dos Consultores (26/10/2026)
+
+/** Um mercado de mentira para os consultores: `n` pregões com variações parecidas com as de verdade. */
+function mercadoDeTeste(n, { acoes = 10, inicio = "2026-01-01" } = {}) {
+  let s = 7;
+  const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const setores = ["Tecnologia", "Alimentos", "Magia", "Mineração", "Turismo"];
+  return Array.from({ length: n }, (_, d) => ({
+    dia: somarDias(inicio, d),
+    acoes: Array.from({ length: acoes }, (_, i) => {
+      const abertura = 10 + Math.floor(r() * 70);
+      const v = Math.round((r() + r() + r() - 1.5) * 16) + (r() < 0.6 ? 2 : -1);
+      return { id: `AC${i}`, nome: `Empresa ${i}`, setor: setores[i % setores.length], emoji: "🏢", abertura, fechamento: precoDepois(abertura, v) };
+    }),
+  }));
+}
+
+caso("consultores: seis personagens com história e jeito próprios; o segredo não vai para o navegador", () => {
+  assert.equal(CONSULTORES.length, 6);
+  assert.equal(new Set(IDS_DOS_CONSULTORES).size, 6);
+  for (const c of CONSULTORES) {
+    assert.ok(c.nome && c.titulo && c.origem && c.idade && c.metodo && c.bordao, c.id);
+    assert.ok(c.historia.length > 120, `${c.id}: a história tem corpo`);
+    assert.ok(c.personalidade.length >= 3, `${c.id}: personalidade`);
+    assert.ok(c.faixaDeclarada > 0 && c.sobreAFaixa, `${c.id}: a faixa que diz ter`);
+    assert.ok(svgDoConsultor(c.id).startsWith("<svg") && svgDoConsultor(c.id).includes("clipPath"), `${c.id}: tem retrato`);
+    assert.equal(consultorPorId(c.id), c);
+  }
+  // o jeito de errar (projecoes.js) só pode ser importado pelo servidor: nada da tela, nada do que vai ao navegador
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  assert.ok(!/ESTILOS|humorDoDia|diaRuim|multRuim/.test(ler("../src/dominio/consultores.js")), "consultores.js não tem o segredo");
+  const naTela = [];
+  const varrer = (pasta) => {
+    for (const e of fs.readdirSync(new URL(pasta, import.meta.url), { withFileTypes: true })) {
+      const p = `${pasta}${e.name}`;
+      if (e.isDirectory()) { if (p !== "../src/app/api") varrer(`${p}/`); } else if (/\.js$/.test(e.name)) naTela.push(p);
+    }
+  };
+  varrer("../src/componentes/");
+  varrer("../src/app/");
+  assert.ok(naTela.length > 20);
+  for (const p of naTela) assert.ok(!/from\s+["'][^"']*dominio\/projecoes/.test(ler(p)), `${p} não pode importar projecoes.js`);
+});
+
+caso("consultores: a mesma projeção para todo mundo; a margem de erro de cada um muda de dia para dia", () => {
+  const acao = { id: "MARA", nome: "Maravilhas", setor: "Magia", abertura: 40, fechamento: 44 };
+  assert.deepEqual(projetar("corvo", "2026-10-26", acao), projetar("corvo", "2026-10-26", { ...acao }));
+  const dias = Array.from({ length: 40 }, (_, i) => somarDias("2026-10-01", i));
+  const desvio = (xs) => { const m = xs.reduce((s, x) => s + x, 0) / xs.length; return Math.sqrt(xs.reduce((s, x) => s + (x - m) ** 2, 0) / xs.length); };
+  const erros = {};
+  for (const id of IDS_DOS_CONSULTORES) {
+    erros[id] = dias.map((d) => humorDoDia(id, d).erro);
+    assert.ok(new Set(erros[id].map((x) => x.toFixed(3))).size > 30, `${id}: o erro muda de um dia para o outro`);
+    assert.ok(Math.max(...erros[id]) / Math.min(...erros[id]) > 1.5, `${id}: há dias bons e dias ruins`);
+  }
+  assert.ok(desvio(erros.ametista) > desvio(erros.corvo), "a Madame é a mais imprevisível; o Corvo, o mais constante");
+});
+
+caso("consultores: cada um erra do seu jeito (300 pregões simulados)", () => {
+  const m = Object.fromEntries(IDS_DOS_CONSULTORES.map((id) => [id, { erro: 0, vies: 0, faixa: 0, lado: 0, proj: 0, real: 0, n: 0, alimentos: [0, 0], outros: [0, 0] }]));
+  for (const { dia, acoes } of mercadoDeTeste(300)) {
+    for (const a of acoes) {
+      const real = variacaoReal(a.abertura, a.fechamento);
+      for (const id of IDS_DOS_CONSULTORES) {
+        const p = projetar(id, dia, a);
+        const av = avaliar(id, p, real);
+        const x = m[id];
+        x.erro += av.erro; x.vies += p.variacao - real; x.faixa += av.naFaixa; x.lado += av.direcao; x.n++;
+        x.proj += Math.abs(p.variacao); x.real += Math.abs(real);
+        const g = a.setor === "Alimentos" ? x.alimentos : x.outros;
+        g[0] += av.erro; g[1]++;
+        if (id === "zuleica") assert.ok(Number.isInteger(p.variacao), "a Dona Zuleica arredonda tudo");
+      }
+    }
+  }
+  const media = (id, k) => m[id][k] / m[id].n;
+  const ordem = [...IDS_DOS_CONSULTORES].sort((a, b) => media(a, "erro") - media(b, "erro"));
+  assert.equal(ordem[0], "corvo", `o Corvo erra menos na média (${ordem.join(" < ")})`);
+  assert.ok(media("corvo", "lado") > 0.75, "o Corvo acerta o lado na maioria das vezes");
+  assert.ok(media("luna", "vies") > 2, "a Luna vê alta em tudo");
+  assert.ok(media("gorgo", "vies") < -2, "o Gorgo vê crise em tudo");
+  assert.ok(m.barao.proj < 0.75 * m.barao.real, "o Barão acha que o mercado anda menos do que anda");
+  assert.ok(m.ametista.proj > 1.2 * m.ametista.real, "a Madame exagera");
+  assert.ok(media("ametista", "faixa") < 0.25, "a Madame diz ±1% e quase nunca cai na faixa");
+  assert.ok(media("barao", "faixa") > 0.5, "a faixa larga do Barão costuma conter o fechamento");
+  const z = m.zuleica;
+  assert.ok(z.alimentos[0] / z.alimentos[1] < z.outros[0] / z.outros[1], "de comida a Dona Zuleica entende");
+  for (const id of IDS_DOS_CONSULTORES) assert.ok(media(id, "lado") > 0.55, `${id} ainda ajuda mais do que atrapalha`);
+});
+
+caso("consultores: o relatório não entrega o fechamento de hoje antes do fim do pregão", () => {
+  const hoje = "2026-10-26";
+  const passados = mercadoDeTeste(9, { acoes: 6, inicio: "2026-10-17" });
+  // o fechamento de hoje é 7771 sobre 7000: nenhuma projeção (em décimos de ponto) dá esse preço exato
+  const deHoje = [{ id: "SEGR", nome: "Segredo S.A.", setor: "Magia", emoji: "🤫", abertura: 7000, fechamento: 7771 }, ...passados[0].acoes.slice(0, 3)];
+  const dias = [...passados, { dia: hoje, acoes: deHoje }];
+  const numeros = (o, saida = []) => { if (typeof o === "number") saida.push(o); else if (o && typeof o === "object") for (const v of Object.values(o)) numeros(v, saida); return saida; };
+
+  const antes = relatorioDaMesa({ hoje, revelado: false, dias });
+  const texto = JSON.stringify(antes);
+  assert.ok(!texto.includes("fechamento") && !texto.includes("resultado") && !texto.includes("humor"), "nada do segredo no relatório");
+  assert.ok(!numeros(antes).includes(7771), "o fechamento de hoje não aparece em lugar nenhum");
+  assert.equal(antes.revelado, false);
+  assert.equal(antes.placarDeHoje, null);
+  assert.equal(antes.consultores.length, 6);
+  for (const c of antes.consultores) {
+    assert.equal(c.projecoes.length, 4);
+    assert.equal(c.hoje, null);
+    assert.ok(c.historico.length === 7 && c.historico.every((h) => h.dia < hoje), "o placar só tem pregões fechados (os 7 últimos)");
+    assert.ok(c.comentario && c.aposta?.frase.includes(c.aposta.acao));
+    for (const p of c.projecoes) {
+      assert.ok(p.faixa.de < p.preco && p.preco < p.faixa.ate, "a projeção fica no meio da faixa que ele declara");
+      assert.ok(p.frase.includes(pctDaFala(p.variacao)), "a fala traz a variação projetada");
+    }
+  }
+  assert.equal(antes.ultimoPregao.dia, passados.at(-1).dia);
+
+  const depois = relatorioDaMesa({ hoje, revelado: true, dias });
+  assert.equal(depois.revelado, true);
+  assert.equal(depois.placarDeHoje.dia, hoje);
+  assert.equal(depois.ultimoPregao.dia, passados.at(-1).dia, "o último pregão continua sendo o de ontem");
+  for (const c of depois.consultores) {
+    assert.ok(c.hoje && c.historico[0].dia === hoje && c.historico.length === 8);
+    const s = c.projecoes.find((p) => p.acao === "SEGR");
+    assert.equal(s.resultado.preco, 7771);
+    assert.equal(s.resultado.variacao, 11);
+    assert.deepEqual(s, { ...projetar(c.id, hoje, deHoje[0]), resultado: s.resultado }, "depois do fechamento, a projeção é a mesma de antes");
+  }
+
+  // sem pregão hoje ainda (a Lisa abrindo): sem projeções, mas o placar dos dias passados aparece
+  const cedo = relatorioDaMesa({ hoje, revelado: false, dias: passados });
+  assert.equal(cedo.temProjecoes, false);
+  assert.ok(cedo.consultores.every((c) => c.aposta === null && c.projecoes.length === 0 && c.historico.length === 7));
+});
+
+caso("consultores: o placar dá nota 10 − erro médio e coroa quem errou menos; a aposta segue o jeito de cada um", () => {
+  assert.equal(notaPeloErro(2.4), 7.6);
+  assert.equal(notaPeloErro(0), 10);
+  assert.equal(notaPeloErro(15), 0);
+  assert.equal(pctDaFala(4.2), "+4,2%");
+  assert.equal(pctDaFala(-3), "−3%");
+  assert.equal(pctDaFala(0), "0%");
+  assert.deepEqual([9, 3, 0, -3, -9].map(rumoDaFala), ["disparar", "subir", "lado", "cair", "despencar"]);
+  const dias = mercadoDeTeste(8, { acoes: 8, inicio: "2026-10-18" });
+  const hoje = dias.at(-1).dia;
+  const r = relatorioDaMesa({ hoje, revelado: false, dias });
+  const ranking = r.ultimoPregao.ranking;
+  assert.equal(ranking.length, 6);
+  for (let i = 1; i < ranking.length; i++) assert.ok(ranking[i - 1].erroMedio <= ranking[i].erroMedio, "do que errou menos para o que errou mais");
+  const campeao = r.consultores.find((c) => c.id === ranking[0].id);
+  assert.equal(campeao.historico[0].melhor, true);
+  assert.equal(r.consultores.filter((c) => c.historico[0].melhor).length, 1, "um campeão por pregão");
+  for (const c of r.consultores) {
+    const vs = c.projecoes.map((p) => p.variacao);
+    if (c.id === "luna" && Math.max(...vs) >= 1) assert.equal(c.aposta.variacao, Math.max(...vs), "a Luna aposta na maior alta");
+    if (c.id === "gorgo" && Math.min(...vs) <= -1) assert.equal(c.aposta.variacao, Math.min(...vs), "o Gorgo aposta na maior queda");
+    if (c.id === "corvo") assert.equal(Math.abs(c.aposta.variacao), Math.max(...vs.map(Math.abs)), "o Corvo aposta no maior sinal");
+    assert.ok(c.resumo.pregoes === 7 && c.resumo.total === 7 * 8 && c.resumo.nota === notaPeloErro(c.resumo.erroMedio));
   }
 });
 

@@ -207,8 +207,9 @@ export function validarPregao(resposta, ativas, { novas = NOVAS_POR_DIA, existen
 }
 
 // ---- o pregão de reserva: sem a IA, um sorteio do dia (o mesmo para todos, porque a semente é o dia)
+// (o sorteio com semente também serve aos consultores: src/dominio/projecoes.js)
 
-function sorteio(semente) {
+export function sorteio(semente) {
   let a = (semente >>> 0) || 1;
   return () => {
     a = (a + 0x6d2b79f5) | 0;

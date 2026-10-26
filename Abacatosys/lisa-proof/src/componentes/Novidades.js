@@ -8,9 +8,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Neuro from "./Neuro.js";
-import { urlDoMonstro } from "./reino/monstrosDePapel.js";
+import { retratoDoConsultor } from "./bolsa/consultoresDePapel.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-25-cadernos-e-biblioteca";
+export const EDICAO_DAS_NOVIDADES = "2026-10-26-consultores-da-bolsa";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,11 +28,14 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "📓", titulo: "Cadernos", texto: "Anote como num editor de código: vários cadernos, módulos e páginas, cor de sintaxe em Markdown, JavaScript, Python, SQL e outras, abas, buscar e substituir, prévia e gravação automática.", destaque: true },
-  { icone: "🔗", titulo: "Ligados ao seu estudo", texto: "Vincule um caderno, um módulo ou uma página a uma trilha, um curso, um assunto, uma torre, um andar ou a página de um livro — e o “📓 Anotações” aparece lá, com o caminho de volta." },
-  { icone: "📚", titulo: "Biblioteca de PDFs", texto: "Suba seus livros em PDF e leia com destaque em cores, sublinhado, notas, marcação de área, marcador de página, sumário, miniaturas, busca e temas sépia e escuro. Mande trechos para o caderno." },
-  { icone: "🎓", titulo: "Cursos a partir de um livro", texto: "Escolha o livro e os capítulos: a Lisa lê o texto e monta o curso seguindo o livro, com as páginas de cada assunto — e o quiz e o exercício cobram o que o livro ensina." },
+  { icone: "🔮", titulo: "Mesa dos Consultores", texto: "Madame Ametista, o Barão Cifrão, a Luna “Foguete”, o Professor Corvo, a Dona Zuleica e o Gorgo, o Urso, projetam onde cada ação da Bolsa fecha. Cada um tem história, jeito e uma margem de erro secreta que muda todo dia.", destaque: true },
+  { icone: "📊", titulo: "O que dizem da sua ação", texto: "Na ação escolhida, uma régua mostra o preço que cada consultor projetou, o preço de agora e a mediana da mesa — com a fala de cada um." },
+  { icone: "🏆", titulo: "Placar e retrospecto", texto: "Depois das 17h, o placar mostra quem chegou mais perto. O retrospecto dos últimos pregões é a sua pista de em quem confiar." },
+  { icone: "✖️", titulo: "Recompensas em triplo", texto: "Quiz, exercício, projetos da semana e do mês e as conquistas de andares do Modo Domínio passam a valer o triplo de pontos e moedas." },
 ];
+
+const NA_ESQUERDA = ["ametista", "barao", "luna"];
+const NA_DIREITA = ["corvo", "zuleica", "gorgo"];
 
 export default function Novidades() {
   const [aberto, setAberto] = useState(false);
@@ -66,17 +69,17 @@ export default function Novidades() {
       <div className="novidades__caixa">
         <div className="novidades__palco" aria-hidden="true">
           <span className="novidades__estrelas" />
-          <img className="novidades__bicho novidades__bicho--cerbero" src={urlDoMonstro("dragaoDeLava")} alt="" />
-          <img className="novidades__bicho novidades__bicho--goblin" src={urlDoMonstro("golem")} alt="" />
-          <img className="novidades__bicho novidades__bicho--cogumelo" src={urlDoMonstro("ent")} alt="" />
-          <img className="novidades__bicho novidades__bicho--morcego" src={urlDoMonstro("kraken")} alt="" />
+          <div className="novidades__retratos">
+            <span>{NA_ESQUERDA.map((id) => <img key={id} className="novidades__retrato" src={retratoDoConsultor(id)} alt="" />)}</span>
+            <span>{NA_DIREITA.map((id) => <img key={id} className="novidades__retrato" src={retratoDoConsultor(id)} alt="" />)}</span>
+          </div>
           <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} /></div>
           <span className="novidades__chao" />
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">Cadernos e Biblioteca!</h2>
-          <p className="novidades__sub">Um caderno de código para anotar enquanto estuda, uma biblioteca para ler e marcar seus PDFs — e cursos montados a partir dos seus livros.</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">A Mesa dos Consultores!</h2>
+          <p className="novidades__sub">Seis personagens projetam o fechamento da Bolsa do Reino — cada um erra do seu jeito, e ninguém sabe a margem de erro de hoje. E estudar agora rende o triplo de moedas.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -86,8 +89,7 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/biblioteca" className="pf-botao novidades__principal" onClick={fechar}>📚 Abrir a biblioteca</Link>
-            <Link href="/cadernos" className="pf-botao pf-botao--sec" onClick={fechar}>📓 Cadernos</Link>
+            <Link ref={principal} href="/bolsa" className="pf-botao novidades__principal" onClick={fechar}>🔮 Ver os consultores</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>

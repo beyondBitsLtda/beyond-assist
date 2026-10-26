@@ -238,3 +238,129 @@
 .bx-nota-teste { color: #d8b4fe; font-size: 13px; margin: 0 0 8px; }
 .bx--teste { box-shadow: inset 0 0 0 2px rgba(168, 85, 247, 0.55); }
 .bx-rodape a { color: #d8b4fe; }
+
+/* ---- a Mesa dos Consultores (26/10/2026): seis personagens de papel e as projeções de cada um.
+   A cor de cada consultor (--cor) só enfeita bordas e marcas — o texto fica nas cores do terminal. */
+.bx-mesa-faixa { padding: 12px 16px 0; }
+.bx-mesa h2 { font-size: 17px; }
+.bx-mesa__sub { margin: 4px 0 12px; color: var(--bx-texto-2); font-size: 13px; max-width: 80ch; }
+.bx-mesa__grade { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@container bolsa (min-width: 1100px) { .bx-mesa__grade { grid-template-columns: minmax(0, 1fr) 290px; } }
+.bx-mesa__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); }
+.bx-consultor {
+  width: 100%; height: 100%; display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px 12px; align-items: start; text-align: left;
+  padding: 10px; border-radius: 14px; border: 1px solid var(--bx-linha); border-top: 3px solid var(--cor); background: var(--bx-painel-2);
+  color: var(--bx-texto); font: inherit; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.bx-consultor:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+.bx-consultor:focus-visible { outline: 2px solid var(--bx-amarelo); outline-offset: 2px; }
+.bx-consultor--aberto { box-shadow: 0 0 0 2px var(--cor); }
+.bx-consultor__retrato { width: 84px; height: 84px; display: block; transform: rotate(-2deg); filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.35)); }
+.bx-mesa__lista li:nth-child(even) .bx-consultor__retrato { transform: rotate(2deg); }
+.bx-consultor__texto { display: grid; gap: 2px; min-width: 0; }
+.bx-consultor__texto strong { font-size: 15px; line-height: 1.2; }
+.bx-consultor__texto small { color: var(--bx-texto-2); font-size: 12px; }
+.bx-consultor__aposta { margin-top: 6px; justify-self: start; padding: 4px 8px; border-radius: 8px; background: var(--bx-fundo-2); font-size: 13px; }
+.bx-consultor__rodape { grid-column: 1 / -1; display: grid; gap: 4px; }
+.bx-consultor__rodape small { color: var(--bx-texto-2); font-size: 12px; }
+.bx-consultor__rodape b { color: var(--bx-texto); }
+.bx-retro { display: flex; align-items: flex-end; gap: 3px; height: 24px; }
+.bx-retro__barra { flex: 1; max-width: 28px; height: var(--h); border-radius: 3px 3px 0 0; background: var(--bx-texto-2); opacity: 0.55; }
+.bx-retro__barra--melhor { background: var(--bx-amarelo); opacity: 1; }
+.bx-retro--vazio { height: auto; font-size: 12px; color: var(--bx-texto-2); }
+
+/* o rosto recortado do retrato (listas e régua) */
+.bx-rosto {
+  --t: 32px; position: relative; display: inline-block; flex: none; width: var(--t); height: var(--t); border-radius: 50%;
+  overflow: hidden; background: #fff; box-shadow: 0 0 0 2px var(--cor, var(--bx-linha));
+}
+.bx-rosto img { position: absolute; width: 190%; height: 190%; max-width: none; left: -45%; top: -40%; }
+
+/* o placar */
+.bx-placar { align-self: start; padding: 10px 12px; border-radius: 14px; background: var(--bx-fundo-2); border: 1px solid var(--bx-linha); }
+.bx-placar h3 { margin: 0 0 8px; font-size: 14px; }
+.bx-placar__bloco + .bx-placar__bloco { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--bx-linha); }
+.bx-placar ol { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 5px; }
+.bx-placar li { display: grid; grid-template-columns: 24px 26px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px; }
+.bx-placar__pos { color: var(--bx-texto-2); font-weight: 800; }
+.bx-placar li:first-child .bx-placar__pos { color: var(--bx-amarelo); }
+.bx-placar__nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bx-placar__nota { font-weight: 800; cursor: help; }
+.bx-placar__nota-rodape { margin: 10px 0 0; font-size: 11px; color: var(--bx-texto-2); }
+
+/* a ficha do consultor */
+.bx-ficha { margin-top: 12px; padding: 14px; border-radius: 14px; background: var(--bx-painel-2); border: 1px solid var(--bx-linha); border-left: 4px solid var(--cor); }
+.bx-ficha__cabeca { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 16px; align-items: start; }
+.bx-ficha__retrato { width: 150px; height: 150px; display: block; transform: rotate(-2deg); filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.35)); }
+.bx-ficha__quem h3 { margin: 0; font-size: 20px; }
+.bx-ficha__quem h3 small { display: block; font-size: 13px; color: var(--bx-texto-2); }
+.bx-ficha__meta { margin: 4px 0 8px; font-size: 13px; color: var(--bx-texto-2); }
+.bx-ficha__tracos { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; padding: 0; }
+.bx-ficha__tracos li { padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 700; background: var(--bx-fundo-2); border: 1px solid var(--cor); }
+.bx-ficha__historia { margin: 0 0 10px; font-size: 14px; line-height: 1.55; max-width: 75ch; }
+.bx-ficha__dados { display: grid; gap: 4px; margin: 0 0 6px; font-size: 13px; }
+.bx-ficha__dados div { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 8px; }
+.bx-ficha__dados dt { color: var(--bx-texto-2); }
+.bx-ficha__dados dd { margin: 0; }
+.bx-balao { position: relative; margin: 12px 0 0 8px; padding: 10px 14px; border-radius: 14px; background: #f8fafc; color: #0f172a; font-size: 14px; font-weight: 600; max-width: 62ch; }
+.bx-balao::before { content: ""; position: absolute; left: -8px; top: 12px; border-style: solid; border-width: 8px 8px 8px 0; border-color: transparent #f8fafc transparent transparent; }
+.bx-ficha__fechar { width: 32px; height: 32px; border: none; border-radius: 50%; background: var(--bx-fundo-2); color: var(--bx-texto); font: inherit; font-size: 14px; cursor: pointer; }
+.bx-ficha__fechar:focus-visible { outline: 2px solid var(--bx-amarelo); outline-offset: 2px; }
+.bx-ficha h4 { margin: 18px 0 8px; font-size: 14px; }
+.bx-ficha__historico { max-width: 560px; }
+.bx-ficha__historico tbody tr { cursor: default; }
+@container bolsa (max-width: 700px) {
+  .bx-ficha__cabeca { grid-template-columns: 96px minmax(0, 1fr) auto; gap: 12px; }
+  .bx-ficha__retrato { width: 96px; height: 96px; }
+  .bx-ficha__dados div { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+@container bolsa (max-width: 480px) {
+  .bx-ficha__cabeca { grid-template-columns: minmax(0, 1fr) auto; }
+  .bx-ficha__retrato { grid-row: 1; grid-column: 1; }
+  .bx-ficha__fechar { grid-row: 1; grid-column: 2; }
+  .bx-ficha__quem { grid-row: 2; grid-column: 1 / -1; }
+}
+
+/* as projeções de um consultor (na ficha) */
+.bx-proj { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); }
+@container bolsa (max-width: 420px) { .bx-proj { grid-template-columns: minmax(0, 1fr); } }
+.bx-proj button {
+  width: 100%; height: 100%; display: grid; grid-template-columns: 64px repeat(3, minmax(0, 1fr)); gap: 6px 10px; align-items: start; text-align: left;
+  padding: 8px 10px; border-radius: 10px; border: 1px solid var(--bx-linha); background: var(--bx-painel); color: var(--bx-texto); font: inherit; font-size: 13px; cursor: pointer;
+}
+.bx-proj button:hover { border-color: var(--cor); }
+.bx-proj button:focus-visible { outline: 2px solid var(--bx-amarelo); outline-offset: 1px; }
+.bx-proj__acao { white-space: nowrap; }
+.bx-proj__num { display: grid; min-width: 0; }
+.bx-proj__num small { color: var(--bx-texto-2); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; }
+.bx-proj__num em { font-style: normal; font-size: 11px; color: var(--bx-texto-2); }
+.bx-proj__fala { grid-column: 1 / -1; color: var(--bx-texto-2); font-style: italic; }
+/* estreito: o código da ação em cima, os três números embaixo */
+@container bolsa (max-width: 560px) {
+  .bx-proj button { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bx-proj__acao { grid-column: 1 / -1; }
+}
+
+/* na ação escolhida: o que os consultores dizem (a régua de preço e a lista) */
+.bx-opinioes { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--bx-painel-2); }
+.bx-opinioes__titulo { margin: 0 0 4px; font-size: 14px; }
+.bx-opinioes__titulo small { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--bx-texto-2); }
+.bx-regua { position: relative; height: calc(16px + var(--faixas) * 36px + 30px); margin: 4px 18px 8px; }
+.bx-regua__eixo { position: absolute; left: -10px; right: -10px; bottom: 20px; height: 2px; border-radius: 2px; background: var(--bx-linha); }
+.bx-regua__marca { position: absolute; top: 16px; bottom: 20px; width: 0; }
+.bx-regua__marca small { position: absolute; transform: translateX(-50%); font-size: 10.5px; font-weight: 700; color: var(--bx-texto-2); white-space: nowrap; }
+.bx-regua__marca--abertura { border-left: 1px dashed var(--bx-texto-2); }
+.bx-regua__marca--abertura small { bottom: -20px; }
+.bx-regua__marca--agora { border-left: 2px solid var(--bx-amarelo); }
+.bx-regua__marca--agora small, .bx-regua__marca--fechou small { top: -16px; color: var(--bx-texto); }
+.bx-regua__marca--fechou { border-left: 2px solid var(--bx-texto); }
+.bx-regua__rosto { position: absolute; bottom: calc(28px + var(--faixa) * 36px); transform: translateX(-50%); line-height: 0; z-index: 1; }
+.bx-regua__rosto::after { content: ""; position: absolute; left: 50%; top: 100%; height: calc(var(--faixa) * 36px + 8px); border-left: 2px solid var(--bx-texto-2); opacity: 0.45; }
+.bx-opinioes__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.bx-opinioes__lista li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; }
+.bx-opinioes__quem { display: grid; min-width: 0; }
+.bx-opinioes__quem q { color: var(--bx-texto-2); font-size: 12.5px; font-style: italic; }
+.bx-opinioes__num { display: grid; justify-items: end; white-space: nowrap; }
+.bx-opinioes__num small { font-size: 11.5px; color: var(--bx-texto-2); }
+.bx-opinioes__rodape { margin: 10px 0 0; font-size: 12px; color: var(--bx-texto-2); }
+@media (prefers-reduced-motion: reduce) { .bx-consultor { transition: none; } .bx-consultor:hover { transform: none; } }

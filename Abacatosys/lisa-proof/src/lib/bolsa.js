@@ -37,6 +37,7 @@ import {
   validarPregao, pregaoDeReserva, saidasDaBolsa, caminhoDoDia, velaDe, sementeDaAcao, valorDaVenda,
   ABRE_AS, FECHA_AS, pregaoAberto, passosAte, precoNaHora, horaDoPasso, proximaVirada,
 } from "@/dominio/bolsa.js";
+import { relatorioDaMesa } from "@/dominio/projecoes.js";
 
 const MINUTOS_PARA_RETOMAR = 3;
 const DIAS_DE_HISTORICO = 14;
@@ -318,6 +319,39 @@ export async function estadoDaBolsa(usuarioId, { hora: horaPedida } = {}) {
     saidas: (saidasR.data || []).map((a) => ({ id: a.id, nome: a.nome, emoji: a.emoji, status: a.status, preco: a.preco, dia: a.saiu_em })),
     ordens: (ordensR.data || []).map((o) => ({ ...o, preco: Number(o.preco), taxa: Number(o.taxa), total: Number(o.total), nome: nomeDe.get(o.acao_id) || o.acao_id })),
   };
+}
+
+// ---------------------------------------------------------------- a mesa dos consultores
+
+/** Quantos dias para trás procurar os pregões do placar (o pregão só abre nos dias em que alguém entra). */
+const DIAS_DO_PLACAR = 21;
+
+/**
+ * A Mesa dos Consultores (26/10/2026): a projeção de cada consultor para o fechamento de hoje e o
+ * placar dos últimos pregões. O fechamento de hoje é o segredo do dia: só a conta das projeções
+ * (src/dominio/projecoes.js) o vê, e o resultado só aparece depois que o pregão fecha (no Reino
+ * de Teste, na hora simulada). Nada é gravado: as projeções saem dos preços, com semente.
+ */
+export async function mesaDosConsultores({ hora: horaPedida } = {}) {
+  const pregao = await pregaoDeHoje();
+  const dia = diaDe();
+  const hora = emTeste() && horaValida(horaPedida) ? horaPedida : horaAgora();
+  const [acoesR, linhas] = await Promise.all([
+    db.from("proof_bolsa_acoes").select("id, nome, setor, emoji, criada_em"),
+    buscarTodas(() => db.from("proof_bolsa_precos").select("acao_id, dia, abertura, preco").gte("dia", somarDias(dia, -DIAS_DO_PLACAR)).lte("dia", dia).order("dia").order("acao_id")),
+  ]);
+  falhou(acoesR.error, "ações");
+  const empresas = new Map((acoesR.data || []).map((a) => [a.id, a]));
+  const porDia = new Map();
+  for (const l of linhas) {
+    const a = empresas.get(l.acao_id);
+    // a estreia não tem o que projetar: a empresa abre e fecha no preço de lançamento
+    if (!a || a.criada_em === l.dia || l.abertura == null) continue;
+    if (!porDia.has(l.dia)) porDia.set(l.dia, []);
+    porDia.get(l.dia).push({ id: a.id, nome: a.nome, setor: a.setor, emoji: a.emoji, abertura: Number(l.abertura), fechamento: Number(l.preco) });
+  }
+  const relatorio = relatorioDaMesa({ hoje: dia, revelado: hora >= FECHA_AS, dias: [...porDia].map(([d, acoes]) => ({ dia: d, acoes })) });
+  return { ...relatorio, hora, abrindo: Boolean(pregao.abrindo), fechaAs: FECHA_AS };
 }
 
 // ---------------------------------------------------------------- comprar e vender
