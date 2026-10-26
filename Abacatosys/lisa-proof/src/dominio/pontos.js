@@ -1,5 +1,16 @@
 // Quanto vale cada coisa. Num lugar só, para a tela e o servidor nunca discordarem.
 
+/**
+ * As recompensas da prática e do Modo Domínio valem o TRIPLO (pedido de 26/10/2026: "triplique o
+ * valor de moedas e pontos dados no quiz, no exercício e nos projetos semanais e mensais, além das
+ * conquistas de andares no Domínio"). Multiplica: o quiz, o exercício, os projetos (da semana,
+ * final e do mês), os andares, os marcos e o topo das torres, e as moedas dadas no lugar de veículo
+ * ou avatar. As moedas do Reino vêm dos pontos (1 ponto = 1 moeda), então triplicam junto.
+ * Não mexe na parte teórica (itens, assuntos, meta do dia) nem nas conquistas da conta.
+ * Vale do momento da mudança em diante: o ponto já ganho fica como foi gravado.
+ */
+export const MULTIPLICADOR_DE_RECOMPENSAS = 3;
+
 export const PONTOS = {
   item: 10,          // um item de checklist marcado
   card: 30,          // bônus por concluir um assunto inteiro

@@ -10,6 +10,7 @@
 
 import { TROPAS, capacidadeDoExercito, capacidadeDaGuarnicao, lotacaoDoAcampamento, espacoUsado } from "./tropas.js";
 import { ORDEM_DOS_VEICULOS, veiculosDe } from "./veiculos.js";
+import { MULTIPLICADOR_DE_RECOMPENSAS } from "./pontos.js";
 
 // ---------------------------------------------------------------- os níveis de complexidade
 
@@ -119,14 +120,17 @@ export function nomeDoChefao(id, epiteto) {
 
 // ---------------------------------------------------------------- pontos, atributos e a luta
 
+// As recompensas dos andares valem o triplo desde 26/10/2026 (MULTIPLICADOR_DE_RECOMPENSAS, em
+// pontos.js): os pontos de cada andar, o bônus dos marcos, o do topo e as moedas no lugar de prêmio.
+
 /** Os pontos de um andar (viram moedas, ranking e ofensiva): dificuldade × nível × nota. */
 export function pontosDoAndar(nota, dificuldade, nivel) {
-  const base = 15 + 10 * Math.min(5, Math.max(1, dificuldade || 1));
+  const base = (15 + 10 * Math.min(5, Math.max(1, dificuldade || 1))) * MULTIPLICADOR_DE_RECOMPENSAS;
   return Math.round(base * NIVEIS[nivelValido(nivel)].fator * Math.max(0, Math.min(100, nota || 0)) / 100);
 }
 
 /** O bônus de chegar ao topo. */
-export const pontosDoTopo = (nivel, n) => Math.round(40 * nivelValido(nivel) * Math.sqrt(Math.max(MIN_ANDARES, n) / 10));
+export const pontosDoTopo = (nivel, n) => Math.round(40 * MULTIPLICADOR_DE_RECOMPENSAS * nivelValido(nivel) * Math.sqrt(Math.max(MIN_ANDARES, n) / 10));
 
 /** As habilidades que a Lisa mede em cada entrega — e que o Neuro ganha. */
 export const ATRIBUTOS = [
@@ -220,7 +224,7 @@ export const valorDasTropas = (pacote) => Object.entries(pacote || {}).reduce((s
 export function premiosDoMarco(k, nivel, chefaoFinal = null) {
   const nv = nivelValido(nivel);
   const pode = (r) => NIVEIS[nv].recompensas.includes(r);
-  const premios = [{ tipo: "pontos", pontos: 10 * nv * (k + 1) }];
+  const premios = [{ tipo: "pontos", pontos: 10 * MULTIPLICADOR_DE_RECOMPENSAS * nv * (k + 1) }];
   if ((k === 0 || k === 2) && pode("tropas")) premios.push({ tipo: "tropas", tropas: TROPAS_DO_NIVEL[nv] });
   if (k === 1) {
     if (pode("defesas")) premios.push({ tipo: "defesas", tropas: DEFESAS_DO_NIVEL[nv] });
@@ -248,7 +252,7 @@ export function premiosDoAndar(numero, n, nivel, chefaoFinal) {
 }
 
 /** O que vira moedas quando o prêmio não tem onde entrar (já tem todos os veículos, já tem o avatar). */
-export const MOEDAS_NO_LUGAR = { veiculo: 800, avatar: 1500 };
+export const MOEDAS_NO_LUGAR = { veiculo: 800 * MULTIPLICADOR_DE_RECOMPENSAS, avatar: 1500 * MULTIPLICADOR_DE_RECOMPENSAS };
 
 /** O veículo do prêmio: o próximo da garagem que a pessoa ainda não tem (null se tem todos). */
 export const veiculoDoPremio = (possui) => ORDEM_DOS_VEICULOS.find((v) => !veiculosDe(possui).includes(v)) || null;

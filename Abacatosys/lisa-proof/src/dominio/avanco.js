@@ -23,6 +23,7 @@
 
 import { somarDias, diasEntre, formatarDia, inicioDaSemana } from "./datas.js";
 import { NOTA_DE_APROVACAO } from "./pratica.js";
+import { MULTIPLICADOR_DE_RECOMPENSAS } from "./pontos.js";
 
 export const PROJETOS_POR_SEMANA = 3;
 
@@ -40,8 +41,11 @@ export const diasPorSemana = (diasDeEstudo) => Math.max(1, Math.min(7, (Array.is
 export const periodoDaSemana = (base, numero) => somarDias(inicioDaSemana(base), 7 * (numero - 1));
 export const periodoDoFinal = (base) => base;
 
-/** O projeto final vale mais quanto maior a trilha: 250 pontos numa semana, até 600. */
-export const valorDoProjetoFinal = (semanas) => Math.min(600, 150 + 100 * Math.max(1, semanas || 1));
+/**
+ * O projeto final vale mais quanto maior a trilha: 250 pontos numa semana, até 600 — × o
+ * multiplicador das recompensas (o triplo desde 26/10/2026: de 750 a 1.800).
+ */
+export const valorDoProjetoFinal = (semanas) => Math.min(600, 150 + 100 * Math.max(1, semanas || 1)) * MULTIPLICADOR_DE_RECOMPENSAS;
 
 /** Os assuntos (cards) com algum quiz aprovado. */
 export function assuntosComQuizAprovado(quizzes) {

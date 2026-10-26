@@ -184,9 +184,17 @@ crontab -e
 | Marcar uma tarefa | 10 |
 | Concluir um assunto (todas as tarefas, ou à mão se não tiver tarefas) | +30 |
 | Bater a meta do dia (uma vez por dia) | +20 |
-| Quiz: cada acerto / gabaritar | 5 / +10 |
-| Exercício (nota 100) | até 40 |
-| Projeto da semana / do mês (nota 100) | até 150 / até 400 |
+| Quiz: cada acerto / gabaritar | 15 / +30 |
+| Exercício (nota 100) | até 120 |
+| Projeto da semana / final ou do mês (nota 100) | até 450 / de 750 a 1.800 (cresce com a trilha) / até 1.200 |
+| Modo Domínio: andar vencido · marco · topo | (15 + 10 × dificuldade) × 3 × fator do nível × nota · 30 × nível × (marco) · 120 × nível × √(andares ÷ 10) |
+
+Desde 26/10/2026 a prática e o Modo Domínio valem o **triplo** (`MULTIPLICADOR_DE_RECOMPENSAS`, em
+`src/dominio/pontos.js`): o quiz, o exercício, os projetos, os andares, os marcos, o topo e as moedas
+dadas no lugar de veículo ou avatar (2.400 e 4.500). As moedas do Reino vêm dos pontos (1 ponto = 1
+moeda), então triplicam junto. A teoria (tarefas, assuntos, meta do dia) e as conquistas da conta
+ficam como estavam, e o ponto já ganho continua como foi gravado. Projeto final gerado antes não tem
+`escalaDoValor` e passa a valer o triplo na hora de pontuar (`valorNaEscalaDeAgora`).
 
 - Desmarcar devolve os pontos **só se foram ganhos hoje**. Ponto de outro dia é história, e
   desmarcar e marcar de novo não gera ponto nem salva a ofensiva.

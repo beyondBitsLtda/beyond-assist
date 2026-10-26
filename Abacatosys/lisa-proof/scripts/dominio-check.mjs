@@ -11,7 +11,7 @@ import {
   normalizarDiasDeEstudo, diasEstimados,
 } from "../src/dominio/plano.js";
 import { resumoDasMetas, tarefasDoDia } from "../src/dominio/metas.js";
-import { nivelPorPontos } from "../src/dominio/pontos.js";
+import { nivelPorPontos, MULTIPLICADOR_DE_RECOMPENSAS, PONTOS } from "../src/dominio/pontos.js";
 import {
   periodoDe, periodoPermitido, pontosDoQuiz, pontosDaNota, validarQuiz, quizParaTela,
   separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo, podeReenviar, entregaConcluida,
@@ -77,7 +77,7 @@ import { montarAgenda, itensDoDia, gradeDoMes, mesVizinho } from "../src/dominio
 import {
   MIN_ANDARES, NOTA_PARA_VENCER, CHEFOES, CHEFOES_FINAIS, ATRIBUTOS, andaresPermitidos, andaresEscolhidos, dificuldadeEsperada,
   chefoesDaTorre, nomeDoChefao, sementeDe, pontosDoAndar, pontosDoTopo, atributosDoNeuro, roteiroDaLuta, marcosDaTorre,
-  premiosDaTorre, premiosDoAndar, encaixarTropas, veiculoDoPremio, valorDasTropas, MOEDAS_NO_LUGAR, blocosDaTorre,
+  premiosDaTorre, premiosDoAndar, premiosDoMarco, encaixarTropas, veiculoDoPremio, valorDasTropas, MOEDAS_NO_LUGAR, blocosDaTorre,
   assuntosDoBloco, mediaDasNotas, branchSugerida, branchValida, codigoDoCertificado, codigoValido, validarAnalise,
   validarTorre, validarDesafio, validarAvaliacaoDoAndar, personagemDoChefao, chefaoDoPersonagem, dificuldadeSempreSobe,
 } from "../src/dominio/modoDominio.js";
@@ -251,10 +251,11 @@ caso("período futuro ou torto fica trancado", () => {
   assert.ok(!periodoPermitido("projeto_mensal", "2026-11-01", "2026-10-07"));
 });
 caso("pontos do quiz e da nota", () => {
-  assert.equal(pontosDoQuiz(5, 5), 35);
-  assert.equal(pontosDoQuiz(3, 5), 15);
-  assert.equal(pontosDaNota("projeto_semanal", 80), 120);
-  assert.equal(pontosDaNota("exercicio", 150), 40);
+  // o triplo desde 26/10/2026: 15 por acerto, 30 de bônus, exercício 120, projeto da semana 450
+  assert.equal(pontosDoQuiz(5, 5), 105);
+  assert.equal(pontosDoQuiz(3, 5), 45);
+  assert.equal(pontosDaNota("projeto_semanal", 80), 360);
+  assert.equal(pontosDaNota("exercicio", 150), 120);
 });
 caso("quiz: pergunta torta sai; menos de 3 boas derruba", () => {
   const boa = { pergunta: "?", opcoes: ["a", "b", "c", "d"], correta: 2, explicacao: "x" };
@@ -350,10 +351,12 @@ caso("avanço: as semanas do plano são as semanas do curso (as do mapa e da age
   const so = avancoDaTrilha({ etapas: curto, diasDeEstudo: [1, 2, 3, 4, 5], base: BASE, hoje: "2026-10-05" });
   assert.equal(so.unidades.length, 1);
   assert.equal(so.unidades[0].tipo, "projeto_final");
-  assert.equal(valorDoProjetoFinal(1), 250);
-  assert.equal(valorDoProjetoFinal(3), 450);
-  assert.equal(valorDoProjetoFinal(9), 600);
-  assert.equal(tabelaDePontos("projeto_final", { requisitos: ["x", "y"], extras: [], valor: 250 }).base, 250);
+  assert.equal(valorDoProjetoFinal(1), 750);
+  assert.equal(valorDoProjetoFinal(3), 1350);
+  assert.equal(valorDoProjetoFinal(9), 1800);
+  // o projeto final gerado antes do triplo (sem escala gravada) passa a valer o triplo; o novo não conta duas vezes
+  assert.equal(tabelaDePontos("projeto_final", { requisitos: ["x", "y"], extras: [], valor: 250 }).base, 750);
+  assert.equal(tabelaDePontos("projeto_final", { requisitos: ["x", "y"], extras: [], valor: 750, escalaDoValor: 3 }).base, 750);
 });
 caso("projeto da semana: sai dos assuntos DA semana do curso, sabe o que veio antes e o que ainda não pode cair", () => {
   // pedido de 23/10/2026: "o projeto da semana 1 não tem nada a ver com a semana 1"
@@ -1054,28 +1057,28 @@ caso("dicas da Lisa: o guia do projeto precisa de passo a passo; o resto é limp
 caso("projeto: cada requisito tem valor claro, os extras são bônus e a soma fecha com a base", () => {
   const conteudo = { requisitos: ["a", "b", "c", "d", "e", "f", "g"], extras: ["x", "y"] };
   const t = tabelaDePontos("projeto_semanal", conteudo);
-  assert.equal(t.base, 150);
-  assert.equal(t.requisitos.reduce((s, v) => s + v, 0), 150);
-  assert.deepEqual(t.requisitos, [22, 22, 22, 21, 21, 21, 21]);
-  assert.deepEqual(t.extras, [15, 15]);
-  assert.equal(t.maximo, 180);
+  assert.equal(t.base, 450);
+  assert.equal(t.requisitos.reduce((s, v) => s + v, 0), 450);
+  assert.deepEqual(t.requisitos, [65, 65, 64, 64, 64, 64, 64]);
+  assert.deepEqual(t.extras, [45, 45]);
+  assert.equal(t.maximo, 540);
   // mais simples NÃO tira pontos; desafiador vale 1,5×
-  assert.equal(tabelaDePontos("projeto_mensal", { ...conteudo, complexidade: "simples" }).base, 400);
-  assert.equal(tabelaDePontos("projeto_mensal", { ...conteudo, complexidade: "desafiador" }).base, 600);
-  assert.equal(tabelaDePontos("projeto_mensal", { ...conteudo, complexidade: "inventada" }).base, 400);
+  assert.equal(tabelaDePontos("projeto_mensal", { ...conteudo, complexidade: "simples" }).base, 1200);
+  assert.equal(tabelaDePontos("projeto_mensal", { ...conteudo, complexidade: "desafiador" }).base, 1800);
+  assert.equal(tabelaDePontos("projeto_mensal", { ...conteudo, complexidade: "inventada" }).base, 1200);
 });
 
 caso("projeto: entregas parciais somam o que é novo e nunca tiram o que já foi garantido", () => {
   const conteudo = { requisitos: ["a", "b", "c", "d", "e"], extras: ["x"] };
-  const t = tabelaDePontos("projeto_semanal", conteudo); // 30 cada, extra 15
+  const t = tabelaDePontos("projeto_semanal", conteudo); // 90 cada, extra 45
   const e1 = cumpridosNaAvaliacao({ requisitos: [{ numero: 1, atendido: true }, { numero: 2, atendido: true }, { numero: 3, atendido: false }] }, conteudo);
   assert.deepEqual(e1, { requisitos: [0, 1], extras: [] });
-  assert.equal(pontosDoProjeto(t, e1), 60);
+  assert.equal(pontosDoProjeto(t, e1), 180);
   // a 2ª entrega quebrou o requisito 2 mas fez o 3 e o 4 e o extra: o 2 continua garantido
   const e2 = cumpridosNaAvaliacao({ requisitos: [{ numero: 1, atendido: true }, { numero: 2, atendido: false }, { numero: 3, atendido: true }, { numero: 4, atendido: true }], extras: [{ numero: 1, atendido: true }] }, conteudo);
   const juntos = juntarCumpridos(e1, e2);
   assert.deepEqual(juntos, { requisitos: [0, 1, 2, 3], extras: [0] });
-  assert.equal(pontosDoProjeto(t, juntos), 135);
+  assert.equal(pontosDoProjeto(t, juntos), 405);
   assert.equal(projetoCompleto(t, juntos), false);
   assert.equal(projetoCompleto(t, juntarCumpridos(juntos, { requisitos: [4] })), true);
   // sem número, vale a ordem; número fora do projeto é ignorado
@@ -1702,12 +1705,22 @@ caso("Modo Domínio: os chefões ficam mais fortes, o do topo é um dos quatro e
 });
 
 caso("Modo Domínio: pontos do andar (dificuldade × nível × nota) e do topo", () => {
-  assert.equal(pontosDoAndar(100, 5, 5), Math.round(65 * 1.75));
-  assert.equal(pontosDoAndar(100, 1, 1), 25);
+  // o triplo desde 26/10/2026
+  assert.equal(pontosDoAndar(100, 5, 5), Math.round(65 * 3 * 1.75));
+  assert.equal(pontosDoAndar(100, 1, 1), 75);
   assert.equal(pontosDoAndar(0, 5, 5), 0);
-  assert.equal(pontosDoAndar(150, 1, 1), 25, "nota acima de 100 não vale mais");
-  assert.equal(pontosDoTopo(1, 10), 40);
-  assert.equal(pontosDoTopo(5, 100), Math.round(200 * Math.sqrt(10)));
+  assert.equal(pontosDoAndar(150, 1, 1), 75, "nota acima de 100 não vale mais");
+  assert.equal(pontosDoTopo(1, 10), 120);
+  assert.equal(pontosDoTopo(5, 100), Math.round(600 * Math.sqrt(10)));
+});
+
+caso("recompensas em triplo (26/10/2026): prática e Domínio sim; teoria e conquistas não", () => {
+  assert.equal(MULTIPLICADOR_DE_RECOMPENSAS, 3);
+  assert.deepEqual(premiosDoMarco(0, 5).find((p) => p.tipo === "pontos"), { tipo: "pontos", pontos: 150 });
+  assert.deepEqual(premiosDoMarco(3, 1).find((p) => p.tipo === "pontos"), { tipo: "pontos", pontos: 120 });
+  assert.equal(PONTOS.item, 10, "a teoria fica como estava");
+  assert.equal(PONTOS.card, 30);
+  assert.equal(PONTOS.meta_diaria, 20);
 });
 
 caso("Modo Domínio: a luta — 60 vence, sem sorte; as vidas fecham certinho", () => {
@@ -1782,7 +1795,7 @@ caso("Modo Domínio: prêmio no Reino — o que não cabe (ou não é liberado) 
   assert.equal(veiculoDoPremio([]), "submarino");
   assert.equal(veiculoDoPremio(["submarino", "dirigivel"]), "tanque");
   assert.equal(veiculoDoPremio(["barco", "submarino", "dirigivel", "tanque", "nave"]), null);
-  assert.ok(MOEDAS_NO_LUGAR.veiculo > 0 && MOEDAS_NO_LUGAR.avatar > 0);
+  assert.deepEqual(MOEDAS_NO_LUGAR, { veiculo: 2400, avatar: 4500 }); // o triplo desde 26/10/2026
 });
 
 caso("Modo Domínio: a torre grande sai em blocos, cada um com a sua fatia de assuntos", () => {

@@ -16,6 +16,7 @@ import { temModelo } from "./ia.js";
 import { gerarQuiz, gerarExercicio, gerarProjeto, gerarGuiaDoProjeto, ajustarComplexidadeDoProjeto, avaliarExercicio, avaliarProjeto } from "./iaPratica.js";
 import { lerRepositorio, ErroDoGitHub } from "./github.js";
 import { diaDe } from "@/dominio/datas.js";
+import { MULTIPLICADOR_DE_RECOMPENSAS } from "@/dominio/pontos.js";
 import {
   TIPOS_DE_DESAFIO, NOMES_DOS_DESAFIOS, TENTATIVAS, NOTA_DE_APROVACAO, fimDoPeriodo,
   pontosDoQuiz, pontosDaNota, quizParaTela, podeReenviar, entregaConcluida, ehProjeto,
@@ -327,7 +328,8 @@ async function gerarConteudoDoProjeto({ trilha, avanco, tipo, unidade, evitar = 
   const conteudo = {
     ...gerado,
     semana: unidade.numero, de: unidade.de, ate: unidade.ate, assuntos: assuntos.map((a) => a.titulo),
-    ...(tipo === "projeto_final" ? { valor: valorDoProjetoFinal(semanas), semanas } : {}),
+    // o valor já vem na escala de agora; a escala fica gravada para um multiplicador futuro não contar duas vezes
+    ...(tipo === "projeto_final" ? { valor: valorDoProjetoFinal(semanas), escalaDoValor: MULTIPLICADOR_DE_RECOMPENSAS, semanas } : {}),
   };
   return { conteudo, titulo: String(gerado.titulo).slice(0, 200), cardIds: assuntos.map((a) => a.cardId) };
 }

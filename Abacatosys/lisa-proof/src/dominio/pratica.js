@@ -5,6 +5,7 @@
 // em src/dominio/avanco.js. Tudo testado por `npm run dominio-check`.
 
 import { inicioDaSemana, fimDaSemana, inicioDoMes, fimDoMes, diaValido, diaDaSemana } from "./datas.js";
+import { MULTIPLICADOR_DE_RECOMPENSAS } from "./pontos.js";
 
 // "projeto_mensal" ficou só para a história: desde 23/10/2026 a última semana do plano termina no
 // PROJETO FINAL, do tamanho da trilha (src/dominio/avanco.js), e ninguém gera projeto do mês novo.
@@ -20,14 +21,18 @@ export const NOMES_DOS_DESAFIOS = {
   projeto_mensal: "Projeto do mês",
 };
 
-/** Pontuação da prática. A parte prática vale mais que a teórica de propósito: dá mais trabalho. */
+/**
+ * Pontuação da prática. A parte prática vale mais que a teórica de propósito: dá mais trabalho.
+ * Os valores de base × MULTIPLICADOR_DE_RECOMPENSAS (o triplo desde 26/10/2026, ver pontos.js).
+ */
+const M = MULTIPLICADOR_DE_RECOMPENSAS;
 export const PONTOS_DA_PRATICA = {
-  acertoNoQuiz: 5,
-  quizPerfeito: 10,       // bônus por acertar todas
-  exercicio: 40,          // nota 100 = 40 pontos
-  projeto_semanal: 150,
-  projeto_final: 400,     // o padrão; o de cada trilha cresce com ela (valorDoProjetoFinal, em avanco.js)
-  projeto_mensal: 400,
+  acertoNoQuiz: 5 * M,       // 15
+  quizPerfeito: 10 * M,      // 30 — bônus por acertar todas
+  exercicio: 40 * M,         // 120 — nota 100
+  projeto_semanal: 150 * M,  // 450
+  projeto_final: 400 * M,    // 1.200 — o padrão; o de cada trilha cresce com ela (valorDoProjetoFinal, em avanco.js)
+  projeto_mensal: 400 * M,   // 1.200
 };
 
 export const NOTA_DE_APROVACAO = 60;
@@ -204,10 +209,20 @@ export const BONUS_POR_EXTRA = 0.1; // cada extra vale 10% da base
 
 export const complexidadeDe = (conteudo) => (COMPLEXIDADES[conteudo?.complexidade] ? conteudo.complexidade : "padrao");
 
+/**
+ * O valor guardado num projeto final (`conteudo.valor`) na escala de agora. O projeto guarda também
+ * a escala com que foi gerado (`escalaDoValor`); o gerado antes do triplo (26/10/2026) não tem o
+ * campo — vale 1 — e passa a valer o triplo como os novos.
+ */
+export function valorNaEscalaDeAgora(conteudo) {
+  const escala = Number(conteudo?.escalaDoValor) > 0 ? Number(conteudo.escalaDoValor) : 1;
+  return Math.round((Number(conteudo.valor) * MULTIPLICADOR_DE_RECOMPENSAS) / escala);
+}
+
 /** Quanto vale cada parte do projeto. A divisão sobra no máximo 1 ponto, que vai para os primeiros.
  *  O projeto final guarda o valor dele (`conteudo.valor`): cresce com o tamanho da trilha. */
 export function tabelaDePontos(tipo, conteudo) {
-  const valor = Number(conteudo?.valor) > 0 ? Number(conteudo.valor) : PONTOS_DA_PRATICA[tipo] || 0;
+  const valor = Number(conteudo?.valor) > 0 ? valorNaEscalaDeAgora(conteudo) : PONTOS_DA_PRATICA[tipo] || 0;
   const base = Math.round(valor * COMPLEXIDADES[complexidadeDe(conteudo)].fator);
   const n = (conteudo?.requisitos || []).length;
   const cada = n ? Math.floor(base / n) : 0;
