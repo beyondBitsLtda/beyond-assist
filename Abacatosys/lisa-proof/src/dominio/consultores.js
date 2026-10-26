@@ -8,6 +8,10 @@
 // otimismo, o exagero) é segredo e mora em src/dominio/projecoes.js, que só o servidor importa —
 // este arquivo vai para o navegador, aquele não. Os retratos estão em
 // src/componentes/bolsa/consultoresDePapel.js.
+//
+// A COR de cada um é a mesma no cartão, no rosto e na linha da previsão no gráfico (26/10/2026):
+// uma paleta validada no fundo escuro do terminal, longe do verde e do vermelho da cotação. Como as
+// seis linhas se cruzam, a cor nunca está sozinha: o rosto e o apelido vão junto.
 
 export const CONSULTORES = [
   {
@@ -22,7 +26,8 @@ export const CONSULTORES = [
     bordao: "As cartas não mentem… às vezes elas só exageram.",
     faixaDeclarada: 1,
     sobreAFaixa: "“A bola de cristal não erra.”",
-    cor: "#a855f7",
+    cor: "#9085e9",
+    apelido: "Ametista",
   },
   {
     id: "barao",
@@ -36,7 +41,8 @@ export const CONSULTORES = [
     bordao: "Devagar se vai ao cofre.",
     faixaDeclarada: 6,
     sobreAFaixa: "“Margem de segurança nunca é demais, meu jovem.”",
-    cor: "#16a34a",
+    cor: "#c98500",
+    apelido: "Barão",
   },
   {
     id: "luna",
@@ -50,7 +56,8 @@ export const CONSULTORES = [
     bordao: "Segura a mão que é foguete! 🚀",
     faixaDeclarada: 2,
     sobreAFaixa: "“Confia no pai… digo, na mãe!”",
-    cor: "#ec4899",
+    cor: "#d55181",
+    apelido: "Luna",
   },
   {
     id: "corvo",
@@ -64,7 +71,8 @@ export const CONSULTORES = [
     bordao: "Correlação não é causalidade — mas paga as contas.",
     faixaDeclarada: 3,
     sobreAFaixa: "“Intervalo de confiança de 90%, naturalmente.”",
-    cor: "#3b82f6",
+    cor: "#3987e5",
+    apelido: "Corvo",
   },
   {
     id: "zuleica",
@@ -78,7 +86,8 @@ export const CONSULTORES = [
     bordao: "Quem compra na baixa, dorme na alta, meu filho.",
     faixaDeclarada: 3,
     sobreAFaixa: "“Mais ou menos, meu bem. Mais pra mais do que pra menos.”",
-    cor: "#f97316",
+    cor: "#d95926",
+    apelido: "Zuleica",
   },
   {
     id: "gorgo",
@@ -92,7 +101,8 @@ export const CONSULTORES = [
     bordao: "Tudo que sobe… cai. Só não sei quando.",
     faixaDeclarada: 4,
     sobreAFaixa: "“Pode ser pior. Geralmente é.”",
-    cor: "#b45309",
+    cor: "#199e70",
+    apelido: "Gorgo",
   },
 ];
 

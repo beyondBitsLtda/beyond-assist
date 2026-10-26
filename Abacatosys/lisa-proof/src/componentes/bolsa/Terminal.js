@@ -14,6 +14,10 @@
 // A MESA DOS CONSULTORES (26/10/2026): seis personagens projetam o fechamento de cada ação, cada um
 // errando do seu jeito (Consultores.js). A tela busca a mesa à parte, quando muda o dia, quando o
 // pregão termina de abrir e quando ele fecha (aí vem o placar de hoje).
+//
+// AS PREVISÕES NO GRÁFICO (26/10/2026): o gráfico da ação mostra a previsão de cada consultor —
+// hora a hora no dia, o fechamento projetado de cada pregão nas velas. A legenda liga e desliga
+// cada um; a escolha fica guardada neste navegador.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -23,8 +27,20 @@ import { reagir, comemorar } from "@/componentes/Neuro.js";
 import { corretagem, valorDaCompra, valorDaVenda } from "@/dominio/bolsa.js";
 import { MUNDO_DE_TESTE, urlNoMundo } from "@/dominio/mundoDeTeste.js";
 import { GraficoDoDia, GraficoDeVelas, Mini } from "./Graficos.js";
-import { MesaDosConsultores, OpinioesDaAcao } from "./Consultores.js";
+import { MesaDosConsultores, OpinioesDaAcao, SeletorDePrevisoes, previsoesDoDia, previsoesDosPregoes } from "./Consultores.js";
+import { IDS_DOS_CONSULTORES } from "@/dominio/consultores.js";
 import { preco, moedas, pct, seta, rumo, horaCurta, diaCurto } from "./formatos.js";
+
+const CHAVE_DAS_PREVISOES = "proof-bolsa-previsoes";
+/** Quem aparece no gráfico (guardado neste navegador; sem armazenamento, todos). */
+function previsoesGuardadas() {
+  try {
+    const v = JSON.parse(localStorage.getItem(CHAVE_DAS_PREVISOES) || "null");
+    return Array.isArray(v) ? v.filter((id) => IDS_DOS_CONSULTORES.includes(id)) : IDS_DOS_CONSULTORES;
+  } catch {
+    return IDS_DOS_CONSULTORES;
+  }
+}
 
 const ORDENS = { altas: "Maiores altas", baixas: "Maiores baixas", nome: "A–Z", volume: "Mais negociadas" };
 
@@ -47,6 +63,12 @@ export default function Terminal({ mundo = "real" }) {
   const [previa, setPrevia] = useState(null);           // Bolsa de Teste: o pregão de amanhã pela Lisa, sem aplicar
   const [mesa, setMesa] = useState(null);               // a Mesa dos Consultores
   const [erroDaMesa, setErroDaMesa] = useState("");
+  const [quem, setQuem] = useState(IDS_DOS_CONSULTORES); // de quem a previsão aparece no gráfico
+  useEffect(() => { setQuem(previsoesGuardadas()); }, []);
+  const escolherQuem = (ids) => {
+    setQuem(ids);
+    try { localStorage.setItem(CHAVE_DAS_PREVISOES, JSON.stringify(ids)); } catch { /* sem armazenamento: vale só agora */ }
+  };
   const [Aviso, avisar] = useAviso();
 
   const carregar = useCallback(() => obter(urlNoMundo(horaDeTeste == null ? "/api/reino/bolsa" : `/api/reino/bolsa?hora=${horaDeTeste}`, mundo))
@@ -217,9 +239,10 @@ export default function Terminal({ mundo = "real" }) {
               <button type="button" role="tab" aria-selected={modo === "hoje"} className={modo === "hoje" ? "bx-aba bx-aba--atual" : "bx-aba"} onClick={() => setModo("hoje")}>Hoje · hora a hora</button>
               <button type="button" role="tab" aria-selected={modo === "velas"} className={modo === "velas" ? "bx-aba bx-aba--atual" : "bx-aba"} onClick={() => setModo("velas")}>{acao.velas.length} dias · velas</button>
             </div>
+            <SeletorDePrevisoes quem={quem} aoMudar={escolherQuem} disponivel={previsoesDoDia(mesa, acao.id, IDS_DOS_CONSULTORES).length > 0 || previsoesDosPregoes(mesa, acao.id, IDS_DOS_CONSULTORES).length > 0} />
             {modo === "hoje"
-              ? <GraficoDoDia horas={acao.horas} abertura={acao.abertura} rotulo={`${acao.nome} hoje: abriu a ${preco(acao.abertura)}, agora ${preco(acao.preco)}`} />
-              : <GraficoDeVelas velas={acao.velas} rotulo={`${acao.nome} nos últimos ${acao.velas.length} dias`} />}
+              ? <GraficoDoDia horas={acao.horas} abertura={acao.abertura} previsoes={previsoesDoDia(mesa, acao.id, quem)} rotulo={`${acao.nome} hoje: abriu a ${preco(acao.abertura)}, agora ${preco(acao.preco)}`} />
+              : <GraficoDeVelas velas={acao.velas} previsoes={previsoesDosPregoes(mesa, acao.id, quem)} rotulo={`${acao.nome} nos últimos ${acao.velas.length} dias`} />}
             {acao.noticia && <p className="bx-noticia"><span>📰</span> {acao.noticia}</p>}
             <OpinioesDaAcao mesa={mesa} acao={acao} />
             <p className="bx-descricao">{acao.descricao}</p>

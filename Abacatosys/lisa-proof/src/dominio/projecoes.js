@@ -23,25 +23,28 @@
 // placar do dia só aparecem depois que o pregão fecha (FECHA_AS).
 
 import { CONSULTORES, consultorPorId } from "./consultores.js";
-import { sorteio, sementeDaAcao, variacaoReal, VARIACAO_MAXIMA } from "./bolsa.js";
+import { sorteio, sementeDaAcao, variacaoReal, caminhoDoDia, VARIACAO_MAXIMA } from "./bolsa.js";
 import { centavos } from "./moedas.js";
 
 /** Quantos pregões passados entram no placar da mesa. */
 export const PREGOES_NO_PLACAR = 7;
+/** Quantos dias de previsões passadas vão para as velas (as mesmas 14 do gráfico). */
+export const DIAS_DE_PREVISOES = 14;
 
 // ---------------------------------------------------------------- o segredo de cada consultor
 //
 // erro: faixas [peso, de, até] do tamanho do ruído do dia, em pontos percentuais (o desvio típico).
 // exagero e vies: [de, até], sorteados por dia. diaRuim: a chance de um dia ruim, que multiplica o
 // erro por multRuim. erroDoSetor / viesDoSetor: o que muda num setor. aposta: o que ele recomenda.
+// traco: o sobe-e-desce da previsão hora a hora (a Madame desenha um drama; o Barão, uma régua).
 
 const ESTILOS = {
-  ametista: { erro: [[0.15, 0.8, 2], [0.45, 5, 10], [0.4, 10, 18]], exagero: [1.3, 1.6], vies: [-1, 1], aposta: "maior" },
-  barao: { erro: [[1, 1.5, 5]], exagero: [0.35, 0.6], vies: [-1, 0.3], diaRuim: 0.1, multRuim: 2.5, aposta: "maior" },
-  luna: { erro: [[1, 3, 7]], exagero: [1.05, 1.3], vies: [2, 5], viesDoSetor: { "Tecnologia": 3, "Exploração espacial": 3 }, diaRuim: 0.12, multRuim: 2, aposta: "alta" },
-  corvo: { erro: [[1, 1.5, 4.5]], exagero: [0.85, 1], vies: [-0.5, 0.5], diaRuim: 0.08, multRuim: 3.5, aposta: "maior" },
-  zuleica: { erro: [[1, 1.5, 12]], exagero: [0.8, 1.2], vies: [-1, 1], erroDoSetor: { "Alimentos": 0.5 }, arredonda: true, aposta: "maior" },
-  gorgo: { erro: [[1, 3, 8]], exagero: [0.9, 1.2], vies: [-6, -2.5], diaRuim: 0.1, multRuim: 2, aposta: "queda" },
+  ametista: { erro: [[0.15, 0.8, 2], [0.45, 5, 10], [0.4, 10, 18]], exagero: [1.3, 1.6], vies: [-1, 1], aposta: "maior", traco: 0.03 },
+  barao: { erro: [[1, 1.5, 5]], exagero: [0.35, 0.6], vies: [-1, 0.3], diaRuim: 0.1, multRuim: 2.5, aposta: "maior", traco: 0.004 },
+  luna: { erro: [[1, 3, 7]], exagero: [1.05, 1.3], vies: [2, 5], viesDoSetor: { "Tecnologia": 3, "Exploração espacial": 3 }, diaRuim: 0.12, multRuim: 2, aposta: "alta", traco: 0.022 },
+  corvo: { erro: [[1, 1.5, 4.5]], exagero: [0.85, 1], vies: [-0.5, 0.5], diaRuim: 0.08, multRuim: 3.5, aposta: "maior", traco: 0.008 },
+  zuleica: { erro: [[1, 1.5, 12]], exagero: [0.8, 1.2], vies: [-1, 1], erroDoSetor: { "Alimentos": 0.5 }, arredonda: true, aposta: "maior", traco: 0.016 },
+  gorgo: { erro: [[1, 3, 8]], exagero: [0.9, 1.2], vies: [-6, -2.5], diaRuim: 0.1, multRuim: 2, aposta: "queda", traco: 0.014 },
 };
 
 // ---------------------------------------------------------------- o que cada um fala
@@ -171,6 +174,18 @@ export function projetar(id, dia, acao) {
   };
 }
 
+/**
+ * A previsão hora a hora (26/10/2026: "uma visão do gráfico da ação com as previsões, igual ao
+ * gráfico, só que traçando uma previsão"): o caminho da abertura até o fechamento que o consultor
+ * projetou, com o sobe-e-desce do jeito dele. Sai só da projeção (e de uma semente própria) — nada
+ * do caminho de verdade. A Dona Zuleica arredonda até a previsão de cada hora.
+ */
+export function caminhoPrevisto(id, dia, acao, projecao) {
+  const e = ESTILOS[id];
+  const caminho = caminhoDoDia({ abertura: acao.abertura, fechamento: projecao.preco, semente: sementeDaAcao(`previsao|${id}|${acao.id}`, dia), volatilidade: e.traco });
+  return e.arredonda ? caminho.map((p, i) => (i === 0 ? p : Math.max(1, Math.round(p)))) : caminho;
+}
+
 /** Como a projeção se saiu: o erro (em pontos percentuais), se acertou o lado e se caiu na faixa que ele declarou. */
 export function avaliar(id, projecao, real) {
   const erro = umaCasa(Math.abs(projecao.variacao - real));
@@ -237,7 +252,8 @@ export function relatorioDaMesa({ hoje, revelado = false, dias = [] }) {
 
   const consultores = CONSULTORES.map((c) => {
     const projecoes = deHoje.map((a) => {
-      const p = projetar(c.id, hoje, a);
+      const p0 = projetar(c.id, hoje, a);
+      const p = { ...p0, horas: caminhoPrevisto(c.id, hoje, a, p0) };
       if (!revelado) return p;
       const real = variacaoReal(a.abertura, a.fechamento);
       return { ...p, resultado: { variacao: real, preco: a.fechamento, ...avaliar(c.id, p, real) } };
@@ -263,6 +279,16 @@ export function relatorioDaMesa({ hoje, revelado = false, dias = [] }) {
     };
   });
 
+  // as previsões dos pregões passados, por ação e por dia, para as velas: { ACAO: { dia: { consultor: preço } } }
+  const previsoesDosPregoes = {};
+  const recentes = dias.filter((d) => d.dia < hoje).sort((a, b) => (a.dia < b.dia ? 1 : -1)).slice(0, DIAS_DE_PREVISOES);
+  for (const { dia, acoes } of recentes) {
+    for (const a of acoes) {
+      const doDia = ((previsoesDosPregoes[a.id] ||= {})[dia] = {});
+      for (const c of CONSULTORES) doDia[c.id] = projetar(c.id, dia, a).preco;
+    }
+  }
+
   const ultimo = placares.find((pl) => pl.dia < hoje);
   const ranking = (pl) => CONSULTORES.map((c) => ({ id: c.id, ...resumoDoDia(pl, c.id) })).sort((a, b) => a.erroMedio - b.erroMedio);
   return {
@@ -270,6 +296,7 @@ export function relatorioDaMesa({ hoje, revelado = false, dias = [] }) {
     revelado: Boolean(revelado && deHoje.length),
     temProjecoes: deHoje.length > 0,
     consultores,
+    previsoesDosPregoes,
     placarDeHoje: revelado && placares[0]?.dia === hoje ? { dia: hoje, ranking: ranking(placares[0]) } : null,
     ultimoPregao: ultimo ? { dia: ultimo.dia, ranking: ranking(ultimo) } : null,
   };

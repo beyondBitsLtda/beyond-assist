@@ -26,6 +26,60 @@ export function Rosto({ id, tamanho = 32 }) {
   );
 }
 
+// ---------------------------------------------------------------- as previsões no gráfico da ação
+
+/** As previsões hora a hora de hoje para uma ação, dos consultores escolhidos (para o GraficoDoDia). */
+export function previsoesDoDia(mesa, acaoId, quem) {
+  if (!mesa) return [];
+  return CONSULTORES.filter((c) => quem.includes(c.id)).map((c) => {
+    const p = mesa.consultores.find((x) => x.id === c.id)?.projecoes.find((x) => x.acao === acaoId);
+    return p?.horas ? { id: c.id, apelido: c.apelido, cor: c.cor, horas: p.horas } : null;
+  }).filter(Boolean);
+}
+
+/** O fechamento que cada consultor escolhido projetou em cada pregão de uma ação, hoje incluso (para as velas). */
+export function previsoesDosPregoes(mesa, acaoId, quem) {
+  if (!mesa) return [];
+  const passadas = mesa.previsoesDosPregoes?.[acaoId] || {};
+  return CONSULTORES.filter((c) => quem.includes(c.id)).map((c) => {
+    const porDia = {};
+    for (const [dia, porConsultor] of Object.entries(passadas)) if (porConsultor[c.id] != null) porDia[dia] = porConsultor[c.id];
+    const hoje = mesa.consultores.find((x) => x.id === c.id)?.projecoes.find((x) => x.acao === acaoId);
+    if (hoje) porDia[mesa.dia] = hoje.preco;
+    return Object.keys(porDia).length ? { id: c.id, apelido: c.apelido, cor: c.cor, porDia } : null;
+  }).filter(Boolean);
+}
+
+/**
+ * A legenda que liga e desliga as previsões no gráfico: um botão por consultor (o rosto, o apelido
+ * e a cor da linha dele) e o atalho para todos ou nenhum.
+ */
+export function SeletorDePrevisoes({ quem, aoMudar, disponivel }) {
+  const todos = CONSULTORES.map((c) => c.id);
+  return (
+    <div className="bx-seletor" role="group" aria-label="Previsões dos consultores no gráfico">
+      <span className="bx-seletor__rotulo">🔮 Previsões</span>
+      {!disponivel ? <span className="bx-seletor__vazio">sem previsões para esta ação hoje</span> : (
+        <>
+          {CONSULTORES.map((c) => {
+            const ligado = quem.includes(c.id);
+            return (
+              <button key={c.id} type="button" className={`bx-seletor__botao${ligado ? " bx-seletor__botao--ligado" : ""}`} style={{ "--cor": c.cor }}
+                aria-pressed={ligado} title={`${c.nome}: ${ligado ? "esconder" : "mostrar"} a previsão`}
+                onClick={() => aoMudar(ligado ? quem.filter((x) => x !== c.id) : todos.filter((x) => x === c.id || quem.includes(x)))}>
+                <Rosto id={c.id} tamanho={20} />
+                <span>{c.apelido}</span>
+                <span className="bx-seletor__traco" aria-hidden="true" />
+              </button>
+            );
+          })}
+          <button type="button" className="bx-seletor__todos" onClick={() => aoMudar(quem.length ? [] : todos)}>{quem.length ? "Esconder todas" : "Mostrar todas"}</button>
+        </>
+      )}
+    </div>
+  );
+}
+
 /** As notas dos últimos pregões (0 a 10), do mais antigo ao mais novo — a única pista do jeito de cada um. */
 function Retrospecto({ historico }) {
   if (!historico.length) return <span className="bx-retro bx-retro--vazio">sem pregões no placar ainda</span>;

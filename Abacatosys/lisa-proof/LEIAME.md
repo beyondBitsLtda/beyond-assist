@@ -231,6 +231,15 @@ Como funciona:
   simulada.
 - **Estreias.** A empresa que estreia no dia fica de fora, porque abre e fecha no preço de
   lançamento.
+- **Previsões no gráfico.** O gráfico de cada ação mostra as previsões dos consultores.
+  - No gráfico hora a hora, cada um tem uma linha tracejada da abertura até as 17h, terminando no
+    fechamento que projetou. O "sobe-e-desce" de cada linha depende do traço do consultor: a Madame
+    oscila muito, o Barão quase em linha reta (`caminhoPrevisto`).
+  - Nas velas, aparece o fechamento que cada um projetou em cada pregão dos últimos 14 dias.
+  - A legenda liga e desliga cada consultor, e a escolha fica guardada no navegador.
+  - A cor de cada consultor é a mesma no cartão, no rosto e na linha. É uma paleta validada no fundo
+    escuro, longe do verde e do vermelho da cotação. O rosto na ponta da linha garante que a cor
+    nunca está sozinha.
 - **Servidor e navegador.** `src/dominio/projecoes.js` (o segredo) só pode ser importado pelo
   servidor; o `dominio-check` barra o import em qualquer tela. O que a tela mostra de cada
   personagem está em `src/dominio/consultores.js`. Os retratos de papel estão em

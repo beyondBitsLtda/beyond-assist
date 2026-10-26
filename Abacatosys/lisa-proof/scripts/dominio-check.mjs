@@ -57,7 +57,7 @@ import {
   ABRE_AS, FECHA_AS, pregaoAberto, passosAte, precoNaHora, horaDoPasso, proximaVirada,
 } from "../src/dominio/bolsa.js";
 import { CONSULTORES, IDS_DOS_CONSULTORES, consultorPorId } from "../src/dominio/consultores.js";
-import { projetar, humorDoDia, avaliar, relatorioDaMesa, notaPeloErro, pctDaFala, rumoDaFala } from "../src/dominio/projecoes.js";
+import { projetar, humorDoDia, avaliar, relatorioDaMesa, notaPeloErro, pctDaFala, rumoDaFala, caminhoPrevisto, DIAS_DE_PREVISOES } from "../src/dominio/projecoes.js";
 import { svgDoConsultor } from "../src/componentes/bolsa/consultoresDePapel.js";
 import { centavos, formatarMoedas, faltam } from "../src/dominio/moedas.js";
 import {
@@ -2046,7 +2046,8 @@ caso("consultores: o relatório não entrega o fechamento de hoje antes do fim d
     const s = c.projecoes.find((p) => p.acao === "SEGR");
     assert.equal(s.resultado.preco, 7771);
     assert.equal(s.resultado.variacao, 11);
-    assert.deepEqual(s, { ...projetar(c.id, hoje, deHoje[0]), resultado: s.resultado }, "depois do fechamento, a projeção é a mesma de antes");
+    assert.deepEqual(s, { ...projetar(c.id, hoje, deHoje[0]), horas: s.horas, resultado: s.resultado }, "depois do fechamento, a projeção é a mesma de antes");
+    assert.deepEqual(s.horas, antes.consultores.find((x) => x.id === c.id).projecoes.find((p) => p.acao === "SEGR").horas, "e a previsão hora a hora também");
   }
 
   // sem pregão hoje ainda (a Lisa abrindo): sem projeções, mas o placar dos dias passados aparece
@@ -2078,6 +2079,36 @@ caso("consultores: o placar dá nota 10 − erro médio e coroa quem errou menos
     if (c.id === "gorgo" && Math.min(...vs) <= -1) assert.equal(c.aposta.variacao, Math.min(...vs), "o Gorgo aposta na maior queda");
     if (c.id === "corvo") assert.equal(Math.abs(c.aposta.variacao), Math.max(...vs.map(Math.abs)), "o Corvo aposta no maior sinal");
     assert.ok(c.resumo.pregoes === 7 && c.resumo.total === 7 * 8 && c.resumo.nota === notaPeloErro(c.resumo.erroMedio));
+  }
+});
+
+caso("consultores: a previsão hora a hora vai da abertura ao fechamento projetado, no traço de cada um", () => {
+  const dias = mercadoDeTeste(20, { acoes: 8, inicio: "2026-10-07" });
+  const hoje = dias.at(-1).dia;
+  const r = relatorioDaMesa({ hoje, revelado: false, dias });
+  const torto = {}; // o quanto a previsão foge da linha reta, em média
+  for (const c of r.consultores) {
+    torto[c.id] = 0;
+    for (const p of c.projecoes) {
+      const a = dias.at(-1).acoes.find((x) => x.id === p.acao);
+      assert.equal(p.horas.length, PASSOS_DO_DIA + 1, "uma previsão para cada hora do pregão");
+      assert.equal(p.horas[0], a.abertura, "começa na abertura");
+      assert.equal(p.horas.at(-1), c.id === "zuleica" ? Math.max(1, Math.round(p.preco)) : p.preco, "termina no fechamento projetado");
+      if (c.id === "zuleica") assert.ok(p.horas.slice(1).every(Number.isInteger), "a Dona Zuleica arredonda até as horas");
+      assert.deepEqual(p.horas, caminhoPrevisto(c.id, hoje, a, p), "a mesma previsão para todo mundo");
+      p.horas.forEach((v, i) => { const reta = a.abertura * Math.pow(p.preco / a.abertura, i / PASSOS_DO_DIA); torto[c.id] += Math.abs(v - reta) / reta; });
+    }
+  }
+  assert.ok(torto.barao < torto.corvo && torto.corvo < torto.ametista, "o Barão traça uma régua; a Madame, um drama");
+  // as previsões dos pregões passados (para as velas): só dias fechados, os 14 mais recentes, todos os consultores
+  const dp = r.previsoesDosPregoes;
+  const diasComPrevisao = [...new Set(Object.values(dp).flatMap((porDia) => Object.keys(porDia)))].sort();
+  assert.equal(diasComPrevisao.length, DIAS_DE_PREVISOES);
+  assert.ok(diasComPrevisao.every((d) => d < hoje), "o dia de hoje fica nas projeções, não no passado");
+  assert.equal(diasComPrevisao[0], dias.at(-1 - DIAS_DE_PREVISOES).dia);
+  const ontem = dias.at(-2);
+  for (const a of ontem.acoes) {
+    for (const id of IDS_DOS_CONSULTORES) assert.equal(dp[a.id][ontem.dia][id], projetar(id, ontem.dia, a).preco);
   }
 });
 

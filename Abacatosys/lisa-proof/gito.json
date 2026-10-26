@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.30.0-cloudflare-pages.1",
+  "versao": "0.31.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-26",
   "compilacao": {
-    "numero": 70,
+    "numero": 71,
     "data": "2026-10-26",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.31.0-cloudflare-pages.1",
+      "data": "2026-10-26",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Bolsa: o gráfico de cada ação mostra as previsões dos consultores, hora a hora no dia e o fechamento projetado em cada pregão nas velas.",
+      "itens": [
+        "No gráfico hora a hora, cada consultor tem uma linha tracejada da abertura às 17h, com o rosto dele na ponta; a linha cheia continua sendo a cotação de verdade.",
+        "Cada um traça do seu jeito: a Madame desenha um drama, o Barão uma régua, a Dona Zuleica arredonda até as horas.",
+        "Nas velas (últimos 14 dias), o fechamento que cada um projetou em cada pregão, ao lado da vela; a dica mostra todos os números.",
+        "Legenda com o rosto e o apelido de cada consultor para ligar e desligar as linhas (a escolha fica guardada no navegador).",
+        "A cor de cada consultor passa a ser a mesma no cartão, no rosto e na linha: uma paleta validada no fundo escuro, longe do verde e do vermelho da cotação.",
+        "As datas das velas não se encostam mais em tela estreita."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.30.0-cloudflare-pages.1",
       "data": "2026-10-26",
@@ -1084,7 +1100,7 @@
         "Planetoides sorteados para a Nave Estelar (raça alienígena, força e tesouro aleatórios), com a batalha numa esfera, estilo Mario Galaxy; e o fundo do mar de verdade nas expedições do Submarino",
         "Mina de Ouro com operários (3 de início) cavando no 3D, chance de diamantes, contratação e aluguel de operários entre jogadores",
         "Bolsa do Reino em tela própria (/bolsa), estilo home broker: ações iguais para todos, pregão das 07:00 às 17:00 (horário de Brasília) com cotações de hora em hora, gráficos e velas, pregão diário decidido pela Lisa (IA), compra e venda com corretagem",
-        "Mesa dos Consultores na Bolsa: seis personagens projetam o fechamento de cada ação, com margem de erro secreta que muda todo dia, placar depois das 17h e retrospecto dos últimos pregões",
+        "Mesa dos Consultores na Bolsa: seis personagens projetam o fechamento de cada ação, com margem de erro secreta que muda todo dia, previsões traçadas no gráfico da ação (hora a hora e por pregão), placar depois das 17h e retrospecto dos últimos pregões",
         "Tela cheia do Reino com menus suspensos e visita completa aos reinos vizinhos durante a paz",
         "Neuro Abacate (mascote do Abacato), personagem gratuito para todos",
         "Reino de Teste (/reino/teste e /bolsa/teste): um mundo à parte com tudo liberado, rivais-robô e ferramentas para zerar os limites do dia e recomeçar; nada dele vale no jogo de verdade (liberado para todos por enquanto; desliga com PROOF_MODO_TESTE=0)",

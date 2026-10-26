@@ -123,15 +123,15 @@ export function sementeDaAcao(ticker, dia) {
  * O caminho do preço no dia, hora a hora: PASSOS_DO_DIA + 1 pontos, das ABRE_AS (a abertura) às
  * FECHA_AS (o fechamento, que vira a abertura de amanhã). No meio, o sobe-e-desce do mercado: um
  * passeio aleatório "amarrado" nas duas pontas (ponte), sobre a linha que leva da abertura ao
- * fechamento.
+ * fechamento. `volatilidade` muda o tamanho do sobe-e-desce (o traço das previsões dos consultores).
  */
-export function caminhoDoDia({ abertura, fechamento, semente }) {
+export function caminhoDoDia({ abertura, fechamento, semente, volatilidade = VOLATILIDADE_DA_HORA }) {
   const r = sorteio(semente);
   const n = PASSOS_DO_DIA;
   const a = Math.max(1, abertura || 1), f = Math.max(1, fechamento || 1);
   const passeio = [0];
   // soma de 3 sorteios: quase normal, sem seno nem logaritmo
-  for (let i = 1; i <= n; i++) passeio.push(passeio[i - 1] + (r() + r() + r() - 1.5) * 2 * VOLATILIDADE_DA_HORA);
+  for (let i = 1; i <= n; i++) passeio.push(passeio[i - 1] + (r() + r() + r() - 1.5) * 2 * volatilidade);
   const fim = passeio[n];
   return passeio.map((w, i) => {
     const ponte = w - (i / n) * fim;
