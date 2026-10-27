@@ -9,6 +9,8 @@ import { useLog } from "./LogProvider.js";
 import { CY, OR, GR, dotColor } from "@/lib/theme.js";
 import { runFullSync } from "@/lib/sync.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
+import usarInstalacao from "./usarInstalacao.js";
+import { DICA_DO_IPHONE } from "@/lib/instalarApp.js";
 
 const pad = (n) => String(n).padStart(2, "0");
 const fmtClock = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -62,6 +64,7 @@ export default function Topbar() {
   const [subscribed, setSubscribed] = useState(false);
   const [subBusy, setSubBusy] = useState(false);
   const [accentName, setAccentName] = useState(DEFAULT_ACCENT.name); // só pro seletor saber qual destacar
+  const instalacao = usarInstalacao();
   const startRef = useRef(Date.now());
 
   // carrega a cor de destaque escolhida antes (Shell.js já aplica cedo — isso é só pro
@@ -313,6 +316,17 @@ export default function Topbar() {
               >
                 Notificações neste aparelho
               </ChaveDoMenu>
+            </GrupoDoMenu>
+          )}
+          {(instalacao.pode || instalacao.ios || instalacao.instalado) && (
+            <GrupoDoMenu titulo="Aplicativo">
+              {instalacao.instalado ? (
+                <ItemDoMenu disabled detalhe="Você já está no app instalado">Lisa instalada</ItemDoMenu>
+              ) : (
+                <ItemDoMenu onClick={instalacao.instalar} detalhe={instalacao.ios ? DICA_DO_IPHONE : "Abre numa janela própria, com ícone na área de trabalho"}>
+                  Instalar a Lisa como app
+                </ItemDoMenu>
+              )}
             </GrupoDoMenu>
           )}
           <GrupoDoMenu titulo="Cor de destaque">

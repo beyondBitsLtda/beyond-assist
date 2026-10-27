@@ -46,7 +46,8 @@ console.log("\n1) quem passa sem login — e quem NÃO deveria passar");
   // Estes precisam ser livres: são máquina, e já têm segredo próprio dentro da rota.
   for (const c of ["/login", "/api/auth/login", "/api/auth/logout",
                    "/api/cron/sync", "/api/cron/notify", "/api/cron/deploy-check",
-                   "/api/lisa-code/chat", "/api/lisa-code/pending-work", "/api/health", "/sw.js"]) {
+                   "/api/lisa-code/chat", "/api/lisa-code/pending-work", "/api/health", "/sw.js",
+                   "/manifest.webmanifest"]) {
     conferir(`livre: ${c}`, ehLivre(c));
   }
   // E estes NÃO podem ser livres, senão a trava não serve para nada.

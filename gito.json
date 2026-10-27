@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.14.0-cloudflare-pages.1",
+  "versao": "0.15.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-27",
   "compilacao": {
-    "numero": 41,
+    "numero": 42,
     "data": "2026-10-27",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.15.0-cloudflare-pages.1",
+      "data": "2026-10-27",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa vira app instalável pelo Chrome (com o atalho \"Tomar nota\"), o Modo Tomar nota ganha o visual da Lisa reagindo à voz, e o quadro \"Notas\" passa a funcionar para qualquer pessoa do Abacato.",
+      "itens": [
+        "Instalar como app: manifesto, ícones (a logo em azul sobre preto) e cor da barra. O Chrome passa a oferecer \"Instalar\"; o menu do pontinho verde (grupo Aplicativo) e os ajustes do celular ganham \"Instalar a Lisa como app\". No iPhone, o item explica o caminho pelo Compartilhar → Adicionar à Tela de Início.",
+        "O app instalado abre direto no Assistente e tem o atalho \"Tomar nota\" (segurar o ícone, no Android), que abre o modo na hora.",
+        "Modo Tomar nota: o visual escolhido para a Lisa (esfera, lente, orbe…) fica no centro enquanto ela escuta, mexendo com o volume da voz, e pensando enquanto transcreve e organiza.",
+        "Correção: o quadro \"Notas\" levava a mesma marca de origem para todo mundo, e o Abacato só aceita uma marca igual no banco inteiro — o segundo usuário não conseguiria criar o dele. Agora a marca leva o dono (e um carimbo, para um quadro arquivado não travar o próximo). O quadro já criado continua sendo achado."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.14.0-cloudflare-pages.1",
       "data": "2026-10-27",
@@ -619,6 +633,7 @@
         "Editor de código na tela em qualquer modo: quando a conversa é sobre código, a Lisa mostra o código e uma janela de editor (realce de sintaxe, número de linha) digita trecho por trecho com a explicação de cada passo; uma aba por resposta (as anteriores ficam), abas por arquivo, janela que arrasta para qualquer lugar e redimensiona pelas bordas e cantos, lembrando onde ficou, e o botão \"destacar\" leva o editor para uma janela separada do sistema (outro monitor); a voz fala só a explicação. Antes de corrigir, a Lisa recebe o código que já apareceu na conversa (versão mais recente de cada arquivo) e pede o que falta em vez de inventar.",
         "Contexto da conversa em qualquer modo: o + da barra anexa imagens (do computador, com Ctrl+V ou arrastando) e vincula até 3 repositórios do GitHub; a cada pergunta a Lisa lê os arquivos do repositório que interessam, escolhidos pela pergunta, pela conversa e pelo que aparece na tela, na câmera e nos prints, e responde relacionando tudo, com o caminho de cada arquivo.",
         "Modo Tomar nota (celular e desktop, também com a tela apagada no Android): escuta até 10 minutos, transcreve, separa por assunto e anota no quadro \"Notas\" do Abacato, com uma coluna por tema e um card por nota (interpretação + transcrição real).",
+        "Instalável como app pelo Chrome (desktop e Android) e pela Tela de Início no iPhone, com atalho direto para o Modo Tomar nota.",
         "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma e Anel de partículas; o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador).",
         "Painel Sentinela de casos de teste e chamados."
       ],

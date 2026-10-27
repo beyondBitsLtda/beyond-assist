@@ -14,7 +14,8 @@
 // microfone das páginas quando a tela bloqueia: lá a tela fica ligada por padrão (Wake Lock),
 // e se a gravação for interrompida a pessoa continua de onde parou.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import VisualDaLisa, { usarVisualEscolhido } from "@/components/panels/visuais/VisualDaLisa.js";
 import {
   CODIGO_DO_GRAVADOR,
   LIMITE_DE_SEGUNDOS,
@@ -81,7 +82,6 @@ export default function TomarNota({ temaInicial = "", aoFechar, aoTerminar }) {
   const [etapa, setEtapa] = useState("preparar"); // preparar | gravando | interrompida | finalizando | falhas | organizando | pronto | erro
   const [tema, setTema] = useState(temaInicial);
   const [segundos, setSegundos] = useState(0);
-  const [nivel, setNivel] = useState(0);
   const [trechos, setTrechos] = useState([]);
   const [erro, setErro] = useState("");
   const [podeTentar, setPodeTentar] = useState(false);
@@ -107,6 +107,22 @@ export default function TomarNota({ temaInicial = "", aoFechar, aoTerminar }) {
   const etapaRef = useRef(etapa);
   const aoTerminarRef = useRef(aoTerminar);
   aoTerminarRef.current = aoTerminar;
+  const nivelRef = useRef(0); // volume (rms) que o gravador mede a cada 100 ms
+  const nivelSuave = useRef(0);
+  const visual = usarVisualEscolhido();
+
+  // O visual da Lisa (o mesmo escolhido no Assistente) lê isto a cada quadro: ouvindo enquanto
+  // grava, pensando enquanto transcreve e organiza. O nível chega de 100 em 100 ms; a
+  // suavização tira o degrau. Com a tela apagada o navegador nem desenha, então não custa nada.
+  const obterSinal = useCallback(() => {
+    const e = etapaRef.current;
+    if (e === "gravando") {
+      nivelSuave.current += (Math.min(1, nivelRef.current * 4.5) - nivelSuave.current) * 0.2;
+      return { estado: "ouvindo", nivel: nivelSuave.current };
+    }
+    if (e === "finalizando" || e === "organizando") return { estado: "pensando", nivel: null };
+    return { estado: "pronta", nivel: null };
+  }, []);
   // A etapa vive também no ref, trocada NA HORA: o gravador e a fila decidem o próximo passo
   // dentro de callbacks, antes de o React renderizar a etapa nova.
   const irPara = (e) => { etapaRef.current = e; setEtapa(e); };
@@ -201,9 +217,10 @@ export default function TomarNota({ temaInicial = "", aoFechar, aoTerminar }) {
       no.port.onmessage = (e) => {
         const m = e.data;
         if (m.tipo === "nivel") {
+          // o relógio só redesenha quando muda o segundo; o volume vai direto para o visual
+          if (Math.floor(m.segundos) !== Math.floor(segundosRef.current)) setSegundos(m.segundos);
           segundosRef.current = m.segundos;
-          setNivel(m.rms);
-          setSegundos(m.segundos);
+          nivelRef.current = m.rms;
         } else if (m.tipo === "trecho") {
           recebeuTrecho(m);
         }
@@ -335,7 +352,7 @@ export default function TomarNota({ temaInicial = "", aoFechar, aoTerminar }) {
     segundosRef.current = 0;
     setTrechos([]);
     setSegundos(0);
-    setNivel(0);
+    nivelRef.current = 0;
     try {
       await abrirMicrofone();
       if (!montado.current) return soltarMicrofone();
@@ -592,7 +609,10 @@ export default function TomarNota({ temaInicial = "", aoFechar, aoTerminar }) {
         {(etapa === "gravando" || etapa === "interrompida") && (
           <div className="tn-corpo tn-corpo--gravando">
             <p className="tn-tema">{tema || "Tema: eu deduzo no fim"}</p>
-            <div className={`tn-medidor${etapa === "interrompida" ? " tn-medidor--parado" : ""}`} style={{ "--nivel": Math.min(1, nivel * 9).toFixed(3) }}>
+            <div className="tn-visual">
+              <VisualDaLisa modo={visual} obterSinal={obterSinal} ocupacao={0.82} />
+            </div>
+            <div className="tn-relogio">
               <span className="tn-tempo">{minutoDe(segundos)}</span>
               <small>de {minutoDe(LIMITE_DE_SEGUNDOS)}</small>
             </div>
@@ -642,7 +662,9 @@ export default function TomarNota({ temaInicial = "", aoFechar, aoTerminar }) {
 
         {(etapa === "finalizando" || etapa === "organizando") && (
           <div className="tn-corpo tn-corpo--espera" aria-live="polite">
-            <div className="tn-girando" aria-hidden="true" />
+            <div className="tn-visual tn-visual--espera">
+              <VisualDaLisa modo={visual} obterSinal={obterSinal} ocupacao={0.8} />
+            </div>
             <p className="tn-estado-grande">
               {etapa === "finalizando"
                 ? `Transcrevendo ${naFila > 1 ? `os últimos ${naFila} trechos` : "o último trecho"}…`

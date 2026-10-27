@@ -246,9 +246,29 @@ navegador já tiver permissão). No **iPhone**, o Safari desliga o microfone das
 a tela bloqueia — por isso lá "Manter a tela ligada" (Wake Lock) vem marcado; se a gravação
 for interrompida, a tela oferece continuar de onde parou.
 
+**Visual.** Enquanto escuta, o centro do painel é o visual escolhido para a Lisa (o mesmo do
+Assistente), mexendo com o volume; transcrevendo e organizando, ele fica "pensando".
+
 **Privacidade.** O áudio não é salvo em lugar nenhum: só trafega para o Gemini na hora. O
 texto já transcrito fica no `localStorage` do aparelho até ser organizado, para sobreviver a
 um recarregamento no meio. Testes: `npm run notas-check`.
+
+## Instalar como app
+
+A Lisa é instalável pelo Chrome (desktop e Android): `public/manifest.webmanifest` (abre em
+`/assistant`, com o atalho "Tomar nota" → `/assistant?modo=tomar-nota`) e os ícones em
+`public/marca/app-*.png`. O manifesto é buscado sem cookie, por isso está em `LIVRES`
+(`src/lib/authSession.js`); `marca/` já fica fora do middleware.
+
+O aviso "pode instalar" do Chrome (`beforeinstallprompt`) chega uma vez e cedo: um script no
+`<head>` (`src/lib/instalarApp.js`) o guarda em `window`, e o item "Instalar a Lisa como app"
+(menu do pontinho verde no desktop, ajustes no celular) só aparece quando ele existe. No iPhone
+não há esse aviso: o item explica Compartilhar → "Adicionar à Tela de Início". O Abacato e o
+Lisa_Proof têm o mesmo botão (`src/componentes/BotaoInstalar.js` em cada um).
+
+Para conferir: DevTools → Application → Manifest, ou `Page.getInstallabilityErrors` pelo
+protocolo do DevTools. Em `next dev` o link do manifesto sai fora do `<head>` e o Chrome o
+ignora — confira com `next build` + `next start`.
 
 ## Estrutura
 

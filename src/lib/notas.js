@@ -16,7 +16,11 @@ import { LIMITE_DE_SEGUNDOS, minutoDe } from "./tomarNota.js";
 
 const PASSO = 1024; // o mesmo espaçamento de posição do Abacato (dominio/Quadro.js)
 const ORIGEM = "lisa";
+// O índice único de (origem, origem_id) dos quadros vale para o banco INTEIRO, não por pessoa:
+// por isso o origem_id leva o dono e um carimbo (quadro arquivado continua ocupando o seu).
+// "tomar-nota" sozinho é o formato da 0.14.0, que o primeiro quadro criado ainda usa.
 const ORIGEM_DO_QUADRO = "tomar-nota";
+const origemDoQuadro = (donoId) => `${ORIGEM_DO_QUADRO}:${donoId}:${Date.now().toString(36)}`;
 // O nome com que o quadro nasce; depois ele é achado pela origem, mesmo renomeado.
 export const NOME_DO_QUADRO = "Notas";
 const MAX_TRECHOS = 40; // 10 min em trechos de ~25–35 s, com folga
@@ -148,7 +152,9 @@ export async function donoDaSessao(req) {
 async function quadroDeNotas(donoId) {
   const { data: marcado } = await supabase
     .from("abacato_quadros").select("id, nome")
-    .eq("dono_id", donoId).eq("origem", ORIGEM).eq("origem_id", ORIGEM_DO_QUADRO).eq("arquivado", false)
+    .eq("dono_id", donoId).eq("origem", ORIGEM).eq("arquivado", false)
+    .or(`origem_id.eq.${ORIGEM_DO_QUADRO},origem_id.like.${ORIGEM_DO_QUADRO}:${donoId}:*`)
+    .order("criado_em", { ascending: false })
     .limit(1).maybeSingle();
   if (marcado) return { ...marcado, novo: false };
   const { data: peloNome } = await supabase
@@ -161,7 +167,7 @@ async function quadroDeNotas(donoId) {
     descricao: "As notas que a Lisa toma no modo Tomar nota: uma coluna por tema, um card por assunto.",
     dono_id: donoId,
     origem: ORIGEM,
-    origem_id: ORIGEM_DO_QUADRO,
+    origem_id: origemDoQuadro(donoId),
   }).select("id, nome").single();
   if (error) throw new Error(`não consegui criar o quadro Notas: ${error.message}`);
   return { ...data, novo: true };

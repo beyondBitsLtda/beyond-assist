@@ -1,9 +1,14 @@
 import "./globals.css";
 import Abertura, { SCRIPT_DA_ABERTURA } from "@/components/shell/Abertura.js";
+import { SCRIPT_DE_INSTALAR } from "@/lib/instalarApp.js";
 
+// manifest + ícones: o Chrome passa a oferecer "Instalar app" (ver src/lib/instalarApp.js)
 export const metadata = {
   title: "Beyond Bits",
   description: "J.A.R.V.I.S. Assistant Interface",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/marca/app-192.png", apple: "/marca/app-apple.png" },
+  appleWebApp: { capable: true, title: "Lisa", statusBarStyle: "black-translucent" },
 };
 
 // sem isso o celular renderiza a página numa largura virtual de ~980px e só depois
@@ -12,6 +17,7 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover", // usa a tela inteira em telas com notch/cantos arredondados
+  themeColor: "#000000", // a barra do app instalado na cor do fundo
 };
 
 export default function RootLayout({ children }) {
@@ -28,6 +34,7 @@ export default function RootLayout({ children }) {
         />
         <link rel="preload" href="/marca/lisa.png" as="image" />
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_DA_ABERTURA }} />
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DE_INSTALAR }} />
       </head>
       <body>
         <Abertura />

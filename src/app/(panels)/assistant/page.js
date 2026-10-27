@@ -55,6 +55,9 @@ import { reposNoTexto, vinculosValidos } from "@/lib/enderecoDoRepositorio.js";
 // Modo Tomar nota (27/10/2026): escuta até 10 min e anota por assunto no quadro "Notas" do Abacato
 import TomarNota from "@/components/panels/TomarNota.js";
 import { pedidoDeTomarNota } from "@/lib/tomarNota.js";
+// "Instalar app" do Chrome (27/10/2026): ver src/lib/instalarApp.js
+import usarInstalacao from "@/components/shell/usarInstalacao.js";
+import { DICA_DO_IPHONE } from "@/lib/instalarApp.js";
 // o editor que abre quando a resposta traz código (qualquer modo — ver IdeDaLisa.js)
 const IdeDaLisa = dynamic(() => import("@/components/panels/IdeDaLisa.js"), { ssr: false, loading: () => null });
 const LisaAvatar3D = dynamic(() => import("@/components/panels/LisaAvatar3D.js"), {
@@ -683,6 +686,16 @@ export default function AssistantPage() {
   };
   const [interactiveMode, setInteractiveMode] = useState(false);
   const [tomarNota, setTomarNota] = useState(null); // { tema } com o painel do Modo Tomar nota aberto
+  const instalacao = usarInstalacao();
+  // O atalho "Tomar nota" do app instalado (segurar o ícone, no Android) abre /assistant?modo=tomar-nota.
+  // O parâmetro sai do endereço logo depois, para recarregar a página não reabrir o modo.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("modo") !== "tomar-nota") return;
+    setTomarNota({ tema: "" });
+    url.searchParams.delete("modo");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, []);
   const [interactiveBubble, setInteractiveBubble] = useState(null); // { text, category } | null
   const [interactiveFace, setInteractiveFace] = useState(null); // expressão forçada, ou null = ela faz o que quiser
   const [interactiveSpeaking, setInteractiveSpeaking] = useState(false); // move a boca enquanto a fala toca
@@ -4013,6 +4026,28 @@ export default function AssistantPage() {
                   <button key={t.name} onClick={() => chooseAccent(t)} title={t.name} style={{ width: 30, height: 30, borderRadius: "50%", background: t.hex, border: `2px solid ${accentName === t.name ? "#eafcff" : "transparent"}`, cursor: "pointer" }} />
                 ))}
               </div>
+
+              {/* aplicativo: some quando o navegador não oferece instalar (e não é iPhone) */}
+              {(instalacao.pode || instalacao.ios || instalacao.instalado) && (
+                <>
+                  <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>APLICATIVO</div>
+                  {instalacao.instalado ? (
+                    <div style={{ fontSize: 13, color: "rgba(207,239,251,0.6)", marginBottom: 14 }}>Você já está no app instalado.</div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={instalacao.instalar}
+                        style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${CY}`, background: "rgba(var(--accent-rgb),0.12)", color: "#eafcff", cursor: "pointer", width: "100%", marginBottom: 6 }}
+                      >
+                        ⤓ Instalar a Lisa como app
+                      </button>
+                      <div style={{ fontSize: 12, color: "rgba(207,239,251,0.5)", marginBottom: 14 }}>
+                        {instalacao.ios ? DICA_DO_IPHONE : "Ganha ícone na tela inicial e abre em tela cheia, sem a barra do navegador."}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
 
               {/* persona */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>PERSONALIDADE</div>

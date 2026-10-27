@@ -42,6 +42,11 @@ export const LIVRES = [
   // O service worker é buscado pelo navegador em contextos onde o cookie pode não ir junto.
   // Bloqueá-lo mata as notificações push de um jeito difícil de diagnosticar.
   { prefixo: "/sw.js", motivo: "service worker das notificações" },
+
+  // O manifesto do app instalável é buscado SEM cookie (o <link rel="manifest"> não manda
+  // credencial). Barrado, ele viraria o HTML do login e o Chrome nunca ofereceria instalar.
+  // Os ícones moram em /marca/, que o matcher do middleware já deixa de fora.
+  { prefixo: "/manifest.webmanifest", motivo: "manifesto do app instalável (Instalar app do Chrome)" },
 ];
 
 /**
