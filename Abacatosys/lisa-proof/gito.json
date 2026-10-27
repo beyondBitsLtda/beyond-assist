@@ -9,14 +9,26 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.33.0-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-26",
+  "versao": "0.34.0-cloudflare-pages.1",
+  "atualizadoEm": "2026-10-27",
   "compilacao": {
-    "numero": 73,
-    "data": "2026-10-26",
+    "numero": 74,
+    "data": "2026-10-27",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.34.0-cloudflare-pages.1",
+      "data": "2026-10-27",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Botão \"Instalar app\": o Lisa_Proof vira aplicativo pelo Chrome (desktop e Android) em um toque.",
+      "itens": [
+        "\"📲 Instalar app\" no rodapé da barra lateral e no topo do celular, ao lado de Minha conta e Reportar problema. Aparece quando o navegador oferece instalar; já instalado, some. No iPhone, explica o caminho pelo Compartilhar → Adicionar à Tela de Início.",
+        "O aviso de instalação do Chrome é guardado por um script no <head>, então o botão funciona mesmo quando o aviso chega antes de a página terminar de carregar."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.33.0-cloudflare-pages.1",
       "data": "2026-10-26",
@@ -1144,7 +1156,8 @@
         "Biblioteca de PDFs (/biblioteca) com leitor: destaque em cores, sublinhado, notas, marcação de área, marcador de página, sumário, miniaturas, busca no texto, temas de leitura e trechos mandados para o caderno",
         "Cursos gerados a partir de um livro da biblioteca, seguindo os capítulos, com as páginas de cada assunto; a explicação, o quiz e o exercício do assunto usam o trecho do livro",
         "Estante virtual da Biblioteca: livros em 3D nas prateleiras, com lombada (cor da capa, título, marcador de leitura, selo de lido, 🎓 de curso), capa ao puxar e destaque com as ações",
-        "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link e vídeos (YouTube/Vimeo), com revisão do bibliotecário (administrador e líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu; Modo cinema (sala 3D com a plateia de avatares) para os vídeos"
+        "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link e vídeos (YouTube/Vimeo), com revisão do bibliotecário (administrador e líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu; Modo cinema (sala 3D com a plateia de avatares) para os vídeos",
+        "Instalável como app (manifesto e ícones já existiam; agora com o botão \"Instalar app\" na própria tela)."
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",

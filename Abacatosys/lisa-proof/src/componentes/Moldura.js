@@ -12,6 +12,7 @@ import Celebracao from "./Celebracao.js";
 import BotaoDeTema from "./BotaoDeTema.js";
 import ReportarProblema from "./ReportarProblema.js";
 import MinhaConta from "./MinhaConta.js";
+import BotaoInstalar from "./BotaoInstalar.js";
 import { AvisoDeVale } from "./Vales.js";
 import Novidades from "./Novidades.js";
 
@@ -79,6 +80,7 @@ export default function Moldura({ children }) {
         </nav>
         <div className="pf-lateral__rodape">
           <MinhaConta />
+          <BotaoInstalar />
           <ReportarProblema />
           <BotaoDeTema comTexto />
           <button type="button" className="pf-lateral__sair" onClick={sair}>Sair</button>
@@ -92,6 +94,7 @@ export default function Moldura({ children }) {
         </Link>
         <div className="pf-topo__acoes">
           <MinhaConta comTexto={false} />
+          <BotaoInstalar comTexto={false} />
           <ReportarProblema comTexto={false} />
           <BotaoDeTema />
           <button type="button" className="pf-topo__sair" onClick={sair}>Sair</button>

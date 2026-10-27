@@ -14,6 +14,7 @@ import "./caderno.css";
 import "./biblioteca.css";
 import "./estante.css";
 import "./acervo.css";
+import { SCRIPT_DE_INSTALAR } from "@/lib/instalarApp.js";
 
 export const metadata = {
   title: "Lisa_Proof",
@@ -53,6 +54,7 @@ export default function RootLayout({ children }) {
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_TEMA }} />
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DE_INSTALAR }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
