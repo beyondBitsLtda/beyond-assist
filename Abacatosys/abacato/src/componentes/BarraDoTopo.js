@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import SeletorDeTema from "./SeletorDeTema.js";
+import BotaoInstalar from "./BotaoInstalar.js";
 
 /**
  * A faixa do topo: tema e sair.
@@ -23,6 +24,7 @@ export default function BarraDoTopo() {
       </Link>
 
       <div className="abacato-topo__direita">
+        <BotaoInstalar />
         <Link href="/conta" className="abacato-topo__sair" title="Minha conta">
           <span aria-hidden="true">◔</span>
           <span className="abacato-topo__sair-texto">Minha conta</span>

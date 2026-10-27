@@ -9,9 +9,13 @@ import { COOKIE_SESSAO, lerSessao, ehApi, ehLivre } from "@/lib/abacatoAuth.js";
  *
  * `marca/` fica de fora porque é a logo da tela de abertura: ela aparece ANTES do login, e o
  * portão barrá-la trocaria a imagem pelo HTML da tela de entrar — a abertura sairia sem marca.
+ * Os ícones do app instalável também moram em `marca/`.
+ *
+ * `manifest.webmanifest` fica de fora porque o navegador o busca SEM cookie: barrado, ele
+ * viraria o HTML da tela de entrar e o Chrome nunca ofereceria "Instalar app".
  */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo.png|marca/).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo.png|marca/|manifest.webmanifest).*)"],
 };
 
 export async function middleware(req) {

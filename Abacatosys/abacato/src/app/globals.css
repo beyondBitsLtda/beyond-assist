@@ -334,6 +334,8 @@ body {
   cursor: pointer;
 }
 .abacato-topo__sair:hover { color: var(--abacato-alerta); border-color: var(--abacato-alerta); }
+/* "Instalar app" usa a mesma pílula, mas instalar não é perigo: o realce é o verde da marca */
+.abacato-topo__instalar:hover { color: var(--abacato-verde); border-color: var(--abacato-verde); }
 
 /* ---- o seletor de tema, segmentado ----
  *

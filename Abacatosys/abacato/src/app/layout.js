@@ -7,11 +7,19 @@ import "./lisa.css";
 import "./plano.css";
 import "./abertura.css";
 import Abertura, { SCRIPT_DA_ABERTURA } from "@/componentes/Abertura.js";
+import { SCRIPT_DE_INSTALAR } from "@/lib/instalarApp.js";
 
+// manifest + ícones: o Chrome passa a oferecer "Instalar app" (ver src/lib/instalarApp.js)
 export const metadata = {
   title: "Abacato System",
   description: "Quadros, documentação e acompanhamento — da Beyond Bits.",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/marca/app-192.png", apple: "/marca/app-apple.png" },
+  appleWebApp: { capable: true, title: "Abacato", statusBarStyle: "default" },
 };
+
+// A barra do app instalado na cor da barra lateral.
+export const viewport = { width: "device-width", initialScale: 1, themeColor: "#111814" };
 
 /**
  * O tema é decidido ANTES de a página pintar, por um script que roda de forma síncrona no
@@ -50,6 +58,7 @@ export default function RootLayout({ children }) {
         <link rel="preload" href="/marca/abacato.png" as="image" />
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_TEMA }} />
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_DA_ABERTURA }} />
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DE_INSTALAR }} />
       </head>
       <body>
         <Abertura />
