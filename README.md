@@ -218,6 +218,38 @@ Nenhuma das duas fica ligada sozinha entre recarregamentos (sem localStorage, de
 é câmera/tela, cada sessão pede de novo) e nenhuma foto é salva em lugar nenhum, nem local
 nem no Supabase — só trafega pro Gemini na hora e é descartada.
 
+## Modo Tomar nota
+
+A Lisa escuta por até **10 minutos** e, no fim, anota no Abacato o que ouviu, separado por
+assunto. Abre pelo botão de nota na barra de modos do celular, por **Modos → Trabalho → Tomar
+nota** no desktop ou dizendo "tomar nota sobre…" no chat.
+
+1. **Tema.** Digitado, falado (o microfone ao lado do campo: quando você termina de falar, a
+   gravação começa sozinha) ou em branco — aí ela deduz pelo que ouvir.
+2. **Escuta.** O gravador é um AudioWorklet (`src/lib/tomarNota.js`): reduz o áudio para
+   16 kHz mono, conta o tempo pelas amostras e corta trechos de 25 a 35 s numa pausa da fala.
+   Cada trecho vai para `/api/notas/trecho` assim que fecha e volta como texto; trecho sem
+   som nenhum nem sai do aparelho.
+3. **Organização.** `/api/notas/organizar` manda a transcrição inteira para o Gemini, que
+   filtra pelo tema e separa em notas (título, interpretação, pontos, encaminhamentos e
+   citações). As citações são conferidas contra a transcrição: só entra como "transcrição
+   literal" o que foi dito de verdade, com o minuto.
+4. **Abacato.** Quadro **Notas** do usuário do Abacato com o mesmo e-mail da sessão da Lisa
+   (criado na primeira vez), uma coluna por tema (o mesmo tema volta para a mesma coluna) e
+   um card por nota, mais um card com a transcrição completa. Quadro e cards levam
+   `origem = "lisa"`; o índice único de `(origem, origem_id)` dos cards impede que uma
+   segunda tentativa da mesma gravação duplique as notas.
+
+**Com a tela apagada.** O microfone aberto mantém a página viva no **Android** e no
+**computador**: a gravação continua e, no fim, dois bipes avisam (e uma notificação, se o
+navegador já tiver permissão). No **iPhone**, o Safari desliga o microfone das páginas quando
+a tela bloqueia — por isso lá "Manter a tela ligada" (Wake Lock) vem marcado; se a gravação
+for interrompida, a tela oferece continuar de onde parou.
+
+**Privacidade.** O áudio não é salvo em lugar nenhum: só trafega para o Gemini na hora. O
+texto já transcrito fica no `localStorage` do aparelho até ser organizado, para sobreviver a
+um recarregamento no meio. Testes: `npm run notas-check`.
+
 ## Estrutura
 
 ```

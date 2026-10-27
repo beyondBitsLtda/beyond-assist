@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.13.1-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-25",
+  "versao": "0.14.0-cloudflare-pages.1",
+  "atualizadoEm": "2026-10-27",
   "compilacao": {
-    "numero": 40,
-    "data": "2026-10-25",
+    "numero": 41,
+    "data": "2026-10-27",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.14.0-cloudflare-pages.1",
+      "data": "2026-10-27",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Modo Tomar nota: a Lisa escuta por até 10 minutos, separa o que ouviu por assunto e anota no quadro \"Notas\" do Abacato (coluna = tema, card = nota), no celular e no desktop.",
+      "itens": [
+        "Abre pelo botão novo na barra de modos do celular, por Modos → Trabalho no desktop ou dizendo \"tomar nota sobre…\" no chat. O tema pode ser digitado, falado (o microfone ao lado do campo começa a gravação sozinho quando você termina de falar) ou deixado em branco, e aí a Lisa deduz.",
+        "Escuta até 10 minutos seguidos. O áudio é cortado em trechos de 25 a 35 s numa pausa da fala e cada trecho é transcrito enquanto a gravação continua (/api/notas/trecho); a tela mostra o tempo, o volume e o que já foi transcrito.",
+        "No fim, a Lisa lê a transcrição inteira, deixa de fora o que não tem a ver com o tema e cria um card por assunto, com título, a interpretação dela, os pontos principais, os encaminhamentos e as frases ditas de verdade com o minuto (/api/notas/organizar). Um último card guarda a transcrição completa.",
+        "O quadro \"Notas\" é criado na primeira vez, na conta do Abacato com o mesmo e-mail da conta da Lisa; o mesmo tema volta para a mesma coluna. Se a resposta se perder e o aparelho tentar de novo, nada é duplicado.",
+        "Com a tela apagada: a gravação roda num AudioWorklet, que segue o ritmo do microfone e não dos timers da página. No Android e no computador ela continua com a tela apagada e avisa com dois bipes (e notificação, se estiver liberada) quando termina. No iPhone o Safari desliga o microfone quando a tela bloqueia, então lá a tela fica ligada por padrão; se a gravação for interrompida, dá para continuar de onde parou.",
+        "O áudio não fica salvo em lugar nenhum. O texto já transcrito fica guardado no aparelho até ser organizado: se a página recarregar no meio, a Lisa oferece organizar o que já tinha."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.13.1-cloudflare-pages.1",
       "data": "2026-10-25",
@@ -602,6 +618,7 @@
         "Consulta a repositórios do GitHub, tarefas de código e pair programming.",
         "Editor de código na tela em qualquer modo: quando a conversa é sobre código, a Lisa mostra o código e uma janela de editor (realce de sintaxe, número de linha) digita trecho por trecho com a explicação de cada passo; uma aba por resposta (as anteriores ficam), abas por arquivo, janela que arrasta para qualquer lugar e redimensiona pelas bordas e cantos, lembrando onde ficou, e o botão \"destacar\" leva o editor para uma janela separada do sistema (outro monitor); a voz fala só a explicação. Antes de corrigir, a Lisa recebe o código que já apareceu na conversa (versão mais recente de cada arquivo) e pede o que falta em vez de inventar.",
         "Contexto da conversa em qualquer modo: o + da barra anexa imagens (do computador, com Ctrl+V ou arrastando) e vincula até 3 repositórios do GitHub; a cada pergunta a Lisa lê os arquivos do repositório que interessam, escolhidos pela pergunta, pela conversa e pelo que aparece na tela, na câmera e nos prints, e responde relacionando tudo, com o caminho de cada arquivo.",
+        "Modo Tomar nota (celular e desktop, também com a tela apagada no Android): escuta até 10 minutos, transcreve, separa por assunto e anota no quadro \"Notas\" do Abacato, com uma coluna por tema e um card por nota (interpretação + transcrição real).",
         "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma e Anel de partículas; o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador).",
         "Painel Sentinela de casos de teste e chamados."
       ],
@@ -699,12 +716,12 @@
       },
       {
         "nome": "Abacato",
-        "descricao": "Fonte alternativa de quadros: a Lisa pode ler o Abacato em vez do Trello.",
+        "descricao": "Fonte alternativa de quadros: a Lisa pode ler o Abacato em vez do Trello. O Modo Tomar nota grava no quadro \"Notas\" do usuário do Abacato com o mesmo e-mail (cria o quadro, a coluna do tema e os cards).",
         "url": "https://abacato.beyond.dev.br"
       },
       {
         "nome": "Google Gemini",
-        "descricao": "Chat em streaming, embeddings, visão (câmera e tela) e voz (TTS).",
+        "descricao": "Chat em streaming, embeddings, visão (câmera e tela), voz (TTS) e transcrição de áudio (Modo Escuta e Modo Tomar nota).",
         "url": "https://ai.google.dev"
       },
       {

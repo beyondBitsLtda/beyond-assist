@@ -52,6 +52,9 @@ import { BotaoMais, FaixaDoContexto } from "@/components/panels/ContextoDaConver
 import { imagemParaAnexo, imagensDaColagem, imagensSoltas } from "@/lib/anexosDaConversa.js";
 import { MAX_ANEXOS } from "@/lib/contextoDaConversa.js";
 import { reposNoTexto, vinculosValidos } from "@/lib/enderecoDoRepositorio.js";
+// Modo Tomar nota (27/10/2026): escuta até 10 min e anota por assunto no quadro "Notas" do Abacato
+import TomarNota from "@/components/panels/TomarNota.js";
+import { pedidoDeTomarNota } from "@/lib/tomarNota.js";
 // o editor que abre quando a resposta traz código (qualquer modo — ver IdeDaLisa.js)
 const IdeDaLisa = dynamic(() => import("@/components/panels/IdeDaLisa.js"), { ssr: false, loading: () => null });
 const LisaAvatar3D = dynamic(() => import("@/components/panels/LisaAvatar3D.js"), {
@@ -679,6 +682,7 @@ export default function AssistantPage() {
     pair: "PAIR PROGRAMMING", disco: "LANÇAR DISCO PRA NALA", mundo: "MUNDO DA LISA",
   };
   const [interactiveMode, setInteractiveMode] = useState(false);
+  const [tomarNota, setTomarNota] = useState(null); // { tema } com o painel do Modo Tomar nota aberto
   const [interactiveBubble, setInteractiveBubble] = useState(null); // { text, category } | null
   const [interactiveFace, setInteractiveFace] = useState(null); // expressão forçada, ou null = ela faz o que quiser
   const [interactiveSpeaking, setInteractiveSpeaking] = useState(false); // move a boca enquanto a fala toca
@@ -2489,6 +2493,16 @@ export default function AssistantPage() {
     // "abre o dashboard" etc. — comando local reconhecido sem gastar chamada nenhuma do
     // Gemini: não passa pelo fluxo normal de pergunta/resposta, só avisa os OUTROS
     // dispositivos abertos (ver RemoteCommandListener.js) e confirma na hora.
+    // "tomar nota sobre X": abre o Modo Tomar nota com o tema já preenchido. Não começa a
+    // gravar sozinho — o microfone abre no toque de "Começar", que é um gesto da pessoa.
+    const temaDaNota = pedidoDeTomarNota(q);
+    if (temaDaNota !== null) {
+      const confirmText = temaDaNota ? `Abri o Tomar nota sobre "${temaDaNota}". Toque em Começar a escutar.` : "Abri o Tomar nota. Diga ou digite o tema e toque em Começar a escutar.";
+      setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: displayText || q }, { id: `a${Date.now() + 1}`, role: "assistant", text: confirmText }]);
+      setTomarNota({ tema: temaDaNota });
+      return;
+    }
+
     const nav = matchNavCommand(q);
     if (nav) {
       stopSpeaking();
@@ -3290,6 +3304,22 @@ export default function AssistantPage() {
     </div>
   );
 
+  // Modo Tomar nota — o mesmo painel no celular e no desktop. O resultado também vai para o chat
+  // (e para a memória da conversa), para dar para perguntar sobre as notas depois.
+  const tomarNotaOverlay = tomarNota && (
+    <TomarNota
+      temaInicial={tomarNota.tema}
+      aoFechar={() => setTomarNota(null)}
+      aoTerminar={(r) => {
+        const notas = (r.cards || []).slice(0, -1);
+        const texto = `📝 Anotei "${r.tema}" no Abacato: ${notas.length} nota${notas.length === 1 ? "" : "s"} na coluna "${r.coluna?.nome}" do quadro ${r.quadro?.nome}${r.quadro?.novo ? " (criei o quadro agora)" : ""}.\n${notas.map((c) => `• ${c.titulo}`).join("\n")}${r.resumo ? `\n\n${r.resumo}` : ""}\n\n${r.quadro?.url || ""}`.trim();
+        setMessages((m) => [...m, { id: `nota${Date.now()}`, role: "assistant", text: texto }]);
+        lembrarDaLisa(texto);
+        addLog("[NOTA]", PU, `${notas.length} notas em "${r.coluna?.nome}" (${r.quadro?.nome})`);
+      }}
+    />
+  );
+
   // tela cheia customizada (ver openFullscreen acima) + aviso de mensagem recebida na Câmera de
   // Vigia — compartilhados entre o branch mobile e o desktop abaixo, computados uma vez só.
   const fullscreenOverlay = fullscreenSource && (
@@ -3754,6 +3784,7 @@ export default function AssistantPage() {
     return (
       <div className="bb-painel bb-celular" style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "var(--bb-fundo)" }}>
         {fullscreenOverlay}
+        {tomarNotaOverlay}
         {cameraVigiaMessageToast}
         {watchPreviews}
         {radioWidget}
@@ -3774,6 +3805,9 @@ export default function AssistantPage() {
                 laço rodando enquanto você está lendo o chat em outra aba */}
             <button type="button" aria-pressed={mobileView === "companion"} onClick={() => setMobileView("companion")} title="Modo interativo" aria-label="Modo interativo">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3" /><path d="M12 3v4M9 13h.01M15 13h.01" /></svg>
+            </button>
+            <button type="button" aria-pressed={!!tomarNota} onClick={() => setTomarNota((v) => v || { tema: "" })} title="Tomar nota" aria-label="Tomar nota">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h4" /></svg>
             </button>
           </div>
           <button type="button" className="bb-redondo" onClick={() => setMobileNavOpen(true)} aria-label="Outros painéis" title="Outros painéis">
@@ -4369,6 +4403,7 @@ export default function AssistantPage() {
       {codeTaskModal}
       {ideDaLisa}
       {fullscreenOverlay}
+      {tomarNotaOverlay}
       {cameraVigiaMessageToast}
       {watchPreviews}
       {radioWidget}
@@ -4600,6 +4635,9 @@ export default function AssistantPage() {
             </ChaveDoMenu>
             <ItemDoMenu onClick={() => setInteractiveMode((v) => !v)} detalhe="Rosto da Lisa e jogos; mostre ✌️ para chamar">
               Modo interativo
+            </ItemDoMenu>
+            <ItemDoMenu onClick={() => setTomarNota((v) => v || { tema: "" })} detalhe="Escuta até 10 min e anota por assunto no Abacato">
+              Tomar nota
             </ItemDoMenu>
           </GrupoDoMenu>
         </Suspenso>

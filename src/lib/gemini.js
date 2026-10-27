@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { TTS_VOICES } from "./ttsVoices.js";
 import { pickKeyIndex, markCooldown, markOk } from "./geminiKeyHealth.js";
 import { streamComRetomada } from "./retomada.js";
+import { limparTranscricao } from "./tomarNota.js";
 
 const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 // gemini-2.5-flash foi descontinuado pra projetos novos no Google Cloud (confirmado ao vivo:
@@ -1540,6 +1541,108 @@ export async function describeAudioIfNotable(audio, systemInstruction = MIC_WATC
   const text = (res.text || "").trim();
   if (!text || /^nada\.?$/i.test(text)) return null;
   return text;
+}
+
+// ---- Modo Tomar nota: ver src/components/panels/TomarNota.js e /api/notas/* ----
+
+const SEM_FALA = "SEM_FALA";
+
+/**
+ * Transcreve UM trecho (~30 s) do Modo Tomar nota, ao pé da letra. O tema e o fim do trecho
+ * anterior vão junto só para o modelo acertar nomes e termos do assunto e não repetir a
+ * palavra cortada na emenda — a transcrição continua sendo do que foi DITO, não do tema.
+ * Devolve "" quando o trecho não tem fala.
+ */
+export async function transcreverTrechoDeNota(audio, { tema = "", anterior = "" } = {}) {
+  const contexto = [
+    tema ? `Assunto da gravação: ${tema}.` : "",
+    anterior ? `Final do trecho anterior (só para continuidade, NÃO repita): "…${anterior}"` : "",
+  ].filter(Boolean).join("\n");
+  const systemInstruction = `Você transcreve áudio em português do Brasil, ao pé da letra.
+- Escreva exatamente o que foi falado, na ordem, com pontuação. Não resuma, não corrija o conteúdo, não comente.
+- O áudio é um trecho de uma gravação maior: pode começar ou terminar no meio de uma palavra. Transcreva só o que der para entender.
+- Trecho que não dá para entender: [inaudível]. Quando outra pessoa começa a falar, comece a fala dela numa linha nova com "— ".
+- Não escreva marcações de tempo, nomes de quem fala nem nada que não foi falado. Silêncio, respiração e ruído não viram palavra: nunca complete com "tchau", "obrigado" ou algo parecido que não foi dito.
+- Se não houver fala nenhuma (silêncio, ruído, música sem letra), responda exatamente: ${SEM_FALA}`;
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client, modelo, abortSignal) =>
+      client.models.generateContent({
+        model: modelo,
+        contents: [{ role: "user", parts: [{ text: `${contexto}\nTranscreva este trecho.`.trim() }, { inlineData: { mimeType: audio.mimeType, data: audio.data } }] }],
+        config: { systemInstruction, temperature: 0, ...(abortSignal ? { abortSignal } : {}) },
+      }),
+    { attempts: 2, delayMs: 800, tetoMs: 30_000 }
+  );
+  const texto = limparTranscricao(res.text);
+  return !texto || texto.includes(SEM_FALA) ? "" : texto;
+}
+
+/**
+ * Organiza a transcrição inteira do Modo Tomar nota em notas por assunto. O tema filtra: o
+ * que não tem a ver com ele (conversa paralela, interrupção) fica de fora. As citações têm de
+ * ser copiadas da transcrição — é o que deixa a interpretação conferível no card.
+ */
+export async function organizarNotas({ tema = "", transcricao, duracaoMin }) {
+  const systemInstruction = `Você é a Lisa no modo "Tomar nota": ouviu uma gravação de ${duracaoMin} min e agora transforma o que ouviu em notas para um quadro do Abacato.
+- ${tema ? `O tema é "${tema}". Use o tema como filtro: deixe de fora o que não tem relação com ele (conversa paralela, interrupção, ruído).` : `Não foi informado um tema: deduza um tema curto (até 6 palavras). Se a pessoa disse o assunto no começo ("o assunto é…", "vamos falar de…"), use isso.`}
+- Quebre o conteúdo em notas por SUBASSUNTO dentro do tema: cada nota cobre um assunto só. Assunto que voltou várias vezes na gravação vira UMA nota. Normalmente de 2 a 8 notas; uma só se a gravação inteira foi sobre um ponto.
+- titulo: curto (até 70 caracteres), específico, que se entenda sem abrir o card.
+- interpretacao: a SUA leitura do que foi dito, em 2 a 5 frases — o que significa, o que foi decidido, o que ficou em aberto. Separe o que foi dito do que você está deduzindo ("parece que…").
+- pontos: os fatos, números, nomes e argumentos importantes, um por item.
+- encaminhamentos: tarefas, decisões e próximos passos mencionados (com quem e quando, se foi dito). Vazio se não houve.
+- citacoes: trechos COPIADOS da transcrição, sem mudar nenhuma palavra, que sustentam a nota. De 1 a 6 por nota.
+- resumo: 1 ou 2 frases sobre a gravação inteira.
+- Escreva em português do Brasil. Não invente nada que não esteja na transcrição.`;
+  // Em stream: 10 minutos de transcrição levam bem mais que o teto para sair inteiros (2 min
+  // levaram 39 s no teste de 27/10/2026). Assim o teto mede só o início da resposta.
+  const stream = await withTransientRetry(
+    CHAT_MODEL,
+    (client, modelo, abortSignal) =>
+      client.models.generateContentStream({
+        model: modelo,
+        contents: `TRANSCRIÇÃO (cada linha começa com o minuto da gravação):\n\n${transcricao}`,
+        config: {
+          systemInstruction,
+          temperature: 0.3,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              tema: { type: "STRING" },
+              resumo: { type: "STRING" },
+              notas: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    titulo: { type: "STRING" },
+                    interpretacao: { type: "STRING" },
+                    pontos: { type: "ARRAY", items: { type: "STRING" } },
+                    encaminhamentos: { type: "ARRAY", items: { type: "STRING" } },
+                    citacoes: { type: "ARRAY", items: { type: "STRING" } },
+                  },
+                  required: ["titulo", "interpretacao", "pontos", "citacoes"],
+                  propertyOrdering: ["titulo", "interpretacao", "pontos", "encaminhamentos", "citacoes"],
+                },
+              },
+            },
+            required: ["tema", "resumo", "notas"],
+            propertyOrdering: ["tema", "resumo", "notas"],
+          },
+          ...(abortSignal ? { abortSignal } : {}),
+        },
+      }),
+    { attempts: 2, delayMs: 1000, tetoMs: 60_000 }
+  );
+  let texto = "";
+  for await (const parte of stream) texto += parte.text || "";
+  const r = JSON.parse(texto);
+  return {
+    tema: String(r?.tema || tema || "").trim(),
+    resumo: String(r?.resumo || "").trim(),
+    notas: (Array.isArray(r?.notas) ? r.notas : []).filter((n) => n?.titulo),
+  };
 }
 
 /**

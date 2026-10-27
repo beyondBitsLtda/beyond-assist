@@ -30,6 +30,7 @@
     "groq-check": "node --import ./scripts/alias-loader.mjs scripts/groq-check.mjs",
     "relevancia-check": "node scripts/relevancia-check.mjs",
     "documentacao-check": "node scripts/documentacao-check.mjs",
+    "notas-check": "node --import ./scripts/alias-loader.mjs scripts/notas-check.mjs",
     "cf:build": "opennextjs-cloudflare build",
     "cf:deploy": "opennextjs-cloudflare deploy",
     "cf:preview": "opennextjs-cloudflare preview"

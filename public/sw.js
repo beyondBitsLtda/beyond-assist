@@ -24,12 +24,15 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = event.notification.data?.url || "/";
+  // `focar`: a página que mandou o aviso ainda está aberta com o resultado na tela (Modo
+  // Tomar nota) — só traz a aba de volta; navegar recarregaria e perderia o que está nela.
+  const focar = !!event.notification.data?.focar;
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {
         if (client.url.includes(self.location.origin) && "focus" in client) {
-          client.navigate(url);
+          if (!focar) client.navigate(url);
           return client.focus();
         }
       }
