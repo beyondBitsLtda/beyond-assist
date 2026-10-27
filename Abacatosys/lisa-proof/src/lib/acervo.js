@@ -118,7 +118,7 @@ export async function estadoDoAcervo(usuarioId) {
   const biblioteca = estadoDaBiblioteca(contagens);
 
   // quem trouxe: nome público e o personagem do Neuro (o avatar na ilha)
-  const pessoas = [...new Set([...aprovados.map((m) => m.autor_id), ...fila.map((m) => m.autor_id), ...bib.map((b) => b.id)])];
+  const pessoas = [...new Set([usuarioId, ...aprovados.map((m) => m.autor_id), ...fila.map((m) => m.autor_id), ...bib.map((b) => b.id)])];
   const [nomes, reinos] = await Promise.all([
     nomesPublicos(pessoas),
     pessoas.length ? supabase.from("proof_reinos").select("usuario_id, personagem").in("usuario_id", pessoas) : Promise.resolve({ data: [] }),
@@ -145,6 +145,7 @@ export async function estadoDoAcervo(usuarioId) {
   }
 
   return {
+    eu: pessoa(usuarioId), // quem está vendo (o avatar dela senta na plateia do Modo cinema)
     biblioteca,
     bibliotecarios: bib.map((b) => ({ ...pessoa(b.id), papel: b.papel, lider: Boolean(b.lider || b.papel === "lider") })),
     souBibliotecario,

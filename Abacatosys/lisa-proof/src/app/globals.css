@@ -203,9 +203,19 @@ button { font: inherit; }
 
 @media (min-width: 900px) {
   .pf-moldura { display: grid; grid-template-columns: 240px 1fr; }
-  .pf-lateral { display: flex; position: sticky; top: 0; height: 100vh; }
+  /* a barra lateral rola quando os itens não cabem na altura da tela (26/10/2026) */
+  .pf-lateral { display: flex; position: sticky; top: 0; height: 100vh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
+  .pf-lateral > * { flex-shrink: 0; }
+  .pf-lateral::-webkit-scrollbar { width: 8px; }
+  .pf-lateral::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); border-radius: 8px; }
   .pf-topo, .pf-abas { display: none; }
   .pf-principal { padding: 32px 32px 48px; }
+}
+/* tela baixa (notebook): a barra lateral aperta um pouco antes de precisar rolar */
+@media (min-width: 900px) and (max-height: 860px) {
+  .pf-lateral { gap: 16px; padding: 18px 14px; }
+  .pf-nav { gap: 2px; }
+  .pf-nav__item { padding: 8px 12px; }
 }
 
 /* ------------------------------------------------------------------ tipografia e blocos */

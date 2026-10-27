@@ -287,6 +287,34 @@ duplicados que estão na fila ou no acervo.
 - Os avatares de quem mais contribuiu andam entre as construções do que trouxeram. Clicando num
   deles, aparece o que a pessoa trouxe. É a interação "sem ser ao vivo" que foi escolhida; ver os
   outros andando ao mesmo tempo ficou para uma segunda etapa.
+- O terreno tem relevo de verdade (`altura()` em `MundoDaBiblioteca.js`). É uma malha polar com:
+  - colinas, e um lago cujo riacho vira cachoeira na borda;
+  - o penhasco em camadas por baixo;
+  - árvores, pedras e flores;
+  - caminhos de pedra com postes de luz, e bancos na praça.
+
+  O chão fica plano onde estão a praça, os caminhos e os lotes das construções. As construções
+  são 35% maiores e projetam sombra.
+
+**A tela.** A tela é organizada assim:
+- o mundo grande, com o painel do nível por cima (no celular ele desce para o rodapé do mundo);
+- a faixa das quatro construções, com a barra até o próximo nível e quanto cada tipo vale agora;
+- o acervo em prateleiras: "Chegaram agora" e uma prateleira por tipo. Procurando ou filtrando, as
+  prateleiras viram uma grade.
+
+Clicar num cartão abre a ficha do material, com a capa, os dados, quem trouxe, as ações e a
+gorjeta. Na aba de envio, uma prévia mostra o cartão como vai aparecer no acervo.
+
+**Modo cinema.** `SalaDeCinema.js` monta uma sala 3D: tela com moldura dourada, cortinas,
+poltronas em degraus (instanciadas), arandelas e o facho do projetor com poeira.
+- **O vídeo na tela.** O vídeo é um iframe do YouTube ou do Vimeo desenhado pelo `CSS3DRenderer`
+  atrás do WebGL. A tela 3D é um buraco transparente (`NoBlending` com opacidade 0), por isso a
+  perspectiva bate e quem está na frente tapa o vídeo.
+- **A plateia.** Você, quem trouxe o vídeo e os contribuidores, até 16. Da poltrona, a plateia
+  aparece em silhueta; em "Ver a plateia", a câmera vai para o palco e mostra os rostos com os
+  nomes. Não é ao vivo.
+- **Controles.** "Acender as luzes", tela cheia e Esc para sair.
+- **Sem WebGL.** O vídeo abre no modo normal.
 
 **Ler.** "Ler na minha biblioteca" cria o livro na estante da pessoa apontando para o PDF do acervo
 (`proof_livros.acervo_id`). O arquivo não é copiado, não ocupa o espaço dela e não é apagado

@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.32.0-cloudflare-pages.1",
+  "versao": "0.33.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-26",
   "compilacao": {
-    "numero": 72,
+    "numero": 73,
     "data": "2026-10-26",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.33.0-cloudflare-pages.1",
+      "data": "2026-10-26",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Biblioteca Colaborativa: mapa com relevo e construções maiores, tela redesenhada (prateleiras, ficha do material) e o Modo cinema — uma sala 3D com a turma da biblioteca nas poltronas.",
+      "itens": [
+        "O mapa ganhou relevo: colinas, um lago com riacho e a cachoeira que cai da borda, o penhasco em camadas, árvores de dois tipos, pedras, flores, caminhos de pedra com postes de luz, bancos na praça, nuvens e ilhotas; sombras de verdade.",
+        "As construções ficaram 35% maiores e mais detalhadas: a torre com sacadas, janelas em arco e agulha; o observatório com nervuras, escada e telescópio; o auditório com colunas, frontão e emblema; o cinema art déco com o letreiro CINE, marquise, cartazes, bilheteria e tapete vermelho.",
+        "A tela redesenhada: o mundo grande com o painel do nível, a faixa das construções com a barra até o próximo nível e o acervo em prateleiras (\"Chegaram agora\" e uma por tipo) com cartões de capa grande; procurar e filtrar viram uma grade; ordem por recentes, agradecidos ou A–Z.",
+        "A ficha do material: capa grande, dados, quem trouxe (com o avatar), as ações e a gorjeta; na aba de envio, a prévia do cartão como vai aparecer.",
+        "Modo cinema: uma sala 3D com tela de moldura dourada, cortinas, poltronas em degraus, arandelas e o facho do projetor; o vídeo do YouTube ou do Vimeo passa na tela com a perspectiva certa; na plateia, você, quem trouxe o vídeo e os frequentadores da biblioteca (silhuetas da poltrona; rostos e nomes em \"Ver a plateia\"); luzes, tela cheia e Esc.",
+        "A barra lateral do app rola quando os itens não cabem na altura da tela (e aperta um pouco em telas baixas)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.32.0-cloudflare-pages.1",
       "data": "2026-10-26",
@@ -1128,7 +1144,7 @@
         "Biblioteca de PDFs (/biblioteca) com leitor: destaque em cores, sublinhado, notas, marcação de área, marcador de página, sumário, miniaturas, busca no texto, temas de leitura e trechos mandados para o caderno",
         "Cursos gerados a partir de um livro da biblioteca, seguindo os capítulos, com as páginas de cada assunto; a explicação, o quiz e o exercício do assunto usam o trecho do livro",
         "Estante virtual da Biblioteca: livros em 3D nas prateleiras, com lombada (cor da capa, título, marcador de leitura, selo de lido, 🎓 de curso), capa ao puxar e destaque com as ações",
-        "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link e vídeos (YouTube/Vimeo), com revisão do bibliotecário (administrador e líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu"
+        "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link e vídeos (YouTube/Vimeo), com revisão do bibliotecário (administrador e líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu; Modo cinema (sala 3D com a plateia de avatares) para os vídeos"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
