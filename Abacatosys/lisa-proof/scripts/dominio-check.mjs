@@ -59,6 +59,11 @@ import {
 import { CONSULTORES, IDS_DOS_CONSULTORES, consultorPorId } from "../src/dominio/consultores.js";
 import { projetar, humorDoDia, avaliar, relatorioDaMesa, notaPeloErro, pctDaFala, rumoDaFala, caminhoPrevisto, DIAS_DE_PREVISOES } from "../src/dominio/projecoes.js";
 import { svgDoConsultor } from "../src/componentes/bolsa/consultoresDePapel.js";
+import {
+  TIPOS_DE_MATERIAL, ORDEM_DOS_TIPOS, CONSTRUCOES_DO_ACERVO, CATEGORIAS_DO_ACERVO, GORJETAS, nivelDaConstrucao, nivelDaBiblioteca, recompensaDe,
+  estadoDaBiblioteca, videoDoLink, linkValido, validarMaterial, podeRevisar, podeRetirar, podeAgradecer, motivoValido,
+} from "../src/dominio/acervo.js";
+import { svgDoFuncionario } from "../src/componentes/acervo/personagensDoAcervo.js";
 import { centavos, formatarMoedas, faltam } from "../src/dominio/moedas.js";
 import {
   semanasDoPlano, avancoDaTrilha, mapaDaTrilha, valorDoProjetoFinal, podeGerarProjeto, semanaDoProjeto, periodoDaSemana, PROJETOS_POR_SEMANA,
@@ -2110,6 +2115,120 @@ caso("consultores: a previsão hora a hora vai da abertura ao fechamento projeta
   for (const a of ontem.acoes) {
     for (const id of IDS_DOS_CONSULTORES) assert.equal(dp[a.id][ontem.dia][id], projetar(id, ontem.dia, a).preco);
   }
+});
+
+// ---------------------------------------------------------------- a Biblioteca Colaborativa (26/10/2026)
+
+const HASH_DE_TESTE = "a".repeat(64);
+
+caso("acervo: quatro tipos, cada um com a sua construção e quem cuida dela", () => {
+  assert.deepEqual(ORDEM_DOS_TIPOS, ["livro", "artigo", "videoaula", "video"]);
+  assert.deepEqual(ORDEM_DOS_TIPOS.map((t) => TIPOS_DE_MATERIAL[t].recompensa), [300, 250, 150, 120], "o livro vale mais que o vídeo");
+  for (const t of ORDEM_DOS_TIPOS) {
+    const c = CONSTRUCOES_DO_ACERVO[t];
+    assert.ok(c.nome && c.personagem.nome && c.personagem.cargo, t);
+    assert.ok(c.personagem.falas.length >= 3, `${t}: falas`);
+    assert.ok(svgDoFuncionario(c.personagem.id).startsWith("<svg"), `${t}: tem desenho`);
+  }
+  assert.ok(CATEGORIAS_DO_ACERVO.includes("Outros"));
+});
+
+caso("acervo: a biblioteca e as construções sobem de nível, e a recompensa sobe junto", () => {
+  assert.deepEqual(nivelDaConstrucao(0), { nivel: 1, proximo: 1, faltam: 1 });
+  assert.deepEqual(nivelDaConstrucao(1), { nivel: 2, proximo: 3, faltam: 2 });
+  assert.deepEqual(nivelDaConstrucao(45), { nivel: 10, proximo: null, faltam: 0 });
+  assert.deepEqual(nivelDaConstrucao(999), { nivel: 10, proximo: null, faltam: 0 });
+  assert.equal(nivelDaBiblioteca(0).nivel, 1);
+  assert.equal(nivelDaBiblioteca(7).nivel, 2);
+  assert.equal(nivelDaBiblioteca(8).nivel, 3);
+  assert.equal(nivelDaBiblioteca(150).nivel, 10);
+  assert.equal(recompensaDe("livro", 1), 300);
+  assert.equal(recompensaDe("livro", 10), 570, "no nível 10, 1,9×");
+  assert.equal(recompensaDe("video", 3), 144);
+  assert.equal(recompensaDe("inventado", 3), 0);
+  const e = estadoDaBiblioteca({ livro: 3, video: 5 });
+  assert.equal(e.total, 8);
+  assert.equal(e.nivel, 3);
+  assert.equal(e.construcoes.livro.nivel, 3);
+  assert.equal(e.construcoes.artigo.nivel, 1);
+  assert.equal(e.recompensas.livro, 360);
+  assert.equal(e.proximo, 15);
+  assert.equal(e.faltam, 7);
+});
+
+caso("acervo: os links de vídeo do YouTube e do Vimeo (e o que não é vídeo)", () => {
+  const id = "dQw4w9WgXcQ";
+  for (const url of [`https://www.youtube.com/watch?v=${id}&t=10s`, `https://youtu.be/${id}`, `https://youtube.com/shorts/${id}`, `https://m.youtube.com/watch?v=${id}`, `https://www.youtube.com/embed/${id}`]) {
+    const v = videoDoLink(url);
+    assert.equal(v?.plataforma, "youtube", url);
+    assert.equal(v.id, id, url);
+    assert.equal(v.embed, `https://www.youtube-nocookie.com/embed/${id}`);
+    assert.equal(v.miniatura, `https://i.ytimg.com/vi/${id}/hqdefault.jpg`);
+  }
+  assert.deepEqual(videoDoLink("https://vimeo.com/76979871"), { plataforma: "vimeo", id: "76979871", embed: "https://player.vimeo.com/video/76979871", miniatura: null });
+  for (const ruim of ["javascript:alert(1)", "https://exemplo.com/video", "youtube.com/watch?v=" + id, "https://www.youtube.com/watch?v=curto", "", null]) {
+    assert.equal(videoDoLink(ruim), null, String(ruim));
+  }
+  assert.equal(linkValido("https://doi.org/10.1000/182"), "https://doi.org/10.1000/182");
+  assert.equal(linkValido("ftp://x.com/a"), null);
+  assert.equal(linkValido("https://com"), null);
+});
+
+caso("acervo: o que vale como envio (e o que acusa duplicado)", () => {
+  const base = { titulo: "Cálculo I — Volume 1", categoria: "Matemática", assunto: "limites" };
+  const pdf = { tamanho: 1000, paginas: 12, hash: HASH_DE_TESTE, sumario: [{ titulo: "Cap. 1", pagina: 1, nivel: 1 }, { titulo: "fora", pagina: 99, nivel: 1 }] };
+  const livro = validarMaterial({ ...base, tipo: "livro", pdf });
+  assert.equal(livro.ok, true, livro.erros?.join("; "));
+  assert.deepEqual(livro.material.pdf.sumario, [{ titulo: "Cap. 1", pagina: 1, nivel: 1 }], "o sumário só com páginas que existem");
+  assert.equal(livro.chave, "livro:calculo i volume 1");
+  assert.equal(validarMaterial({ ...base, tipo: "livro", titulo: "calculo I volume 1!!", pdf }).chave, livro.chave, "o mesmo título, escrito de outro jeito, é duplicado");
+  assert.match(validarMaterial({ ...base, tipo: "livro" }).erros.join(), /escolha o PDF/);
+  assert.match(validarMaterial({ ...base, tipo: "livro", pdf: { ...pdf, hash: "x" } }).erros.join(), /conferir o PDF/);
+  assert.match(validarMaterial({ ...base, tipo: "livro", pdf: { ...pdf, tamanho: 60 * 1024 * 1024 } }).erros.join(), /50 MB/);
+  assert.equal(validarMaterial({ ...base, tipo: "artigo", link: "https://doi.org/10.1000/182" }).ok, true, "artigo por link");
+  assert.equal(validarMaterial({ ...base, tipo: "artigo", pdf }).ok, true, "artigo em PDF");
+  assert.match(validarMaterial({ ...base, tipo: "artigo" }).erros.join(), /PDF ou cole o link/);
+  const v = validarMaterial({ ...base, tipo: "videoaula", link: "https://youtu.be/dQw4w9WgXcQ" });
+  assert.equal(v.ok, true);
+  assert.equal(v.chave, "video:youtube:dQw4w9WgXcQ", "o mesmo vídeo é duplicado, com qualquer título");
+  assert.match(validarMaterial({ ...base, tipo: "video", link: "https://exemplo.com" }).erros.join(), /YouTube ou Vimeo/);
+  assert.match(validarMaterial({ ...base, tipo: "livro", categoria: "Culinária", pdf }).erros.join(), /categoria/);
+  assert.match(validarMaterial({ ...base, tipo: "livro", titulo: "ab", pdf }).erros.join(), /nome/);
+  assert.match(validarMaterial({ ...base, tipo: "inventado" }).erros.join(), /tipo/);
+  assert.equal(validarMaterial({ ...base, tipo: "livro", pdf, capa: "data:text/html;base64,AAAA" }).material.capa, null, "capa só de imagem");
+  assert.equal(validarMaterial({ ...base, tipo: "livro", pdf, capa: "data:image/jpeg;base64,AAAA" }).material.capa, "data:image/jpeg;base64,AAAA");
+});
+
+caso("acervo: quem revisa, quem retira e quem agradece", () => {
+  const dono = { id: "dono", papel: "dono" }, lider = { id: "lider", papel: "lider" };
+  const pendente = (autor) => ({ autor_id: autor, status: "pendente" });
+  assert.equal(podeRevisar({ usuarioId: "alguem", material: pendente("x"), bibliotecarios: [dono, lider] }).ok, false, "só bibliotecário");
+  assert.equal(podeRevisar({ usuarioId: "lider", material: pendente("x"), bibliotecarios: [dono, lider] }).ok, true);
+  assert.match(podeRevisar({ usuarioId: "lider", material: pendente("lider"), bibliotecarios: [dono, lider] }).motivo, /outro bibliotecário/, "o próprio envio fica para o outro");
+  assert.equal(podeRevisar({ usuarioId: "dono", material: pendente("dono"), bibliotecarios: [dono] }).ok, true, "sozinho, revisa o próprio");
+  assert.equal(podeRevisar({ usuarioId: "dono", material: { autor_id: "x", status: "aprovado" }, bibliotecarios: [dono] }).ok, false, "só o que está na fila");
+  assert.equal(podeRetirar({ usuarioId: "dono", material: { status: "aprovado" }, bibliotecarios: [dono] }).ok, true);
+  assert.equal(podeRetirar({ usuarioId: "dono", material: { status: "pendente" }, bibliotecarios: [dono] }).ok, false);
+  assert.equal(podeRetirar({ usuarioId: "alguem", material: { status: "aprovado" }, bibliotecarios: [dono] }).ok, false);
+  const aprovado = { autor_id: "autor", status: "aprovado" };
+  assert.deepEqual(podeAgradecer({ usuarioId: "leitor", material: aprovado, moedas: 25, saldo: 100, jaAgradeceu: false }), { ok: true, moedas: 25 });
+  assert.match(podeAgradecer({ usuarioId: "autor", material: aprovado, moedas: 25, saldo: 100 }).motivo, /si mesmo/);
+  assert.match(podeAgradecer({ usuarioId: "leitor", material: aprovado, moedas: 25, saldo: 100, jaAgradeceu: true }).motivo, /já agradeceu/);
+  assert.match(podeAgradecer({ usuarioId: "leitor", material: aprovado, moedas: 7, saldo: 100 }).motivo, /gorjeta/);
+  assert.match(podeAgradecer({ usuarioId: "leitor", material: aprovado, moedas: 50, saldo: 20 }).motivo, /faltam 30 moedas/);
+  assert.match(podeAgradecer({ usuarioId: "leitor", material: { ...aprovado, status: "pendente" }, moedas: 10, saldo: 100 }).motivo, /não está no acervo/);
+  assert.deepEqual(GORJETAS, [10, 25, 50]);
+  assert.equal(motivoValido("  ok "), null, "motivo de verdade (5 letras ou mais)");
+  assert.equal(motivoValido("PDF incompleto"), "PDF incompleto");
+});
+
+caso("acervo: a migração 020 só acrescenta tipos ao livro-caixa", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const tipos = (sql) => [...sql.match(/proof_reino_movimentos_tipo_check\s+check \(tipo in \(([\s\S]*?)\)\)/)[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  const antes = tipos(ler("../db/018-modo-dominio.sql"));
+  const agora = tipos(ler("../db/020-biblioteca-colaborativa.sql"));
+  for (const t of antes) assert.ok(agora.includes(t), `o tipo ${t} continua`);
+  for (const t of ["acervo", "acervo_revisao", "gorjeta_dada", "gorjeta_recebida"]) assert.ok(agora.includes(t), `entra o tipo ${t}`);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

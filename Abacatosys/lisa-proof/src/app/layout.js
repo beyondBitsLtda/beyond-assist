@@ -13,6 +13,7 @@ import "./dominio.css";
 import "./caderno.css";
 import "./biblioteca.css";
 import "./estante.css";
+import "./acervo.css";
 
 export const metadata = {
   title: "Lisa_Proof",

@@ -8,9 +8,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Neuro from "./Neuro.js";
-import { retratoDoConsultor } from "./bolsa/consultoresDePapel.js";
+import { urlDoFuncionario } from "./acervo/personagensDoAcervo.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-26-consultores-da-bolsa";
+export const EDICAO_DAS_NOVIDADES = "2026-10-26-biblioteca-colaborativa";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,14 +28,14 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🔮", titulo: "Mesa dos Consultores", texto: "Madame Ametista, o Barão Cifrão, a Luna “Foguete”, o Professor Corvo, a Dona Zuleica e o Gorgo, o Urso, projetam onde cada ação da Bolsa fecha. Cada um tem história, jeito e uma margem de erro secreta que muda todo dia.", destaque: true },
-  { icone: "📊", titulo: "O que dizem da sua ação", texto: "Na ação escolhida, uma régua mostra o preço que cada consultor projetou, o preço de agora e a mediana da mesa — com a fala de cada um." },
-  { icone: "🏆", titulo: "Placar e retrospecto", texto: "Depois das 17h, o placar mostra quem chegou mais perto. O retrospecto dos últimos pregões é a sua pista de em quem confiar." },
-  { icone: "✖️", titulo: "Recompensas em triplo", texto: "Quiz, exercício, projetos da semana e do mês e as conquistas de andares do Modo Domínio passam a valer o triplo de pontos e moedas." },
+  { icone: "🏛️", titulo: "Biblioteca Colaborativa", texto: "Uma ilha só para o conhecimento: a Torre dos Livros, o Observatório dos Artigos, o Auditório das Videoaulas e o Cinema dos Vídeos crescem a cada material aprovado — e quem trouxe anda pela ilha.", destaque: true },
+  { icone: "📮", titulo: "Traga e ganhe moedas", texto: "Livro em PDF, artigo científico, videoaula ou vídeo teórico: aprovado, vale de 🪙 120 a 🪙 300 — e as recompensas sobem 10% a cada nível da biblioteca." },
+  { icone: "🔎", titulo: "O bibliotecário confere", texto: "O líder do ranking da semana revisa cada envio (e ganha 🪙 25 por revisão). Recusa sempre vem com o motivo." },
+  { icone: "🙏", titulo: "Leia e agradeça", texto: "O livro abre na sua biblioteca, com marcações e busca; o vídeo, ali mesmo. Gostou? Agradeça com uma gorjeta a quem trouxe." },
 ];
 
-const NA_ESQUERDA = ["ametista", "barao", "luna"];
-const NA_DIREITA = ["corvo", "zuleica", "gorgo"];
+const NA_ESQUERDA = ["celeste", "iris"];
+const NA_DIREITA = ["tobias", "pipoca"];
 
 export default function Novidades() {
   const [aberto, setAberto] = useState(false);
@@ -70,16 +70,16 @@ export default function Novidades() {
         <div className="novidades__palco" aria-hidden="true">
           <span className="novidades__estrelas" />
           <div className="novidades__retratos">
-            <span>{NA_ESQUERDA.map((id) => <img key={id} className="novidades__retrato" src={retratoDoConsultor(id)} alt="" />)}</span>
-            <span>{NA_DIREITA.map((id) => <img key={id} className="novidades__retrato" src={retratoDoConsultor(id)} alt="" />)}</span>
+            <span>{NA_ESQUERDA.map((id) => <img key={id} className="novidades__retrato novidades__retrato--solto" src={urlDoFuncionario(id)} alt="" />)}</span>
+            <span>{NA_DIREITA.map((id) => <img key={id} className="novidades__retrato novidades__retrato--solto" src={urlDoFuncionario(id)} alt="" />)}</span>
           </div>
           <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} /></div>
           <span className="novidades__chao" />
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">A Mesa dos Consultores!</h2>
-          <p className="novidades__sub">Seis personagens projetam o fechamento da Bolsa do Reino — cada um erra do seu jeito, e ninguém sabe a margem de erro de hoje. E estudar agora rende o triplo de moedas.</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">A Biblioteca Colaborativa!</h2>
+          <p className="novidades__sub">Traga livros, artigos e vídeos para todos: o bibliotecário confere, você ganha moedas e a biblioteca cresce. (E na Bolsa, os consultores agora traçam as previsões no gráfico de cada ação.)</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -89,7 +89,7 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/bolsa" className="pf-botao novidades__principal" onClick={fechar}>🔮 Ver os consultores</Link>
+            <Link ref={principal} href="/acervo" className="pf-botao novidades__principal" onClick={fechar}>🏛️ Abrir a Biblioteca Colaborativa</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>

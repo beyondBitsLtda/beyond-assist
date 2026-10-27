@@ -114,3 +114,7 @@
 .novidades__retratos > span > .novidades__retrato:nth-child(3) { animation-delay: 1s; }
 @media (max-width: 520px) { .novidades__retratos > span { gap: 4px; } .novidades__retratos > span > .novidades__retrato:nth-child(2) { display: none; } }
 @media (prefers-reduced-motion: reduce) { .novidades__retrato { animation: none; } }
+
+/* 26/10/2026 (2): os funcionários da Biblioteca Colaborativa no palco (corpo inteiro, sem moldura) */
+.novidades__retrato--solto { width: clamp(56px, 11vw, 118px); filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.22)); }
+.novidades__retratos > span > .novidades__retrato--solto:nth-child(even) { margin-bottom: 0; }

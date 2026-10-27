@@ -245,6 +245,64 @@ Como funciona:
   personagem está em `src/dominio/consultores.js`. Os retratos de papel estão em
   `src/componentes/bolsa/consultoresDePapel.js`.
 
+## Biblioteca Colaborativa (Acervo)
+
+Em `/acervo`, todo mundo pode trazer material para um acervo comum:
+
+- livro em PDF;
+- artigo científico, em PDF ou por link (DOI ou página);
+- videoaula ou vídeo teórico, por link do YouTube ou do Vimeo.
+
+Cada envio tem nome, capa, categoria, assunto e uma descrição opcional. A capa de um PDF é a 1ª
+página, mas a pessoa pode escolher outra imagem.
+
+**Quem é o bibliotecário.** São dois: o administrador (a conta de `PROOF_ADMIN_EMAIL`, a mesma
+da Lisa) e o líder do ranking da semana. Ninguém aprova o próprio envio, a não ser quando é o
+único bibliotecário. Para recusar, o motivo é obrigatório, e o PDF recusado sai do disco.
+
+**Moedas.** As recompensas são do Reino de verdade (livro-caixa) e o mundo de teste não tem
+acervo.
+
+| Quem | O que ganha | Tipo no livro-caixa |
+|---|---|---|
+| Quem trouxe, quando o material é aprovado | 🪙 300 (livro), 250 (artigo), 150 (videoaula), 120 (vídeo teórico), mais 10% a cada nível da biblioteca | `acervo` |
+| O bibliotecário, por revisão (aprovada ou recusada), menos nos próprios envios | 🪙 25 | `acervo_revisao` |
+| Quem trouxe, quando alguém agradece | gorjeta de 🪙 10, 25 ou 50, uma por material por pessoa | `gorjeta_dada` / `gorjeta_recebida` |
+
+**Limites e duplicados.** Cada pessoa manda até 5 envios por dia. Duplicado é o mesmo vídeo, o
+mesmo PDF (pelo SHA-256) ou o mesmo título no mesmo tipo. Índices únicos no banco barram os
+duplicados que estão na fila ou no acervo.
+
+**O mundo.** É uma ilha 3D no papel recortado do Reino, com quatro construções:
+
+| Construção | Funcionário | Acervo |
+|---|---|---|
+| Torre dos Livros | Dona Celeste, a Bibliotecária | livros |
+| Observatório dos Artigos | Doutora Íris, a Cientista | artigos |
+| Auditório das Videoaulas | Mestre Tobias, o Professor | videoaulas |
+| Cinema dos Vídeos | Pipoca, o Projecionista | vídeos teóricos |
+
+- Cada construção cresce com o nível do seu acervo (10 níveis), e a biblioteca toda tem um nível,
+  que aumenta as recompensas.
+- Os avatares de quem mais contribuiu andam entre as construções do que trouxeram. Clicando num
+  deles, aparece o que a pessoa trouxe. É a interação "sem ser ao vivo" que foi escolhida; ver os
+  outros andando ao mesmo tempo ficou para uma segunda etapa.
+
+**Ler.** "Ler na minha biblioteca" cria o livro na estante da pessoa apontando para o PDF do acervo
+(`proof_livros.acervo_id`). O arquivo não é copiado, não ocupa o espaço dela e não é apagado
+quando ela tira o livro da estante. Marcações, busca e cursos funcionam como num PDF próprio.
+
+**Direitos autorais.** O dono do Proof decidiu aceitar qualquer PDF, depois de ser alertado
+sobre os livros com direitos. "Retirar do acervo" (só o bibliotecário) é o caminho para atender
+a uma reclamação. O material sai da lista, e quem já tinha levado o livro para a própria estante
+continua com ele.
+
+**Arquivos.**
+- Banco: `db/020-biblioteca-colaborativa.sql`. Os PDFs ficam no bucket privado `proof-acervo`.
+- Regras: `src/dominio/acervo.js`.
+- Servidor: `src/lib/acervo.js` e as rotas em `/api/acervo`.
+- Tela: `src/componentes/acervo/`.
+
 ## Onde as coisas moram
 
 | Caminho | O quê |

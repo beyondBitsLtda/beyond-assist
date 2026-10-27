@@ -58,6 +58,11 @@ export const IconeBiblioteca = () => (
   <svg {...base}><path d="M4 20V5h3v15M9 20V7h3v13M14.5 7.5l2.9-.8 3.6 13.1-2.9.8zM3 20h18" /></svg>
 );
 
+// Acervo (26/10/2026): a Biblioteca Colaborativa, um prédio de colunas com frontão
+export const IconeAcervo = () => (
+  <svg {...base}><path d="M3 9l9-5 9 5M5 9v9M9.5 9v9M14.5 9v9M19 9v9M3 20h18" /></svg>
+);
+
 // Mais: três pontos
 export const IconeMais = () => (
   <svg {...base}><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>

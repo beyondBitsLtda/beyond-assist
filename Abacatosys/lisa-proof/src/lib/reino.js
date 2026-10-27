@@ -463,6 +463,32 @@ async function lancarEGravar(reino, lancamentos, mudancas) {
   }
 }
 
+// ---------------------------------------------------------------- moedas de fora do Reino
+//
+// A Biblioteca Colaborativa (26/10/2026, src/lib/acervo.js) paga e cobra moedas do mundo de
+// verdade: a recompensa do material aprovado, o pagamento da revisão e a gorjeta. Sempre no mundo
+// de verdade, mesmo que um dia alguém chame de dentro do Reino de Teste.
+
+/** Lança moedas a favor de alguém. Devolve o id do lançamento (para desfazer, se o resto falhar). */
+export function creditarMoedas(usuarioId, tipo, valor, detalhe = {}) {
+  return noMundo("real", () => lancar(usuarioId, tipo, valor, detalhe));
+}
+
+/** Desfaz lançamentos feitos por creditarMoedas. */
+export function desfazerCreditos(ids) {
+  return noMundo("real", () => desfazerLancamentos(ids));
+}
+
+/** Gasta moedas na ordem segura de sempre (lança, grava o reino com a versão, desfaz se perder a corrida). */
+export function gastarMoedas(usuarioId, tipo, valor, detalhe = {}) {
+  return noMundo("real", async () => {
+    const reino = await obterReino(usuarioId);
+    const saldo = await saldoDoUsuario(usuarioId);
+    if (saldo < valor) throw new ErroDeAcesso(400, `faltam ${Math.ceil(valor - saldo)} moedas`);
+    await lancarEGravar(reino, [{ tipo, valor: -valor, detalhe }], {});
+  });
+}
+
 /** Construir ou melhorar uma construção. */
 export async function melhorarConstrucao(usuarioId, chave) {
   const reino = await obterReino(usuarioId);

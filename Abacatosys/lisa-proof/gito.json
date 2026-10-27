@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.31.0-cloudflare-pages.1",
+  "versao": "0.32.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-26",
   "compilacao": {
-    "numero": 71,
+    "numero": 72,
     "data": "2026-10-26",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.32.0-cloudflare-pages.1",
+      "data": "2026-10-26",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Biblioteca Colaborativa (/acervo): todos trazem livros, artigos e vídeos; o bibliotecário confere, quem trouxe ganha moedas e a ilha da biblioteca cresce.",
+      "itens": [
+        "Enviar livro em PDF, artigo científico (PDF ou link), videoaula ou vídeo teórico (YouTube ou Vimeo), com nome, capa, categoria e assunto; a capa do PDF é a 1ª página (ou uma imagem escolhida).",
+        "O bibliotecário é o administrador e o líder do ranking da semana: aprova ou recusa com motivo; ninguém aprova o próprio envio (a não ser sozinho) e cada revisão paga 🪙 25.",
+        "Aprovado, quem trouxe ganha 🪙 300 (livro), 250 (artigo), 150 (videoaula) ou 120 (vídeo teórico), mais 10% a cada nível da biblioteca.",
+        "Um mundo 3D em papel recortado: a Torre dos Livros, o Observatório dos Artigos, o Auditório das Videoaulas e o Cinema dos Vídeos crescem com o acervo; cada um tem o seu funcionário (Dona Celeste, Doutora Íris, Mestre Tobias e Pipoca) e os avatares de quem contribuiu andam pela ilha — clicando, aparece o que a pessoa trouxe.",
+        "Acervo com busca e filtros; o livro abre na biblioteca pessoal (o mesmo PDF, com marcações, busca e cursos, sem ocupar espaço); o vídeo abre na própria página; gorjeta de agradecimento para quem trouxe.",
+        "Limite de 5 envios por dia, duplicados barrados (mesmo vídeo, mesmo PDF ou mesmo título no tipo) e \"retirar do acervo\" para atender a reclamações.",
+        "Novo item \"Acervo\" no menu e a janela de Novidades anunciando a biblioteca."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.31.0-cloudflare-pages.1",
       "data": "2026-10-26",
@@ -1110,7 +1127,8 @@
         "Vínculos do caderno (inteiro, módulo ou página) com trilhas e cursos, assuntos, torres e andares do Modo Domínio e livros (até a página), com o bloco “📓 Anotações” e o “Anotar aqui” em cada um desses lugares",
         "Biblioteca de PDFs (/biblioteca) com leitor: destaque em cores, sublinhado, notas, marcação de área, marcador de página, sumário, miniaturas, busca no texto, temas de leitura e trechos mandados para o caderno",
         "Cursos gerados a partir de um livro da biblioteca, seguindo os capítulos, com as páginas de cada assunto; a explicação, o quiz e o exercício do assunto usam o trecho do livro",
-        "Estante virtual da Biblioteca: livros em 3D nas prateleiras, com lombada (cor da capa, título, marcador de leitura, selo de lido, 🎓 de curso), capa ao puxar e destaque com as ações"
+        "Estante virtual da Biblioteca: livros em 3D nas prateleiras, com lombada (cor da capa, título, marcador de leitura, selo de lido, 🎓 de curso), capa ao puxar e destaque com as ações",
+        "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link e vídeos (YouTube/Vimeo), com revisão do bibliotecário (administrador e líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -1128,7 +1146,9 @@
         "A página de conferência do certificado não mostra nome completo nem e-mail (só o nome público).",
         "PDF escaneado (só imagem, sem texto) dá para ler e marcar por área, mas não serve de base para gerar curso nem para a busca: o Proof não faz OCR.",
         "Os PDFs não são compartilhados entre contas: a biblioteca é de quem subiu; o limite é de 50 MB por arquivo e 2 GB por pessoa (o disco é o do servidor de casa).",
-        "Cadernos não são editados por mais de uma pessoa ao mesmo tempo nem guardam histórico de versões: a versão serve só para não apagar o que outra aba gravou."
+        "Cadernos não são editados por mais de uma pessoa ao mesmo tempo nem guardam histórico de versões: a versão serve só para não apagar o que outra aba gravou.",
+        "A Biblioteca Colaborativa não confere direitos autorais automaticamente: aceita qualquer PDF (decisão do dono) e depende do bibliotecário, que pode retirar um material a qualquer momento.",
+        "Na Biblioteca Colaborativa, os avatares não andam ao vivo (não se vê quem está online agora); a interação é com quem contribuiu."
       ]
     },
     "stack": [
@@ -1148,7 +1168,7 @@
       "Supabase Storage (bucket privado proof-biblioteca) com endereços assinados de envio e de leitura"
     ],
     "arquitetura": {
-      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do curso (a semana de cada assunto no agendamento, a mesma do mapa e da agenda), o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check. O Modo Domínio (db/018) guarda a torre em proof_dominios e cada andar em proof_dominio_andares; as regras (níveis, chefões, pontos, luta, prêmios, conferência da IA) são puras em src/dominio/modoDominio.js, a IA em src/lib/iaDominio.js, o GitHub e o GitLab em src/lib/repositorios.js (só github.com e gitlab.com) e o caminho até o banco em src/lib/dominio.js. Cada passo que gasta IA tem trava contra clique duplo (gravação condicional ao estado lido), e só quem move a torre de andar paga o prêmio do marco. Os prêmios entram no Reino de verdade por premiarDoDominio (src/lib/reino.js), respeitando as capacidades das reservas. O certificado é desenhado num canvas e embrulhado em PDF no navegador; /certificado e /api/certificado são as únicas rotas novas sem login. A biblioteca guarda os PDFs no Storage do mesmo Supabase (bucket privado proof-biblioteca, no disco do iMac): o servidor confere o dono e assina endereços de vida curta, e o navegador envia e lê o arquivo direto, sem o PDF passar pelo Worker. O texto de cada página fica em proof_livro_paginas, e o corte dos trechos (curso, quiz, explicação) e a busca rodam em funções do Postgres, para caber no processamento curto do Worker gratuito.",
+      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do curso (a semana de cada assunto no agendamento, a mesma do mapa e da agenda), o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check. O Modo Domínio (db/018) guarda a torre em proof_dominios e cada andar em proof_dominio_andares; as regras (níveis, chefões, pontos, luta, prêmios, conferência da IA) são puras em src/dominio/modoDominio.js, a IA em src/lib/iaDominio.js, o GitHub e o GitLab em src/lib/repositorios.js (só github.com e gitlab.com) e o caminho até o banco em src/lib/dominio.js. Cada passo que gasta IA tem trava contra clique duplo (gravação condicional ao estado lido), e só quem move a torre de andar paga o prêmio do marco. Os prêmios entram no Reino de verdade por premiarDoDominio (src/lib/reino.js), respeitando as capacidades das reservas. O certificado é desenhado num canvas e embrulhado em PDF no navegador; /certificado e /api/certificado são as únicas rotas novas sem login. A biblioteca guarda os PDFs no Storage do mesmo Supabase (bucket privado proof-biblioteca, no disco do iMac): o servidor confere o dono e assina endereços de vida curta, e o navegador envia e lê o arquivo direto, sem o PDF passar pelo Worker. O texto de cada página fica em proof_livro_paginas, e o corte dos trechos (curso, quiz, explicação) e a busca rodam em funções do Postgres, para caber no processamento curto do Worker gratuito. A Biblioteca Colaborativa guarda o acervo em proof_acervo e as gorjetas em proof_acervo_gorjetas (db/020-biblioteca-colaborativa.sql); os PDFs ficam no bucket privado proof-acervo, e o livro levado para a biblioteca pessoal aponta para o mesmo arquivo (proof_livros.acervo_id).",
       "diagramas": [
         {
           "titulo": "Visão geral",

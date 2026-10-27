@@ -7,6 +7,10 @@
 //   3. o navegador manda o arquivo direto para o Storage (o PDF não passa pelo Worker) e avisa;
 //   4. o navegador tira o texto de cada página e manda em lotes; no último, o livro fica "pronto".
 // Para ler, o servidor assina um endereço de leitura de vida curta, depois de conferir o dono.
+//
+// LIVROS DA BIBLIOTECA COLABORATIVA (26/10/2026): "levar para a minha biblioteca" cria a linha da
+// pessoa (marcações, onde parou, o texto para a busca) apontando para o PDF do acervo (acervo_id):
+// o arquivo não é copiado, não conta no espaço dela e não é apagado quando ela tira o livro da estante.
 
 import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
@@ -16,9 +20,10 @@ import {
 } from "@/dominio/biblioteca.js";
 
 export const BUCKET = "proof-biblioteca";
+export const BUCKET_DO_ACERVO = "proof-acervo";
 const VIDA_DO_ENDERECO = 3 * 60 * 60; // 3 h: dá para ler uma tarde inteira sem o PDF sumir
 
-const CAMPOS_DO_LIVRO = "id, titulo, autor, arquivo, tamanho, paginas, sumario, capa, status, paginas_com_texto, ultima_pagina, criado_em, atualizado_em, lido_em";
+const CAMPOS_DO_LIVRO = "id, titulo, autor, arquivo, tamanho, paginas, sumario, capa, status, paginas_com_texto, ultima_pagina, criado_em, atualizado_em, lido_em, acervo_id";
 const CAMPOS_DA_MARCACAO = "id, livro_id, pagina, tipo, cor, texto, nota, retangulos, criado_em, atualizado_em";
 
 function falhou(error, onde) {
@@ -29,7 +34,7 @@ export function livroParaTela(l, extra = {}) {
   return {
     id: l.id, titulo: l.titulo, autor: l.autor, tamanho: Number(l.tamanho), paginas: l.paginas, sumario: l.sumario || [],
     capa: l.capa, status: l.status, paginasComTexto: l.paginas_com_texto, ultimaPagina: l.ultima_pagina,
-    progresso: progressoDaLeitura(l.ultima_pagina, l.paginas), criadoEm: l.criado_em, lidoEm: l.lido_em, ...extra,
+    progresso: progressoDaLeitura(l.ultima_pagina, l.paginas), criadoEm: l.criado_em, lidoEm: l.lido_em, doAcervo: Boolean(l.acervo_id), ...extra,
   };
 }
 
@@ -46,9 +51,9 @@ export async function exigirLivro(usuarioId, livroId, campos = CAMPOS_DO_LIVRO) 
 }
 
 async function espacoUsado(usuarioId) {
-  const { data, error } = await supabase.from("proof_livros").select("tamanho").eq("usuario_id", usuarioId);
+  const { data, error } = await supabase.from("proof_livros").select("tamanho, acervo_id").eq("usuario_id", usuarioId);
   falhou(error, "espaço");
-  return { usado: data.reduce((s, l) => s + Number(l.tamanho || 0), 0), quantos: data.length };
+  return { usado: data.reduce((s, l) => s + (l.acervo_id ? 0 : Number(l.tamanho || 0)), 0), quantos: data.length };
 }
 
 /** A estante: os livros (sem o texto), quantas marcações cada um tem e o espaço usado. */
@@ -71,7 +76,7 @@ export async function listarLivros(usuarioId) {
   const contar = (lista) => lista.reduce((m, x) => m.set(x.livro_id, (m.get(x.livro_id) || 0) + 1), new Map());
   const porLivro = contar(marcacoes);
   const cursosPorLivro = contar(trilhas); // os cursos feitos a partir do livro (o 🎓 da lombada)
-  const usado = data.reduce((s, l) => s + Number(l.tamanho || 0), 0);
+  const usado = data.reduce((s, l) => s + (l.acervo_id ? 0 : Number(l.tamanho || 0)), 0); // o PDF do acervo não ocupa o espaço da pessoa
   return {
     livros: data.map((l) => livroParaTela(l, { marcacoes: porLivro.get(l.id) || 0, cursos: cursosPorLivro.get(l.id) || 0 })),
     espaco: { usado, total: LIMITES_DA_BIBLIOTECA.total, arquivo: LIMITES_DA_BIBLIOTECA.arquivo },
@@ -134,7 +139,7 @@ export async function gravarTexto(usuarioId, livroId, { paginas, fim }) {
 export async function lerLivro(usuarioId, livroId) {
   const livro = await exigirLivro(usuarioId, livroId);
   if (livro.status === "enviando") return { livro: livroParaTela(livro), endereco: null };
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(livro.arquivo, VIDA_DO_ENDERECO);
+  const { data, error } = await supabase.storage.from(livro.acervo_id ? BUCKET_DO_ACERVO : BUCKET).createSignedUrl(livro.arquivo, VIDA_DO_ENDERECO);
   if (error || !data?.signedUrl) throw new ErroDeAcesso(502, `não consegui abrir o PDF agora: ${error?.message || "sem endereço"}`);
   return { livro: livroParaTela(livro), endereco: data.signedUrl };
 }
@@ -163,9 +168,12 @@ export async function editarLivro(usuarioId, livroId, bruto) {
 
 /** Apaga o arquivo e o livro (texto, marcações e leituras de curso vão junto; a trilha fica, sem o livro). */
 export async function apagarLivro(usuarioId, livroId) {
-  const livro = await exigirLivro(usuarioId, livroId, "id, arquivo");
-  const { error } = await supabase.storage.from(BUCKET).remove([livro.arquivo]);
-  if (error) throw new ErroDeAcesso(502, `não consegui apagar o arquivo: ${error.message}`);
+  const livro = await exigirLivro(usuarioId, livroId, "id, arquivo, acervo_id");
+  // o PDF do acervo é de todos: tirar da estante não apaga o arquivo
+  if (!livro.acervo_id) {
+    const { error } = await supabase.storage.from(BUCKET).remove([livro.arquivo]);
+    if (error) throw new ErroDeAcesso(502, `não consegui apagar o arquivo: ${error.message}`);
+  }
   const { error: e2 } = await supabase.from("proof_livros").delete().eq("id", livroId);
   falhou(e2, "apagar livro");
 }
