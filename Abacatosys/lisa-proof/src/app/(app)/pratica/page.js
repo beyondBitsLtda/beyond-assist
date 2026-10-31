@@ -150,6 +150,18 @@ export default function Pratica() {
         <Neuro humor={neuro.humor} fala={neuro.fala} tamanho={104} ouvir />
       </div>
 
+      {/* a memória e a turma (31/10/2026): os cartões com repetição espaçada e a revisão entre colegas */}
+      <nav className="pratica__atalhos" aria-label="Mais prática">
+        <Link className="pratica__atalho" href="/cartoes">
+          <span aria-hidden="true">🃏</span>
+          <span><strong>Cartões</strong><small>Revisão espaçada: cada cartão volta no dia em que ia ser esquecido</small></span>
+        </Link>
+        <Link className="pratica__atalho" href="/revisoes">
+          <span aria-hidden="true">🤝</span>
+          <span><strong>Revisão da turma</strong><small>Revise a entrega de um colega e ganhe pontos e moedas</small></span>
+        </Link>
+      </nav>
+
       {erro && <div className="pf-aviso pf-aviso--erro" style={{ marginTop: 12 }}>{erro}</div>}
       {!dados.iaDisponivel && <div className="pf-aviso" style={{ marginTop: 12 }}>A IA não está configurada neste servidor: a prática precisa dela.</div>}
 

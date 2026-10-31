@@ -9,11 +9,15 @@
 //   calculo  — lista de 3 a 6 itens com resposta numérica ou expressão: o SERVIDOR corrige, sem IA.
 //   ditado   — frases faladas pela voz do navegador; a pessoa escreve; o servidor compara palavra a palavra.
 //   ouvido   — intervalos ou acordes tocados na tela; a pessoa escolhe o nome; o servidor corrige.
+//   ritmo    — a pessoa bate o compasso junto do metrônomo; o servidor mede o desvio (musica.js).
+//   afinacao — a pessoa canta ou toca a nota no microfone; o navegador detecta a altura e o servidor
+//              mede os cents (musica.js).
 //
-// Os três últimos têm resposta certa: uma tentativa só (como o quiz), e o gabarito só vai para a
+// Os cinco últimos têm resposta certa: uma tentativa só (como o quiz), e o gabarito só vai para a
 // tela depois de corrigido. Puro: sem banco, sem rede, sem DOM.
 
 import { analisar, avaliar, equivalentes, formaAtendida, lerResposta, numeroCerto, formatarNumero, FORMAS } from "./expressao.js";
+import { nomeDaNota } from "./musica.js";
 
 export const MOTORES = {
   codigo: { nome: "Exercício de código", icone: "⌨️", tentativas: 5, corrige: "ia" },
@@ -21,6 +25,8 @@ export const MOTORES = {
   calculo: { nome: "Lista de cálculo", icone: "🧮", tentativas: 1, corrige: "servidor" },
   ditado: { nome: "Ditado", icone: "🎧", tentativas: 1, corrige: "servidor" },
   ouvido: { nome: "Treino de ouvido", icone: "🎼", tentativas: 1, corrige: "servidor" },
+  ritmo: { nome: "Ritmo", icone: "🥁", tentativas: 1, corrige: "servidor" },
+  afinacao: { nome: "Afinação", icone: "🎤", tentativas: 1, corrige: "servidor" },
 };
 export const motorDo = (conteudo) => (MOTORES[conteudo?.motor] ? conteudo.motor : "codigo");
 export const corrigeNoServidor = (motor) => MOTORES[motor]?.corrige === "servidor";
@@ -350,6 +356,9 @@ export function exercicioParaTela(conteudo, corrigido) {
   if (motor === "calculo") return { ...conteudo, itens: conteudo.itens.map(({ resposta, explicacao, tolerancia, ...resto }) => resto) };
   if (motor === "ditado") return { ...conteudo, frases: conteudo.frases.map((f) => ({ fala: embaralhar(f.texto) })) };
   if (motor === "ouvido") return { ...conteudo, itens: conteudo.itens.map(({ correta, ...resto }) => resto) };
+  // a afinação com intervalo esconde a nota pedida (a referência e o intervalo bastam); o ritmo não
+  // tem segredo: o padrão precisa estar à vista
+  if (motor === "afinacao" && conteudo.comIntervalo) return { ...conteudo, itens: conteudo.itens.map(({ alvo, nome, ...resto }) => resto) };
   return conteudo;
 }
 
@@ -362,7 +371,11 @@ export function avaliacaoDoMotor(motor, conteudo, correcao) {
     ? conteudo.itens.map((it) => it.pergunta)
     : motor === "ditado"
       ? conteudo.frases.map((f) => f.texto)
-      : conteudo.itens.map((_, i) => `Item ${i + 1}`);
+      : motor === "ritmo"
+        ? conteudo.itens.map((_, i) => `Compasso ${i + 1}`)
+        : motor === "afinacao"
+          ? conteudo.itens.map((it, i) => `Nota ${i + 1}: ${nomeDaNota(it.alvo, false)}${it.alvo !== it.referencia ? ` (${it.pedido} de ${nomeDaNota(it.referencia, false)})` : ""}`)
+          : conteudo.itens.map((_, i) => `Item ${i + 1}`);
   const resultados = motor === "ditado"
     ? correcao.frases.map((f) => ({
       certo: f.nota >= 0.999,

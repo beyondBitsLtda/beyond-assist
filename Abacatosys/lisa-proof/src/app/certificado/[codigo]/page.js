@@ -34,8 +34,10 @@ export default function ConferenciaDoCertificado() {
         {c && (
           <>
             <h1>✅ Certificado autêntico</h1>
-            <p className="dm-conferencia__quem"><strong>{c.nome}</strong> conquistou os <strong>{c.andares} andares</strong> da torre do repositório</p>
-            <p className="dm-conferencia__repo"><a href={c.url} target="_blank" rel="noreferrer">{c.repo}</a> <small>({c.provedor === "gitlab" ? "GitLab" : "GitHub"})</small></p>
+            <p className="dm-conferencia__quem"><strong>{c.nome}</strong> conquistou os <strong>{c.andares} andares</strong> da torre {c.origem === "tema" ? "do tema" : "do repositório"}</p>
+            {c.origem === "tema"
+              ? <p className="dm-conferencia__repo"><strong>{c.titulo}</strong> <small>({c.tipoDaTorre})</small></p>
+              : <p className="dm-conferencia__repo"><a href={c.url} target="_blank" rel="noreferrer">{c.repo}</a> <small>({c.provedor === "gitlab" ? "GitLab" : "GitHub"})</small></p>}
             <dl className="dm-conferencia__dados">
               <div><dt>Nível</dt><dd>{c.nivel} — {c.nomeDoNivel}</dd></div>
               <div><dt>Média final</dt><dd>{c.media}/100</dd></div>

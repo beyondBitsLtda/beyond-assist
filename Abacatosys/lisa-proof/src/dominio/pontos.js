@@ -59,4 +59,6 @@ export const NOMES_DOS_EVENTOS = {
   projeto_mensal: "Projeto do mês",
   conquista: "Conquista",
   dominio: "Modo Domínio",
+  cartoes: "Cartões revisados",
+  revisao: "Revisão da turma",
 };

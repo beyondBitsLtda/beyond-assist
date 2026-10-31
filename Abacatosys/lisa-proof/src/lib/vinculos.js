@@ -13,13 +13,14 @@ function falhou(error, onde) {
   if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`);
 }
 
-const nomeDaTorre = (repo) => String(repo || "").split("/").pop() || repo;
+// a torre de tema (31/10/2026) se chama pelo tema; a de repositório, pelo nome do repositório
+const nomeDaTorre = (t) => (t?.origem === "tema" ? t.tema : String(t?.repo_caminho || "").split("/").pop() || t?.repo_caminho) || "";
 
 /** Tudo a que a pessoa pode vincular: trilhas (com os assuntos), torres (com os andares) e livros. */
 export async function alvosDisponiveis(usuarioId) {
   const [{ data: trilhas, error: e1 }, { data: torres, error: e2 }, { data: livros, error: e3 }] = await Promise.all([
     supabase.from("proof_trilhas").select("id, tema, livro_id, status, criada_em").eq("usuario_id", usuarioId).order("criada_em"),
-    supabase.from("proof_dominios").select("id, repo_caminho, andares, status, criado_em").eq("usuario_id", usuarioId).order("criado_em"),
+    supabase.from("proof_dominios").select("id, origem, tema, repo_caminho, andares, status, criado_em").eq("usuario_id", usuarioId).order("criado_em"),
     supabase.from("proof_livros").select("id, titulo, paginas").eq("usuario_id", usuarioId).order("titulo"),
   ]);
   falhou(e1, "trilhas");
@@ -41,7 +42,7 @@ export async function alvosDisponiveis(usuarioId) {
       assuntos: etapas.data.filter((e) => e.trilha_id === t.id).map((e) => ({ id: e.card_id, nome: e.abacato_cards?.titulo || "Assunto" })),
     })),
     torres: torres.map((t) => ({
-      id: t.id, nome: nomeDaTorre(t.repo_caminho), repo: t.repo_caminho, status: t.status,
+      id: t.id, nome: nomeDaTorre(t), repo: t.repo_caminho || t.tema, status: t.status,
       andares: andares.data.filter((a) => a.dominio_id === t.id).map((a) => ({ numero: a.numero, nome: a.titulo, chefao: a.chefao_nome })),
     })),
     livros: livros.map((l) => ({ id: l.id, nome: l.titulo, paginas: l.paginas })),
@@ -60,11 +61,11 @@ export async function conferirAlvo(usuarioId, alvo) {
       .eq("card_id", id).eq("proof_trilhas.usuario_id", usuarioId).limit(1);
     if (data?.length) return { nome: data[0].abacato_cards?.titulo || "Assunto", trilhaId: data[0].trilha_id };
   } else if (tipo === "torre" || tipo === "andar") {
-    const { data: torre } = await supabase.from("proof_dominios").select("id, repo_caminho").eq("id", id).eq("usuario_id", usuarioId).maybeSingle();
-    if (torre && tipo === "torre") return { nome: nomeDaTorre(torre.repo_caminho) };
+    const { data: torre } = await supabase.from("proof_dominios").select("id, origem, tema, repo_caminho").eq("id", id).eq("usuario_id", usuarioId).maybeSingle();
+    if (torre && tipo === "torre") return { nome: nomeDaTorre(torre) };
     if (torre) {
       const { data: andar } = await supabase.from("proof_dominio_andares").select("titulo").eq("dominio_id", id).eq("numero", numero).maybeSingle();
-      if (andar) return { nome: andar.titulo, torre: nomeDaTorre(torre.repo_caminho) };
+      if (andar) return { nome: andar.titulo, torre: nomeDaTorre(torre) };
     }
   } else if (tipo === "livro") {
     const { data } = await supabase.from("proof_livros").select("id, titulo, paginas").eq("id", id).eq("usuario_id", usuarioId).maybeSingle();
@@ -85,7 +86,7 @@ async function alvosVivos(usuarioId, vinculos) {
     ids("assunto").length
       ? supabase.from("proof_etapas").select("card_id, trilha_id, abacato_cards(titulo), proof_trilhas!inner(usuario_id)").in("card_id", ids("assunto")).eq("proof_trilhas.usuario_id", usuarioId)
       : { data: [] },
-    ids("torre").length ? supabase.from("proof_dominios").select("id, repo_caminho").in("id", ids("torre")).eq("usuario_id", usuarioId) : { data: [] },
+    ids("torre").length ? supabase.from("proof_dominios").select("id, origem, tema, repo_caminho").in("id", ids("torre")).eq("usuario_id", usuarioId) : { data: [] },
     ids("torre").length ? supabase.from("proof_dominio_andares").select("dominio_id, numero, titulo").in("dominio_id", ids("torre")) : { data: [] },
     ids("livro").length ? supabase.from("proof_livros").select("id, titulo").in("id", ids("livro")).eq("usuario_id", usuarioId) : { data: [] },
   ]);
@@ -99,7 +100,7 @@ async function alvosVivos(usuarioId, vinculos) {
       const a = assuntos.find((x) => x.card_id === v.alvo_id);
       nome = a?.abacato_cards?.titulo;
       alvo.trilhaId = a?.trilha_id;
-    } else if (v.alvo_tipo === "torre") nome = nomeDaTorre(torres.find((t) => t.id === v.alvo_id)?.repo_caminho);
+    } else if (v.alvo_tipo === "torre") nome = nomeDaTorre(torres.find((t) => t.id === v.alvo_id));
     else if (v.alvo_tipo === "andar") {
       existe = torres.some((t) => t.id === v.alvo_id);
       nome = andares.find((a) => a.dominio_id === v.alvo_id && a.numero === v.alvo_numero)?.titulo;

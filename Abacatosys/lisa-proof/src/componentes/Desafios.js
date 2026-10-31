@@ -14,6 +14,7 @@ import Neuro, { reagir, comemorar, celebrar } from "./Neuro.js";
 import { Barra, useAviso } from "./Pecas.js";
 import { Avaliacao, reagirAEntrega } from "./pratica/Retorno.js";
 import { DesafioAberto, ListaDeCalculo, Ditado, TreinoDeOuvido, EntregaComEvidencias } from "./pratica/Motores.js";
+import { TreinoDeRitmo, TreinoDeAfinacao } from "./pratica/MotoresDeMusica.js";
 
 const LETRAS = ["A", "B", "C", "D"];
 
@@ -333,6 +334,8 @@ export function Exercicio({ desafio }) {
   if (desafio.motor === "calculo") return <ListaDeCalculo desafio={desafio} />;
   if (desafio.motor === "ditado") return <Ditado desafio={desafio} />;
   if (desafio.motor === "ouvido") return <TreinoDeOuvido desafio={desafio} />;
+  if (desafio.motor === "ritmo") return <TreinoDeRitmo desafio={desafio} />;
+  if (desafio.motor === "afinacao") return <TreinoDeAfinacao desafio={desafio} />;
   const c = desafio.conteudo;
   return (
     <div className="desafio">

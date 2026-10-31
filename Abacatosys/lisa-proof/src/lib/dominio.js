@@ -3,6 +3,11 @@
 // moram em src/dominio/modoDominio.js; a IA em src/lib/iaDominio.js; o GitHub e o GitLab em
 // src/lib/repositorios.js.
 //
+// A torre de TEMA (31/10/2026, cursos que não são de programação): sem repositório e sem branch; o
+// tema e o perfil (música, idiomas, matemática, livre), e cada andar entregue por texto, fotos, áudio
+// ou vídeo do YouTube (src/lib/entregas.js), avaliados pela Lisa. A luta, os pontos, os marcos e o
+// certificado são os mesmos. As fotos e o áudio vão só para a IA: a entrega guarda um resumo.
+//
 // A torre é sempre do mundo de verdade: os pontos dos andares entram no livro de pontos (viram
 // moedas, ranking e ofensiva) e os prêmios dos marcos vão para o Reino de verdade.
 //
@@ -14,7 +19,10 @@ import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
 import { registrarEvento, registrarOuMelhorar, estudouHoje, depoisDePontuar, resultadoDaPontuacao } from "./estudo.js";
 import { lerRepositorio, pontaDaBranch, mudancasEntre, enderecoOuErro, ErroDoRepositorio } from "./repositorios.js";
-import { analisarRepositorio, montarTorre as montarComIA, detalharDesafio, avaliarEntrega } from "./iaDominio.js";
+import {
+  analisarRepositorio, montarTorre as montarComIA, detalharDesafio, avaliarEntrega,
+  analisarTema, montarTorreDoTema, detalharDesafioDoTema, avaliarAndarDoTema,
+} from "./iaDominio.js";
 import { temModelo } from "./ia.js";
 import { premiarDoDominio } from "./reino.js";
 import { linkDoCommit } from "@/dominio/enderecoDoRepo.js";
@@ -22,10 +30,11 @@ import { nomePublico } from "@/dominio/ranking.js";
 import {
   NIVEIS, andaresPermitidos, andaresEscolhidos, chefoesDaTorre, nomeDoChefao, sementeDe, pontosDoAndar, pontosDoTopo,
   atributosDoNeuro, roteiroDaLuta, premiosDaTorre, premiosDoAndar, branchSugerida, branchValida, codigoDoCertificado,
-  codigoValido, mediaDasNotas, chefaoPorId,
+  codigoValido, mediaDasNotas, chefaoPorId, TORRES_DE_TEMA, tituloDaTorre, validarPedidoDeTema,
 } from "@/dominio/modoDominio.js";
+import { conferirEvidencia } from "@/dominio/motores.js";
 
-const CAMPOS = "id, usuario_id, provedor, repo_caminho, repo_url, repo_branch, analise, nivel, status, andares, andar_atual, chefao_final, entrega_url, entrega_branch, commit_base, premios, certificado, criado_em, atualizado_em, concluido_em";
+const CAMPOS = "id, usuario_id, origem, perfil, tema, provedor, repo_caminho, repo_url, repo_branch, analise, nivel, status, andares, andar_atual, chefao_final, entrega_url, entrega_branch, commit_base, premios, certificado, criado_em, atualizado_em, concluido_em";
 const CAMPOS_DO_ANDAR = "numero, titulo, objetivo, assunto, dificuldade, chefao, chefao_nome, desafio, commit_inicio, ultimo_commit, entregas, tentativas, melhor_nota, atributos, vencido_em";
 
 /** Quantas torres por dia a pessoa pode pedir para analisar (cada análise lê o repositório e gasta IA). */
@@ -99,8 +108,13 @@ function exigirStatus(torre, ...status) {
 
 /** O cartão de uma torre na lista. */
 function resumoDa(t) {
+  const tema = t.origem === "tema";
   return {
     id: t.id,
+    origem: tema ? "tema" : "repositorio",
+    perfil: tema ? t.perfil : "programacao",
+    titulo: tituloDaTorre(t),
+    tipoDaTorre: tema ? TORRES_DE_TEMA[t.perfil]?.nome || "Torre de tema" : "Torre de repositório",
     repo: t.repo_caminho,
     provedor: t.provedor,
     url: t.repo_url,
@@ -126,7 +140,7 @@ export async function listarDominios(usuarioId) {
 }
 
 /** Uma entrega como a tela mostra (o link do commit avaliado). */
-const entregaParaTela = (torre, e) => ({ ...e, link: linkDoCommit(torre.entrega_url || torre.repo_url, e.sha) });
+const entregaParaTela = (torre, e) => (e.sha ? { ...e, link: linkDoCommit(torre.entrega_url || torre.repo_url, e.sha) } : e);
 
 /** A torre inteira para a tela: andares, o andar de agora, o Neuro, os prêmios e o certificado. */
 export async function torreParaTela(usuarioId, id, usuario = null) {
@@ -146,7 +160,8 @@ export async function torreParaTela(usuarioId, id, usuario = null) {
     ...resumoDa(torre),
     analise: torre.analise,
     permitido: andaresPermitidos(torre.nivel),
-    branchSugerida: branchSugerida(torre.repo_caminho),
+    branchSugerida: torre.repo_caminho ? branchSugerida(torre.repo_caminho) : null,
+    ponto: torre.analise?.ponto || "",
     entrega: torre.entrega_url ? { url: torre.entrega_url, branch: torre.entrega_branch, base: torre.commit_base } : null,
     andaresDaTorre: lista,
     atual: atual && !concluida ? {
@@ -204,6 +219,34 @@ export async function analisarDominio(usuarioId, link) {
   return { apto: true, id: data.id, analise };
 }
 
+/** Um TEMA no lugar do repositório: a Lisa diz se ele dá uma torre e de que nível. */
+export async function analisarTemaDominio(usuarioId, pedido) {
+  exigirIA();
+  let p;
+  try { p = validarPedidoDeTema(pedido || {}); } catch (e) { throw new ErroDeAcesso(400, e.message); }
+
+  // o mesmo tema com uma torre em andamento: volta para ela
+  const { data: mesmas, error: e1 } = await supabase.from("proof_dominios").select("id, tema, status")
+    .eq("usuario_id", usuarioId).eq("origem", "tema").eq("perfil", p.perfil).neq("status", "concluido");
+  falhou(e1, "torres");
+  const igual = (mesmas || []).find((t) => String(t.tema).toLowerCase() === p.tema.toLowerCase());
+  if (igual) return { jaExistia: true, id: igual.id };
+
+  const { count, error: e2 } = await supabase.from("proof_dominios").select("id", { count: "exact", head: true })
+    .eq("usuario_id", usuarioId).gte("criado_em", new Date(Date.now() - DIA_MS).toISOString());
+  falhou(e2, "torres");
+  if ((count || 0) >= ANALISES_POR_DIA) throw new ErroDeAcesso(429, `são até ${ANALISES_POR_DIA} torres novas por dia — amanhã tem mais`);
+
+  const analise = await comTraducao(() => analisarTema(p));
+  if (!analise.apto) return { apto: false, analise, tema: p.tema };
+  const { data, error } = await supabase.from("proof_dominios").insert({
+    usuario_id: usuarioId, origem: "tema", perfil: p.perfil, tema: p.tema,
+    analise: { ...analise, ponto: p.ponto }, nivel: analise.complexidade, status: "analisado",
+  }).select("id").single();
+  falhou(error, "torre");
+  return { apto: true, id: data.id, analise };
+}
+
 function comTraducaoSincrona(fn) {
   try {
     return fn();
@@ -230,7 +273,9 @@ export async function montarDominio(usuarioId, id, pedido) {
 
   try {
     const chefoes = chefoesDaTorre(n, sementeDe(id));
-    const roteiro = await comTraducao(() => montarComIA({ repo: { url: torre.repo_url }, analise: torre.analise, n, chefoes }));
+    const roteiro = await comTraducao(() => (torre.origem === "tema"
+      ? montarTorreDoTema({ tema: torre.tema, perfil: torre.perfil, ponto: torre.analise?.ponto || "", analise: torre.analise, n, chefoes })
+      : montarComIA({ repo: { url: torre.repo_url }, analise: torre.analise, n, chefoes })));
     await supabase.from("proof_dominio_andares").delete().eq("dominio_id", id); // sobra de uma montagem que caiu
     const { error: e2 } = await supabase.from("proof_dominio_andares").insert(roteiro.map((a, i) => ({
       dominio_id: id, numero: a.numero, titulo: a.titulo, objetivo: a.objetivo, assunto: a.assunto,
@@ -266,6 +311,7 @@ export async function apagarDominio(usuarioId, id) {
  */
 export async function configurarEntrega(usuarioId, id, { repo, branch }) {
   const torre = await torreDoUsuario(id, usuarioId);
+  if (torre.origem === "tema") throw new ErroDeAcesso(400, "a torre de tema não tem branch: cada andar é entregue na própria tela");
   exigirStatus(torre, "analisado", "ativo");
   const nome = String(branch || "").trim();
   if (!branchValida(nome)) throw new ErroDeAcesso(400, "nome de branch inválido");
@@ -295,14 +341,25 @@ export async function abrirDesafio(usuarioId, id) {
   if (andar.desafio) return torreParaTela(usuarioId, id);
   exigirIA();
 
+  const anterioresDe = async () => (torre.andar_atual > 1
+    ? (await supabase.from("proof_dominio_andares").select("numero, titulo").eq("dominio_id", id)
+        .lt("numero", torre.andar_atual).order("numero")).data?.map((a) => `${a.numero}. ${a.titulo}`) || []
+    : []);
+  if (torre.origem === "tema") {
+    const desafio = await comTraducao(async () => detalharDesafioDoTema({
+      tema: torre.tema, perfil: torre.perfil, ponto: torre.analise?.ponto || "", analise: torre.analise, andar, n: torre.andares, anteriores: await anterioresDe(),
+    }));
+    const { error } = await supabase.from("proof_dominio_andares").update({ desafio })
+      .eq("dominio_id", id).eq("numero", andar.numero).is("desafio", null);
+    falhou(error, "desafio");
+    return torreParaTela(usuarioId, id);
+  }
+
   const ondeLer = andar.commit_inicio && torre.entrega_url
     ? { link: torre.entrega_url, ref: andar.commit_inicio }
     : { link: torre.repo_url, ref: torre.repo_branch };
   const repo = await comTraducao(() => lerRepositorio(ondeLer.link, { ref: ondeLer.ref }));
-  const anteriores = torre.andar_atual > 1
-    ? (await supabase.from("proof_dominio_andares").select("numero, titulo").eq("dominio_id", id)
-        .lt("numero", torre.andar_atual).order("numero")).data?.map((a) => `${a.numero}. ${a.titulo}`) || []
-    : [];
+  const anteriores = await anterioresDe();
   const desafio = await comTraducao(() => detalharDesafio({ repo, analise: torre.analise, andar, n: torre.andares, anteriores }));
 
   // dois cliques ao mesmo tempo: vale o primeiro desafio gravado
@@ -328,15 +385,14 @@ export async function entregarAndar(usuarioId, id) {
   exigirIA();
   const torre = await torreDoUsuario(id, usuarioId);
   exigirStatus(torre, "ativo");
+  if (torre.origem === "tema") throw new ErroDeAcesso(400, "a torre de tema é entregue com texto, fotos, áudio ou vídeo — use o formulário do andar");
   if (!torre.entrega_url || !torre.entrega_branch) throw new ErroDeAcesso(400, "prepare a branch do desafio primeiro");
   const andar = await andarDa(id, torre.andar_atual);
   if (!andar.desafio) throw new ErroDeAcesso(400, "abra o desafio do andar primeiro");
   if (andar.vencido_em) throw new ErroDeAcesso(409, "este andar já foi vencido — atualize a página");
   if (!andar.commit_inicio) throw new ErroDeAcesso(400, "prepare a branch do desafio de novo: falta o ponto de partida do andar");
 
-  const hoje = Date.now() - DIA_MS;
-  const doDia = (andar.entregas || []).filter((e) => new Date(e.quando).getTime() > hoje).length;
-  if (doDia >= ENTREGAS_POR_DIA) throw new ErroDeAcesso(429, `são até ${ENTREGAS_POR_DIA} entregas por andar a cada 24 horas — descanse e volte depois`);
+  exigirLimiteDoDia(andar);
 
   const ponta = await comTraducao(() => pontaDaBranch(torre.entrega_url, torre.entrega_branch));
   const curto = ponta.sha.slice(0, 7);
@@ -351,6 +407,56 @@ export async function entregarAndar(usuarioId, id) {
 
   const estudavaAntes = await estudouHoje(usuarioId);
   const avaliacao = await comTraducao(() => avaliarEntrega({ repo: torre.entrega_url, andar, desafio: andar.desafio, mudancas }));
+  return fecharAndar({
+    usuarioId, torre, andar, avaliacao, estudavaAntes, commit: ponta.sha,
+    registro: { sha: ponta.sha, arquivos: mudancas.arquivos.length, commits: mudancas.commits.length },
+  });
+}
+
+function exigirLimiteDoDia(andar) {
+  const hoje = Date.now() - DIA_MS;
+  const doDia = (andar.entregas || []).filter((e) => new Date(e.quando).getTime() > hoje).length;
+  if (doDia >= ENTREGAS_POR_DIA) throw new ErroDeAcesso(429, `são até ${ENTREGAS_POR_DIA} entregas por andar a cada 24 horas — descanse e volte depois`);
+}
+
+/**
+ * A entrega de um andar da torre de TEMA: o formulário (texto, fotos, áudio, vídeo) já lido por
+ * src/lib/entregas.js. A Lisa avalia e o resto é igual ao do commit: a luta, os pontos e o marco.
+ */
+export async function entregarAndarDoTema(usuarioId, id, entrega) {
+  exigirIA();
+  const torre = await torreDoUsuario(id, usuarioId);
+  exigirStatus(torre, "ativo");
+  if (torre.origem !== "tema") throw new ErroDeAcesso(400, "esta torre é entregue por commit na branch do desafio");
+  const andar = await andarDa(id, torre.andar_atual);
+  if (!andar.desafio) throw new ErroDeAcesso(400, "abra o desafio do andar primeiro");
+  if (andar.vencido_em) throw new ErroDeAcesso(409, "este andar já foi vencido — atualize a página");
+  exigirLimiteDoDia(andar);
+  const conferida = conferirEvidencia(entrega, { aceitas: andar.desafio.evidencias || ["texto"], projeto: true });
+  if (!conferida.ok) throw new ErroDeAcesso(400, conferida.motivo);
+
+  const estudavaAntes = await estudouHoje(usuarioId);
+  const avaliacao = await comTraducao(() => avaliarAndarDoTema({
+    tema: torre.tema, perfil: torre.perfil, andar, desafio: andar.desafio,
+    entrega: {
+      texto: conferida.texto, video: conferida.video,
+      imagens: (entrega.imagens || []).map((i) => ({ mimeType: i.tipo, data: i.data })),
+      audio: entrega.audio ? { data: entrega.audio.data, segundos: conferida.audio.segundos } : null,
+    },
+  }));
+  return fecharAndar({
+    usuarioId, torre, andar, avaliacao, estudavaAntes, commit: null,
+    // o que fica da entrega: um resumo (as fotos e o áudio não são guardados)
+    registro: { evidencias: { texto: (conferida.texto || "").slice(0, 600), video: conferida.video || null, audio: conferida.audio, fotos: conferida.imagens || 0 } },
+  });
+}
+
+/**
+ * Fecha uma entrega avaliada (de commit ou de tema): grava, luta, pontua e, vencendo, sobe a torre e
+ * paga o marco. `commit`: o sha avaliado (torre de repositório), que vira o começo do próximo andar.
+ */
+async function fecharAndar({ usuarioId, torre, andar, avaliacao, estudavaAntes, commit, registro }) {
+  const id = torre.id;
   const tentativa = (andar.tentativas || 0) + 1;
   const luta = roteiroDaLuta({
     nota: avaliacao.nota, atributos: avaliacao.atributos, dificuldade: andar.dificuldade,
@@ -358,9 +464,9 @@ export async function entregarAndar(usuarioId, id) {
   });
   const agora = new Date().toISOString();
   const entrega = {
-    sha: ponta.sha, quando: agora, nota: avaliacao.nota, venceu: avaliacao.venceu, atributos: avaliacao.atributos,
+    ...registro, quando: agora, nota: avaliacao.nota, venceu: avaliacao.venceu, atributos: avaliacao.atributos,
     comentario: avaliacao.comentario, pontosFortes: avaliacao.pontosFortes, melhorar: avaliacao.melhorar,
-    arquivos: mudancas.arquivos.length, commits: mudancas.commits.length, golpes: luta.golpes,
+    golpes: luta.golpes,
   };
   const melhorou = avaliacao.nota > (andar.melhor_nota ?? -1);
 
@@ -368,7 +474,7 @@ export async function entregarAndar(usuarioId, id) {
   const { data: gravou, error: e1 } = await supabase.from("proof_dominio_andares").update({
     entregas: [...(andar.entregas || []), entrega].slice(-10),
     tentativas: tentativa,
-    ultimo_commit: ponta.sha,
+    ultimo_commit: commit || andar.ultimo_commit,
     melhor_nota: melhorou ? avaliacao.nota : andar.melhor_nota,
     atributos: melhorou ? avaliacao.atributos : andar.atributos,
     vencido_em: avaliacao.venceu ? agora : null,
@@ -376,7 +482,7 @@ export async function entregarAndar(usuarioId, id) {
   falhou(e1, "entrega");
   if (!gravou?.length) throw new ErroDeAcesso(409, "outra entrega deste andar acabou de ser avaliada — atualize a página");
 
-  const repoNome = torre.repo_caminho;
+  const repoNome = tituloDaTorre(torre);
   let ganhou = 0;
   const pontos = pontosDoAndar(avaliacao.nota, andar.dificuldade, torre.nivel);
   if (pontos > 0) {
@@ -401,9 +507,9 @@ export async function entregarAndar(usuarioId, id) {
     if (subiu?.length) {
       resultado.concluiu = final;
       resultado.certificado = codigo;
-      if (!final) {
+      if (!final && commit) {
         // o próximo andar começa do commit que venceu este
-        await supabase.from("proof_dominio_andares").update({ commit_inicio: ponta.sha })
+        await supabase.from("proof_dominio_andares").update({ commit_inicio: commit })
           .eq("dominio_id", id).eq("numero", andar.numero + 1);
       }
       const marco = await pagarMarco({ usuarioId, torre, numero: andar.numero, final });
@@ -430,7 +536,7 @@ async function pagarMarco({ usuarioId, torre, numero, final }) {
   for (const p of premios.filter((x) => x.tipo === "pontos")) {
     const ganho = await registrarEvento({
       usuarioId, trilhaId: null, tipo: "dominio", chave: `dominio:${torre.id}:marco:${numero}`, pontos: p.pontos,
-      detalhe: { titulo: `${torre.repo_caminho} · marco do andar ${numero}`, dominio: torre.id },
+      detalhe: { titulo: `${tituloDaTorre(torre)} · marco do andar ${numero}`, dominio: torre.id },
     });
     pontos += ganho;
     entregues.push({ tipo: "pontos", pontos: ganho });
@@ -438,7 +544,7 @@ async function pagarMarco({ usuarioId, torre, numero, final }) {
   if (final) {
     const ganho = await registrarEvento({
       usuarioId, trilhaId: null, tipo: "dominio", chave: `dominio:${torre.id}:topo`, pontos: pontosDoTopo(torre.nivel, torre.andares),
-      detalhe: { titulo: `${torre.repo_caminho} · topo da torre`, dominio: torre.id },
+      detalhe: { titulo: `${tituloDaTorre(torre)} · topo da torre`, dominio: torre.id },
     });
     pontos += ganho;
     entregues.push({ tipo: "topo", pontos: ganho });
@@ -483,6 +589,10 @@ export async function certificadoPublico(codigo) {
     repo: torre.repo_caminho,
     url: torre.repo_url,
     provedor: torre.provedor,
+    origem: torre.origem === "tema" ? "tema" : "repositorio",
+    tema: torre.tema,
+    titulo: tituloDaTorre(torre),
+    tipoDaTorre: torre.origem === "tema" ? TORRES_DE_TEMA[torre.perfil]?.nome || "" : "",
     nivel: torre.nivel,
     nomeDoNivel: NIVEIS[torre.nivel]?.nome || "",
     andares: torre.andares,

@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoFuncionario } from "./acervo/personagensDoAcervo.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-30-cursos-de-qualquer-tema";
+export const EDICAO_DAS_NOVIDADES = "2026-10-31-cartoes-turma-e-torres";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,10 +28,10 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🎵", titulo: "Música, idiomas, matemática e mais", texto: "Crie um curso de violão, inglês, cálculo ou culinária: a Lisa escolhe o tipo de curso, e a prática acompanha o tema.", destaque: true },
-  { icone: "🎧", titulo: "Prática que combina com o tema", texto: "Ditado com a voz do navegador, lista de contas conferida na hora, treino de ouvido e missões com foto, áudio ou vídeo do YouTube." },
-  { icone: "🎙️", titulo: "Projetos sem GitHub", texto: "Fora da programação, o projeto da semana vai com texto, fotos, áudio ou vídeo — a Lisa vê, ouve e corrige pelos critérios." },
-  { icone: "💱", titulo: "Mercado de tropas no Reino", texto: "Venda tropas do exército ou da defesa para liberar espaço na hora, e compre as que outros reinos puseram à venda." },
+  { icone: "🃏", titulo: "Cartões com repetição espaçada", texto: "A Lisa cria os cartões do assunto (ou você escreve os seus) e cada um volta no dia em que você ia esquecer. Em Prática → Cartões.", destaque: true },
+  { icone: "🗼", titulo: "Modo Domínio de qualquer tema", texto: "Torre de repertório, do QECR, de problemas ou de missões: escale um tema de música, idiomas, matemática ou o que quiser, entregando cada andar com texto, fotos, áudio ou vídeo." },
+  { icone: "🥁", titulo: "Ritmo e afinação ao vivo", texto: "Nos cursos de música: bata o ritmo junto do metrônomo e cante ou toque a nota no microfone, com a agulha do afinador na tela." },
+  { icone: "🤝", titulo: "Revisão da turma", texto: "Discordou da Lisa num critério? Um colega revisa, sem nomes. Quem revisa ganha pontos e moedas." },
 ];
 
 const NA_ESQUERDA = ["celeste", "iris"];
@@ -89,7 +89,7 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/trilhas/novo" className="pf-botao novidades__principal" onClick={fechar}>✨ Criar um curso</Link>
+            <Link ref={principal} href="/cartoes" className="pf-botao novidades__principal" onClick={fechar}>🃏 Ver os cartões</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>

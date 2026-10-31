@@ -18,8 +18,8 @@ export const PERFIS = {
   },
   musica: {
     nome: "Música", emoji: "🎵", exemplos: "violão, piano, canto, teoria musical",
-    professora: "professora de música", motores: ["ouvido", "aberto"], evidencias: ["audio", "video", "texto"],
-    descricao: "Treino de ouvido corrigido na hora e prática gravada em áudio ou vídeo, ouvida pela Lisa.",
+    professora: "professora de música", motores: ["ouvido", "ritmo", "afinacao", "aberto"], evidencias: ["audio", "video", "texto"],
+    descricao: "Treino de ouvido, ritmo no metrônomo e afinação no microfone, corrigidos na hora; prática gravada em áudio ou vídeo, ouvida pela Lisa.",
   },
   idiomas: {
     nome: "Idiomas", emoji: "🗣️", exemplos: "inglês, espanhol, francês, português",
@@ -67,8 +67,20 @@ export function perfilPeloTema(tema, padrao = PERFIL_PADRAO) {
   return perfilValido(padrao);
 }
 
-// Assuntos de música que pedem treino de ouvido (os outros, como postura ou um ritmo no violão, são de tocar).
+// Os motores de música pelo assunto: percepção e teoria treinam o ouvido (e cantar o que se ouve);
+// ritmo treina o metrônomo; canto treina a afinação; o resto (postura, uma peça) é tocar e gravar,
+// com o ritmo de vez em quando — todo músico precisa dele.
 const ASSUNTO_DE_OUVIDO = /intervalo|acorde|tr[ií]ade|escala|percep|ouvido|harmonia|tonalidade|cad[eê]ncia|solfejo|teoria/i;
+const ASSUNTO_DE_RITMO = /ritmo|r[ií]tmic|compasso|metr[oô]nomo|andamento|pulsa[cç][aã]o|batida|levada|colch|sem[ií]nima|m[ií]nima|s[ií]ncop|groove|bateria|percuss/i;
+const ASSUNTO_DE_CANTO = /canto|cantar|vocal|voz|afina[cç][aã]o|afinad|respira[cç][aã]o|aquecimento vocal/i;
+
+export function motoresDaMusica(assunto) {
+  const t = `${assunto?.titulo || ""} ${assunto?.descricao || ""}`;
+  if (ASSUNTO_DE_RITMO.test(t)) return ["ritmo", "aberto"];
+  if (ASSUNTO_DE_CANTO.test(t)) return ["afinacao", "aberto"];
+  if (ASSUNTO_DE_OUVIDO.test(t)) return ["ouvido", "afinacao", "aberto"];
+  return ["aberto", "ritmo"];
+}
 
 /** O número do dia (dias desde 1970), para alternar o motor de um dia para o outro. */
 const numeroDoDia = (dia) => {
@@ -79,11 +91,11 @@ const numeroDoDia = (dia) => {
 /**
  * O motor do exercício: programação, sempre o código. Nos outros perfis, os motores se alternam de
  * um dia para o outro e de uma rodada para a seguinte (ditado hoje, redação amanhã; na rodada extra,
- * o outro). Música só usa o treino de ouvido quando o assunto é de percepção ou teoria.
+ * o outro). Música escolhe entre ouvido, ritmo, afinação e o desafio aberto pelo assunto (motoresDaMusica).
  */
 export function motorDoExercicio({ perfil, rodada = 1, assunto = null, dia = "" }) {
   const p = perfilValido(perfil);
   let motores = PERFIS[p].motores;
-  if (p === "musica" && !ASSUNTO_DE_OUVIDO.test(`${assunto?.titulo || ""} ${assunto?.descricao || ""}`)) motores = ["aberto"];
+  if (p === "musica") motores = motoresDaMusica(assunto);
   return motores[(numeroDoDia(dia) + (Number(rodada) || 1) - 1) % motores.length];
 }

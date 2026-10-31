@@ -349,7 +349,7 @@ qualquer hora, em **Ajustes da trilha → Tipo de curso** (vale para a prática 
 | Perfil | Exercício do dia (motores) | Projeto: o que se entrega |
 |---|---|---|
 | Programação | código (o de sempre) | repositório no GitHub |
-| Música | treino de ouvido (só em assunto de teoria/percepção) e desafio aberto | áudio, vídeo do YouTube, texto |
+| Música | treino de ouvido, ritmo e afinação (pelo assunto, `motoresDaMusica`) e desafio aberto | áudio, vídeo do YouTube, texto |
 | Idiomas | ditado e desafio aberto (redação, tradução, pronúncia) | texto, áudio |
 | Matemática e exatas | lista de cálculo e desafio aberto (resolução no caderno) | texto, fotos |
 | Livre (qualquer tema) | desafio aberto (missão prática) | texto, fotos, áudio, vídeo do YouTube |
@@ -369,8 +369,21 @@ rodadas, agenda e pontos não mudam —, com o motor em `conteudo.motor` (exerc�
 - **ditado** — a voz do navegador fala; a correção compara palavra a palavra (acento errado vale meio,
   palavra a mais custa). A frase vai para a tela **embaralhada** (não é segredo, só não fica à vista).
 - **ouvido** — intervalos ou acordes montados pelo código (sem IA, semente fixa), tocados pelo Web Audio.
+- **ritmo** — 6 compassos de 4 tempos (`src/dominio/musica.js`): o metrônomo conta 4 e a pessoa bate
+  no botão grande (ou na barra de espaço). Vão os instantes dos toques em ms; o servidor casa cada
+  batida com o toque mais perto (até 60 ms vale inteiro, até 200 ms um pouco) e **desconta o atraso
+  fixo do aparelho** (a mediana dos desvios, até 180 ms — toque na tela, fone Bluetooth). Toque a
+  mais custa meia batida.
+- **afinacao** — 6 notas: ouvir a referência e cantar (ou tocar) a mesma nota, ou o intervalo pedido
+  (assunto de solfejo). O navegador detecta a altura no microfone (`detectarAltura`, um YIN
+  simplificado, testado com seno sintético) e mostra a agulha ao vivo; vai só a frequência, e o
+  servidor mede os cents **em qualquer oitava** (até 20 cents é afinado). O som não é gravado nem enviado.
 
-Os três corrigidos no servidor têm **uma tentativa só** (`tentativasDe`, em `src/dominio/pratica.js`),
+Música escolhe o motor pelo assunto (`motoresDaMusica`, em `src/dominio/perfis.js`): ritmo/compasso →
+ritmo; canto/voz/afinação → afinação; intervalos/acordes/teoria → ouvido e afinação; o resto (uma
+peça, a postura) → desafio aberto e ritmo.
+
+Os cinco corrigidos no servidor têm **uma tentativa só** (`tentativasDe`, em `src/dominio/pratica.js`),
 como o quiz, e o gabarito só vai para a tela depois da correção (`exercicioParaTela`).
 
 **A entrega por evidências** (`EntregaComEvidencias`, em `src/componentes/pratica/Motores.js`):
@@ -388,9 +401,58 @@ como o quiz, e o gabarito só vai para a tela depois da correção (`exercicioPa
 - A avaliação (`avaliarEntrega`, em `src/lib/iaPratica.js`) devolve o mesmo formato da avaliação de
   código: os projetos continuam pontuando **por requisito**.
 
-**Ainda não feito** (fases seguintes da proposta): ritmo e afinação ao vivo na música, cartões com
-repetição espaçada, correção por colegas e as torres do Modo Domínio por perfil (o Modo Domínio
-continua sendo de repositório).
+### Cartões com repetição espaçada
+
+Pedido de 31/10/2026. Migração `db/023-cartoes-turma-e-torres-de-tema.sql` (`proof_cartoes`). Regras
+em `src/dominio/cartoes.js`; banco em `src/lib/cartoes.js`; tela em `/cartoes` (atalho na Prática).
+
+- Frente, verso e exemplo, por trilha (qualquer perfil, programação também). **A Lisa cria** de 6 a 10
+  do assunto da vez (`gerarCartoes`, prompt por perfil: em idiomas, a palavra na língua e a tradução);
+  **a pessoa escreve** os dela. Até 400 por trilha; a Lisa cria até 60 por dia.
+- A agenda é a do **SM-2** com quatro respostas (esqueci, difícil, lembrei, fácil): esqueceu, volta
+  amanhã (e na mesma sessão, no fim da fila); lembrou, o intervalo cresce (1, 3 dias, depois × a
+  facilidade, até 1 ano). Os botões mostram quando cada resposta faz o cartão voltar.
+- A revisão do dia: os vencidos (os mais atrasados primeiro) e até 15 novos, no máximo 40.
+- **Pontos**: 2 por cartão diferente revisado no dia, até 20, numa chave do dia (`cartoes:AAAA-MM-DD`,
+  tipo `cartoes` no livro de pontos) — contam para a ofensiva e viram moedas.
+
+### Revisão da turma
+
+Pedido de 31/10/2026. Migração 023 (`proof_revisoes`). Regras em `src/dominio/revisoes.js`; banco em
+`src/lib/revisoes.js`; telas no desafio (`PedirRevisao`) e em `/revisoes` (atalho na Prática).
+
+- Depois da avaliação de um **desafio aberto** ou de um **projeto por evidências**, quem entregou pode
+  **contestar** os critérios que a Lisa deu como não cumpridos, com uma justificativa para cada um, e
+  consentir que a entrega apareça **sem o nome** para um colega. Um pedido por desafio.
+- O pedido guarda uma cópia do que já ficava no desafio: o texto, o link do vídeo, as miniaturas das
+  fotos e a duração do áudio. **Nenhuma foto inteira, nenhum áudio** — critério que só o áudio mostra
+  a turma não consegue julgar (e pode dizer "não dá para julgar").
+- Na fila, um colega dá o veredito de cada critério contestado (cumpriu, não cumpriu, não dá para
+  julgar) e um comentário. O pedido fecha primeiro (trava: só quem o encontra "aberta" grava).
+- **Para quem pediu**, o que a turma confirmou passa a valer (`aplicarRevisao`): no desafio aberto, a
+  nota vira a maior entre a da Lisa e a fração de critérios cumpridos; no projeto, o requisito entra
+  nos cumpridos e soma a parte dele. A nota e os pontos **só sobem**.
+- **Para quem revisou**: 15 pontos (= moedas) por revisão, até 5 por dia (tipo `revisao` no livro de
+  pontos). Ninguém revisa o próprio pedido nem o mesmo colega duas vezes na semana; o pedido vence em
+  14 dias.
+
+### Modo Domínio de tema
+
+Pedido de 31/10/2026. Migração 023 (`proof_dominios` ganha `origem`, `perfil` e `tema`; o repositório
+fica opcional, com uma checagem que exige um ou outro). Regras em `src/dominio/modoDominio.js`
+(seção "a torre de TEMA"); IA em `src/lib/iaDominio.js` (`analisarTema`, `montarTorreDoTema`,
+`detalharDesafioDoTema`, `avaliarAndarDoTema`); banco em `src/lib/dominio.js`.
+
+- Em `/dominio`, **Um tema**: o tipo (Torre de repertório, do QECR, de problemas ou de missões, pelos
+  perfis música, idiomas, matemática e livre), o tema e, se quiser, o ponto de partida. A Lisa diz se
+  o tema dá uma torre e o nível (1 a 5), como faz com o repositório.
+- Os andares, os chefões, a luta, os pontos, os marcos, os prêmios do Reino e o certificado são os
+  mesmos. Muda a entrega: **cada andar é entregue na própria tela** (`EntregaDoAndar`), por texto,
+  fotos, áudio de até 3 min ou vídeo do YouTube — o que o desafio do andar aceitar. Sem branch.
+- Os cinco atributos do Neuro ganham o nome do perfil (`atributosDaTorre`: em música, técnica, ritmo,
+  afinação, expressão e repertório). A entrega guarda só um resumo (o texto até 600 caracteres, o
+  link, a duração do áudio e o número de fotos).
+- O certificado e a página de conferência dizem "torre do tema" e mostram o tema no lugar do repositório.
 
 ## Mercado de tropas
 

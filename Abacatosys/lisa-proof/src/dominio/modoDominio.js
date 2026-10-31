@@ -11,6 +11,8 @@
 import { TROPAS, capacidadeDoExercito, capacidadeDaGuarnicao, lotacaoDoAcampamento, espacoUsado } from "./tropas.js";
 import { ORDEM_DOS_VEICULOS, veiculosDe } from "./veiculos.js";
 import { MULTIPLICADOR_DE_RECOMPENSAS } from "./pontos.js";
+import { evidenciasAceitas } from "./motores.js";
+import { evidenciasDoPerfil } from "./perfis.js";
 
 // ---------------------------------------------------------------- os níveis de complexidade
 
@@ -423,5 +425,84 @@ export function validarAvaliacaoDoAndar(bruto) {
     comentario: texto(bruto?.comentario, 1000),
     pontosFortes: lista(bruto?.pontosFortes, 4, 240),
     melhorar: lista(bruto?.melhorar, 4, 240),
+  };
+}
+
+// ---------------------------------------------------------------- a torre de TEMA (31/10/2026)
+//
+// O Modo Domínio para cursos que não são de programação: no lugar do repositório, um TEMA (violão,
+// inglês, cálculo, fotografia…) e o perfil dele. A torre continua do básico ao domínio, com andares,
+// chefões, marcos e certificado; o que muda é a matéria de cada andar e a entrega — texto, fotos,
+// áudio ou vídeo do YouTube, avaliados pela Lisa (como no desafio aberto da prática).
+
+export const PERFIS_DE_TORRE = ["musica", "idiomas", "matematica", "livre"];
+export const TORRES_DE_TEMA = {
+  musica: { nome: "Torre de repertório", emoji: "🎵", explicacao: "Cada andar é uma peça, um trecho ou uma técnica mais difícil que o anterior, entregue gravado." },
+  idiomas: { nome: "Torre do QECR", emoji: "🗣️", explicacao: "Do A1 ao C2: cada andar é uma tarefa no formato das provas de proficiência — ler, ouvir, escrever ou falar." },
+  matematica: { nome: "Torre de problemas", emoji: "📐", explicacao: "Problemas em dificuldade crescente, resolvidos no caderno (foto) ou digitados; os chefões pedem demonstração." },
+  livre: { nome: "Torre de missões", emoji: "🧭", explicacao: "Missões práticas do básico ao domínio do tema, entregues por texto, fotos, áudio ou vídeo." },
+};
+export const perfilDeTorre = (p) => (PERFIS_DE_TORRE.includes(p) ? p : null);
+
+/**
+ * As habilidades que a Lisa mede numa torre de tema: os mesmos cinco atributos do Neuro (a luta e
+ * os pontos não mudam), com o nome e o sentido de cada perfil.
+ */
+export const ATRIBUTOS_DO_TEMA = {
+  musica: {
+    logica: { nome: "Técnica", emoji: "🎯", sentido: "técnica do instrumento ou da voz: notas certas, digitação, postura" },
+    arquitetura: { nome: "Ritmo", emoji: "🥁", sentido: "pulsação firme, andamento, divisão rítmica" },
+    testes: { nome: "Afinação", emoji: "🎤", sentido: "afinação da voz ou do instrumento, precisão das alturas" },
+    qualidade: { nome: "Expressão", emoji: "✨", sentido: "dinâmica, fraseado, musicalidade, som" },
+    dominio: { nome: "Repertório", emoji: "🎼", sentido: "domínio da peça e da teoria por trás dela" },
+  },
+  idiomas: {
+    logica: { nome: "Gramática", emoji: "🧠", sentido: "correção gramatical" },
+    arquitetura: { nome: "Coerência", emoji: "🏛️", sentido: "organização das ideias, conectivos, adequação à tarefa" },
+    testes: { nome: "Compreensão", emoji: "👂", sentido: "entendeu o que leu ou ouviu e respondeu ao que foi pedido" },
+    qualidade: { nome: "Vocabulário", emoji: "✨", sentido: "variedade e precisão das palavras" },
+    dominio: { nome: "Fluência", emoji: "🗣️", sentido: "naturalidade, pronúncia (no áudio), ritmo da fala ou da escrita" },
+  },
+  matematica: {
+    logica: { nome: "Raciocínio", emoji: "🧠", sentido: "argumentos corretos, passos que se justificam" },
+    arquitetura: { nome: "Estratégia", emoji: "🧭", sentido: "escolha do caminho de resolução, organização" },
+    testes: { nome: "Verificação", emoji: "✅", sentido: "confere o resultado, casos particulares, unidades" },
+    qualidade: { nome: "Clareza", emoji: "✨", sentido: "notação limpa, resolução legível, conclusão explícita" },
+    dominio: { nome: "Conteúdo", emoji: "📐", sentido: "domínio das definições e teoremas do tema" },
+  },
+  livre: {
+    logica: { nome: "Entendimento", emoji: "🧠", sentido: "entendeu o conceito e o porquê do que fez" },
+    arquitetura: { nome: "Planejamento", emoji: "🗺️", sentido: "preparo, etapas, organização do trabalho" },
+    testes: { nome: "Capricho", emoji: "🔍", sentido: "atenção aos detalhes, revisão do resultado" },
+    qualidade: { nome: "Resultado", emoji: "✨", sentido: "qualidade do que foi entregue" },
+    dominio: { nome: "Domínio do tema", emoji: "🏅", sentido: "uso certo das técnicas e do vocabulário do tema" },
+  },
+};
+
+/** Os atributos com o nome do perfil da torre (torre de repositório: os de programação). */
+export function atributosDaTorre(perfil) {
+  const rotulos = ATRIBUTOS_DO_TEMA[perfil];
+  return rotulos ? ATRIBUTOS.map((a) => ({ ...a, nome: rotulos[a.id].nome, emoji: rotulos[a.id].emoji, sentido: rotulos[a.id].sentido })) : ATRIBUTOS;
+}
+
+/** O nome que a torre mostra: o tema, ou o repositório. */
+export const tituloDaTorre = (t) => (t?.origem === "tema" ? t.tema : t?.repo_caminho) || "";
+
+/** O tema e o ponto de partida que a pessoa escreveu, conferidos. Lança erro com o motivo. */
+export function validarPedidoDeTema({ tema, perfil, ponto }) {
+  const t = String(tema ?? "").replace(/\s+/g, " ").trim();
+  if (t.length < 3) throw new Error("escreva o tema da torre (ex.: violão popular, inglês, cálculo 1, fotografia)");
+  if (t.length > 80) throw new Error("o tema ficou longo — resuma em até 80 caracteres");
+  if (!perfilDeTorre(perfil)) throw new Error("escolha o tipo da torre: música, idiomas, matemática ou livre");
+  return { tema: t, perfil, ponto: String(ponto ?? "").replace(/\s+/g, " ").trim().slice(0, 300) };
+}
+
+/** O desafio detalhado de um andar de tema: sem arquivos, com as evidências que ele aceita. */
+export function validarDesafioDoTema(bruto, perfil) {
+  const base = validarDesafio(bruto);
+  return {
+    enunciado: base.enunciado, requisitos: base.requisitos, criterios: base.criterios, dica: base.dica,
+    entrega: texto(bruto?.entrega, 400),
+    evidencias: evidenciasAceitas(bruto?.evidencias, evidenciasDoPerfil(perfil)),
   };
 }

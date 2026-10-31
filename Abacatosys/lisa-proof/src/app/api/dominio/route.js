@@ -1,6 +1,6 @@
 import { json } from "@/lib/http.js";
 import { exigirUsuario, respostaDeErro, corpoDe } from "@/lib/sessao.js";
-import { listarDominios, analisarDominio } from "@/lib/dominio.js";
+import { listarDominios, analisarDominio, analisarTemaDominio } from "@/lib/dominio.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,12 +15,16 @@ export async function GET(req) {
   }
 }
 
-/** POST /api/dominio { repo } — a Lisa lê o repositório e diz se ele dá uma torre. */
+/**
+ * POST /api/dominio { repo }                 — a Lisa lê o repositório e diz se ele dá uma torre
+ * POST /api/dominio { tema, perfil, ponto }  — a torre de um TEMA (música, idiomas, matemática, livre)
+ */
 export async function POST(req) {
   try {
     const usuario = await exigirUsuario(req);
-    const { repo } = await corpoDe(req);
-    return json({ ok: true, ...(await analisarDominio(usuario.id, repo)) });
+    const corpo = await corpoDe(req);
+    if (typeof corpo?.tema === "string") return json({ ok: true, ...(await analisarTemaDominio(usuario.id, corpo)) });
+    return json({ ok: true, ...(await analisarDominio(usuario.id, corpo?.repo)) });
   } catch (e) {
     return respostaDeErro(e);
   }

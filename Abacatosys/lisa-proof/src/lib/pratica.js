@@ -31,6 +31,7 @@ import {
   MOTORES, motorDo, corrigeNoServidor, exercicioParaTela, avaliacaoDoMotor, conferirEvidencia,
   gerarOuvido, corrigirCalculo, corrigirDitado, corrigirOuvido,
 } from "@/dominio/motores.js";
+import { gerarRitmo, corrigirRitmo, gerarAfinacao, corrigirAfinacao } from "@/dominio/musica.js";
 import { perfilValido, motorDoExercicio } from "@/dominio/perfis.js";
 import { semanaDoProjeto, semanaDoDesafio, pedidoDoProjeto, projetosOpcionais, podeGerarProjeto, valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
 import { avancoDasTrilhas, avancoDaTrilhaDoUsuario } from "./avanco.js";
@@ -335,17 +336,17 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, 
 
 /**
  * O exercício do dia no motor do perfil (src/dominio/perfis.js: motorDoExercicio). Programação gera o
- * exercício de código de sempre (sem `motor` no conteúdo, como os antigos); o treino de ouvido é
- * montado pelo código, sem IA.
+ * exercício de código de sempre (sem `motor` no conteúdo, como os antigos); o treino de ouvido, o de
+ * ritmo e o de afinação são montados pelo código, sem IA.
  */
 async function gerarExercicioDoPerfil({ tema, perfil, assunto, evitar, anteriores, rodada, dia }) {
   const motor = motorDoExercicio({ perfil, rodada, assunto, dia });
   if (motor === "aberto") return gerarDesafioAberto({ tema, perfil, assunto, evitar, rodada });
   if (motor === "calculo") return gerarCalculo({ tema, assunto, evitar, rodada });
   if (motor === "ditado") return gerarDitado({ tema, assunto, evitar, rodada });
-  if (motor === "ouvido") {
+  if (motor === "ouvido" || motor === "ritmo" || motor === "afinacao") {
     const [semente] = crypto.getRandomValues(new Uint32Array(1));
-    return gerarOuvido({ semente, assunto });
+    return { ouvido: gerarOuvido, ritmo: gerarRitmo, afinacao: gerarAfinacao }[motor]({ semente, assunto });
   }
   return gerarExercicio({ tema, assunto, evitar, anteriores, rodada });
 }
@@ -641,8 +642,9 @@ export async function enviarProjeto({ usuarioId, id, repo }) {
 // ---------------------------------------------------------------- os motores dos outros perfis (30/10/2026)
 
 /**
- * As respostas da lista de cálculo, do ditado ou do treino de ouvido: o SERVIDOR corrige
- * (src/dominio/motores.js), sem IA. Uma tentativa só, como o quiz; a volta traz o gabarito.
+ * As respostas da lista de cálculo, do ditado, do treino de ouvido, do ritmo (os instantes dos
+ * toques) ou da afinação (a frequência detectada): o SERVIDOR corrige (src/dominio/motores.js e
+ * musica.js), sem IA. Uma tentativa só, como o quiz; a volta traz o gabarito.
  */
 export async function responderExercicio({ usuarioId, id, respostas }) {
   const d = await desafioDoUsuario(id, usuarioId);
@@ -653,6 +655,8 @@ export async function responderExercicio({ usuarioId, id, respostas }) {
   const lista = (Array.isArray(respostas) ? respostas : []).slice(0, 12).map((r) => String(r ?? "").slice(0, 300));
   const correcao = motor === "calculo" ? corrigirCalculo(d.conteudo, lista)
     : motor === "ditado" ? corrigirDitado(d.conteudo, lista)
+    : motor === "ritmo" ? corrigirRitmo(d.conteudo, lista)
+    : motor === "afinacao" ? corrigirAfinacao(d.conteudo, lista)
     : corrigirOuvido(d.conteudo, lista);
   const avaliacao = validarAvaliacao(avaliacaoDoMotor(motor, d.conteudo, correcao));
   const resposta = { respostas: lista, correcao };

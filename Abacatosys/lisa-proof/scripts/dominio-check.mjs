@@ -93,6 +93,15 @@ import {
 } from "../src/dominio/motores.js";
 import { PERFIS, ORDEM_DOS_PERFIS, perfilValido, perfilPeloTema, motorDoExercicio, evidenciasDoPerfil } from "../src/dominio/perfis.js";
 import { tentativasDe } from "../src/dominio/pratica.js";
+import {
+  gerarRitmo, corrigirRitmo, lerToques, nivelDoRitmo, gerarAfinacao, corrigirAfinacao, detectarAltura, alturaSustentada,
+  centsAteANota, frequenciaDaNota, nomeDaNota,
+} from "../src/dominio/musica.js";
+import {
+  agendaNova, revisarCartao, previsoes, quandoVolta, cartoesDoDia, resumoDosCartoes, validarCartoes, validarCartao, pontosDaRevisao,
+} from "../src/dominio/cartoes.js";
+import { podePedirRevisao, validarPedido, validarVeredito, podeRevisar as podeRevisarNaTurma, aplicarRevisao, atendidosPelaIA } from "../src/dominio/revisoes.js";
+import { atributosDaTorre, tituloDaTorre, validarPedidoDeTema, validarDesafioDoTema, PERFIS_DE_TORRE, TORRES_DE_TEMA } from "../src/dominio/modoDominio.js";
 import { montarAgenda, itensDoDia, gradeDoMes, mesVizinho } from "../src/dominio/agenda.js";
 import {
   MIN_ANDARES, NOTA_PARA_VENCER, CHEFOES, CHEFOES_FINAIS, ATRIBUTOS, andaresPermitidos, andaresEscolhidos, dificuldadeEsperada,
@@ -2485,8 +2494,8 @@ caso("perfis: o tema decide quando não há IA; o motor alterna por dia e por ro
   assert.notEqual(hoje1, motorDoExercicio({ perfil: "idiomas", rodada: 2, dia }), "a rodada extra troca de motor");
   assert.notEqual(hoje1, motorDoExercicio({ perfil: "idiomas", rodada: 1, dia: amanha }), "e o dia seguinte também");
   assert.ok(["calculo", "aberto"].includes(motorDoExercicio({ perfil: "matematica", rodada: 1, dia })));
-  assert.equal(motorDoExercicio({ perfil: "musica", rodada: 1, dia, assunto: { titulo: "Postura e afinação do violão" } }), "aberto", "assunto de tocar não é de ouvido");
-  assert.ok(["ouvido", "aberto"].includes(motorDoExercicio({ perfil: "musica", rodada: 1, dia, assunto: { titulo: "Intervalos" } })));
+  assert.ok(["afinacao", "aberto"].includes(motorDoExercicio({ perfil: "musica", rodada: 1, dia, assunto: { titulo: "Postura e afinação do violão" } })), "assunto de tocar não é de ouvido");
+  assert.ok(["ouvido", "afinacao", "aberto"].includes(motorDoExercicio({ perfil: "musica", rodada: 1, dia, assunto: { titulo: "Intervalos" } })));
   assert.deepEqual(evidenciasDoPerfil("programacao"), []);
   assert.deepEqual(evidenciasDoPerfil("musica"), ["audio", "video", "texto"]);
   const curso = validarCurso({ tema: "Violão", modulos: [{ nome: "M", assuntos: [{ titulo: "a" }, { titulo: "b" }, { titulo: "c" }] }] });
@@ -2508,6 +2517,234 @@ caso("acervo: a migração 020 só acrescenta tipos ao livro-caixa", () => {
   const agora = tipos(ler("../db/020-biblioteca-colaborativa.sql"));
   for (const t of antes) assert.ok(agora.includes(t), `o tipo ${t} continua`);
   for (const t of ["acervo", "acervo_revisao", "gorjeta_dada", "gorjeta_recebida"]) assert.ok(agora.includes(t), `entra o tipo ${t}`);
+});
+
+// ---------------------------------------------------------------- 31/10/2026: ritmo, afinação, cartões, turma e torre de tema
+
+caso("ritmo: montado pelo código, repetível e no nível do assunto", () => {
+  const a = gerarRitmo({ semente: 5, assunto: { titulo: "Colcheias e levada" } });
+  assert.deepEqual(a, gerarRitmo({ semente: 5, assunto: { titulo: "Colcheias e levada" } }), "a mesma semente dá o mesmo treino");
+  assert.equal(a.motor, "ritmo");
+  assert.equal(a.nivel, "medio");
+  assert.equal(a.itens.length, 6);
+  for (let i = 1; i < a.itens.length; i++) assert.notDeepEqual(a.itens[i].batidas, a.itens[i - 1].batidas, "o mesmo padrão duas vezes seguidas, não");
+  for (const it of a.itens) assert.ok(it.batidas.every((b) => b >= 0 && b < 4), "tudo dentro do compasso de 4 tempos");
+  assert.equal(nivelDoRitmo({ titulo: "Síncope no samba" }), "avancado");
+  assert.equal(nivelDoRitmo({ titulo: "Pulsação e semínimas" }), "basico");
+  assert.equal(MOTORES.ritmo.tentativas, 1);
+  assert.ok(corrigeNoServidor("ritmo") && corrigeNoServidor("afinacao"));
+});
+
+caso("ritmo: corrige pelo desvio e desconta o atraso fixo do aparelho", () => {
+  const c = { bpm: 60, itens: [{ batidas: [0, 1, 2, 3] }, { batidas: [0, 2] }] }; // 1 tempo = 1000 ms
+  const exato = corrigirRitmo(c, ["0,1000,2000,3000", "0,2000"]);
+  assert.equal(exato.nota, 100);
+  assert.equal(exato.atraso, 0);
+  const atrasado = corrigirRitmo(c, ["120,1120,2120,3120", "120,2120"]);
+  assert.equal(atrasado.nota, 100, "quem bate sempre 120 ms depois (fone, toque na tela) está no tempo");
+  assert.equal(atrasado.atraso, 120);
+  const torto = corrigirRitmo(c, ["0,1150,2000,3000", "0,2000"]);
+  assert.ok(torto.nota > 85 && torto.nota < 100, `uma batida 150 ms fora custa um pouco (${torto.nota})`);
+  assert.match(torto.itens[0].motivo, /desvio médio/);
+  const sobrando = corrigirRitmo(c, ["0,500,1000,2000,3000", "0,2000"]);
+  assert.ok(sobrando.itens[0].nota < 1);
+  assert.match(sobrando.itens[0].motivo, /a mais/);
+  const vazio = corrigirRitmo(c, ["", "0,2000"]);
+  assert.equal(vazio.itens[0].nota, 0);
+  assert.equal(vazio.itens[0].motivo, "sem toques");
+  assert.deepEqual(lerToques("30, 10;abc 20"), [10, 20, 30]);
+  const av = avaliacaoDoMotor("ritmo", c, exato);
+  assert.equal(av.requisitos[0].requisito, "Compasso 1");
+});
+
+caso("afinação: cents em qualquer oitava, e a nota pedida some da tela no intervalo", () => {
+  assert.ok(Math.abs(centsAteANota(440, 69)) < 0.01);
+  assert.ok(Math.abs(centsAteANota(220, 69)) < 0.01, "uma oitava abaixo vale");
+  assert.ok(Math.abs(centsAteANota(frequenciaDaNota(69) * 2 ** (30 / 1200), 69) - 30) < 0.01);
+  assert.equal(nomeDaNota(60), "Dó4");
+  assert.equal(nomeDaNota(70, false), "Lá♯");
+  const c = { itens: [{ referencia: 60, alvo: 60, pedido: "a mesma nota" }, { referencia: 60, alvo: 67, pedido: "uma 5ª justa acima" }] };
+  const r = corrigirAfinacao(c, [String(frequenciaDaNota(60) / 2), String(frequenciaDaNota(66))]);
+  assert.equal(r.itens[0].certo, true);
+  assert.equal(r.itens[1].certo, false);
+  assert.match(r.itens[1].motivo, /soou Fá♯/);
+  assert.equal(r.nota, 50);
+  assert.equal(corrigirAfinacao(c, ["", "abc"]).itens[0].motivo, "sem som detectado");
+  const intervalo = gerarAfinacao({ semente: 3, assunto: { titulo: "Solfejo de intervalos" } });
+  assert.equal(intervalo.comIntervalo, true);
+  assert.equal(exercicioParaTela(intervalo, false).itens[0].alvo, undefined, "antes de corrigir, a nota pedida não vai para a tela");
+  assert.equal(exercicioParaTela(intervalo, true).itens[0].alvo, intervalo.itens[0].alvo);
+  const unissono = gerarAfinacao({ semente: 3, assunto: { titulo: "Aquecimento vocal" } });
+  assert.equal(unissono.comIntervalo, false);
+  assert.ok(unissono.itens.every((it) => it.alvo === it.referencia));
+  assert.ok(intervalo.itens.every((it) => it.alvo > it.referencia && it.alvo <= 67));
+  assert.match(avaliacaoDoMotor("afinacao", c, r).requisitos[1].requisito, /Sol/);
+});
+
+caso("afinação: a detecção de altura acha a nota de um seno e de um som com harmônicos", () => {
+  const taxa = 44_100, n = 2048;
+  const seno = Float32Array.from({ length: n }, (_, i) => 0.5 * Math.sin((2 * Math.PI * 220 * i) / taxa));
+  assert.ok(Math.abs(detectarAltura(seno, taxa) - 220) < 1, "seno de 220 Hz");
+  const rico = Float32Array.from({ length: n }, (_, i) => [1, 0.6, 0.4, 0.25].reduce((s, a, h) => s + a * Math.sin((2 * Math.PI * 147 * (h + 1) * i) / taxa), 0) * 0.3);
+  assert.ok(Math.abs(detectarAltura(rico, taxa) - 147) < 1.5, "Ré com harmônicos (o fundamental, não um harmônico)");
+  assert.equal(detectarAltura(new Float32Array(n), taxa), null, "silêncio");
+  let x = 12345;
+  const ruido = Float32Array.from({ length: n }, () => { x = (x * 1103515245 + 12345) % 2147483648; return (x / 2147483648 - 0.5) * 0.6; });
+  assert.equal(detectarAltura(ruido, taxa), null, "ruído não tem altura");
+  assert.equal(alturaSustentada([null, 400, 440, 441, 439, 440, 442]), 440, "o ataque sai e fica a mediana");
+  assert.equal(alturaSustentada([440, 441]), null, "duas leituras não bastam");
+});
+
+caso("música: o motor do exercício pelo assunto (ouvido, ritmo, afinação ou tocar)", () => {
+  const dia = "2026-10-30";
+  const opcoes = (titulo) => new Set([1, 2, 3, 4].map((rodada) => motorDoExercicio({ perfil: "musica", rodada, dia, assunto: { titulo } })));
+  assert.deepEqual([...opcoes("Compasso e semínimas")].sort(), ["aberto", "ritmo"]);
+  assert.deepEqual([...opcoes("Canto: respiração")].sort(), ["aberto", "afinacao"]);
+  assert.deepEqual([...opcoes("Intervalos")].sort(), ["aberto", "afinacao", "ouvido"]);
+  assert.deepEqual([...opcoes("Postura da mão direita")].sort(), ["aberto", "ritmo"]);
+});
+
+caso("cartões: a agenda do SM-2 (esqueci volta amanhã; lembrar alonga o intervalo)", () => {
+  const hoje = "2026-10-31";
+  const c0 = agendaNova(hoje);
+  assert.equal(c0.proxima_em, hoje);
+  const c1 = revisarCartao(c0, "lembrei", hoje);
+  assert.deepEqual([c1.intervalo, c1.repeticoes, c1.proxima_em], [1, 1, "2026-11-01"]);
+  const c2 = revisarCartao(c1, "lembrei", hoje);
+  assert.equal(c2.intervalo, 3);
+  const c3 = revisarCartao(c2, "lembrei", hoje);
+  assert.equal(c3.intervalo, 8, "depois, multiplica pela facilidade (2,5)");
+  const facil = revisarCartao(c0, "facil", hoje);
+  assert.deepEqual([facil.intervalo, facil.facilidade], [3, 2.6]);
+  const esqueci = revisarCartao(c3, "esqueci", hoje);
+  assert.deepEqual([esqueci.intervalo, esqueci.repeticoes, esqueci.lapsos, esqueci.proxima_em], [1, 0, 1, "2026-11-01"]);
+  assert.ok(esqueci.facilidade < c3.facilidade);
+  let ruim = c0;
+  for (let i = 0; i < 10; i++) ruim = revisarCartao(ruim, "esqueci", hoje);
+  assert.equal(ruim.facilidade, 1.3, "a facilidade tem piso");
+  assert.ok(revisarCartao({ intervalo: 10, facilidade: 2.5, repeticoes: 3 }, "dificil", hoje).intervalo >= 10, "difícil não encurta");
+  assert.equal(revisarCartao({ intervalo: 300, facilidade: 3, repeticoes: 9 }, "facil", hoje).intervalo, 365, "no máximo um ano");
+  assert.deepEqual(previsoes(c0, hoje), { esqueci: 1, dificil: 1, lembrei: 1, facil: 3 });
+  assert.throws(() => revisarCartao(c0, "talvez", hoje));
+  assert.equal(quandoVolta(1), "amanhã");
+  assert.equal(quandoVolta(45), "em 2 meses");
+  assert.equal(quandoVolta(400), "em 1 ano");
+});
+
+caso("cartões: a revisão do dia (vencidos primeiro, novos com limite) e a conferência da IA", () => {
+  const hoje = "2026-10-31";
+  const novos = Array.from({ length: 20 }, (_, i) => ({ id: `n${i}`, proxima_em: hoje, revisado_em: null, criado_em: `2026-10-0${(i % 9) + 1}T10:00:00Z` }));
+  const lista = [
+    { id: "hoje", proxima_em: hoje, revisado_em: "2026-10-28T10:00:00Z", repeticoes: 2, intervalo: 3, criado_em: "2026-10-01T00:00:00Z" },
+    { id: "atrasado", proxima_em: "2026-10-20", revisado_em: "2026-10-10T10:00:00Z", repeticoes: 1, intervalo: 1, criado_em: "2026-10-02T00:00:00Z" },
+    { id: "futuro", proxima_em: "2026-11-05", revisado_em: "2026-10-30T10:00:00Z", repeticoes: 3, intervalo: 25, criado_em: "2026-10-01T00:00:00Z" },
+    ...novos,
+  ];
+  const fila = cartoesDoDia(lista, hoje, { cartoes: 10, novos: 5 });
+  assert.equal(fila.length, 7, "2 vencidos e 5 novos");
+  assert.equal(fila[0].id, "atrasado", "o mais atrasado primeiro");
+  assert.ok(!fila.some((c) => c.id === "futuro"));
+  const resumo = resumoDosCartoes(lista, hoje);
+  assert.deepEqual([resumo.total, resumo.novos, resumo.firmes, resumo.proxima], [23, 20, 1, "2026-11-05"]);
+  const bons = validarCartoes({
+    cartoes: [
+      { frente: "to borrow", verso: "pegar emprestado" }, { frente: "To  Borrow", verso: "repetido" }, { frente: "run", verso: "correr" },
+      { frente: "eat", verso: "comer", exemplo: "I eat rice." }, { frente: "", verso: "sem frente" }, { frente: "drink", verso: "beber" },
+    ],
+  }, ["Run"]);
+  assert.deepEqual(bons.map((c) => c.frente), ["to borrow", "eat", "drink"], "sem repetir entre eles nem com os que já existem");
+  assert.throws(() => validarCartoes({ cartoes: [{ frente: "a", verso: "b" }] }), /suficientes/);
+  assert.throws(() => validarCartao({ frente: "Casa", verso: "casa" }), /iguais/);
+  assert.equal(pontosDaRevisao(3), 6);
+  assert.equal(pontosDaRevisao(50), 20, "com teto por dia");
+});
+
+caso("revisão da turma: pedir, revisar e a nota que só sobe", () => {
+  const d = {
+    tipo: "exercicio", rodada: 1, status: "em_andamento", tentativas: 1, nota: 50, pontos: comFatorDaRodada(pontosDaNota("exercicio", 50), 1),
+    conteudo: { motor: "aberto", criterios: ["A", "B", "C", "D"] },
+    avaliacao: { nota: 50, requisitos: [{ numero: 1, atendido: true }, { numero: 2, atendido: true }, { numero: 3, atendido: false, observacao: "não vi" }, { numero: 4, atendido: false }] },
+    resposta: { texto: "minha entrega" },
+  };
+  assert.deepEqual(atendidosPelaIA(d), [0, 1]);
+  assert.equal(podePedirRevisao(d).ok, true);
+  assert.equal(podePedirRevisao(d, { jaPediu: true }).ok, false);
+  assert.equal(podePedirRevisao({ ...d, conteudo: { motor: "calculo" } }).ok, false, "o que tem resposta certa não vai para a turma");
+  assert.equal(podePedirRevisao({ ...d, tentativas: 0 }).ok, false);
+  assert.equal(podePedirRevisao({ ...d, avaliacao: { requisitos: [1, 2, 3, 4].map((numero) => ({ numero, atendido: true })) } }).ok, false);
+
+  const pedido = validarPedido(d, [{ indice: 2, justificativa: "aparece na foto 2" }, { indice: 0, justificativa: "a Lisa já deu esse" }], true);
+  assert.deepEqual(pedido.map((c) => c.indice), [2], "só o que a Lisa deu como não cumprido");
+  assert.throws(() => validarPedido(d, pedido, false), /confirme/);
+  assert.throws(() => validarPedido(d, [{ indice: 2, justificativa: "sim" }], true), /explique/);
+  assert.throws(() => validarPedido(d, [], true), /pelo menos um/);
+
+  assert.throws(() => validarVeredito(pedido, [], "Muito bom, parabéns!"), /cada critério/);
+  assert.throws(() => validarVeredito(pedido, [{ indice: 2, veredito: "cumpriu" }], "ok"), /comentário/);
+  const v = validarVeredito(pedido, [{ indice: 2, veredito: "cumpriu", observacao: "dá para ver na foto" }], "Ficou ótimo, só capriche na luz.");
+  assert.equal(v.vereditos[0].veredito, "cumpriu");
+
+  const agora = Date.parse("2026-10-31T12:00:00Z");
+  const p = { autor_id: "a", status: "aberta", criado_em: "2026-10-30T12:00:00Z" };
+  assert.equal(podeRevisarNaTurma({ usuarioId: "a", pedido: p, agora }).ok, false, "o próprio pedido, não");
+  assert.equal(podeRevisarNaTurma({ usuarioId: "b", pedido: p, revisadosNaSemana: ["a"], agora }).ok, false, "o mesmo colega duas vezes na semana, não");
+  assert.equal(podeRevisarNaTurma({ usuarioId: "b", pedido: { ...p, status: "revisada" }, agora }).ok, false);
+  assert.equal(podeRevisarNaTurma({ usuarioId: "b", pedido: { ...p, criado_em: "2026-10-01T12:00:00Z" }, agora }).ok, false, "vencido");
+  assert.equal(podeRevisarNaTurma({ usuarioId: "b", pedido: p, agora }).ok, true);
+
+  const depois = aplicarRevisao(d, v.vereditos);
+  assert.equal(depois.nota, 75, "3 de 4 critérios");
+  assert.equal(depois.concluido, true);
+  assert.equal(depois.avaliacao.requisitos[2].atendido, true);
+  assert.equal(depois.avaliacao.requisitos[2].turma, true);
+  assert.ok(depois.pontos >= comFatorDaRodada(pontosDaNota("exercicio", 75), 1));
+  const negou = aplicarRevisao(d, [{ indice: 2, veredito: "nao_cumpriu" }]);
+  assert.equal(negou.nota, 50, "a turma não tira nota");
+  assert.equal(negou.pontos, d.pontos);
+
+  const projeto = {
+    tipo: "projeto_semanal", rodada: 1, status: "em_andamento", tentativas: 1, nota: 40, pontos: 0,
+    conteudo: { evidencias: ["texto"], requisitos: ["r1", "r2", "r3"], extras: [] },
+    resposta: { cumpridos: { requisitos: [0], extras: [] } },
+    avaliacao: { nota: 40, requisitos: [{ numero: 1, atendido: true }, { numero: 2, atendido: false }, { numero: 3, atendido: false }] },
+  };
+  const tabela = tabelaDePontos(projeto.tipo, projeto.conteudo);
+  const dp = aplicarRevisao({ ...projeto, pontos: pontosDoProjeto(tabela, projeto.resposta.cumpridos) }, [{ indice: 1, veredito: "cumpriu" }]);
+  assert.deepEqual(dp.resposta.cumpridos.requisitos, [0, 1]);
+  assert.equal(dp.pontos, pontosDoProjeto(tabela, { requisitos: [0, 1], extras: [] }), "soma a parte do requisito confirmado");
+  assert.equal(dp.nota, 67);
+});
+
+caso("torre de tema: o pedido, os atributos do perfil e o desafio com evidências", () => {
+  assert.deepEqual(validarPedidoDeTema({ tema: "  Violão   popular ", perfil: "musica" }), { tema: "Violão popular", perfil: "musica", ponto: "" });
+  assert.throws(() => validarPedidoDeTema({ tema: "ab", perfil: "musica" }), /tema/);
+  assert.throws(() => validarPedidoDeTema({ tema: "Inglês", perfil: "programacao" }), /tipo da torre/);
+  const musica = atributosDaTorre("musica");
+  assert.deepEqual(musica.map((a) => a.id), ATRIBUTOS.map((a) => a.id), "os mesmos cinco atributos do Neuro");
+  assert.ok(musica.some((a) => a.nome === "Afinação"));
+  assert.equal(atributosDaTorre(undefined), ATRIBUTOS, "torre de repositório: os de programação");
+  for (const p of PERFIS_DE_TORRE) assert.ok(TORRES_DE_TEMA[p] && atributosDaTorre(p).every((a) => a.nome && a.sentido), p);
+  assert.equal(tituloDaTorre({ origem: "tema", tema: "Inglês" }), "Inglês");
+  assert.equal(tituloDaTorre({ origem: "repositorio", repo_caminho: "dono/repo" }), "dono/repo");
+  const d = validarDesafioDoTema({ enunciado: "Toque a escala", requisitos: ["a", "b"], criterios: ["c"], dica: "", entrega: "um áudio", evidencias: ["audio", "imagens", "github"] }, "musica");
+  assert.deepEqual(d.evidencias, ["audio"], "só as evidências que o perfil aceita");
+  assert.equal(d.arquivos, undefined);
+  assert.equal(d.entrega, "um áudio");
+});
+
+caso("migração 023: só acrescenta (tabelas, colunas e tipos novos no livro de pontos)", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const sql = ler("../db/023-cartoes-turma-e-torres-de-tema.sql");
+  const tipos = (texto) => [...texto.match(/proof_eventos_tipo_check check \(tipo in \(([\s\S]*?)\)\)/)[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  const antes = tipos(ler("../db/018-modo-dominio.sql"));
+  const agora = tipos(sql);
+  for (const t of antes) assert.ok(agora.includes(t), `o tipo ${t} continua`);
+  for (const t of ["cartoes", "revisao"]) assert.ok(agora.includes(t), `entra o tipo ${t}`);
+  assert.match(sql, /create table if not exists public\.proof_cartoes/);
+  assert.match(sql, /create table if not exists public\.proof_revisoes/);
+  assert.match(sql, /add column if not exists origem text not null default 'repositorio'/);
+  assert.doesNotMatch(sql, /drop table|drop column/i);
+  for (const p of PERFIS_DE_TORRE) assert.ok(sql.includes(`'${p}'`), `a torre aceita ${p}`);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

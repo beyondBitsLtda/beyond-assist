@@ -54,7 +54,7 @@ function centro(x, texto, y, fonte, cor) {
 const dataPorExtenso = (iso) => new Date(iso || Date.now()).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" });
 
 /**
- * Desenha o certificado. `d`: { nome, repo, provedor, nivel, nomeDoNivel, andares, media,
+ * Desenha o certificado. `d`: { nome, repo (ou o tema), provedor, origem, nivel, nomeDoNivel, andares, media,
  * tecnologias, assuntos, concluidoEm, codigo, link, chefaoFinal }.
  */
 export async function desenharCertificado(canvas, d) {
@@ -98,7 +98,7 @@ export async function desenharCertificado(canvas, d) {
   x.strokeStyle = OURO; x.lineWidth = 4;
   x.beginPath(); x.moveTo(L / 2 - 520, 474); x.lineTo(L / 2 + 520, 474); x.stroke();
 
-  centro(x, `conquistou os ${d.andares} andares da torre do repositório`, 535, "400 36px Inter, system-ui, sans-serif", CINZA);
+  centro(x, `conquistou os ${d.andares} andares da torre ${d.origem === "tema" ? "do tema" : "do repositório"}`, 535, "400 36px Inter, system-ui, sans-serif", CINZA);
   const repo = `${d.repo}${d.provedor ? `  (${d.provedor === "gitlab" ? "GitLab" : "GitHub"})` : ""}`;
   const tRepo = caber(x, repo, 700, 52, L - 400);
   centro(x, repo, 600, `700 ${tRepo}px Inter, system-ui, sans-serif`, VERDE);

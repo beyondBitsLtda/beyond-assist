@@ -10,9 +10,11 @@ import Neuro, { celebrar, comemorar, reagir } from "@/componentes/Neuro.js";
 import { urlDoMonstro } from "@/componentes/reino/monstrosDePapel.js";
 import { TROPAS } from "@/dominio/tropas.js";
 import {
-  ATRIBUTOS, NIVEIS, NOTA_PARA_VENCER, chefaoPorId, chefoesDaTorre, sementeDe, premiosDaTorre, pontosDoAndar,
-  pontosDoTopo, dificuldadeEsperada,
+  NIVEIS, NOTA_PARA_VENCER, chefaoPorId, chefoesDaTorre, sementeDe, premiosDaTorre, pontosDoAndar,
+  pontosDoTopo, dificuldadeEsperada, atributosDaTorre,
 } from "@/dominio/modoDominio.js";
+import { PERFIS } from "@/dominio/perfis.js";
+import EntregaDoAndar from "@/componentes/dominio/EntregaDoAndar.js";
 import { baixarCertificado, desenharCertificado } from "@/componentes/dominio/certificado.js";
 import { AnotacoesDoAlvo } from "@/componentes/caderno/Vinculos.js";
 
@@ -162,8 +164,9 @@ export default function PaginaDaTorre() {
   const terminou = luta && luta.passo > (luta.resultado.entrega.golpes || []).length;
   const avisouFim = useRef(null);
   useEffect(() => {
-    if (!terminou || avisouFim.current === luta.resultado.entrega.sha) return undefined;
-    avisouFim.current = luta.resultado.entrega.sha;
+    const chave = luta?.resultado.entrega.sha || luta?.resultado.entrega.quando;
+    if (!terminou || avisouFim.current === chave) return undefined;
+    avisouFim.current = chave;
     const r = luta.resultado;
     if (!celebrar(r)) {
       if (r.concluiu) comemorar("Torre conquistada! 🏆");
@@ -189,13 +192,15 @@ export default function PaginaDaTorre() {
     : { k: "fim", fim: true, venceu: luta.resultado.venceu };
   const ultimo = luta && luta.passo > 0 ? golpes[Math.min(luta.passo, golpes.length) - 1] : null;
 
-  async function entregar() {
-    const r = await agir("entregar", () => criar(`/api/dominio/${id}/entregar`, {}));
-    if (!r) return;
+  // torre de tema: `form` traz o texto, as fotos, o áudio e o vídeo (EntregaDoAndar)
+  async function entregar(form) {
+    const r = await agir("entregar", () => criar(`/api/dominio/${id}/entregar`, form instanceof FormData ? form : {}));
+    if (!r) return false;
     if (telaCheiaRef.current) setPainel(null);
     else document.querySelector(".dm-torre")?.scrollIntoView({ behavior: semMovimento ? "auto" : "smooth", block: "center" });
     setNaSala(!semMovimento);
     setLuta({ resultado: r.resultado, passo: semMovimento ? 999 : 0 });
+    return true;
   }
 
   async function salvarBranch(repo, branch) {
@@ -220,9 +225,11 @@ export default function PaginaDaTorre() {
       <Link href="/dominio" className="dm-voltar">← Modo Domínio</Link>
       <div className="pf-cabecalho">
         <div>
-          <h1 className="dm-titulo">🗼 {torre.repo}</h1>
+          <h1 className="dm-titulo">🗼 {torre.origem === "tema" ? `${PERFIS[torre.perfil]?.emoji || ""} ${torre.titulo}` : torre.titulo}</h1>
           <p>
-            <a href={torre.url} target="_blank" rel="noreferrer">{torre.provedor === "gitlab" ? "GitLab" : "GitHub"} ↗</a>
+            {torre.url
+              ? <a href={torre.url} target="_blank" rel="noreferrer">{torre.provedor === "gitlab" ? "GitLab" : "GitHub"} ↗</a>
+              : <span>{torre.tipoDaTorre}</span>}
             {" · "}Nível {torre.nivel} — {torre.nomeDoNivel}
             {montada && ` · ${torre.vencidos} de ${torre.andares} andares`}
           </p>
@@ -257,18 +264,18 @@ export default function PaginaDaTorre() {
                   aoEscolher={(n) => setVendo(n)}
                   aoFalhar={() => setSemTela(true)}
                 >
-                  {luta && <Placar luta={luta} ultimo={ultimo} terminou={terminou} />}
+                  {luta && <Placar luta={luta} ultimo={ultimo} terminou={terminou} perfil={torre.perfil} />}
                 </TorreDoDominio>
               )}
-              {semTela && luta && <Placar luta={luta} ultimo={ultimo} terminou={terminou} plano />}
+              {semTela && luta && <Placar luta={luta} ultimo={ultimo} terminou={terminou} perfil={torre.perfil} plano />}
               {vendo && <AndarVisto torre={torre} numero={vendo} aoFechar={() => setVendo(null)} />}
               {telaCheia && (
                 <HudDaTorre torre={torre} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} temResultado={Boolean(luta && terminou)}>
                   {painel === "desafio" && (
                     <AndarAtual torre={torre} ocupado={ocupado} lutando={Boolean(luta && !terminou)} aoAbrir={abrirDesafio} aoEntregar={entregar} />
                   )}
-                  {painel === "branch" && <PrepararBranch torre={torre} ocupado={ocupado} aoSalvar={salvarBranch} />}
-                  {painel === "resultado" && luta && terminou && <ResultadoDaEntrega resultado={luta.resultado} aoFechar={() => setPainel(null)} />}
+                  {painel === "branch" && torre.origem !== "tema" && <PrepararBranch torre={torre} ocupado={ocupado} aoSalvar={salvarBranch} />}
+                  {painel === "resultado" && luta && terminou && <ResultadoDaEntrega resultado={luta.resultado} perfil={torre.perfil} aoFechar={() => setPainel(null)} />}
                   {painel === "neuro" && <AtributosDoNeuro torre={torre} />}
                   {painel === "premios" && <TrilhaDePremios torre={torre} />}
                   {painel === "andares" && <ListaDeAndares torre={torre} aberta />}
@@ -279,16 +286,16 @@ export default function PaginaDaTorre() {
             <AtributosDoNeuro torre={torre} />
           </div>
 
-          {luta && terminou && <ResultadoDaEntrega resultado={luta.resultado} aoFechar={() => setLuta(null)} />}
+          {luta && terminou && <ResultadoDaEntrega resultado={luta.resultado} perfil={torre.perfil} aoFechar={() => setLuta(null)} />}
 
           {torre.status === "concluido" ? <Certificado torre={torre} avisar={avisar} /> : (
             <>
-              <PrepararBranch torre={torre} ocupado={ocupado} aoSalvar={salvarBranch} />
+              {torre.origem !== "tema" && <PrepararBranch torre={torre} ocupado={ocupado} aoSalvar={salvarBranch} />}
               <AndarAtual torre={torre} ocupado={ocupado} lutando={Boolean(luta && !terminou)} aoAbrir={abrirDesafio} aoEntregar={entregar} />
             </>
           )}
 
-          <AnotacoesDoAlvo alvo={{ tipo: "torre", id: torre.id }} titulo="Anotações da torre" nomeDoAlvo={torre.repo} />
+          <AnotacoesDoAlvo alvo={{ tipo: "torre", id: torre.id }} titulo="Anotações da torre" nomeDoAlvo={torre.titulo} />
           <TrilhaDePremios torre={torre} />
           <ListaDeAndares torre={torre} aberta={semTela} />
         </>
@@ -309,7 +316,7 @@ function HudDaTorre({ torre, painel, aoPainel, aoSair, temResultado, children })
   const itens = [
     ...(concluida
       ? [{ id: "certificado", emoji: "📜", rotulo: "Certificado" }]
-      : [{ id: "desafio", emoji: "⚔️", rotulo: "Desafio" }, { id: "branch", emoji: "🌿", rotulo: "Branch" }]),
+      : [{ id: "desafio", emoji: "⚔️", rotulo: "Desafio" }, ...(torre.origem === "tema" ? [] : [{ id: "branch", emoji: "🌿", rotulo: "Branch" }])]),
     ...(temResultado ? [{ id: "resultado", emoji: "📝", rotulo: "Resultado" }] : []),
     { id: "neuro", emoji: "🧠", rotulo: "Neuro" },
     { id: "premios", emoji: "🎁", rotulo: "Prêmios" },
@@ -329,7 +336,7 @@ function HudDaTorre({ torre, painel, aoPainel, aoSair, temResultado, children })
     <>
       <div className="rn-hud__topo">
         <div className="rn-hud__reino">
-          <strong>🗼 {torre.repo}</strong>
+          <strong>🗼 {torre.titulo}</strong>
           <span>{concluida ? "🏆 conquistada" : `Andar ${torre.andarAtual} de ${torre.andares}`}</span>
           <span>Nível {torre.nivel}</span>
         </div>
@@ -425,11 +432,11 @@ function MontarTorre({ torre, ocupado, aoMontar }) {
 
 // ------------------------------------------------------------------ a luta
 
-function Placar({ luta, ultimo, terminou, plano = false }) {
+function Placar({ luta, ultimo, terminou, perfil, plano = false }) {
   const r = luta.resultado;
   const vidaNeuro = ultimo ? ultimo.vidaNeuro : 100;
   const vidaChefao = ultimo ? ultimo.vidaChefao : 100;
-  const atributo = ultimo?.especial ? ATRIBUTOS.find((a) => a.id === ultimo.especial) : null;
+  const atributo = ultimo?.especial ? atributosDaTorre(perfil).find((a) => a.id === ultimo.especial) : null;
   const fala = !ultimo ? `⚔️ ${r.chefao.nome} desafia o Neuro!`
     : terminou ? (r.venceu ? `🏆 ${r.chefao.nome} caiu! Nota ${r.entrega.nota}.` : `💫 O Neuro recuou. Nota ${r.entrega.nota} — ${NOTA_PARA_VENCER} vence.`)
     : ultimo.quem === "neuro" ? `${atributo ? `${atributo.emoji} Golpe de ${atributo.nome}! ` : "👊 "}−${ultimo.dano}`
@@ -449,7 +456,7 @@ function Placar({ luta, ultimo, terminou, plano = false }) {
   );
 }
 
-function ResultadoDaEntrega({ resultado: r, aoFechar }) {
+function ResultadoDaEntrega({ resultado: r, perfil, aoFechar }) {
   const e = r.entrega;
   return (
     <section className={`pf-cartao dm-resultado${r.venceu ? " dm-resultado--venceu" : ""}`} aria-label="Resultado da entrega">
@@ -463,7 +470,7 @@ function ResultadoDaEntrega({ resultado: r, aoFechar }) {
         <button type="button" className="dm-fechar" onClick={aoFechar} aria-label="Fechar o resultado">✕</button>
       </div>
       <div className="dm-atributos-da-entrega">
-        {ATRIBUTOS.map((a) => (
+        {atributosDaTorre(perfil).map((a) => (
           <div key={a.id} className="dm-atributo"><span>{a.emoji} {a.nome}</span><Barra valor={e.atributos?.[a.id] || 0} total={100} rotulo={`${a.nome}: ${e.atributos?.[a.id] || 0}`} /><b>{e.atributos?.[a.id] || 0}</b></div>
         ))}
       </div>
@@ -477,12 +484,25 @@ function ResultadoDaEntrega({ resultado: r, aoFechar }) {
           <ul>{r.premios.map((p, i) => <li key={i}>{textoDoRecebido(p)}</li>)}</ul>
         </div>
       )}
-      <small className="dm-resultado__commit">Commit avaliado: {e.link ? <a href={e.link} target="_blank" rel="noreferrer">{e.sha.slice(0, 7)}</a> : e.sha.slice(0, 7)} · {e.arquivos} arquivo(s), {e.commits} commit(s)</small>
+      {e.sha
+        ? <small className="dm-resultado__commit">Commit avaliado: {e.link ? <a href={e.link} target="_blank" rel="noreferrer">{e.sha.slice(0, 7)}</a> : e.sha.slice(0, 7)} · {e.arquivos} arquivo(s), {e.commits} commit(s)</small>
+        : <small className="dm-resultado__commit">Entrega avaliada: {resumoDaEvidencia(e.evidencias)}</small>}
     </section>
   );
 }
 
 // ------------------------------------------------------------------ o Neuro e os prêmios
+
+/** O que foi entregue num andar de tema, em uma linha (as fotos e o áudio não ficam guardados). */
+function resumoDaEvidencia(ev) {
+  if (!ev) return "—";
+  return [
+    ev.texto ? "texto" : "",
+    ev.fotos ? `${ev.fotos} foto(s)` : "",
+    ev.audio ? `áudio de ${Math.floor(ev.audio.segundos / 60)}:${String(ev.audio.segundos % 60).padStart(2, "0")}` : "",
+    ev.video ? "vídeo do YouTube" : "",
+  ].filter(Boolean).join(", ") || "—";
+}
 
 function AtributosDoNeuro({ torre }) {
   const { valores, nivel, experiencia, andares } = torre.neuro;
@@ -496,7 +516,7 @@ function AtributosDoNeuro({ torre }) {
         </div>
       </div>
       <div className="dm-neuro__barras">
-        {ATRIBUTOS.map((a) => (
+        {atributosDaTorre(torre.perfil).map((a) => (
           <div key={a.id} className="dm-atributo"><span>{a.emoji} {a.nome}</span><Barra valor={valores[a.id] || 0} total={100} rotulo={`${a.nome}: ${valores[a.id] || 0}`} /><b>{valores[a.id] || 0}</b></div>
         ))}
       </div>
@@ -602,9 +622,11 @@ function AndarAtual({ torre, ocupado, lutando, aoAbrir, aoEntregar }) {
           {!d ? (
             <div className="dm-andar__abrir">
               <button type="button" className="pf-botao" disabled={Boolean(ocupado)} onClick={aoAbrir}>
-                {ocupado === "desafio" ? "A Lisa está lendo o código…" : "Abrir o desafio do andar"}
+                {ocupado === "desafio" ? (torre.origem === "tema" ? "A Lisa está preparando o desafio…" : "A Lisa está lendo o código…") : "Abrir o desafio do andar"}
               </button>
-              <small>A Lisa lê o código do repositório {torre.entrega ? "no ponto em que o andar começou" : ""} e escreve o desafio.</small>
+              <small>{torre.origem === "tema"
+                ? "A Lisa escreve o desafio do andar e diz o que entregar: texto, fotos, áudio ou vídeo."
+                : `A Lisa lê o código do repositório ${torre.entrega ? "no ponto em que o andar começou " : ""}e escreve o desafio.`}</small>
             </div>
           ) : (
             <div className="dm-desafio">
@@ -615,6 +637,9 @@ function AndarAtual({ torre, ocupado, lutando, aoAbrir, aoEntregar }) {
               {d.arquivos?.length > 0 && <div className="dm-chips">{d.arquivos.map((f) => <code key={f} className="dm-chip dm-chip--arquivo">{f}</code>)}</div>}
               {d.dica && <details className="dm-dica"><summary>💡 Uma dica</summary><p>{d.dica}</p></details>}
 
+              {torre.origem === "tema" ? (
+                <EntregaDoAndar numero={a.numero} desafio={d} ocupado={ocupado} lutando={lutando} aoEntregar={aoEntregar} />
+              ) : (
               <div className="dm-entregar">
                 {torre.entrega ? (
                   <>
@@ -628,6 +653,7 @@ git push`}</code></pre>
                   </>
                 ) : <p className="pf-aviso">Prepare a branch do desafio (acima) para poder entregar.</p>}
               </div>
+              )}
             </div>
           )}
         </div>
@@ -638,11 +664,12 @@ git push`}</code></pre>
           <h3>Entregas deste andar <small>{a.tentativas} tentativa(s) · melhor nota {a.melhorNota ?? "—"}</small></h3>
           <ul>
             {a.entregas.map((e) => (
-              <li key={e.sha + e.quando} className={`pf-cartao dm-entrega${e.venceu ? " dm-entrega--venceu" : ""}`}>
+              <li key={(e.sha || "") + e.quando} className={`pf-cartao dm-entrega${e.venceu ? " dm-entrega--venceu" : ""}`}>
                 <div className="dm-entrega__topo">
                   <span className={`pf-pilula ${e.venceu ? "pf-pilula--verde" : "pf-pilula--atencao"}`}>Nota {e.nota}</span>
                   <small>{new Date(e.quando).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small>
                   {e.link && <a href={e.link} target="_blank" rel="noreferrer"><code>{e.sha.slice(0, 7)}</code></a>}
+                  {e.evidencias && <small>{resumoDaEvidencia(e.evidencias)}</small>}
                 </div>
                 <p>{e.comentario}</p>
                 {e.melhorar?.length > 0 && <details><summary>O que melhorar</summary><ul>{e.melhorar.map((m) => <li key={m}>{m}</li>)}</ul></details>}
@@ -715,7 +742,7 @@ function Certificado({ torre, avisar }) {
   const [baixando, setBaixando] = useState(false);
   const c = torre.certificado;
   const dados = useMemo(() => ({
-    nome: c?.nome, repo: torre.repo, provedor: torre.provedor, nivel: torre.nivel, nomeDoNivel: torre.nomeDoNivel,
+    nome: c?.nome, repo: torre.titulo, provedor: torre.provedor, origem: torre.origem, nivel: torre.nivel, nomeDoNivel: torre.nomeDoNivel,
     andares: torre.andares, media: c?.media, tecnologias: torre.tecnologias, assuntos: c?.assuntos,
     concluidoEm: c?.concluidoEm, codigo: c?.codigo, chefaoFinal: torre.chefaoFinal,
     link: typeof window !== "undefined" ? `${window.location.origin}/certificado/${c?.codigo}` : "",
@@ -742,7 +769,7 @@ function Certificado({ torre, avisar }) {
     <section className="pf-secao dm-certificado">
       <h2 className="pf-secao__titulo">📜 Seu certificado <small>média final {c.media}/100</small></h2>
       <div className="pf-cartao dm-certificado__cartao">
-        <canvas ref={tela} className="dm-certificado__previa" role="img" aria-label={`Certificado de Domínio de ${c.nome} no repositório ${torre.repo}`} />
+        <canvas ref={tela} className="dm-certificado__previa" role="img" aria-label={`Certificado de Domínio de ${c.nome} ${torre.origem === "tema" ? "no tema" : "no repositório"} ${torre.titulo}`} />
         <div className="dm-certificado__acoes">
           <button type="button" className="pf-botao" onClick={baixar} disabled={baixando}>{baixando ? "Gerando o PDF…" : "Baixar certificado (PDF)"}</button>
           <a className="pf-botao pf-botao--sec" href={`/certificado/${c.codigo}`} target="_blank" rel="noreferrer">Página de conferência ↗</a>

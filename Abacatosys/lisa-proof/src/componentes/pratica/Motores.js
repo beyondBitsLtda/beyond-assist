@@ -17,6 +17,7 @@ import Explicacao, { emLinha } from "../Explicacao.js";
 import { reagir, comemorar, celebrar } from "../Neuro.js";
 import { useAviso } from "../Pecas.js";
 import { Avaliacao, reagirAEntrega } from "./Retorno.js";
+import { PedirRevisao } from "./RevisaoDaTurma.js";
 
 // ================================================================ o tipo de curso
 
@@ -39,7 +40,7 @@ export function SeletorDePerfil({ valor, aoMudar, desabilitado = false }) {
 
 // ================================================================ cabeçalho comum dos motores
 
-function Cabecalho({ desafio, children }) {
+export function Cabecalho({ desafio, children }) {
   const motor = MOTORES[desafio.motor];
   return (
     <div className="pf-cartao">
@@ -55,7 +56,7 @@ function Cabecalho({ desafio, children }) {
 }
 
 /** A reação de um motor corrigido no servidor (uma tentativa só): festa, pontos e o gabarito. */
-function reagirACorrecao(r, avisar) {
+export function reagirACorrecao(r, avisar) {
   const festejou = celebrar(r);
   if (r.nota === 100) comemorar(`Nota máxima! ${r.pontos > 0 ? `+${r.pontos} pontos` : ""} 🎉`);
   else if (r.avaliacao.aprovado) { if (!festejou) comemorar(`Aprovado com ${r.nota}! ${r.pontos > 0 ? `+${r.pontos} pontos` : ""}`); }
@@ -63,7 +64,7 @@ function reagirACorrecao(r, avisar) {
   if (r.pontos > 0 && !r.avaliacao.aprovado) avisar(`+${r.pontos} pontos`);
 }
 
-function Rodape({ concluido, rodada, maxRodadas }) {
+export function Rodape({ concluido, rodada, maxRodadas }) {
   if (!concluido) return null;
   return (
     <div className="pf-acoes" style={{ alignItems: "center" }}>
@@ -280,11 +281,16 @@ export function Ditado({ desafio }) {
 // ================================================================ treino de ouvido
 
 let contextoDeAudio = null;
-function tocarNotas(notas, modo) {
+/** O contexto de áudio da página (um só, reaproveitado), já acordado; null se o navegador não toca som. */
+export function audioDaPagina() {
   const Ctx = window.AudioContext || window.webkitAudioContext;
-  if (!Ctx) return false;
+  if (!Ctx) return null;
   contextoDeAudio = contextoDeAudio || new Ctx();
   if (contextoDeAudio.state === "suspended") contextoDeAudio.resume();
+  return contextoDeAudio;
+}
+export function tocarNotas(notas, modo) {
+  if (!audioDaPagina()) return false;
   const t0 = contextoDeAudio.currentTime + 0.05;
   const nota = (midi, inicio, dur) => {
     const osc = contextoDeAudio.createOscillator();
@@ -417,7 +423,7 @@ export function DesafioAberto({ desafio }) {
 // ================================================================ a entrega por evidências
 
 /** A foto reduzida (o lado maior com `lado` px), em JPEG: leve no celular e legível para a IA. */
-async function reduzirImagem(arquivo, lado, qualidade) {
+export async function reduzirImagem(arquivo, lado, qualidade) {
   const url = URL.createObjectURL(arquivo);
   try {
     const img = await new Promise((ok, falha) => {
@@ -472,7 +478,7 @@ async function paraWav(blob, maximoDeSegundos) {
 }
 
 /** O gravador: microfone → MediaRecorder → WAV. Para sozinho no limite de segundos. */
-function useGravador(maximo) {
+export function useGravador(maximo) {
   const [estado, setEstado] = useState("parado"); // parado | gravando | convertendo
   const [segundos, setSegundos] = useState(0);
   const [audio, setAudio] = useState(null); // { blob, url, segundos }
@@ -732,6 +738,7 @@ export function EntregaComEvidencias({ desafio, aceitas, projeto = false, aoAval
         </div>
       )}
       <Avaliacao avaliacao={estado.avaliacao} nota={estado.nota} />
+      {estado.tentativas > 0 && <PedirRevisao desafioId={desafio.id} versao={estado.tentativas} />}
       {Aviso}
     </>
   );

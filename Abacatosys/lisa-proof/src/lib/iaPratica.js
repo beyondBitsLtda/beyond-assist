@@ -6,6 +6,7 @@ import { validarQuiz, validarExercicio, validarProjeto, validarGuia, validarAval
 import { validarAberto, validarCalculo, validarDitado, EVIDENCIAS } from "@/dominio/motores.js";
 import { FORMAS } from "@/dominio/expressao.js";
 import { perfilValido, ehProgramacao, evidenciasDoPerfil } from "@/dominio/perfis.js";
+import { validarCartoes, LIMITES_DOS_CARTOES } from "@/dominio/cartoes.js";
 
 const PERSONA_AVALIADORA =
   PERSONA +
@@ -322,6 +323,46 @@ export async function gerarDitado({ tema, assunto, evitar = [], rodada = 1 }) {
     ].filter(Boolean).join("\n"),
   });
   return validarDitado(bruto);
+}
+
+// ---------------------------------------------------------------- cartões com repetição espaçada (31/10/2026)
+
+/** O que vai em cada lado do cartão, por perfil do curso. */
+const CARTOES_DO_PERFIL = {
+  programacao: "frente: uma pergunta curta sobre um conceito, comando ou função (ex.: \"O que faz o método map de um array?\"); verso: a resposta em 1 ou 2 frases, sem bloco de código longo (um trecho de uma linha pode).",
+  musica: "frente: um conceito, símbolo ou pergunta de teoria e prática (ex.: \"Quantos semitons tem uma 3ª maior?\", \"Notas do acorde de Sol maior\"); verso: a resposta curta. Notas pelo nome (Dó, Ré) e cifra (C, D).",
+  idiomas: "frente: uma palavra ou expressão NA LÍNGUA ESTUDADA, como se usa no dia a dia; verso: a tradução para o português do Brasil (e o gênero ou a forma irregular, se importar); exemplo: uma frase curta NA LÍNGUA ESTUDADA usando a palavra.",
+  matematica: "frente: uma definição, propriedade, fórmula ou pergunta rápida (ex.: \"Derivada de sen(x)\", \"Fórmula de Bhaskara\"); verso: a resposta, com a fórmula em texto simples (x^2, sqrt(), pi); exemplo: um uso rápido.",
+  livre: "frente: um termo, conceito ou pergunta-chave do assunto; verso: a resposta ou definição em 1 ou 2 frases; exemplo: quando ajudar, um caso concreto.",
+};
+
+/** Os cartões de um assunto: o que vale a pena lembrar daqui a um mês. */
+export async function gerarCartoes({ tema, perfil, assunto, existentes = [] }) {
+  const p = perfilValido(perfil);
+  const bruto = await gerarJson({
+    sistema: personaDo(p),
+    esquema: {
+      type: "OBJECT",
+      properties: {
+        cartoes: { type: "ARRAY", items: { type: "OBJECT", properties: { frente: { type: "STRING" }, verso: { type: "STRING" }, exemplo: { type: "STRING" } }, required: ["frente", "verso", "exemplo"] } },
+      },
+      required: ["cartoes"],
+    },
+    pedido: [
+      `Tema do curso: ${tema}`,
+      `Assunto: ${assunto.titulo}`,
+      assunto.descricao ? `Descrição: ${corte(assunto.descricao, 500)}` : "",
+      assunto.trecho || "",
+      "",
+      `Crie de 6 a ${LIMITES_DOS_CARTOES.porGeracao} CARTÕES de memorização (frente e verso) com o que vale a pena lembrar deste assunto daqui a um mês.`,
+      CARTOES_DO_PERFIL[p],
+      `- Frente com até ${LIMITES_DOS_CARTOES.frente} caracteres e verso com até ${LIMITES_DOS_CARTOES.verso}. Uma ideia por cartão: nada de listas longas no verso.`,
+      "- `exemplo` pode ficar vazio quando não ajudar.",
+      "- Do mais básico ao mais avançado do assunto. Escreva em português do Brasil (menos o que for da língua estudada).",
+      existentes.length ? `A pessoa JÁ TEM cartões com estas frentes — não repita nenhuma:\n${existentes.slice(-60).map((f) => `- ${corte(f, 80)}`).join("\n")}` : "",
+    ].filter(Boolean).join("\n"),
+  });
+  return validarCartoes(bruto, existentes);
 }
 
 // ---------------------------------------------------------------- projetos

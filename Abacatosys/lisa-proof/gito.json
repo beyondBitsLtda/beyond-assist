@@ -9,14 +9,33 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.36.0-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-30",
+  "versao": "0.37.0-cloudflare-pages.1",
+  "atualizadoEm": "2026-10-31",
   "compilacao": {
-    "numero": 76,
-    "data": "2026-10-30",
+    "numero": 77,
+    "data": "2026-10-31",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.37.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "O que faltava dos cursos de qualquer tema: ritmo e afinação ao vivo, cartões com repetição espaçada, revisão da turma e o Modo Domínio de tema.",
+      "itens": [
+        "Ritmo ao vivo (música): a pessoa bate o compasso junto do metrônomo; o servidor mede o desvio de cada batida e desconta o atraso fixo do aparelho.",
+        "Afinação ao vivo (música): cantar ou tocar a nota no microfone, com a agulha do afinador na tela; o navegador detecta a altura e manda só a frequência (o som não é gravado). Vale qualquer oitava.",
+        "Nos cursos de música, o exercício do dia escolhe entre ouvido, ritmo, afinação e desafio aberto pelo assunto.",
+        "Cartões com repetição espaçada (tela Cartões): a Lisa cria os do assunto da vez, a pessoa escreve os seus; agenda SM-2 (esqueci, difícil, lembrei, fácil); 2 pontos por cartão revisado, até 20 por dia.",
+        "Revisão da turma (tela Revisão da turma): quem discorda da Lisa num critério pede a revisão de um colega, sem nomes; o que a turma confirma faz a nota e os pontos subirem; quem revisa ganha 15 pontos (até 5 revisões pagas por dia).",
+        "Modo Domínio de tema: torre de repertório, do QECR, de problemas ou de missões, sem repositório; cada andar é entregue por texto, fotos, áudio ou vídeo do YouTube e avaliado pela Lisa; a luta, os prêmios e o certificado continuam iguais.",
+        "Novidades do Proof anunciando as quatro novidades.",
+        "Banco: migração db/023-cartoes-turma-e-torres-de-tema.sql (proof_cartoes, proof_revisoes, colunas origem/perfil/tema em proof_dominios e os tipos cartoes e revisao no livro de pontos). Precisa ser aplicada antes de publicar.",
+        "Regras puras em src/dominio/musica.js, cartoes.js e revisoes.js, mais a seção da torre de tema em modoDominio.js, com 10 casos novos no dominio-check (182 no total)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.36.0-cloudflare-pages.1",
       "data": "2026-10-30",
@@ -1194,7 +1213,8 @@
         "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link e vídeos (YouTube/Vimeo), com revisão do bibliotecário (administrador e líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu; Modo cinema (sala 3D com a plateia de avatares) para os vídeos",
         "Instalável como app (manifesto e ícones já existiam; agora com o botão \"Instalar app\" na própria tela).",
         "Mercado de tropas no Reino: vender tropas do exército ou da defesa (saem na hora e liberam espaço) e comprar as que outros reinos anunciaram",
-        "Tipos de curso além de programação (música, idiomas, matemática e livre), com exercício do dia próprio (lista de cálculo, ditado, treino de ouvido, desafio aberto) e projetos entregues por texto, fotos, áudio ou vídeo do YouTube, avaliados pela IA"
+        "Tipos de curso além de programação (música, idiomas, matemática e livre), com exercício do dia próprio (lista de cálculo, ditado, treino de ouvido, desafio aberto) e projetos entregues por texto, fotos, áudio ou vídeo do YouTube, avaliados pela IA",
+        "Ritmo e afinação ao vivo nos cursos de música, cartões com repetição espaçada (SM-2), revisão da turma (colegas confirmam critérios contestados, sem nomes) e o Modo Domínio de tema (torres de repertório, QECR, problemas e missões, entregues por evidências)"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -1216,7 +1236,7 @@
         "A Biblioteca Colaborativa não confere direitos autorais automaticamente: aceita qualquer PDF (decisão do dono) e depende do bibliotecário, que pode retirar um material a qualquer momento.",
         "Na Biblioteca Colaborativa, os avatares não andam ao vivo (não se vê quem está online agora); a interação é com quem contribuiu.",
         "Não guarda as fotos nem os áudios das entregas: vão só para a avaliação da IA; ficam a nota, o texto e uma miniatura das fotos.",
-        "Ritmo e afinação ao vivo, cartões com repetição espaçada, correção por colegas e o Modo Domínio para cursos que não são de programação ainda não existem."
+        "A revisão da turma não vê fotos inteiras nem ouve áudios (eles não são guardados): só o texto, o link do vídeo e as miniaturas."
       ]
     },
     "stack": [
@@ -1234,7 +1254,7 @@
       "pdf.js (pdfjs-dist 5.7.284) no navegador: leitor, camada de texto selecionável, sumário, capa e extração do texto ao subir",
       "@codemirror/lang-markdown 6.5.2 (Markdown no caderno, com os blocos de código coloridos pela linguagem)",
       "Supabase Storage (bucket privado proof-biblioteca) com endereços assinados de envio e de leitura",
-      "Web Audio, MediaRecorder e SpeechSynthesis no navegador (treino de ouvido, gravação convertida para WAV de 16 kHz e a voz do ditado)"
+      "Web Audio, MediaRecorder, SpeechSynthesis e getUserMedia no navegador (treino de ouvido, metrônomo, detecção de altura para a afinação, gravação convertida para WAV de 16 kHz e a voz do ditado)"
     ],
     "arquitetura": {
       "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do curso (a semana de cada assunto no agendamento, a mesma do mapa e da agenda), o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check. O Modo Domínio (db/018) guarda a torre em proof_dominios e cada andar em proof_dominio_andares; as regras (níveis, chefões, pontos, luta, prêmios, conferência da IA) são puras em src/dominio/modoDominio.js, a IA em src/lib/iaDominio.js, o GitHub e o GitLab em src/lib/repositorios.js (só github.com e gitlab.com) e o caminho até o banco em src/lib/dominio.js. Cada passo que gasta IA tem trava contra clique duplo (gravação condicional ao estado lido), e só quem move a torre de andar paga o prêmio do marco. Os prêmios entram no Reino de verdade por premiarDoDominio (src/lib/reino.js), respeitando as capacidades das reservas. O certificado é desenhado num canvas e embrulhado em PDF no navegador; /certificado e /api/certificado são as únicas rotas novas sem login. A biblioteca guarda os PDFs no Storage do mesmo Supabase (bucket privado proof-biblioteca, no disco do iMac): o servidor confere o dono e assina endereços de vida curta, e o navegador envia e lê o arquivo direto, sem o PDF passar pelo Worker. O texto de cada página fica em proof_livro_paginas, e o corte dos trechos (curso, quiz, explicação) e a busca rodam em funções do Postgres, para caber no processamento curto do Worker gratuito. A Biblioteca Colaborativa guarda o acervo em proof_acervo e as gorjetas em proof_acervo_gorjetas (db/020-biblioteca-colaborativa.sql); os PDFs ficam no bucket privado proof-acervo, e o livro levado para a biblioteca pessoal aponta para o mesmo arquivo (proof_livros.acervo_id).",
@@ -1273,7 +1293,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/022; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/023; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
       }
     ],
     "integracoes": [
@@ -1284,7 +1304,7 @@
       },
       {
         "nome": "Google Gemini",
-        "descricao": "Monta a ordem da trilha, gera checklists de teoria, explica os assuntos, gera quiz, exercício e projetos e corrige as entregas (código, texto, fotos, áudio e vídeo do YouTube por link); abre o pregão diário da Bolsa do Reino.",
+        "descricao": "Monta a ordem da trilha, gera checklists de teoria, explica os assuntos, gera quiz, exercício, projetos e cartões e corrige as entregas (código, texto, fotos, áudio e vídeo do YouTube por link); analisa, monta e avalia as torres do Modo Domínio (de repositório e de tema); abre o pregão diário da Bolsa do Reino.",
         "url": "https://ai.google.dev"
       },
       {

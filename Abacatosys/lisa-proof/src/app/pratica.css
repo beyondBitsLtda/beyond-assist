@@ -315,3 +315,84 @@
 .evid__arquivo { cursor: pointer; }
 .evid__ultima { display: grid; gap: 8px; }
 .evid__texto { margin: 0; white-space: pre-wrap; font-size: 14px; color: var(--pf-tinta-2); max-height: 220px; overflow: auto; }
+
+/* ---- ritmo e afinação ao vivo (31/10/2026) */
+.ritmo__compasso { display: grid; gap: 4px; max-width: 520px; }
+.ritmo__grade { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 2px; }
+.ritmo__celula { height: 26px; border-radius: 4px; background: var(--pf-superficie); border: 1px solid var(--pf-linha); font-size: 11px; font-weight: 800; color: var(--pf-tinta-2); display: grid; place-items: center; }
+.ritmo__celula--tempo { border-left: 2px solid var(--pf-tinta-2); }
+.ritmo__celula--batida { background: var(--pf-tinta); color: var(--pf-superficie); border-color: var(--pf-tinta); }
+.ritmo__toques { position: relative; height: 14px; }
+.ritmo__toques i { position: absolute; top: 0; width: 0; height: 0; transform: translateX(-6px); border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 10px solid var(--pf-verde-forte); }
+.ritmo__cursor { position: absolute; top: -32px; bottom: 0; width: 2px; background: var(--pf-alerta); }
+.ritmo__pad {
+  width: 100%; max-width: 520px; min-height: 96px; border-radius: 16px; border: 2px solid var(--pf-tinta); background: var(--pf-superficie);
+  color: var(--pf-tinta); font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; touch-action: manipulation; user-select: none;
+}
+.ritmo__pad:active { background: var(--pf-superficie-2); }
+.afin__ao-vivo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.afin__nota { font-size: 24px; font-weight: 800; min-width: 64px; }
+.afin__agulha { position: relative; flex: 1; min-width: 160px; max-width: 360px; height: 18px; border-radius: 9px; background: var(--pf-superficie); border: 1px solid var(--pf-linha); }
+.afin__centro { position: absolute; left: 30%; width: 40%; top: 0; bottom: 0; background: var(--pf-verde-claro); }
+.afin__ponteiro { position: absolute; top: -4px; bottom: -4px; width: 4px; transform: translateX(-2px); border-radius: 2px; background: var(--pf-alerta); transition: left 60ms linear; }
+.afin__ponteiro--ok { background: var(--pf-verde-forte); }
+
+/* ---- atalhos da prática: cartões e revisão da turma (31/10/2026) */
+.pratica__atalhos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 12px; }
+.pratica__atalho {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--pf-raio); background: var(--pf-superficie);
+  border: 1px solid var(--pf-linha); color: var(--pf-tinta); text-decoration: none;
+}
+.pratica__atalho > span:first-child { font-size: 26px; }
+.pratica__atalho > span:last-child { display: grid; gap: 2px; }
+.pratica__atalho small { color: var(--pf-tinta-2); font-size: 13px; }
+.pratica__atalho:hover { border-color: var(--pf-tinta-2); }
+
+/* ---- cartões com repetição espaçada (31/10/2026) */
+.cartoes__hoje { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
+.cartoes__revisao { display: grid; gap: 12px; margin-top: 12px; max-width: 640px; }
+.cartoes__cartao {
+  display: grid; gap: 12px; align-content: center; justify-items: center; min-height: 220px; padding: 24px 18px; border-radius: var(--pf-raio-grande);
+  border: 2px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; text-align: center; cursor: pointer;
+}
+.cartoes__cartao--virado { cursor: default; border-color: var(--pf-tinta-2); }
+.cartoes__frente { font-size: 22px; font-weight: 800; overflow-wrap: anywhere; }
+.cartoes__verso { font-size: 18px; padding-top: 12px; border-top: 1px solid var(--pf-linha); width: 100%; overflow-wrap: anywhere; }
+.cartoes__exemplo { font-size: 14px; color: var(--pf-tinta-2); font-style: italic; overflow-wrap: anywhere; }
+.cartoes__dica { font-size: 13px; color: var(--pf-tinta-2); }
+.cartoes__respostas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.cartoes__resposta { display: grid; gap: 2px; padding: 10px 4px; border-radius: 12px; border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; cursor: pointer; }
+.cartoes__resposta small { color: var(--pf-tinta-2); font-size: 12px; }
+.cartoes__resposta--esqueci { border-color: var(--pf-alerta); }
+.cartoes__resposta--facil { border-color: var(--pf-verde-forte); }
+.cartoes__trilhas { display: grid; gap: 12px; margin-top: 16px; }
+.cartoes__trilha { display: grid; gap: 10px; }
+.cartoes__trilha h3 { margin: 0; }
+.cartoes__novo { display: grid; gap: 8px; max-width: 560px; }
+.cartoes__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 420px; overflow: auto; }
+.cartoes__lista li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--pf-superficie-2); font-size: 14px; }
+.cartoes__lista li > span { overflow-wrap: anywhere; }
+.cartoes__lista small { color: var(--pf-tinta-2); white-space: nowrap; }
+@media (max-width: 520px) {
+  .cartoes__respostas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cartoes__lista li { grid-template-columns: 1fr auto; }
+  .cartoes__lista small { grid-column: 1; }
+}
+
+/* ---- revisão da turma (31/10/2026) */
+.turma__convite { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.turma__pedido, .turma__cartao, .turma__resultado { display: grid; gap: 10px; }
+.turma__fila { display: grid; gap: 12px; }
+.turma__meu { display: grid; gap: 4px; }
+.turma__entrega { display: grid; gap: 8px; }
+.turma__criterios { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
+.turma__criterios > li { display: grid; gap: 6px; }
+.turma__contestado { padding: 8px 10px; border-radius: 10px; background: var(--pf-superficie-2); }
+.turma__marcar { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+.turma__marcar input { margin-top: 3px; }
+.turma__marcar small { color: var(--pf-tinta-2); }
+.turma__vereditos { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.turma__selo { display: inline-block; padding: 1px 8px; border-radius: var(--pf-pilula); font-size: 12px; font-weight: 800; border: 1px solid var(--pf-linha); }
+.turma__selo--cumpriu { border-color: var(--pf-verde-forte); color: var(--pf-verde-forte); }
+.turma__selo--nao_cumpriu { border-color: var(--pf-alerta); color: var(--pf-alerta); }
+.turma__comentario { margin: 0; padding: 8px 12px; border-left: 3px solid var(--pf-linha); color: var(--pf-tinta-2); white-space: pre-wrap; }
