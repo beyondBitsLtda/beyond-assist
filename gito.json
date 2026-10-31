@@ -9,14 +9,34 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.1.0",
-  "atualizadoEm": "2026-09-26",
+  "versao": "0.1.1",
+  "atualizadoEm": "2026-10-31",
   "compilacao": {
-    "numero": 1,
-    "data": "2026-09-26",
+    "numero": 2,
+    "data": "2026-10-31",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.1.1",
+      "data": "2026-10-31",
+      "branch": "dominio",
+      "tipo": "seguranca",
+      "resumo": "Andares 1 e 2 do Modo Domínio: o mapa das rotas no README e a conexão com o Supabase protegida para rodar só no servidor.",
+      "itens": [
+        "README com o mapeamento das rotas da aplicação.",
+        "O cliente do Supabase (src/lib/supabase.js) passa a importar \"server-only\": usar a chave-mestra num componente do navegador vira erro de build.",
+        "Script scripts/test-supabase.mjs para conferir a conexão com o banco (lê as variáveis de ambiente; nenhuma chave no código).",
+        "Comentário explicando o painel padrão (Quarto de Guerra) em src/app/(panels)/page.js.",
+        "Issues BEYOND-0003 a BEYOND-0006 atualizadas."
+      ],
+      "issues": [
+        "BEYOND-0003",
+        "BEYOND-0004",
+        "BEYOND-0005",
+        "BEYOND-0006"
+      ]
+    },
     {
       "versao": "0.1.0",
       "data": "2026-09-26",
