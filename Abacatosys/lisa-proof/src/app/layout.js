@@ -14,11 +14,13 @@ import "./caderno.css";
 import "./biblioteca.css";
 import "./estante.css";
 import "./acervo.css";
+import "./marca.css";
+import "./cartoes.css";
 import { SCRIPT_DE_INSTALAR } from "@/lib/instalarApp.js";
 
 export const metadata = {
   title: "Lisa_Proof",
-  description: "Estudo de programação com trilhas, metas e ofensiva — em cima dos quadros STUDY do Abacato.",
+  description: "Estudo diário de qualquer tema — programação, música, idiomas, matemática — com trilhas, prática e ofensiva.",
   icons: { icon: "/icone.svg", apple: "/icone-apple.png" },
   // Instalável como app: é o que libera notificação push no iPhone (só funciona em app instalado
   // na tela de início) e tira a barra do navegador no Android.
@@ -46,6 +48,8 @@ const SCRIPT_DO_TEMA = `
     escuro = s === "escuro" || (s === "sistema" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   } catch (e) { /* sem armazenamento: fica no padrão, escuro */ }
   document.documentElement.setAttribute("data-tema", escuro ? "escuro" : "claro");
+  // a tela de abertura só na primeira página da sessão (src/componentes/marca/TelaDeAbertura.js)
+  try { if (sessionStorage.getItem("proof-abertura")) document.documentElement.setAttribute("data-abertura", "vista"); } catch (e) { /* sem armazenamento */ }
 })();
 `;
 

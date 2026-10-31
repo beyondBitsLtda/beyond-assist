@@ -15,22 +15,26 @@ import MinhaConta from "./MinhaConta.js";
 import BotaoInstalar from "./BotaoInstalar.js";
 import { AvisoDeVale } from "./Vales.js";
 import Novidades from "./Novidades.js";
+import TelaDeAbertura from "./marca/TelaDeAbertura.js";
 
+// em grupos (31/10/2026): treze itens soltos eram uma parede; com um rótulo discreto por grupo, o
+// olho acha o que procura
 const ITENS = [
-  { href: "/", rotulo: "Hoje", Icone: IconeHoje },
-  { href: "/trilhas", rotulo: "Trilhas", Icone: IconeTrilhas },
-  { href: "/agenda", rotulo: "Agenda", Icone: IconeAgenda },
-  { href: "/pratica", rotulo: "Prática", Icone: IconePratica },
-  { href: "/cadernos", rotulo: "Cadernos", Icone: IconeCaderno },
-  { href: "/biblioteca", rotulo: "Biblioteca", Icone: IconeBiblioteca },
-  { href: "/acervo", rotulo: "Acervo", Icone: IconeAcervo },
-  { href: "/progresso", rotulo: "Progresso", Icone: IconeProgresso },
-  { href: "/reino", rotulo: "Reino", Icone: IconeReino },
-  { href: "/dominio", rotulo: "Domínio", Icone: IconeDominio },
-  { href: "/bolsa", rotulo: "Bolsa", Icone: IconeBolsa },
-  { href: "/ranking", rotulo: "Ranking", Icone: IconeRanking },
-  { href: "/raio-x", rotulo: "Raio-X", Icone: IconeRaioX },
+  { href: "/", rotulo: "Hoje", Icone: IconeHoje, grupo: "Estudo" },
+  { href: "/trilhas", rotulo: "Trilhas", Icone: IconeTrilhas, grupo: "Estudo" },
+  { href: "/pratica", rotulo: "Prática", Icone: IconePratica, grupo: "Estudo" },
+  { href: "/agenda", rotulo: "Agenda", Icone: IconeAgenda, grupo: "Estudo" },
+  { href: "/cadernos", rotulo: "Cadernos", Icone: IconeCaderno, grupo: "Leitura" },
+  { href: "/biblioteca", rotulo: "Biblioteca", Icone: IconeBiblioteca, grupo: "Leitura" },
+  { href: "/acervo", rotulo: "Acervo", Icone: IconeAcervo, grupo: "Leitura" },
+  { href: "/reino", rotulo: "Reino", Icone: IconeReino, grupo: "Jogo" },
+  { href: "/dominio", rotulo: "Domínio", Icone: IconeDominio, grupo: "Jogo" },
+  { href: "/bolsa", rotulo: "Bolsa", Icone: IconeBolsa, grupo: "Jogo" },
+  { href: "/ranking", rotulo: "Ranking", Icone: IconeRanking, grupo: "Jogo" },
+  { href: "/progresso", rotulo: "Progresso", Icone: IconeProgresso, grupo: "Você" },
+  { href: "/raio-x", rotulo: "Raio-X", Icone: IconeRaioX, grupo: "Você" },
 ];
+const GRUPOS = [...new Set(ITENS.map((i) => i.grupo))];
 
 // No celular cabem 5 abas: as 4 do dia a dia e um "Mais" com o resto.
 const NAS_ABAS = ["/", "/trilhas", "/pratica", "/reino"];
@@ -59,30 +63,37 @@ export default function Moldura({ children }) {
     <div className="pf-moldura">
       <aside className="pf-lateral">
         <Link href="/" className="pf-marca">
-          <Marca />
+          <Marca tamanho={36} />
           <span>
             Lisa_Proof
             <span className="pf-marca__sub">estudo diário</span>
           </span>
         </Link>
         <nav className="pf-nav" aria-label="Navegação principal">
-          {ITENS.map(({ href, rotulo, Icone }) => (
-            <Link
-              key={href}
-              href={href}
-              className={`pf-nav__item${ativo(caminho, href) ? " pf-nav__item--ativo" : ""}`}
-              aria-current={ativo(caminho, href) ? "page" : undefined}
-            >
-              <Icone />
-              {rotulo}
-            </Link>
+          {GRUPOS.map((grupo) => (
+            <div key={grupo} className="pf-nav__grupo" role="group" aria-label={grupo}>
+              <span className="pf-nav__rotulo" aria-hidden="true">{grupo}</span>
+              {ITENS.filter((i) => i.grupo === grupo).map(({ href, rotulo, Icone }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`pf-nav__item${ativo(caminho, href) ? " pf-nav__item--ativo" : ""}`}
+                  aria-current={ativo(caminho, href) ? "page" : undefined}
+                >
+                  <Icone />
+                  {rotulo}
+                </Link>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="pf-lateral__rodape">
-          <MinhaConta />
-          <BotaoInstalar />
-          <ReportarProblema />
-          <BotaoDeTema comTexto />
+          <div className="pf-lateral__ferramentas">
+            <MinhaConta comTexto={false} />
+            <BotaoDeTema />
+            <ReportarProblema comTexto={false} />
+            <BotaoInstalar comTexto={false} />
+          </div>
           <button type="button" className="pf-lateral__sair" onClick={sair}>Sair</button>
         </div>
       </aside>
@@ -118,6 +129,7 @@ export default function Moldura({ children }) {
         <Mais caminho={caminho} />
       </nav>
       <Celebracao />
+      <TelaDeAbertura />
       <Confete />
       <AvisoDeVale />
       <Novidades />

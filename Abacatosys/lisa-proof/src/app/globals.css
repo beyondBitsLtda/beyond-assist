@@ -112,30 +112,35 @@ button { font: inherit; }
   display: none;
   background: var(--pf-barra);
   color: var(--pf-tinta-barra);
-  padding: 24px 16px;
+  padding: 24px 14px 18px;
   flex-direction: column;
-  gap: 24px;
+  gap: 26px;
 }
 
-.pf-marca { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; text-decoration: none; }
+.pf-marca { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; text-decoration: none; }
 .pf-marca__icone { width: 32px; height: 32px; flex: none; }
 .pf-marca__sub { display: block; font-size: 12px; font-weight: 500; color: var(--pf-tinta-barra-2); }
 
-.pf-nav { display: flex; flex-direction: column; gap: 4px; }
+.pf-nav { display: flex; flex-direction: column; gap: 14px; }
+.pf-nav__grupo { display: flex; flex-direction: column; gap: 1px; }
+.pf-nav__rotulo { padding: 0 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(155, 168, 161, 0.6); }
 .pf-nav__item {
   display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px; border-radius: 12px;
+  padding: 8px 12px; border-radius: 10px; font-size: 14px;
   color: var(--pf-tinta-barra-2); text-decoration: none; font-weight: 500;
 }
 .pf-nav__item:hover { background: var(--pf-barra-2); color: var(--pf-tinta-barra); }
 .pf-nav__item--ativo { background: var(--pf-barra-2); color: var(--pf-tinta-barra); }
 .pf-nav__item--ativo svg { color: var(--pf-verde); }
-.pf-nav__item svg { width: 20px; height: 20px; flex: none; }
+.pf-nav__item svg { width: 18px; height: 18px; flex: none; }
 
-.pf-lateral__rodape { margin-top: auto; display: grid; gap: 8px; }
+.pf-lateral__rodape { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.pf-lateral__ferramentas { display: flex; flex-wrap: wrap; gap: 4px; }
+.pf-lateral .pf-lateral__ferramentas > * { min-width: 36px; min-height: 36px; padding: 6px; background: transparent; border-color: transparent; }
+.pf-lateral .pf-lateral__ferramentas > *:hover { background: rgba(255, 255, 255, 0.08); }
 .pf-lateral__sair {
-  background: none; border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--pf-tinta-barra-2); border-radius: var(--pf-pilula); padding: 8px 14px; cursor: pointer;
+  background: none; border: 0;
+  color: var(--pf-tinta-barra-2); border-radius: var(--pf-pilula); padding: 6px 10px; cursor: pointer; font-size: 14px;
 }
 .pf-lateral__sair:hover { color: var(--pf-tinta-barra); }
 
@@ -214,27 +219,28 @@ button { font: inherit; }
 /* tela baixa (notebook): a barra lateral aperta um pouco antes de precisar rolar */
 @media (min-width: 900px) and (max-height: 860px) {
   .pf-lateral { gap: 16px; padding: 18px 14px; }
-  .pf-nav { gap: 2px; }
-  .pf-nav__item { padding: 8px 12px; }
+  .pf-nav { gap: 8px; }
+  .pf-nav__item { padding: 6px 12px; }
+  .pf-nav__rotulo { padding-bottom: 2px; }
 }
 
 /* ------------------------------------------------------------------ tipografia e blocos */
 
-.pf-cabecalho { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
-.pf-cabecalho h1 { margin: 0; font-size: 24px; line-height: 1.2; }
-.pf-cabecalho p { margin: 4px 0 0; color: var(--pf-tinta-2); }
+.pf-cabecalho { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+.pf-cabecalho h1 { margin: 0; font-size: 24px; line-height: 1.2; letter-spacing: -0.02em; }
+.pf-cabecalho p { margin: 6px 0 0; max-width: 64ch; color: var(--pf-tinta-2); font-size: 14px; }
 @media (min-width: 900px) { .pf-cabecalho h1 { font-size: 28px; } }
 
-.pf-secao { margin-top: 28px; }
-.pf-secao__titulo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 12px; font-size: 17px; }
+.pf-secao { margin-top: 36px; }
+.pf-secao__titulo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 14px; font-size: 16px; letter-spacing: -0.01em; }
 .pf-secao__titulo small { font-weight: 500; color: var(--pf-tinta-2); font-size: 13px; }
 
 .pf-cartao {
   background: var(--pf-superficie); border-radius: var(--pf-raio);
-  box-shadow: var(--pf-sombra); border: 1px solid var(--pf-linha);
+  border: 1px solid var(--pf-linha);
   padding: 16px;
 }
-@media (min-width: 900px) { .pf-cartao { padding: 20px; } }
+@media (min-width: 900px) { .pf-cartao { padding: 22px; } }
 
 .pf-grade { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (min-width: 900px) { .pf-grade { gap: var(--pf-gap); grid-template-columns: repeat(4, minmax(0, 1fr)); } }
@@ -263,8 +269,8 @@ button { font: inherit; }
 
 .pf-pilula {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 10px; border-radius: var(--pf-pilula);
-  font-size: 12px; font-weight: 600; background: var(--pf-superficie-2); color: var(--pf-tinta-2);
+  padding: 2px 9px; border-radius: var(--pf-pilula);
+  font-size: 12px; font-weight: 500; background: var(--pf-superficie-2); color: var(--pf-tinta-2);
   white-space: nowrap;
 }
 .pf-pilula--verde { background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
@@ -361,6 +367,7 @@ button { font: inherit; }
   min-height: 44px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--pf-linha);
   background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; width: 100%;
 }
+.pf-campo__entrada:focus { outline: none; border-color: var(--pf-verde); box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15); }
 .pf-marcar { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
 .pf-marcar input { width: 20px; height: 20px; accent-color: var(--pf-verde); }
 

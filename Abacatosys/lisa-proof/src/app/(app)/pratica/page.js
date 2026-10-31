@@ -143,12 +143,12 @@ export default function Pratica() {
       <div className="pf-cabecalho">
         <div>
           <h1>Prática</h1>
-          <p>Quiz e exercício todo dia sobre o assunto da vez, e um projeto no fim de cada semana do curso. O quiz aprovado conclui o assunto; o projeto aprovado abre a semana seguinte — e o da última semana é o projeto final da trilha.</p>
+          <p>Quiz e exercício do assunto da vez, todo dia; um projeto no fim de cada semana.</p>
         </div>
       </div>
 
       <div className="pf-cartao pratica__neuro">
-        <Neuro humor={neuro.humor} fala={neuro.fala} tamanho={104} ouvir />
+        <Neuro humor={neuro.humor} fala={neuro.fala} tamanho={80} ouvir />
       </div>
 
       {/* a memória e a turma (31/10/2026): os cartões com repetição espaçada e a revisão entre colegas */}

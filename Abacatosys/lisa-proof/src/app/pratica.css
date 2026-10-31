@@ -1,6 +1,6 @@
 /* Prática: visão geral, quiz, exercício e projeto. */
 
-.pratica__neuro { display: flex; align-items: center; }
+.pratica__neuro { display: flex; align-items: center; padding: 12px 16px !important; background: transparent; border-style: dashed; }
 
 .pratica__grade { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 640px) { .pratica__grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -347,37 +347,6 @@
 .pratica__atalho > span:last-child { display: grid; gap: 2px; }
 .pratica__atalho small { color: var(--pf-tinta-2); font-size: 13px; }
 .pratica__atalho:hover { border-color: var(--pf-tinta-2); }
-
-/* ---- cartões com repetição espaçada (31/10/2026) */
-.cartoes__hoje { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
-.cartoes__revisao { display: grid; gap: 12px; margin-top: 12px; max-width: 640px; }
-.cartoes__cartao {
-  display: grid; gap: 12px; align-content: center; justify-items: center; min-height: 220px; padding: 24px 18px; border-radius: var(--pf-raio-grande);
-  border: 2px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; text-align: center; cursor: pointer;
-}
-.cartoes__cartao--virado { cursor: default; border-color: var(--pf-tinta-2); }
-.cartoes__frente { font-size: 22px; font-weight: 800; overflow-wrap: anywhere; }
-.cartoes__verso { font-size: 18px; padding-top: 12px; border-top: 1px solid var(--pf-linha); width: 100%; overflow-wrap: anywhere; }
-.cartoes__exemplo { font-size: 14px; color: var(--pf-tinta-2); font-style: italic; overflow-wrap: anywhere; }
-.cartoes__dica { font-size: 13px; color: var(--pf-tinta-2); }
-.cartoes__respostas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.cartoes__resposta { display: grid; gap: 2px; padding: 10px 4px; border-radius: 12px; border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; cursor: pointer; }
-.cartoes__resposta small { color: var(--pf-tinta-2); font-size: 12px; }
-.cartoes__resposta--esqueci { border-color: var(--pf-alerta); }
-.cartoes__resposta--facil { border-color: var(--pf-verde-forte); }
-.cartoes__trilhas { display: grid; gap: 12px; margin-top: 16px; }
-.cartoes__trilha { display: grid; gap: 10px; }
-.cartoes__trilha h3 { margin: 0; }
-.cartoes__novo { display: grid; gap: 8px; max-width: 560px; }
-.cartoes__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 420px; overflow: auto; }
-.cartoes__lista li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--pf-superficie-2); font-size: 14px; }
-.cartoes__lista li > span { overflow-wrap: anywhere; }
-.cartoes__lista small { color: var(--pf-tinta-2); white-space: nowrap; }
-@media (max-width: 520px) {
-  .cartoes__respostas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cartoes__lista li { grid-template-columns: 1fr auto; }
-  .cartoes__lista small { grid-column: 1; }
-}
 
 /* ---- revisão da turma (31/10/2026) */
 .turma__convite { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }

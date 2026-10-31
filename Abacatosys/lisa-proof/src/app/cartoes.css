@@ -1,0 +1,170 @@
+/* Os cartões com repetição espaçada (visual revisto em 31/10/2026): o monte de hoje, as pilhas de
+ * cada trilha, os mini-cartões e o cartão da revisão, que gira de verdade. */
+
+.cartoes__nota { color: var(--pf-tinta-2); font-size: 13px; }
+.cartoes__mais { justify-self: start; }
+
+/* ---- o monte (um cartão com outros dois atrás) */
+.hoje-cartoes__monte, .pilha__monte { position: relative; flex: none; }
+.hoje-cartoes__monte { width: 76px; height: 100px; }
+.pilha__monte { width: 46px; height: 60px; }
+.hoje-cartoes__monte span, .pilha__monte span {
+  position: absolute; inset: 0; z-index: 2; display: grid; place-items: center;
+  border-radius: 12px; background: var(--pf-verde); color: var(--pf-tinta-sobre-verde);
+  font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.hoje-cartoes__monte span { font-size: 30px; }
+.pilha__monte span { border-radius: 9px; font-size: 17px; }
+.hoje-cartoes__monte::before, .hoje-cartoes__monte::after,
+.pilha__monte::before, .pilha__monte::after {
+  content: ""; position: absolute; inset: 0; border-radius: 12px;
+  background: var(--pf-superficie-2); border: 1px solid var(--pf-linha);
+}
+.hoje-cartoes__monte::before, .pilha__monte::before { transform: rotate(-9deg) translate(-5px, 3px); }
+.hoje-cartoes__monte::after, .pilha__monte::after { transform: rotate(7deg) translate(5px, 2px); z-index: 1; }
+.pilha__monte::before, .pilha__monte::after { border-radius: 9px; }
+.hoje-cartoes__monte--vazio span, .pilha__monte--0 span { background: var(--pf-superficie-2); color: var(--pf-verde-forte); border: 1px dashed var(--pf-linha); }
+.pilha__monte--0::before, .pilha__monte--0::after, .pilha__monte--1::before, .pilha__monte--1::after, .pilha__monte--2::before { display: none; }
+
+/* ---- hoje */
+.hoje-cartoes {
+  display: flex; align-items: center; gap: 28px; padding: 22px 26px;
+  border-radius: var(--pf-raio-grande); background: var(--pf-superficie); border: 1px solid var(--pf-linha);
+}
+.hoje-cartoes__texto { display: grid; gap: 6px; justify-items: start; min-width: 0; }
+.hoje-cartoes__texto h2 { margin: 0; font-size: 20px; line-height: 1.25; }
+.hoje-cartoes__texto p { margin: 0 0 6px; color: var(--pf-tinta-2); font-size: 14px; }
+
+/* ---- as pilhas */
+.pilhas { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+.pilha {
+  display: grid; gap: 14px; align-content: start; padding: 18px;
+  border-radius: var(--pf-raio); background: var(--pf-superficie); border: 1px solid var(--pf-linha);
+}
+.pilha--aberta { grid-column: 1 / -1; }
+.pilha__cabeca { display: flex; align-items: center; gap: 18px; padding-left: 6px; }
+.pilha__info { min-width: 0; }
+.pilha__info h3 {
+  margin: 0; font-size: 16px; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.pilha__info p { margin: 4px 0 0; font-size: 13px; color: var(--pf-tinta-2); }
+.pilha__info b { color: var(--pf-verde-forte); font-weight: 700; }
+.pilha__acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.pilha__acoes .pf-botao { margin-right: 4px; }
+.pilha__botao {
+  min-height: 36px; padding: 6px 12px; border: 0; border-radius: var(--pf-pilula);
+  background: transparent; color: var(--pf-tinta-2); font-weight: 600; font-size: 14px; cursor: pointer;
+}
+.pilha__botao:hover, .pilha__botao--ativo { background: var(--pf-superficie-2); color: var(--pf-tinta); }
+
+/* ---- mini-cartões (Ver todos) */
+.minis { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); }
+.mini {
+  position: relative; display: flex; flex-direction: column; gap: 8px; min-height: 156px; padding: 18px 16px 8px;
+  border-radius: 14px; background: var(--pf-superficie-2); border: 1px solid var(--pf-linha);
+}
+.mini::before { content: ""; position: absolute; left: 16px; right: 16px; top: 0; height: 3px; border-radius: 0 0 3px 3px; background: var(--pf-verde); }
+.mini--seu::before { background: #A855F7; }
+.mini__frente {
+  margin: 0; font-size: 14px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.mini__verso {
+  flex: 1; margin: 0; padding-top: 8px; border-top: 1px dashed var(--pf-linha);
+  font-size: 13px; line-height: 1.45; color: var(--pf-tinta-2); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+.mini__rodape { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--pf-tinta-3); }
+.mini__apagar {
+  display: grid; place-items: center; width: 32px; height: 32px; flex: none;
+  border: 0; border-radius: 9px; background: transparent; color: var(--pf-tinta-3); cursor: pointer;
+}
+.mini__apagar svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mini__apagar:hover { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+
+/* ---- escrever um cartão: as duas faces */
+.novo-cartao { display: grid; gap: 10px; max-width: 540px; }
+.novo-cartao__face {
+  display: grid; gap: 6px; padding: 14px 16px; border-radius: 14px;
+  background: var(--pf-superficie-2); border: 1px solid var(--pf-linha);
+}
+.novo-cartao__face--verso { border-style: dashed; }
+.novo-cartao__face:focus-within { border-color: var(--pf-verde); }
+.novo-cartao__rotulo { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pf-tinta-3); }
+.novo-cartao input, .novo-cartao textarea {
+  width: 100%; padding: 2px 0; border: 0; outline: none; resize: vertical;
+  background: transparent; color: var(--pf-tinta); font: inherit; font-size: 15px;
+}
+.novo-cartao__face:first-child input { font-weight: 700; }
+.novo-cartao .novo-cartao__exemplo { font-size: 13px; color: var(--pf-tinta-2); font-style: italic; }
+
+/* ---- a revisão: o cartão que gira, com o baralho atrás */
+.rev { display: grid; gap: 22px; max-width: 560px; margin: 4px auto 0; }
+.rev__topo { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; }
+.rev__topo .pf-barra { margin-top: 0; }
+.rev__conta { font-weight: 800; font-variant-numeric: tabular-nums; }
+.rev__conta small { color: var(--pf-tinta-3); font-weight: 600; }
+.rev__sair { padding: 6px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--pf-tinta-2); font-weight: 600; cursor: pointer; }
+.rev__sair:hover { background: var(--pf-superficie-2); color: var(--pf-tinta); }
+
+.rev__baralho { position: relative; margin-bottom: 14px; }
+.rev__baralho::before, .rev__baralho::after {
+  content: ""; position: absolute; inset: 0; border-radius: 22px;
+  background: var(--pf-superficie); border: 1px solid var(--pf-linha);
+}
+.rev__baralho::before { transform: translateY(16px) scale(0.9); opacity: 0.45; }
+.rev__baralho::after { transform: translateY(8px) scale(0.95); opacity: 0.8; }
+.rev__baralho--0::before, .rev__baralho--0::after, .rev__baralho--1::before { display: none; }
+
+.flip {
+  position: relative; z-index: 1; display: block; width: 100%; padding: 0; border: 0;
+  background: transparent; color: inherit; font: inherit; text-align: center; cursor: pointer; perspective: 1400px;
+}
+.flip__interno { display: grid; transform-style: preserve-3d; transition: transform 0.55s cubic-bezier(0.3, 0.7, 0.2, 1); }
+.flip--virado .flip__interno { transform: rotateY(180deg); }
+.flip__face {
+  position: relative; grid-area: 1 / 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  min-height: 290px; padding: 44px 26px; border-radius: 22px;
+  background: var(--pf-superficie); border: 1px solid var(--pf-linha); box-shadow: var(--pf-sombra-alta);
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+}
+.flip__face--verso { transform: rotateY(180deg); box-shadow: var(--pf-sombra-alta), inset 0 4px 0 var(--pf-verde); }
+.flip__tag {
+  position: absolute; top: 16px; left: 20px; right: 20px; text-align: left;
+  font-size: 12px; font-weight: 600; color: var(--pf-tinta-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.flip__texto { max-width: 100%; font-size: 23px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.flip__texto--verso { font-size: 19px; font-weight: 600; }
+.flip__exemplo { max-width: 100%; font-size: 14px; font-style: italic; color: var(--pf-tinta-2); overflow-wrap: anywhere; }
+.flip__dica { position: absolute; bottom: 16px; font-size: 12px; color: var(--pf-tinta-3); }
+.flip:focus-visible { outline: none; }
+.flip:focus-visible .flip__face { outline: 2px solid var(--pf-verde); outline-offset: 3px; }
+
+.rev__respostas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; opacity: 0.35; transition: opacity 0.2s ease; }
+.rev__respostas--ativas { opacity: 1; }
+.rev__resposta {
+  position: relative; display: grid; justify-items: center; gap: 2px; padding: 12px 6px;
+  border-radius: 14px; border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta);
+  font: inherit; cursor: pointer; transition: transform 0.12s ease, background 0.12s ease;
+}
+.rev__resposta strong { font-size: 14px; }
+.rev__resposta small { font-size: 12px; color: var(--pf-tinta-2); }
+.rev__resposta kbd { position: absolute; top: 6px; right: 8px; font: inherit; font-size: 10px; color: var(--pf-tinta-3); }
+.rev__resposta--esqueci strong { color: var(--pf-alerta); }
+.rev__resposta--dificil strong { color: var(--pf-atencao); }
+.rev__resposta--lembrei strong { color: var(--pf-verde-forte); }
+.rev__resposta--facil strong { color: var(--pf-verde); }
+.rev__resposta:hover:not(:disabled) { background: var(--pf-superficie-2); transform: translateY(-1px); }
+.rev__resposta:disabled { cursor: default; }
+
+@media (max-width: 560px) {
+  .hoje-cartoes { gap: 18px; padding: 18px; }
+  .hoje-cartoes__monte { width: 60px; height: 80px; }
+  .hoje-cartoes__monte span { font-size: 24px; }
+  .flip__face { min-height: 240px; padding: 40px 18px; }
+  .flip__texto { font-size: 20px; }
+  .rev__respostas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rev__resposta kbd { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .flip__interno, .rev__resposta { transition: none; } }

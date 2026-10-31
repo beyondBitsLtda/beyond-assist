@@ -117,8 +117,11 @@ const SITUACAO_DO_ESTADO = { feito: "concluida", atual: "hoje", disponivel: "dis
 
 function Unidade({ unidade, aoEscolher, temNeuro }) {
   const { cabecalho, paradas } = unidade;
-  const altura = paradas.length * LINHA + 40;
-  const pontos = paradas.map((p, i) => ({ x: 50 + p.onda, y: i * LINHA + 56 }));
+  // o balão "Começar" (e o Neuro) ficam acima da parada de agora: se ela é a primeira da semana, o
+  // trecho desce um pouco, senão o balão entrava embaixo da faixa da semana (31/10/2026)
+  const topo = paradas[0]?.estado === "atual" ? 96 : 56;
+  const altura = paradas.length * LINHA + topo - 16;
+  const pontos = paradas.map((p, i) => ({ x: 50 + p.onda, y: i * LINHA + topo }));
   let feitos = 0;
   while (feitos < paradas.length && ["feito", "dispensado", "liberado"].includes(paradas[feitos].estado)) feitos++;
 
@@ -147,7 +150,7 @@ function Unidade({ unidade, aoEscolher, temNeuro }) {
 
         {paradas.map((p, i) => {
           const x = 50 + p.onda;
-          const y = i * LINHA + 56;
+          const y = i * LINHA + topo;
           const atual = p.estado === "atual" || (p.tipo === "chegada" && p.estado === "feito");
           return (
             <div key={p.chave}>

@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.38.0-cloudflare-pages.1",
+  "versao": "0.39.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-31",
   "compilacao": {
-    "numero": 78,
+    "numero": 79,
     "data": "2026-10-31",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.39.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "Nova marca (o mascote), tela de abertura animada, cartões com cara de cartão e um visual mais limpo.",
+      "itens": [
+        "O mascote (desenho de traço com rabo de cavalo e óculos) virou o logo do sistema: barra lateral, topo do celular, tela de entrada, favicon e ícones do app.",
+        "Tela de abertura animada na primeira página da sessão: o traço do mascote se desenha, os olhos piscam e o nome aparece (um toque pula; respeita quem pede menos movimento).",
+        "Cartões redesenhados: o cartão da revisão gira de verdade (frente e verso) com o baralho atrás, cada trilha é uma pilha e \"Ver todos\" mostra mini-cartões em grade, com paginação.",
+        "Visual mais limpo: cartões planos, cabeçalhos curtos, pílulas mais leves, mais respiro; barra lateral em grupos (Estudo, Leitura, Jogo, Você) com o rodapé numa linha de ícones.",
+        "Correção: no mapa da trilha, o balão \"Começar\" do primeiro assunto da semana ficava escondido embaixo da faixa da semana."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.38.0-cloudflare-pages.1",
       "data": "2026-10-31",

@@ -498,6 +498,30 @@ há menos), guardado em `analise.faixas`. A Lisa lê o texto das páginas do and
 (uma missão prática sobre o que o trecho ensina), e a tela mostra "Leia antes: págs. X–Y" com o link
 para o leitor. Um livro sustenta no máximo um andar a cada duas páginas (`andaresPermitidosDoLivro`).
 
+## A marca e a tela de abertura
+
+Em 31/10/2026, o mascote (o desenho de traço com rabo de cavalo e óculos) virou a marca do sistema, no
+lugar do antigo ✓ verde.
+
+- `src/componentes/marca/desenhoDoMascote.js`: o desenho vetorizado do original, gerado por um script de
+  contorno, sem edição à mão. São os contornos (num `<path>` com `fill-rule="evenodd"`) e as pupilas à
+  parte. A cor vem de `currentColor`.
+- `Mascote` e `SeloDoMascote` (`Mascote.js`): o selo é o mascote num círculo de papel com anel verde. É
+  o `Marca` da barra lateral, do topo do celular e da tela de entrada.
+- `TelaDeAbertura` (`TelaDeAbertura.js`, estilos em `src/app/marca.css`): na primeira página da sessão,
+  o traço do mascote se desenha (`pathLength=1` + `stroke-dashoffset`), a tinta preenche, os olhos
+  piscam, o nome sobe e a tela some em ~2,5 s (um toque, Esc ou Enter pula). O script do `<head>` marca
+  `data-abertura="vista"` quando a sessão já viu a abertura, e assim ela não pisca nas outras páginas.
+  Quem pede menos movimento vê o mascote parado.
+- Ícones (`public/icone.svg`, `icone-192.png`, `icone-512.png`, `icone-apple.png`): o mascote em papel
+  claro. O de 512 deixa o desenho dentro da área segura dos ícones adaptáveis.
+
+O visual foi enxugado na mesma data: cartões planos (sem sombra, só a linha fina), cabeçalhos com uma
+linha de apoio, pílulas mais leves, mais respiro entre as seções. A barra lateral ficou em grupos
+(Estudo, Leitura, Jogo, Você), e o rodapé dela virou uma linha de ícones. Os cartões ganharam tela
+própria (`src/app/cartoes.css`): o cartão da revisão gira de verdade, cada trilha é uma pilha e "Ver
+todos" mostra mini-cartões em grade.
+
 ## Mercado de tropas
 
 Pedido de 30/10/2026: vender tropas do exército ou da defesa para liberar espaço, e os outros

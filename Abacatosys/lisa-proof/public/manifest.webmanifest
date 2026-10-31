@@ -1,7 +1,7 @@
 {
   "name": "Lisa_Proof",
   "short_name": "Lisa_Proof",
-  "description": "Estudo diário de programação com trilhas, prática e ofensiva.",
+  "description": "Estudo diário de qualquer tema, com trilhas, prática e ofensiva.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -1,6 +1,8 @@
 // Ícones em SVG inline: três desenhos não justificam uma biblioteca, e herdar `currentColor`
 // é o que deixa o item ativo da navegação ficar verde só com CSS.
 
+import { SeloDoMascote } from "./marca/Mascote.js";
+
 const base = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true };
 
 export const IconeHoje = () => (
@@ -72,9 +74,5 @@ export const IconeCerto = () => (
   <svg {...base} strokeWidth={3.5}><path d="M5 12.5l4.5 4.5L19 7" /></svg>
 );
 
-export const Marca = ({ className = "pf-marca__icone" }) => (
-  <svg className={className} viewBox="0 0 64 64" aria-hidden="true">
-    <rect width="64" height="64" rx="16" fill="#17201A" />
-    <path d="M18 33.5l9 9 19-21" fill="none" stroke="#22C55E" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+// a marca é o mascote (31/10/2026), num selo de papel (src/componentes/marca/Mascote.js)
+export const Marca = ({ className = "pf-marca__icone", tamanho = 32 }) => <SeloDoMascote className={className} tamanho={tamanho} />;

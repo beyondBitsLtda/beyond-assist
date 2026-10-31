@@ -48,10 +48,10 @@ export default function Entrar() {
     <main className="pf-entrada">
       <form className="pf-entrada__cartao" onSubmit={entrar}>
         <div className="pf-entrada__marca">
-          <Marca className="pf-marca__icone" />
+          <Marca className="pf-marca__icone" tamanho={52} />
           <div>
             <h1>Lisa_Proof</h1>
-            <p>Seu estudo diário de programação</p>
+            <p>Seu estudo diário, de qualquer tema</p>
           </div>
         </div>
 
