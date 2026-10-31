@@ -3,7 +3,9 @@
 //
 // Cada personagem é o mesmo Neuro com outras cores e um acessório desenhado por cima (em
 // src/componentes/Neuro.js e src/app/neuro.css), então funciona com todos os humores, em todas
-// as telas e no boneco de papel do Reino em 3D. O Neuro Clássico e o Neuro Abacate são de todo mundo, de graça.
+// as telas e no boneco de papel do Reino em 3D. O Neuro Clássico, o Neuro Abacate e a Lisa são de todo
+// mundo, de graça. A Lisa (31/10/2026) é o mascote da marca, no selo de papel do logo, com as
+// expressões de cada humor desenhadas por cima (src/componentes/marca/LisaDoNeuro.js).
 
 import { faltam } from "./moedas.js";
 import { CHEFOES_FINAIS, personagemDoChefao } from "./modoDominio.js";
@@ -12,6 +14,7 @@ export const PERSONAGENS = {
   neuro: { nome: "Neuro Clássico", emoji: "🧠", preco: 0, descricao: "O Neuro de sempre, rosa e curioso." },
   // o mascote do Abacato (23/10/2026): de graça, e todo mundo já tem
   abacato: { nome: "Neuro Abacate", emoji: "🥑", preco: 0, descricao: "O Neuro vestido de mascote do Abacato: verde, de luvas brancas e tênis, fazendo o sinal da paz." },
+  lisa: { nome: "Lisa", emoji: "👓", preco: 0, descricao: "O mascote do Lisa_Proof: rabo de cavalo, óculos redondos e brinco, no selo de papel do logo. De graça para todo mundo." },
   ninja: { nome: "Neuro Ninja", emoji: "🥷", preco: 300, descricao: "Silencioso, azul-ardósia e com a faixa vermelha amarrada na testa." },
   astronauta: { nome: "Neuro Astronauta", emoji: "🧑‍🚀", preco: 500, descricao: "Capacete de vidro e antena: estuda até fora da órbita." },
   mago: { nome: "Neuro Mago", emoji: "🧙", preco: 800, descricao: "Chapéu de estrelas e um tom lilás de quem conhece todos os feitiços (e os algoritmos)." },
@@ -26,7 +29,7 @@ export const PERSONAGENS = {
   alienigena: { nome: "Neuro Alienígena", emoji: "👽", preco: 3000, descricao: "Verde, de antenas e um terceiro olho: chegou de um planetoide para estudar com você." },
 };
 export const ORDEM_DOS_PERSONAGENS = [
-  "neuro", "abacato", "ninja", "astronauta", "mago", "cogumelo", "pirata", "mergulhador", "yeti", "robo", "magma", "alienigena",
+  "neuro", "lisa", "abacato", "ninja", "astronauta", "mago", "cogumelo", "pirata", "mergulhador", "yeti", "robo", "magma", "alienigena",
 ];
 
 // Os chefões do Modo Domínio (24/10/2026): "os avatares aqui vão ser os chefões". Não se compram —
@@ -41,7 +44,7 @@ for (const c of CHEFOES_FINAIS) {
 export const ORDEM_DOS_CHEFOES = CHEFOES_FINAIS.map((c) => personagemDoChefao(c.id));
 
 /** Os de graça: todo mundo tem, mesmo que a lista guardada não diga. */
-export const PERSONAGENS_DE_TODOS = ["neuro", "abacato"];
+export const PERSONAGENS_DE_TODOS = ["neuro", "abacato", "lisa"];
 
 /** Os personagens que a pessoa tem (os de graça sempre, mesmo que a lista venha vazia). */
 export function personagensDe(lista) {

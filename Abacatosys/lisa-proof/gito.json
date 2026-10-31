@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.39.1-cloudflare-pages.1",
+  "versao": "0.40.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-31",
   "compilacao": {
-    "numero": 80,
+    "numero": 81,
     "data": "2026-10-31",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.40.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Avatar novo e de graça para todos: a Lisa, o mascote da marca, como personagem do Neuro.",
+      "itens": [
+        "Personagem \"Lisa\" na loja de personagens do Reino, de graça e já liberado para todo mundo (como o Neuro Clássico e o Neuro Abacate).",
+        "O desenho é o mascote no selo de papel do logo, com as expressões de cada humor por cima: boca, bochechas, lágrima, olhos fechados, estrelinhas; os olhos piscam.",
+        "Vale em todas as telas e no boneco de papel do Reino em 3D.",
+        "Novidades do Proof anunciando o avatar."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.39.1-cloudflare-pages.1",
       "data": "2026-10-31",

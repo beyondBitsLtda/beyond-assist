@@ -136,6 +136,21 @@
 }
 @keyframes neuro-balao-flutuante { from { opacity: 0; transform: translate(-50%, 4px) scale(0.96); } to { opacity: 1; transform: translateX(-50%); } }
 
+/* ---- o avatar Lisa (31/10/2026): o mascote da marca no selo de papel */
+.neuro__lisa-papel { fill: #F7F3EA; stroke: #22C55E; stroke-width: 6; }
+.neuro__lisa-tinta { fill: #141A16; }
+.neuro__lisa-boca { fill: none; stroke: #141A16; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.neuro__lisa-bochecha { fill: #F9A8D4; opacity: 0.85; }
+.neuro__lisa-lagrima { fill: #60A5FA; }
+.neuro__lisa-pensar circle { fill: #9CA3AF; }
+.neuro__lisa-brilho path { fill: #FACC15; }
+.neuro__lisa-zz { fill: #6B7280; font: 700 8px Inter, system-ui, sans-serif; }
+.neuro__lisa-zz--grande { font-size: 11px; }
+.neuro__lisa-pupila { transform-box: fill-box; transform-origin: center; animation: lisa-piscar 5s ease-in-out infinite; }
+.neuro--dormindo .neuro__lisa-pupila { display: none; }
+@keyframes lisa-piscar { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.12); } }
+@media (prefers-reduced-motion: reduce) { .neuro__lisa-pupila { animation: none; } }
+
 /* ---- confete ---- */
 .confete { position: fixed; inset: 0; pointer-events: none; z-index: 60; overflow: hidden; }
 .confete__pedaco {

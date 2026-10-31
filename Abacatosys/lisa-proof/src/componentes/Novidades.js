@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoFuncionario } from "./acervo/personagensDoAcervo.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-31-conversa-graficos-e-diario";
+export const EDICAO_DAS_NOVIDADES = "2026-10-31-avatar-lisa";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,7 +28,8 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🃏", titulo: "Cartões, torres de tema e revisão da turma", texto: "Cartões com repetição espaçada (Prática → Cartões), o Modo Domínio de qualquer tema e a revisão de um colega quando você discorda da Lisa.", destaque: true },
+  { icone: "👓", titulo: "Avatar novo, de graça: a Lisa", texto: "O mascote do Proof virou personagem, liberado para todo mundo. Vista no Reino → Personagens: ele pisca, sorri, comemora e até dorme.", destaque: true },
+  { icone: "🃏", titulo: "Cartões, torres de tema e revisão da turma", texto: "Cartões com repetição espaçada (Prática → Cartões), o Modo Domínio de qualquer tema e a revisão de um colega quando você discorda da Lisa." },
   { icone: "💬", titulo: "Conversa com a Lisa", texto: "Nos cursos de idiomas: uma cena do dia a dia na língua do curso. A Lisa faz um papel, corrige cada fala e avalia no fim." },
   { icone: "📈", titulo: "Passo a passo e gráficos", texto: "Na matemática: cada linha da resolução é conferida (o erro aparece onde nasceu) e há gráficos de arrastar pontos e retas. Na música, leitura na pauta, ritmo e afinação ao vivo." },
   { icone: "📓", titulo: "Diário, PDF e torre de um livro", texto: "O diário do dia (o que aprendeu e onde travou), entrega em PDF, a frase-senha nas gravações e a torre do Modo Domínio feita a partir de um livro da Biblioteca." },

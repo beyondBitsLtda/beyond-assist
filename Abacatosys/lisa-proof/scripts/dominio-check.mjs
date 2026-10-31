@@ -1049,17 +1049,21 @@ caso("exercício do dia: o mesmo exercício de novo é barrado", () => {
   assert.equal(exercicioRepetido({ titulo: "Contador de vogais", enunciado: "Conte quantas vogais existem numa palavra digitada." }, antes), false);
 });
 caso("personagens: o Clássico é de todos; comprar cobra, vestir o que já tem é de graça", () => {
-  // 12 na loja (os 5 dos ambientes das expedições estrearam em 23/10/2026): a vitrine fecha as linhas de 6, 4, 3 e 2.
+  // 13 na loja: os 12 de antes (os 5 dos ambientes das expedições estrearam em 23/10/2026) e a Lisa,
+  // o mascote da marca, de graça (31/10/2026).
   // Os chefões do Modo Domínio (24/10/2026) não se compram: ficam fora da loja.
   const daLoja = Object.keys(PERSONAGENS).filter((id) => !PERSONAGENS[id].chefao);
-  assert.equal(daLoja.length, 12);
+  assert.equal(daLoja.length, 13);
   // a vitrine mostra todos os da loja, uma vez cada, do mais barato ao mais caro
   assert.deepEqual([...ORDEM_DOS_PERSONAGENS].sort(), daLoja.sort());
   const precos = ORDEM_DOS_PERSONAGENS.map((id) => PERSONAGENS[id].preco);
   assert.deepEqual(precos, [...precos].sort((a, b) => a - b));
   for (const id of ["cogumelo", "mergulhador", "yeti", "magma", "alienigena"]) assert.ok(PERSONAGENS[id].preco > 0, id);
-  assert.deepEqual(personagensDe([]), ["neuro", "abacato"]);
-  assert.deepEqual(personagensDe(["ninja", "inventado", "ninja"]), ["neuro", "abacato", "ninja"]);
+  assert.deepEqual(personagensDe([]), ["neuro", "abacato", "lisa"]);
+  assert.deepEqual(personagensDe(["ninja", "inventado", "ninja"]), ["neuro", "abacato", "lisa", "ninja"]);
+  // a Lisa (o mascote da marca) também é de graça e de todo mundo
+  assert.equal(PERSONAGENS.lisa.preco, 0);
+  assert.deepEqual(podeEscolherPersonagem({ id: "lisa", possui: [], saldo: 0 }), { ok: true, compra: false, custo: 0 });
   // o Neuro Abacate (mascote do Abacato) é de graça e de todo mundo
   assert.equal(PERSONAGENS.abacato.preco, 0);
   assert.deepEqual(podeEscolherPersonagem({ id: "abacato", possui: [], saldo: 0 }), { ok: true, compra: false, custo: 0 });

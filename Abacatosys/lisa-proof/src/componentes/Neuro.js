@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { chefaoDoPersonagem } from "@/dominio/modoDominio.js";
 import { desenhoDoMonstro, VIEWBOX_DOS_MONSTROS } from "./reino/monstrosDePapel.js";
+import LisaDoNeuro from "./marca/LisaDoNeuro.js";
 
 /**
  * O Neuro — o mascote da Lisa_Proof. Um cérebro desenhado em SVG, animado só com CSS
@@ -147,6 +148,8 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
 
           {chefao ? (
             <g className="neuro__boneco neuro__chefao" dangerouslySetInnerHTML={{ __html: desenhoDoMonstro(chefao) }} />
+          ) : visual === "lisa" ? (
+            <LisaDoNeuro />
           ) : (<>
           <g className="neuro__boneco">
             {/* pernas */}
