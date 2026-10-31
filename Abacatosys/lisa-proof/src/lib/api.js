@@ -5,7 +5,23 @@
 // precisa tratar as duas igual. Esquecer a segunda é o erro clássico: a gravação falha, a
 // resposta chega, e a tela mostra sucesso.
 
-export async function pedir(url, { metodo = "GET", corpo } = {}) {
+// Quando o Cloudflare derruba a requisição por passar do limite de CPU do plano gratuito (erro 1102),
+// a resposta é um 503 SEM o nosso JSON. É intermitente: a mesma chamada, de novo, costuma passar.
+// Leitura (GET) se repete sozinha; escrita só quando quem chama diz que repetir é seguro (`repetir`),
+// porque a primeira pode ter gravado antes de cair (31/10/2026).
+const ESPERAS_DO_503 = [450, 1200];
+const MENSAGEM_DO_503 = "o servidor ficou sem fôlego por um instante (limite do plano gratuito do Cloudflare) — tente de novo";
+
+export async function pedir(url, { metodo = "GET", corpo, repetir = metodo === "GET" } = {}) {
+  for (let tentativa = 0; ; tentativa++) {
+    const r = await pedirUmaVez(url, { metodo, corpo });
+    if (!r.caiuNaPlataforma) return r.dados;
+    if (!repetir || tentativa >= ESPERAS_DO_503.length) throw new Error(MENSAGEM_DO_503);
+    await new Promise((ok) => setTimeout(ok, ESPERAS_DO_503[tentativa]));
+  }
+}
+
+async function pedirUmaVez(url, { metodo, corpo }) {
   let res;
   // FormData (arquivos: fotos, áudio) vai como está — o navegador põe o content-type com o separador
   const formulario = typeof FormData !== "undefined" && corpo instanceof FormData;
@@ -28,9 +44,11 @@ export async function pedir(url, { metodo = "GET", corpo } = {}) {
     throw new Error("sessão expirada");
   }
 
-  const dados = await res.json().catch(() => ({}));
-  if (!res.ok || dados.ok === false) throw new Error(dados.error || `falha ${res.status}`);
-  return dados;
+  const dados = await res.json().catch(() => null);
+  // 503 sem o nosso JSON: quem caiu foi a plataforma, não a regra do app
+  if (res.status === 503 && !dados) return { caiuNaPlataforma: true };
+  if (!res.ok || dados?.ok === false) throw new Error(dados?.error || `falha ${res.status}`);
+  return { dados: dados || {} };
 }
 
 export const obter = (url) => pedir(url);

@@ -2,6 +2,7 @@
  * partes do desenho que só existem num humor têm `v v-<humor>`. */
 
 .neuro {
+  position: relative;
   --neuro-rosa: #F9A8D4;
   --neuro-rosa-escuro: #BE185D;
   --neuro-tinta: #831843;
@@ -121,6 +122,19 @@
 }
 .neuro--fala-direita .neuro__fala::before { left: -8px; }
 .neuro--fala-esquerda .neuro__fala::before { right: -8px; transform: translateY(-50%) rotate(-135deg); }
+
+/* o balão sem fala fixa (cutucada, reação): flutua acima do Neuro, sem mexer no layout em volta */
+.neuro .neuro__fala--flutuante {
+  position: absolute; z-index: 30; left: 50%; bottom: calc(100% + 12px);
+  width: max-content; min-width: 140px; max-width: min(250px, 80vw); text-align: center;
+  transform: translateX(-50%); box-shadow: var(--pf-sombra-alta);
+  animation: neuro-balao-flutuante 0.25s ease-out;
+}
+.neuro .neuro__fala--flutuante::before {
+  content: ""; position: absolute; left: 50%; right: auto; top: auto; bottom: -8px; width: 12px; height: 12px;
+  background: inherit; border: inherit; border-width: 0 2px 2px 0; transform: translateX(-50%) rotate(45deg);
+}
+@keyframes neuro-balao-flutuante { from { opacity: 0; transform: translate(-50%, 4px) scale(0.96); } to { opacity: 1; transform: translateX(-50%); } }
 
 /* ---- confete ---- */
 .confete { position: fixed; inset: 0; pointer-events: none; z-index: 60; overflow: hidden; }

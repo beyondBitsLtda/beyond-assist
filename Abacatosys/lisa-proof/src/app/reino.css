@@ -321,7 +321,7 @@
 
 /* ------------------------------------------------------------ personagens do Neuro */
 .rn-personagens { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); }
-.rn-personagem .pf-botao { white-space: nowrap; }
+.rn-personagem .pf-botao { white-space: normal; max-width: 100%; }
 .rn-personagem { display: grid; gap: 6px; justify-items: center; text-align: center; align-content: start; }
 .rn-personagem--usando { border: 2px solid var(--pf-verde); }
 .rn-personagem__vitrine { display: grid; place-items: center; min-height: 104px; pointer-events: none; }
@@ -728,11 +728,17 @@ button.rn-exp__arte:disabled { cursor: progress; }
 .rn-personagens { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @container personagens (min-width: 540px) { .rn-personagens { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @container personagens (min-width: 760px) { .rn-personagens { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@container personagens (min-width: 1080px) { .rn-personagens { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@container personagens (min-width: 1240px) { .rn-personagens { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 .rn-personagem { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .rn-personagem > strong { text-wrap: balance; }
 .rn-personagem__desc { min-height: 0; }
 .rn-personagem > :last-child { margin-top: auto; padding-top: 4px; }
+/* (31/10/2026) com fonte maior ou zoom, o botão "Comprar · 🪙 1.200" passava da borda: o cartão aperta
+   o recheio, o botão ocupa a largura dele e pode quebrar a linha, e nada sai do cartão */
+.rn-personagem.pf-cartao { padding: 16px 12px; }
+.rn-personagem > * { max-width: 100%; }
+.rn-personagem .rn-botao { width: 100%; justify-content: center; }
+.rn-personagem .rn-botao .pf-botao { width: 100%; padding: 6px 10px; gap: 4px; flex-wrap: wrap; line-height: 1.25; }
 
 /* expedições: o rodapé (o saque e o Atacar) no pé do cartão; as abas dos veículos quebram a linha */
 .rn-exp__lugar { align-items: stretch; }

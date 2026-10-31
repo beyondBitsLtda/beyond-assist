@@ -129,7 +129,8 @@ export default function Assunto({ tarefa, aoMudar }) {
     try {
       let texto = null;
       if (!refazer && tarefa.temExplicacao) texto = (await obter(`/api/cards/${tarefa.cardId}/explicacao`)).texto;
-      if (!texto) texto = (await pedir(`/api/cards/${tarefa.cardId}/explicacao`, { metodo: "POST" })).texto;
+      // repetir é seguro: a explicação é gravada por cima (upsert)
+      if (!texto) texto = (await pedir(`/api/cards/${tarefa.cardId}/explicacao`, { metodo: "POST", repetir: true })).texto;
       setExplicacao(texto);
     } catch (e) {
       setErro(e.message);

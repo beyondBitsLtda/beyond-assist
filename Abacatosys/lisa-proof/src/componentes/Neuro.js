@@ -129,6 +129,9 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
 
   const atual = HUMORES.includes(reacao?.humor) ? reacao.humor : HUMORES.includes(humor) ? humor : "normal";
   const texto = reacao ? reacao.fala : fala;
+  // sem fala fixa, o balão de uma cutucada (ou reação) flutua acima do Neuro: dentro do fluxo ele
+  // era espremido pela coluna estreita onde o Neuro mora e quebrava uma palavra por linha (31/10/2026)
+  const flutuante = Boolean(reacao) && !fala;
   // o chefão do Modo Domínio como avatar: o monstro de papel dele no lugar do cérebro
   const chefao = chefaoDoPersonagem(visual);
 
@@ -341,7 +344,7 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
           </>)}
         </svg>
       </button>
-      {texto ? <div className="neuro__fala" role="status" aria-live="polite">{texto}</div> : null}
+      {texto ? <div className={`neuro__fala${flutuante ? " neuro__fala--flutuante" : ""}`} role="status" aria-live="polite">{texto}</div> : null}
     </div>
   );
 }

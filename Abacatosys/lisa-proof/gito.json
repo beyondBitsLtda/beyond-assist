@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.39.0-cloudflare-pages.1",
+  "versao": "0.39.1-cloudflare-pages.1",
   "atualizadoEm": "2026-10-31",
   "compilacao": {
-    "numero": 79,
+    "numero": 80,
     "data": "2026-10-31",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.39.1-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Correções: o balão do Neuro espremido, os botões da loja de personagens saindo do cartão e o \"falha 503\" das anotações e da explicação.",
+      "itens": [
+        "Balão do Neuro: o balão de uma cutucada (sem fala fixa) flutua acima dele em vez de ser espremido pela coluna estreita, que quebrava uma palavra por linha e cobria o formulário (visto no Modo Domínio).",
+        "Loja de personagens: com zoom ou fonte maior, o botão \"Comprar · moedas\" passava da borda; o botão ocupa a largura do cartão e pode quebrar a linha, e seis por linha só a partir de 1240 px.",
+        "\"falha 503\": o Cloudflare derruba a requisição que passa do limite de CPU do plano gratuito (10 ms) — 17 de 1.351 nas últimas 24 h. A leitura agora se repete sozinha (até duas vezes), a explicação da Lisa também (é gravada por cima), e o erro que sobrar explica o que houve em vez de \"falha 503\"."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.39.0-cloudflare-pages.1",
       "data": "2026-10-31",
