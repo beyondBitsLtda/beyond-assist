@@ -405,4 +405,16 @@
 .diario__lista { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
 .diario__lista small { color: var(--pf-tinta-2); }
 .dm-andar__livro { margin: 0; font-size: 14px; }
-@media (max-width: 520px) { .conversa__fala { max-width: 100%; } }
+/* o desenho de diagrama (31/10/2026): o quadro do ProcessMap num iframe; tela cheia cobre a página */
+.diagrama { display: grid; gap: 10px; }
+.diagrama__tipo { justify-self: start; }
+.diagrama__requisitos { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+.diagrama__barra { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.diagrama__ajuda { margin: 0; flex: 1 1 260px; }
+.diagrama__moldura { position: relative; height: clamp(440px, 68vh, 760px); border: 1px solid var(--pf-linha); border-radius: 14px; overflow: hidden; background: var(--pf-superficie-2); }
+.diagrama__quadro { display: block; width: 100%; height: 100%; border: 0; }
+.diagrama__carregando { position: absolute; inset: 0; display: grid; place-items: center; color: var(--pf-tinta-2); font-size: 14px; }
+.diagrama--cheia { position: fixed; inset: 0; z-index: 1000; margin: 0; border-radius: 0; grid-template-rows: auto 1fr auto auto auto auto; overflow: auto; }
+.diagrama--cheia .diagrama__moldura { height: auto; min-height: 320px; }
+body.diagrama-sem-rolar { overflow: hidden; }
+@media (max-width: 520px) { .conversa__fala { max-width: 100%; } .diagrama__moldura { height: 70vh; } }

@@ -9,12 +9,13 @@
 // perfil, é de programação — o caminho de antes fica igual. Puro.
 
 import { ORDEM_DAS_EVIDENCIAS } from "./motores.js";
+import { motoresComDiagrama } from "./diagramas.js";
 
 export const PERFIS = {
   programacao: {
     nome: "Programação", emoji: "💻", exemplos: "JavaScript, SQL, React, Python",
     professora: "tutora de programação", motores: ["codigo"], evidencias: [],
-    descricao: "Exercício de código com Rodar e projetos entregues pelo GitHub.",
+    descricao: "Exercício de código com Rodar e projetos entregues pelo GitHub; nos cursos de arquitetura e computação, diagramas desenhados no quadro.",
   },
   musica: {
     nome: "Música", emoji: "🎵", exemplos: "violão, piano, canto, teoria musical",
@@ -104,14 +105,17 @@ const numeroDoDia = (dia) => {
 };
 
 /**
- * O motor do exercício: programação, sempre o código. Nos outros perfis, os motores se alternam de
- * um dia para o outro e de uma rodada para a seguinte (ditado hoje, redação amanhã; na rodada extra,
- * o outro). Música escolhe entre ouvido, ritmo, afinação e o desafio aberto pelo assunto (motoresDaMusica).
+ * O motor do exercício: programação, o código (e o desenho, na área de arquitetura). Nos outros
+ * perfis, os motores se alternam de um dia para o outro e de uma rodada para a seguinte (ditado
+ * hoje, redação amanhã; na rodada extra, o outro). Música escolhe entre ouvido, ritmo, afinação e o desafio aberto pelo assunto (motoresDaMusica).
+ * Programação e livre ganham o exercício de desenhar (fluxo, modelo de dados, arquitetura) quando o
+ * curso ou o assunto é da área (src/dominio/diagramas.js: motoresComDiagrama).
  */
-export function motorDoExercicio({ perfil, rodada = 1, assunto = null, dia = "" }) {
+export function motorDoExercicio({ perfil, rodada = 1, assunto = null, dia = "", tema = "" }) {
   const p = perfilValido(perfil);
   let motores = PERFIS[p].motores;
   if (p === "musica") motores = motoresDaMusica(assunto);
   if (p === "matematica") motores = motoresDaMatematica(assunto);
+  if (p === "programacao" || p === "livre") motores = motoresComDiagrama(motores, { tema, assunto });
   return motores[(numeroDoDia(dia) + (Number(rodada) || 1) - 1) % motores.length];
 }

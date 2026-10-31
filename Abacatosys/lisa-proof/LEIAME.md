@@ -498,6 +498,39 @@ há menos), guardado em `analise.faixas`. A Lisa lê o texto das páginas do and
 (uma missão prática sobre o que o trecho ensina), e a tela mostra "Leia antes: págs. X–Y" com o link
 para o leitor. Um livro sustenta no máximo um andar a cada duas páginas (`andaresPermitidosDoLivro`).
 
+### Desenho de diagrama
+
+Pedido de 31/10/2026: "em cursos de ciência da computação, arquitetura de software e áreas correlatas,
+exercícios de desenhar um fluxo de processo, arquitetura de dados, de software etc., para o usuário
+construir e a Lisa avaliar". Motor `diagrama` (5 tentativas, vale a melhor nota, corrigido pela IA).
+Regras em `src/dominio/diagramas.js`; IA em `src/lib/iaPratica.js` (`gerarDesafioDeDiagrama`,
+`avaliarDiagrama`); entrega em `src/lib/pratica.js` (`entregarDiagrama`, pelo `POST .../enviar` com
+`{ diagrama }`); tela em `src/componentes/pratica/Diagrama.js`.
+
+- **Quando entra** (`motoresComDiagrama`, nos perfis programação e livre): assunto de desenho
+  (modelagem, UML, BPMN, arquitetura, nuvem, microsserviços...) põe o diagrama primeiro na roda; curso
+  da área (ciência da computação, engenharia/arquitetura de software, sistemas, banco de dados,
+  nuvem, DevOps) num assunto de código põe um diagrama a cada três dias. Os outros perfis não mudam.
+- **O desafio**: tipo (fluxograma, BPMN, atividades, classes, casos de uso, dados, arquitetura, nuvem,
+  C4 — `TIPOS_DE_DIAGRAMA`, cada um com a coleção de formas que abre no quadro), cenário concreto, 3 a
+  7 requisitos (a rubrica), critérios de qualidade e dicas. O pedido à IA leva as formas que existem e
+  a notação de cada tipo neste quadro (`NOTACAO_DO_TIPO`).
+- **O quadro** é o ProcessMap (JavaScript puro e SVG) copiado para `public/diagramas/`, reaproveitado
+  do repositório da Delp com a autorização confirmada pelo responsável em 31/10/2026; a marca da
+  Delp saiu (logos, temas e o ícone da chapa). Ganhou os temas `proof-escuro` e `proof-claro`, o modo
+  embutido (`?embutido=1` ou dentro de um iframe: sem cabeçalho e sem o fluxo de exemplo) e 38 formas
+  técnicas nas coleções BPMN, Nuvem e infraestrutura e Modelo C4. O `src/middleware.js` deixa
+  `diagramas/` passar sem sessão (é arquivo estático).
+- **A ponte** (`public/diagramas/js/Ponte.js`): `window.PonteDoProof` com `exportar`, `importar`,
+  `tema`, `colecao`, `travar` e `vazio`; avisa a página por `postMessage` (`pronto`, `mudou`). A tela
+  guarda o rascunho no `localStorage` (`proof-diagrama:<id>`) a cada mudança e o apaga quando as
+  tentativas acabam.
+- **A avaliação**: o servidor confere o documento (`conferirDiagrama`: até 400 mil caracteres, 300
+  formas e 500 ligações, pelo menos duas formas, sem o conteúdo das imagens coladas) e guarda em
+  `resposta.diagrama`. A Lisa recebe o desenho em texto (`descreverDiagrama`): cada forma com o tipo e
+  o texto (tabelas e classes linha a linha), o que está dentro de cada raia/fronteira/cluster e cada
+  ligação com as pontas (cardinalidade, herança, composição) e os rótulos. A posição na tela não conta.
+
 ## A marca e a tela de abertura
 
 Em 31/10/2026, o mascote (o desenho de traço com rabo de cavalo e óculos) virou a marca do sistema, no
@@ -564,6 +597,7 @@ Servidor: `src/lib/reino.js` (seção "o mercado de tropas") e `/api/reino/merca
 | `src/componentes/MapaDaTrilha.js` · `src/app/mapa.css` | O mapa da trilha. |
 | `src/lib/auth.js` | Cópia do login do Abacato. **Não mude `chaveDeLogin` aqui sem mudar lá.** |
 | `db/001-proof.sql` · `db/002-pratica.sql` | Tabelas `proof_`. |
+| `public/diagramas/` | O quadro de diagramas (ProcessMap) do exercício de desenhar; `js/Ponte.js` é a ponte com a tela. |
 
 ## Colocar no ar
 

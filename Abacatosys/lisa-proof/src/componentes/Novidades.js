@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoFuncionario } from "./acervo/personagensDoAcervo.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-31-avatar-lisa";
+export const EDICAO_DAS_NOVIDADES = "2026-10-31-diagramas";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,7 +28,8 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "👓", titulo: "Avatar novo, de graça: a Lisa", texto: "O mascote do Proof virou bonequinha de corpo inteiro, liberada para todo mundo. Vista no Reino → Personagens: ela pisca, sorri, comemora e até dorme.", destaque: true },
+  { icone: "🧩", titulo: "Desenhe o diagrama, a Lisa avalia", texto: "Nos cursos de computação e arquitetura de software, o exercício do dia pode ser desenhar: fluxo de processo, BPMN, UML, modelo de dados, arquitetura de software ou de nuvem e C4, num quadro com dezenas de formas técnicas. A Lisa confere requisito por requisito.", destaque: true },
+  { icone: "👓", titulo: "Avatar novo, de graça: a Lisa", texto: "O mascote do Proof virou bonequinha de corpo inteiro, liberada para todo mundo. Vista no Reino → Personagens: ela pisca, sorri, comemora e até dorme." },
   { icone: "🃏", titulo: "Cartões, torres de tema e revisão da turma", texto: "Cartões com repetição espaçada (Prática → Cartões), o Modo Domínio de qualquer tema e a revisão de um colega quando você discorda da Lisa." },
   { icone: "💬", titulo: "Conversa com a Lisa", texto: "Nos cursos de idiomas: uma cena do dia a dia na língua do curso. A Lisa faz um papel, corrige cada fala e avalia no fim." },
   { icone: "📈", titulo: "Passo a passo e gráficos", texto: "Na matemática: cada linha da resolução é conferida (o erro aparece onde nasceu) e há gráficos de arrastar pontos e retas. Na música, leitura na pauta, ritmo e afinação ao vivo." },

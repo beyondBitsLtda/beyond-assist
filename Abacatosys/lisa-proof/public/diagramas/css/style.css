@@ -1,0 +1,520 @@
+/* =========================================================================
+   ProcessMap · Estilos e TEMAS
+   -------------------------------------------------------------------------
+   Todas as cores do sistema vêm de VARIÁVEIS CSS (--nome). Cada tema é só
+   um bloco que redefine essas variáveis. Trocar o tema = trocar o atributo
+   data-theme no <html> (feito pelo ThemeManager.js). Como o SVG do quadro
+   também usa essas variáveis, formas e linhas mudam de cor na hora, sem
+   precisar redesenhar.
+   Uso de uma variável: color: var(--pm-500);
+   ========================================================================= */
+
+/* ===================== TEMA 1 · ProcessMap (roxo escuro, padrão) ===================== */
+:root, [data-theme="processmap"] {
+  /* Escala de "superfícies e destaque": 950 = fundo mais escuro … 200 = destaque mais claro */
+  --pm-950: #0b0710;   /* fundo do quadro */
+  --pm-900: #120c19;   /* barras e painel */
+  --pm-850: #181021;   /* campos */
+  --pm-800: #1f1529;   /* botões */
+  --pm-750: #2a1a3a;   /* botão em hover */
+  --pm-700: #431465;   /* destaque escuro */
+  --pm-600: #5e1f8e;
+  --pm-500: #6f27a5;   /* cor principal */
+  --pm-400: #8b3fd1;   /* destaque vivo */
+  --pm-300: #b48ae0;   /* linhas das conexões */
+  --pm-200: #d6bff3;
+  /* Cores de texto (ink = tinta): principal, secundária, apagada e "forte" */
+  --ink: #ece6f3;
+  --ink-2: #a99bb9;
+  --ink-3: #6f6380;
+  --ink-strong: #ffffff;
+  --line: #2e2240;                          /* bordas e divisórias */
+  --danger: #e5484d;
+  --accent-alpha: rgba(139, 63, 209, .22);  /* destaque translúcido (botão ativo, seleção por área) */
+  --header-bg: linear-gradient(90deg, #120c19, #181021 60%, #431465);
+  --hard-shadow: #000;                      /* sombra "sólida" deslocada (identidade da logo) */
+  --grid-minor: #1d1427;                    /* grade fina */
+  --grid-major: #2a1d38;                    /* grade grossa */
+  --guide: #ff4fd8;                         /* guias de alinhamento */
+  --port-hot: #ff4fd8;                      /* porta escolhida ao conectar */
+  --brand-filter: none;                     /* filtro aplicado à logo ProcessMap */
+  /* Cores das formas (usadas pela paleta do ShapeLibrary) */
+  --sh-main-a: #8b3fd1;  --sh-main-b: #5e1f8e;  --sh-main-stroke: #8b3fd1;  --sh-main-text: #ffffff;
+  --sh-deep-a: #5e1f8e;  --sh-deep-b: #2f0d49;  --sh-deep-stroke: #6f27a5;  --sh-deep-text: #ffffff;
+  --sh-soft-a: #e2cdfa;  --sh-soft-b: #a77fdb;  --sh-soft-stroke: #e6d6fa;  --sh-soft-text: #1f0b33;
+  --sh-graphite: #211a2b; --sh-graphite-stroke: #4a3a5e; --sh-graphite-text: #ece6f3;
+  --shape-shadow-opacity: .7;
+  /* bloco de código: cartão escuro nos temas escuros, claro no claro (contraste AA nos dois) */
+  --code-bg: var(--pm-850); --code-head: var(--pm-800); --code-line: var(--line); --code-dot: var(--ink-3);
+  --code-ink: var(--ink); --code-c: var(--ink-2); --code-k: var(--pm-300); --code-s: #6FCF7F; --code-n: #7FA6EC;
+  --code-f: #FF6B05; --code-p: #9DB3E6; --code-v: #FF6B05;
+  --font: "Segoe UI", "Barlow", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+/* ===================== TEMA 2 · Proof escuro (verde do Lisa_Proof) ===================== */
+[data-theme="proof-escuro"] {
+  --pm-950: #0D1310;  --pm-900: #111814;  --pm-850: #151E19;  --pm-800: #1B2621;  --pm-750: #22302A;
+  --pm-700: #14532D;  --pm-600: #15803D;  --pm-500: #16A34A;  --pm-400: #22C55E;  --pm-300: #6EE7A0;  --pm-200: #BBF7D0;
+  --ink: #E8EDEA;  --ink-2: #9BA8A1;  --ink-3: #6B7A72;  --ink-strong: #FFFFFF;
+  --line: #24312A;
+  --danger: #F87171;
+  --accent-alpha: rgba(34, 197, 94, .18);
+  --header-bg: linear-gradient(90deg, #0A0F0C, #111814 60%, #14532D);
+  --hard-shadow: #000;
+  --grid-minor: #131B16;  --grid-major: #1C2722;
+  --guide: #FACC15;  --port-hot: #FACC15;
+  --brand-filter: none;
+  --sh-main-a: #15803D;  --sh-main-b: #14532D;  --sh-main-stroke: #4ADE80;  --sh-main-text: #FFFFFF;
+  --sh-deep-a: #1C3326;  --sh-deep-b: #0F1F16;  --sh-deep-stroke: #22C55E;  --sh-deep-text: #E8EDEA;
+  --sh-soft-a: #F7F3EA;  --sh-soft-b: #E2DCCD;  --sh-soft-stroke: #22C55E;  --sh-soft-text: #141A16;
+  --sh-graphite: #1B2621; --sh-graphite-stroke: #3A4A41; --sh-graphite-text: #E8EDEA;
+  --shape-shadow-opacity: .55;
+  --code-bg: #151E19; --code-head: #1B2621; --code-line: #24312A; --code-dot: #3A4A41;
+  --code-ink: #E8EDEA; --code-c: #9BA8A1; --code-k: #6EE7A0; --code-s: #FACC15; --code-n: #7FA6EC;
+  --code-f: #FB923C; --code-p: #9DB3E6; --code-v: #FB923C;
+  --font: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+/* ===================== TEMA 3 · Proof claro ===================== */
+[data-theme="proof-claro"] {
+  --pm-950: #F4F6F5;  --pm-900: #FFFFFF;  --pm-850: #F4F6F5;  --pm-800: #FFFFFF;  --pm-750: #E7F3EB;
+  --pm-700: #14532D;  --pm-600: #15803D;  --pm-500: #16A34A;  --pm-400: #16A34A;  --pm-300: #374151;  --pm-200: #14532D;
+  --ink: #1F2937;  --ink-2: #6B7280;  --ink-3: #9CA3AF;  --ink-strong: #111827;
+  --line: #DCE3DF;
+  --danger: #DC2626;
+  --accent-alpha: rgba(34, 197, 94, .14);
+  --header-bg: linear-gradient(90deg, #FFFFFF, #FFFFFF 60%, #E7F3EB);
+  --hard-shadow: rgba(0, 0, 0, .16);
+  --grid-minor: #EAEFEC;  --grid-major: #DCE3DF;
+  --guide: #0A84FF;  --port-hot: #0A84FF;
+  --brand-filter: none;
+  --sh-main-a: #16A34A;  --sh-main-b: #15803D;  --sh-main-stroke: #14532D;  --sh-main-text: #FFFFFF;
+  --sh-deep-a: #1F2937;  --sh-deep-b: #111814;  --sh-deep-stroke: #111814;  --sh-deep-text: #FFFFFF;
+  --sh-soft-a: #FFFFFF;  --sh-soft-b: #F4F6F5;  --sh-soft-stroke: #16A34A;  --sh-soft-text: #111827;
+  --sh-graphite: #EEF2EF; --sh-graphite-stroke: #B8C2BC; --sh-graphite-text: #1F2937;
+  --shape-shadow-opacity: .16;
+  --code-bg: #FFFFFF; --code-head: #F4F6F5; --code-line: #DCE3DF; --code-dot: #B8C2BC;
+  --code-ink: #111827; --code-c: #6B7280; --code-k: #15803D; --code-s: #B45309; --code-n: #2563EB;
+  --code-f: #7C3AED; --code-p: #1E3A8A; --code-v: #7C3AED;
+  --font: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+/* body em coluna flexível: cabeçalho, barra, área de trabalho e rodapé empilhados */
+body {
+  font-family: var(--font);
+  background: var(--pm-950);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;    /* a página não rola: quem rola é o quadro */
+  user-select: none;   /* evita selecionar texto sem querer ao arrastar */
+}
+button { font-family: inherit; }
+
+/* ---------- Cabeçalho ---------- */
+.app-header {
+  height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 18px;
+  background: var(--header-bg); border-bottom: 1px solid var(--line); flex-shrink: 0;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-icon, .brand-icon-big { filter: var(--brand-filter); }
+.brand-icon { height: 32px; }
+.brand-name { font-size: 21px; font-weight: 700; letter-spacing: .2px; color: var(--ink-strong); }
+.brand-name b { color: var(--pm-400); font-weight: 700; }
+.brand-tag {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--pm-200);
+  border: 1px solid var(--pm-600); padding: 2px 7px; border-radius: 99px; background: var(--accent-alpha);
+}
+.doc-name { flex: 1; display: flex; justify-content: center; }
+.doc-name input {
+  width: min(420px, 100%); background: transparent; border: 1px solid transparent; border-radius: 8px;
+  color: var(--ink); font: 600 15px var(--font); text-align: center; padding: 6px 10px;
+}
+.doc-name input:hover { border-color: var(--line); }
+.doc-name input:focus { outline: none; border-color: var(--pm-500); background: var(--pm-900); }
+.header-actions { display: flex; gap: 8px; }
+
+/* ---------- Botões ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--pm-800); color: var(--ink); font-size: 13px; cursor: pointer; transition: .15s;
+}
+.btn:hover { background: var(--pm-750); border-color: var(--pm-600); }
+.btn.primary { background: linear-gradient(135deg, var(--pm-500), var(--pm-700)); border-color: var(--pm-500); color: #fff; }
+.btn.primary:hover { filter: brightness(1.15); }
+.btn svg { width: 16px; height: 16px; }
+
+/* ---------- Barra de ferramentas ---------- */
+.toolbar {
+  display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--pm-900);
+  border-bottom: 1px solid var(--line); flex-shrink: 0; flex-wrap: wrap; row-gap: 4px;
+}
+.tb-group { display: flex; align-items: center; gap: 2px; padding: 0 5px; }
+.tb-group + .tb-group { border-left: 1px solid var(--line); }
+.tb-label { font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .8px; margin-right: 4px; }
+.tb-btn {
+  position: relative; width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center;
+  background: transparent; border: 1px solid transparent; color: var(--ink-2); cursor: pointer; transition: .12s;
+}
+.tb-btn:hover { background: var(--pm-800); color: var(--ink); border-color: var(--line); }
+.tb-btn.active { background: var(--accent-alpha); border-color: var(--pm-500); color: var(--ink-strong); }
+.tb-btn:disabled { opacity: .35; cursor: default; }
+.tb-btn svg { width: 20px; height: 20px; overflow: visible; }
+.tb-btn.shape svg { width: 26px; height: 20px; }
+/* Dica (tooltip) feita só com CSS: ::after cria um elemento com o texto do atributo data-tip */
+.tb-btn[data-tip]:hover::after {
+  content: attr(data-tip); position: fixed; transform: translate(-30%, 34px);
+  background: #000; color: #fff; font-size: 11px; white-space: nowrap;
+  padding: 4px 8px; border-radius: 6px; pointer-events: none; z-index: 50; border: 1px solid var(--pm-600);
+}
+.zoom-label { min-width: 52px; text-align: center; font-size: 12px; color: var(--ink-2); cursor: pointer; }
+
+/* ---------- Área de trabalho ---------- */
+/* flex: 1 = ocupa todo o espaço que sobrar */
+.workspace { flex: 1; display: flex; min-height: 0; }
+.canvas-wrap { position: relative; flex: 1; overflow: hidden; background: var(--pm-950); }
+#canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+/* Cursores conforme a ferramenta (classes trocadas pelo ShapeManager.setTool) */
+.canvas-wrap.panning, .canvas-wrap.space { cursor: grab; }
+.canvas-wrap.panning:active { cursor: grabbing; }
+.canvas-wrap.placing { cursor: crosshair; }
+
+.empty-hint { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; color: var(--ink-3); }
+.empty-hint img { width: 90px; margin: 0 auto 10px; opacity: .55; }
+.empty-hint h2 { color: var(--ink-2); margin: 0 0 6px; font-weight: 600; }
+.empty-hint p { margin: 0; line-height: 1.5; }
+.empty-hint.hidden { display: none; }
+
+/* ---------- Formas ---------- */
+.shape { cursor: move; }
+.shape .body { transition: filter .12s; }
+.shape:hover .body { filter: brightness(1.12); }
+.shape .shadow { fill: var(--hard-shadow); opacity: var(--shape-shadow-opacity); }
+.shape .label {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center;
+  font: 13px/1.25 var(--font); padding: 6px 10px; word-break: break-word; overflow: hidden; pointer-events: none;
+}
+.shape .img-frame { fill: none; stroke: var(--line); stroke-width: 1; }
+/* Portas de conexão: invisíveis (opacity 0) até passar o mouse na forma.
+   "r" (raio) também pode ser animado via CSS no Chrome/Edge. */
+.shape .port {
+  fill: var(--pm-950); stroke: var(--pm-300); stroke-width: 1.5; opacity: 0; cursor: crosshair;
+  transition: opacity .12s, r .12s;
+}
+.shape:hover .port, .show-ports .port { opacity: 1; }
+.shape .port:hover { fill: var(--pm-400); stroke: var(--ink-strong); r: 7; }
+
+/* ---------- Conexões ---------- */
+/* .hit = traço largo e transparente só para facilitar o clique na linha */
+.conn .hit { stroke: transparent; stroke-width: 14; fill: none; cursor: pointer; }
+.conn .line { fill: none; stroke: var(--pm-300); stroke-width: 2; stroke-linejoin: round; }
+.conn:hover .line { stroke: var(--pm-200); }
+.conn.selected .line { stroke: var(--ink-strong); stroke-width: 2.5; }
+.arrow-head { fill: var(--pm-300); }
+.arrow-head.sel { fill: var(--ink-strong); }
+.conn .clabel {
+  font: 12px var(--font); fill: var(--ink); paint-order: stroke; stroke: var(--pm-950); stroke-width: 5px;
+  stroke-linejoin: round; text-anchor: middle; dominant-baseline: middle; cursor: pointer;
+}
+
+/* ---------- Overlay (seleção, alças, guias, indicadores) ---------- */
+.sel-box { fill: none; stroke: var(--pm-400); stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }
+.handle { fill: #fff; stroke: var(--pm-500); stroke-width: 1.5; }
+.guide { stroke: var(--guide); stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
+.marquee { fill: var(--accent-alpha); stroke: var(--pm-400); stroke-width: 1; stroke-dasharray: 4 3; }
+.temp-line { fill: none; stroke: var(--pm-400); stroke-width: 2; stroke-dasharray: 6 4; pointer-events: none; }
+.temp-line.locked { stroke: var(--port-hot); stroke-dasharray: none; }   /* linha "travada" em uma porta */
+.drop-target .body { filter: drop-shadow(0 0 6px var(--pm-400)) brightness(1.2); }
+/* Indicador de porta durante a conexão */
+.ov { pointer-events: none; }
+.port-dot { fill: var(--pm-950); stroke: var(--pm-300); }
+.port-hot { fill: var(--port-hot); stroke: #fff; }
+.port-ring { fill: none; stroke: var(--port-hot); animation: pulse 1s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes pulse { from { opacity: .9; transform: scale(.6); } to { opacity: 0; transform: scale(1.6); } }
+.port-src { fill: var(--port-hot); stroke: #fff; }
+.target-outline { fill: none; stroke: var(--port-hot); stroke-dasharray: 6 4; }
+.tag-bg { fill: var(--port-hot); }
+.tag-bg.muted { fill: var(--pm-700); }
+.tag-tx { fill: #fff; font-family: var(--font); font-weight: 600; dominant-baseline: middle; text-anchor: middle; }
+.end-dot { fill: var(--ink-strong); stroke: var(--pm-500); }
+
+/* Editor de texto sobre a forma */
+.text-editor {
+  position: absolute; z-index: 20; resize: none; border: 2px solid var(--pm-400); background: var(--pm-900);
+  color: var(--ink); font: 13px/1.25 var(--font); text-align: center; padding: 6px; border-radius: 6px; outline: none;
+}
+
+/* ---------- Painel de propriedades ---------- */
+.props { width: 250px; flex-shrink: 0; background: var(--pm-900); border-left: 1px solid var(--line); padding: 14px; overflow-y: auto; font-size: 13px; }
+.props h3 { margin: 0 0 12px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--pm-400); }
+.props .muted { color: var(--ink-3); line-height: 1.5; }
+.props .muted b { color: var(--pm-400); }
+.props .field { margin-bottom: 14px; }
+.props label { display: block; font-size: 11px; color: var(--ink-2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .6px; }
+.props textarea, .props input[type=text], .props input[type=number] {
+  width: 100%; background: var(--pm-850); border: 1px solid var(--line); color: var(--ink);
+  border-radius: 7px; padding: 7px 8px; font: 13px var(--font); user-select: text;
+}
+.props textarea { min-height: 64px; resize: vertical; }
+.props textarea:focus, .props input:focus { outline: none; border-color: var(--pm-500); }
+.props .row { display: flex; gap: 8px; }
+.props .row > * { flex: 1; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.swatch { width: 26px; height: 26px; border-radius: 7px; border: 2px solid transparent; cursor: pointer; box-shadow: 2px 2px 0 var(--hard-shadow); }
+.swatch.active { border-color: var(--ink-strong); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { flex: 1; background: var(--pm-850); border: 0; color: var(--ink-2); padding: 7px 4px; cursor: pointer; font-size: 12px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.active { background: var(--pm-600); color: #fff; }
+.props .btn { width: 100%; justify-content: center; margin-bottom: 8px; }
+.props .btn.danger:hover { background: rgba(229,72,77,.2); border-color: var(--danger); }
+.props .img-preview { width: 100%; max-height: 120px; object-fit: contain; background: var(--pm-850); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; }
+.legend { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.legend div { display: flex; justify-content: space-between; padding: 3px 0; color: var(--ink-2); font-size: 12px; }
+kbd { font: 11px var(--font); background: var(--pm-800); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px; color: var(--ink); }
+
+/* ---------- Rodapé ---------- */
+.statusbar { height: 28px; display: flex; align-items: center; gap: 18px; padding: 0 14px; font-size: 12px; color: var(--ink-2); background: var(--pm-900); border-top: 1px solid var(--line); flex-shrink: 0; }
+.statusbar .grow { flex: 1; }
+.kbd-hint { color: var(--ink-3); }
+
+/* ---------- Toast / Modal ---------- */
+.toast {
+  position: fixed; bottom: 44px; left: 50%; transform: translate(-50%, 20px); background: var(--pm-700); color: #fff;
+  padding: 10px 16px; border-radius: 9px; border: 1px solid var(--pm-400); box-shadow: 4px 4px 0 var(--hard-shadow);
+  opacity: 0; transition: .25s; pointer-events: none; font-size: 13px; z-index: 100;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.error { background: #4a1418; border-color: var(--danger); }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 90; }
+.modal[hidden] { display: none; }
+.modal-card {
+  background: var(--pm-900); color: var(--ink); border: 1px solid var(--pm-600); border-radius: 14px; padding: 22px 26px;
+  width: min(620px, 92vw); box-shadow: 8px 8px 0 var(--hard-shadow); max-height: 86vh; overflow: auto;
+}
+.modal-card h2 { margin: 0 0 14px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+.modal-card table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.modal-card td { padding: 6px 4px; border-bottom: 1px solid var(--line); color: var(--ink-2); }
+.modal-card td:first-child { white-space: nowrap; width: 46%; }
+.modal-card .btn { margin-top: 16px; float: right; }
+
+/* ---------- Modal de temas ---------- */
+.modal-card.wide { width: min(820px, 94vw); }
+.modal-card .sub { color: var(--ink-3); font-size: 13px; margin: -6px 0 16px; }
+.theme-title-icon { width: 30px; height: 30px; }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.theme-card {
+  text-align: left; background: var(--pm-850); border: 2px solid var(--line); border-radius: 12px; padding: 0;
+  cursor: pointer; overflow: hidden; color: var(--ink); transition: .15s; font-family: inherit;
+}
+.theme-card:hover { border-color: var(--pm-400); transform: translateY(-2px); }
+.theme-card.active { border-color: var(--pm-500); box-shadow: 0 0 0 3px var(--accent-alpha); }
+.theme-prev { height: 120px; position: relative; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.theme-prev .bar { height: 14px; border-radius: 4px; }
+.theme-prev .shapes { display: flex; align-items: center; gap: 10px; flex: 1; }
+.theme-prev .s1 { width: 60px; height: 30px; border-radius: 6px; box-shadow: 3px 3px 0 rgba(0,0,0,.6); }
+.theme-prev .arr { width: 24px; height: 2px; }
+.theme-prev .s2 { width: 34px; height: 34px; transform: rotate(45deg) scale(.75); box-shadow: 3px 3px 0 rgba(0,0,0,.6); }
+.theme-prev img { position: absolute; right: 10px; bottom: 10px; height: 34px; }
+.theme-info { padding: 10px 12px 12px; }
+.theme-info b { display: block; font-size: 14px; margin-bottom: 3px; }
+.theme-info span { font-size: 12px; color: var(--ink-3); }
+.theme-dots { display: flex; gap: 5px; margin-top: 8px; }
+.theme-dots i { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(127,127,127,.4); }
+
+/* ---------- Pontas de linha (marcadores) ---------- */
+/* f-line = cheia na cor da linha; f-bg = vazada (cor do quadro); f-none = só o traço */
+.mk-line { stroke: var(--pm-300); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; fill: none; }
+.mk-line.sel { stroke: var(--ink-strong); }
+.mk-line.f-line { fill: var(--pm-300); }
+.mk-line.sel.f-line { fill: var(--ink-strong); }
+.mk-line.f-bg { fill: var(--pm-950); }
+.conn .cl-end { font-size: 11px; }
+
+/* Alças das pontas da linha selecionada: arrastar religa a ponta */
+.end-handle { fill: transparent; stroke: var(--port-hot); cursor: grab; pointer-events: all; }
+.end-handle:hover { fill: var(--accent-alpha); }
+
+/* O "+" embaixo da tabela/classe selecionada: acrescenta um campo */
+.add-row { cursor: pointer; }
+.add-row circle { fill: var(--pm-500); stroke: #FFFFFF; stroke-width: 2; }
+.add-row path { stroke: #FFFFFF; stroke-width: 2.4; stroke-linecap: round; }
+.add-row:hover circle { filter: brightness(1.15); }
+
+/* ---------- Agrupadores (raia, limite do sistema, fronteira) ---------- */
+/* só a borda (ct-hit, larga e invisível) e a faixa do título pegam o clique */
+.shape.container { cursor: default; }
+.ct-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: move; }
+.ct-head { cursor: move; }
+.ct-label { font-weight: 600; padding: 4px 10px; }
+
+/* ---------- Tabela (banco de dados) ---------- */
+.tb-card, .cl-card, .code-card { width: 100%; height: 100%; pointer-events: none; font: 12px/1.3 var(--font); overflow: hidden; border-radius: 6px; }
+.tb-head { font-weight: 700; text-align: center; padding: 8px 8px; height: 34px; letter-spacing: .3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-row { display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 10px; color: var(--ink); border-top: 1px solid var(--line); }
+.tb-keys { display: flex; gap: 3px; min-width: 22px; }
+.tb-key { font-size: 9px; padding: 1px 4px; border-radius: 4px; background: var(--pm-800); color: var(--ink); border: 1px solid var(--line); }
+.tb-key.tb-pk { background: #FF6B05; color: #000000; border-color: #FF6B05; }
+.tb-key.tb-fk { background: #2362D3; color: #FFFFFF; border-color: #2362D3; }
+.tb-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-type { color: var(--ink-3); white-space: nowrap; font-size: 11px; }
+
+/* ---------- Classe UML ---------- */
+.cl-sec { padding: 5px 10px; border-top: 1px solid; line-height: 18px; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.cl-sec.cl-name { border-top: 0; text-align: center; padding: 7px 10px; line-height: 19px; }
+.cl-sec.cl-name b, .cl-sec.cl-name i { display: block; }
+.cl-sec.cl-name i { font-size: 11px; opacity: .85; }
+
+/* ---------- Bloco de código: segue o tema (variáveis --code-* de cada tema) ---------- */
+.code-bg { fill: var(--code-bg); stroke: var(--code-line); stroke-width: 1.2; }
+.code-card { background: var(--code-bg); color: var(--code-ink); border-radius: 8px; }
+.code-head { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 12px; background: var(--code-head); border-bottom: 1px solid var(--code-line); }
+.code-head i { width: 10px; height: 10px; border-radius: 50%; background: var(--code-dot); }
+.code-head i:first-child { background: #CC0F10; }
+.code-head span { margin-left: auto; font: 600 11px var(--font); color: var(--code-ink); letter-spacing: .4px; }
+.code-pre { margin: 0; padding: 9px 12px; font: 12.5px/17px Consolas, "Cascadia Code", "Courier New", monospace; white-space: pre; color: var(--code-ink); tab-size: 2; }
+.tk-k { color: var(--code-k); font-weight: 600; }
+.tk-s { color: var(--code-s); }
+.tk-c { color: var(--code-c); font-style: italic; }
+.tk-n { color: var(--code-n); }
+.tk-f { color: var(--code-f); font-weight: 600; }
+.tk-t { color: var(--code-k); }
+.tk-a { color: var(--code-n); }
+.tk-p { color: var(--code-p); }
+.tk-v { color: var(--code-v); font-weight: 600; }
+
+/* Editor do código DENTRO do bloco: a textarea (texto transparente, só o cursor
+   e a seleção) fica por cima de um <pre> com o realce - digita-se já colorido. */
+.code-editor { position: absolute; z-index: 20; background: var(--code-bg); outline: 2px solid var(--pm-400); border-radius: 0 0 8px 8px; overflow: hidden; }
+.code-editor .ce-pre, .code-editor .ce-ta {
+  position: absolute; inset: 0; margin: 0; border: 0; box-sizing: border-box; width: 100%; height: 100%;
+  font-family: Consolas, "Cascadia Code", "Courier New", monospace; white-space: pre; tab-size: 2; letter-spacing: 0;
+}
+.code-editor .ce-pre { overflow: hidden; pointer-events: none; color: var(--code-ink); }
+.code-editor .ce-ta { background: transparent; color: transparent; caret-color: var(--code-ink); resize: none; outline: none; overflow: auto; }
+.code-editor .ce-ta::selection { background: var(--accent-alpha); color: transparent; }
+
+/* ---------- Mapa mental ---------- */
+.mm-link { fill: none; stroke-linecap: round; }
+.mm-label { padding: 0; }
+.mm-toggle { cursor: pointer; }
+.mm-toggle circle { fill: var(--pm-950); stroke-width: 2; }
+.mm-toggle text { fill: var(--ink); font: 700 11px var(--font); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.mm-toggle:hover circle { fill: var(--pm-800); }
+.mm-ghost { fill: var(--accent-alpha); stroke: var(--pm-400); stroke-dasharray: 5 4; }
+
+/* ---------- Editor de texto: dentro da caixa (anotação) e monoespaçado (código) ---------- */
+.text-editor.left { text-align: left; }
+.text-editor.note { padding-left: 22px; background: var(--pm-900); }
+.text-editor.mono { font: 12.5px/17px Consolas, "Cascadia Code", "Courier New", monospace; white-space: pre; overflow: auto; }
+
+/* ---------- Barra: coleção de figuras ---------- */
+.tb-collection {
+  height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--pm-850); color: var(--ink);
+  font: 600 12px var(--font); padding: 0 6px; margin-right: 6px; cursor: pointer;
+}
+.tb-shapes { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+
+/* ---------- Painel: listas, modelos de ligação e dicas ---------- */
+.props select { width: 100%; background: var(--pm-850); border: 1px solid var(--line); color: var(--ink); border-radius: 7px; padding: 6px 6px; font: 12px var(--font); }
+.props textarea.mono { font: 12px/16px Consolas, "Courier New", monospace; min-height: 110px; white-space: pre; }
+.props .hint { font-size: 12px; margin-top: -6px; }
+.presets { display: flex; flex-wrap: wrap; gap: 4px; }
+.presets button { background: var(--pm-850); border: 1px solid var(--line); color: var(--ink-2); border-radius: 6px; padding: 4px 7px; font: 11px var(--font); cursor: pointer; }
+.presets button:hover { border-color: var(--pm-500); color: var(--ink); }
+
+/* ---------- Etiquetas do cabeçalho e menus (Novo, categoria) ---------- */
+.doc-tags { display: flex; align-items: center; gap: 6px; }
+.cat-box, .fm-novo { position: relative; }
+.doc-tag {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 99px; cursor: pointer;
+  font: 600 12px var(--font); border: 1px solid var(--line); background: var(--pm-850); color: var(--ink-2); white-space: nowrap;
+}
+.doc-tag i { font-style: normal; font-size: 10px; opacity: .7; }
+.doc-tag.cat-oficial { background: var(--pm-500); border-color: var(--pm-500); color: #FFFFFF; }
+.doc-tag.cat-tecnica { background: #213D75; border-color: #213D75; color: #FFFFFF; }
+.doc-tag.cat-pessoal { background: var(--pm-800); border-color: var(--ink-3); color: var(--ink); }
+.doc-tag.cat-nenhuma { border-style: dashed; }
+.tag-menu {
+  position: absolute; left: 0; top: calc(100% + 6px); min-width: 280px; background: var(--pm-900); border: 1px solid var(--line);
+  border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.25); padding: 6px; z-index: 95;
+}
+.tag-menu[hidden] { display: none; }
+.tag-menu button { display: block; width: 100%; text-align: left; background: none; border: 0; color: var(--ink); padding: 8px 10px; border-radius: 6px; cursor: pointer; font: 13px var(--font); }
+.tag-menu button b { display: block; font-weight: 600; }
+.tag-menu button span { display: block; font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.tag-menu button:hover, .tag-menu button.active { background: var(--accent-alpha); }
+
+/* Responsivo: em telas menores esconde rótulos da barra e o painel lateral */
+@media (max-width: 1500px) { .tb-label { display: none; } .tb-group { padding: 0 3px; } }
+@media (max-width: 1100px) { .props { display: none; } .kbd-hint { display: none; } }
+
+/* ---------- Abas (PageTabs.js): no rodapé do quadro, como no Visio ---------- */
+.page-tabs {
+  position: absolute; left: 10px; bottom: 8px; z-index: 6; display: flex; align-items: flex-end; gap: 2px;
+  max-width: calc(100% - 20px); overflow-x: auto; padding-top: 4px;
+}
+.page-tabs[hidden] { display: none; }
+.pg-tab, .pg-add {
+  font: 600 12px var(--font); color: var(--ink-2); background: var(--pm-850); border: 1px solid var(--line);
+  border-radius: 8px 8px 0 0; padding: 6px 14px; cursor: pointer; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+}
+.pg-tab:hover, .pg-add:hover { color: var(--ink); background: var(--pm-800); }
+.pg-tab.active { color: var(--ink-strong); background: var(--pm-900); border-bottom-color: var(--pm-900); box-shadow: inset 0 3px 0 var(--pm-500); }
+.pg-add { padding: 6px 12px; font-size: 14px; line-height: 1; }
+.pg-nome { font: 600 12px var(--font); width: 140px; border: 1px solid var(--pm-400); border-radius: 4px; background: var(--pm-950); color: var(--ink); padding: 1px 4px; }
+.pg-menu {
+  position: absolute; bottom: 36px; min-width: 190px; background: var(--pm-900); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .35); padding: 4px; display: flex; flex-direction: column; z-index: 7;
+}
+.pg-menu button { text-align: left; background: none; border: 0; color: var(--ink); font: 500 12.5px var(--font); padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+.pg-menu button:hover:not(:disabled) { background: var(--pm-800); }
+.pg-menu button:disabled { color: var(--ink-3); cursor: default; }
+
+/* ---------- Lápis (desenho à mão livre) ---------- */
+.canvas-wrap.drawing { cursor: crosshair; }
+.ink-hit { fill: none; stroke: transparent; stroke-linecap: round; stroke-linejoin: round; pointer-events: stroke; cursor: move; }
+.ink-line, .ink-temp { fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.ink-temp { opacity: .85; }
+.canvas-wrap.drawing .shape { pointer-events: none; } /* o lápis desenha por cima de tudo */
+
+/* ---------- Travada e link ---------- */
+.badge { pointer-events: none; }
+.badge rect { stroke-width: 1; }
+.badge path { fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.b-lock rect { fill: var(--pm-500); stroke: var(--pm-500); }
+.b-lock path { stroke: #fff; }
+.b-link rect { fill: var(--pm-850); stroke: var(--line); }
+.b-link path { stroke: var(--ink); }
+.shape.locked, .shape.locked .ct-hit, .shape.locked .ct-head, .shape.locked .ink-hit { cursor: default; }
+.sel-box.travada { stroke: var(--ink-3); stroke-dasharray: 2 4; }
+.canvas-wrap.ctrl .shape.linked, .canvas-wrap.ctrl .shape.linked * { cursor: pointer; }
+
+/* ---------- Schema SQL → diagrama (SqlImport.js) ---------- */
+.sql-modal .modal-card { display: flex; flex-direction: column; gap: 10px; max-height: 92vh; }
+.sql-modal .sub { margin: -6px 0 2px; }
+.sql-texto {
+  width: 100%; min-height: 260px; resize: vertical; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--pm-950); color: var(--ink); font: 12.5px/1.5 Consolas, "Cascadia Code", "Courier New", monospace; tab-size: 2;
+}
+.sql-texto:focus { outline: none; border-color: var(--pm-400); }
+.sql-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.sql-linha .btn { margin: 0; float: none; }
+.sql-op { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.sql-previa { font-size: 13px; color: var(--ink-2); min-height: 18px; }
+.sql-previa b { color: var(--ink); }
+.sql-previa ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink-3); font-size: 12px; max-height: 120px; overflow: auto; }
+.sql-acoes { display: flex; justify-content: flex-end; gap: 8px; }
+.sql-acoes .btn { margin: 0; float: none; }
+
+/* ===================== Lisa_Proof: o quadro embutido no exercício (31/10/2026) =====================
+   Dentro do iframe da tela do exercício, o cabeçalho (nome, arquivos, tema) some: quem dá o
+   contexto é a página do Proof. O resto (barra de formas, quadro, painel, abas) fica igual. */
+html.embutido .app-header { display: none; }
+html.embutido .kbd-hint { display: none; }
+.brand-icon { border-radius: 50%; }
+/* depois de avaliado (sem tentativas), o quadro fica só para ver: nada recebe clique de edição */
+html.quadro-travado .toolbar, html.quadro-travado .props { pointer-events: none; opacity: .55; }
+html.quadro-travado #layerShapes, html.quadro-travado #layerConnections { pointer-events: none; }

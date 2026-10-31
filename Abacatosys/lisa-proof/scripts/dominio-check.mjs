@@ -122,6 +122,10 @@ import {
 import { lerEnderecoDoRepo, linkDoCommit } from "../src/dominio/enderecoDoRepo.js";
 import { pdfDeJpeg } from "../src/dominio/pdf.js";
 import { ehLivre } from "../src/lib/auth.js";
+import {
+  TIPOS_DE_DIAGRAMA, ORDEM_DOS_DIAGRAMAS, NOMES_DAS_FORMAS, NOTACAO_DO_TIPO, LIMITES_DO_DIAGRAMA, validarDesafioDeDiagrama,
+  conferirDiagrama, descreverDiagrama, pedeDiagrama, motoresComDiagrama, tiposSugeridos, formasDoTipo,
+} from "../src/dominio/diagramas.js";
 
 let passou = 0;
 function caso(nome, fn) {
@@ -2937,6 +2941,128 @@ caso("migração 024: só acrescenta (o diário, o livro da torre e o tipo diari
   assert.match(sql, /create table if not exists public\.proof_diario/);
   assert.match(sql, /add column if not exists livro_id uuid/);
   assert.doesNotMatch(sql, /drop table|drop column/i);
+});
+
+// ---------------------------------------------------------------- o desenho de diagrama (31/10/2026)
+
+caso("diagrama: o desafio da IA conferido (tipo, coleção do quadro, requisitos)", () => {
+  const d = validarDesafioDeDiagrama({
+    titulo: "Pedidos da loja", tipo: "dados", cenario: "Uma loja online vende produtos para clientes.",
+    requisitos: ["CLIENTE com PK", "PEDIDO com FK para CLIENTE", "N:N entre PEDIDO e PRODUTO resolvido", "", "x".repeat(400)],
+    criterios: ["notação"], dicas: ["comece pelas entidades"],
+  });
+  assert.equal(d.motor, "diagrama");
+  assert.equal(d.colecao, "db", "o tipo diz a coleção que abre no quadro");
+  assert.equal(d.requisitos.length, 4, "o vazio sai");
+  assert.equal(d.requisitos[3].length, 260, "e o longo é cortado");
+  assert.equal(validarDesafioDeDiagrama({ tipo: "inventado", cenario: "c", requisitos: ["a", "b", "c"] }).tipo, "fluxograma");
+  assert.equal(validarDesafioDeDiagrama({ tipo: "nuvem", cenario: "c", requisitos: ["1", "2", "3", "4", "5", "6", "7", "8"] }).requisitos.length, 7);
+  assert.throws(() => validarDesafioDeDiagrama({ tipo: "bpmn", cenario: "", requisitos: ["a", "b", "c"] }), /cenário/);
+  assert.throws(() => validarDesafioDeDiagrama({ tipo: "bpmn", cenario: "c", requisitos: ["a", "b"] }), /requisitos/);
+  assert.equal(motorDo({ motor: "diagrama" }), "diagrama");
+  assert.ok(!corrigeNoServidor("diagrama"), "quem corrige é a Lisa");
+  assert.equal(tentativasDe({ tipo: "exercicio", conteudo: { motor: "diagrama" } }), 5, "cinco tentativas, vale a melhor nota");
+});
+
+const formaDeTeste = (id, type, text, x = 0, y = 0, w = 120, h = 60) => ({ id, type, text, x, y, w, h, color: "purple" });
+
+caso("diagrama: o documento do quadro conferido (vazio, tamanho, imagens coladas, formato antigo)", () => {
+  assert.equal(conferirDiagrama(null).ok, false);
+  assert.match(conferirDiagrama({ pages: [{ shapes: [formaDeTeste("a", "process", "só uma")], connections: [] }] }).motivo, /pelo menos duas/);
+  const tinta = { pages: [{ shapes: [formaDeTeste("a", "ink", ""), formaDeTeste("b", "ink", ""), formaDeTeste("c", "process", "x")], connections: [] }] };
+  assert.equal(conferirDiagrama(tinta).ok, false, "rabisco à mão não conta como forma");
+  const comImagem = {
+    name: "Meu fluxo", pages: [{ id: "p1", name: "Página 1", shapes: [formaDeTeste("a", "process", "A"), formaDeTeste("b", "decision", "B?"), { ...formaDeTeste("i", "image", ""), src: "data:image/png;base64,AAAA" }],
+      connections: [{ id: "c1", from: "a", to: "b" }, { id: "c2", from: "a" }] }],
+  };
+  const ok = conferirDiagrama(comImagem);
+  assert.ok(ok.ok);
+  assert.equal(ok.formas, 3);
+  assert.equal(ok.ligacoes, 1, "a ligação sem destino sai");
+  assert.equal(ok.doc.pages[0].shapes.find((s) => s.id === "i").src, "", "a imagem colada não é guardada");
+  assert.equal(ok.doc.format, "processmap");
+  assert.equal(ok.doc.version, 4);
+  const antigo = conferirDiagrama({ shapes: [formaDeTeste("a", "process", "A"), formaDeTeste("b", "process", "B")], connections: [] });
+  assert.ok(antigo.ok && antigo.doc.pages.length === 1, "o formato sem abas vira uma aba");
+  const muitas = { pages: [{ shapes: Array.from({ length: LIMITES_DO_DIAGRAMA.formas + 1 }, (_, i) => formaDeTeste(`f${i}`, "process", "")), connections: [] }] };
+  assert.match(conferirDiagrama(muitas).motivo, /formas/);
+  const pesado = { pages: [{ shapes: [formaDeTeste("a", "note", "x".repeat(LIMITES_DO_DIAGRAMA.caracteres)), formaDeTeste("b", "process", "B")], connections: [] }] };
+  assert.match(conferirDiagrama(pesado).motivo, /grande demais/);
+});
+
+caso("diagrama: o desenho em texto para a Lisa (formas, tabelas, raias, pontas e rótulos)", () => {
+  const doc = {
+    pages: [{
+      name: "Modelo",
+      shapes: [
+        formaDeTeste("raia", "lane", "Financeiro", 0, 0, 800, 200),
+        formaDeTeste("t1", "dbTable", "CLIENTE\nPK id: int\nnome: varchar(120)", 20, 20, 200, 120),
+        formaDeTeste("t2", "dbTable", "PEDIDO\nPK id: int\nFK id_cliente: int", 400, 20, 200, 120),
+        formaDeTeste("fora", "process", "Conferir", 20, 400),
+        formaDeTeste("rabisco", "ink", ""),
+      ],
+      connections: [
+        { id: "c1", from: "t1", to: "t2", arrow: "many", arrowStart: "oneOnly", labelFrom: "1", labelTo: "N", label: "faz" },
+        { id: "c2", from: "t2", to: "fora", dashed: true, arrow: "none" },
+      ],
+    }],
+  };
+  const t = descreverDiagrama(doc);
+  assert.match(t, /ABA "Modelo" — 4 formas, 2 ligações/, "o rabisco não entra");
+  assert.match(t, /\[t1\] tabela: "CLIENTE \| PK id: int \| nome: varchar\(120\)"/, "as linhas da tabela, uma a uma");
+  assert.match(t, /\[raia\] raia: "Financeiro" — contém: \[t1\], \[t2\]/);
+  assert.match(t, /\[t2\] tabela: .*\(dentro de \[raia\]\)/);
+  assert.doesNotMatch(t, /\[fora\] processo: "Conferir" \(dentro/, "o que está fora da raia não está dentro");
+  assert.match(t, /- \[t1\] tabela "CLIENTE" → \[t2\] tabela "PEDIDO" \(ponta no destino: muitos; ponta na origem: um e somente um; rótulo "faz"; na origem "1"; no destino "N"\)/);
+  assert.match(t, /- \[t2\] tabela "PEDIDO" → \[fora\] processo "Conferir" \(ponta no destino: sem ponta; tracejada\)/);
+  assert.equal(descreverDiagrama({ pages: [] }), "(o desenho está vazio)");
+});
+
+caso("diagrama: entra na prática de programação e do perfil livre só na área de arquitetura e computação", () => {
+  const dia = "2026-10-30";
+  const opcoes = (perfil, tema, titulo) => [...new Set([1, 2, 3, 4, 5, 6].map((rodada) => motorDoExercicio({ perfil, rodada, dia, tema, assunto: { titulo } })))].sort();
+  assert.deepEqual(opcoes("programacao", "Arquitetura de software", "Microsserviços e mensageria"), ["codigo", "diagrama"]);
+  assert.deepEqual(opcoes("programacao", "Python para iniciantes", "Listas e dicionários"), ["codigo"], "fora da área: só código, como antes");
+  assert.deepEqual(opcoes("programacao", "Python para iniciantes", "Fluxogramas e algoritmos"), ["codigo", "diagrama"], "o assunto de desenho vale em qualquer curso");
+  assert.deepEqual(opcoes("livre", "Gestão de processos", "Mapeamento de processos com BPMN"), ["aberto", "diagrama"]);
+  assert.deepEqual(opcoes("livre", "Culinária", "Massas frescas"), ["aberto"]);
+  assert.deepEqual(opcoes("idiomas", "Arquitetura de software em inglês", "No aeroporto"), ["aberto", "conversa", "ditado"], "os outros perfis não mudam");
+  // assunto de desenho: o diagrama é o primeiro da roda; curso da área num assunto de código: um dia em três
+  assert.deepEqual(motoresComDiagrama(["codigo"], { assunto: { titulo: "Modelagem de dados" } }), ["diagrama", "codigo"]);
+  assert.deepEqual(motoresComDiagrama(["codigo"], { tema: "Ciência da Computação", assunto: { titulo: "Ponteiros" } }), ["codigo", "codigo", "diagrama"]);
+  const tresDias = ["2026-10-30", "2026-10-31", "2026-11-01"].map((d) => motorDoExercicio({ perfil: "programacao", dia: d, tema: "Ciência da Computação", assunto: { titulo: "Ponteiros" } }));
+  assert.equal(tresDias.filter((m) => m === "diagrama").length, 1);
+  assert.equal(motorDoExercicio({ perfil: "programacao", rodada: 2 }), "codigo", "sem tema nem assunto, como sempre");
+  assert.ok(pedeDiagrama({ tema: "Engenharia de Software" }) && !pedeDiagrama({ tema: "Violão" }));
+});
+
+caso("diagrama: o tipo sugerido pelo assunto, as formas de cada tipo e a notação", () => {
+  assert.equal(tiposSugeridos({ assunto: { titulo: "Modelo entidade-relacionamento e normalização" } })[0], "dados");
+  assert.equal(tiposSugeridos({ assunto: { titulo: "Notação BPMN: eventos e gateways" } })[0], "bpmn");
+  assert.equal(tiposSugeridos({ assunto: { titulo: "Herança e polimorfismo" } })[0], "classes");
+  assert.equal(tiposSugeridos({ assunto: { titulo: "Alta disponibilidade na AWS" } })[0], "nuvem");
+  assert.equal(tiposSugeridos({ tema: "Arquitetura de software", assunto: { titulo: "Introdução" } })[0], "arquitetura", "sem pista no assunto, vale o curso");
+  assert.deepEqual(tiposSugeridos({ assunto: { titulo: "Introdução" } }), ["fluxograma", "arquitetura"]);
+  for (const t of ORDEM_DOS_DIAGRAMAS) {
+    assert.ok(formasDoTipo(t).length >= 4, `o tipo ${t} tem formas no quadro`);
+    assert.ok(NOTACAO_DO_TIPO[t], `o tipo ${t} tem a notação`);
+  }
+  assert.ok(formasDoTipo("dados").includes("tabela"));
+  assert.ok(formasDoTipo("nuvem").includes("balanceador de carga"));
+});
+
+caso("diagrama: toda forma das coleções do quadro tem nome para a Lisa, e o middleware deixa o quadro passar", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const biblioteca = ler("../public/diagramas/js/ShapeLibrary.js");
+  const colecoes = [...biblioteca.matchAll(/\{ id: '([a-z0-9]+)', label: '[^']+', order: \[([^\]]+)\] \}/g)].map((m) => [m[1], [...m[2].matchAll(/'([A-Za-z]+)'/g)].map((x) => x[1])]);
+  assert.ok(colecoes.length >= 8, "as coleções do quadro (fluxo, UML, casos de uso, banco, arquitetura, BPMN, nuvem, C4)");
+  for (const [id, formas] of colecoes) {
+    for (const f of formas) assert.ok(NOMES_DAS_FORMAS[f], `a forma ${f} (coleção ${id}) tem nome`);
+  }
+  const doTipo = new Set(Object.values(TIPOS_DE_DIAGRAMA).map((t) => t.colecao));
+  for (const c of doTipo) assert.ok(colecoes.some(([id]) => id === c), `a coleção ${c} existe no quadro`);
+  assert.match(ler("../src/middleware.js"), /diagramas\//, "o quadro é arquivo estático: sem sessão no caminho");
+  assert.match(ler("../public/diagramas/index.html"), /js\/Ponte\.js/);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

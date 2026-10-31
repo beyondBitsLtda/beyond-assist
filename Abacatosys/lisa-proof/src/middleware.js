@@ -11,7 +11,7 @@ import { COOKIE_SESSAO, lerSessao, ehApi, ehLivre } from "@/lib/auth.js";
 // especial — barrá-los trocaria o arquivo pelo HTML do login, e os lembretes e a instalação como
 // app quebrariam sem nenhum erro visível.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icone.svg|icone-192.png|icone-512.png|icone-apple.png|sw.js|manifest.webmanifest).*)"],
+  matcher: ["/((?!_next/static|_next/image|diagramas/|favicon.ico|icone.svg|icone-192.png|icone-512.png|icone-apple.png|sw.js|manifest.webmanifest).*)"],
 };
 
 export async function middleware(req) {

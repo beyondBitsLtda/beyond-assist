@@ -37,6 +37,7 @@ export const MOTORES = {
   passos: { nome: "Passo a passo", icone: "🪜", tentativas: 1, corrige: "servidor" },
   grafico: { nome: "Gráfico", icone: "📈", tentativas: 1, corrige: "servidor" },
   conversa: { nome: "Conversa com a Lisa", icone: "💬", tentativas: 1, corrige: "ia" },
+  diagrama: { nome: "Desenho de diagrama", icone: "🧩", tentativas: 5, corrige: "ia" },
 };
 export const motorDo = (conteudo) => (MOTORES[conteudo?.motor] ? conteudo.motor : "codigo");
 export const corrigeNoServidor = (motor) => MOTORES[motor]?.corrige === "servidor";

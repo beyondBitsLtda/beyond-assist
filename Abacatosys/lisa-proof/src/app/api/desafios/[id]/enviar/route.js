@@ -1,6 +1,6 @@
 import { json } from "@/lib/http.js";
 import { exigirUsuario, respostaDeErro, corpoDe, ErroDeAcesso } from "@/lib/sessao.js";
-import { enviarExercicio, enviarProjeto, responderExercicio, entregarEvidencia, encerrarConversa } from "@/lib/pratica.js";
+import { enviarExercicio, enviarProjeto, responderExercicio, entregarEvidencia, encerrarConversa, entregarDiagrama } from "@/lib/pratica.js";
 import { lerEntrega } from "@/lib/entregas.js";
 
 export const runtime = "nodejs";
@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
  *   desafio aberto e projeto dos outros perfis: formulário (multipart) com texto, video, imagem,
  *     miniatura, audio, segundos e pdf (src/lib/entregas.js)
  *   conversa com a Lisa: { encerrar: true } — a Lisa avalia as falas (cada fala vai por /conversa)
+ *   desenho de diagrama: { diagrama } — o documento do quadro (o JSON do ProcessMap, formato 4)
  *
  * A Lisa avalia na hora e devolve nota, comentário e pontos. Pode demorar alguns segundos.
  */
@@ -28,6 +29,9 @@ export async function POST(req, { params }) {
     if (corpo?.encerrar === true) {
       return json({ ok: true, ...(await encerrarConversa({ usuarioId: usuario.id, id })) });
     }
+    if (corpo?.diagrama && typeof corpo.diagrama === "object") {
+      return json({ ok: true, ...(await entregarDiagrama({ usuarioId: usuario.id, id, diagrama: corpo.diagrama })) });
+    }
     if (Array.isArray(corpo?.respostas)) {
       return json({ ok: true, ...(await responderExercicio({ usuarioId: usuario.id, id, respostas: corpo.respostas })) });
     }
@@ -37,7 +41,7 @@ export async function POST(req, { params }) {
     if (typeof corpo?.repo === "string") {
       return json({ ok: true, ...(await enviarProjeto({ usuarioId: usuario.id, id, repo: corpo.repo })) });
     }
-    throw new ErroDeAcesso(400, "envie a sua resposta: o código, as respostas, a entrega ou o link do repositório");
+    throw new ErroDeAcesso(400, "envie a sua resposta: o código, as respostas, o diagrama, a entrega ou o link do repositório");
   } catch (e) {
     return respostaDeErro(e);
   }

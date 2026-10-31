@@ -16,7 +16,7 @@ import { temModelo } from "./ia.js";
 import {
   gerarQuiz, gerarExercicio, gerarProjeto, gerarGuiaDoProjeto, ajustarComplexidadeDoProjeto, avaliarExercicio, avaliarProjeto,
   gerarDesafioAberto, gerarCalculo, gerarDitado, avaliarEntrega,
-  gerarPassos, gerarConversa, responderNaConversa, avaliarConversa,
+  gerarPassos, gerarConversa, responderNaConversa, avaliarConversa, gerarDesafioDeDiagrama, avaliarDiagrama,
 } from "./iaPratica.js";
 import { lerRepositorio, ErroDoGitHub } from "./github.js";
 import { diaDe } from "@/dominio/datas.js";
@@ -37,6 +37,7 @@ import { gerarGrafico, corrigirGrafico } from "@/dominio/grafico.js";
 import { corrigirPassos } from "@/dominio/passos.js";
 import { turnosDe, podeFalar, podeEncerrar, validarMensagem } from "@/dominio/conversa.js";
 import { gerarSenha, precisaDeSenha } from "@/dominio/senha.js";
+import { conferirDiagrama } from "@/dominio/diagramas.js";
 import { pontosFracos } from "@/dominio/diario.js";
 import { perfilValido, motorDoExercicio } from "@/dominio/perfis.js";
 import { semanaDoProjeto, semanaDoDesafio, pedidoDoProjeto, projetosOpcionais, podeGerarProjeto, valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
@@ -315,7 +316,7 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, 
 
   // as rodadas de antes, para não repetir pergunta nem exercício (a IA é avisada E o código confere)
   // (o exercício de outro perfil não tem enunciado de código: a lista e o ditado entram pelos itens)
-  const resumoDoExercicio = (c) => c?.enunciado || c?.contexto
+  const resumoDoExercicio = (c) => c?.enunciado || c?.contexto || c?.cenario
     || (c?.itens || []).map((i) => i.pergunta).filter(Boolean).join(" | ") || (c?.frases || []).map((f) => f.texto).join(" | ");
   const anteriores = tipo === "quiz"
     ? doDia.flatMap((d) => (d.conteudo?.perguntas || []).map((p) => ({ pergunta: p.pergunta, codigo: p.codigo })))
@@ -374,8 +375,9 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, 
  * ritmo e o de afinação são montados pelo código, sem IA.
  */
 async function gerarExercicioDoPerfil({ tema, perfil, assunto, evitar, anteriores, rodada, dia }) {
-  const motor = motorDoExercicio({ perfil, rodada, assunto, dia });
+  const motor = motorDoExercicio({ perfil, rodada, assunto, dia, tema });
   if (motor === "aberto") return gerarDesafioAberto({ tema, perfil, assunto, evitar, rodada });
+  if (motor === "diagrama") return gerarDesafioDeDiagrama({ tema, perfil, assunto, evitar, rodada });
   if (motor === "calculo") return gerarCalculo({ tema, assunto, evitar, rodada });
   if (motor === "ditado") return gerarDitado({ tema, assunto, evitar, rodada });
   if (motor === "passos") return gerarPassos({ tema, assunto, evitar, rodada });
@@ -743,6 +745,28 @@ export async function entregarEvidencia({ usuarioId, id, entrega }) {
       miniaturas: (entrega.imagens || []).map((i) => i.miniatura).filter(Boolean),
     },
   });
+}
+
+/**
+ * O desenho do diagrama (motor "diagrama", 31/10/2026): o documento do quadro vai conferido (tamanho,
+ * sem as imagens coladas) e a Lisa avalia pelo texto dele (src/dominio/diagramas.js). O desafio
+ * guarda o documento: a tela reabre o desenho para a próxima tentativa e mostra o que foi avaliado.
+ */
+export async function entregarDiagrama({ usuarioId, id, diagrama }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (d.tipo !== "exercicio" || motorDo(d.conteudo) !== "diagrama") throw new ErroDeAcesso(400, "este desafio não é de desenhar um diagrama");
+  exigirReenvio(d);
+  const conferido = conferirDiagrama(diagrama);
+  if (!conferido.ok) throw new ErroDeAcesso(400, conferido.motivo);
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  let avaliacao;
+  try {
+    avaliacao = await avaliarDiagrama({ tema: trilha.tema, perfil: trilha.perfil, desafio: d.conteudo, diagrama: conferido.doc });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  return fecharEntrega({ usuarioId, d, avaliacao, resposta: { diagrama: conferido.doc, formas: conferido.formas, ligacoes: conferido.ligacoes } });
 }
 
 // ---------------------------------------------------------------- a conversa com a Lisa (31/10/2026)
