@@ -1,0 +1,56 @@
+{
+  "id": "BEYOND-0006",
+  "titulo": "Por funcionalidade de conversar com Lisa de forma mais livre",
+  "descricao": "Hoje eu acho os dialogos com a lisa meio travados tipo:\n- Ela não continua o assunto eu falo sobre a em uma interaçãpo na segunda continuo flando sobre A ela recomeça o dialoo todo\n- sonto falta d eter um modo de dialogo fluido tipo ness emodo pro exemplo com a tela ligada e ela observando a tela ou camera eu ativo o modo o microfone fica  aberto e eu começo a conversar com ela e ela me redonde continuando a conversa e o asusnto, se eu fala rnada ela fica de boa masi se eu começar a  falr ela me repsinde como uam epssoa de vrdade sabe ",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "concluida",
+  "responsavel": "",
+  "prazo": "",
+  "versaoAlvo": "0.4.0",
+  "criadaEm": "2026-10-15T00:16:27.548Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-10-25T17:13:02.096Z",
+  "comentarios": [
+    {
+      "quando": "2026-10-15T00:20:06.218Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou fazer em duas partes: (1) memória da conversa — o Assistente passa a mandar as últimas trocas junto com cada pergunta, e a busca de contexto usa a pergunta anterior quando a nova é uma continuação; (2) \"Modo conversa\": microfone aberto direto, a Lisa responde quando você fala (continuando o assunto), fica quieta no silêncio, para de ouvir enquanto ela mesma fala e funciona junto com Tela e Observância.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-10-15T01:15:09.656Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Publicado na lisa.beyond.dev.br (0.4.0-cloudflare-pages.10); a Lisa de casa atualiza sozinha às 03:30.\n\n- Memória: as últimas 5 trocas (até 30 min de pausa) vão com cada pergunta, inclusive os comentários espontâneos de tela/câmera/escuta; o prompt pede para continuar o assunto. Continuações curtas (\"e o prazo dele?\") buscam contexto junto com a pergunta anterior.\n- Modo conversa: Modos → Voz e rádio → Conversa livre (no celular, nos ajustes). Microfone aberto, silêncio e ruído não disparam nada, fecha enquanto ela fala e reabre depois; funciona com Tela e Observância. Encerra pelo aviso no topo ou pelo microfone.\n- Testado: npm run conversa-check (31 casos) e build. A conversa por voz real ainda precisa ser conferida por você.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-10-15T00:16:27.548Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-10-15T00:20:06.218Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "situação: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-10-15T01:15:09.656Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "situação: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-10-15T01:15:09.656Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "versão alvo: → 0.4.0"
+    },
+    {
+      "quando": "2026-10-25T17:13:02.096Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
+    }
+  ]
+}

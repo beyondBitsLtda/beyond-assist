@@ -4,13 +4,13 @@
   "descricao": "a) Criar backup semanal (toda segunda feira) de todo o banco de dados tudo\nb) o arquivo deve ser feito de uma forma que a recuperação seja facil do banco\nc) nao sei ainda onde salvar o bkps preciso da sua ajuda a ideia é salvar em algu serviço de nuvem de preferencia com uso gartuit e com a inetgraçao do bkp automatica.",
   "tipo": "melhoria",
   "prioridade": "critica",
-  "status": "em-andamento",
+  "status": "concluida",
   "responsavel": "Brayan Rodrigues",
   "prazo": "2026-10-12",
   "versaoAlvo": "0.1.0",
   "criadaEm": "2026-10-13T01:15:45.338Z",
   "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
-  "atualizadaEm": "2026-10-13T02:48:11.004Z",
+  "atualizadaEm": "2026-10-15T00:06:50.115Z",
   "comentarios": [
     {
       "quando": "2026-10-13T02:08:44.588Z",
@@ -42,6 +42,11 @@
       "quando": "2026-10-13T02:08:44.588Z",
       "autor": "Brayan Rodrigues (via Claude)",
       "mudanca": "situação: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-10-15T00:06:50.115Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-andamento → concluida"
     }
   ]
 }

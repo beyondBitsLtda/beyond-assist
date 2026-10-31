@@ -4,13 +4,13 @@
   "descricao": "a) por campo de comentários nos cards do abacato\nb) deixar por incluive imagens de anexo nos comentarios seja com control v seja carregando arquivo do pc",
   "tipo": "melhoria",
   "prioridade": "media",
-  "status": "em-revisao",
-  "responsavel": "",
-  "prazo": "",
+  "status": "concluida",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-10-23",
   "versaoAlvo": "0.2.0",
   "criadaEm": "2026-10-13T01:17:34.497Z",
   "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
-  "atualizadaEm": "2026-10-13T01:44:19.586Z",
+  "atualizadaEm": "2026-10-15T00:07:08.986Z",
   "comentarios": [
     {
       "quando": "2026-10-13T01:21:41.569Z",
@@ -51,6 +51,21 @@
       "quando": "2026-10-13T01:44:19.586Z",
       "autor": "Brayan Rodrigues (via Claude)",
       "mudanca": "versão alvo: → 0.2.0"
+    },
+    {
+      "quando": "2026-10-15T00:07:08.986Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
+    },
+    {
+      "quando": "2026-10-15T00:07:08.986Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "responsável: — → Brayan Rodrigues"
+    },
+    {
+      "quando": "2026-10-15T00:07:08.986Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "prazo: — → 2026-10-23"
     }
   ]
 }

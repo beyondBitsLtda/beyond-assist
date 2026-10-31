@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 
 // ⚠️ SERVER-ONLY. Usa a service_role (chave-mestra do banco).
@@ -11,8 +12,7 @@ function getClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
     throw new Error(
-      "SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configuradas. " +
-      "Defina em Vercel → Settings → Environment Variables (ou no .env local)."
+      "SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configuradas. "
     );
   }
   _client = createClient(url, key, {

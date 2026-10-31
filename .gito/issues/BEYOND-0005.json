@@ -1,0 +1,28 @@
+{
+  "id": "BEYOND-0005",
+  "titulo": "Trocar toda e qualquer menção ao Trello pelo abacato.",
+  "descricao": "",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "concluida",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-10-22",
+  "versaoAlvo": "",
+  "criadaEm": "2026-10-15T00:13:26.759Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-10-25T17:12:13.506Z",
+  "comentarios": [],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-10-15T00:13:26.759Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-10-25T17:12:13.506Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: aberta → concluida"
+    }
+  ]
+}
