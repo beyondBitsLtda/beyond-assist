@@ -2320,6 +2320,8 @@ caso("acervo: quem revisa, quem retira e quem agradece", () => {
   assert.equal(podeRevisar({ usuarioId: "lider", material: pendente("x"), bibliotecarios: [dono, lider] }).ok, true);
   assert.match(podeRevisar({ usuarioId: "lider", material: pendente("lider"), bibliotecarios: [dono, lider] }).motivo, /outro bibliotecário/, "o próprio envio fica para o outro");
   assert.equal(podeRevisar({ usuarioId: "dono", material: pendente("dono"), bibliotecarios: [dono] }).ok, true, "sozinho, revisa o próprio");
+  assert.equal(podeRevisar({ usuarioId: "dono", material: pendente("dono"), bibliotecarios: [dono, lider] }).ok, true, "o administrador libera o próprio envio, mesmo com o líder da semana");
+  assert.equal(podeRevisar({ usuarioId: "lider", material: pendente("lider"), bibliotecarios: [lider] }).ok, true, "o líder sozinho também");
   assert.equal(podeRevisar({ usuarioId: "dono", material: { autor_id: "x", status: "aprovado" }, bibliotecarios: [dono] }).ok, false, "só o que está na fila");
   assert.equal(podeRetirar({ usuarioId: "dono", material: { status: "aprovado" }, bibliotecarios: [dono] }).ok, true);
   assert.equal(podeRetirar({ usuarioId: "dono", material: { status: "pendente" }, bibliotecarios: [dono] }).ok, false);

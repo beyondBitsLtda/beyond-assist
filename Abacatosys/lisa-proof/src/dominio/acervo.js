@@ -230,13 +230,15 @@ export function validarMaterial(bruto) {
 // ---------------------------------------------------------------- revisão e gorjeta
 
 /**
- * Pode revisar? Só bibliotecário, só o que está pendente — e ninguém aprova o próprio envio, a não
- * ser quando é o único bibliotecário (o dono sendo também o líder da semana).
+ * Pode revisar? Só bibliotecário, só o que está pendente. O administrador (o "dono") libera qualquer
+ * envio, inclusive o dele (pedido de 31/10/2026); o líder da semana não aprova o próprio envio — esse
+ * fica para o outro bibliotecário, a não ser quando ele é o único.
  */
 export function podeRevisar({ usuarioId, material, bibliotecarios = [] }) {
-  if (!bibliotecarios.some((b) => b.id === usuarioId)) return { ok: false, motivo: "só o bibliotecário revisa os envios" };
+  const eu = bibliotecarios.find((b) => b.id === usuarioId);
+  if (!eu) return { ok: false, motivo: "só o bibliotecário revisa os envios" };
   if (!material || material.status !== "pendente") return { ok: false, motivo: "esse envio não está esperando revisão" };
-  if (material.autor_id === usuarioId && bibliotecarios.some((b) => b.id !== usuarioId)) {
+  if (material.autor_id === usuarioId && eu.papel !== "dono" && bibliotecarios.some((b) => b.id !== usuarioId)) {
     return { ok: false, motivo: "o seu próprio envio fica para o outro bibliotecário" };
   }
   return { ok: true };

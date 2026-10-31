@@ -13,6 +13,7 @@ import Previa from "@/componentes/caderno/Previa.js";
 import Codigo from "@/componentes/codigo/Codigo.js";
 import Folha from "@/componentes/Folha.js";
 import { ChipDoAlvo, EscolherAlvo } from "@/componentes/caderno/Vinculos.js";
+import Atalhos from "@/componentes/caderno/Atalhos.js";
 
 const PREFERENCIAS = "proof-caderno-preferencias";
 const PADRAO = { quebrarLinha: true, tamanhoDaLetra: 15, espacosVisiveis: false, modo: "editor" };
@@ -61,8 +62,20 @@ export default function Caderno() {
   const [renomeando, setRenomeando] = useState(null);
   const [menu, setMenu] = useState(null);
   const editores = useRef({});
+  const abasRef = useRef(null);
+  // no toque (celular, tablet): a barra de atalhos acima do teclado e a letra de no mínimo 16 px (com
+  // menos, o iPhone dá zoom na página ao tocar no editor)
+  const [toque, setToque] = useState(false);
+  const [focado, setFocado] = useState(false);
 
   useEffect(() => { setPrefs(lerPreferencias()); }, []);
+  useEffect(() => {
+    const m = window.matchMedia("(pointer: coarse)");
+    const ver = () => setToque(m.matches);
+    ver();
+    m.addEventListener("change", ver);
+    return () => m.removeEventListener("change", ver);
+  }, []);
   const mudarPrefs = (p) => setPrefs((atual) => {
     const novo = { ...atual, ...p };
     try { localStorage.setItem(PREFERENCIAS, JSON.stringify(novo)); } catch { /* sem armazenamento: vale nesta visita */ }
@@ -138,6 +151,8 @@ export default function Caderno() {
 
   // aba que veio da última visita carrega o texto quando vira a ativa
   useEffect(() => { if (ativa) carregarTexto(ativa); }, [ativa, carregarTexto]);
+  // a aba ativa aparece na fileira de abas (no celular elas rolam para o lado)
+  useEffect(() => { abasRef.current?.querySelector(".cd-aba--ativa")?.scrollIntoView({ block: "nearest", inline: "nearest" }); }, [ativa]);
 
   const arvore = useMemo(() => montarArvore(itens), [itens]);
   const porId = useMemo(() => new Map(itens.map((i) => [i.id, i])), [itens]);
@@ -333,7 +348,7 @@ export default function Caderno() {
   novaRef.current = novaPagina;
   useEffect(() => {
     const tecla = (e) => {
-      if (e.key === "Escape") setTelaCheia(false);
+      if (e.key === "Escape") { setTelaCheia(false); setArvoreAberta(false); }
       if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === "n") { e.preventDefault(); novaRef.current(); }
     };
     document.addEventListener("keydown", tecla);
@@ -357,6 +372,8 @@ export default function Caderno() {
   const modo = prefs.modo;
   const modulos = itens.filter((i) => i.tipo === "modulo");
   const vinculadas = new Set(vinculos.map((v) => v.paginaId).filter(Boolean));
+  const letraMinima = toque ? 16 : 11;
+  const letra = Math.max(letraMinima, prefs.tamanhoDaLetra);
 
   // uma função (e não um componente): a árvore não é recriada a cada tecla, e o campo de renomear não perde o foco
   const itemDaArvore = (item, dentro = false) => {
@@ -417,7 +434,7 @@ export default function Caderno() {
   };
 
   return (
-    <div className={`cd-caderno cd-cor--${caderno.cor}${telaCheia ? " cd-caderno--cheia" : ""}`}>
+    <div className={`cd-caderno cd-cor--${caderno.cor}${telaCheia ? " cd-caderno--cheia" : ""}${focado ? " cd-caderno--digitando" : ""}`}>
       <div className="cd-topo">
         <Link href="/cadernos" className="cd-topo__voltar" aria-label="Voltar para os cadernos">←</Link>
         <button type="button" className="cd-topo__nome" onClick={() => setPainel({ tipo: "caderno" })} title="Nome, cor e ícone do caderno">
@@ -428,7 +445,7 @@ export default function Caderno() {
           {vinculosDoCaderno.slice(0, 3).map((v) => <ChipDoAlvo key={v.id} alvo={v.alvo} />)}
         </div>
         <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno cd-topo__acao" onClick={() => setPainel({ tipo: "vinculos", paginaId: ativa })}>
-          🔗 Vínculos{vinculos.length ? ` (${vinculos.length})` : ""}
+          🔗 <span className="cd-topo__rotulo">Vínculos</span>{vinculos.length ? ` (${vinculos.length})` : ""}
         </button>
         <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno cd-topo__acao cd-so-celular" onClick={() => setArvoreAberta((a) => !a)} aria-expanded={arvoreAberta}>
           ☰ Páginas
@@ -437,6 +454,7 @@ export default function Caderno() {
       {erro && <div className="pf-aviso pf-aviso--erro cd-erro" role="alert">{erro} <button type="button" onClick={() => setErro("")} aria-label="Fechar aviso">×</button></div>}
 
       <div className="cd-area">
+        {arvoreAberta && <button type="button" className="cd-lado__fundo" aria-label="Fechar a lista de páginas" onClick={() => setArvoreAberta(false)} />}
         <aside className={`cd-lado${arvoreAberta ? " cd-lado--aberto" : ""}`} aria-label="Páginas do caderno">
           <input className="cd-lado__busca" type="search" placeholder="🔍 Buscar em todas as páginas" value={filtro} onChange={(e) => setFiltro(e.target.value)} aria-label="Buscar em todas as páginas" />
           {resultados ? (
@@ -464,7 +482,7 @@ export default function Caderno() {
         </aside>
 
         <section className="cd-principal">
-          <div className="cd-abas" role="tablist" aria-label="Páginas abertas">
+          <div className="cd-abas" role="tablist" aria-label="Páginas abertas" ref={abasRef}>
             {abas.map((pid) => {
               const p = porId.get(pid);
               if (!p) return null;
@@ -489,15 +507,15 @@ export default function Caderno() {
                 </select>
                 <div className="cd-segmento" role="group" aria-label="Modo de ver">
                   {[["editor", "Editor"], ["dividido", "Dividido"], ["previa", "Prévia"]].map(([m, r]) => (
-                    <button key={m} type="button" aria-pressed={modo === m} onClick={() => mudarPrefs({ modo: m })}>{r}</button>
+                    <button key={m} type="button" className={`cd-segmento__${m}`} aria-pressed={modo === m} onClick={() => mudarPrefs({ modo: m })}>{r}</button>
                   ))}
                 </div>
                 <button type="button" aria-pressed={prefs.quebrarLinha} onClick={() => mudarPrefs({ quebrarLinha: !prefs.quebrarLinha })} title="Quebra de linha automática">↩ Quebra</button>
-                <button type="button" aria-pressed={prefs.espacosVisiveis} onClick={() => mudarPrefs({ espacosVisiveis: !prefs.espacosVisiveis })} title="Mostrar espaços e tabulações" aria-label="Mostrar espaços">¶</button>
-                <button type="button" onClick={() => mudarPrefs({ tamanhoDaLetra: Math.max(11, prefs.tamanhoDaLetra - 1) })} aria-label="Letra menor" title="Letra menor">A−</button>
-                <button type="button" onClick={() => mudarPrefs({ tamanhoDaLetra: Math.min(24, prefs.tamanhoDaLetra + 1) })} aria-label="Letra maior" title="Letra maior">A+</button>
+                <button type="button" className="cd-ferramentas__espacos" aria-pressed={prefs.espacosVisiveis} onClick={() => mudarPrefs({ espacosVisiveis: !prefs.espacosVisiveis })} title="Mostrar espaços e tabulações" aria-label="Mostrar espaços">¶</button>
+                <button type="button" disabled={letra <= letraMinima} onClick={() => mudarPrefs({ tamanhoDaLetra: Math.max(letraMinima, letra - 1) })} aria-label="Letra menor" title="Letra menor">A−</button>
+                <button type="button" disabled={letra >= 24} onClick={() => mudarPrefs({ tamanhoDaLetra: Math.min(24, letra + 1) })} aria-label="Letra maior" title="Letra maior">A+</button>
                 <button type="button" onClick={() => editores.current[ativa]?.buscar()} title="Buscar e substituir (Ctrl+F / Ctrl+H)" aria-label="Buscar e substituir">🔍</button>
-                <button type="button" onClick={baixar} title="Baixar a página como arquivo" aria-label="Baixar a página">⬇</button>
+                <button type="button" className="cd-ferramentas__baixar" onClick={baixar} title="Baixar a página como arquivo" aria-label="Baixar a página">⬇</button>
                 <button type="button" onClick={() => setTelaCheia((t) => !t)} aria-pressed={telaCheia} title="Tela cheia (Esc sai)" aria-label="Tela cheia">⛶</button>
                 <span className="cd-ferramentas__vinc">
                   {vinculosDaPagina.map((v) => <ChipDoAlvo key={v.id} alvo={v.alvo} />)}
@@ -519,7 +537,11 @@ export default function Caderno() {
                 </div>
               )}
 
-              <div className={`cd-folha cd-folha--${modo}`}>
+              <div
+                className={`cd-folha cd-folha--${modo}`}
+                onFocusCapture={() => setFocado(true)}
+                onBlurCapture={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setFocado(false); }}
+              >
                 {abas.map((pid) => {
                   const p = porId.get(pid);
                   const d = docs[pid];
@@ -531,7 +553,7 @@ export default function Caderno() {
                         valor={d.base}
                         linguagem={p.linguagem}
                         quebrarLinha={prefs.quebrarLinha}
-                        tamanhoDaLetra={prefs.tamanhoDaLetra}
+                        tamanhoDaLetra={letra}
                         espacosVisiveis={prefs.espacosVisiveis}
                         aoMudar={(t) => aoMudarTexto(pid, t)}
                         aoGravar={() => gravar(pid)}
@@ -549,8 +571,10 @@ export default function Caderno() {
                 )}
               </div>
 
+              {toque && focado && modo !== "previa" && <Atalhos editor={() => editores.current[ativa]} linguagem={paginaAtiva.linguagem} />}
+
               <div className="cd-status" aria-live="polite">
-                <span>Ln {cursor.linha}, Col {cursor.coluna}{cursor.selecionados ? ` · ${cursor.selecionados} sel.` : ""}</span>
+                <span className="cd-status__cursor">Ln {cursor.linha}, Col {cursor.coluna}{cursor.selecionados ? ` · ${cursor.selecionados} sel.` : ""}</span>
                 {estat && <span className="cd-status__contagem">{estat.linhas} linhas · {estat.palavras} palavras · {estat.caracteres} caracteres</span>}
                 <span>{rotuloDaLinguagemDoCaderno(paginaAtiva.linguagem)}</span>
                 <span className="cd-status__fixo">UTF-8 · LF</span>

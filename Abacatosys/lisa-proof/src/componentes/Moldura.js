@@ -16,6 +16,7 @@ import BotaoInstalar from "./BotaoInstalar.js";
 import { AvisoDeVale } from "./Vales.js";
 import Novidades from "./Novidades.js";
 import TelaDeAbertura from "./marca/TelaDeAbertura.js";
+import AcompanharTeclado from "./TecladoVirtual.js";
 
 // em grupos (31/10/2026): treze itens soltos eram uma parede; com um rótulo discreto por grupo, o
 // olho acha o que procura
@@ -133,6 +134,7 @@ export default function Moldura({ children }) {
       <Confete />
       <AvisoDeVale />
       <Novidades />
+      <AcompanharTeclado />
     </div>
   );
 }

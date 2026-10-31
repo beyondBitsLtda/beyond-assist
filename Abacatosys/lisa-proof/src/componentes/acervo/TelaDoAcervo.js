@@ -714,6 +714,8 @@ function Mesa({ fila, dados, avisar, aoMudar, aoAssistir }) {
   const [motivos, setMotivos] = useState({});
   const [ocupado, setOcupado] = useState(null);
   const sozinho = dados.bibliotecarios.length <= 1;
+  // o administrador libera qualquer envio, inclusive o dele (src/dominio/acervo.js: podeRevisar)
+  const souDono = dados.bibliotecarios.some((b) => b.id === dados.eu?.id && b.papel === "dono");
 
   async function espiar(m) {
     try {
@@ -741,7 +743,7 @@ function Mesa({ fila, dados, avisar, aoMudar, aoAssistir }) {
     <ul className="ac-fila">
       <li className="ac-fila__regras">Confira se o material é o que diz ser, se está completo e se ajuda a estudar. Aprovando, quem trouxe ganha as moedas do tipo; você ganha {moedas(dados.pagamentoDaRevisao)} por revisão (menos nos seus próprios envios).</li>
       {fila.map((m) => {
-        const proprio = m.meu && !sozinho;
+        const proprio = m.meu && !sozinho && !souDono;
         return (
           <li key={m.id} className="ac-revisao">
             <Capa m={m} />

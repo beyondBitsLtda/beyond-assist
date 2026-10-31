@@ -291,9 +291,63 @@
 .cd-anotacao__onde { color: var(--pf-tinta-3); font-size: 11.5px; }
 .cd-anotacoes__nova { display: grid; gap: 10px; max-width: 460px; }
 
-/* ------------------------------------------------------------ celular */
+/* ------------------------------------------------------------ toque: celular e tablet (31/10/2026) */
+
+/* a barra de atalhos acima do teclado (src/componentes/caderno/Atalhos.js) */
+.cd-atalhos {
+  display: flex; gap: 4px; padding: 6px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+  background: #17201A; border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.cd-atalhos::-webkit-scrollbar { display: none; }
+.cd-atalhos button {
+  flex: 0 0 auto; min-width: 42px; height: 40px; padding: 0 10px; border-radius: 9px; touch-action: manipulation;
+  border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.06); color: #E8EDEA;
+  font: 600 15px/1 ui-monospace, "JetBrains Mono", Consolas, monospace; cursor: pointer;
+}
+.cd-atalhos button:active { background: rgba(34, 197, 94, 0.3); }
+.cd-atalhos .cd-atalhos__negrito { font: 800 16px/1 Inter, system-ui, sans-serif; }
+.cd-atalhos .cd-atalhos__italico { font: italic 600 16px/1 Georgia, serif; }
+
+.cd-lado__fundo { display: none; }
+.cd-ferramentas > button:disabled { opacity: 0.4; cursor: default; }
+
+@media (pointer: coarse) {
+  /* alvos de toque de 40 a 44 px */
+  .cd-topo__voltar { width: 42px; height: 42px; }
+  .cd-arvore__nome { min-height: 42px; padding: 8px; font-size: 15px; }
+  .cd-arvore__mais { width: 40px; height: 40px; opacity: 1; font-size: 18px; }
+  .cd-menu button { padding: 12px; font-size: 15px; }
+  .cd-menu__mover select { min-height: 40px; }
+  .cd-resultados button { padding: 12px 10px; }
+  .cd-aba__nome { padding: 12px 6px 12px 14px; font-size: 13.5px; }
+  .cd-aba__fechar { width: 34px; height: 34px; }
+  .cd-aba--nova { min-width: 48px; }
+  .cd-ferramentas > button, .cd-segmento button, .cd-ferramentas__vincular, .cd-ferramentas__linguagem { min-height: 38px; }
+  .cd-anotacao { padding: 10px 14px; font-size: 14px; }
+  .cd-anotacoes__anotar { min-height: 40px; padding: 8px 14px; }
+  .cd-escolher__nome, .cd-escolher__filhos button { min-height: 44px; }
+  /* campos com 16 px: com menos, o iPhone dá zoom na página ao tocar neles */
+  .cd-caderno :is(input, select, textarea), .cd-novo :is(input, select, textarea), .cd-anotacoes :is(input, select, textarea), .cd-escolher :is(input, select) { font-size: 16px !important; }
+
+  /* digitando no caderno: ele ocupa a área que sobra acima do teclado (src/componentes/TecladoVirtual.js) */
+  html.pf-teclado .cd-caderno--digitando {
+    position: fixed; left: 0; right: 0; top: var(--pf-vv-topo, 0px); z-index: 60;
+    height: var(--pf-vv-altura, 100dvh); min-height: 0; padding: 6px 6px 0; gap: 6px; background: var(--pf-fundo);
+  }
+  html.pf-teclado .cd-caderno--digitando .cd-topo, html.pf-teclado .cd-caderno--digitando .cd-status { display: none; }
+  html.pf-teclado .cd-caderno--digitando .cd-principal { border-radius: 10px 10px 0 0; }
+}
+
+/* ------------------------------------------------------------ celular e tablet em pé */
 
 @media (max-width: 899px) {
+  .cd-lado__fundo { display: block; position: fixed; inset: 0; z-index: 39; padding: 0; border: none; background: rgba(0, 0, 0, 0.4); }
+  /* as ferramentas numa fileira só, que rola para o lado (quebrando, comiam três linhas do editor) */
+  .cd-ferramentas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .cd-ferramentas::-webkit-scrollbar { display: none; }
+  .cd-ferramentas > *, .cd-segmento { flex-shrink: 0; }
+  .cd-ferramentas__vinc { display: none; }
+  .cd-status__cursor, .cd-status__fixo { display: none; }
   .cd-so-celular { display: inline-flex; }
   .cd-area { grid-template-columns: minmax(0, 1fr); }
   .cd-lado {
@@ -305,8 +359,19 @@
   .cd-topo__nome { font-size: 16px; max-width: 46vw; }
   .cd-folha--dividido { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
   .cd-folha--dividido .cd-folha__previa { border-left: none; border-top: 1px solid var(--pf-linha); }
-  .cd-ferramentas__vinc { margin-left: 0; }
   .cd-status__contagem { display: none; }
   .cd-previa { padding: 16px; }
   .cd-anotacoes__anotar { margin-left: 0; }
+  .cd-anotacoes__nova { max-width: none; }
+}
+
+/* celular: dividido não cabe; e, digitando, só o editor e os atalhos */
+@media (max-width: 599px) {
+  .cd-segmento__dividido, .cd-ferramentas__espacos, .cd-ferramentas__baixar { display: none; }
+  /* o topo numa linha só: o nome encolhe e "Vínculos" vira só 🔗 e o número */
+  .cd-topo { flex-wrap: nowrap; }
+  .cd-topo__nome { flex: 1 1 auto; max-width: none; }
+  .cd-topo__rotulo { display: none; }
+  .cd-topo__acao { padding-inline: 10px; }
+  html.pf-teclado .cd-caderno--digitando .cd-abas, html.pf-teclado .cd-caderno--digitando .cd-ferramentas { display: none; }
 }

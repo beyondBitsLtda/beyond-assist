@@ -65,12 +65,16 @@
 /* ------------------------------------------------------------ o leitor */
 
 .lp {
-  display: grid; grid-template-rows: auto auto minmax(0, 1fr); position: relative;
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); position: relative;
   height: calc(100dvh - 56px - var(--pf-nav-altura) - 16px - env(safe-area-inset-bottom)); min-height: 420px;
   border-radius: 12px; overflow: hidden; border: 1px solid var(--pf-linha); background: var(--pf-superficie);
 }
 @media (min-width: 900px) { .lp { height: calc(100dvh - 28px); } }
 .lp--cheia, .lp:fullscreen { height: 100vh; border-radius: 0; border: none; }
+/* o "tela cheia" do iPhone (sem tela cheia de elemento): o leitor cobre o app */
+.lp--foco { position: fixed; inset: 0; z-index: 60; height: 100dvh; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+.lp-barra__controles { display: contents; }
+.lp-lado__fundo { display: none; }
 
 .lp-barra {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 10px;
@@ -162,7 +166,8 @@
 .lp-anotacoes .cd-anotacoes { margin: 0; }
 
 /* a área das páginas */
-.lp-rolagem { flex: 1; min-width: 0; overflow: auto; position: relative; background: #E6E8E7; overscroll-behavior: contain; }
+/* touch-action: o navegador rola, mas a pinça fica com o leitor (o zoom das páginas, LeitorDePdf.js) */
+.lp-rolagem { flex: 1; min-width: 0; overflow: auto; position: relative; background: #E6E8E7; overscroll-behavior: contain; touch-action: pan-x pan-y; }
 :root[data-tema="escuro"] .lp-rolagem { background: #0A0F0C; }
 .lp-abrindo { padding: 40px; text-align: center; }
 .lp-paginas { position: relative; margin: 0 auto; }
@@ -236,19 +241,54 @@
 
 .lp-barra__tema-celular { display: none; }
 
+/* ------------------------------------------------------------ toque: celular e tablet (31/10/2026) */
+
+@media (pointer: coarse) {
+  .lp-barra__voltar { width: 40px; height: 40px; }
+  .lp-barra__botao, .lp-barra__zoom { min-width: 40px; height: 40px; }
+  .lp-barra__pagina input { height: 40px; }
+  .lp-lado__abas button { padding: 10px 2px; font-size: 11.5px; }
+  .lp-lado__abas button > span:first-child { font-size: 18px; }
+  .lp-sumario button { padding: 10px 8px; font-size: 14px; }
+  .lp-busca__lista button, .lp-marcacao__ir { padding: 10px; font-size: 14px; }
+  .lp-marcacao__acoes button { padding: 10px 12px; font-size: 16px; }
+  /* campos com 16 px: com menos, o iPhone dá zoom na página ao tocar neles */
+  .lp :is(input, select, textarea) { font-size: 16px !important; }
+  /* a barrinha da seleção e o balão da marcação: presos embaixo, ao alcance do polegar e longe do
+     menu de copiar do próprio celular (que aparece em cima da seleção) */
+  .lp-flutua {
+    left: 50% !important; top: auto !important; bottom: calc(var(--pf-nav-altura) + 12px + env(safe-area-inset-bottom));
+    max-width: calc(100vw - 16px); flex-wrap: wrap; justify-content: center; gap: 6px; padding: 8px;
+  }
+  .lp--foco .lp-flutua, .lp:fullscreen .lp-flutua { bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .lp-flutua button:not(.lp-cor) { min-width: 42px; height: 42px; font-size: 17px; }
+  .lp-flutua .lp-cor { width: 30px; height: 30px; }
+  .lp-flutua--marcacao { flex-wrap: nowrap; width: min(420px, calc(100vw - 16px)); max-width: none; }
+  .lp-flutua__linha { flex-wrap: wrap; justify-content: center; gap: 6px; }
+  /* escrevendo uma nota: a caixa fica na área que se vê, acima do teclado (TecladoVirtual.js) */
+  html.pf-teclado .lp-modal { top: var(--pf-vv-topo, 0px); bottom: auto; height: var(--pf-vv-altura, 100dvh); place-items: start center; padding: 8px; }
+  html.pf-teclado .lp-modal__caixa { max-height: calc(var(--pf-vv-altura, 100dvh) - 16px); }
+}
+
 @media (max-width: 899px) {
   .lp-lado { position: absolute; z-index: 20; left: 0; top: 0; bottom: 0; width: min(88vw, 340px); box-shadow: var(--pf-sombra-alta); }
+  .lp-lado__fundo { display: block; position: absolute; inset: 0; z-index: 19; padding: 0; border: none; background: rgba(0, 0, 0, 0.35); }
   .lp-lado__rotulo { display: none; }
-  .lp-barra { gap: 4px 6px; padding: 6px 8px; }
-  .lp-barra__titulo { order: -1; flex-basis: 100%; font-size: 14px; }
+  /* duas linhas: voltar, painel e título em cima; os controles embaixo, numa fileira que rola para o lado */
+  .lp-barra { gap: 6px; padding: 6px 8px; }
+  .lp-barra__titulo { flex: 1 1 0; font-size: 14px; }
+  .lp-barra__controles { display: flex; align-items: center; gap: 6px; flex: 1 0 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .lp-barra__controles::-webkit-scrollbar { display: none; }
+  .lp-barra__controles > * { flex-shrink: 0; }
   .lp-barra__ferramentas .lp-cores { display: none; }
-  .lp-barra__botao, .lp-barra__zoom { min-width: 32px; height: 32px; padding: 0 6px; }
-  .lp-barra__zoom { min-width: 58px; }
-  .lp-barra__pagina input { width: 44px; height: 32px; }
-  .lp-barra__tema, .lp-barra__cheia { display: none; }
+  .lp-barra__zoom { min-width: 62px; }
+  .lp-barra__pagina input { width: 48px; }
+  .lp-barra__tema { display: none; }
   .lp-barra__tema-celular { display: inline-block; }
   .lp-barra__curso { padding: 6px 9px; }
   .lp-barra__curso-texto { display: none; }
+  /* as caixas de nota e de mandar para o caderno ficam no alto: o teclado sobe por baixo */
+  .lp-modal { place-items: start center; padding-top: calc(16px + env(safe-area-inset-top)); }
 }
 
 /* ------------------------------------------------------------ curso a partir de um livro */

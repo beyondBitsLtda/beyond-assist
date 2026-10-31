@@ -6,7 +6,7 @@ import {
   EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, dropCursor,
   rectangularSelection, crosshairCursor, highlightSpecialChars, highlightWhitespace, placeholder as dica,
 } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab, undo, redo, indentMore, indentLess } from "@codemirror/commands";
 import { indentOnInput, bracketMatching, foldGutter, foldKeymap, syntaxHighlighting, indentUnit } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap, autocompletion, completionKeymap } from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches, openSearchPanel, search } from "@codemirror/search";
@@ -24,13 +24,20 @@ import { carregarLinguagem } from "../codigo/linguagens.js";
  *
  * Um editor por aba: cada página aberta guarda o próprio histórico de desfazer.
  */
+// Texto corrido (Markdown, texto puro) ganha o corretor e a maiúscula no começo da frase do teclado do
+// celular; código fica sem eles (o corretor trocaria "def" por "de").
+const ehProsa = (linguagem) => linguagem === "markdown" || linguagem === "texto";
+const atributosDa = (linguagem) => EditorView.contentAttributes.of(ehProsa(linguagem)
+  ? { spellcheck: "true", autocorrect: "on", autocapitalize: "sentences" }
+  : { spellcheck: "false", autocorrect: "off", autocapitalize: "off" });
+
 const EditorDoCaderno = forwardRef(function EditorDoCaderno(
   { valor, aoMudar, linguagem, quebrarLinha = true, tamanhoDaLetra = 15, espacosVisiveis = false, somenteLeitura = false, aoGravar, aoCursor, rotulo = "Página do caderno" },
   ref,
 ) {
   const caixa = useRef(null);
   const vista = useRef(null);
-  const travas = useRef({ linguagem: new Compartment(), quebra: new Compartment(), espacos: new Compartment(), leitura: new Compartment(), letra: new Compartment() });
+  const travas = useRef({ linguagem: new Compartment(), quebra: new Compartment(), espacos: new Compartment(), leitura: new Compartment(), letra: new Compartment(), atributos: new Compartment() });
   const ultimo = useRef({ aoMudar, aoGravar, aoCursor });
   ultimo.current = { aoMudar, aoGravar, aoCursor };
 
@@ -48,6 +55,43 @@ const EditorDoCaderno = forwardRef(function EditorDoCaderno(
       const v = vista.current;
       if (!v) return;
       v.dispatch(v.state.replaceSelection(texto));
+      v.focus();
+    },
+    // a barra de atalhos do celular (Atalhos.js): o que o teclado virtual não tem à mão
+    /** Põe `antes` e `depois` em volta de cada seleção (sem seleção, em volta do `exemplo`, que fica selecionado). */
+    envolver: (antes, depois = "", exemplo = "") => {
+      const v = vista.current;
+      if (!v) return;
+      v.dispatch(v.state.changeByRange((r) => {
+        const miolo = v.state.sliceDoc(r.from, r.to) || exemplo;
+        const inicio = r.from + antes.length;
+        return { changes: { from: r.from, to: r.to, insert: antes + miolo + depois }, range: EditorSelection.range(inicio, inicio + miolo.length) };
+      }), { scrollIntoView: true, userEvent: "input" });
+      v.focus();
+    },
+    /** Liga e desliga um começo de linha (# título, - lista, > citação) em todas as linhas da seleção. */
+    prefixar: (prefixo) => {
+      const v = vista.current;
+      if (!v) return;
+      const { state } = v;
+      const numeros = new Set();
+      for (const r of state.selection.ranges) {
+        for (let n = state.doc.lineAt(r.from).number; n <= state.doc.lineAt(r.to).number; n++) numeros.add(n);
+      }
+      const linhas = [...numeros].map((n) => state.doc.line(n));
+      const todasTem = linhas.every((l) => l.text.startsWith(prefixo));
+      v.dispatch({
+        changes: linhas.map((l) => (todasTem ? { from: l.from, to: l.from + prefixo.length } : { from: l.from, insert: prefixo })),
+        scrollIntoView: true, userEvent: "input",
+      });
+      v.focus();
+    },
+    /** desfazer, refazer, recuar, desrecuar */
+    comando: (nome) => {
+      const v = vista.current;
+      const fazer = { desfazer: undo, refazer: redo, recuar: indentMore, desrecuar: indentLess }[nome];
+      if (!v || !fazer) return;
+      fazer(v);
       v.focus();
     },
   }), []);
@@ -100,7 +144,8 @@ const EditorDoCaderno = forwardRef(function EditorDoCaderno(
             if (u.docChanged) ultimo.current.aoMudar?.(u.state.doc.toString());
             if (u.docChanged || u.selectionSet) avisarCursor(u.state);
           }),
-          EditorView.contentAttributes.of({ "aria-label": rotulo, spellcheck: "false", autocorrect: "off", autocapitalize: "off" }),
+          EditorView.contentAttributes.of({ "aria-label": rotulo }),
+          t.atributos.of(atributosDa(linguagem)),
           t.linguagem.of([]),
           t.quebra.of(quebrarLinha ? EditorView.lineWrapping : []),
           t.espacos.of(espacosVisiveis ? highlightWhitespace() : []),
@@ -118,6 +163,7 @@ const EditorDoCaderno = forwardRef(function EditorDoCaderno(
 
   useEffect(() => {
     let vivo = true;
+    vista.current?.dispatch({ effects: travas.current.atributos.reconfigure(atributosDa(linguagem)) });
     const chave = linguagem === "texto" ? null : linguagem;
     (chave ? carregarLinguagem(chave) : Promise.resolve(null)).then((lang) => {
       if (vivo && vista.current) vista.current.dispatch({ effects: travas.current.linguagem.reconfigure(lang || []) });

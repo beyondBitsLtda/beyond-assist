@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.41.0-cloudflare-pages.1",
+  "versao": "0.42.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-31",
   "compilacao": {
-    "numero": 83,
+    "numero": 84,
     "data": "2026-10-31",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.42.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "Cadernos, notas e o leitor de PDF adaptados de verdade a celular e tablet; e o administrador libera qualquer material do acervo, inclusive o dele.",
+      "itens": [
+        "Acervo: o administrador (a conta de PROOF_ADMIN_EMAIL) aprova ou recusa qualquer envio, inclusive os próprios, mesmo com o líder da semana como segundo bibliotecário. O líder continua sem aprovar o próprio envio (fica para o administrador).",
+        "Digitando no celular ou no tablet, a barra de abas de baixo sai do caminho e o caderno ocupa exatamente a área acima do teclado, sem o fim do texto ficar escondido.",
+        "Barra de atalhos acima do teclado no caderno: desfazer, refazer, recuo e os sinais do Markdown (título, negrito, itálico, lista, tarefa, citação, código, link); nas páginas de código, os símbolos de programação.",
+        "Páginas de Markdown e de texto com corretor e maiúscula automática do teclado; as de código continuam sem.",
+        "Letra mínima de 16 px no toque (o iPhone parava de dar zoom ao tocar no editor e nos campos), botões e itens com 40 a 44 px, ferramentas numa fileira que rola para o lado, topo do caderno numa linha só e um fundo escuro para fechar a lista de páginas tocando fora.",
+        "Leitor de PDF: barra em duas linhas no celular (título em cima, controles embaixo), zoom com dois dedos (pinça) no próprio leitor, barra de marcação presa embaixo ao alcance do polegar, painel que fecha ao escolher uma página e tela cheia também no iPhone (modo foco).",
+        "As caixas de nota do leitor e os painéis de baixo ficam acima do teclado enquanto se escreve."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.41.0-cloudflare-pages.1",
       "data": "2026-10-31",
@@ -1266,7 +1283,7 @@
         "Tema escuro (padrão) e claro.",
         "Mapa da trilha no estilo Duolingo e o mascote Neuro, com animações que reagem ao progresso.",
         "Lembretes por notificação push (ofensiva em risco, quiz pendente), enviados pelo relógio do iMac.",
-        "Uso no computador e no celular, instalável como app.",
+        "Uso no computador, no tablet e no celular, instalável como app; no toque, o caderno e o leitor de PDF se ajustam ao teclado virtual, com atalhos de escrita e zoom com dois dedos.",
         "Reportar problema com print, que vira chamado no Abacato para quem administra",
         "Editor de código no exercício e código colorido em todas as telas",
         "Raio-X do estudante: todos os pontos, notas, ritmo e trilhas num lugar só",
@@ -1302,7 +1319,7 @@
         "Biblioteca de PDFs (/biblioteca) com leitor: destaque em cores, sublinhado, notas, marcação de área, marcador de página, sumário, miniaturas, busca no texto, temas de leitura e trechos mandados para o caderno",
         "Cursos gerados a partir de um livro da biblioteca, seguindo os capítulos, com as páginas de cada assunto; a explicação, o quiz e o exercício do assunto usam o trecho do livro",
         "Estante virtual da Biblioteca: livros em 3D nas prateleiras, com lombada (cor da capa, título, marcador de leitura, selo de lido, 🎓 de curso), capa ao puxar e destaque com as ações",
-        "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link e vídeos (YouTube/Vimeo), com revisão do bibliotecário (administrador e líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu; Modo cinema (sala 3D com a plateia de avatares) para os vídeos",
+        "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link e vídeos (YouTube/Vimeo), com revisão do bibliotecário (o administrador, que libera qualquer envio, e o líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu; Modo cinema (sala 3D com a plateia de avatares) para os vídeos",
         "Instalável como app (manifesto e ícones já existiam; agora com o botão \"Instalar app\" na própria tela).",
         "Mercado de tropas no Reino: vender tropas do exército ou da defesa (saem na hora e liberam espaço) e comprar as que outros reinos anunciaram",
         "Tipos de curso além de programação (música, idiomas, matemática e livre), com exercício do dia próprio (lista de cálculo, ditado, treino de ouvido, desafio aberto) e projetos entregues por texto, fotos, áudio ou vídeo do YouTube, avaliados pela IA",

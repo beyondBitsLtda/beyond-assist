@@ -224,6 +224,15 @@ button { font: inherit; }
   .pf-nav__rotulo { padding-bottom: 2px; }
 }
 
+/* o teclado do celular aberto (src/componentes/TecladoVirtual.js): a barra de abas sai do caminho e
+   o painel de baixo (folha) fica na área que se vê, acima do teclado */
+html.pf-teclado .pf-abas { display: none; }
+@media (pointer: coarse) {
+  html.pf-teclado .folha__fundo { top: var(--pf-vv-topo, 0px); bottom: auto; height: var(--pf-vv-altura, 100dvh); }
+  html.pf-teclado .folha { max-height: calc(var(--pf-vv-altura, 100dvh) - 12px); }
+  .folha :is(input, select, textarea) { font-size: 16px !important; }
+}
+
 /* ------------------------------------------------------------------ tipografia e blocos */
 
 .pf-cabecalho { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 24px; }

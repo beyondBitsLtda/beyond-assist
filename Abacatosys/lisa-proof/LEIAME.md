@@ -260,8 +260,9 @@ Cada envio tem nome, capa, categoria, assunto e uma descrição opcional. A capa
 página, mas a pessoa pode escolher outra imagem.
 
 **Quem é o bibliotecário.** São dois: o administrador (a conta de `PROOF_ADMIN_EMAIL`, a mesma
-da Lisa) e o líder do ranking da semana. Ninguém aprova o próprio envio, a não ser quando é o
-único bibliotecário. Para recusar, o motivo é obrigatório, e o PDF recusado sai do disco.
+da Lisa) e o líder do ranking da semana. O administrador libera qualquer envio, inclusive o dele
+(pedido de 31/10/2026); o líder não aprova o próprio envio, a não ser quando é o único
+bibliotecário — esse fica para o administrador. Para recusar, o motivo é obrigatório, e o PDF recusado sai do disco.
 
 **Moedas.** As recompensas são do Reino de verdade (livro-caixa) e o mundo de teste não tem
 acervo.
@@ -530,6 +531,26 @@ Regras em `src/dominio/diagramas.js`; IA em `src/lib/iaPratica.js` (`gerarDesafi
   `resposta.diagrama`. A Lisa recebe o desenho em texto (`descreverDiagrama`): cada forma com o tipo e
   o texto (tabelas e classes linha a linha), o que está dentro de cada raia/fronteira/cluster e cada
   ligação com as pontas (cardinalidade, herança, composição) e os rótulos. A posição na tela não conta.
+
+## Celular e tablet: escrever e ler no toque
+
+Pedido de 31/10/2026: "a parte de escrita nas notas e cadernos e de leitura funcionando super bem em
+tablets e celulares".
+
+- **O teclado virtual** (`src/componentes/TecladoVirtual.js`, montado na `Moldura`): mede a área que
+  se vê (`--pf-vv-altura`, `--pf-vv-topo`, da `visualViewport`) e marca `html.pf-teclado` enquanto
+  alguém digita num aparelho de toque. Com isso a barra de abas de baixo some, o caderno em edição
+  (`.cd-caderno--digitando`) vira uma camada fixa do tamanho exato da área acima do teclado, e as
+  caixas de nota do leitor e as folhas de baixo ficam nessa área.
+- **Caderno**: barra de atalhos acima do teclado (`src/componentes/caderno/Atalhos.js`, usando
+  `envolver`, `prefixar` e `comando` do `EditorDoCaderno`); os botões não tiram o foco do editor.
+  Markdown e texto ganham corretor e maiúscula automática; código, não. No toque, a letra mínima é
+  16 px (o iPhone dá zoom em campos com menos), os alvos têm 40 a 44 px e as ferramentas ficam numa
+  fileira que rola. No celular (< 600 px), sem o modo "Dividido"; digitando, só o editor e os atalhos.
+- **Leitor**: a barra vira duas linhas (`.lp-barra__controles`), a pinça faz o zoom do leitor
+  (`touch-action: pan-x pan-y` na rolagem; durante o gesto só um `transform`, ao soltar o zoom de
+  verdade), a barrinha da seleção fica presa embaixo, o painel fecha ao escolher uma página e o ⛶
+  usa o modo foco (`.lp--foco`) onde não há tela cheia de elemento (iPhone).
 
 ## A marca e a tela de abertura
 
