@@ -28,7 +28,7 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "👓", titulo: "Avatar novo, de graça: a Lisa", texto: "O mascote do Proof virou personagem, liberado para todo mundo. Vista no Reino → Personagens: ele pisca, sorri, comemora e até dorme.", destaque: true },
+  { icone: "👓", titulo: "Avatar novo, de graça: a Lisa", texto: "O mascote do Proof virou bonequinha de corpo inteiro, liberada para todo mundo. Vista no Reino → Personagens: ela pisca, sorri, comemora e até dorme.", destaque: true },
   { icone: "🃏", titulo: "Cartões, torres de tema e revisão da turma", texto: "Cartões com repetição espaçada (Prática → Cartões), o Modo Domínio de qualquer tema e a revisão de um colega quando você discorda da Lisa." },
   { icone: "💬", titulo: "Conversa com a Lisa", texto: "Nos cursos de idiomas: uma cena do dia a dia na língua do curso. A Lisa faz um papel, corrige cada fala e avalia no fim." },
   { icone: "📈", titulo: "Passo a passo e gráficos", texto: "Na matemática: cada linha da resolução é conferida (o erro aparece onde nasceu) e há gráficos de arrastar pontos e retas. Na música, leitura na pauta, ritmo e afinação ao vivo." },

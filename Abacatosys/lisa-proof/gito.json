@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.40.0-cloudflare-pages.1",
+  "versao": "0.40.1-cloudflare-pages.1",
   "atualizadoEm": "2026-10-31",
   "compilacao": {
-    "numero": 81,
+    "numero": 82,
     "data": "2026-10-31",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.40.1-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "A Lisa virou bonequinha de corpo inteiro, como os outros avatares.",
+      "itens": [
+        "No lugar do selo redondo, o avatar Lisa tem corpo: a cabeça do logo colorida (cabelo castanho, rosto, lentes claras, prendedor verde e brinco dourado), roupa verde, braços, pernas e sapatos.",
+        "Cada humor tem a sua pose dos braços (comemorando com os braços para cima, surpreso com eles abertos, pensando com a mão no queixo) além da boca.",
+        "Braços e pernas cor de pele com contorno, para aparecerem no tema claro e no escuro."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.40.0-cloudflare-pages.1",
       "data": "2026-10-31",

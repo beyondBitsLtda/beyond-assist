@@ -136,9 +136,20 @@
 }
 @keyframes neuro-balao-flutuante { from { opacity: 0; transform: translate(-50%, 4px) scale(0.96); } to { opacity: 1; transform: translateX(-50%); } }
 
-/* ---- o avatar Lisa (31/10/2026): o mascote da marca no selo de papel */
-.neuro__lisa-papel { fill: #F7F3EA; stroke: #22C55E; stroke-width: 6; }
+/* ---- o avatar Lisa (31/10/2026): o mascote da marca de corpo inteiro, como os outros avatares */
 .neuro__lisa-tinta { fill: #141A16; }
+.neuro__lisa-membro-contorno { fill: none; stroke: #141A16; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+.neuro__lisa-membro { fill: none; stroke: #FFDCC2; stroke-width: 3.6; stroke-linecap: round; stroke-linejoin: round; }
+.neuro__lisa-contorno { stroke: #141A16; stroke-width: 2.6; }
+.neuro__lisa-mao { fill: #FFDCC2; stroke: #141A16; stroke-width: 2.6; }
+.neuro__lisa-sapato { fill: #8B5A3C; stroke: #141A16; stroke-width: 2.6; }
+.neuro__lisa-roupa { fill: #22C55E; stroke: #141A16; stroke-width: 3; stroke-linejoin: round; }
+.neuro__lisa-gola { fill: none; stroke: #F7F3EA; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.neuro__lisa-pele { fill: #FFDCC2; }
+.neuro__lisa-cabelo { fill: #7A4A2A; }
+.neuro__lisa-prendedor { fill: #22C55E; }
+.neuro__lisa-lente { fill: #EEF5FC; }
+.neuro__lisa-brinco { fill: #FACC15; }
 .neuro__lisa-boca { fill: none; stroke: #141A16; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .neuro__lisa-bochecha { fill: #F9A8D4; opacity: 0.85; }
 .neuro__lisa-lagrima { fill: #60A5FA; }
