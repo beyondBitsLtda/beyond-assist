@@ -23,14 +23,21 @@ export const NOME_DO_REINO_DE_TESTE = "Reino de Teste";
 /**
  * Os rivais do mundo de teste: cinco reinos-robô, do mais fraco ao mais forte, para sempre haver
  * em quem atacar (os reinos de teste de outras pessoas aparecem também). Os ids são fixos — o
- * mesmo robô para todo mundo — e só existem nas tabelas de teste.
+ * mesmo robô para todo mundo — e só existem nas tabelas de teste. `oferta`: operários para
+ * alugar; `tropas`: anúncios no mercado de tropas (refeitos ao restaurar os rivais), para haver o
+ * que comprar no mundo de teste.
  */
 export const RIVAIS_DE_TESTE = [
-  { id: "7e57b070-0000-4000-8000-000000000001", nome: "Vila de Lata", dono: "🤖 Robô Lata", nivel: 1, trofeus: 20, oferta: { quantidade: 2, preco: 8 } },
-  { id: "7e57b070-0000-4000-8000-000000000002", nome: "Forte de Cobre", dono: "🤖 Robô Cobre", nivel: 2, trofeus: 150, oferta: { quantidade: 3, preco: 15 } },
-  { id: "7e57b070-0000-4000-8000-000000000003", nome: "Cidadela de Ferro", dono: "🤖 Robô Ferro", nivel: 3, trofeus: 320, oferta: { quantidade: 4, preco: 25 } },
-  { id: "7e57b070-0000-4000-8000-000000000004", nome: "Bastião de Aço", dono: "🤖 Robô Aço", nivel: 4, trofeus: 600, oferta: null },
-  { id: "7e57b070-0000-4000-8000-000000000005", nome: "Trono de Titânio", dono: "🤖 Robô Titânio", nivel: 5, trofeus: 1000, oferta: null },
+  { id: "7e57b070-0000-4000-8000-000000000001", nome: "Vila de Lata", dono: "🤖 Robô Lata", nivel: 1, trofeus: 20, oferta: { quantidade: 2, preco: 8 },
+    tropas: [{ tropa: "guerreiro", origem: "exercito", quantidade: 10, preco: 5 }] },
+  { id: "7e57b070-0000-4000-8000-000000000002", nome: "Forte de Cobre", dono: "🤖 Robô Cobre", nivel: 2, trofeus: 150, oferta: { quantidade: 3, preco: 15 },
+    tropas: [{ tropa: "arqueira", origem: "guarnicao", quantidade: 8, preco: 12 }] },
+  { id: "7e57b070-0000-4000-8000-000000000003", nome: "Cidadela de Ferro", dono: "🤖 Robô Ferro", nivel: 3, trofeus: 320, oferta: { quantidade: 4, preco: 25 },
+    tropas: [{ tropa: "gigante", origem: "exercito", quantidade: 3, preco: 60 }] },
+  { id: "7e57b070-0000-4000-8000-000000000004", nome: "Bastião de Aço", dono: "🤖 Robô Aço", nivel: 4, trofeus: 600, oferta: null,
+    tropas: [{ tropa: "mago", origem: "guarnicao", quantidade: 4, preco: 70 }] },
+  { id: "7e57b070-0000-4000-8000-000000000005", nome: "Trono de Titânio", dono: "🤖 Robô Titânio", nivel: 5, trofeus: 1000, oferta: null,
+    tropas: [{ tropa: "dragao", origem: "exercito", quantidade: 1, preco: 250 }] },
 ];
 export const rivalDeTeste = (id) => RIVAIS_DE_TESTE.find((r) => r.id === id) || null;
 export const ehRivalDeTeste = (id) => Boolean(rivalDeTeste(id));

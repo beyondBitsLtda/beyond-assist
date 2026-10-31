@@ -75,8 +75,12 @@ import {
 } from "../src/dominio/monstros.js";
 import { montarCombate, passo as passoDoCombate, resultadoDo, resolverCombate, raioDaIlha } from "../src/dominio/combate.js";
 import {
-  capacidadeDoExercito, capacidadeDaGuarnicao, podeTreinar, espacoUsado, somarTropas, contagens, totalDeTropas, lotacaoDoAcampamento,
+  capacidadeDoExercito, capacidadeDaGuarnicao, podeTreinar, podeReceber, espacoUsado, somarTropas, contagens, totalDeTropas, lotacaoDoAcampamento,
 } from "../src/dominio/tropas.js";
+import {
+  ANUNCIOS_POR_REINO, faixaDePreco, descontoSobreOTreino, podeAnunciar, podeComprarDoMercado, maximoParaComprar, podeRetirarAnuncio,
+  anuncioDepoisDaVenda, ordenarOfertas,
+} from "../src/dominio/mercadoDeTropas.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
 import { conferirChamado, tituloDoChamado, descricaoDoChamado } from "../src/dominio/chamado.js";
 import { montarRaioX, acertosDoQuiz, horaEmSaoPaulo } from "../src/dominio/raioX.js";
@@ -1052,6 +1056,82 @@ caso("lotação do Acampamento: exército + defesa juntos; lotado pede Acampamen
   assert.equal(podeTreinar({ tropa: "guerreiro", quantidade: 3, destino: "exercito", niveis: { ...niveis, acampamento: 2 }, reservas, saldo: 999 }).ok, true);
 });
 
+caso("mercado de tropas: o preço vai de 20% ao custo do treino; anunciar libera o espaço", () => {
+  assert.deepEqual(faixaDePreco("guerreiro"), { minimo: 2, maximo: 10, sugerido: 6 });
+  assert.deepEqual(faixaDePreco("dragao"), { minimo: 76, maximo: 380, sugerido: 228 });
+  assert.equal(descontoSobreOTreino("arqueira", 12), 40);
+  const reservas = { exercito: { gigante: 3, guerreiro: 10 }, guarnicao: { arqueira: 4 } };
+  assert.deepEqual(podeAnunciar({ tropa: "gigante", quantidade: 2, preco: 60, origem: "exercito", reservas }), { ok: true, quantidade: 2, preco: 60, libera: 10 });
+  assert.match(podeAnunciar({ tropa: "gigante", quantidade: 4, preco: 60, origem: "exercito", reservas }).motivo, /só 3 Gigante/);
+  assert.match(podeAnunciar({ tropa: "gigante", quantidade: 1, preco: 60, origem: "guarnicao", reservas }).motivo, /não há Gigante na defesa/);
+  assert.match(podeAnunciar({ tropa: "arqueira", quantidade: 1, preco: 21, origem: "guarnicao", reservas }).motivo, /de 4 a 20 moedas/, "nunca mais caro que treinar");
+  assert.match(podeAnunciar({ tropa: "arqueira", quantidade: 1, preco: 3, origem: "guarnicao", reservas }).motivo, /de 4 a 20/);
+  assert.match(podeAnunciar({ tropa: "arqueira", quantidade: 1, preco: 4.5, origem: "guarnicao", reservas }).motivo, /de 4 a 20/, "preço inteiro");
+  assert.match(podeAnunciar({ tropa: "arqueira", quantidade: 0, preco: 10, origem: "guarnicao", reservas }).motivo, /de 1 a 60/);
+  assert.match(podeAnunciar({ tropa: "arqueira", quantidade: 1, preco: 10, origem: "quartel", reservas }).motivo, /exército ou da defesa/);
+  assert.match(podeAnunciar({ tropa: "arqueira", quantidade: 1, preco: 10, origem: "guarnicao", reservas, abertos: ANUNCIOS_POR_REINO }).motivo, /já tem 10 anúncios/);
+});
+
+caso("mercado de tropas: comprar segue as regras do treino (sem o custo dele) e paga o preço do anúncio", () => {
+  const anuncio = { id: "a1", vendedor_id: "vendedor", tropa: "gigante", origem: "exercito", quantidade: 3, restante: 3, preco: 60, status: "aberta" };
+  const niveis = { quartel: 2, castelo: 2, acampamento: 1 };
+  const base = { anuncio, usuarioId: "eu", niveis, reservas: {}, saldo: 1000 };
+  assert.deepEqual(podeComprarDoMercado({ ...base, quantidade: 2, destino: "exercito" }), { ok: true, custo: 120, quantidade: 2 });
+  assert.match(podeComprarDoMercado({ ...base, usuarioId: "vendedor", quantidade: 1, destino: "exercito" }).motivo, /são suas/);
+  assert.match(podeComprarDoMercado({ ...base, quantidade: 4, destino: "exercito" }).motivo, /só sobraram 3/);
+  assert.match(podeComprarDoMercado({ ...base, quantidade: 1, destino: "exercito", niveis: { quartel: 1, castelo: 2 } }).motivo, /Quartel no nível 2/, "a tropa pede o nível da construção");
+  assert.match(podeComprarDoMercado({ ...base, quantidade: 1, destino: "exercito", niveis: { quartel: 0, castelo: 2 } }).motivo, /construa o Quartel/);
+  assert.equal(podeComprarDoMercado({ ...base, quantidade: 1, destino: "guarnicao" }).ok, true, "o gigante defende");
+  assert.match(podeComprarDoMercado({ ...base, anuncio: { ...anuncio, tropa: "balao" }, niveis: { quartel: 5, castelo: 5 }, quantidade: 1, destino: "guarnicao" }).motivo, /não serve para defesa/);
+  assert.match(podeComprarDoMercado({ ...base, quantidade: 1, destino: "exercito", reservas: { exercito: { guerreiro: 28 } } }).motivo, /só cabe mais 2/, "o espaço do exército");
+  assert.match(podeComprarDoMercado({ ...base, quantidade: 1, destino: "guarnicao", reservas: { exercito: { guerreiro: 30 }, guarnicao: { arqueira: 7 } } }).motivo, /Acampamento está lotado/);
+  assert.match(podeComprarDoMercado({ ...base, quantidade: 2, destino: "exercito", saldo: 100 }).motivo, /faltam 20/);
+  assert.match(podeComprarDoMercado({ ...base, anuncio: { ...anuncio, status: "retirada" }, quantidade: 1, destino: "exercito" }).motivo, /vendido ou retirado/);
+  assert.match(podeComprarDoMercado({ ...base, anuncio: null, quantidade: 1, destino: "exercito" }).motivo, /vendido ou retirado/);
+  // o máximo de agora: o que cabe e o que o saldo paga
+  assert.deepEqual(maximoParaComprar({ ...base, destino: "exercito" }), { maximo: 3, motivo: "" });
+  assert.deepEqual(maximoParaComprar({ ...base, destino: "exercito", saldo: 130 }), { maximo: 2, motivo: "" });
+  assert.equal(maximoParaComprar({ ...base, destino: "guarnicao" }).maximo, 2, "a defesa da Torre nível 2 tem 12 de espaço");
+  assert.match(maximoParaComprar({ ...base, destino: "exercito", saldo: 10 }).motivo, /faltam 50/);
+  // vender parte deixa o anúncio aberto; vender tudo fecha
+  assert.deepEqual(anuncioDepoisDaVenda(anuncio, 2), { restante: 1, status: "aberta" });
+  assert.deepEqual(anuncioDepoisDaVenda(anuncio, 3), { restante: 0, status: "vendida" });
+});
+
+caso("mercado de tropas: retirar devolve à reserva de origem, se couber; a vitrine sai na ordem das tropas e do preço", () => {
+  const anuncio = { id: "a1", vendedor_id: "eu", tropa: "arqueira", origem: "guarnicao", quantidade: 5, restante: 4, preco: 10, status: "aberta" };
+  const niveis = { quartel: 1, castelo: 1, acampamento: 1 };
+  assert.deepEqual(podeRetirarAnuncio({ anuncio, usuarioId: "eu", niveis, reservas: {} }), { ok: true, quantidade: 4 });
+  assert.match(podeRetirarAnuncio({ anuncio, usuarioId: "outro", niveis, reservas: {} }).motivo, /não é seu/);
+  assert.match(podeRetirarAnuncio({ anuncio, usuarioId: "eu", niveis, reservas: { guarnicao: { guerreiro: 6 } } }).motivo, /não cabem de volta: só cabe mais 2/);
+  assert.match(podeRetirarAnuncio({ anuncio: { ...anuncio, status: "vendida", restante: 0 }, usuarioId: "eu", niveis, reservas: {} }).motivo, /vendido ou retirado/);
+  const vitrine = ordenarOfertas([
+    { id: "d", tropa: "dragao", preco: 200, criado_em: "2026-10-30T10:00:00Z" },
+    { id: "g2", tropa: "guerreiro", preco: 8, criado_em: "2026-10-30T09:00:00Z" },
+    { id: "g1", tropa: "guerreiro", preco: 5, criado_em: "2026-10-30T11:00:00Z" },
+    { id: "g3", tropa: "guerreiro", preco: 8, criado_em: "2026-10-30T08:00:00Z" },
+  ]);
+  assert.deepEqual(vitrine.map((o) => o.id), ["g1", "g3", "g2", "d"]);
+  // o treino continua igual depois de ganhar o podeReceber
+  assert.deepEqual(podeReceber({ tropa: "guerreiro", quantidade: 3, destino: "exercito", niveis, reservas: {} }), { ok: true, quantidade: 3 });
+  assert.deepEqual(podeTreinar({ tropa: "guerreiro", quantidade: 3, destino: "exercito", niveis, reservas: {}, saldo: 30 }), { ok: true, custo: 30, quantidade: 3 });
+});
+
+caso("mercado de tropas: os anúncios dos robôs de teste respeitam as regras, e a migração 021 só acrescenta tipos", () => {
+  for (const r of RIVAIS_DE_TESTE) {
+    for (const t of r.tropas || []) {
+      const pode = podeAnunciar({ ...t, reservas: { [t.origem]: { [t.tropa]: t.quantidade } } });
+      assert.equal(pode.ok, true, `${r.nome}: ${pode.motivo}`);
+    }
+  }
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const tipos = (sql) => [...sql.match(/proof_reino_movimentos_tipo_check\s+check \(tipo in \(([\s\S]*?)\)\)/)[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  const antes = tipos(ler("../db/020-biblioteca-colaborativa.sql"));
+  const agora = tipos(ler("../db/021-mercado-de-tropas.sql"));
+  for (const t of antes) assert.ok(agora.includes(t), `o tipo ${t} continua`);
+  for (const t of ["mercado_compra", "mercado_venda"]) assert.ok(agora.includes(t), `entra o tipo ${t}`);
+});
+
 caso("dicas da Lisa: o guia do projeto precisa de passo a passo; o resto é limpo e limitado", () => {
   const guia = validarGuia({ passos: ["Crie o repositório", " ", "Monte as pastas", "Implemente o requisito 1"], dicas: ["Teste cada rota", 42], estudar: ["HTTP", "x".repeat(300)] });
   assert.deepEqual(guia.passos, ["Crie o repositório", "Monte as pastas", "Implemente o requisito 1"]);
@@ -1646,8 +1726,8 @@ caso("Reino de Teste: o código do reino e da bolsa só fala com o banco pelo mu
     assert.ok(!/\bsupabase\./.test(src), `${arquivo}: fala com o banco direto (use db.from)`);
     for (const t of tabelas) assert.ok(!src.includes(`buscarEmLotes("${t}"`), `${arquivo}: buscarEmLotes("${t}") sem tabela()`);
   }
-  // cada tabela do jogo tem a gêmea de teste na migração
-  const migracao = ler("../db/016-mundo-de-teste.sql");
+  // cada tabela do jogo tem a gêmea de teste numa migração (a 016 criou as primeiras; as tabelas novas trazem a sua)
+  const migracao = fs.readdirSync(new URL("../db/", import.meta.url)).filter((f) => f >= "016" && f.endsWith(".sql")).map((f) => ler(`../db/${f}`)).join("\n");
   for (const t of tabelas) assert.ok(migracao.includes(`${t.replace(/^proof_/, "proof_teste_")} `) && migracao.includes(`like public.${t} `), `gêmea de ${t}`);
 });
 

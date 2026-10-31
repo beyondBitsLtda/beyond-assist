@@ -24,7 +24,7 @@ import { ErroDeAcesso, respostaDeErro } from "./sessao.js";
 /** As tabelas que cada mundo tem a sua: o reino, o livro-caixa, as batalhas, a paz, os operários e a carteira da bolsa. */
 export const TABELAS_DO_MUNDO = [
   "proof_reinos", "proof_reino_movimentos", "proof_invasoes", "proof_expedicoes", "proof_pazes", "proof_paz_votos",
-  "proof_operarios_ofertas", "proof_alugueis", "proof_bolsa_posicoes", "proof_bolsa_ordens",
+  "proof_operarios_ofertas", "proof_alugueis", "proof_bolsa_posicoes", "proof_bolsa_ordens", "proof_mercado_tropas",
 ];
 const DO_MUNDO = new Set(TABELAS_DO_MUNDO);
 const contexto = new AsyncLocalStorage();

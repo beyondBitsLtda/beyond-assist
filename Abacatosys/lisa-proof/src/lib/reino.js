@@ -46,6 +46,9 @@ import {
   TROPAS, ORDEM_DAS_TROPAS, RESERVAS, contagens, espacoUsado, capacidadeDoExercito, capacidadeDaGuarnicao,
   podeTreinar, somarTropas, heroiNeuro, lotacaoDoAcampamento, totalDeTropas,
 } from "@/dominio/tropas.js";
+import {
+  descontoSobreOTreino, podeAnunciar, podeComprarDoMercado, maximoParaComprar, podeRetirarAnuncio, anuncioDepoisDaVenda, ordenarOfertas,
+} from "@/dominio/mercadoDeTropas.js";
 import { PERSONAGENS, ORDEM_DOS_PERSONAGENS, ORDEM_DOS_CHEFOES, personagensDe, podeEscolherPersonagem } from "@/dominio/personagens.js";
 import { encaixarTropas, veiculoDoPremio, valorDasTropas, MOEDAS_NO_LUGAR } from "@/dominio/modoDominio.js";
 import {
@@ -1112,6 +1115,182 @@ export async function alugarOperarios(usuarioId, donoId, quantidade) {
   return { quantidade: pode.quantidade, custo: pode.custo, ate: periodo.fim, reino: donoR.data.nome };
 }
 
+// ---------------------------------------------------------------- o mercado de tropas (30/10/2026)
+// As regras moram em src/dominio/mercadoDeTropas.js. O anúncio É a tropa fora do reino, então a
+// ordem de cada operação garante que ela nunca exista em dois lugares:
+//   anunciar — tira do reino (trava de versão) e só então cria o anúncio; se o anúncio falhar, volta.
+//   comprar  — desconta do anúncio por "compare e troque" (só grava se o restante ainda é o que eu
+//              li), lança a compra e a venda e grava o meu reino com a versão; qualquer falha
+//              desfaz os lançamentos e devolve as tropas ao anúncio.
+//   retirar  — fecha o anúncio (compare e troque) e põe as tropas de volta no reino; se o reino
+//              perder a corrida, o anúncio reabre.
+
+const CAMPOS_DO_ANUNCIO = "id, vendedor_id, tropa, origem, quantidade, restante, preco, status, criado_em";
+const reservasDe = (reino) => ({ exercito: reino.exercito, guarnicao: reino.guarnicao });
+
+/** Devolve `quantidade` tropas a um anúncio (o desfazer da compra e da retirada). Reabre o anúncio, se precisar. */
+async function devolverAoAnuncio(anuncioId, quantidade) {
+  for (let i = 0; i < 5; i++) {
+    const { data: a, error } = await db.from("proof_mercado_tropas").select("restante, status").eq("id", anuncioId).maybeSingle();
+    falhou(error, "anúncio");
+    if (!a) return;
+    const { data } = await db.from("proof_mercado_tropas")
+      .update({ restante: a.restante + quantidade, status: "aberta", atualizado_em: new Date().toISOString() })
+      .eq("id", anuncioId).eq("restante", a.restante).eq("status", a.status).select("id");
+    if ((data || []).length) return;
+  }
+  throw new ErroDeAcesso(500, "não consegui devolver as tropas ao anúncio — avise o administrador");
+}
+
+/** Põe tropas de volta numa reserva sem conferir espaço (só para desfazer um anúncio que não nasceu). */
+async function devolverAoReino(usuarioId, destino, tropas) {
+  for (let i = 0; i < 4; i++) {
+    const reino = await obterReino(usuarioId);
+    if (await gravarReino(reino, { [destino]: somarTropas(reino[destino], tropas) })) return;
+  }
+  throw new ErroDeAcesso(500, "não consegui devolver as tropas ao reino — avise o administrador");
+}
+
+/** Pôr tropas à venda: elas saem na hora da reserva (o espaço fica livre) e esperam comprador. */
+export async function anunciarTropas(usuarioId, { tropa, quantidade, preco, origem }) {
+  const reino = await obterReino(usuarioId);
+  const { count, error } = await db.from("proof_mercado_tropas").select("id", { count: "exact", head: true })
+    .eq("vendedor_id", usuarioId).eq("status", "aberta");
+  falhou(error, "anúncios");
+  const pode = podeAnunciar({ tropa, quantidade, preco, origem, reservas: reservasDe(reino), abertos: count || 0 });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+
+  const saem = { [tropa]: pode.quantidade };
+  if (!(await gravarReino(reino, { [origem]: somarTropas(reino[origem], saem, -1) }))) throw conflito();
+  const ins = await db.from("proof_mercado_tropas").insert({
+    vendedor_id: usuarioId, tropa, origem, quantidade: pode.quantidade, restante: pode.quantidade, preco: pode.preco,
+  }).select("id").single();
+  if (ins.error) {
+    await devolverAoReino(usuarioId, origem, saem);
+    falhou(ins.error, "anúncio");
+  }
+  return { id: ins.data.id, tropa, nome: TROPAS[tropa].nome, emoji: TROPAS[tropa].emoji, quantidade: pode.quantidade, preco: pode.preco, libera: pode.libera, origem: RESERVAS[origem] };
+}
+
+/** Comprar tropas de um anúncio para o meu exército ou a minha defesa. */
+export async function comprarDoMercado(usuarioId, anuncioId, { quantidade, destino }) {
+  if (!anuncioId || typeof anuncioId !== "string") throw new ErroDeAcesso(400, "qual anúncio?");
+  const eu = await obterReino(usuarioId);
+  const [saldo, anuncioR] = await Promise.all([
+    saldoDoUsuario(usuarioId),
+    db.from("proof_mercado_tropas").select(CAMPOS_DO_ANUNCIO).eq("id", anuncioId).maybeSingle(),
+  ]);
+  falhou(anuncioR.error, "anúncio");
+  const anuncio = anuncioR.data;
+  const pode = podeComprarDoMercado({ anuncio, usuarioId, quantidade: Number(quantidade), destino, niveis: niveisDe(eu), reservas: reservasDe(eu), saldo });
+  if (!pode.ok) throw new ErroDeAcesso(anuncio ? 400 : 404, pode.motivo);
+
+  // 1. as tropas saem do anúncio — só se ninguém comprou nem retirou desde que eu li
+  const separou = await db.from("proof_mercado_tropas")
+    .update({ ...anuncioDepoisDaVenda(anuncio, pode.quantidade), atualizado_em: new Date().toISOString() })
+    .eq("id", anuncio.id).eq("status", "aberta").eq("restante", anuncio.restante).select("id");
+  falhou(separou.error, "anúncio");
+  if (!(separou.data || []).length) throw new ErroDeAcesso(409, "alguém mexeu nesse anúncio agora há pouco — atualize a tela");
+
+  // 2. eu pago, o vendedor recebe, e as tropas entram no meu reino (a versão trava o meu saldo)
+  const lote = { anuncio: anuncio.id, tropa: anuncio.tropa, quantidade: pode.quantidade, preco: anuncio.preco };
+  const ids = [];
+  try {
+    ids.push(await lancar(usuarioId, "mercado_compra", -pode.custo, { ...lote, vendedor: anuncio.vendedor_id, destino }));
+    ids.push(await lancar(anuncio.vendedor_id, "mercado_venda", pode.custo, { ...lote, comprador: usuarioId }));
+    if (!(await gravarReino(eu, { [destino]: somarTropas(eu[destino], { [anuncio.tropa]: pode.quantidade }) }))) throw conflito();
+  } catch (e) {
+    await desfazerLancamentos(ids);
+    await devolverAoAnuncio(anuncio.id, pode.quantidade);
+    throw e;
+  }
+  const [reinoDoVendedor] = await buscarEmLotes(tabela("proof_reinos"), "usuario_id, nome", "usuario_id", [anuncio.vendedor_id]);
+  return {
+    tropa: anuncio.tropa, nome: TROPAS[anuncio.tropa].nome, emoji: TROPAS[anuncio.tropa].emoji, quantidade: pode.quantidade,
+    custo: pode.custo, destino: RESERVAS[destino], reino: reinoDoVendedor?.nome || "outro reino",
+  };
+}
+
+/** O vendedor retira o que sobrou do anúncio: as tropas voltam para a reserva de onde saíram. */
+export async function retirarAnuncio(usuarioId, anuncioId) {
+  if (!anuncioId || typeof anuncioId !== "string") throw new ErroDeAcesso(400, "qual anúncio?");
+  const reino = await obterReino(usuarioId);
+  const { data: anuncio, error } = await db.from("proof_mercado_tropas").select(CAMPOS_DO_ANUNCIO).eq("id", anuncioId).maybeSingle();
+  falhou(error, "anúncio");
+  const pode = podeRetirarAnuncio({ anuncio, usuarioId, niveis: niveisDe(reino), reservas: reservasDe(reino) });
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+
+  const fechou = await db.from("proof_mercado_tropas")
+    .update({ restante: 0, status: "retirada", atualizado_em: new Date().toISOString() })
+    .eq("id", anuncio.id).eq("vendedor_id", usuarioId).eq("status", "aberta").eq("restante", anuncio.restante).select("id");
+  falhou(fechou.error, "anúncio");
+  if (!(fechou.data || []).length) throw new ErroDeAcesso(409, "alguém comprou desse anúncio agora há pouco — atualize a tela");
+  if (!(await gravarReino(reino, { [anuncio.origem]: somarTropas(reino[anuncio.origem], { [anuncio.tropa]: pode.quantidade }) }))) {
+    await devolverAoAnuncio(anuncio.id, pode.quantidade);
+    throw conflito();
+  }
+  return { tropa: anuncio.tropa, nome: TROPAS[anuncio.tropa].nome, emoji: TROPAS[anuncio.tropa].emoji, quantidade: pode.quantidade, origem: RESERVAS[anuncio.origem] };
+}
+
+/**
+ * O mercado como a tela mostra: as ofertas dos outros reinos (com quanto dá para comprar para o
+ * exército e para a defesa agora), os meus anúncios abertos e as minhas vendas recentes.
+ */
+export async function mercadoDeTropas(usuarioId) {
+  const eu = await obterReino(usuarioId);
+  // no Reino de Teste, os robôs sempre têm o que vender (quem comprou tudo acha a vitrine cheia de novo)
+  if (emTeste()) {
+    const { count } = await db.from("proof_mercado_tropas").select("id", { count: "exact", head: true })
+      .eq("status", "aberta").in("vendedor_id", RIVAIS_DE_TESTE.map((r) => r.id));
+    if (!count) for (const r of RIVAIS_DE_TESTE) await anunciosDoRival(r);
+  }
+  const [ofertasR, meusR, vendasR, saldo] = await Promise.all([
+    db.from("proof_mercado_tropas").select(CAMPOS_DO_ANUNCIO).eq("status", "aberta").neq("vendedor_id", usuarioId)
+      .order("preco").order("criado_em").limit(80),
+    db.from("proof_mercado_tropas").select(CAMPOS_DO_ANUNCIO).eq("vendedor_id", usuarioId).eq("status", "aberta")
+      .order("criado_em", { ascending: false }),
+    db.from("proof_reino_movimentos").select("id, valor, detalhe, criado_em").eq("usuario_id", usuarioId).eq("tipo", "mercado_venda")
+      .order("criado_em", { ascending: false }).limit(8),
+    saldoDoUsuario(usuarioId),
+  ]);
+  falhou(ofertasR.error, "mercado de tropas");
+  falhou(meusR.error, "meus anúncios");
+  falhou(vendasR.error, "vendas");
+  const ofertas = ordenarOfertas(ofertasR.data || []);
+  const vendas = vendasR.data || [];
+  const vendedores = [...new Set(ofertas.map((o) => o.vendedor_id))];
+  const [reinos, nomes] = await Promise.all([
+    buscarEmLotes(tabela("proof_reinos"), "usuario_id, nome", "usuario_id", vendedores),
+    nomesPublicos([...vendedores, ...vendas.map((v) => v.detalhe?.comprador)]),
+  ]);
+  const reinoDe = new Map(reinos.map((r) => [r.usuario_id, r.nome]));
+  const niveis = niveisDe(eu), reservas = reservasDe(eu);
+  const daTropa = (t) => ({ tropa: t, nome: TROPAS[t]?.nome || t, emoji: TROPAS[t]?.emoji || "❔", espaco: TROPAS[t]?.espaco || 0 });
+  return {
+    ofertas: ofertas.map((o) => {
+      const exercito = maximoParaComprar({ anuncio: o, usuarioId, destino: "exercito", niveis, reservas, saldo });
+      const guarnicao = maximoParaComprar({ anuncio: o, usuarioId, destino: "guarnicao", niveis, reservas, saldo });
+      return {
+        id: o.id, ...daTropa(o.tropa), quantidade: o.restante, preco: o.preco, desconto: descontoSobreOTreino(o.tropa, o.preco),
+        reino: reinoDe.get(o.vendedor_id) || "Reino", vendedor: nomes.get(o.vendedor_id) || "Estudante anônimo",
+        maximo: { exercito: exercito.maximo, guarnicao: guarnicao.maximo },
+        motivo: { exercito: exercito.motivo, guarnicao: guarnicao.motivo },
+      };
+    }),
+    meus: (meusR.data || []).map((a) => {
+      const volta = podeRetirarAnuncio({ anuncio: a, usuarioId, niveis, reservas });
+      return {
+        id: a.id, ...daTropa(a.tropa), origem: a.origem, quantidade: a.quantidade, restante: a.restante, vendidas: a.quantidade - a.restante,
+        preco: a.preco, criadoEm: a.criado_em, podeRetirar: volta.ok, motivo: volta.ok ? "" : volta.motivo,
+      };
+    }),
+    vendas: vendas.map((v) => ({
+      id: v.id, quando: v.criado_em, valor: Number(v.valor) || 0, ...daTropa(v.detalhe?.tropa), quantidade: v.detalhe?.quantidade || 0,
+      comprador: nomes.get(v.detalhe?.comprador) || "Estudante anônimo",
+    })),
+  };
+}
+
 // ---------------------------------------------------------------- visitar um reino vizinho (na paz)
 
 /** A visão completa de outro reino: só na paz, quando todos os reinos são vizinhos. */
@@ -1175,7 +1354,7 @@ async function garantirRivais() {
   for (const { usuario_id: id } of novos || []) await prepararRival(rivalDeTeste(id));
 }
 
-/** O cofre do robô cheio de novo e a oferta de operários dele no mercado. */
+/** O cofre do robô cheio de novo, a oferta de operários dele e os anúncios de tropas no mercado. */
 async function prepararRival(rival) {
   const saldo = await saldoDoUsuario(rival.id);
   if (saldo < SALDO_DOS_RIVAIS) await lancar(rival.id, "teste", centavos(SALDO_DOS_RIVAIS - saldo), { rival: true });
@@ -1185,6 +1364,17 @@ async function prepararRival(rival) {
     );
     falhou(error, "oferta do rival");
   }
+  await anunciosDoRival(rival);
+}
+
+/** Os anúncios de tropas do robô: ele anuncia direto (as tropas dele não saem de reserva nenhuma), e o que acabou volta cheio. */
+async function anunciosDoRival(rival) {
+  if (!rival.tropas?.length) return;
+  const { data: abertos, error } = await db.from("proof_mercado_tropas").select("tropa").eq("vendedor_id", rival.id).eq("status", "aberta");
+  falhou(error, "anúncios do rival");
+  const tem = new Set((abertos || []).map((a) => a.tropa));
+  const novos = rival.tropas.filter((t) => !tem.has(t.tropa)).map((t) => ({ vendedor_id: rival.id, ...t, restante: t.quantidade }));
+  if (novos.length) falhou((await db.from("proof_mercado_tropas").insert(novos)).error, "anúncios do rival");
 }
 
 /** Trava a mais: o que apaga ou dá coisas de graça só roda com as tabelas de teste na mão. */
@@ -1206,6 +1396,7 @@ async function apagarReinoDeTeste(usuarioId) {
     db.from("proof_operarios_ofertas").delete().eq("dono_id", usuarioId),
     db.from("proof_alugueis").delete().or(`dono_id.eq.${usuarioId},inquilino_id.eq.${usuarioId}`),
     db.from("proof_paz_votos").delete().eq("usuario_id", usuarioId),
+    db.from("proof_mercado_tropas").delete().eq("vendedor_id", usuarioId),
   ]);
   for (const r of apagados) falhou(r.error, "apagar o reino de teste");
   const { error } = await db.from("proof_reinos").delete().eq("usuario_id", usuarioId);

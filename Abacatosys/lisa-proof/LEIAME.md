@@ -331,6 +331,34 @@ continua com ele.
 - Servidor: `src/lib/acervo.js` e as rotas em `/api/acervo`.
 - Tela: `src/componentes/acervo/`.
 
+## Mercado de tropas
+
+Pedido de 30/10/2026: vender tropas do exército ou da defesa para liberar espaço, e os outros
+jogadores comprarem.
+
+- **Anunciar.** O botão **💱 Vender** de cada tropa abre a folha de venda (quantas e o preço por
+  tropa). As tropas anunciadas **saem na hora** da reserva: o espaço e a lotação do Acampamento
+  ficam livres, e elas não lutam mais por ninguém até alguém comprar. O preço vai de 20% ao custo
+  do treino (`faixaDePreco`): ninguém paga mais do que pagaria para treinar, e moeda não se
+  multiplica. Até 10 anúncios abertos por reino e 60 tropas por anúncio.
+- **Comprar.** Quem compra escolhe se vão para o exército ou para a defesa e segue as mesmas
+  regras do treino (`podeReceber`, em `src/dominio/tropas.js`): a construção no nível da tropa, o
+  espaço da reserva e a lotação do Acampamento. Dá para comprar só parte do anúncio. O vendedor
+  recebe na hora (`mercado_venda` no livro-caixa; quem compra lança `mercado_compra`).
+- **Retirar.** O que não foi vendido volta para a reserva de onde saiu, se ainda couber.
+- **Dinheiro em dobro e tropa em dobro.** O anúncio é a tropa fora do reino, então a ordem importa:
+  anunciar tira do reino (trava de versão) antes de criar o anúncio; comprar desconta do anúncio
+  por "compare e troque" (só grava se o `restante` ainda é o que foi lido) antes de pagar; qualquer
+  falha depois disso desfaz os lançamentos e devolve as tropas ao anúncio.
+- **Reino de Teste.** A tabela tem a gêmea `proof_teste_mercado_tropas`, e os reinos-robô anunciam
+  tropas (`RIVAIS_DE_TESTE[].tropas`), refeitas quando a vitrine fica sem nenhuma.
+- **Limite do Worker.** O POST de `/api/reino/mercado` devolve só o reino; a tela pede o mercado de
+  novo pelo GET (os dois juntos chegariam perto das 50 chamadas de rede por requisição).
+
+**Arquivos.** Banco: `db/021-mercado-de-tropas.sql`. Regras: `src/dominio/mercadoDeTropas.js`.
+Servidor: `src/lib/reino.js` (seção "o mercado de tropas") e `/api/reino/mercado`. Tela:
+`src/componentes/reino/MercadoDeTropas.js`.
+
 ## Onde as coisas moram
 
 | Caminho | O quê |

@@ -568,6 +568,16 @@ button.rn-exp__arte:disabled { cursor: progress; }
 .rn-mercado__quem small { color: var(--pf-tinta-2); }
 .rn-mercado__preco small { color: var(--pf-tinta-2); font-size: 12px; }
 
+/* ---- o mercado de tropas */
+.rn-mt__destino { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rn-mt__destino .rn-dias__opcao { min-height: 36px; padding: 0 12px; }
+.rn-mt__emoji { font-size: 22px; line-height: 1; }
+.rn-mt__desconto { margin-left: 6px; font-size: 11px; }
+.rn-mt__botoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.rn-mt__motivo { flex: 1 1 100%; }
+.rn-mt__resumo { margin: 4px 0; padding-left: 18px; display: grid; gap: 2px; font-size: 14px; }
+.rn-tropa__vender { margin-left: auto; }
+
 /* ---- a bolsa */
 .rn-bolsa__manchete { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; border-left: 4px solid var(--pf-verde); }
 .rn-bolsa__manchete span { font-size: 22px; }

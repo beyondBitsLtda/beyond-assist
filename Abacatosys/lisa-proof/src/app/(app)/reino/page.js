@@ -25,6 +25,8 @@ import Folha from "@/componentes/Folha.js";
 import { numero, hora, Moedas, Botao } from "@/componentes/reino/pecas.js";
 import Garagem, { Tanque } from "@/componentes/reino/Garagem.js";
 import MinaDeOuro from "@/componentes/reino/MinaDeOuro.js";
+import MercadoDeTropas, { VenderTropas } from "@/componentes/reino/MercadoDeTropas.js";
+import { ANUNCIOS_POR_REINO } from "@/dominio/mercadoDeTropas.js";
 import ResumoDaBolsa from "@/componentes/bolsa/Resumo.js";
 import Visita from "@/componentes/reino/Visita.js";
 import TelaCheia from "@/componentes/reino/TelaCheia.js";
@@ -63,6 +65,8 @@ export default function Reino() {
   const [resultadoExp, setResultadoExp] = useState(null);
   const [bolsa, setBolsa] = useState(null);
   const [mercado, setMercado] = useState(null); // operários dos outros reinos para alugar
+  const [mercadoDeTropas, setMercadoDeTropas] = useState(null); // tropas à venda, os meus anúncios e as minhas vendas
+  const [vendendo, setVendendo] = useState(null); // a folha de vender: { origem, tropa }
   const [veiculoDoMapa, setVeiculoDoMapa] = useState("barco");
   const [telaCheia, setTelaCheia] = useState(false);
   const [painel, setPainel] = useState(null); // o menu aberto na tela cheia
@@ -75,6 +79,7 @@ export default function Reino() {
 
   const carregarMapa = () => obter(api("/api/reino/expedicoes")).then(setMapa).catch(() => {});
   const carregarMercado = () => obter(api("/api/reino/operarios")).then((r) => setMercado(r.ofertas)).catch(() => {});
+  const carregarMercadoDeTropas = () => obter(api("/api/reino/mercado")).then((r) => setMercadoDeTropas(r.mercado)).catch(() => {});
   /** A bolsa: no primeiro acesso do dia a Lisa abre o pregão; enquanto ela abre, confere de novo. */
   function carregarBolsa() {
     obter(api("/api/reino/bolsa")).then((b) => {
@@ -90,6 +95,7 @@ export default function Reino() {
     obter(api("/api/reino/alvos")).then(setAlvos).catch(() => {});
     carregarMapa();
     carregarMercado();
+    carregarMercadoDeTropas();
     carregarBolsa();
     const aoResgatar = () => obter(api("/api/reino")).then(setReino).catch(() => {});
     window.addEventListener("proof-vale-resgatado", aoResgatar);
@@ -101,7 +107,7 @@ export default function Reino() {
   // chegou pelo atalho das novidades (/reino#expedicoes): a seção só existe depois que tudo carrega
   const pronto = Boolean(reino && mapa);
   useEffect(() => {
-    const alvo = ["#expedicoes", "#paz", "#garagem", "#mina-de-ouro", "#bolsa"].includes(window.location.hash) ? window.location.hash.slice(1) : null;
+    const alvo = ["#expedicoes", "#paz", "#garagem", "#mina-de-ouro", "#bolsa", "#mercado-de-tropas"].includes(window.location.hash) ? window.location.hash.slice(1) : null;
     if (pronto && alvo) document.getElementById(alvo)?.scrollIntoView({ block: "start" });
   }, [pronto]);
 
@@ -170,6 +176,38 @@ export default function Reino() {
   const ofertar = ({ quantidade, preco }) => agir("ofertar", { acao: "ofertar", quantidade, preco },
     (r) => avisar(r.quantidade ? `Oferta salva: ${r.quantidade} operário(s) a 🪙 ${r.preco} cada` : "Oferta retirada"));
   const coletarMina = () => agir("coletar", { acao: "coletar" }, (r) => reagir("feliz", `+${r.coletou} moedas da mina!`));
+
+  /** O mercado de tropas: anunciar, comprar e retirar. O servidor devolve o reino; o mercado vem num pedido à parte. */
+  async function agirNoMercado(chave, corpo, aoTerminar) {
+    setOcupado(chave);
+    try {
+      const r = await criar(api("/api/reino/mercado"), corpo);
+      setReino(r.reino);
+      aoTerminar?.(r.resultado);
+      if (alvos) carregarAlvos(); // o exército mudou: o meu ataque também
+    } catch (e) {
+      avisar(e.message);
+      reagir("triste", "Ops, não deu certo dessa vez.");
+    } finally {
+      carregarMercadoDeTropas();
+      setOcupado("");
+    }
+  }
+  const venderTropas = (venda) => agirNoMercado("mercado:anunciar", { acao: "anunciar", ...venda }, (r) => {
+    setVendendo(null);
+    reagir("feliz", `${r.quantidade} ${r.emoji} ${r.nome} à venda — ${r.libera} de espaço livre!`, 3500);
+  });
+  const comprarTropas = (oferta, quantidade, destino) => agirNoMercado(`mercado:comprar:${oferta.id}`, { acao: "comprar", anuncio: oferta.id, quantidade, destino },
+    (r) => comemorar(`+${r.quantidade} ${r.emoji} ${r.nome} de ${r.reino} ${destino === "exercito" ? "no exército" : "na defesa"}!`));
+  const retirarAnuncio = (a) => agirNoMercado(`mercado:retirar:${a.id}`, { acao: "retirar", anuncio: a.id },
+    (r) => reagir("feliz", `${r.quantidade} ${r.emoji} ${r.nome} de volta para casa`, 3000));
+  function abrirVenda(origem, tropa) {
+    if ((mercadoDeTropas?.meus.length || 0) >= ANUNCIOS_POR_REINO) {
+      avisar(`Você já tem ${ANUNCIOS_POR_REINO} anúncios no mercado — retire um ou espere vender.`);
+      return;
+    }
+    setVendendo({ origem, tropa });
+  }
   const verExpedicoes = (id) => { setVeiculoDoMapa(id); mostrarSecao("expedicoes"); };
 
   /** As ferramentas do Reino de Teste: mexem só no mundo de teste; depois tudo é recarregado. */
@@ -184,6 +222,7 @@ export default function Reino() {
         avisar(`🧪 ${r.resultado.mensagem}`);
         carregarMapa();
         carregarMercado();
+        carregarMercadoDeTropas();
         carregarBolsa();
         carregarAlvos();
         setOcupado("");
@@ -382,8 +421,9 @@ export default function Reino() {
             <p className="pf-estat__nota">Fora da batalha, todas as tropas (exército + defesa) ficam à vista na ilhota do Acampamento, ao lado do reino. Lotado? Aumente o ⛺ Acampamento: cada nível abre +25 de espaço.</p>
           </div>
         )}
-        <Reserva destino="exercito" dados={reino.exercito} heroi={reino.heroi.ataque} ocupado={ocupado} aoTreinar={treinar} />
-        <Reserva destino="guarnicao" dados={reino.guarnicao} heroi={reino.heroi.defesa} ocupado={ocupado} aoTreinar={treinar} />
+        <Reserva destino="exercito" dados={reino.exercito} heroi={reino.heroi.ataque} ocupado={ocupado} aoTreinar={treinar} aoVender={abrirVenda} />
+        <Reserva destino="guarnicao" dados={reino.guarnicao} heroi={reino.heroi.defesa} ocupado={ocupado} aoTreinar={treinar} aoVender={abrirVenda} />
+        <MercadoDeTropas mercado={mercadoDeTropas} ocupado={ocupado} aoComprar={comprarTropas} aoRetirar={retirarAnuncio} />
       </>
     ),
     construcoes: () => (
@@ -593,6 +633,7 @@ export default function Reino() {
           if (r.resultado?.resultado === "aprovada") comemorar("A paz foi aprovada! 🕊️");
           else reagir("feliz", "Proposta de paz levada para votação! 🗳️", 4000);
         })} />
+      <VenderTropas venda={vendendo} ocupado={ocupado} aoFechar={() => setVendendo(null)} aoVender={venderTropas} />
       {Aviso}
     </>
   );
@@ -676,8 +717,8 @@ function assistirNaIlha({ entrada, papel, resultado, titulo, aoTerminar }) {
   return Boolean(detail.aceito);
 }
 
-/** Exército (Quartel) ou tropas de defesa (Torre do Neuro): o que tem e o que dá para treinar. */
-function Reserva({ destino, dados, heroi, ocupado, aoTreinar }) {
+/** Exército (Quartel) ou tropas de defesa (Torre do Neuro): o que tem, o que dá para treinar e o vender (mercado de tropas). */
+function Reserva({ destino, dados, heroi, ocupado, aoTreinar, aoVender }) {
   const exercito = destino === "exercito";
   return (
     <section className="pf-secao" id={exercito ? "exercito" : "guarnicao"}>
@@ -722,6 +763,12 @@ function Reserva({ destino, dados, heroi, ocupado, aoTreinar }) {
                     {!t.podeUm && <span className="rn-motivo">{t.motivo}</span>}
                   </>
                 ) : <span className="rn-motivo">🔒 {exercito ? "Quartel" : "Torre do Neuro"} no nível {t.nivelMinimo}</span>}
+                {t.tem > 0 && (
+                  <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno rn-tropa__vender" disabled={Boolean(ocupado)}
+                    onClick={() => aoVender(destino, t)} title="Pôr à venda no mercado de tropas: sai na hora e libera espaço">
+                    💱 Vender
+                  </button>
+                )}
               </div>
             </article>
           ))}
@@ -1309,6 +1356,10 @@ function Regras() {
         <details>
           <summary>⚒️ Mina de Ouro e operários</summary>
           <p>Todo reino tem uma Mina de Ouro e nasce com {OPERARIOS_INICIAIS} operários. Cada operário tira 1 pepita a cada {HORAS_POR_PEPITA} h, e cada pepita vale {VALOR_DA_PEPITA} moedas na coleta — demora mais que a Mina de Moedas, mas vale mais. Contrate mais operários (cabem mais quanto maior a mina) e, se sobrar, ponha para alugar: quem aluga paga na hora e o operário trabalha {HORAS_DE_ALUGUEL} h na mina de quem alugou.</p>
+        </details>
+        <details>
+          <summary>🏪 Mercado de tropas</summary>
+          <p>Sobrou tropa ou falta espaço? Toque em <strong>💱 Vender</strong> numa tropa do exército ou da defesa: as tropas anunciadas <strong>saem na hora</strong> — o espaço fica livre e elas não lutam mais por você — e ficam à venda para os outros reinos. O preço é por tropa, de 20% até o custo do treino; o dinheiro cai na hora em que alguém compra, e dá para vender só parte de um anúncio. Quem compra escolhe se vão para o exército ou para a defesa e segue as mesmas regras do treino (a construção no nível da tropa, o espaço e a lotação do Acampamento). Até {ANUNCIOS_POR_REINO} anúncios por reino; retirar devolve o que não foi vendido, se ainda couber.</p>
         </details>
         <details>
           <summary>📈 Bolsa do Reino</summary>

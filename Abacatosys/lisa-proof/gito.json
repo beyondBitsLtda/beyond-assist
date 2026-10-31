@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.34.0-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-27",
+  "versao": "0.35.0-cloudflare-pages.1",
+  "atualizadoEm": "2026-10-30",
   "compilacao": {
-    "numero": 74,
-    "data": "2026-10-27",
+    "numero": 75,
+    "data": "2026-10-30",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.35.0-cloudflare-pages.1",
+      "data": "2026-10-30",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Mercado de tropas no Reino: venda tropas do exército ou da defesa para liberar espaço na hora, e compre as que outros reinos puseram à venda.",
+      "itens": [
+        "Botão \"💱 Vender\" em cada tropa do exército e da defesa: escolhe quantas e o preço por tropa (de 20% ao custo do treino). As tropas anunciadas saem na hora, liberando o espaço da reserva e a lotação do Acampamento.",
+        "Nova seção \"🏪 Mercado de tropas\" na parte de Tropas (também na tela cheia): as ofertas dos outros reinos, do mais barato ao mais caro, com o desconto sobre o treino; quem compra escolhe se vão para o exército ou para a defesa.",
+        "A compra segue as mesmas regras do treino (construção no nível da tropa, espaço da reserva e lotação do Acampamento), aceita comprar só parte do anúncio e paga o vendedor na hora.",
+        "Os meus anúncios (até 10) com o \"Retirar\": o que não foi vendido volta para a reserva de onde saiu, se couber; e as vendas recentes com quem comprou.",
+        "Reino de Teste: os reinos-robô anunciam tropas, e a vitrine deles se refaz quando fica vazia.",
+        "Banco: migração db/021-mercado-de-tropas.sql (tabela proof_mercado_tropas, a gêmea de teste e os tipos mercado_compra e mercado_venda no livro-caixa). Precisa ser aplicada antes de publicar.",
+        "Regras puras em src/dominio/mercadoDeTropas.js, com 4 casos novos no dominio-check; o treino passou a usar a mesma regra de entrada na reserva (podeReceber)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.34.0-cloudflare-pages.1",
       "data": "2026-10-27",
@@ -1157,7 +1174,8 @@
         "Cursos gerados a partir de um livro da biblioteca, seguindo os capítulos, com as páginas de cada assunto; a explicação, o quiz e o exercício do assunto usam o trecho do livro",
         "Estante virtual da Biblioteca: livros em 3D nas prateleiras, com lombada (cor da capa, título, marcador de leitura, selo de lido, 🎓 de curso), capa ao puxar e destaque com as ações",
         "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link e vídeos (YouTube/Vimeo), com revisão do bibliotecário (administrador e líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu; Modo cinema (sala 3D com a plateia de avatares) para os vídeos",
-        "Instalável como app (manifesto e ícones já existiam; agora com o botão \"Instalar app\" na própria tela)."
+        "Instalável como app (manifesto e ícones já existiam; agora com o botão \"Instalar app\" na própria tela).",
+        "Mercado de tropas no Reino: vender tropas do exército ou da defesa (saem na hora e liberam espaço) e comprar as que outros reinos anunciaram"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -1233,7 +1251,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/019; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/021; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
       }
     ],
     "integracoes": [

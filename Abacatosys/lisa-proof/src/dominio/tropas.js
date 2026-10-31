@@ -95,13 +95,15 @@ export function espacoUsado(valor) {
 export const totalDeTropas = (valor) => Object.values(contagens(valor)).reduce((s, n) => s + n, 0);
 
 /**
- * Dá para treinar? `destino`: "exercito" (precisa do Quartel) ou "guarnicao" (Torre do Neuro).
- * A tropa é liberada pelo nível da construção de cada reserva.
+ * Cabem `quantidade` tropas em `destino`? As regras de quem ENTRA numa reserva — no treino, na
+ * compra do mercado e na volta de um anúncio retirado (mercadoDeTropas.js): "exercito" precisa do
+ * Quartel, "guarnicao" da Torre do Neuro e só aceita quem defende; o nível da construção libera a
+ * tropa; e há o espaço da reserva e a lotação do Acampamento.
  */
-export function podeTreinar({ tropa, quantidade, destino, niveis, reservas, saldo }) {
+export function podeReceber({ tropa, quantidade, destino, niveis, reservas }) {
   const def = TROPAS[tropa];
   if (!def) return { ok: false, motivo: "tropa desconhecida" };
-  if (!RESERVAS[destino]) return { ok: false, motivo: "treinar para onde?" };
+  if (!RESERVAS[destino]) return { ok: false, motivo: "para o exército ou para a defesa?" };
   const qtd = Math.floor(Number(quantidade) || 0);
   if (qtd < 1 || qtd > 60) return { ok: false, motivo: "quantidade inválida" };
   const casa = destino === "exercito" ? "quartel" : "castelo";
@@ -119,9 +121,16 @@ export function podeTreinar({ tropa, quantidade, destino, niveis, reservas, sald
   if (naIlha + qtd * def.espaco > lotacao) {
     return { ok: false, motivo: `o Acampamento está lotado (${naIlha} de ${lotacao}) — aumente o Acampamento para caber mais tropas` };
   }
-  const custo = qtd * def.custo;
+  return { ok: true, quantidade: qtd };
+}
+
+/** Dá para treinar? As regras de `podeReceber` mais o custo do treino. */
+export function podeTreinar({ tropa, quantidade, destino, niveis, reservas, saldo }) {
+  const cabe = podeReceber({ tropa, quantidade, destino, niveis, reservas });
+  if (!cabe.ok) return cabe;
+  const custo = cabe.quantidade * TROPAS[tropa].custo;
   if (saldo < custo) return { ok: false, custo, motivo: faltam(custo, saldo) };
-  return { ok: true, custo, quantidade: qtd };
+  return { ok: true, custo, quantidade: cabe.quantidade };
 }
 
 /** Soma duas contagens (treino) ou tira uma da outra (perdas). */
