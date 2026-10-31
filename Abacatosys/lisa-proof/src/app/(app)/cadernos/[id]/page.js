@@ -66,15 +66,18 @@ export default function Caderno() {
   // no toque (celular, tablet): a barra de atalhos acima do teclado e a letra de no mínimo 16 px (com
   // menos, o iPhone dá zoom na página ao tocar no editor)
   const [toque, setToque] = useState(false);
+  const [celular, setCelular] = useState(false);
   const [focado, setFocado] = useState(false);
 
   useEffect(() => { setPrefs(lerPreferencias()); }, []);
   useEffect(() => {
     const m = window.matchMedia("(pointer: coarse)");
-    const ver = () => setToque(m.matches);
+    const c = window.matchMedia("(max-width: 599px)");
+    const ver = () => { setToque(m.matches); setCelular(c.matches); };
     ver();
     m.addEventListener("change", ver);
-    return () => m.removeEventListener("change", ver);
+    c.addEventListener("change", ver);
+    return () => { m.removeEventListener("change", ver); c.removeEventListener("change", ver); };
   }, []);
   const mudarPrefs = (p) => setPrefs((atual) => {
     const novo = { ...atual, ...p };
@@ -372,6 +375,9 @@ export default function Caderno() {
   const modo = prefs.modo;
   const modulos = itens.filter((i) => i.tipo === "modulo");
   const vinculadas = new Set(vinculos.map((v) => v.paginaId).filter(Boolean));
+  // no celular, página de texto (Markdown, texto) é escrita como num app de notas: sem a margem dos
+  // números de linha e com a letra de leitura (o resto continua no jeito de editor de código)
+  const prosaNoCelular = celular && (paginaAtiva?.linguagem === "markdown" || paginaAtiva?.linguagem === "texto");
   const letraMinima = toque ? 16 : 11;
   const letra = Math.max(letraMinima, prefs.tamanhoDaLetra);
 
@@ -434,7 +440,7 @@ export default function Caderno() {
   };
 
   return (
-    <div className={`cd-caderno cd-cor--${caderno.cor}${telaCheia ? " cd-caderno--cheia" : ""}${focado ? " cd-caderno--digitando" : ""}`}>
+    <div className={`cd-caderno cd-cor--${caderno.cor}${telaCheia ? " cd-caderno--cheia" : ""}${focado ? " cd-caderno--digitando" : ""}${prosaNoCelular ? " cd-caderno--prosa" : ""}`}>
       <div className="cd-topo">
         <Link href="/cadernos" className="cd-topo__voltar" aria-label="Voltar para os cadernos">←</Link>
         <button type="button" className="cd-topo__nome" onClick={() => setPainel({ tipo: "caderno" })} title="Nome, cor e ícone do caderno">
@@ -555,6 +561,7 @@ export default function Caderno() {
                         quebrarLinha={prefs.quebrarLinha}
                         tamanhoDaLetra={letra}
                         espacosVisiveis={prefs.espacosVisiveis}
+                        semMargem={celular && (p.linguagem === "markdown" || p.linguagem === "texto")}
                         aoMudar={(t) => aoMudarTexto(pid, t)}
                         aoGravar={() => gravar(pid)}
                         aoCursor={pid === ativa ? setCursor : undefined}

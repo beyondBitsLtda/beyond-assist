@@ -224,6 +224,13 @@ button { font: inherit; }
   .pf-nav__rotulo { padding-bottom: 2px; }
 }
 
+/* Celular: nada dentro do conteúdo alarga a página (BEYOND-0008, 31/10/2026). Uma página mais larga
+   que a tela faz o celular diminuir o zoom e "jogar tudo para a esquerda"; com o clip, o que passar
+   da largura é cortado ali mesmo (as fileiras que rolam para o lado continuam rolando). */
+@media (max-width: 899px) {
+  .pf-principal { overflow-x: clip; }
+}
+
 /* o teclado do celular aberto (src/componentes/TecladoVirtual.js): a barra de abas sai do caminho e
    o painel de baixo (folha) fica na área que se vê, acima do teclado */
 html.pf-teclado .pf-abas { display: none; }
@@ -315,7 +322,9 @@ html.pf-teclado .pf-abas { display: none; }
 
 /* ------------------------------------------------------------------ assunto (card do dia) */
 
-.pf-assuntos { display: grid; gap: 12px; }
+/* minmax(0, 1fr): a coluna nunca passa da tela (sem isso, um conteúdo largo num cartão esticava todos os
+   cartões e a página inteira no celular — BEYOND-0008) */
+.pf-assuntos { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 1100px) { .pf-assuntos { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; } }
 
 .pf-assunto__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }

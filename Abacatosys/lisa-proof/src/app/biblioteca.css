@@ -241,6 +241,32 @@
 
 .lp-barra__tema-celular { display: none; }
 
+/* ------------------------------------------------------------ o modo texto (LeituraEmTexto.js, 31/10/2026) */
+
+.lp-leitura { flex: 1; min-width: 0; overflow: auto; overscroll-behavior: contain; padding: 18px 20px 45vh; background: #FBFAF7; color: #1F2421; touch-action: pan-y; }
+.lp--tema-sepia .lp-leitura { background: #F4ECD8; color: #3B2F1E; }
+.lp--tema-escuro .lp-leitura { background: #121614; color: #D9DED9; }
+.lp-leitura__coluna { max-width: 36em; margin: 0 auto; font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif; line-height: 1.7; }
+/* alinhado à esquerda e sem hifenizar: em tela estreita o justificado abria buracos e partia "JavaS-cript" */
+.lp-leitura__coluna p { margin: 0 0 0.85em; overflow-wrap: break-word; }
+.lp-leitura__marca { display: flex; align-items: center; gap: 10px; margin: 1.4em 0 1em; font: 600 12px/1 Inter, system-ui, sans-serif; letter-spacing: 0.04em; opacity: 0.55; }
+.lp-leitura__marca::before, .lp-leitura__marca::after { content: ""; flex: 1; border-top: 1px solid currentColor; opacity: 0.4; }
+.lp-leitura__pagina:first-of-type .lp-leitura__marca { margin-top: 0.2em; }
+.lp-leitura__vazia { font-style: italic; opacity: 0.6; text-align: left !important; }
+.lp-leitura__antes { display: block; margin: 0 auto 8px; padding: 8px 14px; border-radius: 9999px; border: 1px solid currentColor; background: none; color: inherit; opacity: 0.7; font: 600 13px Inter, system-ui, sans-serif; cursor: pointer; }
+.lp-leitura__fim { min-height: 1px; margin-top: 2em; text-align: center; font: 600 13px Inter, system-ui, sans-serif; opacity: 0.5; }
+.lp-leitura ::selection { background: rgba(35, 98, 211, 0.3); }
+.lp-barra__letra { display: inline-grid; place-items: center; cursor: default; }
+.lp-flutua__dica { font-size: 11.5px; color: #C9D1CC; padding: 0 6px; }
+
+/* sem controles (o meio da página, no toque): só a leitura, com a página atual num indicador discreto */
+.lp--sem-barras .lp-barra { display: none; }
+.lp-indicador {
+  position: absolute; z-index: 25; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  padding: 6px 12px; border-radius: 9999px; border: none; background: rgba(23, 32, 26, 0.78); color: #FFFFFF;
+  font: 600 12.5px/1 Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; cursor: pointer; backdrop-filter: blur(4px);
+}
+
 /* ------------------------------------------------------------ toque: celular e tablet (31/10/2026) */
 
 @media (pointer: coarse) {

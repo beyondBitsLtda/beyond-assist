@@ -3,7 +3,8 @@
    acervo em prateleiras de cartões, a ficha de cada material e o Modo cinema. Usa as cores do app
    (--pf-*), nos dois temas; o céu do mundo é o mesmo fim de tarde do Reino. */
 
-.ac { display: grid; gap: 16px; }
+/* as colunas nunca passam da tela: a prateleira que rola para o lado esticava a página inteira (BEYOND-0008) */
+.ac { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
 .pf-principal:has(.ac-heroi) { max-width: 1480px; }
 
 /* ---- o topo */
@@ -111,7 +112,7 @@
 .ac-aba:focus-visible, .ac-chips button:focus-visible { outline: 2px solid var(--pf-verde-forte); outline-offset: 2px; }
 
 /* ---- as ferramentas do acervo */
-.ac-catalogo { display: grid; gap: 14px; }
+.ac-catalogo { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
 .ac-ferramentas { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 760px) { .ac-ferramentas { grid-template-columns: minmax(240px, 1fr) 220px 180px; } }
 .ac-busca { display: flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: 14px; background: var(--pf-superficie); border: 1px solid var(--pf-linha); }
@@ -129,7 +130,8 @@
 .ac-vazio > span:last-child { color: var(--pf-tinta-2); max-width: 46ch; }
 
 /* ---- as prateleiras e a grade */
-.ac-prateleiras { display: grid; gap: 22px; }
+.ac-prateleiras { display: grid; gap: 22px; grid-template-columns: minmax(0, 1fr); }
+.ac-prateleira { min-width: 0; }
 .ac-prateleira__topo { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
 .ac-prateleira__topo h3 { margin: 0; font-size: 18px; }
 .ac-prateleira__topo h3 small { margin-left: 4px; font-size: 13px; color: var(--pf-tinta-2); font-weight: 700; }

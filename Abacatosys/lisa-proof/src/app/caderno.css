@@ -16,6 +16,15 @@
 .pf-principal:has(.cd-caderno), .pf-principal:has(.lp) { max-width: none; padding: 8px 8px calc(var(--pf-nav-altura) + 8px + env(safe-area-inset-bottom)); }
 @media (min-width: 900px) { .pf-principal:has(.cd-caderno), .pf-principal:has(.lp) { padding: 14px 18px; } }
 
+/* celular e tablet em pé: o caderno e o leitor ocupam a tela toda, como um app de notas e um leitor
+   digital — sem o topo e a barra de abas do Proof (cada um tem o seu ← de voltar) (BEYOND-0007) */
+@media (max-width: 899px) {
+  body:has(.cd-caderno) .pf-topo, body:has(.cd-caderno) .pf-abas, body:has(.lp) .pf-topo, body:has(.lp) .pf-abas { display: none; }
+  .pf-principal:has(.cd-caderno), .pf-principal:has(.lp) { padding: max(6px, env(safe-area-inset-top)) 6px max(6px, env(safe-area-inset-bottom)); }
+  body .cd-caderno, body .lp { height: calc(100dvh - max(6px, env(safe-area-inset-top)) - max(6px, env(safe-area-inset-bottom))); min-height: 0; }
+  body .cd-lado { top: max(8px, env(safe-area-inset-top)); bottom: max(8px, env(safe-area-inset-bottom)); }
+}
+
 /* ------------------------------------------------------------ estante */
 
 .cd-estante { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
@@ -166,7 +175,10 @@
 .cd-folha--previa .cd-folha__previa { border-left: none; }
 
 /* o editor do caderno: CodeMirror ocupando a folha */
-.cd-editor { border: none; border-radius: 0; min-height: 0; height: 100%; display: grid; }
+/* a linha da grade do tamanho da folha (minmax): sem isso ela crescia até o tamanho do texto e o editor
+   não rolava — o fim das páginas longas ficava inalcançável (BEYOND-0007) */
+.cd-editor { border: none; border-radius: 0; min-height: 0; height: 100%; display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
+.cd-editor .cm-editor { min-height: 0; }
 .cd-editor .cm-editor { height: 100%; background: transparent; color: var(--pf-codigo-tinta); }
 .cd-editor .cm-editor.cm-focused { outline: none; }
 .cd-editor .cm-scroller { font-family: ui-monospace, "JetBrains Mono", "Cascadia Code", Consolas, monospace; line-height: 1.6; }
@@ -284,10 +296,12 @@
 .cd-anotacoes__anotar { margin-left: auto; border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); border-radius: var(--pf-pilula); padding: 5px 12px; font: 600 13px sans-serif; font-family: inherit; cursor: pointer; }
 .cd-anotacoes__anotar:hover { border-color: var(--pf-verde); }
 .cd-anotacoes__lista { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.cd-anotacao { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--pf-linha); background: var(--pf-superficie-2); color: var(--pf-tinta); text-decoration: none; font-size: 13px; }
+.cd-anotacoes__lista > li { min-width: 0; max-width: 100%; }
+/* quebra a linha quando não cabe: o nome do caderno e o da página lado a lado esticavam o cartão (BEYOND-0008) */
+.cd-anotacao { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; max-width: 100%; min-width: 0; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--pf-linha); background: var(--pf-superficie-2); color: var(--pf-tinta); text-decoration: none; font-size: 13px; }
 .cd-anotacao:hover { border-color: var(--pf-verde); }
 .cd-anotacao__caderno { font-weight: 600; }
-.cd-anotacao__pagina { color: var(--pf-tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.cd-anotacao__pagina { color: var(--pf-tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: min(220px, 100%); min-width: 0; }
 .cd-anotacao__onde { color: var(--pf-tinta-3); font-size: 11.5px; }
 .cd-anotacoes__nova { display: grid; gap: 10px; max-width: 460px; }
 
@@ -364,6 +378,11 @@
   .cd-anotacoes__anotar { margin-left: 0; }
   .cd-anotacoes__nova { max-width: none; }
 }
+
+/* celular, página de texto: escrever como num app de notas — letra de leitura, sem margem de números */
+.cd-caderno--prosa .cd-editor .cm-scroller { font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.65; }
+.cd-caderno--prosa .cd-editor .cm-content { padding-top: 14px; }
+.cd-caderno--prosa .cd-editor .cm-line { padding: 0 16px; }
 
 /* celular: dividido não cabe; e, digitando, só o editor e os atalhos */
 @media (max-width: 599px) {

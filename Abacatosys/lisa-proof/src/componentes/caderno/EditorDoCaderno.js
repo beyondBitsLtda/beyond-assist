@@ -32,12 +32,12 @@ const atributosDa = (linguagem) => EditorView.contentAttributes.of(ehProsa(lingu
   : { spellcheck: "false", autocorrect: "off", autocapitalize: "off" });
 
 const EditorDoCaderno = forwardRef(function EditorDoCaderno(
-  { valor, aoMudar, linguagem, quebrarLinha = true, tamanhoDaLetra = 15, espacosVisiveis = false, somenteLeitura = false, aoGravar, aoCursor, rotulo = "Página do caderno" },
+  { valor, aoMudar, linguagem, quebrarLinha = true, tamanhoDaLetra = 15, espacosVisiveis = false, somenteLeitura = false, semMargem = false, aoGravar, aoCursor, rotulo = "Página do caderno" },
   ref,
 ) {
   const caixa = useRef(null);
   const vista = useRef(null);
-  const travas = useRef({ linguagem: new Compartment(), quebra: new Compartment(), espacos: new Compartment(), leitura: new Compartment(), letra: new Compartment(), atributos: new Compartment() });
+  const travas = useRef({ linguagem: new Compartment(), quebra: new Compartment(), espacos: new Compartment(), leitura: new Compartment(), letra: new Compartment(), atributos: new Compartment(), margem: new Compartment() });
   const ultimo = useRef({ aoMudar, aoGravar, aoCursor });
   ultimo.current = { aoMudar, aoGravar, aoCursor };
 
@@ -109,11 +109,10 @@ const EditorDoCaderno = forwardRef(function EditorDoCaderno(
       state: EditorState.create({
         doc: valor || "",
         extensions: [
-          lineNumbers(),
-          highlightActiveLineGutter(),
+          // a margem (números de linha e dobras) sai no celular, nas páginas de texto: é espaço de escrever
+          t.margem.of(semMargem ? [] : [lineNumbers(), highlightActiveLineGutter(), foldGutter()]),
           highlightSpecialChars(),
           history(),
-          foldGutter(),
           drawSelection(),
           dropCursor(),
           EditorState.allowMultipleSelections.of(true),
@@ -174,6 +173,9 @@ const EditorDoCaderno = forwardRef(function EditorDoCaderno(
   useEffect(() => {
     vista.current?.dispatch({ effects: travas.current.quebra.reconfigure(quebrarLinha ? EditorView.lineWrapping : []) });
   }, [quebrarLinha]);
+  useEffect(() => {
+    vista.current?.dispatch({ effects: travas.current.margem.reconfigure(semMargem ? [] : [lineNumbers(), highlightActiveLineGutter(), foldGutter()]) });
+  }, [semMargem]);
   useEffect(() => {
     vista.current?.dispatch({ effects: travas.current.espacos.reconfigure(espacosVisiveis ? highlightWhitespace() : []) });
   }, [espacosVisiveis]);

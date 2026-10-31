@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoFuncionario } from "./acervo/personagensDoAcervo.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-31-celular";
+export const EDICAO_DAS_NOVIDADES = "2026-10-31-leitor";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,7 +28,7 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "📱", titulo: "Cadernos e leitor no celular e no tablet", texto: "Escrevendo, o caderno se encaixa acima do teclado e ganha uma barra de atalhos (título, negrito, lista, tarefa, código, desfazer). No leitor de PDF, zoom com dois dedos, barra de marcação ao alcance do polegar e tela cheia também no iPhone.", destaque: true },
+  { icone: "📱", titulo: "Leitor e caderno feitos para o celular", texto: "No leitor de PDF, o modo texto (Aa) mostra a página em letra grande, como num leitor digital; tocar no meio esconde os controles e nas laterais vira a tela. O caderno ocupa a tela toda, rola até o fim da página e, no celular, escreve sem a margem de números.", destaque: true },
   { icone: "🧩", titulo: "Desenhe o diagrama, a Lisa avalia", texto: "Nos cursos de computação e arquitetura de software, o exercício do dia pode ser desenhar: fluxo de processo, BPMN, UML, modelo de dados, arquitetura de software ou de nuvem e C4, num quadro com dezenas de formas técnicas. A Lisa confere requisito por requisito." },
   { icone: "👓", titulo: "Avatar novo, de graça: a Lisa", texto: "O mascote do Proof virou bonequinha de corpo inteiro, liberada para todo mundo. Vista no Reino → Personagens: ela pisca, sorri, comemora e até dorme." },
   { icone: "🃏", titulo: "Cartões, torres de tema e revisão da turma", texto: "Cartões com repetição espaçada (Prática → Cartões), o Modo Domínio de qualquer tema e a revisão de um colega quando você discorda da Lisa." },

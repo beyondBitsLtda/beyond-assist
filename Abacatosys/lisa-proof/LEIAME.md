@@ -552,6 +552,30 @@ tablets e celulares".
   verdade), a barrinha da seleção fica presa embaixo, o painel fecha ao escolher uma página e o ⛶
   usa o modo foco (`.lp--foco`) onde não há tela cheia de elemento (iPhone).
 
+### Correções de 31/10/2026, à noite (BEYOND-0007 e BEYOND-0008)
+
+- **A página mais larga que a tela.** Grade com coluna implícita (`display: grid` sem
+  `grid-template-columns`) cresce até o `min-content` do filho mais largo — um chip que não quebra,
+  uma fileira com `overflow-x: auto` (a rolagem não diminui a largura mínima de quem está em volta).
+  A página fica mais larga que o celular e ele tira o zoom ("tudo jogado para a esquerda"). Regra:
+  grade de uma coluna é `grid-template-columns: minmax(0, 1fr)`. E, no celular, `.pf-principal` tem
+  `overflow-x: clip` como rede de proteção.
+- **O editor do caderno não rolava.** `.cd-editor` era grade sem linha definida: a linha crescia até o
+  texto e o rolador do CodeMirror nunca ficava menor que o conteúdo. Agora `grid-template-rows: minmax(0, 1fr)`.
+- **Celular em tela cheia**: com `:has()`, as telas do caderno e do leitor escondem o topo e a barra de
+  abas do Proof abaixo de 900 px. O caderno tira a margem dos números (`semMargem` no editor) e usa a
+  letra de leitura nas páginas de texto (`.cd-caderno--prosa`, abaixo de 600 px).
+- **Leitor como leitor digital**: `tocarNaLeitura` (só no toque) — laterais avançam e voltam uma tela,
+  o meio esconde os controles (`.lp--sem-barras` e o indicador `.lp-indicador`). O **modo texto**
+  (`LeituraEmTexto.js`, botão Aa, `prefs.modo`/`prefs.letra`) tira o texto da página com o pdf.js no
+  navegador e o arruma em parágrafos (`paragrafosDaPagina` em `src/dominio/biblioteca.js`: junta as
+  linhas, desfaz o hífen do fim da linha, tira o número e o cabeçalho corrido). A rolagem do PDF fica
+  montada e escondida no modo texto, e não informa página enquanto escondida (diria "1" e gravaria
+  como onde parou).
+- **Como foi testado**: Edge pelo protocolo de depuração, com viewport mobile e toque, logado num
+  perfil isolado; mede a largura da página e o elemento mais fundo que vaza, a rolagem com dedo e roda,
+  e os toques do leitor.
+
 ## A marca e a tela de abertura
 
 Em 31/10/2026, o mascote (o desenho de traço com rabo de cavalo e óculos) virou a marca do sistema, no

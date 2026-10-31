@@ -12,7 +12,7 @@ import {
 import {
   validarLivroNovo, validarSumario, secoesDoLivro, capitulosDoLivro, juntarFaixas, validarRetangulos, juntarRetangulosPorLinha,
   validarMarcacao, limparTextoDaPagina, validarLoteDeTexto, tituloDoArquivo, progressoDaLeitura, termoDeBusca, formatarTamanho,
-  LIMITES_DA_BIBLIOTECA,
+  LIMITES_DA_BIBLIOTECA, paragrafosDaPagina,
 } from "../src/dominio/biblioteca.js";
 import { blocosDoMarkdown, emLinha, enderecoSeguro, titulosDoMarkdown } from "../src/dominio/markdown.js";
 import {
@@ -344,6 +344,33 @@ caso("a 019 só acrescenta e fecha as funções para a chave anônima", () => {
     assert.match(sql, new RegExp(`alter table public\\.${t}\\s+enable row level security`));
   }
   assert.match(sql, /'proof-biblioteca', 'proof-biblioteca', false/);
+});
+
+console.log("\nmodo texto do leitor");
+caso("a página do PDF vira parágrafos: linhas juntas, hífen desfeito, sem número nem cabeçalho corrido", () => {
+  const pagina = [
+    "2 Capítulo 1 Introdução a JavaScript",
+    "Para ser útil, toda linguagem deve ter uma plataforma, ou biblioteca padrão, ou API de fun-",
+    "ções para fazer coisas como entrada e saída básicas. A linguagem JavaScript básica define",
+    "uma API mínima para trabalhar com texto.",
+    "A Parte III é a seção de referência da API básica. Você pode ler sobre a API de manipulação",
+    "de arrays procurando por \"Array\" nessa parte do livro.",
+    "",
+    "Um parágrafo depois de linha em branco",
+    "2",
+  ].join("\n");
+  const p = paragrafosDaPagina(pagina, 20); // o número do PDF (20) não é o impresso (2): o cabeçalho sai do mesmo jeito
+  assert.equal(p.length, 3, JSON.stringify(p));
+  assert.match(p[0], /^Para ser útil/);
+  assert.match(p[0], /API de funções para fazer/, "o hífen do fim da linha sumiu e a palavra juntou");
+  assert.match(p[0], /trabalhar com texto\.$/, "a linha curta que fecha a frase fecha o parágrafo");
+  assert.match(p[1], /^A Parte III .* manipulação de arrays/, "linha cheia continua na de baixo");
+  assert.equal(p[2], "Um parágrafo depois de linha em branco");
+  assert.ok(!p.some((x) => /Capítulo 1 Introdução/.test(x)), "o cabeçalho corrido com o número da página sai");
+  assert.deepEqual(paragrafosDaPagina(""), []);
+  assert.deepEqual(paragrafosDaPagina("Só uma linha."), ["Só uma linha."]);
+  assert.match(paragrafosDaPagina("bem-\nvindo ao livro")[0], /^bem-vindo|^bemvindo/, "hífen de palavra composta pode ficar ou juntar, mas não quebra");
+  assert.equal(paragrafosDaPagina("Ano de 2024 e mais\n2024")[0].includes("2024"), true, "número no meio do texto fica");
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

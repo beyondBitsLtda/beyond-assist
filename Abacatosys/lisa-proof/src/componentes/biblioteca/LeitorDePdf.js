@@ -8,6 +8,7 @@ import { citacaoDoLivro } from "@/dominio/cadernos.js";
 import { abrirPdf, enviarTextoDoLivro } from "./pdf.js";
 import PaginaDoPdf from "./PaginaDoPdf.js";
 import Miniatura from "./Miniatura.js";
+import LeituraEmTexto from "./LeituraEmTexto.js";
 import { AnotacoesDoAlvo } from "../caderno/Vinculos.js";
 
 const VAO = 14; // espaço entre as páginas
@@ -22,9 +23,12 @@ const PAINEIS = [
   { chave: "anotacoes", rotulo: "Caderno", icone: "📓" },
 ];
 
+// modo: "pagina" (o PDF como é) ou "texto" (o texto da página em letra grande); letra: o tamanho no modo texto
+const PREFS_PADRAO = { tema: "claro", cor: "amarelo", modo: "pagina", letra: 19 };
 function lerPrefs() {
-  try { return { tema: "claro", cor: "amarelo", ...JSON.parse(localStorage.getItem(PREFS) || "{}") }; } catch { return { tema: "claro", cor: "amarelo" }; }
+  try { return { ...PREFS_PADRAO, ...JSON.parse(localStorage.getItem(PREFS) || "{}") }; } catch { return PREFS_PADRAO; }
 }
+const ehToque = (e) => e.pointerType === "touch" || e.pointerType === "pen";
 
 /**
  * O leitor de PDF da biblioteca (25/10/2026): "ler com opção de marcação, igual aos melhores leitores".
@@ -51,7 +55,7 @@ export default function LeitorDePdf({ livroId }) {
   const [visiveis, setVisiveis] = useState({ de: 1, ate: 3 });
   const [marcacoes, setMarcacoes] = useState([]);
   const [painel, setPainel] = useState(null);
-  const [prefs, setPrefs] = useState({ tema: "claro", cor: "amarelo" });
+  const [prefs, setPrefs] = useState(PREFS_PADRAO);
   const [ferramenta, setFerramenta] = useState("texto");
   const [selecao, setSelecao] = useState(null); // { pagina, texto, retangulos, x, y }
   const [aberta, setAberta] = useState(null); // { marcacao, x, y }
@@ -64,6 +68,9 @@ export default function LeitorDePdf({ livroId }) {
   const [aviso, setAviso] = useState("");
   const [telaCheia, setTelaCheia] = useState(false);
   const [foco, setFoco] = useState(false); // o "tela cheia" de quem não tem tela cheia de verdade (iPhone)
+  const [barras, setBarras] = useState(true); // no toque, o meio da página esconde e mostra os controles
+  const [inicioDoTexto, setInicioDoTexto] = useState({ n: 1, chave: 0 }); // de onde o modo texto começa
+  const textoRef = useRef(null);
   const [entradaDePagina, setEntradaDePagina] = useState("1");
   const salvarPosicao = useRef(null);
   const paginaInicial = useRef(null);
@@ -169,6 +176,7 @@ export default function LeitorDePdf({ livroId }) {
   // (a largura é medida, o zoom "largura" recalcula), continua apontando para lá.
   useEffect(() => {
     if (!pdf || !paginaInicial.current) return undefined;
+    setInicioDoTexto((i) => (i.chave ? i : { n: paginaInicial.current, chave: 1 }));
     irParaPagina(paginaInicial.current);
     const t = setTimeout(() => { paginaInicial.current = null; }, 700);
     return () => clearTimeout(t);
@@ -182,9 +190,39 @@ export default function LeitorDePdf({ livroId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [escala]);
 
+  const modoTexto = prefs.modo === "texto";
+  /** Ir para uma página pelos controles (barra, painel, teclado): no modo texto, a leitura recomeça nela. */
+  const irPara = (n) => {
+    const alvo = Math.min(Math.max(1, Math.round(n) || 1), total || 1);
+    if (modoTexto) { setInicioDoTexto({ n: alvo, chave: Date.now() }); setPaginaAtual(alvo); ultimaVista.current = alvo; }
+    else irParaPagina(alvo);
+  };
+  const aoMudarPaginaNoTexto = useCallback((n) => { setPaginaAtual(n); ultimaVista.current = n; }, []);
+  function alternarModoTexto() {
+    if (modoTexto) {
+      mudarPrefs({ modo: "pagina" });
+      const voltar = paginaAtual;
+      setTimeout(() => irParaPagina(voltar), 80);
+    } else {
+      setInicioDoTexto({ n: paginaAtual, chave: Date.now() });
+      mudarPrefs({ modo: "texto" });
+    }
+  }
+
+  /** No toque: as laterais avançam e voltam uma tela; o meio esconde e mostra os controles (como num leitor digital). */
+  function tocarNaLeitura(e, el) {
+    if (!ehToque(e) || !el || e.target.closest?.("button, a, input, textarea, select")) return;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;
+    if (x < 0.28) el.scrollBy({ top: -el.clientHeight * 0.88, behavior: "smooth" });
+    else if (x > 0.72) el.scrollBy({ top: el.clientHeight * 0.88, behavior: "smooth" });
+    else setBarras((b) => !b);
+  }
+
   const aoRolar = useCallback(() => {
     const el = rolagem.current;
-    if (!el || !total) return;
+    // escondida (modo texto), a rolagem do PDF não diz a página: diria "1" e gravaria isso como onde parou
+    if (!el || !total || !el.clientHeight) return;
     const meio = el.scrollTop + el.clientHeight * 0.3;
     let lo = 1, hi = total;
     while (lo < hi) { const m = Math.ceil((lo + hi) / 2); if (topos[m] <= meio) lo = m; else hi = m - 1; }
@@ -272,13 +310,16 @@ export default function LeitorDePdf({ livroId }) {
 
   // ------------------------------------------------------------ teclado
 
+  const irParaRef = useRef(irPara);
+  irParaRef.current = irPara;
+
   useEffect(() => {
     const tecla = (e) => {
       const digitando = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "");
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") { e.preventDefault(); setPainel("busca"); setTimeout(() => document.getElementById("lp-busca")?.focus(), 50); return; }
       if (digitando) return;
-      if (e.key === "ArrowRight" && !e.altKey) { e.preventDefault(); irParaPagina(paginaAtual + 1); }
-      else if (e.key === "ArrowLeft" && !e.altKey) { e.preventDefault(); irParaPagina(paginaAtual - 1); }
+      if (e.key === "ArrowRight" && !e.altKey) { e.preventDefault(); irParaRef.current(paginaAtual + 1); }
+      else if (e.key === "ArrowLeft" && !e.altKey) { e.preventDefault(); irParaRef.current(paginaAtual - 1); }
       else if (e.key === "+" || e.key === "=") setZoom({ modo: "livre", escala: Math.min(4, escala * 1.15) });
       else if (e.key === "-") setZoom({ modo: "livre", escala: Math.max(0.3, escala / 1.15) });
       else if (e.key === "Escape") { setSelecao(null); setAberta(null); setFerramenta("texto"); setFoco(false); }
@@ -293,6 +334,16 @@ export default function LeitorDePdf({ livroId }) {
     return () => document.removeEventListener("fullscreenchange", mudou);
   }, []);
 
+  // a dica dos toques, uma vez por aparelho
+  useEffect(() => {
+    if (!pdf || !window.matchMedia("(pointer: coarse)").matches) return;
+    try {
+      if (localStorage.getItem("proof-leitor-dica-toque")) return;
+      localStorage.setItem("proof-leitor-dica-toque", "1");
+    } catch { return; }
+    setAviso("Dica: toque no meio da página para esconder ou mostrar os controles; nas laterais, para avançar ou voltar. Em Aa, o modo texto.");
+  }, [pdf]);
+
   /** Tela cheia de verdade onde existe; no iPhone (sem tela cheia de elemento), o leitor cobre o app. */
   function alternarTelaCheia() {
     if (document.fullscreenElement) { document.exitFullscreen(); return; }
@@ -304,7 +355,7 @@ export default function LeitorDePdf({ livroId }) {
 
   /** Escolher uma página no painel: no celular, o painel fecha para mostrar a página. */
   const irDoPainel = (n) => {
-    irParaPagina(n);
+    irPara(n);
     if (window.matchMedia("(max-width: 899px)").matches) setPainel(null);
   };
 
@@ -316,6 +367,16 @@ export default function LeitorDePdf({ livroId }) {
     if (!sel || sel.isCollapsed || !sel.rangeCount) { setSelecao(null); return; }
     const range = sel.getRangeAt(0);
     const no = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+    // no modo texto não há página do PDF para marcar: o trecho dá para copiar e mandar para o caderno
+    const doTexto = no?.closest?.(".lp-leitura__pagina");
+    if (doTexto && raiz.current?.contains(doTexto)) {
+      const textoSel = sel.toString().replace(/\s+/g, " ").trim();
+      const ultimo = [...range.getClientRects()].filter((r) => r.width > 1).at(-1);
+      if (!textoSel || !ultimo) { setSelecao(null); return; }
+      setAberta(null);
+      setSelecao({ pagina: Number(doTexto.dataset.pagina), texto: textoSel, retangulos: [], soTexto: true, x: ultimo.left + ultimo.width / 2, y: ultimo.bottom });
+      return;
+    }
     const paginaEl = no?.closest?.(".lp-pagina");
     if (!paginaEl || !rolagem.current?.contains(paginaEl)) { setSelecao(null); return; }
     const p = paginaEl.getBoundingClientRect();
@@ -349,13 +410,20 @@ export default function LeitorDePdf({ livroId }) {
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed) { setTimeout(lerSelecao, 0); return; }
     const paginaEl = e.target.closest?.(".lp-pagina");
-    if (!paginaEl) { setAberta(null); return; }
+    if (!paginaEl) { setAberta(null); tocarNaLeitura(e, rolagem.current); return; }
     const p = paginaEl.getBoundingClientRect();
     const x = (e.clientX - p.left) / p.width;
     const y = (e.clientY - p.top) / p.height;
     const n = Number(paginaEl.dataset.pagina);
     const achada = marcacoes.find((m) => m.pagina === n && m.retangulos.some((r) => x >= r[0] && x <= r[0] + r[2] && y >= r[1] - 0.004 && y <= r[1] + r[3] + 0.004));
     setAberta(achada ? { marcacao: achada, x: e.clientX, y: e.clientY } : null);
+    if (!achada) tocarNaLeitura(e, rolagem.current);
+  }
+
+  function aoTocarNoTexto(e) {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) { setTimeout(lerSelecao, 0); return; }
+    tocarNaLeitura(e, textoRef.current);
   }
 
   async function marcar({ tipo = "destaque", cor = prefs.cor, nota = "" } = {}, de = selecao) {
@@ -444,34 +512,49 @@ export default function LeitorDePdf({ livroId }) {
   const larguraMaxima = Math.max(...paginasParaDesenhar.map((p) => p.largura), 0);
 
   return (
-    <div ref={raiz} className={`lp lp--tema-${prefs.tema}${painel ? " lp--com-painel" : ""}${telaCheia || foco ? " lp--cheia" : ""}${foco ? " lp--foco" : ""}${ferramenta === "area" ? " lp--area" : ""}`}>
+    <div ref={raiz} className={`lp lp--tema-${prefs.tema}${painel ? " lp--com-painel" : ""}${telaCheia || foco ? " lp--cheia" : ""}${foco ? " lp--foco" : ""}${ferramenta === "area" ? " lp--area" : ""}${barras ? "" : " lp--sem-barras"}${modoTexto ? " lp--texto" : ""}`}>
       <div className="lp-barra" role="toolbar" aria-label="Leitor">
         <Link href="/biblioteca" className="lp-barra__voltar" aria-label="Voltar à biblioteca">←</Link>
         <button type="button" className="lp-barra__botao" aria-pressed={Boolean(painel)} onClick={() => setPainel(painel ? null : "sumario")} title="Painel (sumário, páginas, marcações, busca)" aria-label="Painel lateral">☰</button>
         <span className="lp-barra__titulo" title={livro?.titulo}>{livro?.titulo || "…"}</span>
         {/* no computador, os grupos ficam na mesma linha do título; no celular, numa segunda linha que rola para o lado */}
         <div className="lp-barra__controles">
-          <form className="lp-barra__pagina" onSubmit={(e) => { e.preventDefault(); irParaPagina(Number(entradaDePagina)); }}>
-            <button type="button" className="lp-barra__botao" onClick={() => irParaPagina(paginaAtual - 1)} disabled={paginaAtual <= 1} aria-label="Página anterior">‹</button>
+          <form className="lp-barra__pagina" onSubmit={(e) => { e.preventDefault(); irPara(Number(entradaDePagina)); }}>
+            <button type="button" className="lp-barra__botao" onClick={() => irPara(paginaAtual - 1)} disabled={paginaAtual <= 1} aria-label="Página anterior">‹</button>
             <input value={entradaDePagina} onChange={(e) => setEntradaDePagina(e.target.value.replace(/\D/g, ""))} inputMode="numeric" aria-label="Ir para a página" />
             <span>/ {total || "…"}</span>
-            <button type="button" className="lp-barra__botao" onClick={() => irParaPagina(paginaAtual + 1)} disabled={paginaAtual >= total} aria-label="Próxima página">›</button>
+            <button type="button" className="lp-barra__botao" onClick={() => irPara(paginaAtual + 1)} disabled={paginaAtual >= total} aria-label="Próxima página">›</button>
           </form>
           <div className="lp-barra__grupo">
-            <button type="button" className="lp-barra__botao" onClick={() => setZoom({ modo: "livre", escala: Math.max(0.3, escala / 1.15) })} aria-label="Diminuir">−</button>
-            <button type="button" className="lp-barra__zoom" onClick={() => setZoom({ modo: zoom.modo === "largura" ? "pagina" : "largura", escala })} title="Alternar: largura / página inteira">
-              {Math.round(escala * 100)}%{zoom.modo === "largura" ? " ↔" : zoom.modo === "pagina" ? " ▭" : ""}
-            </button>
-            <button type="button" className="lp-barra__botao" onClick={() => setZoom({ modo: "livre", escala: Math.min(4, escala * 1.15) })} aria-label="Aumentar">+</button>
+            <button type="button" className="lp-barra__botao lp-barra__modo" aria-pressed={modoTexto} onClick={alternarModoTexto} title={modoTexto ? "Voltar à página do PDF" : "Modo texto: o texto da página em letra grande (bom no celular)"} aria-label="Modo texto">Aa</button>
+            {modoTexto ? (
+              <>
+                <button type="button" className="lp-barra__botao" onClick={() => mudarPrefs({ letra: Math.max(14, prefs.letra - 1) })} aria-label="Letra menor">A−</button>
+                <span className="lp-barra__zoom lp-barra__letra" aria-label="Tamanho da letra">{prefs.letra}px</span>
+                <button type="button" className="lp-barra__botao" onClick={() => mudarPrefs({ letra: Math.min(32, prefs.letra + 1) })} aria-label="Letra maior">A+</button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="lp-barra__botao" onClick={() => setZoom({ modo: "livre", escala: Math.max(0.3, escala / 1.15) })} aria-label="Diminuir">−</button>
+                <button type="button" className="lp-barra__zoom" onClick={() => setZoom({ modo: zoom.modo === "largura" ? "pagina" : "largura", escala })} title="Alternar: largura / página inteira">
+                  {Math.round(escala * 100)}%{zoom.modo === "largura" ? " ↔" : zoom.modo === "pagina" ? " ▭" : ""}
+                </button>
+                <button type="button" className="lp-barra__botao" onClick={() => setZoom({ modo: "livre", escala: Math.min(4, escala * 1.15) })} aria-label="Aumentar">+</button>
+              </>
+            )}
           </div>
           <div className="lp-barra__grupo lp-barra__ferramentas">
-            <button type="button" className="lp-barra__botao" aria-pressed={ferramenta === "texto"} onClick={() => setFerramenta("texto")} title="Selecionar texto para marcar">𝐓</button>
-            <button type="button" className="lp-barra__botao" aria-pressed={ferramenta === "area"} onClick={() => setFerramenta(ferramenta === "area" ? "texto" : "area")} title="Marcar uma área (figura, fórmula, PDF escaneado)">▭</button>
-            <span className="lp-cores" role="group" aria-label="Cor do marca-texto">
-              {CORES_DE_MARCACAO.map((c) => (
-                <button key={c} type="button" className={`lp-cor lp-cor--${c}`} aria-pressed={prefs.cor === c} aria-label={NOMES_DAS_CORES[c]} onClick={() => mudarPrefs({ cor: c })} />
-              ))}
-            </span>
+            {!modoTexto && (
+              <>
+                <button type="button" className="lp-barra__botao" aria-pressed={ferramenta === "texto"} onClick={() => setFerramenta("texto")} title="Selecionar texto para marcar">𝐓</button>
+                <button type="button" className="lp-barra__botao" aria-pressed={ferramenta === "area"} onClick={() => setFerramenta(ferramenta === "area" ? "texto" : "area")} title="Marcar uma área (figura, fórmula, PDF escaneado)">▭</button>
+                <span className="lp-cores" role="group" aria-label="Cor do marca-texto">
+                  {CORES_DE_MARCACAO.map((c) => (
+                    <button key={c} type="button" className={`lp-cor lp-cor--${c}`} aria-pressed={prefs.cor === c} aria-label={NOMES_DAS_CORES[c]} onClick={() => mudarPrefs({ cor: c })} />
+                  ))}
+                </span>
+              </>
+            )}
             <button type="button" className="lp-barra__botao" aria-pressed={Boolean(marcadorDaPagina)} onClick={alternarMarcador} title={marcadorDaPagina ? "Tirar o marcador desta página" : "Marcar esta página"}>🔖</button>
           </div>
           <div className="lp-barra__grupo">
@@ -579,7 +662,14 @@ export default function LeitorDePdf({ livroId }) {
           </aside>
         )}
 
-        <div ref={rolagem} className="lp-rolagem" onScroll={aoRolar} onPointerUp={aoSoltar} onKeyUp={(e) => e.shiftKey && lerSelecao()}>
+        {modoTexto && pdf && (
+          <LeituraEmTexto
+            key={inicioDoTexto.chave} pdf={pdf} total={total} inicial={inicioDoTexto.n} tamanho={prefs.letra}
+            aoMudarPagina={aoMudarPaginaNoTexto} aoTocar={aoTocarNoTexto} rolagemRef={textoRef}
+          />
+        )}
+        {/* a rolagem do PDF fica montada (escondida) no modo texto: o zoom, a pinça e as medidas continuam valendo */}
+        <div ref={rolagem} className="lp-rolagem" hidden={modoTexto} onScroll={aoRolar} onPointerUp={aoSoltar} onKeyUp={(e) => e.shiftKey && lerSelecao()}>
           {!pdf && <div className="pf-carregando lp-abrindo">Abrindo o livro…</div>}
           {pdf && (
             <div className="lp-paginas" ref={paginasRef} style={{ height: topos[total + 1], minWidth: larguraMaxima + 32 }}>
@@ -603,7 +693,20 @@ export default function LeitorDePdf({ livroId }) {
         </div>
       </div>
 
-      {selecao && (
+      {!barras && (
+        <button type="button" className="lp-indicador" onClick={() => setBarras(true)} aria-label="Mostrar os controles">
+          {paginaAtual} / {total} · {progressoDaLeitura(paginaAtual, total || 1)}%
+        </button>
+      )}
+
+      {selecao?.soTexto && (
+        <div className="lp-flutua" style={{ left: selecao.x, top: selecao.y + 8 }} onPointerDown={(e) => e.preventDefault()} role="toolbar" aria-label="O trecho selecionado">
+          <button type="button" onClick={copiar} title="Copiar">⧉</button>
+          <button type="button" onClick={() => { setParaCaderno({ pagina: selecao.pagina, texto: selecao.texto, nota: "" }); setSelecao(null); }} title="Mandar para o caderno">📓</button>
+          <span className="lp-flutua__dica">para destacar, use o modo página</span>
+        </div>
+      )}
+      {selecao && !selecao.soTexto && (
         <div className="lp-flutua" style={{ left: selecao.x, top: selecao.y + 8 }} onPointerDown={(e) => e.preventDefault()} role="toolbar" aria-label="Marcar a seleção">
           {CORES_DE_MARCACAO.map((c) => (
             <button key={c} type="button" className={`lp-cor lp-cor--${c}`} aria-label={`Destacar em ${NOMES_DAS_CORES[c]}`} title={`Destacar (${NOMES_DAS_CORES[c]})`} onClick={() => marcar({ cor: c })} />

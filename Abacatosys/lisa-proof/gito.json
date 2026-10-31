@@ -9,14 +9,33 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.42.0-cloudflare-pages.1",
+  "versao": "0.43.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-31",
   "compilacao": {
-    "numero": 84,
+    "numero": 85,
     "data": "2026-10-31",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.43.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "No celular, o app não abre mais \"jogado para a esquerda\"; o caderno volta a rolar; e o leitor de PDF ganha o modo texto e a leitura em tela cheia, como um leitor digital.",
+      "itens": [
+        "Início e Biblioteca Colaborativa: a página ficava mais larga que a tela do celular (450 e 978 px numa tela de 390) e o celular diminuía o zoom, jogando tudo para a esquerda. A causa era a coluna das grades crescendo até o conteúdo mais largo: o chip de anotação com o nome do caderno e da página, e a prateleira que rola para o lado. As grades agora têm a largura da tela, o chip quebra a linha e, no celular, nada dentro do conteúdo alarga a página.",
+        "Caderno: o editor não rolava em nenhum aparelho — a página crescia até o tamanho do texto e o fim das páginas longas ficava inalcançável. Corrigido.",
+        "Caderno no celular: ocupa a tela toda (sem o topo e a barra de abas do app) e, nas páginas de texto, sem a margem dos números de linha e com letra de leitura.",
+        "Leitor de PDF no celular: tela toda; tocar no meio esconde e mostra os controles (um indicador discreto mostra a página e o quanto já leu); tocar nas laterais avança ou volta uma tela.",
+        "Modo texto no leitor (botão Aa): o texto da página em letra grande, numa coluna de leitura com o tema do leitor e o tamanho da letra ajustável, em rolagem contínua; o trecho selecionado dá para copiar e mandar para o caderno.",
+        "Testado logado com celular (390 px) e tablet (820 px) emulados: largura das telas, rolagem do caderno com o dedo e com a roda do mouse, e os toques do leitor nos dois modos."
+      ],
+      "issues": [
+        "BEYOND-0007",
+        "BEYOND-0008"
+      ]
+    },
     {
       "versao": "0.42.0-cloudflare-pages.1",
       "data": "2026-10-31",

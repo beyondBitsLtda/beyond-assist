@@ -251,3 +251,44 @@ export function termoDeBusca(bruto) {
   const t = String(bruto || "").replace(/\s+/g, " ").trim().slice(0, 120);
   return t.length >= 2 ? t : null;
 }
+
+// ---------------------------------------------------------------- o modo texto do leitor (31/10/2026)
+
+const FIM_DE_FRASE = /[.!?:;…"”»)\]]$/;
+
+/**
+ * O texto de uma página do PDF (as linhas como o pdf.js entrega) em parágrafos, para o modo texto do
+ * leitor no celular (BEYOND-0007: "funcionar como um e-reader de qualidade faria"). Junta as linhas
+ * de um mesmo parágrafo, desfaz a hifenização do fim da linha ("produ-" + "ção"), tira o número da
+ * página e o cabeçalho corrido de uma linha só com número ("2 Capítulo 1 Introdução"). Um parágrafo
+ * termina numa linha em branco ou numa linha curta que fecha a frase.
+ */
+export function paragrafosDaPagina(texto, numeroDaPagina = null) {
+  let linhas = String(texto || "").replace(/\r/g, "").split("\n").map((l) => l.replace(/\s+/g, " ").trim());
+  const cheias = linhas.filter(Boolean).map((l) => l.length).sort((a, b) => a - b);
+  const tipica = cheias.length ? cheias[Math.floor(cheias.length * 0.75)] : 0;
+  // na 1ª ou na última linha: o número da página sozinho, ou o cabeçalho (rodapé) corrido — linha curta,
+  // sem fechar frase, com um número numa das pontas ("2 Capítulo 1 Introdução", "Introdução a JS 3").
+  // O número impresso nem sempre é o do PDF (capa e sumário contam), então qualquer número serve.
+  const ehNumeracao = (l) => /^\d{1,4}$/.test(l)
+    || (numeroDaPagina != null && l.length < 90 && (l.startsWith(`${numeroDaPagina} `) || l.endsWith(` ${numeroDaPagina}`)))
+    || (l.length < Math.max(60, tipica * 0.75) && !FIM_DE_FRASE.test(l) && (/^\d{1,4} \S/.test(l) || /\S \d{1,4}$/.test(l)));
+  while (linhas.length && !linhas[0]) linhas.shift();
+  while (linhas.length && !linhas.at(-1)) linhas.pop();
+  if (linhas.length > 1 && ehNumeracao(linhas[0])) linhas = linhas.slice(1);
+  if (linhas.length > 1 && ehNumeracao(linhas.at(-1))) linhas = linhas.slice(0, -1);
+
+  const paragrafos = [];
+  let atual = "";
+  const fechar = () => { if (atual.trim()) paragrafos.push(atual.trim()); atual = ""; };
+  for (const linha of linhas) {
+    if (!linha) { fechar(); continue; }
+    if (!atual) atual = linha;
+    else if (/[a-zà-ú]-$/i.test(atual) && /^[a-zà-ú]/.test(linha)) atual = atual.slice(0, -1) + linha;
+    else atual += ` ${linha}`;
+    // linha curta que fecha a frase: fim do parágrafo (a linha cheia continua na de baixo)
+    if (FIM_DE_FRASE.test(linha) && tipica && linha.length < tipica * 0.8) fechar();
+  }
+  fechar();
+  return paragrafos;
+}
