@@ -61,4 +61,5 @@ export const NOMES_DOS_EVENTOS = {
   dominio: "Modo Domínio",
   cartoes: "Cartões revisados",
   revisao: "Revisão da turma",
+  diario: "Diário de estudo",
 };

@@ -21,6 +21,8 @@ export default function PaginaDoDominio() {
   const [tema, setTema] = useState("");
   const [perfil, setPerfil] = useState("musica");
   const [ponto, setPonto] = useState("");
+  const [livros, setLivros] = useState(null); // os livros da Biblioteca com texto (para a torre de um livro)
+  const [livroId, setLivroId] = useState("");
   const [lendo, setLendo] = useState(false);
   const [erro, setErro] = useState("");
   const [recusa, setRecusa] = useState(null);
@@ -32,6 +34,17 @@ export default function PaginaDoDominio() {
   const doTema = origem === "tema";
   const pronto = doTema ? tema.trim().length >= 3 : Boolean(repo.trim());
 
+  // os livros só são lidos quando a pessoa escolhe a torre de tema
+  useEffect(() => {
+    if (!doTema || livros) return;
+    obter("/api/biblioteca").then((r) => setLivros((r.livros || []).filter((l) => l.paginasComTexto > 0))).catch(() => setLivros([]));
+  }, [doTema, livros]);
+  function escolherLivro(id) {
+    setLivroId(id);
+    const l = (livros || []).find((x) => x.id === id);
+    if (l && !tema.trim()) setTema(String(l.titulo).slice(0, 80));
+  }
+
   async function analisar(e) {
     e.preventDefault();
     if (!pronto || lendo) return;
@@ -39,7 +52,7 @@ export default function PaginaDoDominio() {
     setErro("");
     setRecusa(null);
     try {
-      const r = await criar("/api/dominio", doTema ? { tema: tema.trim(), perfil, ponto: ponto.trim() } : { repo: repo.trim() });
+      const r = await criar("/api/dominio", doTema ? { tema: tema.trim(), perfil, ponto: ponto.trim(), livroId: livroId || undefined } : { repo: repo.trim() });
       if (r.id) return router.push(`/dominio/${r.id}`);
       setRecusa(r);
     } catch (e2) {
@@ -82,6 +95,16 @@ export default function PaginaDoDominio() {
                 <input className="pf-campo__entrada" maxLength={80} value={tema} onChange={(e) => setTema(e.target.value)} disabled={lendo} required
                   placeholder={{ musica: "violão popular, canto, piano clássico", idiomas: "inglês, espanhol para viagem", matematica: "cálculo 1, geometria plana", livre: "fotografia, culinária, oratória" }[perfil]} />
               </label>
+              {livros?.length > 0 && (
+                <label className="pf-campo">
+                  <span className="pf-campo__rotulo">📚 A partir de um livro da Biblioteca (opcional)</span>
+                  <select className="pf-campo__entrada" value={livroId} disabled={lendo} onChange={(e) => escolherLivro(e.target.value)}>
+                    <option value="">Sem livro — a Lisa monta pelo tema</option>
+                    {livros.map((l) => <option key={l.id} value={l.id}>{l.titulo}{l.autor ? ` — ${l.autor}` : ""} ({l.paginas} págs.)</option>)}
+                  </select>
+                  {livroId && <small className="pf-estat__nota" style={{ margin: 0 }}>Cada andar cobre um trecho do livro, na ordem do sumário, com uma missão prática sobre ele. Um livro curto sustenta menos andares.</small>}
+                </label>
+              )}
               <label className="pf-campo">
                 <span className="pf-campo__rotulo">De onde você parte (opcional)</span>
                 <input className="pf-campo__entrada" maxLength={300} value={ponto} onChange={(e) => setPonto(e.target.value)} disabled={lendo}

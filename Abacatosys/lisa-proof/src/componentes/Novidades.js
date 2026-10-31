@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoFuncionario } from "./acervo/personagensDoAcervo.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-31-cartoes-turma-e-torres";
+export const EDICAO_DAS_NOVIDADES = "2026-10-31-conversa-graficos-e-diario";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,10 +28,10 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🃏", titulo: "Cartões com repetição espaçada", texto: "A Lisa cria os cartões do assunto (ou você escreve os seus) e cada um volta no dia em que você ia esquecer. Em Prática → Cartões.", destaque: true },
-  { icone: "🗼", titulo: "Modo Domínio de qualquer tema", texto: "Torre de repertório, do QECR, de problemas ou de missões: escale um tema de música, idiomas, matemática ou o que quiser, entregando cada andar com texto, fotos, áudio ou vídeo." },
-  { icone: "🥁", titulo: "Ritmo e afinação ao vivo", texto: "Nos cursos de música: bata o ritmo junto do metrônomo e cante ou toque a nota no microfone, com a agulha do afinador na tela." },
-  { icone: "🤝", titulo: "Revisão da turma", texto: "Discordou da Lisa num critério? Um colega revisa, sem nomes. Quem revisa ganha pontos e moedas." },
+  { icone: "🃏", titulo: "Cartões, torres de tema e revisão da turma", texto: "Cartões com repetição espaçada (Prática → Cartões), o Modo Domínio de qualquer tema e a revisão de um colega quando você discorda da Lisa.", destaque: true },
+  { icone: "💬", titulo: "Conversa com a Lisa", texto: "Nos cursos de idiomas: uma cena do dia a dia na língua do curso. A Lisa faz um papel, corrige cada fala e avalia no fim." },
+  { icone: "📈", titulo: "Passo a passo e gráficos", texto: "Na matemática: cada linha da resolução é conferida (o erro aparece onde nasceu) e há gráficos de arrastar pontos e retas. Na música, leitura na pauta, ritmo e afinação ao vivo." },
+  { icone: "📓", titulo: "Diário, PDF e torre de um livro", texto: "O diário do dia (o que aprendeu e onde travou), entrega em PDF, a frase-senha nas gravações e a torre do Modo Domínio feita a partir de um livro da Biblioteca." },
 ];
 
 const NA_ESQUERDA = ["celeste", "iris"];

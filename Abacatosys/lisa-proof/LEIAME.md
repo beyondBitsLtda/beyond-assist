@@ -350,9 +350,9 @@ qualquer hora, em **Ajustes da trilha → Tipo de curso** (vale para a prática 
 |---|---|---|
 | Programação | código (o de sempre) | repositório no GitHub |
 | Música | treino de ouvido, ritmo e afinação (pelo assunto, `motoresDaMusica`) e desafio aberto | áudio, vídeo do YouTube, texto |
-| Idiomas | ditado e desafio aberto (redação, tradução, pronúncia) | texto, áudio |
-| Matemática e exatas | lista de cálculo e desafio aberto (resolução no caderno) | texto, fotos |
-| Livre (qualquer tema) | desafio aberto (missão prática) | texto, fotos, áudio, vídeo do YouTube |
+| Idiomas | ditado, conversa com a Lisa e desafio aberto (redação, tradução, pronúncia) | texto, áudio, PDF |
+| Matemática e exatas | lista de cálculo, passo a passo e gráfico (pelo assunto, `motoresDaMatematica`) e desafio aberto | texto, fotos, PDF |
+| Livre (qualquer tema) | desafio aberto (missão prática) | texto, fotos, áudio, vídeo do YouTube, PDF |
 
 Nos perfis com dois motores, eles se alternam de um dia para o outro e na rodada extra
 (`motorDoExercicio`).
@@ -379,11 +379,29 @@ rodadas, agenda e pontos não mudam —, com o motor em `conteudo.motor` (exerc�
   simplificado, testado com seno sintético) e mostra a agulha ao vivo; vai só a frequência, e o
   servidor mede os cents **em qualquer oitava** (até 20 cents é afinado). O som não é gravado nem enviado.
 
-Música escolhe o motor pelo assunto (`motoresDaMusica`, em `src/dominio/perfis.js`): ritmo/compasso →
-ritmo; canto/voz/afinação → afinação; intervalos/acordes/teoria → ouvido e afinação; o resto (uma
-peça, a postura) → desafio aberto e ritmo.
+- **leitura** — a nota na pauta (clave de sol ou de fá, pelo assunto; linhas suplementares no
+  avançado), desenhada em SVG; a pessoa escolhe o nome. Montado pelo código (`gerarLeitura`).
+- **passos** — 2 ou 3 problemas (a IA escreve; `validarPassos` descarta o que o analisador não lê ou
+  cuja solução não confere). A pessoa resolve **uma linha por passo** e o servidor confere cada
+  linha (`src/dominio/passos.js`): na expressão, equivalente à anterior e, no fim, na forma pedida; na
+  equação, cada linha continua valendo para as soluções (sem perder raiz, sem virar identidade) e a
+  última isola o x ("x = 2 ou x = 3"). O erro aparece **na linha em que nasceu**.
+- **grafico** — 4 itens no plano de −6 a 6 (`src/dominio/grafico.js`, montado pelo código): marcar um
+  ponto, a reta y = ax + b (dois pontos), o vértice ou as raízes de uma parábola. Os pontos começam
+  em x = ±6, onde nenhuma resposta sorteada fica; a parábola só aparece depois de corrigir.
+- **conversa** — uma cena do dia a dia na língua do curso (`src/dominio/conversa.js`): a Lisa faz um
+  papel, a pessoa escreve até 6 falas (`/api/desafios/:id/conversa`); cada fala volta com a resposta
+  da Lisa e, se precisar, a correção em português. Com 2 falas ou mais, "Encerrar e avaliar" manda a
+  conversa inteira para a avaliação pela rubrica (`{ encerrar: true }` no `/enviar`). A fala da Lisa
+  toca na voz do navegador.
 
-Os cinco corrigidos no servidor têm **uma tentativa só** (`tentativasDe`, em `src/dominio/pratica.js`),
+Música escolhe o motor pelo assunto (`motoresDaMusica`, em `src/dominio/perfis.js`): leitura/pauta →
+leitura; ritmo/compasso → ritmo; canto/voz/afinação → afinação; intervalos/acordes/teoria → ouvido,
+leitura e afinação; o resto (uma peça, a postura) → desafio aberto e ritmo. Matemática
+(`motoresDaMatematica`): equação/expressão/fatoração → passo a passo; função/gráfico/reta/parábola →
+gráfico; a lista de cálculo e o desafio aberto sempre.
+
+Os corrigidos no servidor (e a conversa) têm **uma tentativa só** (`tentativasDe`, em `src/dominio/pratica.js`),
 como o quiz, e o gabarito só vai para a tela depois da correção (`exercicioParaTela`).
 
 **A entrega por evidências** (`EntregaComEvidencias`, em `src/componentes/pratica/Motores.js`):
@@ -400,6 +418,24 @@ como o quiz, e o gabarito só vai para a tela depois da correção (`exercicioPa
   avaliação é refeita sem o vídeo e o servidor avisa no comentário.
 - A avaliação (`avaliarEntrega`, em `src/lib/iaPratica.js`) devolve o mesmo formato da avaliação de
   código: os projetos continuam pontuando **por requisito**.
+- **PDF** (31/10/2026): um arquivo de até 4 MB, onde o perfil aceita (matemática, idiomas, livre). Vai
+  inteiro para o Gemini (`application/pdf`) e não é guardado; a resposta guarda só o tamanho.
+- **Frase-senha** (31/10/2026, `src/dominio/senha.js`): o desafio que pede áudio, foto ou vídeo nasce
+  com uma frase sorteada ("lua azul 27"), mostrada no formulário. A pessoa fala no começo da gravação
+  ou escreve num papel que aparece na foto. A Lisa procura a frase; sem ela, a entrega vale **no
+  máximo 60** (ainda aprova — a IA pode não ter ouvido — mas não sobe o ranking com nota alta). Vale
+  também nos andares da torre de tema. Desafio antigo, sem frase, e entrega só de texto ou PDF: nada muda.
+
+### Diário de estudo
+
+Pedido de 31/10/2026. Migração `db/024-diario-e-torre-do-livro.sql` (`proof_diario`). Regras em
+`src/dominio/diario.js`; banco em `src/lib/diario.js`; o botão **📓 Diário de hoje** em cada trilha da
+Prática (só lê o banco quando abre).
+
+- Uma entrada por trilha e por dia: o que aprendi (obrigatório) e onde travei (opcional). Sem nota.
+- A primeira do dia vale 5 pontos (tipo `diario`, uma chave por dia somando as trilhas) e conta para a ofensiva.
+- **Onde travei** entra no pedido do exercício do dia seguinte (`travadasDoDiario`, em
+  `src/lib/pratica.js`): a Lisa trabalha o ponto fraco, se couber no assunto.
 
 ### Cartões com repetição espaçada
 
@@ -453,6 +489,14 @@ fica opcional, com uma checagem que exige um ou outro). Regras em `src/dominio/m
   afinação, expressão e repertório). A entrega guarda só um resumo (o texto até 600 caracteres, o
   link, a duração do áudio e o número de fotos).
 - O certificado e a página de conferência dizem "torre do tema" e mostram o tema no lugar do repositório.
+
+**Torre de um livro** (31/10/2026, migração 024: `proof_dominios.livro_id`). Na torre de tema, dá para
+escolher um livro da Biblioteca (já com o texto lido). As seções saem do sumário (`secoesDoLivro`, o
+nível mais alto; sem sumário, fatias de 10 páginas) e, ao montar, cada andar ganha o seu trecho
+(`faixasDosAndares`: seções juntas quando há mais seções que andares, divididas pelas páginas quando
+há menos), guardado em `analise.faixas`. A Lisa lê o texto das páginas do andar ao escrever o desafio
+(uma missão prática sobre o que o trecho ensina), e a tela mostra "Leia antes: págs. X–Y" com o link
+para o leitor. Um livro sustenta no máximo um andar a cada duas páginas (`andaresPermitidosDoLivro`).
 
 ## Mercado de tropas
 

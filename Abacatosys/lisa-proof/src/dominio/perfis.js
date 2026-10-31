@@ -18,22 +18,22 @@ export const PERFIS = {
   },
   musica: {
     nome: "Música", emoji: "🎵", exemplos: "violão, piano, canto, teoria musical",
-    professora: "professora de música", motores: ["ouvido", "ritmo", "afinacao", "aberto"], evidencias: ["audio", "video", "texto"],
-    descricao: "Treino de ouvido, ritmo no metrônomo e afinação no microfone, corrigidos na hora; prática gravada em áudio ou vídeo, ouvida pela Lisa.",
+    professora: "professora de música", motores: ["ouvido", "leitura", "ritmo", "afinacao", "aberto"], evidencias: ["audio", "video", "texto"],
+    descricao: "Treino de ouvido, leitura na pauta, ritmo no metrônomo e afinação no microfone, corrigidos na hora; prática gravada em áudio ou vídeo, ouvida pela Lisa.",
   },
   idiomas: {
     nome: "Idiomas", emoji: "🗣️", exemplos: "inglês, espanhol, francês, português",
-    professora: "professora de idiomas", motores: ["ditado", "aberto"], evidencias: ["texto", "audio"],
-    descricao: "Ditado com a voz do navegador, redação e pronúncia gravada, corrigidas pela Lisa.",
+    professora: "professora de idiomas", motores: ["ditado", "conversa", "aberto"], evidencias: ["texto", "audio", "pdf"],
+    descricao: "Ditado com a voz do navegador, conversa com a Lisa numa situação do dia a dia, redação e pronúncia gravada, corrigidas pela Lisa.",
   },
   matematica: {
     nome: "Matemática e exatas", emoji: "📐", exemplos: "álgebra, cálculo, estatística, física",
-    professora: "professora de matemática", motores: ["calculo", "aberto"], evidencias: ["texto", "imagens"],
-    descricao: "Lista de contas e expressões conferida sem IA, e resolução no caderno (foto) lida pela Lisa.",
+    professora: "professora de matemática", motores: ["calculo", "passos", "grafico", "aberto"], evidencias: ["texto", "imagens", "pdf"],
+    descricao: "Lista de contas, passo a passo conferido linha a linha e gráficos de arrastar, sem IA; resolução no caderno (foto ou PDF) lida pela Lisa.",
   },
   livre: {
     nome: "Livre", emoji: "🧭", exemplos: "culinária, fotografia, história, oratória",
-    professora: "tutora", motores: ["aberto"], evidencias: ["texto", "imagens", "audio", "video"],
+    professora: "tutora", motores: ["aberto"], evidencias: ["texto", "imagens", "audio", "video", "pdf"],
     descricao: "Para qualquer tema: missões práticas com entrega em texto, fotos, áudio ou vídeo, avaliadas por critérios.",
   },
 };
@@ -73,13 +73,28 @@ export function perfilPeloTema(tema, padrao = PERFIL_PADRAO) {
 const ASSUNTO_DE_OUVIDO = /intervalo|acorde|tr[ií]ade|escala|percep|ouvido|harmonia|tonalidade|cad[eê]ncia|solfejo|teoria/i;
 const ASSUNTO_DE_RITMO = /ritmo|r[ií]tmic|compasso|metr[oô]nomo|andamento|pulsa[cç][aã]o|batida|levada|colch|sem[ií]nima|m[ií]nima|s[ií]ncop|groove|bateria|percuss/i;
 const ASSUNTO_DE_CANTO = /canto|cantar|vocal|voz|afina[cç][aã]o|afinad|respira[cç][aã]o|aquecimento vocal/i;
+const ASSUNTO_DE_LEITURA = /leitura|partitura|pauta|clave|pentagrama|nomes? das notas|figuras musicais/i;
 
 export function motoresDaMusica(assunto) {
   const t = `${assunto?.titulo || ""} ${assunto?.descricao || ""}`;
+  if (ASSUNTO_DE_LEITURA.test(t)) return ["leitura", "aberto"];
   if (ASSUNTO_DE_RITMO.test(t)) return ["ritmo", "aberto"];
   if (ASSUNTO_DE_CANTO.test(t)) return ["afinacao", "aberto"];
-  if (ASSUNTO_DE_OUVIDO.test(t)) return ["ouvido", "afinacao", "aberto"];
+  if (ASSUNTO_DE_OUVIDO.test(t)) return ["ouvido", "leitura", "afinacao", "aberto"];
   return ["aberto", "ritmo"];
+}
+
+// Os motores de matemática pelo assunto: gráfico para funções, retas e parábolas; passo a passo para
+// equações, expressões e fatoração; a lista de contas e o desafio aberto servem a tudo.
+const ASSUNTO_DE_GRAFICO = /gr[aá]fico|fun[cç][aã]o (afim|linear|quadr[aá]tica)|fun[cç][oõ]es|reta|par[aá]bola|plano cartesiano|coordenad|v[eé]rtice/i;
+const ASSUNTO_DE_PASSOS = /equa[cç]|express[aã]o|express[oõ]es|fatora|simplifica|produtos not[aá]veis|polin[oô]mi|[aá]lgebra|inequa|isolar/i;
+
+export function motoresDaMatematica(assunto) {
+  const t = `${assunto?.titulo || ""} ${assunto?.descricao || ""}`;
+  const motores = ["calculo"];
+  if (ASSUNTO_DE_PASSOS.test(t)) motores.push("passos");
+  if (ASSUNTO_DE_GRAFICO.test(t)) motores.push("grafico");
+  return [...motores, "aberto"];
 }
 
 /** O número do dia (dias desde 1970), para alternar o motor de um dia para o outro. */
@@ -97,5 +112,6 @@ export function motorDoExercicio({ perfil, rodada = 1, assunto = null, dia = "" 
   const p = perfilValido(perfil);
   let motores = PERFIS[p].motores;
   if (p === "musica") motores = motoresDaMusica(assunto);
+  if (p === "matematica") motores = motoresDaMatematica(assunto);
   return motores[(numeroDoDia(dia) + (Number(rodada) || 1) - 1) % motores.length];
 }

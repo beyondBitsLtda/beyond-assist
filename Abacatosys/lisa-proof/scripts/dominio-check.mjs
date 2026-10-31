@@ -102,6 +102,15 @@ import {
 } from "../src/dominio/cartoes.js";
 import { podePedirRevisao, validarPedido, validarVeredito, podeRevisar as podeRevisarNaTurma, aplicarRevisao, atendidosPelaIA } from "../src/dominio/revisoes.js";
 import { atributosDaTorre, tituloDaTorre, validarPedidoDeTema, validarDesafioDoTema, PERFIS_DE_TORRE, TORRES_DE_TEMA } from "../src/dominio/modoDominio.js";
+import { secoesDoLivro, faixasDosAndares, andaresPermitidosDoLivro, paginasDaFaixa } from "../src/dominio/modoDominio.js";
+import { midiDoGrau, nomeDoGrau, pautaDoAssunto, gerarLeitura, corrigirLeitura } from "../src/dominio/musica.js";
+import { validarPassos, corrigirItemDePassos, corrigirPassos, passosParaTela, lerLinhas } from "../src/dominio/passos.js";
+import {
+  gerarGrafico, categoriaDoGrafico, formatarPolinomio, graficoParaTela, corrigirItemDeGrafico, lerPontos, inicioDosPontos,
+} from "../src/dominio/grafico.js";
+import { validarConversa, validarRespostaDaLisa, turnosDe, podeFalar, podeEncerrar, validarMensagem } from "../src/dominio/conversa.js";
+import { gerarSenha, precisaDeSenha, entregaTemMidia, aplicarSenha, TETO_SEM_SENHA } from "../src/dominio/senha.js";
+import { validarEntradaDoDiario, pontosFracos, chaveDoDiario } from "../src/dominio/diario.js";
 import { montarAgenda, itensDoDia, gradeDoMes, mesVizinho } from "../src/dominio/agenda.js";
 import {
   MIN_ANDARES, NOTA_PARA_VENCER, CHEFOES, CHEFOES_FINAIS, ATRIBUTOS, andaresPermitidos, andaresEscolhidos, dificuldadeEsperada,
@@ -2600,7 +2609,7 @@ caso("música: o motor do exercício pelo assunto (ouvido, ritmo, afinação ou 
   const opcoes = (titulo) => new Set([1, 2, 3, 4].map((rodada) => motorDoExercicio({ perfil: "musica", rodada, dia, assunto: { titulo } })));
   assert.deepEqual([...opcoes("Compasso e semínimas")].sort(), ["aberto", "ritmo"]);
   assert.deepEqual([...opcoes("Canto: respiração")].sort(), ["aberto", "afinacao"]);
-  assert.deepEqual([...opcoes("Intervalos")].sort(), ["aberto", "afinacao", "ouvido"]);
+  assert.deepEqual([...opcoes("Intervalos")].sort(), ["aberto", "afinacao", "leitura", "ouvido"]);
   assert.deepEqual([...opcoes("Postura da mão direita")].sort(), ["aberto", "ritmo"]);
 });
 
@@ -2745,6 +2754,185 @@ caso("migração 023: só acrescenta (tabelas, colunas e tipos novos no livro de
   assert.match(sql, /add column if not exists origem text not null default 'repositorio'/);
   assert.doesNotMatch(sql, /drop table|drop column/i);
   for (const p of PERFIS_DE_TORRE) assert.ok(sql.includes(`'${p}'`), `a torre aceita ${p}`);
+});
+
+// ---------------------------------------------------------------- 31/10/2026 (2): o resto da proposta
+
+caso("passo a passo: a IA errada é filtrada; cada linha é conferida e o erro aparece onde nasceu", () => {
+  const c = validarPassos({
+    titulo: "Passos",
+    itens: [
+      { tipo: "equacao", enunciado: "Resolva", inicio: "2x + 3 = 11", solucoes: ["4"], variavel: "x" },
+      { tipo: "expressao", enunciado: "Fatore", inicio: "x^2 + 6x", forma: "fatorada", resposta: "x(x + 6)", variavel: "x" },
+      { tipo: "equacao", enunciado: "Resolva", inicio: "x^2 - 5x + 6 = 0", solucoes: ["2", "3"], variavel: "x" },
+      { tipo: "equacao", enunciado: "Errada", inicio: "x + 1 = 3", solucoes: ["5"], variavel: "x" },
+      { tipo: "expressao", enunciado: "Errada", inicio: "x^2", forma: "fatorada", resposta: "x + x", variavel: "x" },
+    ],
+  });
+  assert.equal(c.itens.length, 3, "a solução que não vale e a resposta que não é equivalente saem");
+  assert.throws(() => validarPassos({ itens: [{ tipo: "equacao", enunciado: "a", inicio: "x = x", solucoes: ["1"] }] }), /passo a passo/);
+  const [eq, ex, quad] = c.itens;
+  assert.equal(corrigirItemDePassos(eq, "2x = 11 - 3\nx = 8/2\nx = 4").certo, true);
+  const errou = corrigirItemDePassos(eq, "2x = 11 + 3\nx = 7");
+  assert.equal(errou.linhaDoErro, 1);
+  assert.match(errou.motivo, /linha 1: não vale mais para x = 4/);
+  assert.equal(corrigirItemDePassos(eq, "2x = 8").nota, 0.5, "certo, mas sem isolar o x");
+  assert.equal(corrigirItemDePassos(ex, "= x(x + 6)").certo, true, "o = do começo da linha é ignorado");
+  assert.equal(corrigirItemDePassos(ex, "x^2 + 6x + 0").nota, 0.5, "equivalente, mas não fatorada");
+  const exErrou = corrigirItemDePassos(ex, "x(x + 6)\nx(x + 5)");
+  assert.equal(exErrou.linhaDoErro, 2);
+  assert.equal(exErrou.nota, 0.25);
+  assert.equal(corrigirItemDePassos(quad, "(x - 2)(x - 3) = 0\nx - 2 = 0 ou x - 3 = 0\nx = 2 ou x = 3").certo, true);
+  assert.equal(corrigirItemDePassos(quad, "(x - 2)(x - 3) = 0\nx = 2, x = 3").certo, true, "a vírgula antes do x também separa");
+  assert.match(corrigirItemDePassos(quad, "(x - 2)(x - 3) = 0\nx = 2").motivo, /não vale mais para x = 3/, "perder uma raiz é erro na linha");
+  assert.match(corrigirItemDePassos(quad, "0 = 0").motivo, /qualquer x/);
+  assert.equal(corrigirPassos(c, ["2x = 8\nx = 4", "x(x+6)", ""]).nota, 67);
+  assert.equal(passosParaTela(c).itens[0].solucoes, undefined, "as soluções não vão para a tela antes");
+  assert.deepEqual(lerLinhas("  a \n\n = b\n"), ["a", "b"]);
+});
+
+caso("gráfico: montado pelo código; reta, ponto, vértice e raízes conferidos no servidor", () => {
+  const g = gerarGrafico({ semente: 9, assunto: { titulo: "Função quadrática e vértice" } });
+  assert.equal(g.categoria, "parabola");
+  assert.deepEqual(g, gerarGrafico({ semente: 9, assunto: { titulo: "Função quadrática e vértice" } }));
+  assert.equal(categoriaDoGrafico({ titulo: "Função afim" }), "reta");
+  assert.equal(categoriaDoGrafico({ titulo: "Plano cartesiano" }), "pontos");
+  assert.equal(formatarPolinomio([1, -4, 3]), "x² − 4x + 3");
+  assert.equal(formatarPolinomio([-1, 0, 2]), "−x² + 2");
+  assert.equal(formatarPolinomio([2, -1]), "2x − 1");
+  const tela = graficoParaTela(g);
+  assert.ok(tela.itens.every((it) => it.h === undefined && it.r1 === undefined), "o vértice e as raízes não vão para a tela");
+  const reta = { tipo: "reta", a: 2, b: -1, expressao: "y = 2x − 1", pontos: 2 };
+  assert.equal(corrigirItemDeGrafico(reta, "0,-1;2,3").certo, true);
+  assert.equal(corrigirItemDeGrafico(reta, "0,-1;2,2").nota, 0.5);
+  assert.equal(corrigirItemDeGrafico(reta, "1,1;1,1").certo, false);
+  assert.equal(corrigirItemDeGrafico({ tipo: "vertice", h: 2, k: -1, pontos: 1 }, "2,-1").certo, true);
+  assert.equal(corrigirItemDeGrafico({ tipo: "raizes", r1: 2, r2: 3, pontos: 2 }, "3,0;2,0").certo, true, "a ordem não importa");
+  assert.equal(corrigirItemDeGrafico({ tipo: "raizes", r1: 2, r2: 3, pontos: 2 }, "2,0;4,0").nota, 0.5);
+  assert.deepEqual(lerPontos("1,2;9,9;a,b"), [[1, 2]], "fora do plano e ilegível saem");
+  // o começo dos pontos nunca é a resposta (a pessoa precisa mexer)
+  for (let s = 1; s < 60; s++) {
+    for (const assunto of [{ titulo: "Função afim" }, { titulo: "Parábola" }, { titulo: "Plano cartesiano" }, {}]) {
+      for (const it of gerarGrafico({ semente: s, assunto }).itens) {
+        assert.notEqual(corrigirItemDeGrafico(it, inicioDosPontos(it.pontos).map((p) => p.join(",")).join(";")).nota, 1, `semente ${s}`);
+        if (it.tipo === "reta") assert.equal(corrigirItemDeGrafico(it, inicioDosPontos(2).map((p) => p.join(",")).join(";")).nota, 0);
+      }
+    }
+  }
+});
+
+caso("leitura na pauta: a posição de cada nota, a clave pelo assunto e o gabarito escondido", () => {
+  assert.equal(midiDoGrau(28), 60, "Dó4");
+  assert.equal(midiDoGrau(30), 64, "Mi4, a linha de baixo da clave de sol");
+  assert.equal(midiDoGrau(18), 43, "Sol2, a linha de baixo da clave de fá");
+  assert.equal(nomeDoGrau(33, true), "Lá4");
+  assert.equal(pautaDoAssunto({ titulo: "Clave de fá no contrabaixo" }).clave, "fa");
+  const l = gerarLeitura({ semente: 4, assunto: { titulo: "Leitura de partitura" } });
+  assert.equal(l.clave, "sol");
+  assert.ok(l.itens.every((it) => it.grau >= 30 && it.grau <= 38));
+  const tela = exercicioParaTela(l, false);
+  assert.ok(tela.itens.every((it) => it.correta === undefined && it.midi === undefined && Number.isInteger(it.grau)));
+  const certas = l.itens.map((it) => it.correta);
+  assert.equal(corrigirLeitura(l, certas).nota, 100);
+  assert.match(corrigirLeitura(l, certas.map((c) => (c + 1) % 7)).itens[0].motivo, /^era /);
+  assert.equal(MOTORES.leitura.tentativas, 1);
+});
+
+caso("conversa: o roteiro, as falas que cabem e quando dá para encerrar", () => {
+  const c = validarConversa({
+    titulo: "No check-in", idioma: "en-US", nivel: "A2", cenario: "Aeroporto", papel: "atendente", objetivo: "fazer o check-in",
+    abertura: "Good morning! Can I see your passport?", dicas: ["window seat — assento na janela"], criterios: ["Cumpriu o objetivo", "Gramática"],
+  });
+  assert.equal(c.motor, "conversa");
+  assert.throws(() => validarConversa({ abertura: "Hi", objetivo: "x", criterios: ["a"] }), /critérios/);
+  assert.equal(validarConversa({ ...c, idioma: "inglês", nivel: "Z9" }).idioma, "en-US");
+  const d = { status: "em_andamento", tentativas: 0, conteudo: c, resposta: {} };
+  assert.deepEqual(turnosDe(d), [{ quem: "lisa", texto: c.abertura }]);
+  assert.equal(podeFalar(d).ok, true);
+  const cheia = Array.from({ length: c.falas }, () => [{ quem: "pessoa", texto: "hi" }, { quem: "lisa", texto: "ok" }]).flat();
+  assert.equal(podeFalar({ ...d, resposta: { turnos: cheia } }).ok, false, "as falas acabam");
+  assert.equal(podeFalar({ ...d, tentativas: 1 }).ok, false, "depois de avaliada, não");
+  assert.equal(podeEncerrar([{ quem: "pessoa", texto: "a" }]).ok, false);
+  assert.equal(podeEncerrar([{ quem: "pessoa", texto: "a" }, { quem: "pessoa", texto: "b" }]).ok, true);
+  assert.throws(() => validarMensagem("   "), /escreva/);
+  assert.equal(validarRespostaDaLisa({ fala: "Sure!", correcao: "", terminou: 1 }).terminou, true);
+  assert.equal(MOTORES.conversa.corrige, "ia");
+});
+
+caso("frase-senha: sorteada, pedida só com mídia, e a entrega sem ela fica no teto", () => {
+  assert.match(gerarSenha([3, 200, 77]), /^\p{L}+ \p{L}+ \d{2}$/u);
+  assert.throws(() => gerarSenha([1]));
+  assert.equal(precisaDeSenha(["texto"]), false);
+  assert.equal(precisaDeSenha(["texto", "audio"]), true);
+  assert.equal(entregaTemMidia({ texto: "x", imagens: [] }), false);
+  assert.equal(entregaTemMidia({ imagens: [{}] }), true);
+  const av = { nota: 90, aprovado: true, comentario: "Muito bom." };
+  assert.deepEqual(aplicarSenha(av, "nao_encontrada", { senha: null, temMidia: true }), av, "desafio antigo, sem senha: nada muda");
+  assert.deepEqual(aplicarSenha(av, "nao_encontrada", { senha: "lua azul 12", temMidia: false }), av, "só texto: nada muda");
+  assert.equal(aplicarSenha(av, "encontrada", { senha: "lua azul 12", temMidia: true }).nota, 90);
+  const sem = aplicarSenha(av, "nao_encontrada", { senha: "lua azul 12", temMidia: true });
+  assert.equal(sem.nota, TETO_SEM_SENHA);
+  assert.equal(sem.aprovado, true, "ainda aprova: a IA pode não ter ouvido");
+  assert.match(sem.comentario, /lua azul 12/);
+  assert.equal(aplicarSenha({ ...av, nota: 40 }, "nao_encontrada", { senha: "lua azul 12", temMidia: true }).nota, 40);
+});
+
+caso("evidências: o PDF entra (tipo e tamanho), só onde o desafio pede", () => {
+  assert.ok(evidenciasDoPerfil("matematica").includes("pdf"));
+  assert.ok(!evidenciasDoPerfil("musica").includes("pdf"));
+  const pdf = { tipo: "application/pdf", bytes: 200_000 };
+  const ok = conferirEvidencia({ pdf }, { aceitas: ["texto", "pdf"] });
+  assert.equal(ok.ok, true);
+  assert.deepEqual(ok.pdf, { kb: 195 });
+  assert.equal(conferirEvidencia({ pdf }, { aceitas: ["texto"] }).ok, false);
+  assert.equal(conferirEvidencia({ pdf: { ...pdf, tipo: "image/png" } }, { aceitas: ["pdf"] }).ok, false);
+  assert.equal(conferirEvidencia({ pdf: { ...pdf, bytes: LIMITES_DA_EVIDENCIA.bytesDoPdf + 1 } }, { aceitas: ["pdf"] }).ok, false);
+});
+
+caso("diário: o que aprendi é obrigatório; onde travei vira o ponto fraco do exercício", () => {
+  assert.throws(() => validarEntradaDoDiario({ aprendi: "pouco" }), /aprendeu/);
+  assert.deepEqual(validarEntradaDoDiario({ aprendi: "  Aprendi a fatorar trinômios.  ", travei: "" }), { aprendi: "Aprendi a fatorar trinômios.", travei: "" });
+  assert.deepEqual(pontosFracos([{ travei: "" }, { travei: "sinal negativo" }, { travei: "fração" }, { travei: "raiz" }]), ["sinal negativo", "fração"]);
+  assert.equal(chaveDoDiario("2026-10-31"), "diario:2026-10-31");
+});
+
+caso("matemática e idiomas: os motores pelo assunto", () => {
+  const dia = "2026-10-30";
+  const opcoes = (perfil, titulo) => [...new Set([1, 2, 3, 4, 5, 6].map((rodada) => motorDoExercicio({ perfil, rodada, dia, assunto: { titulo } })))].sort();
+  assert.deepEqual(opcoes("matematica", "Equações do 2º grau"), ["aberto", "calculo", "passos"]);
+  assert.deepEqual(opcoes("matematica", "Gráfico da função afim"), ["aberto", "calculo", "grafico"]);
+  assert.deepEqual(opcoes("matematica", "Porcentagem"), ["aberto", "calculo"]);
+  assert.deepEqual(opcoes("idiomas", "No aeroporto"), ["aberto", "conversa", "ditado"]);
+  assert.deepEqual(opcoes("musica", "Leitura na clave de sol"), ["aberto", "leitura"]);
+});
+
+caso("torre de um livro: as seções pelo sumário, os trechos de cada andar e o teto de andares", () => {
+  const sumario = [{ titulo: "Cap 1", pagina: 5, nivel: 1 }, { titulo: "1.1", pagina: 7, nivel: 2 }, { titulo: "Cap 2", pagina: 30, nivel: 1 }, { titulo: "Cap 3", pagina: 60, nivel: 1 }];
+  const secoes = secoesDoLivro(sumario, 100);
+  assert.deepEqual(secoes.map((s) => [s.de, s.ate]), [[5, 29], [30, 59], [60, 100]], "o nível mais alto do sumário, até a próxima seção");
+  const dez = faixasDosAndares(secoes, 10);
+  assert.equal(dez.length, 10);
+  for (let i = 1; i < dez.length; i++) assert.ok(dez[i].de > dez[i - 1].de, "na ordem do livro");
+  assert.equal(dez[0].de, 5);
+  assert.equal(dez.at(-1).ate, 100);
+  const dois = faixasDosAndares(secoes, 2);
+  assert.deepEqual(dois.map((f) => [f.de, f.ate]), [[5, 29], [30, 100]], "mais seções que andares: juntam");
+  assert.equal(secoesDoLivro([], 40).length, 4, "sem sumário: fatias de umas 10 páginas");
+  assert.deepEqual(andaresPermitidosDoLivro(3, 30), { min: 10, max: 15 }, "um andar a cada duas páginas");
+  assert.equal(andaresPermitidosDoLivro(5, 400).max, 100);
+  assert.equal(paginasDaFaixa({ de: 4, ate: 4 }), "p. 4");
+});
+
+caso("migração 024: só acrescenta (o diário, o livro da torre e o tipo diario)", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const sql = ler("../db/024-diario-e-torre-do-livro.sql");
+  const tipos = (texto) => [...texto.match(/proof_eventos_tipo_check check \(tipo in \(([\s\S]*?)\)\)/)[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  const antes = tipos(ler("../db/023-cartoes-turma-e-torres-de-tema.sql"));
+  for (const t of antes) assert.ok(tipos(sql).includes(t), `o tipo ${t} continua`);
+  assert.ok(tipos(sql).includes("diario"));
+  assert.match(sql, /create table if not exists public\.proof_diario/);
+  assert.match(sql, /add column if not exists livro_id uuid/);
+  assert.doesNotMatch(sql, /drop table|drop column/i);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

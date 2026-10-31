@@ -16,6 +16,7 @@ import { temModelo } from "./ia.js";
 import {
   gerarQuiz, gerarExercicio, gerarProjeto, gerarGuiaDoProjeto, ajustarComplexidadeDoProjeto, avaliarExercicio, avaliarProjeto,
   gerarDesafioAberto, gerarCalculo, gerarDitado, avaliarEntrega,
+  gerarPassos, gerarConversa, responderNaConversa, avaliarConversa,
 } from "./iaPratica.js";
 import { lerRepositorio, ErroDoGitHub } from "./github.js";
 import { diaDe } from "@/dominio/datas.js";
@@ -31,7 +32,12 @@ import {
   MOTORES, motorDo, corrigeNoServidor, exercicioParaTela, avaliacaoDoMotor, conferirEvidencia,
   gerarOuvido, corrigirCalculo, corrigirDitado, corrigirOuvido,
 } from "@/dominio/motores.js";
-import { gerarRitmo, corrigirRitmo, gerarAfinacao, corrigirAfinacao } from "@/dominio/musica.js";
+import { gerarRitmo, corrigirRitmo, gerarAfinacao, corrigirAfinacao, gerarLeitura, corrigirLeitura } from "@/dominio/musica.js";
+import { gerarGrafico, corrigirGrafico } from "@/dominio/grafico.js";
+import { corrigirPassos } from "@/dominio/passos.js";
+import { turnosDe, podeFalar, podeEncerrar, validarMensagem } from "@/dominio/conversa.js";
+import { gerarSenha, precisaDeSenha } from "@/dominio/senha.js";
+import { pontosFracos } from "@/dominio/diario.js";
 import { perfilValido, motorDoExercicio } from "@/dominio/perfis.js";
 import { semanaDoProjeto, semanaDoDesafio, pedidoDoProjeto, projetosOpcionais, podeGerarProjeto, valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
 import { avancoDasTrilhas, avancoDaTrilhaDoUsuario } from "./avanco.js";
@@ -41,6 +47,26 @@ const CAMPOS = "id, usuario_id, trilha_id, tipo, periodo, rodada, card_ids, titu
 
 function falhou(error, onde) {
   if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`);
+}
+
+/**
+ * A frase-senha (src/dominio/senha.js) do desafio que pede áudio, foto ou vídeo: sorteada quando ele
+ * nasce e mantida quando o projeto troca de enunciado ou de complexidade.
+ */
+function comSenha(conteudo, anterior = null) {
+  if (!precisaDeSenha(conteudo?.evidencias)) return conteudo;
+  return { ...conteudo, senha: anterior?.senha || gerarSenha(crypto.getRandomValues(new Uint8Array(3))) };
+}
+
+/** Onde a pessoa travou nos últimos dias, pelo diário da trilha (nunca derruba quem chama: sem diário, nada). */
+async function travadasDoDiario(trilhaId, usuarioId) {
+  try {
+    const { data } = await supabase.from("proof_diario").select("travei, dia").eq("trilha_id", trilhaId).eq("usuario_id", usuarioId)
+      .order("dia", { ascending: false }).limit(3);
+    return pontosFracos(data || []);
+  } catch {
+    return [];
+  }
 }
 
 // ---------------------------------------------------------------- projetos: pontos por parte
@@ -304,8 +330,15 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, 
     const assuntos = assuntoPedido ? [assuntoPedido] : avanco.assuntoDaPratica ? [avanco.assuntoDaPratica] : [];
     if (!assuntos.length) throw new ErroDeAcesso(400, "a trilha não tem assuntos para praticar");
     // assunto de um curso feito a partir de um livro: a prática cobra o que o trecho do livro ensina
-    const trecho = await trechoDoAssunto(assuntos[0].cardId, 16_000);
+    const [trecho, travadas] = await Promise.all([
+      trechoDoAssunto(assuntos[0].cardId, 16_000),
+      tipo === "exercicio" ? travadasDoDiario(trilha.id, usuarioId) : [],
+    ]);
     if (trecho) assuntos[0] = { ...assuntos[0], trecho: blocoDoTrecho(trecho) };
+    // o diário (src/dominio/diario.js): onde a pessoa travou, para o exercício trabalhar o ponto fraco
+    if (travadas.length) {
+      assuntos[0] = { ...assuntos[0], descricao: `${assuntos[0].descricao || ""}\nNo diário, a pessoa contou que travou em: ${travadas.join(" | ")}. Se couber no assunto, trabalhe isso.`.trim() };
+    }
     try {
       if (tipo === "quiz") {
         conteudo = await gerarQuiz({ tema: trilha.tema, assunto: assuntos[0], anteriores, rodada, perfil });
@@ -320,6 +353,7 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, 
     cardIds = assuntos.map((a) => a.cardId);
   }
 
+  conteudo = comSenha(conteudo);
   const { data, error } = await supabase.from("proof_desafios").insert({
     usuario_id: usuarioId, trilha_id: trilha.id, tipo, periodo: alvo, rodada,
     card_ids: cardIds, titulo: String(titulo).slice(0, 200), conteudo,
@@ -344,9 +378,12 @@ async function gerarExercicioDoPerfil({ tema, perfil, assunto, evitar, anteriore
   if (motor === "aberto") return gerarDesafioAberto({ tema, perfil, assunto, evitar, rodada });
   if (motor === "calculo") return gerarCalculo({ tema, assunto, evitar, rodada });
   if (motor === "ditado") return gerarDitado({ tema, assunto, evitar, rodada });
-  if (motor === "ouvido" || motor === "ritmo" || motor === "afinacao") {
+  if (motor === "passos") return gerarPassos({ tema, assunto, evitar, rodada });
+  if (motor === "conversa") return gerarConversa({ tema, assunto, evitar, rodada });
+  const montadoPeloCodigo = { ouvido: gerarOuvido, ritmo: gerarRitmo, afinacao: gerarAfinacao, leitura: gerarLeitura, grafico: gerarGrafico }[motor];
+  if (montadoPeloCodigo) {
     const [semente] = crypto.getRandomValues(new Uint32Array(1));
-    return { ouvido: gerarOuvido, ritmo: gerarRitmo, afinacao: gerarAfinacao }[motor]({ semente, assunto });
+    return montadoPeloCodigo({ semente, assunto });
   }
   return gerarExercicio({ tema, assunto, evitar, anteriores, rodada });
 }
@@ -392,7 +429,7 @@ export async function trocarProjeto({ usuarioId, id }) {
 
   const evitar = [`${d.titulo}: ${String(d.conteudo?.contexto || "").slice(0, 300)}`];
   const { conteudo: novo, titulo, cardIds } = await gerarConteudoDoProjeto({ trilha, avanco, tipo: d.tipo, unidade, evitar });
-  const conteudo = { ...novo, novos: (d.conteudo?.novos || 0) + 1 };
+  const conteudo = comSenha({ ...novo, novos: (d.conteudo?.novos || 0) + 1 }, d.conteudo);
   await salvar(d.id, { conteudo, titulo, card_ids: cardIds });
   return desafioParaTela({ ...d, conteudo, titulo, card_ids: cardIds }, trilha.tema, unidade);
 }
@@ -586,7 +623,7 @@ export async function mudarComplexidade({ usuarioId, id, nivel }) {
       throw new ErroDeAcesso(502, e.message);
     }
   }
-  const conteudo = { ...novo, ...meta, complexidade: nivel, trocas: trocas + 1, original: padrao };
+  const conteudo = comSenha({ ...novo, ...meta, complexidade: nivel, trocas: trocas + 1, original: padrao }, d.conteudo);
   const titulo = String(novo.titulo || d.titulo).slice(0, 200);
   await salvar(d.id, { conteudo, titulo });
   return desafioParaTela({ ...d, conteudo, titulo }, trilha.tema, unidade);
@@ -652,11 +689,14 @@ export async function responderExercicio({ usuarioId, id, respostas }) {
   const motor = motorDo(d.conteudo);
   if (!corrigeNoServidor(motor)) throw new ErroDeAcesso(400, "este exercício é corrigido pela Lisa — mande a sua entrega");
   exigirReenvio(d);
-  const lista = (Array.isArray(respostas) ? respostas : []).slice(0, 12).map((r) => String(r ?? "").slice(0, 300));
+  const lista = (Array.isArray(respostas) ? respostas : []).slice(0, 12).map((r) => String(r ?? "").slice(0, motor === "passos" ? 2000 : 300));
   const correcao = motor === "calculo" ? corrigirCalculo(d.conteudo, lista)
     : motor === "ditado" ? corrigirDitado(d.conteudo, lista)
     : motor === "ritmo" ? corrigirRitmo(d.conteudo, lista)
     : motor === "afinacao" ? corrigirAfinacao(d.conteudo, lista)
+    : motor === "leitura" ? corrigirLeitura(d.conteudo, lista)
+    : motor === "grafico" ? corrigirGrafico(d.conteudo, lista)
+    : motor === "passos" ? corrigirPassos(d.conteudo, lista)
     : corrigirOuvido(d.conteudo, lista);
   const avaliacao = validarAvaliacao(avaliacaoDoMotor(motor, d.conteudo, correcao));
   const resposta = { respostas: lista, correcao };
@@ -690,6 +730,7 @@ export async function entregarEvidencia({ usuarioId, id, entrega }) {
         texto: conferida.texto, video: conferida.video,
         imagens: (entrega.imagens || []).map((i) => ({ mimeType: i.tipo, data: i.data })),
         audio: entrega.audio ? { data: entrega.audio.data, segundos: conferida.audio.segundos } : null,
+        pdf: entrega.pdf ? { data: entrega.pdf.data } : null,
       },
     });
   } catch (e) {
@@ -698,8 +739,61 @@ export async function entregarEvidencia({ usuarioId, id, entrega }) {
   return fecharEntrega({
     usuarioId, d, avaliacao,
     resposta: {
-      texto: conferida.texto || "", video: conferida.video || null, audio: conferida.audio,
+      texto: conferida.texto || "", video: conferida.video || null, audio: conferida.audio, pdf: conferida.pdf,
       miniaturas: (entrega.imagens || []).map((i) => i.miniatura).filter(Boolean),
     },
   });
+}
+
+// ---------------------------------------------------------------- a conversa com a Lisa (31/10/2026)
+
+async function conversaDoUsuario(id, usuarioId) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (d.tipo !== "exercicio" || motorDo(d.conteudo) !== "conversa") throw new ErroDeAcesso(400, "este desafio não é uma conversa");
+  return d;
+}
+
+/**
+ * Uma fala da pessoa na conversa: a Lisa responde no papel e corrige o que precisar. A trava é o
+ * momento que eu li (duas falas ao mesmo tempo, só uma grava).
+ */
+export async function falarNaConversa({ usuarioId, id, mensagem }) {
+  const d = await conversaDoUsuario(id, usuarioId);
+  const pode = podeFalar(d);
+  if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
+  let texto;
+  try { texto = validarMensagem(mensagem); } catch (e) { throw new ErroDeAcesso(400, e.message); }
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+  const turnos = [...turnosDe(d), { quem: "pessoa", texto }];
+  let resposta;
+  try {
+    resposta = await responderNaConversa({ conteudo: d.conteudo, turnos, ultima: texto });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  const novos = [...turnos.slice(0, -1), { quem: "pessoa", texto, correcao: resposta.correcao }, { quem: "lisa", texto: resposta.fala }];
+  const { data: gravou, error } = await supabase.from("proof_desafios")
+    .update({ resposta: { ...(d.resposta || {}), turnos: novos, terminou: resposta.terminou }, status: "em_andamento", atualizado_em: new Date().toISOString() })
+    .eq("id", d.id).eq("atualizado_em", d.atualizado_em).select("id");
+  falhou(error, "conversa");
+  if (!gravou?.length) throw new ErroDeAcesso(409, "outra fala acabou de chegar — atualize a página");
+  return { turnos: novos, terminou: resposta.terminou, podeMais: podeFalar({ ...d, resposta: { turnos: novos } }).ok };
+}
+
+/** Encerrar a conversa: a Lisa avalia as falas pela rubrica, e os pontos entram como no exercício. */
+export async function encerrarConversa({ usuarioId, id }) {
+  const d = await conversaDoUsuario(id, usuarioId);
+  exigirReenvio(d);
+  const turnos = turnosDe(d);
+  const pode = podeEncerrar(turnos);
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  let avaliacao;
+  try {
+    avaliacao = await avaliarConversa({ tema: trilha.tema, conteudo: d.conteudo, turnos });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  return fecharEntrega({ usuarioId, d, avaliacao, resposta: { ...(d.resposta || {}), turnos } });
 }

@@ -1,6 +1,6 @@
 import { json } from "@/lib/http.js";
 import { exigirUsuario, respostaDeErro, corpoDe, ErroDeAcesso } from "@/lib/sessao.js";
-import { enviarExercicio, enviarProjeto, responderExercicio, entregarEvidencia } from "@/lib/pratica.js";
+import { enviarExercicio, enviarProjeto, responderExercicio, entregarEvidencia, encerrarConversa } from "@/lib/pratica.js";
 import { lerEntrega } from "@/lib/entregas.js";
 
 export const runtime = "nodejs";
@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
  *   projeto de programação: { repo }  — link de um repositório PÚBLICO do GitHub
  *   lista de cálculo, ditado, treino de ouvido:  { respostas: [...] }  — corrigidos no servidor, sem IA
  *   desafio aberto e projeto dos outros perfis: formulário (multipart) com texto, video, imagem,
- *     miniatura, audio e segundos (src/lib/entregas.js)
+ *     miniatura, audio, segundos e pdf (src/lib/entregas.js)
+ *   conversa com a Lisa: { encerrar: true } — a Lisa avalia as falas (cada fala vai por /conversa)
  *
  * A Lisa avalia na hora e devolve nota, comentário e pontos. Pode demorar alguns segundos.
  */
@@ -24,6 +25,9 @@ export async function POST(req, { params }) {
       return json({ ok: true, ...(await entregarEvidencia({ usuarioId: usuario.id, id, entrega: await lerEntrega(req) })) });
     }
     const corpo = await corpoDe(req);
+    if (corpo?.encerrar === true) {
+      return json({ ok: true, ...(await encerrarConversa({ usuarioId: usuario.id, id })) });
+    }
     if (Array.isArray(corpo?.respostas)) {
       return json({ ok: true, ...(await responderExercicio({ usuarioId: usuario.id, id, respostas: corpo.respostas })) });
     }

@@ -10,6 +10,7 @@ import { MOTORES } from "@/dominio/motores.js";
 import { PERFIS } from "@/dominio/perfis.js";
 import { valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
 import Neuro, { reagir } from "@/componentes/Neuro.js";
+import { DiarioDaTrilha } from "@/componentes/pratica/Diario.js";
 
 /** O que o Neuro diz ao abrir a prática: a cobrança do dia. */
 function falaDoNeuro(trilhas) {
@@ -217,6 +218,7 @@ export default function Pratica() {
                 </div>
               ))}
             </div>
+            <DiarioDaTrilha trilhaId={t.trilhaId} tema={t.tema} />
           </section>
         ))
       )}

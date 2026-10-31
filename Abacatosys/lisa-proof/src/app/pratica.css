@@ -396,3 +396,44 @@
 .turma__selo--cumpriu { border-color: var(--pf-verde-forte); color: var(--pf-verde-forte); }
 .turma__selo--nao_cumpriu { border-color: var(--pf-alerta); color: var(--pf-alerta); }
 .turma__comentario { margin: 0; padding: 8px 12px; border-left: 3px solid var(--pf-linha); color: var(--pf-tinta-2); white-space: pre-wrap; }
+
+/* ---- passo a passo, gráfico, leitura na pauta, conversa, frase-senha e diário (31/10/2026) */
+.passos__inicio { font-size: 1.05em; }
+.passos__linhas { margin: 0; padding-left: 22px; display: grid; gap: 4px; font-size: 14px; }
+.passos__linha--ok::marker, .passos__linha--ok { color: var(--pf-verde-forte); }
+.passos__linha--erro { color: var(--pf-alerta); font-weight: 700; }
+.passos__linha--nao { color: var(--pf-tinta-2); }
+.grafico__itens > li { justify-items: start; }
+.grafico__plano { width: 100%; max-width: 340px; aspect-ratio: 1; background: var(--pf-superficie); border: 1px solid var(--pf-linha); border-radius: 12px; touch-action: none; }
+.grafico__grade { stroke: var(--pf-linha); stroke-width: 0.03; }
+.grafico__eixo { stroke: var(--pf-tinta-2); stroke-width: 0.07; }
+.grafico__reta { stroke: var(--pf-verde-forte); stroke-width: 0.1; }
+.grafico__parabola { fill: none; stroke: var(--pf-verde-forte); stroke-width: 0.1; }
+.grafico__ponto { fill: var(--pf-alerta); stroke: var(--pf-superficie); stroke-width: 0.1; }
+.grafico__ponto--solto { cursor: grab; }
+.grafico__ponto:focus-visible { outline: none; stroke: var(--pf-tinta); stroke-width: 0.18; }
+.leitura__itens > li { justify-items: start; }
+.leitura__pauta { width: 100%; max-width: 220px; height: auto; }
+.leitura__linha { stroke: var(--pf-tinta); stroke-width: 1; }
+.leitura__clave { fill: var(--pf-tinta); font-size: 52px; font-family: "Noto Music", "Segoe UI Symbol", "Apple Symbols", serif; }
+.leitura__clave--fa { font-size: 34px; }
+.leitura__nota { fill: var(--pf-tinta); }
+.conversa { display: grid; gap: 12px; }
+.conversa__turnos { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; max-height: 460px; overflow: auto; }
+.conversa__fala { position: relative; display: grid; gap: 4px; padding: 10px 12px; border-radius: 14px; max-width: 86%; }
+.conversa__fala p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.conversa__fala--lisa { justify-self: start; background: var(--pf-superficie-2); padding-right: 40px; }
+.conversa__fala--pessoa { justify-self: end; background: var(--pf-superficie); border: 1px solid var(--pf-linha); }
+.conversa__quem { font-size: 12px; font-weight: 800; color: var(--pf-tinta-2); }
+.conversa__ouvir { position: absolute; top: 6px; right: 6px; border: 0; background: transparent; font-size: 18px; cursor: pointer; }
+.conversa__correcao { color: var(--pf-tinta-2); border-top: 1px dashed var(--pf-linha); padding-top: 4px; }
+.conversa__enviar { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+.senha { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--pf-tinta-2); background: var(--pf-superficie-2); font-size: 14px; }
+.senha small { display: block; color: var(--pf-tinta-2); margin-top: 2px; }
+.senha__frase { white-space: nowrap; }
+.diario { display: grid; gap: 8px; justify-items: start; margin-top: 10px; }
+.diario__form { display: grid; gap: 8px; width: 100%; max-width: 640px; }
+.diario__lista { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.diario__lista small { color: var(--pf-tinta-2); }
+.dm-andar__livro { margin: 0; font-size: 14px; }
+@media (max-width: 520px) { .conversa__fala { max-width: 100%; } }

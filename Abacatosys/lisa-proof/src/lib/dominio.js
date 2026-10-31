@@ -8,6 +8,10 @@
 // ou vídeo do YouTube (src/lib/entregas.js), avaliados pela Lisa. A luta, os pontos, os marcos e o
 // certificado são os mesmos. As fotos e o áudio vão só para a IA: a entrega guarda um resumo.
 //
+// A torre de um LIVRO (31/10/2026): a torre de tema pode nascer de um livro da Biblioteca. Cada andar
+// cobre um trecho dele, na ordem do sumário (faixasDosAndares), e a Lisa lê as páginas do andar ao
+// escrever o desafio. A entrega com áudio, foto ou vídeo traz a frase-senha (src/dominio/senha.js).
+//
 // A torre é sempre do mundo de verdade: os pontos dos andares entram no livro de pontos (viram
 // moedas, ranking e ofensiva) e os prêmios dos marcos vão para o Reino de verdade.
 //
@@ -25,16 +29,19 @@ import {
 } from "./iaDominio.js";
 import { temModelo } from "./ia.js";
 import { premiarDoDominio } from "./reino.js";
+import { exigirLivro, trechosDoLivro } from "./biblioteca.js";
 import { linkDoCommit } from "@/dominio/enderecoDoRepo.js";
 import { nomePublico } from "@/dominio/ranking.js";
 import {
   NIVEIS, andaresPermitidos, andaresEscolhidos, chefoesDaTorre, nomeDoChefao, sementeDe, pontosDoAndar, pontosDoTopo,
   atributosDoNeuro, roteiroDaLuta, premiosDaTorre, premiosDoAndar, branchSugerida, branchValida, codigoDoCertificado,
   codigoValido, mediaDasNotas, chefaoPorId, TORRES_DE_TEMA, tituloDaTorre, validarPedidoDeTema,
+  secoesDoLivro, andaresPermitidosDoLivro, faixasDosAndares, paginasDaFaixa,
 } from "@/dominio/modoDominio.js";
 import { conferirEvidencia } from "@/dominio/motores.js";
+import { gerarSenha, precisaDeSenha } from "@/dominio/senha.js";
 
-const CAMPOS = "id, usuario_id, origem, perfil, tema, provedor, repo_caminho, repo_url, repo_branch, analise, nivel, status, andares, andar_atual, chefao_final, entrega_url, entrega_branch, commit_base, premios, certificado, criado_em, atualizado_em, concluido_em";
+const CAMPOS = "id, usuario_id, origem, perfil, tema, livro_id, provedor, repo_caminho, repo_url, repo_branch, analise, nivel, status, andares, andar_atual, chefao_final, entrega_url, entrega_branch, commit_base, premios, certificado, criado_em, atualizado_em, concluido_em";
 const CAMPOS_DO_ANDAR = "numero, titulo, objetivo, assunto, dificuldade, chefao, chefao_nome, desafio, commit_inicio, ultimo_commit, entregas, tentativas, melhor_nota, atributos, vencido_em";
 
 /** Quantas torres por dia a pessoa pode pedir para analisar (cada análise lê o repositório e gasta IA). */
@@ -142,6 +149,12 @@ export async function listarDominios(usuarioId) {
 /** Uma entrega como a tela mostra (o link do commit avaliado). */
 const entregaParaTela = (torre, e) => (e.sha ? { ...e, link: linkDoCommit(torre.entrega_url || torre.repo_url, e.sha) } : e);
 
+/** O trecho do livro do andar (torre de livro), com o rótulo das páginas. */
+function faixaDoAndar(torre, numero) {
+  const f = torre.analise?.faixas?.[numero - 1];
+  return f ? { ...f, rotulo: paginasDaFaixa(f) } : null;
+}
+
 /** A torre inteira para a tela: andares, o andar de agora, o Neuro, os prêmios e o certificado. */
 export async function torreParaTela(usuarioId, id, usuario = null) {
   const torre = await torreDoUsuario(id, usuarioId);
@@ -159,15 +172,17 @@ export async function torreParaTela(usuarioId, id, usuario = null) {
   return {
     ...resumoDa(torre),
     analise: torre.analise,
-    permitido: andaresPermitidos(torre.nivel),
+    permitido: torre.analise?.livro ? andaresPermitidosDoLivro(torre.nivel, torre.analise.livro.paginas) : andaresPermitidos(torre.nivel),
     branchSugerida: torre.repo_caminho ? branchSugerida(torre.repo_caminho) : null,
     ponto: torre.analise?.ponto || "",
+    livro: torre.analise?.livro ? { id: torre.livro_id, titulo: torre.analise.livro.titulo, autor: torre.analise.livro.autor || "" } : null,
     entrega: torre.entrega_url ? { url: torre.entrega_url, branch: torre.entrega_branch, base: torre.commit_base } : null,
     andaresDaTorre: lista,
     atual: atual && !concluida ? {
       numero: atual.numero, titulo: atual.titulo, objetivo: atual.objetivo, assunto: atual.assunto,
       dificuldade: atual.dificuldade, chefao: atual.chefao, chefaoNome: atual.chefao_nome,
       desafio: atual.desafio, commitInicio: atual.commit_inicio,
+      faixa: faixaDoAndar(torre, atual.numero),
       linkDoInicio: atual.commit_inicio ? linkDoCommit(torre.entrega_url || torre.repo_url, atual.commit_inicio) : null,
       entregas: (atual.entregas || []).map((e) => entregaParaTela(torre, e)).reverse(),
       tentativas: atual.tentativas, melhorNota: atual.melhor_nota,
@@ -225,11 +240,24 @@ export async function analisarTemaDominio(usuarioId, pedido) {
   let p;
   try { p = validarPedidoDeTema(pedido || {}); } catch (e) { throw new ErroDeAcesso(400, e.message); }
 
-  // o mesmo tema com uma torre em andamento: volta para ela
-  const { data: mesmas, error: e1 } = await supabase.from("proof_dominios").select("id, tema, status")
+  // o livro da Biblioteca, se a torre nasce de um (o texto das páginas precisa já ter sido lido)
+  let livro = null;
+  if (pedido?.livroId) {
+    const l = await exigirLivro(usuarioId, pedido.livroId, "id, titulo, autor, paginas, sumario, paginas_com_texto");
+    if (!(l.paginas_com_texto > 0)) throw new ErroDeAcesso(400, "o texto deste livro ainda não foi lido — abra o livro na Biblioteca e espere a leitura terminar");
+    const secoes = secoesDoLivro(l.sumario, l.paginas);
+    const trechos = await trechosDoLivro(l.id, secoes.slice(0, 24).map((x) => ({ de: x.de, ate: x.ate })), 500).catch(() => []);
+    livro = {
+      id: l.id, titulo: l.titulo, autor: l.autor || "", paginas: l.paginas, secoes,
+      amostra: trechos.map((t, i) => `[${secoes[i]?.titulo}] ${String(t?.trecho || "").trim()}`).join("\n").slice(0, 14_000),
+    };
+  }
+
+  // o mesmo tema (ou o mesmo livro) com uma torre em andamento: volta para ela
+  const { data: mesmas, error: e1 } = await supabase.from("proof_dominios").select("id, tema, livro_id, status")
     .eq("usuario_id", usuarioId).eq("origem", "tema").eq("perfil", p.perfil).neq("status", "concluido");
   falhou(e1, "torres");
-  const igual = (mesmas || []).find((t) => String(t.tema).toLowerCase() === p.tema.toLowerCase());
+  const igual = (mesmas || []).find((t) => (livro ? t.livro_id === livro.id : !t.livro_id && String(t.tema).toLowerCase() === p.tema.toLowerCase()));
   if (igual) return { jaExistia: true, id: igual.id };
 
   const { count, error: e2 } = await supabase.from("proof_dominios").select("id", { count: "exact", head: true })
@@ -237,11 +265,13 @@ export async function analisarTemaDominio(usuarioId, pedido) {
   falhou(e2, "torres");
   if ((count || 0) >= ANALISES_POR_DIA) throw new ErroDeAcesso(429, `são até ${ANALISES_POR_DIA} torres novas por dia — amanhã tem mais`);
 
-  const analise = await comTraducao(() => analisarTema(p));
+  const analise = await comTraducao(() => analisarTema({ ...p, livro }));
   if (!analise.apto) return { apto: false, analise, tema: p.tema };
+  if (livro) analise.andaresSugeridos = Math.min(analise.andaresSugeridos, andaresPermitidosDoLivro(analise.complexidade, livro.paginas).max);
+  const { amostra, ...livroGuardado } = livro || {};
   const { data, error } = await supabase.from("proof_dominios").insert({
-    usuario_id: usuarioId, origem: "tema", perfil: p.perfil, tema: p.tema,
-    analise: { ...analise, ponto: p.ponto }, nivel: analise.complexidade, status: "analisado",
+    usuario_id: usuarioId, origem: "tema", perfil: p.perfil, tema: p.tema, livro_id: livro?.id || null,
+    analise: { ...analise, ponto: p.ponto, ...(livro ? { livro: livroGuardado } : {}) }, nivel: analise.complexidade, status: "analisado",
   }).select("id").single();
   falhou(error, "torre");
   return { apto: true, id: data.id, analise };
@@ -261,8 +291,11 @@ export async function montarDominio(usuarioId, id, pedido) {
   const torre = await torreDoUsuario(id, usuarioId);
   const presa = torre.status === "montando" && Date.now() - new Date(torre.atualizado_em).getTime() > MONTAGEM_PRESA_MS;
   if (!presa) exigirStatus(torre, "analisado");
-  const n = andaresEscolhidos(pedido, torre.nivel);
+  const livro = torre.analise?.livro || null;
+  const escolhidos = andaresEscolhidos(pedido, torre.nivel);
+  const n = escolhidos && livro ? Math.min(escolhidos, andaresPermitidosDoLivro(torre.nivel, livro.paginas).max) : escolhidos;
   if (!n) throw new ErroDeAcesso(400, "quantos andares?");
+  const faixas = livro ? faixasDosAndares(livro.secoes, n) : null;
 
   // a trava: só uma montagem por vez (o segundo clique encontra "montando")
   const { data: trava, error: e1 } = await supabase.from("proof_dominios")
@@ -274,7 +307,7 @@ export async function montarDominio(usuarioId, id, pedido) {
   try {
     const chefoes = chefoesDaTorre(n, sementeDe(id));
     const roteiro = await comTraducao(() => (torre.origem === "tema"
-      ? montarTorreDoTema({ tema: torre.tema, perfil: torre.perfil, ponto: torre.analise?.ponto || "", analise: torre.analise, n, chefoes })
+      ? montarTorreDoTema({ tema: torre.tema, perfil: torre.perfil, ponto: torre.analise?.ponto || "", analise: torre.analise, n, chefoes, faixas })
       : montarComIA({ repo: { url: torre.repo_url }, analise: torre.analise, n, chefoes })));
     await supabase.from("proof_dominio_andares").delete().eq("dominio_id", id); // sobra de uma montagem que caiu
     const { error: e2 } = await supabase.from("proof_dominio_andares").insert(roteiro.map((a, i) => ({
@@ -286,6 +319,7 @@ export async function montarDominio(usuarioId, id, pedido) {
     falhou(e2, "andares");
     const { error: e3 } = await supabase.from("proof_dominios").update({
       status: "ativo", andares: n, andar_atual: 1, chefao_final: chefoes[n - 1], atualizado_em: new Date().toISOString(),
+      ...(faixas ? { analise: { ...torre.analise, faixas } } : {}),
     }).eq("id", id);
     falhou(e3, "torre");
   } catch (e) {
@@ -346,9 +380,17 @@ export async function abrirDesafio(usuarioId, id) {
         .lt("numero", torre.andar_atual).order("numero")).data?.map((a) => `${a.numero}. ${a.titulo}`) || []
     : []);
   if (torre.origem === "tema") {
-    const desafio = await comTraducao(async () => detalharDesafioDoTema({
-      tema: torre.tema, perfil: torre.perfil, ponto: torre.analise?.ponto || "", analise: torre.analise, andar, n: torre.andares, anteriores: await anterioresDe(),
+    const faixa = faixaDoAndar(torre, andar.numero);
+    let trecho = null;
+    if (faixa && torre.livro_id) {
+      const [t] = await trechosDoLivro(torre.livro_id, [{ de: faixa.de, ate: faixa.ate }], 14_000).catch(() => []);
+      const texto = String(t?.trecho || "").trim();
+      if (texto) trecho = { texto, fonte: `“${torre.analise.livro.titulo}”, ${faixa.rotulo}${faixa.secao ? ` (${faixa.secao})` : ""}` };
+    }
+    const detalhado = await comTraducao(async () => detalharDesafioDoTema({
+      tema: torre.tema, perfil: torre.perfil, ponto: torre.analise?.ponto || "", analise: torre.analise, andar, n: torre.andares, anteriores: await anterioresDe(), trecho,
     }));
+    const desafio = precisaDeSenha(detalhado.evidencias) ? { ...detalhado, senha: gerarSenha(crypto.getRandomValues(new Uint8Array(3))) } : detalhado;
     const { error } = await supabase.from("proof_dominio_andares").update({ desafio })
       .eq("dominio_id", id).eq("numero", andar.numero).is("desafio", null);
     falhou(error, "desafio");
@@ -442,12 +484,16 @@ export async function entregarAndarDoTema(usuarioId, id, entrega) {
       texto: conferida.texto, video: conferida.video,
       imagens: (entrega.imagens || []).map((i) => ({ mimeType: i.tipo, data: i.data })),
       audio: entrega.audio ? { data: entrega.audio.data, segundos: conferida.audio.segundos } : null,
+      pdf: entrega.pdf ? { data: entrega.pdf.data } : null,
     },
   }));
   return fecharAndar({
     usuarioId, torre, andar, avaliacao, estudavaAntes, commit: null,
     // o que fica da entrega: um resumo (as fotos e o áudio não são guardados)
-    registro: { evidencias: { texto: (conferida.texto || "").slice(0, 600), video: conferida.video || null, audio: conferida.audio, fotos: conferida.imagens || 0 } },
+    registro: {
+      evidencias: { texto: (conferida.texto || "").slice(0, 600), video: conferida.video || null, audio: conferida.audio, fotos: conferida.imagens || 0, pdf: Boolean(conferida.pdf) },
+      ...(avaliacao.senha ? { senha: avaliacao.senha } : {}),
+    },
   });
 }
 

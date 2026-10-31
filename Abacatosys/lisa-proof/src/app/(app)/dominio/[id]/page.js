@@ -229,7 +229,7 @@ export default function PaginaDaTorre() {
           <p>
             {torre.url
               ? <a href={torre.url} target="_blank" rel="noreferrer">{torre.provedor === "gitlab" ? "GitLab" : "GitHub"} ↗</a>
-              : <span>{torre.tipoDaTorre}</span>}
+              : <span>{torre.tipoDaTorre}{torre.livro && <> · 📚 <Link href={`/biblioteca/${torre.livro.id}`}>{torre.livro.titulo}</Link></>}</span>}
             {" · "}Nível {torre.nivel} — {torre.nomeDoNivel}
             {montada && ` · ${torre.vencidos} de ${torre.andares} andares`}
           </p>
@@ -501,6 +501,7 @@ function resumoDaEvidencia(ev) {
     ev.fotos ? `${ev.fotos} foto(s)` : "",
     ev.audio ? `áudio de ${Math.floor(ev.audio.segundos / 60)}:${String(ev.audio.segundos % 60).padStart(2, "0")}` : "",
     ev.video ? "vídeo do YouTube" : "",
+    ev.pdf ? "PDF" : "",
   ].filter(Boolean).join(", ") || "—";
 }
 
@@ -617,6 +618,9 @@ function AndarAtual({ torre, ocupado, lutando, aoAbrir, aoEntregar }) {
         <div className="dm-andar__corpo">
           <h3>{a.titulo}</h3>
           <p className="dm-andar__objetivo">{a.objetivo}</p>
+          {a.faixa && torre.livro && (
+            <p className="dm-andar__livro">📖 Leia antes: <Link href={`/biblioteca/${torre.livro.id}?pagina=${a.faixa.de}`}>{a.faixa.rotulo}</Link>{a.faixa.secao ? ` — ${a.faixa.secao}` : ""}</p>
+          )}
           {a.assunto && <span className="dm-chip">{a.assunto}</span>}
 
           {!d ? (
@@ -669,7 +673,7 @@ git push`}</code></pre>
                   <span className={`pf-pilula ${e.venceu ? "pf-pilula--verde" : "pf-pilula--atencao"}`}>Nota {e.nota}</span>
                   <small>{new Date(e.quando).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small>
                   {e.link && <a href={e.link} target="_blank" rel="noreferrer"><code>{e.sha.slice(0, 7)}</code></a>}
-                  {e.evidencias && <small>{resumoDaEvidencia(e.evidencias)}</small>}
+                  {e.evidencias && <small>{resumoDaEvidencia(e.evidencias)}{e.senha === "nao_encontrada" ? " · sem a frase-senha" : ""}</small>}
                 </div>
                 <p>{e.comentario}</p>
                 {e.melhorar?.length > 0 && <details><summary>O que melhorar</summary><ul>{e.melhorar.map((m) => <li key={m}>{m}</li>)}</ul></details>}

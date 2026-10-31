@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { EVIDENCIAS, LIMITES_DA_EVIDENCIA, videoDoYoutube } from "@/dominio/motores.js";
 import { NOTA_PARA_VENCER } from "@/dominio/modoDominio.js";
 import { reduzirImagem, useGravador } from "@/componentes/pratica/Motores.js";
+import { FraseSenha } from "@/componentes/pratica/FraseSenha.js";
 
 const minutos = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
@@ -17,6 +18,7 @@ export default function EntregaDoAndar({ numero, desafio, ocupado, lutando, aoEn
   const [texto, setTexto] = useState("");
   const [video, setVideo] = useState("");
   const [fotos, setFotos] = useState([]); // { blob, url, miniatura }
+  const [pdf, setPdf] = useState(null);
   const [preparando, setPreparando] = useState(false);
   const [erro, setErro] = useState("");
   const gravador = useGravador(maximoDeAudio);
@@ -32,8 +34,16 @@ export default function EntregaDoAndar({ numero, desafio, ocupado, lutando, aoEn
   };
 
   const videoOk = !video.trim() || Boolean(videoDoYoutube(video));
-  const temAlgo = texto.trim().length > 0 || fotos.length > 0 || Boolean(gravador.audio) || (video.trim() && videoOk);
+  const temAlgo = texto.trim().length > 0 || fotos.length > 0 || Boolean(gravador.audio) || Boolean(pdf) || (video.trim() && videoOk);
   const parado = Boolean(ocupado) || lutando || preparando || gravador.estado !== "parado";
+
+  function escolherPdf(arquivo) {
+    if (!arquivo) return;
+    if (arquivo.type !== "application/pdf") { setErro("o arquivo precisa ser um PDF"); return; }
+    if (arquivo.size > LIMITES_DA_EVIDENCIA.bytesDoPdf) { setErro(`o PDF passou de ${LIMITES_DA_EVIDENCIA.bytesDoPdf / 1_000_000} MB — exporte menor ou mande fotos das páginas`); return; }
+    setErro("");
+    setPdf(arquivo);
+  }
 
   async function adicionarFotos(lista) {
     const arquivos = [...(lista || [])].filter((a) => a.type.startsWith("image/")).slice(0, LIMITES_DA_EVIDENCIA.imagens - fotos.length);
@@ -64,11 +74,13 @@ export default function EntregaDoAndar({ numero, desafio, ocupado, lutando, aoEn
     form.set("video", video.trim());
     fotos.forEach((f, i) => { form.append("imagem", f.blob, `foto-${i + 1}.jpg`); form.append("miniatura", f.miniatura || ""); });
     if (gravador.audio) { form.set("audio", gravador.audio.blob, "audio.wav"); form.set("segundos", String(gravador.audio.segundos)); }
+    if (pdf) form.set("pdf", pdf, pdf.name || "entrega.pdf");
     const ok = await aoEntregar(form);
     if (ok) {
       // os arquivos já foram: a próxima entrega começa sem eles (o texto fica, para melhorar)
       tirarFotos(fotos);
       gravador.limpar();
+      setPdf(null);
     }
   }
 
@@ -76,6 +88,7 @@ export default function EntregaDoAndar({ numero, desafio, ocupado, lutando, aoEn
     <form className="dm-entregar evid" onSubmit={enviar}>
       {desafio.entrega && <p style={{ margin: 0 }}><strong>O que mandar:</strong> {desafio.entrega}</p>}
       <p className="pf-campo__rotulo" style={{ margin: 0 }}>Sua entrega · {aceitas.map((a) => `${EVIDENCIAS[a].icone} ${EVIDENCIAS[a].nome}`).join(" · ")}</p>
+      <FraseSenha senha={desafio.senha} aceitas={aceitas} />
 
       {aceitas.includes("texto") && (
         <label className="pf-campo">
@@ -142,11 +155,26 @@ export default function EntregaDoAndar({ numero, desafio, ocupado, lutando, aoEn
         </label>
       )}
 
+
+      {aceitas.includes("pdf") && (
+        <div className="pf-campo">
+          <span className="pf-campo__rotulo">PDF · um arquivo de até {LIMITES_DA_EVIDENCIA.bytesDoPdf / 1_000_000} MB (a resolução, o trabalho escrito)</span>
+          <div className="pf-acoes" style={{ alignItems: "center" }}>
+            <label className="pf-botao pf-botao--sec pf-botao--pequeno evid__arquivo">
+              📄 {pdf ? "Trocar o PDF" : "Escolher PDF"}
+              <input type="file" accept="application/pdf" hidden disabled={parado} onChange={(ev) => { escolherPdf(ev.target.files?.[0]); ev.target.value = ""; }} />
+            </label>
+            {pdf && <span className="pf-estat__nota" style={{ margin: 0 }}>{pdf.name} · {Math.round(pdf.size / 1024)} KB</span>}
+            {pdf && <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" disabled={parado} onClick={() => setPdf(null)}>Tirar</button>}
+          </div>
+        </div>
+      )}
+
       {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
       <button type="submit" className="pf-botao dm-entregar__botao" disabled={parado || !temAlgo || !videoOk}>
         {ocupado === "entregar" ? "A Lisa está avaliando…" : lutando ? "⚔️ Lutando…" : `⚔️ Entregar o andar ${numero}`}
       </button>
-      <small>A Lisa avalia a entrega e dá a nota. {NOTA_PARA_VENCER}+ vence o chefão. 🔒 As fotos e o áudio vão só para a avaliação e não ficam guardados.</small>
+      <small>A Lisa avalia a entrega e dá a nota. {NOTA_PARA_VENCER}+ vence o chefão. 🔒 As fotos, o áudio e o PDF vão só para a avaliação e não ficam guardados.</small>
     </form>
   );
 }

@@ -6,13 +6,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { criar } from "@/lib/api.js";
-import { alturaSustentada, detectarAltura, nomeDaNota, notaDaFrequencia, centsAteANota } from "@/dominio/musica.js";
+import { alturaSustentada, detectarAltura, nomeDaNota, notaDaFrequencia, centsAteANota, nomeDoGrau, LINHA_DE_BAIXO } from "@/dominio/musica.js";
 import { useAviso } from "../Pecas.js";
 import { Avaliacao } from "./Retorno.js";
 import { Cabecalho, Rodape, reagirACorrecao, audioDaPagina, tocarNotas } from "./Motores.js";
 
 /** Manda as respostas do treino e devolve a correção (uma tentativa só). */
-function useCorrecao(desafio) {
+export function useCorrecao(desafio) {
   const c = desafio.conteudo;
   const [resultado, setResultado] = useState(desafio.status === "concluido"
     ? { conteudo: c, correcao: desafio.resposta?.correcao, avaliacao: desafio.avaliacao, nota: desafio.nota } : null);
@@ -308,6 +308,83 @@ export function TreinoDeAfinacao({ desafio }) {
           <div className="pf-acoes" style={{ alignItems: "center" }}>
             <button type="submit" className="pf-botao" disabled={enviando || Boolean(ouvindo) || faltam > 0}>{enviando ? "Corrigindo…" : "Corrigir"}</button>
             {faltam > 0 && <span className="pf-estat__nota" style={{ margin: 0 }}>Falta cantar {faltam}.</span>}
+          </div>
+        )}
+        <Rodape concluido={Boolean(resultado)} rodada={desafio.rodada} maxRodadas={desafio.maxRodadas} />
+      </form>
+      {resultado && <Avaliacao avaliacao={resultado.avaliacao} nota={resultado.nota} />}
+      {Aviso}
+    </div>
+  );
+}
+
+// ================================================================ leitura na pauta
+
+/** A pauta com uma nota: 5 linhas, a clave e as linhas suplementares quando a nota sai da pauta. */
+function Pauta({ clave, grau }) {
+  const BASE = 70; // a linha de baixo
+  const passo = grau - LINHA_DE_BAIXO[clave]; // meio espaço por grau
+  const y = BASE - passo * 5;
+  const suplementares = [];
+  for (let s = -2; s >= passo; s -= 2) suplementares.push(BASE - s * 5);
+  for (let s = 10; s <= passo; s += 2) suplementares.push(BASE - s * 5);
+  return (
+    <svg viewBox="0 0 120 100" className="leitura__pauta" role="img" aria-label={`Uma nota na pauta, clave de ${clave === "fa" ? "fá" : "sol"}`}>
+      {[0, 1, 2, 3, 4].map((k) => <line key={k} x1={4} x2={116} y1={BASE - k * 10} y2={BASE - k * 10} className="leitura__linha" />)}
+      <text x={6} y={clave === "fa" ? BASE - 18 : BASE + 4} className={`leitura__clave leitura__clave--${clave}`}>{clave === "fa" ? "𝄢" : "𝄞"}</text>
+      {suplementares.map((ly) => <line key={ly} x1={62} x2={88} y1={ly} y2={ly} className="leitura__linha" />)}
+      <ellipse cx={75} cy={y} rx={6.2} ry={4.6} transform={`rotate(-20 75 ${y})`} className="leitura__nota" />
+    </svg>
+  );
+}
+
+export function LeituraNaPauta({ desafio }) {
+  const c = desafio.conteudo;
+  const inicial = (desafio.resposta?.respostas || []).map((r) => (r === "" ? null : Number(r)));
+  const [respostas, setRespostas] = useState(() => c.itens.map((_, i) => (Number.isInteger(inicial[i]) ? inicial[i] : null)));
+  const { resultado, enviando, erro, setErro, enviar, Aviso } = useCorrecao(desafio);
+  const itens = resultado?.conteudo?.itens || c.itens;
+  const faltam = respostas.filter((x) => x == null).length;
+  return (
+    <div className="desafio">
+      <Cabecalho desafio={desafio}>
+        <p className="desafio__texto" style={{ margin: 0 }}>
+          Clave de {c.clave === "fa" ? "fá (a linha da clave é o Fá)" : "sol (a linha da clave é o Sol)"}. Leia cada nota e escolha o nome.{c.completo ? " Algumas usam linhas suplementares." : ""}
+        </p>
+      </Cabecalho>
+      <form className="pf-cartao motor" onSubmit={(e) => { e.preventDefault(); enviar(respostas.map((x) => (x == null ? "" : x))); }}>
+        <ol className="motor__itens leitura__itens">
+          {itens.map((it, i) => {
+            const correcao = resultado?.correcao?.itens?.[i];
+            return (
+              <li key={i} className={correcao ? (correcao.certo ? "motor__item--certo" : "motor__item--errado") : undefined}>
+                <Pauta clave={c.clave} grau={it.grau} />
+                <div className="motor__opcoes" role="radiogroup" aria-label={`Nota ${i + 1}`}>
+                  {c.opcoes.map((o, k) => {
+                    let classe = "motor__opcao";
+                    if (resultado && it.correta === k) classe += " motor__opcao--certa";
+                    else if (resultado && respostas[i] === k) classe += " motor__opcao--errada";
+                    return (
+                      <button key={o} type="button" role="radio" aria-checked={respostas[i] === k} className={classe} disabled={Boolean(resultado) || enviando}
+                        onClick={() => setRespostas((rs) => rs.map((r, n) => (n === i ? k : r)))}>{o}</button>
+                    );
+                  })}
+                </div>
+                {resultado && (
+                  <div className="pf-acoes" style={{ alignItems: "center" }}>
+                    <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={() => { if (!tocarNotas([it.midi], "melodico")) setErro("este navegador não toca som"); }}>▶ Ouvir {nomeDoGrau(it.grau, true)}</button>
+                    {correcao && !correcao.certo && <small className="pf-estat__nota">{correcao.motivo}</small>}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+        {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+        {!resultado && (
+          <div className="pf-acoes" style={{ alignItems: "center" }}>
+            <button type="submit" className="pf-botao" disabled={enviando || faltam > 0}>{enviando ? "Corrigindo…" : "Corrigir"}</button>
+            {faltam > 0 && <span className="pf-estat__nota" style={{ margin: 0 }}>Falta responder {faltam}.</span>}
           </div>
         )}
         <Rodape concluido={Boolean(resultado)} rodada={desafio.rodada} maxRodadas={desafio.maxRodadas} />

@@ -9,14 +9,35 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.37.0-cloudflare-pages.1",
+  "versao": "0.38.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-31",
   "compilacao": {
-    "numero": 77,
+    "numero": 78,
     "data": "2026-10-31",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.38.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "O resto da proposta dos cursos de qualquer tema: conversa com a Lisa, passo a passo e gráficos na matemática, leitura na pauta, diário de estudo, entrega em PDF, frase-senha e a torre do Modo Domínio feita a partir de um livro.",
+      "itens": [
+        "Conversa com a Lisa (idiomas): uma cena do dia a dia na língua do curso; a Lisa faz um papel, responde e corrige cada fala em português, e avalia a conversa no fim pela rubrica.",
+        "Passo a passo (matemática): a resolução linha a linha, conferida pelo servidor sem IA; o erro aparece na linha em que nasceu, e a última linha precisa estar na forma pedida ou isolar o x.",
+        "Gráfico (matemática): marcar pontos, a reta y = ax + b, o vértice e as raízes de parábolas arrastando pontos no plano cartesiano; montado e corrigido pelo código.",
+        "Leitura na pauta (música): a nota desenhada na clave de sol ou de fá; a pessoa escolhe o nome.",
+        "Os motores de matemática e de música são escolhidos pelo assunto; idiomas alterna ditado, conversa e desafio aberto.",
+        "Diário de estudo em cada trilha (o que aprendi, onde travei): sem nota, 5 pontos na primeira entrada do dia, conta para a ofensiva; onde a pessoa travou entra no exercício do dia seguinte.",
+        "Entrega em PDF (até 4 MB) na matemática, em idiomas e no perfil livre, lida pela Lisa e não guardada.",
+        "Frase-senha: o desafio que pede áudio, foto ou vídeo traz uma frase sorteada para falar ou escrever na foto; sem ela, a entrega vale no máximo 60. Vale também nos andares da torre de tema.",
+        "Torre de um livro no Modo Domínio: a torre de tema pode nascer de um livro da Biblioteca; cada andar cobre um trecho do livro, na ordem do sumário, e a Lisa lê as páginas ao escrever o desafio.",
+        "Banco: migração db/024-diario-e-torre-do-livro.sql (proof_diario, proof_dominios.livro_id e o tipo diario no livro de pontos). Precisa ser aplicada depois da 023 e antes de publicar.",
+        "Regras puras em src/dominio/passos.js, grafico.js, conversa.js, senha.js e diario.js, mais a leitura na pauta em musica.js e a torre do livro em modoDominio.js, com 10 casos novos no dominio-check (192 no total)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.37.0-cloudflare-pages.1",
       "data": "2026-10-31",
@@ -1214,7 +1235,8 @@
         "Instalável como app (manifesto e ícones já existiam; agora com o botão \"Instalar app\" na própria tela).",
         "Mercado de tropas no Reino: vender tropas do exército ou da defesa (saem na hora e liberam espaço) e comprar as que outros reinos anunciaram",
         "Tipos de curso além de programação (música, idiomas, matemática e livre), com exercício do dia próprio (lista de cálculo, ditado, treino de ouvido, desafio aberto) e projetos entregues por texto, fotos, áudio ou vídeo do YouTube, avaliados pela IA",
-        "Ritmo e afinação ao vivo nos cursos de música, cartões com repetição espaçada (SM-2), revisão da turma (colegas confirmam critérios contestados, sem nomes) e o Modo Domínio de tema (torres de repertório, QECR, problemas e missões, entregues por evidências)"
+        "Ritmo e afinação ao vivo nos cursos de música, cartões com repetição espaçada (SM-2), revisão da turma (colegas confirmam critérios contestados, sem nomes) e o Modo Domínio de tema (torres de repertório, QECR, problemas e missões, entregues por evidências)",
+        "Conversa com a Lisa (idiomas), passo a passo conferido linha a linha e gráficos de arrastar (matemática), leitura na pauta (música), diário de estudo, entrega em PDF, frase-senha nas gravações e fotos, e a torre do Modo Domínio feita a partir de um livro da Biblioteca"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -1236,7 +1258,8 @@
         "A Biblioteca Colaborativa não confere direitos autorais automaticamente: aceita qualquer PDF (decisão do dono) e depende do bibliotecário, que pode retirar um material a qualquer momento.",
         "Na Biblioteca Colaborativa, os avatares não andam ao vivo (não se vê quem está online agora); a interação é com quem contribuiu.",
         "Não guarda as fotos nem os áudios das entregas: vão só para a avaliação da IA; ficam a nota, o texto e uma miniatura das fotos.",
-        "A revisão da turma não vê fotos inteiras nem ouve áudios (eles não são guardados): só o texto, o link do vídeo e as miniaturas."
+        "A revisão da turma não vê fotos inteiras nem ouve áudios (eles não são guardados): só o texto, o link do vídeo e as miniaturas.",
+        "A conversa com a Lisa é por escrito (a voz do navegador lê as falas dela, mas a pessoa não fala no microfone nessa conversa)."
       ]
     },
     "stack": [
@@ -1293,7 +1316,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/023; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/024; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
       }
     ],
     "integracoes": [
@@ -1304,7 +1327,7 @@
       },
       {
         "nome": "Google Gemini",
-        "descricao": "Monta a ordem da trilha, gera checklists de teoria, explica os assuntos, gera quiz, exercício, projetos e cartões e corrige as entregas (código, texto, fotos, áudio e vídeo do YouTube por link); analisa, monta e avalia as torres do Modo Domínio (de repositório e de tema); abre o pregão diário da Bolsa do Reino.",
+        "descricao": "Monta a ordem da trilha, gera checklists de teoria, explica os assuntos, gera quiz, exercício, projetos e cartões, conversa no papel nos cursos de idiomas e corrige as entregas (código, texto, fotos, áudio, PDF e vídeo do YouTube por link, conferindo a frase-senha); analisa, monta e avalia as torres do Modo Domínio (de repositório e de tema); abre o pregão diário da Bolsa do Reino.",
         "url": "https://ai.google.dev"
       },
       {

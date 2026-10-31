@@ -23,8 +23,9 @@ export function EntregaDoPedido({ entrega }) {
       )}
       {e.video && <p style={{ margin: 0 }}>🎬 <a href={e.video} target="_blank" rel="noreferrer">{e.video}</a></p>}
       {e.audio && <p className="pf-estat__nota" style={{ margin: 0 }}>🎙️ Áudio de {minutos(e.audio.segundos || 0)} — não fica guardado, então a turma não ouve.</p>}
+      {e.pdf && <p className="pf-estat__nota" style={{ margin: 0 }}>📄 PDF de {e.pdf.kb} KB — não fica guardado, então a turma não lê.</p>}
       {e.texto && <p className="evid__texto">{e.texto}</p>}
-      {!e.texto && !e.video && !e.miniaturas?.length && <p className="pf-estat__nota" style={{ margin: 0 }}>A entrega foi só em áudio.</p>}
+      {!e.texto && !e.video && !e.miniaturas?.length && <p className="pf-estat__nota" style={{ margin: 0 }}>A entrega foi só em {e.pdf ? "PDF" : "áudio"}.</p>}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import { reagir, comemorar, celebrar } from "../Neuro.js";
 import { useAviso } from "../Pecas.js";
 import { Avaliacao, reagirAEntrega } from "./Retorno.js";
 import { PedirRevisao } from "./RevisaoDaTurma.js";
+import { FraseSenha } from "./FraseSenha.js";
 
 // ================================================================ o tipo de curso
 
@@ -170,7 +171,7 @@ export function ListaDeCalculo({ desafio }) {
 
 // ================================================================ ditado
 
-function falar(texto, idioma, velocidade = 0.92) {
+export function falar(texto, idioma, velocidade = 0.92) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(texto);
@@ -557,6 +558,7 @@ export function EntregaComEvidencias({ desafio, aceitas, projeto = false, aoAval
   const [texto, setTexto] = useState(r0.texto || "");
   const [video, setVideo] = useState(r0.video || "");
   const [fotos, setFotos] = useState([]); // { blob, url, miniatura }
+  const [pdf, setPdf] = useState(null);
   const [preparando, setPreparando] = useState(false);
   const [estado, setEstado] = useState({ status: desafio.status, nota: desafio.nota, tentativas: desafio.tentativas, avaliacao: desafio.avaliacao, completo: desafio.completo, resposta: r0 });
   const [enviando, setEnviando] = useState(false);
@@ -579,8 +581,16 @@ export function EntregaComEvidencias({ desafio, aceitas, projeto = false, aoAval
   const encerrado = !podeReenviar({ tipo: desafio.tipo, motor: desafio.motor, tentativas: estado.tentativas, status: estado.status, completo: estado.completo });
   const restantes = Math.max(0, (desafio.maxTentativas || 0) - estado.tentativas);
   const videoOk = !video.trim() || Boolean(videoDoYoutube(video));
-  const temAlgo = texto.trim().length > 0 || fotos.length > 0 || Boolean(gravador.audio) || (video.trim() && videoOk);
+  const temAlgo = texto.trim().length > 0 || fotos.length > 0 || Boolean(gravador.audio) || Boolean(pdf) || (video.trim() && videoOk);
   const ocupado = enviando || preparando || gravador.estado !== "parado";
+
+  function escolherPdf(arquivo) {
+    if (!arquivo) return;
+    if (arquivo.type !== "application/pdf") { setErro("o arquivo precisa ser um PDF"); return; }
+    if (arquivo.size > LIMITES_DA_EVIDENCIA.bytesDoPdf) { setErro(`o PDF passou de ${LIMITES_DA_EVIDENCIA.bytesDoPdf / 1_000_000} MB — exporte menor ou mande fotos das páginas`); return; }
+    setErro("");
+    setPdf(arquivo);
+  }
 
   async function adicionarFotos(lista) {
     const arquivos = [...(lista || [])].filter((a) => a.type.startsWith("image/")).slice(0, LIMITES_DA_EVIDENCIA.imagens - fotos.length);
@@ -613,13 +623,18 @@ export function EntregaComEvidencias({ desafio, aceitas, projeto = false, aoAval
     form.set("video", video.trim());
     fotos.forEach((f, i) => { form.append("imagem", f.blob, `foto-${i + 1}.jpg`); form.append("miniatura", f.miniatura || ""); });
     if (gravador.audio) { form.set("audio", gravador.audio.blob, "audio.wav"); form.set("segundos", String(gravador.audio.segundos)); }
+    if (pdf) form.set("pdf", pdf, pdf.name || "entrega.pdf");
     try {
       const r = await criar(`/api/desafios/${desafio.id}/enviar`, form);
-      const resposta = { texto: texto.trim(), video: video.trim() || null, audio: gravador.audio ? { segundos: gravador.audio.segundos } : null, miniaturas: fotos.map((f) => f.miniatura).filter(Boolean) };
+      const resposta = {
+        texto: texto.trim(), video: video.trim() || null, audio: gravador.audio ? { segundos: gravador.audio.segundos } : null,
+        miniaturas: fotos.map((f) => f.miniatura).filter(Boolean), pdf: pdf ? { kb: Math.round(pdf.size / 1024) } : null,
+      };
       setEstado({ status: r.concluido ? "concluido" : "em_andamento", nota: r.nota, tentativas: r.tentativas, avaliacao: r.avaliacao, completo: r.completo, resposta });
       // os arquivos já foram: a próxima entrega começa sem eles (o texto fica, para melhorar)
       tirarFotos(fotos);
       gravador.limpar();
+      setPdf(null);
       aoAvaliar?.(r);
       reagirAEntrega(r, { projeto, avisar });
     } catch (falha) {
@@ -637,6 +652,7 @@ export function EntregaComEvidencias({ desafio, aceitas, projeto = false, aoAval
         <p className="pf-campo__rotulo" style={{ margin: 0 }}>
           Sua entrega · {aceitas.map((a) => `${EVIDENCIAS[a].icone} ${EVIDENCIAS[a].nome}`).join(" · ")}
         </p>
+        <FraseSenha senha={desafio.conteudo?.senha} aceitas={aceitas} />
 
         {aceitas.includes("texto") && (
           <label className="pf-campo">
@@ -706,6 +722,21 @@ export function EntregaComEvidencias({ desafio, aceitas, projeto = false, aoAval
           </label>
         )}
 
+
+        {aceitas.includes("pdf") && (
+          <div className="pf-campo">
+            <span className="pf-campo__rotulo">PDF · um arquivo de até {LIMITES_DA_EVIDENCIA.bytesDoPdf / 1_000_000} MB (a resolução, o trabalho escrito)</span>
+            <div className="pf-acoes" style={{ alignItems: "center" }}>
+              <label className="pf-botao pf-botao--sec pf-botao--pequeno evid__arquivo">
+                📄 {pdf ? "Trocar o PDF" : "Escolher PDF"}
+                <input type="file" accept="application/pdf" hidden disabled={encerrado || enviando} onChange={(ev) => { escolherPdf(ev.target.files?.[0]); ev.target.value = ""; }} />
+              </label>
+              {pdf && <span className="pf-estat__nota" style={{ margin: 0 }}>{pdf.name} · {Math.round(pdf.size / 1024)} KB</span>}
+              {pdf && <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" disabled={encerrado || enviando} onClick={() => setPdf(null)}>Tirar</button>}
+            </div>
+          </div>
+        )}
+
         {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
         <div className="pf-acoes" style={{ alignItems: "center" }}>
           {!encerrado && (
@@ -720,11 +751,11 @@ export function EntregaComEvidencias({ desafio, aceitas, projeto = false, aoAval
           </span>
         </div>
         <p className="pf-estat__nota" style={{ margin: 0 }}>
-          🔒 As fotos e o áudio vão só para a Lisa avaliar e não ficam guardados: fica a avaliação, o texto e uma miniatura das fotos.
+          🔒 As fotos, o áudio e o PDF vão só para a Lisa avaliar e não ficam guardados: fica a avaliação, o texto e uma miniatura das fotos.
         </p>
       </form>
 
-      {estado.tentativas > 0 && (ultima.texto || ultima.miniaturas?.length || ultima.audio || ultima.video) && (
+      {estado.tentativas > 0 && (ultima.texto || ultima.miniaturas?.length || ultima.audio || ultima.video || ultima.pdf) && (
         <div className="pf-cartao evid__ultima">
           <p className="pf-campo__rotulo" style={{ margin: 0 }}>Sua última entrega</p>
           {ultima.miniaturas?.length > 0 && (
@@ -733,6 +764,7 @@ export function EntregaComEvidencias({ desafio, aceitas, projeto = false, aoAval
             </ul>
           )}
           {ultima.audio && <p style={{ margin: 0 }}>🎙️ Áudio de {minutos(ultima.audio.segundos)}</p>}
+          {ultima.pdf && <p style={{ margin: 0 }}>📄 PDF de {ultima.pdf.kb} KB</p>}
           {ultima.video && <p style={{ margin: 0 }}>🎬 <a href={ultima.video} target="_blank" rel="noreferrer">{ultima.video}</a></p>}
           {ultima.texto && <p className="evid__texto">{ultima.texto}</p>}
         </div>

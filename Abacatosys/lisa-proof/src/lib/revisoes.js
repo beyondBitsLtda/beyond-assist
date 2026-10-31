@@ -75,7 +75,7 @@ export async function pedirRevisao(usuarioId, desafioId, { contestados, consenti
     enunciado: String(d.conteudo?.enunciado || d.conteudo?.contexto || "").slice(0, 1500),
     criterios, contestados: lista,
     // só o que já fica guardado no desafio: nenhuma foto inteira, nenhum áudio
-    entrega: { texto: r.texto || "", video: r.video || null, miniaturas: r.miniaturas || [], audio: r.audio || null },
+    entrega: { texto: r.texto || "", video: r.video || null, miniaturas: r.miniaturas || [], audio: r.audio || null, pdf: r.pdf || null },
   }).select(CAMPOS).single();
   if (error?.code === "23505") throw new ErroDeAcesso(409, "este desafio já foi para a revisão da turma");
   falhou(error, "revisão");

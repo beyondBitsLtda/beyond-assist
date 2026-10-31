@@ -301,3 +301,59 @@ export function alturaSustentada(leituras) {
   const resto = boas.slice(Math.floor(boas.length / 4));
   return Math.round(mediana(resto) * 10) / 10;
 }
+
+// ================================================================ leitura na pauta (31/10/2026)
+//
+// A nota aparece na pauta (clave de sol ou de fá) e a pessoa escolhe o nome. Só notas naturais. O
+// "grau" é a posição na pauta: 7 por oitava, Dó4 = 28; a linha de baixo da clave de sol é o Mi4 (30)
+// e a da clave de fá, o Sol2 (18). Montado pelo código e corrigido no servidor, como o ouvido.
+
+export const NOMES_NATURAIS = ["Dó", "Ré", "Mi", "Fá", "Sol", "Lá", "Si"];
+const SEMITONS_NATURAIS = [0, 2, 4, 5, 7, 9, 11];
+export const LINHA_DE_BAIXO = { sol: 30, fa: 18 };
+const FAIXAS_DA_PAUTA = {
+  sol: { basico: [30, 38], completo: [26, 42] }, // Mi4–Fá5; Lá3–Dó6 com linhas suplementares
+  fa: { basico: [18, 26], completo: [14, 30] },  // Sol2–Lá3; Dó2–Mi4
+};
+const ITENS_DA_LEITURA = 8;
+
+export const midiDoGrau = (grau) => (Math.floor(grau / 7) + 1) * 12 + SEMITONS_NATURAIS[((grau % 7) + 7) % 7];
+export const nomeDoGrau = (grau, comOitava = false) => `${NOMES_NATURAIS[((grau % 7) + 7) % 7]}${comOitava ? Math.floor(grau / 7) : ""}`;
+
+/** A clave e o alcance pelo assunto: clave de fá (baixo, grave); linhas suplementares no avançado. */
+export function pautaDoAssunto(assunto) {
+  const t = assuntoEmTexto(assunto);
+  return {
+    clave: /clave de f[aá]|baixo|contrabaixo|violoncelo|tuba|trombone|m[aã]o esquerda/i.test(t) ? "fa" : "sol",
+    completo: assunto?.nivel === "avancado" || /suplementar|extens|todas as claves/i.test(t),
+  };
+}
+
+export function gerarLeitura({ semente, assunto }) {
+  const { clave, completo } = pautaDoAssunto(assunto);
+  const sortear = sorteador(semente);
+  const [de, ate] = FAIXAS_DA_PAUTA[clave][completo ? "completo" : "basico"];
+  const itens = [];
+  let anterior = null;
+  for (let k = 0; k < ITENS_DA_LEITURA; k++) {
+    let grau = de + Math.floor(sortear() * (ate - de + 1));
+    if (grau === anterior) grau = grau === ate ? de : grau + 1;
+    anterior = grau;
+    itens.push({ grau, midi: midiDoGrau(grau), correta: ((grau % 7) + 7) % 7 });
+  }
+  return {
+    motor: "leitura",
+    titulo: `Leitura na pauta: clave de ${clave === "fa" ? "fá" : "sol"}`,
+    clave, completo, opcoes: NOMES_NATURAIS, itens, semente: semente >>> 0,
+  };
+}
+
+export function corrigirLeitura(conteudo, respostas) {
+  const itens = conteudo.itens.map((it, i) => {
+    const r = Number(respostas?.[i]);
+    const certo = Number.isInteger(r) && r === it.correta;
+    const marcou = Number.isInteger(r) && conteudo.opcoes[r];
+    return { certo, motivo: certo ? "" : `era ${nomeDoGrau(it.grau, true)}${marcou ? ` (você marcou ${marcou})` : " (sem resposta)"}` };
+  });
+  return { nota: Math.round((itens.filter((x) => x.certo).length / itens.length) * 100), itens };
+}

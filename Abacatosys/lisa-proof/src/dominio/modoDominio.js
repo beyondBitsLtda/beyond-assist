@@ -506,3 +506,77 @@ export function validarDesafioDoTema(bruto, perfil) {
     evidencias: evidenciasAceitas(bruto?.evidencias, evidenciasDoPerfil(perfil)),
   };
 }
+
+// ---------------------------------------------------------------- a torre de um LIVRO (31/10/2026)
+//
+// Uma torre de tema que nasce de um livro da Biblioteca: cada andar cobre um trecho do livro, na
+// ordem dele (pelo sumário), com uma missão prática sobre o que o trecho ensina. A Lisa lê as páginas
+// do andar quando escreve o desafio. Um livro curto não sustenta muitos andares: no máximo um a cada
+// duas páginas.
+
+/**
+ * As seções do livro pelo sumário (o nível mais alto que aparece), com a página final de cada uma.
+ * Sem sumário que preste (menos de 3 seções), fatias de umas 10 páginas.
+ */
+export function secoesDoLivro(sumario, paginas) {
+  const total = Math.max(1, Math.round(Number(paginas) || 1));
+  const itens = (Array.isArray(sumario) ? sumario : []).filter((s) => s?.titulo && s.pagina >= 1 && s.pagina <= total);
+  const nivelMaisAlto = itens.length ? Math.min(...itens.map((s) => s.nivel || 1)) : 1;
+  const topo = itens.filter((s) => (s.nivel || 1) === nivelMaisAlto).sort((a, b) => a.pagina - b.pagina);
+  const unicos = topo.filter((s, i) => i === 0 || s.pagina !== topo[i - 1].pagina);
+  if (unicos.length >= 3) {
+    return unicos.map((s, i) => ({ titulo: String(s.titulo).slice(0, 120), de: s.pagina, ate: Math.max(s.pagina, (unicos[i + 1]?.pagina ?? total + 1) - 1) }));
+  }
+  const fatias = Math.min(20, Math.max(3, Math.round(total / 10)));
+  const tamanho = Math.max(1, Math.ceil(total / fatias));
+  const lista = [];
+  for (let de = 1; de <= total; de += tamanho) {
+    const ate = Math.min(total, de + tamanho - 1);
+    lista.push({ titulo: `Págs. ${de}–${ate}`, de, ate });
+  }
+  return lista;
+}
+
+/** Quantos andares um livro sustenta, dentro do que o nível permite. */
+export function andaresPermitidosDoLivro(nivel, paginas) {
+  const { min, max } = andaresPermitidos(nivel);
+  return { min, max: Math.max(min, Math.min(max, Math.floor((Number(paginas) || 0) / 2))) };
+}
+
+/**
+ * O trecho de cada um dos `n` andares: com mais seções que andares, as seções vizinhas se juntam;
+ * com menos, cada seção se divide pelo número de páginas (seção maior, mais andares).
+ * Devolve [{ de, ate, secao }], na ordem do livro.
+ */
+export function faixasDosAndares(secoes, n) {
+  const S = secoes.length;
+  if (!S || n < 1) return [];
+  if (S >= n) {
+    return Array.from({ length: n }, (_, i) => {
+      const grupo = secoes.slice(Math.floor((i * S) / n), Math.floor(((i + 1) * S) / n));
+      return { de: grupo[0].de, ate: grupo.at(-1).ate, secao: grupo.map((s) => s.titulo).join(" · ").slice(0, 200) };
+    });
+  }
+  const paginas = secoes.map((s) => Math.max(1, s.ate - s.de + 1));
+  const total = paginas.reduce((a, b) => a + b, 0);
+  const partes = paginas.map((p) => Math.max(1, Math.floor((p / total) * n)));
+  // acerta a soma: sobra vai para a seção com mais páginas por parte
+  while (partes.reduce((a, b) => a + b, 0) < n) {
+    let k = 0;
+    partes.forEach((q, i) => { if (paginas[i] / q > paginas[k] / partes[k]) k = i; });
+    partes[k]++;
+  }
+  while (partes.reduce((a, b) => a + b, 0) > n) {
+    let k = -1;
+    partes.forEach((q, i) => { if (q > 1 && (k < 0 || paginas[i] / q < paginas[k] / partes[k])) k = i; });
+    partes[k]--;
+  }
+  return secoes.flatMap((s, i) => Array.from({ length: partes[i] }, (_, k) => {
+    const de = s.de + Math.floor((k * paginas[i]) / partes[i]);
+    const ate = Math.max(de, s.de + Math.floor(((k + 1) * paginas[i]) / partes[i]) - 1);
+    return { de, ate: Math.min(ate, s.ate), secao: partes[i] > 1 ? `${s.titulo} (parte ${k + 1} de ${partes[i]})`.slice(0, 200) : s.titulo };
+  }));
+}
+
+/** "págs. 45–60" ou "p. 45". */
+export const paginasDaFaixa = (f) => (f.de === f.ate ? `p. ${f.de}` : `págs. ${f.de}–${f.ate}`);

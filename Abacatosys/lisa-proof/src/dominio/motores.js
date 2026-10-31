@@ -12,12 +12,18 @@
 //   ritmo    — a pessoa bate o compasso junto do metrônomo; o servidor mede o desvio (musica.js).
 //   afinacao — a pessoa canta ou toca a nota no microfone; o navegador detecta a altura e o servidor
 //              mede os cents (musica.js).
+//   leitura  — a nota na pauta; a pessoa escolhe o nome (musica.js).
+//   passos   — a resolução linha a linha; o servidor confere cada passo (passos.js).
+//   grafico  — pontos arrastados no plano cartesiano (grafico.js).
+//   conversa — uma situação na língua do curso, conversando com a Lisa; ela avalia no fim (conversa.js).
 //
-// Os cinco últimos têm resposta certa: uma tentativa só (como o quiz), e o gabarito só vai para a
+// Os corrigidos no servidor têm resposta certa: uma tentativa só (como o quiz), e o gabarito só vai para a
 // tela depois de corrigido. Puro: sem banco, sem rede, sem DOM.
 
 import { analisar, avaliar, equivalentes, formaAtendida, lerResposta, numeroCerto, formatarNumero, FORMAS } from "./expressao.js";
-import { nomeDaNota } from "./musica.js";
+import { nomeDaNota, nomeDoGrau } from "./musica.js";
+import { passosParaTela } from "./passos.js";
+import { graficoParaTela } from "./grafico.js";
 
 export const MOTORES = {
   codigo: { nome: "Exercício de código", icone: "⌨️", tentativas: 5, corrige: "ia" },
@@ -27,6 +33,10 @@ export const MOTORES = {
   ouvido: { nome: "Treino de ouvido", icone: "🎼", tentativas: 1, corrige: "servidor" },
   ritmo: { nome: "Ritmo", icone: "🥁", tentativas: 1, corrige: "servidor" },
   afinacao: { nome: "Afinação", icone: "🎤", tentativas: 1, corrige: "servidor" },
+  leitura: { nome: "Leitura na pauta", icone: "🎼", tentativas: 1, corrige: "servidor" },
+  passos: { nome: "Passo a passo", icone: "🪜", tentativas: 1, corrige: "servidor" },
+  grafico: { nome: "Gráfico", icone: "📈", tentativas: 1, corrige: "servidor" },
+  conversa: { nome: "Conversa com a Lisa", icone: "💬", tentativas: 1, corrige: "ia" },
 };
 export const motorDo = (conteudo) => (MOTORES[conteudo?.motor] ? conteudo.motor : "codigo");
 export const corrigeNoServidor = (motor) => MOTORES[motor]?.corrige === "servidor";
@@ -42,8 +52,9 @@ export const EVIDENCIAS = {
   imagens: { nome: "Fotos", icone: "📷" },
   audio: { nome: "Áudio", icone: "🎙️" },
   video: { nome: "Vídeo do YouTube", icone: "🎬" },
+  pdf: { nome: "PDF", icone: "📄" },
 };
-export const ORDEM_DAS_EVIDENCIAS = ["texto", "imagens", "audio", "video"];
+export const ORDEM_DAS_EVIDENCIAS = ["texto", "imagens", "audio", "video", "pdf"];
 
 /** Os limites de cada entrega. O áudio vai em WAV mono de 16 kHz (32 KB por segundo). */
 export const LIMITES_DA_EVIDENCIA = {
@@ -53,9 +64,11 @@ export const LIMITES_DA_EVIDENCIA = {
   segundosDeAudio: { exercicio: 90, projeto: 180 },
   bytesPorSegundoDeAudio: 32_000,
   miniatura: 60_000, // a miniatura guardada de cada foto (data URL de JPEG pequeno)
+  bytesDoPdf: 4_000_000, // um PDF só (a resolução, o trabalho escrito), que vai inteiro para a IA
 };
 const TIPOS_DE_IMAGEM = ["image/jpeg", "image/png", "image/webp"];
 const TIPOS_DE_AUDIO = ["audio/wav", "audio/x-wav", "audio/wave"];
+const TIPOS_DE_PDF = ["application/pdf"];
 
 /** Um link de vídeo do YouTube (o Gemini assiste pelo link). Devolve o endereço limpo ou null. */
 export function videoDoYoutube(url) {
@@ -73,7 +86,7 @@ export function evidenciasAceitas(listaBruta, permitidas = ORDEM_DAS_EVIDENCIAS)
 /**
  * Confere a entrega (só os metadados: o arquivo em si o servidor lê do formulário). `aceitas`: as
  * evidências do desafio; `projeto`: o projeto aceita áudio mais longo.
- *   { texto, video, imagens: [{ tipo, bytes, miniatura }], audio: { tipo, bytes, segundos } | null }
+ *   { texto, video, imagens: [{ tipo, bytes, miniatura }], audio: { tipo, bytes, segundos } | null, pdf: { tipo, bytes } | null }
  */
 export function conferirEvidencia(entrega, { aceitas, projeto = false }) {
   const e = entrega || {};
@@ -81,6 +94,7 @@ export function conferirEvidencia(entrega, { aceitas, projeto = false }) {
   const imagens = Array.isArray(e.imagens) ? e.imagens : [];
   const audio = e.audio || null;
   const video = String(e.video ?? "").trim();
+  const pdf = e.pdf || null;
   const nomes = aceitas.map((a) => EVIDENCIAS[a].nome.toLowerCase()).join(", ");
 
   if (t.length > LIMITES_DA_EVIDENCIA.texto) return { ok: false, motivo: `o texto passou de ${LIMITES_DA_EVIDENCIA.texto.toLocaleString("pt-BR")} caracteres` };
@@ -103,15 +117,23 @@ export function conferirEvidencia(entrega, { aceitas, projeto = false }) {
     if (segundos > maximo + 1) return { ok: false, motivo: `o áudio passou de ${maximo} segundos` };
     if (!(audio.bytes > 0) || audio.bytes > (maximo + 2) * LIMITES_DA_EVIDENCIA.bytesPorSegundoDeAudio + 1024) return { ok: false, motivo: "o áudio é grande demais" };
   }
+  if (pdf) {
+    if (!aceitas.includes("pdf")) return { ok: false, motivo: `este desafio não pede PDF (pede: ${nomes})` };
+    if (!TIPOS_DE_PDF.includes(pdf.tipo)) return { ok: false, motivo: "o arquivo precisa ser um PDF" };
+    if (!(pdf.bytes > 0) || pdf.bytes > LIMITES_DA_EVIDENCIA.bytesDoPdf) return { ok: false, motivo: `o PDF passou de ${LIMITES_DA_EVIDENCIA.bytesDoPdf / 1_000_000} MB — exporte menor ou mande fotos das páginas` };
+  }
   let videoLimpo = null;
   if (video) {
     if (!aceitas.includes("video")) return { ok: false, motivo: `este desafio não pede vídeo (pede: ${nomes})` };
     videoLimpo = videoDoYoutube(video);
     if (!videoLimpo) return { ok: false, motivo: "o vídeo precisa ser um link do YouTube (youtube.com ou youtu.be), público ou não listado" };
   }
-  if (!t && !imagens.length && !audio && !videoLimpo) return { ok: false, motivo: `mande a sua entrega: ${nomes}` };
-  if (t && t.length < 15 && !imagens.length && !audio && !videoLimpo) return { ok: false, motivo: "escreva um pouco mais antes de enviar" };
-  return { ok: true, texto: t, video: videoLimpo, imagens: imagens.length, audio: audio ? { segundos: Math.round(Number(audio.segundos)) } : null };
+  if (!t && !imagens.length && !audio && !videoLimpo && !pdf) return { ok: false, motivo: `mande a sua entrega: ${nomes}` };
+  if (t && t.length < 15 && !imagens.length && !audio && !videoLimpo && !pdf) return { ok: false, motivo: "escreva um pouco mais antes de enviar" };
+  return {
+    ok: true, texto: t, video: videoLimpo, imagens: imagens.length, audio: audio ? { segundos: Math.round(Number(audio.segundos)) } : null,
+    pdf: pdf ? { kb: Math.round(pdf.bytes / 1024) } : null,
+  };
 }
 
 // ================================================================ aberto (a IA corrige pela rubrica)
@@ -359,6 +381,9 @@ export function exercicioParaTela(conteudo, corrigido) {
   // a afinação com intervalo esconde a nota pedida (a referência e o intervalo bastam); o ritmo não
   // tem segredo: o padrão precisa estar à vista
   if (motor === "afinacao" && conteudo.comIntervalo) return { ...conteudo, itens: conteudo.itens.map(({ alvo, nome, ...resto }) => resto) };
+  if (motor === "leitura") return { ...conteudo, itens: conteudo.itens.map(({ correta, midi, ...resto }) => resto) };
+  if (motor === "passos") return passosParaTela(conteudo);
+  if (motor === "grafico") return graficoParaTela(conteudo);
   return conteudo;
 }
 
@@ -375,7 +400,13 @@ export function avaliacaoDoMotor(motor, conteudo, correcao) {
         ? conteudo.itens.map((_, i) => `Compasso ${i + 1}`)
         : motor === "afinacao"
           ? conteudo.itens.map((it, i) => `Nota ${i + 1}: ${nomeDaNota(it.alvo, false)}${it.alvo !== it.referencia ? ` (${it.pedido} de ${nomeDaNota(it.referencia, false)})` : ""}`)
-          : conteudo.itens.map((_, i) => `Item ${i + 1}`);
+          : motor === "leitura"
+            ? conteudo.itens.map((it, i) => `Nota ${i + 1}: ${nomeDoGrau(it.grau, true)}`)
+            : motor === "passos"
+              ? conteudo.itens.map((it) => `${it.enunciado} (${it.inicio})`)
+              : motor === "grafico"
+                ? conteudo.itens.map((it) => it.pedido)
+                : conteudo.itens.map((_, i) => `Item ${i + 1}`);
   const resultados = motor === "ditado"
     ? correcao.frases.map((f) => ({
       certo: f.nota >= 0.999,
