@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoFuncionario } from "./acervo/personagensDoAcervo.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-26-biblioteca-colaborativa";
+export const EDICAO_DAS_NOVIDADES = "2026-10-30-cursos-de-qualquer-tema";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,10 +28,10 @@ function marcarComoVistas() {
 }
 
 const NOVIDADES = [
-  { icone: "🏛️", titulo: "Biblioteca Colaborativa", texto: "Uma ilha só para o conhecimento: a Torre dos Livros, o Observatório dos Artigos, o Auditório das Videoaulas e o Cinema dos Vídeos crescem a cada material aprovado — e quem trouxe anda pela ilha.", destaque: true },
-  { icone: "📮", titulo: "Traga e ganhe moedas", texto: "Livro em PDF, artigo científico, videoaula ou vídeo teórico: aprovado, vale de 🪙 120 a 🪙 300 — e as recompensas sobem 10% a cada nível da biblioteca." },
-  { icone: "🔎", titulo: "O bibliotecário confere", texto: "O líder do ranking da semana revisa cada envio (e ganha 🪙 25 por revisão). Recusa sempre vem com o motivo." },
-  { icone: "🙏", titulo: "Leia e agradeça", texto: "O livro abre na sua biblioteca, com marcações e busca; o vídeo, ali mesmo. Gostou? Agradeça com uma gorjeta a quem trouxe." },
+  { icone: "🎵", titulo: "Música, idiomas, matemática e mais", texto: "Crie um curso de violão, inglês, cálculo ou culinária: a Lisa escolhe o tipo de curso, e a prática acompanha o tema.", destaque: true },
+  { icone: "🎧", titulo: "Prática que combina com o tema", texto: "Ditado com a voz do navegador, lista de contas conferida na hora, treino de ouvido e missões com foto, áudio ou vídeo do YouTube." },
+  { icone: "🎙️", titulo: "Projetos sem GitHub", texto: "Fora da programação, o projeto da semana vai com texto, fotos, áudio ou vídeo — a Lisa vê, ouve e corrige pelos critérios." },
+  { icone: "💱", titulo: "Mercado de tropas no Reino", texto: "Venda tropas do exército ou da defesa para liberar espaço na hora, e compre as que outros reinos puseram à venda." },
 ];
 
 const NA_ESQUERDA = ["celeste", "iris"];
@@ -78,8 +78,8 @@ export default function Novidades() {
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">A Biblioteca Colaborativa!</h2>
-          <p className="novidades__sub">Traga livros, artigos e vídeos para todos: o bibliotecário confere, você ganha moedas e a biblioteca cresce. (E na Bolsa, os consultores agora traçam as previsões no gráfico de cada ação.)</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">Cursos de qualquer tema!</h2>
+          <p className="novidades__sub">O Proof deixou de ser só de programação: cada curso tem o seu tipo, e o exercício do dia e os projetos mudam com ele. (E no Reino, agora dá para vender e comprar tropas.)</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -89,7 +89,7 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/acervo" className="pf-botao novidades__principal" onClick={fechar}>🏛️ Abrir a Biblioteca Colaborativa</Link>
+            <Link ref={principal} href="/trilhas/novo" className="pf-botao novidades__principal" onClick={fechar}>✨ Criar um curso</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>

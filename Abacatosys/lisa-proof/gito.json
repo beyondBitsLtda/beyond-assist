@@ -3,20 +3,38 @@
   "aplicacao": {
     "nome": "Lisa_Proof",
     "codigo": "PROOF",
-    "descricao": "App de estudo de programação no estilo Duolingo: transforma os quadros STUDY do Abacato em trilhas com metas diárias, semanais e mensais, pontos e ofensiva de dias seguidos.",
+    "descricao": "App de estudo no estilo Duolingo: transforma os quadros STUDY do Abacato em trilhas com metas diárias, semanais e mensais, pontos e ofensiva de dias seguidos — para programação, música, idiomas, matemática ou qualquer tema.",
     "tipo": "Aplicação web",
     "situacao": "em homologação",
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.35.0-cloudflare-pages.1",
+  "versao": "0.36.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-30",
   "compilacao": {
-    "numero": 75,
+    "numero": 76,
     "data": "2026-10-30",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.36.0-cloudflare-pages.1",
+      "data": "2026-10-30",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Cursos de qualquer tema: cada curso ganha um tipo (programação, música, idiomas, matemática ou livre) e o exercício do dia e os projetos passam a combinar com ele.",
+      "itens": [
+        "Tipo de curso (perfil) proposto pela Lisa ao criar o curso, trocável na revisão e depois em Ajustes da trilha. Trilhas antigas continuam de programação, sem mudança.",
+        "Exercício do dia por tipo de curso: lista de cálculo (número e expressão, corrigida pelo servidor sem IA, inclusive a forma fatorada ou simplificada), ditado com a voz do navegador, treino de ouvido (intervalos e acordes) e desafio aberto corrigido pela Lisa por critérios.",
+        "Entrega por evidências no lugar do GitHub, no desafio aberto e nos projetos: texto, até 3 fotos, áudio gravado na própria tela (até 90 s no exercício e 3 min no projeto) e vídeo do YouTube. A Lisa vê as fotos, ouve o áudio e assiste ao vídeo.",
+        "Fotos e áudios não são guardados: vão só para a avaliação; ficam a nota, o texto e uma miniatura das fotos.",
+        "Quiz, explicação do assunto, tarefas de teoria, dicas do projeto e complexidade do projeto falam a língua do tipo de curso (sem código fora de programação).",
+        "Novidades do Proof anunciando os cursos de qualquer tema e o mercado de tropas.",
+        "Banco: migração db/022-perfis-de-curso.sql (coluna perfil em proof_trilhas). Precisa ser aplicada antes de publicar.",
+        "Regras puras em src/dominio/perfis.js, motores.js e expressao.js, com 9 casos novos no dominio-check (172 no total)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.35.0-cloudflare-pages.1",
       "data": "2026-10-30",
@@ -1122,7 +1140,7 @@
   ],
   "ficha": {
     "escopo": {
-      "objetivo": "Criar o hábito de estudo diário de programação, usando como conteúdo os quadros de estudo que a pessoa já organiza no Abacato.",
+      "objetivo": "Criar o hábito de estudo diário — de programação ou de qualquer tema —, usando como conteúdo os quadros de estudo que a pessoa já organiza no Abacato.",
       "inclui": [
         "Quadros do Abacato cujo nome começa com STUDY e que pertencem à pessoa logada (dono).",
         "Criar curso com a Lisa: a IA propõe e, com a aprovação da pessoa, cria o quadro STUDY no Abacato com a trilha pronta.",
@@ -1175,7 +1193,8 @@
         "Estante virtual da Biblioteca: livros em 3D nas prateleiras, com lombada (cor da capa, título, marcador de leitura, selo de lido, 🎓 de curso), capa ao puxar e destaque com as ações",
         "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link e vídeos (YouTube/Vimeo), com revisão do bibliotecário (administrador e líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu; Modo cinema (sala 3D com a plateia de avatares) para os vídeos",
         "Instalável como app (manifesto e ícones já existiam; agora com o botão \"Instalar app\" na própria tela).",
-        "Mercado de tropas no Reino: vender tropas do exército ou da defesa (saem na hora e liberam espaço) e comprar as que outros reinos anunciaram"
+        "Mercado de tropas no Reino: vender tropas do exército ou da defesa (saem na hora e liberam espaço) e comprar as que outros reinos anunciaram",
+        "Tipos de curso além de programação (música, idiomas, matemática e livre), com exercício do dia próprio (lista de cálculo, ditado, treino de ouvido, desafio aberto) e projetos entregues por texto, fotos, áudio ou vídeo do YouTube, avaliados pela IA"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -1195,7 +1214,9 @@
         "Os PDFs não são compartilhados entre contas: a biblioteca é de quem subiu; o limite é de 50 MB por arquivo e 2 GB por pessoa (o disco é o do servidor de casa).",
         "Cadernos não são editados por mais de uma pessoa ao mesmo tempo nem guardam histórico de versões: a versão serve só para não apagar o que outra aba gravou.",
         "A Biblioteca Colaborativa não confere direitos autorais automaticamente: aceita qualquer PDF (decisão do dono) e depende do bibliotecário, que pode retirar um material a qualquer momento.",
-        "Na Biblioteca Colaborativa, os avatares não andam ao vivo (não se vê quem está online agora); a interação é com quem contribuiu."
+        "Na Biblioteca Colaborativa, os avatares não andam ao vivo (não se vê quem está online agora); a interação é com quem contribuiu.",
+        "Não guarda as fotos nem os áudios das entregas: vão só para a avaliação da IA; ficam a nota, o texto e uma miniatura das fotos.",
+        "Ritmo e afinação ao vivo, cartões com repetição espaçada, correção por colegas e o Modo Domínio para cursos que não são de programação ainda não existem."
       ]
     },
     "stack": [
@@ -1212,7 +1233,8 @@
       "PDF do certificado montado à mão no navegador (src/dominio/pdf.js); a leitura de PDF da biblioteca usa o pdf.js",
       "pdf.js (pdfjs-dist 5.7.284) no navegador: leitor, camada de texto selecionável, sumário, capa e extração do texto ao subir",
       "@codemirror/lang-markdown 6.5.2 (Markdown no caderno, com os blocos de código coloridos pela linguagem)",
-      "Supabase Storage (bucket privado proof-biblioteca) com endereços assinados de envio e de leitura"
+      "Supabase Storage (bucket privado proof-biblioteca) com endereços assinados de envio e de leitura",
+      "Web Audio, MediaRecorder e SpeechSynthesis no navegador (treino de ouvido, gravação convertida para WAV de 16 kHz e a voz do ditado)"
     ],
     "arquitetura": {
       "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005); as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do curso (a semana de cada assunto no agendamento, a mesma do mapa e da agenda), o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check. O Modo Domínio (db/018) guarda a torre em proof_dominios e cada andar em proof_dominio_andares; as regras (níveis, chefões, pontos, luta, prêmios, conferência da IA) são puras em src/dominio/modoDominio.js, a IA em src/lib/iaDominio.js, o GitHub e o GitLab em src/lib/repositorios.js (só github.com e gitlab.com) e o caminho até o banco em src/lib/dominio.js. Cada passo que gasta IA tem trava contra clique duplo (gravação condicional ao estado lido), e só quem move a torre de andar paga o prêmio do marco. Os prêmios entram no Reino de verdade por premiarDoDominio (src/lib/reino.js), respeitando as capacidades das reservas. O certificado é desenhado num canvas e embrulhado em PDF no navegador; /certificado e /api/certificado são as únicas rotas novas sem login. A biblioteca guarda os PDFs no Storage do mesmo Supabase (bucket privado proof-biblioteca, no disco do iMac): o servidor confere o dono e assina endereços de vida curta, e o navegador envia e lê o arquivo direto, sem o PDF passar pelo Worker. O texto de cada página fica em proof_livro_paginas, e o corte dos trechos (curso, quiz, explicação) e a busca rodam em funções do Postgres, para caber no processamento curto do Worker gratuito. A Biblioteca Colaborativa guarda o acervo em proof_acervo e as gorjetas em proof_acervo_gorjetas (db/020-biblioteca-colaborativa.sql); os PDFs ficam no bucket privado proof-acervo, e o livro levado para a biblioteca pessoal aponta para o mesmo arquivo (proof_livros.acervo_id).",
@@ -1251,7 +1273,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/021; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/022; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
       }
     ],
     "integracoes": [
@@ -1262,7 +1284,7 @@
       },
       {
         "nome": "Google Gemini",
-        "descricao": "Monta a ordem da trilha, gera checklists de teoria, explica os assuntos, gera quiz, exercício e projetos e corrige as entregas; abre o pregão diário da Bolsa do Reino.",
+        "descricao": "Monta a ordem da trilha, gera checklists de teoria, explica os assuntos, gera quiz, exercício e projetos e corrige as entregas (código, texto, fotos, áudio e vídeo do YouTube por link); abre o pregão diário da Bolsa do Reino.",
         "url": "https://ai.google.dev"
       },
       {

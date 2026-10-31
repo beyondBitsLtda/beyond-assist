@@ -23,7 +23,7 @@ export async function GET(req) {
 
     const [perfil, trilhasR, eventos] = await Promise.all([
       perfilDe(usuario.id),
-      supabase.from("proof_trilhas").select("id, quadro_id, tema, inicio_em, dias_de_estudo").eq("usuario_id", usuario.id).eq("status", "ativa"),
+      supabase.from("proof_trilhas").select("id, quadro_id, tema, inicio_em, dias_de_estudo, perfil").eq("usuario_id", usuario.id).eq("status", "ativa"),
       buscarTodas(() =>
         supabase.from("proof_eventos").select("dia, pontos, tipo, chave").eq("usuario_id", usuario.id).order("criado_em")
       ),

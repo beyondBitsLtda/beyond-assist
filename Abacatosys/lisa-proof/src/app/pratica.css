@@ -271,3 +271,47 @@
 /* o projeto da semana seguinte, trancado até o da semana anterior ser aprovado (23/10/2026) */
 .pratica__bloco--trancado { opacity: 0.6; }
 .pratica__bloco:disabled { cursor: default; }
+
+/* ---- cursos que não são de programação (30/10/2026): o tipo de curso, os motores e a entrega */
+.perfil-curso { display: grid; gap: 6px; }
+.perfil-curso__opcoes { flex-wrap: wrap; }
+
+.motor { display: grid; gap: 14px; }
+.motor__itens { margin: 0; padding-left: 22px; display: grid; gap: 14px; }
+.motor__itens > li { display: grid; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--pf-superficie-2); border: 1px solid transparent; }
+.motor__itens > li::marker { font-weight: 800; color: var(--pf-tinta-2); }
+.motor__item--certo { border-color: var(--pf-verde) !important; background: var(--pf-sucesso-fundo) !important; }
+.motor__item--errado { border-color: var(--pf-alerta) !important; background: var(--pf-alerta-fundo) !important; }
+.motor__entrada { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; }
+.motor__aviso { color: var(--pf-alerta); font-size: 13px; }
+.motor__correcao { display: grid; gap: 4px; font-size: 14px; }
+.motor__correcao p { margin: 0; color: var(--pf-tinta-2); }
+.motor__opcoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.motor__opcao {
+  min-height: 40px; padding: 0 12px; border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta);
+}
+.motor__opcao[aria-checked="true"] { border-color: var(--pf-verde); box-shadow: inset 0 0 0 1px var(--pf-verde); }
+.motor__opcao--certa { border-color: var(--pf-verde); background: var(--pf-verde); color: #FFFFFF; }
+.motor__opcao--errada { border-color: var(--pf-alerta); background: var(--pf-alerta-fundo); text-decoration: line-through; }
+.motor__opcao:disabled { cursor: default; }
+
+.ditado__palavras { display: flex; flex-wrap: wrap; gap: 4px 6px; font-size: 15px; }
+.ditado__palavra { padding: 1px 6px; border-radius: 6px; }
+.ditado__palavra--ok { background: var(--pf-verde); color: #FFFFFF; }
+.ditado__palavra--acento { background: var(--pf-atencao-fundo); color: var(--pf-atencao); }
+.ditado__palavra--falta { border: 1px solid var(--pf-alerta); text-decoration: line-through; }
+
+.evid__fotos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; max-width: 420px; }
+.evid__fotos li { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--pf-superficie-2); }
+.evid__fotos img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.evid__fotos--mini { max-width: 240px; }
+.evid__tirar {
+  position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; border-radius: 50%; border: 0; cursor: pointer;
+  background: rgba(0, 0, 0, 0.65); color: #FFFFFF; font-size: 14px; line-height: 1;
+}
+.evid__audio { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.evid__audio audio { max-width: 100%; height: 40px; }
+.evid__arquivo { cursor: pointer; }
+.evid__ultima { display: grid; gap: 8px; }
+.evid__texto { margin: 0; white-space: pre-wrap; font-size: 14px; color: var(--pf-tinta-2); max-height: 220px; overflow: auto; }

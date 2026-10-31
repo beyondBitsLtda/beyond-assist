@@ -6,6 +6,7 @@
 
 import { inicioDaSemana, fimDaSemana, inicioDoMes, fimDoMes, diaValido, diaDaSemana } from "./datas.js";
 import { MULTIPLICADOR_DE_RECOMPENSAS } from "./pontos.js";
+import { MOTORES, motorDo, evidenciasAceitas } from "./motores.js";
 
 // "projeto_mensal" ficou só para a história: desde 23/10/2026 a última semana do plano termina no
 // PROJETO FINAL, do tamanho da trilha (src/dominio/avanco.js), e ninguém gera projeto do mês novo.
@@ -38,6 +39,16 @@ export const PONTOS_DA_PRATICA = {
 export const NOTA_DE_APROVACAO = 60;
 // Exercício: 5 tentativas (eram 3 — pedido de 20/10/2026).
 export const TENTATIVAS = { exercicio: 5, projeto_semanal: 5, projeto_final: 5, projeto_mensal: 5 };
+
+/**
+ * Quantas entregas um desafio aceita. O exercício depende do motor (src/dominio/motores.js): os
+ * corrigidos no servidor (lista de cálculo, ditado, ouvido) têm resposta certa e uma tentativa só,
+ * como o quiz; código e desafio aberto, as 5 de sempre. `motor` serve quem não tem o conteúdo à mão.
+ */
+export function tentativasDe({ tipo, conteudo, motor } = {}) {
+  if (tipo === "exercicio") return MOTORES[motor || motorDo(conteudo)]?.tentativas ?? TENTATIVAS.exercicio;
+  return TENTATIVAS[tipo] || 0;
+}
 
 // ---------------------------------------------------------------- rodadas extras do dia
 //
@@ -128,7 +139,7 @@ export function podeAbrirRodada(tipo, doDia) {
  * requisito ou extra (`completo`) e sobrar tentativa. O que já foi cumprido fica garantido.
  */
 export function podeReenviar(desafio) {
-  const maximo = TENTATIVAS[desafio?.tipo] || 0;
+  const maximo = tentativasDe(desafio || {});
   if ((desafio?.tentativas || 0) >= maximo) return false;
   if (desafio.tipo === "exercicio") return true;
   return !desafio.completo;
@@ -136,8 +147,8 @@ export function podeReenviar(desafio) {
 
 /** Concluído (conta como feito nas metas, na agenda e nas conquistas): a MELHOR nota aprovou, ou
  *  as tentativas acabaram. Pela melhor, e não pela última — reenviar e ir pior não desfaz o feito. */
-export function entregaConcluida({ tipo, melhorNota, tentativas }) {
-  return (Number(melhorNota) || 0) >= NOTA_DE_APROVACAO || tentativas >= (TENTATIVAS[tipo] || 0);
+export function entregaConcluida({ tipo, melhorNota, tentativas, conteudo, motor }) {
+  return (Number(melhorNota) || 0) >= NOTA_DE_APROVACAO || tentativas >= tentativasDe({ tipo, conteudo, motor });
 }
 
 const limitar = (n, min, max) => Math.min(max, Math.max(min, n));
@@ -390,7 +401,7 @@ export function validarExercicio(bruto) {
  * `assuntoDeCada` diz qual assunto (1..n) cada requisito pratica — a tela mostra a ligação com a
  * semana do curso. Torto ou incompleto, o mapa fica de fora (o projeto vale do mesmo jeito).
  */
-export function validarProjeto(bruto, nAssuntos = 0) {
+export function validarProjeto(bruto, nAssuntos = 0, evidenciasDoPerfil = []) {
   const pares = (Array.isArray(bruto?.requisitos) ? bruto.requisitos : [])
     .map((r, i) => ({ texto: texto(r, 300), assunto: Number(Array.isArray(bruto?.assuntoDeCada) ? bruto.assuntoDeCada[i] : NaN) }))
     .filter((p) => p.texto)
@@ -407,6 +418,8 @@ export function validarProjeto(bruto, nAssuntos = 0) {
     extras: listaDeTextos(bruto?.extras, 300, 5),
     entrega: texto(bruto?.entrega, 600),
     criterios: listaDeTextos(bruto?.criterios, 240, 6),
+    // curso que não é de programação: o que a entrega aceita no lugar do repositório (motores.js)
+    ...(evidenciasDoPerfil.length ? { evidencias: evidenciasAceitas(bruto?.evidencias, evidenciasDoPerfil) } : {}),
   };
 }
 

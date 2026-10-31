@@ -13,7 +13,7 @@ export async function GET(req) {
   try {
     const usuario = await exigirUsuario(req);
     const { data: trilhas, error } = await supabase
-      .from("proof_trilhas").select("id, tema, inicio_em, dias_de_estudo").eq("usuario_id", usuario.id).eq("status", "ativa").order("tema");
+      .from("proof_trilhas").select("id, tema, inicio_em, dias_de_estudo, perfil").eq("usuario_id", usuario.id).eq("status", "ativa").order("tema");
     if (error) throw new ErroDeAcesso(500, error.message);
     const hoje = diaDe();
     return json({ ok: true, hoje, iaDisponivel: temModelo(), trilhas: await resumoDaPratica(usuario.id, trilhas || [], hoje) });

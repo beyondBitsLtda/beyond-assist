@@ -1,6 +1,6 @@
 import { json } from "@/lib/http.js";
-import { exigirUsuario, respostaDeErro } from "@/lib/sessao.js";
-import { detalheDaTrilha, apagarTrilha } from "@/lib/trilhas.js";
+import { exigirUsuario, respostaDeErro, corpoDe } from "@/lib/sessao.js";
+import { detalheDaTrilha, apagarTrilha, mudarPerfil } from "@/lib/trilhas.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +11,18 @@ export async function GET(req, { params }) {
     const usuario = await exigirUsuario(req);
     const { id } = await params;
     return json({ ok: true, ...(await detalheDaTrilha({ usuarioId: usuario.id, trilhaId: id })) });
+  } catch (e) {
+    return respostaDeErro(e);
+  }
+}
+
+/** PATCH /api/trilhas/:id   body: { perfil } — troca o tipo de curso (vale para a prática que vier depois). */
+export async function PATCH(req, { params }) {
+  try {
+    const usuario = await exigirUsuario(req);
+    const { id } = await params;
+    const corpo = await corpoDe(req);
+    return json({ ok: true, ...(await mudarPerfil({ usuarioId: usuario.id, trilhaId: id, perfil: String(corpo?.perfil || "") })) });
   } catch (e) {
     return respostaDeErro(e);
   }

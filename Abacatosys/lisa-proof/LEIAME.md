@@ -1,6 +1,8 @@
 # Lisa_Proof
 
-Estudo de programação no estilo Duolingo, em cima dos quadros **STUDY** do Abacato.
+Estudo no estilo Duolingo, em cima dos quadros **STUDY** do Abacato. Nasceu para programação; desde
+30/10/2026 cada curso tem um **perfil** (programação, música, idiomas, matemática ou livre) e a
+prática acompanha o tema — ver "Cursos que não são de programação", abaixo.
 
 - **Quadro** do Abacato com nome começando por `STUDY` → **tema** (ex.: `STUDY JavaScript` → JavaScript).
 - **Card** → **assunto** (ex.: "Lógica de programação em JavaScript").
@@ -20,6 +22,7 @@ estudo.
 | 3 | Projeto da semana e do mês, entregue por repositório público do GitHub e avaliado pela IA | feita |
 | — | Mapa da trilha no estilo Duolingo e o mascote Neuro | feito |
 | — | Lembretes por notificação push e app instalável | feito (falta ligar no iMac, ver abaixo) |
+| — | Perfis de curso: música, idiomas, matemática e livre, com motores de prática e entrega por evidências | feito (30/10/2026) |
 
 ## Prática
 
@@ -330,6 +333,64 @@ continua com ele.
 - Regras: `src/dominio/acervo.js`.
 - Servidor: `src/lib/acervo.js` e as rotas em `/api/acervo`.
 - Tela: `src/componentes/acervo/`.
+
+## Cursos que não são de programação (perfis)
+
+Pedido de 30/10/2026; proposta em https://claude.ai/artifact/ELisFtpFs9CtmDW53QKy96. Migração
+`db/022-perfis-de-curso.sql` (a coluna `proof_trilhas.perfil`; toda trilha antiga fica `programacao`).
+
+**O perfil** (`src/dominio/perfis.js`) não muda a trilha, a teoria, a agenda, os pontos nem o Reino.
+Ele troca três peças da prática: o **motor** do exercício do dia, a **evidência** do projeto no
+lugar do GitHub e o jeito de a Lisa falar (`personaDo`, em `src/lib/ia.js`; programação continua com
+a PERSONA de sempre). Quem escolhe: a IA, ao propor o curso (a pessoa troca na revisão); o quadro
+STUDY que vira trilha sem passar pela IA, pelo nome do tema (`perfilPeloTema`); e a pessoa, a
+qualquer hora, em **Ajustes da trilha → Tipo de curso** (vale para a prática que vier depois).
+
+| Perfil | Exercício do dia (motores) | Projeto: o que se entrega |
+|---|---|---|
+| Programação | código (o de sempre) | repositório no GitHub |
+| Música | treino de ouvido (só em assunto de teoria/percepção) e desafio aberto | áudio, vídeo do YouTube, texto |
+| Idiomas | ditado e desafio aberto (redação, tradução, pronúncia) | texto, áudio |
+| Matemática e exatas | lista de cálculo e desafio aberto (resolução no caderno) | texto, fotos |
+| Livre (qualquer tema) | desafio aberto (missão prática) | texto, fotos, áudio, vídeo do YouTube |
+
+Nos perfis com dois motores, eles se alternam de um dia para o outro e na rodada extra
+(`motorDoExercicio`).
+
+**Os motores** (`src/dominio/motores.js`). O desafio continua `tipo: "exercicio"` — períodos,
+rodadas, agenda e pontos não mudam —, com o motor em `conteudo.motor` (exercício antigo, sem motor,
+é código):
+
+- **aberto** — tarefa ou missão; a IA gera os critérios (a rubrica) e corrige a entrega por eles. 5 tentativas, vale a melhor.
+- **calculo** — 3 a 6 itens de número ou expressão. O **servidor** corrige, sem IA: o analisador de
+  `src/dominio/expressao.js` lê a escrita do dia a dia (`2x²`, `√2`, vírgula), confere a equivalência
+  em 8 valores de x e a forma pedida (fatorada, expandida, simplificada). Item que a IA mandou com
+  resposta ilegível é descartado antes de chegar à pessoa.
+- **ditado** — a voz do navegador fala; a correção compara palavra a palavra (acento errado vale meio,
+  palavra a mais custa). A frase vai para a tela **embaralhada** (não é segredo, só não fica à vista).
+- **ouvido** — intervalos ou acordes montados pelo código (sem IA, semente fixa), tocados pelo Web Audio.
+
+Os três corrigidos no servidor têm **uma tentativa só** (`tentativasDe`, em `src/dominio/pratica.js`),
+como o quiz, e o gabarito só vai para a tela depois da correção (`exercicioParaTela`).
+
+**A entrega por evidências** (`EntregaComEvidencias`, em `src/componentes/pratica/Motores.js`):
+
+- Fotos reduzidas no navegador (1600 px, JPEG) e uma miniatura de 240 px; áudio gravado (ou um
+  arquivo) convertido no navegador para **WAV mono de 16 kHz** — o Gemini não lê o WebM do Chrome.
+  Até 3 fotos, 90 s de áudio no exercício e 180 s no projeto (`LIMITES_DA_EVIDENCIA`).
+- Vai como **formulário multipart** (`src/lib/entregas.js`), em binário: base64 dentro de JSON pesaria
+  um terço a mais e gastaria CPU do Worker. O corpo do pedido ao Gemini é montado uma vez só
+  (`gemini.js`), não a cada chave tentada.
+- **Nada é guardado**: as fotos e o áudio vão para a IA e somem. O desafio guarda o texto, o link, a
+  duração do áudio e as miniaturas (LGPD: o mínimo para a pessoa rever o que mandou).
+- Vídeo do YouTube vai como `fileData` para o Gemini assistir. Se ele não abrir (privado, removido), a
+  avaliação é refeita sem o vídeo e o servidor avisa no comentário.
+- A avaliação (`avaliarEntrega`, em `src/lib/iaPratica.js`) devolve o mesmo formato da avaliação de
+  código: os projetos continuam pontuando **por requisito**.
+
+**Ainda não feito** (fases seguintes da proposta): ritmo e afinação ao vivo na música, cartões com
+repetição espaçada, correção por colegas e as torres do Modo Domínio por perfil (o Modo Domínio
+continua sendo de repositório).
 
 ## Mercado de tropas
 

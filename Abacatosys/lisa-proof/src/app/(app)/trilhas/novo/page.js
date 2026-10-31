@@ -10,6 +10,7 @@ import { NIVEIS_DO_CURSO, DURACOES_EM_SEMANAS, resumoDoCurso } from "@/dominio/c
 import { capitulosDoLivro } from "@/dominio/biblioteca.js";
 import { DiasDeEstudo } from "@/componentes/Pecas.js";
 import Neuro, { reagir, comemorar } from "@/componentes/Neuro.js";
+import { SeletorDePerfil } from "@/componentes/pratica/Motores.js";
 
 const ROTULO_DO_NIVEL = { iniciante: "Iniciante", intermediario: "Intermediário", avancado: "Avançado" };
 
@@ -123,7 +124,7 @@ export default function NovoCurso() {
       <div className="pf-cartao curso__neuro">
         <Neuro
           humor={ocupado ? "pensando" : proposta ? "feliz" : "normal"}
-          fala={proposta ? "" : fonte === "livro" ? "Escolha o livro e os capítulos: eu leio e monto o curso com as páginas de cada assunto." : "O que você quer aprender? Pode ser uma linguagem, um framework, banco de dados…"}
+          fala={proposta ? "" : fonte === "livro" ? "Escolha o livro e os capítulos: eu leio e monto o curso com as páginas de cada assunto." : "O que você quer aprender? Programação, um idioma, um instrumento, matemática… qualquer tema."}
           tamanho={96}
           ouvir
         />
@@ -142,7 +143,7 @@ export default function NovoCurso() {
             <label className="pf-campo">
               <span className="pf-campo__rotulo">Tema do curso</span>
               <input className="pf-campo__entrada" value={tema} onChange={(e) => setTema(e.target.value)} maxLength={80}
-                placeholder="Ex.: JavaScript, SQL para análise de dados, React com TypeScript" required disabled={ocupado} />
+                placeholder="Ex.: JavaScript, Inglês para viagem, Violão, Cálculo I, Fotografia com celular" required disabled={ocupado} />
             </label>
           ) : (
             <>
@@ -251,6 +252,10 @@ export default function NovoCurso() {
               <span className="pf-pilula">{resumo.assuntos} assuntos</span>
               <span className="pf-pilula">{resumo.tarefas} tarefas de teoria</span>
               <span className="pf-pilula">~{resumo.dias} dias de estudo</span>
+            </div>
+            <div className="pf-campo">
+              <span className="pf-campo__rotulo">Tipo de curso · decide o exercício do dia e a entrega dos projetos (dá para trocar depois)</span>
+              <SeletorDePerfil valor={proposta.perfil} desabilitado={ocupado} aoMudar={(perfil) => setProposta((p) => ({ ...p, perfil }))} />
             </div>
           </section>
 

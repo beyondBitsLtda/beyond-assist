@@ -15,6 +15,7 @@ import { diaDe } from "@/dominio/datas.js";
 import { PONTOS, chaveDoEvento, META_DIARIA_PADRAO, pontosDoDiaParaMeta } from "@/dominio/pontos.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, PONTOS_POR_TRILHA } from "@/dominio/conquistas.js";
 import { avancoDaTrilhaDoUsuario, avancoDoQuadro } from "./avanco.js";
+import { perfilValido, perfilPeloTema } from "@/dominio/perfis.js";
 
 const NAO_ACHEI = "não encontrado entre os seus quadros de estudo";
 
@@ -211,6 +212,16 @@ export async function trilhaDoUsuario(trilhaId, usuarioId) {
   falhou(error, "trilha");
   if (!data) throw new ErroDeAcesso(404, "trilha não encontrada");
   return data;
+}
+
+/**
+ * O perfil do curso de um quadro (src/dominio/perfis.js): o da trilha dele; quadro sem trilha, pelo
+ * nome do tema. Antes da migração 022 a coluna não existe — aí vale o tema também.
+ */
+export async function perfilDoQuadro(quadro, usuarioId) {
+  const { data } = await supabase
+    .from("proof_trilhas").select("perfil").eq("quadro_id", quadro.id).eq("usuario_id", usuarioId).maybeSingle();
+  return data?.perfil ? perfilValido(data.perfil) : perfilPeloTema(quadro.tema);
 }
 
 async function idDaTrilhaDoQuadro(quadroId, usuarioId) {

@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { obter, criar, remover } from "@/lib/api.js";
+import { obter, criar, remover, mudar } from "@/lib/api.js";
 import { formatarDia, NOMES_DOS_DIAS } from "@/dominio/datas.js";
+import { PERFIS } from "@/dominio/perfis.js";
 import { Barra, DiasDeEstudo } from "@/componentes/Pecas.js";
 import MapaDaTrilha from "@/componentes/MapaDaTrilha.js";
 import { comemorar } from "@/componentes/Neuro.js";
 import { AnotacoesDoAlvo } from "@/componentes/caderno/Vinculos.js";
+import { SeletorDePerfil } from "@/componentes/pratica/Motores.js";
 
 export default function Trilha() {
   const { id } = useParams();
@@ -67,6 +69,22 @@ export default function Trilha() {
     }
   }
 
+  /** O tipo de curso decide a prática que vier depois (o exercício, o projeto e a entrega). */
+  async function mudarTipo(perfil) {
+    if (perfil === dados?.trilha?.perfil) return;
+    setOcupado("perfil");
+    setErro("");
+    try {
+      await mudar(`/api/trilhas/${id}`, { perfil });
+      setDados((d) => ({ ...d, trilha: { ...d.trilha, perfil } }));
+      setAviso(`Tipo de curso: ${PERFIS[perfil].nome}. Vale a partir da próxima prática (o que já foi gerado continua como está).`);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setOcupado("");
+    }
+  }
+
   async function apagar() {
     if (!window.confirm("Apagar esta trilha? O quadro no Abacato e os pontos que você já ganhou continuam.")) return;
     setOcupado("apagar");
@@ -95,6 +113,7 @@ export default function Trilha() {
         <div>
           <h1>{trilha.tema}</h1>
           <p>
+            {PERFIS[trilha.perfil]?.emoji} {PERFIS[trilha.perfil]?.nome} ·{" "}
             {trilha.geradaPor === "ia" ? "Montada pela Lisa" : "Na ordem do quadro"} · desde {formatarDia(trilha.inicioEm)} ·{" "}
             {trilha.diasDeEstudo.map((d) => NOMES_DOS_DIAS[d]).join(", ")}
           </p>
@@ -133,6 +152,8 @@ export default function Trilha() {
               {ocupado === "ia" ? "A Lisa está reorganizando…" : "Refazer a ordem com a Lisa"}
             </button>
           </div>
+          <p className="pf-campo__rotulo" style={{ margin: "14px 0 6px" }}>Tipo de curso · decide o exercício do dia e a entrega dos projetos</p>
+          <SeletorDePerfil valor={trilha.perfil} aoMudar={mudarTipo} desabilitado={Boolean(ocupado)} />
           <p className="pf-campo__rotulo" style={{ margin: "14px 0 6px" }}>Dias de estudo</p>
           {dias && <DiasDeEstudo valor={dias} aoMudar={setDias} />}
           <div className="pf-acoes" style={{ marginTop: 10 }}>

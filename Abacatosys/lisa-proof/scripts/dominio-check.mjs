@@ -85,6 +85,14 @@ import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/
 import { conferirChamado, tituloDoChamado, descricaoDoChamado } from "../src/dominio/chamado.js";
 import { montarRaioX, acertosDoQuiz, horaEmSaoPaulo } from "../src/dominio/raioX.js";
 import { assuntosParaODuracao, nomeDoQuadro, validarCurso, assuntosEmOrdem, resumoDoCurso } from "../src/dominio/curso.js";
+import { analisar, avaliar as avaliarExpressao, equivalentes, formaAtendida, lerResposta, numeroCerto } from "../src/dominio/expressao.js";
+import {
+  MOTORES, motorDo, corrigeNoServidor, validarAberto, validarCalculo, corrigirCalculo, corrigirItemDeCalculo, validarDitado, compararDitado,
+  corrigirDitado, embaralhar, desembaralhar, gerarOuvido, corrigirOuvido, categoriaDoOuvido, exercicioParaTela, avaliacaoDoMotor,
+  conferirEvidencia, evidenciasAceitas, videoDoYoutube, LIMITES_DA_EVIDENCIA,
+} from "../src/dominio/motores.js";
+import { PERFIS, ORDEM_DOS_PERFIS, perfilValido, perfilPeloTema, motorDoExercicio, evidenciasDoPerfil } from "../src/dominio/perfis.js";
+import { tentativasDe } from "../src/dominio/pratica.js";
 import { montarAgenda, itensDoDia, gradeDoMes, mesVizinho } from "../src/dominio/agenda.js";
 import {
   MIN_ANDARES, NOTA_PARA_VENCER, CHEFOES, CHEFOES_FINAIS, ATRIBUTOS, andaresPermitidos, andaresEscolhidos, dificuldadeEsperada,
@@ -2300,6 +2308,197 @@ caso("acervo: quem revisa, quem retira e quem agradece", () => {
   assert.deepEqual(GORJETAS, [10, 25, 50]);
   assert.equal(motivoValido("  ok "), null, "motivo de verdade (5 letras ou mais)");
   assert.equal(motivoValido("PDF incompleto"), "PDF incompleto");
+});
+
+console.log("\ncursos que não são de programação");
+caso("expressões: lê a escrita do dia a dia (vírgula, ², √, multiplicação implícita) e avalia certo", () => {
+  assert.equal(avaliarExpressao(analisar("2x^2 - 3x + 1"), 2), 3);
+  assert.equal(avaliarExpressao(analisar("(x-2)(x-3)"), 4), 2);
+  assert.equal(avaliarExpressao(analisar("3x²"), 2), 12);
+  assert.ok(Math.abs(avaliarExpressao(analisar("√(x) + 2,5"), 4) - 4.5) < 1e-9);
+  assert.ok(Math.abs(avaliarExpressao(analisar("2pi"), 0) - 2 * Math.PI) < 1e-9);
+  assert.equal(avaliarExpressao(analisar("-x^2"), 3), -9, "o sinal fica fora da potência");
+  assert.equal(avaliarExpressao(analisar("2^3^2"), 0), 512, "potência associa à direita");
+  assert.throws(() => analisar("(x+1"), /parêntese/);
+  assert.throws(() => analisar("y+1"), /incógnita/);
+  assert.throws(() => analisar(""), /vazia/);
+  assert.equal(lerResposta("1/3").toFixed(4), "0.3333");
+  assert.equal(lerResposta("12 cm"), 12);
+  assert.equal(lerResposta("1.000,5"), 1000.5);
+  assert.equal(lerResposta("30%"), 30);
+  assert.ok(numeroCerto(0.333, 1 / 3), "0,333 vale 1/3 (0,5%)");
+  assert.ok(!numeroCerto(0.33, 1 / 3));
+  assert.ok(numeroCerto(3.14, Math.PI, 0.01), "a tolerância do item manda");
+});
+
+caso("expressões: equivalência pelos valores de teste e a forma pedida (fatorada, expandida, simplificada)", () => {
+  assert.equal(equivalentes(analisar("(x-2)(x-3)"), analisar("x^2-5x+6")).iguais, true);
+  const diferente = equivalentes(analisar("(x-2)(x+3)"), analisar("x^2-5x+6"));
+  assert.equal(diferente.iguais, false);
+  assert.ok(Number.isFinite(diferente.x), "diz em que valor de x diferem");
+  assert.equal(equivalentes(analisar("sqrt(x)"), analisar("x^(1/2)")).iguais, true, "fora do domínio das duas é pulado");
+  assert.equal(formaAtendida(analisar("(x-2)(x-3)"), "fatorada"), true);
+  assert.equal(formaAtendida(analisar("-(x-1)^2"), "fatorada"), true);
+  assert.equal(formaAtendida(analisar("x^2-5x+6"), "fatorada"), false);
+  assert.equal(formaAtendida(analisar("x^2-5x+6"), "expandida"), true);
+  assert.equal(formaAtendida(analisar("(x-2)(x-3)"), "expandida"), false);
+  assert.equal(formaAtendida(analisar("(x^2-9)/(x-3)"), "simplificada", analisar("x+3")), false, "a própria pergunta não vale como simplificada");
+});
+
+caso("lista de cálculo: a IA errada é filtrada, e o servidor corrige número, expressão e forma", () => {
+  const lista = validarCalculo({
+    titulo: "Fatoração", itens: [
+      { pergunta: "Fatore x^2 - 5x + 6", tipo: "expressao", resposta: "(x-2)(x-3)", forma: "fatorada", explicacao: "raízes 2 e 3" },
+      { pergunta: "Quanto é 3/4 de 20?", tipo: "numero", resposta: "15", explicacao: "" },
+      { pergunta: "Raiz de 2 com 2 casas", tipo: "numero", resposta: "1.41", tolerancia: 0.01, explicacao: "" },
+      { pergunta: "Item quebrado", tipo: "expressao", resposta: "x +* 2", explicacao: "" },
+      { pergunta: "", tipo: "numero", resposta: "3" },
+    ],
+  });
+  assert.equal(lista.motor, "calculo");
+  assert.equal(lista.itens.length, 3, "o item que não dá para ler e o vazio saem");
+  assert.throws(() => validarCalculo({ itens: [{ pergunta: "a", tipo: "numero", resposta: "1" }] }), /itens que dê para corrigir/);
+  const r = corrigirCalculo(lista, ["(x-3)(x-2)", "15,0", "1,414"]);
+  assert.deepEqual(r.itens.map((i) => i.certo), [true, true, true]);
+  assert.equal(r.nota, 100);
+  const e = corrigirCalculo(lista, ["x^2-5x+6", "16", ""]);
+  assert.match(e.itens[0].motivo, /forma fatorada/);
+  assert.match(e.itens[1].motivo, /deu 16, e a resposta é 15/);
+  assert.equal(e.itens[2].motivo, "sem resposta");
+  assert.equal(e.nota, 0);
+  assert.match(corrigirItemDeCalculo(lista.itens[0], "(x-2)(x+3)").motivo, /não é equivalente: com x = /);
+});
+
+caso("ditado: palavra a palavra, acento vale meio, palavra a mais custa; a frase vai embaralhada para a tela", () => {
+  const d = validarDitado({ titulo: "Ditado", idioma: "es-ES", frases: [
+    { texto: "Mañana vamos a la playa.", traducao: "Amanhã vamos à praia." },
+    { texto: "¿Dónde está la estación?", traducao: "Onde fica a estação?" },
+    { texto: "Me gusta el café.", traducao: "Eu gosto de café." },
+    { texto: "Oi", traducao: "" },
+  ] });
+  assert.equal(d.idioma, "es-ES");
+  assert.equal(d.frases.length, 3, "frase de uma palavra sai");
+  assert.equal(validarDitado({ idioma: "inglês", frases: d.frases }).idioma, "en-US", "idioma torto vira en-US");
+  assert.equal(compararDitado("Mañana vamos a la playa.", "mañana vamos a la playa").nota, 1, "pontuação e maiúscula não contam");
+  assert.equal(compararDitado("Mañana vamos a la playa.", "manana vamos a la playa").nota, 0.9, "acento errado vale meio");
+  assert.equal(compararDitado("Me gusta el café.", "me gusta café").nota, 0.75);
+  assert.ok(compararDitado("Me gusta el café.", "me gusta el café me gusta el café").nota <= 0.5, "colar a frase duas vezes não dá nota cheia");
+  assert.deepEqual(compararDitado("Me gusta el café.", "me gusta cafe").palavras.map((p) => p.marca), ["ok", "ok", "falta", "acento"]);
+  assert.equal(corrigirDitado(d, ["Mañana vamos a la playa", "Dónde está la estación", "Me gusta el café"]).nota, 100);
+  assert.equal(desembaralhar(embaralhar("¿Dónde está? 日本")), "¿Dónde está? 日本");
+  const tela = exercicioParaTela(d, false);
+  assert.ok(!JSON.stringify(tela).includes("playa"), "antes de corrigir, a frase não fica à vista");
+  assert.equal(desembaralhar(tela.frases[0].fala), d.frases[0].texto);
+  assert.ok(JSON.stringify(exercicioParaTela(d, true)).includes("playa"), "corrigido, aparece");
+});
+
+caso("treino de ouvido: montado pelo código (a mesma semente, o mesmo treino), sem gabarito na tela", () => {
+  const assunto = { titulo: "Intervalos de terça e quinta", nivel: "basico" };
+  const a = gerarOuvido({ semente: 42, assunto }), b = gerarOuvido({ semente: 42, assunto });
+  assert.deepEqual(a, b);
+  assert.equal(a.itens.length, 8);
+  assert.equal(a.categoria, "intervalos");
+  assert.deepEqual(a.opcoes, ["2ª maior", "3ª menor", "3ª maior", "4ª justa", "5ª justa", "8ª justa"]);
+  const SEMITONS = { "2ª maior": 2, "3ª menor": 3, "3ª maior": 4, "4ª justa": 5, "5ª justa": 7, "8ª justa": 12 };
+  for (const it of a.itens) {
+    assert.equal(it.notas.length, 2);
+    assert.equal(it.notas[1] - it.notas[0], SEMITONS[a.opcoes[it.correta]], "as notas tocam o intervalo do gabarito");
+  }
+  assert.equal(categoriaDoOuvido({ titulo: "Tríades maiores e menores" }).categoria, "acordes");
+  const acordes = gerarOuvido({ semente: 7, assunto: { titulo: "Acordes", nivel: "avancado" } });
+  assert.deepEqual(acordes.opcoes, ["maior", "menor", "diminuto", "aumentado"]);
+  assert.ok(acordes.itens.every((it) => it.notas.length === 3 && it.modo === "harmonico"));
+  assert.ok(exercicioParaTela(a, false).itens.every((it) => !("correta" in it)));
+  const certas = a.itens.map((it) => it.correta);
+  assert.equal(corrigirOuvido(a, certas).nota, 100);
+  const erradas = certas.map((c) => (c + 1) % a.opcoes.length);
+  const r = corrigirOuvido(a, erradas);
+  assert.equal(r.nota, 0);
+  assert.match(r.itens[0].motivo, /^era .+ \(você marcou .+\)$/);
+  const av = avaliacaoDoMotor("ouvido", a, r);
+  assert.equal(av.requisitos.length, 8);
+  assert.equal(av.requisitos[0].atendido, false);
+});
+
+caso("motores: o exercício antigo é de código; os corrigidos no servidor têm uma tentativa só", () => {
+  assert.equal(motorDo({ titulo: "x", enunciado: "y" }), "codigo");
+  assert.equal(motorDo({ motor: "ditado" }), "ditado");
+  assert.equal(motorDo({ motor: "inventado" }), "codigo");
+  assert.ok(corrigeNoServidor("calculo") && corrigeNoServidor("ouvido") && !corrigeNoServidor("aberto"));
+  assert.equal(MOTORES.codigo.tentativas, 5);
+  assert.equal(tentativasDe({ tipo: "exercicio", conteudo: {} }), 5);
+  assert.equal(tentativasDe({ tipo: "exercicio", conteudo: { motor: "calculo" } }), 1);
+  assert.equal(tentativasDe({ tipo: "exercicio", motor: "aberto" }), 5);
+  assert.equal(tentativasDe({ tipo: "projeto_semanal" }), 5);
+  assert.equal(podeReenviar({ tipo: "exercicio", conteudo: { motor: "ditado" }, tentativas: 1 }), false);
+  assert.equal(podeReenviar({ tipo: "exercicio", conteudo: { motor: "aberto" }, tentativas: 1 }), true);
+  assert.equal(entregaConcluida({ tipo: "exercicio", melhorNota: 40, tentativas: 1, conteudo: { motor: "ouvido" } }), true, "uma tentativa e acabou");
+  assert.equal(entregaConcluida({ tipo: "exercicio", melhorNota: 40, tentativas: 1, conteudo: {} }), false, "o de código continua");
+  const aberto = validarAberto({ titulo: "Missão", enunciado: "Fotografe", entrega: "3 fotos", evidencias: ["imagens", "github", "texto"], dicas: [], criterios: ["a", "b"] }, ["texto", "imagens"]);
+  assert.deepEqual(aberto.evidencias, ["texto", "imagens"], "só as evidências do perfil, na ordem certa");
+  assert.throws(() => validarAberto({ enunciado: "x", criterios: ["só um"] }, ["texto"]), /critérios/);
+  assert.deepEqual(evidenciasAceitas([], ["audio"]), ["texto"]);
+  const proj = validarProjeto({ titulo: "P", requisitos: ["a", "b"], extras: [], entrega: "grave", criterios: [], evidencias: ["audio", "video"] }, 0, ["audio", "video", "texto"]);
+  assert.deepEqual(proj.evidencias, ["audio", "video"]);
+  assert.equal(validarProjeto({ titulo: "P", requisitos: ["a", "b"] }).evidencias, undefined, "projeto de programação não tem evidências");
+});
+
+caso("evidências: tipos, tamanhos, áudio pelo tempo e só vídeo do YouTube", () => {
+  const aceitas = ["texto", "imagens", "audio", "video"];
+  const foto = { tipo: "image/jpeg", bytes: 300_000, miniatura: "data:image/jpeg;base64,AAAA" };
+  assert.equal(conferirEvidencia({ texto: "Fiz a receita e tirei as fotos.", imagens: [foto] }, { aceitas }).ok, true);
+  assert.match(conferirEvidencia({}, { aceitas }).motivo, /mande a sua entrega/);
+  assert.match(conferirEvidencia({ texto: "ok" }, { aceitas }).motivo, /escreva um pouco mais/);
+  assert.match(conferirEvidencia({ imagens: [foto, foto, foto, foto] }, { aceitas }).motivo, /no máximo 3 fotos/);
+  assert.match(conferirEvidencia({ imagens: [{ ...foto, tipo: "image/gif" }] }, { aceitas }).motivo, /JPEG, PNG ou WebP/);
+  assert.match(conferirEvidencia({ imagens: [{ ...foto, bytes: 9e6 }] }, { aceitas }).motivo, /grande demais/);
+  assert.match(conferirEvidencia({ imagens: [{ ...foto, miniatura: "javascript:alert(1)" }] }, { aceitas }).motivo, /miniatura/);
+  assert.match(conferirEvidencia({ imagens: [foto] }, { aceitas: ["texto"] }).motivo, /não pede fotos/);
+  const audio = (segundos) => ({ tipo: "audio/wav", bytes: segundos * LIMITES_DA_EVIDENCIA.bytesPorSegundoDeAudio, segundos });
+  assert.equal(conferirEvidencia({ audio: audio(80) }, { aceitas }).ok, true);
+  assert.match(conferirEvidencia({ audio: audio(120) }, { aceitas }).motivo, /passou de 90 segundos/);
+  assert.equal(conferirEvidencia({ audio: audio(120) }, { aceitas, projeto: true }).ok, true, "o projeto aceita até 3 minutos");
+  assert.match(conferirEvidencia({ audio: { ...audio(10), tipo: "audio/webm" } }, { aceitas }).motivo, /WAV/);
+  assert.equal(videoDoYoutube("https://youtu.be/dQw4w9WgXcQ?t=3"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.equal(videoDoYoutube("https://www.youtube.com/watch?feature=x&v=dQw4w9WgXcQ"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.equal(videoDoYoutube("https://www.youtube.com/shorts/dQw4w9WgXcQ"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.equal(videoDoYoutube("https://vimeo.com/123"), null);
+  assert.match(conferirEvidencia({ video: "https://vimeo.com/123" }, { aceitas }).motivo, /link do YouTube/);
+  assert.equal(conferirEvidencia({ video: "https://youtu.be/dQw4w9WgXcQ" }, { aceitas }).video, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+});
+
+caso("perfis: o tema decide quando não há IA; o motor alterna por dia e por rodada; trilha antiga é programação", () => {
+  assert.deepEqual(ORDEM_DOS_PERFIS, Object.keys(PERFIS));
+  assert.equal(perfilValido(undefined), "programacao");
+  assert.equal(perfilPeloTema("JavaScript"), "programacao");
+  assert.equal(perfilPeloTema("Estatística com Python"), "programacao", "programação vem antes");
+  assert.equal(perfilPeloTema("Inglês para viagem"), "idiomas");
+  assert.equal(perfilPeloTema("Álgebra linear"), "matematica", "palavra acentuada no começo");
+  assert.equal(perfilPeloTema("Violão para iniciantes"), "musica");
+  assert.equal(perfilPeloTema("Culinária japonesa"), "programacao", "sem pista: o padrão dos quadros STUDY");
+  assert.equal(perfilPeloTema("Culinária japonesa", "livre"), "livre");
+  assert.equal(perfilPeloTema("Japonês básico"), "idiomas");
+  assert.equal(motorDoExercicio({ perfil: "programacao", rodada: 2 }), "codigo");
+  assert.equal(motorDoExercicio({ perfil: "livre", rodada: 1, dia: "2026-10-30" }), "aberto");
+  const dia = "2026-10-30", amanha = "2026-10-31";
+  const hoje1 = motorDoExercicio({ perfil: "idiomas", rodada: 1, dia });
+  assert.notEqual(hoje1, motorDoExercicio({ perfil: "idiomas", rodada: 2, dia }), "a rodada extra troca de motor");
+  assert.notEqual(hoje1, motorDoExercicio({ perfil: "idiomas", rodada: 1, dia: amanha }), "e o dia seguinte também");
+  assert.ok(["calculo", "aberto"].includes(motorDoExercicio({ perfil: "matematica", rodada: 1, dia })));
+  assert.equal(motorDoExercicio({ perfil: "musica", rodada: 1, dia, assunto: { titulo: "Postura e afinação do violão" } }), "aberto", "assunto de tocar não é de ouvido");
+  assert.ok(["ouvido", "aberto"].includes(motorDoExercicio({ perfil: "musica", rodada: 1, dia, assunto: { titulo: "Intervalos" } })));
+  assert.deepEqual(evidenciasDoPerfil("programacao"), []);
+  assert.deepEqual(evidenciasDoPerfil("musica"), ["audio", "video", "texto"]);
+  const curso = validarCurso({ tema: "Violão", modulos: [{ nome: "M", assuntos: [{ titulo: "a" }, { titulo: "b" }, { titulo: "c" }] }] });
+  assert.equal(curso.proposta.perfil, "musica", "sem perfil da IA, pelo tema");
+  assert.equal(validarCurso({ tema: "Violão", perfil: "livre", modulos: curso.proposta.modulos }).proposta.perfil, "livre", "a escolha vale");
+  assert.equal(validarCurso({ tema: "Violão", perfil: "hacker", modulos: curso.proposta.modulos }).proposta.perfil, "musica");
+});
+
+caso("perfis: a migração 022 só acrescenta a coluna, com o padrão de antes", () => {
+  const sql = fs.readFileSync(new URL("../db/022-perfis-de-curso.sql", import.meta.url), "utf8");
+  assert.match(sql, /add column if not exists perfil text not null default 'programacao'/);
+  for (const p of ORDEM_DOS_PERFIS) assert.ok(sql.includes(`'${p}'`), `a checagem aceita ${p}`);
 });
 
 caso("acervo: a migração 020 só acrescenta tipos ao livro-caixa", () => {

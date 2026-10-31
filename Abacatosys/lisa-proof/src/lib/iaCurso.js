@@ -1,15 +1,21 @@
 // A Lisa propõe um curso: módulos, assuntos, objetivos e tarefas de teoria. Só PROPÕE — quem
 // cria o quadro é src/lib/cursos.js, depois que a pessoa olhou e confirmou.
 
-import { PERSONA, gerarJson } from "./ia.js";
+import { personaDo, gerarJson } from "./ia.js";
 import { NIVEIS } from "@/dominio/plano.js";
 import { NIVEIS_DO_CURSO, validarCurso } from "@/dominio/curso.js";
 import { validarCursoDoLivro } from "@/dominio/cursoDoLivro.js";
+import { PERFIS, ORDEM_DOS_PERFIS, perfilPeloTema } from "@/dominio/perfis.js";
+
+/** Como a IA escolhe o perfil do curso (src/dominio/perfis.js): o que cada um muda na prática. */
+const LINHA_DO_PERFIL = `- \`perfil\`: o tipo de curso, que decide a prática: ${ORDEM_DOS_PERFIS.map((p) => `${p} (${PERFIS[p].exemplos})`).join("; ")}. ` +
+  "programacao só se a prática for escrever código; um tema que não cabe nos outros é livre.";
 
 const ESQUEMA_DO_CURSO = {
   type: "OBJECT",
   properties: {
     nome: { type: "STRING" },
+    perfil: { type: "STRING", enum: ORDEM_DOS_PERFIS },
     descricao: { type: "STRING" },
     resumo: { type: "STRING" },
     modulos: {
@@ -38,7 +44,7 @@ const ESQUEMA_DO_CURSO = {
       },
     },
   },
-  required: ["nome", "descricao", "resumo", "modulos"],
+  required: ["nome", "perfil", "descricao", "resumo", "modulos"],
 };
 
 /**
@@ -50,7 +56,7 @@ const ESQUEMA_DO_CURSO = {
  */
 export async function proporCurso({ tema, nivel, objetivo, assuntos, dias, semanas }) {
   const bruto = await gerarJson({
-    sistema: PERSONA,
+    sistema: personaDo(perfilPeloTema(tema, "livre")),
     esquema: ESQUEMA_DO_CURSO,
     maxTokens: 16000,
     pensarPouco: true,
@@ -69,8 +75,9 @@ export async function proporCurso({ tema, nivel, objetivo, assuntos, dias, seman
       "- `objetivo`: uma frase com o que a pessoa saberá fazer ao terminar.",
       "- `nivel`: basico, intermediario ou avancado (dentro do curso).",
       "- `dias`: 1 a 5 dias de estudo, conforme o peso; a soma deve ficar perto da duração.",
-      "- `tarefas`: 3 a 5 tarefas de estudo TEÓRICO, cada uma começando com verbo e em até 110 caracteres: ler a documentação oficial ou uma apostila (cite a fonte, ex.: MDN), ler uma discussão de fórum, pedir a definição à Lisa, escrever um resumo próprio. A prática (quiz, exercícios, projetos) a Lisa cuida à parte.",
+      "- `tarefas`: 3 a 5 tarefas de estudo TEÓRICO, cada uma começando com verbo e em até 110 caracteres: ler a documentação oficial, uma apostila ou um livro de referência (cite a fonte concreta, ex.: MDN em programação, um dicionário em idiomas, um método em música), ler uma discussão de fórum, pedir a definição à Lisa, escrever um resumo próprio. A prática (quiz, exercícios, projetos) a Lisa cuida à parte.",
       "- `nome` do curso: curto, sem a palavra STUDY. `descricao`: 1 frase. `resumo`: 2 a 3 frases sobre a lógica do curso.",
+      LINHA_DO_PERFIL,
     ].filter(Boolean).join("\n"),
   });
   return validarCurso({ ...bruto, tema, nivel });
@@ -106,7 +113,7 @@ const ESQUEMA_DO_CURSO_DO_LIVRO = {
       },
     },
   },
-  required: ["nome", "tema", "descricao", "resumo", "modulos"],
+  required: ["nome", "perfil", "tema", "descricao", "resumo", "modulos"],
 };
 
 /**
@@ -120,7 +127,7 @@ const ESQUEMA_DO_CURSO_DO_LIVRO = {
  */
 export async function proporCursoDoLivro({ livro, material, faixas, nivel, objetivo, assuntos, dias, semanas }) {
   const bruto = await gerarJson({
-    sistema: PERSONA,
+    sistema: personaDo(perfilPeloTema(livro.titulo, "livre")),
     esquema: ESQUEMA_DO_CURSO_DO_LIVRO,
     maxTokens: 20000,
     pensarPouco: true,
@@ -142,6 +149,7 @@ export async function proporCursoDoLivro({ livro, material, faixas, nivel, objet
       "- `tarefas`: 2 a 4 tarefas de estudo sobre o CONTEÚDO do trecho, começando com verbo, até 110 caracteres cada: escrever no caderno um resumo de X, refazer o exemplo da pág. N, explicar com as próprias palavras a diferença entre A e B, listar os termos novos. NÃO inclua a tarefa de ler as páginas — ela é posta automaticamente. A prática (quiz, exercícios, projetos) a Lisa cuida à parte.",
       "- Pule o que não é conteúdo de estudo (capa, agradecimentos, índice remissivo, bibliografia), a menos que seja pedido.",
       "- `tema`: o assunto do livro em 2 a 5 palavras (ex.: \"JavaScript\", \"Estruturas de dados em C\").",
+      LINHA_DO_PERFIL,
       "- `nome` do curso: curto, sem a palavra STUDY (ex.: o título do livro, encurtado). `descricao`: 1 frase. `resumo`: 2 a 3 frases sobre a lógica do curso.",
       "",
       material,

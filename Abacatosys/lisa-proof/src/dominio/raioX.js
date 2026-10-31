@@ -7,7 +7,7 @@
 import { diaDe, somarDias, inicioDaSemana } from "./datas.js";
 import { calcularOfensiva } from "./ofensiva.js";
 import { nivelPorPontos, NOMES_DOS_EVENTOS } from "./pontos.js";
-import { NOMES_DOS_DESAFIOS, NOTA_DE_APROVACAO, TENTATIVAS } from "./pratica.js";
+import { NOMES_DOS_DESAFIOS, NOTA_DE_APROVACAO, tentativasDe } from "./pratica.js";
 
 export const SEMANAS_DO_RAIO_X = 12;
 const DIAS_DA_SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -117,7 +117,7 @@ export function montarRaioX({ eventos = [], desafios = [], trilhas = [], metaDia
     tema: temaDa.get(d.trilha_id) || "",
     nota: d.nota ?? null,
     tentativas: d.tentativas || 0,
-    maxTentativas: TENTATIVAS[d.tipo] || null,
+    maxTentativas: tentativasDe(d) || null,
     aprovado: (d.nota ?? 0) >= NOTA_DE_APROVACAO,
     pontos: d.pontos || 0,
   });

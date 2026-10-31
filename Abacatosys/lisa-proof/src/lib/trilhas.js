@@ -10,6 +10,7 @@ import { avancoDaTrilhaDoUsuario } from "./avanco.js";
 import { planejarTrilha, temModelo } from "./ia.js";
 import { planoPadrao, planoDoReplanejamento, montarEtapas, normalizarDiasDeEstudo } from "@/dominio/plano.js";
 import { diaDe, diaValido } from "@/dominio/datas.js";
+import { PERFIS, perfilPeloTema } from "@/dominio/perfis.js";
 
 function falhou(error, onde) {
   if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`);
@@ -76,7 +77,8 @@ export async function criarTrilha({ usuarioId, quadroId, diasDeEstudo, inicio, u
     .from("proof_trilhas")
     .insert({
       usuario_id: usuarioId, quadro_id: quadro.id, tema: quadro.tema, inicio_em: inicioEm,
-      dias_de_estudo: dias, resumo, gerada_por: geradaPor,
+      // o quadro STUDY não passa pela IA do curso: o perfil sai do nome do tema (troca-se na tela da trilha)
+      dias_de_estudo: dias, resumo, gerada_por: geradaPor, perfil: perfilPeloTema(quadro.tema),
     })
     .select("id")
     .single();
@@ -163,6 +165,19 @@ export async function replanejarTrilha({ usuarioId, trilhaId, usarIa = false, di
   return { aviso };
 }
 
+/**
+ * Troca o perfil do curso (src/dominio/perfis.js). Vale para a prática que vier depois: o quiz, o
+ * exercício e o projeto já gerados continuam como nasceram.
+ */
+export async function mudarPerfil({ usuarioId, trilhaId, perfil }) {
+  if (!PERFIS[perfil]) throw new ErroDeAcesso(400, "tipo de curso desconhecido");
+  const trilha = await trilhaDoUsuario(trilhaId, usuarioId);
+  const { error } = await supabase.from("proof_trilhas")
+    .update({ perfil, atualizada_em: new Date().toISOString() }).eq("id", trilha.id);
+  falhou(error, "trilha");
+  return { perfil };
+}
+
 export async function apagarTrilha({ usuarioId, trilhaId }) {
   const trilha = await trilhaDoUsuario(trilhaId, usuarioId);
   // Os pontos ficam: `proof_eventos.trilha_id` vira nulo. Apagar uma trilha não pode apagar a
@@ -188,6 +203,7 @@ export async function detalheDaTrilha({ usuarioId, trilhaId }) {
     trilha: {
       id: trilha.id, tema: trilha.tema, quadroId: trilha.quadro_id, inicioEm: trilha.inicio_em,
       diasDeEstudo: trilha.dias_de_estudo, resumo: trilha.resumo, geradaPor: trilha.gerada_por,
+      perfil: PERFIS[trilha.perfil] ? trilha.perfil : "programacao",
       link: linkDoAbacato(trilha.quadro_id),
     },
     avanco,

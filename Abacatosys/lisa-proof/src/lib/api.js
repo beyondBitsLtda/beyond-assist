@@ -7,11 +7,13 @@
 
 export async function pedir(url, { metodo = "GET", corpo } = {}) {
   let res;
+  // FormData (arquivos: fotos, áudio) vai como está — o navegador põe o content-type com o separador
+  const formulario = typeof FormData !== "undefined" && corpo instanceof FormData;
   try {
     res = await fetch(url, {
       method: metodo,
-      headers: corpo ? { "content-type": "application/json" } : undefined,
-      body: corpo ? JSON.stringify(corpo) : undefined,
+      headers: corpo && !formulario ? { "content-type": "application/json" } : undefined,
+      body: corpo ? (formulario ? corpo : JSON.stringify(corpo)) : undefined,
     });
   } catch {
     // Rede caída, servidor fora, túnel de casa dormindo. Vale uma mensagem própria porque o

@@ -11,7 +11,7 @@ import { ErroDeAcesso } from "./sessao.js";
 import { avancoDaTrilha } from "@/dominio/avanco.js";
 import { diaDe } from "@/dominio/datas.js";
 
-const CAMPOS_DA_TRILHA = "id, usuario_id, quadro_id, tema, inicio_em, dias_de_estudo, status, resumo, gerada_por";
+const CAMPOS_DA_TRILHA = "id, usuario_id, quadro_id, tema, inicio_em, dias_de_estudo, status, resumo, gerada_por, perfil";
 
 /** Busca por uma lista de ids em lotes de 80, e cada lote paginado (o PostgREST devolve até 1000). */
 async function emLotes(tabela, campos, coluna, ids, ajustar = (q) => q) {

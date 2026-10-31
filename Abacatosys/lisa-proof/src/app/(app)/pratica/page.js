@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { obter, criar } from "@/lib/api.js";
 import { formatarDia } from "@/dominio/datas.js";
 import { NOTA_DE_APROVACAO, PONTOS_DA_PRATICA, TENTATIVAS } from "@/dominio/pratica.js";
+import { MOTORES } from "@/dominio/motores.js";
+import { PERFIS } from "@/dominio/perfis.js";
 import { valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
 import Neuro, { reagir } from "@/componentes/Neuro.js";
 
@@ -31,9 +33,11 @@ function situacaoDoDiario(d, tipo) {
   if (d.status === "concluido") {
     const ok = (d.nota ?? 0) >= NOTA_DE_APROVACAO;
     // exercício aprovado com tentativa sobrando: dá para buscar uma nota maior
-    const sobra = tipo === "exercicio" && (d.tentativas ?? 0) < TENTATIVAS.exercicio && (d.nota ?? 0) < 100;
+    // (a lista, o ditado e o ouvido têm uma tentativa só: d.maxTentativas, de src/lib/pratica.js)
+    const maximo = d.maxTentativas ?? TENTATIVAS.exercicio;
+    const sobra = tipo === "exercicio" && (d.tentativas ?? 0) < maximo && (d.nota ?? 0) < 100;
     return {
-      texto: `${tipo === "quiz" ? "Acertos" : "Nota"}: ${d.nota}% · +${d.pontos} pts${sobra ? ` · ${TENTATIVAS.exercicio - (d.tentativas ?? 0)} tentativa(s) para melhorar` : ""}`,
+      texto: `${tipo === "quiz" ? "Acertos" : "Nota"}: ${d.nota}% · +${d.pontos} pts${sobra ? ` · ${maximo - (d.tentativas ?? 0)} tentativa(s) para melhorar` : ""}`,
       acao: sobra ? "Melhorar nota" : "Rever",
       classe: ok ? "pratica__bloco--feito" : "pratica__bloco--parcial",
     };
@@ -65,6 +69,17 @@ const ROTULOS = {
   projeto_final: { titulo: "Projeto final", icone: "🏆", pontos: "do tamanho da trilha" },
 };
 
+/**
+ * O exercício do dia com a cara do curso: o motor de hoje, se já foi gerado (ditado, lista, ouvido…);
+ * senão, o emoji do tipo de curso. Programação continua "Exercício do dia" ⌨️.
+ */
+function rotuloDoExercicio(t) {
+  const motor = t.exercicio?.motor;
+  if (motor && motor !== "codigo" && MOTORES[motor]) return { titulo: `${MOTORES[motor].nome} do dia`, icone: MOTORES[motor].icone };
+  if (t.perfil && t.perfil !== "programacao" && PERFIS[t.perfil]) return { icone: PERFIS[t.perfil].emoji };
+  return {};
+}
+
 /** "Mais um quiz/exercício hoje": aparece quando a rodada atual acabou e ainda cabe outra. */
 function MaisUma({ tipo, d, ocupado, aoPedir }) {
   if (!d?.podeMais) return null;
@@ -75,11 +90,11 @@ function MaisUma({ tipo, d, ocupado, aoPedir }) {
   );
 }
 
-function Bloco({ tipo, situacao, ocupado, aoAbrir, titulo, pontos }) {
+function Bloco({ tipo, situacao, ocupado, aoAbrir, titulo, pontos, icone }) {
   const r = ROTULOS[tipo];
   return (
     <button type="button" className={`pratica__bloco ${situacao.classe}`} onClick={aoAbrir} disabled={ocupado || situacao.desativado}>
-      <span className="pratica__icone" aria-hidden="true">{r.icone}</span>
+      <span className="pratica__icone" aria-hidden="true">{icone || r.icone}</span>
       <span className="pratica__textos">
         <strong>{titulo || r.titulo}</strong>
         <small>{situacao.texto}</small>
@@ -164,7 +179,7 @@ export default function Pratica() {
               </div>
               <div className="pratica__celula">
                 <Bloco tipo="exercicio" situacao={situacaoDoDiario(t.exercicio, "exercicio")} ocupado={ocupado === `${t.trilhaId}:exercicio`}
-                  aoAbrir={() => abrir(t, "exercicio", t.exercicio)} />
+                  {...rotuloDoExercicio(t)} aoAbrir={() => abrir(t, "exercicio", t.exercicio)} />
                 <MaisUma tipo="exercicio" d={t.exercicio} ocupado={ocupado === `${t.trilhaId}:exercicio:mais`} aoPedir={() => abrir(t, "exercicio", t.exercicio, undefined, true)} />
               </div>
               {t.projeto && (

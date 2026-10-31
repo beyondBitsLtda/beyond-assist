@@ -113,7 +113,7 @@ export async function criarCurso({ usuarioId, proposta, diasDeEstudo, inicio, co
     const inicioEm = diaValido(inicio) ? inicio : diaDe();
     const { data: trilha, error: e5 } = await supabase.from("proof_trilhas").insert({
       usuario_id: usuarioId, quadro_id: quadro.id, tema: temaDo(quadro.nome), inicio_em: inicioEm,
-      dias_de_estudo: dias, resumo: p.resumo || null, gerada_por: "ia", ...(livro ? { livro_id: livro.id } : {}),
+      dias_de_estudo: dias, resumo: p.resumo || null, gerada_por: "ia", perfil: p.perfil, ...(livro ? { livro_id: livro.id } : {}),
     }).select("id").single();
     falhou(e5, "trilha");
 

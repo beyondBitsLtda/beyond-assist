@@ -7,6 +7,7 @@
 // Puro: sem banco, sem rede.
 
 import { NIVEIS, MAXIMO_DE_DIAS_POR_ETAPA } from "./plano.js";
+import { PERFIS, perfilPeloTema } from "./perfis.js";
 
 export const NIVEIS_DO_CURSO = {
   iniciante: "Iniciante — do zero, sem experiência no tema",
@@ -104,6 +105,8 @@ export function validarCurso(bruto) {
       descricao: texto(bruto.descricao, 1500),
       resumo: texto(bruto.resumo, 1200),
       nivel: NIVEIS_DO_CURSO[bruto.nivel] ? bruto.nivel : "iniciante",
+      // o perfil do curso (perfis.js): o que a Lisa (ou a pessoa, na revisão) escolheu; sem escolha, pelo tema
+      perfil: PERFIS[bruto.perfil] ? bruto.perfil : perfilPeloTema(tema),
       modulos,
       // o livro de onde o curso saiu (quem cria confere de novo que o livro é da pessoa)
       ...(/^[0-9a-f-]{36}$/i.test(String(bruto.livro?.id || ""))

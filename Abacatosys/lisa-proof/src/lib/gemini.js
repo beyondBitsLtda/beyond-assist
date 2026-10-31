@@ -95,11 +95,14 @@ export async function conversar({ contents, sistema, ferramentas, maxTokens, esq
       ...(pensarPouco ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
     },
   };
+  // O corpo vira texto uma vez só (e de novo só se mudar): com foto ou áudio da entrega ele tem
+  // megabytes, e refazer o texto a cada chave tentada gastaria o tempo de CPU do Worker.
+  let corpoEmTexto = null;
   const buscar = (modelo, chave) =>
     fetch(`${BASE}/${modelo}:generateContent?key=${encodeURIComponent(chave)}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(corpo),
+      body: (corpoEmTexto ??= JSON.stringify(corpo)),
     });
 
   /** Uma tentativa: devolve `{ parte }`, `{ cota }`, `{ sobrecarga }` ou `{ erro }`. */
@@ -110,6 +113,7 @@ export async function conversar({ contents, sistema, ferramentas, maxTokens, esq
       // Modelo que não conhece o ajuste de raciocínio responde 400: tira a opção e tenta de novo.
       if (resposta.status === 400 && corpo.generationConfig.thinkingConfig) {
         delete corpo.generationConfig.thinkingConfig;
+        corpoEmTexto = null;
         resposta = await buscar(modelo, chave);
       }
     } catch (e) {

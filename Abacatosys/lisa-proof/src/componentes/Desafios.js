@@ -12,6 +12,8 @@ import Codigo from "./codigo/Codigo.js";
 import EditorDeCodigo from "./codigo/EditorDeCodigo.js";
 import Neuro, { reagir, comemorar, celebrar } from "./Neuro.js";
 import { Barra, useAviso } from "./Pecas.js";
+import { Avaliacao, reagirAEntrega } from "./pratica/Retorno.js";
+import { DesafioAberto, ListaDeCalculo, Ditado, TreinoDeOuvido, EntregaComEvidencias } from "./pratica/Motores.js";
 
 const LETRAS = ["A", "B", "C", "D"];
 
@@ -179,54 +181,7 @@ export function Quiz({ desafio }) {
 
 // ================================================================ avaliação
 
-export function Avaliacao({ avaliacao, nota }) {
-  if (!avaliacao) return null;
-  const valor = nota ?? avaliacao.nota;
-  const ok = valor >= NOTA_DE_APROVACAO;
-  return (
-    <div className="pf-cartao avaliacao">
-      <div className="avaliacao__topo">
-        <div className={`avaliacao__nota${ok ? " avaliacao__nota--ok" : ""}`}>{valor}</div>
-        <div>
-          <span className={`pf-pilula ${ok ? "pf-pilula--verde" : "pf-pilula--atencao"}`}>{ok ? "Aprovado" : `Ainda não (mínimo ${NOTA_DE_APROVACAO})`}</span>
-          {avaliacao.comentario && <p style={{ margin: "8px 0 0" }}>{avaliacao.comentario}</p>}
-        </div>
-      </div>
-      {avaliacao.requisitos?.length > 0 && (
-        <ul className="avaliacao__lista">
-          {avaliacao.requisitos.map((r, i) => (
-            <li key={i} className={r.atendido ? "avaliacao__ok" : "avaliacao__falta"}>
-              <b aria-hidden="true">{r.atendido ? "✓" : "✗"}</b>
-              <span>{r.requisito}{r.observacao && <small>{r.observacao}</small>}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {avaliacao.extras?.length > 0 && (
-        <ul className="avaliacao__lista">
-          {avaliacao.extras.map((r, i) => (
-            <li key={i} className={r.atendido ? "avaliacao__ok" : "avaliacao__falta"}>
-              <b aria-hidden="true">{r.atendido ? "✓" : "–"}</b>
-              <span>Extra: {r.requisito}{r.observacao && <small>{r.observacao}</small>}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {avaliacao.pontosFortes?.length > 0 && (
-        <>
-          <p className="pf-campo__rotulo">O que ficou bom</p>
-          <ul className="avaliacao__simples">{avaliacao.pontosFortes.map((t, i) => <li key={i}>{t}</li>)}</ul>
-        </>
-      )}
-      {avaliacao.melhorias?.length > 0 && (
-        <>
-          <p className="pf-campo__rotulo">Para melhorar</p>
-          <ul className="avaliacao__simples">{avaliacao.melhorias.map((t, i) => <li key={i}>{t}</li>)}</ul>
-        </>
-      )}
-    </div>
-  );
-}
+export { Avaliacao };
 
 function Entrega({ desafio, campo, rotulo, aoEnviar, aoAvaliar, conteudoInicial, placeholder, multilinha, linguagem }) {
   const [valor, setValor] = useState(conteudoInicial || "");
@@ -252,22 +207,7 @@ function Entrega({ desafio, campo, rotulo, aoEnviar, aoAvaliar, conteudoInicial,
       const r = await aoEnviar(valor);
       setEstado({ status: r.concluido ? "concluido" : "em_andamento", nota: r.nota, tentativas: r.tentativas, avaliacao: r.avaliacao, completo: r.completo });
       aoAvaliar?.(r);
-      celebrar(r);
-      if (projeto) {
-        // projeto em partes: o que conta é o que esta entrega garantiu de NOVO
-        if (r.completo) comemorar(`Projeto completo! ${r.pontos > 0 ? `+${r.pontos} pontos` : ""}`);
-        else if (r.pontos > 0) comemorar(`+${r.pontos} pontos garantidos!`);
-        else reagir("pensando", "Nada novo garantido desta vez — veja na avaliação o que faltou.", 6000);
-      } else if (r.avaliacao.aprovado) {
-        comemorar(`Aprovado com ${r.avaliacao.nota}! ${r.pontos > 0 ? `+${r.pontos} pontos` : ""}`);
-        if (r.reenviar && r.avaliacao.nota < 100) setTimeout(() => reagir("feliz", `Quer buscar uma nota maior? Ainda tem ${r.restantes} tentativa(s) — vale a melhor.`, 6000), 4200);
-      }
-      else reagir("triste", r.restantes ? `Faltou pouco! Você ainda tem ${r.restantes} tentativa(s).` : "Não foi dessa vez, mas olha quanta coisa boa na avaliação.", 6000);
-      if (r.pontos > 0 && !r.avaliacao.aprovado) avisar(`+${r.pontos} pontos`);
-      // a trilha amarrada: o projeto aprovado abre a semana seguinte; o final fecha a trilha
-      if (r.semana?.trilhaConcluida) setTimeout(() => comemorar("Trilha concluída! 🏆"), 4400);
-      else if (r.semana?.liberou) setTimeout(() => comemorar(`Semana ${r.semana.liberou} liberada! 🔓`), 4400);
-      else if (r.semana?.podeOutro) setTimeout(() => reagir("pensando", "As entregas acabaram sem aprovação — na trilha dá para gerar um projeto novo para esta semana.", 7000), 4400);
+      reagirAEntrega(r, { projeto, avisar });
     } catch (falha) {
       setErro(falha.message);
       reagir("surpreso", "Ops, algo deu errado no envio.");
@@ -388,6 +328,11 @@ function Rodar({ linguagem, tema, codigo }) {
 // ================================================================ exercício
 
 export function Exercicio({ desafio }) {
+  // os motores dos cursos que não são de programação (src/dominio/motores.js)
+  if (desafio.motor === "aberto") return <DesafioAberto desafio={desafio} />;
+  if (desafio.motor === "calculo") return <ListaDeCalculo desafio={desafio} />;
+  if (desafio.motor === "ditado") return <Ditado desafio={desafio} />;
+  if (desafio.motor === "ouvido") return <TreinoDeOuvido desafio={desafio} />;
   const c = desafio.conteudo;
   return (
     <div className="desafio">
@@ -778,15 +723,25 @@ export function Projeto({ desafio: inicial, aoMudar }) {
         )}
       </div>
       <DicasDaLisa key={`dicas-${desafio.complexidade}-${desafio.titulo}`} desafio={desafio} />
-      <Entrega
-        desafio={desafio}
-        aoAvaliar={(r) => { if (r.pontuacao) setPontuacao(r.pontuacao); setDesafio((d) => ({ ...d, tentativas: r.tentativas })); }}
-        campo="repo"
-        rotulo="Link do repositório público no GitHub"
-        placeholder="https://github.com/seu-usuario/seu-projeto"
-        conteudoInicial={desafio.resposta?.repo}
-        aoEnviar={(repo) => criar(`/api/desafios/${desafio.id}/enviar`, { repo })}
-      />
+      {Array.isArray(c.evidencias) ? (
+        // curso que não é de programação: a entrega é por texto, fotos, áudio ou vídeo
+        <EntregaComEvidencias
+          desafio={desafio}
+          aceitas={c.evidencias}
+          projeto
+          aoAvaliar={(r) => { if (r.pontuacao) setPontuacao(r.pontuacao); setDesafio((d) => ({ ...d, tentativas: r.tentativas })); }}
+        />
+      ) : (
+        <Entrega
+          desafio={desafio}
+          aoAvaliar={(r) => { if (r.pontuacao) setPontuacao(r.pontuacao); setDesafio((d) => ({ ...d, tentativas: r.tentativas })); }}
+          campo="repo"
+          rotulo="Link do repositório público no GitHub"
+          placeholder="https://github.com/seu-usuario/seu-projeto"
+          conteudoInicial={desafio.resposta?.repo}
+          aoEnviar={(repo) => criar(`/api/desafios/${desafio.id}/enviar`, { repo })}
+        />
+      )}
     </div>
   );
 }
