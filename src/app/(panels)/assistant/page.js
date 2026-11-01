@@ -14,7 +14,8 @@ import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
 import FontesDaWeb from "@/components/panels/FontesDaWeb.js";
 import CenaDaLisa from "@/components/panels/hud/CenaDaLisa.js";
 import JanelaDaResposta from "@/components/panels/hud/JanelaDaResposta.js";
-import { citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto } from "@/lib/processmapNaConversa.js";
+import { citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, pedeEmTodos } from "@/lib/processmapNaConversa.js";
+import { pedirPlano, executarPlano, textoDoAndamento } from "@/lib/trabalhoNoProjeto.js";
 import { apiDosFluxos } from "@/lib/fluxogramasNoNavegador.js";
 
 const apiDosFluxosDaConversa = apiDosFluxos();
@@ -285,6 +286,7 @@ export default function AssistantPage() {
   const projetosRef = useRef({ em: 0, lista: null });
   const quadroVinculoRef = useRef(null); // { fluxo, projeto }
   const resolverProjetoRef = useRef(null);
+  const ultimoProjetoRef = useRef(null); // o último projeto em que a Lisa trabalhou nesta conversa
   const planejarNoProjetoRef = useRef(null);
   const trabalharNoProjetoRef = useRef(null);
   // as mensagens da conversa, para mandar o código que já apareceu nela junto da pergunta
@@ -2789,22 +2791,27 @@ export default function AssistantPage() {
   // deixou, e o que ela arrumou fica no lugar. A explicação da Lisa vira a resposta da conversa (e é
   // falada, se a voz estiver ligada); o desenho aparece no quadro.
   // `mudar`: o pedido é mudar o desenho que está no quadro (ele vai junto); senão é um desenho novo
-  // quem acha o projeto do ProcessMap citado na pergunta (src/lib/processmapNaConversa.js): devolve
-  // { projeto, fluxos (com os documentos), citado (o fluxo citado pelo nome), provavel (o aberto no
-  // quadro, se for desse projeto, ou o único dele) }, ou null
+  // quem acha o projeto do ProcessMap da pergunta (src/lib/processmapNaConversa.js): o citado pelo nome
+  // ou — "anote todos os fluxogramas do projeto", sem nome — o projeto em que se está trabalhando (o do
+  // fluxo aberto no quadro, ou o último desta conversa). Devolve { projeto, fluxos (com os documentos),
+  // citado (o fluxo citado pelo nome), provavel (o aberto no quadro, se for desse projeto, ou o único) },
+  // ou null
   resolverProjetoRef.current = async (q) => {
-    if (!citaProjeto(q)) return null;
+    if (!citaProjeto(q) && !pedeEmTodos(q)) return null;
     try {
       if (!projetosRef.current.lista || Date.now() - projetosRef.current.em > 30_000) {
         projetosRef.current = { em: Date.now(), lista: await apiDosFluxosDaConversa.listar() };
       }
-      const achado = projetoCitado(q, projetosRef.current.lista);
+      const lista = projetosRef.current.lista || [];
+      const emUso = quadroVinculoRef.current?.projeto || ultimoProjetoRef.current;
+      const achado = projetoCitado(q, lista) || (emUso && lista.find((p) => p.id === emUso.id)) || null;
       if (!achado) return null;
       const { projeto, fluxos } = await apiDosFluxosDaConversa.lerProjeto(achado.id);
+      ultimoProjetoRef.current = projeto;
       const vinculado = quadroVinculoRef.current;
       const citado = fluxoCitado(q, fluxos, { nomeDoProjeto: projeto.nome });
       const provavel = (vinculado && fluxos.find((f) => f.id === vinculado.fluxo.id)) || (fluxos.length === 1 ? fluxos[0] : null);
-      addLog("[PROCESSMAP]", PU, `projeto "${projeto.nome}": ${fluxos.length} desenho${fluxos.length === 1 ? "" : "s"} lido${fluxos.length === 1 ? "" : "s"}${citado ? ` · citado: "${citado.nome}"` : ""}`);
+      addLog("[PROCESSMAP]", PU, `projeto "${projeto.nome}"${projetoCitado(q, lista) ? "" : " (o que está em uso)"}: ${fluxos.length} desenho${fluxos.length === 1 ? "" : "s"} lido${fluxos.length === 1 ? "" : "s"}${citado ? ` · citado: "${citado.nome}"` : ""}`);
       return { projeto, fluxos, citado, provavel };
     } catch (err) {
       addLog("[PROCESSMAP]", OR, `não consegui ler o projeto: ${err.message}`);
@@ -2816,38 +2823,32 @@ export default function AssistantPage() {
   const conversaEmTexto = () => conversaVigente(conversaRef.current).slice(-6)
     .map((t) => `${t.papel === "lisa" ? "LISA" : "PESSOA"}: ${String(t.texto).slice(0, 1000)}`).join("\n");
 
-  // o plano de um pedido feito sobre um projeto do ProcessMap (/api/processmap/plano): { acao, explicacao,
-  // operacoes }, ou null se o modelo falhou. A janela já mostra a pergunta enquanto a Lisa planeja.
+  // o plano de um pedido feito sobre um projeto do ProcessMap (src/lib/trabalhoNoProjeto.js): { acao,
+  // explicacao, operacoes }, ou null se o modelo falhou (tenta duas vezes). A janela já mostra a
+  // pergunta enquanto a Lisa planeja.
   planejarNoProjetoRef.current = async (q, doProjeto, displayText) => {
     setQuestion(displayText || q);
     setAnswer("");
     setFontes([]);
     setBusy(true);
     setMode("listening");
-    try {
-      const res = await fetch("/api/processmap/plano", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          pedido: q,
-          projeto: contextoDoProjeto(doProjeto.projeto, doProjeto.fluxos),
-          fluxos: doProjeto.fluxos.map(({ id, nome, modo, formas }) => ({ id, nome, modo, formas })),
-          aberto: quadroVinculoRef.current?.fluxo.id || "",
-          conversa: conversaEmTexto(),
-        }),
-      });
-      const r = await res.json().catch(() => ({}));
-      if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
-      addLog("[PROCESSMAP]", PU, r.plano.acao === "mudar" ? `plano: ${r.plano.operacoes.length} desenho${r.plano.operacoes.length === 1 ? "" : "s"} para mudar ou criar` : "é pergunta sobre o projeto");
-      return r.plano;
-    } catch (err) {
-      addLog("[PROCESSMAP]", OR, `não consegui planejar: ${err.message}`);
-      return null;
+    for (let tentativa = 1; tentativa <= 2; tentativa++) {
+      try {
+        const plano = await pedirPlano({
+          pedido: q, projeto: doProjeto.projeto, fluxos: doProjeto.fluxos,
+          aberto: quadroVinculoRef.current?.fluxo.id || "", conversa: conversaEmTexto(),
+        });
+        addLog("[PROCESSMAP]", PU, plano.acao === "mudar" ? `plano: ${plano.operacoes.length} desenho${plano.operacoes.length === 1 ? "" : "s"} para mudar ou criar` : "é pergunta sobre o projeto");
+        return plano;
+      } catch (err) {
+        addLog("[PROCESSMAP]", OR, `não consegui planejar (tentativa ${tentativa}): ${err.message}`);
+      }
     }
+    return null;
   };
 
-  // executa o plano: cada operação é um desenho (/api/diagrama, com o projeto inteiro como contexto),
-  // salvo no projeto na hora; a janela mostra o andamento; o último desenho abre no quadro, ligado.
+  // executa o plano (src/lib/trabalhoNoProjeto.js): cada operação é um desenho salvo no projeto na
+  // hora; a janela mostra o andamento; o último desenho abre no quadro, ligado.
   trabalharNoProjetoRef.current = async (q, { displayText, doProjeto, plano }) => {
     const shown = displayText || q;
     stopSpeaking();
@@ -2860,71 +2861,33 @@ export default function AssistantPage() {
     setMode("listening");
     setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
     const nome = doProjeto.projeto.nome;
-    const linhas = plano.operacoes.map((op) => ({
-      nome: op.fluxo ? doProjeto.fluxos.find((f) => f.id === op.fluxo)?.nome || "?" : op.nome,
-      estado: "na fila", ok: null, nota: "",
-    }));
-    const marca = (l) => (l.ok === true ? "✓" : l.ok === false ? "✗" : l.estado === "trabalhando…" ? "◆" : "◇");
-    const mostrar = (fim = "") => setAnswer(`${plano.explicacao || `Vou trabalhar no projeto "${nome}".`}\n\n${linhas
-      .map((l) => `${marca(l)} "${l.nome}" — ${l.estado}${l.nota ? `: ${l.nota}` : ""}`).join("\n")}${fim ? `\n\n${fim}` : ""}`);
-    mostrar();
-    addLog("[PROCESSMAP]", PU, `trabalhando em "${nome}": ${linhas.map((l) => l.nome).join(", ")}`);
-    const conversa = conversaEmTexto();
-    let ultimo = null;
-    let feitos = 0;
+    addLog("[PROCESSMAP]", PU, `trabalhando em "${nome}": ${plano.operacoes.length} desenho${plano.operacoes.length === 1 ? "" : "s"}`);
+    // o fluxo aberto no quadro tem o que a pessoa acabou de mexer: parte dele
+    const abertoId = quadroAbertoRef.current && desenhoRef.current ? quadroVinculoRef.current?.fluxo.id || "" : "";
     try {
-      for (const [i, op] of plano.operacoes.entries()) {
-        const linha = linhas[i];
-        linha.estado = "trabalhando…";
-        mostrar();
-        try {
-          const fluxo = op.fluxo ? doProjeto.fluxos.find((f) => f.id === op.fluxo) : null;
-          // o fluxo aberto no quadro tem o que a pessoa acabou de mexer: parte dele
-          const aberto = Boolean(fluxo && quadroVinculoRef.current?.fluxo.id === fluxo.id && quadroAbertoRef.current && desenhoRef.current);
-          const res = await fetch("/api/diagrama", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              pedido: !fluxo && op.tipo === "mapa mental" ? `Monte um mapa mental. ${op.pedido}` : op.pedido,
-              atual: fluxo ? (aberto ? desenhoRef.current : fluxo.documento) : null,
-              conversa,
-              projeto: contextoDoProjeto(doProjeto.projeto, doProjeto.fluxos, { alvo: fluxo }),
-            }),
-          });
-          const r = await res.json().catch(() => ({}));
-          if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
-          const salvo = fluxo
-            ? await apiDosFluxosDaConversa.salvar(fluxo.id, aberto ? { documento: r.doc, forcar: true } : { documento: r.doc, versao: fluxo.versao })
-            : (await apiDosFluxosDaConversa.criar({ documento: r.doc, nome: op.nome || r.titulo, projetoId: doProjeto.projeto.id, origem: "lisa" })).fluxo;
-          linha.nome = salvo.nome;
-          linha.estado = fluxo ? "atualizado" : "criado";
-          linha.ok = true;
-          linha.nota = String(r.explicacao || "").split(/(?<=[.!?])\s/)[0].slice(0, 160);
-          feitos++;
-          ultimo = { r, vinculo: { fluxo: salvo, projeto: doProjeto.projeto }, mudanca: Boolean(fluxo) };
-          addLog("[PROCESSMAP]", GR, `${linha.estado}: "${salvo.nome}"`);
-        } catch (err) {
-          linha.estado = err.status === 409 ? "não salvei (mudou em outro lugar agora há pouco)" : "não deu";
-          linha.nota = err.status === 409 ? "" : err.message;
-          linha.ok = false;
-          addLog("[PROCESSMAP]", OR, `"${linha.nome}": ${err.message}`);
-        }
-        mostrar();
-      }
+      const { linhas, feitos, resultados } = await executarPlano({
+        plano, projeto: doProjeto.projeto, fluxos: doProjeto.fluxos, api: apiDosFluxosDaConversa,
+        conversa: conversaEmTexto(), abertoId,
+        docDe: (f) => (f.id === abertoId ? desenhoRef.current : f.documento),
+        aoAndar: (ls) => setAnswer(textoDoAndamento(plano, ls)),
+      });
+      for (const l of linhas) addLog("[PROCESSMAP]", l.ok ? GR : OR, `"${l.nome}": ${l.estado}${l.ok ? "" : ` ${l.nota}`}`);
       projetosRef.current.em = 0; // a lista mudou
+      ultimoProjetoRef.current = doProjeto.projeto;
+      const ultimo = resultados.at(-1);
       if (ultimo) {
-        desenhoRef.current = ultimo.r.doc;
+        desenhoRef.current = ultimo.doc;
         setQuadro({
-          versao: { doc: ultimo.r.doc, chave: `d${Date.now()}`, colecao: ultimo.r.colecao, mudanca: ultimo.mudanca, vinculo: ultimo.vinculo },
-          titulo: ultimo.vinculo.fluxo.nome, explicacao: ultimo.r.explicacao,
+          versao: { doc: ultimo.doc, chave: `d${Date.now()}`, colecao: ultimo.colecao, mudanca: ultimo.mudou, vinculo: { fluxo: ultimo.fluxo, projeto: doProjeto.projeto } },
+          titulo: ultimo.fluxo.nome, explicacao: ultimo.explicacao,
         });
       }
       const total = plano.operacoes.length;
       const fim = feitos
-        ? `Salvo no projeto "${nome}" do ProcessMap (${feitos} de ${total})${ultimo ? `; "${ultimo.vinculo.fluxo.nome}" está aberto no quadro` : ""}.`
+        ? `Salvo no projeto "${nome}" do ProcessMap (${feitos} de ${total})${ultimo ? `; "${ultimo.fluxo.nome}" está aberto no quadro` : ""}.`
         : `Não consegui mudar nada no projeto "${nome}".`;
-      mostrar(fim);
-      const texto = `${plano.explicacao ? `${plano.explicacao}\n\n` : ""}${linhas.map((l) => `${marca(l)} "${l.nome}" — ${l.estado}${l.nota ? `: ${l.nota}` : ""}`).join("\n")}\n\n${fim}`;
+      const texto = textoDoAndamento(plano, linhas, fim);
+      setAnswer(texto);
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
       conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
       if (voiceOn) enqueueSpeech(feitos ? `Pronto. ${feitos === total ? "Tudo salvo" : `${feitos} de ${total} salvos`} no projeto ${nome}.` : `Não consegui mudar o projeto ${nome}.`, gen);
@@ -3456,7 +3419,7 @@ export default function AssistantPage() {
       versao={quadro.versao} titulo={quadro.titulo} explicacao={quadro.explicacao} ocupado={desenhando}
       aoMudar={(doc) => { desenhoRef.current = doc; }}
       aoPedir={(p) => desenharNaTelaRef.current?.(p, { mudar: true })}
-      aoVincular={(r) => { quadroVinculoRef.current = r; }}
+      aoVincular={(r) => { quadroVinculoRef.current = r; if (r?.projeto) ultimoProjetoRef.current = r.projeto; }}
       aoFechar={() => { setQuadro(null); desenhoRef.current = null; quadroVinculoRef.current = null; }}
     />
   );

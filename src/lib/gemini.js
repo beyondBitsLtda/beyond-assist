@@ -1294,7 +1294,7 @@ Decida:
     prontos (nomes de etapas, tópicos, o texto inteiro de uma nota), em português.
   - Para a pessoa, "fluxograma" é QUALQUER desenho do projeto (fluxograma ou mapa mental): "todos os
     fluxogramas", "todos os desenhos", "em cada fluxo" = uma operação para CADA desenho da lista, mapas
-    mentais inclusive. Não pule nenhum (só um desenho vazio, de 1 forma, pode ficar de fora).
+    mentais inclusive. Não pule nenhum, nem o que ainda está quase vazio.
   - Desenho com várias abas (veja as linhas "ABA" no conteúdo): o que vale para "todos" vai em CADA
     aba — diga isso na instrução, nomeando as abas, e escreva o texto de cada uma.
   - Comentário, nota, anotação, explicação num fluxograma: peça "uma forma do tipo note (anotação), sem

@@ -153,10 +153,10 @@ export function pedeEmTodos(pedido) {
     && p.slice(i + 1, i + 4).some((y) => DESENHOS.some((d) => parecida(y, d))));
 }
 
-/** Os desenhos do projeto (com algo desenhado: mais de uma forma) que o plano deixou de fora. */
+/** Os desenhos do projeto que o plano deixou de fora ("todos os mapas mentais": o quase vazio também). */
 export function faltandoNoPlano(plano, fluxos) {
   const cobertos = new Set((plano?.operacoes || []).map((o) => o.fluxo).filter(Boolean));
-  return (fluxos || []).filter((f) => !cobertos.has(String(f.id)) && (Number(f.formas) || 0) > 1);
+  return (fluxos || []).filter((f) => !cobertos.has(String(f.id)));
 }
 
 /** Junta ao plano as operações do segundo plano (só as dos desenhos que faltavam, sem repetir). */

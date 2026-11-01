@@ -13,6 +13,7 @@ import {
   citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, secaoDoProjeto, validarPlano, LIMITE_DE_OPERACOES,
   pedeEmTodos, faltandoNoPlano, completarPlano,
 } from "../src/lib/processmapNaConversa.js";
+import { pedirPlano, executarPlano, textoDoAndamento } from "../src/lib/trabalhoNoProjeto.js";
 import { montarDocumento, validarDesenho, tamanhoDaNota } from "../src/lib/diagramaDaLisa.js";
 
 let falhas = 0;
@@ -334,7 +335,8 @@ console.log("o plano no projeto (01/11/2026: \"essa minha interação deveria se
 
   const pagina = ler("src/app/(panels)/assistant/page.js");
   conferir("o projeto citado vale antes da regra do Abacato", /const doProjeto = !alvoDaIde \? await resolverProjetoRef/.test(pagina));
-  conferir("a Lisa planeja e trabalha no projeto (vários desenhos)", /await planejarNoProjetoRef\.current\?\.\(q, doProjeto, displayText\)/.test(pagina) && /plano\?\.acao === "mudar"\) return trabalharNoProjetoRef/.test(pagina) && /for \(const \[i, op\] of plano\.operacoes\.entries\(\)\)/.test(pagina));
+  conferir("a Lisa planeja e trabalha no projeto (vários desenhos)", /await planejarNoProjetoRef\.current\?\.\(q, doProjeto, displayText\)/.test(pagina) && /plano\?\.acao === "mudar"\) return trabalharNoProjetoRef/.test(pagina) && /await executarPlano\(\{/.test(pagina)
+    && /for \(const \[i, op\] of plano\.operacoes\.entries\(\)\)/.test(ler("src/lib/trabalhoNoProjeto.js")));
   const rotaDoPlano = ler("src/app/api/processmap/plano/route.js");
   conferir("a rota do plano confere o que o modelo devolveu", /validarPlano\(await planejarNoProjeto\(base\), fluxos\)/.test(rotaDoPlano));
 
@@ -350,12 +352,58 @@ console.log("o plano no projeto (01/11/2026: \"essa minha interação deveria se
   ];
   const so2 = validarPlano({ acao: "mudar", operacoes: [{ fluxo: "nucleo", pedido: "Lisa Task" }, { fluxo: "mvp", pedido: "nota" }] }, doProjetoTodo);
   const faltam = faltandoNoPlano(so2, doProjetoTodo);
-  conferir("o que o plano esqueceu: os mapas mentais com desenho (o vazio não conta)", faltam.map((f) => f.id).join() === "mobile");
-  const completo = completarPlano(so2, validarPlano({ acao: "mudar", operacoes: [{ fluxo: "mobile", pedido: "tópico Conceito e decisões" }, { fluxo: "mvp", pedido: "repetido" }, { fluxo: "", nome: "Outro", pedido: "x" }] }, doProjetoTodo), faltam);
-  conferir("a segunda volta completa só com os que faltavam (sem repetir, sem inventar desenho)", completo.operacoes.map((o) => o.fluxo).join() === "nucleo,mvp,mobile");
+  conferir("o que o plano esqueceu: os mapas mentais, até o quase vazio (\"todos os mapas mentais\")", faltam.map((f) => f.id).join() === "mobile,vazio");
+  const completo = completarPlano(so2, validarPlano({ acao: "mudar", operacoes: [{ fluxo: "mobile", pedido: "tópico Conceito e decisões" }, { fluxo: "vazio", pedido: "tópico Conceito e decisões" }, { fluxo: "mvp", pedido: "repetido" }, { fluxo: "", nome: "Outro", pedido: "x" }] }, doProjetoTodo), faltam);
+  conferir("a segunda volta completa só com os que faltavam (sem repetir, sem inventar desenho)", completo.operacoes.map((o) => o.fluxo).join() === "nucleo,mvp,mobile,vazio");
   conferir("a rota pede a segunda volta quando o pedido é para todos", /pedeEmTodos\(pedido\) \? faltandoNoPlano\(plano, fluxos\)/.test(rotaDoPlano) && /complemento:/.test(rotaDoPlano) && /completarPlano\(plano, extra, faltando\)/.test(rotaDoPlano));
   conferir("\"\\n\" escrito ao pé da letra no plano vira quebra de linha", validarPlano({ acao: "mudar", operacoes: [{ fluxo: "mvp", pedido: "• A\\n• B" }] }, doProjetoTodo).operacoes[0].pedido === "• A\n• B");
   conferir("o planejador sabe que \"fluxograma\" é qualquer desenho e que cada aba recebe a nota", /mapas\s+mentais inclusive/.test(ler("src/lib/gemini.js")) && /vai em CADA\s+aba/.test(ler("src/lib/gemini.js")));
+}
+
+console.log("executar o plano (a conversa e a barra do painel ProcessMap usam o mesmo)");
+{
+  const projeto = { id: "p1", nome: "Produto Lisa" };
+  const fluxos = [
+    { id: "mvp", nome: "Fluxo MVP", modo: "diagram", formas: 5, versao: 3, documento: { pages: [{ id: "desk", shapes: [] }] } },
+    { id: "nucleo", nome: "Núcleo", modo: "mindmap", formas: 9, versao: 7, documento: { mode: "mindmap", pages: [{ shapes: [] }] } },
+    { id: "mobile", nome: "Dev Mobile", modo: "mindmap", formas: 9, versao: 1, documento: { mode: "mindmap", pages: [{ shapes: [] }] } },
+  ];
+  const pedidos = [];
+  const buscar = async (url, init) => {
+    const corpo = JSON.parse(init.body);
+    pedidos.push({ url, corpo });
+    if (url === "/api/processmap/plano") return { ok: true, status: 200, json: async () => ({ ok: true, plano: { acao: "mudar", explicacao: "Vou anotar tudo.", operacoes: [] } }) };
+    if (/Núcleo dá erro/.test(corpo.pedido)) return { ok: false, status: 500, json: async () => ({ ok: false, error: "o modelo caiu" }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true, doc: { pages: [{ shapes: [{ id: "nota", type: "note" }] }] }, colecao: "flow", titulo: "T", explicacao: "Anotei. Detalhe a mais." }) };
+  };
+  const gravacoes = [];
+  const api = {
+    salvar: async (id, dados) => { gravacoes.push({ id, ...dados }); return { id, nome: fluxos.find((f) => f.id === id).nome, versao: 99 }; },
+    criar: async (dados) => { gravacoes.push({ novo: true, ...dados }); return { fluxo: { id: "novo", nome: dados.nome, versao: 1 } }; },
+  };
+  const plano0 = await pedirPlano({ pedido: "anote todos", projeto, fluxos, aberto: "mvp", buscar });
+  conferir("pedir o plano manda o projeto inteiro e o fluxo aberto", plano0.acao === "mudar" && pedidos[0].corpo.aberto === "mvp" && pedidos[0].corpo.fluxos.length === 3 && /PROJETO "Produto Lisa"/.test(pedidos[0].corpo.projeto));
+  const plano = { acao: "mudar", explicacao: "Vou anotar tudo.", operacoes: [
+    { fluxo: "mvp", pedido: "nota em cada aba" }, { fluxo: "nucleo", pedido: "Núcleo dá erro" },
+    { fluxo: "mobile", pedido: "galho Conceito e decisões" }, { fluxo: "", nome: "Decisões", tipo: "mapa mental", pedido: "as decisões" },
+  ] };
+  const andamentos = [];
+  const daTela = { pages: [{ id: "desk", shapes: [{ id: "mexido" }] }] };
+  const r = await executarPlano({ plano, projeto, fluxos, api, abertoId: "mvp", buscar, docDe: (f) => (f.id === "mvp" ? daTela : f.documento), aoAndar: (ls) => andamentos.push(ls.map((l) => l.estado).join("|")) });
+  conferir("todos os desenhos do plano são trabalhados, um por um", pedidos.filter((p) => p.url === "/api/diagrama").length === 4);
+  conferir("o aberto parte do que está na tela e grava por cima; os outros, pela versão", gravacoes[0].id === "mvp" && gravacoes[0].forcar === true && JSON.stringify(pedidos[1].corpo.atual) === JSON.stringify(daTela) && gravacoes.find((g) => g.id === "mobile")?.versao === 1);
+  conferir("um que dá erro não para os outros", r.linhas[1].ok === false && /o modelo caiu/.test(r.linhas[1].nota) && r.linhas[2].ok === true && r.feitos === 3);
+  conferir("desenho novo é criado no projeto, como mapa mental quando pedido", gravacoes.some((g) => g.novo && g.projetoId === "p1" && g.nome === "Decisões") && /^Monte um mapa mental\./.test(pedidos.at(-1).corpo.pedido));
+  conferir("cada desenho leva o projeto inteiro como contexto, marcando o que muda", pedidos.filter((p) => p.url === "/api/diagrama").every((p) => /PROJETO "Produto Lisa"/.test(p.corpo.projeto)) && /É ESTE QUE O PEDIDO MUDA/.test(pedidos[1].corpo.projeto));
+  conferir("o andamento aparece a cada passo", andamentos.some((a) => a.startsWith("trabalhando…|na fila")) && andamentos.at(-1).split("|").every((x) => x !== "na fila" && x !== "trabalhando…"));
+  const texto = textoDoAndamento(plano, r.linhas, "Salvo.");
+  conferir("o texto do andamento: explicação, ✓/✗ por desenho e o fecho", /^Vou anotar tudo\./.test(texto) && /✓ "Fluxo MVP" — atualizado: Anotei\./.test(texto) && /✗ "Núcleo" — não deu: o modelo caiu/.test(texto) && /✓ "Decisões" — criado/.test(texto) && /Salvo\.$/.test(texto));
+
+  const painel = ler("src/app/(panels)/fluxogramas/page.js");
+  conferir("a barra do painel ProcessMap trabalha no projeto inteiro quando o pedido fala dele", /falaDoProjeto\(q, doProjeto\.fluxos\)/.test(painel) && /await trabalharNoProjeto\(q, abertoRef\.current\)/.test(painel) && /executarPlano\(\{/.test(painel));
+  conferir("e para o salvamento do fluxo aberto enquanto a Lisa grava, reabrindo depois", /salvador\.current\?\.parar\(\);\s*salvador\.current = null;/.test(painel) && /await abrirFluxo\(a\.id, \{ deNovo: true \}\)/.test(painel));
+  const conversaPagina = ler("src/app/(panels)/assistant/page.js");
+  conferir("na conversa, \"do projeto\" sem nome é o projeto em uso (o do quadro ou o último)", /projetoCitado\(q, lista\) \|\| \(emUso && lista\.find/.test(conversaPagina) && /if \(!citaProjeto\(q\) && !pedeEmTodos\(q\)\) return null;/.test(conversaPagina));
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");

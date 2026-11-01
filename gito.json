@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.24.1-cloudflare-pages.1",
+  "versao": "0.24.2-cloudflare-pages.1",
   "atualizadoEm": "2026-11-01",
   "compilacao": {
-    "numero": 54,
+    "numero": 55,
     "data": "2026-11-01",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.24.2-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "A barra \"pedir à Lisa\" do painel ProcessMap e a conversa sem o nome do projeto passam a trabalhar no projeto inteiro: \"em todos os fluxogramas\" anota todos os desenhos, aba por aba.",
+      "itens": [
+        "Correção: no painel ProcessMap, a barra \"pedir à Lisa\" só mexia no fluxo aberto — \"crie uma nota em todos os fluxogramas\" anotava um só. Agora, quando o pedido fala do projeto (\"todos\", \"cada\", \"projeto\", outro fluxo pelo nome), ela planeja e trabalha em cada desenho do projeto, mostra o andamento e reabre o fluxo aberto com a versão nova (o salvamento automático pausa enquanto ela grava).",
+        "Correção: na conversa, \"anote todos os fluxogramas do projeto\" sem dizer o nome caía no fluxo aberto no quadro; agora \"o projeto\" é o que está em uso (o do fluxo aberto no quadro ou o último desta conversa).",
+        "\"Todos os mapas mentais\" inclui o mapa ainda quase vazio; se o plano falhar, a Lisa tenta de novo antes de desistir.",
+        "Planejar e executar ficaram num módulo só (src/lib/trabalhoNoProjeto.js), usado pela conversa e pelo painel — o mesmo comportamento nos dois lugares."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.24.1-cloudflare-pages.1",
       "data": "2026-11-01",

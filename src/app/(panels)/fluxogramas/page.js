@@ -13,6 +13,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiDosFluxos, assinaturaDoDesenho, criarSalvador, LIMITE_DO_KEEPALIVE } from "@/lib/fluxogramasNoNavegador.js";
+import { citaProjeto, fluxoCitado, pedeEmTodos } from "@/lib/processmapNaConversa.js";
+import { pedirPlano, executarPlano, textoDoAndamento } from "@/lib/trabalhoNoProjeto.js";
 
 const api = apiDosFluxos();
 const CHAVE_DO_ULTIMO = "lisa-processmap-ultimo";
@@ -384,6 +386,48 @@ export default function ProcessMapPage() {
 
   // ---- a Lisa desenha ----
 
+  // Um pedido sobre o projeto ("em todos os fluxogramas", "no projeto", "no fluxo de X" que não é o
+  // aberto): a Lisa planeja e trabalha em cada desenho do projeto (src/lib/trabalhoNoProjeto.js), não
+  // só no aberto — "de novo, ela só fez as anotações no primeiro fluxograma" (01/11/2026).
+  const falaDoProjeto = (q, fluxosDoProjeto) => pedeEmTodos(q) || citaProjeto(q)
+    || Boolean(fluxoCitado(q, (fluxosDoProjeto || []).filter((f) => f.id !== abertoRef.current?.id)));
+
+  async function trabalharNoProjeto(q, a) {
+    const p = ponte();
+    // o que está na tela vai para o banco antes: a Lisa parte do que a pessoa acabou de mexer
+    await salvador.current?.agora();
+    const { projeto, fluxos } = await api.lerProjeto(a.projetoId);
+    setExplicacao(`Planejando o trabalho no projeto "${projeto.nome}" (${fluxos.length} desenho${fluxos.length === 1 ? "" : "s"})…`);
+    const plano = await pedirPlano({ pedido: q, projeto, fluxos, aberto: a.id });
+    if (plano.acao !== "mudar") {
+      setExplicacao(plano.explicacao || "Isso parece uma pergunta sobre o projeto: pergunte na conversa do Assistente, que eu respondo com todos os desenhos dele.");
+      return;
+    }
+    const daTela = p.exportar();
+    // enquanto a Lisa trabalha, o salvamento automático do fluxo aberto para (ela grava por cima)
+    salvador.current?.parar();
+    salvador.current = null;
+    let linhas = [];
+    let fim = "";
+    try {
+      const r = await executarPlano({
+        plano, projeto, fluxos, api, abertoId: a.id,
+        docDe: (f) => (f.id === a.id ? daTela : f.documento),
+        aoAndar: (ls) => setExplicacao(textoDoAndamento(plano, ls)),
+      });
+      linhas = r.linhas;
+      fim = r.feitos
+        ? `Salvo no projeto "${projeto.nome}" (${r.feitos} de ${plano.operacoes.length}). Os outros desenhos estão na lista à esquerda.`
+        : `Não consegui mudar nada no projeto "${projeto.nome}".`;
+      setPedido("");
+    } finally {
+      // a lista e o fluxo aberto voltam do banco (com a versão nova e o salvamento ligado de novo)
+      await recarregarLista();
+      await abrirFluxo(a.id, { deNovo: true });
+      setExplicacao(textoDoAndamento(plano, linhas, fim));
+    }
+  }
+
   async function pedirALisa(e) {
     e.preventDefault();
     const q = pedido.trim();
@@ -392,6 +436,11 @@ export default function ProcessMapPage() {
     setDesenhando(true);
     setAviso("");
     try {
+      const doProjeto = abertoRef.current && projetos?.find((x) => x.id === abertoRef.current.projetoId);
+      if (doProjeto && falaDoProjeto(q, doProjeto.fluxos)) {
+        await trabalharNoProjeto(q, abertoRef.current);
+        return;
+      }
       const atual = p.vazio() ? null : p.exportar();
       const res = await fetch("/api/diagrama", {
         method: "POST",
