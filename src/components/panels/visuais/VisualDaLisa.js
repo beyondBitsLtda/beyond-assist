@@ -14,6 +14,7 @@ const COMPONENTES = {
   orbe: dynamic(() => import("./Orbe.js"), { ssr: false, loading: () => null }),
   plasma: dynamic(() => import("./Plasma.js"), { ssr: false, loading: () => null }),
   anel: dynamic(() => import("./Anel.js"), { ssr: false, loading: () => null }),
+  rosto: dynamic(() => import("./Rosto.js"), { ssr: false, loading: () => null }),
 };
 
 /** O visual `modo`, ligado ao sinal da voz (`obterSinal`, chamado a cada quadro). */

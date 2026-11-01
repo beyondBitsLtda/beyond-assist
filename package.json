@@ -20,6 +20,7 @@
     "fala-check": "node scripts/fala-check.mjs",
     "codigo-check": "node scripts/codigo-check.mjs",
     "diagrama-check": "node scripts/diagrama-check.mjs",
+    "web-check": "node scripts/web-check.mjs",
     "contexto-check": "node --import ./scripts/alias-loader.mjs scripts/contexto-check.mjs",
     "visuais-check": "node scripts/visuais-check.mjs",
     "audio-check": "node scripts/audio-check.mjs",

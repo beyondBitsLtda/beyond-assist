@@ -7,6 +7,7 @@ import {
   VISUAIS, ESTADOS, VISUAL_PADRAO, CHAVE_DO_VISUAL, EVENTO_DO_VISUAL,
   visualDe, coresDe, criarEnvelope, criarPesos, lerVisual, escolherVisual,
 } from "../src/lib/visuaisDaLisa.js";
+import { pontosDoRosto, distanciaDoRosto, OLHO, BOCA_Y } from "../src/lib/rostoDaLisa.js";
 
 let falhas = 0;
 const ok = (t) => console.log(`  ok    ${t}`);
@@ -16,14 +17,14 @@ const ler = (caminho) => fs.readFileSync(new URL(`../${caminho}`, import.meta.ur
 
 console.log("catálogo");
 const ids = VISUAIS.map((v) => v.id);
-conferir("os cinco visuais, sem id repetido", ids.join() === "esfera,lente,orbe,plasma,anel" && new Set(ids).size === ids.length, ids.join());
+conferir("os seis visuais, sem id repetido", ids.join() === "esfera,lente,orbe,plasma,anel,rosto" && new Set(ids).size === ids.length, ids.join());
 conferir("cada visual tem nome e descrição", VISUAIS.every((v) => v.nome && v.descricao.length > 20));
 conferir("cada visual tem 3 cores válidas para cada estado", VISUAIS.every((v) => ESTADOS.every((e) => v.cores[e]?.length === 3 && v.cores[e].every((c) => /^#[0-9a-f]{6}$/i.test(c)))));
 conferir("id desconhecido cai no padrão", visualDe("nao-existe").id === VISUAL_PADRAO && coresDe("nao-existe", "falando").join() === visualDe(VISUAL_PADRAO).cores.falando.join());
 conferir("estado desconhecido usa as cores de repouso", coresDe("lente", "dormindo").join() === visualDe("lente").cores.pronta.join());
 const seletor = ler("src/components/panels/visuais/VisualDaLisa.js");
 conferir("todo visual do catálogo tem componente no seletor", ids.every((id) => new RegExp(`\\b${id}: dynamic\\(`).test(seletor)));
-conferir("e cada componente novo tem o seu arquivo", ["Lente", "Orbe", "Plasma", "Anel"].every((n) => fs.existsSync(new URL(`../src/components/panels/visuais/${n}.js`, import.meta.url))));
+conferir("e cada componente novo tem o seu arquivo", ["Lente", "Orbe", "Plasma", "Anel", "Rosto"].every((n) => fs.existsSync(new URL(`../src/components/panels/visuais/${n}.js`, import.meta.url))));
 conferir("o painel está na lista de painéis", /href: "\/visual"/.test(ler("src/lib/navegacao.js")));
 
 console.log("envelope da voz");
@@ -58,6 +59,39 @@ console.log("pesos dos estados");
   for (let i = 0; i < 200; i++) p = pesos("falando", 0.016);
   conferir("e chega lá", p.falando > 0.99);
   conferir("os pesos somam 1", Math.abs(ESTADOS.reduce((s, e) => s + p[e], 0) - 1) < 1e-9);
+}
+
+console.log("o rosto");
+{
+  let semente = 7;
+  const acaso = () => ((semente = (semente * 16807) % 2147483647) / 2147483647);
+  const r = pontosDoRosto(6000, acaso);
+  const ys = [];
+  const at = (arr, i, k = 3) => Array.from(arr.subarray(i * k, i * k + k));
+  for (let i = 0; i < r.total; i++) ys.push(r.posicoes[i * 3 + 1]);
+  conferir("sai a quantidade pedida de pontos", r.total === 6000, String(r.total));
+  conferir("todos na superfície (distância ~0)", Array.from({ length: 300 }, (_, i) => Math.abs(distanciaDoRosto(...at(r.posicoes, i * 20)))).every((d) => d < 0.003));
+  conferir("do pescoço ao alto da cabeça", Math.min(...ys) < -1.2 && Math.max(...ys) > 0.95, `${Math.min(...ys).toFixed(2)} ${Math.max(...ys).toFixed(2)}`);
+  conferir("as normais têm tamanho 1", Array.from({ length: 200 }, (_, i) => Math.hypot(...at(r.normais, i * 30))).every((n) => Math.abs(n - 1) < 1e-3));
+  let frente = 0;
+  for (let i = 0; i < r.total; i++) if (r.posicoes[i * 3 + 2] > 0.3) frente++;
+  conferir("o rosto (a frente) fica com boa parte dos pontos", frente / r.total > 0.38, (frente / r.total).toFixed(2));
+  const parte = (campo) => Array.from({ length: r.total }, (_, i) => i).filter((i) => r[campo][i] > 0.5);
+  const olhos = parte("olho");
+  conferir("há pontos nos dois olhos", olhos.some((i) => r.posicoes[i * 3] > 0) && olhos.some((i) => r.posicoes[i * 3] < 0) && olhos.length > 40, String(olhos.length));
+  conferir("a íris de cada olho é medida no próprio olho (-1..1)", olhos.every((i) => Math.hypot(r.iris[i * 2], r.iris[i * 2 + 1]) <= 1.1));
+  // os dois olhos medem a íris no mesmo sentido do mundo (não espelhado): o olhar é um só
+  conferir("a íris é medida no mesmo sentido nos dois olhos", olhos.every((i) => {
+    const x = r.posicoes[i * 3];
+    return Math.abs(r.iris[i * 2] * OLHO.raio - (x - Math.sign(x) * OLHO.x)) < 1e-4 && Math.abs(r.iris[i * 2 + 1] * OLHO.raio - (r.posicoes[i * 3 + 1] - OLHO.y)) < 1e-4;
+  }));
+  const queixo = parte("mandibula");
+  conferir("a mandíbula é só abaixo da boca", queixo.length > 100 && queixo.every((i) => r.posicoes[i * 3 + 1] < BOCA_Y), String(queixo.length));
+  conferir("o lábio de cima fica acima da linha da boca, na frente", parte("labio").length > 10 && parte("labio").every((i) => r.posicoes[i * 3 + 1] > BOCA_Y && r.posicoes[i * 3 + 2] > 0.45));
+  conferir("as sobrancelhas ficam acima dos olhos", parte("sobrancelha").length > 20 && parte("sobrancelha").every((i) => r.posicoes[i * 3 + 1] > OLHO.y + 0.05));
+  conferir("a pálpebra fica logo acima do olho", parte("palpebra").every((i) => r.posicoes[i * 3 + 1] > OLHO.y && r.posicoes[i * 3 + 1] < OLHO.y + 0.16));
+  conferir("rosto simétrico", Math.abs(distanciaDoRosto(0.3, -0.2, 0.5) - distanciaDoRosto(-0.3, -0.2, 0.5)) < 1e-12);
+  conferir("o nariz é a parte mais da frente", (() => { let iz = 0; for (let i = 0; i < r.total; i++) if (r.posicoes[i * 3 + 2] > r.posicoes[iz * 3 + 2]) iz = i; return Math.abs(r.posicoes[iz * 3]) < 0.08 && r.posicoes[iz * 3 + 1] < 0 && r.posicoes[iz * 3 + 1] > -0.4; })());
 }
 
 console.log("preferência no navegador");

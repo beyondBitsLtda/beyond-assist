@@ -217,6 +217,16 @@ input::placeholder, textarea::placeholder { color: var(--bb-texto-3); }
    do card ficava abaixo da dobra, atrás da barra de digitação — visto nos prints do tour, 18/10. */
 .bb-conversa:has(.bb-rascunho) { max-width: 760px; max-height: 62vh; }
 .bb-conversa-nota { margin-top: 10px; font-family: var(--bb-mono); font-size: 11px; color: var(--bb-texto-3); }
+/* As fontes da pesquisa na internet (FontesDaWeb.js): links pequenos embaixo da resposta */
+.bb-fontes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; white-space: normal; }
+.bb-conversa .bb-fontes { justify-content: center; }
+.bb-fontes-cabeca { font-family: var(--bb-mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--bb-texto-3); margin-right: 2px; }
+.bb-fonte {
+  font-family: var(--bb-mono); font-size: 11px; line-height: 1.3; color: var(--bb-texto-2);
+  border: 1px solid var(--bb-linha-forte); border-radius: 999px; padding: 3px 10px; max-width: 220px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bb-fonte:hover, .bb-fonte:focus-visible { color: var(--accent-hex); border-color: rgba(var(--accent-rgb), 0.5); }
 .bb-codigo-ao-vivo {
   margin-top: 14px; text-align: left; background: var(--bb-superficie); border: 1px solid var(--bb-linha);
   border-radius: 12px; padding: 12px 14px; max-height: 260px; overflow-y: auto; font-family: var(--bb-mono); font-size: 11px;

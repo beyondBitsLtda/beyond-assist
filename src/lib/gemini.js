@@ -376,7 +376,7 @@ export async function embedForIngest(texts, taskType = "RETRIEVAL_DOCUMENT") {
  * presente, vira multimodal: o mesmo modelo de chat também enxerga imagem, sem precisar de
  * nenhum modelo/endpoint separado.
  */
-export async function* chatStream(prompt, systemInstruction, { tools, images } = {}) {
+export async function* chatStream(prompt, systemInstruction, { tools, images, aoMetadados } = {}) {
   const config = {};
   if (systemInstruction) config.systemInstruction = systemInstruction;
   if (tools) config.tools = tools;
@@ -387,13 +387,26 @@ export async function* chatStream(prompt, systemInstruction, { tools, images } =
 
   // retry na abertura do stream (withTransientRetry — 429/503 costumam se resolver em
   // segundos) e retomada se ele quebrar no meio (streamComRetomada, ver retomada.js).
-  const abrir = (c) => withTransientRetry(CHAT_MODEL, (client, modelo, abortSignal) =>
-    client.models.generateContentStream({
-      model: modelo,
-      contents: c,
-      config: { ...config, ...(abortSignal ? { abortSignal } : {}) },
-    })
-  );
+  // `aoMetadados` (01/11/2026): recebe o groundingMetadata (as fontes da busca do Google) e o
+  // urlContextMetadata (as páginas lidas) que chegam junto dos pedaços — ver src/lib/buscaNaWeb.js
+  const abrir = async (c) => {
+    const stream = await withTransientRetry(CHAT_MODEL, (client, modelo, abortSignal) =>
+      client.models.generateContentStream({
+        model: modelo,
+        contents: c,
+        config: { ...config, ...(abortSignal ? { abortSignal } : {}) },
+      })
+    );
+    if (!aoMetadados) return stream;
+    return (async function* () {
+      for await (const chunk of stream) {
+        const candidato = chunk?.candidates?.[0];
+        if (candidato?.groundingMetadata) aoMetadados(candidato.groundingMetadata);
+        if (candidato?.urlContextMetadata) aoMetadados(candidato.urlContextMetadata);
+        yield chunk;
+      }
+    })();
+  };
   yield* streamComRetomada(abrir, contents);
 }
 

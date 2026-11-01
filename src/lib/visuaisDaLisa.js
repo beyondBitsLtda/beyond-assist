@@ -70,6 +70,17 @@ export const VISUAIS = [
       falando: ["#4f8dff", "#b85cff", "#ff3fc8"],
     },
   },
+  {
+    id: "rosto",
+    nome: "Rosto",
+    descricao: "Um rosto 3D de pontos de luz: abre a boca com a voz, pisca, ergue as sobrancelhas e inclina a cabeça quando escuta.",
+    cores: {
+      pronta: ["#a8e6ff", "#5a8cff", "#6a5cff"],
+      ouvindo: ["#9ff5e4", "#3fc8e0", "#3f8cff"],
+      pensando: ["#c9bcff", "#7b6bff", "#9b5cff"],
+      falando: ["#a0dcff", "#8f7cff", "#ff7ad9"],
+    },
+  },
 ];
 
 export const VISUAL_PADRAO = "esfera";

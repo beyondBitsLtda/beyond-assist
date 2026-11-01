@@ -11,6 +11,7 @@ import { langForPath } from "@/lib/highlightCode.js";
 import { respostaSemCodigo, trechosDaResposta, codigoDaConversa } from "@/lib/codigoNaResposta.js";
 import { pedidoDeDesenho, descreverDiagrama } from "@/lib/diagramaDaLisa.js";
 import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
+import FontesDaWeb from "@/components/panels/FontesDaWeb.js";
 import { Highlight } from "prism-react-renderer";
 import { TTS_VOICES, STEVE_VOICE_NAME } from "@/lib/ttsVoices.js";
 import { pickBrowserVoice, speakText, stopBrowserVoiceAudio, isBrowserVoiceAudioPlaying } from "@/lib/browserVoice.js";
@@ -182,6 +183,8 @@ export default function AssistantPage() {
   const [cards, setCards] = useState([]);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  // os sites que a Lisa usou quando pesquisou na internet (evento "fontes" do /api/ask)
+  const [fontes, setFontes] = useState([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);   // mic ativo (STT)
@@ -488,6 +491,7 @@ export default function AssistantPage() {
 
   const recognitionRef = useRef(null);
   const answerRef = useRef("");
+  const fontesRef = useRef([]);
   // última pergunta+cards e ação proposta ainda não confirmada — mandados de volta pro
   // backend a cada pergunta nova, pra ele saber a que card "reprograme pra amanhã" se refere
   // e se a mensagem atual está confirmando/cancelando uma ação (ver /api/ask).
@@ -2381,6 +2385,7 @@ export default function AssistantPage() {
     setBusy(true);
     setQuestion(q);
     setAnswer("");
+    setFontes([]);
     answerRef.current = "";
     setMode("listening");
     setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: q, codeMode: true }]);
@@ -2471,6 +2476,7 @@ export default function AssistantPage() {
     setBusy(true);
     setQuestion(q);
     setAnswer("");
+    setFontes([]);
     const idDaIde = abrirNaIde(q);
     answerRef.current = "";
     setMode("listening");
@@ -2570,8 +2576,10 @@ export default function AssistantPage() {
     setBusy(true);
     setQuestion(shown);
     setAnswer("");
+    setFontes([]);
     const idDaIde = abrirNaIde(shown, alvoDaIde);
     answerRef.current = "";
+    fontesRef.current = [];
     setCards([]);
     setMode("listening");
     setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown, anexos: anexosRef.current.map((a) => ({ id: a.id, previa: a.previa, nome: a.nome })) }]);
@@ -2688,6 +2696,14 @@ export default function AssistantPage() {
             setLeituraDosRepos(payload);
             addLog("[REPO]", PU, `${payload?.lidos?.length || 0} arquivo(s) lido(s): ${(payload?.lidos || []).map((l) => l.path).join(", ") || "—"}`);
             for (const aviso of payload?.avisos || []) addLog("[REPO]", OR, aviso);
+          } else if (event === "pesquisa") {
+            addLog("[WEB]", PU, payload?.buscador
+              ? `pesquisei "${payload.consulta}" no ${payload.buscador}: ${payload.total} resultado(s), ${payload.lidas} página(s) lida(s)`
+              : `a pesquisa por "${payload?.consulta}" falhou: ${(payload?.erros || []).join(" · ")}`);
+          } else if (event === "fontes") {
+            fontesRef.current = Array.isArray(payload) ? payload : [];
+            setFontes(fontesRef.current);
+            addLog("[WEB]", PU, `${fontesRef.current.length} fonte(s): ${fontesRef.current.map((f) => f.titulo).join(", ")}`);
           } else if (event === "token") {
             setAnswer((a) => { const na = a + payload; answerRef.current = na; return na; });
           } else if (event === "error") {
@@ -2701,7 +2717,7 @@ export default function AssistantPage() {
       historyRef.current = { question: q, cards: latestCards };
       conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", answerRef.current);
       if (answerRef.current.trim()) ultimaRespostaRef.current = answerRef.current;
-      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: answerRef.current }]);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: answerRef.current, ...(fontesRef.current.length ? { fontes: fontesRef.current } : {}) }]);
     } catch (err) {
       addLog("[ERR]", OR, err.message);
       setAnswer(`Falha ao consultar o backend: ${err.message}`);
@@ -2736,6 +2752,7 @@ export default function AssistantPage() {
     setDesenhando(true);
     setQuestion(shown);
     setAnswer("");
+    setFontes([]);
     setMode("listening");
     setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
     addLog("[QUADRO]", PU, quadroAbertoRef.current ? "mudando o desenho…" : "desenhando o processo…");
@@ -3992,7 +4009,7 @@ export default function AssistantPage() {
                     fontSize: 14.5, lineHeight: 1.45, color: "#eafcff", whiteSpace: "pre-wrap", userSelect: "text",
                   }}
                 >
-                  {m.role === "assistant" ? <TextoComCodigo texto={m.text} /> : (
+                  {m.role === "assistant" ? <><TextoComCodigo texto={m.text} /><FontesDaWeb fontes={m.fontes} /></> : (
                     <>
                       {m.anexos?.length ? <span className="bb-balao-anexos">{m.anexos.map((a) => <img key={a.id} src={a.previa} alt={a.nome} />)}</span> : null}
                       {m.text}
@@ -4906,6 +4923,7 @@ export default function AssistantPage() {
           <p className={`bb-conversa-resposta${!answer && mode === "idle" ? " bb-conversa-resposta--vazia" : ""}`}>
             {mode === "speaking" || answer ? (respostaSemCodigo(separarRascunho(answer).fala) || "…") : mode === "listening" ? "…" : "Pergunte alguma coisa, por texto ou pelo microfone."}
           </p>
+          <FontesDaWeb fontes={fontes} />
           {separarRascunho(answer).rascunho && (
             <div className="bb-rascunho">
               <div className="bb-rascunho-cabeca">Rascunho do card · ainda não gravado</div>

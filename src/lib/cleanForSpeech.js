@@ -24,6 +24,8 @@ export function cleanForSpeech(input) {
 
   // links [texto](url) → texto
   t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  // link solto (a Lisa citando uma fonte da internet) → só o site: "https://www.gov.br/receita/x" → "gov.br"
+  t = t.replace(/\bhttps?:\/\/(?:www\.)?([^\s/?#)]+)[^\s)]*/gi, "$1");
 
   // bullets no início da linha (-, *, •, +) → vira frase
   t = t.replace(/^\s*[-*•+]\s+/gm, "");

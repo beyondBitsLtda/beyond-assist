@@ -11,6 +11,7 @@ import { pareceAcao, pendenteValida } from "@/lib/acoesNoAbacato.js";
 import { tratarAcaoNoAbacato } from "@/lib/fluxoDeAcoesNoAbacato.js";
 import { comCodigoNaTela, secaoDoCodigoDaConversa } from "@/lib/codigoNaResposta.js";
 import { secaoDoDiagrama } from "@/lib/diagramaDaLisa.js";
+import { webDaPergunta, fontesDaBusca } from "@/lib/buscaNaWeb.js";
 import { contextoDosRepositorios } from "@/lib/repositorioNaConversa.js";
 import { notaDasImagens, imagensValidas } from "@/lib/contextoDaConversa.js";
 
@@ -57,8 +58,8 @@ function looksLikeTasksQuestion(question, scope) {
   return !!detectDateRange(question);
 }
 
-async function* chatStreamWithFallback(prompt, systemInstruction, tools, images) {
-  const primary = chatStream(prompt, systemInstruction, { tools, images });
+async function* chatStreamWithFallback(prompt, systemInstruction, tools, images, aoMetadados) {
+  const primary = chatStream(prompt, systemInstruction, { tools, images, aoMetadados });
   let yieldedAny = false;
   try {
     for await (const piece of primary) {
@@ -310,7 +311,11 @@ export async function POST(req) {
         const delpNote = delpConsent
           ? `TAREFAS DA DELP (empresa onde o usuário trabalha) — o usuário PEDIU EXPLICITAMENTE\npra considerar isso agora:\n${await getDelpTasksForContext()}`
           : null;
-        const combinedNote = [promptNote, imageNote, delpNote].filter(Boolean).join("\n\n") || null;
+        // pediu internet (pesquisar, procurar na web, um site ou link na mensagem): em qualquer escopo,
+        // o servidor pesquisa e o Gemini abre as páginas (src/lib/buscaNaWeb.js)
+        const web = await webDaPergunta(question, { turnos, ferramentasDoEscopo: tools });
+        if (web.pesquisa) send(controller, "pesquisa", { consulta: web.pesquisa.consulta, buscador: web.pesquisa.buscador, total: web.pesquisa.resultados.length, lidas: web.paginas.length, erros: web.pesquisa.erros });
+        const combinedNote = [promptNote, imageNote, delpNote, web.nota].filter(Boolean).join("\n\n") || null;
 
         // o código que já apareceu na conversa vai inteiro (a conversa em si vai cortada por fala),
         // para a Lisa ver o todo antes de propor uma correção
@@ -334,9 +339,13 @@ export async function POST(req) {
         // em qualquer modo: quando o assunto é código, a resposta traz o código em blocos e a tela
         // abre o editor que digita (src/lib/codigoNaResposta.js, src/components/panels/IdeDaLisa.js)
         const instrucao = withContextDocs(withPersona(comCodigoNaTela(systemInstruction), personaMode));
-        for await (const piece of chatStreamWithFallback(prompt, instrucao, tools, images)) {
+        const metadados = [];
+        for await (const piece of chatStreamWithFallback(prompt, instrucao, web.ferramentas, images, (m) => metadados.push(m))) {
           send(controller, "token", piece);
         }
+        // as páginas lidas e os primeiros resultados: links embaixo da resposta (não entram na fala)
+        const fontes = fontesDaBusca(metadados, 6, web.fontes);
+        if (fontes.length) send(controller, "fontes", fontes);
 
         send(controller, "done", { ok: true });
       } catch (err) {

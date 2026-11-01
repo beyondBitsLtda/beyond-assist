@@ -14,6 +14,12 @@ import * as THREE from "three";
  * Os pontos ficam numa esfera de Fibonacci (espalhados por igual, sem a costura dos polos), e o
  * shader os empurra para fora com ruído simplex 3D: devagar em repouso, forte e rápido falando.
  * A cor desliza entre as paletas de cada estado; a escala respira com o volume.
+ *
+ * Mais definição (01/11/2026, "consegue fazer ela ficar uma qualidade melhor?"): o dobro de pontos,
+ * menores e macios (com um miolo claro, em vez do disco chapado); um tremor em cada ponto e uma
+ * casca com espessura, que desfazem a espiral de Fibonacci que aparecia como "malha"; uma terceira
+ * camada de ruído, fina, para a superfície ter detalhe; a borda acesa (luz de contorno), que dá
+ * volume; e um brilho bem suave por dentro, atrás dos pontos.
  */
 const PALETAS = {
   pronta: ["#7cc4ff", "#4a7dff", "#6a5cff"],
@@ -23,9 +29,9 @@ const PALETAS = {
 };
 
 const VERTICE = `
-  uniform float uTempo, uAmp, uTam;
+  uniform float uTempo, uAmp, uTam, uAlfa;
   uniform vec3 uC1, uC2, uC3;
-  attribute float aAcaso;
+  attribute float aAcaso, aCasca;
   varying vec3 vCor;
   varying float vAlfa;
   vec4 permute(vec4 x){ return mod(((x*34.0)+1.0)*x, 289.0); }
@@ -53,15 +59,20 @@ const VERTICE = `
     vec3 n = normalize(position);
     float lento = snoise(n * 1.4 + vec3(0.0, uTempo * 0.22, uTempo * 0.12));
     float rapido = snoise(n * 3.1 - vec3(uTempo * 0.9));
-    float desloca = lento * (0.14 + uAmp * 0.42) + rapido * (0.02 + uAmp * 0.2);
-    vec3 p = n * (1.0 + desloca);
+    float fino = snoise(n * 7.5 + vec3(uTempo * 0.35, 0.0, -uTempo * 0.3));
+    float desloca = lento * (0.14 + uAmp * 0.42) + rapido * (0.02 + uAmp * 0.2) + fino * (0.008 + uAmp * 0.05);
+    vec3 p = n * (1.0 + desloca + aCasca * 0.014);
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
-    gl_PointSize = uTam * (0.75 + aAcaso * 0.5) * (5.0 / -mv.z);
+    float frente = dot(normalize(normalMatrix * n), vec3(0.0, 0.0, 1.0));
+    float borda = pow(1.0 - abs(frente), 3.0);
+    gl_PointSize = uTam * (0.6 + aAcaso * 0.6) * (5.0 / -mv.z) * (1.0 + borda * 0.3);
     gl_Position = projectionMatrix * mv;
     float t = clamp(n.y * 0.5 + 0.5 + desloca * 0.6, 0.0, 1.0);
-    vCor = mix(mix(uC3, uC2, smoothstep(0.0, 0.55, t)), uC1, smoothstep(0.55, 1.0, t));
-    float frente = dot(normalize(normalMatrix * n), vec3(0.0, 0.0, 1.0));
-    vAlfa = (0.16 + 0.84 * smoothstep(-0.35, 0.9, frente)) * (0.85 + desloca * 0.6);
+    vec3 cor = mix(mix(uC3, uC2, smoothstep(0.0, 0.55, t)), uC1, smoothstep(0.55, 1.0, t));
+    // a crista da onda e a borda puxam para a cor clara
+    vCor = mix(cor, uC1, clamp(borda * 0.55 + smoothstep(0.06, 0.3, desloca) * uAmp, 0.0, 1.0));
+    float cintila = 0.82 + 0.18 * sin(uTempo * (1.2 + aAcaso * 2.5) + aAcaso * 60.0);
+    vAlfa = (0.1 + 0.72 * smoothstep(-0.35, 0.9, frente) + borda * 0.5) * (0.85 + desloca * 0.6) * cintila * uAlfa;
   }
 `;
 
@@ -69,9 +80,29 @@ const FRAGMENTO = `
   varying vec3 vCor;
   varying float vAlfa;
   void main(){
-    float d = length(gl_PointCoord - 0.5);
-    if (d > 0.5) discard;
-    gl_FragColor = vec4(vCor, vAlfa * smoothstep(0.5, 0.15, d));
+    vec2 c = gl_PointCoord - 0.5;
+    float d2 = dot(c, c);
+    if (d2 > 0.25) discard;
+    // ponto macio com um miolo mais claro (em vez do disco chapado)
+    float halo = exp(-d2 * 11.0);
+    float miolo = exp(-d2 * 70.0);
+    gl_FragColor = vec4(vCor + miolo * 0.3, vAlfa * (halo * 0.85 + miolo * 0.5));
+  }
+`;
+
+// o brilho por dentro: um disco de luz bem fraco atrás dos pontos, que dá corpo à esfera
+const BRILHO_VERTICE = `
+  varying vec2 vUv;
+  void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+`;
+const BRILHO_FRAGMENTO = `
+  uniform float uAmp, uAlfa;
+  uniform vec3 uC1, uC2;
+  varying vec2 vUv;
+  void main(){
+    float r = length(vUv - 0.5) * 2.0;
+    float a = exp(-r * r * 4.5) * (0.07 + uAmp * 0.12) * uAlfa;
+    gl_FragColor = vec4(mix(uC2, uC1, 0.35), a);
   }
 `;
 
@@ -101,27 +132,38 @@ export default function EsferaDaVoz({ obterSinal, ocupacao = 0.78 }) {
     const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 50);
 
     const estreita = window.innerWidth < 768;
-    const N = estreita ? 6000 : 11000;
+    const N = estreita ? 12000 : 24000;
     const posicoes = new Float32Array(N * 3);
     const acaso = new Float32Array(N);
+    const casca = new Float32Array(N);
     const ouro = Math.PI * (3 - Math.sqrt(5));
+    // o tremor: meia distância entre vizinhos, para a espiral de Fibonacci não aparecer
+    const tremor = Math.sqrt((4 * Math.PI) / N) * 0.5;
     for (let i = 0; i < N; i++) {
       const y = 1 - (i / (N - 1)) * 2;
       const r = Math.sqrt(1 - y * y);
       const t = ouro * i;
-      posicoes[i * 3] = Math.cos(t) * r;
-      posicoes[i * 3 + 1] = y;
-      posicoes[i * 3 + 2] = Math.sin(t) * r;
+      const x = Math.cos(t) * r + (Math.random() - 0.5) * tremor;
+      const yy = y + (Math.random() - 0.5) * tremor;
+      const z = Math.sin(t) * r + (Math.random() - 0.5) * tremor;
+      const tam = Math.hypot(x, yy, z) || 1;
+      posicoes[i * 3] = x / tam;
+      posicoes[i * 3 + 1] = yy / tam;
+      posicoes[i * 3 + 2] = z / tam;
       acaso[i] = Math.random();
+      casca[i] = (Math.random() + Math.random()) - 1; // -1..1, mais perto de 0
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(posicoes, 3));
     geo.setAttribute("aAcaso", new THREE.BufferAttribute(acaso, 1));
+    geo.setAttribute("aCasca", new THREE.BufferAttribute(casca, 1));
 
     const uniforms = {
       uTempo: { value: 0 },
       uAmp: { value: 0.1 },
-      uTam: { value: 3 * pixel },
+      // com o dobro de pontos (somando luz), cada um brilha menos
+      uAlfa: { value: estreita ? 1.15 : 1.05 },
+      uTam: { value: 2.3 * pixel },
       uC1: { value: new THREE.Color(PALETAS.pronta[0]) },
       uC2: { value: new THREE.Color(PALETAS.pronta[1]) },
       uC3: { value: new THREE.Color(PALETAS.pronta[2]) },
@@ -131,6 +173,14 @@ export default function EsferaDaVoz({ obterSinal, ocupacao = 0.78 }) {
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     });
     const pontos = new THREE.Points(geo, material);
+    const brilhoGeo = new THREE.PlaneGeometry(2.6, 2.6);
+    const brilhoMaterial = new THREE.ShaderMaterial({
+      uniforms, vertexShader: BRILHO_VERTICE, fragmentShader: BRILHO_FRAGMENTO,
+      transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+    });
+    const brilho = new THREE.Mesh(brilhoGeo, brilhoMaterial);
+    brilho.renderOrder = -1;
+    cena.add(brilho);
     cena.add(pontos);
 
     // A esfera ocupa `ocupacao` do lado MENOR da área: a câmera se afasta o quanto for preciso.
@@ -145,7 +195,9 @@ export default function EsferaDaVoz({ obterSinal, ocupacao = 0.78 }) {
       const alvoNaLargura = 1 / (Math.tan(metade) * camera.aspect * ocupacao);
       camera.position.set(0, 0, Math.max(alvoNaAltura, alvoNaLargura) * 1.12);
       camera.updateProjectionMatrix();
-      uniforms.uTam.value = (estreita ? 2.4 : 3.1) * pixel;
+      // o ponto cresce com a área: numa prévia pequena e na tela cheia, a esfera tem a mesma textura
+      // (antes era fixo, e a esfera grande ficava rala)
+      uniforms.uTam.value = (estreita ? 2.2 : 2.4) * pixel * THREE.MathUtils.clamp(Math.min(w, h) / 480, 0.75, 1.7);
     };
     const observador = new ResizeObserver(ajustar);
     observador.observe(el);
@@ -192,6 +244,7 @@ export default function EsferaDaVoz({ obterSinal, ocupacao = 0.78 }) {
       pontos.rotation.y += dt * giro;
       pontos.rotation.x = Math.sin(t * 0.13) * 0.18;
       pontos.scale.setScalar(1 + amp * 0.06);
+      brilho.scale.setScalar(1 + amp * 0.1);
       renderer.render(cena, camera);
       quadro = requestAnimationFrame(animar);
     };
@@ -202,6 +255,8 @@ export default function EsferaDaVoz({ obterSinal, ocupacao = 0.78 }) {
       observador.disconnect();
       geo.dispose();
       material.dispose();
+      brilhoGeo.dispose();
+      brilhoMaterial.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
