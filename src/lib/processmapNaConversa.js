@@ -144,21 +144,49 @@ export function validarPlano(bruto, fluxos) {
 // de MD/markdown/README, ou do editor de código junto de arquivo/documento/página, ou de documentação
 // sem falar de nota no desenho. A Lisa escreve um .md por desenho do projeto, mais a visão geral.
 
-// (o editor sem folga para erro: "editar a aba" é mudar o desenho)
-const NO_EDITOR = ["editor", "ide"];
-const DE_TEXTO = ["arquivo", "arquivos", "documento", "documentos", "pagina", "paginas", "aba", "abas", "spec", "especificacao", "especificacoes", "escreva", "escrever", "escreve"];
-// (só o verbo, escrito igual: "documento" e "documentação" também são assunto de fluxo — "o fluxo de
-// aprovação de documentos" — e o resto o plano decide)
-const DOCUMENTAR = ["documente", "documentar", "documenta", "documentem"];
+// (01/11/2026, de novo: "ele ainda não abriu o editor e escreveu os arquivos md" — o pedido veio com
+// erros que as palavras exatas não pegavam. Agora vale letra trocada de lugar, "mds", "emedê", "editro".)
+
+// a distância de edição contando a troca de duas letras vizinhas como um erro só ("editro" → "editor")
+function distanciaComTroca(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const custo = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + custo);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+const perto = (x, alvo) => x === alvo || (Math.abs(x.length - alvo.length) <= folgaDe(alvo) && distanciaComTroca(x, alvo) <= folgaDe(alvo));
+const pertoDeAlgum = (p, lista) => p.some((x) => lista.some((d) => perto(x, d)));
+
+// "md", "mds", "emd", "emedê" (a voz); "markdown" e "readme" com erro
+const ehMarkdown = (x) => /^e?m+d+s?$/.test(x) || /^emede(s|is)?$/.test(x) || (x.length >= 6 && (perto(x, "markdown") || perto(x, "markdowns"))) || perto(x, "readme");
+// o editor de código — mas não o verbo: "editar a aba" é mudar o desenho
+const VERBO_EDITAR = new Set(["editar", "edite", "edita", "editei", "editou", "editam", "editem", "editado", "editada", "editando", "editaria", "edito"]);
+const ehEditor = (x) => x === "ide" || x === "ides" || x === "vscode" || (!VERBO_EDITAR.has(x) && perto(x, "editor"));
+const DE_TEXTO = ["arquivo", "arquivos", "documento", "documentos", "pagina", "paginas", "aba", "abas", "spec", "especificacao", "especificacoes", "escreva", "escrever", "escreve", "codigo", "abra", "abre", "abrir", "texto", "textos"];
+// (o verbo; "documento" e "documentação" sozinhos também são assunto de fluxo — "o fluxo de aprovação de
+// documentos" — e só contam junto de "cada/todos/por" + desenho)
+const DOCUMENTAR = ["documente", "documentar", "documentem", "documenta"];
+const DOCUMENTACAO = ["documentacao", "documentacoes", "documentos", "especificacao", "especificacoes"];
+const CADA = ["cada", "todos", "todas", "por"];
 const NO_DESENHO = ["nota", "notas", "anotacao", "anotacoes", "comentario", "comentarios"];
 
 /** O pedido é escrever documentos (.md no editor) a partir dos desenhos, e não mudar os desenhos? */
 export function pedeDocumentacao(pedido) {
   const p = palavrasDe(pedido);
-  const tem = (lista) => p.some((x) => lista.some((d) => parecida(x, d)));
-  if (p.some((x) => x === "md" || x === "readme") || p.some((x) => x.length >= 7 && parecida(x, "markdown"))) return true;
-  if (p.some((x) => NO_EDITOR.includes(x)) && tem(DE_TEXTO)) return true;
-  return p.some((x) => DOCUMENTAR.includes(x)) && !tem(NO_DESENHO);
+  if (p.some(ehMarkdown) || p.some((x, i) => x === "eme" && /^des?$/.test(p[i + 1] || ""))) return true;
+  if ((p.some(ehEditor) || /\bvs code\b/.test(p.join(" "))) && pertoDeAlgum(p, DE_TEXTO)) return true;
+  if (pertoDeAlgum(p, NO_DESENHO)) return false;
+  // ("documento(s)" e "documentação" estão a uma letra do verbo: não contam aqui)
+  if (p.some((x) => !/^documento|^documentac/.test(x) && DOCUMENTAR.some((d) => perto(x, d)))) return true;
+  // "a documentação de cada fluxograma", "a especificação de todos os fluxos" (e não "documentos de cada área")
+  const cadaDesenho = p.some((x, i) => CADA.some((c) => perto(x, c)) && p.slice(i + 1, i + 4).some((y) => DESENHOS.some((d) => parecida(y, d))));
+  return pertoDeAlgum(p, DOCUMENTACAO) && cadaDesenho;
 }
 
 const fatia = (s) => semAcento(s).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50);

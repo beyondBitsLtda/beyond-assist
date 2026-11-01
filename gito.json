@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.25.0-cloudflare-pages.1",
+  "versao": "0.25.1-cloudflare-pages.1",
   "atualizadoEm": "2026-11-01",
   "compilacao": {
-    "numero": 56,
+    "numero": 57,
     "data": "2026-11-01",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.25.1-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "O pedido dos .md no editor é reconhecido mesmo com erros de digitação, a Lisa planeja só o pedido de agora (não refaz pedidos antigos da conversa) e o desenho grande tem mais tempo.",
+      "itens": [
+        "Correção: pediram de novo os arquivos .md no editor e a Lisa mexeu nos desenhos — o pedido veio escrito de um jeito que as palavras exatas não pegavam, e o plano refez pedidos antigos da conversa (a Lisa Task, a prioridade de voz). Agora o pedido de documento aceita letra trocada e erro de digitação ou de voz (\"mds\", \"editro\", \"aquivos\", \"emedês\", \"docuemnte\", \"documentação de cada fluxograma\"), e \"abra o editor e escreva…\" usa o projeto em uso.",
+        "O planejador recebe a conversa só como contexto (os pedidos dela já foram feitos) e põe o pedido de documento acima de qualquer mudança de desenho.",
+        "Correção: o \"Fluxo de Uso MVP\" estourou os 75s do Gemini. Desenho e .md agora têm até 150s, com uma tentativa por modelo (sem repetir a mesma resposta longa com outra chave)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.25.0-cloudflare-pages.1",
       "data": "2026-11-01",

@@ -412,6 +412,13 @@ console.log("documentar: um .md por desenho no editor (01/11/2026: a Lisa mexeu 
   const pedidoReal = "Lisa faça um arquivo MD no editor explicando toda anossa estrategia e conceito da construçã do noss MVP baseaod no projeto process map Produto lisa faal uamaba de MD por flugrama emapa mental que etmos eu viu usar isso para pedir o claud eara construir a rota e formar o nosso mvp";
   conferir("o pedido de verdade (com os erros) é reconhecido como documentar", pedeDocumentacao(pedidoReal));
   conferir("e outros jeitos de pedir", ["escreva um markdown de cada fluxograma", "gere o README do projeto", "no editor, escreva um arquivo por fluxo", "documente os fluxos do projeto", "faça um .md por mapa mental", "crie uma pagina no editor de codigo para cada fluxo"].every(pedeDocumentacao));
+  conferir("com erros de digitação e de voz também (\"mds\", \"editro\", \"aquivos\", \"emedês\", \"docuemnte\")", [
+    "abra o editro de codigo e escreva os mds de cada fluxo do projeto", "Lisa abre a IDE e escreve os aquivos de cada fluxograma",
+    "no projeto produto lisa faça os emedês de cada mapa", "faça os arquivos eme de dos fluxos", "gere a documentaçao de cada fluxograma do projeto para o claude",
+    "crie a especificação de todos os fluxos do projeto", "docuemnte os fluxos do projeto", "escreva no vs code um arquivo por fluxograma", "markdwon de todos os desenhos", "abra o editor",
+  ].every(pedeDocumentacao));
+  conferir("e assunto de fluxo com \"documentos\" não vira documentar", !["crie um fluxo de aprovação de documento por área", "no projeto x, crie um fluxo da gestão de documentos de cada área", "edite a aba Desktop e escreva o texto da nota"].some(pedeDocumentacao));
+  conferir("o planejador planeja só o pedido de agora (a conversa é contexto) e põe documento acima de mudança", /O PEDIDO DE AGORA \(é ESTE que você planeja\)/.test(ler("src/lib/gemini.js")) && /é "documentar", nunca "mudar"/.test(ler("src/lib/gemini.js")));
   conferir("pedido de mudar o desenho não é documentar", !["crie uma nota de texto em tdoso os fluogramas descrevendo o conceito", "documente nas notas de cada fluxo as decisões", "crie um fluxo de aprovação de documentos", "editar a aba Desktop", "pinte de verde as decisões", "crie uma aba com o detalhe da aprovação", "no projeto Produto Lisa, ponha a especificação do login no fluxo"].some(pedeDocumentacao));
   conferir("o plano pode decidir \"documentar\" (e aí nenhuma operação)", validarPlano({ acao: "documentar", explicacao: "Vou escrever.", operacoes: [{ fluxo: "x", pedido: "y" }] }, []).acao === "documentar" && validarPlano({ acao: "documentar", operacoes: [{ fluxo: "x", pedido: "y" }] }, []).operacoes.length === 0);
   const rotaDoPlano = ler("src/app/api/processmap/plano/route.js");

@@ -214,6 +214,10 @@ const PAUSA_DO_MODELO_MS = 3 * 60_000;
  * modelo para os outros (a demora é da tarefa, não do Google) e o erro diz o que foi.
  */
 const TETO_LONGO_MS = 75_000;
+// O desenho de várias abas com anotações longas e o .md de um desenho (01/11/2026: o "Fluxo de Uso MVP"
+// estourou os 75s): mais tempo, e uma tentativa por modelo — repetir a mesma resposta longa com outra
+// chave só dobra a espera; se não der, vai para o modelo de reserva, que é mais rápido.
+const TETO_DO_DESENHO_MS = 150_000;
 const modeloPausadoAte = new Map();
 
 /** Os modelos de chat na ordem em que vale tentar AGORA: os pausados vão para o fim. */
@@ -1252,7 +1256,7 @@ Regras:
           },
         },
       }),
-    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
+    { attempts: 1, delayMs: 800, tetoMs: TETO_DO_DESENHO_MS }
   );
   try {
     return JSON.parse(res.text);
@@ -1271,10 +1275,11 @@ Regras:
 export async function planejarNoProjeto({ pedido, projeto = "", fluxos = [], aberto = "", conversa = "", complemento = "" }) {
   const lista = fluxos.map((f) => `- id "${f.id}": "${f.nome}" (${f.modo === "mindmap" ? "mapa mental" : "fluxograma"}, ${f.formas ?? "?"} formas)${f.id === aberto ? " — aberto no quadro agora" : ""}`).join("\n");
   const prompt = [
-    conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-6000)}\n` : "",
+    // (01/11/2026: o plano refez pedidos antigos da conversa em vez do pedido de agora)
+    conversa ? `A CONVERSA ATÉ AQUI (só contexto: os pedidos que estão nela JÁ FORAM FEITOS — não os repita):\n${conversa.slice(-6000)}\n` : "",
     `OS DESENHOS DO PROJETO:\n${lista || "(nenhum ainda)"}\n`,
     projeto ? `O CONTEÚDO DELES:\n${projeto.slice(0, 30000)}\n` : "",
-    `PEDIDO DA PESSOA: "${String(pedido || "").slice(0, 6000)}"`,
+    `O PEDIDO DE AGORA (é ESTE que você planeja): "${String(pedido || "").slice(0, 6000)}"`,
     // a segunda volta (src/app/api/processmap/plano): os desenhos que o primeiro plano esqueceu
     complemento ? `\nATENÇÃO: ${complemento}` : "",
   ].filter(Boolean).join("\n");
@@ -1293,6 +1298,9 @@ Decida:
   "documentar" quando a pessoa quer um TEXTO feito a partir dos desenhos, fora deles — arquivo .md,
   markdown, README, documento, especificação, "no editor", "para pedir ao Claude/a uma IA construir".
   Com "documentar", NENHUM desenho muda (operacoes vazia): a Lisa escreve os arquivos no editor.
+  O pedido de agora que fala de MD, markdown, arquivos, editor, IDE ou documentação — mesmo escrito com
+  erro ("mds", "emedê", "editro", "aquivos", "documentaçao") — é "documentar", nunca "mudar".
+  Planeje SÓ o pedido de agora: a conversa é contexto, e os pedidos antigos dela já foram feitos.
   Citar outro sistema no meio do pedido (ex.: "uma versão do Abacato integrada à Lisa") não muda isso:
   é conteúdo do desenho.
 - "operacoes" (só com "mudar"): uma por desenho a mudar ou criar, na ordem em que fazem sentido.
@@ -1422,7 +1430,7 @@ Regras:
   const res = await withTransientRetry(
     CHAT_MODEL,
     (client, modelo) => client.models.generateContent({ model: modelo, contents: prompt, config: { systemInstruction } }),
-    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
+    { attempts: 1, delayMs: 800, tetoMs: TETO_DO_DESENHO_MS }
   );
   // (se o modelo cercar o arquivo inteiro num bloco de código, a cerca sai)
   const texto = String(res.text || "").trim().replace(/^`{3,}\s*(markdown|md)?\s*\n([\s\S]*?)\n`{3,}\s*$/i, "$2").trim();
@@ -1504,7 +1512,7 @@ Regras:
           },
         },
       }),
-    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
+    { attempts: 1, delayMs: 800, tetoMs: TETO_DO_DESENHO_MS }
   );
   try {
     return JSON.parse(res.text);

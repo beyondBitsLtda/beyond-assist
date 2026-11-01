@@ -2801,8 +2801,10 @@ export default function AssistantPage() {
   // citado (o fluxo citado pelo nome), provavel (o aberto no quadro, se for desse projeto, ou o único) },
   // ou null
   resolverProjetoRef.current = async (q) => {
-    // ("faça um md por fluxograma", sem dizer "projeto": vale o projeto em uso)
-    const documentaDesenhos = pedeDocumentacao(q) && /flux|mapa|desenho|diagrama/i.test(q);
+    // ("faça um md por fluxograma" ou "abra o editor e escreva os mds", sem dizer "projeto": vale o
+    // projeto em uso — o do quadro ou o último desta conversa)
+    const documentaDesenhos = pedeDocumentacao(q)
+      && (/flu|grama|mapa|desenh|diagram/i.test(q) || Boolean(quadroVinculoRef.current?.projeto || ultimoProjetoRef.current));
     if (!citaProjeto(q) && !pedeEmTodos(q) && !documentaDesenhos) return null;
     try {
       if (!projetosRef.current.lista || Date.now() - projetosRef.current.em > 30_000) {
