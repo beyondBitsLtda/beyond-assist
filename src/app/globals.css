@@ -768,16 +768,8 @@ button.bb-fluxos-estado { border: 1px solid rgba(255, 157, 61, 0.4); background:
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; transform-style: preserve-3d;
   transition: transform 1.1s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-/* a resposta chegou: a Lisa recua e vai para o lado; a janela vem para a frente */
-.bb-cena--hud .bb-cena-lisa { transform: translate3d(-18%, 0, -150px); }
-.bb-cena-grade {
-  position: absolute; left: -30%; right: -30%; bottom: 0; height: 70%; transform-origin: 50% 100%;
-  transform: rotateX(80deg); opacity: 0; transition: opacity 1.4s ease;
-  background-image: linear-gradient(rgba(var(--hud), 0.22) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--hud), 0.22) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 80%); mask-image: linear-gradient(to top, #000 0%, transparent 80%);
-}
-.bb-cena--hud .bb-cena-grade { opacity: 0.5; }
+/* a resposta chegou: a Lisa recua (no centro) e a janela vem para a frente, do lado */
+.bb-cena--hud .bb-cena-lisa { transform: translate3d(0, 0, -150px); }
 
 /* os hologramas: escondidos, e surgindo (piscando) cada um na sua profundidade e no seu tempo */
 .bb-holo {
@@ -840,10 +832,10 @@ button.bb-fluxos-estado { border: 1px solid rgba(255, 157, 61, 0.4); background:
 
 /* a janela da resposta: vem do fundo da cena (uma linha que se abre) e fica inclinada na perspectiva */
 .bb-jr {
-  position: absolute; z-index: 8; right: 6%; top: 50%; width: min(540px, 40vw); transform-style: preserve-3d;
-  transform: translate3d(0, -50%, 90px) rotateY(-7deg);
+  position: absolute; z-index: 8; right: 6%; top: 50%; width: min(480px, 27vw); transform-style: preserve-3d;
+  transform: translate3d(0, -50%, 40px) rotateY(-6deg);
 }
-.bb-jr[data-arrastada] { right: auto; transform: translate3d(0, 0, 90px) rotateY(-7deg); }
+.bb-jr[data-arrastada] { right: auto; transform: translate3d(0, 0, 40px) rotateY(-6deg); }
 .bb-jr-surge { position: relative; animation: bb-jr-surge 0.85s cubic-bezier(0.2, 0.9, 0.25, 1) both; }
 @keyframes bb-jr-surge {
   0% { transform: translateZ(-420px) scale(0.7, 0.02); opacity: 0; }
@@ -901,8 +893,8 @@ button.bb-fluxos-estado { border: 1px solid rgba(255, 157, 61, 0.4); background:
 .bb-jr-canto--b { left: -5px; bottom: -5px; border-left-width: 3px; border-bottom-width: 3px; }
 .bb-jr-aba { position: absolute; left: 34px; top: -6px; width: 92px; height: 4px; background: rgb(var(--hud)); clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%); box-shadow: 0 0 8px rgb(var(--hud)); pointer-events: none; }
 
-/* tela estreita (tablet em pé): a Lisa sobe, a janela fica embaixo, de lado a lado */
-@media (max-width: 900px) {
+/* tela estreita (tablet, notebook pequeno): a Lisa sobe, a janela fica embaixo, de lado a lado */
+@media (max-width: 1100px) {
   .bb-cena--hud .bb-cena-lisa { transform: translate3d(0, -16%, -150px); }
   .bb-jr { left: 4%; right: 4%; top: auto; bottom: 2%; width: auto; transform: translate3d(0, 0, 70px); }
   .bb-jr[data-arrastada] { transform: translate3d(0, 0, 70px); }

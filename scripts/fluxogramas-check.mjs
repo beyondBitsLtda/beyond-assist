@@ -9,6 +9,8 @@ import {
 } from "../src/lib/fluxogramas.js";
 import { apiDosFluxos, assinaturaDoDesenho, criarSalvador, enderecoDoFluxo } from "../src/lib/fluxogramasNoNavegador.js";
 import { GRUPOS_DE_PAINEIS } from "../src/lib/navegacao.js";
+import { citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, secaoDoProjeto } from "../src/lib/processmapNaConversa.js";
+import { montarDocumento, validarDesenho } from "../src/lib/diagramaDaLisa.js";
 
 let falhas = 0;
 const ok = (t) => console.log(`  ok    ${t}`);
@@ -255,8 +257,42 @@ console.log("as peças ligadas");
   conferir("Ctrl+S embutido salva na página (não baixa .json)", /avisar\(k === 's' \? 'salvar' : 'importar'\)/.test(ponte));
   const quadro = ler("src/components/panels/QuadroDaLisa.js");
   conferir("o quadro da Lisa tem o \"salvar\" e grava as mudanças depois", /SalvarFluxo/.test(quadro) && /salvador\.current\?\.mudou\(ultimoDoc\.current\)/.test(quadro) && /v\.mudanca/.test(quadro));
-  conferir("a conversa marca quando o desenho novo é mudança do anterior", /mudanca \}/.test(ler("src/app/(panels)/assistant/page.js")));
+  conferir("a conversa marca quando o desenho novo é mudança do anterior", /colecao: r\.colecao, mudanca[,} ]/.test(ler("src/app/(panels)/assistant/page.js")));
   conferir("a Lisa sabe que dá para salvar e onde achar", /painel ProcessMap/.test(ler("src/lib/codigoNaResposta.js")));
+}
+
+console.log("o projeto citado na conversa (01/11/2026: \"no projeto X do ProcessMap, faça tal coisa\")");
+{
+  const projetos = [
+    { id: "p1", nome: "Compras" }, { id: "p2", nome: "RH" }, { id: "p3", nome: "Meus fluxogramas" },
+    { id: "p4", nome: "Lançamento do App" }, { id: "p5", nome: "Compras internacionais" },
+  ];
+  conferir("fala de projeto: \"projeto\" ou \"processmap\" (até com erro)", citaProjeto("no projeto Compras, inclua…") && citaProjeto("lá no procesmap") && citaProjeto("no process map") && !citaProjeto("fiz compras hoje"));
+  conferir("acha o projeto pelo nome, sem acento e com erro de digitação", projetoCitado("no projeto compras do processmap, inclua a cotação", projetos)?.id === "p1"
+    && projetoCitado("no projeto lancamento do app, ...", projetos)?.id === "p4" && projetoCitado("no projeto Lançamnto do App, ...", projetos)?.id === "p4");
+  conferir("o nome mais completo ganha (\"Compras internacionais\" e não \"Compras\")", projetoCitado("no projeto de compras internacionais, mude…", projetos)?.id === "p5");
+  conferir("sem falar de projeto, nem procura (\"compras\" sozinho é conversa)", projetoCitado("quais compras eu fiz?", projetos) === null);
+  conferir("projeto que não existe: nada", projetoCitado("no projeto financeiro, …", projetos) === null);
+  const fluxos = [{ id: "f1", nome: "Pedido de compra" }, { id: "f2", nome: "Aprovação de fornecedor" }, { id: "f3", nome: "Novo fluxograma" }, { id: "f4", nome: "Compras do mês" }];
+  conferir("acha o fluxo citado dentro do projeto", fluxoCitado("no projeto Compras, no fluxo de aprovação de fornecedor, inclua a etapa X", fluxos, { nomeDoProjeto: "Compras" })?.id === "f2");
+  conferir("o nome do projeto não escolhe fluxo (\"no projeto Compras\" não é \"Compras do mês\")", fluxoCitado("no projeto Compras, inclua uma etapa de cotação", fluxos, { nomeDoProjeto: "Compras" }) === null);
+  conferir("fluxo de nome genérico (\"Novo fluxograma\") só se escrito igual", fluxoCitado("no projeto Compras, desenhe um novo fluxo", fluxos, { nomeDoProjeto: "Compras" }) === null && fluxoCitado("abra o novo fluxograma do projeto", fluxos)?.id === "f3");
+
+  const doc = montarDocumento(validarDesenho({ titulo: "Pedido", formas: [{ id: "a", tipo: "process", texto: "Registrar pedido" }, { id: "b", tipo: "process", texto: "Cotar" }], ligacoes: [{ de: "a", para: "b" }] }));
+  const comDocs = [{ ...fluxos[0], modo: "diagram", formas: 2, documento: doc }, { ...fluxos[1], modo: "diagram", formas: 0, documento: null, origem: "lisa" }];
+  const texto = contextoDoProjeto({ nome: "Compras" }, comDocs, { alvo: comDocs[1] });
+  conferir("o contexto traz o projeto, a lista e cada desenho descrito", /PROJETO "Compras" DO PROCESSMAP — 2 desenhos/.test(texto) && /"Registrar pedido"/.test(texto) && /\[a\] .* → \[b\]/.test(texto));
+  conferir("o fluxo que o pedido muda vem primeiro e marcado", texto.indexOf("Aprovação de fornecedor\" (fluxograma") < texto.indexOf("=== \"Pedido de compra") && /É ESTE QUE O PEDIDO MUDA/.test(texto));
+  const muitos = Array.from({ length: 30 }, (_, i) => ({ id: `x${i}`, nome: `Fluxo ${i}`, modo: "diagram", formas: 2, documento: doc }));
+  conferir("projeto grande não estoura o prompt", contextoDoProjeto({ nome: "Grande" }, muitos.map((f) => ({ ...f, documento: { ...doc, name: "x".repeat(5000) } }))).length <= 26_000);
+  conferir("a seção da conversa: vazia sem projeto, e pede para perguntar qual fluxo quando não disser", secaoDoProjeto("") === "" && /pergunte qual/.test(secaoDoProjeto(texto)));
+
+  const pagina = ler("src/app/(panels)/assistant/page.js");
+  conferir("a conversa acha o projeto antes de decidir entre desenhar e responder", /await resolverProjetoRef\.current\?\.\(q\)/.test(pagina) && /projeto: doProjeto\?\.texto \|\| ""/.test(pagina));
+  conferir("o desenho no projeto é salvo lá (muda o alvo ou cria um fluxo) e o quadro abre ligado", /apiDosFluxosDaConversa\.salvar\(alvo\.id/.test(pagina) && /apiDosFluxosDaConversa\.criar\(\{ documento: r\.doc, nome: r\.titulo, projetoId/.test(pagina) && /mudanca, vinculo \}/.test(pagina));
+  conferir("o quadro grava no fluxo ligado e avisa a página", /if \(!mesmaVersao && v\.vinculo\)/.test(ler("src/components/panels/QuadroDaLisa.js")) && /aoVincularRef\.current\?\.\(r\)/.test(ler("src/components/panels/QuadroDaLisa.js")));
+  conferir("a conversa e o desenho recebem o projeto", /secaoDoProjeto\(body\.projeto\)/.test(ler("src/app/api/ask/route.js")) && /desenharDiagrama\(\{ pedido, estrutura, conversa, contexto, projeto \}\)/.test(ler("src/app/api/diagrama/route.js")));
+  conferir("ler um projeto com os documentos: GET /api/fluxogramas/projetos?id=", /export async function GET/.test(ler("src/app/api/fluxogramas/projetos/route.js")));
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");

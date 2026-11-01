@@ -36,6 +36,8 @@ export function apiDosFluxos(buscar = (...a) => fetch(...a)) {
     /** { documento?, nome?, projetoId?, versao?, forcar? } → o fluxo (sem documento). `extra`: keepalive ao sair. */
     salvar: async (id, dados, extra) => (await chamar(`/api/fluxogramas/${encodeURIComponent(id)}`, "PUT", dados, extra)).fluxo,
     excluir: (id) => chamar(`/api/fluxogramas/${encodeURIComponent(id)}`, "DELETE"),
+    /** um projeto com os fluxos e os documentos (a Lisa trabalhando no projeto citado na conversa) */
+    lerProjeto: (id) => chamar(`/api/fluxogramas/projetos?id=${encodeURIComponent(id)}`),
     criarProjeto: async (nome) => (await chamar("/api/fluxogramas/projetos", "POST", { nome })).projeto,
     mudarProjeto: (id, dados) => chamar("/api/fluxogramas/projetos", "PATCH", { id, ...dados }),
     excluirProjeto: (id) => chamar(`/api/fluxogramas/projetos?id=${encodeURIComponent(id)}`, "DELETE"),

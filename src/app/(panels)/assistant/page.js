@@ -14,6 +14,10 @@ import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
 import FontesDaWeb from "@/components/panels/FontesDaWeb.js";
 import CenaDaLisa from "@/components/panels/hud/CenaDaLisa.js";
 import JanelaDaResposta from "@/components/panels/hud/JanelaDaResposta.js";
+import { citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto } from "@/lib/processmapNaConversa.js";
+import { apiDosFluxos } from "@/lib/fluxogramasNoNavegador.js";
+
+const apiDosFluxosDaConversa = apiDosFluxos();
 import { Highlight } from "prism-react-renderer";
 import { TTS_VOICES, STEVE_VOICE_NAME } from "@/lib/ttsVoices.js";
 import { pickBrowserVoice, speakText, stopBrowserVoiceAudio, isBrowserVoiceAudioPlaying } from "@/lib/browserVoice.js";
@@ -276,6 +280,11 @@ export default function AssistantPage() {
   const quadroAbertoRef = useRef(false);
   quadroAbertoRef.current = Boolean(quadro);
   const desenharNaTelaRef = useRef(null);
+  // os projetos do ProcessMap na conversa (01/11/2026): a lista (guardada 30 s), o fluxo salvo que está
+  // aberto no quadro (o quadro avisa) e quem acha o projeto citado — ver resolverProjetoRef abaixo
+  const projetosRef = useRef({ em: 0, lista: null });
+  const quadroVinculoRef = useRef(null); // { fluxo, projeto }
+  const resolverProjetoRef = useRef(null);
   // as mensagens da conversa, para mandar o código que já apareceu nela junto da pergunta
   const mensagensRef = useRef([]);
 
@@ -2582,8 +2591,21 @@ export default function AssistantPage() {
 
     // "desenhe o processo de…" (ou, com o quadro aberto, "inclua uma etapa…"): a Lisa desenha no
     // quadro em vez de responder em texto (BEYOND-0010) — ver desenharNaTela abaixo
-    const desenho = !acaoNoAbacato && !alvoDaIde ? pedidoDeDesenho(q, { quadroAberto: quadroAbertoRef.current }) : null;
-    if (desenho) return desenharNaTelaRef.current?.(q, { displayText, mudar: desenho === "alterar" });
+    // "no projeto X do ProcessMap, …" (01/11/2026): os desenhos do projeto vão junto da pergunta, e um
+    // pedido de desenho trabalha nele — muda o fluxo citado (ou o aberto no quadro, ou o único do
+    // projeto) ou cria um fluxo novo no projeto, e salva lá
+    const doProjeto = !acaoNoAbacato && !alvoDaIde ? await resolverProjetoRef.current?.(q) : null;
+    const desenho = !acaoNoAbacato && !alvoDaIde
+      ? pedidoDeDesenho(q, { quadroAberto: quadroAbertoRef.current || Boolean(doProjeto?.citado || doProjeto?.provavel) })
+      : null;
+    if (doProjeto) {
+      const novo = /\bnov[oa]s?\b/i.test(q);
+      doProjeto.alvo = desenho === "alterar" ? doProjeto.citado || doProjeto.provavel : desenho === "novo" && !novo ? doProjeto.citado : null;
+      doProjeto.texto = contextoDoProjeto(doProjeto.projeto, doProjeto.fluxos, { alvo: doProjeto.alvo });
+    }
+    // mudar "um fluxo do projeto" sem dizer qual (com vários): vira conversa, e a Lisa pergunta qual
+    const semAlvo = desenho === "alterar" && doProjeto && !doProjeto.alvo;
+    if (desenho && !semAlvo) return desenharNaTelaRef.current?.(q, { displayText, mudar: desenho === "alterar" || Boolean(doProjeto?.alvo), doProjeto });
 
     const shown = displayText || q;
     setBusy(true);
@@ -2665,6 +2687,8 @@ export default function AssistantPage() {
           ].filter(Boolean).join("\n\n"),
           // o desenho do quadro como está agora, em texto (BEYOND-0010): a Lisa vê o que a pessoa mudou
           diagrama: quadroAbertoRef.current && desenhoRef.current ? descreverDiagrama(desenhoRef.current) : "",
+          // o projeto do ProcessMap citado na pergunta, com os desenhos dele (01/11/2026)
+          projeto: doProjeto?.texto || "",
           pendingAction: pendingActionRef.current,
           images: images.length ? images : null,
           // o código dos repositórios vinculados, já lido acima (/api/repos/contexto)
@@ -2756,7 +2780,30 @@ export default function AssistantPage() {
   // deixou, e o que ela arrumou fica no lugar. A explicação da Lisa vira a resposta da conversa (e é
   // falada, se a voz estiver ligada); o desenho aparece no quadro.
   // `mudar`: o pedido é mudar o desenho que está no quadro (ele vai junto); senão é um desenho novo
-  desenharNaTelaRef.current = async (q, { displayText, mudar = false } = {}) => {
+  // quem acha o projeto do ProcessMap citado na pergunta (src/lib/processmapNaConversa.js): devolve
+  // { projeto, fluxos (com os documentos), citado (o fluxo citado pelo nome), provavel (o aberto no
+  // quadro, se for desse projeto, ou o único dele) }, ou null
+  resolverProjetoRef.current = async (q) => {
+    if (!citaProjeto(q)) return null;
+    try {
+      if (!projetosRef.current.lista || Date.now() - projetosRef.current.em > 30_000) {
+        projetosRef.current = { em: Date.now(), lista: await apiDosFluxosDaConversa.listar() };
+      }
+      const achado = projetoCitado(q, projetosRef.current.lista);
+      if (!achado) return null;
+      const { projeto, fluxos } = await apiDosFluxosDaConversa.lerProjeto(achado.id);
+      const vinculado = quadroVinculoRef.current;
+      const citado = fluxoCitado(q, fluxos, { nomeDoProjeto: projeto.nome });
+      const provavel = (vinculado && fluxos.find((f) => f.id === vinculado.fluxo.id)) || (fluxos.length === 1 ? fluxos[0] : null);
+      addLog("[PROCESSMAP]", PU, `projeto "${projeto.nome}": ${fluxos.length} desenho${fluxos.length === 1 ? "" : "s"} lido${fluxos.length === 1 ? "" : "s"}${citado ? ` · citado: "${citado.nome}"` : ""}`);
+      return { projeto, fluxos, citado, provavel };
+    } catch (err) {
+      addLog("[PROCESSMAP]", OR, `não consegui ler o projeto: ${err.message}`);
+      return null;
+    }
+  };
+
+  desenharNaTelaRef.current = async (q, { displayText, mudar = false, doProjeto = null } = {}) => {
     const shown = displayText || q;
     stopSpeaking();
     const gen = ++speechGenRef.current;
@@ -2792,18 +2839,45 @@ export default function AssistantPage() {
           addLog("[REPO]", OR, `a leitura do repositório falhou: ${err.message}`);
         }
       }
+      // no projeto: parte do fluxo-alvo (o do quadro, se for ele que está aberto: tem o que a pessoa
+      // acabou de mexer); sem projeto, do que está no quadro
+      const alvo = doProjeto?.alvo || null;
+      const alvoAberto = Boolean(alvo && quadroVinculoRef.current?.fluxo.id === alvo.id && quadroAbertoRef.current && desenhoRef.current);
+      const atual = alvo ? (alvoAberto ? desenhoRef.current : alvo.documento) : mudar && quadroAbertoRef.current ? desenhoRef.current : null;
       const res = await fetch("/api/diagrama", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ pedido: q, atual: mudar && quadroAbertoRef.current ? desenhoRef.current : null, conversa, contexto }),
+        body: JSON.stringify({ pedido: q, atual, conversa, contexto, projeto: doProjeto?.texto || "" }),
       });
       const r = await res.json().catch(() => ({}));
       if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
       desenhoRef.current = r.doc;
+      // no projeto: salva lá (o fluxo-alvo ganha a versão nova; sem alvo, nasce um fluxo no projeto) e
+      // o quadro abre ligado a ele (`vinculo`: o que mudar depois também é salvo)
+      let vinculo = null;
+      let aviso = "";
+      if (doProjeto) {
+        try {
+          if (alvo) {
+            const fluxo = await apiDosFluxosDaConversa.salvar(alvo.id, alvoAberto ? { documento: r.doc, forcar: true } : { documento: r.doc, versao: alvo.versao });
+            vinculo = { fluxo, projeto: doProjeto.projeto };
+          } else {
+            vinculo = await apiDosFluxosDaConversa.criar({ documento: r.doc, nome: r.titulo, projetoId: doProjeto.projeto.id, origem: "lisa" });
+          }
+          projetosRef.current.em = 0; // a lista mudou
+          addLog("[PROCESSMAP]", GR, `salvo em "${vinculo.projeto.nome}" → "${vinculo.fluxo.nome}"`);
+        } catch (err) {
+          aviso = err.status === 409
+            ? ` Não salvei no projeto: o fluxo "${alvo?.nome}" foi mudado em outro lugar agora há pouco — o desenho ficou só no quadro.`
+            : ` Não consegui salvar no projeto (${err.message}); o desenho ficou só no quadro.`;
+          addLog("[PROCESSMAP]", OR, aviso.trim());
+        }
+      }
       // `mudanca`: é o mesmo desenho, mudado — se ele foi salvo num projeto, o quadro grava a mudança
       const mudanca = Boolean(mudar && quadroAbertoRef.current);
-      setQuadro({ versao: { doc: r.doc, chave: `d${Date.now()}`, colecao: r.colecao, mudanca }, titulo: r.titulo, explicacao: r.explicacao });
-      const texto = r.explicacao || `Desenhei "${r.titulo}" no quadro.`;
+      setQuadro({ versao: { doc: r.doc, chave: `d${Date.now()}`, colecao: r.colecao, mudanca, vinculo }, titulo: r.titulo, explicacao: r.explicacao });
+      const salvoNoProjeto = vinculo ? ` ${alvo ? "Atualizei" : "Salvei"} "${vinculo.fluxo.nome}" no projeto "${vinculo.projeto.nome}" do ProcessMap.` : "";
+      const texto = `${r.explicacao || `Desenhei "${r.titulo}" no quadro.`}${salvoNoProjeto}${aviso}`;
       setAnswer(texto);
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
       conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
@@ -3250,7 +3324,8 @@ export default function AssistantPage() {
       versao={quadro.versao} titulo={quadro.titulo} explicacao={quadro.explicacao} ocupado={desenhando}
       aoMudar={(doc) => { desenhoRef.current = doc; }}
       aoPedir={(p) => desenharNaTelaRef.current?.(p, { mudar: true })}
-      aoFechar={() => { setQuadro(null); desenhoRef.current = null; }}
+      aoVincular={(r) => { quadroVinculoRef.current = r; }}
+      aoFechar={() => { setQuadro(null); desenhoRef.current = null; quadroVinculoRef.current = null; }}
     />
   );
 

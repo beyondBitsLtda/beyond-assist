@@ -177,8 +177,12 @@ export function validarDesenho(bruto) {
 // as formas e as ligações de uma aba, conferidas
 function formasELigacoes(a) {
   const vistos = new Set();
+  const iguais = new Set(); // id + tipo + texto: a mesma forma repetida pelo modelo (acontece) sai, não vira cópia
   const formas = [];
   for (const f of (Array.isArray(a?.formas) ? a.formas : []).slice(0, LIMITES_DO_DESENHO.formas)) {
+    const repetida = `${idLimpo(f?.id)}|${f?.tipo}|${String(f?.texto ?? "").trim()}`;
+    if (idLimpo(f?.id) && iguais.has(repetida)) continue;
+    iguais.add(repetida);
     let id = idLimpo(f?.id) || `f${formas.length + 1}`;
     while (vistos.has(id)) id = `${id}-2`;
     vistos.add(id);

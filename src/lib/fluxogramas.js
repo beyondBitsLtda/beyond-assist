@@ -120,6 +120,18 @@ async function tocarProjeto(id) {
   await supabase.from("lisa_projetos").update({ atualizado_em: agora() }).eq("id", id);
 }
 
+/**
+ * Um projeto com os fluxos dele, documentos inclusos (os mexidos por último primeiro, até `max`) —
+ * para a Lisa trabalhar no projeto citado na conversa (src/lib/processmapNaConversa.js).
+ */
+export async function lerProjeto(dono, id, { max = 20 } = {}) {
+  const projeto = await projetoDoDono(dono, id);
+  const { data, error } = await supabase.from("lisa_fluxogramas").select(`${COLUNAS_DO_FLUXO}, documento`)
+    .eq("projeto_id", id).eq("dono_id", dono).eq("arquivado", false).order("atualizado_em", { ascending: false }).limit(max);
+  if (error) throw new ErroDosFluxos(`não consegui ler os fluxos do projeto: ${error.message}`, 500);
+  return { projeto: { id: projeto.id, nome: projeto.nome }, fluxos: (data || []).map((l) => ({ ...resumoDoFluxo(l), documento: l.documento })) };
+}
+
 /** Cria um projeto. */
 export async function criarProjeto(dono, { nome, descricao } = {}) {
   const n = nomeLimpo(nome, LIMITES.nomeDoProjeto);

@@ -1117,11 +1117,14 @@ primeira linha da resposta já é a primeira linha real do arquivo.`;
  * mexido pela pessoa), é uma MUDANÇA: ela devolve o desenho inteiro de novo, mantendo os ids do que
  * continua. A saída passa por validarDesenho antes de ir para a tela.
  */
-export async function desenharDiagrama({ pedido, estrutura = null, conversa = "", contexto = "" }) {
+export async function desenharDiagrama({ pedido, estrutura = null, conversa = "", contexto = "", projeto = "" }) {
   const formas = TIPOS.map((t) => `- ${t}: ${FORMAS[t].nome}`).join("\n");
   const prompt = [
     contexto
       ? `O CÓDIGO DOS REPOSITÓRIOS VINCULADOS À CONVERSA (para "essa arquitetura", "o meu sistema": desenhe o que está AQUI, com os nomes reais de arquivos, rotas, serviços e tabelas):\n${contexto.slice(0, 40000)}\n`
+      : "",
+    projeto
+      ? `O PROJETO DO PROCESSMAP ONDE ESTE DESENHO MORA (os desenhos dele como estão salvos — mantenha os mesmos nomes de etapas, áreas/raias e termos, e não repita o que outro fluxo já detalha):\n${projeto.slice(0, 30000)}\n`
       : "",
     conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-6000)}\n` : "",
     estrutura
@@ -1259,9 +1262,12 @@ Regras:
  * (src/lib/diagramaDaLisa.js: validarMapaMental, montarMapaMental). Com `estrutura` (o mapa que está na
  * tela), é uma mudança: a árvore inteira de volta, com os mesmos ids do que continua.
  */
-export async function desenharMapaMental({ pedido, estrutura = null, conversa = "", contexto = "" }) {
+export async function desenharMapaMental({ pedido, estrutura = null, conversa = "", contexto = "", projeto = "" }) {
   const prompt = [
     contexto ? `CONTEXTO (código, ou o desenho que está na tela, para basear o mapa):\n${contexto.slice(0, 40000)}\n` : "",
+    projeto
+      ? `O PROJETO DO PROCESSMAP ONDE ESTE DESENHO MORA (os desenhos dele como estão salvos — mantenha os mesmos nomes de etapas, áreas/raias e termos, e não repita o que outro fluxo já detalha):\n${projeto.slice(0, 30000)}\n`
+      : "",
     conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-6000)}\n` : "",
     estrutura
       ? `O MAPA QUE ESTÁ NA TELA AGORA (a pessoa pode ter mexido nele — parta DELE):\n${JSON.stringify(estrutura).slice(0, 20000)}\n`

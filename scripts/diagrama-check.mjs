@@ -292,6 +292,8 @@ console.log("\nas abas (01/11/2026: \"a Lisa deve poder criar abas dentro dos fl
   const umaAba = { ...tela, activePage: "zz", pages: [{ ...principal, id: "zz" }] };
   const legado = montarDocumento(validarDesenho({ titulo: "Compras", formas: est.abas[0].formas, ligacoes: est.abas[0].ligacoes }), umaAba);
   conferir("formato antigo (uma aba): continua sendo a mesma aba", legado.pages.length === 1 && legado.pages[0].id === "zz" && legado.pages[0].shapes.find((x) => x.id === "pedir").locked === true);
+  const repetidas = validarDesenho({ titulo: "X", formas: [{ id: "ini", tipo: "terminal", texto: "Início" }, { id: "ini", tipo: "terminal", texto: "Início" }, { id: "ini", tipo: "process", texto: "Outra" }], ligacoes: [] });
+  conferir("a mesma forma repetida pelo modelo sai; id repetido com outra forma vira outro id", repetidas.formas.map((f) => f.id).join() === "ini,ini-2");
   conferir("link para aba que não existe sai", montarDocumento(validarDesenho({ titulo: "X", formas: [{ id: "a", tipo: "process", texto: "A", link: "inventada" }], ligacoes: [] })).pages[0].shapes[0].link === undefined);
   conferir("\"crie uma aba com o detalhe da aprovação\", com o quadro aberto, muda o desenho", pedidoDeDesenho("crie uma aba com o detalhe da aprovação", { quadroAberto: true }) === "alterar" && pedidoDeDesenho("separe o processo em abas por área", { quadroAberto: true }) === "alterar");
 }

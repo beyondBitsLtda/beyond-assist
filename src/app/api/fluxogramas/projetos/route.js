@@ -1,10 +1,10 @@
-import { donoDe, criarProjeto, mudarProjeto, arquivarProjeto } from "@/lib/fluxogramas.js";
+import { donoDe, criarProjeto, mudarProjeto, arquivarProjeto, lerProjeto } from "@/lib/fluxogramas.js";
 import { jsonResponse } from "@/lib/http.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// ProcessMap na Lisa (01/11/2026): criar, renomear e excluir (arquivar) projetos.
+// ProcessMap na Lisa (01/11/2026): ler (com os documentos), criar, renomear e excluir (arquivar) projetos.
 const falhou = (err) => jsonResponse({ ok: false, error: String(err?.message || err) }, err?.status || 500);
 
 async function comDono(req, fazer) {
@@ -15,6 +15,11 @@ async function comDono(req, fazer) {
   } catch (err) {
     return falhou(err);
   }
+}
+
+/** GET /api/fluxogramas/projetos?id=… → { projeto, fluxos } com os documentos (a Lisa trabalhando no projeto). */
+export async function GET(req) {
+  return comDono(req, (dono) => lerProjeto(dono, new URL(req.url).searchParams.get("id")));
 }
 
 /** POST /api/fluxogramas/projetos   { nome, descricao? } → { projeto } */

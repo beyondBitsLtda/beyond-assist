@@ -37,7 +37,7 @@ const apiDosFluxosSalvos = apiDosFluxos();
 const ESTADO_DO_SALVO = { salvo: "✓ salvo", pendente: "✓ salvo · alterado…", salvando: "salvando…", erro: "⚠ não salvou", conflito: "⚠ mudou em outra aba" };
 const CAMPO = { ...mono, fontSize: 11.5, padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(0,0,0,0.35)", color: "#eafcff", outline: "none" };
 
-export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocupado = false, aoMudar, aoPedir, aoFechar }) {
+export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocupado = false, aoMudar, aoPedir, aoFechar, aoVincular }) {
   const quadro = useRef(null);
   const importada = useRef(null); // a chave da versão que o quadro já abriu
   const ultimoDoc = useRef(null); // o desenho como está agora (com o que a pessoa mexeu)
@@ -65,6 +65,8 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
   const [estadoSalvo, setEstadoSalvo] = useState("salvo");
   const [salvarAberto, setSalvarAberto] = useState(false);
   const vivo = useRef(true);
+  const aoVincularRef = useRef(aoVincular);
+  aoVincularRef.current = aoVincular;
 
   /** Passa a gravar sozinho no fluxo guardado (ou para de gravar, com `null`). */
   const ligarSalvo = (r, doc) => {
@@ -73,6 +75,7 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
     salvoRef.current = r;
     setSalvo(r);
     setEstadoSalvo("salvo");
+    aoVincularRef.current?.(r); // a página sabe qual fluxo do ProcessMap está aberto (a conversa trabalha nele)
     if (!r) return;
     const id = r.fluxo.id;
     salvador.current = criarSalvador({
@@ -123,7 +126,11 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
       if (v.colecao) p.colecao(v.colecao);
       const novaVersao = !mesmaVersao && importada.current !== null;
       importada.current = v.chave;
-      if (salvoRef.current) {
+      if (!mesmaVersao && v.vinculo) {
+        // a conversa já salvou este desenho num projeto do ProcessMap: o quadro passa a gravar nele
+        p.nome(v.vinculo.fluxo.nome);
+        ligarSalvo(v.vinculo, p.exportar());
+      } else if (salvoRef.current) {
         p.nome(salvoRef.current.fluxo.nome);
         // a Lisa mudou o desenho guardado: grava; um desenho novo não é o guardado: para de gravar
         if (novaVersao && v.mudanca) salvador.current?.mudou(p.exportar());

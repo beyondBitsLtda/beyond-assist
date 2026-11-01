@@ -11,6 +11,7 @@ import { pareceAcao, pendenteValida } from "@/lib/acoesNoAbacato.js";
 import { tratarAcaoNoAbacato } from "@/lib/fluxoDeAcoesNoAbacato.js";
 import { comCodigoNaTela, secaoDoCodigoDaConversa } from "@/lib/codigoNaResposta.js";
 import { secaoDoDiagrama } from "@/lib/diagramaDaLisa.js";
+import { secaoDoProjeto } from "@/lib/processmapNaConversa.js";
 import { webDaPergunta, fontesDaBusca } from "@/lib/buscaNaWeb.js";
 import { contextoDosRepositorios } from "@/lib/repositorioNaConversa.js";
 import { notaDasImagens, imagensValidas } from "@/lib/contextoDaConversa.js";
@@ -335,7 +336,7 @@ export async function POST(req) {
           secaoDosRepos = r.secao;
           send(controller, "repos", { lidos: r.lidos, repos: r.repos || [], avisos: r.avisos });
         }
-        const prompt = buildPrompt(question, matches, combinedNote, blocoDaConversa(turnos), secaoDoCodigoDaConversa(body.codigo) + secaoDoDiagrama(body.diagrama) + secaoDosRepos);
+        const prompt = buildPrompt(question, matches, combinedNote, blocoDaConversa(turnos), secaoDoCodigoDaConversa(body.codigo) + secaoDoDiagrama(body.diagrama) + secaoDoProjeto(body.projeto) + secaoDosRepos);
         // em qualquer modo: quando o assunto é código, a resposta traz o código em blocos e a tela
         // abre o editor que digita (src/lib/codigoNaResposta.js, src/components/panels/IdeDaLisa.js)
         const instrucao = withContextDocs(withPersona(comCodigoNaTela(systemInstruction), personaMode));

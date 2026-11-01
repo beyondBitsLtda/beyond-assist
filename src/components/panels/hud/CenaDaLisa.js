@@ -5,10 +5,11 @@
 // da imagem surgissem. Quero um zoom mais próximo da Lisa também e um efeito de profundidade quando
 // surgirem essas janelas e elementos na tela."
 //
-// Camadas numa perspectiva 3D: a grade do chão e os hologramas (HologramasDaLisa.js), a Lisa (o
-// visual, com o anel e os cantos que andam com ela) e a janela da resposta (JanelaDaResposta.js).
-// Quando a resposta aparece (`ativa`), a Lisa recua e vai para o lado, a janela vem do fundo para a
-// frente e os hologramas surgem em profundidades diferentes; o mundo inteiro inclina de leve com o
+// Camadas numa perspectiva 3D: os hologramas (HologramasDaLisa.js), a Lisa (o visual, com o anel e
+// os cantos que andam com ela) e a janela da resposta (JanelaDaResposta.js). Quando a resposta aparece
+// (`ativa`), a Lisa recua um pouco (sem sair do centro — "não gostei que a Lisa não ficou
+// centralizada"), a janela vem do fundo para a frente e os hologramas surgem em profundidades
+// diferentes; o mundo inteiro inclina de leve com o
 // mouse (paralaxe). O nível da voz e o estado entram como variáveis de CSS a cada quadro (--nivel,
 // data-estado), sem renderizar o React de novo: as barras e os anéis reagem à fala. Com "reduzir
 // movimento", sem paralaxe (os giros e o surgir saem no CSS).
@@ -67,7 +68,6 @@ export default function CenaDaLisa({ ativa = false, obterSinal, dados = {}, jane
   return (
     <div ref={cena} className={`bb-cena${ativa ? " bb-cena--hud" : ""}`}>
       <div className="bb-cena-mundo">
-        <div className="bb-cena-grade" aria-hidden="true" />
         <HologramasDaLisa dados={dados} />
         <div className="bb-cena-lisa">
           <AnelDaLisa />
