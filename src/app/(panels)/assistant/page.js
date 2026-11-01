@@ -14,8 +14,8 @@ import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
 import FontesDaWeb from "@/components/panels/FontesDaWeb.js";
 import CenaDaLisa from "@/components/panels/hud/CenaDaLisa.js";
 import JanelaDaResposta from "@/components/panels/hud/JanelaDaResposta.js";
-import { citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, pedeEmTodos } from "@/lib/processmapNaConversa.js";
-import { pedirPlano, executarPlano, textoDoAndamento } from "@/lib/trabalhoNoProjeto.js";
+import { citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, pedeEmTodos, pedeDocumentacao, respostaComDocumentos } from "@/lib/processmapNaConversa.js";
+import { pedirPlano, executarPlano, textoDoAndamento, documentarProjeto } from "@/lib/trabalhoNoProjeto.js";
 import { apiDosFluxos } from "@/lib/fluxogramasNoNavegador.js";
 
 const apiDosFluxosDaConversa = apiDosFluxos();
@@ -289,6 +289,7 @@ export default function AssistantPage() {
   const ultimoProjetoRef = useRef(null); // o último projeto em que a Lisa trabalhou nesta conversa
   const planejarNoProjetoRef = useRef(null);
   const trabalharNoProjetoRef = useRef(null);
+  const documentarNoProjetoRef = useRef(null);
   // as mensagens da conversa, para mandar o código que já apareceu nela junto da pergunta
   const mensagensRef = useRef([]);
 
@@ -2602,7 +2603,10 @@ export default function AssistantPage() {
     // desenhos do projeto junto. Sem plano (o modelo falhou), o caminho antigo: um desenho, por palavras.
     const doProjeto = !alvoDaIde ? await resolverProjetoRef.current?.(q) : null;
     if (doProjeto) {
+      // "um MD por fluxograma no editor" (01/11/2026): documentos no editor de código, nenhum desenho muda
+      if (pedeDocumentacao(q)) return documentarNoProjetoRef.current?.(q, { displayText, doProjeto });
       const plano = await planejarNoProjetoRef.current?.(q, doProjeto, displayText);
+      if (plano?.acao === "documentar") return documentarNoProjetoRef.current?.(q, { displayText, doProjeto, plano });
       if (plano?.acao === "mudar") return trabalharNoProjetoRef.current?.(q, { displayText, doProjeto, plano });
       if (!plano) {
         const semPlano = pedidoDeDesenho(q, { quadroAberto: true });
@@ -2797,7 +2801,9 @@ export default function AssistantPage() {
   // citado (o fluxo citado pelo nome), provavel (o aberto no quadro, se for desse projeto, ou o único) },
   // ou null
   resolverProjetoRef.current = async (q) => {
-    if (!citaProjeto(q) && !pedeEmTodos(q)) return null;
+    // ("faça um md por fluxograma", sem dizer "projeto": vale o projeto em uso)
+    const documentaDesenhos = pedeDocumentacao(q) && /flux|mapa|desenho|diagrama/i.test(q);
+    if (!citaProjeto(q) && !pedeEmTodos(q) && !documentaDesenhos) return null;
     try {
       if (!projetosRef.current.lista || Date.now() - projetosRef.current.em > 30_000) {
         projetosRef.current = { em: Date.now(), lista: await apiDosFluxosDaConversa.listar() };
@@ -2898,6 +2904,49 @@ export default function AssistantPage() {
     }
   };
 
+  // "faça um MD por fluxograma e mapa mental no editor" (01/11/2026): a Lisa escreve a visão geral e
+  // um .md por desenho do projeto (src/lib/trabalhoNoProjeto.js: documentarProjeto) e abre tudo no
+  // editor de código, uma aba por arquivo. Os desenhos só são lidos — nada é mudado nem salvo neles.
+  documentarNoProjetoRef.current = async (q, { displayText, doProjeto, plano = null }) => {
+    const shown = displayText || q;
+    stopSpeaking();
+    const gen = ++speechGenRef.current;
+    speechEngineRef.current = null;
+    setBusy(true);
+    setQuestion(shown);
+    setAnswer("");
+    setFontes([]);
+    setMode("listening");
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
+    const { projeto, fluxos } = doProjeto;
+    const n = fluxos.filter((f) => f.documento).length;
+    const andamento = {
+      explicacao: plano?.explicacao || `Vou escrever no editor de código a visão geral do projeto "${projeto.nome}" e um arquivo .md para ${n === 1 ? "o desenho" : `cada um dos ${n} desenhos`} — sem mexer em nenhum desenho.`,
+    };
+    addLog("[PROCESSMAP]", PU, `documentando "${projeto.nome}": visão geral + ${n} arquivo${n === 1 ? "" : "s"} .md`);
+    try {
+      const { linhas, documentos } = await documentarProjeto({
+        pedido: q, projeto, fluxos, conversa: conversaEmTexto(),
+        aoAndar: (ls) => setAnswer(textoDoAndamento(andamento, ls)),
+      });
+      for (const l of linhas) addLog("[PROCESSMAP]", l.ok ? GR : OR, `${l.nome}: ${l.estado}${l.ok ? "" : ` ${l.nota}`}`);
+      ultimoProjetoRef.current = projeto;
+      const falharam = linhas.filter((l) => l.ok === false).map((l) => l.nome);
+      const intro = documentos.length
+        ? `Escrevi ${documentos.length} arquivo${documentos.length === 1 ? "" : "s"} .md no editor de código, um por aba: a visão geral do projeto "${projeto.nome}" e um para cada desenho (fluxogramas e mapas mentais, com todas as abas). Nenhum desenho foi mudado. Cada arquivo traz conceito, estratégia do MVP, decisões, passo a passo, rotas e telas, dados, critérios de aceite e um parágrafo pronto para pedir ao Claude.${falharam.length ? `\n\nNão consegui escrever: ${falharam.join(", ")} — peça de novo que eu tento só esses.` : ""}`
+        : `Não consegui escrever os documentos do projeto "${projeto.nome}" agora (${linhas.find((l) => l.nota)?.nota || "erro"}). Nenhum desenho foi mudado.`;
+      const texto = respostaComDocumentos(intro, documentos);
+      if (documentos.length) guardarNaIde(abrirNaIde(shown), shown, texto);
+      setAnswer(texto);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
+      conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", intro);
+      if (voiceOn) enqueueSpeech(documentos.length ? `Pronto. Escrevi ${documentos.length} documentos no editor de código, um para cada desenho do projeto ${projeto.nome}, mais a visão geral.` : `Não consegui escrever os documentos agora.`, gen);
+    } finally {
+      setBusy(false);
+      setMode("idle");
+    }
+  };
+
   desenharNaTelaRef.current = async (q, { displayText, mudar = false, doProjeto = null } = {}) => {
     const shown = displayText || q;
     stopSpeaking();
@@ -2954,7 +3003,9 @@ export default function AssistantPage() {
       if (doProjeto) {
         try {
           if (alvo) {
-            const fluxo = await apiDosFluxosDaConversa.salvar(alvo.id, alvoAberto ? { documento: r.doc, forcar: true } : { documento: r.doc, versao: alvo.versao });
+            // (origem "lisa": a versão de antes fica guardada — dá para voltar pelo painel ProcessMap)
+            const daLisa = { documento: r.doc, origem: "lisa", motivo: q.replace(/\s+/g, " ").slice(0, 140) };
+            const fluxo = await apiDosFluxosDaConversa.salvar(alvo.id, alvoAberto ? { ...daLisa, forcar: true } : { ...daLisa, versao: alvo.versao });
             vinculo = { fluxo, projeto: doProjeto.projeto };
           } else {
             vinculo = await apiDosFluxosDaConversa.criar({ documento: r.doc, nome: r.titulo, projetoId: doProjeto.projeto.id, origem: "lisa" });

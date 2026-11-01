@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiDosFluxos, assinaturaDoDesenho, criarSalvador, LIMITE_DO_KEEPALIVE } from "@/lib/fluxogramasNoNavegador.js";
-import { citaProjeto, fluxoCitado, pedeEmTodos } from "@/lib/processmapNaConversa.js";
+import { citaProjeto, fluxoCitado, pedeEmTodos, pedeDocumentacao } from "@/lib/processmapNaConversa.js";
 import { pedirPlano, executarPlano, textoDoAndamento } from "@/lib/trabalhoNoProjeto.js";
 
 const api = apiDosFluxos();
@@ -78,6 +78,10 @@ export default function ProcessMapPage() {
   const [desenhando, setDesenhando] = useState(false);
   const [explicacao, setExplicacao] = useState("");
   const [aviso, setAviso] = useState("");
+  // "Versões anteriores…" (01/11/2026): { fluxo, lista (null = carregando), erro, voltando (id) }
+  const [versoes, setVersoes] = useState(null);
+  // o próximo salvamento automático é o desenho que a Lisa acabou de fazer (a versão de antes fica guardada)
+  const daLisaRef = useRef("");
   const ponte = () => quadro.current?.contentWindow?.PonteDoProof || null;
 
   // ---- a árvore de projetos ----
@@ -122,7 +126,9 @@ export default function ProcessMapPage() {
       assinatura: assinaturaDoDesenho(doc),
       gravar: (d, { versao, forcar, saindo }) => {
         const extra = saindo && JSON.stringify(d).length < LIMITE_DO_KEEPALIVE ? { keepalive: true } : undefined;
-        return api.salvar(id, { documento: d, versao, forcar }, extra);
+        const motivo = daLisaRef.current;
+        daLisaRef.current = "";
+        return api.salvar(id, { documento: d, versao, forcar, ...(motivo ? { origem: "lisa", motivo } : {}) }, extra);
       },
       aoEstado: (e) => {
         if (abertoRef.current?.id !== id) return;
@@ -386,6 +392,9 @@ export default function ProcessMapPage() {
 
   // ---- a Lisa desenha ----
 
+  // "um MD por fluxograma no editor" (01/11/2026): os .md a Lisa escreve no editor de código do Assistente
+  const PARA_DOCUMENTAR = "Os documentos .md eu escrevo no editor de código do Assistente, um por desenho, sem mexer nos desenhos: lá, peça \"no projeto <nome>, faça um md por fluxograma e mapa mental\". Aqui não mudei nada.";
+
   // Um pedido sobre o projeto ("em todos os fluxogramas", "no projeto", "no fluxo de X" que não é o
   // aberto): a Lisa planeja e trabalha em cada desenho do projeto (src/lib/trabalhoNoProjeto.js), não
   // só no aberto — "de novo, ela só fez as anotações no primeiro fluxograma" (01/11/2026).
@@ -399,6 +408,10 @@ export default function ProcessMapPage() {
     const { projeto, fluxos } = await api.lerProjeto(a.projetoId);
     setExplicacao(`Planejando o trabalho no projeto "${projeto.nome}" (${fluxos.length} desenho${fluxos.length === 1 ? "" : "s"})…`);
     const plano = await pedirPlano({ pedido: q, projeto, fluxos, aberto: a.id });
+    if (plano.acao === "documentar") {
+      setExplicacao(PARA_DOCUMENTAR);
+      return;
+    }
     if (plano.acao !== "mudar") {
       setExplicacao(plano.explicacao || "Isso parece uma pergunta sobre o projeto: pergunte na conversa do Assistente, que eu respondo com todos os desenhos dele.");
       return;
@@ -433,6 +446,11 @@ export default function ProcessMapPage() {
     const q = pedido.trim();
     const p = ponte();
     if (!q || desenhando || !p) return;
+    // pedido de .md / documento: aqui não há editor de código, e o desenho não muda
+    if (pedeDocumentacao(q)) {
+      setExplicacao(PARA_DOCUMENTAR);
+      return;
+    }
     setDesenhando(true);
     setAviso("");
     try {
@@ -459,6 +477,7 @@ export default function ProcessMapPage() {
         return;
       }
       p.nome(a.nome);
+      daLisaRef.current = q.replace(/\s+/g, " ").slice(0, 140); // a versão de antes fica guardada
       salvador.current?.mudou(p.exportar());
       await salvador.current?.agora();
       // o fluxo ainda tinha o nome de nascença: fica com o título que a Lisa deu
@@ -467,6 +486,42 @@ export default function ProcessMapPage() {
       setAviso(`A Lisa não conseguiu desenhar: ${err.message}`);
     } finally {
       setDesenhando(false);
+    }
+  }
+
+  // ---- versões anteriores (01/11/2026: "ela estragou o meu fluxograma da versão desktop") ----
+
+  async function verVersoes(f) {
+    setMenu(null);
+    setVersoes({ fluxo: f, lista: null, erro: "", voltando: null });
+    try {
+      const lista = await api.versoes(f.id);
+      setVersoes((v) => (v?.fluxo.id === f.id ? { ...v, lista } : v));
+    } catch (err) {
+      setVersoes((v) => (v?.fluxo.id === f.id ? { ...v, lista: [], erro: err.message } : v));
+    }
+  }
+
+  async function voltarPara(v) {
+    const f = versoes?.fluxo;
+    if (!f || versoes.voltando) return;
+    setVersoes((x) => ({ ...x, voltando: v.id, erro: "" }));
+    const eOAberto = abertoRef.current?.id === f.id;
+    try {
+      if (eOAberto) {
+        // o que está na tela vai antes (fica guardado como versão), e o salvamento para enquanto volta
+        await salvador.current?.agora();
+        salvador.current?.parar();
+        salvador.current = null;
+      }
+      await api.voltarVersao(f.id, v.id);
+      await recarregarLista();
+      if (eOAberto) await abrirFluxo(f.id, { deNovo: true });
+      setVersoes(null);
+      setExplicacao(`"${f.nome}" voltou para a versão ${v.versao} (${quando(v.criadoEm)} ${hora(v.criadoEm)}, ${v.formas} formas). A versão de antes ficou guardada: dá para desfazer em "Versões anteriores…".`);
+    } catch (err) {
+      if (eOAberto && !salvador.current) await abrirFluxo(f.id, { deNovo: true }).catch(() => {});
+      setVersoes((x) => (x ? { ...x, voltando: null, erro: err.message } : x));
     }
   }
 
@@ -617,6 +672,7 @@ export default function ProcessMapPage() {
                         {menu === f.id && (
                           <Menu aoFechar={() => setMenu(null)} itens={[
                             { rotulo: "Duplicar", fazer: () => duplicar(f) },
+                            { rotulo: "Versões anteriores…", fazer: () => verVersoes(f) },
                             ...(outros.length ? [{ titulo: "Mover para" }, ...outros.map((o) => ({ rotulo: `→ ${o.nome}`, fazer: () => mudarFluxo(f.id, { projetoId: o.id }) }))] : []),
                             { rotulo: "Excluir", perigo: true, fazer: () => excluirFluxo(f) },
                           ]} />
@@ -663,6 +719,7 @@ export default function ProcessMapPage() {
                 </div>
               )}
             </div>
+            <button type="button" className="bb-fluxos-botao" disabled={!aberto} onClick={() => aberto && verVersoes(aberto)} title="as versões guardadas deste desenho — voltar para uma delas">Versões</button>
             <button type="button" className="bb-fluxos-botao" onClick={() => arquivo.current?.click()} title="abrir um .json do ProcessMap como fluxograma novo">Importar</button>
             <button type="button" className="bb-fluxos-botao" onClick={exportar} title="baixar este desenho em .json">Exportar</button>
             <input ref={arquivo} type="file" accept=".json,application/json" hidden onChange={importarArquivo} />
@@ -674,6 +731,34 @@ export default function ProcessMapPage() {
             <span>Este fluxograma foi salvo em outra aba ou aparelho{estado.fluxo?.atualizadoEm ? ` às ${hora(estado.fluxo.atualizadoEm)}` : ""}.</span>
             <button type="button" className="bb-fluxos-botao" onClick={() => salvador.current?.ficarComAMinha()}>Ficar com a minha</button>
             <button type="button" className="bb-fluxos-botao" onClick={() => aberto && abrirFluxo(aberto.id, { deNovo: true })}>Abrir a de lá</button>
+          </div>
+        )}
+        {versoes && (
+          <div className="bb-fluxos-versoes" role="dialog" aria-label={`versões anteriores de ${versoes.fluxo.nome}`}>
+            <div className="bb-fluxos-versoes-topo">
+              <b>Versões anteriores · {versoes.fluxo.nome}</b>
+              <button type="button" onClick={() => setVersoes(null)} aria-label="fechar as versões">×</button>
+            </div>
+            {versoes.erro && <p className="bb-fluxos-versoes-erro">{versoes.erro}</p>}
+            {versoes.lista === null && <p className="bb-fluxos-vazio">Carregando…</p>}
+            {versoes.lista?.length === 0 && !versoes.erro && (
+              <p className="bb-fluxos-vazio">Nenhuma versão guardada ainda. A partir de agora, a versão de antes fica guardada sempre que a Lisa muda o desenho, quando somem formas e a cada 10 minutos de trabalho.</p>
+            )}
+            {versoes.lista?.length > 0 && (
+              <ul>
+                {versoes.lista.map((v) => (
+                  <li key={v.id}>
+                    <span>
+                      <b>v{v.versao}</b> · {quando(v.criadoEm)} {hora(v.criadoEm)} · {v.formas} forma{v.formas === 1 ? "" : "s"}
+                      {v.motivo && <small>{v.motivo}</small>}
+                    </span>
+                    <button type="button" className="bb-fluxos-botao" disabled={Boolean(versoes.voltando)} onClick={() => voltarPara(v)}>
+                      {versoes.voltando === v.id ? "voltando…" : "voltar para esta"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
         {aviso && (

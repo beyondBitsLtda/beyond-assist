@@ -83,6 +83,67 @@ export function arvoreDeProjetos(projetos, fluxos) {
 const COLUNAS_DO_FLUXO = "id, projeto_id, nome, origem, modo, formas, versao, atualizado_em, criado_em";
 
 // Erro com o status HTTP que a rota devolve (404, 409...), para a tela saber o que aconteceu.
+// ---- versões anteriores (01/11/2026: "ela estragou o meu fluxograma das funcionalidades da versão
+// desktop" — a Lisa gravou por cima uma aba pela metade, e só existia a última versão) ----
+//
+// Antes de gravar um documento por cima, a versão que está no banco é guardada em
+// lisa_fluxogramas_versoes (db/fluxogramas_versoes.sql) quando: a Lisa está gravando (ou a pessoa
+// está voltando a uma versão), somem formas (QUEDA ou mais), ou a última guardada tem mais de
+// INTERVALO — o salvamento automático grava a cada poucos segundos, e guardar todas seria demais.
+export const VERSOES = { guardar: 60, intervaloMs: 10 * 60_000, queda: 3 };
+
+/** Por que guardar a versão de agora antes de gravar por cima ("" = não guardar). Puro (testado). */
+export function guardarAntes({ origem, formasAntes = 0, formasDepois = null, ultimaEm = null, agoraMs = Date.now() }) {
+  if (origem === "lisa") return "antes de a Lisa mudar";
+  if (origem === "volta") return "antes de voltar a uma versão anterior";
+  if (formasDepois != null && Number(formasAntes) - Number(formasDepois) >= VERSOES.queda) return "antes de sumirem formas";
+  if (!ultimaEm || agoraMs - new Date(ultimaEm).getTime() >= VERSOES.intervaloMs) return "automática";
+  return "";
+}
+
+// uma falha aqui não impede a gravação: a versão anterior é a rede de segurança, não o trabalho
+async function guardarVersao(dono, atual, { origem, motivo, formasDepois }) {
+  try {
+    const tabela = () => supabase.from("lisa_fluxogramas_versoes");
+    const { data: ultima } = await tabela().select("criado_em").eq("fluxo_id", atual.id)
+      .order("criado_em", { ascending: false }).limit(1).maybeSingle();
+    const porque = guardarAntes({ origem, formasAntes: atual.formas, formasDepois, ultimaEm: ultima?.criado_em });
+    if (!porque) return;
+    const { data: velho } = await supabase.from("lisa_fluxogramas").select("documento").eq("id", atual.id).eq("dono_id", dono).maybeSingle();
+    if (!velho?.documento) return;
+    const { error } = await tabela().insert({
+      fluxo_id: atual.id, dono_id: dono, versao: atual.versao, nome: atual.nome || "", documento: velho.documento,
+      modo: atual.modo || "diagram", formas: atual.formas || 0, motivo: nomeLimpo(`${porque}${motivo ? `: ${motivo}` : ""}`, 200),
+    });
+    if (error) return;
+    // as mais antigas saem (ficam as VERSOES.guardar mais novas)
+    const { data: sobra } = await tabela().select("id").eq("fluxo_id", atual.id)
+      .order("criado_em", { ascending: false }).range(VERSOES.guardar, VERSOES.guardar + 200);
+    if (sobra?.length) await tabela().delete().in("id", sobra.map((v) => v.id));
+  } catch {
+    // (a tabela pode ainda não existir: a gravação segue)
+  }
+}
+
+/** As versões anteriores de um fluxo, da mais nova para a mais antiga (sem os documentos). */
+export async function listarVersoes(dono, id) {
+  if (!idValido(id)) throw new ErroDosFluxos("fluxograma inválido", 400);
+  const { data, error } = await supabase.from("lisa_fluxogramas_versoes").select("id, versao, nome, formas, modo, motivo, criado_em")
+    .eq("fluxo_id", id).eq("dono_id", dono).order("criado_em", { ascending: false }).limit(VERSOES.guardar);
+  if (error) throw new ErroDosFluxos(`não consegui ler as versões: ${error.message}`, 500);
+  return (data || []).map((v) => ({ id: v.id, versao: v.versao, nome: v.nome, formas: v.formas, modo: v.modo, motivo: v.motivo, criadoEm: v.criado_em }));
+}
+
+/** Volta o fluxo para uma versão anterior (a de agora fica guardada antes: dá para desfazer). */
+export async function voltarVersao(dono, id, versaoId) {
+  if (!idValido(id) || !idValido(versaoId)) throw new ErroDosFluxos("versão inválida", 400);
+  const { data, error } = await supabase.from("lisa_fluxogramas_versoes").select("documento, versao, criado_em")
+    .eq("id", versaoId).eq("fluxo_id", id).eq("dono_id", dono).maybeSingle();
+  if (error) throw new ErroDosFluxos(`não consegui ler a versão: ${error.message}`, 500);
+  if (!data) throw new ErroDosFluxos("essa versão não existe mais", 404);
+  return salvarFluxo(dono, id, { documento: data.documento, forcar: true, origem: "volta", motivo: `para a versão ${data.versao}` });
+}
+
 export class ErroDosFluxos extends Error {
   constructor(mensagem, status = 400, extra = {}) {
     super(mensagem);
@@ -208,11 +269,12 @@ export async function criarFluxo(dono, { projetoId, projetoNovo, nome, documento
  * Grava num fluxo que já existe: o documento, o nome e/ou o projeto (mover). `versao` é a versão
  * em que a tela se baseou; se o banco já está noutra (outra aba gravou no meio), nada é gravado e
  * volta um erro 409 com o fluxo como está lá. `forcar` grava por cima mesmo assim (a pessoa
- * escolheu ficar com a dela).
+ * escolheu ficar com a dela). `origem` ("lisa" quando é a Lisa gravando) e `motivo` (o pedido)
+ * decidem se a versão de antes fica guardada (guardarAntes).
  */
-export async function salvarFluxo(dono, id, { documento, nome, projetoId, versao, forcar = false } = {}) {
+export async function salvarFluxo(dono, id, { documento, nome, projetoId, versao, forcar = false, origem = "pessoa", motivo = "" } = {}) {
   if (!idValido(id)) throw new ErroDosFluxos("fluxograma inválido", 400);
-  const { data: atual, error: erroAtual } = await supabase.from("lisa_fluxogramas").select("id, projeto_id, versao")
+  const { data: atual, error: erroAtual } = await supabase.from("lisa_fluxogramas").select("id, projeto_id, versao, nome, formas, modo")
     .eq("id", id).eq("dono_id", dono).eq("arquivado", false).maybeSingle();
   if (erroAtual) throw new ErroDosFluxos(`não consegui ler o fluxograma: ${erroAtual.message}`, 500);
   if (!atual) throw new ErroDosFluxos("esse fluxograma não existe mais", 404);
@@ -230,6 +292,9 @@ export async function salvarFluxo(dono, id, { documento, nome, projetoId, versao
     mudancas.documento = mudancas.nome ? { ...doc.documento, name: mudancas.nome } : doc.documento;
     mudancas.modo = doc.modo;
     mudancas.formas = doc.formas;
+    await guardarVersao(dono, atual, {
+      origem: ["lisa", "volta"].includes(origem) ? origem : "pessoa", motivo: nomeLimpo(motivo, 160), formasDepois: doc.formas,
+    });
   }
   if (projetoId !== undefined && projetoId !== atual.projeto_id) {
     await projetoDoDono(dono, projetoId);

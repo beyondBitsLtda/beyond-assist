@@ -2,6 +2,7 @@ import { desenharDiagrama, desenharMapaMental } from "@/lib/gemini.js";
 import {
   validarDesenho, montarDocumento, estruturaDoDocumento, documentoValido,
   vaiSerMapaMental, validarMapaMental, montarMapaMental, estruturaDoMapa, descreverDiagrama,
+  semPerdas, PEDE_PARA_TIRAR,
 } from "@/lib/diagramaDaLisa.js";
 import { jsonResponse } from "@/lib/http.js";
 
@@ -40,14 +41,17 @@ export async function POST(req) {
       });
       const mapa = validarMapaMental(bruto);
       if (!mapa.topicos.length) throw new Error("a Lisa não montou nenhum tópico — tente pedir de outro jeito");
-      return jsonResponse({ ok: true, doc: montarMapaMental(mapa, mapaNaTela ? atual : null), titulo: mapa.titulo, colecao: null, explicacao: mapa.explicacao });
+      // a trava contra perda: sem pedido de tirar nada, tópico que existia não some
+      const manterTudo = mapaNaTela && !PEDE_PARA_TIRAR.test(pedido);
+      return jsonResponse({ ok: true, doc: montarMapaMental(mapa, mapaNaTela ? atual : null, { manterTudo }), titulo: mapa.titulo, colecao: null, explicacao: mapa.explicacao });
     }
     // (um mapa mental na tela não é base para um fluxograma: as abas dele não têm o que manter)
     const base = mapaNaTela ? null : atual;
     const estrutura = base ? estruturaDoDocumento(base) : null;
     const bruto = await desenharDiagrama({ pedido, estrutura, conversa, contexto, projeto });
-    const desenho = validarDesenho(bruto);
-    return jsonResponse({ ok: true, doc: montarDocumento(desenho, base), titulo: desenho.titulo, colecao: desenho.colecao, explicacao: desenho.explicacao });
+    // a trava contra perda: sem pedido de tirar nada, o que o modelo esqueceu volta para o lugar
+    const { desenho, devolvidas } = semPerdas(validarDesenho(bruto), base, pedido);
+    return jsonResponse({ ok: true, doc: montarDocumento(desenho, base), titulo: desenho.titulo, colecao: desenho.colecao, explicacao: desenho.explicacao, devolvidas });
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err?.message || err) }, 500);
   }

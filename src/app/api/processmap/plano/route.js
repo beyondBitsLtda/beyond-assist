@@ -1,5 +1,5 @@
 import { planejarNoProjeto } from "@/lib/gemini.js";
-import { validarPlano, pedeEmTodos, faltandoNoPlano, completarPlano } from "@/lib/processmapNaConversa.js";
+import { validarPlano, pedeEmTodos, faltandoNoPlano, completarPlano, pedeDocumentacao } from "@/lib/processmapNaConversa.js";
 import { jsonResponse } from "@/lib/http.js";
 
 export const runtime = "nodejs";
@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/processmap/plano (01/11/2026) — a Lisa planeja um pedido feito sobre um projeto do ProcessMap.
  *   { pedido, projeto (os desenhos em texto), fluxos: [{ id, nome, modo, formas }], aberto?, conversa? }
- * Devolve { plano: { acao: "mudar" | "responder", explicacao, operacoes: [{ fluxo, nome, tipo, pedido }] } }.
+ * Devolve { plano: { acao: "mudar" | "responder" | "documentar", explicacao, operacoes: [{ fluxo, nome, tipo, pedido }] } }.
+ * "documentar" (os .md no editor, sem mexer nos desenhos): /api/processmap/documento.
  * Quem executa as operações (uma por desenho, por /api/diagrama) e salva é a página do Assistente.
  */
 export async function POST(req) {
@@ -25,6 +26,8 @@ export async function POST(req) {
       aberto: String(body?.aberto || ""),
       conversa: String(body?.conversa || ""),
     };
+    // pedido de .md / documento no editor: nunca vira mudança de desenho (a Lisa mexia nos desenhos)
+    if (pedeDocumentacao(pedido)) return jsonResponse({ ok: true, plano: { acao: "documentar", explicacao: "", operacoes: [] } });
     let plano = validarPlano(await planejarNoProjeto(base), fluxos);
     // "em todos os fluxogramas": o desenho que o plano esqueceu (o modelo deixava os mapas mentais de
     // fora) ganha uma segunda volta, só para os que faltaram

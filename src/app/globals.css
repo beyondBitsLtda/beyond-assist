@@ -725,6 +725,17 @@ button.bb-fluxos-estado { border: 1px solid rgba(255, 157, 61, 0.4); background:
 .bb-fluxos-so-celular { display: none; }
 .bb-fluxos-aviso { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 14px; font-size: 13px; color: var(--bb-texto); background: rgba(255, 157, 61, 0.08); border-bottom: 1px solid rgba(255, 157, 61, 0.28); }
 .bb-fluxos-aviso span { flex: 1; min-width: 200px; }
+/* as versões anteriores do fluxo aberto ou escolhido na lista (01/11/2026) */
+.bb-fluxos-versoes { max-height: 280px; overflow: auto; padding: 8px 14px 10px; border-bottom: 1px solid var(--bb-linha); background: var(--bb-superficie); }
+.bb-fluxos-versoes-topo { display: flex; align-items: center; gap: 10px; padding-bottom: 6px; font-size: 13.5px; color: var(--bb-texto); }
+.bb-fluxos-versoes-topo b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.bb-fluxos-versoes-topo button { border: 0; background: none; color: var(--bb-texto-3); font-size: 18px; line-height: 1; cursor: pointer; }
+.bb-fluxos-versoes ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.bb-fluxos-versoes li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 9px; background: var(--bb-superficie-2); }
+.bb-fluxos-versoes li > span { flex: 1; min-width: 0; font-size: 13px; color: var(--bb-texto-2); }
+.bb-fluxos-versoes li > span b { color: var(--bb-texto); font-family: var(--bb-mono); font-weight: 600; }
+.bb-fluxos-versoes li small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--bb-texto-3); }
+.bb-fluxos-versoes-erro { margin: 0 0 6px; font-size: 13px; color: var(--bb-aviso); }
 .bb-fluxos-palco { position: relative; flex: 1; min-height: 0; background: #050b10; }
 .bb-fluxos-palco iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
 .bb-fluxos-desenhando { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(5, 11, 16, 0.6); color: var(--bb-texto); font-size: 14px; letter-spacing: 0.02em; }

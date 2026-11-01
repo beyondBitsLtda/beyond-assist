@@ -130,8 +130,56 @@ export function validarPlano(bruto, fluxos) {
       pedido,
     });
   }
+  // "documentar": a pessoa quer TEXTO a partir dos desenhos (os .md no editor) — nenhum desenho muda
+  if (bruto?.acao === "documentar") return { acao: "documentar", explicacao: linha(bruto?.explicacao, 600), operacoes: [] };
   const mudar = bruto?.acao === "mudar" && operacoes.length > 0;
   return { acao: mudar ? "mudar" : "responder", explicacao: linha(bruto?.explicacao, 600), operacoes: mudar ? operacoes : [] };
+}
+
+// ---- documentar (01/11/2026: "faça um arquivo MD no editor explicando a estratégia e o conceito do
+// MVP, uma aba de MD por fluxograma e mapa mental — vou usar para pedir ao Claude construir as rotas";
+// a Lisa mexeu nos desenhos em vez disso, e estragou um) ----
+//
+// Pedido de documento é reconhecido sem o modelo (não pode virar mudança de desenho por engano): fala
+// de MD/markdown/README, ou do editor de código junto de arquivo/documento/página, ou de documentação
+// sem falar de nota no desenho. A Lisa escreve um .md por desenho do projeto, mais a visão geral.
+
+// (o editor sem folga para erro: "editar a aba" é mudar o desenho)
+const NO_EDITOR = ["editor", "ide"];
+const DE_TEXTO = ["arquivo", "arquivos", "documento", "documentos", "pagina", "paginas", "aba", "abas", "spec", "especificacao", "especificacoes", "escreva", "escrever", "escreve"];
+// (só o verbo, escrito igual: "documento" e "documentação" também são assunto de fluxo — "o fluxo de
+// aprovação de documentos" — e o resto o plano decide)
+const DOCUMENTAR = ["documente", "documentar", "documenta", "documentem"];
+const NO_DESENHO = ["nota", "notas", "anotacao", "anotacoes", "comentario", "comentarios"];
+
+/** O pedido é escrever documentos (.md no editor) a partir dos desenhos, e não mudar os desenhos? */
+export function pedeDocumentacao(pedido) {
+  const p = palavrasDe(pedido);
+  const tem = (lista) => p.some((x) => lista.some((d) => parecida(x, d)));
+  if (p.some((x) => x === "md" || x === "readme") || p.some((x) => x.length >= 7 && parecida(x, "markdown"))) return true;
+  if (p.some((x) => NO_EDITOR.includes(x)) && tem(DE_TEXTO)) return true;
+  return p.some((x) => DOCUMENTAR.includes(x)) && !tem(NO_DESENHO);
+}
+
+const fatia = (s) => semAcento(s).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50);
+
+/** O caminho do .md de um desenho: docs/<projeto>/01-<desenho>.md (0 = a visão geral). */
+export function arquivoDoDocumento(projeto, desenho, i) {
+  const pasta = `docs/${fatia(projeto?.nome) || "projeto"}`;
+  return i === 0 ? `${pasta}/00-visao-geral.md` : `${pasta}/${String(i).padStart(2, "0")}-${fatia(desenho?.nome) || "desenho"}.md`;
+}
+
+/**
+ * A resposta com os documentos, cada um num bloco "````markdown docs/…/01-x.md" (quatro crases: o .md
+ * pode ter blocos de três dentro) — o editor de código abre uma aba por bloco. Uma linha de quatro ou
+ * mais crases dentro do documento fecharia o bloco antes da hora: vira três.
+ */
+export function respostaComDocumentos(intro, documentos) {
+  const blocos = documentos.map((d) => {
+    const corpo = String(d.markdown || "").replace(/\r/g, "").replace(/^(\s*)`{4,}/gm, "$1```").trim();
+    return `${d.legenda ? `${d.legenda}\n\n` : ""}\`\`\`\`markdown ${d.arquivo}\n${corpo}\n\`\`\`\``;
+  });
+  return [String(intro || "").trim(), ...blocos].filter(Boolean).join("\n\n");
 }
 
 // ---- "em todos os fluxogramas" (01/11/2026: "ela não criou comentários detalhados em todos os

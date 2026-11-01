@@ -5,15 +5,16 @@
 
 import fs from "node:fs";
 import {
-  LIMITES, idValido, nomeLimpo, donoDe, documentoParaGuardar, resumoDoFluxo, arvoreDeProjetos,
+  LIMITES, idValido, nomeLimpo, donoDe, documentoParaGuardar, resumoDoFluxo, arvoreDeProjetos, guardarAntes, VERSOES,
 } from "../src/lib/fluxogramas.js";
 import { apiDosFluxos, assinaturaDoDesenho, criarSalvador, enderecoDoFluxo } from "../src/lib/fluxogramasNoNavegador.js";
 import { GRUPOS_DE_PAINEIS } from "../src/lib/navegacao.js";
 import {
   citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, secaoDoProjeto, validarPlano, LIMITE_DE_OPERACOES,
-  pedeEmTodos, faltandoNoPlano, completarPlano,
+  pedeEmTodos, faltandoNoPlano, completarPlano, pedeDocumentacao, arquivoDoDocumento, respostaComDocumentos,
 } from "../src/lib/processmapNaConversa.js";
-import { pedirPlano, executarPlano, textoDoAndamento } from "../src/lib/trabalhoNoProjeto.js";
+import { pedirPlano, executarPlano, textoDoAndamento, documentarProjeto } from "../src/lib/trabalhoNoProjeto.js";
+import { trechosDaResposta, respostaSemCodigo } from "../src/lib/codigoNaResposta.js";
 import { montarDocumento, validarDesenho, tamanhoDaNota } from "../src/lib/diagramaDaLisa.js";
 
 let falhas = 0;
@@ -403,7 +404,97 @@ console.log("executar o plano (a conversa e a barra do painel ProcessMap usam o 
   conferir("a barra do painel ProcessMap trabalha no projeto inteiro quando o pedido fala dele", /falaDoProjeto\(q, doProjeto\.fluxos\)/.test(painel) && /await trabalharNoProjeto\(q, abertoRef\.current\)/.test(painel) && /executarPlano\(\{/.test(painel));
   conferir("e para o salvamento do fluxo aberto enquanto a Lisa grava, reabrindo depois", /salvador\.current\?\.parar\(\);\s*salvador\.current = null;/.test(painel) && /await abrirFluxo\(a\.id, \{ deNovo: true \}\)/.test(painel));
   const conversaPagina = ler("src/app/(panels)/assistant/page.js");
-  conferir("na conversa, \"do projeto\" sem nome é o projeto em uso (o do quadro ou o último)", /projetoCitado\(q, lista\) \|\| \(emUso && lista\.find/.test(conversaPagina) && /if \(!citaProjeto\(q\) && !pedeEmTodos\(q\)\) return null;/.test(conversaPagina));
+  conferir("na conversa, \"do projeto\" sem nome é o projeto em uso (o do quadro ou o último)", /projetoCitado\(q, lista\) \|\| \(emUso && lista\.find/.test(conversaPagina) && /if \(!citaProjeto\(q\) && !pedeEmTodos\(q\) && !documentaDesenhos\) return null;/.test(conversaPagina));
+}
+
+console.log("documentar: um .md por desenho no editor (01/11/2026: a Lisa mexeu nos desenhos em vez de escrever os MD)");
+{
+  const pedidoReal = "Lisa faça um arquivo MD no editor explicando toda anossa estrategia e conceito da construçã do noss MVP baseaod no projeto process map Produto lisa faal uamaba de MD por flugrama emapa mental que etmos eu viu usar isso para pedir o claud eara construir a rota e formar o nosso mvp";
+  conferir("o pedido de verdade (com os erros) é reconhecido como documentar", pedeDocumentacao(pedidoReal));
+  conferir("e outros jeitos de pedir", ["escreva um markdown de cada fluxograma", "gere o README do projeto", "no editor, escreva um arquivo por fluxo", "documente os fluxos do projeto", "faça um .md por mapa mental", "crie uma pagina no editor de codigo para cada fluxo"].every(pedeDocumentacao));
+  conferir("pedido de mudar o desenho não é documentar", !["crie uma nota de texto em tdoso os fluogramas descrevendo o conceito", "documente nas notas de cada fluxo as decisões", "crie um fluxo de aprovação de documentos", "editar a aba Desktop", "pinte de verde as decisões", "crie uma aba com o detalhe da aprovação", "no projeto Produto Lisa, ponha a especificação do login no fluxo"].some(pedeDocumentacao));
+  conferir("o plano pode decidir \"documentar\" (e aí nenhuma operação)", validarPlano({ acao: "documentar", explicacao: "Vou escrever.", operacoes: [{ fluxo: "x", pedido: "y" }] }, []).acao === "documentar" && validarPlano({ acao: "documentar", operacoes: [{ fluxo: "x", pedido: "y" }] }, []).operacoes.length === 0);
+  const rotaDoPlano = ler("src/app/api/processmap/plano/route.js");
+  conferir("a rota do plano responde \"documentar\" sem perguntar ao modelo", /if \(pedeDocumentacao\(pedido\)\) return jsonResponse\(\{ ok: true, plano: \{ acao: "documentar"/.test(rotaDoPlano));
+  conferir("o planejador conhece a ação documentar", /"documentar" quando a pessoa quer um TEXTO/.test(ler("src/lib/gemini.js")) && /enum: \["mudar", "responder", "documentar"\]/.test(ler("src/lib/gemini.js")));
+
+  const projeto = { id: "p1", nome: "Produto Lisa" };
+  conferir("os caminhos: docs/<projeto>/00-visao-geral.md e 01-<desenho>.md", arquivoDoDocumento(projeto, null, 0) === "docs/produto-lisa/00-visao-geral.md" && arquivoDoDocumento(projeto, { nome: "Fluxo de Uso MVP - Lisa Assistant" }, 1) === "docs/produto-lisa/01-fluxo-de-uso-mvp-lisa-assistant.md");
+
+  // a resposta: um bloco de quatro crases por arquivo; cada um vira uma aba do editor
+  const resposta = respostaComDocumentos("Escrevi 2 arquivos.", [
+    { arquivo: "docs/produto-lisa/00-visao-geral.md", legenda: "**00-visao-geral.md** — a visão geral.", markdown: "# Produto Lisa\n\n```bash\nnpm run dev\n```\n\nFim." },
+    { arquivo: "docs/produto-lisa/01-fluxo.md", legenda: "**01-fluxo.md** — o fluxo.", markdown: "# Fluxo\n````\nquatro crases dentro\n````\n## Rotas" },
+  ]);
+  const { trechos } = trechosDaResposta(resposta);
+  conferir("o editor abre uma aba por arquivo, com o nome do arquivo", trechos.length === 2 && trechos.map((t) => t.rotulo).join() === "00-visao-geral.md,01-fluxo.md" && trechos.every((t) => t.linguagem === "markdown" && t.completo));
+  conferir("o bloco de código de dentro do .md fica inteiro no arquivo", /```bash\nnpm run dev\n```\n\nFim\./.test(trechos[0].codigo));
+  conferir("quatro crases dentro do .md não quebram a aba", /## Rotas$/.test(trechos[1].codigo) && !/````/.test(trechos[1].codigo));
+  conferir("a conversa mostra o texto, não os arquivos", /^Escrevi 2 arquivos\./.test(respostaSemCodigo(resposta)) && !/npm run dev/.test(respostaSemCodigo(resposta)));
+
+  // documentarProjeto com servidor falso: lê, escreve, e NUNCA grava desenho
+  const fluxos = [
+    { id: "mvp", nome: "Fluxo de Uso MVP", modo: "diagram", formas: 9, documento: { name: "Fluxo de Uso MVP", mode: "diagram", activePage: "desk", pages: [{ id: "desk", name: "Fluxo Desktop", shapes: [{ id: "n", type: "note", x: 0, y: 0, w: 360, h: 200, text: "• Conceito: " + "c".repeat(900) }], connections: [] }, { id: "mob", name: "Fluxo Mobile", shapes: [{ id: "i", type: "terminal", x: 0, y: 0, w: 160, h: 60, text: "Início" }], connections: [] }] } },
+    { id: "nucleo", nome: "Núcleo", modo: "mindmap", formas: 3, documento: { mode: "mindmap", name: "Núcleo", pages: [{ id: "p1", shapes: [{ id: "root", type: "mmRoot", text: "Lisa" }, { id: "a", type: "mmNode", parent: "root", text: "Voz" }] }] } },
+    { id: "falha", nome: "Este dá erro", modo: "diagram", formas: 1, documento: { pages: [{ id: "p1", shapes: [{ id: "x", type: "process", x: 0, y: 0, w: 160, h: 60, text: "X" }] }] } },
+  ];
+  const chamadas = [];
+  let aoMesmoTempo = 0, pico = 0;
+  const buscar = async (url, init) => {
+    const corpo = JSON.parse(init.body);
+    chamadas.push({ url, corpo, metodo: init.method });
+    aoMesmoTempo++; pico = Math.max(pico, aoMesmoTempo);
+    await new Promise((r) => setTimeout(r, 5));
+    aoMesmoTempo--;
+    if (corpo.desenho?.nome === "Este dá erro") return { ok: false, status: 500, json: async () => ({ ok: false, error: "o modelo caiu" }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true, markdown: `# ${corpo.desenho?.nome || "Visão geral"}\n\nTexto.` }) };
+  };
+  const andamentos = [];
+  const r = await documentarProjeto({ pedido: pedidoReal, projeto, fluxos, buscar, aoAndar: (ls) => andamentos.push(ls.map((l) => l.estado).join("|")) });
+  conferir("só /api/processmap/documento é chamado — nenhum desenho é gravado", chamadas.every((c) => c.url === "/api/processmap/documento"));
+  conferir("a visão geral e um arquivo por desenho, na ordem (o que deu erro fica de fora)", r.documentos.map((d) => d.arquivo.split("/").pop()).join() === "00-visao-geral.md,01-fluxo-de-uso-mvp.md,02-nucleo.md" && r.linhas[3].ok === false && /o modelo caiu/.test(r.linhas[3].nota));
+  const doMvp = chamadas.find((c) => c.corpo.desenho?.nome === "Fluxo de Uso MVP").corpo;
+  conferir("cada desenho vai inteiro: todas as abas e a anotação sem corte", /ABA "Fluxo Desktop"/.test(doMvp.desenho.descricao) && /ABA "Fluxo Mobile"/.test(doMvp.desenho.descricao) && doMvp.desenho.descricao.includes("c".repeat(900)));
+  conferir("o mapa mental vai como mapa mental", chamadas.find((c) => c.corpo.desenho?.nome === "Núcleo").corpo.desenho.tipo === "mapa mental");
+  conferir("a visão geral recebe a lista dos arquivos", chamadas.find((c) => !c.corpo.desenho).corpo.arquivos.map((a) => a.arquivo.split("/").pop()).join() === "01-fluxo-de-uso-mvp.md,02-nucleo.md,03-este-da-erro.md");
+  conferir("escreve alguns ao mesmo tempo (não um por um)", pico >= 2 && pico <= 3);
+  conferir("a legenda diz quantas abas o desenho tem", /"Fluxo de Uso MVP" \(fluxograma, 2 abas\)/.test(r.documentos[1].legenda));
+  conferir("o andamento aparece a cada passo", andamentos.some((a) => a.includes("escrevendo…")) && andamentos.at(-1).split("|").every((x) => x === "escrito" || x === "não deu"));
+
+  const conversaPagina = ler("src/app/(panels)/assistant/page.js");
+  conferir("na conversa: pedido de documento vai para documentar ANTES do plano de mudar", /if \(pedeDocumentacao\(q\)\) return documentarNoProjetoRef\.current\?\.\(q, \{ displayText, doProjeto \}\);\s*const plano = await planejarNoProjetoRef/.test(conversaPagina) && /plano\?\.acao === "documentar"\) return documentarNoProjetoRef/.test(conversaPagina));
+  conferir("e os arquivos vão para o editor de código", /guardarNaIde\(abrirNaIde\(shown\), shown, texto\)/.test(conversaPagina) && /respostaComDocumentos\(intro, documentos\)/.test(conversaPagina));
+  const painel = ler("src/app/(panels)/fluxogramas/page.js");
+  conferir("no painel ProcessMap, pedido de documento não mexe no desenho", /if \(pedeDocumentacao\(q\)\) \{\s*setExplicacao\(PARA_DOCUMENTAR\);\s*return;/.test(painel) && /plano\.acao === "documentar"/.test(painel));
+}
+
+console.log("versões anteriores (01/11/2026: \"ela estragou o meu fluxograma da versão desktop\")");
+{
+  const t0 = Date.parse("2026-11-01T12:00:00Z");
+  const ha = (min) => new Date(t0 - min * 60_000).toISOString();
+  conferir("a Lisa gravando: a versão de antes sempre fica", guardarAntes({ origem: "lisa", formasAntes: 9, formasDepois: 10, ultimaEm: ha(1), agoraMs: t0 }) === "antes de a Lisa mudar");
+  conferir("voltar a uma versão também guarda a de agora (dá para desfazer)", guardarAntes({ origem: "volta", formasAntes: 2, formasDepois: 9, ultimaEm: ha(0), agoraMs: t0 }) !== "");
+  conferir("sumiram formas (3 ou mais): guarda, mesmo logo depois de outra", guardarAntes({ origem: "pessoa", formasAntes: 9, formasDepois: 2, ultimaEm: ha(1), agoraMs: t0 }) === "antes de sumirem formas");
+  conferir("a pessoa desenhando: no máximo uma a cada 10 minutos", guardarAntes({ origem: "pessoa", formasAntes: 9, formasDepois: 10, ultimaEm: ha(3), agoraMs: t0 }) === "" && guardarAntes({ origem: "pessoa", formasAntes: 9, formasDepois: 10, ultimaEm: ha(11), agoraMs: t0 }) === "automática" && guardarAntes({ origem: "pessoa", formasAntes: 9, formasDepois: 9, ultimaEm: null, agoraMs: t0 }) === "automática");
+  conferir("ficam as 60 mais novas de cada fluxo", VERSOES.guardar === 60);
+
+  const banco = ler("src/lib/fluxogramas.js");
+  conferir("a gravação guarda a versão de antes ANTES de gravar por cima, e falhar nisso não impede a gravação", /await guardarVersao\(dono, atual, \{/.test(banco) && /catch \{\s*\/\/ \(a tabela pode ainda não existir/.test(banco));
+  conferir("voltar é gravar a versão escolhida por cima, guardando a de agora", /salvarFluxo\(dono, id, \{ documento: data\.documento, forcar: true, origem: "volta"/.test(banco));
+  const sql = ler("db/fluxogramas_versoes.sql");
+  conferir("a tabela das versões: do fluxo (some junto), com dono, documento e motivo, e RLS", /create table if not exists public\.lisa_fluxogramas_versoes/.test(sql) && /references public\.lisa_fluxogramas \(id\) on delete cascade/.test(sql) && /enable row level security/.test(sql));
+  conferir("a rota lista e volta", fs.existsSync("src/app/api/fluxogramas/[id]/versoes/route.js") && /export async function GET/.test(ler("src/app/api/fluxogramas/[id]/versoes/route.js")) && /voltarVersao\(dono, id, versaoId\)/.test(ler("src/app/api/fluxogramas/[id]/versoes/route.js")));
+
+  const chamadas = [];
+  const api = apiDosFluxos(async (url, init) => { chamadas.push({ url, metodo: init?.method || "GET", corpo: init?.body ? JSON.parse(init.body) : null }); return { ok: true, status: 200, json: async () => ({ ok: true, versoes: [{ id: "v1" }], fluxo: { id: "f1", versao: 9 } }) }; });
+  const lista = await api.versoes("f1");
+  const voltou = await api.voltarVersao("f1", "v1");
+  conferir("o navegador: listar e voltar", lista[0].id === "v1" && voltou.versao === 9 && chamadas[0].url === "/api/fluxogramas/f1/versoes" && chamadas[1].metodo === "POST" && chamadas[1].corpo.versaoId === "v1");
+
+  conferir("o trabalho no projeto grava como Lisa (a versão de antes fica)", /origem: "lisa", motivo:/.test(ler("src/lib/trabalhoNoProjeto.js")));
+  const painel = ler("src/app/(panels)/fluxogramas/page.js");
+  conferir("o painel tem \"Versões anteriores…\" e \"voltar para esta\"", /Versões anteriores…/.test(painel) && /voltar para esta/.test(painel) && /await api\.voltarVersao\(f\.id, v\.id\)/.test(painel));
+  conferir("e o desenho que a Lisa faz no fluxo aberto também grava como Lisa", /daLisaRef\.current = q/.test(painel) && /origem: "lisa", motivo/.test(painel));
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");

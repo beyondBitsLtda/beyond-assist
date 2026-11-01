@@ -25,6 +25,7 @@ O pacote é **criptografado** antes de sair do iMac.
 |---|---|
 | `backup.sh 3horas` / `backup.sh semanal` | Gera, confere, criptografa e envia. O de 3 horas faz o rodízio dos 3 últimos. É o que o cron roda. |
 | `restaurar.sh` | Recupera o backup: `listar`, `ensaio` (num banco descartável) ou `producao`. |
+| `recuperar-fluxo.sh` | Recupera **um** fluxograma do ProcessMap sem tocar no resto: `ver` e `guardar` (entra nas "Versões anteriores…" do fluxo). |
 | `configurar-drive.sh` | Liga o Google Drive uma vez: login pelo navegador, na área de trabalho do iMac, e o primeiro envio. **É o destino em uso.** |
 | `configurar-r2.sh` | Alternativa: liga o Cloudflare R2, se um dia for ativado. |
 
@@ -159,6 +160,17 @@ O rclone vem com um client_id do Google que é usado por todo mundo e está send
 ```
 
 O modo `producao` pede para digitar `RESTAURAR` e nunca escolhe "o mais recente" sozinho.
+
+Um fluxograma só (a Lisa ou alguém estragou um desenho e o resto do banco está bom):
+
+```bash
+~/backup/recuperar-fluxo.sh ver "Fluxo de Uso MVP" 3horas      # como ele está no backup, aba por aba
+~/backup/recuperar-fluxo.sh guardar "Fluxo de Uso MVP" 3horas_2026-11-01_09h00
+```
+
+`guardar` não sobrescreve nada: a versão do backup vira uma versão anterior do fluxo (precisa de
+`db/fluxogramas_versoes.sql` aplicado), e no painel ProcessMap é só ⋯ → "Versões anteriores…" →
+"voltar para esta".
 
 **Só uma tabela** (por exemplo, cards apagados por engano):
 

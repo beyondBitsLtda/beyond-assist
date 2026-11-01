@@ -7,7 +7,7 @@ import {
   validarDesenho, camadasDoDesenho, posicoesDoDesenho, montarDocumento, estruturaDoDocumento, descreverDiagrama,
   pedidoDeDesenho, documentoValido, FORMAS, distanciaDeEdicao, pareceDiagramaEmTexto,
   pedeMapaMental, validarMapaMental, montarMapaMental, estruturaDoMapa, LIMITES_DO_MAPA,
-  CORES, NOMES_DAS_CORES, corPeloNome, nomeDaCor, vaiSerMapaMental,
+  CORES, NOMES_DAS_CORES, corPeloNome, nomeDaCor, vaiSerMapaMental, semPerdas, PEDE_PARA_TIRAR, estruturaQueCabe,
 } from "../src/lib/diagramaDaLisa.js";
 import fs from "node:fs";
 
@@ -305,6 +305,117 @@ console.log("\nas abas (01/11/2026: \"a Lisa deve poder criar abas dentro dos fl
   conferir("e no mapa mental vira espaço", validarMapaMental({ tema: "T", topicos: [{ texto: "Linha um\\nlinha dois" }] }).topicos[0].texto === "Linha um linha dois");
   conferir("link para aba que não existe sai", montarDocumento(validarDesenho({ titulo: "X", formas: [{ id: "a", tipo: "process", texto: "A", link: "inventada" }], ligacoes: [] })).pages[0].shapes[0].link === undefined);
   conferir("\"crie uma aba com o detalhe da aprovação\", com o quadro aberto, muda o desenho", pedidoDeDesenho("crie uma aba com o detalhe da aprovação", { quadroAberto: true }) === "alterar" && pedidoDeDesenho("separe o processo em abas por área", { quadroAberto: true }) === "alterar");
+}
+
+console.log("\na trava contra perda (01/11/2026: pediram notas e a aba \"Fluxo Desktop\" ficou só com a raia e o início)");
+{
+  // a aba Desktop: duas raias, oito formas; a aba Mobile com ids repetidos ("ini" existe nas duas)
+  const desktop = montarDocumento(validarDesenho({
+    titulo: "Fluxo de Uso MVP",
+    formas: [
+      { id: "ini", tipo: "terminal", texto: "Acesso via Browser Desktop", raia: "Usuário" },
+      { id: "admin", tipo: "decision", texto: "É admin?", raia: "Sistema / Lisa" },
+      { id: "completo", tipo: "process", texto: "Acesso Completo (Código, 3D, Sentinela, Painéis)", raia: "Sistema / Lisa", cor: "verde" },
+      { id: "primeiro", tipo: "decision", texto: "É o Primeiro Acesso?", raia: "Sistema / Lisa" },
+      { id: "entrevista", tipo: "process", texto: "Lisa realiza Entrevista de Perfil e Contexto", raia: "Sistema / Lisa" },
+      { id: "responde", tipo: "process", texto: "Responde perguntas da Lisa", raia: "Usuário" },
+      { id: "uso", tipo: "process", texto: "Uso MVP: Chat e Voz com Lisa", raia: "Usuário" },
+      { id: "fim", tipo: "terminal", texto: "Sessão Concluída", raia: "Usuário" },
+    ],
+    ligacoes: [
+      { de: "ini", para: "admin" }, { de: "admin", para: "completo", rotulo: "Sim" }, { de: "admin", para: "primeiro", rotulo: "Não" },
+      { de: "primeiro", para: "entrevista", rotulo: "Sim" }, { de: "entrevista", para: "responde" }, { de: "responde", para: "uso" },
+      { de: "primeiro", para: "uso", rotulo: "Não" }, { de: "completo", para: "uso" }, { de: "uso", para: "fim" },
+    ],
+  })).pages[0];
+  desktop.id = "desk"; desktop.name = "Fluxo Desktop";
+  const mobile = { id: "mob", name: "Fluxo Mobile", shapes: [{ id: "ini", type: "terminal", x: 10, y: 10, w: 160, h: 60, text: "Acesso via App" }, { id: "fimm", type: "terminal", x: 300, y: 10, w: 160, h: 60, text: "Fim" }], connections: [{ id: "c1", from: "ini", to: "fimm" }] };
+  const tela = { format: "processmap", version: 4, name: "Fluxo de Uso MVP", mode: "diagram", activePage: "desk", pages: [desktop, mobile] };
+  const formasDe = (pg) => pg.shapes.filter((s) => !["lane", "pool", "frame", "group"].includes(s.type));
+
+  // o que o modelo devolveu: a aba Desktop só com o início e a nota nova
+  const metade = validarDesenho({
+    titulo: "Fluxo de Uso MVP",
+    abas: [
+      { id: "desk", nome: "Fluxo Desktop", formas: [{ id: "ini", tipo: "terminal", texto: "Acesso via Browser Desktop", raia: "Usuário" }, { id: "nota", tipo: "note", texto: "• Conceito: entrada pelo navegador" }], ligacoes: [] },
+      { id: "mob", nome: "Fluxo Mobile", formas: [{ id: "ini", tipo: "terminal", texto: "Acesso via App" }, { id: "fimm", tipo: "terminal", texto: "Fim" }, { id: "nota", tipo: "note", texto: "• Conceito: app" }], ligacoes: [{ de: "ini", para: "fimm" }] },
+    ],
+  });
+  const { desenho, devolvidas } = semPerdas(metade, tela, "crie uma nota detalhada em cada aba explicando o conceito");
+  const doc = montarDocumento(desenho, tela);
+  const [d] = doc.pages;
+  conferir("num pedido de acrescentar, as 7 formas esquecidas voltam", devolvidas === 7 && formasDe(d).length === 9, `devolvidas ${devolvidas}, formas ${formasDe(d).length}`);
+  conferir("e voltam com o texto e a cor de antes", d.shapes.find((s) => s.id === "completo")?.text === "Acesso Completo (Código, 3D, Sentinela, Painéis)" && d.shapes.find((s) => s.id === "completo")?.color === desktop.shapes.find((s) => s.id === "completo").color);
+  conferir("as ligações delas voltam (com o rótulo)", d.connections.length === 9 && d.connections.some((c) => c.from === "admin" && c.to === "primeiro" && c.label === "Não"), `ligações ${d.connections.length}`);
+  conferir("as duas raias continuam", d.shapes.filter((s) => s.type === "lane").map((s) => s.text).sort().join() === "Sistema / Lisa,Usuário");
+  conferir("no lugar onde estavam", d.shapes.find((s) => s.id === "entrevista").x === desktop.shapes.find((s) => s.id === "entrevista").x && d.shapes.find((s) => s.id === "entrevista").y === desktop.shapes.find((s) => s.id === "entrevista").y);
+  conferir("e a nota nova entra", d.shapes.some((s) => s.id === "nota" && s.type === "note"));
+  const soNota = validarDesenho({
+    titulo: "Fluxo de Uso MVP",
+    abas: [
+      { id: "desk", nome: "Fluxo Desktop", formas: [{ id: "nota", tipo: "note", texto: "• Conceito" }], ligacoes: [] },
+      { id: "mob", nome: "Fluxo Mobile", formas: [{ id: "ini", tipo: "terminal", texto: "Acesso via App" }, { id: "fimm", tipo: "terminal", texto: "Fim" }], ligacoes: [{ de: "ini", para: "fimm" }] },
+    ],
+  });
+  const r2 = semPerdas(soNota, tela, "crie uma nota em cada aba");
+  const doc2 = montarDocumento(r2.desenho, tela);
+  conferir("o id repetido em outra aba (\"ini\" no Mobile) não impede a volta do \"ini\" do Desktop", r2.devolvidas === 8 && doc2.pages[0].shapes.find((s) => s.id === "ini")?.text === "Acesso via Browser Desktop" && doc2.pages[1].shapes.filter((s) => s.id === "ini").length === 1, `devolvidas ${r2.devolvidas}`);
+
+  // pedido que manda tirar: aí a forma pode sumir
+  const tirar = validarDesenho({ titulo: "Fluxo de Uso MVP", abas: [{ id: "desk", nome: "Fluxo Desktop", formas: est2(desktop).filter((f) => f.id !== "completo"), ligacoes: [] }] });
+  conferir("\"remova o acesso completo\": a forma sai mesmo", semPerdas(tirar, tela, "remova o acesso completo").devolvidas === 0);
+  conferir("o pedido de tirar é reconhecido (remova, apague, limpe, tire, refaça)", ["remova a etapa", "apague a nota", "limpe as vermelhas", "tire o fim", "refaça o fluxo", "simplifique"].every((p) => PEDE_PARA_TIRAR.test(p)) && !["crie uma nota", "adicione comentários", "pinte de verde", "detalhe as etapas"].some((p) => PEDE_PARA_TIRAR.test(p)));
+
+  // forma levada para uma aba nova não é duplicada na aba de onde saiu
+  const levou = validarDesenho({
+    titulo: "Fluxo de Uso MVP",
+    abas: [
+      { id: "desk", nome: "Fluxo Desktop", formas: est2(desktop).filter((f) => f.id !== "entrevista"), ligacoes: [] },
+      { id: "onb", nome: "Onboarding", formas: [{ id: "entrevista", tipo: "process", texto: "Lisa realiza Entrevista de Perfil e Contexto" }], ligacoes: [] },
+    ],
+  });
+  const levado = semPerdas(levou, tela, "crie uma aba de onboarding com a entrevista");
+  conferir("forma que foi para uma aba nova não volta para a antiga", levado.devolvidas === 0 && montarDocumento(levado.desenho, tela).pages.flatMap((p) => p.shapes).filter((s) => s.id === "entrevista").length === 1);
+
+  // a aba de um documento de uma aba volta pelo formato antigo, com id diferente
+  const sozinha = { ...tela, activePage: "zz", pages: [{ ...desktop, id: "zz" }] };
+  const legado = semPerdas(validarDesenho({ titulo: "X", formas: [{ id: "ini", tipo: "terminal", texto: "Acesso via Browser Desktop" }], ligacoes: [] }), sozinha, "acrescente uma nota");
+  conferir("documento de uma aba, resposta no formato antigo: também volta", legado.devolvidas === 7);
+
+  // "crie uma nota" e o modelo reescreveu a nota que a pessoa já tinha: a dela fica, a nova entra ao lado
+  const comNotaDaPessoa = { ...tela, pages: [{ ...desktop, shapes: [...desktop.shapes, { id: "minha", type: "note", x: 0, y: 0, w: 360, h: 120, text: "• Minha decisão: começar pelo desktop" }] }, mobile] };
+  const reescreveu = validarDesenho({ titulo: "X", abas: [{ id: "desk", nome: "Fluxo Desktop", formas: [...est2(comNotaDaPessoa.pages[0]).filter((f) => f.id !== "minha"), { id: "minha", tipo: "note", texto: "• Conceito novo da Lisa" }], ligacoes: [] }] });
+  const r3 = semPerdas(reescreveu, comNotaDaPessoa, "crie uma nota detalhada em cada aba");
+  const notas = montarDocumento(r3.desenho, comNotaDaPessoa).pages[0].shapes.filter((s) => s.type === "note");
+  conferir("\"crie uma nota\": a nota da pessoa não é reescrita — a nova entra ao lado", notas.find((s) => s.id === "minha")?.text === "• Minha decisão: começar pelo desktop" && notas.some((s) => s.id === "minha-nova" && s.text === "• Conceito novo da Lisa"));
+  const r4 = semPerdas(validarDesenho({ titulo: "X", abas: [{ id: "desk", nome: "Fluxo Desktop", formas: [...est2(comNotaDaPessoa.pages[0]).filter((f) => f.id !== "minha"), { id: "minha", tipo: "note", texto: "• Atualizada" }], ligacoes: [] }] }), comNotaDaPessoa, "atualize a nota com as decisões de hoje");
+  conferir("\"atualize a nota\": aí a nota muda mesmo", montarDocumento(r4.desenho, comNotaDaPessoa).pages[0].shapes.filter((s) => s.type === "note").map((s) => s.text).join() === "• Atualizada");
+
+  // a anotação longa não é cortada no caminho de ida e volta
+  const longa = "• Conceito: " + "a".repeat(900);
+  const comNota = { ...tela, pages: [{ ...desktop, shapes: [...desktop.shapes, { id: "n1", type: "note", x: 0, y: 0, w: 360, h: 200, text: longa }] }, mobile] };
+  conferir("a anotação vai inteira para a Lisa (não volta cortada)", estruturaDoDocumento(comNota).abas[0].formas.find((f) => f.id === "n1").texto === longa);
+
+  // o desenho grande vai para o modelo sem ser cortado no meio (antes: JSON cortado em 24 mil letras)
+  const grande = estruturaDoDocumento(tela);
+  grande.abas.push(...Array.from({ length: 6 }, (_, i) => ({ id: `extra${i}`, nome: `Extra ${i}`, formas: [{ id: "n", tipo: "note", texto: "x".repeat(1400) }], ligacoes: [] })));
+  const cabe = JSON.parse(estruturaQueCabe(grande, 5000));
+  conferir("desenho grande: o JSON vai inteiro (não cortado), a aba aberta completa e as que não cabem marcadas", cabe.abas.length === 8 && cabe.abas[0].formas.length === 8 && cabe.abas.some((a) => a.naoCoube && a.quantasFormas === 1) && estruturaQueCabe(estruturaDoDocumento(tela)) === JSON.stringify(estruturaDoDocumento(tela)));
+
+  // mapa mental: num pedido de acrescentar, galho esquecido volta com os filhos
+  const mapa = montarMapaMental(validarMapaMental({
+    titulo: "Produto Lisa", tema: "Lisa",
+    topicos: [{ id: "voz", texto: "Voz", filhos: [{ id: "stt", texto: "Reconhecer fala" }] }, { id: "ide", texto: "Editor", filhos: [{ id: "abas", texto: "Abas de código" }] }],
+  }));
+  const novo = validarMapaMental({ titulo: "Produto Lisa", tema: "Lisa", topicos: [{ id: "voz", texto: "Voz", filhos: [{ id: "stt", texto: "Reconhecer fala" }, { id: "tts", texto: "Falar" }] }] });
+  const ficou = montarMapaMental(novo, mapa, { manterTudo: true });
+  conferir("mapa mental: o galho esquecido volta com os filhos (manterTudo)", ["ide", "abas", "tts"].every((id) => ficou.pages[0].shapes.some((s) => s.id === id)) && ficou.pages[0].shapes.find((s) => s.id === "abas").parent === "ide");
+  const tirou = montarMapaMental(novo, mapa, { manterTudo: false });
+  conferir("mapa mental: com pedido de tirar, o galho sai", !tirou.pages[0].shapes.some((s) => s.id === "ide"));
+}
+
+function est2(pg) {
+  return estruturaDoDocumento({ pages: [pg] }).abas[0].formas;
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");

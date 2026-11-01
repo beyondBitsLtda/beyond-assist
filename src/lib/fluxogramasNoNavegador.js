@@ -33,9 +33,16 @@ export function apiDosFluxos(buscar = (...a) => fetch(...a)) {
     ler: async (id) => (await chamar(`/api/fluxogramas/${encodeURIComponent(id)}`)).fluxo,
     /** { documento, nome, projetoId | projetoNovo, origem } → { fluxo, projeto } */
     criar: (dados) => chamar("/api/fluxogramas", "POST", dados),
-    /** { documento?, nome?, projetoId?, versao?, forcar? } → o fluxo (sem documento). `extra`: keepalive ao sair. */
+    /**
+     * { documento?, nome?, projetoId?, versao?, forcar?, origem?, motivo? } → o fluxo (sem documento).
+     * `origem: "lisa"` guarda a versão de antes (dá para voltar). `extra`: keepalive ao sair.
+     */
     salvar: async (id, dados, extra) => (await chamar(`/api/fluxogramas/${encodeURIComponent(id)}`, "PUT", dados, extra)).fluxo,
     excluir: (id) => chamar(`/api/fluxogramas/${encodeURIComponent(id)}`, "DELETE"),
+    /** as versões anteriores do fluxo (sem documento), da mais nova para a mais antiga */
+    versoes: async (id) => (await chamar(`/api/fluxogramas/${encodeURIComponent(id)}/versoes`)).versoes,
+    /** volta o fluxo para uma versão anterior → o fluxo (a versão de agora fica guardada) */
+    voltarVersao: async (id, versaoId) => (await chamar(`/api/fluxogramas/${encodeURIComponent(id)}/versoes`, "POST", { versaoId })).fluxo,
     /** um projeto com os fluxos e os documentos (a Lisa trabalhando no projeto citado na conversa) */
     lerProjeto: (id) => chamar(`/api/fluxogramas/projetos?id=${encodeURIComponent(id)}`),
     criarProjeto: async (nome) => (await chamar("/api/fluxogramas/projetos", "POST", { nome })).projeto,

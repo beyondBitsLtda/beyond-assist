@@ -3,7 +3,7 @@ import { TTS_VOICES } from "./ttsVoices.js";
 import { pickKeyIndex, markCooldown, markOk } from "./geminiKeyHealth.js";
 import { streamComRetomada } from "./retomada.js";
 import { limparTranscricao } from "./tomarNota.js";
-import { FORMAS, TIPOS, COLECOES, PONTAS, NOMES_DAS_CORES } from "./diagramaDaLisa.js";
+import { FORMAS, TIPOS, COLECOES, PONTAS, NOMES_DAS_CORES, estruturaQueCabe } from "./diagramaDaLisa.js";
 
 const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 // gemini-2.5-flash foi descontinuado pra projetos novos no Google Cloud (confirmado ao vivo:
@@ -1128,7 +1128,7 @@ export async function desenharDiagrama({ pedido, estrutura = null, conversa = ""
       : "",
     conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-6000)}\n` : "",
     estrutura
-      ? `O DESENHO QUE ESTÁ NA TELA AGORA (a pessoa pode ter mexido nele — parta DELE; "abaAtiva" é a aba que ela está vendo):\n${JSON.stringify(estrutura).slice(0, 24000)}\n`
+      ? `O DESENHO QUE ESTÁ NA TELA AGORA (a pessoa pode ter mexido nele — parta DELE; "abaAtiva" é a aba que ela está vendo):\n${estruturaQueCabe(estrutura)}\n`
       : "",
     `PEDIDO: "${String(pedido || "").slice(0, 8000)}"`,
   ].filter(Boolean).join("\n");
@@ -1147,6 +1147,8 @@ Regras:
 - Numa MUDANÇA, devolva TODAS as abas que existem, na mesma ordem:
   a aba que o pedido não mexe vai só com { "id", "nome", "manter": true } (sem formas) — ela fica
   exatamente como está; a aba que muda vai INTEIRA (todas as formas e ligações dela, com os ids).
+  NUNCA devolva uma aba pela metade: forma que você não devolve some do desenho da pessoa.
+  Aba marcada "naoCoube": true veio sem as formas (o desenho é grande): devolva { "id", "nome", "manter": true }.
   Pedido que não cita aba é sobre a aba que a pessoa está vendo ("abaAtiva").
 - Criar aba ("crie uma aba…", "separe em abas…", "detalhe a aprovação numa aba nova"): acrescente a aba
   com um id novo e as formas dela. Quando a aba nova detalha uma etapa de outra aba, ponha nessa etapa
@@ -1169,6 +1171,9 @@ Regras:
 - Comece por um início e termine num fim quando for um processo. Entre 4 e 30 formas: completo, mas legível.
 - Se houver um desenho na tela, é uma MUDANÇA: devolva o desenho INTEIRO atualizado, mantendo o "id"
   de toda forma que continua (é assim que o que a pessoa arrumou fica no lugar), e mude só o que foi pedido.
+  "Crie", "inclua", "acrescente" uma forma (uma nota, uma etapa) é ACRESCENTAR uma forma NOVA, com id novo:
+  as que já existem, anotações inclusive, voltam com o MESMO texto — só reescreva o texto de uma forma que
+  existe quando o pedido mandar ("atualize a nota", "reescreva", "corrija").
 - "cor": a cor de cada forma (${NOMES_DAS_CORES.join(", ")}). Num desenho novo, deixe sem cor (cada tipo
   tem a sua), a não ser que o pedido fale de cor. Numa MUDANÇA, cada forma já vem com a cor que tem na
   tela: devolva a MESMA cor, a não ser que o pedido mexa nela.
@@ -1284,7 +1289,10 @@ versão 100% funcional, porém [sem] a função X" quer dizer que a função X f
 
 Decida:
 - "acao": "mudar" quando o pedido é criar, incluir, pôr, mudar, pintar, remover, reorganizar ou anotar
-  algo nos desenhos do projeto; "responder" quando é só pergunta, análise ou opinião sobre o projeto.
+  algo nos desenhos do projeto; "responder" quando é só pergunta, análise ou opinião sobre o projeto;
+  "documentar" quando a pessoa quer um TEXTO feito a partir dos desenhos, fora deles — arquivo .md,
+  markdown, README, documento, especificação, "no editor", "para pedir ao Claude/a uma IA construir".
+  Com "documentar", NENHUM desenho muda (operacoes vazia): a Lisa escreve os arquivos no editor.
   Citar outro sistema no meio do pedido (ex.: "uma versão do Abacato integrada à Lisa") não muda isso:
   é conteúdo do desenho.
 - "operacoes" (só com "mudar"): uma por desenho a mudar ou criar, na ordem em que fazem sentido.
@@ -1321,7 +1329,7 @@ Decida:
           responseSchema: {
             type: "OBJECT",
             properties: {
-              acao: { type: "STRING", enum: ["mudar", "responder"] },
+              acao: { type: "STRING", enum: ["mudar", "responder", "documentar"] },
               explicacao: { type: "STRING" },
               operacoes: {
                 type: "ARRAY",
@@ -1349,6 +1357,80 @@ Decida:
 }
 
 /**
+ * A Lisa escreve um .md a partir de um desenho do projeto (01/11/2026: "faça um arquivo MD no editor
+ * explicando a estratégia e o conceito do MVP, uma aba de MD por fluxograma e mapa mental — vou usar
+ * para pedir ao Claude construir as rotas"). `desenho`: { nome, tipo, descricao (o desenho inteiro em
+ * texto, com as anotações) }; sem desenho, é a VISÃO GERAL do projeto, que aponta para `arquivos`.
+ * Devolve o Markdown (texto). Nenhum desenho muda.
+ */
+export async function escreverDocumento({ pedido, projeto = "", nomeDoProjeto = "", desenho = null, arquivos = [], conversa = "", hoje = "" }) {
+  const visaoGeral = !desenho;
+  const prompt = [
+    conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-6000)}\n` : "",
+    `O PROJETO "${nomeDoProjeto}" DO PROCESSMAP (todos os desenhos, para manter os mesmos nomes e não contradizer nada):\n${String(projeto).slice(0, 40000)}\n`,
+    visaoGeral
+      ? `OS ARQUIVOS QUE A LISA ESTÁ ESCREVENDO (um por desenho):\n${arquivos.map((a) => `- ${a.arquivo}: "${a.nome}" (${a.tipo})`).join("\n")}\n`
+      : `O DESENHO DESTE ARQUIVO: "${desenho.nome}" (${desenho.tipo}), inteiro, com as anotações:\n${String(desenho.descricao).slice(0, 60000)}\n`,
+    `O PEDIDO DA PESSOA (o que ela quer destes documentos): "${String(pedido || "").slice(0, 4000)}"`,
+  ].filter(Boolean).join("\n");
+
+  // [título exato da seção, o que vai nela] — o título vai sozinho na linha "## …"
+  const secoes = (visaoGeral
+    ? [
+      ["Conceito do produto", "o que é, para quem, que problema resolve (3 a 6 frases)"],
+      ["Estratégia do MVP", "o que entra, o que fica de fora e por quê"],
+      ["Os desenhos e os arquivos", "tabela | Arquivo | Desenho | O que cobre |"],
+      ["Ordem de construção sugerida", "passos numerados, cada um apontando o arquivo"],
+      ["Decisões que valem para o projeto todo", "tabela | Decisão | Por quê |"],
+      ["Pontos em aberto", "o que os desenhos não respondem"],
+      ["Como usar estes arquivos com o Claude", "um parágrafo pronto para colar"],
+    ]
+    : [
+      ["Conceito", "o que este desenho resolve, para quem (3 a 6 frases)"],
+      ["Estratégia no MVP", "o que entra no MVP e o que fica para depois, com o porquê"],
+      ["Decisões e motivos", "tabela | Decisão | Por quê |"],
+      ["Passo a passo", 'uma subseção "### Aba <nome da aba>" por aba (mapa mental: "### <galho>" por galho); cada passo com quem faz (a raia), o que acontece e os desvios (decisão: Sim/Não e para onde vai)'],
+      ["Rotas, telas e APIs a construir", "tabela | Rota ou tela | Método | O que faz | Passo do desenho |"],
+      ["Dados", "tabela | Entidade | Campos | Para quê |"],
+      ["Critérios de aceite", 'lista "- [ ] Dado …, quando …, então …", testável'],
+      ["Pontos em aberto", "perguntas que o desenho não responde"],
+      ["Como pedir ao Claude", 'um parágrafo pronto para colar ("Construa … seguindo este arquivo …")'],
+    ]).map(([titulo, conteudo]) => `## ${titulo}\n   (conteúdo: ${conteudo})`).join("\n");
+  const cabeca = visaoGeral
+    ? `# ${nomeDoProjeto} — visão geral do MVP\n> Projeto do ProcessMap · gerado pela Lisa em ${hoje} · um arquivo por desenho (tabela abaixo)`
+    : `# ${desenho.nome}\n> Projeto ${nomeDoProjeto} · ${desenho.tipo} do ProcessMap · gerado pela Lisa em ${hoje}`;
+
+  const systemInstruction = `Você é a Lisa e escreve, em Markdown e em português do Brasil, ${visaoGeral ? "a visão geral de um projeto do ProcessMap (o conjunto dos desenhos dele)" : "a especificação de UM desenho (fluxograma ou mapa mental) de um projeto do ProcessMap"}.
+Quem lê: uma IA de código (o Claude), que vai construir as rotas e as telas do MVP a partir deste
+arquivo, e a equipe. Então: preciso, completo, verificável, sem enrolação.
+
+Comece com este cabeçalho e use estes títulos "##", nesta ordem. O título é SÓ o texto da linha "##"; o
+"(conteúdo: …)" diz o que escrever na seção e não aparece no arquivo. Seção sem material nos desenhos:
+escreva "Não definido nos desenhos.".
+${cabeca}
+${secoes}
+
+Regras:
+- Use o que está nos desenhos (etapas, raias, decisões, abas, anotações), na conversa e no pedido. Cite as
+  etapas pelo texto exato do desenho, entre aspas.
+- O que for proposta sua (nome de rota, campo, tela que o desenho não nomeia), marque com "(proposta)".
+  Não invente regra de negócio que contradiga os desenhos.
+- Nada de senha, token, chave, CPF, salário, dado de saúde ou bancário, nem dado pessoal real.
+- Blocos de código só com três crases (nunca quatro).
+- Responda SÓ com o Markdown do arquivo: sem nada antes ou depois e sem cercar tudo num bloco de código.`;
+
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client, modelo) => client.models.generateContent({ model: modelo, contents: prompt, config: { systemInstruction } }),
+    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
+  );
+  // (se o modelo cercar o arquivo inteiro num bloco de código, a cerca sai)
+  const texto = String(res.text || "").trim().replace(/^`{3,}\s*(markdown|md)?\s*\n([\s\S]*?)\n`{3,}\s*$/i, "$2").trim();
+  if (!texto) throw new Error("o documento veio vazio — tente de novo");
+  return texto;
+}
+
+/**
  * A Lisa monta um MAPA MENTAL (01/11/2026): devolve a árvore { titulo, tema, explicacao, topicos:
  * [{ id, texto, filhos: [{ id, texto, filhos: [{ id, texto }] }] }] } — o quadro faz o layout
  * (src/lib/diagramaDaLisa.js: validarMapaMental, montarMapaMental). Com `estrutura` (o mapa que está na
@@ -1362,7 +1444,7 @@ export async function desenharMapaMental({ pedido, estrutura = null, conversa = 
       : "",
     conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-6000)}\n` : "",
     estrutura
-      ? `O MAPA QUE ESTÁ NA TELA AGORA (a pessoa pode ter mexido nele — parta DELE):\n${JSON.stringify(estrutura).slice(0, 20000)}\n`
+      ? `O MAPA QUE ESTÁ NA TELA AGORA (a pessoa pode ter mexido nele — parta DELE):\n${JSON.stringify(estrutura).slice(0, 100_000)}\n`
       : "",
     `PEDIDO: "${String(pedido || "").slice(0, 8000)}"`,
   ].filter(Boolean).join("\n");

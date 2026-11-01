@@ -481,6 +481,83 @@ function agrupadorDe(s, agrupadores) {
   return agrupadores.filter((g) => g !== s && dentro(centro(s), g)).sort((a, b) => Number(a.w) * Number(a.h) - Number(b.w) * Number(b.h))[0] || null;
 }
 
+/** Pedido que manda tirar, mover ou refazer: só aí formas que existiam podem sumir do desenho. */
+export const PEDE_PARA_TIRAR = /\b(remov|apag|exclu|delet|elimin|limp|tir[ae]|tirar|separ|mov[aei]|refa[çz]|reorganiz|simplifi[cq]|resum[ai]|condens|descart|substitu|troqu|troc|junt|enxug|reduz|recome[cç]|redesenh|desfa[çz]|transform|convert|recri)\w*/i;
+/** Pedido que manda mudar o texto do que existe: só aí a anotação que já existia pode ser reescrita. */
+export const PEDE_PARA_REESCREVER = /\b(atualiz|reescrev|corri[jg]|edit|alter|reformul|revis|melhor[ae]|ajust|mud[ae]|complement|amplie|ampli[ae]r|expand)\w*/i;
+
+/**
+ * Trava contra perda (01/11/2026: pediram notas e a aba "Fluxo Desktop" voltou só com uma raia e o
+ * início — o modelo devolveu a aba pela metade, e o resto foi apagado ao gravar): num pedido que só
+ * acrescenta ou ajusta (sem PEDE_PARA_TIRAR), toda forma que existia e não veio na resposta volta para
+ * o lugar, com o texto, o tipo e as ligações dela. Forma que mudou de aba não conta como sumida.
+ * E num pedido de acrescentar ("crie uma nota"), sem pedir para mudar texto (PEDE_PARA_REESCREVER), a
+ * anotação que já existia não é reescrita: o modelo reescrevia a nota da pessoa em vez de criar outra —
+ * a dela fica igual e o texto novo entra numa anotação nova, ao lado.
+ * Devolve { desenho, devolvidas } (devolvidas: formas que voltaram + anotações preservadas).
+ */
+export function semPerdas(desenho, anterior, pedido) {
+  if (!anterior || anterior.mode === "mindmap" || !desenho?.abas?.length || PEDE_PARA_TIRAR.test(String(pedido || ""))) return { desenho, devolvidas: 0 };
+  const guardarNotas = !PEDE_PARA_REESCREVER.test(String(pedido || ""));
+  const est = estruturaDoDocumento(anterior);
+  const paginas = abasDe(anterior);
+  // a aba velha de cada aba da resposta (uma aba sobre um documento de uma aba é a mesma, como em montarDocumento)
+  const velhaDe = (aba) => (est.abas.length === 1 && desenho.abas.length === 1 ? 0 : est.abas.findIndex((v) => idLimpo(v.id) === aba.id));
+  // forma que chegou numa aba onde não estava foi movida para lá: na aba de onde saiu, não é perda
+  // (o id é por aba — "ini" pode existir em todas)
+  const chegaram = new Set();
+  for (const aba of desenho.abas) {
+    if (aba.manter) continue;
+    const i = velhaDe(aba);
+    const tinha = new Set(i >= 0 ? est.abas[i].formas.map((f) => idLimpo(f.id)) : []);
+    for (const f of aba.formas) if (!tinha.has(f.id)) chegaram.add(f.id);
+  }
+  let devolvidas = 0;
+  for (const aba of desenho.abas) {
+    if (aba.manter) continue;
+    const i = velhaDe(aba);
+    if (i < 0) continue;
+    const velha = est.abas[i];
+    const originais = new Map((paginas[i]?.shapes || []).map((sh) => [String(sh?.id), sh]));
+    const ids = new Set(aba.formas.map((f) => f.id));
+    const voltaram = new Set();
+    if (guardarNotas) {
+      for (const f of [...aba.formas]) {
+        const original = originais.get(f.id);
+        const antes = String(original?.text ?? "").trim();
+        if (f.tipo !== "note" || original?.type !== "note" || !antes || antes === f.texto.trim()) continue;
+        let id = `${f.id}-nova`;
+        while (ids.has(id)) id = `${id}-2`;
+        aba.formas.push({ ...f, id });
+        f.texto = String(original.text);
+        ids.add(id);
+        devolvidas++;
+      }
+    }
+    for (const f of velha.formas) {
+      const id = idLimpo(f.id);
+      if (!id || ids.has(id) || chegaram.has(id)) continue;
+      const original = originais.get(String(f.id));
+      aba.formas.push({
+        id, tipo: f.tipo, texto: String(original?.text ?? f.texto ?? ""), raia: f.raia || "",
+        ...(CORES[original?.color] ? { cor: original.color } : {}), ...(f.link ? { link: idLimpo(f.link) } : {}),
+      });
+      ids.add(id);
+      voltaram.add(id);
+      devolvidas++;
+    }
+    // as ligações das formas que voltaram (uma ligação trocada entre formas que ficaram é decisão do pedido)
+    const pares = new Set(aba.ligacoes.map((l) => `${l.de}>${l.para}`));
+    for (const l of velha.ligacoes) {
+      const de = idLimpo(l.de), para = idLimpo(l.para);
+      if (!(voltaram.has(de) || voltaram.has(para)) || !ids.has(de) || !ids.has(para) || pares.has(`${de}>${para}`)) continue;
+      aba.ligacoes.push({ de, para, rotulo: String(l.rotulo || ""), tracejada: Boolean(l.tracejada), ponta: PONTAS.includes(l.ponta) ? l.ponta : "arrow" });
+      pares.add(`${de}>${para}`);
+    }
+  }
+  return { desenho, devolvidas };
+}
+
 /**
  * A estrutura do desenho na tela, no mesmo formato que a IA devolve — é o que vai para a Lisa
  * quando o pedido é mudar o desenho (ela devolve as abas que mudam inteiras, mantendo os ids). Todas
@@ -492,12 +569,35 @@ export function estruturaDoDocumento(doc) {
   return { titulo: String(doc?.name || abas[0]?.nome || "Processo"), abaAtiva: aberta?.id || "p1", abas };
 }
 
+/**
+ * O desenho da tela em JSON para o modelo, sem cortar no meio (01/11/2026: o JSON era cortado em 24 mil
+ * letras — com várias abas e anotações longas, a última aba chegava pela metade e voltava pela metade,
+ * e a aba "Fluxo Desktop" perdeu as formas). Se não couber, entram a aba aberta e as outras na ordem,
+ * enquanto couberem; as que sobram vão só com id e nome, marcadas "naoCoube" (o modelo as mantém).
+ */
+export function estruturaQueCabe(estrutura, limite = 120_000) {
+  const json = JSON.stringify(estrutura);
+  if (json.length <= limite) return json;
+  const ordem = [...estrutura.abas].sort((a, b) => Number(b.id === estrutura.abaAtiva) - Number(a.id === estrutura.abaAtiva));
+  const cabem = new Set();
+  let usado = 500;
+  for (const a of ordem) {
+    const n = JSON.stringify(a).length;
+    if (usado + n <= limite) { cabem.add(a); usado += n; }
+  }
+  return JSON.stringify({
+    ...estrutura,
+    abas: estrutura.abas.map((a) => (cabem.has(a) ? a : { id: a.id, nome: a.nome, naoCoube: true, quantasFormas: a.formas.length })),
+  });
+}
+
 function estruturaDaAba(aba, i) {
   const todas = (aba.shapes || []).filter((sh) => sh && sh.type !== "ink" && sh.type !== "image");
   const agrupadores = todas.filter((sh) => AGRUPADORES.has(sh.type) && ehNumero(sh.w));
   const formas = todas.filter((sh) => !AGRUPADORES.has(sh.type)).map((sh) => ({
     id: String(sh.id), tipo: FORMAS[sh.type] ? sh.type : sh.type || "process",
-    texto: String(sh.text ?? "").slice(0, LIMITES_DO_DESENHO.texto),
+    // (a anotação vai inteira: cortada aqui, ela voltaria cortada na próxima mudança)
+    texto: String(sh.text ?? "").slice(0, sh.type === "note" ? LIMITES_DO_DESENHO.nota : LIMITES_DO_DESENHO.texto),
     raia: agrupadorDe(sh, agrupadores)?.text || "",
     cor: nomeDaCor(sh.color),
     ...(sh.link != null ? { link: String(sh.link) } : {}),
@@ -509,9 +609,12 @@ function estruturaDaAba(aba, i) {
   return { id: String(aba.id ?? `p${i + 1}`), nome: String(aba.name || `Página ${i + 1}`), formas, ligacoes };
 }
 
-/** O desenho em texto, para a Lisa ler o que está na tela (o que a pessoa mudou também). */
-export function descreverDiagrama(doc) {
-  if (doc?.mode === "mindmap") return descreverMapa(doc);
+/**
+ * O desenho em texto, para a Lisa ler o que está na tela (o que a pessoa mudou também). `inteiro` (os
+ * .md que a Lisa escreve): o texto das formas e das anotações sem corte, e um teto bem maior.
+ */
+export function descreverDiagrama(doc, { inteiro = false } = {}) {
+  if (doc?.mode === "mindmap") return descreverMapa(doc, { inteiro });
   const partes = [];
   for (const aba of abasDe(doc)) {
     const formas = (aba.shapes || []).filter((s) => s && s.type !== "ink");
@@ -528,7 +631,7 @@ export function descreverDiagrama(doc) {
     const aberta = abasDe(doc).length > 1 && String(aba.id) === String(doc?.activePage) ? " (a que está aberta)" : "";
     partes.push(`ABA "${aba.name || "Página"}" [aba ${aba.id ?? "p1"}]${aberta} — ${formas.length} formas, ${(aba.connections || []).length} ligações`);
     for (const s of formas) {
-      const conteudo = String(s.text ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).join(" | ").slice(0, 200);
+      const conteudo = String(s.text ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).join(" | ").slice(0, inteiro ? LIMITES_DO_DESENHO.nota : 200);
       let linha = `- [${s.id}] ${nome(s)}, ${nomeDaCor(s.color)}${conteudo ? `: "${conteudo}"` : ""}`;
       if (!AGRUPADORES.has(s.type)) { const g = agrupadorDe(s, agrupadores); if (g) linha += ` (dentro de [${g.id}])`; }
       if (s.link != null) linha += ` (abre a aba ${s.link})`;
@@ -543,7 +646,7 @@ export function descreverDiagrama(doc) {
       partes.push(`- ${curto(c.from)} → ${curto(c.to)}${extras ? ` (${extras})` : ""}`);
     }
   }
-  return partes.join("\n").slice(0, 12_000) || "";
+  return partes.join("\n").slice(0, inteiro ? 60_000 : 12_000) || "";
 }
 
 /**
@@ -702,13 +805,20 @@ export function validarMapaMental(bruto) {
  * O documento do quadro (formato 4, modo mapa mental). Com o mapa `anterior` (uma mudança), o que a
  * pessoa arrumou fica: a posição manual (ox, oy), o galho recolhido, a cor e o lado de cada tópico
  * que continua (mesmo id) — e os tópicos mais fundos que a Lisa não vê (abaixo do 3º nível) voltam
- * pendurados onde estavam, se o pai continua.
+ * pendurados onde estavam, se o pai continua. Com `manterTudo` (a trava contra perda: o pedido não
+ * manda tirar nada), QUALQUER tópico que existia e não veio na resposta volta, com o galho dele.
  */
-export function montarMapaMental(mapa, anterior = null) {
+export function montarMapaMental(mapa, anterior = null, { manterTudo = false } = {}) {
   const antigos = new Map();
+  let temaVelho = null;
   for (const aba of anterior?.mode === "mindmap" ? abasDe(anterior).slice(0, 1) : []) {
-    for (const s of aba.shapes || []) if (s && s.type === "mmNode") antigos.set(String(s.id), s);
+    for (const s of aba.shapes || []) {
+      if (s && s.type === "mmNode") antigos.set(String(s.id), s);
+      if (s && s.type === "mmRoot") temaVelho = String(s.id);
+    }
   }
+  // o pai de um tópico antigo, já no mapa novo (o tema antigo é o tema de agora)
+  const paiDe = (velho) => (String(velho.parent) === temaVelho ? ID_DO_TEMA : String(velho.parent));
   const shapes = [{ id: ID_DO_TEMA, type: "mmRoot", x: -100, y: -28, w: 200, h: 56, text: mapa.tema, color: "purple" }];
   const pendurar = (lista, pai, nivel) => lista.forEach((t, i) => {
     const velho = antigos.get(t.id);
@@ -729,8 +839,14 @@ export function montarMapaMental(mapa, anterior = null) {
   while (achou) {
     achou = false;
     for (const [id, velho] of antigos) {
-      if (ids.has(id) || !ids.has(String(velho.parent)) || profundidade(antigos, velho) <= 3) continue;
-      shapes.push({ id, type: "mmNode", x: 0, y: 0, w: 120, h: 36, text: String(velho.text ?? ""), parent: String(velho.parent), ...(velho.collapsed === true ? { collapsed: true } : {}) });
+      if (ids.has(id) || !ids.has(paiDe(velho)) || (!manterTudo && profundidade(antigos, velho) <= 3)) continue;
+      const galho = paiDe(velho) === ID_DO_TEMA;
+      shapes.push({
+        id, type: "mmNode", x: 0, y: 0, w: 120, h: 36, text: String(velho.text ?? ""), parent: paiDe(velho),
+        ...(galho && (velho.side === "left" || velho.side === "right") ? { side: velho.side } : {}),
+        ...(galho && velho.color ? { color: velho.color } : {}),
+        ...(velho.collapsed === true ? { collapsed: true } : {}),
+      });
       ids.add(id);
       achou = true;
     }
@@ -763,7 +879,7 @@ export function estruturaDoMapa(doc) {
 }
 
 /** O mapa em texto, recuado por nível (o que a Lisa lê quando a pessoa conversa sobre ele). */
-function descreverMapa(doc) {
+function descreverMapa(doc, { inteiro = false } = {}) {
   const aba = abasDe(doc)[0] || { shapes: [] };
   const nos = (aba.shapes || []).filter((s) => s && (s.type === "mmRoot" || s.type === "mmNode"));
   const tema = nos.find((s) => s.type === "mmRoot");
@@ -778,5 +894,5 @@ function descreverMapa(doc) {
     }
   };
   descer(tema.id, 1);
-  return linhas.join("\n").slice(0, 12_000);
+  return linhas.join("\n").slice(0, inteiro ? 60_000 : 12_000);
 }

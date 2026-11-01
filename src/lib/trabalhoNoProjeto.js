@@ -6,7 +6,8 @@
 // painel só sabia mexer no fluxo aberto). Sem React: `buscar` e `api` vêm de fora (testado com
 // servidor falso em scripts/fluxogramas-check.mjs).
 
-import { contextoDoProjeto } from "./processmapNaConversa.js";
+import { contextoDoProjeto, arquivoDoDocumento } from "./processmapNaConversa.js";
+import { descreverDiagrama } from "./diagramaDaLisa.js";
 
 const JSON_ = { "content-type": "application/json" };
 
@@ -71,8 +72,10 @@ export async function executarPlano({
       });
       const r = await res.json().catch(() => ({}));
       if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
+      // (origem "lisa": a versão de antes fica guardada — dá para voltar pelo painel ProcessMap)
+      const daLisa = { documento: r.doc, origem: "lisa", motivo: String(op.pedido).replace(/\s+/g, " ").slice(0, 140) };
       const salvo = fluxo
-        ? await api.salvar(fluxo.id, fluxo.id === abertoId ? { documento: r.doc, forcar: true } : { documento: r.doc, versao: fluxo.versao })
+        ? await api.salvar(fluxo.id, fluxo.id === abertoId ? { ...daLisa, forcar: true } : { ...daLisa, versao: fluxo.versao })
         : (await api.criar({ documento: r.doc, nome: op.nome || r.titulo, projetoId: projeto.id, origem: "lisa" })).fluxo;
       linha.nome = salvo.nome;
       linha.estado = fluxo ? "atualizado" : "criado";
@@ -88,4 +91,67 @@ export async function executarPlano({
     aoAndar(linhas);
   }
   return { linhas, feitos: resultados.length, resultados };
+}
+
+const tipoDe = (f) => (f.modo === "mindmap" || f.documento?.mode === "mindmap" ? "mapa mental" : "fluxograma");
+const abasDoDesenho = (f) => (f.documento?.mode === "mindmap" ? 1 : f.documento?.pages?.length || 1);
+
+/**
+ * "Faça um MD por fluxograma e mapa mental" (01/11/2026): a Lisa escreve a visão geral do projeto e um
+ * .md por desenho (/api/processmap/documento), `simultaneos` de cada vez. NENHUM desenho é mudado nem
+ * salvo — só lidos. Devolve { linhas, documentos: [{ arquivo, markdown, legenda }] } (os que deram certo,
+ * na ordem: visão geral, depois os desenhos); a página põe cada um numa aba do editor de código.
+ */
+export async function documentarProjeto({ pedido, projeto, fluxos, conversa = "", aoAndar = () => {}, buscar = (...a) => fetch(...a), simultaneos = 3 }) {
+  const desenhos = fluxos.filter((f) => f.documento);
+  const arquivos = desenhos.map((f, i) => ({ fluxo: f, arquivo: arquivoDoDocumento(projeto, f, i + 1), nome: f.nome, tipo: tipoDe(f) }));
+  const visao = { fluxo: null, arquivo: arquivoDoDocumento(projeto, null, 0), nome: "Visão geral do projeto", tipo: "visão geral" };
+  const tarefas = [visao, ...arquivos];
+  const linhas = tarefas.map((t) => ({ nome: t.arquivo.split("/").pop(), estado: "na fila", ok: null, nota: "", trabalhando: false }));
+  const documentos = new Array(tarefas.length).fill(null);
+  const texto = contextoDoProjeto(projeto, fluxos);
+  aoAndar(linhas);
+  let proxima = 0;
+  const trabalhar = async () => {
+    while (proxima < tarefas.length) {
+      const i = proxima++;
+      const t = tarefas[i];
+      const linha = linhas[i];
+      linha.estado = "escrevendo…";
+      linha.trabalhando = true;
+      aoAndar(linhas);
+      try {
+        const res = await buscar("/api/processmap/documento", {
+          method: "POST",
+          headers: JSON_,
+          body: JSON.stringify({
+            pedido, conversa, projeto: texto, nomeDoProjeto: projeto.nome,
+            ...(t.fluxo
+              ? { desenho: { nome: t.nome, tipo: t.tipo, descricao: descreverDiagrama(t.fluxo.documento, { inteiro: true }) } }
+              : { arquivos: arquivos.map(({ arquivo, nome, tipo }) => ({ arquivo, nome, tipo })) }),
+          }),
+        });
+        const r = await res.json().catch(() => ({}));
+        if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
+        const abas = t.fluxo ? abasDoDesenho(t.fluxo) : 0;
+        documentos[i] = {
+          arquivo: t.arquivo,
+          markdown: r.markdown,
+          legenda: t.fluxo
+            ? `**${linha.nome}** — "${t.nome}" (${t.tipo}${abas > 1 ? `, ${abas} abas` : ""}).`
+            : `**${linha.nome}** — o conceito, a estratégia do MVP e a ordem de construção, apontando para os arquivos de cada desenho.`,
+        };
+        linha.estado = "escrito";
+        linha.ok = true;
+      } catch (err) {
+        linha.estado = "não deu";
+        linha.nota = err.message;
+        linha.ok = false;
+      }
+      linha.trabalhando = false;
+      aoAndar(linhas);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(simultaneos, tarefas.length)) }, trabalhar));
+  return { linhas, documentos: documentos.filter(Boolean) };
 }
