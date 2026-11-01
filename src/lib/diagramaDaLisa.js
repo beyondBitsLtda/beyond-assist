@@ -485,6 +485,13 @@ function agrupadorDe(s, agrupadores) {
 export const PEDE_PARA_TIRAR = /\b(remov|apag|exclu|delet|elimin|limp|tir[ae]|tirar|separ|mov[aei]|refa[çz]|reorganiz|simplifi[cq]|resum[ai]|condens|descart|substitu|troqu|troc|junt|enxug|reduz|recome[cç]|redesenh|desfa[çz]|transform|convert|recri)\w*/i;
 /** Pedido que manda mudar o texto do que existe: só aí a anotação que já existia pode ser reescrita. */
 export const PEDE_PARA_REESCREVER = /\b(atualiz|reescrev|corri[jg]|edit|alter|reformul|revis|melhor[ae]|ajust|mud[ae]|complement|amplie|ampli[ae]r|expand)\w*/i;
+// a nota NOVA ("crie uma nota", "adicione uma anotação") — e não a que existe ("coloque X NA nota", "a
+// nota DESSA aba está errada"): só aí a anotação que já existia fica como estava (01/11/2026: "a nota
+// está errada, o certo é…" voltava igual, com uma cópia nova ao lado, e a Lisa dizia que tinha corrigido)
+const CRIA = /\b(cri[ae]|adicion|acrescent|inclu|ponh|coloqu|insir)\w*/i;
+const NOTA = /\b(notas?|note|anota[çc](?:[aã]o|[oõ]es)|coment[aá]rios?)\b/i;
+const NA_NOTA = /\b(n[ao]s?|d[ao]s?|ness[ae]s?|dess[ae]s?|nest[ae]s?|dest[ae]s?|à|a)\s+(notas?|note|anota[çc]|coment[aá]ri)/i;
+const pedeNotaNova = (p) => CRIA.test(p) && NOTA.test(p) && !PEDE_PARA_REESCREVER.test(p) && !NA_NOTA.test(p.replace(/\b(cri[ae]|adicion|acrescent|inclu|ponh|coloqu|insir)\w*\s+(uma|um|a|as)\s+/gi, " "));
 
 /**
  * Trava contra perda (01/11/2026: pediram notas e a aba "Fluxo Desktop" voltou só com uma raia e o
@@ -498,7 +505,7 @@ export const PEDE_PARA_REESCREVER = /\b(atualiz|reescrev|corri[jg]|edit|alter|re
  */
 export function semPerdas(desenho, anterior, pedido) {
   if (!anterior || anterior.mode === "mindmap" || !desenho?.abas?.length || PEDE_PARA_TIRAR.test(String(pedido || ""))) return { desenho, devolvidas: 0 };
-  const guardarNotas = !PEDE_PARA_REESCREVER.test(String(pedido || ""));
+  const guardarNotas = pedeNotaNova(String(pedido || ""));
   const est = estruturaDoDocumento(anterior);
   const paginas = abasDe(anterior);
   // a aba velha de cada aba da resposta (uma aba sobre um documento de uma aba é a mesma, como em montarDocumento)
@@ -567,6 +574,60 @@ export function estruturaDoDocumento(doc) {
   const abas = abasDe(doc).map((aba, i) => estruturaDaAba(aba, i));
   const aberta = abas.find((a) => a.id === String(doc?.activePage)) || abas[0];
   return { titulo: String(doc?.name || abas[0]?.nome || "Processo"), abaAtiva: aberta?.id || "p1", abas };
+}
+
+/**
+ * O que mudou DE VERDADE entre dois documentos (01/11/2026: "eu peço algo específico, ela diz que
+ * corrigiu, mas não corrige" — a resposta era a explicação do modelo, e no "Núcleo de Funcionalidades"
+ * ela disse "atualizado" com zero mudança). Compara aba por aba, pelo id: abas novas e removidas, formas
+ * novas e sumidas, textos, cores, ligações, raias e o que foi movido de lugar ou de galho.
+ * Devolve { mudou, texto } — o texto em português, para a conversa ("" se nada mudou).
+ */
+export function resumoDaMudanca(antes, depois) {
+  const mapaDeAbas = (doc) => new Map(abasDe(doc).map((a, i) => [String(a.id ?? `p${i + 1}`), a]));
+  const formasDe = (a) => new Map((a?.shapes || []).filter((s) => s && s.type !== "ink" && !AGRUPADORES.has(s.type)).map((s) => [String(s.id), s]));
+  const raiasDe = (a) => (a?.shapes || []).filter((s) => s && AGRUPADORES.has(s.type)).map((s) => String(s.text ?? "").trim()).sort().join("|");
+  const txt = (s) => String(s?.text ?? "").replace(/\s+/g, " ").trim();
+  const curto = (s) => `"${txt(s).slice(0, 40) || s.type}${txt(s).length > 40 ? "…" : ""}"`;
+  const lista = (xs) => `${xs.slice(0, 3).map(curto).join(", ")}${xs.length > 3 ? ` e mais ${xs.length - 3}` : ""}`;
+  const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+  const A = mapaDeAbas(antes);
+  const D = mapaDeAbas(depois);
+  const mapa = depois?.mode === "mindmap";
+  const partes = [];
+  if ((antes?.mode === "mindmap") !== mapa) partes.push(mapa ? "virou mapa mental" : "virou fluxograma");
+  for (const [id, d] of D) {
+    const a = A.get(id);
+    const nome = d.name || a?.name || id;
+    const fd = formasDe(d);
+    if (!a) { partes.push(`aba nova "${nome}" (${plural(fd.size, "forma", "formas")})`); continue; }
+    const fa = formasDe(a);
+    const novas = [...fd.keys()].filter((k) => !fa.has(k)).map((k) => fd.get(k));
+    const sumidas = [...fa.keys()].filter((k) => !fd.has(k)).map((k) => fa.get(k));
+    const ficaram = [...fd.keys()].filter((k) => fa.has(k));
+    const textos = ficaram.filter((k) => txt(fa.get(k)) !== txt(fd.get(k))).map((k) => fd.get(k));
+    const cores = ficaram.filter((k) => (fa.get(k).color || "") !== (fd.get(k).color || ""));
+    const outras = ficaram.filter((k) => String(fa.get(k).parent ?? "") !== String(fd.get(k).parent ?? "") || String(fa.get(k).link ?? "") !== String(fd.get(k).link ?? "") || fa.get(k).type !== fd.get(k).type);
+    const lugar = mapa ? [] : ficaram.filter((k) => Number(fa.get(k).x) !== Number(fd.get(k).x) || Number(fa.get(k).y) !== Number(fd.get(k).y));
+    const ligacao = (c) => `${c.from}>${c.to}>${c.label || ""}`;
+    const ligA = new Set((a.connections || []).map(ligacao));
+    const ligD = new Set((d.connections || []).map(ligacao));
+    const ligNovas = [...ligD].filter((x) => !ligA.has(x)).length;
+    const ligSumidas = [...ligA].filter((x) => !ligD.has(x)).length;
+    const itens = [];
+    if (novas.length) itens.push(`+${plural(novas.length, "forma", "formas")} (${lista(novas)})`);
+    if (sumidas.length) itens.push(`−${plural(sumidas.length, "forma", "formas")} (${lista(sumidas)})`);
+    if (textos.length) itens.push(`${plural(textos.length, "texto mudado", "textos mudados")} (${lista(textos)})`);
+    if (cores.length) itens.push(plural(cores.length, "cor trocada", "cores trocadas"));
+    if (outras.length) itens.push(plural(outras.length, mapa ? "tópico mudou de galho" : "forma religada", mapa ? "tópicos mudaram de galho" : "formas religadas"));
+    if (ligNovas || ligSumidas) itens.push(`ligações ${[ligNovas ? `+${ligNovas}` : "", ligSumidas ? `−${ligSumidas}` : ""].filter(Boolean).join(" ")}`);
+    if (raiasDe(a) !== raiasDe(d)) itens.push("raias mudaram");
+    if ((a.name || "") !== (d.name || "")) itens.push(`aba renomeada (era "${a.name}")`);
+    if (!itens.length && lugar.length) itens.push(`só a posição de ${plural(lugar.length, "forma", "formas")}`);
+    if (itens.length) partes.push(`${D.size > 1 || A.size > 1 ? `aba "${nome}": ` : ""}${itens.join(", ")}`);
+  }
+  for (const [id, a] of A) if (!D.has(id)) partes.push(`aba "${a.name || id}" removida`);
+  return { mudou: partes.length > 0, texto: partes.join("; ") };
 }
 
 /**
@@ -700,8 +761,16 @@ const SUBSTANTIVOS_DE_DESENHO = new Set(["desenho", "desenhos", "desenhado", "de
 const VERBOS_GERAIS = ["monte", "montar", "crie", "criar", "cria", "faca", "fazer", "faz", "gere", "gerar", "mostre", "mostrar", "coloque", "ponha", "quero", "preciso"];
 const COISAS_FORTES = ["diagrama", "diagramas", "fluxograma", "fluxogramas", "bpmn", "swimlane", "organograma", "processmap"];
 const COISAS = [...COISAS_FORTES, "processo", "processos", "fluxo", "fluxos", "arquitetura", "workflow", "jornada", "pipeline", "esteira", "raias", "mapa", "modelagem"];
-const VERBO_DE_MUDANCA = /\b(adicion\w*|acrescent\w*|inclu\w*|coloque|ponha|remov\w*|tir[ae]|apag\w*|exclu\w*|troqu\w*|troc\w*|mud\w*|renome\w*|lig\w*|conect\w*|separ\w*|junt\w*|reorganiz\w*|refa[çz]\w*|corrij\w*|ajust\w*|divid\w*|mov[ae]\w*|limp\w*|pint\w*|color\w*|destaqu\w*|destac\w*|marqu\w*|deix[ae]\w*|cri[ae]\w*|detalh\w*)\b/i;
-const PARTE_DO_DESENHO = /\b(etapa|passo|caixa|forma|raia|decis[aã]o|liga[çc][aã]o|seta|fluxo|diagrama|processo|desenho|quadro|in[ií]cio|fim|tarefa|gateway|evento|swimlane|caminho|mapa|t[oó]pico|galho|atividade|cor|cores|vermelh[ao]|verde|azul|[aâ]mbar|amarel[ao]|laranja|cinza|grafite|branc[ao]|aba|p[aá]gina|subprocesso)s?\b/i;
+// (01/11/2026: "corrija a nota", "complete a aba", "arrume o texto" não contavam como mudança — o
+// pedido ia para a conversa, que não muda desenho nenhum, e a resposta dizia que tinha corrigido)
+const VERBO_DE_MUDANCA = /\b(adicion\w*|acrescent\w*|inclu\w*|coloque|ponha|remov\w*|tir[ae]|apag\w*|exclu\w*|troqu\w*|troc\w*|mud\w*|renome\w*|lig\w*|conect\w*|separ\w*|junt\w*|reorganiz\w*|refa[çz]\w*|corrij\w*|corrig\w*|ajust\w*|divid\w*|mov[ae]\w*|limp\w*|pint\w*|color\w*|destaqu\w*|destac\w*|marqu\w*|deix[ae]\w*|cri[ae]\w*|detalh\w*|complet\w*|arrum\w*|consert\w*|atualiz\w*|reescrev\w*|melhor[ae]\w*|edit[ae]\w*|alter[ae]\w*|insir\w*|acert[ae]\w*|revis[ae]\w*|anot[ae]\w*)\b/i;
+const PARTE_DO_DESENHO = /\b(etapa|passo|caixa|forma|raia|decis[aã]o|liga[çc][aã]o|seta|fluxo|fluxograma|diagrama|processo|desenho|quadro|in[ií]cio|fim|tarefa|gateway|evento|swimlane|caminho|mapa|t[oó]pico|galho|atividade|cor|cores|vermelh[ao]|verde|azul|[aâ]mbar|amarel[ao]|laranja|cinza|grafite|branc[ao]|aba|p[aá]gina|subprocesso)s?\b/i;
+// (a nota é parte do desenho para mandar o pedido ao PLANO do projeto, que decide; no quadro sem projeto
+// não — "crie uma nota da reunião" com o quadro aberto é outra coisa)
+const PARTE_OU_NOTA = new RegExp(`${PARTE_DO_DESENHO.source.slice(0, -"s?\\b".length - 1)}|nota|anota[çc][aã]o|anota[çc][oõ]e|coment[aá]rio|r[oó]tulo)s?\\b`, "i");
+
+/** O pedido manda mudar alguma parte de um desenho ("corrija a nota da aba Desktop", "complete o fluxo")? */
+export const pedeMudancaNoDesenho = (q) => VERBO_DE_MUDANCA.test(String(q || "")) && PARTE_OU_NOTA.test(String(q || ""));
 
 /**
  * A pergunta pede para desenhar ("novo") ou, com o quadro aberto, para mudar o desenho que está nele

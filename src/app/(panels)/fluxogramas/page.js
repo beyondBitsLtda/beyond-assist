@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiDosFluxos, assinaturaDoDesenho, criarSalvador, LIMITE_DO_KEEPALIVE } from "@/lib/fluxogramasNoNavegador.js";
-import { citaProjeto, fluxoCitado, pedeEmTodos, pedeDocumentacao } from "@/lib/processmapNaConversa.js";
+import { citaProjeto, fluxoCitado, pedeEmTodos, pedeDocumentacao, respostaDeConfirmacao, textoDaConfirmacao } from "@/lib/processmapNaConversa.js";
 import { pedirPlano, executarPlano, textoDoAndamento } from "@/lib/trabalhoNoProjeto.js";
 
 const api = apiDosFluxos();
@@ -78,6 +78,9 @@ export default function ProcessMapPage() {
   const [desenhando, setDesenhando] = useState(false);
   const [explicacao, setExplicacao] = useState("");
   const [aviso, setAviso] = useState("");
+  // o pedido sobre o projeto esperando o "sim" (01/11/2026: "ela deve me perguntar se eu tenho certeza;
+  // se eu disser sim, aí ela faz"): { q, a, plano, projeto, fluxos }
+  const [confirmacao, setConfirmacao] = useState(null);
   // "Versões anteriores…" (01/11/2026): { fluxo, lista (null = carregando), erro, voltando (id) }
   const [versoes, setVersoes] = useState(null);
   // o próximo salvamento automático é o desenho que a Lisa acabou de fazer (a versão de antes fica guardada)
@@ -402,7 +405,6 @@ export default function ProcessMapPage() {
     || Boolean(fluxoCitado(q, (fluxosDoProjeto || []).filter((f) => f.id !== abertoRef.current?.id)));
 
   async function trabalharNoProjeto(q, a) {
-    const p = ponte();
     // o que está na tela vai para o banco antes: a Lisa parte do que a pessoa acabou de mexer
     await salvador.current?.agora();
     const { projeto, fluxos } = await api.lerProjeto(a.projetoId);
@@ -416,7 +418,20 @@ export default function ProcessMapPage() {
       setExplicacao(plano.explicacao || "Isso parece uma pergunta sobre o projeto: pergunte na conversa do Assistente, que eu respondo com todos os desenhos dele.");
       return;
     }
-    const daTela = p.exportar();
+    // mostra o que entendeu e espera o "sim" (os botões abaixo, ou "sim"/"não"/a correção na barra)
+    setConfirmacao({ q, a, plano, projeto, fluxos });
+    setExplicacao(textoDaConfirmacao(plano, projeto, fluxos));
+    setPedido("");
+  }
+
+  // depois do "sim": o projeto é lido de novo e o fluxo aberto parte do que está na tela AGORA (a pessoa
+  // pode ter mexido, ou aberto outro fluxo, enquanto decidia)
+  async function fazerNoProjeto({ a: aEntao, plano, projeto: projetoEntao, fluxos: fluxosEntao }) {
+    const p = ponte();
+    await salvador.current?.agora();
+    const { projeto, fluxos } = await api.lerProjeto(projetoEntao.id).catch(() => ({ projeto: projetoEntao, fluxos: fluxosEntao }));
+    const a = abertoRef.current?.id === aEntao.id ? abertoRef.current : { ...aEntao, id: "" };
+    const daTela = a.id ? p.exportar() : null;
     // enquanto a Lisa trabalha, o salvamento automático do fluxo aberto para (ela grava por cima)
     salvador.current?.parar();
     salvador.current = null;
@@ -436,8 +451,25 @@ export default function ProcessMapPage() {
     } finally {
       // a lista e o fluxo aberto voltam do banco (com a versão nova e o salvamento ligado de novo)
       await recarregarLista();
-      await abrirFluxo(a.id, { deNovo: true });
+      if (abertoRef.current) await abrirFluxo(abertoRef.current.id, { deNovo: true });
       setExplicacao(textoDoAndamento(plano, linhas, fim));
+    }
+  }
+
+  // os botões "Sim, fazer" / "Não" do que a Lisa entendeu
+  async function responderConfirmacao(sim) {
+    const conf = confirmacao;
+    setConfirmacao(null);
+    if (!conf) return;
+    if (!sim) { setExplicacao("Tudo bem, não fiz nada."); return; }
+    setDesenhando(true);
+    setAviso("");
+    try {
+      await fazerNoProjeto(conf);
+    } catch (err) {
+      setAviso(`A Lisa não conseguiu: ${err.message}`);
+    } finally {
+      setDesenhando(false);
     }
   }
 
@@ -446,6 +478,25 @@ export default function ProcessMapPage() {
     const q = pedido.trim();
     const p = ponte();
     if (!q || desenhando || !p) return;
+    // a resposta ao "posso fazer?" digitada na barra: sim, não, ou a correção do que ela entendeu
+    if (confirmacao) {
+      const resposta = respostaDeConfirmacao(q);
+      if (resposta === "sim" || resposta === "nao") { setPedido(""); return responderConfirmacao(resposta === "sim"); }
+      const conf = confirmacao;
+      setConfirmacao(null);
+      if (resposta === "corrige" && abertoRef.current) {
+        setDesenhando(true);
+        try {
+          await trabalharNoProjeto(`${conf.q}\n\nCORREÇÃO DA PESSOA sobre o que eu entendi (vale mais que o pedido acima): ${q}`, abertoRef.current);
+          setPedido("");
+        } catch (err) {
+          setAviso(`A Lisa não conseguiu: ${err.message}`);
+        } finally {
+          setDesenhando(false);
+        }
+        return;
+      }
+    }
     // pedido de .md / documento: aqui não há editor de código, e o desenho não muda
     if (pedeDocumentacao(q)) {
       setExplicacao(PARA_DOCUMENTAR);
@@ -777,7 +828,13 @@ export default function ProcessMapPage() {
           <div className="bb-fluxos-explicacao">
             <span aria-hidden="true">✦</span>
             <p>{explicacao}</p>
-            <button type="button" onClick={() => setExplicacao("")} aria-label="fechar a explicação">×</button>
+            {confirmacao && (
+              <span className="bb-fluxos-confirmar">
+                <button type="button" className="bb-fluxos-botao bb-fluxos-botao--lisa" disabled={desenhando} onClick={() => responderConfirmacao(true)}>Sim, fazer</button>
+                <button type="button" className="bb-fluxos-botao" disabled={desenhando} onClick={() => responderConfirmacao(false)}>Não</button>
+              </span>
+            )}
+            <button type="button" onClick={() => { setExplicacao(""); setConfirmacao(null); }} aria-label="fechar a explicação">×</button>
           </div>
         )}
         <form className="bb-fluxos-pedir" onSubmit={pedirALisa}>

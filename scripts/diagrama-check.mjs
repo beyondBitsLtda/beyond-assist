@@ -7,7 +7,7 @@ import {
   validarDesenho, camadasDoDesenho, posicoesDoDesenho, montarDocumento, estruturaDoDocumento, descreverDiagrama,
   pedidoDeDesenho, documentoValido, FORMAS, distanciaDeEdicao, pareceDiagramaEmTexto,
   pedeMapaMental, validarMapaMental, montarMapaMental, estruturaDoMapa, LIMITES_DO_MAPA,
-  CORES, NOMES_DAS_CORES, corPeloNome, nomeDaCor, vaiSerMapaMental, semPerdas, PEDE_PARA_TIRAR, estruturaQueCabe,
+  CORES, NOMES_DAS_CORES, corPeloNome, nomeDaCor, vaiSerMapaMental, semPerdas, PEDE_PARA_TIRAR, estruturaQueCabe, resumoDaMudanca,
 } from "../src/lib/diagramaDaLisa.js";
 import fs from "node:fs";
 
@@ -390,6 +390,26 @@ console.log("\na trava contra perda (01/11/2026: pediram notas e a aba \"Fluxo D
   conferir("\"crie uma nota\": a nota da pessoa não é reescrita — a nova entra ao lado", notas.find((s) => s.id === "minha")?.text === "• Minha decisão: começar pelo desktop" && notas.some((s) => s.id === "minha-nova" && s.text === "• Conceito novo da Lisa"));
   const r4 = semPerdas(validarDesenho({ titulo: "X", abas: [{ id: "desk", nome: "Fluxo Desktop", formas: [...est2(comNotaDaPessoa.pages[0]).filter((f) => f.id !== "minha"), { id: "minha", tipo: "note", texto: "• Atualizada" }], ligacoes: [] }] }), comNotaDaPessoa, "atualize a nota com as decisões de hoje");
   conferir("\"atualize a nota\": aí a nota muda mesmo", montarDocumento(r4.desenho, comNotaDaPessoa).pages[0].shapes.filter((s) => s.type === "note").map((s) => s.text).join() === "• Atualizada");
+
+  // "a nota está errada, o certo é…" (corrigir a nota que existe): a nota muda, sem cópia ao lado
+  const corrigeNota = (pedido) => {
+    const resp = validarDesenho({ titulo: "X", abas: [{ id: "desk", nome: "Fluxo Desktop", formas: [...est2(comNotaDaPessoa.pages[0]).filter((f) => f.id !== "minha"), { id: "minha", tipo: "note", texto: "• Decisão certa: começar pelo mobile" }], ligacoes: [] }] });
+    return montarDocumento(semPerdas(resp, comNotaDaPessoa, pedido).desenho, comNotaDaPessoa).pages[0].shapes.filter((s) => s.type === "note").map((s) => s.text);
+  };
+  conferir("corrigir a nota que existe (\"a nota está errada\", \"coloque na nota\", \"troque o texto da nota\"): ela muda, sem cópia", ["a nota da aba Desktop está errada, o certo é começar pelo mobile", "coloque na nota que a decisão é começar pelo mobile", "Na anotação existente da aba Fluxo Desktop, troque o texto"].every((p) => corrigeNota(p).join() === "• Decisão certa: começar pelo mobile"));
+
+  // o que mudou de verdade (resumoDaMudanca): nada, textos, formas, abas, mapa mental
+  conferir("resumo da mudança: desenho igual não mudou", resumoDaMudanca(tela, JSON.parse(JSON.stringify(tela))).mudou === false);
+  const mexido = JSON.parse(JSON.stringify(tela));
+  mexido.pages[0].shapes.find((s) => s.id === "admin").text = "É administrador?";
+  mexido.pages[0].shapes.push({ id: "login", type: "process", x: 10, y: 10, w: 160, h: 60, text: "Fazer login" });
+  mexido.pages[1].name = "Celular";
+  mexido.pages.push({ id: "novo", name: "Onboarding", shapes: [{ id: "a", type: "process", x: 0, y: 0, w: 100, h: 50, text: "A" }], connections: [] });
+  const resumo = resumoDaMudanca(tela, mexido);
+  conferir("resumo da mudança: diz a forma nova, o texto mudado, a aba renomeada e a aba nova", resumo.mudou && /aba "Fluxo Desktop": \+1 forma \("Fazer login"\), 1 texto mudado \("É administrador\?"\)/.test(resumo.texto) && /aba renomeada \(era "Fluxo Mobile"\)/.test(resumo.texto) && /aba nova "Onboarding" \(1 forma\)/.test(resumo.texto), resumo.texto);
+  const mapaA = montarMapaMental(validarMapaMental({ titulo: "M", tema: "Lisa", topicos: [{ id: "voz", texto: "Voz" }] }));
+  const mapaB = montarMapaMental(validarMapaMental({ titulo: "M", tema: "Lisa", topicos: [{ id: "voz", texto: "Voz e rádio" }, { id: "task", texto: "Lisa Task" }] }), mapaA);
+  conferir("resumo da mudança no mapa mental", /\+1 forma \("Lisa Task"\), 1 texto mudado \("Voz e rádio"\)/.test(resumoDaMudanca(mapaA, mapaB).texto), resumoDaMudanca(mapaA, mapaB).texto);
 
   // a anotação longa não é cortada no caminho de ida e volta
   const longa = "• Conceito: " + "a".repeat(900);

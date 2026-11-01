@@ -215,9 +215,9 @@ const PAUSA_DO_MODELO_MS = 3 * 60_000;
  */
 const TETO_LONGO_MS = 75_000;
 // O desenho de várias abas com anotações longas e o .md de um desenho (01/11/2026: o "Fluxo de Uso MVP"
-// estourou os 75s): mais tempo, e uma tentativa por modelo — repetir a mesma resposta longa com outra
-// chave só dobra a espera; se não der, vai para o modelo de reserva, que é mais rápido.
-const TETO_DO_DESENHO_MS = 150_000;
+// estourou os 75s): mais tempo. Duas tentativas por modelo, como o resto — com uma só, a "alta demanda"
+// de uma chave já derrubava o pedido (visto em 01/11/2026); depois vem o modelo de reserva.
+const TETO_DO_DESENHO_MS = 120_000;
 const modeloPausadoAte = new Map();
 
 /** Os modelos de chat na ordem em que vale tentar AGORA: os pausados vão para o fim. */
@@ -1256,7 +1256,7 @@ Regras:
           },
         },
       }),
-    { attempts: 1, delayMs: 800, tetoMs: TETO_DO_DESENHO_MS }
+    { attempts: 2, delayMs: 800, tetoMs: TETO_DO_DESENHO_MS }
   );
   try {
     return JSON.parse(res.text);
@@ -1276,7 +1276,7 @@ export async function planejarNoProjeto({ pedido, projeto = "", fluxos = [], abe
   const lista = fluxos.map((f) => `- id "${f.id}": "${f.nome}" (${f.modo === "mindmap" ? "mapa mental" : "fluxograma"}, ${f.formas ?? "?"} formas)${f.id === aberto ? " — aberto no quadro agora" : ""}`).join("\n");
   const prompt = [
     // (01/11/2026: o plano refez pedidos antigos da conversa em vez do pedido de agora)
-    conversa ? `A CONVERSA ATÉ AQUI (só contexto: os pedidos que estão nela JÁ FORAM FEITOS — não os repita):\n${conversa.slice(-6000)}\n` : "",
+    conversa ? `A CONVERSA ATÉ AQUI (contexto: os pedidos antigos dela já foram tentados, e a resposta da Lisa diz o que mudou de verdade em cada desenho — "mudou: …", "não mudou nada", "não deu"):\n${conversa.slice(-6000)}\n` : "",
     `OS DESENHOS DO PROJETO:\n${lista || "(nenhum ainda)"}\n`,
     projeto ? `O CONTEÚDO DELES:\n${projeto.slice(0, 30000)}\n` : "",
     `O PEDIDO DE AGORA (é ESTE que você planeja): "${String(pedido || "").slice(0, 6000)}"`,
@@ -1297,7 +1297,12 @@ Decida:
   algo nos desenhos do projeto; "responder" quando é só pergunta, análise ou opinião sobre o projeto;
   "documentar" quando a pessoa quer SÓ um TEXTO feito a partir dos desenhos, fora deles — arquivo .md,
   markdown, README, documento, especificação, "no editor", "para pedir ao Claude/a uma IA construir".
-  Planeje SÓ o pedido de agora: a conversa é contexto, e os pedidos antigos dela já foram feitos.
+  Planeje SÓ o pedido de agora: não refaça pedidos antigos da conversa por conta própria. Mas a conversa
+  diz a QUE o pedido de agora se refere: "corrija isso", "não ficou certo", "ainda está faltando", "a
+  nota está errada" falam do último desenho e da última mudança — use a conversa para achar o desenho,
+  a aba e a forma certos, e faça a correção pedida ("mudar"), dizendo na instrução EXATAMENTE o que trocar
+  (o texto de antes e o de depois, a etapa a incluir e entre quais, a aba). Corrigir o texto de uma nota
+  que existe é reescrever ESSA nota (mesmo id), não criar outra.
 - "documentos": os arquivos .md que o pedido de agora pede (MD, markdown, arquivo, documento, "no editor",
   mesmo escrito com erro: "mds", "emedê", "aruivo md", "editro"), escritos no editor de código. Quantos o
   pedido pedir: "um arquivo md" = UM; "um md por fluxograma e mapa mental" = um por desenho. Cada um:
@@ -1333,7 +1338,11 @@ Decida:
     pelo conteúdo. Nada que se encaixe: crie um desenho novo para isso.
   - Ao descrever conceito, decisões e motivos do projeto, use o que está nos desenhos e na conversa
     (e o que o próprio pedido decide); não invente fatos que contradigam o projeto.
-- "explicacao": 1 a 2 frases, falando com a pessoa, dizendo o que você vai fazer (sem listar tudo).`;
+- Pedido ambíguo (o desenho, a aba ou a forma não foram ditos certinho): NÃO devolva "responder" para
+  pedir o nome exato — escolha o mais provável pelo assunto, pelos nomes parecidos e pela conversa, e
+  diga na "explicacao" como entendeu ("Entendi que é a nota da aba Fluxo Mobile do Fluxo de Uso MVP").
+  A pessoa confirma antes de eu fazer, e corrige se eu entendi errado.
+- "explicacao": 1 a 2 frases, falando com a pessoa, dizendo o que você entendeu e vai fazer (sem listar tudo).`;
 
   const res = await withTransientRetry(
     CHAT_MODEL,
@@ -1482,7 +1491,7 @@ Regras:
   const res = await withTransientRetry(
     CHAT_MODEL,
     (client, modelo) => client.models.generateContent({ model: modelo, contents: prompt, config: { systemInstruction } }),
-    { attempts: 1, delayMs: 800, tetoMs: TETO_DO_DESENHO_MS }
+    { attempts: 2, delayMs: 800, tetoMs: TETO_DO_DESENHO_MS }
   );
   // (se o modelo cercar o arquivo inteiro num bloco de código, a cerca sai)
   const texto = String(res.text || "").trim().replace(/^`{3,}\s*(markdown|md)?\s*\n([\s\S]*?)\n`{3,}\s*$/i, "$2").trim();
@@ -1564,7 +1573,7 @@ Regras:
           },
         },
       }),
-    { attempts: 1, delayMs: 800, tetoMs: TETO_DO_DESENHO_MS }
+    { attempts: 2, delayMs: 800, tetoMs: TETO_DO_DESENHO_MS }
   );
   try {
     return JSON.parse(res.text);

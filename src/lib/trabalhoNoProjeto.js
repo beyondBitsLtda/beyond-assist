@@ -7,7 +7,7 @@
 // servidor falso em scripts/fluxogramas-check.mjs).
 
 import { contextoDoProjeto, caminhoDoDocumento, documentosPorDesenho } from "./processmapNaConversa.js";
-import { descreverDiagrama } from "./diagramaDaLisa.js";
+import { descreverDiagrama, resumoDaMudanca } from "./diagramaDaLisa.js";
 
 const JSON_ = { "content-type": "application/json" };
 
@@ -61,28 +61,43 @@ export async function executarPlano({
     aoAndar(linhas);
     try {
       const fluxo = op.fluxo ? fluxos.find((f) => f.id === op.fluxo) : null;
+      const antes = fluxo ? docDe(fluxo) : null;
       const res = await buscar("/api/diagrama", {
         method: "POST",
         headers: JSON_,
         body: JSON.stringify({
           pedido: !fluxo && op.tipo === "mapa mental" ? `Monte um mapa mental. ${op.pedido}` : op.pedido,
-          atual: fluxo ? docDe(fluxo) : null,
+          atual: antes,
           conversa, contexto,
           projeto: contextoDoProjeto(projeto, fluxos, { alvo: fluxo }),
         }),
       });
       const r = await res.json().catch(() => ({}));
       if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
+      // o que mudou DE VERDADE (01/11/2026: "ela diz que corrigiu, mas não corrige" — a linha dizia
+      // "atualizado" com a explicação do modelo, mesmo quando o desenho voltava igual): desenho igual não
+      // é gravado, e a linha diz o que mudou, não o que o modelo diz que fez
+      const mudanca = fluxo ? resumoDaMudanca(antes, r.doc) : null;
+      if (mudanca && !mudanca.mudou) {
+        linha.estado = "não mudou nada";
+        linha.nota = "o desenho voltou igual — diga o que está errado e onde (a aba, a etapa, a nota)";
+        linha.ok = false;
+        linha.trabalhando = false;
+        aoAndar(linhas);
+        continue;
+      }
       // (origem "lisa": a versão de antes fica guardada — dá para voltar pelo painel ProcessMap)
       const daLisa = { documento: r.doc, origem: "lisa", motivo: String(op.pedido).replace(/\s+/g, " ").slice(0, 140) };
       const salvo = fluxo
         ? await api.salvar(fluxo.id, fluxo.id === abertoId ? { ...daLisa, forcar: true } : { ...daLisa, versao: fluxo.versao })
         : (await api.criar({ documento: r.doc, nome: op.nome || r.titulo, projetoId: projeto.id, origem: "lisa" })).fluxo;
       linha.nome = salvo.nome;
-      linha.estado = fluxo ? "atualizado" : "criado";
+      linha.estado = fluxo ? "mudou" : "criado";
       linha.ok = true;
-      linha.nota = String(r.explicacao || "").split(/(?<=[.!?])\s/)[0].slice(0, 160);
-      resultados.push({ op, fluxo: salvo, doc: r.doc, colecao: r.colecao, explicacao: r.explicacao, mudou: Boolean(fluxo) });
+      const abas = r.doc?.mode === "mindmap" ? 1 : r.doc?.pages?.length || 1;
+      const formas = (r.doc?.pages || []).reduce((t, p) => t + (p.shapes || []).length, 0);
+      linha.nota = mudanca ? mudanca.texto : `${formas} formas${abas > 1 ? ` em ${abas} abas` : ""}`;
+      resultados.push({ op, fluxo: salvo, doc: r.doc, colecao: r.colecao, explicacao: r.explicacao, mudou: Boolean(fluxo), mudanca: mudanca?.texto || "" });
     } catch (err) {
       linha.estado = err.status === 409 ? "não salvei (mudou em outro lugar agora há pouco)" : "não deu";
       linha.nota = err.status === 409 ? "" : err.message;

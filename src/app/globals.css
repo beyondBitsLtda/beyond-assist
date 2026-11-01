@@ -743,6 +743,10 @@ button.bb-fluxos-estado { border: 1px solid rgba(255, 157, 61, 0.4); background:
 .bb-fluxos-explicacao > span { color: var(--accent-hex); }
 .bb-fluxos-explicacao p { flex: 1; margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--bb-texto-2); white-space: pre-wrap; }
 .bb-fluxos-explicacao button { border: 0; background: none; color: var(--bb-texto-3); font-size: 18px; line-height: 1; cursor: pointer; }
+/* "Sim, fazer" / "Não" do que a Lisa entendeu (01/11/2026) — os botões de verdade, não o × da explicação */
+.bb-fluxos-confirmar { display: flex; flex-direction: column; gap: 6px; align-self: center; }
+.bb-fluxos-confirmar .bb-fluxos-botao { height: 34px; padding: 0 14px; border: 1px solid var(--bb-linha-forte); background: var(--bb-superficie-2); color: var(--bb-texto); font-size: 13px; }
+.bb-fluxos-confirmar .bb-fluxos-botao--lisa { border-color: rgba(var(--accent-rgb), 0.55); background: rgba(var(--accent-rgb), 0.16); }
 .bb-fluxos-pedir { display: flex; gap: 8px; padding: 9px 12px max(9px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--bb-linha); background: var(--bb-superficie); }
 .bb-fluxos-pedir input { flex: 1; min-width: 0; height: 38px; padding: 0 12px; font: inherit; font-size: 14px; border: 1px solid var(--bb-linha-forte); }
 .bb-fluxos-veu { display: none; }

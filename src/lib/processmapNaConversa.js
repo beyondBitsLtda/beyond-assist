@@ -53,6 +53,35 @@ export function projetoCitado(pergunta, projetos) {
 }
 
 /**
+ * O projeto MAIS PROVÁVEL do pedido, mesmo com o nome dito pela metade ou com erro (01/11/2026: "ela
+ * pede para eu falar exatamente o nome do projeto — ela tem que interpretar e saber o que eu quero, e me
+ * perguntar se eu tenho certeza"). Em ordem: o nome inteiro; o nome de um desenho dele; metade ou mais
+ * das palavras do nome; o projeto em uso; o único; o mexido por último (a lista vem do mais novo para o
+ * mais velho). Como a Lisa confirma antes de fazer, um palpite errado só custa um "não, é no X".
+ * Devolve { projeto, como } ou null (a pessoa não tem projeto).
+ */
+export function projetoProvavel(pergunta, projetos, { emUso = null } = {}) {
+  const lista = projetos || [];
+  if (!lista.length) return null;
+  const inteiro = melhor(lista, pergunta, (p) => p.nome);
+  if (inteiro) return { projeto: inteiro, como: "citado" };
+  const peloDesenho = melhor(lista.flatMap((p) => (p.fluxos || []).map((f) => ({ nome: f.nome, projeto: p }))), pergunta, (f) => f.nome);
+  if (peloDesenho) return { projeto: peloDesenho.projeto, como: "pelo desenho" };
+  const palavras = palavrasDe(pergunta);
+  let parecido = null;
+  let nota = 0;
+  for (const p of lista) {
+    const fortes = palavrasDe(p.nome).filter((x) => !VAZIAS.has(x) && !GENERICAS.has(x));
+    const n = fortes.length ? fortes.filter((f) => palavras.some((w) => parecida(w, f))).length / fortes.length : 0;
+    if (n > nota) { nota = n; parecido = p; }
+  }
+  if (parecido && nota >= 0.5) return { projeto: parecido, como: "parecido" };
+  const emUsoNaLista = emUso && lista.find((p) => p.id === emUso.id);
+  if (emUsoNaLista) return { projeto: emUsoNaLista, como: "em uso" };
+  return { projeto: lista[0], como: lista.length === 1 ? "único" : "mais recente" };
+}
+
+/**
  * O fluxo citado na pergunta, dentro dos fluxos do projeto (o nome do projeto não conta como citação
  * do fluxo: "no projeto Compras" não escolhe o fluxo "Compras do mês"), ou null.
  */
@@ -330,3 +359,57 @@ export function completarPlano(plano, extra, faltando) {
   return { ...plano, operacoes: [...plano.operacoes, ...novas].slice(0, LIMITE_DE_OPERACOES) };
 }
 
+
+// ---- a confirmação (01/11/2026: "ela tem que interpretar e saber o que eu quero, porém deve me
+// perguntar se eu tenho certeza; se eu disser sim, aí ela faz") ----
+//
+// Antes de mudar desenho ou escrever documento, a Lisa diz o que entendeu (o projeto, cada desenho e o
+// que vai fazer nele) e pergunta. "Sim" faz; "não" cancela; uma correção ("não, é no fluxo mobile")
+// refaz o entendimento com ela e pergunta de novo; outro assunto deixa o pedido de lado.
+
+export const VALIDADE_DA_CONFIRMACAO_MS = 15 * 60_000;
+
+const SIM = ["sim", "pode", "isso", "exato", "exatamente", "manda", "ok", "okay", "beleza", "blz", "confirmo", "confirmado", "certeza", "claro", "yes", "bora", "vai", "uhum", "aham", "positivo", "perfeito", "correto", "certo", "faz", "faca", "fazer", "segue", "prossiga", "continue"];
+// as palavras que podem vir junto do sim sem mudar nada ("sim, pode fazer, Lisa")
+const JUNTO_DO_SIM = new Set([...SIM, "s", "ss", "mesmo", "ver", "tenho", "lisa", "por", "favor", "pfv", "pf", "ir", "em", "frente", "la", "e", "a", "o", "de", "pode", "agora", "entao", "tudo", "isso", "mesmo", "ai", "aí", "tranquilo", "show", "massa", "top", "obrigado", "obrigada", "valeu"]);
+const NAO = ["nao", "n", "cancela", "cancelar", "cancele", "deixa", "deixe", "esquece", "esqueca", "para", "pare", "negativo", "no", "nope", "nada"];
+const CORRECAO = /^(nao|n)\b.{8,}|^(sim|s|pode)\s+(mas|so que|porem|so|e no|e na)\b|^(e|eh|e no|e na|e nos|e nas)\s+(no|na|nos|nas|o|a)\b|^na verdade\b|^(eu )?quis dizer\b|^(nao e|não é)\b|\berrad[oa]\b|^o (certo|correto)\b|^(mas|so que|porem)\b|^faltou\b|^(e )?tamb[eé]m\b|^troca\b|^muda\b|^(no|na) (projeto|fluxo|fluxograma|mapa|aba|desenho)\b/;
+
+/**
+ * A resposta à pergunta "posso fazer?": "sim", "nao", "corrige" (a pessoa ajustou o que a Lisa entendeu)
+ * ou null (é outro assunto). Aguenta erro de digitação ("simm", "pd fazer") e o jeito de falar.
+ */
+export function respostaDeConfirmacao(texto) {
+  const t = semAcento(texto).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  const p = t.split(" ");
+  const ehSim = (x) => /^s+i*m+$/.test(x) || /^s+$/.test(x) || x === "pd" || SIM.some((s) => perto(x, s));
+  if (p.length <= 8 && p.some(ehSim) && p.every((x) => JUNTO_DO_SIM.has(x) || ehSim(x)) && !p.some((x) => NAO.includes(x))) return "sim";
+  if (/^(sim|s|pode)\b.*\b(tenho certeza|pode fazer|faz|faca)\b/.test(t) && p.length <= 12 && !CORRECAO.test(t.replace(/^(sim|s|pode)\s+/, ""))) return "sim";
+  // "não, obrigado", "deixa pra lá": não (e não uma correção)
+  const SO_O_NAO = new Set([...NAO, "obrigado", "obrigada", "valeu", "lisa", "por", "favor", "agora", "ainda", "pra", "la", "isso", "mesmo", "melhor", "faz", "faca", "precisa"]);
+  if (p.length <= 5 && p.some((x) => NAO.includes(x)) && p.every((x) => SO_O_NAO.has(x))) return "nao";
+  if (CORRECAO.test(t)) return "corrige";
+  if (p.length <= 5 && p.some((x) => NAO.includes(x))) return "nao";
+  return null;
+}
+
+/**
+ * O que a Lisa entendeu, para a pessoa confirmar: o projeto (e como ele foi achado), cada desenho e o
+ * que vai ser feito nele, os documentos, e a pergunta.
+ */
+export function textoDaConfirmacao(plano, projeto, fluxos, { como = "" } = {}) {
+  const nomeDe = (id) => (fluxos || []).find((f) => String(f.id) === String(id))?.nome || "?";
+  const resumo = (t) => { const s = String(t || "").replace(/\s+/g, " ").trim(); return s.length > 240 ? `${s.slice(0, 240)}…` : s; };
+  const ondeAchei = { "em uso": " (o que está em uso)", "pelo desenho": " (pelo nome do desenho)", parecido: " (pelo nome parecido)", "mais recente": " (o mais recente — se não for esse, diga qual)", "único": "" }[como] || "";
+  const linhas = [
+    ...(plano.operacoes || []).map((o) => (o.fluxo ? `• Mudar "${nomeDe(o.fluxo)}": ${resumo(o.pedido)}` : `• Criar ${o.tipo === "mapa mental" ? "o mapa mental" : "o fluxograma"} "${o.nome}": ${resumo(o.pedido)}`)),
+    ...(plano.documentos || []).map((d) => `• Escrever no editor o arquivo ${d.arquivo}${d.titulo && d.estilo === "livre" ? ` — ${d.titulo}` : ""}`),
+  ];
+  return [
+    // (o modelo às vezes já começa com "Entendi…": não repete)
+    `${!plano.explicacao ? "Entendi assim:" : /^entendi\b/i.test(plano.explicacao) ? plano.explicacao : `Entendi assim: ${plano.explicacao}`}`,
+    `No projeto "${projeto?.nome || "?"}"${ondeAchei}:\n${linhas.join("\n")}`,
+    `${plano.operacoes?.length ? "Os desenhos que eu mudar ficam com a versão de antes guardada. " : ""}Posso fazer? Responda sim, não, ou me diga o que corrigir.`,
+  ].join("\n\n");
+}

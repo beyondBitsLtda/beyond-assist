@@ -9,12 +9,12 @@ import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 import { langForPath } from "@/lib/highlightCode.js";
 import { respostaSemCodigo, trechosDaResposta, codigoDaConversa } from "@/lib/codigoNaResposta.js";
-import { pedidoDeDesenho, descreverDiagrama } from "@/lib/diagramaDaLisa.js";
+import { pedidoDeDesenho, descreverDiagrama, resumoDaMudanca, pedeMudancaNoDesenho } from "@/lib/diagramaDaLisa.js";
 import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
 import FontesDaWeb from "@/components/panels/FontesDaWeb.js";
 import CenaDaLisa from "@/components/panels/hud/CenaDaLisa.js";
 import JanelaDaResposta from "@/components/panels/hud/JanelaDaResposta.js";
-import { citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, pedeEmTodos, pedeDocumentacao, respostaComDocumentos, ajustarAoPedido, documentosPorDesenho } from "@/lib/processmapNaConversa.js";
+import { citaProjeto, projetoProvavel, fluxoCitado, contextoDoProjeto, pedeEmTodos, pedeDocumentacao, respostaComDocumentos, ajustarAoPedido, documentosPorDesenho, respostaDeConfirmacao, textoDaConfirmacao, VALIDADE_DA_CONFIRMACAO_MS, pedeNovoDesenho } from "@/lib/processmapNaConversa.js";
 import { pedirPlano, executarPlano, textoDoAndamento, escreverDocumentos } from "@/lib/trabalhoNoProjeto.js";
 import { apiDosFluxos } from "@/lib/fluxogramasNoNavegador.js";
 
@@ -290,6 +290,11 @@ export default function AssistantPage() {
   const planejarNoProjetoRef = useRef(null);
   const trabalharNoProjetoRef = useRef(null);
   const documentarNoProjetoRef = useRef(null);
+  // o pedido sobre o projeto esperando o "sim" (01/11/2026: "ela deve me perguntar se eu tenho certeza;
+  // se eu disser sim, aí ela faz"): { q, doProjeto, plano, como, em }
+  const planoPendenteRef = useRef(null);
+  const confirmarNoProjetoRef = useRef(null);
+  const executarPendenteRef = useRef(null);
   // as mensagens da conversa, para mandar o código que já apareceu nela junto da pergunta
   const mensagensRef = useRef([]);
 
@@ -2550,6 +2555,29 @@ export default function AssistantPage() {
   const ask = useCallback(async (q, { displayText, alvoDaIde = null } = {}) => {
     if (!q.trim() || busy) return;
 
+    // a resposta ao "posso fazer?" de um pedido sobre o projeto (01/11/2026): "sim" faz; "não" cancela;
+    // uma correção refaz o entendimento com ela e pergunta de novo; outro assunto deixa o pedido de lado
+    const pendente = planoPendenteRef.current;
+    if (pendente && !alvoDaIde) {
+      planoPendenteRef.current = null;
+      const resposta = Date.now() - pendente.em < VALIDADE_DA_CONFIRMACAO_MS ? respostaDeConfirmacao(q) : null;
+      if (resposta === "sim") return executarPendenteRef.current?.(pendente, displayText || q);
+      if (resposta === "nao") {
+        const texto = "Tudo bem, não fiz nada.";
+        setQuestion(displayText || q);
+        setAnswer(texto);
+        setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: displayText || q }, { id: `a${Date.now() + 1}`, role: "assistant", text: texto }]);
+        conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+        if (voiceOn) enqueueSpeech(texto, ++speechGenRef.current);
+        return;
+      }
+      if (resposta === "corrige") {
+        const corrigido = `${pendente.q}\n\nCORREÇÃO DA PESSOA sobre o que eu entendi (vale mais que o pedido acima): ${q}`;
+        const plano = await planejarNoProjetoRef.current?.(corrigido, pendente.doProjeto, displayText || q);
+        if (plano?.acao === "mudar" || plano?.acao === "documentar") return confirmarNoProjetoRef.current?.(corrigido, { displayText: displayText || q, doProjeto: pendente.doProjeto, plano });
+      }
+    }
+
     // "abre o dashboard" etc. — comando local reconhecido sem gastar chamada nenhuma do
     // Gemini: não passa pelo fluxo normal de pergunta/resposta, só avisa os OUTROS
     // dispositivos abertos (ver RemoteCommandListener.js) e confirma na hora.
@@ -2608,18 +2636,15 @@ export default function AssistantPage() {
       // plano tira as mudanças de desenho que não foram pedidas. Sem o modelo, o documento ainda sai.
       const plano = (await planejarNoProjetoRef.current?.(q, doProjeto, displayText))
         || (pedeDocumentacao(q) ? ajustarAoPedido({ acao: "documentar", explicacao: "", operacoes: [], documentos: [] }, q, doProjeto.fluxos) : null);
-      if (plano?.acao === "documentar") return documentarNoProjetoRef.current?.(q, { displayText, doProjeto, plano });
-      if (plano?.acao === "mudar") {
-        const feito = await trabalharNoProjetoRef.current?.(q, { displayText, doProjeto, plano });
-        if (feito && plano.documentos?.length) {
-          return documentarNoProjetoRef.current?.(q, { displayText, doProjeto, plano, criados: feito.criados, antes: feito.texto, contexto: feito.contexto });
-        }
-        return;
-      }
+      // (01/11/2026: "ela tem que interpretar e saber o que eu quero, porém deve me perguntar se eu tenho
+      // certeza; se eu disser sim, aí ela faz") — mostra o que entendeu e espera o "sim"
+      if (plano?.acao === "documentar" || plano?.acao === "mudar") return confirmarNoProjetoRef.current?.(q, { displayText, doProjeto, plano });
       if (!plano) {
+        // sem o plano (o modelo falhou duas vezes), só um desenho NOVO sai sem confirmar — mudar o que
+        // existe por palavra-chave, sem entender o pedido, é o que estragou a aba "Fluxo Desktop"
         const semPlano = pedidoDeDesenho(q, { quadroAberto: true });
-        const alvo = semPlano === "alterar" ? doProjeto.citado || doProjeto.provavel : semPlano === "novo" && !/\bnov[oa]s?\b/i.test(q) ? doProjeto.citado : null;
-        if (semPlano === "novo" || alvo) {
+        const alvo = semPlano === "novo" && !/\bnov[oa]s?\b/i.test(q) ? doProjeto.citado : null;
+        if (semPlano === "novo" && !alvo) {
           doProjeto.alvo = alvo;
           doProjeto.texto = contextoDoProjeto(doProjeto.projeto, doProjeto.fluxos, { alvo });
           return desenharNaTelaRef.current?.(q, { displayText, mudar: Boolean(alvo), doProjeto });
@@ -2811,24 +2836,35 @@ export default function AssistantPage() {
   resolverProjetoRef.current = async (q) => {
     // ("faça um md por fluxograma" ou "abra o editor e escreva os mds", sem dizer "projeto": vale o
     // projeto em uso — o do quadro ou o último desta conversa)
-    const documentaDesenhos = pedeDocumentacao(q)
-      && (/flu|grama|mapa|desenh|diagram/i.test(q) || Boolean(quadroVinculoRef.current?.projeto || ultimoProjetoRef.current));
-    if (!citaProjeto(q) && !pedeEmTodos(q) && !documentaDesenhos) return null;
+    const temProjetoEmUso = Boolean(quadroVinculoRef.current?.projeto || ultimoProjetoRef.current);
+    const documentaDesenhos = pedeDocumentacao(q) && (/flu|grama|mapa|desenh|diagram/i.test(q) || temProjetoEmUso);
+    // "corrija a nota da aba Desktop", "complete o fluxo", sem dizer o projeto (01/11/2026: "peço para
+    // ela corrigir e ela não corrige" — o pedido caía na conversa, que não muda desenho nenhum, e a
+    // resposta dizia que tinha corrigido): com um projeto em uso — o do quadro ligado, ou o último desta
+    // conversa se o quadro não tem outro desenho solto aberto —, vai para o plano do projeto
+    // (sem projeto em uso, também: o projeto mais provável — a Lisa confirma antes de fazer — desde que o
+    // quadro não tenha um desenho solto aberto, que é dele que a pessoa fala)
+    const mudaDesenho = (pedeMudancaNoDesenho(q) || pedeNovoDesenho(q))
+      && Boolean(quadroVinculoRef.current?.projeto || !quadroAbertoRef.current);
+    if (!citaProjeto(q) && !pedeEmTodos(q) && !documentaDesenhos && !mudaDesenho) return null;
     try {
       if (!projetosRef.current.lista || Date.now() - projetosRef.current.em > 30_000) {
         projetosRef.current = { em: Date.now(), lista: await apiDosFluxosDaConversa.listar() };
       }
       const lista = projetosRef.current.lista || [];
       const emUso = quadroVinculoRef.current?.projeto || ultimoProjetoRef.current;
-      const achado = projetoCitado(q, lista) || (emUso && lista.find((p) => p.id === emUso.id)) || null;
-      if (!achado) return null;
+      // o projeto mais provável — o nome pela metade, com erro, o de um desenho dele, o em uso (01/11/2026:
+      // "ela pede para eu falar exatamente o nome do projeto; ela tem que interpretar")
+      const provavelDoPedido = projetoProvavel(q, lista, { emUso });
+      if (!provavelDoPedido) return null;
+      const achado = provavelDoPedido.projeto;
       const { projeto, fluxos } = await apiDosFluxosDaConversa.lerProjeto(achado.id);
       ultimoProjetoRef.current = projeto;
       const vinculado = quadroVinculoRef.current;
       const citado = fluxoCitado(q, fluxos, { nomeDoProjeto: projeto.nome });
       const provavel = (vinculado && fluxos.find((f) => f.id === vinculado.fluxo.id)) || (fluxos.length === 1 ? fluxos[0] : null);
-      addLog("[PROCESSMAP]", PU, `projeto "${projeto.nome}"${projetoCitado(q, lista) ? "" : " (o que está em uso)"}: ${fluxos.length} desenho${fluxos.length === 1 ? "" : "s"} lido${fluxos.length === 1 ? "" : "s"}${citado ? ` · citado: "${citado.nome}"` : ""}`);
-      return { projeto, fluxos, citado, provavel };
+      addLog("[PROCESSMAP]", PU, `projeto "${projeto.nome}" (${provavelDoPedido.como}): ${fluxos.length} desenho${fluxos.length === 1 ? "" : "s"} lido${fluxos.length === 1 ? "" : "s"}${citado ? ` · citado: "${citado.nome}"` : ""}`);
+      return { projeto, fluxos, citado, provavel, como: provavelDoPedido.como };
     } catch (err) {
       addLog("[PROCESSMAP]", OR, `não consegui ler o projeto: ${err.message}`);
       return null;
@@ -2942,6 +2978,42 @@ export default function AssistantPage() {
     }
   };
 
+  // Mostra o que a Lisa entendeu do pedido sobre o projeto e pergunta "posso fazer?" — nada muda antes do
+  // "sim" (src/lib/processmapNaConversa.js: textoDaConfirmacao, respostaDeConfirmacao).
+  confirmarNoProjetoRef.current = (q, { displayText, doProjeto, plano }) => {
+    const shown = displayText || q;
+    stopSpeaking();
+    const gen = ++speechGenRef.current;
+    speechEngineRef.current = null;
+    const texto = textoDaConfirmacao(plano, doProjeto.projeto, doProjeto.fluxos, { como: doProjeto.como });
+    planoPendenteRef.current = { q, doProjeto, plano, em: Date.now() };
+    addLog("[PROCESSMAP]", PU, `esperando o "sim": ${plano.operacoes.length} desenho(s), ${plano.documentos?.length || 0} documento(s) em "${doProjeto.projeto.nome}"`);
+    setQuestion(shown);
+    setAnswer(texto);
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }, { id: `a${Date.now() + 1}`, role: "assistant", text: texto }]);
+    conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+    setBusy(false);
+    setMode("idle");
+    if (voiceOn) enqueueSpeech(`${plano.explicacao || "Entendi o pedido."} No projeto ${doProjeto.projeto.nome}. Posso fazer?`, gen);
+  };
+
+  // Depois do "sim": lê o projeto de novo (alguém pode ter mexido enquanto a pessoa decidia) e faz.
+  executarPendenteRef.current = async (pendente, shown) => {
+    const { q, plano } = pendente;
+    let { doProjeto } = pendente;
+    try {
+      const novo = await apiDosFluxosDaConversa.lerProjeto(doProjeto.projeto.id);
+      doProjeto = { ...doProjeto, projeto: novo.projeto, fluxos: novo.fluxos };
+    } catch (err) {
+      addLog("[PROCESSMAP]", OR, `não consegui reler o projeto (sigo com o que li antes): ${err.message}`);
+    }
+    if (plano.acao === "documentar") return documentarNoProjetoRef.current?.(q, { displayText: shown, doProjeto, plano });
+    const feito = await trabalharNoProjetoRef.current?.(q, { displayText: shown, doProjeto, plano });
+    if (feito && plano.documentos?.length) {
+      return documentarNoProjetoRef.current?.(q, { displayText: shown, doProjeto, plano, criados: feito.criados, antes: feito.texto, contexto: feito.contexto });
+    }
+  };
+
   // Os .md no editor de código (01/11/2026): os documentos do plano — "um md por fluxograma e mapa
   // mental" (a visão geral e um por desenho) ou o que o pedido pedir, sobre o assunto dele ("faça um
   // fluxograma da arquitetura pensando em cibersegurança … e um md também"). Uma aba do editor por
@@ -3020,6 +3092,17 @@ export default function AssistantPage() {
       });
       const r = await res.json().catch(() => ({}));
       if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
+      // o que mudou DE VERDADE (src/lib/diagramaDaLisa.js: resumoDaMudanca) — e não só o que o modelo diz
+      const mudancaReal = atual ? resumoDaMudanca(atual, r.doc) : null;
+      if (mudancaReal && !mudancaReal.mudou) {
+        const texto = "Não mudei nada: o desenho voltou igual. Diga o que está errado e onde — a aba, a etapa ou a nota, pelo texto que aparece nela — que eu corrijo.";
+        addLog("[QUADRO]", OR, "o desenho voltou igual — nada foi mudado nem salvo");
+        setAnswer(texto);
+        setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
+        conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+        if (voiceOn) enqueueSpeech(texto, gen);
+        return;
+      }
       desenhoRef.current = r.doc;
       // no projeto: salva lá (o fluxo-alvo ganha a versão nova; sem alvo, nasce um fluxo no projeto) e
       // o quadro abre ligado a ele (`vinculo`: o que mudar depois também é salvo)
@@ -3048,7 +3131,7 @@ export default function AssistantPage() {
       const mudanca = Boolean(mudar && quadroAbertoRef.current);
       setQuadro({ versao: { doc: r.doc, chave: `d${Date.now()}`, colecao: r.colecao, mudanca, vinculo }, titulo: r.titulo, explicacao: r.explicacao });
       const salvoNoProjeto = vinculo ? ` ${alvo ? "Atualizei" : "Salvei"} "${vinculo.fluxo.nome}" no projeto "${vinculo.projeto.nome}" do ProcessMap.` : "";
-      const texto = `${r.explicacao || `Desenhei "${r.titulo}" no quadro.`}${salvoNoProjeto}${aviso}`;
+      const texto = `${r.explicacao || `Desenhei "${r.titulo}" no quadro.`}${mudancaReal ? `\n\nO que mudou: ${mudancaReal.texto}.` : ""}${salvoNoProjeto}${aviso}`;
       setAnswer(texto);
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
       conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);

@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.26.0-cloudflare-pages.1",
+  "versao": "0.27.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-01",
   "compilacao": {
-    "numero": 58,
+    "numero": 59,
     "data": "2026-11-01",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.27.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa interpreta o pedido sobre os fluxos (sem exigir o nome exato do projeto), mostra o que entendeu e só faz depois do \"sim\"; e só diz que mudou o que mudou de verdade.",
+      "itens": [
+        "Confirmação: antes de mudar desenho ou escrever documento, a Lisa diz o que entendeu — o projeto (e como achou: pelo nome, pelo nome parecido, pelo desenho, o em uso), cada desenho e o que vai fazer nele — e pergunta \"posso fazer?\". \"Sim\" (do jeito que a pessoa fala: \"pode\", \"manda ver\", \"tenho certeza\", \"simm\") faz; \"não\" cancela; uma correção (\"não, é no fluxo mobile\") refaz o entendimento e pergunta de novo. No painel ProcessMap, botões \"Sim, fazer\" / \"Não\". Depois do sim, o projeto é lido de novo.",
+        "Interpretar em vez de pedir o nome exato: o projeto é achado pelo nome inteiro, pela metade, com erro de digitação, pelo nome de um desenho dele, pelo em uso ou pelo mais recente; o planejador escolhe o desenho mais provável e diz como entendeu, em vez de perguntar o nome; a conversa comum nunca pede o nome exato.",
+        "Correção: \"corrija a nota da aba Desktop\", \"complete o fluxo\", \"a nota está errada, arrume\" — sem dizer o projeto — caíam na conversa comum, que não muda desenho nenhum, e a resposta dizia que tinha corrigido. Agora, com um projeto em uso (o do quadro ligado ou o último da conversa), o pedido vai para o plano do projeto; e a conversa comum nunca mais diz que corrigiu, atualizou ou salvou um desenho.",
+        "Correção: a resposta repetia a explicação do modelo (\"atualizado: verifiquei e confirmei…\") mesmo quando o desenho voltava igual — visto no \"Núcleo de Funcionalidades\". Agora a Lisa compara o antes e o depois: desenho igual não é gravado e a resposta diz \"não mudou nada\"; desenho mudado diz o que mudou (formas novas e sumidas, textos, cores, ligações, abas).",
+        "Correção: \"a nota está errada, o certo é…\" e \"coloque na nota…\" voltavam com a nota antiga e uma cópia nova ao lado (a trava das notas valia para qualquer pedido). Agora a nota existente só fica intacta quando o pedido é criar uma nota nova.",
+        "O plano usa a conversa para entender a que \"corrija isso\", \"não ficou certo\" e \"ainda falta\" se referem, e escreve na instrução exatamente o que trocar."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.26.0-cloudflare-pages.1",
       "data": "2026-11-01",
