@@ -2563,9 +2563,8 @@ export default function AssistantPage() {
 
     // "desenhe o processo de…" (ou, com o quadro aberto, "inclua uma etapa…"): a Lisa desenha no
     // quadro em vez de responder em texto (BEYOND-0010) — ver desenharNaTela abaixo
-    if (!acaoNoAbacato && !alvoDaIde && pedidoDeDesenho(q, { quadroAberto: quadroAbertoRef.current })) {
-      return desenharNaTelaRef.current?.(q, { displayText });
-    }
+    const desenho = !acaoNoAbacato && !alvoDaIde ? pedidoDeDesenho(q, { quadroAberto: quadroAbertoRef.current }) : null;
+    if (desenho) return desenharNaTelaRef.current?.(q, { displayText, mudar: desenho === "alterar" });
 
     const shown = displayText || q;
     setBusy(true);
@@ -2727,7 +2726,8 @@ export default function AssistantPage() {
   // desenho que já está na tela, se houver: assim "inclua uma etapa" parte do fluxo como a pessoa
   // deixou, e o que ela arrumou fica no lugar. A explicação da Lisa vira a resposta da conversa (e é
   // falada, se a voz estiver ligada); o desenho aparece no quadro.
-  desenharNaTelaRef.current = async (q, { displayText } = {}) => {
+  // `mudar`: o pedido é mudar o desenho que está no quadro (ele vai junto); senão é um desenho novo
+  desenharNaTelaRef.current = async (q, { displayText, mudar = false } = {}) => {
     const shown = displayText || q;
     stopSpeaking();
     const gen = ++speechGenRef.current;
@@ -2740,12 +2740,32 @@ export default function AssistantPage() {
     setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
     addLog("[QUADRO]", PU, quadroAbertoRef.current ? "mudando o desenho…" : "desenhando o processo…");
     const conversa = conversaVigente(conversaRef.current).slice(-6)
-      .map((t) => `${t.papel === "lisa" ? "LISA" : "PESSOA"}: ${String(t.texto).slice(0, 600)}`).join("\n");
+      .map((t) => `${t.papel === "lisa" ? "LISA" : "PESSOA"}: ${String(t.texto).slice(0, 1000)}`).join("\n");
     try {
+      // "desenhe essa arquitetura": com um repositório vinculado, o código dele vai junto (lido antes,
+      // num pedido só dele, como na pergunta normal — ver ask acima)
+      let contexto = "";
+      if (reposRef.current.length) {
+        addLog("[REPO]", PU, `lendo ${reposRef.current.map((r) => r.repo).join(", ")} para o desenho…`);
+        try {
+          const rr = await fetch("/api/repos/contexto", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ repos: reposRef.current, question: q, turnos: conversaVigente(conversaRef.current), images: null }),
+          });
+          const leitura = await rr.json().catch(() => ({}));
+          if (rr.ok && leitura.ok !== false) {
+            contexto = leitura.secao || "";
+            setLeituraDosRepos(leitura);
+          }
+        } catch (err) {
+          addLog("[REPO]", OR, `a leitura do repositório falhou: ${err.message}`);
+        }
+      }
       const res = await fetch("/api/diagrama", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ pedido: q, atual: quadroAbertoRef.current ? desenhoRef.current : null, conversa }),
+        body: JSON.stringify({ pedido: q, atual: mudar && quadroAbertoRef.current ? desenhoRef.current : null, conversa, contexto }),
       });
       const r = await res.json().catch(() => ({}));
       if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
@@ -3189,6 +3209,7 @@ export default function AssistantPage() {
     <IdeDaLisa
       interacoes={ideViva ? [...ideHistorico, { ...ideViva, texto: answer }] : ideHistorico} chegando={busy}
       aoPedir={pedirNaIde} aoMudarCodigo={(texto) => { codigoDaIdeRef.current = texto; }}
+      aoDesenhar={(codigo, nome) => desenharNaTelaRef.current?.(`Desenhe no quadro este diagrama:\n${codigo}`, { displayText: `◇ desenhar no quadro: ${nome}` })}
     />
   );
   // o quadro da Lisa (BEYOND-0010): aparece quando ela desenha; o que a pessoa mexe volta para cá
@@ -3196,7 +3217,7 @@ export default function AssistantPage() {
     <QuadroDaLisa
       versao={quadro.versao} titulo={quadro.titulo} explicacao={quadro.explicacao} ocupado={desenhando}
       aoMudar={(doc) => { desenhoRef.current = doc; }}
-      aoPedir={(p) => desenharNaTelaRef.current?.(p)}
+      aoPedir={(p) => desenharNaTelaRef.current?.(p, { mudar: true })}
       aoFechar={() => { setQuadro(null); desenhoRef.current = null; }}
     />
   );

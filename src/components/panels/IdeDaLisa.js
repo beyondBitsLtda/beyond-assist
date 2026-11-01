@@ -33,6 +33,7 @@ import { CY, OR, GR, PU, mono } from "@/lib/theme.js";
 import { trechosDaResposta, digitacao, passoDaDigitacao } from "@/lib/codigoNaResposta.js";
 import { LinhasDoCodigo, FONTE_DO_CODIGO } from "./TextoComCodigo.js";
 import { caixaGuardada, ajustarCaixa, moverCaixa, redimensionarCaixa } from "@/lib/janelaFlutuante.js";
+import { pareceDiagramaEmTexto } from "@/lib/diagramaDaLisa.js";
 
 const BATIDA_MS = 30;
 const CHAVE_DA_CAIXA = "lisa-ide-caixa"; // onde e de que tamanho a janela ficou (só neste navegador)
@@ -136,8 +137,9 @@ function EditorEditavel({ codigo, linguagem, aoMudar, rotulo, numeros }) {
  * `alvo`: a aba de onde saiu o pedido feito pela barra "pedir à Lisa" — a resposta é escrita em cima dela.
  * `aoPedir({ pedido, nome, linguagem, codigo, alvo })`: a barra "pedir à Lisa" (a página faz a pergunta).
  * `aoMudarCodigo(texto)`: o que está escrito ou mudado na IDE, pronto para ir junto das perguntas.
+ * `aoDesenhar(codigo, nome)`: a aba é um diagrama em texto (Mermaid, PlantUML) — desenhar no quadro da Lisa.
  */
-export default function IdeDaLisa({ interacoes = [], chegando = false, aoPedir, aoMudarCodigo }) {
+export default function IdeDaLisa({ interacoes = [], chegando = false, aoPedir, aoMudarCodigo, aoDesenhar }) {
   const [ocultas, setOcultas] = useState(() => new Set()); // abas de resposta que a pessoa fechou
   const lista = useMemo(
     () => interacoes
@@ -425,6 +427,8 @@ export default function IdeDaLisa({ interacoes = [], chegando = false, aoPedir, 
   const linhas = visivel.split("\n");
   const linhasNaTela = codigoNaTela.split("\n").length;
   const editado = !minha && trecho && edicoes[chaveAtual] != null && edicoes[chaveAtual] !== trecho.codigo;
+  // um diagrama em texto (Mermaid que a conversa escreveu, por exemplo) vira desenho no quadro num toque
+  const ehDiagrama = Boolean(aoDesenhar) && !digitandoEste && pareceDiagramaEmTexto(codigoNaTela, minha ? minha.linguagem : trecho?.linguagem || trecho?.rotulo);
 
   const podePedir = Boolean(aoPedir) && !chegando && !digitandoEste;
   const pedir = (e) => {
@@ -624,6 +628,17 @@ export default function IdeDaLisa({ interacoes = [], chegando = false, aoPedir, 
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 14px", background: "rgba(123,216,143,0.07)", borderBottom: "1px solid rgba(123,216,143,0.2)", flex: "none" }}>
               <span style={{ fontSize: 12, color: GR, flex: 1, fontFamily: "var(--bb-fonte)" }}>✎ A Lisa escreveu a nova versão em cima deste código.</span>
               <button type="button" onClick={desfazer} title="voltar ao código de antes da Lisa reescrever" style={BOTAO}>↶ desfazer</button>
+            </div>
+          )}
+
+          {ehDiagrama && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 14px", background: "rgba(201,166,255,0.08)", borderBottom: "1px solid rgba(201,166,255,0.22)", flex: "none" }}>
+              <span style={{ fontSize: 12, color: PU, flex: 1, fontFamily: "var(--bb-fonte)" }}>◇ Isto é um diagrama em texto — a Lisa desenha ele no quadro.</span>
+              <button type="button" disabled={chegando} title="a Lisa monta este diagrama no quadro (o ProcessMap), onde dá para mexer"
+                onClick={() => aoDesenhar(codigoNaTela, minha ? minha.nome : trecho?.arquivo || trecho?.rotulo || "diagrama")}
+                style={{ ...BOTAO, color: PU, borderColor: "rgba(201,166,255,0.45)", opacity: chegando ? 0.5 : 1 }}>
+                ◇ desenhar no quadro
+              </button>
             </div>
           )}
 

@@ -5,7 +5,7 @@
 
 import {
   validarDesenho, camadasDoDesenho, posicoesDoDesenho, montarDocumento, estruturaDoDocumento, descreverDiagrama,
-  pedidoDeDesenho, documentoValido, FORMAS,
+  pedidoDeDesenho, documentoValido, FORMAS, distanciaDeEdicao, pareceDiagramaEmTexto,
 } from "../src/lib/diagramaDaLisa.js";
 
 let falhas = 0;
@@ -122,6 +122,26 @@ console.log("\nquando a conversa pede desenho");
   conferir("pergunta sobre o processo não é pedido de desenho", pedidoDeDesenho("como funciona o processo de compras?") === null);
   conferir("pergunta de código não é desenho", pedidoDeDesenho("crie uma função que soma dois números") === null);
   conferir("redesenhar este fluxo com o quadro aberto: alterar", pedidoDeDesenho("refaça esse fluxo separando em raias", { quadroAberto: true }) === "alterar");
+  // os pedidos de verdade, com erro de digitação (31/10/2026: caíam na conversa e a Lisa escrevia Mermaid)
+  conferir("\"quero que desneho ess arquiettrua via processmap\": novo", pedidoDeDesenho("quero que desneho ess arquiettrua via processmap") === "novo");
+  conferir("\"desnehe a arquitetura deste repositorio\": novo", pedidoDeDesenho("desnehe a arquitetura deste repositorio") === "novo");
+  conferir("citar o quadro já é pedido (process map, quadro de diagramas)", pedidoDeDesenho("mostra isso no process map") === "novo" && pedidoDeDesenho("coloca no quadro de diagramas") === "novo");
+  conferir("\"quero um diagrama do processo de vendas\": novo", pedidoDeDesenho("quero um diagrama do processo de vendas") === "novo");
+  conferir("pergunta com o verbo de pedir: novo", pedidoDeDesenho("pode desenhar o fluxo do login?") === "novo");
+  conferir("pergunta sobre um desenho não é pedido", pedidoDeDesenho("meu desenho de arquitetura está certo?") === null);
+  conferir("desenvolva / deseja não viram desenhe", pedidoDeDesenho("desenvolva uma função que valida o processo") === null && pedidoDeDesenho("deseja ver o fluxo?") === null);
+  conferir("criar um processo de deploy (código) não é desenho", pedidoDeDesenho("crie um processo de deploy no github actions") === null);
+  conferir("card no quadro do Abacato não é desenho", pedidoDeDesenho("crie um card no quadro Notas") === null);
+  conferir("com o quadro aberto, desenhar outra coisa é desenho novo", pedidoDeDesenho("desenhe a arquitetura do sistema de pagamentos", { quadroAberto: true }) === "novo");
+  conferir("a distância de edição conta a inversão como 1", distanciaDeEdicao("desneho", "desenho") === 1 && distanciaDeEdicao("arquiettrua", "arquitetura") === 2);
+}
+
+console.log("\ndiagrama em texto na IDE (o botão de desenhar no quadro)");
+{
+  conferir("Mermaid (flowchart TD) é diagrama", pareceDiagramaEmTexto("flowchart TD\n    subgraph Entrada\n    A --> B\n    end"));
+  conferir("pela linguagem do bloco (mermaid, plantuml)", pareceDiagramaEmTexto("A --> B", "mermaid") && pareceDiagramaEmTexto("x", "plantuml"));
+  conferir("PlantUML e Graphviz também", pareceDiagramaEmTexto("@startuml\nA -> B\n@enduml") && pareceDiagramaEmTexto("digraph G { a -> b }"));
+  conferir("código comum não é", !pareceDiagramaEmTexto("function soma(a, b) {\n  return a + b;\n}", "javascript") && !pareceDiagramaEmTexto("const graph = {}"));
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");

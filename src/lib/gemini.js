@@ -1104,14 +1104,17 @@ primeira linha da resposta já é a primeira linha real do arquivo.`;
  * mexido pela pessoa), é uma MUDANÇA: ela devolve o desenho inteiro de novo, mantendo os ids do que
  * continua. A saída passa por validarDesenho antes de ir para a tela.
  */
-export async function desenharDiagrama({ pedido, estrutura = null, conversa = "" }) {
+export async function desenharDiagrama({ pedido, estrutura = null, conversa = "", contexto = "" }) {
   const formas = TIPOS.map((t) => `- ${t}: ${FORMAS[t].nome}`).join("\n");
   const prompt = [
-    conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-4000)}\n` : "",
+    contexto
+      ? `O CÓDIGO DOS REPOSITÓRIOS VINCULADOS À CONVERSA (para "essa arquitetura", "o meu sistema": desenhe o que está AQUI, com os nomes reais de arquivos, rotas, serviços e tabelas):\n${contexto.slice(0, 40000)}\n`
+      : "",
+    conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-6000)}\n` : "",
     estrutura
       ? `O DESENHO QUE ESTÁ NA TELA AGORA (a pessoa pode ter mexido nele — parta DELE):\n${JSON.stringify(estrutura).slice(0, 20000)}\n`
       : "",
-    `PEDIDO: "${String(pedido || "").slice(0, 2000)}"`,
+    `PEDIDO: "${String(pedido || "").slice(0, 8000)}"`,
   ].filter(Boolean).join("\n");
 
   const systemInstruction = `Você é a Lisa e desenha processos num quadro de diagramas (fluxograma, BPMN, UML de atividades,
@@ -1137,7 +1140,11 @@ Regras:
 - Se houver um desenho na tela, é uma MUDANÇA: devolva o desenho INTEIRO atualizado, mantendo o "id"
   de toda forma que continua (é assim que o que a pessoa arrumou fica no lugar), e mude só o que foi pedido.
 - "explicacao": 1 a 3 frases em português, falando com a pessoa, dizendo o que você desenhou ou mudou.
-- "titulo": o nome do processo.`;
+- "titulo": o nome do processo.
+- Se o PEDIDO trouxer um diagrama em texto (Mermaid, PlantUML), desenhe fielmente o que ele descreve: as
+  mesmas etapas, decisões e ligações (cada "subgraph" vira uma raia), com as formas certas do quadro.
+- Arquitetura de um sistema: quem usa, as telas/apps, as rotas/APIs, os serviços externos (IA, banco,
+  armazenamento) e as ligações com o que trafega no rótulo; agrupe por camada ou responsável com raias.`;
 
   const res = await withTransientRetry(
     CHAT_MODEL,

@@ -388,18 +388,69 @@ export function documentoValido(doc) {
 
 // ---------------------------------------------------------------- quando a conversa pede desenho
 
-const VERBO_DE_DESENHO = /\b(desenh\w*|diagram\w*|mapei\w*|mapeie|modele|monte|crie|cria|fa[çc]a|gere|mostre|esboce|rabisque)\b/i;
-const COISA_DESENHAVEL = /\b(processo|fluxo|fluxograma|diagrama|bpmn|workflow|jornada|arquitetura|esteira|pipeline|organograma|swimlane|raias?)\b/i;
+// O reconhecimento aguenta erro de digitação (31/10/2026: "quero que desneho ess arquiettrua via
+// processmap" caía na conversa normal e a Lisa respondia com Mermaid no editor): cada palavra é
+// comparada com as formas certas pela distância de edição (letra trocada, faltando, sobrando ou
+// invertida conta 1), com folga que cresce com o tamanho da palavra.
+const semAcento = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const palavrasDe = (texto) => semAcento(texto).split(/[^a-z0-9]+/).filter(Boolean);
+
+/** A distância de edição com transposição ("optimal string alignment"): "desneho" → "desenho" = 1. */
+export function distanciaDeEdicao(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...new Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+const folgaDe = (alvo) => (alvo.length <= 4 ? 0 : alvo.length <= 7 ? 1 : 2);
+/** Alguma das palavras é (quase) uma das formas? */
+const temQuase = (palavras, formas) => palavras.some((p) => formas.some((f) => p === f
+  || (Math.abs(p.length - f.length) <= folgaDe(f) && distanciaDeEdicao(p, f) <= folgaDe(f))));
+
+const IMPERATIVOS_DE_DESENHO = ["desenhe", "desenha", "desenhar", "desenhasse", "desenhando", "diagrame", "diagramar", "mapeie", "mapear", "esboce", "esbocar", "rabisque"];
+const VERBOS_DE_DESENHO = [...IMPERATIVOS_DE_DESENHO, "desenho"];
+const SUBSTANTIVOS_DE_DESENHO = new Set(["desenho", "desenhos", "desenhado", "desenhada", "desenhista"]);
+const VERBOS_GERAIS = ["monte", "montar", "crie", "criar", "cria", "faca", "fazer", "faz", "gere", "gerar", "mostre", "mostrar", "coloque", "ponha", "quero", "preciso"];
+const COISAS_FORTES = ["diagrama", "diagramas", "fluxograma", "fluxogramas", "bpmn", "swimlane", "organograma", "processmap"];
+const COISAS = [...COISAS_FORTES, "processo", "processos", "fluxo", "fluxos", "arquitetura", "workflow", "jornada", "pipeline", "esteira", "raias", "mapa", "modelagem"];
 const VERBO_DE_MUDANCA = /\b(adicion\w*|acrescent\w*|inclu\w*|coloque|ponha|remov\w*|tir[ae]|apag\w*|exclu\w*|troqu\w*|troc\w*|mud\w*|renome\w*|lig\w*|conect\w*|separ\w*|junt\w*|reorganiz\w*|refa[çz]\w*|corrij\w*|ajust\w*|divid\w*|mov[ae]\w*)\b/i;
 const PARTE_DO_DESENHO = /\b(etapa|passo|caixa|forma|raia|decis[aã]o|liga[çc][aã]o|seta|fluxo|diagrama|processo|desenho|quadro|in[ií]cio|fim|tarefa|gateway|evento|swimlane|caminho)s?\b/i;
 
 /**
- * A pergunta pede para desenhar ("novo") ou, com o quadro aberto, para mudar o desenho ("alterar")?
- * null = conversa normal (o desenho na tela vai junto como contexto, se houver).
+ * A pergunta pede para desenhar ("novo") ou, com o quadro aberto, para mudar o desenho que está nele
+ * ("alterar")? null = conversa normal (o desenho na tela vai junto como contexto, se houver).
+ * Citar o quadro ("via processmap", "no quadro de diagramas") já é pedido de desenho.
  */
 export function pedidoDeDesenho(pergunta, { quadroAberto = false } = {}) {
   const q = String(pergunta || "");
+  const palavras = palavrasDe(q);
+  const texto = palavras.join(" ");
+  const citaOQuadro = temQuase(palavras, ["processmap"]) || /\bprocess map\b/.test(texto) || /\bquadro de diagramas?\b/.test(texto);
   if (quadroAberto && VERBO_DE_MUDANCA.test(q) && PARTE_DO_DESENHO.test(q)) return "alterar";
-  if (VERBO_DE_DESENHO.test(q) && COISA_DESENHAVEL.test(q)) return quadroAberto && /\b(esse|este|nesse|neste|o mesmo)\b/i.test(q) ? "alterar" : "novo";
-  return null;
+  // pergunta sobre um desenho ("meu desenho está certo?") não é pedido — a não ser com o verbo de pedir
+  // ("desenho", escrito certinho, é o substantivo: fica a uma letra de "desenhe", mas não pede nada)
+  const imperativo = temQuase(palavras.filter((p) => !SUBSTANTIVOS_DE_DESENHO.has(p)), IMPERATIVOS_DE_DESENHO);
+  if (q.includes("?") && !citaOQuadro && !imperativo) return null;
+  const verbo = temQuase(palavras, VERBOS_DE_DESENHO);
+  const pede = citaOQuadro
+    || (verbo && (temQuase(palavras, COISAS) || /\bno quadro\b/.test(texto)))
+    || (temQuase(palavras, VERBOS_GERAIS) && temQuase(palavras, COISAS_FORTES));
+  if (!pede) return null;
+  // "mude esse desenho", "refaça este fluxo": é o que está na tela; o resto é um desenho novo
+  return quadroAberto && /\b(esse|este|nesse|neste|desse|deste|o mesmo) (desenho|diagrama|fluxo|quadro|processo)\b/.test(texto) ? "alterar" : "novo";
+}
+
+/** O código parece um diagrama em texto (Mermaid, PlantUML, Graphviz)? — a IDE oferece desenhar no quadro. */
+export function pareceDiagramaEmTexto(codigo, linguagem = "") {
+  if (/^(mermaid|plantuml|puml|dot|graphviz)$/i.test(String(linguagem || ""))) return true;
+  const c = String(codigo || "").trimStart();
+  return /^(flowchart|graph)\s+(TD|TB|BT|LR|RL)\b/i.test(c)
+    || /^(sequenceDiagram|classDiagram|erDiagram|stateDiagram(-v2)?|journey|gantt|C4Context|C4Container|C4Component|mindmap)\b/.test(c)
+    || /^@startuml/i.test(c)
+    || /^(strict\s+)?(di)?graph\s+[\w"]*\s*\{/.test(c);
 }

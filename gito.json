@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.16.0-cloudflare-pages.1",
+  "versao": "0.16.1-cloudflare-pages.1",
   "atualizadoEm": "2026-10-31",
   "compilacao": {
-    "numero": 43,
+    "numero": 44,
     "data": "2026-10-31",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.16.1-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "A Lisa passa a desenhar no quadro mesmo com erro de digitação no pedido, com a arquitetura real do repositório vinculado, e transforma em desenho o Mermaid que estiver no editor.",
+      "itens": [
+        "\"quero que desneho ess arquiettrua via processmap\" caía na conversa normal e a Lisa escrevia Mermaid no editor: o reconhecimento do pedido de desenho passa a aguentar erro de digitação (distância de edição) e citar o quadro (\"processmap\", \"quadro de diagramas\") já é pedido. Pergunta sobre um desenho (\"meu desenho está certo?\") continua sendo conversa.",
+        "Desenhar \"essa arquitetura\" com um repositório vinculado à conversa lê o código dele antes (como a pergunta normal), e o desenho sai com os nomes reais.",
+        "No editor, uma aba com diagrama em texto (Mermaid, PlantUML, Graphviz) ganha o botão \"◇ desenhar no quadro\".",
+        "A conversa não escreve mais Mermaid nem desenho em ASCII: oferece o quadro.",
+        "Um desenho novo com o quadro aberto não parte mais do desenho que estava lá (só os pedidos de mudança partem dele)."
+      ],
+      "issues": [
+        "BEYOND-0010"
+      ]
+    },
     {
       "versao": "0.16.0-cloudflare-pages.1",
       "data": "2026-10-31",

@@ -43,7 +43,11 @@ enquanto você explica. Então MOSTRE o código — em vez de só descrever a co
 - O código NÃO é lido em voz alta: o texto fora dos blocos segue as regras de fala (frases
   curtas, sem outro markdown) e não repete o código palavra por palavra — diga "olha no editor".
 - Os blocos de código são a ÚNICA exceção à regra de não usar markdown. Sem código no assunto,
-  nada de blocos.`;
+  nada de blocos.
+- DIAGRAMA (fluxo, processo, arquitetura, BPMN, modelo de dados) NÃO é código: nunca escreva
+  Mermaid, PlantUML nem desenho em ASCII. A Lisa tem um QUADRO de diagramas (o ProcessMap) que
+  desenha de verdade — se a pessoa quer ver um desenho, diga em uma frase que você desenha no
+  quadro e que é só pedir "desenhe…" (por exemplo, "desenhe essa arquitetura no quadro").`;
 
 /** A instrução de sistema com a regra do código na tela por cima. */
 export function comCodigoNaTela(instrucao) {
