@@ -9,14 +9,33 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.27.0-cloudflare-pages.1",
+  "versao": "0.28.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-01",
   "compilacao": {
-    "numero": 59,
+    "numero": 60,
     "data": "2026-11-01",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.28.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "O modo MVP: quem não é o dono da Lisa entra numa versão limitada — conversa e voz, Modo Tela, editor de código, ProcessMap, repositórios públicos, entrevista do primeiro acesso e Lisa Task —, sem nada dos dados, chaves e painéis do admin.",
+      "itens": [
+        "Dois papéis na sessão: admin (quem está em LISA_ADMINS ou tem app_metadata.role = admin no token assinado) e usuário (qualquer outra conta). Sem LISA_ADMINS configurado, o modo fica desligado e todos entram como antes — o código entra no ar sem trancar o dono.",
+        "O portão (middleware) usa a lista do que o usuário pode: o Assistente, o ProcessMap, o Visual e a Lisa Task, e as APIs da conversa, voz, Modo Tela, repositórios, desenho, ProcessMap, notas, perfil e tarefas. O resto: 403 na API e volta ao Assistente na página.",
+        "A conversa do usuário não usa a base de conhecimento, o Abacato, a Delp, a persona nem o contexto pessoal do admin; usa o perfil da entrevista, as tarefas dele, a tela, o código da conversa, o quadro e os repositórios públicos.",
+        "Repositórios do usuário: só públicos, lidos sem o token do admin — e o privado não sai nem pelo cache que o admin deixou no Worker. Modo Tela do usuário: sem gravar no histórico do Vigia. Modo Código com PR continua só do admin (usa o token dele).",
+        "Entrevista do primeiro acesso: com consentimento, 5 perguntas por voz ou chat; o perfil personaliza a conversa e \"apague meu perfil\" apaga de verdade (LGPD).",
+        "Lisa Task leve: tarefas da pessoa, só texto (sem arquivos), na tela /lisa-task ou pedindo \"crie uma tarefa: …\" na conversa.",
+        "Limite do dia por usuário (as chaves de IA são do admin): 50 perguntas, 10 desenhos, 120 comentários de tela e 100 falas, ajustáveis por LISA_LIMITE_*.",
+        "A tela esconde do usuário os modos do admin (câmera, vigia, rádio, escuta do ambiente, transmissão, Modo Código, persona, painéis) e o menu mostra só os painéis dele.",
+        "Banco: tabelas novas lisa_perfis, lisa_tarefas e lisa_uso, e a função lisa_contar_uso (db/mvp_usuarios.sql)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.27.0-cloudflare-pages.1",
       "data": "2026-11-01",
@@ -913,7 +932,9 @@
         "Painel ProcessMap (/fluxogramas): o editor de diagramas inteiro dentro da Lisa (fluxograma, mapa mental e schema SQL), com projetos e fluxogramas salvos no banco (salvamento automático, aviso de conflito entre abas, importar/exportar .json) e a barra \"pedir à Lisa\" para desenhar ou mudar o fluxo aberto. Na conversa, \"no projeto X do ProcessMap, …\" faz a Lisa ler os fluxogramas do projeto e trabalhar nele (mudar um fluxo ou criar outro, salvando lá).",
         "Cena do Assistente no computador: a resposta numa janela holográfica flutuante e arrastável, com hologramas em volta (anéis, mira, painéis de status e de sinal de voz, barras, grade), a Lisa mais perto e no centro, e profundidade 3D com paralaxe do mouse.",
         "Documentar um projeto do ProcessMap: a Lisa escreve no editor de código a visão geral e um .md por desenho (para pedir a uma IA de código construir as rotas), sem mudar os desenhos",
-        "Versões anteriores de cada fluxograma do ProcessMap, com \"voltar para esta\""
+        "Versões anteriores de cada fluxograma do ProcessMap, com \"voltar para esta\"",
+        "Modo MVP: usuários convidados (que não são o dono) entram numa versão limitada — conversa e voz, Modo Tela, editor de código, ProcessMap, repositórios públicos, entrevista do primeiro acesso e Lisa Task —, com limite diário de uso",
+        "Lisa Task leve: tarefas pessoais só em texto, sem arquivos"
       ],
       "naoInclui": [
         "Não é multiusuário: o login existe, mas só para o responsável.",
@@ -921,7 +942,8 @@
         "Não guarda fotos da câmera, capturas de tela nem imagens anexadas: elas vão ao Gemini e são descartadas (a miniatura de um anexo fica só na aba aberta).",
         "Não altera os repositórios vinculados à conversa: só lê. Mudar código continua sendo pelas tarefas de código, com branch e PR.",
         "Não versiona a planilha da Delp; ela fica só no banco.",
-        "O Abacato mora neste repositório (Abacatosys/abacato), mas é outra aplicação, publicada à parte em abacato.beyond.dev.br."
+        "O Abacato mora neste repositório (Abacatosys/abacato), mas é outra aplicação, publicada à parte em abacato.beyond.dev.br.",
+        "No modo MVP, o usuário não acessa os dados, painéis, chaves, repositórios privados nem o Modo Código (PR) do admin"
       ]
     },
     "stack": [
@@ -941,7 +963,7 @@
       "Quadro de diagramas: o ProcessMap (JavaScript puro e SVG) em public/diagramas — o mesmo do Lisa_Proof, com o tema da Lisa —, embutido num iframe do mesmo endereço (ponte em public/diagramas/js/Ponte.js); a IA devolve a estrutura e o layout em camadas é feito em src/lib/diagramaDaLisa.js"
     ],
     "arquitetura": {
-      "resumo": "A Lisa é um app Next.js que roda como Worker na Cloudflare (plano gratuito): as páginas saem estáticas pelo CDN e as rotas de API rodam no Worker. Os dados moram num Supabase auto-hospedado no servidor de casa (iMac com Zorin OS), que a Lisa alcança por um túnel da Cloudflare (cloudflared) em banco.beyond.dev.br. O túnel é aberto de dentro da casa para fora, então nenhuma porta do roteador foi aberta. A Lisa nunca fala SQL direto: chama o PostgREST por HTTP. O agendamento (SYNC, notificações push e Map of Deploy) é feito pelo crontab do servidor de casa; o Worker lisa-cron continua publicado, sem horários, como reserva. O Sentinela continua num projeto Supabase da nuvem. O banco fica tão disponível quanto a casa: queda de luz ou de internet lá derruba os dados. Detalhes em docs/infraestrutura.html e servidor/README.md.",
+      "resumo": "A Lisa é um app Next.js que roda como Worker na Cloudflare (plano gratuito): as páginas saem estáticas pelo CDN e as rotas de API rodam no Worker. Os dados moram num Supabase auto-hospedado no servidor de casa (iMac com Zorin OS), que a Lisa alcança por um túnel da Cloudflare (cloudflared) em banco.beyond.dev.br. O túnel é aberto de dentro da casa para fora, então nenhuma porta do roteador foi aberta. A Lisa nunca fala SQL direto: chama o PostgREST por HTTP. O agendamento (SYNC, notificações push e Map of Deploy) é feito pelo crontab do servidor de casa; o Worker lisa-cron continua publicado, sem horários, como reserva. O Sentinela continua num projeto Supabase da nuvem. O banco fica tão disponível quanto a casa: queda de luz ou de internet lá derruba os dados. Detalhes em docs/infraestrutura.html e servidor/README.md. Papéis (01/11/2026): o portão (src/middleware.js) confere o token do Supabase Auth e decide pelo papel — admin (LISA_ADMINS ou app_metadata.role) ou usuário (lista DO_USUARIO em src/lib/authSession.js); as rotas que mudam para o usuário leem o papel em src/lib/papelNaSessao.js.",
       "diagramas": [
         {
           "titulo": "Visão geral",
@@ -981,7 +1003,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "Fica no iMac de casa e é publicado só pelo túnel da Cloudflare, em HTTPS (PostgREST). O Postgres não é exposto na internet. O Studio só abre no próprio iMac. Teste: https://banco.beyond.dev.br/ responder 401 é normal; 530 significa túnel fora (confira se o iMac está ligado). Backup: a cada 3 horas (ficam os 3 últimos) e semanal (segunda 03:15, guardado até apagar), pelo cron do iMac (~/backup), com conteúdo criptografado, no Google Drive (pasta beyond-backup); restaurar com scripts/backup/restaurar.sh — ver scripts/backup/LEIA-ME.md. Os projetos e fluxogramas do painel ProcessMap ficam nas tabelas lisa_projetos e lisa_fluxogramas (db/fluxogramas.sql), e as versões anteriores de cada fluxo em lisa_fluxogramas_versoes (db/fluxogramas_versoes.sql); um fluxo só volta de um backup com scripts/backup/recuperar-fluxo.sh."
+        "observacao": "Fica no iMac de casa e é publicado só pelo túnel da Cloudflare, em HTTPS (PostgREST). O Postgres não é exposto na internet. O Studio só abre no próprio iMac. Teste: https://banco.beyond.dev.br/ responder 401 é normal; 530 significa túnel fora (confira se o iMac está ligado). Backup: a cada 3 horas (ficam os 3 últimos) e semanal (segunda 03:15, guardado até apagar), pelo cron do iMac (~/backup), com conteúdo criptografado, no Google Drive (pasta beyond-backup); restaurar com scripts/backup/restaurar.sh — ver scripts/backup/LEIA-ME.md. Os projetos e fluxogramas do painel ProcessMap ficam nas tabelas lisa_projetos e lisa_fluxogramas (db/fluxogramas.sql), e as versões anteriores de cada fluxo em lisa_fluxogramas_versoes (db/fluxogramas_versoes.sql); um fluxo só volta de um backup com scripts/backup/recuperar-fluxo.sh. Modo MVP: lisa_perfis, lisa_tarefas e lisa_uso (db/mvp_usuarios.sql), separadas por dono."
       },
       {
         "nome": "Sentinela (Beyond Test)",

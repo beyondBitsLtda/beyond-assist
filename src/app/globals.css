@@ -725,6 +725,35 @@ button.bb-fluxos-estado { border: 1px solid rgba(255, 157, 61, 0.4); background:
 .bb-fluxos-so-celular { display: none; }
 .bb-fluxos-aviso { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 14px; font-size: 13px; color: var(--bb-texto); background: rgba(255, 157, 61, 0.08); border-bottom: 1px solid rgba(255, 157, 61, 0.28); }
 .bb-fluxos-aviso span { flex: 1; min-width: 200px; }
+/* ------------------------------------------------------------ a Lisa Task leve (01/11/2026, o MVP)
+   As tarefas da pessoa, só texto, no visual da Lisa (src/app/(panels)/lisa-task/page.js). */
+.bb-lt { max-width: 860px; margin: 0 auto; padding: 28px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 20px; color: var(--bb-texto); }
+.bb-lt-topo h1 { margin: 0 0 6px; font-size: 26px; font-weight: 600; }
+.bb-lt-topo p { margin: 0; color: var(--bb-texto-2); font-size: 14px; line-height: 1.5; max-width: 62ch; }
+.bb-lt-nova { display: flex; flex-wrap: wrap; gap: 8px; }
+.bb-lt-nova input, .bb-lt-nova select { height: 38px; padding: 0 12px; font: inherit; font-size: 14px; color: var(--bb-texto); background: var(--bb-superficie-2); border: 1px solid var(--bb-linha-forte); border-radius: 9px; }
+.bb-lt-nova #lt-titulo { flex: 1 1 240px; min-width: 0; }
+.bb-lt-nova input:focus, .bb-lt-nova select:focus { outline: none; border-color: rgba(var(--accent-rgb), 0.6); }
+.bb-lt-erro { margin: 0; font-size: 13px; color: var(--bb-aviso); }
+.bb-lt-vazio { margin: 0; color: var(--bb-texto-3); font-size: 14px; }
+.bb-lt-secao { display: grid; gap: 8px; }
+.bb-lt-secao h2 { margin: 0; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bb-texto-3); font-weight: 600; }
+.bb-lt-secao h2 small { font-family: var(--bb-mono); margin-left: 6px; }
+.bb-lt-secao ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.bb-lt-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--bb-superficie); border: 1px solid var(--bb-linha); }
+.bb-lt-item[data-prioridade="alta"][data-feita="nao"] { border-color: rgba(var(--accent-rgb), 0.55); }
+.bb-lt-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent-hex); flex: none; cursor: pointer; }
+.bb-lt-titulo { flex: 1; min-width: 0; font-size: 15px; overflow-wrap: anywhere; cursor: pointer; }
+.bb-lt-item[data-feita="sim"] .bb-lt-titulo { color: var(--bb-texto-3); text-decoration: line-through; }
+.bb-lt-chip { flex: none; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(var(--accent-rgb), 0.6); color: var(--bb-texto); }
+.bb-lt-quando { flex: none; font-size: 12px; color: var(--bb-texto-2); font-family: var(--bb-mono); }
+.bb-lt-prioridade { flex: none; height: 28px; font: inherit; font-size: 12px; color: var(--bb-texto-2); background: transparent; border: 1px solid var(--bb-linha); border-radius: 7px; }
+.bb-lt-apagar { flex: none; border: 0; background: none; color: var(--bb-texto-3); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.bb-lt-apagar:hover { color: var(--bb-aviso); }
+@media (max-width: 560px) {
+  .bb-lt-item { flex-wrap: wrap; }
+  .bb-lt-titulo { flex-basis: calc(100% - 40px); }
+}
 /* as versões anteriores do fluxo aberto ou escolhido na lista (01/11/2026) */
 .bb-fluxos-versoes { max-height: 280px; overflow: auto; padding: 8px 14px 10px; border-bottom: 1px solid var(--bb-linha); background: var(--bb-superficie); }
 .bb-fluxos-versoes-topo { display: flex; align-items: center; gap: 10px; padding-bottom: 6px; font-size: 13.5px; color: var(--bb-texto); }

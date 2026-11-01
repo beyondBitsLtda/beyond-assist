@@ -4,12 +4,15 @@
 // Assistente no celular, que já tinha divergido dela (uma tinha a Máquina, a outra o Dashboard
 // AR). O menu "Painéis" do topo e a lista do celular leem daqui; um painel novo entra num lugar só.
 
+import { podeAcessar } from "./authSession.js";
+
 export const GRUPOS_DE_PAINEIS = [
   {
     titulo: "Conversa",
     itens: [
       { href: "/assistant", rotulo: "Assistente" },
       { href: "/visual", rotulo: "Visual da Lisa", detalhe: "Esfera, Lente, Orbe, Plasma, Anel ou Rosto" },
+      { href: "/lisa-task", rotulo: "Lisa Task", detalhe: "Suas tarefas leves" },
     ],
   },
   {
@@ -54,6 +57,16 @@ export const GRUPOS_DE_PAINEIS = [
     ],
   },
 ];
+
+/**
+ * Os grupos que o papel alcança (01/11/2026, o MVP): o usuário vê só o que o portão deixa ele abrir
+ * (src/lib/authSession.js: podeAcessar); sem saber o papel ainda, o menu mostra o do usuário.
+ */
+export function gruposDoPapel(papel) {
+  return GRUPOS_DE_PAINEIS
+    .map((g) => ({ ...g, itens: g.itens.filter((i) => podeAcessar(papel || "usuario", i.href)) }))
+    .filter((g) => g.itens.length);
+}
 
 /** O painel de um caminho, para o topo mostrar onde se está. */
 export function painelDe(caminho) {

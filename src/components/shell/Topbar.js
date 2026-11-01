@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Suspenso, { GrupoDoMenu, ItemDoMenu, ChaveDoMenu, LinkDoMenu } from "./Suspenso.js";
-import { GRUPOS_DE_PAINEIS, painelDe } from "@/lib/navegacao.js";
+import { gruposDoPapel, painelDe } from "@/lib/navegacao.js";
+import usePapel from "@/lib/usePapel.js";
 import { useLog } from "./LogProvider.js";
 import { CY, OR, GR, dotColor } from "@/lib/theme.js";
 import { runFullSync } from "@/lib/sync.js";
@@ -52,6 +53,8 @@ function urlBase64ToUint8Array(base64String) {
 export default function Topbar() {
   const { addLog } = useLog();
   const pathname = usePathname();
+  // (01/11/2026, o MVP) o usuário vê só os painéis dele, sem o sync e os avisos do admin
+  const papel = usePapel();
   // Começa neutro e só ganha a hora no navegador: o HTML é pré-renderizado no BUILD, e a hora
   // do build nunca bate com a do cliente — o React descartava a hidratação e refazia a raiz
   // inteira (erro #418), o que também apagava a tela de abertura.
@@ -108,6 +111,8 @@ export default function Topbar() {
   // status do SYNC automático (cron do Supabase) — busca ao montar e a cada 30s, pra
   // refletir os ticks (1x/min) sem precisar recarregar a página.
   useEffect(() => {
+    // (01/11/2026, o MVP) o sync é do admin: o usuário nem pergunta
+    if (papel !== "admin") return undefined;
     let alive = true;
     const check = () => {
       fetch("/api/sync-status")
@@ -118,7 +123,7 @@ export default function Topbar() {
     check();
     const id = setInterval(check, 30000);
     return () => { alive = false; clearInterval(id); };
-  }, []);
+  }, [papel]);
 
   // notificações push: registra o service worker e checa se este dispositivo já está inscrito
   useEffect(() => {
@@ -268,7 +273,7 @@ export default function Topbar() {
             </>
           }
         >
-          {GRUPOS_DE_PAINEIS.map((g) => (
+          {gruposDoPapel(papel).map((g) => (
             <GrupoDoMenu key={g.titulo} titulo={g.titulo}>
               {g.itens.map((i) => (
                 <LinkDoMenu key={i.href} href={i.href} detalhe={i.detalhe} atual={pathname === i.href}>{i.rotulo}</LinkDoMenu>
@@ -291,7 +296,7 @@ export default function Topbar() {
               </div>
             ))}
           </GrupoDoMenu>
-          <GrupoDoMenu titulo="Sincronização">
+          {papel === "admin" && <GrupoDoMenu titulo="Sincronização">
             <div className="bb-linha-de-status" title={autoSyncTitle}>
               <span>Automática</span>
               <em style={{ color: autoSyncColor }}>{autoSyncLabel}</em>
@@ -305,8 +310,8 @@ export default function Topbar() {
             >
               {ingesting ? "Sincronizando…" : "Sincronizar agora"}
             </ItemDoMenu>
-          </GrupoDoMenu>
-          {pushSupported && (
+          </GrupoDoMenu>}
+          {pushSupported && papel === "admin" && (
             <GrupoDoMenu titulo="Avisos">
               <ChaveDoMenu
                 ligado={subscribed}

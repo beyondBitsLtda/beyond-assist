@@ -8,6 +8,7 @@ import NotificationToasts from "./NotificationToasts.js";
 import RemoteCommandListener from "./RemoteCommandListener.js";
 import { applyAccentTheme } from "@/lib/accentThemes.js";
 import { useIsMobile } from "@/lib/useIsMobile.js";
+import usePapel from "@/lib/usePapel.js";
 
 /**
  * Casca compartilhada por todos os painéis: fundo preto, topo e conteúdo.
@@ -20,6 +21,14 @@ export default function Shell({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const isMobile = useIsMobile();
+  // (01/11/2026, o MVP) os avisos e os comandos remotos são do admin: o usuário não os escuta
+  const papel = usePapel();
+  const doAdmin = papel === "admin" && (
+    <>
+      <NotificationToasts />
+      <RemoteCommandListener />
+    </>
+  );
   // no mobile, o Assistente é uma experiência própria em tela cheia (sem Topbar/Sidebar —
   // ver src/app/(panels)/assistant/page.js) — as outras abas continuam com a casca normal.
   const mobileAssistantFullScreen = isMobile && pathname === "/assistant";
@@ -58,8 +67,7 @@ export default function Shell({ children }) {
       <LogProvider>
         <div className="bb-app" style={{ position: "fixed", inset: 0, overflow: "hidden" }}>
           {children}
-          <NotificationToasts />
-          <RemoteCommandListener />
+          {doAdmin}
         </div>
       </LogProvider>
     );
@@ -72,8 +80,7 @@ export default function Shell({ children }) {
         {/* bb-painel: a camada de revisão visual dos painéis (fonte, espaçamento, superfícies — ver
             globals.css). O Assistente já nasceu no visual novo e fica de fora. */}
         <div className={pathname === "/assistant" ? "bb-conteudo" : "bb-conteudo bb-painel"} style={{ flex: 1, minHeight: 0, overflow: "auto", position: "relative" }}>{children}</div>
-        <NotificationToasts />
-        <RemoteCommandListener />
+        {doAdmin}
       </div>
     </LogProvider>
   );

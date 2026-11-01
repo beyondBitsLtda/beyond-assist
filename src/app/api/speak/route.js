@@ -2,6 +2,7 @@ import { synthesizeSpeech } from "@/lib/gemini.js";
 import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
 import { b64ParaBytes } from "@/lib/base64.js";
 import { pcmDoGemini } from "@/lib/audioDoGemini.js";
+import { usarDoDia } from "@/lib/usoDoDia.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,9 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req) {
   try {
+    // (01/11/2026, o MVP) o usuário tem o limite do dia — as chaves de IA são do admin
+    const limite = await usarDoDia(req, "voz");
+    if (limite) return json({ error: limite.erro, limite: true }, limite.status);
     const { text, voice } = await req.json();
     const clean = cleanForSpeech(text || "");
     if (!clean) return json({ error: "texto vazio" }, 400);

@@ -151,6 +151,75 @@ export function precisaRenovar(payload, margemSegundos = 300, agoraSegundos = Ma
   return segundosAteExpirar(payload, agoraSegundos) < margemSegundos;
 }
 
+// ---- papéis (01/11/2026, o MVP: "quando um usuário que não seja eu logar, ele tem acesso a uma
+// versão limitada da aplicação") ----
+//
+// Dois papéis. ADMIN é o dono da Lisa: entra em tudo, como sempre. USUÁRIO é qualquer outra conta:
+// o assistente, a voz, o Modo Tela, o editor de código, o ProcessMap, os repositórios públicos, o
+// perfil e as tarefas leves — e nada do que é do admin (Sentinela, Abacato, painéis, chaves,
+// comandos remotos, a base de conhecimento dele).
+
+/** Os ids (o "sub" do token) de LISA_ADMINS, separados por vírgula, espaço ou ponto e vírgula. */
+export function adminsDe(texto) {
+  return String(texto ?? "").split(/[\s,;]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+}
+
+/**
+ * O papel de quem está na sessão: "admin" ou "usuario". Admin é quem está em LISA_ADMINS ou tem
+ * `app_metadata.role = "admin"` no token — o token é assinado pelo banco, ninguém se promove pelo
+ * navegador. Sem LISA_ADMINS configurado, o modo MVP está DESLIGADO e todo mundo é admin, como
+ * antes: assim o código entra no ar sem trancar o dono para fora, e o modo liga quando a variável
+ * ganha o id dele.
+ */
+export function papelDe(payload, listaDeAdmins) {
+  const admins = adminsDe(listaDeAdmins);
+  if (!admins.length) return "admin";
+  if (!payload) return "usuario";
+  if (payload.app_metadata?.role === "admin") return "admin";
+  return admins.includes(String(payload.sub || "").toLowerCase()) ? "admin" : "usuario";
+}
+
+/**
+ * O que o USUÁRIO alcança — o resto é recusado (lista do que pode, nunca do que não pode: um painel
+ * novo nasce fechado para ele). Cada entrada com o motivo, como em LIVRES.
+ */
+export const DO_USUARIO = [
+  // as telas da versão MVP
+  { prefixo: "/assistant", motivo: "o assistente em tela cheia (conversa, voz, Modo Tela, editor de código)" },
+  { prefixo: "/fluxogramas", motivo: "o ProcessMap — os projetos já são separados por pessoa" },
+  { prefixo: "/visual", motivo: "o visual da Lisa (esferas, rosto)" },
+  { prefixo: "/lisa-task", motivo: "as tarefas leves da pessoa" },
+  // o que essas telas chamam
+  { prefixo: "/api/ask", motivo: "a conversa — no modo usuário, sem a base, o Abacato, a persona e o contexto do admin" },
+  { prefixo: "/api/speak", motivo: "a voz da Lisa" },
+  { prefixo: "/api/screen-comment", motivo: "o Modo Tela — no modo usuário, sem gravar no histórico do Vigia" },
+  { prefixo: "/api/repos/contexto", motivo: "repositórios como contexto — no modo usuário, só os públicos, sem o token do admin" },
+  { prefixo: "/api/diagrama", motivo: "o desenho no quadro" },
+  { prefixo: "/api/processmap/", motivo: "o plano e os .md do ProcessMap" },
+  { prefixo: "/api/fluxogramas", motivo: "os projetos e fluxogramas da pessoa (filtrados pelo dono)" },
+  { prefixo: "/api/notas", motivo: "o Tomar nota (por pessoa)" },
+  { prefixo: "/api/perfil", motivo: "a entrevista do primeiro acesso" },
+  { prefixo: "/api/lisa-task", motivo: "as tarefas leves" },
+];
+
+const casaCom = (caminho) => (l) => (l.prefixo.endsWith("/")
+  ? caminho.startsWith(l.prefixo)
+  : caminho === l.prefixo || caminho.startsWith(l.prefixo + "/"));
+
+/**
+ * O papel alcança o caminho? Admin, tudo. Usuário, só DO_USUARIO — e os arquivos públicos (um
+ * caminho de página que termina em extensão: imagem, som, script da pasta public).
+ */
+export function podeAcessar(papel, caminho) {
+  if (papel === "admin") return true;
+  const c = String(caminho || "");
+  if (DO_USUARIO.some(casaCom(c))) return true;
+  return !c.startsWith("/api/") && /\/[^/]+\.[a-z0-9]{2,5}$/i.test(c);
+}
+
+/** O cookie que diz o papel à tela (só para esconder o que o usuário não usa — quem barra é o portão). */
+export const COOKIE_PAPEL = "lisa_papel";
+
 /** Para onde mandar depois de entrar. Só aceita caminho interno — sem isso, um link
  *  `?de=https://site-falso` faria a própria Lisa despejar o usuário lá depois do login. */
 export function destinoSeguro(bruto) {

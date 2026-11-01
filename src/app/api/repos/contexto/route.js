@@ -1,6 +1,7 @@
 import { contextoDosRepositorios } from "@/lib/repositorioNaConversa.js";
 import { turnosValidos, blocoDaConversa } from "@/lib/conversa.js";
 import { imagensValidas } from "@/lib/contextoDaConversa.js";
+import { ehUsuario } from "@/lib/papelNaSessao.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +33,8 @@ export async function POST(req) {
       pergunta: question,
       conversa: blocoDaConversa(turnosValidos(body.turnos)),
       imagens: imagensValidas(body.images),
+      // (01/11/2026, o MVP) o usuário só lê repositórios públicos, sem o token do admin
+      soPublicos: ehUsuario(req),
     });
     return Response.json({ ok: true, secao: r.secao, lidos: r.lidos, repos: r.repos || [], avisos: r.avisos }, { headers: { "cache-control": "no-store" } });
   } catch (err) {

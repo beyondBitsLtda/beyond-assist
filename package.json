@@ -16,6 +16,7 @@
     "abacato-check": "node --env-file=.env scripts/abacato-check.mjs",
     "quadros-check": "node --env-file=.env --import ./scripts/alias-loader.mjs scripts/quadros-check.mjs",
     "auth-check": "node scripts/auth-check.mjs",
+    "mvp-check": "node --import ./scripts/alias-loader.mjs scripts/mvp-check.mjs",
     "reserva-check": "node --import ./scripts/alias-loader.mjs scripts/reserva-check.mjs",
     "fala-check": "node scripts/fala-check.mjs",
     "codigo-check": "node scripts/codigo-check.mjs",

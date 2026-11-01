@@ -72,16 +72,25 @@ async function chamar(caminho, { comToken = true } = {}) {
 const arvores = new Map(); // "dono/repo@branch" → { quando, dados }
 const conteudos = new Map(); // sha → texto (o mesmo sha é sempre o mesmo conteúdo)
 
+// (01/11/2026, o MVP) o USUÁRIO só lê repositórios públicos: sem o token do admin — que alcança os
+// privados dele — e recusando o privado também quando ele vem do cache, que é do Worker inteiro
+const SO_PUBLICOS = "nesta versão da Lisa eu só leio repositórios públicos";
+
 /** A árvore de um repositório vinculado: { repo, branch, privado, arquivos: [{ path, sha, size }], total }. */
-export async function lerRepositorioVinculado({ repo, branch }) {
+export async function lerRepositorioVinculado({ repo, branch }, { soPublicos = false } = {}) {
   const chave = `${repo.toLowerCase()}@${branch || ""}`;
   const guardada = arvores.get(chave);
-  if (guardada && Date.now() - guardada.quando < TTL_DA_ARVORE) return guardada.dados;
+  if (guardada && Date.now() - guardada.quando < TTL_DA_ARVORE) {
+    if (soPublicos && guardada.dados.privado) throw new ErroDoRepositorio(`${repo} é privado — ${SO_PUBLICOS}`);
+    return guardada.dados;
+  }
 
-  const info = await chamar(`/repos/${repo}`);
-  if (!info) throw new ErroDoRepositorio(`não achei ${repo} (ou ele é privado e a Lisa não tem acesso)`);
+  const comToken = !soPublicos;
+  const info = await chamar(`/repos/${repo}`, { comToken });
+  if (!info) throw new ErroDoRepositorio(soPublicos ? `não achei ${repo} — se ele é privado, ${SO_PUBLICOS}` : `não achei ${repo} (ou ele é privado e a Lisa não tem acesso)`);
+  if (soPublicos && info.private) throw new ErroDoRepositorio(`${repo} é privado — ${SO_PUBLICOS}`);
   const ramo = branch || info.default_branch;
-  const arvore = await chamar(`/repos/${repo}/git/trees/${encodeURIComponent(ramo)}?recursive=1`);
+  const arvore = await chamar(`/repos/${repo}/git/trees/${encodeURIComponent(ramo)}?recursive=1`, { comToken });
   if (!arvore) throw new ErroDoRepositorio(`a branch "${ramo}" não existe em ${repo}`);
   const arquivos = (arvore.tree || [])
     .filter((n) => n.type === "blob" && EXTENSOES.test(n.path) && !IGNORAR.test(n.path) && (n.size || 0) <= 400_000)
@@ -92,9 +101,9 @@ export async function lerRepositorioVinculado({ repo, branch }) {
   return dados;
 }
 
-async function conteudoDoArquivo(repo, sha) {
+async function conteudoDoArquivo(repo, sha, { soPublicos = false } = {}) {
   if (conteudos.has(sha)) return conteudos.get(sha);
-  const blob = await chamar(`/repos/${repo}/git/blobs/${sha}`);
+  const blob = await chamar(`/repos/${repo}/git/blobs/${sha}`, { comToken: !soPublicos });
   if (!blob || blob.encoding !== "base64") return null;
   const texto = b64ParaTexto(blob.content);
   const valor = texto.includes("\uFFFD") ? null : texto; // caractere de substituição: era binário
@@ -194,14 +203,15 @@ export function secaoDosRepositorios(repos, lidos, avisos = []) {
 /**
  * O contexto dos repositórios vinculados para uma pergunta: { secao, lidos: [{ repo, path }],
  * avisos }. Nunca derruba a conversa: um repositório que falha vira um aviso na seção.
+ * `soPublicos` (o usuário do MVP): sem o token do admin, e repositório privado vira aviso.
  */
-export async function contextoDosRepositorios({ vinculos, pergunta, conversa = "", imagens = [] }) {
+export async function contextoDosRepositorios({ vinculos, pergunta, conversa = "", imagens = [], soPublicos = false }) {
   const lista = vinculosValidos(vinculos, MAX_REPOS);
   if (!lista.length) return { secao: "", lidos: [], avisos: [] };
 
   const avisos = [];
   const repos = [];
-  for (const r of await Promise.all(lista.map((v) => lerRepositorioVinculado(v).catch((e) => ({ ...v, erro: e.message }))))) {
+  for (const r of await Promise.all(lista.map((v) => lerRepositorioVinculado(v, { soPublicos }).catch((e) => ({ ...v, erro: e.message }))))) {
     if (r.erro) avisos.push(`Não consegui ler ${r.repo}: ${r.erro}.`);
     else repos.push(r);
   }
@@ -222,7 +232,7 @@ export async function contextoDosRepositorios({ vinculos, pergunta, conversa = "
   const textos = await Promise.all(fila.slice(0, MAX_LIDOS).map(async (f) => {
     const a = porRepo.get(f.repo)?.get(f.path);
     if (!a) return null;
-    const texto = await conteudoDoArquivo(f.repo, a.sha).catch(() => null);
+    const texto = await conteudoDoArquivo(f.repo, a.sha, { soPublicos }).catch(() => null);
     return texto == null ? null : { ...f, texto };
   }));
 

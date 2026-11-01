@@ -15,9 +15,82 @@ import { secaoDoProjeto } from "@/lib/processmapNaConversa.js";
 import { webDaPergunta, fontesDaBusca } from "@/lib/buscaNaWeb.js";
 import { contextoDosRepositorios } from "@/lib/repositorioNaConversa.js";
 import { notaDasImagens, imagensValidas } from "@/lib/contextoDaConversa.js";
+import { sessaoDe } from "@/lib/papelNaSessao.js";
+import { usarDoDia } from "@/lib/usoDoDia.js";
+import { lerPerfil, listarTarefas, criarTarefa } from "@/lib/perfilEtarefas.js";
+import { INSTRUCAO_DO_USUARIO, secaoDoPerfil, secaoDasTarefas, pedidoDeTarefa, promptDoUsuario } from "@/lib/modoUsuario.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const CABECALHOS_SSE = { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", connection: "keep-alive" };
+
+/** O erro do Gemini numa frase para a pessoa (o mesmo para o admin e o usuário). */
+function erroAmigavel(err) {
+  const keySuffix = err?.keyLabel ? ` [${err.keyLabel}]` : "";
+  if (err?.code === "QUOTA") return `⚠️ Quota do Gemini cheia${keySuffix}. Aguarde cerca de 1 minuto e pergunte de novo.`;
+  if (err?.code === "UNAVAILABLE") return `⚠️ O Gemini está com alta demanda no momento${keySuffix} (já tentei de novo automaticamente). Espere um instante e pergunte de novo.`;
+  if (/too many subrequests/i.test(String(err?.message || err))) return "⚠️ Esta pergunta precisou de mais chamadas de rede do que o servidor deixa fazer de uma vez. Pergunte de novo; se repetir, tire uma imagem do contexto.";
+  return String(err?.message || err);
+}
+
+/**
+ * A conversa do USUÁRIO do MVP (01/11/2026: "quando um usuário que não seja eu logar, ele tem acesso a
+ * uma versão limitada"). Sem a base de conhecimento do admin (os documentos dele), sem o Abacato, a
+ * Delp, a persona e o contexto pessoal dele. Com o perfil da entrevista, a Lisa Task da pessoa ("crie
+ * uma tarefa…" vira tarefa), o Modo Tela (as imagens), os repositórios públicos que a tela leu antes
+ * (/api/repos/contexto, sem o token do admin), o código da conversa, o quadro e o projeto do ProcessMap
+ * dela. Conta no limite do dia (src/lib/usoDoDia.js).
+ */
+function conversaDoUsuario(req, body, question, images, dono) {
+  const encoder = new TextEncoder();
+  const send = (controller, event, data) => controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        send(controller, "context", []);
+        const limite = await usarDoDia(req, "pergunta");
+        if (limite) {
+          send(controller, "token", limite.erro);
+          send(controller, "done", { ok: true });
+          return;
+        }
+        const tarefa = pedidoDeTarefa(question);
+        if (tarefa && dono) {
+          const t = await criarTarefa(dono, tarefa);
+          send(controller, "token", `Anotei na sua Lisa Task: "${t.titulo}"${t.prioridade === "alta" ? ", com prioridade alta" : ""}.`);
+          send(controller, "done", { ok: true });
+          return;
+        }
+        const [perfil, tarefas] = dono
+          ? await Promise.all([lerPerfil(dono).catch(() => null), listarTarefas(dono).catch(() => [])])
+          : [null, []];
+        const turnos = turnosValidos(body.history?.turnos);
+        const web = await webDaPergunta(question, { turnos, ferramentasDoEscopo: [{ googleSearch: {} }] });
+        if (web.pesquisa) send(controller, "pesquisa", { consulta: web.pesquisa.consulta, buscador: web.pesquisa.buscador, total: web.pesquisa.resultados.length, lidas: web.paginas.length, erros: web.pesquisa.erros });
+        const nota = [notaDasImagens(images), web.nota].filter(Boolean).join("\n\n") || null;
+        const secaoDosRepos = typeof body.contextoDosRepos?.secao === "string" ? body.contextoDosRepos.secao.slice(0, 170_000) : "";
+        const prompt = promptDoUsuario(question, {
+          hoje: todayLabel(), nota, conversa: blocoDaConversa(turnos),
+          extra: secaoDoCodigoDaConversa(body.codigo) + secaoDoDiagrama(body.diagrama) + secaoDoProjeto(body.projeto) + secaoDosRepos,
+        });
+        const instrucao = comCodigoNaTela(INSTRUCAO_DO_USUARIO + secaoDoPerfil(perfil) + secaoDasTarefas(tarefas));
+        const metadados = [];
+        for await (const piece of chatStreamWithFallback(prompt, instrucao, web.ferramentas, images, (m) => metadados.push(m))) {
+          send(controller, "token", piece);
+        }
+        const fontes = fontesDaBusca(metadados, 6, web.fontes);
+        if (fontes.length) send(controller, "fontes", fontes);
+        send(controller, "done", { ok: true });
+      } catch (err) {
+        send(controller, "error", { message: erroAmigavel(err) });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, { headers: CABECALHOS_SSE });
+}
 
 /**
  * Gera a resposta com `tools` (grounding via Google Search); se a chamada falhar, tenta
@@ -128,6 +201,10 @@ export async function POST(req) {
       headers: { "content-type": "application/json" },
     });
   }
+
+  // o USUÁRIO do MVP (01/11/2026) tem a conversa dele, sem nada do admin — ver conversaDoUsuario
+  const sessao = sessaoDe(req);
+  if (sessao.papel === "usuario") return conversaDoUsuario(req, body, question, images, sessao.dono);
 
   const encoder = new TextEncoder();
   const send = (controller, event, data) =>

@@ -10,6 +10,9 @@ import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 import { langForPath } from "@/lib/highlightCode.js";
 import { respostaSemCodigo, trechosDaResposta, codigoDaConversa } from "@/lib/codigoNaResposta.js";
 import { pedidoDeDesenho, descreverDiagrama, resumoDaMudanca, pedeMudancaNoDesenho } from "@/lib/diagramaDaLisa.js";
+import usePapel from "@/lib/usePapel.js";
+import { podeAcessar } from "@/lib/authSession.js";
+import { PEDIDO_DE_CONSENTIMENTO, PERGUNTAS_DA_ENTREVISTA, perfilDasRespostas, PEDE_APAGAR_PERFIL } from "@/lib/modoUsuario.js";
 import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
 import FontesDaWeb from "@/components/panels/FontesDaWeb.js";
 import CenaDaLisa from "@/components/panels/hud/CenaDaLisa.js";
@@ -188,6 +191,15 @@ function playListenBeep() {
 export default function AssistantPage() {
   const { logs, addLog } = useLog();
   const [mode, setMode] = useState("idle");
+  // (01/11/2026, o MVP) o papel de quem está na tela. O USUÁRIO tem a conversa, a voz, o Modo Tela, o
+  // editor de código, o ProcessMap, os repositórios públicos, a entrevista e a Lisa Task; os modos do
+  // admin somem da tela e ficam desligados (quem barra de verdade é o portão, src/middleware.js)
+  const papel = usePapel();
+  const usuario = papel === "usuario";
+  const usuarioRef = useRef(false);
+  usuarioRef.current = usuario;
+  const entrevistaRef = useRef({ estado: null, i: 0, respostas: {} });
+  const entrevistaFazRef = useRef(null);
   const [cards, setCards] = useState([]);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -2546,6 +2558,96 @@ export default function AssistantPage() {
     }
   }, [personaMode, addLog, voiceOn, stopSpeaking, enqueueSpeech, abrirNaIde, guardarNaIde]);
 
+  // o usuário não liga os modos do admin (e o que veio ligado do navegador desliga)
+  useEffect(() => {
+    if (!usuario) return;
+    setCodeMode(false); setObservanceMode(false); setVigiaMode(false); setVigiaAutoOn(false); setVigiaWatching(false);
+    setCameraWatching(false); setCameraVigiaMode(false); setMicWatchMode(false); setRadioMode(false);
+    setTransmissionMode(false); setInteractiveMode(false); setPersonaMode(false);
+  }, [usuario, codeMode, observanceMode, vigiaMode, vigiaAutoOn, vigiaWatching, cameraWatching, cameraVigiaMode, micWatchMode, radioMode, transmissionMode, interactiveMode, personaMode]);
+
+  // ---- a entrevista do primeiro acesso (o USUÁRIO do MVP; src/lib/modoUsuario.js) ----
+  // Sem perfil, a Lisa pede o consentimento e, com o "sim", faz 5 perguntas, uma por vez; as respostas
+  // vão para /api/perfil. "agora não" adia até a próxima sessão; "apague meu perfil" apaga de verdade.
+  const responderSemServidor = (q, texto, displayText) => {
+    const shown = displayText || q;
+    setQuestion(shown);
+    setAnswer(texto);
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }, { id: `a${Date.now() + 1}`, role: "assistant", text: texto }]);
+    conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+    if (voiceOn) enqueueSpeech(texto, ++speechGenRef.current);
+  };
+  useEffect(() => {
+    if (!usuario) return undefined;
+    let adiada = false;
+    try { adiada = sessionStorage.getItem("lisa-entrevista-adiada") === "1"; } catch { /* sem armazenamento */ }
+    if (adiada) return undefined;
+    let vivo = true;
+    fetch("/api/perfil").then((r) => r.json()).then((j) => {
+      if (!vivo || !j?.ok || j.perfil || entrevistaRef.current.estado) return;
+      entrevistaRef.current = { estado: "consentimento", i: 0, respostas: {} };
+      setAnswer(PEDIDO_DE_CONSENTIMENTO);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: PEDIDO_DE_CONSENTIMENTO }]);
+      lembrarDaLisa(PEDIDO_DE_CONSENTIMENTO);
+    }).catch(() => {});
+    return () => { vivo = false; };
+  }, [usuario]); // eslint-disable-line react-hooks/exhaustive-deps
+  entrevistaFazRef.current = async (q, displayText) => {
+    const e = entrevistaRef.current;
+    const t = q.trim();
+    const adiar = () => { try { sessionStorage.setItem("lisa-entrevista-adiada", "1"); } catch { /* sem armazenamento */ } };
+    if (!e.estado) {
+      if (PEDE_APAGAR_PERFIL.test(t)) {
+        const r = await fetch("/api/perfil", { method: "DELETE" }).then((x) => x.json()).catch(() => ({}));
+        responderSemServidor(q, r.ok ? "Apaguei o seu perfil: o que você me contou na entrevista não está mais guardado. Se quiser recomeçar, diga \"quero fazer a entrevista\"." : "Não consegui apagar o perfil agora. Tente de novo em instantes.", displayText);
+        return true;
+      }
+      if (/\b(fazer|refazer|come[cç]ar|recome[cç]ar)\s+(a\s+)?entrevista\b/i.test(t)) {
+        entrevistaRef.current = { estado: "consentimento", i: 0, respostas: {} };
+        responderSemServidor(q, PEDIDO_DE_CONSENTIMENTO, displayText);
+        return true;
+      }
+      return false;
+    }
+    if (e.estado === "consentimento") {
+      const r = respostaDeConfirmacao(t);
+      if (r === "sim") {
+        entrevistaRef.current = { estado: "pergunta", i: 0, respostas: {} };
+        responderSemServidor(q, `Combinado! ${PERGUNTAS_DA_ENTREVISTA[0].pergunta}`, displayText);
+        return true;
+      }
+      entrevistaRef.current = { estado: null, i: 0, respostas: {} };
+      adiar();
+      if (r === "nao") {
+        responderSemServidor(q, "Tudo bem! Quando quiser, diga \"quero fazer a entrevista\". Pode me perguntar o que precisar.", displayText);
+        return true;
+      }
+      return false; // outro assunto: segue a conversa normal
+    }
+    if (/^(cancel[ae]|par[ae]|sair|chega)\b|\b(cancel[ae]|par[ae]r?)\s+(a\s+)?entrevista\b/i.test(t)) {
+      entrevistaRef.current = { estado: null, i: 0, respostas: {} };
+      adiar();
+      responderSemServidor(q, "Parei a entrevista e não guardei nada. Quando quiser, diga \"quero fazer a entrevista\".", displayText);
+      return true;
+    }
+    const atual = PERGUNTAS_DA_ENTREVISTA[e.i];
+    const respostas = { ...e.respostas, [atual.campo]: t };
+    const i = e.i + 1;
+    if (i < PERGUNTAS_DA_ENTREVISTA.length) {
+      entrevistaRef.current = { estado: "pergunta", i, respostas };
+      responderSemServidor(q, PERGUNTAS_DA_ENTREVISTA[i].pergunta, displayText);
+      return true;
+    }
+    entrevistaRef.current = { estado: null, i: 0, respostas: {} };
+    const perfil = perfilDasRespostas(respostas);
+    const r = await fetch("/api/perfil", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ consentimento: true, ...perfil }) })
+      .then((x) => x.json()).catch(() => ({}));
+    responderSemServidor(q, r.ok
+      ? `Pronto${perfil.nome ? `, ${perfil.nome}` : ""}! Guardei o que você me contou e vou usar para te ajudar melhor. Para apagar, é só dizer "apague meu perfil". Por onde começamos?`
+      : "Não consegui guardar as suas respostas agora. Sigo te ajudando assim mesmo, e você pode pedir \"quero fazer a entrevista\" depois.", displayText);
+    return true;
+  };
+
   // ---- pergunta real ao backend (SSE) ----
   // `displayText` (opcional) — o que aparece no chat/log, quando diferente do `q` de verdade
   // mandado pro backend. Existe pra réplica do Modo Escuta (ver listenForReply abaixo): a
@@ -2557,6 +2659,9 @@ export default function AssistantPage() {
 
     // a resposta ao "posso fazer?" de um pedido sobre o projeto (01/11/2026): "sim" faz; "não" cancela;
     // uma correção refaz o entendimento com ela e pergunta de novo; outro assunto deixa o pedido de lado
+    // o USUÁRIO do MVP: a entrevista do primeiro acesso e o "apague meu perfil", sem o servidor da conversa
+    if (usuarioRef.current && !alvoDaIde && await entrevistaFazRef.current?.(q, displayText)) return;
+
     const pendente = planoPendenteRef.current;
     if (pendente && !alvoDaIde) {
       planoPendenteRef.current = null;
@@ -4447,6 +4552,7 @@ export default function AssistantPage() {
                 <button onClick={() => setMobileSettingsOpen(false)} style={{ ...mono, fontSize: 10, padding: "5px 10px", border: "1px solid rgba(var(--accent-rgb),0.2)", borderRadius: 4, background: "transparent", color: "rgba(207,239,251,0.6)", cursor: "pointer" }}>✕ fechar</button>
               </div>
 
+{!usuario && (<>
               {/* escopo */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginBottom: 8 }}>ESCOPO</div>
               <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
@@ -4485,6 +4591,7 @@ export default function AssistantPage() {
                 </>
               )}
 
+</>)}
               {/* voz */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>VOZ</div>
               <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
@@ -4524,6 +4631,7 @@ export default function AssistantPage() {
                 </>
               )}
 
+{!usuario && (<>
               {/* persona */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>PERSONALIDADE</div>
               <button
@@ -4601,6 +4709,7 @@ export default function AssistantPage() {
                 Com o modo ligado, ela também cumprimenta sozinha se reconhecer a Alice ou a Nala na câmera.
               </div>
 
+</>)}
               {/* Modo Tela — compartilhar a tela do dispositivo. A maioria dos navegadores de
                   CELULAR não tem suporte a getDisplayMedia (compartilhamento de tela) — o botão
                   fica disponível, mas se o seu navegador não suportar, aparece o aviso de erro
@@ -4638,6 +4747,7 @@ export default function AssistantPage() {
                       />
                     </>
                   )}
+{!usuario && (<>
                   <button
                     onClick={() => setTransmissionMode((v) => !v)}
                     style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${transmissionMode ? OR : "rgba(var(--accent-rgb),0.18)"}`, background: transmissionMode ? "rgba(217,89,38,0.12)" : "transparent", color: transmissionMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
@@ -4648,7 +4758,8 @@ export default function AssistantPage() {
                     <div style={{ fontSize: 10.5, color: "rgba(207,239,251,0.45)", marginBottom: 8, lineHeight: 1.4 }}>
                       Outro dispositivo com o Modo Vigia (abaixo) pode assistir esta tela AO VIVO agora.
                     </div>
-                  )}
+                  )}</>)}
+
                 </>
               )}
               {screenError && <div style={{ ...mono, fontSize: 9.5, color: OR, marginBottom: 8 }}>⚠ {screenError}</div>}
@@ -4658,6 +4769,7 @@ export default function AssistantPage() {
                 for o seu caso, o aviso acima vai dizer isso claramente.
               </div>
 
+{!usuario && (<>
               {/* Câmera de Vigia — como o Modo Tela, só que filma com a câmera do dispositivo
                   (áudio junto) em vez da tela. Funciona em celular também (ao contrário do Modo
                   Tela). Quem assiste (Modo Vigia, "Assistir Câmera de Vigia") pode mandar
@@ -4821,6 +4933,7 @@ export default function AssistantPage() {
               >
                 {ingesting ? "SINCRONIZANDO…" : "◈ SYNC AGORA"}
               </button>
+</>)}
             </div>
           </div>
         )}
@@ -4842,6 +4955,9 @@ export default function AssistantPage() {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {[
+                  { href: "/fluxogramas", glyph: "◇", label: "PROCESSMAP" },
+                  { href: "/lisa-task", glyph: "✓", label: "LISA TASK" },
+                  { href: "/visual", glyph: "◎", label: "VISUAL DA LISA" },
                   { href: "/dashboard", glyph: "▧", label: "DASHBOARD" },
                   { href: "/dashboard/ar", glyph: "◫", label: "DASHBOARD · MODO AR" },
                   { href: "/", glyph: "◈", label: "QUARTO DE GUERRA" },
@@ -4858,7 +4974,7 @@ export default function AssistantPage() {
                   { href: "/arch-docs", glyph: "🗺️", label: "MAPA DE ARQUITETURA" },
                   { href: "/test-mode", glyph: "🧪", label: "MODO DE TESTES" },
                   { href: "/sync-status", glyph: "📊", label: "PROGRESSO DO SYNC" },
-                ].map((item) => (
+                ].filter((item) => podeAcessar(papel || "usuario", item.href)).map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -4978,6 +5094,7 @@ export default function AssistantPage() {
           }
         >
           <GrupoDoMenu titulo="Percepção">
+{!usuario && (<>
             <ChaveDoMenu
               ligado={observanceMode}
               onChange={() => setObservanceMode((v) => !v)}
@@ -4988,6 +5105,7 @@ export default function AssistantPage() {
             </ChaveDoMenu>
             {observanceError && <div className="bb-erro-do-menu">{observanceError}</div>}
 
+</>)}
             <ChaveDoMenu
               ligado={screenMode}
               onChange={() => setScreenMode((v) => !v)}
@@ -5020,6 +5138,7 @@ export default function AssistantPage() {
                     />
                   </div>
                 )}
+{!usuario && (<>
                 <ChaveDoMenu
                   ligado={transmissionMode}
                   onChange={() => setTransmissionMode((v) => !v)}
@@ -5028,10 +5147,12 @@ export default function AssistantPage() {
                 >
                   Transmissão
                 </ChaveDoMenu>
+</>)}
               </div>
             )}
             {screenError && <div className="bb-erro-do-menu">{screenError}</div>}
 
+{!usuario && (<>
             <ChaveDoMenu
               ligado={micWatchMode && (screenMode || observanceMode)}
               onChange={() => setMicWatchMode((v) => !v)}
@@ -5057,8 +5178,10 @@ export default function AssistantPage() {
               </div>
             )}
             {cameraVigiaError && <div className="bb-erro-do-menu">{cameraVigiaError}</div>}
+</>)}
           </GrupoDoMenu>
 
+{!usuario && (<>
           <GrupoDoMenu titulo="Vigia">
             <ChaveDoMenu
               ligado={vigiaMode}
@@ -5111,6 +5234,7 @@ export default function AssistantPage() {
             )}
           </GrupoDoMenu>
 
+</>)}
           <GrupoDoMenu titulo="Voz e rádio">
             <ChaveDoMenu
               ligado={conversaAberta}
@@ -5122,6 +5246,7 @@ export default function AssistantPage() {
             >
               Conversa livre
             </ChaveDoMenu>
+{!usuario && (<>
             <ChaveDoMenu
               ligado={radioMode}
               onChange={() => { unlockAudioPlayback(); acordarAudio(); setRadioMode((v) => !v); }}
@@ -5129,6 +5254,7 @@ export default function AssistantPage() {
             >
               Rádio
             </ChaveDoMenu>
+</>)}
             <ChaveDoMenu
               ligado={escutaPalavra}
               onChange={() => { unlockAudioPlayback(); acordarAudio(); setEscutaPalavra((v) => !v); }}
@@ -5139,6 +5265,7 @@ export default function AssistantPage() {
           </GrupoDoMenu>
 
           <GrupoDoMenu titulo="Trabalho">
+{!usuario && (<>
             <ChaveDoMenu
               ligado={codeMode}
               onChange={() => setCodeMode((v) => !v)}
@@ -5181,6 +5308,7 @@ export default function AssistantPage() {
             <ItemDoMenu onClick={() => setInteractiveMode((v) => !v)} detalhe="Rosto da Lisa e jogos; mostre ✌️ para chamar">
               Modo interativo
             </ItemDoMenu>
+</>)}
             <ItemDoMenu onClick={() => setTomarNota((v) => v || { tema: "" })} detalhe="Escuta até 10 min e anota por assunto no Abacato">
               Tomar nota
             </ItemDoMenu>
@@ -5400,6 +5528,7 @@ export default function AssistantPage() {
         {faixaDoContexto}
         <div className="bb-campo-de-mensagem">
           <BotaoMais aoEscolherImagens={anexarImagens} aoVincular={vincularRepo} desabilitado={busy} />
+{!usuario && (<>
           <Suspenso
             titulo="Perguntar sobre"
             paraCima
@@ -5449,6 +5578,7 @@ export default function AssistantPage() {
               )}
             </GrupoDoMenu>
           </Suspenso>
+</>)}
 
           <input
             value={input}

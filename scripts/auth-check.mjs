@@ -17,7 +17,15 @@ import {
   lerPayload,
   precisaRenovar,
   segundosAteExpirar,
+  papelDe,
+  podeAcessar,
+  adminsDe,
+  DO_USUARIO,
 } from "../src/lib/authSession.js";
+import { lerPapelDoCookie } from "../src/lib/usePapel.js";
+import fs from "node:fs";
+
+const ler = (c) => fs.readFileSync(new URL(`../${c}`, import.meta.url), "utf8");
 
 let falhas = 0;
 const ok = (t) => console.log(`  ok    ${t}`);
@@ -133,6 +141,34 @@ console.log("\n6) leitura do payload não decide nada sozinha");
   conferir("lerPayload lê o conteúdo", lerPayload(t)?.email === "a@b.c");
   conferir("lerPayload devolve null em lixo", lerPayload("nao-e-token") === null);
   conferir("o nome do cookie está definido", typeof COOKIE_SESSAO === "string" && COOKIE_SESSAO.length > 3);
+}
+
+console.log("\npapéis (01/11/2026, o MVP: quem não é o dono entra numa versão limitada)");
+{
+  const dono = "11111111-1111-1111-1111-111111111111";
+  const outro = "22222222-2222-2222-2222-222222222222";
+  conferir("sem LISA_ADMINS, o modo MVP está desligado: todo mundo é admin (ninguém fica trancado fora)", papelDe({ sub: outro }, undefined) === "admin" && papelDe({ sub: outro }, "") === "admin");
+  conferir("com LISA_ADMINS, o dono é admin e o outro é usuário", papelDe({ sub: dono }, dono) === "admin" && papelDe({ sub: outro }, dono) === "usuario");
+  conferir("a lista aceita vírgula, espaço e maiúsculas", adminsDe(` ${dono.toUpperCase()} ,${outro}; `).join() === `${dono},${outro}` && papelDe({ sub: outro }, `${dono}, ${outro}`) === "admin");
+  conferir("app_metadata.role = admin (no token assinado) também é admin", papelDe({ sub: outro, app_metadata: { role: "admin" } }, dono) === "admin");
+  conferir("user_metadata (que a própria pessoa edita) NÃO dá admin", papelDe({ sub: outro, user_metadata: { role: "admin" } }, dono) === "usuario");
+  conferir("sem sessão, com o modo ligado: usuário", papelDe(null, dono) === "usuario");
+
+  const pode = (c) => podeAcessar("usuario", c);
+  conferir("o usuário abre o assistente, o ProcessMap, o visual e a Lisa Task", ["/assistant", "/fluxogramas", "/visual", "/lisa-task"].every(pode));
+  conferir("e chama a conversa, a voz, o Modo Tela, os repositórios públicos, o desenho, o perfil e as tarefas", ["/api/ask", "/api/speak", "/api/screen-comment", "/api/repos/contexto", "/api/diagrama", "/api/processmap/plano", "/api/processmap/documento", "/api/fluxogramas", "/api/fluxogramas/abc/versoes", "/api/fluxogramas/projetos", "/api/notas/organizar", "/api/perfil", "/api/lisa-task", "/api/lisa-task/abc"].every(pode));
+  conferir("NÃO abre os painéis do admin", !["/", "/sentinel", "/tasks", "/boards", "/delp-tasks", "/code-repos", "/code-tasks", "/gemini-keys", "/maquina", "/thoughts", "/arch-docs", "/test-mode", "/sync-status", "/dashboard", "/news", "/scheduled-announcements", "/map-of-deploy", "/auth-check"].some(pode));
+  conferir("NÃO chama as APIs do admin", !["/api/sentinel/kanban", "/api/code-repos", "/api/code-tasks/step", "/api/kanban", "/api/boards-overview", "/api/remote-command", "/api/radio/playlist", "/api/camera-comment", "/api/mic-comment", "/api/screen-watch/ask", "/api/screen-share/signal", "/api/ingest", "/api/gemini-keys", "/api/delp-tasks", "/api/notifications/subscribe", "/api/pair", "/api/quiz", "/api/thoughts", "/api/tasks"].some(pode));
+  conferir("prefixo não engana (\"/assistantX\", \"/api/askme\", \"/api/perfilx\")", !["/assistantX", "/api/askme", "/api/perfilx", "/lisa-taskx"].some(pode));
+  conferir("os arquivos públicos (imagem, som) passam; API com extensão não", pode("/sons/bip.mp3") && pode("/icones/lisa.png") && !pode("/api/sentinel/x.json"));
+  conferir("o admin abre tudo", ["/", "/sentinel", "/api/code-repos", "/maquina"].every((c) => podeAcessar("admin", c)));
+  conferir("cada caminho do usuário tem motivo escrito", DO_USUARIO.every((l) => l.motivo && l.motivo.length > 10));
+  conferir("a tela lê o papel do cookie", lerPapelDoCookie("a=1; lisa_papel=usuario; b=2") === "usuario" && lerPapelDoCookie("lisa_papel=admin") === "admin" && lerPapelDoCookie("lisa_papel=root") === null && lerPapelDoCookie("") === null);
+
+  // o portão de verdade: o papel vem do token conferido, e o usuário barrado recebe 403 ou volta ao assistente
+  const portao = ler("src/middleware.js");
+  conferir("o portão decide pelo papel do token conferido (e do token renovado)", /return comPapel\(req, caminho, resultado\.payload\);/.test(portao) && /comPapel\(req, caminho, lerPayload\(novo\.acesso\), resp\)/.test(portao) && /papelDe\(payload, process\.env\.LISA_ADMINS\)/.test(portao));
+  conferir("usuário fora da lista: 403 na API, volta ao assistente na página", /status: 403/.test(portao) && /NextResponse\.redirect\(new URL\("\/assistant", req\.url\)\)/.test(portao));
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");

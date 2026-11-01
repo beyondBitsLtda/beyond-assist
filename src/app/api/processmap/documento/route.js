@@ -1,5 +1,6 @@
 import { escreverDocumento } from "@/lib/gemini.js";
 import { jsonResponse } from "@/lib/http.js";
+import { usarDoDia } from "@/lib/usoDoDia.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,9 @@ const tipoDe = (t) => (t === "mapa mental" ? "mapa mental" : "fluxograma");
 
 export async function POST(req) {
   try {
+    // (01/11/2026, o MVP) o usuário tem o limite do dia — as chaves de IA são do admin
+    const limite = await usarDoDia(req, "desenho");
+    if (limite) return jsonResponse({ ok: false, error: limite.erro, limite: true }, limite.status);
     const body = await req.json();
     const pedido = String(body?.pedido || "").trim();
     if (!pedido) return jsonResponse({ ok: false, error: "diga o que documentar" }, 400);

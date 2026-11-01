@@ -8,9 +8,13 @@ import { NextResponse } from "next/server";
 import {
   COOKIE_SESSAO,
   COOKIE_RENOVA,
+  COOKIE_PAPEL,
   conferirToken,
   ehApi,
   ehLivre,
+  lerPayload,
+  papelDe,
+  podeAcessar,
   precisaRenovar,
 } from "@/lib/authSession.js";
 
@@ -64,6 +68,30 @@ async function renovar(tokenDeRenovacao) {
   }
 }
 
+/**
+ * O papel decide o que passa (01/11/2026, o MVP — ver papelDe e DO_USUARIO em authSession.js).
+ * Usuário fora da lista: API recebe 403, página volta para o assistente. Quem passa leva o cookie
+ * do papel, para a tela esconder o que ele não usa.
+ */
+function comPapel(req, caminho, payload, resp = NextResponse.next()) {
+  const papel = papelDe(payload, process.env.LISA_ADMINS);
+  if (!podeAcessar(papel, caminho)) {
+    if (ehApi(caminho)) {
+      return NextResponse.json(
+        { ok: false, error: "isso não faz parte da sua versão da Lisa", motivo: "papel" },
+        { status: 403, headers: { "cache-control": "no-store" } }
+      );
+    }
+    const volta = NextResponse.redirect(new URL("/assistant", req.url));
+    for (const c of resp.cookies.getAll()) volta.cookies.set(c);
+    resp = volta;
+  }
+  if (req.cookies.get(COOKIE_PAPEL)?.value !== papel) {
+    resp.cookies.set(COOKIE_PAPEL, papel, { httpOnly: false, secure: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 });
+  }
+  return resp;
+}
+
 export async function middleware(req) {
   const caminho = req.nextUrl.pathname;
   if (ehLivre(caminho)) return NextResponse.next();
@@ -74,7 +102,7 @@ export async function middleware(req) {
   const resultado = await conferirToken(token, segredo);
 
   if (resultado.ok && !precisaRenovar(resultado.payload)) {
-    return NextResponse.next();
+    return comPapel(req, caminho, resultado.payload);
   }
 
   // Vencido (ou quase) e com token de renovação: troca por baixo dos panos e segue. O usuário
@@ -87,11 +115,12 @@ export async function middleware(req) {
       const opcoes = { httpOnly: true, secure: true, sameSite: "lax", path: "/" };
       resp.cookies.set(COOKIE_SESSAO, novo.acesso, { ...opcoes, maxAge: 60 * 60 * 24 });
       resp.cookies.set(COOKIE_RENOVA, novo.renova, { ...opcoes, maxAge: 60 * 60 * 24 * 30 });
-      return resp;
+      // (o papel vem do token NOVO — o que o banco acabou de assinar)
+      return comPapel(req, caminho, lerPayload(novo.acesso), resp);
     }
     // Renovação falhou: se o token ainda vale por alguns minutos, deixa passar em vez de
     // expulsar. Supabase fora do ar não pode virar "ninguém entra".
-    if (resultado.ok) return NextResponse.next();
+    if (resultado.ok) return comPapel(req, caminho, resultado.payload);
   }
 
   return ehApi(caminho) ? negar(resultado.motivo) : paraLogin(req, caminho);
