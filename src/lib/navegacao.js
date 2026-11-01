@@ -9,7 +9,7 @@ export const GRUPOS_DE_PAINEIS = [
     titulo: "Conversa",
     itens: [
       { href: "/assistant", rotulo: "Assistente" },
-      { href: "/visual", rotulo: "Visual da Lisa", detalhe: "Esfera, Lente, Orbe, Plasma ou Anel" },
+      { href: "/visual", rotulo: "Visual da Lisa", detalhe: "Esfera, Lente, Orbe, Plasma, Anel ou Rosto" },
     ],
   },
   {
@@ -20,6 +20,7 @@ export const GRUPOS_DE_PAINEIS = [
       { href: "/boards", rotulo: "Boards" },
       { href: "/dashboard", rotulo: "Dashboard" },
       { href: "/delp-tasks", rotulo: "Tarefas Delp" },
+      { href: "/fluxogramas", rotulo: "ProcessMap", detalhe: "Projetos e fluxogramas" },
       { href: "/map-of-deploy", rotulo: "Mapa de deploy" },
     ],
   },

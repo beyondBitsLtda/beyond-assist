@@ -16,16 +16,25 @@
 // desenhada lá por um portal do React. O iframe nasce de novo na janela nova (e de novo ao voltar),
 // então o quadro guarda o desenho como está (`ultimoDoc`, com o que a pessoa mexeu) e reabre ele —
 // nada se perde na mudança. Os avisos do quadro chegam pela janela onde o iframe está.
+//
+// "💾 salvar" (01/11/2026, ProcessMap na Lisa): guarda o desenho num projeto do painel ProcessMap
+// (/fluxogramas, SalvarFluxo.js). Dali em diante o quadro grava sozinho o que mudar — o que a pessoa
+// mexe e o que a Lisa redesenha a pedido (`versao.mudanca`); um desenho novo (outro pedido de
+// desenho) começa sem salvar, para não gravar por cima do fluxo guardado.
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CY, OR, GR, mono } from "@/lib/theme.js";
 import { ajustarCaixa, moverCaixa, redimensionarCaixa } from "@/lib/janelaFlutuante.js";
 import { prepararJanelaSeparada } from "./IdeDaLisa.js";
+import SalvarFluxo from "./SalvarFluxo.js";
+import { apiDosFluxos, assinaturaDoDesenho, criarSalvador, enderecoDoFluxo, LIMITE_DO_KEEPALIVE } from "@/lib/fluxogramasNoNavegador.js";
 
 const CHAVE_DA_CAIXA = "lisa-quadro-caixa";
 const tela = () => ({ w: window.innerWidth, h: window.innerHeight });
 const BOTAO = { ...mono, fontSize: 10, padding: "3px 9px", borderRadius: 5, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "transparent", color: "#cfeffb", cursor: "pointer" };
+const apiDosFluxosSalvos = apiDosFluxos();
+const ESTADO_DO_SALVO = { salvo: "✓ salvo", pendente: "✓ salvo · alterado…", salvando: "salvando…", erro: "⚠ não salvou", conflito: "⚠ mudou em outra aba" };
 const CAMPO = { ...mono, fontSize: 11.5, padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(0,0,0,0.35)", color: "#eafcff", outline: "none" };
 
 export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocupado = false, aoMudar, aoPedir, aoFechar }) {
@@ -49,6 +58,31 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
   const separadaRef = useRef(null);
   separadaRef.current = separada;
   const ponte = () => quadro.current?.contentWindow?.PonteDoProof || null;
+  // o fluxo guardado no ProcessMap ({ fluxo, projeto }) e o salvamento automático dele
+  const [salvo, setSalvo] = useState(null);
+  const salvoRef = useRef(null);
+  const salvador = useRef(null);
+  const [estadoSalvo, setEstadoSalvo] = useState("salvo");
+  const [salvarAberto, setSalvarAberto] = useState(false);
+  const vivo = useRef(true);
+
+  /** Passa a gravar sozinho no fluxo guardado (ou para de gravar, com `null`). */
+  const ligarSalvo = (r, doc) => {
+    salvador.current?.parar();
+    salvador.current = null;
+    salvoRef.current = r;
+    setSalvo(r);
+    setEstadoSalvo("salvo");
+    if (!r) return;
+    const id = r.fluxo.id;
+    salvador.current = criarSalvador({
+      versao: r.fluxo.versao,
+      assinatura: assinaturaDoDesenho(doc),
+      gravar: (d, { versao, forcar, saindo }) => apiDosFluxosSalvos.salvar(id, { documento: d, versao, forcar },
+        saindo && JSON.stringify(d).length < LIMITE_DO_KEEPALIVE ? { keepalive: true } : undefined),
+      aoEstado: (e) => { if (vivo.current && salvoRef.current?.fluxo.id === id) setEstadoSalvo(e.estado); },
+    });
+  };
 
   // onde a janela nasce: onde ficou da última vez ou, na primeira, à esquerda (a IDE nasce à direita)
   useEffect(() => {
@@ -87,7 +121,14 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
     try {
       p.importar(mesmaVersao && ultimoDoc.current ? ultimoDoc.current : v.doc);
       if (v.colecao) p.colecao(v.colecao);
+      const novaVersao = !mesmaVersao && importada.current !== null;
       importada.current = v.chave;
+      if (salvoRef.current) {
+        p.nome(salvoRef.current.fluxo.nome);
+        // a Lisa mudou o desenho guardado: grava; um desenho novo não é o guardado: para de gravar
+        if (novaVersao && v.mudanca) salvador.current?.mudou(p.exportar());
+        else if (novaVersao) ligarSalvo(null);
+      }
     } catch { /* desenho estragado: o quadro fica com o de antes */ }
   };
   useEffect(() => { importar(); }, [versao?.chave]);
@@ -98,6 +139,15 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
     function ouvir(e) {
       if (e.source !== quadro.current?.contentWindow || e.data?.origem !== "quadro") return;
       if (e.data.tipo === "pronto") { importar(true); return; }
+      // Ctrl+S no quadro: grava já (ou abre o "salvar", se ainda não foi guardado)
+      // (o desenho é lido agora: a última mudança ainda pode estar na espera do "mudou")
+      if (e.data.tipo === "salvar") {
+        const s = salvador.current;
+        if (!s) { setSalvarAberto(true); return; }
+        try { const d = ponte()?.exportar(); if (d) { ultimoDoc.current = d; s.mudou(d); } } catch { /* grava o que já tinha */ }
+        s.agora();
+        return;
+      }
       if (e.data.tipo !== "mudou") return;
       clearTimeout(espera.current);
       espera.current = setTimeout(() => {
@@ -105,6 +155,7 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
         if (!p) return;
         ultimoDoc.current = p.exportar();
         aoMudarRef.current?.(ultimoDoc.current);
+        salvador.current?.mudou(ultimoDoc.current);
       }, 500);
     }
     const outra = separada?.win;
@@ -127,6 +178,13 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
     return () => { clearInterval(vigia); window.removeEventListener("pagehide", fecharJunto); };
   }, [separada]);
   useEffect(() => () => { try { separadaRef.current?.win.close(); } catch { /* já fechou */ } }, []);
+  // fechar o quadro grava o que faltou; fechar a página manda com keepalive
+  useEffect(() => {
+    vivo.current = true;
+    const sair = () => salvador.current?.sair();
+    window.addEventListener("pagehide", sair);
+    return () => { vivo.current = false; window.removeEventListener("pagehide", sair); salvador.current?.agora(); };
+  }, []);
 
   if (!caixa) return null;
 
@@ -239,7 +297,38 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
             — {ocupado ? "a Lisa está desenhando…" : titulo ? `${titulo} · mexa à vontade, ela vê o que mudou` : "mexa à vontade, ela vê o que mudou"}
           </span>
         </div>
-        <div style={{ minWidth: 54, flex: "none", display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ position: "relative", minWidth: 54, flex: "none", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+          {salvo ? (
+            <>
+              <span title={`salvo em ${salvo.projeto?.nome || "um projeto"} — o que mudar aqui é salvo sozinho`}
+                style={{ fontSize: 10, color: estadoSalvo === "erro" || estadoSalvo === "conflito" ? OR : GR, whiteSpace: "nowrap", maxWidth: 190, overflow: "hidden", textOverflow: "ellipsis" }}>
+                {ESTADO_DO_SALVO[estadoSalvo] || "✓ salvo"}{estadoSalvo === "salvo" && salvo.projeto?.nome ? ` · ${salvo.projeto.nome}` : ""}
+              </span>
+              <a href={enderecoDoFluxo(salvo.fluxo.id)} target="_blank" rel="noopener noreferrer" onPointerDown={(e) => e.stopPropagation()}
+                title="abrir este fluxograma no painel ProcessMap (outra aba)" style={{ ...BOTAO, flex: "none", textDecoration: "none" }}>
+                ↗ ProcessMap
+              </a>
+            </>
+          ) : !minimizada && (
+            <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={() => setSalvarAberto((v) => !v)} aria-expanded={salvarAberto}
+              title="guardar este desenho num projeto do ProcessMap — depois disso, o que mudar é salvo sozinho"
+              style={{ ...BOTAO, flex: "none", color: GR, borderColor: "rgba(123,216,143,0.4)" }}>
+              💾 salvar
+            </button>
+          )}
+          {salvarAberto && !salvo && !minimizada && (
+            <SalvarFluxo
+              nomeInicial={titulo}
+              obterDocumento={() => { try { return ponte()?.exportar() || ultimoDoc.current || versaoRef.current?.doc || null; } catch { return null; } }}
+              aoSalvo={(r) => {
+                setSalvarAberto(false);
+                let doc = null;
+                try { ponte()?.nome(r.fluxo.nome); doc = ponte()?.exportar(); } catch { /* o quadro ainda vai abrir */ }
+                ligarSalvo(r, doc);
+              }}
+              aoFechar={() => setSalvarAberto(false)}
+            />
+          )}
           {naPagina && podeSeparar && (
             <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={separar}
               title="abrir o quadro numa janela separada — dá para levar para outro monitor, maximizar e deixar ao lado"

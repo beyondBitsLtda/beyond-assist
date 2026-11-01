@@ -2787,7 +2787,9 @@ export default function AssistantPage() {
       const r = await res.json().catch(() => ({}));
       if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
       desenhoRef.current = r.doc;
-      setQuadro({ versao: { doc: r.doc, chave: `d${Date.now()}`, colecao: r.colecao }, titulo: r.titulo, explicacao: r.explicacao });
+      // `mudanca`: é o mesmo desenho, mudado — se ele foi salvo num projeto, o quadro grava a mudança
+      const mudanca = Boolean(mudar && quadroAbertoRef.current);
+      setQuadro({ versao: { doc: r.doc, chave: `d${Date.now()}`, colecao: r.colecao, mudanca }, titulo: r.titulo, explicacao: r.explicacao });
       const texto = r.explicacao || `Desenhei "${r.titulo}" no quadro.`;
       setAnswer(texto);
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);

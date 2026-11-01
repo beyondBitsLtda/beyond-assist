@@ -73,12 +73,12 @@ export const VISUAIS = [
   {
     id: "rosto",
     nome: "Rosto",
-    descricao: "Um busto holográfico de linhas de luz que se desfaz em partículas: abre a boca com a voz, pisca, ergue as sobrancelhas e inclina a cabeça quando escuta.",
+    descricao: "Um retrato térmico: o rosto escuro, a borda quente do vermelho ao creme e um halo ciano. Fala com a boca e a garganta acesas, escuta com as orelhas quentes e pensa com uma onda de calor.",
     cores: {
-      pronta: ["#c4f1ff", "#2f9bff", "#0b3dff"],
-      ouvindo: ["#c8fff4", "#27d3ff", "#0a6bff"],
-      pensando: ["#dcd6ff", "#6b8cff", "#3a2dff"],
-      falando: ["#d6f6ff", "#40b4ff", "#5a3dff"],
+      pronta: ["#ffecc8", "#e8692a", "#5cc6d6"],
+      ouvindo: ["#fff1d2", "#f07a32", "#62dcec"],
+      pensando: ["#ffe6d2", "#de5a36", "#86b4ff"],
+      falando: ["#fff2d6", "#ff7a2a", "#58ccd8"],
     },
   },
 ];

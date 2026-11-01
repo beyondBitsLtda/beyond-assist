@@ -7,7 +7,7 @@ import {
   VISUAIS, ESTADOS, VISUAL_PADRAO, CHAVE_DO_VISUAL, EVENTO_DO_VISUAL,
   visualDe, coresDe, criarEnvelope, criarPesos, lerVisual, escolherVisual,
 } from "../src/lib/visuaisDaLisa.js";
-import { pontosDoRosto, distanciaDoRosto, OLHO, BOCA_Y, INCLINACAO } from "../src/lib/rostoDaLisa.js";
+import { FORMA, RAIO, CENTRO_Y, CAIXA, resolucaoDoRosto, criarMovimentoDoRosto } from "../src/lib/rostoDaLisa.js";
 
 let falhas = 0;
 const ok = (t) => console.log(`  ok    ${t}`);
@@ -63,48 +63,45 @@ console.log("pesos dos estados");
 
 console.log("o rosto");
 {
-  let semente = 7;
-  const acaso = () => ((semente = (semente * 16807) % 2147483647) / 2147483647);
-  const r = pontosDoRosto({ linhas: 60, passo: 0.014, angulos: 220, acaso });
-  const ys = [];
-  const at = (arr, i, k = 3) => Array.from(arr.subarray(i * k, i * k + k));
-  for (let i = 0; i < r.total; i++) ys.push(r.posicoes[i * 3 + 1]);
-  const amostra = Array.from({ length: 400 }, (_, i) => Math.floor((i * r.total) / 400));
-  conferir("um busto inteiro de pontos", r.total > 12000, String(r.total));
-  conferir("todos na superfície (distância ~0)", amostra.every((i) => Math.abs(distanciaDoRosto(...at(r.posicoes, i))) < 0.01));
-  conferir("do peito ao alto da cabeça", Math.min(...ys) < -1.9 && Math.max(...ys) > 0.95, `${Math.min(...ys).toFixed(2)} ${Math.max(...ys).toFixed(2)}`);
-  conferir("as normais têm tamanho 1", amostra.every((i) => Math.abs(Math.hypot(...at(r.normais, i)) - 1) < 1e-3));
-  // cada linha é uma fatia inclinada: todos os pontos dela no mesmo plano y + INCLINACAO·z
-  conferir("cada linha fica no seu plano", (() => {
-    const plano = new Map();
-    for (let i = 0; i < r.total; i++) {
-      const s = r.posicoes[i * 3 + 1] + INCLINACAO * r.posicoes[i * 3 + 2];
-      if (!plano.has(r.linha[i])) plano.set(r.linha[i], s);
-      if (Math.abs(plano.get(r.linha[i]) - s) > 1e-3) return false;
-    }
-    return plano.size > 50;
-  })());
-  // onde o contorno se parte (atrás dos ombros), a linha vira dois trechos: nenhum ponto no vazio
-  conferir("nenhum ponto solto no ar (todos, não só a amostra)", Array.from({ length: r.total }, (_, i) => i).every((i) => Math.abs(distanciaDoRosto(...at(r.posicoes, i))) < 0.02));
-  // a cabeça gira sobre o pescoço; os ombros ficam
-  conferir("os ombros não giram com a cabeça; a cabeça gira inteira", Array.from({ length: r.total }, (_, i) => i).every((i) => (r.posicoes[i * 3 + 1] < -1.32 ? r.cabeca[i] === 0 : true) && (r.posicoes[i * 3 + 1] > -0.84 ? r.cabeca[i] === 1 : true)));
-  conferir("o cabelo fica no alto e atrás, não no rosto", Array.from({ length: r.total }, (_, i) => i).filter((i) => r.cabelo[i] > 0.5).every((i) => r.posicoes[i * 3 + 1] > 0.5 || r.posicoes[i * 3 + 2] < -0.05));
-  const parte = (campo) => Array.from({ length: r.total }, (_, i) => i).filter((i) => r[campo][i] > 0.5);
-  const olhos = parte("olho");
-  conferir("há pontos nos dois olhos", olhos.some((i) => r.posicoes[i * 3] > 0) && olhos.some((i) => r.posicoes[i * 3] < 0) && olhos.length > 40, String(olhos.length));
-  conferir("a íris de cada olho é medida no próprio olho (-1..1)", olhos.every((i) => Math.hypot(r.iris[i * 2], r.iris[i * 2 + 1]) <= 1.1));
-  // os dois olhos medem a íris no mesmo sentido do mundo (não espelhado): o olhar é um só
-  conferir("a íris é medida no mesmo sentido nos dois olhos", olhos.every((i) => {
-    const x = r.posicoes[i * 3];
-    return Math.abs(r.iris[i * 2] * OLHO.raio - (x - Math.sign(x) * OLHO.x)) < 1e-4 && Math.abs(r.iris[i * 2 + 1] * OLHO.raio - (r.posicoes[i * 3 + 1] - OLHO.y)) < 1e-4;
-  }));
-  const queixo = parte("mandibula");
-  conferir("a mandíbula é só abaixo da boca e acima do pescoço", queixo.length > 100 && queixo.every((i) => r.posicoes[i * 3 + 1] < BOCA_Y && r.posicoes[i * 3 + 1] > -0.95), String(queixo.length));
-  conferir("o lábio de cima fica acima da linha da boca, na frente", parte("labio").length > 10 && parte("labio").every((i) => r.posicoes[i * 3 + 1] > BOCA_Y && r.posicoes[i * 3 + 2] > 0.45));
-  conferir("as sobrancelhas ficam acima dos olhos", parte("sobrancelha").length > 20 && parte("sobrancelha").every((i) => r.posicoes[i * 3 + 1] > OLHO.y + 0.05));
-  conferir("a pálpebra fica logo acima do olho", parte("palpebra").every((i) => r.posicoes[i * 3 + 1] > OLHO.y && r.posicoes[i * 3 + 1] < OLHO.y + 0.16));
-  conferir("rosto simétrico", Math.abs(distanciaDoRosto(0.3, -0.2, 0.5) - distanciaDoRosto(-0.3, -0.2, 0.5)) < 1e-12);
-  conferir("o nariz é a parte mais da frente", (() => { let iz = 0; for (let i = 0; i < r.total; i++) if (r.posicoes[i * 3 + 2] > r.posicoes[iz * 3 + 2]) iz = i; return Math.abs(r.posicoes[iz * 3]) < 0.08 && r.posicoes[iz * 3 + 1] < 0 && r.posicoes[iz * 3 + 1] > -0.4; })());
+  // a forma é GLSL (o navegador compila); aqui, o que dá para conferir sem placa de vídeo
+  const contar = (c) => FORMA.split(c).length - 1;
+  conferir("a forma define forma(p, orelha) e usa a cabeça, a boca e a respiração", /float forma\(vec3 p, out float orelha\)/.test(FORMA) && ["uCabeca", "uBoca", "uRespira"].every((u) => FORMA.includes(u)));
+  conferir("a forma fecha chaves e parênteses", contar("{") === contar("}") && contar("(") === contar(")"));
+  conferir("os números da forma saem como float do GLSL (sem 'NaN', sem inteiro solto em vec3)", !/NaN|undefined/.test(FORMA) && !/vec3\(\s*-?\d+\s*,/.test(FORMA));
+  conferir("o componente injeta a forma no shader", /\$\{FORMA\}/.test(ler("src/components/panels/visuais/Rosto.js")));
+  conferir("o busto cabe na caixa marchada (topo da cabeça e ombros)", CAIXA.max[1] > 1.05 && CAIXA.min[1] < CENTRO_Y - RAIO && CAIXA.max[0] >= 1.8);
+
+  // a resolução de desenho: 3/4 da tela, nunca mais que o teto no lado maior
+  const lado = (css, dpr, limite) => css * resolucaoDoRosto(css, css, dpr, limite);
+  conferir("tela grande: no máximo 560 px de desenho", lado(760, 1) <= 560.5 && lado(760, 2) <= 560.5);
+  conferir("celular de densidade 3: também no teto, não 9× a conta", lado(360, 3) <= 560.5 && lado(360, 3) > 400);
+  conferir("miniatura: 3/4 da resolução", Math.abs(resolucaoDoRosto(190, 190, 1) - 0.75) < 1e-9);
+  conferir("o teto mais baixo (aparelho lento) vale", lado(760, 1, 300) <= 300.5);
+
+  // o movimento: cada estado faz o seu
+  const pesosDe = (e) => ({ pronta: 0, ouvindo: 0, pensando: 0, falando: 0, [e]: 1 });
+  const rodar = (estado, amp, segundos = 1.5, extra = {}) => {
+    const mov = criarMovimentoDoRosto();
+    let r;
+    for (let t = 0; t < segundos; t += 1 / 60) r = mov({ pesos: pesosDe(estado), amp, t, dt: 1 / 60, ...extra });
+    return r;
+  };
+  const falandoAlto = rodar("falando", 0.9);
+  const falandoBaixo = rodar("falando", 0.1);
+  const pronta = rodar("pronta", 0.1);
+  conferir("falando alto, a mandíbula abre", falandoAlto.boca > 0.8, falandoAlto.boca.toFixed(2));
+  conferir("falando baixo (pausa), a boca fecha", falandoBaixo.boca < 0.05);
+  conferir("parada, a boca fica fechada e fria", pronta.boca < 0.01 && pronta.calorBoca < 0.01);
+  conferir("falando, a boca e a garganta esquentam com a voz", falandoAlto.calorBoca > falandoBaixo.calorBoca && falandoBaixo.calorBoca > 0.1);
+  const ouvindo = rodar("ouvindo", 0.6);
+  conferir("ouvindo, as orelhas esquentam (e mais com mais som)", ouvindo.calorOrelha > 0.9 && rodar("ouvindo", 0.1).calorOrelha < ouvindo.calorOrelha && pronta.calorOrelha < 0.01);
+  conferir("ouvindo, a cabeça inclina", ouvindo.roll > 0.08);
+  conferir("pensando, a onda de calor liga e olha para cima", rodar("pensando", 0.2, 3).onda > 0.95 && rodar("pensando", 0.2, 3).pitch < -0.08);
+  const segue = (x) => rodar("pronta", 0.1, 2, { ponteiro: { x, y: 0, quando: 0.5 } }).yaw;
+  conferir("parada, a cabeça segue o ponteiro (para os dois lados)", segue(1) > 0.15 && segue(-1) < -0.15);
+  conferir("ponteiro parado há mais de 4s não conta", Math.abs(rodar("pronta", 0.1, 6, { ponteiro: { x: 1, y: 0, quando: 0 } }).yaw) < 0.13);
+  const calmo = rodar("ouvindo", 0.6, 1.5, { reduzido: true });
+  conferir("com \"reduzir movimento\", a cabeça mexe bem menos", Math.abs(calmo.roll) < Math.abs(ouvindo.roll) * 0.5 && Math.abs(calmo.respira) <= 0.35);
 }
 
 console.log("preferência no navegador");
