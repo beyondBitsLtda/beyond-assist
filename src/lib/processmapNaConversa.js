@@ -116,7 +116,8 @@ export function validarPlano(bruto, fluxos) {
   const ids = new Set((fluxos || []).map((f) => String(f.id)));
   const operacoes = [];
   for (const op of Array.isArray(bruto?.operacoes) ? bruto.operacoes : []) {
-    const pedido = String(op?.pedido ?? "").trim().slice(0, 6000);
+    // (o modelo às vezes escreve a quebra de linha como "\n" literal: vira quebra de verdade)
+    const pedido = String(op?.pedido ?? "").replace(/\\n/g, "\n").trim().slice(0, 6000);
     if (!pedido) continue;
     const fluxo = ids.has(String(op?.fluxo ?? "")) ? String(op.fluxo) : "";
     const mesma = fluxo && operacoes.find((o) => o.fluxo === fluxo);
@@ -131,5 +132,37 @@ export function validarPlano(bruto, fluxos) {
   }
   const mudar = bruto?.acao === "mudar" && operacoes.length > 0;
   return { acao: mudar ? "mudar" : "responder", explicacao: linha(bruto?.explicacao, 600), operacoes: mudar ? operacoes : [] };
+}
+
+// ---- "em todos os fluxogramas" (01/11/2026: "ela não criou comentários detalhados em todos os
+// fluxogramas dentro do projeto, fez apenas em um") ----
+//
+// O modelo leu "fluxograma" ao pé da letra e deixou os mapas mentais de fora. Para quem fala,
+// "fluxograma" é qualquer desenho do projeto. Quando o pedido diz "todos"/"cada" desenho e o plano
+// esquece algum, a rota do plano pede um segundo plano só para os que faltaram (faltandoNoPlano).
+
+// "todos" com as trocas de letra de quem digita rápido ("tdoso"): a mesma letra, em outra ordem
+const ordenada = (p) => [...p].sort().join("");
+const TODOS = new Set(["todos", "todas", "cada"].map(ordenada));
+const DESENHOS = ["fluxo", "fluxos", "fluxograma", "fluxogramas", "desenho", "desenhos", "mapa", "mapas", "diagrama", "diagramas", "aba", "abas", "processo", "processos"];
+
+/** O pedido vale para todos os desenhos do projeto ("em todos os fluxogramas", "em cada fluxo")? */
+export function pedeEmTodos(pedido) {
+  const p = palavrasDe(pedido);
+  return p.some((x, i) => (TODOS.has(ordenada(x)) || parecida(x, "todos"))
+    && p.slice(i + 1, i + 4).some((y) => DESENHOS.some((d) => parecida(y, d))));
+}
+
+/** Os desenhos do projeto (com algo desenhado: mais de uma forma) que o plano deixou de fora. */
+export function faltandoNoPlano(plano, fluxos) {
+  const cobertos = new Set((plano?.operacoes || []).map((o) => o.fluxo).filter(Boolean));
+  return (fluxos || []).filter((f) => !cobertos.has(String(f.id)) && (Number(f.formas) || 0) > 1);
+}
+
+/** Junta ao plano as operações do segundo plano (só as dos desenhos que faltavam, sem repetir). */
+export function completarPlano(plano, extra, faltando) {
+  const ids = new Set(faltando.map((f) => String(f.id)));
+  const novas = (extra?.operacoes || []).filter((o) => ids.has(o.fluxo) && !plano.operacoes.some((x) => x.fluxo === o.fluxo));
+  return { ...plano, operacoes: [...plano.operacoes, ...novas].slice(0, LIMITE_DE_OPERACOES) };
 }
 

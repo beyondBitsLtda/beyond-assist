@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.24.0-cloudflare-pages.1",
+  "versao": "0.24.1-cloudflare-pages.1",
   "atualizadoEm": "2026-11-01",
   "compilacao": {
-    "numero": 53,
+    "numero": 54,
     "data": "2026-11-01",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.24.1-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "\"Em todos os fluxogramas\" passa a valer para todos os desenhos do projeto (mapas mentais e cada aba inclusos), com notas detalhadas e bem quebradas, e a Lisa entende negação quebrada pela digitação.",
+      "itens": [
+        "Correção: \"crie uma nota em todos os fluogramas\" só anotava um desenho — o plano lia \"fluxograma\" ao pé da letra e deixava os mapas mentais de fora, e no fluxo de duas abas a nota entrava só na primeira. Agora \"todos\" é todo desenho do projeto (o vazio fica de fora) e o que vale para todos vai em cada aba.",
+        "Se o pedido diz \"todos\"/\"cada\" (até \"tdoso os fluogramas\") e o plano esquece algum desenho, a rota do plano faz uma segunda volta só para os que faltaram.",
+        "Correção: a anotação saía com \"\\n\" escrito no meio do texto; agora é quebra de linha, e cada tópico \"•\" começa numa linha. As notas ficaram mais detalhadas (o conceito e cada decisão com o porquê, ligados ao que o desenho ou a aba mostra); no mapa mental, um galho \"Conceito e decisões\".",
+        "Correção: um pedido para um mapa mental com a palavra \"processo\" (comum ao explicar decisões) trocava o mapa por um fluxograma novo; agora o mapa continua mapa, a não ser que o pedido seja transformá-lo.",
+        "A Lisa trata negação quebrada pela digitação (\"porme em a função\" = \"porém sem a função\"): a Lisa Task entra como Abacato integrado sem a hospedagem de arquivos."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.24.0-cloudflare-pages.1",
       "data": "2026-11-01",

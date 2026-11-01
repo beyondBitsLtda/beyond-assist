@@ -1263,18 +1263,24 @@ Regras:
  * (a instrução completa para aquele desenho) }] }. Conferido por validarPlano
  * (src/lib/processmapNaConversa.js); quem executa é a página do Assistente.
  */
-export async function planejarNoProjeto({ pedido, projeto = "", fluxos = [], aberto = "", conversa = "" }) {
+export async function planejarNoProjeto({ pedido, projeto = "", fluxos = [], aberto = "", conversa = "", complemento = "" }) {
   const lista = fluxos.map((f) => `- id "${f.id}": "${f.nome}" (${f.modo === "mindmap" ? "mapa mental" : "fluxograma"}, ${f.formas ?? "?"} formas)${f.id === aberto ? " — aberto no quadro agora" : ""}`).join("\n");
   const prompt = [
     conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-6000)}\n` : "",
     `OS DESENHOS DO PROJETO:\n${lista || "(nenhum ainda)"}\n`,
     projeto ? `O CONTEÚDO DELES:\n${projeto.slice(0, 30000)}\n` : "",
     `PEDIDO DA PESSOA: "${String(pedido || "").slice(0, 6000)}"`,
+    // a segunda volta (src/app/api/processmap/plano): os desenhos que o primeiro plano esqueceu
+    complemento ? `\nATENÇÃO: ${complemento}` : "",
   ].filter(Boolean).join("\n");
 
   const systemInstruction = `Você é a Lisa e trabalha nos desenhos (fluxogramas e mapas mentais) de um projeto do ProcessMap.
 A pessoa fala com você por voz ou por texto, muitas vezes com erros de digitação e de transcrição ("cir"
 é "crie", "fluogramas" é "fluxogramas", "abacto" é "Abacato") — entenda a INTENÇÃO, não as palavras.
+Cuidado com negação quebrada pela digitação, que inverte o sentido: "porme em a", "porem sm a", "porém
+em a função" = "porém SEM a função"; "cm" = "com", "sm" = "sem". "Porém" anuncia uma exceção: "uma
+versão 100% funcional, porém [sem] a função X" quer dizer que a função X fica DE FORA. Na dúvida entre
+"com" e "sem", fique com o que faz sentido na frase e diga na "explicacao" como entendeu.
 
 Decida:
 - "acao": "mudar" quando o pedido é criar, incluir, pôr, mudar, pintar, remover, reorganizar ou anotar
@@ -1286,10 +1292,17 @@ Decida:
   - "pedido": a instrução COMPLETA e independente para aquele desenho — quem a executa só vê esse
     desenho, não a conversa nem o pedido original. Escreva tudo que precisa entrar, com os textos
     prontos (nomes de etapas, tópicos, o texto inteiro de uma nota), em português.
-  - "todos os fluxogramas", "em cada fluxo" = uma operação para CADA desenho da lista.
-  - Nota de texto num fluxograma: peça "uma forma do tipo note (anotação), sem ligações, com o texto: …"
-    e escreva o texto inteiro (claro, em tópicos curtos com "• ", até uns 900 caracteres). Num mapa
-    mental: um tópico principal com subtópicos.
+  - Para a pessoa, "fluxograma" é QUALQUER desenho do projeto (fluxograma ou mapa mental): "todos os
+    fluxogramas", "todos os desenhos", "em cada fluxo" = uma operação para CADA desenho da lista, mapas
+    mentais inclusive. Não pule nenhum (só um desenho vazio, de 1 forma, pode ficar de fora).
+  - Desenho com várias abas (veja as linhas "ABA" no conteúdo): o que vale para "todos" vai em CADA
+    aba — diga isso na instrução, nomeando as abas, e escreva o texto de cada uma.
+  - Comentário, nota, anotação, explicação num fluxograma: peça "uma forma do tipo note (anotação), sem
+    ligações, com o texto: …" e escreva o texto inteiro, DETALHADO: o conceito e cada decisão com o
+    porquê, ligados ao que aquele desenho (ou aquela aba) mostra — em tópicos com "• ", até uns 1300
+    caracteres. Quebre as linhas com quebra de linha de verdade, nunca escrevendo "\\n". Num mapa
+    mental: um tópico principal "Conceito e decisões" com subtópicos curtos (uma decisão e o porquê em
+    cada um).
   - Pedido que fala de "as funcionalidades", "o fluxo de X" etc.: ache o desenho certo pelo nome e
     pelo conteúdo. Nada que se encaixe: crie um desenho novo para isso.
   - Ao descrever conceito, decisões e motivos do projeto, use o que está nos desenhos e na conversa

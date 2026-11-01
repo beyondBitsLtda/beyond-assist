@@ -191,8 +191,10 @@ function formasELigacoes(a) {
     formas.push({
       id,
       tipo: FORMAS[f?.tipo] ? f.tipo : "process",
-      // tabela e classe têm várias linhas; o resto, uma
-      texto: String(f?.texto ?? "").replace(/\r/g, "").split("\n").map((l) => texto(l, nota ? 600 : 120)).filter(Boolean).join("\n").slice(0, nota ? LIMITES_DO_DESENHO.nota : LIMITES_DO_DESENHO.texto),
+      // tabela e classe têm várias linhas; o resto, uma ("\n" escrito ao pé da letra pelo modelo
+      // também é quebra de linha: a anotação saía com "\n•" no meio do texto). Na anotação, cada
+      // tópico "•" começa numa linha (o modelo às vezes manda todos corridos numa linha só).
+      texto: (nota ? String(f?.texto ?? "").replace(/[ \t]+•[ \t]*/g, "\n• ") : String(f?.texto ?? "")).replace(/\r/g, "").replace(/\\n/g, "\n").split("\n").map((l) => texto(l, nota ? 600 : 120)).filter(Boolean).join("\n").slice(0, nota ? LIMITES_DO_DESENHO.nota : LIMITES_DO_DESENHO.texto),
       raia: texto(f?.raia, 60),
       ...(corPeloNome(f?.cor) ? { cor: corPeloNome(f.cor) } : {}),
       ...(idLimpo(f?.link) ? { link: idLimpo(f.link) } : {}),
@@ -645,6 +647,18 @@ export const LIMITES_DO_MAPA = { topicos: 8, filhos: 6, netos: 5, total: 70, tex
 const CORES_DOS_GALHOS = ["green", "deep", "amber", "red", "lilac", "purple", "graphite", "white"];
 const ID_DO_TEMA = "raiz";
 
+/**
+ * O desenho que sai é um mapa mental? Quando o pedido fala em mapa mental, ou quando há um mapa mental
+ * na tela — aí só deixa de ser se o pedido for transformá-lo em fluxograma. (Antes, qualquer
+ * "processo" no texto do pedido trocava o mapa por um fluxograma novo, e o pedido de uma nota
+ * "explicando as decisões do processo" apagava o mapa.)
+ */
+export function vaiSerMapaMental(pedido, atual) {
+  if (pedeMapaMental(pedido)) return true;
+  if (atual?.mode !== "mindmap") return false;
+  return !/\b(transform\w*|convert\w*|vir[ae]\w*|refa[cç]a\w*|passe\w*)\b[^.]{0,40}\b(fluxograma|diagrama|bpmn)\b/i.test(String(pedido || ""));
+}
+
 /** A pergunta fala em mapa mental ("mapa mental", "mapas mentais", "mind map")? */
 export function pedeMapaMental(texto) {
   return /\bmapas? ment(al|ais)\b|\bmind ?maps?\b/.test(semAcento(texto));
@@ -666,7 +680,7 @@ export function validarMapaMental(bruto) {
     return id;
   };
   const ramo = (lista, max, nivel) => (Array.isArray(lista) ? lista : []).slice(0, max).flatMap((t) => {
-    const txt = texto(t?.texto, LIMITES_DO_MAPA.texto);
+    const txt = texto(String(t?.texto ?? "").replace(/\\n/g, " "), LIMITES_DO_MAPA.texto);
     if (!txt || total >= LIMITES_DO_MAPA.total) return [];
     total++;
     const no = { id: idDe(t?.id), texto: txt };

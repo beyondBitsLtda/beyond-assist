@@ -7,7 +7,7 @@ import {
   validarDesenho, camadasDoDesenho, posicoesDoDesenho, montarDocumento, estruturaDoDocumento, descreverDiagrama,
   pedidoDeDesenho, documentoValido, FORMAS, distanciaDeEdicao, pareceDiagramaEmTexto,
   pedeMapaMental, validarMapaMental, montarMapaMental, estruturaDoMapa, LIMITES_DO_MAPA,
-  CORES, NOMES_DAS_CORES, corPeloNome, nomeDaCor,
+  CORES, NOMES_DAS_CORES, corPeloNome, nomeDaCor, vaiSerMapaMental,
 } from "../src/lib/diagramaDaLisa.js";
 import fs from "node:fs";
 
@@ -187,7 +187,12 @@ console.log("\no mapa mental (01/11/2026)");
   conferir("um fluxograma na tela não empresta nada a um mapa novo", montarMapaMental(mapa, { mode: "diagram", pages: [{ shapes: [{ id: "pesquisa-inicial", ox: 99 }] }] }).pages[0].shapes.find((s) => s.id === "pesquisa-inicial").ox === undefined);
   conferir("a Lisa lê o mapa como árvore (o recuo é o nível)", /MAPA MENTAL "Lançamento"/.test(descreverDiagrama(doc)) && /\n {4}- \[publico\] "Público"/.test(descreverDiagrama(doc)));
   const rota = fs.readFileSync(new URL("../src/app/api/diagrama/route.js", import.meta.url), "utf8");
-  conferir("a rota desenha mapa mental quando pedem ou quando há um mapa na tela", /pedeMapaMental\(pedido\)/.test(rota) && /mapaNaTela/.test(rota) && /desenharMapaMental/.test(rota));
+  conferir("a rota desenha mapa mental quando pedem ou quando há um mapa na tela", /vaiSerMapaMental\(pedido, atual\)/.test(rota) && /mapaNaTela/.test(rota) && /desenharMapaMental/.test(rota));
+  const mapaNaTela = { mode: "mindmap", pages: [{ shapes: [] }] };
+  conferir("mapa na tela continua mapa, mesmo com \"processo\" no pedido (antes, virava fluxograma e o mapa sumia)",
+    vaiSerMapaMental("adicione um tópico explicando as decisões do processo", mapaNaTela) && vaiSerMapaMental("inclua um galho de riscos", mapaNaTela));
+  conferir("só deixa de ser mapa se o pedido for transformar em fluxograma", !vaiSerMapaMental("transforme esse mapa em um fluxograma", mapaNaTela) && !vaiSerMapaMental("refaça como diagrama BPMN", mapaNaTela));
+  conferir("sem mapa na tela, só quando o pedido fala em mapa mental", vaiSerMapaMental("faça um mapa mental", null) && !vaiSerMapaMental("desenhe o processo", { mode: "diagram" }));
   const fm = fs.readFileSync(new URL("../public/diagramas/js/FileManager.js", import.meta.url), "utf8");
   conferir("o quadro reabre o mapa com as cores dos galhos (não tudo roxo)", /def\.mind && !PM\.Palette\.some/.test(fm));
 }
@@ -294,6 +299,10 @@ console.log("\nas abas (01/11/2026: \"a Lisa deve poder criar abas dentro dos fl
   conferir("formato antigo (uma aba): continua sendo a mesma aba", legado.pages.length === 1 && legado.pages[0].id === "zz" && legado.pages[0].shapes.find((x) => x.id === "pedir").locked === true);
   const repetidas = validarDesenho({ titulo: "X", formas: [{ id: "ini", tipo: "terminal", texto: "Início" }, { id: "ini", tipo: "terminal", texto: "Início" }, { id: "ini", tipo: "process", texto: "Outra" }], ligacoes: [] });
   conferir("a mesma forma repetida pelo modelo sai; id repetido com outra forma vira outro id", repetidas.formas.map((f) => f.id).join() === "ini,ini-2");
+  const comBarraN = validarDesenho({ titulo: "X", formas: [{ id: "n", tipo: "note", texto: "• Conceito: A\\n• Decisão: B" }], ligacoes: [] });
+  conferir("\"\\n\" escrito ao pé da letra vira quebra de linha (a anotação saía com \"\\n•\" no texto)", comBarraN.formas[0].texto === "• Conceito: A\n• Decisão: B");
+  conferir("na anotação, cada tópico \"•\" começa numa linha", validarDesenho({ titulo: "X", formas: [{ id: "n", tipo: "note", texto: "• Conceito: A. • Decisão: B. • Motivo: C." }], ligacoes: [] }).formas[0].texto === "• Conceito: A.\n• Decisão: B.\n• Motivo: C.");
+  conferir("e no mapa mental vira espaço", validarMapaMental({ tema: "T", topicos: [{ texto: "Linha um\\nlinha dois" }] }).topicos[0].texto === "Linha um linha dois");
   conferir("link para aba que não existe sai", montarDocumento(validarDesenho({ titulo: "X", formas: [{ id: "a", tipo: "process", texto: "A", link: "inventada" }], ligacoes: [] })).pages[0].shapes[0].link === undefined);
   conferir("\"crie uma aba com o detalhe da aprovação\", com o quadro aberto, muda o desenho", pedidoDeDesenho("crie uma aba com o detalhe da aprovação", { quadroAberto: true }) === "alterar" && pedidoDeDesenho("separe o processo em abas por área", { quadroAberto: true }) === "alterar");
 }

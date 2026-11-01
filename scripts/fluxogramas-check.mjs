@@ -9,7 +9,10 @@ import {
 } from "../src/lib/fluxogramas.js";
 import { apiDosFluxos, assinaturaDoDesenho, criarSalvador, enderecoDoFluxo } from "../src/lib/fluxogramasNoNavegador.js";
 import { GRUPOS_DE_PAINEIS } from "../src/lib/navegacao.js";
-import { citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, secaoDoProjeto, validarPlano, LIMITE_DE_OPERACOES } from "../src/lib/processmapNaConversa.js";
+import {
+  citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, secaoDoProjeto, validarPlano, LIMITE_DE_OPERACOES,
+  pedeEmTodos, faltandoNoPlano, completarPlano,
+} from "../src/lib/processmapNaConversa.js";
 import { montarDocumento, validarDesenho, tamanhoDaNota } from "../src/lib/diagramaDaLisa.js";
 
 let falhas = 0;
@@ -332,7 +335,27 @@ console.log("o plano no projeto (01/11/2026: \"essa minha interação deveria se
   const pagina = ler("src/app/(panels)/assistant/page.js");
   conferir("o projeto citado vale antes da regra do Abacato", /const doProjeto = !alvoDaIde \? await resolverProjetoRef/.test(pagina));
   conferir("a Lisa planeja e trabalha no projeto (vários desenhos)", /await planejarNoProjetoRef\.current\?\.\(q, doProjeto, displayText\)/.test(pagina) && /plano\?\.acao === "mudar"\) return trabalharNoProjetoRef/.test(pagina) && /for \(const \[i, op\] of plano\.operacoes\.entries\(\)\)/.test(pagina));
-  conferir("a rota do plano confere o que o modelo devolveu", /validarPlano\(bruto, fluxos\)/.test(ler("src/app/api/processmap/plano/route.js")));
+  const rotaDoPlano = ler("src/app/api/processmap/plano/route.js");
+  conferir("a rota do plano confere o que o modelo devolveu", /validarPlano\(await planejarNoProjeto\(base\), fluxos\)/.test(rotaDoPlano));
+
+  // "ela não criou comentários em todos os fluxogramas, fez apenas em um"
+  const frase = "alem disso cir uma nota d etexto em tdoso os fluogramas descreevndo o conceito";
+  conferir("\"em todos\": entende \"tdoso os fluogramas\", \"em cada fluxo\", \"todas as abas\"", pedeEmTodos(frase) && pedeEmTodos("ponha uma nota em cada fluxo") && pedeEmTodos("em todas as abas") && pedeEmTodos("em todos os desenhos do projeto"));
+  conferir("e não confunde (\"no fluxo de compras\", \"todos os dias\")", !pedeEmTodos("no fluxo de compras, inclua uma etapa") && !pedeEmTodos("faço isso todos os dias"));
+  const doProjetoTodo = [
+    { id: "mvp", nome: "Fluxo de Uso MVP", modo: "diagram", formas: 12 },
+    { id: "nucleo", nome: "Núcleo de Funcionalidades", modo: "mindmap", formas: 20 },
+    { id: "mobile", nome: "Assistente Dev Mobile", modo: "mindmap", formas: 22 },
+    { id: "vazio", nome: "Novo mapa mental", modo: "mindmap", formas: 1 },
+  ];
+  const so2 = validarPlano({ acao: "mudar", operacoes: [{ fluxo: "nucleo", pedido: "Lisa Task" }, { fluxo: "mvp", pedido: "nota" }] }, doProjetoTodo);
+  const faltam = faltandoNoPlano(so2, doProjetoTodo);
+  conferir("o que o plano esqueceu: os mapas mentais com desenho (o vazio não conta)", faltam.map((f) => f.id).join() === "mobile");
+  const completo = completarPlano(so2, validarPlano({ acao: "mudar", operacoes: [{ fluxo: "mobile", pedido: "tópico Conceito e decisões" }, { fluxo: "mvp", pedido: "repetido" }, { fluxo: "", nome: "Outro", pedido: "x" }] }, doProjetoTodo), faltam);
+  conferir("a segunda volta completa só com os que faltavam (sem repetir, sem inventar desenho)", completo.operacoes.map((o) => o.fluxo).join() === "nucleo,mvp,mobile");
+  conferir("a rota pede a segunda volta quando o pedido é para todos", /pedeEmTodos\(pedido\) \? faltandoNoPlano\(plano, fluxos\)/.test(rotaDoPlano) && /complemento:/.test(rotaDoPlano) && /completarPlano\(plano, extra, faltando\)/.test(rotaDoPlano));
+  conferir("\"\\n\" escrito ao pé da letra no plano vira quebra de linha", validarPlano({ acao: "mudar", operacoes: [{ fluxo: "mvp", pedido: "• A\\n• B" }] }, doProjetoTodo).operacoes[0].pedido === "• A\n• B");
+  conferir("o planejador sabe que \"fluxograma\" é qualquer desenho e que cada aba recebe a nota", /mapas\s+mentais inclusive/.test(ler("src/lib/gemini.js")) && /vai em CADA\s+aba/.test(ler("src/lib/gemini.js")));
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");

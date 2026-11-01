@@ -1,7 +1,7 @@
 import { desenharDiagrama, desenharMapaMental } from "@/lib/gemini.js";
 import {
   validarDesenho, montarDocumento, estruturaDoDocumento, documentoValido,
-  pedeMapaMental, validarMapaMental, montarMapaMental, estruturaDoMapa, descreverDiagrama,
+  vaiSerMapaMental, validarMapaMental, montarMapaMental, estruturaDoMapa, descreverDiagrama,
 } from "@/lib/diagramaDaLisa.js";
 import { jsonResponse } from "@/lib/http.js";
 
@@ -32,7 +32,7 @@ export async function POST(req) {
     const contexto = String(body?.contexto || "");
     const projeto = String(body?.projeto || "").slice(0, 30_000);
     const mapaNaTela = atual?.mode === "mindmap";
-    if (pedeMapaMental(pedido) || (mapaNaTela && !/\b(fluxograma|diagrama|bpmn|processo)\b/i.test(pedido))) {
+    if (vaiSerMapaMental(pedido, atual)) {
       // um fluxograma na tela vira base ("transforme em mapa mental"); um mapa na tela é mudado
       const daTela = atual && !mapaNaTela ? `O DESENHO QUE ESTÁ NA TELA (um fluxograma):\n${descreverDiagrama(atual)}` : "";
       const bruto = await desenharMapaMental({
