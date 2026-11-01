@@ -130,10 +130,37 @@ export function validarPlano(bruto, fluxos) {
       pedido,
     });
   }
-  // "documentar": a pessoa quer TEXTO a partir dos desenhos (os .md no editor) — nenhum desenho muda
-  if (bruto?.acao === "documentar") return { acao: "documentar", explicacao: linha(bruto?.explicacao, 600), operacoes: [] };
+  // os .md que o pedido pede (01/11/2026: "faça um fluxograma da arquitetura pensando em cibersegurança
+  // … faça um arquivo md também" — um documento SOBRE O ASSUNTO, ao lado do desenho novo)
+  const documentos = [];
+  for (const d of Array.isArray(bruto?.documentos) ? bruto.documentos : []) {
+    const pedido = String(d?.pedido ?? "").replace(/\\n/g, "\n").trim().slice(0, 4000);
+    if (!pedido || documentos.length >= LIMITE_DE_DOCUMENTOS) continue;
+    const titulo = linha(d?.titulo, 120) || "Documento";
+    documentos.push({
+      arquivo: nomeDeArquivo(d?.arquivo || titulo, documentos.map((x) => x.arquivo)),
+      titulo,
+      desenhos: [...new Set((Array.isArray(d?.desenhos) ? d.desenhos : []).map(String).filter((id) => ids.has(id)))],
+      novos: d?.novos === true,
+      pedido,
+      estilo: "livre",
+    });
+  }
+  const explicacao = linha(bruto?.explicacao, 600);
+  // "documentar": a pessoa quer TEXTO a partir dos desenhos — o modelo disse que nenhum desenho muda
+  if (bruto?.acao === "documentar") return { acao: "documentar", explicacao, operacoes: [], documentos };
   const mudar = bruto?.acao === "mudar" && operacoes.length > 0;
-  return { acao: mudar ? "mudar" : "responder", explicacao: linha(bruto?.explicacao, 600), operacoes: mudar ? operacoes : [] };
+  return { acao: mudar ? "mudar" : documentos.length ? "documentar" : "responder", explicacao, operacoes: mudar ? operacoes : [], documentos };
+}
+
+export const LIMITE_DE_DOCUMENTOS = 8;
+
+/** O nome do .md: curto, com hífens, sem repetir outro da mesma resposta. */
+export function nomeDeArquivo(texto, usados = []) {
+  const base = fatia(String(texto || "").replace(/\.md$/i, "")) || "documento";
+  let nome = `${base}.md`;
+  for (let i = 2; usados.includes(nome); i++) nome = `${base}-${i}.md`;
+  return nome;
 }
 
 // ---- documentar (01/11/2026: "faça um arquivo MD no editor explicando a estratégia e o conceito do
@@ -185,8 +212,66 @@ export function pedeDocumentacao(pedido) {
   // ("documento(s)" e "documentação" estão a uma letra do verbo: não contam aqui)
   if (p.some((x) => !/^documento|^documentac/.test(x) && DOCUMENTAR.some((d) => perto(x, d)))) return true;
   // "a documentação de cada fluxograma", "a especificação de todos os fluxos" (e não "documentos de cada área")
-  const cadaDesenho = p.some((x, i) => CADA.some((c) => perto(x, c)) && p.slice(i + 1, i + 4).some((y) => DESENHOS.some((d) => parecida(y, d))));
-  return pertoDeAlgum(p, DOCUMENTACAO) && cadaDesenho;
+  return pertoDeAlgum(p, DOCUMENTACAO) && umPorDesenho(pedido);
+}
+
+/** "um md POR fluxograma", "a documentação de CADA fluxo", "de TODOS os desenhos". */
+export function umPorDesenho(pedido) {
+  const p = palavrasDe(pedido);
+  return p.some((x, i) => CADA.some((c) => perto(x, c)) && p.slice(i + 1, i + 4).some((y) => DESENHOS.some((d) => parecida(y, d))));
+}
+
+// ---- desenho E documento no mesmo pedido (01/11/2026: "faça um fluxograma desenhando a arquitetura do
+// nosso produto já pensando em cibersegurança, onde hoje nós falhamos … faça um arquivo md também" — a
+// Lisa reescreveu os .md do MVP e não desenhou nada) ----
+//
+// O plano diz o que desenhar e quais documentos escrever. A trava (ajustarAoPedido), sem o modelo: num
+// pedido que fala de documento, desenho que JÁ EXISTE só muda se o pedido mandar mudar (PEDE_MUDANCA), e
+// desenho NOVO só nasce se o pedido pedir um (pedeNovoDesenho) — foi assim que a aba "Fluxo Desktop" se perdeu.
+
+const FAZER = ["faca", "faz", "fazer", "crie", "cria", "criar", "monte", "monta", "montar", "gere", "gera", "gerar", "desenhe", "desenha", "desenhar"];
+const DESENHO_NOVO = ["fluxograma", "fluxo", "diagrama", "mapa", "desenho", "arquitetura", "bpmn"];
+
+/** O pedido manda fazer um desenho novo ("faça um fluxograma da arquitetura", "desenhando a arquitetura")? */
+export function pedeNovoDesenho(pedido) {
+  const p = palavrasDe(pedido);
+  if (p.some((x) => x !== "desenho" && x !== "desenhos" && (perto(x, "desenhando") || perto(x, "desenhe") || perto(x, "desenhar")))) return true;
+  return p.some((x, i) => FAZER.some((v) => perto(x, v)) && p.slice(i + 1, i + 4).some((y) => DESENHO_NOVO.some((d) => parecida(y, d))));
+}
+
+/** O pedido manda mudar o que já está desenhado (incluir, pôr, mudar, pintar, tirar, anotar…). */
+export const PEDE_MUDANCA = /\b(inclu|adicion|acrescent|ponh|coloqu|mud[ae]|alter|atualiz|pint|remov|apag|exclu|tir[ae]|corrij|corrig|edit[ae]|renome|separ|mov[ae]|anot|refac|refaz)\w*/;
+
+/** Os documentos "um por desenho": a visão geral do projeto e uma especificação de cada desenho. */
+export function documentosPorDesenho(fluxos) {
+  return [
+    { arquivo: "00-visao-geral.md", titulo: "Visão geral do projeto", desenhos: [], novos: false, pedido: "", estilo: "visao-geral" },
+    ...(fluxos || []).map((f, i) => ({
+      arquivo: `${String(i + 1).padStart(2, "0")}-${fatia(f.nome) || "desenho"}.md`, titulo: String(f.nome || "Desenho"),
+      desenhos: [String(f.id)], novos: false, pedido: "", estilo: "especificacao",
+    })),
+  ];
+}
+
+/**
+ * A trava do plano num pedido de documento (sem o modelo): tira as mudanças que o pedido não mandou
+ * fazer e garante os documentos — os do plano; ou, se o plano não trouxe (ou trouxe menos que "um por
+ * desenho" pedia), um por desenho ou um só sobre o pedido.
+ */
+export function ajustarAoPedido(plano, pedido, fluxos) {
+  if (!pedeDocumentacao(pedido)) return plano;
+  const muda = PEDE_MUDANCA.test(semAcento(pedido));
+  const novo = pedeNovoDesenho(pedido);
+  const operacoes = (plano.operacoes || []).filter((o) => (o.fluxo ? muda : novo));
+  let documentos = plano.documentos || [];
+  if (umPorDesenho(pedido) && documentos.length < (fluxos || []).length) documentos = documentosPorDesenho(fluxos);
+  if (!documentos.length) {
+    documentos = [{
+      arquivo: "documento.md", titulo: linha(pedido, 80) || "Documento", desenhos: [], novos: operacoes.some((o) => !o.fluxo),
+      pedido: String(pedido).slice(0, 4000), estilo: "livre",
+    }];
+  }
+  return { ...plano, acao: operacoes.length ? "mudar" : "documentar", operacoes, documentos };
 }
 
 const fatia = (s) => semAcento(s).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50);
@@ -196,6 +281,9 @@ export function arquivoDoDocumento(projeto, desenho, i) {
   const pasta = `docs/${fatia(projeto?.nome) || "projeto"}`;
   return i === 0 ? `${pasta}/00-visao-geral.md` : `${pasta}/${String(i).padStart(2, "0")}-${fatia(desenho?.nome) || "desenho"}.md`;
 }
+
+/** O caminho de um documento do plano: docs/<projeto>/<arquivo>. */
+export const caminhoDoDocumento = (projeto, arquivo) => `docs/${fatia(projeto?.nome) || "projeto"}/${arquivo}`;
 
 /**
  * A resposta com os documentos, cada um num bloco "````markdown docs/…/01-x.md" (quatro crases: o .md

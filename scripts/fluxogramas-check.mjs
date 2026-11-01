@@ -12,8 +12,9 @@ import { GRUPOS_DE_PAINEIS } from "../src/lib/navegacao.js";
 import {
   citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, secaoDoProjeto, validarPlano, LIMITE_DE_OPERACOES,
   pedeEmTodos, faltandoNoPlano, completarPlano, pedeDocumentacao, arquivoDoDocumento, respostaComDocumentos,
+  pedeNovoDesenho, ajustarAoPedido, nomeDeArquivo,
 } from "../src/lib/processmapNaConversa.js";
-import { pedirPlano, executarPlano, textoDoAndamento, documentarProjeto } from "../src/lib/trabalhoNoProjeto.js";
+import { pedirPlano, executarPlano, textoDoAndamento, documentarProjeto, escreverDocumentos } from "../src/lib/trabalhoNoProjeto.js";
 import { trechosDaResposta, respostaSemCodigo } from "../src/lib/codigoNaResposta.js";
 import { montarDocumento, validarDesenho, tamanhoDaNota } from "../src/lib/diagramaDaLisa.js";
 
@@ -336,7 +337,7 @@ console.log("o plano no projeto (01/11/2026: \"essa minha interação deveria se
 
   const pagina = ler("src/app/(panels)/assistant/page.js");
   conferir("o projeto citado vale antes da regra do Abacato", /const doProjeto = !alvoDaIde \? await resolverProjetoRef/.test(pagina));
-  conferir("a Lisa planeja e trabalha no projeto (vários desenhos)", /await planejarNoProjetoRef\.current\?\.\(q, doProjeto, displayText\)/.test(pagina) && /plano\?\.acao === "mudar"\) return trabalharNoProjetoRef/.test(pagina) && /await executarPlano\(\{/.test(pagina)
+  conferir("a Lisa planeja e trabalha no projeto (vários desenhos)", /await planejarNoProjetoRef\.current\?\.\(q, doProjeto, displayText\)/.test(pagina) && /plano\?\.acao === "mudar"\) \{\s*const feito = await trabalharNoProjetoRef/.test(pagina) && /await executarPlano\(\{/.test(pagina)
     && /for \(const \[i, op\] of plano\.operacoes\.entries\(\)\)/.test(ler("src/lib/trabalhoNoProjeto.js")));
   const rotaDoPlano = ler("src/app/api/processmap/plano/route.js");
   conferir("a rota do plano confere o que o modelo devolveu", /validarPlano\(await planejarNoProjeto\(base\), fluxos\)/.test(rotaDoPlano));
@@ -356,7 +357,7 @@ console.log("o plano no projeto (01/11/2026: \"essa minha interação deveria se
   conferir("o que o plano esqueceu: os mapas mentais, até o quase vazio (\"todos os mapas mentais\")", faltam.map((f) => f.id).join() === "mobile,vazio");
   const completo = completarPlano(so2, validarPlano({ acao: "mudar", operacoes: [{ fluxo: "mobile", pedido: "tópico Conceito e decisões" }, { fluxo: "vazio", pedido: "tópico Conceito e decisões" }, { fluxo: "mvp", pedido: "repetido" }, { fluxo: "", nome: "Outro", pedido: "x" }] }, doProjetoTodo), faltam);
   conferir("a segunda volta completa só com os que faltavam (sem repetir, sem inventar desenho)", completo.operacoes.map((o) => o.fluxo).join() === "nucleo,mvp,mobile,vazio");
-  conferir("a rota pede a segunda volta quando o pedido é para todos", /pedeEmTodos\(pedido\) \? faltandoNoPlano\(plano, fluxos\)/.test(rotaDoPlano) && /complemento:/.test(rotaDoPlano) && /completarPlano\(plano, extra, faltando\)/.test(rotaDoPlano));
+  conferir("a rota pede a segunda volta quando o pedido é para todos", /pedeEmTodos\(pedido\) && !pedeDocumentacao\(pedido\) \? faltandoNoPlano\(plano, fluxos\)/.test(rotaDoPlano) && /complemento:/.test(rotaDoPlano) && /completarPlano\(plano, extra, faltando\)/.test(rotaDoPlano));
   conferir("\"\\n\" escrito ao pé da letra no plano vira quebra de linha", validarPlano({ acao: "mudar", operacoes: [{ fluxo: "mvp", pedido: "• A\\n• B" }] }, doProjetoTodo).operacoes[0].pedido === "• A\n• B");
   conferir("o planejador sabe que \"fluxograma\" é qualquer desenho e que cada aba recebe a nota", /mapas\s+mentais inclusive/.test(ler("src/lib/gemini.js")) && /vai em CADA\s+aba/.test(ler("src/lib/gemini.js")));
 }
@@ -418,12 +419,33 @@ console.log("documentar: um .md por desenho no editor (01/11/2026: a Lisa mexeu 
     "crie a especificação de todos os fluxos do projeto", "docuemnte os fluxos do projeto", "escreva no vs code um arquivo por fluxograma", "markdwon de todos os desenhos", "abra o editor",
   ].every(pedeDocumentacao));
   conferir("e assunto de fluxo com \"documentos\" não vira documentar", !["crie um fluxo de aprovação de documento por área", "no projeto x, crie um fluxo da gestão de documentos de cada área", "edite a aba Desktop e escreva o texto da nota"].some(pedeDocumentacao));
-  conferir("o planejador planeja só o pedido de agora (a conversa é contexto) e põe documento acima de mudança", /O PEDIDO DE AGORA \(é ESTE que você planeja\)/.test(ler("src/lib/gemini.js")) && /é "documentar", nunca "mudar"/.test(ler("src/lib/gemini.js")));
+  conferir("o planejador planeja só o pedido de agora (a conversa é contexto) e põe documento acima de mudança", /O PEDIDO DE AGORA \(é ESTE que você planeja\)/.test(ler("src/lib/gemini.js")) && /NÃO mude os desenhos que já existem, a não ser que ele mande mudar/.test(ler("src/lib/gemini.js")));
   conferir("pedido de mudar o desenho não é documentar", !["crie uma nota de texto em tdoso os fluogramas descrevendo o conceito", "documente nas notas de cada fluxo as decisões", "crie um fluxo de aprovação de documentos", "editar a aba Desktop", "pinte de verde as decisões", "crie uma aba com o detalhe da aprovação", "no projeto Produto Lisa, ponha a especificação do login no fluxo"].some(pedeDocumentacao));
   conferir("o plano pode decidir \"documentar\" (e aí nenhuma operação)", validarPlano({ acao: "documentar", explicacao: "Vou escrever.", operacoes: [{ fluxo: "x", pedido: "y" }] }, []).acao === "documentar" && validarPlano({ acao: "documentar", operacoes: [{ fluxo: "x", pedido: "y" }] }, []).operacoes.length === 0);
   const rotaDoPlano = ler("src/app/api/processmap/plano/route.js");
-  conferir("a rota do plano responde \"documentar\" sem perguntar ao modelo", /if \(pedeDocumentacao\(pedido\)\) return jsonResponse\(\{ ok: true, plano: \{ acao: "documentar"/.test(rotaDoPlano));
-  conferir("o planejador conhece a ação documentar", /"documentar" quando a pessoa quer um TEXTO/.test(ler("src/lib/gemini.js")) && /enum: \["mudar", "responder", "documentar"\]/.test(ler("src/lib/gemini.js")));
+  conferir("a rota do plano passa o plano pela trava (e, sem o modelo, o documento ainda sai)", /plano = ajustarAoPedido\(plano, pedido, fluxos\)/.test(rotaDoPlano) && /if \(!pedeDocumentacao\(pedido\)\) throw err;/.test(rotaDoPlano));
+  conferir("o planejador conhece a ação documentar e devolve os documentos", /"documentar" quando a pessoa quer SÓ um TEXTO/.test(ler("src/lib/gemini.js")) && /enum: \["mudar", "responder", "documentar"\]/.test(ler("src/lib/gemini.js")) && /documentos: \{\s*type: "ARRAY"/.test(ler("src/lib/gemini.js")));
+
+  // 01/11/2026: "faça um fluxograma desenhando a arquitetura … cibersegurança, onde hoje falhamos? … faça
+  // um arquivo md também" — a Lisa reescreveu os .md do MVP e não desenhou nada
+  const pedidoSeguranca = "Lisa faça um fluxograma desnhando a arquitetura do nosso produto já pensando em cyber segurança onde hoje nos falhamos ? pque eu tenho que tomar cuidaod antes de expandir o usoo, fla um aruivo md tambem";
+  const doProjeto = [{ id: "mvp", nome: "Fluxo de Uso MVP" }, { id: "nucleo", nome: "Núcleo de Funcionalidades" }];
+  conferir("o pedido de segurança pede um desenho novo e um documento", pedeNovoDesenho(pedidoSeguranca) && pedeDocumentacao(pedidoSeguranca));
+  conferir("\"desenho novo\" é pedido de fazer, não citação", ["desenhe a arquitetura", "monte um mapa mental do lançamento", "crie um fluxograma de compras"].every(pedeNovoDesenho) && !["faça um md do desenho Núcleo", pedidoReal, "documente os fluxos do projeto"].some(pedeNovoDesenho));
+  const planoSeguranca = ajustarAoPedido(validarPlano({
+    acao: "mudar", explicacao: "Vou desenhar a arquitetura com os riscos e escrever a análise.",
+    operacoes: [{ fluxo: "", nome: "Arquitetura e Cibersegurança", tipo: "fluxograma", pedido: "Desenhe a arquitetura…" }, { fluxo: "mvp", pedido: "acrescente uma nota de segurança" }],
+    documentos: [{ arquivo: "analise de seguranca.md", titulo: "Análise de cibersegurança", desenhos: ["mvp", "inventado"], novos: true, pedido: "a arquitetura de hoje, onde falhamos, riscos e o que fazer antes de expandir" }],
+  }, doProjeto), pedidoSeguranca, doProjeto);
+  conferir("o plano: desenha o fluxograma NOVO e não mexe nos que existem", planoSeguranca.acao === "mudar" && planoSeguranca.operacoes.length === 1 && planoSeguranca.operacoes[0].fluxo === "" && planoSeguranca.operacoes[0].nome === "Arquitetura e Cibersegurança");
+  conferir("e escreve UM documento sobre o assunto, ligado ao desenho novo", planoSeguranca.documentos.length === 1 && planoSeguranca.documentos[0].arquivo === "analise-de-seguranca.md" && planoSeguranca.documentos[0].novos === true && planoSeguranca.documentos[0].desenhos.join() === "mvp" && planoSeguranca.documentos[0].estilo === "livre");
+  const primeiroPedido = ajustarAoPedido(validarPlano({ acao: "mudar", operacoes: [{ fluxo: "mvp", pedido: "nota" }, { fluxo: "nucleo", pedido: "nota" }] }, doProjeto), pedidoReal, doProjeto);
+  conferir("\"um md por fluxograma\": nenhum desenho muda, e sai a visão geral + um por desenho", primeiroPedido.acao === "documentar" && primeiroPedido.operacoes.length === 0 && primeiroPedido.documentos.map((d) => d.arquivo).join() === "00-visao-geral.md,01-fluxo-de-uso-mvp.md,02-nucleo-de-funcionalidades.md");
+  const semModelo = ajustarAoPedido(validarPlano({ acao: "documentar" }, doProjeto), "faça um arquivo md sobre os riscos de segurança do projeto", doProjeto);
+  conferir("sem documentos no plano, sai um documento sobre o pedido", semModelo.acao === "documentar" && semModelo.documentos.length === 1 && semModelo.documentos[0].estilo === "livre" && /riscos de segurança/.test(semModelo.documentos[0].pedido));
+  const mandaMudar = ajustarAoPedido(validarPlano({ acao: "mudar", operacoes: [{ fluxo: "mvp", pedido: "inclua a etapa de login" }], documentos: [{ arquivo: "login.md", titulo: "Login", pedido: "o login" }] }, doProjeto), "inclua a etapa de login no Fluxo de Uso MVP e faça um md do login", doProjeto);
+  conferir("mudança pedida com todas as letras continua junto do documento", mandaMudar.acao === "mudar" && mandaMudar.operacoes.length === 1 && mandaMudar.documentos.length === 1);
+  conferir("nome de arquivo: curto, com hífens, sem repetir", nomeDeArquivo("Análise de Segurança.md") === "analise-de-seguranca.md" && nomeDeArquivo("x", ["x.md"]) === "x-2.md");
 
   const projeto = { id: "p1", nome: "Produto Lisa" };
   conferir("os caminhos: docs/<projeto>/00-visao-geral.md e 01-<desenho>.md", arquivoDoDocumento(projeto, null, 0) === "docs/produto-lisa/00-visao-geral.md" && arquivoDoDocumento(projeto, { nome: "Fluxo de Uso MVP - Lisa Assistant" }, 1) === "docs/produto-lisa/01-fluxo-de-uso-mvp-lisa-assistant.md");
@@ -453,23 +475,31 @@ console.log("documentar: um .md por desenho no editor (01/11/2026: a Lisa mexeu 
     aoMesmoTempo++; pico = Math.max(pico, aoMesmoTempo);
     await new Promise((r) => setTimeout(r, 5));
     aoMesmoTempo--;
-    if (corpo.desenho?.nome === "Este dá erro") return { ok: false, status: 500, json: async () => ({ ok: false, error: "o modelo caiu" }) };
-    return { ok: true, status: 200, json: async () => ({ ok: true, markdown: `# ${corpo.desenho?.nome || "Visão geral"}\n\nTexto.` }) };
+    if (corpo.desenhos?.[0]?.nome === "Este dá erro") return { ok: false, status: 500, json: async () => ({ ok: false, error: "o modelo caiu" }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true, markdown: `# ${corpo.desenhos?.[0]?.nome || corpo.titulo || "Visão geral"}\n\nTexto.` }) };
   };
   const andamentos = [];
   const r = await documentarProjeto({ pedido: pedidoReal, projeto, fluxos, buscar, aoAndar: (ls) => andamentos.push(ls.map((l) => l.estado).join("|")) });
   conferir("só /api/processmap/documento é chamado — nenhum desenho é gravado", chamadas.every((c) => c.url === "/api/processmap/documento"));
   conferir("a visão geral e um arquivo por desenho, na ordem (o que deu erro fica de fora)", r.documentos.map((d) => d.arquivo.split("/").pop()).join() === "00-visao-geral.md,01-fluxo-de-uso-mvp.md,02-nucleo.md" && r.linhas[3].ok === false && /o modelo caiu/.test(r.linhas[3].nota));
-  const doMvp = chamadas.find((c) => c.corpo.desenho?.nome === "Fluxo de Uso MVP").corpo;
-  conferir("cada desenho vai inteiro: todas as abas e a anotação sem corte", /ABA "Fluxo Desktop"/.test(doMvp.desenho.descricao) && /ABA "Fluxo Mobile"/.test(doMvp.desenho.descricao) && doMvp.desenho.descricao.includes("c".repeat(900)));
-  conferir("o mapa mental vai como mapa mental", chamadas.find((c) => c.corpo.desenho?.nome === "Núcleo").corpo.desenho.tipo === "mapa mental");
-  conferir("a visão geral recebe a lista dos arquivos", chamadas.find((c) => !c.corpo.desenho).corpo.arquivos.map((a) => a.arquivo.split("/").pop()).join() === "01-fluxo-de-uso-mvp.md,02-nucleo.md,03-este-da-erro.md");
+  const doMvp = chamadas.find((c) => c.corpo.desenhos?.[0]?.nome === "Fluxo de Uso MVP").corpo;
+  conferir("cada desenho vai inteiro: todas as abas e a anotação sem corte", /ABA "Fluxo Desktop"/.test(doMvp.desenhos[0].descricao) && /ABA "Fluxo Mobile"/.test(doMvp.desenhos[0].descricao) && doMvp.desenhos[0].descricao.includes("c".repeat(900)) && doMvp.estilo === "especificacao");
+  conferir("o mapa mental vai como mapa mental", chamadas.find((c) => c.corpo.desenhos?.[0]?.nome === "Núcleo").corpo.desenhos[0].tipo === "mapa mental");
+  conferir("a visão geral recebe a lista dos arquivos", chamadas.find((c) => c.corpo.estilo === "visao-geral").corpo.arquivos.map((a) => a.arquivo.split("/").pop()).join() === "01-fluxo-de-uso-mvp.md,02-nucleo.md,03-este-da-erro.md");
   conferir("escreve alguns ao mesmo tempo (não um por um)", pico >= 2 && pico <= 3);
   conferir("a legenda diz quantas abas o desenho tem", /"Fluxo de Uso MVP" \(fluxograma, 2 abas\)/.test(r.documentos[1].legenda));
   conferir("o andamento aparece a cada passo", andamentos.some((a) => a.includes("escrevendo…")) && andamentos.at(-1).split("|").every((x) => x === "escrito" || x === "não deu"));
 
+  chamadas.length = 0;
+  const criado = { id: "arq", nome: "Arquitetura e Cibersegurança", modo: "diagram", documento: { name: "Arquitetura", mode: "diagram", pages: [{ id: "p1", name: "Arquitetura", shapes: [{ id: "api", type: "process", x: 0, y: 0, w: 160, h: 60, text: "API sem limite de taxa" }], connections: [] }] } };
+  const r2 = await escreverDocumentos({ pedido: pedidoSeguranca, projeto, fluxos, criados: [criado], documentos: planoSeguranca.documentos, contexto: "CODIGO", buscar });
+  const corpoSeg = chamadas[0].corpo;
+  conferir("o documento do plano: só ele (não os do MVP), com o foco, o estilo livre e o código", r2.documentos.length === 1 && r2.documentos[0].arquivo === "docs/produto-lisa/analise-de-seguranca.md" && corpoSeg.estilo === "livre" && /onde falhamos/.test(corpoSeg.foco) && corpoSeg.contexto === "CODIGO");
+  conferir("e fala do desenho que o mesmo pedido criou (e dos que ele citou)", corpoSeg.desenhos.map((d) => d.nome).join() === "Fluxo de Uso MVP,Arquitetura e Cibersegurança" && /API sem limite de taxa/.test(corpoSeg.desenhos[1].descricao));
+
   const conversaPagina = ler("src/app/(panels)/assistant/page.js");
-  conferir("na conversa: pedido de documento vai para documentar ANTES do plano de mudar", /if \(pedeDocumentacao\(q\)\) return documentarNoProjetoRef\.current\?\.\(q, \{ displayText, doProjeto \}\);\s*const plano = await planejarNoProjetoRef/.test(conversaPagina) && /plano\?\.acao === "documentar"\) return documentarNoProjetoRef/.test(conversaPagina));
+  conferir("na conversa: o plano decide desenho e documentos, e sem o modelo o documento ainda sai", /\|\| \(pedeDocumentacao\(q\) \? ajustarAoPedido\(/.test(conversaPagina) && /plano\?\.acao === "documentar"\) return documentarNoProjetoRef/.test(conversaPagina));
+  conferir("desenho novo + documento: desenha primeiro, depois escreve sobre o desenho criado", /if \(feito && plano\.documentos\?\.length\) \{\s*return documentarNoProjetoRef\.current\?\.\(q, \{ displayText, doProjeto, plano, criados: feito\.criados, antes: feito\.texto, contexto: feito\.contexto \}\)/.test(conversaPagina));
   conferir("e os arquivos vão para o editor de código", /guardarNaIde\(abrirNaIde\(shown\), shown, texto\)/.test(conversaPagina) && /respostaComDocumentos\(intro, documentos\)/.test(conversaPagina));
   const painel = ler("src/app/(panels)/fluxogramas/page.js");
   conferir("no painel ProcessMap, pedido de documento não mexe no desenho", /if \(pedeDocumentacao\(q\)\) \{\s*setExplicacao\(PARA_DOCUMENTAR\);\s*return;/.test(painel) && /plano\.acao === "documentar"/.test(painel));

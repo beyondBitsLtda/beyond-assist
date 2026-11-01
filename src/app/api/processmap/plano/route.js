@@ -1,5 +1,5 @@
 import { planejarNoProjeto } from "@/lib/gemini.js";
-import { validarPlano, pedeEmTodos, faltandoNoPlano, completarPlano, pedeDocumentacao } from "@/lib/processmapNaConversa.js";
+import { validarPlano, pedeEmTodos, faltandoNoPlano, completarPlano, pedeDocumentacao, ajustarAoPedido } from "@/lib/processmapNaConversa.js";
 import { jsonResponse } from "@/lib/http.js";
 
 export const runtime = "nodejs";
@@ -8,9 +8,11 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/processmap/plano (01/11/2026) — a Lisa planeja um pedido feito sobre um projeto do ProcessMap.
  *   { pedido, projeto (os desenhos em texto), fluxos: [{ id, nome, modo, formas }], aberto?, conversa? }
- * Devolve { plano: { acao: "mudar" | "responder" | "documentar", explicacao, operacoes: [{ fluxo, nome, tipo, pedido }] } }.
- * "documentar" (os .md no editor, sem mexer nos desenhos): /api/processmap/documento.
- * Quem executa as operações (uma por desenho, por /api/diagrama) e salva é a página do Assistente.
+ * Devolve { plano: { acao: "mudar" | "responder" | "documentar", explicacao, operacoes: [{ fluxo, nome,
+ * tipo, pedido }], documentos: [{ arquivo, titulo, desenhos, novos, pedido, estilo }] } }.
+ * As operações (desenhos) são feitas por /api/diagrama; os documentos (.md no editor), por
+ * /api/processmap/documento — um pedido pode ter os dois ("faça um fluxograma da arquitetura … e um md").
+ * Num pedido de documento, ajustarAoPedido tira as mudanças de desenho que o pedido não mandou fazer.
  */
 export async function POST(req) {
   try {
@@ -26,12 +28,18 @@ export async function POST(req) {
       aberto: String(body?.aberto || ""),
       conversa: String(body?.conversa || ""),
     };
-    // pedido de .md / documento no editor: nunca vira mudança de desenho (a Lisa mexia nos desenhos)
-    if (pedeDocumentacao(pedido)) return jsonResponse({ ok: true, plano: { acao: "documentar", explicacao: "", operacoes: [] } });
-    let plano = validarPlano(await planejarNoProjeto(base), fluxos);
+    let plano;
+    try {
+      plano = validarPlano(await planejarNoProjeto(base), fluxos);
+    } catch (err) {
+      // sem o modelo, um pedido de documento ainda sai (os documentos, sem mudar desenho nenhum)
+      if (!pedeDocumentacao(pedido)) throw err;
+      plano = validarPlano({ acao: "documentar", explicacao: "" }, fluxos);
+    }
+    plano = ajustarAoPedido(plano, pedido, fluxos);
     // "em todos os fluxogramas": o desenho que o plano esqueceu (o modelo deixava os mapas mentais de
     // fora) ganha uma segunda volta, só para os que faltaram
-    const faltando = plano.acao === "mudar" && pedeEmTodos(pedido) ? faltandoNoPlano(plano, fluxos) : [];
+    const faltando = plano.acao === "mudar" && pedeEmTodos(pedido) && !pedeDocumentacao(pedido) ? faltandoNoPlano(plano, fluxos) : [];
     if (faltando.length) {
       const extra = validarPlano(await planejarNoProjeto({
         ...base,

@@ -6,7 +6,7 @@
 // painel só sabia mexer no fluxo aberto). Sem React: `buscar` e `api` vêm de fora (testado com
 // servidor falso em scripts/fluxogramas-check.mjs).
 
-import { contextoDoProjeto, arquivoDoDocumento } from "./processmapNaConversa.js";
+import { contextoDoProjeto, caminhoDoDocumento, documentosPorDesenho } from "./processmapNaConversa.js";
 import { descreverDiagrama } from "./diagramaDaLisa.js";
 
 const JSON_ = { "content-type": "application/json" };
@@ -41,10 +41,11 @@ export function textoDoAndamento(plano, linhas, fim = "") {
  * { linhas, feitos, resultados: [{ op, fluxo (salvo), doc, colecao, explicacao, mudou }] }.
  *   docDe(fluxo): o documento de partida (o da tela, quando é o fluxo aberto — tem o que a pessoa
  *   acabou de mexer); `abertoId`: esse fluxo grava por cima (a versão da tela é a que vale).
- *   aoAndar(linhas): a cada passo, para a tela mostrar o andamento.
+ *   aoAndar(linhas): a cada passo, para a tela mostrar o andamento. `contexto`: o código dos
+ *   repositórios ligados à conversa ("a arquitetura do nosso produto" desenha o que existe de verdade).
  */
 export async function executarPlano({
-  plano, projeto, fluxos, api, conversa = "", abertoId = "",
+  plano, projeto, fluxos, api, conversa = "", contexto = "", abertoId = "",
   docDe = (f) => f.documento, aoAndar = () => {}, buscar = (...a) => fetch(...a),
 }) {
   const linhas = plano.operacoes.map((op) => ({
@@ -66,7 +67,7 @@ export async function executarPlano({
         body: JSON.stringify({
           pedido: !fluxo && op.tipo === "mapa mental" ? `Monte um mapa mental. ${op.pedido}` : op.pedido,
           atual: fluxo ? docDe(fluxo) : null,
-          conversa,
+          conversa, contexto,
           projeto: contextoDoProjeto(projeto, fluxos, { alvo: fluxo }),
         }),
       });
@@ -97,19 +98,28 @@ const tipoDe = (f) => (f.modo === "mindmap" || f.documento?.mode === "mindmap" ?
 const abasDoDesenho = (f) => (f.documento?.mode === "mindmap" ? 1 : f.documento?.pages?.length || 1);
 
 /**
- * "Faça um MD por fluxograma e mapa mental" (01/11/2026): a Lisa escreve a visão geral do projeto e um
- * .md por desenho (/api/processmap/documento), `simultaneos` de cada vez. NENHUM desenho é mudado nem
- * salvo — só lidos. Devolve { linhas, documentos: [{ arquivo, markdown, legenda }] } (os que deram certo,
- * na ordem: visão geral, depois os desenhos); a página põe cada um numa aba do editor de código.
+ * Escreve os documentos do plano (/api/processmap/documento), `simultaneos` de cada vez. NENHUM desenho é
+ * mudado nem salvo — só lidos. Cada documento: { arquivo, titulo, desenhos (ids), novos, pedido (o foco),
+ * estilo }; `criados`: os fluxos que o plano acabou de criar (os documentos com `novos` falam deles —
+ * "faça um fluxograma da arquitetura … e um md também"). `contexto`: o código dos repositórios ligados.
+ * Devolve { linhas, documentos: [{ arquivo (docs/<projeto>/…), markdown, legenda }] } (os que deram
+ * certo, na ordem do plano); a página põe cada um numa aba do editor de código.
  */
-export async function documentarProjeto({ pedido, projeto, fluxos, conversa = "", aoAndar = () => {}, buscar = (...a) => fetch(...a), simultaneos = 3 }) {
-  const desenhos = fluxos.filter((f) => f.documento);
-  const arquivos = desenhos.map((f, i) => ({ fluxo: f, arquivo: arquivoDoDocumento(projeto, f, i + 1), nome: f.nome, tipo: tipoDe(f) }));
-  const visao = { fluxo: null, arquivo: arquivoDoDocumento(projeto, null, 0), nome: "Visão geral do projeto", tipo: "visão geral" };
-  const tarefas = [visao, ...arquivos];
-  const linhas = tarefas.map((t) => ({ nome: t.arquivo.split("/").pop(), estado: "na fila", ok: null, nota: "", trabalhando: false }));
-  const documentos = new Array(tarefas.length).fill(null);
-  const texto = contextoDoProjeto(projeto, fluxos);
+export async function escreverDocumentos({
+  pedido, projeto, fluxos, documentos: pedidos, criados = [], conversa = "", contexto = "",
+  aoAndar = () => {}, buscar = (...a) => fetch(...a), simultaneos = 3,
+}) {
+  const todos = [...fluxos, ...criados.filter((c) => !fluxos.some((f) => f.id === c.id))];
+  const porId = new Map(todos.map((f) => [String(f.id), f]));
+  const tarefas = pedidos.map((d) => {
+    const base = [...d.desenhos.map((id) => porId.get(String(id))), ...(d.novos ? criados : [])].filter((f) => f?.documento);
+    return { ...d, base: [...new Set(base)], caminho: caminhoDoDocumento(projeto, d.arquivo) };
+  });
+  // a visão geral aponta para os arquivos de cada desenho
+  const deDesenho = tarefas.filter((t) => t.estilo === "especificacao").map((t) => ({ arquivo: t.arquivo, nome: t.base[0]?.nome || t.titulo, tipo: tipoDe(t.base[0] || {}) }));
+  const linhas = tarefas.map((t) => ({ nome: t.arquivo, estado: "na fila", ok: null, nota: "", trabalhando: false }));
+  const prontos = new Array(tarefas.length).fill(null);
+  const texto = contextoDoProjeto(projeto, todos);
   aoAndar(linhas);
   let proxima = 0;
   const trabalhar = async () => {
@@ -125,21 +135,24 @@ export async function documentarProjeto({ pedido, projeto, fluxos, conversa = ""
           method: "POST",
           headers: JSON_,
           body: JSON.stringify({
-            pedido, conversa, projeto: texto, nomeDoProjeto: projeto.nome,
-            ...(t.fluxo
-              ? { desenho: { nome: t.nome, tipo: t.tipo, descricao: descreverDiagrama(t.fluxo.documento, { inteiro: true }) } }
-              : { arquivos: arquivos.map(({ arquivo, nome, tipo }) => ({ arquivo, nome, tipo })) }),
+            pedido, conversa, contexto, projeto: texto, nomeDoProjeto: projeto.nome,
+            foco: t.pedido, titulo: t.titulo, estilo: t.estilo,
+            desenhos: t.base.map((f) => ({ nome: f.nome, tipo: tipoDe(f), descricao: descreverDiagrama(f.documento, { inteiro: true }) })),
+            ...(t.estilo === "visao-geral" ? { arquivos: deDesenho } : {}),
           }),
         });
         const r = await res.json().catch(() => ({}));
         if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
-        const abas = t.fluxo ? abasDoDesenho(t.fluxo) : 0;
-        documentos[i] = {
-          arquivo: t.arquivo,
+        const um = t.base[0];
+        const abas = um ? abasDoDesenho(um) : 0;
+        prontos[i] = {
+          arquivo: t.caminho,
           markdown: r.markdown,
-          legenda: t.fluxo
-            ? `**${linha.nome}** — "${t.nome}" (${t.tipo}${abas > 1 ? `, ${abas} abas` : ""}).`
-            : `**${linha.nome}** — o conceito, a estratégia do MVP e a ordem de construção, apontando para os arquivos de cada desenho.`,
+          legenda: t.estilo === "visao-geral"
+            ? `**${t.arquivo}** — o conceito, a estratégia do MVP e a ordem de construção, apontando para os arquivos de cada desenho.`
+            : t.estilo === "especificacao" && um
+              ? `**${t.arquivo}** — "${um.nome}" (${tipoDe(um)}${abas > 1 ? `, ${abas} abas` : ""}).`
+              : `**${t.arquivo}** — ${t.titulo}${t.base.length ? ` (a partir de ${t.base.map((f) => `"${f.nome}"`).join(", ")})` : ""}.`,
         };
         linha.estado = "escrito";
         linha.ok = true;
@@ -153,5 +166,14 @@ export async function documentarProjeto({ pedido, projeto, fluxos, conversa = ""
     }
   };
   await Promise.all(Array.from({ length: Math.max(1, Math.min(simultaneos, tarefas.length)) }, trabalhar));
-  return { linhas, documentos: documentos.filter(Boolean) };
+  return { linhas, documentos: prontos.filter(Boolean) };
+}
+
+/**
+ * "Faça um MD por fluxograma e mapa mental" (01/11/2026): a visão geral do projeto e um .md por desenho
+ * (documentosPorDesenho) — o mesmo que escreverDocumentos com esses documentos.
+ */
+export function documentarProjeto({ fluxos, ...resto }) {
+  const desenhos = fluxos.filter((f) => f.documento);
+  return escreverDocumentos({ ...resto, fluxos, documentos: documentosPorDesenho(desenhos) });
 }

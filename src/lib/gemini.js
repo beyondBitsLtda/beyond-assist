@@ -1295,12 +1295,22 @@ versão 100% funcional, porém [sem] a função X" quer dizer que a função X f
 Decida:
 - "acao": "mudar" quando o pedido é criar, incluir, pôr, mudar, pintar, remover, reorganizar ou anotar
   algo nos desenhos do projeto; "responder" quando é só pergunta, análise ou opinião sobre o projeto;
-  "documentar" quando a pessoa quer um TEXTO feito a partir dos desenhos, fora deles — arquivo .md,
+  "documentar" quando a pessoa quer SÓ um TEXTO feito a partir dos desenhos, fora deles — arquivo .md,
   markdown, README, documento, especificação, "no editor", "para pedir ao Claude/a uma IA construir".
-  Com "documentar", NENHUM desenho muda (operacoes vazia): a Lisa escreve os arquivos no editor.
-  O pedido de agora que fala de MD, markdown, arquivos, editor, IDE ou documentação — mesmo escrito com
-  erro ("mds", "emedê", "editro", "aquivos", "documentaçao") — é "documentar", nunca "mudar".
   Planeje SÓ o pedido de agora: a conversa é contexto, e os pedidos antigos dela já foram feitos.
+- "documentos": os arquivos .md que o pedido de agora pede (MD, markdown, arquivo, documento, "no editor",
+  mesmo escrito com erro: "mds", "emedê", "aruivo md", "editro"), escritos no editor de código. Quantos o
+  pedido pedir: "um arquivo md" = UM; "um md por fluxograma e mapa mental" = um por desenho. Cada um:
+  "arquivo" (nome curto-com-hifens.md, do assunto), "titulo", "desenhos" (ids da lista em que ele se
+  baseia; vazio = o projeto todo), "novos" (true se ele fala dos desenhos que este plano CRIA) e
+  "pedido": o que o documento deve trazer, COMPLETO e sobre o ASSUNTO do pedido (ex.: segurança — a
+  arquitetura de hoje, onde falhamos, os riscos priorizados e o que fazer antes de expandir o uso), não
+  um modelo fixo. Sem arquivo pedido, "documentos" fica vazio.
+- Um pedido pode ter as duas coisas: "faça um fluxograma da arquitetura … faça um md também" = "mudar"
+  com UMA operação (o desenho NOVO, "fluxo" vazio) + um documento com "novos": true. Quando o pedido pede
+  documento, NÃO mude os desenhos que já existem, a não ser que ele mande mudar um deles com todas as
+  letras ("inclua no fluxo X…"); explicar, documentar, especificar ou analisar NÃO é mudar desenho.
+  Só documento, sem desenho novo nem mudança: "documentar".
   Citar outro sistema no meio do pedido (ex.: "uma versão do Abacato integrada à Lisa") não muda isso:
   é conteúdo do desenho.
 - "operacoes" (só com "mudar"): uma por desenho a mudar ou criar, na ordem em que fazem sentido.
@@ -1350,6 +1360,17 @@ Decida:
                   required: ["pedido"],
                 },
               },
+              documentos: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    arquivo: { type: "STRING" }, titulo: { type: "STRING" }, desenhos: { type: "ARRAY", items: { type: "STRING" } },
+                    novos: { type: "BOOLEAN" }, pedido: { type: "STRING" },
+                  },
+                  required: ["arquivo", "titulo", "pedido"],
+                },
+              },
             },
             required: ["acao", "explicacao"],
           },
@@ -1365,25 +1386,37 @@ Decida:
 }
 
 /**
- * A Lisa escreve um .md a partir de um desenho do projeto (01/11/2026: "faça um arquivo MD no editor
- * explicando a estratégia e o conceito do MVP, uma aba de MD por fluxograma e mapa mental — vou usar
- * para pedir ao Claude construir as rotas"). `desenho`: { nome, tipo, descricao (o desenho inteiro em
- * texto, com as anotações) }; sem desenho, é a VISÃO GERAL do projeto, que aponta para `arquivos`.
- * Devolve o Markdown (texto). Nenhum desenho muda.
+ * A Lisa escreve um .md para o editor de código a partir dos desenhos do projeto. Nenhum desenho muda.
+ * Três estilos:
+ *   "livre" (o padrão): o documento que o pedido pede, sobre o ASSUNTO dele (01/11/2026: "faça um
+ *     fluxograma da arquitetura pensando em cibersegurança, onde hoje falhamos … faça um md também" — a
+ *     Lisa escrevia sempre a mesma especificação de MVP); `foco` é o que este arquivo deve trazer.
+ *   "especificacao": a especificação de UM desenho para uma IA de código construir as rotas ("uma aba de
+ *     MD por fluxograma e mapa mental — vou usar para pedir ao Claude construir as rotas").
+ *   "visao-geral": a visão geral do projeto, apontando para `arquivos` (os .md de cada desenho).
+ * `desenhos`: [{ nome, tipo, descricao (o desenho inteiro em texto, com as anotações) }]. `contexto`: o
+ * código dos repositórios ligados à conversa, quando houver. Devolve o Markdown (texto).
  */
-export async function escreverDocumento({ pedido, projeto = "", nomeDoProjeto = "", desenho = null, arquivos = [], conversa = "", hoje = "" }) {
-  const visaoGeral = !desenho;
+export async function escreverDocumento({
+  pedido, foco = "", titulo = "", estilo = "livre", desenhos = [], desenho = null, arquivos = [],
+  projeto = "", nomeDoProjeto = "", conversa = "", contexto = "", hoje = "",
+}) {
+  const base = desenhos.length ? desenhos : desenho ? [desenho] : [];
+  const tipo = ["especificacao", "visao-geral"].includes(estilo) ? estilo : "livre";
+  const um = base[0];
   const prompt = [
     conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-6000)}\n` : "",
+    contexto ? `O CÓDIGO DOS REPOSITÓRIOS LIGADOS À CONVERSA (a evidência do que existe de verdade):\n${String(contexto).slice(0, 40000)}\n` : "",
     `O PROJETO "${nomeDoProjeto}" DO PROCESSMAP (todos os desenhos, para manter os mesmos nomes e não contradizer nada):\n${String(projeto).slice(0, 40000)}\n`,
-    visaoGeral
+    tipo === "visao-geral"
       ? `OS ARQUIVOS QUE A LISA ESTÁ ESCREVENDO (um por desenho):\n${arquivos.map((a) => `- ${a.arquivo}: "${a.nome}" (${a.tipo})`).join("\n")}\n`
-      : `O DESENHO DESTE ARQUIVO: "${desenho.nome}" (${desenho.tipo}), inteiro, com as anotações:\n${String(desenho.descricao).slice(0, 60000)}\n`,
-    `O PEDIDO DA PESSOA (o que ela quer destes documentos): "${String(pedido || "").slice(0, 4000)}"`,
+      : base.map((d) => `O DESENHO "${d.nome}" (${d.tipo}), inteiro, com as anotações:\n${String(d.descricao).slice(0, 60000 / base.length)}\n`).join("\n"),
+    `O PEDIDO DA PESSOA: "${String(pedido || "").slice(0, 4000)}"`,
+    foco ? `O QUE ESTE ARQUIVO DEVE TRAZER: ${String(foco).slice(0, 4000)}` : "",
   ].filter(Boolean).join("\n");
 
   // [título exato da seção, o que vai nela] — o título vai sozinho na linha "## …"
-  const secoes = (visaoGeral
+  const secoes = tipo === "livre" ? "" : (tipo === "visao-geral"
     ? [
       ["Conceito do produto", "o que é, para quem, que problema resolve (3 a 6 frases)"],
       ["Estratégia do MVP", "o que entra, o que fica de fora e por quê"],
@@ -1403,26 +1436,45 @@ export async function escreverDocumento({ pedido, projeto = "", nomeDoProjeto = 
       ["Critérios de aceite", 'lista "- [ ] Dado …, quando …, então …", testável'],
       ["Pontos em aberto", "perguntas que o desenho não responde"],
       ["Como pedir ao Claude", 'um parágrafo pronto para colar ("Construa … seguindo este arquivo …")'],
-    ]).map(([titulo, conteudo]) => `## ${titulo}\n   (conteúdo: ${conteudo})`).join("\n");
-  const cabeca = visaoGeral
+    ]).map(([t, conteudo]) => `## ${t}\n   (conteúdo: ${conteudo})`).join("\n");
+  const fonte = base.length ? ` · a partir de ${base.map((d) => `"${d.nome}"`).join(", ")}` : "";
+  const cabeca = tipo === "visao-geral"
     ? `# ${nomeDoProjeto} — visão geral do MVP\n> Projeto do ProcessMap · gerado pela Lisa em ${hoje} · um arquivo por desenho (tabela abaixo)`
-    : `# ${desenho.nome}\n> Projeto ${nomeDoProjeto} · ${desenho.tipo} do ProcessMap · gerado pela Lisa em ${hoje}`;
+    : tipo === "especificacao"
+      ? `# ${um?.nome || titulo}\n> Projeto ${nomeDoProjeto} · ${um?.tipo || "desenho"} do ProcessMap · gerado pela Lisa em ${hoje}`
+      : `# ${titulo || "Documento"}\n> Projeto ${nomeDoProjeto} · gerado pela Lisa em ${hoje}${fonte}`;
 
-  const systemInstruction = `Você é a Lisa e escreve, em Markdown e em português do Brasil, ${visaoGeral ? "a visão geral de um projeto do ProcessMap (o conjunto dos desenhos dele)" : "a especificação de UM desenho (fluxograma ou mapa mental) de um projeto do ProcessMap"}.
-Quem lê: uma IA de código (o Claude), que vai construir as rotas e as telas do MVP a partir deste
-arquivo, e a equipe. Então: preciso, completo, verificável, sem enrolação.
-
-Comece com este cabeçalho e use estes títulos "##", nesta ordem. O título é SÓ o texto da linha "##"; o
+  const comoEscrever = tipo === "livre"
+    ? `Escreva o documento que o pedido pede, sobre o ASSUNTO do pedido ("o que este arquivo deve trazer"),
+com títulos "##" que sirvam a esse assunto — não um modelo fixo. Comece com este cabeçalho:
+${cabeca}
+Guias por assunto (use o que couber):
+- Segurança, cibersegurança, riscos, "onde falhamos", "antes de expandir o uso": a arquitetura de hoje
+  (componentes, onde os dados moram, por onde trafegam, quem acessa); onde falhamos hoje — cada lacuna com
+  a evidência (o desenho, o código ou a conversa), o impacto e a chance, numa tabela | Lacuna | Evidência |
+  Risco (alto/médio/baixo) | O que fazer |; o que fazer ANTES de expandir o uso, em ordem (agora / antes
+  de expandir / depois); como verificar cada correção; e os pontos a confirmar. Referências quando
+  ajudarem: OWASP Top 10, LGPD (dados pessoais), ISO/IEC 27001 (controles).
+- Especificação para construir (rotas, telas, "para o Claude construir"): conceito, passo a passo, rotas
+  e telas, dados, critérios de aceite "Dado/quando/então" e um parágrafo pronto para pedir ao Claude.
+- Arquitetura: as camadas, os componentes e as integrações, e as decisões com o porquê.`
+    : `Comece com este cabeçalho e use estes títulos "##", nesta ordem. O título é SÓ o texto da linha "##"; o
 "(conteúdo: …)" diz o que escrever na seção e não aparece no arquivo. Seção sem material nos desenhos:
 escreva "Não definido nos desenhos.".
 ${cabeca}
-${secoes}
+${secoes}`;
+
+  const systemInstruction = `Você é a Lisa e escreve, em Markdown e em português do Brasil, ${tipo === "visao-geral" ? "a visão geral de um projeto do ProcessMap (o conjunto dos desenhos dele)" : tipo === "especificacao" ? "a especificação de UM desenho (fluxograma ou mapa mental) de um projeto do ProcessMap" : "um documento pedido pela pessoa, a partir dos desenhos de um projeto do ProcessMap"}.
+Quem lê: a equipe e uma IA de código (o Claude), que vai trabalhar a partir deste arquivo. Então:
+preciso, completo, verificável, sem enrolação.
+
+${comoEscrever}
 
 Regras:
-- Use o que está nos desenhos (etapas, raias, decisões, abas, anotações), na conversa e no pedido. Cite as
-  etapas pelo texto exato do desenho, entre aspas.
-- O que for proposta sua (nome de rota, campo, tela que o desenho não nomeia), marque com "(proposta)".
-  Não invente regra de negócio que contradiga os desenhos.
+- Use o que está nos desenhos (etapas, raias, decisões, abas, anotações), no código (se veio), na conversa
+  e no pedido. Cite as etapas pelo texto exato do desenho, entre aspas.
+- O que for proposta sua (nome de rota, campo, tela que o desenho não nomeia), marque com "(proposta)";
+  o que você deduz sem evidência, com "(a confirmar)". Não invente fato que contradiga os desenhos.
 - Nada de senha, token, chave, CPF, salário, dado de saúde ou bancário, nem dado pessoal real.
 - Blocos de código só com três crases (nunca quatro).
 - Responda SÓ com o Markdown do arquivo: sem nada antes ou depois e sem cercar tudo num bloco de código.`;

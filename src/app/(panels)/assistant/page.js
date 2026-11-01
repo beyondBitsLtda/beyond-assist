@@ -14,8 +14,8 @@ import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
 import FontesDaWeb from "@/components/panels/FontesDaWeb.js";
 import CenaDaLisa from "@/components/panels/hud/CenaDaLisa.js";
 import JanelaDaResposta from "@/components/panels/hud/JanelaDaResposta.js";
-import { citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, pedeEmTodos, pedeDocumentacao, respostaComDocumentos } from "@/lib/processmapNaConversa.js";
-import { pedirPlano, executarPlano, textoDoAndamento, documentarProjeto } from "@/lib/trabalhoNoProjeto.js";
+import { citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, pedeEmTodos, pedeDocumentacao, respostaComDocumentos, ajustarAoPedido, documentosPorDesenho } from "@/lib/processmapNaConversa.js";
+import { pedirPlano, executarPlano, textoDoAndamento, escreverDocumentos } from "@/lib/trabalhoNoProjeto.js";
 import { apiDosFluxos } from "@/lib/fluxogramasNoNavegador.js";
 
 const apiDosFluxosDaConversa = apiDosFluxos();
@@ -2603,11 +2603,19 @@ export default function AssistantPage() {
     // desenhos do projeto junto. Sem plano (o modelo falhou), o caminho antigo: um desenho, por palavras.
     const doProjeto = !alvoDaIde ? await resolverProjetoRef.current?.(q) : null;
     if (doProjeto) {
-      // "um MD por fluxograma no editor" (01/11/2026): documentos no editor de código, nenhum desenho muda
-      if (pedeDocumentacao(q)) return documentarNoProjetoRef.current?.(q, { displayText, doProjeto });
-      const plano = await planejarNoProjetoRef.current?.(q, doProjeto, displayText);
+      // o plano diz o que desenhar e quais .md escrever no editor (01/11/2026: "faça um fluxograma da
+      // arquitetura … e um md também" — um pedido pode ter os dois); num pedido de documento, a rota do
+      // plano tira as mudanças de desenho que não foram pedidas. Sem o modelo, o documento ainda sai.
+      const plano = (await planejarNoProjetoRef.current?.(q, doProjeto, displayText))
+        || (pedeDocumentacao(q) ? ajustarAoPedido({ acao: "documentar", explicacao: "", operacoes: [], documentos: [] }, q, doProjeto.fluxos) : null);
       if (plano?.acao === "documentar") return documentarNoProjetoRef.current?.(q, { displayText, doProjeto, plano });
-      if (plano?.acao === "mudar") return trabalharNoProjetoRef.current?.(q, { displayText, doProjeto, plano });
+      if (plano?.acao === "mudar") {
+        const feito = await trabalharNoProjetoRef.current?.(q, { displayText, doProjeto, plano });
+        if (feito && plano.documentos?.length) {
+          return documentarNoProjetoRef.current?.(q, { displayText, doProjeto, plano, criados: feito.criados, antes: feito.texto, contexto: feito.contexto });
+        }
+        return;
+      }
       if (!plano) {
         const semPlano = pedidoDeDesenho(q, { quadroAberto: true });
         const alvo = semPlano === "alterar" ? doProjeto.citado || doProjeto.provavel : semPlano === "novo" && !/\bnov[oa]s?\b/i.test(q) ? doProjeto.citado : null;
@@ -2857,6 +2865,30 @@ export default function AssistantPage() {
 
   // executa o plano (src/lib/trabalhoNoProjeto.js): cada operação é um desenho salvo no projeto na
   // hora; a janela mostra o andamento; o último desenho abre no quadro, ligado.
+  // "a arquitetura do nosso produto": com repositório vinculado, o código dele vai junto (lido uma vez,
+  // num pedido só dele, como na pergunta normal — ver ask acima); "" sem repositório
+  const lerContextoDosRepos = async (q, para = "o desenho") => {
+    if (!reposRef.current.length) return "";
+    addLog("[REPO]", PU, `lendo ${reposRef.current.map((r) => r.repo).join(", ")} para ${para}…`);
+    try {
+      const rr = await fetch("/api/repos/contexto", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ repos: reposRef.current, question: q, turnos: conversaVigente(conversaRef.current), images: null }),
+      });
+      const leitura = await rr.json().catch(() => ({}));
+      if (rr.ok && leitura.ok !== false) {
+        setLeituraDosRepos(leitura);
+        return leitura.secao || "";
+      }
+    } catch (err) {
+      addLog("[REPO]", OR, `a leitura do repositório falhou: ${err.message}`);
+    }
+    return "";
+  };
+
+  // Devolve { texto, criados, contexto } — com documentos no plano, a página segue para eles
+  // (documentarNoProjetoRef) sem falar "pronto" antes da hora.
   trabalharNoProjetoRef.current = async (q, { displayText, doProjeto, plano }) => {
     const shown = displayText || q;
     stopSpeaking();
@@ -2872,10 +2904,12 @@ export default function AssistantPage() {
     addLog("[PROCESSMAP]", PU, `trabalhando em "${nome}": ${plano.operacoes.length} desenho${plano.operacoes.length === 1 ? "" : "s"}`);
     // o fluxo aberto no quadro tem o que a pessoa acabou de mexer: parte dele
     const abertoId = quadroAbertoRef.current && desenhoRef.current ? quadroVinculoRef.current?.fluxo.id || "" : "";
+    const comDocumentos = plano.documentos?.length > 0;
     try {
+      const contexto = await lerContextoDosRepos(q);
       const { linhas, feitos, resultados } = await executarPlano({
         plano, projeto: doProjeto.projeto, fluxos: doProjeto.fluxos, api: apiDosFluxosDaConversa,
-        conversa: conversaEmTexto(), abertoId,
+        conversa: conversaEmTexto(), contexto, abertoId,
         docDe: (f) => (f.id === abertoId ? desenhoRef.current : f.documento),
         aoAndar: (ls) => setAnswer(textoDoAndamento(plano, ls)),
       });
@@ -2898,7 +2932,9 @@ export default function AssistantPage() {
       setAnswer(texto);
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
       conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
-      if (voiceOn) enqueueSpeech(feitos ? `Pronto. ${feitos === total ? "Tudo salvo" : `${feitos} de ${total} salvos`} no projeto ${nome}.` : `Não consegui mudar o projeto ${nome}.`, gen);
+      if (voiceOn && !comDocumentos) enqueueSpeech(feitos ? `Pronto. ${feitos === total ? "Tudo salvo" : `${feitos} de ${total} salvos`} no projeto ${nome}.` : `Não consegui mudar o projeto ${nome}.`, gen);
+      const criados = resultados.filter((r) => !r.mudou).map((r) => ({ ...r.fluxo, documento: r.doc }));
+      return { texto, criados, contexto };
     } finally {
       setBusy(false);
       setDesenhando(false);
@@ -2906,43 +2942,48 @@ export default function AssistantPage() {
     }
   };
 
-  // "faça um MD por fluxograma e mapa mental no editor" (01/11/2026): a Lisa escreve a visão geral e
-  // um .md por desenho do projeto (src/lib/trabalhoNoProjeto.js: documentarProjeto) e abre tudo no
-  // editor de código, uma aba por arquivo. Os desenhos só são lidos — nada é mudado nem salvo neles.
-  documentarNoProjetoRef.current = async (q, { displayText, doProjeto, plano = null }) => {
+  // Os .md no editor de código (01/11/2026): os documentos do plano — "um md por fluxograma e mapa
+  // mental" (a visão geral e um por desenho) ou o que o pedido pedir, sobre o assunto dele ("faça um
+  // fluxograma da arquitetura pensando em cibersegurança … e um md também"). Uma aba do editor por
+  // arquivo. Os desenhos só são lidos. `antes`: o que a Lisa acabou de desenhar no mesmo pedido (o texto
+  // do andamento) — aí a vez continua, sem repetir a pergunta; `criados`: os desenhos novos dele.
+  documentarNoProjetoRef.current = async (q, { displayText, doProjeto, plano = null, criados = [], antes = "", contexto = null }) => {
     const shown = displayText || q;
     stopSpeaking();
     const gen = ++speechGenRef.current;
     speechEngineRef.current = null;
     setBusy(true);
     setQuestion(shown);
-    setAnswer("");
+    setAnswer(antes);
     setFontes([]);
     setMode("listening");
-    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
+    if (!antes) setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
     const { projeto, fluxos } = doProjeto;
-    const n = fluxos.filter((f) => f.documento).length;
+    const pedidos = plano?.documentos?.length ? plano.documentos : documentosPorDesenho(fluxos.filter((f) => f.documento));
     const andamento = {
-      explicacao: plano?.explicacao || `Vou escrever no editor de código a visão geral do projeto "${projeto.nome}" e um arquivo .md para ${n === 1 ? "o desenho" : `cada um dos ${n} desenhos`} — sem mexer em nenhum desenho.`,
+      explicacao: antes ? "Agora os arquivos .md no editor de código:" : plano?.explicacao || `Vou escrever ${pedidos.length === 1 ? "o arquivo .md" : `${pedidos.length} arquivos .md`} no editor de código, sem mexer em nenhum desenho.`,
     };
-    addLog("[PROCESSMAP]", PU, `documentando "${projeto.nome}": visão geral + ${n} arquivo${n === 1 ? "" : "s"} .md`);
+    const comAntes = (t) => (antes ? `${antes}\n\n${t}` : t);
+    addLog("[PROCESSMAP]", PU, `documentando "${projeto.nome}": ${pedidos.map((d) => d.arquivo).join(", ")}`);
     try {
-      const { linhas, documentos } = await documentarProjeto({
-        pedido: q, projeto, fluxos, conversa: conversaEmTexto(),
-        aoAndar: (ls) => setAnswer(textoDoAndamento(andamento, ls)),
+      const { linhas, documentos } = await escreverDocumentos({
+        pedido: q, projeto, fluxos, documentos: pedidos, criados, conversa: conversaEmTexto(),
+        contexto: contexto ?? await lerContextoDosRepos(q, "os documentos"),
+        aoAndar: (ls) => setAnswer(comAntes(textoDoAndamento(andamento, ls))),
       });
       for (const l of linhas) addLog("[PROCESSMAP]", l.ok ? GR : OR, `${l.nome}: ${l.estado}${l.ok ? "" : ` ${l.nota}`}`);
       ultimoProjetoRef.current = projeto;
       const falharam = linhas.filter((l) => l.ok === false).map((l) => l.nome);
+      const nomes = documentos.map((d) => d.arquivo.split("/").pop()).join(", ");
       const intro = documentos.length
-        ? `Escrevi ${documentos.length} arquivo${documentos.length === 1 ? "" : "s"} .md no editor de código, um por aba: a visão geral do projeto "${projeto.nome}" e um para cada desenho (fluxogramas e mapas mentais, com todas as abas). Nenhum desenho foi mudado. Cada arquivo traz conceito, estratégia do MVP, decisões, passo a passo, rotas e telas, dados, critérios de aceite e um parágrafo pronto para pedir ao Claude.${falharam.length ? `\n\nNão consegui escrever: ${falharam.join(", ")} — peça de novo que eu tento só esses.` : ""}`
-        : `Não consegui escrever os documentos do projeto "${projeto.nome}" agora (${linhas.find((l) => l.nota)?.nota || "erro"}). Nenhum desenho foi mudado.`;
+        ? `Escrevi ${documentos.length === 1 ? `o arquivo ${nomes}` : `${documentos.length} arquivos .md (${nomes})`} no editor de código${documentos.length > 1 ? ", um por aba" : ""}.${antes ? "" : " Nenhum desenho foi mudado."}${falharam.length ? `\n\nNão consegui escrever: ${falharam.join(", ")} — peça de novo que eu tento só esses.` : ""}`
+        : `Não consegui escrever ${pedidos.length === 1 ? "o documento" : "os documentos"} agora (${linhas.find((l) => l.nota)?.nota || "erro"}).${antes ? "" : " Nenhum desenho foi mudado."}`;
       const texto = respostaComDocumentos(intro, documentos);
       if (documentos.length) guardarNaIde(abrirNaIde(shown), shown, texto);
-      setAnswer(texto);
+      setAnswer(comAntes(texto));
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
       conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", intro);
-      if (voiceOn) enqueueSpeech(documentos.length ? `Pronto. Escrevi ${documentos.length} documentos no editor de código, um para cada desenho do projeto ${projeto.nome}, mais a visão geral.` : `Não consegui escrever os documentos agora.`, gen);
+      if (voiceOn) enqueueSpeech(documentos.length ? `Pronto.${antes ? " Desenhei e" : ""} escrevi ${documentos.length === 1 ? "o documento" : `${documentos.length} documentos`} no editor de código.` : `Não consegui escrever os documentos agora.`, gen);
     } finally {
       setBusy(false);
       setMode("idle");
@@ -2965,26 +3006,8 @@ export default function AssistantPage() {
     const conversa = conversaVigente(conversaRef.current).slice(-6)
       .map((t) => `${t.papel === "lisa" ? "LISA" : "PESSOA"}: ${String(t.texto).slice(0, 1000)}`).join("\n");
     try {
-      // "desenhe essa arquitetura": com um repositório vinculado, o código dele vai junto (lido antes,
-      // num pedido só dele, como na pergunta normal — ver ask acima)
-      let contexto = "";
-      if (reposRef.current.length) {
-        addLog("[REPO]", PU, `lendo ${reposRef.current.map((r) => r.repo).join(", ")} para o desenho…`);
-        try {
-          const rr = await fetch("/api/repos/contexto", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ repos: reposRef.current, question: q, turnos: conversaVigente(conversaRef.current), images: null }),
-          });
-          const leitura = await rr.json().catch(() => ({}));
-          if (rr.ok && leitura.ok !== false) {
-            contexto = leitura.secao || "";
-            setLeituraDosRepos(leitura);
-          }
-        } catch (err) {
-          addLog("[REPO]", OR, `a leitura do repositório falhou: ${err.message}`);
-        }
-      }
+      // "desenhe essa arquitetura": com um repositório vinculado, o código dele vai junto
+      const contexto = await lerContextoDosRepos(q);
       // no projeto: parte do fluxo-alvo (o do quadro, se for ele que está aberto: tem o que a pessoa
       // acabou de mexer); sem projeto, do que está no quadro
       const alvo = doProjeto?.alvo || null;

@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.25.1-cloudflare-pages.1",
+  "versao": "0.26.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-01",
   "compilacao": {
-    "numero": 57,
+    "numero": 58,
     "data": "2026-11-01",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.26.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Num pedido só, a Lisa desenha o fluxograma novo E escreve o .md sobre o assunto pedido (ex.: arquitetura e cibersegurança), sem mexer nos desenhos que já existem.",
+      "itens": [
+        "Correção: \"faça um fluxograma da arquitetura pensando em cibersegurança, onde hoje falhamos … faça um arquivo md também\" reescrevia os .md do MVP e não desenhava nada — qualquer pedido com \"md\" virava \"só documento, sempre o mesmo modelo\".",
+        "O plano agora traz as duas coisas: os desenhos a criar ou mudar e os documentos a escrever (quantos o pedido pedir, cada um com o assunto e os desenhos em que se baseia). A Lisa desenha primeiro e depois escreve o .md sobre o desenho que acabou de criar.",
+        "O .md é escrito sobre o assunto do pedido (segurança: arquitetura de hoje, onde falhamos, tabela de lacunas e riscos, o que fazer agora / antes de expandir / depois, como verificar); a especificação de MVP por desenho continua para \"um md por fluxograma\".",
+        "Trava sem o modelo: num pedido de documento, desenho que já existe só muda se o pedido mandar mudar com todas as letras, e desenho novo só nasce se o pedido pedir um. Sem o modelo, o documento ainda sai.",
+        "Com repositório vinculado na conversa, o código dele vai junto para o desenho e para o documento (a arquitetura de verdade, não só a dos desenhos)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.25.1-cloudflare-pages.1",
       "data": "2026-11-01",
