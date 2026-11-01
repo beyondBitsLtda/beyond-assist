@@ -73,12 +73,12 @@ export const VISUAIS = [
   {
     id: "rosto",
     nome: "Rosto",
-    descricao: "Um rosto 3D de pontos de luz: abre a boca com a voz, pisca, ergue as sobrancelhas e inclina a cabeça quando escuta.",
+    descricao: "Um busto holográfico de linhas de luz que se desfaz em partículas: abre a boca com a voz, pisca, ergue as sobrancelhas e inclina a cabeça quando escuta.",
     cores: {
-      pronta: ["#a8e6ff", "#5a8cff", "#6a5cff"],
-      ouvindo: ["#9ff5e4", "#3fc8e0", "#3f8cff"],
-      pensando: ["#c9bcff", "#7b6bff", "#9b5cff"],
-      falando: ["#a0dcff", "#8f7cff", "#ff7ad9"],
+      pronta: ["#c4f1ff", "#2f9bff", "#0b3dff"],
+      ouvindo: ["#c8fff4", "#27d3ff", "#0a6bff"],
+      pensando: ["#dcd6ff", "#6b8cff", "#3a2dff"],
+      falando: ["#d6f6ff", "#40b4ff", "#5a3dff"],
     },
   },
 ];

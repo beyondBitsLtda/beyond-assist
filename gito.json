@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.18.0-cloudflare-pages.1",
+  "versao": "0.18.0-cloudflare-pages.2",
   "atualizadoEm": "2026-11-01",
   "compilacao": {
-    "numero": 46,
+    "numero": 47,
     "data": "2026-11-01",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.18.0-cloudflare-pages.2",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "O visual Rosto foi refeito no estilo da referência: um busto holográfico de linhas de luz azul, com pescoço e ombros, que se desfaz em partículas de um lado.",
+      "itens": [
+        "Em vez de pontos espalhados, o rosto é feito de linhas de pontos que contornam o busto em fatias levemente inclinadas, como um escaneamento: as linhas descem sobre o nariz, os lábios e o queixo, e é isso que mostra o relevo.",
+        "Busto com pescoço, ombros e peito (que somem embaixo) e volume de cabelo, onde as linhas ondulam como fios.",
+        "Azul elétrico com brilho em volta das linhas; a nuca e o lado direito se desfazem em partículas que vão e voltam (mais falando, menos ouvindo).",
+        "A cabeça gira e inclina sobre o pescoço, com os ombros parados; de vez em quando uma faixa de linhas escorrega para o lado, como interferência num holograma (nunca com \"reduzir movimento\").",
+        "Ao aparecer, o busto se materializa de baixo para cima com uma linha de varredura; os pontos são calculados aos poucos, entre os quadros, sem travar a tela, e o cálculo é dividido entre o visual grande e a miniatura do painel.",
+        "Continua: a boca abre com o volume da fala, pisca, passeia o olhar, ergue as sobrancelhas ouvindo, olha para cima pensando e segue o ponteiro do mouse."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.18.0-cloudflare-pages.1",
       "data": "2026-11-01",
@@ -701,7 +717,7 @@
         "Contexto da conversa em qualquer modo: o + da barra anexa imagens (do computador, com Ctrl+V ou arrastando) e vincula até 3 repositórios do GitHub; a cada pergunta a Lisa lê os arquivos do repositório que interessam, escolhidos pela pergunta, pela conversa e pelo que aparece na tela, na câmera e nos prints, e responde relacionando tudo, com o caminho de cada arquivo.",
         "Modo Tomar nota (celular e desktop, também com a tela apagada no Android): escuta até 10 minutos, transcreve, separa por assunto e anota no quadro \"Notas\" do Abacato, com uma coluna por tema e um card por nota (interpretação + transcrição real).",
         "Instalável como app pelo Chrome (desktop e Android) e pela Tela de Início no iPhone, com atalho direto para o Modo Tomar nota.",
-        "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma, Anel de partículas e Rosto (um rosto 3D que abre a boca com a fala, pisca, olha e inclina a cabeça ouvindo); o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador).",
+        "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma, Anel de partículas e Rosto (um busto holográfico de linhas de luz que abre a boca com a fala, pisca, olha, inclina a cabeça ouvindo e se desfaz em partículas de um lado); o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador).",
         "Painel Sentinela de casos de teste e chamados.",
         "Editor de código da conversa colaborativo: abas editáveis, abas suas com o seu código e a Lisa reescrevendo em cima a pedido, com o que está na IDE indo junto das perguntas.",
         "Quadro de processos: a Lisa desenha fluxogramas, BPMN com raias, arquitetura e C4 quando pedido; a pessoa mexe no desenho e a Lisa conversa sobre ele e o altera a partir do que está na tela.",
