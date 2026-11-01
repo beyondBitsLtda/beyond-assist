@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.16.1-cloudflare-pages.1",
+  "versao": "0.17.0-cloudflare-pages.1",
   "atualizadoEm": "2026-10-31",
   "compilacao": {
-    "numero": 44,
+    "numero": 45,
     "data": "2026-10-31",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.17.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "O quadro da Lisa ganha o \"⧉ destacar\", como o editor de código: vai para uma janela separada (outro monitor) e volta, sem perder o que você mexeu.",
+      "itens": [
+        "Botão \"⧉ destacar\" na barra do quadro (no computador): o quadro abre numa janela de verdade do sistema, com a explicação, o desenho e a barra \"pedir à Lisa\"; \"↩ voltar para a página\" (ou fechar a janela) traz de volta.",
+        "O desenho como está, com o que você mexeu, vai junto para a janela separada e volta com ela; um desenho novo da Lisa abre na janela onde o quadro estiver.",
+        "Na página, enquanto o quadro está separado, fica o aviso \"◇ quadro numa janela separada · trazer de volta\"."
+      ],
+      "issues": [
+        "BEYOND-0010"
+      ]
+    },
     {
       "versao": "0.16.1-cloudflare-pages.1",
       "data": "2026-10-31",

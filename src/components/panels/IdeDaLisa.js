@@ -63,9 +63,9 @@ const BOTAO = { ...mono, fontSize: 10, padding: "3px 9px", borderRadius: 5, bord
  * dentro por um portal do React — o mesmo componente, o mesmo estado, então as respostas novas
  * continuam chegando nela. Aqui ela recebe os estilos e as cores do tema da página.
  */
-function prepararJanelaSeparada(win) {
+export function prepararJanelaSeparada(win, titulo = "Editor da Lisa") {
   const d = win.document;
-  d.title = "Editor da Lisa";
+  d.title = titulo;
   d.head.querySelectorAll("link, style").forEach((e) => e.remove());
   for (const el of document.querySelectorAll('link[rel="stylesheet"], style')) {
     const copia = el.cloneNode(true);

@@ -11,10 +11,17 @@
 // manda o desenho em texto junto das perguntas — a Lisa "vê" o fluxo como ele está. A barra de baixo
 // pede uma mudança no desenho (aoPedir). A janela é como a da IDE: arrasta pela barra de título,
 // redimensiona pelo canto, maximiza, e convive com o editor de código (fica do outro lado da tela).
+//
+// "⧉ destacar" (como na IDE): a janela vai para uma janela de verdade do sistema (outro monitor),
+// desenhada lá por um portal do React. O iframe nasce de novo na janela nova (e de novo ao voltar),
+// então o quadro guarda o desenho como está (`ultimoDoc`, com o que a pessoa mexeu) e reabre ele —
+// nada se perde na mudança. Os avisos do quadro chegam pela janela onde o iframe está.
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CY, OR, GR, mono } from "@/lib/theme.js";
 import { ajustarCaixa, moverCaixa, redimensionarCaixa } from "@/lib/janelaFlutuante.js";
+import { prepararJanelaSeparada } from "./IdeDaLisa.js";
 
 const CHAVE_DA_CAIXA = "lisa-quadro-caixa";
 const tela = () => ({ w: window.innerWidth, h: window.innerHeight });
@@ -24,6 +31,7 @@ const CAMPO = { ...mono, fontSize: 11.5, padding: "6px 10px", borderRadius: 6, b
 export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocupado = false, aoMudar, aoPedir, aoFechar }) {
   const quadro = useRef(null);
   const importada = useRef(null); // a chave da versão que o quadro já abriu
+  const ultimoDoc = useRef(null); // o desenho como está agora (com o que a pessoa mexeu)
   const versaoRef = useRef(versao);
   versaoRef.current = versao;
   const aoMudarRef = useRef(aoMudar);
@@ -35,6 +43,11 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
   const [minimizada, setMinimizada] = useState(false);
   const [mexendo, setMexendo] = useState(false);
   const [pedido, setPedido] = useState("");
+  const [separada, setSeparada] = useState(null); // { win, raiz } — o quadro numa janela do sistema
+  const [podeSeparar, setPodeSeparar] = useState(false);
+  const [avisoSeparar, setAvisoSeparar] = useState("");
+  const separadaRef = useRef(null);
+  separadaRef.current = separada;
   const ponte = () => quadro.current?.contentWindow?.PonteDoProof || null;
 
   // onde a janela nasce: onde ficou da última vez ou, na primeira, à esquerda (a IDE nasce à direita)
@@ -56,31 +69,64 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
     return () => window.removeEventListener("resize", ajustar);
   }, []);
 
-  /** Abre no quadro a versão que a Lisa mandou (se ele já carregou e se ainda não abriu esta). */
-  const importar = () => {
+  // janela separada só no computador: no celular, uma "janela" nova é só outra aba
+  useEffect(() => {
+    setPodeSeparar(!window.matchMedia?.("(pointer: coarse)").matches && window.innerWidth >= 700);
+  }, []);
+
+  /**
+   * Abre no quadro o desenho certo: a versão nova que a Lisa mandou ou — quando o iframe acabou de
+   * nascer (`deNovo`: destacou, voltou) — o desenho como estava, com o que a pessoa mexeu.
+   */
+  const importar = (deNovo = false) => {
     const p = ponte();
     const v = versaoRef.current;
-    if (!p || !v?.doc || importada.current === v.chave) return;
+    if (!p || !v?.doc) return;
+    const mesmaVersao = importada.current === v.chave;
+    if (mesmaVersao && !deNovo) return;
     try {
-      p.importar(v.doc);
+      p.importar(mesmaVersao && ultimoDoc.current ? ultimoDoc.current : v.doc);
       if (v.colecao) p.colecao(v.colecao);
       importada.current = v.chave;
     } catch { /* desenho estragado: o quadro fica com o de antes */ }
   };
   useEffect(() => { importar(); }, [versao?.chave]);
 
-  // o quadro avisa: pronto (abre a versão) e cada mudança (o documento inteiro volta para a página)
+  // o quadro avisa: pronto (abre o desenho) e cada mudança (o documento inteiro volta para a página).
+  // Com o quadro destacado, os avisos chegam pela janela separada (é ela a "mãe" do iframe).
   useEffect(() => {
     function ouvir(e) {
       if (e.source !== quadro.current?.contentWindow || e.data?.origem !== "quadro") return;
-      if (e.data.tipo === "pronto") { importar(); return; }
+      if (e.data.tipo === "pronto") { importar(true); return; }
       if (e.data.tipo !== "mudou") return;
       clearTimeout(espera.current);
-      espera.current = setTimeout(() => { const p = ponte(); if (p) aoMudarRef.current?.(p.exportar()); }, 500);
+      espera.current = setTimeout(() => {
+        const p = ponte();
+        if (!p) return;
+        ultimoDoc.current = p.exportar();
+        aoMudarRef.current?.(ultimoDoc.current);
+      }, 500);
     }
+    const outra = separada?.win;
     window.addEventListener("message", ouvir);
-    return () => { window.removeEventListener("message", ouvir); clearTimeout(espera.current); };
-  }, []);
+    outra?.addEventListener("message", ouvir);
+    return () => {
+      window.removeEventListener("message", ouvir);
+      try { outra?.removeEventListener("message", ouvir); } catch { /* a janela já fechou */ }
+      clearTimeout(espera.current);
+    };
+  }, [separada]);
+
+  // a janela separada fechou (pelo X do sistema ou pelo botão): o quadro volta para a página. E se a
+  // página da Lisa fechar ou recarregar, a separada fecha junto (sem ela, ficaria vazia).
+  useEffect(() => {
+    if (!separada) return undefined;
+    const vigia = setInterval(() => { if (separada.win.closed) setSeparada(null); }, 600);
+    const fecharJunto = () => { try { separada.win.close(); } catch { /* já fechou */ } };
+    window.addEventListener("pagehide", fecharJunto);
+    return () => { clearInterval(vigia); window.removeEventListener("pagehide", fecharJunto); };
+  }, [separada]);
+  useEffect(() => () => { try { separadaRef.current?.win.close(); } catch { /* já fechou */ } }, []);
 
   if (!caixa) return null;
 
@@ -109,6 +155,31 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
     window.addEventListener("pointercancel", soltar);
   };
 
+  /** Guarda o desenho como está agora (o iframe vai nascer de novo na outra janela). */
+  const guardarAgora = () => {
+    try { const p = ponte(); if (p) ultimoDoc.current = p.exportar(); } catch { /* fica o último guardado */ }
+  };
+  // leva o quadro para uma janela do sistema, no mesmo lugar e tamanho em que ele está na página
+  const separar = () => {
+    guardarAgora();
+    const borda = Math.max(0, window.outerHeight - window.innerHeight); // a barra do navegador
+    const win = window.open("", "lisa-quadro",
+      `popup=yes,width=${Math.round(caixa.w)},height=${Math.round(caixa.h)},left=${Math.round(window.screenX + caixa.x)},top=${Math.round(window.screenY + borda + caixa.y)}`);
+    if (!win) {
+      setAvisoSeparar("O navegador bloqueou a janela nova. Libere os pop-ups da Lisa e tente de novo.");
+      return;
+    }
+    setAvisoSeparar("");
+    setMaximizada(false);
+    setMinimizada(false);
+    setSeparada({ win, raiz: prepararJanelaSeparada(win, titulo ? `Quadro da Lisa · ${titulo}` : "Quadro da Lisa") });
+  };
+  const juntar = () => {
+    guardarAgora();
+    try { separada?.win.close(); } catch { /* já fechou */ }
+    setSeparada(null);
+  };
+
   const pedir = (e) => {
     e.preventDefault();
     const p = pedido.trim();
@@ -118,11 +189,14 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
   };
 
   const colecao = versao?.colecao || "flow";
-  return (
+  // na página: janela flutuante com o canto de redimensionar; separada: ocupa a janela do sistema
+  // inteira (quem move e redimensiona é o próprio sistema)
+  const naPagina = !separada;
+  const janela = (
     <div
       role="dialog"
       aria-label="Quadro da Lisa: o processo desenhado"
-      style={{
+      style={naPagina ? {
         position: "fixed", zIndex: 189,
         left: maximizada ? "2vw" : caixa.x, top: maximizada ? "4vh" : caixa.y,
         width: maximizada ? "96vw" : caixa.w, height: minimizada ? "auto" : maximizada ? "90vh" : caixa.h,
@@ -130,33 +204,56 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
         background: "#050b10", border: `1px solid ${mexendo ? CY : "rgba(var(--accent-rgb),0.3)"}`, borderRadius: 10,
         boxShadow: "0 20px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,0,0,0.4)", ...mono,
         userSelect: mexendo ? "none" : undefined,
+      } : {
+        position: "fixed", inset: 0, display: "flex", flexDirection: "column", overflow: "hidden",
+        background: "#050b10", color: "#cfeffb", ...mono,
       }}
     >
-      {/* barra de título — arrastável; bolinhas de fechar, minimizar e maximizar */}
+      {/* barra de título — arrastável na página; bolinhas de fechar, minimizar e maximizar */}
       <div
-        onPointerDown={(e) => comecarGesto(e, "mover")}
-        onDoubleClick={() => setMaximizada((v) => !v)}
+        onPointerDown={naPagina ? (e) => comecarGesto(e, "mover") : undefined}
+        onDoubleClick={naPagina ? () => setMaximizada((v) => !v) : undefined}
         style={{
           display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", flex: "none",
           background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(var(--accent-rgb),0.18)",
-          cursor: maximizada ? "default" : mexendo ? "grabbing" : "grab", userSelect: "none", touchAction: "none",
+          cursor: !naPagina || maximizada ? "default" : mexendo ? "grabbing" : "grab", userSelect: "none", touchAction: "none",
         }}
       >
-        <div style={{ display: "flex", gap: 7, flex: "none" }}>
-          <span onPointerDown={(e) => e.stopPropagation()} onClick={aoFechar} title="fechar o quadro"
-            style={{ width: 11, height: 11, borderRadius: "50%", background: OR, cursor: "pointer", opacity: 0.8 }} />
-          <span onPointerDown={(e) => e.stopPropagation()} onClick={() => setMinimizada((v) => !v)} title="minimizar"
-            style={{ width: 11, height: 11, borderRadius: "50%", background: "rgba(207,239,251,0.4)", cursor: "pointer" }} />
-          <span onPointerDown={(e) => e.stopPropagation()} onClick={() => setMaximizada((v) => !v)} title="maximizar"
-            style={{ width: 11, height: 11, borderRadius: "50%", background: GR, cursor: "pointer", opacity: 0.8 }} />
-        </div>
+        {naPagina ? (
+          <div style={{ display: "flex", gap: 7, flex: "none" }}>
+            <span onPointerDown={(e) => e.stopPropagation()} onClick={aoFechar} title="fechar o quadro"
+              style={{ width: 11, height: 11, borderRadius: "50%", background: OR, cursor: "pointer", opacity: 0.8 }} />
+            <span onPointerDown={(e) => e.stopPropagation()} onClick={() => setMinimizada((v) => !v)} title="minimizar"
+              style={{ width: 11, height: 11, borderRadius: "50%", background: "rgba(207,239,251,0.4)", cursor: "pointer" }} />
+            <span onPointerDown={(e) => e.stopPropagation()} onClick={() => setMaximizada((v) => !v)} title="maximizar"
+              style={{ width: 11, height: 11, borderRadius: "50%", background: GR, cursor: "pointer", opacity: 0.8 }} />
+          </div>
+        ) : (
+          <button type="button" onClick={juntar} title="trazer o quadro de volta para a página da Lisa" style={{ ...BOTAO, flex: "none" }}>
+            ↩ voltar para a página
+          </button>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1, justifyContent: "center" }}>
           <span style={{ fontSize: 10.5, letterSpacing: 1.5, color: CY, flex: "none" }}>◇ QUADRO DA LISA</span>
           <span style={{ fontSize: 9.5, color: ocupado ? "rgba(207,239,251,0.55)" : GR, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             — {ocupado ? "a Lisa está desenhando…" : titulo ? `${titulo} · mexa à vontade, ela vê o que mudou` : "mexa à vontade, ela vê o que mudou"}
           </span>
         </div>
+        <div style={{ minWidth: 54, flex: "none", display: "flex", justifyContent: "flex-end" }}>
+          {naPagina && podeSeparar && (
+            <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={separar}
+              title="abrir o quadro numa janela separada — dá para levar para outro monitor, maximizar e deixar ao lado"
+              style={{ ...BOTAO, flex: "none" }}>
+              ⧉ destacar
+            </button>
+          )}
+        </div>
       </div>
+      {avisoSeparar && (
+        <div role="alert" onClick={() => setAvisoSeparar("")} style={{ padding: "6px 12px", fontSize: 11, color: OR, background: "rgba(255,157,61,0.08)", borderBottom: "1px solid rgba(255,157,61,0.25)", cursor: "pointer", flex: "none" }}>
+          {avisoSeparar}
+        </div>
+      )}
 
       {!minimizada && (
         <>
@@ -168,8 +265,9 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
           )}
           <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
             <iframe
-              ref={quadro} title="Quadro da Lisa" onLoad={importar}
-              src={`/diagramas/index.html?embutido=1&tema=lisa&colecao=${encodeURIComponent(colecao)}`}
+              ref={quadro} title="Quadro da Lisa" onLoad={() => importar(true)}
+              // endereço completo: na janela separada (about:blank), um caminho relativo não teria base certa
+              src={`${window.location.origin}/diagramas/index.html?embutido=1&tema=lisa&colecao=${encodeURIComponent(colecao)}`}
               // enquanto arrasta a janela, o iframe não pode engolir o movimento do mouse
               style={{ display: "block", width: "100%", height: "100%", border: 0, pointerEvents: mexendo ? "none" : undefined }}
             />
@@ -191,8 +289,8 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
         </>
       )}
 
-      {/* o canto de redimensionar */}
-      {!maximizada && !minimizada && (
+      {/* o canto de redimensionar (na página) */}
+      {naPagina && !maximizada && !minimizada && (
         <div aria-hidden="true" onPointerDown={(e) => comecarGesto(e, "se")}
           style={{
             position: "absolute", right: 0, bottom: 0, width: 18, height: 18, zIndex: 3, cursor: "nwse-resize", touchAction: "none",
@@ -200,5 +298,25 @@ export default function QuadroDaLisa({ versao, titulo = "", explicacao = "", ocu
           }} />
       )}
     </div>
+  );
+
+  if (!separada) return janela;
+  // separada: o quadro é desenhado na janela do sistema; na página fica só o aviso de onde ele está
+  return (
+    <>
+      {createPortal(janela, separada.raiz)}
+      <button
+        type="button"
+        onClick={juntar}
+        title="fechar a janela separada e trazer o quadro de volta para cá"
+        style={{
+          position: "fixed", left: 20, bottom: 88, zIndex: 189, ...mono, fontSize: 11.5, letterSpacing: 0.5,
+          padding: "9px 14px", borderRadius: 999, border: `1px solid ${CY}`, background: "rgba(5,11,16,0.92)",
+          color: "#eafcff", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+        }}
+      >
+        ◇ quadro numa janela separada · trazer de volta
+      </button>
+    </>
   );
 }
