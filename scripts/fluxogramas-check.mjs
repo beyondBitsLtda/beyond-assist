@@ -9,8 +9,8 @@ import {
 } from "../src/lib/fluxogramas.js";
 import { apiDosFluxos, assinaturaDoDesenho, criarSalvador, enderecoDoFluxo } from "../src/lib/fluxogramasNoNavegador.js";
 import { GRUPOS_DE_PAINEIS } from "../src/lib/navegacao.js";
-import { citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, secaoDoProjeto } from "../src/lib/processmapNaConversa.js";
-import { montarDocumento, validarDesenho } from "../src/lib/diagramaDaLisa.js";
+import { citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, secaoDoProjeto, validarPlano, LIMITE_DE_OPERACOES } from "../src/lib/processmapNaConversa.js";
+import { montarDocumento, validarDesenho, tamanhoDaNota } from "../src/lib/diagramaDaLisa.js";
 
 let falhas = 0;
 const ok = (t) => console.log(`  ok    ${t}`);
@@ -293,6 +293,46 @@ console.log("o projeto citado na conversa (01/11/2026: \"no projeto X do Process
   conferir("o quadro grava no fluxo ligado e avisa a página", /if \(!mesmaVersao && v\.vinculo\)/.test(ler("src/components/panels/QuadroDaLisa.js")) && /aoVincularRef\.current\?\.\(r\)/.test(ler("src/components/panels/QuadroDaLisa.js")));
   conferir("a conversa e o desenho recebem o projeto", /secaoDoProjeto\(body\.projeto\)/.test(ler("src/app/api/ask/route.js")) && /desenharDiagrama\(\{ pedido, estrutura, conversa, contexto, projeto \}\)/.test(ler("src/app/api/diagrama/route.js")));
   conferir("ler um projeto com os documentos: GET /api/fluxogramas/projetos?id=", /export async function GET/.test(ler("src/app/api/fluxogramas/projetos/route.js")));
+}
+
+console.log("o plano no projeto (01/11/2026: \"essa minha interação deveria ser o suficiente\")");
+{
+  const fluxos = [{ id: "f1", nome: "Funcionalidades" }, { id: "f2", nome: "Arquitetura" }];
+  const plano = validarPlano({
+    acao: "mudar", explicacao: "  Vou incluir a Lisa Task e pôr uma nota em cada fluxo. ",
+    operacoes: [
+      { fluxo: "f1", pedido: "Inclua o tópico Lisa Task." },
+      { fluxo: "f2", pedido: "Adicione uma forma do tipo note com o texto: …" },
+      { fluxo: "f1", pedido: "Adicione também uma nota." },
+      { fluxo: "inventado", nome: "Decisões", tipo: "mapa mental", pedido: "Monte as decisões." },
+      { fluxo: "f2", pedido: "   " },
+    ],
+  }, fluxos);
+  conferir("mudar: uma operação por desenho, na ordem", plano.acao === "mudar" && plano.operacoes.map((o) => o.fluxo || o.nome).join() === "f1,f2,Decisões");
+  conferir("duas operações no mesmo desenho viram uma (as instruções se somam)", /Lisa Task[\s\S]*Além disso: Adicione também uma nota/.test(plano.operacoes[0].pedido));
+  conferir("desenho que não é do projeto vira desenho novo (com nome e tipo)", plano.operacoes[2].fluxo === "" && plano.operacoes[2].tipo === "mapa mental");
+  conferir("operação sem instrução sai; a explicação vem limpa", plano.operacoes.length === 3 && plano.explicacao === "Vou incluir a Lisa Task e pôr uma nota em cada fluxo.");
+  conferir("\"mudar\" sem nenhuma operação que sobre é \"responder\"", validarPlano({ acao: "mudar", operacoes: [{ fluxo: "f1", pedido: "" }] }, fluxos).acao === "responder");
+  conferir("\"responder\" não leva operações", validarPlano({ acao: "responder", operacoes: [{ fluxo: "f1", pedido: "x" }] }, fluxos).operacoes.length === 0);
+  conferir("no máximo LIMITE_DE_OPERACOES", validarPlano({ acao: "mudar", operacoes: Array.from({ length: 30 }, (_, i) => ({ nome: `N${i}`, pedido: "x" })) }, []).operacoes.length === LIMITE_DE_OPERACOES);
+  conferir("plano estragado: responder", validarPlano(null, fluxos).acao === "responder" && validarPlano("lixo", fluxos).acao === "responder");
+
+  // a nota de texto: longa, do tamanho do texto e ao lado do desenho
+  const longo = "• Conceito: a Lisa Task é o Abacato dentro da Lisa.\n• Decisão: sem hospedagem de arquivos, para não duplicar armazenamento.\n• Decisão: o visual é o da Lisa.\n• " + "x".repeat(400);
+  const d = validarDesenho({ titulo: "A", formas: [{ id: "a", tipo: "process", texto: "Etapa" }, { id: "nota", tipo: "note", texto: longo }], ligacoes: [] });
+  conferir("a anotação guarda texto longo (uma etapa, não)", d.formas.find((f) => f.id === "nota").texto.length > 400 && validarDesenho({ titulo: "A", formas: [{ id: "a", tipo: "process", texto: "y".repeat(500) }], ligacoes: [] }).formas[0].texto.length <= 120);
+  conferir("o tamanho da anotação acompanha o texto", tamanhoDaNota("curta").h === 60 && tamanhoDaNota(longo).h > 150 && tamanhoDaNota(longo).w === 360);
+  const tela = montarDocumento(validarDesenho({ titulo: "A", formas: [{ id: "a", tipo: "process", texto: "A" }, { id: "b", tipo: "process", texto: "B" }], ligacoes: [{ de: "a", para: "b" }] }));
+  const comNota = montarDocumento(validarDesenho({ titulo: "A", formas: [{ id: "a", tipo: "process", texto: "A" }, { id: "b", tipo: "process", texto: "B" }, { id: "nota", tipo: "note", texto: longo }], ligacoes: [{ de: "a", para: "b" }] }), tela);
+  const formas = comNota.pages[0].shapes;
+  const nota = formas.find((x) => x.id === "nota");
+  const direita = Math.max(...formas.filter((x) => x.id !== "nota").map((x) => x.x + x.w));
+  conferir("a anotação solta entra ao lado do desenho, sem empurrar ninguém", nota.x > direita && ["a", "b"].every((id) => formas.find((x) => x.id === id).x === tela.pages[0].shapes.find((x) => x.id === id).x) && nota.h === tamanhoDaNota(nota.text).h);
+
+  const pagina = ler("src/app/(panels)/assistant/page.js");
+  conferir("o projeto citado vale antes da regra do Abacato", /const doProjeto = !alvoDaIde \? await resolverProjetoRef/.test(pagina));
+  conferir("a Lisa planeja e trabalha no projeto (vários desenhos)", /await planejarNoProjetoRef\.current\?\.\(q, doProjeto, displayText\)/.test(pagina) && /plano\?\.acao === "mudar"\) return trabalharNoProjetoRef/.test(pagina) && /for \(const \[i, op\] of plano\.operacoes\.entries\(\)\)/.test(pagina));
+  conferir("a rota do plano confere o que o modelo devolveu", /validarPlano\(bruto, fluxos\)/.test(ler("src/app/api/processmap/plano/route.js")));
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");

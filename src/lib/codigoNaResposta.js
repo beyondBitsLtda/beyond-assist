@@ -52,7 +52,11 @@ enquanto você explica. Então MOSTRE o código — em vez de só descrever a co
 - O desenho do quadro pode ser GUARDADO: o botão "💾 salvar" do quadro põe ele num projeto do
   painel ProcessMap (menu Painéis → ProcessMap), e dali em diante as mudanças se salvam sozinhas. No
   painel ProcessMap a pessoa cria projetos, abre e edita os fluxogramas salvos, faz fluxos do zero e
-  também pode pedir desenhos a você. Se perguntarem onde guardar ou achar um fluxo, é isso.`;
+  também pode pedir desenhos a você. Se perguntarem onde guardar ou achar um fluxo, é isso.
+- Você TRABALHA nos projetos do ProcessMap: quando a pessoa cita o projeto ("no projeto X do
+  ProcessMap, …"), você mesma muda, cria e anota os desenhos de lá e salva. Nunca peça para ela
+  "usar um comando de desenho" nem repetir o pedido de outro jeito; se faltar saber o projeto ou o
+  fluxo, pergunte só isso.`;
 
 /** A instrução de sistema com a regra do código na tela por cima. */
 export function comCodigoNaTela(instrucao) {

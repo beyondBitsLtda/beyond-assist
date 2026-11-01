@@ -95,3 +95,41 @@ export function secaoDoProjeto(texto) {
     ? `\n\nO PROJETO DO PROCESSMAP QUE A PESSOA CITOU (os desenhos dele como estão salvos agora; cada forma tem um id entre colchetes, e "→" é uma ligação). Use para responder sobre o projeto, comparar fluxos, achar etapas, apontar falhas. Se o pedido for mudar um fluxo e não disser qual (e houver mais de um), pergunte qual, citando os nomes:\n${t}`
     : "";
 }
+
+// ---- o plano (01/11/2026): "essa minha interação deveria ser o suficiente para ela fazer a alteração" ----
+//
+// Um pedido sobre o projeto pode mexer em vários desenhos de uma vez ("ponha nas funcionalidades…
+// e crie uma nota em todos os fluxogramas…"), escrito com erros de digitação. Em vez de adivinhar por
+// palavras-chave, a Lisa planeja com o modelo (src/lib/gemini.js: planejarNoProjeto): "mudar" (com uma
+// operação por desenho, cada uma com a instrução completa) ou "responder" (é pergunta). A página
+// executa as operações uma a uma (/api/diagrama) e salva cada desenho no projeto.
+
+export const LIMITE_DE_OPERACOES = 12;
+const linha = (v, max) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+
+/**
+ * Confere o plano: operação sem instrução sai; desenho que não é do projeto vira desenho novo; duas
+ * operações no mesmo desenho viram uma (as instruções se somam); no máximo LIMITE_DE_OPERACOES.
+ * Sem operação que sobre, é "responder".
+ */
+export function validarPlano(bruto, fluxos) {
+  const ids = new Set((fluxos || []).map((f) => String(f.id)));
+  const operacoes = [];
+  for (const op of Array.isArray(bruto?.operacoes) ? bruto.operacoes : []) {
+    const pedido = String(op?.pedido ?? "").trim().slice(0, 6000);
+    if (!pedido) continue;
+    const fluxo = ids.has(String(op?.fluxo ?? "")) ? String(op.fluxo) : "";
+    const mesma = fluxo && operacoes.find((o) => o.fluxo === fluxo);
+    if (mesma) { mesma.pedido = `${mesma.pedido}\n\nAlém disso: ${pedido}`.slice(0, 9000); continue; }
+    if (operacoes.length >= LIMITE_DE_OPERACOES) break;
+    operacoes.push({
+      fluxo,
+      nome: fluxo ? "" : linha(op?.nome, 120) || "Novo fluxograma",
+      tipo: op?.tipo === "mapa mental" ? "mapa mental" : "fluxograma",
+      pedido,
+    });
+  }
+  const mudar = bruto?.acao === "mudar" && operacoes.length > 0;
+  return { acao: mudar ? "mudar" : "responder", explicacao: linha(bruto?.explicacao, 600), operacoes: mudar ? operacoes : [] };
+}
+

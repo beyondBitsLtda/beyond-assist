@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.23.0-cloudflare-pages.1",
+  "versao": "0.24.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-01",
   "compilacao": {
-    "numero": 52,
+    "numero": 53,
     "data": "2026-11-01",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.24.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Pedido sobre um projeto do ProcessMap passa a ser planejado pela própria Lisa: ela entende a intenção (mesmo com erros de digitação) e muda vários desenhos de uma vez, salvando cada um.",
+      "itens": [
+        "Correção: \"no projeto Produto Lisa…, ponha nas funcionalidades… e crie uma nota em todos os fluxogramas…\" virava conversa (\"use o comando de desenho\"): a frase citava o Abacato, e a regra das ações em card do Abacato passava na frente; e o caminho antigo só sabia mexer num desenho. Agora o projeto citado vale antes dessa regra.",
+        "Plano: com um projeto citado, a Lisa planeja com o modelo (/api/processmap/plano) — \"mudar\" (uma operação por desenho, cada uma com a instrução completa e os textos prontos) ou \"responder\" (pergunta sobre o projeto). Executa as operações uma a uma, salva cada desenho no projeto e mostra o andamento na janela (◆ trabalhando, ✓ atualizado/criado, ✗ não deu); o último abre no quadro, ligado.",
+        "Anotações de texto (conceito, decisões, explicações): aceitam texto longo, ficam do tamanho do texto e entram numa coluna ao lado do desenho, sem empurrar as etapas.",
+        "A Lisa não pede mais para \"usar o comando de desenho\": citando o projeto, ela mesma muda, cria e anota; se faltar saber o projeto ou o fluxo, pergunta só isso.",
+        "Testado de ponta a ponta com a frase original (Gemini e banco reais, projeto de teste apagado): a Lisa Task entrou nas funcionalidades e cada fluxograma ganhou a nota com conceito e decisões, em 40 s."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.23.0-cloudflare-pages.1",
       "data": "2026-11-01",

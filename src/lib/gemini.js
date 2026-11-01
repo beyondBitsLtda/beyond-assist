@@ -1257,6 +1257,85 @@ Regras:
 }
 
 /**
+ * A Lisa planeja o trabalho num projeto do ProcessMap (01/11/2026): lê o pedido (com os erros de
+ * digitação e de transcrição de quem fala) e os desenhos do projeto, e devolve { acao: "mudar" |
+ * "responder", explicacao, operacoes: [{ fluxo (id, ou vazio para um desenho novo), nome, tipo, pedido
+ * (a instrução completa para aquele desenho) }] }. Conferido por validarPlano
+ * (src/lib/processmapNaConversa.js); quem executa é a página do Assistente.
+ */
+export async function planejarNoProjeto({ pedido, projeto = "", fluxos = [], aberto = "", conversa = "" }) {
+  const lista = fluxos.map((f) => `- id "${f.id}": "${f.nome}" (${f.modo === "mindmap" ? "mapa mental" : "fluxograma"}, ${f.formas ?? "?"} formas)${f.id === aberto ? " — aberto no quadro agora" : ""}`).join("\n");
+  const prompt = [
+    conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-6000)}\n` : "",
+    `OS DESENHOS DO PROJETO:\n${lista || "(nenhum ainda)"}\n`,
+    projeto ? `O CONTEÚDO DELES:\n${projeto.slice(0, 30000)}\n` : "",
+    `PEDIDO DA PESSOA: "${String(pedido || "").slice(0, 6000)}"`,
+  ].filter(Boolean).join("\n");
+
+  const systemInstruction = `Você é a Lisa e trabalha nos desenhos (fluxogramas e mapas mentais) de um projeto do ProcessMap.
+A pessoa fala com você por voz ou por texto, muitas vezes com erros de digitação e de transcrição ("cir"
+é "crie", "fluogramas" é "fluxogramas", "abacto" é "Abacato") — entenda a INTENÇÃO, não as palavras.
+
+Decida:
+- "acao": "mudar" quando o pedido é criar, incluir, pôr, mudar, pintar, remover, reorganizar ou anotar
+  algo nos desenhos do projeto; "responder" quando é só pergunta, análise ou opinião sobre o projeto.
+  Citar outro sistema no meio do pedido (ex.: "uma versão do Abacato integrada à Lisa") não muda isso:
+  é conteúdo do desenho.
+- "operacoes" (só com "mudar"): uma por desenho a mudar ou criar, na ordem em que fazem sentido.
+  - "fluxo": o id do desenho existente (da lista); vazio para um desenho novo (aí dê "nome" e "tipo").
+  - "pedido": a instrução COMPLETA e independente para aquele desenho — quem a executa só vê esse
+    desenho, não a conversa nem o pedido original. Escreva tudo que precisa entrar, com os textos
+    prontos (nomes de etapas, tópicos, o texto inteiro de uma nota), em português.
+  - "todos os fluxogramas", "em cada fluxo" = uma operação para CADA desenho da lista.
+  - Nota de texto num fluxograma: peça "uma forma do tipo note (anotação), sem ligações, com o texto: …"
+    e escreva o texto inteiro (claro, em tópicos curtos com "• ", até uns 900 caracteres). Num mapa
+    mental: um tópico principal com subtópicos.
+  - Pedido que fala de "as funcionalidades", "o fluxo de X" etc.: ache o desenho certo pelo nome e
+    pelo conteúdo. Nada que se encaixe: crie um desenho novo para isso.
+  - Ao descrever conceito, decisões e motivos do projeto, use o que está nos desenhos e na conversa
+    (e o que o próprio pedido decide); não invente fatos que contradigam o projeto.
+- "explicacao": 1 a 2 frases, falando com a pessoa, dizendo o que você vai fazer (sem listar tudo).`;
+
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client, modelo) =>
+      client.models.generateContent({
+        model: modelo,
+        contents: prompt,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              acao: { type: "STRING", enum: ["mudar", "responder"] },
+              explicacao: { type: "STRING" },
+              operacoes: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    fluxo: { type: "STRING" }, nome: { type: "STRING" },
+                    tipo: { type: "STRING", enum: ["fluxograma", "mapa mental"] }, pedido: { type: "STRING" },
+                  },
+                  required: ["pedido"],
+                },
+              },
+            },
+            required: ["acao", "explicacao"],
+          },
+        },
+      }),
+    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
+  );
+  try {
+    return JSON.parse(res.text);
+  } catch {
+    throw new Error("o plano não veio em JSON válido — tente de novo");
+  }
+}
+
+/**
  * A Lisa monta um MAPA MENTAL (01/11/2026): devolve a árvore { titulo, tema, explicacao, topicos:
  * [{ id, texto, filhos: [{ id, texto, filhos: [{ id, texto }] }] }] } — o quadro faz o layout
  * (src/lib/diagramaDaLisa.js: validarMapaMental, montarMapaMental). Com `estrutura` (o mapa que está na

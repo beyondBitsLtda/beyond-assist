@@ -76,7 +76,7 @@ const NOMES_DAS_PONTAS = {
 // as formas que agrupam outras (raias, fronteiras): o que está dentro delas importa
 const AGRUPADORES = new Set(["lane", "laneV", "umlSwimlane", "umlPackage", "ucSystem", "dbSchema", "archBoundary", "cloudCluster"]);
 
-export const LIMITES_DO_DESENHO = { formas: 60, ligacoes: 120, texto: 300, documento: 300_000, abas: 12 };
+export const LIMITES_DO_DESENHO = { formas: 60, ligacoes: 120, texto: 300, nota: 1500, documento: 300_000, abas: 12 };
 
 /**
  * As cores das formas (01/11/2026: "se eu falar limpe as atividades da cor vermelha do fluxo, ela deve
@@ -186,11 +186,13 @@ function formasELigacoes(a) {
     let id = idLimpo(f?.id) || `f${formas.length + 1}`;
     while (vistos.has(id)) id = `${id}-2`;
     vistos.add(id);
+    // a anotação é texto corrido (conceito, decisões): linhas e total bem maiores que os de uma etapa
+    const nota = f?.tipo === "note";
     formas.push({
       id,
       tipo: FORMAS[f?.tipo] ? f.tipo : "process",
       // tabela e classe têm várias linhas; o resto, uma
-      texto: String(f?.texto ?? "").replace(/\r/g, "").split("\n").map((l) => texto(l, 120)).filter(Boolean).join("\n").slice(0, LIMITES_DO_DESENHO.texto),
+      texto: String(f?.texto ?? "").replace(/\r/g, "").split("\n").map((l) => texto(l, nota ? 600 : 120)).filter(Boolean).join("\n").slice(0, nota ? LIMITES_DO_DESENHO.nota : LIMITES_DO_DESENHO.texto),
       raia: texto(f?.raia, 60),
       ...(corPeloNome(f?.cor) ? { cor: corPeloNome(f.cor) } : {}),
       ...(idLimpo(f?.link) ? { link: idLimpo(f.link) } : {}),
@@ -379,9 +381,19 @@ export function montarDocumento(desenho, anterior = null) {
   return { format: "processmap", version: 4, name: desenho.titulo, mode: "diagram", activePage: String(ativa.id), pages: paginas };
 }
 
+/** O tamanho de uma anotação pelo texto: 360 de largura e a altura das linhas (quebradas a ~46 letras). */
+export function tamanhoDaNota(txt) {
+  const linhas = String(txt ?? "").split("\n").reduce((n, l) => n + Math.max(1, Math.ceil(l.length / 46)), 0);
+  return { w: 360, h: Math.max(60, 26 + linhas * 19) };
+}
+
+// a anotação sem ligação vai numa coluna ao lado do desenho (não entra no layout em camadas)
+const notaSolta = (f, ligadas) => f.tipo === "note" && !ligadas.has(f.id);
+
 // uma aba remontada: as formas e as ligações da Lisa, com o que a pessoa arrumou na aba de antes
 function montarAba(desenho, abaAnterior) {
-  const { pos, raias } = posicoesDoDesenho(desenho);
+  const ligadas = new Set(desenho.ligacoes.flatMap((l) => [l.de, l.para]));
+  const { pos, raias } = posicoesDoDesenho({ ...desenho, formas: desenho.formas.filter((f) => !notaSolta(f, ligadas)) });
   const antigas = new Map();
   for (const sh of abaAnterior?.shapes || []) antigas.set(String(sh.id), sh);
   const ficou = (sh) => ({ x: Number(sh.x), y: Number(sh.y), w: Number(sh.w), h: Number(sh.h) });
@@ -407,15 +419,34 @@ function montarAba(desenho, abaAnterior) {
     const velha = antigas.get(f.id);
     if (velha && velha.type === f.tipo) formasQueFicam.push(ficou(velha));
   }
-  for (const f of desenho.formas) {
+  // as anotações soltas por último: a coluna delas fica à direita de tudo o que já está na aba
+  const ordem = [...desenho.formas.filter((f) => !notaSolta(f, ligadas)), ...desenho.formas.filter((f) => notaSolta(f, ligadas))];
+  let colunaDasNotas = null;
+  for (const f of ordem) {
     const t = FORMAS[f.tipo];
     const velha = antigas.get(f.id);
     const mesma = velha && velha.type === f.tipo;
     let base;
-    if (mesma) base = { x: velha.x, y: velha.y, w: velha.w, h: velha.h, color: velha.color };
-    else {
+    if (mesma) {
+      base = { x: velha.x, y: velha.y, w: velha.w, h: velha.h, color: velha.color };
+      // a anotação que ganhou texto cresce para caber
+      if (f.tipo === "note") base.h = Math.max(Number(velha.h) || 0, tamanhoDaNota(f.texto).h);
+    } else if (notaSolta(f, ligadas)) {
+      const tam = tamanhoDaNota(f.texto);
+      if (!colunaDasNotas) {
+        const caixas = [...shapes, ...formasQueFicam].filter((x) => ehNumero(x.x) && ehNumero(x.w));
+        colunaDasNotas = caixas.length
+          ? { x: Math.max(...caixas.map((x) => Number(x.x) + Number(x.w))) + 60, y: Math.min(...caixas.map((x) => Number(x.y))) }
+          : { x: MARGEM, y: MARGEM };
+      }
+      const c = semEsbarrar({ x: colunaDasNotas.x, y: colunaDasNotas.y, ...tam }, formasQueFicam);
+      colunaDasNotas.y = c.y + c.h + 24;
+      formasQueFicam.push(c);
+      base = { ...c, color: velha?.color || t.cor || "graphite" };
+    } else {
       const p = pos.get(f.id);
-      const c = semEsbarrar({ x: p.x, y: p.y, w: t.w, h: t.h }, formasQueFicam);
+      const tam = f.tipo === "note" ? tamanhoDaNota(f.texto) : { w: t.w, h: t.h };
+      const c = semEsbarrar({ x: p.x, y: p.y, ...tam }, formasQueFicam);
       formasQueFicam.push(c);
       base = { ...c, color: velha?.color || t.cor || "purple" };
     }

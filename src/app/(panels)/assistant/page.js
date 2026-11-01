@@ -285,6 +285,8 @@ export default function AssistantPage() {
   const projetosRef = useRef({ em: 0, lista: null });
   const quadroVinculoRef = useRef(null); // { fluxo, projeto }
   const resolverProjetoRef = useRef(null);
+  const planejarNoProjetoRef = useRef(null);
+  const trabalharNoProjetoRef = useRef(null);
   // as mensagens da conversa, para mandar o código que já apareceu nela junto da pergunta
   const mensagensRef = useRef([]);
 
@@ -2591,21 +2593,28 @@ export default function AssistantPage() {
 
     // "desenhe o processo de…" (ou, com o quadro aberto, "inclua uma etapa…"): a Lisa desenha no
     // quadro em vez de responder em texto (BEYOND-0010) — ver desenharNaTela abaixo
-    // "no projeto X do ProcessMap, …" (01/11/2026): os desenhos do projeto vão junto da pergunta, e um
-    // pedido de desenho trabalha nele — muda o fluxo citado (ou o aberto no quadro, ou o único do
-    // projeto) ou cria um fluxo novo no projeto, e salva lá
-    const doProjeto = !acaoNoAbacato && !alvoDaIde ? await resolverProjetoRef.current?.(q) : null;
-    const desenho = !acaoNoAbacato && !alvoDaIde
-      ? pedidoDeDesenho(q, { quadroAberto: quadroAbertoRef.current || Boolean(doProjeto?.citado || doProjeto?.provavel) })
-      : null;
+    // "no projeto X do ProcessMap, …" (01/11/2026): o projeto citado vale ANTES da regra do Abacato
+    // ("uma versão do Abacato integrada à Lisa" é conteúdo do desenho, não um card). A Lisa planeja com
+    // o modelo — entende a intenção mesmo com erro de digitação, e um pedido que mexe em vários desenhos
+    // de uma vez — e trabalha no projeto (trabalharNoProjetoRef). Se for pergunta, responde com os
+    // desenhos do projeto junto. Sem plano (o modelo falhou), o caminho antigo: um desenho, por palavras.
+    const doProjeto = !alvoDaIde ? await resolverProjetoRef.current?.(q) : null;
     if (doProjeto) {
-      const novo = /\bnov[oa]s?\b/i.test(q);
-      doProjeto.alvo = desenho === "alterar" ? doProjeto.citado || doProjeto.provavel : desenho === "novo" && !novo ? doProjeto.citado : null;
-      doProjeto.texto = contextoDoProjeto(doProjeto.projeto, doProjeto.fluxos, { alvo: doProjeto.alvo });
+      const plano = await planejarNoProjetoRef.current?.(q, doProjeto, displayText);
+      if (plano?.acao === "mudar") return trabalharNoProjetoRef.current?.(q, { displayText, doProjeto, plano });
+      if (!plano) {
+        const semPlano = pedidoDeDesenho(q, { quadroAberto: true });
+        const alvo = semPlano === "alterar" ? doProjeto.citado || doProjeto.provavel : semPlano === "novo" && !/\bnov[oa]s?\b/i.test(q) ? doProjeto.citado : null;
+        if (semPlano === "novo" || alvo) {
+          doProjeto.alvo = alvo;
+          doProjeto.texto = contextoDoProjeto(doProjeto.projeto, doProjeto.fluxos, { alvo });
+          return desenharNaTelaRef.current?.(q, { displayText, mudar: Boolean(alvo), doProjeto });
+        }
+      }
+      doProjeto.texto = contextoDoProjeto(doProjeto.projeto, doProjeto.fluxos);
     }
-    // mudar "um fluxo do projeto" sem dizer qual (com vários): vira conversa, e a Lisa pergunta qual
-    const semAlvo = desenho === "alterar" && doProjeto && !doProjeto.alvo;
-    if (desenho && !semAlvo) return desenharNaTelaRef.current?.(q, { displayText, mudar: desenho === "alterar" || Boolean(doProjeto?.alvo), doProjeto });
+    const desenho = !acaoNoAbacato && !alvoDaIde && !doProjeto ? pedidoDeDesenho(q, { quadroAberto: quadroAbertoRef.current }) : null;
+    if (desenho) return desenharNaTelaRef.current?.(q, { displayText, mudar: desenho === "alterar" });
 
     const shown = displayText || q;
     setBusy(true);
@@ -2800,6 +2809,129 @@ export default function AssistantPage() {
     } catch (err) {
       addLog("[PROCESSMAP]", OR, `não consegui ler o projeto: ${err.message}`);
       return null;
+    }
+  };
+
+  // a conversa dos últimos turnos, em texto (vai para o desenho e para o plano)
+  const conversaEmTexto = () => conversaVigente(conversaRef.current).slice(-6)
+    .map((t) => `${t.papel === "lisa" ? "LISA" : "PESSOA"}: ${String(t.texto).slice(0, 1000)}`).join("\n");
+
+  // o plano de um pedido feito sobre um projeto do ProcessMap (/api/processmap/plano): { acao, explicacao,
+  // operacoes }, ou null se o modelo falhou. A janela já mostra a pergunta enquanto a Lisa planeja.
+  planejarNoProjetoRef.current = async (q, doProjeto, displayText) => {
+    setQuestion(displayText || q);
+    setAnswer("");
+    setFontes([]);
+    setBusy(true);
+    setMode("listening");
+    try {
+      const res = await fetch("/api/processmap/plano", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          pedido: q,
+          projeto: contextoDoProjeto(doProjeto.projeto, doProjeto.fluxos),
+          fluxos: doProjeto.fluxos.map(({ id, nome, modo, formas }) => ({ id, nome, modo, formas })),
+          aberto: quadroVinculoRef.current?.fluxo.id || "",
+          conversa: conversaEmTexto(),
+        }),
+      });
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
+      addLog("[PROCESSMAP]", PU, r.plano.acao === "mudar" ? `plano: ${r.plano.operacoes.length} desenho${r.plano.operacoes.length === 1 ? "" : "s"} para mudar ou criar` : "é pergunta sobre o projeto");
+      return r.plano;
+    } catch (err) {
+      addLog("[PROCESSMAP]", OR, `não consegui planejar: ${err.message}`);
+      return null;
+    }
+  };
+
+  // executa o plano: cada operação é um desenho (/api/diagrama, com o projeto inteiro como contexto),
+  // salvo no projeto na hora; a janela mostra o andamento; o último desenho abre no quadro, ligado.
+  trabalharNoProjetoRef.current = async (q, { displayText, doProjeto, plano }) => {
+    const shown = displayText || q;
+    stopSpeaking();
+    const gen = ++speechGenRef.current;
+    speechEngineRef.current = null;
+    setBusy(true);
+    setDesenhando(true);
+    setQuestion(shown);
+    setFontes([]);
+    setMode("listening");
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
+    const nome = doProjeto.projeto.nome;
+    const linhas = plano.operacoes.map((op) => ({
+      nome: op.fluxo ? doProjeto.fluxos.find((f) => f.id === op.fluxo)?.nome || "?" : op.nome,
+      estado: "na fila", ok: null, nota: "",
+    }));
+    const marca = (l) => (l.ok === true ? "✓" : l.ok === false ? "✗" : l.estado === "trabalhando…" ? "◆" : "◇");
+    const mostrar = (fim = "") => setAnswer(`${plano.explicacao || `Vou trabalhar no projeto "${nome}".`}\n\n${linhas
+      .map((l) => `${marca(l)} "${l.nome}" — ${l.estado}${l.nota ? `: ${l.nota}` : ""}`).join("\n")}${fim ? `\n\n${fim}` : ""}`);
+    mostrar();
+    addLog("[PROCESSMAP]", PU, `trabalhando em "${nome}": ${linhas.map((l) => l.nome).join(", ")}`);
+    const conversa = conversaEmTexto();
+    let ultimo = null;
+    let feitos = 0;
+    try {
+      for (const [i, op] of plano.operacoes.entries()) {
+        const linha = linhas[i];
+        linha.estado = "trabalhando…";
+        mostrar();
+        try {
+          const fluxo = op.fluxo ? doProjeto.fluxos.find((f) => f.id === op.fluxo) : null;
+          // o fluxo aberto no quadro tem o que a pessoa acabou de mexer: parte dele
+          const aberto = Boolean(fluxo && quadroVinculoRef.current?.fluxo.id === fluxo.id && quadroAbertoRef.current && desenhoRef.current);
+          const res = await fetch("/api/diagrama", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              pedido: !fluxo && op.tipo === "mapa mental" ? `Monte um mapa mental. ${op.pedido}` : op.pedido,
+              atual: fluxo ? (aberto ? desenhoRef.current : fluxo.documento) : null,
+              conversa,
+              projeto: contextoDoProjeto(doProjeto.projeto, doProjeto.fluxos, { alvo: fluxo }),
+            }),
+          });
+          const r = await res.json().catch(() => ({}));
+          if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
+          const salvo = fluxo
+            ? await apiDosFluxosDaConversa.salvar(fluxo.id, aberto ? { documento: r.doc, forcar: true } : { documento: r.doc, versao: fluxo.versao })
+            : (await apiDosFluxosDaConversa.criar({ documento: r.doc, nome: op.nome || r.titulo, projetoId: doProjeto.projeto.id, origem: "lisa" })).fluxo;
+          linha.nome = salvo.nome;
+          linha.estado = fluxo ? "atualizado" : "criado";
+          linha.ok = true;
+          linha.nota = String(r.explicacao || "").split(/(?<=[.!?])\s/)[0].slice(0, 160);
+          feitos++;
+          ultimo = { r, vinculo: { fluxo: salvo, projeto: doProjeto.projeto }, mudanca: Boolean(fluxo) };
+          addLog("[PROCESSMAP]", GR, `${linha.estado}: "${salvo.nome}"`);
+        } catch (err) {
+          linha.estado = err.status === 409 ? "não salvei (mudou em outro lugar agora há pouco)" : "não deu";
+          linha.nota = err.status === 409 ? "" : err.message;
+          linha.ok = false;
+          addLog("[PROCESSMAP]", OR, `"${linha.nome}": ${err.message}`);
+        }
+        mostrar();
+      }
+      projetosRef.current.em = 0; // a lista mudou
+      if (ultimo) {
+        desenhoRef.current = ultimo.r.doc;
+        setQuadro({
+          versao: { doc: ultimo.r.doc, chave: `d${Date.now()}`, colecao: ultimo.r.colecao, mudanca: ultimo.mudanca, vinculo: ultimo.vinculo },
+          titulo: ultimo.vinculo.fluxo.nome, explicacao: ultimo.r.explicacao,
+        });
+      }
+      const total = plano.operacoes.length;
+      const fim = feitos
+        ? `Salvo no projeto "${nome}" do ProcessMap (${feitos} de ${total})${ultimo ? `; "${ultimo.vinculo.fluxo.nome}" está aberto no quadro` : ""}.`
+        : `Não consegui mudar nada no projeto "${nome}".`;
+      mostrar(fim);
+      const texto = `${plano.explicacao ? `${plano.explicacao}\n\n` : ""}${linhas.map((l) => `${marca(l)} "${l.nome}" — ${l.estado}${l.nota ? `: ${l.nota}` : ""}`).join("\n")}\n\n${fim}`;
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
+      conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+      if (voiceOn) enqueueSpeech(feitos ? `Pronto. ${feitos === total ? "Tudo salvo" : `${feitos} de ${total} salvos`} no projeto ${nome}.` : `Não consegui mudar o projeto ${nome}.`, gen);
+    } finally {
+      setBusy(false);
+      setDesenhando(false);
+      setMode("idle");
     }
   };
 
