@@ -9,9 +9,14 @@
 // (src/components/panels/visuais/Rosto.js): elipsoides juntados com "mínimo suave", e o rosto quase
 // sem traço — as órbitas, o nariz e a boca só sugeridos, para pegar um fio de luz de lado.
 //
+// Ajustes (01/11/2026, "aumentar a resolução, pôr a Lisa com cabelo feminino também, além de um
+// modo de cores diferentes"): cabelo longo (o padrão) ou raspado, e a paleta — a térmica da foto ou
+// outras cinco. Cada navegador guarda os seus (lerAjustesDoRosto / escolherAjustesDoRosto), e o
+// rosto aberto troca na hora, deslizando.
+//
 // Aqui fica o que não precisa de navegador: o enquadramento, a forma (o GLSL, que o componente
-// injeta), a resolução de desenho e o MOVIMENTO — o que cada estado faz com o rosto. Testado por
-// `npm run visuais-check`.
+// injeta), a resolução de desenho, as paletas, os ajustes e o MOVIMENTO — o que cada estado faz com
+// o rosto. Testado por `npm run visuais-check`.
 
 /** O busto cabe num círculo deste raio, centrado em CENTRO_Y (o visual inteiro, como a Esfera). */
 export const RAIO = 1.5;
@@ -26,9 +31,10 @@ export const CAIXA = { min: [-1.85, -2.7, -1.15], max: [1.85, 1.22, 1.2] };
 const n = (v) => (Number.isInteger(v) ? `${v}.0` : String(v));
 
 /**
- * A forma em GLSL: `float forma(vec3 p, out float orelha)` devolve a distância até o busto e, em
- * `orelha`, a distância até as orelhas (o calor delas). Usa os uniformes uCabeca (mundo → cabeça),
- * uBoca (0–1, a mandíbula) e uRespira (-1–1, os ombros).
+ * A forma em GLSL: `float forma(vec3 p, out float orelha, out float fio)` devolve a distância até o
+ * busto e, em `orelha` e `fio`, a distância até as orelhas (o calor delas) e até o cabelo. Usa os
+ * uniformes uCabeca (mundo → cabeça), uBoca (0–1, a mandíbula), uRespira (-1–1, os ombros), uCabelo
+ * (0 raspado – 1 longo; no meio, o cabelo cresce ou some) e uTempo (o balanço das mechas).
  */
 export const FORMA = `
   float elipsoide(vec3 p, vec3 r){ float k0 = length(p / r); float k1 = length(p / (r * r)); return k0 * (k0 - 1.0) / k1; }
@@ -61,8 +67,8 @@ export const FORMA = `
     // as órbitas: duas covas rasas (pegam um fio de luz na pálpebra de cima)
     vec3 e = vec3(abs(m.x), m.y, m.z) - vec3(0.24, -0.14, 0.72);
     d = tira(d, elipsoide(e, vec3(0.15, 0.08, 0.07)), 0.1);
-    // o nariz: uma crista discreta
-    d = uniao(d, elipsoide(m - vec3(0.0, -0.4, 0.68), vec3(0.055, 0.17, 0.085)), 0.14);
+    // o nariz: uma crista discreta (baixa: de lado, um nariz alto acendia um risco laranja no rosto)
+    d = uniao(d, elipsoide(m - vec3(0.0, -0.4, 0.66), vec3(0.05, 0.15, 0.07)), 0.14);
     // a boca: lábios finos que mal aparecem e, falando, uma fenda que abre
     vec3 b = m - vec3(0.0, -0.69, 0.5);
     d = uniao(d, elipsoide(b, vec3(0.14, 0.035, 0.05)), 0.06);
@@ -82,22 +88,115 @@ export const FORMA = `
     return d;
   }
 
-  float forma(vec3 p, out float orelha){
+  // as mechas compridas acompanham a cabeça em cima e o corpo embaixo (onde pousam nos ombros)
+  vec3 noCabelo(vec3 p, vec3 q){
+    vec3 h = mix(p, q, smoothstep(-1.6, -0.4, p.y));
+    // o balanço: as pontas mexem mais que a raiz
+    h.x += sin(uTempo * 0.9 + h.y * 1.7) * 0.014 * smoothstep(0.0, -1.6, h.y);
+    return h;
+  }
+
+  // o cabelo: longo, com a franja caindo de lado, preso atrás das orelhas (elas ficam de fora,
+  // acendendo quando a Lisa escuta) e descendo por trás do pescoço até pousar nos ombros. Com
+  // uCabelo < 1 ele encolhe para dentro do crânio e some (a troca de cabelo desliza em vez de pular).
+  float cabelo(vec3 p, vec3 q){
+    if (uCabelo < 0.01) return 9.0;
+    vec3 h = noCabelo(p, q);
+    // a calota: um pouco maior que o crânio
+    float d = elipsoide(h - vec3(0.0, 0.13, -0.1), vec3(0.79, 1.0, 0.9));
+    // abre o rosto com a linha do cabelo inclinada: a franja desce de um lado e cobre um canto da testa
+    vec3 a = h - vec3(0.0, -0.45, 0.62);
+    a.xy = gira(a.xy, 0.2);
+    d = tira(d, elipsoide(a, vec3(0.62, 0.98, 0.72)), 0.1);
+    // as orelhas ficam de fora: abaixo da têmpora e na frente da nuca, nada de cabelo
+    d = tira(d, max(h.y - 0.02, -h.z - 0.3), 0.12);
+    // as mechas: dos lados, atrás das orelhas e do pescoço, descendo até os ombros
+    vec3 l = vec3(abs(h.x), h.y, h.z) - vec3(0.56, -0.95, -0.48);
+    l.xy = gira(l.xy, -0.1);
+    float mechas = elipsoide(l, vec3(0.34, 1.32, 0.32));
+    // e o volume das costas, que junta as duas
+    mechas = uniao(mechas, elipsoide(h - vec3(0.0, -0.7, -0.6), vec3(0.8, 1.2, 0.32)), 0.3);
+    d = uniao(d, mechas, 0.2);
+    return d + (1.0 - uCabelo) * 0.35;
+  }
+
+  float forma(vec3 p, out float orelha, out float fio){
     vec3 q = PIVO + uCabeca * (p - PIVO);
-    return uniao(cabeca(q, orelha), corpo(p), 0.05);
+    fio = cabelo(p, q);
+    return uniao(uniao(cabeca(q, orelha), fio, 0.04), corpo(p), 0.05);
   }
 `;
 
 const limitar = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /**
- * Quantos pixels de desenho por pixel CSS. O raymarching custa por pixel, e o visual é macio e
- * granulado de propósito: desenhar em 3/4 da resolução (e nunca mais que `limite` pixels no lado
- * maior) não aparece, e a tela grande num celular de densidade 3 não vira 9× mais conta.
+ * Quantos pixels de desenho por pixel CSS. O teto vale no lado MENOR da tela, que é o que dá o
+ * tamanho do busto: numa tela larga (o Assistente em tela cheia, 1700 × 800) o resto é fundo, que a
+ * caixa do busto pula sem marchar. Até 01/11/2026 o teto (560 px) valia no lado maior, e a tela
+ * cheia saía a 1/3 da resolução — pixelada. Agora: a densidade da tela, até `limite` px no lado menor
+ * (o componente usa 1100 no computador e 820 no celular, e baixa sozinho se os quadros ficarem lentos).
  */
-export function resolucaoDoRosto(largura, altura, densidade = 1, limite = 560) {
-  const lado = Math.max(1, largura, altura);
-  return limitar(Math.min((densidade || 1) * 0.75, limite / lado), 0.2, 2);
+export function resolucaoDoRosto(largura, altura, densidade = 1, limite = 1100) {
+  const lado = Math.max(1, Math.min(largura, altura));
+  return limitar(Math.min(densidade || 1, limite / lado), 0.35, 3);
+}
+
+// ---- as cores e o cabelo (cada navegador guarda os seus) ----
+
+/** O cabelo do rosto. */
+export const CABELOS_DO_ROSTO = [
+  { id: "longo", nome: "Longo", descricao: "Cabelo comprido, com franja de lado e preso atrás das orelhas" },
+  { id: "raspado", nome: "Raspado", descricao: "A cabeça raspada da foto de referência" },
+];
+
+/**
+ * As paletas: `profundo` (onde o calor começa), `meio`, `borda` (a silhueta, quase branca), `halo`
+ * (a luz por fora) e `haloPensando`. A térmica é a da foto; as outras foram pedidas como "um modo de
+ * cores diferentes".
+ */
+export const PALETAS_DO_ROSTO = [
+  { id: "termico", nome: "Térmico", profundo: "#6b1d0b", meio: "#e8692a", borda: "#ffecc8", halo: "#5cc6d6", haloPensando: "#86b4ff" },
+  { id: "holograma", nome: "Holograma", profundo: "#0b2470", meio: "#2f86ff", borda: "#dcf4ff", halo: "#9a7dff", haloPensando: "#d08bff" },
+  { id: "neon", nome: "Neon", profundo: "#4d0a4f", meio: "#ff3fa4", borda: "#ffe0f3", halo: "#46c8ff", haloPensando: "#9d8bff" },
+  { id: "aurora", nome: "Aurora", profundo: "#06372f", meio: "#17c48e", borda: "#e2fff0", halo: "#b58cff", haloPensando: "#7fb6ff" },
+  { id: "ouro", nome: "Ouro", profundo: "#4a2604", meio: "#e0a020", borda: "#fff4d4", halo: "#a8d8ff", haloPensando: "#c9b2ff" },
+  { id: "prata", nome: "Prata", profundo: "#26282c", meio: "#8f949c", borda: "#ffffff", halo: "#c8d2e0", haloPensando: "#c6c2ff" },
+];
+
+export const AJUSTES_PADRAO = { cabelo: "longo", paleta: "termico" };
+export const CHAVE_DO_ROSTO = "lisa-rosto";
+export const EVENTO_DO_ROSTO = "lisa-rosto"; // avisa a própria aba quando o cabelo ou as cores mudam
+
+/** Os ajustes conferidos: o que não existe volta ao padrão. */
+export function ajustesValidos(bruto) {
+  const a = bruto && typeof bruto === "object" ? bruto : {};
+  return {
+    cabelo: CABELOS_DO_ROSTO.some((c) => c.id === a.cabelo) ? a.cabelo : AJUSTES_PADRAO.cabelo,
+    paleta: PALETAS_DO_ROSTO.some((c) => c.id === a.paleta) ? a.paleta : AJUSTES_PADRAO.paleta,
+  };
+}
+
+/** Os ajustes guardados neste navegador. */
+export function lerAjustesDoRosto() {
+  try {
+    return ajustesValidos(JSON.parse(localStorage.getItem(CHAVE_DO_ROSTO) || "null"));
+  } catch {
+    return { ...AJUSTES_PADRAO };
+  }
+}
+
+/** Muda parte dos ajustes (`{ cabelo }` ou `{ paleta }`): guarda e avisa o rosto aberto nesta aba. */
+export function escolherAjustesDoRosto(parcial) {
+  const a = ajustesValidos({ ...lerAjustesDoRosto(), ...parcial });
+  try { localStorage.setItem(CHAVE_DO_ROSTO, JSON.stringify(a)); } catch { /* vale só nesta tela */ }
+  try { window.dispatchEvent(new CustomEvent(EVENTO_DO_ROSTO, { detail: a })); } catch { /* sem janela (testes) */ }
+  return a;
+}
+
+/** As cores que o shader recebe num estado: [borda, meio, halo, profundo]. */
+export function coresDoRosto(paletaId, estado) {
+  const p = PALETAS_DO_ROSTO.find((x) => x.id === paletaId) || PALETAS_DO_ROSTO[0];
+  return [p.borda, p.meio, estado === "pensando" ? p.haloPensando : p.halo, p.profundo];
 }
 
 /**

@@ -335,6 +335,7 @@ export function estruturaDoDocumento(doc) {
 
 /** O desenho em texto, para a Lisa ler o que está na tela (o que a pessoa mudou também). */
 export function descreverDiagrama(doc) {
+  if (doc?.mode === "mindmap") return descreverMapa(doc);
   const partes = [];
   for (const aba of abasDe(doc)) {
     const formas = (aba.shapes || []).filter((s) => s && s.type !== "ink");
@@ -419,7 +420,7 @@ const VERBOS_GERAIS = ["monte", "montar", "crie", "criar", "cria", "faca", "faze
 const COISAS_FORTES = ["diagrama", "diagramas", "fluxograma", "fluxogramas", "bpmn", "swimlane", "organograma", "processmap"];
 const COISAS = [...COISAS_FORTES, "processo", "processos", "fluxo", "fluxos", "arquitetura", "workflow", "jornada", "pipeline", "esteira", "raias", "mapa", "modelagem"];
 const VERBO_DE_MUDANCA = /\b(adicion\w*|acrescent\w*|inclu\w*|coloque|ponha|remov\w*|tir[ae]|apag\w*|exclu\w*|troqu\w*|troc\w*|mud\w*|renome\w*|lig\w*|conect\w*|separ\w*|junt\w*|reorganiz\w*|refa[çz]\w*|corrij\w*|ajust\w*|divid\w*|mov[ae]\w*)\b/i;
-const PARTE_DO_DESENHO = /\b(etapa|passo|caixa|forma|raia|decis[aã]o|liga[çc][aã]o|seta|fluxo|diagrama|processo|desenho|quadro|in[ií]cio|fim|tarefa|gateway|evento|swimlane|caminho)s?\b/i;
+const PARTE_DO_DESENHO = /\b(etapa|passo|caixa|forma|raia|decis[aã]o|liga[çc][aã]o|seta|fluxo|diagrama|processo|desenho|quadro|in[ií]cio|fim|tarefa|gateway|evento|swimlane|caminho|mapa|t[oó]pico|galho)s?\b/i;
 
 /**
  * A pergunta pede para desenhar ("novo") ou, com o quadro aberto, para mudar o desenho que está nele
@@ -437,12 +438,14 @@ export function pedidoDeDesenho(pergunta, { quadroAberto = false } = {}) {
   const imperativo = temQuase(palavras.filter((p) => !SUBSTANTIVOS_DE_DESENHO.has(p)), IMPERATIVOS_DE_DESENHO);
   if (q.includes("?") && !citaOQuadro && !imperativo) return null;
   const verbo = temQuase(palavras, VERBOS_DE_DESENHO);
+  // "faça um mapa mental sobre…" (01/11/2026): mapa mental é desenho do quadro, como fluxograma
+  const mental = pedeMapaMental(texto);
   const pede = citaOQuadro
-    || (verbo && (temQuase(palavras, COISAS) || /\bno quadro\b/.test(texto)))
-    || (temQuase(palavras, VERBOS_GERAIS) && temQuase(palavras, COISAS_FORTES));
+    || (verbo && (temQuase(palavras, COISAS) || mental || /\bno quadro\b/.test(texto)))
+    || (temQuase(palavras, VERBOS_GERAIS) && (temQuase(palavras, COISAS_FORTES) || mental));
   if (!pede) return null;
   // "mude esse desenho", "refaça este fluxo": é o que está na tela; o resto é um desenho novo
-  return quadroAberto && /\b(esse|este|nesse|neste|desse|deste|o mesmo) (desenho|diagrama|fluxo|quadro|processo)\b/.test(texto) ? "alterar" : "novo";
+  return quadroAberto && /\b(esse|este|nesse|neste|desse|deste|o mesmo) (desenho|diagrama|fluxo|quadro|processo|mapa)\b/.test(texto) ? "alterar" : "novo";
 }
 
 /** O código parece um diagrama em texto (Mermaid, PlantUML, Graphviz)? — a IDE oferece desenhar no quadro. */
@@ -453,4 +456,133 @@ export function pareceDiagramaEmTexto(codigo, linguagem = "") {
     || /^(sequenceDiagram|classDiagram|erDiagram|stateDiagram(-v2)?|journey|gantt|C4Context|C4Container|C4Component|mindmap)\b/.test(c)
     || /^@startuml/i.test(c)
     || /^(strict\s+)?(di)?graph\s+[\w"]*\s*\{/.test(c);
+}
+
+// ---------------------------------------------------------------- o mapa mental (01/11/2026)
+//
+// "Tá faltando no ProcessMap o modo de mapa mental": a Lisa também desenha mapas mentais. No
+// ProcessMap o mapa mental é uma árvore — um tema central (mmRoot) e tópicos (mmNode) com "parent" —
+// e o próprio quadro faz o layout (public/diagramas/js/MindMap.js): aqui só se monta a árvore. Os
+// filhos do tema se alternam entre a direita e a esquerda, e cada galho ganha uma cor.
+
+export const LIMITES_DO_MAPA = { topicos: 8, filhos: 6, netos: 5, total: 70, texto: 120 };
+const CORES_DOS_GALHOS = ["green", "deep", "amber", "red", "lilac", "purple", "graphite", "white"];
+const ID_DO_TEMA = "raiz";
+
+/** A pergunta fala em mapa mental ("mapa mental", "mapas mentais", "mind map")? */
+export function pedeMapaMental(texto) {
+  return /\bmapas? ment(al|ais)\b|\bmind ?maps?\b/.test(semAcento(texto));
+}
+
+/**
+ * Confere o mapa que a IA devolveu: { titulo, tema, explicacao, topicos: [{ id, texto, filhos: [{ id,
+ * texto, filhos: [{ id, texto }] }] }] } — três níveis abaixo do tema, com teto por nível e no total.
+ * Tópico sem texto sai; ids limpos e sem repetir.
+ */
+export function validarMapaMental(bruto) {
+  const vistos = new Set([ID_DO_TEMA]);
+  let total = 1;
+  let n = 0;
+  const idDe = (v) => {
+    let id = idLimpo(v) || `t${++n}`;
+    while (vistos.has(id)) id = `${id}-2`;
+    vistos.add(id);
+    return id;
+  };
+  const ramo = (lista, max, nivel) => (Array.isArray(lista) ? lista : []).slice(0, max).flatMap((t) => {
+    const txt = texto(t?.texto, LIMITES_DO_MAPA.texto);
+    if (!txt || total >= LIMITES_DO_MAPA.total) return [];
+    total++;
+    const no = { id: idDe(t?.id), texto: txt };
+    if (nivel < 3) no.filhos = ramo(t?.filhos, nivel === 1 ? LIMITES_DO_MAPA.filhos : LIMITES_DO_MAPA.netos, nivel + 1);
+    return [no];
+  });
+  const topicos = ramo(bruto?.topicos, LIMITES_DO_MAPA.topicos, 1);
+  return {
+    titulo: texto(bruto?.titulo, 80) || texto(bruto?.tema, 80) || "Mapa mental",
+    tema: texto(bruto?.tema, LIMITES_DO_MAPA.texto) || texto(bruto?.titulo, 80) || "Tema central",
+    explicacao: texto(bruto?.explicacao, 600),
+    topicos,
+  };
+}
+
+/**
+ * O documento do quadro (formato 4, modo mapa mental). Com o mapa `anterior` (uma mudança), o que a
+ * pessoa arrumou fica: a posição manual (ox, oy), o galho recolhido, a cor e o lado de cada tópico
+ * que continua (mesmo id) — e os tópicos mais fundos que a Lisa não vê (abaixo do 3º nível) voltam
+ * pendurados onde estavam, se o pai continua.
+ */
+export function montarMapaMental(mapa, anterior = null) {
+  const antigos = new Map();
+  for (const aba of anterior?.mode === "mindmap" ? abasDe(anterior).slice(0, 1) : []) {
+    for (const s of aba.shapes || []) if (s && s.type === "mmNode") antigos.set(String(s.id), s);
+  }
+  const shapes = [{ id: ID_DO_TEMA, type: "mmRoot", x: -100, y: -28, w: 200, h: 56, text: mapa.tema, color: "purple" }];
+  const pendurar = (lista, pai, nivel) => lista.forEach((t, i) => {
+    const velho = antigos.get(t.id);
+    const no = { id: t.id, type: "mmNode", x: 0, y: 0, w: 120, h: 36, text: t.texto, parent: pai };
+    if (nivel === 1) {
+      no.side = velho?.side === "left" || velho?.side === "right" ? velho.side : i % 2 ? "left" : "right";
+      no.color = velho?.color || CORES_DOS_GALHOS[i % CORES_DOS_GALHOS.length];
+    }
+    if (velho?.collapsed === true) no.collapsed = true;
+    for (const k of ["ox", "oy"]) if (ehNumero(velho?.[k]) && Number(velho[k])) no[k] = Number(velho[k]);
+    shapes.push(no);
+    if (t.filhos?.length) pendurar(t.filhos, t.id, nivel + 1);
+  });
+  pendurar(mapa.topicos, ID_DO_TEMA, 1);
+  // os tópicos fundos que a Lisa não viu, onde estavam (enquanto o pai existir)
+  const ids = new Set(shapes.map((x) => x.id));
+  let achou = true;
+  while (achou) {
+    achou = false;
+    for (const [id, velho] of antigos) {
+      if (ids.has(id) || !ids.has(String(velho.parent)) || profundidade(antigos, velho) <= 3) continue;
+      shapes.push({ id, type: "mmNode", x: 0, y: 0, w: 120, h: 36, text: String(velho.text ?? ""), parent: String(velho.parent), ...(velho.collapsed === true ? { collapsed: true } : {}) });
+      ids.add(id);
+      achou = true;
+    }
+  }
+  return {
+    format: "processmap", version: 4, name: mapa.titulo, mode: "mindmap", activePage: "p1",
+    pages: [{ id: "p1", name: mapa.titulo.slice(0, 40), shapes, connections: [] }],
+  };
+}
+
+// quantos níveis abaixo do tema (o filho do tema é 1)
+function profundidade(nos, s) {
+  let d = 1;
+  let p = nos.get(String(s.parent));
+  while (p && d < 50) { d++; p = nos.get(String(p.parent)); }
+  return d;
+}
+
+/** A árvore do mapa na tela, no formato que a IA devolve (para mudar o mapa a partir dele). */
+export function estruturaDoMapa(doc) {
+  const aba = abasDe(doc)[0] || { shapes: [] };
+  const nos = (aba.shapes || []).filter((s) => s && (s.type === "mmRoot" || s.type === "mmNode"));
+  const tema = nos.find((s) => s.type === "mmRoot");
+  const arvore = (id, nivel) => nos.filter((s) => s.type === "mmNode" && String(s.parent) === String(id)).map((s) => ({
+    id: String(s.id), texto: String(s.text ?? "").slice(0, LIMITES_DO_MAPA.texto),
+    ...(nivel < 3 ? { filhos: arvore(s.id, nivel + 1) } : {}),
+  }));
+  return { titulo: String(doc?.name || "Mapa mental"), tema: String(tema?.text ?? "Tema central"), topicos: tema ? arvore(tema.id, 1) : [] };
+}
+
+/** O mapa em texto, recuado por nível (o que a Lisa lê quando a pessoa conversa sobre ele). */
+function descreverMapa(doc) {
+  const aba = abasDe(doc)[0] || { shapes: [] };
+  const nos = (aba.shapes || []).filter((s) => s && (s.type === "mmRoot" || s.type === "mmNode"));
+  const tema = nos.find((s) => s.type === "mmRoot");
+  if (!tema) return "";
+  const linhas = [`MAPA MENTAL "${doc?.name || "Mapa mental"}" — ${nos.length} tópicos (cada um com o id entre colchetes; o recuo mostra quem é filho de quem)`, `[${tema.id}] TEMA: "${String(tema.text ?? "").slice(0, 200)}"`];
+  const descer = (id, nivel) => {
+    if (nivel > 12) return;
+    for (const s of nos.filter((x) => x.type === "mmNode" && String(x.parent) === String(id))) {
+      linhas.push(`${"  ".repeat(nivel)}- [${s.id}] "${String(s.text ?? "").replace(/\s+/g, " ").slice(0, 200)}"${s.collapsed ? " (recolhido)" : ""}`);
+      descer(s.id, nivel + 1);
+    }
+  };
+  descer(tema.id, 1);
+  return linhas.join("\n").slice(0, 12_000);
 }

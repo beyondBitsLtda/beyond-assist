@@ -73,7 +73,7 @@ export const VISUAIS = [
   {
     id: "rosto",
     nome: "Rosto",
-    descricao: "Um retrato térmico: o rosto escuro, a borda quente do vermelho ao creme e um halo ciano. Fala com a boca e a garganta acesas, escuta com as orelhas quentes e pensa com uma onda de calor.",
+    descricao: "Um retrato térmico: o rosto escuro, a borda quente do vermelho ao creme e um halo ciano. Fala com a boca e a garganta acesas, escuta com as orelhas quentes e pensa com uma onda de calor. Cabelo longo ou raspado e seis paletas de cor.",
     cores: {
       pronta: ["#ffecc8", "#e8692a", "#5cc6d6"],
       ouvindo: ["#fff1d2", "#f07a32", "#62dcec"],

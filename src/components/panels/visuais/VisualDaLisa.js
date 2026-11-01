@@ -6,6 +6,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { lerVisual, EVENTO_DO_VISUAL, CHAVE_DO_VISUAL, VISUAL_PADRAO } from "@/lib/visuaisDaLisa.js";
+import { lerAjustesDoRosto, AJUSTES_PADRAO, EVENTO_DO_ROSTO, CHAVE_DO_ROSTO } from "@/lib/rostoDaLisa.js";
 
 // (o Next exige as opções do dynamic escritas em cada chamada, não numa variável)
 const COMPONENTES = {
@@ -38,4 +39,21 @@ export function usarVisualEscolhido() {
     };
   }, []);
   return modo;
+}
+
+/** O cabelo e as cores do Rosto escolhidos neste navegador — e acompanha a troca na hora. */
+export function usarAjustesDoRosto() {
+  const [ajustes, setAjustes] = useState(AJUSTES_PADRAO);
+  useEffect(() => {
+    setAjustes(lerAjustesDoRosto());
+    const aoEscolher = (e) => setAjustes(e.detail || lerAjustesDoRosto());
+    const aoGuardar = (e) => { if (e.key === CHAVE_DO_ROSTO) setAjustes(lerAjustesDoRosto()); };
+    window.addEventListener(EVENTO_DO_ROSTO, aoEscolher);
+    window.addEventListener("storage", aoGuardar);
+    return () => {
+      window.removeEventListener(EVENTO_DO_ROSTO, aoEscolher);
+      window.removeEventListener("storage", aoGuardar);
+    };
+  }, []);
+  return ajustes;
 }

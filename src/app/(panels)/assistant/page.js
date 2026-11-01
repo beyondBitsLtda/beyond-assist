@@ -47,8 +47,9 @@ import { loadGames } from "@/lib/gameHistory.js";
 // realmente ligar a Visão 3D; desktop-only por decisão do usuário, nunca entra no bundle mobile.
 // a voz da Lisa como esfera de pontos (three.js) — aparência padrão desde a revisão visual
 // o visual do centro (Esfera de pontos, Lente, Orbe, Plasma, Anel) — escolhido no painel /visual
-import VisualDaLisa, { usarVisualEscolhido } from "@/components/panels/visuais/VisualDaLisa.js";
+import VisualDaLisa, { usarVisualEscolhido, usarAjustesDoRosto } from "@/components/panels/visuais/VisualDaLisa.js";
 import { VISUAIS, escolherVisual } from "@/lib/visuaisDaLisa.js";
+import { CABELOS_DO_ROSTO, PALETAS_DO_ROSTO, escolherAjustesDoRosto } from "@/lib/rostoDaLisa.js";
 // o contexto da conversa (25/10/2026): imagens anexadas (o +, Ctrl+V, arrastar) e repositórios vinculados
 import { BotaoMais, FaixaDoContexto } from "@/components/panels/ContextoDaConversa.js";
 import { imagemParaAnexo, imagensDaColagem, imagensSoltas } from "@/lib/anexosDaConversa.js";
@@ -471,6 +472,7 @@ export default function AssistantPage() {
   // com avatarView "esfera": QUAL visual reage à voz (Esfera de pontos, Lente, Orbe, Plasma ou
   // Anel — src/lib/visuaisDaLisa.js), escolhido no painel /visual ou no menu de aparência
   const visualDaLisa = usarVisualEscolhido();
+  const ajustesDoRosto = usarAjustesDoRosto(); // o cabelo e as cores, quando o visual é o Rosto
   // qual "corpo" 3D usar quando avatarView === "3d" — "cyborg" (original, sem esqueleto) ou
   // "ironman" (rigado, com gestos de verdade por modo, ver LisaAvatarIronMan.js)
   const [avatarSkin, setAvatarSkin] = useState("cyborg");
@@ -4823,7 +4825,7 @@ export default function AssistantPage() {
               valor={avatarView}
               onChange={chooseAvatarView}
               opcoes={[
-                { valor: "esfera", rotulo: "Visual", titulo: "Um visual que reage à voz (Esfera de pontos, Lente, Orbe, Plasma ou Anel)" },
+                { valor: "esfera", rotulo: "Visual", titulo: "Um visual que reage à voz (Esfera de pontos, Lente, Orbe, Plasma, Anel ou Rosto)" },
                 { valor: "traditional", rotulo: "Ondas", titulo: "Visualizador de onda tradicional" },
                 { valor: "3d", rotulo: "Avatar 3D", titulo: "Corpo em modelo 3D — arraste/belisque pra ajustar o enquadramento" },
               ]}
@@ -4834,6 +4836,20 @@ export default function AssistantPage() {
                   {VISUAIS.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
                 </select>
               </div>
+            )}
+            {avatarView === "esfera" && visualDaLisa === "rosto" && (
+              <>
+                <div className="bb-campo-do-menu">
+                  <select className="bb-select" value={ajustesDoRosto.cabelo} onChange={(e) => escolherAjustesDoRosto({ cabelo: e.target.value })} title="O cabelo do Rosto">
+                    {CABELOS_DO_ROSTO.map((c) => <option key={c.id} value={c.id}>Cabelo {c.nome.toLowerCase()}</option>)}
+                  </select>
+                </div>
+                <div className="bb-campo-do-menu">
+                  <select className="bb-select" value={ajustesDoRosto.paleta} onChange={(e) => escolherAjustesDoRosto({ paleta: e.target.value })} title="As cores do Rosto">
+                    {PALETAS_DO_ROSTO.map((p) => <option key={p.id} value={p.id}>Cores: {p.nome}</option>)}
+                  </select>
+                </div>
+              </>
             )}
             {avatarView === "esfera" && (
               <LinkDoMenu href="/visual" detalhe="Prévia ao vivo de cada visual, falando, ouvindo e pensando">

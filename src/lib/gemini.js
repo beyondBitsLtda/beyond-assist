@@ -1204,6 +1204,73 @@ Regras:
   }
 }
 
+/**
+ * A Lisa monta um MAPA MENTAL (01/11/2026): devolve a árvore { titulo, tema, explicacao, topicos:
+ * [{ id, texto, filhos: [{ id, texto, filhos: [{ id, texto }] }] }] } — o quadro faz o layout
+ * (src/lib/diagramaDaLisa.js: validarMapaMental, montarMapaMental). Com `estrutura` (o mapa que está na
+ * tela), é uma mudança: a árvore inteira de volta, com os mesmos ids do que continua.
+ */
+export async function desenharMapaMental({ pedido, estrutura = null, conversa = "", contexto = "" }) {
+  const prompt = [
+    contexto ? `CONTEXTO (código, ou o desenho que está na tela, para basear o mapa):\n${contexto.slice(0, 40000)}\n` : "",
+    conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-6000)}\n` : "",
+    estrutura
+      ? `O MAPA QUE ESTÁ NA TELA AGORA (a pessoa pode ter mexido nele — parta DELE):\n${JSON.stringify(estrutura).slice(0, 20000)}\n`
+      : "",
+    `PEDIDO: "${String(pedido || "").slice(0, 8000)}"`,
+  ].filter(Boolean).join("\n");
+
+  const systemInstruction = `Você é a Lisa e monta MAPAS MENTAIS num quadro. Você NÃO escreve coordenadas: devolve a árvore e o
+quadro organiza o desenho sozinho (o tema no centro, os tópicos dos dois lados).
+
+Regras:
+- "tema": o assunto central, curto (1 a 5 palavras).
+- "topicos": de 3 a 8 tópicos principais; cada um pode ter "filhos" (até 6) e cada filho, os seus "filhos"
+  (até 5). Textos curtos (1 a 6 palavras), sem pontuação no fim, sem numerar. Cubra o assunto de forma
+  útil e equilibrada: ideias, partes, causas, ações, exemplos — o que fizer sentido para o pedido.
+- "id": curto, sem espaço nem acento (ex.: "redes", "seo"). Se houver um mapa na tela, é uma MUDANÇA:
+  devolva a árvore INTEIRA atualizada, mantendo o "id" de todo tópico que continua (é assim que o que
+  a pessoa arrumou fica no lugar), e mude só o que foi pedido.
+- Se o contexto trouxer um fluxograma ou código e o pedido for transformá-lo em mapa mental, organize
+  o conteúdo dele em tópicos.
+- "explicacao": 1 a 3 frases em português, falando com a pessoa, dizendo o que você montou ou mudou.
+- "titulo": o nome do mapa.`;
+
+  const topico = (filhos) => ({
+    type: "OBJECT",
+    properties: { id: { type: "STRING" }, texto: { type: "STRING" }, ...(filhos ? { filhos } : {}) },
+    required: ["id", "texto"],
+  });
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client, modelo) =>
+      client.models.generateContent({
+        model: modelo,
+        contents: prompt,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              titulo: { type: "STRING" },
+              tema: { type: "STRING" },
+              explicacao: { type: "STRING" },
+              topicos: { type: "ARRAY", items: topico({ type: "ARRAY", items: topico({ type: "ARRAY", items: topico(null) }) }) },
+            },
+            required: ["titulo", "tema", "explicacao", "topicos"],
+          },
+        },
+      }),
+    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
+  );
+  try {
+    return JSON.parse(res.text);
+  } catch {
+    throw new Error("a resposta do mapa mental não veio em JSON válido — tente de novo");
+  }
+}
+
 // O DIAGRAMA (Mermaid) é montado no CÓDIGO a partir do grafo de dependência REAL (calculado
 // pelos imports indexados, não pela IA) — de propósito: pedir pra IA escrever sintaxe Mermaid
 // direto já causou dor de cabeça parecida com o bug do comentário no topo do CSS (texto solto

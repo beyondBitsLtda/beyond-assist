@@ -7,7 +7,11 @@ import {
   VISUAIS, ESTADOS, VISUAL_PADRAO, CHAVE_DO_VISUAL, EVENTO_DO_VISUAL,
   visualDe, coresDe, criarEnvelope, criarPesos, lerVisual, escolherVisual,
 } from "../src/lib/visuaisDaLisa.js";
-import { FORMA, RAIO, CENTRO_Y, CAIXA, resolucaoDoRosto, criarMovimentoDoRosto } from "../src/lib/rostoDaLisa.js";
+import {
+  FORMA, RAIO, CENTRO_Y, CAIXA, resolucaoDoRosto, criarMovimentoDoRosto,
+  CABELOS_DO_ROSTO, PALETAS_DO_ROSTO, AJUSTES_PADRAO, CHAVE_DO_ROSTO, EVENTO_DO_ROSTO,
+  ajustesValidos, lerAjustesDoRosto, escolherAjustesDoRosto, coresDoRosto,
+} from "../src/lib/rostoDaLisa.js";
 
 let falhas = 0;
 const ok = (t) => console.log(`  ok    ${t}`);
@@ -65,18 +69,19 @@ console.log("o rosto");
 {
   // a forma é GLSL (o navegador compila); aqui, o que dá para conferir sem placa de vídeo
   const contar = (c) => FORMA.split(c).length - 1;
-  conferir("a forma define forma(p, orelha) e usa a cabeça, a boca e a respiração", /float forma\(vec3 p, out float orelha\)/.test(FORMA) && ["uCabeca", "uBoca", "uRespira"].every((u) => FORMA.includes(u)));
+  conferir("a forma define forma(p, orelha, fio) e usa a cabeça, a boca, a respiração e o cabelo", /float forma\(vec3 p, out float orelha, out float fio\)/.test(FORMA) && ["uCabeca", "uBoca", "uRespira", "uCabelo"].every((u) => FORMA.includes(u)));
+  conferir("sem cabelo, a forma nem calcula o cabelo (raspado não custa nada a mais)", /if \(uCabelo < 0\.01\) return 9\.0;/.test(FORMA));
   conferir("a forma fecha chaves e parênteses", contar("{") === contar("}") && contar("(") === contar(")"));
   conferir("os números da forma saem como float do GLSL (sem 'NaN', sem inteiro solto em vec3)", !/NaN|undefined/.test(FORMA) && !/vec3\(\s*-?\d+\s*,/.test(FORMA));
   conferir("o componente injeta a forma no shader", /\$\{FORMA\}/.test(ler("src/components/panels/visuais/Rosto.js")));
   conferir("o busto cabe na caixa marchada (topo da cabeça e ombros)", CAIXA.max[1] > 1.05 && CAIXA.min[1] < CENTRO_Y - RAIO && CAIXA.max[0] >= 1.8);
 
-  // a resolução de desenho: 3/4 da tela, nunca mais que o teto no lado maior
-  const lado = (css, dpr, limite) => css * resolucaoDoRosto(css, css, dpr, limite);
-  conferir("tela grande: no máximo 560 px de desenho", lado(760, 1) <= 560.5 && lado(760, 2) <= 560.5);
-  conferir("celular de densidade 3: também no teto, não 9× a conta", lado(360, 3) <= 560.5 && lado(360, 3) > 400);
-  conferir("miniatura: 3/4 da resolução", Math.abs(resolucaoDoRosto(190, 190, 1) - 0.75) < 1e-9);
-  conferir("o teto mais baixo (aparelho lento) vale", lado(760, 1, 300) <= 300.5);
+  // a resolução de desenho: a da tela, com teto no lado MENOR (o que dá o tamanho do busto)
+  conferir("tela cheia larga (1700 × 794): resolução inteira, não 1/3 (a captura pixelada)", resolucaoDoRosto(1700, 794, 1) === 1);
+  conferir("tela densa: até o teto no lado menor", Math.abs(794 * resolucaoDoRosto(1700, 794, 2) - 1100) < 0.5);
+  conferir("celular de densidade 3: no teto do celular, não 9× a conta", Math.abs(390 * resolucaoDoRosto(390, 844, 3, 820) - 820) < 0.5);
+  conferir("miniatura: resolução inteira", resolucaoDoRosto(190, 190, 1) === 1);
+  conferir("o teto mais baixo (aparelho lento) vale", 760 * resolucaoDoRosto(760, 760, 1, 420) <= 420.5);
 
   // o movimento: cada estado faz o seu
   const pesosDe = (e) => ({ pronta: 0, ouvindo: 0, pensando: 0, falando: 0, [e]: 1 });
@@ -102,6 +107,33 @@ console.log("o rosto");
   conferir("ponteiro parado há mais de 4s não conta", Math.abs(rodar("pronta", 0.1, 6, { ponteiro: { x: 1, y: 0, quando: 0 } }).yaw) < 0.13);
   const calmo = rodar("ouvindo", 0.6, 1.5, { reduzido: true });
   conferir("com \"reduzir movimento\", a cabeça mexe bem menos", Math.abs(calmo.roll) < Math.abs(ouvindo.roll) * 0.5 && Math.abs(calmo.respira) <= 0.35);
+}
+
+console.log("o cabelo e as cores do rosto");
+{
+  const hex = (c) => /^#[0-9a-f]{6}$/i.test(c);
+  conferir("cabelo longo e raspado; o padrão é o longo", CABELOS_DO_ROSTO.map((c) => c.id).join() === "longo,raspado" && AJUSTES_PADRAO.cabelo === "longo");
+  conferir("seis paletas, sem id repetido, a térmica primeiro (o padrão)", PALETAS_DO_ROSTO.length === 6 && new Set(PALETAS_DO_ROSTO.map((p) => p.id)).size === 6 && PALETAS_DO_ROSTO[0].id === "termico" && AJUSTES_PADRAO.paleta === "termico");
+  conferir("cada paleta tem as cinco cores válidas", PALETAS_DO_ROSTO.every((p) => ["profundo", "meio", "borda", "halo", "haloPensando"].every((k) => hex(p[k]))));
+  conferir("as cores do shader: borda, meio, halo e profundo", coresDoRosto("neon", "pronta").join() === ["#ffe0f3", "#ff3fa4", "#46c8ff", "#4d0a4f"].join());
+  conferir("pensando, o halo muda", coresDoRosto("termico", "pensando")[2] !== coresDoRosto("termico", "pronta")[2]);
+  conferir("paleta que não existe usa a térmica", coresDoRosto("xyz", "pronta").join() === coresDoRosto("termico", "pronta").join());
+  conferir("ajustes estragados voltam ao padrão", JSON.stringify(ajustesValidos({ cabelo: "moicano", paleta: 3 })) === JSON.stringify(AJUSTES_PADRAO) && JSON.stringify(ajustesValidos(null)) === JSON.stringify(AJUSTES_PADRAO));
+  const guardado = new Map();
+  const avisos = [];
+  globalThis.localStorage = { getItem: (k) => guardado.get(k) ?? null, setItem: (k, v) => guardado.set(k, String(v)) };
+  globalThis.window = { dispatchEvent: (e) => avisos.push(e) };
+  globalThis.CustomEvent ??= class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  conferir("sem escolha guardada, o padrão", JSON.stringify(lerAjustesDoRosto()) === JSON.stringify(AJUSTES_PADRAO));
+  escolherAjustesDoRosto({ paleta: "aurora" });
+  const a = escolherAjustesDoRosto({ cabelo: "raspado" });
+  conferir("escolher muda só a parte pedida e guarda", a.paleta === "aurora" && a.cabelo === "raspado" && JSON.parse(guardado.get(CHAVE_DO_ROSTO)).paleta === "aurora");
+  conferir("e avisa o rosto aberto", avisos.at(-1)?.type === EVENTO_DO_ROSTO && avisos.at(-1)?.detail?.cabelo === "raspado");
+  globalThis.localStorage = { getItem() { throw new Error("bloqueado"); }, setItem() { throw new Error("bloqueado"); } };
+  conferir("navegador sem armazenamento: não quebra", lerAjustesDoRosto().paleta === "termico" && escolherAjustesDoRosto({ paleta: "ouro" }).paleta === "ouro");
+  const rosto = ler("src/components/panels/visuais/Rosto.js");
+  conferir("o rosto escuta a troca (evento e outras abas) e solta ao sair", /addEventListener\(EVENTO_DO_ROSTO/.test(rosto) && /removeEventListener\(EVENTO_DO_ROSTO/.test(rosto) && /removeEventListener\("storage"/.test(rosto));
+  conferir("o painel /visual e o menu do Assistente oferecem cabelo e cores", /<AjustesDoRosto \/>/.test(ler("src/app/(panels)/visual/page.js")) && /escolherAjustesDoRosto\(\{ cabelo/.test(ler("src/app/(panels)/assistant/page.js")) && /escolherAjustesDoRosto\(\{ paleta/.test(ler("src/app/(panels)/assistant/page.js")));
 }
 
 console.log("preferência no navegador");

@@ -126,7 +126,9 @@ export default function ProcessMapPage() {
         if (abertoRef.current?.id !== id) return;
         setEstado(e);
         if (e.estado === "salvo" && e.fluxo) {
-          abertoRef.current = { ...abertoRef.current, versao: e.fluxo.versao };
+          // (o modo pode ter mudado: "transforme em mapa mental")
+          abertoRef.current = { ...abertoRef.current, versao: e.fluxo.versao, modo: e.fluxo.modo };
+          setAberto(abertoRef.current);
           atualizarNaArvore(e.fluxo);
         }
       },
@@ -517,7 +519,7 @@ export default function ProcessMapPage() {
             </p>
           )}
           {projetos?.length === 0 && (
-            <p className="bb-fluxos-vazio">Nenhum projeto ainda. Crie um em “+ projeto”, ou comece a desenhar: o primeiro traço já salva em “Meus fluxogramas”.</p>
+            <p className="bb-fluxos-vazio">Nenhum projeto ainda. Crie um em “+ projeto”, comece a desenhar (o primeiro traço já salva em “Meus fluxogramas”) ou peça à Lisa um fluxograma ou um mapa mental na barra de baixo.</p>
           )}
           {projetos?.map((pr) => {
             const aberta = expandidos.has(pr.id);
@@ -572,8 +574,9 @@ export default function ProcessMapPage() {
                         )}
                       </li>
                     ))}
-                    <li>
-                      <button type="button" className="bb-fluxos-novo-item" onClick={() => novoFluxo(pr.id)}>+ novo fluxograma</button>
+                    <li className="bb-fluxos-novos">
+                      <button type="button" className="bb-fluxos-novo-item" onClick={() => novoFluxo(pr.id, "diagram")}>+ fluxograma</button>
+                      <button type="button" className="bb-fluxos-novo-item" onClick={() => novoFluxo(pr.id, "mindmap")}>+ mapa mental</button>
                     </li>
                   </ul>
                 )}
@@ -602,7 +605,7 @@ export default function ProcessMapPage() {
           <div className="bb-fluxos-acoes">
             <div className="bb-fluxos-ancora">
               <button type="button" className="bb-fluxos-botao bb-fluxos-novo-botao" aria-expanded={menu === "novo"}
-                onClick={() => setMenu((m) => (m === "novo" ? null : "novo"))}>+ Novo</button>
+                onClick={() => setMenu((m) => (m === "novo" ? null : "novo"))}>+ Novo ▾</button>
               {menu === "novo" && (
                 <div className="bb-fluxos-menu bb-fluxos-menu--novo" role="menu">
                   <button type="button" role="menuitem" onClick={() => novoFluxo(projetoAlvo, "diagram")}><b>Fluxograma</b><span>Formas e conexões, com todas as coleções de figuras.</span></button>
@@ -645,7 +648,9 @@ export default function ProcessMapPage() {
         )}
         <form className="bb-fluxos-pedir" onSubmit={pedirALisa}>
           <input value={pedido} onChange={(e) => setPedido(e.target.value)} disabled={desenhando}
-            placeholder={aberto ? "Peça à Lisa uma mudança: inclua a aprovação do diretor, separe em raias…" : "Peça à Lisa um desenho: o processo de compras, a arquitetura do sistema…"}
+            placeholder={!aberto ? "Peça à Lisa um desenho: o processo de compras, um mapa mental sobre o lançamento…"
+              : aberto.modo === "mindmap" ? "Peça à Lisa uma mudança: inclua um tópico de riscos, detalhe o galho de marketing…"
+              : "Peça à Lisa uma mudança: inclua a aprovação do diretor, separe em raias…"}
             aria-label="pedir à Lisa um desenho ou uma mudança" />
           <button type="submit" className="bb-fluxos-botao bb-fluxos-botao--lisa" disabled={desenhando || !pedido.trim()}>
             {desenhando ? "desenhando…" : "✦ pedir à Lisa"}

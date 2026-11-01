@@ -6,7 +6,9 @@
 import {
   validarDesenho, camadasDoDesenho, posicoesDoDesenho, montarDocumento, estruturaDoDocumento, descreverDiagrama,
   pedidoDeDesenho, documentoValido, FORMAS, distanciaDeEdicao, pareceDiagramaEmTexto,
+  pedeMapaMental, validarMapaMental, montarMapaMental, estruturaDoMapa, LIMITES_DO_MAPA,
 } from "../src/lib/diagramaDaLisa.js";
+import fs from "node:fs";
 
 let falhas = 0;
 const ok = (t) => console.log(`  ok    ${t}`);
@@ -142,6 +144,49 @@ console.log("\ndiagrama em texto na IDE (o botão de desenhar no quadro)");
   conferir("pela linguagem do bloco (mermaid, plantuml)", pareceDiagramaEmTexto("A --> B", "mermaid") && pareceDiagramaEmTexto("x", "plantuml"));
   conferir("PlantUML e Graphviz também", pareceDiagramaEmTexto("@startuml\nA -> B\n@enduml") && pareceDiagramaEmTexto("digraph G { a -> b }"));
   conferir("código comum não é", !pareceDiagramaEmTexto("function soma(a, b) {\n  return a + b;\n}", "javascript") && !pareceDiagramaEmTexto("const graph = {}"));
+}
+
+console.log("\no mapa mental (01/11/2026)");
+{
+  conferir("reconhece o pedido de mapa mental", pedeMapaMental("faça um MAPA MENTAL sobre vendas") && pedeMapaMental("crie mapas mentais") && pedeMapaMental("um mind map do projeto") && !pedeMapaMental("o mapa do site") && !pedeMapaMental("mapa de calor"));
+  conferir("\"faça um mapa mental sobre X\" desenha no quadro", pedidoDeDesenho("faça um mapa mental sobre o lançamento do app") === "novo" && pedidoDeDesenho("desenhe um mind map de marketing") === "novo");
+  conferir("\"o que é um mapa mental?\" continua conversa", pedidoDeDesenho("o que é um mapa mental?") === null);
+  conferir("com o mapa aberto, \"mude esse mapa\" é mudança", pedidoDeDesenho("refaça esse mapa com menos tópicos", { quadroAberto: true }) === "alterar");
+  const bruto = {
+    titulo: "Lançamento", tema: "App de delivery", explicacao: "Montei o mapa.",
+    topicos: [
+      { id: "Pesquisa Inicial", texto: "Pesquisa", filhos: [{ id: "publico", texto: "Público", filhos: [{ id: "x", texto: "Idade" }, { texto: "  " }] }, { texto: "" }] },
+      { id: "publico", texto: "Marketing", filhos: [] },
+      { texto: "Operação" },
+      ...Array.from({ length: 10 }, (_, i) => ({ texto: `Extra ${i}` })),
+    ],
+  };
+  const mapa = validarMapaMental(bruto);
+  conferir("até 8 tópicos principais", mapa.topicos.length === LIMITES_DO_MAPA.topicos);
+  conferir("tópico sem texto sai; ids limpos e sem repetir", mapa.topicos[0].id === "pesquisa-inicial" && mapa.topicos[0].filhos.length === 1 && mapa.topicos[0].filhos[0].filhos.length === 1 && mapa.topicos[1].id !== "publico");
+  conferir("três níveis abaixo do tema, no máximo", !("filhos" in mapa.topicos[0].filhos[0].filhos[0]));
+  const doc = montarMapaMental(mapa);
+  const nos = doc.pages[0].shapes;
+  conferir("vira um documento de mapa mental do quadro", doc.mode === "mindmap" && doc.format === "processmap" && doc.version === 4 && nos[0].type === "mmRoot" && nos[0].text === "App de delivery" && doc.pages[0].connections.length === 0);
+  const galhos = nos.filter((s) => s.parent === nos[0].id);
+  conferir("os galhos se alternam entre direita e esquerda, cada um com uma cor", galhos.length === 8 && galhos[0].side === "right" && galhos[1].side === "left" && new Set(galhos.slice(0, 5).map((s) => s.color)).size === 5);
+  conferir("todo tópico pendura num nó que existe", nos.slice(1).every((s) => s.type === "mmNode" && nos.some((p) => p.id === s.parent)));
+  conferir("a estrutura volta igual (para a Lisa mudar o mapa)", JSON.stringify(estruturaDoMapa(doc).topicos) === JSON.stringify(mapa.topicos));
+  // a pessoa arrumou o primeiro galho (recolheu, arrastou, trocou de lado e de cor) e pendurou um tópico no 4º nível
+  const arrumado = JSON.parse(JSON.stringify(doc));
+  const g0 = arrumado.pages[0].shapes.find((s) => s.id === "pesquisa-inicial");
+  Object.assign(g0, { collapsed: true, ox: 30, oy: -12, side: "left", color: "red" });
+  arrumado.pages[0].shapes.push({ id: "fundo", type: "mmNode", text: "Faixa 18-25", parent: "x" });
+  const mudado = montarMapaMental(validarMapaMental({ ...bruto, topicos: bruto.topicos.slice(0, 3) }), arrumado);
+  const g1 = mudado.pages[0].shapes.find((s) => s.id === "pesquisa-inicial");
+  conferir("numa mudança, o que a pessoa arrumou fica (recolhido, posição, lado, cor)", g1.collapsed === true && g1.ox === 30 && g1.oy === -12 && g1.side === "left" && g1.color === "red");
+  conferir("e o tópico fundo que a Lisa não vê volta pendurado onde estava", mudado.pages[0].shapes.some((s) => s.id === "fundo" && s.parent === "x"));
+  conferir("um fluxograma na tela não empresta nada a um mapa novo", montarMapaMental(mapa, { mode: "diagram", pages: [{ shapes: [{ id: "pesquisa-inicial", ox: 99 }] }] }).pages[0].shapes.find((s) => s.id === "pesquisa-inicial").ox === undefined);
+  conferir("a Lisa lê o mapa como árvore (o recuo é o nível)", /MAPA MENTAL "Lançamento"/.test(descreverDiagrama(doc)) && /\n {4}- \[publico\] "Público"/.test(descreverDiagrama(doc)));
+  const rota = fs.readFileSync(new URL("../src/app/api/diagrama/route.js", import.meta.url), "utf8");
+  conferir("a rota desenha mapa mental quando pedem ou quando há um mapa na tela", /pedeMapaMental\(pedido\)/.test(rota) && /mapaNaTela/.test(rota) && /desenharMapaMental/.test(rota));
+  const fm = fs.readFileSync(new URL("../public/diagramas/js/FileManager.js", import.meta.url), "utf8");
+  conferir("o quadro reabre o mapa com as cores dos galhos (não tudo roxo)", /def\.mind && !PM\.Palette\.some/.test(fm));
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");

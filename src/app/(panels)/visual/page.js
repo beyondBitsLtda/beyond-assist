@@ -8,8 +8,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import VisualDaLisa, { usarVisualEscolhido } from "@/components/panels/visuais/VisualDaLisa.js";
+import VisualDaLisa, { usarVisualEscolhido, usarAjustesDoRosto } from "@/components/panels/visuais/VisualDaLisa.js";
+import AjustesDoRosto from "@/components/panels/visuais/AjustesDoRosto.js";
 import { VISUAIS, ESTADOS, escolherVisual, visualDe } from "@/lib/visuaisDaLisa.js";
+import { coresDoRosto } from "@/lib/rostoDaLisa.js";
 
 const NOMES_DOS_ESTADOS = { auto: "Automático", pronta: "Pronta", ouvindo: "Ouvindo", pensando: "Pensando", falando: "Falando" };
 const PASSO_DO_AUTOMATICO_MS = 3500;
@@ -44,6 +46,9 @@ export default function VisualDaLisaPage() {
 
   const naPrevia = foco || emUso;
   const v = visualDe(naPrevia);
+  // o Rosto tem cabelo e paleta escolhidos aqui: as cores mostradas são as da paleta dele
+  const ajustesDoRosto = usarAjustesDoRosto();
+  const coresDoEstado = (e) => (v.id === "rosto" ? coresDoRosto(ajustesDoRosto.paleta, e).slice(0, 3) : v.cores[e]);
 
   return (
     <div className="bb-visuais">
@@ -73,10 +78,11 @@ export default function VisualDaLisaPage() {
             {ESTADOS.map((e) => (
               <div key={e} className={`bb-visuais-paleta-linha${e === estadoAgora ? " bb-visuais-paleta-linha--agora" : ""}`}>
                 <span>{NOMES_DOS_ESTADOS[e]}</span>
-                {v.cores[e].map((cor) => <i key={cor} style={{ background: cor }} title={cor} />)}
+                {coresDoEstado(e).map((cor) => <i key={cor} style={{ background: cor }} title={cor} />)}
               </div>
             ))}
           </div>
+          {v.id === "rosto" && <AjustesDoRosto />}
           <div className="bb-visuais-acoes">
             {naPrevia === emUso
               ? <span className="bb-visuais-em-uso">✓ Em uso no Assistente</span>

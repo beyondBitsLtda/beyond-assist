@@ -449,6 +449,10 @@ input::placeholder, textarea::placeholder { color: var(--bb-texto-3); }
 .bb-visuais-simulador span { color: var(--bb-texto-3); font-size: 13px; margin-right: 4px; }
 .bb-visuais-simulador button { border: 1px solid var(--bb-linha); background: transparent; color: var(--bb-texto-2); border-radius: 999px; padding: 6px 13px; font-size: 13px; cursor: pointer; }
 .bb-visuais-simulador button[aria-pressed="true"] { color: var(--bb-texto); border-color: rgba(var(--accent-rgb), 0.6); background: rgba(var(--accent-rgb), 0.12); }
+/* o cabelo e as cores do Rosto (01/11/2026) */
+.bb-visuais-ajustes { display: grid; gap: 8px; margin-top: 4px; }
+.bb-visuais-ajustes button { display: inline-flex; align-items: center; gap: 7px; }
+.bb-visuais-amostra { width: 14px; height: 14px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08); }
 .bb-visuais-palco { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 28px; align-items: center; background: var(--bb-superficie); border: 1px solid var(--bb-linha); border-radius: var(--bb-raio); padding: 20px; }
 .bb-visuais-tela { position: relative; display: block; width: 100%; aspect-ratio: 1; padding: 0; border-radius: 12px; background: #000; border: 1px solid var(--bb-linha); overflow: hidden; cursor: pointer; }
 .bb-visuais-tela--grande { max-width: 540px; justify-self: center; cursor: default; }
@@ -689,6 +693,9 @@ input::placeholder, textarea::placeholder { color: var(--bb-texto-3); }
 .bb-fluxos-acao:hover { background: var(--bb-superficie-3); color: var(--bb-texto); }
 .bb-fluxos-novo-item { width: 100%; border: 0; background: none; color: var(--bb-texto-3); font: inherit; font-size: 13px; text-align: left; padding: 6px 8px 6px 46px; cursor: pointer; border-radius: 9px; }
 .bb-fluxos-novo-item:hover { color: var(--bb-texto); background: var(--bb-superficie-2); }
+.bb-fluxos-novos { display: flex; gap: 2px; }
+.bb-fluxos-novos .bb-fluxos-novo-item { width: auto; flex: none; }
+.bb-fluxos-novos .bb-fluxos-novo-item + .bb-fluxos-novo-item { padding-left: 8px; }
 .bb-fluxos-legenda { margin: 0; padding: 10px 16px 14px; border-top: 1px solid var(--bb-linha); font-size: 11.5px; color: var(--bb-texto-3); }
 .bb-fluxos-menu { position: absolute; z-index: 40; top: calc(100% + 2px); right: 4px; min-width: 196px; max-width: 280px; max-height: 320px; overflow: auto; display: grid; padding: 5px; border-radius: 11px; background: var(--bb-superficie-3); border: 1px solid var(--bb-linha-forte); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55); }
 .bb-fluxos-menu button { border: 0; background: none; color: var(--bb-texto); font: inherit; font-size: 13px; text-align: left; padding: 7px 10px; border-radius: 7px; cursor: pointer; display: grid; gap: 2px; }

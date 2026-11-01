@@ -280,6 +280,9 @@ PM.FileManager = class FileManager {
         w: Math.max(def.ink ? 4 : 20, num(s.w, def.w)), h: Math.max(def.ink ? 4 : 20, num(s.h, def.h)),
         text: String(s.text ?? ''), color: PM.paletteById(s.color).id,     // cor inválida vira a principal
       };
+      // mapa mental: sem cor escolhida, o galho fica com a cor automática dele (MindMap.color). Antes,
+      // a cor padrão entrava em todo tópico ao abrir, e o mapa reaberto saía todo roxo.
+      if (def.mind && !PM.Palette.some((p) => p.id === s.color)) delete out.color;
       if (type === 'image') {
         // Só aceita data URLs de imagem em base64 PURO (segurança: nada de endereços
         // externos, scripts ou aspas que fechariam o atributo no HTML)
