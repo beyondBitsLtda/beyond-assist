@@ -76,7 +76,48 @@ const NOMES_DAS_PONTAS = {
 // as formas que agrupam outras (raias, fronteiras): o que está dentro delas importa
 const AGRUPADORES = new Set(["lane", "laneV", "umlSwimlane", "umlPackage", "ucSystem", "dbSchema", "archBoundary", "cloudCluster"]);
 
-export const LIMITES_DO_DESENHO = { formas: 60, ligacoes: 120, texto: 300, documento: 300_000 };
+export const LIMITES_DO_DESENHO = { formas: 60, ligacoes: 120, texto: 300, documento: 300_000, abas: 12 };
+
+/**
+ * As cores das formas (01/11/2026: "se eu falar limpe as atividades da cor vermelha do fluxo, ela deve
+ * entender e fazer, não apenas o conteúdo"). A chave é o id do ProcessMap (PM.Palette); `nome` é como
+ * a pessoa vê a cor no tema da Lisa (a "principal" é azul, não roxa) e `outros`, os jeitos de dizer.
+ * A Lisa lê e devolve o nome; o quadro guarda o id.
+ */
+export const CORES = {
+  purple: { nome: "azul", outros: ["azul principal", "principal", "padrao", "normal", "roxo"] },
+  deep: { nome: "azul-escuro", outros: ["azul escuro", "marinho", "escuro"] },
+  lilac: { nome: "azul-claro", outros: ["azul claro", "claro", "lilas"] },
+  graphite: { nome: "grafite", outros: ["cinza", "cinza escuro", "preto"] },
+  white: { nome: "branco", outros: ["branca"] },
+  green: { nome: "verde", outros: ["concluido", "concluida", "feito"] },
+  amber: { nome: "âmbar", outros: ["ambar", "laranja", "amarelo", "amarela", "atencao", "alerta"] },
+  red: { nome: "vermelho", outros: ["vermelha", "problema", "erro", "bloqueado"] },
+};
+export const NOMES_DAS_CORES = Object.values(CORES).map((c) => c.nome);
+
+/** O id da cor a partir do id, do nome ou de um jeito de dizer ("vermelho", "Âmbar", "laranja"); null se não for cor. */
+export function corPeloNome(v) {
+  const t = String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[-_]+/g, " ").trim();
+  if (!t) return null;
+  for (const [id, c] of Object.entries(CORES)) {
+    const formas = [id, c.nome, ...(c.outros || [])].map((x) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[-_]+/g, " "));
+    if (formas.includes(t)) return id;
+  }
+  return null;
+}
+
+/** O nome de uma cor guardada (o id do ProcessMap) — sem cor ou cor estranha é a principal, azul. */
+export const nomeDaCor = (id) => (CORES[id] || CORES.purple).nome;
+
+// a lista "pintar" ([{ id, cor }]) por cima das cores de cada item (forma ou galho)
+function aplicarPintura(itens, pintar) {
+  for (const p of Array.isArray(pintar) ? pintar.slice(0, 200) : []) {
+    const cor = corPeloNome(p?.cor);
+    const alvo = cor && itens.find((x) => x.id === idLimpo(p?.id));
+    if (alvo) alvo.cor = cor;
+  }
+}
 
 const texto = (v, max) => String(v ?? "").replace(/[ \t]+/g, " ").trim().slice(0, max);
 const idLimpo = (v) => String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
@@ -84,14 +125,60 @@ const idLimpo = (v) => String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").
 // ---------------------------------------------------------------- o desenho que a IA devolve
 
 /**
- * Confere a estrutura que a IA devolveu: { titulo, colecao, explicacao, formas: [{ id, tipo, texto,
- * raia }], ligacoes: [{ de, para, rotulo, tracejada, ponta }] }. Tipo desconhecido vira processo;
- * ligação para forma que não existe sai; ids repetidos ganham sufixo.
+ * Confere a estrutura que a IA devolveu: { titulo, colecao, explicacao, abaAtiva, abasRemovidas,
+ * pintar, abas: [{ id, nome, manter, formas: [{ id, tipo, texto, raia, cor, link }], ligacoes: [{ de,
+ * para, rotulo, tracejada, ponta }] }] }. O formato antigo (formas e ligacoes no topo, uma aba só)
+ * continua valendo: vira a aba "p1".
+ *
+ * Abas (01/11/2026: "a Lisa deve poder criar abas dentro dos fluxogramas quando eu pedir"): a aba que
+ * o pedido não mexe vem com `manter` (sem formas) e fica como está; a que some da resposta também fica
+ * (apagar aba é só pela lista `abasRemovidas` — um esquecimento do modelo não apaga o trabalho de
+ * ninguém). `link` liga uma forma a outra aba (o Ctrl+clique do quadro abre a aba).
+ *
+ * Em cada aba: tipo desconhecido vira processo; ligação para forma que não existe sai; ids repetidos
+ * ganham sufixo; `cor` (o nome) vira o id do quadro, e cor que não existe fica de fora (a forma fica
+ * com a que tinha, ou a do tipo). `pintar` ([{ aba?, id, cor }]) é a lista das formas que mudaram de
+ * cor: vale por cima (o modelo às vezes devolve a forma com a cor antiga e só conta a troca na
+ * explicação; a lista à parte ele preenche). Devolve também `formas`/`ligacoes` da primeira aba que
+ * muda (o formato de uma aba).
  */
 export function validarDesenho(bruto) {
+  const brutas = Array.isArray(bruto?.abas) && bruto.abas.length
+    ? bruto.abas
+    : [{ id: "p1", nome: bruto?.titulo, formas: bruto?.formas, ligacoes: bruto?.ligacoes }];
+  const vistas = new Set();
+  const abas = [];
+  for (const a of brutas.slice(0, LIMITES_DO_DESENHO.abas)) {
+    let id = idLimpo(a?.id) || `aba${abas.length + 1}`;
+    while (vistas.has(id)) id = `${id}-2`;
+    vistas.add(id);
+    const nome = texto(a?.nome, 60) || `Página ${abas.length + 1}`;
+    if (a?.manter === true) { abas.push({ id, nome, manter: true, formas: [], ligacoes: [] }); continue; }
+    const { formas, ligacoes } = formasELigacoes(a);
+    if (!formas.length) continue; // aba vazia sai (se ela já existia, fica como estava)
+    aplicarPintura(formas, (Array.isArray(bruto?.pintar) ? bruto.pintar : []).filter((x) => !x?.aba || idLimpo(x.aba) === id));
+    abas.push({ id, nome, formas, ligacoes });
+  }
+  if (!abas.some((a) => a.formas.length)) {
+    if (!abas.some((a) => a.manter)) throw new Error("a Lisa não devolveu nenhuma forma — tente descrever o processo de novo");
+  }
+  const primeira = abas.find((a) => a.formas.length) || { formas: [], ligacoes: [] };
+  return {
+    titulo: texto(bruto?.titulo, 100) || "Processo",
+    colecao: COLECOES.includes(bruto?.colecao) ? bruto.colecao : "flow",
+    explicacao: String(bruto?.explicacao ?? "").trim().slice(0, 1500),
+    abas,
+    abasRemovidas: (Array.isArray(bruto?.abasRemovidas) ? bruto.abasRemovidas : []).map(idLimpo).filter(Boolean),
+    abaAtiva: idLimpo(bruto?.abaAtiva),
+    formas: primeira.formas, ligacoes: primeira.ligacoes,
+  };
+}
+
+// as formas e as ligações de uma aba, conferidas
+function formasELigacoes(a) {
   const vistos = new Set();
   const formas = [];
-  for (const f of (Array.isArray(bruto?.formas) ? bruto.formas : []).slice(0, LIMITES_DO_DESENHO.formas)) {
+  for (const f of (Array.isArray(a?.formas) ? a.formas : []).slice(0, LIMITES_DO_DESENHO.formas)) {
     let id = idLimpo(f?.id) || `f${formas.length + 1}`;
     while (vistos.has(id)) id = `${id}-2`;
     vistos.add(id);
@@ -101,13 +188,14 @@ export function validarDesenho(bruto) {
       // tabela e classe têm várias linhas; o resto, uma
       texto: String(f?.texto ?? "").replace(/\r/g, "").split("\n").map((l) => texto(l, 120)).filter(Boolean).join("\n").slice(0, LIMITES_DO_DESENHO.texto),
       raia: texto(f?.raia, 60),
+      ...(corPeloNome(f?.cor) ? { cor: corPeloNome(f.cor) } : {}),
+      ...(idLimpo(f?.link) ? { link: idLimpo(f.link) } : {}),
     });
   }
-  if (!formas.length) throw new Error("a Lisa não devolveu nenhuma forma — tente descrever o processo de novo");
   const ids = new Set(formas.map((f) => f.id));
   const pares = new Set();
   const ligacoes = [];
-  for (const l of (Array.isArray(bruto?.ligacoes) ? bruto.ligacoes : []).slice(0, LIMITES_DO_DESENHO.ligacoes)) {
+  for (const l of (Array.isArray(a?.ligacoes) ? a.ligacoes : []).slice(0, LIMITES_DO_DESENHO.ligacoes)) {
     const de = idLimpo(l?.de), para = idLimpo(l?.para);
     if (!ids.has(de) || !ids.has(para) || de === para) continue;
     const rotulo = texto(l?.rotulo, 60);
@@ -116,12 +204,7 @@ export function validarDesenho(bruto) {
     pares.add(chave);
     ligacoes.push({ de, para, rotulo, tracejada: Boolean(l?.tracejada), ponta: PONTAS.includes(l?.ponta) ? l.ponta : "arrow" });
   }
-  return {
-    titulo: texto(bruto?.titulo, 100) || "Processo",
-    colecao: COLECOES.includes(bruto?.colecao) ? bruto.colecao : "flow",
-    explicacao: String(bruto?.explicacao ?? "").trim().slice(0, 1500),
-    formas, ligacoes,
-  };
+  return { formas, ligacoes };
 }
 
 // ---------------------------------------------------------------- o layout em camadas
@@ -249,17 +332,59 @@ function semEsbarrar(caixa, outras) {
 
 /**
  * O documento do quadro (formato 4) para o desenho. Com `anterior` (o documento que estava na tela,
- * talvez mexido pela pessoa), a forma que continua com o mesmo id fica onde estava e do tamanho que
- * estava; a nova entra no lugar do layout e só desce se esbarrar em algo que já estava lá.
+ * talvez mexido pela pessoa), cada aba é tratada por si: a aba que a Lisa mudou é remontada (a forma
+ * que continua com o mesmo id fica onde estava, do tamanho e com o que tinha — travada, link,
+ * linguagem —, a nova entra no lugar do layout e só desce se esbarrar em algo que já estava lá; as
+ * imagens coladas e os rabiscos, que a Lisa não vê, ficam); a aba mantida (ou que ela nem citou) fica
+ * exatamente como estava; a aba nova entra no fim; a removida sai.
  */
 export function montarDocumento(desenho, anterior = null) {
+  const antigas = Array.isArray(anterior?.pages) ? anterior.pages.filter((p) => p && typeof p === "object") : [];
+  const novas = (desenho.abas?.length ? desenho.abas : [{ id: "p1", nome: desenho.titulo, formas: desenho.formas, ligacoes: desenho.ligacoes }]).map((a) => ({ ...a }));
+  // o formato de uma aba sobre um documento de uma aba: é a mesma aba, seja qual for o id dela
+  if (antigas.length === 1 && novas.length === 1 && !novas[0].manter && idLimpo(antigas[0].id) !== novas[0].id) novas[0].id = idLimpo(antigas[0].id);
+  const removidas = new Set(desenho.abasRemovidas || []);
+  const usadas = new Set();
+  const paginas = [];
+  const mudadas = [];
+  for (const [i, p] of antigas.entries()) {
+    const id = String(p.id ?? `p${i + 1}`);
+    if (removidas.has(idLimpo(id))) continue;
+    const nova = novas.find((a) => a.id === idLimpo(id));
+    if (nova) usadas.add(nova);
+    if (!nova || nova.manter) { paginas.push({ ...p, id, name: nova?.nome || p.name || `Página ${i + 1}` }); continue; }
+    paginas.push({ id, name: nova.nome, ...montarAba(nova, p) });
+    mudadas.push(id);
+  }
+  const criadas = [];
+  for (const a of novas) {
+    if (usadas.has(a) || a.manter || removidas.has(a.id)) continue;
+    let id = a.id || `p${paginas.length + 1}`;
+    while (paginas.some((p) => idLimpo(p.id) === idLimpo(id))) id = `${id}-2`;
+    paginas.push({ id, name: a.nome, ...montarAba(a, null) });
+    criadas.push(id);
+  }
+  if (!paginas.length) paginas.push({ id: "p1", name: "Página 1", shapes: [], connections: [] });
+  // link para aba que não existe (removida, inventada) sai
+  const ids = new Set(paginas.map((p) => String(p.id)));
+  for (const pg of paginas) for (const sh of pg.shapes || []) if (sh.link != null && !ids.has(String(sh.link))) delete sh.link;
+  // a aba que a pessoa vê: a que a Lisa indicou, senão a que ela criou, a que mudou ou a que estava aberta
+  const achar = (id) => paginas.find((p) => idLimpo(p.id) === idLimpo(id));
+  const ativa = (desenho.abaAtiva && achar(desenho.abaAtiva)) || (criadas[0] && achar(criadas[0]))
+    || (mudadas[0] && achar(mudadas[0])) || (anterior?.activePage && achar(anterior.activePage)) || paginas[0];
+  return { format: "processmap", version: 4, name: desenho.titulo, mode: "diagram", activePage: String(ativa.id), pages: paginas };
+}
+
+// uma aba remontada: as formas e as ligações da Lisa, com o que a pessoa arrumou na aba de antes
+function montarAba(desenho, abaAnterior) {
   const { pos, raias } = posicoesDoDesenho(desenho);
   const antigas = new Map();
-  for (const aba of anterior?.pages || []) for (const s of aba.shapes || []) antigas.set(String(s.id), s);
-  const ficou = (s) => ({ x: Number(s.x), y: Number(s.y), w: Number(s.w), h: Number(s.h) });
+  for (const sh of abaAnterior?.shapes || []) antigas.set(String(sh.id), sh);
+  const ficou = (sh) => ({ x: Number(sh.x), y: Number(sh.y), w: Number(sh.w), h: Number(sh.h) });
   const raiasQueFicam = [];
   const formasQueFicam = [];
-  const shapes = [];
+  // as imagens coladas e os rabiscos à mão: a Lisa não os vê, então ficam onde estavam
+  const shapes = (abaAnterior?.shapes || []).filter((sh) => sh && (sh.type === "image" || sh.type === "ink"));
   const novasRaias = [];
   for (const r of raias) {
     const velha = antigas.get(idDaRaia(r.nome));
@@ -281,23 +406,29 @@ export function montarDocumento(desenho, anterior = null) {
   for (const f of desenho.formas) {
     const t = FORMAS[f.tipo];
     const velha = antigas.get(f.id);
+    const mesma = velha && velha.type === f.tipo;
     let base;
-    if (velha && velha.type === f.tipo) base = { x: velha.x, y: velha.y, w: velha.w, h: velha.h, color: velha.color };
+    if (mesma) base = { x: velha.x, y: velha.y, w: velha.w, h: velha.h, color: velha.color };
     else {
       const p = pos.get(f.id);
       const c = semEsbarrar({ x: p.x, y: p.y, w: t.w, h: t.h }, formasQueFicam);
       formasQueFicam.push(c);
-      base = { ...c, color: t.cor || "purple" };
+      base = { ...c, color: velha?.color || t.cor || "purple" };
     }
-    shapes.push({ id: f.id, type: f.tipo, ...base, text: f.texto });
+    // a cor que a Lisa devolveu ("pinte de verde", ou a mesma que já tinha) vale por cima
+    if (f.cor) base.color = f.cor;
+    // o que a forma tinha e a Lisa não vê (travada, linguagem, fonte) continua
+    const forma = { ...(mesma ? velha : {}), id: f.id, type: f.tipo, ...base, text: f.texto };
+    if (f.link) forma.link = f.link;
+    shapes.push(forma);
   }
-  const connections = desenho.ligacoes.map((l, i) => ({
-    id: `l-${l.de}-${l.para}-${i}`, from: l.de, to: l.para, label: l.rotulo, arrow: l.ponta, dashed: l.tracejada,
-  }));
-  return {
-    format: "processmap", version: 4, name: desenho.titulo, mode: "diagram", activePage: "p1",
-    pages: [{ id: "p1", name: desenho.titulo.slice(0, 40), shapes, connections }],
-  };
+  // a ligação que continua (mesmas pontas) guarda o estilo e as portas que a pessoa escolheu
+  const ligacoesAntigas = abaAnterior?.connections || [];
+  const connections = desenho.ligacoes.map((l, i) => {
+    const velha = ligacoesAntigas.find((c) => String(c.from) === l.de && String(c.to) === l.para);
+    return { ...(velha || {}), id: velha?.id || `l-${l.de}-${l.para}-${i}`, from: l.de, to: l.para, label: l.rotulo, arrow: l.ponta, dashed: l.tracejada };
+  });
+  return { shapes, connections };
 }
 
 // ---------------------------------------------------------------- o desenho de volta para a Lisa
@@ -315,22 +446,30 @@ function agrupadorDe(s, agrupadores) {
 
 /**
  * A estrutura do desenho na tela, no mesmo formato que a IA devolve — é o que vai para a Lisa
- * quando o pedido é mudar o desenho (ela devolve o desenho inteiro, mantendo os ids).
+ * quando o pedido é mudar o desenho (ela devolve as abas que mudam inteiras, mantendo os ids). Todas
+ * as abas vão, com a que está aberta marcada (`abaAtiva`): pedido que não fala de aba é sobre ela.
  */
 export function estruturaDoDocumento(doc) {
-  const aba = abasDe(doc)[0] || { shapes: [], connections: [] };
-  const todas = (aba.shapes || []).filter((s) => s && s.type !== "ink" && s.type !== "image");
-  const agrupadores = todas.filter((s) => AGRUPADORES.has(s.type) && ehNumero(s.w));
-  const formas = todas.filter((s) => !AGRUPADORES.has(s.type)).map((s) => ({
-    id: String(s.id), tipo: FORMAS[s.type] ? s.type : s.type || "process",
-    texto: String(s.text ?? "").slice(0, LIMITES_DO_DESENHO.texto),
-    raia: agrupadorDe(s, agrupadores)?.text || "",
+  const abas = abasDe(doc).map((aba, i) => estruturaDaAba(aba, i));
+  const aberta = abas.find((a) => a.id === String(doc?.activePage)) || abas[0];
+  return { titulo: String(doc?.name || abas[0]?.nome || "Processo"), abaAtiva: aberta?.id || "p1", abas };
+}
+
+function estruturaDaAba(aba, i) {
+  const todas = (aba.shapes || []).filter((sh) => sh && sh.type !== "ink" && sh.type !== "image");
+  const agrupadores = todas.filter((sh) => AGRUPADORES.has(sh.type) && ehNumero(sh.w));
+  const formas = todas.filter((sh) => !AGRUPADORES.has(sh.type)).map((sh) => ({
+    id: String(sh.id), tipo: FORMAS[sh.type] ? sh.type : sh.type || "process",
+    texto: String(sh.text ?? "").slice(0, LIMITES_DO_DESENHO.texto),
+    raia: agrupadorDe(sh, agrupadores)?.text || "",
+    cor: nomeDaCor(sh.color),
+    ...(sh.link != null ? { link: String(sh.link) } : {}),
   }));
   const ids = new Set(formas.map((f) => f.id));
   const ligacoes = (aba.connections || []).filter((c) => ids.has(String(c.from)) && ids.has(String(c.to))).map((c) => ({
     de: String(c.from), para: String(c.to), rotulo: String(c.label || ""), tracejada: Boolean(c.dashed), ponta: c.arrow || "arrow",
   }));
-  return { titulo: String(doc?.name || aba.name || "Processo"), formas, ligacoes };
+  return { id: String(aba.id ?? `p${i + 1}`), nome: String(aba.name || `Página ${i + 1}`), formas, ligacoes };
 }
 
 /** O desenho em texto, para a Lisa ler o que está na tela (o que a pessoa mudou também). */
@@ -349,11 +488,13 @@ export function descreverDiagrama(doc) {
       const linha = String(s.text ?? "").split(/\r?\n/)[0].trim().slice(0, 60);
       return `[${s.id}] ${nome(s)}${linha ? ` "${linha}"` : ""}`;
     };
-    partes.push(`ABA "${aba.name || "Página"}" — ${formas.length} formas, ${(aba.connections || []).length} ligações`);
+    const aberta = abasDe(doc).length > 1 && String(aba.id) === String(doc?.activePage) ? " (a que está aberta)" : "";
+    partes.push(`ABA "${aba.name || "Página"}" [aba ${aba.id ?? "p1"}]${aberta} — ${formas.length} formas, ${(aba.connections || []).length} ligações`);
     for (const s of formas) {
       const conteudo = String(s.text ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).join(" | ").slice(0, 200);
-      let linha = `- [${s.id}] ${nome(s)}${conteudo ? `: "${conteudo}"` : ""}`;
+      let linha = `- [${s.id}] ${nome(s)}, ${nomeDaCor(s.color)}${conteudo ? `: "${conteudo}"` : ""}`;
       if (!AGRUPADORES.has(s.type)) { const g = agrupadorDe(s, agrupadores); if (g) linha += ` (dentro de [${g.id}])`; }
+      if (s.link != null) linha += ` (abre a aba ${s.link})`;
       partes.push(linha);
     }
     for (const c of aba.connections || []) {
@@ -419,8 +560,8 @@ const SUBSTANTIVOS_DE_DESENHO = new Set(["desenho", "desenhos", "desenhado", "de
 const VERBOS_GERAIS = ["monte", "montar", "crie", "criar", "cria", "faca", "fazer", "faz", "gere", "gerar", "mostre", "mostrar", "coloque", "ponha", "quero", "preciso"];
 const COISAS_FORTES = ["diagrama", "diagramas", "fluxograma", "fluxogramas", "bpmn", "swimlane", "organograma", "processmap"];
 const COISAS = [...COISAS_FORTES, "processo", "processos", "fluxo", "fluxos", "arquitetura", "workflow", "jornada", "pipeline", "esteira", "raias", "mapa", "modelagem"];
-const VERBO_DE_MUDANCA = /\b(adicion\w*|acrescent\w*|inclu\w*|coloque|ponha|remov\w*|tir[ae]|apag\w*|exclu\w*|troqu\w*|troc\w*|mud\w*|renome\w*|lig\w*|conect\w*|separ\w*|junt\w*|reorganiz\w*|refa[çz]\w*|corrij\w*|ajust\w*|divid\w*|mov[ae]\w*)\b/i;
-const PARTE_DO_DESENHO = /\b(etapa|passo|caixa|forma|raia|decis[aã]o|liga[çc][aã]o|seta|fluxo|diagrama|processo|desenho|quadro|in[ií]cio|fim|tarefa|gateway|evento|swimlane|caminho|mapa|t[oó]pico|galho)s?\b/i;
+const VERBO_DE_MUDANCA = /\b(adicion\w*|acrescent\w*|inclu\w*|coloque|ponha|remov\w*|tir[ae]|apag\w*|exclu\w*|troqu\w*|troc\w*|mud\w*|renome\w*|lig\w*|conect\w*|separ\w*|junt\w*|reorganiz\w*|refa[çz]\w*|corrij\w*|ajust\w*|divid\w*|mov[ae]\w*|limp\w*|pint\w*|color\w*|destaqu\w*|destac\w*|marqu\w*|deix[ae]\w*|cri[ae]\w*|detalh\w*)\b/i;
+const PARTE_DO_DESENHO = /\b(etapa|passo|caixa|forma|raia|decis[aã]o|liga[çc][aã]o|seta|fluxo|diagrama|processo|desenho|quadro|in[ií]cio|fim|tarefa|gateway|evento|swimlane|caminho|mapa|t[oó]pico|galho|atividade|cor|cores|vermelh[ao]|verde|azul|[aâ]mbar|amarel[ao]|laranja|cinza|grafite|branc[ao]|aba|p[aá]gina|subprocesso)s?\b/i;
 
 /**
  * A pergunta pede para desenhar ("novo") ou, com o quadro aberto, para mudar o desenho que está nele
@@ -475,9 +616,9 @@ export function pedeMapaMental(texto) {
 }
 
 /**
- * Confere o mapa que a IA devolveu: { titulo, tema, explicacao, topicos: [{ id, texto, filhos: [{ id,
+ * Confere o mapa que a IA devolveu: { titulo, tema, explicacao, topicos: [{ id, texto, cor, filhos: [{ id,
  * texto, filhos: [{ id, texto }] }] }] } — três níveis abaixo do tema, com teto por nível e no total.
- * Tópico sem texto sai; ids limpos e sem repetir.
+ * Tópico sem texto sai; ids limpos e sem repetir; a `cor` (o nome) só vale nos galhos (1º nível).
  */
 export function validarMapaMental(bruto) {
   const vistos = new Set([ID_DO_TEMA]);
@@ -494,10 +635,12 @@ export function validarMapaMental(bruto) {
     if (!txt || total >= LIMITES_DO_MAPA.total) return [];
     total++;
     const no = { id: idDe(t?.id), texto: txt };
+    if (nivel === 1 && corPeloNome(t?.cor)) no.cor = corPeloNome(t.cor);
     if (nivel < 3) no.filhos = ramo(t?.filhos, nivel === 1 ? LIMITES_DO_MAPA.filhos : LIMITES_DO_MAPA.netos, nivel + 1);
     return [no];
   });
   const topicos = ramo(bruto?.topicos, LIMITES_DO_MAPA.topicos, 1);
+  aplicarPintura(topicos, bruto?.pintar);
   return {
     titulo: texto(bruto?.titulo, 80) || texto(bruto?.tema, 80) || "Mapa mental",
     tema: texto(bruto?.tema, LIMITES_DO_MAPA.texto) || texto(bruto?.titulo, 80) || "Tema central",
@@ -523,7 +666,7 @@ export function montarMapaMental(mapa, anterior = null) {
     const no = { id: t.id, type: "mmNode", x: 0, y: 0, w: 120, h: 36, text: t.texto, parent: pai };
     if (nivel === 1) {
       no.side = velho?.side === "left" || velho?.side === "right" ? velho.side : i % 2 ? "left" : "right";
-      no.color = velho?.color || CORES_DOS_GALHOS[i % CORES_DOS_GALHOS.length];
+      no.color = t.cor || velho?.color || CORES_DOS_GALHOS[i % CORES_DOS_GALHOS.length];
     }
     if (velho?.collapsed === true) no.collapsed = true;
     for (const k of ["ox", "oy"]) if (ehNumero(velho?.[k]) && Number(velho[k])) no[k] = Number(velho[k]);
@@ -564,6 +707,7 @@ export function estruturaDoMapa(doc) {
   const tema = nos.find((s) => s.type === "mmRoot");
   const arvore = (id, nivel) => nos.filter((s) => s.type === "mmNode" && String(s.parent) === String(id)).map((s) => ({
     id: String(s.id), texto: String(s.text ?? "").slice(0, LIMITES_DO_MAPA.texto),
+    ...(nivel === 1 && CORES[s.color] ? { cor: nomeDaCor(s.color) } : {}),
     ...(nivel < 3 ? { filhos: arvore(s.id, nivel + 1) } : {}),
   }));
   return { titulo: String(doc?.name || "Mapa mental"), tema: String(tema?.text ?? "Tema central"), topicos: tema ? arvore(tema.id, 1) : [] };
@@ -579,7 +723,8 @@ function descreverMapa(doc) {
   const descer = (id, nivel) => {
     if (nivel > 12) return;
     for (const s of nos.filter((x) => x.type === "mmNode" && String(x.parent) === String(id))) {
-      linhas.push(`${"  ".repeat(nivel)}- [${s.id}] "${String(s.text ?? "").replace(/\s+/g, " ").slice(0, 200)}"${s.collapsed ? " (recolhido)" : ""}`);
+      const cor = nivel === 1 && CORES[s.color] ? ` (galho ${nomeDaCor(s.color)})` : "";
+      linhas.push(`${"  ".repeat(nivel)}- [${s.id}] "${String(s.text ?? "").replace(/\s+/g, " ").slice(0, 200)}"${cor}${s.collapsed ? " (recolhido)" : ""}`);
       descer(s.id, nivel + 1);
     }
   };

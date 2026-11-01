@@ -7,6 +7,7 @@ import {
   validarDesenho, camadasDoDesenho, posicoesDoDesenho, montarDocumento, estruturaDoDocumento, descreverDiagrama,
   pedidoDeDesenho, documentoValido, FORMAS, distanciaDeEdicao, pareceDiagramaEmTexto,
   pedeMapaMental, validarMapaMental, montarMapaMental, estruturaDoMapa, LIMITES_DO_MAPA,
+  CORES, NOMES_DAS_CORES, corPeloNome, nomeDaCor,
 } from "../src/lib/diagramaDaLisa.js";
 import fs from "node:fs";
 
@@ -82,7 +83,7 @@ console.log("\nraias");
   const doc = montarDocumento(d);
   const lanes = doc.pages[0].shapes.filter((s) => s.type === "lane");
   conferir("o documento traz as raias como formas do quadro", lanes.length === 3 && lanes[0].text === "Cliente");
-  const est = estruturaDoDocumento(doc);
+  const est = estruturaDoDocumento(doc).abas[0];
   conferir("a estrutura de volta sabe a raia de cada forma (pelo desenho)", est.formas.find((f) => f.id === "d").raia === "Financeiro" && est.formas.every((f) => f.tipo !== "lane"));
   const texto = descreverDiagrama(doc);
   conferir("o texto para a Lisa diz o que está dentro de cada raia e as ligações", /\[d\] tarefa de serviço.*"Cobrar" \(dentro de \[raia-financeiro\]\)/.test(texto) && /\[c\].*→ \[d\].*rótulo "sim"/.test(texto), texto.slice(0, 400));
@@ -171,7 +172,9 @@ console.log("\no mapa mental (01/11/2026)");
   const galhos = nos.filter((s) => s.parent === nos[0].id);
   conferir("os galhos se alternam entre direita e esquerda, cada um com uma cor", galhos.length === 8 && galhos[0].side === "right" && galhos[1].side === "left" && new Set(galhos.slice(0, 5).map((s) => s.color)).size === 5);
   conferir("todo tópico pendura num nó que existe", nos.slice(1).every((s) => s.type === "mmNode" && nos.some((p) => p.id === s.parent)));
-  conferir("a estrutura volta igual (para a Lisa mudar o mapa)", JSON.stringify(estruturaDoMapa(doc).topicos) === JSON.stringify(mapa.topicos));
+  const semCor = (lista) => JSON.parse(JSON.stringify(lista, (k, v) => (k === "cor" ? undefined : v)));
+  conferir("a estrutura volta igual (para a Lisa mudar o mapa)", JSON.stringify(semCor(estruturaDoMapa(doc).topicos)) === JSON.stringify(mapa.topicos));
+  conferir("e leva a cor de cada galho, pelo nome", estruturaDoMapa(doc).topicos.slice(0, 3).map((t) => t.cor).join() === "verde,azul-escuro,âmbar");
   // a pessoa arrumou o primeiro galho (recolheu, arrastou, trocou de lado e de cor) e pendurou um tópico no 4º nível
   const arrumado = JSON.parse(JSON.stringify(doc));
   const g0 = arrumado.pages[0].shapes.find((s) => s.id === "pesquisa-inicial");
@@ -187,6 +190,110 @@ console.log("\no mapa mental (01/11/2026)");
   conferir("a rota desenha mapa mental quando pedem ou quando há um mapa na tela", /pedeMapaMental\(pedido\)/.test(rota) && /mapaNaTela/.test(rota) && /desenharMapaMental/.test(rota));
   const fm = fs.readFileSync(new URL("../public/diagramas/js/FileManager.js", import.meta.url), "utf8");
   conferir("o quadro reabre o mapa com as cores dos galhos (não tudo roxo)", /def\.mind && !PM\.Palette\.some/.test(fm));
+}
+
+console.log("\nas cores (01/11/2026: \"limpe as atividades da cor vermelha\")");
+{
+  conferir("cada cor do quadro tem um nome, sem repetir", Object.keys(CORES).join() === "purple,deep,lilac,graphite,white,green,amber,red" && new Set(NOMES_DAS_CORES).size === 8);
+  conferir("o nome, o id e os jeitos de dizer viram a cor do quadro", corPeloNome("vermelho") === "red" && corPeloNome("Vermelha") === "red" && corPeloNome("Âmbar") === "amber" && corPeloNome("laranja") === "amber" && corPeloNome("azul-escuro") === "deep" && corPeloNome("azul escuro") === "deep" && corPeloNome("green") === "green");
+  conferir("o que não é cor fica de fora", corPeloNome("rosa") === null && corPeloNome("") === null && corPeloNome(null) === null);
+  conferir("sem cor, a forma é azul (a principal do tema da Lisa)", nomeDaCor(undefined) === "azul" && nomeDaCor("purple") === "azul" && nomeDaCor("red") === "vermelho");
+
+  // um fluxo com duas atividades vermelhas
+  const tela = montarDocumento(validarDesenho({
+    titulo: "Pedido", colecao: "flow", explicacao: "",
+    formas: [
+      { id: "ini", tipo: "terminal", texto: "Início" }, { id: "a", tipo: "process", texto: "Registrar" },
+      { id: "b", tipo: "process", texto: "Conferir estoque" }, { id: "c", tipo: "process", texto: "Pedir ao fornecedor" },
+      { id: "d", tipo: "process", texto: "Pagar" }, { id: "fim", tipo: "terminal", texto: "Fim" },
+    ],
+    ligacoes: [{ de: "ini", para: "a" }, { de: "a", para: "b" }, { de: "b", para: "c" }, { de: "c", para: "d" }, { de: "d", para: "fim" }],
+  }));
+  for (const s of tela.pages[0].shapes) if (s.id === "b" || s.id === "c") s.color = "red";
+  const pos = Object.fromEntries(tela.pages[0].shapes.map((s) => [s.id, s.x + "," + s.y]));
+  const estDoc = estruturaDoDocumento(tela);
+  const est = estDoc.abas[0];
+  conferir("a Lisa recebe a cor de cada forma", est.formas.find((f) => f.id === "b").cor === "vermelho" && est.formas.find((f) => f.id === "a").cor === "azul" && est.formas.find((f) => f.id === "ini").cor === "azul-escuro");
+  conferir("e lê as cores na conversa (\"quais estão em vermelho?\")", /\[b\] [^\n]*, vermelho: "Conferir estoque"/.test(descreverDiagrama(tela)));
+  conferir("validar: o nome vira a cor do quadro; cor inventada fica de fora", validarDesenho({ formas: [{ id: "x", tipo: "process", texto: "X", cor: "verde" }, { id: "y", tipo: "process", texto: "Y", cor: "rosa" }], ligacoes: [] }).formas.map((f) => f.cor ?? "-").join() === "green,-");
+  // o que a IA devolve para "limpe as atividades da cor vermelha do fluxo": sem b e c, religado
+  const limpo = montarDocumento(validarDesenho({
+    titulo: "Pedido", colecao: "flow", explicacao: "Tirei as duas vermelhas.",
+    formas: est.formas.filter((f) => f.cor !== "vermelho"),
+    ligacoes: [{ de: "ini", para: "a" }, { de: "a", para: "d" }, { de: "d", para: "fim" }],
+  }), tela);
+  const ficaram = limpo.pages[0].shapes;
+  conferir("limpar as vermelhas: elas saem, o fluxo fica religado", !ficaram.some((s) => s.id === "b" || s.id === "c") && limpo.pages[0].connections.some((c) => c.from === "a" && c.to === "d"));
+  conferir("e o resto fica onde e da cor que estava", ficaram.every((s) => pos[s.id] === s.x + "," + s.y) && ficaram.find((s) => s.id === "ini").color === "deep" && ficaram.find((s) => s.id === "a").color === "purple");
+  // "pinte as vermelhas de verde"
+  const pintado = montarDocumento(validarDesenho({ ...estDoc, colecao: "flow", abas: [{ ...est, formas: est.formas.map((f) => (f.cor === "vermelho" ? { ...f, cor: "verde" } : f)) }] }), tela);
+  conferir("pintar: a cor pedida vale, sem sair do lugar", pintado.pages[0].shapes.filter((s) => s.id === "b" || s.id === "c").every((s) => s.color === "green" && pos[s.id] === s.x + "," + s.y));
+  conferir("a lista \"pintar\" vale por cima da cor da forma (o modelo às vezes só conta a troca)", validarDesenho({ formas: [{ id: "x", tipo: "process", texto: "X", cor: "azul" }, { id: "y", tipo: "process", texto: "Y" }], ligacoes: [], pintar: [{ id: "x", cor: "verde" }, { id: "nao-existe", cor: "verde" }, { id: "y", cor: "rosa" }] }).formas.map((f) => f.cor ?? "-").join() === "green,-");
+  conferir("e nos galhos do mapa mental", validarMapaMental({ tema: "T", topicos: [{ id: "a", texto: "A", cor: "azul" }], pintar: [{ id: "a", cor: "vermelho" }] }).topicos[0].cor === "red");
+  conferir("devolver a mesma cor não muda nada", montarDocumento(validarDesenho({ ...estDoc, colecao: "flow" }), tela).pages[0].shapes.every((s) => s.color === tela.pages[0].shapes.find((x) => x.id === s.id).color));
+
+  conferir("\"limpe as atividades da cor vermelha do fluxo\", com o quadro aberto, muda o desenho", pedidoDeDesenho("limpe as atividades da cor vermelha do fluxo", { quadroAberto: true }) === "alterar");
+  conferir("\"pinte as etapas de aprovação de verde\" também", pedidoDeDesenho("pinte as etapas de aprovação de verde", { quadroAberto: true }) === "alterar" && pedidoDeDesenho("deixe tudo que está em âmbar em vermelho", { quadroAberto: true }) === "alterar");
+  conferir("sem quadro aberto, não vira desenho", pedidoDeDesenho("limpe as atividades da cor vermelha do fluxo") === null);
+  conferir("galho do mapa mental: a cor pedida vale", montarMapaMental(validarMapaMental({ tema: "T", topicos: [{ texto: "A", cor: "vermelho" }, { texto: "B" }] })).pages[0].shapes.filter((s) => s.parent === "raiz").map((s) => s.color).join() === "red,deep");
+}
+
+console.log("\nas abas (01/11/2026: \"a Lisa deve poder criar abas dentro dos fluxogramas\")");
+{
+  // um documento de duas abas: o processo principal e o de pagamento, com uma imagem, um rabisco,
+  // uma forma travada e uma ligação com estilo escolhido pela pessoa
+  const principal = montarDocumento(validarDesenho({
+    titulo: "Compras", colecao: "flow",
+    formas: [{ id: "ini", tipo: "terminal", texto: "Início" }, { id: "pedir", tipo: "process", texto: "Pedir" }, { id: "aprovar", tipo: "process", texto: "Aprovar" }, { id: "fim", tipo: "terminal", texto: "Fim" }],
+    ligacoes: [{ de: "ini", para: "pedir" }, { de: "pedir", para: "aprovar" }, { de: "aprovar", para: "fim" }],
+  })).pages[0];
+  principal.id = "p1"; principal.name = "Principal";
+  principal.shapes.push({ id: "img1", type: "image", x: 900, y: 40, w: 100, h: 80, src: "data:image/png;base64,AAAA" }, { id: "tinta", type: "ink", x: 0, y: 0, w: 10, h: 10, pts: [0, 0, 5, 5] });
+  principal.shapes.find((x) => x.id === "pedir").locked = true;
+  principal.connections.find((c) => c.from === "pedir").style = "curve";
+  const pagamento = { id: "pag", name: "Pagamento", shapes: [{ id: "x", type: "process", x: 10, y: 10, w: 160, h: 70, text: "Pagar", color: "purple" }], connections: [] };
+  const tela = { format: "processmap", version: 4, name: "Compras", mode: "diagram", activePage: "p1", pages: [principal, pagamento] };
+
+  const est = estruturaDoDocumento(tela);
+  conferir("a Lisa vê todas as abas, com a aberta marcada", est.abas.map((a) => `${a.id}:${a.nome}`).join() === "p1:Principal,pag:Pagamento" && est.abaAtiva === "p1");
+  conferir("e a imagem e o rabisco não entram como formas", !est.abas[0].formas.some((f) => f.id === "img1" || f.id === "tinta"));
+  conferir("na conversa, cada aba aparece com o id e a marca da aberta", /ABA "Principal" \[aba p1\] \(a que está aberta\)/.test(descreverDiagrama(tela)) && /ABA "Pagamento" \[aba pag\]/.test(descreverDiagrama(tela)));
+
+  // "crie uma aba com o detalhe da aprovação": a principal muda (a etapa ganha o link), o pagamento fica
+  const resposta = validarDesenho({
+    titulo: "Compras", colecao: "flow", explicacao: "Criei a aba.", abaAtiva: "aprovacao",
+    abas: [
+      { ...est.abas[0], formas: est.abas[0].formas.map((f) => (f.id === "aprovar" ? { ...f, link: "aprovacao" } : f)) },
+      { id: "pag", nome: "Pagamento", manter: true },
+      { id: "aprovacao", nome: "Detalhe da aprovação", formas: [{ id: "a1", tipo: "process", texto: "Conferir valor" }, { id: "a2", tipo: "decision", texto: "Acima do limite?" }], ligacoes: [{ de: "a1", para: "a2" }] },
+    ],
+  });
+  const novo = montarDocumento(resposta, tela);
+  const [p1, pag, aprov] = novo.pages;
+  conferir("a aba nova entra no fim, e a pessoa vê ela", novo.pages.map((x) => x.id).join() === "p1,pag,aprovacao" && novo.activePage === "aprovacao" && aprov.shapes.length === 2 && aprov.connections.length === 1);
+  conferir("a etapa detalhada abre a aba nova (link)", p1.shapes.find((x) => x.id === "aprovar").link === "aprovacao");
+  conferir("a aba mantida fica exatamente igual", JSON.stringify(pag) === JSON.stringify(pagamento));
+  conferir("a imagem e o rabisco da aba mudada ficam", p1.shapes.some((x) => x.id === "img1" && x.src) && p1.shapes.some((x) => x.id === "tinta"));
+  conferir("a forma travada continua travada, no lugar", p1.shapes.find((x) => x.id === "pedir").locked === true && p1.shapes.find((x) => x.id === "pedir").x === principal.shapes.find((x) => x.id === "pedir").x);
+  conferir("a ligação que continua guarda o estilo escolhido", p1.connections.find((c) => c.from === "pedir").style === "curve");
+
+  // o modelo esqueceu a aba de pagamento: ela fica (apagar é só pela lista)
+  const esqueceu = montarDocumento(validarDesenho({ titulo: "Compras", abas: [{ ...est.abas[0] }] }), tela);
+  conferir("aba que some da resposta não é apagada", esqueceu.pages.map((x) => x.id).join() === "p1,pag");
+  // "apague a aba de pagamento"; e um link para ela some junto
+  const comLink = JSON.parse(JSON.stringify(tela));
+  comLink.pages[0].shapes.find((x) => x.id === "fim").link = "pag";
+  const apagou = montarDocumento(validarDesenho({ titulo: "Compras", abas: [{ id: "p1", nome: "Principal", manter: true }], abasRemovidas: ["pag"] }), comLink);
+  conferir("apagar aba: só pela lista \"abasRemovidas\", e o link para ela sai", apagou.pages.map((x) => x.id).join() === "p1" && apagou.pages[0].shapes.find((x) => x.id === "fim").link === undefined);
+  // renomear sem mexer no resto
+  const renomeou = montarDocumento(validarDesenho({ titulo: "Compras", abas: [{ id: "p1", nome: "Principal", manter: true }, { id: "pag", nome: "Contas a pagar", manter: true }] }), tela);
+  conferir("renomear aba: só o nome muda", renomeou.pages[1].name === "Contas a pagar" && JSON.stringify(renomeou.pages[1].shapes) === JSON.stringify(pagamento.shapes));
+  // o formato de uma aba (sem "abas") sobre um documento de uma aba de id qualquer: é a mesma aba
+  const umaAba = { ...tela, activePage: "zz", pages: [{ ...principal, id: "zz" }] };
+  const legado = montarDocumento(validarDesenho({ titulo: "Compras", formas: est.abas[0].formas, ligacoes: est.abas[0].ligacoes }), umaAba);
+  conferir("formato antigo (uma aba): continua sendo a mesma aba", legado.pages.length === 1 && legado.pages[0].id === "zz" && legado.pages[0].shapes.find((x) => x.id === "pedir").locked === true);
+  conferir("link para aba que não existe sai", montarDocumento(validarDesenho({ titulo: "X", formas: [{ id: "a", tipo: "process", texto: "A", link: "inventada" }], ligacoes: [] })).pages[0].shapes[0].link === undefined);
+  conferir("\"crie uma aba com o detalhe da aprovação\", com o quadro aberto, muda o desenho", pedidoDeDesenho("crie uma aba com o detalhe da aprovação", { quadroAberto: true }) === "alterar" && pedidoDeDesenho("separe o processo em abas por área", { quadroAberto: true }) === "alterar");
 }
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");

@@ -39,10 +39,12 @@ export async function POST(req) {
       if (!mapa.topicos.length) throw new Error("a Lisa não montou nenhum tópico — tente pedir de outro jeito");
       return jsonResponse({ ok: true, doc: montarMapaMental(mapa, mapaNaTela ? atual : null), titulo: mapa.titulo, colecao: null, explicacao: mapa.explicacao });
     }
-    const estrutura = atual ? estruturaDoDocumento(atual) : null;
+    // (um mapa mental na tela não é base para um fluxograma: as abas dele não têm o que manter)
+    const base = mapaNaTela ? null : atual;
+    const estrutura = base ? estruturaDoDocumento(base) : null;
     const bruto = await desenharDiagrama({ pedido, estrutura, conversa, contexto });
     const desenho = validarDesenho(bruto);
-    return jsonResponse({ ok: true, doc: montarDocumento(desenho, atual), titulo: desenho.titulo, colecao: desenho.colecao, explicacao: desenho.explicacao });
+    return jsonResponse({ ok: true, doc: montarDocumento(desenho, base), titulo: desenho.titulo, colecao: desenho.colecao, explicacao: desenho.explicacao });
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err?.message || err) }, 500);
   }

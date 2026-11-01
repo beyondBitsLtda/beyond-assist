@@ -3,7 +3,7 @@ import { TTS_VOICES } from "./ttsVoices.js";
 import { pickKeyIndex, markCooldown, markOk } from "./geminiKeyHealth.js";
 import { streamComRetomada } from "./retomada.js";
 import { limparTranscricao } from "./tomarNota.js";
-import { FORMAS, TIPOS, COLECOES, PONTAS } from "./diagramaDaLisa.js";
+import { FORMAS, TIPOS, COLECOES, PONTAS, NOMES_DAS_CORES } from "./diagramaDaLisa.js";
 
 const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 // gemini-2.5-flash foi descontinuado pra projetos novos no Google Cloud (confirmado ao vivo:
@@ -1125,7 +1125,7 @@ export async function desenharDiagrama({ pedido, estrutura = null, conversa = ""
       : "",
     conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-6000)}\n` : "",
     estrutura
-      ? `O DESENHO QUE ESTÁ NA TELA AGORA (a pessoa pode ter mexido nele — parta DELE):\n${JSON.stringify(estrutura).slice(0, 20000)}\n`
+      ? `O DESENHO QUE ESTÁ NA TELA AGORA (a pessoa pode ter mexido nele — parta DELE; "abaAtiva" é a aba que ela está vendo):\n${JSON.stringify(estrutura).slice(0, 24000)}\n`
       : "",
     `PEDIDO: "${String(pedido || "").slice(0, 8000)}"`,
   ].filter(Boolean).join("\n");
@@ -1138,6 +1138,20 @@ As formas que existem (o "tipo" é o nome à esquerda):
 ${formas}
 
 Regras:
+- O desenho tem ABAS (páginas do quadro). "abas": cada uma com "id" curto (sem espaço nem acento), "nome",
+  "formas" e "ligacoes". Num desenho novo, uma aba só (id "p1"), a não ser que o pedido peça abas
+  ("uma aba por área", "o subprocesso numa aba separada").
+- Numa MUDANÇA, devolva TODAS as abas que existem, na mesma ordem:
+  a aba que o pedido não mexe vai só com { "id", "nome", "manter": true } (sem formas) — ela fica
+  exatamente como está; a aba que muda vai INTEIRA (todas as formas e ligações dela, com os ids).
+  Pedido que não cita aba é sobre a aba que a pessoa está vendo ("abaAtiva").
+- Criar aba ("crie uma aba…", "separe em abas…", "detalhe a aprovação numa aba nova"): acrescente a aba
+  com um id novo e as formas dela. Quando a aba nova detalha uma etapa de outra aba, ponha nessa etapa
+  "link": o id da aba nova (no quadro, Ctrl+clique na etapa abre a aba) — e devolva a aba da etapa
+  inteira, com o link. Separar em abas é MOVER: a forma que foi para a aba nova sai da aba de antes.
+- Renomear aba: a aba com o "nome" novo (com "manter": true se nada mais nela muda).
+- Apagar aba: o id dela em "abasRemovidas" (aba que você só deixar de fora NÃO é apagada).
+- "abaAtiva": a aba que a pessoa deve ver depois — a que você criou, senão a que mudou.
 - "formas": cada uma com um "id" curto, sem espaço nem acento (ex.: "pedido", "aprova", "nf"), o "tipo"
   e o "texto" que aparece dentro (curto: 2 a 6 palavras; tabela e classe podem ter várias linhas).
 - "raia": quem faz aquela etapa (pessoa, área ou sistema), quando o processo tem mais de um
@@ -1152,6 +1166,20 @@ Regras:
 - Comece por um início e termine num fim quando for um processo. Entre 4 e 30 formas: completo, mas legível.
 - Se houver um desenho na tela, é uma MUDANÇA: devolva o desenho INTEIRO atualizado, mantendo o "id"
   de toda forma que continua (é assim que o que a pessoa arrumou fica no lugar), e mude só o que foi pedido.
+- "cor": a cor de cada forma (${NOMES_DAS_CORES.join(", ")}). Num desenho novo, deixe sem cor (cada tipo
+  tem a sua), a não ser que o pedido fale de cor. Numa MUDANÇA, cada forma já vem com a cor que tem na
+  tela: devolva a MESMA cor, a não ser que o pedido mexa nela.
+- A pessoa pode apontar formas pela APARÊNCIA, e não só pelo texto: pela cor ("as vermelhas", "as
+  atividades em âmbar"), pelo tipo ("os losangos", "as decisões") ou pela raia ("o que está no
+  Financeiro"). Ache TODAS as formas que batem e faça o que foi pedido com elas:
+  "limpe", "apague", "remova", "tire" as X → tire essas formas do desenho e religue o fluxo em volta
+  (quem apontava para elas passa a apontar para a etapa seguinte);
+  "pinte de verde", "deixe em vermelho", "marque como concluída" → troque a cor;
+  "tire a cor", "volte ao normal" → a cor volta para "azul".
+  TODA troca de cor vai também em "pintar": uma entrada { aba, id, cor } para cada forma cuja cor mudou
+  (sem troca de cor, "pintar" fica vazio).
+  Na "explicacao", diga quais formas foram (pelo texto delas). Se nenhuma forma tiver aquela cor, não
+  mude nada e diga isso.
 - "explicacao": 1 a 3 frases em português, falando com a pessoa, dizendo o que você desenhou ou mudou.
 - "titulo": o nome do processo.
 - Se o PEDIDO trouxer um diagrama em texto (Mermaid, PlantUML), desenhe fielmente o que ele descreve: as
@@ -1174,24 +1202,45 @@ Regras:
               titulo: { type: "STRING" },
               colecao: { type: "STRING", enum: COLECOES },
               explicacao: { type: "STRING" },
-              formas: {
+              abaAtiva: { type: "STRING" },
+              abas: {
                 type: "ARRAY",
                 items: {
                   type: "OBJECT",
-                  properties: { id: { type: "STRING" }, tipo: { type: "STRING", enum: TIPOS }, texto: { type: "STRING" }, raia: { type: "STRING" } },
-                  required: ["id", "tipo", "texto"],
+                  properties: {
+                    id: { type: "STRING" },
+                    nome: { type: "STRING" },
+                    manter: { type: "BOOLEAN" },
+                    formas: {
+                      type: "ARRAY",
+                      items: {
+                        type: "OBJECT",
+                        properties: {
+                          id: { type: "STRING" }, tipo: { type: "STRING", enum: TIPOS }, texto: { type: "STRING" }, raia: { type: "STRING" },
+                          cor: { type: "STRING", enum: NOMES_DAS_CORES }, link: { type: "STRING" },
+                        },
+                        required: ["id", "tipo", "texto"],
+                      },
+                    },
+                    ligacoes: {
+                      type: "ARRAY",
+                      items: {
+                        type: "OBJECT",
+                        properties: { de: { type: "STRING" }, para: { type: "STRING" }, rotulo: { type: "STRING" }, tracejada: { type: "BOOLEAN" }, ponta: { type: "STRING", enum: PONTAS } },
+                        required: ["de", "para"],
+                      },
+                    },
+                  },
+                  required: ["id", "nome"],
                 },
               },
-              ligacoes: {
+              abasRemovidas: { type: "ARRAY", items: { type: "STRING" } },
+              pintar: {
                 type: "ARRAY",
-                items: {
-                  type: "OBJECT",
-                  properties: { de: { type: "STRING" }, para: { type: "STRING" }, rotulo: { type: "STRING" }, tracejada: { type: "BOOLEAN" }, ponta: { type: "STRING", enum: PONTAS } },
-                  required: ["de", "para"],
-                },
+                items: { type: "OBJECT", properties: { aba: { type: "STRING" }, id: { type: "STRING" }, cor: { type: "STRING", enum: NOMES_DAS_CORES } }, required: ["id", "cor"] },
               },
             },
-            required: ["titulo", "colecao", "explicacao", "formas", "ligacoes"],
+            required: ["titulo", "colecao", "explicacao", "abas"],
           },
         },
       }),
@@ -1233,12 +1282,21 @@ Regras:
   a pessoa arrumou fica no lugar), e mude só o que foi pedido.
 - Se o contexto trouxer um fluxograma ou código e o pedido for transformá-lo em mapa mental, organize
   o conteúdo dele em tópicos.
+- "cor": a cor de cada galho (tópico principal): ${NOMES_DAS_CORES.join(", ")}. Num mapa novo, deixe sem cor
+  (o quadro alterna sozinho). Numa MUDANÇA, devolva a cor que cada galho já tem, a não ser que o pedido
+  mexa nela. A pessoa pode apontar galhos pela cor ("limpe os galhos vermelhos", "pinte o de marketing
+  de verde"): ache todos os que batem e faça o pedido (limpar/apagar/remover = tirar o galho inteiro).
+  Toda troca de cor vai também em "pintar": { id, cor } de cada galho que mudou (sem troca, vazio).
 - "explicacao": 1 a 3 frases em português, falando com a pessoa, dizendo o que você montou ou mudou.
 - "titulo": o nome do mapa.`;
 
-  const topico = (filhos) => ({
+  const topico = (filhos, comCor = false) => ({
     type: "OBJECT",
-    properties: { id: { type: "STRING" }, texto: { type: "STRING" }, ...(filhos ? { filhos } : {}) },
+    properties: {
+      id: { type: "STRING" }, texto: { type: "STRING" },
+      ...(comCor ? { cor: { type: "STRING", enum: NOMES_DAS_CORES } } : {}),
+      ...(filhos ? { filhos } : {}),
+    },
     required: ["id", "texto"],
   });
   const res = await withTransientRetry(
@@ -1256,7 +1314,11 @@ Regras:
               titulo: { type: "STRING" },
               tema: { type: "STRING" },
               explicacao: { type: "STRING" },
-              topicos: { type: "ARRAY", items: topico({ type: "ARRAY", items: topico({ type: "ARRAY", items: topico(null) }) }) },
+              topicos: { type: "ARRAY", items: topico({ type: "ARRAY", items: topico({ type: "ARRAY", items: topico(null) }) }, true) },
+              pintar: {
+                type: "ARRAY",
+                items: { type: "OBJECT", properties: { id: { type: "STRING" }, cor: { type: "STRING", enum: NOMES_DAS_CORES } }, required: ["id", "cor"] },
+              },
             },
             required: ["titulo", "tema", "explicacao", "topicos"],
           },
