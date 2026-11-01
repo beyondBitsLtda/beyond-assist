@@ -26,7 +26,7 @@ export const TEMA_DO_CODIGO = {
   ],
 };
 
-const FONTE_DO_CODIGO = "var(--bb-mono, 'JetBrains Mono', ui-monospace, monospace)";
+export const FONTE_DO_CODIGO = "var(--bb-mono, 'JetBrains Mono', ui-monospace, monospace)";
 
 /** As linhas de um código com realce (ou sem cor, se a linguagem não tem gramática). `fim`: o que vai no fim da última linha (o cursor do editor). */
 export function LinhasDoCodigo({ codigo, linguagem, fim = null }) {

@@ -25,7 +25,7 @@ import {
  * trocaria a imagem pelo HTML da tela de login, e a abertura sairia sem marca nenhuma.
  */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|monaco|mediapipe|models|preview.html|marca/).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|monaco|mediapipe|models|preview.html|marca/|diagramas/).*)"],
 };
 
 function paraLogin(req, caminho) {

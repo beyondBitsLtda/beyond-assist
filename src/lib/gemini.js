@@ -3,6 +3,7 @@ import { TTS_VOICES } from "./ttsVoices.js";
 import { pickKeyIndex, markCooldown, markOk } from "./geminiKeyHealth.js";
 import { streamComRetomada } from "./retomada.js";
 import { limparTranscricao } from "./tomarNota.js";
+import { FORMAS, TIPOS, COLECOES, PONTAS } from "./diagramaDaLisa.js";
 
 const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 // gemini-2.5-flash foi descontinuado pra projetos novos no Google Cloud (confirmado ao vivo:
@@ -1096,6 +1097,93 @@ primeira linha da resposta já é a primeira linha real do arquivo.`;
 }
 
 // ---- Mapa de arquitetura: ver src/lib/archDocs.js ----
+/**
+ * O processo desenhado no quadro (31/10/2026, BEYOND-0010): a Lisa devolve só a ESTRUTURA — as
+ * formas (id, tipo, texto, raia) e as ligações —, e o layout é feito no código
+ * (src/lib/diagramaDaLisa.js: montarDocumento). Com `estrutura` (o desenho que está na tela, talvez
+ * mexido pela pessoa), é uma MUDANÇA: ela devolve o desenho inteiro de novo, mantendo os ids do que
+ * continua. A saída passa por validarDesenho antes de ir para a tela.
+ */
+export async function desenharDiagrama({ pedido, estrutura = null, conversa = "" }) {
+  const formas = TIPOS.map((t) => `- ${t}: ${FORMAS[t].nome}`).join("\n");
+  const prompt = [
+    conversa ? `A CONVERSA ATÉ AQUI (contexto):\n${conversa.slice(-4000)}\n` : "",
+    estrutura
+      ? `O DESENHO QUE ESTÁ NA TELA AGORA (a pessoa pode ter mexido nele — parta DELE):\n${JSON.stringify(estrutura).slice(0, 20000)}\n`
+      : "",
+    `PEDIDO: "${String(pedido || "").slice(0, 2000)}"`,
+  ].filter(Boolean).join("\n");
+
+  const systemInstruction = `Você é a Lisa e desenha processos num quadro de diagramas (fluxograma, BPMN, UML de atividades,
+arquitetura de software ou de nuvem, C4, modelo de dados). Você NÃO escreve coordenadas: devolve a
+estrutura e o quadro organiza o desenho sozinho.
+
+As formas que existem (o "tipo" é o nome à esquerda):
+${formas}
+
+Regras:
+- "formas": cada uma com um "id" curto, sem espaço nem acento (ex.: "pedido", "aprova", "nf"), o "tipo"
+  e o "texto" que aparece dentro (curto: 2 a 6 palavras; tabela e classe podem ter várias linhas).
+- "raia": quem faz aquela etapa (pessoa, área ou sistema), quando o processo tem mais de um
+  responsável — formas com raia viram raias horizontais (swimlanes). Sem responsáveis, deixe vazio.
+- "ligacoes": de → para, na ordem do fluxo. Saídas de uma decisão ou gateway levam "rotulo"
+  (ex.: Sim/Não, aprovado/recusado). Volta para uma etapa anterior (refazer) também é ligação.
+  "ponta": "arrow" (normal); em modelo de dados, as de cardinalidade ("oneOnly", "many", "zeroMany");
+  em classes, "triangle" (herança). "tracejada" para dependência, mensagem ou fluxo opcional.
+- Escolha a família de formas que combina com o pedido e devolva em "colecao" (${COLECOES.join(", ")}):
+  fluxograma simples → terminal/process/decision; "BPMN" ou processo de negócio com áreas → bpmn*;
+  arquitetura → arch*/cloud*; C4 → c4*; dados → dbTable.
+- Comece por um início e termine num fim quando for um processo. Entre 4 e 30 formas: completo, mas legível.
+- Se houver um desenho na tela, é uma MUDANÇA: devolva o desenho INTEIRO atualizado, mantendo o "id"
+  de toda forma que continua (é assim que o que a pessoa arrumou fica no lugar), e mude só o que foi pedido.
+- "explicacao": 1 a 3 frases em português, falando com a pessoa, dizendo o que você desenhou ou mudou.
+- "titulo": o nome do processo.`;
+
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client, modelo) =>
+      client.models.generateContent({
+        model: modelo,
+        contents: prompt,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              titulo: { type: "STRING" },
+              colecao: { type: "STRING", enum: COLECOES },
+              explicacao: { type: "STRING" },
+              formas: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: { id: { type: "STRING" }, tipo: { type: "STRING", enum: TIPOS }, texto: { type: "STRING" }, raia: { type: "STRING" } },
+                  required: ["id", "tipo", "texto"],
+                },
+              },
+              ligacoes: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: { de: { type: "STRING" }, para: { type: "STRING" }, rotulo: { type: "STRING" }, tracejada: { type: "BOOLEAN" }, ponta: { type: "STRING", enum: PONTAS } },
+                  required: ["de", "para"],
+                },
+              },
+            },
+            required: ["titulo", "colecao", "explicacao", "formas", "ligacoes"],
+          },
+        },
+      }),
+    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
+  );
+  try {
+    return JSON.parse(res.text);
+  } catch {
+    throw new Error("a resposta do desenho não veio em JSON válido — tente de novo");
+  }
+}
+
 // O DIAGRAMA (Mermaid) é montado no CÓDIGO a partir do grafo de dependência REAL (calculado
 // pelos imports indexados, não pela IA) — de propósito: pedir pra IA escrever sintaxe Mermaid
 // direto já causou dor de cabeça parecida com o bug do comentário no topo do CSS (texto solto

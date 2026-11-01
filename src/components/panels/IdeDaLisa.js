@@ -18,12 +18,20 @@
 // para OUTRO MONITOR, o botão "⧉ destacar" leva o editor para uma janela de verdade do sistema
 // (prepararJanelaSeparada, abaixo); fechando ela, o editor volta para a página. A voz não
 // lê o código (cleanForSpeech tira os blocos) — ela fala a explicação enquanto o editor digita.
+//
+// COLABORATIVA (31/10/2026, BEYOND-0009: "eu pôr lá o meu código também e pedir ela para analisar e
+// escrever em cima desse código"): depois de digitada, toda aba é editável (o código colorido fica
+// embaixo e uma caixa de texto transparente por cima — EditorEditavel); "＋ meu código" abre uma aba
+// sua, para colar ou escrever. A barra "pedir à Lisa" manda o pedido com o código da aba (aoPedir); a
+// resposta dela é digitada numa aba nova, como sempre, e no fim é escrita EM CIMA da aba de onde o
+// pedido saiu, com "↶ desfazer". E o que está escrito ou mudado na IDE vai junto de qualquer pergunta
+// (aoMudarCodigo): a Lisa responde sobre o que está na tela.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CY, OR, GR, PU, mono } from "@/lib/theme.js";
 import { trechosDaResposta, digitacao, passoDaDigitacao } from "@/lib/codigoNaResposta.js";
-import { LinhasDoCodigo } from "./TextoComCodigo.js";
+import { LinhasDoCodigo, FONTE_DO_CODIGO } from "./TextoComCodigo.js";
 import { caixaGuardada, ajustarCaixa, moverCaixa, redimensionarCaixa } from "@/lib/janelaFlutuante.js";
 
 const BATIDA_MS = 30;
@@ -74,11 +82,62 @@ function prepararJanelaSeparada(win) {
   return raiz;
 }
 
+// as linguagens de uma aba sua (o nome é o da gramática do realce, como em codigoNaResposta.js)
+const LINGUAGENS_DA_ABA = [
+  ["javascript", "JavaScript"], ["typescript", "TypeScript"], ["jsx", "JSX"], ["python", "Python"], ["sql", "SQL"],
+  ["markup", "HTML"], ["css", "CSS"], ["json", "JSON"], ["clike", "Java / C# / PHP"], ["go", "Go"], ["rust", "Rust"], ["", "texto"],
+];
+const chaveDoTrecho = (id, i) => `${id}:${i}`;
+const CAMPO = { ...mono, fontSize: 11.5, padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(0,0,0,0.35)", color: "#eafcff", outline: "none" };
+
 /**
- * `interacoes`: as respostas da conversa, da mais antiga para a mais nova — [{ id, pergunta, texto }].
- * A última pode estar chegando ainda (`chegando`). As que não têm código não viram aba.
+ * O código editável: o realce embaixo (o mesmo LinhasDoCodigo) e uma caixa de texto transparente
+ * por cima, com a mesma letra, o mesmo espaço entre linhas e o mesmo recuo — o que se digita aparece
+ * colorido. Tab põe dois espaços (em vez de pular para o próximo botão).
  */
-export default function IdeDaLisa({ interacoes = [], chegando = false }) {
+function EditorEditavel({ codigo, linguagem, aoMudar, rotulo, numeros }) {
+  const linhas = codigo.split("\n");
+  const letra = { fontFamily: FONTE_DO_CODIGO, fontSize: 12, lineHeight: 1.6, tabSize: 2 };
+  const recuo = (e) => {
+    if (e.key !== "Tab") return;
+    e.preventDefault();
+    const el = e.currentTarget;
+    const { selectionStart: a, selectionEnd: b, value } = el;
+    const novo = `${value.slice(0, a)}  ${value.slice(b)}`;
+    aoMudar(novo);
+    requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = a + 2; });
+  };
+  return (
+    <div className="bb-ide-num" style={{ display: "flex", minHeight: "100%", ...letra }}>
+      {numeros(linhas.length)}
+      <div style={{ position: "relative", flex: "1 0 auto", minWidth: 0 }}>
+        {/* um espaço no fim: a última linha vazia também ocupa altura (onde fica o cursor) */}
+        <pre aria-hidden="true" style={{ margin: 0, padding: "10px 14px 10px 6px", whiteSpace: "pre", color: "#cfeffb", pointerEvents: "none", ...letra }}>
+          <LinhasDoCodigo codigo={`${codigo} `} linguagem={linguagem} />
+        </pre>
+        <textarea
+          className="ide-lisa__campo" value={codigo} onChange={(e) => aoMudar(e.target.value)} onKeyDown={recuo}
+          spellCheck={false} autoCapitalize="off" autoCorrect="off" wrap="off" aria-label={rotulo}
+          placeholder={codigo ? undefined : "Cole ou escreva o seu código aqui…"}
+          style={{
+            position: "absolute", inset: 0, width: "100%", height: "100%", margin: 0, padding: "10px 14px 10px 6px", boxSizing: "border-box",
+            border: 0, outline: "none", resize: "none", overflow: "hidden", background: "transparent",
+            color: "transparent", caretColor: "#eafcff", whiteSpace: "pre", ...letra,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * `interacoes`: as respostas da conversa, da mais antiga para a mais nova — [{ id, pergunta, texto,
+ * alvo? }]. A última pode estar chegando ainda (`chegando`). As que não têm código não viram aba.
+ * `alvo`: a aba de onde saiu o pedido feito pela barra "pedir à Lisa" — a resposta é escrita em cima dela.
+ * `aoPedir({ pedido, nome, linguagem, codigo, alvo })`: a barra "pedir à Lisa" (a página faz a pergunta).
+ * `aoMudarCodigo(texto)`: o que está escrito ou mudado na IDE, pronto para ir junto das perguntas.
+ */
+export default function IdeDaLisa({ interacoes = [], chegando = false, aoPedir, aoMudarCodigo }) {
   const [ocultas, setOcultas] = useState(() => new Set()); // abas de resposta que a pessoa fechou
   const lista = useMemo(
     () => interacoes
@@ -103,10 +162,20 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
   const [separada, setSeparada] = useState(null); // { win, raiz } — o editor numa janela do sistema
   const [podeSeparar, setPodeSeparar] = useState(false); // só no computador (no celular, janela é aba)
   const [avisoSeparar, setAvisoSeparar] = useState("");
+  // a IDE colaborativa: as abas suas, o que você mudou nas da Lisa, o que ela reescreveu (para desfazer)
+  const [minhas, setMinhas] = useState([]); // [{ chave, nome, linguagem, codigo }]
+  const [edicoes, setEdicoes] = useState({}); // "idDaResposta:trecho" → o código como você deixou
+  const [vistaMinha, setVistaMinha] = useState(null); // a chave da aba sua na tela; null = uma resposta
+  const [reescritas, setReescritas] = useState({}); // aba → { anterior } (o "↶ desfazer")
+  const [pedido, setPedido] = useState("");
+  const aplicadas = useRef(new Set()); // respostas com alvo já escritas em cima da aba
+  const aoMudarCodigoRef = useRef(aoMudarCodigo);
+  aoMudarCodigoRef.current = aoMudarCodigo;
   const corpoRef = useRef(null);
   const gesto = useRef(null);
   const separadaRef = useRef(null);
   separadaRef.current = separada;
+  const temAlgo = Boolean(ultima) || minhas.length > 0;
 
   // a digitação é só da resposta mais nova; as de antes aparecem inteiras
   const pulouUltima = semAnimacao || (ultima && puladas.has(ultima.id));
@@ -139,16 +208,17 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
     setFechada(false);
     setEscolhida(null);
     setAba(null);
+    setVistaMinha(null);
   }, [ultima?.id]);
 
   // onde a janela nasce: onde você deixou da última vez (guardado neste navegador) ou, na primeira
   // vez, no canto direito
   useEffect(() => {
-    if (caixa || !ultima) return;
+    if (caixa || !temAlgo) return;
     let guardada = null;
     try { guardada = JSON.parse(localStorage.getItem(CHAVE_DA_CAIXA) || "null"); } catch { /* sem armazenamento: nasce no canto */ }
     setCaixa(caixaGuardada(guardada, tela()));
-  }, [caixa, ultima]);
+  }, [caixa, temAlgo]);
 
   // soltou depois de arrastar ou redimensionar: guarda para abrir no mesmo lugar da próxima vez
   useEffect(() => {
@@ -188,29 +258,88 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
   const visivel = estado?.visiveis[mostrado] ?? "";
   const digitandoEste = ehUltima && !estado.terminou && mostrado === estado.atual;
 
+  // a aba sua na tela (ou a primeira, enquanto ainda não há resposta com código)
+  const minha = (vistaMinha && minhas.find((m) => m.chave === vistaMinha)) || (!vista ? minhas[0] : null) || null;
+  const chaveAtual = minha ? minha.chave : vista ? chaveDoTrecho(vista.id, mostrado) : null;
+  // o código da resposta como está agora: como você deixou (ou como a Lisa reescreveu), senão o dela
+  const codigoDaResposta = trecho ? (edicoes[chaveAtual] ?? trecho.codigo) : "";
+  /** O trecho de uma resposta pela chave "id:índice". */
+  const trechoDaChave = (chave) => {
+    const [id, i] = String(chave).split(":");
+    return lista.find((it) => it.id === id)?.trechos[Number(i)] || null;
+  };
+
   // seguindo a digitação, o editor rola junto com o código
   useEffect(() => {
     if (aba == null && corpoRef.current) corpoRef.current.scrollTop = corpoRef.current.scrollHeight;
   }, [visivel.length, aba]);
 
-  if (!ultima || !caixa) return null;
+  // a resposta a um pedido da barra terminou de chegar e de ser digitada: o código dela é escrito EM
+  // CIMA da aba de onde o pedido saiu (com o "↶ desfazer"), e essa aba volta para a tela
+  useEffect(() => {
+    if (!ultima?.alvo || chegando || !estadoDaUltima?.terminou || aplicadas.current.has(ultima.id)) return;
+    aplicadas.current.add(ultima.id);
+    const novo = ultima.trechos[0]?.codigo;
+    if (!novo) return;
+    const alvo = ultima.alvo;
+    const daMinha = minhas.find((m) => m.chave === alvo);
+    const anterior = daMinha ? daMinha.codigo : edicoes[alvo] ?? trechoDaChave(alvo)?.codigo ?? "";
+    if (daMinha) setMinhas((ms) => ms.map((m) => (m.chave === alvo ? { ...m, codigo: novo } : m)));
+    else setEdicoes((e) => ({ ...e, [alvo]: novo }));
+    setReescritas((r) => ({ ...r, [alvo]: { anterior } }));
+    if (daMinha) {
+      setVistaMinha(alvo);
+    } else {
+      const [id, i] = alvo.split(":");
+      setVistaMinha(null);
+      setEscolhida(id === ultima.id ? null : id);
+      setAba(Number(i));
+    }
+    // só quando a resposta termina (o resto entra pela leitura do momento)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ultima?.id, chegando, estadoDaUltima?.terminou]);
 
-  if (fechada && !separada) {
+  // o que está escrito ou mudado na IDE vai junto das perguntas (a página guarda o texto pronto)
+  useEffect(() => {
+    const partes = [];
+    for (const m of minhas) if (m.codigo.trim()) partes.push(`\`\`\`${m.linguagem || ""} ${m.nome}\n${m.codigo}\n\`\`\``);
+    for (const [chave, codigo] of Object.entries(edicoes)) {
+      const t = trechoDaChave(chave);
+      if (t && codigo !== t.codigo) partes.push(`\`\`\`${t.linguagem || ""} ${t.arquivo || t.rotulo} (como está na IDE agora)\n${codigo}\n\`\`\``);
+    }
+    aoMudarCodigoRef.current?.(partes.length
+      ? `NA IDE, ESCRITO OU MUDADO PELA PESSOA (é o que está na tela agora — vale mais que a versão que apareceu antes na conversa):\n${partes.join("\n\n")}`.slice(0, 12_000)
+      : "");
+    // a lista (que muda a cada pedaço da resposta chegando) entra só pela leitura do trecho
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minhas, edicoes]);
+
+  const abrirMinha = () => {
+    const chave = `m${Date.now()}`;
+    setMinhas((ms) => [...ms, { chave, nome: `meu-codigo-${ms.length + 1}`, linguagem: "javascript", codigo: "" }]);
+    setVistaMinha(chave);
+    setFechada(false);
+    setMinimizada(false);
+  };
+
+  const totalDeAbas = lista.length + minhas.length;
+  if (!separada && (!temAlgo || fechada)) {
     return (
       <button
         type="button"
-        onClick={() => setFechada(false)}
-        title="abrir de novo o editor com o código desta conversa"
+        onClick={temAlgo ? () => setFechada(false) : abrirMinha}
+        title={temAlgo ? "abrir de novo o editor com o código desta conversa" : "abrir o editor: cole o seu código e peça à Lisa para analisar ou mudar"}
         style={{
           position: "fixed", right: 20, bottom: 88, zIndex: 190, ...mono, fontSize: 11.5, letterSpacing: 0.5,
           padding: "9px 14px", borderRadius: 999, border: `1px solid ${PU}`, background: "rgba(5,11,16,0.92)",
           color: "#eafcff", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
         }}
       >
-        {"</>"} ver o código da Lisa{lista.length > 1 ? ` (${lista.length})` : ""}
+        {"</>"} {temAlgo ? `ver o código${totalDeAbas > 1 ? ` (${totalDeAbas})` : ""}` : "editor"}
       </button>
     );
   }
+  if (!caixa) return null;
 
   // arrastar (pela barra de título) ou redimensionar (por uma borda ou canto): `tipo` é "mover"
   // ou a direção da borda ("n", "se"...). Funciona com mouse, caneta e dedo (pointer events).
@@ -240,11 +369,12 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
     window.addEventListener("pointercancel", soltar);
   };
 
+  const codigoNaTela = minha ? minha.codigo : digitandoEste ? visivel : codigoDaResposta;
   const copiar = async () => {
     try {
       // da janela onde o editor está (a separada tem o foco quando o botão é clicado lá)
       const onde = corpoRef.current?.ownerDocument?.defaultView || window;
-      await onde.navigator.clipboard.writeText(trecho.codigo);
+      await onde.navigator.clipboard.writeText(codigoNaTela);
       setCopiado(true);
       setTimeout(() => setCopiado(false), 1500);
     } catch { /* sem permissão de área de transferência: o código continua na tela para selecionar */ }
@@ -269,21 +399,53 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
     setSeparada(null);
   };
 
-  const escolher = (id) => { setEscolhida(id === ultima.id ? null : id); setAba(null); };
+  const escolher = (id) => { setVistaMinha(null); setEscolhida(ultima && id === ultima.id ? null : id); setAba(null); };
   const esconder = (id) => {
     setOcultas((s) => new Set([...s, id]));
     if (escolhida === id) setEscolhida(null);
     setAba(null);
   };
+  const fecharMinha = (chave) => {
+    setMinhas((ms) => ms.filter((m) => m.chave !== chave));
+    if (vistaMinha === chave) setVistaMinha(null);
+  };
+  const mudarMinha = (mudanca) => setMinhas((ms) => ms.map((m) => (m.chave === minha.chave ? { ...m, ...mudanca } : m)));
 
-  const indice = lista.findIndex((it) => it.id === vista.id);
-  const situacao = !ehUltima
-    ? `resposta #${indice + 1} · completa`
-    : estado.terminou
-      ? (chegando ? "a Lisa ainda está escrevendo…" : "pronto")
-      : `digitando ${vista.trechos.length > 1 ? `trecho ${estado.atual + 1} de ${vista.trechos.length}` : "o código"}…`;
-  const explicacao = trecho?.fala || (estado.terminou && mostrado === vista.trechos.length - 1 ? vista.depois : "");
+  const indice = vista ? lista.findIndex((it) => it.id === vista.id) : -1;
+  const situacao = minha
+    ? "o seu código — edite à vontade e peça à Lisa"
+    : !ehUltima
+      ? `resposta #${indice + 1} · completa — dá para editar`
+      : estado.terminou
+        ? (chegando ? "a Lisa ainda está escrevendo…" : "pronto — dá para editar")
+        : `digitando ${vista.trechos.length > 1 ? `trecho ${estado.atual + 1} de ${vista.trechos.length}` : "o código"}…`;
+  const tudoPronto = Boolean(minha) || !ehUltima || (estado.terminou && !chegando);
+  const explicacao = minha ? "" : trecho?.fala || (estado?.terminou && mostrado === vista.trechos.length - 1 ? vista.depois : "");
+  const reescrita = chaveAtual ? reescritas[chaveAtual] : null;
   const linhas = visivel.split("\n");
+  const linhasNaTela = codigoNaTela.split("\n").length;
+  const editado = !minha && trecho && edicoes[chaveAtual] != null && edicoes[chaveAtual] !== trecho.codigo;
+
+  const podePedir = Boolean(aoPedir) && !chegando && !digitandoEste;
+  const pedir = (e) => {
+    e.preventDefault();
+    const p = pedido.trim();
+    if (!p || !podePedir) return;
+    aoPedir({
+      pedido: p,
+      nome: minha ? minha.nome : trecho?.arquivo || trecho?.rotulo || "código",
+      linguagem: minha ? minha.linguagem : trecho?.linguagem || "",
+      codigo: codigoNaTela,
+      alvo: chaveAtual,
+    });
+    setPedido("");
+  };
+  const desfazer = () => {
+    if (!reescrita) return;
+    if (minha) mudarMinha({ codigo: reescrita.anterior });
+    else setEdicoes((e) => ({ ...e, [chaveAtual]: reescrita.anterior }));
+    setReescritas((r) => { const n = { ...r }; delete n[chaveAtual]; return n; });
+  };
 
   // classes "bb-": a camada de fonte dos painéis não troca a fonte delas (ver TextoComCodigo.js)
   const numeros = (n) => (
@@ -332,6 +494,8 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
           background: ${CY}; animation: ide-lisa-piscar 1s steps(1) infinite; }
         @keyframes ide-lisa-piscar { 50% { opacity: 0; } }
         @media (prefers-reduced-motion: reduce) { .ide-lisa__cursor { animation: none; } }
+        .ide-lisa__campo::placeholder { color: rgba(207,239,251,0.35); }
+        .ide-lisa__campo::selection { background: rgba(var(--accent-rgb),0.35); }
       `}</style>
 
       {/* barra de título — arrastável na página; bolinhas de fechar, minimizar e maximizar */}
@@ -360,7 +524,7 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1, justifyContent: "center" }}>
           <span style={{ fontSize: 10.5, letterSpacing: 1.5, color: CY, flex: "none" }}>⌨ EDITOR DA LISA</span>
-          <span style={{ fontSize: 9.5, color: (ehUltima ? estado.terminou && !chegando : true) ? GR : "rgba(207,239,251,0.55)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ fontSize: 9.5, color: tudoPronto ? GR : "rgba(207,239,251,0.55)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             — {situacao}
           </span>
         </div>
@@ -382,34 +546,54 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
 
       {!minimizada && (
         <>
-          {/* abas de resposta — uma por interação com código; as de antes continuam aqui */}
-          {lista.length > 1 && (
-            <div role="tablist" aria-label="Respostas com código" style={{ display: "flex", background: "rgba(0,0,0,0.45)", borderBottom: "1px solid rgba(var(--accent-rgb),0.14)", flex: "none", overflowX: "auto" }}>
-              {lista.map((it, i) => {
-                const ativa = it.id === vista.id;
-                const digitando = it.id === ultima.id && !estadoDaUltima.terminou;
-                return (
-                  <div key={it.id} style={{
-                    display: "flex", alignItems: "center", flex: "none", borderRight: "1px solid rgba(var(--accent-rgb),0.1)",
-                    background: ativa ? "rgba(var(--accent-rgb),0.1)" : "transparent", borderBottom: `2px solid ${ativa ? PU : "transparent"}`,
-                  }}>
-                    <button type="button" role="tab" aria-selected={ativa} onClick={() => escolher(it.id)} title={it.pergunta || `resposta #${i + 1}`}
-                      style={{ ...mono, display: "flex", alignItems: "center", gap: 6, padding: "6px 4px 6px 12px", fontSize: 10.5, border: 0, background: "transparent", cursor: "pointer", whiteSpace: "nowrap", color: ativa ? "#eafcff" : "rgba(207,239,251,0.5)" }}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", flex: "none", background: digitando ? OR : PU, opacity: ativa ? 1 : 0.6 }} />
-                      <b style={{ color: ativa ? PU : "inherit" }}>#{i + 1}</b> {curta(it.pergunta)}
-                    </button>
-                    <button type="button" onClick={() => esconder(it.id)} title="fechar esta aba" aria-label={`fechar a aba da resposta #${i + 1}`}
-                      style={{ ...mono, border: 0, background: "transparent", color: "rgba(207,239,251,0.4)", cursor: "pointer", fontSize: 12, padding: "4px 10px 4px 6px" }}>
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {/* as abas: uma por resposta com código (as de antes continuam aqui), as suas e o "＋ meu código" */}
+          <div role="tablist" aria-label="Abas do editor" style={{ display: "flex", background: "rgba(0,0,0,0.45)", borderBottom: "1px solid rgba(var(--accent-rgb),0.14)", flex: "none", overflowX: "auto" }}>
+            {lista.map((it, i) => {
+              const ativa = !minha && it.id === vista?.id;
+              const digitando = it.id === ultima?.id && !estadoDaUltima.terminou;
+              return (
+                <div key={it.id} style={{
+                  display: "flex", alignItems: "center", flex: "none", borderRight: "1px solid rgba(var(--accent-rgb),0.1)",
+                  background: ativa ? "rgba(var(--accent-rgb),0.1)" : "transparent", borderBottom: `2px solid ${ativa ? PU : "transparent"}`,
+                }}>
+                  <button type="button" role="tab" aria-selected={ativa} onClick={() => escolher(it.id)} title={it.pergunta || `resposta #${i + 1}`}
+                    style={{ ...mono, display: "flex", alignItems: "center", gap: 6, padding: "6px 4px 6px 12px", fontSize: 10.5, border: 0, background: "transparent", cursor: "pointer", whiteSpace: "nowrap", color: ativa ? "#eafcff" : "rgba(207,239,251,0.5)" }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", flex: "none", background: digitando ? OR : PU, opacity: ativa ? 1 : 0.6 }} />
+                    <b style={{ color: ativa ? PU : "inherit" }}>#{i + 1}</b> {curta(it.pergunta)}
+                  </button>
+                  <button type="button" onClick={() => esconder(it.id)} title="fechar esta aba" aria-label={`fechar a aba da resposta #${i + 1}`}
+                    style={{ ...mono, border: 0, background: "transparent", color: "rgba(207,239,251,0.4)", cursor: "pointer", fontSize: 12, padding: "4px 10px 4px 6px" }}>
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+            {minhas.map((m) => {
+              const ativa = minha?.chave === m.chave;
+              return (
+                <div key={m.chave} style={{
+                  display: "flex", alignItems: "center", flex: "none", borderRight: "1px solid rgba(var(--accent-rgb),0.1)",
+                  background: ativa ? "rgba(123,216,143,0.08)" : "transparent", borderBottom: `2px solid ${ativa ? GR : "transparent"}`,
+                }}>
+                  <button type="button" role="tab" aria-selected={ativa} onClick={() => setVistaMinha(m.chave)} title={`o seu código: ${m.nome}`}
+                    style={{ ...mono, display: "flex", alignItems: "center", gap: 6, padding: "6px 4px 6px 12px", fontSize: 10.5, border: 0, background: "transparent", cursor: "pointer", whiteSpace: "nowrap", color: ativa ? "#eafcff" : "rgba(207,239,251,0.5)" }}>
+                    <b style={{ color: ativa ? GR : "inherit" }}>✎</b> {curta(m.nome, 22)}
+                  </button>
+                  <button type="button" onClick={() => fecharMinha(m.chave)} title="fechar esta aba (o código dela sai da IDE)" aria-label={`fechar a aba ${m.nome}`}
+                    style={{ ...mono, border: 0, background: "transparent", color: "rgba(207,239,251,0.4)", cursor: "pointer", fontSize: 12, padding: "4px 10px 4px 6px" }}>
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+            <button type="button" onClick={abrirMinha} title="abrir uma aba sua: cole ou escreva o seu código e peça à Lisa"
+              style={{ ...mono, flex: "none", border: 0, background: "transparent", color: GR, cursor: "pointer", fontSize: 10.5, padding: "6px 12px", whiteSpace: "nowrap" }}>
+              ＋ meu código
+            </button>
+          </div>
 
           {/* abas de arquivo da resposta na tela (o arquivo, quando a Lisa disse qual é) */}
-          {vista.trechos.length > 1 && (
+          {!minha && vista && vista.trechos.length > 1 && (
             <div style={{ display: "flex", background: "rgba(0,0,0,0.3)", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flex: "none", overflowX: "auto" }}>
               {vista.trechos.map((t, i) => {
                 const ativa = i === mostrado;
@@ -435,6 +619,14 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
             </div>
           )}
 
+          {/* a Lisa escreveu em cima desta aba: dá para voltar ao que estava */}
+          {reescrita && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 14px", background: "rgba(123,216,143,0.07)", borderBottom: "1px solid rgba(123,216,143,0.2)", flex: "none" }}>
+              <span style={{ fontSize: 12, color: GR, flex: 1, fontFamily: "var(--bb-fonte)" }}>✎ A Lisa escreveu a nova versão em cima deste código.</span>
+              <button type="button" onClick={desfazer} title="voltar ao código de antes da Lisa reescrever" style={BOTAO}>↶ desfazer</button>
+            </div>
+          )}
+
           {/* a explicação do passo que está na tela — o que a Lisa está fazendo neste trecho */}
           {explicacao && (
             <div style={{ display: "flex", gap: 8, padding: "8px 14px", background: "rgba(var(--accent-rgb),0.06)", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flex: "none", maxHeight: 96, overflowY: "auto" }}>
@@ -443,29 +635,62 @@ export default function IdeDaLisa({ interacoes = [], chegando = false }) {
             </div>
           )}
 
-          {/* o editor — número de linha e o código com realce, digitado */}
+          {/* o editor — número de linha e o código com realce: digitado pela Lisa, depois editável */}
           <div ref={corpoRef} onWheel={() => setAba((a) => (a == null ? mostrado : a))} style={{ flex: 1, minHeight: 0, overflow: "auto", background: "#050b10" }}>
-            <div className="bb-ide-num" style={{ display: "flex", fontSize: 12, lineHeight: 1.6 }}>
-              {numeros(linhas.length)}
-              {/* sem quebrar linha (rola para o lado, como num editor): a numeração fica alinhada */}
-              <pre style={{ margin: 0, padding: "10px 14px 10px 6px", whiteSpace: "pre", color: "#cfeffb", flex: 1, ...mono }}>
-                <LinhasDoCodigo codigo={visivel} linguagem={trecho?.linguagem} fim={cursor} />
-              </pre>
-            </div>
+            {minha ? (
+              <EditorEditavel codigo={minha.codigo} linguagem={minha.linguagem} rotulo={`o código da aba ${minha.nome}`} numeros={numeros} aoMudar={(c) => mudarMinha({ codigo: c })} />
+            ) : digitandoEste || !trecho ? (
+              <div className="bb-ide-num" style={{ display: "flex", fontSize: 12, lineHeight: 1.6 }}>
+                {numeros(linhas.length)}
+                {/* sem quebrar linha (rola para o lado, como num editor): a numeração fica alinhada */}
+                <pre style={{ margin: 0, padding: "10px 14px 10px 6px", whiteSpace: "pre", color: "#cfeffb", flex: 1, ...mono }}>
+                  <LinhasDoCodigo codigo={visivel} linguagem={trecho?.linguagem} fim={cursor} />
+                </pre>
+              </div>
+            ) : (
+              <EditorEditavel codigo={codigoDaResposta} linguagem={trecho.linguagem} rotulo={`o código de ${trecho.arquivo || trecho.rotulo}`} numeros={numeros}
+                aoMudar={(c) => setEdicoes((e) => ({ ...e, [chaveAtual]: c }))} />
+            )}
           </div>
 
-          {/* barra de status — linguagem, linhas e os botões */}
+          {/* pedir à Lisa sobre o código desta aba: ela responde e escreve a nova versão em cima dela */}
+          {aoPedir && !digitandoEste && (
+            <form onSubmit={pedir} style={{ display: "flex", gap: 8, padding: "7px 10px", background: "rgba(var(--accent-rgb),0.05)", borderTop: "1px solid rgba(var(--accent-rgb),0.14)", flex: "none" }}>
+              <input value={pedido} onChange={(e) => setPedido(e.target.value)} disabled={chegando}
+                placeholder={chegando ? "a Lisa está respondendo…" : "Peça sobre este código: ache o erro, explique, refatore, comente…"}
+                aria-label="pedir à Lisa sobre o código desta aba" style={{ ...CAMPO, flex: 1, minWidth: 0 }} />
+              <button type="submit" disabled={!podePedir || !pedido.trim()} title="a Lisa responde e escreve a nova versão em cima desta aba"
+                style={{ ...BOTAO, color: GR, borderColor: "rgba(123,216,143,0.4)", opacity: !podePedir || !pedido.trim() ? 0.5 : 1 }}>
+                ✦ pedir à Lisa
+              </button>
+            </form>
+          )}
+
+          {/* barra de status — o arquivo (ou a sua aba: nome e linguagem), as linhas e os botões */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "5px 18px 5px 12px", background: "rgba(0,0,0,0.4)", borderTop: "1px solid rgba(var(--accent-rgb),0.14)", flex: "none" }}>
-            <span style={{ fontSize: 9.5, color: PU, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {trecho?.arquivo || trecho?.rotulo} · {trecho?.linguagem || "texto"} · {linhas.length} linha(s)
-            </span>
+            {minha ? (
+              <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 9.5, color: PU, minWidth: 0 }}>
+                ✎
+                <input value={minha.nome} onChange={(e) => mudarMinha({ nome: e.target.value.slice(0, 60) })} aria-label="nome da aba"
+                  style={{ ...CAMPO, fontSize: 9.5, padding: "2px 6px", width: 130 }} />
+                <select value={minha.linguagem} onChange={(e) => mudarMinha({ linguagem: e.target.value })} aria-label="linguagem do código"
+                  style={{ ...CAMPO, fontSize: 9.5, padding: "2px 4px" }}>
+                  {LINGUAGENS_DA_ABA.map(([v, r]) => <option key={v || "texto"} value={v}>{r}</option>)}
+                </select>
+                · {linhasNaTela} linha(s)
+              </span>
+            ) : (
+              <span style={{ fontSize: 9.5, color: PU, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {trecho?.arquivo || trecho?.rotulo} · {trecho?.linguagem || "texto"} · {linhasNaTela} linha(s){editado ? " · editado por você" : ""}
+              </span>
+            )}
             <div style={{ display: "flex", gap: 8, flex: "none" }}>
-              {ehUltima && !estado.terminou && (
+              {!minha && ehUltima && !estado.terminou && (
                 <button type="button" onClick={() => setPuladas((s) => new Set([...s, ultima.id]))} title="mostrar o código inteiro agora" style={BOTAO}>
                   ⏩ pular
                 </button>
               )}
-              <button type="button" onClick={copiar} disabled={!trecho?.codigo} title="copiar este trecho" style={{ ...BOTAO, color: copiado ? GR : "#cfeffb" }}>
+              <button type="button" onClick={copiar} disabled={!codigoNaTela} title="copiar o código desta aba" style={{ ...BOTAO, color: copiado ? GR : "#cfeffb" }}>
                 {copiado ? "✓ copiado" : "⧉ copiar"}
               </button>
             </div>

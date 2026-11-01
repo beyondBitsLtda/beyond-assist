@@ -9,6 +9,7 @@ import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 import { langForPath } from "@/lib/highlightCode.js";
 import { respostaSemCodigo, trechosDaResposta, codigoDaConversa } from "@/lib/codigoNaResposta.js";
+import { pedidoDeDesenho, descreverDiagrama } from "@/lib/diagramaDaLisa.js";
 import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
 import { Highlight } from "prism-react-renderer";
 import { TTS_VOICES, STEVE_VOICE_NAME } from "@/lib/ttsVoices.js";
@@ -60,6 +61,7 @@ import usarInstalacao from "@/components/shell/usarInstalacao.js";
 import { DICA_DO_IPHONE } from "@/lib/instalarApp.js";
 // o editor que abre quando a resposta traz código (qualquer modo — ver IdeDaLisa.js)
 const IdeDaLisa = dynamic(() => import("@/components/panels/IdeDaLisa.js"), { ssr: false, loading: () => null });
+const QuadroDaLisa = dynamic(() => import("@/components/panels/QuadroDaLisa.js"), { ssr: false, loading: () => null });
 const LisaAvatar3D = dynamic(() => import("@/components/panels/LisaAvatar3D.js"), {
   ssr: false,
   loading: () => null,
@@ -237,16 +239,28 @@ export default function AssistantPage() {
   // cada — perguntar de novo não apaga nada. `ideViva` é a resposta chegando agora (o texto dela
   // é o `answer`); quando termina, ela entra no histórico (se tiver código) com o mesmo id.
   const [ideHistorico, setIdeHistorico] = useState([]);
-  const [ideViva, setIdeViva] = useState(null); // { id, pergunta }
-  const abrirNaIde = useCallback((pergunta) => {
+  const [ideViva, setIdeViva] = useState(null); // { id, pergunta, alvo }
+  // `alvo` (BEYOND-0009): a aba da IDE de onde saiu o pedido ("pedir à Lisa") — a resposta é
+  // escrita em cima dela quando termina
+  const abrirNaIde = useCallback((pergunta, alvo = null) => {
     const id = `r${Date.now()}`;
-    setIdeViva({ id, pergunta });
+    setIdeViva({ id, pergunta, alvo });
     return id;
   }, []);
-  const guardarNaIde = useCallback((id, pergunta, texto) => {
+  const guardarNaIde = useCallback((id, pergunta, texto, alvo = null) => {
     setIdeViva((v) => (v?.id === id ? null : v));
-    if (trechosDaResposta(texto).temCodigo) setIdeHistorico((h) => [...h, { id, pergunta, texto }].slice(-30));
+    if (trechosDaResposta(texto).temCodigo) setIdeHistorico((h) => [...h, { id, pergunta, texto, alvo }].slice(-30));
   }, []);
+  // o que está escrito ou mudado na IDE (as abas suas e as que você editou): vai junto das perguntas
+  const codigoDaIdeRef = useRef("");
+  // o quadro da Lisa (BEYOND-0010): o processo desenhado na tela. `desenhoRef` é o documento como
+  // está agora no quadro (com o que a pessoa mexeu) — vai em texto junto das perguntas.
+  const [quadro, setQuadro] = useState(null); // { versao: { doc, chave, colecao }, titulo, explicacao }
+  const [desenhando, setDesenhando] = useState(false);
+  const desenhoRef = useRef(null);
+  const quadroAbertoRef = useRef(false);
+  quadroAbertoRef.current = Boolean(quadro);
+  const desenharNaTelaRef = useRef(null);
   // as mensagens da conversa, para mandar o código que já apareceu nela junto da pergunta
   const mensagensRef = useRef([]);
 
@@ -2500,7 +2514,7 @@ export default function AssistantPage() {
   // pergunta enviada carrega um lembrete de qual foi o último comentário da Lisa (pro Gemini
   // entender a que "isso" se refere), mas mostrar esse lembrete pro usuário seria estranho —
   // ele só vê a própria fala transcrita, limpa.
-  const ask = useCallback(async (q, { displayText } = {}) => {
+  const ask = useCallback(async (q, { displayText, alvoDaIde = null } = {}) => {
     if (!q.trim() || busy) return;
 
     // "abre o dashboard" etc. — comando local reconhecido sem gastar chamada nenhuma do
@@ -2547,11 +2561,17 @@ export default function AssistantPage() {
     // askVigiaMode acima.
     if (vigiaMode && !acaoNoAbacato) return askVigiaMode(q);
 
+    // "desenhe o processo de…" (ou, com o quadro aberto, "inclua uma etapa…"): a Lisa desenha no
+    // quadro em vez de responder em texto (BEYOND-0010) — ver desenharNaTela abaixo
+    if (!acaoNoAbacato && !alvoDaIde && pedidoDeDesenho(q, { quadroAberto: quadroAbertoRef.current })) {
+      return desenharNaTelaRef.current?.(q, { displayText });
+    }
+
     const shown = displayText || q;
     setBusy(true);
     setQuestion(shown);
     setAnswer("");
-    const idDaIde = abrirNaIde(shown);
+    const idDaIde = abrirNaIde(shown, alvoDaIde);
     answerRef.current = "";
     setCards([]);
     setMode("listening");
@@ -2618,7 +2638,13 @@ export default function AssistantPage() {
           history: { ...(historyRef.current || {}), turnos: conversaVigente(conversaRef.current), ultimaResposta: ultimaRespostaRef.current.slice(0, 8000) },
           // o código que já apareceu na conversa, inteiro (a conversa vai cortada por fala): para a
           // Lisa ver o todo antes de propor uma correção. Conversa vencida (30 min parada) não leva.
-          codigo: conversaVigente(conversaRef.current).length ? codigoDaConversa(mensagensRef.current.slice(-24).map((m) => m.text)) : "",
+          // e o que está escrito ou mudado na IDE agora (BEYOND-0009), que vale mais que a versão da conversa
+          codigo: [
+            conversaVigente(conversaRef.current).length ? codigoDaConversa(mensagensRef.current.slice(-24).map((m) => m.text)) : "",
+            codigoDaIdeRef.current,
+          ].filter(Boolean).join("\n\n"),
+          // o desenho do quadro como está agora, em texto (BEYOND-0010): a Lisa vê o que a pessoa mudou
+          diagrama: quadroAbertoRef.current && desenhoRef.current ? descreverDiagrama(desenhoRef.current) : "",
           pendingAction: pendingActionRef.current,
           images: images.length ? images : null,
           // o código dos repositórios vinculados, já lido acima (/api/repos/contexto)
@@ -2685,7 +2711,7 @@ export default function AssistantPage() {
       setBusy(false);
       setMode("idle");
       // a resposta com código vira uma aba do editor e fica lá (a próxima pergunta não apaga)
-      guardarNaIde(idDaIde, shown, answerRef.current);
+      guardarNaIde(idDaIde, shown, answerRef.current, alvoDaIde);
       // fala a resposta INTEIRA de uma vez, só agora que terminou de chegar — 1 chamada de
       // TTS por resposta, nunca duas vozes diferentes na mesma fala (ver nota no topo do arquivo).
       // O rascunho de um card (o texto inteiro dele) fica só na tela: ela fala o que mudou.
@@ -2694,6 +2720,61 @@ export default function AssistantPage() {
     }
   }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode, vigiaMode, askVigiaMode, abrirNaIde, guardarNaIde, guardarRepos]);
   askRef.current = ask; // ver comentário no askRef acima — mantém sempre a versão mais recente pros efeitos de vigília chamarem
+
+  // ---- O quadro da Lisa (BEYOND-0010): ela desenha o processo e a pessoa mexe ----
+  //
+  // O pedido vai para /api/diagrama (a IA monta a estrutura, o servidor faz o layout) junto do
+  // desenho que já está na tela, se houver: assim "inclua uma etapa" parte do fluxo como a pessoa
+  // deixou, e o que ela arrumou fica no lugar. A explicação da Lisa vira a resposta da conversa (e é
+  // falada, se a voz estiver ligada); o desenho aparece no quadro.
+  desenharNaTelaRef.current = async (q, { displayText } = {}) => {
+    const shown = displayText || q;
+    stopSpeaking();
+    const gen = ++speechGenRef.current;
+    speechEngineRef.current = null;
+    setBusy(true);
+    setDesenhando(true);
+    setQuestion(shown);
+    setAnswer("");
+    setMode("listening");
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
+    addLog("[QUADRO]", PU, quadroAbertoRef.current ? "mudando o desenho…" : "desenhando o processo…");
+    const conversa = conversaVigente(conversaRef.current).slice(-6)
+      .map((t) => `${t.papel === "lisa" ? "LISA" : "PESSOA"}: ${String(t.texto).slice(0, 600)}`).join("\n");
+    try {
+      const res = await fetch("/api/diagrama", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ pedido: q, atual: quadroAbertoRef.current ? desenhoRef.current : null, conversa }),
+      });
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
+      desenhoRef.current = r.doc;
+      setQuadro({ versao: { doc: r.doc, chave: `d${Date.now()}`, colecao: r.colecao }, titulo: r.titulo, explicacao: r.explicacao });
+      const texto = r.explicacao || `Desenhei "${r.titulo}" no quadro.`;
+      setAnswer(texto);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
+      conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+      addLog("[QUADRO]", GR, `${r.titulo}: ${r.doc?.pages?.[0]?.shapes?.length || 0} formas`);
+      if (voiceOn) enqueueSpeech(texto, gen);
+    } catch (err) {
+      const texto = `Não consegui desenhar agora: ${err.message}`;
+      addLog("[ERR]", OR, err.message);
+      setAnswer(texto);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
+    } finally {
+      setBusy(false);
+      setDesenhando(false);
+      setMode("idle");
+    }
+  };
+
+  // a barra "pedir à Lisa" da IDE (BEYOND-0009): a pergunta leva o código da aba; a resposta é
+  // digitada como sempre e, no fim, escrita em cima da aba de onde o pedido saiu
+  const pedirNaIde = useCallback(({ pedido, nome, linguagem, codigo, alvo }) => {
+    const q = `${pedido}\n\nO código está na IDE, na aba "${nome}". Se for mudar o código, devolva a versão COMPLETA dele num bloco só (ela vai substituir o que está na aba):\n\`\`\`${linguagem || ""} ${nome}\n${codigo}\n\`\`\``;
+    askRef.current?.(q, { displayText: `${pedido}  ·  ⌨ ${nome}`, alvoDaIde: alvo });
+  }, []);
 
   // ---- Modo Escuta por palavra: "Lisa, ..." ----
   //
@@ -3105,7 +3186,19 @@ export default function AssistantPage() {
   // uma janela só para a conversa inteira, uma aba por resposta — a que está chegando entra viva.
   mensagensRef.current = messages;
   const ideDaLisa = !codeMode && (
-    <IdeDaLisa interacoes={ideViva ? [...ideHistorico, { ...ideViva, texto: answer }] : ideHistorico} chegando={busy} />
+    <IdeDaLisa
+      interacoes={ideViva ? [...ideHistorico, { ...ideViva, texto: answer }] : ideHistorico} chegando={busy}
+      aoPedir={pedirNaIde} aoMudarCodigo={(texto) => { codigoDaIdeRef.current = texto; }}
+    />
+  );
+  // o quadro da Lisa (BEYOND-0010): aparece quando ela desenha; o que a pessoa mexe volta para cá
+  const quadroDaLisa = quadro && (
+    <QuadroDaLisa
+      versao={quadro.versao} titulo={quadro.titulo} explicacao={quadro.explicacao} ocupado={desenhando}
+      aoMudar={(doc) => { desenhoRef.current = doc; }}
+      aoPedir={(p) => desenharNaTelaRef.current?.(p)}
+      aoFechar={() => { setQuadro(null); desenhoRef.current = null; }}
+    />
   );
 
   const codeTaskModal = codeModalOpen && (
@@ -4399,6 +4492,7 @@ export default function AssistantPage() {
         )}
         {codeTaskModal}
         {ideDaLisa}
+        {quadroDaLisa}
       </div>
     );
   }
@@ -4437,6 +4531,7 @@ export default function AssistantPage() {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {codeTaskModal}
       {ideDaLisa}
+      {quadroDaLisa}
       {fullscreenOverlay}
       {tomarNotaOverlay}
       {cameraVigiaMessageToast}

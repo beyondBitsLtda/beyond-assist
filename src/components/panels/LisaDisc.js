@@ -161,8 +161,6 @@ function NalaField({ throwReq, onResult, onMood }) {
   const nalaRef = useRef(newNala(45));
   const reactAtRef = useRef(0);
   const resolvedRef = useRef(true);
-  // o ritmo de consulta do laço de sinais — guardado em ref pra dar pra acordar de fora dele
-  const ritmoRef = useRef(null);
   const onResultRef = useRef(onResult);
   onResultRef.current = onResult;
   const onMoodRef = useRef(onMood);
@@ -397,6 +395,11 @@ export default function LisaDisc({ onMood }) {
   const roleRef = useRef(role);
   roleRef.current = role;
   const pendingRef = useRef(null); // id do lance esperando resposta
+  // o ritmo de consulta do laço de sinais — guardado em ref pra dar pra acordar de fora dele.
+  // Tem que morar AQUI, no mesmo componente do laço (e de throwDisc/reportResult). Declarado no
+  // NalaField, como estava, o nome não existia neste escopo: escolher qualquer papel lançava
+  // ReferenceError no efeito de escuta e derrubava a página inteira (BEYOND-0002).
+  const ritmoRef = useRef(null);
   const onMoodRef = useRef(onMood);
   onMoodRef.current = onMood;
 
