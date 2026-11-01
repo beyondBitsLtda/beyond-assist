@@ -25,7 +25,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { criarEnvelope, criarPesos } from "@/lib/visuaisDaLisa.js";
 import {
-  FORMA, RAIO, CENTRO_Y, CAMERA, CAIXA, resolucaoDoRosto, criarMovimentoDoRosto,
+  FORMA, CENTRO_Y, CAMERA, CAIXA, resolucaoDoRosto, criarMovimentoDoRosto, enquadramentoDoRosto,
   coresDoRosto, lerAjustesDoRosto, ajustesValidos, EVENTO_DO_ROSTO, CHAVE_DO_ROSTO,
 } from "@/lib/rostoDaLisa.js";
 
@@ -35,6 +35,7 @@ const v3 = (a) => `vec3(${a.map(n).join(", ")})`;
 const FRAGMENTO = `
   precision highp float;
   uniform vec2 uRes;
+  uniform float uRaio, uCentroY;
   uniform float uOcup, uTempo, uGrao, uAquece, uBoca, uCalorBoca, uCalorOrelha, uOnda, uRespira, uCabelo, uDensidade;
   uniform mat3 uCabeca;
   uniform vec3 uC0, uC1, uC2, uC3;
@@ -73,8 +74,9 @@ const FRAGMENTO = `
 
   void main(){
     vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / (0.5 * min(uRes.x, uRes.y) * uOcup);
-    vec3 ro = vec3(0.0, ${n(CAMERA.y)}, ${n(CAMERA.distancia)});
-    vec3 rd = normalize(vec3(uv.x * ${n(RAIO)}, ${n(CENTRO_Y)} + uv.y * ${n(RAIO)}, 0.0) - ro);
+    // o enquadramento (enquadramentoDoRosto): a câmera acompanha o centro, um pouco acima dele
+    vec3 ro = vec3(0.0, uCentroY + ${n(Number((CAMERA.y - CENTRO_Y).toFixed(4)))}, ${n(CAMERA.distancia)});
+    vec3 rd = normalize(vec3(uv.x * uRaio, uCentroY + uv.y * uRaio, 0.0) - ro);
     // o grão: muda ~24 vezes por segundo, como um filme (parado com "reduzir movimento"); um grão
     // por pixel da tela (não do desenho), para ele não mudar de tamanho com a resolução
     vec2 celula = floor(gl_FragCoord.xy / max(uDensidade, 1.0));
@@ -89,7 +91,7 @@ const FRAGMENTO = `
 
     vec3 cor = vec3(0.0);
     float dmin = 9.0, orelhaPerto = 9.0, fioPerto = 9.0, tPerto = 0.0; // a menor distância do raio ao busto (e às orelhas e ao cabelo, ali)
-    float y = ${n(CENTRO_Y)} + uv.y * ${n(RAIO)};
+    float y = uCentroY + uv.y * uRaio;
     if (sai > entra) {
       float t = max(entra, 0.0), orelha = 9.0, fio = 9.0, d = 9.0;
       bool achou = false;
@@ -171,12 +173,14 @@ const VERTICE = "void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }";
  * `ajustes` ({ cabelo, paleta }) fixa o cabelo e as cores deste rosto; sem ele, vale o que a pessoa
  * escolheu neste navegador.
  */
-export default function Rosto({ obterSinal, ocupacao = 0.78, ajustes: ajustesFixos = null }) {
+export default function Rosto({ obterSinal, ocupacao = 0.78, ajustes: ajustesFixos = null, zoom = 1 }) {
   const montagem = useRef(null);
   const sinalRef = useRef(obterSinal);
   sinalRef.current = obterSinal;
   const fixosRef = useRef(ajustesFixos);
   fixosRef.current = ajustesFixos;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
 
   useEffect(() => {
     const el = montagem.current;
@@ -204,6 +208,8 @@ export default function Rosto({ obterSinal, ocupacao = 0.78, ajustes: ajustesFix
     const c = coresDoRosto(ajustes.paleta, "pronta");
     const uniforms = {
       uRes: { value: new THREE.Vector2(1, 1) },
+      uRaio: { value: enquadramentoDoRosto(zoom).raio },
+      uCentroY: { value: enquadramentoDoRosto(zoom).centroY },
       uOcup: { value: ocupacao },
       uTempo: { value: 0 },
       uGrao: { value: 0 },
@@ -292,6 +298,11 @@ export default function Rosto({ obterSinal, ocupacao = 0.78, ajustes: ajustesFix
       uniforms.uC2.value.lerp(alvoCor[1], kc);
       uniforms.uC3.value.lerp(alvoCor[2], kc);
       uniforms.uC0.value.lerp(alvoCor[3], kc);
+      // o zoom desliza (chegar perto é um movimento de câmera, não um salto)
+      const quadroAlvo = enquadramentoDoRosto(zoomRef.current);
+      const kz = reduzido ? 1 : Math.min(1, dt * 2.5);
+      uniforms.uRaio.value += (quadroAlvo.raio - uniforms.uRaio.value) * kz;
+      uniforms.uCentroY.value += (quadroAlvo.centroY - uniforms.uCentroY.value) * kz;
       // o cabelo cresce ou some em pouco mais de um segundo
       const cabeloMeta = ajustes.cabelo === "longo" ? 1 : 0;
       const u = uniforms.uCabelo;

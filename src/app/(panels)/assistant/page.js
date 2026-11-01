@@ -12,6 +12,8 @@ import { respostaSemCodigo, trechosDaResposta, codigoDaConversa } from "@/lib/co
 import { pedidoDeDesenho, descreverDiagrama } from "@/lib/diagramaDaLisa.js";
 import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
 import FontesDaWeb from "@/components/panels/FontesDaWeb.js";
+import CenaDaLisa from "@/components/panels/hud/CenaDaLisa.js";
+import JanelaDaResposta from "@/components/panels/hud/JanelaDaResposta.js";
 import { Highlight } from "prism-react-renderer";
 import { TTS_VOICES, STEVE_VOICE_NAME } from "@/lib/ttsVoices.js";
 import { pickBrowserVoice, speakText, stopBrowserVoiceAudio, isBrowserVoiceAudioPlaying } from "@/lib/browserVoice.js";
@@ -188,6 +190,15 @@ export default function AssistantPage() {
   const [fontes, setFontes] = useState([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  // a janela da resposta (01/11/2026, src/components/panels/hud/): o × fecha até a próxima pergunta,
+  // e cada pergunta nova faz a janela surgir de novo (a chave dela muda)
+  const [janelaFechada, setJanelaFechada] = useState(false);
+  const [numeroDaResposta, setNumeroDaResposta] = useState(0);
+  useEffect(() => {
+    if (!busy) return;
+    setJanelaFechada(false);
+    setNumeroDaResposta((n) => n + 1);
+  }, [busy]);
   const [listening, setListening] = useState(false);   // mic ativo (STT)
   // true só durante a janela de resposta automática do Modo Escuta (listenForReply) — sinal
   // visual/sonoro claro de "agora é sua vez de falar", separado do `listening` do botão manual.
@@ -4569,6 +4580,39 @@ export default function AssistantPage() {
     : geminiVoiceStatus === false ? "a última tentativa falhou"
     : "ainda sem tentativa nesta sessão";
 
+  // ---- a janela da resposta (01/11/2026): o que antes ficava escrito embaixo do visual ----
+  const falaDaResposta = mode === "speaking" || answer ? respostaSemCodigo(separarRascunho(answer).fala) : "";
+  const rascunhoDaResposta = separarRascunho(answer).rascunho;
+  const janelaNaTela = !janelaFechada && Boolean(question) && (busy || mode !== "idle" || Boolean(answer));
+  const estadoDaJanela = !answer && (busy || mode !== "idle") ? "PROCESSANDO" : busy || mode === "speaking" ? "RESPONDENDO" : "RESPOSTA";
+  const palavrasDaResposta = falaDaResposta ? falaDaResposta.trim().split(/\s+/).length : 0;
+  const janelaDaResposta = janelaNaTela && (
+    <JanelaDaResposta key={numeroDaResposta} estado={estadoDaJanela} pergunta={question} texto={falaDaResposta || (answer ? "…" : "")}
+      digitando={busy} aoFechar={() => setJanelaFechada(true)}>
+      <FontesDaWeb fontes={fontes} />
+      {rascunhoDaResposta && (
+        <div className="bb-rascunho">
+          <div className="bb-rascunho-cabeca">Rascunho do card · ainda não gravado</div>
+          <pre>{rascunhoDaResposta}</pre>
+        </div>
+      )}
+      {ttsWaitSeconds !== null && (
+        <div className="bb-conversa-nota">Preparando a voz… {ttsWaitSeconds}s de {SPEAK_TIMEOUT_MS / 1000}s</div>
+      )}
+      {(liveCode || liveCodeDone.length > 0) && (
+        <div className="bb-codigo-ao-vivo">
+          {liveCodeDone.map((f) => <div key={f.path} style={{ color: "var(--bb-ok)", marginBottom: 6 }}>✓ {f.path}</div>)}
+          {liveCode && (
+            <div>
+              <div style={{ color: PU, marginBottom: 4 }}>✎ {liveCode.path}</div>
+              <pre>{liveCode.content.slice(-2500)}</pre>
+            </div>
+          )}
+        </div>
+      )}
+    </JanelaDaResposta>
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {codeTaskModal}
@@ -4904,7 +4948,10 @@ export default function AssistantPage() {
       </TopoExtra>
 
       <main className="bb-palco">
-        <div className="bb-palco-visual">
+        {/* a cena (01/11/2026): a Lisa mais perto e, com a resposta, a janela holográfica e os
+            hologramas em profundidade — src/components/panels/hud/ */}
+        <CenaDaLisa ativa={janelaNaTela} obterSinal={obterSinalDaEsfera} janela={janelaDaResposta}
+          dados={{ estado: estadoDaJanela, voz: voiceName, palavras: palavrasDaResposta, fontes: fontes.length }}>
           {avatarView === "3d" ? (
             <div style={{ position: "relative", width: "min(70vh,680px)", height: "min(70vh,680px)" }}>
               {avatarSkin === "ironman" ? <LisaAvatarIronMan mode={mode} /> : <LisaAvatar3D mode={mode} />}
@@ -4923,9 +4970,9 @@ export default function AssistantPage() {
               <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
             </div>
           ) : (
-            <VisualDaLisa modo={visualDaLisa} obterSinal={obterSinalDaEsfera} />
+            <VisualDaLisa modo={visualDaLisa} obterSinal={obterSinalDaEsfera} zoom={1.2} />
           )}
-        </div>
+        </CenaDaLisa>
 
         <RotuloDaVoz obterSinal={obterSinalDaEsfera} />
 
@@ -4936,33 +4983,11 @@ export default function AssistantPage() {
           </button>
         )}
 
-        <section className="bb-conversa" aria-live="polite">
-          {(mode !== "idle" || answer) && question && <p className="bb-conversa-pergunta">{question}</p>}
-          <p className={`bb-conversa-resposta${!answer && mode === "idle" ? " bb-conversa-resposta--vazia" : ""}`}>
-            {mode === "speaking" || answer ? (respostaSemCodigo(separarRascunho(answer).fala) || "…") : mode === "listening" ? "…" : "Pergunte alguma coisa, por texto ou pelo microfone."}
-          </p>
-          <FontesDaWeb fontes={fontes} />
-          {separarRascunho(answer).rascunho && (
-            <div className="bb-rascunho">
-              <div className="bb-rascunho-cabeca">Rascunho do card · ainda não gravado</div>
-              <pre>{separarRascunho(answer).rascunho}</pre>
-            </div>
-          )}
-          {ttsWaitSeconds !== null && (
-            <div className="bb-conversa-nota">Preparando a voz… {ttsWaitSeconds}s de {SPEAK_TIMEOUT_MS / 1000}s</div>
-          )}
-          {(liveCode || liveCodeDone.length > 0) && (
-            <div className="bb-codigo-ao-vivo">
-              {liveCodeDone.map((f) => <div key={f.path} style={{ color: "var(--bb-ok)", marginBottom: 6 }}>✓ {f.path}</div>)}
-              {liveCode && (
-                <div>
-                  <div style={{ color: PU, marginBottom: 4 }}>✎ {liveCode.path}</div>
-                  <pre>{liveCode.content.slice(-2500)}</pre>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
+        {!janelaNaTela && !answer && (
+          <section className="bb-conversa" aria-live="polite">
+            <p className="bb-conversa-resposta bb-conversa-resposta--vazia">Pergunte alguma coisa, por texto ou pelo microfone.</p>
+          </section>
+        )}
 
         {/* prévias do que a câmera e a tela estão vendo — sempre montadas enquanto o modo estiver
             ligado: a captura de cada pergunta lê destes mesmos <video> */}

@@ -21,6 +21,15 @@
 /** O busto cabe num círculo deste raio, centrado em CENTRO_Y (o visual inteiro, como a Esfera). */
 export const RAIO = 1.5;
 export const CENTRO_Y = -0.5;
+/**
+ * O enquadramento com zoom (01/11/2026: "quero um zoom mais próximo da Lisa"): o raio visível diminui
+ * e o centro sobe do peito para o rosto, então chegar perto é chegar no rosto (e não no decote). 1 é o
+ * busto inteiro; o Assistente usa ~1.3 (cabeça, pescoço e o alto dos ombros).
+ */
+export function enquadramentoDoRosto(zoom = 1) {
+  const z = Math.min(1.8, Math.max(1, Number(zoom) || 1));
+  return { raio: RAIO / z, centroY: CENTRO_Y + (z - 1) * 0.75 };
+}
 /** A câmera: longe e um pouco acima do centro (perspectiva leve, como numa foto de retrato). */
 export const CAMERA = { y: CENTRO_Y + 0.3, distancia: 7.5 };
 /** A cabeça gira em volta deste ponto (no alto do pescoço); os ombros ficam. */

@@ -18,10 +18,14 @@ const COMPONENTES = {
   rosto: dynamic(() => import("./Rosto.js"), { ssr: false, loading: () => null }),
 };
 
-/** O visual `modo`, ligado ao sinal da voz (`obterSinal`, chamado a cada quadro). */
-export default function VisualDaLisa({ modo, obterSinal, ocupacao }) {
+/**
+ * O visual `modo`, ligado ao sinal da voz (`obterSinal`, chamado a cada quadro). `zoom` (> 1) chega
+ * mais perto: o Rosto sobe o enquadramento para o rosto; os outros só crescem na tela.
+ */
+export default function VisualDaLisa({ modo, obterSinal, ocupacao, zoom = 1 }) {
   const Componente = COMPONENTES[modo] || COMPONENTES[VISUAL_PADRAO];
-  return <Componente key={modo} obterSinal={obterSinal} ocupacao={ocupacao} />;
+  const ocupa = ocupacao ?? (zoom > 1 && modo !== "rosto" ? Math.min(0.95, 0.78 * zoom) : undefined);
+  return <Componente key={modo} obterSinal={obterSinal} ocupacao={ocupa} zoom={zoom} />;
 }
 
 /** O visual escolhido neste navegador — e acompanha a troca na hora (nesta aba e nas outras). */

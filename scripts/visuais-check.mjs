@@ -10,7 +10,7 @@ import {
 import {
   FORMA, RAIO, CENTRO_Y, CAIXA, resolucaoDoRosto, criarMovimentoDoRosto,
   CABELOS_DO_ROSTO, PALETAS_DO_ROSTO, AJUSTES_PADRAO, CHAVE_DO_ROSTO, EVENTO_DO_ROSTO,
-  ajustesValidos, lerAjustesDoRosto, escolherAjustesDoRosto, coresDoRosto,
+  ajustesValidos, lerAjustesDoRosto, escolherAjustesDoRosto, coresDoRosto, enquadramentoDoRosto,
 } from "../src/lib/rostoDaLisa.js";
 
 let falhas = 0;
@@ -134,6 +134,25 @@ console.log("o cabelo e as cores do rosto");
   const rosto = ler("src/components/panels/visuais/Rosto.js");
   conferir("o rosto escuta a troca (evento e outras abas) e solta ao sair", /addEventListener\(EVENTO_DO_ROSTO/.test(rosto) && /removeEventListener\(EVENTO_DO_ROSTO/.test(rosto) && /removeEventListener\("storage"/.test(rosto));
   conferir("o painel /visual e o menu do Assistente oferecem cabelo e cores", /<AjustesDoRosto \/>/.test(ler("src/app/(panels)/visual/page.js")) && /escolherAjustesDoRosto\(\{ cabelo/.test(ler("src/app/(panels)/assistant/page.js")) && /escolherAjustesDoRosto\(\{ paleta/.test(ler("src/app/(panels)/assistant/page.js")));
+}
+
+console.log("a cena do Assistente (janela da resposta, hologramas, zoom)");
+{
+  const e1 = enquadramentoDoRosto(1);
+  const e12 = enquadramentoDoRosto(1.2);
+  conferir("zoom 1: o busto inteiro, como sempre", e1.raio === RAIO && e1.centroY === CENTRO_Y);
+  conferir("zoom maior: chega perto e sobe para o rosto", e12.raio < e1.raio && e12.centroY > e1.centroY && Math.abs(e12.raio - RAIO / 1.2) < 1e-9);
+  conferir("zoom fora da faixa fica dentro dela", enquadramentoDoRosto(0.2).raio === RAIO && enquadramentoDoRosto(9).raio === RAIO / 1.8 && enquadramentoDoRosto("lixo").raio === RAIO);
+  const rosto = ler("src/components/panels/visuais/Rosto.js");
+  conferir("o rosto recebe o zoom e o enquadramento desliza", /zoom = 1 \}\)/.test(rosto) && /uRaio/.test(rosto) && /uCentroY/.test(rosto) && /enquadramentoDoRosto\(zoomRef\.current\)/.test(rosto));
+  const seletor = ler("src/components/panels/visuais/VisualDaLisa.js");
+  conferir("o seletor passa o zoom (os outros visuais crescem na tela)", /zoom=\{zoom\}/.test(seletor) && /0\.78 \* zoom/.test(seletor));
+  const pagina = ler("src/app/(panels)/assistant/page.js");
+  conferir("o Assistente põe a Lisa na cena, mais perto, e a resposta na janela", /<CenaDaLisa ativa=\{janelaNaTela\}/.test(pagina) && /zoom=\{1\.2\}/.test(pagina) && /<JanelaDaResposta key=\{numeroDaResposta\}/.test(pagina));
+  conferir("o × fecha até a próxima pergunta", /aoFechar=\{\(\) => setJanelaFechada\(true\)\}/.test(pagina) && /if \(!busy\) return;\s*setJanelaFechada\(false\)/.test(pagina));
+  const css = ler("src/app/globals.css");
+  conferir("com \"reduzir movimento\": sem paralaxe, sem giros, sem o surgir", /prefers-reduced-motion: reduce\) \{\s*\.bb-cena-mundo \{ transform: none !important; \}/.test(css) && /\.bb-jr-surge, \.bb-cena--hud \.bb-holo--barras i \{ animation: none !important; \}/.test(css));
+  conferir("os hologramas e a janela existem", ["CenaDaLisa", "HologramasDaLisa", "JanelaDaResposta"].every((n) => fs.existsSync(new URL(`../src/components/panels/hud/${n}.js`, import.meta.url))));
 }
 
 console.log("preferência no navegador");
