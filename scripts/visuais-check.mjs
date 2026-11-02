@@ -205,16 +205,29 @@ console.log("as brincadeiras do Rosto (02/11/2026: \"bater no vidro e falar toc 
   let tudoNumero = true;
   for (const b of BRINCADEIRAS) for (let s = 0; s <= b.duracao; s += 0.05) for (const peso of [1, 0.5, 0]) tudoNumero &&= numeros(poseDaBrincadeira(b.id, s, peso));
   conferir("todas as poses, a cada 50 ms e com qualquer peso, só com números de verdade", tudoNumero);
-  const foraDaTela = (pose) => (!pose.mao || pose.mao[1] < -2.5) && (!pose.jogo || (pose.jogo.pos[1] < -2.5 && pose.jogo.tela === 0));
+  const foraDaTela = (pose) => (!pose.mao || pose.mao.centro[1] < -2.5) &&(!pose.jogo || (pose.jogo.pos[1] < -2.5 && pose.jogo.tela === 0));
   conferir("começa e termina com o punho e o videogame fora da tela", BRINCADEIRAS.every((b) => foraDaTela(poseDaBrincadeira(b.id, 0)) && foraDaTela(poseDaBrincadeira(b.id, b.duracao))));
   conferir("peso 0 (fim da saída): tudo fora, cabeça e boca no lugar, nada escrito",
     BRINCADEIRAS.every((b) => { const p = poseDaBrincadeira(b.id, 3, 0); return foraDaTela(p) && !p.cabeca.yaw && !p.cabeca.pitch && !p.cabeca.roll && !p.boca && p.falas.every((f) => !f.opacidade) && p.notas.every((n) => !n.opacidade); }));
 
   const quadro = enquadramentoDoRosto(1.2);
   const noVidro = poseDaBrincadeira("vidro", 1.45);
-  conferir("vidro: o punho chega perto da tela (bem na frente do rosto) e bate", noVidro.mao[2] > 2.9 && poseDaBrincadeira("vidro", 1.3).mao[2] < noVidro.mao[2]);
-  const [u, v] = uvDoPonto(noVidro.mao, quadro);
-  conferir("vidro: o punho aparece ao lado do rosto, na altura dos olhos, dentro do quadro", u < -0.45 && u > -1.05 && v > -0.2 && v < 0.5, `${u.toFixed(2)}, ${v.toFixed(2)}`);
+  conferir("vidro: o punho chega perto da tela (bem na frente do rosto) e bate", noVidro.mao.centro[2] > 2.1 && poseDaBrincadeira("vidro", 1.3).mao.centro[2] < noVidro.mao.centro[2]);
+  const [u, v] = uvDoPonto(noVidro.mao.centro, quadro);
+  conferir("vidro: o punho aparece ao lado do rosto, perto da altura dos olhos, dentro do quadro", u < -0.45 && u > -1.05 && v > -0.2 && v < 0.5, `${u.toFixed(2)}, ${v.toFixed(2)}`);
+  // a mão (02/11/2026: "está pequena para o tamanho do corpo e nada parecida com uma mão humana")
+  const [po, de, co] = noVidro.mao.eixos;
+  const unitario = (a) => Math.abs(Math.hypot(...a) - 1) < 1e-9;
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  conferir("vidro: os eixos da mão (polegar, dedos, costas) são perpendiculares e de tamanho 1", [po, de, co].every(unitario) && Math.abs(dot(po, de)) < 1e-9 && Math.abs(dot(po, co)) < 1e-9 && Math.abs(dot(de, co)) < 1e-9);
+  conferir("vidro: no vidro, os nós viram para a câmera e o polegar fica do lado do rosto", de[2] > 0.9 && po[0] > 0.7);
+  const doPulso = noVidro.mao.centro.map((c, i) => c - noVidro.mao.pulso[i]);
+  conferir("vidro: o pulso fica atrás do punho (mais longe da câmera) e o cotovelo, fora da tela", doPulso[2] > 0.4 && noVidro.mao.cotovelo[1] < -2.5);
+  const palma = COISAS.match(/caixinha\(l - vec3\(0\.0, 0\.45, -0\.02\), vec3\(([\d.]+), ([\d.]+), ([\d.]+)\)/);
+  conferir("vidro: a palma tem o tamanho de uma de verdade para a cabeça dela (quase metade da largura do rosto)", palma && Number(palma[1]) * 2 >= 0.55 && Number(palma[2]) * 2 >= 0.7, palma?.slice(1).join());
+  const maoFechada = COISAS.slice(COISAS.indexOf("float maoFechada("), COISAS.indexOf("float punho("));
+  conferir("vidro: a mão fechada tem palma, quatro dedos de três falanges e o polegar em três partes",
+    (maoFechada.match(/dedo\(l, /g) || []).length === 4 && (maoFechada.match(/po = (min\(po, )?cone\(/g) || []).length === 3 && /float dedo\(vec3 l, vec3 b, vec3 c, float r, vec3 a\)/.test(COISAS));
   const ondas = poseDaBrincadeira("vidro", 2).batidas;
   conferir("vidro: duas batidas, cada uma com a sua onda", ondas.length === 2 && ondas[0].idade > ondas[1].idade && ondas[1].idade > 0);
   conferir("vidro: \"toc toc\" e depois \"tem alguém aí?\"", poseDaBrincadeira("vidro", 2).falas[0].opacidade === 1 && poseDaBrincadeira("vidro", 4).falas[1].opacidade === 1 && poseDaBrincadeira("vidro", 4).falas[0].opacidade === 0);
@@ -230,10 +243,12 @@ console.log("as brincadeiras do Rosto (02/11/2026: \"bater no vidro e falar toc 
     naTela([0, quadro.centroY, 0], quadro, 800, 600, 0.78).every((c, i) => Math.abs(c - [400, 300][i]) < 1e-9));
   conferir("e mais perto da câmera, maior (o punho no vidro sai mais longe do centro que o mesmo ponto lá atrás)",
     Math.abs(uvDoPonto([-0.6, 0, 2.7], quadro)[0]) > Math.abs(uvDoPonto([-0.6, 0, 0], quadro)[0]));
-  conferir("a caixa marchada vai até o punho no vidro, e só nessa hora", frenteDaCaixa(null) === CAIXA.max[2] && frenteDaCaixa(noVidro) > noVidro.mao[2] && frenteDaCaixa(poseDaBrincadeira("cantarola", 3)) === CAIXA.max[2]);
+  conferir("a caixa marchada vai até o punho no vidro, e só nessa hora", frenteDaCaixa(null) === CAIXA.max[2] && frenteDaCaixa(noVidro) > noVidro.mao.centro[2] + 0.5 &&frenteDaCaixa(poseDaBrincadeira("cantarola", 3)) === CAIXA.max[2]);
 
   conferir("o desenho do punho e do videogame em GLSL, sem número solto em vec3", /float punho\(vec3 p\)/.test(COISAS) && /float aparelho\(vec3 p, out float maos\)/.test(COISAS) && !/NaN|undefined/.test(COISAS) && !/vec3\(\s*-?\d+\s*,/.test(COISAS));
-  conferir("longe da mão, o laço dos dedos não roda", /if \(d > 0\.1\) d -= 0\.06;\s*else \{\s*for/.test(COISAS));
+  conferir("longe das mãos, os dedos não são calculados (só a esfera que contém a mão)", /esfera > 0\.12 \? esfera : maoFechada\(l\)/.test(COISAS) && /esfera > 0\.1 \? esfera : maoNoJogo\(m\)/.test(COISAS));
+  conferir("jogo: as mãos seguram as pontas, com três dedos nas costas, o indicador em cima e o polegar na frente",
+    /float maoNoJogo\(vec3 m\)/.test(COISAS) && /vec3 m = vec3\(abs\(l\.x\), l\.y, l\.z\)/.test(COISAS));
   const rosto = ler("src/components/panels/visuais/Rosto.js");
   conferir("o Rosto injeta as coisas, marcha a cena inteira e ondula o vidro",
     /\$\{COISAS\}/.test(rosto) && /d = cena\(ro \+ rd \* t, orelha, fio, coisa\)/.test(rosto) && /batida\(uBatida1, uv, desvio, luzDoVidro\)/.test(rosto) && /uFrente\) - ro\) \* inv/.test(rosto));

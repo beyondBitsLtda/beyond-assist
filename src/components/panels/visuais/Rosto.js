@@ -49,6 +49,8 @@ const FRAGMENTO = `
   // as brincadeiras (src/lib/brincadeirasDoRosto.js): o punho, o videogame, as batidas no vidro e a
   // frente da caixa marchada (o punho no vidro fica bem mais perto da câmera que o busto)
   uniform vec4 uMao, uJogo;
+  uniform mat3 uMaoEixos;
+  uniform vec3 uPulso, uCotovelo;
   uniform float uJogoGiro, uJogoTela, uFrente;
   uniform vec3 uBatida1, uBatida2;
   ${FORMA}
@@ -66,7 +68,7 @@ const FRAGMENTO = `
     return min(d, min(coisa.x, coisa.y));
   }
   // o meio da tela do videogame (virada para ela) e para onde ela olha
-  vec3 telaDoJogo(){ return uJogo.xyz + vec3(0.0, gira(vec2(0.06, -0.05), uJogoGiro)); }
+  vec3 telaDoJogo(){ return uJogo.xyz + vec3(0.0, gira(vec2(0.03, -0.07), uJogoGiro)); }
   vec3 normalDaTela(){ return vec3(0.0, gira(vec2(0.0, -1.0), uJogoGiro)); }
 
   // o vidro: cada batida do punho faz uma onda na tela a partir de onde bateu (b.xy, em uv; b.z é a
@@ -137,6 +139,8 @@ const FRAGMENTO = `
     float entra = max(max(ta.x, ta.y), ta.z), sai = min(min(tb.x, tb.y), tb.z);
 
     vec3 cor = vec3(0.0);
+    float objeto = 0.0; // 1 quando o pixel é do punho, das mãos ou do videogame
+    float coisaPerto = 9.0; // o quanto o raio passou perto deles (o halo deles também escapa do círculo)
     float dmin = 9.0, orelhaPerto = 9.0, fioPerto = 9.0, tPerto = 0.0; // a menor distância do raio ao busto (e às orelhas e ao cabelo, ali)
     float y = uCentroY + uv.y * uRaio;
     if (sai > entra) {
@@ -145,6 +149,7 @@ const FRAGMENTO = `
       bool achou = false;
       for (int i = 0; i < 80; i++) {
         d = cena(ro + rd * t, orelha, fio, coisa);
+        coisaPerto = min(coisaPerto, min(coisa.x, coisa.y));
         if (d < dmin) { dmin = d; orelhaPerto = orelha; fioPerto = fio; tPerto = t; }
         if (d < 0.0015) { achou = true; break; }
         t += d * 0.8;
@@ -161,8 +166,8 @@ const FRAGMENTO = `
         float calor = 1.13 - 1.27 * frente;
         if (coisa.x <= coisa.y) {
           // a mão mais quente que o braço, para o olho ir para ela
-          float naMao = max(smoothstep(0.4, 0.2, length(p - uMao.xyz)) * step(0.01, uMao.w),
-            smoothstep(0.45, 0.25, length(p - uJogo.xyz)) * step(0.01, uJogo.w));
+          float naMao = max(smoothstep(0.85, 0.5, length(p - uMao.xyz)) * step(0.01, uMao.w),
+            smoothstep(1.15, 0.85, length(p - uJogo.xyz)) * step(0.01, uJogo.w));
           calor = 0.98 - 0.72 * frente + 0.2 * naMao;
         } else {
           vec3 l = p - uJogo.xyz;
@@ -170,6 +175,7 @@ const FRAGMENTO = `
           calor = calor * 0.85 + uJogoTela * 0.8 * smoothstep(-0.005, -0.045, l.z);
         }
         cor = rampa((calor + (grao - 0.5) * 0.12) * uAquece);
+        objeto = 1.0;
       } else if (achou) {
         vec3 p = ro + rd * t;
         y = p.y;
@@ -234,10 +240,12 @@ const FRAGMENTO = `
       cor += mix(uC3, vec3(0.8, 1.0, 0.9), 0.3) * uJogoTela * exp(-raioDaTela * 6.0) * 0.4 * uAquece;
     }
     // embaixo e dos lados, os ombros somem antes da borda da tela (e do círculo do visual, numa
-    // área larga) — nunca um corte seco
+    // área larga) — nunca um corte seco. O punho e o videogame só somem na borda da tela: o círculo
+    // apagaria a mão, que fica ao lado do rosto
     vec2 f = gl_FragCoord.xy / uRes;
     float r = length(vec2(uv.x, min(uv.y, 0.0)));
-    cor *= smoothstep(0.0, 0.2, f.y) * smoothstep(0.0, 0.1, f.x) * smoothstep(1.0, 0.9, f.x) * smoothstep(1.32, 1.05, r);
+    objeto = max(objeto, smoothstep(0.3, 0.0, coisaPerto));
+    cor *= smoothstep(0.0, 0.2, f.y) * smoothstep(0.0, 0.1, f.x) * smoothstep(1.0, 0.9, f.x) * mix(smoothstep(1.32, 1.05, r), 1.0, objeto);
     // o grão do filme por cima de tudo (e um pó leve no fundo, em volta do busto)
     cor *= 0.84 + 0.32 * grao;
     cor += mix(uC1, vec3(1.0), 0.3) * 0.9 * (grao2 * grao2) * 0.035 * smoothstep(1.25, 0.2, length(uv)) * uAquece;
@@ -311,6 +319,9 @@ export default function Rosto({ obterSinal, ocupacao = 0.78, ajustes: ajustesFix
       uC2: { value: new THREE.Color(c[1]) },
       uC3: { value: new THREE.Color(c[2]) },
       uMao: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uMaoEixos: { value: new THREE.Matrix3() },
+      uPulso: { value: new THREE.Vector3() },
+      uCotovelo: { value: new THREE.Vector3() },
       uJogo: { value: new THREE.Vector4(0, 0, 0, 0) },
       uJogoGiro: { value: 0 },
       uJogoTela: { value: 0 },
@@ -483,8 +494,14 @@ export default function Rosto({ obterSinal, ocupacao = 0.78, ajustes: ajustesFix
       uniforms.uCabeca.value.setFromMatrix4(giroM4.makeRotationFromEuler(giro)).transpose();
       uniforms.uBoca.value = Math.max(mv.boca, pose?.boca || 0);
       uniforms.uCalorBoca.value = Math.max(mv.calorBoca, pose?.calorBoca || 0);
-      if (pose?.mao) uniforms.uMao.value.set(pose.mao[0], pose.mao[1], pose.mao[2], 1);
-      else uniforms.uMao.value.w = 0;
+      if (pose?.mao) {
+        // a mão é desenhada no espaço dela: as linhas da matriz são o polegar, os dedos e as costas
+        const { centro, eixos: [po, de, co], pulso, cotovelo } = pose.mao;
+        uniforms.uMao.value.set(centro[0], centro[1], centro[2], 1);
+        uniforms.uMaoEixos.value.set(po[0], po[1], po[2], de[0], de[1], de[2], co[0], co[1], co[2]);
+        uniforms.uPulso.value.set(pulso[0], pulso[1], pulso[2]);
+        uniforms.uCotovelo.value.set(cotovelo[0], cotovelo[1], cotovelo[2]);
+      } else uniforms.uMao.value.w = 0;
       if (pose?.jogo) {
         uniforms.uJogo.value.set(pose.jogo.pos[0], pose.jogo.pos[1], pose.jogo.pos[2], 1);
         uniforms.uJogoGiro.value = pose.jogo.giro;

@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.34.0-cloudflare-pages.1",
+  "versao": "0.34.1-cloudflare-pages.1",
   "atualizadoEm": "2026-11-02",
   "compilacao": {
-    "numero": 66,
+    "numero": 67,
     "data": "2026-11-02",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.34.1-cloudflare-pages.1",
+      "data": "2026-11-02",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "As mãos da Lisa nas brincadeiras do Rosto agora são mãos de verdade, no tamanho certo para o corpo dela.",
+      "itens": [
+        "O punho que bate no vidro tem palma, quatro dedos com as três falanges dobradas até a palma (com os sulcos entre eles), os nós e o polegar cruzando na frente; antes era uma bola pequena, um terço do tamanho de uma mão para a cabeça dela.",
+        "O punho fica ao lado do rosto, de frente para a câmera, e vira para o vidro enquanto sobe; o antebraço sai do pulso, atrás do punho.",
+        "O videogame agora é deitado e segurado pelas pontas: três dedos abraçando as costas (o lado que se vê), o indicador no botão de cima e o polegar na frente; antes as mãos eram dois ovais.",
+        "As mãos e o videogame não somem mais no círculo do visual (só na borda da tela)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.34.0-cloudflare-pages.1",
       "data": "2026-11-02",
