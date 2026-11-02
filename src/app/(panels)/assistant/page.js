@@ -4448,7 +4448,7 @@ export default function AssistantPage() {
           // ---- MODO VOZ: a esfera da voz ocupando a tela, e o botão de segurar para falar ----
           <div className="bb-celular-voz">
             <div className="bb-celular-esfera">
-              <VisualDaLisa modo={visualDaLisa} obterSinal={obterSinalDaEsfera} ocupacao={0.86} />
+              <VisualDaLisa modo={visualDaLisa} obterSinal={obterSinalDaEsfera} ocupacao={0.86} brincadeiras />
             </div>
             <RotuloDaVoz obterSinal={obterSinalDaEsfera} />
             <div className="bb-celular-fala">
@@ -5467,7 +5467,7 @@ export default function AssistantPage() {
               <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
             </div>
           ) : (
-            <VisualDaLisa modo={visualDaLisa} obterSinal={obterSinalDaEsfera} zoom={1.2} />
+            <VisualDaLisa modo={visualDaLisa} obterSinal={obterSinalDaEsfera} zoom={1.2} brincadeiras />
           )}
         </CenaDaLisa>
 

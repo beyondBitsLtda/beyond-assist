@@ -12,6 +12,9 @@ import {
   CABELOS_DO_ROSTO, PALETAS_DO_ROSTO, AJUSTES_PADRAO, CHAVE_DO_ROSTO, EVENTO_DO_ROSTO,
   ajustesValidos, lerAjustesDoRosto, escolherAjustesDoRosto, coresDoRosto, enquadramentoDoRosto,
 } from "../src/lib/rostoDaLisa.js";
+import {
+  BRINCADEIRAS, TEMPOS, criarOcio, poseDaBrincadeira, uvDoPonto, naTela, frenteDaCaixa, COISAS,
+} from "../src/lib/brincadeirasDoRosto.js";
 
 let falhas = 0;
 const ok = (t) => console.log(`  ok    ${t}`);
@@ -144,7 +147,7 @@ console.log("a cena do Assistente (janela da resposta, hologramas, zoom)");
   conferir("zoom maior: chega perto e sobe para o rosto", e12.raio < e1.raio && e12.centroY > e1.centroY && Math.abs(e12.raio - RAIO / 1.2) < 1e-9);
   conferir("zoom fora da faixa fica dentro dela", enquadramentoDoRosto(0.2).raio === RAIO && enquadramentoDoRosto(9).raio === RAIO / 1.8 && enquadramentoDoRosto("lixo").raio === RAIO);
   const rosto = ler("src/components/panels/visuais/Rosto.js");
-  conferir("o rosto recebe o zoom e o enquadramento desliza", /zoom = 1 \}\)/.test(rosto) && /uRaio/.test(rosto) && /uCentroY/.test(rosto) && /enquadramentoDoRosto\(zoomRef\.current\)/.test(rosto));
+  conferir("o rosto recebe o zoom e o enquadramento desliza", /zoom = 1, brincadeiras = false \}\)/.test(rosto) &&/uRaio/.test(rosto) && /uCentroY/.test(rosto) && /enquadramentoDoRosto\(zoomRef\.current\)/.test(rosto));
   const seletor = ler("src/components/panels/visuais/VisualDaLisa.js");
   conferir("o seletor passa o zoom (os outros visuais crescem na tela)", /zoom=\{zoom\}/.test(seletor) && /0\.78 \* zoom/.test(seletor));
   const pagina = ler("src/app/(panels)/assistant/page.js");
@@ -153,6 +156,94 @@ console.log("a cena do Assistente (janela da resposta, hologramas, zoom)");
   const css = ler("src/app/globals.css");
   conferir("com \"reduzir movimento\": sem paralaxe, sem giros, sem o surgir", /prefers-reduced-motion: reduce\) \{\s*\.bb-cena-mundo \{ transform: none !important; \}/.test(css) && /\.bb-jr-surge, \.bb-cena--hud \.bb-holo--barras i \{ animation: none !important; \}/.test(css));
   conferir("os hologramas e a janela existem", ["CenaDaLisa", "HologramasDaLisa", "JanelaDaResposta"].every((n) => fs.existsSync(new URL(`../src/components/panels/hud/${n}.js`, import.meta.url))));
+}
+
+console.log("as brincadeiras do Rosto (02/11/2026: \"bater no vidro e falar toc toc, pegar um gameboy e jogar, cantarolar\")");
+{
+  const ids = BRINCADEIRAS.map((b) => b.id);
+  conferir("as três brincadeiras, cada uma com a sua duração", ids.join() === "vidro,jogo,cantarola" && BRINCADEIRAS.every((b) => b.duracao > 5 && b.nome));
+
+  // o relógio da ociosidade, com o acaso fixo (sempre a primeira opção que sobra)
+  const ocio = criarOcio({ acaso: () => 0 });
+  conferir("parada há menos de 30 s: nada", ocio.passo(0) === null && ocio.passo(TEMPOS.primeira - 0.1) === null);
+  const primeira = ocio.passo(TEMPOS.primeira);
+  conferir("aos 30 s sem ninguém mexer, começa uma", primeira?.id === "vidro" && primeira.s === 0 && primeira.peso === 1, JSON.stringify(primeira));
+  conferir("e segue com o tempo dela", ocio.passo(TEMPOS.primeira + 2)?.s === 2);
+  ocio.gesto(TEMPOS.primeira + 3);
+  const saindo = ocio.passo(TEMPOS.primeira + 3 + TEMPOS.saida / 2);
+  conferir("um gesto encerra devagar (o peso cai até 0 na saída)", saindo?.id === "vidro" && saindo.peso > 0.4 && saindo.peso < 0.6, JSON.stringify(saindo));
+  conferir("e some de vez no fim da saída", ocio.passo(TEMPOS.primeira + 3 + TEMPOS.saida + 0.01) === null);
+  const depois = TEMPOS.primeira + 3;
+  conferir("depois do gesto, o relógio recomeça (de novo 30 s)", ocio.passo(depois + TEMPOS.primeira - 0.1) === null && ocio.passo(depois + TEMPOS.primeira)?.id !== undefined);
+  conferir("e não repete a última", ocio.passo(depois + TEMPOS.primeira + 0.1)?.id === "jogo");
+
+  const fala = criarOcio({ acaso: () => 0 });
+  fala.passo(0);
+  conferir("ouvindo, pensando ou falando: não brinca (e o relógio recomeça)", fala.passo(TEMPOS.primeira, "falando") === null && fala.passo(TEMPOS.primeira + 5) === null && fala.passo(2 * TEMPOS.primeira)?.id === "vidro");
+  const mouse = criarOcio({ acaso: () => 0 });
+  mouse.passo(0);
+  mouse.gesto(20, { fraco: true });
+  conferir("o mouse andando também conta como gesto (adia a próxima)", mouse.passo(TEMPOS.primeira) === null && mouse.passo(20 + TEMPOS.primeira)?.id === "vidro");
+  const parada = criarOcio({ acaso: () => 0.5 });
+  parada.passo(0);
+  const ate = parada.passo(TEMPOS.primeira);
+  const dura = BRINCADEIRAS.find((b) => b.id === ate.id).duracao;
+  conferir("inteira até o fim, e a próxima só depois do intervalo (45 a 90 s)",
+    parada.passo(TEMPOS.primeira + dura) === null && parada.passo(TEMPOS.primeira + dura + TEMPOS.entre[0] - 1) === null
+    && parada.passo(TEMPOS.primeira + dura + TEMPOS.entre[1])?.id !== undefined);
+  const pedida = criarOcio();
+  pedida.pedir("cantarola", 5);
+  pedida.gesto(5.5, { fraco: true });
+  conferir("a pedida (no /visual) começa na hora e o mouse andando não a encerra", pedida.passo(6)?.id === "cantarola" && pedida.passo(6).peso === 1);
+  pedida.gesto(6.5);
+  conferir("um clique encerra até a pedida", pedida.passo(6.5 + TEMPOS.saida + 0.01) === null);
+  pedida.pedir("lixo", 10);
+  conferir("pedir uma que não existe não faz nada", pedida.passo(10.1) === null);
+
+  // o roteiro: números de verdade o tempo todo, e começa e termina com tudo fora da tela
+  const numeros = (o) => JSON.stringify(o, (k, v) => (typeof v === "number" && !Number.isFinite(v) ? "NaN!" : v)).includes("NaN!") === false;
+  let tudoNumero = true;
+  for (const b of BRINCADEIRAS) for (let s = 0; s <= b.duracao; s += 0.05) for (const peso of [1, 0.5, 0]) tudoNumero &&= numeros(poseDaBrincadeira(b.id, s, peso));
+  conferir("todas as poses, a cada 50 ms e com qualquer peso, só com números de verdade", tudoNumero);
+  const foraDaTela = (pose) => (!pose.mao || pose.mao[1] < -2.5) && (!pose.jogo || (pose.jogo.pos[1] < -2.5 && pose.jogo.tela === 0));
+  conferir("começa e termina com o punho e o videogame fora da tela", BRINCADEIRAS.every((b) => foraDaTela(poseDaBrincadeira(b.id, 0)) && foraDaTela(poseDaBrincadeira(b.id, b.duracao))));
+  conferir("peso 0 (fim da saída): tudo fora, cabeça e boca no lugar, nada escrito",
+    BRINCADEIRAS.every((b) => { const p = poseDaBrincadeira(b.id, 3, 0); return foraDaTela(p) && !p.cabeca.yaw && !p.cabeca.pitch && !p.cabeca.roll && !p.boca && p.falas.every((f) => !f.opacidade) && p.notas.every((n) => !n.opacidade); }));
+
+  const quadro = enquadramentoDoRosto(1.2);
+  const noVidro = poseDaBrincadeira("vidro", 1.45);
+  conferir("vidro: o punho chega perto da tela (bem na frente do rosto) e bate", noVidro.mao[2] > 2.9 && poseDaBrincadeira("vidro", 1.3).mao[2] < noVidro.mao[2]);
+  const [u, v] = uvDoPonto(noVidro.mao, quadro);
+  conferir("vidro: o punho aparece ao lado do rosto, na altura dos olhos, dentro do quadro", u < -0.45 && u > -1.05 && v > -0.2 && v < 0.5, `${u.toFixed(2)}, ${v.toFixed(2)}`);
+  const ondas = poseDaBrincadeira("vidro", 2).batidas;
+  conferir("vidro: duas batidas, cada uma com a sua onda", ondas.length === 2 && ondas[0].idade > ondas[1].idade && ondas[1].idade > 0);
+  conferir("vidro: \"toc toc\" e depois \"tem alguém aí?\"", poseDaBrincadeira("vidro", 2).falas[0].opacidade === 1 && poseDaBrincadeira("vidro", 4).falas[1].opacidade === 1 && poseDaBrincadeira("vidro", 4).falas[0].opacidade === 0);
+  const jogando = poseDaBrincadeira("jogo", 5);
+  conferir("jogo: o videogame nas mãos, a tela acesa e ela olhando para baixo", jogando.jogo.pos[1] > -1.1 && jogando.jogo.tela > 0.5 && jogando.cabeca.pitch > 0.2);
+  conferir("jogo: na vitória ela levanta o rosto e comemora", poseDaBrincadeira("jogo", 9).cabeca.pitch < jogando.cabeca.pitch && poseDaBrincadeira("jogo", 9.4).falas[1].opacidade === 1);
+  conferir("jogo: os bipes saem de cima do aparelho", jogando.notas.length > 0 && jogando.notas.every((n) => n.ponto[1] > jogando.jogo.pos[1]));
+  const cancao = poseDaBrincadeira("cantarola", 4);
+  conferir("cantarola: a cabeça balança, a garganta esquenta e as notas sobem", Math.abs(poseDaBrincadeira("cantarola", 3.3).cabeca.roll) > 0.05 && cancao.calorBoca > 0.2 && cancao.notas.length >= 2 && cancao.notas.every((n) => n.deriva[1] < 0));
+  conferir("cantarola: sem punho e sem videogame", !cancao.mao && !cancao.jogo);
+
+  conferir("a câmera da projeção é a do shader: o centro do quadro cai no meio do visual",
+    naTela([0, quadro.centroY, 0], quadro, 800, 600, 0.78).every((c, i) => Math.abs(c - [400, 300][i]) < 1e-9));
+  conferir("e mais perto da câmera, maior (o punho no vidro sai mais longe do centro que o mesmo ponto lá atrás)",
+    Math.abs(uvDoPonto([-0.6, 0, 2.7], quadro)[0]) > Math.abs(uvDoPonto([-0.6, 0, 0], quadro)[0]));
+  conferir("a caixa marchada vai até o punho no vidro, e só nessa hora", frenteDaCaixa(null) === CAIXA.max[2] && frenteDaCaixa(noVidro) > noVidro.mao[2] && frenteDaCaixa(poseDaBrincadeira("cantarola", 3)) === CAIXA.max[2]);
+
+  conferir("o desenho do punho e do videogame em GLSL, sem número solto em vec3", /float punho\(vec3 p\)/.test(COISAS) && /float aparelho\(vec3 p, out float maos\)/.test(COISAS) && !/NaN|undefined/.test(COISAS) && !/vec3\(\s*-?\d+\s*,/.test(COISAS));
+  conferir("longe da mão, o laço dos dedos não roda", /if \(d > 0\.1\) d -= 0\.06;\s*else \{\s*for/.test(COISAS));
+  const rosto = ler("src/components/panels/visuais/Rosto.js");
+  conferir("o Rosto injeta as coisas, marcha a cena inteira e ondula o vidro",
+    /\$\{COISAS\}/.test(rosto) && /d = cena\(ro \+ rd \* t, orelha, fio, coisa\)/.test(rosto) && /batida\(uBatida1, uv, desvio, luzDoVidro\)/.test(rosto) && /uFrente\) - ro\) \* inv/.test(rosto));
+  conferir("o Rosto escuta os gestos, o pedido do /visual, e solta tudo ao sair",
+    /\["pointerdown", "keydown", "wheel", "touchstart"\]/.test(rosto) && /ocio\.gesto\(agora\(\), \{ fraco: true \}\)/.test(rosto) && /addEventListener\(EVENTO_DA_BRINCADEIRA/.test(rosto) && /removeEventListener\(EVENTO_DA_BRINCADEIRA/.test(rosto) && /camada\.remove\(\)/.test(rosto));
+  conferir("com \"reduzir movimento\", não brinca", /brincarRef\.current && !reduzido \? ocio\.passo/.test(rosto));
+  const pagina = ler("src/app/(panels)/assistant/page.js");
+  conferir("o Assistente liga as brincadeiras (no computador e no celular); a galeria do /visual, não",
+    (pagina.match(/<VisualDaLisa [^>]*brincadeiras \/>/g) || []).length === 2 && /<VisualDaLisa key=\{`grande-\$\{naPrevia\}`\}[^>]*brincadeiras \/>/.test(ler("src/app/(panels)/visual/page.js")) && /<VisualDaLisa modo=\{x\.id\} obterSinal=\{obterSinal\} ocupacao=\{0\.82\} \/>/.test(ler("src/app/(panels)/visual/page.js")));
+  conferir("o seletor passa adiante", /brincadeiras=\{brincadeiras\}/.test(ler("src/components/panels/visuais/VisualDaLisa.js")));
 }
 
 console.log("preferência no navegador");

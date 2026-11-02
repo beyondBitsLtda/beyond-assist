@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.33.0-cloudflare-pages.1",
+  "versao": "0.34.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-02",
   "compilacao": {
-    "numero": 65,
+    "numero": 66,
     "data": "2026-11-02",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.34.0-cloudflare-pages.1",
+      "data": "2026-11-02",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "No modo Rosto, quando ninguém mexe na tela, a Lisa brinca: bate no vidro, joga videogame ou cantarola.",
+      "itens": [
+        "Depois de 30 s parada (e sem mouse, tecla, toque ou rolagem), ela faz uma brincadeira; as seguintes vêm a cada 45 a 90 s, sem repetir a anterior.",
+        "Bate no vidro: o punho sobe, bate duas vezes na tela por dentro (a tela ondula onde bate), \"toc toc\", e ela inclina a cabeça: \"tem alguém aí?\".",
+        "Videogame: ela pega um videogame de mão, olha para baixo e joga; a tela dele ilumina o rosto de baixo, saem bipes e, no fim, \"passei de fase!\".",
+        "Cantarola: a cabeça balança no ritmo, a garganta esquenta a cada nota e as notas sobem da boca.",
+        "Qualquer gesto ou a Lisa ouvir, pensar ou falar encerra a brincadeira devagar. Sem som, e nada com \"reduzir movimento\" ligado.",
+        "No painel Visual da Lisa, a prévia do Rosto tem botões para ver cada brincadeira na hora."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.33.0-cloudflare-pages.1",
       "data": "2026-11-02",
@@ -996,7 +1012,7 @@
         "Contexto da conversa em qualquer modo: o + da barra anexa imagens (do computador, com Ctrl+V ou arrastando) e vincula até 3 repositórios do GitHub; a cada pergunta a Lisa lê os arquivos do repositório que interessam, escolhidos pela pergunta, pela conversa e pelo que aparece na tela, na câmera e nos prints, e responde relacionando tudo, com o caminho de cada arquivo.",
         "Modo Tomar nota (celular e desktop, também com a tela apagada no Android): escuta até 10 minutos, transcreve, separa por assunto e anota no quadro \"Notas\" do Abacato, com uma coluna por tema e um card por nota (interpretação + transcrição real).",
         "Instalável como app pelo Chrome (desktop e Android) e pela Tela de Início no iPhone, com atalho direto para o Modo Tomar nota.",
-        "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma, Anel de partículas e Rosto (um retrato térmico: borda quente e halo; a garganta esquenta com a fala, as orelhas acendem ouvindo e uma onda de calor sobe pela cabeça pensando; cabelo longo ou raspado e seis paletas de cor); o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador). No modo MVP, o usuário tem só a Esfera de pontos (padrão) e o Rosto.",
+        "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma, Anel de partículas e Rosto (um retrato térmico: borda quente e halo; a garganta esquenta com a fala, as orelhas acendem ouvindo e uma onda de calor sobe pela cabeça pensando; cabelo longo ou raspado e seis paletas de cor; parada e sem ninguém mexer, ela brinca: bate no vidro, joga videogame ou cantarola); o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador). No modo MVP, o usuário tem só a Esfera de pontos (padrão) e o Rosto.",
         "Painel Sentinela de casos de teste e chamados.",
         "Editor de código da conversa colaborativo: abas editáveis, abas suas com o seu código e a Lisa reescrevendo em cima a pedido, com o que está na IDE indo junto das perguntas.",
         "Quadro de processos: a Lisa desenha fluxogramas, BPMN com raias, arquitetura, C4 e mapas mentais quando pedido; a pessoa mexe no desenho e a Lisa conversa sobre ele e o altera a partir do que está na tela, inclusive pela aparência (\"limpe as atividades vermelhas\", \"pinte de verde\") e por abas (cria, detalha uma etapa numa aba ligada a ela, separa, renomeia e apaga abas). O desenho do quadro pode ser salvo num projeto do ProcessMap (botão \"💾 salvar\"), e dali em diante as mudanças se salvam sozinhas.",

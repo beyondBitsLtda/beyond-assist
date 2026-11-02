@@ -12,6 +12,7 @@ import VisualDaLisa, { usarVisualEscolhido, usarAjustesDoRosto } from "@/compone
 import AjustesDoRosto from "@/components/panels/visuais/AjustesDoRosto.js";
 import { VISUAIS, ESTADOS, escolherVisual, visualDe } from "@/lib/visuaisDaLisa.js";
 import { coresDoRosto } from "@/lib/rostoDaLisa.js";
+import { BRINCADEIRAS, pedirBrincadeira } from "@/lib/brincadeirasDoRosto.js";
 
 const NOMES_DOS_ESTADOS = { auto: "Automático", pronta: "Pronta", ouvindo: "Ouvindo", pensando: "Pensando", falando: "Falando" };
 const PASSO_DO_AUTOMATICO_MS = 3500;
@@ -68,7 +69,7 @@ export default function VisualDaLisaPage() {
 
       <section className="bb-visuais-palco" aria-label={`Prévia: ${v.nome}`}>
         <div className="bb-visuais-tela bb-visuais-tela--grande">
-          <VisualDaLisa key={`grande-${naPrevia}`} modo={naPrevia} obterSinal={obterSinal} />
+          <VisualDaLisa key={`grande-${naPrevia}`} modo={naPrevia} obterSinal={obterSinal} brincadeiras />
         </div>
         <div className="bb-visuais-info">
           <span className="bb-visuais-estado"><i />{NOMES_DOS_ESTADOS[estadoAgora]}</span>
@@ -83,6 +84,16 @@ export default function VisualDaLisaPage() {
             ))}
           </div>
           {v.id === "rosto" && <AjustesDoRosto />}
+          {v.id === "rosto" && (
+            // as brincadeiras de quando ninguém mexe (no Assistente, depois de 30 s parada); aqui, na
+            // hora — com o simulador em "Pronta", que é o único estado em que ela brinca
+            <div className="bb-visuais-simulador" role="group" aria-label="Brincadeiras do Rosto">
+              <span>Parada, ela brinca. Ver agora:</span>
+              {BRINCADEIRAS.map((b) => (
+                <button key={b.id} type="button" onClick={() => { estadoRef.current = "pronta"; setSimular("pronta"); pedirBrincadeira(b.id); }}>{b.nome}</button>
+              ))}
+            </div>
+          )}
           <div className="bb-visuais-acoes">
             {naPrevia === emUso
               ? <span className="bb-visuais-em-uso">✓ Em uso no Assistente</span>
