@@ -11,6 +11,7 @@ import { langForPath } from "@/lib/highlightCode.js";
 import { respostaSemCodigo, trechosDaResposta, codigoDaConversa } from "@/lib/codigoNaResposta.js";
 import { pedidoDeDesenho, descreverDiagrama, resumoDaMudanca, pedeMudancaNoDesenho } from "@/lib/diagramaDaLisa.js";
 import usePapel from "@/lib/usePapel.js";
+import { ContaNoCelular } from "@/components/shell/MenuDaConta.js";
 import { podeAcessar } from "@/lib/authSession.js";
 import { PEDIDO_DE_CONSENTIMENTO, PERGUNTAS_DA_ENTREVISTA, perfilDasRespostas, PEDE_APAGAR_PERFIL } from "@/lib/modoUsuario.js";
 import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
@@ -4630,6 +4631,9 @@ export default function AssistantPage() {
                   )}
                 </>
               )}
+
+              {/* a conta: e-mail, acesso, uso do dia, perfil e Sair (o celular não tem o topo) */}
+              <ContaNoCelular />
 
 {!usuario && (<>
               {/* persona */}

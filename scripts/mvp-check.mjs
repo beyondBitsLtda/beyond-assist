@@ -125,5 +125,25 @@ console.log("a tela do usuário");
   conferir("o menu do topo mostra só os painéis do papel; os avisos e comandos remotos são do admin", /gruposDoPapel\(papel\)/.test(ler("src/components/shell/Topbar.js")) && /const doAdmin = papel === "admin" &&/.test(ler("src/components/shell/Shell.js")));
 }
 
+console.log("a conta: sair e ver as informações (01/11/2026: \"faltou um botão de sair da Lisa e ver as informações da conta\")");
+{
+  const { POST: sair } = await import("../src/app/api/auth/logout/route.js");
+  const req = new Request("http://local/api/auth/logout", { method: "POST" });
+  req.cookies = { get: () => undefined };
+  const res = await sair(req);
+  const cookies = res.headers.getSetCookie();
+  conferir("sair apaga a sessão, a renovação e o papel", res.status === 200 && ["lisa_sessao=;", "lisa_renova=;", "lisa_papel=;"].every((c) => cookies.some((x) => x.startsWith(c) && /Max-Age=0/.test(x))), cookies.join(" | "));
+  conferir("e encerra a sessão no Supabase (melhor esforço, sem travar quem quer sair)", /\/auth\/v1\/logout/.test(ler("src/app/api/auth/logout/route.js")) && /AbortSignal\.timeout\(4000\)/.test(ler("src/app/api/auth/logout/route.js")));
+  const { GET: eu } = await import("../src/app/api/auth/eu/route.js");
+  const semSessao = new Request("http://local/api/auth/eu");
+  semSessao.cookies = { get: () => undefined };
+  const j = await (await eu(semSessao)).json();
+  conferir("sem sessão, a conta diz \"não logado\"", j.ok === true && j.logado === false && j.papel === null);
+  conferir("logado, a conta traz o e-mail, o acesso e (usuário) o uso de hoje", /email: String\(r\.payload\.email/.test(ler("src/app/api/auth/eu/route.js")) && /uso: papel === "usuario"/.test(ler("src/app/api/auth/eu/route.js")));
+  conferir("o menu Conta está no topo, e no celular nas configurações do Assistente", /<MenuDaConta \/>/.test(ler("src/components/shell/Topbar.js")) && /<ContaNoCelular \/>/.test(ler("src/app/(panels)/assistant/page.js")));
+  const menu = ler("src/components/shell/MenuDaConta.js");
+  conferir("o menu tem Sair, o tipo de acesso e, para o usuário, o uso e apagar o perfil (com confirmação)", /Sair da Lisa/.test(menu) && /Usuário · versão MVP/.test(menu) && /Uso de hoje/.test(menu) && /Confirmar: apagar meu perfil/.test(menu) && /window\.location\.href = "\/login"/.test(menu));
+}
+
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");
 process.exit(falhas ? 1 : 0);

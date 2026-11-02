@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Suspenso, { GrupoDoMenu, ItemDoMenu, ChaveDoMenu, LinkDoMenu } from "./Suspenso.js";
 import { gruposDoPapel, painelDe } from "@/lib/navegacao.js";
 import usePapel from "@/lib/usePapel.js";
+import MenuDaConta from "./MenuDaConta.js";
 import { useLog } from "./LogProvider.js";
 import { CY, OR, GR, dotColor } from "@/lib/theme.js";
 import { runFullSync } from "@/lib/sync.js";
@@ -351,6 +352,9 @@ export default function Topbar() {
           </GrupoDoMenu>
           <div className="bb-relogio"><span>{clock}</span><span>no ar há {uptime}</span></div>
         </Suspenso>
+
+        {/* a conta: e-mail, acesso, uso do dia e perfil (usuário do MVP) e Sair */}
+        <MenuDaConta />
       </div>
     </header>
   );

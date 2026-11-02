@@ -99,6 +99,16 @@ input::placeholder, textarea::placeholder { color: var(--bb-texto-3); }
 .bb-cores button[aria-pressed="true"] { border-color: var(--bb-texto); }
 .bb-linha-de-status { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; color: var(--bb-texto-2); font-size: 14px; }
 .bb-linha-de-status em { font-style: normal; font-family: var(--bb-mono); font-size: 12px; }
+/* a conta (01/11/2026): o e-mail pode ser longo — quebra em vez de alargar o menu */
+.bb-linha-de-status em.bb-conta-valor { text-align: right; min-width: 0; overflow-wrap: anywhere; color: var(--bb-texto); }
+.bb-conta-perigo { color: var(--bb-aviso); }
+.bb-conta-celular { display: grid; gap: 6px; margin-bottom: 14px; }
+.bb-conta-celular-titulo { font-family: var(--bb-mono); font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: rgba(var(--accent-rgb), 0.5); margin-top: 8px; }
+.bb-conta-celular-linha { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: rgba(207, 239, 251, 0.6); }
+.bb-conta-celular-linha b { font-weight: 500; color: #eafcff; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.bb-conta-celular-botao { font: inherit; font-family: var(--bb-mono); font-size: 11px; letter-spacing: 1px; padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(var(--accent-rgb), 0.35); background: transparent; color: #eafcff; cursor: pointer; width: 100%; margin-top: 4px; }
+.bb-conta-celular-botao--perigo { border-color: rgba(255, 157, 61, 0.5); color: var(--bb-aviso); }
+.bb-conta-celular-botao:disabled { opacity: 0.5; cursor: default; }
 .bb-relogio { display: flex; justify-content: space-between; padding: 10px 10px 6px; border-top: 1px solid var(--bb-linha); margin-top: 6px; font-family: var(--bb-mono); font-size: 11px; color: var(--bb-texto-3); }
 .bb-campo-do-menu { padding: 4px 10px 8px; display: flex; flex-direction: column; gap: 6px; }
 .bb-campo-do-menu label { font-size: 12px; color: var(--bb-texto-3); }

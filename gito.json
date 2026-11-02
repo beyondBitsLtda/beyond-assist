@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.28.0-cloudflare-pages.1",
+  "versao": "0.29.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-01",
   "compilacao": {
-    "numero": 60,
+    "numero": 61,
     "data": "2026-11-01",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.29.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Menu Conta: sair da Lisa e ver as informações da conta (e-mail, tipo de acesso e, para o usuário do MVP, o uso de hoje e o perfil da entrevista).",
+      "itens": [
+        "Menu \"Conta\" no topo: o e-mail, o tipo de acesso (administrador ou usuário da versão MVP) e o botão Sair. No celular, onde o Assistente é tela cheia, o mesmo bloco aparece nas configurações.",
+        "Para o usuário do MVP: o uso de hoje (perguntas, desenhos, comentários de tela e falas, com o limite de cada um) e o perfil da entrevista, com \"apagar meu perfil\" (pede confirmação).",
+        "Sair encerra a sessão de verdade: o token de renovação é revogado no Supabase (sem travar quem quer sair se o banco estiver fora) e os cookies da sessão e do papel são apagados."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.28.0-cloudflare-pages.1",
       "data": "2026-11-01",
