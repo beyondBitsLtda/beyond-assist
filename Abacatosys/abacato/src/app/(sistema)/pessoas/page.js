@@ -331,8 +331,10 @@ A conta fica desligada e a pessoa não consegue entrar.`
               A conta Lisa Task é para quem usa a Lisa: abre o Abacato com o nome e o visual da
               Lisa, cria até <strong>10 quadros</strong> de tarefas e compartilha{" "}
               <strong>3</strong> com até <strong>3 pessoas</strong>. Não tem a parte de
-              documentos, não administra o Abacato e não fala com a assistente dele. O login é
-              separado do da Lisa: passe a senha sorteada para a pessoa.
+              documentos, não administra o Abacato e não fala com a assistente dele. Quem tem
+              conta na Lisa nem precisa ser criado aqui: entra pelo menu Lisa Task com a mesma
+              conta, e a conta Lisa Task nasce no primeiro acesso. Criar aqui serve para dar também
+              uma senha do próprio Abacato.
             </p>
           ) : tipo === "cliente" ? (
             <p className="abacato-dica">

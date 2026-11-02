@@ -39,8 +39,32 @@ console.log("a conversa do usuário");
 
 console.log("a Lisa Task é o Abacato (01/11/2026: \"use o Abacato já existente, só passa um modo gráfico nele e limite o acesso a não deixar usar a parte de documentos\")");
 {
-  const pagina = ler("src/app/(panels)/lisa-task/page.js");
-  conferir("a rota /lisa-task leva ao Abacato, já com o visual da Lisa", /redirect\(ENDERECO_DA_LISA_TASK\)/.test(pagina) && /abacato\.beyond\.dev\.br\/\?visual=lisa/.test(pagina));
+  // a entrada com a mesma conta (01/11/2026: "o usuário cadastrado na Lisa deve ser o mesmo que vai acessar o Lisa Task")
+  const { createHmac } = await import("node:crypto");
+  process.env.SUPABASE_JWT_SECRET = "segredo-de-teste-da-lisa-com-tamanho-bom";
+  const b64 = (x) => Buffer.from(typeof x === "string" ? x : JSON.stringify(x)).toString("base64url");
+  const jwt = (segundos) => {
+    const corpo = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ sub: "u-1", email: "alice@x.dev", exp: Math.floor(Date.now() / 1000) + segundos })}`;
+    return `${corpo}.${createHmac("sha256", process.env.SUPABASE_JWT_SECRET).update(corpo).digest("base64url")}`;
+  };
+  const { GET: abrirLisaTask } = await import("../src/app/(panels)/lisa-task/route.js");
+  const pedir = (token, q = "") => {
+    const req = new Request(`https://lisa.beyond.dev.br/lisa-task${q}`);
+    req.cookies = { get: (n) => (n === "lisa_sessao" && token ? { value: token } : undefined) };
+    return abrirLisaTask(req);
+  };
+  const token = jwt(3600);
+  const entrada = await pedir(token);
+  const html = await entrada.text();
+  conferir("com a sessão da Lisa, a página posta o token para a entrada do Abacato (num formulário, fora da URL)", entrada.status === 200 && /<form method="post" action="https:\/\/abacato\.beyond\.dev\.br\/api\/auth\/lisa">/.test(html) && html.includes(`name="token" value="${token}"`) && !/\?token=/.test(html));
+  conferir("e a página não fica em cache nem abre dentro de outro site", entrada.headers.get("cache-control") === "no-store" && entrada.headers.get("x-frame-options") === "DENY");
+  const quaseVencida = jwt(100);
+  const volta = await pedir(quaseVencida);
+  conferir("sessão perto de vencer: uma volta a mais, para pegar a que o portão renovou", volta.status === 303 && /\/lisa-task\?de-novo=1$/.test(volta.headers.get("location")) && (await pedir(quaseVencida, "?de-novo=1")).status === 200);
+  const semSessao = await pedir(undefined, "?de-novo=1");
+  conferir("sem sessão, volta ao login da Lisa", semSessao.status === 303 && /\/login\?de=%2Flisa-task$/.test(semSessao.headers.get("location")));
+  const rotaDoAbacato = ler("Abacatosys/abacato/src/app/api/auth/lisa/route.js");
+  conferir("o Abacato confirma a pessoa no Supabase Auth, só aceita pedido vindo da Lisa e cria a conta como Lisa Task", /\/auth\/v1\/user/.test(rotaDoAbacato) && /origemPermitida\(req\.headers\.get\("origin"\)/.test(rotaDoAbacato) && /tipo: "lisatask",[\s\S]*admin: false,\s*lisa: false/.test(rotaDoAbacato));
   conferir("o menu do topo e o do celular abrem em outra aba (o Abacato tem login próprio)", /\{ href: "\/lisa-task", rotulo: "Lisa Task",[^}]*novaAba: true \}/.test(ler("src/lib/navegacao.js")) && /target=\{novaAba \? "_blank" : undefined\}/.test(ler("src/components/shell/Suspenso.js")) && /novaAba=\{i\.novaAba\}/.test(ler("src/components/shell/Topbar.js")) && /label: "LISA TASK", novaAba: true/.test(ler("src/app/(panels)/assistant/page.js")));
   conferir("a conversa não cria mais tarefa na Lisa (a Lisa Task leve saiu)", !/pedidoDeTarefa|criarTarefa|secaoDasTarefas|lisa_tarefas/.test(ler("src/app/api/ask/route.js") + ler("src/lib/perfilDoUsuario.js")) && !fs.existsSync(new URL("../src/app/api/lisa-task", import.meta.url)));
   conferir("e diz à pessoa que as tarefas ficam no menu Lisa Task", /pelo menu Lisa Task/.test(INSTRUCAO_DO_USUARIO));

@@ -104,7 +104,7 @@ export default function Entrar() {
         <p className="abacato-entrada__sub" style={{ marginTop: 2 }}>
           <PorVisual
             abacato="Esta conta é só do Abacato — não é a mesma da Lisa."
-            lisa="O login da Lisa Task é separado do da Lisa: use o e-mail e a senha que você recebeu para ela."
+            lisa="Quem usa a Lisa entra pelo menu Lisa Task, já com a conta da Lisa. Aqui, só com uma senha do Abacato."
           />
         </p>
       </form>

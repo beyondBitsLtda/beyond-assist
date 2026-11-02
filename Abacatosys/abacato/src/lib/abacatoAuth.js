@@ -294,7 +294,7 @@ async function assinar(texto, segredo) {
  */
 export const LIVRES = [
   { prefixo: "/entrar", motivo: "a própria tela de login" },
-  { prefixo: "/api/auth/", motivo: "entrar e sair" },
+  { prefixo: "/api/auth/", motivo: "entrar e sair — inclusive pela Lisa (/api/auth/lisa, que confere a sessão dela no Supabase Auth)" },
   { prefixo: "/api/saude", motivo: "checagem de saúde — monitoramento que exige login não monitora" },
   // O link público de acompanhamento que o cliente abre SEM conta. É o motivo de o Abacato
   // existir, e por isso mora numa rota própria, separada de tudo que exige sessão.

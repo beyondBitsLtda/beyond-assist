@@ -69,7 +69,8 @@ export const PLANOS = {
    * A parte de documentos não existe para esta conta — nem os projetos dela, nem os que alguém
    * compartilhar com ela. A trava está no middleware (a tela e as rotas) e no `exigir` de
    * src/lib/acesso.js, que confere no banco a cada pedido. Os quadros seguem os tetos do
-   * cliente: é gente de fora, e o resto da regra é igual.
+   * cliente: é gente de fora, e o resto da regra é igual. Quem tem conta na Lisa entra com ela
+   * (src/dominio/entradaDaLisa.js) — a conta nasce no primeiro acesso.
    */
   lisatask: {
     rotulo: "Lisa Task",

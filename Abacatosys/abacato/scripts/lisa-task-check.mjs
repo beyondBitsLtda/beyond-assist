@@ -9,7 +9,8 @@
 
 import fs from "node:fs";
 import { PLANOS, planoDe, tipoValido, deFora, RECADOS } from "../src/dominio/planos.js";
-import { DOCUMENTOS, ehDocumentos, criarSessao, lerSessao, COOKIE_VISUAL } from "../src/lib/abacatoAuth.js";
+import { DOCUMENTOS, ehDocumentos, ehLivre, criarSessao, lerSessao, COOKIE_VISUAL } from "../src/lib/abacatoAuth.js";
+import { decidirEntrada, origensDaLisa, origemPermitida, nomeDaPessoa, ORIGEM_DA_LISA } from "../src/dominio/entradaDaLisa.js";
 
 let falhas = 0;
 const conferir = (t, cond, d = "") => {
@@ -87,6 +88,35 @@ console.log("\n5) o script do <head> que liga o visual");
   conferir("sem o cookie, fica o Abacato", rodar("outro=1").visual === undefined);
   conferir("outro valor não liga", rodar("abacato_visual=lisax").visual === undefined);
   conferir("outro cookie com o mesmo final não liga", rodar("meu_abacato_visual=lisa").visual === undefined);
+}
+
+console.log("\n6) entrar com a conta da Lisa (src/dominio/entradaDaLisa.js)");
+{
+  conferir("sem conta no Abacato: cria", decidirEntrada(null) === "criar");
+  conferir("conta Lisa Task ativa: entra", decidirEntrada({ tipo: "lisatask", ativo: true, aprovado: true }) === "entrar");
+  conferir("conta Lisa Task desativada (ou não aprovada): não entra",
+    decidirEntrada({ tipo: "lisatask", ativo: false }) === "desativada" &&
+    decidirEntrada({ tipo: "lisatask", ativo: true, aprovado: false }) === "desativada");
+  conferir("conta interna ou de cliente com o mesmo e-mail: só com a senha do Abacato",
+    decidirEntrada({ tipo: "interno", ativo: true }) === "senha" && decidirEntrada({ tipo: "cliente", ativo: true }) === "senha");
+
+  const lisa = origensDaLisa(undefined);
+  conferir("sem LISA_ORIGEM, só a Lisa de produção", lisa.length === 1 && lisa[0] === ORIGEM_DA_LISA);
+  conferir("a origem da Lisa passa; outro site, nenhuma ou \"null\" não",
+    origemPermitida("https://lisa.beyond.dev.br", lisa) && !origemPermitida("https://lisa.beyond.dev.br.mal.com", lisa) &&
+    !origemPermitida("https://abacato.beyond.dev.br", lisa) && !origemPermitida(null, lisa) && !origemPermitida("null", lisa));
+  conferir("LISA_ORIGEM aceita mais de uma, com ou sem barra no fim",
+    origemPermitida("http://localhost:3000", origensDaLisa("https://lisa.beyond.dev.br/, http://localhost:3000")));
+
+  conferir("o nome vem do Auth, ou do começo do e-mail",
+    nomeDaPessoa({ email: "a@b.c", metadados: { nome: " Alice " } }) === "Alice" &&
+    nomeDaPessoa({ email: "maria.silva@b.c" }) === "Maria silva" && nomeDaPessoa({}) === "Pessoa da Lisa");
+
+  const rota = fs.readFileSync(new URL("../src/app/api/auth/lisa/route.js", import.meta.url), "utf8");
+  conferir("a rota confere a origem, a pessoa no Supabase Auth, e cria só conta Lisa Task sem poderes",
+    /origemPermitida\(req\.headers\.get\("origin"\)/.test(rota) && /\/auth\/v1\/user/.test(rota) &&
+    /tipo: "lisatask",[\s\S]*admin: false,\s*lisa: false/.test(rota));
+  conferir("a rota fica fora do portão de sessão (quem chega ainda não tem sessão do Abacato)", ehLivre("/api/auth/lisa"));
 }
 
 console.log(falhas ? `\n${falhas} falha(s)\n` : "\ntudo certo\n");

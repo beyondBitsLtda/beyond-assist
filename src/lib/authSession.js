@@ -189,7 +189,7 @@ export const DO_USUARIO = [
   { prefixo: "/fluxogramas", motivo: "o ProcessMap — os projetos já são separados por pessoa" },
   // (o /visual, o catálogo de visuais, fica com o admin: o usuário tem só a Esfera de pontos e o Rosto,
   // escolhidos no menu do Assistente — src/lib/visuaisDaLisa.js: VISUAIS_DO_USUARIO)
-  { prefixo: "/lisa-task", motivo: "o atalho para a Lisa Task (o Abacato com o visual da Lisa, login próprio)" },
+  { prefixo: "/lisa-task", motivo: "a entrada na Lisa Task (o Abacato com o visual da Lisa), com a mesma conta da Lisa" },
   // o que essas telas chamam
   { prefixo: "/api/ask", motivo: "a conversa — no modo usuário, sem a base, o Abacato, a persona e o contexto do admin" },
   { prefixo: "/api/speak", motivo: "a voz da Lisa" },
