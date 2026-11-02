@@ -56,7 +56,8 @@ console.log("a Lisa Task é o Abacato (01/11/2026: \"use o Abacato já existente
   const token = jwt(3600);
   const entrada = await pedir(token);
   const html = await entrada.text();
-  conferir("com a sessão da Lisa, a página posta o token para a entrada do Abacato (num formulário, fora da URL)", entrada.status === 200 && /<form method="post" action="https:\/\/abacato\.beyond\.dev\.br\/api\/auth\/lisa">/.test(html) && html.includes(`name="token" value="${token}"`) && !/\?token=/.test(html));
+  conferir("com a sessão da Lisa, a página posta o token para a entrada da Lisa Task (num formulário, fora da URL)", entrada.status === 200 && /<form method="post" action="https:\/\/lisatask\.beyond\.dev\.br\/api\/auth\/lisa">/.test(html) && html.includes(`name="token" value="${token}"`) && !/\?token=/.test(html));
+  conferir("o endereço que a pessoa vê é lisatask, não abacato (a página e o menu)", !/abacato/i.test(html) && !/Abacato/.test(ler("src/lib/navegacao.js").match(/\{ href: "\/lisa-task"[^}]*\}/)?.[0] ?? "Abacato"));
   conferir("e a página não fica em cache nem abre dentro de outro site", entrada.headers.get("cache-control") === "no-store" && entrada.headers.get("x-frame-options") === "DENY");
   const quaseVencida = jwt(100);
   const volta = await pedir(quaseVencida);

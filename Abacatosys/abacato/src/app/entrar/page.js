@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { destinoSeguro, chaveDeLogin } from "@/lib/abacatoAuth.js";
 import PorVisual from "@/componentes/PorVisual.js";
+import { ORIGEM_DA_LISA } from "@/dominio/entradaDaLisa.js";
 
 /**
  * A porta do Abacato.
@@ -104,7 +105,10 @@ export default function Entrar() {
         <p className="abacato-entrada__sub" style={{ marginTop: 2 }}>
           <PorVisual
             abacato="Esta conta é só do Abacato — não é a mesma da Lisa."
-            lisa="Quem usa a Lisa entra pelo menu Lisa Task, já com a conta da Lisa. Aqui, só com uma senha do Abacato."
+            lisa={<>
+              Quem usa a Lisa entra com a conta da Lisa:{" "}
+              <a href={`${ORIGEM_DA_LISA}/lisa-task`}>entrar pela Lisa</a>. Aqui, só com uma senha do Abacato.
+            </>}
           />
         </p>
       </form>

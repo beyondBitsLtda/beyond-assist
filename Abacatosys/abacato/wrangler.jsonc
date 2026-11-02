@@ -20,5 +20,10 @@
   // manha na Lisa: o deploy passava, e as chaves sumiam sem nenhum erro.
   "keep_vars": true,
   "observability": { "enabled": true },
-  "routes": [{ "pattern": "abacato.beyond.dev.br", "custom_domain": true }]
+  // Dois endereços, o mesmo Abacato: lisatask é o que o menu Lisa Task da Lisa abre (o visual
+  // da Lisa sai do endereço e do tipo da conta; ver src/middleware.js).
+  "routes": [
+    { "pattern": "abacato.beyond.dev.br", "custom_domain": true },
+    { "pattern": "lisatask.beyond.dev.br", "custom_domain": true }
+  ]
 }

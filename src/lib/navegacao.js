@@ -12,7 +12,7 @@ export const GRUPOS_DE_PAINEIS = [
     itens: [
       { href: "/assistant", rotulo: "Assistente" },
       { href: "/visual", rotulo: "Visual da Lisa", detalhe: "Esfera, Lente, Orbe, Plasma, Anel ou Rosto" },
-      { href: "/lisa-task", rotulo: "Lisa Task", detalhe: "Seus quadros de tarefas (abre o Abacato em outra aba)", novaAba: true },
+      { href: "/lisa-task", rotulo: "Lisa Task", detalhe: "Seus quadros de tarefas (abre em outra aba)", novaAba: true },
     ],
   },
   {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { COOKIE_SESSAO, COOKIE_VISUAL, lerSessao, ehApi, ehLivre, ehDocumentos } from "@/lib/abacatoAuth.js";
 import { PLANOS, RECADOS } from "@/dominio/planos.js";
+import { ehLisaTask } from "@/dominio/entradaDaLisa.js";
 
 /**
  * O portão do Abacato. Roda antes de qualquer página ou rota.
@@ -78,11 +79,12 @@ function comVisual(req, resposta, visual) {
   return resposta;
 }
 
-/** Sem sessão ainda, vale o `?visual=lisa` do link que a Lisa abre: assim até a tela de entrar
- *  já sai como Lisa Task. Sem o parâmetro, fica o que estava. */
+/** Sem sessão ainda, quem decide é o endereço (lisatask.beyond.dev.br é a Lisa Task) ou o
+ *  `?visual=` do link: assim até a tela de entrar já sai como Lisa Task. Sem nenhum dos dois,
+ *  fica o que estava. */
 function visualPedido(req, resposta) {
   const pedido = req.nextUrl.searchParams.get("visual");
-  if (pedido === "lisa") return comVisual(req, resposta, "lisa");
   if (pedido === "abacato") return comVisual(req, resposta, null);
+  if (pedido === "lisa" || ehLisaTask(req.headers.get("host"))) return comVisual(req, resposta, "lisa");
   return resposta;
 }

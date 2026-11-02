@@ -25,6 +25,16 @@ export function decidirEntrada(conta) {
 
 export const ORIGEM_DA_LISA = "https://lisa.beyond.dev.br";
 
+/** O mesmo Worker atende dois endereços (wrangler.jsonc): o do Abacato e o da Lisa Task, que é
+ *  o que a Lisa abre — quem usa a Lisa não vê "abacato" na barra de endereço. */
+export const ENDERECO_DO_ABACATO = "abacato.beyond.dev.br";
+export const ENDERECO_DA_LISA_TASK = "lisatask.beyond.dev.br";
+
+/** O pedido chegou pelo endereço da Lisa Task? (o cabeçalho Host, com ou sem porta) */
+export function ehLisaTask(host) {
+  return String(host || "").split(":")[0].trim().toLowerCase() === ENDERECO_DA_LISA_TASK;
+}
+
 /** As origens que podem mandar alguém entrar (LISA_ORIGEM, separadas por vírgula; a Lisa de
  *  produção sem a variável). */
 export function origensDaLisa(texto) {

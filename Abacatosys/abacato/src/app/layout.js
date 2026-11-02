@@ -48,13 +48,29 @@ const SCRIPT_DO_TEMA = `
 
 /**
  * O visual da Lisa Task (src/app/visual-lisa.css), decidido como o tema: ANTES de pintar. Quem
- * grava o cookie é o middleware, pelo tipo da conta. O título da aba acompanha o nome.
+ * grava o cookie é o middleware, pelo tipo da conta e pelo endereço.
+ *
+ * A aba também vira Lisa Task: título e ícone. O Next devolve o título e o ícone do `metadata` a
+ * cada troca de tela, e por isso um observador no <head> põe os da Lisa de volta sempre que
+ * mudam — trocar uma vez só, no carregamento, durava até o primeiro clique.
  */
 const SCRIPT_DO_VISUAL = `
 (function () {
   if (!/(?:^|;\\s*)abacato_visual=lisa(?:;|$)/.test(document.cookie)) return;
   document.documentElement.setAttribute("data-visual", "lisa");
-  document.addEventListener("DOMContentLoaded", function () { document.title = "Lisa Task"; });
+  function acertar() {
+    if (document.title !== "Lisa Task") document.title = "Lisa Task";
+    var icones = document.head.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]');
+    for (var i = 0; i < icones.length; i++) {
+      var certo = icones[i].getAttribute("rel") === "icon" ? "/marca/lisa-192.png" : "/marca/lisa-apple.png";
+      if (icones[i].getAttribute("href") !== certo) icones[i].setAttribute("href", certo);
+    }
+  }
+  new MutationObserver(acertar).observe(document.head, {
+    childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["href"]
+  });
+  acertar();
+  document.addEventListener("DOMContentLoaded", acertar);
 })();
 `;
 

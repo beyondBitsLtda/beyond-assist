@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.32.0-cloudflare-pages.1",
-  "atualizadoEm": "2026-11-01",
+  "versao": "0.33.0-cloudflare-pages.1",
+  "atualizadoEm": "2026-11-02",
   "compilacao": {
-    "numero": 64,
-    "data": "2026-11-01",
+    "numero": 65,
+    "data": "2026-11-02",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.33.0-cloudflare-pages.1",
+      "data": "2026-11-02",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "A Lisa Task tem endereço e aba próprios: lisatask.beyond.dev.br, com o título e o ícone da Lisa.",
+      "itens": [
+        "O menu Lisa Task abre lisatask.beyond.dev.br: é o mesmo Abacato, mas quem usa a Lisa não vê \"abacato\" na barra de endereço. O abacato.beyond.dev.br continua igual.",
+        "A aba do navegador mostra \"Lisa Task\" e o ícone da Lisa o tempo todo; antes o título voltava a \"Abacato System\" ao trocar de tela, e o ícone era o do abacate.",
+        "No endereço da Lisa Task, a tela de entrar já sai no visual da Lisa e tem o link \"entrar pela Lisa\" para quando a sessão vence.",
+        "Conta interna ou de cliente que chega pelo menu Lisa Task segue para o endereço do Abacato, onde fica a sessão dela.",
+        "O detalhe do menu da Lisa deixou de dizer \"abre o Abacato\"."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.32.0-cloudflare-pages.1",
       "data": "2026-11-01",
@@ -991,7 +1006,7 @@
         "Documentar um projeto do ProcessMap: a Lisa escreve no editor de código a visão geral e um .md por desenho (para pedir a uma IA de código construir as rotas), sem mudar os desenhos",
         "Versões anteriores de cada fluxograma do ProcessMap, com \"voltar para esta\"",
         "Modo MVP: usuários convidados (que não são o dono) entram numa versão limitada — conversa e voz, Modo Tela, editor de código, ProcessMap, repositórios públicos, entrevista do primeiro acesso e o atalho da Lisa Task —, com limite diário de uso",
-        "Lisa Task: é o Abacato com o nome e o visual da Lisa (conta do tipo Lisa Task), só com os quadros de tarefas; a parte de documentos (projetos, pastas e arquivos) não existe para ela e é barrada no servidor. O menu Lisa Task abre o Abacato em outra aba já com a conta da Lisa (a conta Lisa Task nasce no primeiro acesso)."
+        "Lisa Task: é o Abacato com o nome e o visual da Lisa (conta do tipo Lisa Task), só com os quadros de tarefas; a parte de documentos (projetos, pastas e arquivos) não existe para ela e é barrada no servidor. O menu Lisa Task abre lisatask.beyond.dev.br (o mesmo Abacato, com o título e o ícone da Lisa na aba) em outra aba já com a conta da Lisa (a conta Lisa Task nasce no primeiro acesso)."
       ],
       "naoInclui": [
         "Não é multiusuário: o login existe, mas só para o responsável.",
@@ -1089,7 +1104,7 @@
       },
       {
         "nome": "Abacato",
-        "descricao": "Fonte alternativa de quadros: a Lisa pode ler o Abacato em vez do Trello. O Modo Tomar nota grava no quadro \"Notas\" do usuário do Abacato com o mesmo e-mail (cria o quadro, a coluna do tema e os cards). A Lisa Task também é o Abacato: o menu Lisa Task leva a abacato.beyond.dev.br/?visual=lisa, e as contas do tipo Lisa Task abrem com o visual da Lisa e sem documentos. A pessoa entra com a conta da Lisa: a Lisa posta o token do Supabase Auth em /api/auth/lisa do Abacato, que confirma em /auth/v1/user e entra com a conta do mesmo e-mail.",
+        "descricao": "Fonte alternativa de quadros: a Lisa pode ler o Abacato em vez do Trello. O Modo Tomar nota grava no quadro \"Notas\" do usuário do Abacato com o mesmo e-mail (cria o quadro, a coluna do tema e os cards). A Lisa Task também é o Abacato: o menu Lisa Task leva a lisatask.beyond.dev.br (um segundo endereço do mesmo Worker do Abacato; variável LISA_TASK_URL), e as contas do tipo Lisa Task abrem com o visual da Lisa e sem documentos. A pessoa entra com a conta da Lisa: a Lisa posta o token do Supabase Auth em /api/auth/lisa do Abacato, que confirma em /auth/v1/user e entra com a conta do mesmo e-mail.",
         "url": "https://abacato.beyond.dev.br"
       },
       {
@@ -1141,6 +1156,10 @@
       {
         "titulo": "Produção",
         "url": "https://lisa.beyond.dev.br/"
+      },
+      {
+        "titulo": "Lisa Task",
+        "url": "https://lisatask.beyond.dev.br"
       },
       {
         "titulo": "Documentação de infraestrutura",

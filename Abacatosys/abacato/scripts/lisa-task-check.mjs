@@ -10,7 +10,10 @@
 import fs from "node:fs";
 import { PLANOS, planoDe, tipoValido, deFora, RECADOS } from "../src/dominio/planos.js";
 import { DOCUMENTOS, ehDocumentos, ehLivre, criarSessao, lerSessao, COOKIE_VISUAL } from "../src/lib/abacatoAuth.js";
-import { decidirEntrada, origensDaLisa, origemPermitida, nomeDaPessoa, ORIGEM_DA_LISA } from "../src/dominio/entradaDaLisa.js";
+import {
+  decidirEntrada, origensDaLisa, origemPermitida, nomeDaPessoa, ORIGEM_DA_LISA,
+  ehLisaTask, ENDERECO_DA_LISA_TASK, ENDERECO_DO_ABACATO,
+} from "../src/dominio/entradaDaLisa.js";
 
 let falhas = 0;
 const conferir = (t, cond, d = "") => {
@@ -73,19 +76,39 @@ console.log("\n5) o script do <head> que liga o visual");
   const script = new Function("return `" + bruto + "`;")();
   conferir("o script procura o mesmo cookie que o middleware grava", script.includes(COOKIE_VISUAL + "=lisa"));
 
+  // Um <head> de mentira: os dois ícones que o metadata do Next escreve e um observador que só
+  // guarda a função, para o teste "trocar de tela" na mão.
   const rodar = (cookie) => {
     const html = { atributos: {}, setAttribute(k, v) { this.atributos[k] = v; } };
+    const link = (rel, href) => ({ a: { rel, href }, getAttribute(k) { return this.a[k]; }, setAttribute(k, v) { this.a[k] = v; } });
+    const icones = [link("icon", "/marca/app-192.png"), link("apple-touch-icon", "/marca/app-apple.png")];
+    const head = { querySelectorAll: () => icones };
+    const observadores = [];
+    class Observador { constructor(f) { this.f = f; observadores.push(this); } observe(alvo) { this.alvo = alvo; } }
     const ouvintes = [];
-    const document = { cookie, documentElement: html, title: "Abacato System", addEventListener: (_, f) => ouvintes.push(f) };
-    new Function("document", script)(document);
+    const document = { cookie, documentElement: html, head, title: "Abacato System", addEventListener: (_, f) => ouvintes.push(f) };
+    new Function("document", "MutationObserver", script)(document, Observador);
     ouvintes.forEach((f) => f());
-    return { visual: html.atributos["data-visual"], titulo: document.title };
+    return { visual: html.atributos["data-visual"], document, icones, observadores, hrefs: () => icones.map((i) => i.a.href) };
   };
   const lisa = rodar("abacato-tema=x; abacato_visual=lisa; outro=1");
   conferir("com o cookie, liga o visual da Lisa", lisa.visual === "lisa");
-  conferir("e o título vira Lisa Task", lisa.titulo === "Lisa Task");
+  conferir("e o título vira Lisa Task", lisa.document.title === "Lisa Task");
+  conferir("e o ícone da aba vira o da Lisa", lisa.hrefs().join() === "/marca/lisa-192.png,/marca/lisa-apple.png", lisa.hrefs().join());
+  conferir("os ícones da Lisa existem em public/marca",
+    ["lisa-192.png", "lisa-apple.png"].every((f) => fs.existsSync(new URL(`../public/marca/${f}`, import.meta.url))));
+
+  // A troca de tela: o Next escreve de novo o título e o ícone do Abacato no <head>.
+  lisa.document.title = "Abacato System";
+  lisa.icones[0].a.href = "/marca/app-192.png";
+  conferir("vigia o <head>", lisa.observadores.length === 1 && lisa.observadores[0].alvo === lisa.document.head);
+  lisa.observadores.forEach((o) => o.f());
+  conferir("depois de trocar de tela, a aba continua Lisa Task", lisa.document.title === "Lisa Task" && lisa.hrefs()[0] === "/marca/lisa-192.png");
+
+  const abacato = rodar("outro=1");
+  conferir("sem o cookie, fica o Abacato (título, ícone, e nada vigiando)", abacato.visual === undefined &&
+    abacato.document.title === "Abacato System" && abacato.hrefs()[0] === "/marca/app-192.png" && abacato.observadores.length === 0);
   conferir("cookie no começo também vale", rodar("abacato_visual=lisa").visual === "lisa");
-  conferir("sem o cookie, fica o Abacato", rodar("outro=1").visual === undefined);
   conferir("outro valor não liga", rodar("abacato_visual=lisax").visual === undefined);
   conferir("outro cookie com o mesmo final não liga", rodar("meu_abacato_visual=lisa").visual === undefined);
 }
@@ -117,6 +140,30 @@ console.log("\n6) entrar com a conta da Lisa (src/dominio/entradaDaLisa.js)");
     /origemPermitida\(req\.headers\.get\("origin"\)/.test(rota) && /\/auth\/v1\/user/.test(rota) &&
     /tipo: "lisatask",[\s\S]*admin: false,\s*lisa: false/.test(rota));
   conferir("a rota fica fora do portão de sessão (quem chega ainda não tem sessão do Abacato)", ehLivre("/api/auth/lisa"));
+}
+
+console.log("\n7) o endereço da Lisa Task (lisatask.beyond.dev.br)");
+{
+  conferir("reconhece o endereço, com ou sem porta, maiúscula ou não",
+    ehLisaTask(ENDERECO_DA_LISA_TASK) && ehLisaTask("LisaTask.beyond.dev.br:443"));
+  conferir("o Abacato, um parecido e nenhum não são a Lisa Task",
+    !ehLisaTask(ENDERECO_DO_ABACATO) && !ehLisaTask("lisatask.beyond.dev.br.mal.com") &&
+    !ehLisaTask("x.lisatask.beyond.dev.br") && !ehLisaTask(undefined) && !ehLisaTask(""));
+
+  const wrangler = fs.readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  conferir("o Worker atende os dois endereços",
+    [ENDERECO_DO_ABACATO, ENDERECO_DA_LISA_TASK].every((e) => wrangler.includes(`{ "pattern": "${e}", "custom_domain": true }`)));
+
+  const middleware = fs.readFileSync(new URL("../src/middleware.js", import.meta.url), "utf8");
+  conferir("sem sessão, o endereço da Lisa Task já dá o visual da Lisa",
+    /pedido === "lisa" \|\| ehLisaTask\(req\.headers\.get\("host"\)\)\) return comVisual\(req, resposta, "lisa"\)/.test(middleware));
+
+  const rota = fs.readFileSync(new URL("../src/app/api/auth/lisa/route.js", import.meta.url), "utf8");
+  conferir("conta interna que chega pela Lisa Task segue para o endereço do Abacato",
+    /decisao === "senha"\)[\s\S]{0,80}ehLisaTask\(req\.headers\.get\("host"\)\) \? `https:\/\/\$\{ENDERECO_DO_ABACATO\}\/quadros`/.test(rota));
+
+  const entrar = fs.readFileSync(new URL("../src/app/entrar/page.js", import.meta.url), "utf8");
+  conferir("a tela de entrar, no visual da Lisa, leva de volta à entrada pela Lisa", /href=\{`\$\{ORIGEM_DA_LISA\}\/lisa-task`\}/.test(entrar));
 }
 
 console.log(falhas ? `\n${falhas} falha(s)\n` : "\ntudo certo\n");

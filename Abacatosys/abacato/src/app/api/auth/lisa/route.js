@@ -1,7 +1,9 @@
 import { supabase } from "@/lib/supabase.js";
 import { COOKIE_SESSAO, criarSessao, guardarChave } from "@/lib/abacatoAuth.js";
 import { anotar, TIPOS_DE_EVENTO } from "@/lib/eventos.js";
-import { decidirEntrada, origensDaLisa, origemPermitida, nomeDaPessoa } from "@/dominio/entradaDaLisa.js";
+import {
+  decidirEntrada, origensDaLisa, origemPermitida, nomeDaPessoa, ehLisaTask, ENDERECO_DO_ABACATO,
+} from "@/dominio/entradaDaLisa.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,9 +40,11 @@ export async function POST(req) {
     .from("abacato_usuarios").select(CAMPOS).ilike("email", pessoa.email).maybeSingle();
 
   const decisao = decidirEntrada(conta);
-  // Conta interna ou de cliente com o mesmo e-mail: segue pela porta de sempre. Com sessão do
-  // Abacato aberta, entra; sem ela, o middleware leva à tela de entrar.
-  if (decisao === "senha") return irPara("/quadros");
+  // Conta interna ou de cliente com o mesmo e-mail: segue pela porta de sempre, no endereço do
+  // Abacato (é lá que a sessão dela mora). Com sessão aberta, entra; sem ela, a tela de entrar.
+  if (decisao === "senha") {
+    return irPara(ehLisaTask(req.headers.get("host")) ? `https://${ENDERECO_DO_ABACATO}/quadros` : "/quadros");
+  }
   if (decisao === "desativada") {
     return aviso(403, "A sua conta da Lisa Task está desativada. Fale com quem administra a Lisa.");
   }

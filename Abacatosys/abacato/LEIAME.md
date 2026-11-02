@@ -49,6 +49,10 @@ npm run login-check
 
 **https://abacato.beyond.dev.br**
 
+O mesmo Worker também atende **https://lisatask.beyond.dev.br**, o endereço que o menu Lisa Task
+da Lisa abre: lá, a tela de entrar já sai no visual da Lisa, e a aba mostra o título e o ícone da
+Lisa (ver `src/dominio/entradaDaLisa.js` e `wrangler.jsonc`).
+
 Cloudflare Worker, na conta `beyondbitsLisa` — a mesma da Lisa, em projeto separado. O banco
 continua sendo o Postgres do iMac, alcançado pelo túnel em `banco.beyond.dev.br`. O quadro
 inteiro carrega em 0,3–0,5s por esse caminho.
