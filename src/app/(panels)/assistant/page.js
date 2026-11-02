@@ -13,7 +13,7 @@ import { pedidoDeDesenho, descreverDiagrama, resumoDaMudanca, pedeMudancaNoDesen
 import usePapel from "@/lib/usePapel.js";
 import { ContaNoCelular } from "@/components/shell/MenuDaConta.js";
 import { podeAcessar } from "@/lib/authSession.js";
-import { PEDIDO_DE_CONSENTIMENTO, PERGUNTAS_DA_ENTREVISTA, perfilDasRespostas, PEDE_APAGAR_PERFIL } from "@/lib/modoUsuario.js";
+import { PEDIDO_DE_CONSENTIMENTO, pedidoDaSegundaEtapa, perguntasDaEtapa, perfilDaEtapa, etapaQueFalta, respostaAoConvite, PEDE_APAGAR_PERFIL } from "@/lib/modoUsuario.js";
 import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
 import FontesDaWeb from "@/components/panels/FontesDaWeb.js";
 import CenaDaLisa from "@/components/panels/hud/CenaDaLisa.js";
@@ -199,7 +199,7 @@ export default function AssistantPage() {
   const usuario = papel === "usuario";
   const usuarioRef = useRef(false);
   usuarioRef.current = usuario;
-  const entrevistaRef = useRef({ estado: null, i: 0, respostas: {} });
+  const entrevistaRef = useRef({ estado: null, etapa: 1, i: 0, respostas: {}, nome: "" });
   const entrevistaFazRef = useRef(null);
   const [cards, setCards] = useState([]);
   const [question, setQuestion] = useState("");
@@ -2568,8 +2568,11 @@ export default function AssistantPage() {
   }, [usuario, codeMode, observanceMode, vigiaMode, vigiaAutoOn, vigiaWatching, cameraWatching, cameraVigiaMode, micWatchMode, radioMode, transmissionMode, interactiveMode, personaMode]);
 
   // ---- a entrevista do primeiro acesso (o USUÁRIO do MVP; src/lib/modoUsuario.js) ----
-  // Sem perfil, a Lisa pede o consentimento e, com o "sim", faz 5 perguntas, uma por vez; as respostas
-  // vão para /api/perfil. "agora não" adia até a próxima sessão; "apague meu perfil" apaga de verdade.
+  // Em duas etapas, cada uma com o convite antes ("sim" começa; "agora não"/"depois" deixa para outra
+  // sessão): 1) SOBRE VOCÊ — nome, quem a pessoa é, o jeito dela, algo importante —, de onde a Lisa
+  // escreve o retrato da pessoa; 2) ESTUDOS E TRABALHO. Uma pergunta por vez; ao fim de cada etapa, o
+  // perfil vai para /api/perfil (que junta com o que já existe e reescreve o retrato). "apague meu
+  // perfil" apaga de verdade.
   const responderSemServidor = (q, texto, displayText) => {
     const shown = displayText || q;
     setQuestion(shown);
@@ -2578,74 +2581,94 @@ export default function AssistantPage() {
     conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
     if (voiceOn) enqueueSpeech(texto, ++speechGenRef.current);
   };
+  const adiadaNestaSessao = (etapa) => { try { return sessionStorage.getItem(`lisa-entrevista-adiada-${etapa}`) === "1"; } catch { return false; } };
+  const adiarNestaSessao = (etapa) => { try { sessionStorage.setItem(`lisa-entrevista-adiada-${etapa}`, "1"); } catch { /* sem armazenamento */ } };
+  const perguntaNumerada = (etapa, i) => {
+    const lista = perguntasDaEtapa(etapa);
+    return `(${i + 1} de ${lista.length}) ${lista[i].pergunta}`;
+  };
   useEffect(() => {
     if (!usuario) return undefined;
-    let adiada = false;
-    try { adiada = sessionStorage.getItem("lisa-entrevista-adiada") === "1"; } catch { /* sem armazenamento */ }
-    if (adiada) return undefined;
     let vivo = true;
     fetch("/api/perfil").then((r) => r.json()).then((j) => {
-      if (!vivo || !j?.ok || j.perfil || entrevistaRef.current.estado) return;
-      entrevistaRef.current = { estado: "consentimento", i: 0, respostas: {} };
-      setAnswer(PEDIDO_DE_CONSENTIMENTO);
-      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: PEDIDO_DE_CONSENTIMENTO }]);
-      lembrarDaLisa(PEDIDO_DE_CONSENTIMENTO);
+      if (!vivo || !j?.ok || entrevistaRef.current.estado) return;
+      const etapa = etapaQueFalta(j.perfil);
+      if (!etapa || adiadaNestaSessao(etapa)) return;
+      const convite = etapa === 1 ? PEDIDO_DE_CONSENTIMENTO : pedidoDaSegundaEtapa(j.perfil?.nome, { depois: true });
+      entrevistaRef.current = { estado: "convite", etapa, i: 0, respostas: {}, nome: j.perfil?.nome || "" };
+      setAnswer(convite);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: convite }]);
+      lembrarDaLisa(convite);
     }).catch(() => {});
     return () => { vivo = false; };
   }, [usuario]); // eslint-disable-line react-hooks/exhaustive-deps
   entrevistaFazRef.current = async (q, displayText) => {
     const e = entrevistaRef.current;
     const t = q.trim();
-    const adiar = () => { try { sessionStorage.setItem("lisa-entrevista-adiada", "1"); } catch { /* sem armazenamento */ } };
     if (!e.estado) {
       if (PEDE_APAGAR_PERFIL.test(t)) {
         const r = await fetch("/api/perfil", { method: "DELETE" }).then((x) => x.json()).catch(() => ({}));
         responderSemServidor(q, r.ok ? "Apaguei o seu perfil: o que você me contou na entrevista não está mais guardado. Se quiser recomeçar, diga \"quero fazer a entrevista\"." : "Não consegui apagar o perfil agora. Tente de novo em instantes.", displayText);
         return true;
       }
-      if (/\b(fazer|refazer|come[cç]ar|recome[cç]ar)\s+(a\s+)?entrevista\b/i.test(t)) {
-        entrevistaRef.current = { estado: "consentimento", i: 0, respostas: {} };
-        responderSemServidor(q, PEDIDO_DE_CONSENTIMENTO, displayText);
+      const querEstudos = /\b(perguntas?\s+(dos|sobre\s+os?|de)\s+estudos?|segunda\s+(etapa|parte)|continuar\s+a\s+entrevista)\b/i.test(t);
+      if (querEstudos || /\b(fazer|refazer|come[cç]ar|recome[cç]ar)\s+(a\s+)?entrevista\b/i.test(t)) {
+        const etapa = querEstudos ? 2 : 1;
+        entrevistaRef.current = { estado: "convite", etapa, i: 0, respostas: {}, nome: e.nome || "" };
+        responderSemServidor(q, etapa === 1 ? PEDIDO_DE_CONSENTIMENTO : pedidoDaSegundaEtapa(e.nome, { depois: true }), displayText);
         return true;
       }
       return false;
     }
-    if (e.estado === "consentimento") {
-      const r = respostaDeConfirmacao(t);
+    if (e.estado === "convite") {
+      const r = respostaAoConvite(t);
       if (r === "sim") {
-        entrevistaRef.current = { estado: "pergunta", i: 0, respostas: {} };
-        responderSemServidor(q, `Combinado! ${PERGUNTAS_DA_ENTREVISTA[0].pergunta}`, displayText);
+        entrevistaRef.current = { ...e, estado: "pergunta", i: 0, respostas: {} };
+        responderSemServidor(q, `Combinado! ${perguntaNumerada(e.etapa, 0)}`, displayText);
         return true;
       }
-      entrevistaRef.current = { estado: null, i: 0, respostas: {} };
-      adiar();
+      entrevistaRef.current = { estado: null, etapa: e.etapa, i: 0, respostas: {}, nome: e.nome };
+      adiarNestaSessao(e.etapa);
       if (r === "nao") {
-        responderSemServidor(q, "Tudo bem! Quando quiser, diga \"quero fazer a entrevista\". Pode me perguntar o que precisar.", displayText);
+        responderSemServidor(q, e.etapa === 1
+          ? "Tudo bem! Quando quiser, diga \"quero fazer a entrevista\". Pode me perguntar o que precisar."
+          : "Tudo bem, fica para depois. Quando quiser, diga \"vamos às perguntas dos estudos\".", displayText);
         return true;
       }
       return false; // outro assunto: segue a conversa normal
     }
     if (/^(cancel[ae]|par[ae]|sair|chega)\b|\b(cancel[ae]|par[ae]r?)\s+(a\s+)?entrevista\b/i.test(t)) {
-      entrevistaRef.current = { estado: null, i: 0, respostas: {} };
-      adiar();
-      responderSemServidor(q, "Parei a entrevista e não guardei nada. Quando quiser, diga \"quero fazer a entrevista\".", displayText);
+      entrevistaRef.current = { estado: null, etapa: e.etapa, i: 0, respostas: {}, nome: e.nome };
+      adiarNestaSessao(e.etapa);
+      responderSemServidor(q, "Parei a entrevista e não guardei o que faltava desta parte. Quando quiser, diga \"quero fazer a entrevista\".", displayText);
       return true;
     }
-    const atual = PERGUNTAS_DA_ENTREVISTA[e.i];
-    const respostas = { ...e.respostas, [atual.campo]: t };
+    const lista = perguntasDaEtapa(e.etapa);
+    const respostas = { ...e.respostas, [lista[e.i].campo]: t };
     const i = e.i + 1;
-    if (i < PERGUNTAS_DA_ENTREVISTA.length) {
-      entrevistaRef.current = { estado: "pergunta", i, respostas };
-      responderSemServidor(q, PERGUNTAS_DA_ENTREVISTA[i].pergunta, displayText);
+    if (i < lista.length) {
+      entrevistaRef.current = { ...e, i, respostas };
+      responderSemServidor(q, perguntaNumerada(e.etapa, i), displayText);
       return true;
     }
-    entrevistaRef.current = { estado: null, i: 0, respostas: {} };
-    const perfil = perfilDasRespostas(respostas);
-    const r = await fetch("/api/perfil", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ consentimento: true, ...perfil }) })
+    // fim da etapa: guarda (o servidor junta com o que já existe e reescreve o retrato da pessoa)
+    entrevistaRef.current = { estado: null, etapa: e.etapa, i: 0, respostas: {}, nome: e.nome };
+    setAnswer("Anotando…");
+    const dados = perfilDaEtapa(e.etapa, respostas);
+    const r = await fetch("/api/perfil", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ consentimento: true, ...dados, retrato: true }) })
       .then((x) => x.json()).catch(() => ({}));
-    responderSemServidor(q, r.ok
-      ? `Pronto${perfil.nome ? `, ${perfil.nome}` : ""}! Guardei o que você me contou e vou usar para te ajudar melhor. Para apagar, é só dizer "apague meu perfil". Por onde começamos?`
-      : "Não consegui guardar as suas respostas agora. Sigo te ajudando assim mesmo, e você pode pedir \"quero fazer a entrevista\" depois.", displayText);
+    const nome = r.perfil?.nome || dados.nome || e.nome || "";
+    if (!r.ok) {
+      responderSemServidor(q, "Não consegui guardar as suas respostas agora. Sigo te ajudando assim mesmo, e você pode pedir \"quero fazer a entrevista\" depois.", displayText);
+      return true;
+    }
+    if (e.etapa === 1) {
+      // a etapa 1 acabou: já convida para a 2
+      entrevistaRef.current = { estado: "convite", etapa: 2, i: 0, respostas: {}, nome };
+      responderSemServidor(q, `Guardei, obrigada! ${pedidoDaSegundaEtapa(nome)}`, displayText);
+      return true;
+    }
+    responderSemServidor(q, `Pronto${nome ? `, ${nome}` : ""}! Agora eu te conheço e sei como te ajudar. Para apagar o que você me contou, é só dizer "apague meu perfil". Por onde começamos?`, displayText);
     return true;
   };
 

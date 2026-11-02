@@ -30,14 +30,26 @@ export async function lerPerfil(dono) {
   return doPerfil(data);
 }
 
-/** Guarda o perfil — só com o consentimento dado (a tela pergunta antes da entrevista). */
+// as preferências que a entrevista guarda, e o tamanho de cada uma (01/11/2026: a entrevista em duas
+// etapas — "sobre você" e "estudos e trabalho" — e o retrato que a Lisa escreve da pessoa)
+const PREFERENCIAS = { sobre: 600, jeito: 300, importante: 400, ajuda: 300, tempo: 120, resposta: 120, retrato: 1200 };
+
+/**
+ * Guarda o perfil — só com o consentimento dado (a tela pergunta antes de cada etapa). Junta com o
+ * que já existe: a etapa 2 não apaga o que a 1 guardou, e o campo que não veio fica como estava.
+ */
 export async function salvarPerfil(dono, dados = {}) {
   if (!dados.consentimento) throw new ErroDoUsuario("o perfil só é guardado com o seu consentimento");
-  const prefs = dados.preferencias && typeof dados.preferencias === "object" ? dados.preferencias : {};
+  const atual = await lerPerfil(dono).catch(() => null);
+  const novas = dados.preferencias && typeof dados.preferencias === "object" ? dados.preferencias : {};
+  const prefs = { ...(atual?.preferencias || {}) };
+  for (const [k, max] of Object.entries(PREFERENCIAS)) if (novas[k] !== undefined) prefs[k] = texto(novas[k], max);
+  if (novas.etapa !== undefined) prefs.etapa = Math.max(Number(prefs.etapa) || 0, Math.min(2, Number(novas.etapa) || 0));
+  const campo = (k, max) => (dados[k] !== undefined ? texto(dados[k], max) : atual?.[k] ?? "");
   const linhaDoBanco = {
     dono_id: dono,
-    nome: texto(dados.nome, 80), area: texto(dados.area, 300), nivel: texto(dados.nivel, 80), objetivos: texto(dados.objetivos, 600),
-    preferencias: { resposta: texto(prefs.resposta, 120) },
+    nome: campo("nome", 80), area: campo("area", 300), nivel: campo("nivel", 80), objetivos: campo("objetivos", 600),
+    preferencias: prefs,
     consentimento_em: agora(), atualizado_em: agora(),
   };
   const { data, error } = await supabase.from("lisa_perfis").upsert(linhaDoBanco, { onConflict: "dono_id" }).select("*").single();

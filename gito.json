@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.29.0-cloudflare-pages.1",
+  "versao": "0.30.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-01",
   "compilacao": {
-    "numero": 61,
+    "numero": 62,
     "data": "2026-11-01",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.30.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "A entrevista do usuário em duas etapas — primeiro sobre a pessoa (para a Lisa formar o retrato dela e o tom da conversa), depois sobre estudos e trabalho.",
+      "itens": [
+        "Etapa 1, sobre você: o nome, \"me descreva você\", o jeito da pessoa e como prefere ser tratada, e algo importante a saber. Com isso a Lisa escreve o retrato da pessoa (como falar com ela), que vai em toda conversa dela.",
+        "Etapa 2, estudos e trabalho: nível, linguagens e tecnologias, foco, como prefere a ajuda e tempo por semana. A Lisa convida logo depois da etapa 1; \"depois\" deixa para a próxima sessão.",
+        "Correção: \"Sim pode perguntar\" não era reconhecido como sim, a entrevista sumia e o modelo improvisava 5 perguntas de uma vez. O convite agora aceita qualquer resposta que comece com sim, pode, claro, ok, bora…, e a conversa não faz mais entrevista por conta própria.",
+        "Uma pergunta por vez, numerada (\"1 de 4\"); o perfil junta as duas etapas sem apagar a primeira, e o convite avisa que não precisa contar nada sensível."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.29.0-cloudflare-pages.1",
       "data": "2026-11-01",

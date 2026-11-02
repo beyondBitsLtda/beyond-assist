@@ -8,8 +8,9 @@
 
 import fs from "node:fs";
 import {
-  INSTRUCAO_DO_USUARIO, secaoDoPerfil, secaoDasTarefas, pedidoDeTarefa, PERGUNTAS_DA_ENTREVISTA,
-  perfilDasRespostas, PEDE_APAGAR_PERFIL, limitesDoDia, LIMITES_PADRAO, mensagemDoLimite, promptDoUsuario,
+  INSTRUCAO_DO_USUARIO, secaoDoPerfil, secaoDasTarefas, pedidoDeTarefa, PERGUNTAS_SOBRE_VOCE, PERGUNTAS_DOS_ESTUDOS,
+  perguntasDaEtapa, perfilDaEtapa, etapaQueFalta, respostaAoConvite, pedidoDaSegundaEtapa, PEDIDO_DE_CONSENTIMENTO,
+  PEDE_APAGAR_PERFIL, limitesDoDia, LIMITES_PADRAO, mensagemDoLimite, promptDoUsuario,
 } from "../src/lib/modoUsuario.js";
 
 let falhas = 0;
@@ -51,16 +52,28 @@ console.log("a tarefa pedida na conversa");
   conferir("pergunta sobre tarefa não cria tarefa", ["quais são minhas tarefas?", "como organizar tarefas?", "o que é uma tarefa assíncrona?", "crie um fluxograma de tarefas"].every((q) => pedidoDeTarefa(q) === null));
 }
 
-console.log("a entrevista do primeiro acesso");
+console.log("a entrevista do primeiro acesso, em duas etapas (01/11/2026: \"antes deveriam ter perguntas pessoais, para a Lisa formar a persona do usuário\")");
 {
-  conferir("5 perguntas, uma por campo", PERGUNTAS_DA_ENTREVISTA.length === 5 && PERGUNTAS_DA_ENTREVISTA.map((p) => p.campo).join() === "nome,area,nivel,objetivos,resposta");
-  const p = perfilDasRespostas({ nome: "pode me chamar de Ana", area: "dados em Python", nivel: "começando", objetivos: "aprender pandas", resposta: "explicadas" });
-  conferir("as respostas viram o perfil (\"pode me chamar de Ana\" → Ana)", p.nome === "Ana" && p.area === "dados em Python" && p.preferencias.resposta === "explicadas");
+  conferir("etapa 1, sobre você: nome, descrição, jeito, algo importante", PERGUNTAS_SOBRE_VOCE.map((p) => p.campo).join() === "nome,sobre,jeito,importante" && /Me descreva você/.test(PERGUNTAS_SOBRE_VOCE[1].pergunta));
+  conferir("etapa 2, estudos e trabalho: as 5 do print (nível, tecnologias, foco, ajuda, tempo)", PERGUNTAS_DOS_ESTUDOS.map((p) => p.campo).join() === "nivel,area,objetivos,ajuda,tempo" && perguntasDaEtapa(2) === PERGUNTAS_DOS_ESTUDOS && perguntasDaEtapa(1) === PERGUNTAS_SOBRE_VOCE);
+  conferir("o convite explica as duas etapas, o que é guardado e que não precisa contar nada sensível", /4 perguntas sobre você/.test(PEDIDO_DE_CONSENTIMENTO) && /5 sobre seus estudos/.test(PEDIDO_DE_CONSENTIMENTO) && /apague meu perfil/.test(PEDIDO_DE_CONSENTIMENTO) && /nada sensível/.test(PEDIDO_DE_CONSENTIMENTO));
+  const e1 = perfilDaEtapa(1, { nome: "Meu nome é Alice.", sobre: "Sou dev front-end e gosto de games", jeito: "direta, curiosa", importante: "estudo à noite" });
+  conferir("as respostas da etapa 1 viram o perfil (\"Meu nome é Alice.\" → Alice)", e1.nome === "Alice" && e1.preferencias.sobre === "Sou dev front-end e gosto de games" && e1.preferencias.etapa === 1);
+  const e2 = perfilDaEtapa(2, { nivel: "iniciante", area: "HTML e JavaScript", objetivos: "migração de carreira", ajuda: "explicando do zero", tempo: "5 horas" });
+  conferir("e as da etapa 2 (sem mexer no nome)", e2.nivel === "iniciante" && e2.area === "HTML e JavaScript" && e2.preferencias.tempo === "5 horas" && e2.preferencias.etapa === 2 && !("nome" in e2));
+  conferir("a etapa que falta: 1 sem perfil, 2 depois da primeira, nenhuma depois das duas", etapaQueFalta(null) === 1 && etapaQueFalta({ nome: "Alice", preferencias: { etapa: 1 } }) === 2 && etapaQueFalta({ preferencias: { etapa: 2 } }) === null);
+  conferir("o convite reconhece \"Sim pode perguntar\" (o print), \"bora\", \"claro, manda\"…", ["Sim pode perguntar", "sim", "bora", "claro, manda", "pode sim", "ok vamos lá"].every((x) => respostaAoConvite(x) === "sim"));
+  conferir("… e \"agora não\", \"depois\"; outro assunto não é resposta", ["agora não", "depois", "não", "Não, obrigado"].every((x) => respostaAoConvite(x) === "nao") && ["qual a capital da França?", "me ajuda com React"].every((x) => respostaAoConvite(x) === null));
+  conferir("o convite da etapa 2 numa sessão seguinte", /^Oi, Alice! Ficaram 5 perguntas/.test(pedidoDaSegundaEtapa("Alice", { depois: true })) && /^Prontinho, Alice!/.test(pedidoDaSegundaEtapa("Alice")));
+  const comRetrato = secaoDoPerfil({ nome: "Alice", nivel: "iniciante", preferencias: { retrato: "Alice é iniciante e direta; fale simples.", jeito: "direta" } });
+  conferir("o retrato da pessoa vai na instrução da conversa, com o que ela contou", /COMO FALAR COM ELA[\s\S]*Alice é iniciante e direta/.test(comRetrato) && /O jeito dela/.test(comRetrato) && /Nível em programação: iniciante/.test(comRetrato));
+  conferir("a conversa não improvisa entrevista", /Não faça entrevistas nem listas de perguntas sobre a pessoa por conta própria/.test(INSTRUCAO_DO_USUARIO));
   conferir("\"apague meu perfil\" é reconhecido", ["apague meu perfil", "Lisa, exclua meus dados", "esqueça meus dados"].every((q) => PEDE_APAGAR_PERFIL.test(q)) && !PEDE_APAGAR_PERFIL.test("apague a nota do fluxo"));
   const banco = ler("src/lib/perfilEtarefas.js");
-  conferir("o perfil só é guardado com consentimento, e apagar apaga de verdade", /if \(!dados\.consentimento\) throw/.test(banco) && /from\("lisa_perfis"\)\.delete\(\)\.eq\("dono_id", dono\)/.test(banco));
+  conferir("o perfil só é guardado com consentimento, junta as etapas (sem apagar a primeira), e apagar apaga de verdade", /if \(!dados\.consentimento\) throw/.test(banco) && /const prefs = \{ \.\.\.\(atual\?\.preferencias \|\| \{\}\) \};/.test(banco) && /from\("lisa_perfis"\)\.delete\(\)\.eq\("dono_id", dono\)/.test(banco));
+  conferir("ao fim de cada etapa, a Lisa reescreve o retrato (sem perder o perfil se o modelo falhar)", /retratoDaPessoa\(perfil\)\.catch\(\(\) => ""\)/.test(ler("src/app/api/perfil/route.js")) && /export async function retratoDaPessoa/.test(ler("src/lib/gemini.js")));
   const pagina = ler("src/app/(panels)/assistant/page.js");
-  conferir("a tela pede o consentimento antes e faz as perguntas uma por vez", /setAnswer\(PEDIDO_DE_CONSENTIMENTO\)/.test(pagina) && /if \(usuarioRef\.current && !alvoDaIde && await entrevistaFazRef\.current\?\.\(q, displayText\)\) return;/.test(pagina) && /consentimento: true, \.\.\.perfil/.test(pagina));
+  conferir("a tela convida antes de cada etapa, uma pergunta por vez, e emenda a etapa 2 na 1", /const etapa = etapaQueFalta\(j\.perfil\)/.test(pagina) && /if \(usuarioRef\.current && !alvoDaIde && await entrevistaFazRef\.current\?\.\(q, displayText\)\) return;/.test(pagina) && /consentimento: true, \.\.\.dados, retrato: true/.test(pagina) && /entrevistaRef\.current = \{ estado: "convite", etapa: 2/.test(pagina));
 }
 
 console.log("a Lisa Task leve");

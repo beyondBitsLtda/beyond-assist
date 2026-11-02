@@ -1395,6 +1395,39 @@ Decida:
 }
 
 /**
+ * O RETRATO da pessoa (01/11/2026, o MVP: "perguntas pessoais — qual seu nome, me descreva você —, algo
+ * que ajude a Lisa a formar a persona do usuário que ela vai tratar"). A partir do que a pessoa contou
+ * na entrevista, a Lisa escreve para si mesma quem é a pessoa e como falar com ela; o retrato vai na
+ * instrução de cada conversa dessa pessoa (src/lib/modoUsuario.js: secaoDoPerfil). Devolve o texto.
+ */
+export async function retratoDaPessoa(perfil) {
+  const p = perfil?.preferencias || {};
+  const contou = [
+    perfil?.nome && `Nome: ${perfil.nome}`,
+    p.sobre && `Como se descreve: ${p.sobre}`,
+    p.jeito && `O jeito dela e como prefere que falem com ela: ${p.jeito}`,
+    p.importante && `Importante saber: ${p.importante}`,
+    perfil?.nivel && `Nível em programação: ${perfil.nivel}`,
+    perfil?.area && `Linguagens e tecnologias: ${perfil.area}`,
+    perfil?.objetivos && `Foco agora: ${perfil.objetivos}`,
+    p.ajuda && `Como prefere a ajuda: ${p.ajuda}`,
+    p.tempo && `Tempo por semana: ${p.tempo}`,
+  ].filter(Boolean).join("\n");
+  if (!contou) return "";
+  const systemInstruction = `Você é a Lisa, assistente de desenvolvimento e produtividade. Uma pessoa nova acabou de responder
+à sua entrevista de boas-vindas. Escreva, para VOCÊ MESMA, o retrato dela em 3 a 5 frases curtas, em
+português do Brasil: quem ela é, o jeito dela e COMO você deve falar com ela (tom, nível de detalhe,
+exemplos, o que evitar). Use só o que ela contou — não invente fatos, não julgue, e não registre dados
+sensíveis (saúde, religião, política, documentos), mesmo que apareçam. Responda só com o retrato.`;
+  const res = await withTransientRetry(
+    CHAT_MODEL,
+    (client, modelo) => client.models.generateContent({ model: modelo, contents: `O QUE A PESSOA CONTOU:\n${contou.slice(0, 3000)}`, config: { systemInstruction } }),
+    { attempts: 2, delayMs: 800, tetoMs: TETO_LONGO_MS }
+  );
+  return String(res.text || "").trim().slice(0, 1200);
+}
+
+/**
  * A Lisa escreve um .md para o editor de código a partir dos desenhos do projeto. Nenhum desenho muda.
  * Três estilos:
  *   "livre" (o padrão): o documento que o pedido pede, sobre o ASSUNTO dele (01/11/2026: "faça um

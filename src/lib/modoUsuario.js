@@ -24,6 +24,9 @@ O que você faz por esta pessoa:
 - Desenha fluxogramas e mapas mentais no quadro (o ProcessMap) quando a pessoa pede.
 - Guarda tarefas na Lisa Task dela (só texto, sem arquivos) quando ela pede.
 
+Não faça entrevistas nem listas de perguntas sobre a pessoa por conta própria: a entrevista de
+boas-vindas já é feita pela tela, uma pergunta por vez.
+
 Você NÃO tem acesso a dados de outras pessoas, a quadros de tarefas de equipe, a chamados de suporte,
 a e-mails nem a repositórios privados. Se pedirem algo assim, diga em uma frase que isso não faz parte
 desta versão da Lisa. Nunca diga que fez uma ação que não fez.
@@ -43,18 +46,28 @@ export function promptDoUsuario(pergunta, { hoje = "", nota = null, conversa = "
   return `DATA DE HOJE: ${hoje}${nota ? `\n\nCONTEXTO ATIVO: ${nota}` : ""}${secaoDaConversa(conversa)}${extra || ""}\n\nPERGUNTA DA PESSOA:\n${pergunta}`;
 }
 
-/** O perfil da entrevista, em texto para a conversa ("" sem perfil). */
+/**
+ * O perfil da entrevista, em texto para a conversa ("" sem perfil): o RETRATO da pessoa (escrito pela
+ * Lisa a partir da etapa "sobre você" — como tratar essa pessoa) e o que ela contou.
+ */
 export function secaoDoPerfil(perfil) {
   if (!perfil) return "";
   const p = perfil.preferencias || {};
   const linhas = [
     perfil.nome && `- Chame a pessoa de: ${linha(perfil.nome, 80)}`,
-    perfil.area && `- Trabalha ou estuda com: ${linha(perfil.area, 300)}`,
+    p.sobre && `- Como ela se descreve: ${linha(p.sobre, 600)}`,
+    p.jeito && `- O jeito dela e como prefere que você fale: ${linha(p.jeito, 300)}`,
+    p.importante && `- Importante saber: ${linha(p.importante, 400)}`,
     perfil.nivel && `- Nível em programação: ${linha(perfil.nivel, 80)}`,
-    perfil.objetivos && `- O que quer conseguir com a sua ajuda: ${linha(perfil.objetivos, 600)}`,
+    perfil.area && `- Linguagens e tecnologias: ${linha(perfil.area, 300)}`,
+    perfil.objetivos && `- Foco agora: ${linha(perfil.objetivos, 600)}`,
+    p.ajuda && `- Como prefere a sua ajuda: ${linha(p.ajuda, 300)}`,
+    p.tempo && `- Tempo por semana: ${linha(p.tempo, 120)}`,
     p.resposta && `- Prefere respostas: ${linha(p.resposta, 120)}`,
   ].filter(Boolean);
-  return linhas.length ? `\n\nQUEM É A PESSOA (da entrevista do primeiro acesso — use para personalizar, sem repetir isso a cada resposta):\n${linhas.join("\n")}` : "";
+  if (!linhas.length && !p.retrato) return "";
+  const retrato = p.retrato ? `\nCOMO FALAR COM ELA (o retrato que você escreveu depois da entrevista — siga esse tom):\n${linha(p.retrato, 1200)}\n` : "";
+  return `\n\nQUEM É A PESSOA (da entrevista do primeiro acesso — use para personalizar, sem repetir isso a cada resposta):${retrato}\n${linhas.join("\n")}`;
 }
 
 /** As tarefas abertas da pessoa, em texto ("" sem tarefas). */
@@ -82,26 +95,76 @@ export function pedidoDeTarefa(texto) {
   return { titulo: titulo.charAt(0).toUpperCase() + titulo.slice(1, 200), prioridade: alta ? "alta" : "normal" };
 }
 
-// ---- a entrevista do primeiro acesso ----
+// ---- a entrevista do primeiro acesso, em duas etapas (01/11/2026: "essas perguntas deveriam ser uma
+// segunda interação; antes deveriam ter perguntas pessoais — qual seu nome, me descreva você —, algo
+// que ajude a Lisa a formar a persona do usuário que ela vai tratar") ----
+//
+// Etapa 1, SOBRE VOCÊ: o nome, quem a pessoa é, o jeito dela e algo importante — com isso a Lisa
+// escreve o RETRATO da pessoa (gemini.js: retratoDaPessoa), que guia o tom das respostas.
+// Etapa 2, ESTUDOS E TRABALHO: nível, tecnologias, foco, como prefere a ajuda e tempo por semana.
+// Cada etapa pede o "sim" antes; a 2 pode ficar para depois (a Lisa pergunta de novo noutra sessão).
 
-export const PEDIDO_DE_CONSENTIMENTO = "Oi! Sou a Lisa. Antes de começar, posso te fazer 5 perguntas rápidas para te conhecer? Eu guardo só as suas respostas, para personalizar a conversa — e você apaga quando quiser dizendo \"apague meu perfil\". Responda sim para começar, ou \"agora não\".";
+const AVISO_DO_QUE_GUARDA = "Eu guardo só as suas respostas, para personalizar a conversa, e você apaga quando quiser dizendo \"apague meu perfil\". Não precisa contar nada sensível (saúde, religião, documentos).";
 
-export const PERGUNTAS_DA_ENTREVISTA = [
+export const PEDIDO_DE_CONSENTIMENTO = `Oi! Sou a Lisa. Antes de começar, quero te conhecer para conversar do seu jeito: primeiro 4 perguntas sobre você e, depois, 5 sobre seus estudos e trabalho. ${AVISO_DO_QUE_GUARDA} Podemos começar? (sim, ou "agora não")`;
+
+/** O convite para a etapa 2: logo depois da 1, ou numa sessão seguinte (`depois`). */
+export const pedidoDaSegundaEtapa = (nome, { depois = false } = {}) => (depois
+  ? `Oi${nome ? `, ${nome}` : ""}! Ficaram 5 perguntas sobre seus estudos e trabalho, para eu te ajudar no ponto certo. Vamos agora? (sim, ou "depois")`
+  : `${nome ? `Prontinho, ${nome}! ` : ""}Agora, 5 perguntas sobre seus estudos e trabalho, para eu te ajudar no ponto certo. Vamos? (sim, ou "depois")`);
+
+export const PERGUNTAS_SOBRE_VOCE = [
   { campo: "nome", pergunta: "Como você quer que eu te chame?" },
-  { campo: "area", pergunta: "Com o que você trabalha ou estuda? Por exemplo: front-end em React, dados em Python, back-end, gestão." },
-  { campo: "nivel", pergunta: "Qual o seu nível com programação: começando, intermediário ou avançado?" },
-  { campo: "objetivos", pergunta: "O que você quer conseguir com a minha ajuda nas próximas semanas?" },
-  { campo: "resposta", pergunta: "Por último: prefere respostas curtas e diretas, ou mais explicadas, com exemplos?" },
+  { campo: "sobre", pergunta: "Me descreva você: o que você faz, do que gosta, o que te move?" },
+  { campo: "jeito", pergunta: "Como você é no dia a dia — mais direto, curioso, detalhista, brincalhão? E como prefere que eu fale com você?" },
+  { campo: "importante", pergunta: "Tem algo importante que eu deva saber sobre você para te ajudar melhor? Pode ser sua rotina, um objetivo ou o que costuma te atrapalhar." },
 ];
 
-/** O perfil montado a partir das respostas da entrevista (na ordem de PERGUNTAS_DA_ENTREVISTA). */
-export function perfilDasRespostas(respostas) {
-  const r = (campo) => linha(respostas?.[campo], campo === "objetivos" ? 600 : campo === "area" ? 300 : 80);
+export const PERGUNTAS_DOS_ESTUDOS = [
+  { campo: "nivel", pergunta: "Qual é o seu nível atual com programação, ou o que você está estudando no momento?" },
+  { campo: "area", pergunta: "Quais linguagens ou tecnologias você usa, ou quer aprender?" },
+  { campo: "objetivos", pergunta: "Qual é o seu foco principal agora: trabalho, migração de carreira, faculdade ou projetos pessoais?" },
+  { campo: "ajuda", pergunta: "Como prefere que eu te ajude no dia a dia: direto ao ponto no código, explicando conceitos do zero, ou montando planos de estudo?" },
+  { campo: "tempo", pergunta: "Por último: quanto tempo por semana você consegue dedicar a isso?" },
+];
+
+/** As perguntas de cada etapa. */
+export const perguntasDaEtapa = (etapa) => (etapa === 2 ? PERGUNTAS_DOS_ESTUDOS : PERGUNTAS_SOBRE_VOCE);
+
+const tirarApresentacao = (nome) => nome.replace(/^(me chame de|pode me chamar de|meu nome é|é|eu sou o|eu sou a|sou o|sou a)\s+/i, "").replace(/[.!]+$/, "");
+
+/** O que a etapa grava no perfil (as colunas e as preferências), a partir das respostas. */
+export function perfilDaEtapa(etapa, respostas) {
+  const r = (campo, max) => linha(respostas?.[campo], max);
+  if (etapa === 2) {
+    return {
+      nivel: r("nivel", 80), area: r("area", 300), objetivos: r("objetivos", 600),
+      preferencias: { ajuda: r("ajuda", 300), tempo: r("tempo", 120), etapa: 2 },
+    };
+  }
   return {
-    nome: r("nome").replace(/^(me chame de|pode me chamar de|é|eu sou o|eu sou a|sou o|sou a)\s+/i, ""),
-    area: r("area"), nivel: r("nivel"), objetivos: r("objetivos"),
-    preferencias: { resposta: r("resposta") },
+    nome: tirarApresentacao(r("nome", 80)),
+    preferencias: { sobre: r("sobre", 600), jeito: r("jeito", 300), importante: r("importante", 400), etapa: 1 },
   };
+}
+
+/** A etapa que falta: 1 sem perfil, 2 se só a primeira foi feita, null se as duas estão feitas. */
+export function etapaQueFalta(perfil) {
+  if (!perfil) return 1;
+  return Number(perfil.preferencias?.etapa) >= 2 || (perfil.nivel && perfil.objetivos) ? null : 2;
+}
+
+/**
+ * A resposta ao convite da entrevista: "sim", "nao" ou null (outro assunto). Mais solta que a
+ * confirmação de mudar um desenho — "sim, pode perguntar", "bora", "claro, manda" valem; o convite
+ * não mexe em nada (01/11/2026: "Sim pode perguntar" não era reconhecido, e a entrevista sumia).
+ */
+export function respostaAoConvite(texto) {
+  const t = String(texto || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  if (/^(nao|n|agora nao|depois|mais tarde|outra hora|deixa|deixa pra la|pula|pular|cancela|nao quero)\b/.test(t)) return "nao";
+  if (/^(sim|s|ss|si+m+|pode|podemos|claro|ok|okay|beleza|blz|bora|vamos|vambora|manda|pode mandar|com certeza|certo|uhum|aham|yes|quero|topo|partiu|isso)\b/.test(t)) return "sim";
+  return null;
 }
 
 /** "apague meu perfil", "esqueça meus dados" — a pessoa quer apagar o perfil. */
