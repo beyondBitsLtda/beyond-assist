@@ -93,14 +93,30 @@ export async function abrirMicrofone() {
     const c = contexto();
     if (!c) return;
     if (c.state === "suspended") await c.resume().catch(() => {});
-    streamDoMic = await navigator.mediaDevices.getUserMedia({ audio: true });
+    medirMicrofone(await navigator.mediaDevices.getUserMedia({ audio: true }));
+  } catch {
+    fecharMicrofone();
+  }
+}
+
+/**
+ * Mede o volume de um microfone que JÁ está aberto (o da gravação da fala, src/lib/gravadorDeFala.js),
+ * sem abrir outro: no Android, dois donos do microfone ao mesmo tempo derrubam um deles. Com o
+ * contexto suspenso (sem gesto ainda), não mede — a esfera simula, a gravação segue igual.
+ */
+export function medirMicrofone(stream) {
+  try {
+    const c = contexto();
+    if (!c || c.state !== "running" || !stream) return;
+    streamDoMic = stream;
     analisadorDoMic = c.createAnalyser();
     analisadorDoMic.fftSize = 512;
     analisadorDoMic.smoothingTimeConstant = 0.5;
-    c.createMediaStreamSource(streamDoMic).connect(analisadorDoMic);
+    c.createMediaStreamSource(stream).connect(analisadorDoMic);
     dadosDoMic = new Uint8Array(analisadorDoMic.fftSize);
   } catch {
-    fecharMicrofone();
+    analisadorDoMic = null;
+    dadosDoMic = null;
   }
 }
 

@@ -63,6 +63,8 @@ import { VISUAIS, escolherVisual, visuaisDoUsuario, visualDoUsuario } from "@/li
 import { CABELOS_DO_ROSTO, PALETAS_DO_ROSTO, escolherAjustesDoRosto } from "@/lib/rostoDaLisa.js";
 // o contexto da conversa (25/10/2026): imagens anexadas (o +, Ctrl+V, arrastar) e repositórios vinculados
 import { BotaoMais, FaixaDoContexto } from "@/components/panels/ContextoDaConversa.js";
+// o microfone do celular como o do WhatsApp (02/11/2026): segura grava, solta envia, ← cancela, ↑ trava
+import MicrofoneDaLisa from "@/components/panels/MicrofoneDaLisa.js";
 import { imagemParaAnexo, imagensDaColagem, imagensSoltas } from "@/lib/anexosDaConversa.js";
 import { MAX_ANEXOS } from "@/lib/contextoDaConversa.js";
 import { reposNoTexto, vinculosValidos } from "@/lib/enderecoDoRepositorio.js";
@@ -527,6 +529,16 @@ export default function AssistantPage() {
   const isMobile = useIsMobile();
   const [mobileView, setMobileView] = useState("chat"); // "chat" | "voice"
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
+  // gravando a fala pelo microfone do celular (MicrofoneDaLisa): a esfera escuta, e o "</> editor"
+  // flutuante sai do caminho (globals.css: body.bb-gravando-fala, body[data-celular])
+  const [gravandoFala, setGravandoFala] = useState(false);
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    document.body.classList.toggle("bb-gravando-fala", gravandoFala);
+    if (isMobile) document.body.dataset.celular = mobileView;
+    else delete document.body.dataset.celular;
+    return () => { document.body.classList.remove("bb-gravando-fala"); delete document.body.dataset.celular; };
+  }, [gravandoFala, isMobile, mobileView]);
   // no mobile o Assistente é tela cheia (sem Sidebar/Topbar — ver Shell.js), então essas são
   // as ÚNICAS abas que existem nesse modo: sem esse atalho, não tem como chegar nos outros
   // painéis (Dashboard, AR, Quarto de Guerra, etc.) a partir do celular.
@@ -3637,19 +3649,8 @@ export default function AssistantPage() {
     rec.start();
   }, [addLog, ask, stopSpeaking]);
   toggleMicForGestureRef.current = toggleMic;
-
-  // ---- microfone "segurar pra falar" (mobile) — igual WhatsApp: pressiona e segura o botão
-  // pra falar, solta pra parar de ouvir e já mandar. toggleMic() já faz exatamente isso num
-  // único disparo (liga se não estava ouvindo, desliga-e-envia se estava) — só precisa ser
-  // chamado 1x no press e 1x no release, nunca os dois no mesmo evento (por isso NÃO usa
-  // onClick aqui: um toque simples já dispara pointerdown+pointerup+click em sequência, e o
-  // click extra chamaria toggleMic() uma 3ª vez, reabrindo o mic logo depois de soltar).
-  const startMicHold = useCallback(() => {
-    if (!listening && !busy) toggleMic();
-  }, [listening, busy, toggleMic]);
-  const stopMicHold = useCallback(() => {
-    if (listening) toggleMic();
-  }, [listening, toggleMic]);
+  // (no celular, o microfone de segurar é o MicrofoneDaLisa: grava o áudio de verdade, como o
+  // WhatsApp — o reconhecimento do navegador falhava lá; ver src/lib/falaComoWhatsApp.js)
 
   // modo chat (mobile): rola pro fim sempre que a conversa cresce ou a resposta vai chegando
   useEffect(() => {
@@ -4381,14 +4382,14 @@ export default function AssistantPage() {
   // ---- revisão visual: gaveta aberta no desktop e o sinal que move a esfera ----
   const [gaveta, setGaveta] = useState(null); // "registro" | "contexto" | null
   const sinalDaEsferaRef = useRef({});
-  sinalDaEsferaRef.current = { listening, autoListening, mode, conversaOuvindo: conversaEstado === "ouvindo" };
+  sinalDaEsferaRef.current = { listening, autoListening, mode, conversaOuvindo: conversaEstado === "ouvindo", gravandoFala };
   // Lido a cada quadro pela esfera: "falando" vem do áudio tocando de verdade (o mode já voltou
   // a "idle" quando a fala começa — ver ask()), "ouvindo" do microfone, "pensando" da busca.
   const obterSinalDaEsfera = useCallback(() => {
     const s = sinalDaEsferaRef.current;
     const falando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
     if (falando) return { estado: "falando", nivel: nivelDaVoz() };
-    if (s.listening || s.autoListening || s.conversaOuvindo) return { estado: "ouvindo", nivel: nivelDoMicrofone() };
+    if (s.listening || s.autoListening || s.conversaOuvindo || s.gravandoFala) return { estado: "ouvindo", nivel: nivelDoMicrofone() };
     if (s.mode === "listening" || s.mode === "speaking") return { estado: "pensando", nivel: null };
     return { estado: "pronta", nivel: null };
   }, []);
@@ -4451,25 +4452,14 @@ export default function AssistantPage() {
               <VisualDaLisa modo={visualDaLisa} obterSinal={obterSinalDaEsfera} ocupacao={0.86} brincadeiras />
             </div>
             <RotuloDaVoz obterSinal={obterSinalDaEsfera} />
-            <div className="bb-celular-fala">
-              {mode === "listening" ? `"${question}"` : mode === "speaking" ? "Respondendo…" : "Segure o microfone para falar"}
-            </div>
-            <button
-              type="button"
-              className={`bb-botao-segurar${listening ? " bb-botao-segurar--ouvindo" : ""}`}
-              onPointerDown={(e) => { e.preventDefault(); acordarAudio(); startMicHold(); }}
-              onPointerUp={stopMicHold}
-              onPointerLeave={stopMicHold}
-              onPointerCancel={stopMicHold}
-              onContextMenu={(e) => e.preventDefault()}
-              disabled={busy}
-              title="Segure pra falar, solte pra enviar"
-              aria-label="Segure para falar"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="9" y="2.5" width="6" height="12" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
-              </svg>
-            </button>
+            <MicrofoneDaLisa
+              variante="voz"
+              desabilitado={busy}
+              rotulo={mode === "listening" ? `"${question}"` : mode === "speaking" ? "Respondendo…" : null}
+              aoComecar={() => { stopSpeaking(); acordarAudio(); }}
+              aoGravando={setGravandoFala}
+              aoTexto={(q) => ask(q)}
+            />
           </div>
         ) : (
           // ---- MODO CHAT: bolhas de conversa, tipo Gemini/ChatGPT ----
@@ -4532,8 +4522,9 @@ export default function AssistantPage() {
 
             {/* o contexto da conversa: imagens anexadas e repositórios vinculados */}
             <div className="bb-contexto-celular">{faixaDoContexto}</div>
-            {/* barra de entrada */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderTop: "1px solid rgba(var(--accent-rgb),0.12)" }}>
+            {/* barra de entrada — sem texto, o microfone (como o do WhatsApp: a faixa da gravação
+                cobre o campo); com texto, o enviar */}
+            <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderTop: "1px solid rgba(var(--accent-rgb),0.12)" }}>
               <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, padding: "6px 14px 6px 6px", border: "1px solid rgba(var(--accent-rgb),0.2)", borderRadius: 22, background: "rgba(255,255,255,0.04)" }}>
                 <BotaoMais aoEscolherImagens={anexarImagens} aoVincular={vincularRepo} desabilitado={busy} classeDoBotao="bb-redondo bb-redondo--mais-celular" />
                 <input
@@ -4545,26 +4536,23 @@ export default function AssistantPage() {
                   style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#eafcff", fontSize: 15 }}
                 />
               </div>
-              <button
-                onPointerDown={(e) => { e.preventDefault(); startMicHold(); }}
-                onPointerUp={stopMicHold}
-                onPointerLeave={stopMicHold}
-                onPointerCancel={stopMicHold}
-                onContextMenu={(e) => e.preventDefault()}
-                disabled={busy}
-                title="Segure pra falar, solte pra enviar"
-                style={{ width: 42, height: 42, borderRadius: "50%", flex: "none", border: `1.5px solid ${listening ? OR : CY}`, background: listening ? "rgba(255,157,61,0.15)" : "rgba(var(--accent-rgb),0.06)", color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
-              >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /></svg>
-              </button>
-              {input.trim() && (
+              {input.trim() ? (
                 <button
                   onClick={() => { if (!busy) { ask(input); setInput(""); } }}
                   disabled={busy}
+                  aria-label="Enviar"
                   style={{ width: 42, height: 42, borderRadius: "50%", flex: "none", border: `1.5px solid ${CY}`, background: "rgba(var(--accent-rgb),0.14)", color: CY, cursor: busy ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                 >
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
                 </button>
+              ) : (
+                <MicrofoneDaLisa
+                  variante="chat"
+                  desabilitado={busy}
+                  aoComecar={() => { stopSpeaking(); acordarAudio(); }}
+                  aoGravando={setGravandoFala}
+                  aoTexto={(q) => ask(q)}
+                />
               )}
             </div>
           </div>

@@ -19,6 +19,7 @@
     "mvp-check": "node --import ./scripts/alias-loader.mjs scripts/mvp-check.mjs",
     "reserva-check": "node --import ./scripts/alias-loader.mjs scripts/reserva-check.mjs",
     "fala-check": "node scripts/fala-check.mjs",
+    "microfone-check": "node scripts/microfone-check.mjs",
     "codigo-check": "node scripts/codigo-check.mjs",
     "diagrama-check": "node scripts/diagrama-check.mjs",
     "web-check": "node scripts/web-check.mjs",

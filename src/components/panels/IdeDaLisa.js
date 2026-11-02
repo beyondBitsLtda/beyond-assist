@@ -329,6 +329,7 @@ export default function IdeDaLisa({ interacoes = [], chegando = false, aoPedir, 
     return (
       <button
         type="button"
+        className="bb-ide-chamar"
         onClick={temAlgo ? () => setFechada(false) : abrirMinha}
         title={temAlgo ? "abrir de novo o editor com o código desta conversa" : "abrir o editor: cole o seu código e peça à Lisa para analisar ou mudar"}
         style={{

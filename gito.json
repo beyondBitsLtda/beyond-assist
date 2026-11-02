@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.34.1-cloudflare-pages.1",
+  "versao": "0.35.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-02",
   "compilacao": {
-    "numero": 67,
+    "numero": 68,
     "data": "2026-11-02",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.35.0-cloudflare-pages.1",
+      "data": "2026-11-02",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "No celular, o microfone funciona como o do WhatsApp, no chat e no modo voz (que antes nem funcionava).",
+      "itens": [
+        "Segurar grava (com ponto vermelho e relógio), soltar envia; deslizar para a esquerda cancela; deslizar para cima trava e continua gravando sem segurar, com lixeira e enviar; um toque rápido só mostra a dica.",
+        "O áudio agora é gravado de verdade (MediaRecorder) e transcrito no servidor pela mesma transcrição do Tomar nota, em vez do reconhecimento de voz do navegador, que no celular parava na primeira pausa, parava quando o dedo saía do botão e brigava pelo microfone.",
+        "O modo voz do celular voltou a funcionar: o app abria o microfone duas vezes ao mesmo tempo (para gravar e para medir o volume), e no Android isso derrubava a gravação; agora o volume é medido do mesmo microfone.",
+        "Falas de até 2 minutos; as longas são cortadas nas pausas para a transcrição. Silêncio não vai para o servidor.",
+        "O botão flutuante \"</> editor\" sai do caminho enquanto grava e, no modo voz, fica no topo (antes ficava em cima do \"Segure para falar\")."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.34.1-cloudflare-pages.1",
       "data": "2026-11-02",
@@ -1026,6 +1041,7 @@
         "Contexto da conversa em qualquer modo: o + da barra anexa imagens (do computador, com Ctrl+V ou arrastando) e vincula até 3 repositórios do GitHub; a cada pergunta a Lisa lê os arquivos do repositório que interessam, escolhidos pela pergunta, pela conversa e pelo que aparece na tela, na câmera e nos prints, e responde relacionando tudo, com o caminho de cada arquivo.",
         "Modo Tomar nota (celular e desktop, também com a tela apagada no Android): escuta até 10 minutos, transcreve, separa por assunto e anota no quadro \"Notas\" do Abacato, com uma coluna por tema e um card por nota (interpretação + transcrição real).",
         "Instalável como app pelo Chrome (desktop e Android) e pela Tela de Início no iPhone, com atalho direto para o Modo Tomar nota.",
+        "Microfone do celular como o do WhatsApp, no chat e no modo voz: segurar grava, soltar envia, deslizar para a esquerda cancela e para cima trava; o áudio é transcrito no servidor (a mesma transcrição do Tomar nota) e não fica guardado.",
         "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma, Anel de partículas e Rosto (um retrato térmico: borda quente e halo; a garganta esquenta com a fala, as orelhas acendem ouvindo e uma onda de calor sobe pela cabeça pensando; cabelo longo ou raspado e seis paletas de cor; parada e sem ninguém mexer, ela brinca: bate no vidro, joga videogame ou cantarola); o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador). No modo MVP, o usuário tem só a Esfera de pontos (padrão) e o Rosto.",
         "Painel Sentinela de casos de teste e chamados.",
         "Editor de código da conversa colaborativo: abas editáveis, abas suas com o seu código e a Lisa reescrevendo em cima a pedido, com o que está na IDE indo junto das perguntas.",
