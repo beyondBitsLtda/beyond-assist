@@ -5,6 +5,7 @@ import { obter, criar, mudar } from "@/lib/api.js";
 import { guardarSenha } from "@/lib/abacatoAuth.js";
 import { sortearSenha, emailValido } from "@/dominio/papeis.js";
 import { Usuario } from "@/dominio/Quadro.js";
+import { deFora, planoDe } from "@/dominio/planos.js";
 
 /**
  * As contas do Abacato.
@@ -78,8 +79,8 @@ export default function Pessoas() {
         tipo,
         // Conta de cliente não administra e não fala com a assistente. A trava real está no
         // servidor e no banco; aqui é só não mandar o que seria recusado.
-        admin: tipo === "cliente" ? false : ehAdmin,
-        lisa: tipo === "cliente" ? false : comLisa,
+        admin: deFora(tipo) ? false : ehAdmin,
+        lisa: deFora(tipo) ? false : comLisa,
       });
       setSenhaNova({ nome: nome.trim(), email: email.trim().toLowerCase(), senha });
       setNome(""); setEmail(""); setEhAdmin(false); setComLisa(false); setTipo("interno"); setCriando(false);
@@ -321,10 +322,19 @@ A conta fica desligada e a pessoa não consegue entrar.`
             <select className="abacato-campo__entrada" value={tipo} onChange={(e) => setTipo(e.target.value)}>
               <option value="interno">Interna — da casa, sem limites</option>
               <option value="cliente">Cliente — de fora, com limites de uso</option>
+              <option value="lisatask">Lisa Task — quem usa a Lisa, só quadros de tarefas</option>
             </select>
           </label>
 
-          {tipo === "cliente" ? (
+          {tipo === "lisatask" ? (
+            <p className="abacato-dica">
+              A conta Lisa Task é para quem usa a Lisa: abre o Abacato com o nome e o visual da
+              Lisa, cria até <strong>10 quadros</strong> de tarefas e compartilha{" "}
+              <strong>3</strong> com até <strong>3 pessoas</strong>. Não tem a parte de
+              documentos, não administra o Abacato e não fala com a assistente dele. O login é
+              separado do da Lisa: passe a senha sorteada para a pessoa.
+            </p>
+          ) : tipo === "cliente" ? (
             <p className="abacato-dica">
               A conta de cliente cria até <strong>10 quadros</strong> e{" "}
               <strong>10 projetos</strong>, compartilha <strong>3</strong> de cada com até{" "}
@@ -372,7 +382,7 @@ A conta fica desligada e a pessoa não consegue entrar.`
                 <strong>
                   {p.nome}
                   {souEu && <span className="abacato-etiqueta abacato-etiqueta--ok">você</span>}
-                  {p.tipo === "cliente" && <span className="abacato-selo abacato-selo--cliente">cliente</span>}
+                  {deFora(p.tipo) && <span className={`abacato-selo abacato-selo--${p.tipo}`}>{planoDe(p.tipo).rotulo.toLowerCase()}</span>}
                   {p.admin && <span className="abacato-etiqueta">administra</span>}
                   {p.lisa && <span className="abacato-etiqueta abacato-etiqueta--ok">Lisa</span>}
                   {!p.ativo && <span className="abacato-etiqueta abacato-etiqueta--alerta">desativada</span>}
@@ -389,7 +399,7 @@ A conta fica desligada e a pessoa não consegue entrar.`
                 {/* Conta de cliente não tem este botão: a assistente não é dela, e um botão que
                     sempre devolve erro é pior que botão nenhum. O servidor recusa de qualquer
                     jeito, e o banco também. */}
-                {p.tipo !== "cliente" && (
+                {!deFora(p.tipo) && (
                   <button type="button"
                     className={`abacato-botao abacato-botao--pequeno ${p.lisa ? "abacato-botao--fantasma" : ""}`}
                     onClick={() => alternar(p, "lisa")}
@@ -408,7 +418,7 @@ A conta fica desligada e a pessoa não consegue entrar.`
                     criar contas só volta pelo terminal do servidor. */}
                 {!souEu && (
                   <>
-                    {p.tipo !== "cliente" && (
+                    {!deFora(p.tipo) && (
                       <button type="button" className="abacato-botao abacato-botao--fantasma abacato-botao--pequeno"
                         onClick={() => alternar(p, "admin")}>
                         {p.admin ? "Tirar administração" : "Tornar administrador"}

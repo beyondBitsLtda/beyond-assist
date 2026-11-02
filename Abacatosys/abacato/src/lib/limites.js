@@ -154,6 +154,7 @@ export async function usoDe(usuarioId) {
     admin: Boolean(conta.admin),
     lisa: Boolean(conta.lisa),
     verDiretorio: Boolean(p.verDiretorio),
+    documentos: Boolean(p.documentos),
     quadros: medir(quadros, p.quadros),
     projetos: medir(projetos, p.projetos),
     quadrosCompartilhados: medir(quadrosComp, p.quadrosCompartilhados),
@@ -203,6 +204,14 @@ export async function exigirPodeCriarProjeto(usuarioId) {
  */
 export async function exigirPodeCompartilhar(tipo, id, usuarioAlvoId) {
   const ehProjeto = tipo === "projeto";
+  // Projeto é documento, e a conta Lisa Task não abre documento nenhum: convidá-la seria um
+  // membro que nunca consegue entrar.
+  if (ehProjeto) {
+    const alvo = await contaDe(usuarioAlvoId);
+    if (alvo && !alvo.plano.documentos) {
+      throw new ErroDeAcesso(400, "Esta pessoa usa a Lisa Task, que não tem a parte de documentos.");
+    }
+  }
   const tabela = ehProjeto ? "abacato_projetos" : "abacato_quadros";
   const tabelaMembros = ehProjeto ? "abacato_projeto_membros" : "abacato_membros";
   const coluna = ehProjeto ? "projeto_id" : "quadro_id";

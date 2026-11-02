@@ -11,6 +11,7 @@
 import { supabase } from "./supabase.js";
 import { COOKIE_SESSAO, lerSessao } from "./abacatoAuth.js";
 import { Quadro, poderesDo } from "@/dominio/Quadro.js";
+import { planoDe, RECADOS } from "@/dominio/planos.js";
 import { json } from "./http.js";
 
 /** Quem está pedindo, lido do cookie assinado. O middleware já barrou quem não tem sessão —
@@ -353,6 +354,8 @@ export async function exigir(req, tipo, id, acao) {
   const coluna = ehProjeto ? "projeto_id" : "quadro_id";
   const donoDe = ehProjeto ? alvo.projetoId : alvo.quadroId;
 
+  if (ehProjeto) await exigirDocumentos(usuario.id);
+
   const { data: raiz } = await supabase
     .from(tabela).select("id, dono_id, arquivado").eq("id", donoDe).maybeSingle();
   if (!raiz) throw new ErroDeAcesso(404, ehProjeto ? "projeto não encontrado" : "quadro não encontrado");
@@ -371,6 +374,18 @@ export async function exigir(req, tipo, id, acao) {
   if (!poderes[acao]) throw new ErroDeAcesso(403, `seu papel (${papel}) não permite ${acao}`);
 
   return { usuario, papel, poderes, quadroId: ehProjeto ? null : raiz.id, projetoId: ehProjeto ? raiz.id : null, ...alvo };
+}
+
+/**
+ * A parte de documentos existe para esta conta? A Lisa Task não tem (src/dominio/planos.js).
+ *
+ * Lido do BANCO, e não do cookie: o middleware já barra pelo tipo que está na sessão, mas a
+ * sessão vale uma semana, e uma conta que virou Lisa Task precisa perder os documentos no
+ * mesmo instante — inclusive os projetos que alguém tinha compartilhado com ela.
+ */
+export async function exigirDocumentos(usuarioId) {
+  const { data } = await supabase.from("abacato_usuarios").select("tipo").eq("id", usuarioId).maybeSingle();
+  if (!planoDe(data?.tipo).documentos) throw new ErroDeAcesso(403, RECADOS.semDocumentos);
 }
 
 /** Marca o quadro como tocado agora. Serve à ordenação da lista de quadros e, mais para

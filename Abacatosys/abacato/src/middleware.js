@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { COOKIE_SESSAO, lerSessao, ehApi, ehLivre } from "@/lib/abacatoAuth.js";
+import { COOKIE_SESSAO, COOKIE_VISUAL, lerSessao, ehApi, ehLivre, ehDocumentos } from "@/lib/abacatoAuth.js";
+import { PLANOS, RECADOS } from "@/dominio/planos.js";
 
 /**
  * O portão do Abacato. Roda antes de qualquer página ou rota.
@@ -20,13 +21,27 @@ export const config = {
 
 export async function middleware(req) {
   const caminho = req.nextUrl.pathname;
-  if (ehLivre(caminho)) return NextResponse.next();
+  if (ehLivre(caminho)) return visualPedido(req, NextResponse.next());
 
   const sessao = await lerSessao(
     req.cookies.get(COOKIE_SESSAO)?.value,
     process.env.ABACATO_SESSAO_SECRET
   );
-  if (sessao.ok) return NextResponse.next();
+  if (sessao.ok) {
+    // O plano sai do tipo gravado na sessão. Sessão de antes do tipo existir não é barrada
+    // aqui — o `exigir` de src/lib/acesso.js confere no banco de qualquer jeito.
+    const plano = PLANOS[sessao.usuario.tipo];
+    if (plano && !plano.documentos && ehDocumentos(caminho)) {
+      if (ehApi(caminho)) {
+        return NextResponse.json(
+          { ok: false, error: RECADOS.semDocumentos },
+          { status: 403, headers: { "cache-control": "no-store" } }
+        );
+      }
+      return comVisual(req, NextResponse.redirect(new URL("/quadros", req.url)), plano.visual);
+    }
+    return comVisual(req, NextResponse.next(), plano?.visual);
+  }
 
   // API recebe 401; página recebe redirecionamento. A diferença importa: um fetch que segue
   // redirecionamento receberia o HTML do login como se fosse dado, e o erro apareceria bem
@@ -44,5 +59,30 @@ export async function middleware(req) {
   // Cookie inválido some junto, senão o navegador insiste em mandá-lo a cada tentativa e o log
   // enche de "assinatura não bate" que não são ataque, são lixo.
   resposta.cookies.delete(COOKIE_SESSAO);
+  return visualPedido(req, resposta);
+}
+
+/**
+ * O visual da tela é só aparência: um cookie que o script do <head> lê antes de pintar (ver
+ * src/app/layout.js). Com sessão, quem decide é o tipo da conta — a Lisa Task sai com a cara da
+ * Lisa. Grava só quando muda, para não mandar cookie a cada pedido.
+ */
+function comVisual(req, resposta, visual) {
+  const atual = req.cookies.get(COOKIE_VISUAL)?.value;
+  if ((visual || undefined) === atual) return resposta;
+  if (visual) {
+    resposta.cookies.set(COOKIE_VISUAL, visual, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", secure: true });
+  } else {
+    resposta.cookies.delete(COOKIE_VISUAL);
+  }
+  return resposta;
+}
+
+/** Sem sessão ainda, vale o `?visual=lisa` do link que a Lisa abre: assim até a tela de entrar
+ *  já sai como Lisa Task. Sem o parâmetro, fica o que estava. */
+function visualPedido(req, resposta) {
+  const pedido = req.nextUrl.searchParams.get("visual");
+  if (pedido === "lisa") return comVisual(req, resposta, "lisa");
+  if (pedido === "abacato") return comVisual(req, resposta, null);
   return resposta;
 }

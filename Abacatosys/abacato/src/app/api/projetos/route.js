@@ -1,6 +1,6 @@
 import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
-import { quemEh, respostaDeErro, ErroDeAcesso } from "@/lib/acesso.js";
+import { quemEh, respostaDeErro, ErroDeAcesso, exigirDocumentos } from "@/lib/acesso.js";
 import { corValida } from "@/dominio/cores.js";
 import { exigirPodeCriarProjeto } from "@/lib/limites.js";
 import { anotar, anotarLimite, TIPOS_DE_EVENTO } from "@/lib/eventos.js";
@@ -14,6 +14,7 @@ export async function GET(req) {
   try {
     const usuario = await quemEh(req);
     if (!usuario) throw new ErroDeAcesso(401, "sem sessão");
+    await exigirDocumentos(usuario.id);
     const querArquivados = new URL(req.url).searchParams.get("arquivados") === "1";
 
     const [meus, convidados] = await Promise.all([
@@ -70,6 +71,7 @@ export async function POST(req) {
   try {
     const usuario = await quemEh(req);
     if (!usuario) throw new ErroDeAcesso(401, "sem sessão");
+    await exigirDocumentos(usuario.id);
     const { nome, descricao, cor, workspaceId } = await req.json().catch(() => ({}));
     if (!nome?.trim()) throw new ErroDeAcesso(400, "o projeto precisa de um nome");
 

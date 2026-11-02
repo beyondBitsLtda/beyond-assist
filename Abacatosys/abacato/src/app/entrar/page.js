@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { destinoSeguro, chaveDeLogin } from "@/lib/abacatoAuth.js";
+import PorVisual from "@/componentes/PorVisual.js";
 
 /**
  * A porta do Abacato.
@@ -64,7 +65,9 @@ export default function Entrar() {
       <form className="abacato-entrada__cartao" onSubmit={entrar}>
         <div className="abacato-entrada__marca">
           <span className="abacato-marca abacato-marca--entrada" role="img" aria-label="Abacato" />
-          <p className="abacato-entrada__sub">Quadros, documentação e acompanhamento</p>
+          <p className="abacato-entrada__sub">
+            <PorVisual abacato="Quadros, documentação e acompanhamento" lisa="Suas tarefas, com a Lisa" />
+          </p>
         </div>
 
         <label className="abacato-campo">
@@ -99,7 +102,10 @@ export default function Entrar() {
         </button>
 
         <p className="abacato-entrada__sub" style={{ marginTop: 2 }}>
-          Esta conta é só do Abacato — não é a mesma da Lisa.
+          <PorVisual
+            abacato="Esta conta é só do Abacato — não é a mesma da Lisa."
+            lisa="O login da Lisa Task é separado do da Lisa: use o e-mail e a senha que você recebeu para ela."
+          />
         </p>
       </form>
     </main>

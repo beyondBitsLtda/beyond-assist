@@ -1,5 +1,6 @@
 import { supabase } from "./supabase.js";
 import { quemEh, ErroDeAcesso } from "./acesso.js";
+import { deFora } from "@/dominio/planos.js";
 
 /**
  * Quem está pedindo é administrador do Abacato?
@@ -53,7 +54,7 @@ export async function podeUsarLisa(req) {
   // pode ligar por engano numa tela futura, e o tipo da conta é a regra. A constraint do banco
   // é a terceira barreira. Uma trava dessas custa uma linha; o vazamento custa a conversa
   // inteira de outra empresa.
-  return { usuario, pode: Boolean(data.lisa) && data.tipo !== "cliente" };
+  return { usuario, pode: Boolean(data.lisa) && !deFora(data.tipo) };
 }
 
 /** A mesma pergunta, mas barrando. Para as rotas que só existem se a resposta for sim. */

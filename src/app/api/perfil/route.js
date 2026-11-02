@@ -1,11 +1,11 @@
 import { comDono } from "@/lib/rotaDoUsuario.js";
-import { lerPerfil, salvarPerfil, apagarPerfil } from "@/lib/perfilEtarefas.js";
+import { lerPerfil, salvarPerfil, apagarPerfil } from "@/lib/perfilDoUsuario.js";
 import { retratoDaPessoa } from "@/lib/gemini.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// O perfil da entrevista do primeiro acesso (01/11/2026, o MVP — src/lib/perfilEtarefas.js).
+// O perfil da entrevista do primeiro acesso (01/11/2026, o MVP — src/lib/perfilDoUsuario.js).
 
 /** GET /api/perfil → { perfil } (null: ainda não fez a entrevista). */
 export async function GET(req) {

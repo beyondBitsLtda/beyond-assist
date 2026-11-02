@@ -187,8 +187,9 @@ export const DO_USUARIO = [
   // as telas da versão MVP
   { prefixo: "/assistant", motivo: "o assistente em tela cheia (conversa, voz, Modo Tela, editor de código)" },
   { prefixo: "/fluxogramas", motivo: "o ProcessMap — os projetos já são separados por pessoa" },
-  { prefixo: "/visual", motivo: "o visual da Lisa (esferas, rosto)" },
-  { prefixo: "/lisa-task", motivo: "as tarefas leves da pessoa" },
+  // (o /visual, o catálogo de visuais, fica com o admin: o usuário tem só a Esfera de pontos e o Rosto,
+  // escolhidos no menu do Assistente — src/lib/visuaisDaLisa.js: VISUAIS_DO_USUARIO)
+  { prefixo: "/lisa-task", motivo: "o atalho para a Lisa Task (o Abacato com o visual da Lisa, login próprio)" },
   // o que essas telas chamam
   { prefixo: "/api/ask", motivo: "a conversa — no modo usuário, sem a base, o Abacato, a persona e o contexto do admin" },
   { prefixo: "/api/speak", motivo: "a voz da Lisa" },
@@ -199,7 +200,6 @@ export const DO_USUARIO = [
   { prefixo: "/api/fluxogramas", motivo: "os projetos e fluxogramas da pessoa (filtrados pelo dono)" },
   { prefixo: "/api/notas", motivo: "o Tomar nota (por pessoa)" },
   { prefixo: "/api/perfil", motivo: "a entrevista do primeiro acesso" },
-  { prefixo: "/api/lisa-task", motivo: "as tarefas leves" },
 ];
 
 const casaCom = (caminho) => (l) => (l.prefixo.endsWith("/")

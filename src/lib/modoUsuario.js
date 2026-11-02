@@ -3,8 +3,8 @@
 // nessa parte do MVP, e usar repositório para contexto também").
 //
 // Aqui, sem rede e sem banco (testado em scripts/mvp-check.mjs): a instrução da conversa do usuário —
-// assistente de dev e estudos, sem nada do admin —, o perfil da entrevista em texto, as tarefas dele
-// em texto, o pedido de tarefa por voz ou chat, as perguntas da entrevista e os limites do dia.
+// assistente de dev e estudos, sem nada do admin —, o perfil da entrevista em texto, as perguntas da
+// entrevista e os limites do dia. (As tarefas saíram daqui: a Lisa Task é o Abacato.)
 
 import { secaoDaConversa } from "./conversa.js";
 
@@ -22,7 +22,8 @@ O que você faz por esta pessoa:
 - Quando há uma captura de tela anexada (o Modo Tela), olhe para ela e responda sobre o que aparece.
 - Quando há um repositório público vinculado, use os arquivos dele que vierem junto e cite os caminhos.
 - Desenha fluxogramas e mapas mentais no quadro (o ProcessMap) quando a pessoa pede.
-- Guarda tarefas na Lisa Task dela (só texto, sem arquivos) quando ela pede.
+- A Lisa Task dela (os quadros de tarefas) abre pelo menu Lisa Task, em outra aba, com login próprio.
+  Você não cria nem lê essas tarefas: se ela pedir para anotar uma, diga que é pelo menu Lisa Task.
 
 Não faça entrevistas nem listas de perguntas sobre a pessoa por conta própria: a entrevista de
 boas-vindas já é feita pela tela, uma pergunta por vez.
@@ -68,31 +69,6 @@ export function secaoDoPerfil(perfil) {
   if (!linhas.length && !p.retrato) return "";
   const retrato = p.retrato ? `\nCOMO FALAR COM ELA (o retrato que você escreveu depois da entrevista — siga esse tom):\n${linha(p.retrato, 1200)}\n` : "";
   return `\n\nQUEM É A PESSOA (da entrevista do primeiro acesso — use para personalizar, sem repetir isso a cada resposta):${retrato}\n${linhas.join("\n")}`;
-}
-
-/** As tarefas abertas da pessoa, em texto ("" sem tarefas). */
-export function secaoDasTarefas(tarefas) {
-  const abertas = (tarefas || []).filter((t) => t.status !== "feita").slice(0, 30);
-  if (!abertas.length) return "";
-  const item = (t) => `- ${linha(t.titulo, 200)}${t.prioridade === "alta" ? " (prioridade alta)" : ""}${t.lembreteEm ? ` (lembrete: ${String(t.lembreteEm).slice(0, 16).replace("T", " ")})` : ""}`;
-  return `\n\nAS TAREFAS ABERTAS DA PESSOA NA LISA TASK (use se ela perguntar das tarefas dela):\n${abertas.map(item).join("\n")}`;
-}
-
-// ---- a tarefa pedida por voz ou chat ("crie uma tarefa: revisar o PR", "me lembra de estudar React") ----
-
-const PEDE_TAREFA = /^(?:lisa[,\s]+)?(?:por favor[,\s]+)?(?:cri[ae]|adicion[ae]|anot[ae]|coloqu[ae]|ponh[ae]|inclu[ai]|registr[ae]|nova)\s+(?:(?:uma|a|essa|esta|na minha)\s+)?(?:nova\s+)?tarefa(?:\s+(?:na|no)\s+(?:minha\s+)?(?:lisa\s*task|lista))?\s*(?:de|para|pra|:|-|—)?\s*(.+)$/i;
-const ME_LEMBRA = /^(?:lisa[,\s]+)?(?:me\s+lembr[ae]|lembr[ae]-?me)\s+(?:de\s+|que\s+)?(.+)$/i;
-
-/** O pedido é criar uma tarefa? { titulo, prioridade } ou null. */
-export function pedidoDeTarefa(texto) {
-  const t = String(texto || "").trim().replace(/[.!]+$/, "");
-  const m = t.match(PEDE_TAREFA) || t.match(ME_LEMBRA);
-  if (!m) return null;
-  let titulo = m[1].trim().replace(/^["“']|["”']$/g, "");
-  const alta = /\b(urgente|com prioridade alta|prioridade alta|importante)\b/i.test(titulo);
-  titulo = titulo.replace(/,?\s*(é\s+)?(urgente|com prioridade alta|prioridade alta|importante)\b/gi, "").trim();
-  if (titulo.length < 2) return null;
-  return { titulo: titulo.charAt(0).toUpperCase() + titulo.slice(1, 200), prioridade: alta ? "alta" : "normal" };
 }
 
 // ---- a entrevista do primeiro acesso, em duas etapas (01/11/2026: "essas perguntas deveriam ser uma

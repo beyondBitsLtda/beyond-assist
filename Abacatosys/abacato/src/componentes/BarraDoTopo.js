@@ -19,7 +19,7 @@ export default function BarraDoTopo() {
     <header className="abacato-topo">
       {/* A marca aparece só no celular: no computador ela já está no alto da barra lateral, e
           repetir o nome do sistema duas vezes na mesma tela é ruído. */}
-      <Link href="/quadros" className="abacato-topo__marca" aria-label="Abacato — início">
+      <Link href="/quadros" className="abacato-topo__marca" aria-label="Início">
         <span className="abacato-marca abacato-marca--topo" aria-hidden="true" />
       </Link>
 
@@ -33,7 +33,7 @@ export default function BarraDoTopo() {
         <button
           type="button"
           className="abacato-topo__sair"
-          title="Sair do Abacato"
+          title="Sair"
           onClick={async () => {
             await fetch("/api/auth/sair", { method: "POST" });
             window.location.href = "/entrar";

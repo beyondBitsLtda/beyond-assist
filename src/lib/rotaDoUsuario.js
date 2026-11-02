@@ -1,4 +1,4 @@
-// O molde das rotas do que é da pessoa (01/11/2026, o MVP — perfil e Lisa Task): o dono vem da sessão
+// O molde das rotas do que é da pessoa (01/11/2026, o MVP — o perfil): o dono vem da sessão
 // (o portão já conferiu o token); sem dono, 401; o erro devolve o status dele.
 
 import { sessaoDe } from "./papelNaSessao.js";

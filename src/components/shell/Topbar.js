@@ -277,7 +277,7 @@ export default function Topbar() {
           {gruposDoPapel(papel).map((g) => (
             <GrupoDoMenu key={g.titulo} titulo={g.titulo}>
               {g.itens.map((i) => (
-                <LinkDoMenu key={i.href} href={i.href} detalhe={i.detalhe} atual={pathname === i.href}>{i.rotulo}</LinkDoMenu>
+                <LinkDoMenu key={i.href} href={i.href} detalhe={i.detalhe} atual={pathname === i.href} novaAba={i.novaAba}>{i.rotulo}</LinkDoMenu>
               ))}
             </GrupoDoMenu>
           ))}

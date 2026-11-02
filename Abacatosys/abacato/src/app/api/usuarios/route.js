@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase.js";
 import { quemEh, respostaDeErro, ErroDeAcesso } from "@/lib/acesso.js";
 import { exigirAdmin } from "@/lib/admin.js";
 import { emailValido } from "@/dominio/papeis.js";
-import { planoDe, tipoValido } from "@/dominio/planos.js";
+import { planoDe, tipoValido, deFora } from "@/dominio/planos.js";
 import { contaDe } from "@/lib/limites.js";
 import { anotar, TIPOS_DE_EVENTO } from "@/lib/eventos.js";
 
@@ -124,8 +124,8 @@ export async function POST(req) {
       // Cliente NUNCA é administrador e NUNCA fala com a assistente, venha o que vier no corpo
       // do pedido. O banco também recusa (constraint `abacato_usuarios_cliente_sem_lisa`); esta
       // linha é para a resposta ser um "não" claro em vez de um erro de banco.
-      admin: tipo === "cliente" ? false : Boolean(ehAdmin),
-      lisa: tipo === "cliente" ? false : Boolean(podeLisa),
+      admin: deFora(tipo) ? false : Boolean(ehAdmin),
+      lisa: deFora(tipo) ? false : Boolean(podeLisa),
       criado_por: admin.id,
     }).select("id, nome, email, ativo, admin, lisa, tipo, aprovado, criado_em").single();
     if (error) throw new ErroDeAcesso(500, error.message);

@@ -84,6 +84,21 @@ export const VISUAIS = [
 ];
 
 export const VISUAL_PADRAO = "esfera";
+
+/**
+ * Os visuais do USUÁRIO do MVP (01/11/2026: "os únicos disponíveis devem ser o rosto e, de padrão, a
+ * esfera de pontos — nada de avatar 3D"). O admin continua com o catálogo inteiro.
+ */
+export const VISUAIS_DO_USUARIO = ["esfera", "rosto"];
+
+export function visuaisDoUsuario() {
+  return VISUAIS.filter((v) => VISUAIS_DO_USUARIO.includes(v.id));
+}
+
+/** O visual que o usuário vê: o escolhido, se for um dos dele; senão, o padrão (a Esfera de pontos). */
+export function visualDoUsuario(id) {
+  return VISUAIS_DO_USUARIO.includes(id) ? id : VISUAL_PADRAO;
+}
 export const CHAVE_DO_VISUAL = "lisa-visual";
 export const EVENTO_DO_VISUAL = "lisa-visual"; // avisa a própria aba quando o visual muda
 

@@ -247,6 +247,9 @@ export async function criarSessao(usuario, segredo, duracaoSegundos = 60 * 60 * 
     id: usuario.id,
     email: usuario.email,
     nome: usuario.nome,
+    // O tipo da conta vai junto para o middleware saber o plano sem ir ao banco (a Lisa Task
+    // não abre documentos e tem visual próprio). As rotas conferem o tipo no banco de novo.
+    tipo: usuario.tipo,
     exp: Math.floor(Date.now() / 1000) + duracaoSegundos,
   };
   const corpo = paraBase64(enc.encode(JSON.stringify(payload)));
@@ -317,6 +320,21 @@ export function ehLivre(caminho) {
       ? caminho.startsWith(l.prefixo)
       : caminho === l.prefixo || caminho.startsWith(l.prefixo + "/")
   );
+}
+
+/** O cookie do visual da tela (ver src/middleware.js). Não é segredo e não decide acesso
+ *  nenhum: quem o lê é o JavaScript do <head>, por isso NÃO é httpOnly. */
+export const COOKIE_VISUAL = "abacato_visual";
+
+/**
+ * A parte de documentos inteira: a tela e as rotas que só ela usa. A conta sem documentos (Lisa
+ * Task, ver src/dominio/planos.js) é barrada aqui pelo middleware, e de novo no `exigir`.
+ * `/api/itens` e `/api/links` NÃO entram: são item de checklist e link de card, do quadro.
+ */
+export const DOCUMENTOS = ["/documentos", "/api/projetos", "/api/documentos", "/api/pastas"];
+
+export function ehDocumentos(caminho) {
+  return DOCUMENTOS.some((p) => caminho === p || caminho.startsWith(p + "/"));
 }
 
 export function ehApi(caminho) {

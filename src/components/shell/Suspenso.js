@@ -123,11 +123,12 @@ export function SegmentosDoMenu({ opcoes, valor, onChange, rotulo }) {
   );
 }
 
-/** Item que navega para outro painel. */
-export function LinkDoMenu({ href, children, detalhe, atual = false }) {
+/** Item que navega para outro painel (`novaAba`: abre em outra aba, como a Lisa Task, que é o Abacato). */
+export function LinkDoMenu({ href, children, detalhe, atual = false, novaAba = false }) {
   const { fechar } = useSuspenso();
   return (
-    <Link href={href} className={`bb-item${atual ? " bb-item--atual" : ""}`} onClick={fechar} aria-current={atual ? "page" : undefined}>
+    <Link href={href} className={`bb-item${atual ? " bb-item--atual" : ""}`} onClick={fechar} aria-current={atual ? "page" : undefined}
+      target={novaAba ? "_blank" : undefined} rel={novaAba ? "noopener" : undefined}>
       <span className="bb-item-texto">{children}{detalhe && <small>{detalhe}</small>}</span>
     </Link>
   );

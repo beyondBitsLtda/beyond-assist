@@ -59,7 +59,7 @@ import { loadGames } from "@/lib/gameHistory.js";
 // a voz da Lisa como esfera de pontos (three.js) — aparência padrão desde a revisão visual
 // o visual do centro (Esfera de pontos, Lente, Orbe, Plasma, Anel) — escolhido no painel /visual
 import VisualDaLisa, { usarVisualEscolhido, usarAjustesDoRosto } from "@/components/panels/visuais/VisualDaLisa.js";
-import { VISUAIS, escolherVisual } from "@/lib/visuaisDaLisa.js";
+import { VISUAIS, escolherVisual, visuaisDoUsuario, visualDoUsuario } from "@/lib/visuaisDaLisa.js";
 import { CABELOS_DO_ROSTO, PALETAS_DO_ROSTO, escolherAjustesDoRosto } from "@/lib/rostoDaLisa.js";
 // o contexto da conversa (25/10/2026): imagens anexadas (o +, Ctrl+V, arrastar) e repositórios vinculados
 import { BotaoMais, FaixaDoContexto } from "@/components/panels/ContextoDaConversa.js";
@@ -193,7 +193,7 @@ export default function AssistantPage() {
   const { logs, addLog } = useLog();
   const [mode, setMode] = useState("idle");
   // (01/11/2026, o MVP) o papel de quem está na tela. O USUÁRIO tem a conversa, a voz, o Modo Tela, o
-  // editor de código, o ProcessMap, os repositórios públicos, a entrevista e a Lisa Task; os modos do
+  // editor de código, o ProcessMap, os repositórios públicos, a entrevista e a Lisa Task (o Abacato); os modos do
   // admin somem da tela e ficam desligados (quem barra de verdade é o portão, src/middleware.js)
   const papel = usePapel();
   const usuario = papel === "usuario";
@@ -513,8 +513,11 @@ export default function AssistantPage() {
   // "esfera" (padrão desde a revisão visual de out/2026, ver EsferaDaVoz.js) também vale.
   const [avatarView, setAvatarView] = useState("esfera");
   // com avatarView "esfera": QUAL visual reage à voz (Esfera de pontos, Lente, Orbe, Plasma ou
-  // Anel — src/lib/visuaisDaLisa.js), escolhido no painel /visual ou no menu de aparência
-  const visualDaLisa = usarVisualEscolhido();
+  // Anel — src/lib/visuaisDaLisa.js), escolhido no painel /visual ou no menu de aparência. O usuário
+  // do MVP só tem a Esfera de pontos e o Rosto (visualDoUsuario), sem gravar nada: o navegador pode
+  // ser o mesmo do admin, e a escolha dele continua guardada.
+  const visualEscolhido = usarVisualEscolhido();
+  const visualDaLisa = usuario ? visualDoUsuario(visualEscolhido) : visualEscolhido;
   const ajustesDoRosto = usarAjustesDoRosto(); // o cabelo e as cores, quando o visual é o Rosto
   // qual "corpo" 3D usar quando avatarView === "3d" — "cyborg" (original, sem esqueleto) ou
   // "ironman" (rigado, com gestos de verdade por modo, ver LisaAvatarIronMan.js)
@@ -1952,6 +1955,12 @@ export default function AssistantPage() {
     const savedSkin = localStorage.getItem("avatarSkin");
     if (savedSkin === "cyborg" || savedSkin === "ironman") setAvatarSkin(savedSkin);
   }, []);
+
+  // o usuário do MVP não tem Ondas nem Avatar 3D (01/11/2026: "os únicos disponíveis devem ser o
+  // rosto e, de padrão, a esfera de pontos — nada de avatar 3D")
+  useEffect(() => {
+    if (usuario && avatarView !== "esfera") setAvatarView("esfera");
+  }, [usuario, avatarView]);
 
   const chooseAvatarView = useCallback((view) => {
     setAvatarView(view);
@@ -4983,7 +4992,7 @@ export default function AssistantPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {[
                   { href: "/fluxogramas", glyph: "◇", label: "PROCESSMAP" },
-                  { href: "/lisa-task", glyph: "✓", label: "LISA TASK" },
+                  { href: "/lisa-task", glyph: "✓", label: "LISA TASK", novaAba: true },
                   { href: "/visual", glyph: "◎", label: "VISUAL DA LISA" },
                   { href: "/dashboard", glyph: "▧", label: "DASHBOARD" },
                   { href: "/dashboard/ar", glyph: "◫", label: "DASHBOARD · MODO AR" },
@@ -5005,6 +5014,8 @@ export default function AssistantPage() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    target={item.novaAba ? "_blank" : undefined}
+                    rel={item.novaAba ? "noopener" : undefined}
                     onClick={() => setMobileNavOpen(false)}
                     style={{ ...mono, fontSize: 12, letterSpacing: 1.5, padding: "14px 16px", borderRadius: 8, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "rgba(var(--accent-rgb),0.05)", color: "#eafcff", textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}
                   >
@@ -5348,20 +5359,22 @@ export default function AssistantPage() {
           rotulo={<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2.2" /><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" /></svg>}
         >
           <GrupoDoMenu titulo="Aparência da Lisa">
-            <SegmentosDoMenu
-              rotulo="Aparência"
-              valor={avatarView}
-              onChange={chooseAvatarView}
-              opcoes={[
-                { valor: "esfera", rotulo: "Visual", titulo: "Um visual que reage à voz (Esfera de pontos, Lente, Orbe, Plasma, Anel ou Rosto)" },
-                { valor: "traditional", rotulo: "Ondas", titulo: "Visualizador de onda tradicional" },
-                { valor: "3d", rotulo: "Avatar 3D", titulo: "Corpo em modelo 3D — arraste/belisque pra ajustar o enquadramento" },
-              ]}
-            />
+            {!usuario && (
+              <SegmentosDoMenu
+                rotulo="Aparência"
+                valor={avatarView}
+                onChange={chooseAvatarView}
+                opcoes={[
+                  { valor: "esfera", rotulo: "Visual", titulo: "Um visual que reage à voz (Esfera de pontos, Lente, Orbe, Plasma, Anel ou Rosto)" },
+                  { valor: "traditional", rotulo: "Ondas", titulo: "Visualizador de onda tradicional" },
+                  { valor: "3d", rotulo: "Avatar 3D", titulo: "Corpo em modelo 3D — arraste/belisque pra ajustar o enquadramento" },
+                ]}
+              />
+            )}
             {avatarView === "esfera" && (
               <div className="bb-campo-do-menu">
                 <select className="bb-select" value={visualDaLisa} onChange={(e) => escolherVisual(e.target.value)} title="O visual que fica no centro e reage à voz">
-                  {VISUAIS.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+                  {(usuario ? visuaisDoUsuario() : VISUAIS).map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
                 </select>
               </div>
             )}
@@ -5379,7 +5392,7 @@ export default function AssistantPage() {
                 </div>
               </>
             )}
-            {avatarView === "esfera" && (
+            {avatarView === "esfera" && !usuario && (
               <LinkDoMenu href="/visual" detalhe="Prévia ao vivo de cada visual, falando, ouvindo e pensando">
                 Ver os visuais da Lisa
               </LinkDoMenu>

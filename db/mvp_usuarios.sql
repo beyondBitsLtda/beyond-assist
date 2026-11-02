@@ -12,6 +12,7 @@
 --    - lisa_perfis: a entrevista do primeiro acesso (nome, área, nível, objetivos, preferências), só
 --      depois do consentimento dele, e apagável a qualquer hora (LGPD: só o necessário);
 --    - lisa_tarefas: a Lisa Task leve — SEM campo de arquivo ("Sem Hospedagem de Arquivos");
+--      sem uso desde 01/11/2026 (a Lisa Task virou o Abacato com o visual da Lisa); a tabela fica, com os dados;
 --    - lisa_uso: quantas perguntas, desenhos, comentários de tela e falas ele usou no dia, para
 --      o limite diário (as chaves de IA são do admin).
 --  Tudo só pela service_role, pelas rotas da Lisa (mesmo padrão das outras tabelas).

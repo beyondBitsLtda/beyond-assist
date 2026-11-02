@@ -2,13 +2,14 @@
 // limitada"; "quero a função dela ver a tela, escrever código e ProcessMap já nessa parte do MVP, e
 // usar repositório para contexto também". O portão e os papéis são testados em auth-check; aqui, o
 // que o USUÁRIO recebe: a conversa sem nada do admin, os repositórios só públicos (com o GitHub
-// simulado), a entrevista, a Lisa Task, o limite do dia e as telas que escondem o que é do admin.
+// simulado), a entrevista, a Lisa Task (o Abacato), o limite do dia, os avatares e as telas que escondem o
+// que é do admin.
 //
 // Rodar: node --import ./scripts/alias-loader.mjs scripts/mvp-check.mjs
 
 import fs from "node:fs";
 import {
-  INSTRUCAO_DO_USUARIO, secaoDoPerfil, secaoDasTarefas, pedidoDeTarefa, PERGUNTAS_SOBRE_VOCE, PERGUNTAS_DOS_ESTUDOS,
+  INSTRUCAO_DO_USUARIO, secaoDoPerfil, PERGUNTAS_SOBRE_VOCE, PERGUNTAS_DOS_ESTUDOS,
   perguntasDaEtapa, perfilDaEtapa, etapaQueFalta, respostaAoConvite, pedidoDaSegundaEtapa, PEDIDO_DE_CONSENTIMENTO,
   PEDE_APAGAR_PERFIL, limitesDoDia, LIMITES_PADRAO, mensagemDoLimite, promptDoUsuario,
 } from "../src/lib/modoUsuario.js";
@@ -28,7 +29,6 @@ console.log("a conversa do usuário");
   conferir("o prompt leva a data, a tela, a conversa e o repositório — sem \"contexto recuperado\" da base do admin", /DATA DE HOJE: 01\/11\/2026/.test(prompt) && /CONTEXTO ATIVO: há uma captura/.test(prompt) && /CONVERSA ATÉ AGORA/.test(prompt) && /REPOSITÓRIO: x/.test(prompt) && !/CONTEXTO RECUPERADO/.test(prompt) && /PERGUNTA DA PESSOA:\ncomo faço um hook\?$/.test(prompt));
   const perfil = { nome: "Ana", area: "front-end em React", nivel: "intermediário", objetivos: "aprender testes", preferencias: { resposta: "curtas" } };
   conferir("o perfil entra na instrução", /Chame a pessoa de: Ana/.test(secaoDoPerfil(perfil)) && /React/.test(secaoDoPerfil(perfil)) && /curtas/.test(secaoDoPerfil(perfil)) && secaoDoPerfil(null) === "");
-  conferir("as tarefas abertas também (as feitas não)", /Revisar o PR \(prioridade alta\)/.test(secaoDasTarefas([{ titulo: "Revisar o PR", prioridade: "alta", status: "aberta" }, { titulo: "Antiga", status: "feita" }])) && !/Antiga/.test(secaoDasTarefas([{ titulo: "Revisar o PR", status: "aberta" }, { titulo: "Antiga", status: "feita" }])) && secaoDasTarefas([]) === "");
 
   const rota = ler("src/app/api/ask/route.js");
   const doUsuario = rota.slice(rota.indexOf("function conversaDoUsuario"), rota.indexOf("return new Response(stream, { headers: CABECALHOS_SSE });"));
@@ -37,19 +37,15 @@ console.log("a conversa do usuário");
   conferir("e conta no limite do dia", /usarDoDia\(req, "pergunta"\)/.test(doUsuario));
 }
 
-console.log("a tarefa pedida na conversa");
+console.log("a Lisa Task é o Abacato (01/11/2026: \"use o Abacato já existente, só passa um modo gráfico nele e limite o acesso a não deixar usar a parte de documentos\")");
 {
-  const casos = {
-    "crie uma tarefa: revisar o PR": "Revisar o PR",
-    "Lisa, adicione a tarefa estudar React hooks": "Estudar React hooks",
-    "nova tarefa: ligar para o cliente": "Ligar para o cliente",
-    "me lembra de estudar testes amanhã": "Estudar testes amanhã",
-    "anote uma tarefa de mandar o relatório": "Mandar o relatório",
-  };
-  const certos = Object.entries(casos).filter(([q, t]) => pedidoDeTarefa(q)?.titulo === t);
-  conferir("\"crie uma tarefa…\", \"me lembra de…\" viram tarefa", certos.length === Object.keys(casos).length, Object.entries(casos).filter(([q, t]) => pedidoDeTarefa(q)?.titulo !== t).map(([q]) => `${q} → ${JSON.stringify(pedidoDeTarefa(q))}`).join(" | "));
-  conferir("\"urgente\" vira prioridade alta (e sai do título)", pedidoDeTarefa("crie uma tarefa urgente: corrigir o login")?.prioridade === "alta" || pedidoDeTarefa("crie uma tarefa: corrigir o login, urgente")?.prioridade === "alta");
-  conferir("pergunta sobre tarefa não cria tarefa", ["quais são minhas tarefas?", "como organizar tarefas?", "o que é uma tarefa assíncrona?", "crie um fluxograma de tarefas"].every((q) => pedidoDeTarefa(q) === null));
+  const pagina = ler("src/app/(panels)/lisa-task/page.js");
+  conferir("a rota /lisa-task leva ao Abacato, já com o visual da Lisa", /redirect\(ENDERECO_DA_LISA_TASK\)/.test(pagina) && /abacato\.beyond\.dev\.br\/\?visual=lisa/.test(pagina));
+  conferir("o menu do topo e o do celular abrem em outra aba (o Abacato tem login próprio)", /\{ href: "\/lisa-task", rotulo: "Lisa Task",[^}]*novaAba: true \}/.test(ler("src/lib/navegacao.js")) && /target=\{novaAba \? "_blank" : undefined\}/.test(ler("src/components/shell/Suspenso.js")) && /novaAba=\{i\.novaAba\}/.test(ler("src/components/shell/Topbar.js")) && /label: "LISA TASK", novaAba: true/.test(ler("src/app/(panels)/assistant/page.js")));
+  conferir("a conversa não cria mais tarefa na Lisa (a Lisa Task leve saiu)", !/pedidoDeTarefa|criarTarefa|secaoDasTarefas|lisa_tarefas/.test(ler("src/app/api/ask/route.js") + ler("src/lib/perfilDoUsuario.js")) && !fs.existsSync(new URL("../src/app/api/lisa-task", import.meta.url)));
+  conferir("e diz à pessoa que as tarefas ficam no menu Lisa Task", /pelo menu Lisa Task/.test(INSTRUCAO_DO_USUARIO));
+  const planos = ler("Abacatosys/abacato/src/dominio/planos.js");
+  conferir("no Abacato, a conta Lisa Task não tem documentos e tem o visual da Lisa", /lisatask: \{[\s\S]*?documentos: false,[\s\S]*?visual: "lisa"/.test(planos));
 }
 
 console.log("a entrevista do primeiro acesso, em duas etapas (01/11/2026: \"antes deveriam ter perguntas pessoais, para a Lisa formar a persona do usuário\")");
@@ -69,21 +65,19 @@ console.log("a entrevista do primeiro acesso, em duas etapas (01/11/2026: \"ante
   conferir("o retrato da pessoa vai na instrução da conversa, com o que ela contou", /COMO FALAR COM ELA[\s\S]*Alice é iniciante e direta/.test(comRetrato) && /O jeito dela/.test(comRetrato) && /Nível em programação: iniciante/.test(comRetrato));
   conferir("a conversa não improvisa entrevista", /Não faça entrevistas nem listas de perguntas sobre a pessoa por conta própria/.test(INSTRUCAO_DO_USUARIO));
   conferir("\"apague meu perfil\" é reconhecido", ["apague meu perfil", "Lisa, exclua meus dados", "esqueça meus dados"].every((q) => PEDE_APAGAR_PERFIL.test(q)) && !PEDE_APAGAR_PERFIL.test("apague a nota do fluxo"));
-  const banco = ler("src/lib/perfilEtarefas.js");
+  const banco = ler("src/lib/perfilDoUsuario.js");
   conferir("o perfil só é guardado com consentimento, junta as etapas (sem apagar a primeira), e apagar apaga de verdade", /if \(!dados\.consentimento\) throw/.test(banco) && /const prefs = \{ \.\.\.\(atual\?\.preferencias \|\| \{\}\) \};/.test(banco) && /from\("lisa_perfis"\)\.delete\(\)\.eq\("dono_id", dono\)/.test(banco));
   conferir("ao fim de cada etapa, a Lisa reescreve o retrato (sem perder o perfil se o modelo falhar)", /retratoDaPessoa\(perfil\)\.catch\(\(\) => ""\)/.test(ler("src/app/api/perfil/route.js")) && /export async function retratoDaPessoa/.test(ler("src/lib/gemini.js")));
   const pagina = ler("src/app/(panels)/assistant/page.js");
   conferir("a tela convida antes de cada etapa, uma pergunta por vez, e emenda a etapa 2 na 1", /const etapa = etapaQueFalta\(j\.perfil\)/.test(pagina) && /if \(usuarioRef\.current && !alvoDaIde && await entrevistaFazRef\.current\?\.\(q, displayText\)\) return;/.test(pagina) && /consentimento: true, \.\.\.dados, retrato: true/.test(pagina) && /entrevistaRef\.current = \{ estado: "convite", etapa: 2/.test(pagina));
 }
 
-console.log("a Lisa Task leve");
+console.log("o que é de cada usuário no banco");
 {
   const sql = ler("db/mvp_usuarios.sql");
-  conferir("a tabela não tem campo de arquivo (\"Sem Hospedagem de Arquivos\")", /create table if not exists public\.lisa_tarefas/.test(sql) && !/arquivo|anexo|url|storage/i.test(sql.slice(sql.indexOf("lisa_tarefas ("), sql.indexOf("lisa_tarefas_dono_idx"))));
-  conferir("perfil, tarefas e uso têm dono e RLS; só a service_role conta o uso", /lisa_perfis[\s\S]*dono_id/.test(sql) && /enable row level security/.test(sql) && /revoke all on function public\.lisa_contar_uso\(uuid, text\) from public, anon, authenticated/.test(sql));
-  const banco = ler("src/lib/perfilEtarefas.js");
-  conferir("toda leitura e escrita de tarefa filtra pelo dono", (banco.match(/from\("lisa_tarefas"\)/g) || []).length === 4 && (banco.match(/\.eq\("dono_id", dono\)/g) || []).length >= 5);
-  conferir("a tela existe e o menu mostra para todos", fs.existsSync(new URL("../src/app/(panels)/lisa-task/page.js", import.meta.url)) && /\{ href: "\/lisa-task", rotulo: "Lisa Task"/.test(ler("src/lib/navegacao.js")));
+  conferir("perfil e uso têm dono e RLS; só a service_role conta o uso", /lisa_perfis[\s\S]*dono_id/.test(sql) && /enable row level security/.test(sql) && /revoke all on function public\.lisa_contar_uso\(uuid, text\) from public, anon, authenticated/.test(sql));
+  const banco = ler("src/lib/perfilDoUsuario.js");
+  conferir("toda leitura, gravação e remoção do perfil é do dono", (banco.match(/from\("lisa_perfis"\)/g) || []).length === 3 && (banco.match(/\.eq\("dono_id", dono\)/g) || []).length === 2 && /dono_id: dono,/.test(banco));
 }
 
 console.log("o limite do dia");
@@ -135,6 +129,10 @@ console.log("a tela do usuário");
   conferir("os modos do admin somem e ficam desligados para o usuário", (pagina.match(/\{!usuario && \(<>/g) || []).length >= 10 && /setCodeMode\(false\); setObservanceMode\(false\); setVigiaMode\(false\)/.test(pagina));
   conferir("o Modo Tela, a conversa livre e a palavra \"Lisa\" continuam para ele", /ligado=\{screenMode\}/.test(pagina) && /ligado=\{conversaAberta\}/.test(pagina) && /ligado=\{escutaPalavra\}/.test(pagina));
   conferir("os outros painéis do celular só mostram o que ele abre", /\.filter\(\(item\) => podeAcessar\(papel \|\| "usuario", item\.href\)\)/.test(pagina));
+  const { visuaisDoUsuario, visualDoUsuario, VISUAL_PADRAO } = await import("../src/lib/visuaisDaLisa.js");
+  conferir("avatares do usuário: só a Esfera de pontos (o padrão) e o Rosto", visuaisDoUsuario().map((v) => v.id).join() === "esfera,rosto" && VISUAL_PADRAO === "esfera");
+  conferir("um visual que ele não tem cai na Esfera de pontos", visualDoUsuario("orbe") === "esfera" && visualDoUsuario("anel") === "esfera" && visualDoUsuario("rosto") === "rosto" && visualDoUsuario(undefined) === "esfera");
+  conferir("sem Ondas, Avatar 3D nem o catálogo /visual — e a escolha do admin no mesmo navegador não é apagada", /if \(usuario && avatarView !== "esfera"\) setAvatarView\("esfera"\)/.test(pagina) && /const visualDaLisa = usuario \? visualDoUsuario\(visualEscolhido\) : visualEscolhido;/.test(pagina) && /\(usuario \? visuaisDoUsuario\(\) : VISUAIS\)\.map/.test(pagina) && /\{avatarView === "esfera" && !usuario && \(/.test(pagina) && /\{!usuario && \(\n\s*<SegmentosDoMenu\n\s*rotulo="Aparência"/.test(pagina));
   conferir("o menu do topo mostra só os painéis do papel; os avisos e comandos remotos são do admin", /gruposDoPapel\(papel\)/.test(ler("src/components/shell/Topbar.js")) && /const doAdmin = papel === "admin" &&/.test(ler("src/components/shell/Shell.js")));
 }
 

@@ -34,6 +34,8 @@ export const PLANOS = {
     lisa: true,
     /** Vê a lista de quem existe no sistema, para poder convidar clicando. */
     verDiretorio: true,
+    /** Tem a parte de documentos (projetos, pastas, arquivos). */
+    documentos: true,
   },
 
   /**
@@ -57,6 +59,32 @@ export const PLANOS = {
     // outros clientes nem a equipe — é o tipo de vazamento que ninguém percebe porque a tela
     // nunca mostrou, mas a resposta da API trazia.
     verDiretorio: false,
+    documentos: true,
+  },
+
+  /**
+   * Quem vem da Lisa (o MVP da assistente, 01/11/2026): o Abacato com o nome "Lisa Task" e o
+   * visual da Lisa, só com os quadros de tarefas.
+   *
+   * A parte de documentos não existe para esta conta — nem os projetos dela, nem os que alguém
+   * compartilhar com ela. A trava está no middleware (a tela e as rotas) e no `exigir` de
+   * src/lib/acesso.js, que confere no banco a cada pedido. Os quadros seguem os tetos do
+   * cliente: é gente de fora, e o resto da regra é igual.
+   */
+  lisatask: {
+    rotulo: "Lisa Task",
+    quadros: 10,
+    quadrosCompartilhados: 3,
+    membrosPorQuadro: 3,
+    projetos: 0,
+    projetosCompartilhados: 0,
+    membrosPorProjeto: 0,
+    armazenamento: 0,
+    lisa: false,
+    verDiretorio: false,
+    documentos: false,
+    /** O visual da tela (ver src/app/visual-lisa.css). Sem isto, o do Abacato. */
+    visual: "lisa",
   },
 };
 
@@ -64,6 +92,12 @@ export const TIPOS = Object.keys(PLANOS);
 
 export function tipoValido(tipo) {
   return TIPOS.includes(tipo);
+}
+
+/** Conta de fora da casa (cliente ou Lisa Task): não administra o Abacato e não fala com a
+ *  assistente dele, venha o que vier no pedido. Tipo desconhecido também é de fora. */
+export function deFora(tipo) {
+  return tipo !== "interno";
 }
 
 /** O plano de um tipo. Tipo desconhecido cai no MAIS restrito, e não no mais permissivo. */
@@ -129,6 +163,7 @@ export const RECADOS = {
     `Cada quadro da sua conta aceita ${teto} pessoas além de você.`,
   membrosPorProjeto: (teto) =>
     `Cada projeto da sua conta aceita ${teto} pessoas além de você.`,
+  semDocumentos: "A sua conta Lisa Task tem os quadros de tarefas; a parte de documentos não faz parte dela.",
   armazenamento: (teto, usado) =>
     `Seus arquivos somam ${emTamanho(usado)} e o limite da sua conta é ${emTamanho(teto)}. ` +
     `Apague alguma versão antiga para liberar espaço.`,

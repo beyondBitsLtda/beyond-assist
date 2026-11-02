@@ -17,8 +17,8 @@ import { contextoDosRepositorios } from "@/lib/repositorioNaConversa.js";
 import { notaDasImagens, imagensValidas } from "@/lib/contextoDaConversa.js";
 import { sessaoDe } from "@/lib/papelNaSessao.js";
 import { usarDoDia } from "@/lib/usoDoDia.js";
-import { lerPerfil, listarTarefas, criarTarefa } from "@/lib/perfilEtarefas.js";
-import { INSTRUCAO_DO_USUARIO, secaoDoPerfil, secaoDasTarefas, pedidoDeTarefa, promptDoUsuario } from "@/lib/modoUsuario.js";
+import { lerPerfil } from "@/lib/perfilDoUsuario.js";
+import { INSTRUCAO_DO_USUARIO, secaoDoPerfil, promptDoUsuario } from "@/lib/modoUsuario.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,8 +37,8 @@ function erroAmigavel(err) {
 /**
  * A conversa do USUÁRIO do MVP (01/11/2026: "quando um usuário que não seja eu logar, ele tem acesso a
  * uma versão limitada"). Sem a base de conhecimento do admin (os documentos dele), sem o Abacato, a
- * Delp, a persona e o contexto pessoal dele. Com o perfil da entrevista, a Lisa Task da pessoa ("crie
- * uma tarefa…" vira tarefa), o Modo Tela (as imagens), os repositórios públicos que a tela leu antes
+ * Delp, a persona e o contexto pessoal dele. Com o perfil da entrevista, o Modo Tela
+ * (as imagens), os repositórios públicos que a tela leu antes
  * (/api/repos/contexto, sem o token do admin), o código da conversa, o quadro e o projeto do ProcessMap
  * dela. Conta no limite do dia (src/lib/usoDoDia.js).
  */
@@ -55,16 +55,7 @@ function conversaDoUsuario(req, body, question, images, dono) {
           send(controller, "done", { ok: true });
           return;
         }
-        const tarefa = pedidoDeTarefa(question);
-        if (tarefa && dono) {
-          const t = await criarTarefa(dono, tarefa);
-          send(controller, "token", `Anotei na sua Lisa Task: "${t.titulo}"${t.prioridade === "alta" ? ", com prioridade alta" : ""}.`);
-          send(controller, "done", { ok: true });
-          return;
-        }
-        const [perfil, tarefas] = dono
-          ? await Promise.all([lerPerfil(dono).catch(() => null), listarTarefas(dono).catch(() => [])])
-          : [null, []];
+        const perfil = dono ? await lerPerfil(dono).catch(() => null) : null;
         const turnos = turnosValidos(body.history?.turnos);
         const web = await webDaPergunta(question, { turnos, ferramentasDoEscopo: [{ googleSearch: {} }] });
         if (web.pesquisa) send(controller, "pesquisa", { consulta: web.pesquisa.consulta, buscador: web.pesquisa.buscador, total: web.pesquisa.resultados.length, lidas: web.paginas.length, erros: web.pesquisa.erros });
@@ -74,7 +65,7 @@ function conversaDoUsuario(req, body, question, images, dono) {
           hoje: todayLabel(), nota, conversa: blocoDaConversa(turnos),
           extra: secaoDoCodigoDaConversa(body.codigo) + secaoDoDiagrama(body.diagrama) + secaoDoProjeto(body.projeto) + secaoDosRepos,
         });
-        const instrucao = comCodigoNaTela(INSTRUCAO_DO_USUARIO + secaoDoPerfil(perfil) + secaoDasTarefas(tarefas));
+        const instrucao = comCodigoNaTela(INSTRUCAO_DO_USUARIO + secaoDoPerfil(perfil));
         const metadados = [];
         for await (const piece of chatStreamWithFallback(prompt, instrucao, web.ferramentas, images, (m) => metadados.push(m))) {
           send(controller, "token", piece);

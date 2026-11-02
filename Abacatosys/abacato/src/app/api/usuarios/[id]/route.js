@@ -2,6 +2,7 @@ import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { respostaDeErro, ErroDeAcesso } from "@/lib/acesso.js";
 import { exigirAdmin } from "@/lib/admin.js";
+import { deFora } from "@/dominio/planos.js";
 import { anotar, TIPOS_DE_EVENTO } from "@/lib/eventos.js";
 
 export const runtime = "nodejs";
@@ -70,9 +71,9 @@ export async function PATCH(req, { params }) {
     // `abacato_usuarios_cliente_sem_lisa`); aqui a recusa vira uma frase em vez de um erro de
     // banco, e cobre também o sinalizador de administrador, que o banco não vigia.
     const tipoFinal = mudancas.tipo || alvo.tipo;
-    if (tipoFinal === "cliente") {
-      if (mudancas.lisa) throw new ErroDeAcesso(400, "contas de cliente não têm acesso à assistente");
-      if (mudancas.admin) throw new ErroDeAcesso(400, "uma conta de cliente não pode administrar o Abacato");
+    if (deFora(tipoFinal)) {
+      if (mudancas.lisa) throw new ErroDeAcesso(400, "contas de fora (cliente ou Lisa Task) não têm acesso à assistente");
+      if (mudancas.admin) throw new ErroDeAcesso(400, "uma conta de fora (cliente ou Lisa Task) não pode administrar o Abacato");
     }
 
     // Trocar a senha de outra pessoa: o selo vem pronto do navegador de quem administra, que

@@ -30,13 +30,14 @@ export default function MeuPlano() {
   if (erro) return <p className="abacato-plano__nota">{erro}</p>;
   if (!uso) return <p className="abacato-plano__nota">carregando…</p>;
 
+  // Sem a parte de documentos (Lisa Task), projetos e arquivos não são limite: não existem.
   const medidas = [
     { nome: "Quadros de tarefas", m: uso.quadros },
-    { nome: "Projetos de documentação", m: uso.projetos },
+    { nome: "Projetos de documentação", m: uso.projetos, documento: true },
     { nome: "Quadros compartilhados", m: uso.quadrosCompartilhados },
-    { nome: "Projetos compartilhados", m: uso.projetosCompartilhados },
-    { nome: "Arquivos", m: uso.armazenamento, tamanho: true },
-  ];
+    { nome: "Projetos compartilhados", m: uso.projetosCompartilhados, documento: true },
+    { nome: "Arquivos", m: uso.armazenamento, tamanho: true, documento: true },
+  ].filter((x) => uso.documentos || !x.documento);
 
   return (
     <section>
@@ -45,7 +46,13 @@ export default function MeuPlano() {
           Sua conta é <span className={`abacato-selo abacato-selo--${uso.tipo}`}>{uso.plano}</span>
         </div>
         <p className="abacato-plano__nota" style={{ margin: 0 }}>
-          {uso.tipo === "cliente" ? (
+          {uso.tipo === "lisatask" ? (
+            <>
+              A Lisa Task tem os seus quadros de tarefas: cada um aceita até{" "}
+              <strong>{uso.membrosPorQuadro}</strong> pessoas além de você. Precisa de mais
+              espaço? Fale com quem administra a Lisa.
+            </>
+          ) : uso.tipo === "cliente" ? (
             <>
               Você vê apenas o que criou e o que alguém compartilhou com você. Cada quadro seu
               aceita até <strong>{uso.membrosPorQuadro}</strong> pessoas além de você, e cada

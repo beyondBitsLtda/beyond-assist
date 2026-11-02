@@ -6,6 +6,7 @@ import "./pessoas.css";
 import "./lisa.css";
 import "./plano.css";
 import "./abertura.css";
+import "./visual-lisa.css";
 import Abertura, { SCRIPT_DA_ABERTURA } from "@/componentes/Abertura.js";
 import { SCRIPT_DE_INSTALAR } from "@/lib/instalarApp.js";
 
@@ -45,6 +46,18 @@ const SCRIPT_DO_TEMA = `
 })();
 `;
 
+/**
+ * O visual da Lisa Task (src/app/visual-lisa.css), decidido como o tema: ANTES de pintar. Quem
+ * grava o cookie é o middleware, pelo tipo da conta. O título da aba acompanha o nome.
+ */
+const SCRIPT_DO_VISUAL = `
+(function () {
+  if (!/(?:^|;\\s*)abacato_visual=lisa(?:;|$)/.test(document.cookie)) return;
+  document.documentElement.setAttribute("data-visual", "lisa");
+  document.addEventListener("DOMContentLoaded", function () { document.title = "Lisa Task"; });
+})();
+`;
+
 export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
@@ -53,10 +66,11 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
         />
         <link rel="preload" href="/marca/abacato.png" as="image" />
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_TEMA }} />
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_VISUAL }} />
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_DA_ABERTURA }} />
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_DE_INSTALAR }} />
       </head>

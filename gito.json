@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.30.0-cloudflare-pages.1",
+  "versao": "0.31.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-01",
   "compilacao": {
-    "numero": 62,
+    "numero": 63,
     "data": "2026-11-01",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.31.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa Task passa a ser o Abacato, com o nome e o visual da Lisa e sem a parte de documentos; e o usuário do MVP fica só com a Esfera de pontos e o Rosto.",
+      "itens": [
+        "Abacato: conta nova do tipo \"Lisa Task\" (criada em Pessoas). Ela abre com o nome Lisa Task e o visual da Lisa (fundo preto, azul da Lisa, fonte Barlow) e tem só os quadros de tarefas, com os limites do cliente (10 quadros, 3 compartilhados com até 3 pessoas).",
+        "Abacato: a parte de documentos (projetos, pastas e arquivos) não existe para a Lisa Task. O servidor barra as telas e as rotas pelo tipo da sessão e confere de novo no banco a cada pedido; ninguém consegue pôr uma conta Lisa Task num projeto.",
+        "Abacato: o link da Lisa (?visual=lisa) já mostra a tela de entrar com a cara da Lisa Task. O login continua sendo o do Abacato, separado do da Lisa.",
+        "Lisa: o menu Lisa Task (no topo e no celular) abre o Abacato em outra aba. A Lisa Task leve (a lista de tarefas dentro da Lisa e o \"crie uma tarefa\" na conversa) saiu; a tabela lisa_tarefas fica no banco, com os dados.",
+        "Lisa: no modo MVP, o avatar é só a Esfera de pontos (o padrão) ou o Rosto. Ondas, Avatar 3D e o catálogo /visual ficam só com o admin, e a escolha do admin no mesmo navegador não é apagada.",
+        "Banco do Abacato: a migração db/014-lisa-task.sql aceita o tipo novo (aplicar antes de publicar o Abacato)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.30.0-cloudflare-pages.1",
       "data": "2026-11-01",
@@ -951,7 +967,7 @@
         "Contexto da conversa em qualquer modo: o + da barra anexa imagens (do computador, com Ctrl+V ou arrastando) e vincula até 3 repositórios do GitHub; a cada pergunta a Lisa lê os arquivos do repositório que interessam, escolhidos pela pergunta, pela conversa e pelo que aparece na tela, na câmera e nos prints, e responde relacionando tudo, com o caminho de cada arquivo.",
         "Modo Tomar nota (celular e desktop, também com a tela apagada no Android): escuta até 10 minutos, transcreve, separa por assunto e anota no quadro \"Notas\" do Abacato, com uma coluna por tema e um card por nota (interpretação + transcrição real).",
         "Instalável como app pelo Chrome (desktop e Android) e pela Tela de Início no iPhone, com atalho direto para o Modo Tomar nota.",
-        "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma, Anel de partículas e Rosto (um retrato térmico: borda quente e halo; a garganta esquenta com a fala, as orelhas acendem ouvindo e uma onda de calor sobe pela cabeça pensando; cabelo longo ou raspado e seis paletas de cor); o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador).",
+        "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma, Anel de partículas e Rosto (um retrato térmico: borda quente e halo; a garganta esquenta com a fala, as orelhas acendem ouvindo e uma onda de calor sobe pela cabeça pensando; cabelo longo ou raspado e seis paletas de cor); o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador). No modo MVP, o usuário tem só a Esfera de pontos (padrão) e o Rosto.",
         "Painel Sentinela de casos de teste e chamados.",
         "Editor de código da conversa colaborativo: abas editáveis, abas suas com o seu código e a Lisa reescrevendo em cima a pedido, com o que está na IDE indo junto das perguntas.",
         "Quadro de processos: a Lisa desenha fluxogramas, BPMN com raias, arquitetura, C4 e mapas mentais quando pedido; a pessoa mexe no desenho e a Lisa conversa sobre ele e o altera a partir do que está na tela, inclusive pela aparência (\"limpe as atividades vermelhas\", \"pinte de verde\") e por abas (cria, detalha uma etapa numa aba ligada a ela, separa, renomeia e apaga abas). O desenho do quadro pode ser salvo num projeto do ProcessMap (botão \"💾 salvar\"), e dali em diante as mudanças se salvam sozinhas.",
@@ -960,8 +976,8 @@
         "Cena do Assistente no computador: a resposta numa janela holográfica flutuante e arrastável, com hologramas em volta (anéis, mira, painéis de status e de sinal de voz, barras, grade), a Lisa mais perto e no centro, e profundidade 3D com paralaxe do mouse.",
         "Documentar um projeto do ProcessMap: a Lisa escreve no editor de código a visão geral e um .md por desenho (para pedir a uma IA de código construir as rotas), sem mudar os desenhos",
         "Versões anteriores de cada fluxograma do ProcessMap, com \"voltar para esta\"",
-        "Modo MVP: usuários convidados (que não são o dono) entram numa versão limitada — conversa e voz, Modo Tela, editor de código, ProcessMap, repositórios públicos, entrevista do primeiro acesso e Lisa Task —, com limite diário de uso",
-        "Lisa Task leve: tarefas pessoais só em texto, sem arquivos"
+        "Modo MVP: usuários convidados (que não são o dono) entram numa versão limitada — conversa e voz, Modo Tela, editor de código, ProcessMap, repositórios públicos, entrevista do primeiro acesso e o atalho da Lisa Task —, com limite diário de uso",
+        "Lisa Task: é o Abacato com o nome e o visual da Lisa (conta do tipo Lisa Task), só com os quadros de tarefas; a parte de documentos (projetos, pastas e arquivos) não existe para ela e é barrada no servidor. O menu Lisa Task abre o Abacato em outra aba, com o login próprio dele."
       ],
       "naoInclui": [
         "Não é multiusuário: o login existe, mas só para o responsável.",
@@ -1030,7 +1046,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "Fica no iMac de casa e é publicado só pelo túnel da Cloudflare, em HTTPS (PostgREST). O Postgres não é exposto na internet. O Studio só abre no próprio iMac. Teste: https://banco.beyond.dev.br/ responder 401 é normal; 530 significa túnel fora (confira se o iMac está ligado). Backup: a cada 3 horas (ficam os 3 últimos) e semanal (segunda 03:15, guardado até apagar), pelo cron do iMac (~/backup), com conteúdo criptografado, no Google Drive (pasta beyond-backup); restaurar com scripts/backup/restaurar.sh — ver scripts/backup/LEIA-ME.md. Os projetos e fluxogramas do painel ProcessMap ficam nas tabelas lisa_projetos e lisa_fluxogramas (db/fluxogramas.sql), e as versões anteriores de cada fluxo em lisa_fluxogramas_versoes (db/fluxogramas_versoes.sql); um fluxo só volta de um backup com scripts/backup/recuperar-fluxo.sh. Modo MVP: lisa_perfis, lisa_tarefas e lisa_uso (db/mvp_usuarios.sql), separadas por dono."
+        "observacao": "Fica no iMac de casa e é publicado só pelo túnel da Cloudflare, em HTTPS (PostgREST). O Postgres não é exposto na internet. O Studio só abre no próprio iMac. Teste: https://banco.beyond.dev.br/ responder 401 é normal; 530 significa túnel fora (confira se o iMac está ligado). Backup: a cada 3 horas (ficam os 3 últimos) e semanal (segunda 03:15, guardado até apagar), pelo cron do iMac (~/backup), com conteúdo criptografado, no Google Drive (pasta beyond-backup); restaurar com scripts/backup/restaurar.sh — ver scripts/backup/LEIA-ME.md. Os projetos e fluxogramas do painel ProcessMap ficam nas tabelas lisa_projetos e lisa_fluxogramas (db/fluxogramas.sql), e as versões anteriores de cada fluxo em lisa_fluxogramas_versoes (db/fluxogramas_versoes.sql); um fluxo só volta de um backup com scripts/backup/recuperar-fluxo.sh. Modo MVP: lisa_perfis, lisa_tarefas (sem uso desde a 0.31.0: a Lisa Task é o Abacato) e lisa_uso (db/mvp_usuarios.sql), separadas por dono."
       },
       {
         "nome": "Sentinela (Beyond Test)",
@@ -1059,7 +1075,7 @@
       },
       {
         "nome": "Abacato",
-        "descricao": "Fonte alternativa de quadros: a Lisa pode ler o Abacato em vez do Trello. O Modo Tomar nota grava no quadro \"Notas\" do usuário do Abacato com o mesmo e-mail (cria o quadro, a coluna do tema e os cards).",
+        "descricao": "Fonte alternativa de quadros: a Lisa pode ler o Abacato em vez do Trello. O Modo Tomar nota grava no quadro \"Notas\" do usuário do Abacato com o mesmo e-mail (cria o quadro, a coluna do tema e os cards). A Lisa Task também é o Abacato: o menu Lisa Task leva a abacato.beyond.dev.br/?visual=lisa, e as contas do tipo Lisa Task abrem com o visual da Lisa e sem documentos.",
         "url": "https://abacato.beyond.dev.br"
       },
       {
