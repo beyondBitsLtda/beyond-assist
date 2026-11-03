@@ -70,6 +70,11 @@ export const IconeChamados = () => (
   <svg {...base}><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z" /><path d="M12 8v4M12 15.5v.01" /></svg>
 );
 
+// Lisa jogadora: a cabeça de um robô (BEYOND-0014)
+export const IconeLisa = () => (
+  <svg {...base}><rect x="4" y="7" width="16" height="12" rx="3" /><path d="M12 3v4M9 12v1M15 12v1M9.5 16h5" /></svg>
+);
+
 // Mais: três pontos
 export const IconeMais = () => (
   <svg {...base}><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>

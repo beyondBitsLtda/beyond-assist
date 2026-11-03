@@ -1,0 +1,21 @@
+/* A Lisa joga (BEYOND-0014): src/app/(app)/lisa/page.js. Só tokens do tema, para o escuro sair igual. */
+
+.lj-numeros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+@media (min-width: 900px) { .lj-numeros { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.lj-numero { min-width: 0; }
+
+.lj-grade { display: grid; gap: 12px; }
+@media (min-width: 720px) { .lj-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1200px) { .lj-grade { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.lj-bloco { min-width: 0; display: grid; gap: 8px; align-content: start; }
+.lj-bloco__titulo { margin: 0; font-size: 15px; }
+.lj-destaque { margin: 0; font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+
+.lj-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; overflow-wrap: anywhere; }
+.lj-lista--chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lj-lista a { color: var(--pf-verde-forte); }
+
+.lj-diario { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lj-diario__linha { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; align-items: start; padding: 10px 12px; border-radius: 12px; background: var(--pf-superficie); border: 1px solid var(--pf-linha); font-size: 14px; overflow-wrap: anywhere; }
+.lj-diario__icone { font-size: 18px; line-height: 1.2; }
+.lj-diario__quando { font-size: 12px; color: var(--pf-tinta-2); margin-right: 4px; }

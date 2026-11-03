@@ -14,7 +14,8 @@
     "cf:build": "opennextjs-cloudflare build",
     "cf:deploy": "opennextjs-cloudflare deploy",
     "publicar": "npm run cf:build && wrangler deploy",
-    "lembretes": "node --env-file=.env.local --env-file=.env.lembretes scripts/lembretes.mjs"
+    "lembretes": "node --env-file=.env.local --env-file=.env.lembretes scripts/lembretes.mjs",
+    "lisa-joga": "node --env-file=.env.local --import ./scripts/alias-loader.mjs scripts/lisa-joga.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",

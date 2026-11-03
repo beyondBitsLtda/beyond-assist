@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   IconeHoje, IconeTrilhas, IconeAgenda, IconePratica, IconeProgresso, IconeRaioX, IconeRanking, IconeReino, IconeDominio, IconeBolsa, IconeMais, Marca,
-  IconeCaderno, IconeBiblioteca, IconeAcervo, IconeChamados,
+  IconeCaderno, IconeBiblioteca, IconeAcervo, IconeChamados, IconeLisa,
 } from "./Icones.js";
 import { Confete } from "./Neuro.js";
 import Celebracao from "./Celebracao.js";
@@ -32,6 +32,7 @@ const ITENS = [
   { href: "/dominio", rotulo: "Domínio", Icone: IconeDominio, grupo: "Jogo" },
   { href: "/bolsa", rotulo: "Bolsa", Icone: IconeBolsa, grupo: "Jogo" },
   { href: "/ranking", rotulo: "Ranking", Icone: IconeRanking, grupo: "Jogo" },
+  { href: "/lisa", rotulo: "Lisa joga", Icone: IconeLisa, grupo: "Jogo" },
   { href: "/progresso", rotulo: "Progresso", Icone: IconeProgresso, grupo: "Você" },
   { href: "/raio-x", rotulo: "Raio-X", Icone: IconeRaioX, grupo: "Você" },
   { href: "/chamados", rotulo: "Chamados", Icone: IconeChamados, grupo: "Você" },

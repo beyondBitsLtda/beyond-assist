@@ -83,6 +83,10 @@ import {
 } from "../src/dominio/mercadoDeTropas.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
 import {
+  CONTA_DA_LISA, PERFIL_DO_CURSO, TEMAS_DE_TECNOLOGIA, temaDoMes, sorteio as sorteioDaLisa, chanceDeAcerto, respostasDoQuiz, oQueFazerAgora, itensDaTeoriaHoje,
+  melhoriaDaVez, compraNaBolsa, alvoDaInvasao, documentoDoDiagrama,
+} from "../src/dominio/lisaJogadora.js";
+import {
   conferirChamado, tituloDoChamado, descricaoDoChamado, relatoDoChamado, situacaoDoChamado, previsaoDoChamado, fimDaPrevisao,
   diaEmBrasilia, quemAbriu, ordenarChamados, conferirAtualizacao, TETO_DA_RESPOSTA,
 } from "../src/dominio/chamado.js";
@@ -3168,6 +3172,84 @@ caso("diagrama: toda forma das coleções do quadro tem nome para a Lisa, e o mi
   for (const c of doTipo) assert.ok(colecoes.some(([id]) => id === c), `a coleção ${c} existe no quadro`);
   assert.match(ler("../src/middleware.js"), /diagramas\//, "o quadro é arquivo estático: sem sessão no caminho");
   assert.match(ler("../public/diagramas/index.html"), /js\/Ponte\.js/);
+});
+
+// ---------------------------------------------------------------- a Lisa jogadora (BEYOND-0014)
+caso("lisa jogadora: um curso de tecnologia por mês, sem repetir", () => {
+  assert.equal(temaDoMes([]), TEMAS_DE_TECNOLOGIA[0]);
+  assert.equal(temaDoMes([TEMAS_DE_TECNOLOGIA[0], TEMAS_DE_TECNOLOGIA[1].toUpperCase()]), TEMAS_DE_TECNOLOGIA[2], "sem ligar para maiúsculas");
+  assert.ok(TEMAS_DE_TECNOLOGIA.includes(temaDoMes(TEMAS_DE_TECNOLOGIA)), "todos feitos: recomeça a lista");
+  assert.match(CONTA_DA_LISA.apelido, /Lisa/);
+});
+caso("lisa jogadora: a assertividade cresce com o curso e os erros ensinam", () => {
+  const dia0 = chanceDeAcerto({ diasNoCurso: 0 });
+  const dia10 = chanceDeAcerto({ diasNoCurso: 10 });
+  const dia30 = chanceDeAcerto({ diasNoCurso: 30 });
+  assert.ok(dia0 >= 0.5 && dia0 <= 0.6, `começa aprendendo (${dia0})`);
+  assert.ok(dia0 < dia10 && dia10 < dia30 && dia30 <= 0.92, `sobe com o mês (${dia0} → ${dia10} → ${dia30})`);
+  assert.ok(chanceDeAcerto({ diasNoCurso: 10, errosRecentes: 1 }) < dia10, "quem errou muito ontem acerta um pouco menos hoje");
+  const sortear = sorteioDaLisa(sementeDe("2026-11-03:quiz"));
+  const perguntas = Array.from({ length: 200 }, () => ({ opcoes: ["a", "b", "c", "d"], correta: 2 }));
+  const escolhas = respostasDoQuiz(perguntas, 0.7, sortear);
+  const taxa = escolhas.filter((e) => e === 2).length / escolhas.length;
+  assert.ok(taxa > 0.6 && taxa < 0.8, `acerta perto da chance (${taxa})`);
+  assert.ok(escolhas.every((e) => e >= 0 && e <= 3), "quando erra, marca uma opção que existe");
+  assert.deepEqual(respostasDoQuiz(perguntas.slice(0, 5), 0.7, sorteioDaLisa(7)), respostasDoQuiz(perguntas.slice(0, 5), 0.7, sorteioDaLisa(7)), "a mesma semente, as mesmas escolhas");
+});
+caso("lisa jogadora: a agenda do dia, como uma pessoa", () => {
+  assert.deepEqual(oQueFazerAgora({ hora: 6, diaDaSemana: 2 }), [], "de madrugada, nada");
+  assert.deepEqual(oQueFazerAgora({ hora: 8, diaDaSemana: 2 }), ["curso", "mina", "teoria"]);
+  assert.deepEqual(oQueFazerAgora({ hora: 13, diaDaSemana: 2, feito: ["curso", "mina", "teoria"] }), ["quiz", "bolsa"], "a Bolsa às 10h (só abre das 7h às 17h)");
+  assert.ok(!oQueFazerAgora({ hora: 9, diaDaSemana: 2 }).includes("bolsa") && oQueFazerAgora({ hora: 10, diaDaSemana: 2 }).includes("bolsa"));
+  assert.ok(!oQueFazerAgora({ hora: 22, diaDaSemana: 2 }).includes("acervo"), "o Acervo é só no domingo");
+  assert.ok(oQueFazerAgora({ hora: 22, diaDaSemana: 0 }).includes("acervo") && oQueFazerAgora({ hora: 22, diaDaSemana: 0 }).includes("caderno"));
+  const n = itensDaTeoriaHoje(sorteioDaLisa(3));
+  assert.ok(n >= 2 && n <= 5, "de 2 a 5 itens da teoria por dia");
+});
+caso("lisa jogadora: no Reino e na Bolsa, com reserva; invade alguém do tamanho dela", () => {
+  const opcoes = [{ chave: "muralha", custo: 400, prioridade: 1 }, { chave: "mina", custo: 250, prioridade: 3 }, { chave: "quartel", custo: 900, prioridade: 5 }];
+  assert.equal(melhoriaDaVez(opcoes, 500).chave, "mina", "a de maior prioridade que cabe, deixando a reserva");
+  assert.equal(melhoriaDaVez(opcoes, 300), null, "sem sobra além da reserva, não gasta");
+  const acoes = [{ codigo: "ASTRO", preco: 55 }, { codigo: "NEURO", preco: 900 }];
+  const sempre = () => 0.9;
+  assert.deepEqual(compraNaBolsa(acoes, 420, sempre), { codigo: "ASTRO", quantidade: 2 });
+  assert.equal(compraNaBolsa(acoes, 320, sempre), null, "sem sobra além da reserva");
+  assert.equal(compraNaBolsa(acoes, 5000, () => 0.1), null, "nem todo dia ela mexe na Bolsa");
+  const reinos = [{ usuarioId: "eu", trofeus: 100 }, { usuarioId: "a", trofeus: 10 }, { usuarioId: "b", trofeus: 95 }, { usuarioId: "c", trofeus: 400 }, { usuarioId: "d", trofeus: 120 }, { usuarioId: "e", trofeus: 80 }];
+  const alvo = alvoDaInvasao(reinos, "eu", 100, sorteioDaLisa(1));
+  assert.ok(["b", "d", "e"].includes(alvo.usuarioId), `um dos três mais parecidos (${alvo.usuarioId})`);
+  assert.equal(alvoDaInvasao([{ usuarioId: "eu", trofeus: 1 }], "eu", 1, sorteioDaLisa(1)), null, "nunca ela mesma");
+});
+
+caso("lisa jogadora: o diagrama dela vira um documento que o quadro aceita", () => {
+  const doc = documentoDoDiagrama({ titulo: "Rede da empresa", formas: [
+    { id: "a", tipo: "terminal", texto: "Internet" }, { id: "b", tipo: "process", texto: "Roteador" }, { id: "c", tipo: "database", texto: "Servidor" },
+    { id: "d", tipo: "inventado", texto: "Switch" }, { id: "e", tipo: "note", texto: "  " },
+  ], ligacoes: [{ de: "a", para: "b", rotulo: "WAN" }, { de: "b", para: "c" }, { de: "b", para: "x" }, { de: "c", para: "c" }] });
+  const r = conferirDiagrama(doc);
+  assert.ok(r.ok, r.motivo);
+  assert.equal(r.formas, 4, "forma sem texto sai");
+  assert.equal(r.ligacoes, 2, "ligação para forma que não existe (ou para si mesma) sai");
+  assert.equal(doc.pages[0].shapes.find((s) => s.id === "d").type, "process", "tipo desconhecido vira processo");
+  assert.equal(conferirDiagrama(documentoDoDiagrama({ formas: [{ id: "a", texto: "só uma" }] })).ok, false, "uma forma só não é diagrama");
+});
+caso("lisa jogadora: a rotina, a conta-robô, a página pública e o curso no perfil livre", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const script = ler("./lisa-joga.mjs");
+  assert.match(script, /const proposta = \{ \.\.\.r\.proposta, perfil: PERFIL_DO_CURSO \};/, "o curso dela é sempre do perfil livre (entrega por texto)");
+  assert.equal(PERFIL_DO_CURSO, "livre");
+  assert.match(script, /oQueFazerAgora\(\{ hora, diaDaSemana, feito: await feitoHoje\(id\) \}\)/, "faz o que está na vez e ainda não fez hoje");
+  assert.ok(script.includes("await registrarNoDiario(id, acao, `Tentei ${NOME_DA_ACAO[acao] || acao} e não deu desta vez.`"), "falhou: fica no diário e não insiste");
+  for (const f of ["marcarItem", "responderQuiz", "entregarEvidencia", "melhorarConstrucao", "invadir", "comprarAcao", "criarMaterial", "criarPagina"]) {
+    assert.ok(script.includes(`${f}(`), `joga pelas mesmas funções das telas: ${f}`);
+  }
+  assert.match(script, /no_ranking: true, meta_diaria: 30, robo: true/, "a conta nasce marcada como robô");
+  assert.ok(!/senha_hash: ["'`]/.test(script), "a senha dela é aleatória (ninguém entra pela tela)");
+  assert.match(ler("../db/026-lisa-jogadora.sql"), /add column if not exists robo boolean not null default false[\s\S]*create table if not exists public\.proof_lisa_diario[\s\S]*enable row level security/);
+  assert.match(ler("../src/app/api/lisa/route.js"), /await exigirUsuario\(req\);\s*return json\(\{ ok: true, \.\.\.\(await perfilDaLisa\(\)\) \}\)/);
+  assert.match(ler("../src/componentes/Moldura.js"), /\{ href: "\/lisa", rotulo: "Lisa joga", Icone: IconeLisa, grupo: "Jogo" \}/);
+  assert.match(ler("../package.json"), /"lisa-joga": "node --env-file=\.env\.local --import \.\/scripts\/alias-loader\.mjs scripts\/lisa-joga\.mjs"/);
+  assert.match(ler("../src/lib/lisaJogadora.js"), /link: m\.status === "aprovado" \? m\.link : null/, "link do Acervo só depois de aprovado");
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

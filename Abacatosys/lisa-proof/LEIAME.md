@@ -180,6 +180,24 @@ crontab -e
 0 12,20 * * * cd <pasta do repositório>/Abacatosys/lisa-proof && npm run lembretes >> ~/proof-lembretes.log 2>&1
 ```
 
+
+## A Lisa jogadora (BEYOND-0014)
+
+A Lisa joga o Proof com uma conta própria ("Lisa robô", marcada com `proof_perfis.robo`), pelas mesmas
+funções das telas: um curso de tecnologia por mês (perfil livre, entrega por texto ou diagrama), teoria,
+quiz e exercício do dia, projeto da semana, Reino, Bolsa, caderno e Acervo. As decisões ficam em
+`src/dominio/lisaJogadora.js`; quem joga é `scripts/lisa-joga.mjs`; o que ela faz vai para
+`proof_lisa_diario` e aparece na página **Lisa joga** (`/lisa`).
+
+No iMac, na pasta do projeto (com o mesmo `.env.local` dos lembretes):
+
+```bash
+npm run lisa-joga -- --criar-conta   # só na primeira vez (a conta já existe em produção desde 03/11/2026)
+npm run lisa-joga -- --so=quiz       # uma ação fora da agenda, para conferir
+# crontab: de hora em hora, das 7h às 22h, com trava para não rodar duas juntas
+15 7-22 * * * cd <pasta do repositório>/Abacatosys/lisa-proof && /usr/bin/flock -n /tmp/proof-lisa.lock npm run lisa-joga >> ~/proof-lisa.log 2>&1
+```
+
 ## Pontos
 
 | Ação | Pontos |
