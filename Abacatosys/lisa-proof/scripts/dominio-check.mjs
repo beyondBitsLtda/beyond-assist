@@ -1783,6 +1783,37 @@ caso("bolsa: quem tinha ações de quem sai da bolsa recebe uma vez só, e a car
   assert.match(terminal, /as suas \{s\.quantidade\} ações viraram pó/);
 });
 
+caso("reino: cobrar e gravar numa transação só, nos dois mundos (a Mina de Ouro paga que não subiu de nível)", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const reino = ler("../src/lib/reino.js");
+  const lancarEGravar = reino.slice(reino.indexOf("async function lancarEGravar("), reino.indexOf("// ---------------------------------------------------------------- moedas de fora do Reino"));
+  // um pedido só ao banco: nada de lançar e depois gravar (cancelar no meio deixava a cobrança sem a melhoria)
+  assert.match(lancarEGravar, /db\.rpc\("proof_lancar_e_gravar", \{/);
+  assert.ok(!/\blancar\(|gravarReino\(|desfazerLancamentos\(/.test(lancarEGravar), "lancarEGravar não lança nem grava em pedidos separados");
+  assert.match(lancarEGravar, /if \(!gravou\) throw conflito\(\);/);
+  // o mundo vai junto em toda função do banco
+  assert.match(ler("../src/lib/mundo.js"), /rpc: \(nome, args\) => supabase\.rpc\(nome, \{ \.\.\.args, p_teste: emTeste\(\) \}\)/);
+  const sql = ler("../db/025-reino-cobra-e-grava-junto.sql");
+  assert.match(sql, /create or replace function public\.proof_lancar_e_gravar\(\s*p_teste boolean, p_usuario uuid, p_versao integer, p_mudancas jsonb, p_lancamentos jsonb/);
+  assert.match(sql, /'proof_teste_reinos' else 'proof_reinos'/);
+  assert.match(sql, /'proof_teste_reino_movimentos' else 'proof_reino_movimentos'/);
+  assert.match(sql, /where r\.usuario_id = \$2 and r\.versao = \$3/, "só grava a versão que foi lida");
+  assert.ok(sql.indexOf("if gravou <> 1 then") < sql.indexOf("insert into public.%I (usuario_id, tipo, valor, detalhe)"), "só lança depois de gravar o reino, na mesma transação");
+  assert.match(sql, /revoke all on function public\.proof_lancar_e_gravar\(boolean, uuid, integer, jsonb, jsonb\) from public, anon, authenticated/);
+  // o estorno entra nos dois livros-caixa
+  for (const t of ["proof_reino_movimentos_tipo_check", "proof_teste_reino_movimentos_tipo_check"]) {
+    const bloco = sql.slice(sql.indexOf(`add constraint ${t}`));
+    assert.match(bloco.slice(0, bloco.indexOf(";")), /'mercado_venda', 'estorno'\)/, t);
+  }
+  // a tela faz um pedido do reino de cada vez
+  const pagina = ler("../src/app/(app)/reino/page.js");
+  for (const f of ["agir", "agirNoMercado"]) {
+    const corpo = pagina.slice(pagina.indexOf(`async function ${f}(`));
+    assert.match(corpo.slice(0, 200), /if \(pedindoRef\.current\) return;\s*pedindoRef\.current = true;/, f);
+  }
+  assert.match(pagina, /ocupado=\{ocupado === c\.chave\} travado=\{!!ocupado\}/);
+});
+
 caso("moedas com centavos: a bolsa conta centavo por centavo, e a venda devolve os centavos", () => {
   assert.equal(valorDaCompra(23.45, 3), 70.35);
   assert.equal(valorDaVenda(23.45, 3), 70.35);

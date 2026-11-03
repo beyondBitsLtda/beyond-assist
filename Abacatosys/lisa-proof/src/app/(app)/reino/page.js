@@ -57,6 +57,9 @@ export default function Reino() {
   const [reino, setReino] = useState(null);
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState("");
+  // Um pedido do reino de cada vez: cliques seguidos em compras diferentes disputavam a mesma versão
+  // do reino (o servidor recusa o segundo, mas a pessoa via "tente de novo" sem entender por quê).
+  const pedindoRef = useRef(false);
   const [alvos, setAlvos] = useState(null);
   const [resultado, setResultado] = useState(null);
   const [simulando, setSimulando] = useState(false);
@@ -151,6 +154,8 @@ export default function Reino() {
   }
 
   async function agir(chave, corpo, aoTerminar) {
+    if (pedindoRef.current) return;
+    pedindoRef.current = true;
     setOcupado(chave);
     try {
       const r = await criar(api("/api/reino"), corpo);
@@ -161,6 +166,7 @@ export default function Reino() {
       avisar(e.message);
       reagir("triste", "Ops, não deu certo dessa vez.");
     } finally {
+      pedindoRef.current = false;
       setOcupado("");
     }
   }
@@ -179,6 +185,8 @@ export default function Reino() {
 
   /** O mercado de tropas: anunciar, comprar e retirar. O servidor devolve o reino; o mercado vem num pedido à parte. */
   async function agirNoMercado(chave, corpo, aoTerminar) {
+    if (pedindoRef.current) return;
+    pedindoRef.current = true;
     setOcupado(chave);
     try {
       const r = await criar(api("/api/reino/mercado"), corpo);
@@ -189,6 +197,7 @@ export default function Reino() {
       avisar(e.message);
       reagir("triste", "Ops, não deu certo dessa vez.");
     } finally {
+      pedindoRef.current = false;
       carregarMercadoDeTropas();
       setOcupado("");
     }
@@ -385,7 +394,7 @@ export default function Reino() {
             <div className="pf-estat__rotulo">O seu Neuro</div>
             <div className="pf-estat__valor">Nível {reino.neuro.nivel} <small>· {reino.neuro.estagio}</small></div>
             <p className="pf-estat__nota">O herói do reino: vai em toda invasão (❤️ {reino.heroi.ataque.vida} · 💥 {reino.heroi.ataque.dano}) e defende a Torre. Máximo agora: nível {reino.neuro.maximo} (sobe com a Torre do Neuro).</p>
-            <Botao ok={reino.neuro.ok} motivo={reino.neuro.motivo} ocupado={ocupado === "neuro"}
+            <Botao ok={reino.neuro.ok} motivo={reino.neuro.motivo} ocupado={ocupado === "neuro"} travado={!!ocupado}
               aoClicar={() => agir("neuro", { acao: "neuro" }, (r) => comemorar(`Neuro nível ${r.nivel}! ${r.estagio} 🧠`))}>
               Treinar Neuro · <Moedas n={reino.neuro.custo} />
             </Botao>
@@ -442,7 +451,7 @@ export default function Reino() {
               <p className="pf-estat__nota">{c.nivel > 0 ? c.efeitoAtual : "Ainda não construída."}</p>
               {c.efeitoProximo && <p className="pf-estat__nota rn-construcao__proximo">Próximo nível: {c.efeitoProximo}</p>}
               {c.nivel < c.max ? (
-                <Botao ok={c.pode} motivo={c.motivo} ocupado={ocupado === c.chave}
+                <Botao ok={c.pode} motivo={c.motivo} ocupado={ocupado === c.chave} travado={!!ocupado}
                   aoClicar={() => agir(c.chave, { acao: "melhorar", chave: c.chave }, (r) => reagir("comemorando", `${c.nome} nível ${r.nivel}! 🎉`))}>
                   {c.chave === "terreno" ? (c.nivel === 0 ? "Comprar terra" : "Expandir de novo") : c.nivel === 0 ? "Construir" : "Melhorar"} · <Moedas n={c.custo} />
                 </Botao>

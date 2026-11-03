@@ -10,11 +10,11 @@ export const hora = (iso) => new Date(iso).toLocaleString("pt-BR", { timeZone: "
 /** Moedas: com centavos quando tem (ou sempre, com `centavos` — o saldo, que é dinheiro de verdade). */
 export const Moedas = ({ n, centavos = false }) => <span className="rn-moedas">🪙 {formatarMoedas(n, { sempreComCentavos: centavos })}</span>;
 
-/** Botão que, quando não pode, diz o porquê em vez de só ficar cinza. */
-export function Botao({ ok, motivo, ocupado, aoClicar, children, secundario = false }) {
+/** Botão que, quando não pode, diz o porquê em vez de só ficar cinza. `travado`: outro pedido do reino está em andamento. */
+export function Botao({ ok, motivo, ocupado, travado = false, aoClicar, children, secundario = false }) {
   return (
     <div className="rn-botao">
-      <button type="button" className={`pf-botao pf-botao--pequeno${secundario ? " pf-botao--sec" : ""}`} disabled={!ok || ocupado} onClick={aoClicar}>
+      <button type="button" className={`pf-botao pf-botao--pequeno${secundario ? " pf-botao--sec" : ""}`} disabled={!ok || ocupado || travado} onClick={aoClicar}>
         {ocupado ? "Um instante…" : children}
       </button>
       {!ok && motivo && <span className="rn-motivo">{motivo}</span>}

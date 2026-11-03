@@ -1,14 +1,15 @@
 // O Reino do Neuro no banco: ler o reino, gastar moedas, coletar a mina e invadir. As regras
 // (custos, força, saque, limites) moram em src/dominio/reino.js; aqui é só o caminho até o banco.
 //
-// O cuidado com dinheiro em dobro. Não há transação entre várias linhas pelo PostgREST, então
-// toda operação que mexe no saldo segue a mesma ordem:
+// O cuidado com dinheiro em dobro. Toda operação que mexe no saldo de uma pessoa só:
 //   1. lê o reino (com a `versao`) e calcula o saldo;
-//   2. lança o movimento no livro-caixa;
-//   3. grava o reino "onde versao = a que eu li" (e sobe a versao);
-//   4. se o passo 3 não pegou linha nenhuma, alguém mexeu antes: apaga o movimento e devolve 409.
-// Lançar ANTES de gravar faz qualquer leitura concorrente ver o saldo já descontado; o pior caso
-// é ela subestimar o saldo por um instante, nunca gastar o que não existe.
+//   2. chama proof_lancar_e_gravar (db/025), que numa transação só grava o reino "onde versao = a
+//      que eu li" (e sobe a versao) e lança os movimentos no livro-caixa;
+//   3. se a versão mudou, nada foi gravado nem cobrado: devolve 409.
+// Até 03/11/2026 eram dois pedidos (lançar, depois gravar, e apagar o lançamento se perdesse a
+// corrida). Um pedido cancelado entre os dois cobrou uma Mina de Ouro que nunca subiu de nível.
+// O que envolve duas pessoas (invasão, aluguel, mercado de tropas) ainda segue lançar → gravar →
+// desfazer, com lancar() e desfazerLancamentos().
 //
 // DOIS MUNDOS (23/10/2026): tudo aqui fala com o banco por `db` (src/lib/mundo.js), que no Reino de
 // Teste grava nas tabelas gêmeas proof_teste_*. As poucas diferenças do mundo de teste (o reino que
@@ -451,19 +452,16 @@ async function gravarReino(reino, mudancas) {
   return (data || []).length === 1;
 }
 
-/** Lança, grava; se a gravação perder a corrida, desfaz o lançamento. */
+/** Grava o reino e lança as moedas na mesma transação (db/025); se a versão mudou, nada acontece e é 409. */
 async function lancarEGravar(reino, lancamentos, mudancas) {
-  const ids = [];
-  try {
-    for (const l of lancamentos) ids.push(await lancar(reino.usuario_id, l.tipo, l.valor, l.detalhe));
-    if (!(await gravarReino(reino, mudancas))) {
-      await desfazerLancamentos(ids);
-      throw conflito();
-    }
-  } catch (e) {
-    if (!(e instanceof ErroDeAcesso && e.status === 409)) await desfazerLancamentos(ids);
-    throw e;
-  }
+  const { data: gravou, error } = await db.rpc("proof_lancar_e_gravar", {
+    p_usuario: reino.usuario_id,
+    p_versao: reino.versao,
+    p_mudancas: mudancas,
+    p_lancamentos: lancamentos.map((l) => ({ tipo: l.tipo, valor: l.valor, detalhe: l.detalhe || {} })),
+  });
+  falhou(error, "gravar reino");
+  if (!gravou) throw conflito();
 }
 
 // ---------------------------------------------------------------- moedas de fora do Reino

@@ -37,8 +37,14 @@ export const mundoAtual = () => (emTeste() ? "teste" : "real");
 /** O nome da tabela no mundo de agora: `proof_reinos` vira `proof_teste_reinos` no mundo de teste. */
 export const tabela = (nome) => (emTeste() && DO_MUNDO.has(nome) ? nome.replace(/^proof_/, "proof_teste_") : nome);
 
-/** O banco do mundo de agora (o mesmo `from` do supabase, com a tabela trocada no mundo de teste). */
-export const db = { from: (nome) => supabase.from(tabela(nome)) };
+/**
+ * O banco do mundo de agora (o mesmo `from` do supabase, com a tabela trocada no mundo de teste). As
+ * funções do banco do jogo (db/025) recebem o mundo em `p_teste` e escolhem a tabela lá dentro.
+ */
+export const db = {
+  from: (nome) => supabase.from(tabela(nome)),
+  rpc: (nome, args) => supabase.rpc(nome, { ...args, p_teste: emTeste() }),
+};
 
 /** Roda `fn` num mundo ("real" ou "teste"). */
 export function noMundo(mundo, fn) {
