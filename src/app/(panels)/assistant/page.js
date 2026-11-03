@@ -18,7 +18,7 @@ import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
 import FontesDaWeb from "@/components/panels/FontesDaWeb.js";
 import CenaDaLisa from "@/components/panels/hud/CenaDaLisa.js";
 import JanelaDaResposta from "@/components/panels/hud/JanelaDaResposta.js";
-import { citaProjeto, projetoProvavel, fluxoCitado, contextoDoProjeto, pedeEmTodos, pedeDocumentacao, respostaComDocumentos, ajustarAoPedido, documentosPorDesenho, respostaDeConfirmacao, textoDaConfirmacao, VALIDADE_DA_CONFIRMACAO_MS, pedeNovoDesenho, planoDeDesenhoNovo } from "@/lib/processmapNaConversa.js";
+import { citaProjeto, projetoDoPedido, perguntaDoProjeto, fluxoCitado, contextoDoProjeto, pedeEmTodos, pedeDocumentacao, respostaComDocumentos, ajustarAoPedido, documentosPorDesenho, respostaDeConfirmacao, textoDaConfirmacao, VALIDADE_DA_CONFIRMACAO_MS, pedeNovoDesenho, planoDeDesenhoNovo } from "@/lib/processmapNaConversa.js";
 import { pedirPlano, executarPlano, textoDoAndamento, escreverDocumentos } from "@/lib/trabalhoNoProjeto.js";
 import { apiDosFluxos } from "@/lib/fluxogramasNoNavegador.js";
 
@@ -2831,6 +2831,17 @@ export default function AssistantPage() {
     // de uma vez — e trabalha no projeto (trabalharNoProjetoRef). Se for pergunta, responde com os
     // desenhos do projeto junto. Sem plano (o modelo falhou), o caminho antigo: um desenho, por palavras.
     const doProjeto = !alvoDaIde ? await resolverProjetoRef.current?.(q) : null;
+    // falou de projeto sem dizer qual, e há mais de um: pergunta, em vez de escolher (BEYOND-0013)
+    if (doProjeto?.perguntar) {
+      const texto = perguntaDoProjeto(doProjeto.perguntar);
+      setQuestion(displayText || q);
+      setAnswer(texto);
+      setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: displayText || q }, { id: `a${Date.now() + 1}`, role: "assistant", text: texto }]);
+      conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+      addLog("[PROCESSMAP]", PU, "falou de projeto sem dizer qual: perguntei");
+      if (voiceOn) enqueueSpeech("Em qual projeto do ProcessMap? Os nomes estão na tela.", ++speechGenRef.current);
+      return;
+    }
     if (doProjeto) {
       // o plano diz o que desenhar e quais .md escrever no editor (01/11/2026: "faça um fluxograma da
       // arquitetura … e um md também" — um pedido pode ter os dois); num pedido de documento, a rota do
@@ -3059,37 +3070,44 @@ export default function AssistantPage() {
   // citado (o fluxo citado pelo nome), provavel (o aberto no quadro, se for desse projeto, ou o único) },
   // ou null
   resolverProjetoRef.current = async (q) => {
-    // ("faça um md por fluxograma" ou "abra o editor e escreva os mds", sem dizer "projeto": vale o
-    // projeto em uso — o do quadro ou o último desta conversa)
-    const temProjetoEmUso = Boolean(quadroVinculoRef.current?.projeto || ultimoProjetoRef.current);
-    const documentaDesenhos = pedeDocumentacao(q) && (/flu|grama|mapa|desenh|diagram/i.test(q) || temProjetoEmUso);
-    // "corrija a nota da aba Desktop", "complete o fluxo", sem dizer o projeto (01/11/2026: "peço para
-    // ela corrigir e ela não corrige" — o pedido caía na conversa, que não muda desenho nenhum, e a
-    // resposta dizia que tinha corrigido): com um projeto em uso — o do quadro ligado, ou o último desta
-    // conversa se o quadro não tem outro desenho solto aberto —, vai para o plano do projeto
-    // (sem projeto em uso, também: o projeto mais provável — a Lisa confirma antes de fazer — desde que o
-    // quadro não tenha um desenho solto aberto, que é dele que a pessoa fala)
-    const mudaDesenho = (pedeMudancaNoDesenho(q) || pedeNovoDesenho(q))
-      && Boolean(quadroVinculoRef.current?.projeto || !quadroAbertoRef.current);
-    if (!citaProjeto(q) && !pedeEmTodos(q) && !documentaDesenhos && !mudaDesenho) return null;
+    // O projeto só entra quando é EXPLÍCITO (03/11/2026, BEYOND-0013: "se eu não falo qual é o projeto,
+    // ela supõe um e isso está errado"): a pessoa fala de projeto (o nome pode vir pela metade ou com
+    // erro), nomeia um desenho salvo, ou mexe no desenho aberto no quadro, que já é de um projeto.
+    // Desenho novo sem projeto é avulso, no quadro; o 💾 salvar dele escolhe um projeto ou cria um.
+    // A regra mora em projetoDoPedido (src/lib/processmapNaConversa.js, testada).
+    const vinculado = quadroVinculoRef.current?.projeto || null;
+    const emUso = vinculado || ultimoProjetoRef.current;
+    const citado = citaProjeto(q);
+    // ("faça um md por fluxograma" ou "escreva os mds", sem dizer "projeto": vale o projeto em uso — o do
+    // quadro ou o último que a pessoa citou nesta conversa —, nunca um palpite)
+    const documentaDesenhos = pedeDocumentacao(q) && (/flu|grama|mapa|desenh|diagram/i.test(q) || Boolean(emUso));
+    const emTodos = pedeEmTodos(q);
+    // "corrija a nota da aba Desktop", "complete o fluxo" (01/11/2026: "peço para ela corrigir e ela não
+    // corrige"): o desenho que a pessoa nomeia ou o do quadro ligado vão para o plano do projeto; com um
+    // desenho avulso aberto no quadro, é dele que ela fala
+    const mudaDesenho = (pedeMudancaNoDesenho(q) || pedeNovoDesenho(q)) && Boolean(vinculado || !quadroAbertoRef.current);
+    if (!citado && !emTodos && !documentaDesenhos && !mudaDesenho) return null;
     try {
       if (!projetosRef.current.lista || Date.now() - projetosRef.current.em > 30_000) {
         projetosRef.current = { em: Date.now(), lista: await apiDosFluxosDaConversa.listar() };
       }
       const lista = projetosRef.current.lista || [];
-      const emUso = quadroVinculoRef.current?.projeto || ultimoProjetoRef.current;
-      // o projeto mais provável — o nome pela metade, com erro, o de um desenho dele, o em uso (01/11/2026:
-      // "ela pede para eu falar exatamente o nome do projeto; ela tem que interpretar")
-      const provavelDoPedido = projetoProvavel(q, lista, { emUso });
-      if (!provavelDoPedido) return null;
+      const escolha = projetoDoPedido(q, lista, { emUso: ultimoProjetoRef.current, vinculado });
+      if (escolha?.perguntar) return { perguntar: escolha.perguntar };
+      const emUsoNaLista = emUso ? lista.find((p) => p.id === emUso.id) : null;
+      const provavelDoPedido = escolha || ((documentaDesenhos || emTodos) && emUsoNaLista ? { projeto: emUsoNaLista, como: "em uso" } : null);
+      if (!provavelDoPedido) {
+        if (mudaDesenho && !citado) addLog("[PROCESSMAP]", PU, "sem projeto citado: desenho avulso no quadro");
+        return null;
+      }
       const achado = provavelDoPedido.projeto;
       const { projeto, fluxos } = await apiDosFluxosDaConversa.lerProjeto(achado.id);
       ultimoProjetoRef.current = projeto;
-      const vinculado = quadroVinculoRef.current;
-      const citado = fluxoCitado(q, fluxos, { nomeDoProjeto: projeto.nome });
-      const provavel = (vinculado && fluxos.find((f) => f.id === vinculado.fluxo.id)) || (fluxos.length === 1 ? fluxos[0] : null);
-      addLog("[PROCESSMAP]", PU, `projeto "${projeto.nome}" (${provavelDoPedido.como}): ${fluxos.length} desenho${fluxos.length === 1 ? "" : "s"} lido${fluxos.length === 1 ? "" : "s"}${citado ? ` · citado: "${citado.nome}"` : ""}`);
-      return { projeto, fluxos, citado, provavel, como: provavelDoPedido.como };
+      const doQuadro = quadroVinculoRef.current;
+      const fluxoDoPedido = fluxoCitado(q, fluxos, { nomeDoProjeto: projeto.nome });
+      const provavel = (doQuadro && fluxos.find((f) => f.id === doQuadro.fluxo.id)) || (fluxos.length === 1 ? fluxos[0] : null);
+      addLog("[PROCESSMAP]", PU, `projeto "${projeto.nome}" (${provavelDoPedido.como}): ${fluxos.length} desenho${fluxos.length === 1 ? "" : "s"} lido${fluxos.length === 1 ? "" : "s"}${fluxoDoPedido ? ` · citado: "${fluxoDoPedido.nome}"` : ""}`);
+      return { projeto, fluxos, citado: fluxoDoPedido, provavel, como: provavelDoPedido.como };
     } catch (err) {
       addLog("[PROCESSMAP]", OR, `não consegui ler o projeto: ${err.message}`);
       return null;
@@ -3357,9 +3375,11 @@ export default function AssistantPage() {
       const mudanca = Boolean(mudar && quadroAbertoRef.current);
       setQuadro({ versao: { doc: r.doc, chave: `d${Date.now()}`, colecao: r.colecao, mudanca, vinculo }, titulo: r.titulo, explicacao: r.explicacao });
       const salvoNoProjeto = vinculo ? ` ${alvo ? "Atualizei" : "Salvei"} "${vinculo.fluxo.nome}" no projeto "${vinculo.projeto.nome}" do ProcessMap.` : "";
+      // desenho NOVO sem projeto citado: avulso, e quem decide onde guardar é a pessoa (BEYOND-0013)
+      const avulso = !doProjeto && !mudanca ? "\n\nFicou avulso, fora de projeto. Para guardar, toque em 💾 salvar no quadro: num projeto que já existe ou num novo." : "";
       // o que a pessoa listou e não entrou nem na segunda tentativa: dito, e não escondido
       const faltou = r.faltando?.length ? `\n\nNão achei no desenho: ${r.faltando.slice(0, 8).map((i) => `"${i}"`).join(", ")}. Se faltou, me diga onde entra.` : "";
-      const texto = `${r.explicacao || `Desenhei "${r.titulo}" no quadro.`}${mudancaReal ? `\n\nO que mudou: ${mudancaReal.texto}.` : ""}${salvoNoProjeto}${aviso}${faltou}`;
+      const texto = `${r.explicacao || `Desenhei "${r.titulo}" no quadro.`}${mudancaReal ? `\n\nO que mudou: ${mudancaReal.texto}.` : ""}${salvoNoProjeto}${aviso}${avulso}${faltou}`;
       setAnswer(texto);
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
       conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
@@ -3383,7 +3403,9 @@ export default function AssistantPage() {
   // — mudando o desenho aberto quando o pedido era mudar, senão um desenho novo.
   fazerDesenhoConfirmadoRef.current = async (pendente, shown) => {
     const { q, imagens = [] } = pendente;
-    const doProjeto = await resolverProjetoRef.current?.(q);
+    // ("em qual projeto?" já foi perguntado na vez do pedido; aqui, sem a resposta, o desenho sai avulso)
+    const resolvido = await resolverProjetoRef.current?.(q);
+    const doProjeto = resolvido?.perguntar ? null : resolvido;
     if (doProjeto) {
       const plano = await planejarNoProjetoRef.current?.(q, doProjeto, shown, { imagens, confirmado: true });
       if (plano?.acao === "mudar" || plano?.acao === "documentar") return executarPendenteRef.current?.({ q, doProjeto, plano, imagens }, shown);

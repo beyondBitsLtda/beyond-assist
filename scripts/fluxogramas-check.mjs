@@ -12,7 +12,7 @@ import { GRUPOS_DE_PAINEIS } from "../src/lib/navegacao.js";
 import {
   citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, secaoDoProjeto, validarPlano, LIMITE_DE_OPERACOES,
   pedeEmTodos, faltandoNoPlano, completarPlano, pedeDocumentacao, arquivoDoDocumento, respostaComDocumentos,
-  pedeNovoDesenho, ajustarAoPedido, nomeDeArquivo, projetoProvavel, respostaDeConfirmacao, textoDaConfirmacao,
+  pedeNovoDesenho, ajustarAoPedido, nomeDeArquivo, projetoProvavel, projetoDoPedido, perguntaDoProjeto, respostaDeConfirmacao, textoDaConfirmacao,
   tipoDitoNoPlano, planoDeDesenhoNovo, rotuloDoTipo,
 } from "../src/lib/processmapNaConversa.js";
 import { pedirPlano, executarPlano, textoDoAndamento, documentarProjeto, escreverDocumentos } from "../src/lib/trabalhoNoProjeto.js";
@@ -406,7 +406,11 @@ console.log("executar o plano (a conversa e a barra do painel ProcessMap usam o 
   conferir("a barra do painel ProcessMap trabalha no projeto inteiro quando o pedido fala dele", /falaDoProjeto\(q, doProjeto\.fluxos\)/.test(painel) && /await trabalharNoProjeto\(q, abertoRef\.current\)/.test(painel) && /executarPlano\(\{/.test(painel));
   conferir("e para o salvamento do fluxo aberto enquanto a Lisa grava, reabrindo depois", /salvador\.current\?\.parar\(\);\s*salvador\.current = null;/.test(painel) && /if \(abertoRef\.current\) await abrirFluxo\(abertoRef\.current\.id, \{ deNovo: true \}\)/.test(painel));
   const conversaPagina = ler("src/app/(panels)/assistant/page.js");
-  conferir("na conversa, \"do projeto\" sem nome é o projeto em uso (o do quadro ou o último)", /const provavelDoPedido = projetoProvavel\(q, lista, \{ emUso \}\)/.test(conversaPagina) && /if \(!citaProjeto\(q\) && !pedeEmTodos\(q\) && !documentaDesenhos && !mudaDesenho\) return null;/.test(conversaPagina));
+  conferir("na conversa, o projeto só entra quando é explícito (BEYOND-0013); falou de projeto sem dizer qual, ela pergunta",
+    conversaPagina.includes("const escolha = projetoDoPedido(q, lista, { emUso: ultimoProjetoRef.current, vinculado });")
+    && conversaPagina.includes("if (!citado && !emTodos && !documentaDesenhos && !mudaDesenho) return null;")
+    && conversaPagina.includes("if (doProjeto?.perguntar) {") && !conversaPagina.includes("projetoProvavel("));
+  conferir("o desenho novo sem projeto diz que ficou avulso e como guardar", conversaPagina.includes("Ficou avulso, fora de projeto. Para guardar, toque em 💾 salvar no quadro"));
 
   // (02/11/2026) cada desenho NOVO leva o tipo do plano; todos levam o pedido da pessoa e a tela
   pedidos.length = 0;
@@ -586,6 +590,25 @@ console.log("interpretar e confirmar (01/11/2026: \"ela pede o nome exato do pro
   conferir("pelo nome de um desenho dele (\"o núcleo de funcionalidades\")", achado("ponha a voz no núcleo de funcionalidades").projeto.id === "a" && achado("ponha a voz no núcleo de funcionalidades").como === "pelo desenho");
   conferir("sem nome nenhum: o em uso, ou o mais recente", achado("corrija a nota", { emUso: { id: "c" } }).projeto.id === "c" && achado("corrija a nota").projeto.id === "a" && achado("corrija a nota").como === "mais recente");
   conferir("sem projeto nenhum: nada", projetoProvavel("corrija a nota", []) === null);
+
+  // BEYOND-0013 (03/11/2026): "se eu não falo qual é o projeto, ela supõe um e isso está errado; se eu não
+  // falar, é um desenho avulso" — o palpite só vale quando a pessoa fala de projeto
+  const doPedido = (q, op) => projetoDoPedido(q, projetos, op);
+  conferir("falando de projeto, o nome vale mesmo pela metade ou com erro", doPedido("no projeto produto lisa, crie um fluxo de login").projeto.id === "a"
+    && doPedido("no projto produto lsia, corrija a nota").projeto.id === "a" && doPedido("no projeto das compras, inclua a aprovação").projeto.id === "b");
+  conferir("desenho NOVO sem falar de projeto: avulso (nem o em uso, nem o do quadro, nem o mais recente)",
+    doPedido("desenhe um fluxograma de vendas") === null && doPedido("faça um BPMN de onboarding", { emUso: { id: "c" }, vinculado: { id: "a" } }) === null
+    && doPedido("crie um mapa mental sobre compras") === null);
+  conferir("mudar sem falar de projeto: só o desenho salvo que ela nomeia, ou o desenho aberto no quadro",
+    doPedido("ponha a voz no núcleo de funcionalidades").projeto.id === "a" && doPedido("corrija a nota da aba desktop", { vinculado: { id: "c" } }).como === "do quadro"
+    && doPedido("corrija a nota da aba desktop") === null && doPedido("corrija a nota da aba desktop", { emUso: { id: "b" } }) === null);
+  conferir("\"no projeto\" sem nome que bata: o do quadro, depois o último da conversa", doPedido("no projeto, inclua uma nota", { vinculado: { id: "b" }, emUso: { id: "c" } }).projeto.id === "b"
+    && doPedido("no projeto, inclua uma nota", { emUso: { id: "c" } }).como === "em uso");
+  const pergunta = doPedido("no meu projeto do processmap, inclua uma nota");
+  conferir("\"no projeto\" sem nome, sem projeto em uso e com vários: pergunta qual, com os nomes", Array.isArray(pergunta?.perguntar) && pergunta.perguntar.join() === "Produto Lisa,Compras Delp,RH"
+    && /^Em qual projeto do ProcessMap\? Tenho "Produto Lisa", "Compras Delp", "RH"\./.test(perguntaDoProjeto(pergunta.perguntar)) && /avulso/.test(perguntaDoProjeto(pergunta.perguntar)));
+  conferir("com um projeto só, ele mesmo; sem projeto, nada", projetoDoPedido("no projeto, inclua uma nota", [projetos[2]]).como === "único" && projetoDoPedido("no projeto X", []) === null);
+  conferir("a confirmação diz quando o projeto veio do quadro", /No projeto "RH" \(o do desenho aberto no quadro\)/.test(textoDaConfirmacao({ acao: "mudar", operacoes: [] }, projetos[2], [], { como: "do quadro" })));
 
   const sim = ["sim", "Sim!", "simm", "s", "pode", "pode fazer", "sim, pode fazer Lisa", "tenho certeza", "sim tenho certeza", "manda ver", "ok", "beleza, faz", "isso mesmo", "pd fazer", "claro"];
   const nao = ["não", "nao", "cancela", "deixa", "não, obrigado", "esquece", "não faz", "deixa pra lá"];

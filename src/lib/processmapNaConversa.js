@@ -17,10 +17,15 @@ const GENERICAS = new Set(["projeto", "projetos", "fluxo", "fluxos", "fluxograma
 const folgaDe = (p) => (p.length <= 4 ? 0 : p.length <= 7 ? 1 : 2);
 const parecida = (a, b) => a === b || (Math.abs(a.length - b.length) <= folgaDe(b) && distanciaDeEdicao(a, b) <= folgaDe(b));
 
+// "projeto" com os erros de digitação de quem escreve rápido (BEYOND-0013: falar de projeto é o que
+// decide se a Lisa trabalha num; "no projto X" é falar). Lista fechada, e não "parecida": "prometo" e
+// "projetar" estão a uma letra de "projeto" e não falam de projeto nenhum.
+const PROJETO_ESCRITO = new Set(["projeto", "projetos", "projto", "projtos", "proejto", "porjeto", "prjeto", "projeot", "projeo", "projecto", "projetro"]);
+
 /** A pergunta fala de um projeto do ProcessMap ("no projeto X", "do processmap")? */
 export function citaProjeto(pergunta) {
   const p = palavrasDe(pergunta);
-  return p.some((x) => x === "projeto" || x === "projetos" || parecida(x, "processmap")) || /\bprocess map\b/.test(semAcento(pergunta));
+  return p.some((x) => PROJETO_ESCRITO.has(x) || parecida(x, "processmap")) || /\bprocess map\b/.test(semAcento(pergunta));
 }
 
 /**
@@ -79,6 +84,49 @@ export function projetoProvavel(pergunta, projetos, { emUso = null } = {}) {
   const emUsoNaLista = emUso && lista.find((p) => p.id === emUso.id);
   if (emUsoNaLista) return { projeto: emUsoNaLista, como: "em uso" };
   return { projeto: lista[0], como: lista.length === 1 ? "único" : "mais recente" };
+}
+
+/**
+ * O projeto do pedido, só quando ele é EXPLÍCITO (03/11/2026, BEYOND-0013: "se eu não falo qual é o
+ * projeto, ela supõe um e isso está errado; se eu não falar, é um desenho avulso, e a partir dele eu
+ * decido se crio um projeto ou salvo num existente"). O palpite de projetoProvavel — o em uso, o único,
+ * o mais recente — só vale quando a pessoa FALA de projeto:
+ *
+ *   fala de projeto ("no projeto X", "do ProcessMap")  o nome, mesmo pela metade ou com erro; ou o de um
+ *                                                      desenho dele; sem nome que bata, o do quadro ou o
+ *                                                      último desta conversa; senão, se só há um, ele;
+ *                                                      senão, { perguntar: [nomes] } — qual?
+ *   não fala, e pede um desenho NOVO                   null: desenho avulso, no quadro
+ *   não fala, e pede para mudar                        o projeto de um desenho salvo que ela nomeia, ou o
+ *                                                      do desenho aberto no quadro (`vinculado`); senão null
+ *
+ * Devolve { projeto, como } | { perguntar } | null.
+ */
+export function projetoDoPedido(pergunta, projetos, { emUso = null, vinculado = null } = {}) {
+  const lista = projetos || [];
+  if (!lista.length) return null;
+  const naLista = (p) => (p ? lista.find((x) => x.id === p.id) || null : null);
+  if (citaProjeto(pergunta)) {
+    const r = projetoProvavel(pergunta, lista);
+    if (["citado", "pelo desenho", "parecido"].includes(r.como)) return r;
+    const doQuadro = naLista(vinculado);
+    if (doQuadro) return { projeto: doQuadro, como: "do quadro" };
+    const ultimo = naLista(emUso);
+    if (ultimo) return { projeto: ultimo, como: "em uso" };
+    return lista.length === 1 ? { projeto: lista[0], como: "único" } : { perguntar: lista.map((p) => p.nome) };
+  }
+  if (pedeNovoDesenho(pergunta)) return null;
+  const peloDesenho = melhor(lista.flatMap((p) => (p.fluxos || []).map((f) => ({ nome: f.nome, projeto: p }))), pergunta, (f) => f.nome);
+  if (peloDesenho) return { projeto: peloDesenho.projeto, como: "pelo desenho" };
+  const doQuadro = naLista(vinculado);
+  return doQuadro ? { projeto: doQuadro, como: "do quadro" } : null;
+}
+
+/** A pergunta de volta quando a pessoa fala de projeto sem dizer qual (e há mais de um). */
+export function perguntaDoProjeto(nomes) {
+  const lista = (nomes || []).slice(0, 8).map((n) => `"${n}"`);
+  const mais = (nomes || []).length > lista.length ? ` e mais ${nomes.length - lista.length}` : "";
+  return `Em qual projeto do ProcessMap? Tenho ${lista.join(", ")}${mais}. Diga "no projeto <nome>, …". Se for um desenho novo sem projeto, eu faço avulso no quadro e você decide no 💾 salvar onde guardar.`;
 }
 
 /**
@@ -435,7 +483,7 @@ export function respostaDeConfirmacao(texto) {
 export function textoDaConfirmacao(plano, projeto, fluxos, { como = "" } = {}) {
   const nomeDe = (id) => (fluxos || []).find((f) => String(f.id) === String(id))?.nome || "?";
   const resumo = (t) => { const s = String(t || "").replace(/\s+/g, " ").trim(); return s.length > 240 ? `${s.slice(0, 240)}…` : s; };
-  const ondeAchei = { "em uso": " (o que está em uso)", "pelo desenho": " (pelo nome do desenho)", parecido: " (pelo nome parecido)", "mais recente": " (o mais recente — se não for esse, diga qual)", "único": "" }[como] || "";
+  const ondeAchei = { "em uso": " (o que está em uso)", "do quadro": " (o do desenho aberto no quadro)", "pelo desenho": " (pelo nome do desenho)", parecido: " (pelo nome parecido)", "mais recente": " (o mais recente — se não for esse, diga qual)", "único": "" }[como] || "";
   const linhas = [
     ...(plano.operacoes || []).map((o) => (o.fluxo ? `• Mudar "${nomeDe(o.fluxo)}": ${resumo(o.pedido)}` : `• Criar ${rotuloDoTipo(o.tipo)}${o.nome ? ` "${o.nome}"` : ""}: ${resumo(o.pedido)}`)),
     ...(plano.documentos || []).map((d) => `• Escrever no editor o arquivo ${d.arquivo}${d.titulo && d.estilo === "livre" ? ` — ${d.titulo}` : ""}`),
