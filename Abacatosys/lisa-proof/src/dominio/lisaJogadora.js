@@ -88,6 +88,7 @@ export const AGENDA = [
   { acao: "bolsa", de: 10 },         // a Bolsa só negocia das 7h às 17h
   { acao: "caderno", de: 21, dias: [0, 3] },   // domingo e quarta: as anotações do que estudou
   { acao: "acervo", de: 18, dias: [0] },       // domingo: vídeos e artigos da semana
+  { acao: "correio", de: 17 },      // o correio (BEYOND-0016): um recadinho para alguém e avalia os que chegaram
 ];
 
 /** O que está na vez nesta hora e dia da semana, tirando o que já foi feito hoje. */

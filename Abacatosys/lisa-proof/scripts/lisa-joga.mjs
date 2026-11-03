@@ -24,6 +24,7 @@ import { estadoDaBolsa, comprarAcao } from "@/lib/bolsa.js";
 import { criarMaterial } from "@/lib/acervo.js";
 import { criarCaderno, criarPagina } from "@/lib/cadernos.js";
 import { conversar, textoDe } from "@/lib/gemini.js";
+import { destinatarios, mandarPerguntaDoQuiz, mandarRecado, avaliarRecado } from "@/lib/correio.js";
 import { assuntosParaODuracao } from "@/dominio/curso.js";
 import { diaDe } from "@/dominio/datas.js";
 import { motorDo } from "@/dominio/motores.js";
@@ -134,7 +135,17 @@ async function quiz(id) {
   const chance = chanceDeAcerto({ diasNoCurso: atual.dias, errosRecentes: await errosRecentes(id) });
   const perguntas = d.conteudo?.perguntas || [];
   const escolhas = respostasDoQuiz(perguntas, chance, sortearPara("quiz"));
-  const respondidas = d.resposta?.escolhas || {};
+  // às vezes uma pergunta vai pelo correio para alguém (BEYOND-0016) — ela manda, mas não recebe
+  let peloCorreio = "";
+  if (!d.resposta?.enviadas?.length && sortearPara("quiz-correio")() < 0.4) {
+    try {
+      const lista = (await destinatarios(id)).filter((x) => !x.robo);
+      const alvo = lista[Math.floor(sortearPara("quiz-alvo")() * lista.length)];
+      if (alvo) { await mandarPerguntaDoQuiz(id, d.id, { indice: 0, paraId: alvo.id }); peloCorreio = ` Mandei uma pergunta pelo correio para ${alvo.nome}.`; d = await desafioDoUsuario(d.id, id); }
+    } catch (e) { log("quiz pelo correio:", e.message); }
+  }
+  const respondidas = { ...(d.resposta?.escolhas || {}) };
+  for (const i of d.resposta?.enviadas || []) respondidas[i] = "correio";
   let fim = null;
   for (let i = 0; i < perguntas.length; i++) {
     if (respondidas[i] !== undefined) continue;
@@ -142,7 +153,7 @@ async function quiz(id) {
   }
   d = await desafioDoUsuario(d.id, id);
   return {
-    resumo: `Fiz o quiz do dia sobre "${fim?.assunto?.titulo || fim?.assunto || atual.tema}": ${fim?.acertos ?? "?"} de ${perguntas.length} (nota ${d.nota ?? "?"}).`,
+    resumo: `Fiz o quiz do dia sobre "${fim?.assunto?.titulo || atual.tema}": ${fim?.acertos ?? "?"} de ${perguntas.length - (d.resposta?.enviadas?.length || 0)} (nota ${d.nota ?? "?"}).${peloCorreio}`,
     detalhe: { nota: d.nota, chance },
   };
 }
@@ -302,10 +313,42 @@ async function acervo(id) {
   return { resumo: enviados.length ? `Mandei para o Acervo ${enviados.join(" e ")} (esperando um bibliotecário aprovar).` : "Procurei material para o Acervo e não achei nada bom esta semana." };
 }
 
+// ---------------------------------------------------------------- o correio (BEYOND-0016)
+
+async function correio(id) {
+  const feito = [];
+  // os recados que chegaram: ela lê e avalia (útil quando é uma mensagem de verdade, não um "oi" para ganhar moedas)
+  const { data: chegaram } = await supabase.from("proof_correio").select("id, texto").eq("para_id", id).eq("tipo", "recado").is("avaliacao", null).limit(5);
+  for (const c of chegaram || []) {
+    try {
+      const veredito = await escrever(`Um jogador me mandou este recado no Proof: "${c.texto}"
+Responda só SIM se ele é útil (uma dica, um incentivo de verdade, uma pergunta sobre estudo) ou NAO se é vazio, repetido ou só para ganhar moedas.`, { maxTokens: 10 });
+      const util = /^s*sim/i.test(veredito);
+      await avaliarRecado(id, c.id, util);
+      feito.push(`li um recado (${util ? "útil" : "não tão útil"})`);
+    } catch (e) { log("avaliar recado:", e.message); }
+  }
+  // um recadinho para alguém, a partir do que a pessoa anda fazendo
+  try {
+    const lista = (await destinatarios(id)).filter((x) => !x.robo);
+    const alvo = lista[Math.floor(sortearPara("recado")() * lista.length)];
+    if (alvo) {
+      const [{ data: semana }, { data: reino }] = await Promise.all([
+        supabase.from("proof_ranking_semana").select("pontos").eq("usuario_id", alvo.id).maybeSingle(),
+        supabase.from("proof_reinos").select("trofeus, neuro_nivel").eq("usuario_id", alvo.id).maybeSingle(),
+      ]);
+      const texto = await escrever(`Escreva um recadinho (até 280 caracteres) para ${alvo.nome}, outro jogador do Proof. O que sei: ${Number(semana?.pontos || 0)} pontos nos últimos 7 dias; no Reino, ${Number(reino?.trofeus || 0)} troféus e o Neuro no nível ${reino?.neuro_nivel || 1}. Seja gentil e específica: um incentivo ou uma dica de estudo ou de jogo que combine com esses números. Não invente outros fatos. Só o texto do recado.`, { sistema: "Você é a Lisa, jogadora-robô do Proof, simpática e direta. Português do Brasil.", maxTokens: 300 });
+      await mandarRecado(id, { paraId: alvo.id, texto: texto.slice(0, 480) });
+      feito.push(`mandei um recado para ${alvo.nome}`);
+    }
+  } catch (e) { log("recado:", e.message); }
+  return { resumo: feito.length ? `No correio: ${feito.join("; ")}.` : "Passei no correio; nada de novo." };
+}
+
 // ---------------------------------------------------------------- a passada
 
-const ACOES = { curso, mina, teoria, quiz, exercicio, projeto, reino, bolsa, caderno, acervo };
-const NOME_DA_ACAO = { curso: "escolher o curso", mina: "recolher a mina", teoria: "estudar a teoria", quiz: "o quiz", exercicio: "o exercício", projeto: "o projeto", reino: "o Reino", bolsa: "a Bolsa", caderno: "o caderno", acervo: "o Acervo" };
+const ACOES = { curso, mina, teoria, quiz, exercicio, projeto, reino, bolsa, caderno, acervo, correio };
+const NOME_DA_ACAO = { curso: "escolher o curso", mina: "recolher a mina", teoria: "estudar a teoria", quiz: "o quiz", exercicio: "o exercício", projeto: "o projeto", reino: "o Reino", bolsa: "a Bolsa", caderno: "o caderno", acervo: "o Acervo", correio: "o correio" };
 
 async function main() {
   if (args.has("criar-conta")) return criarConta();

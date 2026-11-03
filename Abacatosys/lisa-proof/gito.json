@@ -9,14 +9,32 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.45.0-cloudflare-pages.1",
+  "versao": "0.46.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-03",
   "compilacao": {
-    "numero": 90,
+    "numero": 91,
     "data": "2026-11-03",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.46.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Correio: cada jogador tem um mensageiro e uma caixa; recado útil dá moedas aos dois, e no quiz do dia até 2 perguntas podem ir pelo correio para outros jogadores.",
+      "itens": [
+        "Tela Correio (menu Jogo): recebidas (com o número de não lidas), enviadas e escrever. Até 5 recados por dia.",
+        "Quem recebe avalia o recado: útil, os dois ganham 🪙 15 (quem manda ganha de até 3 recados úteis por dia, e o mesmo par rende uma vez por dia); não útil, ninguém ganha.",
+        "No quiz do dia, \"📮 Mandar esta por correio\": antes de responder ou depois de errar, até 2 perguntas vão para outro jogador e saem do placar. O quiz termina com pelo menos 3 respondidas, conta para a ofensiva e para concluir o assunto (a nota é sobre as respondidas), mas vale menos: só os acertos, vezes 0,7, sem o bônus de gabaritar.",
+        "Quem recebe a pergunta responde na caixa: acertou, ganha 🪙 10 e quem mandou ganha 🪙 5; a resposta certa e a explicação aparecem depois de responder.",
+        "A Lisa também usa o correio: às vezes manda uma pergunta do quiz dela para alguém, todo fim de tarde manda um recadinho com base nos pontos da semana e no Reino da pessoa, e avalia os recados que recebe. Ninguém manda pergunta para ela (recado pode).",
+        "Migração db/027: proof_correio e o tipo \"correio\" no livro de moedas do Reino."
+      ],
+      "issues": [
+        "BEYOND-0016"
+      ]
+    },
     {
       "versao": "0.45.0-cloudflare-pages.1",
       "data": "2026-11-03",
@@ -1423,7 +1441,8 @@
         "Conversa com a Lisa (idiomas), passo a passo conferido linha a linha e gráficos de arrastar (matemática), leitura na pauta (música), diário de estudo, entrega em PDF, frase-senha nas gravações e fotos, e a torre do Modo Domínio feita a partir de um livro da Biblioteca",
         "Exercício de desenhar diagramas (fluxograma, BPMN, UML, modelo de dados, arquitetura de software e de nuvem, C4) num quadro embutido, avaliado pela Lisa, nos cursos de computação, arquitetura e áreas próximas",
         "Tela Chamados: quem reportou acompanha status, previsão de término e respostas; o técnico (administrador) vê todos e muda status, previsão e responde (os chamados são cards do quadro \"Chamados — Lisa Proof\" no Abacato)",
-        "A Lisa jogadora: uma conta-robô que estuda e joga sozinha (curso do mês, quiz, exercício, projeto, Reino, Bolsa, caderno, Acervo), com tudo visível na página \"Lisa joga\""
+        "A Lisa jogadora: uma conta-robô que estuda e joga sozinha (curso do mês, quiz, exercício, projeto, Reino, Bolsa, caderno, Acervo), com tudo visível na página \"Lisa joga\"",
+        "Correio entre jogadores: recados avaliados por quem recebe (útil dá moedas aos dois) e até 2 perguntas do quiz do dia mandadas para outros jogadores (o quiz fecha com 3 respondidas, valendo menos)"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -1504,7 +1523,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/026; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/027; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
       }
     ],
     "integracoes": [

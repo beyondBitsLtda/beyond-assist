@@ -18,6 +18,7 @@ import "./marca.css";
 import "./cartoes.css";
 import "./chamados.css";
 import "./lisa.css";
+import "./correio.css";
 import { SCRIPT_DE_INSTALAR } from "@/lib/instalarApp.js";
 
 export const metadata = {

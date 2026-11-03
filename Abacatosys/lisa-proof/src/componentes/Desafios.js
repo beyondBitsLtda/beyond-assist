@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { criar } from "@/lib/api.js";
+import { criar, obter } from "@/lib/api.js";
 import { formatarDia } from "@/dominio/datas.js";
 import { NOTA_DE_APROVACAO, podeReenviar, COMPLEXIDADES, ORDEM_DAS_COMPLEXIDADES } from "@/dominio/pratica.js";
+import { CORREIO } from "@/dominio/correio.js";
 import { execucaoDoExercicio } from "@/dominio/execucao.js";
 import { rodarCodigo } from "./codigo/rodar.js";
 import Explicacao, { emLinha } from "./Explicacao.js";
@@ -75,8 +76,11 @@ export function Quiz({ desafio }) {
   }
 
   if (acabou || revendo) {
-    const acertos = perguntas.filter((p) => p.escolha === p.correta).length;
-    const pct = Math.round((acertos / perguntas.length) * 100);
+    // as que foram pelo correio (BEYOND-0016) saem do placar
+    const valem = perguntas.filter((p) => !p.enviada);
+    const acertos = valem.filter((p) => p.respondida && p.escolha === p.correta).length;
+    const pct = valem.length ? Math.round((acertos / valem.length) * 100) : 0;
+    const peloCorreio = perguntas.length - valem.length;
     return (
       <div className="quiz">
         {!revendo && (
@@ -88,8 +92,8 @@ export function Quiz({ desafio }) {
               lado="cima"
               ouvir
             />
-            <div className="quiz__placar">{acertos}<small>/{perguntas.length}</small></div>
-            <p className="pf-estat__nota">acertos · {final ? final.pontos : desafio.pontos} pontos</p>
+            <div className="quiz__placar">{acertos}<small>/{valem.length}</small></div>
+            <p className="pf-estat__nota">acertos · {final ? final.pontos : desafio.pontos} pontos{peloCorreio ? ` · ${peloCorreio} pelo correio ${CORREIO.mensageiro} (o quiz vale menos)` : ""}</p>
             {final?.assunto?.concluido && <div className="pf-aviso pf-aviso--ok">✅ Assunto concluído: <strong>{final.assunto.titulo}</strong> — teoria e quiz em dia.</div>}
             {final?.assunto?.faltaTeoria && <div className="pf-aviso">Quiz aprovado! Agora termine a teoria (as tarefas) de <strong>{final.assunto.titulo}</strong> para concluir o assunto.</div>}
             {final?.assunto?.reprovado && <div className="pf-aviso">Para concluir o assunto, o quiz precisa de {final.assunto.precisa}% de acertos. Dá para tentar outra rodada hoje (na Prática) ou amanhã.</div>}
@@ -109,7 +113,7 @@ export function Quiz({ desafio }) {
             <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={() => setRevendo(false)}>← Resultado</button>
             {perguntas.map((p, i) => (
               <div key={i} className="pf-cartao quiz__revisao">
-                <p className="pf-campo__rotulo">Pergunta {i + 1} · {p.escolha === p.correta ? "✓ acertou" : "✗ errou"}</p>
+                <p className="pf-campo__rotulo">Pergunta {i + 1} · {p.enviada ? `${CORREIO.mensageiro} foi pelo correio` : p.escolha === p.correta ? "✓ acertou" : "✗ errou"}</p>
                 <Explicacao texto={p.pergunta} className="quiz__pergunta" linguagem={p.linguagem || desafio.tema} />
                 {p.codigo && <Codigo texto={p.codigo} linguagem={p.linguagem || desafio.tema} />}
                 <ul className="quiz__lista-revisao">
@@ -130,6 +134,19 @@ export function Quiz({ desafio }) {
   }
 
   const p = perguntas[indice];
+  const jaForam = perguntas.filter((x) => x.enviada).length;
+  const cabeCorreio = jaForam < CORREIO.perguntasPorQuiz && perguntas.length - jaForam - 1 >= CORREIO.respondidasNoMinimo;
+  const podeMandar = cabeCorreio && (!resultado || (!resultado.acertou && !resultado.terminou));
+  // a pergunta foi pelo correio: sai do placar e o quiz segue (ou termina, se era a última)
+  function mandou(r) {
+    setPerguntas((ps) => ps.map((x, i) => (i === indice ? { ...x, enviada: true, respondida: true, escolha: null } : x)));
+    if (r.terminou) setFinal(r);
+    setResultado(null);
+    avisar(`${CORREIO.mensageiro} Pergunta enviada`);
+    const proximo = indice + 1;
+    setIndice(proximo);
+    if (proximo >= perguntas.length && r.terminou) { const festejou = celebrar(r); if (!festejou && r.pontos > 0) avisar(`+${r.pontos} pontos`); }
+  }
   return (
     <div className="quiz">
       <div className="quiz__topo">
@@ -165,6 +182,8 @@ export function Quiz({ desafio }) {
         })}
       </div>
 
+      {podeMandar && <MandarPorCorreio desafioId={desafio.id} indice={indice} depoisDeErrar={Boolean(resultado)} aoMandar={mandou} />}
+
       {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
 
       {resultado && (
@@ -179,6 +198,54 @@ export function Quiz({ desafio }) {
         </div>
       )}
       {Aviso}
+    </div>
+  );
+}
+
+/**
+ * Mandar a pergunta pelo correio (BEYOND-0016): até duas por quiz, para outro jogador; sai do placar e o
+ * quiz termina com pelo menos três respondidas (valendo menos). A Lisa não recebe perguntas.
+ */
+function MandarPorCorreio({ desafioId, indice, depoisDeErrar, aoMandar }) {
+  const [aberto, setAberto] = useState(false);
+  const [lista, setLista] = useState(null);
+  const [para, setPara] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+  useEffect(() => { setAberto(false); setPara(""); setErro(""); }, [indice]);
+  async function abrir() {
+    setAberto(true);
+    if (lista) return;
+    try { setLista(((await obter("/api/correio")).destinatarios || []).filter((d) => !d.robo)); } catch (e) { setErro(e.message); }
+  }
+  async function mandar() {
+    if (!para || enviando) return;
+    setEnviando(true);
+    setErro("");
+    try { aoMandar(await criar(`/api/desafios/${desafioId}/correio`, { indice, paraId: para })); } catch (e) { setErro(e.message); } finally { setEnviando(false); }
+  }
+  if (!aberto) {
+    return (
+      <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno quiz__correio" onClick={abrir}>
+        {CORREIO.mensageiro} {depoisDeErrar ? "Mandar esta por correio (sai do placar)" : "Mandar esta por correio"}
+      </button>
+    );
+  }
+  return (
+    <div className="pf-cartao quiz__correio-caixa">
+      <p className="pf-estat__nota">O mensageiro leva a pergunta para outro jogador. Ela sai do seu placar, e o quiz termina com pelo menos {CORREIO.respondidasNoMinimo} respondidas, valendo menos. Se a pessoa acertar, vocês dois ganham moedas.</p>
+      {lista === null && !erro && <p className="pf-estat__nota">Carregando os jogadores…</p>}
+      {lista && (
+        <div className="quiz__correio-linha">
+          <select className="pf-campo__entrada" value={para} onChange={(e) => setPara(e.target.value)} aria-label="Para quem vai a pergunta">
+            <option value="">Para quem?</option>
+            {lista.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
+          </select>
+          <button type="button" className="pf-botao pf-botao--pequeno" disabled={!para || enviando} onClick={mandar}>{enviando ? "Mandando…" : "Mandar"}</button>
+          <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={() => setAberto(false)}>Cancelar</button>
+        </div>
+      )}
+      {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
     </div>
   );
 }

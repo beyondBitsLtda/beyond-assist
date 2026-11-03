@@ -23,7 +23,7 @@ import { diaDe } from "@/dominio/datas.js";
 import { MULTIPLICADOR_DE_RECOMPENSAS } from "@/dominio/pontos.js";
 import {
   TIPOS_DE_DESAFIO, NOMES_DOS_DESAFIOS, NOTA_DE_APROVACAO, fimDoPeriodo,
-  pontosDoQuiz, pontosDaNota, quizParaTela, podeReenviar, entregaConcluida, ehProjeto,
+  pontosDoQuiz, pontosDaNota, quizParaTela, PONTOS_DA_PRATICA, podeReenviar, entregaConcluida, ehProjeto,
   RODADAS_POR_DIA, podeAbrirRodada, comFatorDaRodada, tentativasDe, validarAvaliacao,
   tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto,
   complexidadeDe, podeTrocarComplexidade, TROCAS_DE_COMPLEXIDADE, podeTrocarProjeto, projetoAntigo,
@@ -38,6 +38,7 @@ import { corrigirPassos } from "@/dominio/passos.js";
 import { turnosDe, podeFalar, podeEncerrar, validarMensagem } from "@/dominio/conversa.js";
 import { gerarSenha, precisaDeSenha } from "@/dominio/senha.js";
 import { conferirDiagrama } from "@/dominio/diagramas.js";
+import { contaDoQuiz } from "@/dominio/correio.js";
 import { pontosFracos } from "@/dominio/diario.js";
 import { perfilValido, motorDoExercicio } from "@/dominio/perfis.js";
 import { semanaDoProjeto, semanaDoDesafio, pedidoDoProjeto, projetosOpcionais, podeGerarProjeto, valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
@@ -457,48 +458,53 @@ export async function responderQuiz({ usuarioId, id, indice, escolha }) {
   if (!Number.isInteger(e) || e < 0 || e > 3) throw new ErroDeAcesso(400, "opção inválida");
 
   const escolhas = { ...(d.resposta?.escolhas || {}) };
+  const enviadas = (d.resposta?.enviadas || []).map(Number);
+  if (enviadas.includes(i)) throw new ErroDeAcesso(409, "esta pergunta foi pelo correio");
   if (escolhas[i] !== undefined) throw new ErroDeAcesso(409, "esta pergunta já foi respondida");
   escolhas[i] = e;
 
-  const respondidas = Object.keys(escolhas).length;
-  const acertos = Object.entries(escolhas).filter(([k, v]) => perguntas[Number(k)].correta === v).length;
-  const terminou = respondidas === perguntas.length;
+  return {
+    ...(await gravarQuiz({ usuarioId, d, escolhas, enviadas })),
+    acertou: perguntas[i].correta === e,
+    correta: perguntas[i].correta,
+    explicacao: perguntas[i].explicacao,
+  };
+}
 
-  const pontosDoDesafio = terminou ? comFatorDaRodada(pontosDoQuiz(acertos, perguntas.length), d.rodada) : 0;
-  const estudavaAntes = terminou ? await estudouHoje(usuarioId) : true;
+/**
+ * Grava o quiz com as respostas e as perguntas mandadas pelo correio (BEYOND-0016, src/lib/correio.js
+ * também chama). A conta é contaDoQuiz (src/dominio/correio.js): a pergunta mandada sai do placar, o quiz
+ * termina quando toda pergunta foi respondida ou mandada, e com correio valem só os acertos, reduzidos.
+ * Terminou: dá a nota, os pontos, e o quiz aprovado conclui o assunto.
+ */
+export async function gravarQuiz({ usuarioId, d, escolhas, enviadas = [] }) {
+  const perguntas = d.conteudo.perguntas;
+  const c = contaDoQuiz(perguntas, escolhas, enviadas, pontosDoQuiz, PONTOS_DA_PRATICA.acertoNoQuiz);
+  const pontosDoDesafio = c.terminou ? comFatorDaRodada(c.pontos, d.rodada) : 0;
+  const estudavaAntes = c.terminou ? await estudouHoje(usuarioId) : true;
   await salvar(d.id, {
-    resposta: { escolhas },
-    status: terminou ? "concluido" : "em_andamento",
-    ...(terminou ? { nota: Math.round((acertos / perguntas.length) * 100), pontos: pontosDoDesafio } : {}),
+    resposta: { escolhas, ...(enviadas.length ? { enviadas } : {}) },
+    status: c.terminou ? "concluido" : "em_andamento",
+    ...(c.terminou ? { nota: c.nota, pontos: pontosDoDesafio } : {}),
   });
 
   let pontuacao = resultadoDaPontuacao(0, { pontosExtras: 0, metaBatida: false, ofensivaAumentou: false, ofensiva: null, conquistas: [] });
   let assunto = null;
-  if (terminou) {
+  if (c.terminou) {
     // o quiz aprovado conclui o assunto (se a teoria também estiver feita): a trilha pode ter acabado
-    const nota = Math.round((acertos / perguntas.length) * 100);
-    if (nota >= NOTA_DE_APROVACAO) {
+    if (c.nota >= NOTA_DE_APROVACAO) {
       const { avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
       const etapa = avanco.etapas.find((e) => (d.card_ids || []).map(String).includes(String(e.cardId)));
       if (etapa) assunto = { titulo: etapa.titulo, concluido: etapa.concluido, faltaTeoria: !etapa.teoria };
     } else assunto = { reprovado: true, precisa: NOTA_DE_APROVACAO };
     const pontos = await registrarEvento({
       usuarioId, trilhaId: d.trilha_id, tipo: "quiz", chave: `pratica:${d.id}`, pontos: pontosDoDesafio,
-      detalhe: { titulo: d.titulo, acertos, total: perguntas.length },
+      detalhe: { titulo: d.titulo, acertos: c.acertos, total: perguntas.length, ...(c.comCorreio ? { peloCorreio: c.enviadas } : {}) },
     });
     pontuacao = resultadoDaPontuacao(pontos, await depoisDePontuar({ usuarioId, trilhaId: d.trilha_id, estudavaAntes, ganhou: pontos, verTrilha: Boolean(assunto?.concluido) }));
   }
 
-  return {
-    assunto,
-    acertou: perguntas[i].correta === e,
-    correta: perguntas[i].correta,
-    explicacao: perguntas[i].explicacao,
-    terminou,
-    acertos,
-    total: perguntas.length,
-    ...pontuacao,
-  };
+  return { assunto, terminou: c.terminou, acertos: c.acertos, total: perguntas.length, enviadas: c.enviadas, ...pontuacao };
 }
 
 function exigirReenvio(d) {

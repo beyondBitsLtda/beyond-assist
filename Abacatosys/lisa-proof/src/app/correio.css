@@ -1,0 +1,18 @@
+/* O correio (BEYOND-0016): src/app/(app)/correio/page.js e o "mandar por correio" do quiz (Desafios.js). */
+
+.co-abas { margin-bottom: 16px; max-width: 100%; overflow-x: auto; }
+.co-abas__n { margin-left: 6px; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 9999px; background: var(--pf-alerta); color: #FFFFFF; font-size: 12px; }
+.co-vazio { text-align: center; padding: 28px 16px; }
+.co-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.co-carta { display: grid; gap: 10px; min-width: 0; }
+.co-carta[data-nova] { border-color: var(--pf-verde); }
+.co-carta__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.co-carta__quem { font-size: 12px; color: var(--pf-tinta-2); }
+.co-carta__texto { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; }
+.co-opcoes { display: grid; gap: 8px; }
+.co-escrever { display: grid; gap: 12px; max-width: 640px; }
+
+.quiz__correio { justify-self: start; margin-top: 4px; }
+.quiz__correio-caixa { display: grid; gap: 10px; }
+.quiz__correio-linha { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.quiz__correio-linha .pf-campo__entrada { flex: 1 1 180px; min-width: 0; }

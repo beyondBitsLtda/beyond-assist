@@ -474,6 +474,8 @@ export function validarAvaliacao(bruto) {
  */
 export function quizParaTela(conteudo, resposta) {
   const escolhas = resposta?.escolhas || {};
+  // as mandadas pelo correio (BEYOND-0016) contam como feitas: o quiz não volta nelas
+  const enviadas = new Set((resposta?.enviadas || []).map(Number));
   return conteudo.perguntas.map((p, i) => {
     const escolha = escolhas[i];
     const respondida = escolha !== undefined && escolha !== null;
@@ -485,7 +487,8 @@ export function quizParaTela(conteudo, resposta) {
       // quiz salvo antes da correção, com a pergunta pedindo um código que a IA não mandou
       faltouCodigo: !codigo && perguntaPedeCodigo(pergunta),
       opcoes: p.opcoes,
-      respondida,
+      respondida: respondida || enviadas.has(i),
+      enviada: enviadas.has(i),
       escolha: respondida ? escolha : null,
       correta: respondida ? p.correta : null,
       explicacao: respondida ? p.explicacao : null,

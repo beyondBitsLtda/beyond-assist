@@ -13,7 +13,7 @@ import {
 import { resumoDasMetas, tarefasDoDia } from "../src/dominio/metas.js";
 import { nivelPorPontos, MULTIPLICADOR_DE_RECOMPENSAS, PONTOS } from "../src/dominio/pontos.js";
 import {
-  periodoDe, periodoPermitido, pontosDoQuiz, pontosDaNota, validarQuiz, quizParaTela,
+  periodoDe, periodoPermitido, pontosDoQuiz, PONTOS_DA_PRATICA, pontosDaNota, validarQuiz, quizParaTela,
   separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo, podeReenviar, entregaConcluida,
   validarAvaliacao, assuntoAtual, TENTATIVAS, RODADAS_POR_DIA, podeAbrirRodada, fatorDaRodada, comFatorDaRodada,
   perguntaRepetida, perguntasNovas, exercicioRepetido, validarGuia,
@@ -82,6 +82,9 @@ import {
   anuncioDepoisDaVenda, ordenarOfertas,
 } from "../src/dominio/mercadoDeTropas.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
+import {
+  CORREIO, conferirRecado, contaDoQuiz, podeMandarPergunta, perguntaNaCarta, recompensaDoRecado, recompensaDaPergunta, podeEscreverPara,
+} from "../src/dominio/correio.js";
 import {
   CONTA_DA_LISA, PERFIL_DO_CURSO, TEMAS_DE_TECNOLOGIA, temaDoMes, sorteio as sorteioDaLisa, chanceDeAcerto, respostasDoQuiz, oQueFazerAgora, itensDaTeoriaHoje,
   melhoriaDaVez, compraNaBolsa, alvoDaInvasao, documentoDoDiagrama,
@@ -3250,6 +3253,67 @@ caso("lisa jogadora: a rotina, a conta-robô, a página pública e o curso no pe
   assert.match(ler("../src/componentes/Moldura.js"), /\{ href: "\/lisa", rotulo: "Lisa joga", Icone: IconeLisa, grupo: "Jogo" \}/);
   assert.match(ler("../package.json"), /"lisa-joga": "node --env-file=\.env\.local --import \.\/scripts\/alias-loader\.mjs scripts\/lisa-joga\.mjs"/);
   assert.match(ler("../src/lib/lisaJogadora.js"), /link: m\.status === "aprovado" \? m\.link : null/, "link do Acervo só depois de aprovado");
+});
+
+// ---------------------------------------------------------------- o correio (BEYOND-0016)
+caso("correio: o recado, para quem dá para escrever, e ninguém pergunta para a Lisa", () => {
+  assert.deepEqual(conferirRecado("  valeu pela dica  "), { ok: true, texto: "valeu pela dica" });
+  assert.equal(conferirRecado("oi").ok, false);
+  assert.equal(conferirRecado("x".repeat(CORREIO.recadoMaximo + 1)).ok, false);
+  assert.equal(podeEscreverPara({ de: "a", para: "a", tipo: "recado" }).ok, false, "não para si mesmo");
+  assert.equal(podeEscreverPara({ de: "a", para: "lisa", tipo: "pergunta", paraEhRobo: true }).ok, false, "a Lisa não recebe pergunta");
+  assert.equal(podeEscreverPara({ de: "a", para: "lisa", tipo: "recado", paraEhRobo: true }).ok, true, "recado para a Lisa pode");
+});
+caso("correio: o quiz termina com 3 respondidas e 2 pelo correio, valendo menos e sem o bônus", () => {
+  const perguntas = Array.from({ length: 5 }, () => ({ opcoes: ["a", "b", "c", "d"], correta: 1 }));
+  const normal = contaDoQuiz(perguntas, { 0: 1, 1: 1, 2: 1, 3: 1, 4: 1 }, [], pontosDoQuiz, PONTOS_DA_PRATICA.acertoNoQuiz);
+  assert.deepEqual([normal.terminou, normal.nota, normal.pontos], [true, 100, pontosDoQuiz(5, 5)], "sem correio, como sempre");
+  const comCorreio = contaDoQuiz(perguntas, { 0: 1, 2: 1, 4: 0 }, [1, 3], pontosDoQuiz, PONTOS_DA_PRATICA.acertoNoQuiz);
+  assert.equal(comCorreio.terminou, true);
+  assert.equal(comCorreio.nota, 67, "a nota é sobre as 3 que ficaram (2 de 3)");
+  assert.equal(comCorreio.pontos, Math.round(2 * PONTOS_DA_PRATICA.acertoNoQuiz * CORREIO.fatorDoQuizComCorreio), "só os acertos, reduzidos");
+  assert.ok(comCorreio.pontos < pontosDoQuiz(2, 5), "vale menos que responder tudo");
+  const errouEMandou = contaDoQuiz(perguntas, { 0: 0, 1: 1, 2: 1, 3: 1 }, [0], pontosDoQuiz, PONTOS_DA_PRATICA.acertoNoQuiz);
+  assert.equal(errouEMandou.terminou, false, "falta a 5ª");
+  assert.equal(errouEMandou.acertos, 3, "a errada que foi pelo correio sai do placar");
+  assert.equal(contaDoQuiz(perguntas, { 0: 1 }, [], pontosDoQuiz, 15).pontos, 0, "sem terminar, sem pontos");
+});
+caso("correio: quando dá para mandar uma pergunta do quiz", () => {
+  const perguntas = Array.from({ length: 5 }, () => ({ correta: 2 }));
+  assert.equal(podeMandarPergunta({ perguntas, indice: 0 }).ok, true, "a que ainda não respondeu");
+  assert.equal(podeMandarPergunta({ perguntas, escolhas: { 0: 1 }, indice: 0 }).ok, true, "a que errou");
+  assert.equal(podeMandarPergunta({ perguntas, escolhas: { 0: 2 }, indice: 0 }).ok, false, "a que acertou, não");
+  assert.equal(podeMandarPergunta({ perguntas, enviadas: [0, 1], indice: 2 }).ok, false, "até 2 por quiz");
+  assert.equal(podeMandarPergunta({ perguntas, indice: 0, status: "concluido" }).ok, false, "quiz terminado, não");
+  assert.equal(podeMandarPergunta({ perguntas: perguntas.slice(0, 4), enviadas: [0], indice: 1 }).ok, false, "sobram pelo menos 3 para responder");
+  assert.equal(podeMandarPergunta({ perguntas, enviadas: [3], indice: 3 }).ok, false, "a mesma duas vezes, não");
+  assert.ok(!("correta" in perguntaNaCarta({ pergunta: "?", opcoes: [], correta: 1 })), "a carta não leva a resposta antes de responder");
+});
+caso("correio: recompensas, com teto para não virar mina de moedas", () => {
+  assert.deepEqual(recompensaDoRecado({ util: true }), { remetente: CORREIO.recompensaDoRecado, destinatario: CORREIO.recompensaDoRecado });
+  assert.deepEqual(recompensaDoRecado({ util: false }), { remetente: 0, destinatario: 0 });
+  assert.equal(recompensaDoRecado({ util: true, pagosHojeAoRemetente: CORREIO.recadosPagosPorDia }).remetente, 0, "quem manda ganha de poucos por dia");
+  assert.deepEqual(recompensaDoRecado({ util: true, parJaPagouHoje: true }), { remetente: 0, destinatario: 0 }, "o mesmo par rende uma vez por dia");
+  assert.deepEqual(recompensaDaPergunta(true), { destinatario: CORREIO.recompensaDaPergunta, remetente: CORREIO.ajudaDaPergunta });
+  assert.deepEqual(recompensaDaPergunta(false), { destinatario: 0, remetente: 0 });
+});
+caso("correio: as rotas, a tela, o quiz e a Lisa", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const lib = ler("../src/lib/correio.js");
+  assert.match(lib, /\.eq\("id", c\.id\)\.is\("avaliacao", null\)/, "a avaliação marca antes de pagar (dois cliques não pagam duas vezes)");
+  assert.match(lib, /\.eq\("id", c\.id\)\.is\("escolha", null\)/);
+  assert.match(lib, /creditarMoedas\(usuarioId, "correio"/);
+  assert.match(lib, /return gravarQuiz\(\{ usuarioId, d, escolhas, enviadas: \[\.\.\.enviadas, i\] \}\)/, "a pergunta mandada pode fechar o quiz");
+  const pratica = ler("../src/lib/pratica.js");
+  assert.match(pratica, /const c = contaDoQuiz\(perguntas, escolhas, enviadas, pontosDoQuiz, PONTOS_DA_PRATICA\.acertoNoQuiz\);/);
+  assert.match(pratica, /if \(enviadas\.includes\(i\)\) throw new ErroDeAcesso\(409, "esta pergunta foi pelo correio"\)/);
+  assert.match(ler("../db/027-correio.sql"), /create table if not exists public\.proof_correio[\s\S]*proof_correio_pergunta_unica[\s\S]*'estorno', 'correio'\)\);[\s\S]*'estorno', 'correio'\)\);/);
+  const quiz = ler("../src/componentes/Desafios.js");
+  assert.match(quiz, /const valem = perguntas\.filter\(\(p\) => !p\.enviada\);/, "o placar final sem as que foram pelo correio");
+  assert.match(quiz, /<MandarPorCorreio desafioId=\{desafio\.id\}/);
+  assert.match(ler("../src/componentes/Moldura.js"), /\{ href: "\/correio", rotulo: "Correio", Icone: IconeCorreio, grupo: "Jogo" \}/);
+  assert.match(ler("./lisa-joga.mjs"), /const ACOES = \{[^}]*correio \};/);
+  assert.ok(oQueFazerAgora({ hora: 18, diaDaSemana: 2 }).includes("correio"), "a Lisa passa no correio no fim da tarde");
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

@@ -75,6 +75,11 @@ export const IconeLisa = () => (
   <svg {...base}><rect x="4" y="7" width="16" height="12" rx="3" /><path d="M12 3v4M9 12v1M15 12v1M9.5 16h5" /></svg>
 );
 
+// Correio: um envelope (BEYOND-0016)
+export const IconeCorreio = () => (
+  <svg {...base}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>
+);
+
 // Mais: três pontos
 export const IconeMais = () => (
   <svg {...base}><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>
