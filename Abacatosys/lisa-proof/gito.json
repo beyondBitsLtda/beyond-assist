@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.43.2-cloudflare-pages.1",
+  "versao": "0.43.3-cloudflare-pages.1",
   "atualizadoEm": "2026-11-03",
   "compilacao": {
-    "numero": 87,
+    "numero": 88,
     "data": "2026-11-03",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.43.3-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "O exercício do dia vale o triplo de novo: até 360 pontos (e moedas do Reino) com nota 100.",
+      "itens": [
+        "O exercício do dia passa de até 120 para até 360 pontos com nota 100, proporcional à nota como antes (nota 50 vale 180).",
+        "A 2ª e a 3ª rodada do dia continuam valendo metade (até 180), e as moedas do Reino seguem os pontos (1 ponto = 1 moeda).",
+        "Vale do momento da mudança em diante: o que já foi ganho fica como foi gravado. O quiz do dia e os projetos não mudaram."
+      ],
+      "issues": [
+        "BEYOND-0017"
+      ]
+    },
     {
       "versao": "0.43.2-cloudflare-pages.1",
       "data": "2026-11-03",

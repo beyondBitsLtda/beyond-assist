@@ -293,11 +293,14 @@ caso("período futuro ou torto fica trancado", () => {
   assert.ok(!periodoPermitido("projeto_mensal", "2026-11-01", "2026-10-07"));
 });
 caso("pontos do quiz e da nota", () => {
-  // o triplo desde 26/10/2026: 15 por acerto, 30 de bônus, exercício 120, projeto da semana 450
+  // o triplo desde 26/10/2026: 15 por acerto, 30 de bônus, projeto da semana 450; o exercício do dia, o
+  // triplo de novo desde 03/11/2026 (BEYOND-0017): 360 com nota 100, metade na 2ª e na 3ª rodada
   assert.equal(pontosDoQuiz(5, 5), 105);
   assert.equal(pontosDoQuiz(3, 5), 45);
   assert.equal(pontosDaNota("projeto_semanal", 80), 360);
-  assert.equal(pontosDaNota("exercicio", 150), 120);
+  assert.equal(pontosDaNota("exercicio", 150), 360);
+  assert.equal(pontosDaNota("exercicio", 50), 180);
+  assert.equal(comFatorDaRodada(pontosDaNota("exercicio", 100), 2), 180);
 });
 caso("quiz: pergunta torta sai; menos de 3 boas derruba", () => {
   const boa = { pergunta: "?", opcoes: ["a", "b", "c", "d"], correta: 2, explicacao: "x" };

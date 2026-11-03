@@ -30,7 +30,9 @@ const M = MULTIPLICADOR_DE_RECOMPENSAS;
 export const PONTOS_DA_PRATICA = {
   acertoNoQuiz: 5 * M,       // 15
   quizPerfeito: 10 * M,      // 30 — bônus por acertar todas
-  exercicio: 40 * M,         // 120 — nota 100
+  // o Exercício do dia, triplicado de novo em 03/11/2026 (BEYOND-0017: "os pontos de exercício diário devem
+  // ser triplicados"): 40 × 3 × 3. As rodadas extras do dia continuam valendo metade.
+  exercicio: 40 * 3 * M,     // 360 — nota 100
   projeto_semanal: 150 * M,  // 450
   projeto_final: 400 * M,    // 1.200 — o padrão; o de cada trilha cresce com ela (valorDoProjetoFinal, em avanco.js)
   projeto_mensal: 400 * M,   // 1.200
