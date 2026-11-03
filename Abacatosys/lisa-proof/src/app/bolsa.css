@@ -186,6 +186,11 @@
 @container bolsa (min-width: 1000px) { .bx-grade-baixo { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr); } }
 .bx-carteira__total { margin: 0 0 8px; font-size: 14px; color: var(--bx-texto-2); }
 .bx-carteira__total strong { color: var(--bx-texto); }
+/* a empresa da minha carteira que saiu da bolsa (02/11/2026): quanto entrou no saldo, ou que faliu */
+.bx-carteira__saidas { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.bx-carteira__saida { font-size: 13px; line-height: 1.45; padding: 8px 10px; border-radius: 10px; background: var(--bx-painel-2); border-left: 3px solid var(--bx-sobe); overflow-wrap: anywhere; }
+.bx-carteira__saida strong { color: var(--bx-texto); }
+.bx-carteira__saida--falencia { border-left-color: var(--bx-cai); }
 .bx-tabela { width: 100%; border-collapse: collapse; font-size: 13px; }
 .bx-tabela th, .bx-tabela td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--bx-linha); }
 .bx-tabela th:first-child, .bx-tabela thead th:first-child { text-align: left; }

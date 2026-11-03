@@ -9,14 +9,26 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.43.0-cloudflare-pages.1",
-  "atualizadoEm": "2026-10-31",
+  "versao": "0.43.1-cloudflare-pages.1",
+  "atualizadoEm": "2026-11-02",
   "compilacao": {
-    "numero": 85,
-    "data": "2026-10-31",
+    "numero": 86,
+    "data": "2026-11-02",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.43.1-cloudflare-pages.1",
+      "data": "2026-11-02",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Bolsa do Reino: quem tem ações de uma empresa que sai da bolsa recebe com segurança, e a carteira avisa quanto recebeu.",
+      "itens": [
+        "Quando uma empresa fecha o capital (a bolsa tem no máximo 12 e entram 2 por dia, então as mais antigas saem), o pagamento a quem tinha ações agora é lançado ANTES de zerar a posição, uma vez só por pessoa e ação, e com o erro conferido. Antes, a posição era zerada primeiro e o pagamento não era conferido: se ele falhasse ou a função caísse no meio, as ações sumiam sem o dinheiro entrar.",
+        "A carteira mostra, por 7 dias, as empresas suas que saíram da bolsa: \"fechou o capital: você recebeu X moedas pelas N ações — já está no seu saldo\", ou \"faliu: as suas N ações viraram pó\". Antes isso só aparecia por 3 dias no mural de notícias e na lista recolhida das últimas ordens."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.43.0-cloudflare-pages.1",
       "data": "2026-10-31",

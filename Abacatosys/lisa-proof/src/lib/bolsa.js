@@ -149,17 +149,38 @@ async function retirarDaBolsa(acao, motivo, dia) {
   await db.from("proof_bolsa_acoes").update({ status: motivo, saiu_em: dia }).eq("id", acao.id).eq("status", "ativa");
 }
 
+/**
+ * Paga (ou não, na falência) e zera a posição de cada um. (02/11/2026, chamado "a ação Astro sumiu e
+ * não sei se recebi o dinheiro dela") Antes, a posição era zerada e o pagamento lançado depois, sem
+ * conferir o erro: se o lançamento falhasse, ou a função caísse entre os dois, as ações sumiam e o
+ * dinheiro não entrava — e a retomada do pregão não achava mais a posição (já zerada) para pagar.
+ * Agora o pagamento vem PRIMEIRO, uma vez só por pessoa e ação (o resgate dessa ação já lançado não
+ * se repete), com o erro conferido; depois a posição zera. Cair no meio deixa a posição cheia e o
+ * pagamento feito: a retomada só zera. Ninguém negocia enquanto o pregão abre (acaoParaNegociar).
+ */
 async function devolverPosicoes(acao, motivo) {
   const posicoes = await buscarTodas(() => db.from("proof_bolsa_posicoes").select("usuario_id, quantidade, custo").eq("acao_id", acao.id).gt("quantidade", 0).order("usuario_id"));
   for (const p of posicoes) {
-    // zera primeiro (só se ninguém mexeu); depois paga — nunca paga duas vezes
-    const { data: zerou } = await db.from("proof_bolsa_posicoes").update({ quantidade: 0, custo: 0 })
-      .eq("usuario_id", p.usuario_id).eq("acao_id", acao.id).eq("quantidade", p.quantidade).select("usuario_id");
-    if (!(zerou || []).length) continue;
     const total = motivo === "fechada" ? p.quantidade * acao.preco : 0;
-    if (total > 0) await db.from("proof_reino_movimentos").insert({ usuario_id: p.usuario_id, tipo: "bolsa_resgate", valor: total, detalhe: { acao: acao.id, quantidade: p.quantidade, preco: acao.preco } });
-    await db.from("proof_bolsa_ordens").insert({ usuario_id: p.usuario_id, acao_id: acao.id, tipo: motivo === "fechada" ? "resgate" : "falencia", quantidade: p.quantidade, preco: acao.preco, taxa: 0, total });
+    if (total > 0 && !(await jaResgatou(p.usuario_id, acao.id))) {
+      const { error } = await db.from("proof_reino_movimentos").insert({ usuario_id: p.usuario_id, tipo: "bolsa_resgate", valor: total, detalhe: { acao: acao.id, quantidade: p.quantidade, preco: acao.preco } });
+      falhou(error, "resgate da bolsa");
+    }
+    const { data: zerou, error } = await db.from("proof_bolsa_posicoes").update({ quantidade: 0, custo: 0 })
+      .eq("usuario_id", p.usuario_id).eq("acao_id", acao.id).eq("quantidade", p.quantidade).select("usuario_id");
+    falhou(error, "carteira");
+    if (!(zerou || []).length) continue;
+    const ordem = await db.from("proof_bolsa_ordens").insert({ usuario_id: p.usuario_id, acao_id: acao.id, tipo: motivo === "fechada" ? "resgate" : "falencia", quantidade: p.quantidade, preco: acao.preco, taxa: 0, total });
+    falhou(ordem.error, "ordem de resgate");
   }
+}
+
+/** O resgate desta ação já foi pago a esta pessoa (uma ação só sai da bolsa uma vez)? */
+async function jaResgatou(usuarioId, acaoId) {
+  const { data, error } = await db.from("proof_reino_movimentos").select("id")
+    .eq("usuario_id", usuarioId).eq("tipo", "bolsa_resgate").eq("detalhe->>acao", acaoId).limit(1);
+  falhou(error, "resgate da bolsa");
+  return (data || []).length > 0;
 }
 
 async function aplicarPregao(dia, pregao, ativas) {
@@ -263,13 +284,17 @@ export async function estadoDaBolsa(usuarioId, { hora: horaPedida } = {}) {
   const hora = simulada ? horaPedida : horaDeVerdade;
   const passos = passosAte(hora); // quantas horas de pregão já andaram (nenhuma antes das 07:00)
   const inicioDoDia = `${dia}T00:00:00-03:00`;
-  const [ativas, posicoesR, ordensR, saidasR, saldo, volumeR] = await Promise.all([
+  const [ativas, posicoesR, ordensR, saidasR, saldo, volumeR, minhasSaidasR] = await Promise.all([
     acoesAtivas(),
     db.from("proof_bolsa_posicoes").select("acao_id, quantidade, custo").eq("usuario_id", usuarioId).gt("quantidade", 0),
     db.from("proof_bolsa_ordens").select("acao_id, tipo, quantidade, preco, taxa, total, criado_em").eq("usuario_id", usuarioId).order("criado_em", { ascending: false }).limit(10),
     db.from("proof_bolsa_acoes").select(CAMPOS_DA_ACAO).neq("status", "ativa").gte("saiu_em", somarDias(dia, -3)).order("saiu_em", { ascending: false }),
     saldoDoUsuario(usuarioId),
     db.from("proof_bolsa_ordens").select("acao_id, quantidade").in("tipo", ["compra", "venda"]).gte("criado_em", inicioDoDia).limit(5000),
+    // as empresas da MINHA carteira que saíram da bolsa nos últimos dias (02/11/2026: "a ação Astro
+    // sumiu, não sei se recebi o dinheiro dela") — o aviso fica na carteira, e não só no mural
+    db.from("proof_bolsa_ordens").select("acao_id, tipo, quantidade, preco, total, criado_em").eq("usuario_id", usuarioId).in("tipo", ["resgate", "falencia"])
+      .gte("criado_em", `${somarDias(dia, -(DIAS_DO_AVISO_DE_SAIDA - 1))}T00:00:00-03:00`).order("criado_em", { ascending: false }),
   ]);
   falhou(posicoesR.error, "carteira");
   const historico = await historicoDe(ativas.map((a) => a.id), somarDias(dia, -(DIAS_DE_HISTORICO - 1)));
@@ -318,7 +343,23 @@ export async function estadoDaBolsa(usuarioId, { hora: horaPedida } = {}) {
     carteira: { valor: carteiraValor, custo: carteiraCusto, lucro: centavos(carteiraValor - carteiraCusto) },
     saidas: (saidasR.data || []).map((a) => ({ id: a.id, nome: a.nome, emoji: a.emoji, status: a.status, preco: a.preco, dia: a.saiu_em })),
     ordens: (ordensR.data || []).map((o) => ({ ...o, preco: Number(o.preco), taxa: Number(o.taxa), total: Number(o.total), nome: nomeDe.get(o.acao_id) || o.acao_id })),
+    minhasSaidas: await comNomes(minhasSaidasR.data || [], nomeDe),
   };
+}
+
+/** Quantos dias a carteira avisa que uma empresa minha saiu da bolsa (e quanto eu recebi). */
+const DIAS_DO_AVISO_DE_SAIDA = 7;
+
+// os resgates e as falências da minha carteira, com o nome e o emoji da empresa (que pode ter saído
+// há mais tempo que o mural mostra)
+async function comNomes(ordens, nomeDe) {
+  const faltam = [...new Set(ordens.map((o) => o.acao_id))];
+  const { data } = faltam.length ? await db.from("proof_bolsa_acoes").select("id, nome, emoji").in("id", faltam) : { data: [] };
+  const acao = new Map((data || []).map((a) => [a.id, a]));
+  return ordens.map((o) => ({
+    acao: o.acao_id, nome: acao.get(o.acao_id)?.nome || nomeDe.get(o.acao_id) || o.acao_id, emoji: acao.get(o.acao_id)?.emoji || "🏢",
+    tipo: o.tipo, quantidade: o.quantidade, preco: Number(o.preco), total: Number(o.total), dia: diaDe(new Date(o.criado_em)),
+  }));
 }
 
 // ---------------------------------------------------------------- a mesa dos consultores

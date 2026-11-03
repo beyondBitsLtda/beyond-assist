@@ -1765,6 +1765,24 @@ caso("Reino de Teste: o código do reino e da bolsa só fala com o banco pelo mu
   for (const t of tabelas) assert.ok(migracao.includes(`${t.replace(/^proof_/, "proof_teste_")} `) && migracao.includes(`like public.${t} `), `gêmea de ${t}`);
 });
 
+caso("bolsa: quem tinha ações de quem sai da bolsa recebe uma vez só, e a carteira avisa (chamado \"a ação Astro sumiu\")", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const bolsa = ler("../src/lib/bolsa.js");
+  const devolver = bolsa.slice(bolsa.indexOf("async function devolverPosicoes("), bolsa.indexOf("async function jaResgatou("));
+  // paga ANTES de zerar (cair no meio deixa a posição cheia para a retomada), sem pagar duas vezes, e confere os erros
+  assert.ok(devolver.indexOf('tipo: "bolsa_resgate"') < devolver.indexOf("update({ quantidade: 0, custo: 0 })"), "o pagamento vem antes de zerar a posição");
+  assert.match(devolver, /if \(total > 0 && !\(await jaResgatou\(p\.usuario_id, acao\.id\)\)\)/);
+  assert.match(devolver, /falhou\(error, "resgate da bolsa"\)/);
+  assert.match(devolver, /falhou\(ordem\.error, "ordem de resgate"\)/);
+  assert.match(bolsa, /\.eq\("tipo", "bolsa_resgate"\)\.eq\("detalhe->>acao", acaoId\)/);
+  // a carteira mostra as empresas minhas que saíram nos últimos dias, com o quanto entrou
+  assert.match(bolsa, /\.in\("tipo", \["resgate", "falencia"\]\)/);
+  assert.match(bolsa, /minhasSaidas: await comNomes\(/);
+  const terminal = ler("../src/componentes/bolsa/Terminal.js");
+  assert.match(terminal, /fechou o capital: você recebeu <strong>🪙 \{moedas\(s\.total\)\}<\/strong>/);
+  assert.match(terminal, /as suas \{s\.quantidade\} ações viraram pó/);
+});
+
 caso("moedas com centavos: a bolsa conta centavo por centavo, e a venda devolve os centavos", () => {
   assert.equal(valorDaCompra(23.45, 3), 70.35);
   assert.equal(valorDaVenda(23.45, 3), 70.35);

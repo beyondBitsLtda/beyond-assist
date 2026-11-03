@@ -354,6 +354,18 @@ function Carteira({ bolsa, aoEscolher }) {
         <span className={`bx-txt--${rumo(c.lucro)}`}>{c.lucro >= 0 ? "+" : "−"}🪙 {moedas(Math.abs(c.lucro))}</span>
       </div>
       <p className="bx-carteira__total">Vale <strong>🪙 {moedas(c.valor)}</strong> · pagou 🪙 {moedas(c.custo)}</p>
+      {/* (02/11/2026: "a ação Astro sumiu, não sei se recebi o dinheiro dela") a empresa minha que saiu da bolsa, e quanto entrou */}
+      {(bolsa.minhasSaidas || []).length > 0 && (
+        <ul className="bx-carteira__saidas" aria-label="Empresas da sua carteira que saíram da bolsa">
+          {bolsa.minhasSaidas.map((s, i) => (
+            <li key={`${s.acao}-${i}`} className={`bx-carteira__saida bx-carteira__saida--${s.tipo}`}>
+              {s.tipo === "resgate"
+                ? <>🏁 {s.emoji} <strong>{s.nome}</strong> fechou o capital: você recebeu <strong>🪙 {moedas(s.total)}</strong> pelas {s.quantidade} ações ({preco(s.preco)} cada) — já está no seu saldo ({diaCurto(s.dia)})</>
+                : <>💀 {s.emoji} <strong>{s.nome}</strong> faliu: as suas {s.quantidade} ações viraram pó ({diaCurto(s.dia)})</>}
+            </li>
+          ))}
+        </ul>
+      )}
       {minhas.length === 0 ? <p className="bx-vazio">Você ainda não tem ações. Escolha uma empresa e compre pela boleta.</p> : (
         <table className="bx-tabela">
           <thead><tr><th scope="col">Ação</th><th scope="col">Qtd.</th><th scope="col">Médio</th><th scope="col">Agora</th><th scope="col">Resultado</th></tr></thead>
