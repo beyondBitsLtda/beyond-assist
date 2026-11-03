@@ -57,8 +57,54 @@ export const TROPAS = {
     alcance: 2.5, velocidade: 1.4, voa: true, acertaAr: false, alvo: "aliado", nivelMinimo: 5,
     descricao: "Voa atrás do exército e cura as tropas em volta. Não ataca — proteja-a das flechas.",
   },
+  // ---- tropas novas (03/11/2026, BEYOND-0020: "acrescente muitas outras tropas")
+  lanceiro: {
+    nome: "Lanceiro", emoji: "🔱", espaco: 2, custo: 35, vida: 140, dano: 14, intervalo: 1.0,
+    alcance: 1.2, velocidade: 1.5, voa: false, acertaAr: false, alvo: "qualquer", nivelMinimo: 2, defende: true,
+    descricao: "A lança comprida alcança um pouco mais longe que a espada. Barato e firme na linha de frente.",
+  },
+  cavaleiro: {
+    nome: "Cavaleiro", emoji: "🐎", espaco: 4, custo: 110, vida: 320, dano: 26, intervalo: 1.1,
+    alcance: 0.7, velocidade: 2.6, voa: false, acertaAr: false, alvo: "defesa", nivelMinimo: 3, defende: true,
+    descricao: "Galopa direto até as defesas: rápido, forte e duro de derrubar.",
+  },
+  grifo: {
+    nome: "Grifo", emoji: "🦅", espaco: 6, custo: 170, vida: 420, dano: 34, intervalo: 1.0,
+    alcance: 0.8, velocidade: 2.1, voa: true, acertaAr: true, alvo: "qualquer", nivelMinimo: 4, defende: true,
+    descricao: "Voa por cima da muralha e ataca no chão e no ar. Canhão não alcança; a Defesa Aérea sim.",
+  },
+  colosso: {
+    nome: "Colosso de Pedra", emoji: "🗿", espaco: 12, custo: 300, vida: 1600, dano: 40, intervalo: 1.8, area: 0.7,
+    alcance: 0.9, velocidade: 0.8, voa: false, acertaAr: false, alvo: "defesa", nivelMinimo: 5,
+    descricao: "Lento como montanha e quase impossível de derrubar. Pisa nas defesas com dano em área.",
+  },
+  // ---- a tripulação da Temporada das Ilhas (ilhas.js): treinada no Porto, paga em conchas 🐚
+  pirata: {
+    nome: "Pirata", emoji: "🏴‍☠️", espaco: 1, custo: 60, vida: 95, dano: 12, intervalo: 1.0,
+    alcance: 0.6, velocidade: 1.8, voa: false, acertaAr: false, alvo: "qualquer", nivelMinimo: 1, temporada: "ilhas",
+    descricao: "Sabre na mão e coragem de sobra: a base de toda tripulação.",
+  },
+  arpoadora: {
+    nome: "Arpoadora", emoji: "🎣", espaco: 1, custo: 110, vida: 45, dano: 11, intervalo: 1.0,
+    alcance: 2.9, velocidade: 1.7, voa: false, acertaAr: true, alvo: "qualquer", nivelMinimo: 1, temporada: "ilhas",
+    descricao: "Arremessa arpões de longe, por cima da paliçada, e acerta quem voa.",
+  },
+  polvorista: {
+    nome: "Polvorista", emoji: "🛢️", espaco: 2, custo: 220, vida: 40, dano: 32, intervalo: 1.0, contraMuralha: 12,
+    alcance: 0.5, velocidade: 2.2, voa: false, acertaAr: false, alvo: "muralha", suicida: true, nivelMinimo: 2, temporada: "ilhas",
+    descricao: "Rola um barril de pólvora até a Paliçada e explode tudo (12×). Some junto.",
+  },
+  papagaio: {
+    nome: "Papagaio de Guerra", emoji: "🦜", espaco: 3, custo: 260, vida: 180, dano: 20, intervalo: 0.8,
+    alcance: 0.7, velocidade: 2.6, voa: true, acertaAr: true, alvo: "defesa", nivelMinimo: 3, temporada: "ilhas",
+    descricao: "Voa rápido até as defesas e bica sem parar. Frágil contra a Torre Tiki.",
+  },
 };
-export const ORDEM_DAS_TROPAS = ["guerreiro", "arqueira", "bombardeiro", "gigante", "mago", "balao", "dragao", "curandeira"];
+export const ORDEM_DAS_TROPAS = ["guerreiro", "arqueira", "lanceiro", "bombardeiro", "gigante", "cavaleiro", "mago", "balao", "grifo", "dragao", "curandeira", "colosso"];
+/** A tripulação da Temporada das Ilhas: só no Porto das ilhas (ilhas.js), nunca no Quartel. */
+export const ORDEM_DA_TRIPULACAO = ["pirata", "arpoadora", "polvorista", "papagaio"];
+/** Todas, para o motor de combate e as contagens (o Reino e as ilhas usam o mesmo motor). */
+export const TODAS_AS_TROPAS = [...ORDEM_DAS_TROPAS, ...ORDEM_DA_TRIPULACAO];
 export const RESERVAS = { exercito: "exército", guarnicao: "tropas de defesa" };
 
 /** O herói Neuro. No ataque luta corpo a corpo; na defesa atira livros de longe (e acerta quem voa). */
@@ -80,7 +126,7 @@ export const lotacaoDoAcampamento = (nivel) => 15 + 25 * Math.max(1, Math.min(4,
 /** Contagens limpas: só tropas conhecidas, inteiros ≥ 0. */
 export function contagens(valor) {
   const c = {};
-  for (const t of ORDEM_DAS_TROPAS) {
+  for (const t of TODAS_AS_TROPAS) {
     const n = Math.floor(Number(valor?.[t]) || 0);
     if (n > 0) c[t] = n;
   }
@@ -89,7 +135,7 @@ export function contagens(valor) {
 
 export function espacoUsado(valor) {
   const c = contagens(valor);
-  return ORDEM_DAS_TROPAS.reduce((s, t) => s + (c[t] || 0) * TROPAS[t].espaco, 0);
+  return TODAS_AS_TROPAS.reduce((s, t) => s + (c[t] || 0) * TROPAS[t].espaco, 0);
 }
 
 export const totalDeTropas = (valor) => Object.values(contagens(valor)).reduce((s, n) => s + n, 0);
@@ -103,6 +149,7 @@ export const totalDeTropas = (valor) => Object.values(contagens(valor)).reduce((
 export function podeReceber({ tropa, quantidade, destino, niveis, reservas }) {
   const def = TROPAS[tropa];
   if (!def) return { ok: false, motivo: "tropa desconhecida" };
+  if (def.temporada) return { ok: false, motivo: `${def.nome} é da tripulação das ilhas: treine no Porto de uma ilha sua` };
   if (!RESERVAS[destino]) return { ok: false, motivo: "para o exército ou para a defesa?" };
   const qtd = Math.floor(Number(quantidade) || 0);
   if (qtd < 1 || qtd > 60) return { ok: false, motivo: "quantidade inválida" };
@@ -146,7 +193,7 @@ export function somarTropas(a, b, sinal = 1) {
 /** Força de ataque por segundo de um grupo (para a tela comparar exércitos). */
 export function danoPorSegundo(valor, nivelDoNeuro = 0, lado = "ataque") {
   const c = contagens(valor);
-  let total = ORDEM_DAS_TROPAS.reduce((s, t) => s + (c[t] || 0) * (TROPAS[t].dano / TROPAS[t].intervalo) * (TROPAS[t].area ? 1.5 : 1), 0);
+  let total = TODAS_AS_TROPAS.reduce((s, t) => s + (c[t] || 0) * (TROPAS[t].dano / TROPAS[t].intervalo) * (TROPAS[t].area ? 1.5 : 1), 0);
   if (nivelDoNeuro > 0) { const h = heroiNeuro(nivelDoNeuro, lado); total += h.dano / h.intervalo; }
   return Math.round(total);
 }

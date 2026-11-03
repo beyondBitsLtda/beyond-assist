@@ -63,14 +63,19 @@ export const MONSTROS = {
   polvoEstelar: { nome: "Polvo Estelar", vida: 160, dano: 14, intervalo: 1.0, alcance: 2.6, velocidade: 1.4, voa: false, acertaAr: true },
   disco: { nome: "Disco Voador", vida: 140, dano: 15, intervalo: 1.0, alcance: 1.8, velocidade: 2.0, voa: true, acertaAr: true },
   rainhaAlien: { nome: "Rainha Alienígena", vida: 1200, dano: 28, intervalo: 1.2, alcance: 2.0, velocidade: 1.2, voa: false, acertaAr: true, area: 0.7 },
+  // os nativos das ilhas (Temporada das Ilhas, ilhas.js)
+  nativo: { nome: "Guerreiro Nativo", vida: 100, dano: 12, intervalo: 1.0, alcance: 0.7, velocidade: 1.8, voa: false, acertaAr: false },
+  xama: { nome: "Xamã da Ilha", vida: 90, dano: 13, intervalo: 1.2, alcance: 2.6, velocidade: 1.4, voa: false, acertaAr: true, area: 0.6 },
+  chefeTiki: { nome: "Chefe Tiki", vida: 900, dano: 26, intervalo: 1.4, alcance: 1.0, velocidade: 1.1, voa: false, acertaAr: false, area: 0.7 },
 };
 // os grandes primeiro: o primeiro monstro da lista fica perto do covil (combate.js)
 export const ORDEM_DOS_MONSTROS = [
-  "ogro", "ent", "cerbero", "kraken", "giganteDeGelo", "dragaoDeLava", "rainhaAlien",
+  "ogro", "ent", "cerbero", "kraken", "giganteDeGelo", "dragaoDeLava", "rainhaAlien", "chefeTiki",
   "golem", "golemDeMagma", "cristalino", "yeti", "ciborgue",
   "orc", "aranha", "lobo", "esqueleto", "slime", "goblin", "cogumelo", "bandido", "morcego",
   "tubarao", "caranguejo", "tritao", "aguaViva", "bode", "harpia", "salamandra", "diabrete",
   "gosmoide", "insetoide", "polvoEstelar", "zorg", "disco",
+  "nativo", "xama",
 ];
 export const ehMonstro = (tipo) => Boolean(MONSTROS[tipo]);
 
@@ -132,6 +137,13 @@ export const EXPEDICOES = [
     construcoes: { castelo: 2, mina: 2, cofre: 1, torre: 2, canhao: 1, quartel: 1, muralha: 1 },
     monstros: { lobo: 5, aranha: 2 },
   },
+  // nova (03/11/2026, BEYOND-0020): lugar novo num cenário de sempre (`cenario`)
+  {
+    id: "pantano-gosmas", nome: "Pântano das Gosmas", tipo: "bosque", cenario: "floresta-sombria", torreMinima: 2, dificuldade: 2, recompensa: 110, chefe: "slime",
+    descricao: "Gosmas grudentas, cogumelos e aranhas no meio da lama. Devagar se vai longe — e com área se vai mais rápido.",
+    construcoes: { castelo: 2, mina: 2, cofre: 1, torre: 2, canhao: 1, quartel: 1 },
+    monstros: { slime: 5, cogumelo: 4, aranha: 2 },
+  },
   {
     id: "acampamento-orc", nome: "Acampamento Orc", tipo: "acampamento", torreMinima: 2, dificuldade: 2, recompensa: 120, chefe: "orc",
     descricao: "Orcs e goblins juntaram o saque de três reinos numa só tenda.",
@@ -144,17 +156,38 @@ export const EXPEDICOES = [
     construcoes: { castelo: 3, terreno: 1, mina: 3, cofre: 3, torre: 2, canhao: 2, quartel: 2, muralha: 1, defesaAerea: 1 },
     monstros: { bandido: 3, goblin: 4, ogro: 1 },
   },
+  // nova (03/11/2026, BEYOND-0020): lugar novo num cenário de sempre (`cenario`)
+  {
+    id: "vale-uivante", nome: "Vale Uivante", tipo: "floresta", cenario: "floresta-lobos", torreMinima: 3, dificuldade: 3, recompensa: 175, chefe: "lobo",
+    descricao: "Na lua cheia, a alcateia inteira desce o vale. Os esqueletos vigiam a toca do líder.",
+    construcoes: { castelo: 3, mina: 2, cofre: 2, torre: 3, canhao: 2, quartel: 1, muralha: 2 },
+    monstros: { lobo: 8, aranha: 2, esqueleto: 2 },
+  },
   {
     id: "bosque-assombrado", nome: "Bosque Assombrado", tipo: "bosque", torreMinima: 3, dificuldade: 3, recompensa: 180, chefe: "esqueleto",
     descricao: "Esqueletos se levantam da terra e morcegos cobrem o céu. Cuidado com quem voa.",
     construcoes: { castelo: 3, terreno: 1, mina: 2, cofre: 3, torre: 2, canhao: 2, muralha: 2, biblioteca: 1, defesaAerea: 2 },
     monstros: { esqueleto: 6, morcego: 4 },
   },
+  // nova (03/11/2026, BEYOND-0020): lugar novo num cenário de sempre (`cenario`)
+  {
+    id: "cemiterio-esquecido", nome: "Cemitério Esquecido", tipo: "bosque", cenario: "bosque-assombrado", torreMinima: 3, dificuldade: 3, recompensa: 185, chefe: "esqueleto",
+    descricao: "Lápides tortas, morcegos e um exército de esqueletos que não sabe que a guerra acabou.",
+    construcoes: { castelo: 3, terreno: 1, mina: 2, cofre: 2, torre: 2, canhao: 2, quartel: 2, muralha: 2, biblioteca: 1 },
+    monstros: { esqueleto: 7, morcego: 5 },
+  },
   {
     id: "floresta-sombria", nome: "Floresta Sombria", tipo: "floresta", torreMinima: 4, dificuldade: 4, recompensa: 240, chefe: "ent",
     descricao: "As árvores andam. Ents antigos e aranhas gigantes guardam o coração da floresta.",
     construcoes: { castelo: 4, terreno: 2, mina: 3, cofre: 3, torre: 3, canhao: 3, quartel: 3, muralha: 2, defesaAerea: 2, morteiro: 1, torreMagica: 1 },
     monstros: { aranha: 3, lobo: 3, ent: 1 },
+  },
+  // nova (03/11/2026, BEYOND-0020): lugar novo num cenário de sempre (`cenario`)
+  {
+    id: "fortaleza-ogros", nome: "Fortaleza dos Ogros", tipo: "acampamento", cenario: "acampamento-orc", torreMinima: 4, dificuldade: 4, recompensa: 250, chefe: "ogro",
+    descricao: "Dois ogros mandam numa fortaleza de orcs e goblins. Gigantes e bombardeiros na frente!",
+    construcoes: { castelo: 4, terreno: 1, mina: 3, cofre: 3, torre: 3, canhao: 3, quartel: 2, muralha: 3, defesaAerea: 1 },
+    monstros: { ogro: 2, orc: 4, goblin: 6 },
   },
   {
     id: "covil-cerbero", nome: "Covil do Cérbero", tipo: "acampamento", torreMinima: 5, dificuldade: 5, recompensa: 320, chefe: "cerbero",
@@ -176,6 +209,13 @@ export const EXPEDICOES = [
     construcoes: { castelo: 3, terreno: 1, mina: 3, cofre: 2, torre: 2, canhao: 2, quartel: 2, muralha: 1, defesaAerea: 1 },
     monstros: { tubarao: 3, tritao: 3, caranguejo: 2, aguaViva: 2 },
   },
+  // nova (03/11/2026, BEYOND-0020): lugar novo num cenário de sempre (`cenario`)
+  {
+    id: "jardim-aguas-vivas", nome: "Jardim das Águas-vivas", tipo: "submerso", veiculo: "submarino", cenario: "recife-tritoes", torreMinima: 3, dificuldade: 3, recompensa: 200, chefe: "aguaViva",
+    descricao: "Um campo de águas-vivas brilhando no escuro, com caranguejos e tritões de guarda. Leve quem acerta no ar.",
+    construcoes: { castelo: 3, mina: 2, cofre: 2, torre: 3, canhao: 2, quartel: 1, muralha: 2 },
+    monstros: { aguaViva: 6, caranguejo: 3, tritao: 2 },
+  },
   {
     id: "fossa-kraken", nome: "Fossa do Kraken", tipo: "submerso", veiculo: "submarino", torreMinima: 4, dificuldade: 4, recompensa: 280, chefe: "kraken",
     descricao: "No ponto mais fundo do oceano, os tentáculos do Kraken abraçam o maior tesouro do mar.",
@@ -195,6 +235,13 @@ export const EXPEDICOES = [
     descricao: "Um pico sem caminho de volta: as harpias atacam do céu e um golem de pedra vigia os ovos de ouro.",
     construcoes: { castelo: 3, terreno: 1, mina: 2, cofre: 3, torre: 3, canhao: 2, quartel: 2, muralha: 1, defesaAerea: 2 },
     monstros: { harpia: 5, bode: 3, golem: 1 },
+  },
+  // nova (03/11/2026, BEYOND-0020): lugar novo num cenário de sempre (`cenario`)
+  {
+    id: "desfiladeiro-golems", nome: "Desfiladeiro dos Golems", tipo: "montanha", veiculo: "dirigivel", cenario: "trilha-yetis", torreMinima: 4, dificuldade: 4, recompensa: 270, chefe: "golem",
+    descricao: "Golems de pedra fecham o desfiladeiro; bodes e harpias atacam de cima. Paciência e tropas pesadas.",
+    construcoes: { castelo: 4, terreno: 1, mina: 3, cofre: 3, torre: 3, canhao: 3, quartel: 2, muralha: 3, defesaAerea: 2 },
+    monstros: { golem: 2, bode: 4, harpia: 3 },
   },
   {
     id: "pico-gigante", nome: "Pico do Gigante de Gelo", tipo: "montanha", veiculo: "dirigivel", torreMinima: 4, dificuldade: 4, recompensa: 290, chefe: "giganteDeGelo",
@@ -222,6 +269,7 @@ export const EXPEDICOES = [
     construcoes: { castelo: 5, terreno: 3, mina: 3, cofre: 3, torre: 4, canhao: 3, quartel: 3, muralha: 3, defesaAerea: 2, morteiro: 1, torreMagica: 1, torreRaio: 1 },
     monstros: { dragaoDeLava: 1, salamandra: 2, diabrete: 3 },
   },
+
 ];
 export const expedicaoPorId = (id) => EXPEDICOES.find((x) => x.id === id) || null;
 /** O veículo que leva até a expedição (as de antes dos veículos vão de Barco). */

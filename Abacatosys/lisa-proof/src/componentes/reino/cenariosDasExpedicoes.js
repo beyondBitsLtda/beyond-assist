@@ -64,6 +64,11 @@ export const CENARIOS = {
     chao: "#2f4a35", paleta: { madeira: "#3b2a1e", escura: "#24180f", telhado: "#14532d", pedra: "#4b5548", tecido: "#1e293b", brilho: "#c084fc" },
     cabana: "tenda", estaca: "madeira", luz: { ceu: "#6b8f7a", chao: "#13251a", sol: "#bfd8c8", forca: 0.9 },
   },
+  // ---- a Temporada das Ilhas (03/11/2026): areia, coqueiros e tochas tiki (ilhas.js)
+  "ilha-tropical": {
+    chao: "#f1d99a", paleta: { madeira: "#a0703f", escura: "#6e4a2a", telhado: "#d4a95a", pedra: "#d6cfc0", tecido: "#16a34a", brilho: "#fb923c" },
+    cabana: "casa", estaca: "madeira", luz: { ceu: "#ffffff", chao: "#f1d99a", sol: "#fff1cc", forca: 1.7 },
+  },
   "covil-cerbero": {
     chao: "#3b2b2b", paleta: { madeira: "#2a1c1c", escura: "#140d0d", telhado: "#7f1d1d", pedra: "#3f3a3a", tecido: "#450a0a", brilho: "#f97316" },
     cabana: "tenda", estaca: "pedra", lava: true, luz: { ceu: "#ff9a6b", chao: "#2a0f0a", sol: "#ffb27a", forca: 1.2 },
@@ -539,6 +544,46 @@ function covil(p, cen) {
       for (const lado of [-1, 1]) { const chifre = p.cone(0.07, 0.4, 5, OSSO, lado * 0.25, 1.1, 1.05); chifre.rotation.z = -lado * 0.7; g.add(chifre); }
       break;
     }
+    case "ilha-tropical": {
+      const coqueiro = (x, z, s) => {
+        const inclina = (r() - 0.5) * 0.6;
+        for (let k = 0; k < 4; k++) {
+          const seg = p.cilindro(0.06 * s, 0.085 * s, 0.4 * s, 5, k % 2 ? "#8a5a2b" : "#a0703f", x + inclina * k * 0.1 * s, (0.2 + k * 0.37) * s, z);
+          seg.rotation.z = -inclina * 0.35;
+          g.add(seg);
+        }
+        const tx = x + inclina * 0.42 * s, ty = 1.55 * s;
+        for (let k = 0; k < 7; k++) {
+          const ang = (k / 7) * Math.PI * 2 + r() * 0.3;
+          const folha = p.caixa(0.75 * s, 0.03, 0.17 * s, k % 2 ? "#16a34a" : "#22c55e", tx + Math.cos(ang) * 0.32 * s, ty - 0.08 * s, z + Math.sin(ang) * 0.32 * s);
+          folha.rotation.y = -ang;
+          folha.rotation.z = -0.38;
+          g.add(folha);
+        }
+        for (let k = 0; k < 3; k++) g.add(p.malha(new THREE.SphereGeometry(0.065 * s, 6, 4), "#7c4a2d", tx + (k - 1) * 0.08 * s, ty - 0.14 * s, z + 0.06 * s));
+      };
+      const tocha = (x, z) => {
+        g.add(p.cilindro(0.04, 0.05, 1.0, 5, "#6e4a2a", x, 0.5, z));
+        g.add(p.cilindro(0.09, 0.07, 0.16, 6, "#a0703f", x, 1.05, z));
+        const fogo = p.malha(new THREE.OctahedronGeometry(0.1, 0), p.brilho("#ff8a1f"), x, 1.22, z);
+        fogo.scale.y = 1.7;
+        fogo.userData.gira = true;
+        g.add(fogo);
+      };
+      const canoa = (x, z) => {
+        const casco = p.malha(new THREE.SphereGeometry(0.4, 8, 4, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), "#8a5a2b", x, 0.12, z);
+        casco.scale.set(1.8, 0.5, 0.6);
+        casco.rotation.y = r() * Math.PI;
+        g.add(casco);
+      };
+      for (const [x, z, s] of lugares(14, R - 1.9, R - 0.4, 1.1)) coqueiro(x, z, s * 1.05);
+      for (const [x, z] of lugares(8, 1.6, R - 1.0, 1.0)) g.add(p.cilindro(0.5 + r() * 0.35, 0.5, 0.04, 9, r() > 0.4 ? "#86c76b" : "#6fbf5a", x, 0.03, z));
+      for (const [x, z] of lugares(6, 1.8, R - 1.0, 1.3)) tocha(x, z);
+      for (const [x, z] of lugares(3, R - 1.2, R - 0.5, 1.4)) canoa(x, z);
+      for (const [x, z] of lugares(10, 1.5, R - 0.6, 0.8)) estrela(x, z);
+      for (const [x, z, s] of lugares(6, 1.6, R - 0.8, 1.0)) pedra(x, z, s, "#d6cfc0");
+      break;
+    }
     default:
       if (cen.espaco) {
         // a base alienígena: a cúpula de vidro, o anel de luzes e a antena
@@ -585,7 +630,8 @@ export function estruturaDaExpedicao(p, chave, nivel, cen) {
     case "morteiro": return caldeirao(p, nivel, c);
     case "torreMagica": return totem(p, nivel, c);
     case "torreRaio": return obelisco(p, nivel, c);
-    default: return nada(p);
+    // as construções sem desenho do lugar (as novas do Reino) usam o desenho de sempre
+    default: return null;
   }
 }
 

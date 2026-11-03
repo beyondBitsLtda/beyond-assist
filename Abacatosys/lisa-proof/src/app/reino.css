@@ -161,6 +161,7 @@
 .ch-chefao__golpes ul { margin: 0 0 8px; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
 .ch-chefao__atalhos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .ch-caiu { margin-bottom: 12px; }
+.ch-chefao__roubo { padding: 6px 8px; border-radius: var(--pf-raio); background: rgba(220, 38, 38, 0.08); }
 .ch-placar { margin-top: 12px; }
 @media (max-width: 520px) { .ch-chefao { grid-template-columns: 1fr; justify-items: start; } }
 /* o selo do clima (03/11/2026): no canto de cima à direita — à esquerda fica o botão de tela cheia */
@@ -817,3 +818,6 @@ button.rn-exp__arte:disabled { cursor: progress; }
 .rn-chefoes__titulo { margin: 0; font-size: 15px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .rn-chefoes__titulo small { font-weight: 400; color: var(--pf-tinta-2); font-size: 12px; }
 .rn-personagem--trancado .rn-personagem__vitrine { filter: grayscale(1) brightness(0.55); opacity: 0.8; }
+
+/* a Temporada das Ilhas (03/11/2026): o céu do mar do Caribe nas batalhas das ilhas */
+:root .rn-mundo[data-cenario="ilha-tropical"] { background: linear-gradient(180deg, #67c7f0 0%, #b6e6fa 60%, #e8f8ff 100%); }

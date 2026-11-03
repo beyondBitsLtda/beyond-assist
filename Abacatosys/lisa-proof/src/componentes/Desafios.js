@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { criar, obter } from "@/lib/api.js";
 import { formatarDia } from "@/dominio/datas.js";
-import { NOTA_DE_APROVACAO, podeReenviar, COMPLEXIDADES, ORDEM_DAS_COMPLEXIDADES } from "@/dominio/pratica.js";
+import { NOTA_DE_APROVACAO, podeReenviar, COMPLEXIDADES, ORDEM_DAS_COMPLEXIDADES, temExemploDaLisa } from "@/dominio/pratica.js";
 import { CORREIO } from "@/dominio/correio.js";
 import { execucaoDoExercicio } from "@/dominio/execucao.js";
 import { rodarCodigo } from "./codigo/rodar.js";
@@ -399,6 +399,15 @@ function Rodar({ linguagem, tema, codigo }) {
 // ================================================================ exercício
 
 export function Exercicio({ desafio }) {
+  return (
+    <>
+      <CorpoDoExercicio desafio={desafio} />
+      {temExemploDaLisa(desafio.tipo, desafio.motor) && <ExemploDaLisa desafio={desafio} />}
+    </>
+  );
+}
+
+function CorpoDoExercicio({ desafio }) {
   // os motores dos cursos que não são de programação (src/dominio/motores.js)
   if (desafio.motor === "aberto") return <DesafioAberto desafio={desafio} />;
   if (desafio.motor === "calculo") return <ListaDeCalculo desafio={desafio} />;
@@ -452,6 +461,86 @@ export function Exercicio({ desafio }) {
         aoEnviar={(codigo) => criar(`/api/desafios/${desafio.id}/enviar`, { codigo })}
       />
     </div>
+  );
+}
+
+// ================================================================ o exemplo da Lisa (BEYOND-0022)
+
+/**
+ * "Modo dica: o exemplo da Lisa" (03/11/2026, BEYOND-0022): uma aplicação de exemplo, num cenário parecido,
+ * com todos os conceitos de que o exercício ou o projeto precisa — a pessoa vê os conceitos funcionando juntos
+ * e leva a ideia para o dela. Não resolve o desafio. Gera uma vez (fica guardado no desafio).
+ */
+function ExemploDaLisa({ desafio }) {
+  const [exemplo, setExemplo] = useState(desafio.conteudo?.aplicacao || null);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  async function pedir() {
+    setCarregando(true);
+    setErro("");
+    reagir("pensando", "Escrevendo um exemplo com os conceitos que você vai usar…", 40000);
+    try {
+      const r = await criar(`/api/desafios/${desafio.id}/exemplo`, {});
+      setExemplo(r.exemplo);
+      reagir("feliz", "Olha aí: os conceitos funcionando juntos. Agora leve a ideia para o seu!", 5000);
+    } catch (falha) {
+      setErro(falha.message);
+      reagir("surpreso", "Não consegui montar o exemplo agora.");
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  return (
+    <section className="pf-cartao dicas-lisa exemplo-lisa" aria-label="Exemplo da Lisa">
+      <div className="dicas-lisa__topo">
+        <Neuro humor={exemplo ? "feliz" : "pensando"} tamanho={64} />
+        <div>
+          <p className="dicas-lisa__titulo">🧩 Modo dica: o exemplo da Lisa</p>
+          <p className="dicas-lisa__sub">
+            {exemplo
+              ? exemplo.titulo
+              : "Veja todos os conceitos de que você precisa funcionando juntos num exemplo parecido. A Lisa escreve o exemplo — o seu continua com você."}
+          </p>
+        </div>
+      </div>
+      {!exemplo && (
+        <div className="pf-acoes">
+          <button type="button" className="pf-botao" onClick={pedir} disabled={carregando}>
+            {carregando ? "A Lisa está escrevendo…" : "💡 Mostrar o exemplo da Lisa"}
+          </button>
+        </div>
+      )}
+      {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+      {exemplo && (
+        <details className="exemplo-lisa__corpo" open>
+          <summary>Conceitos e exemplo</summary>
+          <p className="pf-campo__rotulo">Os conceitos que o desafio pede</p>
+          <ul className="exemplo-lisa__conceitos">
+            {exemplo.conceitos.map((c, i) => <li key={i}><strong>{c.nome}</strong> — {emLinha(c.explicacao)}</li>)}
+          </ul>
+          {exemplo.codigo ? (
+            <>
+              <p className="pf-campo__rotulo">O exemplo{exemplo.linguagem ? ` (${exemplo.linguagem})` : ""}</p>
+              <Codigo texto={exemplo.codigo} linguagem={exemplo.linguagem || desafio.conteudo?.linguagem || desafio.tema} />
+            </>
+          ) : (
+            <>
+              <p className="pf-campo__rotulo">O exemplo, resolvido passo a passo</p>
+              <ol className="exemplo-lisa__passos">{exemplo.passos.map((p, i) => <li key={i}>{emLinha(p)}</li>)}</ol>
+            </>
+          )}
+          {exemplo.comoFunciona.length > 0 && (
+            <>
+              <p className="pf-campo__rotulo">Como ele funciona</p>
+              <ol className="exemplo-lisa__passos">{exemplo.comoFunciona.map((p, i) => <li key={i}>{emLinha(p)}</li>)}</ol>
+            </>
+          )}
+          {exemplo.paraOSeu && <p className="exemplo-lisa__seu">➡️ {emLinha(exemplo.paraOSeu)}</p>}
+        </details>
+      )}
+    </section>
   );
 }
 
@@ -801,6 +890,7 @@ export function Projeto({ desafio: inicial, aoMudar }) {
         )}
       </div>
       <DicasDaLisa key={`dicas-${desafio.complexidade}-${desafio.titulo}`} desafio={desafio} />
+      <ExemploDaLisa key={`exemplo-${desafio.complexidade}-${desafio.titulo}`} desafio={desafio} />
       {Array.isArray(c.evidencias) ? (
         // curso que não é de programação: a entrega é por texto, fotos, áudio ou vídeo
         <EntregaComEvidencias

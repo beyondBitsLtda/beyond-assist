@@ -504,7 +504,98 @@ function caixaDeCorreio(p) {
   return g;
 }
 
-const CONSTRUTORES = { castelo, mina, minaDeOuro, cofre, torre, canhao, quartel, muralha, biblioteca, defesaAerea, morteiro, torreMagica, torreRaio };
+// ------------------------------------------------------------------ as construções novas (03/11/2026, BEYOND-0020)
+
+/** Pomar: cerquinha de madeira, macieiras (uma a mais a cada nível) e o cesto de maçãs. */
+function pomar(p, n) {
+  const g = new THREE.Group();
+  const a = A(n);
+  for (const [x, z, w, d] of [[0, -0.78, 1.6, 0.06], [0, 0.78, 1.6, 0.06], [-0.78, 0, 0.06, 1.6], [0.78, 0, 0.06, 1.6]]) g.add(p.caixa(w, 0.16, d, COR.madeira, x, 0.12, z));
+  for (const [x, z] of [[-0.78, -0.78], [0.78, -0.78], [-0.78, 0.78], [0.78, 0.78]]) g.add(p.caixa(0.08, 0.3, 0.08, COR.madeiraEscura, x, 0.15, z));
+  const arvores = [[-0.38, -0.36], [0.38, -0.36], [-0.38, 0.36], [0.38, 0.36], [0, 0]].slice(0, Math.min(5, n + 1));
+  for (const [x, z] of arvores) {
+    g.add(p.cilindro(0.05, 0.07, 0.42, 5, COR.madeiraEscura, x, 0.21, z));
+    g.add(p.malha(new THREE.DodecahedronGeometry(0.28, 0), COR.folha, x, 0.58, z));
+    for (const [dx, dy, dz] of [[0.2, 0.02, 0.08], [-0.12, 0.1, 0.18], [0.04, -0.06, -0.22]]) g.add(p.malha(new THREE.SphereGeometry(0.055, 6, 4), "#dc2626", x + dx, 0.58 + dy, z + dz));
+  }
+  if (n >= 2) {
+    g.add(p.cilindro(0.16, 0.13, 0.18, 8, COR.madeira, 0.56, 0.09, 0.56));
+    for (let i = 0; i < 3; i++) g.add(p.malha(new THREE.SphereGeometry(0.06, 6, 4), "#ef4444", 0.5 + i * 0.06, 0.2, 0.56));
+  }
+  if (n >= 3) p.bandeira(g, -0.78, 0.3, -0.78, a.bandeira);
+  return g;
+}
+
+/** Lança-Chamas: base de pedra, o bico de metal e a chama acesa (maior a cada nível). */
+function lancaChamas(p, n) {
+  const g = new THREE.Group();
+  const a = A(n);
+  g.add(p.cilindro(0.5, 0.6, 0.3, 8, a.clara, 0, 0.15, 0));
+  g.add(p.cilindro(0.3, 0.38, 0.45, 8, n >= 4 ? a.metal : "#4b5563", 0, 0.52, 0));
+  const bico = p.cilindro(0.09, 0.14, 0.6, 8, "#374151", 0, 0.9, 0.18);
+  bico.rotation.x = Math.PI / 3;
+  g.add(bico);
+  g.add(p.cilindro(0.16, 0.16, 0.42, 8, "#b91c1c", -0.38, 0.4, -0.2), p.cilindro(0.16, 0.16, 0.42, 8, "#b91c1c", 0.38, 0.4, -0.2));
+  const chama = p.malha(new THREE.ConeGeometry(0.14 + 0.02 * n, 0.4 + 0.06 * n, 7), p.brilho("#ff8a1f"), 0, 1.1, 0.5);
+  chama.rotation.x = Math.PI / 3;
+  chama.userData.gira = true;
+  g.add(chama);
+  enfeitar(p, g, n, 1.3, 0.9);
+  return g;
+}
+
+/** Torre de Gelo: torre azul-clara com um cristal de gelo girando no alto e pingentes. */
+function torreDeGelo(p, n) {
+  const g = new THREE.Group();
+  const a = A(n);
+  const h = 1.2 + 0.25 * n;
+  g.add(p.cilindro(0.55, 0.62, 0.3, 8, a.clara, 0, 0.15, 0));
+  g.add(p.cilindro(0.3, 0.44, h, 8, "#bfdbfe", 0, h / 2, 0));
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2;
+    const p0 = p.cone(0.05, 0.22, 4, "#e0f2fe", Math.cos(ang) * 0.4, h - 0.12, Math.sin(ang) * 0.4);
+    p0.rotation.x = Math.PI;
+    g.add(p0);
+  }
+  g.add(p.cilindro(0.5, 0.5, 0.1, 8, "#93c5fd", 0, h + 0.05, 0));
+  const cristal = p.malha(new THREE.OctahedronGeometry(0.28, 0), p.brilho("#bae6fd"), 0, h + 0.65, 0);
+  cristal.scale.y = 1.7;
+  cristal.userData.gira = true;
+  g.add(cristal);
+  if (n >= 3) p.bandeira(g, 0.38, h - 0.1, 0, a.bandeira);
+  if (n >= 4) g.add(p.cilindro(0.46, 0.46, 0.05, 8, COR.ouro, 0, h * 0.55, 0));
+  return g;
+}
+
+/** Catapulta: estrutura de madeira sobre rodas, o braço com a pedra e uma pilha de munição. */
+function catapulta(p, n) {
+  const g = new THREE.Group();
+  const a = A(n);
+  g.add(p.caixa(1.1, 0.14, 0.7, COR.madeira, 0, 0.22, 0));
+  for (const [x, z] of [[-0.42, -0.4], [0.42, -0.4], [-0.42, 0.4], [0.42, 0.4]]) {
+    const roda = p.cilindro(0.2, 0.2, 0.08, 10, COR.madeiraEscura, x, 0.2, z);
+    roda.rotation.x = Math.PI / 2;
+    g.add(roda);
+  }
+  for (const z of [-0.26, 0.26]) {
+    const pe = p.caixa(0.08, 0.7, 0.08, COR.madeiraEscura, 0, 0.6, z);
+    g.add(pe);
+  }
+  g.add(p.caixa(0.1, 0.08, 0.6, COR.madeiraEscura, 0, 0.95, 0));
+  const braco = p.caixa(1.2, 0.08, 0.1, COR.madeira, 0.2, 0.95, 0);
+  braco.rotation.z = 0.5;
+  g.add(braco);
+  g.add(p.malha(new THREE.DodecahedronGeometry(0.15 + 0.01 * n, 0), "#78716c", 0.72, 1.28, 0));
+  for (let i = 0; i < Math.min(5, n + 1); i++) g.add(p.malha(new THREE.DodecahedronGeometry(0.12, 0), "#57534e", -0.6 + (i % 3) * 0.16, 0.12 + Math.floor(i / 3) * 0.14, 0.45));
+  if (n >= 3) p.bandeira(g, -0.5, 0.3, -0.3, a.bandeira);
+  if (n >= 4) g.add(p.caixa(1.14, 0.05, 0.05, COR.ouro, 0, 0.3, 0.36));
+  return g;
+}
+
+const CONSTRUTORES = {
+  castelo, mina, minaDeOuro, cofre, torre, canhao, quartel, muralha, biblioteca, defesaAerea, morteiro, torreMagica, torreRaio,
+  pomar, lancaChamas, torreDeGelo, catapulta,
+};
 // Onde cada construção fica na ilha: os lugares do motor de combate e a Mina de Ouro, que não
 // entra na batalha (fica debaixo da terra) — num canto livre, longe da praia de desembarque.
 const LUGARES_DO_MUNDO = { ...LUGARES, minaDeOuro: [1.3, -4.5] };
@@ -1402,7 +1493,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
      * vira o modelo para onde ele vai). Feitos de peças simples, como o resto do mundo.
      */
     function veiculoDaBatalha(id, cor) {
-      if (!id || id === "barco") return navio(cor);
+      if (!id || id === "barco" || id === "navio") return navio(cor);
       const g = new THREE.Group();
       if (id === "submarino") {
         const corpo = p.malha(new THREE.SphereGeometry(0.5, 12, 8), "#facc15");
@@ -1473,7 +1564,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       casca.scale.setScalar(1.05);
       return casca;
     }
-    const NOME_DO_VEICULO = { barco: "O navio", submarino: "O submarino", dirigivel: "O dirigível", tanque: "O tanque de magma", nave: "A nave" };
+    const NOME_DO_VEICULO = { barco: "O navio", navio: "O navio pirata", submarino: "O submarino", dirigivel: "O dirigível", tanque: "O tanque de magma", nave: "A nave" };
 
     function voar(n, de, para, u, tt) {
       const a = suave(u);

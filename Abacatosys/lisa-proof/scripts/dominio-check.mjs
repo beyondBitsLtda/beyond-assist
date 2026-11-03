@@ -13,6 +13,7 @@ import {
 import { resumoDasMetas, tarefasDoDia } from "../src/dominio/metas.js";
 import { nivelPorPontos, MULTIPLICADOR_DE_RECOMPENSAS, PONTOS } from "../src/dominio/pontos.js";
 import {
+  temExemploDaLisa, validarExemploDaLisa,
   periodoDe, periodoPermitido, pontosDoQuiz, PONTOS_DA_PRATICA, arquivosDoProjeto, pontosDaNota, validarQuiz, quizParaTela,
   separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo, podeReenviar, entregaConcluida,
   validarAvaliacao, assuntoAtual, TENTATIVAS, RODADAS_POR_DIA, podeAbrirRodada, fatorDaRodada, comFatorDaRodada,
@@ -31,9 +32,14 @@ import {
   NIVEIS_INICIAIS, producaoPorHora, ORDEM_DAS_CONSTRUCOES, poderDo,
 } from "../src/dominio/reino.js";
 import { ARTEFATOS, manaDe, pontosQueContam, podeForjar, efeitoDe, bonusDaPocao, PONTOS_POR_MANA } from "../src/dominio/forja.js";
-import { CHEFOES_DA_PROCRASTINACAO, chefaoDoAtraso, podeNascer, danoDosEstudos, danoDosCadernos, situacaoDoChefao, pesoDoAtraso, HORAS_ATE_O_PROXIMO } from "../src/dominio/chefoes.js";
+import { CHEFOES_DA_PROCRASTINACAO, roubosVencidos, valorDoRoubo, chefaoDoAtraso, podeNascer, danoDosEstudos, danoDosCadernos, situacaoDoChefao, pesoDoAtraso, HORAS_ATE_O_PROXIMO } from "../src/dominio/chefoes.js";
 import { DUELO, PERGUNTAS_DO_DUELO, montarDuelo, respostasDaLisa, perguntaParaTela, corrigir, resultadoDoDuelo, movimentosDoDuelo, podeDuelar, segundosDoDuelo } from "../src/dominio/duelo.js";
 import { humorDoNeuro, diasSemEstudo, evolucaoDa, fatorDaMinaDoHumor, EVOLUCOES_DO_NEURO, DIAS_PARA_REVOLTAR } from "../src/dominio/humorDoNeuro.js";
+import { TROPAS, ORDEM_DAS_TROPAS, ORDEM_DA_TRIPULACAO } from "../src/dominio/tropas.js";
+import { LUGARES } from "../src/dominio/combate.js";
+import { fazExpedicao } from "../src/dominio/veiculos.js";
+import { ARQUIPELAGO, CONSTRUCOES_DA_ILHA, CONCHAS_POR_MOEDA, capacidadeDaTripulacao, batalhaNaIlha, desfechoNaIlha, guardasDaConquista, construcoesAposConquista, defensorDaIlha, producaoDaIlha, juntadoNaIlha, podeConstruirNaIlha, podeTreinarTripulacao, podeAtacarIlha, pactoVigente, pactoPendente, saqueDeConchas, protecaoDoBau } from "../src/dominio/ilhas.js";
+import { BUGS, SOLUCOES_DOS_BUGS, ANDARES_DA_MASMORRA, arnesDoBug, lerArnes, NIVEIS_DO_MASCOTE, CODIGO_INICIAL_DO_MASCOTE, SOLUCAO_DO_MASCOTE, simularMascote, arnesDoMascote, PUZZLES_DE_PARSONS, blocosEmbaralhados, conferirParsons, faseLiberada } from "../src/dominio/arena.js";
 import { luzDaHora, tempoDoBloco, climaDoReino, textoDoClima, agoraEmBrasilia, TEMPOS } from "../src/dominio/clima.js";
 import {
   RIVAIS_DE_TESTE, FERRAMENTAS_DE_TESTE, reinoDoRival, reinoLiberado, reinoNovoDeTeste, urlNoMundo, ehRivalDeTeste,
@@ -1409,12 +1415,16 @@ caso("expedições: cada lugar tem dificuldade de 1 a 5 e recompensa que cresce 
     assert.ok(x.recompensa > (antes[v] || 0), `${x.id}: a recompensa precisa crescer`);
     antes[v] = x.recompensa;
   }
-  // os veículos novos: três lugares cada, um por nível
+  // os veículos novos: pelo menos três lugares cada, de níveis diferentes (desde 03/11/2026, BEYOND-0020,
+  // o submarino e o dirigível ganharam um quarto lugar, e a dificuldade nunca desce dentro do veículo)
   for (const v of ["submarino", "dirigivel", "tanque"]) {
     const lugares = EXPEDICOES.filter((x) => veiculoDa(x) === v);
-    assert.equal(lugares.length, 3, v);
-    assert.equal(new Set(lugares.map((x) => x.dificuldade)).size, 3, `${v}: um lugar por nível`);
+    assert.ok(lugares.length >= 3, v);
+    assert.ok(new Set(lugares.map((x) => x.dificuldade)).size >= 3, `${v}: três níveis pelo menos`);
+    assert.ok(lugares.every((x, i) => !i || x.dificuldade >= lugares[i - 1].dificuldade), `${v}: a dificuldade não desce`);
   }
+  // os lugares novos usam o cenário de um lugar que já existe
+  for (const x of EXPEDICOES.filter((e) => e.cenario)) assert.ok(EXPEDICOES.some((e) => e.id === x.cenario), `${x.id}: cenário ${x.cenario}`);
   assert.equal(expedicaoPorId("covil-cerbero").dificuldade, 5);
   assert.equal(defensorDaExpedicao(expedicaoPorId("vila-bandidos")).cenario, "vila-bandidos");
 });
@@ -2032,7 +2042,9 @@ caso("Modo Domínio: prêmio no Reino — o que não cabe (ou não é liberado) 
   for (const [t, q] of Object.entries(e.cabem)) assert.ok(podeTreinar({ tropa: t, quantidade: q, destino: "exercito", niveis: n, reservas: vazio, saldo: 1e9 }).ok, t);
   assert.equal(veiculoDoPremio([]), "submarino");
   assert.equal(veiculoDoPremio(["submarino", "dirigivel"]), "tanque");
-  assert.equal(veiculoDoPremio(["barco", "submarino", "dirigivel", "tanque", "nave"]), null);
+  // o Navio (Temporada das Ilhas, 03/11/2026) entrou no fim da fila: com os cinco de antes, o prêmio é ele
+  assert.equal(veiculoDoPremio(["barco", "submarino", "dirigivel", "tanque", "nave"]), "navio");
+  assert.equal(veiculoDoPremio(["barco", "submarino", "dirigivel", "tanque", "nave", "navio"]), null);
   assert.deepEqual(MOEDAS_NO_LUGAR, { veiculo: 2400, avatar: 4500 }); // o triplo desde 26/10/2026
 });
 
@@ -3316,7 +3328,7 @@ caso("correio: as rotas, a tela, o quiz e a Lisa", () => {
   assert.match(quiz, /const valem = perguntas\.filter\(\(p\) => !p\.enviada\);/, "o placar final sem as que foram pelo correio");
   assert.match(quiz, /<MandarPorCorreio desafioId=\{desafio\.id\}/);
   assert.match(ler("../src/componentes/Moldura.js"), /\{ href: "\/correio", rotulo: "Correio", Icone: IconeCorreio, grupo: "Jogo" \}/);
-  assert.match(ler("./lisa-joga.mjs"), /const ACOES = \{[^}]*correio \};/);
+  assert.match(ler("./lisa-joga.mjs"), /const ACOES = \{[^}]*correio[,}]/);
   assert.ok(oQueFazerAgora({ hora: 18, diaDaSemana: 2 }).includes("correio"), "a Lisa passa no correio no fim da tarde");
 });
 
@@ -3379,9 +3391,10 @@ caso("Raposão: o personagem azul e branco, à venda por 610, e a área de prese
   assert.match(ler("../db/028-presentes.sql"), /create unique index if not exists proof_presentes_um_por_item on public\.proof_presentes \(usuario_id, tipo, item\)/);
   assert.match(ler("../src/componentes/Moldura.js"), /\{ href: "\/presentes", rotulo: "Presentes", Icone: IconePresentes, grupo: "Você" \}/);
   const novidades = ler("../src/componentes/Novidades.js");
-  // a edição seguinte (03/11/2026, à noite) já trocou o Raposão pelo clima e pelas ideias da Lisa
-  assert.match(novidades, /EDICAO_DAS_NOVIDADES = "2026-11-03-clima-e-forja"/, "a edição nova aparece de novo para todo mundo");
-  for (const t of ["O Reino agora tem clima e anoitece", "O humor do Neuro", "Forja de Artefatos", "Chefões da Procrastinação", "Duelo de Lógica com a Lisa"]) assert.ok(novidades.includes(t), t);
+  // as edições seguintes trocaram o Raposão pelo clima e, depois, pelo anúncio da versão 1.0
+  assert.match(novidades, /EDICAO_DAS_NOVIDADES = "2026-11-03-versao-1"/, "a edição nova aparece de novo para todo mundo");
+  assert.match(novidades, /O Lisa_Proof chegou à versão 1\.0!/);
+  for (const t of ["Temporada das Ilhas", "Arena Lúdica de Programação", "O exemplo da Lisa nos exercícios", "Reino maior", "Chefões com dentes"]) assert.ok(novidades.includes(t), t);
 });
 caso("modo espectador: a tela também não deixa escolher nada (só olhar)", () => {
   const moldura = fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8");
@@ -3527,7 +3540,7 @@ caso("Chefões da Procrastinação: o atraso vira chefão; os estudos (Prática 
   assert.equal(situacaoDoChefao({ vida: 150, dano: 999 }).derrotado, true);
   const lib = fs.readFileSync(new URL("../src/lib/chefoes.js", import.meta.url), "utf8");
   assert.match(lib, /update\(\{ derrotado_em: marca \}\)\.eq\("id", c\.id\)\.is\("derrotado_em", null\)/, "cai e paga uma vez só");
-  assert.match(lib, /creditarMoedas\(usuarioId, "chefao", c\.recompensa/);
+  assert.match(lib, /creditarMoedas\(usuarioId, "chefao", total, \{ chefao: c\.id, tipo: c\.tipo, recompensa: c\.recompensa/);
   const sql = fs.readFileSync(new URL("../db/029-forja-chefoes-duelos.sql", import.meta.url), "utf8");
   assert.match(sql, /create unique index if not exists proof_chefoes_um_vivo on public\.proof_chefoes \(usuario_id\) where derrotado_em is null/);
   assert.equal((sql.match(/'correio',\s+'forja', 'chefao', 'duelo'\)\);/g) || []).length, 2, "os tipos novos entram no livro-caixa dos dois mundos");
@@ -3590,6 +3603,220 @@ caso("Duelo de Lógica: o gabarito confere, a Lisa erra às vezes e quem acerta 
   assert.match(lib, /\.eq\("id", d\.id\)\.eq\("status", "aberto"\)\.select\(CAMPOS\)/, "encerra uma vez só");
   assert.match(lib, /grava antes de cobrar/);
   assert.match(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /\{ href: "\/forja", rotulo: "Forja", Icone: IconeForja, grupo: "Jogo" \}/);
+});
+
+caso("BEYOND-0019: moedas com no máximo 2 casas (o bônus do humor do Neuro não vaza ponto flutuante)", () => {
+  const reino = { construcoes: { mina: 3 }, coletado_em: new Date(Date.now() - 100 * 3_600_000).toISOString() };
+  for (const fator of [1, 1.05, 1.1, 1.15, 1.2, 2 * 1.05]) {
+    const v = producaoAcumulada(reino, new Date(), fator);
+    assert.ok(Number.isInteger(v), "a mina cheia é inteira (fator " + fator + "): " + v);
+  }
+  const lib = fs.readFileSync(new URL("../src/lib/reino.js", import.meta.url), "utf8");
+  assert.match(lib, /porHora: centavos\(taxaDeProducao\(n\) \* fatorDaMina\)/);
+  assert.match(lib, /capacidade: Math\.floor\(taxaDeProducao\(n\) \* fatorDaMina \* HORAS_ATE_ENCHER\)/);
+  const tela = fs.readFileSync(new URL("../src/app/(app)/reino/page.js", import.meta.url), "utf8");
+  assert.match(tela, /Produz \{formatarMoedas\(reino\.mina\.porHora\)\} moeda\(s\) por hora/);
+  assert.match(fs.readFileSync(new URL("../src/componentes/reino/pecas.js", import.meta.url), "utf8"), /maximumFractionDigits: 2/);
+});
+
+caso("BEYOND-0018: o chefão de pé rouba pouco por dia (com teto) e devolve tudo quando cai", () => {
+  const nasceu = "2026-11-01T12:00:00Z";
+  assert.equal(roubosVencidos({ nasceuEm: nasceu, agora: new Date("2026-11-02T11:59:00Z") }).vezes, 0, "as primeiras 24 h são de graça");
+  const dois = roubosVencidos({ nasceuEm: nasceu, agora: new Date("2026-11-03T13:00:00Z") });
+  assert.equal(dois.vezes, 2);
+  assert.equal(dois.relogio, "2026-11-03T12:00:00.000Z", "o relógio anda em passos de 24 h");
+  assert.equal(roubosVencidos({ nasceuEm: nasceu, ultimoRouboEm: dois.relogio, agora: new Date("2026-11-03T20:00:00Z") }).vezes, 0, "o mesmo roubo não vale duas vezes");
+  assert.equal(valorDoRoubo({ tipo: "hidra", vezes: 1, saldo: 1000 }), 15);
+  assert.equal(valorDoRoubo({ tipo: "hidra", vezes: 1, saldo: 100 }), 5, "nunca mais que 5% do saldo");
+  assert.equal(valorDoRoubo({ tipo: "hidra", vezes: 1, saldo: 0 }), 0);
+  assert.equal(valorDoRoubo({ tipo: "tita", vezes: 30, saldo: 9999 }), 200, "no total, nunca mais que a recompensa");
+  assert.equal(valorDoRoubo({ tipo: "lesma", vezes: 3, saldo: 9999, jaRoubado: 55 }), 5, "o teto conta o que já foi roubado");
+  assert.ok(CHEFOES_DA_PROCRASTINACAO.every((c) => c.rouboPorDia > 0 && c.rouboPorDia * 7 <= c.recompensa * 1.5), "pouco por dia");
+  const lib = fs.readFileSync(new URL("../src/lib/chefoes.js", import.meta.url), "utf8");
+  assert.match(lib, /creditarMoedas\(usuarioId, "chefao", -valor, \{ chefao: c\.id, tipo: c\.tipo, roubo: true \}\)/);
+  assert.match(lib, /const total = c\.recompensa \+ \(c\.roubado \|\| 0\);/, "derrubado, devolve o que roubou");
+  assert.match(lib, /q = c\.ultimo_roubo_em \? q\.eq\("ultimo_roubo_em", c\.ultimo_roubo_em\) : q\.is\("ultimo_roubo_em", null\);/, "duas abas não roubam duas vezes");
+});
+
+caso("BEYOND-0022: o exemplo da Lisa vale para exercícios e projetos, e chega conferido", () => {
+  assert.equal(temExemploDaLisa("exercicio", "codigo"), true);
+  assert.equal(temExemploDaLisa("exercicio", undefined), true, "sem motor é código");
+  assert.equal(temExemploDaLisa("projeto_semanal", "aberto"), true);
+  assert.equal(temExemploDaLisa("exercicio", "ritmo"), false, "treino de música não tem o que aplicar");
+  assert.equal(temExemploDaLisa("quiz", "codigo"), false);
+  const e = validarExemploDaLisa({ titulo: "Estoque", conceitos: [{ nome: "laço", explicacao: "repete" }, { nome: "", explicacao: "x" }], linguagem: "Python",
+    codigo: "```python\nfor livro in livros:\n    print(livro)\n```", comoFunciona: ["percorre a lista"], paraOSeu: "troque a lista" });
+  assert.equal(e.conceitos.length, 1, "conceito sem nome cai fora");
+  assert.equal(e.codigo, "for livro in livros:\n    print(livro)", "sem as cercas do markdown, com a indentação");
+  assert.equal(e.linguagem, "python");
+  assert.throws(() => validarExemploDaLisa({ conceitos: [{ nome: "a", explicacao: "b" }], codigo: "x" }), /não conseguiu montar o exemplo/);
+  const semCodigo = validarExemploDaLisa({ conceitos: [{ nome: "a", explicacao: "b" }], passos: ["um", "dois"], codigo: "ignorado" }, { comCodigo: false });
+  assert.equal(semCodigo.codigo, "");
+  assert.deepEqual(semCodigo.passos, ["um", "dois"]);
+  const tela = fs.readFileSync(new URL("../src/componentes/Desafios.js", import.meta.url), "utf8");
+  assert.match(tela, /\{temExemploDaLisa\(desafio\.tipo, desafio\.motor\) && <ExemploDaLisa desafio=\{desafio\} \/>\}/, "em todo exercício que tem o que aplicar");
+  assert.match(tela, /<ExemploDaLisa key=\{`exemplo-/, "e nos projetos");
+  assert.match(fs.readFileSync(new URL("../src/lib/pratica.js", import.meta.url), "utf8"), /if \(d\.conteudo\?\.aplicacao\) return d\.conteudo\.aplicacao;/, "gera uma vez só");
+  assert.match(fs.readFileSync(new URL("../src/app/api/desafios/[id]/exemplo/route.js", import.meta.url), "utf8"), /exemploDaLisa\(\{ usuarioId: usuario\.id, id \}\)/, "a rota existe");
+});
+
+caso("BEYOND-0020: tropas, construções e defesas novas no Reino (e a tripulação das ilhas fora do Quartel)", () => {
+  for (const t of ["lanceiro", "cavaleiro", "grifo", "colosso"]) {
+    assert.ok(TROPAS[t] && ORDEM_DAS_TROPAS.includes(t), t);
+    assert.ok(!TROPAS[t].temporada, `${t} é do Reino`);
+  }
+  for (const t of ["pirata", "arpoadora", "polvorista", "papagaio"]) {
+    assert.equal(TROPAS[t].temporada, "ilhas", t);
+    assert.ok(!ORDEM_DAS_TROPAS.includes(t), `${t} não aparece no Quartel`);
+    assert.ok(ORDEM_DA_TRIPULACAO.includes(t), t);
+  }
+  assert.deepEqual(contagens({ pirata: 3, guerreiro: 2, inventado: 9 }), { guerreiro: 2, pirata: 3 }, "o motor conta as duas listas");
+  const niveis = { ...NIVEIS_INICIAIS, quartel: 5, castelo: 5, acampamento: 4 };
+  assert.match(podeTreinar({ tropa: "pirata", quantidade: 1, destino: "exercito", niveis, reservas: {}, saldo: 9999 }).motivo, /tripulação das ilhas/);
+  assert.equal(podeTreinar({ tropa: "colosso", quantidade: 1, destino: "exercito", niveis, reservas: {}, saldo: 9999 }).ok, true);
+  for (const chave of ["pomar", "lancaChamas", "torreDeGelo", "catapulta"]) {
+    assert.ok(CONSTRUCOES[chave] && ORDEM_DAS_CONSTRUCOES.includes(chave) && chave in NIVEIS_INICIAIS, chave);
+    const [x, z] = LUGARES[chave];
+    const raio = Math.hypot(x, z);
+    assert.ok(raio < raioDaIlha(CONSTRUCOES[chave].terreno) - 0.2, `${chave} cabe na terra do Terreno ${CONSTRUCOES[chave].terreno}`);
+    for (const [outra, [ox, oz]] of Object.entries(LUGARES)) if (outra !== chave) assert.ok(Math.hypot(ox - x, oz - z) > 1.6, `${chave} longe de ${outra}`);
+    assert.ok(typeof CONSTRUCOES[chave].efeito(1) === "string", chave);
+  }
+  assert.equal(taxaDeProducao({ mina: 2, biblioteca: 1, pomar: 3 }), 2 + 2 + 6, "o Pomar rende junto com a Mina");
+  const exp = EXPEDICOES.filter((x) => ["pantano-gosmas", "vale-uivante", "cemiterio-esquecido", "fortaleza-ogros", "jardim-aguas-vivas", "desfiladeiro-golems"].includes(x.id));
+  assert.equal(exp.length, 6, "seis expedições novas");
+  assert.equal(VEICULOS.navio.destino, "A Temporada das Ilhas");
+  assert.equal(fazExpedicao("navio"), false);
+  assert.equal(fazExpedicao("barco"), true);
+});
+
+caso("BEYOND-0020: a Temporada das Ilhas — conquista, construção com conchas, tripulação, ataques e pactos", () => {
+  assert.equal(ARQUIPELAGO.length, 12);
+  assert.equal(new Set(ARQUIPELAGO.map((i) => i.id)).size, 12);
+  for (const i of ARQUIPELAGO) {
+    assert.ok(i.x >= 0 && i.x <= 100 && i.y >= 0 && i.y <= 100 && i.nivel >= 1 && i.nivel <= 5, i.id);
+    for (const k of Object.keys(i.construcoes)) assert.ok(CONSTRUCOES_DA_ILHA[k] && (CONSTRUCOES[k]?.terreno || 0) <= 1, `${i.id}: ${k} cabe na ilha (Terreno 1)`);
+    assert.ok(Object.keys(contagensDeMonstros(i.nativos)).length > 0, `${i.id} tem nativos`);
+  }
+  assert.equal(CONCHAS_POR_MOEDA, 10, "a moeda das ilhas é bem mais barata");
+  // a primeira ilha cai com a tripulação de quem acabou de comprar o navio; a lendária, não
+  const coqueiro = { id: "coqueiro", dono_id: null };
+  const inicial = { pirata: 16 };
+  assert.ok(espacoUsado(inicial) <= capacidadeDaTripulacao([]));
+  let conquistas = 0;
+  for (let s = 1; s <= 8; s++) if (batalhaNaIlha({ tripulacao: inicial, ilha: coqueiro, semente: s * 7919 }).estrelas >= 2) conquistas++;
+  assert.ok(conquistas >= 6, `16 piratas conquistam o Coqueiro (${conquistas}/8)`);
+  assert.equal(batalhaNaIlha({ tripulacao: inicial, ilha: { id: "grande-tiki", dono_id: null }, semente: 7 }).estrelas < 2, true, "a lendária pede muito mais");
+  assert.deepEqual(desfechoNaIlha({ estrelas: 2, ilha: coqueiro }), { tipo: "conquista", moedas: 20, conchas: 100 });
+  assert.equal(desfechoNaIlha({ estrelas: 1, ilha: { id: "tesouro", dono_id: "x" } }).tipo, "saque");
+  assert.equal(desfechoNaIlha({ estrelas: 0, ilha: coqueiro }).tipo, "derrota");
+  assert.deepEqual(guardasDaConquista("tesouro"), { nativo: 5, xama: 2, chefeTiki: 1 }, "metade dos nativos fica de guarda");
+  assert.deepEqual(construcoesAposConquista({ castelo: 1, mina: 3, torre: 1 }), { castelo: 1, mina: 2 }, "trocou de dono: cada uma perde um nível");
+  const def = defensorDaIlha({ id: "coqueiro", dono_id: "dono", construcoes: { castelo: 2 }, guardas: { nativo: 2 } });
+  assert.equal(def.cenario, "ilha-tropical");
+  assert.equal(def.construcoes.terreno, 1);
+  assert.deepEqual(def.monstros, { nativo: 2 }, "a ilha de jogador é defendida pelos guardas");
+  // produção e coleta
+  assert.deepEqual(producaoDaIlha({ mina: 2, biblioteca: 3 }), { conchas: 50, moedas: 6 });
+  const agora = new Date("2026-11-03T20:00:00Z");
+  assert.deepEqual(juntadoNaIlha({ mina: 2, biblioteca: 1 }, "2026-11-01T00:00:00Z", agora), { conchas: 600, moedas: 24, horas: 12 }, "enche em 12 horas");
+  // construir
+  const base = { castelo: 1, mina: 1 };
+  assert.match(podeConstruirNaIlha({ souDono: false, construcoes: base, chave: "mina", conchas: 9999 }).motivo, /não é sua/);
+  assert.match(podeConstruirNaIlha({ souDono: true, construcoes: base, chave: "mina", conchas: 9999 }).motivo, /Cabana do Chefe/);
+  assert.deepEqual(podeConstruirNaIlha({ souDono: true, construcoes: base, chave: "castelo", conchas: 600 }), { ok: true, custo: 600 });
+  assert.match(podeConstruirNaIlha({ souDono: true, construcoes: base, chave: "torre", conchas: 100 }).motivo, /faltam 250 conchas/);
+  // tripulação
+  assert.equal(capacidadeDaTripulacao([{ construcoes: { quartel: 2 } }, { construcoes: { quartel: 1 } }]), 16 + 36);
+  assert.match(podeTreinarTripulacao({ tropa: "guerreiro", quantidade: 1, tripulacao: {}, conchas: 999 }).motivo, /não é da tripulação/);
+  assert.match(podeTreinarTripulacao({ tropa: "papagaio", quantidade: 1, tripulacao: {}, conchas: 9999 }).motivo, /Porto no nível 3/);
+  assert.match(podeTreinarTripulacao({ tropa: "pirata", quantidade: 17, tripulacao: {}, conchas: 9999 }).motivo, /só cabe mais 16/);
+  assert.deepEqual(podeTreinarTripulacao({ tropa: "pirata", quantidade: 5, tripulacao: {}, conchas: 300 }), { ok: true, custo: 300, quantidade: 5 });
+  // atacar
+  const ok = { usuarioId: "eu", ilha: { id: "coqueiro", dono_id: null }, temNavio: true, tripulacao: { pirata: 5 }, ataquesHoje: 0, agora };
+  assert.equal(podeAtacarIlha(ok).ok, true);
+  assert.match(podeAtacarIlha({ ...ok, temNavio: false }).motivo, /Navio/);
+  assert.match(podeAtacarIlha({ ...ok, ataquesHoje: 3 }).motivo, /3 ataques de hoje/);
+  assert.match(podeAtacarIlha({ ...ok, tripulacao: {} }).motivo, /tripulação/);
+  assert.match(podeAtacarIlha({ ...ok, ilhasMinhas: [{}, {}, {}] }).motivo, /3 ilhas/);
+  assert.match(podeAtacarIlha({ ...ok, ilha: { id: "coqueiro", dono_id: "eu" } }).motivo, /já é sua/);
+  assert.match(podeAtacarIlha({ ...ok, ilha: { id: "coqueiro", dono_id: "ele", escudo_ate: "2026-11-04T00:00:00Z" } }).motivo, /escudo/);
+  const pacto = { de_id: "ele", para_id: "eu", aceito_em: "2026-11-02T00:00:00Z", ate: "2026-11-09T00:00:00Z", criado_em: "2026-11-02T00:00:00Z" };
+  assert.match(podeAtacarIlha({ ...ok, ilha: { id: "coqueiro", dono_id: "ele" }, pactos: [pacto] }).motivo, /pacto/, "o pacto é a única paz das ilhas");
+  assert.equal(pactoVigente([pacto], "eu", "ele", new Date("2026-11-10T00:00:00Z")), null, "o pacto vence");
+  assert.equal(pactoPendente({ criado_em: "2026-11-03T00:00:00Z", aceito_em: null }, agora), true);
+  assert.equal(saqueDeConchas(2000, protecaoDoBau([{ construcoes: { cofre: 2 } }])), 280, "20% do que passa do Baú");
+  assert.equal(saqueDeConchas(99999, 0), 1500, "com teto");
+  // o banco e a tela
+  const lib = fs.readFileSync(new URL("../src/lib/ilhas.js", import.meta.url), "utf8");
+  assert.match(lib, /\.eq\("id", ilha\.id\)\.eq\("versao", ilha\.versao\)/, "duas conquistas juntas: só a primeira vale");
+  assert.match(lib, /if \(desfecho\.tipo === "conquista"\) \{\s*await gravarIlha/, "a conquista grava a ilha antes de tudo");
+  assert.match(fs.readFileSync(new URL("../src/componentes/reino/cenariosDasExpedicoes.js", import.meta.url), "utf8"), /"ilha-tropical": \{/);
+  assert.match(fs.readFileSync(new URL("../src/componentes/reino/Mundo3D.js", import.meta.url), "utf8"), /id === "barco" \|\| id === "navio"/);
+  assert.match(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /\{ href: "\/ilhas", rotulo: "Ilhas", Icone: IconeIlhas, grupo: "Jogo" \}/);
+  assert.match(fs.readFileSync(new URL("./lisa-joga.mjs", import.meta.url), "utf8"), /const ACOES = \{[^}]*ilhas \};/, "a Lisa tem a ilha dela");
+  assert.match(fs.readFileSync(new URL("../db/030-versao-1.sql", import.meta.url), "utf8"), /'ilhas', 'arena'\)\);/);
+});
+
+caso("BEYOND-0023: a Arena Lúdica — todo bug quebra, toda solução passa, o mascote e o Parsons conferem certo", () => {
+  // roda o arnês como o navegador e o Node rodam: o código inteiro, com um console que guarda as linhas
+  const rodar = (codigo) => {
+    const linhas = [];
+    try { new Function("console", codigo)({ log: (...a) => linhas.push(a.join(" ")), error: () => {}, warn: () => {}, info: () => {} }); } catch { /* sintaxe quebrada: os testes nem rodam */ }
+    return linhas.join("\n");
+  };
+  const LENTOS = new Set(["fibonacci-lento", "tem-repetido"]); // o quebrado não termina a tempo: só a solução roda aqui
+  for (const [id, bug] of Object.entries(BUGS)) {
+    assert.ok(["porta", "armadilha", "inimigo"].includes(bug.obstaculo) && ["sintaxe", "logica", "desempenho"].includes(bug.tipo), id);
+    if (!LENTOS.has(id)) {
+      const quebrado = lerArnes(rodar(arnesDoBug(id, bug.codigo, "s1")), "s1");
+      assert.ok(!quebrado || quebrado.some((t) => !t.ok), `${id}: o código quebrado não passa`);
+    }
+    const certo = lerArnes(rodar(arnesDoBug(id, SOLUCOES_DOS_BUGS[id], "s2")), "s2");
+    assert.ok(certo && certo.every((t) => t.ok), `${id}: a solução de referência passa (${JSON.stringify(certo)})`);
+  }
+  assert.equal(lerArnes("ARENA:outra:[{\"ok\":true}]", "s3"), null, "a linha precisa da senha desta conferência");
+  assert.ok(ANDARES_DA_MASMORRA.every((a) => a.bugs.length === 2 && a.bugs.every((b) => BUGS[b])));
+  for (const a of ANDARES_DA_MASMORRA) for (const c of "HABS") assert.ok(a.mapa.some((l) => l.includes(c)), `${a.id} tem ${c}`);
+  // o mascote: o código inicial perde, a referência vence todos os níveis (direto e pelo arnês)
+  const decidirDe = (codigo) => new Function(codigo + "; return decidir;")();
+  for (const n of NIVEIS_DO_MASCOTE) {
+    assert.equal(simularMascote(n, decidirDe(CODIGO_INICIAL_DO_MASCOTE)).venceu, false, `${n.id}: só andar não basta`);
+    assert.equal(simularMascote(n, decidirDe(SOLUCAO_DO_MASCOTE)).venceu, true, `${n.id}: a referência vence`);
+    const r = lerArnes(rodar(arnesDoMascote(n.id, SOLUCAO_DO_MASCOTE, "m1")), "m1");
+    assert.equal(r?.venceu, true, `${n.id}: pelo arnês também`);
+  }
+  assert.match(simularMascote(NIVEIS_DO_MASCOTE[3], () => "andar").motivo, /caiu na água/);
+  assert.match(simularMascote(NIVEIS_DO_MASCOTE[1], () => "andar").motivo, /bateu na parede/);
+  assert.match(simularMascote(NIVEIS_DO_MASCOTE[0], () => "pular").motivo, /devolveu "pular"/);
+  assert.match(simularMascote(NIVEIS_DO_MASCOTE[0], () => { throw new Error("ops"); }).motivo, /deu erro: ops/);
+  // o Parsons: embaralhado nunca vem na ordem certa; a ordem e o recuo certos passam; o "}" vale em qualquer posição dele
+  for (const p of PUZZLES_DE_PARSONS) {
+    const blocos = blocosEmbaralhados(p.id, "alguém");
+    assert.equal(blocos.length, p.linhas.length);
+    assert.ok(blocos.some((b, i) => b.id !== `b${i}`), `${p.id} vem embaralhado`);
+    assert.ok(blocos.every((b) => !("recuo" in b)), "o recuo não vem junto");
+    const certa = p.linhas.map(([, recuo], i) => ({ id: `b${i}`, recuo }));
+    assert.equal(conferirParsons(p.id, certa).ok, true, p.id);
+    assert.equal(conferirParsons(p.id, certa.map((r, i) => (i === 1 ? { ...r, recuo: r.recuo + 1 } : r))).ok, false, `${p.id}: recuo errado não passa`);
+  }
+  const fz = PUZZLES_DE_PARSONS.find((p) => p.id === "contar-vogais");
+  const iguais = fz.linhas.map(([t], i) => (t === "}" ? i : -1)).filter((i) => i >= 0);
+  const trocada = fz.linhas.map(([, recuo], i) => ({ id: `b${i}`, recuo }));
+  [trocada[iguais[0]].id, trocada[iguais[1]].id] = [trocada[iguais[1]].id, trocada[iguais[0]].id];
+  trocada[iguais[0]].recuo = fz.linhas[iguais[0]][1];
+  trocada[iguais[1]].recuo = fz.linhas[iguais[1]][1];
+  assert.equal(conferirParsons("contar-vogais", trocada).ok, true, "dois \"}\" trocados de lugar continuam certos");
+  assert.equal(conferirParsons("contar-vogais", [{ id: "b0", recuo: 0 }]).ok, false, "incompleta não passa");
+  // as fases liberam em ordem
+  assert.equal(faseLiberada("mascote", "nivel-1"), true);
+  assert.equal(faseLiberada("mascote", "nivel-2"), false);
+  assert.equal(faseLiberada("mascote", "nivel-2", new Set(["mascote:nivel-1"])), true);
+  const lib = fs.readFileSync(new URL("../src/lib/arena.js", import.meta.url), "utf8");
+  assert.match(lib, /const NODE = "nodejs-20\.17\.0";/, "o servidor confere no Node do Wandbox, nunca no nosso");
+  assert.match(lib, /update\(\{ concluida_em: new Date\(\)\.toISOString\(\), recompensa: valor \}\)\.eq\("id", id\)\.is\("concluida_em", null\)/, "paga uma vez só");
+  assert.match(lib, /creditarMoedas\(usuarioId, "arena", valor/);
+  assert.match(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /\{ href: "\/arena", rotulo: "Arena", Icone: IconeArena, grupo: "Estudo" \}/);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

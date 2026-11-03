@@ -403,6 +403,45 @@ const DESENHOS = {
     <ellipse cx="82" cy="62" rx="12" ry="15" fill="#1f2937"/><ellipse cx="118" cy="62" rx="12" ry="15" fill="#1f2937"/>
     <circle cx="85" cy="57" r="4" fill="#22d3ee" stroke="none"/><circle cx="121" cy="57" r="4" fill="#22d3ee" stroke="none"/>
     <path d="M90 86 Q100 92 110 86" fill="none" stroke-width="4"/>`,
+  // ---- os nativos das ilhas (Temporada das Ilhas, 03/11/2026)
+  nativo: () => `
+    <rect x="84" y="154" width="13" height="28" rx="5" fill="#a0703f"/><rect x="104" y="154" width="13" height="28" rx="5" fill="#a0703f"/>
+    ${pes("#7c4a2d", 186, 12)}
+    <path d="M160 186 L160 22" stroke="#1f2937" stroke-width="11"/><path d="M160 186 L160 22" stroke="#8a5a2b" stroke-width="5"/>
+    <path d="M160 6 L149 32 L171 32 Z" fill="#cbd5e1"/>
+    <path d="M66 108 Q100 96 134 108 L138 140 Q100 150 62 140 Z" fill="#b5754a"/>
+    <path d="M70 120 Q100 128 130 120" fill="none" stroke="#f8fafc" stroke-width="5"/>
+    <path d="M62 138 L58 168 M72 140 L70 172 M84 142 L84 174 M96 142 L98 176 M108 142 L110 176 M120 142 L122 174 M132 140 L134 170 M140 138 L144 166" stroke="#65a30d" stroke-width="7"/>
+    <ellipse cx="100" cy="74" rx="30" ry="34" fill="#b5754a"/>
+    <path d="M76 66 h18 M106 66 h18" stroke-width="5"/>
+    <circle cx="86" cy="76" r="5" fill="#1f2937" stroke="none"/><circle cx="114" cy="76" r="5" fill="#1f2937" stroke="none"/>
+    <path d="M84 92 Q100 102 116 92" fill="none"/>
+    <path d="M78 52 L70 16 L90 44 Z M100 46 L100 8 L112 42 Z M122 52 L132 16 L112 44 Z" fill="#ef4444"/>
+    <path d="M70 56 Q100 40 130 56" fill="none" stroke="#f59e0b" stroke-width="7"/>`,
+
+  xama: () => `
+    <path d="M150 186 L150 48" stroke="#1f2937" stroke-width="10"/><path d="M150 186 L150 48" stroke="#8a5a2b" stroke-width="5"/>
+    <circle cx="150" cy="38" r="14" fill="#a3e635"/><circle cx="150" cy="38" r="7" fill="#ecfccb" stroke="none"/>
+    <path d="M58 182 Q100 96 142 182 Z" fill="#7c2d12"/>
+    <path d="M66 180 L74 150 M86 184 L90 150 M110 184 L110 150 M134 180 L126 150" stroke="#65a30d" stroke-width="7"/>
+    <rect x="68" y="34" width="64" height="86" rx="14" fill="#f59e0b"/>
+    <path d="M76 56 h16 M108 56 h16" stroke-width="6"/>
+    <circle cx="86" cy="70" r="7" fill="#1f2937" stroke="none"/><circle cx="114" cy="70" r="7" fill="#1f2937" stroke="none"/>
+    <rect x="84" y="88" width="32" height="16" rx="4" fill="#fff"/><path d="M92 88 v16 M100 88 v16 M108 88 v16" stroke-width="3"/>
+    <path d="M60 30 Q100 0 140 30" fill="none" stroke="#22c55e" stroke-width="10"/>
+    <path d="M70 26 L64 8 M100 18 L100 0 M130 26 L136 8" stroke="#ef4444" stroke-width="6"/>`,
+
+  chefeTiki: () => `
+    <rect x="58" y="150" width="30" height="36" rx="8" fill="#7c4a2d"/><rect x="112" y="150" width="30" height="36" rx="8" fill="#7c4a2d"/>
+    <path d="M30 96 L4 130 L26 136 L42 110 Z M170 96 L196 130 L174 136 L158 110 Z" fill="#a0703f"/>
+    <rect x="40" y="20" width="120" height="140" rx="22" fill="#a0703f"/>
+    <path d="M40 72 H160 M40 118 H160" stroke="#6b4423" stroke-width="6"/>
+    <path d="M58 40 h30 M112 40 h30" stroke-width="7"/>
+    <ellipse cx="74" cy="56" rx="12" ry="9" fill="#fde047"/><ellipse cx="126" cy="56" rx="12" ry="9" fill="#fde047"/>
+    <circle cx="74" cy="56" r="4" fill="#1f2937" stroke="none"/><circle cx="126" cy="56" r="4" fill="#1f2937" stroke="none"/>
+    <rect x="62" y="84" width="76" height="24" rx="6" fill="#7f1d1d"/><path d="M74 84 v24 M88 84 v24 M100 84 v24 M112 84 v24 M126 84 v24" stroke="#fef3c7" stroke-width="4"/>
+    <path d="M58 134 Q100 146 142 134" fill="none" stroke="#65a30d" stroke-width="9"/>
+    <path d="M70 20 Q80 -6 100 8 Q120 -6 130 20 Z" fill="#f97316"/><path d="M86 18 Q94 2 100 12 Q106 2 114 18 Z" fill="#fde047" stroke="none"/>`,
 };
 
 /** Uma cabeça do Cérbero: focinho, orelhas pontudas, olhos em brasa e fogo saindo da boca. */
@@ -447,5 +486,6 @@ export const TAMANHO_DOS_MONSTROS = {
   bode: 0.95, harpia: 0.95, yeti: 1.5, golem: 1.8, giganteDeGelo: 2.4,
   diabrete: 0.8, salamandra: 1.15, golemDeMagma: 1.85, dragaoDeLava: 2.4,
   zorg: 0.85, gosmoide: 1.1, insetoide: 1.0, ciborgue: 1.35, cristalino: 1.6, polvoEstelar: 1.1, disco: 1.2, rainhaAlien: 2.1,
+  nativo: 0.95, xama: 1.0, chefeTiki: 2.0,
 };
 export const VOO_DOS_MONSTROS = { morcego: 1.2, aguaViva: 1.0, harpia: 1.3, diabrete: 1.1, disco: 1.4 };

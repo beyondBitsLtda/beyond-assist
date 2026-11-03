@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoFuncionario } from "./acervo/personagensDoAcervo.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-11-03-clima-e-forja";
+export const EDICAO_DAS_NOVIDADES = "2026-11-03-versao-1";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -27,14 +27,15 @@ function marcarComoVistas() {
   window.dispatchEvent(new CustomEvent("proof-novidades-fechou"));
 }
 
-// a edição de 03/11/2026 (à noite): o clima do Reino e as quatro ideias da Lisa — o humor do Neuro, a Forja,
-// os Chefões da Procrastinação e o Duelo de Lógica
+// a edição da VERSÃO 1.0 (03/11/2026): o Lisa_Proof sai do "em construção". O que chegou nela vem primeiro; o
+// resto lembra o que o app já é, para quem chega agora
 const NOVIDADES = [
-  { icone: "🌧️", destaque: true, titulo: "O Reino agora tem clima e anoitece", texto: "A luz segue a hora de verdade: amanhece, entardece dourado e anoitece com estrelas e janelas acesas. E o tempo muda a cada 3 horas — chuva, neve, vento e tempestade com relâmpagos." },
-  { icone: "🧠", titulo: "O humor do Neuro", texto: "Estudando todo dia, o Neuro evolui e a sua mina rende até +20%. Sumiu 3 dias? Ele fica revoltado e fecha as expedições até você voltar a estudar." },
-  { icone: "⚒️", titulo: "Forja de Artefatos", texto: "Seus estudos viram mana (menu Jogo → Forja): a Poção de Foco dá +50% no que você ganhar por 2 horas, e o Escudo de Folga protege o reino por 24 horas." },
-  { icone: "👹", titulo: "Chefões da Procrastinação", texto: "Matérias e revisões atrasadas viram um monstro gigante no seu Reino. Bata nele com a Prática, o diário e os Cadernos — derrubou, ganha moedas." },
-  { icone: "⚔️", titulo: "Duelo de Lógica com a Lisa", texto: "Em Lisa joga → Duelo: 5 perguntas rápidas de código e raciocínio, valendo moedas. Ganhou dela, leva a aposta do reino dela." },
+  { icone: "🏝️", destaque: true, titulo: "Temporada das Ilhas", texto: "A primeira temporada de domínio: compre o Navio Pirata, conquiste as ilhas dos nativos com a sua tripulação, construa com conchas e dispute o arquipélago com os outros jogadores — aqui, só pacto entre dois segura um ataque." },
+  { icone: "🕹️", destaque: true, titulo: "Arena Lúdica de Programação", texto: "Conserte bugs para atravessar a Masmorra da Depuração, programe o mascote para comer tudo e monte algoritmos embaralhados. O terminal roda na hora e a Lisa explica os erros." },
+  { icone: "🧩", titulo: "O exemplo da Lisa nos exercícios", texto: "Travou? Em todo exercício e projeto, a Lisa mostra um exemplo que aplica todos os conceitos que você vai precisar — sem resolver o seu." },
+  { icone: "⚔️", titulo: "Reino maior", texto: "Tropas novas (Lanceiro, Cavaleiro, Grifo e o Colosso de Pedra), o Pomar, o Lança-Chamas, a Torre de Gelo, a Catapulta e seis expedições novas." },
+  { icone: "👹", titulo: "Chefões com dentes", texto: "De pé, o chefão da procrastinação rouba um pouquinho do reino por dia. Derrube ele e recebe tudo de volta, mais a recompensa." },
+  { icone: "🧠", titulo: "Tudo o que já estava aqui", texto: "Trilhas e prática diária, Cadernos e Biblioteca, o Modo Domínio, a Bolsa, a Forja, o Duelo com a Lisa, o clima do Reino e o humor do Neuro." },
 ];
 
 const NA_ESQUERDA = ["celeste", "iris"];
@@ -76,13 +77,13 @@ export default function Novidades() {
             <span>{NA_ESQUERDA.map((id) => <img key={id} className="novidades__retrato novidades__retrato--solto" src={urlDoFuncionario(id)} alt="" />)}</span>
             <span>{NA_DIREITA.map((id) => <img key={id} className="novidades__retrato novidades__retrato--solto" src={urlDoFuncionario(id)} alt="" />)}</span>
           </div>
-          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} /></div>
+          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} /><span className="novidades__versao" aria-hidden="true">1.0</span></div>
           <span className="novidades__chao" />
         </div>
         <div className="novidades__corpo">
-          <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">Chuva, noite e chefões no Reino!</h2>
-          <p className="novidades__sub">O Reino ganhou clima de verdade, e chegaram as ideias da Lisa: o humor do Neuro, a Forja, os Chefões e o Duelo.</p>
+          <span className="novidades__selo novidades__selo--versao">🎉 Versão 1.0</span>
+          <h2 id="novidades-titulo" className="novidades__titulo">O Lisa_Proof chegou à versão 1.0!</h2>
+          <p className="novidades__sub">Obrigado por estudar e jogar com a gente até aqui. A 1.0 fecha o "em construção" com a Temporada das Ilhas, a Arena Lúdica e o exemplo da Lisa em todo exercício.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -92,8 +93,9 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/reino" className="pf-botao novidades__principal" onClick={fechar}>🌧️ Ver o Reino</Link>
-            <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
+            <Link ref={principal} href="/ilhas" className="pf-botao novidades__principal" onClick={fechar}>🏝️ Ir para as Ilhas</Link>
+            <Link href="/arena" className="pf-botao pf-botao--sec" onClick={fechar}>🕹️ Abrir a Arena</Link>
+            <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois</button>
           </div>
         </div>
       </div>

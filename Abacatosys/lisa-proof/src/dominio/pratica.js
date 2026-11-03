@@ -440,6 +440,40 @@ export function validarGuia(bruto) {
 }
 
 /**
+ * O "Exemplo da Lisa" (03/11/2026, BEYOND-0022: "os exercícios devem ter uma dica que mostra uma aplicação de
+ * todos os conceitos necessários, inclusive os de projetos — a Lisa fazer uma aplicação de código de exemplo").
+ * Vale para o exercício e para os projetos; os treinos de música, o ditado e a conversa não têm o que aplicar.
+ */
+export const MOTORES_SEM_EXEMPLO = new Set(["ouvido", "ritmo", "afinacao", "leitura", "ditado", "conversa"]);
+export const temExemploDaLisa = (tipo, motor) => tipo !== "quiz" && !MOTORES_SEM_EXEMPLO.has(motor || "codigo");
+
+/** Tira as cercas de markdown que o modelo às vezes põe em volta do código. */
+const semCercas = (codigo) => String(codigo ?? "").replace(/\r\n/g, "\n").replace(/^\s*`{3}[\w+#-]*\n?/, "").replace(/\n?`{3}\s*$/, "").trim();
+
+/**
+ * O exemplo, conferido: os conceitos (nome e para que serve), o código (ou, fora da programação, o exemplo
+ * resolvido em passos), como ele funciona e como levar a ideia para o desafio — sem resolver o desafio.
+ */
+export function validarExemploDaLisa(bruto, { comCodigo = true } = {}) {
+  const conceitos = (Array.isArray(bruto?.conceitos) ? bruto.conceitos : [])
+    .map((c) => ({ nome: texto(c?.nome, 80), explicacao: texto(c?.explicacao, 300) }))
+    .filter((c) => c.nome && c.explicacao).slice(0, 8);
+  if (conceitos.length < 1) throw new Error("a Lisa não conseguiu montar o exemplo — tente de novo");
+  const codigo = comCodigo ? semCercas(bruto?.codigo).slice(0, 6000) : "";
+  const passos = listaDeTextos(bruto?.passos, 400, 10);
+  if (comCodigo ? codigo.length < 20 : passos.length < 2) throw new Error("a Lisa não conseguiu montar o exemplo — tente de novo");
+  return {
+    titulo: texto(bruto?.titulo, 120) || "Um exemplo parecido",
+    conceitos,
+    linguagem: comCodigo ? texto(bruto?.linguagem, 30).toLowerCase() : "",
+    codigo,
+    passos: comCodigo ? [] : passos,
+    comoFunciona: listaDeTextos(bruto?.comoFunciona, 300, 8),
+    paraOSeu: texto(bruto?.paraOSeu, 500),
+  };
+}
+
+/**
  * A avaliação da IA, conferida. `aprovado` sai da NOTA, não do que o modelo disse: um "aprovado"
  * com nota 40 (ou o contrário) é contradição que a tela não teria como explicar.
  */

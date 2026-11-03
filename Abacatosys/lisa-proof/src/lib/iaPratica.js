@@ -2,7 +2,7 @@
 // Tudo que sai daqui passa pelas conferências de src/dominio/pratica.js.
 
 import { PERSONA, personaDo, corte, gerarJson } from "./ia.js";
-import { validarQuiz, validarExercicio, validarProjeto, validarGuia, validarAvaliacao, perguntasNovas, exercicioRepetido, FOCO_DA_RODADA } from "@/dominio/pratica.js";
+import { validarQuiz, validarExercicio, validarProjeto, validarGuia, validarAvaliacao, perguntasNovas, exercicioRepetido, FOCO_DA_RODADA, validarExemploDaLisa } from "@/dominio/pratica.js";
 import { validarAberto, validarCalculo, validarDitado, EVIDENCIAS } from "@/dominio/motores.js";
 import { FORMAS } from "@/dominio/expressao.js";
 import { perfilValido, ehProgramacao, evidenciasDoPerfil } from "@/dominio/perfis.js";
@@ -837,6 +837,59 @@ export async function gerarGuiaDoProjeto({ tema, tipo, projeto, perfil = "progra
     ].filter(Boolean).join("\n"),
   });
   return validarGuia(bruto);
+}
+
+// ---------------------------------------------------------------- o exemplo da Lisa (BEYOND-0022)
+
+const ESQUEMA_DO_EXEMPLO = {
+  type: "OBJECT",
+  properties: {
+    titulo: { type: "STRING" },
+    conceitos: { type: "ARRAY", items: { type: "OBJECT", properties: { nome: { type: "STRING" }, explicacao: { type: "STRING" } }, required: ["nome", "explicacao"] } },
+    linguagem: { type: "STRING" },
+    codigo: { type: "STRING" },
+    passos: { type: "ARRAY", items: { type: "STRING" } },
+    comoFunciona: { type: "ARRAY", items: { type: "STRING" } },
+    paraOSeu: { type: "STRING" },
+  },
+  required: ["titulo", "conceitos", "comoFunciona", "paraOSeu"],
+};
+
+/**
+ * O "Exemplo da Lisa": uma aplicação pequena, de OUTRO cenário, que usa todos os conceitos de que o desafio
+ * precisa — a pessoa vê os conceitos funcionando juntos e leva a ideia para o dela. Não resolve o desafio.
+ * `resumo`: o enunciado (ou os requisitos) do desafio em texto. Fora da programação (`comCodigo` falso), o
+ * exemplo é resolvido em passos, sem código.
+ */
+export async function gerarExemploDaLisa({ tema, perfil = "programacao", resumo, linguagem = "", comCodigo = true }) {
+  const bruto = await gerarJson({
+    sistema: personaDo(comCodigo ? "programacao" : perfil) + " Aqui você ensina com um exemplo: mostra os conceitos funcionando num caso parecido, sem fazer o trabalho do estudante.",
+    esquema: ESQUEMA_DO_EXEMPLO,
+    maxTokens: 6000,
+    pedido: [
+      `Tema do curso: ${tema}`,
+      linguagem ? `Linguagem do desafio: ${linguagem}` : "",
+      "O desafio do estudante:",
+      resumo,
+      "",
+      "Monte o EXEMPLO DA LISA:",
+      "- `conceitos`: TODOS os conceitos de que o desafio precisa (de 2 a 8), cada um com o nome e uma frase de para que serve.",
+      ...(comCodigo
+        ? ["- `codigo`: UMA aplicação de exemplo, completa e que roda, num cenário DIFERENTE do desafio (outro assunto, outros",
+          "  nomes), que usa todos esses conceitos juntos. De 20 a 70 linhas, com comentários curtos em português marcando",
+          "  onde cada conceito aparece. Sem markdown nem crases em volta: só o código.",
+          `- \`linguagem\`: a linguagem do código (${linguagem || "a do curso"}), em minúsculas.`]
+        : ["- `passos`: um exemplo RESOLVIDO, passo a passo (de 3 a 8 passos), de um caso DIFERENTE do desafio que usa todos",
+          "  esses conceitos. Cada passo em 1 ou 2 frases."]),
+      "- `comoFunciona`: de 3 a 6 frases curtas explicando o exemplo, na ordem em que ele acontece.",
+      "- `paraOSeu`: 2 ou 3 frases dizendo como levar a ideia para o desafio — o que muda e por onde começar — SEM",
+      "  dar a resposta nem o código do desafio.",
+      "- `titulo`: o nome do exemplo (ex.: \"Um controle de estoque de livraria\").",
+      "",
+      "Regras: o exemplo NÃO pode ser a solução do desafio, nem uma versão dele com outros nomes. Português do Brasil.",
+    ].filter(Boolean).join("\n"),
+  });
+  return validarExemploDaLisa(bruto, { comCodigo });
 }
 
 // ---------------------------------------------------------------- avaliação

@@ -19,7 +19,8 @@ import { criarCurso } from "@/lib/cursos.js";
 import { detalheDaTrilha } from "@/lib/trilhas.js";
 import { marcarItem } from "@/lib/estudo.js";
 import { obterOuCriarDesafio, desafioDoUsuario, responderQuiz, entregarEvidencia, entregarDiagrama, enviarExercicio, entregarProjetoEmArquivos } from "@/lib/pratica.js";
-import { estadoDoReino, coletarMina, melhorarConstrucao, treinarTropas, alvosDe, invadir, saldoDoUsuario, renomearReino } from "@/lib/reino.js";
+import { estadoDoReino, coletarMina, melhorarConstrucao, treinarTropas, alvosDe, invadir, saldoDoUsuario, renomearReino, comprarVeiculo } from "@/lib/reino.js";
+import { estadoDasIlhas, comprarConchas, coletarIlhas, construirNaIlha, treinarTripulacao, atacarIlha, aceitarPacto } from "@/lib/ilhas.js";
 import { estadoDaBolsa, comprarAcao } from "@/lib/bolsa.js";
 import { criarMaterial } from "@/lib/acervo.js";
 import { valesPendentes, resgatarVale } from "@/lib/vales.js";
@@ -392,8 +393,63 @@ Responda só SIM se ele é útil (uma dica, um incentivo de verdade, uma pergunt
 
 // ---------------------------------------------------------------- a passada
 
-const ACOES = { curso, mina, teoria, quiz, exercicio, projeto, reino, bolsa, caderno, acervo, correio };
-const NOME_DA_ACAO = { curso: "escolher o curso", mina: "recolher a mina", teoria: "estudar a teoria", quiz: "o quiz", exercicio: "o exercício", projeto: "o projeto", reino: "o Reino", bolsa: "a Bolsa", caderno: "o caderno", acervo: "o Acervo", correio: "o correio" };
+// ---------------------------------------------------------------- a Temporada das Ilhas (BEYOND-0020)
+
+/**
+ * A ilha da Lisa ("a Lisa também vai poder ter a ilha dela e jogar"): compra o Navio quando dá, aceita os
+ * pactos (ela é da paz), coleta, troca moedas por conchas quando falta, melhora uma construção por dia,
+ * completa a tripulação e, enquanto não tem ilha, zarpa para a ilha dos nativos mais fácil. Uma ilha basta.
+ */
+async function ilhas(id) {
+  const feito = [];
+  let estado = await estadoDasIlhas(id);
+  if (!estado.temporada.aberta) return { resumo: "A Temporada das Ilhas está fechada agora." };
+  if (!estado.temNavio) {
+    try {
+      await comprarVeiculo(id, "navio");
+      feito.push("comprei o Navio Pirata");
+      estado = await estadoDasIlhas(id);
+    } catch (e) {
+      return { resumo: `Ainda não deu para comprar o Navio Pirata (${e.message}).` };
+    }
+  }
+  for (const p of estado.pactos.filter((x) => x.pendente && !x.euPropus)) {
+    try { await aceitarPacto(id, p.id); feito.push(`aceitei o pacto com ${p.com}`); } catch (e) { log("pacto:", e.message); }
+  }
+  if (estado.ilhas.some((i) => i.dono?.souEu && (i.juntado?.conchas || i.juntado?.moedas))) {
+    try { const r = await coletarIlhas(id); feito.push(`coletei 🐚 ${r.conchas} e 🪙 ${r.moedas}`); } catch (e) { log("coleta nas ilhas:", e.message); }
+  }
+  estado = await estadoDasIlhas(id);
+  if (estado.conchas < 400 && estado.moedas > 300) {
+    try { await comprarConchas(id, 50); feito.push("troquei 🪙 50 por 🐚 500"); } catch (e) { log("conchas:", e.message); }
+    estado = await estadoDasIlhas(id);
+  }
+  const minha = estado.ilhas.find((i) => i.dono?.souEu);
+  const obra = minha?.construcoes.filter((c) => c.pode).sort((a, b) => a.custo - b.custo)[0];
+  if (obra) {
+    try { await construirNaIlha(id, minha.id, obra.chave); feito.push(`melhorei ${obra.nome} na ${minha.nome}`); } catch (e) { log("obra na ilha:", e.message); }
+    estado = await estadoDasIlhas(id);
+  }
+  // a tripulação: um terço de arpoadoras, o resto de piratas, no espaço que sobra
+  let livre = estado.tripulacao.capacidade - estado.tripulacao.usado;
+  for (const [tropa, parte] of [["arpoadora", 3], ["pirata", 1]]) {
+    const n = Math.min(10, Math.floor(livre / parte));
+    if (n < 1) continue;
+    try { await treinarTripulacao(id, tropa, n); feito.push(`treinei ${n} ${tropa === "pirata" ? "pirata(s)" : "arpoadora(s)"}`); livre -= n; } catch (e) { log("tripulação:", e.message); }
+  }
+  if (!estado.ilhas.some((i) => i.dono?.souEu)) {
+    estado = await estadoDasIlhas(id);
+    const alvo = estado.ilhas.filter((i) => !i.dono && i.podeAtacar).sort((a, b) => a.nivel - b.nivel)[0];
+    if (alvo) {
+      const r = await atacarIlha(id, alvo.id);
+      feito.push(`zarpei para a ${alvo.nome}: ${r.desfecho === "conquista" ? "conquistei! 🏝️" : r.desfecho === "saque" ? "voltei com conchas" : "a ilha resistiu desta vez"}`);
+    }
+  }
+  return { resumo: feito.length ? `Nas ilhas: ${feito.join("; ")}.` : "Passei pelas ilhas e só olhei o mar.", detalhe: { ilha: minha?.id || null } };
+}
+
+const ACOES = { curso, mina, teoria, quiz, exercicio, projeto, reino, bolsa, caderno, acervo, correio, ilhas };
+const NOME_DA_ACAO = { curso: "escolher o curso", mina: "recolher a mina", teoria: "estudar a teoria", quiz: "o quiz", exercicio: "o exercício", projeto: "o projeto", reino: "o Reino", bolsa: "a Bolsa", caderno: "o caderno", acervo: "o Acervo", correio: "o correio", ilhas: "as ilhas" };
 
 async function main() {
   if (args.has("criar-conta")) return criarConta();

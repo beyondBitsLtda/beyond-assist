@@ -37,7 +37,7 @@ import {
 import {
   EXPEDICOES, TIPOS_DE_LUGAR, MONSTROS, DIFICULDADES, expedicaoPorId, podeExpedicionar, contagensDeMonstros, veiculoDa,
 } from "@/dominio/monstros.js";
-import { VEICULOS, ORDEM_DOS_VEICULOS, veiculosDe, podeComprarVeiculo, tanqueDoDia, podeAbastecer } from "@/dominio/veiculos.js";
+import { VEICULOS, ORDEM_DOS_VEICULOS, veiculosDe, podeComprarVeiculo, tanqueDoDia, podeAbastecer, fazExpedicao } from "@/dominio/veiculos.js";
 import { planetoideDa, sementeDoPlanetoide, RACAS } from "@/dominio/planetoides.js";
 import {
   OPERARIOS_INICIAIS, HORAS_POR_PEPITA, VALOR_DA_PEPITA, HORAS_DE_ALUGUEL, PRECO_MINIMO_DO_ALUGUEL, PRECO_MAXIMO_DO_ALUGUEL,
@@ -376,8 +376,9 @@ export async function estadoDoReino(usuarioId) {
     humorDoNeuro: humor,
     mina: {
       paraColetar: producaoAcumulada(reino, agora, fatorDaMina),
-      porHora: taxaDeProducao(n) * fatorDaMina,
-      capacidade: taxaDeProducao(n) * fatorDaMina * HORAS_ATE_ENCHER,
+      // duas casas no máximo: o bônus do humor (×1,05…) deixava o ponto flutuante aparecer (BEYOND-0019)
+      porHora: centavos(taxaDeProducao(n) * fatorDaMina),
+      capacidade: Math.floor(taxaDeProducao(n) * fatorDaMina * HORAS_ATE_ENCHER),
       dobrada: (paz.vigente?.fatorDaMina || 1) > 1,
       bonusDoNeuro: humor.bonusDaMina,
     },
@@ -526,7 +527,7 @@ export async function melhorarConstrucao(usuarioId, chave) {
   const mudancas = { construcoes: { ...n, [chave]: (n[chave] || 0) + 1 } };
   // A mina melhorada produz mais por hora: o que ela já tinha juntado é coletado antes, para o
   // nível novo não valer para trás.
-  if (chave === "mina" || chave === "biblioteca") {
+  if (chave === "mina" || chave === "biblioteca" || chave === "pomar") {
     const juntado = producaoAcumulada(reino);
     if (juntado > 0) lancamentos.push({ tipo: "coleta", valor: juntado, detalhe: { automatica: true } });
     mudancas.coletado_em = new Date().toISOString();
@@ -815,7 +816,7 @@ export async function expedicoesDe(usuarioId) {
   for (const x of tanques.lista) vezesHoje.set(x.expedicao, (vezesHoje.get(x.expedicao) || 0) + 1);
   const torre = niveisDe(eu).castelo;
   const tropa = exercitoDaExpedicao(eu.exercito, torre);
-  const meus = veiculosDe(eu.veiculos);
+  const meus = veiculosDe(eu.veiculos).filter(fazExpedicao);
   const planetoide = planetoideDaVez(usuarioId, tanques);
   const garagem = garagemParaTela(eu, saldo, tanques);
   return {

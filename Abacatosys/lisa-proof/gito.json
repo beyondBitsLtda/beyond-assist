@@ -5,18 +5,42 @@
     "codigo": "PROOF",
     "descricao": "App de estudo no estilo Duolingo: transforma os quadros STUDY do Abacato em trilhas com metas diárias, semanais e mensais, pontos e ofensiva de dias seguidos — para programação, música, idiomas, matemática ou qualquer tema.",
     "tipo": "Aplicação web",
-    "situacao": "em homologação",
+    "situacao": "em produção",
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.49.0-cloudflare-pages.1",
+  "versao": "1.0.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-03",
   "compilacao": {
-    "numero": 94,
+    "numero": 95,
     "data": "2026-11-03",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.0.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Versão 1.0: a Temporada das Ilhas, a Arena Lúdica de Programação, o exemplo da Lisa em todo exercício, um Reino maior, o chefão que rouba (e devolve) e a correção das moedas com casas demais — com o modal anunciando a 1.0.",
+      "itens": [
+        "Temporada das Ilhas (BEYOND-0020): o arquipélago de 12 ilhas, do Navio Pirata (a garagem do reino) à conquista dos nativos com ⭐⭐. Nas ilhas se constrói com conchas 🐚 (10 por moeda: território desvalorizado), elas produzem conchas e pérolas (moedas de verdade), a tripulação é própria (Pirata, Arpoadora, Polvorista e Papagaio de Guerra) e outros jogadores podem tomar a sua ilha. Paz geral não vale: só pacto entre dois jogadores. A Lisa também tem a ilha dela.",
+        "Reino maior (BEYOND-0020): tropas novas (Lanceiro, Cavaleiro, Grifo e Colosso de Pedra), o Pomar, o Lança-Chamas, a Torre de Gelo e a Catapulta, e seis expedições novas (Pântano das Gosmas, Vale Uivante, Cemitério Esquecido, Fortaleza dos Ogros, Jardim das Águas-vivas e Desfiladeiro dos Golems).",
+        "Arena Lúdica de Programação (BEYOND-0023): a Masmorra da Depuração (pixel art: portas, armadilhas e inimigos são bugs de sintaxe, lógica ou desempenho), o Mascote Programável (a função decidir controla o mascote numa grade) e os Quebra-cabeças de Parsons (ordem e recuo). Terminal com o editor e os testes rodando na hora, a Lisa explica os erros, o progresso fica salvo e cada fase nova rende moedas; o servidor confere antes de pagar (Parsons no próprio servidor; masmorra e mascote no Node do Wandbox).",
+        "Modo dica nos exercícios (BEYOND-0022): o exemplo da Lisa — uma aplicação de exemplo, num cenário parecido, com todos os conceitos de que o exercício ou o projeto precisa, sem resolver o desafio. Gera uma vez e fica guardado.",
+        "Chefão da Procrastinação com dano (BEYOND-0018): de pé, ele rouba um pouco do reino a cada 24 horas (8, 15 ou 25 moedas, nunca mais que 5% do saldo nem, no total, mais que a recompensa dele). Derrubado, devolve tudo o que roubou, além da recompensa.",
+        "Correção (BEYOND-0019): as moedas não aparecem mais com um monte de casas decimais — a produção da mina com o bônus do humor do Neuro é arredondada na conta e na tela.",
+        "Aviso de novidades: a edição da versão 1.0 abre uma vez para todos.",
+        "Migração db/030: as colunas do roubo do chefão, proof_ilhas, proof_tripulacoes, proof_conchas, proof_ilha_batalhas, proof_pactos e proof_arena, e os tipos ilhas e arena no livro-caixa."
+      ],
+      "issues": [
+        "BEYOND-0018",
+        "BEYOND-0019",
+        "BEYOND-0020",
+        "BEYOND-0022",
+        "BEYOND-0023"
+      ]
+    },
     {
       "versao": "0.49.0-cloudflare-pages.1",
       "data": "2026-11-03",
@@ -1498,7 +1522,10 @@
         "Humor do Neuro: a ofensiva de estudo faz o mascote evoluir (bônus na mina); dias sem estudo o revoltam e fecham as expedições",
         "Forja de Artefatos: mana dos pontos de estudo para forjar a Poção de Foco (+50% por 2 h) e o Escudo de Folga (24 h sem invasões)",
         "Chefões da Procrastinação: o atraso de estudo vira um chefão no mapa do Reino, derrubado com estudo e Cadernos, com recompensa em moedas",
-        "Duelo de Lógica com a Lisa: perguntas rápidas de código e raciocínio, com aposta de moedas contra o reino dela"
+        "Duelo de Lógica com a Lisa: perguntas rápidas de código e raciocínio, com aposta de moedas contra o reino dela",
+        "Temporada das Ilhas: arquipélago para conquistar com navio e tripulação, construção com conchas, produção, invasão entre jogadores e pactos individuais",
+        "Arena Lúdica de Programação: masmorra de depuração, mascote programável e quebra-cabeças de Parsons, com terminal, explicação da Lisa e recompensa por fase",
+        "Exemplo da Lisa: uma aplicação de exemplo com os conceitos de cada exercício e projeto, sem resolver o desafio"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -1579,7 +1606,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/029; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/030; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
       }
     ],
     "integracoes": [
@@ -1600,7 +1627,7 @@
       },
       {
         "nome": "Wandbox",
-        "descricao": "Compilador on-line gratuito (sem chave) usado pelo botão Rodar dos exercícios em C, Python, PHP, Java, C# e outras linguagens. O servidor do Proof envia só o código e a entrada digitada; há um freio de 30 execuções a cada 10 minutos por pessoa.",
+        "descricao": "Compilador on-line gratuito (sem chave) usado pelo botão Rodar dos exercícios em C, Python, PHP, Java, C# e outras linguagens. O servidor do Proof envia só o código e a entrada digitada; há um freio de 30 execuções a cada 10 minutos por pessoa. Também confere as fases da Arena Lúdica (Node 20) antes de pagar a recompensa.",
         "url": "https://wandbox.org"
       },
       {

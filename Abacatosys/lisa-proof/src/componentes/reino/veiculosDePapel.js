@@ -3,6 +3,16 @@
 // no 3D da batalha cada um tem o seu modelo (Mundo3D, função veiculoDaBatalha).
 
 const DESENHOS = {
+  // o Navio da Temporada das Ilhas (03/11/2026): velas, canhões no costado e a bandeira pirata
+  navio: () => `
+    <path d="M18 118 L182 118 L158 166 L42 166 Z" fill="#7c4a2d"/>
+    <path d="M30 132 H170" stroke="#4b3621" stroke-width="6"/>
+    <circle cx="66" cy="148" r="6" fill="#1f2937" stroke="none"/><circle cx="100" cy="148" r="6" fill="#1f2937" stroke="none"/><circle cx="134" cy="148" r="6" fill="#1f2937" stroke="none"/>
+    <path d="M70 118 V24 M130 118 V40" stroke-width="7"/>
+    <path d="M40 34 Q70 50 100 34 L100 96 Q70 108 40 96 Z" fill="#f8fafc"/>
+    <path d="M106 50 Q130 62 154 50 L154 100 Q130 110 106 100 Z" fill="#f8fafc"/>
+    <path d="M70 24 L98 14 L70 4 Z" fill="#1f2937"/><circle cx="80" cy="14" r="3" fill="#fff" stroke="none"/>
+    <path d="M14 184 q12 -12 24 0 q12 -12 24 0 q12 -12 24 0 q12 -12 24 0 q12 -12 24 0 q12 -12 24 0 q12 -12 24 0" fill="none" stroke="#38bdf8" stroke-width="6"/>`,
   barco: () => `
     <path d="M30 120 L170 120 L150 160 L50 160 Z" fill="#a0703f"/>
     <path d="M42 120 L158 120" stroke-width="8" stroke="#6e4a2a"/>

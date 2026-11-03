@@ -44,3 +44,122 @@
 .du-errado { color: #dc2626; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .du-partida__barra span { transition: none; } }
 @media (max-width: 560px) { .du-apostas { flex-direction: column; align-items: flex-start; } }
+
+/* ---- a Temporada das Ilhas (03/11/2026, BEYOND-0020) */
+.il-faixa { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.il-faixa__item { display: grid; gap: 2px; padding: 8px 12px; border-radius: var(--pf-raio); background: var(--pf-superficie); border: 1px solid var(--pf-linha); min-width: 120px; }
+.il-faixa__item strong { font-size: 16px; }
+.il-navio { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 14px; }
+.il-navio p { flex: 1 1 260px; margin: 0; }
+.il-conchas { margin-bottom: 14px; display: grid; gap: 8px; }
+.il-conchas p { margin: 0; }
+.il-conchas__botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.il-grade { display: grid; gap: 16px; margin-bottom: 20px; }
+@media (min-width: 1000px) { .il-grade { grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr); align-items: start; } }
+.il-mapa { position: relative; aspect-ratio: 16 / 11; border-radius: var(--pf-raio-grande); overflow: hidden; border: 1px solid var(--pf-linha); }
+.il-mapa__mar { position: absolute; inset: 0; width: 100%; height: 100%; }
+.il-ilha {
+  position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px;
+  border: none; background: none; padding: 0; cursor: pointer; font: inherit; color: #0b2e4a; max-width: 120px;
+}
+.il-ilha__terra {
+  display: grid; place-items: center; width: 56px; height: 40px; border-radius: 48% 52% 46% 54% / 55% 45% 55% 45%;
+  background: radial-gradient(circle at 50% 40%, #6fbf5a 0 42%, #f1d99a 44% 100%); box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.35), 0 4px 10px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+.il-ilha__emoji { font-size: 20px; line-height: 1; }
+.il-ilha__nome { font-size: 11px; font-weight: 800; background: rgba(255, 255, 255, 0.85); padding: 1px 6px; border-radius: 9999px; white-space: nowrap; }
+.il-ilha__dono { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9999px; white-space: nowrap; background: rgba(11, 46, 74, 0.75); color: #fff; }
+.il-ilha--minha .il-ilha__dono { background: #2362D3; }
+.il-ilha--outro .il-ilha__dono { background: #b91c1c; }
+.il-ilha:hover .il-ilha__terra, .il-ilha--escolhida .il-ilha__terra { transform: scale(1.12); }
+.il-ilha--escolhida .il-ilha__terra { box-shadow: 0 0 0 4px #fde047, 0 4px 12px rgba(0, 0, 0, 0.3); }
+.il-ilha:focus-visible { outline: 3px solid #fde047; outline-offset: 4px; border-radius: 12px; }
+@media (max-width: 640px) {
+  .il-ilha__terra { width: 40px; height: 30px; }
+  .il-ilha__emoji { font-size: 15px; }
+  .il-ilha__nome { display: none; }
+  .il-ilha__dono { font-size: 9px; }
+}
+.il-painel { display: grid; gap: 10px; }
+.il-painel__topo { display: flex; gap: 10px; align-items: center; }
+.il-painel__topo h2 { margin: 0; font-size: 19px; }
+.il-painel__topo p { margin: 2px 0 0; }
+.il-painel__emoji { font-size: 34px; line-height: 1; }
+.il-painel__sub { margin: 6px 0 0; font-size: 15px; }
+.il-painel__acoes { display: grid; gap: 8px; justify-items: start; }
+.il-painel__acoes p { margin: 0; }
+.il-defensores { display: grid; gap: 4px; }
+.il-defensores__lista { display: flex; flex-wrap: wrap; gap: 8px; }
+.il-defensor { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.il-construcoes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.il-construcoes li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 10px; font-size: 14px; padding: 6px 0; border-bottom: 1px solid var(--pf-linha); }
+.il-construcoes small { color: var(--pf-tinta-2); }
+.il-construcoes__vazia { opacity: 0.75; }
+.il-construcoes__motivo { flex-basis: 100%; color: var(--pf-tinta-2); font-size: 12px; text-align: right; }
+.il-tripulacao { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.il-tropa { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: start; }
+.il-tropa p { margin: 4px 0; }
+.il-tropa__botoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.il-lista { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
+.il-lista li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.il-batalha { display: grid; gap: 10px; margin-bottom: 20px; }
+.il-resultado { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.il-resultado--conquista { border: 2px solid var(--pf-verde); }
+.il-resultado--derrota { border: 2px solid #dc2626; }
+
+/* ---- a Arena Lúdica de Programação (03/11/2026, BEYOND-0023) */
+.ar-jogos { margin-bottom: 8px; flex-wrap: wrap; }
+.ar-jogo__descricao { margin-bottom: 12px; }
+.ar-fases { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.ar-fase { border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); border-radius: 9999px; padding: 5px 12px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ar-fase[aria-selected="true"] { border-color: var(--pf-verde); box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25); }
+.ar-fase:disabled { opacity: 0.55; cursor: not-allowed; }
+.ar-sprite { display: block; image-rendering: pixelated; }
+.ar-mapa { display: grid; gap: 0; max-width: 640px; border-radius: 10px; overflow: hidden; border: 4px solid #1f2937; outline: none; }
+.ar-mapa:focus-visible { box-shadow: 0 0 0 3px #fde047; }
+.ar-celula { aspect-ratio: 1; display: grid; place-items: center; background: var(--ar-chao, #d1d5db); }
+.ar-celula--parede { background: var(--ar-parede, #4b5563); box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.25), inset 0 4px 0 rgba(255, 255, 255, 0.08); }
+.ar-celula--agua { background: repeating-linear-gradient(135deg, #38bdf8 0 6px, #0ea5e9 6px 12px); }
+.ar-mapa--pedra { --ar-chao: #d6d3d1; --ar-parede: #57534e; }
+.ar-mapa--musgo { --ar-chao: #c7d2a8; --ar-parede: #3f6212; }
+.ar-mapa--cripta { --ar-chao: #ddd6fe; --ar-parede: #4c1d95; }
+.ar-mapa--lava { --ar-chao: #fed7aa; --ar-parede: #7f1d1d; }
+.ar-mapa--grama { --ar-chao: #bbf7d0; --ar-parede: #166534; }
+.ar-obstaculo { border: none; background: none; padding: 0; width: 100%; height: 100%; cursor: pointer; animation: ar-pulsa 1.6s ease-in-out infinite; }
+@keyframes ar-pulsa { 50% { transform: scale(0.9); } }
+.ar-controles { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 10px 0; }
+.ar-dpad { display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(2, 36px); gap: 4px; }
+.ar-dpad button { border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); border-radius: 8px; font-size: 16px; cursor: pointer; }
+.ar-dpad button:nth-child(1) { grid-column: 2; }
+.ar-dpad button:nth-child(2) { grid-column: 1; grid-row: 2; }
+.ar-dpad button:nth-child(3) { grid-column: 3; grid-row: 2; }
+.ar-dpad button:nth-child(4) { grid-column: 2; grid-row: 2; }
+.ar-placar { display: flex; flex-wrap: wrap; gap: 6px; }
+.ar-chegada { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 10px; }
+.ar-terminal { display: grid; gap: 10px; margin-top: 12px; border: 2px solid #1f2937; }
+.ar-terminal__topo { display: flex; gap: 10px; align-items: flex-start; }
+.ar-terminal__topo h3 { margin: 0 0 4px; font-size: 16px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ar-terminal__topo p { margin: 0; }
+.ar-terminal__topo > div { flex: 1; }
+.ar-terminal__acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+.ar-testes { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ar-testes th, .ar-testes td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--pf-linha); vertical-align: top; word-break: break-word; }
+.ar-testes--ok td:last-child { color: var(--pf-verde); font-weight: 700; }
+.ar-testes--erro td:last-child { color: #dc2626; font-weight: 700; }
+.ar-console { margin: 0; padding: 8px 10px; border-radius: var(--pf-raio); background: #0f172a; color: #e2e8f0; font: 13px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; max-height: 200px; overflow: auto; }
+.ar-console--erro { color: #fecaca; }
+.ar-dica { margin: 0; font-size: 14px; padding: 6px 10px; border-radius: var(--pf-raio); background: rgba(253, 224, 71, 0.18); }
+.ar-explicacao { padding: 8px 10px; border-radius: var(--pf-raio); background: var(--pf-superficie-2); font-size: 14px; }
+.ar-nivel__grade { display: grid; gap: 14px; }
+@media (min-width: 1000px) { .ar-nivel__grade { grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.1fr); align-items: start; } }
+.ar-nivel__codigo { display: grid; gap: 8px; }
+.ar-mascote__ai { display: block; width: 100%; animation: ar-tremer 0.4s ease-in-out 2; }
+@keyframes ar-tremer { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.ar-blocos { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.ar-bloco { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--pf-linha); border-radius: 8px; background: var(--pf-superficie); cursor: grab; }
+.ar-bloco__texto { flex: 1; font: 14px/1.4 ui-monospace, Menlo, Consolas, monospace; white-space: pre; overflow-x: auto; background: #0f172a; color: #e2e8f0; border-radius: 6px; padding: 4px 8px; }
+.ar-bloco__botoes { display: flex; gap: 4px; }
+.ar-bloco__botoes button { width: 30px; height: 30px; border: 1px solid var(--pf-linha); background: var(--pf-superficie-2); color: var(--pf-tinta); border-radius: 6px; cursor: pointer; font-size: 14px; }
+.ar-bloco__botoes button:disabled { opacity: 0.4; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .ar-obstaculo, .ar-mascote__ai { animation: none; } }

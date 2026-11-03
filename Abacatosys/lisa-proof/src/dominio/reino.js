@@ -105,6 +105,27 @@ export const CONSTRUCOES = {
     custos: [900, 1800, 3200, 5000, 8000],
     efeito: (n) => `${def("torreRaio")(n).dano} de dano a cada ${virgula(def("torreRaio")(n).intervalo)} s num alvo só · alcance ${virgula(def("torreRaio")(n).alcance)} · chão e ar · ❤️ ${PREDIOS_EM_COMBATE.torreRaio.vida(n)}`,
   },
+  // ---- novas (03/11/2026, BEYOND-0020: "acrescente muitas outras construções e defesas")
+  pomar: {
+    nome: "Pomar", emoji: "🍎", max: 5, terreno: 1,
+    custos: [220, 480, 900, 1600, 2800],
+    efeito: (n) => `+${2 * n} moedas por hora junto com a Mina (coletadas juntas) · ❤️ ${PREDIOS_EM_COMBATE.pomar.vida(n)}`,
+  },
+  lancaChamas: {
+    nome: "Lança-Chamas", emoji: "🔥", max: 5, terreno: 1,
+    custos: [350, 700, 1300, 2300, 4000],
+    efeito: (n) => `${def("lancaChamas")(n).dano} de dano em área a cada ${virgula(def("lancaChamas")(n).intervalo)} s · alcance curto (${virgula(def("lancaChamas")(n).alcance)}) · só chão · ❤️ ${PREDIOS_EM_COMBATE.lancaChamas.vida(n)}`,
+  },
+  torreDeGelo: {
+    nome: "Torre de Gelo", emoji: "❄️", max: 5, terreno: 2,
+    custos: [600, 1150, 2100, 3500, 5600],
+    efeito: (n) => `${def("torreDeGelo")(n).dano} de dano em área a cada ${virgula(def("torreDeGelo")(n).intervalo)} s · alcance ${virgula(def("torreDeGelo")(n).alcance)} · chão e ar · ❤️ ${PREDIOS_EM_COMBATE.torreDeGelo.vida(n)}`,
+  },
+  catapulta: {
+    nome: "Catapulta", emoji: "🪨", max: 5, terreno: 3,
+    custos: [950, 1900, 3300, 5200, 8200],
+    efeito: (n) => `${def("catapulta")(n).dano} de dano em área a cada ${virgula(def("catapulta")(n).intervalo)} s · alcance ${virgula(def("catapulta")(n).minimo)} a ${virgula(def("catapulta")(n).alcance)} · só chão · ❤️ ${PREDIOS_EM_COMBATE.catapulta.vida(n)}`,
+  },
   acampamento: {
     nome: "Acampamento", emoji: "⛺", max: 4,
     // a ilhota das tropas, ao lado do reino: fora da batalha, todas as tropas ficam à vista lá
@@ -118,12 +139,13 @@ export const CONSTRUCOES = {
   },
 };
 export const ORDEM_DAS_CONSTRUCOES = [
-  "castelo", "terreno", "mina", "minaDeOuro", "biblioteca", "cofre", "muralha", "torre", "canhao",
-  "defesaAerea", "morteiro", "torreMagica", "torreRaio", "quartel", "acampamento",
+  "castelo", "terreno", "mina", "minaDeOuro", "biblioteca", "pomar", "cofre", "muralha", "torre", "canhao",
+  "defesaAerea", "lancaChamas", "morteiro", "torreMagica", "torreDeGelo", "torreRaio", "catapulta", "quartel", "acampamento",
 ];
 export const NIVEIS_INICIAIS = {
   castelo: 1, terreno: 0, mina: 1, minaDeOuro: 1, biblioteca: 0, cofre: 0, muralha: 0, torre: 0, canhao: 0,
   defesaAerea: 0, morteiro: 0, torreMagica: 0, torreRaio: 0, quartel: 0, acampamento: 1,
+  pomar: 0, lancaChamas: 0, torreDeGelo: 0, catapulta: 0,
 };
 
 export const HORAS_ATE_ENCHER = 12;
@@ -141,8 +163,8 @@ export function trofeusDoCombate(estrelas) {
 }
 
 export const producaoPorHora = (nivelDaMina) => Math.max(0, nivelDaMina);
-/** Moedas por hora do reino inteiro: a Mina mais a Biblioteca (2 por nível). */
-export const taxaDeProducao = (niveis) => producaoPorHora(niveis?.mina || 0) + 2 * Math.max(0, niveis?.biblioteca || 0);
+/** Moedas por hora do reino inteiro: a Mina mais a Biblioteca e o Pomar (2 por nível cada). */
+export const taxaDeProducao = (niveis) => producaoPorHora(niveis?.mina || 0) + 2 * Math.max(0, niveis?.biblioteca || 0) + 2 * Math.max(0, niveis?.pomar || 0);
 export const capacidadeDaMina = (nivelDaMina) => producaoPorHora(nivelDaMina) * HORAS_ATE_ENCHER;
 export const protecaoDoCofre = (nivelDoCofre) => 150 * Math.max(0, nivelDoCofre);
 export const custoDoNeuro = (nivelAtual) => 100 * nivelAtual;
@@ -217,7 +239,8 @@ export function producaoAcumulada(reino, agora = new Date(), fator = 1) {
   const desde = new Date(reino?.coletado_em || agora).getTime();
   const horas = Math.max(0, (agora.getTime() - desde) / 3_600_000);
   const taxa = taxaDeProducao(n) * fator;
-  return Math.min(taxa * HORAS_ATE_ENCHER, Math.floor(horas * taxa));
+  // inteiro sempre: com o bônus do humor do Neuro (×1,05…) a capacidade cheia vinha 302,40000000000003 (BEYOND-0019)
+  return Math.floor(Math.min(taxa * HORAS_ATE_ENCHER, horas * taxa));
 }
 
 /** O escudo protege até `escudo_ate`. */

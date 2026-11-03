@@ -9,10 +9,10 @@
 //   jogo       ela pega um videogame de mão, olha para baixo e joga — a tela dele, virada para ela,
 //              ilumina o rosto de baixo e pisca; no fim, "passei de fase!"
 //   cantarola  a cabeça balança no ritmo, a garganta esquenta a cada nota e as notas sobem da boca
-//   preso      o mímico preso na caixa de vidro (02/11/2026: "as mãos abertas no vidro como se
-//              estivesse presa, tipo um mímico"): as duas mãos espalmadas no vidro, uma de cada vez
-//              desencosta, procura outro lugar e encosta de novo; ela olha cada mão; no fim empurra
-//              com as duas e pergunta "me tira daqui?"
+//
+// O mímico preso no vidro (as duas mãos espalmadas na tela) saiu em 03/11/2026 (BEYOND-0021: "tire a
+// animação da Lisa pondo as mãos na tela, ficou muito bizarro"). O shader ainda sabe desenhar a mão
+// aberta (maoAberta em COISAS), mas nenhuma brincadeira a usa.
 //
 // Só no estado "pronta" e só depois de um tempo sem ninguém mexer (TEMPOS). Qualquer gesto — mouse,
 // tecla, toque, rolagem — ou a Lisa sair de "pronta" encerra a brincadeira devagar (o punho desce, o
@@ -31,7 +31,6 @@ export const BRINCADEIRAS = [
   { id: "vidro", nome: "Bate no vidro", duracao: 7.2 },
   { id: "jogo", nome: "Videogame", duracao: 12 },
   { id: "cantarola", nome: "Cantarola", duracao: 9.5 },
-  { id: "preso", nome: "Presa no vidro", duracao: 10.5 },
 ];
 
 /** Quanto tempo sem gesto até a primeira, o intervalo entre as seguintes e quanto dura a saída. */
@@ -217,86 +216,13 @@ function vidro(s, peso, aperto) {
   return p;
 }
 
-// ---- o mímico (preso) ----
+// ---- a mão aberta ----
 
 /**
- * A mão aberta é desenhada em ESCALA_DA_PALMA do tamanho da fechada (ver maoAberta em COISAS): encostada
- * no vidro ela fica bem mais perto da câmera que o rosto, e no tamanho inteiro tomava a tela.
+ * A mão aberta é desenhada em ESCALA_DA_PALMA do tamanho da fechada (ver maoAberta em COISAS). Era a do
+ * mímico, que saiu (BEYOND-0021); o shader continua sabendo desenhá-la.
  */
 export const ESCALA_DA_PALMA = 0.84;
-/** O meio da palma aberta, no espaço da mão (o pulso na origem). */
-const MEIO_DA_PALMA = [0, 0.45 * ESCALA_DA_PALMA, 0];
-/** Onde as palmas encostam no vidro (z): um palmo na frente do rosto. */
-const VIDRO_Z = 1.55;
-/**
- * Por onde cada mão anda no vidro: [quando chega, x, y] do meio da palma. Uma de cada vez desencosta,
- * vai para outro lugar e encosta de novo (MUDANCA segundos de viagem), como o mímico tateando a parede
- * — sempre dos lados do rosto, sem tapá-lo. `lado`: +1 a mão à esquerda de quem vê (o polegar para o
- * rosto, +x); `abre`: os dedos inclinados um pouco para fora.
- */
-const PALMAS = [
-  { lado: 1, abre: -0.12, paradas: [[1.3, -1.05, -0.3], [3.8, -1.12, 0.3], [6.4, -0.98, 0.42]] },
-  { lado: -1, abre: 0.12, paradas: [[1.35, 1.05, -0.24], [5.0, 1.14, -0.55], [7.6, 1.0, 0.36]] },
-];
-const MUDANCA = 0.8;
-/** O empurrão do fim, com as duas mãos, e o "me tira daqui?". */
-const EMPURRAO = [8.0, 8.3, 8.7, 9.0];
-
-/**
- * Os eixos da mão aberta encostada no vidro: a palma para a câmera, os dedos para `dedos` e o polegar
- * para o rosto (`lado` +1 na mão à esquerda de quem vê, −1 na da direita: uma é o espelho da outra).
- */
-export function eixosDaPalma(dedos, lado) {
-  const atras = [0, 0, -1];
-  const costas = normalizar(somar(atras, escalar(dedos, -produto(atras, dedos))));
-  return [escalar(normalizar(vetorial(costas, dedos)), lado), dedos, costas];
-}
-
-// o meio da palma aos s segundos: sobe até a primeira parada; de uma parada à outra, desencosta (z para
-// trás), anda e encosta de novo
-function ondeEstaAPalma(m, s, aperto) {
-  const [[, x0, y0], ...resto] = m.paradas;
-  let x = x0, y = y0, z = VIDRO_Z;
-  for (const [t, xn, yn] of resto) {
-    const a = entre(s, t - MUDANCA, t);
-    x += (xn - x) * a;
-    y += (yn - y) * a;
-    z -= 0.2 * pulso(s, t - MUDANCA / 2, MUDANCA / 2);
-  }
-  return [x * aperto, y, z + 0.06 * janela(s, ...EMPURRAO)];
-}
-
-function preso(s, peso, aperto) {
-  const p = NEUTRA();
-  const k = entre(s, 0.2, 1.3) * (1 - entre(s, 9.2, 10.3)) * peso;
-  const maos = PALMAS.map((m) => {
-    const ponto = ondeEstaAPalma(m, s, aperto);
-    const fora = [ponto[0] * 1.1, -3.4, 1.1];
-    const centro = misturar(fora, ponto, k);
-    // os dedos em leque e, subindo, um pouco para a frente (a mão chega de baixo)
-    const dedos = normalizar([m.abre, 1, 0.1 + 0.5 * (1 - k)]);
-    const eixos = eixosDaPalma(dedos, m.lado);
-    const doPulso = naMao(eixos, centro, escalar(MEIO_DA_PALMA, -1));
-    return { centro, eixos, pulso: doPulso, cotovelo: [doPulso[0] * 0.8, -3.1, doPulso[2] - 0.7], aberta: true };
-  });
-  [p.mao, p.mao2] = maos;
-  // (a palma encostando não ondula o vidro: a onda desenhava um círculo em cima da mão)
-  // olha para a mão que está mudando de lugar (e para cima, se ela sobe); no fim, inclina a cabeça e pede
-  let yaw = 0, pitch = 0;
-  PALMAS.forEach((m) => m.paradas.slice(1).forEach(([t, , y], i) => {
-    const olha = janela(s, t - MUDANCA - 0.25, t - MUDANCA + 0.15, t + 0.2, t + 0.7);
-    yaw += -m.lado * 0.15 * olha;
-    pitch += (y > m.paradas[i][2] ? -0.08 : 0.06) * olha;
-  }));
-  p.cabeca.yaw = yaw * peso;
-  p.cabeca.pitch = (pitch + 0.04 * janela(s, ...EMPURRAO)) * peso;
-  p.cabeca.roll = 0.13 * janela(s, 8.2, 8.7, 9.5, 10.1) * peso;
-  const fala = 0.32 * (0.5 + 0.5 * Math.sin(s * 18)) * janela(s, 8.45, 8.55, 9.3, 9.5);
-  p.boca = fala * peso;
-  p.calorBoca = fala * 0.8 * peso;
-  p.falas = [{ texto: "me tira daqui?", ponto: ANCORAS.cabeca, desvio: [0, 0], opacidade: janela(s, 8.4, 8.6, 9.7, 10.1) * peso }];
-  return p;
-}
 
 function jogo(s, peso) {
   const p = NEUTRA();
@@ -347,7 +273,7 @@ function cantarola(s, peso) {
   return p;
 }
 
-const ROTEIROS = { vidro, jogo, cantarola, preso };
+const ROTEIROS = { vidro, jogo, cantarola };
 
 /**
  * A pose da brincadeira `id` aos `s` segundos, com `peso` (0–1: na saída, tudo volta ao lugar e some).

@@ -19,7 +19,7 @@ export default function ChefaoDoReino({ aberta, aoFechar, estado }) {
       {!estado && <p className="pf-estat__nota">Procurando o chefão…</p>}
       {caiu && (
         <div className="pf-aviso pf-aviso--ok ch-caiu" role="status">
-          🎉 Você derrubou {caiu.emoji} <strong>{caiu.nome}</strong>! +🪙 {caiu.recompensa} no seu saldo.
+          🎉 Você derrubou {caiu.emoji} <strong>{caiu.nome}</strong>! +🪙 {caiu.recompensa} no seu saldo{caiu.roubado ? `, e as 🪙 ${caiu.roubado} que ele tinha roubado voltaram` : ""}.
         </div>
       )}
       {estado && !c && (
@@ -39,6 +39,11 @@ export default function ChefaoDoReino({ aberta, aoFechar, estado }) {
             </div>
             <p className="pf-estat__nota">❤️ {c.restante} de {c.vida} · já levou {c.dano} de dano · derrubou, ganha 🪙 {c.recompensa}</p>
             <p className="pf-estat__nota">Nasceu em {quando(c.nasceuEm)} do seu atraso (peso {c.atraso}: cada assunto atrasado vale 3; cada revisão vencida, 1).</p>
+            <p className="pf-estat__nota ch-chefao__roubo">
+              💰 De pé, ele rouba até 🪙 {c.rouboPorDia} por dia do seu reino (nunca mais que {Math.round(c.parteMaximaDoSaldo * 100)}% do saldo, e no total nunca mais que a recompensa).
+              {c.roubado ? <> Já levou <strong>🪙 {c.roubado}</strong> — derrube ele e tudo volta.</> : " Ainda não levou nada."}
+              {c.proximoRoubo && <> Próximo roubo: {quando(c.proximoRoubo)}.</>}
+            </p>
           </div>
           <div className="ch-chefao__golpes">
             <h4>Como bater nele</h4>

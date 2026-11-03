@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.37.0-cloudflare-pages.1",
+  "versao": "0.37.1-cloudflare-pages.1",
   "atualizadoEm": "2026-11-03",
   "compilacao": {
-    "numero": 71,
+    "numero": 72,
     "data": "2026-11-03",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.37.1-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "O rosto da Lisa não faz mais o mímico com as mãos encostadas na tela.",
+      "itens": [
+        "Saiu a brincadeira \"Presa no vidro\" (o mímico com as duas mãos espalmadas na tela), que ficou estranha. Parada, ela continua batendo no vidro, jogando videogame e cantarolando."
+      ],
+      "issues": [
+        "BEYOND-0021"
+      ]
+    },
     {
       "versao": "0.37.0-cloudflare-pages.1",
       "data": "2026-11-03",

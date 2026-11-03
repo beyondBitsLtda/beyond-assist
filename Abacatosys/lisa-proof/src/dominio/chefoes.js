@@ -8,9 +8,9 @@
  * atraso sai o chefão (o maior que couber). `monstro` é o desenho de papel (src/componentes/reino/monstrosDePapel.js).
  */
 export const CHEFOES_DA_PROCRASTINACAO = [
-  { id: "lesma", nome: "Lesma da Preguiça", emoji: "🐌", monstro: "slime", atrasoMinimo: 3, vida: 150, recompensa: 60 },
-  { id: "hidra", nome: "Hidra do Depois", emoji: "🐉", monstro: "cerbero", atrasoMinimo: 10, vida: 300, recompensa: 120 },
-  { id: "tita", nome: "Titã da Procrastinação", emoji: "👹", monstro: "ogro", atrasoMinimo: 25, vida: 500, recompensa: 200 },
+  { id: "lesma", nome: "Lesma da Preguiça", emoji: "🐌", monstro: "slime", atrasoMinimo: 3, vida: 150, recompensa: 60, rouboPorDia: 8 },
+  { id: "hidra", nome: "Hidra do Depois", emoji: "🐉", monstro: "cerbero", atrasoMinimo: 10, vida: 300, recompensa: 120, rouboPorDia: 15 },
+  { id: "tita", nome: "Titã da Procrastinação", emoji: "👹", monstro: "ogro", atrasoMinimo: 25, vida: 500, recompensa: 200, rouboPorDia: 25 },
 ];
 export const chefaoPorId = (id) => CHEFOES_DA_PROCRASTINACAO.find((c) => c.id === id) || null;
 
@@ -56,6 +56,30 @@ export function danoDosEstudos(eventos) {
  */
 export const DANO_POR_PAGINA = 25;
 export const danoDosCadernos = (paginas, vida) => Math.min(Math.floor(vida / 2), Math.max(0, paginas) * DANO_POR_PAGINA);
+
+/**
+ * O dano que o chefão dá (03/11/2026, BEYOND-0018: "roubar moedas, porém uma quantidade que não seja punitiva
+ * demais"): de pé, a cada 24 horas ele rouba um pouco do reino — `rouboPorDia` (8, 15 ou 25), nunca mais que
+ * 5% do saldo e, somando tudo, nunca mais que a recompensa dele. As primeiras 24 horas são de graça. Quem
+ * derruba o chefão recebe de volta tudo o que ele roubou, além da recompensa.
+ */
+export const ROUBO_DO_CHEFAO = { horasEntreRoubos: 24, parteMaximaDoSaldo: 0.05 };
+
+/** Quantos roubos venceram desde o último (ou desde que nasceu) e quando passa a contar o próximo. */
+export function roubosVencidos({ nasceuEm, ultimoRouboEm = null, agora = new Date() }) {
+  const passo = ROUBO_DO_CHEFAO.horasEntreRoubos * 3_600_000;
+  const desde = new Date(ultimoRouboEm || nasceuEm).getTime();
+  const vezes = Math.max(0, Math.floor((agora.getTime() - desde) / passo));
+  return { vezes, relogio: new Date(desde + vezes * passo).toISOString(), proximo: new Date(desde + (vezes + 1) * passo).toISOString() };
+}
+
+/** Quanto o chefão leva agora: `vezes` roubos de até `rouboPorDia`, cada um até 5% do saldo, com o teto da recompensa. */
+export function valorDoRoubo({ tipo, vezes, saldo, jaRoubado = 0 }) {
+  const def = chefaoPorId(tipo);
+  if (!def || vezes <= 0) return 0;
+  const porVez = Math.min(def.rouboPorDia, Math.floor(Math.max(0, saldo) * ROUBO_DO_CHEFAO.parteMaximaDoSaldo));
+  return Math.max(0, Math.min(vezes * porVez, def.recompensa - Math.max(0, jaRoubado)));
+}
 
 /** Como o chefão está: a vida que resta e se caiu. */
 export function situacaoDoChefao({ vida, dano }) {

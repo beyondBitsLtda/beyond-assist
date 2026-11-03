@@ -14,6 +14,11 @@ export const VEICULOS = {
     nome: "Barco Voador", emoji: "⛵", preco: 0, torreMinima: 1, destino: "Vilas, florestas, bosques e acampamentos",
     descricao: "O barco do reino, de todo mundo: leva as tropas a qualquer ilha de monstros.",
   },
+  // a Temporada das Ilhas (03/11/2026, BEYOND-0020): o navio não faz expedição — leva a tripulação ao arquipélago
+  navio: {
+    nome: "Navio Pirata", emoji: "🏴‍☠️", preco: 900, torreMinima: 2, destino: "A Temporada das Ilhas",
+    descricao: "Leva a tripulação ao arquipélago: conquiste ilhas dos nativos, construa nelas e dispute com os outros jogadores.",
+  },
   submarino: {
     nome: "Submarino", emoji: "🌊", preco: 600, torreMinima: 2, destino: "Reinos submersos",
     descricao: "Desce ao fundo do mar, onde tritões, tubarões e o Kraken guardam tesouros afundados.",
@@ -31,7 +36,10 @@ export const VEICULOS = {
     descricao: "Cada viagem cai num planetoide diferente, com uma raça alienígena sorteada: a força e o tesouro mudam toda vez.",
   },
 };
-export const ORDEM_DOS_VEICULOS = ["barco", "submarino", "dirigivel", "tanque", "nave"];
+// o Navio no fim: o prêmio do Modo Domínio entrega o próximo veículo da fila (modoDominio.js)
+export const ORDEM_DOS_VEICULOS = ["barco", "submarino", "dirigivel", "tanque", "nave", "navio"];
+/** Os que fazem expedição (o Navio vai às ilhas, que têm o próprio limite: ilhas.js). */
+export const fazExpedicao = (id) => id !== "navio";
 export const CARGAS_POR_DIA = 3;
 export const EXTRAS_POR_DIA = 5;
 

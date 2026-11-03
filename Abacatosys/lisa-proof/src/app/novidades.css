@@ -120,3 +120,11 @@
 /* 26/10/2026 (2): os funcionários da Biblioteca Colaborativa no palco (corpo inteiro, sem moldura) */
 .novidades__retrato--solto { width: clamp(56px, 11vw, 118px); filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.22)); }
 .novidades__retratos > span > .novidades__retrato--solto:nth-child(even) { margin-bottom: 0; }
+
+/* a versão 1.0 (03/11/2026): o selo dourado e o "1.0" grande ao lado do Neuro comemorando */
+.novidades__selo--versao { background: linear-gradient(90deg, #f59e0b, #fde047); color: #3a2a00; }
+.novidades__neuro { position: relative; }
+.novidades__versao {
+  position: absolute; right: -46px; top: 4px; padding: 2px 10px; border-radius: 12px; font-size: 26px; font-weight: 900;
+  color: #3a2a00; background: linear-gradient(135deg, #fde047, #f59e0b); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); transform: rotate(8deg);
+}

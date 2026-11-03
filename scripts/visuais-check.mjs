@@ -161,7 +161,7 @@ console.log("a cena do Assistente (janela da resposta, hologramas, zoom)");
 console.log("as brincadeiras do Rosto (02/11/2026: \"bater no vidro e falar toc toc, pegar um gameboy e jogar, cantarolar\")");
 {
   const ids = BRINCADEIRAS.map((b) => b.id);
-  conferir("as quatro brincadeiras, cada uma com a sua duração", ids.join() === "vidro,jogo,cantarola,preso" && BRINCADEIRAS.every((b) => b.duracao > 5 && b.nome));
+  conferir("as três brincadeiras (o mímico saiu, BEYOND-0021), cada uma com a sua duração", ids.join() === "vidro,jogo,cantarola" && BRINCADEIRAS.every((b) => b.duracao > 5 && b.nome));
 
   // o relógio da ociosidade, com o acaso fixo (sempre a primeira opção que sobra)
   const ocio = criarOcio({ acaso: () => 0 });
@@ -245,21 +245,11 @@ console.log("as brincadeiras do Rosto (02/11/2026: \"bater no vidro e falar toc 
   conferir("cantarola: a cabeça balança, a garganta esquenta e as notas sobem", Math.abs(poseDaBrincadeira("cantarola", 3.3).cabeca.roll) > 0.05 && cancao.calorBoca > 0.2 && cancao.notas.length >= 2 && cancao.notas.every((n) => n.deriva[1] < 0));
   conferir("cantarola: sem punho e sem videogame", !cancao.mao && !cancao.jogo);
 
-  // o mímico (02/11/2026: "as mãos abertas no vidro como se estivesse presa, tipo um mímico")
-  const presa = poseDaBrincadeira("preso", 2);
-  const [esq, dir] = [presa.mao, presa.mao2];
-  conferir("preso: as duas mãos abertas, uma de cada lado do rosto, encostadas no vidro", esq.aberta && dir.aberta && esq.centro[0] < -0.9 && dir.centro[0] > 0.9 && esq.centro[2] > 1.4 && dir.centro[2] > 1.4);
-  conferir("preso: as palmas viradas para o vidro, os dedos para cima e os polegares para o rosto (uma mão é o espelho da outra)",
-    [esq, dir].every((m) => m.eixos[2][2] < -0.95 && m.eixos[1][1] > 0.9) && esq.eixos[0][0] > 0.9 && dir.eixos[0][0] < -0.9 && [esq, dir].every((m) => [0, 1, 2].every((i) => unitario(m.eixos[i]))));
-  const andando = poseDaBrincadeira("preso", 3.4);
-  conferir("preso: uma mão de cada vez desencosta e muda de lugar, e ela olha para essa mão",
-    andando.mao.centro[2] < presa.mao.centro[2] - 0.1 && Math.abs(andando.mao2.centro[2] - presa.mao2.centro[2]) < 1e-9 && andando.cabeca.yaw < -0.1 && poseDaBrincadeira("preso", 4.6).cabeca.yaw > 0.1);
-  const pede = poseDaBrincadeira("preso", 9);
-  conferir("preso: no fim empurra com as duas e pede \"me tira daqui?\" — sem onda no vidro (o círculo ficava em cima da mão)",
-    pede.falas[0].texto === "me tira daqui?" && pede.falas[0].opacidade === 1 && pede.boca > 0 && BRINCADEIRAS.every((b) => b.id !== "preso" || [1.5, 3.9, 8.4].every((s) => !poseDaBrincadeira("preso", s).batidas.length)));
-  const celular = poseDaBrincadeira("preso", 2, 1, { proporcao: 390 / 760 });
+  // o mímico saiu (03/11/2026, BEYOND-0021: "tire a animação da Lisa pondo as mãos na tela")
+  conferir("o mímico com as mãos no vidro não está mais entre as brincadeiras (nem no ócio, nem no /visual)",
+    BRINCADEIRAS.every((b) => b.id !== "preso") && !poseDaBrincadeira("preso", 2).mao && !poseDaBrincadeira("preso", 2).mao2);
   conferir("no celular em pé, as mãos chegam mais perto do rosto (não saem pela borda); na tela deitada, nada muda",
-    apertoDaTela(390 / 760) < 0.8 && apertoDaTela(1.6) === 1 && Math.abs(celular.mao.centro[0]) < Math.abs(esq.centro[0]) * 0.8 && poseDaBrincadeira("vidro", 1.45, 1, { proporcao: 0.5 }).mao.centro[0] > noVidro.mao.centro[0]);
+    apertoDaTela(390 / 760) < 0.8 && apertoDaTela(1.6) === 1 && poseDaBrincadeira("vidro", 1.45, 1, { proporcao: 0.5 }).mao.centro[0] > noVidro.mao.centro[0]);
   conferir("a caixa marchada vai até a segunda mão também", frenteDaCaixa({ mao2: { centro: [0, 0, 2.4] } }) > 3);
 
   conferir("a câmera da projeção é a do shader: o centro do quadro cai no meio do visual",

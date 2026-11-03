@@ -17,6 +17,7 @@ import {
   gerarQuiz, gerarExercicio, gerarProjeto, gerarGuiaDoProjeto, ajustarComplexidadeDoProjeto, avaliarExercicio, avaliarProjeto,
   gerarDesafioAberto, gerarCalculo, gerarDitado, avaliarEntrega,
   gerarPassos, gerarConversa, responderNaConversa, avaliarConversa, gerarDesafioDeDiagrama, avaliarDiagrama,
+  gerarExemploDaLisa,
 } from "./iaPratica.js";
 import { lerRepositorio, ErroDoGitHub } from "./github.js";
 import { diaDe } from "@/dominio/datas.js";
@@ -27,6 +28,7 @@ import {
   RODADAS_POR_DIA, podeAbrirRodada, comFatorDaRodada, tentativasDe, validarAvaliacao,
   tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto,
   complexidadeDe, podeTrocarComplexidade, TROCAS_DE_COMPLEXIDADE, podeTrocarProjeto, projetoAntigo, arquivosDoProjeto,
+  temExemploDaLisa,
 } from "@/dominio/pratica.js";
 import {
   MOTORES, motorDo, corrigeNoServidor, exercicioParaTela, avaliacaoDoMotor, conferirEvidencia,
@@ -656,6 +658,41 @@ export async function guiaDoProjeto({ usuarioId, id }) {
   }
   await salvar(d.id, { conteudo: { ...d.conteudo, guia } });
   return guia;
+}
+
+/** O desafio em texto, para o pedido do exemplo: o que ele pede, sem as respostas. */
+function resumoDoDesafio(c = {}) {
+  const linhas = [];
+  for (const k of ["titulo", "enunciado", "contexto", "cenario", "pergunta", "objetivo"]) if (typeof c[k] === "string" && c[k].trim()) linhas.push(c[k].trim());
+  for (const k of ["requisitos", "extras", "criterios", "pede"]) {
+    const lista = Array.isArray(c[k]) ? c[k].map((x) => (typeof x === "string" ? x : x?.texto || x?.enunciado || "")).filter(Boolean) : [];
+    if (lista.length) linhas.push(`${k}:\n- ${lista.slice(0, 14).join("\n- ")}`);
+  }
+  return linhas.join("\n").slice(0, 3500);
+}
+
+/**
+ * O "Exemplo da Lisa" (BEYOND-0022): uma aplicação de exemplo com todos os conceitos do exercício ou do
+ * projeto, num cenário parecido. A primeira chamada gera; as seguintes devolvem o que ficou guardado.
+ */
+export async function exemploDaLisa({ usuarioId, id }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  const motor = eProjeto(d.tipo) ? "aberto" : motorDo(d.conteudo || {});
+  if (!temExemploDaLisa(d.tipo, motor)) throw new ErroDeAcesso(400, "este desafio não tem exemplo da Lisa");
+  if (d.conteudo?.aplicacao) return d.conteudo.aplicacao;
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  const perfil = perfilValido(trilha.perfil);
+  // com código: o exercício de código, e os projetos e desafios dos cursos de programação
+  const comCodigo = motor === "codigo" || (perfil === "programacao" && !Array.isArray(d.conteudo?.evidencias));
+  let aplicacao;
+  try {
+    aplicacao = await gerarExemploDaLisa({ tema: trilha.tema, perfil, resumo: resumoDoDesafio(d.conteudo), linguagem: d.conteudo?.linguagem || "", comCodigo });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  await salvar(d.id, { conteudo: { ...d.conteudo, aplicacao } });
+  return aplicacao;
 }
 
 export async function enviarProjeto({ usuarioId, id, repo }) {

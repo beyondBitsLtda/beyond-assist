@@ -90,6 +90,16 @@ export const IconeForja = () => (
   <svg {...base}><path d="M3 8h14l4-2v4l-4 1h-3v3h2v3H7v-3h2v-3H6a3 3 0 0 1-3-3z" /></svg>
 );
 
+// Ilhas: um coqueiro numa ilhota (Temporada das Ilhas, 03/11/2026)
+export const IconeIlhas = () => (
+  <svg {...base}><path d="M3 20c3-2 15-2 18 0M12 19V9M12 9c-2-3-6-3-8-1M12 9c2-3 6-3 8-1M12 9c-1-3-4-5-7-4M12 9c1-3 4-5 7-4" /></svg>
+);
+
+// Arena: um controle de videogame (Arena Lúdica, 03/11/2026)
+export const IconeArena = () => (
+  <svg {...base}><path d="M7 8h10a4 4 0 0 1 4 4v1a3 3 0 0 1-5.2 2L14 13h-4l-1.8 2A3 3 0 0 1 3 13v-1a4 4 0 0 1 4-4zM8 10v4M6 12h4M15.5 11.5h.01M17.5 13.5h.01" /></svg>
+);
+
 // Mais: três pontos
 export const IconeMais = () => (
   <svg {...base}><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>

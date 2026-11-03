@@ -19,6 +19,7 @@ import { CARGAS_POR_DIA, EXTRAS_POR_DIA } from "@/dominio/veiculos.js";
 import { HORAS_POR_PEPITA, VALOR_DA_PEPITA, OPERARIOS_INICIAIS, HORAS_DE_ALUGUEL } from "@/dominio/ouro.js";
 import { VARIACAO_MAXIMA, TAXA_DA_CORRETAGEM, PRECO_MINIMO, MAXIMO_DE_ACOES } from "@/dominio/bolsa.js";
 import { HORAS_ENTRE_ATAQUES_AO_MESMO_REINO } from "@/dominio/reino.js";
+import { formatarMoedas } from "@/dominio/moedas.js";
 import { urlDoMonstro } from "@/componentes/reino/monstrosDePapel.js";
 import { termosDaPaz, DIAS_DE_PAZ, OFENSIVA_PARA_VOTAR } from "@/dominio/paz.js";
 import Folha from "@/componentes/Folha.js";
@@ -92,7 +93,8 @@ export default function Reino() {
   const [chefaoAberto, setChefaoAberto] = useState(false);
   const verChefao = useCallback(() => obter("/api/chefao").then((d) => {
     setChefao(d);
-    if (d.caiuAgora) comemorar(`${d.caiuAgora.emoji} ${d.caiuAgora.nome} caiu! +🪙 ${d.caiuAgora.recompensa}`);
+    if (d.caiuAgora) comemorar(`${d.caiuAgora.emoji} ${d.caiuAgora.nome} caiu! +🪙 ${d.caiuAgora.recompensa + (d.caiuAgora.roubado || 0)}`);
+    else if (d.roubouAgora > 0) reagir("triste", `${d.chefao.emoji} ${d.chefao.nome} roubou 🪙 ${d.roubouAgora} do reino! Derrube ele para recuperar.`, 5500);
     else if (d.chefao?.nasceuAgora) reagir("surpreso", `${d.chefao.emoji} O atraso virou um chefão: ${d.chefao.nome}!`, 5000);
   }).catch(() => setChefao(null)), []);
   useEffect(() => { verChefao(); }, [verChefao]);
@@ -426,8 +428,8 @@ export default function Reino() {
           </section>
           <section className="pf-cartao">
             <div className="pf-estat__rotulo">⛏️ Mina de Moedas {reino.paz?.vigente && <span className="pf-pilula pf-pilula--verde rn-mina-x2">×{reino.paz.vigente.fatorDaMina} paz</span>}</div>
-            <div className="pf-estat__valor"><Moedas n={reino.mina.paraColetar} /> <small>de {reino.mina.capacidade}</small></div>
-            <p className="pf-estat__nota">Produz {reino.mina.porHora} moeda(s) por hora e para quando enche ({HORAS_ATE_ENCHER} h). Colete sempre que passar por aqui.{reino.mina.bonusDoNeuro ? ` Com o Neuro evoluído, +${Math.round(reino.mina.bonusDoNeuro * 100)}%.` : ""}</p>
+            <div className="pf-estat__valor"><Moedas n={reino.mina.paraColetar} /> <small>de {formatarMoedas(reino.mina.capacidade)}</small></div>
+            <p className="pf-estat__nota">Produz {formatarMoedas(reino.mina.porHora)} moeda(s) por hora e para quando enche ({HORAS_ATE_ENCHER} h). Colete sempre que passar por aqui.{reino.mina.bonusDoNeuro ? ` Com o Neuro evoluído, +${Math.round(reino.mina.bonusDoNeuro * 100)}%.` : ""}</p>
             <Botao ok={reino.mina.paraColetar > 0} motivo="nada para coletar ainda" ocupado={ocupado === "coletar"} aoClicar={coletarMina}>
               Coletar
             </Botao>
@@ -1103,7 +1105,7 @@ function Paz({ reino, ocupado, aoAgir, aoPropor }) {
           <h3 className="rn-convite__titulo">{v.reinos} reinos em paz por {v.dias} dias, até {hora(v.ate)}</h3>
           <ul className="rn-aliado__beneficios">
             <li>⚔️ <span>Sem guerra: nenhum reino pode invadir outro</span></li>
-            <li>⛏️ <span>A sua mina rende ×{v.fatorDaMina}: {reino.mina.porHora} moeda(s) por hora</span></li>
+            <li>⛏️ <span>A sua mina rende ×{v.fatorDaMina}: {formatarMoedas(reino.mina.porHora)} moeda(s) por hora</span></li>
             <li>🗺️ <span>Expedições repartem: quando alguém saqueia, cada um dos outros reinos ganha {Math.round(v.parteDaExpedicao * 100)}% do saque</span></li>
             <li>🏝️ <span>Todos vizinhos: {v.vizinhos.map((x) => x.nome).join(", ") || "—"}</span></li>
           </ul>
@@ -1265,7 +1267,14 @@ function Expedicoes({ mapa, veiculo, aoVeiculo, ocupado, resultado, aoFecharResu
           <button type="button" className="pf-botao pf-botao--pequeno" onClick={aoGaragem}>🚗 Ir à garagem</button>
         </div>
       )}
-      {v?.tem && (
+      {v?.tem && v.id === "navio" && (
+        <div className="pf-cartao rn-exp__trancado">
+          <img src={urlDoVeiculo(v.id)} alt="" width="72" height="72" />
+          <p><strong>{v.emoji} {v.nome}</strong>: o navio não faz expedição — ele leva a sua tripulação ao arquipélago da Temporada das Ilhas.</p>
+          <Link href="/ilhas" className="pf-botao pf-botao--pequeno">🏝️ Abrir o arquipélago</Link>
+        </div>
+      )}
+      {v?.tem && v.id !== "navio" && (
         <div className="rn-exp__tanque">
           <Tanque tanque={v.tanque} />
           <span className="rn-motivo">{v.tanque.restantes ? `${v.tanque.restantes} expedição(ões) de ${v.nome} hoje` : `tanque vazio${v.tanque.extras ? ` (já abasteceu ${v.tanque.extras}×)` : ""}`}</span>

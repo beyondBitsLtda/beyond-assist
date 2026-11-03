@@ -30,6 +30,10 @@ export const LUGARES = {
   biblioteca: [-6.95, -2.53], defesaAerea: [-2.53, -6.95],   // Terreno 1 (contas feitas: raio 7,4)
   morteiro: [4.3, -7.45], torreMagica: [-8.31, 2.23],        // Terreno 2 (raio 8,6)
   torreRaio: [-6.93, -6.93],                                 // Terreno 3 (raio 9,8)
+  // as novas (03/11/2026, BEYOND-0020), nos vãos livres de cada anel, longe da praia e da ponte
+  pomar: [-5.67, 4.75], lancaChamas: [6.71, -3.13],          // Terreno 1
+  torreDeGelo: [-1.49, 8.47],                                // Terreno 2
+  catapulta: [1.70, -9.65],                                  // Terreno 3
 };
 /** O raio da ilha: 7, e mais 1,2 a cada expansão do Terreno. */
 export const raioDaIlha = (terreno) => 7 + 1.2 * Math.max(0, Math.min(3, terreno || 0));
@@ -56,11 +60,21 @@ export const PREDIOS_EM_COMBATE = {
   morteiro: { vida: (n) => 450 + 170 * n, raio: 0.6, defesa: (n) => ({ dano: 20 + 10 * n, intervalo: 3.0, alcance: 6.0, minimo: 1.6, area: 1.1, acertaAr: false, acertaChao: true, arma: "morteiro" }) },
   torreMagica: { vida: (n) => 400 + 160 * n, raio: 0.6, defesa: (n) => ({ dano: 12 + 6 * n, intervalo: 1.3, alcance: 3.8, area: 0.9, acertaAr: true, acertaChao: true, arma: "magia" }) },
   torreRaio: { vida: (n) => 650 + 250 * n, raio: 0.6, defesa: (n) => ({ dano: 16 + 8 * n, intervalo: 0.5, alcance: 3.4, acertaAr: true, acertaChao: true, arma: "raio" }) },
+  pomar: { vida: (n) => 420 + 160 * n, raio: 0.85 },
+  lancaChamas: { vida: (n) => 520 + 200 * n, raio: 0.55, defesa: (n) => ({ dano: 14 + 7 * n, intervalo: 0.6, alcance: 2.6, area: 0.8, acertaAr: false, acertaChao: true, arma: "fogo" }) },
+  torreDeGelo: { vida: (n) => 480 + 190 * n, raio: 0.6, defesa: (n) => ({ dano: 18 + 9 * n, intervalo: 1.2, alcance: 4.0, area: 1.0, acertaAr: true, acertaChao: true, arma: "magia" }) },
+  catapulta: { vida: (n) => 560 + 210 * n, raio: 0.65, defesa: (n) => ({ dano: 34 + 14 * n, intervalo: 3.5, alcance: 6.8, minimo: 2.0, area: 1.3, acertaAr: false, acertaChao: true, arma: "morteiro" }) },
   muralha: { vida: (n) => 600 + 400 * n },
 };
 // gigantes e balões na frente (seguram o fogo), bombardeiros logo atrás (para abrir a muralha)
-const ORDEM_DE_ENTRADA = ["gigante", "balao", "bombardeiro", "guerreiro", "arqueira", "mago", "dragao", "curandeira"];
-const PREDIOS_DA_BATALHA = ["castelo", "mina", "cofre", "quartel", "torre", "canhao", "biblioteca", "defesaAerea", "morteiro", "torreMagica", "torreRaio"];
+const ORDEM_DE_ENTRADA = [
+  "colosso", "gigante", "cavaleiro", "balao", "grifo", "papagaio", "bombardeiro", "polvorista",
+  "guerreiro", "lanceiro", "pirata", "arqueira", "arpoadora", "mago", "dragao", "curandeira",
+];
+const PREDIOS_DA_BATALHA = [
+  "castelo", "mina", "cofre", "quartel", "torre", "canhao", "biblioteca", "defesaAerea", "morteiro", "torreMagica", "torreRaio",
+  "pomar", "lancaChamas", "torreDeGelo", "catapulta",
+];
 // lugares em volta da Torre do Neuro de onde a guarnição sai
 const SAIDAS_DA_GUARNICAO = [[0.9, 1.2], [1.3, 0.5], [0.3, 1.4], [1.4, -0.2], [-0.4, 1.3], [1.0, 0.9], [0.0, 1.0], [1.5, 0.9]];
 // Expedições (22/10/2026): os monstros já começam soltos, espalhados em volta das construções, e
@@ -82,6 +96,7 @@ const ARMAS = {
   arqueira: "flecha", dragao: "fogo", mago: "magia", balao: "bomba", bombardeiro: "explosao", bandido: "flecha", aranha: "magia", cerbero: "fogo",
   tritao: "flecha", kraken: "magia", harpia: "flecha", salamandra: "fogo", diabrete: "fogo", dragaoDeLava: "fogo",
   zorg: "raio", ciborgue: "missil", polvoEstelar: "magia", disco: "raio", rainhaAlien: "raio",
+  arpoadora: "flecha", polvorista: "explosao", xama: "magia", chefeTiki: "fogo",
 };
 const arma = (u) => (u.tipo === "heroi" ? (u.lado === "defesa" ? "livro" : "golpe") : ARMAS[u.tipo] || "golpe");
 

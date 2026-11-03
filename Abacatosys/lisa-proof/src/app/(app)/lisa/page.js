@@ -7,7 +7,7 @@ import { NOMES_DOS_DESAFIOS } from "@/dominio/pratica.js";
 
 const numero = (n) => new Intl.NumberFormat("pt-BR").format(Math.round(n || 0));
 const quando = (iso) => new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-const ICONE_DA_ACAO = { curso: "🎓", mina: "⛏️", teoria: "📖", quiz: "❓", exercicio: "✍️", projeto: "🧩", reino: "🏰", bolsa: "📈", caderno: "📓", acervo: "🏛️", conta: "👋" };
+const ICONE_DA_ACAO = { curso: "🎓", mina: "⛏️", teoria: "📖", quiz: "❓", exercicio: "✍️", projeto: "🧩", reino: "🏰", bolsa: "📈", caderno: "📓", acervo: "🏛️", conta: "👋", correio: "🕊️", ilhas: "🏝️" };
 const STATUS_DO_ACERVO = { pendente: "esperando aprovação", aprovado: "aprovado", recusado: "recusado", retirado: "retirado" };
 
 /**

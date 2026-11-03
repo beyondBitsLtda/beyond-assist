@@ -418,3 +418,11 @@
 .diagrama--cheia .diagrama__moldura { height: auto; min-height: 320px; }
 body.diagrama-sem-rolar { overflow: hidden; }
 @media (max-width: 520px) { .conversa__fala { max-width: 100%; } .diagrama__moldura { height: 70vh; } }
+
+/* o exemplo da Lisa (03/11/2026, BEYOND-0022): os conceitos e uma aplicação de exemplo com todos eles */
+.exemplo-lisa { margin-top: 14px; }
+.exemplo-lisa__corpo > summary { cursor: pointer; font-weight: 700; color: var(--pf-tinta); }
+.exemplo-lisa__corpo[open] > summary { margin-bottom: 8px; }
+.exemplo-lisa__conceitos { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.exemplo-lisa__passos { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
+.exemplo-lisa__seu { margin: 6px 0 0; padding: 8px 10px; border-radius: var(--pf-raio); background: var(--pf-superficie-2); font-size: 14px; }
