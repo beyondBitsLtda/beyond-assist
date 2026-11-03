@@ -9,14 +9,33 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.35.0-cloudflare-pages.1",
+  "versao": "0.36.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-02",
   "compilacao": {
-    "numero": 68,
+    "numero": 69,
     "data": "2026-11-02",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.36.0-cloudflare-pages.1",
+      "data": "2026-11-02",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Pedidos de criar ou mudar fluxogramas não caem mais num beco sem saída, e o desenho sai do tipo e com o conteúdo que a pessoa pediu. No Rosto, o \"toc toc\" virou batida de porta e entrou a brincadeira do mímico preso no vidro.",
+      "itens": [
+        "Quando um pedido de desenho caía na conversa comum, a Lisa dizia que não podia mudar nada \"por aqui\" e mandava \"dar o comando direto\"; agora ela diz o que entendeu, pergunta \"Posso fazer?\" e o \"sim\" faz o desenho de verdade.",
+        "O \"sim\" entende mais jeitos de falar, inclusive com erro de digitação: \"Poder fazer a alteração\", \"pode criar\", \"pode desenhar\", \"faz isso pra mim\".",
+        "O desenho e o plano do projeto passam a ver a tela (Modo Tela) e os prints anexados: \"pegue o exercício da minha tela e estruture no ProcessMap\" desenha os passos que estão na tela.",
+        "O tipo pedido é regra: BPMN, UML de atividades, diagrama de classes, casos de uso, modelo de dados, C4, fluxograma com raias e mapa mental saem nesse tipo (forma de outra família vira a equivalente). \"Um fluxograma a partir do mapa mental\" sai fluxograma, e não mais mapa mental.",
+        "O conteúdo dado em lista (tópicos, \"as etapas são: A, B e C\", \"A → B → C\") vai com as palavras da pessoa; o que faltar no desenho volta para a IA uma vez e, se ainda faltar, a Lisa avisa o que não entrou.",
+        "Num projeto do ProcessMap, \"faça um BPMN de…\" que a IA lia como pergunta vira desenho novo (com a confirmação de sempre), e a confirmação diz o tipo (\"Criar o diagrama BPMN…\").",
+        "Um fluxograma na tela só vira mapa mental quando o pedido manda transformar; transformar um mapa mental em fluxograma leva o conteúdo do mapa.",
+        "Rosto: o \"toc toc\" agora é uma batida de porta — a mão fechada fica em pé, com a palma para o vidro, e bate com os nós dos dedos num movimento do pulso (antes o punho inteiro avançava contra a câmera, como um murro); a onda do vidro ficou mais leve.",
+        "Rosto: brincadeira nova, \"Presa no vidro\" — as duas mãos abertas espalmadas no vidro, uma de cada vez desencosta e procura outro lugar, ela olha cada mão e no fim empurra com as duas e pergunta \"me tira daqui?\". No celular em pé, as mãos chegam mais perto do rosto para não sair pela borda."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.35.0-cloudflare-pages.1",
       "data": "2026-11-02",
@@ -1042,10 +1061,10 @@
         "Modo Tomar nota (celular e desktop, também com a tela apagada no Android): escuta até 10 minutos, transcreve, separa por assunto e anota no quadro \"Notas\" do Abacato, com uma coluna por tema e um card por nota (interpretação + transcrição real).",
         "Instalável como app pelo Chrome (desktop e Android) e pela Tela de Início no iPhone, com atalho direto para o Modo Tomar nota.",
         "Microfone do celular como o do WhatsApp, no chat e no modo voz: segurar grava, soltar envia, deslizar para a esquerda cancela e para cima trava; o áudio é transcrito no servidor (a mesma transcrição do Tomar nota) e não fica guardado.",
-        "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma, Anel de partículas e Rosto (um retrato térmico: borda quente e halo; a garganta esquenta com a fala, as orelhas acendem ouvindo e uma onda de calor sobe pela cabeça pensando; cabelo longo ou raspado e seis paletas de cor; parada e sem ninguém mexer, ela brinca: bate no vidro, joga videogame ou cantarola); o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador). No modo MVP, o usuário tem só a Esfera de pontos (padrão) e o Rosto.",
+        "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma, Anel de partículas e Rosto (um retrato térmico: borda quente e halo; a garganta esquenta com a fala, as orelhas acendem ouvindo e uma onda de calor sobe pela cabeça pensando; cabelo longo ou raspado e seis paletas de cor; parada e sem ninguém mexer, ela brinca: bate no vidro como numa porta, joga videogame, cantarola ou fica presa no vidro como um mímico); o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador). No modo MVP, o usuário tem só a Esfera de pontos (padrão) e o Rosto.",
         "Painel Sentinela de casos de teste e chamados.",
         "Editor de código da conversa colaborativo: abas editáveis, abas suas com o seu código e a Lisa reescrevendo em cima a pedido, com o que está na IDE indo junto das perguntas.",
-        "Quadro de processos: a Lisa desenha fluxogramas, BPMN com raias, arquitetura, C4 e mapas mentais quando pedido; a pessoa mexe no desenho e a Lisa conversa sobre ele e o altera a partir do que está na tela, inclusive pela aparência (\"limpe as atividades vermelhas\", \"pinte de verde\") e por abas (cria, detalha uma etapa numa aba ligada a ela, separa, renomeia e apaga abas). O desenho do quadro pode ser salvo num projeto do ProcessMap (botão \"💾 salvar\"), e dali em diante as mudanças se salvam sozinhas.",
+        "Quadro de processos: a Lisa desenha fluxogramas, BPMN com raias, arquitetura, C4 e mapas mentais quando pedido; a pessoa mexe no desenho e a Lisa conversa sobre ele e o altera a partir do que está na tela, inclusive pela aparência (\"limpe as atividades vermelhas\", \"pinte de verde\") e por abas (cria, detalha uma etapa numa aba ligada a ela, separa, renomeia e apaga abas). O desenho do quadro pode ser salvo num projeto do ProcessMap (botão \"💾 salvar\"), e dali em diante as mudanças se salvam sozinhas. A Lisa respeita o tipo pedido (BPMN, UML, classes, casos de uso, modelo de dados, C4, raias, mapa mental) e o conteúdo dado pela pessoa, inclusive o que está na tela ou num print anexado.",
         "Internet em qualquer modo: pedir para pesquisar ou procurar na web faz o servidor pesquisar (DuckDuckGo, com o Google Notícias de reserva) e ler as primeiras páginas; citar um site ou colar um link faz a Lisa ler a página. As fontes aparecem como links embaixo da resposta.",
         "Painel ProcessMap (/fluxogramas): o editor de diagramas inteiro dentro da Lisa (fluxograma, mapa mental e schema SQL), com projetos e fluxogramas salvos no banco (salvamento automático, aviso de conflito entre abas, importar/exportar .json) e a barra \"pedir à Lisa\" para desenhar ou mudar o fluxo aberto. Na conversa, \"no projeto X do ProcessMap, …\" faz a Lisa ler os fluxogramas do projeto e trabalhar nele (mudar um fluxo ou criar outro, salvando lá).",
         "Cena do Assistente no computador: a resposta numa janela holográfica flutuante e arrastável, com hologramas em volta (anéis, mira, painéis de status e de sinal de voz, barras, grade), a Lisa mais perto e no centro, e profundidade 3D com paralaxe do mouse.",

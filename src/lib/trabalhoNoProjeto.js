@@ -11,8 +11,11 @@ import { descreverDiagrama, resumoDaMudanca } from "./diagramaDaLisa.js";
 
 const JSON_ = { "content-type": "application/json" };
 
-/** O plano do pedido sobre o projeto: { acao, explicacao, operacoes }. Lança se o servidor falhar. */
-export async function pedirPlano({ pedido, projeto, fluxos, aberto = "", conversa = "", buscar = (...a) => fetch(...a) }) {
+/**
+ * O plano do pedido sobre o projeto: { acao, explicacao, operacoes }. Lança se o servidor falhar.
+ * `imagens`: a tela e os prints da conversa; `confirmado`: a pessoa já disse "sim" na conversa.
+ */
+export async function pedirPlano({ pedido, projeto, fluxos, aberto = "", conversa = "", imagens = [], confirmado = false, buscar = (...a) => fetch(...a) }) {
   const res = await buscar("/api/processmap/plano", {
     method: "POST",
     headers: JSON_,
@@ -21,6 +24,8 @@ export async function pedirPlano({ pedido, projeto, fluxos, aberto = "", convers
       projeto: contextoDoProjeto(projeto, fluxos),
       fluxos: fluxos.map(({ id, nome, modo, formas }) => ({ id, nome, modo, formas })),
       aberto, conversa,
+      ...(imagens.length ? { imagens } : {}),
+      ...(confirmado ? { confirmado: true } : {}),
     }),
   });
   const r = await res.json().catch(() => ({}));
@@ -43,9 +48,11 @@ export function textoDoAndamento(plano, linhas, fim = "") {
  *   acabou de mexer); `abertoId`: esse fluxo grava por cima (a versão da tela é a que vale).
  *   aoAndar(linhas): a cada passo, para a tela mostrar o andamento. `contexto`: o código dos
  *   repositórios ligados à conversa ("a arquitetura do nosso produto" desenha o que existe de verdade).
+ *   `pedido`: o pedido nas palavras da pessoa (cada desenho vê, além da instrução do plano, o tipo e o
+ *   conteúdo que ela pediu); `imagens`: a tela e os prints da conversa.
  */
 export async function executarPlano({
-  plano, projeto, fluxos, api, conversa = "", contexto = "", abertoId = "",
+  plano, projeto, fluxos, api, conversa = "", contexto = "", abertoId = "", pedido = "", imagens = [],
   docDe = (f) => f.documento, aoAndar = () => {}, buscar = (...a) => fetch(...a),
 }) {
   const linhas = plano.operacoes.map((op) => ({
@@ -70,6 +77,10 @@ export async function executarPlano({
           atual: antes,
           conversa, contexto,
           projeto: contextoDoProjeto(projeto, fluxos, { alvo: fluxo }),
+          // o desenho novo sai do tipo que o plano deu (o que a pessoa disse); o que existe fica do tipo que é
+          ...(!fluxo && op.tipo ? { tipo: op.tipo } : {}),
+          ...(pedido ? { original: pedido } : {}),
+          ...(imagens.length ? { imagens } : {}),
         }),
       });
       const r = await res.json().catch(() => ({}));
@@ -97,6 +108,8 @@ export async function executarPlano({
       const abas = r.doc?.mode === "mindmap" ? 1 : r.doc?.pages?.length || 1;
       const formas = (r.doc?.pages || []).reduce((t, p) => t + (p.shapes || []).length, 0);
       linha.nota = mudanca ? mudanca.texto : `${formas} formas${abas > 1 ? ` em ${abas} abas` : ""}`;
+      // o que a pessoa listou e não entrou nem na segunda tentativa: dito, e não escondido
+      if (r.faltando?.length) linha.nota += ` — não achei no desenho: ${r.faltando.slice(0, 6).map((i) => `"${i}"`).join(", ")}`;
       resultados.push({ op, fluxo: salvo, doc: r.doc, colecao: r.colecao, explicacao: r.explicacao, mudou: Boolean(fluxo), mudanca: mudanca?.texto || "" });
     } catch (err) {
       linha.estado = err.status === 409 ? "não salvei (mudou em outro lugar agora há pouco)" : "não deu";

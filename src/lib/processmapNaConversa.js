@@ -7,7 +7,7 @@
 // texto com todos os fluxogramas do projeto, que vai junto da pergunta (/api/ask) ou do pedido de
 // desenho (/api/diagrama). Quem busca os projetos e salva o resultado é a página do Assistente.
 
-import { descreverDiagrama, distanciaDeEdicao } from "./diagramaDaLisa.js";
+import { descreverDiagrama, distanciaDeEdicao, TIPOS_DE_DESENHO, TIPOS_NO_PLANO, idDoTipo, tipoPedido } from "./diagramaDaLisa.js";
 
 const semAcento = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const palavrasDe = (texto) => semAcento(texto).split(/[^a-z0-9]+/).filter(Boolean);
@@ -152,10 +152,11 @@ export function validarPlano(bruto, fluxos) {
     const mesma = fluxo && operacoes.find((o) => o.fluxo === fluxo);
     if (mesma) { mesma.pedido = `${mesma.pedido}\n\nAlém disso: ${pedido}`.slice(0, 9000); continue; }
     if (operacoes.length >= LIMITE_DE_OPERACOES) break;
+    const tipo = TIPOS_NO_PLANO.includes(op?.tipo) ? op.tipo : "fluxograma";
     operacoes.push({
       fluxo,
-      nome: fluxo ? "" : linha(op?.nome, 120) || "Novo fluxograma",
-      tipo: op?.tipo === "mapa mental" ? "mapa mental" : "fluxograma",
+      nome: fluxo ? "" : linha(op?.nome, 120) || (tipo === "mapa mental" ? "Novo mapa mental" : "Novo fluxograma"),
+      tipo,
       pedido,
     });
   }
@@ -183,6 +184,36 @@ export function validarPlano(bruto, fluxos) {
 }
 
 export const LIMITE_DE_DOCUMENTOS = 8;
+
+/**
+ * O tipo que a pessoa disse vale mais que o do modelo (02/11/2026: "criar o fluxograma do tipo que eu
+ * pedir"): num plano com UM desenho novo, se o pedido diz um tipo ("faça um BPMN…", "um mapa mental…",
+ * "com raias"), é esse o tipo dele. Com vários desenhos novos, cada um fica com o tipo que o modelo deu.
+ * Só a notação manda aqui (BPMN, UML, C4, raias, mapa…): "a arquitetura desse exercício" é assunto.
+ */
+export function tipoDitoNoPlano(plano, pedido) {
+  const novos = (plano?.operacoes || []).filter((o) => !o.fluxo);
+  const dito = tipoPedido(pedido);
+  if (novos.length !== 1 || !(TIPOS_DE_DESENHO[dito]?.formas || dito === "mapa")) return plano;
+  return { ...plano, operacoes: plano.operacoes.map((o) => (o === novos[0] ? { ...o, tipo: TIPOS_DE_DESENHO[dito].plano } : o)) };
+}
+
+/**
+ * O plano de um pedido que a pessoa JÁ confirmou na conversa e que o modelo ainda leu como pergunta: um
+ * desenho novo no projeto, com o pedido inteiro como instrução e o tipo que ele diz.
+ */
+export function planoDeDesenhoNovo(pedido) {
+  const tipo = TIPOS_DE_DESENHO[tipoPedido(pedido)]?.plano || "fluxograma";
+  return { acao: "mudar", explicacao: "", operacoes: [{ fluxo: "", nome: "", tipo, pedido: String(pedido || "").slice(0, 6000) }], documentos: [] };
+}
+
+const ROTULOS = {
+  fluxograma: "o fluxograma", mapa: "o mapa mental", simples: "o fluxograma simples", raias: "o fluxograma com raias",
+  bpmn: "o diagrama BPMN", atividades: "o diagrama UML de atividades", classes: "o diagrama de classes", casos: "o diagrama de casos de uso",
+  dados: "o modelo de dados", c4: "o diagrama C4", arquitetura: "o diagrama de arquitetura", nuvem: "o diagrama de arquitetura de nuvem",
+};
+/** "o fluxograma", "o mapa mental", "o diagrama BPMN" — para a pergunta de confirmação. */
+export const rotuloDoTipo = (tipo) => ROTULOS[idDoTipo(tipo)] || ROTULOS.fluxograma;
 
 /** O nome do .md: curto, com hífens, sem repetir outro da mesma resposta. */
 export function nomeDeArquivo(texto, usados = []) {
@@ -370,8 +401,11 @@ export function completarPlano(plano, extra, faltando) {
 export const VALIDADE_DA_CONFIRMACAO_MS = 15 * 60_000;
 
 const SIM = ["sim", "pode", "isso", "exato", "exatamente", "manda", "ok", "okay", "beleza", "blz", "confirmo", "confirmado", "certeza", "claro", "yes", "bora", "vai", "uhum", "aham", "positivo", "perfeito", "correto", "certo", "faz", "faca", "fazer", "segue", "prossiga", "continue"];
-// as palavras que podem vir junto do sim sem mudar nada ("sim, pode fazer, Lisa")
-const JUNTO_DO_SIM = new Set([...SIM, "s", "ss", "mesmo", "ver", "tenho", "lisa", "por", "favor", "pfv", "pf", "ir", "em", "frente", "la", "e", "a", "o", "de", "pode", "agora", "entao", "tudo", "isso", "mesmo", "ai", "aí", "tranquilo", "show", "massa", "top", "obrigado", "obrigada", "valeu"]);
+// as palavras que podem vir junto do sim sem mudar nada ("sim, pode fazer, Lisa"; 02/11/2026: "Poder fazer
+// a alteração" — com o erro de digitação — ficava sem resposta)
+const JUNTO_DO_SIM = new Set([...SIM, "s", "ss", "mesmo", "ver", "tenho", "lisa", "por", "favor", "pfv", "pf", "ir", "em", "frente", "la", "e", "a", "o", "de", "pode", "agora", "entao", "tudo", "isso", "mesmo", "ai", "aí", "tranquilo", "show", "massa", "top", "obrigado", "obrigada", "valeu",
+  "poder", "podes", "alteracao", "alteracoes", "mudanca", "mudancas", "desenho", "fluxograma", "fluxo", "mapa", "mental", "diagrama", "as", "os", "essa", "esse", "isto", "ja", "logo", "assim", "jeito", "do", "da", "pra", "para", "mim", "voce", "favor",
+  "criar", "crie", "cria", "desenhar", "desenhe", "desenha", "mudar", "alterar", "altere", "seguir", "fazendo", "executar", "execute", "aplicar", "aplique", "pode", "podem", "manda", "mande"]);
 const NAO = ["nao", "n", "cancela", "cancelar", "cancele", "deixa", "deixe", "esquece", "esqueca", "para", "pare", "negativo", "no", "nope", "nada"];
 const CORRECAO = /^(nao|n)\b.{8,}|^(sim|s|pode)\s+(mas|so que|porem|so|e no|e na)\b|^(e|eh|e no|e na|e nos|e nas)\s+(no|na|nos|nas|o|a)\b|^na verdade\b|^(eu )?quis dizer\b|^(nao e|não é)\b|\berrad[oa]\b|^o (certo|correto)\b|^(mas|so que|porem)\b|^faltou\b|^(e )?tamb[eé]m\b|^troca\b|^muda\b|^(no|na) (projeto|fluxo|fluxograma|mapa|aba|desenho)\b/;
 
@@ -403,7 +437,7 @@ export function textoDaConfirmacao(plano, projeto, fluxos, { como = "" } = {}) {
   const resumo = (t) => { const s = String(t || "").replace(/\s+/g, " ").trim(); return s.length > 240 ? `${s.slice(0, 240)}…` : s; };
   const ondeAchei = { "em uso": " (o que está em uso)", "pelo desenho": " (pelo nome do desenho)", parecido: " (pelo nome parecido)", "mais recente": " (o mais recente — se não for esse, diga qual)", "único": "" }[como] || "";
   const linhas = [
-    ...(plano.operacoes || []).map((o) => (o.fluxo ? `• Mudar "${nomeDe(o.fluxo)}": ${resumo(o.pedido)}` : `• Criar ${o.tipo === "mapa mental" ? "o mapa mental" : "o fluxograma"} "${o.nome}": ${resumo(o.pedido)}`)),
+    ...(plano.operacoes || []).map((o) => (o.fluxo ? `• Mudar "${nomeDe(o.fluxo)}": ${resumo(o.pedido)}` : `• Criar ${rotuloDoTipo(o.tipo)}${o.nome ? ` "${o.nome}"` : ""}: ${resumo(o.pedido)}`)),
     ...(plano.documentos || []).map((d) => `• Escrever no editor o arquivo ${d.arquivo}${d.titulo && d.estilo === "livre" ? ` — ${d.titulo}` : ""}`),
   ];
   return [

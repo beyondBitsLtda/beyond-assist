@@ -798,6 +798,298 @@ export function pedidoDeDesenho(pergunta, { quadroAberto = false } = {}) {
   return quadroAberto && /\b(esse|este|nesse|neste|desse|deste|o mesmo) (desenho|diagrama|fluxo|quadro|processo|mapa)\b/.test(texto) ? "alterar" : "novo";
 }
 
+// ---------------------------------------------------------------- o tipo e o conteúdo pedidos
+//
+// (02/11/2026: "ela não respeita fazer exatamente o que eu peço: criar o fluxograma do tipo que eu
+// pedir com o conteúdo que eu pedir") O tipo dito ("um BPMN", "diagrama de classes", "com raias") vira
+// regra, e não sugestão: num desenho novo (ou num "transforme em…"), as formas que o modelo trouxer de
+// outra família são trocadas pela equivalente da família pedida. E o conteúdo dado em lista (tópicos,
+// "etapas: A, B e C", "A → B → C") é conferido no desenho pronto: o que faltou volta para o modelo uma vez.
+
+const FLUXO = ["terminal", "process", "decision", "data", "document", "subprocess", "database", "delay", "manual"];
+
+/**
+ * Os tipos de desenho que a pessoa pode pedir: `plano` é o nome no plano do projeto (o modelo escolhe
+ * um deles), `colecao` a paleta do quadro, `formas` as que valem (a anotação vale em todos). O
+ * "fluxograma" genérico só quer dizer "não é mapa mental" — a família fica livre. "Arquitetura" e
+ * "nuvem" também não trocam formas: são assunto tanto quanto tipo ("a arquitetura e os requisitos desse
+ * exercício" é o passo a passo dele), e o modelo já desenha arquitetura com arch* e cloud*.
+ */
+export const TIPOS_DE_DESENHO = {
+  fluxograma: { nome: "fluxograma", plano: "fluxograma" },
+  mapa: { nome: "mapa mental", plano: "mapa mental" },
+  simples: { nome: "fluxograma simples", plano: "fluxograma simples", colecao: "flow", formas: FLUXO },
+  raias: { nome: "fluxograma com raias (swimlane)", plano: "raias", colecao: "flow", formas: FLUXO, raias: true },
+  bpmn: { nome: "BPMN", plano: "bpmn", colecao: "bpmn", formas: TIPOS.filter((t) => t.startsWith("bpmn")) },
+  atividades: { nome: "UML de atividades", plano: "uml de atividades", colecao: "uml", formas: ["umlInitial", "umlAction", "umlDecision", "umlFinal"] },
+  classes: { nome: "diagrama de classes (UML)", plano: "diagrama de classes", colecao: "uml", formas: ["umlClass"] },
+  casos: { nome: "casos de uso (UML)", plano: "casos de uso", colecao: "usecase", formas: ["ucActor", "ucCase"] },
+  dados: { nome: "modelo de dados", plano: "modelo de dados", colecao: "db", formas: ["dbTable"] },
+  c4: { nome: "C4", plano: "c4", colecao: "c4", formas: ["c4Person", "c4System", "c4Container", "c4External"] },
+  arquitetura: { nome: "arquitetura de software", plano: "arquitetura" },
+  nuvem: { nome: "arquitetura de nuvem", plano: "nuvem" },
+};
+/** Os nomes do plano (o enum que o modelo do plano escolhe). */
+export const TIPOS_NO_PLANO = Object.values(TIPOS_DE_DESENHO).map((t) => t.plano);
+/** O id do tipo a partir do id ou do nome do plano ("uml de atividades" → "atividades"); null se não for tipo. */
+export function idDoTipo(v) {
+  const t = String(v ?? "").trim().toLowerCase();
+  if (TIPOS_DE_DESENHO[t]) return t;
+  return Object.keys(TIPOS_DE_DESENHO).find((id) => TIPOS_DE_DESENHO[id].plano === t) || null;
+}
+
+// as menções de tipo no texto (sem acento, minúsculo); na ordem: a de cima ganha quando duas se sobrepõem
+const MENCOES = [
+  ["mapa", /\bmapas? ment(al|ais)\b|\bmind ?maps?\b/g],
+  ["bpmn", /\bbpmn\b/g],
+  ["classes", /\b(diagramas?|uml) de class(e|es)\b/g],
+  ["casos", /\b((diagramas?|uml) de )?casos? de uso\b|\buse ?cases?\b/g],
+  ["atividades", /\b(diagramas?|uml) de atividades?\b|\buml\b/g],
+  ["dados", /\b(modelos?|diagramas?|modelagem) (de dados|entidade relacionamento|er|relacional)\b|\b(der|mer)\b|\bentidade relacionamento\b/g],
+  ["c4", /\bc4\b/g],
+  ["simples", /\b(fluxogramas?|fluxos?|diagramas?) (simples|tradicional|classico|padrao|comum|basico)\b/g],
+  ["nuvem", /\b(arquitetura|diagrama|desenho)s? (de|da|na|em) nuvem\b|\bcloud\b|\baws\b|\bazure\b|\bgcp\b/g],
+  ["arquitetura", /\barquitetura\b/g],
+  ["raias", /\bswim ?lanes?\b|\b(com|em|por) raias?\b|\braias\b/g],
+];
+// o que é "o jeito de desenhar" (e não o assunto): ganha do assunto ("a arquitetura em BPMN" é BPMN)
+const NOTACOES = new Set(["mapa", "bpmn", "classes", "casos", "atividades", "dados", "c4", "simples"]);
+const GENERICO = /\b(fluxogramas?|fluxos?|diagramas?|desenhos?|processos?|esquemas?)\b/g;
+const CRIAR = /\b(faca|facam|faz|fazer|crie|cria|criar|monte|monta|montar|gere|gera|gerar|desenhe|desenha|desenhar|elabore|elaborar|construa|construir|estruture|estruturar|modele|modelar|organize|organizar|quero|queria|preciso|gostaria|mostre|mostrar|coloque|colocar|ponha|bote|botar|transforme|transformar|converta|converter|refaca|refazer|redesenhe|redesenhar|passe|passar)\b/;
+// "transforme esse fluxo EM mapa mental", "refaça como BPMN", "passe para UML"
+const TRANSFORMA = /\b(transform|convert|vir[ae]|pass[ae]|refac|refaz|redesenh|mud[ae]|troqu|troc)\w*\b[^.;\n]{0,60}?\b(em|para|pra|como|num|numa)\s+(um\s+|uma\s+)?/g;
+// o tipo depois do desenho só é o tipo DELE quando vem colado ("fluxograma BPMN") ou depois de
+// "em/usando/tipo/estilo…" ("a arquitetura em BPMN") — "um fluxograma a partir do mapa mental" é fluxograma
+const QUALIFICA = /(^|\s)(em|usando|tipo|estilo|formato|notacao|como|modelo|padrao)\s*$/;
+// o texto para achar o tipo: sem acento, minúsculo, só letras, números e o fim de frase
+const textoDoTipo = (s) => semAcento(s).replace(/[^a-z0-9.;\n]+/g, " ").replace(/ {2,}/g, " ");
+
+function mencoes(t) {
+  const achadas = [];
+  for (const [id, re] of MENCOES) {
+    for (const m of t.matchAll(re)) {
+      const ini = m.index, fim = m.index + m[0].length;
+      if (!achadas.some((a) => a.ini < fim && ini < a.fim)) achadas.push({ id, ini, fim });
+    }
+  }
+  return achadas.sort((a, b) => a.ini - b.ini);
+}
+
+// o tipo do primeiro desenho dito no trecho (até o fim da frase): o dito de cara ("um BPMN", "a
+// arquitetura") ou o genérico ("um fluxograma"), com o que o qualifica ("fluxograma BPMN", "a
+// arquitetura em C4", "fluxograma com raias"); o genérico sem qualificação é "fluxograma"
+function tipoDoTrecho(trecho) {
+  const fim = trecho.search(/[.;\n]/);
+  const t = fim < 0 ? trecho : trecho.slice(0, fim);
+  const ms = mencoes(t);
+  const generico = [...t.matchAll(GENERICO)][0];
+  if (!ms.length && !generico) return null;
+  const ehGenerico = Boolean(generico) && !(ms[0] && ms[0].ini <= generico.index);
+  const depois = ehGenerico ? generico.index + generico[0].length : ms[0].fim;
+  for (const m of ms) {
+    if (m.ini < depois) continue;
+    if (m.id === "raias" && ehGenerico) return "raias";
+    const antes = t.slice(depois, m.ini);
+    if (NOTACOES.has(m.id) && (!antes.trim() || QUALIFICA.test(antes))) return m.id;
+  }
+  return ehGenerico ? "fluxograma" : ms[0].id;
+}
+
+/**
+ * O tipo que um "transforme em…" pede ("transforme esse fluxo em mapa mental", "refaça como BPMN",
+ * "passe para fluxograma" = o clássico), ou null — "mude a cor para verde" não é transformar.
+ */
+export function tipoDaTransformacao(pedido) {
+  const t = textoDoTipo(pedido);
+  for (const tr of t.matchAll(TRANSFORMA)) {
+    const alvo = tipoDoTrecho(t.slice(tr.index + tr[0].length, tr.index + tr[0].length + 80));
+    if (alvo) return alvo === "fluxograma" ? "simples" : alvo;
+  }
+  return null;
+}
+
+/**
+ * O tipo de desenho que o pedido pede (o id de TIPOS_DE_DESENHO), ou null se ele não diz. Vale o alvo
+ * de um "transforme em…"; senão o primeiro desenho depois do verbo ("faça um BPMN…", "crie um
+ * fluxograma com raias…"); sem verbo, o único tipo citado.
+ */
+export function tipoPedido(pedido) {
+  const t = textoDoTipo(pedido);
+  if (!t.trim()) return null;
+  const alvo = tipoDaTransformacao(pedido);
+  if (alvo) return alvo;
+  const v = t.match(CRIAR);
+  if (v) {
+    const trecho = t.slice(v.index + v[0].length, v.index + v[0].length + 120);
+    const id = tipoDoTrecho(trecho);
+    if (id) return id;
+  }
+  const ids = [...new Set(mencoes(t).map((m) => m.id))];
+  const notacoes = ids.filter((id) => NOTACOES.has(id));
+  if (notacoes.length === 1) return notacoes[0];
+  if (!notacoes.length && ids.length === 1) return ids[0];
+  return null;
+}
+
+// o papel de uma forma, para achar a equivalente em outra família
+function papelDa(f, ligacoes) {
+  const t = f.tipo;
+  if (t === "bpmnStart" || t === "umlInitial") return "inicio";
+  if (t === "bpmnEnd" || t === "umlFinal") return "fim";
+  if (t === "terminal") {
+    const entra = ligacoes.some((l) => l.para === f.id);
+    const sai = ligacoes.some((l) => l.de === f.id);
+    return /\b(fim|final|termin|encerr|end)\w*/i.test(f.texto) || (entra && !sai) ? "fim" : "inicio";
+  }
+  if (["decision", "bpmnGatewayX", "bpmnGatewayParallel", "umlDecision"].includes(t)) return "decisao";
+  if (["delay", "bpmnTimer"].includes(t)) return "espera";
+  if (["data", "document", "bpmnDataObject", "bpmnMessageEvent"].includes(t)) return "dado";
+  if (["database", "dbTable", "cloudWarehouse", "cloudBucket"].includes(t)) return "banco";
+  if (["ucActor", "c4Person", "cloudUsers", "bpmnUserTask", "manual"].includes(t)) return "pessoa";
+  if (["archExternal", "c4External", "archCloud"].includes(t)) return "externo";
+  if (["bpmnServiceTask", "archService", "archComponent", "c4Container", "c4System", "cloudFunction", "cloudContainer", "archServer"].includes(t)) return "sistema";
+  return "etapa";
+}
+const EQUIVALENTES = {
+  simples: { inicio: "terminal", fim: "terminal", decisao: "decision", espera: "delay", dado: "data", banco: "database", pessoa: "manual", padrao: "process" },
+  bpmn: { inicio: "bpmnStart", fim: "bpmnEnd", decisao: "bpmnGatewayX", espera: "bpmnTimer", dado: "bpmnDataObject", banco: "bpmnDataObject", pessoa: "bpmnUserTask", sistema: "bpmnServiceTask", padrao: "bpmnTask" },
+  atividades: { inicio: "umlInitial", fim: "umlFinal", decisao: "umlDecision", padrao: "umlAction" },
+  classes: { padrao: "umlClass" },
+  casos: { pessoa: "ucActor", padrao: "ucCase" },
+  dados: { padrao: "dbTable" },
+  c4: { pessoa: "c4Person", externo: "c4External", padrao: "c4Container" },
+};
+EQUIVALENTES.raias = EQUIVALENTES.simples;
+
+/**
+ * Põe o desenho na família do tipo pedido: a "colecao" passa a ser a do tipo, e cada forma de outra
+ * família vira a equivalente (o início de um fluxograma vira o evento de início no BPMN, a decisão vira
+ * o gateway…), com o mesmo id, texto e raia. A anotação fica. Devolve quantas formas foram trocadas.
+ */
+export function naFamilia(desenho, tipo) {
+  const t = TIPOS_DE_DESENHO[tipo];
+  if (!t?.formas || !desenho?.abas) return { desenho, trocadas: 0 };
+  const vale = new Set([...t.formas, "note"]);
+  const eq = EQUIVALENTES[tipo];
+  let trocadas = 0;
+  for (const aba of desenho.abas) {
+    if (aba.manter) continue;
+    for (const f of aba.formas) {
+      if (vale.has(f.tipo)) continue;
+      const papel = papelDa(f, aba.ligacoes);
+      f.tipo = eq[papel] || eq.padrao;
+      trocadas++;
+    }
+  }
+  desenho.colecao = t.colecao;
+  return { desenho, trocadas };
+}
+
+const LISTA_NA_LINHA = /^\s*(?:[-*•–]|\d{1,2}\s*[.)º°-])\s+(.+?)\s*$/;
+const LISTA_DEPOIS_DE = /\b(etapas|passos|atividades|topicos|fases|itens|partes|areas|raias|tarefas|subtopicos|telas|funcionalidades|requisitos)\b[^:\n]{0,40}:\s*([^\n]+)/gi;
+const limparItem = (s) => String(s).replace(/^["“'`]+|["”'`.;:,!?]+$/g, "").replace(/\s+/g, " ").trim();
+const palavrasFortes = (s) => palavrasDe(s).filter((p) => p.length >= 3 && !["que", "com", "sem", "para", "pra", "dos", "das", "nos", "nas", "uma", "por", "seu", "sua", "the", "and"].includes(p));
+
+/**
+ * O conteúdo que o pedido dá em LISTA, item por item: as linhas com tópico ("- Pagar", "1. Pagar"), as
+ * cadeias "A → B → C" e o que vem depois de "as etapas são:" separado por vírgula ou "e". Só os itens de
+ * até 10 palavras (o resto é instrução, não o texto de uma forma).
+ */
+export function itensDoPedido(pedido) {
+  const texto = String(pedido || "");
+  const itens = [];
+  for (const linha of texto.split(/\r?\n/)) {
+    const m = linha.match(LISTA_NA_LINHA);
+    if (m) itens.push(m[1].split(/:\s+/)[0]);
+  }
+  for (const frase of texto.split(/[\n.]/)) {
+    if (!/→|->|=>/.test(frase)) continue;
+    const partes = frase.split(/\s*(?:→|->|=>)\s*/);
+    partes[0] = partes[0].split(":").pop();
+    itens.push(...partes);
+  }
+  for (const m of semAcento(texto).matchAll(LISTA_DEPOIS_DE)) {
+    // (o trecho vem do texto sem acento: pega o mesmo trecho no original, pela posição)
+    const ini = m.index + m[0].length - m[2].length;
+    itens.push(...texto.slice(ini, ini + m[2].length).split(/\s*(?:,|;|\be\b)\s*/));
+  }
+  const vistos = new Set();
+  return itens.map(limparItem).filter((i) => {
+    const n = palavrasDe(i).length;
+    const chave = palavrasDe(i).join(" ");
+    if (!n || n > 10 || !palavrasFortes(i).length || vistos.has(chave)) return false;
+    vistos.add(chave);
+    return true;
+  }).slice(0, 60);
+}
+
+/** Os textos de um documento do quadro (todas as abas; raias e tópicos do mapa inclusive). */
+export const textosDoDocumento = (doc) => abasDe(doc).flatMap((a) => (a.shapes || []).map((s) => String(s?.text ?? ""))).filter(Boolean);
+
+/**
+ * Os itens pedidos que não estão em nenhum texto do desenho: um item está lá quando ao menos 2/3 das
+ * palavras dele (com 3 letras ou mais) aparecem num mesmo texto — aguentando plural e erro de uma letra.
+ */
+export function faltandoNoDesenho(itens, textos) {
+  const doDesenho = (textos || []).map((t) => palavrasDe(t));
+  const bate = (p, w) => p === w || (p.length >= 5 && w.length >= 5 && (p.startsWith(w.slice(0, 5)) && Math.abs(p.length - w.length) <= 3)) || (p.length > 4 && distanciaDeEdicao(p, w) <= 1);
+  return (itens || []).filter((item) => {
+    const fortes = palavrasFortes(item);
+    if (!fortes.length) return false;
+    const precisa = Math.ceil(fortes.length * 2 / 3);
+    return !doDesenho.some((ws) => fortes.filter((p) => ws.some((w) => bate(p, w))).length >= precisa);
+  });
+}
+
+/** O que o desenho pronto deixou de cumprir do pedido (frases para o modelo), [] se cumpriu. */
+export function oQueFaltou(doc, { itens = [], tipo = null } = {}) {
+  const problemas = [];
+  const faltando = faltandoNoDesenho(itens, textosDoDocumento(doc));
+  if (faltando.length) problemas.push(`faltaram estes itens que a pessoa deu (ponha cada um, com as palavras dela): ${faltando.map((i) => `"${i}"`).join(", ")}`);
+  if (TIPOS_DE_DESENHO[tipo]?.raias && !abasDe(doc).some((a) => (a.shapes || []).some((s) => s?.type === "lane"))) {
+    problemas.push("a pessoa pediu raias (swimlane) e o desenho veio sem: dê a cada forma a \"raia\" de quem faz a etapa");
+  }
+  return { problemas, faltando };
+}
+
+// ---------------------------------------------------------------- a conversa que entendeu um pedido de desenho
+//
+// (02/11/2026: "pode fazer a alteração" → "por aqui nesta resposta eu não altero nada; é só me dar o
+// comando direto") Quando um pedido de desenho cai na conversa comum, a Lisa diz o que entendeu,
+// pergunta "Posso fazer?" e termina com a MARCA; o servidor tira a marca do texto e avisa a página
+// (o evento "desenho"), que guarda o pedido — e o "sim" seguinte desenha de verdade.
+
+export const MARCA_DE_DESENHO = "[[DESENHAR]]";
+
+/**
+ * Tira a marca do texto que chega aos pedaços (ela pode vir partida entre dois pedaços): `passar`
+ * devolve o que já pode ir para a tela, segurando o fim que pode ser o começo da marca; `fim` devolve o
+ * que sobrou e se a marca apareceu.
+ */
+export function filtroDaMarca(marca = MARCA_DE_DESENHO) {
+  let guardado = "";
+  let marcou = false;
+  return {
+    passar(pedaco) {
+      let t = guardado + String(pedaco ?? "");
+      guardado = "";
+      for (let i = t.indexOf(marca); i >= 0; i = t.indexOf(marca)) {
+        marcou = true;
+        t = t.slice(0, i).replace(/[ \t]+$/, "") + t.slice(i + marca.length);
+      }
+      for (let n = Math.min(marca.length - 1, t.length); n > 0; n--) {
+        if (marca.startsWith(t.slice(-n))) { guardado = t.slice(-n); t = t.slice(0, -n); break; }
+      }
+      return t;
+    },
+    fim() {
+      const resto = guardado;
+      guardado = "";
+      return { resto, marcou };
+    },
+  };
+}
+
 /** O código parece um diagrama em texto (Mermaid, PlantUML, Graphviz)? — a IDE oferece desenhar no quadro. */
 export function pareceDiagramaEmTexto(codigo, linguagem = "") {
   if (/^(mermaid|plantuml|puml|dot|graphviz)$/i.test(String(linguagem || ""))) return true;
@@ -826,9 +1118,13 @@ const ID_DO_TEMA = "raiz";
  * "explicando as decisões do processo" apagava o mapa.)
  */
 export function vaiSerMapaMental(pedido, atual) {
-  if (pedeMapaMental(pedido)) return true;
-  if (atual?.mode !== "mindmap") return false;
-  return !/\b(transform\w*|convert\w*|vir[ae]\w*|refa[cç]a\w*|passe\w*)\b[^.]{0,40}\b(fluxograma|diagrama|bpmn)\b/i.test(String(pedido || ""));
+  if (atual?.mode === "mindmap") {
+    return !/\b(transform\w*|convert\w*|vir[ae]\w*|refa[cç]a\w*|passe\w*)\b[^.]{0,40}\b(fluxograma|diagrama|bpmn)\b/i.test(String(pedido || ""));
+  }
+  // (02/11/2026) um fluxograma na tela só vira mapa mental se o pedido mandar transformar — "inclua no
+  // fluxo o que está no mapa mental" é mudar o fluxograma
+  if (atual) return tipoDaTransformacao(pedido) === "mapa";
+  return pedeMapaMental(pedido);
 }
 
 /** A pergunta fala em mapa mental ("mapa mental", "mapas mentais", "mind map")? */

@@ -61,8 +61,13 @@ enquanto você explica. Então MOSTRE o código — em vez de só descrever a co
 - ESTA resposta é só conversa: daqui você NÃO muda, anota, corrige nem salva desenho nenhum (quando um
   desenho muda, a resposta é outra, com a lista do que mudou de verdade). Então NUNCA diga "corrigi",
   "atualizei", "ajustei", "fiz a alteração" ou "salvei" sobre um fluxograma, uma nota ou um mapa mental.
-  Se a pessoa pedir uma mudança e a resposta for esta, diga com franqueza que ainda não mudou nada e diga
-  em uma frase o que você entendeu que ela quer (o desenho e a mudança), sem pedir o nome exato.`;
+- Se a pessoa pediu para CRIAR ou MUDAR um desenho (fluxograma, BPMN, UML, mapa mental, nota, aba — no
+  quadro ou num projeto do ProcessMap) e a resposta veio para cá: diga em uma ou duas frases o que você
+  entendeu — o TIPO de desenho e o CONTEÚDO que ela pediu (o que está na tela ou no print também),
+  sem pedir o nome exato — e pergunte "Posso fazer?". Na última linha, sozinha, escreva [[DESENHAR]]: a tela
+  tira essa marca, e o "sim" da pessoa faz o desenho de verdade. Nunca diga que não consegue, nunca peça
+  para ela "dar o comando", repetir o pedido, usar outro modo ou ir a outro lugar. Pergunta sobre
+  desenho ("o que é BPMN?", "o fluxo está certo?") não leva a marca.`;
 
 /** A instrução de sistema com a regra do código na tela por cima. */
 export function comCodigoNaTela(instrucao) {

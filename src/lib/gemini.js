@@ -3,7 +3,7 @@ import { TTS_VOICES } from "./ttsVoices.js";
 import { pickKeyIndex, markCooldown, markOk } from "./geminiKeyHealth.js";
 import { streamComRetomada } from "./retomada.js";
 import { limparTranscricao } from "./tomarNota.js";
-import { FORMAS, TIPOS, COLECOES, PONTAS, NOMES_DAS_CORES, estruturaQueCabe } from "./diagramaDaLisa.js";
+import { FORMAS, TIPOS, COLECOES, PONTAS, NOMES_DAS_CORES, estruturaQueCabe, TIPOS_DE_DESENHO, TIPOS_NO_PLANO } from "./diagramaDaLisa.js";
 
 const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 // gemini-2.5-flash foi descontinuado pra projetos novos no Google Cloud (confirmado ao vivo:
@@ -1121,8 +1121,26 @@ primeira linha da resposta já é a primeira linha real do arquivo.`;
  * mexido pela pessoa), é uma MUDANÇA: ela devolve o desenho inteiro de novo, mantendo os ids do que
  * continua. A saída passa por validarDesenho antes de ir para a tela.
  */
-export async function desenharDiagrama({ pedido, estrutura = null, conversa = "", contexto = "", projeto = "" }) {
+// (02/11/2026: "pegue o exercício que está na minha tela e estruture no ProcessMap" — o desenho não
+// via a tela nem os prints anexados) As imagens vão junto do pedido de desenho e do plano.
+const comImagens = (prompt, imagens) => (imagens?.length
+  ? [{ role: "user", parts: [{ text: prompt }, ...imagens.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } }))] }]
+  : prompt);
+const notaDasImagensDoDesenho = (imagens) => (imagens?.length
+  ? `HÁ ${imagens.length === 1 ? "UMA IMAGEM" : `${imagens.length} IMAGENS`} JUNTO DO PEDIDO (${imagens.map((i) => (i.origem === "tela" ? "a tela da pessoa agora" : `um print anexado${i.nome ? ` "${i.nome}"` : ""}`)).join("; ")}): o conteúdo pedido pode estar nela ("o exercício da minha tela", "este print", "isso") — leia e use o que está lá, fielmente, com os nomes e textos que aparecem.\n`
+  : "");
+// o pedido nas palavras da pessoa, quando quem pede o desenho é o plano (que escreve a instrução de cada desenho)
+const blocoDoOriginal = (original, pedido) => (original && original.trim() !== String(pedido || "").trim()
+  ? `O PEDIDO DA PESSOA, COM AS PALAVRAS DELA (o tipo de desenho e o conteúdo que ela pediu valem; o PEDIDO abaixo é a parte que cabe a este desenho):\n"${original.slice(0, 6000)}"\n`
+  : "");
+// a segunda volta: o que a primeira tentativa deixou de cumprir (src/lib/diagramaDaLisa.js: oQueFaltou)
+const blocoDoQueFaltou = (faltou) => (faltou?.length
+  ? `\nATENÇÃO — A SUA PRIMEIRA TENTATIVA NÃO CUMPRIU O PEDIDO: ${faltou.join("; ")}. Refaça cumprindo isso, sem perder o resto.`
+  : "");
+
+export async function desenharDiagrama({ pedido, estrutura = null, conversa = "", contexto = "", projeto = "", tipo = null, imagens = [], original = "", faltou = [] }) {
   const formas = TIPOS.map((t) => `- ${t}: ${FORMAS[t].nome}`).join("\n");
+  const exigido = TIPOS_DE_DESENHO[tipo];
   const prompt = [
     contexto
       ? `O CÓDIGO DOS REPOSITÓRIOS VINCULADOS À CONVERSA (para "essa arquitetura", "o meu sistema": desenhe o que está AQUI, com os nomes reais de arquivos, rotas, serviços e tabelas):\n${contexto.slice(0, 40000)}\n`
@@ -1134,7 +1152,12 @@ export async function desenharDiagrama({ pedido, estrutura = null, conversa = ""
     estrutura
       ? `O DESENHO QUE ESTÁ NA TELA AGORA (a pessoa pode ter mexido nele — parta DELE; "abaAtiva" é a aba que ela está vendo):\n${estruturaQueCabe(estrutura)}\n`
       : "",
-    `PEDIDO: "${String(pedido || "").slice(0, 8000)}"`,
+    notaDasImagensDoDesenho(imagens),
+    blocoDoOriginal(original, pedido),
+    exigido?.formas
+      ? `TIPO DE DESENHO PEDIDO: ${exigido.nome}. Use SÓ estas formas: ${exigido.formas.join(", ")} (e "note" para anotações); "colecao": "${exigido.colecao}".${exigido.raias ? " Toda forma leva a \"raia\" de quem faz a etapa." : ""}\n`
+      : "",
+    `PEDIDO: "${String(pedido || "").slice(0, 8000)}"${blocoDoQueFaltou(faltou)}`,
   ].filter(Boolean).join("\n");
 
   const systemInstruction = `Você é a Lisa e desenha processos num quadro de diagramas (fluxograma, BPMN, UML de atividades,
@@ -1143,6 +1166,14 @@ estrutura e o quadro organiza o desenho sozinho.
 
 As formas que existem (o "tipo" é o nome à esquerda):
 ${formas}
+
+FAÇA EXATAMENTE O QUE A PESSOA PEDIU:
+- O TIPO de desenho que ela disse (BPMN, UML de atividades, diagrama de classes, casos de uso, modelo de
+  dados, C4, arquitetura, com raias) é o tipo que sai, com as formas dessa família — nunca outro.
+- O CONTEÚDO que ela deu (as etapas, os nomes, as áreas, os textos — no pedido, nas imagens, no código ou
+  na conversa) vai TODO, com as palavras dela e na ordem dela: não junte, não resuma, não renomeie, não
+  pule nenhum item e não acrescente etapas que ela não pediu. Só complete por conta própria o que ela não
+  disse (o início e o fim, uma decisão óbvia entre duas etapas) ou quando ela pedir para você criar o conteúdo.
 
 Regras:
 - O desenho tem ABAS (páginas do quadro). "abas": cada uma com "id" curto (sem espaço nem acento), "nome",
@@ -1162,17 +1193,18 @@ Regras:
 - Apagar aba: o id dela em "abasRemovidas" (aba que você só deixar de fora NÃO é apagada).
 - "abaAtiva": a aba que a pessoa deve ver depois — a que você criou, senão a que mudou.
 - "formas": cada uma com um "id" curto, sem espaço nem acento (ex.: "pedido", "aprova", "nf"), o "tipo"
-  e o "texto" que aparece dentro (curto: 2 a 6 palavras; tabela e classe podem ter várias linhas).
+  e o "texto" que aparece dentro: o que a pessoa escreveu para aquela etapa, como ela escreveu; quando é
+  você quem escreve, curto (2 a 6 palavras). Tabela e classe podem ter várias linhas.
 - "raia": quem faz aquela etapa (pessoa, área ou sistema), quando o processo tem mais de um
   responsável — formas com raia viram raias horizontais (swimlanes). Sem responsáveis, deixe vazio.
 - "ligacoes": de → para, na ordem do fluxo. Saídas de uma decisão ou gateway levam "rotulo"
   (ex.: Sim/Não, aprovado/recusado). Volta para uma etapa anterior (refazer) também é ligação.
   "ponta": "arrow" (normal); em modelo de dados, as de cardinalidade ("oneOnly", "many", "zeroMany");
   em classes, "triangle" (herança). "tracejada" para dependência, mensagem ou fluxo opcional.
-- Escolha a família de formas que combina com o pedido e devolva em "colecao" (${COLECOES.join(", ")}):
-  fluxograma simples → terminal/process/decision; "BPMN" ou processo de negócio com áreas → bpmn*;
-  arquitetura → arch*/cloud*; C4 → c4*; dados → dbTable.
-- Comece por um início e termine num fim quando for um processo. Entre 4 e 30 formas: completo, mas legível.
+- A família de formas vai em "colecao" (${COLECOES.join(", ")}). Se a pessoa disse o tipo, é ele (veja
+  TIPO DE DESENHO PEDIDO). Se não disse: fluxograma simples → terminal/process/decision; "BPMN" ou
+  processo de negócio com áreas → bpmn*; arquitetura → arch*/cloud*; C4 → c4*; dados → dbTable.
+- Comece por um início e termine num fim quando for um processo. Quantas formas o conteúdo pedir (até 60).
 - Se houver um desenho na tela, é uma MUDANÇA: devolva o desenho INTEIRO atualizado, mantendo o "id"
   de toda forma que continua (é assim que o que a pessoa arrumou fica no lugar), e mude só o que foi pedido.
   "Crie", "inclua", "acrescente" uma forma (uma nota, uma etapa) é ACRESCENTAR uma forma NOVA, com id novo:
@@ -1204,7 +1236,7 @@ Regras:
     (client, modelo) =>
       client.models.generateContent({
         model: modelo,
-        contents: prompt,
+        contents: comImagens(prompt, imagens),
         config: {
           systemInstruction,
           responseMimeType: "application/json",
@@ -1272,14 +1304,17 @@ Regras:
  * (a instrução completa para aquele desenho) }] }. Conferido por validarPlano
  * (src/lib/processmapNaConversa.js); quem executa é a página do Assistente.
  */
-export async function planejarNoProjeto({ pedido, projeto = "", fluxos = [], aberto = "", conversa = "", complemento = "" }) {
+export async function planejarNoProjeto({ pedido, projeto = "", fluxos = [], aberto = "", conversa = "", complemento = "", imagens = [], confirmado = false }) {
   const lista = fluxos.map((f) => `- id "${f.id}": "${f.nome}" (${f.modo === "mindmap" ? "mapa mental" : "fluxograma"}, ${f.formas ?? "?"} formas)${f.id === aberto ? " — aberto no quadro agora" : ""}`).join("\n");
   const prompt = [
     // (01/11/2026: o plano refez pedidos antigos da conversa em vez do pedido de agora)
     conversa ? `A CONVERSA ATÉ AQUI (contexto: os pedidos antigos dela já foram tentados, e a resposta da Lisa diz o que mudou de verdade em cada desenho — "mudou: …", "não mudou nada", "não deu"):\n${conversa.slice(-6000)}\n` : "",
     `OS DESENHOS DO PROJETO:\n${lista || "(nenhum ainda)"}\n`,
     projeto ? `O CONTEÚDO DELES:\n${projeto.slice(0, 30000)}\n` : "",
+    notaDasImagensDoDesenho(imagens),
     `O PEDIDO DE AGORA (é ESTE que você planeja): "${String(pedido || "").slice(0, 6000)}"`,
+    // (02/11/2026) a pessoa já disse "sim, pode fazer" ao que a Lisa entendeu na conversa
+    confirmado ? `\nA PESSOA JÁ CONFIRMOU que quer o desenho feito ou mudado: devolva "mudar" (ou "documentar", se ela só quer texto) — nunca "responder".` : "",
     // a segunda volta (src/app/api/processmap/plano): os desenhos que o primeiro plano esqueceu
     complemento ? `\nATENÇÃO: ${complemento}` : "",
   ].filter(Boolean).join("\n");
@@ -1320,9 +1355,16 @@ Decida:
   é conteúdo do desenho.
 - "operacoes" (só com "mudar"): uma por desenho a mudar ou criar, na ordem em que fazem sentido.
   - "fluxo": o id do desenho existente (da lista); vazio para um desenho novo (aí dê "nome" e "tipo").
-  - "pedido": a instrução COMPLETA e independente para aquele desenho — quem a executa só vê esse
-    desenho, não a conversa nem o pedido original. Escreva tudo que precisa entrar, com os textos
-    prontos (nomes de etapas, tópicos, o texto inteiro de uma nota), em português.
+  - "tipo" (do desenho novo): o que a pessoa DISSE — "bpmn", "uml de atividades", "diagrama de classes",
+    "casos de uso", "modelo de dados", "c4", "arquitetura", "nuvem", "raias" (fluxograma com swimlanes),
+    "fluxograma simples", "mapa mental"; "fluxograma" quando ela não disse um tipo. Nunca troque o tipo
+    que ela pediu por outro. "arquitetura"/"nuvem" só quando o desenho é a arquitetura de um sistema
+    (componentes, serviços, bancos); o passo a passo de um exercício ou de um processo é "fluxograma".
+  - "pedido": a instrução COMPLETA e independente para aquele desenho — quem a executa vê esse desenho
+    e as imagens, não a conversa. Escreva tudo que precisa entrar, com os textos prontos (nomes de
+    etapas, tópicos, o texto inteiro de uma nota), em português. O conteúdo que a PESSOA deu (as etapas,
+    os nomes, os textos, a lista dela, o que está na tela ou no print) vai com as palavras dela, item por
+    item, sem resumir, juntar, trocar nem acrescentar. Diga o tipo do desenho na instrução.
   - Para a pessoa, "fluxograma" é QUALQUER desenho do projeto (fluxograma ou mapa mental): "todos os
     fluxogramas", "todos os desenhos", "em cada fluxo" = uma operação para CADA desenho da lista, mapas
     mentais inclusive. Não pule nenhum, nem o que ainda está quase vazio.
@@ -1349,7 +1391,7 @@ Decida:
     (client, modelo) =>
       client.models.generateContent({
         model: modelo,
-        contents: prompt,
+        contents: comImagens(prompt, imagens),
         config: {
           systemInstruction,
           responseMimeType: "application/json",
@@ -1364,7 +1406,7 @@ Decida:
                   type: "OBJECT",
                   properties: {
                     fluxo: { type: "STRING" }, nome: { type: "STRING" },
-                    tipo: { type: "STRING", enum: ["fluxograma", "mapa mental"] }, pedido: { type: "STRING" },
+                    tipo: { type: "STRING", enum: TIPOS_NO_PLANO }, pedido: { type: "STRING" },
                   },
                   required: ["pedido"],
                 },
@@ -1538,7 +1580,7 @@ Regras:
  * (src/lib/diagramaDaLisa.js: validarMapaMental, montarMapaMental). Com `estrutura` (o mapa que está na
  * tela), é uma mudança: a árvore inteira de volta, com os mesmos ids do que continua.
  */
-export async function desenharMapaMental({ pedido, estrutura = null, conversa = "", contexto = "", projeto = "" }) {
+export async function desenharMapaMental({ pedido, estrutura = null, conversa = "", contexto = "", projeto = "", imagens = [], original = "", faltou = [] }) {
   const prompt = [
     contexto ? `CONTEXTO (código, ou o desenho que está na tela, para basear o mapa):\n${contexto.slice(0, 40000)}\n` : "",
     projeto
@@ -1548,17 +1590,23 @@ export async function desenharMapaMental({ pedido, estrutura = null, conversa = 
     estrutura
       ? `O MAPA QUE ESTÁ NA TELA AGORA (a pessoa pode ter mexido nele — parta DELE):\n${JSON.stringify(estrutura).slice(0, 100_000)}\n`
       : "",
-    `PEDIDO: "${String(pedido || "").slice(0, 8000)}"`,
+    notaDasImagensDoDesenho(imagens),
+    blocoDoOriginal(original, pedido),
+    `PEDIDO: "${String(pedido || "").slice(0, 8000)}"${blocoDoQueFaltou(faltou)}`,
   ].filter(Boolean).join("\n");
 
   const systemInstruction = `Você é a Lisa e monta MAPAS MENTAIS num quadro. Você NÃO escreve coordenadas: devolve a árvore e o
 quadro organiza o desenho sozinho (o tema no centro, os tópicos dos dois lados).
 
 Regras:
+- O CONTEÚDO que a pessoa deu (o tema, os tópicos, a lista dela, o que está na tela ou no print) vai TODO,
+  com as palavras dela e na ordem dela: não junte, não resuma, não renomeie e não pule nenhum. Só crie
+  tópicos por conta própria para o que ela não disse, ou quando ela pedir para você criar o conteúdo.
 - "tema": o assunto central, curto (1 a 5 palavras).
 - "topicos": de 3 a 8 tópicos principais; cada um pode ter "filhos" (até 6) e cada filho, os seus "filhos"
-  (até 5). Textos curtos (1 a 6 palavras), sem pontuação no fim, sem numerar. Cubra o assunto de forma
-  útil e equilibrada: ideias, partes, causas, ações, exemplos — o que fizer sentido para o pedido.
+  (até 5). Textos curtos (1 a 6 palavras) quando é você quem escreve, sem pontuação no fim, sem numerar.
+  Cubra o assunto de forma útil e equilibrada: ideias, partes, causas, ações, exemplos — o que fizer
+  sentido para o pedido.
 - "id": curto, sem espaço nem acento (ex.: "redes", "seo"). Se houver um mapa na tela, é uma MUDANÇA:
   devolva a árvore INTEIRA atualizada, mantendo o "id" de todo tópico que continua (é assim que o que
   a pessoa arrumou fica no lugar), e mude só o que foi pedido.
@@ -1586,7 +1634,7 @@ Regras:
     (client, modelo) =>
       client.models.generateContent({
         model: modelo,
-        contents: prompt,
+        contents: comImagens(prompt, imagens),
         config: {
           systemInstruction,
           responseMimeType: "application/json",

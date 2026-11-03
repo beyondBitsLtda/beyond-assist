@@ -51,36 +51,42 @@ const FRAGMENTO = `
   uniform vec4 uMao, uJogo;
   uniform mat3 uMaoEixos;
   uniform vec3 uPulso, uCotovelo;
+  uniform float uMaoAberta;
+  // a segunda mão (a do mímico, sempre aberta)
+  uniform vec4 uMao2;
+  uniform mat3 uMaoEixos2;
+  uniform vec3 uPulso2, uCotovelo2;
   uniform float uJogoGiro, uJogoTela, uFrente;
   uniform vec3 uBatida1, uBatida2;
   ${FORMA}
   ${COISAS}
 
-  // o busto e, nas brincadeiras, o punho e o videogame com as mãos: coisa.x é a distância até a
-  // pele de fora do busto (o punho, as mãos), coisa.y até o aparelho
+  // o busto e, nas brincadeiras, as mãos e o videogame: coisa.x é a distância até a pele de fora do
+  // busto (o punho, as mãos abertas, as que seguram o jogo), coisa.y até o aparelho
   float cena(vec3 p, out float orelha, out float fio, out vec2 coisa){
     float d = forma(p, orelha, fio);
     coisa = vec2(9.0);
-    if (uMao.w + uJogo.w < 0.01) return d;
+    if (uMao.w + uMao2.w + uJogo.w < 0.01) return d;
     float maos;
     float ap = aparelho(p, maos);
-    coisa = vec2(min(punho(p), maos), ap);
+    coisa = vec2(min(min(punho(p), outraMao(p)), maos), ap);
     return min(d, min(coisa.x, coisa.y));
   }
   // o meio da tela do videogame (virada para ela) e para onde ela olha
   vec3 telaDoJogo(){ return uJogo.xyz + vec3(0.0, gira(vec2(0.03, -0.07), uJogoGiro)); }
   vec3 normalDaTela(){ return vec3(0.0, gira(vec2(0.0, -1.0), uJogoGiro)); }
 
-  // o vidro: cada batida do punho faz uma onda na tela a partir de onde bateu (b.xy, em uv; b.z é a
-  // idade em segundos, < 0 antes de bater) e um clarão rápido no ponto
+  // o vidro: cada batida dos nós (ou palma do mímico que encosta) faz uma onda leve na tela a partir de
+  // onde tocou (b.xy, em uv; b.z é a idade em segundos, < 0 antes de tocar) e um clarão rápido no
+  // ponto — leve: é uma batida de porta, não um soco (02/11/2026)
   void batida(vec3 b, vec2 uv, inout vec2 desvio, inout float luz){
     if (b.z < 0.0 || b.z > 2.5) return;
     vec2 d = uv - b.xy;
     float r = length(d);
     float frente = r - b.z * 0.85;
-    float some = exp(-b.z * 1.8);
-    desvio += d / max(r, 0.001) * sin(frente * 42.0) * exp(-frente * frente * 50.0) * 0.012 * some;
-    luz += exp(-frente * frente * 700.0) * some * 0.45 + exp(-r * r * 300.0) * exp(-b.z * 7.0) * 0.7;
+    float some = exp(-b.z * 2.2);
+    desvio += d / max(r, 0.001) * sin(frente * 42.0) * exp(-frente * frente * 50.0) * 0.007 * some;
+    luz += exp(-frente * frente * 700.0) * some * 0.3 + exp(-r * r * 300.0) * exp(-b.z * 8.0) * 0.45;
   }
 
   float acaso(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -166,7 +172,8 @@ const FRAGMENTO = `
         float calor = 1.13 - 1.27 * frente;
         if (coisa.x <= coisa.y) {
           // a mão mais quente que o braço, para o olho ir para ela
-          float naMao = max(smoothstep(0.85, 0.5, length(p - uMao.xyz)) * step(0.01, uMao.w),
+          float naMao = max(max(smoothstep(0.85, 0.5, length(p - uMao.xyz)) * step(0.01, uMao.w),
+            smoothstep(0.85, 0.5, length(p - uMao2.xyz)) * step(0.01, uMao2.w)),
             smoothstep(1.15, 0.85, length(p - uJogo.xyz)) * step(0.01, uJogo.w));
           calor = 0.98 - 0.72 * frente + 0.2 * naMao;
         } else {
@@ -322,6 +329,11 @@ export default function Rosto({ obterSinal, ocupacao = 0.78, ajustes: ajustesFix
       uMaoEixos: { value: new THREE.Matrix3() },
       uPulso: { value: new THREE.Vector3() },
       uCotovelo: { value: new THREE.Vector3() },
+      uMaoAberta: { value: 0 },
+      uMao2: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uMaoEixos2: { value: new THREE.Matrix3() },
+      uPulso2: { value: new THREE.Vector3() },
+      uCotovelo2: { value: new THREE.Vector3() },
       uJogo: { value: new THREE.Vector4(0, 0, 0, 0) },
       uJogoGiro: { value: 0 },
       uJogoTela: { value: 0 },
@@ -487,21 +499,27 @@ export default function Rosto({ obterSinal, ocupacao = 0.78, ajustes: ajustesFix
       // a brincadeira (com "reduzir movimento", nenhuma): soma na cabeça e na boca, e põe o punho, o
       // videogame e as batidas no vidro
       const b = brincarRef.current && !reduzido ? ocio.passo(t, sinal.estado) : null;
-      const pose = b ? poseDaBrincadeira(b.id, b.s, b.peso) : null;
+      // (no celular em pé, as mãos chegam mais perto do rosto para não sair pela borda)
+      const proporcao = uniforms.uRes.value.x / Math.max(1, uniforms.uRes.value.y);
+      const pose = b ? poseDaBrincadeira(b.id, b.s, b.peso, { proporcao }) : null;
       const cab = pose?.cabeca;
       // a cabeça gira; o shader precisa do contrário (do mundo para a cabeça): a transposta
       giro.set(mv.pitch + (cab?.pitch || 0), mv.yaw + (cab?.yaw || 0), mv.roll + (cab?.roll || 0));
       uniforms.uCabeca.value.setFromMatrix4(giroM4.makeRotationFromEuler(giro)).transpose();
       uniforms.uBoca.value = Math.max(mv.boca, pose?.boca || 0);
       uniforms.uCalorBoca.value = Math.max(mv.calorBoca, pose?.calorBoca || 0);
-      if (pose?.mao) {
-        // a mão é desenhada no espaço dela: as linhas da matriz são o polegar, os dedos e as costas
-        const { centro, eixos: [po, de, co], pulso, cotovelo } = pose.mao;
-        uniforms.uMao.value.set(centro[0], centro[1], centro[2], 1);
-        uniforms.uMaoEixos.value.set(po[0], po[1], po[2], de[0], de[1], de[2], co[0], co[1], co[2]);
-        uniforms.uPulso.value.set(pulso[0], pulso[1], pulso[2]);
-        uniforms.uCotovelo.value.set(cotovelo[0], cotovelo[1], cotovelo[2]);
-      } else uniforms.uMao.value.w = 0;
+      // a mão é desenhada no espaço dela: as linhas da matriz são o polegar, os dedos e as costas
+      const porAMao = (mao, [uM, uE, uP, uC]) => {
+        if (!mao) { uM.value.w = 0; return; }
+        const { centro, eixos: [po, de, co], pulso, cotovelo } = mao;
+        uM.value.set(centro[0], centro[1], centro[2], 1);
+        uE.value.set(po[0], po[1], po[2], de[0], de[1], de[2], co[0], co[1], co[2]);
+        uP.value.set(pulso[0], pulso[1], pulso[2]);
+        uC.value.set(cotovelo[0], cotovelo[1], cotovelo[2]);
+      };
+      porAMao(pose?.mao, [uniforms.uMao, uniforms.uMaoEixos, uniforms.uPulso, uniforms.uCotovelo]);
+      porAMao(pose?.mao2, [uniforms.uMao2, uniforms.uMaoEixos2, uniforms.uPulso2, uniforms.uCotovelo2]);
+      uniforms.uMaoAberta.value = pose?.mao?.aberta ? 1 : 0;
       if (pose?.jogo) {
         uniforms.uJogo.value.set(pose.jogo.pos[0], pose.jogo.pos[1], pose.jogo.pos[2], 1);
         uniforms.uJogoGiro.value = pose.jogo.giro;

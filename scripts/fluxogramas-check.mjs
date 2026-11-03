@@ -13,6 +13,7 @@ import {
   citaProjeto, projetoCitado, fluxoCitado, contextoDoProjeto, secaoDoProjeto, validarPlano, LIMITE_DE_OPERACOES,
   pedeEmTodos, faltandoNoPlano, completarPlano, pedeDocumentacao, arquivoDoDocumento, respostaComDocumentos,
   pedeNovoDesenho, ajustarAoPedido, nomeDeArquivo, projetoProvavel, respostaDeConfirmacao, textoDaConfirmacao,
+  tipoDitoNoPlano, planoDeDesenhoNovo, rotuloDoTipo,
 } from "../src/lib/processmapNaConversa.js";
 import { pedirPlano, executarPlano, textoDoAndamento, documentarProjeto, escreverDocumentos } from "../src/lib/trabalhoNoProjeto.js";
 import { trechosDaResposta, respostaSemCodigo } from "../src/lib/codigoNaResposta.js";
@@ -297,7 +298,7 @@ console.log("o projeto citado na conversa (01/11/2026: \"no projeto X do Process
   conferir("a conversa acha o projeto antes de decidir entre desenhar e responder", /await resolverProjetoRef\.current\?\.\(q\)/.test(pagina) && /projeto: doProjeto\?\.texto \|\| ""/.test(pagina));
   conferir("o desenho no projeto é salvo lá (muda o alvo ou cria um fluxo) e o quadro abre ligado", /apiDosFluxosDaConversa\.salvar\(alvo\.id/.test(pagina) && /apiDosFluxosDaConversa\.criar\(\{ documento: r\.doc, nome: r\.titulo, projetoId/.test(pagina) && /mudanca, vinculo \}/.test(pagina));
   conferir("o quadro grava no fluxo ligado e avisa a página", /if \(!mesmaVersao && v\.vinculo\)/.test(ler("src/components/panels/QuadroDaLisa.js")) && /aoVincularRef\.current\?\.\(r\)/.test(ler("src/components/panels/QuadroDaLisa.js")));
-  conferir("a conversa e o desenho recebem o projeto", /secaoDoProjeto\(body\.projeto\)/.test(ler("src/app/api/ask/route.js")) && /desenharDiagrama\(\{ pedido, estrutura, conversa, contexto, projeto \}\)/.test(ler("src/app/api/diagrama/route.js")));
+  conferir("a conversa e o desenho recebem o projeto", /secaoDoProjeto\(body\.projeto\)/.test(ler("src/app/api/ask/route.js")) && /desenharDiagrama\(\{\s*pedido, estrutura, conversa, contexto: \[contexto, doMapa\]\.filter\(Boolean\)\.join\("\\n\\n"\), projeto,/.test(ler("src/app/api/diagrama/route.js")));
   conferir("ler um projeto com os documentos: GET /api/fluxogramas/projetos?id=", /export async function GET/.test(ler("src/app/api/fluxogramas/projetos/route.js")));
 }
 
@@ -337,7 +338,7 @@ console.log("o plano no projeto (01/11/2026: \"essa minha interação deveria se
 
   const pagina = ler("src/app/(panels)/assistant/page.js");
   conferir("o projeto citado vale antes da regra do Abacato", /const doProjeto = !alvoDaIde \? await resolverProjetoRef/.test(pagina));
-  conferir("a Lisa planeja e trabalha no projeto (vários desenhos)", /await planejarNoProjetoRef\.current\?\.\(q, doProjeto, displayText\)/.test(pagina) && /plano\?\.acao === "documentar" \|\| plano\?\.acao === "mudar"\) return confirmarNoProjetoRef/.test(pagina) && /const feito = await trabalharNoProjetoRef/.test(pagina) && /await executarPlano\(\{/.test(pagina)
+  conferir("a Lisa planeja e trabalha no projeto (vários desenhos)", /await planejarNoProjetoRef\.current\?\.\(q, doProjeto, displayText, \{ imagens: imagensDoPedido\(\) \}\)/.test(pagina) && /plano\?\.acao === "documentar" \|\| plano\?\.acao === "mudar"\) return confirmarNoProjetoRef/.test(pagina) && /const feito = await trabalharNoProjetoRef/.test(pagina) && /await executarPlano\(\{/.test(pagina)
     && /for \(const \[i, op\] of plano\.operacoes\.entries\(\)\)/.test(ler("src/lib/trabalhoNoProjeto.js")));
   const rotaDoPlano = ler("src/app/api/processmap/plano/route.js");
   conferir("a rota do plano confere o que o modelo devolveu", /validarPlano\(await planejarNoProjeto\(base\), fluxos\)/.test(rotaDoPlano));
@@ -406,6 +407,48 @@ console.log("executar o plano (a conversa e a barra do painel ProcessMap usam o 
   conferir("e para o salvamento do fluxo aberto enquanto a Lisa grava, reabrindo depois", /salvador\.current\?\.parar\(\);\s*salvador\.current = null;/.test(painel) && /if \(abertoRef\.current\) await abrirFluxo\(abertoRef\.current\.id, \{ deNovo: true \}\)/.test(painel));
   const conversaPagina = ler("src/app/(panels)/assistant/page.js");
   conferir("na conversa, \"do projeto\" sem nome é o projeto em uso (o do quadro ou o último)", /const provavelDoPedido = projetoProvavel\(q, lista, \{ emUso \}\)/.test(conversaPagina) && /if \(!citaProjeto\(q\) && !pedeEmTodos\(q\) && !documentaDesenhos && !mudaDesenho\) return null;/.test(conversaPagina));
+
+  // (02/11/2026) cada desenho NOVO leva o tipo do plano; todos levam o pedido da pessoa e a tela
+  pedidos.length = 0;
+  await executarPlano({
+    plano: { acao: "mudar", explicacao: "", operacoes: [{ fluxo: "", nome: "Compras", tipo: "bpmn", pedido: "o processo de compras" }, { fluxo: "mvp", pedido: "inclua o login" }] },
+    projeto, fluxos, api, buscar, pedido: "faça um BPMN de compras e inclua o login no MVP", imagens: [{ mimeType: "image/png", data: "AAAA", origem: "tela" }],
+  });
+  const [novoBpmn, mudaMvp] = pedidos.filter((p) => p.url === "/api/diagrama").map((p) => p.corpo);
+  conferir("o desenho novo vai com o tipo do plano; o que existe, sem tipo (fica do tipo que é)", novoBpmn.tipo === "bpmn" && !("tipo" in mudaMvp));
+  conferir("e todos com o pedido nas palavras da pessoa e a tela", novoBpmn.original === "faça um BPMN de compras e inclua o login no MVP" && mudaMvp.imagens?.[0]?.origem === "tela");
+  pedidos.length = 0;
+  await pedirPlano({ pedido: "pode fazer", projeto, fluxos, buscar, imagens: [{ mimeType: "image/png", data: "AAAA", origem: "tela" }], confirmado: true });
+  conferir("o plano leva a tela e o \"já confirmou\"", pedidos[0].corpo.confirmado === true && pedidos[0].corpo.imagens.length === 1);
+}
+
+console.log("o \"Posso fazer?\" da conversa e o tipo no plano (02/11/2026: \"pode fazer a alteração\" → \"é só me dar o comando direto\")");
+{
+  const sim = ["Poder fazer a alteração", "pode fazer a alteração", "pode fazer as alterações", "sim, pode criar", "pode desenhar", "sim pode fazer o fluxograma", "faz isso pra mim", "pode seguir", "manda ver lisa"];
+  conferir("o \"sim\" do jeito que a pessoa fala, com o erro de digitação", sim.every((x) => respostaDeConfirmacao(x) === "sim"), sim.filter((x) => respostaDeConfirmacao(x) !== "sim").join(" | "));
+  conferir("e um pedido novo não vira \"sim\"", ["pode fazer um BPMN de vendas com 5 etapas", "sim mas em BPMN", "pode mudar a cor para azul"].every((x) => respostaDeConfirmacao(x) !== "sim"));
+
+  const fluxos = [{ id: "f1", nome: "Compras" }];
+  const op = (tipo) => validarPlano({ acao: "mudar", operacoes: [{ fluxo: "", nome: "", tipo, pedido: "x" }] }, fluxos).operacoes[0];
+  conferir("o plano aceita os tipos (BPMN, UML, C4, raias…); tipo estranho vira fluxograma", op("bpmn").tipo === "bpmn" && op("uml de atividades").tipo === "uml de atividades" && op("raias").tipo === "raias" && op("inventado").tipo === "fluxograma" && op("mapa mental").nome === "Novo mapa mental");
+  const dito = tipoDitoNoPlano({ acao: "mudar", operacoes: [{ fluxo: "", nome: "Compras", tipo: "fluxograma", pedido: "x" }] }, "faça um BPMN do processo de compras");
+  conferir("o tipo que a pessoa disse vale mais que o do modelo (um desenho novo)", dito.operacoes[0].tipo === "bpmn");
+  const dois = { acao: "mudar", operacoes: [{ fluxo: "", tipo: "mapa mental", pedido: "a" }, { fluxo: "", tipo: "fluxograma", pedido: "b" }] };
+  conferir("com dois desenhos novos, cada um fica com o do modelo; sem tipo dito, nada muda", tipoDitoNoPlano(dois, "faça um BPMN e um mapa mental") === dois && tipoDitoNoPlano(dois, "anote tudo") === dois);
+  const novo = planoDeDesenhoNovo("crie um diagrama de classes do sistema de vendas");
+  conferir("já confirmado e lido como pergunta: um desenho novo com o pedido inteiro e o tipo dito", novo.acao === "mudar" && novo.operacoes[0].tipo === "diagrama de classes" && novo.operacoes[0].pedido === "crie um diagrama de classes do sistema de vendas" && !novo.operacoes[0].fluxo);
+  conferir("a confirmação diz o tipo (\"o diagrama BPMN\")", rotuloDoTipo("bpmn") === "o diagrama BPMN" && rotuloDoTipo("mapa mental") === "o mapa mental" && rotuloDoTipo("raias") === "o fluxograma com raias" && /• Criar o diagrama BPMN "Compras": o processo/.test(textoDaConfirmacao({ acao: "mudar", explicacao: "", operacoes: [{ fluxo: "", nome: "Compras", tipo: "bpmn", pedido: "o processo" }] }, { nome: "P" }, [])));
+
+  const rotaDoPlano = ler("src/app/api/processmap/plano/route.js");
+  conferir("a rota do plano: tela, \"já confirmou\" e o tipo dito", /imagensValidas\(body\?\.imagens\)/.test(rotaDoPlano) && /if \(confirmado && plano\.acao === "responder"\) plano = planoDeDesenhoNovo\(pedido\)/.test(rotaDoPlano) && /plano = tipoDitoNoPlano\(plano, pedido\)/.test(rotaDoPlano));
+  const conversa = ler("src/lib/codigoNaResposta.js");
+  conferir("a conversa pergunta \"Posso fazer?\" e marca [[DESENHAR]] — e não manda \"dar o comando\"", /pergunte "Posso fazer\?"/.test(conversa) && /\[\[DESENHAR\]\]/.test(conversa) && /nunca peça\s+para ela "dar o comando"/.test(conversa) && !/diga com franqueza que ainda não mudou nada/.test(conversa));
+  const ask = ler("src/app/api/ask/route.js");
+  conferir("o /api/ask tira a marca (admin e usuário) e manda o evento \"desenho\"", (ask.match(/await falarSemAMarca\(controller, send, chatStreamWithFallback/g) || []).length === 2 && /send\(controller, "desenho", \{ pedir: true \}\)/.test(ask));
+  const pagina = ler("src/app/(panels)/assistant/page.js");
+  conferir("a página guarda o pedido entendido e o \"sim\" desenha de verdade", /event === "desenho"/.test(pagina) && /desenhoPendenteRef\.current = \{ q, imagens: images\.filter/.test(pagina) && /respostaDeConfirmacao\(q\) === "sim"\) \{\s*return fazerDesenhoConfirmadoRef\.current/.test(pagina) && /planejarNoProjetoRef\.current\?\.\(q, doProjeto, shown, \{ imagens, confirmado: true \}\)/.test(pagina));
+  conferir("o plano, o desenho e a confirmação levam a tela e os prints", /planejarNoProjetoRef\.current\?\.\(q, doProjeto, displayText, \{ imagens: imagensDoPedido\(\) \}\)/.test(pagina) && /mudar: desenho === "alterar", imagens: imagensDoPedido\(\)/.test(pagina) && /planoPendenteRef\.current = \{ q, doProjeto, plano, imagens, em: Date\.now\(\) \}/.test(pagina) && /pedido: q, imagens,/.test(pagina));
+  conferir("\"faça um BPMN…\" lido como pergunta sobre o projeto vira desenho novo (com confirmação)", /if \(plano\?\.acao === "responder" && !q\.includes\("\?"\) && pedeNovoDesenho\(q\)\) plano = planoDeDesenhoNovo\(q\)/.test(pagina));
 }
 
 console.log("documentar: um .md por desenho no editor (01/11/2026: a Lisa mexeu nos desenhos em vez de escrever os MD)");
@@ -557,7 +600,7 @@ console.log("interpretar e confirmar (01/11/2026: \"ela pede o nome exato do pro
   conferir("a pergunta diz o projeto, cada desenho e o que vai fazer, e pergunta", /^Entendi que é a nota da aba Fluxo Mobile\./.test(texto) && /^Entendi assim: Vou/.test(textoDaConfirmacao({ ...plano, explicacao: "Vou corrigir." }, projetos[0], projetos[0].fluxos)) && /No projeto "Produto Lisa" \(pelo nome parecido\)/.test(texto) && /• Mudar "Fluxo de Uso MVP - Lisa Assistant": Reescreva a nota/.test(texto) && /• Criar o fluxograma "Segurança"/.test(texto) && /• Escrever no editor o arquivo seguranca\.md/.test(texto) && /Posso fazer\? Responda sim, não, ou me diga o que corrigir\.$/.test(texto));
 
   const pagina = ler("src/app/(panels)/assistant/page.js");
-  conferir("na conversa: nada muda antes do \"sim\"", /if \(plano\?\.acao === "documentar" \|\| plano\?\.acao === "mudar"\) return confirmarNoProjetoRef\.current/.test(pagina) && /planoPendenteRef\.current = \{ q, doProjeto, plano, em: Date\.now\(\) \}/.test(pagina));
+  conferir("na conversa: nada muda antes do \"sim\"", /if \(plano\?\.acao === "documentar" \|\| plano\?\.acao === "mudar"\) return confirmarNoProjetoRef\.current/.test(pagina) && /planoPendenteRef\.current = \{ q, doProjeto, plano, imagens, em: Date\.now\(\) \}/.test(pagina));
   conferir("o \"sim\" faz (relendo o projeto), o \"não\" cancela, a correção pergunta de novo", /if \(resposta === "sim"\) return executarPendenteRef\.current/.test(pagina) && /Tudo bem, não fiz nada\./.test(pagina) && /CORREÇÃO DA PESSOA sobre o que eu entendi/.test(pagina) && /await apiDosFluxosDaConversa\.lerProjeto\(doProjeto\.projeto\.id\)/.test(pagina));
   conferir("sem o plano, nada que existe muda por palavra-chave", !/semPlano === "alterar" \? doProjeto\.citado/.test(pagina));
   const painel = ler("src/app/(panels)/fluxogramas/page.js");

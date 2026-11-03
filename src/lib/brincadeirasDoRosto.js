@@ -2,11 +2,17 @@
 // tela no modo rosto, sem nenhuma interação do usuário, tipo: ela bater no vidro e falar toc toc,
 // ela pegar um gameboy e jogar, ela cantarolar algo".
 //
-//   vidro      o punho sobe, bate duas vezes na tela por dentro (a tela ondula onde bate), "toc
-//              toc", e ela inclina a cabeça: "tem alguém aí?"
+//   vidro      a mão fechada sobe e bate duas vezes no vidro com os nós dos dedos, como numa porta —
+//              o antebraço em pé e a batida no pulso (02/11/2026: "ela faz como se fosse um murro na
+//              tela, ao invés de bater como em portas") —, "toc toc", e ela inclina a cabeça: "tem
+//              alguém aí?"
 //   jogo       ela pega um videogame de mão, olha para baixo e joga — a tela dele, virada para ela,
 //              ilumina o rosto de baixo e pisca; no fim, "passei de fase!"
 //   cantarola  a cabeça balança no ritmo, a garganta esquenta a cada nota e as notas sobem da boca
+//   preso      o mímico preso na caixa de vidro (02/11/2026: "as mãos abertas no vidro como se
+//              estivesse presa, tipo um mímico"): as duas mãos espalmadas no vidro, uma de cada vez
+//              desencosta, procura outro lugar e encosta de novo; ela olha cada mão; no fim empurra
+//              com as duas e pergunta "me tira daqui?"
 //
 // Só no estado "pronta" e só depois de um tempo sem ninguém mexer (TEMPOS). Qualquer gesto — mouse,
 // tecla, toque, rolagem — ou a Lisa sair de "pronta" encerra a brincadeira devagar (o punho desce, o
@@ -25,6 +31,7 @@ export const BRINCADEIRAS = [
   { id: "vidro", nome: "Bate no vidro", duracao: 7.2 },
   { id: "jogo", nome: "Videogame", duracao: 12 },
   { id: "cantarola", nome: "Cantarola", duracao: 9.5 },
+  { id: "preso", nome: "Presa no vidro", duracao: 10.5 },
 ];
 
 /** Quanto tempo sem gesto até a primeira, o intervalo entre as seguintes e quanto dura a saída. */
@@ -112,21 +119,25 @@ const produto = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const vetorial = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const normalizar = (a) => escalar(a, 1 / Math.hypot(...a));
 
-/** Onde o punho (o meio dele) e o videogame ficam fora da tela (de onde sobem e para onde descem). */
+/** Onde o pulso e o videogame ficam fora da tela (de onde sobem e para onde descem). */
 export const FORA = { mao: [-1.05, -2.9, 1.0], jogo: [0, -2.9, 0.9] };
 /**
- * O punho junto do vidro: ao lado do rosto, à esquerda de quem vê, um pouco abaixo dos olhos. A mão
- * tem o tamanho de uma mão de verdade perto da cabeça dela (02/11/2026: "a mão está pequena para o
- * tamanho do corpo e nada parecida com uma mão humana") — e, mais perto da câmera, parece maior.
+ * A batida de porta (02/11/2026: "ela faz como se fosse um murro na tela"): o antebraço fica em pé,
+ * a mão fechada com a palma para o vidro, e quem bate é o PULSO — a mão dobra para a frente, os nós do
+ * meio dos dedos tocam o vidro e ela volta. Antes, o punho inteiro avançava contra a câmera, com a
+ * frente dele virada para ela: um soco. A mão tem o tamanho de uma de verdade perto da cabeça dela —
+ * e, mais perto da câmera, parece maior.
+ *
+ * O pulso junto do vidro: ao lado do rosto, à esquerda de quem vê; o punho fica um pouco abaixo dos olhos.
  */
-const PUNHO_NO_VIDRO = [-0.82, -0.26, 1.9];
-/** Para onde os dedos apontam (do pulso para os nós): no vidro, para a câmera e um pouco para o
- *  rosto; subindo, para cima. */
-const DEDOS_NO_VIDRO = normalizar([0.32, 0.12, 1]);
-const DEDOS_SUBINDO = normalizar([0.05, 1, 0.3]);
-/** O meio do punho fechado, no espaço da mão (o pulso na origem; ver maoFechada em COISAS). */
+const PULSO_NO_VIDRO = [-0.88, -0.74, 1.6];
+/** O quanto a mão dobra para o vidro no pulso (radianos, a partir de em pé): parada, armando e batendo. */
+const DOBRA = { parada: 0.28, armando: 0.08, batendo: 0.68 };
+/** Os dedos (do pulso para os nós) com a mão dobrada `a` para a frente: em pé, puxando para o rosto. */
+const dedosDobrados = (a) => normalizar([0.1, Math.cos(a), Math.sin(a)]);
+/** O meio do punho fechado e os nós do meio dos dedos (os que tocam a porta), no espaço da mão. */
 const MEIO_DO_PUNHO = [0, 0.6, -0.22];
-const AVANCO_DA_BATIDA = 0.3;
+const NOS_DA_BATIDA = [0.05, 0.82, -0.53];
 const BATIDAS = [1.45, 1.8];
 const JOGO_NAS_MAOS = [0, -1.02, 1.3];
 
@@ -151,31 +162,45 @@ const SIMBOLOS = ["♪", "♫", "♩", "♬"];
 const NEUTRA = () => ({
   cabeca: { yaw: 0, pitch: 0, roll: 0 },
   boca: 0, calorBoca: 0,
-  mao: null, // { centro, eixos: [polegar, dedos, costas], pulso, cotovelo } do punho, no mundo
+  // { centro, eixos: [polegar, dedos, costas], pulso, cotovelo, aberta } da mão, no mundo (o centro é o
+  // meio do punho, ou o da palma na mão aberta); mao2 é a segunda mão (aberta), a do mímico
+  mao: null,
+  mao2: null,
   jogo: null, // { pos: [x, y, z], giro, tela }
   batidas: [], // { idade, ponto }: a tela ondula no ponto (idade em s desde a batida)
   falas: [], // { texto, ponto, opacidade, desvio: [x, y] em px }
   notas: [], // { chave, simbolo, ponto, idade, vida, deriva: [x, y] em px, tamanho, opacidade }
 });
 
-function vidro(s, peso) {
+// o pulso fora da tela (o punho, em pé, fica 0,6 acima dele: abaixo da borda também)
+const PULSO_FORA = somar(FORA.mao, [0, -0.7, 0]);
+// os nós no vidro, na hora da batida (onde a tela ondula), e o punho parado junto dele (onde sai o "toc toc")
+const NOS_NO_VIDRO = naMao(eixosDaMao(dedosDobrados(DOBRA.batendo), 0), PULSO_NO_VIDRO, NOS_DA_BATIDA);
+const PUNHO_PARADO = naMao(eixosDaMao(dedosDobrados(DOBRA.parada), 0), PULSO_NO_VIDRO, MEIO_DO_PUNHO);
+
+function vidro(s, peso, aperto) {
   const p = NEUTRA();
   const k = entre(s, 0.15, 1.2) * (1 - entre(s, 5.6, 6.9)) * peso;
-  // sobe com os dedos para cima e, chegando, vira os nós para o vidro
-  const dedos = normalizar(misturar(DEDOS_SUBINDO, DEDOS_NO_VIDRO, entre(k, 0.35, 1)));
-  const eixos = eixosDaMao(dedos, 0.45);
-  // a batida: avança rápido até o vidro (na direção dos dedos) e volta mais devagar
-  let avanco = 0;
+  // na tela estreita (o celular em pé), a mão vem mais para perto do rosto, para não sair pela borda
+  const perto = [PULSO_NO_VIDRO[0] * (aperto - 1), 0, 0];
+  // o pulso: antes de cada batida a mão arma (dobra para trás), bate rápido (para a frente, até os nós
+  // tocarem o vidro) e volta mais devagar — como quem bate numa porta
+  let dobra = DOBRA.parada;
+  let batendo = 0;
   for (const b of BATIDAS) {
     const u = s - b;
-    if (u > -0.12 && u < 0.24) avanco += u < 0 ? liso(1 + u / 0.12) : 1 - liso(u / 0.24);
+    dobra += (DOBRA.armando - DOBRA.parada) * pulso(s, b - 0.15, 0.1);
+    if (u > -0.07 && u < 0.2) batendo += u < 0 ? liso(1 + u / 0.07) : 1 - liso(u / 0.2);
   }
-  const centro = somar(misturar(FORA.mao, PUNHO_NO_VIDRO, k), escalar(dedos, AVANCO_DA_BATIDA * avanco * peso));
-  // o pulso sai do meio do punho de volta pelo espaço da mão; o antebraço desce dele para fora da tela
-  const doPulso = naMao(eixos, centro, escalar(MEIO_DO_PUNHO, -1));
-  p.mao = { centro, eixos, pulso: doPulso, cotovelo: [doPulso[0] - 0.15, -3.1, doPulso[2] - 0.6] };
-  const contato = somar(PUNHO_NO_VIDRO, escalar(DEDOS_NO_VIDRO, AVANCO_DA_BATIDA + 0.4));
-  p.batidas = BATIDAS.map((b) => ({ idade: s - b, ponto: contato }));
+  dobra += (DOBRA.batendo - DOBRA.parada) * batendo;
+  // subindo, a mão vem em pé; junto do vidro, dobra no pulso
+  const eixos = eixosDaMao(dedosDobrados(dobra * k), 0);
+  // o pulso quase não sai do lugar: só acompanha a batida um pouquinho
+  const doPulso = somar(misturar(PULSO_FORA, somar(PULSO_NO_VIDRO, perto), k), [0, 0, 0.05 * batendo * k]);
+  const centro = naMao(eixos, doPulso, MEIO_DO_PUNHO);
+  // o antebraço desce do pulso para fora da tela, para trás (para o corpo dela)
+  p.mao = { centro, eixos, pulso: doPulso, cotovelo: [doPulso[0] - 0.12, -3.1, doPulso[2] - 0.5] };
+  p.batidas = BATIDAS.map((b) => ({ idade: s - b, ponto: somar(NOS_NO_VIDRO, perto) }));
   // olha para a mão (que está à esquerda de quem vê), depois para quem está do outro lado
   p.cabeca.yaw = -0.13 * janela(s, 0.3, 1.0, 2.3, 2.9) * peso;
   p.cabeca.pitch = 0.05 * janela(s, 1.0, 1.4, 2.6, 3.2) * peso;
@@ -186,9 +211,90 @@ function vidro(s, peso) {
   p.boca = fala * peso;
   p.calorBoca = fala * 0.8 * peso;
   p.falas = [
-    { texto: "toc toc", ponto: PUNHO_NO_VIDRO, desvio: [0, -130], opacidade: janela(s, 1.45, 1.6, 2.9, 3.2) * peso },
+    { texto: "toc toc", ponto: somar(PUNHO_PARADO, perto), desvio: [0, -130], opacidade: janela(s, 1.45, 1.6, 2.9, 3.2) * peso },
     { texto: "tem alguém aí?", ponto: ANCORAS.cabeca, desvio: [0, 0], opacidade: janela(s, 3.1, 3.3, 5.3, 5.7) * peso },
   ];
+  return p;
+}
+
+// ---- o mímico (preso) ----
+
+/**
+ * A mão aberta é desenhada em ESCALA_DA_PALMA do tamanho da fechada (ver maoAberta em COISAS): encostada
+ * no vidro ela fica bem mais perto da câmera que o rosto, e no tamanho inteiro tomava a tela.
+ */
+export const ESCALA_DA_PALMA = 0.84;
+/** O meio da palma aberta, no espaço da mão (o pulso na origem). */
+const MEIO_DA_PALMA = [0, 0.45 * ESCALA_DA_PALMA, 0];
+/** Onde as palmas encostam no vidro (z): um palmo na frente do rosto. */
+const VIDRO_Z = 1.55;
+/**
+ * Por onde cada mão anda no vidro: [quando chega, x, y] do meio da palma. Uma de cada vez desencosta,
+ * vai para outro lugar e encosta de novo (MUDANCA segundos de viagem), como o mímico tateando a parede
+ * — sempre dos lados do rosto, sem tapá-lo. `lado`: +1 a mão à esquerda de quem vê (o polegar para o
+ * rosto, +x); `abre`: os dedos inclinados um pouco para fora.
+ */
+const PALMAS = [
+  { lado: 1, abre: -0.12, paradas: [[1.3, -1.05, -0.3], [3.8, -1.12, 0.3], [6.4, -0.98, 0.42]] },
+  { lado: -1, abre: 0.12, paradas: [[1.35, 1.05, -0.24], [5.0, 1.14, -0.55], [7.6, 1.0, 0.36]] },
+];
+const MUDANCA = 0.8;
+/** O empurrão do fim, com as duas mãos, e o "me tira daqui?". */
+const EMPURRAO = [8.0, 8.3, 8.7, 9.0];
+
+/**
+ * Os eixos da mão aberta encostada no vidro: a palma para a câmera, os dedos para `dedos` e o polegar
+ * para o rosto (`lado` +1 na mão à esquerda de quem vê, −1 na da direita: uma é o espelho da outra).
+ */
+export function eixosDaPalma(dedos, lado) {
+  const atras = [0, 0, -1];
+  const costas = normalizar(somar(atras, escalar(dedos, -produto(atras, dedos))));
+  return [escalar(normalizar(vetorial(costas, dedos)), lado), dedos, costas];
+}
+
+// o meio da palma aos s segundos: sobe até a primeira parada; de uma parada à outra, desencosta (z para
+// trás), anda e encosta de novo
+function ondeEstaAPalma(m, s, aperto) {
+  const [[, x0, y0], ...resto] = m.paradas;
+  let x = x0, y = y0, z = VIDRO_Z;
+  for (const [t, xn, yn] of resto) {
+    const a = entre(s, t - MUDANCA, t);
+    x += (xn - x) * a;
+    y += (yn - y) * a;
+    z -= 0.2 * pulso(s, t - MUDANCA / 2, MUDANCA / 2);
+  }
+  return [x * aperto, y, z + 0.06 * janela(s, ...EMPURRAO)];
+}
+
+function preso(s, peso, aperto) {
+  const p = NEUTRA();
+  const k = entre(s, 0.2, 1.3) * (1 - entre(s, 9.2, 10.3)) * peso;
+  const maos = PALMAS.map((m) => {
+    const ponto = ondeEstaAPalma(m, s, aperto);
+    const fora = [ponto[0] * 1.1, -3.4, 1.1];
+    const centro = misturar(fora, ponto, k);
+    // os dedos em leque e, subindo, um pouco para a frente (a mão chega de baixo)
+    const dedos = normalizar([m.abre, 1, 0.1 + 0.5 * (1 - k)]);
+    const eixos = eixosDaPalma(dedos, m.lado);
+    const doPulso = naMao(eixos, centro, escalar(MEIO_DA_PALMA, -1));
+    return { centro, eixos, pulso: doPulso, cotovelo: [doPulso[0] * 0.8, -3.1, doPulso[2] - 0.7], aberta: true };
+  });
+  [p.mao, p.mao2] = maos;
+  // (a palma encostando não ondula o vidro: a onda desenhava um círculo em cima da mão)
+  // olha para a mão que está mudando de lugar (e para cima, se ela sobe); no fim, inclina a cabeça e pede
+  let yaw = 0, pitch = 0;
+  PALMAS.forEach((m) => m.paradas.slice(1).forEach(([t, , y], i) => {
+    const olha = janela(s, t - MUDANCA - 0.25, t - MUDANCA + 0.15, t + 0.2, t + 0.7);
+    yaw += -m.lado * 0.15 * olha;
+    pitch += (y > m.paradas[i][2] ? -0.08 : 0.06) * olha;
+  }));
+  p.cabeca.yaw = yaw * peso;
+  p.cabeca.pitch = (pitch + 0.04 * janela(s, ...EMPURRAO)) * peso;
+  p.cabeca.roll = 0.13 * janela(s, 8.2, 8.7, 9.5, 10.1) * peso;
+  const fala = 0.32 * (0.5 + 0.5 * Math.sin(s * 18)) * janela(s, 8.45, 8.55, 9.3, 9.5);
+  p.boca = fala * peso;
+  p.calorBoca = fala * 0.8 * peso;
+  p.falas = [{ texto: "me tira daqui?", ponto: ANCORAS.cabeca, desvio: [0, 0], opacidade: janela(s, 8.4, 8.6, 9.7, 10.1) * peso }];
   return p;
 }
 
@@ -241,17 +347,21 @@ function cantarola(s, peso) {
   return p;
 }
 
-const ROTEIROS = { vidro, jogo, cantarola };
+const ROTEIROS = { vidro, jogo, cantarola, preso };
 
 /**
  * A pose da brincadeira `id` aos `s` segundos, com `peso` (0–1: na saída, tudo volta ao lugar e some).
- * Fora do tempo da brincadeira, o punho e o videogame estão fora da tela.
+ * Fora do tempo da brincadeira, o punho e o videogame estão fora da tela. `proporcao` (largura ÷ altura
+ * do visual): na tela estreita, as mãos chegam mais perto do rosto (apertoDaTela).
  */
-export function poseDaBrincadeira(id, s, peso = 1) {
+export function poseDaBrincadeira(id, s, peso = 1, { proporcao = 1.3 } = {}) {
   const roteiro = ROTEIROS[id];
   if (!roteiro) return NEUTRA();
-  return roteiro(limitar(s, 0, duracaoDe(id)), limitar(peso, 0, 1));
+  return roteiro(limitar(s, 0, duracaoDe(id)), limitar(peso, 0, 1), apertoDaTela(proporcao));
 }
+
+/** O quanto as mãos chegam para perto do rosto: 1 na tela deitada; até 0,74 no celular em pé. */
+export const apertoDaTela = (proporcao) => limitar(0.74 + (Number(proporcao) - 0.5) * 0.52, 0.74, 1);
 
 // ---- da cena para a tela ----
 
@@ -277,6 +387,7 @@ export function naTela(ponto, quadro, largura, altura, ocupacao) {
 export function frenteDaCaixa(pose) {
   let z = CAIXA.max[2];
   if (pose?.mao) z = Math.max(z, pose.mao.centro[2] + 0.75);
+  if (pose?.mao2) z = Math.max(z, pose.mao2.centro[2] + 0.75);
   if (pose?.jogo) z = Math.max(z, pose.jogo.pos[2] + 0.5);
   return z;
 }
@@ -290,7 +401,11 @@ export function frenteDaCaixa(pose) {
  * `float punho(vec3 p)`: a mão fechada que bate no vidro — a palma, o "gordinho" do polegar, os
  * quatro dedos com as três falanges dobradas até a palma (separados, para os sulcos aparecerem) e o
  * polegar cruzando na frente deles, como num punho de verdade — e o antebraço descendo para fora da
- * tela. A mão é desenhada no espaço dela (uMaoEixos leva do mundo para lá; o pulso em uPulso).
+ * tela. A mão é desenhada no espaço dela (uMaoEixos leva do mundo para lá; o pulso em uPulso). Com
+ * uMaoAberta, é a mão ABERTA do mímico (maoAberta): a palma achatada, os quatro dedos esticados em
+ * leque e o polegar aberto para o lado.
+ *
+ * `float outraMao(vec3 p)`: a segunda mão do mímico (aberta), nos uniforms terminados em 2.
  *
  * `float aparelho(vec3 p, out float maos)`: o videogame deitado, visto por trás (a tela está virada
  * para ela) e, em `maos`, as duas mãos segurando as pontas: a palma em concha, três dedos abraçando
@@ -334,12 +449,54 @@ export const COISAS = `
     return uniao(d, elipsoide(l - vec3(0.0, 0.0, -0.02), vec3(0.25, 0.16, 0.17)), 0.12);
   }
 
+  // um dedo esticado: da base b, na direção u, com as três falanges c (quase retas: a mão aberta
+  // encostada no vidro)
+  float dedoReto(vec3 l, vec3 b, vec3 u, vec3 c, float r){
+    vec3 j1 = b + u * c.x;
+    vec3 j2 = j1 + u * c.y;
+    vec3 j3 = j2 + u * c.z;
+    return min(min(cone(l, b, j1, r, r * 0.93), cone(l, j1, j2, r * 0.93, r * 0.86)), cone(l, j2, j3, r * 0.86, r * 0.78));
+  }
+
+  float maoAberta(vec3 l){
+    // a palma, achatada, e o "gordinho" do polegar
+    float d = caixinha(l - vec3(0.0, 0.45, 0.0), vec3(0.3, 0.37, 0.08), 0.07);
+    d = uniao(d, elipsoide(l - vec3(0.2, 0.27, -0.04), vec3(0.15, 0.22, 0.1)), 0.08);
+    // indicador, médio, anelar e mínimo, esticados e um pouco abertos
+    float dd = dedoReto(l, vec3(0.22, 0.8, 0.0), normalize(vec3(0.12, 1.0, -0.05)), vec3(0.38, 0.23, 0.17), 0.088);
+    dd = min(dd, dedoReto(l, vec3(0.075, 0.84, 0.0), normalize(vec3(0.03, 1.0, -0.05)), vec3(0.42, 0.26, 0.18), 0.092));
+    dd = min(dd, dedoReto(l, vec3(-0.075, 0.82, 0.0), normalize(vec3(-0.06, 1.0, -0.05)), vec3(0.39, 0.24, 0.17), 0.087));
+    dd = min(dd, dedoReto(l, vec3(-0.22, 0.76, 0.0), normalize(vec3(-0.17, 1.0, -0.05)), vec3(0.3, 0.19, 0.15), 0.076));
+    d = uniao(d, dd, 0.05);
+    // o polegar, aberto para o lado
+    float po = cone(l, vec3(0.25, 0.18, -0.04), vec3(0.42, 0.36, -0.06), 0.115, 0.1);
+    po = min(po, cone(l, vec3(0.42, 0.36, -0.06), vec3(0.53, 0.52, -0.05), 0.1, 0.09));
+    po = min(po, cone(l, vec3(0.53, 0.52, -0.05), vec3(0.58, 0.66, -0.04), 0.09, 0.08));
+    d = uniao(d, po, 0.05);
+    // o pulso
+    return uniao(d, elipsoide(l - vec3(0.0, 0.0, 0.0), vec3(0.25, 0.16, 0.15)), 0.12);
+  }
+
+  // a mão aberta no tamanho do mímico (ESCALA_DA_PALMA da fechada), com a esfera que a contém
+  float palmaNoVidro(vec3 l){
+    vec3 a = l / ${ESCALA_DA_PALMA.toFixed(2)};
+    float esfera = length(a - vec3(0.05, 0.8, 0.0)) - 0.98;
+    return (esfera > 0.12 ? esfera : maoAberta(a)) * ${ESCALA_DA_PALMA.toFixed(2)};
+  }
+
   float punho(vec3 p){
     if (uMao.w < 0.01) return 9.0;
     float braco = cone(p, uPulso, uCotovelo, 0.2, 0.3);
     vec3 l = uMaoEixos * (p - uPulso);
+    if (uMaoAberta > 0.5) return uniao(palmaNoVidro(l), braco, 0.1);
     float esfera = length(l - vec3(0.03, 0.5, -0.2)) - 0.78;
     return uniao(esfera > 0.12 ? esfera : maoFechada(l), braco, 0.1);
+  }
+
+  float outraMao(vec3 p){
+    if (uMao2.w < 0.01) return 9.0;
+    float braco = cone(p, uPulso2, uCotovelo2, 0.2, 0.3);
+    return uniao(palmaNoVidro(uMaoEixos2 * (p - uPulso2)), braco, 0.1);
   }
 
   // o corpo do videogame: um retângulo de cantos bem redondos (1,1 × 0,58), fino

@@ -8,6 +8,7 @@ import {
   pedidoDeDesenho, documentoValido, FORMAS, distanciaDeEdicao, pareceDiagramaEmTexto,
   pedeMapaMental, validarMapaMental, montarMapaMental, estruturaDoMapa, LIMITES_DO_MAPA,
   CORES, NOMES_DAS_CORES, corPeloNome, nomeDaCor, vaiSerMapaMental, semPerdas, PEDE_PARA_TIRAR, estruturaQueCabe, resumoDaMudanca,
+  tipoPedido, tipoDaTransformacao, idDoTipo, TIPOS_NO_PLANO, naFamilia, itensDoPedido, faltandoNoDesenho, oQueFaltou, filtroDaMarca, MARCA_DE_DESENHO,
 } from "../src/lib/diagramaDaLisa.js";
 import fs from "node:fs";
 
@@ -432,6 +433,62 @@ console.log("\na trava contra perda (01/11/2026: pediram notas e a aba \"Fluxo D
   conferir("mapa mental: o galho esquecido volta com os filhos (manterTudo)", ["ide", "abas", "tts"].every((id) => ficou.pages[0].shapes.some((s) => s.id === id)) && ficou.pages[0].shapes.find((s) => s.id === "abas").parent === "ide");
   const tirou = montarMapaMental(novo, mapa, { manterTudo: false });
   conferir("mapa mental: com pedido de tirar, o galho sai", !tirou.pages[0].shapes.some((s) => s.id === "ide"));
+}
+
+console.log("o tipo e o conteúdo pedidos (02/11/2026: \"criar o fluxograma do tipo que eu pedir com o conteúdo que eu pedir\")");
+{
+  const casos = [
+    ["faça um fluxograma BPMN do processo de compras", "bpmn"], ["crie um BPMN de compras", "bpmn"],
+    ["faça um fluxograma de compras em BPMN", "bpmn"], ["desenhe a arquitetura em BPMN", "bpmn"],
+    ["faça um fluxograma a partir do mapa mental do produto", "fluxograma"], ["faça um mapa mental sobre BPMN", "mapa"],
+    ["crie um fluxograma BPMN com base no mapa mental X", "bpmn"], ["desenhe a arquitetura do sistema", "arquitetura"],
+    ["faça um diagrama de classes do sistema de vendas", "classes"], ["crie um diagrama UML de atividades do login", "atividades"],
+    ["monte um diagrama de casos de uso", "casos"], ["faça um uml de casos de uso", "casos"], ["faça o modelo de dados do app", "dados"],
+    ["faça um DER das tabelas", "dados"], ["desenhe um diagrama C4 da Lisa", "c4"], ["faça um fluxograma com raias por área", "raias"],
+    ["faça um fluxograma simples do login", "simples"], ["faça um fluxograma do login", "fluxograma"],
+    ["transforme esse fluxograma em mapa mental", "mapa"], ["transforme o mapa mental em fluxograma", "simples"], ["refaça como BPMN", "bpmn"],
+    ["no projeto X, o processo de compras em BPMN", "bpmn"], ["desenhe a arquitetura na nuvem da AWS", "nuvem"],
+    ["mude a cor para verde", null], ["inclua a etapa de aprovação", null], ["estruture tudo isso no quadro do ProcessMap", null],
+  ];
+  const errados = casos.filter(([q, t]) => tipoPedido(q) !== t);
+  conferir("o tipo dito no pedido (o alvo de \"transforme em…\", o desenho depois do verbo, o qualificado por \"em/usando\")", !errados.length, errados.map(([q, t]) => `${q} → ${tipoPedido(q)} (esperado ${t})`).join(" | "));
+  conferir("\"mude a cor para verde\" não é transformar; \"passe para UML de atividades\" é", tipoDaTransformacao("mude a cor para verde") === null && tipoDaTransformacao("passe para UML de atividades") === "atividades");
+  conferir("o nome do plano vira o id do tipo", idDoTipo("uml de atividades") === "atividades" && idDoTipo("mapa mental") === "mapa" && idDoTipo("bpmn") === "bpmn" && idDoTipo("x") === null && TIPOS_NO_PLANO.includes("raias"));
+  conferir("um fluxograma na tela só vira mapa mental se o pedido mandar transformar", !vaiSerMapaMental("inclua no fluxo o que está no mapa mental", { mode: "diagram", pages: [] }) && vaiSerMapaMental("transforme em mapa mental", { mode: "diagram", pages: [] }));
+
+  const fluxo = validarDesenho({ titulo: "Compras", abas: [{ id: "p1", nome: "Compras", formas: [
+    { id: "ini", tipo: "terminal", texto: "Início" }, { id: "pede", tipo: "process", texto: "Pedir" }, { id: "ok", tipo: "decision", texto: "Aprovado?" },
+    { id: "espera", tipo: "delay", texto: "Aguardar" }, { id: "fim", tipo: "terminal", texto: "Fim" }, { id: "n", tipo: "note", texto: "uma nota" },
+  ], ligacoes: [{ de: "ini", para: "pede" }, { de: "pede", para: "ok" }, { de: "ok", para: "espera" }, { de: "espera", para: "fim" }] }] });
+  const { desenho: bpmn, trocadas } = naFamilia(fluxo, "bpmn");
+  const tipos = Object.fromEntries(bpmn.abas[0].formas.map((f) => [f.id, f.tipo]));
+  conferir("pediu BPMN e veio fluxograma: cada forma vira a equivalente do BPMN (a anotação fica)", trocadas === 5 && bpmn.colecao === "bpmn" && tipos.ini === "bpmnStart" && tipos.pede === "bpmnTask" && tipos.ok === "bpmnGatewayX" && tipos.espera === "bpmnTimer" && tipos.fim === "bpmnEnd" && tipos.n === "note", JSON.stringify(tipos));
+  const uml = naFamilia(validarDesenho({ titulo: "x", formas: [{ id: "a", tipo: "bpmnStart", texto: "" }, { id: "b", tipo: "bpmnTask", texto: "Logar" }, { id: "c", tipo: "bpmnEnd", texto: "" }], ligacoes: [{ de: "a", para: "b" }, { de: "b", para: "c" }] }), "atividades").desenho;
+  conferir("e o BPMN pedido como UML de atividades vira nó inicial, ação e nó final", uml.abas[0].formas.map((f) => f.tipo).join() === "umlInitial,umlAction,umlFinal" && uml.colecao === "uml");
+  conferir("o fluxograma genérico não força família nenhuma", naFamilia(validarDesenho(bruto), "fluxograma").trocadas === 0);
+
+  const itens = itensDoPedido("Faça o fluxo:\n- Receber o pedido\n- Conferir estoque\n2. Emitir nota fiscal\nE no fim: pedido → separação → entrega");
+  conferir("o conteúdo em lista: tópicos, numerados e \"A → B → C\"", ["Receber o pedido", "Conferir estoque", "Emitir nota fiscal", "pedido", "separação", "entrega"].every((i) => itens.includes(i)), JSON.stringify(itens));
+  conferir("e \"as etapas são: A, B e C\"", JSON.stringify(itensDoPedido("as etapas do processo são: cadastro do cliente, análise de crédito e aprovação do gerente.")) === JSON.stringify(["cadastro do cliente", "análise de crédito", "aprovação do gerente"]));
+  conferir("pedido sem lista não tem itens (o modelo decide o conteúdo)", itensDoPedido("desenhe o processo de compras da empresa").length === 0);
+  const falta = faltandoNoDesenho(["Receber o pedido", "Conferir estoque", "Emitir nota fiscal", "entrega"], ["Receber pedido", "Conferência de estoque", "Entregar"]);
+  conferir("o que faltou no desenho (aguentando \"Conferência\" por \"Conferir\" e \"Entregar\" por \"entrega\")", JSON.stringify(falta) === JSON.stringify(["Emitir nota fiscal"]), JSON.stringify(falta));
+  const docSemRaias = montarDocumento(validarDesenho(bruto));
+  const pedidoComRaias = oQueFaltou(docSemRaias, { tipo: "raias", itens: ["Registrar o pedido", "Pagar o fornecedor"] });
+  conferir("oQueFaltou: os itens que faltaram e as raias pedidas que não vieram", pedidoComRaias.faltando.join() === "Pagar o fornecedor" && pedidoComRaias.problemas.length === 2 && /raias/.test(pedidoComRaias.problemas[1]));
+
+  const passar = (pedacos) => { const f = filtroDaMarca(); const t = pedacos.map((p) => f.passar(p)).join(""); const fim = f.fim(); return { t: t + fim.resto, marcou: fim.marcou }; };
+  const partida = passar(["Entendi: um BPMN de compras. Posso fazer?\n[[DES", "ENH", "AR]]"]);
+  conferir("a marca [[DESENHAR]] sai do texto mesmo chegando partida, e avisa", partida.t === "Entendi: um BPMN de compras. Posso fazer?\n" && partida.marcou && MARCA_DE_DESENHO === "[[DESENHAR]]");
+  const parecida = passar(["a [[", "b]] c", " [[DESENHA"]);
+  conferir("texto parecido com o começo da marca passa inteiro, sem avisar", parecida.t === "a [[b]] c [[DESENHA" && !parecida.marcou);
+
+  const rota = fs.readFileSync("src/app/api/diagrama/route.js", "utf8");
+  conferir("a rota: o tipo do plano ou do pedido; numa mudança, só \"transforme em…\" troca o tipo", /idDoTipo\(body\?\.tipo\) \|\| tipoPedido\(pedido\)/.test(rota) && /const tipo = atual && !transforma \? null : dito/.test(rota));
+  conferir("a rota põe na família, confere o conteúdo e desenha de novo uma vez se faltou", /if \(tipo\) naFamilia\(desenho, tipo\)/.test(rota) && /oQueFaltou\(doc, \{ itens, tipo \}\)/.test(rota) && /comSegundaVolta\(desenhar\)/.test(rota) && /desenhar\(primeira\.problemas\)/.test(rota));
+  conferir("a rota recebe a tela e os prints (sem a câmera) e o pedido original", /imagensValidas\(body\?\.imagens\)\.filter\(\(i\) => i\.origem !== "camera"\)/.test(rota) && /original, faltou/.test(rota));
+  const gem = fs.readFileSync("src/lib/gemini.js", "utf8");
+  conferir("o modelo do desenho: o tipo pedido é regra, o conteúdo dela vai todo, e ele vê as imagens", /FAÇA EXATAMENTE O QUE A PESSOA PEDIU/.test(gem) && /TIPO DE DESENHO PEDIDO: \$\{exigido\.nome\}/.test(gem) && /contents: comImagens\(prompt, imagens\)/.test(gem) && !/Entre 4 e 30 formas/.test(gem));
 }
 
 function est2(pg) {

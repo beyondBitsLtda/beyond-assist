@@ -1,5 +1,6 @@
 import { planejarNoProjeto } from "@/lib/gemini.js";
-import { validarPlano, pedeEmTodos, faltandoNoPlano, completarPlano, pedeDocumentacao, ajustarAoPedido } from "@/lib/processmapNaConversa.js";
+import { validarPlano, pedeEmTodos, faltandoNoPlano, completarPlano, pedeDocumentacao, ajustarAoPedido, tipoDitoNoPlano, planoDeDesenhoNovo } from "@/lib/processmapNaConversa.js";
+import { imagensValidas } from "@/lib/contextoDaConversa.js";
 import { jsonResponse } from "@/lib/http.js";
 
 export const runtime = "nodejs";
@@ -13,6 +14,9 @@ export const dynamic = "force-dynamic";
  * As operações (desenhos) são feitas por /api/diagrama; os documentos (.md no editor), por
  * /api/processmap/documento — um pedido pode ter os dois ("faça um fluxograma da arquitetura … e um md").
  * Num pedido de documento, ajustarAoPedido tira as mudanças de desenho que o pedido não mandou fazer.
+ * (02/11/2026) `imagens`: a tela e os prints (o conteúdo do pedido pode estar neles); `confirmado`: a
+ * pessoa já disse "sim" ao que a Lisa entendeu na conversa — o plano não volta como "responder". E o
+ * tipo dito no pedido ("faça um BPMN…") vale para o desenho novo (tipoDitoNoPlano).
  */
 export async function POST(req) {
   try {
@@ -22,11 +26,14 @@ export async function POST(req) {
     const fluxos = (Array.isArray(body?.fluxos) ? body.fluxos : []).slice(0, 40).map((f) => ({
       id: String(f?.id || ""), nome: String(f?.nome || "").slice(0, 120), modo: f?.modo === "mindmap" ? "mindmap" : "diagram", formas: Number(f?.formas) || 0,
     })).filter((f) => f.id);
+    const confirmado = body?.confirmado === true;
     const base = {
       pedido, fluxos,
       projeto: String(body?.projeto || "").slice(0, 30_000),
       aberto: String(body?.aberto || ""),
       conversa: String(body?.conversa || ""),
+      imagens: imagensValidas(body?.imagens).filter((i) => i.origem !== "camera").slice(0, 6),
+      confirmado,
     };
     let plano;
     try {
@@ -37,6 +44,9 @@ export async function POST(req) {
       plano = validarPlano({ acao: "documentar", explicacao: "" }, fluxos);
     }
     plano = ajustarAoPedido(plano, pedido, fluxos);
+    // já confirmado e o modelo ainda leu como pergunta: um desenho novo com o pedido inteiro
+    if (confirmado && plano.acao === "responder") plano = planoDeDesenhoNovo(pedido);
+    plano = tipoDitoNoPlano(plano, pedido);
     // "em todos os fluxogramas": o desenho que o plano esqueceu (o modelo deixava os mapas mentais de
     // fora) ganha uma segunda volta, só para os que faltaram
     const faltando = plano.acao === "mudar" && pedeEmTodos(pedido) && !pedeDocumentacao(pedido) ? faltandoNoPlano(plano, fluxos) : [];

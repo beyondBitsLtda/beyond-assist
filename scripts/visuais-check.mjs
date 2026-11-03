@@ -13,7 +13,7 @@ import {
   ajustesValidos, lerAjustesDoRosto, escolherAjustesDoRosto, coresDoRosto, enquadramentoDoRosto,
 } from "../src/lib/rostoDaLisa.js";
 import {
-  BRINCADEIRAS, TEMPOS, criarOcio, poseDaBrincadeira, uvDoPonto, naTela, frenteDaCaixa, COISAS,
+  BRINCADEIRAS, TEMPOS, criarOcio, poseDaBrincadeira, uvDoPonto, naTela, frenteDaCaixa, COISAS, apertoDaTela,
 } from "../src/lib/brincadeirasDoRosto.js";
 
 let falhas = 0;
@@ -161,7 +161,7 @@ console.log("a cena do Assistente (janela da resposta, hologramas, zoom)");
 console.log("as brincadeiras do Rosto (02/11/2026: \"bater no vidro e falar toc toc, pegar um gameboy e jogar, cantarolar\")");
 {
   const ids = BRINCADEIRAS.map((b) => b.id);
-  conferir("as três brincadeiras, cada uma com a sua duração", ids.join() === "vidro,jogo,cantarola" && BRINCADEIRAS.every((b) => b.duracao > 5 && b.nome));
+  conferir("as quatro brincadeiras, cada uma com a sua duração", ids.join() === "vidro,jogo,cantarola,preso" && BRINCADEIRAS.every((b) => b.duracao > 5 && b.nome));
 
   // o relógio da ociosidade, com o acaso fixo (sempre a primeira opção que sobra)
   const ocio = criarOcio({ acaso: () => 0 });
@@ -205,8 +205,8 @@ console.log("as brincadeiras do Rosto (02/11/2026: \"bater no vidro e falar toc 
   let tudoNumero = true;
   for (const b of BRINCADEIRAS) for (let s = 0; s <= b.duracao; s += 0.05) for (const peso of [1, 0.5, 0]) tudoNumero &&= numeros(poseDaBrincadeira(b.id, s, peso));
   conferir("todas as poses, a cada 50 ms e com qualquer peso, só com números de verdade", tudoNumero);
-  const foraDaTela = (pose) => (!pose.mao || pose.mao.centro[1] < -2.5) &&(!pose.jogo || (pose.jogo.pos[1] < -2.5 && pose.jogo.tela === 0));
-  conferir("começa e termina com o punho e o videogame fora da tela", BRINCADEIRAS.every((b) => foraDaTela(poseDaBrincadeira(b.id, 0)) && foraDaTela(poseDaBrincadeira(b.id, b.duracao))));
+  const foraDaTela = (pose) => (!pose.mao || pose.mao.centro[1] < -2.5) && (!pose.mao2 || pose.mao2.centro[1] < -2.5) && (!pose.jogo || (pose.jogo.pos[1] < -2.5 && pose.jogo.tela === 0));
+  conferir("começa e termina com as mãos e o videogame fora da tela", BRINCADEIRAS.every((b) => foraDaTela(poseDaBrincadeira(b.id, 0)) && foraDaTela(poseDaBrincadeira(b.id, b.duracao))));
   conferir("peso 0 (fim da saída): tudo fora, cabeça e boca no lugar, nada escrito",
     BRINCADEIRAS.every((b) => { const p = poseDaBrincadeira(b.id, 3, 0); return foraDaTela(p) && !p.cabeca.yaw && !p.cabeca.pitch && !p.cabeca.roll && !p.boca && p.falas.every((f) => !f.opacidade) && p.notas.every((n) => !n.opacidade); }));
 
@@ -220,12 +220,18 @@ console.log("as brincadeiras do Rosto (02/11/2026: \"bater no vidro e falar toc 
   const unitario = (a) => Math.abs(Math.hypot(...a) - 1) < 1e-9;
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   conferir("vidro: os eixos da mão (polegar, dedos, costas) são perpendiculares e de tamanho 1", [po, de, co].every(unitario) && Math.abs(dot(po, de)) < 1e-9 && Math.abs(dot(po, co)) < 1e-9 && Math.abs(dot(de, co)) < 1e-9);
-  conferir("vidro: no vidro, os nós viram para a câmera e o polegar fica do lado do rosto", de[2] > 0.9 && po[0] > 0.7);
+  // (02/11/2026: "ela faz como se fosse um murro na tela, ao invés de bater como em portas")
+  const emPe = poseDaBrincadeira("vidro", 2.2);
+  const armando = poseDaBrincadeira("vidro", 1.3);
+  conferir("vidro: batida de porta, e não soco — a mão em pé, a palma para o vidro e o polegar do lado do rosto", emPe.mao.eixos[1][1] > 0.9 && emPe.mao.eixos[2][2] < -0.9 && po[0] > 0.7);
+  conferir("vidro: quem bate é o pulso (a mão dobra para o vidro e volta; o pulso quase não sai do lugar)",
+    de[2] > armando.mao.eixos[1][2] + 0.4 && de[2] > emPe.mao.eixos[1][2] + 0.25 && Math.hypot(...noVidro.mao.pulso.map((c, i) => c - emPe.mao.pulso[i])) < 0.08);
+  conferir("vidro: o que encosta no vidro são os nós do meio dos dedos (a onda nasce na frente do punho, mais perto da câmera)", noVidro.batidas[0].ponto[2] > noVidro.mao.centro[2] + 0.2);
   const doPulso = noVidro.mao.centro.map((c, i) => c - noVidro.mao.pulso[i]);
   conferir("vidro: o pulso fica atrás do punho (mais longe da câmera) e o cotovelo, fora da tela", doPulso[2] > 0.4 && noVidro.mao.cotovelo[1] < -2.5);
   const palma = COISAS.match(/caixinha\(l - vec3\(0\.0, 0\.45, -0\.02\), vec3\(([\d.]+), ([\d.]+), ([\d.]+)\)/);
   conferir("vidro: a palma tem o tamanho de uma de verdade para a cabeça dela (quase metade da largura do rosto)", palma && Number(palma[1]) * 2 >= 0.55 && Number(palma[2]) * 2 >= 0.7, palma?.slice(1).join());
-  const maoFechada = COISAS.slice(COISAS.indexOf("float maoFechada("), COISAS.indexOf("float punho("));
+  const maoFechada = COISAS.slice(COISAS.indexOf("float maoFechada("), COISAS.indexOf("float dedoReto("));
   conferir("vidro: a mão fechada tem palma, quatro dedos de três falanges e o polegar em três partes",
     (maoFechada.match(/dedo\(l, /g) || []).length === 4 && (maoFechada.match(/po = (min\(po, )?cone\(/g) || []).length === 3 && /float dedo\(vec3 l, vec3 b, vec3 c, float r, vec3 a\)/.test(COISAS));
   const ondas = poseDaBrincadeira("vidro", 2).batidas;
@@ -239,6 +245,23 @@ console.log("as brincadeiras do Rosto (02/11/2026: \"bater no vidro e falar toc 
   conferir("cantarola: a cabeça balança, a garganta esquenta e as notas sobem", Math.abs(poseDaBrincadeira("cantarola", 3.3).cabeca.roll) > 0.05 && cancao.calorBoca > 0.2 && cancao.notas.length >= 2 && cancao.notas.every((n) => n.deriva[1] < 0));
   conferir("cantarola: sem punho e sem videogame", !cancao.mao && !cancao.jogo);
 
+  // o mímico (02/11/2026: "as mãos abertas no vidro como se estivesse presa, tipo um mímico")
+  const presa = poseDaBrincadeira("preso", 2);
+  const [esq, dir] = [presa.mao, presa.mao2];
+  conferir("preso: as duas mãos abertas, uma de cada lado do rosto, encostadas no vidro", esq.aberta && dir.aberta && esq.centro[0] < -0.9 && dir.centro[0] > 0.9 && esq.centro[2] > 1.4 && dir.centro[2] > 1.4);
+  conferir("preso: as palmas viradas para o vidro, os dedos para cima e os polegares para o rosto (uma mão é o espelho da outra)",
+    [esq, dir].every((m) => m.eixos[2][2] < -0.95 && m.eixos[1][1] > 0.9) && esq.eixos[0][0] > 0.9 && dir.eixos[0][0] < -0.9 && [esq, dir].every((m) => [0, 1, 2].every((i) => unitario(m.eixos[i]))));
+  const andando = poseDaBrincadeira("preso", 3.4);
+  conferir("preso: uma mão de cada vez desencosta e muda de lugar, e ela olha para essa mão",
+    andando.mao.centro[2] < presa.mao.centro[2] - 0.1 && Math.abs(andando.mao2.centro[2] - presa.mao2.centro[2]) < 1e-9 && andando.cabeca.yaw < -0.1 && poseDaBrincadeira("preso", 4.6).cabeca.yaw > 0.1);
+  const pede = poseDaBrincadeira("preso", 9);
+  conferir("preso: no fim empurra com as duas e pede \"me tira daqui?\" — sem onda no vidro (o círculo ficava em cima da mão)",
+    pede.falas[0].texto === "me tira daqui?" && pede.falas[0].opacidade === 1 && pede.boca > 0 && BRINCADEIRAS.every((b) => b.id !== "preso" || [1.5, 3.9, 8.4].every((s) => !poseDaBrincadeira("preso", s).batidas.length)));
+  const celular = poseDaBrincadeira("preso", 2, 1, { proporcao: 390 / 760 });
+  conferir("no celular em pé, as mãos chegam mais perto do rosto (não saem pela borda); na tela deitada, nada muda",
+    apertoDaTela(390 / 760) < 0.8 && apertoDaTela(1.6) === 1 && Math.abs(celular.mao.centro[0]) < Math.abs(esq.centro[0]) * 0.8 && poseDaBrincadeira("vidro", 1.45, 1, { proporcao: 0.5 }).mao.centro[0] > noVidro.mao.centro[0]);
+  conferir("a caixa marchada vai até a segunda mão também", frenteDaCaixa({ mao2: { centro: [0, 0, 2.4] } }) > 3);
+
   conferir("a câmera da projeção é a do shader: o centro do quadro cai no meio do visual",
     naTela([0, quadro.centroY, 0], quadro, 800, 600, 0.78).every((c, i) => Math.abs(c - [400, 300][i]) < 1e-9));
   conferir("e mais perto da câmera, maior (o punho no vidro sai mais longe do centro que o mesmo ponto lá atrás)",
@@ -246,7 +269,10 @@ console.log("as brincadeiras do Rosto (02/11/2026: \"bater no vidro e falar toc 
   conferir("a caixa marchada vai até o punho no vidro, e só nessa hora", frenteDaCaixa(null) === CAIXA.max[2] && frenteDaCaixa(noVidro) > noVidro.mao.centro[2] + 0.5 &&frenteDaCaixa(poseDaBrincadeira("cantarola", 3)) === CAIXA.max[2]);
 
   conferir("o desenho do punho e do videogame em GLSL, sem número solto em vec3", /float punho\(vec3 p\)/.test(COISAS) && /float aparelho\(vec3 p, out float maos\)/.test(COISAS) && !/NaN|undefined/.test(COISAS) && !/vec3\(\s*-?\d+\s*,/.test(COISAS));
-  conferir("longe das mãos, os dedos não são calculados (só a esfera que contém a mão)", /esfera > 0\.12 \? esfera : maoFechada\(l\)/.test(COISAS) && /esfera > 0\.1 \? esfera : maoNoJogo\(m\)/.test(COISAS));
+  conferir("longe das mãos, os dedos não são calculados (só a esfera que contém a mão)", /esfera > 0\.12 \? esfera : maoFechada\(l\)/.test(COISAS) && /esfera > 0\.1 \? esfera : maoNoJogo\(m\)/.test(COISAS) && /esfera > 0\.12 \? esfera : maoAberta\(a\)/.test(COISAS));
+  const maoAberta = COISAS.slice(COISAS.indexOf("float maoAberta("), COISAS.indexOf("float palmaNoVidro("));
+  conferir("a mão aberta do mímico: palma, quatro dedos esticados de três falanges e o polegar em três partes, menor que a fechada",
+    (maoAberta.match(/dedoReto\(l, /g) || []).length === 4 && (maoAberta.match(/po = (min\(po, )?cone\(/g) || []).length === 3 && /vec3 a = l \/ 0\.84;/.test(COISAS) && /float outraMao\(vec3 p\)/.test(COISAS) && /if \(uMaoAberta > 0\.5\) return uniao\(palmaNoVidro\(l\), braco, 0\.1\)/.test(COISAS));
   conferir("jogo: as mãos seguram as pontas, com três dedos nas costas, o indicador em cima e o polegar na frente",
     /float maoNoJogo\(vec3 m\)/.test(COISAS) && /vec3 m = vec3\(abs\(l\.x\), l\.y, l\.z\)/.test(COISAS));
   const rosto = ler("src/components/panels/visuais/Rosto.js");
@@ -255,6 +281,9 @@ console.log("as brincadeiras do Rosto (02/11/2026: \"bater no vidro e falar toc 
   conferir("o Rosto escuta os gestos, o pedido do /visual, e solta tudo ao sair",
     /\["pointerdown", "keydown", "wheel", "touchstart"\]/.test(rosto) && /ocio\.gesto\(agora\(\), \{ fraco: true \}\)/.test(rosto) && /addEventListener\(EVENTO_DA_BRINCADEIRA/.test(rosto) && /removeEventListener\(EVENTO_DA_BRINCADEIRA/.test(rosto) && /camada\.remove\(\)/.test(rosto));
   conferir("com \"reduzir movimento\", não brinca", /brincarRef\.current && !reduzido \? ocio\.passo/.test(rosto));
+  conferir("o Rosto desenha a segunda mão, a mão aberta e passa a proporção da tela",
+    /uniform vec4 uMao2;/.test(rosto) && /uniform float uMaoAberta;/.test(rosto) && /min\(min\(punho\(p\), outraMao\(p\)\), maos\)/.test(rosto) && /porAMao\(pose\?\.mao2, \[uniforms\.uMao2/.test(rosto) && /poseDaBrincadeira\(b\.id, b\.s, b\.peso, \{ proporcao \}\)/.test(rosto));
+  conferir("a onda do vidro é leve (batida de porta, não soco)", /\* 0\.007 \* some/.test(rosto) && !/\* 0\.012 \* some/.test(rosto));
   const pagina = ler("src/app/(panels)/assistant/page.js");
   conferir("o Assistente liga as brincadeiras (no computador e no celular); a galeria do /visual, não",
     (pagina.match(/<VisualDaLisa [^>]*brincadeiras \/>/g) || []).length === 2 && /<VisualDaLisa key=\{`grande-\$\{naPrevia\}`\}[^>]*brincadeiras \/>/.test(ler("src/app/(panels)/visual/page.js")) && /<VisualDaLisa modo=\{x\.id\} obterSinal=\{obterSinal\} ocupacao=\{0\.82\} \/>/.test(ler("src/app/(panels)/visual/page.js")));

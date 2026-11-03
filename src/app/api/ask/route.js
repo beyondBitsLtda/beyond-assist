@@ -10,7 +10,7 @@ import { fonteDosQuadros } from "@/lib/configLisa.js";
 import { pareceAcao, pendenteValida } from "@/lib/acoesNoAbacato.js";
 import { tratarAcaoNoAbacato } from "@/lib/fluxoDeAcoesNoAbacato.js";
 import { comCodigoNaTela, secaoDoCodigoDaConversa } from "@/lib/codigoNaResposta.js";
-import { secaoDoDiagrama } from "@/lib/diagramaDaLisa.js";
+import { secaoDoDiagrama, filtroDaMarca } from "@/lib/diagramaDaLisa.js";
 import { secaoDoProjeto } from "@/lib/processmapNaConversa.js";
 import { webDaPergunta, fontesDaBusca } from "@/lib/buscaNaWeb.js";
 import { contextoDosRepositorios } from "@/lib/repositorioNaConversa.js";
@@ -32,6 +32,22 @@ function erroAmigavel(err) {
   if (err?.code === "UNAVAILABLE") return `⚠️ O Gemini está com alta demanda no momento${keySuffix} (já tentei de novo automaticamente). Espere um instante e pergunte de novo.`;
   if (/too many subrequests/i.test(String(err?.message || err))) return "⚠️ Esta pergunta precisou de mais chamadas de rede do que o servidor deixa fazer de uma vez. Pergunte de novo; se repetir, tire uma imagem do contexto.";
   return String(err?.message || err);
+}
+
+/**
+ * Manda os pedaços da resposta sem a marca [[DESENHAR]] (02/11/2026): a Lisa a escreve quando entendeu
+ * um pedido de desenho que veio parar na conversa e perguntou "Posso fazer?" — aí a página recebe o
+ * evento "desenho" e guarda o pedido, e o "sim" seguinte desenha (src/lib/codigoNaResposta.js).
+ */
+async function falarSemAMarca(controller, send, pedacos) {
+  const filtro = filtroDaMarca();
+  for await (const piece of pedacos) {
+    const t = filtro.passar(piece);
+    if (t) send(controller, "token", t);
+  }
+  const { resto, marcou } = filtro.fim();
+  if (resto) send(controller, "token", resto);
+  if (marcou) send(controller, "desenho", { pedir: true });
 }
 
 /**
@@ -67,9 +83,7 @@ function conversaDoUsuario(req, body, question, images, dono) {
         });
         const instrucao = comCodigoNaTela(INSTRUCAO_DO_USUARIO + secaoDoPerfil(perfil));
         const metadados = [];
-        for await (const piece of chatStreamWithFallback(prompt, instrucao, web.ferramentas, images, (m) => metadados.push(m))) {
-          send(controller, "token", piece);
-        }
+        await falarSemAMarca(controller, send, chatStreamWithFallback(prompt, instrucao, web.ferramentas, images, (m) => metadados.push(m)));
         const fontes = fontesDaBusca(metadados, 6, web.fontes);
         if (fontes.length) send(controller, "fontes", fontes);
         send(controller, "done", { ok: true });
@@ -409,9 +423,7 @@ export async function POST(req) {
         // abre o editor que digita (src/lib/codigoNaResposta.js, src/components/panels/IdeDaLisa.js)
         const instrucao = withContextDocs(withPersona(comCodigoNaTela(systemInstruction), personaMode));
         const metadados = [];
-        for await (const piece of chatStreamWithFallback(prompt, instrucao, web.ferramentas, images, (m) => metadados.push(m))) {
-          send(controller, "token", piece);
-        }
+        await falarSemAMarca(controller, send, chatStreamWithFallback(prompt, instrucao, web.ferramentas, images, (m) => metadados.push(m)));
         // as páginas lidas e os primeiros resultados: links embaixo da resposta (não entram na fala)
         const fontes = fontesDaBusca(metadados, 6, web.fontes);
         if (fontes.length) send(controller, "fontes", fontes);
