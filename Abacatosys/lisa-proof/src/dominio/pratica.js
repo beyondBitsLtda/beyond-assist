@@ -522,3 +522,35 @@ export function assuntosDoPeriodo(etapas, de, ate) {
     .filter((e) => e.inicio && e.inicio <= ate && e.fim >= de)
     .sort((a, b) => a.ordem - b.ordem);
 }
+
+// ---------------------------------------------------------------- o projeto entregue em arquivos (03/11/2026)
+//
+// "A Lisa não tem GitHub, ela deve entregar de outro jeito": o projeto de programação também pode chegar
+// como arquivos (caminho e conteúdo), e a correção é a mesma do repositório (src/lib/pratica.js,
+// entregarProjetoEmArquivos). Aqui, a conferência: até 20 arquivos, caminhos simples, texto com limite.
+
+export const LIMITES_DA_ENTREGA_EM_ARQUIVOS = { arquivos: 20, porArquivo: 20_000, total: 150_000 };
+
+/** Confere os arquivos: { ok, arquivos: [{ caminho, conteudo }] } ou { ok: false, erro }. */
+export function arquivosDoProjeto(arquivos) {
+  const L = LIMITES_DA_ENTREGA_EM_ARQUIVOS;
+  const lista = Array.isArray(arquivos) ? arquivos : [];
+  if (!lista.length) return { ok: false, erro: "mande pelo menos um arquivo" };
+  if (lista.length > L.arquivos) return { ok: false, erro: `até ${L.arquivos} arquivos por entrega` };
+  const vistos = new Set();
+  const limpos = [];
+  let total = 0;
+  for (const a of lista) {
+    const caminho = String(a?.caminho ?? "").trim().replace(/^\/+/, "");
+    if (!/^[\w.\-/ ]{1,120}$/.test(caminho) || caminho.split("/").some((p) => p === ".." || p === "")) return { ok: false, erro: `caminho de arquivo inválido: "${caminho.slice(0, 60)}"` };
+    if (vistos.has(caminho)) return { ok: false, erro: `o arquivo ${caminho} veio duas vezes` };
+    vistos.add(caminho);
+    const conteudo = String(a?.conteudo ?? "");
+    if (!conteudo.trim()) return { ok: false, erro: `o arquivo ${caminho} está vazio` };
+    if (conteudo.length > L.porArquivo) return { ok: false, erro: `o arquivo ${caminho} passou de ${L.porArquivo} caracteres` };
+    total += conteudo.length;
+    limpos.push({ caminho, conteudo });
+  }
+  if (total > L.total) return { ok: false, erro: `a entrega passou de ${L.total} caracteres` };
+  return { ok: true, arquivos: limpos };
+}

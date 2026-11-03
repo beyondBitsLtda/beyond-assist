@@ -16,3 +16,6 @@
 .quiz__correio-caixa { display: grid; gap: 10px; }
 .quiz__correio-linha { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .quiz__correio-linha .pf-campo__entrada { flex: 1 1 180px; min-width: 0; }
+
+/* a caixa no Reino: o rótulo dela fica vermelho quando chega carta nova */
+.rn-mundo__rotulo--carta { background: var(--pf-alerta); color: #FFFFFF; border-color: var(--pf-alerta); }

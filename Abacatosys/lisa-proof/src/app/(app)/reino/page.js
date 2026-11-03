@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -31,6 +31,7 @@ import ResumoDaBolsa from "@/componentes/bolsa/Resumo.js";
 import Visita from "@/componentes/reino/Visita.js";
 import TelaCheia from "@/componentes/reino/TelaCheia.js";
 import ModoDeTeste from "@/componentes/reino/ModoDeTeste.js";
+import CorreioDoReino from "@/componentes/reino/CorreioDoReino.js";
 import { MUNDO_DE_TESTE, FERRAMENTAS_DE_TESTE, urlNoMundo } from "@/dominio/mundoDeTeste.js";
 import { urlDoVeiculo } from "@/componentes/reino/veiculosDePapel.js";
 
@@ -74,6 +75,17 @@ export default function Reino() {
   const [telaCheia, setTelaCheia] = useState(false);
   const [painel, setPainel] = useState(null); // o menu aberto na tela cheia
   const [visita, setVisita] = useState(null); // o reino vizinho que estou visitando (na paz)
+  // o correio no reino (BEYOND-0016): as cartas não lidas levantam a bandeirinha da caixa; null = sem caixa
+  const [cartas, setCartas] = useState(null);
+  const [correioAberto, setCorreioAberto] = useState(false);
+  const contarCartas = useCallback(() => {
+    obter("/api/correio?destinatarios=0").then((d) => setCartas(d.naoLidas || 0)).catch(() => setCartas(null));
+  }, []);
+  useEffect(() => {
+    contarCartas();
+    const relogio = setInterval(contarCartas, 60_000); // o pombo chega sem precisar recarregar a tela
+    return () => clearInterval(relogio);
+  }, [contarCartas]);
   const telaCheiaRef = useRef(false);
   telaCheiaRef.current = telaCheia;
   const pediuTelaCheiaDeVerdade = useRef(false);
@@ -149,6 +161,7 @@ export default function Reino() {
     else document.getElementById(idDaSecao)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }
   function escolherConstrucao(chave) {
+    if (chave === "correio") { setCorreioAberto(true); return; }
     if (telaCheiaRef.current) { setPainel("construcoes"); setTimeout(() => irParaConstrucao(chave), 80); }
     else irParaConstrucao(chave);
   }
@@ -569,7 +582,8 @@ export default function Reino() {
       {!telaCheia && !teste && <CartaoDeVale />}
 
       {/* ------------------------------------------------------------ vista (e a tela cheia, por cima de tudo) */}
-      <VistaDoReino reino={reino} visita={visita} telaCheia={telaCheia} aoTelaCheia={entrarNaTelaCheia}
+      <CorreioDoReino aberta={correioAberto} aoFechar={() => { setCorreioAberto(false); contarCartas(); }} aoLer={() => setCartas(0)} />
+      <VistaDoReino reino={reino} visita={visita} telaCheia={telaCheia} aoTelaCheia={entrarNaTelaCheia} cartas={cartas}
         aoEscolher={escolherConstrucao} aoVisitar={visitar} aoVoltarDaVisita={() => setVisita(null)}>
         {telaCheia && (
           <TelaCheia reino={reino} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} ocupado={ocupado} comTeste={teste}
@@ -665,7 +679,7 @@ function irParaConstrucao(chave) {
  * seção ocupa a tela toda (o mundo não é montado de novo) e os menus vêm em `children`. Numa
  * visita (na paz), o mundo mostra a ilha do vizinho.
  */
-function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, aoEscolher, aoVisitar, aoVoltarDaVisita, children }) {
+function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, cartas = null, aoEscolher, aoVisitar, aoVoltarDaVisita, children }) {
   const [plana, setPlana] = useState(false);
   const humor = reino.escudoAte ? "normal" : "feliz";
   const vendo = visita && !visita.carregando ? visita : null;
@@ -676,6 +690,7 @@ function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, aoEscolher, aoVis
           tropas={vendo ? vendo.tropas : { exercito: reino.exercito.tropas, guarnicao: reino.guarnicao.tropas }}
           vizinhos={vendo ? [] : reino.paz?.vigente?.vizinhos || []}
           personagem={vendo ? vendo.personagem : undefined} soLeitura={Boolean(vendo)}
+          cartas={vendo ? null : cartas}
           mineiros={vendo ? vendo.ouro?.trabalhando || 0 : reino.ouro?.equipe?.trabalhando || 0} diamantes={vendo ? 0 : reino.ouro?.diamantes || 0}
           humor={humor} aoEscolher={vendo ? undefined : aoEscolher} aoVisitar={aoVisitar} aoFalhar={() => setPlana(true)} />
       )}

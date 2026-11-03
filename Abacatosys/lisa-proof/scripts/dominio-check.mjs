@@ -13,7 +13,7 @@ import {
 import { resumoDasMetas, tarefasDoDia } from "../src/dominio/metas.js";
 import { nivelPorPontos, MULTIPLICADOR_DE_RECOMPENSAS, PONTOS } from "../src/dominio/pontos.js";
 import {
-  periodoDe, periodoPermitido, pontosDoQuiz, PONTOS_DA_PRATICA, pontosDaNota, validarQuiz, quizParaTela,
+  periodoDe, periodoPermitido, pontosDoQuiz, PONTOS_DA_PRATICA, arquivosDoProjeto, pontosDaNota, validarQuiz, quizParaTela,
   separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo, podeReenviar, entregaConcluida,
   validarAvaliacao, assuntoAtual, TENTATIVAS, RODADAS_POR_DIA, podeAbrirRodada, fatorDaRodada, comFatorDaRodada,
   perguntaRepetida, perguntasNovas, exercicioRepetido, validarGuia,
@@ -86,7 +86,7 @@ import {
   CORREIO, conferirRecado, contaDoQuiz, podeMandarPergunta, perguntaNaCarta, recompensaDoRecado, recompensaDaPergunta, podeEscreverPara,
 } from "../src/dominio/correio.js";
 import {
-  CONTA_DA_LISA, PERFIL_DO_CURSO, TEMAS_DE_TECNOLOGIA, temaDoMes, sorteio as sorteioDaLisa, chanceDeAcerto, respostasDoQuiz, oQueFazerAgora, itensDaTeoriaHoje,
+  CONTA_DA_LISA, TEMAS_DE_TECNOLOGIA, temaDoMes, sorteio as sorteioDaLisa, chanceDeAcerto, respostasDoQuiz, oQueFazerAgora, itensDaTeoriaHoje,
   melhoriaDaVez, compraNaBolsa, alvoDaInvasao, documentoDoDiagrama,
 } from "../src/dominio/lisaJogadora.js";
 import {
@@ -3236,11 +3236,9 @@ caso("lisa jogadora: o diagrama dela vira um documento que o quadro aceita", () 
   assert.equal(doc.pages[0].shapes.find((s) => s.id === "d").type, "process", "tipo desconhecido vira processo");
   assert.equal(conferirDiagrama(documentoDoDiagrama({ formas: [{ id: "a", texto: "só uma" }] })).ok, false, "uma forma só não é diagrama");
 });
-caso("lisa jogadora: a rotina, a conta-robô, a página pública e o curso no perfil livre", () => {
+caso("lisa jogadora: a rotina, a conta-robô e a página pública", () => {
   const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
   const script = ler("./lisa-joga.mjs");
-  assert.match(script, /const proposta = \{ \.\.\.r\.proposta, perfil: PERFIL_DO_CURSO \};/, "o curso dela é sempre do perfil livre (entrega por texto)");
-  assert.equal(PERFIL_DO_CURSO, "livre");
   assert.match(script, /oQueFazerAgora\(\{ hora, diaDaSemana, feito: await feitoHoje\(id\) \}\)/, "faz o que está na vez e ainda não fez hoje");
   assert.ok(script.includes("await registrarNoDiario(id, acao, `Tentei ${NOME_DA_ACAO[acao] || acao} e não deu desta vez.`"), "falhou: fica no diário e não insiste");
   for (const f of ["marcarItem", "responderQuiz", "entregarEvidencia", "melhorarConstrucao", "invadir", "comprarAcao", "criarMaterial", "criarPagina"]) {
@@ -3314,6 +3312,49 @@ caso("correio: as rotas, a tela, o quiz e a Lisa", () => {
   assert.match(ler("../src/componentes/Moldura.js"), /\{ href: "\/correio", rotulo: "Correio", Icone: IconeCorreio, grupo: "Jogo" \}/);
   assert.match(ler("./lisa-joga.mjs"), /const ACOES = \{[^}]*correio \};/);
   assert.ok(oQueFazerAgora({ hora: 18, diaDaSemana: 2 }).includes("correio"), "a Lisa passa no correio no fim da tarde");
+});
+
+caso("projeto em arquivos (sem GitHub): a conferência dos arquivos", () => {
+  const ok = arquivosDoProjeto([{ caminho: "/src/app.py", conteudo: "print(1)" }, { caminho: "README.md", conteudo: "# Projeto" }]);
+  assert.deepEqual(ok, { ok: true, arquivos: [{ caminho: "src/app.py", conteudo: "print(1)" }, { caminho: "README.md", conteudo: "# Projeto" }] });
+  assert.equal(arquivosDoProjeto([]).ok, false);
+  assert.equal(arquivosDoProjeto([{ caminho: "../segredo", conteudo: "x" }]).ok, false, "nada de subir pastas");
+  assert.equal(arquivosDoProjeto([{ caminho: "a.js", conteudo: "1" }, { caminho: "a.js", conteudo: "2" }]).ok, false, "o mesmo arquivo duas vezes");
+  assert.equal(arquivosDoProjeto([{ caminho: "a.js", conteudo: "  " }]).ok, false, "arquivo vazio");
+  assert.equal(arquivosDoProjeto(Array.from({ length: 21 }, (_, i) => ({ caminho: `f${i}.js`, conteudo: "x" }))).ok, false, "até 20 arquivos");
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const pratica = ler("../src/lib/pratica.js");
+  assert.match(pratica, /export async function entregarProjetoEmArquivos\(\{ usuarioId, id, arquivos \}\)[\s\S]*?avaliarProjeto\(\{ tema: trilha\.tema, projeto: d\.conteudo, repositorio \}\)/, "a mesma correção do repositório");
+  const script = ler("./lisa-joga.mjs");
+  assert.match(script, /await entregarProjetoEmArquivos\(\{ usuarioId: id, id: d\.id, arquivos \}\)/, "a Lisa entrega o projeto de programação em arquivos");
+  assert.match(script, /await enviarExercicio\(\{ usuarioId: id, id: d\.id, codigo: await codigoDaEntrega/, "e o exercício de código");
+  assert.match(script, /const criado = await criarCurso\(\{ usuarioId: id, proposta: r\.proposta,/, "o perfil do curso é o que a IA propôs");
+  assert.ok(TEMAS_DE_TECNOLOGIA.some((t) => /python|javascript|sql/i.test(t)), "com cursos de programação na lista");
+});
+caso("modo espectador: as telas da Lisa por dentro, só para olhar", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const sessao = ler("../src/lib/sessao.js");
+  assert.match(sessao, /if \(req\.method !== "GET" && req\.method !== "HEAD"\) throw new ErroDeAcesso\(403/, "nada se escreve espiando");
+  assert.match(sessao, /if \(!perfil\?\.robo\) return null;/, "só a conta-robô pode ser espiada");
+  assert.ok(sessao.includes(String.raw`const SO_DELA = [/^\/api\/correio`), "o correio e os chamados dela ficam de fora");
+  assert.ok(sessao.includes(String.raw`const DA_PESSOA = [/^\/api\/auth`), "o login e o próprio modo seguem com a pessoa");
+  assert.match(ler("../src/app/api/espiar/route.js"), /await exigirUsuarioReal\(req\)/);
+  assert.match(ler("../src/componentes/Moldura.js"), /<FaixaDoEspectador \/>/);
+  assert.match(ler("../src/app/(app)/lisa/page.js"), /<BotaoDeEspiar \/>/);
+});
+caso("correio no Reino: a caixa com o pombo-carteiro, a bandeirinha e a folha das cartas", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const mundo = ler("../src/componentes/reino/Mundo3D.js");
+  assert.match(mundo, /function caixaDeCorreio\(p\)/);
+  assert.match(mundo, /g\.traverse\(\(o\) => \{ o\.userData\.chave = "correio"; \}\);/, "tocar na caixa escolhe o correio");
+  assert.match(mundo, /correio\.userData\.bandeira\.rotation\.z = novas \? 0 : Math\.PI \/ 2;/, "a bandeirinha sobe com carta nova");
+  assert.match(mundo, /api\.current\?\.definirCartas\(cartas\);/);
+  const pagina = ler("../src/app/(app)/reino/page.js");
+  assert.match(pagina, /if \(chave === "correio"\) \{ setCorreioAberto\(true\); return; \}/);
+  assert.match(pagina, /cartas=\{vendo \? null : cartas\}/, "na visita a outro reino, a caixa não aparece");
+  assert.match(ler("../src/componentes/reino/CorreioDoReino.js"), /<Recebidas cartas=\{caixa\.recebidas\.slice\(0, 10\)\} agir=\{agir\} \/>/);
+  assert.match(CONTA_DA_LISA.reino, /Lisa/, "o reino da Lisa tem nome próprio");
+  assert.match(ler("./lisa-joga.mjs"), /await renomearReino\(id, CONTA_DA_LISA\.reino\)/);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

@@ -810,6 +810,10 @@ export function Projeto({ desafio: inicial, aoMudar }) {
           aoAvaliar={(r) => { if (r.pontuacao) setPontuacao(r.pontuacao); setDesafio((d) => ({ ...d, tentativas: r.tentativas })); }}
         />
       ) : (
+        <>
+        {desafio.resposta?.emArquivos && (
+          <p className="pf-estat__nota">Entregue em arquivos, sem GitHub: {(desafio.resposta.arquivos || []).join(", ")}.</p>
+        )}
         <Entrega
           desafio={desafio}
           aoAvaliar={(r) => { if (r.pontuacao) setPontuacao(r.pontuacao); setDesafio((d) => ({ ...d, tentativas: r.tentativas })); }}
@@ -819,6 +823,7 @@ export function Projeto({ desafio: inicial, aoMudar }) {
           conteudoInicial={desafio.resposta?.repo}
           aoEnviar={(repo) => criar(`/api/desafios/${desafio.id}/enviar`, { repo })}
         />
+        </>
       )}
     </div>
   );

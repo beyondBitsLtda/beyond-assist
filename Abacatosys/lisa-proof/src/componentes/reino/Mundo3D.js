@@ -467,6 +467,41 @@ function minaDeOuro(p, n) {
   return g;
 }
 
+// o correio (03/11/2026, BEYOND-0016: "o carteiro com as mensagens e a caixa de correio devem ser vistos no
+// reino"): a caixa no poste, perto da praça, com o pombo-carteiro pousado em cima; a bandeirinha vermelha
+// sobe quando chega carta nova. Não é construção (não sobe de nível): está em todo reino.
+const LUGAR_DO_CORREIO = [2.05, 1.15];
+function caixaDeCorreio(p) {
+  const g = new THREE.Group();
+  g.add(p.cilindro(0.05, 0.06, 0.75, 6, COR.madeiraEscura, 0, 0.375, 0));
+  g.add(p.caixa(0.42, 0.26, 0.28, "#2f6fb5", 0, 0.86, 0));
+  const tampa = p.cilindro(0.14, 0.14, 0.42, 10, "#2f6fb5", 0, 0.99, 0);
+  tampa.rotation.z = Math.PI / 2;
+  g.add(tampa);
+  g.add(p.caixa(0.03, 0.04, 0.16, "#1b2a3f", 0.215, 0.88, 0)); // a fenda
+  const bandeira = new THREE.Group();
+  bandeira.position.set(0.23, 0.82, -0.12);
+  bandeira.add(p.caixa(0.03, 0.3, 0.03, "#7a4a26", 0, 0.15, 0));
+  bandeira.add(p.caixa(0.03, 0.1, 0.14, "#d63a3a", 0, 0.27, 0.07));
+  g.add(bandeira);
+  const pombo = new THREE.Group();
+  pombo.position.set(-0.06, 1.16, 0.02);
+  const corpo = p.malha(new THREE.SphereGeometry(0.1, 8, 6), "#f4f1ea", 0, 0, 0);
+  corpo.scale.set(1.25, 0.9, 0.9);
+  const cabeca = p.malha(new THREE.SphereGeometry(0.06, 8, 6), "#f4f1ea", 0.12, 0.08, 0);
+  const bico = p.cone(0.02, 0.06, 5, "#e8a33a", 0.19, 0.08, 0);
+  bico.rotation.z = -Math.PI / 2;
+  const asa1 = p.caixa(0.14, 0.02, 0.07, "#dcd8cf", -0.02, 0.03, 0.09);
+  const asa2 = p.caixa(0.14, 0.02, 0.07, "#dcd8cf", -0.02, 0.03, -0.09);
+  const bolsa = p.caixa(0.07, 0.06, 0.05, "#8a5a2b", -0.02, -0.06, 0.1); // a bolsa do carteiro
+  pombo.add(corpo, cabeca, bico, asa1, asa2, bolsa);
+  g.add(pombo);
+  g.userData.bandeira = bandeira;
+  g.userData.pombo = pombo;
+  g.traverse((o) => { o.userData.chave = "correio"; });
+  return g;
+}
+
 const CONSTRUTORES = { castelo, mina, minaDeOuro, cofre, torre, canhao, quartel, muralha, biblioteca, defesaAerea, morteiro, torreMagica, torreRaio };
 // Onde cada construção fica na ilha: os lugares do motor de combate e a Mina de Ouro, que não
 // entra na batalha (fica debaixo da terra) — num canto livre, longe da praia de desembarque.
@@ -656,7 +691,7 @@ function nuvens(p) {
 // svgComoImagem e recorteDePapel moram em ./papel.js (a torre do Modo Domínio usa as mesmas)
 
 // ------------------------------------------------------------------ o componente
-export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "normal", personagem: personagemFixo, soLeitura = false, mineiros = 0, diamantes = 0, aoEscolher, aoVisitar, aoFalhar }) {
+export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "normal", personagem: personagemFixo, soLeitura = false, mineiros = 0, diamantes = 0, cartas = null, aoEscolher, aoVisitar, aoFalhar }) {
   const caixa = useRef(null);
   const molde = useRef(null);
   const rotulos = useRef({});
@@ -740,6 +775,19 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
     const predios = new Map(); // chave → { grupo, nivel, cenario, ancora, nasceu }
     const camadaPredios = new THREE.Group();
     mundo.add(camadaPredios);
+    // o correio: na camada das construções (tocar escolhe "correio"); some quando não há caixa (numa visita)
+    const correio = caixaDeCorreio(p);
+    correio.position.set(LUGAR_DO_CORREIO[0], 0, LUGAR_DO_CORREIO[1]);
+    correio.visible = false;
+    camadaPredios.add(correio);
+    const ancoraDoCorreio = new THREE.Vector3(LUGAR_DO_CORREIO[0], 1.45, LUGAR_DO_CORREIO[1]);
+    function definirCartas(n) {
+      correio.visible = n !== null && n !== undefined;
+      const novas = Number(n) > 0;
+      correio.userData.bandeira.rotation.z = novas ? 0 : Math.PI / 2; // de pé com carta nova; deitada sem
+      correio.userData.pombo.rotation.y = novas ? -0.6 : 0;           // com carta, o pombo olha para quem chega
+      sujo = true;
+    }
     const descartar = (o) => o.traverse((m) => m.geometry?.dispose());
     let girando = [];
     function atualizarConstrucoes(lista, animar = true) {
@@ -877,6 +925,11 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
         if (!r) continue;
         const [x, y] = projetar(info.ancora);
         r.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+      }
+      const rCorreio = rotulos.current.__correio;
+      if (rCorreio) {
+        rCorreio.style.visibility = correio.visible ? "visible" : "hidden";
+        if (correio.visible) { const [cx, cy] = projetar(ancoraDoCorreio); rCorreio.style.transform = `translate(${cx}px, ${cy}px) translate(-50%, -100%)`; }
       }
       const rAcamp = rotulos.current.acampamento;
       if (rAcamp && ilhota.grupo) {
@@ -1901,6 +1954,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       mostrarTropas,
       definirVizinhos,
       definirMineiros,
+      definirCartas,
     };
 
     return () => {
@@ -1951,6 +2005,11 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
     api.current?.definirMineiros(mineiros, diamantes);
   }, [mineiros, diamantes]);
 
+  // ---- o correio: a caixa aparece com `cartas` (as não lidas; null = sem caixa, como numa visita)
+  useEffect(() => {
+    api.current?.definirCartas(cartas);
+  }, [cartas]);
+
   // ---- os reinos vizinhos (paz)
   const mostrados = (vizinhos || []).filter((v) => v?.construcoes).slice(0, MAXIMO_DE_VIZINHOS);
   const chaveDosVizinhos = JSON.stringify(mostrados.map((v) => ({ id: v.id, nome: v.nome, construcoes: v.construcoes })));
@@ -1997,6 +2056,12 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
           <span aria-hidden="true">{c.emoji}</span> {c.nivel ? `nv ${c.nivel}` : "construir"}
         </button>
       ))}
+      {cartas !== null && cartas !== undefined && (
+        <button type="button" className={`rn-mundo__rotulo${cartas ? " rn-mundo__rotulo--carta" : ""}`} ref={(n) => { rotulos.current.__correio = n; }}
+          onClick={() => aoEscolher?.("correio")} aria-label={cartas ? `Correio: ${cartas} carta(s) nova(s)` : "Correio — abrir a caixa"}>
+          <span aria-hidden="true">📮</span> {cartas ? `${cartas} nova${cartas === 1 ? "" : "s"}` : "correio"}
+        </button>
+      )}
       {mostrados.map((v, i) => (
         <button key={i} type="button" className="rn-mundo__rotulo rn-mundo__rotulo--vizinho" ref={(n) => { rotulos.current[`__vizinho${i}`] = n; }}
           onClick={() => aoVisitar?.(v)} aria-label={`Visitar o ${v.nome}`}>

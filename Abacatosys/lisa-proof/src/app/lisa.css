@@ -19,3 +19,14 @@
 .lj-diario__linha { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; align-items: start; padding: 10px 12px; border-radius: 12px; background: var(--pf-superficie); border: 1px solid var(--pf-linha); font-size: 14px; overflow-wrap: anywhere; }
 .lj-diario__icone { font-size: 18px; line-height: 1.2; }
 .lj-diario__quando { font-size: 12px; color: var(--pf-tinta-2); margin-right: 4px; }
+
+/* O modo espectador: a faixa no topo de todas as telas enquanto se vê o Proof da Lisa */
+.pf-espectador {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 0 0 16px; padding: 10px 14px; border-radius: 12px;
+  background: var(--pf-atencao-fundo); color: var(--pf-atencao); border: 1px solid var(--pf-atencao);
+  font-size: 14px;
+}
+.pf-espectador strong { color: inherit; }
+.lj-espiar { display: grid; gap: 6px; justify-items: start; }

@@ -18,10 +18,11 @@ import { proporCurso } from "@/lib/iaCurso.js";
 import { criarCurso } from "@/lib/cursos.js";
 import { detalheDaTrilha } from "@/lib/trilhas.js";
 import { marcarItem } from "@/lib/estudo.js";
-import { obterOuCriarDesafio, desafioDoUsuario, responderQuiz, entregarEvidencia, entregarDiagrama } from "@/lib/pratica.js";
-import { estadoDoReino, coletarMina, melhorarConstrucao, treinarTropas, alvosDe, invadir, saldoDoUsuario } from "@/lib/reino.js";
+import { obterOuCriarDesafio, desafioDoUsuario, responderQuiz, entregarEvidencia, entregarDiagrama, enviarExercicio, entregarProjetoEmArquivos } from "@/lib/pratica.js";
+import { estadoDoReino, coletarMina, melhorarConstrucao, treinarTropas, alvosDe, invadir, saldoDoUsuario, renomearReino } from "@/lib/reino.js";
 import { estadoDaBolsa, comprarAcao } from "@/lib/bolsa.js";
 import { criarMaterial } from "@/lib/acervo.js";
+import { valesPendentes, resgatarVale } from "@/lib/vales.js";
 import { criarCaderno, criarPagina } from "@/lib/cadernos.js";
 import { conversar, textoDe } from "@/lib/gemini.js";
 import { destinatarios, mandarPerguntaDoQuiz, mandarRecado, avaliarRecado } from "@/lib/correio.js";
@@ -29,7 +30,7 @@ import { assuntosParaODuracao } from "@/dominio/curso.js";
 import { diaDe } from "@/dominio/datas.js";
 import { motorDo } from "@/dominio/motores.js";
 import {
-  CONTA_DA_LISA, PERFIL_DO_CURSO, temaDoMes, sorteio, sementeDe, chanceDeAcerto, respostasDoQuiz, oQueFazerAgora,
+  CONTA_DA_LISA, temaDoMes, sorteio, sementeDe, chanceDeAcerto, respostasDoQuiz, oQueFazerAgora,
   itensDaTeoriaHoje, melhoriaDaVez, compraNaBolsa, alvoDaInvasao, documentoDoDiagrama, TIPOS_DO_DIAGRAMA,
 } from "@/dominio/lisaJogadora.js";
 
@@ -92,12 +93,11 @@ async function curso(id) {
   const tema = temaDoMes((anteriores || []).map((t) => t.tema));
   const r = await proporCurso({
     tema, nivel: "iniciante", semanas: 4, dias: 4 * DIAS_DE_ESTUDO.length,
-    objetivo: "Entender os conceitos e aplicar no dia a dia de uma equipe de tecnologia, sem precisar programar.",
+    objetivo: "Entender os conceitos e aplicar no dia a dia de uma equipe de tecnologia.",
     assuntos: assuntosParaODuracao(4, DIAS_DE_ESTUDO.length),
   });
   if (!r.ok) throw new Error(`a proposta do curso falhou: ${r.erros.join("; ")}`);
-  const proposta = { ...r.proposta, perfil: PERFIL_DO_CURSO };
-  const criado = await criarCurso({ usuarioId: id, proposta, diasDeEstudo: DIAS_DE_ESTUDO });
+  const criado = await criarCurso({ usuarioId: id, proposta: r.proposta, diasDeEstudo: DIAS_DE_ESTUDO });
   return { resumo: `Comecei o curso do mês: "${criado.nome.replace(/^STUDYs+/i, "")}" (${criado.assuntos} assuntos em 4 semanas).`, detalhe: { tema, trilhaId: criado.trilhaId } };
 }
 
@@ -168,6 +168,31 @@ async function textoDaEntrega(conteudo, { chance, sortear, projeto = false }) {
 }
 const entregaDeTexto = (texto) => ({ texto, video: null, imagens: [], audio: null, pdf: null });
 
+/** O código do exercício: o que ela escreveria (às vezes com um descuido, como quem está aprendendo). */
+async function codigoDaEntrega(conteudo, { chance, sortear }) {
+  const descuido = sortear() > chance;
+  const texto = await escrever(`EXERCÍCIO DE PROGRAMAÇÃO do meu curso (em JSON):
+${JSON.stringify(conteudo).slice(0, 6000)}
+
+Escreva a MINHA solução: só o código, completo, na linguagem pedida, com comentários curtos.${descuido ? " Como estudante ainda aprendendo, deixe UM caso de borda sem tratar (sem dizer isso)." : ""} Sem crases de markdown.`, { sistema: ESTUDANTE, maxTokens: 4000 });
+  // (sem as crases do markdown, se o modelo pôs)
+  return texto.replace(/^`{3}[\w+-]*\n?|`{3}\s*$/g, "").trim();
+}
+
+/** O projeto de programação em arquivos (ela não tem GitHub): os arquivos que ela escreveria para os requisitos. */
+async function arquivosDaEntrega(conteudo, { chance, sortear }) {
+  const descuido = sortear() > chance;
+  const esquema = { type: "OBJECT", properties: { arquivos: { type: "ARRAY", items: { type: "OBJECT", properties: { caminho: { type: "STRING" }, conteudo: { type: "STRING" } }, required: ["caminho", "conteudo"] } } }, required: ["arquivos"] };
+  const parte = await conversar({
+    sistema: ESTUDANTE, esquema, maxTokens: 12000, temperatura: 0.4,
+    contents: [{ role: "user", parts: [{ text: `PROJETO DE PROGRAMAÇÃO do meu curso (em JSON):
+${JSON.stringify(conteudo).slice(0, 7000)}
+
+Escreva os arquivos do MEU projeto (de 2 a 8: o código, um README.md curto dizendo como rodar e o que cada requisito virou), atendendo os requisitos.${descuido ? " Como estudante ainda aprendendo, deixe UM requisito incompleto (sem dizer isso)." : ""}` }] }],
+  });
+  return JSON.parse(textoDe(parte)).arquivos || [];
+}
+
 /** O diagrama do exercício: a IA monta a estrutura (como uma aluna, às vezes esquecendo uma parte) e o quadro recebe o documento. */
 async function diagramaDaEntrega(conteudo, { chance, sortear }) {
   const descuido = sortear() > chance;
@@ -202,6 +227,8 @@ async function exercicio(id) {
   if (motor === "aberto") {
     const texto = await textoDaEntrega(d.conteudo, { chance, sortear: sortearPara("exercicio") });
     r = await entregarEvidencia({ usuarioId: id, id: d.id, entrega: entregaDeTexto(texto) });
+  } else if (motor === "codigo") {
+    r = await enviarExercicio({ usuarioId: id, id: d.id, codigo: await codigoDaEntrega(d.conteudo, { chance, sortear: sortearPara("exercicio") }) });
   } else if (motor === "diagrama") {
     r = await entregarDiagrama({ usuarioId: id, id: d.id, diagrama: await diagramaDaEntrega(d.conteudo, { chance, sortear: sortearPara("exercicio") }) });
   } else {
@@ -220,9 +247,17 @@ async function projeto(id) {
   const { desafio } = await obterOuCriarDesafio({ usuarioId: id, trilhaId: atual.id, tipo: semana.tipo, periodo: semana.periodo });
   const d = await desafioDoUsuario(desafio.id, id);
   if (d.status === "concluido" && Number(d.nota) >= 60) return { resumo: `O projeto da semana ${semana.numero} já está aprovado.` };
-  const texto = await textoDaEntrega(d.conteudo, { chance: chanceDeAcerto({ diasNoCurso: atual.dias }), sortear: sortearPara("projeto"), projeto: true });
-  const r = await entregarEvidencia({ usuarioId: id, id: d.id, entrega: entregaDeTexto(texto) });
-  return { resumo: `Entreguei o ${semana.final ? "projeto final" : `projeto da semana ${semana.numero}`} "${d.titulo}": nota ${r?.nota ?? "?"}.`, detalhe: { nota: r?.nota ?? null } };
+  const chance = chanceDeAcerto({ diasNoCurso: atual.dias });
+  const nome = semana.final ? "projeto final" : `projeto da semana ${semana.numero}`;
+  // com evidências (os cursos que não são de programação): o texto; sem (programação): os arquivos, sem GitHub
+  if (Array.isArray(d.conteudo?.evidencias)) {
+    const texto = await textoDaEntrega(d.conteudo, { chance, sortear: sortearPara("projeto"), projeto: true });
+    const r = await entregarEvidencia({ usuarioId: id, id: d.id, entrega: entregaDeTexto(texto) });
+    return { resumo: `Entreguei o ${nome} "${d.titulo}": nota ${r?.nota ?? "?"}.`, detalhe: { nota: r?.nota ?? null } };
+  }
+  const arquivos = await arquivosDaEntrega(d.conteudo, { chance, sortear: sortearPara("projeto") });
+  const r = await entregarProjetoEmArquivos({ usuarioId: id, id: d.id, arquivos });
+  return { resumo: `Entreguei o ${nome} "${d.titulo}" em ${arquivos.length} arquivos (sem GitHub): nota ${r?.nota ?? "?"}.`, detalhe: { nota: r?.nota ?? null, arquivos: arquivos.map((a) => a.caminho) } };
 }
 
 // ---------------------------------------------------------------- Reino e Bolsa
@@ -239,6 +274,16 @@ async function mina(id) {
 async function reino(id) {
   const feito = [];
   const estado = await estadoDoReino(id);
+  // o reino dela tem nome próprio (03/11/2026: "a Lisa deve personalizar o nome do reino dela"), para
+  // não se confundir com os "Reino do Neuro" de quem ainda não escolheu
+  const { data: atual } = await supabase.from("proof_reinos").select("nome").eq("usuario_id", id).maybeSingle();
+  // os vales que chegaram (o de boas-vindas, os de conquista): ela resgata, como qualquer jogador
+  try {
+    for (const v of await valesPendentes(id)) { await resgatarVale(id, v.id); feito.push(`resgatei um vale de 🪙 ${v.moedas ?? v.valor ?? ""}`.trim()); }
+  } catch (e) { log("vales:", e.message); }
+  if (atual && atual.nome !== CONTA_DA_LISA.reino) {
+    try { await renomearReino(id, CONTA_DA_LISA.reino); feito.push(`dei ao reino o nome de ${CONTA_DA_LISA.reino}`); } catch (e) { log("nome do reino:", e.message); }
+  }
   const opcoes = (estado.construcoes || []).filter((c) => c.pode).map((c) => ({ chave: c.chave, custo: c.custo, prioridade: PRIORIDADE[c.chave] || 1 }));
   const melhoria = melhoriaDaVez(opcoes, estado.saldo);
   if (melhoria) {

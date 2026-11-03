@@ -60,6 +60,28 @@ async function sair() {
  * Duas navegações, uma de cada vez: barra lateral a partir de 900px e, abaixo disso, barra de
  * abas presa embaixo — no celular o polegar alcança o rodapé, não o canto de cima.
  */
+/**
+ * O modo espectador ligado (src/lib/sessao.js): uma faixa em todas as telas avisa que é o Proof da Lisa,
+ * só para olhar, com o botão de voltar para o seu.
+ */
+function FaixaDoEspectador() {
+  const [espiando, setEspiando] = useState(false);
+  useEffect(() => {
+    setEspiando(document.cookie.split(";").some((p) => p.trim() === "proof_espiar=lisa"));
+  }, []);
+  if (!espiando) return null;
+  async function voltar() {
+    await fetch("/api/espiar", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ligar: false }) }).catch(() => {});
+    window.location.href = "/lisa";
+  }
+  return (
+    <div className="pf-espectador" role="status">
+      <span>👀 Você está vendo o Proof da <strong>Lisa</strong> por dentro — as telas são as dela, só para olhar.</span>
+      <button type="button" className="pf-botao pf-botao--pequeno" onClick={voltar}>Voltar para o meu</button>
+    </div>
+  );
+}
+
 export default function Moldura({ children }) {
   const caminho = usePathname() || "/";
 
@@ -116,7 +138,10 @@ export default function Moldura({ children }) {
         </div>
       </header>
 
-      <main className="pf-principal">{children}</main>
+      <main className="pf-principal">
+        <FaixaDoEspectador />
+        {children}
+      </main>
 
       <nav className="pf-abas" aria-label="Navegação principal">
         {ABAS.map(({ href, rotulo, Icone }) => (

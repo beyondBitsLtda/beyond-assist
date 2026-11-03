@@ -26,6 +26,7 @@ export default function LisaJoga() {
           <h1>🤖 A Lisa joga</h1>
           <p>A Lisa estuda e joga no Proof como qualquer pessoa: um curso de tecnologia por mês, o quiz e o exercício do dia, o Reino, a Bolsa, o caderno e o Acervo. Ela erra, aprende e melhora com o tempo — e tudo o que faz fica aqui.</p>
         </div>
+        {dados?.existe && <BotaoDeEspiar />}
       </div>
       {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
       {!dados && !erro && <p className="pf-estat__nota">Carregando…</p>}
@@ -125,6 +126,27 @@ function Painel({ d }) {
         ) : <div className="pf-cartao"><p className="pf-estat__nota">Nada ainda.</p></div>}
       </section>
     </>
+  );
+}
+
+/** Entra no Proof da Lisa: as mesmas telas (Reino, trilhas, cadernos, prática, Bolsa, Raio-X), com os dados dela, só para olhar. */
+function BotaoDeEspiar() {
+  const [entrando, setEntrando] = useState(false);
+  const [erro, setErro] = useState("");
+  async function entrar() {
+    setEntrando(true);
+    try {
+      const r = await fetch("/api/espiar", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ligar: true }) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+      window.location.href = "/reino";
+    } catch (e) { setErro(e.message); setEntrando(false); }
+  }
+  return (
+    <div className="lj-espiar">
+      <button type="button" className="pf-botao" onClick={entrar} disabled={entrando}>{entrando ? "Entrando…" : "👀 Ver tudo da Lisa por dentro"}</button>
+      <span className="pf-estat__nota">O Reino, as trilhas, os cadernos e a Prática dela, nas mesmas telas que as suas.</span>
+      {erro && <span className="pf-aviso pf-aviso--erro">{erro}</span>}
+    </div>
   );
 }
 

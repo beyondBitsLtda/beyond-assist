@@ -13,34 +13,31 @@ export { sorteio } from "./bolsa.js";
 export { sementeDe } from "./modoDominio.js";
 
 /** A conta dela: um e-mail que não recebe nada, para ninguém confundir com a conta de uma pessoa. */
-export const CONTA_DA_LISA = { email: "lisa.jogadora@proof.beyond.dev.br", nome: "Lisa", apelido: "Lisa robô" }; // (o apelido só aceita letras; o 🤖 vem da marca de robô)
+export const CONTA_DA_LISA = { email: "lisa.jogadora@proof.beyond.dev.br", nome: "Lisa", apelido: "Lisa robô", reino: "Cidadela da Lisa" }; // (o apelido só aceita letras; o 🤖 vem da marca de robô)
 
 /**
- * Os cursos que ela faz, um por mês, na ordem (sem repetir enquanto houver tema novo). Todos de
- * tecnologia, sem ser de programação, e a rotina cria o curso no perfil "livre" (PERFIL_DO_CURSO, ver
- * src/dominio/perfis.js): o exercício e o projeto são entregues por texto, que ela escreve. Nos de
- * programação o projeto é um repositório público no GitHub — e uma rotina não cria repositório na conta
- * de ninguém —, então ela pararia na primeira semana.
+ * Os cursos que ela faz, um por mês, na ordem (sem repetir enquanto houver tema novo): de tecnologia,
+ * alternando programação e o resto. O perfil é o que a IA propuser — nos de programação o exercício é
+ * código e o projeto vai em ARQUIVOS (ela não tem GitHub: entregarProjetoEmArquivos, src/lib/pratica.js);
+ * nos outros, a entrega é por texto ou diagrama.
  */
 export const TEMAS_DE_TECNOLOGIA = [
   "Redes de computadores",
+  "Python do zero ao intermediário",
   "Segurança da informação",
+  "JavaScript moderno",
   "Computação em nuvem",
+  "SQL e modelagem de dados",
   "Testes de software",
+  "Git e GitHub na prática",
   "Engenharia de requisitos",
+  "APIs REST com Node.js",
   "Experiência do usuário (UX)",
-  "Gestão ágil de projetos",
+  "Algoritmos e estruturas de dados",
   "Inteligência artificial: conceitos e ética",
-  "Internet das coisas",
-  "Sistemas operacionais",
-  "Governança de TI",
-  "LGPD para equipes de tecnologia",
-  "Transformação digital",
-  "Arquitetura de computadores",
+  "Docker e containers",
+  "Linux na linha de comando",
 ];
-
-/** O perfil do curso dela, qualquer que seja o que a IA propôs (a entrega por texto). */
-export const PERFIL_DO_CURSO = "livre";
 
 /** O tema do mês: o primeiro da lista que ela ainda não fez (os feitos vêm pelos títulos das trilhas dela). */
 export function temaDoMes(feitos = []) {

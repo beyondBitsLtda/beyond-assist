@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.46.0-cloudflare-pages.1",
+  "versao": "0.47.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-03",
   "compilacao": {
-    "numero": 91,
+    "numero": 92,
     "data": "2026-11-03",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.47.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Dá para ver tudo da Lisa por dentro (modo espectador), ela entrega projetos de programação sem GitHub, tem reino com nome próprio, e o correio aparece no Reino com o pombo-carteiro.",
+      "itens": [
+        "Modo espectador: na página \"Lisa joga\", \"👀 Ver tudo da Lisa por dentro\" abre o Proof dela nas mesmas telas de sempre — Reino, trilhas, Prática, cadernos, Bolsa, Raio-X —, com uma faixa no topo e \"Voltar para o meu\". Só leitura: nada se grava (403), só a conta-robô pode ser espiada, e o correio e os chamados dela ficam de fora.",
+        "Projeto de programação entregue em arquivos, sem GitHub (entregarProjetoEmArquivos): a mesma correção da IA, com os arquivos no lugar do repositório. A Lisa usa isso e escreve o código do exercício do dia; os cursos dela voltam a incluir programação (Python, JavaScript, SQL…), com o perfil que a IA propuser.",
+        "O reino da Lisa ganha nome próprio (Cidadela da Lisa) e ela resgata os vales que chegam, como qualquer jogador.",
+        "Correio no Reino: a caixa de correio no poste, perto da praça, com o pombo-carteiro; a bandeirinha sobe e o rótulo fica vermelho quando chega carta nova (a contagem atualiza a cada minuto). Tocar na caixa abre as cartas ali mesmo: avaliar o recado e responder a pergunta do quiz."
+      ],
+      "issues": [
+        "BEYOND-0014",
+        "BEYOND-0016"
+      ]
+    },
     {
       "versao": "0.46.0-cloudflare-pages.1",
       "data": "2026-11-03",
@@ -1442,7 +1459,8 @@
         "Exercício de desenhar diagramas (fluxograma, BPMN, UML, modelo de dados, arquitetura de software e de nuvem, C4) num quadro embutido, avaliado pela Lisa, nos cursos de computação, arquitetura e áreas próximas",
         "Tela Chamados: quem reportou acompanha status, previsão de término e respostas; o técnico (administrador) vê todos e muda status, previsão e responde (os chamados são cards do quadro \"Chamados — Lisa Proof\" no Abacato)",
         "A Lisa jogadora: uma conta-robô que estuda e joga sozinha (curso do mês, quiz, exercício, projeto, Reino, Bolsa, caderno, Acervo), com tudo visível na página \"Lisa joga\"",
-        "Correio entre jogadores: recados avaliados por quem recebe (útil dá moedas aos dois) e até 2 perguntas do quiz do dia mandadas para outros jogadores (o quiz fecha com 3 respondidas, valendo menos)"
+        "Correio entre jogadores: recados avaliados por quem recebe (útil dá moedas aos dois) e até 2 perguntas do quiz do dia mandadas para outros jogadores (o quiz fecha com 3 respondidas, valendo menos)",
+        "Modo espectador: ver o Proof da Lisa jogadora por dentro (as mesmas telas, só leitura)"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",

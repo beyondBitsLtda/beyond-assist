@@ -26,7 +26,7 @@ import {
   pontosDoQuiz, pontosDaNota, quizParaTela, PONTOS_DA_PRATICA, podeReenviar, entregaConcluida, ehProjeto,
   RODADAS_POR_DIA, podeAbrirRodada, comFatorDaRodada, tentativasDe, validarAvaliacao,
   tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto,
-  complexidadeDe, podeTrocarComplexidade, TROCAS_DE_COMPLEXIDADE, podeTrocarProjeto, projetoAntigo,
+  complexidadeDe, podeTrocarComplexidade, TROCAS_DE_COMPLEXIDADE, podeTrocarProjeto, projetoAntigo, arquivosDoProjeto,
 } from "@/dominio/pratica.js";
 import {
   MOTORES, motorDo, corrigeNoServidor, exercicioParaTela, avaliacaoDoMotor, conferirEvidencia,
@@ -682,6 +682,30 @@ export async function enviarProjeto({ usuarioId, id, repo }) {
     usuarioId, d, avaliacao,
     resposta: { repo: repositorio.url, branch: repositorio.branch, arquivos: repositorio.arquivos.map((a) => a.caminho) },
   });
+}
+
+/**
+ * O projeto de programação entregue em ARQUIVOS, sem GitHub (03/11/2026: "a Lisa não tem GitHub, ela deve
+ * entregar de outro jeito"): a mesma correção de enviarProjeto (avaliarProjeto), com os arquivos no lugar do
+ * repositório baixado. Quem usa hoje é a Lisa jogadora (scripts/lisa-joga.mjs); a tela segue pelo GitHub.
+ */
+export async function entregarProjetoEmArquivos({ usuarioId, id, arquivos }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (!eProjeto(d.tipo)) throw new ErroDeAcesso(400, "este desafio não é um projeto");
+  if (Array.isArray(d.conteudo?.evidencias)) throw new ErroDeAcesso(400, "este projeto é entregue pela tela dele (as evidências)");
+  exigirReenvio(d);
+  const conferidos = arquivosDoProjeto(arquivos);
+  if (!conferidos.ok) throw new ErroDeAcesso(400, conferidos.erro);
+
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  const repositorio = { url: "entregue em arquivos no Proof (sem GitHub)", branch: "entrega", arquivos: conferidos.arquivos };
+  let avaliacao;
+  try {
+    avaliacao = await avaliarProjeto({ tema: trilha.tema, projeto: d.conteudo, repositorio });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  return fecharEntrega({ usuarioId, d, avaliacao, resposta: { emArquivos: true, arquivos: conferidos.arquivos.map((a) => a.caminho) } });
 }
 
 // ---------------------------------------------------------------- os motores dos outros perfis (30/10/2026)
