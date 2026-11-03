@@ -110,7 +110,7 @@ export default function GeminiKeysPage() {
   const provedor = provedores.find((p) => p.id === provedorId) || provedores[0];
   const keyCount = provedor.keyCount;
   const models = provedor.models;
-  const modelKeys = Object.keys(models); // Gemini: ["chat","tts","embed"] · Groq: ["chat"]
+  const modelKeys = Object.keys(models); // Gemini: ["chat","tts","embed"] · Groq: ["chat","fala"]
 
   // saúde indexada por `${key_index}:${model}` pra lookup rápido na matriz
   const healthMap = new Map();

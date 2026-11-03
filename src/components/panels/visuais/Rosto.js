@@ -58,6 +58,8 @@ const FRAGMENTO = `
   uniform vec3 uPulso2, uCotovelo2;
   uniform float uJogoGiro, uJogoTela, uFrente;
   uniform vec3 uBatida1, uBatida2;
+  // sempre 0, mas o compilador não sabe (BEYOND-0012): os laços que começam nele não são desenrolados
+  uniform int uZero;
   ${FORMA}
   ${COISAS}
 
@@ -104,13 +106,20 @@ const FRAGMENTO = `
   }
 
   // a normal medida com um passo e: com passo largo, é a normal de uma superfície "borrada" — os
-  // traços pequenos (órbitas, nariz, boca) só sugerem, como na foto
+  // traços pequenos (órbitas, nariz, boca) só sugerem, como na foto.
+  // Num laço, e não em quatro chamadas (BEYOND-0012: "trava o navegador ao abrir o Assistente"): o
+  // compilador do Windows (Direct3D) e o do celular copiam a cena inteira — busto, mãos, videogame —
+  // em cada chamada, e com nove cópias o shader levava segundos para compilar com a tela parada. Os
+  // quatro cantos do tetraedro são os mesmos de antes: (1,-1,-1), (-1,-1,1), (-1,1,-1), (1,1,1).
   vec3 normalEm(vec3 p, float e){
-    const vec2 k = vec2(1.0, -1.0);
     float o, f;
     vec2 c;
-    return normalize(k.xyy * cena(p + k.xyy * e, o, f, c) + k.yyx * cena(p + k.yyx * e, o, f, c)
-      + k.yxy * cena(p + k.yxy * e, o, f, c) + k.xxx * cena(p + k.xxx * e, o, f, c));
+    vec3 n = vec3(0.0);
+    for (int i = uZero; i < 4; i++) {
+      vec3 k = 2.0 * vec3(float(((i + 3) >> 1) & 1), float((i >> 1) & 1), float(i & 1)) - 1.0;
+      n += k * cena(p + k * e, o, f, c);
+    }
+    return normalize(n);
   }
 
   // o calor em cor (na térmica: preto → vermelho escuro → laranja → creme → quase branco)
@@ -153,7 +162,7 @@ const FRAGMENTO = `
       float t = max(entra, 0.0), orelha = 9.0, fio = 9.0, d = 9.0;
       vec2 coisa = vec2(9.0);
       bool achou = false;
-      for (int i = 0; i < 80; i++) {
+      for (int i = uZero; i < 80; i++) {
         d = cena(ro + rd * t, orelha, fio, coisa);
         coisaPerto = min(coisaPerto, min(coisa.x, coisa.y));
         if (d < dmin) { dmin = d; orelhaPerto = orelha; fioPerto = fio; tPerto = t; }
@@ -161,14 +170,18 @@ const FRAGMENTO = `
         t += d * 0.8;
         if (t > sai) break;
       }
-      if (achou && min(coisa.x, coisa.y) < 0.004) {
+      // a normal medida UMA vez, para os dois casos abaixo (uma chamada a menos de normalEm é uma cópia
+      // a menos da cena no shader compilado — BEYOND-0012): fina nas mãos e no aparelho, larga no busto
+      bool naCoisa = achou && min(coisa.x, coisa.y) < 0.004;
+      vec3 p = ro + rd * t;
+      vec3 nn = achou ? normalEm(p, naCoisa ? 0.012 : 0.07) : vec3(0.0, 0.0, 1.0);
+      if (naCoisa) {
         // o punho, as mãos e o videogame: sem os traços do rosto, e com a normal fina (o aparelho e os
         // dedos são menores que o passo largo do rosto). A mão é quente inteira, como numa câmera
         // térmica de verdade — e é assim que os nós e os dedos aparecem; o plástico é frio por dentro
         // e acende só na borda e do lado da tela, que está virada para ela
-        vec3 p = ro + rd * t;
         y = p.y;
-        float frente = clamp(dot(normalEm(p, 0.012), -rd), 0.0, 1.0);
+        float frente = clamp(dot(nn, -rd), 0.0, 1.0);
         float calor = 1.13 - 1.27 * frente;
         if (coisa.x <= coisa.y) {
           // a mão mais quente que o braço, para o olho ir para ela
@@ -184,9 +197,7 @@ const FRAGMENTO = `
         cor = rampa((calor + (grao - 0.5) * 0.12) * uAquece);
         objeto = 1.0;
       } else if (achou) {
-        vec3 p = ro + rd * t;
         y = p.y;
-        vec3 nn = normalEm(p, 0.07);
         vec3 q = PIVO + uCabeca * (p - PIVO);
         float frente = clamp(dot(nn, -rd), 0.0, 1.0);
         // a borda é quente: quanto mais de lado a câmera vê a superfície, mais calor (uma faixa larga
@@ -340,6 +351,7 @@ export default function Rosto({ obterSinal, ocupacao = 0.78, ajustes: ajustesFix
       uFrente: { value: frenteDaCaixa(null) },
       uBatida1: { value: new THREE.Vector3(0, 0, -1) },
       uBatida2: { value: new THREE.Vector3(0, 0, -1) },
+      uZero: { value: 0 },
     };
     const geo = new THREE.PlaneGeometry(2, 2);
     const material = new THREE.ShaderMaterial({
@@ -548,9 +560,18 @@ export default function Rosto({ obterSinal, ocupacao = 0.78, ajustes: ajustesFix
       renderer.render(cena, camera);
       quadro = requestAnimationFrame(animar);
     };
-    quadro = requestAnimationFrame(animar);
+    // O shader compila EM PARALELO antes do primeiro quadro (BEYOND-0012: "quando eu aciono o modo
+    // assistente ela trava o navegador e só depois de segundos volta a funcionar"). O primeiro
+    // render() esperava a compilação com a página parada — medido: uma tarefa de 30 s no Edge com
+    // o WebGL por software, segundos numa placa de verdade. Com compileAsync o navegador compila
+    // por fora (KHR_parallel_shader_compile) e a página segue respondendo; o rosto entra quando fica
+    // pronto, esquentando do preto como sempre.
+    let vivo = true;
+    const comecar = () => { if (vivo) quadro = requestAnimationFrame(animar); };
+    renderer.compileAsync(cena, camera).then(comecar, comecar);
 
     return () => {
+      vivo = false;
       cancelAnimationFrame(quadro);
       observador.disconnect();
       window.removeEventListener("pointermove", aoMover);

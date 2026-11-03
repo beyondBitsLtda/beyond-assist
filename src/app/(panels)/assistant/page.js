@@ -65,6 +65,9 @@ import { CABELOS_DO_ROSTO, PALETAS_DO_ROSTO, escolherAjustesDoRosto } from "@/li
 import { BotaoMais, FaixaDoContexto } from "@/components/panels/ContextoDaConversa.js";
 // o microfone do celular como o do WhatsApp (02/11/2026): segura grava, solta envia, ← cancela, ↑ trava
 import MicrofoneDaLisa from "@/components/panels/MicrofoneDaLisa.js";
+// a Conversa livre no celular escuta gravando, e o nome dela sai certo na fala (03/11/2026, BEYOND-0011)
+import { abrirConversaPorGravacao } from "@/lib/conversaPorGravacao.js";
+import { corrigirNomeDaLisa, dicaDoErro } from "@/lib/falaComoWhatsApp.js";
 import { imagemParaAnexo, imagensDaColagem, imagensSoltas } from "@/lib/anexosDaConversa.js";
 import { MAX_ANEXOS } from "@/lib/contextoDaConversa.js";
 import { reposNoTexto, vinculosValidos } from "@/lib/enderecoDoRepositorio.js";
@@ -101,6 +104,22 @@ function unlockAudioPlayback() {
   } catch {
     // sem suporte a Audio (não deveria acontecer em nenhum navegador real) — só segue sem destravar
   }
+}
+
+/** Uma fala dela nunca prende a Conversa livre por mais que isto (BEYOND-0011). */
+const FALA_MAXIMA_MS = 4 * 60_000;
+
+/** Espera a fala dela acabar — a fila inteira (pedaços que entram depois também) e o áudio tocando —,
+ *  até `parou()` ou o teto. Sem teto, um áudio que nunca avisava que terminou deixava a Conversa livre
+ *  em "respondendo…" para sempre (BEYOND-0011). */
+async function esperarAFalaAcabar({ fila, falando, parou, ateMs = Date.now() + FALA_MAXIMA_MS }) {
+  const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  let atual;
+  do {
+    atual = fila();
+    await Promise.race([Promise.resolve(atual).catch(() => {}), esperar(Math.max(0, ateMs - Date.now()))]);
+  } while (atual !== fila() && !parou() && Date.now() < ateMs);
+  while (!parou() && falando() && Date.now() < ateMs) await esperar(250);
 }
 
 const MODE_META = {
@@ -2284,7 +2303,15 @@ export default function AssistantPage() {
         audioRef.current = audio;
         audio.onended = () => { URL.revokeObjectURL(result.url); audioRef.current = null; addLog("[TTS]", GR, "voz Gemini"); finish(); };
         audio.onerror = () => { URL.revokeObjectURL(result.url); audioRef.current = null; finish(); };
-        audio.play().catch(finish);
+        // O celular recusa tocar som sem um toque recente: o play() falha e nem onended nem onerror
+        // chegam. Antes, audioRef ficava preso aqui e a Conversa livre esperava a fala acabar para
+        // sempre — "a Lisa fica pensando e nunca responde" (BEYOND-0011).
+        audio.play().catch((err) => {
+          URL.revokeObjectURL(result.url);
+          if (audioRef.current === audio) audioRef.current = null;
+          addLog("[TTS]", OR, `o navegador não deixou tocar a voz: ${err?.name || err}`);
+          finish();
+        });
       } else {
         if (typeof window === "undefined" || !window.speechSynthesis) return finish();
         const clean = cleanForSpeech(text);
@@ -2924,6 +2951,8 @@ export default function AssistantPage() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let chegouErro = false;
+      let terminou = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -2968,14 +2997,27 @@ export default function AssistantPage() {
           } else if (event === "token") {
             setAnswer((a) => { const na = a + payload; answerRef.current = na; return na; });
           } else if (event === "error") {
+            chegouErro = true;
             addLog("[ERR]", OR, String(payload?.message || payload));
-            setAnswer((a) => a + `\n[erro: ${payload?.message || payload}]`);
+            // também em answerRef: é dele que saem a bolha do chat do celular e a fala (antes, a bolha ficava vazia)
+            setAnswer((a) => { const na = `${a}\n[erro: ${payload?.message || payload}]`.trim(); answerRef.current = na; return na; });
           } else if (event === "desenho") {
             pedeDesenho = true;
           } else if (event === "done") {
+            terminou = true;
             addLog("[STATE]", CY, "core → IDLE · standby");
           }
         }
+      }
+      // Nada de texto e nenhum erro: a janela ficava em "processando" para sempre (ela mostra isso
+      // enquanto a resposta está vazia). Agora a Lisa diz o que houve (BEYOND-0011).
+      if (!answerRef.current.trim() && !chegouErro) {
+        const aviso = terminou
+          ? "Não consegui formar uma resposta agora (veio vazia). Pergunte de novo, por favor."
+          : "A conexão caiu antes de a resposta chegar. Pergunte de novo, por favor.";
+        addLog("[ERR]", OR, terminou ? "resposta vazia do servidor" : "o stream fechou sem o fim");
+        answerRef.current = aviso;
+        setAnswer(aviso);
       }
       if (pedeDesenho) {
         desenhoPendenteRef.current = { q, imagens: images.filter((i) => i.origem !== "camera"), em: Date.now() };
@@ -2987,7 +3029,8 @@ export default function AssistantPage() {
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: answerRef.current, ...(fontesRef.current.length ? { fontes: fontesRef.current } : {}) }]);
     } catch (err) {
       addLog("[ERR]", OR, err.message);
-      setAnswer(`Falha ao consultar o backend: ${err.message}`);
+      answerRef.current = `Falha ao consultar o backend: ${err.message}`;
+      setAnswer(answerRef.current);
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: `Falha ao consultar o backend: ${err.message}` }]);
     } finally {
       setBusy(false);
@@ -3525,6 +3568,39 @@ export default function AssistantPage() {
   useEffect(() => {
     if (!conversaAberta) { setConversaEstado("desligada"); return; }
     if (typeof window === "undefined") return;
+
+    let parado = false;
+    // o áudio da fala conta enquanto toca de verdade: um <audio> parado não é ela falando (BEYOND-0011)
+    const tocandoAgora = () => { const a = audioRef.current; return Boolean(a && !a.paused && !a.ended); };
+    const falandoAgora = () => tocandoAgora() || isBrowserVoiceAudioPlaying() || window.speechSynthesis?.speaking;
+    const fimDaFalaDela = (parou) => esperarAFalaAcabar({ fila: () => speechQueueRef.current, falando: falandoAgora, parou });
+
+    // No CELULAR a conversa escuta gravando (src/lib/conversaPorGravacao.js, BEYOND-0011): o reconhecimento
+    // do navegador com o microfone da esfera aberto derrubava a escuta no Android, e a conversa parava.
+    // Sem interromper por "Lisa" (seria um segundo microfone): ela termina de falar e a escuta volta.
+    if (isMobile) {
+      let conversa = null;
+      addLog("[CONVERSA]", PU, "conversa aberta (celular: gravando) — pode falar quando quiser");
+      abrirConversaPorGravacao({
+        aoEstado: (e) => { if (!parado) setConversaEstado(e === "ouvindo" ? "ouvindo" : "respondendo"); },
+        aoAviso: (t) => addLog("[CONVERSA]", OR, t),
+        aoMotor: ({ motor, aviso }) => addLog("[CONVERSA]", aviso ? OR : GR, `transcrito por ${motor === "groq" ? "Whisper (Groq)" : "Gemini"}${aviso ? ` — ${aviso}` : ""}`),
+        aoTexto: async (texto) => {
+          if (parado) return;
+          addLog("[CONVERSA]", CY, `→ "${texto}"`);
+          await askRef.current?.(texto);
+          await fimDaFalaDela(() => parado);
+        },
+      })
+        .then((c) => { if (parado) c.fechar(); else conversa = c; })
+        .catch((err) => { addLog("[CONVERSA]", OR, dicaDoErro(err)); setConversaAberta(false); });
+      return () => {
+        parado = true;
+        conversa?.fechar();
+        setConversaEstado("desligada");
+      };
+    }
+
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
       addLog("[CONVERSA]", OR, "este navegador não reconhece fala — use o Chrome ou o Edge");
@@ -3532,16 +3608,13 @@ export default function AssistantPage() {
       return;
     }
 
-    let parado = false;
     let rec = null;
     let religar = null;
     let processando = false;
     let ultimaFalaEm = 0;
-    const falandoAgora = () => !!audioRef.current || isBrowserVoiceAudioPlaying() || window.speechSynthesis?.speaking;
     // Uma fala dela que termina gera, às vezes, um "resultado" atrasado com as próprias palavras
     // dela: o que chega até 1,2 s depois de ela parar de falar é eco, não você.
     const vigia = setInterval(() => { if (falandoAgora()) ultimaFalaEm = Date.now(); }, 200);
-    const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
     abrirMicrofone(); // só para a esfera medir o volume da sua voz
 
     // INTERROMPER: enquanto ela fala, um segundo reconhecimento fica atento só à palavra "Lisa".
@@ -3567,10 +3640,9 @@ export default function AssistantPage() {
       };
       // a fala acabou sozinha: a fila inteira (pedaços que entram depois também) e o áudio tocando.
       // Parar por interrupção também esvazia a fila — aí quem termina é o vigia, não isto.
+      // (com teto: um áudio que nunca termina não prende a conversa — BEYOND-0011)
       (async () => {
-        let fila;
-        do { fila = speechQueueRef.current; await Promise.resolve(fila).catch(() => {}); } while (fila !== speechQueueRef.current);
-        while (!parado && !interrompendo && falandoAgora()) await esperar(250);
+        await fimDaFalaDela(() => parado || interrompendo);
         if (!interrompendo) terminar({ interrompida: false, resto: "" });
       })();
       const calar = () => {
@@ -3611,7 +3683,7 @@ export default function AssistantPage() {
       rec.interimResults = false;
       rec.onresult = async (ev) => {
         if (parado || processando) return;
-        const dito = (ev.results[ev.results.length - 1]?.[0]?.transcript || "").trim();
+        const dito = corrigirNomeDaLisa((ev.results[ev.results.length - 1]?.[0]?.transcript || "").trim());
         if (!falaQueValePergunta(dito)) return;
         if (falandoAgora() || Date.now() - ultimaFalaEm < 1200) return; // eco dela mesma
         processando = true;
@@ -3629,7 +3701,7 @@ export default function AssistantPage() {
               if (r.resto && falaQueValePergunta(r.resto)) { pergunta = r.resto; addLog("[CONVERSA]", CY, `→ "${r.resto}"`); }
             }
           }
-          while (!parado && falandoAgora()) await esperar(250); // e qualquer outra fala dela
+          await fimDaFalaDela(() => parado); // e qualquer outra fala dela
         } catch (err) {
           addLog("[CONVERSA]", OR, `falhou: ${err?.message || err}`);
         }
@@ -3655,7 +3727,7 @@ export default function AssistantPage() {
       fecharMicrofone();
       setConversaEstado("desligada");
     };
-  }, [conversaAberta, addLog, stopSpeaking]);
+  }, [conversaAberta, isMobile, addLog, stopSpeaking]);
 
   // ---- STT: ouvir microfone (Web Speech API) ----
   const toggleMic = useCallback(() => {
@@ -3696,7 +3768,7 @@ export default function AssistantPage() {
       setListening(false);
       fecharMicrofone();
       recognitionRef.current = null;
-      const q = (finalText || "").trim();
+      const q = corrigirNomeDaLisa((finalText || "").trim());
       if (q) { addLog("[VOICE]", CY, `→ "${q}"`); setInput(""); ask(q); }
       else addLog("[VOICE]", OR, "nada capturado");
     };
@@ -5320,7 +5392,7 @@ export default function AssistantPage() {
               ligado={conversaAberta}
               onChange={() => { unlockAudioPlayback(); acordarAudio(); setConversaAberta((v) => !v); }}
               detalhe={conversaAberta
-                ? (conversaEstado === "respondendo" ? "Respondendo… diga \"Lisa\" para interromper" : "Pode falar — ela continua o assunto")
+                ? (conversaEstado === "respondendo" ? (isMobile ? "Respondendo… a escuta volta quando ela terminar de falar" : "Respondendo… diga \"Lisa\" para interromper") : "Pode falar — ela continua o assunto")
                 : "Microfone aberto: fale quando quiser, ela responde continuando a conversa"}
               cor="#3fe0c5"
             >

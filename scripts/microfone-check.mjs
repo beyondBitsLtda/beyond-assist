@@ -9,6 +9,7 @@ import fs from "node:fs";
 import {
   GESTO, LIMITE_DA_FALA, TAXA_DA_FALA, PICO_DE_SILENCIO, DICAS, gestoDoDedo, aoSoltar, relogioDaFala, tipoDeGravacao,
   mixarEmMono, reamostrar, pcm16DeFloat, picoDaFala, cortesNaPausa, juntarTranscricoes, dicaDoErro,
+  corrigirNomeDaLisa, dicaDaTranscricao, textoDoWhisper, VEZ, inicioDaEscuta, passoDaEscuta,
 } from "../src/lib/falaComoWhatsApp.js";
 
 let falhas = 0;
@@ -74,6 +75,63 @@ conferir("os botões antigos (Web Speech de segurar) saíram", !/startMicHold|st
 conferir("o usuário comum alcança a transcrição", /prefixo: "\/api\/notas"/.test(ler("src/lib/authSession.js")));
 conferir("o \"</> editor\" sai do caminho gravando e no modo voz", /className="bb-ide-chamar"/.test(ler("src/components/panels/IdeDaLisa.js"))
   && /body\.bb-gravando-fala \.bb-ide-chamar/.test(ler("src/app/globals.css")) && /body\[data-celular="voice"\] \.bb-ide-chamar/.test(ler("src/app/globals.css")));
+
+console.log("\no nome dela, o texto do Whisper e a Conversa livre no celular (BEYOND-0011)");
+const nomes = [
+  ["oi Elisa, que horas são?", "oi Lisa, que horas são?"], ["Elisa, me ajuda", "Lisa, me ajuda"], ["olá Liza", "olá Lisa"],
+  ["bom dia, Alissa!", "bom dia, Lisa!"], ["me diz, Elisa, onde fica", "me diz, Lisa, onde fica"], ["Obrigada, Elisa.", "Obrigada, Lisa."],
+  ["eliza qual o clima", "Lisa qual o clima"], ["Lisa", "Lisa"],
+];
+conferir("chamando por ela (começo, cumprimento, entre vírgulas): o nome vira Lisa", nomes.every(([de, para]) => corrigirNomeDaLisa(de) === para),
+  nomes.filter(([de, para]) => corrigirNomeDaLisa(de) !== para).map(([de]) => `${de} → ${corrigirNomeDaLisa(de)}`).join(" | "));
+conferir("no meio da frase, outra pessoa: fica como veio", corrigirNomeDaLisa("pergunte à Elisa do RH") === "pergunte à Elisa do RH"
+  && corrigirNomeDaLisa("a Elisa mandou o relatório") === "a Elisa mandou o relatório" && corrigirNomeDaLisa("Elisabete, oi") === "Elisabete, oi");
+conferir("a dica da transcrição leva o nome e o fim da fala anterior", /Lisa/.test(dicaDaTranscricao()) && dicaDaTranscricao("e o prazo?").endsWith("e o prazo?"));
+conferir("Whisper: junta os trechos com fala", textoDoWhisper({ text: "x", segments: [{ text: " Oi, Lisa.", no_speech_prob: 0.02, avg_logprob: -0.2 }, { text: " Tudo bem?", no_speech_prob: 0.1, avg_logprob: -0.3 }] }) === "Oi, Lisa. Tudo bem?");
+conferir("Whisper: o trecho que ele mesmo marca como sem fala sai", textoDoWhisper({ segments: [{ text: " Que horas são?", no_speech_prob: 0.05, avg_logprob: -0.2 }, { text: " Obrigado.", no_speech_prob: 0.9, avg_logprob: -1.2 }] }) === "Que horas são?");
+conferir("Whisper: frase de legenda inventada no silêncio vira nada", textoDoWhisper({ text: "Legendas pela comunidade Amara.org" }) === "" && textoDoWhisper({ text: " " }) === "");
+conferir("Whisper: sem segments, usa o text", textoDoWhisper({ text: " Abre o quadro" }) === "Abre o quadro");
+
+// a escuta: um volume a cada 80 ms, como no aparelho
+const escutar = (trilha, inicio = 0) => {
+  let estado = inicioDaEscuta(inicio);
+  const acoes = [];
+  let t = inicio;
+  for (const [nivel, ms] of trilha) for (let fim = t + ms; t < fim; t += 80) {
+    const r = passoDaEscuta(estado, nivel, t);
+    estado = r.estado;
+    if (r.acao) acoes.push({ acao: r.acao, t, inicio: estado.inicio, ultimaVoz: estado.ultimaVoz });
+  }
+  return acoes;
+};
+const fala = escutar([[0.01, 2000], [0.3, 1500], [0.01, VEZ.silencioMs + 200]]);
+conferir("silêncio, 1,5 s de fala, silêncio: começou e terminou uma vez", fala.map((a) => a.acao).join() === "comecou,terminou", JSON.stringify(fala.map((a) => a.acao)));
+conferir("termina depois do silêncio do fim, não antes", fala[1] && fala[1].t - fala[1].ultimaVoz >= VEZ.silencioMs && fala[1].t - fala[1].ultimaVoz < VEZ.silencioMs + 200);
+conferir("a pausa curta no meio da frase não encerra a fala", escutar([[0.3, 800], [0.01, 500], [0.3, 800], [0.01, VEZ.silencioMs + 100]]).map((a) => a.acao).join() === "comecou,terminou");
+conferir("um estalo (menos que a fala mínima) é descartado", escutar([[0.01, 500], [0.4, 100], [0.01, VEZ.silencioMs + 200]]).map((a) => a.acao).join() === "comecou,descartar");
+conferir("ninguém fala: a gravação recomeça a cada espera", escutar([[0.01, VEZ.esperaMs * 2 + 200]]).filter((a) => a.acao === "recomecar").length === 2);
+conferir("fala sem fim: enviada no limite (no aparelho a gravação para aí)", escutar([[0.3, VEZ.falaMaximaMs + 400]]).map((a) => a.acao).slice(0, 2).join() === "comecou,terminou");
+conferir("um ruído constante do lugar vira o novo silêncio", escutar([[0.05, 6000], [0.08, 3000]]).length === 0 && escutar([[0.05, 6000], [0.4, 800], [0.05, VEZ.silencioMs + 200]]).map((a) => a.acao).join() === "comecou,terminou");
+
+console.log("\na conversa e a transcrição no aparelho e no servidor (BEYOND-0011)");
+const conversaCelular = ler("src/lib/conversaPorGravacao.js");
+conferir("a Conversa livre do celular grava (MediaRecorder) e mede o volume do mesmo microfone, sem o reconhecimento do navegador",
+  /new MediaRecorder\(stream/.test(conversaCelular) && /medirMicrofone\(stream\)/.test(conversaCelular) && !/SpeechRecognition/.test(conversaCelular));
+conferir("fecha o microfone enquanto ela responde e reabre depois", /fecharMicrofoneDaConversa\(\);\s*\n\s*if \(!fechada/.test(conversaCelular) && /if \(!parado\) await ouvir\(\)/.test(conversaCelular));
+conferir("corta o silêncio de antes da fala", /falaEmWav\(fechada\.blob, \{ desde \}\)/.test(conversaCelular) && /desde > 0 \? tudo\.subarray/.test(gravador));
+conferir("a página usa a conversa por gravação no celular, antes do reconhecimento do navegador",
+  /if \(isMobile\) \{[\s\S]{0,200}abrirConversaPorGravacao\(/.test(pagina) && pagina.indexOf("abrirConversaPorGravacao({") < pagina.indexOf("const SR = window.SpeechRecognition || window.webkitSpeechRecognition;\n    if (!SR) {\n      addLog(\"[CONVERSA]\""));
+conferir("a espera pela fala dela tem teto e não confia num <audio> parado", /async function esperarAFalaAcabar/.test(pagina) && /Date\.now\(\) < ateMs/.test(pagina) && /!a\.paused && !a\.ended/.test(pagina)
+  && !/while \(!parado && falandoAgora\(\)\) await esperar/.test(pagina));
+conferir("o play() recusado solta o áudio (antes ficava preso e a conversa esperava para sempre)", /audio\.play\(\)\.catch\(\(err\) => \{[\s\S]{0,120}if \(audioRef\.current === audio\) audioRef\.current = null;/.test(pagina));
+conferir("resposta vazia: a Lisa avisa em vez de ficar em \"processando\"", /if \(!answerRef\.current\.trim\(\) && !chegouErro\)/.test(pagina) && /if \(!falou\) send\(controller, "token", RESPOSTA_VAZIA\)/.test(ler("src/app/api/ask/route.js")));
+conferir("o erro do servidor também vai para a bolha e para a fala", /chegouErro = true;[\s\S]{0,400}answerRef\.current = na;/.test(pagina));
+conferir("a fala do reconhecimento do computador também corrige o nome", /const dito = corrigirNomeDaLisa\(/.test(pagina) && /const q = corrigirNomeDaLisa\(\(finalText/.test(pagina));
+conferir("o microfone pede a transcrição como pedido, com teto", /comando: true/.test(gravador) && /TETO_DA_TRANSCRICAO_MS/.test(gravador));
+const rotaDoTrecho = ler("src/app/api/notas/trecho/route.js");
+const transcricao = ler("src/lib/transcricaoDaFala.js");
+conferir("a rota manda o pedido para a transcrição rápida; o Tomar nota segue no Gemini", /if \(comando\) \{[\s\S]{0,120}transcreverPedido\(/.test(rotaDoTrecho) && /transcreverTrechoDeNota\(audio, \{\s*\n\s*tema:/.test(rotaDoTrecho));
+conferir("Groq primeiro; falhou, Gemini; nos dois o nome sai certo", transcricao.indexOf("transcreverNaGroq(") < transcricao.indexOf("transcreverTrechoDeNota(") && (transcricao.match(/corrigirNomeDaLisa\(/g) || []).length === 2);
 
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");
 process.exit(falhas ? 1 : 0);

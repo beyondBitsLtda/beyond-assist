@@ -155,3 +155,84 @@ export function dicaDoErro(erro) {
   if (nome === "NotReadableError") return "O microfone está em uso por outro app. Feche o outro app e tente de novo";
   return "Não consegui abrir o microfone. Tente de novo";
 }
+
+// ---- o nome dela, o texto do Whisper e a Conversa livre no celular (03/11/2026, BEYOND-0011) ----
+//
+// "eu falo oi Lisa e ela entende oi Elisa": o reconhecimento não conhece o nome. Quando a pessoa
+// CHAMA por ela (no começo da fala, depois de um cumprimento ou entre vírgulas), o nome parecido
+// vira Lisa; no meio de uma frase ("pergunte à Elisa do RH") fica como veio.
+
+const NOME_PARECIDO = "(?:e?l[iíy]s{1,2}a|e?l[iíy]za|alis{1,2}a|lise)";
+const DEPOIS_DO_NOME = String.raw`(?![\p{L}\p{N}])`;
+const CUMPRIMENTO = "(?:oi|olá|ola|ei|hey|e a[ií]|al[ôo]|bom dia|boa tarde|boa noite|obrigad[oa]|valeu|tchau|ok|okay|ô|ó)";
+
+/** "oi Elisa, que horas são" → "oi Lisa, que horas são". */
+export function corrigirNomeDaLisa(texto) {
+  return String(texto || "")
+    .replace(new RegExp(String.raw`(^\s*|[.!?]\s+)${NOME_PARECIDO}${DEPOIS_DO_NOME}`, "giu"), "$1Lisa")
+    .replace(new RegExp(String.raw`((?:^|[\s,.!?])${CUMPRIMENTO}[\s,!]*)${NOME_PARECIDO}${DEPOIS_DO_NOME}`, "giu"), "$1Lisa")
+    .replace(new RegExp(String.raw`(,\s*)${NOME_PARECIDO}(?=\s*[,.!?]|\s*$)`, "giu"), "$1Lisa");
+}
+
+/** A dica de vocabulário da transcrição: o nome dela e o fim da fala anterior. */
+export function dicaDaTranscricao(anterior = "") {
+  const fim = String(anterior || "").slice(-200);
+  return `Conversa com a Lisa, a assistente. Oi, Lisa.${fim ? ` ${fim}` : ""}`;
+}
+
+// O Whisper, num trecho sem fala, às vezes "ouve" frases de legenda de vídeo. Só as que nunca
+// seriam um pedido à Lisa.
+const ALUCINACOES_DO_WHISPER = [/amara\.org/i, /legendas? (pela|por|da) comunidade/i, /legendado por/i, /inscreva-se no canal/i, /obrigad[oa] por assistir/i];
+
+/** A resposta do Whisper (verbose_json) → o texto falado. Trechos que ele mesmo marca como sem
+ *  fala (no_speech_prob alto E pouca confiança) e as frases de legenda ficam de fora. */
+export function textoDoWhisper(resposta, { semFala = 0.6 } = {}) {
+  const segmentos = Array.isArray(resposta?.segments) ? resposta.segments : null;
+  const partes = segmentos
+    ? segmentos.filter((s) => !(Number(s?.no_speech_prob) > semFala && Number(s?.avg_logprob) < -0.5)).map((s) => s?.text)
+    : [resposta?.text];
+  const texto = juntarTranscricoes(partes);
+  return !texto || ALUCINACOES_DO_WHISPER.some((r) => r.test(texto)) ? "" : texto;
+}
+
+/**
+ * A Conversa livre no celular escuta GRAVANDO, como o microfone do chat — o reconhecimento do
+ * navegador com um segundo microfone aberto (o da esfera) derruba a escuta no Android, e era isso
+ * que deixava a conversa parada. A gravação corre o tempo todo; o volume diz quando a fala começou
+ * e quando acabou (VEZ.silencioMs de silêncio). O limiar acompanha o ruído do lugar.
+ *
+ *   silencioMs    silêncio que encerra a fala
+ *   falaMinimaMs  menos voz que isto (um estalo, uma tosse) é descartado, sem ir para o servidor
+ *   falaMaximaMs  uma fala vai até aqui; no limite, é enviada
+ *   esperaMs      sem ninguém falar, a gravação recomeça (o áudio parado não cresce à toa)
+ */
+export const VEZ = { silencioMs: 1100, falaMinimaMs: 350, falaMaximaMs: 30_000, esperaMs: 20_000, limiarMinimo: 0.06, fatorDoRuido: 2.5 };
+
+export function inicioDaEscuta(agora) {
+  return { falando: false, inicio: 0, ultimaVoz: 0, ruido: 0.02, desde: agora };
+}
+
+/** Um passo da escuta com o volume de agora (0–1, o de nivelDoMicrofone). Devolve { estado, acao }:
+ *  "comecou" | "terminou" (com estado.inicio/ultimaVoz da fala) | "descartar" | "recomecar" | null. */
+export function passoDaEscuta(estado, nivel, agora, regras = VEZ) {
+  const e = { ...estado };
+  const v = Number(nivel) || 0;
+  const limiar = Math.max(regras.limiarMinimo, e.ruido * regras.fatorDoRuido);
+  if (!e.falando) {
+    if (v >= limiar) {
+      Object.assign(e, { falando: true, inicio: agora, ultimaVoz: agora });
+      return { estado: e, acao: "comecou" };
+    }
+    e.ruido = e.ruido * 0.95 + v * 0.05; // só o silêncio ensina o ruído do lugar
+    if (agora - e.desde >= regras.esperaMs) { e.desde = agora; return { estado: e, acao: "recomecar" }; }
+    return { estado: e, acao: null };
+  }
+  if (v >= limiar * 0.7) e.ultimaVoz = agora; // um pouco abaixo do limiar ainda é a mesma fala
+  const acabou = agora - e.ultimaVoz >= regras.silencioMs;
+  const longa = agora - e.inicio >= regras.falaMaximaMs;
+  if (!acabou && !longa) return { estado: e, acao: null };
+  const vale = longa || e.ultimaVoz - e.inicio >= regras.falaMinimaMs;
+  e.falando = false;
+  e.desde = agora;
+  return { estado: e, acao: vale ? "terminou" : "descartar" };
+}

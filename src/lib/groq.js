@@ -42,6 +42,8 @@ const CHAVES = (process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || "")
 // comando. Os outros candidatos eram openai/gpt-oss-20b (menor, mais rápido) e
 // qwen/qwen3.8-27b.
 const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+// A transcrição do microfone (transcreverNaGroq, no fim do arquivo).
+const GROQ_MODELO_DE_FALA = process.env.GROQ_MODELO_DE_FALA || "whisper-large-v3-turbo";
 
 /** Converte o histórico do formato do Gemini para o formato de mensagens da OpenAI/Groq. */
 export function paraMensagensOpenAI(contents, instrucaoDeSistema) {
@@ -255,6 +257,57 @@ function classificarErroDaGroq(status, detalhe) {
 
 /** Para o painel de chaves: quantas existem e qual modelo elas atendem. Nunca as chaves. */
 export const GROQ_KEY_COUNT = CHAVES.length;
-export const GROQ_MODELS = { chat: GROQ_MODEL };
+export const GROQ_MODELS = { chat: GROQ_MODEL, fala: GROQ_MODELO_DE_FALA };
 
 export const GROQ_MODELO_ATUAL = GROQ_MODEL;
+
+// ---- A fala do microfone pelo Whisper da Groq (03/11/2026, BEYOND-0011) ----
+//
+// "a função de microfone demora muito a transcrever": a transcrição ia para o modelo de chat do
+// Gemini, o mesmo que fica sobrecarregado (503) nas horas de pico — e uma frase de três segundos
+// esperava as tentativas e as reservas dele. O Whisper da Groq é um modelo só de transcrição:
+// devolve uma frase curta em menos de um segundo e aceita uma dica de vocabulário (o nome Lisa).
+// Quem chama (src/lib/transcricaoDaFala.js) cai para o Gemini se a Groq falhar.
+
+const GROQ_FALA_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
+
+/** WAV em base64 → a resposta do Whisper (verbose_json: text e segments). Teto de 15 s por tentativa. */
+export async function transcreverNaGroq(audio, { dica = "" } = {}) {
+  if (!CHAVES.length) throw new Error("GROQ_API_KEYS não configurada no servidor");
+  const bytes = Uint8Array.from(atob(audio.data), (c) => c.charCodeAt(0));
+  const tentadas = new Set();
+  let ultimoErro;
+  for (let tentativa = 1; tentativa <= Math.min(2, CHAVES.length); tentativa++) {
+    const indice = await pickKeyIndex(CHAVES.length, GROQ_MODELO_DE_FALA, tentadas);
+    tentadas.add(indice);
+    const corpo = new FormData();
+    corpo.append("file", new Blob([bytes], { type: audio.mimeType }), "fala.wav");
+    corpo.append("model", GROQ_MODELO_DE_FALA);
+    corpo.append("language", "pt");
+    corpo.append("temperature", "0");
+    corpo.append("response_format", "verbose_json");
+    if (dica) corpo.append("prompt", dica);
+    const controlador = new AbortController();
+    const relogio = setTimeout(() => controlador.abort(), 15_000);
+    let res;
+    try {
+      res = await fetch(GROQ_FALA_URL, { method: "POST", headers: { authorization: `Bearer ${CHAVES[indice]}` }, body: corpo, signal: controlador.signal });
+    } catch (err) {
+      ultimoErro = err?.name === "AbortError" ? new Error("a Groq não transcreveu em 15 s") : err;
+      continue;
+    } finally {
+      clearTimeout(relogio);
+    }
+    if (res.ok) {
+      await markOk(indice, GROQ_MODELO_DE_FALA);
+      return res.json();
+    }
+    const detalhe = await res.text().catch(() => "");
+    const classificado = classificarErroDaGroq(res.status, detalhe);
+    if (classificado.marcar) await markCooldown(indice, GROQ_MODELO_DE_FALA, { untilMs: classificado.ateMs, reason: classificado.motivo, error: detalhe.slice(0, 200) });
+    ultimoErro = new Error(res.status === 404 ? `Groq não conhece o modelo de fala "${GROQ_MODELO_DE_FALA}" — ajuste GROQ_MODELO_DE_FALA` : classificado.mensagem);
+    if (!classificado.transitorio) break;
+  }
+  throw ultimoErro || new Error("Groq: a transcrição falhou");
+}
+

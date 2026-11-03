@@ -41,14 +41,20 @@ function erroAmigavel(err) {
  */
 async function falarSemAMarca(controller, send, pedacos) {
   const filtro = filtroDaMarca();
+  let falou = false;
   for await (const piece of pedacos) {
     const t = filtro.passar(piece);
-    if (t) send(controller, "token", t);
+    if (t) { send(controller, "token", t); falou = true; }
   }
   const { resto, marcou } = filtro.fim();
-  if (resto) send(controller, "token", resto);
+  if (resto) { send(controller, "token", resto); falou = true; }
   if (marcou) send(controller, "desenho", { pedir: true });
+  // O Gemini às vezes termina sem texto nenhum (bloqueio, limite gasto pensando): sem isto a resposta
+  // chegava vazia e a janela ficava em "processando" (BEYOND-0011).
+  if (!falou) send(controller, "token", RESPOSTA_VAZIA);
 }
+
+const RESPOSTA_VAZIA = "Não consegui formar uma resposta agora (o modelo devolveu vazio). Pergunte de novo, de outro jeito se puder.";
 
 /**
  * A conversa do USUÁRIO do MVP (01/11/2026: "quando um usuário que não seja eu logar, ele tem acesso a

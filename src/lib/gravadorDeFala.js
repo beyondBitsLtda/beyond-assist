@@ -3,8 +3,8 @@
 // Grava com o MediaRecorder (webm no Android, mp4 no iPhone): ele não depende do reconhecimento de
 // voz do navegador nem de um gesto para começar. Depois, o OfflineAudioContext decodifica o
 // arquivo (também sem gesto) e a fala vira WAV mono de 16 kHz — o formato que o Gemini aceita
-// sempre — em pedaços de até 35 s, transcritos por /api/notas/trecho, a mesma transcrição do
-// Tomar nota. O áudio não fica guardado: só o texto volta.
+// sempre — em pedaços de até 35 s, transcritos por /api/notas/trecho como pedido (o Whisper da Groq
+// primeiro; se falhar, a transcrição do Tomar nota). O áudio não fica guardado: só o texto volta.
 
 import {
   TAXA_DA_FALA, tipoDeGravacao, mixarEmMono, reamostrar, pcm16DeFloat, picoDaFala, cortesNaPausa, juntarTranscricoes,
@@ -51,8 +51,9 @@ export async function comecarGravacao() {
   };
 }
 
-/** A gravação → { segundos, pico, pedacos: [base64 de WAV mono 16 kHz] }. */
-export async function falaEmWav(blob) {
+/** A gravação → { segundos, pico, pedacos: [base64 de WAV mono 16 kHz] }. `desde` (segundos): o começo
+ *  que fica de fora — na Conversa livre a gravação corre antes de a pessoa falar (conversaPorGravacao.js). */
+export async function falaEmWav(blob, { desde = 0 } = {}) {
   const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   // 44,1 kHz é a taxa que todo navegador aceita num OfflineAudioContext; a redução para 16 kHz é nossa
   const ctx = new Offline(1, 1, 44_100);
@@ -63,7 +64,8 @@ export async function falaEmWav(blob) {
   });
   const canais = [];
   for (let c = 0; c < audio.numberOfChannels; c++) canais.push(audio.getChannelData(c));
-  const pcm = pcm16DeFloat(reamostrar(mixarEmMono(canais), audio.sampleRate, TAXA_DA_FALA));
+  const tudo = pcm16DeFloat(reamostrar(mixarEmMono(canais), audio.sampleRate, TAXA_DA_FALA));
+  const pcm = desde > 0 ? tudo.subarray(Math.min(tudo.length, Math.floor(desde * TAXA_DA_FALA))) : tudo;
   return {
     segundos: pcm.length / TAXA_DA_FALA,
     pico: picoDaFala(pcm),
@@ -71,19 +73,37 @@ export async function falaEmWav(blob) {
   };
 }
 
-/** Os pedaços → o texto (cada um leva o fim do anterior, para a emenda sair certa). */
-export async function transcreverFala(pedacos, { sinal } = {}) {
+/** Um pedaço não espera mais que isto pela transcrição: sem resposta, vira erro (e não "transcrevendo…" para sempre). */
+const TETO_DA_TRANSCRICAO_MS = 40_000;
+
+/** Os pedaços → o texto (cada um leva o fim do anterior, para a emenda sair certa). Vão como `comando`:
+ *  o Whisper da Groq primeiro, mais rápido (src/lib/transcricaoDaFala.js). `aoResultado` recebe
+ *  { motor, aviso } de cada pedaço — quem transcreveu, para o registro. */
+export async function transcreverFala(pedacos, { sinal, aoResultado } = {}) {
   const textos = [];
   for (const data of pedacos) {
-    const r = await fetch("/api/notas/trecho", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ anterior: (textos.at(-1) || "").slice(-240), audio: { mimeType: "audio/wav", data } }),
-      signal: sinal,
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.ok) throw new Error(d.error || `a transcrição falhou (HTTP ${r.status})`);
-    textos.push(d.texto || "");
+    const teto = new AbortController();
+    const relogio = setTimeout(() => teto.abort(), TETO_DA_TRANSCRICAO_MS);
+    const desistir = () => teto.abort();
+    sinal?.addEventListener?.("abort", desistir);
+    try {
+      const r = await fetch("/api/notas/trecho", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ comando: true, anterior: (textos.at(-1) || "").slice(-240), audio: { mimeType: "audio/wav", data } }),
+        signal: teto.signal,
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) throw new Error(d.error || `a transcrição falhou (HTTP ${r.status})`);
+      try { aoResultado?.({ motor: d.motor, aviso: d.aviso }); } catch { /* o registro não derruba a fala */ }
+      textos.push(d.texto || "");
+    } catch (e) {
+      if (e?.name === "AbortError" && !sinal?.aborted) throw new Error(`a transcrição não respondeu em ${TETO_DA_TRANSCRICAO_MS / 1000} s`);
+      throw e;
+    } finally {
+      clearTimeout(relogio);
+      sinal?.removeEventListener?.("abort", desistir);
+    }
   }
   return juntarTranscricoes(textos);
 }

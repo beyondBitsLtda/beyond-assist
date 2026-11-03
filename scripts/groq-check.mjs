@@ -134,5 +134,40 @@ console.log("\n7) uma conversa inteira, ida e volta");
   conferir("a ordem das mensagens se mantém", m.map((x) => x.role).join(",") === "system,user,assistant,tool");
 }
 
+console.log("\n6) a fala do microfone pelo Whisper (transcreverNaGroq, BEYOND-0011), sem rede");
+{
+  // um módulo novo (o ?fala), lido já com duas chaves: a primeira responde 429, a segunda transcreve
+  process.env.GROQ_API_KEYS = "chave-a,chave-b";
+  const pedidos = [];
+  const status = [429, 200];
+  const fetchDeVerdade = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (!String(url).includes("api.groq.com/openai/v1/audio/transcriptions")) return new Response("[]", { status: 200 });
+    pedidos.push({ chave: init.headers?.authorization, corpo: init.body });
+    const s = status.shift();
+    return s === 200
+      ? new Response(JSON.stringify({ text: " Oi, Lisa.", segments: [{ text: " Oi, Lisa.", no_speech_prob: 0.01, avg_logprob: -0.2 }] }), { status: 200 })
+      : new Response("Rate limit reached. Please try again in 2s.", { status: s });
+  };
+  try {
+    const { transcreverNaGroq, GROQ_MODELS } = await import("../src/lib/groq.js?fala");
+    const r = await transcreverNaGroq({ mimeType: "audio/wav", data: btoa("RIFF....WAVE") }, { dica: "Conversa com a Lisa, a assistente." });
+    conferir("devolve o JSON do Whisper", r?.text === " Oi, Lisa." && r?.segments?.length === 1);
+    conferir("429 numa chave: tenta a outra", pedidos.length === 2 && pedidos[0].chave !== pedidos[1].chave, pedidos.map((p) => p.chave).join(" · "));
+    const corpo = pedidos[1]?.corpo;
+    conferir("manda o áudio como arquivo WAV", corpo?.get("file") instanceof Blob && corpo.get("file").type === "audio/wav");
+    conferir("Whisper turbo, em português, temperatura 0, verbose_json",
+      corpo?.get("model") === "whisper-large-v3-turbo" && corpo?.get("language") === "pt" && corpo?.get("temperature") === "0" && corpo?.get("response_format") === "verbose_json");
+    conferir("a dica (o nome Lisa) vai como prompt", corpo?.get("prompt") === "Conversa com a Lisa, a assistente.");
+    conferir("o painel de chaves enxerga o modelo de fala", GROQ_MODELS.fala === "whisper-large-v3-turbo" && Boolean(GROQ_MODELS.chat));
+    status.push(500, 500);
+    let erro = null;
+    await transcreverNaGroq({ mimeType: "audio/wav", data: btoa("x") }).catch((e) => { erro = e; });
+    conferir("as duas chaves fora: levanta erro (quem chama cai para o Gemini)", erro instanceof Error, String(erro));
+  } finally {
+    globalThis.fetch = fetchDeVerdade;
+  }
+}
+
 console.log(falhas ? `\n${falhas} FALHA(S)\n` : "\nTUDO PASSOU\n");
 process.exit(falhas ? 1 : 0);

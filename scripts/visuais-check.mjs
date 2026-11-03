@@ -288,6 +288,19 @@ console.log("as brincadeiras do Rosto (02/11/2026: \"bater no vidro e falar toc 
   conferir("o Assistente liga as brincadeiras (no computador e no celular); a galeria do /visual, não",
     (pagina.match(/<VisualDaLisa [^>]*brincadeiras \/>/g) || []).length === 2 && /<VisualDaLisa key=\{`grande-\$\{naPrevia\}`\}[^>]*brincadeiras \/>/.test(ler("src/app/(panels)/visual/page.js")) && /<VisualDaLisa modo=\{x\.id\} obterSinal=\{obterSinal\} ocupacao=\{0\.82\} \/>/.test(ler("src/app/(panels)/visual/page.js")));
   conferir("o seletor passa adiante", /brincadeiras=\{brincadeiras\}/.test(ler("src/components/panels/visuais/VisualDaLisa.js")));
+  // BEYOND-0012: abrir o Assistente com o Rosto travava a página (30 s medidos no Edge com WebGL por
+  // software): o primeiro render() esperava compilar um shader com nove cópias da cena
+  const chamadasDaCena = (rosto.match(/cena\(/g) || []).length - 1; // menos a declaração
+  conferir("o shader chama a cena só duas vezes (a marcha e o laço da normal), e a normal uma vez",
+    chamadasDaCena === 2 && (rosto.match(/normalEm\(p, /g) || []).length === 1, `cena: ${chamadasDaCena}`);
+  conferir("os laços começam num uniform (o compilador não os desenrola)",
+    /uniform int uZero;/.test(rosto) && /for \(int i = uZero; i < 80; i\+\+\)/.test(rosto) && /for \(int i = uZero; i < 4; i\+\+\)/.test(rosto) && /uZero: \{ value: 0 \}/.test(rosto) && !/for \(int i = 0;/.test(rosto));
+  conferir("a normal do tetraedro tem os mesmos quatro cantos de antes", (() => {
+    const canto = (i) => [((i + 3) >> 1) & 1, (i >> 1) & 1, i & 1].map((b) => 2 * b - 1).join();
+    return [0, 1, 2, 3].map(canto).join(" ") === "1,-1,-1 -1,-1,1 -1,1,-1 1,1,1";
+  })());
+  conferir("compila em paralelo antes do primeiro quadro, sem travar a página",
+    /renderer\.compileAsync\(cena, camera\)\.then\(comecar, comecar\)/.test(rosto) && !/\n    quadro = requestAnimationFrame\(animar\);\n/.test(rosto) && /vivo = false;/.test(rosto));
 }
 
 console.log("preferência no navegador");

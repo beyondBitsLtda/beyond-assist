@@ -9,14 +9,33 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.36.0-cloudflare-pages.1",
-  "atualizadoEm": "2026-11-02",
+  "versao": "0.36.1-cloudflare-pages.1",
+  "atualizadoEm": "2026-11-03",
   "compilacao": {
-    "numero": 69,
-    "data": "2026-11-02",
+    "numero": 70,
+    "data": "2026-11-03",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.36.1-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "O microfone transcreve em menos de um segundo e acerta o nome da Lisa, a Conversa livre volta a funcionar no celular, a Lisa nunca mais fica em \"processando\" sem responder, e abrir o Assistente com o Rosto não trava mais o navegador.",
+      "itens": [
+        "A fala do microfone (chat, modo voz e Conversa livre) é transcrita pelo Whisper da Groq, que devolve uma frase curta em menos de um segundo; se a Groq falhar, a transcrição do Gemini de antes atende. O Tomar nota continua só no Gemini.",
+        "\"Oi Elisa\", \"Liza\" e parecidos viram \"Lisa\" quando a pessoa chama por ela (no começo da fala, depois de um cumprimento ou entre vírgulas); no meio de uma frase, como \"pergunte à Elisa do RH\", o nome fica como veio.",
+        "Conversa livre no celular: escuta gravando com o mesmo microfone do chat e percebe o fim da fala pelo silêncio, sem o reconhecimento de voz do navegador, que no Android caía quando a esfera abria o microfone ao mesmo tempo. O microfone fecha enquanto ela responde e reabre quando ela termina de falar.",
+        "Quando o celular recusava tocar a voz, a Lisa ficava \"falando\" para sempre e a Conversa livre nunca voltava a ouvir. Agora a voz recusada é encerrada, e a espera pela fala dela tem teto de 4 minutos.",
+        "Resposta vazia do modelo, ou conexão que cai antes do fim: a Lisa diz o que houve em vez de ficar em \"processando\". Os erros do servidor passam a aparecer também na bolha do chat do celular e na fala.",
+        "Abrir o Assistente com o visual Rosto travava a página por segundos (30 s medidos com WebGL por software): o primeiro quadro esperava compilar um shader com nove cópias da cena. A cena agora é chamada duas vezes, os laços não são desenrolados pelo compilador e o shader compila em paralelo; o rosto entra quando fica pronto, com a página respondendo. No teste, o maior travamento caiu de 30,7 s para 0,08 s."
+      ],
+      "issues": [
+        "BEYOND-0011",
+        "BEYOND-0012"
+      ]
+    },
     {
       "versao": "0.36.0-cloudflare-pages.1",
       "data": "2026-11-02",
@@ -1060,7 +1079,7 @@
         "Contexto da conversa em qualquer modo: o + da barra anexa imagens (do computador, com Ctrl+V ou arrastando) e vincula até 3 repositórios do GitHub; a cada pergunta a Lisa lê os arquivos do repositório que interessam, escolhidos pela pergunta, pela conversa e pelo que aparece na tela, na câmera e nos prints, e responde relacionando tudo, com o caminho de cada arquivo.",
         "Modo Tomar nota (celular e desktop, também com a tela apagada no Android): escuta até 10 minutos, transcreve, separa por assunto e anota no quadro \"Notas\" do Abacato, com uma coluna por tema e um card por nota (interpretação + transcrição real).",
         "Instalável como app pelo Chrome (desktop e Android) e pela Tela de Início no iPhone, com atalho direto para o Modo Tomar nota.",
-        "Microfone do celular como o do WhatsApp, no chat e no modo voz: segurar grava, soltar envia, deslizar para a esquerda cancela e para cima trava; o áudio é transcrito no servidor (a mesma transcrição do Tomar nota) e não fica guardado.",
+        "Microfone do celular como o do WhatsApp, no chat e no modo voz: segurar grava, soltar envia, deslizar para a esquerda cancela e para cima trava; o áudio é transcrito no servidor (Whisper da Groq, com a transcrição do Gemini de reserva), o nome da Lisa sai certo e o áudio não fica guardado. No celular, a Conversa livre também escuta gravando e percebe o fim da fala pelo silêncio.",
         "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma, Anel de partículas e Rosto (um retrato térmico: borda quente e halo; a garganta esquenta com a fala, as orelhas acendem ouvindo e uma onda de calor sobe pela cabeça pensando; cabelo longo ou raspado e seis paletas de cor; parada e sem ninguém mexer, ela brinca: bate no vidro como numa porta, joga videogame, cantarola ou fica presa no vidro como um mímico); o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador). No modo MVP, o usuário tem só a Esfera de pontos (padrão) e o Rosto.",
         "Painel Sentinela de casos de teste e chamados.",
         "Editor de código da conversa colaborativo: abas editáveis, abas suas com o seu código e a Lisa reescrevendo em cima a pedido, com o que está na IDE indo junto das perguntas.",
@@ -1091,7 +1110,7 @@
       "Supabase auto-hospedado em Docker (PostgreSQL 17.6 + pgvector, PostgREST, Auth)",
       "Cloudflare Tunnel (cloudflared)",
       "Google Gemini (chat gemini-3.6-flash, embeddings, voz gemini-3.8-flash-tts com reserva gemini-3.1-flash-tts-preview)",
-      "Groq (modelos de linguagem, em rodízio de chaves)",
+      "Groq (modelos de linguagem e o Whisper para a fala do microfone, em rodízio de chaves)",
       "Three.js",
       "MediaPipe Tasks Vision",
       "Monaco Editor",
@@ -1179,7 +1198,7 @@
       },
       {
         "nome": "Groq",
-        "descricao": "Modelos de linguagem alternativos, com rodízio de chaves.",
+        "descricao": "Modelos de linguagem alternativos (Lisa Code) e a transcrição da fala do microfone (Whisper, whisper-large-v3-turbo), com rodízio de chaves.",
         "url": "https://api.groq.com"
       },
       {
