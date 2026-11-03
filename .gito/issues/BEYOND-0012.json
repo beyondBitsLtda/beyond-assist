@@ -1,0 +1,46 @@
+{
+  "id": "BEYOND-0012",
+  "titulo": "Modo processmap",
+  "descricao": "- quando eu aciono o modo assistente ela trava o navegador e so depois de segundos volat a funcionar.",
+  "tipo": "bug",
+  "prioridade": "media",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-03",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T15:15:07.796Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T16:18:09.305Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T15:48:13.864Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Confirmado com você: trava ao abrir o Assistente (vindo do ProcessMap), no computador e no celular. Vou medir o que a tela do Assistente faz ao abrir (perfil de CPU num navegador, com a Lisa rodando localmente) e tirar do caminho o que segura a tela.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T16:18:09.305Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Corrigido na Lisa 0.36.1-cloudflare-pages.1 (publicada, commit 5680d31). Causa medida: com o visual Rosto, o primeiro quadro esperava compilar o shader do rosto com a página parada (30,7 s no Edge com WebGL por software; segundos numa placa de verdade). Com Esfera, Plasma e Orbe não travava. O shader chamava a cena (busto, mãos, videogame) nove vezes, e o compilador do Windows e do celular copia tudo em cada chamada. Agora são duas chamadas, os laços não são desenrolados, e o shader compila em paralelo (compileAsync): a página responde enquanto compila e o rosto entra quando fica pronto, esquentando do preto como antes. No mesmo teste, o maior travamento caiu para 0,08 s, e o print confirma o rosto igual ao de antes.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T15:15:07.796Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T15:48:13.864Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T16:18:09.305Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "id": "BEYOND-0013",
+  "titulo": "Process Map",
+  "descricao": "- Hoje o modo de desenho da lisa no prcess map ta muito ruim , por exemplo, se eu não falo com ela qual é o projeto que ela deve escrever ela supoe um e isso ta errado eu devo dizer explicitamente para ela , s eeu \nquero que desnehe em um projetoe specifico, se eu nao faar ela tem que enetdner que é um desneho avulso e a partr desse desenho avulso eu decido se vou criar um projeto para ele ou salvar em ume xistente.",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-03",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T15:17:56.060Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T16:48:11.388Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T16:18:25.691Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou mudar a regra: a Lisa só trabalha num projeto do ProcessMap quando você diz qual (\"no projeto X\"). Sem projeto citado, todo desenho novo é avulso, no quadro, e é você quem decide no \"salvar\" se cria um projeto para ele ou guarda num que já existe. Mudar o desenho que está aberto no quadro continua valendo nele.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T16:48:11.388Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito na Lisa 0.37.0-cloudflare-pages.1 (publicada, commit f1950c1). A Lisa só trabalha num projeto do ProcessMap quando você fala dele (\"no projeto X\", o nome pode vir pela metade ou com erro, inclusive \"no projto X\"), quando você nomeia um desenho salvo, ou quando mexe no desenho aberto no quadro, que já é de um projeto. Desenho novo sem projeto sai avulso no quadro, com o aviso de que o 💾 salvar guarda num projeto existente ou num novo. \"No projeto\" sem um nome que bata vale o projeto do quadro ou o último citado na conversa; sem nenhum dos dois, ela pergunta qual, com os nomes, em vez de escolher o mais recente. Testes: fluxogramas-check (casos novos da regra) passou.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T15:17:56.060Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T16:18:25.691Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T16:48:11.388Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

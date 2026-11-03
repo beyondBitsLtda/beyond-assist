@@ -1,0 +1,52 @@
+{
+  "id": "BEYOND-0016",
+  "titulo": "Modo recados: proof.lisa",
+  "descricao": "- cada jogador vai ganhar um mensageito e uma caixa de correio\n- acda jogador vai poder mandar recados uns para os outrso , esse scomentarios serão avaliadso pelo jogador que recebe e em aso de o joagdorque rece achar util ambos ganha, moedas\n- vai ser possivel mandar perguntas dos quizzes via correio, vai funcionar assim: eu comecei um quizz diario eu posos mandar ate duas perguntas por coreio para jogadres senod asism eu poss finalzar o quiz respndei apenas 3 perguntas (porem ganho moedas reduzidas) inclusive eu poso mandar as pergunts que eu errei sendo asism que posos finalizaro quizzbaer aofensiva e pontuar porme mandando para os outrso joagdores,\n- A lisa vai poder faezr isso tamebm nos quiszes dela, porem os jogadres nao vao pdoer mandar pergunats a ela apenas ela a eles, alemd e pergunats a lis apoder amandar recadinhos tamebm (e aqui ea ev mandar o rcaod com base no mundo e nas estatscas d ecada joagdor como contexto.",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-19",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T15:30:37.399Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T18:19:04.400Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T17:23:37.553Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou começar o correio: um mensageiro e uma caixa de correio por jogador, recados avaliados por quem recebe (útil = os dois ganham moedas), perguntas do quiz mandadas por correio (até 2 por quiz, terminando com 3 respondidas e moedas reduzidas) e a Lisa mandando perguntas e recados com base nas estatísticas de cada um.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T17:40:09.600Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito no Lisa_Proof 0.46.0-cloudflare-pages.1 (publicado, commit 3e074c3; migração db/027 aplicada). Cada jogador tem o mensageiro 🕊️ e a caixa (tela Correio, menu Jogo): recebidas, enviadas e escrever, até 5 recados por dia. Quem recebe avalia: útil, os dois ganham 🪙 15 (quem manda ganha de até 3 recados úteis por dia, e o mesmo par rende uma vez por dia, para não virar farm). No quiz do dia, \"📮 Mandar esta por correio\" antes de responder ou depois de errar: até 2 perguntas vão para outros jogadores e saem do placar; o quiz termina com pelo menos 3 respondidas, conta para a ofensiva e para concluir o assunto (nota sobre as respondidas), mas vale menos (só os acertos, vezes 0,7, sem o bônus de gabaritar). Quem recebe responde na caixa: acertou, 🪙 10 para ele e 🪙 5 para quem mandou. A Lisa usa o correio pela rotina dela (às vezes manda uma pergunta do quiz, todo fim de tarde um recadinho a partir dos pontos da semana e do Reino da pessoa, e avalia os recados que recebe); ninguém manda pergunta para ela, recado pode. Testes: 215 casos do dominio-check; tela conferida no celular; leitura da caixa e dos destinatários conferida no banco real. Não mandei nenhum recado de teste para não chegar mensagem a uma pessoa de verdade.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T18:19:04.400Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Ajuste no Lisa_Proof 0.47.0-cloudflare-pages.1 (publicado, commit 2e78405): o correio aparece no Reino — a caixa no poste, perto da praça, com o pombo-carteiro; a bandeirinha sobe e o rótulo fica vermelho quando chega carta nova (atualiza a cada minuto), e tocar na caixa abre as cartas ali mesmo para avaliar o recado ou responder a pergunta. Sobre as moedas da Bolsa: conferido no banco, nenhuma ação sumiu sem pagamento; o fechamento paga o preço do dia (decidido manter assim).",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T15:30:37.399Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T17:23:37.553Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T17:40:09.600Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

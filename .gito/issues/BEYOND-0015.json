@@ -1,0 +1,46 @@
+{
+  "id": "BEYOND-0015",
+  "titulo": "Modo gestão de chamados - proof.beyond",
+  "descricao": "- Crie uma tela de gerenciamento de chamados, essa tela vai pegar os chamdos abertos  mostrar para o tecnico e o requsitanet o sstaus dos chamdos , o tecnico ve d etdoos e o requisitanet ve os seus inclusive co previsça de termino",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-03",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T15:26:59.411Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T16:48:11.488Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T16:24:47.493Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou criar a tela Chamados no Proof (/chamados), lendo os chamados do quadro \"Chamados — Lisa Proof\" do Abacato. Quem abriu vê os seus: status, aberto em, previsão de término (o prazo do card) e a última resposta do técnico. O técnico (a conta administradora do Proof) vê todos, com quem abriu, e ali mesmo muda o status, marca a previsão e responde.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T16:48:11.488Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito no Lisa_Proof 0.44.0-cloudflare-pages.1 (publicado em proof.beyond.dev.br, commit c280758). Tela Chamados (/chamados, no menu \"Você\"; no celular, em \"Mais\"). Quem abriu vê os seus: status (aberto, em análise, resolvido), quando abriu, o relato, a previsão de término (vermelha quando passou) e as respostas do técnico. O técnico (a conta administradora) vê todos, com o nome de quem abriu, e ali mesmo muda o status, marca ou tira a previsão e responde. Tudo continua no card do quadro \"Chamados — Lisa Proof\" do Abacato: coluna = status, prazo = previsão, comentário = resposta. Conferido com os dados reais em modo leitura: o técnico vê os 12 chamados; quem abriu vê só os seus, sem o nome dos outros. Telas conferidas no computador e no celular.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T15:26:59.411Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T16:24:47.493Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T16:48:11.488Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

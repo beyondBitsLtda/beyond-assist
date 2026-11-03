@@ -1,0 +1,46 @@
+{
+  "id": "BEYOND-0017",
+  "titulo": "exercicios diarios pontuação - proof.beyond",
+  "descricao": "- Os pontos de exercico diario dvem ser triplicados ",
+  "tipo": "bug",
+  "prioridade": "media",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-12",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T15:31:30.519Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T16:18:09.415Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T16:03:33.820Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "O exercício do dia já valia o triplo desde 26/10 (até 120 pontos). Vou triplicar de novo, como pedido: até 360 com nota 100, mantendo a regra das rodadas extras (metade) e as moedas do Reino seguindo os pontos. O quiz do dia e os projetos ficam como estão.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T16:18:09.415Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito no Lisa_Proof 0.43.3-cloudflare-pages.1 (publicado em proof.beyond.dev.br, commit aa8c45f). O exercício do dia já valia o triplo desde 26/10 (até 120); agora vale o triplo de novo: até 360 pontos com nota 100, proporcional à nota (nota 50 = 180). A 2ª e a 3ª rodada do dia continuam valendo metade (até 180), e as moedas do Reino seguem os pontos. Vale daqui em diante; o já ganho fica como foi gravado. O quiz do dia e os projetos não mudaram. Testes do domínio: 200 casos passaram.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T15:31:30.519Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T16:03:33.820Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T16:18:09.415Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

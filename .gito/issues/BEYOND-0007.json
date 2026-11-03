@@ -1,0 +1,51 @@
+{
+  "id": "BEYOND-0007",
+  "titulo": "Lisa.Proof",
+  "descricao": "Problemas com o uso dos cadernos de anotações:\n- Não tem scrool pra rolar o contéudo das anaotações\n-  a versão mobile do caderno de notas e de leitura de livro estao inutilizaveis, muito dificil de usa rmuito mal programado para o mobile, devrima funcionar como um ereeder de qualdiade faria.",
+  "tipo": "bug",
+  "prioridade": "media",
+  "status": "concluida",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-07",
+  "versaoAlvo": "",
+  "criadaEm": "2026-10-31T22:53:59.680Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T15:07:34.116Z",
+  "comentarios": [
+    {
+      "quando": "2026-10-31T23:10:05.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou testar logado no celular e no tablet emulados: a rolagem das anotações (caderno, prévia, painel do leitor), o editor do caderno e o leitor de PDF, e deixar a leitura com cara de leitor digital (página cheia, virar página com toque, controles que somem).",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-01T00:22:11.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Corrigido no Lisa_Proof 0.43.0-cloudflare-pages.1 (publicado). Rolagem: o editor do caderno não rolava em nenhum aparelho (a página crescia até o tamanho do texto e o fim ficava inalcançável) — corrigido e testado com o dedo e com a roda do mouse. Celular: caderno e leitor em tela cheia (sem o topo e a barra de abas do app); caderno sem a margem dos números e com letra de leitura nas páginas de texto. Leitor como leitor digital: tocar no meio esconde e mostra os controles, nas laterais avança e volta; novo modo texto (botão Aa) com o texto da página em letra grande, tamanho ajustável e o tema do leitor. Para conferir: abrir um caderno longo e um livro no celular.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-10-31T22:53:59.680Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-10-31T23:10:05.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-01T00:22:11.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-11-03T15:07:34.116Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "id": "BEYOND-0011",
+  "titulo": "Microfone versão mobile",
+  "descricao": "- Hoje eu acho que a função de mirofone dmeor amuito trasncrever e passar a lisa o comando tanto no modo chat como no modo conversa.\n- Hoje  o modo conversa nao funciona a lisa fica pensando e nao faz nads nunca responde de volta\n- a qualidade da trasncrição tem que melhroar ta muito ruim eu falo oi lisa  e ela enetnde oi Elisa por exemplo",
+  "tipo": "bug",
+  "prioridade": "alta",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-05",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T15:10:48.806Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T16:18:09.204Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T15:32:13.485Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou olhar os três pontos na Lisa (branch cloudflare-pages): (1) o microfone no celular, no chat e no modo conversa — como a fala vira texto e chega à Lisa; (2) o modo conversa que fica pensando e não responde — achar onde a vez trava e garantir que ela sempre responda ou diga o erro; (3) a transcrição (\"oi Lisa\" virando \"oi Elisa\") — corrigir o nome dela e o que mais der para melhorar no reconhecimento.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T16:18:09.204Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Corrigido na Lisa 0.36.1-cloudflare-pages.1 (publicada em lisa.beyond.dev.br, commit 5680d31). (1) Demora: a fala do microfone (chat, modo voz e Conversa livre) agora é transcrita pelo Whisper da Groq, que devolve uma frase curta em menos de 1 s; se a Groq falhar, a transcrição do Gemini de antes atende. (2) Conversa livre no celular: escuta gravando com o mesmo microfone do chat e percebe o fim da fala pelo silêncio, sem o reconhecimento do navegador, que caía no Android. A causa do \"fica pensando e nunca responde\": quando o celular recusava tocar a voz, a Lisa ficava \"falando\" para sempre e a conversa nunca voltava a ouvir; agora isso é encerrado, e a espera tem teto. Resposta vazia ou conexão cortada também viram aviso, em vez de \"processando\". (3) \"oi Elisa\", \"Liza\" e parecidos viram \"Lisa\" quando você chama por ela. Testado: regras e ligações (microfone-check, groq-check) e a conversa gravando no Edge com microfone simulado (4 voltas: ouvir, transcrever, responder, ouvir). A Groq só dá para conferir no aparelho: no Registro da Conversa livre aparece \"transcrito por Whisper (Groq)\".",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T15:10:48.806Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T15:12:10.997Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "descrição alterada"
+    },
+    {
+      "quando": "2026-11-03T15:32:13.485Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T16:18:09.204Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

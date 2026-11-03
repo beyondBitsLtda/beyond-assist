@@ -1,0 +1,52 @@
+{
+  "id": "BEYOND-0014",
+  "titulo": "Modo novo para o proof.beyond",
+  "descricao": "- Quero que a Lisa jogue quero que ela escolha um curso de tecnologia todo mes e finalize ele , quero que ela faça os quizzes exerciciso semanais  diarios d eentrega\n- quero que ela jogue o modo reino, melhroe seu reino, compre açoes , ataque outrso jogadores etc.\n- para isso cire uam rotian paar lisa jogar imitando um jogador fazendo coisa qu e joagdores fazem\n- o reino dlea deve ser visivel paar todos verem, como tuido que ela faz curss atividades o raio x dela ,ofensiva moedas qu ela vomprou etc\n\n- ela nao deve subr arquivos no modo acervo, as ela toda seman deve alimentar ali com videos sobre tecnologia, links de artigos etc.\n=- ela deve criar seeus cardernos de nota etc.\n- ela dve imitar e faezr o progresos nos cursos como alguem d everdade ous eja melhroando as acertividades e aprendnedo com o processo.",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-13",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T15:23:08.373Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T18:19:04.249Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T16:48:11.572Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou fazer a Lisa jogar com uma conta nova só dela (decidido com você), marcada como jogadora-robô, com reino, cursos e cadernos próprios e visíveis a todos. A rotina roda pelo relógio do iMac.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T17:23:37.464Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito no Lisa_Proof 0.45.0-cloudflare-pages.1 (publicado, commit 19695e5). A Lisa tem conta própria (\"Lisa robô\", marcada como robô, sem senha conhecida) e joga pelas mesmas funções das telas, por uma rotina de hora em hora (scripts/lisa-joga.mjs): curso de tecnologia do mês criado pela IA no perfil livre (entrega por texto ou diagrama, sem GitHub), teoria, quiz, exercício, projeto da semana (quando termina os assuntos ou a semana acaba), mina, Reino (melhora com reserva, treina, invade alguém do tamanho dela), Bolsa (das 7h às 17h), caderno (domingo e quarta) e Acervo (domingo: um vídeo e um artigo de verdade achados numa busca, para os bibliotecários aprovarem). Ela acerta como quem aprende: ~55% no começo do mês, subindo até ~90%, e os erros recentes puxam para baixo. Tudo aparece para todos na página \"Lisa joga\" (menu Jogo). Primeira passada feita hoje: curso \"Redes de Computadores\", 3 itens de teoria, quiz nota 60, exercício de diagrama nota 55, cofre melhorado, uma página no caderno. FALTA LIGAR O RELÓGIO NO IMAC (eu não alcanço a rede de casa): na pasta do lisa-proof, com o .env.local, pôr no crontab: 15 7-22 * * * cd <pasta>/Abacatosys/lisa-proof && /usr/bin/flock -n /tmp/proof-lisa.lock npm run lisa-joga >> ~/proof-lisa.log 2>&1 (está também no LEIAME).",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T18:19:04.249Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Ajustes no Lisa_Proof 0.47.0-cloudflare-pages.1 (publicado, commit 2e78405), a pedido: (1) modo espectador — na página \"Lisa joga\", \"👀 Ver tudo da Lisa por dentro\" abre o Proof dela nas mesmas telas que as suas (Reino, trilhas, Prática, cadernos, Bolsa, Raio-X), só para olhar, com \"Voltar para o meu\" na faixa do topo; (2) sem GitHub — o projeto de programação dela vai em arquivos, com a mesma correção da IA, e ela escreve o código do exercício do dia, então os cursos dela voltam a incluir programação; (3) o reino dela agora se chama \"Cidadela da Lisa\" e ela resgatou o vale de boas-vindas (🪙 450).",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T15:23:08.373Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T16:48:11.572Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T17:23:37.464Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

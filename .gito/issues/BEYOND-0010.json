@@ -1,0 +1,57 @@
+{
+  "id": "BEYOND-0010",
+  "titulo": "lisa.beyond - Uso do process Map",
+  "descricao": "Quero que a lisa desenhe processos na tela usando o processmap (a mesma aplciaçãoq ue ja esta com o codigo no lisa proof) , para ela fazer isso eu tenho que deliberadamente solictar a ela que desnehe o processo de laho e dali podemos conversar sobre , eu aletrar o fluxo dela e ela interagir com esse fluxo, alemd esse modo poder funioanrjuto com a IDE de codigo ",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "concluida",
+  "responsavel": "",
+  "prazo": "",
+  "versaoAlvo": "",
+  "criadaEm": "2026-10-31T22:58:33.942Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T15:07:41.208Z",
+  "comentarios": [
+    {
+      "quando": "2026-10-31T23:52:40.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou levar o quadro do ProcessMap (o mesmo do Lisa_Proof) para a Lisa: quando você pedir para ela desenhar um processo, ela monta o diagrama numa janela; você pode alterar o desenho e ele vai junto (em texto) nas perguntas seguintes, então ela conversa sobre o fluxo como ficou. A janela convive com a IDE de código.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-01T00:22:11.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito na Lisa 0.16.0-cloudflare-pages.1 (publicada). Diga \"desenhe o processo de…\" (ou fluxograma, BPMN, arquitetura) e a Lisa monta o desenho num quadro — o mesmo ProcessMap do Lisa_Proof, com o tema dela —, em raias quando há responsáveis. Você mexe à vontade: o desenho vai em texto junto das perguntas, então ela conversa sobre o fluxo como ele está; pedidos de mudança (na conversa ou pela barra do quadro) partem do desenho da tela e mantêm no lugar o que você arrumou. O quadro convive com a IDE (cada um de um lado), e dá para pedir código a partir do fluxo. Testado com o Gemini de verdade (um processo de compras com 4 raias e uma mudança acrescentando o almoxarifado).",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-01T00:44:07.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "evidencias": [],
+      "texto": "Correção na Lisa 0.16.1-cloudflare-pages.1 (publicada): \"quero que desneho ess arquiettrua via processmap\" não era reconhecido (erro de digitação) e caía na conversa, que respondia com Mermaid no editor. Agora o pedido aguenta erro de digitação e citar o quadro (\"processmap\") já basta; desenhar \"essa arquitetura\" lê o repositório vinculado; e a aba do editor com Mermaid ganhou \"◇ desenhar no quadro\" (testado com o Mermaid do print: 5 raias, Sim/Não). Para conferir: repetir o pedido, ou abrir a aba #2 no editor e tocar em \"◇ desenhar no quadro\"."
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-10-31T22:58:33.942Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-10-31T23:52:40.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-01T00:22:11.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-11-03T15:07:41.208Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
+    }
+  ]
+}

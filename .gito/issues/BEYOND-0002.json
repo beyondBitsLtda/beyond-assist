@@ -4,20 +4,37 @@
   "descricao": "Depois que trocamos para a hospedagem via cloudflare e alocamos o banoc e outros recursos no servidro caseiro o modulo de brincar com a Nlaa nõa funciona, mesmo na versão casa. ou na versão lisa.",
   "tipo": "bug",
   "prioridade": "baixa",
-  "status": "aberta",
+  "status": "concluida",
   "responsavel": "Brayan Rodrigues",
   "prazo": "2026-10-07",
   "versaoAlvo": "0.1.0",
   "criadaEm": "2026-09-27T05:16:52.307Z",
   "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
-  "atualizadaEm": "2026-09-27T05:16:52.307Z",
-  "comentarios": [],
+  "atualizadaEm": "2026-11-03T15:06:46.663Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-01T00:22:11.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Corrigido na Lisa 0.16.0-cloudflare-pages.1 (publicada; a versão casa pega na atualização das 3h30 ou rodando servidor/atualizar-lisa.sh). Causa: desde a migração para a Cloudflare (commit a14ac05), o ritmoRef do jogo estava declarado no componente errado (NalaField) e o LisaDisc usava um nome que não existia — escolher qualquer papel (EU LANÇO DAQUI / ESTA TELA É A NALA) derrubava a página com ReferenceError, nas duas versões. Para conferir: Assistente → Modo Interativo → Lançar Disco pra Nala (2 telas), um aparelho em cada papel; em até uns 6 s aparece \"OUTRA TELA CONECTADA\".",
+      "evidencias": []
+    }
+  ],
   "evidencias": [],
   "historico": [
     {
       "quando": "2026-09-27T05:16:52.307Z",
       "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
       "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-01T00:22:11.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-revisao"
+    },
+    {
+      "quando": "2026-11-03T15:06:46.663Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
     }
   ]
 }

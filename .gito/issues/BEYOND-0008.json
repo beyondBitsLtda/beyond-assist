@@ -1,0 +1,51 @@
+{
+  "id": "BEYOND-0008",
+  "titulo": "Lisa.Proof = Versão mobile ruim",
+  "descricao": "O aplicativo abre jogando os lementos todos para a esquerd ao inves de cebtralizar a interface está totalemnete desocnfigruada e mal adptada oa mobile. ",
+  "tipo": "melhoria",
+  "prioridade": "critica",
+  "status": "concluida",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-07",
+  "versaoAlvo": "",
+  "criadaEm": "2026-10-31T22:55:02.058Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T15:07:02.576Z",
+  "comentarios": [
+    {
+      "quando": "2026-10-31T23:10:05.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou reproduzir no celular emulado (viewport mobile, toque) já logado, medir qual elemento passa da largura da tela e empurra a página para a esquerda, corrigir e conferir de novo no celular e no tablet antes de publicar.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-01T00:21:53.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Corrigido no Lisa_Proof 0.43.0-cloudflare-pages.1 (publicado em proof.beyond.dev.br). Causa: na Início e na Biblioteca Colaborativa a página ficava mais larga que o celular (450 e 978 px numa tela de 390) — as grades cresciam até o conteúdo mais largo (o chip de anotação com o nome do caderno e da página; a prateleira que rola para o lado) — e o celular tirava o zoom, jogando tudo para a esquerda. As grades agora têm a largura da tela, o chip quebra a linha e, no celular, nada dentro do conteúdo alarga a página. Conferido logado num celular emulado: Início e acervo com 390 px; Trilhas, Prática, Reino, Cadernos, Biblioteca, Agenda, Domínio, Conquistas e as telas de detalhe já estavam certas. Para conferir: abrir o app no celular.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-10-31T22:55:02.058Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-10-31T23:10:05.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-01T00:21:53.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-11-03T15:07:02.576Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
+    }
+  ]
+}

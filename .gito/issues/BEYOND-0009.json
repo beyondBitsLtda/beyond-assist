@@ -1,0 +1,51 @@
+{
+  "id": "BEYOND-0009",
+  "titulo": "Lisa.beyond = IDE",
+  "descricao": "Eu gostaria que a IDE que a lisa abre na tela fosse colaborativa, ous eja eu por la o meu código tambem e pedir ela para analisar e escrever em cima dese codigo posto la.",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "concluida",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-07",
+  "versaoAlvo": "",
+  "criadaEm": "2026-10-31T22:56:53.689Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T15:07:16.250Z",
+  "comentarios": [
+    {
+      "quando": "2026-10-31T23:52:40.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou tornar a janela de código da Lisa colaborativa: dá para editar as abas, abrir uma aba \"Meu código\" e colar o seu código, e pedir à Lisa (na própria janela) para analisar ou alterar aquele código — ela reescreve na mesma aba, digitando como hoje. O código das abas vai junto com as perguntas, então a Lisa responde sobre o que está na tela.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-01T00:22:11.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito na Lisa 0.16.0-cloudflare-pages.1 (publicada em lisa.beyond.dev.br). A IDE ficou colaborativa: depois de digitada, toda aba é editável (com o realce); \"＋ meu código\" abre uma aba sua para colar ou escrever, com nome e linguagem; a barra \"pedir à Lisa\" manda o pedido com o código da aba e a resposta dela é escrita em cima da aba quando termina, com \"↶ desfazer\". O que está escrito ou mudado na IDE vai junto de qualquer pergunta. O botão \"</> editor\" (canto de baixo) abre a IDE mesmo sem código da Lisa. Testado num ambiente isolado com os componentes reais (editar, colar, pedir, reescrever e desfazer).",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-10-31T22:56:53.689Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-10-31T23:52:40.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-01T00:22:11.000Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-11-03T15:07:16.250Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
+    }
+  ]
+}
