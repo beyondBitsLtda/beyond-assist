@@ -30,6 +30,11 @@ import {
   proximoAtaqueAoReino, esperaAte, HORAS_ENTRE_ATAQUES_AO_MESMO_REINO, batalhaDeExpedicao, CONSTRUCOES, exercitoDaExpedicao, caidasNoAtaque,
   NIVEIS_INICIAIS, producaoPorHora, ORDEM_DAS_CONSTRUCOES, poderDo,
 } from "../src/dominio/reino.js";
+import { ARTEFATOS, manaDe, pontosQueContam, podeForjar, efeitoDe, bonusDaPocao, PONTOS_POR_MANA } from "../src/dominio/forja.js";
+import { CHEFOES_DA_PROCRASTINACAO, chefaoDoAtraso, podeNascer, danoDosEstudos, danoDosCadernos, situacaoDoChefao, pesoDoAtraso, HORAS_ATE_O_PROXIMO } from "../src/dominio/chefoes.js";
+import { DUELO, PERGUNTAS_DO_DUELO, montarDuelo, respostasDaLisa, perguntaParaTela, corrigir, resultadoDoDuelo, movimentosDoDuelo, podeDuelar, segundosDoDuelo } from "../src/dominio/duelo.js";
+import { humorDoNeuro, diasSemEstudo, evolucaoDa, fatorDaMinaDoHumor, EVOLUCOES_DO_NEURO, DIAS_PARA_REVOLTAR } from "../src/dominio/humorDoNeuro.js";
+import { luzDaHora, tempoDoBloco, climaDoReino, textoDoClima, agoraEmBrasilia, TEMPOS } from "../src/dominio/clima.js";
 import {
   RIVAIS_DE_TESTE, FERRAMENTAS_DE_TESTE, reinoDoRival, reinoLiberado, reinoNovoDeTeste, urlNoMundo, ehRivalDeTeste,
 } from "../src/dominio/mundoDeTeste.js";
@@ -3374,8 +3379,9 @@ caso("Raposão: o personagem azul e branco, à venda por 610, e a área de prese
   assert.match(ler("../db/028-presentes.sql"), /create unique index if not exists proof_presentes_um_por_item on public\.proof_presentes \(usuario_id, tipo, item\)/);
   assert.match(ler("../src/componentes/Moldura.js"), /\{ href: "\/presentes", rotulo: "Presentes", Icone: IconePresentes, grupo: "Você" \}/);
   const novidades = ler("../src/componentes/Novidades.js");
-  assert.match(novidades, /EDICAO_DAS_NOVIDADES = "2026-11-03-raposao"/, "a edição nova aparece de novo para todo mundo");
-  assert.match(novidades, /personagem: "raposao", destaque: true/);
+  // a edição seguinte (03/11/2026, à noite) já trocou o Raposão pelo clima e pelas ideias da Lisa
+  assert.match(novidades, /EDICAO_DAS_NOVIDADES = "2026-11-03-clima-e-forja"/, "a edição nova aparece de novo para todo mundo");
+  for (const t of ["O Reino agora tem clima e anoitece", "O humor do Neuro", "Forja de Artefatos", "Chefões da Procrastinação", "Duelo de Lógica com a Lisa"]) assert.ok(novidades.includes(t), t);
 });
 caso("modo espectador: a tela também não deixa escolher nada (só olhar)", () => {
   const moldura = fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8");
@@ -3383,6 +3389,207 @@ caso("modo espectador: a tela também não deixa escolher nada (só olhar)", () 
   assert.match(moldura, /for \(const tipo of \["click", "submit", "change"\]\) document\.addEventListener\(tipo, travar, true\);/);
   assert.match(moldura, /document\.addEventListener\("focusin", tirarFoco, true\);/, "campos não recebem foco");
   assert.match(moldura, /const LIVRES = 'a\[href\], \[role="tab"\], summary, \[aria-expanded\], \.pf-espectador, \.rn-mundo__rotulo/, "navegar, abas, seções e as construções continuam");
+});
+
+caso("clima do Reino: a luz pela hora de Brasília e o tempo por blocos de 3 horas, igual para todos", () => {
+  assert.equal(luzDaHora(3).periodo, "madrugada");
+  assert.equal(luzDaHora(3).sol, 0);
+  assert.equal(luzDaHora(6).periodo, "amanhecer");
+  assert.ok(luzDaHora(6).sol > 0 && luzDaHora(6).sol < 1 && luzDaHora(6).quente > 0.5, "o amanhecer é dourado");
+  assert.equal(luzDaHora(12).sol, 1);
+  assert.equal(luzDaHora(12).quente, 0);
+  assert.equal(luzDaHora(18).periodo, "entardecer");
+  assert.equal(luzDaHora(20).periodo, "noite");
+  assert.equal(luzDaHora(20).sol, 0);
+  assert.ok(luzDaHora(7).lado < 0 && luzDaHora(17).lado > 0, "o sol nasce de um lado e se põe do outro");
+  assert.deepEqual(luzDaHora(26), luzDaHora(2), "a hora dá a volta");
+  // Brasília: 23h UTC são 20h aqui
+  assert.deepEqual(agoraEmBrasilia(new Date("2026-11-03T23:30:00Z")), { hora: 20.5, dia: "2026-11-03", mes: 11 });
+  assert.deepEqual(agoraEmBrasilia(new Date("2026-11-04T02:00:00Z")).dia, "2026-11-03", "à meia-noite UTC ainda é o dia anterior aqui");
+  // o mesmo bloco dá o mesmo tempo para todos; dentro do bloco, não muda
+  assert.deepEqual(tempoDoBloco("2026-11-03", 13, 11), tempoDoBloco("2026-11-03", 14.9, 11));
+  const contar = (mes) => {
+    const n = {};
+    for (let d = 1; d <= 28; d++) for (let b = 0; b < 8; b++) {
+      const { tempo, vento, intensidade } = tempoDoBloco(`2026-${String(mes).padStart(2, "0")}-${String(d).padStart(2, "0")}`, b * 3, mes);
+      assert.ok(TEMPOS[tempo]);
+      assert.ok(vento.forca >= 0 && vento.forca <= 1 && vento.direcao >= 0 && vento.direcao <= Math.PI * 2);
+      assert.ok(intensidade >= 0.75 && intensidade <= 1);
+      n[tempo] = (n[tempo] || 0) + 1;
+    }
+    return n;
+  };
+  const novembro = contar(11), julho = contar(7);
+  assert.ok(Object.keys(novembro).length >= 5, "o tempo varia ao longo do mês");
+  assert.ok(novembro.limpo > (novembro.chuva || 0), "céu limpo é o mais comum");
+  assert.ok((julho.neve || 0) > (novembro.neve || 0), "neve é mais comum no inverno daqui");
+  // o desenho: nuvens, chuva, neve, raios; e o selo
+  const c = climaDoReino(new Date("2026-11-03T23:30:00Z"), { tempo: "tempestade" });
+  assert.equal(c.tempo, "tempestade");
+  assert.equal(c.raios, true);
+  assert.ok(c.chuva > 0.7 && c.neve === 0 && c.escurece === 0.4);
+  assert.match(textoDoClima(c), /^⛈️ Tempestade · .+ · noite$/);
+  assert.match(textoDoClima(climaDoReino(new Date("2026-11-03T23:30:00Z"), { tempo: "limpo" })), /^🌙 Noite limpa · /, "de noite, céu limpo é lua");
+  assert.match(textoDoClima(climaDoReino(new Date(), { tempo: "neve", hora: 12 })), /^🌨️ Neve · .+ · dia$/);
+  assert.equal(climaDoReino(new Date(), { tempo: "inventado" }).tempo in TEMPOS, true, "tempo desconhecido não passa");
+  const mundo = fs.readFileSync(new URL("../src/componentes/reino/Mundo3D.js", import.meta.url), "utf8");
+  assert.doesNotMatch(mundo, /dataset\.tema === "escuro"/, "a noite do Reino é a do relógio, não a do tema");
+  assert.match(mundo, /const PINGOS = semMovimento \? 0 : 700, FLOCOS = semMovimento \? 0 : 450;/, "sem movimento, nada cai");
+  assert.match(mundo, /if \(clima\.raios && !cenarioDaIlha && !semMovimento\)/, "relâmpago só com movimento e fora das expedições");
+  assert.match(fs.readFileSync(new URL("../src/app/reino.css", import.meta.url), "utf8"), /background: var\(--rn-ceu, linear-gradient/);
+});
+
+caso("humor do Neuro: a sequência faz ele evoluir (mina com bônus); sumir por dias o revolta e fecha as expedições", () => {
+  assert.equal(diasSemEstudo(null, "2026-11-03"), null);
+  assert.equal(diasSemEstudo("2026-11-03", "2026-11-03"), 0);
+  assert.equal(diasSemEstudo("2026-11-02", "2026-11-03"), 1);
+  assert.equal(diasSemEstudo("2026-10-30", "2026-11-03"), 4, "atravessa o mês");
+  assert.equal(evolucaoDa(0).id, "comum");
+  assert.equal(evolucaoDa(3).id, "animado");
+  assert.equal(evolucaoDa(13).id, "radiante");
+  assert.equal(evolucaoDa(30).id, "lendario");
+  assert.ok(EVOLUCOES_DO_NEURO.every((e, i, l) => !i || (e.minimo > l[i - 1].minimo && e.bonus > l[i - 1].bonus)), "cada estágio pede mais dias e dá mais");
+  assert.ok(EVOLUCOES_DO_NEURO.at(-1).bonus <= 0.2, "bônus moderado");
+  const contente = humorDoNeuro({ ofensiva: { atual: 8, estudouHoje: true }, semEstudo: 0 });
+  assert.equal(contente.estado, "contente");
+  assert.equal(contente.humor, "comemorando");
+  assert.equal(contente.bonusDaMina, 0.1);
+  assert.equal(contente.expedicoesFechadas, false);
+  assert.equal(contente.proximo.id, "brilhante");
+  assert.equal(contente.proximo.faltam, 6);
+  assert.equal(fatorDaMinaDoHumor(contente), 1.1);
+  const risco = humorDoNeuro({ ofensiva: { atual: 4, estudouHoje: false }, semEstudo: 1 });
+  assert.equal(risco.estado, "em-risco");
+  assert.equal(risco.bonusDaMina, 0.05, "a sequência ainda vale até o dia acabar");
+  const chateado = humorDoNeuro({ ofensiva: { atual: 0, estudouHoje: false }, semEstudo: DIAS_PARA_REVOLTAR - 1 });
+  assert.equal(chateado.estado, "chateado");
+  assert.equal(chateado.humor, "triste");
+  assert.equal(chateado.expedicoesFechadas, false, "chateado só avisa");
+  const revoltado = humorDoNeuro({ ofensiva: { atual: 0, estudouHoje: false }, semEstudo: 5 });
+  assert.equal(revoltado.estado, "revoltado");
+  assert.equal(revoltado.humor, "bravo");
+  assert.equal(revoltado.expedicoesFechadas, true);
+  assert.equal(revoltado.bonusDaMina, 0);
+  assert.match(revoltado.texto, /5 dias sem estudo/);
+  const novo = humorDoNeuro({ ofensiva: { atual: 0, estudouHoje: false }, semEstudo: null });
+  assert.equal(novo.estado, "novo");
+  assert.equal(novo.expedicoesFechadas, false, "quem nunca estudou não começa com o Neuro revoltado");
+  // voltou a estudar: no mesmo dia ele desarma
+  assert.equal(humorDoNeuro({ ofensiva: { atual: 1, estudouHoje: true }, semEstudo: 0 }).estado, "contente");
+  const lib = fs.readFileSync(new URL("../src/lib/reino.js", import.meta.url), "utf8");
+  assert.match(lib, /if \(humor\.expedicoesFechadas\) throw new ErroDeAcesso\(400/, "o servidor barra a expedição, não só a tela");
+  assert.match(lib, /fatorDaMinaNaPaz\(\(await pazDeAgora\(\)\)\.paz, agora\) \* fatorDaMinaDoHumor\(await humorDoNeuroDe\(usuarioId\)\)/, "a coleta usa o bônus");
+  assert.match(lib, /if \(emTeste\(\)\) return \{ \.\.\.h, bonusDaMina: 0, expedicoesFechadas: false/, "no Reino de Teste só aparece");
+  assert.match(fs.readFileSync(new URL("../src/componentes/Neuro.js", import.meta.url), "utf8"), /export const HUMORES = \[[^\]]*"bravo"\]/);
+});
+
+caso("Forja de Artefatos: estudo vira mana; a poção rende +50% por 2 h (com teto) e o escudo protege 24 h, um a cada 3 dias", () => {
+  assert.equal(PONTOS_POR_MANA, 10);
+  assert.deepEqual(manaDe({ pontos: 435, gasta: 30 }), { ganha: 43, gasta: 30, disponivel: 13, proxima: 5 });
+  assert.equal(manaDe({ pontos: 100, gasta: 400 }).disponivel, 0, "nunca negativa");
+  assert.equal(pontosQueContam([{ tipo: "quiz", pontos: 90 }, { tipo: "conquista", pontos: 500 }, { tipo: "item", pontos: 10 }]), 100, "conquista não é tempo de estudo");
+  const agora = new Date("2026-11-03T15:00:00Z");
+  assert.equal(podeForjar({ item: "pocao", mana: 29, agora }).ok, false);
+  assert.match(podeForjar({ item: "pocao", mana: 29, agora }).motivo, /faltam 1 de mana/);
+  assert.equal(podeForjar({ item: "pocao", mana: 30, agora }).ok, true);
+  assert.equal(podeForjar({ item: "pocao", mana: 90, agora, forjados: [{ item: "pocao", inicio: "2026-11-03T14:00:00Z", ate: "2026-11-03T16:00:00Z" }] }).ok, false, "uma poção de cada vez");
+  assert.equal(podeForjar({ item: "pocao", mana: 90, agora, forjados: [{ item: "pocao", inicio: "2026-11-03T12:00:00Z", ate: "2026-11-03T14:00:00Z" }] }).ok, true);
+  assert.match(podeForjar({ item: "escudo", mana: 90, agora, forjados: [{ item: "escudo", inicio: "2026-11-02T15:00:00Z", ate: "2026-11-03T15:00:00Z" }] }).motivo, /próximo Escudo de Folga fica pronto em 48 h/);
+  assert.equal(podeForjar({ item: "escudo", mana: 90, agora, forjados: [{ item: "escudo", inicio: "2026-10-31T14:00:00Z", ate: "2026-11-01T14:00:00Z" }] }).ok, true, "passaram 3 dias");
+  assert.match(podeForjar({ item: "escudo", mana: 90, agora, escudoAte: "2026-11-04T10:00:00Z" }).motivo, /já está protegido/);
+  assert.equal(podeForjar({ item: "espada", mana: 999, agora }).ok, false);
+  assert.deepEqual(efeitoDe("pocao", agora), { inicio: "2026-11-03T15:00:00.000Z", ate: "2026-11-03T17:00:00.000Z" });
+  assert.equal(efeitoDe("escudo", agora, "2026-11-03T20:00:00Z").ate, "2026-11-04T20:00:00.000Z", "o escudo soma ao que resta");
+  assert.equal(bonusDaPocao(120), 60);
+  assert.equal(bonusDaPocao(5000), ARTEFATOS.pocao.tetoDoBonus, "com teto");
+  assert.equal(bonusDaPocao(0), 0);
+  const lib = fs.readFileSync(new URL("../src/lib/forja.js", import.meta.url), "utf8");
+  assert.match(lib, /update\(\{ liquidado_em: marca \}\)\.eq\("id", f\.id\)\.is\("liquidado_em", null\)/, "a poção paga uma vez só");
+  assert.match(lib, /await creditarMoedas\(usuarioId, "forja", bonus/);
+  assert.match(fs.readFileSync(new URL("../src/lib/reino.js", import.meta.url), "utf8"), /export function protegerReino\(usuarioId, ate\)[\s\S]*?noMundo\("real"/, "o escudo vai para o reino de verdade");
+});
+
+caso("Chefões da Procrastinação: o atraso vira chefão; os estudos (Prática e Cadernos em dobro) derrubam e pagam", () => {
+  assert.equal(pesoDoAtraso({ atrasados: 2, revisoesVencidas: 4 }), 10);
+  assert.equal(chefaoDoAtraso({ atrasados: 0, revisoesVencidas: 2 }), null, "atraso pequeno não vira chefão");
+  assert.equal(chefaoDoAtraso({ atrasados: 1, revisoesVencidas: 0 }).id, "lesma");
+  assert.equal(chefaoDoAtraso({ atrasados: 2, revisoesVencidas: 4 }).id, "hidra");
+  assert.equal(chefaoDoAtraso({ atrasados: 9, revisoesVencidas: 0 }).id, "tita");
+  assert.ok(CHEFOES_DA_PROCRASTINACAO.every((c, i, l) => !i || (c.vida > l[i - 1].vida && c.recompensa > l[i - 1].recompensa)));
+  const agora = new Date("2026-11-03T15:00:00Z");
+  assert.equal(podeNascer({ vivo: { id: "x" }, atraso: { atrasados: 9 }, agora }).ok, false, "um vivo por vez");
+  assert.equal(podeNascer({ ultimoDerrotadoEm: "2026-11-03T00:00:00Z", atraso: { atrasados: 9 }, agora }).ok, false, "descanso depois da vitória");
+  assert.equal(podeNascer({ ultimoDerrotadoEm: new Date(agora.getTime() - (HORAS_ATE_O_PROXIMO + 1) * 3_600_000).toISOString(), atraso: { atrasados: 1 }, agora }).ok, true);
+  assert.equal(danoDosEstudos([{ tipo: "quiz", pontos: 30 }, { tipo: "item", pontos: 10 }, { tipo: "conquista", pontos: 300 }, { tipo: "meta_diaria", pontos: 20 }, { tipo: "diario", pontos: 15 }]), 60 + 10 + 30);
+  assert.equal(danoDosCadernos(3, 300), 75);
+  assert.equal(danoDosCadernos(50, 300), 150, "Cadernos dão até metade da vida");
+  assert.deepEqual(situacaoDoChefao({ vida: 150, dano: 40 }), { vida: 150, dano: 40, restante: 110, derrotado: false, parte: 110 / 150 });
+  assert.equal(situacaoDoChefao({ vida: 150, dano: 999 }).derrotado, true);
+  const lib = fs.readFileSync(new URL("../src/lib/chefoes.js", import.meta.url), "utf8");
+  assert.match(lib, /update\(\{ derrotado_em: marca \}\)\.eq\("id", c\.id\)\.is\("derrotado_em", null\)/, "cai e paga uma vez só");
+  assert.match(lib, /creditarMoedas\(usuarioId, "chefao", c\.recompensa/);
+  const sql = fs.readFileSync(new URL("../db/029-forja-chefoes-duelos.sql", import.meta.url), "utf8");
+  assert.match(sql, /create unique index if not exists proof_chefoes_um_vivo on public\.proof_chefoes \(usuario_id\) where derrotado_em is null/);
+  assert.equal((sql.match(/'correio',\s+'forja', 'chefao', 'duelo'\)\);/g) || []).length, 2, "os tipos novos entram no livro-caixa dos dois mundos");
+  assert.match(fs.readFileSync(new URL("../src/componentes/reino/Mundo3D.js", import.meta.url), "utf8"), /rn-mundo__rotulo rn-mundo__rotulo--chefao/);
+});
+
+caso("Duelo de Lógica: o gabarito confere, a Lisa erra às vezes e quem acerta mais leva a aposta", () => {
+  const ids = new Set();
+  for (const p of PERGUNTAS_DO_DUELO) {
+    assert.ok(!ids.has(p.id), "id repetido: " + p.id); ids.add(p.id);
+    assert.equal(p.opcoes.length, 4, p.id);
+    assert.equal(new Set(p.opcoes).size, 4, "opções repetidas em " + p.id);
+    assert.ok(Number.isInteger(p.certa) && p.certa >= 0 && p.certa < 4, p.id);
+    assert.ok([1, 2, 3].includes(p.dificuldade), p.id);
+  }
+  for (const d of [1, 2, 3]) assert.ok(PERGUNTAS_DO_DUELO.filter((p) => p.dificuldade === d).length >= DUELO.mistura.filter((x) => x === d).length + 3, "perguntas de sobra na dificuldade " + d);
+  // o gabarito das perguntas que dá para rodar aqui: roda e confere
+  const certa = (id) => { const p = PERGUNTAS_DO_DUELO.find((x) => x.id === id); return p.opcoes[p.certa]; };
+  assert.equal(certa("js-soma-texto"), String(2 + "2"));
+  assert.equal(certa("js-length"), String([1, 2, 3].length));
+  assert.equal(certa("js-typeof-null"), '"' + typeof null + '"');
+  assert.equal(certa("js-ponto-flutuante"), String(0.1 + 0.2 === 0.3));
+  assert.equal(certa("js-sort-texto"), "[" + [10, 1, 3].sort().join(", ") + "]");
+  assert.equal(certa("binario-1011"), String(parseInt("1011", 2)));
+  assert.equal(certa("apertos-de-mao"), String((5 * 4) / 2));
+  assert.equal(certa("seq-n-n1"), String(6 * 7));
+  assert.equal(certa("horas-minutos"), String(2.5 * 60));
+  { const a = [1, 2, 3]; const b = a; b.push(4); assert.equal(certa("js-referencia"), String(a.length)); }
+  // o sorteio: 5 perguntas, sem repetir, na mistura de dificuldades
+  let semente = 7;
+  const s = () => { semente = (semente * 16807) % 2147483647; return semente / 2147483647; };
+  for (let k = 0; k < 30; k++) {
+    const sorteadas = montarDuelo(s);
+    assert.equal(new Set(sorteadas).size, DUELO.perguntas);
+    assert.deepEqual(sorteadas.map((id) => PERGUNTAS_DO_DUELO.find((p) => p.id === id).dificuldade), DUELO.mistura);
+  }
+  // a Lisa acerta mais nas fáceis, erra às vezes
+  let certas = 0, total = 0;
+  for (let k = 0; k < 400; k++) { const sorteadas = montarDuelo(s); certas += corrigir(sorteadas, respostasDaLisa(sorteadas, s)).acertos; total += 5; }
+  const media = (certas / total) * 5;
+  assert.ok(media > 3.2 && media < 4.1, "a Lisa acerta em média ~3,7 de 5 (deu " + media.toFixed(2) + ")");
+  assert.equal("certa" in perguntaParaTela("py-len"), false, "a tela não vê o gabarito");
+  const c = corrigir(["py-len", "seq-dobro", "html-link"], [1, 0, "x"]);
+  assert.equal(c.acertos, 1);
+  assert.equal(c.detalhe[2].resposta, null, "resposta que não é índice vale como sem resposta");
+  assert.equal(resultadoDoDuelo(4, 3), "venceu");
+  assert.equal(resultadoDoDuelo(3, 3), "empate");
+  assert.equal(resultadoDoDuelo(2, 3), "perdeu");
+  assert.deepEqual(movimentosDoDuelo("venceu", 50), { jogador: 100, lisa: -50 });
+  assert.deepEqual(movimentosDoDuelo("empate", 50), { jogador: 50, lisa: 0 });
+  assert.deepEqual(movimentosDoDuelo("perdeu", 50), { jogador: 0, lisa: 50 });
+  assert.equal(podeDuelar({ aposta: 50, saldo: 100, saldoDaLisa: 100, feitosHoje: 0 }).ok, true);
+  assert.match(podeDuelar({ aposta: 35, saldo: 100, saldoDaLisa: 100, feitosHoje: 0 }).motivo, /escolha uma aposta/);
+  assert.match(podeDuelar({ aposta: 50, saldo: 100, saldoDaLisa: 100, feitosHoje: 3 }).motivo, /3 duelos de hoje/);
+  assert.match(podeDuelar({ aposta: 100, saldo: 60, saldoDaLisa: 500, feitosHoje: 0 }).motivo, /faltam 40 moedas/);
+  assert.match(podeDuelar({ aposta: 100, saldo: 600, saldoDaLisa: 50, feitosHoje: 0 }).motivo, /a Lisa não tem moedas/);
+  assert.match(podeDuelar({ aposta: 20, saldo: 600, saldoDaLisa: 500, feitosHoje: 0, temAberto: true }).motivo, /já está aberto/);
+  assert.equal(segundosDoDuelo(), 5 * 25 + 10);
+  const lib = fs.readFileSync(new URL("../src/lib/duelo.js", import.meta.url), "utf8");
+  assert.match(lib, /\.eq\("id", d\.id\)\.eq\("status", "aberto"\)\.select\(CAMPOS\)/, "encerra uma vez só");
+  assert.match(lib, /grava antes de cobrar/);
+  assert.match(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /\{ href: "\/forja", rotulo: "Forja", Icone: IconeForja, grupo: "Jogo" \}/);
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

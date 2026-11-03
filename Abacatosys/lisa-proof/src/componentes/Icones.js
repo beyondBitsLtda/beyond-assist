@@ -85,6 +85,11 @@ export const IconePresentes = () => (
   <svg {...base}><rect x="3" y="9" width="18" height="12" rx="1.5" /><path d="M3 13h18M12 9v12M12 9c-1.5-3-6-4-6-1.5S10 9 12 9zM12 9c1.5-3 6-4 6-1.5S14 9 12 9z" /></svg>
 );
 
+// Forja: uma bigorna (03/11/2026)
+export const IconeForja = () => (
+  <svg {...base}><path d="M3 8h14l4-2v4l-4 1h-3v3h2v3H7v-3h2v-3H6a3 3 0 0 1-3-3z" /></svg>
+);
+
 // Mais: três pontos
 export const IconeMais = () => (
   <svg {...base}><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>

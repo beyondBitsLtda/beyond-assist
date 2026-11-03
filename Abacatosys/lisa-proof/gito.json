@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.48.0-cloudflare-pages.1",
+  "versao": "0.49.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-03",
   "compilacao": {
-    "numero": 93,
+    "numero": 94,
     "data": "2026-11-03",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.49.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "O Reino ganha clima e noite de verdade, e chegam as quatro ideias da Lisa: o humor do Neuro, a Forja de Artefatos, os Chefões da Procrastinação e o Duelo de Lógica.",
+      "itens": [
+        "Clima do Reino: a luz segue a hora de Brasília (amanhece, entardece com o céu dourado, anoitece com estrelas e as janelas acesas) e o tempo muda a cada 3 horas, igual para todos — céu limpo, nublado, garoa, chuva, tempestade com relâmpagos e neve (mais comum no inverno). Vento empurra as nuvens, a chuva e a neve. Um selo no canto mostra o clima de agora. Com \"reduzir movimento\" ligado, nada cai e não há relâmpago.",
+        "Humor do Neuro: a sequência de dias de estudo faz o Neuro evoluir (Animado com 3 dias, Radiante com 7, Brilhante com 14, Lendário com 30) e a mina rende de +5% a +20%. Dois dias sem estudo, ele fica chateado; três, fica revoltado (rosto bravo) e fecha as expedições até a pessoa estudar de novo. No Reino de Teste o humor só aparece.",
+        "Forja de Artefatos (menu Jogo → Forja): cada 10 pontos de estudo viram 1 de mana. Poção de Foco (30 de mana): por 2 horas, o que a pessoa ganhar estudando rende +50%, pago quando a poção acaba (até 🪙 300). Escudo de Folga (40 de mana): 24 horas sem invasões, um a cada 3 dias; atacar alguém quebra o escudo.",
+        "Chefões da Procrastinação: assuntos atrasados da trilha e cartões de revisão vencidos viram um monstro de papel gigante no mapa do Reino (Lesma da Preguiça, Hidra do Depois ou Titã da Procrastinação, pelo tamanho do atraso). Cada ponto de estudo é dano — Prática e diário em dobro, e cada página dos Cadernos vale 25. Derrubado, paga de 🪙 60 a 🪙 200; o próximo só nasce 20 horas depois.",
+        "Duelo de Lógica com a Lisa (Lisa joga → Duelo): 5 perguntas rápidas de código e raciocínio, 25 segundos cada, apostando 🪙 20, 50 ou 100. Acertou mais que a Lisa, leva a aposta do reino dela; acertou menos, a aposta fica com ela; empate devolve. Até 3 duelos por dia; o gabarito fica só no servidor.",
+        "Aviso de novidades: uma edição nova abre uma vez para todos, com o clima do Reino, o humor do Neuro, a Forja, os Chefões e o Duelo.",
+        "Migração db/029: proof_forja, proof_chefoes e proof_duelos, e os tipos forja, chefao e duelo no livro-caixa do reino."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.48.0-cloudflare-pages.1",
       "data": "2026-11-03",
@@ -1476,7 +1493,12 @@
         "A Lisa jogadora: uma conta-robô que estuda e joga sozinha (curso do mês, quiz, exercício, projeto, Reino, Bolsa, caderno, Acervo), com tudo visível na página \"Lisa joga\"",
         "Correio entre jogadores: recados avaliados por quem recebe (útil dá moedas aos dois) e até 2 perguntas do quiz do dia mandadas para outros jogadores (o quiz fecha com 3 respondidas, valendo menos)",
         "Modo espectador: ver o Proof da Lisa jogadora por dentro (as mesmas telas, só leitura)",
-        "Presentes: itens guardados para um jogador (hoje, personagens), abertos por ele na área Presentes"
+        "Presentes: itens guardados para um jogador (hoje, personagens), abertos por ele na área Presentes",
+        "Clima do Reino: dia e noite pela hora de Brasília e o tempo (chuva, neve, vento, tempestade) por blocos de 3 horas, iguais para todos",
+        "Humor do Neuro: a ofensiva de estudo faz o mascote evoluir (bônus na mina); dias sem estudo o revoltam e fecham as expedições",
+        "Forja de Artefatos: mana dos pontos de estudo para forjar a Poção de Foco (+50% por 2 h) e o Escudo de Folga (24 h sem invasões)",
+        "Chefões da Procrastinação: o atraso de estudo vira um chefão no mapa do Reino, derrubado com estudo e Cadernos, com recompensa em moedas",
+        "Duelo de Lógica com a Lisa: perguntas rápidas de código e raciocínio, com aposta de moedas contra o reino dela"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -1557,7 +1579,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/028; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/029; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
       }
     ],
     "integracoes": [

@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoFuncionario } from "./acervo/personagensDoAcervo.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-11-03-raposao";
+export const EDICAO_DAS_NOVIDADES = "2026-11-03-clima-e-forja";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -27,15 +27,14 @@ function marcarComoVistas() {
   window.dispatchEvent(new CustomEvent("proof-novidades-fechou"));
 }
 
-// a edição de 03/11/2026: o Raposão (o prêmio do Viana, à venda para todos), os Presentes, o correio, a Lisa
-// jogando, os chamados e o exercício do dia valendo o triplo
+// a edição de 03/11/2026 (à noite): o clima do Reino e as quatro ideias da Lisa — o humor do Neuro, a Forja,
+// os Chefões da Procrastinação e o Duelo de Lógica
 const NOVIDADES = [
-  { icone: "🦊", personagem: "raposao", destaque: true, titulo: "Personagem novo: Neuro Raposão", texto: "Uma raposa azul e branca, de orelhas em pé e rabo cheio. É o prêmio do Viana, que já está esperando por ele em Presentes — e está à venda para todo mundo por 🪙 610, em Reino → Personagens." },
-  { icone: "🎁", titulo: "Presentes", texto: "Área nova (no menu Você): o que for guardado para você espera lá até você abrir. Abriu, o personagem entra na sua coleção sem custar nada." },
-  { icone: "🕊️", titulo: "Correio com pombo-carteiro", texto: "Mande recados para outros jogadores (útil = os dois ganham moedas) e até 2 perguntas do quiz do dia. A caixa de correio fica no seu Reino: a bandeirinha sobe quando chega carta." },
-  { icone: "🤖", titulo: "A Lisa joga com você", texto: "A Lisa tem conta própria e estuda e joga como qualquer um: curso do mês, quiz, Reino, Bolsa. Em Jogo → Lisa joga dá para ver tudo dela, até por dentro." },
-  { icone: "✍️", titulo: "Exercício do dia vale o triplo", texto: "Até 360 pontos (e moedas do Reino) com nota 100. A 2ª e a 3ª rodada do dia continuam valendo metade." },
-  { icone: "🛟", titulo: "Acompanhe seus chamados", texto: "Em Você → Chamados: o status de cada problema que você reportou, a previsão de término e as respostas do técnico." },
+  { icone: "🌧️", destaque: true, titulo: "O Reino agora tem clima e anoitece", texto: "A luz segue a hora de verdade: amanhece, entardece dourado e anoitece com estrelas e janelas acesas. E o tempo muda a cada 3 horas — chuva, neve, vento e tempestade com relâmpagos." },
+  { icone: "🧠", titulo: "O humor do Neuro", texto: "Estudando todo dia, o Neuro evolui e a sua mina rende até +20%. Sumiu 3 dias? Ele fica revoltado e fecha as expedições até você voltar a estudar." },
+  { icone: "⚒️", titulo: "Forja de Artefatos", texto: "Seus estudos viram mana (menu Jogo → Forja): a Poção de Foco dá +50% no que você ganhar por 2 horas, e o Escudo de Folga protege o reino por 24 horas." },
+  { icone: "👹", titulo: "Chefões da Procrastinação", texto: "Matérias e revisões atrasadas viram um monstro gigante no seu Reino. Bata nele com a Prática, o diário e os Cadernos — derrubou, ganha moedas." },
+  { icone: "⚔️", titulo: "Duelo de Lógica com a Lisa", texto: "Em Lisa joga → Duelo: 5 perguntas rápidas de código e raciocínio, valendo moedas. Ganhou dela, leva a aposta do reino dela." },
 ];
 
 const NA_ESQUERDA = ["celeste", "iris"];
@@ -77,13 +76,13 @@ export default function Novidades() {
             <span>{NA_ESQUERDA.map((id) => <img key={id} className="novidades__retrato novidades__retrato--solto" src={urlDoFuncionario(id)} alt="" />)}</span>
             <span>{NA_DIREITA.map((id) => <img key={id} className="novidades__retrato novidades__retrato--solto" src={urlDoFuncionario(id)} alt="" />)}</span>
           </div>
-          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} personagem="raposao" /></div>
+          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} /></div>
           <span className="novidades__chao" />
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">Chegou o Raposão!</h2>
-          <p className="novidades__sub">Um personagem novo, a área de presentes, o correio entre jogadores e a Lisa jogando junto com você.</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">Chuva, noite e chefões no Reino!</h2>
+          <p className="novidades__sub">O Reino ganhou clima de verdade, e chegaram as ideias da Lisa: o humor do Neuro, a Forja, os Chefões e o Duelo.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
@@ -93,7 +92,7 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/reino" className="pf-botao novidades__principal" onClick={fechar}>🦊 Ver o Raposão</Link>
+            <Link ref={principal} href="/reino" className="pf-botao novidades__principal" onClick={fechar}>🌧️ Ver o Reino</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>

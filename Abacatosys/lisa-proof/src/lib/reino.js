@@ -20,6 +20,7 @@ import { ErroDeAcesso } from "./sessao.js";
 import { buscarTodas, buscarEmLotes } from "./estudo.js";
 import { diaDe, somarDias } from "@/dominio/datas.js";
 import { calcularOfensiva } from "@/dominio/ofensiva.js";
+import { humorDoNeuro, diasSemEstudo, fatorDaMinaDoHumor } from "@/dominio/humorDoNeuro.js";
 import { nomePublico, textoPublicoValido } from "@/dominio/ranking.js";
 import {
   CONSTRUCOES, ORDEM_DAS_CONSTRUCOES, NIVEIS_INICIAIS, ATAQUES_POR_DIA, ESCUDO_DE_NOVATO_HORAS,
@@ -200,6 +201,26 @@ async function ofensivasDe(ids) {
   return new Map([...diasDe].map(([id, d]) => [id, calcularOfensiva(d, hoje).atual]));
 }
 
+/**
+ * O humor do Neuro (src/dominio/humorDoNeuro.js): a ofensiva e o último dia de estudo. Os eventos de estudo
+ * são um só nos dois mundos; no Reino de Teste o humor aparece, mas não dá bônus nem fecha expedição.
+ */
+export async function humorDoNeuroDe(usuarioId) {
+  const hoje = diaDe();
+  const desde = somarDias(hoje, -45);
+  const eventos = await buscarTodas(() =>
+    db.from("proof_eventos").select("dia").eq("usuario_id", usuarioId).gte("dia", desde).order("criado_em")
+  );
+  let ultimo = eventos.reduce((u, e) => (e.dia > u ? e.dia : u), "");
+  if (!ultimo) {
+    const { data } = await db.from("proof_eventos").select("dia").eq("usuario_id", usuarioId).order("dia", { ascending: false }).limit(1);
+    ultimo = data?.[0]?.dia || "";
+  }
+  const h = humorDoNeuro({ ofensiva: calcularOfensiva(eventos.map((e) => e.dia), hoje), semEstudo: diasSemEstudo(ultimo || null, hoje) });
+  if (emTeste()) return { ...h, bonusDaMina: 0, expedicoesFechadas: false, soNoReal: true };
+  return h;
+}
+
 /** O placar de uma votação: os votos, os reinos, quem pode votar agora (ofensiva em dia) e o resultado. */
 async function placarDa(votacao) {
   const [votosR, reinos] = await Promise.all([
@@ -320,7 +341,7 @@ export async function cancelarPaz(usuarioId, pazId) {
 /** Tudo o que a tela do reino precisa. */
 export async function estadoDoReino(usuarioId) {
   const reino = await obterReino(usuarioId);
-  const [saldo, hoje, batalhasR, paz, tanques, ouro] = await Promise.all([
+  const [saldo, hoje, batalhasR, paz, tanques, ouro, humor] = await Promise.all([
     saldoDoUsuario(usuarioId),
     invasoesDeHoje(usuarioId),
     db.from("proof_invasoes")
@@ -330,8 +351,9 @@ export async function estadoDoReino(usuarioId) {
     pazParaTela(usuarioId),
     tanquesDeHoje(usuarioId),
     ouroDe(reino),
+    humorDoNeuroDe(usuarioId),
   ]);
-  const fatorDaMina = paz.vigente?.fatorDaMina || 1;
+  const fatorDaMina = (paz.vigente?.fatorDaMina || 1) * fatorDaMinaDoHumor(humor);
   falhou(batalhasR.error, "batalhas");
   const batalhas = batalhasR.data || [];
   const nomes = await nomesPublicos(batalhas.flatMap((b) => [b.atacante_id, b.defensor_id]));
@@ -351,11 +373,13 @@ export async function estadoDoReino(usuarioId) {
       custo: custoDoNeuro(reino.neuro_nivel),
       ...podeSubirNeuro(reino, saldo),
     },
+    humorDoNeuro: humor,
     mina: {
       paraColetar: producaoAcumulada(reino, agora, fatorDaMina),
       porHora: taxaDeProducao(n) * fatorDaMina,
       capacidade: taxaDeProducao(n) * fatorDaMina * HORAS_ATE_ENCHER,
-      dobrada: fatorDaMina > 1,
+      dobrada: (paz.vigente?.fatorDaMina || 1) > 1,
+      bonusDoNeuro: humor.bonusDaMina,
     },
     paz,
     diasDePaz: DIAS_DE_PAZ,
@@ -560,6 +584,28 @@ export function darPersonagem(usuarioId, id) {
   });
 }
 
+/**
+ * O Escudo de Folga da Forja (src/lib/forja.js): protege o reino de verdade até `ate` (nunca encurta o escudo
+ * que já existe). Devolve até quando ficou e até quando era.
+ */
+export function protegerReino(usuarioId, ate) {
+  return noMundo("real", async () => {
+    const reino = await obterReino(usuarioId);
+    const antes = temEscudo(reino) ? reino.escudo_ate : null;
+    const novo = antes && new Date(antes).getTime() > new Date(ate).getTime() ? antes : ate;
+    await lancarEGravar(reino, [], { escudo_ate: novo });
+    return { escudoAte: novo, antes };
+  });
+}
+
+/** O escudo de agora do reino de verdade (null = sem escudo), sem criar reino para quem não tem. */
+export function escudoDoReino(usuarioId) {
+  return noMundo("real", async () => {
+    const { data } = await db.from("proof_reinos").select("escudo_ate").eq("usuario_id", usuarioId).maybeSingle();
+    return data && temEscudo(data) ? data.escudo_ate : null;
+  });
+}
+
 /** Só ler qual personagem a pessoa usa (sem criar reino para quem ainda não abriu o Reino). */
 export async function personagemDe(usuarioId) {
   const { data } = await db.from("proof_reinos").select("personagem").eq("usuario_id", usuarioId).maybeSingle();
@@ -569,7 +615,8 @@ export async function personagemDe(usuarioId) {
 export async function coletarMina(usuarioId) {
   const reino = await obterReino(usuarioId);
   const agora = new Date();
-  const valor = producaoAcumulada(reino, agora, fatorDaMinaNaPaz((await pazDeAgora()).paz, agora));
+  const fator = fatorDaMinaNaPaz((await pazDeAgora()).paz, agora) * fatorDaMinaDoHumor(await humorDoNeuroDe(usuarioId));
+  const valor = producaoAcumulada(reino, agora, fator);
   if (valor <= 0) throw new ErroDeAcesso(400, "a mina ainda não juntou nenhuma moeda inteira");
   await lancarEGravar(reino, [{ tipo: "coleta", valor }], { coletado_em: agora.toISOString() });
   return { coletou: valor };
@@ -753,11 +800,12 @@ function garagemParaTela(reino, saldo, tanques) {
 /** O mapa das expedições: por veículo, com o tanque de cada um, o planetoide da vez e as melhores estrelas. */
 export async function expedicoesDe(usuarioId) {
   const eu = await obterReino(usuarioId);
-  const [tanques, historico, saldo] = await Promise.all([
+  const [tanques, historico, saldo, humor] = await Promise.all([
     tanquesDeHoje(usuarioId),
     db.from("proof_expedicoes").select("id, expedicao, veiculo, estrelas, destruicao, saque, combate, detalhe, criado_em")
       .eq("usuario_id", usuarioId).order("criado_em", { ascending: false }).limit(300),
     saldoDoUsuario(usuarioId),
+    humorDoNeuroDe(usuarioId),
   ]);
   falhou(historico.error, "expedições");
   const todas = historico.data || [];
@@ -780,9 +828,13 @@ export async function expedicoesDe(usuarioId) {
     veiculos: garagem,
     // com que exército a pessoa parte: o dela, ou a Tropa da Expedição (emprestada, de graça)
     tropa: { emprestada: tropa.emprestado, tropas: tropa.exercito },
+    // o Neuro revoltado (dias sem estudo) fecha as expedições até a pessoa estudar de novo
+    fechadas: humor.expedicoesFechadas ? humor.texto : "",
     lugares: [...EXPEDICOES, planetoide].map((x) => {
       const veiculo = veiculoDa(x);
-      const pode = podeExpedicionar({ expedicao: x, nivelDaTorre: torre, veiculos: eu.veiculos, tanque: tanques.tanque(veiculo) });
+      const pode = humor.expedicoesFechadas
+        ? { ok: false, motivo: "o Neuro está revoltado e fechou as expedições: estude hoje para abrir" }
+        : podeExpedicionar({ expedicao: x, nivelDaTorre: torre, veiculos: eu.veiculos, tanque: tanques.tanque(veiculo) });
       return {
         id: x.id, nome: x.nome, tipo: x.tipo, lugar: TIPOS_DE_LUGAR[x.tipo].nome, emoji: TIPOS_DE_LUGAR[x.tipo].emoji,
         descricao: x.descricao, torreMinima: x.torreMinima, recompensa: x.recompensa, chefe: x.chefe,
@@ -824,6 +876,8 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
   const torre = niveisDe(eu).castelo;
   const pode = podeExpedicionar({ expedicao, nivelDaTorre: torre, veiculos: eu.veiculos, tanque });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  const humor = await humorDoNeuroDe(usuarioId);
+  if (humor.expedicoesFechadas) throw new ErroDeAcesso(400, "o Neuro está revoltado e fechou as expedições: estude hoje para ele abrir de novo");
 
   const tropa = exercitoDaExpedicao(eu.exercito, torre);
   const r = batalhaDeExpedicao({ atacante: { exercito: tropa.exercito, neuro_nivel: eu.neuro_nivel }, expedicao, semente: semente() });

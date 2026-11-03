@@ -1,0 +1,46 @@
+/* A Forja de Artefatos e o Duelo de Lógica (03/11/2026). */
+
+/* ---- a Forja */
+.fj-mana .pf-botao { margin-top: 8px; }
+.fj-artefatos { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.fj-artefato { display: grid; grid-template-columns: 56px 1fr; gap: 12px; align-items: start; }
+.fj-artefato__emoji { font-size: 40px; line-height: 1; text-align: center; }
+.fj-artefato h3 { margin: 0 0 6px; font-size: 17px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.fj-artefato .pf-botao { margin-top: 8px; }
+.fj-artefato__motivo { margin-top: 6px; }
+.fj-historico { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+
+/* ---- a entrada do duelo na tela da Lisa */
+.lj-duelo { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; text-decoration: none; color: inherit; border: 2px solid var(--pf-verde); }
+.lj-duelo:hover { box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18), var(--pf-sombra); }
+.lj-duelo__emoji { font-size: 36px; line-height: 1; }
+
+/* ---- o duelo */
+.du-apostas { display: flex; gap: 16px; align-items: center; margin-bottom: 20px; }
+.du-apostas__botoes { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+.du-recentes { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.du-partida { display: grid; gap: 12px; margin-bottom: 20px; }
+.du-partida__topo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.du-partida__tempo { margin-left: auto; font-weight: 800; font-variant-numeric: tabular-nums; }
+.du-partida__tempo--fim { color: #dc2626; }
+.du-partida__barra { height: 6px; border-radius: 9999px; background: var(--pf-linha); overflow: hidden; }
+.du-partida__barra span { display: block; height: 100%; background: var(--pf-verde); transition: width 0.25s linear; }
+.du-partida__pergunta { margin: 0; font-size: 19px; line-height: 1.35; }
+.du-partida__codigo { margin: 0; padding: 10px 12px; border-radius: var(--pf-raio); background: #0f172a; color: #e2e8f0; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-x: auto; white-space: pre; }
+.du-partida__opcoes { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.du-opcao { justify-content: flex-start; text-align: left; white-space: normal; min-height: 48px; }
+.du-opcao__letra { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 9999px; background: var(--pf-linha); font-weight: 800; font-size: 12px; flex: none; }
+.du-resultado { display: grid; gap: 12px; margin-bottom: 20px; }
+.du-resultado__topo { display: flex; gap: 12px; align-items: center; }
+.du-resultado__topo h2 { margin: 0 0 4px; }
+.du-resultado__emoji { font-size: 44px; line-height: 1; }
+.du-resultado--venceu { border: 2px solid var(--pf-verde); }
+.du-resultado--perdeu { border: 2px solid #dc2626; }
+.du-correcao { margin: 0; padding-left: 20px; display: grid; gap: 10px; font-size: 14px; }
+.du-correcao strong { display: block; }
+.du-correcao .du-partida__codigo { margin: 6px 0; font-size: 13px; }
+.du-correcao__linha { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; }
+.du-certo { color: var(--pf-verde); font-weight: 700; }
+.du-errado { color: #dc2626; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .du-partida__barra span { transition: none; } }
+@media (max-width: 560px) { .du-apostas { flex-direction: column; align-items: flex-start; } }

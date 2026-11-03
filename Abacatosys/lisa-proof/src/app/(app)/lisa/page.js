@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { obter } from "@/lib/api.js";
 import { NOMES_DOS_DESAFIOS } from "@/dominio/pratica.js";
 
@@ -31,6 +32,12 @@ export default function LisaJoga() {
       {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
       {!dados && !erro && <p className="pf-estat__nota">Carregando…</p>}
       {dados && !dados.existe && <div className="pf-cartao"><p className="pf-estat__nota">A Lisa ainda não entrou no jogo. Volte em breve!</p></div>}
+      {dados?.existe && (
+        <Link href="/lisa/duelo" className="pf-cartao lj-duelo">
+          <span className="lj-duelo__emoji" aria-hidden="true">⚔️</span>
+          <span><strong>Duelo de Lógica com a Lisa</strong><br /><span className="pf-estat__nota">5 perguntas rápidas de código e raciocínio. Venceu, leva moedas do reino dela; perdeu, a aposta fica com ela.</span></span>
+        </Link>
+      )}
       {dados?.existe && <Painel d={dados} />}
     </>
   );

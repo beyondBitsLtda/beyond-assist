@@ -37,7 +37,7 @@
 .neuro .v { display: none; }
 .neuro--normal .v-normal, .neuro--feliz .v-feliz, .neuro--comemorando .v-comemorando,
 .neuro--triste .v-triste, .neuro--pensando .v-pensando, .neuro--dormindo .v-dormindo,
-.neuro--surpreso .v-surpreso { display: inline; }
+.neuro--surpreso .v-surpreso, .neuro--bravo .v-bravo { display: inline; }
 
 /* Pontos de giro em coordenadas do desenho. */
 .neuro__boneco { transform-box: view-box; transform-origin: 100px 182px; }
@@ -172,6 +172,12 @@
   0% { transform: translate(0, 0) rotate(0); opacity: 1; }
   100% { transform: translate(var(--deriva), 105vh) rotate(var(--giro)); opacity: 0.9; }
 }
+
+/* o Neuro revoltado: bochechas vermelhas, o 💢 e um tremidinho de raiva */
+.neuro__raiva { fill: none; stroke: #DC2626; stroke-width: 4.5; stroke-linecap: round; }
+.neuro--bravo .neuro__bochecha { fill: #EF4444; opacity: 0.85; }
+.neuro--bravo .neuro__boneco { animation: neuro-bufar 1.1s ease-in-out infinite; }
+@keyframes neuro-bufar { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-2px); } 40% { transform: translateX(2px); } 60% { transform: translateX(-1px); } }
 
 @media (prefers-reduced-motion: reduce) {
   .neuro *, .neuro__svg, .neuro__fala { animation: none !important; transition: none !important; }

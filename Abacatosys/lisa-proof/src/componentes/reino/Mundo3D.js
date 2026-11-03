@@ -10,6 +10,8 @@ import { cenarioDe, estruturaDaExpedicao, terrenoDaExpedicao, raioDoPlanetoide }
 import { uniformeDaCurva, curvarTudo, curvarPonto } from "./curvatura.js";
 import { svgDoOperario } from "./operariosDePapel.js";
 import { svgComoImagem, recorteDePapel } from "./papel.js";
+import { urlDoMonstro } from "./monstrosDePapel.js";
+import { climaDoReino, textoDoClima } from "@/dominio/clima.js";
 
 /**
  * O Reino em 3D: uma ilha flutuante low poly com as construções, e o Neuro como um recorte de
@@ -665,19 +667,26 @@ function ponte(p, de, ate) {
   return g;
 }
 
+// as estrelas do céu da noite: [x %, y %, tamanho em px], fixas (no alto, mais delas)
+const ESTRELAS = [
+  [6, 10, 1.5], [14, 32, 1], [21, 6, 2], [29, 22, 1], [37, 9, 1.5], [44, 40, 1], [52, 14, 2], [58, 30, 1],
+  [66, 5, 1.5], [73, 26, 1], [80, 12, 2], [87, 36, 1], [93, 8, 1.5], [11, 52, 1], [34, 58, 1], [70, 50, 1], [96, 60, 1],
+];
+
 function nuvens(p) {
   const g = new THREE.Group();
   // um pouco de brilho próprio: na sombra, nuvem branca virava pedra cinza
   const branco = new THREE.MeshStandardMaterial({ color: "#ffffff", flatShading: true, roughness: 1, emissive: "#ffffff", emissiveIntensity: 0.4 });
   const r = aleatorio(7);
-  for (let i = 0; i < 5; i++) {
+  // 10 nuvens: o clima mostra mais ou menos delas (céu limpo, umas 4; tempestade, todas)
+  for (let i = 0; i < 10; i++) {
     const n = new THREE.Group();
     for (let k = 0; k < 3; k++) {
       const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5 + r() * 0.35, 0), branco);
       b.position.set(k * 0.6 - 0.6, r() * 0.2, r() * 0.3);
       n.add(b);
     }
-    const a = (i / 5) * Math.PI * 2 + r();
+    const a = ((i % 5) / 5) * Math.PI * 2 + (i >= 5 ? 0.6 : 0) + r();
     n.userData = { a, raioBase: 9 + r() * 2.5, raio: 0, y: 2.6 + r() * 1.8 };
     n.userData.raio = n.userData.raioBase;
     n.position.set(Math.cos(a) * n.userData.raio, n.userData.y, Math.sin(a) * n.userData.raio);
@@ -691,7 +700,7 @@ function nuvens(p) {
 // svgComoImagem e recorteDePapel moram em ./papel.js (a torre do Modo Domínio usa as mesmas)
 
 // ------------------------------------------------------------------ o componente
-export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "normal", personagem: personagemFixo, soLeitura = false, mineiros = 0, diamantes = 0, cartas = null, aoEscolher, aoVisitar, aoFalhar }) {
+export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "normal", personagem: personagemFixo, soLeitura = false, mineiros = 0, diamantes = 0, cartas = null, chefao = null, aoEscolher, aoVisitar, aoFalhar }) {
   const caixa = useRef(null);
   const molde = useRef(null);
   const rotulos = useRef({});
@@ -700,6 +709,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
   const [reacao, setReacao] = useState(null);
   const [texto, setTexto] = useState("");
   const [legenda, setLegenda] = useState(null);
+  const [selo, setSelo] = useState(""); // o clima de agora, no canto: "🌧️ Chuva · brisa · noite"
   const legendaRef = useRef(null);
   legendaRef.current = setLegenda;
   const humorAtual = reacao?.humor || humor;
@@ -746,6 +756,8 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
     const mundo = new THREE.Group();
     const ilhaAtual = { grupo: ilha(p, 0), terreno: 0, enfeites: true };
     let cenarioDaIlha = null;  // numa expedição: o cenário dela (terreno, estruturas, céu e luz)
+    // o Chefão da Procrastinação no mapa (montado lá embaixo, em definirChefao); o enquadre conta com ele
+    const chefaoNoMapa = { grupo: null, dados: null, lugar: [0, 0], monstro: null, ancora: new THREE.Vector3() };
     mundo.add(ilhaAtual.grupo);
     // a ilhota do Acampamento e a ponte (montadas por definirAcampamento)
     const ilhota = { grupo: null, ponte: null, nivel: 0, centro: [0, 0], raio: 0 };
@@ -878,6 +890,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       } else medir(0, 0, raioDaIlha(ilhaAtual.terreno) + 0.2, -1.4, 3.2);
       if (ilhota.grupo?.visible) medir(ilhota.centro[0], ilhota.centro[1], ilhota.raio + 0.2, -1.0, 2.6);
       for (const v of vizinhanca.ilhas) if (v.grupo.visible) medir(v.centro[0], v.centro[1], v.raio + 0.15, -0.8, 1.8);
+      if (chefaoNoMapa.grupo?.visible) medir(chefaoNoMapa.lugar[0], chefaoNoMapa.lugar[1], 2.6, 0.6, 7.2);
       let meiaL = ((maxX - minX) / 2) * 1.04, meiaA = ((maxY - minY) / 2) * 1.06;
       if (meiaL / meiaA > aspecto) meiaA = meiaL / aspecto; else meiaL = meiaA * aspecto;
       const cx = (maxX + minX) / 2, cy = (maxY + minY) / 2;
@@ -890,29 +903,139 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       sujo = true;
     }
 
-    // tema: dia ou noite, seguindo o atributo data-tema do app
+    // o céu (03/11/2026: "chuva, neve, vento; faça o reino anoitecer"): a hora de Brasília e o tempo do bloco
+    // de 3 horas (src/dominio/clima.js), iguais para todo mundo — antes era o tema claro/escuro do app. O sol
+    // anda e se põe com o dourado do fim de tarde, as janelas acendem quando escurece, o céu fechado escurece
+    // o dia e cinza as nuvens, e a chuva ou a neve caem levadas pelo vento. Numa expedição vale o céu do lugar.
+    // ?ceu=tempestade&hora=19 na barra fixa o céu (só a vista: para ver um clima sem esperar por ele)
+    const pedido = new URLSearchParams(window.location.search);
+    const forcar = { tempo: pedido.get("ceu") || undefined, hora: pedido.has("hora") ? Number(pedido.get("hora")) : undefined };
+    const climaAgora = () => climaDoReino(new Date(), forcar);
+    let clima = climaAgora();
+    const cor = (a) => new THREE.Color(a);
+    const mistura = (a, b, t) => cor(a).lerp(cor(b), Math.max(0, Math.min(1, t)));
+    function fundoDoCeu() {
+      const { luz } = clima;
+      const fechado = Math.min(1, clima.nuvens * (clima.chuva || clima.neve ? 0.7 : 0.3));
+      const nublado = luz.sol > 0.4 ? "#8C99A8" : "#151d2a";
+      const topo = mistura("#0E1A2E", "#BFE3F7", luz.sol).lerp(cor("#F2A07B"), luz.quente * 0.65).lerp(cor(nublado), fechado);
+      const meio = mistura("#18294A", "#E4F3FB", luz.sol).lerp(cor("#F7C59A"), luz.quente * 0.6).lerp(cor(nublado), fechado * 0.8);
+      const base = mistura("#1D3150", "#F3FAF4", luz.sol).lerp(cor("#FBE3C2"), luz.quente * 0.5).lerp(cor(nublado), fechado * 0.6);
+      const degrade = `linear-gradient(180deg, #${topo.getHexString()} 0%, #${meio.getHexString()} 70%, #${base.getHexString()} 100%)`;
+      // de noite, com o céu aberto, as estrelas aparecem por cima do degradê
+      const brilho = Math.round((1 - luz.sol) * (1 - fechado) * 100) / 100;
+      if (brilho < 0.15) return degrade;
+      const estrelas = ESTRELAS.map(([x, y, r]) => `radial-gradient(${r}px ${r}px at ${x}% ${y}%, rgba(255,255,255,${brilho}) 60%, transparent 61%)`);
+      return [...estrelas, degrade].join(", ");
+    }
     function aplicarTema() {
-      const noite = document.documentElement.dataset.tema === "escuro";
-      ceu.color.set(noite ? "#6a7bb0" : "#ffffff");
-      ceu.groundColor.set(noite ? "#1e3324" : "#7fb36a");
-      ceu.intensity = noite ? 0.7 : 1.1;
-      sol.color.set(noite ? "#b9c8ff" : "#fff3dd");
-      sol.intensity = noite ? 0.8 : 1.7;
+      const { luz } = clima;
+      const forca = luz.sol * (1 - clima.escurece);
+      const noite = luz.sol < 0.45;
+      ceu.color.copy(mistura("#6a7bb0", "#ffffff", luz.sol));
+      ceu.groundColor.copy(mistura("#1e3324", "#7fb36a", luz.sol));
+      ceu.intensity = 0.7 + 0.45 * forca;
+      sol.color.copy(mistura("#b9c8ff", "#fff3dd", luz.sol).lerp(cor("#ffb36b"), luz.quente * 0.8));
+      sol.intensity = 0.8 + 0.95 * forca;
+      // o sol vai do nascente ao poente (a sombra anda); de noite, a lua fica alta, do outro lado
+      if (luz.sol > 0.05) sol.position.set(11 * luz.lado, 3 + 8 * luz.altura, 5);
+      else sol.position.set(-5, 11, -4);
       p.janela.color.set(noite ? "#ffcf6b" : "#3b3b4f");
       p.janela.emissive.set(noite ? "#ffb347" : "#000000");
       p.janela.emissiveIntensity = noite ? 0.9 : 0;
-      const luz = cenarioDaIlha?.luz;
-      if (luz) {
-        ceu.color.set(luz.ceu);
-        ceu.groundColor.set(luz.chao);
-        sol.color.set(luz.sol);
-        sol.intensity = luz.forca;
+      const nuvem = p.materiais.get("nuvem");
+      const cinza = (clima.chuva || clima.neve ? 0.5 : clima.nuvens > 0.5 ? 0.2 : 0) + (1 - luz.sol) * 0.3;
+      nuvem.color.copy(mistura("#ffffff", "#6f7a88", cinza));
+      nuvem.emissive.copy(nuvem.color);
+      nuvem.emissiveIntensity = 0.12 + 0.28 * luz.sol;
+      const quantas = Math.round(3 + 7 * clima.nuvens);
+      grupoNuvens.children.forEach((n, i) => { n.visible = i < quantas; });
+      // o fundo é o CSS do quadro: a cor calculada entra por variável (o céu das expedições, no CSS, vence)
+      el.style.setProperty("--rn-ceu", fundoDoCeu());
+      const luzDoLugar = cenarioDaIlha?.luz;
+      if (luzDoLugar) {
+        ceu.color.set(luzDoLugar.ceu);
+        ceu.groundColor.set(luzDoLugar.chao);
+        sol.color.set(luzDoLugar.sol);
+        sol.intensity = luzDoLugar.forca;
       }
+      const aqui = !cenarioDaIlha;
+      chuva.visible = aqui && clima.chuva > 0 && PINGOS > 0;
+      neve.visible = aqui && clima.neve > 0 && FLOCOS > 0;
+      chuva.geometry.setDrawRange(0, Math.floor(PINGOS * clima.chuva) * 2);
+      neve.geometry.setDrawRange(0, Math.floor(FLOCOS * clima.neve));
       sujo = true;
     }
-    const observaTema = new MutationObserver(aplicarTema);
-    observaTema.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
-    aplicarTema();
+
+    // a chuva (riscos) e a neve (flocos) caem numa caixa em volta da ilha e voltam ao alto ao tocar o chão;
+    // sem movimento (prefers-reduced-motion), nada cai e não há relâmpago: fica só a luz e as nuvens
+    const PINGOS = semMovimento ? 0 : 700, FLOCOS = semMovimento ? 0 : 450;
+    const pontoNoAr = (alto) => [(Math.random() - 0.5) * 24, alto ? 10 + Math.random() * 4 : Math.random() * 14, (Math.random() - 0.5) * 24];
+    const geoChuva = new THREE.BufferGeometry();
+    geoChuva.setAttribute("position", new THREE.BufferAttribute(new Float32Array(Math.max(1, PINGOS) * 6), 3));
+    for (let i = 0; i < PINGOS; i++) { const [x, y, z] = pontoNoAr(false); geoChuva.attributes.position.array.set([x, y, z, x, y - 0.35, z], i * 6); }
+    const chuva = new THREE.LineSegments(geoChuva, new THREE.LineBasicMaterial({ color: "#b5cbe8", transparent: true, opacity: 0.55, depthWrite: false }));
+    const geoNeve = new THREE.BufferGeometry();
+    geoNeve.setAttribute("position", new THREE.BufferAttribute(new Float32Array(Math.max(1, FLOCOS) * 3), 3));
+    for (let i = 0; i < FLOCOS; i++) geoNeve.attributes.position.array.set(pontoNoAr(false), i * 3);
+    // na câmera ortográfica o tamanho do ponto é em pixels (não diminui com a distância)
+    const neve = new THREE.Points(geoNeve, new THREE.PointsMaterial({ color: "#ffffff", size: 3.5, sizeAttenuation: false, transparent: true, opacity: 0.9, depthWrite: false }));
+    chuva.frustumCulled = false;
+    neve.frustumCulled = false;
+    cena.add(chuva, neve);
+    const relampago = { ate: 0, proximo: 0 };
+    function animarClima(t, dt) {
+      const vx = Math.cos(clima.vento.direcao) * clima.vento.forca * 4;
+      const vz = Math.sin(clima.vento.direcao) * clima.vento.forca * 4;
+      if (chuva.visible) {
+        const a = geoChuva.attributes.position.array;
+        const queda = (10 + clima.vento.forca * 4) * dt;
+        for (let i = 0, n = Math.floor(PINGOS * clima.chuva); i < n; i++) {
+          const k = i * 6;
+          let x = a[k] + vx * dt, y = a[k + 1] - queda, z = a[k + 2] + vz * dt;
+          if (y < 0) [x, y, z] = pontoNoAr(true);
+          // o risco inclina com o vento
+          a[k] = x; a[k + 1] = y; a[k + 2] = z;
+          a[k + 3] = x - vx * 0.06; a[k + 4] = y - 0.35; a[k + 5] = z - vz * 0.06;
+        }
+        geoChuva.attributes.position.needsUpdate = true;
+        sujo = true;
+      }
+      if (neve.visible) {
+        const a = geoNeve.attributes.position.array;
+        for (let i = 0, n = Math.floor(FLOCOS * clima.neve); i < n; i++) {
+          const k = i * 3;
+          let x = a[k] + (vx * 0.4 + Math.sin(t * 1.3 + i) * 0.25) * dt;
+          let y = a[k + 1] - (0.8 + clima.vento.forca * 0.6) * dt;
+          let z = a[k + 2] + (vz * 0.4 + Math.cos(t + i) * 0.2) * dt;
+          if (y < 0) [x, y, z] = pontoNoAr(true);
+          a[k] = x; a[k + 1] = y; a[k + 2] = z;
+        }
+        geoNeve.attributes.position.needsUpdate = true;
+        sujo = true;
+      }
+      // na tempestade, um relâmpago de vez em quando: o céu clareia por um instante (bem menos de 3 por segundo)
+      if (clima.raios && !cenarioDaIlha && !semMovimento) {
+        if (!relampago.proximo) relampago.proximo = t + 3 + Math.random() * 6;
+        if (!relampago.ate && t > relampago.proximo) {
+          relampago.ate = t + 0.12;
+          ceu.intensity += 2.2;
+          sujo = true;
+        } else if (relampago.ate && t > relampago.ate) {
+          relampago.ate = 0;
+          relampago.proximo = t + 5 + Math.random() * 10;
+          aplicarTema();
+        }
+      }
+    }
+    // a luz anda com o relógio e o tempo troca a cada 3 horas: confere a cada minuto
+    function atualizarClima() {
+      clima = climaAgora();
+      aplicarTema();
+      setSelo(textoDoClima(clima));
+    }
+    const relogioDoClima = setInterval(atualizarClima, 60_000);
+    atualizarClima();
 
     // rótulos e balão: HTML por cima do canvas, reposicionados a cada quadro
     const projetar = (v) => {
@@ -930,6 +1053,12 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       if (rCorreio) {
         rCorreio.style.visibility = correio.visible ? "visible" : "hidden";
         if (correio.visible) { const [cx, cy] = projetar(ancoraDoCorreio); rCorreio.style.transform = `translate(${cx}px, ${cy}px) translate(-50%, -100%)`; }
+      }
+      const rChefao = rotulos.current.__chefao;
+      if (rChefao) {
+        const ver = Boolean(chefaoNoMapa.grupo?.visible);
+        rChefao.style.visibility = ver ? "visible" : "hidden";
+        if (ver) { const [x, y] = projetar(chefaoNoMapa.ancora); rChefao.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`; }
       }
       const rAcamp = rotulos.current.acampamento;
       if (rAcamp && ilhota.grupo) {
@@ -1151,6 +1280,50 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
         m.position.y = TAMANHO_DO_MINEIRO / 2 + (ciclo >= 0.55 && ciclo < 0.65 ? -0.04 : 0);
       }
       if (!semMovimento) for (const j of joias.children) { j.rotation.y = t * 1.6 + j.userData.giro; j.position.y = j.userData.y + Math.sin(t * 3 + j.userData.giro) * 0.04; }
+    }
+
+    // ---- o Chefão da Procrastinação (03/11/2026): o atraso de estudo vira um monstro de papel gigante pairando
+    // na beira da ilha, com a vida no rótulo. Cai com os estudos (src/lib/chefoes.js); some nas batalhas.
+    const matChefao = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(document.createElement("canvas")), transparent: true, alphaTest: 0.35, side: THREE.DoubleSide });
+    matChefao.map.colorSpace = THREE.SRGBColorSpace;
+    matChefao.visible = false;
+    const ALTURA_DO_CHEFAO = 3.6; // o meio do papel: gigante, mais alto que a torre
+    const papelDoChefao = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), matChefao);
+    papelDoChefao.position.y = ALTURA_DO_CHEFAO;
+    chefaoNoMapa.grupo = new THREE.Group();
+    chefaoNoMapa.grupo.visible = false;
+    chefaoNoMapa.grupo.add(papelDoChefao);
+    mundo.add(chefaoNoMapa.grupo);
+    function definirChefao(c) {
+      chefaoNoMapa.dados = c || null;
+      if (c) {
+        // atrás da ilha (do lado oposto ao da câmera no começo), na beirada
+        const r = raioDaIlha(ilhaAtual.terreno) * 0.7;
+        chefaoNoMapa.lugar = [-r, -r];
+        chefaoNoMapa.grupo.position.set(-r, 0, -r);
+        chefaoNoMapa.ancora.set(-r, ALTURA_DO_CHEFAO + 2.6, -r);
+        if (chefaoNoMapa.monstro !== c.monstro) {
+          chefaoNoMapa.monstro = c.monstro;
+          matChefao.visible = false;
+          const img = new Image();
+          img.onload = () => { matChefao.map.image = recorteDePapel(img); matChefao.map.needsUpdate = true; matChefao.visible = true; sujo = true; };
+          img.src = urlDoMonstro(c.monstro);
+        }
+      }
+      chefaoNoMapa.grupo.visible = Boolean(c) && !sim;
+      enquadrar();
+    }
+    function animarChefao(t) {
+      if (!chefaoNoMapa.dados) return;
+      const mostrar = !sim;
+      if (chefaoNoMapa.grupo.visible !== mostrar) { chefaoNoMapa.grupo.visible = mostrar; enquadrar(); }
+      if (!mostrar) return;
+      papelDoChefao.rotation.y = vista.azimute; // de frente para a câmera, como todo papel
+      if (!semMovimento) {
+        papelDoChefao.position.y = ALTURA_DO_CHEFAO + Math.sin(t * 1.4) * 0.2;
+        papelDoChefao.rotation.z = Math.sin(t * 0.9) * 0.05;
+        sujo = true;
+      }
     }
 
 
@@ -1846,6 +2019,8 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       }
 
       animarMineiros(agora / 1000);
+      animarClima(agora / 1000, dt);
+      animarChefao(agora / 1000);
 
       if (folha.visible) {
         // o papel sempre de frente para a câmera
@@ -1878,9 +2053,9 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
           andar.vy -= 12 * dt;
           andar.pulo = Math.max(0, andar.pulo + andar.vy * dt);
           if (andar.pulo === 0) andar.vy = 0;
-          // nuvens
+          // nuvens: com vento, andam mais depressa
           for (const n of grupoNuvens.children) {
-            n.userData.a += dt * 0.02;
+            n.userData.a += dt * (0.02 + clima.vento.forca * 0.1);
             n.position.set(Math.cos(n.userData.a) * n.userData.raio, n.userData.y, Math.sin(n.userData.a) * n.userData.raio);
           }
         }
@@ -1955,6 +2130,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       definirVizinhos,
       definirMineiros,
       definirCartas,
+      definirChefao,
     };
 
     return () => {
@@ -1977,7 +2153,11 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       matDiamante.dispose();
       observaTamanho.disconnect();
       observaVisao.disconnect();
-      observaTema.disconnect();
+      clearInterval(relogioDoClima);
+      matChefao.map.dispose();
+      matChefao.dispose();
+      chuva.material.dispose();
+      neve.material.dispose();
       cena.traverse((o) => { o.geometry?.dispose(); });
       for (const m of p.materiais.values()) m.dispose();
       p.janela.dispose();
@@ -2009,6 +2189,14 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
   useEffect(() => {
     api.current?.definirCartas(cartas);
   }, [cartas]);
+
+  // ---- o Chefão da Procrastinação (null = nenhum, ou numa visita)
+  const chaveDoChefao = chefao ? `${chefao.id}:${chefao.monstro}` : "";
+  useEffect(() => {
+    api.current?.definirChefao(chefao);
+    // o desenho só muda quando o chefão muda (a vida está no rótulo, que é HTML)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveDoChefao]);
 
   // ---- os reinos vizinhos (paz)
   const mostrados = (vizinhos || []).filter((v) => v?.construcoes).slice(0, MAXIMO_DE_VIZINHOS);
@@ -2056,6 +2244,13 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
           <span aria-hidden="true">{c.emoji}</span> {c.nivel ? `nv ${c.nivel}` : "construir"}
         </button>
       ))}
+      {selo && <span className="rn-mundo__clima">{selo}</span>}
+      {chefao && (
+        <button type="button" className="rn-mundo__rotulo rn-mundo__rotulo--chefao" ref={(n) => { rotulos.current.__chefao = n; }}
+          onClick={() => aoEscolher?.("chefao")} aria-label={`${chefao.nome}: ${chefao.restante} de ${chefao.vida} de vida — ver o chefão`}>
+          <span aria-hidden="true">{chefao.emoji}</span> {chefao.nome} · ❤️ {chefao.restante}/{chefao.vida}
+        </button>
+      )}
       {cartas !== null && cartas !== undefined && (
         <button type="button" className={`rn-mundo__rotulo${cartas ? " rn-mundo__rotulo--carta" : ""}`} ref={(n) => { rotulos.current.__correio = n; }}
           onClick={() => aoEscolher?.("correio")} aria-label={cartas ? `Correio: ${cartas} carta(s) nova(s)` : "Correio — abrir a caixa"}>

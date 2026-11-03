@@ -134,9 +134,44 @@
 .rn-mundo {
   position: relative; height: 380px; border-radius: var(--pf-raio-grande); overflow: hidden;
   border: 1px solid var(--pf-linha); touch-action: pan-y; user-select: none;
-  background: linear-gradient(180deg, #BFE3F7 0%, #E4F3FB 70%, #F3FAF4 100%);
+  /* o céu segue a hora e o clima (Mundo3D põe --rn-ceu); o degradê fixo é só até o 3D carregar */
+  background: var(--rn-ceu, linear-gradient(180deg, #BFE3F7 0%, #E4F3FB 70%, #F3FAF4 100%));
 }
-:root[data-tema="escuro"] .rn-mundo { background: linear-gradient(180deg, #0E1A2E 0%, #18294A 70%, #1D3150 100%); }
+:root[data-tema="escuro"] .rn-mundo { background: var(--rn-ceu, linear-gradient(180deg, #0E1A2E 0%, #18294A 70%, #1D3150 100%)); }
+/* o humor do Neuro (03/11/2026): a evolução pela ofensiva, e o aviso quando ele se revolta */
+.rn-humor { display: grid; gap: 6px; margin: 8px 0 10px; padding: 10px 12px; border-radius: var(--pf-raio); background: var(--pf-superficie-2, rgba(0, 0, 0, 0.03)); border: 1px solid var(--pf-linha); }
+.rn-humor__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
+.rn-humor__emoji { font-size: 20px; line-height: 1; }
+.rn-humor__barra { height: 6px; border-radius: 9999px; background: var(--pf-linha); overflow: hidden; }
+.rn-humor__barra span { display: block; height: 100%; border-radius: inherit; background: var(--pf-verde); }
+.rn-humor .pf-estat__nota { margin: 0; }
+.rn-humor--revoltado { border-color: #DC2626; background: rgba(220, 38, 38, 0.08); }
+.rn-humor--chateado { border-color: #D97706; background: rgba(217, 119, 6, 0.08); }
+.rn-exp__fechadas { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+/* o Chefão da Procrastinação (03/11/2026): o rótulo no mapa e a folha */
+.rn-mundo__rotulo--chefao { z-index: 3; background: #7f1d1d; color: #fff; border-color: #dc2626; font-weight: 800; }
+.rn-mundo__rotulo--chefao:hover { background: #991b1b; }
+.ch-chefao { display: grid; gap: 12px; grid-template-columns: 140px 1fr; align-items: start; }
+.ch-chefao__arte { width: 140px; height: 140px; object-fit: contain; }
+.ch-chefao__nome { margin: 0 0 6px; font-size: 18px; }
+.ch-chefao__vida { height: 10px; border-radius: 9999px; background: var(--pf-linha); overflow: hidden; margin-bottom: 6px; }
+.ch-chefao__vida span { display: block; height: 100%; border-radius: inherit; background: #dc2626; }
+.ch-chefao__golpes { grid-column: 1 / -1; }
+.ch-chefao__golpes h4 { margin: 4px 0 6px; font-size: 14px; }
+.ch-chefao__golpes ul { margin: 0 0 8px; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
+.ch-chefao__atalhos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ch-caiu { margin-bottom: 12px; }
+.ch-placar { margin-top: 12px; }
+@media (max-width: 520px) { .ch-chefao { grid-template-columns: 1fr; justify-items: start; } }
+/* o selo do clima (03/11/2026): no canto de cima à direita — à esquerda fica o botão de tela cheia */
+.rn-mundo__clima {
+  position: absolute; right: 10px; top: 10px; z-index: 2; pointer-events: none; white-space: nowrap;
+  padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 700;
+  background: rgba(17, 24, 20, 0.62); color: #fff; backdrop-filter: blur(2px);
+}
+.rn-mundo--batalha .rn-mundo__clima { display: none; }
+.rn-tela-cheia .rn-mundo__clima { top: auto; bottom: 132px; }
+@media (max-width: 640px) { .rn-mundo__clima { font-size: 11px; padding: 2px 8px; } }
 @media (max-width: 640px) { .rn-mundo { height: 300px; } }
 .rn-mundo canvas { display: block; width: 100%; height: 100%; cursor: grab; }
 .rn-mundo canvas:active { cursor: grabbing; }

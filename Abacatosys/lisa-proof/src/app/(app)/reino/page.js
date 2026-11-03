@@ -32,6 +32,7 @@ import Visita from "@/componentes/reino/Visita.js";
 import TelaCheia from "@/componentes/reino/TelaCheia.js";
 import ModoDeTeste from "@/componentes/reino/ModoDeTeste.js";
 import CorreioDoReino from "@/componentes/reino/CorreioDoReino.js";
+import ChefaoDoReino from "@/componentes/reino/ChefaoDoReino.js";
 import { MUNDO_DE_TESTE, FERRAMENTAS_DE_TESTE, urlNoMundo } from "@/dominio/mundoDeTeste.js";
 import { urlDoVeiculo } from "@/componentes/reino/veiculosDePapel.js";
 
@@ -86,6 +87,15 @@ export default function Reino() {
     const relogio = setInterval(contarCartas, 60_000); // o pombo chega sem precisar recarregar a tela
     return () => clearInterval(relogio);
   }, [contarCartas]);
+  // o Chefão da Procrastinação (03/11/2026): nasce do atraso de estudo, aparece no mapa e cai com os estudos
+  const [chefao, setChefao] = useState(null);
+  const [chefaoAberto, setChefaoAberto] = useState(false);
+  const verChefao = useCallback(() => obter("/api/chefao").then((d) => {
+    setChefao(d);
+    if (d.caiuAgora) comemorar(`${d.caiuAgora.emoji} ${d.caiuAgora.nome} caiu! +🪙 ${d.caiuAgora.recompensa}`);
+    else if (d.chefao?.nasceuAgora) reagir("surpreso", `${d.chefao.emoji} O atraso virou um chefão: ${d.chefao.nome}!`, 5000);
+  }).catch(() => setChefao(null)), []);
+  useEffect(() => { verChefao(); }, [verChefao]);
   const telaCheiaRef = useRef(false);
   telaCheiaRef.current = telaCheia;
   const pediuTelaCheiaDeVerdade = useRef(false);
@@ -162,6 +172,7 @@ export default function Reino() {
   }
   function escolherConstrucao(chave) {
     if (chave === "correio") { setCorreioAberto(true); return; }
+    if (chave === "chefao") { setChefaoAberto(true); verChefao(); return; }
     if (telaCheiaRef.current) { setPainel("construcoes"); setTimeout(() => irParaConstrucao(chave), 80); }
     else irParaConstrucao(chave);
   }
@@ -406,6 +417,7 @@ export default function Reino() {
           <section className="pf-cartao rn-neuro">
             <div className="pf-estat__rotulo">O seu Neuro</div>
             <div className="pf-estat__valor">Nível {reino.neuro.nivel} <small>· {reino.neuro.estagio}</small></div>
+            {reino.humorDoNeuro && <HumorDoNeuro humor={reino.humorDoNeuro} />}
             <p className="pf-estat__nota">O herói do reino: vai em toda invasão (❤️ {reino.heroi.ataque.vida} · 💥 {reino.heroi.ataque.dano}) e defende a Torre. Máximo agora: nível {reino.neuro.maximo} (sobe com a Torre do Neuro).</p>
             <Botao ok={reino.neuro.ok} motivo={reino.neuro.motivo} ocupado={ocupado === "neuro"} travado={!!ocupado}
               aoClicar={() => agir("neuro", { acao: "neuro" }, (r) => comemorar(`Neuro nível ${r.nivel}! ${r.estagio} 🧠`))}>
@@ -415,7 +427,7 @@ export default function Reino() {
           <section className="pf-cartao">
             <div className="pf-estat__rotulo">⛏️ Mina de Moedas {reino.paz?.vigente && <span className="pf-pilula pf-pilula--verde rn-mina-x2">×{reino.paz.vigente.fatorDaMina} paz</span>}</div>
             <div className="pf-estat__valor"><Moedas n={reino.mina.paraColetar} /> <small>de {reino.mina.capacidade}</small></div>
-            <p className="pf-estat__nota">Produz {reino.mina.porHora} moeda(s) por hora e para quando enche ({HORAS_ATE_ENCHER} h). Colete sempre que passar por aqui.</p>
+            <p className="pf-estat__nota">Produz {reino.mina.porHora} moeda(s) por hora e para quando enche ({HORAS_ATE_ENCHER} h). Colete sempre que passar por aqui.{reino.mina.bonusDoNeuro ? ` Com o Neuro evoluído, +${Math.round(reino.mina.bonusDoNeuro * 100)}%.` : ""}</p>
             <Botao ok={reino.mina.paraColetar > 0} motivo="nada para coletar ainda" ocupado={ocupado === "coletar"} aoClicar={coletarMina}>
               Coletar
             </Botao>
@@ -583,7 +595,8 @@ export default function Reino() {
 
       {/* ------------------------------------------------------------ vista (e a tela cheia, por cima de tudo) */}
       <CorreioDoReino aberta={correioAberto} aoFechar={() => { setCorreioAberto(false); contarCartas(); }} aoLer={() => setCartas(0)} />
-      <VistaDoReino reino={reino} visita={visita} telaCheia={telaCheia} aoTelaCheia={entrarNaTelaCheia} cartas={cartas}
+      <ChefaoDoReino aberta={chefaoAberto} aoFechar={() => setChefaoAberto(false)} estado={chefao} />
+      <VistaDoReino reino={reino} visita={visita} telaCheia={telaCheia} aoTelaCheia={entrarNaTelaCheia} cartas={cartas} chefao={chefao?.chefao || null}
         aoEscolher={escolherConstrucao} aoVisitar={visitar} aoVoltarDaVisita={() => setVisita(null)}>
         {telaCheia && (
           <TelaCheia reino={reino} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} ocupado={ocupado} comTeste={teste}
@@ -679,9 +692,10 @@ function irParaConstrucao(chave) {
  * seção ocupa a tela toda (o mundo não é montado de novo) e os menus vêm em `children`. Numa
  * visita (na paz), o mundo mostra a ilha do vizinho.
  */
-function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, cartas = null, aoEscolher, aoVisitar, aoVoltarDaVisita, children }) {
+function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, cartas = null, chefao = null, aoEscolher, aoVisitar, aoVoltarDaVisita, children }) {
   const [plana, setPlana] = useState(false);
-  const humor = reino.escudoAte ? "normal" : "feliz";
+  // o rosto do Neuro no mundo é o humor dele (a ofensiva de estudo): feliz, pensando, triste ou bravo
+  const humor = reino.humorDoNeuro?.humor || (reino.escudoAte ? "normal" : "feliz");
   const vendo = visita && !visita.carregando ? visita : null;
   return (
     <section aria-label={vendo ? `Vista do ${vendo.nome}` : "Vista do reino"} className={`rn-vista3d${telaCheia ? " rn-tela-cheia" : ""}${vendo ? " rn-vista3d--visita" : ""}`}>
@@ -690,7 +704,7 @@ function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, cartas = null, ao
           tropas={vendo ? vendo.tropas : { exercito: reino.exercito.tropas, guarnicao: reino.guarnicao.tropas }}
           vizinhos={vendo ? [] : reino.paz?.vigente?.vizinhos || []}
           personagem={vendo ? vendo.personagem : undefined} soLeitura={Boolean(vendo)}
-          cartas={vendo ? null : cartas}
+          cartas={vendo ? null : cartas} chefao={vendo ? null : chefao}
           mineiros={vendo ? vendo.ouro?.trabalhando || 0 : reino.ouro?.equipe?.trabalhando || 0} diamantes={vendo ? 0 : reino.ouro?.diamantes || 0}
           humor={humor} aoEscolher={vendo ? undefined : aoEscolher} aoVisitar={aoVisitar} aoFalhar={() => setPlana(true)} />
       )}
@@ -1186,6 +1200,31 @@ function PropostaDePaz({ aberta, totalDeReinos, ocupado, aoFechar, aoEnviar }) {
 }
 
 /**
+ * O humor do Neuro (src/dominio/humorDoNeuro.js): a evolução pela ofensiva, com a barrinha até a próxima, e o
+ * aviso quando ele está chateado ou revoltado.
+ */
+function HumorDoNeuro({ humor }) {
+  const { evolucao, proximo, estado } = humor;
+  const anterior = evolucao.minimo;
+  const parte = proximo ? Math.max(0, Math.min(1, (humor.ofensiva - anterior) / (proximo.minimo - anterior))) : 1;
+  return (
+    <div className={`rn-humor rn-humor--${estado}`}>
+      <div className="rn-humor__topo">
+        <span className="rn-humor__emoji" aria-hidden="true">{estado === "revoltado" ? "😤" : estado === "chateado" ? "😟" : evolucao.emoji}</span>
+        <strong>{estado === "revoltado" ? "Neuro revoltado" : estado === "chateado" ? "Neuro chateado" : evolucao.nome}</strong>
+        {humor.bonusDaMina > 0 && <span className="pf-pilula pf-pilula--verde">mina +{Math.round(humor.bonusDaMina * 100)}%</span>}
+      </div>
+      {proximo && estado !== "revoltado" && (
+        <div className="rn-humor__barra" role="progressbar" aria-label={`Até ${proximo.nome}`} aria-valuemin={0} aria-valuemax={proximo.minimo} aria-valuenow={humor.ofensiva}>
+          <span style={{ width: `${Math.round(parte * 100)}%` }} />
+        </div>
+      )}
+      <p className="pf-estat__nota">{humor.texto}{humor.soNoReal ? " (No Reino de Teste o humor só aparece: não dá bônus nem fecha nada.)" : ""}</p>
+    </div>
+  );
+}
+
+/**
  * O mapa das expedições, por veículo: uma aba para cada um (com o tanque de hoje), e os lugares
  * aonde ele leva — um cartão por lugar, com o chefe, os monstros, as estrelas e o saque. A Nave
  * mostra o radar: o planetoide sorteado para a próxima viagem.
@@ -1203,6 +1242,11 @@ function Expedicoes({ mapa, veiculo, aoVeiculo, ocupado, resultado, aoFecharResu
         {" "}{CARGAS_POR_DIA} expedições por dia (pode repetir o mesmo lugar); acabou o combustível, dá para abastecer com moedas.
         O saque é proporcional à destruição (⭐⭐⭐ dá +{Math.round(BONUS_DE_TRES_ESTRELAS * 100)}%).
       </p>
+      {mapa?.fechadas && (
+        <div className="pf-aviso pf-aviso--erro rn-exp__fechadas" role="status">
+          <span aria-hidden="true">😤</span> {mapa.fechadas} <Link href="/">Estudar agora →</Link>
+        </div>
+      )}
       {mapa?.veiculos && (
         <div className="rn-exp__abas" role="tablist" aria-label="Veículos">
           {mapa.veiculos.map((x) => (
