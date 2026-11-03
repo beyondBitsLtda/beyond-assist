@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.47.0-cloudflare-pages.1",
+  "versao": "0.48.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-03",
   "compilacao": {
-    "numero": 92,
+    "numero": 93,
     "data": "2026-11-03",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.48.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Personagem novo Neuro Raposão (🪙 610, o prêmio do Viana), a área Presentes, o aviso de novidades da semana, e o modo espectador da Lisa que não deixa mais escolher nada.",
+      "itens": [
+        "Neuro Raposão: uma raposa azul e branca (orelhas, focinho, bochechas de pelo e rabo cheio), à venda por 🪙 610 em Reino → Personagens. Original, sem o escudo nem a marca de nenhum clube.",
+        "Área Presentes (menu Você): o que for guardado para o jogador espera lá até ele abrir; abrir põe o personagem na coleção sem cobrar. O primeiro é o Raposão do Viana.",
+        "O aviso de novidades volta a abrir uma vez para todos, com o Raposão em destaque, os Presentes, o correio, a Lisa jogando, o exercício valendo o triplo e os chamados.",
+        "Correção do modo espectador: além do servidor recusar, a tela não deixa mais escolher nada nas coisas da Lisa (botões, campos e formulários do conteúdo e das folhas param e avisam \"aqui é só olhar\"); navegar, trocar de aba, abrir seções e ver as construções continuam.",
+        "Migração db/028: proof_presentes."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.47.0-cloudflare-pages.1",
       "data": "2026-11-03",
@@ -1460,7 +1475,8 @@
         "Tela Chamados: quem reportou acompanha status, previsão de término e respostas; o técnico (administrador) vê todos e muda status, previsão e responde (os chamados são cards do quadro \"Chamados — Lisa Proof\" no Abacato)",
         "A Lisa jogadora: uma conta-robô que estuda e joga sozinha (curso do mês, quiz, exercício, projeto, Reino, Bolsa, caderno, Acervo), com tudo visível na página \"Lisa joga\"",
         "Correio entre jogadores: recados avaliados por quem recebe (útil dá moedas aos dois) e até 2 perguntas do quiz do dia mandadas para outros jogadores (o quiz fecha com 3 respondidas, valendo menos)",
-        "Modo espectador: ver o Proof da Lisa jogadora por dentro (as mesmas telas, só leitura)"
+        "Modo espectador: ver o Proof da Lisa jogadora por dentro (as mesmas telas, só leitura)",
+        "Presentes: itens guardados para um jogador (hoje, personagens), abertos por ele na área Presentes"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -1541,7 +1557,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/027; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/028; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
       }
     ],
     "integracoes": [

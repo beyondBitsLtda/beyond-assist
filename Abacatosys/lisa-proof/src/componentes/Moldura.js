@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   IconeHoje, IconeTrilhas, IconeAgenda, IconePratica, IconeProgresso, IconeRaioX, IconeRanking, IconeReino, IconeDominio, IconeBolsa, IconeMais, Marca,
-  IconeCaderno, IconeBiblioteca, IconeAcervo, IconeChamados, IconeLisa, IconeCorreio,
+  IconeCaderno, IconeBiblioteca, IconeAcervo, IconeChamados, IconeLisa, IconeCorreio, IconePresentes,
 } from "./Icones.js";
 import { Confete } from "./Neuro.js";
 import Celebracao from "./Celebracao.js";
@@ -36,6 +36,7 @@ const ITENS = [
   { href: "/lisa", rotulo: "Lisa joga", Icone: IconeLisa, grupo: "Jogo" },
   { href: "/progresso", rotulo: "Progresso", Icone: IconeProgresso, grupo: "Você" },
   { href: "/raio-x", rotulo: "Raio-X", Icone: IconeRaioX, grupo: "Você" },
+  { href: "/presentes", rotulo: "Presentes", Icone: IconePresentes, grupo: "Você" },
   { href: "/chamados", rotulo: "Chamados", Icone: IconeChamados, grupo: "Você" },
 ];
 const GRUPOS = [...new Set(ITENS.map((i) => i.grupo))];
@@ -64,11 +65,51 @@ async function sair() {
  * O modo espectador ligado (src/lib/sessao.js): uma faixa em todas as telas avisa que é o Proof da Lisa,
  * só para olhar, com o botão de voltar para o seu.
  */
+// Espiando, a tela também não deixa escolher nada (03/11/2026: "no modo de ver as coisas da Lisa eu não
+// poderia escolher nada, não poderia interagir nas coisas dela"): o servidor já recusa qualquer gravação
+// (403), e aqui os botões, campos e formulários do conteúdo e das folhas param antes de tentar. Continua
+// livre o que é só olhar: navegar (links), trocar de aba, abrir e fechar seções e folhas, os rótulos das
+// construções no Reino, a tela cheia e o girar.
+const ONDE_TRAVA = ".pf-principal, .folha";
+const LIVRES = 'a[href], [role="tab"], summary, [aria-expanded], .pf-espectador, .rn-mundo__rotulo, [data-so-olhar]';
+const SO_OLHAR = /^(fechar|voltar|cancelar|depois|entendi|ok\b|ver\b|mostrar|esconder|tela cheia|sair da tela|girar|←|‹|›|→|✕|×)/i;
+function podeTocar(alvo) {
+  if (alvo.closest(LIVRES)) return true;
+  const rotulo = (alvo.getAttribute("aria-label") || alvo.textContent || "").trim();
+  return SO_OLHAR.test(rotulo);
+}
+
 function FaixaDoEspectador() {
   const [espiando, setEspiando] = useState(false);
+  const [aviso, setAviso] = useState(false);
   useEffect(() => {
     setEspiando(document.cookie.split(";").some((p) => p.trim() === "proof_espiar=lisa"));
   }, []);
+  useEffect(() => {
+    if (!espiando) return undefined;
+    let relogio = null;
+    const avisar = () => { setAviso(true); clearTimeout(relogio); relogio = setTimeout(() => setAviso(false), 2200); };
+    const travar = (e) => {
+      const alvo = e.target?.closest?.('button, input, select, textarea, label, [role="button"], [role="option"], [role="switch"], [contenteditable="true"]');
+      if (!alvo || !alvo.closest(ONDE_TRAVA) || podeTocar(alvo)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (e.type === "click" || e.type === "submit") avisar();
+    };
+    const tirarFoco = (e) => {
+      const t = e.target;
+      if (t?.matches?.('input, select, textarea, [contenteditable="true"]') && t.closest(ONDE_TRAVA) && !podeTocar(t)) t.blur();
+    };
+    document.documentElement.dataset.espiando = "1";
+    for (const tipo of ["click", "submit", "change"]) document.addEventListener(tipo, travar, true);
+    document.addEventListener("focusin", tirarFoco, true);
+    return () => {
+      clearTimeout(relogio);
+      delete document.documentElement.dataset.espiando;
+      for (const tipo of ["click", "submit", "change"]) document.removeEventListener(tipo, travar, true);
+      document.removeEventListener("focusin", tirarFoco, true);
+    };
+  }, [espiando]);
   if (!espiando) return null;
   async function voltar() {
     await fetch("/api/espiar", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ligar: false }) }).catch(() => {});
@@ -78,6 +119,7 @@ function FaixaDoEspectador() {
     <div className="pf-espectador" role="status">
       <span>👀 Você está vendo o Proof da <strong>Lisa</strong> por dentro — as telas são as dela, só para olhar.</span>
       <button type="button" className="pf-botao pf-botao--pequeno" onClick={voltar}>Voltar para o meu</button>
+      {aviso && <span className="pf-espectador__aviso">Aqui é só olhar: estas são as coisas da Lisa.</span>}
     </div>
   );
 }

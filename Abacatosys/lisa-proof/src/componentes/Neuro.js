@@ -303,6 +303,18 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
               <path d="M170 84 L184 90 L174 96 L188 104 L175 108 L186 118 L170 118 Z" fill="#F8FAFC" stroke="#94A3B8" strokeWidth="2.5" strokeLinejoin="round" />
               <path d="M18 34 v14 M12 37.5 l12 7 M12 44.5 l12 -7 M184 52 v12 M179 55 l10 6 M179 61 l10 -6" stroke="#38BDF8" strokeWidth="2.5" strokeLinecap="round" />
             </g>
+            <g className="acc acc-raposao">
+              {/* o Raposão: orelhas de raposa, bochechas de pelo branco, focinho preto e o rabo cheio */}
+              <path d="M44 58 L40 6 L84 40 Z" fill="#1E4FB8" stroke="#0B2E6F" strokeWidth="3" strokeLinejoin="round" />
+              <path d="M52 50 L47 20 L73 40 Z" fill="#F8FAFC" />
+              <path d="M156 58 L160 6 L116 40 Z" fill="#1E4FB8" stroke="#0B2E6F" strokeWidth="3" strokeLinejoin="round" />
+              <path d="M148 50 L153 20 L127 40 Z" fill="#F8FAFC" />
+              <path d="M30 98 L12 106 L26 112 L10 122 L28 124 L18 134 L38 128 Q 42 112 30 98 Z" fill="#F8FAFC" stroke="#BFDBFE" strokeWidth="2" strokeLinejoin="round" />
+              <path d="M170 98 L188 106 L174 112 L190 122 L172 124 L182 134 L162 128 Q 158 112 170 98 Z" fill="#F8FAFC" stroke="#BFDBFE" strokeWidth="2" strokeLinejoin="round" />
+              <ellipse cx="100" cy="109" rx="6.5" ry="4.5" fill="#0A1F44" />
+              <path d="M148 166 C 182 168, 198 146, 193 114 C 186 132, 170 142, 150 150 Z" fill="#1E4FB8" stroke="#0B2E6F" strokeWidth="3" strokeLinejoin="round" />
+              <path d="M193 114 C 198 126, 196 138, 189 145 C 184 134, 186 123, 193 114 Z" fill="#F8FAFC" />
+            </g>
             <g className="acc acc-magma">
               <g transform="translate(66 48) scale(0.62) translate(-100 -30)">
                 <path d="M100 30 C 82 22, 86 2, 98 -12 C 98 2, 106 4, 110 -4 C 120 12, 116 26, 100 30 Z" fill="#F97316" stroke="#9A3412" strokeWidth="3" strokeLinejoin="round" />

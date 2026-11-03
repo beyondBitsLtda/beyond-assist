@@ -59,6 +59,8 @@
   flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; font-size: 21px;
   background: var(--pf-superficie); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
+/* o item com o personagem desenhado (o Raposão, 03/11/2026) */
+.novidades__item--destaque .novidades__icone:has(.neuro) { width: 70px; height: 70px; overflow: visible; }
 .novidades__acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
 .novidades__principal { flex: 1 1 220px; justify-content: center; text-align: center; font-size: 16px; box-shadow: 0 5px 0 #15803d; }
 

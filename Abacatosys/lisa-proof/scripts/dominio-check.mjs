@@ -1114,11 +1114,12 @@ caso("exercício do dia: o mesmo exercício de novo é barrado", () => {
   assert.equal(exercicioRepetido({ titulo: "Contador de vogais", enunciado: "Conte quantas vogais existem numa palavra digitada." }, antes), false);
 });
 caso("personagens: o Clássico é de todos; comprar cobra, vestir o que já tem é de graça", () => {
-  // 13 na loja: os 12 de antes (os 5 dos ambientes das expedições estrearam em 23/10/2026) e a Lisa,
-  // o mascote da marca, de graça (31/10/2026).
+  // 14 na loja: os 12 de antes (os 5 dos ambientes das expedições estrearam em 23/10/2026), a Lisa,
+  // o mascote da marca, de graça (31/10/2026), e o Raposão (03/11/2026, 🪙 610 — o prêmio do Viana).
   // Os chefões do Modo Domínio (24/10/2026) não se compram: ficam fora da loja.
   const daLoja = Object.keys(PERSONAGENS).filter((id) => !PERSONAGENS[id].chefao);
-  assert.equal(daLoja.length, 13);
+  assert.equal(daLoja.length, 14);
+  assert.equal(PERSONAGENS.raposao.preco, 610);
   // a vitrine mostra todos os da loja, uma vez cada, do mais barato ao mais caro
   assert.deepEqual([...ORDEM_DOS_PERSONAGENS].sort(), daLoja.sort());
   const precos = ORDEM_DOS_PERSONAGENS.map((id) => PERSONAGENS[id].preco);
@@ -3355,6 +3356,33 @@ caso("correio no Reino: a caixa com o pombo-carteiro, a bandeirinha e a folha da
   assert.match(ler("../src/componentes/reino/CorreioDoReino.js"), /<Recebidas cartas=\{caixa\.recebidas\.slice\(0, 10\)\} agir=\{agir\} \/>/);
   assert.match(CONTA_DA_LISA.reino, /Lisa/, "o reino da Lisa tem nome próprio");
   assert.match(ler("./lisa-joga.mjs"), /await renomearReino\(id, CONTA_DA_LISA\.reino\)/);
+});
+
+caso("Raposão: o personagem azul e branco, à venda por 610, e a área de presentes", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  assert.equal(PERSONAGENS.raposao.emoji, "🦊");
+  assert.ok(ORDEM_DOS_PERSONAGENS.indexOf("raposao") > ORDEM_DOS_PERSONAGENS.indexOf("astronauta") && ORDEM_DOS_PERSONAGENS.indexOf("raposao") < ORDEM_DOS_PERSONAGENS.indexOf("mago"), "na vitrine, pelo preço");
+  assert.match(ler("../src/componentes/Neuro.js"), /<g className="acc acc-raposao">/, "o desenho por cima do Neuro");
+  const css = ler("../src/app/neuro.css");
+  assert.match(css, /\.neuro\[data-personagem="raposao"\] \.acc-raposao/);
+  assert.match(css, /\.neuro\[data-personagem="raposao"\] \{ --neuro-rosa: #1E4FB8;/, "azul");
+  const reino = ler("../src/lib/reino.js");
+  assert.match(reino, /export function darPersonagem\(usuarioId, id\)[\s\S]*?noMundo\("real"[\s\S]*?lancarEGravar\(reino, \[\], \{ personagens:/, "presente entra na coleção sem cobrar, no mundo de verdade");
+  const presentes = ler("../src/lib/presentes.js");
+  assert.match(presentes, /\.eq\("id", id\)\.is\("aberto_em", null\)/, "abrir marca antes de entregar (dois cliques não entregam duas vezes)");
+  assert.match(presentes, /update\(\{ aberto_em: null \}\)/, "se a entrega falhar, o presente volta a ficar fechado");
+  assert.match(ler("../db/028-presentes.sql"), /create unique index if not exists proof_presentes_um_por_item on public\.proof_presentes \(usuario_id, tipo, item\)/);
+  assert.match(ler("../src/componentes/Moldura.js"), /\{ href: "\/presentes", rotulo: "Presentes", Icone: IconePresentes, grupo: "Você" \}/);
+  const novidades = ler("../src/componentes/Novidades.js");
+  assert.match(novidades, /EDICAO_DAS_NOVIDADES = "2026-11-03-raposao"/, "a edição nova aparece de novo para todo mundo");
+  assert.match(novidades, /personagem: "raposao", destaque: true/);
+});
+caso("modo espectador: a tela também não deixa escolher nada (só olhar)", () => {
+  const moldura = fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8");
+  assert.match(moldura, /const ONDE_TRAVA = "\.pf-principal, \.folha";/, "o conteúdo e as folhas (que abrem por portal)");
+  assert.match(moldura, /for \(const tipo of \["click", "submit", "change"\]\) document\.addEventListener\(tipo, travar, true\);/);
+  assert.match(moldura, /document\.addEventListener\("focusin", tirarFoco, true\);/, "campos não recebem foco");
+  assert.match(moldura, /const LIVRES = 'a\[href\], \[role="tab"\], summary, \[aria-expanded\], \.pf-espectador, \.rn-mundo__rotulo/, "navegar, abas, seções e as construções continuam");
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

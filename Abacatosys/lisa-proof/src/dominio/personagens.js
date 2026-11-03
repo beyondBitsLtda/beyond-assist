@@ -17,6 +17,8 @@ export const PERSONAGENS = {
   lisa: { nome: "Lisa", emoji: "👓", preco: 0, descricao: "O mascote do Lisa_Proof de corpo inteiro: rabo de cavalo, óculos redondos, brinco e roupa verde. De graça para todo mundo." },
   ninja: { nome: "Neuro Ninja", emoji: "🥷", preco: 300, descricao: "Silencioso, azul-ardósia e com a faixa vermelha amarrada na testa." },
   astronauta: { nome: "Neuro Astronauta", emoji: "🧑‍🚀", preco: 500, descricao: "Capacete de vidro e antena: estuda até fora da órbita." },
+  // a raposa azul e branca (03/11/2026): o prêmio do Viana (src/lib/presentes.js), e à venda para todo mundo
+  raposao: { nome: "Neuro Raposão", emoji: "🦊", preco: 610, descricao: "Uma raposa azul e branca, de orelhas em pé, focinho preto e rabo cheio de ponta branca: astuta e que não desiste fácil." },
   mago: { nome: "Neuro Mago", emoji: "🧙", preco: 800, descricao: "Chapéu de estrelas e um tom lilás de quem conhece todos os feitiços (e os algoritmos)." },
   pirata: { nome: "Neuro Pirata", emoji: "🏴‍☠️", preco: 1200, descricao: "Chapéu de três pontas e tapa-olho, caçando tesouros de conhecimento." },
   robo: { nome: "Neuro Robô", emoji: "🤖", preco: 2000, descricao: "Metálico, com parafusos e uma antena que brilha. Processa qualquer matéria." },
@@ -29,7 +31,7 @@ export const PERSONAGENS = {
   alienigena: { nome: "Neuro Alienígena", emoji: "👽", preco: 3000, descricao: "Verde, de antenas e um terceiro olho: chegou de um planetoide para estudar com você." },
 };
 export const ORDEM_DOS_PERSONAGENS = [
-  "neuro", "lisa", "abacato", "ninja", "astronauta", "mago", "cogumelo", "pirata", "mergulhador", "yeti", "robo", "magma", "alienigena",
+  "neuro", "lisa", "abacato", "ninja", "astronauta", "raposao", "mago", "cogumelo", "pirata", "mergulhador", "yeti", "robo", "magma", "alienigena",
 ];
 
 // Os chefões do Modo Domínio (24/10/2026): "os avatares aqui vão ser os chefões". Não se compram —

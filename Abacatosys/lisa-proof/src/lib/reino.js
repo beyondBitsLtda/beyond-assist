@@ -546,6 +546,20 @@ export async function escolherPersonagem(usuarioId, id) {
   return { personagem: id, comprou: pode.compra, custo: pode.custo, nome: PERSONAGENS[id].nome };
 }
 
+/**
+ * Um personagem de PRESENTE (src/lib/presentes.js, 03/11/2026): entra na lista da pessoa sem cobrar nada,
+ * no Reino de verdade; vestir fica com ela, em Personagens. Se já tinha, nada muda.
+ */
+export function darPersonagem(usuarioId, id) {
+  if (!PERSONAGENS[id] || PERSONAGENS[id].chefao) throw new ErroDeAcesso(400, "personagem inválido");
+  return noMundo("real", async () => {
+    const reino = await obterReino(usuarioId);
+    if ((reino.personagens || []).includes(id)) return { jaTinha: true };
+    await lancarEGravar(reino, [], { personagens: personagensDe([...(reino.personagens || []), id]) });
+    return { jaTinha: false };
+  });
+}
+
 /** Só ler qual personagem a pessoa usa (sem criar reino para quem ainda não abriu o Reino). */
 export async function personagemDe(usuarioId) {
   const { data } = await db.from("proof_reinos").select("personagem").eq("usuario_id", usuarioId).maybeSingle();

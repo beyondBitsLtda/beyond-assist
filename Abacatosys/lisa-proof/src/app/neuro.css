@@ -185,12 +185,16 @@
 .neuro[data-personagem="robo"] .acc-robo,
 .neuro[data-personagem="cogumelo"] .acc-cogumelo, .neuro[data-personagem="mergulhador"] .acc-mergulhador,
 .neuro[data-personagem="yeti"] .acc-yeti, .neuro[data-personagem="magma"] .acc-magma,
-.neuro[data-personagem="alienigena"] .acc-alienigena,
+.neuro[data-personagem="alienigena"] .acc-alienigena, .neuro[data-personagem="raposao"] .acc-raposao,
 .neuro[data-personagem="abacato"] .acc-abacato, .neuro[data-personagem="abacato"] .acc-abacato-fundo { display: inline; }
 
 .neuro[data-personagem="ninja"] { --neuro-rosa: #64748B; --neuro-rosa-escuro: #1E293B; --neuro-tinta: #0F172A; }
 .neuro[data-personagem="ninja"] .neuro__dobras path { stroke: #94A3B8; }
 .neuro[data-personagem="ninja"] .neuro__bochecha { fill: #F87171; opacity: 0.5; }
+
+.neuro[data-personagem="raposao"] { --neuro-rosa: #1E4FB8; --neuro-rosa-escuro: #0B2E6F; --neuro-tinta: #0A1F44; }
+.neuro[data-personagem="raposao"] .neuro__dobras path { stroke: #93C5FD; }
+.neuro[data-personagem="raposao"] .neuro__bochecha { fill: #FFFFFF; opacity: 0.55; }
 
 .neuro[data-personagem="astronauta"] { --neuro-rosa: #E0F2FE; --neuro-rosa-escuro: #0369A1; --neuro-tinta: #0C4A6E; }
 .neuro[data-personagem="astronauta"] .neuro__dobras path { stroke: #7DD3FC; }

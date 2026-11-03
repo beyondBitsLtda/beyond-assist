@@ -80,6 +80,11 @@ export const IconeCorreio = () => (
   <svg {...base}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>
 );
 
+// Presentes: uma caixa com laço
+export const IconePresentes = () => (
+  <svg {...base}><rect x="3" y="9" width="18" height="12" rx="1.5" /><path d="M3 13h18M12 9v12M12 9c-1.5-3-6-4-6-1.5S10 9 12 9zM12 9c1.5-3 6-4 6-1.5S14 9 12 9z" /></svg>
+);
+
 // Mais: três pontos
 export const IconeMais = () => (
   <svg {...base}><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>

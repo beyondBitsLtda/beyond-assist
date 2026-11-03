@@ -30,3 +30,20 @@
 }
 .pf-espectador strong { color: inherit; }
 .lj-espiar { display: grid; gap: 6px; justify-items: start; }
+.pf-espectador__aviso { flex-basis: 100%; font-weight: 700; }
+/* espiando, o que não se pode tocar avisa pelo cursor (a trava em si é a Moldura.js, e o servidor dá 403) */
+html[data-espiando] :is(.pf-principal, .folha) :is(button, input, select, textarea):not(.pf-espectador *):not(.rn-mundo__rotulo):not([role="tab"]) { cursor: not-allowed; }
+
+/* Presentes (src/app/(app)/presentes/page.js) */
+.pr-vazio { text-align: center; padding: 28px 16px; }
+.pr-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.pr-presente { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 14px; align-items: center; }
+.pr-presente[data-aberto] { opacity: 0.92; }
+.pr-presente__figura { display: grid; place-items: center; min-height: 120px; }
+.pr-presente__caixa { font-size: 72px; line-height: 1; animation: pr-balanca 2.4s ease-in-out infinite; }
+@keyframes pr-balanca { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@media (prefers-reduced-motion: reduce) { .pr-presente__caixa { animation: none; } }
+.pr-presente__texto { display: grid; gap: 6px; justify-items: start; min-width: 0; }
+.pr-presente__titulo { margin: 0; font-size: 17px; overflow-wrap: anywhere; }
+.pr-presente__mensagem { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 420px) { .pr-presente { grid-template-columns: 1fr; justify-items: center; text-align: center; } .pr-presente__texto { justify-items: center; } }

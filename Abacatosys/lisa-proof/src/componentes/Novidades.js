@@ -10,7 +10,7 @@ import Link from "next/link";
 import Neuro from "./Neuro.js";
 import { urlDoFuncionario } from "./acervo/personagensDoAcervo.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-10-31-leitor";
+export const EDICAO_DAS_NOVIDADES = "2026-11-03-raposao";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -27,14 +27,15 @@ function marcarComoVistas() {
   window.dispatchEvent(new CustomEvent("proof-novidades-fechou"));
 }
 
+// a edição de 03/11/2026: o Raposão (o prêmio do Viana, à venda para todos), os Presentes, o correio, a Lisa
+// jogando, os chamados e o exercício do dia valendo o triplo
 const NOVIDADES = [
-  { icone: "📱", titulo: "Leitor e caderno feitos para o celular", texto: "No leitor de PDF, o modo texto (Aa) mostra a página em letra grande, como num leitor digital; tocar no meio esconde os controles e nas laterais vira a tela. O caderno ocupa a tela toda, rola até o fim da página e, no celular, escreve sem a margem de números.", destaque: true },
-  { icone: "🧩", titulo: "Desenhe o diagrama, a Lisa avalia", texto: "Nos cursos de computação e arquitetura de software, o exercício do dia pode ser desenhar: fluxo de processo, BPMN, UML, modelo de dados, arquitetura de software ou de nuvem e C4, num quadro com dezenas de formas técnicas. A Lisa confere requisito por requisito." },
-  { icone: "👓", titulo: "Avatar novo, de graça: a Lisa", texto: "O mascote do Proof virou bonequinha de corpo inteiro, liberada para todo mundo. Vista no Reino → Personagens: ela pisca, sorri, comemora e até dorme." },
-  { icone: "🃏", titulo: "Cartões, torres de tema e revisão da turma", texto: "Cartões com repetição espaçada (Prática → Cartões), o Modo Domínio de qualquer tema e a revisão de um colega quando você discorda da Lisa." },
-  { icone: "💬", titulo: "Conversa com a Lisa", texto: "Nos cursos de idiomas: uma cena do dia a dia na língua do curso. A Lisa faz um papel, corrige cada fala e avalia no fim." },
-  { icone: "📈", titulo: "Passo a passo e gráficos", texto: "Na matemática: cada linha da resolução é conferida (o erro aparece onde nasceu) e há gráficos de arrastar pontos e retas. Na música, leitura na pauta, ritmo e afinação ao vivo." },
-  { icone: "📓", titulo: "Diário, PDF e torre de um livro", texto: "O diário do dia (o que aprendeu e onde travou), entrega em PDF, a frase-senha nas gravações e a torre do Modo Domínio feita a partir de um livro da Biblioteca." },
+  { icone: "🦊", personagem: "raposao", destaque: true, titulo: "Personagem novo: Neuro Raposão", texto: "Uma raposa azul e branca, de orelhas em pé e rabo cheio. É o prêmio do Viana, que já está esperando por ele em Presentes — e está à venda para todo mundo por 🪙 610, em Reino → Personagens." },
+  { icone: "🎁", titulo: "Presentes", texto: "Área nova (no menu Você): o que for guardado para você espera lá até você abrir. Abriu, o personagem entra na sua coleção sem custar nada." },
+  { icone: "🕊️", titulo: "Correio com pombo-carteiro", texto: "Mande recados para outros jogadores (útil = os dois ganham moedas) e até 2 perguntas do quiz do dia. A caixa de correio fica no seu Reino: a bandeirinha sobe quando chega carta." },
+  { icone: "🤖", titulo: "A Lisa joga com você", texto: "A Lisa tem conta própria e estuda e joga como qualquer um: curso do mês, quiz, Reino, Bolsa. Em Jogo → Lisa joga dá para ver tudo dela, até por dentro." },
+  { icone: "✍️", titulo: "Exercício do dia vale o triplo", texto: "Até 360 pontos (e moedas do Reino) com nota 100. A 2ª e a 3ª rodada do dia continuam valendo metade." },
+  { icone: "🛟", titulo: "Acompanhe seus chamados", texto: "Em Você → Chamados: o status de cada problema que você reportou, a previsão de término e as respostas do técnico." },
 ];
 
 const NA_ESQUERDA = ["celeste", "iris"];
@@ -76,23 +77,23 @@ export default function Novidades() {
             <span>{NA_ESQUERDA.map((id) => <img key={id} className="novidades__retrato novidades__retrato--solto" src={urlDoFuncionario(id)} alt="" />)}</span>
             <span>{NA_DIREITA.map((id) => <img key={id} className="novidades__retrato novidades__retrato--solto" src={urlDoFuncionario(id)} alt="" />)}</span>
           </div>
-          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} /></div>
+          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} personagem="raposao" /></div>
           <span className="novidades__chao" />
         </div>
         <div className="novidades__corpo">
           <span className="novidades__selo">✨ Novidade no Proof</span>
-          <h2 id="novidades-titulo" className="novidades__titulo">Cursos de qualquer tema!</h2>
-          <p className="novidades__sub">O Proof deixou de ser só de programação: cada curso tem o seu tipo, e o exercício do dia e os projetos mudam com ele. (E no Reino, agora dá para vender e comprar tropas.)</p>
+          <h2 id="novidades-titulo" className="novidades__titulo">Chegou o Raposão!</h2>
+          <p className="novidades__sub">Um personagem novo, a área de presentes, o correio entre jogadores e a Lisa jogando junto com você.</p>
           <ul className="novidades__lista">
             {NOVIDADES.map((n) => (
               <li key={n.titulo} className={n.destaque ? "novidades__item novidades__item--destaque" : "novidades__item"}>
-                <span className="novidades__icone" aria-hidden="true">{n.icone}</span>
+                <span className="novidades__icone" aria-hidden="true">{n.personagem ? <Neuro personagem={n.personagem} humor="feliz" tamanho={66} /> : n.icone}</span>
                 <span><strong>{n.titulo}</strong><span>{n.texto}</span></span>
               </li>
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/cartoes" className="pf-botao novidades__principal" onClick={fechar}>🃏 Ver os cartões</Link>
+            <Link ref={principal} href="/reino" className="pf-botao novidades__principal" onClick={fechar}>🦊 Ver o Raposão</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois eu vejo</button>
           </div>
         </div>
