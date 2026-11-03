@@ -82,7 +82,10 @@ import {
   anuncioDepoisDaVenda, ordenarOfertas,
 } from "../src/dominio/mercadoDeTropas.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
-import { conferirChamado, tituloDoChamado, descricaoDoChamado } from "../src/dominio/chamado.js";
+import {
+  conferirChamado, tituloDoChamado, descricaoDoChamado, relatoDoChamado, situacaoDoChamado, previsaoDoChamado, fimDaPrevisao,
+  diaEmBrasilia, quemAbriu, ordenarChamados, conferirAtualizacao, TETO_DA_RESPOSTA,
+} from "../src/dominio/chamado.js";
 import { montarRaioX, acertosDoQuiz, horaEmSaoPaulo } from "../src/dominio/raioX.js";
 import { assuntosParaODuracao, nomeDoQuadro, validarCurso, assuntosEmOrdem, resumoDoCurso } from "../src/dominio/curso.js";
 import { analisar, avaliar as avaliarExpressao, equivalentes, formaAtendida, lerResposta, numeroCerto } from "../src/dominio/expressao.js";
@@ -691,6 +694,54 @@ caso("chamado: título curto da primeira frase e descrição com quem, onde e qu
   assert.ok(d.includes("Reportado por: Ana <ana@exemplo.invalid>"));
   assert.ok(d.includes("Quando: 20/10/2026 15:42 (Brasília)"));
   assert.ok(d.includes("Tela: /pratica/1") && d.includes("janela 1600×1000 · tema escuro · pt-BR") && d.endsWith("a pergunta 5 veio sem código"));
+  assert.equal(relatoDoChamado(d), "a pergunta 5 veio sem código", "a tela mostra só o relato, sem e-mail nem aparelho");
+});
+caso("chamados (BEYOND-0015): a coluna vira o status e o prazo vira a previsão", () => {
+  assert.equal(situacaoDoChamado({ coluna: "Novos" }), "aberto");
+  assert.equal(situacaoDoChamado({ coluna: "Em análise" }), "analise");
+  assert.equal(situacaoDoChamado({ coluna: "Resolvidos" }), "resolvido");
+  assert.equal(situacaoDoChamado({ coluna: "Em análise", concluido: true }), "resolvido", "o concluído do Abacato vale");
+  assert.equal(situacaoDoChamado({ coluna: "Aguardando peça" }), "analise", "coluna que alguém criou: em análise");
+  const agora = new Date("2026-11-03T15:00:00Z");
+  assert.deepEqual(previsaoDoChamado({ fimEm: null, situacao: "aberto", agora }), { texto: "sem previsão ainda", atrasada: false });
+  assert.deepEqual(previsaoDoChamado({ fimEm: fimDaPrevisao("2026-11-05"), situacao: "analise", agora }), { texto: "previsto para 05/11", atrasada: false });
+  assert.deepEqual(previsaoDoChamado({ fimEm: fimDaPrevisao("2026-11-01"), situacao: "analise", agora }), { texto: "era para 01/11", atrasada: true });
+  assert.equal(previsaoDoChamado({ fimEm: fimDaPrevisao("2026-11-01"), situacao: "resolvido", agora }), null, "resolvido não tem previsão");
+  assert.equal(fimDaPrevisao("2026-11-05"), "2026-11-05T21:00:00.000Z", "18:00 em Brasília");
+  assert.equal(diaEmBrasilia("2027-01-10T21:00:00Z", agora), "10/01/2027", "outro ano leva o ano");
+  assert.equal(quemAbriu("u-123/1730000000000"), "u-123");
+});
+caso("chamados: em aberto primeiro (previsão mais perto antes), resolvidos depois", () => {
+  const c = (id, situacao, criadoEm, fimEm = null) => ({ id, situacao, criadoEm, fimEm });
+  const ordem = ordenarChamados([
+    c("r1", "resolvido", "2026-11-01"), c("a1", "aberto", "2026-10-30"), c("a2", "analise", "2026-11-02", "2026-11-04T21:00:00Z"),
+    c("r2", "resolvido", "2026-11-02"), c("a3", "aberto", "2026-10-29"),
+  ]).map((x) => x.id);
+  assert.deepEqual(ordem, ["a2", "a3", "a1", "r2", "r1"]);
+});
+caso("chamados: o que o técnico manda é conferido", () => {
+  const coluna = "6f1c2a3b-1111-4222-8333-944455556666";
+  assert.deepEqual(conferirAtualizacao({ colunaId: coluna }), { ok: true, mudancas: { colunaId: coluna } });
+  assert.deepEqual(conferirAtualizacao({ previsao: "2026-11-05" }), { ok: true, mudancas: { previsao: "2026-11-05" } });
+  assert.deepEqual(conferirAtualizacao({ previsao: "" }), { ok: true, mudancas: { previsao: "" } }, "vazio tira a previsão");
+  assert.equal(conferirAtualizacao({ previsao: "amanhã" }).ok, false);
+  assert.equal(conferirAtualizacao({ colunaId: "x' or 1=1" }).ok, false);
+  assert.equal(conferirAtualizacao({ resposta: "x".repeat(TETO_DA_RESPOSTA + 1) }).ok, false);
+  assert.equal(conferirAtualizacao({ resposta: "   " }).ok, false, "resposta em branco não conta");
+  assert.equal(conferirAtualizacao({}).ok, false);
+});
+caso("chamados: as rotas, a tela no menu, e só o técnico muda", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const lib = ler("../src/lib/chamados.js");
+  assert.match(lib, /if \(admin\.id !== usuario\.id\) throw new ErroDeAcesso\(403, "só o técnico muda um chamado"\)/);
+  assert.match(lib, /consulta = consulta\.like\("origem_id", `\$\{usuario\.id\}\/%`\)/, "quem não é técnico só vê os seus");
+  assert.match(lib, /card\.abacato_colunas\?\.quadro_id !== quadroId\) throw new ErroDeAcesso\(404/, "só card do quadro de chamados");
+  assert.match(lib, /\.\.\.\(tecnico \? \{ quem:/, "o nome de quem abriu só vai para o técnico");
+  assert.match(ler("../src/app/api/chamados/route.js"), /export async function GET\(req\)[\s\S]*listarChamados\(usuario\)/);
+  assert.match(ler("../src/app/api/chamados/[id]/route.js"), /export async function PATCH\(req, \{ params \}\)[\s\S]*atualizarChamado\(usuario, id, corpo\)/);
+  assert.match(ler("../src/componentes/Moldura.js"), /\{ href: "\/chamados", rotulo: "Chamados", Icone: IconeChamados, grupo: "Você" \}/);
+  assert.match(ler("../src/app/layout.js"), /import "\.\/chamados\.css";/);
+  assert.match(ler("../src/componentes/ReportarProblema.js"), /<Link href="\/chamados"/);
 });
 
 caso("raio-x: acertos do quiz pelo gabarito guardado", () => {

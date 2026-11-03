@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.43.3-cloudflare-pages.1",
+  "versao": "0.44.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-03",
   "compilacao": {
-    "numero": 88,
+    "numero": 89,
     "data": "2026-11-03",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.44.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Tela Chamados: quem reportou um problema acompanha o status, a previsão de término e as respostas; o técnico vê todos e muda status e previsão e responde ali mesmo.",
+      "itens": [
+        "Nova tela Chamados (menu \"Você\", e no celular em \"Mais\"), com filtros Em aberto, Resolvidos e Todos.",
+        "Quem abriu vê só os seus: o status (aberto, em análise, resolvido), quando abriu, o relato, a previsão de término (em vermelho quando passou) e as respostas do técnico.",
+        "O técnico (a conta administradora do Proof) vê todos os chamados, com quem abriu, e muda o status, marca ou tira a previsão e responde sem sair do Proof. Tudo continua no card do quadro \"Chamados — Lisa Proof\" do Abacato: a coluna é o status, o prazo é a previsão e a resposta é um comentário.",
+        "Depois de mandar um \"Reportar problema\", a confirmação leva para a tela Chamados."
+      ],
+      "issues": [
+        "BEYOND-0015"
+      ]
+    },
     {
       "versao": "0.43.3-cloudflare-pages.1",
       "data": "2026-11-03",
@@ -1386,7 +1402,8 @@
         "Tipos de curso além de programação (música, idiomas, matemática e livre), com exercício do dia próprio (lista de cálculo, ditado, treino de ouvido, desafio aberto) e projetos entregues por texto, fotos, áudio ou vídeo do YouTube, avaliados pela IA",
         "Ritmo e afinação ao vivo nos cursos de música, cartões com repetição espaçada (SM-2), revisão da turma (colegas confirmam critérios contestados, sem nomes) e o Modo Domínio de tema (torres de repertório, QECR, problemas e missões, entregues por evidências)",
         "Conversa com a Lisa (idiomas), passo a passo conferido linha a linha e gráficos de arrastar (matemática), leitura na pauta (música), diário de estudo, entrega em PDF, frase-senha nas gravações e fotos, e a torre do Modo Domínio feita a partir de um livro da Biblioteca",
-        "Exercício de desenhar diagramas (fluxograma, BPMN, UML, modelo de dados, arquitetura de software e de nuvem, C4) num quadro embutido, avaliado pela Lisa, nos cursos de computação, arquitetura e áreas próximas"
+        "Exercício de desenhar diagramas (fluxograma, BPMN, UML, modelo de dados, arquitetura de software e de nuvem, C4) num quadro embutido, avaliado pela Lisa, nos cursos de computação, arquitetura e áreas próximas",
+        "Tela Chamados: quem reportou acompanha status, previsão de término e respostas; o técnico (administrador) vê todos e muda status, previsão e responde (os chamados são cards do quadro \"Chamados — Lisa Proof\" no Abacato)"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",

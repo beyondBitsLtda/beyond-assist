@@ -1,0 +1,33 @@
+/* A tela Chamados (BEYOND-0015): src/app/(app)/chamados/page.js. Só tokens do tema, para o escuro sair igual. */
+
+.ch-filtros { margin-bottom: 16px; max-width: 100%; overflow-x: auto; }
+.ch-filtros__n { margin-left: 4px; font-weight: 500; opacity: 0.75; }
+.ch-vazio { text-align: center; padding: 28px 16px; }
+
+.ch-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.ch-item { display: grid; gap: 10px; min-width: 0; }
+.ch-item[data-situacao="resolvido"] { opacity: 0.85; }
+.ch-item__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ch-item__quando { font-size: 12px; color: var(--pf-tinta-2); }
+.ch-item__titulo { margin: 0; font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
+.ch-item__previsao { margin: 0; font-size: 14px; color: var(--pf-tinta-2); }
+.ch-item__previsao strong { color: var(--pf-tinta); }
+.ch-item__previsao--atrasada, .ch-item__previsao--atrasada strong { color: var(--pf-alerta); }
+
+.ch-item__relato summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--pf-tinta-2); }
+.ch-item__relato p { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+
+.ch-respostas { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ch-resposta { padding: 10px 12px; border-radius: 12px; background: var(--pf-superficie-2); border-left: 3px solid var(--pf-verde); }
+.ch-resposta__quem { font-size: 12px; font-weight: 600; color: var(--pf-tinta-2); }
+.ch-resposta p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+
+.ch-gestao { display: grid; gap: 12px; padding-top: 12px; border-top: 1px solid var(--pf-linha); }
+.ch-gestao__data { display: flex; gap: 8px; align-items: center; }
+.ch-gestao__data .pf-campo__entrada { flex: 1; min-width: 0; }
+.ch-gestao__resposta { display: grid; gap: 8px; justify-items: start; }
+.ch-gestao__resposta .pf-campo { width: 100%; }
+@media (min-width: 720px) {
+  .ch-gestao { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .ch-gestao__resposta { grid-column: 1 / -1; }
+}

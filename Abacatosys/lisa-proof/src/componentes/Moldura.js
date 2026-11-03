@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   IconeHoje, IconeTrilhas, IconeAgenda, IconePratica, IconeProgresso, IconeRaioX, IconeRanking, IconeReino, IconeDominio, IconeBolsa, IconeMais, Marca,
-  IconeCaderno, IconeBiblioteca, IconeAcervo,
+  IconeCaderno, IconeBiblioteca, IconeAcervo, IconeChamados,
 } from "./Icones.js";
 import { Confete } from "./Neuro.js";
 import Celebracao from "./Celebracao.js";
@@ -34,6 +34,7 @@ const ITENS = [
   { href: "/ranking", rotulo: "Ranking", Icone: IconeRanking, grupo: "Jogo" },
   { href: "/progresso", rotulo: "Progresso", Icone: IconeProgresso, grupo: "Você" },
   { href: "/raio-x", rotulo: "Raio-X", Icone: IconeRaioX, grupo: "Você" },
+  { href: "/chamados", rotulo: "Chamados", Icone: IconeChamados, grupo: "Você" },
 ];
 const GRUPOS = [...new Set(ITENS.map((i) => i.grupo))];
 

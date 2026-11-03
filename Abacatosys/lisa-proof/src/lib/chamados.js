@@ -13,6 +13,7 @@ import { ErroDeAcesso } from "./sessao.js";
 import {
   NOME_DO_QUADRO_DE_CHAMADOS, COLUNAS_DE_CHAMADOS, ORIGEM_DO_CHAMADO, LIMITE_POR_DIA,
   TIPOS_DE_IMAGEM, tituloDoChamado, descricaoDoChamado,
+  situacaoDoChamado, relatoDoChamado, quemAbriu, ordenarChamados, conferirAtualizacao, fimDaPrevisao,
 } from "@/dominio/chamado.js";
 
 const BUCKET_DE_COMENTARIOS = "abacato-comentarios"; // o do Abacato (src/lib/comentariosNoBanco.js)
@@ -122,4 +123,109 @@ export async function abrirChamado({ usuario, conferido, imagem, versao }) {
 
   await supabase.from("abacato_quadros").update({ atualizado_em: instante.toISOString() }).eq("id", quadroId);
   return { cardId: card.id };
+}
+
+// ---------------------------------------------------------------- a tela de chamados (03/11/2026)
+//
+// BEYOND-0015. Quem abriu vê os seus (pelo origem_id, que começa com o id dele); o técnico — o
+// administrador, dono do quadro — vê todos, com quem abriu, e muda dali mesmo o status (a coluna), a
+// previsão (o prazo do card) e responde (um comentário no card). Ninguém vê o chamado de outra pessoa.
+
+const LIMITE_DA_LISTA = 200;
+
+/** O administrador, sem levantar erro (null se o Proof não conhece o e-mail dele). */
+async function administradorOuNada() {
+  try { return await administrador(); } catch { return null; }
+}
+
+/** { tecnico, colunas: [{ id, nome, situacao }], chamados: [...] } para a tela. */
+export async function listarChamados(usuario) {
+  const admin = await administradorOuNada();
+  const tecnico = Boolean(admin && admin.id === usuario.id);
+  let colunas = [];
+  let consulta = supabase
+    .from("abacato_cards")
+    .select("id, titulo, descricao, criado_em, fim_em, concluido, origem_id, coluna_id, abacato_colunas(nome, posicao, quadro_id)")
+    .eq("origem", ORIGEM_DO_CHAMADO).eq("arquivado", false)
+    .order("criado_em", { ascending: false }).limit(LIMITE_DA_LISTA);
+  if (tecnico) {
+    const { quadroId } = await quadroDeChamados(admin.id);
+    const { data } = await supabase.from("abacato_colunas").select("id, nome, posicao")
+      .eq("quadro_id", quadroId).eq("arquivada", false).order("posicao");
+    colunas = (data || []).map((c) => ({ id: c.id, nome: c.nome, situacao: situacaoDoChamado({ coluna: c.nome }) }));
+  } else {
+    consulta = consulta.like("origem_id", `${usuario.id}/%`);
+  }
+  const { data: cards, error } = await consulta;
+  if (error) throw new ErroDeAcesso(500, `não consegui ler os chamados: ${error.message}`);
+
+  const ids = (cards || []).map((c) => c.id);
+  // as respostas: os comentários do técnico (o print que quem abriu mandou não é resposta)
+  const respostas = new Map();
+  if (ids.length && admin) {
+    const { data } = await supabase.from("abacato_comentarios").select("card_id, texto, criado_em")
+      .in("card_id", ids).eq("autor_id", admin.id).order("criado_em");
+    for (const r of data || []) respostas.set(r.card_id, [...(respostas.get(r.card_id) || []), { texto: r.texto, em: r.criado_em }]);
+  }
+  // quem abriu: só para o técnico, pelo nome da conta
+  const nomes = new Map();
+  if (tecnico && cards?.length) {
+    const quem = [...new Set(cards.map((c) => quemAbriu(c.origem_id)).filter(Boolean))];
+    const { data } = await supabase.from("abacato_usuarios").select("id, nome").in("id", quem);
+    for (const u of data || []) nomes.set(u.id, u.nome);
+  }
+
+  const chamados = (cards || []).map((c) => ({
+    id: c.id,
+    titulo: String(c.titulo || "").replace(/^🐞\s*/, ""),
+    relato: relatoDoChamado(c.descricao),
+    criadoEm: c.criado_em,
+    fimEm: c.fim_em,
+    colunaId: c.coluna_id,
+    coluna: c.abacato_colunas?.nome || "",
+    situacao: situacaoDoChamado({ coluna: c.abacato_colunas?.nome, concluido: c.concluido }),
+    respostas: respostas.get(c.id) || [],
+    ...(tecnico ? { quem: nomes.get(quemAbriu(c.origem_id)) || "(conta removida)" } : {}),
+  }));
+  return { tecnico, colunas, chamados: ordenarChamados(chamados) };
+}
+
+/** O técnico muda o status, a previsão ou responde. Só o administrador; só cards de chamado do quadro dele. */
+export async function atualizarChamado(usuario, id, pedido) {
+  const admin = await administrador();
+  if (admin.id !== usuario.id) throw new ErroDeAcesso(403, "só o técnico muda um chamado");
+  const conferido = conferirAtualizacao(pedido);
+  if (!conferido.ok) throw new ErroDeAcesso(400, conferido.erro);
+  const { mudancas } = conferido;
+  const { quadroId } = await quadroDeChamados(admin.id);
+
+  const { data: card } = await supabase.from("abacato_cards").select("id, coluna_id, abacato_colunas(quadro_id)")
+    .eq("id", id).eq("origem", ORIGEM_DO_CHAMADO).maybeSingle();
+  if (!card || card.abacato_colunas?.quadro_id !== quadroId) throw new ErroDeAcesso(404, "chamado não encontrado");
+
+  const campos = {};
+  if (mudancas.colunaId && mudancas.colunaId !== card.coluna_id) {
+    const { data: coluna } = await supabase.from("abacato_colunas").select("id, nome")
+      .eq("id", mudancas.colunaId).eq("quadro_id", quadroId).eq("arquivada", false).maybeSingle();
+    if (!coluna) throw new ErroDeAcesso(400, "status inválido");
+    // no topo da coluna nova, como o chamado novo; "resolvido" marca o card como concluído no Abacato
+    const { data: primeiro } = await supabase.from("abacato_cards").select("posicao")
+      .eq("coluna_id", coluna.id).eq("arquivado", false).order("posicao").limit(1).maybeSingle();
+    Object.assign(campos, {
+      coluna_id: coluna.id,
+      posicao: (primeiro?.posicao ?? PASSO) - PASSO,
+      concluido: situacaoDoChamado({ coluna: coluna.nome }) === "resolvido",
+    });
+  }
+  if (mudancas.previsao !== undefined) campos.fim_em = fimDaPrevisao(mudancas.previsao);
+  if (Object.keys(campos).length) {
+    const { error } = await supabase.from("abacato_cards").update(campos).eq("id", card.id);
+    if (error) throw new ErroDeAcesso(500, `não consegui mudar o chamado: ${error.message}`);
+  }
+  if (mudancas.resposta) {
+    const { error } = await supabase.from("abacato_comentarios").insert({ card_id: card.id, autor_id: admin.id, texto: mudancas.resposta });
+    if (error) throw new ErroDeAcesso(500, `não consegui gravar a resposta: ${error.message}`);
+  }
+  await supabase.from("abacato_quadros").update({ atualizado_em: new Date().toISOString() }).eq("id", quadroId);
+  return { ok: true };
 }

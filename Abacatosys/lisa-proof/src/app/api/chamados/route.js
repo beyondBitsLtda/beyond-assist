@@ -1,7 +1,7 @@
 import { json } from "@/lib/http.js";
 import { exigirUsuario, respostaDeErro, ErroDeAcesso } from "@/lib/sessao.js";
 import { conferirChamado } from "@/dominio/chamado.js";
-import { abrirChamado } from "@/lib/chamados.js";
+import { abrirChamado, listarChamados } from "@/lib/chamados.js";
 import gito from "../../../../gito.json";
 
 export const runtime = "nodejs";
@@ -10,6 +10,19 @@ export const dynamic = "force-dynamic";
 // A versão que está no ar (a do gito.json, que o build embute), para o chamado dizer em qual
 // versão o problema aconteceu. PROOF_VERSAO sobrepõe, para teste local.
 const VERSAO = process.env.PROOF_VERSAO || gito.versao || "";
+
+/**
+ * GET /api/chamados — a tela Chamados (BEYOND-0015): os chamados de quem pede, ou todos para o técnico,
+ * com o status, a previsão de término e as respostas. { tecnico, colunas, chamados }.
+ */
+export async function GET(req) {
+  try {
+    const usuario = await exigirUsuario(req);
+    return json({ ok: true, ...(await listarChamados(usuario)) });
+  } catch (e) {
+    return respostaDeErro(e);
+  }
+}
 
 /**
  * POST /api/chamados — "Reportar problema". Corpo multipart: `texto` (o relato), `pagina` (o

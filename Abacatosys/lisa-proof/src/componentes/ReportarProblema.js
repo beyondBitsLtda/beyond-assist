@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Folha from "./Folha.js";
@@ -126,7 +127,7 @@ export default function ReportarProblema({ className = "", comTexto = true }) {
         {enviado ? (
           <div className="pf-reporte">
             <h2 className="pf-reporte__titulo">Recebido! 🐞</h2>
-            <p>Seu relato virou um chamado para a equipe, com a tela em que você estava{enviado.comPrint ? " e o print" : ""}. Obrigado por avisar.</p>
+            <p>Seu relato virou um chamado para a equipe, com a tela em que você estava{enviado.comPrint ? " e o print" : ""}. Obrigado por avisar. Acompanhe o status e a previsão em <Link href="/chamados" onClick={fechar}>Chamados</Link>.</p>
             <div className="pf-acoes">
               <button type="button" className="pf-botao" onClick={fechar}>Fechar</button>
               <button type="button" className="pf-botao pf-botao--sec" onClick={() => setEnviado(null)}>Reportar outra coisa</button>

@@ -65,6 +65,11 @@ export const IconeAcervo = () => (
   <svg {...base}><path d="M3 9l9-5 9 5M5 9v9M9.5 9v9M14.5 9v9M19 9v9M3 20h18" /></svg>
 );
 
+// Chamados: um balão de conversa com um ponto de exclamação (BEYOND-0015)
+export const IconeChamados = () => (
+  <svg {...base}><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z" /><path d="M12 8v4M12 15.5v.01" /></svg>
+);
+
 // Mais: três pontos
 export const IconeMais = () => (
   <svg {...base}><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>

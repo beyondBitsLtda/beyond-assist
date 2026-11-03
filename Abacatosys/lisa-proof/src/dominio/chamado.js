@@ -77,3 +77,91 @@ export function descricaoDoChamado({ texto, pagina, contexto, usuario, instante 
   ];
   return linhas.filter((l, i) => l !== "" || i > 0).join("\n").replace(/\n{3,}/g, "\n\n");
 }
+
+// ---------------------------------------------------------------- a tela de chamados (03/11/2026)
+//
+// BEYOND-0015: "uma tela de gerenciamento de chamados: pega os chamados abertos e mostra para o técnico
+// e o requisitante o status; o técnico vê todos e o requisitante vê os seus, inclusive com a previsão de
+// término". O chamado continua sendo o card do quadro de chamados no Abacato: a coluna é o status, o
+// prazo do card (fim_em) é a previsão, e os comentários do técnico são as respostas.
+
+export const SITUACOES = {
+  aberto: { rotulo: "Aberto", ordem: 0 },
+  analise: { rotulo: "Em análise", ordem: 1 },
+  resolvido: { rotulo: "Resolvido", ordem: 2 },
+};
+export const TETO_DA_RESPOSTA = 2000;
+
+/** A situação pela coluna do card (e pelo "concluído" do Abacato): aberto, em análise ou resolvido. */
+export function situacaoDoChamado({ coluna = "", concluido = false } = {}) {
+  const nome = String(coluna).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  if (concluido || /resolvid|conclu|fechad|feito|pront/.test(nome)) return "resolvido";
+  if (/novo|abert|entrada|fila/.test(nome) || !nome) return "aberto";
+  return "analise";
+}
+
+/** "05/11" (no ano de agora) ou "05/11/2027", em Brasília. */
+export function diaEmBrasilia(instante, agora = new Date()) {
+  const fmt = (d, o) => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", ...o }).format(d);
+  const d = new Date(instante);
+  const mesmoAno = fmt(d, { year: "numeric" }) === fmt(agora, { year: "numeric" });
+  return fmt(d, mesmoAno ? { day: "2-digit", month: "2-digit" } : { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+/** A previsão de término para a tela: { texto, atrasada } — ou null quando já está resolvido. */
+export function previsaoDoChamado({ fimEm = null, situacao, agora = new Date() } = {}) {
+  if (situacao === "resolvido") return null;
+  if (!fimEm) return { texto: "sem previsão ainda", atrasada: false };
+  const atrasada = new Date(fimEm).getTime() < agora.getTime();
+  return { texto: `${atrasada ? "era para" : "previsto para"} ${diaEmBrasilia(fimEm, agora)}`, atrasada };
+}
+
+/** O relato da pessoa, sem o cabeçalho que descricaoDoChamado põe (quem, quando, aparelho). */
+export function relatoDoChamado(descricao) {
+  const t = String(descricao || "");
+  const i = t.indexOf("O que aconteceu:\n");
+  return (i >= 0 ? t.slice(i + "O que aconteceu:\n".length) : t).trim();
+}
+
+/** O id de quem abriu, guardado no começo do origem_id ("<usuário>/<instante>"). */
+export const quemAbriu = (origemId) => String(origemId || "").split("/")[0] || null;
+
+/** Os em aberto primeiro (os de previsão mais perto antes; sem previsão, os mais antigos), depois os resolvidos, do mais novo. */
+export function ordenarChamados(lista) {
+  const prazo = (c) => (c.fimEm ? new Date(c.fimEm).getTime() : Infinity);
+  return [...(lista || [])].sort((a, b) => {
+    const ra = a.situacao === "resolvido" ? 1 : 0;
+    const rb = b.situacao === "resolvido" ? 1 : 0;
+    if (ra !== rb) return ra - rb;
+    if (ra) return new Date(b.criadoEm) - new Date(a.criadoEm);
+    return prazo(a) - prazo(b) || new Date(a.criadoEm) - new Date(b.criadoEm);
+  });
+}
+
+/**
+ * O que o técnico mudou: { colunaId?, previsao? ("AAAA-MM-DD", ou "" para tirar), resposta? }.
+ * Devolve { ok, erro } ou { ok, mudancas } só com o que veio.
+ */
+export function conferirAtualizacao({ colunaId, previsao, resposta } = {}) {
+  const mudancas = {};
+  if (colunaId !== undefined) {
+    if (!/^[0-9a-f-]{36}$/i.test(String(colunaId))) return { ok: false, erro: "status inválido" };
+    mudancas.colunaId = String(colunaId);
+  }
+  if (previsao !== undefined) {
+    const p = String(previsao ?? "").trim();
+    if (p && !/^\d{4}-\d{2}-\d{2}$/.test(p)) return { ok: false, erro: "a previsão precisa ser uma data" };
+    if (p && Number.isNaN(new Date(`${p}T12:00:00Z`).getTime())) return { ok: false, erro: "a previsão precisa ser uma data" };
+    mudancas.previsao = p;
+  }
+  if (resposta !== undefined) {
+    const r = String(resposta ?? "").replace(/\r\n/g, "\n").trim();
+    if (r.length > TETO_DA_RESPOSTA) return { ok: false, erro: `a resposta passou de ${TETO_DA_RESPOSTA} caracteres` };
+    if (r) mudancas.resposta = r;
+  }
+  if (!Object.keys(mudancas).length) return { ok: false, erro: "nada para mudar" };
+  return { ok: true, mudancas };
+}
+
+/** A previsão "AAAA-MM-DD" vira o fim do expediente desse dia em Brasília (18:00, UTC−3). */
+export const fimDaPrevisao = (dia) => (dia ? `${dia}T21:00:00.000Z` : null);
