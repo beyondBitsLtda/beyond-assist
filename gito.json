@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.37.2-dominio.1",
+  "versao": "0.38.0",
   "atualizadoEm": "2026-11-04",
   "compilacao": {
-    "numero": 73,
+    "numero": 74,
     "data": "2026-11-04",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.38.0",
+      "data": "2026-11-04",
+      "branch": "main",
+      "tipo": "funcionalidade",
+      "resumo": "A main recebe a branch dominio inteira: a Lisa até a 0.37.1, o Lisa Proof e a primeira API Route do Modo Domínio, a /api/ping.",
+      "itens": [
+        "Fim da 0.37.2-dominio.1: a dominio chega à main com tudo o que veio da cloudflare-pages (as versões 0.2.0 a 0.37.1 da Lisa, no histórico abaixo) e o Lisa Proof em Abacatosys/lisa-proof, que tem versão e histórico no gito.json dele.",
+        "Andar 3 do Modo Domínio: a rota GET /api/ping (src/app/api/ping/route.js) responde { \"status\": \"online\" } e serve para conferir se a plataforma está no ar.",
+        "Os andares 1 e 2 (0.1.1) continuam valendo: o cliente do Supabase só roda no servidor."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.37.2-dominio.1",
       "data": "2026-11-04",
@@ -1166,7 +1179,8 @@
         "Documentar um projeto do ProcessMap: a Lisa escreve no editor de código a visão geral e um .md por desenho (para pedir a uma IA de código construir as rotas), sem mudar os desenhos",
         "Versões anteriores de cada fluxograma do ProcessMap, com \"voltar para esta\"",
         "Modo MVP: usuários convidados (que não são o dono) entram numa versão limitada — conversa e voz, Modo Tela, editor de código, ProcessMap, repositórios públicos, entrevista do primeiro acesso e o atalho da Lisa Task —, com limite diário de uso",
-        "Lisa Task: é o Abacato com o nome e o visual da Lisa (conta do tipo Lisa Task), só com os quadros de tarefas; a parte de documentos (projetos, pastas e arquivos) não existe para ela e é barrada no servidor. O menu Lisa Task abre lisatask.beyond.dev.br (o mesmo Abacato, com o título e o ícone da Lisa na aba) em outra aba já com a conta da Lisa (a conta Lisa Task nasce no primeiro acesso)."
+        "Lisa Task: é o Abacato com o nome e o visual da Lisa (conta do tipo Lisa Task), só com os quadros de tarefas; a parte de documentos (projetos, pastas e arquivos) não existe para ela e é barrada no servidor. O menu Lisa Task abre lisatask.beyond.dev.br (o mesmo Abacato, com o título e o ícone da Lisa na aba) em outra aba já com a conta da Lisa (a conta Lisa Task nasce no primeiro acesso).",
+        "Rota GET /api/ping, que responde { \"status\": \"online\" } para conferir se a plataforma está no ar."
       ],
       "naoInclui": [
         "Não é multiusuário: o login existe, mas só para o responsável.",
