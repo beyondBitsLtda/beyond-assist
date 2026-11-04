@@ -1,0 +1,437 @@
+/* Prática: visão geral, quiz, exercício e projeto. */
+
+.pratica__neuro { display: flex; align-items: center; padding: 12px 16px !important; background: transparent; border-style: dashed; }
+
+.pratica__grade { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .pratica__grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.pratica__bloco {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 84px; text-align: left;
+  padding: 14px 16px; border-radius: var(--pf-raio); cursor: pointer;
+  background: var(--pf-superficie); color: var(--pf-tinta);
+  border: 2px solid var(--pf-linha); box-shadow: 0 4px 0 var(--pf-linha);
+  text-decoration: none; font: inherit;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.pratica__bloco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--pf-linha); }
+.pratica__bloco:disabled { cursor: progress; opacity: 0.75; }
+.pratica__bloco--feito { border-color: #EAB308; box-shadow: 0 4px 0 #CA8A04; }
+.pratica__bloco--andamento { border-color: var(--pf-verde); box-shadow: 0 4px 0 var(--pf-verde-sombra); }
+.pratica__bloco--parcial { border-color: #F97316; box-shadow: 0 4px 0 #C2410C; }
+.pratica__icone { font-size: 30px; line-height: 1; flex: none; }
+.pratica__textos { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.pratica__textos small { color: var(--pf-tinta-2); font-size: 13px; }
+.pratica__pontos { color: var(--pf-verde-texto) !important; font-weight: 800; }
+.pratica__acao {
+  flex: none; padding: 6px 12px; border-radius: var(--pf-pilula);
+  background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); font-weight: 900; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  background: var(--pf-botao-fundo); box-shadow: var(--pf-botao-brilho); font-family: var(--pf-fonte-titulo); font-weight: 600;
+}
+
+/* ---- quiz ---- */
+.quiz { max-width: 680px; margin: 0 auto; display: grid; gap: 16px; }
+.quiz__topo { display: flex; align-items: center; gap: 12px; }
+.quiz__topo .pf-barra { margin-top: 0; height: 14px; background: var(--pf-calor-0); }
+.quiz__sair { font-size: 20px; color: var(--pf-tinta-3); text-decoration: none; padding: 6px; }
+.quiz__contador { font-weight: 700; color: var(--pf-tinta-2); font-variant-numeric: tabular-nums; }
+.quiz__neuro { display: flex; }
+.quiz__pergunta { font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.quiz__pergunta p { margin: 0 0 8px; }
+.quiz__pergunta pre, .desafio__texto pre {
+  margin: 8px 0; padding: 12px; border-radius: 10px; overflow-x: auto; font-size: 14px; font-weight: 400;
+  background: var(--pf-codigo-fundo); color: var(--pf-codigo-tinta);
+}
+.quiz__pergunta code, .quiz__opcao code, .desafio code { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 0.92em; }
+.quiz__pergunta :not(pre) > code, .quiz__opcao code, .desafio :not(pre) > code { background: var(--pf-linha); padding: 1px 5px; border-radius: 6px; }
+
+.quiz__opcoes { display: grid; gap: 10px; }
+.quiz__opcao {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; text-align: left;
+  padding: 12px 14px; border-radius: 14px; cursor: pointer; font-size: 15px;
+  background: var(--pf-superficie); color: var(--pf-tinta);
+  border: 2px solid var(--pf-linha); box-shadow: 0 4px 0 var(--pf-linha);
+}
+.quiz__opcao:hover:not(:disabled) { border-color: var(--pf-verde); }
+.quiz__opcao:disabled { cursor: default; }
+.quiz__letra {
+  flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  border: 2px solid var(--pf-linha); font-weight: 800; font-size: 13px; color: var(--pf-tinta-2);
+}
+.quiz__opcao--certa { border-color: var(--pf-verde); box-shadow: 0 4px 0 var(--pf-verde-sombra); background: var(--pf-sucesso-fundo); }
+.quiz__opcao--certa .quiz__letra { background: var(--pf-verde); border-color: var(--pf-verde); color: #FFFFFF; }
+.quiz__opcao--errada { border-color: var(--pf-alerta); box-shadow: 0 4px 0 #991B1B; background: var(--pf-alerta-fundo); }
+.quiz__opcao--errada .quiz__letra { background: var(--pf-alerta); border-color: var(--pf-alerta); color: #FFFFFF; }
+
+.quiz__retorno {
+  position: sticky; bottom: calc(var(--pf-nav-altura) + 8px + env(safe-area-inset-bottom)); z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px; border-radius: var(--pf-raio); animation: neuro-balao 0.2s ease-out;
+}
+@media (min-width: 900px) { .quiz__retorno { bottom: 16px; } }
+.quiz__retorno p { margin: 4px 0 0; font-size: 14px; }
+.quiz__retorno div { flex: 1 1 240px; }
+.quiz__retorno--certo { background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
+.quiz__retorno--errado { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+.quiz__retorno--errado .pf-botao { background: var(--pf-alerta); color: #FFFFFF; }
+
+.quiz__fim { display: grid; justify-items: center; text-align: center; gap: 6px; padding: 24px 16px; }
+.quiz__placar { font-size: 56px; font-weight: 800; line-height: 1; }
+.quiz__placar small { font-size: 24px; color: var(--pf-tinta-2); }
+.quiz__revisao { display: grid; gap: 6px; }
+.quiz__lista-revisao { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.quiz__lista-revisao li { padding: 6px 10px; border-radius: 8px; }
+.quiz__ok { background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
+.quiz__erro { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+
+/* ---- exercício e projeto ---- */
+.desafio { display: grid; gap: 14px; max-width: 860px; }
+.desafio .pf-campo__rotulo { margin: 14px 0 6px; display: block; }
+.desafio__texto { font-size: 15px; }
+.desafio__texto h3 { font-size: 16px; margin: 12px 0 6px; }
+.desafio__texto p { margin: 0 0 8px; }
+.desafio__exemplo {
+  margin: 0; padding: 12px; border-radius: 10px; overflow-x: auto; white-space: pre-wrap;
+  background: var(--pf-superficie-2); font-family: ui-monospace, Consolas, monospace; font-size: 13px;
+}
+.desafio__dicas { display: grid; gap: 6px; margin-top: 12px; }
+.desafio__dicas details { background: var(--pf-superficie-2); border-radius: 10px; padding: 8px 12px; }
+.desafio__dicas summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.desafio__dicas p { margin: 6px 0 2px; font-size: 14px; }
+.desafio__requisitos { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+
+/* Projeto: complexidade, valor de cada parte e o placar das entregas parciais */
+.complexidade { display: grid; gap: 6px; margin: 4px 0 6px; }
+.complexidade__opcoes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.complexidade__opcao {
+  display: grid; gap: 2px; justify-items: center; min-height: 48px; padding: 6px 8px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; font-weight: 600; font-size: 14px;
+}
+.complexidade__opcao small { font-weight: 500; font-size: 12px; color: var(--pf-tinta-2); }
+.complexidade__opcao--atual { border-color: var(--pf-verde); background: var(--pf-sucesso-fundo); box-shadow: inset 0 0 0 1px var(--pf-verde); }
+.complexidade__opcao:disabled { cursor: not-allowed; opacity: .55; }
+.complexidade__opcao--atual:disabled { opacity: 1; }
+.complexidade__nota { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
+.projeto__parte { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.projeto__parte > span:first-child { min-width: 0; }
+.projeto__valor {
+  flex: none; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  background: var(--pf-pilula); color: var(--pf-tinta);
+}
+.projeto__valor--feito { background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
+.projeto__parte--feita > .projeto__parte > span:first-child { color: var(--pf-tinta-2); }
+.projeto__placar { display: grid; gap: 8px; margin-top: 14px; padding: 12px; border-radius: 12px; background: var(--pf-superficie-2); }
+.projeto__placar-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.projeto__nota { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
+.projeto__entregas { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13px; }
+
+/* Projeto ligado à semana do curso (23/10/2026): os assuntos que ele pratica, requisito por requisito */
+.projeto__assuntos { display: grid; gap: 6px; margin: 4px 0 8px; padding: 10px 12px; border-radius: 12px; background: var(--pf-superficie-2); }
+.projeto__assuntos-lista { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.projeto__assuntos-lista li {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 4px 10px 4px 4px; border-radius: 999px;
+  background: var(--pf-pilula); font-size: 13px; font-weight: 600;
+}
+.projeto__assunto-n {
+  flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--pf-verde); color: #FFFFFF; font-size: 11px; font-weight: 800;
+}
+.projeto__assunto-tag {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; margin-top: 4px; padding: 2px 10px 2px 2px; border-radius: 999px;
+  background: var(--pf-pilula); color: var(--pf-tinta-2); font-size: 12px; font-weight: 600;
+}
+.projeto__assunto-texto { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.projeto__assunto-tag .projeto__assunto-n { width: 18px; height: 18px; font-size: 10px; }
+.projeto__trocar { display: grid; gap: 8px; margin: 12px 0 4px; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--pf-linha); }
+.projeto__trocar p { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
+.projeto__trocar--antigo { border: 1px solid var(--pf-atencao); background: var(--pf-atencao-fundo); }
+.projeto__trocar--antigo p { color: var(--pf-tinta); font-weight: 600; }
+.projeto__trocar-acao { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.projeto__trocar-acao small { font-size: 12px; color: var(--pf-tinta-2); }
+
+/* Rodar o código do exercício */
+.rodar { display: grid; gap: 8px; margin-top: 8px; }
+.rodar__barra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rodar__onde { font-size: 13px; color: var(--pf-tinta-2); }
+.rodar__link { background: none; border: 0; padding: 4px 0; color: var(--pf-verde-forte); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.rodar__entrada { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 14px; resize: vertical; }
+.rodar__saida { border-radius: 12px; overflow: hidden; background: var(--pf-codigo-fundo); color: var(--pf-codigo-tinta); }
+.rodar__topo { display: flex; justify-content: space-between; padding: 6px 12px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .75; }
+.rodar__linha {
+  margin: 0; padding: 2px 12px; white-space: pre-wrap; word-break: break-word; font-size: 13.5px; line-height: 1.5;
+  font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
+}
+.rodar__linha:last-child { padding-bottom: 10px; }
+.rodar__linha--erro { color: #ff8a80; }
+.rodar__linha--aviso { color: #ffd479; }
+.rodar__linha--info { opacity: .8; font-style: italic; }
+.rodar__tabela-caixa { overflow-x: auto; padding: 0 12px 10px; }
+.rodar__tabela { border-collapse: collapse; font-size: 13px; font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; }
+.rodar__tabela th, .rodar__tabela td { border: 1px solid rgba(255, 255, 255, .18); padding: 4px 10px; text-align: left; white-space: nowrap; }
+.rodar__tabela th { font-weight: 700; }
+.rodar__nota { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
+.rodar__saida .rodar__nota { color: inherit; opacity: .75; padding-top: 6px; }
+
+/* Dicas da Lisa (projetos): o passo a passo dá para ir marcando */
+.dicas-lisa { display: grid; gap: 10px; }
+.dicas-lisa__topo { display: flex; align-items: center; gap: 12px; }
+.dicas-lisa__topo > :first-child { flex: none; }
+.dicas-lisa__titulo { margin: 0; font-weight: 700; font-size: 17px; color: var(--pf-tinta); }
+.dicas-lisa__sub { margin: 2px 0 0; font-size: 14px; color: var(--pf-tinta-2); }
+.dicas-lisa .pf-campo__rotulo { margin: 4px 0 0; }
+.dicas-lisa__passos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dicas-lisa__passo label {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer; min-height: 40px;
+  background: var(--pf-superficie-2); border-radius: 10px; padding: 9px 12px; font-size: 14px; line-height: 1.5;
+}
+.dicas-lisa__passo input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--pf-verde); }
+.dicas-lisa__passo--feito span { color: var(--pf-tinta-2); text-decoration: line-through; }
+
+.entrega { display: grid; gap: 12px; }
+.entrega__codigo {
+  width: 100%; min-height: 260px; resize: vertical; padding: 14px; border-radius: 12px;
+  border: 1px solid var(--pf-linha); background: var(--pf-codigo-fundo); color: var(--pf-codigo-tinta);
+  font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 14px; line-height: 1.55; tab-size: 2;
+}
+
+.avaliacao { display: grid; gap: 10px; }
+.avaliacao__topo { display: flex; gap: 16px; align-items: flex-start; }
+.avaliacao__nota {
+  flex: none; width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 26px; font-weight: 800; border: 6px solid #F97316; color: #C2410C;
+}
+.avaliacao__nota--ok { border-color: var(--pf-verde); color: var(--pf-verde-forte); }
+.avaliacao__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.avaliacao__lista li { display: flex; gap: 10px; padding: 8px 10px; border-radius: 10px; font-size: 14px; }
+.avaliacao__lista small { display: block; color: var(--pf-tinta-2); margin-top: 2px; }
+.avaliacao__ok { background: var(--pf-sucesso-fundo); }
+.avaliacao__ok b { color: var(--pf-verde-forte); }
+.avaliacao__falta { background: var(--pf-alerta-fundo); }
+.avaliacao__falta b { color: var(--pf-alerta); }
+.avaliacao__simples { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
+.avaliacao .pf-campo__rotulo { margin: 6px 0 0; }
+
+/* ---- criar curso ---- */
+.curso__neuro { display: flex; align-items: center; margin-bottom: 14px; }
+.curso__form { display: grid; gap: 16px; max-width: 720px; }
+.curso__form textarea.pf-campo__entrada { resize: vertical; min-height: 64px; }
+.curso__resumo { display: grid; gap: 12px; }
+.curso__assuntos { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.curso__assunto { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; padding: 12px 14px; }
+.curso__tirar {
+  width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--pf-linha);
+  background: transparent; color: var(--pf-tinta-3); cursor: pointer;
+}
+.curso__tirar:hover { color: var(--pf-alerta); border-color: var(--pf-alerta); }
+.curso__tarefas { margin-top: 6px; font-size: 13px; }
+.curso__tarefas summary { cursor: pointer; color: var(--pf-tinta-2); font-weight: 600; }
+.curso__tarefas ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 2px; color: var(--pf-tinta-2); }
+.curso__confirmar { margin-top: 20px; position: sticky; bottom: calc(var(--pf-nav-altura) + 8px + env(safe-area-inset-bottom)); background: var(--pf-fundo); padding: 10px 0; }
+@media (min-width: 900px) { .curso__confirmar { bottom: 0; } }
+.trilhas__criar {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 16px; text-decoration: none; color: inherit;
+  border: 2px dashed var(--pf-verde); background: var(--pf-sucesso-fundo);
+}
+.trilhas__criar strong { display: block; font-size: 16px; }
+.trilhas__criar small { color: var(--pf-tinta-2); }
+
+/* ---- conquistas ---- */
+.conquistas { display: grid; gap: 18px; }
+.conquistas__grupo .pf-campo__rotulo { margin: 0 0 8px; }
+.conquistas__grade { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 640px) { .conquistas__grade { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .conquistas__grade { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.conquista {
+  display: grid; justify-items: center; text-align: center; gap: 4px; padding: 14px 10px;
+  border-radius: 16px; background: var(--pf-superficie-2); border: 2px solid transparent;
+}
+.conquista .pf-barra { width: 100%; margin-top: 4px; background: var(--pf-calor-0); }
+.conquista__medalha {
+  width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; font-size: 28px;
+  background: var(--pf-calor-0); filter: grayscale(1); opacity: 0.55;
+}
+.conquista--ok { border-color: #EAB308; }
+.conquista--ok .conquista__medalha {
+  filter: none; opacity: 1;
+  background: radial-gradient(circle at 35% 30%, #FEF08A 0%, #EAB308 55%, #A16207 100%);
+  box-shadow: 0 3px 0 #A16207, 0 0 16px rgba(234, 179, 8, 0.35);
+}
+.conquista__nome { font-size: 14px; line-height: 1.25; }
+.conquista__descricao { font-size: 12px; color: var(--pf-tinta-2); line-height: 1.3; }
+.conquista__quando { font-size: 12px; font-weight: 700; color: var(--pf-tinta-2); }
+.conquista--ok .conquista__quando { color: #CA8A04; }
+
+/* ---- Hoje: o Neuro em destaque e a prática do dia ---- */
+.hoje__neuro { display: flex; align-items: center; margin-bottom: 16px; }
+.hoje__pratica { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .hoje__pratica { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* bloco do diário + o "mais um hoje" logo abaixo */
+.pratica__celula { display: grid; gap: 6px; align-content: start; }
+.pratica__mais { justify-self: start; }
+
+/* o projeto da semana seguinte, trancado até o da semana anterior ser aprovado (23/10/2026) */
+.pratica__bloco--trancado { opacity: 0.6; }
+.pratica__bloco:disabled { cursor: default; }
+
+/* ---- cursos que não são de programação (30/10/2026): o tipo de curso, os motores e a entrega */
+.perfil-curso { display: grid; gap: 6px; }
+.perfil-curso__opcoes { flex-wrap: wrap; }
+
+.motor { display: grid; gap: 14px; }
+.motor__itens { margin: 0; padding-left: 22px; display: grid; gap: 14px; }
+.motor__itens > li { display: grid; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--pf-superficie-2); border: 1px solid transparent; }
+.motor__itens > li::marker { font-weight: 800; color: var(--pf-tinta-2); }
+.motor__item--certo { border-color: var(--pf-verde) !important; background: var(--pf-sucesso-fundo) !important; }
+.motor__item--errado { border-color: var(--pf-alerta) !important; background: var(--pf-alerta-fundo) !important; }
+.motor__entrada { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; }
+.motor__aviso { color: var(--pf-alerta); font-size: 13px; }
+.motor__correcao { display: grid; gap: 4px; font-size: 14px; }
+.motor__correcao p { margin: 0; color: var(--pf-tinta-2); }
+.motor__opcoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.motor__opcao {
+  min-height: 40px; padding: 0 12px; border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta);
+}
+.motor__opcao[aria-checked="true"] { border-color: var(--pf-verde); box-shadow: inset 0 0 0 1px var(--pf-verde); }
+.motor__opcao--certa { border-color: var(--pf-verde); background: var(--pf-verde); color: #FFFFFF; }
+.motor__opcao--errada { border-color: var(--pf-alerta); background: var(--pf-alerta-fundo); text-decoration: line-through; }
+.motor__opcao:disabled { cursor: default; }
+
+.ditado__palavras { display: flex; flex-wrap: wrap; gap: 4px 6px; font-size: 15px; }
+.ditado__palavra { padding: 1px 6px; border-radius: 6px; }
+.ditado__palavra--ok { background: var(--pf-verde); color: #FFFFFF; }
+.ditado__palavra--acento { background: var(--pf-atencao-fundo); color: var(--pf-atencao); }
+.ditado__palavra--falta { border: 1px solid var(--pf-alerta); text-decoration: line-through; }
+
+.evid__fotos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; max-width: 420px; }
+.evid__fotos li { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--pf-superficie-2); }
+.evid__fotos img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.evid__fotos--mini { max-width: 240px; }
+.evid__tirar {
+  position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; border-radius: 50%; border: 0; cursor: pointer;
+  background: rgba(0, 0, 0, 0.65); color: #FFFFFF; font-size: 14px; line-height: 1;
+}
+.evid__audio { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.evid__audio audio { max-width: 100%; height: 40px; }
+.evid__arquivo { cursor: pointer; }
+.evid__ultima { display: grid; gap: 8px; }
+.evid__texto { margin: 0; white-space: pre-wrap; font-size: 14px; color: var(--pf-tinta-2); max-height: 220px; overflow: auto; }
+
+/* ---- ritmo e afinação ao vivo (31/10/2026) */
+.ritmo__compasso { display: grid; gap: 4px; max-width: 520px; }
+.ritmo__grade { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 2px; }
+.ritmo__celula { height: 26px; border-radius: 4px; background: var(--pf-superficie); border: 1px solid var(--pf-linha); font-size: 11px; font-weight: 800; color: var(--pf-tinta-2); display: grid; place-items: center; }
+.ritmo__celula--tempo { border-left: 2px solid var(--pf-tinta-2); }
+.ritmo__celula--batida { background: var(--pf-tinta); color: var(--pf-superficie); border-color: var(--pf-tinta); }
+.ritmo__toques { position: relative; height: 14px; }
+.ritmo__toques i { position: absolute; top: 0; width: 0; height: 0; transform: translateX(-6px); border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 10px solid var(--pf-verde-forte); }
+.ritmo__cursor { position: absolute; top: -32px; bottom: 0; width: 2px; background: var(--pf-alerta); }
+.ritmo__pad {
+  width: 100%; max-width: 520px; min-height: 96px; border-radius: 16px; border: 2px solid var(--pf-tinta); background: var(--pf-superficie);
+  color: var(--pf-tinta); font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; touch-action: manipulation; user-select: none;
+}
+.ritmo__pad:active { background: var(--pf-superficie-2); }
+.afin__ao-vivo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.afin__nota { font-size: 24px; font-weight: 800; min-width: 64px; }
+.afin__agulha { position: relative; flex: 1; min-width: 160px; max-width: 360px; height: 18px; border-radius: 9px; background: var(--pf-superficie); border: 1px solid var(--pf-linha); }
+.afin__centro { position: absolute; left: 30%; width: 40%; top: 0; bottom: 0; background: var(--pf-verde-claro); }
+.afin__ponteiro { position: absolute; top: -4px; bottom: -4px; width: 4px; transform: translateX(-2px); border-radius: 2px; background: var(--pf-alerta); transition: left 60ms linear; }
+.afin__ponteiro--ok { background: var(--pf-verde-forte); }
+
+/* ---- atalhos da prática: cartões e revisão da turma (31/10/2026) */
+.pratica__atalhos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 12px; }
+.pratica__atalho {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--pf-raio); background: var(--pf-superficie);
+  border: 1px solid var(--pf-linha); color: var(--pf-tinta); text-decoration: none;
+}
+.pratica__atalho > span:first-child { font-size: 26px; }
+.pratica__atalho > span:last-child { display: grid; gap: 2px; }
+.pratica__atalho small { color: var(--pf-tinta-2); font-size: 13px; }
+.pratica__atalho:hover { border-color: var(--pf-tinta-2); }
+
+/* ---- revisão da turma (31/10/2026) */
+.turma__convite { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.turma__pedido, .turma__cartao, .turma__resultado { display: grid; gap: 10px; }
+.turma__fila { display: grid; gap: 12px; }
+.turma__meu { display: grid; gap: 4px; }
+.turma__entrega { display: grid; gap: 8px; }
+.turma__criterios { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
+.turma__criterios > li { display: grid; gap: 6px; }
+.turma__contestado { padding: 8px 10px; border-radius: 10px; background: var(--pf-superficie-2); }
+.turma__marcar { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+.turma__marcar input { margin-top: 3px; }
+.turma__marcar small { color: var(--pf-tinta-2); }
+.turma__vereditos { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.turma__selo { display: inline-block; padding: 1px 8px; border-radius: var(--pf-pilula); font-size: 12px; font-weight: 800; border: 1px solid var(--pf-linha); }
+.turma__selo--cumpriu { border-color: var(--pf-verde-forte); color: var(--pf-verde-forte); }
+.turma__selo--nao_cumpriu { border-color: var(--pf-alerta); color: var(--pf-alerta); }
+.turma__comentario { margin: 0; padding: 8px 12px; border-left: 3px solid var(--pf-linha); color: var(--pf-tinta-2); white-space: pre-wrap; }
+
+/* ---- passo a passo, gráfico, leitura na pauta, conversa, frase-senha e diário (31/10/2026) */
+.passos__inicio { font-size: 1.05em; }
+.passos__linhas { margin: 0; padding-left: 22px; display: grid; gap: 4px; font-size: 14px; }
+.passos__linha--ok::marker, .passos__linha--ok { color: var(--pf-verde-forte); }
+.passos__linha--erro { color: var(--pf-alerta); font-weight: 700; }
+.passos__linha--nao { color: var(--pf-tinta-2); }
+.grafico__itens > li { justify-items: start; }
+.grafico__plano { width: 100%; max-width: 340px; aspect-ratio: 1; background: var(--pf-superficie); border: 1px solid var(--pf-linha); border-radius: 12px; touch-action: none; }
+.grafico__grade { stroke: var(--pf-linha); stroke-width: 0.03; }
+.grafico__eixo { stroke: var(--pf-tinta-2); stroke-width: 0.07; }
+.grafico__reta { stroke: var(--pf-verde-forte); stroke-width: 0.1; }
+.grafico__parabola { fill: none; stroke: var(--pf-verde-forte); stroke-width: 0.1; }
+.grafico__ponto { fill: var(--pf-alerta); stroke: var(--pf-superficie); stroke-width: 0.1; }
+.grafico__ponto--solto { cursor: grab; }
+.grafico__ponto:focus-visible { outline: none; stroke: var(--pf-tinta); stroke-width: 0.18; }
+.leitura__itens > li { justify-items: start; }
+.leitura__pauta { width: 100%; max-width: 220px; height: auto; }
+.leitura__linha { stroke: var(--pf-tinta); stroke-width: 1; }
+.leitura__clave { fill: var(--pf-tinta); font-size: 52px; font-family: "Noto Music", "Segoe UI Symbol", "Apple Symbols", serif; }
+.leitura__clave--fa { font-size: 34px; }
+.leitura__nota { fill: var(--pf-tinta); }
+.conversa { display: grid; gap: 12px; }
+.conversa__turnos { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; max-height: 460px; overflow: auto; }
+.conversa__fala { position: relative; display: grid; gap: 4px; padding: 10px 12px; border-radius: 14px; max-width: 86%; }
+.conversa__fala p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.conversa__fala--lisa { justify-self: start; background: var(--pf-superficie-2); padding-right: 40px; }
+.conversa__fala--pessoa { justify-self: end; background: var(--pf-superficie); border: 1px solid var(--pf-linha); }
+.conversa__quem { font-size: 12px; font-weight: 800; color: var(--pf-tinta-2); }
+.conversa__ouvir { position: absolute; top: 6px; right: 6px; border: 0; background: transparent; font-size: 18px; cursor: pointer; }
+.conversa__correcao { color: var(--pf-tinta-2); border-top: 1px dashed var(--pf-linha); padding-top: 4px; }
+.conversa__enviar { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+.senha { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--pf-tinta-2); background: var(--pf-superficie-2); font-size: 14px; }
+.senha small { display: block; color: var(--pf-tinta-2); margin-top: 2px; }
+.senha__frase { white-space: nowrap; }
+.diario { display: grid; gap: 8px; justify-items: start; margin-top: 10px; }
+.diario__form { display: grid; gap: 8px; width: 100%; max-width: 640px; }
+.diario__lista { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.diario__lista small { color: var(--pf-tinta-2); }
+.dm-andar__livro { margin: 0; font-size: 14px; }
+/* o desenho de diagrama (31/10/2026): o quadro do ProcessMap num iframe; tela cheia cobre a página */
+.diagrama { display: grid; gap: 10px; }
+.diagrama__tipo { justify-self: start; }
+.diagrama__requisitos { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+.diagrama__barra { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.diagrama__ajuda { margin: 0; flex: 1 1 260px; }
+.diagrama__moldura { position: relative; height: clamp(440px, 68vh, 760px); border: 1px solid var(--pf-linha); border-radius: 14px; overflow: hidden; background: var(--pf-superficie-2); }
+.diagrama__quadro { display: block; width: 100%; height: 100%; border: 0; }
+.diagrama__carregando { position: absolute; inset: 0; display: grid; place-items: center; color: var(--pf-tinta-2); font-size: 14px; }
+.diagrama--cheia { position: fixed; inset: 0; z-index: 1000; margin: 0; border-radius: 0; grid-template-rows: auto 1fr auto auto auto auto; overflow: auto; }
+.diagrama--cheia .diagrama__moldura { height: auto; min-height: 320px; }
+body.diagrama-sem-rolar { overflow: hidden; }
+@media (max-width: 520px) { .conversa__fala { max-width: 100%; } .diagrama__moldura { height: 70vh; } }
+
+/* o exemplo da Lisa (03/11/2026, BEYOND-0022): os conceitos e uma aplicação de exemplo com todos eles */
+.exemplo-lisa { margin-top: 14px; }
+.exemplo-lisa__corpo > summary { cursor: pointer; font-weight: 700; color: var(--pf-tinta); }
+.exemplo-lisa__corpo[open] > summary { margin-bottom: 8px; }
+.exemplo-lisa__conceitos { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.exemplo-lisa__passos { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
+.exemplo-lisa__seu { margin: 6px 0 0; padding: 8px 10px; border-radius: var(--pf-raio); background: var(--pf-superficie-2); font-size: 14px; }
+
+/* ---- o minigame do dia (03/11/2026: a Arena virou minigame da Prática, como o quiz) */
+.mg-dia__bloco { width: 100%; }
+.mg-dia__corpo { margin-top: 14px; display: grid; gap: 14px; }
+.mg-dia__corpo .agenda__modos { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+/* o contador de fases do minigame é progresso, não aviso: neutro */
+.mg-dia__corpo .co-abas__n { background: var(--pf-superficie); color: var(--pf-tinta-2); border: 1px solid var(--pf-linha); font-weight: 800; }
+.mg-dia__corpo [aria-selected="true"] .co-abas__n { background: var(--pf-tinta-sobre-verde); color: #A2E33A; border-color: transparent; }

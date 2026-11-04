@@ -1,0 +1,127 @@
+// O portão da Lisa: roda ANTES de qualquer página ou rota, e decide quem passa.
+//
+// Ele precisa ser rápido, porque roda em toda requisição. Por isso a conferência do token é
+// local (assinatura conferida com Web Crypto, ver src/lib/authSession.js) e só há viagem de
+// rede quando o token está perto de vencer — uma vez por hora, não uma vez por clique.
+
+import { NextResponse } from "next/server";
+import {
+  COOKIE_SESSAO,
+  COOKIE_RENOVA,
+  COOKIE_PAPEL,
+  conferirToken,
+  ehApi,
+  ehLivre,
+  lerPayload,
+  papelDe,
+  podeAcessar,
+  precisaRenovar,
+} from "@/lib/authSession.js";
+
+/**
+ * O que o portão NÃO vê.
+ *
+ * Arquivos estáticos e imagens ficam de fora por desempenho: passar o editor Monaco inteiro
+ * (15 MB) por uma checagem de assinatura a cada pedaço não protege nada e custa em tudo.
+ * A regra de negócio — quais CAMINHOS são livres — mora em authSession.js, não aqui.
+ *
+ * `marca/` é a logo da tela de abertura: ela aparece ANTES do login, então o portão barrá-la
+ * trocaria a imagem pelo HTML da tela de login, e a abertura sairia sem marca nenhuma.
+ */
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|monaco|mediapipe|models|preview.html|marca/|diagramas/).*)"],
+};
+
+function paraLogin(req, caminho) {
+  const url = new URL("/login", req.url);
+  if (caminho && caminho !== "/") url.searchParams.set("de", caminho);
+  const resp = NextResponse.redirect(url);
+  // Cookie inválido some junto: senão o navegador insiste em mandá-lo a cada tentativa, e o
+  // log fica cheio de "assinatura não bate" que não são ataque, são lixo.
+  resp.cookies.delete(COOKIE_SESSAO);
+  return resp;
+}
+
+function negar(motivo) {
+  return NextResponse.json(
+    { ok: false, error: "não autenticado", motivo },
+    { status: 401, headers: { "cache-control": "no-store" } }
+  );
+}
+
+/** Troca o token vencido por um novo, usando o de renovação. Devolve os dois novos, ou null. */
+async function renovar(tokenDeRenovacao) {
+  const url = process.env.SUPABASE_URL;
+  const anon = process.env.SUPABASE_ANON_KEY;
+  if (!url || !anon || !tokenDeRenovacao) return null;
+  try {
+    const r = await fetch(`${url}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+      headers: { apikey: anon, "content-type": "application/json" },
+      body: JSON.stringify({ refresh_token: tokenDeRenovacao }),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j?.access_token ? { acesso: j.access_token, renova: j.refresh_token } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * O papel decide o que passa (01/11/2026, o MVP — ver papelDe e DO_USUARIO em authSession.js).
+ * Usuário fora da lista: API recebe 403, página volta para o assistente. Quem passa leva o cookie
+ * do papel, para a tela esconder o que ele não usa.
+ */
+function comPapel(req, caminho, payload, resp = NextResponse.next()) {
+  const papel = papelDe(payload, process.env.LISA_ADMINS);
+  if (!podeAcessar(papel, caminho)) {
+    if (ehApi(caminho)) {
+      return NextResponse.json(
+        { ok: false, error: "isso não faz parte da sua versão da Lisa", motivo: "papel" },
+        { status: 403, headers: { "cache-control": "no-store" } }
+      );
+    }
+    const volta = NextResponse.redirect(new URL("/assistant", req.url));
+    for (const c of resp.cookies.getAll()) volta.cookies.set(c);
+    resp = volta;
+  }
+  if (req.cookies.get(COOKIE_PAPEL)?.value !== papel) {
+    resp.cookies.set(COOKIE_PAPEL, papel, { httpOnly: false, secure: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 });
+  }
+  return resp;
+}
+
+export async function middleware(req) {
+  const caminho = req.nextUrl.pathname;
+  if (ehLivre(caminho)) return NextResponse.next();
+
+  const segredo = process.env.SUPABASE_JWT_SECRET;
+  const token = req.cookies.get(COOKIE_SESSAO)?.value;
+
+  const resultado = await conferirToken(token, segredo);
+
+  if (resultado.ok && !precisaRenovar(resultado.payload)) {
+    return comPapel(req, caminho, resultado.payload);
+  }
+
+  // Vencido (ou quase) e com token de renovação: troca por baixo dos panos e segue. O usuário
+  // não percebe; sem isso ele seria expulso de hora em hora, no meio do que estivesse fazendo.
+  const podeRenovar = resultado.ok || resultado.motivo === "expirado";
+  if (podeRenovar) {
+    const novo = await renovar(req.cookies.get(COOKIE_RENOVA)?.value);
+    if (novo) {
+      const resp = NextResponse.next();
+      const opcoes = { httpOnly: true, secure: true, sameSite: "lax", path: "/" };
+      resp.cookies.set(COOKIE_SESSAO, novo.acesso, { ...opcoes, maxAge: 60 * 60 * 24 });
+      resp.cookies.set(COOKIE_RENOVA, novo.renova, { ...opcoes, maxAge: 60 * 60 * 24 * 30 });
+      // (o papel vem do token NOVO — o que o banco acabou de assinar)
+      return comPapel(req, caminho, lerPayload(novo.acesso), resp);
+    }
+    // Renovação falhou: se o token ainda vale por alguns minutos, deixa passar em vez de
+    // expulsar. Supabase fora do ar não pode virar "ninguém entra".
+    if (resultado.ok) return comPapel(req, caminho, resultado.payload);
+  }
+
+  return ehApi(caminho) ? negar(resultado.motivo) : paraLogin(req, caminho);
+}

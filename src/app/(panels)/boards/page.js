@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CY, OR, GR, mono } from "@/lib/theme.js";
+import FonteDosQuadros from "@/components/panels/FonteDosQuadros.js";
 
 export default function BoardsOverviewPage() {
   const [boards, setBoards] = useState(null);
@@ -39,12 +40,16 @@ export default function BoardsOverviewPage() {
         <button
           onClick={load}
           disabled={loading}
-          title="Busca direto do Trello (ao vivo) — atualiza sozinho a cada 1 min também"
+          title="Busca direto da fonte configurada (ao vivo) — atualiza sozinho a cada 1 min também"
           style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
         >
           {loading ? "…" : "↻ ATUALIZAR"}
         </button>
       </div>
+
+      {/* O interruptor fica AQUI, e não numa tela de configuração escondida: esta é a página
+          que mostra os quadros, e é olhando para eles que se decide trocar de fonte. */}
+      <FonteDosQuadros aoTrocar={load} />
 
       {error && <div style={{ ...mono, fontSize: 11, color: OR, marginBottom: 16 }}>⚠ {error}</div>}
 

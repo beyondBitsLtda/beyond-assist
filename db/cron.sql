@@ -1,6 +1,18 @@
 -- ============================================================
 --  Cron jobs automáticos — Supabase aciona a Vercel
 --
+--  ⚠️  ESTE ARQUIVO É O AGENDAMENTO DA VERCEL, E ESTÁ SENDO APOSENTADO.
+--
+--  Na Cloudflare quem agenda é o Worker `workers/lisa-cron` (Cron Triggers), que faz o mesmo
+--  trabalho e mais um: ele também ENVIA as notificações, que a rota sozinha não consegue.
+--
+--  Enquanto os dois estiverem ligados você sincroniza em dobro e recebe aviso em dobro. A ordem
+--  segura é: subir o Worker, ver um tique de verdade acontecer (`npx wrangler tail`), e SÓ
+--  ENTÃO desligar os três jobs daqui — os comandos estão no fim deste arquivo.
+--
+--  O domínio abaixo é o da Vercel. Se você rodar este arquivo hoje, ele continua alimentando a
+--  Vercel, não a Cloudflare.
+--
 --  Dois ciclos agendados aqui, ambos rodando no Postgres do Supabase (pg_cron + pg_net,
 --  extensões nativas, sem custo extra) — NENHUM dos dois usa o cron nativo da Vercel,
 --  de propósito: o plano Hobby da Vercel só permite cron 1x/dia (mais frequente que isso
@@ -108,7 +120,8 @@ select cron.schedule(
 -- pausar um job sem apagar:
 -- select cron.alter_job((select jobid from cron.job where jobname = 'beyond-sync-tick'), active := false);
 
--- remover de vez, se precisar:
+-- remover de vez — é ISTO que você roda depois de ver o Worker lisa-cron tiquetaqueando,
+-- para parar de sincronizar em dobro e receber aviso em dobro:
 -- select cron.unschedule('beyond-sync-start');
 -- select cron.unschedule('beyond-sync-tick');
 -- select cron.unschedule('beyond-notify-tick');

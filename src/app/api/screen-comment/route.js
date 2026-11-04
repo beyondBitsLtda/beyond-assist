@@ -2,6 +2,8 @@ import { describeScreenIfNotable, SCREEN_WATCH_INSTRUCTION } from "@/lib/gemini.
 import { withPersona } from "@/lib/rag.js";
 import { jsonResponse } from "@/lib/http.js";
 import { logScreenObservation } from "@/lib/screenWatch.js";
+import { ehUsuario } from "@/lib/papelNaSessao.js";
+import { usarDoDia } from "@/lib/usoDoDia.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,12 +30,19 @@ export async function POST(req) {
     if (!image?.data || !image?.mimeType) {
       return jsonResponse({ ok: false, error: "image é obrigatório" }, 400);
     }
+    // (01/11/2026, o MVP) o USUÁRIO tem o Modo Tela, mas sem a persona do admin, sem gravar no
+    // histórico do Vigia (screen_observations é do admin) e com o limite do dia
+    const usuario = ehUsuario(req);
+    if (usuario) {
+      const limite = await usarDoDia(req, "tela");
+      if (limite) return jsonResponse({ ok: false, error: limite.erro, limite: true }, limite.status);
+    }
     const focusBlock = focus?.trim()
       ? `\n\nDIRECIONAMENTO DADO PELO USUÁRIO — priorize isso acima do critério padrão acima (mas ainda pode notar algo MUITO óbvio fora disso, tipo um erro na tela): "${focus.trim()}"`
       : "";
-    const instruction = withPersona(SCREEN_WATCH_INSTRUCTION + focusBlock, personaMode);
+    const instruction = withPersona(SCREEN_WATCH_INSTRUCTION + focusBlock, personaMode && !usuario);
     const comment = await describeScreenIfNotable(image, instruction);
-    if (persist && comment) await logScreenObservation(comment);
+    if (persist && comment && !usuario) await logScreenObservation(comment);
     return jsonResponse({ ok: true, comment });
   } catch (err) {
     // err.keyLabel (ver rewriteError em gemini.js) diz qual chave do pool falhou —

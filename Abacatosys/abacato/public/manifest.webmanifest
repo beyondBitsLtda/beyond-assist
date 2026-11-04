@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "Abacato",
+  "short_name": "Abacato",
+  "description": "Quadros, documentação e acompanhamento — da Beyond Bits.",
+  "start_url": "/quadros",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F4F6F5",
+  "theme_color": "#111814",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/marca/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/marca/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/marca/app-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

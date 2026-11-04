@@ -1,0 +1,58 @@
+{
+  "name": "lisa-proof",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "//": "Mesmas versoes do Abacato e da Lisa de proposito: o que ja foi provado no workerd deles nao precisa ser descoberto de novo aqui.",
+  "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start -p 3100",
+    "dominio-check": "node scripts/dominio-check.mjs",
+    "biblioteca-check": "node scripts/biblioteca-check.mjs",
+    "migrar": "node --env-file=.env.local scripts/migrar.mjs",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:deploy": "opennextjs-cloudflare deploy",
+    "publicar": "npm run cf:build && wrangler deploy",
+    "lembretes": "node --env-file=.env.local --env-file=.env.lembretes scripts/lembretes.mjs",
+    "lisa-joga": "node --env-file=.env.local --import ./scripts/alias-loader.mjs scripts/lisa-joga.mjs"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.20.4",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-cpp": "^6.0.3",
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-go": "^6.0.1",
+    "@codemirror/lang-html": "^6.4.12",
+    "@codemirror/lang-java": "^6.0.2",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lang-markdown": "6.5.2",
+    "@codemirror/lang-php": "^6.0.2",
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/lang-rust": "^6.0.2",
+    "@codemirror/lang-sql": "^6.10.0",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/legacy-modes": "^6.5.5",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
+    "@lezer/highlight": "^1.2.5",
+    "@opennextjs/cloudflare": "^1.20.6",
+    "@supabase/supabase-js": "^2.45.0",
+    "next": "^15.5.25",
+    "pdfjs-dist": "5.7.284",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "0.170.0",
+    "wrangler": "^4.131.1"
+  },
+  "allowScripts": {
+    "esbuild@0.25.4": true,
+    "esbuild@0.28.1": true,
+    "workerd@1.20261001.1": true
+  },
+  "devDependencies": {
+    "web-push": "^3.6.7"
+  }
+}

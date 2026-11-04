@@ -1,9 +1,12 @@
-import { readFile } from "fs/promises";
-import path from "path";
-
 // Modo Rádio: playlist mantida manualmente pelo usuário em radio/playlist.txt — uma música por
 // linha, formato "Título:URL" (URL do YouTube). Arquivo do repositório, não do Supabase — o
 // usuário edita direto, sem precisar de nenhuma tela de upload.
+//
+// O conteúdo entra no bundle em tempo de build (regra `asset/source` no next.config.mjs). Era
+// lido do disco com fs/promises, o que não existe no Edge runtime do Cloudflare — e ali a
+// playlist apareceria simplesmente vazia. Editar o arquivo continua bastando: ele é lido no
+// próximo deploy.
+import raw from "../../radio/playlist.txt";
 
 function extractYouTubeId(url) {
   try {
@@ -19,9 +22,8 @@ function extractYouTubeId(url) {
 /** Lê e parseia radio/playlist.txt — linhas sem ":http" (em branco, comentário, mal formatada)
  * são ignoradas em silêncio, nunca derrubam a playlist inteira por causa de uma linha ruim. */
 export async function getRadioPlaylist() {
-  const filePath = path.join(process.cwd(), "radio", "playlist.txt");
-  const raw = await readFile(filePath, "utf-8");
-  return raw
+  // continua async: mudar a assinatura obrigaria a mexer em quem chama, sem ganho nenhum
+  return String(raw || "")
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)

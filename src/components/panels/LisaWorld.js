@@ -14,6 +14,7 @@ import { adereco, gesto } from "./lisaAnim.js";
 import * as A from "./isoArt.js";
 import CasaInterior from "./CasaInterior.js";
 import { pollWorldSignals, sendWorldSignal } from "@/lib/worldSignals.js";
+import { abaVisivel, criarRitmo } from "@/lib/ritmoDePoll.js";
 import {
   GOD_EVENTS, HORDA, MORDIDA_ALCANCE, TIRO_ALCANCE, TIRO_INTERVALO,
   criarInimigos, criarSorteador, passoInimigo, planoDe,
@@ -56,7 +57,12 @@ const NALA_SPEED = 3.4;
 const GAP_MIN_MS = 1200;
 const GAP_VAR_MS = 2400;
 const SEEN_KEY = "lisaWorld.seenXp";
-const POLL_MS = 900;          // o Modo Deus escuta o outro aparelho nesse ritmo
+// O Modo Deus escuta o outro aparelho neste ritmo — rápido enquanto chega evento, desacelerando
+// sozinho quando o painel do outro lado está parado. A 0,9s fixos, uma aba esquecida aberta
+// gastava 96 mil chamadas por dia: quase a cota diária inteira do plano gratuito, sem ninguém
+// usando nada. Ver src/lib/ritmoDePoll.js.
+const POLL_RAPIDO_MS = 900;
+const POLL_LENTO_MS = 10000;
 const SPAWN = [7.5, 40.5];    // por onde as ameaças entram: o portão
 const CORRENDO = 240;         // "acelerar o dia": um dia inteiro em ~6 minutos, uma hora a cada 15s
 
@@ -118,6 +124,8 @@ export default function LisaWorld({ fullscreen = false }) {
   const ultimoTiroRef = useRef(-9999); // relógio da animação do tiro: o coice cai no disparo
   const noiteRef = useRef(sceneRef.current.night);
   const sorteadoresRef = useRef({});
+  // o ritmo de consulta do laço de sinais — em ref pra dar pra acordar de fora dele
+  const ritmoRef = useRef(null);
 
   // tela estreita: os botões perdem o texto e viram só o ícone. Antes a fileira quebrava em duas
   // linhas no celular e cobria o que a Lisa estava fazendo.
@@ -245,17 +253,26 @@ export default function LisaWorld({ fullscreen = false }) {
     let timer = null;
     let since = null;
     let primed = false;
+    const ritmo = criarRitmo({ rapido: POLL_RAPIDO_MS, lento: POLL_LENTO_MS });
+    ritmoRef.current = ritmo;
     const loop = async () => {
+      // aba escondida não tem ninguém olhando: espera o ritmo lento e nem consulta
+      if (!abaVisivel()) {
+        if (!stop) timer = setTimeout(loop, POLL_LENTO_MS);
+        return;
+      }
       try {
         const { now, signals } = await pollWorldSignals(since);
         since = now;
         // a primeira leitura traz o rabo da fila (eventos de antes de eu abrir) — descarta
         if (primed) for (const sig of signals) if (sig.kind === "evento") aplicarEvento(sig.payload?.evento);
         primed = true;
+        ritmo.registrar(signals.length);
       } catch {
         /* sem rede ou sem tabela: o painel local continua funcionando */
+        ritmo.registrar(0);
       }
-      if (!stop) timer = setTimeout(loop, POLL_MS);
+      if (!stop) timer = setTimeout(loop, ritmo.intervalo);
     };
     loop();
     return () => { stop = true; clearTimeout(timer); };
@@ -263,6 +280,8 @@ export default function LisaWorld({ fullscreen = false }) {
 
   /** Manda pro outro aparelho E aplica aqui: assim funciona com duas telas ou com uma só. */
   const mandar = useCallback((key) => {
+    // mandou evento: o outro lado responde em seguida, então volta ao ritmo rápido na hora
+    ritmoRef.current?.acordar();
     sendWorldSignal("evento", { evento: key });
     aplicarEvento(key);
   }, [aplicarEvento]);

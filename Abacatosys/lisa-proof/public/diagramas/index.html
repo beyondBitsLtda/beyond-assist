@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<!-- ======================================================================
+     index.html — ESTRUTURA DA PÁGINA
+     O HTML só define as "caixas" da tela. O conteúdo de cada caixa
+     (botões, formas, painel) é criado pelo JavaScript nos módulos.
+     Layout: Cabeçalho → Barra de ferramentas → (Quadro | Painel) → Rodapé
+     O atributo data-theme no <html> define o tema ativo (ThemeManager.js).
+     ====================================================================== -->
+<html lang="pt-BR" data-theme="proof-escuro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quadro de diagramas · Lisa_Proof</title>
+  <link rel="icon" href="/icone.svg" />
+  <link rel="stylesheet" href="css/style.css" /> <!-- todo o visual (temas via variáveis CSS) -->
+</head>
+<body>
+  <!-- ===== CABEÇALHO ===== -->
+  <header class="app-header">
+    <div class="brand">
+      <img src="/icone.svg" alt="" class="brand-icon" />
+      <span class="brand-name">Quadro<b> · Proof</b></span>
+    </div>
+
+    <div class="doc-name">
+      <input id="docName" type="text" value="Novo processo" spellcheck="false" title="Nome do processo (usado no arquivo exportado)" />
+    </div>
+    <!-- Etiquetas do documento: a categoria (FileManager.js) -->
+    <div class="doc-tags" id="docTags"></div>
+
+    <!-- Botão do seletor de temas (ThemeManager.js) -->
+    <div class="header-actions" id="themeAction"></div>
+    <!-- Preenchido pelo FileManager.js (Novo / Importar / Exportar) -->
+    <div class="header-actions" id="fileActions"><!-- FileManager --></div>
+
+  </header>
+
+  <!-- Preenchida pelo Toolbar.js -->
+  <nav class="toolbar" id="toolbar"><!-- Toolbar --></nav>
+
+  <!-- ===== ÁREA DE TRABALHO ===== -->
+  <main class="workspace">
+    <div class="canvas-wrap" id="canvasWrap">
+      <!-- O quadro é um único <svg>. Camadas (de baixo para cima):
+           gridRect (grade) → world { linhas → formas → overlay de seleção }.
+           O Viewport.js aplica translate/scale no grupo #world para rolar e dar zoom. -->
+      <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+        <defs id="defs"></defs> <!-- recursos: grade, degradês, setas -->
+        <rect id="gridRect" width="100%" height="100%" fill="url(#gridMajor)"></rect>
+        <g id="world">
+          <g id="layerConnections"></g>
+          <g id="layerShapes"></g>
+          <g id="layerOverlay"></g>
+        </g>
+      </svg>
+      <!-- Aviso exibido só quando o quadro está vazio -->
+      <div class="empty-hint" id="emptyHint">
+        <h2>Monte o seu diagrama</h2>
+        <p>Escolha a coleção na barra de cima e arraste as formas para o quadro.<br />Para ligar duas formas, arraste de uma bolinha da borda até a outra.</p>
+      </div>
+    </div>
+
+    <!-- Preenchido pelo PropertiesPanel.js -->
+    <aside class="props" id="propsPanel"><!-- PropertiesPanel --></aside>
+  </main>
+
+  <!-- ===== RODAPÉ ===== -->
+  <footer class="statusbar">
+    <span id="stCount">0 formas · 0 conexões</span>
+    <span id="stSel"></span>
+    <span class="grow"></span>
+    <span id="stPos">x 0 · y 0</span>
+    <span class="kbd-hint">Roda: rolar · Shift+Roda: lateral · Ctrl+Roda: zoom · Espaço+arrastar: mover quadro · <kbd>?</kbd> atalhos</span>
+  </footer>
+
+  <div class="toast" id="toast"></div>             <!-- mensagens temporárias -->
+  <div class="modal" id="helpModal" hidden></div>  <!-- janela de atalhos -->
+  <div class="modal" id="themeModal" hidden></div> <!-- janela de temas -->
+
+  <!-- Scripts clássicos (funcionam offline via file://, sem servidor).
+       A ORDEM IMPORTA: cada arquivo usa classes dos anteriores.
+       Catálogo e utilitários primeiro, módulos de interface depois e o App por último. -->
+  <script src="js/ShapeLibrary.js"></script>
+  <script src="js/Viewport.js"></script>
+  <script src="js/History.js"></script>
+  <script src="js/ConnectionRouter.js"></script>
+  <script src="js/SyntaxHighlighter.js"></script>
+  <script src="js/MindMap.js"></script>
+  <script src="js/ShapeManager.js"></script>
+  <script src="js/ImagePaste.js"></script>
+  <script src="js/ThemeManager.js"></script>
+  <script src="js/FileManager.js"></script>
+  <script src="js/Toolbar.js"></script>
+  <script src="js/PropertiesPanel.js"></script>
+  <script src="js/PageTabs.js"></script>
+  <script src="js/SqlImport.js"></script>
+  <script src="js/App.js"></script>
+  <script src="js/Ponte.js"></script> <!-- Lisa_Proof: a ponte com a página do exercício -->
+</body>
+</html>

@@ -1,0 +1,246 @@
+/*
+ * O plano da conta e o painel de uso.
+ *
+ * Tudo sai das variáveis de globals.css — nenhuma cor escrita à mão. É o que faz estas telas
+ * já nascerem funcionando no tema escuro, em vez de virarem texto cinza sobre fundo cinza na
+ * primeira vez que alguém trocar o tema.
+ */
+
+/* ------------------------------------------------------------------ o plano */
+
+.abacato-plano {
+  background: var(--abacato-superficie-2);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  padding: 16px 18px;
+}
+.abacato-plano__titulo {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: var(--abacato-tinta);
+}
+.abacato-plano__lista {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--abacato-tinta-2);
+}
+.abacato-plano__lista strong { color: var(--abacato-tinta); }
+.abacato-plano__nota {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--abacato-tinta-3);
+}
+
+/* Uma barra por limite. `--parte` é a fração já calculada no JS: mandar a porcentagem pronta
+   evita repetir a mesma divisão em dois lugares que podem discordar. */
+.abacato-medidas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.abacato-medida {
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  padding: 14px 16px;
+}
+.abacato-medida__topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.abacato-medida__nome { font-size: 13px; color: var(--abacato-tinta-2); }
+.abacato-medida__valor {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--abacato-tinta);
+  font-variant-numeric: tabular-nums;
+}
+.abacato-medida__trilho {
+  height: 8px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-linha);
+  overflow: hidden;
+}
+.abacato-medida__barra {
+  height: 100%;
+  width: var(--parte, 0%);
+  background: var(--abacato-verde);
+  border-radius: var(--abacato-raio-pilula);
+  transition: width 0.3s ease;
+}
+/* Laranja a partir de 80%, vermelho no teto. A cor é o aviso que chega antes do "não" — sem
+   ela a pessoa só descobre o limite quando ele barra. */
+.abacato-medida--quase .abacato-medida__barra { background: var(--abacato-atencao); }
+.abacato-medida--cheio .abacato-medida__barra { background: var(--abacato-alerta); }
+.abacato-medida__nota {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--abacato-tinta-3);
+}
+.abacato-medida--cheio .abacato-medida__nota { color: var(--abacato-alerta); }
+
+/* --------------------------------------------------------- o painel de uso */
+
+.abacato-uso__abas {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: var(--abacato-gap);
+}
+.abacato-uso__aba {
+  border: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta-2);
+  border-radius: var(--abacato-raio-pilula);
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.abacato-uso__aba--ativa {
+  background: var(--abacato-verde);
+  border-color: var(--abacato-verde);
+  color: #06200F;
+}
+
+.abacato-uso__cartoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: var(--abacato-gap-2);
+}
+.abacato-uso__cartao {
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  padding: 16px 18px;
+}
+.abacato-uso__numero {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--abacato-tinta);
+  font-variant-numeric: tabular-nums;
+}
+.abacato-uso__rotulo {
+  font-size: 12px;
+  color: var(--abacato-tinta-2);
+  margin-top: 4px;
+}
+.abacato-uso__cartao--atencao .abacato-uso__numero { color: var(--abacato-atencao); }
+
+/* A tabela rola dentro do próprio contêiner. Sem isto, uma lista de quadros com nomes longos
+   faz a página inteira andar de lado, e a barra lateral sai da tela junto. */
+.abacato-uso__tabela-caixa {
+  overflow-x: auto;
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+}
+.abacato-uso__tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 560px;
+}
+.abacato-uso__tabela th {
+  text-align: left;
+  padding: 11px 14px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--abacato-tinta-3);
+  border-bottom: 1px solid var(--abacato-linha);
+  white-space: nowrap;
+}
+.abacato-uso__tabela td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--abacato-linha);
+  color: var(--abacato-tinta);
+  vertical-align: middle;
+}
+.abacato-uso__tabela tr:last-child td { border-bottom: none; }
+.abacato-uso__tabela td.abacato-uso__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--abacato-tinta-2);
+}
+.abacato-uso__fraco { color: var(--abacato-tinta-3); font-size: 12px; }
+
+.abacato-selo {
+  display: inline-block;
+  border-radius: var(--abacato-raio-pilula);
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta-2);
+  border: 1px solid var(--abacato-linha);
+  white-space: nowrap;
+}
+.abacato-selo--cliente { background: var(--abacato-atencao-fundo); color: var(--abacato-atencao); border-color: transparent; }
+.abacato-selo--interno { background: var(--abacato-verde-claro); color: var(--abacato-verde-fundo); border-color: transparent; }
+.abacato-selo--espera { background: var(--abacato-alerta-fundo); color: var(--abacato-alerta); border-color: transparent; }
+
+/* O gráfico de atividade por dia: barras em CSS puro, sem biblioteca. São trinta números —
+   carregar uma biblioteca de gráficos para isto custaria mais que a tela inteira. */
+.abacato-barras {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 120px;
+  padding: 12px 14px;
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  overflow-x: auto;
+}
+.abacato-barras__col {
+  flex: 1 0 10px;
+  min-width: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+}
+.abacato-barras__barra {
+  background: var(--abacato-verde);
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  height: var(--altura, 2px);
+}
+
+/* ------------------------------------------------------------- os convites */
+
+.abacato-convite {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--abacato-linha);
+}
+.abacato-convite:last-child { border-bottom: none; }
+.abacato-convite__link {
+  flex: 1 1 260px;
+  min-width: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--abacato-tinta-2);
+  background: var(--abacato-superficie-2);
+  border: 1px solid var(--abacato-linha);
+  border-radius: 10px;
+  padding: 7px 10px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.abacato-convite__morto { opacity: 0.5; }

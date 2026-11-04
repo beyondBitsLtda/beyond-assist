@@ -1,0 +1,105 @@
+import { json } from "@/lib/http.js";
+import { supabase } from "@/lib/supabase.js";
+import { quemEh, respostaDeErro, ErroDeAcesso, exigirDocumentos } from "@/lib/acesso.js";
+import { corValida } from "@/dominio/cores.js";
+import { exigirPodeCriarProjeto } from "@/lib/limites.js";
+import { anotar, anotarLimite, TIPOS_DE_EVENTO } from "@/lib/eventos.js";
+import { workspacesEOnde, workspaceDoDono, porNoWorkspace } from "@/lib/workspacesNoBanco.js";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/** GET /api/projetos — os projetos de documentação que esta pessoa pode abrir. */
+export async function GET(req) {
+  try {
+    const usuario = await quemEh(req);
+    if (!usuario) throw new ErroDeAcesso(401, "sem sessão");
+    await exigirDocumentos(usuario.id);
+    const querArquivados = new URL(req.url).searchParams.get("arquivados") === "1";
+
+    const [meus, convidados] = await Promise.all([
+      supabase.from("abacato_projetos")
+        .select("id, nome, descricao, cor, dono_id, criado_em")
+        .eq("dono_id", usuario.id).eq("arquivado", querArquivados),
+      supabase.from("abacato_projeto_membros")
+        .select("papel, abacato_projetos ( id, nome, descricao, cor, dono_id, criado_em, arquivado )")
+        .eq("usuario_id", usuario.id),
+    ]);
+    if (meus.error) throw new ErroDeAcesso(500, meus.error.message);
+
+    const lista = [...(meus.data || []).map((p) => ({ ...p, papel: "dono" }))];
+    for (const linha of convidados.data || []) {
+      const p = linha.abacato_projetos;
+      if (!p || Boolean(p.arquivado) !== querArquivados || lista.some((x) => x.id === p.id)) continue;
+      lista.push({ ...p, papel: linha.papel });
+    }
+
+    // Quantos documentos cada um tem. Um projeto de documentação sem essa conta obriga a
+    // entrar para descobrir se há algo lá dentro.
+    const contagem = new Map();
+    if (lista.length) {
+      const { data } = await supabase.from("abacato_documentos")
+        .select("projeto_id").in("projeto_id", lista.map((p) => p.id)).eq("arquivado", false);
+      for (const d of data || []) contagem.set(d.projeto_id, (contagem.get(d.projeto_id) || 0) + 1);
+    }
+
+    let arquivados = 0;
+    if (!querArquivados) {
+      const { count } = await supabase.from("abacato_projetos")
+        .select("id", { count: "exact", head: true }).eq("dono_id", usuario.id).eq("arquivado", true);
+      arquivados = count || 0;
+    }
+
+    lista.sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+
+    // Os MESMOS workspaces da lista de quadros (ver db/011). Nunca derruba a lista.
+    const { workspaces, onde } = await workspacesEOnde(usuario.id, "projeto");
+    return json({
+      ok: true,
+      projetos: lista.map((p) => ({ ...p, documentos: contagem.get(p.id) || 0, workspace_id: onde.get(p.id) || null })),
+      workspaces,
+      arquivados,
+      mostrandoArquivados: querArquivados,
+    });
+  } catch (e) {
+    return respostaDeErro(e);
+  }
+}
+
+/** POST /api/projetos   body: { nome, descricao?, cor?, workspaceId? } */
+export async function POST(req) {
+  try {
+    const usuario = await quemEh(req);
+    if (!usuario) throw new ErroDeAcesso(401, "sem sessão");
+    await exigirDocumentos(usuario.id);
+    const { nome, descricao, cor, workspaceId } = await req.json().catch(() => ({}));
+    if (!nome?.trim()) throw new ErroDeAcesso(400, "o projeto precisa de um nome");
+
+    // Mesmo desenho do quadro: quem decide é o servidor. A tela esconder o botão é conforto.
+    try {
+      await exigirPodeCriarProjeto(usuario.id);
+    } catch (e) {
+      anotarLimite({ usuarioId: usuario.id, limite: "projetos" });
+      throw e;
+    }
+
+    const { data, error } = await supabase.from("abacato_projetos").insert({
+      nome: nome.trim(),
+      descricao: descricao?.trim() || null,
+      cor: corValida(cor) ? cor : "#22C55E",
+      dono_id: usuario.id,
+    }).select("id, nome, descricao, cor, criado_em").single();
+    if (error) throw new ErroDeAcesso(500, error.message);
+
+    // Criado de dentro de um workspace: já nasce nele. Workspace alheio é ignorado, e o projeto
+    // nasce solto, como sempre nasceu.
+    if (await workspaceDoDono(usuario.id, workspaceId)) {
+      await porNoWorkspace(usuario.id, "projeto", data.id, workspaceId).catch(() => {});
+    }
+
+    anotar({ usuarioId: usuario.id, tipo: TIPOS_DE_EVENTO.criouProjeto, alvo: data.nome, alvoId: data.id });
+    return json({ ok: true, projeto: { ...data, papel: "dono", documentos: 0 } }, 201);
+  } catch (e) {
+    return respostaDeErro(e);
+  }
+}

@@ -2,7 +2,6 @@ import { runCodeTaskStep } from "@/lib/codeTasks.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 /**
  * POST /api/code-tasks/step

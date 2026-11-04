@@ -1,0 +1,497 @@
+// Os projetos do ProcessMap na conversa (01/11/2026): "faça a Lisa poder trabalhar num projeto do
+// ProcessMap específico — na conversa eu falo 'Lisa, no projeto X do ProcessMap, faça tal coisa' — e
+// ela ter a capacidade de ver os fluxogramas de lá e ter o contexto perfeito para trabalhar".
+//
+// Aqui, sem rede e sem banco (testado em scripts/fluxogramas-check.mjs): reconhecer na pergunta o
+// projeto citado (pelo nome, aguentando erro de digitação) e, dentro dele, o fluxo citado; e montar o
+// texto com todos os fluxogramas do projeto, que vai junto da pergunta (/api/ask) ou do pedido de
+// desenho (/api/diagrama). Quem busca os projetos e salva o resultado é a página do Assistente.
+
+import { descreverDiagrama, distanciaDeEdicao, TIPOS_DE_DESENHO, TIPOS_NO_PLANO, idDoTipo, tipoPedido } from "./diagramaDaLisa.js";
+
+const semAcento = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const palavrasDe = (texto) => semAcento(texto).split(/[^a-z0-9]+/).filter(Boolean);
+// palavras que não identificam um projeto ou um fluxo ("o fluxo de compras" é identificado por "compras")
+const VAZIAS = new Set(["a", "o", "as", "os", "de", "do", "da", "dos", "das", "e", "em", "no", "na", "nos", "nas", "um", "uma", "para", "pra", "com", "por"]);
+const GENERICAS = new Set(["projeto", "projetos", "fluxo", "fluxos", "fluxograma", "fluxogramas", "mapa", "mapas", "mental", "mentais", "novo", "nova", "processo", "processos", "diagrama", "diagramas", "meus", "minhas", "meu", "minha"]);
+const folgaDe = (p) => (p.length <= 4 ? 0 : p.length <= 7 ? 1 : 2);
+const parecida = (a, b) => a === b || (Math.abs(a.length - b.length) <= folgaDe(b) && distanciaDeEdicao(a, b) <= folgaDe(b));
+
+// "projeto" com os erros de digitação de quem escreve rápido (BEYOND-0013: falar de projeto é o que
+// decide se a Lisa trabalha num; "no projto X" é falar). Lista fechada, e não "parecida": "prometo" e
+// "projetar" estão a uma letra de "projeto" e não falam de projeto nenhum.
+const PROJETO_ESCRITO = new Set(["projeto", "projetos", "projto", "projtos", "proejto", "porjeto", "prjeto", "projeot", "projeo", "projecto", "projetro"]);
+
+/** A pergunta fala de um projeto do ProcessMap ("no projeto X", "do processmap")? */
+export function citaProjeto(pergunta) {
+  const p = palavrasDe(pergunta);
+  return p.some((x) => PROJETO_ESCRITO.has(x) || parecida(x, "processmap")) || /\bprocess map\b/.test(semAcento(pergunta));
+}
+
+/**
+ * Quão bem o nome aparece na pergunta: o número de palavras do nome que estão nela (cada uma pode ter
+ * erro de digitação), se TODAS as que identificam estão; 0 se falta alguma. Nome só de palavras
+ * genéricas ("Novo fluxograma") só vale escrito igual.
+ */
+function encaixe(nome, palavras, texto) {
+  const doNome = palavrasDe(nome).filter((x) => !VAZIAS.has(x));
+  const fortes = doNome.filter((x) => !GENERICAS.has(x));
+  if (!fortes.length) return doNome.length && texto.includes(doNome.join(" ")) ? doNome.length : 0;
+  return fortes.every((f) => palavras.some((p) => parecida(p, f))) ? fortes.length + doNome.length * 0.01 : 0;
+}
+
+function melhor(lista, pergunta, nomeDe) {
+  const palavras = palavrasDe(pergunta);
+  const texto = palavras.join(" ");
+  let achado = null;
+  let nota = 0;
+  for (const item of lista || []) {
+    const n = encaixe(nomeDe(item), palavras, texto);
+    if (n > nota) { nota = n; achado = item; }
+  }
+  return achado;
+}
+
+/** O projeto citado na pergunta (o de nome mais completo que bate), ou null — só se ela fala de projeto. */
+export function projetoCitado(pergunta, projetos) {
+  return citaProjeto(pergunta) ? melhor(projetos, pergunta, (p) => p.nome) : null;
+}
+
+/**
+ * O projeto MAIS PROVÁVEL do pedido, mesmo com o nome dito pela metade ou com erro (01/11/2026: "ela
+ * pede para eu falar exatamente o nome do projeto — ela tem que interpretar e saber o que eu quero, e me
+ * perguntar se eu tenho certeza"). Em ordem: o nome inteiro; o nome de um desenho dele; metade ou mais
+ * das palavras do nome; o projeto em uso; o único; o mexido por último (a lista vem do mais novo para o
+ * mais velho). Como a Lisa confirma antes de fazer, um palpite errado só custa um "não, é no X".
+ * Devolve { projeto, como } ou null (a pessoa não tem projeto).
+ */
+export function projetoProvavel(pergunta, projetos, { emUso = null } = {}) {
+  const lista = projetos || [];
+  if (!lista.length) return null;
+  const inteiro = melhor(lista, pergunta, (p) => p.nome);
+  if (inteiro) return { projeto: inteiro, como: "citado" };
+  const peloDesenho = melhor(lista.flatMap((p) => (p.fluxos || []).map((f) => ({ nome: f.nome, projeto: p }))), pergunta, (f) => f.nome);
+  if (peloDesenho) return { projeto: peloDesenho.projeto, como: "pelo desenho" };
+  const palavras = palavrasDe(pergunta);
+  let parecido = null;
+  let nota = 0;
+  for (const p of lista) {
+    const fortes = palavrasDe(p.nome).filter((x) => !VAZIAS.has(x) && !GENERICAS.has(x));
+    const n = fortes.length ? fortes.filter((f) => palavras.some((w) => parecida(w, f))).length / fortes.length : 0;
+    if (n > nota) { nota = n; parecido = p; }
+  }
+  if (parecido && nota >= 0.5) return { projeto: parecido, como: "parecido" };
+  const emUsoNaLista = emUso && lista.find((p) => p.id === emUso.id);
+  if (emUsoNaLista) return { projeto: emUsoNaLista, como: "em uso" };
+  return { projeto: lista[0], como: lista.length === 1 ? "único" : "mais recente" };
+}
+
+/**
+ * O projeto do pedido, só quando ele é EXPLÍCITO (03/11/2026, BEYOND-0013: "se eu não falo qual é o
+ * projeto, ela supõe um e isso está errado; se eu não falar, é um desenho avulso, e a partir dele eu
+ * decido se crio um projeto ou salvo num existente"). O palpite de projetoProvavel — o em uso, o único,
+ * o mais recente — só vale quando a pessoa FALA de projeto:
+ *
+ *   fala de projeto ("no projeto X", "do ProcessMap")  o nome, mesmo pela metade ou com erro; ou o de um
+ *                                                      desenho dele; sem nome que bata, o do quadro ou o
+ *                                                      último desta conversa; senão, se só há um, ele;
+ *                                                      senão, { perguntar: [nomes] } — qual?
+ *   não fala, e pede um desenho NOVO                   null: desenho avulso, no quadro
+ *   não fala, e pede para mudar                        o projeto de um desenho salvo que ela nomeia, ou o
+ *                                                      do desenho aberto no quadro (`vinculado`); senão null
+ *
+ * Devolve { projeto, como } | { perguntar } | null.
+ */
+export function projetoDoPedido(pergunta, projetos, { emUso = null, vinculado = null } = {}) {
+  const lista = projetos || [];
+  if (!lista.length) return null;
+  const naLista = (p) => (p ? lista.find((x) => x.id === p.id) || null : null);
+  if (citaProjeto(pergunta)) {
+    const r = projetoProvavel(pergunta, lista);
+    if (["citado", "pelo desenho", "parecido"].includes(r.como)) return r;
+    const doQuadro = naLista(vinculado);
+    if (doQuadro) return { projeto: doQuadro, como: "do quadro" };
+    const ultimo = naLista(emUso);
+    if (ultimo) return { projeto: ultimo, como: "em uso" };
+    return lista.length === 1 ? { projeto: lista[0], como: "único" } : { perguntar: lista.map((p) => p.nome) };
+  }
+  if (pedeNovoDesenho(pergunta)) return null;
+  const peloDesenho = melhor(lista.flatMap((p) => (p.fluxos || []).map((f) => ({ nome: f.nome, projeto: p }))), pergunta, (f) => f.nome);
+  if (peloDesenho) return { projeto: peloDesenho.projeto, como: "pelo desenho" };
+  const doQuadro = naLista(vinculado);
+  return doQuadro ? { projeto: doQuadro, como: "do quadro" } : null;
+}
+
+/** A pergunta de volta quando a pessoa fala de projeto sem dizer qual (e há mais de um). */
+export function perguntaDoProjeto(nomes) {
+  const lista = (nomes || []).slice(0, 8).map((n) => `"${n}"`);
+  const mais = (nomes || []).length > lista.length ? ` e mais ${nomes.length - lista.length}` : "";
+  return `Em qual projeto do ProcessMap? Tenho ${lista.join(", ")}${mais}. Diga "no projeto <nome>, …". Se for um desenho novo sem projeto, eu faço avulso no quadro e você decide no 💾 salvar onde guardar.`;
+}
+
+/**
+ * O fluxo citado na pergunta, dentro dos fluxos do projeto (o nome do projeto não conta como citação
+ * do fluxo: "no projeto Compras" não escolhe o fluxo "Compras do mês"), ou null.
+ */
+export function fluxoCitado(pergunta, fluxos, { nomeDoProjeto = "" } = {}) {
+  const doProjeto = new Set(palavrasDe(nomeDoProjeto));
+  const sem = palavrasDe(pergunta).filter((p) => !doProjeto.has(p)).join(" ");
+  return melhor(fluxos, sem, (f) => f.nome);
+}
+
+const LIMITE_POR_FLUXO = 6000;
+const LIMITE_TOTAL = 24_000;
+
+/**
+ * O projeto em texto, para a Lisa: o nome, a lista dos fluxogramas e cada um descrito (formas com id,
+ * cor, raias, abas e ligações — o mesmo texto do quadro). `alvo`: o fluxo que o pedido vai mudar, que
+ * vem primeiro e marcado.
+ */
+export function contextoDoProjeto(projeto, fluxos, { alvo = null } = {}) {
+  const ordem = [...(fluxos || [])].sort((a, b) => (a.id === alvo?.id ? -1 : b.id === alvo?.id ? 1 : 0));
+  const tipo = (f) => (f.modo === "mindmap" ? "mapa mental" : "fluxograma");
+  const partes = [
+    `PROJETO "${projeto?.nome || "?"}" DO PROCESSMAP — ${ordem.length} ${ordem.length === 1 ? "desenho" : "desenhos"}: ${ordem.map((f) => `"${f.nome}" (${tipo(f)})`).join(", ") || "nenhum ainda"}.`,
+  ];
+  let total = partes[0].length;
+  for (const f of ordem) {
+    const marca = f.id === alvo?.id ? " — É ESTE QUE O PEDIDO MUDA" : "";
+    const corpo = f.documento ? descreverDiagrama(f.documento).slice(0, LIMITE_POR_FLUXO) : "(sem desenho)";
+    const bloco = `\n\n=== "${f.nome}" (${tipo(f)}, ${f.formas ?? "?"} formas${f.origem === "lisa" ? ", desenhado pela Lisa" : ""})${marca} ===\n${corpo}`;
+    if (total + bloco.length > LIMITE_TOTAL) { partes.push(`\n\n(… e mais ${ordem.length - partes.length + 1} desenhos que não couberam aqui)`); break; }
+    partes.push(bloco);
+    total += bloco.length;
+  }
+  return partes.join("");
+}
+
+/** A seção do prompt da conversa com o projeto citado ("" sem projeto). */
+export function secaoDoProjeto(texto) {
+  const t = typeof texto === "string" ? texto.slice(0, LIMITE_TOTAL + 2000).trim() : "";
+  return t
+    ? `\n\nO PROJETO DO PROCESSMAP QUE A PESSOA CITOU (os desenhos dele como estão salvos agora; cada forma tem um id entre colchetes, e "→" é uma ligação). Use para responder sobre o projeto, comparar fluxos, achar etapas, apontar falhas. Se o pedido for mudar um fluxo e não disser qual (e houver mais de um), pergunte qual, citando os nomes:\n${t}`
+    : "";
+}
+
+// ---- o plano (01/11/2026): "essa minha interação deveria ser o suficiente para ela fazer a alteração" ----
+//
+// Um pedido sobre o projeto pode mexer em vários desenhos de uma vez ("ponha nas funcionalidades…
+// e crie uma nota em todos os fluxogramas…"), escrito com erros de digitação. Em vez de adivinhar por
+// palavras-chave, a Lisa planeja com o modelo (src/lib/gemini.js: planejarNoProjeto): "mudar" (com uma
+// operação por desenho, cada uma com a instrução completa) ou "responder" (é pergunta). A página
+// executa as operações uma a uma (/api/diagrama) e salva cada desenho no projeto.
+
+export const LIMITE_DE_OPERACOES = 12;
+const linha = (v, max) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+
+/**
+ * Confere o plano: operação sem instrução sai; desenho que não é do projeto vira desenho novo; duas
+ * operações no mesmo desenho viram uma (as instruções se somam); no máximo LIMITE_DE_OPERACOES.
+ * Sem operação que sobre, é "responder".
+ */
+export function validarPlano(bruto, fluxos) {
+  const ids = new Set((fluxos || []).map((f) => String(f.id)));
+  const operacoes = [];
+  for (const op of Array.isArray(bruto?.operacoes) ? bruto.operacoes : []) {
+    // (o modelo às vezes escreve a quebra de linha como "\n" literal: vira quebra de verdade)
+    const pedido = String(op?.pedido ?? "").replace(/\\n/g, "\n").trim().slice(0, 6000);
+    if (!pedido) continue;
+    const fluxo = ids.has(String(op?.fluxo ?? "")) ? String(op.fluxo) : "";
+    const mesma = fluxo && operacoes.find((o) => o.fluxo === fluxo);
+    if (mesma) { mesma.pedido = `${mesma.pedido}\n\nAlém disso: ${pedido}`.slice(0, 9000); continue; }
+    if (operacoes.length >= LIMITE_DE_OPERACOES) break;
+    const tipo = TIPOS_NO_PLANO.includes(op?.tipo) ? op.tipo : "fluxograma";
+    operacoes.push({
+      fluxo,
+      nome: fluxo ? "" : linha(op?.nome, 120) || (tipo === "mapa mental" ? "Novo mapa mental" : "Novo fluxograma"),
+      tipo,
+      pedido,
+    });
+  }
+  // os .md que o pedido pede (01/11/2026: "faça um fluxograma da arquitetura pensando em cibersegurança
+  // … faça um arquivo md também" — um documento SOBRE O ASSUNTO, ao lado do desenho novo)
+  const documentos = [];
+  for (const d of Array.isArray(bruto?.documentos) ? bruto.documentos : []) {
+    const pedido = String(d?.pedido ?? "").replace(/\\n/g, "\n").trim().slice(0, 4000);
+    if (!pedido || documentos.length >= LIMITE_DE_DOCUMENTOS) continue;
+    const titulo = linha(d?.titulo, 120) || "Documento";
+    documentos.push({
+      arquivo: nomeDeArquivo(d?.arquivo || titulo, documentos.map((x) => x.arquivo)),
+      titulo,
+      desenhos: [...new Set((Array.isArray(d?.desenhos) ? d.desenhos : []).map(String).filter((id) => ids.has(id)))],
+      novos: d?.novos === true,
+      pedido,
+      estilo: "livre",
+    });
+  }
+  const explicacao = linha(bruto?.explicacao, 600);
+  // "documentar": a pessoa quer TEXTO a partir dos desenhos — o modelo disse que nenhum desenho muda
+  if (bruto?.acao === "documentar") return { acao: "documentar", explicacao, operacoes: [], documentos };
+  const mudar = bruto?.acao === "mudar" && operacoes.length > 0;
+  return { acao: mudar ? "mudar" : documentos.length ? "documentar" : "responder", explicacao, operacoes: mudar ? operacoes : [], documentos };
+}
+
+export const LIMITE_DE_DOCUMENTOS = 8;
+
+/**
+ * O tipo que a pessoa disse vale mais que o do modelo (02/11/2026: "criar o fluxograma do tipo que eu
+ * pedir"): num plano com UM desenho novo, se o pedido diz um tipo ("faça um BPMN…", "um mapa mental…",
+ * "com raias"), é esse o tipo dele. Com vários desenhos novos, cada um fica com o tipo que o modelo deu.
+ * Só a notação manda aqui (BPMN, UML, C4, raias, mapa…): "a arquitetura desse exercício" é assunto.
+ */
+export function tipoDitoNoPlano(plano, pedido) {
+  const novos = (plano?.operacoes || []).filter((o) => !o.fluxo);
+  const dito = tipoPedido(pedido);
+  if (novos.length !== 1 || !(TIPOS_DE_DESENHO[dito]?.formas || dito === "mapa")) return plano;
+  return { ...plano, operacoes: plano.operacoes.map((o) => (o === novos[0] ? { ...o, tipo: TIPOS_DE_DESENHO[dito].plano } : o)) };
+}
+
+/**
+ * O plano de um pedido que a pessoa JÁ confirmou na conversa e que o modelo ainda leu como pergunta: um
+ * desenho novo no projeto, com o pedido inteiro como instrução e o tipo que ele diz.
+ */
+export function planoDeDesenhoNovo(pedido) {
+  const tipo = TIPOS_DE_DESENHO[tipoPedido(pedido)]?.plano || "fluxograma";
+  return { acao: "mudar", explicacao: "", operacoes: [{ fluxo: "", nome: "", tipo, pedido: String(pedido || "").slice(0, 6000) }], documentos: [] };
+}
+
+const ROTULOS = {
+  fluxograma: "o fluxograma", mapa: "o mapa mental", simples: "o fluxograma simples", raias: "o fluxograma com raias",
+  bpmn: "o diagrama BPMN", atividades: "o diagrama UML de atividades", classes: "o diagrama de classes", casos: "o diagrama de casos de uso",
+  dados: "o modelo de dados", c4: "o diagrama C4", arquitetura: "o diagrama de arquitetura", nuvem: "o diagrama de arquitetura de nuvem",
+};
+/** "o fluxograma", "o mapa mental", "o diagrama BPMN" — para a pergunta de confirmação. */
+export const rotuloDoTipo = (tipo) => ROTULOS[idDoTipo(tipo)] || ROTULOS.fluxograma;
+
+/** O nome do .md: curto, com hífens, sem repetir outro da mesma resposta. */
+export function nomeDeArquivo(texto, usados = []) {
+  const base = fatia(String(texto || "").replace(/\.md$/i, "")) || "documento";
+  let nome = `${base}.md`;
+  for (let i = 2; usados.includes(nome); i++) nome = `${base}-${i}.md`;
+  return nome;
+}
+
+// ---- documentar (01/11/2026: "faça um arquivo MD no editor explicando a estratégia e o conceito do
+// MVP, uma aba de MD por fluxograma e mapa mental — vou usar para pedir ao Claude construir as rotas";
+// a Lisa mexeu nos desenhos em vez disso, e estragou um) ----
+//
+// Pedido de documento é reconhecido sem o modelo (não pode virar mudança de desenho por engano): fala
+// de MD/markdown/README, ou do editor de código junto de arquivo/documento/página, ou de documentação
+// sem falar de nota no desenho. A Lisa escreve um .md por desenho do projeto, mais a visão geral.
+
+// (01/11/2026, de novo: "ele ainda não abriu o editor e escreveu os arquivos md" — o pedido veio com
+// erros que as palavras exatas não pegavam. Agora vale letra trocada de lugar, "mds", "emedê", "editro".)
+
+// a distância de edição contando a troca de duas letras vizinhas como um erro só ("editro" → "editor")
+function distanciaComTroca(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const custo = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + custo);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+const perto = (x, alvo) => x === alvo || (Math.abs(x.length - alvo.length) <= folgaDe(alvo) && distanciaComTroca(x, alvo) <= folgaDe(alvo));
+const pertoDeAlgum = (p, lista) => p.some((x) => lista.some((d) => perto(x, d)));
+
+// "md", "mds", "emd", "emedê" (a voz); "markdown" e "readme" com erro
+const ehMarkdown = (x) => /^e?m+d+s?$/.test(x) || /^emede(s|is)?$/.test(x) || (x.length >= 6 && (perto(x, "markdown") || perto(x, "markdowns"))) || perto(x, "readme");
+// o editor de código — mas não o verbo: "editar a aba" é mudar o desenho
+const VERBO_EDITAR = new Set(["editar", "edite", "edita", "editei", "editou", "editam", "editem", "editado", "editada", "editando", "editaria", "edito"]);
+const ehEditor = (x) => x === "ide" || x === "ides" || x === "vscode" || (!VERBO_EDITAR.has(x) && perto(x, "editor"));
+const DE_TEXTO = ["arquivo", "arquivos", "documento", "documentos", "pagina", "paginas", "aba", "abas", "spec", "especificacao", "especificacoes", "escreva", "escrever", "escreve", "codigo", "abra", "abre", "abrir", "texto", "textos"];
+// (o verbo; "documento" e "documentação" sozinhos também são assunto de fluxo — "o fluxo de aprovação de
+// documentos" — e só contam junto de "cada/todos/por" + desenho)
+const DOCUMENTAR = ["documente", "documentar", "documentem", "documenta"];
+const DOCUMENTACAO = ["documentacao", "documentacoes", "documentos", "especificacao", "especificacoes"];
+const CADA = ["cada", "todos", "todas", "por"];
+const NO_DESENHO = ["nota", "notas", "anotacao", "anotacoes", "comentario", "comentarios"];
+
+/** O pedido é escrever documentos (.md no editor) a partir dos desenhos, e não mudar os desenhos? */
+export function pedeDocumentacao(pedido) {
+  const p = palavrasDe(pedido);
+  if (p.some(ehMarkdown) || p.some((x, i) => x === "eme" && /^des?$/.test(p[i + 1] || ""))) return true;
+  if ((p.some(ehEditor) || /\bvs code\b/.test(p.join(" "))) && pertoDeAlgum(p, DE_TEXTO)) return true;
+  if (pertoDeAlgum(p, NO_DESENHO)) return false;
+  // ("documento(s)" e "documentação" estão a uma letra do verbo: não contam aqui)
+  if (p.some((x) => !/^documento|^documentac/.test(x) && DOCUMENTAR.some((d) => perto(x, d)))) return true;
+  // "a documentação de cada fluxograma", "a especificação de todos os fluxos" (e não "documentos de cada área")
+  return pertoDeAlgum(p, DOCUMENTACAO) && umPorDesenho(pedido);
+}
+
+/** "um md POR fluxograma", "a documentação de CADA fluxo", "de TODOS os desenhos". */
+export function umPorDesenho(pedido) {
+  const p = palavrasDe(pedido);
+  return p.some((x, i) => CADA.some((c) => perto(x, c)) && p.slice(i + 1, i + 4).some((y) => DESENHOS.some((d) => parecida(y, d))));
+}
+
+// ---- desenho E documento no mesmo pedido (01/11/2026: "faça um fluxograma desenhando a arquitetura do
+// nosso produto já pensando em cibersegurança, onde hoje nós falhamos … faça um arquivo md também" — a
+// Lisa reescreveu os .md do MVP e não desenhou nada) ----
+//
+// O plano diz o que desenhar e quais documentos escrever. A trava (ajustarAoPedido), sem o modelo: num
+// pedido que fala de documento, desenho que JÁ EXISTE só muda se o pedido mandar mudar (PEDE_MUDANCA), e
+// desenho NOVO só nasce se o pedido pedir um (pedeNovoDesenho) — foi assim que a aba "Fluxo Desktop" se perdeu.
+
+const FAZER = ["faca", "faz", "fazer", "crie", "cria", "criar", "monte", "monta", "montar", "gere", "gera", "gerar", "desenhe", "desenha", "desenhar"];
+const DESENHO_NOVO = ["fluxograma", "fluxo", "diagrama", "mapa", "desenho", "arquitetura", "bpmn"];
+
+/** O pedido manda fazer um desenho novo ("faça um fluxograma da arquitetura", "desenhando a arquitetura")? */
+export function pedeNovoDesenho(pedido) {
+  const p = palavrasDe(pedido);
+  if (p.some((x) => x !== "desenho" && x !== "desenhos" && (perto(x, "desenhando") || perto(x, "desenhe") || perto(x, "desenhar")))) return true;
+  return p.some((x, i) => FAZER.some((v) => perto(x, v)) && p.slice(i + 1, i + 4).some((y) => DESENHO_NOVO.some((d) => parecida(y, d))));
+}
+
+/** O pedido manda mudar o que já está desenhado (incluir, pôr, mudar, pintar, tirar, anotar…). */
+export const PEDE_MUDANCA = /\b(inclu|adicion|acrescent|ponh|coloqu|mud[ae]|alter|atualiz|pint|remov|apag|exclu|tir[ae]|corrij|corrig|edit[ae]|renome|separ|mov[ae]|anot|refac|refaz)\w*/;
+
+/** Os documentos "um por desenho": a visão geral do projeto e uma especificação de cada desenho. */
+export function documentosPorDesenho(fluxos) {
+  return [
+    { arquivo: "00-visao-geral.md", titulo: "Visão geral do projeto", desenhos: [], novos: false, pedido: "", estilo: "visao-geral" },
+    ...(fluxos || []).map((f, i) => ({
+      arquivo: `${String(i + 1).padStart(2, "0")}-${fatia(f.nome) || "desenho"}.md`, titulo: String(f.nome || "Desenho"),
+      desenhos: [String(f.id)], novos: false, pedido: "", estilo: "especificacao",
+    })),
+  ];
+}
+
+/**
+ * A trava do plano num pedido de documento (sem o modelo): tira as mudanças que o pedido não mandou
+ * fazer e garante os documentos — os do plano; ou, se o plano não trouxe (ou trouxe menos que "um por
+ * desenho" pedia), um por desenho ou um só sobre o pedido.
+ */
+export function ajustarAoPedido(plano, pedido, fluxos) {
+  if (!pedeDocumentacao(pedido)) return plano;
+  const muda = PEDE_MUDANCA.test(semAcento(pedido));
+  const novo = pedeNovoDesenho(pedido);
+  const operacoes = (plano.operacoes || []).filter((o) => (o.fluxo ? muda : novo));
+  let documentos = plano.documentos || [];
+  if (umPorDesenho(pedido) && documentos.length < (fluxos || []).length) documentos = documentosPorDesenho(fluxos);
+  if (!documentos.length) {
+    documentos = [{
+      arquivo: "documento.md", titulo: linha(pedido, 80) || "Documento", desenhos: [], novos: operacoes.some((o) => !o.fluxo),
+      pedido: String(pedido).slice(0, 4000), estilo: "livre",
+    }];
+  }
+  return { ...plano, acao: operacoes.length ? "mudar" : "documentar", operacoes, documentos };
+}
+
+const fatia = (s) => semAcento(s).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50);
+
+/** O caminho do .md de um desenho: docs/<projeto>/01-<desenho>.md (0 = a visão geral). */
+export function arquivoDoDocumento(projeto, desenho, i) {
+  const pasta = `docs/${fatia(projeto?.nome) || "projeto"}`;
+  return i === 0 ? `${pasta}/00-visao-geral.md` : `${pasta}/${String(i).padStart(2, "0")}-${fatia(desenho?.nome) || "desenho"}.md`;
+}
+
+/** O caminho de um documento do plano: docs/<projeto>/<arquivo>. */
+export const caminhoDoDocumento = (projeto, arquivo) => `docs/${fatia(projeto?.nome) || "projeto"}/${arquivo}`;
+
+/**
+ * A resposta com os documentos, cada um num bloco "````markdown docs/…/01-x.md" (quatro crases: o .md
+ * pode ter blocos de três dentro) — o editor de código abre uma aba por bloco. Uma linha de quatro ou
+ * mais crases dentro do documento fecharia o bloco antes da hora: vira três.
+ */
+export function respostaComDocumentos(intro, documentos) {
+  const blocos = documentos.map((d) => {
+    const corpo = String(d.markdown || "").replace(/\r/g, "").replace(/^(\s*)`{4,}/gm, "$1```").trim();
+    return `${d.legenda ? `${d.legenda}\n\n` : ""}\`\`\`\`markdown ${d.arquivo}\n${corpo}\n\`\`\`\``;
+  });
+  return [String(intro || "").trim(), ...blocos].filter(Boolean).join("\n\n");
+}
+
+// ---- "em todos os fluxogramas" (01/11/2026: "ela não criou comentários detalhados em todos os
+// fluxogramas dentro do projeto, fez apenas em um") ----
+//
+// O modelo leu "fluxograma" ao pé da letra e deixou os mapas mentais de fora. Para quem fala,
+// "fluxograma" é qualquer desenho do projeto. Quando o pedido diz "todos"/"cada" desenho e o plano
+// esquece algum, a rota do plano pede um segundo plano só para os que faltaram (faltandoNoPlano).
+
+// "todos" com as trocas de letra de quem digita rápido ("tdoso"): a mesma letra, em outra ordem
+const ordenada = (p) => [...p].sort().join("");
+const TODOS = new Set(["todos", "todas", "cada"].map(ordenada));
+const DESENHOS = ["fluxo", "fluxos", "fluxograma", "fluxogramas", "desenho", "desenhos", "mapa", "mapas", "diagrama", "diagramas", "aba", "abas", "processo", "processos"];
+
+/** O pedido vale para todos os desenhos do projeto ("em todos os fluxogramas", "em cada fluxo")? */
+export function pedeEmTodos(pedido) {
+  const p = palavrasDe(pedido);
+  return p.some((x, i) => (TODOS.has(ordenada(x)) || parecida(x, "todos"))
+    && p.slice(i + 1, i + 4).some((y) => DESENHOS.some((d) => parecida(y, d))));
+}
+
+/** Os desenhos do projeto que o plano deixou de fora ("todos os mapas mentais": o quase vazio também). */
+export function faltandoNoPlano(plano, fluxos) {
+  const cobertos = new Set((plano?.operacoes || []).map((o) => o.fluxo).filter(Boolean));
+  return (fluxos || []).filter((f) => !cobertos.has(String(f.id)));
+}
+
+/** Junta ao plano as operações do segundo plano (só as dos desenhos que faltavam, sem repetir). */
+export function completarPlano(plano, extra, faltando) {
+  const ids = new Set(faltando.map((f) => String(f.id)));
+  const novas = (extra?.operacoes || []).filter((o) => ids.has(o.fluxo) && !plano.operacoes.some((x) => x.fluxo === o.fluxo));
+  return { ...plano, operacoes: [...plano.operacoes, ...novas].slice(0, LIMITE_DE_OPERACOES) };
+}
+
+
+// ---- a confirmação (01/11/2026: "ela tem que interpretar e saber o que eu quero, porém deve me
+// perguntar se eu tenho certeza; se eu disser sim, aí ela faz") ----
+//
+// Antes de mudar desenho ou escrever documento, a Lisa diz o que entendeu (o projeto, cada desenho e o
+// que vai fazer nele) e pergunta. "Sim" faz; "não" cancela; uma correção ("não, é no fluxo mobile")
+// refaz o entendimento com ela e pergunta de novo; outro assunto deixa o pedido de lado.
+
+export const VALIDADE_DA_CONFIRMACAO_MS = 15 * 60_000;
+
+const SIM = ["sim", "pode", "isso", "exato", "exatamente", "manda", "ok", "okay", "beleza", "blz", "confirmo", "confirmado", "certeza", "claro", "yes", "bora", "vai", "uhum", "aham", "positivo", "perfeito", "correto", "certo", "faz", "faca", "fazer", "segue", "prossiga", "continue"];
+// as palavras que podem vir junto do sim sem mudar nada ("sim, pode fazer, Lisa"; 02/11/2026: "Poder fazer
+// a alteração" — com o erro de digitação — ficava sem resposta)
+const JUNTO_DO_SIM = new Set([...SIM, "s", "ss", "mesmo", "ver", "tenho", "lisa", "por", "favor", "pfv", "pf", "ir", "em", "frente", "la", "e", "a", "o", "de", "pode", "agora", "entao", "tudo", "isso", "mesmo", "ai", "aí", "tranquilo", "show", "massa", "top", "obrigado", "obrigada", "valeu",
+  "poder", "podes", "alteracao", "alteracoes", "mudanca", "mudancas", "desenho", "fluxograma", "fluxo", "mapa", "mental", "diagrama", "as", "os", "essa", "esse", "isto", "ja", "logo", "assim", "jeito", "do", "da", "pra", "para", "mim", "voce", "favor",
+  "criar", "crie", "cria", "desenhar", "desenhe", "desenha", "mudar", "alterar", "altere", "seguir", "fazendo", "executar", "execute", "aplicar", "aplique", "pode", "podem", "manda", "mande"]);
+const NAO = ["nao", "n", "cancela", "cancelar", "cancele", "deixa", "deixe", "esquece", "esqueca", "para", "pare", "negativo", "no", "nope", "nada"];
+const CORRECAO = /^(nao|n)\b.{8,}|^(sim|s|pode)\s+(mas|so que|porem|so|e no|e na)\b|^(e|eh|e no|e na|e nos|e nas)\s+(no|na|nos|nas|o|a)\b|^na verdade\b|^(eu )?quis dizer\b|^(nao e|não é)\b|\berrad[oa]\b|^o (certo|correto)\b|^(mas|so que|porem)\b|^faltou\b|^(e )?tamb[eé]m\b|^troca\b|^muda\b|^(no|na) (projeto|fluxo|fluxograma|mapa|aba|desenho)\b/;
+
+/**
+ * A resposta à pergunta "posso fazer?": "sim", "nao", "corrige" (a pessoa ajustou o que a Lisa entendeu)
+ * ou null (é outro assunto). Aguenta erro de digitação ("simm", "pd fazer") e o jeito de falar.
+ */
+export function respostaDeConfirmacao(texto) {
+  const t = semAcento(texto).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  const p = t.split(" ");
+  const ehSim = (x) => /^s+i*m+$/.test(x) || /^s+$/.test(x) || x === "pd" || SIM.some((s) => perto(x, s));
+  if (p.length <= 8 && p.some(ehSim) && p.every((x) => JUNTO_DO_SIM.has(x) || ehSim(x)) && !p.some((x) => NAO.includes(x))) return "sim";
+  if (/^(sim|s|pode)\b.*\b(tenho certeza|pode fazer|faz|faca)\b/.test(t) && p.length <= 12 && !CORRECAO.test(t.replace(/^(sim|s|pode)\s+/, ""))) return "sim";
+  // "não, obrigado", "deixa pra lá": não (e não uma correção)
+  const SO_O_NAO = new Set([...NAO, "obrigado", "obrigada", "valeu", "lisa", "por", "favor", "agora", "ainda", "pra", "la", "isso", "mesmo", "melhor", "faz", "faca", "precisa"]);
+  if (p.length <= 5 && p.some((x) => NAO.includes(x)) && p.every((x) => SO_O_NAO.has(x))) return "nao";
+  if (CORRECAO.test(t)) return "corrige";
+  if (p.length <= 5 && p.some((x) => NAO.includes(x))) return "nao";
+  return null;
+}
+
+/**
+ * O que a Lisa entendeu, para a pessoa confirmar: o projeto (e como ele foi achado), cada desenho e o
+ * que vai ser feito nele, os documentos, e a pergunta.
+ */
+export function textoDaConfirmacao(plano, projeto, fluxos, { como = "" } = {}) {
+  const nomeDe = (id) => (fluxos || []).find((f) => String(f.id) === String(id))?.nome || "?";
+  const resumo = (t) => { const s = String(t || "").replace(/\s+/g, " ").trim(); return s.length > 240 ? `${s.slice(0, 240)}…` : s; };
+  const ondeAchei = { "em uso": " (o que está em uso)", "do quadro": " (o do desenho aberto no quadro)", "pelo desenho": " (pelo nome do desenho)", parecido: " (pelo nome parecido)", "mais recente": " (o mais recente — se não for esse, diga qual)", "único": "" }[como] || "";
+  const linhas = [
+    ...(plano.operacoes || []).map((o) => (o.fluxo ? `• Mudar "${nomeDe(o.fluxo)}": ${resumo(o.pedido)}` : `• Criar ${rotuloDoTipo(o.tipo)}${o.nome ? ` "${o.nome}"` : ""}: ${resumo(o.pedido)}`)),
+    ...(plano.documentos || []).map((d) => `• Escrever no editor o arquivo ${d.arquivo}${d.titulo && d.estilo === "livre" ? ` — ${d.titulo}` : ""}`),
+  ];
+  return [
+    // (o modelo às vezes já começa com "Entendi…": não repete)
+    `${!plano.explicacao ? "Entendi assim:" : /^entendi\b/i.test(plano.explicacao) ? plano.explicacao : `Entendi assim: ${plano.explicacao}`}`,
+    `No projeto "${projeto?.nome || "?"}"${ondeAchei}:\n${linhas.join("\n")}`,
+    `${plano.operacoes?.length ? "Os desenhos que eu mudar ficam com a versão de antes guardada. " : ""}Posso fazer? Responda sim, não, ou me diga o que corrigir.`,
+  ].join("\n\n");
+}

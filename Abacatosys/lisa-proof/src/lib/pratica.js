@@ -1,0 +1,890 @@
+// A parte prática no banco: gerar (ou reaproveitar) o desafio do período, responder, entregar e
+// pontuar. A regra de cada coisa mora em src/dominio/pratica.js; aqui é só o caminho até o banco,
+// a IA e o GitHub.
+//
+// AMARRADA À TRILHA (23/10/2026, src/dominio/avanco.js): o quiz e o exercício são do assunto da vez
+// (o das semanas abertas do plano); o quiz aprovado conclui o assunto; cada semana do plano tem o
+// seu projeto, a última tem o projeto final, e o projeto aprovado abre a semana seguinte.
+
+import { supabase } from "./supabase.js";
+import { ErroDeAcesso } from "./sessao.js";
+import {
+  registrarEvento, registrarOuMelhorar, quadroDeEstudo, trilhaDoUsuario,
+  estudouHoje, depoisDePontuar, resultadoDaPontuacao,
+} from "./estudo.js";
+import { temModelo } from "./ia.js";
+import {
+  gerarQuiz, gerarExercicio, gerarProjeto, gerarGuiaDoProjeto, ajustarComplexidadeDoProjeto, avaliarExercicio, avaliarProjeto,
+  gerarDesafioAberto, gerarCalculo, gerarDitado, avaliarEntrega,
+  gerarPassos, gerarConversa, responderNaConversa, avaliarConversa, gerarDesafioDeDiagrama, avaliarDiagrama,
+  gerarExemploDaLisa,
+} from "./iaPratica.js";
+import { lerRepositorio, ErroDoGitHub } from "./github.js";
+import { diaDe } from "@/dominio/datas.js";
+import { MULTIPLICADOR_DE_RECOMPENSAS } from "@/dominio/pontos.js";
+import {
+  TIPOS_DE_DESAFIO, NOMES_DOS_DESAFIOS, NOTA_DE_APROVACAO, fimDoPeriodo,
+  pontosDoQuiz, pontosDaNota, quizParaTela, PONTOS_DA_PRATICA, podeReenviar, entregaConcluida, ehProjeto,
+  RODADAS_POR_DIA, podeAbrirRodada, comFatorDaRodada, tentativasDe, validarAvaliacao,
+  tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto,
+  complexidadeDe, podeTrocarComplexidade, TROCAS_DE_COMPLEXIDADE, podeTrocarProjeto, projetoAntigo, arquivosDoProjeto,
+  temExemploDaLisa,
+} from "@/dominio/pratica.js";
+import {
+  MOTORES, motorDo, corrigeNoServidor, exercicioParaTela, avaliacaoDoMotor, conferirEvidencia,
+  gerarOuvido, corrigirCalculo, corrigirDitado, corrigirOuvido,
+} from "@/dominio/motores.js";
+import { gerarRitmo, corrigirRitmo, gerarAfinacao, corrigirAfinacao, gerarLeitura, corrigirLeitura } from "@/dominio/musica.js";
+import { gerarGrafico, corrigirGrafico } from "@/dominio/grafico.js";
+import { corrigirPassos } from "@/dominio/passos.js";
+import { turnosDe, podeFalar, podeEncerrar, validarMensagem } from "@/dominio/conversa.js";
+import { gerarSenha, precisaDeSenha } from "@/dominio/senha.js";
+import { conferirDiagrama } from "@/dominio/diagramas.js";
+import { contaDoQuiz } from "@/dominio/correio.js";
+import { pontosFracos } from "@/dominio/diario.js";
+import { perfilValido, motorDoExercicio } from "@/dominio/perfis.js";
+import { semanaDoProjeto, semanaDoDesafio, pedidoDoProjeto, projetosOpcionais, podeGerarProjeto, valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
+import { avancoDasTrilhas, avancoDaTrilhaDoUsuario } from "./avanco.js";
+import { trechoDoAssunto, blocoDoTrecho } from "./leituras.js";
+
+const CAMPOS = "id, usuario_id, trilha_id, tipo, periodo, rodada, card_ids, titulo, conteudo, status, resposta, avaliacao, nota, pontos, tentativas, criado_em, atualizado_em";
+
+function falhou(error, onde) {
+  if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`);
+}
+
+/**
+ * A frase-senha (src/dominio/senha.js) do desafio que pede áudio, foto ou vídeo: sorteada quando ele
+ * nasce e mantida quando o projeto troca de enunciado ou de complexidade.
+ */
+function comSenha(conteudo, anterior = null) {
+  if (!precisaDeSenha(conteudo?.evidencias)) return conteudo;
+  return { ...conteudo, senha: anterior?.senha || gerarSenha(crypto.getRandomValues(new Uint8Array(3))) };
+}
+
+/** Onde a pessoa travou nos últimos dias, pelo diário da trilha (nunca derruba quem chama: sem diário, nada). */
+async function travadasDoDiario(trilhaId, usuarioId) {
+  try {
+    const { data } = await supabase.from("proof_diario").select("travei, dia").eq("trilha_id", trilhaId).eq("usuario_id", usuarioId)
+      .order("dia", { ascending: false }).limit(3);
+    return pontosFracos(data || []);
+  } catch {
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------- projetos: pontos por parte
+
+const eProjeto = ehProjeto;
+const NADA_CUMPRIDO = { requisitos: [], extras: [] };
+
+/** O que o projeto já tem garantido. Projeto entregue antes da pontuação por parte (sem
+ *  `resposta.cumpridos`) é lido da última avaliação, na ordem dos requisitos. */
+function cumpridosDe(d) {
+  return d.resposta?.cumpridos || (d.avaliacao ? cumpridosNaAvaliacao(d.avaliacao, d.conteudo) : NADA_CUMPRIDO);
+}
+
+/** A pontuação do projeto como a tela mostra: quanto vale cada parte e o que já foi garantido. */
+function pontuacaoDoProjeto(d) {
+  const tabela = tabelaDePontos(d.tipo, d.conteudo);
+  const cumpridos = cumpridosDe(d);
+  return {
+    tabela,
+    cumpridos,
+    garantidos: pontosDoProjeto(tabela, cumpridos),
+    completo: projetoCompleto(tabela, cumpridos),
+    entregas: d.resposta?.entregas || [],
+  };
+}
+
+/** O projeto da vez de uma trilha, como a tela mostra: a semana do plano (ou o final), se está
+ *  liberado e o desafio dele (se já existe). */
+function projetoDaVezParaTela(avanco) {
+  const u = avanco.semanaDaVez || avanco.unidades.at(-1) || null;
+  if (!u) return null;
+  const d = u.projeto;
+  return {
+    tipo: u.tipo, periodo: u.periodo, numero: u.numero, seguinte: u.seguinte, final: u.final, semanas: avanco.unidades.length,
+    de: u.de, ate: u.ate, aberta: u.aberta, liberado: u.projetoLiberado, aprovado: u.aprovado, passou: u.passou,
+    podeOutro: u.podeOutroProjeto, rodadas: u.rodadas,
+    ...(d ? { id: d.id, status: d.status, nota: d.nota, titulo: d.titulo } : { status: null }),
+  };
+}
+
+// ---------------------------------------------------------------- ler
+
+/**
+ * O desafio como a tela pode ver (o quiz sem o gabarito das perguntas não respondidas). `unidade`: a
+ * semana do curso do projeto (do avanço) — os projetos de antes das semanas do curso não a guardam.
+ */
+export function desafioParaTela(d, tema, unidade = null) {
+  const semana = d.conteudo?.semana || (eProjeto(d.tipo) ? unidade?.numero : null) || null;
+  const base = {
+    id: d.id,
+    trilhaId: d.trilha_id,
+    tema: tema || "",
+    tipo: d.tipo,
+    nome: d.tipo === "projeto_semanal" && semana ? `Projeto da semana ${semana}` : NOMES_DOS_DESAFIOS[d.tipo],
+    periodo: d.periodo,
+    rodada: d.rodada || 1,
+    maxRodadas: RODADAS_POR_DIA[d.tipo] || 1,
+    ate: d.conteudo?.ate || unidade?.ate || fimDoPeriodo(d.tipo, d.periodo),
+    titulo: d.titulo,
+    // o projeto da semana do curso e o final guardam a semana e as datas dela; os antigos, só o calendário
+    semana,
+    // `dispensada`: a semana foi concluída antes das regras novas — o projeto dela é opcional
+    semanaDoCurso: semana && d.tipo !== "projeto_mensal"
+      ? { numero: semana, de: d.conteudo?.de || unidade?.de || null, ate: d.conteudo?.ate || unidade?.ate || null, dispensada: Boolean(unidade?.dispensada) }
+      : null,
+    status: d.status,
+    nota: d.nota,
+    pontos: d.pontos,
+    tentativas: d.tentativas,
+    maxTentativas: tentativasDe(d) || null,
+    avaliacao: d.avaliacao || null,
+  };
+  if (d.tipo === "quiz") {
+    return { ...base, perguntas: quizParaTela(d.conteudo, d.resposta) };
+  }
+  if (eProjeto(d.tipo)) {
+    const { original, ...conteudo } = d.conteudo || {}; // a versão padrão guardada não vai para a tela
+    const pontuacao = pontuacaoDoProjeto(d);
+    const antigo = projetoAntigo(d.conteudo);
+    return {
+      ...base, conteudo, resposta: d.resposta || {}, pontuacao, completo: pontuacao.completo,
+      complexidade: complexidadeDe(d.conteudo),
+      trocasRestantes: Math.max(0, TROCAS_DE_COMPLEXIDADE - (d.conteudo?.trocas || 0)),
+      // os assuntos que o projeto pratica; num antigo, os da semana do curso dele (o que ele DEVIA praticar)
+      antigo,
+      assuntos: !antigo ? d.conteudo.assuntos : (unidade?.etapas || []).map((e) => e.titulo),
+      troca: podeTrocarProjeto(d),
+    };
+  }
+  // o exercício: o motor diz a tela; os corrigidos no servidor só mostram o gabarito depois de corrigidos
+  const motor = motorDo(d.conteudo);
+  return {
+    ...base, motor, nomeDoMotor: MOTORES[motor].nome,
+    nome: motor === "codigo" ? base.nome : `${MOTORES[motor].nome} do dia`,
+    conteudo: exercicioParaTela(d.conteudo, d.status === "concluido"), resposta: d.resposta || {},
+  };
+}
+
+/** Um desafio para abrir na tela; o projeto vem com a semana do curso dele (a do avanço da trilha). */
+export async function desafioParaAbrir(id, usuarioId) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (d.tipo === "projeto_semanal" || d.tipo === "projeto_final") {
+    const { trilha, avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
+    return desafioParaTela(d, trilha.tema, semanaDoDesafio(avanco, d));
+  }
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  return desafioParaTela(d, trilha.tema);
+}
+
+export async function desafioDoUsuario(id, usuarioId) {
+  const { data, error } = await supabase.from("proof_desafios").select(CAMPOS).eq("id", id).eq("usuario_id", usuarioId).maybeSingle();
+  falhou(error, "desafio");
+  if (!data) throw new ErroDeAcesso(404, "desafio não encontrado");
+  return data;
+}
+
+/**
+ * O resumo da prática de cada trilha ativa: o assunto atual e a situação do quiz e do exercício
+ * de hoje e dos projetos da semana e do mês. É o que alimenta a cobrança na tela.
+ */
+export async function resumoDaPratica(usuarioId, trilhas, hoje = diaDe(), avancosProntos = null) {
+  if (!trilhas.length) return [];
+  const [avancos, desafiosR] = await Promise.all([
+    avancosProntos || avancoDasTrilhas(trilhas, hoje),
+    supabase.from("proof_desafios")
+      .select("id, trilha_id, tipo, periodo, rodada, status, nota, pontos, titulo, tentativas, motor:conteudo->>motor")
+      .eq("usuario_id", usuarioId)
+      .eq("periodo", hoje)
+      .in("tipo", ["quiz", "exercicio"]),
+  ]);
+  falhou(desafiosR.error, "desafios");
+
+  const doPeriodo = (trilhaId, tipo, periodo) =>
+    (desafiosR.data || []).filter((d) => d.trilha_id === trilhaId && d.tipo === tipo && d.periodo === periodo);
+  // a rodada mais recente é a que aparece; "feito" vale se QUALQUER rodada do dia foi concluída
+  const achar = (trilhaId, tipo, periodo) =>
+    doPeriodo(trilhaId, tipo, periodo).reduce((m, d) => (!m || (d.rodada || 1) > (m.rodada || 1) ? d : m), null);
+  const curto = (d) => (d ? {
+    id: d.id, status: d.status, nota: d.nota, pontos: d.pontos, titulo: d.titulo, tentativas: d.tentativas, rodada: d.rodada || 1,
+    ...(d.tipo === "exercicio" ? { motor: motorDo(d), maxTentativas: tentativasDe({ tipo: "exercicio", motor: motorDo(d) }) } : {}),
+  } : null);
+  const diario = (trilhaId, tipo) => {
+    const lista = doPeriodo(trilhaId, tipo, hoje);
+    const atual = curto(achar(trilhaId, tipo, hoje));
+    if (!atual) return null;
+    return {
+      ...atual,
+      rodadas: lista.length,
+      maxRodadas: RODADAS_POR_DIA[tipo],
+      feito: lista.some((d) => d.status === "concluido"),
+      podeMais: podeAbrirRodada(tipo, lista).ok,
+      pontosDoDia: lista.reduce((s, d) => s + (d.pontos || 0), 0),
+    };
+  };
+
+  return trilhas.map((t) => {
+    const avanco = avancos.get(t.id);
+    const atual = avanco?.assuntoDaPratica || null;
+    const semana = avanco?.semanaDaVez;
+    return {
+      trilhaId: t.id,
+      tema: t.tema,
+      perfil: perfilValido(t.perfil),
+      // o assunto da prática: o quiz aprovado dele conclui o assunto (se a teoria também estiver feita)
+      assunto: atual ? { cardId: atual.cardId, titulo: atual.titulo, teoria: atual.teoria, concluido: atual.concluido, faltaQuiz: atual.faltaQuiz } : null,
+      semana: semana ? { numero: semana.numero, total: avanco.unidades.at(-1).numero, final: semana.final } : null,
+      progresso: avanco?.progresso || { feitos: 0, total: 0 },
+      concluida: Boolean(avanco?.concluida),
+      quiz: diario(t.id, "quiz"),
+      exercicio: diario(t.id, "exercicio"),
+      projeto: avanco ? projetoDaVezParaTela(avanco) : null,
+      // começados em semanas dispensadas: opcionais (valem pontos, não travam nada), mas não somem
+      opcionais: projetosOpcionais(avanco).map((u) => ({ id: u.projeto.id, tipo: u.tipo, numero: u.numero, titulo: u.projeto.titulo, status: u.projeto.status, nota: u.projeto.nota })),
+    };
+  });
+}
+
+// ---------------------------------------------------------------- gerar
+
+/**
+ * O desafio do período: o que já existe, ou um novo gerado pela IA.
+ *
+ * A IA é chamada ANTES do insert, e o índice único (usuário, trilha, tipo, período) decide quem
+ * fica se dois pedidos chegarem juntos: o segundo perde o insert e devolve o do primeiro. Gasta
+ * uma chamada de IA à toa nesse caso raro, mas nunca cria dois quizzes do mesmo dia.
+ */
+export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, novaRodada = false, cardId = null }) {
+  if (!TIPOS_DE_DESAFIO.includes(tipo)) throw new ErroDeAcesso(400, "tipo de desafio inválido");
+  if (tipo === "projeto_mensal") throw new ErroDeAcesso(400, "o projeto do mês deu lugar ao projeto final da trilha");
+  const hoje = diaDe();
+  const { trilha, avanco } = await avancoDaTrilhaDoUsuario(trilhaId, usuarioId, hoje);
+  const projeto = eProjeto(tipo);
+
+  // quiz e exercício: de hoje, sobre o assunto da vez. Projeto: a semana do plano pedida (ou a da vez).
+  let alvo = hoje;
+  let unidade = null;
+  if (projeto) {
+    alvo = periodo || (avanco.semanaDaVez?.tipo === tipo ? avanco.semanaDaVez.periodo : null);
+    unidade = alvo ? semanaDoProjeto(avanco, tipo, alvo) : null;
+    if (!unidade) throw new ErroDeAcesso(400, tipo === "projeto_final" ? "esta trilha não tem projeto final agora" : "esta semana do plano não existe");
+  } else if (periodo && periodo !== hoje) {
+    throw new ErroDeAcesso(400, "quiz e exercício são só de hoje");
+  }
+
+  const existentes = await supabase.from("proof_desafios").select(CAMPOS)
+    .eq("usuario_id", usuarioId).eq("trilha_id", trilha.id).eq("tipo", tipo).eq("periodo", alvo).order("rodada");
+  falhou(existentes.error, "desafio");
+  const doDia = existentes.data || [];
+
+  let rodada = 1;
+  // o quiz de UM assunto (o painel do assunto: "fazer o quiz deste assunto"): o de hoje dele, ou uma
+  // rodada nova — se o quiz de hoje foi de outro assunto, conta como mais uma rodada do dia
+  let assuntoPedido = null;
+  if (tipo === "quiz" && cardId) {
+    assuntoPedido = avanco.etapas.find((e) => String(e.cardId) === String(cardId)) || null;
+    if (!assuntoPedido) throw new ErroDeAcesso(404, "este assunto não está na trilha");
+    if (assuntoPedido.bloqueada) throw new ErroDeAcesso(409, `este assunto ${assuntoPedido.motivo}`);
+    const dele = doDia.filter((d) => (d.card_ids || []).map(String).includes(String(cardId)));
+    if (dele.length && !novaRodada) return { desafio: dele[dele.length - 1], tema: trilha.tema, novo: false };
+    if (doDia.length) {
+      const pode = podeAbrirRodada(tipo, doDia);
+      if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
+      rodada = pode.rodada;
+    }
+  } else if (projeto) {
+    // o projeto da semana que já existe (inclusive um antigo, da semana do calendário, que vale para ela)
+    const vale = unidade.projeto ? await desafioDoUsuario(unidade.projeto.id, usuarioId).catch(() => null) : doDia.at(-1) || null;
+    if (vale && !novaRodada) return { desafio: vale, tema: trilha.tema, novo: false };
+    if (novaRodada) {
+      if (!unidade.podeOutroProjeto) throw new ErroDeAcesso(409, `só dá para um projeto novo quando o anterior acabou sem aprovação (até ${PROJETOS_POR_SEMANA} por semana)`);
+      rodada = Math.max(0, ...doDia.map((d) => d.rodada || 1)) + 1;
+    }
+    const pode = podeGerarProjeto(unidade, hoje);
+    if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
+  } else if (!novaRodada || !RODADAS_POR_DIA[tipo]) {
+    // sem pedir rodada nova: devolve a mais recente (ou cria a primeira)
+    if (doDia.length) return { desafio: doDia[doDia.length - 1], tema: trilha.tema, novo: false };
+  } else {
+    const pode = podeAbrirRodada(tipo, doDia);
+    if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
+    rodada = pode.rodada;
+  }
+
+  await quadroDeEstudo(trilha.quadro_id, usuarioId); // o quadro ainda é desta pessoa e de estudo
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+
+  // as rodadas de antes, para não repetir pergunta nem exercício (a IA é avisada E o código confere)
+  // (o exercício de outro perfil não tem enunciado de código: a lista e o ditado entram pelos itens)
+  const resumoDoExercicio = (c) => c?.enunciado || c?.contexto || c?.cenario
+    || (c?.itens || []).map((i) => i.pergunta).filter(Boolean).join(" | ") || (c?.frases || []).map((f) => f.texto).join(" | ");
+  const anteriores = tipo === "quiz"
+    ? doDia.flatMap((d) => (d.conteudo?.perguntas || []).map((p) => ({ pergunta: p.pergunta, codigo: p.codigo })))
+    : doDia.map((d) => ({ titulo: d.titulo, enunciado: resumoDoExercicio(d.conteudo) }));
+  const evitar = tipo === "quiz" ? [] : anteriores.map((a) => `${a.titulo}: ${String(a.enunciado || "").slice(0, 300)}`);
+  const perfil = perfilValido(trilha.perfil);
+
+  let conteudo, titulo, cardIds;
+  if (projeto) {
+    ({ conteudo, titulo, cardIds } = await gerarConteudoDoProjeto({ trilha, avanco, tipo, unidade, evitar }));
+  } else {
+    const assuntos = assuntoPedido ? [assuntoPedido] : avanco.assuntoDaPratica ? [avanco.assuntoDaPratica] : [];
+    if (!assuntos.length) throw new ErroDeAcesso(400, "a trilha não tem assuntos para praticar");
+    // assunto de um curso feito a partir de um livro: a prática cobra o que o trecho do livro ensina
+    const [trecho, travadas] = await Promise.all([
+      trechoDoAssunto(assuntos[0].cardId, 16_000),
+      tipo === "exercicio" ? travadasDoDiario(trilha.id, usuarioId) : [],
+    ]);
+    if (trecho) assuntos[0] = { ...assuntos[0], trecho: blocoDoTrecho(trecho) };
+    // o diário (src/dominio/diario.js): onde a pessoa travou, para o exercício trabalhar o ponto fraco
+    if (travadas.length) {
+      assuntos[0] = { ...assuntos[0], descricao: `${assuntos[0].descricao || ""}\nNo diário, a pessoa contou que travou em: ${travadas.join(" | ")}. Se couber no assunto, trabalhe isso.`.trim() };
+    }
+    try {
+      if (tipo === "quiz") {
+        conteudo = await gerarQuiz({ tema: trilha.tema, assunto: assuntos[0], anteriores, rodada, perfil });
+        titulo = `Quiz${rodada > 1 ? ` ${rodada}` : ""}: ${assuntos[0].titulo}`;
+      } else {
+        conteudo = await gerarExercicioDoPerfil({ tema: trilha.tema, perfil, assunto: assuntos[0], evitar, anteriores, rodada, dia: hoje });
+        titulo = conteudo.titulo;
+      }
+    } catch (e) {
+      throw new ErroDeAcesso(502, e.message);
+    }
+    cardIds = assuntos.map((a) => a.cardId);
+  }
+
+  conteudo = comSenha(conteudo);
+  const { data, error } = await supabase.from("proof_desafios").insert({
+    usuario_id: usuarioId, trilha_id: trilha.id, tipo, periodo: alvo, rodada,
+    card_ids: cardIds, titulo: String(titulo).slice(0, 200), conteudo,
+  }).select(CAMPOS).single();
+
+  if (error?.code === "23505") {
+    const { data: ganhou } = await supabase.from("proof_desafios").select(CAMPOS)
+      .eq("usuario_id", usuarioId).eq("trilha_id", trilha.id).eq("tipo", tipo).eq("periodo", alvo).eq("rodada", rodada).single();
+    return { desafio: ganhou, tema: trilha.tema, novo: false };
+  }
+  falhou(error, "desafio");
+  return { desafio: data, tema: trilha.tema, novo: true };
+}
+
+/**
+ * O exercício do dia no motor do perfil (src/dominio/perfis.js: motorDoExercicio). Programação gera o
+ * exercício de código de sempre (sem `motor` no conteúdo, como os antigos); o treino de ouvido, o de
+ * ritmo e o de afinação são montados pelo código, sem IA.
+ */
+async function gerarExercicioDoPerfil({ tema, perfil, assunto, evitar, anteriores, rodada, dia }) {
+  const motor = motorDoExercicio({ perfil, rodada, assunto, dia, tema });
+  if (motor === "aberto") return gerarDesafioAberto({ tema, perfil, assunto, evitar, rodada });
+  if (motor === "diagrama") return gerarDesafioDeDiagrama({ tema, perfil, assunto, evitar, rodada });
+  if (motor === "calculo") return gerarCalculo({ tema, assunto, evitar, rodada });
+  if (motor === "ditado") return gerarDitado({ tema, assunto, evitar, rodada });
+  if (motor === "passos") return gerarPassos({ tema, assunto, evitar, rodada });
+  if (motor === "conversa") return gerarConversa({ tema, assunto, evitar, rodada });
+  const montadoPeloCodigo = { ouvido: gerarOuvido, ritmo: gerarRitmo, afinacao: gerarAfinacao, leitura: gerarLeitura, grafico: gerarGrafico }[motor];
+  if (montadoPeloCodigo) {
+    const [semente] = crypto.getRandomValues(new Uint32Array(1));
+    return montadoPeloCodigo({ semente, assunto });
+  }
+  return gerarExercicio({ tema, assunto, evitar, anteriores, rodada });
+}
+
+/**
+ * O enunciado do projeto de uma semana do curso (ou do final), gerado pela IA a partir dos assuntos
+ * dela (src/dominio/avanco.js: pedidoDoProjeto). A semana, as datas e os assuntos vão junto no
+ * conteúdo: a tela mostra o que o projeto pratica, requisito por requisito.
+ */
+async function gerarConteudoDoProjeto({ trilha, avanco, tipo, unidade, evitar = [] }) {
+  const { assuntos, semanas, antes, depois } = pedidoDoProjeto(avanco, tipo, unidade);
+  if (!assuntos.length) throw new ErroDeAcesso(400, "a trilha não tem assuntos para praticar");
+  let gerado;
+  try {
+    gerado = await gerarProjeto({ tema: trilha.tema, tipo, assuntos, semanas, numero: unidade.numero, antes, depois, evitar, perfil: trilha.perfil });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  const conteudo = {
+    ...gerado,
+    semana: unidade.numero, de: unidade.de, ate: unidade.ate, assuntos: assuntos.map((a) => a.titulo),
+    // o valor já vem na escala de agora; a escala fica gravada para um multiplicador futuro não contar duas vezes
+    ...(tipo === "projeto_final" ? { valor: valorDoProjetoFinal(semanas), escalaDoValor: MULTIPLICADOR_DE_RECOMPENSAS, semanas } : {}),
+  };
+  return { conteudo, titulo: String(gerado.titulo).slice(0, 200), cardIds: assuntos.map((a) => a.cardId) };
+}
+
+/**
+ * Trocar o projeto da semana (ou o final) por outro, antes da primeira entrega (pedido de 23/10/2026:
+ * "o projeto da semana 1 não tem nada a ver com a semana 1"). O novo sai dos assuntos da semana do
+ * curso; o desafio continua o mesmo (mesma semana, mesma rodada) — só o enunciado muda.
+ */
+export async function trocarProjeto({ usuarioId, id }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  const pode = podeTrocarProjeto(d);
+  if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
+  const { trilha, avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
+  const unidade = semanaDoDesafio(avanco, d);
+  if (!unidade) throw new ErroDeAcesso(409, "este projeto não é de nenhuma semana da trilha agora");
+  if (unidade.dispensada) throw new ErroDeAcesso(409, "esta semana foi concluída antes das regras novas — o projeto dela é opcional");
+  await quadroDeEstudo(trilha.quadro_id, usuarioId);
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+
+  const evitar = [`${d.titulo}: ${String(d.conteudo?.contexto || "").slice(0, 300)}`];
+  const { conteudo: novo, titulo, cardIds } = await gerarConteudoDoProjeto({ trilha, avanco, tipo: d.tipo, unidade, evitar });
+  const conteudo = comSenha({ ...novo, novos: (d.conteudo?.novos || 0) + 1 }, d.conteudo);
+  await salvar(d.id, { conteudo, titulo, card_ids: cardIds });
+  return desafioParaTela({ ...d, conteudo, titulo, card_ids: cardIds }, trilha.tema, unidade);
+}
+
+// ---------------------------------------------------------------- responder e entregar
+
+async function salvar(id, campos) {
+  const { error } = await supabase.from("proof_desafios")
+    .update({ ...campos, atualizado_em: new Date().toISOString() }).eq("id", id);
+  falhou(error, "desafio");
+}
+
+/** Uma resposta do quiz. A correção é aqui, no servidor — a tela nunca recebe o gabarito antes. */
+export async function responderQuiz({ usuarioId, id, indice, escolha }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (d.tipo !== "quiz") throw new ErroDeAcesso(400, "este desafio não é um quiz");
+  if (d.periodo !== diaDe()) throw new ErroDeAcesso(400, "este quiz já passou — faça o de hoje");
+
+  const perguntas = d.conteudo.perguntas;
+  const i = Number(indice);
+  const e = Number(escolha);
+  if (!Number.isInteger(i) || i < 0 || i >= perguntas.length) throw new ErroDeAcesso(400, "pergunta inválida");
+  if (!Number.isInteger(e) || e < 0 || e > 3) throw new ErroDeAcesso(400, "opção inválida");
+
+  const escolhas = { ...(d.resposta?.escolhas || {}) };
+  const enviadas = (d.resposta?.enviadas || []).map(Number);
+  if (enviadas.includes(i)) throw new ErroDeAcesso(409, "esta pergunta foi pelo correio");
+  if (escolhas[i] !== undefined) throw new ErroDeAcesso(409, "esta pergunta já foi respondida");
+  escolhas[i] = e;
+
+  return {
+    ...(await gravarQuiz({ usuarioId, d, escolhas, enviadas })),
+    acertou: perguntas[i].correta === e,
+    correta: perguntas[i].correta,
+    explicacao: perguntas[i].explicacao,
+  };
+}
+
+/**
+ * Grava o quiz com as respostas e as perguntas mandadas pelo correio (BEYOND-0016, src/lib/correio.js
+ * também chama). A conta é contaDoQuiz (src/dominio/correio.js): a pergunta mandada sai do placar, o quiz
+ * termina quando toda pergunta foi respondida ou mandada, e com correio valem só os acertos, reduzidos.
+ * Terminou: dá a nota, os pontos, e o quiz aprovado conclui o assunto.
+ */
+export async function gravarQuiz({ usuarioId, d, escolhas, enviadas = [] }) {
+  const perguntas = d.conteudo.perguntas;
+  const c = contaDoQuiz(perguntas, escolhas, enviadas, pontosDoQuiz, PONTOS_DA_PRATICA.acertoNoQuiz);
+  const pontosDoDesafio = c.terminou ? comFatorDaRodada(c.pontos, d.rodada) : 0;
+  const estudavaAntes = c.terminou ? await estudouHoje(usuarioId) : true;
+  await salvar(d.id, {
+    resposta: { escolhas, ...(enviadas.length ? { enviadas } : {}) },
+    status: c.terminou ? "concluido" : "em_andamento",
+    ...(c.terminou ? { nota: c.nota, pontos: pontosDoDesafio } : {}),
+  });
+
+  let pontuacao = resultadoDaPontuacao(0, { pontosExtras: 0, metaBatida: false, ofensivaAumentou: false, ofensiva: null, conquistas: [] });
+  let assunto = null;
+  if (c.terminou) {
+    // o quiz aprovado conclui o assunto (se a teoria também estiver feita): a trilha pode ter acabado
+    if (c.nota >= NOTA_DE_APROVACAO) {
+      const { avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
+      const etapa = avanco.etapas.find((e) => (d.card_ids || []).map(String).includes(String(e.cardId)));
+      if (etapa) assunto = { titulo: etapa.titulo, concluido: etapa.concluido, faltaTeoria: !etapa.teoria };
+    } else assunto = { reprovado: true, precisa: NOTA_DE_APROVACAO };
+    const pontos = await registrarEvento({
+      usuarioId, trilhaId: d.trilha_id, tipo: "quiz", chave: `pratica:${d.id}`, pontos: pontosDoDesafio,
+      detalhe: { titulo: d.titulo, acertos: c.acertos, total: perguntas.length, ...(c.comCorreio ? { peloCorreio: c.enviadas } : {}) },
+    });
+    pontuacao = resultadoDaPontuacao(pontos, await depoisDePontuar({ usuarioId, trilhaId: d.trilha_id, estudavaAntes, ganhou: pontos, verTrilha: Boolean(assunto?.concluido) }));
+  }
+
+  return { assunto, terminou: c.terminou, acertos: c.acertos, total: perguntas.length, enviadas: c.enviadas, ...pontuacao };
+}
+
+function exigirReenvio(d) {
+  const alvo = eProjeto(d.tipo) ? { ...d, completo: pontuacaoDoProjeto(d).completo } : d;
+  if (podeReenviar(alvo)) return;
+  if (d.tentativas >= tentativasDe(d)) throw new ErroDeAcesso(409, tentativasDe(d) === 1 ? "este exercício já foi corrigido — faça outra rodada na Prática" : "as tentativas deste desafio acabaram");
+  throw new ErroDeAcesso(409, eProjeto(d.tipo) ? "este projeto já está completo — tudo entregue!" : "este desafio já foi aprovado");
+}
+
+/** Fecha uma entrega avaliada: grava, pontua pela melhor nota e diz se ainda dá para reenviar. */
+async function fecharEntrega({ usuarioId, d, avaliacao, resposta }) {
+  const tentativas = d.tentativas + 1;
+  const melhorNota = Math.max(d.nota ?? 0, avaliacao.nota);
+  let pontosDoDesafio = comFatorDaRodada(pontosDaNota(d.tipo, melhorNota), d.rodada);
+  let acabou = entregaConcluida({ tipo: d.tipo, melhorNota, tentativas, conteudo: d.conteudo });
+  let pontuacao = null;
+
+  // Projeto: pontos POR PARTE (21/10/2026). O que esta entrega cumpriu junta com o que já estava
+  // garantido; a entrega registra só o que foi novo, para a tela mostrar "+60 nesta entrega".
+  if (eProjeto(d.tipo)) {
+    const tabela = tabelaDePontos(d.tipo, d.conteudo);
+    const antes = cumpridosDe(d);
+    const cumpridos = juntarCumpridos(antes, cumpridosNaAvaliacao(avaliacao, d.conteudo));
+    pontosDoDesafio = pontosDoProjeto(tabela, cumpridos);
+    const novos = {
+      requisitos: cumpridos.requisitos.filter((i) => !antes.requisitos.includes(i)),
+      extras: cumpridos.extras.filter((i) => !antes.extras.includes(i)),
+    };
+    const entregas = [...(d.resposta?.entregas || []), {
+      em: new Date().toISOString(), tentativa: tentativas, ...novos, pontos: pontosDoDesafio - pontosDoProjeto(tabela, antes),
+    }].slice(-tentativasDe(d));
+    resposta = { ...resposta, cumpridos, entregas };
+    acabou = acabou || cumpridos.requisitos.length >= tabela.requisitos.length;
+    pontuacao = pontuacaoDoProjeto({ ...d, resposta });
+  }
+  const estudavaAntes = await estudouHoje(usuarioId);
+
+  await salvar(d.id, {
+    resposta,
+    avaliacao,
+    nota: melhorNota,
+    pontos: Math.max(d.pontos || 0, pontosDoDesafio),
+    tentativas,
+    status: acabou ? "concluido" : "em_andamento",
+  });
+
+  const pontos = await registrarOuMelhorar({
+    usuarioId, trilhaId: d.trilha_id, tipo: d.tipo, chave: `pratica:${d.id}`, pontos: pontosDoDesafio,
+    detalhe: { titulo: d.titulo, nota: melhorNota },
+  });
+  // o projeto da semana do plano aprovado abre a semana seguinte; o final, aprovado, fecha a trilha
+  let semana = null;
+  if (d.tipo === "projeto_semanal" || d.tipo === "projeto_final") {
+    const { avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
+    const u = avanco.unidades.find((x) => x.projeto?.id === d.id);
+    if (u) {
+      const proxima = avanco.unidades.find((x) => x.numero === u.seguinte);
+      semana = {
+        numero: u.numero, final: u.final, aprovado: u.aprovado, podeOutro: u.podeOutroProjeto,
+        liberou: u.passou && proxima ? proxima.numero : null, trilhaConcluida: avanco.concluida,
+      };
+    }
+  }
+  const extra = await depoisDePontuar({ usuarioId, trilhaId: d.trilha_id, estudavaAntes, ganhou: pontos, verTrilha: Boolean(semana?.trilhaConcluida) });
+
+  return {
+    avaliacao,
+    nota: melhorNota,
+    tentativas,
+    restantes: Math.max(0, tentativasDe(d) - tentativas),
+    concluido: acabou,
+    reenviar: podeReenviar({ tipo: d.tipo, conteudo: d.conteudo, tentativas, status: acabou ? "concluido" : "em_andamento", completo: pontuacao?.completo }),
+    ...(pontuacao ? { pontuacao, completo: pontuacao.completo } : {}),
+    semana,
+    ...resultadoDaPontuacao(pontos, extra),
+  };
+}
+
+export async function enviarExercicio({ usuarioId, id, codigo }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (d.tipo !== "exercicio") throw new ErroDeAcesso(400, "este desafio não é um exercício");
+  if (motorDo(d.conteudo) !== "codigo") throw new ErroDeAcesso(400, "este exercício não é de código — responda pela tela dele");
+  exigirReenvio(d);
+  const texto = String(codigo || "");
+  if (texto.trim().length < 10) throw new ErroDeAcesso(400, "escreva a sua solução antes de enviar");
+  if (texto.length > 20_000) throw new ErroDeAcesso(400, "a solução passou de 20 mil caracteres");
+
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  let avaliacao;
+  try {
+    avaliacao = await avaliarExercicio({ tema: trilha.tema, exercicio: d.conteudo, codigo: texto });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  return fecharEntrega({ usuarioId, d, avaliacao, resposta: { codigo: texto } });
+}
+
+/**
+ * Troca a complexidade do projeto (antes da primeira entrega). "Padrão" volta para a versão
+ * original sem chamar a IA; as outras são reescritas a partir dela. As dicas da Lisa, que falavam
+ * dos requisitos antigos, são descartadas.
+ */
+export async function mudarComplexidade({ usuarioId, id, nivel }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  const pode = podeTrocarComplexidade(d, nivel);
+  if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
+  const { trilha, avanco } = await avancoDaTrilhaDoUsuario(d.trilha_id, usuarioId);
+  const unidade = semanaDoDesafio(avanco, d);
+
+  const { guia, original, trocas = 0, complexidade, ...atual } = d.conteudo || {};
+  // a semana do curso (número, datas e assuntos), o valor do projeto final e as trocas de projeto
+  // não mudam com a complexidade
+  const meta = Object.fromEntries(["semana", "de", "ate", "assuntos", "valor", "semanas", "novos"].filter((k) => atual[k] != null).map((k) => [k, atual[k]]));
+  const padrao = original || atual;
+  let novo = padrao;
+  if (nivel !== "padrao") {
+    if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+    // a versão desafiadora também não pode exigir o que a trilha ainda não ensinou
+    const depois = unidade && d.tipo === "projeto_semanal" ? pedidoDoProjeto(avanco, d.tipo, unidade).depois : [];
+    try {
+      // projeto de antes dos perfis (entregue pelo GitHub) continua de programação, seja qual for a trilha
+      novo = await ajustarComplexidadeDoProjeto({ tema: trilha.tema, tipo: d.tipo, projeto: padrao, nivel, depois, perfil: padrao.evidencias ? trilha.perfil : "programacao" });
+    } catch (e) {
+      throw new ErroDeAcesso(502, e.message);
+    }
+  }
+  const conteudo = comSenha({ ...novo, ...meta, complexidade: nivel, trocas: trocas + 1, original: padrao }, d.conteudo);
+  const titulo = String(novo.titulo || d.titulo).slice(0, 200);
+  await salvar(d.id, { conteudo, titulo });
+  return desafioParaTela({ ...d, conteudo, titulo }, trilha.tema, unidade);
+}
+
+/**
+ * As "Dicas da Lisa" de um projeto (semana ou mês). Geradas uma vez e guardadas no próprio desafio
+ * (`conteudo.guia`): abrir de novo, ou clicar duas vezes, não gasta outra chamada da IA.
+ */
+export async function guiaDoProjeto({ usuarioId, id }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (!eProjeto(d.tipo)) throw new ErroDeAcesso(400, "as dicas da Lisa são para os projetos");
+  if (d.conteudo?.guia) return d.conteudo.guia;
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  let guia;
+  try {
+    guia = await gerarGuiaDoProjeto({ tema: trilha.tema, tipo: d.tipo, projeto: d.conteudo, perfil: trilha.perfil });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  await salvar(d.id, { conteudo: { ...d.conteudo, guia } });
+  return guia;
+}
+
+/** O desafio em texto, para o pedido do exemplo: o que ele pede, sem as respostas. */
+function resumoDoDesafio(c = {}) {
+  const linhas = [];
+  for (const k of ["titulo", "enunciado", "contexto", "cenario", "pergunta", "objetivo"]) if (typeof c[k] === "string" && c[k].trim()) linhas.push(c[k].trim());
+  for (const k of ["requisitos", "extras", "criterios", "pede"]) {
+    const lista = Array.isArray(c[k]) ? c[k].map((x) => (typeof x === "string" ? x : x?.texto || x?.enunciado || "")).filter(Boolean) : [];
+    if (lista.length) linhas.push(`${k}:\n- ${lista.slice(0, 14).join("\n- ")}`);
+  }
+  return linhas.join("\n").slice(0, 3500);
+}
+
+/**
+ * O "Exemplo da Lisa" (BEYOND-0022): uma aplicação de exemplo com todos os conceitos do exercício ou do
+ * projeto, num cenário parecido. A primeira chamada gera; as seguintes devolvem o que ficou guardado.
+ */
+export async function exemploDaLisa({ usuarioId, id }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  const motor = eProjeto(d.tipo) ? "aberto" : motorDo(d.conteudo || {});
+  if (!temExemploDaLisa(d.tipo, motor)) throw new ErroDeAcesso(400, "este desafio não tem exemplo da Lisa");
+  if (d.conteudo?.aplicacao) return d.conteudo.aplicacao;
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  const perfil = perfilValido(trilha.perfil);
+  // com código: o exercício de código, e os projetos e desafios dos cursos de programação
+  const comCodigo = motor === "codigo" || (perfil === "programacao" && !Array.isArray(d.conteudo?.evidencias));
+  let aplicacao;
+  try {
+    aplicacao = await gerarExemploDaLisa({ tema: trilha.tema, perfil, resumo: resumoDoDesafio(d.conteudo), linguagem: d.conteudo?.linguagem || "", comCodigo });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  await salvar(d.id, { conteudo: { ...d.conteudo, aplicacao } });
+  return aplicacao;
+}
+
+export async function enviarProjeto({ usuarioId, id, repo }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (!eProjeto(d.tipo)) throw new ErroDeAcesso(400, "este desafio não é um projeto");
+  if (Array.isArray(d.conteudo?.evidencias)) throw new ErroDeAcesso(400, "este projeto não é entregue pelo GitHub — mande a entrega pela tela dele");
+  exigirReenvio(d);
+
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  let repositorio;
+  try {
+    repositorio = await lerRepositorio(repo);
+  } catch (e) {
+    throw new ErroDeAcesso(e instanceof ErroDoGitHub ? 400 : 502, e.message);
+  }
+
+  let avaliacao;
+  try {
+    avaliacao = await avaliarProjeto({ tema: trilha.tema, projeto: d.conteudo, repositorio });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  return fecharEntrega({
+    usuarioId, d, avaliacao,
+    resposta: { repo: repositorio.url, branch: repositorio.branch, arquivos: repositorio.arquivos.map((a) => a.caminho) },
+  });
+}
+
+/**
+ * O projeto de programação entregue em ARQUIVOS, sem GitHub (03/11/2026: "a Lisa não tem GitHub, ela deve
+ * entregar de outro jeito"): a mesma correção de enviarProjeto (avaliarProjeto), com os arquivos no lugar do
+ * repositório baixado. Quem usa hoje é a Lisa jogadora (scripts/lisa-joga.mjs); a tela segue pelo GitHub.
+ */
+export async function entregarProjetoEmArquivos({ usuarioId, id, arquivos }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (!eProjeto(d.tipo)) throw new ErroDeAcesso(400, "este desafio não é um projeto");
+  if (Array.isArray(d.conteudo?.evidencias)) throw new ErroDeAcesso(400, "este projeto é entregue pela tela dele (as evidências)");
+  exigirReenvio(d);
+  const conferidos = arquivosDoProjeto(arquivos);
+  if (!conferidos.ok) throw new ErroDeAcesso(400, conferidos.erro);
+
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  const repositorio = { url: "entregue em arquivos no Proof (sem GitHub)", branch: "entrega", arquivos: conferidos.arquivos };
+  let avaliacao;
+  try {
+    avaliacao = await avaliarProjeto({ tema: trilha.tema, projeto: d.conteudo, repositorio });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  return fecharEntrega({ usuarioId, d, avaliacao, resposta: { emArquivos: true, arquivos: conferidos.arquivos.map((a) => a.caminho) } });
+}
+
+// ---------------------------------------------------------------- os motores dos outros perfis (30/10/2026)
+
+/**
+ * As respostas da lista de cálculo, do ditado, do treino de ouvido, do ritmo (os instantes dos
+ * toques) ou da afinação (a frequência detectada): o SERVIDOR corrige (src/dominio/motores.js e
+ * musica.js), sem IA. Uma tentativa só, como o quiz; a volta traz o gabarito.
+ */
+export async function responderExercicio({ usuarioId, id, respostas }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (d.tipo !== "exercicio") throw new ErroDeAcesso(400, "este desafio não é um exercício");
+  const motor = motorDo(d.conteudo);
+  if (!corrigeNoServidor(motor)) throw new ErroDeAcesso(400, "este exercício é corrigido pela Lisa — mande a sua entrega");
+  exigirReenvio(d);
+  const lista = (Array.isArray(respostas) ? respostas : []).slice(0, 12).map((r) => String(r ?? "").slice(0, motor === "passos" ? 2000 : 300));
+  const correcao = motor === "calculo" ? corrigirCalculo(d.conteudo, lista)
+    : motor === "ditado" ? corrigirDitado(d.conteudo, lista)
+    : motor === "ritmo" ? corrigirRitmo(d.conteudo, lista)
+    : motor === "afinacao" ? corrigirAfinacao(d.conteudo, lista)
+    : motor === "leitura" ? corrigirLeitura(d.conteudo, lista)
+    : motor === "grafico" ? corrigirGrafico(d.conteudo, lista)
+    : motor === "passos" ? corrigirPassos(d.conteudo, lista)
+    : corrigirOuvido(d.conteudo, lista);
+  const avaliacao = validarAvaliacao(avaliacaoDoMotor(motor, d.conteudo, correcao));
+  const resposta = { respostas: lista, correcao };
+  const r = await fecharEntrega({ usuarioId, d, avaliacao, resposta });
+  return { ...r, conteudo: exercicioParaTela(d.conteudo, true), resposta };
+}
+
+/**
+ * A entrega por evidências: o desafio aberto do dia ou o projeto de um curso que não é de
+ * programação. `entrega` já vem do formulário com os arquivos em base64 (src/lib/entregas.js):
+ *   { texto, video, imagens: [{ tipo, bytes, data, miniatura }], audio: { tipo, bytes, segundos, data } | null }
+ * Os arquivos vão só para a IA: o desafio guarda o texto, o link, a duração do áudio e as miniaturas.
+ */
+export async function entregarEvidencia({ usuarioId, id, entrega }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  const projeto = eProjeto(d.tipo);
+  if (!projeto && (d.tipo !== "exercicio" || motorDo(d.conteudo) !== "aberto")) throw new ErroDeAcesso(400, "este desafio não recebe entrega por arquivos");
+  if (projeto && !Array.isArray(d.conteudo?.evidencias)) throw new ErroDeAcesso(400, "este projeto é entregue pelo link do GitHub");
+  exigirReenvio(d);
+
+  const conferida = conferirEvidencia(entrega, { aceitas: d.conteudo.evidencias || ["texto"], projeto });
+  if (!conferida.ok) throw new ErroDeAcesso(400, conferida.motivo);
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+
+  let avaliacao;
+  try {
+    avaliacao = await avaliarEntrega({
+      tema: trilha.tema, perfil: trilha.perfil, tipo: d.tipo, desafio: d.conteudo,
+      entrega: {
+        texto: conferida.texto, video: conferida.video,
+        imagens: (entrega.imagens || []).map((i) => ({ mimeType: i.tipo, data: i.data })),
+        audio: entrega.audio ? { data: entrega.audio.data, segundos: conferida.audio.segundos } : null,
+        pdf: entrega.pdf ? { data: entrega.pdf.data } : null,
+      },
+    });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  return fecharEntrega({
+    usuarioId, d, avaliacao,
+    resposta: {
+      texto: conferida.texto || "", video: conferida.video || null, audio: conferida.audio, pdf: conferida.pdf,
+      miniaturas: (entrega.imagens || []).map((i) => i.miniatura).filter(Boolean),
+    },
+  });
+}
+
+/**
+ * O desenho do diagrama (motor "diagrama", 31/10/2026): o documento do quadro vai conferido (tamanho,
+ * sem as imagens coladas) e a Lisa avalia pelo texto dele (src/dominio/diagramas.js). O desafio
+ * guarda o documento: a tela reabre o desenho para a próxima tentativa e mostra o que foi avaliado.
+ */
+export async function entregarDiagrama({ usuarioId, id, diagrama }) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (d.tipo !== "exercicio" || motorDo(d.conteudo) !== "diagrama") throw new ErroDeAcesso(400, "este desafio não é de desenhar um diagrama");
+  exigirReenvio(d);
+  const conferido = conferirDiagrama(diagrama);
+  if (!conferido.ok) throw new ErroDeAcesso(400, conferido.motivo);
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  let avaliacao;
+  try {
+    avaliacao = await avaliarDiagrama({ tema: trilha.tema, perfil: trilha.perfil, desafio: d.conteudo, diagrama: conferido.doc });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  return fecharEntrega({ usuarioId, d, avaliacao, resposta: { diagrama: conferido.doc, formas: conferido.formas, ligacoes: conferido.ligacoes } });
+}
+
+// ---------------------------------------------------------------- a conversa com a Lisa (31/10/2026)
+
+async function conversaDoUsuario(id, usuarioId) {
+  const d = await desafioDoUsuario(id, usuarioId);
+  if (d.tipo !== "exercicio" || motorDo(d.conteudo) !== "conversa") throw new ErroDeAcesso(400, "este desafio não é uma conversa");
+  return d;
+}
+
+/**
+ * Uma fala da pessoa na conversa: a Lisa responde no papel e corrige o que precisar. A trava é o
+ * momento que eu li (duas falas ao mesmo tempo, só uma grava).
+ */
+export async function falarNaConversa({ usuarioId, id, mensagem }) {
+  const d = await conversaDoUsuario(id, usuarioId);
+  const pode = podeFalar(d);
+  if (!pode.ok) throw new ErroDeAcesso(409, pode.motivo);
+  let texto;
+  try { texto = validarMensagem(mensagem); } catch (e) { throw new ErroDeAcesso(400, e.message); }
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+  const turnos = [...turnosDe(d), { quem: "pessoa", texto }];
+  let resposta;
+  try {
+    resposta = await responderNaConversa({ conteudo: d.conteudo, turnos, ultima: texto });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  const novos = [...turnos.slice(0, -1), { quem: "pessoa", texto, correcao: resposta.correcao }, { quem: "lisa", texto: resposta.fala }];
+  const { data: gravou, error } = await supabase.from("proof_desafios")
+    .update({ resposta: { ...(d.resposta || {}), turnos: novos, terminou: resposta.terminou }, status: "em_andamento", atualizado_em: new Date().toISOString() })
+    .eq("id", d.id).eq("atualizado_em", d.atualizado_em).select("id");
+  falhou(error, "conversa");
+  if (!gravou?.length) throw new ErroDeAcesso(409, "outra fala acabou de chegar — atualize a página");
+  return { turnos: novos, terminou: resposta.terminou, podeMais: podeFalar({ ...d, resposta: { turnos: novos } }).ok };
+}
+
+/** Encerrar a conversa: a Lisa avalia as falas pela rubrica, e os pontos entram como no exercício. */
+export async function encerrarConversa({ usuarioId, id }) {
+  const d = await conversaDoUsuario(id, usuarioId);
+  exigirReenvio(d);
+  const turnos = turnosDe(d);
+  const pode = podeEncerrar(turnos);
+  if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
+  if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
+  const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
+  let avaliacao;
+  try {
+    avaliacao = await avaliarConversa({ tema: trilha.tema, conteudo: d.conteudo, turnos });
+  } catch (e) {
+    throw new ErroDeAcesso(502, e.message);
+  }
+  return fecharEntrega({ usuarioId, d, avaliacao, resposta: { ...(d.resposta || {}), turnos } });
+}

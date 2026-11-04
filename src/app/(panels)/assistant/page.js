@@ -3,14 +3,36 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { cleanForSpeech } from "@/lib/cleanForSpeech.js";
+import { cleanForSpeech, pedacosParaVoz } from "@/lib/cleanForSpeech.js";
+import { detectarAcordar, interpretarComando, escolherMusica, normalizar } from "@/lib/escutaPorPalavra.js";
 import { useLog } from "@/components/shell/LogProvider.js";
 import { CY, OR, GR, PU, mono, meterFor, dotColor } from "@/lib/theme.js";
 import { langForPath } from "@/lib/highlightCode.js";
+import { respostaSemCodigo, trechosDaResposta, codigoDaConversa } from "@/lib/codigoNaResposta.js";
+import { pedidoDeDesenho, descreverDiagrama, resumoDaMudanca, pedeMudancaNoDesenho } from "@/lib/diagramaDaLisa.js";
+import usePapel from "@/lib/usePapel.js";
+import { ContaNoCelular } from "@/components/shell/MenuDaConta.js";
+import { podeAcessar } from "@/lib/authSession.js";
+import { PEDIDO_DE_CONSENTIMENTO, pedidoDaSegundaEtapa, perguntasDaEtapa, perfilDaEtapa, etapaQueFalta, respostaAoConvite, PEDE_APAGAR_PERFIL } from "@/lib/modoUsuario.js";
+import TextoComCodigo from "@/components/panels/TextoComCodigo.js";
+import FontesDaWeb from "@/components/panels/FontesDaWeb.js";
+import CenaDaLisa from "@/components/panels/hud/CenaDaLisa.js";
+import JanelaDaResposta from "@/components/panels/hud/JanelaDaResposta.js";
+import { citaProjeto, projetoDoPedido, perguntaDoProjeto, fluxoCitado, contextoDoProjeto, pedeEmTodos, pedeDocumentacao, respostaComDocumentos, ajustarAoPedido, documentosPorDesenho, respostaDeConfirmacao, textoDaConfirmacao, VALIDADE_DA_CONFIRMACAO_MS, pedeNovoDesenho, planoDeDesenhoNovo } from "@/lib/processmapNaConversa.js";
+import { pedirPlano, executarPlano, textoDoAndamento, escreverDocumentos } from "@/lib/trabalhoNoProjeto.js";
+import { apiDosFluxos } from "@/lib/fluxogramasNoNavegador.js";
+
+const apiDosFluxosDaConversa = apiDosFluxos();
 import { Highlight } from "prism-react-renderer";
 import { TTS_VOICES, STEVE_VOICE_NAME } from "@/lib/ttsVoices.js";
 import { pickBrowserVoice, speakText, stopBrowserVoiceAudio, isBrowserVoiceAudioPlaying } from "@/lib/browserVoice.js";
 import { useIsMobile } from "@/lib/useIsMobile.js";
+import TopoExtra from "@/components/shell/TopoExtra.js";
+import Suspenso, { GrupoDoMenu, ItemDoMenu, ChaveDoMenu, SegmentosDoMenu, LinkDoMenu } from "@/components/shell/Suspenso.js";
+import RotuloDaVoz from "@/components/panels/RotuloDaVoz.js";
+import { adicionarTurno, conversaVigente, falaQueValePergunta, interrupcaoNaFala, marcarInterrompida } from "@/lib/conversa.js";
+import { pareceAcao, falaSemRascunho, separarRascunho } from "@/lib/acoesNoAbacato.js";
+import { acordarAudio, escutarElemento, nivelDaVoz, abrirMicrofone, fecharMicrofone, nivelDoMicrofone } from "@/lib/vozAnalisador.js";
 import { ACCENT_THEMES, DEFAULT_ACCENT, applyAccentTheme } from "@/lib/accentThemes.js";
 import { getDeviceId, matchNavCommand } from "@/lib/deviceId.js";
 import { runFullSync } from "@/lib/sync.js";
@@ -34,6 +56,30 @@ import { loadGames } from "@/lib/gameHistory.js";
 
 // carregado sob demanda (three.js + o modelo glTF pesam ~12MB) — só baixa se a pessoa
 // realmente ligar a Visão 3D; desktop-only por decisão do usuário, nunca entra no bundle mobile.
+// a voz da Lisa como esfera de pontos (three.js) — aparência padrão desde a revisão visual
+// o visual do centro (Esfera de pontos, Lente, Orbe, Plasma, Anel) — escolhido no painel /visual
+import VisualDaLisa, { usarVisualEscolhido, usarAjustesDoRosto } from "@/components/panels/visuais/VisualDaLisa.js";
+import { VISUAIS, escolherVisual, visuaisDoUsuario, visualDoUsuario } from "@/lib/visuaisDaLisa.js";
+import { CABELOS_DO_ROSTO, PALETAS_DO_ROSTO, escolherAjustesDoRosto } from "@/lib/rostoDaLisa.js";
+// o contexto da conversa (25/10/2026): imagens anexadas (o +, Ctrl+V, arrastar) e repositórios vinculados
+import { BotaoMais, FaixaDoContexto } from "@/components/panels/ContextoDaConversa.js";
+// o microfone do celular como o do WhatsApp (02/11/2026): segura grava, solta envia, ← cancela, ↑ trava
+import MicrofoneDaLisa from "@/components/panels/MicrofoneDaLisa.js";
+// a Conversa livre no celular escuta gravando, e o nome dela sai certo na fala (03/11/2026, BEYOND-0011)
+import { abrirConversaPorGravacao } from "@/lib/conversaPorGravacao.js";
+import { corrigirNomeDaLisa, dicaDoErro } from "@/lib/falaComoWhatsApp.js";
+import { imagemParaAnexo, imagensDaColagem, imagensSoltas } from "@/lib/anexosDaConversa.js";
+import { MAX_ANEXOS } from "@/lib/contextoDaConversa.js";
+import { reposNoTexto, vinculosValidos } from "@/lib/enderecoDoRepositorio.js";
+// Modo Tomar nota (27/10/2026): escuta até 10 min e anota por assunto no quadro "Notas" do Abacato
+import TomarNota from "@/components/panels/TomarNota.js";
+import { pedidoDeTomarNota } from "@/lib/tomarNota.js";
+// "Instalar app" do Chrome (27/10/2026): ver src/lib/instalarApp.js
+import usarInstalacao from "@/components/shell/usarInstalacao.js";
+import { DICA_DO_IPHONE } from "@/lib/instalarApp.js";
+// o editor que abre quando a resposta traz código (qualquer modo — ver IdeDaLisa.js)
+const IdeDaLisa = dynamic(() => import("@/components/panels/IdeDaLisa.js"), { ssr: false, loading: () => null });
+const QuadroDaLisa = dynamic(() => import("@/components/panels/QuadroDaLisa.js"), { ssr: false, loading: () => null });
 const LisaAvatar3D = dynamic(() => import("@/components/panels/LisaAvatar3D.js"), {
   ssr: false,
   loading: () => null,
@@ -58,6 +104,22 @@ function unlockAudioPlayback() {
   } catch {
     // sem suporte a Audio (não deveria acontecer em nenhum navegador real) — só segue sem destravar
   }
+}
+
+/** Uma fala dela nunca prende a Conversa livre por mais que isto (BEYOND-0011). */
+const FALA_MAXIMA_MS = 4 * 60_000;
+
+/** Espera a fala dela acabar — a fila inteira (pedaços que entram depois também) e o áudio tocando —,
+ *  até `parou()` ou o teto. Sem teto, um áudio que nunca avisava que terminou deixava a Conversa livre
+ *  em "respondendo…" para sempre (BEYOND-0011). */
+async function esperarAFalaAcabar({ fila, falando, parou, ateMs = Date.now() + FALA_MAXIMA_MS }) {
+  const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  let atual;
+  do {
+    atual = fila();
+    await Promise.race([Promise.resolve(atual).catch(() => {}), esperar(Math.max(0, ateMs - Date.now()))]);
+  } while (atual !== fila() && !parou() && Date.now() < ateMs);
+  while (!parou() && falando() && Date.now() < ateMs) await esperar(250);
 }
 
 const MODE_META = {
@@ -151,11 +213,31 @@ function playListenBeep() {
 export default function AssistantPage() {
   const { logs, addLog } = useLog();
   const [mode, setMode] = useState("idle");
+  // (01/11/2026, o MVP) o papel de quem está na tela. O USUÁRIO tem a conversa, a voz, o Modo Tela, o
+  // editor de código, o ProcessMap, os repositórios públicos, a entrevista e a Lisa Task (o Abacato); os modos do
+  // admin somem da tela e ficam desligados (quem barra de verdade é o portão, src/middleware.js)
+  const papel = usePapel();
+  const usuario = papel === "usuario";
+  const usuarioRef = useRef(false);
+  usuarioRef.current = usuario;
+  const entrevistaRef = useRef({ estado: null, etapa: 1, i: 0, respostas: {}, nome: "" });
+  const entrevistaFazRef = useRef(null);
   const [cards, setCards] = useState([]);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  // os sites que a Lisa usou quando pesquisou na internet (evento "fontes" do /api/ask)
+  const [fontes, setFontes] = useState([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  // a janela da resposta (01/11/2026, src/components/panels/hud/): o × fecha até a próxima pergunta,
+  // e cada pergunta nova faz a janela surgir de novo (a chave dela muda)
+  const [janelaFechada, setJanelaFechada] = useState(false);
+  const [numeroDaResposta, setNumeroDaResposta] = useState(0);
+  useEffect(() => {
+    if (!busy) return;
+    setJanelaFechada(false);
+    setNumeroDaResposta((n) => n + 1);
+  }, [busy]);
   const [listening, setListening] = useState(false);   // mic ativo (STT)
   // true só durante a janela de resposta automática do Modo Escuta (listenForReply) — sinal
   // visual/sonoro claro de "agora é sua vez de falar", separado do `listening` do botão manual.
@@ -207,6 +289,53 @@ export default function AssistantPage() {
   // mostra o código de cada arquivo sendo escrito ao vivo (liveCode), não só o PR pronto no
   // final. Nunca commita na branch escolhida — sempre cria uma branch nova e abre um PR.
   const [codeMode, setCodeMode] = useState(false);
+  // o editor de código (IdeDaLisa): as respostas desta conversa que trouxeram código, uma aba
+  // cada — perguntar de novo não apaga nada. `ideViva` é a resposta chegando agora (o texto dela
+  // é o `answer`); quando termina, ela entra no histórico (se tiver código) com o mesmo id.
+  const [ideHistorico, setIdeHistorico] = useState([]);
+  const [ideViva, setIdeViva] = useState(null); // { id, pergunta, alvo }
+  // `alvo` (BEYOND-0009): a aba da IDE de onde saiu o pedido ("pedir à Lisa") — a resposta é
+  // escrita em cima dela quando termina
+  const abrirNaIde = useCallback((pergunta, alvo = null) => {
+    const id = `r${Date.now()}`;
+    setIdeViva({ id, pergunta, alvo });
+    return id;
+  }, []);
+  const guardarNaIde = useCallback((id, pergunta, texto, alvo = null) => {
+    setIdeViva((v) => (v?.id === id ? null : v));
+    if (trechosDaResposta(texto).temCodigo) setIdeHistorico((h) => [...h, { id, pergunta, texto, alvo }].slice(-30));
+  }, []);
+  // o que está escrito ou mudado na IDE (as abas suas e as que você editou): vai junto das perguntas
+  const codigoDaIdeRef = useRef("");
+  // o quadro da Lisa (BEYOND-0010): o processo desenhado na tela. `desenhoRef` é o documento como
+  // está agora no quadro (com o que a pessoa mexeu) — vai em texto junto das perguntas.
+  const [quadro, setQuadro] = useState(null); // { versao: { doc, chave, colecao }, titulo, explicacao }
+  const [desenhando, setDesenhando] = useState(false);
+  const desenhoRef = useRef(null);
+  const quadroAbertoRef = useRef(false);
+  quadroAbertoRef.current = Boolean(quadro);
+  const desenharNaTelaRef = useRef(null);
+  // os projetos do ProcessMap na conversa (01/11/2026): a lista (guardada 30 s), o fluxo salvo que está
+  // aberto no quadro (o quadro avisa) e quem acha o projeto citado — ver resolverProjetoRef abaixo
+  const projetosRef = useRef({ em: 0, lista: null });
+  const quadroVinculoRef = useRef(null); // { fluxo, projeto }
+  const resolverProjetoRef = useRef(null);
+  const ultimoProjetoRef = useRef(null); // o último projeto em que a Lisa trabalhou nesta conversa
+  const planejarNoProjetoRef = useRef(null);
+  const trabalharNoProjetoRef = useRef(null);
+  const documentarNoProjetoRef = useRef(null);
+  // o pedido sobre o projeto esperando o "sim" (01/11/2026: "ela deve me perguntar se eu tenho certeza;
+  // se eu disser sim, aí ela faz"): { q, doProjeto, plano, como, em }
+  const planoPendenteRef = useRef(null);
+  const confirmarNoProjetoRef = useRef(null);
+  const executarPendenteRef = useRef(null);
+  // o pedido de desenho que caiu na conversa comum e que a Lisa entendeu e perguntou "Posso fazer?" (o
+  // evento "desenho" do /api/ask; 02/11/2026: "pode fazer a alteração" → "é só me dar o comando direto"):
+  // { q, imagens, em } — o "sim" seguinte desenha (fazerDesenhoConfirmadoRef)
+  const desenhoPendenteRef = useRef(null);
+  const fazerDesenhoConfirmadoRef = useRef(null);
+  // as mensagens da conversa, para mandar o código que já apareceu nela junto da pergunta
+  const mensagensRef = useRef([]);
 
   // Modo Vigia: com isso ligado, toda pergunta busca no HISTÓRICO de observações do Modo Tela
   // (tabela screen_observations, ver src/lib/screenWatch.js) em vez de conversar normalmente
@@ -407,7 +536,15 @@ export default function AssistantPage() {
   // Visão do avatar: "traditional" (visualizador de onda de sempre) ou "3d" (corpo/modelo 3D,
   // ver LisaAvatar3D.js) — DESKTOP-ONLY de propósito (o toggle só existe no branch desktop
   // deste componente, então nunca aparece nem carrega no mobile).
-  const [avatarView, setAvatarView] = useState("traditional");
+  // "esfera" (padrão desde a revisão visual de out/2026, ver EsferaDaVoz.js) também vale.
+  const [avatarView, setAvatarView] = useState("esfera");
+  // com avatarView "esfera": QUAL visual reage à voz (Esfera de pontos, Lente, Orbe, Plasma ou
+  // Anel — src/lib/visuaisDaLisa.js), escolhido no painel /visual ou no menu de aparência. O usuário
+  // do MVP só tem a Esfera de pontos e o Rosto (visualDoUsuario), sem gravar nada: o navegador pode
+  // ser o mesmo do admin, e a escolha dele continua guardada.
+  const visualEscolhido = usarVisualEscolhido();
+  const visualDaLisa = usuario ? visualDoUsuario(visualEscolhido) : visualEscolhido;
+  const ajustesDoRosto = usarAjustesDoRosto(); // o cabelo e as cores, quando o visual é o Rosto
   // qual "corpo" 3D usar quando avatarView === "3d" — "cyborg" (original, sem esqueleto) ou
   // "ironman" (rigado, com gestos de verdade por modo, ver LisaAvatarIronMan.js)
   const [avatarSkin, setAvatarSkin] = useState("cyborg");
@@ -416,6 +553,16 @@ export default function AssistantPage() {
   const isMobile = useIsMobile();
   const [mobileView, setMobileView] = useState("chat"); // "chat" | "voice"
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
+  // gravando a fala pelo microfone do celular (MicrofoneDaLisa): a esfera escuta, e o "</> editor"
+  // flutuante sai do caminho (globals.css: body.bb-gravando-fala, body[data-celular])
+  const [gravandoFala, setGravandoFala] = useState(false);
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    document.body.classList.toggle("bb-gravando-fala", gravandoFala);
+    if (isMobile) document.body.dataset.celular = mobileView;
+    else delete document.body.dataset.celular;
+    return () => { document.body.classList.remove("bb-gravando-fala"); delete document.body.dataset.celular; };
+  }, [gravandoFala, isMobile, mobileView]);
   // no mobile o Assistente é tela cheia (sem Sidebar/Topbar — ver Shell.js), então essas são
   // as ÚNICAS abas que existem nesse modo: sem esse atalho, não tem como chegar nos outros
   // painéis (Dashboard, AR, Quarto de Guerra, etc.) a partir do celular.
@@ -428,11 +575,98 @@ export default function AssistantPage() {
 
   const recognitionRef = useRef(null);
   const answerRef = useRef("");
+  const fontesRef = useRef([]);
   // última pergunta+cards e ação proposta ainda não confirmada — mandados de volta pro
   // backend a cada pergunta nova, pra ele saber a que card "reprograme pra amanhã" se refere
   // e se a mensagem atual está confirmando/cancelando uma ação (ver /api/ask).
   const historyRef = useRef(null);
+  // As últimas trocas (BEYOND-0006): vão junto com cada pergunta para a Lisa continuar o
+  // assunto. Inclui o que ela comenta sozinha (tela, câmera, escuta) — "por quê?" logo depois
+  // de um comentário dela precisa saber de qual comentário se trata.
+  const conversaRef = useRef([]);
+  // A última fala INTEIRA dela (a memória corta cada fala): "cria um card com esse texto" usa esta.
+  const ultimaRespostaRef = useRef("");
+  const lembrarDaLisa = (texto) => { conversaRef.current = adicionarTurno(conversaVigente(conversaRef.current), "lisa", texto); ultimaRespostaRef.current = String(texto || ""); };
   const pendingActionRef = useRef(null);
+
+  // ---- o contexto da conversa (25/10/2026): imagens anexadas e repositórios vinculados ----
+  // Pedido: "ponha um + na barra de conversa e deixe eu colar imagens lá, tanto do PC como do
+  // Ctrl+C/Ctrl+V; além disso, a função de eu vincular repositórios — além da conversa e do que
+  // ela estiver vendo em tela e câmera, ela usa essas informações de contexto, inclusive
+  // conseguindo correlacioná-las". Não é um modo nem um escopo: vale em qualquer conversa e vai
+  // junto de cada pergunta até a pessoa tirar. Os repositórios ficam guardados neste navegador
+  // (sobrevivem ao recarregar); as imagens, só nesta visita (são grandes).
+  const [anexos, setAnexos] = useState([]);
+  const [preparandoAnexos, setPreparandoAnexos] = useState(0);
+  const [reposVinculados, setReposVinculados] = useState([]);
+  const [leituraDosRepos, setLeituraDosRepos] = useState(null);
+  const anexosRef = useRef([]);
+  anexosRef.current = anexos;
+  const reposRef = useRef([]);
+  reposRef.current = reposVinculados;
+  useEffect(() => {
+    try { setReposVinculados(vinculosValidos(JSON.parse(localStorage.getItem("lisa-repos-vinculados") || "[]"))); } catch { /* nada guardado */ }
+  }, []);
+  const guardarRepos = useCallback((lista) => {
+    reposRef.current = lista;
+    setReposVinculados(lista);
+    try { localStorage.setItem("lisa-repos-vinculados", JSON.stringify(lista)); } catch { /* sem armazenamento: vale só nesta visita */ }
+  }, []);
+  const anexarImagens = useCallback(async (arquivos) => {
+    const cabem = Math.max(0, MAX_ANEXOS - anexosRef.current.length);
+    const lista = (arquivos || []).slice(0, cabem);
+    if ((arquivos || []).length > cabem) addLog("[ANEXO]", OR, `no máximo ${MAX_ANEXOS} imagens no contexto — tire alguma para pôr outra`);
+    if (!lista.length) return;
+    setPreparandoAnexos((n) => n + lista.length);
+    for (const arquivo of lista) {
+      try {
+        const a = await imagemParaAnexo(arquivo);
+        setAnexos((atual) => (atual.length >= MAX_ANEXOS ? atual : [...atual, a]));
+        addLog("[ANEXO]", GR, `${a.nome} · ${a.largura}×${a.altura} no contexto`);
+      } catch (err) {
+        addLog("[ANEXO]", OR, err.message);
+      } finally {
+        setPreparandoAnexos((n) => Math.max(0, n - 1));
+      }
+    }
+  }, [addLog]);
+  const vincularRepo = useCallback((r) => {
+    // o mais novo primeiro: passando do limite, sai o mais antigo
+    guardarRepos(vinculosValidos([r, ...reposRef.current.filter((x) => x.repo.toLowerCase() !== r.repo.toLowerCase())]));
+    setLeituraDosRepos(null);
+    addLog("[REPO]", PU, `vinculado: ${r.repo}${r.branch ? `@${r.branch}` : ""} — a Lisa lê o código a cada pergunta`);
+  }, [guardarRepos, addLog]);
+  const desvincularRepo = useCallback((repo) => {
+    guardarRepos(reposRef.current.filter((x) => x.repo.toLowerCase() !== repo.toLowerCase()));
+    addLog("[REPO]", PU, `desvinculado: ${repo}`);
+  }, [guardarRepos, addLog]);
+  const limparContexto = useCallback(() => {
+    setAnexos([]);
+    guardarRepos([]);
+    setLeituraDosRepos(null);
+  }, [guardarRepos]);
+  // Ctrl+V com imagem e arrastar imagem para a tela: viram anexos (texto colado segue normal)
+  useEffect(() => {
+    const colar = (e) => { const imgs = imagensDaColagem(e); if (!imgs.length) return; e.preventDefault(); anexarImagens(imgs); };
+    const sobre = (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) e.preventDefault(); };
+    const soltar = (e) => { const imgs = imagensSoltas(e); if (!imgs.length) return; e.preventDefault(); anexarImagens(imgs); };
+    document.addEventListener("paste", colar);
+    window.addEventListener("dragover", sobre);
+    window.addEventListener("drop", soltar);
+    return () => {
+      document.removeEventListener("paste", colar);
+      window.removeEventListener("dragover", sobre);
+      window.removeEventListener("drop", soltar);
+    };
+  }, [anexarImagens]);
+  const faixaDoContexto = (
+    <FaixaDoContexto
+      anexos={anexos} repos={reposVinculados} leitura={leituraDosRepos} preparando={preparandoAnexos}
+      aoRemoverAnexo={(id) => setAnexos((atual) => atual.filter((a) => a.id !== id))}
+      aoDesvincular={desvincularRepo} aoLimpar={limparContexto}
+    />
+  );
+
   const audioRef = useRef(null);
   const currentAudioResolveRef = useRef(null);
 
@@ -532,11 +766,11 @@ export default function AssistantPage() {
   const [cameraVigiaIncomingMsg, setCameraVigiaIncomingMsg] = useState(null);
 
   // Modo Rádio: a Lisa incorpora uma apresentadora de rádio, alternando blocos de locução
-  // (novidades reais de Trello/Tarefas Delp/Sentinela/Pensamentos, categoria sorteada) com
+  // (novidades reais de Abacato/Tarefas Delp/Sentinela/Pensamentos, categoria sorteada) com
   // música de verdade da playlist (radio/playlist.txt, tocada via YouTube IFrame API — ver
   // src/lib/youtubePlayer.js). Ela anuncia a música antes de tocar e comenta depois que acaba.
   const RADIO_CATEGORIES = ["trello", "delp", "sentinel", "thoughts", "weather", "news"];
-  const RADIO_CATEGORY_LABELS = { trello: "Trello", delp: "Tarefas Delp", sentinel: "Sentinela", thoughts: "pensamentos", weather: "previsão do tempo", news: "notícias (com o Steve)" };
+  const RADIO_CATEGORY_LABELS = { trello: "Abacato", delp: "Tarefas Delp", sentinel: "Sentinela", thoughts: "pensamentos", weather: "previsão do tempo", news: "notícias (com o Steve)" };
   // Modo Interativo — a Lisa como robozinho de mesa: tela limpa, carinha de LED fazendo graça
   // sozinha (ver LisaPixelFace.js), e de vez em quando ela puxa assunto com algo REAL. A câmera
   // fica ligada só pelo gesto ✌️ de acordar, que já roda 100% local no navegador (MediaPipe em
@@ -553,6 +787,17 @@ export default function AssistantPage() {
     pair: "PAIR PROGRAMMING", disco: "LANÇAR DISCO PRA NALA", mundo: "MUNDO DA LISA",
   };
   const [interactiveMode, setInteractiveMode] = useState(false);
+  const [tomarNota, setTomarNota] = useState(null); // { tema } com o painel do Modo Tomar nota aberto
+  const instalacao = usarInstalacao();
+  // O atalho "Tomar nota" do app instalado (segurar o ícone, no Android) abre /assistant?modo=tomar-nota.
+  // O parâmetro sai do endereço logo depois, para recarregar a página não reabrir o modo.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("modo") !== "tomar-nota") return;
+    setTomarNota({ tema: "" });
+    url.searchParams.delete("modo");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, []);
   const [interactiveBubble, setInteractiveBubble] = useState(null); // { text, category } | null
   const [interactiveFace, setInteractiveFace] = useState(null); // expressão forçada, ou null = ela faz o que quiser
   const [interactiveSpeaking, setInteractiveSpeaking] = useState(false); // move a boca enquanto a fala toca
@@ -602,6 +847,22 @@ export default function AssistantPage() {
   const radioSeenKeysRef = useRef({}); // { trello: [...ids...], delp: [...], sentinel: [...], thoughts: [...], news: [...] } — itens já mencionados nesta sessão, pra pickVaried (pendingWork.js) evitar repeti-los enquanto houver opção nova
   const radioStateHandlerRef = useRef(null); // ver playAndWaitEnded
   const radioSkipRef = useRef(null); // preenchida enquanto uma música toca — ver botão "pular" no radioWidget
+
+  // ---- Modo Escuta por palavra ("Lisa, ...") ----
+  const [escutaPalavra, setEscutaPalavra] = useState(false);
+  const [escutaEstado, setEscutaEstado] = useState("dormindo"); // dormindo | acordada | ocupada
+  // Modo conversa (BEYOND-0006): microfone aberto, ela responde quando você fala e fica quieta
+  // no silêncio. Exclusivo com a escuta por palavra — os dois abririam o microfone ao mesmo tempo.
+  const [conversaAberta, setConversaAberta] = useState(false);
+  const [conversaEstado, setConversaEstado] = useState("desligada"); // desligada | ouvindo | respondendo
+  const conversaAbertaRef = useRef(false);
+  conversaAbertaRef.current = conversaAberta;
+  useEffect(() => { if (conversaAberta) setEscutaPalavra(false); }, [conversaAberta]);
+  useEffect(() => { if (escutaPalavra) setConversaAberta(false); }, [escutaPalavra]);
+  // Fila de UM pedido só. O laço do rádio a consome na próxima escolha de música, em vez
+  // de sortear. Uma fila maior não ajudaria: pedir duas músicas de uma vez não é como
+  // ninguém fala, e a segunda chegaria minutos depois, quando o pedido já não faz sentido.
+  const pedidoDeMusicaRef = useRef(null);
 
   useEffect(() => {
     if (!radioMode) { setRadioStatus(null); setRadioNowPlaying(null); return; }
@@ -677,6 +938,13 @@ export default function AssistantPage() {
     };
 
     const pickSong = () => {
+      // Pedido falado tem precedência sobre o sorteio — é o "toca aquela do Pink Floyd".
+      const pedido = pedidoDeMusicaRef.current;
+      if (pedido) {
+        pedidoDeMusicaRef.current = null;
+        radioRecentRef.current = [...radioRecentRef.current, pedido.videoId];
+        return pedido;
+      }
       const list = radioPlaylistRef.current;
       if (!list.length) return null;
       const recent = radioRecentRef.current;
@@ -1405,6 +1673,7 @@ export default function AssistantPage() {
   // silêncio de verdade) ou até a pessoa ficar quieta (aí volta a ser só a vigília normal).
   const MAX_REPLY_TURNS = 6;
   const openReplyWindow = useCallback(async (comment, logPrefix, turn = 1) => {
+    if (conversaAbertaRef.current) return; // o Modo conversa já está ouvindo
     if (!micWatchMode || listeningForWatchRef.current || busyForWatchRef.current) return;
     if (turn > MAX_REPLY_TURNS) { addLog(logPrefix, CY, "várias idas e voltas seguidas — parando a escuta automática por aqui (pode continuar na mão, segurando o microfone)."); return; }
 
@@ -1459,7 +1728,7 @@ export default function AssistantPage() {
         if (!data?.ok) { addLog("[TELA]", OR, `vigília falhou: ${data?.error || `HTTP ${res.status}`}`); return; }
         if (!data.comment) { addLog("[TELA]", CY, "vigília: nada digno de nota agora"); return; }
         addLog("[TELA]", PU, data.comment);
-        setMessages((m) => [...m, { id: `screen${Date.now()}`, role: "assistant", text: data.comment }]);
+        setMessages((m) => [...m, { id: `screen${Date.now()}`, role: "assistant", text: data.comment }]); lembrarDaLisa(data.comment);
         // tenta a voz do Gemini primeiro (com fallback automático pro navegador se falhar) —
         // antes era só navegador de propósito, pra poupar cota; agora que tem uma chave
         // prioritária com faturamento e folga de sobra, vale usar a voz de verdade aqui também.
@@ -1511,7 +1780,7 @@ export default function AssistantPage() {
         if (typeof data.latestId === "number") vigiaLastIdRef.current = data.latestId;
         if (!data.comment) { addLog("[VIGIA]", CY, "nada novo digno de nota agora"); return; }
         addLog("[VIGIA]", PU, data.comment);
-        setMessages((m) => [...m, { id: `vigia${Date.now()}`, role: "assistant", text: data.comment }]);
+        setMessages((m) => [...m, { id: `vigia${Date.now()}`, role: "assistant", text: data.comment }]); lembrarDaLisa(data.comment);
         const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || proactiveTurnRef.current || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
         if (jaFalando) addLog("[VIGIA]", CY, "narração achada, mas a Lisa já está falando — só no texto desta vez");
         else if (voiceOnForScreenRef.current) {
@@ -1557,7 +1826,7 @@ export default function AssistantPage() {
         if (!data?.ok) { addLog("[OBS]", OR, `saudação falhou: ${data?.error || `HTTP ${res.status}`}`); return; }
         if (!data.comment) { addLog("[OBS]", CY, "saudação: nada digno de nota agora"); return; }
         addLog("[OBS]", PU, data.comment);
-        setMessages((m) => [...m, { id: `obsgreet${Date.now()}`, role: "assistant", text: data.comment }]);
+        setMessages((m) => [...m, { id: `obsgreet${Date.now()}`, role: "assistant", text: data.comment }]); lembrarDaLisa(data.comment);
         // mesma regra de prioridade de voz da vigília do Modo Tela — nunca fala por cima de
         // uma fala já em andamento (resposta normal, ou saudação do gesto de acordar).
         const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || proactiveTurnRef.current || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
@@ -1700,7 +1969,7 @@ export default function AssistantPage() {
           if (!data?.ok) { addLog("[MIC]", OR, `escuta falhou: ${data?.error || `HTTP ${res.status}`}`); continue; }
           if (!data.comment) { addLog("[MIC]", CY, "escuta: nada digno de nota agora"); continue; }
           addLog("[MIC]", PU, data.comment);
-          setMessages((m) => [...m, { id: `mic${Date.now()}`, role: "assistant", text: data.comment }]);
+          setMessages((m) => [...m, { id: `mic${Date.now()}`, role: "assistant", text: data.comment }]); lembrarDaLisa(data.comment);
           const jaFalando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
           if (jaFalando) addLog("[MIC]", CY, "escuta: comentário achado, mas a Lisa já está falando — só no texto desta vez");
           else if (voiceOnForScreenRef.current) speakText(data.comment, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
@@ -1718,10 +1987,16 @@ export default function AssistantPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = localStorage.getItem("avatarView");
-    if (saved === "3d" || saved === "traditional") setAvatarView(saved);
+    if (saved === "3d" || saved === "traditional" || saved === "esfera") setAvatarView(saved);
     const savedSkin = localStorage.getItem("avatarSkin");
     if (savedSkin === "cyborg" || savedSkin === "ironman") setAvatarSkin(savedSkin);
   }, []);
+
+  // o usuário do MVP não tem Ondas nem Avatar 3D (01/11/2026: "os únicos disponíveis devem ser o
+  // rosto e, de padrão, a esfera de pontos — nada de avatar 3D")
+  useEffect(() => {
+    if (usuario && avatarView !== "esfera") setAvatarView("esfera");
+  }, [usuario, avatarView]);
 
   const chooseAvatarView = useCallback((view) => {
     setAvatarView(view);
@@ -1908,7 +2183,7 @@ export default function AssistantPage() {
     };
     raf = requestAnimationFrame(draw);
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-  }, []);
+  }, [avatarView, isMobile, mobileView]);
 
   // ---- TTS em 2 pedaços: voz do Gemini, com voz do navegador como reserva (nunca alterna no meio) ----
 
@@ -1927,17 +2202,27 @@ export default function AssistantPage() {
   }, []);
   stopSpeakingForGestureRef.current = stopSpeaking;
 
-  // teto de espera pela voz do Gemini — só uma rede de segurança pra uma chamada REALMENTE
-  // travada (nunca volta), NÃO uma tentativa de "acelerar" a resposta. Já errei esse número
-  // pra menos duas vezes: 3,2s matava toda chamada; depois 9s ainda cortava o servidor no
-  // meio das PRÓPRIAS 3 tentativas dele (retry com espera do lado do servidor soma tempo
-  // real, e o corte no navegador chegava antes do servidor terminar de tentar); depois 20s
-  // ainda derrubava respostas que estavam pra dar certo (com as chaves TODAS saudáveis no
-  // painel /gemini-keys — ou seja, não era cota, era só o Gemini demorando mais do que 20s
-  // pra sintetizar áudio às vezes). A Vercel já tem um teto absoluto de 60s pra função (ver
-  // maxDuration em /api/speak) — 45s dá bastante margem real sem deixar o navegador esperando
-  // depois que o servidor já teria desistido sozinho.
-  const SPEAK_TIMEOUT_MS = 45000;
+  // Teto de espera pela voz do Gemini — rede de segurança pra uma chamada travada, NÃO uma
+  // tentativa de "acelerar" a resposta. Já errei pra menos três vezes: 3,2s matava toda
+  // chamada; 9s cortava o servidor no meio das próprias tentativas dele; 20s derrubava
+  // respostas que iam dar certo.
+  //
+  // Os 45s vieram depois, calibrados por um motivo que NÃO VALE MAIS: "a Vercel corta a
+  // função em 60s, então esperar mais é inútil". A Lisa saiu da Vercel; o Worker não tem
+  // esse corte. Medido em produção depois da mudança, em dez amostras: 4, 4, 5, 13, 27, 28,
+  // 39, 58, 69 e 112 segundos — duas de seis passavam de 45s e caíam pra voz do navegador.
+  //
+  // O número abaixo NÃO é escolhido por gosto: ele cobre o pior caso do servidor. As três
+  // tentativas agora SE SOBREPÕEM (ver TTS_HEDGE_MS em src/lib/gemini.js) — a última começa
+  // aos 32s e morre no teto aos 58s. Os 70s aqui dão a margem de rede.
+  //
+  // Baixou de 85s justamente por causa do hedge: se as três já morreram aos 58s, esperar mais
+  // vinte e sete segundos não salva nenhuma chamada e só atrasa a voz de reserva.
+  //
+  // Mexer num sem mexer no outro reabre exatamente o problema que isto resolve: o navegador
+  // desistindo antes de o servidor terminar de tentar. `npm run fala-check` confere a conta —
+  // ela já se desencontrou duas vezes.
+  const SPEAK_TIMEOUT_MS = 70000;
   // contador visível NA CONVERSA (não só no log de debug) enquanto espera — null = não está
   // esperando voz nenhuma; número = segundos decorridos desde que a chamada começou. Existe
   // pra deixar claro que a Lisa ainda está tentando a voz do Gemini (não travou), com quanto
@@ -1979,8 +2264,8 @@ export default function AssistantPage() {
   // REPRODUÇÃO de propósito: decidir é rápido (só espera a resposta do /api/speak, não o
   // áudio tocar até o fim), então o próximo pedaço já pode começar a sintetizar enquanto o
   // atual ainda está sendo ouvido — é isso que fecha o gap sem reabrir a corrida de voz.
-  const resolveChunkEngine = useCallback(async (tryGemini, text) => {
-    const result = tryGemini ? await synthesizeChunk(text) : { url: null, skipped: true };
+  const resolveChunkEngine = useCallback(async (tryGemini, text, antecipada = null) => {
+    const result = tryGemini ? await (antecipada || synthesizeChunk(text)) : { url: null, skipped: true };
     if (result?.url) {
       speechEngineRef.current = "gemini";
       setGeminiVoiceStatus(true);
@@ -2014,10 +2299,19 @@ export default function AssistantPage() {
 
       if (result?.url) {
         const audio = new Audio(result.url);
+        escutarElemento(audio); // a esfera mede o volume; se o áudio ainda não foi liberado, toca normal
         audioRef.current = audio;
         audio.onended = () => { URL.revokeObjectURL(result.url); audioRef.current = null; addLog("[TTS]", GR, "voz Gemini"); finish(); };
         audio.onerror = () => { URL.revokeObjectURL(result.url); audioRef.current = null; finish(); };
-        audio.play().catch(finish);
+        // O celular recusa tocar som sem um toque recente: o play() falha e nem onended nem onerror
+        // chegam. Antes, audioRef ficava preso aqui e a Conversa livre esperava a fala acabar para
+        // sempre — "a Lisa fica pensando e nunca responde" (BEYOND-0011).
+        audio.play().catch((err) => {
+          URL.revokeObjectURL(result.url);
+          if (audioRef.current === audio) audioRef.current = null;
+          addLog("[TTS]", OR, `o navegador não deixou tocar a voz: ${err?.name || err}`);
+          finish();
+        });
       } else {
         if (typeof window === "undefined" || !window.speechSynthesis) return finish();
         const clean = cleanForSpeech(text);
@@ -2034,9 +2328,17 @@ export default function AssistantPage() {
     });
   }, [addLog]);
 
-  const enqueueSpeech = useCallback((text, gen) => {
-    const clean = (text || "").trim();
-    if (!clean) return;
+  const enfileirarPedaco = useCallback((clean, gen) => {
+    // SÍNTESE ANTECIPADA (BEYOND-0001): o áudio deste pedaço começa a ser gerado JÁ, em
+    // paralelo com os anteriores, e não só quando o anterior fica pronto. Medido com uma
+    // resposta de 733 caracteres em cinco pedaços: gerando um de cada vez, um pedaço lento
+    // (21s) abria 10s de silêncio no meio da fala; em paralelo, ele fica pronto muito antes
+    // de chegar a vez dele. Não custa chamada a mais — são as mesmas, só começam antes.
+    const podeTentarAgora = geminiVoiceEnabled && speechEngineRef.current !== "browser" && Date.now() >= geminiDownUntilRef.current;
+    const antecipada = podeTentarAgora ? synthesizeChunk(clean) : null;
+    // Se no fim a vez deste pedaço for de outro motor (um anterior falhou), o áudio gerado
+    // sobra: solta a memória dele.
+    const descartar = () => { antecipada?.then((r) => { if (r?.url) URL.revokeObjectURL(r.url); }); };
 
     // fila de DECISÃO: só decide se tenta o Gemini pra este pedaço depois que o pedaço
     // anterior já sabe o motor dele — fecha a corrida em que, numa resposta curta, o "resto"
@@ -2044,9 +2346,10 @@ export default function AssistantPage() {
     // mais lenta que o streaming do texto, às vezes) — daí cabeça e resto saíam em vozes
     // diferentes. Rápido (não espera áudio tocar), então não reabre o gap que isso evita.
     const thisDecision = engineDecisionRef.current.then(() => {
-      if (gen !== speechGenRef.current) return { url: null, skipped: true };
+      if (gen !== speechGenRef.current) { descartar(); return { url: null, skipped: true }; }
       const tryGemini = geminiVoiceEnabled && speechEngineRef.current !== "browser" && Date.now() >= geminiDownUntilRef.current;
-      return resolveChunkEngine(tryGemini, clean);
+      if (!tryGemini) descartar();
+      return resolveChunkEngine(tryGemini, clean, tryGemini ? antecipada : null);
     });
     engineDecisionRef.current = thisDecision.catch(() => ({ url: null, skipped: true }));
 
@@ -2057,7 +2360,24 @@ export default function AssistantPage() {
       if (gen !== speechGenRef.current) return;
       return playResult(result, clean, gen);
     });
-  }, [resolveChunkEngine, playResult, geminiVoiceEnabled]);
+  }, [resolveChunkEngine, playResult, geminiVoiceEnabled, synthesizeChunk]);
+
+  const enqueueSpeech = useCallback((text, gen) => {
+    const bruto = (text || "").trim();
+    if (!bruto) return;
+
+    // BEYOND-0001: a resposta vai em PEDAÇOS (pedacosParaVoz), não numa chamada só.
+    //
+    // Numa chamada só, uma resposta longa levava mais que o teto do servidor para ser gerada,
+    // caía para a voz do navegador e armava o disjuntor — a issue inteira. Em pedaços, o
+    // primeiro (curto) começa a tocar em poucos segundos e cada seguinte é gerado enquanto o
+    // anterior toca: a fila de DECISÃO de enfileirarPedaco já sintetiza o próximo sem esperar o
+    // áudio do atual acabar. A antiga objeção ("cada pedaço é um sorteio contra uma API que
+    // pendura") era do modelo antigo — ver a medição em gemini.js e cleanForSpeech.js.
+    //
+    // O streaming da resposta ainda pode chamar isto várias vezes; cada chamada corta a sua parte.
+    for (const pedaco of pedacosParaVoz(cleanForSpeech(bruto))) enfileirarPedaco(pedaco, gen);
+  }, [enfileirarPedaco]);
 
   // ---- escopo do assistente ----
   const computeScope = useCallback(() => {
@@ -2163,6 +2483,7 @@ export default function AssistantPage() {
     setBusy(true);
     setQuestion(q);
     setAnswer("");
+    setFontes([]);
     answerRef.current = "";
     setMode("listening");
     setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: q, codeMode: true }]);
@@ -2253,6 +2574,8 @@ export default function AssistantPage() {
     setBusy(true);
     setQuestion(q);
     setAnswer("");
+    setFontes([]);
+    const idDaIde = abrirNaIde(q);
     answerRef.current = "";
     setMode("listening");
     setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: q, vigiaMode: true }]);
@@ -2285,8 +2608,122 @@ export default function AssistantPage() {
     } finally {
       setBusy(false);
       setMode("idle");
+      guardarNaIde(idDaIde, q, answerRef.current);
     }
-  }, [personaMode, addLog, voiceOn, stopSpeaking, enqueueSpeech]);
+  }, [personaMode, addLog, voiceOn, stopSpeaking, enqueueSpeech, abrirNaIde, guardarNaIde]);
+
+  // o usuário não liga os modos do admin (e o que veio ligado do navegador desliga)
+  useEffect(() => {
+    if (!usuario) return;
+    setCodeMode(false); setObservanceMode(false); setVigiaMode(false); setVigiaAutoOn(false); setVigiaWatching(false);
+    setCameraWatching(false); setCameraVigiaMode(false); setMicWatchMode(false); setRadioMode(false);
+    setTransmissionMode(false); setInteractiveMode(false); setPersonaMode(false);
+  }, [usuario, codeMode, observanceMode, vigiaMode, vigiaAutoOn, vigiaWatching, cameraWatching, cameraVigiaMode, micWatchMode, radioMode, transmissionMode, interactiveMode, personaMode]);
+
+  // ---- a entrevista do primeiro acesso (o USUÁRIO do MVP; src/lib/modoUsuario.js) ----
+  // Em duas etapas, cada uma com o convite antes ("sim" começa; "agora não"/"depois" deixa para outra
+  // sessão): 1) SOBRE VOCÊ — nome, quem a pessoa é, o jeito dela, algo importante —, de onde a Lisa
+  // escreve o retrato da pessoa; 2) ESTUDOS E TRABALHO. Uma pergunta por vez; ao fim de cada etapa, o
+  // perfil vai para /api/perfil (que junta com o que já existe e reescreve o retrato). "apague meu
+  // perfil" apaga de verdade.
+  const responderSemServidor = (q, texto, displayText) => {
+    const shown = displayText || q;
+    setQuestion(shown);
+    setAnswer(texto);
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }, { id: `a${Date.now() + 1}`, role: "assistant", text: texto }]);
+    conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+    if (voiceOn) enqueueSpeech(texto, ++speechGenRef.current);
+  };
+  const adiadaNestaSessao = (etapa) => { try { return sessionStorage.getItem(`lisa-entrevista-adiada-${etapa}`) === "1"; } catch { return false; } };
+  const adiarNestaSessao = (etapa) => { try { sessionStorage.setItem(`lisa-entrevista-adiada-${etapa}`, "1"); } catch { /* sem armazenamento */ } };
+  const perguntaNumerada = (etapa, i) => {
+    const lista = perguntasDaEtapa(etapa);
+    return `(${i + 1} de ${lista.length}) ${lista[i].pergunta}`;
+  };
+  useEffect(() => {
+    if (!usuario) return undefined;
+    let vivo = true;
+    fetch("/api/perfil").then((r) => r.json()).then((j) => {
+      if (!vivo || !j?.ok || entrevistaRef.current.estado) return;
+      const etapa = etapaQueFalta(j.perfil);
+      if (!etapa || adiadaNestaSessao(etapa)) return;
+      const convite = etapa === 1 ? PEDIDO_DE_CONSENTIMENTO : pedidoDaSegundaEtapa(j.perfil?.nome, { depois: true });
+      entrevistaRef.current = { estado: "convite", etapa, i: 0, respostas: {}, nome: j.perfil?.nome || "" };
+      setAnswer(convite);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: convite }]);
+      lembrarDaLisa(convite);
+    }).catch(() => {});
+    return () => { vivo = false; };
+  }, [usuario]); // eslint-disable-line react-hooks/exhaustive-deps
+  entrevistaFazRef.current = async (q, displayText) => {
+    const e = entrevistaRef.current;
+    const t = q.trim();
+    if (!e.estado) {
+      if (PEDE_APAGAR_PERFIL.test(t)) {
+        const r = await fetch("/api/perfil", { method: "DELETE" }).then((x) => x.json()).catch(() => ({}));
+        responderSemServidor(q, r.ok ? "Apaguei o seu perfil: o que você me contou na entrevista não está mais guardado. Se quiser recomeçar, diga \"quero fazer a entrevista\"." : "Não consegui apagar o perfil agora. Tente de novo em instantes.", displayText);
+        return true;
+      }
+      const querEstudos = /\b(perguntas?\s+(dos|sobre\s+os?|de)\s+estudos?|segunda\s+(etapa|parte)|continuar\s+a\s+entrevista)\b/i.test(t);
+      if (querEstudos || /\b(fazer|refazer|come[cç]ar|recome[cç]ar)\s+(a\s+)?entrevista\b/i.test(t)) {
+        const etapa = querEstudos ? 2 : 1;
+        entrevistaRef.current = { estado: "convite", etapa, i: 0, respostas: {}, nome: e.nome || "" };
+        responderSemServidor(q, etapa === 1 ? PEDIDO_DE_CONSENTIMENTO : pedidoDaSegundaEtapa(e.nome, { depois: true }), displayText);
+        return true;
+      }
+      return false;
+    }
+    if (e.estado === "convite") {
+      const r = respostaAoConvite(t);
+      if (r === "sim") {
+        entrevistaRef.current = { ...e, estado: "pergunta", i: 0, respostas: {} };
+        responderSemServidor(q, `Combinado! ${perguntaNumerada(e.etapa, 0)}`, displayText);
+        return true;
+      }
+      entrevistaRef.current = { estado: null, etapa: e.etapa, i: 0, respostas: {}, nome: e.nome };
+      adiarNestaSessao(e.etapa);
+      if (r === "nao") {
+        responderSemServidor(q, e.etapa === 1
+          ? "Tudo bem! Quando quiser, diga \"quero fazer a entrevista\". Pode me perguntar o que precisar."
+          : "Tudo bem, fica para depois. Quando quiser, diga \"vamos às perguntas dos estudos\".", displayText);
+        return true;
+      }
+      return false; // outro assunto: segue a conversa normal
+    }
+    if (/^(cancel[ae]|par[ae]|sair|chega)\b|\b(cancel[ae]|par[ae]r?)\s+(a\s+)?entrevista\b/i.test(t)) {
+      entrevistaRef.current = { estado: null, etapa: e.etapa, i: 0, respostas: {}, nome: e.nome };
+      adiarNestaSessao(e.etapa);
+      responderSemServidor(q, "Parei a entrevista e não guardei o que faltava desta parte. Quando quiser, diga \"quero fazer a entrevista\".", displayText);
+      return true;
+    }
+    const lista = perguntasDaEtapa(e.etapa);
+    const respostas = { ...e.respostas, [lista[e.i].campo]: t };
+    const i = e.i + 1;
+    if (i < lista.length) {
+      entrevistaRef.current = { ...e, i, respostas };
+      responderSemServidor(q, perguntaNumerada(e.etapa, i), displayText);
+      return true;
+    }
+    // fim da etapa: guarda (o servidor junta com o que já existe e reescreve o retrato da pessoa)
+    entrevistaRef.current = { estado: null, etapa: e.etapa, i: 0, respostas: {}, nome: e.nome };
+    setAnswer("Anotando…");
+    const dados = perfilDaEtapa(e.etapa, respostas);
+    const r = await fetch("/api/perfil", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ consentimento: true, ...dados, retrato: true }) })
+      .then((x) => x.json()).catch(() => ({}));
+    const nome = r.perfil?.nome || dados.nome || e.nome || "";
+    if (!r.ok) {
+      responderSemServidor(q, "Não consegui guardar as suas respostas agora. Sigo te ajudando assim mesmo, e você pode pedir \"quero fazer a entrevista\" depois.", displayText);
+      return true;
+    }
+    if (e.etapa === 1) {
+      // a etapa 1 acabou: já convida para a 2
+      entrevistaRef.current = { estado: "convite", etapa: 2, i: 0, respostas: {}, nome };
+      responderSemServidor(q, `Guardei, obrigada! ${pedidoDaSegundaEtapa(nome)}`, displayText);
+      return true;
+    }
+    responderSemServidor(q, `Pronto${nome ? `, ${nome}` : ""}! Agora eu te conheço e sei como te ajudar. Para apagar o que você me contou, é só dizer "apague meu perfil". Por onde começamos?`, displayText);
+    return true;
+  };
 
   // ---- pergunta real ao backend (SSE) ----
   // `displayText` (opcional) — o que aparece no chat/log, quando diferente do `q` de verdade
@@ -2294,12 +2731,67 @@ export default function AssistantPage() {
   // pergunta enviada carrega um lembrete de qual foi o último comentário da Lisa (pro Gemini
   // entender a que "isso" se refere), mas mostrar esse lembrete pro usuário seria estranho —
   // ele só vê a própria fala transcrita, limpa.
-  const ask = useCallback(async (q, { displayText } = {}) => {
+  const ask = useCallback(async (q, { displayText, alvoDaIde = null } = {}) => {
     if (!q.trim() || busy) return;
+
+    // a resposta ao "posso fazer?" de um pedido sobre o projeto (01/11/2026): "sim" faz; "não" cancela;
+    // uma correção refaz o entendimento com ela e pergunta de novo; outro assunto deixa o pedido de lado
+    // o USUÁRIO do MVP: a entrevista do primeiro acesso e o "apague meu perfil", sem o servidor da conversa
+    if (usuarioRef.current && !alvoDaIde && await entrevistaFazRef.current?.(q, displayText)) return;
+
+    const pendente = planoPendenteRef.current;
+    if (pendente && !alvoDaIde) {
+      planoPendenteRef.current = null;
+      const resposta = Date.now() - pendente.em < VALIDADE_DA_CONFIRMACAO_MS ? respostaDeConfirmacao(q) : null;
+      if (resposta === "sim") return executarPendenteRef.current?.(pendente, displayText || q);
+      if (resposta === "nao") {
+        const texto = "Tudo bem, não fiz nada.";
+        setQuestion(displayText || q);
+        setAnswer(texto);
+        setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: displayText || q }, { id: `a${Date.now() + 1}`, role: "assistant", text: texto }]);
+        conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+        if (voiceOn) enqueueSpeech(texto, ++speechGenRef.current);
+        return;
+      }
+      if (resposta === "corrige") {
+        const corrigido = `${pendente.q}\n\nCORREÇÃO DA PESSOA sobre o que eu entendi (vale mais que o pedido acima): ${q}`;
+        const plano = await planejarNoProjetoRef.current?.(corrigido, pendente.doProjeto, displayText || q, { imagens: pendente.imagens });
+        if (plano?.acao === "mudar" || plano?.acao === "documentar") return confirmarNoProjetoRef.current?.(corrigido, { displayText: displayText || q, doProjeto: pendente.doProjeto, plano, imagens: pendente.imagens });
+      }
+    }
+
+    // o "sim" ao "Posso fazer?" da conversa comum: desenha o pedido que ela entendeu (com a tela e os
+    // prints daquela hora); qualquer outra coisa deixa o pedido de lado e segue normal
+    const desenhoPendente = desenhoPendenteRef.current;
+    if (desenhoPendente && !alvoDaIde) {
+      desenhoPendenteRef.current = null;
+      if (Date.now() - desenhoPendente.em < VALIDADE_DA_CONFIRMACAO_MS && respostaDeConfirmacao(q) === "sim") {
+        return fazerDesenhoConfirmadoRef.current?.(desenhoPendente, displayText || q);
+      }
+    }
+
+    // a tela e os prints anexados, uma vez por pergunta (o desenho e o plano também os veem: "pegue o
+    // exercício da minha tela e estruture no ProcessMap"); a câmera só vai para a conversa
+    const comOrigem = (img, origem) => (img ? { ...img, origem } : null);
+    let imagensDaVez = null;
+    const imagensDoPedido = () => (imagensDaVez ??= [
+      ...anexosRef.current.map((a) => ({ mimeType: a.mimeType, data: a.data, origem: "anexo", nome: a.nome })),
+      screenMode && comOrigem(captureScreenFrame(), "tela"),
+    ].filter(Boolean));
 
     // "abre o dashboard" etc. — comando local reconhecido sem gastar chamada nenhuma do
     // Gemini: não passa pelo fluxo normal de pergunta/resposta, só avisa os OUTROS
     // dispositivos abertos (ver RemoteCommandListener.js) e confirma na hora.
+    // "tomar nota sobre X": abre o Modo Tomar nota com o tema já preenchido. Não começa a
+    // gravar sozinho — o microfone abre no toque de "Começar", que é um gesto da pessoa.
+    const temaDaNota = pedidoDeTomarNota(q);
+    if (temaDaNota !== null) {
+      const confirmText = temaDaNota ? `Abri o Tomar nota sobre "${temaDaNota}". Toque em Começar a escutar.` : "Abri o Tomar nota. Diga ou digite o tema e toque em Começar a escutar.";
+      setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: displayText || q }, { id: `a${Date.now() + 1}`, role: "assistant", text: confirmText }]);
+      setTomarNota({ tema: temaDaNota });
+      return;
+    }
+
     const nav = matchNavCommand(q);
     if (nav) {
       stopSpeaking();
@@ -2319,22 +2811,76 @@ export default function AssistantPage() {
       return;
     }
 
+    // Pedido de card no Abacato (criar, concluir, excluir…) vale em QUALQUER modo: no Modo Código
+    // ele viraria um pedido de código, e no Vigia uma pergunta sobre a tela.
+    const acaoNoAbacato = pareceAcao(q, ["abacato", "abacato_escolha", "abacato_rascunho"].includes(pendingActionRef.current?.type));
+
     // Modo Código ligado: a pergunta vira um pedido de mudança de código, não uma conversa —
     // ver askCodeMode acima.
-    if (codeMode) return askCodeMode(q);
+    if (codeMode && !acaoNoAbacato) return askCodeMode(q);
 
     // Modo Vigia ligado: a pergunta busca no histórico de observações do Modo Tela — ver
     // askVigiaMode acima.
-    if (vigiaMode) return askVigiaMode(q);
+    if (vigiaMode && !acaoNoAbacato) return askVigiaMode(q);
+
+    // "desenhe o processo de…" (ou, com o quadro aberto, "inclua uma etapa…"): a Lisa desenha no
+    // quadro em vez de responder em texto (BEYOND-0010) — ver desenharNaTela abaixo
+    // "no projeto X do ProcessMap, …" (01/11/2026): o projeto citado vale ANTES da regra do Abacato
+    // ("uma versão do Abacato integrada à Lisa" é conteúdo do desenho, não um card). A Lisa planeja com
+    // o modelo — entende a intenção mesmo com erro de digitação, e um pedido que mexe em vários desenhos
+    // de uma vez — e trabalha no projeto (trabalharNoProjetoRef). Se for pergunta, responde com os
+    // desenhos do projeto junto. Sem plano (o modelo falhou), o caminho antigo: um desenho, por palavras.
+    const doProjeto = !alvoDaIde ? await resolverProjetoRef.current?.(q) : null;
+    // falou de projeto sem dizer qual, e há mais de um: pergunta, em vez de escolher (BEYOND-0013)
+    if (doProjeto?.perguntar) {
+      const texto = perguntaDoProjeto(doProjeto.perguntar);
+      setQuestion(displayText || q);
+      setAnswer(texto);
+      setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: displayText || q }, { id: `a${Date.now() + 1}`, role: "assistant", text: texto }]);
+      conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+      addLog("[PROCESSMAP]", PU, "falou de projeto sem dizer qual: perguntei");
+      if (voiceOn) enqueueSpeech("Em qual projeto do ProcessMap? Os nomes estão na tela.", ++speechGenRef.current);
+      return;
+    }
+    if (doProjeto) {
+      // o plano diz o que desenhar e quais .md escrever no editor (01/11/2026: "faça um fluxograma da
+      // arquitetura … e um md também" — um pedido pode ter os dois); num pedido de documento, a rota do
+      // plano tira as mudanças de desenho que não foram pedidas. Sem o modelo, o documento ainda sai.
+      let plano = (await planejarNoProjetoRef.current?.(q, doProjeto, displayText, { imagens: imagensDoPedido() }))
+        || (pedeDocumentacao(q) ? ajustarAoPedido({ acao: "documentar", explicacao: "", operacoes: [], documentos: [] }, q, doProjeto.fluxos) : null);
+      // (02/11/2026) "faça um BPMN de…" que o modelo leu como pergunta: é um desenho novo no projeto
+      // (a Lisa confirma antes, como sempre)
+      if (plano?.acao === "responder" && !q.includes("?") && pedeNovoDesenho(q)) plano = planoDeDesenhoNovo(q);
+      // (01/11/2026: "ela tem que interpretar e saber o que eu quero, porém deve me perguntar se eu tenho
+      // certeza; se eu disser sim, aí ela faz") — mostra o que entendeu e espera o "sim"
+      if (plano?.acao === "documentar" || plano?.acao === "mudar") return confirmarNoProjetoRef.current?.(q, { displayText, doProjeto, plano, imagens: imagensDoPedido() });
+      if (!plano) {
+        // sem o plano (o modelo falhou duas vezes), só um desenho NOVO sai sem confirmar — mudar o que
+        // existe por palavra-chave, sem entender o pedido, é o que estragou a aba "Fluxo Desktop"
+        const semPlano = pedidoDeDesenho(q, { quadroAberto: true });
+        const alvo = semPlano === "novo" && !/\bnov[oa]s?\b/i.test(q) ? doProjeto.citado : null;
+        if (semPlano === "novo" && !alvo) {
+          doProjeto.alvo = alvo;
+          doProjeto.texto = contextoDoProjeto(doProjeto.projeto, doProjeto.fluxos, { alvo });
+          return desenharNaTelaRef.current?.(q, { displayText, mudar: Boolean(alvo), doProjeto, imagens: imagensDoPedido() });
+        }
+      }
+      doProjeto.texto = contextoDoProjeto(doProjeto.projeto, doProjeto.fluxos);
+    }
+    const desenho = !acaoNoAbacato && !alvoDaIde && !doProjeto ? pedidoDeDesenho(q, { quadroAberto: quadroAbertoRef.current }) : null;
+    if (desenho) return desenharNaTelaRef.current?.(q, { displayText, mudar: desenho === "alterar", imagens: imagensDoPedido() });
 
     const shown = displayText || q;
     setBusy(true);
     setQuestion(shown);
     setAnswer("");
+    setFontes([]);
+    const idDaIde = abrirNaIde(shown, alvoDaIde);
     answerRef.current = "";
+    fontesRef.current = [];
     setCards([]);
     setMode("listening");
-    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown, anexos: anexosRef.current.map((a) => ({ id: a.id, previa: a.previa, nome: a.nome })) }]);
 
     stopSpeaking(); // corta qualquer fala de uma resposta anterior
     const gen = ++speechGenRef.current;
@@ -2346,9 +2892,46 @@ export default function AssistantPage() {
 
     let latestCards = [];
 
-    // câmera (Observância) e/ou tela (Modo Tela) — cada uma só entra se estiver ligada e
-    // conseguir tirar o retrato; nenhuma das duas depende da outra.
-    const images = [observanceMode && captureObservanceFrame(), screenMode && captureScreenFrame()].filter(Boolean);
+    // um link de repositório do GitHub na mensagem já vincula ele à conversa
+    const linkados = reposNoTexto(q);
+    if (linkados.length) {
+      guardarRepos(vinculosValidos([...linkados.map((l) => ({ repo: l.repo, branch: l.branch })), ...reposRef.current]));
+      addLog("[REPO]", PU, `vinculado pelo link: ${linkados.map((l) => l.repo).join(", ")}`);
+    }
+
+    // as imagens, na ordem que a nota do servidor explica: as anexadas pela pessoa, a tela (Modo
+    // Tela) e a câmera (Observância) — cada uma só entra se existir; nenhuma depende da outra.
+    const images = [
+      ...imagensDoPedido(),
+      observanceMode && comOrigem(captureObservanceFrame(), "camera"),
+    ].filter(Boolean);
+    let pedeDesenho = false; // a Lisa entendeu um pedido de desenho e perguntou "Posso fazer?"
+
+    // Os repositórios vinculados são lidos ANTES, num pedido só deles: dentro do /api/ask, as
+    // chamadas ao GitHub somavam com as da pergunta e estouravam o limite de 50 chamadas de rede
+    // por pedido do Worker ("Too many subrequests", 25/10/2026). A seção pronta vai na pergunta.
+    let contextoDosRepos = null;
+    if (reposRef.current.length) {
+      setLeituraDosRepos({ lendo: true });
+      addLog("[REPO]", PU, `lendo ${reposRef.current.map((r) => r.repo).join(", ")}…`);
+      try {
+        const r = await fetch("/api/repos/contexto", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ repos: reposRef.current, question: q, turnos: conversaVigente(conversaRef.current), images: images.length ? images : null }),
+        });
+        const leitura = await r.json().catch(() => ({}));
+        if (!r.ok || leitura.ok === false) throw new Error(leitura.error || `HTTP ${r.status}`);
+        contextoDosRepos = { secao: leitura.secao || "" };
+        setLeituraDosRepos(leitura);
+        addLog("[REPO]", PU, `${leitura.lidos?.length || 0} arquivo(s) lido(s): ${(leitura.lidos || []).map((l) => l.path).join(", ") || "—"}`);
+        for (const aviso of leitura.avisos || []) addLog("[REPO]", OR, aviso);
+      } catch (err) {
+        // sem a leitura, a pergunta segue assim mesmo (a Lisa avisa que não viu o código)
+        setLeituraDosRepos({ lidos: [], repos: [], avisos: reposRef.current.map((r) => `Não consegui ler ${r.repo}: ${err.message}`) });
+        addLog("[REPO]", OR, `a leitura do repositório falhou: ${err.message}`);
+      }
+    }
 
     try {
       const res = await fetch("/api/ask", {
@@ -2356,8 +2939,22 @@ export default function AssistantPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           question: q, scope: computeScope(), personaMode,
-          history: historyRef.current, pendingAction: pendingActionRef.current,
+          history: { ...(historyRef.current || {}), turnos: conversaVigente(conversaRef.current), ultimaResposta: ultimaRespostaRef.current.slice(0, 8000) },
+          // o código que já apareceu na conversa, inteiro (a conversa vai cortada por fala): para a
+          // Lisa ver o todo antes de propor uma correção. Conversa vencida (30 min parada) não leva.
+          // e o que está escrito ou mudado na IDE agora (BEYOND-0009), que vale mais que a versão da conversa
+          codigo: [
+            conversaVigente(conversaRef.current).length ? codigoDaConversa(mensagensRef.current.slice(-24).map((m) => m.text)) : "",
+            codigoDaIdeRef.current,
+          ].filter(Boolean).join("\n\n"),
+          // o desenho do quadro como está agora, em texto (BEYOND-0010): a Lisa vê o que a pessoa mudou
+          diagrama: quadroAbertoRef.current && desenhoRef.current ? descreverDiagrama(desenhoRef.current) : "",
+          // o projeto do ProcessMap citado na pergunta, com os desenhos dele (01/11/2026)
+          projeto: doProjeto?.texto || "",
+          pendingAction: pendingActionRef.current,
           images: images.length ? images : null,
+          // o código dos repositórios vinculados, já lido acima (/api/repos/contexto)
+          contextoDosRepos,
         }),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
@@ -2365,6 +2962,8 @@ export default function AssistantPage() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let chegouErro = false;
+      let terminou = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -2394,35 +2993,768 @@ export default function AssistantPage() {
             else if (payload?.debug) addLog("[ACTION]", PU, `nenhuma ação detectada (intent=${payload.checkedIntent})`);
             else if (pendingActionRef.current) addLog("[ACTION]", PU, "aguardando confirmação…");
             else addLog("[ACTION]", PU, "resolvida");
+          } else if (event === "repos") {
+            setLeituraDosRepos(payload);
+            addLog("[REPO]", PU, `${payload?.lidos?.length || 0} arquivo(s) lido(s): ${(payload?.lidos || []).map((l) => l.path).join(", ") || "—"}`);
+            for (const aviso of payload?.avisos || []) addLog("[REPO]", OR, aviso);
+          } else if (event === "pesquisa") {
+            addLog("[WEB]", PU, payload?.buscador
+              ? `pesquisei "${payload.consulta}" no ${payload.buscador}: ${payload.total} resultado(s), ${payload.lidas} página(s) lida(s)`
+              : `a pesquisa por "${payload?.consulta}" falhou: ${(payload?.erros || []).join(" · ")}`);
+          } else if (event === "fontes") {
+            fontesRef.current = Array.isArray(payload) ? payload : [];
+            setFontes(fontesRef.current);
+            addLog("[WEB]", PU, `${fontesRef.current.length} fonte(s): ${fontesRef.current.map((f) => f.titulo).join(", ")}`);
           } else if (event === "token") {
             setAnswer((a) => { const na = a + payload; answerRef.current = na; return na; });
           } else if (event === "error") {
+            chegouErro = true;
             addLog("[ERR]", OR, String(payload?.message || payload));
-            setAnswer((a) => a + `\n[erro: ${payload?.message || payload}]`);
+            // também em answerRef: é dele que saem a bolha do chat do celular e a fala (antes, a bolha ficava vazia)
+            setAnswer((a) => { const na = `${a}\n[erro: ${payload?.message || payload}]`.trim(); answerRef.current = na; return na; });
+          } else if (event === "desenho") {
+            pedeDesenho = true;
           } else if (event === "done") {
+            terminou = true;
             addLog("[STATE]", CY, "core → IDLE · standby");
           }
         }
       }
+      // Nada de texto e nenhum erro: a janela ficava em "processando" para sempre (ela mostra isso
+      // enquanto a resposta está vazia). Agora a Lisa diz o que houve (BEYOND-0011).
+      if (!answerRef.current.trim() && !chegouErro) {
+        const aviso = terminou
+          ? "Não consegui formar uma resposta agora (veio vazia). Pergunte de novo, por favor."
+          : "A conexão caiu antes de a resposta chegar. Pergunte de novo, por favor.";
+        addLog("[ERR]", OR, terminou ? "resposta vazia do servidor" : "o stream fechou sem o fim");
+        answerRef.current = aviso;
+        setAnswer(aviso);
+      }
+      if (pedeDesenho) {
+        desenhoPendenteRef.current = { q, imagens: images.filter((i) => i.origem !== "camera"), em: Date.now() };
+        addLog("[QUADRO]", PU, "pedido de desenho entendido na conversa — esperando o \"sim\"");
+      }
       historyRef.current = { question: q, cards: latestCards };
-      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: answerRef.current }]);
+      conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", answerRef.current);
+      if (answerRef.current.trim()) ultimaRespostaRef.current = answerRef.current;
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: answerRef.current, ...(fontesRef.current.length ? { fontes: fontesRef.current } : {}) }]);
     } catch (err) {
       addLog("[ERR]", OR, err.message);
-      setAnswer(`Falha ao consultar o backend: ${err.message}`);
+      answerRef.current = `Falha ao consultar o backend: ${err.message}`;
+      setAnswer(answerRef.current);
       setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: `Falha ao consultar o backend: ${err.message}` }]);
     } finally {
       setBusy(false);
       setMode("idle");
+      // a resposta com código vira uma aba do editor e fica lá (a próxima pergunta não apaga)
+      guardarNaIde(idDaIde, shown, answerRef.current, alvoDaIde);
       // fala a resposta INTEIRA de uma vez, só agora que terminou de chegar — 1 chamada de
       // TTS por resposta, nunca duas vozes diferentes na mesma fala (ver nota no topo do arquivo).
-      const full = answerRef.current.trim();
+      // O rascunho de um card (o texto inteiro dele) fica só na tela: ela fala o que mudou.
+      const full = falaSemRascunho(answerRef.current).trim();
       if (voiceEnabled && full) enqueueSpeech(full, gen);
     }
-  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode, vigiaMode, askVigiaMode]);
+  }, [busy, addLog, voiceOn, computeScope, stopSpeaking, enqueueSpeech, personaMode, observanceMode, captureObservanceFrame, screenMode, captureScreenFrame, codeMode, askCodeMode, vigiaMode, askVigiaMode, abrirNaIde, guardarNaIde, guardarRepos]);
   askRef.current = ask; // ver comentário no askRef acima — mantém sempre a versão mais recente pros efeitos de vigília chamarem
+
+  // ---- O quadro da Lisa (BEYOND-0010): ela desenha o processo e a pessoa mexe ----
+  //
+  // O pedido vai para /api/diagrama (a IA monta a estrutura, o servidor faz o layout) junto do
+  // desenho que já está na tela, se houver: assim "inclua uma etapa" parte do fluxo como a pessoa
+  // deixou, e o que ela arrumou fica no lugar. A explicação da Lisa vira a resposta da conversa (e é
+  // falada, se a voz estiver ligada); o desenho aparece no quadro.
+  // `mudar`: o pedido é mudar o desenho que está no quadro (ele vai junto); senão é um desenho novo
+  // quem acha o projeto do ProcessMap da pergunta (src/lib/processmapNaConversa.js): o citado pelo nome
+  // ou — "anote todos os fluxogramas do projeto", sem nome — o projeto em que se está trabalhando (o do
+  // fluxo aberto no quadro, ou o último desta conversa). Devolve { projeto, fluxos (com os documentos),
+  // citado (o fluxo citado pelo nome), provavel (o aberto no quadro, se for desse projeto, ou o único) },
+  // ou null
+  resolverProjetoRef.current = async (q) => {
+    // O projeto só entra quando é EXPLÍCITO (03/11/2026, BEYOND-0013: "se eu não falo qual é o projeto,
+    // ela supõe um e isso está errado"): a pessoa fala de projeto (o nome pode vir pela metade ou com
+    // erro), nomeia um desenho salvo, ou mexe no desenho aberto no quadro, que já é de um projeto.
+    // Desenho novo sem projeto é avulso, no quadro; o 💾 salvar dele escolhe um projeto ou cria um.
+    // A regra mora em projetoDoPedido (src/lib/processmapNaConversa.js, testada).
+    const vinculado = quadroVinculoRef.current?.projeto || null;
+    const emUso = vinculado || ultimoProjetoRef.current;
+    const citado = citaProjeto(q);
+    // ("faça um md por fluxograma" ou "escreva os mds", sem dizer "projeto": vale o projeto em uso — o do
+    // quadro ou o último que a pessoa citou nesta conversa —, nunca um palpite)
+    const documentaDesenhos = pedeDocumentacao(q) && (/flu|grama|mapa|desenh|diagram/i.test(q) || Boolean(emUso));
+    const emTodos = pedeEmTodos(q);
+    // "corrija a nota da aba Desktop", "complete o fluxo" (01/11/2026: "peço para ela corrigir e ela não
+    // corrige"): o desenho que a pessoa nomeia ou o do quadro ligado vão para o plano do projeto; com um
+    // desenho avulso aberto no quadro, é dele que ela fala
+    const mudaDesenho = (pedeMudancaNoDesenho(q) || pedeNovoDesenho(q)) && Boolean(vinculado || !quadroAbertoRef.current);
+    if (!citado && !emTodos && !documentaDesenhos && !mudaDesenho) return null;
+    try {
+      if (!projetosRef.current.lista || Date.now() - projetosRef.current.em > 30_000) {
+        projetosRef.current = { em: Date.now(), lista: await apiDosFluxosDaConversa.listar() };
+      }
+      const lista = projetosRef.current.lista || [];
+      const escolha = projetoDoPedido(q, lista, { emUso: ultimoProjetoRef.current, vinculado });
+      if (escolha?.perguntar) return { perguntar: escolha.perguntar };
+      const emUsoNaLista = emUso ? lista.find((p) => p.id === emUso.id) : null;
+      const provavelDoPedido = escolha || ((documentaDesenhos || emTodos) && emUsoNaLista ? { projeto: emUsoNaLista, como: "em uso" } : null);
+      if (!provavelDoPedido) {
+        if (mudaDesenho && !citado) addLog("[PROCESSMAP]", PU, "sem projeto citado: desenho avulso no quadro");
+        return null;
+      }
+      const achado = provavelDoPedido.projeto;
+      const { projeto, fluxos } = await apiDosFluxosDaConversa.lerProjeto(achado.id);
+      ultimoProjetoRef.current = projeto;
+      const doQuadro = quadroVinculoRef.current;
+      const fluxoDoPedido = fluxoCitado(q, fluxos, { nomeDoProjeto: projeto.nome });
+      const provavel = (doQuadro && fluxos.find((f) => f.id === doQuadro.fluxo.id)) || (fluxos.length === 1 ? fluxos[0] : null);
+      addLog("[PROCESSMAP]", PU, `projeto "${projeto.nome}" (${provavelDoPedido.como}): ${fluxos.length} desenho${fluxos.length === 1 ? "" : "s"} lido${fluxos.length === 1 ? "" : "s"}${fluxoDoPedido ? ` · citado: "${fluxoDoPedido.nome}"` : ""}`);
+      return { projeto, fluxos, citado: fluxoDoPedido, provavel, como: provavelDoPedido.como };
+    } catch (err) {
+      addLog("[PROCESSMAP]", OR, `não consegui ler o projeto: ${err.message}`);
+      return null;
+    }
+  };
+
+  // a conversa dos últimos turnos, em texto (vai para o desenho e para o plano)
+  const conversaEmTexto = () => conversaVigente(conversaRef.current).slice(-6)
+    .map((t) => `${t.papel === "lisa" ? "LISA" : "PESSOA"}: ${String(t.texto).slice(0, 1000)}`).join("\n");
+
+  // o plano de um pedido feito sobre um projeto do ProcessMap (src/lib/trabalhoNoProjeto.js): { acao,
+  // explicacao, operacoes }, ou null se o modelo falhou (tenta duas vezes). A janela já mostra a
+  // pergunta enquanto a Lisa planeja.
+  // `imagens`: a tela e os prints da pergunta; `confirmado`: a pessoa já disse "sim" na conversa
+  planejarNoProjetoRef.current = async (q, doProjeto, displayText, { imagens = [], confirmado = false } = {}) => {
+    setQuestion(displayText || q);
+    setAnswer("");
+    setFontes([]);
+    setBusy(true);
+    setMode("listening");
+    for (let tentativa = 1; tentativa <= 2; tentativa++) {
+      try {
+        const plano = await pedirPlano({
+          pedido: q, projeto: doProjeto.projeto, fluxos: doProjeto.fluxos,
+          aberto: quadroVinculoRef.current?.fluxo.id || "", conversa: conversaEmTexto(), imagens, confirmado,
+        });
+        addLog("[PROCESSMAP]", PU, plano.acao === "mudar" ? `plano: ${plano.operacoes.length} desenho${plano.operacoes.length === 1 ? "" : "s"} para mudar ou criar` : "é pergunta sobre o projeto");
+        return plano;
+      } catch (err) {
+        addLog("[PROCESSMAP]", OR, `não consegui planejar (tentativa ${tentativa}): ${err.message}`);
+      }
+    }
+    return null;
+  };
+
+  // executa o plano (src/lib/trabalhoNoProjeto.js): cada operação é um desenho salvo no projeto na
+  // hora; a janela mostra o andamento; o último desenho abre no quadro, ligado.
+  // "a arquitetura do nosso produto": com repositório vinculado, o código dele vai junto (lido uma vez,
+  // num pedido só dele, como na pergunta normal — ver ask acima); "" sem repositório
+  const lerContextoDosRepos = async (q, para = "o desenho") => {
+    if (!reposRef.current.length) return "";
+    addLog("[REPO]", PU, `lendo ${reposRef.current.map((r) => r.repo).join(", ")} para ${para}…`);
+    try {
+      const rr = await fetch("/api/repos/contexto", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ repos: reposRef.current, question: q, turnos: conversaVigente(conversaRef.current), images: null }),
+      });
+      const leitura = await rr.json().catch(() => ({}));
+      if (rr.ok && leitura.ok !== false) {
+        setLeituraDosRepos(leitura);
+        return leitura.secao || "";
+      }
+    } catch (err) {
+      addLog("[REPO]", OR, `a leitura do repositório falhou: ${err.message}`);
+    }
+    return "";
+  };
+
+  // Devolve { texto, criados, contexto } — com documentos no plano, a página segue para eles
+  // (documentarNoProjetoRef) sem falar "pronto" antes da hora.
+  trabalharNoProjetoRef.current = async (q, { displayText, doProjeto, plano, imagens = [] }) => {
+    const shown = displayText || q;
+    stopSpeaking();
+    const gen = ++speechGenRef.current;
+    speechEngineRef.current = null;
+    setBusy(true);
+    setDesenhando(true);
+    setQuestion(shown);
+    setFontes([]);
+    setMode("listening");
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
+    const nome = doProjeto.projeto.nome;
+    addLog("[PROCESSMAP]", PU, `trabalhando em "${nome}": ${plano.operacoes.length} desenho${plano.operacoes.length === 1 ? "" : "s"}`);
+    // o fluxo aberto no quadro tem o que a pessoa acabou de mexer: parte dele
+    const abertoId = quadroAbertoRef.current && desenhoRef.current ? quadroVinculoRef.current?.fluxo.id || "" : "";
+    const comDocumentos = plano.documentos?.length > 0;
+    try {
+      const contexto = await lerContextoDosRepos(q);
+      const { linhas, feitos, resultados } = await executarPlano({
+        plano, projeto: doProjeto.projeto, fluxos: doProjeto.fluxos, api: apiDosFluxosDaConversa,
+        conversa: conversaEmTexto(), contexto, abertoId, pedido: q, imagens,
+        docDe: (f) => (f.id === abertoId ? desenhoRef.current : f.documento),
+        aoAndar: (ls) => setAnswer(textoDoAndamento(plano, ls)),
+      });
+      for (const l of linhas) addLog("[PROCESSMAP]", l.ok ? GR : OR, `"${l.nome}": ${l.estado}${l.ok ? "" : ` ${l.nota}`}`);
+      projetosRef.current.em = 0; // a lista mudou
+      ultimoProjetoRef.current = doProjeto.projeto;
+      const ultimo = resultados.at(-1);
+      if (ultimo) {
+        desenhoRef.current = ultimo.doc;
+        setQuadro({
+          versao: { doc: ultimo.doc, chave: `d${Date.now()}`, colecao: ultimo.colecao, mudanca: ultimo.mudou, vinculo: { fluxo: ultimo.fluxo, projeto: doProjeto.projeto } },
+          titulo: ultimo.fluxo.nome, explicacao: ultimo.explicacao,
+        });
+      }
+      const total = plano.operacoes.length;
+      const fim = feitos
+        ? `Salvo no projeto "${nome}" do ProcessMap (${feitos} de ${total})${ultimo ? `; "${ultimo.fluxo.nome}" está aberto no quadro` : ""}.`
+        : `Não consegui mudar nada no projeto "${nome}".`;
+      const texto = textoDoAndamento(plano, linhas, fim);
+      setAnswer(texto);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
+      conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+      if (voiceOn && !comDocumentos) enqueueSpeech(feitos ? `Pronto. ${feitos === total ? "Tudo salvo" : `${feitos} de ${total} salvos`} no projeto ${nome}.` : `Não consegui mudar o projeto ${nome}.`, gen);
+      const criados = resultados.filter((r) => !r.mudou).map((r) => ({ ...r.fluxo, documento: r.doc }));
+      return { texto, criados, contexto };
+    } finally {
+      setBusy(false);
+      setDesenhando(false);
+      setMode("idle");
+    }
+  };
+
+  // Mostra o que a Lisa entendeu do pedido sobre o projeto e pergunta "posso fazer?" — nada muda antes do
+  // "sim" (src/lib/processmapNaConversa.js: textoDaConfirmacao, respostaDeConfirmacao).
+  confirmarNoProjetoRef.current = (q, { displayText, doProjeto, plano, imagens = [] }) => {
+    const shown = displayText || q;
+    stopSpeaking();
+    const gen = ++speechGenRef.current;
+    speechEngineRef.current = null;
+    const texto = textoDaConfirmacao(plano, doProjeto.projeto, doProjeto.fluxos, { como: doProjeto.como });
+    planoPendenteRef.current = { q, doProjeto, plano, imagens, em: Date.now() };
+    addLog("[PROCESSMAP]", PU, `esperando o "sim": ${plano.operacoes.length} desenho(s), ${plano.documentos?.length || 0} documento(s) em "${doProjeto.projeto.nome}"`);
+    setQuestion(shown);
+    setAnswer(texto);
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }, { id: `a${Date.now() + 1}`, role: "assistant", text: texto }]);
+    conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+    setBusy(false);
+    setMode("idle");
+    if (voiceOn) enqueueSpeech(`${plano.explicacao || "Entendi o pedido."} No projeto ${doProjeto.projeto.nome}. Posso fazer?`, gen);
+  };
+
+  // Depois do "sim": lê o projeto de novo (alguém pode ter mexido enquanto a pessoa decidia) e faz.
+  executarPendenteRef.current = async (pendente, shown) => {
+    const { q, plano, imagens = [] } = pendente;
+    let { doProjeto } = pendente;
+    try {
+      const novo = await apiDosFluxosDaConversa.lerProjeto(doProjeto.projeto.id);
+      doProjeto = { ...doProjeto, projeto: novo.projeto, fluxos: novo.fluxos };
+    } catch (err) {
+      addLog("[PROCESSMAP]", OR, `não consegui reler o projeto (sigo com o que li antes): ${err.message}`);
+    }
+    if (plano.acao === "documentar") return documentarNoProjetoRef.current?.(q, { displayText: shown, doProjeto, plano });
+    const feito = await trabalharNoProjetoRef.current?.(q, { displayText: shown, doProjeto, plano, imagens });
+    if (feito && plano.documentos?.length) {
+      return documentarNoProjetoRef.current?.(q, { displayText: shown, doProjeto, plano, criados: feito.criados, antes: feito.texto, contexto: feito.contexto });
+    }
+  };
+
+  // Os .md no editor de código (01/11/2026): os documentos do plano — "um md por fluxograma e mapa
+  // mental" (a visão geral e um por desenho) ou o que o pedido pedir, sobre o assunto dele ("faça um
+  // fluxograma da arquitetura pensando em cibersegurança … e um md também"). Uma aba do editor por
+  // arquivo. Os desenhos só são lidos. `antes`: o que a Lisa acabou de desenhar no mesmo pedido (o texto
+  // do andamento) — aí a vez continua, sem repetir a pergunta; `criados`: os desenhos novos dele.
+  documentarNoProjetoRef.current = async (q, { displayText, doProjeto, plano = null, criados = [], antes = "", contexto = null }) => {
+    const shown = displayText || q;
+    stopSpeaking();
+    const gen = ++speechGenRef.current;
+    speechEngineRef.current = null;
+    setBusy(true);
+    setQuestion(shown);
+    setAnswer(antes);
+    setFontes([]);
+    setMode("listening");
+    if (!antes) setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
+    const { projeto, fluxos } = doProjeto;
+    const pedidos = plano?.documentos?.length ? plano.documentos : documentosPorDesenho(fluxos.filter((f) => f.documento));
+    const andamento = {
+      explicacao: antes ? "Agora os arquivos .md no editor de código:" : plano?.explicacao || `Vou escrever ${pedidos.length === 1 ? "o arquivo .md" : `${pedidos.length} arquivos .md`} no editor de código, sem mexer em nenhum desenho.`,
+    };
+    const comAntes = (t) => (antes ? `${antes}\n\n${t}` : t);
+    addLog("[PROCESSMAP]", PU, `documentando "${projeto.nome}": ${pedidos.map((d) => d.arquivo).join(", ")}`);
+    try {
+      const { linhas, documentos } = await escreverDocumentos({
+        pedido: q, projeto, fluxos, documentos: pedidos, criados, conversa: conversaEmTexto(),
+        contexto: contexto ?? await lerContextoDosRepos(q, "os documentos"),
+        aoAndar: (ls) => setAnswer(comAntes(textoDoAndamento(andamento, ls))),
+      });
+      for (const l of linhas) addLog("[PROCESSMAP]", l.ok ? GR : OR, `${l.nome}: ${l.estado}${l.ok ? "" : ` ${l.nota}`}`);
+      ultimoProjetoRef.current = projeto;
+      const falharam = linhas.filter((l) => l.ok === false).map((l) => l.nome);
+      const nomes = documentos.map((d) => d.arquivo.split("/").pop()).join(", ");
+      const intro = documentos.length
+        ? `Escrevi ${documentos.length === 1 ? `o arquivo ${nomes}` : `${documentos.length} arquivos .md (${nomes})`} no editor de código${documentos.length > 1 ? ", um por aba" : ""}.${antes ? "" : " Nenhum desenho foi mudado."}${falharam.length ? `\n\nNão consegui escrever: ${falharam.join(", ")} — peça de novo que eu tento só esses.` : ""}`
+        : `Não consegui escrever ${pedidos.length === 1 ? "o documento" : "os documentos"} agora (${linhas.find((l) => l.nota)?.nota || "erro"}).${antes ? "" : " Nenhum desenho foi mudado."}`;
+      const texto = respostaComDocumentos(intro, documentos);
+      if (documentos.length) guardarNaIde(abrirNaIde(shown), shown, texto);
+      setAnswer(comAntes(texto));
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
+      conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", intro);
+      if (voiceOn) enqueueSpeech(documentos.length ? `Pronto.${antes ? " Desenhei e" : ""} escrevi ${documentos.length === 1 ? "o documento" : `${documentos.length} documentos`} no editor de código.` : `Não consegui escrever os documentos agora.`, gen);
+    } finally {
+      setBusy(false);
+      setMode("idle");
+    }
+  };
+
+  desenharNaTelaRef.current = async (q, { displayText, mudar = false, doProjeto = null, imagens = [] } = {}) => {
+    const shown = displayText || q;
+    stopSpeaking();
+    const gen = ++speechGenRef.current;
+    speechEngineRef.current = null;
+    setBusy(true);
+    setDesenhando(true);
+    setQuestion(shown);
+    setAnswer("");
+    setFontes([]);
+    setMode("listening");
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: shown }]);
+    addLog("[QUADRO]", PU, quadroAbertoRef.current ? "mudando o desenho…" : "desenhando o processo…");
+    const conversa = conversaVigente(conversaRef.current).slice(-6)
+      .map((t) => `${t.papel === "lisa" ? "LISA" : "PESSOA"}: ${String(t.texto).slice(0, 1000)}`).join("\n");
+    try {
+      // "desenhe essa arquitetura": com um repositório vinculado, o código dele vai junto
+      const contexto = await lerContextoDosRepos(q);
+      // no projeto: parte do fluxo-alvo (o do quadro, se for ele que está aberto: tem o que a pessoa
+      // acabou de mexer); sem projeto, do que está no quadro
+      const alvo = doProjeto?.alvo || null;
+      const alvoAberto = Boolean(alvo && quadroVinculoRef.current?.fluxo.id === alvo.id && quadroAbertoRef.current && desenhoRef.current);
+      const atual = alvo ? (alvoAberto ? desenhoRef.current : alvo.documento) : mudar && quadroAbertoRef.current ? desenhoRef.current : null;
+      const res = await fetch("/api/diagrama", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ pedido: q, atual, conversa, contexto, projeto: doProjeto?.texto || "", ...(imagens.length ? { imagens } : {}) }),
+      });
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok || !r.ok) throw new Error(r.error || `HTTP ${res.status}`);
+      // o que mudou DE VERDADE (src/lib/diagramaDaLisa.js: resumoDaMudanca) — e não só o que o modelo diz
+      const mudancaReal = atual ? resumoDaMudanca(atual, r.doc) : null;
+      if (mudancaReal && !mudancaReal.mudou) {
+        const texto = "Não mudei nada: o desenho voltou igual. Diga o que está errado e onde — a aba, a etapa ou a nota, pelo texto que aparece nela — que eu corrijo.";
+        addLog("[QUADRO]", OR, "o desenho voltou igual — nada foi mudado nem salvo");
+        setAnswer(texto);
+        setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
+        conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+        if (voiceOn) enqueueSpeech(texto, gen);
+        return;
+      }
+      desenhoRef.current = r.doc;
+      // no projeto: salva lá (o fluxo-alvo ganha a versão nova; sem alvo, nasce um fluxo no projeto) e
+      // o quadro abre ligado a ele (`vinculo`: o que mudar depois também é salvo)
+      let vinculo = null;
+      let aviso = "";
+      if (doProjeto) {
+        try {
+          if (alvo) {
+            // (origem "lisa": a versão de antes fica guardada — dá para voltar pelo painel ProcessMap)
+            const daLisa = { documento: r.doc, origem: "lisa", motivo: q.replace(/\s+/g, " ").slice(0, 140) };
+            const fluxo = await apiDosFluxosDaConversa.salvar(alvo.id, alvoAberto ? { ...daLisa, forcar: true } : { ...daLisa, versao: alvo.versao });
+            vinculo = { fluxo, projeto: doProjeto.projeto };
+          } else {
+            vinculo = await apiDosFluxosDaConversa.criar({ documento: r.doc, nome: r.titulo, projetoId: doProjeto.projeto.id, origem: "lisa" });
+          }
+          projetosRef.current.em = 0; // a lista mudou
+          addLog("[PROCESSMAP]", GR, `salvo em "${vinculo.projeto.nome}" → "${vinculo.fluxo.nome}"`);
+        } catch (err) {
+          aviso = err.status === 409
+            ? ` Não salvei no projeto: o fluxo "${alvo?.nome}" foi mudado em outro lugar agora há pouco — o desenho ficou só no quadro.`
+            : ` Não consegui salvar no projeto (${err.message}); o desenho ficou só no quadro.`;
+          addLog("[PROCESSMAP]", OR, aviso.trim());
+        }
+      }
+      // `mudanca`: é o mesmo desenho, mudado — se ele foi salvo num projeto, o quadro grava a mudança
+      const mudanca = Boolean(mudar && quadroAbertoRef.current);
+      setQuadro({ versao: { doc: r.doc, chave: `d${Date.now()}`, colecao: r.colecao, mudanca, vinculo }, titulo: r.titulo, explicacao: r.explicacao });
+      const salvoNoProjeto = vinculo ? ` ${alvo ? "Atualizei" : "Salvei"} "${vinculo.fluxo.nome}" no projeto "${vinculo.projeto.nome}" do ProcessMap.` : "";
+      // desenho NOVO sem projeto citado: avulso, e quem decide onde guardar é a pessoa (BEYOND-0013)
+      const avulso = !doProjeto && !mudanca ? "\n\nFicou avulso, fora de projeto. Para guardar, toque em 💾 salvar no quadro: num projeto que já existe ou num novo." : "";
+      // o que a pessoa listou e não entrou nem na segunda tentativa: dito, e não escondido
+      const faltou = r.faltando?.length ? `\n\nNão achei no desenho: ${r.faltando.slice(0, 8).map((i) => `"${i}"`).join(", ")}. Se faltou, me diga onde entra.` : "";
+      const texto = `${r.explicacao || `Desenhei "${r.titulo}" no quadro.`}${mudancaReal ? `\n\nO que mudou: ${mudancaReal.texto}.` : ""}${salvoNoProjeto}${aviso}${avulso}${faltou}`;
+      setAnswer(texto);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
+      conversaRef.current = adicionarTurno(adicionarTurno(conversaVigente(conversaRef.current), "voce", q), "lisa", texto);
+      addLog("[QUADRO]", GR, `${r.titulo}: ${r.doc?.pages?.[0]?.shapes?.length || 0} formas`);
+      if (voiceOn) enqueueSpeech(texto, gen);
+    } catch (err) {
+      const texto = `Não consegui desenhar agora: ${err.message}`;
+      addLog("[ERR]", OR, err.message);
+      setAnswer(texto);
+      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text: texto }]);
+    } finally {
+      setBusy(false);
+      setDesenhando(false);
+      setMode("idle");
+    }
+  };
+
+  // O "sim" ao "Posso fazer?" da conversa comum (02/11/2026): o pedido que ela entendeu vai, agora de
+  // verdade, para o caminho do desenho. Sobre um projeto do ProcessMap, o plano já sabe que a pessoa
+  // confirmou (não volta como pergunta) e é feito sem perguntar de novo; sem projeto, desenha no quadro
+  // — mudando o desenho aberto quando o pedido era mudar, senão um desenho novo.
+  fazerDesenhoConfirmadoRef.current = async (pendente, shown) => {
+    const { q, imagens = [] } = pendente;
+    // ("em qual projeto?" já foi perguntado na vez do pedido; aqui, sem a resposta, o desenho sai avulso)
+    const resolvido = await resolverProjetoRef.current?.(q);
+    const doProjeto = resolvido?.perguntar ? null : resolvido;
+    if (doProjeto) {
+      const plano = await planejarNoProjetoRef.current?.(q, doProjeto, shown, { imagens, confirmado: true });
+      if (plano?.acao === "mudar" || plano?.acao === "documentar") return executarPendenteRef.current?.({ q, doProjeto, plano, imagens }, shown);
+      doProjeto.alvo = null;
+      doProjeto.texto = contextoDoProjeto(doProjeto.projeto, doProjeto.fluxos);
+    }
+    const quadroComDesenho = quadroAbertoRef.current && Boolean(desenhoRef.current);
+    const mudar = !doProjeto && quadroComDesenho
+      && (pedidoDeDesenho(q, { quadroAberto: true }) === "alterar" || (pedeMudancaNoDesenho(q) && !pedeNovoDesenho(q)));
+    return desenharNaTelaRef.current?.(q, { displayText: shown, mudar, doProjeto, imagens });
+  };
+
+  // a barra "pedir à Lisa" da IDE (BEYOND-0009): a pergunta leva o código da aba; a resposta é
+  // digitada como sempre e, no fim, escrita em cima da aba de onde o pedido saiu
+  const pedirNaIde = useCallback(({ pedido, nome, linguagem, codigo, alvo }) => {
+    const q = `${pedido}\n\nO código está na IDE, na aba "${nome}". Se for mudar o código, devolva a versão COMPLETA dele num bloco só (ela vai substituir o que está na aba):\n\`\`\`${linguagem || ""} ${nome}\n${codigo}\n\`\`\``;
+    askRef.current?.(q, { displayText: `${pedido}  ·  ⌨ ${nome}`, alvoDaIde: alvo });
+  }, []);
+
+  // ---- Modo Escuta por palavra: "Lisa, ..." ----
+  //
+  // O microfone fica aberto o tempo todo, mas nada acontece até a palavra de acordar. A
+  // decisão do que fazer com o que foi dito mora em src/lib/escutaPorPalavra.js, testada por
+  // `npm run escuta-check` — aqui fica só o que precisa do navegador: o microfone, o laço que
+  // religa o reconhecimento e a ligação com o rádio.
+  //
+  // Feito para ficar aberto NO IMAC, que é quem tem o microfone e as caixas de som.
+  const ESCUTA_JANELA_MS = 8000; // quanto ela espera o comando depois de ouvir só "Lisa"
+
+  useEffect(() => {
+    if (!escutaPalavra) { setEscutaEstado("dormindo"); return; }
+    if (typeof window === "undefined") return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      addLog("[ESCUTA]", OR, "este navegador não reconhece fala — use o Chrome ou o Edge");
+      setEscutaPalavra(false);
+      return;
+    }
+
+    let parado = false;
+    let rec = null;
+    let religar = null;
+    let acordadaAte = 0;
+    // Enquanto ela responde, o microfone fica fechado de propósito — e `onend` não pode
+    // religá-lo por conta própria, senão haveria dois reconhecimentos abertos ao mesmo tempo.
+    let processando = false;
+
+    // Um bip curto ao acordar. Parece enfeite e não é: sem retorno nenhum, a pessoa não sabe
+    // se foi ouvida e fala de novo por cima — que é justamente quando o reconhecimento erra.
+    const bip = () => {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator(), vol = ctx.createGain();
+        osc.frequency.value = 880; vol.gain.value = 0.06;
+        osc.connect(vol); vol.connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + 0.09);
+        setTimeout(() => ctx.close().catch(() => {}), 300);
+      } catch { /* sem áudio disponível — o modo continua funcionando, só mais mudo */ }
+    };
+
+    const tocar = async (alvo) => {
+      // Mesma rota que o laço do rádio usa. `getRadioPlaylist` lê o arquivo em tempo de build
+      // e não existe no navegador — chamá-la aqui daria ReferenceError em execução, sem o
+      // build reclamar de nada.
+      let lista = radioPlaylistRef.current;
+      if (!lista?.length) {
+        try {
+          const res = await fetch("/api/radio/playlist");
+          const data = await res.json();
+          lista = data?.ok ? data.playlist : [];
+          radioPlaylistRef.current = lista; // o rádio reaproveita quando for ligado
+        } catch { lista = []; }
+      }
+      const musica = alvo ? escolherMusica(alvo, lista) : null;
+
+      if (alvo && !musica) {
+        // Dizer "não achei" é melhor que tocar outra coisa: duas escolhas erradas e ninguém
+        // mais confia no modo. A playlist é o arquivo radio/playlist.txt, editado à mão.
+        addLog("[ESCUTA]", OR, `não achei "${alvo}" na playlist`);
+        await speakText(`Não achei ${alvo} na playlist.`, { voiceName: voiceNameForScreenRef.current }).catch(() => {});
+        return;
+      }
+      if (musica) {
+        pedidoDeMusicaRef.current = musica;
+        addLog("[ESCUTA]", PU, `pedido: ${musica.title}`);
+      }
+      if (!radioMode) setRadioMode(true);
+      else radioSkipRef.current?.(); // já estava tocando: pula para o pedido agora
+    };
+
+    const responder = async (dito) => {
+      const cmd = interpretarComando(dito);
+      addLog("[ESCUTA]", PU, `"${dito}" → ${cmd.tipo}`);
+      if (cmd.tipo === "parar") { stopSpeaking(); setRadioMode(false); return; }
+      if (cmd.tipo === "pular") { radioSkipRef.current?.(); return; }
+      if (cmd.tipo === "tocar") return tocar(cmd.alvo);
+      if (cmd.tipo === "perguntar") return askRef.current?.(cmd.texto);
+    };
+
+    const iniciar = () => {
+      if (parado) return;
+      rec = new SR();
+      rec.lang = "pt-BR";
+      rec.continuous = true;
+      rec.interimResults = false;
+
+      rec.onresult = async (ev) => {
+        if (parado) return;
+        const dito = ev.results[ev.results.length - 1]?.[0]?.transcript || "";
+        if (!dito.trim()) return;
+
+        const janelaAberta = Date.now() < acordadaAte;
+        const { acordou, resto } = detectarAcordar(dito);
+        if (!acordou && !janelaAberta) return; // conversa normal da casa — ignora
+
+        const comando = acordou ? resto : normalizar(dito);
+        if (!comando) {
+          // Ouviu só "Lisa": abre a janela e espera a próxima frase.
+          acordadaAte = Date.now() + ESCUTA_JANELA_MS;
+          setEscutaEstado("acordada");
+          bip();
+          // Sem isto o rótulo fica em "ouvindo o comando…" para sempre quando ninguém
+          // completa a frase — e aí não dá para saber se ela ainda está esperando algo.
+          setTimeout(() => { if (!parado && Date.now() >= acordadaAte) setEscutaEstado("dormindo"); }, ESCUTA_JANELA_MS + 200);
+          return;
+        }
+
+        acordadaAte = 0;
+        setEscutaEstado("ocupada");
+        if (acordou) bip();
+
+        // Fecha o microfone enquanto ela responde e fala, senão ela se escuta e se interrompe.
+        processando = true;
+        try { rec?.stop(); } catch { /* já parado */ }
+        try {
+          await responder(comando);
+          await speechQueueRef.current?.catch?.(() => {}); // espera a fala terminar de tocar
+        } catch (err) {
+          addLog("[ESCUTA]", OR, `falhou: ${err?.message || err}`);
+        }
+        processando = false;
+        if (!parado) { setEscutaEstado("dormindo"); iniciar(); }
+      };
+
+      rec.onerror = (ev) => {
+        // `no-speech` e `aborted` são rotina num microfone que fica aberto o dia todo; só
+        // valem log os erros que realmente impedem de ouvir.
+        if (ev?.error && !["no-speech", "aborted"].includes(ev.error)) {
+          addLog("[ESCUTA]", OR, `reconhecimento: ${ev.error}`);
+        }
+      };
+
+      // O reconhecimento do Chrome desiste sozinho de tempos em tempos, sem erro nenhum. Sem
+      // este religa, o modo morre calado depois de alguns minutos e não há como saber por quê.
+      //
+      // A condição é `!processando`, e não "a janela de comando está fechada" como escrevi
+      // primeiro: com aquela, ouvir só "Lisa" abria a janela e então o religa era justamente
+      // o que NÃO acontecia — ela ficaria esperando um comando de microfone fechado.
+      rec.onend = () => { if (!parado && !processando) religar = setTimeout(iniciar, 400); };
+
+      try { rec.start(); } catch { /* já estava rodando */ }
+    };
+
+    addLog("[ESCUTA]", PU, "ouvindo — diga \"Lisa\" e o comando");
+    iniciar();
+
+    return () => {
+      parado = true;
+      clearTimeout(religar);
+      try { rec?.stop(); } catch { /* já parado */ }
+      setEscutaEstado("dormindo");
+    };
+  }, [escutaPalavra, radioMode, addLog, stopSpeaking]);
+
+  // ---- Modo conversa (BEYOND-0006) ----
+  //
+  // Microfone aberto o tempo todo, como na escuta por palavra, mas sem precisar dizer "Lisa":
+  // cada frase vira uma pergunta que CONTINUA a conversa (conversaRef vai junto). No silêncio,
+  // nada acontece. Enquanto ela responde e fala, o reconhecimento fica fechado — senão ela se
+  // ouve e responde a si mesma — e reabre quando a fala termina. Funciona junto com a Tela e a
+  // Observância: ask() já manda o retrato delas em cada pergunta.
+  useEffect(() => {
+    if (!conversaAberta) { setConversaEstado("desligada"); return; }
+    if (typeof window === "undefined") return;
+
+    let parado = false;
+    // o áudio da fala conta enquanto toca de verdade: um <audio> parado não é ela falando (BEYOND-0011)
+    const tocandoAgora = () => { const a = audioRef.current; return Boolean(a && !a.paused && !a.ended); };
+    const falandoAgora = () => tocandoAgora() || isBrowserVoiceAudioPlaying() || window.speechSynthesis?.speaking;
+    const fimDaFalaDela = (parou) => esperarAFalaAcabar({ fila: () => speechQueueRef.current, falando: falandoAgora, parou });
+
+    // No CELULAR a conversa escuta gravando (src/lib/conversaPorGravacao.js, BEYOND-0011): o reconhecimento
+    // do navegador com o microfone da esfera aberto derrubava a escuta no Android, e a conversa parava.
+    // Sem interromper por "Lisa" (seria um segundo microfone): ela termina de falar e a escuta volta.
+    if (isMobile) {
+      let conversa = null;
+      addLog("[CONVERSA]", PU, "conversa aberta (celular: gravando) — pode falar quando quiser");
+      abrirConversaPorGravacao({
+        aoEstado: (e) => { if (!parado) setConversaEstado(e === "ouvindo" ? "ouvindo" : "respondendo"); },
+        aoAviso: (t) => addLog("[CONVERSA]", OR, t),
+        aoMotor: ({ motor, aviso }) => addLog("[CONVERSA]", aviso ? OR : GR, `transcrito por ${motor === "groq" ? "Whisper (Groq)" : "Gemini"}${aviso ? ` — ${aviso}` : ""}`),
+        aoTexto: async (texto) => {
+          if (parado) return;
+          addLog("[CONVERSA]", CY, `→ "${texto}"`);
+          await askRef.current?.(texto);
+          await fimDaFalaDela(() => parado);
+        },
+      })
+        .then((c) => { if (parado) c.fechar(); else conversa = c; })
+        .catch((err) => { addLog("[CONVERSA]", OR, dicaDoErro(err)); setConversaAberta(false); });
+      return () => {
+        parado = true;
+        conversa?.fechar();
+        setConversaEstado("desligada");
+      };
+    }
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      addLog("[CONVERSA]", OR, "este navegador não reconhece fala — use o Chrome ou o Edge");
+      setConversaAberta(false);
+      return;
+    }
+
+    let rec = null;
+    let religar = null;
+    let processando = false;
+    let ultimaFalaEm = 0;
+    // Uma fala dela que termina gera, às vezes, um "resultado" atrasado com as próprias palavras
+    // dela: o que chega até 1,2 s depois de ela parar de falar é eco, não você.
+    const vigia = setInterval(() => { if (falandoAgora()) ultimaFalaEm = Date.now(); }, 200);
+    abrirMicrofone(); // só para a esfera medir o volume da sua voz
+
+    // INTERROMPER: enquanto ela fala, um segundo reconhecimento fica atento só à palavra "Lisa".
+    // Ouviu → ela para NA HORA (a fala inteira, não só o pedaço tocando) e espera o resto da sua
+    // frase; "Lisa, não é esse, é o de vendas" já vira a próxima pergunta. Eco da própria voz dela
+    // (um trecho da fala que contém "Lisa") é ignorado — ver interrupcaoNaFala em conversa.js.
+    // Devolve { interrompida, resto } quando a fala acaba ou quando você a interrompe.
+    const ESPERA_PELA_CORRECAO_MS = 4000;
+    let ouvidoAtivo = null; // o reconhecimento da interrupção, para a limpeza do efeito fechar
+    const vigiarInterrupcao = () => new Promise((resolve) => {
+      const textoDela = ultimaRespostaRef.current || "";
+      let fim = false;
+      let interrompendo = false;
+      let ouvido = null;
+      let prazo = null;
+      const terminar = (r) => {
+        if (fim) return;
+        fim = true;
+        clearTimeout(prazo);
+        try { ouvido?.abort(); } catch { /* já parado */ }
+        if (ouvidoAtivo === ouvido) ouvidoAtivo = null;
+        resolve(r);
+      };
+      // a fala acabou sozinha: a fila inteira (pedaços que entram depois também) e o áudio tocando.
+      // Parar por interrupção também esvazia a fila — aí quem termina é o vigia, não isto.
+      // (com teto: um áudio que nunca termina não prende a conversa — BEYOND-0011)
+      (async () => {
+        await fimDaFalaDela(() => parado || interrompendo);
+        if (!interrompendo) terminar({ interrompida: false, resto: "" });
+      })();
+      const calar = () => {
+        interrompendo = true;
+        speechGenRef.current++; // os próximos pedaços desta resposta não tocam mais
+        stopSpeaking();
+        playListenBeep();
+        prazo = setTimeout(() => terminar({ interrompida: true, resto: "" }), ESPERA_PELA_CORRECAO_MS);
+      };
+      const abrir = () => {
+        if (fim || parado) return terminar({ interrompida: interrompendo, resto: "" });
+        ouvido = new SR();
+        ouvidoAtivo = ouvido;
+        ouvido.lang = "pt-BR";
+        ouvido.continuous = true;
+        ouvido.interimResults = true; // a palavra vem num resultado parcial: para antes de você terminar
+        ouvido.onresult = (ev) => {
+          for (let i = ev.resultIndex; i < ev.results.length; i++) {
+            const r = interrupcaoNaFala(ev.results[i][0].transcript, textoDela);
+            if (!r.interrompe) continue;
+            if (!interrompendo) { calar(); addLog("[CONVERSA]", PU, "interrompida — pode falar"); }
+            // a frase fechou: o que veio depois de "Lisa" é a correção
+            if (ev.results[i].isFinal) return terminar({ interrompida: true, resto: r.resto });
+          }
+        };
+        ouvido.onerror = () => { /* no-speech/aborted são rotina aqui */ };
+        ouvido.onend = () => { if (!fim) setTimeout(abrir, 150); };
+        try { ouvido.start(); } catch { /* já rodando */ }
+      };
+      abrir();
+    });
+
+    const iniciar = () => {
+      if (parado) return;
+      rec = new SR();
+      rec.lang = "pt-BR";
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.onresult = async (ev) => {
+        if (parado || processando) return;
+        const dito = corrigirNomeDaLisa((ev.results[ev.results.length - 1]?.[0]?.transcript || "").trim());
+        if (!falaQueValePergunta(dito)) return;
+        if (falandoAgora() || Date.now() - ultimaFalaEm < 1200) return; // eco dela mesma
+        processando = true;
+        setConversaEstado("respondendo");
+        try { rec?.stop(); } catch { /* já parado */ }
+        addLog("[CONVERSA]", CY, `→ "${dito}"`);
+        try {
+          let pergunta = dito;
+          while (pergunta && !parado) {
+            await askRef.current?.(pergunta);
+            pergunta = null;
+            const r = await vigiarInterrupcao(); // espera a fala terminar — ou você dizer "Lisa"
+            if (r.interrompida) {
+              conversaRef.current = marcarInterrompida(conversaRef.current);
+              if (r.resto && falaQueValePergunta(r.resto)) { pergunta = r.resto; addLog("[CONVERSA]", CY, `→ "${r.resto}"`); }
+            }
+          }
+          await fimDaFalaDela(() => parado); // e qualquer outra fala dela
+        } catch (err) {
+          addLog("[CONVERSA]", OR, `falhou: ${err?.message || err}`);
+        }
+        processando = false;
+        if (!parado) { setConversaEstado("ouvindo"); iniciar(); }
+      };
+      rec.onerror = (ev) => {
+        if (ev?.error && !["no-speech", "aborted"].includes(ev.error)) addLog("[CONVERSA]", OR, `reconhecimento: ${ev.error}`);
+      };
+      // o reconhecimento do Chrome desiste sozinho de tempos em tempos: religa calado
+      rec.onend = () => { if (!parado && !processando) religar = setTimeout(iniciar, 300); };
+      try { rec.start(); setConversaEstado("ouvindo"); } catch { /* já estava rodando */ }
+    };
+
+    addLog("[CONVERSA]", PU, "conversa aberta — pode falar quando quiser");
+    iniciar();
+    return () => {
+      parado = true;
+      clearTimeout(religar);
+      clearInterval(vigia);
+      try { rec?.stop(); } catch { /* já parado */ }
+      try { ouvidoAtivo?.abort(); } catch { /* já parado */ }
+      fecharMicrofone();
+      setConversaEstado("desligada");
+    };
+  }, [conversaAberta, isMobile, addLog, stopSpeaking]);
 
   // ---- STT: ouvir microfone (Web Speech API) ----
   const toggleMic = useCallback(() => {
+    // Com a conversa aberta o microfone já está ouvindo: o botão serve para encerrá-la.
+    if (conversaAbertaRef.current) { setConversaAberta(false); return; }
     if (typeof window === "undefined") return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { setVoiceSupported(false); addLog("[VOICE]", OR, "navegador sem suporte a microfone"); return; }
@@ -2443,7 +3775,7 @@ export default function AssistantPage() {
     recognitionRef.current = rec;
 
     let finalText = "";
-    rec.onstart = () => { setListening(true); addLog("[VOICE]", GR, "ouvindo…"); };
+    rec.onstart = () => { setListening(true); addLog("[VOICE]", GR, "ouvindo…"); abrirMicrofone(); };
     rec.onresult = (e) => {
       let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -2456,27 +3788,17 @@ export default function AssistantPage() {
     rec.onerror = (e) => { addLog("[VOICE]", OR, `mic: ${e.error}`); };
     rec.onend = () => {
       setListening(false);
+      fecharMicrofone();
       recognitionRef.current = null;
-      const q = (finalText || "").trim();
+      const q = corrigirNomeDaLisa((finalText || "").trim());
       if (q) { addLog("[VOICE]", CY, `→ "${q}"`); setInput(""); ask(q); }
       else addLog("[VOICE]", OR, "nada capturado");
     };
     rec.start();
   }, [addLog, ask, stopSpeaking]);
   toggleMicForGestureRef.current = toggleMic;
-
-  // ---- microfone "segurar pra falar" (mobile) — igual WhatsApp: pressiona e segura o botão
-  // pra falar, solta pra parar de ouvir e já mandar. toggleMic() já faz exatamente isso num
-  // único disparo (liga se não estava ouvindo, desliga-e-envia se estava) — só precisa ser
-  // chamado 1x no press e 1x no release, nunca os dois no mesmo evento (por isso NÃO usa
-  // onClick aqui: um toque simples já dispara pointerdown+pointerup+click em sequência, e o
-  // click extra chamaria toggleMic() uma 3ª vez, reabrindo o mic logo depois de soltar).
-  const startMicHold = useCallback(() => {
-    if (!listening && !busy) toggleMic();
-  }, [listening, busy, toggleMic]);
-  const stopMicHold = useCallback(() => {
-    if (listening) toggleMic();
-  }, [listening, toggleMic]);
+  // (no celular, o microfone de segurar é o MicrofoneDaLisa: grava o áudio de verdade, como o
+  // WhatsApp — o reconhecimento do navegador falhava lá; ver src/lib/falaComoWhatsApp.js)
 
   // modo chat (mobile): rola pro fim sempre que a conversa cresce ou a resposta vai chegando
   useEffect(() => {
@@ -2485,9 +3807,10 @@ export default function AssistantPage() {
   }, [isMobile, mobileView, messages, answer]);
 
   const meta = MODE_META[mode];
+  // o código da resposta vai para o editor (IdeDaLisa); aqui fica só o aviso no lugar dele
   const transcript =
     mode === "speaking" || answer
-      ? answer || "…"
+      ? respostaSemCodigo(answer) || "…"
       : mode === "listening"
       ? `"${question}"`
       : 'Standby. Digite uma pergunta abaixo e pressione Enter. Eu sou a Lisa.';
@@ -2525,6 +3848,27 @@ export default function AssistantPage() {
     setCodeModalInput("");
     askCodeMode(q);
   };
+
+  // Editor das respostas com código, em qualquer modo (o Modo Código tem a janela dele, acima):
+  // uma janela só para a conversa inteira, uma aba por resposta — a que está chegando entra viva.
+  mensagensRef.current = messages;
+  const ideDaLisa = !codeMode && (
+    <IdeDaLisa
+      interacoes={ideViva ? [...ideHistorico, { ...ideViva, texto: answer }] : ideHistorico} chegando={busy}
+      aoPedir={pedirNaIde} aoMudarCodigo={(texto) => { codigoDaIdeRef.current = texto; }}
+      aoDesenhar={(codigo, nome) => desenharNaTelaRef.current?.(`Desenhe no quadro este diagrama:\n${codigo}`, { displayText: `◇ desenhar no quadro: ${nome}` })}
+    />
+  );
+  // o quadro da Lisa (BEYOND-0010): aparece quando ela desenha; o que a pessoa mexe volta para cá
+  const quadroDaLisa = quadro && (
+    <QuadroDaLisa
+      versao={quadro.versao} titulo={quadro.titulo} explicacao={quadro.explicacao} ocupado={desenhando}
+      aoMudar={(doc) => { desenhoRef.current = doc; }}
+      aoPedir={(p) => desenharNaTelaRef.current?.(p, { mudar: true })}
+      aoVincular={(r) => { quadroVinculoRef.current = r; if (r?.projeto) ultimoProjetoRef.current = r.projeto; }}
+      aoFechar={() => { setQuadro(null); desenhoRef.current = null; quadroVinculoRef.current = null; }}
+    />
+  );
 
   const codeTaskModal = codeModalOpen && (
     <div
@@ -2735,6 +4079,22 @@ export default function AssistantPage() {
     </div>
   );
 
+  // Modo Tomar nota — o mesmo painel no celular e no desktop. O resultado também vai para o chat
+  // (e para a memória da conversa), para dar para perguntar sobre as notas depois.
+  const tomarNotaOverlay = tomarNota && (
+    <TomarNota
+      temaInicial={tomarNota.tema}
+      aoFechar={() => setTomarNota(null)}
+      aoTerminar={(r) => {
+        const notas = (r.cards || []).slice(0, -1);
+        const texto = `📝 Anotei "${r.tema}" no Abacato: ${notas.length} nota${notas.length === 1 ? "" : "s"} na coluna "${r.coluna?.nome}" do quadro ${r.quadro?.nome}${r.quadro?.novo ? " (criei o quadro agora)" : ""}.\n${notas.map((c) => `• ${c.titulo}`).join("\n")}${r.resumo ? `\n\n${r.resumo}` : ""}\n\n${r.quadro?.url || ""}`.trim();
+        setMessages((m) => [...m, { id: `nota${Date.now()}`, role: "assistant", text: texto }]);
+        lembrarDaLisa(texto);
+        addLog("[NOTA]", PU, `${notas.length} notas em "${r.coluna?.nome}" (${r.quadro?.nome})`);
+      }}
+    />
+  );
+
   // tela cheia customizada (ver openFullscreen acima) + aviso de mensagem recebida na Câmera de
   // Vigia — compartilhados entre o branch mobile e o desktop abaixo, computados uma vez só.
   const fullscreenOverlay = fullscreenSource && (
@@ -2926,6 +4286,14 @@ export default function AssistantPage() {
             ))}
 
             <div style={{ height: 1, background: "rgba(var(--accent-rgb),0.15)", margin: "2px 0" }} />
+
+            <button
+              onClick={() => { unlockAudioPlayback(); acordarAudio(); setConversaAberta((v) => !v); }}
+              title="Microfone aberto: fale quando quiser, ela responde continuando a conversa"
+              style={{ ...mono, fontSize: 10, letterSpacing: 1, padding: "7px 10px", borderRadius: 6, textAlign: "left", border: `1px solid ${conversaAberta ? GR : "rgba(var(--accent-rgb),0.18)"}`, background: conversaAberta ? "rgba(123,216,143,0.12)" : "transparent", color: "#eafcff", cursor: "pointer" }}
+            >
+              🗣️ Conversa livre: {conversaAberta ? (conversaEstado === "respondendo" ? "respondendo…" : "ouvindo") : "OFF"}
+            </button>
 
             <button
               onClick={() => { unlockAudioPlayback(); setRadioMode((v) => !v); }}
@@ -3159,6 +4527,21 @@ export default function AssistantPage() {
   // sonora no meio, como o modo de voz do ChatGPT). Reaproveita TODO o estado/lógica de cima
   // (ask, toggleMic, canvasRef, voz, escopo) — só a apresentação muda.
   // ==========================================================================================
+  // ---- revisão visual: gaveta aberta no desktop e o sinal que move a esfera ----
+  const [gaveta, setGaveta] = useState(null); // "registro" | "contexto" | null
+  const sinalDaEsferaRef = useRef({});
+  sinalDaEsferaRef.current = { listening, autoListening, mode, conversaOuvindo: conversaEstado === "ouvindo", gravandoFala };
+  // Lido a cada quadro pela esfera: "falando" vem do áudio tocando de verdade (o mode já voltou
+  // a "idle" quando a fala começa — ver ask()), "ouvindo" do microfone, "pensando" da busca.
+  const obterSinalDaEsfera = useCallback(() => {
+    const s = sinalDaEsferaRef.current;
+    const falando = !!audioRef.current || isBrowserVoiceAudioPlaying() || (typeof window !== "undefined" && window.speechSynthesis?.speaking);
+    if (falando) return { estado: "falando", nivel: nivelDaVoz() };
+    if (s.listening || s.autoListening || s.conversaOuvindo || s.gravandoFala) return { estado: "ouvindo", nivel: nivelDoMicrofone() };
+    if (s.mode === "listening" || s.mode === "speaking") return { estado: "pensando", nivel: null };
+    return { estado: "pronta", nivel: null };
+  }, []);
+
   if (isMobile) {
     const autoSyncOk = autoSync?.ok && autoSync.status !== undefined;
     const autoSyncColor = !autoSync
@@ -3174,94 +4557,57 @@ export default function AssistantPage() {
       : "rgba(207,239,251,0.35)";
 
     return (
-      <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "#000" }}>
+      <div className="bb-painel bb-celular" style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "var(--bb-fundo)" }}>
         {fullscreenOverlay}
+        {tomarNotaOverlay}
         {cameraVigiaMessageToast}
         {watchPreviews}
         {radioWidget}
-        {/* barra superior mínima */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(var(--accent-rgb),0.12)", flex: "none" }}>
-          <button
-            onClick={() => setMobileSettingsOpen(true)}
-            aria-label="Configurações"
-            style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(var(--accent-rgb),0.05)", color: CY, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+        {/* barra do topo — revisão visual: ajustes, marca, modo de conversa e painéis */}
+        <div className="bb-celular-topo">
+          <button type="button" className="bb-redondo" onClick={() => setMobileSettingsOpen(true)} aria-label="Ajustes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="14" y2="17" /></svg>
           </button>
-          <div style={{ ...mono, fontSize: 12, letterSpacing: 3, color: CY }}>◈ LISA</div>
-          <div style={{ display: "flex", gap: 4 }}>
-            <button
-              onClick={() => setMobileNavOpen(true)}
-              aria-label="Outros painéis"
-              title="Outros painéis (Dashboard, AR, Quarto de Guerra…)"
-              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid rgba(var(--accent-rgb),0.25)", background: "rgba(var(--accent-rgb),0.05)", color: CY, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
+          <div className="bb-celular-marca">Lisa</div>
+          <div className="bb-celular-modos" role="group" aria-label="Modo de conversa">
+            <button type="button" aria-pressed={mobileView === "chat"} onClick={() => setMobileView("chat")} title="Chat" aria-label="Chat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
             </button>
-            <button
-              onClick={() => setMobileView("chat")}
-              title="Modo chat"
-              style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${mobileView === "chat" ? CY : "rgba(var(--accent-rgb),0.2)"}`, background: mobileView === "chat" ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: mobileView === "chat" ? "#eafcff" : "rgba(207,239,251,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-            </button>
-            <button
-              onClick={() => setMobileView("voice")}
-              title="Modo voz"
-              style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${mobileView === "voice" ? CY : "rgba(var(--accent-rgb),0.2)"}`, background: mobileView === "voice" ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: mobileView === "voice" ? "#eafcff" : "rgba(207,239,251,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /></svg>
+            <button type="button" aria-pressed={mobileView === "voice"} onClick={() => setMobileView("voice")} title="Voz" aria-label="Voz">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3.5" /></svg>
             </button>
             {/* entrar/sair dessa view É ligar/desligar o modo — evita ficar com a câmera e o
                 laço rodando enquanto você está lendo o chat em outra aba */}
-            <button
-              onClick={() => setMobileView("companion")}
-              title="Modo interativo"
-              style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${mobileView === "companion" ? CY : "rgba(var(--accent-rgb),0.2)"}`, background: mobileView === "companion" ? "rgba(var(--accent-rgb),0.12)" : "transparent", color: mobileView === "companion" ? "#eafcff" : "rgba(207,239,251,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}
-            >
-              🤖
+            <button type="button" aria-pressed={mobileView === "companion"} onClick={() => setMobileView("companion")} title="Modo interativo" aria-label="Modo interativo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3" /><path d="M12 3v4M9 13h.01M15 13h.01" /></svg>
+            </button>
+            <button type="button" aria-pressed={!!tomarNota} onClick={() => setTomarNota((v) => v || { tema: "" })} title="Tomar nota" aria-label="Tomar nota">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h4" /></svg>
             </button>
           </div>
+          <button type="button" className="bb-redondo" onClick={() => setMobileNavOpen(true)} aria-label="Outros painéis" title="Outros painéis">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" /></svg>
+          </button>
         </div>
 
         {mobileView === "companion" ? (
           // ---- MODO INTERATIVO: tela limpa, só a carinha dela (ver interactiveScreen) ----
           interactiveScreen
         ) : mobileView === "voice" ? (
-          // ---- MODO VOZ: tela escura, só a onda sonora, como o modo de voz do ChatGPT ----
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, padding: 20 }}>
-            <div style={{ position: "relative", width: "min(80vw,320px)", height: "min(80vw,320px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ position: "absolute", inset: "-6%", border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: "50%", borderTopColor: "rgba(var(--accent-rgb),0.45)", borderRightColor: "rgba(var(--accent-rgb),0.28)", animation: "bb-sweep 14s linear infinite" }} />
-              <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
-              <div style={{ position: "relative", textAlign: "center", pointerEvents: "none" }}>
-                <div style={{ ...mono, fontSize: 10, letterSpacing: 5, color: meta.color }}>{meta.label}</div>
-              </div>
+          // ---- MODO VOZ: a esfera da voz ocupando a tela, e o botão de segurar para falar ----
+          <div className="bb-celular-voz">
+            <div className="bb-celular-esfera">
+              <VisualDaLisa modo={visualDaLisa} obterSinal={obterSinalDaEsfera} ocupacao={0.86} brincadeiras />
             </div>
-            <button
-              onPointerDown={(e) => { e.preventDefault(); startMicHold(); }}
-              onPointerUp={stopMicHold}
-              onPointerLeave={stopMicHold}
-              onPointerCancel={stopMicHold}
-              onContextMenu={(e) => e.preventDefault()}
-              disabled={busy}
-              title="Segure pra falar, solte pra enviar"
-              style={{
-                marginTop: 40, width: 76, height: 76, borderRadius: "50%",
-                border: `2px solid ${listening ? OR : CY}`,
-                background: listening ? "rgba(255,157,61,0.15)" : "rgba(var(--accent-rgb),0.08)",
-                color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer",
-                boxShadow: listening ? `0 0 24px ${OR}` : `0 0 20px rgba(var(--accent-rgb),0.4)`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                touchAction: "none", userSelect: "none", WebkitUserSelect: "none",
-              }}
-            >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
-              </svg>
-            </button>
-            <div style={{ ...mono, fontSize: 10, color: "rgba(207,239,251,0.4)", marginTop: 14, letterSpacing: 1, textAlign: "center", minHeight: 32, padding: "0 16px" }}>
-              {mode === "listening" ? `"${question}"` : mode === "speaking" ? "falando…" : "toque no microfone pra falar"}
-            </div>
+            <RotuloDaVoz obterSinal={obterSinalDaEsfera} />
+            <MicrofoneDaLisa
+              variante="voz"
+              desabilitado={busy}
+              rotulo={mode === "listening" ? `"${question}"` : mode === "speaking" ? "Respondendo…" : null}
+              aoComecar={() => { stopSpeaking(); acordarAudio(); }}
+              aoGravando={setGravandoFala}
+              aoTexto={(q) => ask(q)}
+            />
           </div>
         ) : (
           // ---- MODO CHAT: bolhas de conversa, tipo Gemini/ChatGPT ----
@@ -3283,12 +4629,17 @@ export default function AssistantPage() {
                     fontSize: 14.5, lineHeight: 1.45, color: "#eafcff", whiteSpace: "pre-wrap", userSelect: "text",
                   }}
                 >
-                  {m.text}
+                  {m.role === "assistant" ? <><TextoComCodigo texto={m.text} /><FontesDaWeb fontes={m.fontes} /></> : (
+                    <>
+                      {m.anexos?.length ? <span className="bb-balao-anexos">{m.anexos.map((a) => <img key={a.id} src={a.previa} alt={a.nome} />)}</span> : null}
+                      {m.text}
+                    </>
+                  )}
                 </div>
               ))}
               {busy && answer && (
                 <div style={{ alignSelf: "flex-start", maxWidth: "82%", padding: "10px 14px", borderRadius: "14px 14px 14px 3px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", fontSize: 14.5, lineHeight: 1.45, color: "#eafcff", whiteSpace: "pre-wrap", userSelect: "text" }}>
-                  {answer}
+                  {respostaSemCodigo(answer)}
                 </div>
               )}
               {busy && !answer && (
@@ -3317,9 +4668,13 @@ export default function AssistantPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* barra de entrada */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderTop: "1px solid rgba(var(--accent-rgb),0.12)" }}>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", padding: "10px 14px", border: "1px solid rgba(var(--accent-rgb),0.2)", borderRadius: 22, background: "rgba(255,255,255,0.04)" }}>
+            {/* o contexto da conversa: imagens anexadas e repositórios vinculados */}
+            <div className="bb-contexto-celular">{faixaDoContexto}</div>
+            {/* barra de entrada — sem texto, o microfone (como o do WhatsApp: a faixa da gravação
+                cobre o campo); com texto, o enviar */}
+            <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderTop: "1px solid rgba(var(--accent-rgb),0.12)" }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, padding: "6px 14px 6px 6px", border: "1px solid rgba(var(--accent-rgb),0.2)", borderRadius: 22, background: "rgba(255,255,255,0.04)" }}>
+                <BotaoMais aoEscolherImagens={anexarImagens} aoVincular={vincularRepo} desabilitado={busy} classeDoBotao="bb-redondo bb-redondo--mais-celular" />
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -3329,26 +4684,23 @@ export default function AssistantPage() {
                   style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#eafcff", fontSize: 15 }}
                 />
               </div>
-              <button
-                onPointerDown={(e) => { e.preventDefault(); startMicHold(); }}
-                onPointerUp={stopMicHold}
-                onPointerLeave={stopMicHold}
-                onPointerCancel={stopMicHold}
-                onContextMenu={(e) => e.preventDefault()}
-                disabled={busy}
-                title="Segure pra falar, solte pra enviar"
-                style={{ width: 42, height: 42, borderRadius: "50%", flex: "none", border: `1.5px solid ${listening ? OR : CY}`, background: listening ? "rgba(255,157,61,0.15)" : "rgba(var(--accent-rgb),0.06)", color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
-              >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /></svg>
-              </button>
-              {input.trim() && (
+              {input.trim() ? (
                 <button
                   onClick={() => { if (!busy) { ask(input); setInput(""); } }}
                   disabled={busy}
+                  aria-label="Enviar"
                   style={{ width: 42, height: 42, borderRadius: "50%", flex: "none", border: `1.5px solid ${CY}`, background: "rgba(var(--accent-rgb),0.14)", color: CY, cursor: busy ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                 >
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
                 </button>
+              ) : (
+                <MicrofoneDaLisa
+                  variante="chat"
+                  desabilitado={busy}
+                  aoComecar={() => { stopSpeaking(); acordarAudio(); }}
+                  aoGravando={setGravandoFala}
+                  aoTexto={(q) => ask(q)}
+                />
               )}
             </div>
           </div>
@@ -3369,6 +4721,7 @@ export default function AssistantPage() {
                 <button onClick={() => setMobileSettingsOpen(false)} style={{ ...mono, fontSize: 10, padding: "5px 10px", border: "1px solid rgba(var(--accent-rgb),0.2)", borderRadius: 4, background: "transparent", color: "rgba(207,239,251,0.6)", cursor: "pointer" }}>✕ fechar</button>
               </div>
 
+{!usuario && (<>
               {/* escopo */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginBottom: 8 }}>ESCOPO</div>
               <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
@@ -3407,6 +4760,7 @@ export default function AssistantPage() {
                 </>
               )}
 
+</>)}
               {/* voz */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>VOZ</div>
               <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
@@ -3424,6 +4778,32 @@ export default function AssistantPage() {
                 ))}
               </div>
 
+              {/* aplicativo: some quando o navegador não oferece instalar (e não é iPhone) */}
+              {(instalacao.pode || instalacao.ios || instalacao.instalado) && (
+                <>
+                  <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>APLICATIVO</div>
+                  {instalacao.instalado ? (
+                    <div style={{ fontSize: 13, color: "rgba(207,239,251,0.6)", marginBottom: 14 }}>Você já está no app instalado.</div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={instalacao.instalar}
+                        style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${CY}`, background: "rgba(var(--accent-rgb),0.12)", color: "#eafcff", cursor: "pointer", width: "100%", marginBottom: 6 }}
+                      >
+                        ⤓ Instalar a Lisa como app
+                      </button>
+                      <div style={{ fontSize: 12, color: "rgba(207,239,251,0.5)", marginBottom: 14 }}>
+                        {instalacao.ios ? DICA_DO_IPHONE : "Ganha ícone na tela inicial e abre em tela cheia, sem a barra do navegador."}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* a conta: e-mail, acesso, uso do dia, perfil e Sair (o celular não tem o topo) */}
+              <ContaNoCelular />
+
+{!usuario && (<>
               {/* persona */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>PERSONALIDADE</div>
               <button
@@ -3501,6 +4881,7 @@ export default function AssistantPage() {
                 Com o modo ligado, ela também cumprimenta sozinha se reconhecer a Alice ou a Nala na câmera.
               </div>
 
+</>)}
               {/* Modo Tela — compartilhar a tela do dispositivo. A maioria dos navegadores de
                   CELULAR não tem suporte a getDisplayMedia (compartilhamento de tela) — o botão
                   fica disponível, mas se o seu navegador não suportar, aparece o aviso de erro
@@ -3538,6 +4919,7 @@ export default function AssistantPage() {
                       />
                     </>
                   )}
+{!usuario && (<>
                   <button
                     onClick={() => setTransmissionMode((v) => !v)}
                     style={{ ...mono, fontSize: 10.5, padding: "10px 14px", borderRadius: 6, border: `1px solid ${transmissionMode ? OR : "rgba(var(--accent-rgb),0.18)"}`, background: transmissionMode ? "rgba(217,89,38,0.12)" : "transparent", color: transmissionMode ? "#eafcff" : "rgba(207,239,251,0.55)", cursor: "pointer", width: "100%", marginBottom: 8 }}
@@ -3548,7 +4930,8 @@ export default function AssistantPage() {
                     <div style={{ fontSize: 10.5, color: "rgba(207,239,251,0.45)", marginBottom: 8, lineHeight: 1.4 }}>
                       Outro dispositivo com o Modo Vigia (abaixo) pode assistir esta tela AO VIVO agora.
                     </div>
-                  )}
+                  )}</>)}
+
                 </>
               )}
               {screenError && <div style={{ ...mono, fontSize: 9.5, color: OR, marginBottom: 8 }}>⚠ {screenError}</div>}
@@ -3558,6 +4941,7 @@ export default function AssistantPage() {
                 for o seu caso, o aviso acima vai dizer isso claramente.
               </div>
 
+{!usuario && (<>
               {/* Câmera de Vigia — como o Modo Tela, só que filma com a câmera do dispositivo
                   (áudio junto) em vez da tela. Funciona em celular também (ao contrário do Modo
                   Tela). Quem assiste (Modo Vigia, "Assistir Câmera de Vigia") pode mandar
@@ -3669,7 +5053,7 @@ export default function AssistantPage() {
               </div>
 
               {/* Modo Rádio — a Lisa incorpora uma apresentadora de rádio, alternando locução
-                  (novidades reais de Trello/Tarefas Delp/Sentinela/Pensamentos) com música de
+                  (novidades reais de Abacato/Tarefas Delp/Sentinela/Pensamentos) com música de
                   verdade da playlist (radio/playlist.txt, tocada via YouTube). */}
               <div style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)", marginTop: 14, marginBottom: 8 }}>MODO RÁDIO</div>
               <button
@@ -3679,7 +5063,7 @@ export default function AssistantPage() {
                 📻 Modo Rádio: {radioMode ? "ON" : "OFF"}
               </button>
               <div style={{ fontSize: 11, color: "rgba(207,239,251,0.45)", marginBottom: 14, lineHeight: 1.4 }}>
-                A Lisa vira apresentadora: alterna blocos de novidades reais (Trello, Tarefas
+                A Lisa vira apresentadora: alterna blocos de novidades reais (Abacato, Tarefas
                 Delp, Sentinela, Pensamentos) com música da sua playlist — anuncia antes de
                 tocar e comenta depois. Veja o player no canto inferior esquerdo da tela.
               </div>
@@ -3721,6 +5105,7 @@ export default function AssistantPage() {
               >
                 {ingesting ? "SINCRONIZANDO…" : "◈ SYNC AGORA"}
               </button>
+</>)}
             </div>
           </div>
         )}
@@ -3742,6 +5127,9 @@ export default function AssistantPage() {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {[
+                  { href: "/fluxogramas", glyph: "◇", label: "PROCESSMAP" },
+                  { href: "/lisa-task", glyph: "✓", label: "LISA TASK", novaAba: true },
+                  { href: "/visual", glyph: "◎", label: "VISUAL DA LISA" },
                   { href: "/dashboard", glyph: "▧", label: "DASHBOARD" },
                   { href: "/dashboard/ar", glyph: "◫", label: "DASHBOARD · MODO AR" },
                   { href: "/", glyph: "◈", label: "QUARTO DE GUERRA" },
@@ -3758,10 +5146,12 @@ export default function AssistantPage() {
                   { href: "/arch-docs", glyph: "🗺️", label: "MAPA DE ARQUITETURA" },
                   { href: "/test-mode", glyph: "🧪", label: "MODO DE TESTES" },
                   { href: "/sync-status", glyph: "📊", label: "PROGRESSO DO SYNC" },
-                ].map((item) => (
+                ].filter((item) => podeAcessar(papel || "usuario", item.href)).map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
+                    target={item.novaAba ? "_blank" : undefined}
+                    rel={item.novaAba ? "noopener" : undefined}
                     onClick={() => setMobileNavOpen(false)}
                     style={{ ...mono, fontSize: 12, letterSpacing: 1.5, padding: "14px 16px", borderRadius: 8, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "rgba(var(--accent-rgb),0.05)", color: "#eafcff", textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}
                   >
@@ -3773,807 +5163,640 @@ export default function AssistantPage() {
           </div>
         )}
         {codeTaskModal}
+        {ideDaLisa}
+        {quadroDaLisa}
       </div>
     );
   }
 
+  // ---- DESKTOP — revisão visual (out/2026): a esfera no centro, a conversa embaixo dela e
+  // TODO o resto em menus discretos. Os controles são exatamente os de antes (mesmos estados e
+  // mesmas funções); só mudaram de lugar:
+  //   • "Modos" e "⚙" vão para o topo do app (TopoExtra) — eram a barra ESCOPO + cinco gavetas
+  //   • o escopo vai para dentro do campo de mensagem
+  //   • SYSTEM_LOGS e RETRIEVED_CONTEXT viram gavetas laterais, fechadas por padrão
+  //   • as prévias de câmera/tela ficam sempre montadas enquanto o modo estiver ligado (antes
+  //     sumiam ao fechar a gaveta — e a captura lê desses mesmos <video>)
+  const modosLigados = [
+    observanceMode, screenMode, micWatchMode && (screenMode || observanceMode), cameraVigiaMode,
+    vigiaMode, radioMode, escutaPalavra, codeMode, personaMode,
+  ].filter(Boolean).length;
+  const nomeDoEscopo = scopeMode === "general"
+    ? "Geral"
+    : scopePanel === TASKS_SCOPE ? "Tarefas"
+    : scopePanel === THOUGHTS_SCOPE ? "Pensamentos"
+    : scopePanel === SENTINEL_SCOPE ? "Sentinela"
+    : scopePanel === DELP_SCOPE ? "Tarefas Delp"
+    : scopePanel === CODE_SCOPE ? "Código"
+    : scopePanel || "Este painel";
+  const enviarPergunta = () => {
+    acordarAudio();
+    if (!busy && input.trim()) { ask(input); setInput(""); }
+  };
+  const estadoGeminiVoz = !geminiVoiceEnabled
+    ? "desligada — usando a voz do navegador"
+    : geminiVoiceStatus === true ? "funcionando"
+    : geminiVoiceStatus === false ? "a última tentativa falhou"
+    : "ainda sem tentativa nesta sessão";
+
+  // ---- a janela da resposta (01/11/2026): o que antes ficava escrito embaixo do visual ----
+  const falaDaResposta = mode === "speaking" || answer ? respostaSemCodigo(separarRascunho(answer).fala) : "";
+  const rascunhoDaResposta = separarRascunho(answer).rascunho;
+  const janelaNaTela = !janelaFechada && Boolean(question) && (busy || mode !== "idle" || Boolean(answer));
+  const estadoDaJanela = !answer && (busy || mode !== "idle") ? "PROCESSANDO" : busy || mode === "speaking" ? "RESPONDENDO" : "RESPOSTA";
+  const palavrasDaResposta = falaDaResposta ? falaDaResposta.trim().split(/\s+/).length : 0;
+  const janelaDaResposta = janelaNaTela && (
+    <JanelaDaResposta key={numeroDaResposta} estado={estadoDaJanela} pergunta={question} texto={falaDaResposta || (answer ? "…" : "")}
+      digitando={busy} aoFechar={() => setJanelaFechada(true)}>
+      <FontesDaWeb fontes={fontes} />
+      {rascunhoDaResposta && (
+        <div className="bb-rascunho">
+          <div className="bb-rascunho-cabeca">Rascunho do card · ainda não gravado</div>
+          <pre>{rascunhoDaResposta}</pre>
+        </div>
+      )}
+      {ttsWaitSeconds !== null && (
+        <div className="bb-conversa-nota">Preparando a voz… {ttsWaitSeconds}s de {SPEAK_TIMEOUT_MS / 1000}s</div>
+      )}
+      {(liveCode || liveCodeDone.length > 0) && (
+        <div className="bb-codigo-ao-vivo">
+          {liveCodeDone.map((f) => <div key={f.path} style={{ color: "var(--bb-ok)", marginBottom: 6 }}>✓ {f.path}</div>)}
+          {liveCode && (
+            <div>
+              <div style={{ color: PU, marginBottom: 4 }}>✎ {liveCode.path}</div>
+              <pre>{liveCode.content.slice(-2500)}</pre>
+            </div>
+          )}
+        </div>
+      )}
+    </JanelaDaResposta>
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {codeTaskModal}
+      {ideDaLisa}
+      {quadroDaLisa}
       {fullscreenOverlay}
+      {tomarNotaOverlay}
       {cameraVigiaMessageToast}
       {watchPreviews}
       {radioWidget}
       {/* Modo Interativo no desktop: sobreposição de tela cheia por cima do painel inteiro */}
       {interactiveMode && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 240, display: "flex", flexDirection: "column", background: "#000" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", flex: "none" }}>
-            <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: CY }}>🤖 MODO INTERATIVO</div>
-            <button
-              onClick={() => setInteractiveMode(false)}
-              title="Sair do Modo Interativo"
-              style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "6px 12px", borderRadius: 4, border: "1px solid rgba(var(--accent-rgb),0.3)", background: "transparent", color: "rgba(207,239,251,0.7)", cursor: "pointer" }}
-            >
-              ✕ SAIR
+        <div style={{ position: "fixed", inset: 0, zIndex: 240, display: "flex", flexDirection: "column", background: "var(--bb-fundo)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", flex: "none" }}>
+            <div style={{ fontSize: 14, color: "var(--bb-texto-2)" }}>Modo interativo</div>
+            <button type="button" className="bb-menu-botao" onClick={() => setInteractiveMode(false)} title="Sair do Modo Interativo">
+              Sair
             </button>
           </div>
           {interactiveScreen}
         </div>
       )}
-      {/* ESCOPO DO ASSISTENTE */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)", flexWrap: "wrap" }}>
-        <span style={{ ...mono, fontSize: 9, letterSpacing: 2, color: "rgba(var(--accent-rgb),0.5)" }}>ESCOPO</span>
-        <div style={{ display: "flex", gap: 4 }}>
-          {[{ key: "panel", label: "ESTE PAINEL" }, { key: "general", label: "GERAL" }].map((m) => (
-            <button
-              key={m.key}
-              onClick={() => setScopeMode(m.key)}
-              style={{
-                ...mono, fontSize: 9.5, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${scopeMode === m.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
-                background: scopeMode === m.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
-                color: scopeMode === m.key ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
+
+      <TopoExtra>
+        <Suspenso
+          titulo="Modos"
+          largura={340}
+          rotulo={
+            <>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2 5h7M12 5h2M2 11h2M7 11h7" /><circle cx="10.5" cy="5" r="1.6" /><circle cx="5.5" cy="11" r="1.6" /></svg>
+              <span className="bb-rotulo">Modos</span>
+              {modosLigados > 0 && <span className="bb-contador">{modosLigados}</span>}
+            </>
+          }
+        >
+          <GrupoDoMenu titulo="Percepção">
+{!usuario && (<>
+            <ChaveDoMenu
+              ligado={observanceMode}
+              onChange={() => setObservanceMode((v) => !v)}
+              detalhe="A câmera tira uma foto a cada pergunta"
+              title={observanceMode ? "Modo Observância ligado — a câmera tira 1 foto por pergunta, nada fica salvo" : "Ligar a câmera pra Lisa poder ver o que você mostra (postura, roupa, gestos) ao responder"}
             >
-              {m.label}
-            </button>
-          ))}
-        </div>
-        {scopeMode === "panel" ? (
-          <select
-            value={scopePanel}
-            onChange={(e) => setScopePanel(e.target.value)}
-            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
-          >
-            {panelOptions.map((b) => <option key={b} value={b}>{b}</option>)}
-            <option value={TASKS_SCOPE}>Tarefas (por prazo)</option>
-            <option value={THOUGHTS_SCOPE}>Pensamentos</option>
-            <option value={SENTINEL_SCOPE}>Chamados (Sentinela)</option>
-            <option value={DELP_SCOPE}>Tarefas Delp</option>
-            <option value={CODE_SCOPE}>Código</option>
-          </select>
-        ) : null}
+              Observância
+            </ChaveDoMenu>
+            {observanceError && <div className="bb-erro-do-menu">{observanceError}</div>}
 
-        {/* projeto do Sentinela — só aparece com o escopo "Chamados (Sentinela)" selecionado,
-            pra Lisa saber exatamente de qual projeto de teste está falando */}
-        {scopeMode === "panel" && scopePanel === SENTINEL_SCOPE && (
-          <select
-            value={sentinelProjectId}
-            onChange={(e) => setSentinelProjectId(e.target.value)}
-            title="Projeto de teste (Sentinela) — força a resposta a considerar só esse projeto"
-            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: `1px solid ${OR}55`, background: "#08131a", color: "#eafcff" }}
-          >
-            <option value="all">Todos os projetos</option>
-            {sentinelProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        )}
-
-        {/* repositório/arquivo — só aparecem com o escopo "Código" selecionado */}
-        {scopeMode === "panel" && scopePanel === CODE_SCOPE && (
-          <select
-            value={codeRepo}
-            onChange={(e) => setCodeRepo(e.target.value)}
-            title="Repositório — força a resposta a considerar só esse repo"
-            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
-          >
-            <option value="all">Todos os repositórios</option>
-            {codeRepos.map((r) => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
-          </select>
-        )}
-        {scopeMode === "panel" && scopePanel === CODE_SCOPE && codeRepo !== "all" && (
-          <select
-            value={codeFile}
-            onChange={(e) => setCodeFile(e.target.value)}
-            title="Arquivo específico — sem escolher nenhum, busca no repositório inteiro"
-            style={{ ...mono, fontSize: 9.5, padding: "6px 8px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff", maxWidth: 220 }}
-          >
-            <option value="">repositório inteiro</option>
-            {codeFiles.map((f) => <option key={f} value={f}>{f}</option>)}
-          </select>
-        )}
-
-        {scopeMode === "general" && (
-          <span style={{ ...mono, fontSize: 9, color: PU }}>vê todos os painéis · pode buscar na web quando precisar</span>
-        )}
-
-        {/* categorias de recursos — colapsadas por padrão (ver openSettingsCategory). Antes
-            disto era uma FILEIRA ÚNICA com todo botão sempre visível ao mesmo tempo — virou
-            confuso de bater o olho ("um monte de toggle"). Agora só o "chip" da categoria
-            fica sempre visível (com uma bolinha ● indicando se algo dentro está ligado);
-            clique abre os controles daquela categoria numa linha própria abaixo. */}
-        <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
-          {[
-            { key: "appearance", label: "🎭 PERSONA", active: personaMode || avatarView === "3d" },
-            { key: "code", label: "🛠️ CÓDIGO", active: codeMode },
-            { key: "sensing", label: "👁 OBSERVAÇÃO", active: observanceMode || screenMode || micWatchMode },
-            { key: "vigia", label: "🕵️ VIGIA", active: vigiaMode },
-            { key: "radio", label: "📻 RÁDIO", active: radioMode },
-          ].map((cat) => (
-            <button
-              key={cat.key}
-              onClick={() => setOpenSettingsCategory((v) => (v === cat.key ? null : cat.key))}
-              title={cat.active ? `${cat.label} — algo ligado aqui dentro` : cat.label}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${openSettingsCategory === cat.key ? CY : cat.active ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: openSettingsCategory === cat.key ? "rgba(var(--accent-rgb),0.14)" : "transparent",
-                color: cat.active ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
+</>)}
+            <ChaveDoMenu
+              ligado={screenMode}
+              onChange={() => setScreenMode((v) => !v)}
+              detalhe="O navegador pede para escolher o que compartilhar"
+              title={screenMode ? "Modo Tela ligado — clique pra desligar" : "Compartilhar a tela pra Lisa poder ver o que está acontecendo nela"}
             >
-              {cat.label} {cat.active ? "●" : ""} {openSettingsCategory === cat.key ? "▲" : "▼"}
-            </button>
-          ))}
-          {/* Este é um interruptor direto, não um acordeão como os de cima: o Modo Interativo
-              abre uma tela cheia própria, não tem controle nenhum pra mostrar numa gaveta. */}
-          <button
-            onClick={() => setInteractiveMode((v) => !v)}
-            title="Modo Interativo — tela limpa com a carinha da Lisa; mostre ✌️ pra chamar ela"
-            style={{
-              ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-              border: `1px solid ${interactiveMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-              background: interactiveMode ? "rgba(123,216,143,0.12)" : "transparent",
-              color: interactiveMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-              cursor: "pointer",
-            }}
-          >
-            🤖 INTERATIVO {interactiveMode ? "●" : ""}
-          </button>
-        </div>
-
-        {openSettingsCategory === "appearance" && (
-          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
-            {/* Modo Persona — liga a personalidade de persona.md por cima das respostas */}
-            <button
-              onClick={togglePersonaMode}
-              title={personaMode ? "Modo Persona ligado (persona.md) — clique pra desligar" : "Modo Persona desligado (tom direto de sempre) — clique pra ligar"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${personaMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-                background: personaMode ? "rgba(201,166,255,0.12)" : "transparent",
-                color: personaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              🎭 PERSONA {personaMode ? "ON" : "OFF"}
-            </button>
-
-            {/* Visão do avatar: visualizador de onda de sempre × corpo em modelo 3D — desktop-only */}
-            <div style={{ display: "flex", gap: 4 }}>
-              {[{ key: "traditional", label: "◈ VISÃO TRADICIONAL" }, { key: "3d", label: "🧑 VISÃO 3D" }].map((v) => (
-                <button
-                  key={v.key}
-                  onClick={() => chooseAvatarView(v.key)}
-                  title={v.key === "3d" ? "Corpo em modelo 3D no lugar do visualizador — arraste/belisque pra ajustar o enquadramento" : "Visualizador de onda tradicional"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${avatarView === v.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: avatarView === v.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
-                    color: avatarView === v.key ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
+              Tela
+            </ChaveDoMenu>
+            {screenMode && (
+              <div className="bb-sub-do-menu">
+                <ChaveDoMenu
+                  ligado={screenAutoComment}
+                  onChange={() => setScreenAutoComment((v) => !v)}
+                  detalhe="Só fala quando achar algo digno de nota"
+                  title={screenAutoComment ? "Vigiando sozinha — clique pra desligar" : "Deixar a Lisa de olho na tela sozinha, comentando só quando achar algo relevante"}
                 >
-                  {v.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Aparência do corpo 3D — só faz sentido com a Visão 3D ligada */}
-            {avatarView === "3d" && (
-              <div style={{ display: "flex", gap: 4 }}>
-                {[{ key: "cyborg", label: "◈ CYBORG" }, { key: "ironman", label: "🤖 IRON MAN" }].map((s) => (
-                  <button
-                    key={s.key}
-                    onClick={() => chooseAvatarSkin(s.key)}
-                    title={s.key === "ironman" ? "Corpo rigado (esqueleto de verdade) — gestos reais por modo, se os clipes já tiverem sido enviados" : "Corpo original (sem esqueleto, só balanço/respiração)"}
-                    style={{
-                      ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                      border: `1px solid ${avatarSkin === s.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
-                      background: avatarSkin === s.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
-                      color: avatarSkin === s.key ? "#eafcff" : "rgba(207,239,251,0.55)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {s.label}
-                  </button>
-                ))}
+                  Comentar sozinha
+                </ChaveDoMenu>
+                {screenAutoComment && (
+                  <div className="bb-campo-do-menu">
+                    <select className="bb-select" value={screenIntervalMs} onChange={(e) => chooseScreenInterval(Number(e.target.value))} title="De quanto em quanto tempo ela verifica a tela sozinha">
+                      {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+                    </select>
+                    <input
+                      className="bb-input"
+                      value={screenFocus}
+                      onChange={(e) => updateScreenFocus(e.target.value)}
+                      placeholder="O que priorizar (ex.: avise se o build quebrar)"
+                      title="O que ela deve priorizar notar na tela — em branco, ela decide sozinha"
+                    />
+                  </div>
+                )}
+{!usuario && (<>
+                <ChaveDoMenu
+                  ligado={transmissionMode}
+                  onChange={() => setTransmissionMode((v) => !v)}
+                  detalhe="Outro aparelho no Modo Vigia assiste ao vivo"
+                  cor={OR}
+                >
+                  Transmissão
+                </ChaveDoMenu>
+</>)}
               </div>
             )}
-          </div>
-        )}
+            {screenError && <div className="bb-erro-do-menu">{screenError}</div>}
 
-        {openSettingsCategory === "code" && (
-          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
-            {/* Modo Código — toda mensagem vira pedido de mudança de código (branch nova + PR) */}
-            <button
-              onClick={() => setCodeMode((v) => !v)}
-              title={codeMode ? "Modo Código ligado — toda mensagem vira pedido de mudança. Clique pra desligar" : "Ligar Modo Código — a Lisa passa a propor mudança de código (branch + PR) em vez de conversar"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${codeMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-                background: codeMode ? "rgba(201,166,255,0.12)" : "transparent",
-                color: codeMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
+{!usuario && (<>
+            <ChaveDoMenu
+              ligado={micWatchMode && (screenMode || observanceMode)}
+              onChange={() => setMicWatchMode((v) => !v)}
+              disabled={!screenMode && !observanceMode}
+              detalhe={!screenMode && !observanceMode ? "Ligue a Tela ou a Observância primeiro" : "Microfone aberto, ouvindo o ambiente"}
             >
-              🛠️ CÓDIGO {codeMode ? "ON" : "OFF"}
-            </button>
-            {codeMode && (
-              <>
-                <select
-                  value={codeModeRepo}
-                  onChange={(e) => setCodeModeRepo(e.target.value)}
-                  style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
+              Escuta
+            </ChaveDoMenu>
+            {micWatchError && <div className="bb-erro-do-menu">{micWatchError}</div>}
+
+            <ChaveDoMenu
+              ligado={cameraVigiaMode}
+              onChange={() => setCameraVigiaMode((v) => !v)}
+              detalhe="Filma com câmera e áudio para outro aparelho assistir"
+            >
+              Câmera de vigia
+            </ChaveDoMenu>
+            {cameraVigiaMode && (
+              <div className="bb-sub-do-menu">
+                <ItemDoMenu fecharAoClicar={false} onClick={() => setCameraFacing((f) => (f === "user" ? "environment" : "user"))} detalhe="Para celular">
+                  Câmera {cameraFacing === "user" ? "frontal" : "traseira"} · trocar
+                </ItemDoMenu>
+              </div>
+            )}
+            {cameraVigiaError && <div className="bb-erro-do-menu">{cameraVigiaError}</div>}
+</>)}
+          </GrupoDoMenu>
+
+{!usuario && (<>
+          <GrupoDoMenu titulo="Vigia">
+            <ChaveDoMenu
+              ligado={vigiaMode}
+              onChange={() => setVigiaMode((v) => !v)}
+              detalhe="Pergunte sobre o que a Lisa vem vendo na tela"
+              cor={OR}
+            >
+              Vigia
+            </ChaveDoMenu>
+            {vigiaMode && (
+              <div className="bb-sub-do-menu">
+                <ChaveDoMenu ligado={vigiaAutoOn} onChange={() => setVigiaAutoOn((v) => !v)} detalhe="Conta sozinha o que há de novo">
+                  Narrar sozinha
+                </ChaveDoMenu>
+                {vigiaAutoOn && (
+                  <div className="bb-campo-do-menu">
+                    <select className="bb-select" value={vigiaAutoIntervalMs} onChange={(e) => chooseVigiaAutoInterval(Number(e.target.value))} title="De quanto em quanto tempo ela verifica se há algo novo">
+                      {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+                    </select>
+                  </div>
+                )}
+                <ChaveDoMenu
+                  ligado={vigiaWatching}
+                  onChange={() => setVigiaWatching((v) => !v)}
+                  detalhe={vigiaWatching ? (vigiaWatchStatus === "connected" ? "Ao vivo — veja o canto da tela" : vigiaWatchStatus === "procurando" ? "Procurando…" : vigiaWatchStatus || "Conectando…") : "A tela de outro aparelho, ao vivo"}
                 >
-                  <option value="">repositório…</option>
+                  Assistir tela
+                </ChaveDoMenu>
+                <ChaveDoMenu
+                  ligado={cameraWatching}
+                  onChange={() => setCameraWatching((v) => !v)}
+                  detalhe={cameraWatching ? (cameraWatchStatus === "connected" ? "Ao vivo — veja o canto da tela" : cameraWatchStatus === "procurando" ? "Procurando…" : cameraWatchStatus || "Conectando…") : "A câmera de vigia de outro aparelho"}
+                >
+                  Assistir câmera
+                </ChaveDoMenu>
+                {cameraWatching && (
+                  <div className="bb-campo-do-menu bb-campo-do-menu--linha">
+                    <input
+                      className="bb-input"
+                      value={cameraChatText}
+                      onChange={(e) => setCameraChatText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") sendCameraChat(); }}
+                      placeholder="Mensagem para a Lisa ler lá"
+                      title="A Lisa lê essa mensagem em voz alta na tela de quem está com a Câmera de Vigia ligada"
+                    />
+                    <button type="button" className="bb-botao-pequeno" onClick={sendCameraChat}>Enviar</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </GrupoDoMenu>
+
+</>)}
+          <GrupoDoMenu titulo="Voz e rádio">
+            <ChaveDoMenu
+              ligado={conversaAberta}
+              onChange={() => { unlockAudioPlayback(); acordarAudio(); setConversaAberta((v) => !v); }}
+              detalhe={conversaAberta
+                ? (conversaEstado === "respondendo" ? (isMobile ? "Respondendo… a escuta volta quando ela terminar de falar" : "Respondendo… diga \"Lisa\" para interromper") : "Pode falar — ela continua o assunto")
+                : "Microfone aberto: fale quando quiser, ela responde continuando a conversa"}
+              cor="#3fe0c5"
+            >
+              Conversa livre
+            </ChaveDoMenu>
+{!usuario && (<>
+            <ChaveDoMenu
+              ligado={radioMode}
+              onChange={() => { unlockAudioPlayback(); acordarAudio(); setRadioMode((v) => !v); }}
+              detalhe={radioMode ? "O player fica no canto inferior esquerdo" : "A Lisa vira apresentadora, com a sua playlist"}
+            >
+              Rádio
+            </ChaveDoMenu>
+</>)}
+            <ChaveDoMenu
+              ligado={escutaPalavra}
+              onChange={() => { unlockAudioPlayback(); acordarAudio(); setEscutaPalavra((v) => !v); }}
+              detalhe={escutaPalavra ? (escutaEstado === "acordada" ? "Ouvindo o comando…" : escutaEstado === "ocupada" ? "Respondendo…" : "Diga \"Lisa\" e o comando") : "Microfone aberto, reage quando você diz \"Lisa\""}
+            >
+              Palavra &quot;Lisa&quot;
+            </ChaveDoMenu>
+          </GrupoDoMenu>
+
+          <GrupoDoMenu titulo="Trabalho">
+{!usuario && (<>
+            <ChaveDoMenu
+              ligado={codeMode}
+              onChange={() => setCodeMode((v) => !v)}
+              detalhe="Toda mensagem vira pedido de mudança (branch + PR)"
+              cor={PU}
+            >
+              Modo código
+            </ChaveDoMenu>
+            {codeMode && (
+              <div className="bb-campo-do-menu">
+                <select className="bb-select" value={codeModeRepo} onChange={(e) => setCodeModeRepo(e.target.value)}>
+                  <option value="">Repositório…</option>
                   {codeModeRepos.map((r) => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
                 </select>
                 {codeModeRepo && (
-                  <select
-                    value={codeModeBranch}
-                    onChange={(e) => setCodeModeBranch(e.target.value)}
-                    style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff" }}
-                  >
-                    <option value="">branch base…</option>
+                  <select className="bb-select" value={codeModeBranch} onChange={(e) => setCodeModeBranch(e.target.value)}>
+                    <option value="">Branch base…</option>
                     {codeModeBranches.map((b) => <option key={b} value={b}>{b}</option>)}
                   </select>
                 )}
                 {codeModeRepo && codeModeAvailableFiles.length > 0 && (
-                  <select
-                    multiple
-                    value={codeModeFiles}
-                    onChange={(e) => setCodeModeFiles(Array.from(e.target.selectedOptions).map((o) => o.value).slice(0, CODE_MODE_MAX_FILES))}
-                    title={`arquivos fixos (até ${CODE_MODE_MAX_FILES}, ctrl/cmd+clique pra marcar mais de um) — garantidos no contexto de toda pergunta enquanto o Modo Código estiver ligado`}
-                    style={{ ...mono, fontSize: 9, padding: "4px", borderRadius: 3, border: `1px solid ${PU}55`, background: "#08131a", color: "#eafcff", width: 160, height: 60 }}
-                  >
-                    {codeModeAvailableFiles.map((f) => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {openSettingsCategory === "sensing" && (
-          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
-            {/* Modo Observância — liga a câmera, tira 1 foto no instante de cada pergunta e manda
-                junto pro Gemini (multimodal); nunca fica ligado sozinho entre recarregamentos. */}
-            <button
-              onClick={() => setObservanceMode((v) => !v)}
-              title={observanceMode ? "Modo Observância ligado — a câmera tira 1 foto por pergunta, nada fica salvo. Clique pra desligar" : "Ligar a câmera pra Lisa poder ver o que você mostra (postura, roupa, gestos) ao responder"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${observanceMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: observanceMode ? "rgba(123,216,143,0.12)" : "transparent",
-                color: observanceMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              👁 OBSERVÂNCIA {observanceMode ? "ON" : "OFF"}
-            </button>
-            {observanceMode && (
-              <video ref={observanceVideoRef} autoPlay playsInline muted title="o que a câmera vê agora — só uma foto disso é enviada, no instante de cada pergunta" style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
-            )}
-            {observanceError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {observanceError}</span>}
-
-            {/* Modo Tela — desktop-only ("enquanto mexo no PC"). Reativo (cada pergunta manda um
-                retrato da tela) + proativo opcional (vigia sozinha e só fala se achar algo digno de
-                nota, ver o useEffect de screenAutoComment acima). O navegador SEMPRE pede permissão
-                nativa pra escolher tela/janela/aba — isso não dá pra pular. */}
-            <button
-              onClick={() => setScreenMode((v) => !v)}
-              title={screenMode ? "Modo Tela ligado — o navegador pede pra você escolher o que compartilhar. Clique pra desligar" : "Compartilhar a tela pra Lisa poder ver o que está acontecendo nela"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${screenMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: screenMode ? "rgba(123,216,143,0.12)" : "transparent",
-                color: screenMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              🖵 TELA {screenMode ? "ON" : "OFF"}
-            </button>
-            {screenMode && (
-              <>
-                <video ref={screenVideoRef} autoPlay playsInline muted title="o que está sendo compartilhado — só um retrato disso é enviado por vez" style={{ width: 72, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }} />
-                <button
-                  onClick={() => setScreenAutoComment((v) => !v)}
-                  title={screenAutoComment ? "Vigiando sozinha — só fala se achar algo digno de nota. Clique pra desligar" : "Deixar a Lisa de olho na tela sozinha, comentando só quando achar algo relevante (sem você perguntar)"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${screenAutoComment ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: screenAutoComment ? "rgba(201,166,255,0.12)" : "transparent",
-                    color: screenAutoComment ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
-                >
-                  💬 AUTO {screenAutoComment ? "ON" : "OFF"}
-                </button>
-                {screenAutoComment && (
                   <>
+                    <label>Arquivos fixos (até {CODE_MODE_MAX_FILES}; Ctrl+clique marca mais de um)</label>
                     <select
-                      value={screenIntervalMs}
-                      onChange={(e) => chooseScreenInterval(Number(e.target.value))}
-                      title="De quanto em quanto tempo ela verifica a tela sozinha"
-                      style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
+                      className="bb-select"
+                      multiple
+                      value={codeModeFiles}
+                      onChange={(e) => setCodeModeFiles(Array.from(e.target.selectedOptions).map((o) => o.value).slice(0, CODE_MODE_MAX_FILES))}
+                      style={{ height: 96 }}
                     >
-                      {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
+                      {codeModeAvailableFiles.map((f) => <option key={f} value={f}>{f}</option>)}
                     </select>
-                    <input
-                      value={screenFocus}
-                      onChange={(e) => updateScreenFocus(e.target.value)}
-                      placeholder="direcionamento (ex.: avise se o build quebrar)"
-                      title="O que ela deve priorizar notar na tela — fica em branco pra ela decidir sozinha o que é relevante"
-                      style={{ ...mono, fontSize: 9, padding: "5px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff", width: 220 }}
-                    />
                   </>
                 )}
-                <button
-                  onClick={() => setTransmissionMode((v) => !v)}
-                  title={transmissionMode ? "Transmissão ligada — outro dispositivo com o Modo Vigia pode assistir sua tela AO VIVO agora. Clique pra desligar" : "Deixar outro dispositivo (ex.: seu celular, com o Modo Vigia) assistir esta tela AO VIVO"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${transmissionMode ? OR : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: transmissionMode ? "rgba(217,89,38,0.12)" : "transparent",
-                    color: transmissionMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
-                >
-                  📡 TRANSMISSÃO {transmissionMode ? "ON" : "OFF"}
-                </button>
+              </div>
+            )}
+            <ChaveDoMenu ligado={personaMode} onChange={() => togglePersonaMode()} detalhe="Personalidade do persona.md por cima das respostas" cor={PU}>
+              Persona
+            </ChaveDoMenu>
+            <ItemDoMenu onClick={() => setInteractiveMode((v) => !v)} detalhe="Rosto da Lisa e jogos; mostre ✌️ para chamar">
+              Modo interativo
+            </ItemDoMenu>
+</>)}
+            <ItemDoMenu onClick={() => setTomarNota((v) => v || { tema: "" })} detalhe="Escuta até 10 min e anota por assunto no Abacato">
+              Tomar nota
+            </ItemDoMenu>
+          </GrupoDoMenu>
+        </Suspenso>
+
+        <Suspenso
+          titulo="Ajustes do Assistente"
+          largura={310}
+          rotulo={<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2.2" /><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" /></svg>}
+        >
+          <GrupoDoMenu titulo="Aparência da Lisa">
+            {!usuario && (
+              <SegmentosDoMenu
+                rotulo="Aparência"
+                valor={avatarView}
+                onChange={chooseAvatarView}
+                opcoes={[
+                  { valor: "esfera", rotulo: "Visual", titulo: "Um visual que reage à voz (Esfera de pontos, Lente, Orbe, Plasma, Anel ou Rosto)" },
+                  { valor: "traditional", rotulo: "Ondas", titulo: "Visualizador de onda tradicional" },
+                  { valor: "3d", rotulo: "Avatar 3D", titulo: "Corpo em modelo 3D — arraste/belisque pra ajustar o enquadramento" },
+                ]}
+              />
+            )}
+            {avatarView === "esfera" && (
+              <div className="bb-campo-do-menu">
+                <select className="bb-select" value={visualDaLisa} onChange={(e) => escolherVisual(e.target.value)} title="O visual que fica no centro e reage à voz">
+                  {(usuario ? visuaisDoUsuario() : VISUAIS).map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+                </select>
+              </div>
+            )}
+            {avatarView === "esfera" && visualDaLisa === "rosto" && (
+              <>
+                <div className="bb-campo-do-menu">
+                  <select className="bb-select" value={ajustesDoRosto.cabelo} onChange={(e) => escolherAjustesDoRosto({ cabelo: e.target.value })} title="O cabelo do Rosto">
+                    {CABELOS_DO_ROSTO.map((c) => <option key={c.id} value={c.id}>Cabelo {c.nome.toLowerCase()}</option>)}
+                  </select>
+                </div>
+                <div className="bb-campo-do-menu">
+                  <select className="bb-select" value={ajustesDoRosto.paleta} onChange={(e) => escolherAjustesDoRosto({ paleta: e.target.value })} title="As cores do Rosto">
+                    {PALETAS_DO_ROSTO.map((p) => <option key={p.id} value={p.id}>Cores: {p.nome}</option>)}
+                  </select>
+                </div>
               </>
             )}
-            {screenError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {screenError}</span>}
-
-            {/* Modo Escuta — precisa do Modo Tela ou da Observância ligado (não roda sozinho, ver
-                useEffect de micWatchMode acima). Microfone REALMENTE aberto, diferente do
-                "segure pra falar" de sempre. */}
-            <button
-              onClick={() => setMicWatchMode((v) => !v)}
-              disabled={!screenMode && !observanceMode}
-              title={
-                !screenMode && !observanceMode
-                  ? "ligue o Modo Tela ou a Observância primeiro"
-                  : (micWatchMode ? "Modo Escuta ligado — microfone aberto de verdade, grava pedacinhos curtos e descarta. Clique pra desligar" : "Deixar o microfone aberto pra Lisa ir ouvindo (ex.: comentar se você estiver cantando)")
-              }
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${micWatchMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: micWatchMode ? "rgba(123,216,143,0.12)" : "transparent",
-                color: (!screenMode && !observanceMode) ? "rgba(207,239,251,0.3)" : (micWatchMode ? "#eafcff" : "rgba(207,239,251,0.55)"),
-                cursor: (!screenMode && !observanceMode) ? "not-allowed" : "pointer",
-              }}
+            {avatarView === "esfera" && !usuario && (
+              <LinkDoMenu href="/visual" detalhe="Prévia ao vivo de cada visual, falando, ouvindo e pensando">
+                Ver os visuais da Lisa
+              </LinkDoMenu>
+            )}
+            {avatarView === "3d" && (
+              <SegmentosDoMenu
+                rotulo="Corpo 3D"
+                valor={avatarSkin}
+                onChange={chooseAvatarSkin}
+                opcoes={[
+                  { valor: "cyborg", rotulo: "Cyborg", titulo: "Corpo original (sem esqueleto, só balanço/respiração)" },
+                  { valor: "ironman", rotulo: "Iron Man", titulo: "Corpo rigado — gestos reais por modo" },
+                ]}
+              />
+            )}
+          </GrupoDoMenu>
+          <GrupoDoMenu titulo="Voz">
+            <ChaveDoMenu ligado={voiceOn} onChange={() => { if (voiceOn) stopSpeaking(); setVoiceOn((v) => !v); }} detalhe="A Lisa fala as respostas em voz alta">
+              Falar as respostas
+            </ChaveDoMenu>
+            <ChaveDoMenu
+              ligado={geminiVoiceEnabled}
+              onChange={() => setGeminiVoiceEnabled((v) => {
+                const next = !v;
+                if (next) geminiDownUntilRef.current = 0; // reativou na mão → tenta de novo já na próxima, não espera o disjuntor
+                return next;
+              })}
+              detalhe={estadoGeminiVoz}
+              cor={geminiVoiceStatus === false ? OR : undefined}
             >
-              🎙️ ESCUTA {micWatchMode && (screenMode || observanceMode) ? "ON" : "OFF"}
-            </button>
-            {micWatchError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {micWatchError}</span>}
+              Voz do Gemini
+            </ChaveDoMenu>
+            {geminiVoiceEnabled && (
+              <div className="bb-campo-do-menu">
+                <select
+                  className="bb-select"
+                  value={voiceName}
+                  onChange={(e) => {
+                    setVoiceName(e.target.value);
+                    if (typeof window !== "undefined") localStorage.setItem("voiceName", e.target.value);
+                  }}
+                  title="Voz do Gemini (a Google não documenta gênero — teste e escolha a que preferir)"
+                >
+                  {TTS_VOICES.map((v) => <option key={v.name} value={v.name}>{v.name} · {v.trait}</option>)}
+                </select>
+              </div>
+            )}
+          </GrupoDoMenu>
+        </Suspenso>
+      </TopoExtra>
 
-            {/* Câmera de Vigia — como o Modo Tela, só que filma com a câmera (áudio junto) em
-                vez da tela. Funciona em celular também. Quem assiste no Modo Vigia pode mandar
-                mensagens que a Lisa lê em voz alta e mostra aqui — tipo um interfone. */}
-            <button
-              onClick={() => setCameraVigiaMode((v) => !v)}
-              title={cameraVigiaMode ? "Câmera de Vigia ligada (com áudio) — outro dispositivo com o Modo Vigia pode assistir. Clique pra desligar" : "Filmar com a câmera (e microfone) pra outro dispositivo assistir ao vivo, tipo uma babá eletrônica"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${cameraVigiaMode ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: cameraVigiaMode ? "rgba(123,216,143,0.12)" : "transparent",
-                color: cameraVigiaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              📷 CÂMERA {cameraVigiaMode ? "ON" : "OFF"}
-            </button>
+      <main className="bb-palco">
+        {/* a cena (01/11/2026): a Lisa mais perto e, com a resposta, a janela holográfica e os
+            hologramas em profundidade — src/components/panels/hud/ */}
+        <CenaDaLisa ativa={janelaNaTela} obterSinal={obterSinalDaEsfera} janela={janelaDaResposta}
+          dados={{ estado: estadoDaJanela, voz: voiceName, palavras: palavrasDaResposta, fontes: fontes.length }}>
+          {avatarView === "3d" ? (
+            <div style={{ position: "relative", width: "min(70vh,680px)", height: "min(70vh,680px)" }}>
+              {avatarSkin === "ironman" ? <LisaAvatarIronMan mode={mode} /> : <LisaAvatar3D mode={mode} />}
+              {avatarSkin !== "ironman" && (
+                <a
+                  href="https://sketchfab.com/3d-models/android-cyborg-anime-girl-5fda47ea8ca048f7939f78da94aea54f"
+                  target="_blank" rel="noreferrer"
+                  className="bb-credito"
+                >
+                  modelo: &quot;Android Cyborg Anime Girl&quot; por lawlietrecluze · CC-BY-4.0
+                </a>
+              )}
+            </div>
+          ) : avatarView === "traditional" ? (
+            <div style={{ position: "relative", width: "min(52vh,520px)", height: "min(52vh,520px)" }}>
+              <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+            </div>
+          ) : (
+            <VisualDaLisa modo={visualDaLisa} obterSinal={obterSinalDaEsfera} zoom={1.2} brincadeiras />
+          )}
+        </CenaDaLisa>
+
+        <RotuloDaVoz obterSinal={obterSinalDaEsfera} />
+
+        {autoListening && <div className="bb-pode-falar">Pode falar</div>}
+        {conversaAberta && !autoListening && (
+          <button type="button" className="bb-conversa-aberta" onClick={() => setConversaAberta(false)} title="Encerrar a conversa livre">
+            <i />{conversaEstado === "respondendo" ? "Respondendo · diga \"Lisa\" para interromper" : "Conversa aberta · pode falar"}<span>encerrar</span>
+          </button>
+        )}
+
+        {!janelaNaTela && !answer && (
+          <section className="bb-conversa" aria-live="polite">
+            <p className="bb-conversa-resposta bb-conversa-resposta--vazia">Pergunte alguma coisa, por texto ou pelo microfone.</p>
+          </section>
+        )}
+
+        {/* prévias do que a câmera e a tela estão vendo — sempre montadas enquanto o modo estiver
+            ligado: a captura de cada pergunta lê destes mesmos <video> */}
+        {(observanceMode || screenMode || cameraVigiaMode) && (
+          <div className="bb-previas">
+            {observanceMode && (
+              <figure>
+                <video ref={observanceVideoRef} autoPlay playsInline muted title="o que a câmera vê agora — só uma foto disso é enviada, no instante de cada pergunta" />
+                <figcaption>Câmera</figcaption>
+              </figure>
+            )}
+            {screenMode && (
+              <figure>
+                <video ref={screenVideoRef} autoPlay playsInline muted title="o que está sendo compartilhado — só um retrato disso é enviado por vez" />
+                <figcaption>Tela{transmissionMode ? " · ao vivo" : ""}</figcaption>
+              </figure>
+            )}
             {cameraVigiaMode && (
-              <>
+              <figure>
                 <video
                   ref={cameraVigiaVideoRef} autoPlay playsInline muted
                   onLoadedMetadata={(e) => addLog("[CÂMERA]", GR, `preview carregado: ${e.target.videoWidth}x${e.target.videoHeight}`)}
                   onError={() => addLog("[CÂMERA]", OR, "preview: erro ao decodificar o vídeo")}
                   title="o que a câmera de vigia está vendo"
-                  style={{ width: 54, height: 40, borderRadius: 4, objectFit: "cover", border: `1px solid ${GR}55` }}
                 />
-                <button
-                  onClick={() => setCameraFacing((f) => (f === "user" ? "environment" : "user"))}
-                  title="Trocar entre câmera frontal e traseira (celular)"
-                  style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "transparent", color: "rgba(207,239,251,0.7)", cursor: "pointer" }}
-                >
-                  🔄 {cameraFacing === "user" ? "frontal" : "traseira"}
-                </button>
-              </>
-            )}
-            {cameraVigiaError && <span style={{ ...mono, fontSize: 8.5, color: OR }}>⚠ {cameraVigiaError}</span>}
-          </div>
-        )}
-
-        {openSettingsCategory === "vigia" && (
-          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
-            {/* Modo Vigia — pergunta (ou narra sozinha) sobre o HISTÓRICO de observações do Modo
-                Tela. NÃO depende de screenMode neste aparelho — funciona de qualquer
-                dispositivo, inclusive celular, contanto que outro aparelho esteja alimentando
-                a memória (Modo Tela ligado lá) e/ou transmitindo ao vivo (Transmissão lá). */}
-            <button
-              onClick={() => setVigiaMode((v) => !v)}
-              title={vigiaMode ? "Modo Vigia ligado — toda pergunta busca no histórico de observações da tela. Clique pra desligar" : "Perguntar sobre o que a Lisa vem observando na tela, de qualquer dispositivo"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${vigiaMode ? OR : "rgba(var(--accent-rgb),0.18)"}`,
-                background: vigiaMode ? "rgba(217,89,38,0.12)" : "transparent",
-                color: vigiaMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              👁️ VIGIA {vigiaMode ? "ON" : "OFF"}
-            </button>
-            {vigiaMode && (
-              <>
-                <button
-                  onClick={() => setVigiaAutoOn((v) => !v)}
-                  title={vigiaAutoOn ? "Narrando sozinha o que há de novo — clique pra desligar" : "Deixar a Lisa te contar sozinha, de tempos em tempos, o que há de novo na tela (não precisa perguntar)"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${vigiaAutoOn ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: vigiaAutoOn ? "rgba(201,166,255,0.12)" : "transparent",
-                    color: vigiaAutoOn ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
-                >
-                  💬 AUTO {vigiaAutoOn ? "ON" : "OFF"}
-                </button>
-                {vigiaAutoOn && (
-                  <select
-                    value={vigiaAutoIntervalMs}
-                    onChange={(e) => chooseVigiaAutoInterval(Number(e.target.value))}
-                    title="De quanto em quanto tempo ela verifica se há algo novo pra te contar"
-                    style={{ ...mono, fontSize: 9, padding: "5px 6px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff" }}
-                  >
-                    {SCREEN_INTERVAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>a cada {o.label}</option>)}
-                  </select>
-                )}
-                <button
-                  onClick={() => setVigiaWatching((v) => !v)}
-                  title={vigiaWatching ? "Assistindo ao vivo — clique pra parar" : "Ver AO VIVO a tela de outro dispositivo com Modo Tela + Transmissão ligados"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${vigiaWatching ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: vigiaWatching ? "rgba(123,216,143,0.12)" : "transparent",
-                    color: vigiaWatching ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
-                >
-                  📺 ASSISTIR {vigiaWatching ? "ON" : "OFF"}
-                </button>
-                {vigiaWatching && (
-                  <span style={{ ...mono, fontSize: 8.5, color: vigiaWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
-                    {vigiaWatchStatus === "connected" ? "● ao vivo — veja o canto da tela" : vigiaWatchStatus === "procurando" ? "procurando…" : vigiaWatchStatus || "conectando…"}
-                  </span>
-                )}
-                <button
-                  onClick={() => setCameraWatching((v) => !v)}
-                  title={cameraWatching ? "Assistindo a câmera ao vivo — clique pra parar" : "Ver AO VIVO a câmera de outro dispositivo com Câmera de Vigia ligada"}
-                  style={{
-                    ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                    border: `1px solid ${cameraWatching ? GR : "rgba(var(--accent-rgb),0.18)"}`,
-                    background: cameraWatching ? "rgba(123,216,143,0.12)" : "transparent",
-                    color: cameraWatching ? "#eafcff" : "rgba(207,239,251,0.55)",
-                    cursor: "pointer",
-                  }}
-                >
-                  📷 ASSISTIR CÂMERA {cameraWatching ? "ON" : "OFF"}
-                </button>
-                {cameraWatching && (
-                  <>
-                    <span style={{ ...mono, fontSize: 8.5, color: cameraWatchStatus === "connected" ? GR : "rgba(207,239,251,0.45)" }}>
-                      {cameraWatchStatus === "connected" ? "● ao vivo — veja o canto da tela" : cameraWatchStatus === "procurando" ? "procurando…" : cameraWatchStatus || "conectando…"}
-                    </span>
-                    <input
-                      value={cameraChatText}
-                      onChange={(e) => setCameraChatText(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") sendCameraChat(); }}
-                      placeholder="mensagem pra Lisa ler lá"
-                      title="A Lisa lê essa mensagem em voz alta e mostra na tela de quem está com a Câmera de Vigia ligada"
-                      style={{ ...mono, fontSize: 9, padding: "5px 8px", borderRadius: 3, border: "1px solid rgba(var(--accent-rgb),0.18)", background: "#08131a", color: "#eafcff", width: 180 }}
-                    />
-                    <button
-                      onClick={sendCameraChat}
-                      style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3, border: `1px solid ${GR}`, background: "rgba(123,216,143,0.12)", color: "#eafcff", cursor: "pointer" }}
-                    >
-                      ENVIAR
-                    </button>
-                  </>
-                )}
-              </>
+                <figcaption>Vigia</figcaption>
+              </figure>
             )}
           </div>
         )}
 
-        {openSettingsCategory === "radio" && (
-          <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 0 0" }}>
-            {/* Modo Rádio — a Lisa incorpora uma apresentadora de rádio, alternando locução
-                (novidades reais) com música de verdade da playlist (radio/playlist.txt). Ver o
-                useEffect de radioMode acima e o widget flutuante (radioWidget). */}
-            <button
-              onClick={() => { unlockAudioPlayback(); setRadioMode((v) => !v); }}
-              title={radioMode ? "Modo Rádio ligado — veja o player no canto da tela. Clique pra desligar" : "Ligar o Modo Rádio: a Lisa vira apresentadora, intercalando novidades reais com música da sua playlist"}
-              style={{
-                ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3,
-                border: `1px solid ${radioMode ? PU : "rgba(var(--accent-rgb),0.18)"}`,
-                background: radioMode ? "rgba(201,166,255,0.12)" : "transparent",
-                color: radioMode ? "#eafcff" : "rgba(207,239,251,0.55)",
-                cursor: "pointer",
-              }}
-            >
-              📻 RÁDIO {radioMode ? "ON" : "OFF"}
-            </button>
-            {radioMode && (
-              <span style={{ ...mono, fontSize: 8.5, color: "rgba(207,239,251,0.6)" }}>veja o player no canto inferior esquerdo</span>
-            )}
-          </div>
-        )}
+        <button type="button" className="bb-aba-lateral bb-aba-lateral--esq" aria-expanded={gaveta === "registro"} onClick={() => setGaveta((g) => (g === "registro" ? null : "registro"))}>
+          Registro
+        </button>
+        <button type="button" className="bb-aba-lateral bb-aba-lateral--dir" aria-expanded={gaveta === "contexto"} onClick={() => setGaveta((g) => (g === "contexto" ? null : "contexto"))}>
+          Contexto{cards.length ? ` · ${cards.length}` : ""}
+        </button>
 
-        {/* pisca bem visível só durante a janela de resposta automática (ver openReplyWindow)
-            — sinal claro de "agora é sua vez", além do bipe sonoro que toca junto. Fica fora
-            das categorias colapsáveis de propósito — é um aviso urgente, não uma configuração,
-            então precisa aparecer mesmo com tudo fechado. */}
-        {autoListening && (
-          <span style={{ ...mono, fontSize: 9, letterSpacing: 1, padding: "5px 10px", borderRadius: 3, border: `1px solid ${GR}`, background: "rgba(123,216,143,0.18)", color: "#eafcff", animation: "bb-dot 0.9s ease-in-out infinite" }}>
-            🎙️ PODE FALAR
-          </span>
-        )}
-      </div>
-
-      {/* abas — só aparecem no mobile (ver .bb-assistant-tabs em globals.css). No mobile o
-          chat abre direto (sem a coluna de contexto — ela some de vez, nem vira aba) */}
-      <div className="bb-assistant-tabs" style={{ gap: 4, padding: "8px 26px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)" }}>
-        {[{ key: "visualizer", label: "CHAT" }, { key: "logs", label: "LOGS" }].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setMobileTab(t.key)}
-            style={{
-              ...mono, fontSize: 9.5, letterSpacing: 1, padding: "6px 12px", borderRadius: 3,
-              border: `1px solid ${mobileTab === t.key ? CY : "rgba(var(--accent-rgb),0.18)"}`,
-              background: mobileTab === t.key ? "rgba(var(--accent-rgb),0.1)" : "transparent",
-              color: mobileTab === t.key ? "#eafcff" : "rgba(207,239,251,0.55)",
-              cursor: "pointer",
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* MAIN GRID */}
-      <main className="bb-assistant-grid" style={{ position: "relative", flex: 1, display: "grid", gridTemplateColumns: "minmax(220px,320px) minmax(0,1fr) minmax(280px,360px)", minHeight: 0 }}>
-        {/* LEFT: LOGS */}
-        <aside className={`bb-assistant-pane${mobileTab === "logs" ? " bb-active" : ""}`} style={{ borderRight: "1px solid rgba(var(--accent-rgb),0.12)", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(90deg, rgba(6,18,24,0.35), transparent)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)" }}>
-            <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ SYSTEM_LOGS</div>
-            <div style={{ ...mono, fontSize: 9, color: "rgba(255,157,61,0.85)", animation: "bb-flicker 2s infinite" }}>● LIVE</div>
-          </div>
-          <div style={{ flex: 1, overflow: "hidden", padding: "12px 14px", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 7 }}>
-            {logs.map((log) => (
-              <div key={log.id} style={{ ...mono, fontSize: 10.5, lineHeight: 1.45, animation: "bb-slidein .35s ease" }}>
-                <span style={{ color: "rgba(255,255,255,0.32)" }}>{log.t}</span>
-                <span style={{ color: log.color, margin: "0 5px" }}>{log.tag}</span>
-                <span style={{ color: "#a9cede" }}>{log.msg}</span>
-              </div>
-            ))}
-            <div style={{ ...mono, fontSize: 10.5, color: CY }}>&gt;<span style={{ display: "inline-block", width: 7, height: 13, background: CY, marginLeft: 4, verticalAlign: "middle", animation: "bb-blink 1s step-end infinite" }} /></div>
-          </div>
-        </aside>
-
-        {/* CENTER: VISUALIZER */}
-        <section className={`bb-assistant-pane${mobileTab === "visualizer" ? " bb-active" : ""}`} style={{ position: "relative", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, minWidth: 0 }}>
-          {avatarView === "3d" ? (
-            <div style={{ position: "relative", width: "min(70vh,680px)", height: "min(70vh,680px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {avatarSkin === "ironman" ? <LisaAvatarIronMan mode={mode} /> : <LisaAvatar3D mode={mode} />}
-              <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, textAlign: "center", pointerEvents: "none" }}>
-                <div style={{ ...mono, fontSize: 10, letterSpacing: 4, color: meta.color }}>{meta.label}</div>
-              </div>
-              {avatarSkin !== "ironman" && (
-                <a
-                  href="https://sketchfab.com/3d-models/android-cyborg-anime-girl-5fda47ea8ca048f7939f78da94aea54f"
-                  target="_blank" rel="noreferrer"
-                  style={{ position: "absolute", bottom: -18, right: 0, ...mono, fontSize: 7.5, letterSpacing: 0.5, color: "rgba(207,239,251,0.3)", textDecoration: "none" }}
-                >
-                  modelo: "Android Cyborg Anime Girl" por lawlietrecluze · CC-BY-4.0
-                </a>
-              )}
-            </div>
-          ) : (
-            <div style={{ position: "relative", width: "min(52vh,520px)", height: "min(52vh,520px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ position: "absolute", inset: "-6%", border: "1px solid rgba(var(--accent-rgb),0.12)", borderRadius: "50%", borderTopColor: "rgba(var(--accent-rgb),0.45)", borderRightColor: "rgba(var(--accent-rgb),0.28)", animation: "bb-sweep 14s linear infinite" }} />
-              <div style={{ position: "absolute", inset: "4%", border: "1px dashed rgba(255,157,61,0.18)", borderRadius: "50%", animation: "bb-sweep 22s linear infinite reverse" }} />
-              <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
-              <div style={{ position: "relative", textAlign: "center", pointerEvents: "none" }}>
-                <div style={{ ...mono, fontSize: 11, letterSpacing: 5, color: meta.color }}>{meta.label}</div>
-                <div style={{ fontSize: 13, letterSpacing: 2, color: "rgba(207,239,251,0.55)", marginTop: 6, ...mono }}>{meta.sub}</div>
-              </div>
-            </div>
-          )}
-          <div style={{ marginTop: 26, width: "min(80%,560px)", textAlign: "center" }}>
-            <div style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(var(--accent-rgb),0.5)", marginBottom: 8 }}>↳ INTENT INTERPRETATION</div>
-            <div style={{ fontSize: 19, lineHeight: 1.4, color: "#eafcff", fontWeight: 500, letterSpacing: 0.4, whiteSpace: "pre-wrap" }}>{transcript}</div>
-            {ttsWaitSeconds !== null && (
-              <div style={{ ...mono, fontSize: 10.5, letterSpacing: 1, color: CY, marginTop: 10 }}>
-                ⏳ aguardando voz do Gemini… {ttsWaitSeconds}s / {SPEAK_TIMEOUT_MS / 1000}s
-              </div>
-            )}
-            {(liveCode || liveCodeDone.length > 0) && (
-              <div style={{ ...mono, fontSize: 10.5, textAlign: "left", background: "#08131a", border: `1px solid ${PU}55`, borderRadius: 8, padding: "12px 14px", maxHeight: 280, overflowY: "auto", marginTop: 14 }}>
-                {liveCodeDone.map((f) => (
-                  <div key={f.path} style={{ color: GR, marginBottom: 6 }}>✓ {f.path}</div>
-                ))}
-                {liveCode && (
-                  <div>
-                    <div style={{ color: PU, marginBottom: 4 }}>✎ {liveCode.path}</div>
-                    <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all", color: "rgba(207,239,251,0.8)", fontSize: 10, lineHeight: 1.4 }}>{liveCode.content.slice(-2500)}</pre>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* RIGHT: CONTEXT — some de vez no mobile (não é aba, ver .bb-assistant-context em globals.css) */}
-        <aside className="bb-assistant-pane bb-assistant-context" style={{ borderLeft: "1px solid rgba(var(--accent-rgb),0.12)", flexDirection: "column", minHeight: 0, minWidth: 0, background: "linear-gradient(270deg, rgba(6,18,24,0.35), transparent)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(var(--accent-rgb),0.1)" }}>
-            <div style={{ ...mono, fontSize: 11, letterSpacing: 3, color: CY }}>◈ RETRIEVED_CONTEXT</div>
-            <div style={{ ...mono, fontSize: 9, color: "rgba(var(--accent-rgb),0.5)" }}>pgvector · {cards.length} matches</div>
-          </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-            {cards.length === 0 && (
-              <div style={{ ...mono, fontSize: 10.5, color: "rgba(207,239,251,0.4)", padding: "6px 2px" }}>
-                aguardando primeira consulta…
-              </div>
-            )}
-            {cards.map((c, i) => {
-              const brain = c.source === "BRAIN";
-              const sentinel = c.source === "SENTINELA";
-              const accent = brain ? PU : sentinel ? OR : CY;
-              const edge = brain ? "rgba(201,166,255,0.32)" : sentinel ? "rgba(255,157,61,0.32)" : "rgba(var(--accent-rgb),0.3)";
-              return (
-                <div key={i} style={{ flex: "none", border: `1px solid ${edge}`, borderRadius: 6, padding: "13px 14px", background: "linear-gradient(160deg, rgba(var(--accent-rgb),0.05), rgba(0,0,0,0.2))", position: "relative", overflow: "hidden" }}>
-                  <div style={{ position: "absolute", top: 0, left: 0, width: 3, height: "100%", background: accent, boxShadow: `0 0 10px ${accent}` }} />
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ ...mono, fontSize: 8.5, letterSpacing: 2, padding: "3px 7px", border: `1px solid ${edge}`, borderRadius: 3, color: accent, background: "rgba(0,0,0,0.3)" }}>{c.source}</span>
-                    <span style={{ ...mono, fontSize: 9, color: "rgba(207,239,251,0.4)" }}>{c.board}</span>
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: "#eafcff", letterSpacing: 0.3, lineHeight: 1.25 }}>{c.title}</div>
-                  <div style={{ fontSize: 12.5, color: "rgba(169,206,222,0.8)", marginTop: 5, lineHeight: 1.4 }}>{c.snippet}</div>
-                  <div style={{ ...mono, fontSize: 9, color: "rgba(var(--accent-rgb),0.55)", marginTop: 9 }}>SIM {meterFor(c.pct)} {c.sim}</div>
-                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 9, paddingTop: 9, borderTop: "1px dashed rgba(var(--accent-rgb),0.14)" }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: OR, boxShadow: "0 0 7px #ff9d3d" }} />
-                    <span style={{ ...mono, fontSize: 9, letterSpacing: 1, color: "rgba(255,157,61,0.85)" }}>LAST_MODIFIED</span>
-                    <span style={{ ...mono, fontSize: 10, color: "#ffbe7a", marginLeft: "auto", whiteSpace: "nowrap" }}>{c.modified}</span>
-                  </div>
+        {gaveta === "registro" && (
+          <aside className="bb-gaveta bb-gaveta--esq" aria-label="Registro">
+            <header>Registro<button type="button" aria-label="Fechar registro" onClick={() => setGaveta(null)}>×</button></header>
+            <div className="bb-gaveta-registro">
+              {logs.map((log) => (
+                <div key={log.id} className="bb-registro-linha">
+                  <time>{log.t}</time>
+                  <span style={{ color: log.color }}>{log.tag}</span>
+                  <span>{log.msg}</span>
                 </div>
+              ))}
+              {logs.length === 0 && <div className="bb-gaveta-vazia">Nada registrado ainda.</div>}
+            </div>
+          </aside>
+        )}
+        {gaveta === "contexto" && (
+          <aside className="bb-gaveta bb-gaveta--dir" aria-label="Contexto da resposta">
+            <header>Contexto da resposta<button type="button" aria-label="Fechar contexto" onClick={() => setGaveta(null)}>×</button></header>
+            {cards.length === 0 && <div className="bb-gaveta-vazia">Os cards e notas usados na resposta aparecem aqui depois da primeira pergunta.</div>}
+            {cards.map((c, i) => {
+              const cor = c.source === "BRAIN" ? PU : c.source === "SENTINELA" ? OR : CY;
+              return (
+                <article key={i} className="bb-cartao-contexto">
+                  <div className="bb-cartao-contexto-topo">
+                    <span style={{ color: cor }}>{c.source}</span>
+                    <span>{c.board}</span>
+                  </div>
+                  <b>{c.title}</b>
+                  {c.snippet && <p>{c.snippet}</p>}
+                  <div className="bb-cartao-contexto-pe">
+                    <span title="similaridade com a pergunta">{c.sim}</span>
+                    <span>{c.modified}</span>
+                  </div>
+                </article>
               );
             })}
-          </div>
-        </aside>
+          </aside>
+        )}
       </main>
 
-      {/* BOTTOM COMMAND BAR */}
-      <footer className="bb-footer" style={{ position: "relative", display: "flex", alignItems: "center", gap: 18, padding: "14px 26px", borderTop: "1px solid rgba(var(--accent-rgb),0.16)", background: "linear-gradient(0deg, rgba(6,20,26,0.6), transparent)" }}>
-        <div className="bb-footer-hide" style={{ ...mono, fontSize: 10, letterSpacing: 3, color: "rgba(var(--accent-rgb),0.5)" }}>STATE</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 5, border: `1px solid ${meta.color}`, color: meta.color }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: meta.color, boxShadow: `0 0 8px ${meta.color}` }} />
-          <span className="bb-footer-hide" style={{ fontWeight: 600, letterSpacing: 1.5, fontSize: 13 }}>{meta.label}</span>
-        </div>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid rgba(var(--accent-rgb),0.18)", borderRadius: 5, background: "rgba(var(--accent-rgb),0.03)", ...mono }}>
-          <span style={{ color: CY, fontSize: 13 }}>&gt;_</span>
+      <footer className="bb-pe">
+        <div className="bb-pe__coluna">
+        {faixaDoContexto}
+        <div className="bb-campo-de-mensagem">
+          <BotaoMais aoEscolherImagens={anexarImagens} aoVincular={vincularRepo} desabilitado={busy} />
+{!usuario && (<>
+          <Suspenso
+            titulo="Perguntar sobre"
+            paraCima
+            lado="esquerda"
+            largura={300}
+            classeDoBotao="bb-escopo"
+            rotulo={<>{nomeDoEscopo}<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2 4l3 3 3-3" /></svg></>}
+          >
+            <GrupoDoMenu titulo="Perguntar sobre">
+              <SegmentosDoMenu
+                rotulo="Escopo"
+                valor={scopeMode}
+                onChange={setScopeMode}
+                opcoes={[{ valor: "panel", rotulo: "Um painel" }, { valor: "general", rotulo: "Geral" }]}
+              />
+              {scopeMode === "general" ? (
+                <div className="bb-nota-do-menu">Vê todos os painéis e pode buscar na web quando precisar.</div>
+              ) : (
+                <div className="bb-campo-do-menu">
+                  <select className="bb-select" value={scopePanel} onChange={(e) => setScopePanel(e.target.value)}>
+                    {panelOptions.map((b) => <option key={b} value={b}>{b}</option>)}
+                    <option value={TASKS_SCOPE}>Tarefas (por prazo)</option>
+                    <option value={THOUGHTS_SCOPE}>Pensamentos</option>
+                    <option value={SENTINEL_SCOPE}>Chamados (Sentinela)</option>
+                    <option value={DELP_SCOPE}>Tarefas Delp</option>
+                    <option value={CODE_SCOPE}>Código</option>
+                  </select>
+                  {scopePanel === SENTINEL_SCOPE && (
+                    <select className="bb-select" value={sentinelProjectId} onChange={(e) => setSentinelProjectId(e.target.value)} title="Projeto de teste (Sentinela) — força a resposta a considerar só esse projeto">
+                      <option value="all">Todos os projetos</option>
+                      {sentinelProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  )}
+                  {scopePanel === CODE_SCOPE && (
+                    <select className="bb-select" value={codeRepo} onChange={(e) => setCodeRepo(e.target.value)} title="Repositório — força a resposta a considerar só esse repo">
+                      <option value="all">Todos os repositórios</option>
+                      {codeRepos.map((r) => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
+                    </select>
+                  )}
+                  {scopePanel === CODE_SCOPE && codeRepo !== "all" && (
+                    <select className="bb-select" value={codeFile} onChange={(e) => setCodeFile(e.target.value)} title="Arquivo específico — sem escolher nenhum, busca no repositório inteiro">
+                      <option value="">Repositório inteiro</option>
+                      {codeFiles.map((f) => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  )}
+                </div>
+              )}
+            </GrupoDoMenu>
+          </Suspenso>
+</>)}
+
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !busy) { ask(input); setInput(""); }
-            }}
+            onKeyDown={(e) => { if (e.key === "Enter") enviarPergunta(); }}
             disabled={busy}
-            placeholder={busy ? "processando…" : (listening ? "ouvindo… fale agora" : 'pergunte ou clique no microfone…')}
-            style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#eafcff", fontSize: 12, letterSpacing: 0.5 }}
+            placeholder={busy ? "Pensando…" : listening ? "Ouvindo… pode falar" : "Pergunte alguma coisa para a Lisa"}
+            aria-label="Mensagem para a Lisa"
           />
-        </div>
 
-        {/* botão de microfone (STT) */}
-        <button
-          onClick={toggleMic}
-          disabled={busy}
-          title={listening ? "Parar de ouvir" : "Falar (microfone)"}
-          style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            width: 44, height: 44, borderRadius: "50%",
-            border: `1.5px solid ${listening ? OR : CY}`,
-            background: listening ? "rgba(255,157,61,0.15)" : "rgba(var(--accent-rgb),0.06)",
-            color: listening ? OR : CY, cursor: busy ? "not-allowed" : "pointer",
-            boxShadow: listening ? `0 0 16px ${OR}` : "none",
-            animation: listening ? "bb-dot 1s ease-in-out infinite" : "none",
-            transition: "all .2s",
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="23" />
-            <line x1="8" y1="23" x2="16" y2="23" />
-          </svg>
-        </button>
-
-        {/* toggle de voz (TTS) */}
-        <button
-          onClick={() => { if (voiceOn) stopSpeaking(); setVoiceOn(v => !v); }}
-          title={voiceOn ? "Voz ligada (clique p/ mutar)" : "Voz desligada"}
-          style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            width: 40, height: 40, borderRadius: "50%",
-            border: `1px solid ${voiceOn ? CY : "rgba(207,239,251,0.3)"}`,
-            background: "rgba(var(--accent-rgb),0.04)", color: voiceOn ? CY : "rgba(207,239,251,0.4)",
-            cursor: "pointer", transition: "all .2s",
-          }}
-        >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-            {voiceOn
-              ? <><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></>
-              : <><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></>}
-          </svg>
-        </button>
-
-        {/* liga/desliga a voz do Gemini especificamente + mostra se ela tá disponível */}
-        <button
-          onClick={() => setGeminiVoiceEnabled((v) => {
-            const next = !v;
-            if (next) geminiDownUntilRef.current = 0; // reativou na mão → tenta de novo já na próxima, não espera o disjuntor
-            return next;
-          })}
-          title={
-            !geminiVoiceEnabled
-              ? "Voz Gemini desativada — usando só a voz do navegador (clique pra reativar)"
-              : geminiVoiceStatus === false
-              ? "Voz Gemini ativada, mas a última tentativa falhou (clique pra desativar e usar só a voz do navegador)"
-              : geminiVoiceStatus === true
-              ? "Voz Gemini ativada e funcionando (clique pra desativar)"
-              : "Voz Gemini ativada, ainda sem tentativa nesta sessão (clique pra desativar)"
-          }
-          style={{
-            display: "flex", alignItems: "center", gap: 7,
-            padding: "0 13px", height: 40, borderRadius: 20,
-            border: `1px solid ${geminiVoiceEnabled ? CY : "rgba(207,239,251,0.25)"}`,
-            background: geminiVoiceEnabled ? "rgba(var(--accent-rgb),0.04)" : "transparent",
-            color: geminiVoiceEnabled ? "#eafcff" : "rgba(207,239,251,0.45)",
-            cursor: "pointer", transition: "all .2s", ...mono, fontSize: 9.5, letterSpacing: 1.5,
-          }}
-        >
-          <span
-            style={{
-              width: 7, height: 7, borderRadius: "50%",
-              background: dotColor(geminiVoiceEnabled ? geminiVoiceStatus : null),
-              boxShadow: geminiVoiceEnabled && geminiVoiceStatus != null ? `0 0 8px ${dotColor(geminiVoiceStatus)}` : "none",
-            }}
-          />
-          <span className="bb-footer-hide">
-            VOZ GEMINI{!geminiVoiceEnabled ? " · OFF" : geminiVoiceStatus === true ? " · OK" : geminiVoiceStatus === false ? " · FALHOU" : ""}
-          </span>
-        </button>
-
-        {/* qual das 30 vozes do Gemini usar — a Google não documenta gênero, então teste e
-            escolha a que soar certa; a escolha fica salva neste navegador. */}
-        {geminiVoiceEnabled && (
-          <select
-            value={voiceName}
-            onChange={(e) => {
-              setVoiceName(e.target.value);
-              if (typeof window !== "undefined") localStorage.setItem("voiceName", e.target.value);
-            }}
-            title="Voz do Gemini (a Google não documenta gênero — teste e escolha a que preferir)"
-            style={{ ...mono, fontSize: 9.5, padding: "0 10px", height: 40, borderRadius: 20, border: "1px solid rgba(var(--accent-rgb),0.2)", background: "#08131a", color: "#eafcff" }}
+          <button
+            type="button"
+            className="bb-redondo"
+            onClick={() => { if (voiceOn) stopSpeaking(); setVoiceOn((v) => !v); }}
+            title={voiceOn ? "Voz ligada (clique para mutar)" : "Voz desligada (clique para ligar)"}
+            aria-pressed={voiceOn}
           >
-            {TTS_VOICES.map((v) => (
-              <option key={v.name} value={v.name}>{v.name} · {v.trait}</option>
-            ))}
-          </select>
-        )}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              {voiceOn
+                ? <><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></>
+                : <><line x1="22" y1="9" x2="16" y2="15" /><line x1="16" y1="9" x2="22" y2="15" /></>}
+            </svg>
+          </button>
+          <button
+            type="button"
+            className={`bb-redondo bb-redondo--mic${listening || conversaAberta ? " bb-redondo--ouvindo" : ""}`}
+            onClick={() => { acordarAudio(); toggleMic(); }}
+            disabled={busy && !conversaAberta}
+            title={conversaAberta ? "Encerrar a conversa livre" : listening ? "Parar de ouvir" : "Falar (microfone)"}
+            aria-pressed={listening || conversaAberta}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="9" y="2.5" width="6" height="12" rx="3" />
+              <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+            </svg>
+          </button>
+          <button type="button" className="bb-redondo bb-redondo--enviar" onClick={enviarPergunta} disabled={busy || !input.trim()} title="Enviar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
+          </button>
+        </div>
+        </div>
       </footer>
     </div>
   );

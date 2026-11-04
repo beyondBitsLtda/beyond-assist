@@ -2,7 +2,6 @@ import { runArchDocStep } from "@/lib/archDocs.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 /**
  * POST /api/arch-docs/step   body: { docId?, repo }

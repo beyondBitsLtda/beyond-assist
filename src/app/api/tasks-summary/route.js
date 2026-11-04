@@ -1,4 +1,4 @@
-import { loadAllTrelloCards } from "@/lib/liveTrello.js";
+import { loadAllCards } from "@/lib/liveQuadros.js";
 import { getDateBoundaries } from "@/lib/dateRanges.js";
 import { jsonResponse } from "@/lib/http.js";
 
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    const all = await loadAllTrelloCards();
+    const all = await loadAllCards();
     const { startOfToday, endOfToday, endOfTomorrow, endOfWeek } = getDateBoundaries();
     const counts = { overdue: 0, today: 0, tomorrow: 0, week: 0, upcoming: 0 };
 

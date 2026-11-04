@@ -1,0 +1,889 @@
+/* ============================================================ Ranking e Reino do Neuro */
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ------------------------------------------------------------ ranking */
+.rk-eu { display: flex; align-items: center; gap: 16px; }
+.rk-eu__posicao {
+  flex: none; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 18px;
+  background: var(--pf-destaque-fundo); color: #FFFFFF; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.rk-tabela-caixa { padding: 0; overflow: hidden; }
+.rk-tabela td, .rk-tabela th { padding: 10px 12px; }
+.rk-col-pos { width: 48px; font-size: 15px; text-align: center !important; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rk-col-valor { text-align: right !important; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rk-sub { display: block; font-size: 12px; font-weight: 400; color: var(--pf-tinta-2); }
+.rk-voce { margin-left: 8px; vertical-align: middle; }
+.rk-linha--eu { background: var(--pf-sucesso-fundo); }
+.rk-tabela td.rk-col-pos:not(:empty) { font-size: 15px; }
+.rk-medalha { font-size: 22px; line-height: 1; }
+.rk-reticencias td { text-align: center; color: var(--pf-tinta-2); padding: 4px; }
+.rk-perfil { display: grid; gap: 12px; }
+.rk-perfil__linha { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+@media (max-width: 560px) { .rk-col-extra { display: none; } }
+
+/* ------------------------------------------------------------ reino: a vista */
+.rn-vista {
+  border-radius: var(--pf-raio-grande); overflow: hidden; border: 1px solid var(--pf-linha);
+  background: linear-gradient(180deg, #CFE8F7 0%, #E6F4EA 58%, #A7D7AF 58%, #8CC995 100%);
+  padding: 18px 12px 14px;
+}
+:root[data-tema="escuro"] .rn-vista { background: linear-gradient(180deg, #14233A 0%, #1B2B3F 58%, #1D3B27 58%, #163020 100%); }
+.rn-vista__chao { display: flex; align-items: flex-end; justify-content: center; gap: clamp(4px, 2vw, 18px); min-height: 150px; }
+.rn-vista__centro { display: flex; align-items: flex-end; gap: 2px; }
+.rn-vista__neuro { margin-bottom: -8px; }
+.rn-predio { display: grid; justify-items: center; gap: 2px; }
+/* o prédio cresce com o nível: um jeito de "ver" o reino evoluir sem desenhar 30 sprites */
+.rn-predio__emoji { font-size: calc(26px + var(--nivel, 0) * 5px); line-height: 1; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.18)); }
+.rn-predio--grande .rn-predio__emoji { font-size: calc(46px + var(--nivel, 1) * 7px); }
+.rn-predio--vazio .rn-predio__emoji { opacity: 0.55; font-size: 24px; }
+.rn-predio__nivel {
+  font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 9999px;
+  background: rgba(17, 24, 20, 0.78); color: #FFFFFF; white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .rn-vista { padding: 12px 6px 10px; }
+  .rn-vista__chao { gap: 3px; min-height: 110px; }
+  .rn-predio__nivel { font-size: 10px; padding: 1px 5px; }
+  .rn-vista__neuro .neuro { --neuro-tamanho: 62px !important; }
+}
+@media (max-width: 480px) { .rn-predio__emoji { font-size: calc(20px + var(--nivel, 0) * 3px); } .rn-predio--grande .rn-predio__emoji { font-size: calc(36px + var(--nivel, 1) * 5px); } }
+
+.rn-numeros { display: grid; gap: 12px; margin-top: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
+.rn-numero .pf-estat__valor { font-size: 20px; overflow-wrap: anywhere; }
+.rn-numero .pf-estat__nota { margin-bottom: 0; }
+.rn-moedas { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------ botões com motivo */
+.rn-botao { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+/* travado de verdade parece travado: cinza, não um verde apagado que lembra "carregando" */
+.rn-botao .pf-botao:disabled { cursor: not-allowed; opacity: 1; background: var(--pf-superficie-2); border-color: var(--pf-linha); color: var(--pf-tinta-2); }
+.rn-motivo { font-size: 12px; color: var(--pf-tinta-2); }
+
+/* ------------------------------------------------------------ construções */
+/* as grades do Reino contam colunas pelo espaço que existe, não pela largura da janela (com o
+   conteúdo limitado, a conta pela janela abria colunas demais e os cartões encavalavam) */
+.rn-construcoes { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.rn-construcao { display: flex; flex-direction: column; }
+.rn-construcao .rn-botao { margin-top: auto; padding-top: 12px; }
+.rn-construcao__topo { display: flex; align-items: center; gap: 12px; }
+.rn-construcao__topo h3 { margin: 0 0 4px; font-size: 16px; }
+.rn-construcao__emoji { font-size: 34px; line-height: 1; }
+.rn-construcao__proximo { color: var(--pf-verde-forte); }
+.rn-niveis { display: inline-flex; gap: 4px; }
+.rn-niveis span { width: 14px; height: 6px; border-radius: 3px; background: var(--pf-superficie-2); border: 1px solid var(--pf-linha); }
+.rn-niveis .rn-niveis__cheio { background: var(--pf-verde); border-color: var(--pf-verde); }
+
+/* ------------------------------------------------------------ invasões */
+.rn-procurar { display: grid; gap: 12px; justify-items: start; }
+.rn-alvos td, .rn-alvos th { padding: 10px 12px; }
+.rn-col-acao { text-align: right !important; white-space: nowrap; }
+.rn-col-acao .rn-motivo { white-space: normal; display: inline-block; max-width: 180px; text-align: right; }
+@media (max-width: 560px) { .rn-col-info { display: none; } }
+.rn-faixa--fraca { background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
+.rn-faixa--media { background: var(--pf-atencao-fundo); color: var(--pf-atencao); }
+.rn-faixa--forte, .rn-faixa--fortissima { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+
+.rn-resultado { margin-bottom: 12px; display: grid; gap: 8px; justify-items: start; border-width: 2px; }
+.rn-resultado p { margin: 0; }
+.rn-resultado__titulo { font-size: 18px; font-weight: 800; }
+.rn-resultado__titulo small { font-weight: 500; color: var(--pf-tinta-2); font-size: 14px; }
+.rn-resultado--venceu { border-color: var(--pf-verde); background: var(--pf-sucesso-fundo); }
+.rn-resultado--perdeu { border-color: var(--pf-alerta-fundo); }
+
+.rn-batalhas { list-style: none; margin: 0; padding: 0; display: grid; }
+.rn-batalhas li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--pf-linha); }
+.rn-batalhas li:last-child { border-bottom: 0; }
+.rn-batalha__icone { font-size: 22px; }
+.rn-batalha__texto { flex: 1; min-width: 0; font-size: 14px; }
+.rn-batalha__texto small { display: block; color: var(--pf-tinta-2); font-size: 12px; margin-top: 2px; }
+.rn-batalha__saldo { font-weight: 700; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rn-batalha--perdi .rn-batalha__saldo { color: var(--pf-alerta); }
+.rn-batalha--ganhei .rn-batalha__saldo { color: var(--pf-verde-forte); }
+
+.rn-renomear { background: none; border: none; color: var(--pf-verde-forte); cursor: pointer; font: inherit; font-size: 13px; padding: 4px; }
+.rn-renomear__form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.rn-renomear__form .pf-campo__entrada { flex: 1; min-width: 180px; }
+
+.rn-regras { display: grid; gap: 4px; }
+.rn-regras details { border-bottom: 1px solid var(--pf-linha); padding: 8px 0; }
+.rn-regras details:last-child { border-bottom: 0; }
+.rn-regras summary { cursor: pointer; font-weight: 700; min-height: 32px; display: flex; align-items: center; }
+.rn-regras p { margin: 6px 0 4px; font-size: 14px; color: var(--pf-tinta-2); line-height: 1.5; }
+
+/* ------------------------------------------------------------ navegação: "Mais" no celular */
+.pf-mais { position: relative; display: flex; }
+.pf-mais > .pf-abas__item { width: 100%; background: none; border: none; font: inherit; font-size: 11px; font-weight: 500; cursor: pointer; }
+.pf-mais__menu {
+  position: fixed; right: 8px; bottom: calc(var(--pf-nav-altura) + env(safe-area-inset-bottom) + 8px); z-index: 30;
+  min-width: 200px; padding: 6px; border-radius: 16px; display: grid;
+  background: var(--pf-superficie); border: 1px solid var(--pf-linha); box-shadow: var(--pf-sombra-alta);
+}
+.pf-mais__menu a {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px;
+  color: var(--pf-tinta); text-decoration: none; font-weight: 600; font-size: 15px;
+}
+.pf-mais__menu a svg { width: 20px; height: 20px; }
+.pf-mais__menu a:hover, .pf-mais__menu a:focus-visible { background: var(--pf-superficie-2); }
+.pf-mais__menu a[aria-current="page"] { color: var(--pf-verde-forte); }
+
+/* ------------------------------------------------------------ reino: o mundo 3D */
+.rn-mundo {
+  position: relative; height: 380px; border-radius: var(--pf-raio-grande); overflow: hidden;
+  border: 1px solid var(--pf-linha); touch-action: pan-y; user-select: none;
+  /* o céu segue a hora e o clima (Mundo3D põe --rn-ceu); o degradê fixo é só até o 3D carregar */
+  background: var(--rn-ceu, linear-gradient(180deg, #BFE3F7 0%, #E4F3FB 70%, #F3FAF4 100%));
+}
+:root[data-tema="escuro"] .rn-mundo { background: var(--rn-ceu, linear-gradient(180deg, #0E1A2E 0%, #18294A 70%, #1D3150 100%)); }
+/* o humor do Neuro (03/11/2026): a evolução pela ofensiva, e o aviso quando ele se revolta */
+.rn-humor { display: grid; gap: 6px; margin: 8px 0 10px; padding: 10px 12px; border-radius: var(--pf-raio); background: var(--pf-superficie-2, rgba(0, 0, 0, 0.03)); border: 1px solid var(--pf-linha); }
+.rn-humor__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
+.rn-humor__emoji { font-size: 20px; line-height: 1; }
+.rn-humor__barra { height: 6px; border-radius: 9999px; background: var(--pf-linha); overflow: hidden; }
+.rn-humor__barra span { display: block; height: 100%; border-radius: inherit; background: var(--pf-verde); }
+.rn-humor .pf-estat__nota { margin: 0; }
+.rn-humor--revoltado { border-color: #DC2626; background: rgba(220, 38, 38, 0.08); }
+.rn-humor--chateado { border-color: #D97706; background: rgba(217, 119, 6, 0.08); }
+.rn-exp__fechadas { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+/* o Chefão da Procrastinação (03/11/2026): o rótulo no mapa e a folha */
+.rn-mundo__rotulo--chefao { z-index: 3; background: #7f1d1d; color: #fff; border-color: #dc2626; font-weight: 800; }
+.rn-mundo__rotulo--chefao:hover { background: #991b1b; }
+.ch-chefao { display: grid; gap: 12px; grid-template-columns: 140px 1fr; align-items: start; }
+.ch-chefao__arte { width: 140px; height: 140px; object-fit: contain; }
+.ch-chefao__nome { margin: 0 0 6px; font-size: 18px; }
+.ch-chefao__vida { height: 10px; border-radius: 9999px; background: var(--pf-linha); overflow: hidden; margin-bottom: 6px; }
+.ch-chefao__vida span { display: block; height: 100%; border-radius: inherit; background: #dc2626; }
+.ch-chefao__golpes { grid-column: 1 / -1; }
+.ch-chefao__golpes h4 { margin: 4px 0 6px; font-size: 14px; }
+.ch-chefao__golpes ul { margin: 0 0 8px; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
+.ch-chefao__atalhos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ch-caiu { margin-bottom: 12px; }
+.ch-chefao__roubo { padding: 6px 8px; border-radius: var(--pf-raio); background: rgba(220, 38, 38, 0.08); }
+.ch-placar { margin-top: 12px; }
+@media (max-width: 520px) { .ch-chefao { grid-template-columns: 1fr; justify-items: start; } }
+/* o selo do clima (03/11/2026): no canto de cima à direita — à esquerda fica o botão de tela cheia */
+.rn-mundo__clima {
+  position: absolute; right: 10px; top: 10px; z-index: 2; pointer-events: none; white-space: nowrap;
+  padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 700;
+  background: rgba(17, 24, 20, 0.62); color: #fff; backdrop-filter: blur(2px);
+}
+.rn-mundo--batalha .rn-mundo__clima { display: none; }
+.rn-tela-cheia .rn-mundo__clima { top: auto; bottom: 132px; }
+@media (max-width: 640px) { .rn-mundo__clima { font-size: 11px; padding: 2px 8px; } }
+@media (max-width: 640px) { .rn-mundo { height: 300px; } }
+.rn-mundo canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.rn-mundo canvas:active { cursor: grabbing; }
+.rn-mundo--carregando { display: grid; place-items: center; color: var(--pf-tinta-2); font-size: 14px; }
+
+.rn-mundo__rotulo {
+  position: absolute; left: 0; top: 0; z-index: 2; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 3px 10px;
+  border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(17, 24, 20, 0.82); color: #FFFFFF; font: inherit; font-size: 12px; font-weight: 700;
+  cursor: pointer; will-change: transform;
+}
+.rn-mundo__rotulo:hover { background: rgba(17, 24, 20, 0.95); }
+.rn-mundo__rotulo:focus-visible { outline: 2px solid var(--pf-verde); outline-offset: 2px; }
+.rn-mundo__rotulo--vazio { background: rgba(255, 255, 255, 0.88); color: #3A2A1E; border-color: rgba(0, 0, 0, 0.12); }
+
+.rn-mundo__fala {
+  position: absolute; left: 0; top: 0; z-index: 3; max-width: 220px; padding: 8px 12px; border-radius: 14px;
+  background: #FFFFFF; color: #1F2937; font-size: 13px; font-weight: 600; line-height: 1.3;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); pointer-events: none; opacity: 0; transition: opacity 0.2s;
+}
+.rn-mundo__fala::after {
+  content: ""; position: absolute; left: 50%; bottom: -6px; width: 12px; height: 12px;
+  background: #FFFFFF; transform: translateX(-50%) rotate(45deg);
+}
+.rn-mundo__fala--visivel { opacity: 1; }
+
+.rn-mundo__giro { position: absolute; right: 10px; bottom: 10px; z-index: 2; display: flex; gap: 6px; }
+.rn-mundo__giro button {
+  width: 36px; height: 36px; border-radius: 9999px; border: 1px solid var(--pf-linha); cursor: pointer;
+  background: var(--pf-superficie); color: var(--pf-tinta); font-size: 18px; line-height: 1; box-shadow: var(--pf-sombra);
+}
+.rn-mundo__giro button:focus-visible { outline: 2px solid var(--pf-verde); outline-offset: 2px; }
+.rn-mundo__dica {
+  position: absolute; left: 12px; bottom: 12px; z-index: 1; font-size: 12px; font-weight: 600;
+  padding: 3px 8px; border-radius: 9999px; background: rgba(255, 255, 255, 0.7); color: #3A4A40; pointer-events: none;
+}
+:root[data-tema="escuro"] .rn-mundo__dica { background: rgba(0, 0, 0, 0.4); color: #D5E0DA; }
+.rn-mundo__molde { position: absolute; left: -10000px; top: 0; width: 220px; height: 220px; pointer-events: none; }
+
+.rn-construcao--destaque { animation: rn-destaque 1.4s ease-out; }
+@keyframes rn-destaque {
+  0%, 30% { box-shadow: 0 0 0 3px var(--pf-verde), var(--pf-sombra); }
+  100% { box-shadow: 0 0 0 0 transparent, var(--pf-sombra); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rn-construcao--destaque { animation: none; box-shadow: 0 0 0 3px var(--pf-verde); }
+  .rn-mundo__fala { transition: none; }
+}
+
+/* ------------------------------------------------------------ atalho de invasão, abaixo do mundo */
+.rn-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 12px; }
+.rn-acoes__invadir { gap: 10px; }
+.rn-acoes__conta { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 9999px; background: rgba(0, 0, 0, 0.12); }
+.rn-acoes__nota { flex: 1; min-width: 160px; font-size: 13px; color: var(--pf-tinta-2); }
+.rn-acoes__ranking { margin-left: auto; }
+.rn-construcao:focus { outline: none; }
+#invadir { scroll-margin-top: 16px; }
+@media (max-width: 640px) { .rn-mundo__dica { display: none; } }
+
+/* ------------------------------------------------------------ modo simulação */
+.rn-simulador { margin-top: 12px; display: grid; gap: 20px; }
+@media (min-width: 1000px) { .rn-simulador { grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); align-items: start; } }
+.rn-simulador__principal { display: grid; gap: 14px; justify-items: start; min-width: 0; }
+.rn-simulador__principal > * { max-width: 100%; }
+.rn-simulador__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.rn-simulador__topo h2 { margin: 0; font-size: 18px; }
+.rn-simulador .agenda__modos { flex-wrap: wrap; }
+.rn-simulador__rivais { display: flex; flex-wrap: wrap; gap: 8px; }
+.rn-simulador__rival { display: grid; gap: 2px; text-align: left; padding: 8px 14px; min-height: 52px; }
+.rn-simulador__rival small { font-weight: 500; opacity: 0.85; }
+.rn-simulador__chance { width: 100%; }
+.rn-simulador__chance .pf-estat__rotulo strong { color: var(--pf-tinta); font-size: 15px; }
+.rn-simulacao { width: 100%; padding: 14px 16px; border-radius: var(--pf-raio); border-width: 2px; border-style: solid; }
+.rn-simulacao__acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.rn-passos { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; line-height: 1.5; }
+.rn-passos b { font-variant-numeric: tabular-nums; }
+.rn-simulador__regras { padding: 14px 16px; border-radius: var(--pf-raio); background: var(--pf-superficie-2); border: 1px solid var(--pf-linha); }
+.rn-simulador__regras h3 { margin: 0 0 8px; font-size: 15px; }
+.rn-simulador__regras dl { margin: 0; display: grid; gap: 2px; font-size: 13px; }
+.rn-simulador__regras dt { font-weight: 700; margin-top: 8px; }
+.rn-simulador__regras dd { margin: 0; color: var(--pf-tinta-2); line-height: 1.45; }
+
+/* ------------------------------------------------------------ batalha em andamento (sobre a ilha) */
+.rn-mundo__alerta {
+  position: absolute; left: 50%; top: 12px; z-index: 4; transform: translateX(-50%);
+  display: grid; gap: 4px; justify-items: center; text-align: center;
+  width: min(92%, 520px); padding: 10px 16px 12px; border-radius: 16px; color: #FFFFFF;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); pointer-events: none;
+}
+.rn-mundo__alerta--defesa { background: rgba(153, 27, 27, 0.92); animation: rn-alerta 0.9s ease-in-out infinite; }
+.rn-mundo__alerta--ataque { background: rgba(30, 64, 175, 0.92); }
+.rn-mundo__alerta-titulo { font-size: 15px; font-weight: 800; letter-spacing: 0.04em; }
+.rn-mundo__alerta-texto { font-size: 14px; font-weight: 600; opacity: 0.95; }
+.rn-mundo__progresso { width: 100%; height: 5px; border-radius: 9999px; background: rgba(255, 255, 255, 0.25); overflow: hidden; margin-top: 4px; }
+.rn-mundo__progresso span { display: block; height: 100%; width: 0; background: #FFFFFF; animation: rn-progresso linear forwards; }
+@keyframes rn-progresso { from { width: 0; } to { width: 100%; } }
+@keyframes rn-alerta { 0%, 100% { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(239, 68, 68, 0.55); } 50% { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 0 10px rgba(239, 68, 68, 0); } }
+@media (max-width: 640px) { .rn-mundo__alerta { top: 8px; padding: 8px 12px 10px; } .rn-mundo__alerta-titulo { font-size: 13px; } .rn-mundo__alerta-texto { font-size: 12px; } }
+@media (prefers-reduced-motion: reduce) { .rn-mundo__alerta--defesa { animation: none; } }
+
+/* ------------------------------------------------------------ vales de moedas */
+.vale { display: grid; gap: 12px; justify-items: center; text-align: center; padding: 4px 8px 12px; }
+.vale__presente { font-size: 64px; line-height: 1; animation: vale-pulo 1.4s ease-in-out infinite; }
+.vale__titulo { margin: 0; font-size: 22px; }
+.vale__texto { margin: 0; color: var(--pf-tinta-2); font-size: 15px; line-height: 1.5; max-width: 420px; }
+.vale__acoes { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.vale__nota { margin: 0; font-size: 12px; color: var(--pf-tinta-2); }
+@keyframes vale-pulo { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-8px) rotate(-6deg); } }
+@media (prefers-reduced-motion: reduce) { .vale__presente { animation: none; } }
+
+.vale-cartao-lista { display: grid; gap: 8px; margin-bottom: 16px; }
+.vale-cartao { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; border: 2px dashed var(--pf-verde); background: var(--pf-sucesso-fundo); }
+.vale-cartao__icone { font-size: 34px; }
+.vale-cartao__texto { flex: 1; min-width: 200px; display: grid; gap: 2px; }
+.vale-cartao__texto span { font-size: 13px; color: var(--pf-tinta-2); }
+
+/* durante a batalha, os rótulos saem da frente do alerta e da cena */
+.rn-mundo--batalha .rn-mundo__rotulo { opacity: 0.3; pointer-events: none; transition: opacity 0.3s; }
+@media (max-width: 640px) { .rn-simulador .agenda__modos { border-radius: 16px; } .rn-simulador .agenda__modo { border-radius: 12px; } }
+
+/* ------------------------------------------------------------ combate: tropas, replay e placar */
+.rn-reserva { display: grid; gap: 14px; }
+.rn-reserva__topo { display: grid; gap: 6px; }
+@media (min-width: 760px) { .rn-reserva__topo { grid-template-columns: minmax(220px, 1fr) 2fr; align-items: center; gap: 16px; } }
+.rn-reserva__topo .pf-estat__nota { margin: 0; }
+.rn-tropas { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
+.rn-tropa {
+  display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: start;
+  padding: 12px; border-radius: 14px; border: 1px solid var(--pf-linha); background: var(--pf-superficie-2);
+}
+.rn-tropa--heroi { border-color: var(--pf-verde); }
+.rn-tropa--bloqueada { opacity: 0.7; }
+.rn-tropa__emoji { font-size: 30px; line-height: 1; grid-row: span 2; }
+.rn-tropa__texto { display: grid; gap: 3px; min-width: 0; }
+.rn-tropa__texto strong { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rn-tropa__texto strong small { font-weight: 500; color: var(--pf-tinta-2); font-size: 12px; }
+.rn-tropa__dados { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--pf-tinta); }
+.rn-tropa__desc { font-size: 12px; color: var(--pf-tinta-2); line-height: 1.4; }
+.rn-tropa__acoes { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.rn-tropa__acoes .pf-botao:disabled { cursor: not-allowed; opacity: 1; background: var(--pf-superficie); border-color: var(--pf-linha); color: var(--pf-tinta-2); }
+.rn-batalha__ver { flex: none; }
+
+.rn-mundo__alerta--vitoria { background: rgba(21, 128, 61, 0.94); }
+.rn-mundo__alerta--derrota { background: rgba(55, 65, 81, 0.94); }
+.rn-mundo__pular {
+  pointer-events: auto; margin-top: 6px; padding: 4px 12px; border-radius: 9999px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.5); background: rgba(255, 255, 255, 0.15); color: #FFFFFF; font: inherit; font-size: 12px; font-weight: 700;
+}
+.rn-mundo__pular:hover { background: rgba(255, 255, 255, 0.28); }
+.rn-mundo__pular:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
+
+/* batalha no celular: alerta compacto, ilha mais alta e fora do alcance do topo fixo */
+.rn-mundo { scroll-margin-top: 72px; }
+@media (max-width: 640px) {
+  .rn-mundo--batalha { height: 400px; }
+  .rn-mundo--batalha .rn-mundo__alerta { width: calc(100% - 16px); top: 6px; padding: 6px 10px 8px; gap: 2px; }
+  .rn-mundo--batalha .rn-mundo__progresso { margin-top: 2px; height: 4px; }
+  .rn-mundo__pular { margin-top: 3px; padding: 2px 10px; font-size: 11px; }
+}
+
+/* ------------------------------------------------------------ aviso da batalha: faixa fina no topo
+   (no meio da ilha ele tapava a luta). Título e texto numa linha, barra de progresso na borda de
+   baixo da faixa, "pular" à direita. A ilha cresce durante a batalha. */
+.rn-mundo--batalha { height: 470px; }
+.rn-mundo__alerta {
+  left: 0; right: 0; top: 0; transform: none; width: auto; max-width: none;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 2px 10px;
+  padding: 6px 12px 8px; border-radius: 0; text-align: left; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+.rn-mundo__alerta-titulo { font-size: 13px; letter-spacing: 0.03em; }
+.rn-mundo__alerta-texto { font-size: 13px; flex: 1; min-width: 160px; }
+.rn-mundo__progresso { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; margin: 0; border-radius: 0; }
+.rn-mundo__pular { margin: 0; padding: 2px 10px; font-size: 11px; }
+.rn-mundo--batalha .rn-mundo__rotulo { opacity: 0; }
+.rn-mundo--batalha .rn-mundo__dica { display: none; }
+@media (max-width: 640px) {
+  .rn-mundo--batalha { height: 420px; }
+  .rn-mundo--batalha .rn-mundo__alerta { width: auto; top: 0; padding: 5px 10px 7px; }
+  .rn-mundo__alerta-titulo, .rn-mundo__alerta-texto { font-size: 12px; }
+}
+
+/* ------------------------------------------------------------ personagens do Neuro */
+.rn-personagens { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); }
+.rn-personagem .pf-botao { white-space: normal; max-width: 100%; }
+.rn-personagem { display: grid; gap: 6px; justify-items: center; text-align: center; align-content: start; }
+.rn-personagem--usando { border: 2px solid var(--pf-verde); }
+.rn-personagem__vitrine { display: grid; place-items: center; min-height: 104px; pointer-events: none; }
+.rn-personagem__desc { font-size: 12px; color: var(--pf-tinta-2); line-height: 1.4; min-height: 3.6em; }
+.rn-personagem .rn-botao { justify-content: center; }
+#personagens { scroll-margin-top: 16px; }
+
+/* lotação da ilha (as tropas ficam à vista no chão) */
+.rn-lotacao { display: grid; gap: 8px; margin-top: 28px; }
+@media (min-width: 760px) { .rn-lotacao { grid-template-columns: minmax(240px, 1fr) 2fr; align-items: center; gap: 16px; } }
+.rn-lotacao .pf-estat__nota { margin: 0; }
+
+/* ---------------------------------------------------------------- expedições (contra a CPU) */
+.rn-exp__intro { margin: -4px 0 12px; }
+.rn-exp { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); }
+.rn-exp__lugar { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: start; position: relative; overflow: hidden; }
+.rn-exp__lugar::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--rn-exp-cor, var(--pf-verde)); }
+.rn-exp__lugar--vila { --rn-exp-cor: #d9a441; --rn-exp-fundo: radial-gradient(circle at 50% 40%, #fdf1cf 0%, #e9c77b 100%); }
+.rn-exp__lugar--floresta { --rn-exp-cor: #2f6b3a; --rn-exp-fundo: radial-gradient(circle at 50% 40%, #cfe8c4 0%, #6fa864 100%); }
+.rn-exp__lugar--bosque { --rn-exp-cor: #e53935; --rn-exp-fundo: radial-gradient(circle at 50% 40%, #f4fbe9 0%, #a8d98e 100%); }
+.rn-exp__lugar--acampamento { --rn-exp-cor: #8b2e2e; --rn-exp-fundo: radial-gradient(circle at 50% 40%, #f3d9c6 0%, #b07a5a 100%); }
+.rn-exp__arte { position: relative; width: 112px; height: 112px; border-radius: 16px; display: grid; place-items: center; background: var(--rn-exp-fundo); }
+.rn-exp__arte img { width: 104px; height: 104px; filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.18)); }
+.rn-exp__estrelas { position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); display: flex; gap: 1px; padding: 1px 8px; border-radius: 9999px;
+  background: var(--pf-superficie); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2); font-size: 15px; line-height: 1.3; color: #c9c9c9; }
+.rn-exp__estrela--ok { color: #f5b301; }
+.rn-exp__info { display: grid; gap: 6px; min-width: 0; }
+.rn-exp__info h3 { margin: 0; font-size: 17px; }
+.rn-exp__info .pf-estat__nota { margin: 0; }
+.rn-exp__tipo { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; color: var(--pf-tinta-2); text-transform: uppercase; }
+.rn-exp__monstros { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.rn-exp__monstros li { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 2px; border-radius: 9999px; background: var(--pf-superficie-2); font-size: 12px; font-weight: 600; }
+.rn-exp__monstros img { width: 26px; height: 26px; }
+.rn-exp__rodape { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.rn-exp__saque small { color: var(--pf-tinta-2); }
+.rn-exp__lugar--bloqueada .rn-exp__arte img, .rn-exp__lugar--bloqueada .rn-exp__monstros img { filter: grayscale(1) brightness(0.45); }
+.rn-exp__lugar--bloqueada .rn-exp__arte { background: var(--pf-superficie-2); }
+.rn-exp__recentes { margin-top: 12px; }
+@media (max-width: 420px) {
+  .rn-exp__lugar { grid-template-columns: 84px minmax(0, 1fr); }
+  .rn-exp__arte { width: 84px; height: 84px; }
+  .rn-exp__arte img { width: 78px; height: 78px; }
+}
+.rn-revanche { margin-left: 6px; font-size: 11px; vertical-align: middle; }
+.rn-acoes__conta--sec { margin-left: 6px; background: var(--pf-superficie-2); color: var(--pf-tinta); }
+
+/* dificuldade e recompensa de cada expedição */
+.rn-exp__vezes { display: inline-block; white-space: nowrap; margin-left: 8px; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 700; vertical-align: middle; background: var(--pf-superficie-2); color: var(--pf-tinta-2); }
+.rn-exp__nivel { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rn-exp__dif { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 800; }
+.rn-exp__dif span { font-size: 11px; letter-spacing: -1px; }
+.rn-exp__dif--1 { background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
+.rn-exp__dif--2 { background: var(--pf-atencao-fundo); color: var(--pf-atencao); }
+.rn-exp__dif--3 { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+.rn-exp__dif--4 { background: #ede9fe; color: #6d28d9; }
+.rn-exp__dif--5 { background: #1f1414; color: #fdba74; box-shadow: inset 0 0 0 1px #f97316; }
+:root[data-tema="escuro"] .rn-exp__dif--4 { background: #2e1065; color: #c4b5fd; }
+.rn-exp__premio { font-size: 13px; font-weight: 700; color: var(--pf-tinta); }
+
+/* expedições: o céu de cada lugar (o Mundo3D marca data-cenario no quadro durante a luta) */
+:root .rn-mundo[data-cenario="bosque-cogumelos"] { background: linear-gradient(180deg, #fbe3ef 0%, #e9f7df 70%, #f6fbef 100%); }
+:root .rn-mundo[data-cenario="vila-goblins"] { background: linear-gradient(180deg, #bfe3f7 0%, #e8f5d6 75%, #f4f9e8 100%); }
+:root .rn-mundo[data-cenario="floresta-lobos"] { background: linear-gradient(180deg, #b9cde2 0%, #e2ebf4 70%, #f8fafc 100%); }
+:root .rn-mundo[data-cenario="acampamento-orc"] { background: linear-gradient(180deg, #e8914a 0%, #f6c690 65%, #fbe6c8 100%); }
+:root .rn-mundo[data-cenario="vila-bandidos"] { background: linear-gradient(180deg, #f2b45a 0%, #fbdca0 65%, #fff4dc 100%); }
+:root .rn-mundo[data-cenario="bosque-assombrado"] { background: linear-gradient(180deg, #1b1430 0%, #3b2a5c 65%, #5b4483 100%); }
+:root .rn-mundo[data-cenario="floresta-sombria"] { background: linear-gradient(180deg, #08140e 0%, #15301f 65%, #23452f 100%); }
+:root .rn-mundo[data-cenario="covil-cerbero"] { background: linear-gradient(180deg, #1c0505 0%, #5c1010 55%, #b4380f 100%); }
+
+/* a arte do chefe é um botão: clicar nela parte na expedição (ou mostra por que ainda não dá) */
+button.rn-exp__arte { border: 0; padding: 0; font: inherit; cursor: pointer; transition: transform 0.15s ease; }
+button.rn-exp__arte:hover:not(:disabled) { transform: translateY(-2px) scale(1.03); }
+button.rn-exp__arte:focus-visible { outline: 3px solid var(--pf-verde); outline-offset: 2px; }
+button.rn-exp__arte:disabled { cursor: progress; }
+.rn-exp__lugar--bloqueada button.rn-exp__arte { cursor: not-allowed; }
+.rn-exp__clique {
+  position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--pf-verde); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); font-size: 14px;
+}
+.rn-exp__tropa { margin-bottom: 12px; }
+.rn-exp__tropa--emprestada { border-left: 4px solid #f59e0b; }
+
+/* ---------------------------------------------------------------- paz entre os reinos (proposta, votação, termos) */
+.rn-convite { display: grid; gap: 10px; border: 2px solid #f59e0b; background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(124, 58, 237, 0.06)); margin-bottom: 12px; }
+.rn-convite__topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.rn-convite__selo { justify-self: start; display: inline-block; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #fff; background: linear-gradient(90deg, #b45309, #7c3aed); }
+.rn-convite__selo--aliado { background: linear-gradient(90deg, #15803d, #0e7490); }
+.rn-convite__titulo { margin: 0; font-size: 18px; }
+.rn-convite__titulo small { font-weight: 500; color: var(--pf-tinta-2); }
+.rn-convite--enviado { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border: 1px dashed var(--pf-linha); background: var(--pf-superficie); font-size: 14px; }
+.rn-termos { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 700px) { .rn-termos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.rn-termos li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--pf-superficie-2); font-size: 13.5px; line-height: 1.4; }
+.rn-termos li strong { display: block; color: var(--pf-tinta); }
+.rn-termos li > span:last-child > span { color: var(--pf-tinta-2); }
+.rn-termos__icone { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--pf-superficie); font-size: 18px; }
+.rn-aliado { display: grid; gap: 10px; border-left: 4px solid #15803d; margin-bottom: 12px; }
+.rn-aliado__beneficios { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.rn-aliado__beneficios li { display: flex; gap: 8px; }
+.rn-aliado__reino { display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: var(--pf-superficie-2); }
+.rn-aliado__predios { display: flex; flex-wrap: wrap; gap: 6px; }
+.rn-convite-novo { display: grid; gap: 8px; }
+.rn-dias { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.rn-dias__opcao { min-height: 44px; border-radius: 10px; border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; font-weight: 700; cursor: pointer; }
+.rn-dias__opcao--atual { border-color: var(--pf-verde); background: var(--pf-sucesso-fundo); box-shadow: inset 0 0 0 1px var(--pf-verde); }
+.rn-mina-x2 { margin-left: 6px; font-size: 11px; vertical-align: middle; }
+.rn-mundo__rotulo--vizinho { pointer-events: none; background: #15803d; color: #fff; }
+.rn-convite__selo--paz { background: linear-gradient(90deg, #0e7490, #15803d); }
+.rn-paz { display: grid; gap: 10px; margin-bottom: 12px; }
+.rn-paz--vigente { border-left: 4px solid #0e7490; }
+.rn-paz--vazia { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.rn-paz--vazia .pf-estat__nota { flex: 1 1 320px; margin: 0; }
+.rn-paz__placar { display: grid; gap: 6px; font-size: 14px; }
+.rn-paz__meu-voto { margin: 0; font-weight: 700; color: var(--pf-verde-forte); }
+.rn-paz__sem-voto { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px; background: var(--pf-fundo); }
+.rn-paz__sem-voto p { margin: 0; flex: 1 1 260px; font-size: 14px; }
+.rn-paz__propor { display: grid; justify-items: start; gap: 6px; }
+.rn-paz__propor .rn-motivo { max-width: 260px; }
+
+/* ============================================================ 23/10/2026: veículos, ouro, bolsa, tela cheia e visita */
+
+/* ---- o quadro do 3D: o botão de tela cheia e a tela cheia */
+.rn-vista3d { position: relative; }
+.rn-vista3d__cheia {
+  position: absolute; left: 12px; top: 12px; z-index: 3; border: none; cursor: pointer;
+  padding: 6px 12px; border-radius: 9999px; font: inherit; font-size: 13px; font-weight: 700;
+  background: rgba(17, 24, 20, 0.78); color: #fff;
+}
+.rn-vista3d__cheia:hover { background: rgba(17, 24, 20, 0.95); }
+.rn-vista3d__cheia:focus-visible { outline: 2px solid var(--pf-verde); outline-offset: 2px; }
+.rn-sem-rolagem, .rn-sem-rolagem body { overflow: hidden; }
+.rn-tela-cheia { position: fixed; inset: 0; z-index: 35; background: var(--pf-fundo); }
+.rn-tela-cheia .rn-mundo { height: 100%; border-radius: 0; border: none; }
+.rn-tela-cheia .rn-mundo__dica { bottom: 86px; }
+.rn-tela-cheia .rn-mundo__giro { bottom: 86px; }
+
+.rn-hud__topo {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 5; display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 8px; padding: calc(10px + env(safe-area-inset-top)) 12px 0; pointer-events: none;
+}
+.rn-hud__reino, .rn-hud__rapido { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; pointer-events: auto; }
+.rn-hud__reino > * {
+  padding: 6px 10px; border-radius: 9999px; background: rgba(17, 24, 20, 0.8); color: #fff; font-size: 13px; font-weight: 700;
+}
+.rn-hud__reino strong { font-size: 14px; }
+.rn-hud__botao {
+  border: none; cursor: pointer; font: inherit; font-size: 13px; font-weight: 800; padding: 7px 12px; border-radius: 9999px;
+  background: var(--pf-verde); color: var(--pf-tinta-sobre-verde);
+}
+.rn-hud__botao:disabled { opacity: 0.6; cursor: default; }
+.rn-hud__botao:focus-visible, .rn-hud__item:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.rn-hud__sair { background: rgba(17, 24, 20, 0.85); color: #fff; }
+@media (max-width: 640px) { .rn-hud__sair span { display: none; } .rn-hud__reino > span:nth-child(4) { display: none; } }
+
+.rn-hud__dock {
+  position: absolute; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 6;
+  display: flex; gap: 4px; padding: 6px; border-radius: 20px; max-width: calc(100% - 16px); overflow-x: auto;
+  background: rgba(17, 24, 20, 0.86); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35); scrollbar-width: none;
+}
+.rn-hud__dock::-webkit-scrollbar { display: none; }
+.rn-hud__item {
+  flex: none; display: grid; justify-items: center; gap: 2px; min-width: 62px; padding: 6px 8px; border: none; cursor: pointer;
+  border-radius: 14px; background: transparent; color: #e8ede9; font: inherit; font-size: 20px; line-height: 1;
+}
+.rn-hud__item small { font-size: 11px; font-weight: 700; }
+.rn-hud__item:hover { background: rgba(255, 255, 255, 0.1); }
+.rn-hud__item--atual { background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); }
+
+.rn-hud__painel {
+  position: absolute; z-index: 5; right: 12px; top: calc(58px + env(safe-area-inset-top)); bottom: 86px; width: min(460px, calc(100% - 24px));
+  display: flex; flex-direction: column; border-radius: 20px; overflow: hidden;
+  background: var(--pf-fundo); box-shadow: var(--pf-sombra-alta); border: 1px solid var(--pf-linha);
+  animation: folha-subir 0.2s ease-out;
+}
+.rn-hud__painel-topo { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--pf-linha); background: var(--pf-superficie); }
+.rn-hud__painel-corpo { overflow-y: auto; padding: 0 14px 16px; overscroll-behavior: contain; }
+.rn-hud__painel-corpo > :first-child { margin-top: 12px; }
+.rn-hud__painel-corpo .pf-grade--2 { grid-template-columns: minmax(0, 1fr); }
+.rn-hud__painel-corpo .rn-exp, .rn-hud__painel-corpo .rn-bolsa, .rn-hud__painel-corpo .rn-garagem, .rn-hud__painel-corpo .rn-construcoes { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 640px) {
+  .rn-hud__painel { left: 8px; right: 8px; width: auto; top: auto; bottom: 84px; max-height: 62vh; border-radius: 20px; }
+}
+
+/* ---- a visita a um reino vizinho */
+.rn-mundo__rotulo--vizinho { pointer-events: auto; cursor: pointer; border: none; font: inherit; }
+.rn-mundo__rotulo--vizinho:hover { background: #166534; }
+.rn-visita {
+  position: absolute; left: 12px; bottom: 12px; z-index: 4; width: min(420px, calc(100% - 24px)); max-height: calc(100% - 24px); overflow-y: auto;
+  padding: 12px 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.95); color: var(--pf-tinta); box-shadow: var(--pf-sombra-alta);
+}
+:root[data-tema="escuro"] .rn-visita { background: rgba(20, 23, 17, 0.95); border: 1px solid rgba(255, 255, 255, 0.07); }
+.rn-tela-cheia .rn-visita { bottom: 86px; }
+.rn-visita--carregando { font-weight: 700; }
+.rn-visita__topo { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.rn-visita__topo h3 { margin: 2px 0; font-size: 17px; }
+.rn-visita__topo small { color: var(--pf-tinta-2); }
+.rn-visita__selo { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--pf-verde-forte); }
+.rn-visita__botoes { display: flex; gap: 6px; }
+.rn-visita__corpo { margin-top: 8px; display: grid; gap: 6px; }
+.rn-visita__linha { margin: 0; font-size: 13px; }
+.rn-visita__predios { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; font-size: 13px; }
+
+/* ---- a garagem e o tanque */
+.rn-garagem { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); }
+.rn-veiculo { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: start; }
+.rn-veiculo:not(.rn-veiculo--meu) .rn-veiculo__arte { filter: grayscale(0.55); opacity: 0.85; }
+.rn-veiculo--meu { box-shadow: inset 0 0 0 2px var(--pf-verde); }
+.rn-veiculo__info h3 { margin: 0; font-size: 16px; }
+.rn-veiculo__destino { font-size: 12px; font-weight: 700; color: var(--pf-verde-forte); }
+.rn-veiculo__info .pf-estat__nota { margin: 4px 0 8px; }
+.rn-veiculo__rodape { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.rn-tanque { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 700; color: var(--pf-tinta); }
+.rn-tanque__carga { width: 12px; height: 16px; border-radius: 3px; border: 2px solid var(--pf-tinta-2); background: transparent; }
+.rn-tanque__carga--cheia { background: var(--pf-atencao); border-color: var(--pf-atencao); }
+.rn-tanque small { margin-left: 4px; color: var(--pf-tinta-2); }
+.rn-tanque--compacto { font-size: 12px; }
+.rn-tanque--compacto .rn-tanque__carga { width: 7px; height: 11px; border-width: 1.5px; border-radius: 2px; }
+
+/* ---- expedições: as abas dos veículos e o radar */
+.rn-exp__abas { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; scrollbar-width: thin; }
+.rn-exp__aba {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 9999px; cursor: pointer;
+  border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; font-size: 14px; font-weight: 700;
+}
+.rn-exp__aba--atual { background: var(--pf-destaque-fundo); color: #fff; border-color: transparent; }
+.rn-exp__aba--atual .rn-tanque, .rn-exp__aba--atual .rn-tanque small { color: #fff; }
+.rn-exp__aba--trancada { opacity: 0.8; }
+.rn-exp__aba:focus-visible { outline: 2px solid var(--pf-verde); outline-offset: 2px; }
+.rn-exp__trancado { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.rn-exp__trancado p { flex: 1 1 260px; margin: 0; font-size: 14px; }
+.rn-exp__tanque { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.rn-exp__forca { display: inline-flex; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 800; background: var(--pf-sucesso-fundo); color: var(--pf-verde-forte); }
+.rn-exp__forca--forte { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+.rn-exp__lugar--planetoide { background: linear-gradient(135deg, var(--pf-superficie) 60%, rgba(124, 58, 237, 0.12)); }
+
+/* ---- a mina de ouro */
+.rn-ouro { display: grid; gap: 8px; align-content: start; }
+.rn-ouro .pf-estat__valor small { font-size: 14px; font-weight: 600; color: var(--pf-tinta-2); }
+.rn-ouro__alugueis { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.rn-ouro__campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rn-mercado { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rn-mercado li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: var(--pf-fundo); }
+.rn-mercado__quem { flex: 1 1 160px; display: grid; }
+.rn-mercado__quem small { color: var(--pf-tinta-2); }
+.rn-mercado__preco small { color: var(--pf-tinta-2); font-size: 12px; }
+
+/* ---- o mercado de tropas */
+.rn-mt__destino { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rn-mt__destino .rn-dias__opcao { min-height: 36px; padding: 0 12px; }
+.rn-mt__emoji { font-size: 22px; line-height: 1; }
+.rn-mt__desconto { margin-left: 6px; font-size: 11px; }
+.rn-mt__botoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.rn-mt__motivo { flex: 1 1 100%; }
+.rn-mt__resumo { margin: 4px 0; padding-left: 18px; display: grid; gap: 2px; font-size: 14px; }
+.rn-tropa__vender { margin-left: auto; }
+
+/* ---- a bolsa */
+.rn-bolsa__manchete { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; border-left: 4px solid var(--pf-verde); }
+.rn-bolsa__manchete span { font-size: 22px; }
+.rn-bolsa__manchete p { margin: 0; }
+.rn-bolsa__abrindo { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; margin-bottom: 12px; }
+.rn-bolsa__carteira { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 12px; }
+@media (max-width: 640px) { .rn-bolsa__carteira { grid-template-columns: minmax(0, 1fr); } }
+.rn-hud__painel-corpo .rn-bolsa__carteira { grid-template-columns: minmax(0, 1fr); }
+.rn-bolsa { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 700px) { .rn-bolsa { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .rn-bolsa { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.rn-acao { display: grid; gap: 8px; align-content: start; }
+.rn-acao__topo { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.rn-acao__emoji { font-size: 28px; }
+.rn-acao__nome h3 { margin: 0; font-size: 15px; }
+.rn-acao__nome small { color: var(--pf-tinta-2); font-size: 12px; }
+.rn-acao__preco { display: grid; justify-items: end; gap: 2px; font-weight: 800; }
+.rn-acao__noticia { margin: 0; }
+.rn-acao__minha { margin: 0; font-size: 13px; }
+.rn-acao__acoes { margin-top: 0; }
+.rn-var { display: inline-flex; padding: 1px 8px; border-radius: 9999px; font-size: 12px; font-weight: 800; }
+.rn-var--sobe { color: var(--pf-verde-forte); }
+.rn-var--cai { color: var(--pf-alerta); }
+.rn-var--igual { color: var(--pf-tinta-2); }
+.rn-var.rn-var--sobe { background: var(--pf-sucesso-fundo); }
+.rn-var.rn-var--cai { background: var(--pf-alerta-fundo); }
+.rn-var.rn-var--igual { background: var(--pf-fundo); }
+.rn-var--estreia { background: var(--pf-atencao-fundo); color: var(--pf-atencao); }
+.rn-grafico { display: grid; gap: 2px; }
+.rn-grafico__svg { width: 100%; height: 48px; display: block; touch-action: pan-y; }
+.rn-grafico__linha { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.rn-grafico__svg--sobe { color: var(--pf-verde-forte); }
+.rn-grafico__svg--cai { color: var(--pf-alerta); }
+.rn-grafico__linha, .rn-grafico__ponto { stroke: currentColor; }
+.rn-grafico__ponto { fill: var(--pf-superficie); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.rn-grafico__ponto--foco { fill: currentColor; }
+.rn-grafico__guia { stroke: var(--pf-tinta-2); stroke-width: 1; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
+.rn-grafico__dica { font-size: 11px; color: var(--pf-tinta-2); }
+.rn-bolsa__saidas, .rn-bolsa__ordens { margin-top: 12px; }
+.rn-bolsa__saidas ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.rn-negociar { display: grid; gap: 12px; }
+.rn-negociar h2 small { display: block; font-size: 13px; font-weight: 600; color: var(--pf-tinta-2); }
+.rn-negociar .rn-dias { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rn-negociar__qtd { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rn-negociar__qtd input { width: 100px; }
+.rn-negociar__conta { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--pf-superficie); }
+.rn-negociar__conta dt, .rn-negociar__conta dd { margin: 0; font-size: 14px; }
+.rn-negociar__conta dd { text-align: right; }
+
+/* ---- o céu dos lugares novos (o Mundo3D marca data-cenario no quadro durante a luta) */
+/* o fundo do mar (23/10/2026: "debaixo da água de verdade"): o fundo da tela é a própria água — a
+   mesma cor da névoa do Mundo3D lá longe, um pouco mais clara no alto, onde a luz da superfície chega */
+:root .rn-mundo[data-cenario="recife-tritoes"] { background: linear-gradient(180deg, #3aa9d4 0%, #1b86b4 45%, #1b86b4 100%); }
+:root .rn-mundo[data-cenario="cidade-afundada"] { background: linear-gradient(180deg, #2a86ad 0%, #12668f 45%, #12668f 100%); }
+:root .rn-mundo[data-cenario="fossa-kraken"] { background: linear-gradient(180deg, #13306a 0%, #0a1f44 45%, #0a1f44 100%); }
+:root .rn-mundo[data-cenario="trilha-yetis"] { background: linear-gradient(180deg, #a9c9ea 0%, #dbe9f7 65%, #ffffff 100%); }
+:root .rn-mundo[data-cenario="ninho-harpias"] { background: linear-gradient(180deg, #7fb2e8 0%, #c5dcf5 60%, #fff7ed 100%); }
+:root .rn-mundo[data-cenario="pico-gigante"] { background: linear-gradient(180deg, #5e8fd6 0%, #a9c9f2 60%, #eaf3ff 100%); }
+:root .rn-mundo[data-cenario="forja-diabretes"] { background: linear-gradient(180deg, #2a0d06 0%, #7a2a0f 55%, #e0742a 100%); }
+:root .rn-mundo[data-cenario="rio-de-magma"] { background: linear-gradient(180deg, #160604 0%, #5c1a08 55%, #d9541a 100%); }
+:root .rn-mundo[data-cenario="trono-dragao"] { background: linear-gradient(180deg, #120303 0%, #6b0f0f 55%, #e4361b 100%); }
+/* o espaço em volta do planetoide (23/10/2026): estrelas por cima do céu de cada um */
+:root .rn-mundo[data-cenario="planetoide-0"] { background: radial-gradient(1.5px 1.5px at 8% 18%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 22% 62%, #fff 60%, transparent 61%), radial-gradient(1.5px 1.5px at 35% 12%, #e0e7ff 60%, transparent 61%), radial-gradient(1px 1px at 48% 80%, #fff 60%, transparent 61%), radial-gradient(2px 2px at 62% 28%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 74% 70%, #fde68a 60%, transparent 61%), radial-gradient(1.5px 1.5px at 88% 42%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 92% 88%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 15% 90%, #c7d2fe 60%, transparent 61%), radial-gradient(1.5px 1.5px at 55% 52%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 30% 38%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 82% 10%, #fff 60%, transparent 61%), radial-gradient(circle at 80% 15%, #f5d0fe 0 3%, transparent 4%), linear-gradient(180deg, #0b0420 0%, #1d0b40 60%, #2a1458 100%); }
+:root .rn-mundo[data-cenario="planetoide-1"] { background: radial-gradient(1.5px 1.5px at 8% 18%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 22% 62%, #fff 60%, transparent 61%), radial-gradient(1.5px 1.5px at 35% 12%, #e0e7ff 60%, transparent 61%), radial-gradient(1px 1px at 48% 80%, #fff 60%, transparent 61%), radial-gradient(2px 2px at 62% 28%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 74% 70%, #fde68a 60%, transparent 61%), radial-gradient(1.5px 1.5px at 88% 42%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 92% 88%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 15% 90%, #c7d2fe 60%, transparent 61%), radial-gradient(1.5px 1.5px at 55% 52%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 30% 38%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 82% 10%, #fff 60%, transparent 61%), radial-gradient(circle at 20% 20%, #bbf7d0 0 4%, transparent 5%), linear-gradient(180deg, #02120a 0%, #06261a 60%, #0f3d29 100%); }
+:root .rn-mundo[data-cenario="planetoide-2"] { background: radial-gradient(1.5px 1.5px at 8% 18%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 22% 62%, #fff 60%, transparent 61%), radial-gradient(1.5px 1.5px at 35% 12%, #e0e7ff 60%, transparent 61%), radial-gradient(1px 1px at 48% 80%, #fff 60%, transparent 61%), radial-gradient(2px 2px at 62% 28%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 74% 70%, #fde68a 60%, transparent 61%), radial-gradient(1.5px 1.5px at 88% 42%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 92% 88%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 15% 90%, #c7d2fe 60%, transparent 61%), radial-gradient(1.5px 1.5px at 55% 52%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 30% 38%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 82% 10%, #fff 60%, transparent 61%), radial-gradient(circle at 75% 20%, #fde68a 0 5%, transparent 6%), linear-gradient(180deg, #1a0602 0%, #3a1306 60%, #5a1f0c 100%); }
+:root .rn-mundo[data-cenario="planetoide-3"] { background: radial-gradient(1.5px 1.5px at 8% 18%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 22% 62%, #fff 60%, transparent 61%), radial-gradient(1.5px 1.5px at 35% 12%, #e0e7ff 60%, transparent 61%), radial-gradient(1px 1px at 48% 80%, #fff 60%, transparent 61%), radial-gradient(2px 2px at 62% 28%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 74% 70%, #fde68a 60%, transparent 61%), radial-gradient(1.5px 1.5px at 88% 42%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 92% 88%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 15% 90%, #c7d2fe 60%, transparent 61%), radial-gradient(1.5px 1.5px at 55% 52%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 30% 38%, #fff 60%, transparent 61%), radial-gradient(1px 1px at 82% 10%, #fff 60%, transparent 61%), radial-gradient(circle at 30% 15%, #e0e7ff 0 3%, transparent 4%), linear-gradient(180deg, #030616 0%, #0f1438 60%, #1b2257 100%); }
+
+/* ajustes do teste visual (23/10/2026) */
+.rn-veiculo__rodape .pf-botao, .rn-exp__tanque .pf-botao { white-space: nowrap; }
+.rn-vista3d:has(.rn-mundo--batalha) .rn-vista3d__cheia { display: none; }
+@media (max-width: 640px) {
+  .rn-hud__painel { max-height: 52vh; }
+  .rn-visita { max-height: 48%; left: 8px; right: 8px; width: auto; }
+}
+
+/* ---- o tesouro da mina: barra de ouro e diamante (23/10/2026) */
+.rn-icone-ouro, .rn-icone-diamante { display: inline-block; vertical-align: -0.2em; flex: none; }
+.rn-ouro__tesouro { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.rn-ouro__tesouro > span { display: inline-flex; align-items: center; gap: 4px; }
+.rn-ouro__diamantes { opacity: 0.55; }
+.rn-ouro__diamantes--tem { opacity: 1; animation: rn-brilho-diamante 1.6s ease-in-out infinite; }
+@keyframes rn-brilho-diamante { 50% { filter: drop-shadow(0 0 6px rgba(125, 211, 252, 0.95)); } }
+@media (prefers-reduced-motion: reduce) { .rn-ouro__diamantes--tem { animation: none; } }
+.rn-hud__botao { display: inline-flex; align-items: center; gap: 4px; }
+
+/* ---- as ferramentas do Reino de Teste (23/10/2026) */
+.rn-teste__caixa { margin-top: 12px; border: 2px dashed #a855f7; border-radius: var(--pf-raio); background: var(--pf-superficie); padding: 0 14px; }
+.rn-teste__caixa summary { cursor: pointer; padding: 12px 0; font-weight: 800; }
+.rn-teste__caixa summary small { font-weight: 600; color: var(--pf-tinta-2); margin-left: 6px; }
+.rn-teste { display: grid; gap: 10px; padding-bottom: 14px; }
+.rn-teste__aviso { margin: 0; font-size: 14px; padding: 10px 12px; border-radius: 12px; background: rgba(168, 85, 247, 0.12); }
+.rn-teste__grade { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.rn-teste__botao {
+  display: flex; gap: 10px; align-items: center; text-align: left; padding: 10px 12px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--pf-linha); background: var(--pf-fundo); color: var(--pf-tinta); font: inherit;
+}
+.rn-teste__botao:hover { border-color: #a855f7; }
+.rn-teste__botao:disabled { opacity: 0.6; cursor: default; }
+.rn-teste__botao:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; }
+.rn-teste__botao span:last-child { display: grid; }
+.rn-teste__botao small { color: var(--pf-tinta-2); font-size: 12px; }
+.rn-teste__botao--limpar { border-style: dashed; }
+.rn-teste__emoji { font-size: 22px; }
+.rn-teste__dica { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
+
+/* ---- ajustes de layout (23/10/2026): nada sai do cartão */
+.rn-personagem { min-width: 0; overflow-wrap: anywhere; }
+.rn-personagem .rn-botao { flex-wrap: wrap; }
+.rn-personagem .rn-motivo { overflow-wrap: anywhere; }
+.rn-construcao, .rn-veiculo, .rn-exp__lugar, .rn-tropa, .rn-ouro { min-width: 0; }
+
+/* com o Reino mais largo, o mundo 3D também cresce um pouco na altura */
+@media (min-width: 1400px) { .rn-mundo { height: 460px; } }
+
+/* ---- o Reino de Teste, um mundo à parte (23/10/2026): a faixa que avisa onde a pessoa está e a
+   entrada a partir do reino de verdade. O roxo é a cor do teste em todo o app. */
+.rn-faixa-teste {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; padding: 12px 14px;
+  border: 2px dashed #a855f7; border-radius: var(--pf-raio); background: rgba(168, 85, 247, 0.1); font-size: 14px;
+}
+.rn-faixa-teste > span:nth-child(2) { flex: 1 1 320px; min-width: 0; }
+.rn-faixa-teste__selo { font-weight: 900; letter-spacing: 0.06em; color: #7e22ce; white-space: nowrap; }
+:root[data-tema="escuro"] .rn-faixa-teste__selo { color: #d8b4fe; }
+.rn-entrada-teste {
+  display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 14px; border-radius: var(--pf-raio);
+  border: 2px dashed #a855f7; background: var(--pf-superficie); color: var(--pf-tinta); text-decoration: none;
+}
+.rn-entrada-teste:hover { background: rgba(168, 85, 247, 0.08); }
+.rn-entrada-teste:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; }
+.rn-entrada-teste > span:nth-child(2) { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.rn-entrada-teste small { color: var(--pf-tinta-2); font-size: 13px; }
+.rn-entrada-teste__emoji { font-size: 26px; }
+.rn-entrada-teste__ir { font-weight: 800; color: #7e22ce; white-space: nowrap; }
+:root[data-tema="escuro"] .rn-entrada-teste__ir { color: #d8b4fe; }
+#teste.pf-secao { margin-top: 12px; }
+
+/* ---- os cartões do Reino com o pé no lugar (23/10/2026: "o tamanho desses cartões fica estranho,
+   mal feito, com tamanhos quebrados"). Numa linha, todo cartão tem a mesma altura e o botão (ou o
+   selo) fica no pé, alinhado com os vizinhos; e as grades contam colunas que fecham as linhas
+   (a do cartão sobra sozinha numa linha). Contadas pela largura da SEÇÃO (container queries): a
+   mesma seção também aparece estreita, no painel da tela cheia. */
+
+/* construções: o selo "Nível máximo" no pé, como o botão de melhorar */
+.rn-construcao > .pf-pilula { margin-top: auto; align-self: flex-start; }
+
+/* personagens: 6, 4, 3 ou 2 por linha (12 personagens fecham todas as linhas) */
+#personagens { container-type: inline-size; container-name: personagens; }
+.rn-personagens { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container personagens (min-width: 540px) { .rn-personagens { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container personagens (min-width: 760px) { .rn-personagens { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container personagens (min-width: 1240px) { .rn-personagens { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.rn-personagem { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.rn-personagem > strong { text-wrap: balance; }
+.rn-personagem__desc { min-height: 0; }
+.rn-personagem > :last-child { margin-top: auto; padding-top: 4px; }
+/* (31/10/2026) com fonte maior ou zoom, o botão "Comprar · 🪙 1.200" passava da borda: o cartão aperta
+   o recheio, o botão ocupa a largura dele e pode quebrar a linha, e nada sai do cartão */
+.rn-personagem.pf-cartao { padding: 16px 12px; }
+.rn-personagem > * { max-width: 100%; }
+.rn-personagem .rn-botao { width: 100%; justify-content: center; }
+.rn-personagem .rn-botao .pf-botao { width: 100%; padding: 6px 10px; gap: 4px; flex-wrap: wrap; line-height: 1.25; }
+
+/* expedições: o rodapé (o saque e o Atacar) no pé do cartão; as abas dos veículos quebram a linha */
+.rn-exp__lugar { align-items: stretch; }
+.rn-exp__arte { align-self: start; }
+.rn-exp__info { display: flex; flex-direction: column; gap: 6px; }
+.rn-exp__rodape { margin-top: auto; padding-top: 4px; }
+.rn-exp__abas { flex-wrap: wrap; overflow: visible; padding-bottom: 0; }
+
+/* garagem: os 5 veículos lado a lado na tela larga; em 2 colunas, o último ocupa a linha toda */
+#garagem { container-type: inline-size; container-name: garagem; }
+.rn-garagem { grid-template-columns: minmax(0, 1fr); }
+.rn-veiculo { align-items: stretch; }
+.rn-veiculo__arte { align-self: start; }
+.rn-veiculo__info { display: flex; flex-direction: column; }
+.rn-veiculo__rodape { margin-top: auto; }
+@container garagem (min-width: 620px) {
+  .rn-garagem { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rn-garagem > .rn-veiculo:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+@container garagem (min-width: 1150px) {
+  .rn-garagem { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .rn-garagem > .rn-veiculo:last-child:nth-child(odd) { grid-column: auto; }
+  /* a arte não estica: a sobra de altura fica no texto, e os títulos ficam na mesma linha */
+  .rn-veiculo { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; text-align: center; }
+  .rn-veiculo__arte { justify-self: center; }
+  .rn-veiculo__rodape { justify-content: center; }
+}
+
+/* tropas: os botões de treinar no pé do cartão */
+.rn-tropa { grid-template-rows: auto 1fr; }
+.rn-tropa__acoes { align-self: end; }
+
+/* as ferramentas do Reino de Teste: 4 por linha (8 ferramentas, duas linhas cheias) */
+#teste { container-type: inline-size; container-name: ferramentas; }
+.rn-teste__grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container ferramentas (min-width: 880px) { .rn-teste__grade { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container ferramentas (max-width: 420px) { .rn-teste__grade { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---- os chefões do Modo Domínio (24/10/2026): avatares que se ganham no topo de uma torre Mestre */
+.rn-chefoes { display: grid; gap: 10px; margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px dashed var(--pf-linha); }
+.rn-chefoes__titulo { margin: 0; font-size: 15px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.rn-chefoes__titulo small { font-weight: 400; color: var(--pf-tinta-2); font-size: 12px; }
+.rn-personagem--trancado .rn-personagem__vitrine { filter: grayscale(1) brightness(0.55); opacity: 0.8; }
+
+/* a Temporada das Ilhas (03/11/2026): o céu do mar do Caribe nas batalhas das ilhas */
+:root .rn-mundo[data-cenario="ilha-tropical"] { background: linear-gradient(180deg, #67c7f0 0%, #b6e6fa 60%, #e8f8ff 100%); }
+
+/* ------------------------------------------------------------ o menu do Reino em abas (03/11/2026)
+   "o menu do reino tá muito cheio e bagunçado": cinco abas (Reino, Batalha, Expedições, Forja, Bolsa); cada
+   uma mostra só as suas partes. A barra gruda no alto ao rolar. */
+.rn-menu {
+  position: sticky; top: 72px; z-index: 8;
+  display: flex; gap: 4px; margin: 22px 0 6px; padding: 6px;
+  overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+  border-radius: var(--pf-pilula); background: rgba(20, 23, 17, 0.92); border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+:root:not([data-tema="escuro"]) .rn-menu { background: rgba(255, 255, 255, 0.92); border-color: var(--pf-linha); box-shadow: var(--pf-sombra); }
+@media (min-width: 900px) { .rn-menu { top: 14px; } }
+.rn-menu::-webkit-scrollbar { display: none; }
+.rn-menu__aba {
+  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 46px; padding: 8px 18px; border: 0; border-radius: var(--pf-pilula); background: transparent; cursor: pointer;
+  color: var(--pf-tinta-2); font: inherit; font-size: 13px; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.rn-menu__aba:hover { color: var(--pf-tinta); background: var(--pf-superficie-2); }
+.rn-menu__aba[aria-selected="true"] { background: var(--pf-botao-fundo); color: var(--pf-tinta-sobre-verde); box-shadow: var(--pf-botao-brilho); }
+.rn-menu__aba { font-family: var(--pf-fonte-titulo); font-weight: 600; }
+.rn-menu__marca {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 9999px;
+  background: #E5484D; color: #FFFFFF; font-size: 11px; font-weight: 900; letter-spacing: 0;
+}
+.rn-menu__aba[aria-selected="true"] .rn-menu__marca { background: var(--pf-tinta-sobre-verde); color: #A2E33A; }
+@media (max-width: 640px) { .rn-menu__aba { padding: 8px 14px; font-size: 12px; } }
+/* a seção aberta pelo link (#forja, #grandes-expedicoes) não fica embaixo da barra que gruda */
+.pf-principal:has(.rn-menu) .pf-secao { scroll-margin-top: 140px; }
+
+/* a linha de ações da aba Batalha */
+.rn-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; padding: 12px 14px; border-radius: var(--pf-raio); background: var(--pf-superficie); border: 1px solid var(--pf-linha); }
+.rn-acoes__nota { flex: 1 1 260px; font-size: 14px; font-weight: 700; color: var(--pf-tinta-2); }
+
+/* os artefatos da Forja em efeito, por cima do mundo 3D (embaixo do selo do clima) */
+.rn-efeitos { position: absolute; right: 10px; top: 44px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.rn-efeitos__selo {
+  border: 1px solid rgba(139, 209, 26, 0.45); cursor: pointer; padding: 5px 12px; border-radius: 9999px;
+  font: inherit; font-size: 12px; font-weight: 800; white-space: nowrap;
+  background: rgba(10, 12, 9, 0.74); color: #F2F5EE; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.rn-efeitos__selo:hover { background: rgba(10, 12, 9, 0.92); border-color: #8BD11A; }
+.rn-vista3d:has(.rn-mundo--batalha) .rn-efeitos { display: none; }
+.rn-tela-cheia .rn-efeitos { top: auto; bottom: 166px; }
+@media (max-width: 640px) { .rn-efeitos { top: 38px; } .rn-efeitos__selo { font-size: 11px; padding: 4px 10px; } }
+
+/* a ilha das Grandes Expedições aberta no mundo 3D */
+.rn-visita--ilha { border: 1px solid rgba(56, 189, 248, 0.35); }
+.rn-visita--ilha .rn-visita__selo { color: #38BDF8; }
+:root:not([data-tema="escuro"]) .rn-visita--ilha .rn-visita__selo { color: #0369A1; }
+.il-ver3d { margin: 0 0 16px; }
+
+/* o Reino no celular: as cinco abas cabem na tela (emoji em cima, nome embaixo) e os números em duas colunas */
+@media (max-width: 640px) {
+  .rn-menu { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; top: 66px; padding: 5px; border-radius: 22px; overflow: visible; }
+  .rn-menu__aba { position: relative; flex-direction: column; gap: 1px; min-height: 56px; padding: 6px 2px; font-size: 9.5px; letter-spacing: 0.02em; border-radius: 17px; }
+  .rn-menu__aba > span[aria-hidden="true"] { font-size: 19px; line-height: 1.1; }
+  .rn-menu__marca { position: absolute; top: 3px; right: 6px; min-width: 17px; height: 17px; padding: 0 4px; font-size: 10px; }
+  .rn-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .rn-numero { padding: 14px; }
+  .rn-numero .pf-estat__valor { font-size: 18px; }
+  .rn-numero .pf-estat__nota { font-size: 12px; }
+}

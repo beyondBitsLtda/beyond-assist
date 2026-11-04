@@ -1,0 +1,156 @@
+/* O modal de novidades (componentes/Novidades.js): um palco de aventura com os monstros das
+   expedições e o Neuro comemorando, e a lista do que mudou. */
+.novidades {
+  position: fixed; inset: 0; z-index: 60; display: flex; padding: 16px; overflow-y: auto;
+  background: rgba(6, 12, 9, 0.62); backdrop-filter: blur(4px);
+  animation: novidades-fundo 0.25s ease-out both;
+}
+.novidades__caixa {
+  /* margin auto: centraliza quando cabe e começa do topo quando é mais alta que a tela (no celular) */
+  margin: auto; width: min(980px, 100%); border-radius: 24px; overflow: hidden; background: var(--pf-superficie);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); animation: novidades-entrar 0.45s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+
+/* o palco: céu de fim de tarde, estrelas, morro verde e a turma */
+.novidades__palco {
+  position: relative; height: 176px; overflow: hidden;
+  background: linear-gradient(180deg, #1e1b4b 0%, #5b21b6 48%, #ea580c 100%);
+}
+.novidades__estrelas {
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 18%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 30% 35%, #fde68a 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 52% 12%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 68% 28%, #fff 50%, transparent 51%),
+    radial-gradient(2px 2px at 84% 14%, #fde68a 50%, transparent 51%), radial-gradient(1px 1px at 92% 40%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 44% 44%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 6% 46%, #fff 50%, transparent 51%);
+  opacity: 0.9; animation: novidades-piscar 2.4s ease-in-out infinite alternate;
+}
+.novidades__chao {
+  position: absolute; left: -10%; right: -10%; bottom: -22px; height: 58px;
+  background: #3f8f4a; border-radius: 50%; box-shadow: inset 0 6px 0 #57a85f;
+}
+.novidades__bicho { position: absolute; z-index: 1; filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.25)); }
+.novidades__bicho--cerbero { width: 142px; left: 3%; bottom: 8px; animation: novidades-boiar 2.8s ease-in-out infinite; }
+.novidades__bicho--goblin { width: 74px; right: 9%; bottom: 16px; animation: novidades-boiar 2.2s 0.4s ease-in-out infinite; }
+.novidades__bicho--cogumelo { width: 54px; right: 27%; bottom: 18px; animation: novidades-pular 1.6s ease-in-out infinite; }
+.novidades__bicho--morcego { width: 62px; right: 5%; top: 14px; animation: novidades-voar 3.2s ease-in-out infinite; }
+.novidades__neuro { position: absolute; z-index: 2; left: 50%; bottom: 10px; transform: translateX(-50%); }
+
+.novidades__corpo { display: grid; gap: 10px; padding: 18px 22px 22px; }
+.novidades__selo {
+  justify-self: start; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #fff; background: linear-gradient(90deg, #7c3aed, #ea580c);
+}
+.novidades__titulo { margin: 0; font-size: 27px; font-weight: 800; line-height: 1.15; color: var(--pf-tinta); }
+.novidades__sub { margin: 0; color: var(--pf-tinta-2); font-size: 15px; }
+.novidades__lista { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 560px) { .novidades__lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.novidades__item {
+  display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 14px;
+  background: var(--pf-superficie-2); font-size: 13.5px; line-height: 1.4;
+}
+.novidades__item strong { display: block; font-size: 14.5px; color: var(--pf-tinta); }
+.novidades__item > span:last-child > span { color: var(--pf-tinta-2); }
+.novidades__item--destaque {
+  grid-column: 1 / -1; border: 2px solid #f59e0b;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(234, 88, 12, 0.14));
+}
+.novidades__icone {
+  flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; font-size: 21px;
+  background: var(--pf-superficie); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+/* o item com o personagem desenhado (o Raposão, 03/11/2026) */
+.novidades__item--destaque .novidades__icone:has(.neuro) { width: 70px; height: 70px; overflow: visible; }
+.novidades__acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.novidades__principal { flex: 1 1 220px; justify-content: center; text-align: center; font-size: 16px; box-shadow: var(--pf-botao-brilho); }
+
+@keyframes novidades-fundo { from { opacity: 0; } }
+@keyframes novidades-entrar { from { opacity: 0; transform: translateY(24px) scale(0.94); } }
+@keyframes novidades-piscar { to { opacity: 0.45; } }
+@keyframes novidades-boiar { 50% { transform: translateY(-6px); } }
+@keyframes novidades-pular { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-14px) rotate(-6deg); } }
+@keyframes novidades-voar { 0%, 100% { transform: translate(0, 0) rotate(-4deg); } 50% { transform: translate(-18px, 10px) rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .novidades, .novidades__caixa, .novidades__estrelas, .novidades__bicho { animation: none; }
+}
+/* no computador (pedido de 25/10/2026: "mais largo, ocupando mais espaço de tela"): palco mais alto,
+   a turma maior e a lista em três colunas */
+@media (min-width: 900px) {
+  .novidades__palco { height: 230px; }
+  .novidades__bicho--cerbero { width: 184px; left: 5%; }
+  .novidades__bicho--goblin { width: 96px; right: 11%; }
+  .novidades__bicho--cogumelo { width: 70px; right: 28%; }
+  .novidades__bicho--morcego { width: 80px; }
+  .novidades__corpo { gap: 12px; padding: 24px 32px 28px; }
+  .novidades__titulo { font-size: 34px; }
+  .novidades__sub { font-size: 16.5px; max-width: 70ch; }
+  .novidades__lista { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .novidades__item { padding: 14px 16px; font-size: 14.5px; }
+  .novidades__item strong { font-size: 15.5px; }
+  .novidades__acoes { justify-content: flex-end; }
+  .novidades__principal { flex: 0 1 320px; }
+  .novidades__neuro { transform: translateX(-50%) scale(1.3); transform-origin: bottom center; }
+}
+/* tela larga mas baixa (notebook): o palco encolhe para os botões caberem sem rolar */
+@media (min-width: 900px) and (max-height: 820px) {
+  .novidades__palco { height: 160px; }
+  .novidades__bicho--cerbero { width: 138px; }
+  .novidades__neuro { transform: translateX(-50%) scale(1.05); }
+  .novidades__corpo { gap: 8px; padding: 18px 28px 20px; }
+  .novidades__titulo { font-size: 28px; }
+  .novidades__item { padding: 10px 14px; font-size: 13.5px; }
+}
+@media (max-width: 420px) {
+  .novidades__palco { height: 150px; }
+  .novidades__bicho--cerbero { width: 112px; }
+  .novidades__titulo { font-size: 23px; }
+  .novidades__corpo { padding: 16px 16px 18px; }
+}
+
+/* 26/10/2026: os consultores da Bolsa no palco, três de cada lado do Neuro */
+.novidades__retratos { position: absolute; z-index: 1; left: 3%; right: 3%; bottom: 14px; display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none; }
+.novidades__retratos > span { display: flex; gap: 8px; align-items: flex-end; }
+.novidades__retrato { width: clamp(44px, 9vw, 92px); height: auto; filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.25)); animation: novidades-boiar 2.6s ease-in-out infinite; }
+.novidades__retratos > span > .novidades__retrato:nth-child(odd) { rotate: -5deg; }
+.novidades__retratos > span > .novidades__retrato:nth-child(even) { rotate: 4deg; margin-bottom: 10px; animation-delay: 0.5s; }
+.novidades__retratos > span > .novidades__retrato:nth-child(3) { animation-delay: 1s; }
+@media (max-width: 520px) { .novidades__retratos > span { gap: 4px; } .novidades__retratos > span > .novidades__retrato:nth-child(2) { display: none; } }
+@media (prefers-reduced-motion: reduce) { .novidades__retrato { animation: none; } }
+
+/* 26/10/2026 (2): os funcionários da Biblioteca Colaborativa no palco (corpo inteiro, sem moldura) */
+.novidades__retrato--solto { width: clamp(56px, 11vw, 118px); filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.22)); }
+.novidades__retratos > span > .novidades__retrato--solto:nth-child(even) { margin-bottom: 0; }
+
+/* a versão 1.0 (03/11/2026): o selo dourado e o "1.0" grande ao lado do Neuro comemorando */
+.novidades__selo--versao { background: linear-gradient(90deg, #f59e0b, #fde047); color: #3a2a00; }
+.novidades__neuro { position: relative; }
+.novidades__versao {
+  position: absolute; right: -46px; top: 4px; padding: 2px 10px; border-radius: 12px; font-size: 26px; font-weight: 900;
+  color: #3a2a00; background: linear-gradient(135deg, #fde047, #f59e0b); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); transform: rotate(8deg);
+}
+
+/* ---- a 1.0 com o banner (03/11/2026): o banner no topo e o modal no verde do visual premium */
+.novidades__caixa { width: min(760px, 100%); border: 1px solid rgba(139, 209, 26, 0.3); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(139, 209, 26, 0.18); }
+:root[data-tema="escuro"] .novidades__caixa { background: linear-gradient(180deg, #111909 0%, #0B0E08 100%); }
+.novidades__banner { display: block; line-height: 0; background: #1f9d3a; }
+.novidades__banner img { display: block; width: 100%; height: auto; aspect-ratio: 1672 / 941; object-fit: cover; }
+.novidades__selo--versao { color: #0D1A02; background: linear-gradient(90deg, #A6E63B, #7CC213); box-shadow: 0 0 18px rgba(139, 209, 26, 0.35); }
+.novidades__item--destaque { border: 1px solid rgba(139, 209, 26, 0.45); background: linear-gradient(135deg, rgba(139, 209, 26, 0.14), rgba(139, 209, 26, 0.04)); }
+:root[data-tema="escuro"] .novidades__item { border: 1px solid rgba(255, 255, 255, 0.06); }
+:root[data-tema="escuro"] .novidades__item--destaque { border-color: rgba(139, 209, 26, 0.45); }
+@media (max-width: 560px) { .novidades { padding: 10px; } .novidades__corpo { padding: 16px; } .novidades__titulo { font-size: 23px; } }
+
+/* ---- a 1.0 grande e curta (03/11/2026: "bem mais largo, menos texto, um texto só apresentando o sistema") */
+.novidades__caixa { width: min(1180px, 100%); border-radius: 30px; }
+.novidades__corpo--curto { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px 32px; padding: 26px 34px 30px; }
+.novidades__texto { flex: 1 1 520px; display: grid; gap: 8px; }
+.novidades__corpo--curto .novidades__titulo { font-size: 34px; font-weight: 600; }
+.novidades__corpo--curto .novidades__sub { font-size: 17px; line-height: 1.55; max-width: 62ch; }
+.novidades__corpo--curto .novidades__acoes { flex: 0 1 300px; display: grid; gap: 10px; margin: 0; }
+.novidades__corpo--curto .novidades__acoes .pf-botao { width: 100%; min-height: 54px; font-size: 16px; }
+@media (max-width: 700px) {
+  .novidades__corpo--curto { padding: 20px 18px 22px; }
+  .novidades__corpo--curto .novidades__titulo { font-size: 26px; }
+  .novidades__corpo--curto .novidades__sub { font-size: 15.5px; }
+  .novidades__corpo--curto .novidades__acoes { flex-basis: 100%; }
+}

@@ -4,14 +4,20 @@ import { sentinelSupabase } from "@/lib/sentinelSupabase.js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** GET /api/health → { supabase, trello, gemini, sentinel } (true = ok) */
+/** GET /api/health → { supabase, abacato, trello, gemini, sentinel } (true = ok) */
 export async function GET() {
-  const status = { supabase: false, trello: false, gemini: false, sentinel: false };
+  const status = { supabase: false, abacato: false, trello: false, gemini: false, sentinel: false };
 
   // Supabase (Beyond Brain): conta linhas em documents
   try {
     const { error } = await supabase.from("documents").select("id", { count: "exact", head: true });
     status.supabase = !error;
+  } catch {}
+
+  // Abacato: o sistema de tarefas (mesmo banco, tabelas abacato_*)
+  try {
+    const { error } = await supabase.from("abacato_quadros").select("id", { count: "exact", head: true });
+    status.abacato = !error;
   } catch {}
 
   // Sentinela: projeto Supabase separado — conta linhas em support_tickets
@@ -32,8 +38,12 @@ export async function GET() {
     }
   } catch {}
 
-  // Gemini: só checa se a chave está presente (evita gastar cota num ping)
-  status.gemini = Boolean(process.env.GEMINI_API_KEY);
+  // Gemini: só checa se a chave está presente (evita gastar cota num ping).
+  //
+  // Aceita as DUAS variáveis, na mesma ordem que o src/lib/gemini.js usa de verdade. Checar só a
+  // singular acendia a luz laranja em quem configurou o pool (GEMINI_API_KEYS) — ou seja, o
+  // indicador dizia que o Gemini estava fora enquanto ele respondia normalmente.
+  status.gemini = Boolean(process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY);
 
   return new Response(JSON.stringify(status), {
     headers: { "content-type": "application/json", "cache-control": "no-store" },

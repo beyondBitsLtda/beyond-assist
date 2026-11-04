@@ -1,0 +1,445 @@
+/* Abacato System — a Lisa.
+ *
+ * Um botão no canto e uma janela de conversa. O botão fica ACIMA de tudo mas fora do caminho:
+ * no celular ele sobe, porque embaixo mora a barra de navegação — um botão flutuante em cima
+ * dela é o jeito de a pessoa errar o alvo todas as vezes.
+ */
+
+/* ============================================================ a cor da Lisa
+ *
+ * ROSA CHOQUE, E SÓ AQUI DENTRO.
+ *
+ * O Abacato inteiro é verde; a Lisa é a única coisa do sistema que não é o sistema — é alguém
+ * a quem se fala. Dar a ela uma cor própria faz o botão no canto e a janela serem reconhecidos
+ * antes de serem lidos, e é por isso que os tokens abaixo existem em vez de um `filter: hue-
+ * rotate` ou de uma troca no verde global: o verde continua sendo a cor de ação do Abacato, e
+ * o rosa vale exclusivamente dentro das regras deste arquivo.
+ *
+ * OS PARES FORAM MEDIDOS, NÃO ESCOLHIDOS NO OLHO, e o estilo-check remede a cada vez. O rosa
+ * de ação leva texto branco por cima, e essa dupla precisa passar no contraste mínimo: #E5007E
+ * com branco dá 4,53:1, acima do 4,5 exigido. Os rosas mais óbvios reprovam — #FC0FC0 (o
+ * "shocking pink" de catálogo) dá 3,52:1 e #FF69B4 dá 2,65:1: bonitos na paleta, ilegíveis no
+ * botão. O véu (fundo de selo) e a tinta que vai sobre ele são outro par, medido separadamente
+ * — 6,21:1 no claro, 7,96:1 no escuro.
+ *
+ * No escuro só o PAR DO VÉU troca. O rosa de ação continua o mesmo nos dois temas de propósito:
+ * ele aparece sempre com branco por cima, e um rosa mais claro no escuro derrubaria justamente
+ * o contraste que essa dupla precisa ter.
+ */
+:root {
+  --lisa-rosa: #E5007E;          /* a cor de ação: botão, balão de quem fala, foco */
+  --lisa-rosa-forte: #C2006B;    /* o mesmo rosa pressionado */
+  --lisa-sobre-rosa: #FFFFFF;    /* a única tinta que vai por cima do rosa de ação */
+  --lisa-veu: #FFE3F2;           /* fundo de selo: rosa lavado */
+  --lisa-tinta-veu: #A8005C;     /* e a tinta que vai sobre ele */
+}
+:root[data-tema="escuro"] {
+  --lisa-veu: #3B0A24;
+  --lisa-tinta-veu: #FF8FC5;
+}
+
+/* ============================================================ o botão */
+
+.abacato-lisa-botao {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--lisa-rosa);
+  color: var(--lisa-sobre-rosa);
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: var(--abacato-sombra-alta);
+}
+.abacato-lisa-botao:hover { background: var(--lisa-rosa-forte); }
+
+/* O ponto pulsa devagar. É o único movimento da tela, e serve a uma coisa: dizer que ali há
+   alguém para responder. Some para quem pediu menos movimento. */
+.abacato-lisa-botao__ponto,
+.abacato-lisa__ponto {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--lisa-sobre-rosa);
+  flex-shrink: 0;
+  animation: abacato-pulso 2.4s ease-in-out infinite;
+}
+.abacato-lisa__ponto { background: var(--lisa-rosa); }
+
+@keyframes abacato-pulso {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .abacato-lisa-botao__ponto, .abacato-lisa__ponto { animation: none; }
+}
+
+/* ============================================================ a janela */
+
+.abacato-lisa {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 22px;
+}
+.abacato-lisa__fundo {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.abacato-lisa__caixa {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(460px, 100%);
+  height: min(640px, 82vh);
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio-grande);
+  box-shadow: var(--abacato-sombra-alta);
+  overflow: hidden;
+}
+
+.abacato-lisa__topo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--abacato-linha);
+  flex-shrink: 0;
+}
+.abacato-lisa__topo strong { font-size: 15px; }
+
+/* ============================================================ a conversa */
+
+.abacato-lisa__conversa {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.abacato-lisa__vazio { margin: auto 0; }
+.abacato-lisa__vazio-titulo { font-weight: 600; margin: 0 0 6px; }
+.abacato-lisa__sugestoes { display: flex; flex-direction: column; gap: 7px; margin-top: 16px; }
+.abacato-lisa__sugestao {
+  text-align: left;
+  border: 1px solid var(--abacato-linha);
+  border-radius: 12px;
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 13px;
+  padding: 9px 13px;
+  cursor: pointer;
+}
+.abacato-lisa__sugestao:hover { border-color: var(--lisa-rosa); color: var(--abacato-tinta); }
+
+.abacato-fala { display: flex; flex-direction: column; gap: 6px; max-width: 88%; }
+.abacato-fala--pessoa { align-self: flex-end; align-items: flex-end; }
+.abacato-fala--lisa { align-self: flex-start; }
+
+.abacato-fala__texto {
+  border-radius: 16px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  /* A resposta pode trazer lista e quebra de linha; sem isto tudo vira um parágrafo só. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.abacato-fala--pessoa .abacato-fala__texto {
+  background: var(--lisa-rosa);
+  color: var(--lisa-sobre-rosa);
+  border-bottom-right-radius: 5px;
+}
+.abacato-fala--lisa .abacato-fala__texto {
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta);
+  border-bottom-left-radius: 5px;
+}
+.abacato-fala__pensando { color: var(--abacato-tinta-3); font-style: italic; }
+
+/* O que ela MEXEU, marcado. Uma assistente que altera dados sem dizer o que alterou
+   transforma cada resposta numa dúvida. */
+.abacato-fala__acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.abacato-fala__acao {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--lisa-veu);
+  color: var(--lisa-tinta-veu);
+}
+
+/* ============================================================ a barra de baixo */
+
+.abacato-lisa__barra {
+  display: flex;
+  gap: 9px;
+  align-items: flex-end;
+  padding: 12px 14px;
+  border-top: 1px solid var(--abacato-linha);
+  flex-shrink: 0;
+}
+.abacato-lisa__campo {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  max-height: 120px;
+  padding: 10px 13px;
+  border: 1px solid var(--abacato-linha);
+  border-radius: 13px;
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta);
+}
+.abacato-lisa__campo:focus {
+  outline: none;
+  border-color: var(--lisa-rosa);
+  background: var(--abacato-superficie);
+}
+
+@media (max-width: 620px) {
+  /* Embaixo mora a barra de navegação do celular: o botão sobe para não disputar o toque. */
+  .abacato-lisa-botao { bottom: 82px; right: 16px; padding: 11px 17px; }
+  .abacato-lisa { padding: 0; align-items: stretch; }
+  .abacato-lisa__caixa { width: 100%; height: 100%; border-radius: 0; border: 0; }
+}
+
+/* ============================================================ o que a Lisa herda
+ *
+ * Botões, selos e o ícone de fechar vêm do sistema e nascem verdes. Aqui dentro eles viram
+ * rosa — porque um botão verde dentro de uma janela rosa não parece um botão do sistema, parece
+ * um botão que alguém esqueceu de pintar.
+ *
+ * O escopo é a janela, e não o botão: `.abacato-lisa` e `.abacato-gen` são os dois contêineres
+ * da assistente (a conversa e o Quadro Gen, que usa a moldura de painel e não a dela). Nada
+ * fora deles é tocado — é o que garante que o resto do Abacato siga verde.
+ *
+ * O `:not(--fantasma)` não é detalhe: sem ele, o botão fantasma — que é uma borda com fundo
+ * transparente — ganharia fundo rosa e viraria um botão principal, e a janela passaria a ter
+ * dois botões principais disputando o clique.
+ *
+ * A tinta é BRANCA, e não a tinta escura que o botão verde usa. Aquela tinta (#06140C) sobre
+ * este rosa dá 4,16:1 e reprova; o branco dá 4,53:1 e passa. É por isso que o botão não pode
+ * simplesmente trocar de fundo e herdar o resto.
+ */
+.abacato-lisa .abacato-botao:not(.abacato-botao--fantasma),
+.abacato-gen .abacato-botao:not(.abacato-botao--fantasma) {
+  background: var(--lisa-rosa);
+  color: var(--lisa-sobre-rosa);
+}
+
+.abacato-lisa .abacato-botao--fantasma:hover,
+.abacato-gen .abacato-botao--fantasma:hover {
+  color: var(--lisa-rosa);
+  border-color: var(--lisa-rosa);
+}
+
+.abacato-lisa .abacato-icone:hover,
+.abacato-gen .abacato-icone:hover { color: var(--lisa-rosa); }
+
+/* O selo de "pronto" dentro da janela — o contador de versão da prévia usa este. */
+.abacato-lisa .abacato-etiqueta--ok,
+.abacato-gen .abacato-etiqueta--ok {
+  background: var(--lisa-veu);
+  color: var(--lisa-tinta-veu);
+}
+
+/* O foco do teclado. O sistema desenha o anel com `outline: 2px solid var(--abacato-verde)`,
+   então sem esta regra navegar pela janela de teclado acenderia um anel verde numa janela rosa.
+   Os alvos são nomeados um a um de propósito: um `.abacato-lisa :focus-visible` genérico empata
+   em especificidade com a regra do sistema e só ganha por ser lido depois — e essa vitória some
+   no dia em que alguém trocar a ordem dos imports no layout. */
+.abacato-lisa .abacato-botao:focus-visible,
+.abacato-lisa .abacato-campo__entrada:focus-visible,
+.abacato-gen .abacato-botao:focus-visible,
+.abacato-gen .abacato-campo__entrada:focus-visible { outline-color: var(--lisa-rosa); }
+
+/* E o resto do que recebe foco aqui dentro (sugestões, campo de texto, ícone) usa o anel
+   padrão do navegador — este é o único lugar onde ele ganha a cor da Lisa. */
+.abacato-lisa :focus-visible,
+.abacato-gen :focus-visible { outline-color: var(--lisa-rosa); }
+
+/* ============================================================ Quadro Gen */
+
+/* A caixa é mais alta que a da Lisa: aqui cabe uma conversa E um quadro inteiro. */
+.abacato-gen { height: min(780px, 90vh); }
+
+/* TRÊS FAIXAS QUE NÃO DISPUTAM ESPAÇO, e essa é a correção de um defeito real.
+ *
+ * Na primeira versão as três moravam dentro de um contêiner que rolava, e cada uma rolava
+ * por dentro também. O resultado: assim que a prévia aparecia, a conversa encolhia para uma
+ * tira de 40px com barra de rolagem — dava para ver meia mensagem — e o botão de criar,
+ * que ficava no fim da prévia, caía abaixo do corte. A pessoa pedia uma mudança, não via a
+ * resposta, e não achava o botão.
+ *
+ * Agora: a conversa tem altura PRÓPRIA e mínima, a prévia fica com o que sobra, e a barra
+ * de criar é presa embaixo. Nenhuma das três pode espremer a outra.
+ */
+.abacato-gen__corpo {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Sem rolagem AQUI: quem rola são as faixas de dentro. Uma rolagem externa somada às
+     internas é o que fazia a conversa desaparecer. */
+  overflow: hidden;
+}
+
+.abacato-gen__conversa {
+  /* Não cresce, não encolhe: o tamanho é este. */
+  flex: 0 0 auto;
+  min-height: 130px;
+  max-height: 34vh;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Sem proposta na tela, a conversa é a tela inteira.
+   A classe vem do componente, e não de um :has(): o layout inteiro depende desta regra, e
+   depender de um seletor que um navegador pode não entender é apostar a tela num detalhe. */
+.abacato-gen__corpo:not(.abacato-gen__corpo--com-previa) .abacato-gen__conversa {
+  flex: 1;
+  max-height: none;
+}
+.abacato-gen__vazio { margin: auto 0; }
+
+/* ------------------------------------------------ a prévia */
+
+.abacato-gen__previa {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie-2);
+  padding: 16px;
+}
+.abacato-gen__previa-topo { display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px; }
+.abacato-gen__previa-nome { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.abacato-gen__previa-nome strong { font-size: 15px; }
+
+.abacato-gen__etiquetas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.abacato-gen__etiqueta {
+  font-size: 11px;
+  font-weight: 700;
+  color: #FFFFFF;
+  padding: 2px 10px;
+  border-radius: var(--abacato-raio-pilula);
+}
+
+/* As colunas rolam na horizontal, como no quadro de verdade — é o que faz a prévia parecer
+   com o que vai ser criado, em vez de uma lista de listas. */
+.abacato-gen__colunas {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  align-items: flex-start;
+  padding-bottom: 6px;
+}
+.abacato-gen__coluna {
+  flex: 0 0 200px;
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.abacato-gen__coluna-nome {
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.abacato-gen__card {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--abacato-superficie-2);
+  border-radius: 9px;
+  padding: 7px 9px;
+  font-size: 12.5px;
+}
+.abacato-gen__card-titulo { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.abacato-gen__marca { width: 4px; align-self: stretch; border-radius: 3px; flex-shrink: 0; }
+
+/* ------------------------------------------------ a barra de criar */
+
+/* Presa embaixo, fora da prévia que rola. É a decisão da tela: ela não pode depender de
+   rolar até o fim para aparecer. */
+.abacato-gen__acoes {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-top: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie);
+}
+.abacato-gen__acoes .abacato-botao { margin-left: auto; }
+
+@media (max-width: 620px) {
+  .abacato-gen__conversa { min-height: 110px; max-height: 28vh; }
+  .abacato-gen__coluna { flex-basis: 170px; }
+  .abacato-gen__acoes .abacato-botao { margin-left: 0; width: 100%; }
+}
+
+/* O card da prévia abre com <details>: fechado mostra o título, aberto mostra a descrição e
+   os passos. Todos abertos de uma vez fariam a prévia virar um texto corrido de duas mil
+   palavras, e a forma do quadro — que é o que se confere primeiro — sumiria. */
+.abacato-gen__card { display: block; cursor: pointer; }
+.abacato-gen__card > summary { list-style: none; display: flex; align-items: center; gap: 7px; }
+.abacato-gen__card > summary::-webkit-details-marker { display: none; }
+.abacato-gen__card[open] > summary { margin-bottom: 7px; }
+.abacato-gen__card-topo { display: flex; align-items: center; gap: 7px; }
+.abacato-gen__card-corpo { border-top: 1px solid var(--abacato-linha); padding-top: 7px; }
+.abacato-gen__card-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--abacato-tinta-2);
+  overflow-wrap: anywhere;
+}
+.abacato-gen__passos {
+  margin: 7px 0 0;
+  padding-left: 18px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--abacato-tinta-2);
+}
+.abacato-gen__passos li { overflow-wrap: anywhere; }
+
+/* A seta some para quem pediu menos movimento; o triângulo é o único indício de que abre. */
+.abacato-gen__card > summary::after {
+  content: "▸";
+  margin-left: auto;
+  color: var(--abacato-tinta-3);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.abacato-gen__card[open] > summary::after { content: "▾"; }

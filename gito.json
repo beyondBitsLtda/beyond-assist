@@ -9,14 +9,515 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.1.1",
-  "atualizadoEm": "2026-10-31",
+  "versao": "0.37.2-dominio.1",
+  "atualizadoEm": "2026-11-04",
   "compilacao": {
-    "numero": 2,
-    "data": "2026-10-31",
+    "numero": 73,
+    "data": "2026-11-04",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.37.2-dominio.1",
+      "data": "2026-11-04",
+      "branch": "dominio",
+      "tipo": "melhoria",
+      "resumo": "A branch dominio recebe todo o trabalho da cloudflare-pages (a Lisa até a 0.37.1 e o Lisa Proof) junto com os andares 1 e 2 do Modo Domínio e as issues do Gito.",
+      "itens": [
+        "Junção da cloudflare-pages na dominio: as versões 0.2.0 a 0.37.1 da Lisa (veja o histórico abaixo) e o Lisa Proof em Abacatosys/lisa-proof, que tem versão e histórico no gito.json dele.",
+        "Os andares 1 e 2 do Modo Domínio (0.1.1) continuam valendo: o cliente do Supabase só roda no servidor (\"server-only\"). Nenhum componente do navegador que chegou da cloudflare-pages importa o banco, então o build não muda.",
+        "Issues do Gito: BEYOND-0011 a BEYOND-0017 concluídas e BEYOND-0018 a BEYOND-0023 registradas."
+      ],
+      "issues": [
+        "BEYOND-0011",
+        "BEYOND-0012",
+        "BEYOND-0013",
+        "BEYOND-0014",
+        "BEYOND-0015",
+        "BEYOND-0016",
+        "BEYOND-0017",
+        "BEYOND-0018",
+        "BEYOND-0019",
+        "BEYOND-0020",
+        "BEYOND-0021",
+        "BEYOND-0022",
+        "BEYOND-0023"
+      ]
+    },
+    {
+      "versao": "0.37.1-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "O rosto da Lisa não faz mais o mímico com as mãos encostadas na tela.",
+      "itens": [
+        "Saiu a brincadeira \"Presa no vidro\" (o mímico com as duas mãos espalmadas na tela), que ficou estranha. Parada, ela continua batendo no vidro, jogando videogame e cantarolando."
+      ],
+      "issues": [
+        "BEYOND-0021"
+      ]
+    },
+    {
+      "versao": "0.37.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "A Lisa não escolhe mais um projeto do ProcessMap sozinha: sem você dizer qual, o desenho novo sai avulso no quadro, e você decide no 💾 salvar onde guardar.",
+      "itens": [
+        "Desenho novo sem falar de projeto (\"desenhe um fluxo de vendas\") sai avulso no quadro, mesmo com um projeto em uso ou aberto; a Lisa avisa que ficou avulso e que o 💾 salvar guarda num projeto existente ou num novo.",
+        "Falando de projeto (\"no projeto X\"), o nome continua valendo pela metade ou com erro de digitação, inclusive na palavra (\"no projto X\").",
+        "\"No projeto\" sem um nome que bata: vale o projeto do desenho aberto no quadro ou o último citado na conversa; sem nenhum dos dois e com mais de um projeto, a Lisa pergunta qual, com os nomes, em vez de escolher o mais recente.",
+        "Mudar um desenho continua funcionando sem dizer o projeto quando o desenho está aberto no quadro (já salvo num projeto) ou quando você diz o nome do desenho salvo."
+      ],
+      "issues": [
+        "BEYOND-0013"
+      ]
+    },
+    {
+      "versao": "0.36.1-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "O microfone transcreve em menos de um segundo e acerta o nome da Lisa, a Conversa livre volta a funcionar no celular, a Lisa nunca mais fica em \"processando\" sem responder, e abrir o Assistente com o Rosto não trava mais o navegador.",
+      "itens": [
+        "A fala do microfone (chat, modo voz e Conversa livre) é transcrita pelo Whisper da Groq, que devolve uma frase curta em menos de um segundo; se a Groq falhar, a transcrição do Gemini de antes atende. O Tomar nota continua só no Gemini.",
+        "\"Oi Elisa\", \"Liza\" e parecidos viram \"Lisa\" quando a pessoa chama por ela (no começo da fala, depois de um cumprimento ou entre vírgulas); no meio de uma frase, como \"pergunte à Elisa do RH\", o nome fica como veio.",
+        "Conversa livre no celular: escuta gravando com o mesmo microfone do chat e percebe o fim da fala pelo silêncio, sem o reconhecimento de voz do navegador, que no Android caía quando a esfera abria o microfone ao mesmo tempo. O microfone fecha enquanto ela responde e reabre quando ela termina de falar.",
+        "Quando o celular recusava tocar a voz, a Lisa ficava \"falando\" para sempre e a Conversa livre nunca voltava a ouvir. Agora a voz recusada é encerrada, e a espera pela fala dela tem teto de 4 minutos.",
+        "Resposta vazia do modelo, ou conexão que cai antes do fim: a Lisa diz o que houve em vez de ficar em \"processando\". Os erros do servidor passam a aparecer também na bolha do chat do celular e na fala.",
+        "Abrir o Assistente com o visual Rosto travava a página por segundos (30 s medidos com WebGL por software): o primeiro quadro esperava compilar um shader com nove cópias da cena. A cena agora é chamada duas vezes, os laços não são desenrolados pelo compilador e o shader compila em paralelo; o rosto entra quando fica pronto, com a página respondendo. No teste, o maior travamento caiu de 30,7 s para 0,08 s."
+      ],
+      "issues": [
+        "BEYOND-0011",
+        "BEYOND-0012"
+      ]
+    },
+    {
+      "versao": "0.36.0-cloudflare-pages.1",
+      "data": "2026-11-02",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Pedidos de criar ou mudar fluxogramas não caem mais num beco sem saída, e o desenho sai do tipo e com o conteúdo que a pessoa pediu. No Rosto, o \"toc toc\" virou batida de porta e entrou a brincadeira do mímico preso no vidro.",
+      "itens": [
+        "Quando um pedido de desenho caía na conversa comum, a Lisa dizia que não podia mudar nada \"por aqui\" e mandava \"dar o comando direto\"; agora ela diz o que entendeu, pergunta \"Posso fazer?\" e o \"sim\" faz o desenho de verdade.",
+        "O \"sim\" entende mais jeitos de falar, inclusive com erro de digitação: \"Poder fazer a alteração\", \"pode criar\", \"pode desenhar\", \"faz isso pra mim\".",
+        "O desenho e o plano do projeto passam a ver a tela (Modo Tela) e os prints anexados: \"pegue o exercício da minha tela e estruture no ProcessMap\" desenha os passos que estão na tela.",
+        "O tipo pedido é regra: BPMN, UML de atividades, diagrama de classes, casos de uso, modelo de dados, C4, fluxograma com raias e mapa mental saem nesse tipo (forma de outra família vira a equivalente). \"Um fluxograma a partir do mapa mental\" sai fluxograma, e não mais mapa mental.",
+        "O conteúdo dado em lista (tópicos, \"as etapas são: A, B e C\", \"A → B → C\") vai com as palavras da pessoa; o que faltar no desenho volta para a IA uma vez e, se ainda faltar, a Lisa avisa o que não entrou.",
+        "Num projeto do ProcessMap, \"faça um BPMN de…\" que a IA lia como pergunta vira desenho novo (com a confirmação de sempre), e a confirmação diz o tipo (\"Criar o diagrama BPMN…\").",
+        "Um fluxograma na tela só vira mapa mental quando o pedido manda transformar; transformar um mapa mental em fluxograma leva o conteúdo do mapa.",
+        "Rosto: o \"toc toc\" agora é uma batida de porta — a mão fechada fica em pé, com a palma para o vidro, e bate com os nós dos dedos num movimento do pulso (antes o punho inteiro avançava contra a câmera, como um murro); a onda do vidro ficou mais leve.",
+        "Rosto: brincadeira nova, \"Presa no vidro\" — as duas mãos abertas espalmadas no vidro, uma de cada vez desencosta e procura outro lugar, ela olha cada mão e no fim empurra com as duas e pergunta \"me tira daqui?\". No celular em pé, as mãos chegam mais perto do rosto para não sair pela borda."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.35.0-cloudflare-pages.1",
+      "data": "2026-11-02",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "No celular, o microfone funciona como o do WhatsApp, no chat e no modo voz (que antes nem funcionava).",
+      "itens": [
+        "Segurar grava (com ponto vermelho e relógio), soltar envia; deslizar para a esquerda cancela; deslizar para cima trava e continua gravando sem segurar, com lixeira e enviar; um toque rápido só mostra a dica.",
+        "O áudio agora é gravado de verdade (MediaRecorder) e transcrito no servidor pela mesma transcrição do Tomar nota, em vez do reconhecimento de voz do navegador, que no celular parava na primeira pausa, parava quando o dedo saía do botão e brigava pelo microfone.",
+        "O modo voz do celular voltou a funcionar: o app abria o microfone duas vezes ao mesmo tempo (para gravar e para medir o volume), e no Android isso derrubava a gravação; agora o volume é medido do mesmo microfone.",
+        "Falas de até 2 minutos; as longas são cortadas nas pausas para a transcrição. Silêncio não vai para o servidor.",
+        "O botão flutuante \"</> editor\" sai do caminho enquanto grava e, no modo voz, fica no topo (antes ficava em cima do \"Segure para falar\")."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.34.1-cloudflare-pages.1",
+      "data": "2026-11-02",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "As mãos da Lisa nas brincadeiras do Rosto agora são mãos de verdade, no tamanho certo para o corpo dela.",
+      "itens": [
+        "O punho que bate no vidro tem palma, quatro dedos com as três falanges dobradas até a palma (com os sulcos entre eles), os nós e o polegar cruzando na frente; antes era uma bola pequena, um terço do tamanho de uma mão para a cabeça dela.",
+        "O punho fica ao lado do rosto, de frente para a câmera, e vira para o vidro enquanto sobe; o antebraço sai do pulso, atrás do punho.",
+        "O videogame agora é deitado e segurado pelas pontas: três dedos abraçando as costas (o lado que se vê), o indicador no botão de cima e o polegar na frente; antes as mãos eram dois ovais.",
+        "As mãos e o videogame não somem mais no círculo do visual (só na borda da tela)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.34.0-cloudflare-pages.1",
+      "data": "2026-11-02",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "No modo Rosto, quando ninguém mexe na tela, a Lisa brinca: bate no vidro, joga videogame ou cantarola.",
+      "itens": [
+        "Depois de 30 s parada (e sem mouse, tecla, toque ou rolagem), ela faz uma brincadeira; as seguintes vêm a cada 45 a 90 s, sem repetir a anterior.",
+        "Bate no vidro: o punho sobe, bate duas vezes na tela por dentro (a tela ondula onde bate), \"toc toc\", e ela inclina a cabeça: \"tem alguém aí?\".",
+        "Videogame: ela pega um videogame de mão, olha para baixo e joga; a tela dele ilumina o rosto de baixo, saem bipes e, no fim, \"passei de fase!\".",
+        "Cantarola: a cabeça balança no ritmo, a garganta esquenta a cada nota e as notas sobem da boca.",
+        "Qualquer gesto ou a Lisa ouvir, pensar ou falar encerra a brincadeira devagar. Sem som, e nada com \"reduzir movimento\" ligado.",
+        "No painel Visual da Lisa, a prévia do Rosto tem botões para ver cada brincadeira na hora."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.33.0-cloudflare-pages.1",
+      "data": "2026-11-02",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "A Lisa Task tem endereço e aba próprios: lisatask.beyond.dev.br, com o título e o ícone da Lisa.",
+      "itens": [
+        "O menu Lisa Task abre lisatask.beyond.dev.br: é o mesmo Abacato, mas quem usa a Lisa não vê \"abacato\" na barra de endereço. O abacato.beyond.dev.br continua igual.",
+        "A aba do navegador mostra \"Lisa Task\" e o ícone da Lisa o tempo todo; antes o título voltava a \"Abacato System\" ao trocar de tela, e o ícone era o do abacate.",
+        "No endereço da Lisa Task, a tela de entrar já sai no visual da Lisa e tem o link \"entrar pela Lisa\" para quando a sessão vence.",
+        "Conta interna ou de cliente que chega pelo menu Lisa Task segue para o endereço do Abacato, onde fica a sessão dela.",
+        "O detalhe do menu da Lisa deixou de dizer \"abre o Abacato\"."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.32.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Quem tem conta na Lisa entra na Lisa Task com essa mesma conta, sem um segundo login.",
+      "itens": [
+        "O menu Lisa Task envia a sessão da pessoa para o Abacato num formulário (fora da URL), e o Abacato confirma no próprio Supabase Auth quem é.",
+        "A conta do Abacato é a do mesmo e-mail; se não existe, nasce como Lisa Task no primeiro acesso, sem poderes de administração e sem documentos.",
+        "Conta interna ou de cliente com o mesmo e-mail continua entrando só com a senha do Abacato: uma sessão da Lisa não abre acesso maior por tabela.",
+        "O Abacato só aceita essa entrada vinda da página da Lisa (cabeçalho Origin), e uma conta Lisa Task desativada não entra."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.31.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa Task passa a ser o Abacato, com o nome e o visual da Lisa e sem a parte de documentos; e o usuário do MVP fica só com a Esfera de pontos e o Rosto.",
+      "itens": [
+        "Abacato: conta nova do tipo \"Lisa Task\" (criada em Pessoas). Ela abre com o nome Lisa Task e o visual da Lisa (fundo preto, azul da Lisa, fonte Barlow) e tem só os quadros de tarefas, com os limites do cliente (10 quadros, 3 compartilhados com até 3 pessoas).",
+        "Abacato: a parte de documentos (projetos, pastas e arquivos) não existe para a Lisa Task. O servidor barra as telas e as rotas pelo tipo da sessão e confere de novo no banco a cada pedido; ninguém consegue pôr uma conta Lisa Task num projeto.",
+        "Abacato: o link da Lisa (?visual=lisa) já mostra a tela de entrar com a cara da Lisa Task. O login continua sendo o do Abacato, separado do da Lisa.",
+        "Lisa: o menu Lisa Task (no topo e no celular) abre o Abacato em outra aba. A Lisa Task leve (a lista de tarefas dentro da Lisa e o \"crie uma tarefa\" na conversa) saiu; a tabela lisa_tarefas fica no banco, com os dados.",
+        "Lisa: no modo MVP, o avatar é só a Esfera de pontos (o padrão) ou o Rosto. Ondas, Avatar 3D e o catálogo /visual ficam só com o admin, e a escolha do admin no mesmo navegador não é apagada.",
+        "Banco do Abacato: a migração db/014-lisa-task.sql aceita o tipo novo (aplicar antes de publicar o Abacato)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.30.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "A entrevista do usuário em duas etapas — primeiro sobre a pessoa (para a Lisa formar o retrato dela e o tom da conversa), depois sobre estudos e trabalho.",
+      "itens": [
+        "Etapa 1, sobre você: o nome, \"me descreva você\", o jeito da pessoa e como prefere ser tratada, e algo importante a saber. Com isso a Lisa escreve o retrato da pessoa (como falar com ela), que vai em toda conversa dela.",
+        "Etapa 2, estudos e trabalho: nível, linguagens e tecnologias, foco, como prefere a ajuda e tempo por semana. A Lisa convida logo depois da etapa 1; \"depois\" deixa para a próxima sessão.",
+        "Correção: \"Sim pode perguntar\" não era reconhecido como sim, a entrevista sumia e o modelo improvisava 5 perguntas de uma vez. O convite agora aceita qualquer resposta que comece com sim, pode, claro, ok, bora…, e a conversa não faz mais entrevista por conta própria.",
+        "Uma pergunta por vez, numerada (\"1 de 4\"); o perfil junta as duas etapas sem apagar a primeira, e o convite avisa que não precisa contar nada sensível."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.29.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Menu Conta: sair da Lisa e ver as informações da conta (e-mail, tipo de acesso e, para o usuário do MVP, o uso de hoje e o perfil da entrevista).",
+      "itens": [
+        "Menu \"Conta\" no topo: o e-mail, o tipo de acesso (administrador ou usuário da versão MVP) e o botão Sair. No celular, onde o Assistente é tela cheia, o mesmo bloco aparece nas configurações.",
+        "Para o usuário do MVP: o uso de hoje (perguntas, desenhos, comentários de tela e falas, com o limite de cada um) e o perfil da entrevista, com \"apagar meu perfil\" (pede confirmação).",
+        "Sair encerra a sessão de verdade: o token de renovação é revogado no Supabase (sem travar quem quer sair se o banco estiver fora) e os cookies da sessão e do papel são apagados."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.28.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "O modo MVP: quem não é o dono da Lisa entra numa versão limitada — conversa e voz, Modo Tela, editor de código, ProcessMap, repositórios públicos, entrevista do primeiro acesso e Lisa Task —, sem nada dos dados, chaves e painéis do admin.",
+      "itens": [
+        "Dois papéis na sessão: admin (quem está em LISA_ADMINS ou tem app_metadata.role = admin no token assinado) e usuário (qualquer outra conta). Sem LISA_ADMINS configurado, o modo fica desligado e todos entram como antes — o código entra no ar sem trancar o dono.",
+        "O portão (middleware) usa a lista do que o usuário pode: o Assistente, o ProcessMap, o Visual e a Lisa Task, e as APIs da conversa, voz, Modo Tela, repositórios, desenho, ProcessMap, notas, perfil e tarefas. O resto: 403 na API e volta ao Assistente na página.",
+        "A conversa do usuário não usa a base de conhecimento, o Abacato, a Delp, a persona nem o contexto pessoal do admin; usa o perfil da entrevista, as tarefas dele, a tela, o código da conversa, o quadro e os repositórios públicos.",
+        "Repositórios do usuário: só públicos, lidos sem o token do admin — e o privado não sai nem pelo cache que o admin deixou no Worker. Modo Tela do usuário: sem gravar no histórico do Vigia. Modo Código com PR continua só do admin (usa o token dele).",
+        "Entrevista do primeiro acesso: com consentimento, 5 perguntas por voz ou chat; o perfil personaliza a conversa e \"apague meu perfil\" apaga de verdade (LGPD).",
+        "Lisa Task leve: tarefas da pessoa, só texto (sem arquivos), na tela /lisa-task ou pedindo \"crie uma tarefa: …\" na conversa.",
+        "Limite do dia por usuário (as chaves de IA são do admin): 50 perguntas, 10 desenhos, 120 comentários de tela e 100 falas, ajustáveis por LISA_LIMITE_*.",
+        "A tela esconde do usuário os modos do admin (câmera, vigia, rádio, escuta do ambiente, transmissão, Modo Código, persona, painéis) e o menu mostra só os painéis dele.",
+        "Banco: tabelas novas lisa_perfis, lisa_tarefas e lisa_uso, e a função lisa_contar_uso (db/mvp_usuarios.sql)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.27.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa interpreta o pedido sobre os fluxos (sem exigir o nome exato do projeto), mostra o que entendeu e só faz depois do \"sim\"; e só diz que mudou o que mudou de verdade.",
+      "itens": [
+        "Confirmação: antes de mudar desenho ou escrever documento, a Lisa diz o que entendeu — o projeto (e como achou: pelo nome, pelo nome parecido, pelo desenho, o em uso), cada desenho e o que vai fazer nele — e pergunta \"posso fazer?\". \"Sim\" (do jeito que a pessoa fala: \"pode\", \"manda ver\", \"tenho certeza\", \"simm\") faz; \"não\" cancela; uma correção (\"não, é no fluxo mobile\") refaz o entendimento e pergunta de novo. No painel ProcessMap, botões \"Sim, fazer\" / \"Não\". Depois do sim, o projeto é lido de novo.",
+        "Interpretar em vez de pedir o nome exato: o projeto é achado pelo nome inteiro, pela metade, com erro de digitação, pelo nome de um desenho dele, pelo em uso ou pelo mais recente; o planejador escolhe o desenho mais provável e diz como entendeu, em vez de perguntar o nome; a conversa comum nunca pede o nome exato.",
+        "Correção: \"corrija a nota da aba Desktop\", \"complete o fluxo\", \"a nota está errada, arrume\" — sem dizer o projeto — caíam na conversa comum, que não muda desenho nenhum, e a resposta dizia que tinha corrigido. Agora, com um projeto em uso (o do quadro ligado ou o último da conversa), o pedido vai para o plano do projeto; e a conversa comum nunca mais diz que corrigiu, atualizou ou salvou um desenho.",
+        "Correção: a resposta repetia a explicação do modelo (\"atualizado: verifiquei e confirmei…\") mesmo quando o desenho voltava igual — visto no \"Núcleo de Funcionalidades\". Agora a Lisa compara o antes e o depois: desenho igual não é gravado e a resposta diz \"não mudou nada\"; desenho mudado diz o que mudou (formas novas e sumidas, textos, cores, ligações, abas).",
+        "Correção: \"a nota está errada, o certo é…\" e \"coloque na nota…\" voltavam com a nota antiga e uma cópia nova ao lado (a trava das notas valia para qualquer pedido). Agora a nota existente só fica intacta quando o pedido é criar uma nota nova.",
+        "O plano usa a conversa para entender a que \"corrija isso\", \"não ficou certo\" e \"ainda falta\" se referem, e escreve na instrução exatamente o que trocar."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.26.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Num pedido só, a Lisa desenha o fluxograma novo E escreve o .md sobre o assunto pedido (ex.: arquitetura e cibersegurança), sem mexer nos desenhos que já existem.",
+      "itens": [
+        "Correção: \"faça um fluxograma da arquitetura pensando em cibersegurança, onde hoje falhamos … faça um arquivo md também\" reescrevia os .md do MVP e não desenhava nada — qualquer pedido com \"md\" virava \"só documento, sempre o mesmo modelo\".",
+        "O plano agora traz as duas coisas: os desenhos a criar ou mudar e os documentos a escrever (quantos o pedido pedir, cada um com o assunto e os desenhos em que se baseia). A Lisa desenha primeiro e depois escreve o .md sobre o desenho que acabou de criar.",
+        "O .md é escrito sobre o assunto do pedido (segurança: arquitetura de hoje, onde falhamos, tabela de lacunas e riscos, o que fazer agora / antes de expandir / depois, como verificar); a especificação de MVP por desenho continua para \"um md por fluxograma\".",
+        "Trava sem o modelo: num pedido de documento, desenho que já existe só muda se o pedido mandar mudar com todas as letras, e desenho novo só nasce se o pedido pedir um. Sem o modelo, o documento ainda sai.",
+        "Com repositório vinculado na conversa, o código dele vai junto para o desenho e para o documento (a arquitetura de verdade, não só a dos desenhos)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.25.1-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "O pedido dos .md no editor é reconhecido mesmo com erros de digitação, a Lisa planeja só o pedido de agora (não refaz pedidos antigos da conversa) e o desenho grande tem mais tempo.",
+      "itens": [
+        "Correção: pediram de novo os arquivos .md no editor e a Lisa mexeu nos desenhos — o pedido veio escrito de um jeito que as palavras exatas não pegavam, e o plano refez pedidos antigos da conversa (a Lisa Task, a prioridade de voz). Agora o pedido de documento aceita letra trocada e erro de digitação ou de voz (\"mds\", \"editro\", \"aquivos\", \"emedês\", \"docuemnte\", \"documentação de cada fluxograma\"), e \"abra o editor e escreva…\" usa o projeto em uso.",
+        "O planejador recebe a conversa só como contexto (os pedidos dela já foram feitos) e põe o pedido de documento acima de qualquer mudança de desenho.",
+        "Correção: o \"Fluxo de Uso MVP\" estourou os 75s do Gemini. Desenho e .md agora têm até 150s, com uma tentativa por modelo (sem repetir a mesma resposta longa com outra chave)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.25.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa escreve um .md por desenho do projeto no editor de código (sem mexer nos desenhos), não apaga mais formas ao mudar um fluxo, e todo fluxo ganha \"Versões anteriores…\" para voltar atrás.",
+      "itens": [
+        "Documentar: \"faça um MD por fluxograma e mapa mental no editor\" agora abre o editor de código com a visão geral do projeto e um arquivo .md por desenho (conceito, estratégia do MVP, decisões, passo a passo por aba, rotas e telas, dados, critérios de aceite e um parágrafo pronto para pedir ao Claude). Nenhum desenho é mudado — antes a Lisa alterava os fluxos.",
+        "Correção: a Lisa apagou a maior parte da aba \"Fluxo Desktop\" de um fluxo de várias abas. Causa: o desenho enviado a ela era cortado em 24 mil letras, e a última aba chegava (e voltava) pela metade. Agora o desenho vai inteiro (ou, se for enorme, as abas que não cabem ficam como estão), e uma trava devolve qualquer forma que sumir num pedido que não manda tirar nada, com texto, cor e ligações.",
+        "Correção: \"crie uma nota\" reescrevia a anotação que já existia; agora a anotação da pessoa fica igual e a nova entra ao lado (só \"atualize/reescreva a nota\" muda o texto). Num mapa mental, tópico esquecido pela Lisa também volta para o lugar.",
+        "Versões anteriores: antes de gravar por cima, a versão de antes fica guardada (sempre que a Lisa grava, quando somem 3 formas ou mais, e a cada 10 minutos de trabalho; as 60 mais novas de cada fluxo). No painel ProcessMap: botão \"Versões\" ou ⋯ → \"Versões anteriores…\" → \"voltar para esta\" (e a versão de agora também fica guardada).",
+        "Banco: tabela nova lisa_fluxogramas_versoes (db/fluxogramas_versoes.sql). Backup: scripts/backup/recuperar-fluxo.sh recupera um fluxo só de um backup, como versão anterior, sem sobrescrever o resto do banco."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.24.2-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "A barra \"pedir à Lisa\" do painel ProcessMap e a conversa sem o nome do projeto passam a trabalhar no projeto inteiro: \"em todos os fluxogramas\" anota todos os desenhos, aba por aba.",
+      "itens": [
+        "Correção: no painel ProcessMap, a barra \"pedir à Lisa\" só mexia no fluxo aberto — \"crie uma nota em todos os fluxogramas\" anotava um só. Agora, quando o pedido fala do projeto (\"todos\", \"cada\", \"projeto\", outro fluxo pelo nome), ela planeja e trabalha em cada desenho do projeto, mostra o andamento e reabre o fluxo aberto com a versão nova (o salvamento automático pausa enquanto ela grava).",
+        "Correção: na conversa, \"anote todos os fluxogramas do projeto\" sem dizer o nome caía no fluxo aberto no quadro; agora \"o projeto\" é o que está em uso (o do fluxo aberto no quadro ou o último desta conversa).",
+        "\"Todos os mapas mentais\" inclui o mapa ainda quase vazio; se o plano falhar, a Lisa tenta de novo antes de desistir.",
+        "Planejar e executar ficaram num módulo só (src/lib/trabalhoNoProjeto.js), usado pela conversa e pelo painel — o mesmo comportamento nos dois lugares."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.24.1-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "\"Em todos os fluxogramas\" passa a valer para todos os desenhos do projeto (mapas mentais e cada aba inclusos), com notas detalhadas e bem quebradas, e a Lisa entende negação quebrada pela digitação.",
+      "itens": [
+        "Correção: \"crie uma nota em todos os fluogramas\" só anotava um desenho — o plano lia \"fluxograma\" ao pé da letra e deixava os mapas mentais de fora, e no fluxo de duas abas a nota entrava só na primeira. Agora \"todos\" é todo desenho do projeto (o vazio fica de fora) e o que vale para todos vai em cada aba.",
+        "Se o pedido diz \"todos\"/\"cada\" (até \"tdoso os fluogramas\") e o plano esquece algum desenho, a rota do plano faz uma segunda volta só para os que faltaram.",
+        "Correção: a anotação saía com \"\\n\" escrito no meio do texto; agora é quebra de linha, e cada tópico \"•\" começa numa linha. As notas ficaram mais detalhadas (o conceito e cada decisão com o porquê, ligados ao que o desenho ou a aba mostra); no mapa mental, um galho \"Conceito e decisões\".",
+        "Correção: um pedido para um mapa mental com a palavra \"processo\" (comum ao explicar decisões) trocava o mapa por um fluxograma novo; agora o mapa continua mapa, a não ser que o pedido seja transformá-lo.",
+        "A Lisa trata negação quebrada pela digitação (\"porme em a função\" = \"porém sem a função\"): a Lisa Task entra como Abacato integrado sem a hospedagem de arquivos."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.24.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Pedido sobre um projeto do ProcessMap passa a ser planejado pela própria Lisa: ela entende a intenção (mesmo com erros de digitação) e muda vários desenhos de uma vez, salvando cada um.",
+      "itens": [
+        "Correção: \"no projeto Produto Lisa…, ponha nas funcionalidades… e crie uma nota em todos os fluxogramas…\" virava conversa (\"use o comando de desenho\"): a frase citava o Abacato, e a regra das ações em card do Abacato passava na frente; e o caminho antigo só sabia mexer num desenho. Agora o projeto citado vale antes dessa regra.",
+        "Plano: com um projeto citado, a Lisa planeja com o modelo (/api/processmap/plano) — \"mudar\" (uma operação por desenho, cada uma com a instrução completa e os textos prontos) ou \"responder\" (pergunta sobre o projeto). Executa as operações uma a uma, salva cada desenho no projeto e mostra o andamento na janela (◆ trabalhando, ✓ atualizado/criado, ✗ não deu); o último abre no quadro, ligado.",
+        "Anotações de texto (conceito, decisões, explicações): aceitam texto longo, ficam do tamanho do texto e entram numa coluna ao lado do desenho, sem empurrar as etapas.",
+        "A Lisa não pede mais para \"usar o comando de desenho\": citando o projeto, ela mesma muda, cria e anota; se faltar saber o projeto ou o fluxo, pergunta só isso.",
+        "Testado de ponta a ponta com a frase original (Gemini e banco reais, projeto de teste apagado): a Lisa Task entrou nas funcionalidades e cada fluxograma ganhou a nota com conceito e decisões, em 40 s."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.23.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa trabalha num projeto do ProcessMap citado na conversa (\"no projeto X, faça…\"), lendo os fluxogramas dele e salvando lá; e a cena do Assistente deixa a Lisa no centro, sem a grade do chão.",
+      "itens": [
+        "\"No projeto X do ProcessMap, …\": a Lisa acha o projeto pelo nome (sem acento, com erro de digitação, o nome mais completo ganha) e lê todos os fluxogramas dele — formas, cores, raias, abas e ligações — como contexto da resposta. Sem falar em projeto/ProcessMap, não procura.",
+        "Pedido de desenho no projeto: muda o fluxo citado pelo nome (ou o que está aberto no quadro, ou o único do projeto) e salva a versão nova lá; sem fluxo citado, cria um fluxo novo no projeto. O quadro abre ligado ao fluxo salvo (o que mudar depois também é salvo). Pedido de mudança sem dizer qual fluxo, num projeto com vários: a Lisa pergunta qual, citando os nomes.",
+        "O desenho no projeto respeita os outros fluxos dele (mesmos nomes de etapas, áreas e termos). Se o fluxo foi mudado em outro lugar no meio do caminho, ela não grava por cima e avisa.",
+        "A mesma forma repetida pelo modelo na resposta (acontece de vez em quando) é descartada, em vez de virar três \"Início\".",
+        "Cena: a Lisa fica no centro quando a resposta aparece (só recua em profundidade); a grade 3D do chão saiu; a janela da resposta ficou mais estreita e afastada da borda, para não cobrir a Lisa nem ser cortada."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.22.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "No Assistente (computador), a resposta da Lisa passa a aparecer numa janela holográfica flutuante, com hologramas em volta, a Lisa mais perto e profundidade 3D.",
+      "itens": [
+        "A resposta sai numa janela flutuante de cantos cortados (no lugar do texto embaixo do visual): surge do fundo da cena como uma linha que se abre, mostra a pergunta, \"processando\" enquanto pensa e o texto chegando com cursor; traz junto as fontes da internet, o rascunho de card e o código ao vivo. Arrasta pela barra (a posição fica guardada; dois cliques voltam ao lugar), o × fecha até a próxima pergunta.",
+        "Hologramas no estilo da referência surgem com a resposta, cada um piscando ao ligar e numa profundidade: anel com marcações girando atrás da Lisa, cantos de mira em volta dela, uma mira, o painel \"SISTEMA LISA\" (estado, voz, palavras, fontes), o \"SINAL DE VOZ\" com barras que seguem a fala, barras de dados e uma grade de chão.",
+        "Profundidade: a cena é 3D — com a resposta, a Lisa recua e vai para o lado e a janela vem para a frente, inclinada; tudo inclina de leve com o mouse (paralaxe).",
+        "Zoom: a Lisa fica mais perto (o Rosto sobe o enquadramento do peito para o rosto, deslizando; os outros visuais crescem na tela).",
+        "Tela estreita (tablet em pé): a janela vai para baixo e os painéis laterais saem. Celular continua como estava. Com \"reduzir movimento\": sem paralaxe, sem giros e sem o surgir."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.21.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa passa a enxergar e mexer nas cores do desenho (\"limpe as atividades vermelhas\", \"pinte de verde\") e nas abas dos fluxogramas (criar, detalhar uma etapa numa aba, separar, renomear, apagar), sem perder o que a pessoa arrumou.",
+      "itens": [
+        "A Lisa recebe a cor de cada forma do quadro (azul, azul-escuro, azul-claro, grafite, branco, verde, âmbar, vermelho — os nomes como aparecem no tema dela) e pode apontar formas pela aparência: cor, tipo ou raia.",
+        "\"Limpe/apague/remova as atividades vermelhas\": as formas daquela cor saem e o fluxo é religado em volta; \"pinte de verde\", \"deixe em vermelho\", \"marque como concluídas\": a cor muda sem a forma sair do lugar; \"tire a cor\": volta ao azul. Sem nenhuma forma da cor pedida, ela não mexe e avisa.",
+        "Na conversa, com o quadro aberto, pedidos assim viram mudança no desenho (limpar, pintar, colorir, destacar, marcar, deixar), e a Lisa lê as cores para responder (\"quais etapas estão em vermelho?\").",
+        "No mapa mental, o mesmo vale para os galhos (\"limpe os galhos vermelhos\", \"pinte o de marketing de verde\").",
+        "As trocas de cor também vêm numa lista à parte da resposta da IA, aplicada por cima: o modelo às vezes contava a troca na explicação e devolvia a forma com a cor antiga.",
+        "Abas: a Lisa vê todas as abas do fluxograma (com a que está aberta) e, a pedido, cria aba nova (\"crie uma aba com o detalhe da aprovação\" — e a etapa ganha o link para a aba, que abre no Ctrl+clique), separa o processo em abas, muda só a aba citada, renomeia e apaga. Depois, o quadro mostra a aba nova.",
+        "Correção: pedir uma mudança num fluxograma de várias abas apagava as outras abas (a Lisa só via e devolvia a primeira). Agora a aba que o pedido não mexe fica exatamente como está, e uma aba que o modelo esqueça de devolver também fica — apagar aba é só a pedido.",
+        "Correção: ao redesenhar, a Lisa perdia o que não via — a forma travada, o link para outra aba, a linguagem do bloco de código, as imagens coladas, os rabiscos à mão e o estilo das ligações. Agora tudo isso continua nas formas e ligações que ficam."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.20.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa passa a montar mapas mentais no quadro e no ProcessMap, e o Rosto ganha resolução alta, cabelo longo e seis paletas de cor.",
+      "itens": [
+        "Mapa mental: \"faça um mapa mental sobre…\" (na conversa ou na barra \"pedir à Lisa\" do ProcessMap) monta um tema central com tópicos e subtópicos, galhos coloridos dos dois lados; com um mapa aberto, ela muda o mapa e mantém o que a pessoa arrumou (posição, galho recolhido, cor, lado).",
+        "A Lisa lê o mapa mental aberto como árvore quando a pessoa conversa sobre ele, e um fluxograma na tela pode virar mapa mental (\"transforme em mapa mental\").",
+        "Painel ProcessMap: \"+ fluxograma\" e \"+ mapa mental\" em cada projeto, e o menu \"+ Novo ▾\" com fluxograma, mapa mental e schema SQL.",
+        "Correção no ProcessMap: o mapa mental reaberto (de arquivo ou salvo) ficava com todos os galhos roxos; agora volta com as cores de cada galho.",
+        "Rosto em resolução alta: o teto de desenho passou a valer no lado menor da tela (na tela cheia do Assistente saía a 1/3 da resolução, pixelado); até 1100 px no computador e 820 no celular, baixando sozinho em aparelho lento. O grão do filme ficou do tamanho de um pixel da tela.",
+        "Rosto com cabelo: longo (o padrão), com franja de lado, preso atrás das orelhas e caindo atrás dos ombros, com fios riscados de luz e as pontas balançando; ou raspado, como antes.",
+        "Rosto com seis paletas: Térmico, Holograma, Neon, Aurora, Ouro e Prata. Cabelo e cores são escolhidos no painel /visual e no menu \"Aparência da Lisa\", valem na hora e ficam guardados no navegador.",
+        "O risco laranja do nariz quando a cabeça vira foi atenuado."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.19.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "O ProcessMap ganha um painel próprio na Lisa, com projetos e fluxogramas salvos (inclusive os que a Lisa desenha), e o visual Rosto vira um retrato térmico no estilo da foto de referência.",
+      "itens": [
+        "Painel ProcessMap (menu Painéis → Trabalho → ProcessMap, em /fluxogramas): projetos à esquerda e o ProcessMap inteiro à direita, para usar livremente — fluxograma, mapa mental e diagrama de schema SQL.",
+        "Cada fluxograma é salvo sozinho no banco um instante depois de cada mudança (Ctrl+S salva na hora); sem nada aberto, o primeiro traço já cria o fluxo em \"Meus fluxogramas\" (ou no projeto mexido por último).",
+        "Projetos: criar, renomear e excluir; fluxogramas: abrir, renomear pelo título, duplicar, mover de projeto e excluir. Excluir só arquiva (continua no banco). Importar e exportar .json continuam.",
+        "Duas abas mexendo no mesmo fluxo não se apagam: a segunda a gravar recebe o aviso \"mudou em outro lugar\" e escolhe ficar com a dela ou abrir a de lá.",
+        "Barra \"pedir à Lisa\" no painel: ela desenha um fluxo novo ou muda o que está aberto, e o resultado já fica salvo.",
+        "Quadro da Lisa na conversa: botão \"💾 salvar\" guarda o desenho dela num projeto (existente ou novo); dali em diante o que a pessoa mexe e o que a Lisa redesenha a pedido também é salvo, e \"↗ ProcessMap\" abre o fluxo no painel. Fluxos da Lisa aparecem com a marca ✦.",
+        "Banco: duas tabelas novas, lisa_projetos e lisa_fluxogramas (db/fluxogramas.sql), separadas por pessoa logada.",
+        "Visual Rosto refeito como retrato térmico: cabeça raspada esguia, interior preto, borda que vai do vermelho ao creme, orelhas e ombros quentes, halo ciano e grão de filme. Falando, a mandíbula abre e a garganta esquenta com a voz; ouvindo, as orelhas acendem; pensando, uma onda de calor sobe pela cabeça (halo lilás); pronta, respira e segue o ponteiro.",
+        "O Rosto é desenhado por raymarching em resolução reduzida (até 560 px, baixando sozinho em aparelho lento) e respeita \"reduzir movimento\"."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.18.0-cloudflare-pages.2",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "O visual Rosto foi refeito no estilo da referência: um busto holográfico de linhas de luz azul, com pescoço e ombros, que se desfaz em partículas de um lado.",
+      "itens": [
+        "Em vez de pontos espalhados, o rosto é feito de linhas de pontos que contornam o busto em fatias levemente inclinadas, como um escaneamento: as linhas descem sobre o nariz, os lábios e o queixo, e é isso que mostra o relevo.",
+        "Busto com pescoço, ombros e peito (que somem embaixo) e volume de cabelo, onde as linhas ondulam como fios.",
+        "Azul elétrico com brilho em volta das linhas; a nuca e o lado direito se desfazem em partículas que vão e voltam (mais falando, menos ouvindo).",
+        "A cabeça gira e inclina sobre o pescoço, com os ombros parados; de vez em quando uma faixa de linhas escorrega para o lado, como interferência num holograma (nunca com \"reduzir movimento\").",
+        "Ao aparecer, o busto se materializa de baixo para cima com uma linha de varredura; os pontos são calculados aos poucos, entre os quadros, sem travar a tela, e o cálculo é dividido entre o visual grande e a miniatura do painel.",
+        "Continua: a boca abre com o volume da fala, pisca, passeia o olhar, ergue as sobrancelhas ouvindo, olha para cima pensando e segue o ponteiro do mouse."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.18.0-cloudflare-pages.1",
+      "data": "2026-11-01",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa pesquisa na internet e lê sites em qualquer modo, com as fontes embaixo da resposta; a esfera ganha mais definição; e há um visual novo, o Rosto 3D, que fala, escuta e pisca.",
+      "itens": [
+        "Pedir para pesquisar, procurar na internet, abrir um site ou colar um link agora funciona em qualquer escopo (antes só no \"Geral\", e nem lá: as chaves do Gemini não têm cota para a busca do Google e respondiam 429).",
+        "A pesquisa é feita pelo servidor no DuckDuckGo (se não responder, na versão Lite e depois no Google Notícias), as três primeiras páginas são lidas em paralelo e o texto vai para a Lisa responder; um site citado é lido pela própria Lisa. Resposta em 2 a 12 segundos, contra 26 a 54 quando o Gemini abria as páginas.",
+        "As fontes aparecem como links pequenos embaixo da resposta (e no histórico da conversa); a voz não lê endereços.",
+        "A busca do Google do Gemini saiu do escopo \"Geral\": cada pergunta ali punha chaves de castigo por 90 segundos à toa. Com uma chave paga, GEMINI_BUSCA_GOOGLE=1 a liga de novo.",
+        "No \"Geral\", a Lisa não diz mais que pesquisou quando não pesquisou: sem nada da internet junto, ela responde com o que sabe, avisa que pode estar desatualizado e oferece pesquisar; um \"sim\" logo depois pesquisa a pergunta anterior.",
+        "Esfera de pontos com mais definição: o dobro de pontos, menores e macios, sem a grade em espiral que aparecia como malha, com borda iluminada, uma camada fina de ondulação e um brilho suave por dentro; o tamanho do ponto acompanha o da tela.",
+        "Visual novo \"Rosto\" (no painel Visual da Lisa e no menu de aparência): um rosto 3D de pontos de luz que abre a boca com o volume da fala, pisca, passeia o olhar, ergue as sobrancelhas e inclina a cabeça ouvindo, olha para cima pensando e segue o ponteiro do mouse com os olhos."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.17.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "O quadro da Lisa ganha o \"⧉ destacar\", como o editor de código: vai para uma janela separada (outro monitor) e volta, sem perder o que você mexeu.",
+      "itens": [
+        "Botão \"⧉ destacar\" na barra do quadro (no computador): o quadro abre numa janela de verdade do sistema, com a explicação, o desenho e a barra \"pedir à Lisa\"; \"↩ voltar para a página\" (ou fechar a janela) traz de volta.",
+        "O desenho como está, com o que você mexeu, vai junto para a janela separada e volta com ela; um desenho novo da Lisa abre na janela onde o quadro estiver.",
+        "Na página, enquanto o quadro está separado, fica o aviso \"◇ quadro numa janela separada · trazer de volta\"."
+      ],
+      "issues": [
+        "BEYOND-0010"
+      ]
+    },
+    {
+      "versao": "0.16.1-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "A Lisa passa a desenhar no quadro mesmo com erro de digitação no pedido, com a arquitetura real do repositório vinculado, e transforma em desenho o Mermaid que estiver no editor.",
+      "itens": [
+        "\"quero que desneho ess arquiettrua via processmap\" caía na conversa normal e a Lisa escrevia Mermaid no editor: o reconhecimento do pedido de desenho passa a aguentar erro de digitação (distância de edição) e citar o quadro (\"processmap\", \"quadro de diagramas\") já é pedido. Pergunta sobre um desenho (\"meu desenho está certo?\") continua sendo conversa.",
+        "Desenhar \"essa arquitetura\" com um repositório vinculado à conversa lê o código dele antes (como a pergunta normal), e o desenho sai com os nomes reais.",
+        "No editor, uma aba com diagrama em texto (Mermaid, PlantUML, Graphviz) ganha o botão \"◇ desenhar no quadro\".",
+        "A conversa não escreve mais Mermaid nem desenho em ASCII: oferece o quadro.",
+        "Um desenho novo com o quadro aberto não parte mais do desenho que estava lá (só os pedidos de mudança partem dele)."
+      ],
+      "issues": [
+        "BEYOND-0010"
+      ]
+    },
+    {
+      "versao": "0.16.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A IDE da Lisa vira colaborativa (você põe o seu código e ela escreve em cima), a Lisa passa a desenhar processos num quadro que você pode mexer, e o jogo de lançar disco com a Nala volta a funcionar.",
+      "itens": [
+        "IDE colaborativa (BEYOND-0009): depois de digitada, toda aba do editor é editável, com o realce de sintaxe; \"＋ meu código\" abre uma aba sua para colar ou escrever (com nome e linguagem); a barra \"pedir à Lisa\" manda o pedido com o código da aba e a resposta dela é escrita em cima dessa aba quando termina, com \"↶ desfazer\". O que está escrito ou mudado na IDE vai junto de qualquer pergunta. O botão \"</> editor\" abre a IDE mesmo antes de a Lisa escrever código.",
+        "Quadro da Lisa (BEYOND-0010): \"desenhe o processo de…\" (ou um fluxograma, BPMN, arquitetura) faz a Lisa montar o desenho num quadro — o mesmo ProcessMap do Lisa_Proof, com o tema da Lisa — em raias quando há responsáveis. A IA devolve só a estrutura e o layout é feito no código (src/lib/diagramaDaLisa.js). Você mexe à vontade: o desenho vai em texto junto das perguntas, então a Lisa conversa sobre o fluxo como ele está; pedidos de mudança (pela conversa ou pela barra do quadro) partem do desenho da tela e mantêm no lugar o que você arrumou. O quadro convive com a IDE (cada um de um lado).",
+        "Jogo de lançar disco com a Nala (BEYOND-0002): escolher o papel (lançador ou Nala) derrubava a página com \"ritmoRef is not defined\" desde a migração para a Cloudflare (commit a14ac05), nas duas versões, casa e Lisa. O ritmo de consulta foi declarado no componente certo.",
+        "Rota nova POST /api/diagrama; testes novos em npm run diagrama-check."
+      ],
+      "issues": [
+        "BEYOND-0002",
+        "BEYOND-0009",
+        "BEYOND-0010"
+      ]
+    },
     {
       "versao": "0.1.1",
       "data": "2026-10-31",
@@ -35,6 +536,591 @@
         "BEYOND-0004",
         "BEYOND-0005",
         "BEYOND-0006"
+      ]
+    },
+    {
+      "versao": "0.15.0-cloudflare-pages.1",
+      "data": "2026-10-27",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa vira app instalável pelo Chrome (com o atalho \"Tomar nota\"), o Modo Tomar nota ganha o visual da Lisa reagindo à voz, e o quadro \"Notas\" passa a funcionar para qualquer pessoa do Abacato.",
+      "itens": [
+        "Instalar como app: manifesto, ícones (a logo em azul sobre preto) e cor da barra. O Chrome passa a oferecer \"Instalar\"; o menu do pontinho verde (grupo Aplicativo) e os ajustes do celular ganham \"Instalar a Lisa como app\". No iPhone, o item explica o caminho pelo Compartilhar → Adicionar à Tela de Início.",
+        "O app instalado abre direto no Assistente e tem o atalho \"Tomar nota\" (segurar o ícone, no Android), que abre o modo na hora.",
+        "Modo Tomar nota: o visual escolhido para a Lisa (esfera, lente, orbe…) fica no centro enquanto ela escuta, mexendo com o volume da voz, e pensando enquanto transcreve e organiza.",
+        "Correção: o quadro \"Notas\" levava a mesma marca de origem para todo mundo, e o Abacato só aceita uma marca igual no banco inteiro — o segundo usuário não conseguiria criar o dele. Agora a marca leva o dono (e um carimbo, para um quadro arquivado não travar o próximo). O quadro já criado continua sendo achado."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.14.0-cloudflare-pages.1",
+      "data": "2026-10-27",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Modo Tomar nota: a Lisa escuta por até 10 minutos, separa o que ouviu por assunto e anota no quadro \"Notas\" do Abacato (coluna = tema, card = nota), no celular e no desktop.",
+      "itens": [
+        "Abre pelo botão novo na barra de modos do celular, por Modos → Trabalho no desktop ou dizendo \"tomar nota sobre…\" no chat. O tema pode ser digitado, falado (o microfone ao lado do campo começa a gravação sozinho quando você termina de falar) ou deixado em branco, e aí a Lisa deduz.",
+        "Escuta até 10 minutos seguidos. O áudio é cortado em trechos de 25 a 35 s numa pausa da fala e cada trecho é transcrito enquanto a gravação continua (/api/notas/trecho); a tela mostra o tempo, o volume e o que já foi transcrito.",
+        "No fim, a Lisa lê a transcrição inteira, deixa de fora o que não tem a ver com o tema e cria um card por assunto, com título, a interpretação dela, os pontos principais, os encaminhamentos e as frases ditas de verdade com o minuto (/api/notas/organizar). Um último card guarda a transcrição completa.",
+        "O quadro \"Notas\" é criado na primeira vez, na conta do Abacato com o mesmo e-mail da conta da Lisa; o mesmo tema volta para a mesma coluna. Se a resposta se perder e o aparelho tentar de novo, nada é duplicado.",
+        "Com a tela apagada: a gravação roda num AudioWorklet, que segue o ritmo do microfone e não dos timers da página. No Android e no computador ela continua com a tela apagada e avisa com dois bipes (e notificação, se estiver liberada) quando termina. No iPhone o Safari desliga o microfone quando a tela bloqueia, então lá a tela fica ligada por padrão; se a gravação for interrompida, dá para continuar de onde parou.",
+        "O áudio não fica salvo em lugar nenhum. O texto já transcrito fica guardado no aparelho até ser organizado: se a página recarregar no meio, a Lisa oferece organizar o que já tinha."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.13.1-cloudflare-pages.1",
+      "data": "2026-10-25",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Pergunta com repositório vinculado dava \"Too many subrequests\": a leitura do repositório agora roda num pedido próprio, antes da pergunta.",
+      "itens": [
+        "O Worker gratuito aceita 50 chamadas de rede por pedido. A leitura do repositório (árvore, a IA escolhendo os arquivos, um pedido por arquivo) somava com as da pergunta (banco, memória, Gemini com as tentativas e o registro de uso das chaves) e passava do limite.",
+        "Nova rota /api/repos/contexto: a tela lê os repositórios primeiro (a faixa mostra \"lendo o repositório…\") e manda a seção pronta na pergunta; cada pedido tem o limite inteiro.",
+        "Se o limite estourar por outro motivo, a Lisa explica com uma frase em vez de mostrar o erro cru da Cloudflare."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.13.0-cloudflare-pages.1",
+      "data": "2026-10-25",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Contexto da conversa: o + da barra anexa imagens (do computador, com Ctrl+V ou arrastando) e vincula repositórios do GitHub, que a Lisa lê e relaciona com a tela, a câmera e a conversa.",
+      "itens": [
+        "Botão + na barra de mensagem (computador e celular), em qualquer modo e escopo, com \"Imagem do computador\" e \"Vincular repositório\".",
+        "Imagem colada com Ctrl+V ou arrastada para a tela também vira anexo; até 6 por vez, reduzidas a 1600 px no navegador antes de ir para a Lisa.",
+        "Repositório vinculado pelo link do GitHub, por dono/repo ou dono/repo@branch (a branch é opcional); colar o link na mensagem também vincula. Até 3 por conversa, lembrados no navegador.",
+        "A cada pergunta a Lisa lê a árvore do repositório, a IA escolhe até 8 arquivos olhando a pergunta, a conversa e as imagens (tela, câmera, prints) e lê esses arquivos, mais o README e o manifesto. A resposta cita os caminhos e diz de qual arquivo vem o código que aparece na tela.",
+        "Faixa \"Contexto\" acima da barra com as miniaturas, os repositórios e quantos arquivos foram lidos; cada item sai no ×, ou tudo de uma vez em \"limpar\".",
+        "Se o GitHub recusar o token da Lisa, ela continua lendo os repositórios públicos sem ele, e nunca pede token nem senha na conversa.",
+        "Sem migração de banco. Teste novo: npm run contexto-check."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.12.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.12.0: os visuais Lente, Orbe de vidro, Plasma e Anel de partículas e o painel Visual da Lisa.",
+      "itens": [
+        "Junta a branch lisa-modos-graficos (0.12.0-lisa-modos-graficos.1).",
+        "Sem migração de banco.",
+        "Deploy com a conta beyondbitsLisa indicada no comando (CLOUDFLARE_ACCOUNT_ID)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.12.0-lisa-modos-graficos.1",
+      "data": "2026-10-24",
+      "branch": "lisa-modos-graficos",
+      "tipo": "funcionalidade",
+      "resumo": "Quatro visuais novos para o centro do Assistente (Lente, Orbe de vidro, Plasma e Anel de partículas) e o painel \"Visual da Lisa\" para ver e escolher.",
+      "itens": [
+        "Lente: disco de vidro escuro com aro de arco-íris, anéis com aberração cromática e reflexo em crescente que acende com a voz.",
+        "Orbe de vidro: esfera translúcida com fitas iridescentes (roxo, azul, dourado) que se cruzam e giram por dentro.",
+        "Plasma: formas onduladas feitas de linhas finas, rosa, roxo e azul, com o núcleo claro que acende quando ela fala.",
+        "Anel de partículas: milhares de pontos do azul ao magenta que respiram, giram pensando e ondulam falando.",
+        "Todos reagem ao mesmo sinal da Esfera de pontos (pronta, ouvindo, pensando, falando, com o volume real quando há) e mudam de cor por estado.",
+        "Painel /visual (em Painéis › Conversa): prévia grande e galeria ao vivo, simulador de estado e o botão \"Usar este visual\"; o menu Aparência da Lisa também troca o visual. A escolha vale na hora, inclusive em outra aba aberta.",
+        "Teste novo: npm run visuais-check."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.11.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.11.0: o editor numa janela separada (outro monitor) e o README com blocos dentro numa aba só.",
+      "itens": [
+        "Junta a branch lisa-editor-destacado (0.11.0-lisa-editor-destacado.1).",
+        "Sem migração de banco.",
+        "Deploy com a conta beyondbitsLisa indicada no comando (CLOUDFLARE_ACCOUNT_ID)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.11.0-lisa-editor-destacado.1",
+      "data": "2026-10-24",
+      "branch": "lisa-editor-destacado",
+      "tipo": "funcionalidade",
+      "resumo": "O editor da Lisa vai para uma janela separada (outro monitor), e um README com blocos dentro deixa de sair quebrado.",
+      "itens": [
+        "Botão \"⧉ destacar\" no editor: abre o editor numa janela de verdade do sistema, que vai para outro monitor, maximiza e continua recebendo as respostas novas; \"voltar para a página\" (ou fechar a janela) traz o editor de volta. Só no computador.",
+        "Correção: um arquivo com blocos de código dentro (um README com o comando de rodar) saía quebrado em dois, com metade na caixa de texto e uma aba vazia. O leitor dos blocos agora segue o Markdown (bloco de quatro crases só fecha com quatro) e entende blocos dentro de um markdown.",
+        "A regra da Lisa pede um arquivo inteiro num bloco só, com quatro crases quando ele tem blocos dentro.",
+        "A voz usa o mesmo leitor do editor: não lê o README nem o código de dentro dele."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.10.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.10.0: editor em janela livre com uma aba por resposta, e a Lisa vendo o código inteiro da conversa.",
+      "itens": [
+        "Junta a branch lisa-janela-livre (0.10.0-lisa-janela-livre.1).",
+        "Sem migração de banco.",
+        "Deploy com a conta beyondbitsLisa indicada no comando (CLOUDFLARE_ACCOUNT_ID), porque o login da Cloudflare enxerga mais de uma conta."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.10.0-lisa-janela-livre.1",
+      "data": "2026-10-24",
+      "branch": "lisa-janela-livre",
+      "tipo": "funcionalidade",
+      "resumo": "O editor da Lisa vira uma janela livre (arrasta e redimensiona) com uma aba por resposta, e a Lisa passa a ver o código inteiro da conversa antes de propor uma correção.",
+      "itens": [
+        "Janela livre: arrasta para qualquer lugar pela barra de título, aumenta e diminui por qualquer borda ou canto (com a marquinha no canto de baixo à direita) e abre de novo onde e do tamanho que ficou (guardado no navegador).",
+        "Uma janela para a conversa inteira: cada resposta com código vira uma aba (#1, #2…, com a pergunta no título); perguntar de novo não apaga nada, e uma resposta sem código não fecha o editor. Dá para fechar uma aba e voltar às anteriores.",
+        "Ver o todo: o código que já apareceu na conversa (o que você colou em bloco e o que a Lisa mostrou) vai inteiro junto da pergunta, na versão mais recente de cada arquivo, até 12 mil caracteres — antes ele chegava cortado em 700 caracteres por fala.",
+        "A regra da Lisa agora pede para entender o fluxo inteiro antes de corrigir (de onde vêm os dados, quem chama), pedir a parte que falta em vez de inventar e mostrar a função ou o arquivo completo que muda.",
+        "Testes novos em npm run codigo-check: geometria da janela e o código da conversa."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.9.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.9.0: o editor de código que a Lisa abre e digita quando a conversa é sobre código.",
+      "itens": [
+        "Junta a branch lisa-ide-do-codigo (0.9.0-lisa-ide-do-codigo.1).",
+        "Sem migração de banco.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.9.0-lisa-ide-do-codigo.1",
+      "data": "2026-10-24",
+      "branch": "lisa-ide-do-codigo",
+      "tipo": "funcionalidade",
+      "resumo": "Quando a conversa é sobre código, a Lisa abre um editor na tela e digita o código explicando cada passo, em qualquer modo.",
+      "itens": [
+        "A instrução da Lisa ganhou a regra do código na tela: quando o assunto é código, ela mostra o código em blocos (com a linguagem e o arquivo), com a explicação de cada trecho antes dele; a voz continua sem ler código.",
+        "Janela de editor (IdeDaLisa): abre sozinha quando a resposta traz código, digita trecho por trecho com cursor, realce de sintaxe e número de linha, abas por arquivo e a explicação do passo atual em cima; botões de pular, copiar, minimizar, maximizar e fechar, e arrasta pela barra de título.",
+        "Fechada, vira o botão \"ver o código da Lisa\" para reabrir; cada pergunta nova recomeça a digitação.",
+        "Na conversa, o bloco de código vira o aviso \"código no editor\"; no histórico do chat (celular) o código aparece num bloco com realce.",
+        "Não é um modo novo: vale em qualquer modo do Assistente (o Modo Código continua com a janela dele).",
+        "Teste novo: npm run codigo-check."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.8.1-cloudflare-pages.1",
+      "data": "2026-10-21",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Publicação da 0.8.1: a Lisa escreve o conteúdo quando o pedido é para elaborar o card (antes criava o card vazio).",
+      "itens": [
+        "Mesmo conteúdo da 0.8.1-lisa-card-com-conteudo.1. Sem migração de banco.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.8.1-lisa-card-com-conteudo.1",
+      "data": "2026-10-21",
+      "branch": "lisa-card-com-conteudo",
+      "tipo": "correcao",
+      "resumo": "A Lisa criava card vazio quando o pedido era para ela elaborar o conteúdo (\"cria um card com a estrutura que você acha ideal…\").",
+      "itens": [
+        "Pedidos de conteúdo (estrutura, plano, lista, ideias, \"o que você acha ideal\", \"descrevendo seção por seção\") agora abrem o rascunho, e a Lisa já escreve a proposta antes de criar o card. No teste, 8 de 8 pedidos assim viravam card vazio; agora 8 de 8 vão para o rascunho.",
+        "O módulo de ações é obrigado a decidir de onde vem o texto do card (nenhum, ditado, escrever ou a última resposta), em vez de um campo opcional que o modelo ignorava.",
+        "A confirmação avisa quando o card vai sair sem descrição (\"…sem descrição. Confirma?\").",
+        "Prazo dito no pedido (\"amanhã às 10h\") não se perde mais: antes saía em cerca de metade das vezes; no teste, 6 de 6.",
+        "No rascunho, um pedido com várias mudanças (\"deixa mais curto e põe prazo sexta\") aplica todas, não só o prazo."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.8.0-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Abacato: cards arquivados com restauração e menu do quadro clicável com foto de parede (branch cards-arquivados) vão ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.8.0-cards-arquivados.1 e .2: \"Cards arquivados\" no menu do quadro com Restaurar, botões dos painéis legíveis em quadros com papel de parede e o menu \"⋯\" acima das colunas."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.8.0-cards-arquivados.2",
+      "data": "2026-10-20",
+      "branch": "cards-arquivados",
+      "tipo": "correcao",
+      "resumo": "Abacato: o menu \"⋯\" do quadro abria por baixo das colunas em quadros com foto de papel de parede.",
+      "itens": [
+        "Em quadros com foto de papel de parede, \"Colunas arquivadas\", \"Papel de parede\" (e agora \"Cards arquivados\") ficavam debaixo do \"+ Adicionar coluna\", impossíveis de clicar. O topo do quadro passa a ficar uma camada acima das colunas."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.8.0-cards-arquivados.1",
+      "data": "2026-10-20",
+      "branch": "cards-arquivados",
+      "tipo": "funcionalidade",
+      "resumo": "Abacato: ver os cards arquivados de um quadro e trazê-los de volta.",
+      "itens": [
+        "No menu \"⋯\" do quadro, novo item \"Cards arquivados\": lista os cards que saíram do quadro (pela tela ou pela Lisa), com a coluna de onde vieram, o prazo, se estavam concluídos e o começo da descrição.",
+        "\"↩ Restaurar\" devolve o card à coluna dele, no mesmo lugar, com descrição, checklist, comentários e anexos. Se a coluna também estiver arquivada, o card vai para o topo da primeira coluna ativa e a tela avisa.",
+        "Busca pelo título; em quadros com mais de 300 arquivados, a busca é feita no banco.",
+        "As cópias de histórico das tarefas que se repetem não aparecem na lista (restaurar uma duplicaria a tarefa).",
+        "Corrigido: em quadros com papel de parede, os botões e ícones dos painéis (card aberto, Recorrentes, Colunas arquivadas, Quem acessa) ficavam brancos sobre fundo claro. O botão Restaurar passa a ser verde cheio."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.7.1-cloudflare-pages.1",
+      "data": "2026-10-19",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Correções do rascunho do card e do tempo das tarefas longas (branches rascunho-ajustes e teto-longo) juntam na cloudflare-pages e vão ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.7.1-rascunho-ajustes.1 e da 0.7.1-teto-longo.1: \"me ajuda a montar um card\" funciona, o rascunho aparece inteiro e com texto, e a Lisa Code tem até 75s por tentativa sem pausar o chat."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.7.1-teto-longo.1",
+      "data": "2026-10-19",
+      "branch": "teto-longo",
+      "tipo": "correcao",
+      "resumo": "A extensão Lisa Code parava com \"alta demanda\" em toda edição grande: o limite de 12s do chat valia também para tarefas que precisam de mais tempo.",
+      "itens": [
+        "Tarefas de resposta longa (Lisa Code, planejar e editar código, mapa de arquitetura, avaliação de testes) passam a ter até 75s por tentativa; o chat continua com 12s para começar a responder.",
+        "Quando uma tarefa longa demora, o modelo do chat não fica mais pausado por 3 minutos para todo mundo.",
+        "O erro de demora agora diz \"o Gemini não terminou de responder em Ns\", em vez de \"alta demanda\".",
+        "A chamada da Lisa Code que estoura o tempo é cancelada de verdade (não fica gastando cota).",
+        "Extensão Lisa Code 0.5.2: a trava de passos seguidos subiu de 10 para 25, e a mensagem diz para responder \"siga\" para continuar."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.7.1-rascunho-ajustes.1",
+      "data": "2026-10-18",
+      "branch": "rascunho-ajustes",
+      "tipo": "correcao",
+      "resumo": "Correções no card montado na conversa, achadas ao tirar os prints do tour de demonstração.",
+      "itens": [
+        "\"Me ajuda a montar um card\", \"monta comigo\", \"vamos elaborar\" e \"faz um card\" agora chegam ao módulo de ações: antes, o filtro de entrada não reconhecia esses verbos e a Lisa respondia como conversa comum.",
+        "\"Move o relatório para Fazendo\" (sem dizer \"card\") também passa a ser entendido como pedido de mover.",
+        "O texto do rascunho não fica mais escondido atrás da barra de digitação: com um rascunho na tela, a conversa ganha espaço e a esfera encolhe.",
+        "O primeiro texto do rascunho não sai mais vazio: a instrução exige o texto quando o rascunho ainda não tem, e o servidor pede de novo, uma vez, se vier sem.",
+        "O teste de ponta a ponta passa pelo mesmo filtro da rota, para não deixar escapar esse tipo de falha de novo."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.7.0-cloudflare-pages.1",
+      "data": "2026-10-18",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Montar um card conversando com a Lisa (branch elaborar-card) junta na cloudflare-pages e vai ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.7.0-elaborar-card.1: rascunho do card montado na conversa, com perguntas, ajustes e gravação só no \"pode criar\"."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.7.0-elaborar-card.1",
+      "data": "2026-10-18",
+      "branch": "elaborar-card",
+      "tipo": "funcionalidade",
+      "resumo": "Montar um card conversando com a Lisa: ela pergunta o que falta, escreve, ajusta a cada pedido e só grava quando você aprova.",
+      "itens": [
+        "Pedir um card com texto (\"um card com um pitch de vendas\") ou dizer \"me ajuda a montar um card\" abre um rascunho em vez de gravar direto.",
+        "No rascunho, ela pergunta o que muda o texto (público, objetivo, tom, prazo), escreve uma versão e ajusta o que você pedir: \"deixa mais curto\", \"fala do preço\", \"põe prazo sexta\".",
+        "O card só é gravado no \"pode criar\" (ou \"pode salvar\", ao melhorar o texto de um card que já existe). \"Esquece esse card\" desiste sem gravar nada.",
+        "Uma pergunta de outro assunto no meio não perde o rascunho: ela responde e o card continua esperando.",
+        "Na tela, o rascunho aparece numa prévia do card, separada da fala; a voz fala só o que mudou, sem ler o texto inteiro.",
+        "Texto escrito na hora passa sempre pelo rascunho (substitui a confirmação com o texto inteiro da 0.6.1)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.6.1-cloudflare-pages.1",
+      "data": "2026-10-18",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Descrição escrita pela Lisa (branch descricao-escrita) junta na cloudflare-pages e vai ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.6.1-descricao-escrita.1: card \"com um pitch/e-mail/roteiro\" ganha o texto escrito na hora, mostrado inteiro na confirmação; a última resposta só entra quando você se refere a ela."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.6.1-descricao-escrita.1",
+      "data": "2026-10-18",
+      "branch": "descricao-escrita",
+      "tipo": "correcao",
+      "resumo": "Pedir um card \"com um pitch de vendas\" (ou e-mail, roteiro...) faz a Lisa escrever o texto, em vez de colar na descrição a última resposta dela sobre outro assunto.",
+      "itens": [
+        "Novo caminho no módulo de ações: quando o pedido é de um texto novo, a Lisa escreve com o que sabe do assunto (quadros e notas do Beyond Brain) e só então propõe o card.",
+        "A última resposta só vai para o card quando você se refere a ela (\"esse texto\", \"o e-mail que você fez\").",
+        "A confirmação passa a mostrar o texto: inteiro quando acabou de ser escrito, ou o começo dele quando é longo. Antes aparecia só \"com o texto completo na descrição\", e dava para confirmar sem ver.",
+        "Vale para criar e para editar a descrição de um card."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.6.0-cloudflare-pages.1",
+      "data": "2026-10-16",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Interromper a Lisa dizendo \"Lisa\" no Modo conversa e retomada de respostas cortadas (branch interromper) juntam na cloudflare-pages e vão ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.6.0-interromper.1 e .2: dizer \"Lisa\" enquanto ela fala a faz parar e ouvir a correção; resposta cortada pelo Gemini é retomada de onde parou."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.6.0-interromper.2",
+      "data": "2026-10-16",
+      "branch": "interromper",
+      "tipo": "correcao",
+      "resumo": "Resposta cortada no meio pelo Gemini sobrecarregado agora é retomada de onde parou, em vez de mostrar \"Incomplete JSON segment\".",
+      "itens": [
+        "Quando o Gemini fecha a resposta no meio (visto hoje com os modelos em alta demanda), a Lisa pede a outra chave ou modelo que continue exatamente do ponto onde parou; quem lê ou ouve não percebe o corte.",
+        "Se cortar de novo, aparece uma frase que se entende (\"o Gemini cortou a resposta no meio... pergunte de novo\") em vez do erro técnico.",
+        "Novo script scripts/medir-modelos.mjs para medir, na hora, a demora e as falhas de cada modelo de chat."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.6.0-interromper.1",
+      "data": "2026-10-15",
+      "branch": "interromper",
+      "tipo": "funcionalidade",
+      "resumo": "No Modo conversa, dizer \"Lisa\" enquanto ela fala a faz parar na hora e ouvir a correção.",
+      "itens": [
+        "Enquanto ela responde no Modo conversa, o microfone fica atento à palavra \"Lisa\": ao ouvir, ela para a fala inteira (não só o trecho que estava tocando) e dá o bipe de escuta.",
+        "\"Lisa, não é esse, é o de vendas\" já vira a próxima pergunta; dizer só \"Lisa\" e esperar também funciona — ela volta a ouvir normalmente.",
+        "A resposta interrompida fica marcada na memória da conversa, para ela saber que foi cortada e aceitar a correção.",
+        "A própria voz dela saindo pelas caixas de som não conta como interrupção, mesmo quando ela diz \"Lisa\".",
+        "O aviso do Modo conversa mostra \"diga Lisa para interromper\" enquanto ela responde."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.5.0-cloudflare-pages.11",
+      "data": "2026-10-15",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Ações nos cards do Abacato (branch acoes-abacato) juntam na cloudflare-pages e vão ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.5.0-acoes-abacato.1: criar, editar, concluir, reabrir, mover e excluir cards do Abacato em qualquer conversa, e Abacato no lugar do Trello no que a Lisa sabe e diz."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.5.0-acoes-abacato.1",
+      "data": "2026-10-15",
+      "branch": "acoes-abacato",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa cria, edita, conclui, reabre, move e exclui cards do Abacato em qualquer conversa, e passa a tratar o Abacato (não o Trello) como o sistema de tarefas.",
+      "itens": [
+        "Causa do \"não tenho permissão\": o fluxo de ações era do Trello (só via cards com fonte TRELLO — com os quadros no Abacato a lista vinha vazia), só sabia prazo/coluna/concluído, e as instruções diziam \"você NÃO tem o poder de mudar nada\".",
+        "Novo fluxo (src/lib/fluxoDeAcoesNoAbacato.js): o Gemini entende o pedido com a conversa, os cards candidatos e os quadros/colunas; toda gravação pede \"Confirma?\"; pedido ambíguo pergunta qual card; \"cria um card com esse texto\" usa a última resposta inteira dela.",
+        "Gravação direta nas tabelas do Abacato (src/lib/abacatoAcoes.js) com as regras do próprio Abacato: prazo \"dia 30\" = 30 às 23:59 em Brasília (antes virava 29 às 21h), concluir tarefa recorrente reprograma como na tela dele, excluir = arquivar (dá para recuperar).",
+        "Vale em qualquer modo: texto, voz, conversa livre, e também com o Modo Código ou o Vigia ligados.",
+        "Trello → Abacato no que a Lisa sabe e diz: instruções, persona, rádio, Lisa Code, títulos de notificação, luz de saúde (agora confere o Abacato) e textos das telas. O Mapa de deploy continua no Trello, como é de fato.",
+        "Testes: npm run acoes-abacato-check e acoes-abacato-e2e (Gemini + banco reais, quadro temporário apagado no fim; 17 cenários)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.4.0-cloudflare-pages.10",
+      "data": "2026-10-15",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Conversa livre (branch conversa-livre) junta na cloudflare-pages e vai ao ar (BEYOND-0006).",
+      "itens": [
+        "Mesmo conteúdo da 0.4.0-conversa-livre.1: memória das últimas trocas e Modo conversa com microfone aberto."
+      ],
+      "issues": [
+        "BEYOND-0006"
+      ]
+    },
+    {
+      "versao": "0.4.0-conversa-livre.1",
+      "data": "2026-10-15",
+      "branch": "conversa-livre",
+      "tipo": "funcionalidade",
+      "resumo": "Conversa mais livre com a Lisa: ela lembra das últimas trocas e continua o assunto, e o Modo conversa deixa o microfone aberto para falar quando quiser (BEYOND-0006).",
+      "itens": [
+        "Memória da conversa: o Assistente manda as últimas 5 trocas (até 30 min de pausa) junto com cada pergunta, e o prompt pede para continuar o assunto em vez de recomeçar. Inclui os comentários que ela faz sozinha da tela, câmera e escuta.",
+        "Continuações curtas (\"e o prazo dele?\") buscam contexto junto com a pergunta anterior, para achar o mesmo card ou nota de antes.",
+        "Modo conversa (Modos → Voz e rádio → Conversa livre; no celular, nos ajustes): microfone aberto, cada frase vira pergunta, o silêncio e ruídos curtos não disparam nada, o reconhecimento fecha enquanto ela fala (sem eco) e reabre depois. Funciona junto com Tela e Observância.",
+        "O botão do microfone encerra a conversa livre; a escuta por palavra e a janela de resposta automática não abrem um segundo microfone com ela ligada.",
+        "Teste novo: npm run conversa-check (31 casos)."
+      ],
+      "issues": [
+        "BEYOND-0006"
+      ]
+    },
+    {
+      "versao": "0.3.0-cloudflare-pages.9",
+      "data": "2026-10-14",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "Revisão visual (branch revisao-visual) junta na cloudflare-pages e vai ao ar na Lisa de casa e na da nuvem.",
+      "itens": [
+        "Mesmo conteúdo da 0.3.0-revisao-visual.1: esfera da voz, topo com Painéis e status, Modos e Ajustes do Assistente, celular e primeira passada nos painéis."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.3.0-revisao-visual.1",
+      "data": "2026-10-14",
+      "branch": "revisao-visual",
+      "tipo": "melhoria",
+      "resumo": "Revisão visual da Lisa: fundo preto, menus discretos e a voz como uma esfera de pontos 3D que reage ao som. Nenhuma função mudou.",
+      "itens": [
+        "Assistente: a esfera de pontos (three.js) ocupa o centro e se deforma com o volume real da voz da Lisa e do microfone; muda de cor ao ouvir, pensar e falar. Rosto/ondas e avatar 3D continuam em Ajustes.",
+        "Topo do app: marca, painel atual, menu \"Painéis\" agrupado (Trabalho, Conhecimento, Código e testes, Sistema) e um ponto de status com conexões, sincronização, notificações, cor de destaque e relógio. A barra lateral saiu.",
+        "Assistente: \"Modos\" (percepção, vigia, voz e rádio, trabalho) e Ajustes (aparência e voz) no topo; escopo dentro do campo de mensagem; registro e contexto viram gavetas laterais; prévias de câmera e tela sempre montadas enquanto o modo estiver ligado.",
+        "Celular: topo novo (ajustes, Chat/Voz/Interativo, painéis) e a esfera na tela de voz.",
+        "Painéis: primeira passada (fonte Barlow, sem espaçamento de HUD, tamanhos mínimos legíveis, superfícies no preto novo). Cor de destaque padrão passa a azul suave."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.8",
+      "data": "2026-10-13",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "A Lisa deixa de ficar muda quando o modelo do Google está sobrecarregado, e acaba o chiado de rádio entre as falas.",
+      "itens": [
+        "Causa medida em 13/10: gemini-3.6-flash e gemini-3.5-flash em 503 em todas as 35 chaves, e algumas chamadas penduradas por mais de 25s; a abertura da resposta não tinha teto, então a pergunta travava sem texto, voz nem erro.",
+        "Cada tentativa de chat tem 12s para começar a responder; estourou, conta como sobrecarga e passa para o próximo modelo.",
+        "O modelo que esgotou as tentativas fica pausado por 3 minutos: as perguntas seguintes começam direto pela reserva que responde (medido: 1ª pergunta 17s, 2ª 0,9s).",
+        "Na Lisa de casa, enquanto a correção não chega por atualização, o gemini-3.5-flash-lite foi posto como modelo principal no .env (com as outras duas como reserva).",
+        "Chiado entre as falas: o gemini-3.8-flash-tts devolve um WAV inteiro (cabeçalho + bloco C2PA de ~6 KB no fim), que era tratado como PCM cru — o cabeçalho e o C2PA tocavam como som (fim de cada pedaço a -4 dB). Agora só o bloco de áudio é usado (src/lib/audioDoGemini.js): medido, o fim passou a -71 dB. Teste: npm run audio-check."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.7",
+      "data": "2026-10-12",
+      "branch": "cloudflare-pages",
+      "tipo": "infraestrutura",
+      "resumo": "Backup a cada 3 horas e semanal do banco de casa (Lisa, Abacato, Beyond Brain, Beyond Space) e do Storage, criptografado no Google Drive, com ensaio de restauração (BEYOND-0003).",
+      "itens": [
+        "A cada 3 horas (00h, 03h... 21h), guardando os 3 mais recentes — o 4º substitui o mais antigo, só depois que o novo subiu e conferiu; semanal toda segunda às 03:15, guardado na nuvem até alguém apagar.",
+        "Nome legível no Drive, com tipo, dia e hora (beyond-bkp-semanal_AAAA-MM-DD_HHhMM.tar), nas pastas 3horas/ e semanal/ de beyond-backup; só o conteúdo vai cifrado.",
+        "Cada pacote: bases do Postgres (pg_dump custom), papéis, arquivos do Storage e configuração do Supabase, com SHA-256 de cada arquivo; criptografado (rclone crypt) e conferido por hash depois do envio. Se a nuvem falhar, o pacote fica guardado no iMac.",
+        "restaurar.sh: ensaio num Postgres descartável, restauração em produção com confirmação, e recuperação de uma tabela só; acha o pacote por data ou tipo. Guia em scripts/backup/LEIA-ME.md.",
+        "Testado no iMac: pacote de 265 MB; ensaio restaurou 128 tabelas e 229 arquivos sem erro; envios ao Drive conferidos.",
+        "Pendente: client_id próprio do Google (o compartilhado do rclone será desligado em 2026) — scripts/backup/trocar-client-id-drive.sh."
+      ],
+      "issues": [
+        "BEYOND-0003"
+      ]
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.6",
+      "data": "2026-10-12",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Abacato: comentários nos cards, com imagens anexas por Ctrl+V ou pelo botão de anexar (BEYOND-0004).",
+      "itens": [
+        "Nova seção \"Comentários\" no card aberto do Abacato: escrever, editar o próprio e apagar; mostra autor e quando.",
+        "Imagens no comentário: Ctrl+V com o card aberto, botão \"Anexar imagem\" (arquivo do PC) ou arrastar o arquivo; até 6 por comentário, 10 MB cada. Prints grandes são reduzidos no navegador antes de enviar.",
+        "As imagens ficam num bucket PRIVADO do Storage (abacato-comentarios) e abrem por endereço assinado de 1 hora, só para quem enxerga o quadro.",
+        "Quem comenta: dono, editor e comentarista; o leitor só lê. Apagar: quem escreveu, ou dono e editor do quadro.",
+        "O espaço das imagens conta no armazenamento do plano do dono do quadro.",
+        "Banco: migração db/013-comentarios.sql (tabelas abacato_comentarios e abacato_comentario_anexos). Teste novo: npm run comentario-check (30 casos)."
+      ],
+      "issues": [
+        "BEYOND-0004"
+      ]
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.5",
+      "data": "2026-10-09",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "O chat deixa de responder \"alta demanda\" quando o modelo do Google está sobrecarregado: passa para um modelo reserva.",
+      "itens": [
+        "Causa: o Google responde 503 quando o MODELO está sobrecarregado, com qualquer chave; o chat trocava de chave três vezes no mesmo modelo, castigando cada uma por 30s, e desistia — o painel ficava com \"sobrecarga\" em chaves boas.",
+        "Depois de duas sobrecargas no mesmo modelo, a chamada passa para o modelo reserva: gemini-3.5-flash e depois gemini-3.5-flash-lite (configurável em GEMINI_CHAT_RESERVAS). Vale também quando o modelo principal esgota a cota ou é desligado (404).",
+        "A sobrecarga tira a chave de circulação só por 5s (era 30s), porque a culpa não é da chave.",
+        "Vale para todas as 28 chamadas de chat da Lisa (respostas, ações, vigília, observação, rádio...). Embeddings e voz seguem com as regras próprias.",
+        "Testado: com o principal desligado, a resposta veio pela reserva em 3s; o caminho normal segue igual."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.4",
+      "data": "2026-10-07",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "A voz do Gemini deixa de cair para a do navegador em mensagens longas (BEYOND-0001).",
+      "itens": [
+        "Causa medida: o modelo de voz antigo (gemini-2.5-flash-preview-tts) pendurava com frequência, sobretudo em textos longos; e o tempo de síntese cresce com o texto — uma resposta inteira numa chamada só passava do teto de 26s, caía para o navegador e armava o disjuntor de 60s, levando as mensagens seguintes junto.",
+        "Modelo de voz novo: gemini-3.8-flash-tts (fora de preview) como principal e gemini-3.1-flash-tts-preview como reserva, com as tentativas sobrepostas alternando entre os dois (vence o que estiver saudável na hora). Configurável em GEMINI_TTS_MODEL e GEMINI_TTS_RESERVAS.",
+        "Teto e intervalo das tentativas proporcionais ao tamanho do texto, em vez de números fixos.",
+        "As respostas longas são faladas em pedaços (o primeiro curto), todos gerados em paralelo e tocados em ordem: a primeira voz sai em ~6s e não há silêncio entre os pedaços. Vale para o Assistente e para o speakText (rádio, vigília, avisos).",
+        "Testado de ponta a ponta com o código real: resposta de 733 caracteres em 5 pedaços, 3 de 3 rodadas inteiras na voz do Gemini. npm run fala-check reescrito com as medições de 07/10."
+      ],
+      "issues": [
+        "BEYOND-0001"
+      ]
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.3",
+      "data": "2026-09-28",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Abacato ganha integrações por token: o Beyond-Lead passa a ler o quadro do CRM e criar os leads prospectados nele.",
+      "itens": [
+        "Abacato: novas rotas /api/integracoes/quadro (lê o quadro, sem responsáveis, membros, links nem anexos) e /api/integracoes/cards (cria card no fim da coluna de entrada, com conferência de duplicado no quadro inteiro).",
+        "O acesso é por token de integração (Authorization: Bearer abi_...) que abre UM quadro só; o banco guarda apenas o SHA-256 do token. A coluna onde o card nasce é fixada na integração, e não vem no pedido.",
+        "Novo script scripts/criar-integracao.mjs: sorteia o token, grava num arquivo da sua máquina e gera o SQL que liga a integração ao quadro e à coluna pelo nome.",
+        "Nova conferência npm run integracao-check (token, cabeçalho, portão de sessão e regra de duplicado, sem banco).",
+        "Banco: nova migração db/012-integracoes.sql (tabela abacato_integracoes)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.2",
+      "data": "2026-09-27",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Workspaces também nos Documentos, e o menu ⋯ dos cartões deixa de ficar atrás dos outros cartões.",
+      "itens": [
+        "Documentos: os projetos entram nos MESMOS workspaces dos quadros — o \"Delp\" é o mesmo nas duas listas. Seções por workspace, \"+ Projeto aqui\" e \"Mover para workspace\" no ⋯ do projeto.",
+        "Correção: o menu ⋯ de um cartão de quadro ou de projeto às vezes ficava atrás dos cartões vizinhos e não dava para clicar nas opções. Era o efeito de levantar o cartão ao passar o mouse, que prendia o menu dentro dele.",
+        "Banco: nova migração db/011-workspaces-documentos.sql (tabela abacato_workspace_projetos)."
+      ],
+      "issues": [
+        "BEYOND-0003"
+      ]
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.1",
+      "data": "2026-09-27",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Abacato ganha workspaces, colunas arrastáveis, card aberto no centro no estilo Trello, checklist editável e modo calendário.",
+      "itens": [
+        "Workspaces: cada pessoa cria pastas e organiza nelas os quadros que enxerga; não mudam quem acessa o quê.",
+        "Arrastar e soltar colunas pelo nome, com espaço reservado e miniatura da coluna.",
+        "O card abre num modal no centro da tela, e não mais numa gaveta à direita.",
+        "Card mais enxuto: etiquetas, membros, datas, checklist, repetir, link e capa ficam numa faixa \"Adicionar\"; o corpo mostra só o que o card tem.",
+        "Checklist: nome e itens renomeáveis com um clique, e itens reordenáveis arrastando pela alça.",
+        "Modo calendário do quadro: cards no dia da entrega, arrastar para outro dia muda o prazo, e dá para criar um card já num dia.",
+        "Banco: nova migração db/010-workspaces.sql (tabelas abacato_workspaces e abacato_workspace_quadros)."
+      ],
+      "issues": [
+        "BEYOND-0003"
       ]
     },
     {
@@ -65,14 +1151,31 @@
         "Notificações push de card novo e de tarefa atrasada.",
         "Kanban de tarefas da Delp a partir de planilha enviada pela tela.",
         "Consulta a repositórios do GitHub, tarefas de código e pair programming.",
-        "Painel Sentinela de casos de teste e chamados."
+        "Editor de código na tela em qualquer modo: quando a conversa é sobre código, a Lisa mostra o código e uma janela de editor (realce de sintaxe, número de linha) digita trecho por trecho com a explicação de cada passo; uma aba por resposta (as anteriores ficam), abas por arquivo, janela que arrasta para qualquer lugar e redimensiona pelas bordas e cantos, lembrando onde ficou, e o botão \"destacar\" leva o editor para uma janela separada do sistema (outro monitor); a voz fala só a explicação. Antes de corrigir, a Lisa recebe o código que já apareceu na conversa (versão mais recente de cada arquivo) e pede o que falta em vez de inventar.",
+        "Contexto da conversa em qualquer modo: o + da barra anexa imagens (do computador, com Ctrl+V ou arrastando) e vincula até 3 repositórios do GitHub; a cada pergunta a Lisa lê os arquivos do repositório que interessam, escolhidos pela pergunta, pela conversa e pelo que aparece na tela, na câmera e nos prints, e responde relacionando tudo, com o caminho de cada arquivo.",
+        "Modo Tomar nota (celular e desktop, também com a tela apagada no Android): escuta até 10 minutos, transcreve, separa por assunto e anota no quadro \"Notas\" do Abacato, com uma coluna por tema e um card por nota (interpretação + transcrição real).",
+        "Instalável como app pelo Chrome (desktop e Android) e pela Tela de Início no iPhone, com atalho direto para o Modo Tomar nota.",
+        "Microfone do celular como o do WhatsApp, no chat e no modo voz: segurar grava, soltar envia, deslizar para a esquerda cancela e para cima trava; o áudio é transcrito no servidor (Whisper da Groq, com a transcrição do Gemini de reserva), o nome da Lisa sai certo e o áudio não fica guardado. No celular, a Conversa livre também escuta gravando e percebe o fim da fala pelo silêncio.",
+        "Visuais da Lisa no centro do Assistente, que reagem à voz (ouvindo, pensando, falando): Esfera de pontos, Lente, Orbe de vidro, Plasma, Anel de partículas e Rosto (um retrato térmico: borda quente e halo; a garganta esquenta com a fala, as orelhas acendem ouvindo e uma onda de calor sobe pela cabeça pensando; cabelo longo ou raspado e seis paletas de cor; parada e sem ninguém mexer, ela brinca: bate no vidro como numa porta, joga videogame, cantarola ou fica presa no vidro como um mímico); o painel \"Visual da Lisa\" (/visual) mostra todos ao vivo, com simulador de estado, e escolhe o que vai para o Assistente (guardado no navegador). No modo MVP, o usuário tem só a Esfera de pontos (padrão) e o Rosto.",
+        "Painel Sentinela de casos de teste e chamados.",
+        "Editor de código da conversa colaborativo: abas editáveis, abas suas com o seu código e a Lisa reescrevendo em cima a pedido, com o que está na IDE indo junto das perguntas.",
+        "Quadro de processos: a Lisa desenha fluxogramas, BPMN com raias, arquitetura, C4 e mapas mentais quando pedido; a pessoa mexe no desenho e a Lisa conversa sobre ele e o altera a partir do que está na tela, inclusive pela aparência (\"limpe as atividades vermelhas\", \"pinte de verde\") e por abas (cria, detalha uma etapa numa aba ligada a ela, separa, renomeia e apaga abas). O desenho do quadro pode ser salvo num projeto do ProcessMap (botão \"💾 salvar\"), e dali em diante as mudanças se salvam sozinhas. A Lisa respeita o tipo pedido (BPMN, UML, classes, casos de uso, modelo de dados, C4, raias, mapa mental) e o conteúdo dado pela pessoa, inclusive o que está na tela ou num print anexado.",
+        "Internet em qualquer modo: pedir para pesquisar ou procurar na web faz o servidor pesquisar (DuckDuckGo, com o Google Notícias de reserva) e ler as primeiras páginas; citar um site ou colar um link faz a Lisa ler a página. As fontes aparecem como links embaixo da resposta.",
+        "Painel ProcessMap (/fluxogramas): o editor de diagramas inteiro dentro da Lisa (fluxograma, mapa mental e schema SQL), com projetos e fluxogramas salvos no banco (salvamento automático, aviso de conflito entre abas, importar/exportar .json) e a barra \"pedir à Lisa\" para desenhar ou mudar o fluxo aberto. Na conversa, \"no projeto X do ProcessMap, …\" faz a Lisa ler os fluxogramas do projeto e trabalhar nele (mudar um fluxo ou criar outro, salvando lá); sem citar projeto, o desenho novo é avulso, no quadro, e o 💾 salvar escolhe onde guardar.",
+        "Cena do Assistente no computador: a resposta numa janela holográfica flutuante e arrastável, com hologramas em volta (anéis, mira, painéis de status e de sinal de voz, barras, grade), a Lisa mais perto e no centro, e profundidade 3D com paralaxe do mouse.",
+        "Documentar um projeto do ProcessMap: a Lisa escreve no editor de código a visão geral e um .md por desenho (para pedir a uma IA de código construir as rotas), sem mudar os desenhos",
+        "Versões anteriores de cada fluxograma do ProcessMap, com \"voltar para esta\"",
+        "Modo MVP: usuários convidados (que não são o dono) entram numa versão limitada — conversa e voz, Modo Tela, editor de código, ProcessMap, repositórios públicos, entrevista do primeiro acesso e o atalho da Lisa Task —, com limite diário de uso",
+        "Lisa Task: é o Abacato com o nome e o visual da Lisa (conta do tipo Lisa Task), só com os quadros de tarefas; a parte de documentos (projetos, pastas e arquivos) não existe para ela e é barrada no servidor. O menu Lisa Task abre lisatask.beyond.dev.br (o mesmo Abacato, com o título e o ícone da Lisa na aba) em outra aba já com a conta da Lisa (a conta Lisa Task nasce no primeiro acesso)."
       ],
       "naoInclui": [
         "Não é multiusuário: o login existe, mas só para o responsável.",
         "Não cria nem apaga cards no Trello.",
-        "Não guarda fotos da câmera nem capturas de tela: elas vão ao Gemini e são descartadas.",
+        "Não guarda fotos da câmera, capturas de tela nem imagens anexadas: elas vão ao Gemini e são descartadas (a miniatura de um anexo fica só na aba aberta).",
+        "Não altera os repositórios vinculados à conversa: só lê. Mudar código continua sendo pelas tarefas de código, com branch e PR.",
         "Não versiona a planilha da Delp; ela fica só no banco.",
-        "Não inclui o Abacato: ele é outra aplicação, em Abacatosys/abacato, com hospedagem própria."
+        "O Abacato mora neste repositório (Abacatosys/abacato), mas é outra aplicação, publicada à parte em abacato.beyond.dev.br.",
+        "No modo MVP, o usuário não acessa os dados, painéis, chaves, repositórios privados nem o Modo Código (PR) do admin"
       ]
     },
     "stack": [
@@ -82,16 +1185,17 @@
       "Cloudflare Workers, com o adaptador @opennextjs/cloudflare e o wrangler",
       "Supabase auto-hospedado em Docker (PostgreSQL 17.6 + pgvector, PostgREST, Auth)",
       "Cloudflare Tunnel (cloudflared)",
-      "Google Gemini (gemini-2.5-flash, embeddings, TTS)",
-      "Groq (modelos de linguagem, em rodízio de chaves)",
+      "Google Gemini (chat gemini-3.6-flash, embeddings, voz gemini-3.8-flash-tts com reserva gemini-3.1-flash-tts-preview)",
+      "Groq (modelos de linguagem e o Whisper para a fala do microfone, em rodízio de chaves)",
       "Three.js",
       "MediaPipe Tasks Vision",
       "Monaco Editor",
       "ExcelJS",
-      "Extensão VS Code em TypeScript (Lisa Code)"
+      "Extensão VS Code em TypeScript (Lisa Code)",
+      "Quadro de diagramas: o ProcessMap (JavaScript puro e SVG) em public/diagramas — o mesmo do Lisa_Proof, com o tema da Lisa —, embutido num iframe do mesmo endereço (ponte em public/diagramas/js/Ponte.js); a IA devolve a estrutura e o layout em camadas é feito em src/lib/diagramaDaLisa.js"
     ],
     "arquitetura": {
-      "resumo": "A Lisa é um app Next.js que roda como Worker na Cloudflare (plano gratuito): as páginas saem estáticas pelo CDN e as rotas de API rodam no Worker. Os dados moram num Supabase auto-hospedado no servidor de casa (iMac com Zorin OS), que a Lisa alcança por um túnel da Cloudflare (cloudflared) em banco.beyond.dev.br. O túnel é aberto de dentro da casa para fora, então nenhuma porta do roteador foi aberta. A Lisa nunca fala SQL direto: chama o PostgREST por HTTP. O agendamento (SYNC, notificações push e Map of Deploy) é feito pelo crontab do servidor de casa; o Worker lisa-cron continua publicado, sem horários, como reserva. O Sentinela continua num projeto Supabase da nuvem. O banco fica tão disponível quanto a casa: queda de luz ou de internet lá derruba os dados. Detalhes em docs/infraestrutura.html e servidor/README.md.",
+      "resumo": "A Lisa é um app Next.js que roda como Worker na Cloudflare (plano gratuito): as páginas saem estáticas pelo CDN e as rotas de API rodam no Worker. Os dados moram num Supabase auto-hospedado no servidor de casa (iMac com Zorin OS), que a Lisa alcança por um túnel da Cloudflare (cloudflared) em banco.beyond.dev.br. O túnel é aberto de dentro da casa para fora, então nenhuma porta do roteador foi aberta. A Lisa nunca fala SQL direto: chama o PostgREST por HTTP. O agendamento (SYNC, notificações push e Map of Deploy) é feito pelo crontab do servidor de casa; o Worker lisa-cron continua publicado, sem horários, como reserva. O Sentinela continua num projeto Supabase da nuvem. O banco fica tão disponível quanto a casa: queda de luz ou de internet lá derruba os dados. Detalhes em docs/infraestrutura.html e servidor/README.md. Papéis (01/11/2026): o portão (src/middleware.js) confere o token do Supabase Auth e decide pelo papel — admin (LISA_ADMINS ou app_metadata.role) ou usuário (lista DO_USUARIO em src/lib/authSession.js); as rotas que mudam para o usuário leem o papel em src/lib/papelNaSessao.js.",
       "diagramas": [
         {
           "titulo": "Visão geral",
@@ -131,7 +1235,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "Fica no iMac de casa e é publicado só pelo túnel da Cloudflare, em HTTPS (PostgREST). O Postgres não é exposto na internet. O Studio só abre no próprio iMac. Teste: https://banco.beyond.dev.br/ responder 401 é normal; 530 significa túnel fora (confira se o iMac está ligado)."
+        "observacao": "Fica no iMac de casa e é publicado só pelo túnel da Cloudflare, em HTTPS (PostgREST). O Postgres não é exposto na internet. O Studio só abre no próprio iMac. Teste: https://banco.beyond.dev.br/ responder 401 é normal; 530 significa túnel fora (confira se o iMac está ligado). Backup: a cada 3 horas (ficam os 3 últimos) e semanal (segunda 03:15, guardado até apagar), pelo cron do iMac (~/backup), com conteúdo criptografado, no Google Drive (pasta beyond-backup); restaurar com scripts/backup/restaurar.sh — ver scripts/backup/LEIA-ME.md. Os projetos e fluxogramas do painel ProcessMap ficam nas tabelas lisa_projetos e lisa_fluxogramas (db/fluxogramas.sql), e as versões anteriores de cada fluxo em lisa_fluxogramas_versoes (db/fluxogramas_versoes.sql); um fluxo só volta de um backup com scripts/backup/recuperar-fluxo.sh. Modo MVP: lisa_perfis, lisa_tarefas (sem uso desde a 0.31.0: a Lisa Task é o Abacato) e lisa_uso (db/mvp_usuarios.sql), separadas por dono."
       },
       {
         "nome": "Sentinela (Beyond Test)",
@@ -160,22 +1264,22 @@
       },
       {
         "nome": "Abacato",
-        "descricao": "Fonte alternativa de quadros: a Lisa pode ler o Abacato em vez do Trello.",
+        "descricao": "Fonte alternativa de quadros: a Lisa pode ler o Abacato em vez do Trello. O Modo Tomar nota grava no quadro \"Notas\" do usuário do Abacato com o mesmo e-mail (cria o quadro, a coluna do tema e os cards). A Lisa Task também é o Abacato: o menu Lisa Task leva a lisatask.beyond.dev.br (um segundo endereço do mesmo Worker do Abacato; variável LISA_TASK_URL), e as contas do tipo Lisa Task abrem com o visual da Lisa e sem documentos. A pessoa entra com a conta da Lisa: a Lisa posta o token do Supabase Auth em /api/auth/lisa do Abacato, que confirma em /auth/v1/user e entra com a conta do mesmo e-mail.",
         "url": "https://abacato.beyond.dev.br"
       },
       {
         "nome": "Google Gemini",
-        "descricao": "Chat em streaming, embeddings, visão (câmera e tela) e voz (TTS).",
+        "descricao": "Chat em streaming, embeddings, visão (câmera e tela), voz (TTS) e transcrição de áudio (Modo Escuta e Modo Tomar nota). A leitura de páginas (urlContext) abre os sites citados; a busca do Google (googleSearch) só com GEMINI_BUSCA_GOOGLE=1, porque as chaves atuais não têm cota para ela.",
         "url": "https://ai.google.dev"
       },
       {
         "nome": "Groq",
-        "descricao": "Modelos de linguagem alternativos, com rodízio de chaves.",
+        "descricao": "Modelos de linguagem alternativos (Lisa Code) e a transcrição da fala do microfone (Whisper, whisper-large-v3-turbo), com rodízio de chaves.",
         "url": "https://api.groq.com"
       },
       {
         "nome": "GitHub",
-        "descricao": "Leitura de repositórios; criação de branches e PRs nas tarefas de código e no pair programming.",
+        "descricao": "Leitura de repositórios (painel de repositórios e contexto da conversa: a árvore e os arquivos dos repositórios vinculados, só leitura); criação de branches e PRs nas tarefas de código e no pair programming. Com o token recusado, lê só os repositórios públicos.",
         "url": "https://api.github.com"
       },
       {
@@ -192,6 +1296,16 @@
         "nome": "Feeds de notícias",
         "descricao": "RSS de sites de tecnologia (Canaltech, Tecnoblog, Olhar Digital, TabNews e outros) no painel de notícias.",
         "url": ""
+      },
+      {
+        "nome": "Beyond-Lead",
+        "descricao": "Sistema de prospecção da Beyond Bits. Lê o quadro do CRM no Abacato para o dashboard de funil e cria nele os leads prospectados, pelas rotas /api/integracoes/* com token de integração (tabela abacato_integracoes). Revogar: desligar a integração (ativo = false).",
+        "url": "https://github.com/beyondBitsLtda/Beyond-Lead"
+      },
+      {
+        "nome": "DuckDuckGo e Google Notícias (pesquisa na internet)",
+        "descricao": "A pesquisa que a Lisa faz quando a pessoa pede internet: a página HTML do DuckDuckGo (e a versão Lite), sem chave; o RSS do Google Notícias é a reserva. As páginas dos resultados são lidas pelo servidor (src/lib/buscaNaWeb.js).",
+        "url": "https://html.duckduckgo.com/html/"
       }
     ],
     "links": [
@@ -202,6 +1316,10 @@
       {
         "titulo": "Produção",
         "url": "https://lisa.beyond.dev.br/"
+      },
+      {
+        "titulo": "Lisa Task",
+        "url": "https://lisatask.beyond.dev.br"
       },
       {
         "titulo": "Documentação de infraestrutura",

@@ -1,0 +1,590 @@
+// A parte prática: quiz e exercício do dia, o projeto de cada semana do plano e o projeto final.
+//
+// Puro, como o resto de src/dominio: períodos, pontuação e conferência do que a IA devolve. O
+// avanço na trilha (o quiz que conclui o assunto, o projeto que abre a semana seguinte, o mapa) mora
+// em src/dominio/avanco.js. Tudo testado por `npm run dominio-check`.
+
+import { inicioDaSemana, fimDaSemana, inicioDoMes, fimDoMes, diaValido, diaDaSemana } from "./datas.js";
+import { MULTIPLICADOR_DE_RECOMPENSAS } from "./pontos.js";
+import { MOTORES, motorDo, evidenciasAceitas } from "./motores.js";
+
+// "projeto_mensal" ficou só para a história: desde 23/10/2026 a última semana do plano termina no
+// PROJETO FINAL, do tamanho da trilha (src/dominio/avanco.js), e ninguém gera projeto do mês novo.
+export const TIPOS_DE_DESAFIO = ["quiz", "exercicio", "projeto_semanal", "projeto_final", "projeto_mensal"];
+export const TIPOS_DE_PROJETO = ["projeto_semanal", "projeto_final", "projeto_mensal"];
+export const ehProjeto = (tipo) => TIPOS_DE_PROJETO.includes(tipo);
+
+export const NOMES_DOS_DESAFIOS = {
+  quiz: "Quiz do dia",
+  exercicio: "Exercício do dia",
+  projeto_semanal: "Projeto da semana",
+  projeto_final: "Projeto final",
+  projeto_mensal: "Projeto do mês",
+};
+
+/**
+ * Pontuação da prática. A parte prática vale mais que a teórica de propósito: dá mais trabalho.
+ * Os valores de base × MULTIPLICADOR_DE_RECOMPENSAS (o triplo desde 26/10/2026, ver pontos.js).
+ */
+const M = MULTIPLICADOR_DE_RECOMPENSAS;
+export const PONTOS_DA_PRATICA = {
+  acertoNoQuiz: 5 * M,       // 15
+  quizPerfeito: 10 * M,      // 30 — bônus por acertar todas
+  // o Exercício do dia, triplicado de novo em 03/11/2026 (BEYOND-0017: "os pontos de exercício diário devem
+  // ser triplicados"): 40 × 3 × 3. As rodadas extras do dia continuam valendo metade.
+  exercicio: 40 * 3 * M,     // 360 — nota 100
+  projeto_semanal: 150 * M,  // 450
+  projeto_final: 400 * M,    // 1.200 — o padrão; o de cada trilha cresce com ela (valorDoProjetoFinal, em avanco.js)
+  projeto_mensal: 400 * M,   // 1.200
+};
+
+export const NOTA_DE_APROVACAO = 60;
+// Exercício: 5 tentativas (eram 3 — pedido de 20/10/2026).
+export const TENTATIVAS = { exercicio: 5, projeto_semanal: 5, projeto_final: 5, projeto_mensal: 5 };
+
+/**
+ * Quantas entregas um desafio aceita. O exercício depende do motor (src/dominio/motores.js): os
+ * corrigidos no servidor (lista de cálculo, ditado, ouvido) têm resposta certa e uma tentativa só,
+ * como o quiz; código e desafio aberto, as 5 de sempre. `motor` serve quem não tem o conteúdo à mão.
+ */
+export function tentativasDe({ tipo, conteudo, motor } = {}) {
+  if (tipo === "exercicio") return MOTORES[motor || motorDo(conteudo)]?.tentativas ?? TENTATIVAS.exercicio;
+  return TENTATIVAS[tipo] || 0;
+}
+
+// ---------------------------------------------------------------- rodadas extras do dia
+//
+// Quem quiser pode fazer até 3 quizzes e 3 exercícios por dia, em cada trilha (pedido de
+// 20/10/2026). Cada rodada é um desafio novo sobre o assunto do dia, sem repetir as perguntas
+// das anteriores. A 2ª e a 3ª valem METADE dos pontos (e das moedas do reino): praticar mais
+// sempre compensa, mas repetir quiz fácil não sobe o ranking como estudar o assunto seguinte.
+export const RODADAS_POR_DIA = { quiz: 3, exercicio: 3 };
+export const fatorDaRodada = (rodada) => ((Number(rodada) || 1) <= 1 ? 1 : 0.5);
+export const comFatorDaRodada = (pontos, rodada) => Math.round((pontos || 0) * fatorDaRodada(rodada));
+
+// ---------------------------------------------------------------- perguntas repetidas
+// Chamado de 20/10/2026: nas rodadas extras do quiz, a IA devolvia as mesmas perguntas (às vezes
+// idênticas, às vezes só reformuladas). O pedido já dizia "não repita"; agora o código confere.
+// Duas perguntas são "a mesma" se as palavras que importam se sobrepõem muito, ou se o código
+// delas é praticamente o mesmo (a mesma pergunta sobre o mesmo programa, com outras palavras).
+
+// palavras que não dizem nada do conteúdo (e o "Analise o código abaixo" de toda pergunta)
+const VAZIAS = new Set((
+  "a o as os e de do da dos das um uma uns umas que qual quais quem como onde quando porque por para pra " +
+  "com sem em no na nos nas ao aos se ser sera esta este essa esse isso isto ha tem mais menos ou nao sim " +
+  "sobre entre apos depois antes pode podem deve devem seguinte seguintes seguir abaixo acima trecho codigo " +
+  "programa analise observe considere veja exemplo resultado saida exibido impresso exibida impressa valor " +
+  "opcao opcoes alternativa correta corretamente principal the of to in is and"
+).split(" "));
+
+export function palavrasDe(texto) {
+  return new Set(String(texto || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, " ").split(" ").filter((p) => p.length > 2 && !VAZIAS.has(p)));
+}
+const sobreposicao = (a, b) => {
+  if (!a.size || !b.size) return 0;
+  let comum = 0;
+  for (const p of a) if (b.has(p)) comum++;
+  return comum / Math.min(a.size, b.size);
+};
+const tokensDoCodigo = (codigo) => new Set(String(codigo || "").replace(/s+/g, " ").split(/[^A-Za-z0-9_]+/).filter((p) => p.length > 1));
+
+/** A pergunta `p` é repetição de `q`? (`{ pergunta, codigo }` nos dois) */
+export function perguntaRepetida(p, q) {
+  const a = palavrasDe(p?.pergunta), b = palavrasDe(q?.pergunta);
+  if (sobreposicao(a, b) >= 0.6 && Math.min(a.size, b.size) >= 2) return true;
+  const ca = tokensDoCodigo(p?.codigo), cb = tokensDoCodigo(q?.codigo);
+  if (ca.size >= 3 && cb.size >= 3 && sobreposicao(ca, cb) >= 0.8) return true;
+  return String(p?.pergunta || "").trim().toLowerCase() === String(q?.pergunta || "").trim().toLowerCase();
+}
+
+/** As perguntas que não repetem nenhuma de `anteriores` nem uma da outra, na ordem em que vieram. */
+export function perguntasNovas(perguntas, anteriores = []) {
+  const aceitas = [];
+  for (const p of perguntas || []) {
+    if (anteriores.some((q) => perguntaRepetida(p, q)) || aceitas.some((q) => perguntaRepetida(p, q))) continue;
+    aceitas.push(p);
+  }
+  return aceitas;
+}
+
+/** O exercício novo repete um de antes? (mesmo título, ou enunciado quase igual) */
+export function exercicioRepetido(novo, anteriores = []) {
+  const t = palavrasDe(`${novo?.titulo || ""} ${String(novo?.enunciado || "").slice(0, 400)}`);
+  return anteriores.some((a) => sobreposicao(t, palavrasDe(`${a.titulo || ""} ${String(a.enunciado || "").slice(0, 400)}`)) >= 0.7);
+}
+
+/** O foco de cada rodada extra, para a IA ir por outro caminho (e não só "não repita"). */
+export const FOCO_DA_RODADA = {
+  2: "foque em APLICAÇÃO: situações práticas, casos de uso do dia a dia e erros comuns de iniciante",
+  3: "foque em DESAFIO: leitura de código um pouco mais longo, pegadinhas, comparações entre duas formas de fazer e \"o que acontece se…\"",
+};
+
+/** Dá para abrir mais uma rodada hoje? `doDia`: os desafios deste tipo, trilha e dia. */
+export function podeAbrirRodada(tipo, doDia) {
+  const maximo = RODADAS_POR_DIA[tipo] || 1;
+  const lista = doDia || [];
+  if (!lista.length) return { ok: true, rodada: 1 };
+  const ultima = lista.reduce((m, d) => ((d.rodada || 1) > (m.rodada || 1) ? d : m));
+  if ((ultima.rodada || 1) >= maximo) return { ok: false, motivo: `hoje você já fez as ${maximo} rodadas — amanhã tem mais` };
+  if (ultima.status !== "concluido") return { ok: false, motivo: "termine a rodada atual antes de abrir outra" };
+  return { ok: true, rodada: (ultima.rodada || 1) + 1 };
+}
+
+/**
+ * Ainda dá para mandar outra solução?
+ *
+ * Exercício do dia: enquanto houver tentativa — MESMO APROVADO. Vale a melhor nota, então tentar
+ * de novo só pode subir a nota, nunca derrubar (pedido de 20/10/2026: antes o exercício travava no
+ * primeiro aprovado, e quem tirou 70 não podia buscar o 100 com as tentativas que sobravam).
+ * Projetos: entregam em PARTES (pedido de 21/10/2026) — dá para mandar de novo enquanto faltar algum
+ * requisito ou extra (`completo`) e sobrar tentativa. O que já foi cumprido fica garantido.
+ */
+export function podeReenviar(desafio) {
+  const maximo = tentativasDe(desafio || {});
+  if ((desafio?.tentativas || 0) >= maximo) return false;
+  if (desafio.tipo === "exercicio") return true;
+  return !desafio.completo;
+}
+
+/** Concluído (conta como feito nas metas, na agenda e nas conquistas): a MELHOR nota aprovou, ou
+ *  as tentativas acabaram. Pela melhor, e não pela última — reenviar e ir pior não desfaz o feito. */
+export function entregaConcluida({ tipo, melhorNota, tentativas, conteudo, motor }) {
+  return (Number(melhorNota) || 0) >= NOTA_DE_APROVACAO || tentativas >= tentativasDe({ tipo, conteudo, motor });
+}
+
+const limitar = (n, min, max) => Math.min(max, Math.max(min, n));
+
+function texto(valor, limite) {
+  const t = String(valor ?? "").trim();
+  return t.length > limite ? `${t.slice(0, limite).trim()}…` : t;
+}
+
+function listaDeTextos(valor, limite, maximo) {
+  return (Array.isArray(valor) ? valor : []).map((v) => texto(v, limite)).filter(Boolean).slice(0, maximo);
+}
+
+// ---------------------------------------------------------------- períodos
+
+/** O período de um desafio que começa em `dia`: o próprio dia, a segunda da semana ou o dia 1. */
+export function periodoDe(tipo, dia) {
+  if (tipo === "projeto_semanal") return inicioDaSemana(dia);
+  if (tipo === "projeto_mensal") return inicioDoMes(dia);
+  return dia;
+}
+
+export function fimDoPeriodo(tipo, periodo) {
+  if (tipo === "projeto_semanal") return fimDaSemana(periodo);
+  if (tipo === "projeto_mensal") return fimDoMes(periodo);
+  return periodo;
+}
+
+/**
+ * O período pedido existe e não está no futuro? Quiz e exercício são só de hoje. Os projetos da
+ * semana do plano e o final são conferidos pelo avanço da trilha (src/dominio/avanco.js: a semana
+ * precisa estar aberta); aqui fica só a regra antiga, da semana e do mês do calendário.
+ */
+export function periodoPermitido(tipo, periodo, hoje) {
+  if (!TIPOS_DE_DESAFIO.includes(tipo) || !diaValido(periodo)) return false;
+  if (tipo === "projeto_final") return true;
+  if (tipo === "projeto_semanal" && diaDaSemana(periodo) !== 1) return false;
+  if (tipo === "projeto_mensal" && !periodo.endsWith("-01")) return false;
+  if (tipo === "quiz" || tipo === "exercicio") return periodo === hoje;
+  return periodo <= periodoDe(tipo, hoje);
+}
+
+// ---------------------------------------------------------------- pontos
+
+export function pontosDoQuiz(acertos, total) {
+  return acertos * PONTOS_DA_PRATICA.acertoNoQuiz + (total > 0 && acertos === total ? PONTOS_DA_PRATICA.quizPerfeito : 0);
+}
+
+export function pontosDaNota(tipo, nota) {
+  return Math.round((limitar(Number(nota) || 0, 0, 100) / 100) * (PONTOS_DA_PRATICA[tipo] || 0));
+}
+
+// ---------------------------------------------------------------- projetos: pontos por parte e complexidade
+//
+// Pedido de 21/10/2026: pontuação CLARA para entregas parciais, e complexidade ajustável. Cada
+// requisito obrigatório tem um valor visível (a base do projeto dividida entre eles) e cada extra
+// soma um bônus. Entregar em partes soma: o que uma entrega cumpriu fica garantido, e a próxima só
+// acrescenta o que for novo. A complexidade pode CAIR sem perder pontos (quem está começando não é
+// punido por isso) e SUBIR valendo mais. Só dá para trocar antes da primeira entrega.
+
+export const COMPLEXIDADES = {
+  simples: { nome: "Mais simples", fator: 1 },
+  padrao: { nome: "Padrão", fator: 1 },
+  desafiador: { nome: "Desafiador", fator: 1.5 },
+};
+export const ORDEM_DAS_COMPLEXIDADES = ["simples", "padrao", "desafiador"];
+export const TROCAS_DE_COMPLEXIDADE = 3;
+export const BONUS_POR_EXTRA = 0.1; // cada extra vale 10% da base
+
+export const complexidadeDe = (conteudo) => (COMPLEXIDADES[conteudo?.complexidade] ? conteudo.complexidade : "padrao");
+
+/**
+ * O valor guardado num projeto final (`conteudo.valor`) na escala de agora. O projeto guarda também
+ * a escala com que foi gerado (`escalaDoValor`); o gerado antes do triplo (26/10/2026) não tem o
+ * campo — vale 1 — e passa a valer o triplo como os novos.
+ */
+export function valorNaEscalaDeAgora(conteudo) {
+  const escala = Number(conteudo?.escalaDoValor) > 0 ? Number(conteudo.escalaDoValor) : 1;
+  return Math.round((Number(conteudo.valor) * MULTIPLICADOR_DE_RECOMPENSAS) / escala);
+}
+
+/** Quanto vale cada parte do projeto. A divisão sobra no máximo 1 ponto, que vai para os primeiros.
+ *  O projeto final guarda o valor dele (`conteudo.valor`): cresce com o tamanho da trilha. */
+export function tabelaDePontos(tipo, conteudo) {
+  const valor = Number(conteudo?.valor) > 0 ? valorNaEscalaDeAgora(conteudo) : PONTOS_DA_PRATICA[tipo] || 0;
+  const base = Math.round(valor * COMPLEXIDADES[complexidadeDe(conteudo)].fator);
+  const n = (conteudo?.requisitos || []).length;
+  const cada = n ? Math.floor(base / n) : 0;
+  const resto = n ? base - cada * n : 0;
+  const bonus = Math.round(base * BONUS_POR_EXTRA);
+  const extras = (conteudo?.extras || []).map(() => bonus);
+  return {
+    base,
+    requisitos: Array.from({ length: n }, (_, i) => cada + (i < resto ? 1 : 0)),
+    extras,
+    maximo: base + extras.reduce((s, v) => s + v, 0),
+  };
+}
+
+/** As partes que a avaliação deu como cumpridas: posições (0, 1, …) dos requisitos e dos extras.
+ *  A IA numera cada item (1 = o primeiro); sem número, vale a ordem em que veio. */
+export function cumpridosNaAvaliacao(avaliacao, conteudo) {
+  const pegar = (itens, total) => {
+    const ok = new Set();
+    (Array.isArray(itens) ? itens : []).forEach((r, i) => {
+      if (!r?.atendido) return;
+      const n = Number.isInteger(r.numero) && r.numero >= 1 ? r.numero - 1 : i;
+      if (n < total) ok.add(n);
+    });
+    return [...ok].sort((a, b) => a - b);
+  };
+  return {
+    requisitos: pegar(avaliacao?.requisitos, (conteudo?.requisitos || []).length),
+    extras: pegar(avaliacao?.extras, (conteudo?.extras || []).length),
+  };
+}
+
+/** O que já estava garantido mais o desta entrega: entregar em partes soma, nunca tira. */
+export function juntarCumpridos(antes, agora) {
+  const unir = (a, b) => [...new Set([...(a || []), ...(b || [])])].sort((x, y) => x - y);
+  return { requisitos: unir(antes?.requisitos, agora?.requisitos), extras: unir(antes?.extras, agora?.extras) };
+}
+
+export function pontosDoProjeto(tabela, cumpridos) {
+  const somar = (valores, posicoes) => (posicoes || []).reduce((s, i) => s + (valores[i] || 0), 0);
+  return somar(tabela.requisitos, cumpridos?.requisitos) + somar(tabela.extras, cumpridos?.extras);
+}
+
+/** Tudo cumprido (requisitos e extras): não há mais o que entregar. */
+export function projetoCompleto(tabela, cumpridos) {
+  return tabela.requisitos.length > 0
+    && (cumpridos?.requisitos || []).length >= tabela.requisitos.length
+    && (cumpridos?.extras || []).length >= tabela.extras.length;
+}
+
+/** Dá para trocar a complexidade? Só antes da primeira entrega, e no máximo TROCAS_DE_COMPLEXIDADE vezes. */
+export function podeTrocarComplexidade({ tipo, tentativas, conteudo }, nivel) {
+  if (!ehProjeto(tipo)) return { ok: false, motivo: "só os projetos têm complexidade" };
+  if (!COMPLEXIDADES[nivel]) return { ok: false, motivo: "complexidade inválida" };
+  if ((tentativas || 0) > 0) return { ok: false, motivo: "a complexidade fica fixa depois da primeira entrega" };
+  if (complexidadeDe(conteudo) === nivel) return { ok: false, motivo: "o projeto já está nessa complexidade" };
+  if ((conteudo?.trocas || 0) >= TROCAS_DE_COMPLEXIDADE) return { ok: false, motivo: `as ${TROCAS_DE_COMPLEXIDADE} trocas de complexidade deste projeto já foram usadas` };
+  return { ok: true };
+}
+
+/**
+ * Trocar o projeto da semana (ou o final) por outro, gerado de novo dos assuntos da semana do curso
+ * (pedido de 23/10/2026: "o projeto da semana 1 não tem nada a ver com a semana 1"). Só antes da
+ * primeira entrega, e no máximo TROCAS_DE_PROJETO vezes.
+ */
+export const TROCAS_DE_PROJETO = 3;
+export function podeTrocarProjeto({ tipo, tentativas, conteudo }) {
+  if (tipo !== "projeto_semanal" && tipo !== "projeto_final") return { ok: false, motivo: "só o projeto da semana e o final podem ser trocados" };
+  if ((tentativas || 0) > 0) return { ok: false, motivo: "o projeto fica fixo depois da primeira entrega" };
+  const usados = conteudo?.novos || 0;
+  if (usados >= TROCAS_DE_PROJETO) return { ok: false, motivo: `os ${TROCAS_DE_PROJETO} projetos novos já foram gerados` };
+  return { ok: true, restantes: TROCAS_DE_PROJETO - usados };
+}
+
+/** Gerado antes das semanas do curso (23/10/2026): o projeto não guarda de quais assuntos da semana ele é. */
+export const projetoAntigo = (conteudo) => !Array.isArray(conteudo?.assuntos);
+
+// ---------------------------------------------------------------- o que a IA devolve
+
+// ---------------------------------------------------------------- o código das perguntas
+//
+// O código de uma pergunta mora num campo próprio (`codigo` + `linguagem`), e não dentro do
+// texto. Antes ele vinha numa cerca ``` dentro da pergunta, e de dois jeitos dava errado (vistos
+// em 20/10/2026): o modelo escrevia "Observe o bloco de código C abaixo" e não mandava código
+// nenhum; ou mandava a cerca grudada numa linha só, e a tela mostrava as crases cruas.
+
+/** Texto de código: tira só as bordas em branco (a indentação da primeira linha fica) e uma
+ *  cerca ``` que o modelo tenha posto em volta. */
+export function textoDeCodigo(valor, limite) {
+  let t = String(valor ?? "").replace(/\r\n/g, "\n");
+  const cerca = /^\s*```[A-Za-z][\w#+.-]*[ \t]*\n?([\s\S]*?)\n?```\s*$/.exec(t) || /^\s*```\n?([\s\S]*?)\n?```\s*$/.exec(t);
+  if (cerca) t = cerca[1];
+  t = t.replace(/^\s*\n/, "").replace(/\s+$/, "");
+  return t.length > limite ? t.slice(0, limite) : t;
+}
+
+/** Tira de dentro do texto o primeiro bloco ``` (inteiro ou grudado numa linha só) e devolve
+ *  { texto, codigo, linguagem }. Sem bloco, devolve o texto como veio. */
+export function separarCodigoDaPergunta(pergunta) {
+  const t = String(pergunta ?? "");
+  const m = /```([A-Za-z][\w#+.-]*)?[ \t]*\n?([\s\S]*?)```/.exec(t);
+  if (!m) return { texto: t.trim(), codigo: "", linguagem: "" };
+  let linguagem = m[1] || "";
+  let codigo = m[2];
+  // "```let x" sem nome de linguagem: o regex leu "let" como linguagem
+  if (linguagem && !/^(js|jsx|ts|tsx|javascript|typescript|python|py|java|c|cpp|c\+\+|cs|csharp|c#|sql|html|css|php|json|go|golang|rust|rs|kotlin|kt|dart|bash|sh|shell|ruby|rb|swift|xml|mysql|postgresql)$/i.test(linguagem)) {
+    codigo = `${linguagem} ${codigo}`;
+    linguagem = "";
+  }
+  const texto = `${t.slice(0, m.index)} ${t.slice(m.index + m[0].length)}`.replace(/[ \t]{2,}/g, " ").replace(/\s*\n\s*/g, " ").trim();
+  return { texto, codigo: textoDeCodigo(codigo, 3000), linguagem };
+}
+
+// "Observe o código abaixo", "analise o trecho a seguir", "o que o programa seguinte imprime":
+// a pergunta só faz sentido com o código na tela.
+const PEDE_CODIGO = /\b(c[oó]digo|trecho|bloco|programa|fun[cç][aã]o|script|consulta|comando|snippet|exemplo)\b[^.?!:]{0,40}\b(abaixo|a seguir|seguinte)\b|\b(seguinte|abaixo:?)\s+(c[oó]digo|trecho|bloco|programa|consulta)\b|\b(observe|analise|considere|veja|leia)\s+(o|este|esse|a|esta|essa)\s+(c[oó]digo|trecho|bloco|programa|consulta|fun[cç][aã]o|script)\b/i;
+export function perguntaPedeCodigo(texto) {
+  return PEDE_CODIGO.test(String(texto || ""));
+}
+
+/** A pergunta com o código no lugar certo — também para quizzes antigos, salvos com a cerca
+ *  dentro do texto. */
+export function normalizarPergunta(p) {
+  const sep = separarCodigoDaPergunta(p?.pergunta);
+  const codigo = textoDeCodigo(p?.codigo, 3000) || sep.codigo;
+  return { pergunta: sep.texto, codigo, linguagem: String(p?.linguagem || "").trim().slice(0, 30) || sep.linguagem };
+}
+
+/** Quiz de múltipla escolha: 3 a 6 perguntas, 4 opções, uma certa. Pergunta torta é descartada,
+ *  e menos de 3 boas derruba o quiz inteiro (melhor pedir de novo que dar um quiz de uma pergunta).
+ *  "Torta" inclui a que pede para ler um código que não veio. */
+export function validarQuiz(bruto) {
+  const perguntas = (Array.isArray(bruto?.perguntas) ? bruto.perguntas : [])
+    .map((p) => {
+      const opcoes = listaDeTextos(p?.opcoes, 300, 4);
+      const correta = Number.parseInt(p?.correta, 10);
+      if (opcoes.length !== 4 || !(correta >= 0 && correta <= 3) || new Set(opcoes).size !== 4) return null;
+      const { pergunta: textoDaPergunta, codigo, linguagem } = normalizarPergunta(p);
+      const pergunta = texto(textoDaPergunta, 1200);
+      if (!pergunta) return null;
+      if (!codigo && perguntaPedeCodigo(pergunta)) return null; // "observe o código abaixo" — e não há código
+      return { pergunta, codigo, linguagem, opcoes, correta, explicacao: texto(p?.explicacao, 800) };
+    })
+    .filter(Boolean)
+    .slice(0, 6);
+  if (perguntas.length < 3) throw new Error("a IA não montou perguntas suficientes — tente de novo");
+  return { perguntas };
+}
+
+export function validarExercicio(bruto) {
+  const enunciado = texto(bruto?.enunciado, 4000);
+  if (!enunciado) throw new Error("a IA não devolveu o enunciado — tente de novo");
+  return {
+    titulo: texto(bruto?.titulo, 120) || "Exercício do dia",
+    enunciado,
+    linguagem: texto(bruto?.linguagem, 40) || "",
+    exemplo: texto(bruto?.exemplo, 1500),
+    dicas: listaDeTextos(bruto?.dicas, 240, 4),
+    criterios: listaDeTextos(bruto?.criterios, 240, 6),
+  };
+}
+
+/**
+ * O projeto que a IA devolveu, conferido. Com `nAssuntos` (quantos assuntos o pedido numerou),
+ * `assuntoDeCada` diz qual assunto (1..n) cada requisito pratica — a tela mostra a ligação com a
+ * semana do curso. Torto ou incompleto, o mapa fica de fora (o projeto vale do mesmo jeito).
+ */
+export function validarProjeto(bruto, nAssuntos = 0, evidenciasDoPerfil = []) {
+  const pares = (Array.isArray(bruto?.requisitos) ? bruto.requisitos : [])
+    .map((r, i) => ({ texto: texto(r, 300), assunto: Number(Array.isArray(bruto?.assuntoDeCada) ? bruto.assuntoDeCada[i] : NaN) }))
+    .filter((p) => p.texto)
+    .slice(0, 10);
+  const requisitos = pares.map((p) => p.texto);
+  if (requisitos.length < 2) throw new Error("a IA não devolveu requisitos suficientes — tente de novo");
+  const mapa = pares.map((p) => p.assunto);
+  const temMapa = nAssuntos > 0 && mapa.every((n) => Number.isInteger(n) && n >= 1 && n <= nAssuntos);
+  return {
+    titulo: texto(bruto?.titulo, 120) || "Projeto",
+    contexto: texto(bruto?.contexto, 2000),
+    requisitos,
+    ...(temMapa ? { assuntoDeCada: mapa } : {}),
+    extras: listaDeTextos(bruto?.extras, 300, 5),
+    entrega: texto(bruto?.entrega, 600),
+    criterios: listaDeTextos(bruto?.criterios, 240, 6),
+    // curso que não é de programação: o que a entrega aceita no lugar do repositório (motores.js)
+    ...(evidenciasDoPerfil.length ? { evidencias: evidenciasAceitas(bruto?.evidencias, evidenciasDoPerfil) } : {}),
+  };
+}
+
+/**
+ * As "Dicas da Lisa" de um projeto, conferidas: o passo a passo básico (em ordem), dicas soltas e o
+ * que vale revisar antes. Sem passo a passo não serve — é o coração do guia.
+ */
+export function validarGuia(bruto) {
+  const passos = listaDeTextos(bruto?.passos, 400, 10);
+  if (passos.length < 3) throw new Error("a Lisa não conseguiu montar o passo a passo — tente de novo");
+  return {
+    passos,
+    dicas: listaDeTextos(bruto?.dicas, 300, 6),
+    estudar: listaDeTextos(bruto?.estudar, 120, 6),
+  };
+}
+
+/**
+ * O "Exemplo da Lisa" (03/11/2026, BEYOND-0022: "os exercícios devem ter uma dica que mostra uma aplicação de
+ * todos os conceitos necessários, inclusive os de projetos — a Lisa fazer uma aplicação de código de exemplo").
+ * Vale para o exercício e para os projetos; os treinos de música, o ditado e a conversa não têm o que aplicar.
+ */
+export const MOTORES_SEM_EXEMPLO = new Set(["ouvido", "ritmo", "afinacao", "leitura", "ditado", "conversa"]);
+export const temExemploDaLisa = (tipo, motor) => tipo !== "quiz" && !MOTORES_SEM_EXEMPLO.has(motor || "codigo");
+
+/** Tira as cercas de markdown que o modelo às vezes põe em volta do código. */
+const semCercas = (codigo) => String(codigo ?? "").replace(/\r\n/g, "\n").replace(/^\s*`{3}[\w+#-]*\n?/, "").replace(/\n?`{3}\s*$/, "").trim();
+
+/**
+ * O exemplo, conferido: os conceitos (nome e para que serve), o código (ou, fora da programação, o exemplo
+ * resolvido em passos), como ele funciona e como levar a ideia para o desafio — sem resolver o desafio.
+ */
+export function validarExemploDaLisa(bruto, { comCodigo = true } = {}) {
+  const conceitos = (Array.isArray(bruto?.conceitos) ? bruto.conceitos : [])
+    .map((c) => ({ nome: texto(c?.nome, 80), explicacao: texto(c?.explicacao, 300) }))
+    .filter((c) => c.nome && c.explicacao).slice(0, 8);
+  if (conceitos.length < 1) throw new Error("a Lisa não conseguiu montar o exemplo — tente de novo");
+  const codigo = comCodigo ? semCercas(bruto?.codigo).slice(0, 6000) : "";
+  const passos = listaDeTextos(bruto?.passos, 400, 10);
+  if (comCodigo ? codigo.length < 20 : passos.length < 2) throw new Error("a Lisa não conseguiu montar o exemplo — tente de novo");
+  return {
+    titulo: texto(bruto?.titulo, 120) || "Um exemplo parecido",
+    conceitos,
+    linguagem: comCodigo ? texto(bruto?.linguagem, 30).toLowerCase() : "",
+    codigo,
+    passos: comCodigo ? [] : passos,
+    comoFunciona: listaDeTextos(bruto?.comoFunciona, 300, 8),
+    paraOSeu: texto(bruto?.paraOSeu, 500),
+  };
+}
+
+/**
+ * A avaliação da IA, conferida. `aprovado` sai da NOTA, não do que o modelo disse: um "aprovado"
+ * com nota 40 (ou o contrário) é contradição que a tela não teria como explicar.
+ */
+function itensAvaliados(lista) {
+  return (Array.isArray(lista) ? lista : []).slice(0, 12).map((r) => {
+    const numero = Math.round(Number(r?.numero));
+    return {
+      ...(numero >= 1 && numero <= 12 ? { numero } : {}),
+      requisito: texto(r?.requisito, 300),
+      atendido: Boolean(r?.atendido),
+      observacao: texto(r?.observacao, 400),
+    };
+  }).filter((r) => r.requisito);
+}
+
+export function validarAvaliacao(bruto) {
+  const nota = limitar(Math.round(Number(bruto?.nota) || 0), 0, 100);
+  return {
+    nota,
+    aprovado: nota >= NOTA_DE_APROVACAO,
+    comentario: texto(bruto?.comentario, 2000),
+    pontosFortes: listaDeTextos(bruto?.pontosFortes, 300, 6),
+    melhorias: listaDeTextos(bruto?.melhorias, 300, 6),
+    requisitos: itensAvaliados(bruto?.requisitos),
+    extras: itensAvaliados(bruto?.extras).slice(0, 5),
+  };
+}
+
+/**
+ * O quiz como a tela pode ver: a resposta certa e a explicação só aparecem depois que a pergunta
+ * foi respondida. Mandar o gabarito junto seria deixar a resposta no código-fonte da página.
+ */
+export function quizParaTela(conteudo, resposta) {
+  const escolhas = resposta?.escolhas || {};
+  // as mandadas pelo correio (BEYOND-0016) contam como feitas: o quiz não volta nelas
+  const enviadas = new Set((resposta?.enviadas || []).map(Number));
+  return conteudo.perguntas.map((p, i) => {
+    const escolha = escolhas[i];
+    const respondida = escolha !== undefined && escolha !== null;
+    const { pergunta, codigo, linguagem } = normalizarPergunta(p);
+    return {
+      pergunta,
+      codigo,
+      linguagem,
+      // quiz salvo antes da correção, com a pergunta pedindo um código que a IA não mandou
+      faltouCodigo: !codigo && perguntaPedeCodigo(pergunta),
+      opcoes: p.opcoes,
+      respondida: respondida || enviadas.has(i),
+      enviada: enviadas.has(i),
+      escolha: respondida ? escolha : null,
+      correta: respondida ? p.correta : null,
+      explicacao: respondida ? p.explicacao : null,
+    };
+  });
+}
+
+// ---------------------------------------------------------------- assuntos de referência
+
+/**
+ * O assunto da prática de hoje: o primeiro pendente que já começou (atrasado antes); se nada
+ * começou, o próximo; se a trilha acabou, o último — praticar o que já se estudou ainda vale.
+ *
+ * @param etapas  `{ cardId, ordem, inicio, fim, concluido }`
+ */
+export function assuntoAtual(etapas, hoje) {
+  const ordenadas = [...etapas].sort((a, b) => a.ordem - b.ordem);
+  const pendentes = ordenadas.filter((e) => !e.concluido);
+  return (
+    pendentes.find((e) => e.inicio && e.inicio <= hoje) ||
+    pendentes.find((e) => e.inicio) ||
+    pendentes[0] ||
+    ordenadas.at(-1) ||
+    null
+  );
+}
+
+/** Os assuntos planejados que encostam no período [de, ate]. */
+export function assuntosDoPeriodo(etapas, de, ate) {
+  return [...etapas]
+    .filter((e) => e.inicio && e.inicio <= ate && e.fim >= de)
+    .sort((a, b) => a.ordem - b.ordem);
+}
+
+// ---------------------------------------------------------------- o projeto entregue em arquivos (03/11/2026)
+//
+// "A Lisa não tem GitHub, ela deve entregar de outro jeito": o projeto de programação também pode chegar
+// como arquivos (caminho e conteúdo), e a correção é a mesma do repositório (src/lib/pratica.js,
+// entregarProjetoEmArquivos). Aqui, a conferência: até 20 arquivos, caminhos simples, texto com limite.
+
+export const LIMITES_DA_ENTREGA_EM_ARQUIVOS = { arquivos: 20, porArquivo: 20_000, total: 150_000 };
+
+/** Confere os arquivos: { ok, arquivos: [{ caminho, conteudo }] } ou { ok: false, erro }. */
+export function arquivosDoProjeto(arquivos) {
+  const L = LIMITES_DA_ENTREGA_EM_ARQUIVOS;
+  const lista = Array.isArray(arquivos) ? arquivos : [];
+  if (!lista.length) return { ok: false, erro: "mande pelo menos um arquivo" };
+  if (lista.length > L.arquivos) return { ok: false, erro: `até ${L.arquivos} arquivos por entrega` };
+  const vistos = new Set();
+  const limpos = [];
+  let total = 0;
+  for (const a of lista) {
+    const caminho = String(a?.caminho ?? "").trim().replace(/^\/+/, "");
+    if (!/^[\w.\-/ ]{1,120}$/.test(caminho) || caminho.split("/").some((p) => p === ".." || p === "")) return { ok: false, erro: `caminho de arquivo inválido: "${caminho.slice(0, 60)}"` };
+    if (vistos.has(caminho)) return { ok: false, erro: `o arquivo ${caminho} veio duas vezes` };
+    vistos.add(caminho);
+    const conteudo = String(a?.conteudo ?? "");
+    if (!conteudo.trim()) return { ok: false, erro: `o arquivo ${caminho} está vazio` };
+    if (conteudo.length > L.porArquivo) return { ok: false, erro: `o arquivo ${caminho} passou de ${L.porArquivo} caracteres` };
+    total += conteudo.length;
+    limpos.push({ caminho, conteudo });
+  }
+  if (total > L.total) return { ok: false, erro: `a entrega passou de ${L.total} caracteres` };
+  return { ok: true, arquivos: limpos };
+}

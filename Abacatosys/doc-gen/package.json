@@ -1,0 +1,23 @@
+{
+  "name": "docgen",
+  "version": "2.0.0",
+  "description": "Le um repositorio e escreve um portal HTML de documentacao tecnica: arquitetura, mapa de chamadas, modelo de dados e o codigo-fonte navegavel. Sem dependencias, saida offline, e publicacao direta num projeto de documentacao do Abacato.",
+  "main": "src/index.js",
+  "bin": {
+    "docgen": "bin/docgen.js"
+  },
+  "scripts": {
+    "gerar": "node bin/docgen.js",
+    "estilo-check": "node scripts/estilo-check.mjs",
+    "publicar-check": "node scripts/publicar-check.mjs",
+    "publicado-check": "node scripts/publicado-check.mjs",
+    "tela": "node bin/docgen.js --tela",
+    "tela-check": "node scripts/tela-check.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {}
+}

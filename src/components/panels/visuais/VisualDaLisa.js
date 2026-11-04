@@ -1,0 +1,64 @@
+"use client";
+
+// O visual do centro do Assistente, escolhido no painel "Visual da Lisa" (/visual) ou no menu
+// "Aparência da Lisa". Cada um é carregado só quando é usado (WebGL pesa).
+
+import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+import { lerVisual, EVENTO_DO_VISUAL, CHAVE_DO_VISUAL, VISUAL_PADRAO } from "@/lib/visuaisDaLisa.js";
+import { lerAjustesDoRosto, AJUSTES_PADRAO, EVENTO_DO_ROSTO, CHAVE_DO_ROSTO } from "@/lib/rostoDaLisa.js";
+
+// (o Next exige as opções do dynamic escritas em cada chamada, não numa variável)
+const COMPONENTES = {
+  esfera: dynamic(() => import("../EsferaDaVoz.js"), { ssr: false, loading: () => null }),
+  lente: dynamic(() => import("./Lente.js"), { ssr: false, loading: () => null }),
+  orbe: dynamic(() => import("./Orbe.js"), { ssr: false, loading: () => null }),
+  plasma: dynamic(() => import("./Plasma.js"), { ssr: false, loading: () => null }),
+  anel: dynamic(() => import("./Anel.js"), { ssr: false, loading: () => null }),
+  rosto: dynamic(() => import("./Rosto.js"), { ssr: false, loading: () => null }),
+};
+
+/**
+ * O visual `modo`, ligado ao sinal da voz (`obterSinal`, chamado a cada quadro). `zoom` (> 1) chega
+ * mais perto: o Rosto sobe o enquadramento para o rosto; os outros só crescem na tela. `brincadeiras`
+ * liga as animações de quando ninguém mexe (só o Rosto tem; ver src/lib/brincadeirasDoRosto.js).
+ */
+export default function VisualDaLisa({ modo, obterSinal, ocupacao, zoom = 1, brincadeiras = false }) {
+  const Componente = COMPONENTES[modo] || COMPONENTES[VISUAL_PADRAO];
+  const ocupa = ocupacao ?? (zoom > 1 && modo !== "rosto" ? Math.min(0.95, 0.78 * zoom) : undefined);
+  return <Componente key={modo} obterSinal={obterSinal} ocupacao={ocupa} zoom={zoom} brincadeiras={brincadeiras} />;
+}
+
+/** O visual escolhido neste navegador — e acompanha a troca na hora (nesta aba e nas outras). */
+export function usarVisualEscolhido() {
+  const [modo, setModo] = useState(VISUAL_PADRAO);
+  useEffect(() => {
+    setModo(lerVisual());
+    const aoEscolher = (e) => setModo(e.detail || lerVisual());
+    const aoGuardar = (e) => { if (e.key === CHAVE_DO_VISUAL) setModo(lerVisual()); };
+    window.addEventListener(EVENTO_DO_VISUAL, aoEscolher);
+    window.addEventListener("storage", aoGuardar);
+    return () => {
+      window.removeEventListener(EVENTO_DO_VISUAL, aoEscolher);
+      window.removeEventListener("storage", aoGuardar);
+    };
+  }, []);
+  return modo;
+}
+
+/** O cabelo e as cores do Rosto escolhidos neste navegador — e acompanha a troca na hora. */
+export function usarAjustesDoRosto() {
+  const [ajustes, setAjustes] = useState(AJUSTES_PADRAO);
+  useEffect(() => {
+    setAjustes(lerAjustesDoRosto());
+    const aoEscolher = (e) => setAjustes(e.detail || lerAjustesDoRosto());
+    const aoGuardar = (e) => { if (e.key === CHAVE_DO_ROSTO) setAjustes(lerAjustesDoRosto()); };
+    window.addEventListener(EVENTO_DO_ROSTO, aoEscolher);
+    window.addEventListener("storage", aoGuardar);
+    return () => {
+      window.removeEventListener(EVENTO_DO_ROSTO, aoEscolher);
+      window.removeEventListener("storage", aoGuardar);
+    };
+  }, []);
+  return ajustes;
+}

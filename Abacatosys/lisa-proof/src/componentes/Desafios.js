@@ -1,0 +1,920 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { criar, obter } from "@/lib/api.js";
+import { formatarDia } from "@/dominio/datas.js";
+import { NOTA_DE_APROVACAO, podeReenviar, COMPLEXIDADES, ORDEM_DAS_COMPLEXIDADES, temExemploDaLisa } from "@/dominio/pratica.js";
+import { CORREIO } from "@/dominio/correio.js";
+import { execucaoDoExercicio } from "@/dominio/execucao.js";
+import { rodarCodigo } from "./codigo/rodar.js";
+import Explicacao, { emLinha } from "./Explicacao.js";
+import Codigo from "./codigo/Codigo.js";
+import EditorDeCodigo from "./codigo/EditorDeCodigo.js";
+import Neuro, { reagir, comemorar, celebrar } from "./Neuro.js";
+import { Barra, useAviso } from "./Pecas.js";
+import { Avaliacao, reagirAEntrega } from "./pratica/Retorno.js";
+import { DesafioAberto, ListaDeCalculo, Ditado, TreinoDeOuvido, EntregaComEvidencias } from "./pratica/Motores.js";
+import { TreinoDeRitmo, TreinoDeAfinacao, LeituraNaPauta } from "./pratica/MotoresDeMusica.js";
+import { PassoAPasso, Grafico } from "./pratica/MotoresDeMatematica.js";
+import { ConversaComALisa } from "./pratica/Conversa.js";
+import { DesenhoDeDiagrama } from "./pratica/Diagrama.js";
+
+const LETRAS = ["A", "B", "C", "D"];
+
+// ================================================================ quiz
+
+/**
+ * O quiz, uma pergunta por vez, como no Duolingo: escolhe, vê na hora se acertou (com a
+ * explicação) e segue. A correção é do servidor — a tela só fica sabendo da resposta certa
+ * depois de responder.
+ */
+export function Quiz({ desafio }) {
+  const [perguntas, setPerguntas] = useState(desafio.perguntas);
+  const primeiraAberta = perguntas.findIndex((p) => !p.respondida);
+  const [indice, setIndice] = useState(primeiraAberta === -1 ? perguntas.length : primeiraAberta);
+  const [enviando, setEnviando] = useState(false);
+  const [resultado, setResultado] = useState(null); // resposta do servidor da pergunta atual
+  const [final, setFinal] = useState(null);
+  const [erro, setErro] = useState("");
+  const [revendo, setRevendo] = useState(false);
+  const [Aviso, avisar] = useAviso();
+
+  const respondidas = perguntas.filter((p) => p.respondida).length;
+  const acabou = indice >= perguntas.length;
+
+  async function escolher(opcao) {
+    if (enviando || resultado) return;
+    setEnviando(true);
+    setErro("");
+    try {
+      const r = await criar(`/api/desafios/${desafio.id}/responder`, { indice, escolha: opcao });
+      setPerguntas((ps) => ps.map((p, i) => (i === indice ? { ...p, respondida: true, escolha: opcao, correta: r.correta, explicacao: r.explicacao } : p)));
+      setResultado(r);
+      if (r.acertou) reagir("feliz", ["Isso aí!", "Mandou bem!", "Certinho! 🎯", "Você sabe das coisas!"][indice % 4]);
+      else reagir("triste", "Quase! Lê a explicação que fica fácil.");
+      if (r.terminou) setFinal(r);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  function continuar() {
+    setResultado(null);
+    const proximo = indice + 1;
+    setIndice(proximo);
+    if (proximo >= perguntas.length && final) {
+      // Ofensiva, meta e conquistas abrem a festa em tela cheia; sem nada disso, a comemoração
+      // do gabarito (ou só os pontos) fica no próprio Neuro.
+      const festejou = celebrar(final);
+      if (!festejou && final.assunto?.concluido) comemorar(`Assunto concluído: ${final.assunto.titulo}! ✅`);
+      else if (!festejou && final.acertos === final.total) comemorar(`Gabaritou! +${final.pontos} pontos 🎉`);
+      else if (!festejou && final.pontos > 0) avisar(`+${final.pontos} pontos`);
+    }
+  }
+
+  if (acabou || revendo) {
+    // as que foram pelo correio (BEYOND-0016) saem do placar
+    const valem = perguntas.filter((p) => !p.enviada);
+    const acertos = valem.filter((p) => p.respondida && p.escolha === p.correta).length;
+    const pct = valem.length ? Math.round((acertos / valem.length) * 100) : 0;
+    const peloCorreio = perguntas.length - valem.length;
+    return (
+      <div className="quiz">
+        {!revendo && (
+          <div className="pf-cartao quiz__fim">
+            <Neuro
+              humor={pct === 100 ? "comemorando" : pct >= NOTA_DE_APROVACAO ? "feliz" : "pensando"}
+              fala={pct === 100 ? "Perfeito! Gabaritou!" : pct >= NOTA_DE_APROVACAO ? "Muito bom! Amanhã tem mais." : "Errar faz parte. Revisa as explicações e amanhã você arrasa!"}
+              tamanho={130}
+              lado="cima"
+              ouvir
+            />
+            <div className="quiz__placar">{acertos}<small>/{valem.length}</small></div>
+            <p className="pf-estat__nota">acertos · {final ? final.pontos : desafio.pontos} pontos{peloCorreio ? ` · ${peloCorreio} pelo correio ${CORREIO.mensageiro} (o quiz vale menos)` : ""}</p>
+            {final?.assunto?.concluido && <div className="pf-aviso pf-aviso--ok">✅ Assunto concluído: <strong>{final.assunto.titulo}</strong> — teoria e quiz em dia.</div>}
+            {final?.assunto?.faltaTeoria && <div className="pf-aviso">Quiz aprovado! Agora termine a teoria (as tarefas) de <strong>{final.assunto.titulo}</strong> para concluir o assunto.</div>}
+            {final?.assunto?.reprovado && <div className="pf-aviso">Para concluir o assunto, o quiz precisa de {final.assunto.precisa}% de acertos. Dá para tentar outra rodada hoje (na Prática) ou amanhã.</div>}
+            <div className="pf-acoes" style={{ justifyContent: "center" }}>
+              <button type="button" className="pf-botao pf-botao--sec" onClick={() => setRevendo(true)}>Ver respostas</button>
+              <Link className="pf-botao" href="/pratica">Voltar à prática</Link>
+            </div>
+            {(desafio.rodada || 1) < (desafio.maxRodadas || 1) && (
+              <p className="pf-estat__nota" style={{ textAlign: "center" }}>
+                Quer mais? Na Prática dá para fazer mais {(desafio.maxRodadas || 1) - (desafio.rodada || 1)} quiz(zes) hoje, valendo metade dos pontos.
+              </p>
+            )}
+          </div>
+        )}
+        {revendo && (
+          <>
+            <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={() => setRevendo(false)}>← Resultado</button>
+            {perguntas.map((p, i) => (
+              <div key={i} className="pf-cartao quiz__revisao">
+                <p className="pf-campo__rotulo">Pergunta {i + 1} · {p.enviada ? `${CORREIO.mensageiro} foi pelo correio` : p.escolha === p.correta ? "✓ acertou" : "✗ errou"}</p>
+                <Explicacao texto={p.pergunta} className="quiz__pergunta" linguagem={p.linguagem || desafio.tema} />
+                {p.codigo && <Codigo texto={p.codigo} linguagem={p.linguagem || desafio.tema} />}
+                <ul className="quiz__lista-revisao">
+                  {p.opcoes.map((o, j) => (
+                    <li key={j} className={j === p.correta ? "quiz__ok" : j === p.escolha ? "quiz__erro" : ""}>
+                      <b>{LETRAS[j]}</b> {emLinha(o)}
+                    </li>
+                  ))}
+                </ul>
+                {p.explicacao && <p className="pf-estat__nota">{emLinha(p.explicacao)}</p>}
+              </div>
+            ))}
+          </>
+        )}
+        {Aviso}
+      </div>
+    );
+  }
+
+  const p = perguntas[indice];
+  const jaForam = perguntas.filter((x) => x.enviada).length;
+  const cabeCorreio = jaForam < CORREIO.perguntasPorQuiz && perguntas.length - jaForam - 1 >= CORREIO.respondidasNoMinimo;
+  const podeMandar = cabeCorreio && (!resultado || (!resultado.acertou && !resultado.terminou));
+  // a pergunta foi pelo correio: sai do placar e o quiz segue (ou termina, se era a última)
+  function mandou(r) {
+    setPerguntas((ps) => ps.map((x, i) => (i === indice ? { ...x, enviada: true, respondida: true, escolha: null } : x)));
+    if (r.terminou) setFinal(r);
+    setResultado(null);
+    avisar(`${CORREIO.mensageiro} Pergunta enviada`);
+    const proximo = indice + 1;
+    setIndice(proximo);
+    if (proximo >= perguntas.length && r.terminou) { const festejou = celebrar(r); if (!festejou && r.pontos > 0) avisar(`+${r.pontos} pontos`); }
+  }
+  return (
+    <div className="quiz">
+      <div className="quiz__topo">
+        <Link href="/pratica" className="quiz__sair" aria-label="Sair do quiz">✕</Link>
+        <div style={{ flex: 1 }}><Barra valor={respondidas} total={perguntas.length} rotulo="Progresso do quiz" /></div>
+        <span className="quiz__contador">{indice + 1}/{perguntas.length}</span>
+      </div>
+
+      <div className="quiz__neuro"><Neuro humor="pensando" tamanho={84} ouvir lado="direita" /></div>
+
+      <Explicacao texto={p.pergunta} className="quiz__pergunta" linguagem={p.linguagem || desafio.tema} />
+      {p.codigo && <Codigo texto={p.codigo} linguagem={p.linguagem || desafio.tema} />}
+      {p.faltouCodigo && (
+        <div className="pf-aviso pf-aviso--erro">
+          O código desta pergunta não chegou — foi uma falha da Lisa ao montar este quiz (já corrigida
+          para os próximos). Se quiser, use “Reportar problema”.
+        </div>
+      )}
+
+      <div className="quiz__opcoes" role="group" aria-label="Opções">
+        {p.opcoes.map((o, j) => {
+          let classe = "quiz__opcao";
+          if (resultado) {
+            if (j === resultado.correta) classe += " quiz__opcao--certa";
+            else if (j === p.escolha) classe += " quiz__opcao--errada";
+          }
+          return (
+            <button key={j} type="button" className={classe} onClick={() => escolher(j)} disabled={enviando || Boolean(resultado)}>
+              <span className="quiz__letra">{LETRAS[j]}</span>
+              <span>{emLinha(o)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {podeMandar && <MandarPorCorreio desafioId={desafio.id} indice={indice} depoisDeErrar={Boolean(resultado)} aoMandar={mandou} />}
+
+      {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+
+      {resultado && (
+        <div className={`quiz__retorno ${resultado.acertou ? "quiz__retorno--certo" : "quiz__retorno--errado"}`}>
+          <div>
+            <strong>{resultado.acertou ? "Correto! 🎉" : `Resposta certa: ${LETRAS[resultado.correta]}`}</strong>
+            {resultado.explicacao && <p>{emLinha(resultado.explicacao)}</p>}
+          </div>
+          <button type="button" className="pf-botao" onClick={continuar}>
+            {indice + 1 >= perguntas.length ? "Ver resultado" : "Continuar"}
+          </button>
+        </div>
+      )}
+      {Aviso}
+    </div>
+  );
+}
+
+/**
+ * Mandar a pergunta pelo correio (BEYOND-0016): até duas por quiz, para outro jogador; sai do placar e o
+ * quiz termina com pelo menos três respondidas (valendo menos). A Lisa não recebe perguntas.
+ */
+function MandarPorCorreio({ desafioId, indice, depoisDeErrar, aoMandar }) {
+  const [aberto, setAberto] = useState(false);
+  const [lista, setLista] = useState(null);
+  const [para, setPara] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+  useEffect(() => { setAberto(false); setPara(""); setErro(""); }, [indice]);
+  async function abrir() {
+    setAberto(true);
+    if (lista) return;
+    try { setLista(((await obter("/api/correio")).destinatarios || []).filter((d) => !d.robo)); } catch (e) { setErro(e.message); }
+  }
+  async function mandar() {
+    if (!para || enviando) return;
+    setEnviando(true);
+    setErro("");
+    try { aoMandar(await criar(`/api/desafios/${desafioId}/correio`, { indice, paraId: para })); } catch (e) { setErro(e.message); } finally { setEnviando(false); }
+  }
+  if (!aberto) {
+    return (
+      <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno quiz__correio" onClick={abrir}>
+        {CORREIO.mensageiro} {depoisDeErrar ? "Mandar esta por correio (sai do placar)" : "Mandar esta por correio"}
+      </button>
+    );
+  }
+  return (
+    <div className="pf-cartao quiz__correio-caixa">
+      <p className="pf-estat__nota">O mensageiro leva a pergunta para outro jogador. Ela sai do seu placar, e o quiz termina com pelo menos {CORREIO.respondidasNoMinimo} respondidas, valendo menos. Se a pessoa acertar, vocês dois ganham moedas.</p>
+      {lista === null && !erro && <p className="pf-estat__nota">Carregando os jogadores…</p>}
+      {lista && (
+        <div className="quiz__correio-linha">
+          <select className="pf-campo__entrada" value={para} onChange={(e) => setPara(e.target.value)} aria-label="Para quem vai a pergunta">
+            <option value="">Para quem?</option>
+            {lista.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
+          </select>
+          <button type="button" className="pf-botao pf-botao--pequeno" disabled={!para || enviando} onClick={mandar}>{enviando ? "Mandando…" : "Mandar"}</button>
+          <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={() => setAberto(false)}>Cancelar</button>
+        </div>
+      )}
+      {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+    </div>
+  );
+}
+
+// ================================================================ avaliação
+
+export { Avaliacao };
+
+function Entrega({ desafio, campo, rotulo, aoEnviar, aoAvaliar, conteudoInicial, placeholder, multilinha, linguagem }) {
+  const [valor, setValor] = useState(conteudoInicial || "");
+  const [estado, setEstado] = useState({ status: desafio.status, nota: desafio.nota, tentativas: desafio.tentativas, avaliacao: desafio.avaliacao, completo: desafio.completo });
+  const projeto = desafio.tipo !== "exercicio";
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [Aviso, avisar] = useAviso();
+  const formulario = useRef(null);
+
+  // Encerrado = não dá mais para enviar. O exercício aprovado continua aberto enquanto sobrar
+  // tentativa (vale a melhor nota) — ver podeReenviar.
+  const encerrado = !podeReenviar({ tipo: desafio.tipo, tentativas: estado.tentativas, status: estado.status, completo: estado.completo });
+  const aprovado = (estado.nota ?? 0) >= NOTA_DE_APROVACAO;
+  const restantes = Math.max(0, (desafio.maxTentativas || 0) - estado.tentativas);
+
+  async function enviar(e) {
+    e.preventDefault();
+    setEnviando(true);
+    setErro("");
+    reagir("pensando", campo === "repo" ? "Lendo o seu repositório com calma…" : "Lendo o seu código…", 60000);
+    try {
+      const r = await aoEnviar(valor);
+      setEstado({ status: r.concluido ? "concluido" : "em_andamento", nota: r.nota, tentativas: r.tentativas, avaliacao: r.avaliacao, completo: r.completo });
+      aoAvaliar?.(r);
+      reagirAEntrega(r, { projeto, avisar });
+    } catch (falha) {
+      setErro(falha.message);
+      reagir("surpreso", "Ops, algo deu errado no envio.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  // Ctrl+Enter no editor envia, como o botão
+  function enviarPeloAtalho() {
+    if (!encerrado && !enviando && valor.trim()) formulario.current?.requestSubmit();
+  }
+
+  return (
+    <>
+      <form ref={formulario} className="pf-cartao entrega" onSubmit={enviar}>
+        {multilinha ? (
+          <div className="pf-campo">
+            <span className="pf-campo__rotulo">{rotulo}</span>
+            <EditorDeCodigo valor={valor} aoMudar={setValor} linguagem={linguagem} placeholder={placeholder}
+              desabilitado={encerrado || enviando} aoCtrlEnter={enviarPeloAtalho} rotulo={rotulo} />
+            {desafio.tipo === "exercicio" && <Rodar linguagem={desafio.conteudo?.linguagem} tema={desafio.tema} codigo={valor} />}
+          </div>
+        ) : (
+          <label className="pf-campo">
+            <span className="pf-campo__rotulo">{rotulo}</span>
+            <input className="pf-campo__entrada" type="url" value={valor} onChange={(e) => setValor(e.target.value)}
+              placeholder={placeholder} disabled={encerrado || enviando} required />
+          </label>
+        )}
+        {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+        <div className="pf-acoes" style={{ alignItems: "center" }}>
+          {!encerrado && (
+            <button type="submit" className="pf-botao" disabled={enviando || !valor.trim()}>
+              {enviando ? "A Lisa está avaliando…" : !estado.tentativas ? "Enviar para a Lisa avaliar" : projeto ? "Entregar de novo (soma o que for novo)" : aprovado ? "Tentar uma nota maior" : "Enviar de novo"}
+            </button>
+          )}
+          <span className="pf-estat__nota" style={{ margin: 0 }}>
+            {projeto
+              ? (encerrado
+                ? (estado.completo ? "Projeto completo — tudo entregue!" : "As entregas deste projeto acabaram.")
+                : `Entrega ${estado.tentativas + 1} de ${desafio.maxTentativas} · cada requisito novo soma os pontos dele`)
+              : encerrado
+                ? (aprovado ? `Concluído com nota ${estado.nota}.` : "Desafio encerrado.")
+                : `${aprovado ? `Aprovado com ${estado.nota} · ` : ""}Tentativa ${estado.tentativas + 1} de ${desafio.maxTentativas} · vale a melhor nota`}
+            {!encerrado && restantes <= 1 && estado.tentativas > 0 ? " · última chance!" : ""}
+          </span>
+        </div>
+      </form>
+      <Avaliacao avaliacao={estado.avaliacao} nota={estado.nota} />
+      {Aviso}
+    </>
+  );
+}
+
+// ================================================================ rodar o código
+
+/**
+ * "▶ Rodar": roda o código do exercício e mostra a saída, antes de enviar para a Lisa (pedido de
+ * 21/10/2026). JavaScript e SQL rodam no navegador; as outras linguagens, num compilador on-line.
+ */
+function Rodar({ linguagem, tema, codigo }) {
+  const exec = execucaoDoExercicio(linguagem, tema);
+  const [rodando, setRodando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [comEntrada, setComEntrada] = useState(false);
+  const [entrada, setEntrada] = useState("");
+
+  if (!exec) return <p className="rodar__nota">O botão Rodar ainda não funciona para esta linguagem.</p>;
+
+  async function rodar() {
+    setRodando(true);
+    setResultado(await rodarCodigo({ linguagem: linguagem || exec.chave, tema, codigo, entrada: comEntrada ? entrada : "" }));
+    setRodando(false);
+  }
+
+  return (
+    <div className="rodar">
+      <div className="rodar__barra">
+        <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={rodar} disabled={rodando || !codigo.trim()}>
+          {rodando ? "Rodando…" : "▶ Rodar"}
+        </button>
+        <span className="rodar__onde">{exec.rotulo} · {exec.onde === "navegador" ? "roda aqui no navegador" : "roda num compilador on-line"}</span>
+        {exec.onde === "servidor" && (
+          <button type="button" className="rodar__link" onClick={() => setComEntrada((v) => !v)} aria-expanded={comEntrada}>
+            {comEntrada ? "tirar a entrada" : "+ entrada do teclado"}
+          </button>
+        )}
+      </div>
+      {comEntrada && (
+        <label className="pf-campo">
+          <span className="pf-campo__rotulo">Entrada do programa (o que seria digitado no teclado, uma linha por leitura)</span>
+          <textarea className="pf-campo__entrada rodar__entrada" rows={3} value={entrada} onChange={(e) => setEntrada(e.target.value)} />
+        </label>
+      )}
+      {resultado && (
+        <div className="rodar__saida" aria-live="polite">
+          <div className="rodar__topo">
+            <span>Saída</span>
+            {resultado.ms > 0 && <span>{(resultado.ms / 1000).toFixed(1).replace(".", ",")} s</span>}
+          </div>
+          {resultado.linhas.map((l, i) => <pre key={i} className={`rodar__linha rodar__linha--${l.tipo}`}>{l.texto}</pre>)}
+          {(resultado.tabelas || []).map((t, i) => (
+            <div key={i} className="rodar__tabela-caixa">
+              <table className="rodar__tabela">
+                <thead><tr>{t.colunas.map((c, k) => <th key={k}>{c}</th>)}</tr></thead>
+                <tbody>{t.linhas.map((linha, j) => <tr key={j}>{linha.map((v, k) => <td key={k}>{v === null ? "NULL" : String(v)}</td>)}</tr>)}</tbody>
+              </table>
+              {t.total > t.linhas.length && <p className="rodar__nota">mostrando {t.linhas.length} de {t.total} linhas</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ================================================================ exercício
+
+export function Exercicio({ desafio }) {
+  return (
+    <>
+      <CorpoDoExercicio desafio={desafio} />
+      {temExemploDaLisa(desafio.tipo, desafio.motor) && <ExemploDaLisa desafio={desafio} />}
+    </>
+  );
+}
+
+function CorpoDoExercicio({ desafio }) {
+  // os motores dos cursos que não são de programação (src/dominio/motores.js)
+  if (desafio.motor === "aberto") return <DesafioAberto desafio={desafio} />;
+  if (desafio.motor === "calculo") return <ListaDeCalculo desafio={desafio} />;
+  if (desafio.motor === "ditado") return <Ditado desafio={desafio} />;
+  if (desafio.motor === "ouvido") return <TreinoDeOuvido desafio={desafio} />;
+  if (desafio.motor === "ritmo") return <TreinoDeRitmo desafio={desafio} />;
+  if (desafio.motor === "afinacao") return <TreinoDeAfinacao desafio={desafio} />;
+  if (desafio.motor === "leitura") return <LeituraNaPauta desafio={desafio} />;
+  if (desafio.motor === "passos") return <PassoAPasso desafio={desafio} />;
+  if (desafio.motor === "grafico") return <Grafico desafio={desafio} />;
+  if (desafio.motor === "conversa") return <ConversaComALisa desafio={desafio} />;
+  if (desafio.motor === "diagrama") return <DesenhoDeDiagrama desafio={desafio} />;
+  const c = desafio.conteudo;
+  return (
+    <div className="desafio">
+      <div className="pf-cartao">
+        <div className="pf-assunto__chips">
+          <span className="pf-pilula pf-pilula--tema">{desafio.tema}</span>
+          {c.linguagem && <span className="pf-pilula">{c.linguagem}</span>}
+          <span className="pf-pilula">{formatarDia(desafio.periodo, { comSemana: true })}</span>
+        </div>
+        <Explicacao texto={c.enunciado} className="desafio__texto" linguagem={c.linguagem} />
+        {c.exemplo && (
+          <>
+            <p className="pf-campo__rotulo">Exemplo</p>
+            <pre className="desafio__exemplo">{c.exemplo}</pre>
+          </>
+        )}
+        {c.dicas.length > 0 && (
+          <div className="desafio__dicas">
+            {c.dicas.map((d, i) => (
+              <details key={i}><summary>Dica {i + 1}</summary><p>{emLinha(d)}</p></details>
+            ))}
+          </div>
+        )}
+        {c.criterios.length > 0 && (
+          <>
+            <p className="pf-campo__rotulo">Como a Lisa vai corrigir</p>
+            <ul className="avaliacao__simples">{c.criterios.map((t, i) => <li key={i}>{t}</li>)}</ul>
+          </>
+        )}
+      </div>
+      <Entrega
+        desafio={desafio}
+        campo="codigo"
+        multilinha
+        linguagem={c.linguagem || desafio.tema}
+        rotulo="Sua solução"
+        placeholder={`// escreva aqui a sua solução${c.linguagem ? ` em ${c.linguagem}` : ""}`}
+        conteudoInicial={desafio.resposta?.codigo}
+        aoEnviar={(codigo) => criar(`/api/desafios/${desafio.id}/enviar`, { codigo })}
+      />
+    </div>
+  );
+}
+
+// ================================================================ o exemplo da Lisa (BEYOND-0022)
+
+/**
+ * "Modo dica: o exemplo da Lisa" (03/11/2026, BEYOND-0022): uma aplicação de exemplo, num cenário parecido,
+ * com todos os conceitos de que o exercício ou o projeto precisa — a pessoa vê os conceitos funcionando juntos
+ * e leva a ideia para o dela. Não resolve o desafio. Gera uma vez (fica guardado no desafio).
+ */
+function ExemploDaLisa({ desafio }) {
+  const [exemplo, setExemplo] = useState(desafio.conteudo?.aplicacao || null);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  async function pedir() {
+    setCarregando(true);
+    setErro("");
+    reagir("pensando", "Escrevendo um exemplo com os conceitos que você vai usar…", 40000);
+    try {
+      const r = await criar(`/api/desafios/${desafio.id}/exemplo`, {});
+      setExemplo(r.exemplo);
+      reagir("feliz", "Olha aí: os conceitos funcionando juntos. Agora leve a ideia para o seu!", 5000);
+    } catch (falha) {
+      setErro(falha.message);
+      reagir("surpreso", "Não consegui montar o exemplo agora.");
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  return (
+    <section className="pf-cartao dicas-lisa exemplo-lisa" aria-label="Exemplo da Lisa">
+      <div className="dicas-lisa__topo">
+        <Neuro humor={exemplo ? "feliz" : "pensando"} tamanho={64} />
+        <div>
+          <p className="dicas-lisa__titulo">🧩 Modo dica: o exemplo da Lisa</p>
+          <p className="dicas-lisa__sub">
+            {exemplo
+              ? exemplo.titulo
+              : "Veja todos os conceitos de que você precisa funcionando juntos num exemplo parecido. A Lisa escreve o exemplo — o seu continua com você."}
+          </p>
+        </div>
+      </div>
+      {!exemplo && (
+        <div className="pf-acoes">
+          <button type="button" className="pf-botao" onClick={pedir} disabled={carregando}>
+            {carregando ? "A Lisa está escrevendo…" : "💡 Mostrar o exemplo da Lisa"}
+          </button>
+        </div>
+      )}
+      {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+      {exemplo && (
+        <details className="exemplo-lisa__corpo" open>
+          <summary>Conceitos e exemplo</summary>
+          <p className="pf-campo__rotulo">Os conceitos que o desafio pede</p>
+          <ul className="exemplo-lisa__conceitos">
+            {exemplo.conceitos.map((c, i) => <li key={i}><strong>{c.nome}</strong> — {emLinha(c.explicacao)}</li>)}
+          </ul>
+          {exemplo.codigo ? (
+            <>
+              <p className="pf-campo__rotulo">O exemplo{exemplo.linguagem ? ` (${exemplo.linguagem})` : ""}</p>
+              <Codigo texto={exemplo.codigo} linguagem={exemplo.linguagem || desafio.conteudo?.linguagem || desafio.tema} />
+            </>
+          ) : (
+            <>
+              <p className="pf-campo__rotulo">O exemplo, resolvido passo a passo</p>
+              <ol className="exemplo-lisa__passos">{exemplo.passos.map((p, i) => <li key={i}>{emLinha(p)}</li>)}</ol>
+            </>
+          )}
+          {exemplo.comoFunciona.length > 0 && (
+            <>
+              <p className="pf-campo__rotulo">Como ele funciona</p>
+              <ol className="exemplo-lisa__passos">{exemplo.comoFunciona.map((p, i) => <li key={i}>{emLinha(p)}</li>)}</ol>
+            </>
+          )}
+          {exemplo.paraOSeu && <p className="exemplo-lisa__seu">➡️ {emLinha(exemplo.paraOSeu)}</p>}
+        </details>
+      )}
+    </section>
+  );
+}
+
+// ================================================================ dicas da Lisa (projetos)
+
+/**
+ * "Dicas da Lisa": travou no projeto? A Lisa monta um passo a passo básico, dicas e o que revisar —
+ * guia o caminho, não entrega a solução. Gera uma vez (fica guardado no desafio). Os passos dá para
+ * ir marcando; a marcação fica só neste navegador.
+ */
+function DicasDaLisa({ desafio }) {
+  const [guia, setGuia] = useState(desafio.conteudo?.guia || null);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [feitos, setFeitos] = useState([]);
+  const chave = `proof-guia-${desafio.id}`;
+
+  useEffect(() => {
+    try { setFeitos(JSON.parse(localStorage.getItem(chave) || "[]")); } catch { /* sem armazenamento: começa do zero */ }
+  }, [chave]);
+
+  function marcar(i) {
+    setFeitos((atual) => {
+      const marcados = atual.includes(i) ? atual.filter((x) => x !== i) : [...atual, i];
+      try { localStorage.setItem(chave, JSON.stringify(marcados)); } catch { /* marcação só nesta visita */ }
+      return marcados;
+    });
+  }
+
+  async function pedir() {
+    setCarregando(true);
+    setErro("");
+    reagir("pensando", "Montando um passo a passo para o seu projeto…", 40000);
+    try {
+      const r = await criar(`/api/desafios/${desafio.id}/dicas`, {});
+      setGuia(r.guia);
+      reagir("feliz", "Prontinho! Vai marcando os passos conforme for fazendo.", 5000);
+    } catch (falha) {
+      setErro(falha.message);
+      reagir("surpreso", "Não consegui montar as dicas agora.");
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  const feitosNoGuia = guia ? feitos.filter((i) => i < guia.passos.length).length : 0;
+  return (
+    <section className="pf-cartao dicas-lisa" aria-label="Dicas da Lisa">
+      <div className="dicas-lisa__topo">
+        <Neuro humor={guia ? "feliz" : "pensando"} tamanho={64} />
+        <div>
+          <p className="dicas-lisa__titulo">💡 Dicas da Lisa</p>
+          <p className="dicas-lisa__sub">
+            {guia
+              ? `Passo a passo básico · ${feitosNoGuia} de ${guia.passos.length} feito(s)`
+              : "Não sabe por onde começar? A Lisa monta um passo a passo básico e dicas para você — sem entregar a solução."}
+          </p>
+        </div>
+      </div>
+      {!guia && (
+        <div className="pf-acoes">
+          <button type="button" className="pf-botao" onClick={pedir} disabled={carregando}>
+            {carregando ? "A Lisa está montando…" : "Quero as dicas da Lisa"}
+          </button>
+        </div>
+      )}
+      {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+      {guia && (
+        <>
+          <p className="pf-campo__rotulo">Passo a passo</p>
+          <ol className="dicas-lisa__passos">
+            {guia.passos.map((p, i) => (
+              <li key={i} className={`dicas-lisa__passo${feitos.includes(i) ? " dicas-lisa__passo--feito" : ""}`}>
+                <label>
+                  <input type="checkbox" checked={feitos.includes(i)} onChange={() => marcar(i)} />
+                  <span><strong>{i + 1}.</strong> {emLinha(p)}</span>
+                </label>
+              </li>
+            ))}
+          </ol>
+          {guia.dicas.length > 0 && (
+            <>
+              <p className="pf-campo__rotulo">Dicas</p>
+              <div className="desafio__dicas">
+                {guia.dicas.map((d, i) => (
+                  <details key={i}><summary>Dica {i + 1}</summary><p>{emLinha(d)}</p></details>
+                ))}
+              </div>
+            </>
+          )}
+          {guia.estudar.length > 0 && (
+            <>
+              <p className="pf-campo__rotulo">Vale revisar antes</p>
+              <div className="pf-assunto__chips">{guia.estudar.map((t, i) => <span key={i} className="pf-pilula">{emLinha(t)}</span>)}</div>
+            </>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+// ================================================================ projeto
+
+/**
+ * A complexidade do projeto (pedido de 21/10/2026): mais simples NÃO tira pontos; desafiador vale
+ * 1,5×. Só dá para trocar antes da primeira entrega — a Lisa reescreve o projeto no nível pedido.
+ */
+function Complexidade({ desafio, aoMudar }) {
+  const [mudando, setMudando] = useState("");
+  const [erro, setErro] = useState("");
+  const travada = desafio.tentativas > 0;
+  const semTrocas = desafio.trocasRestantes <= 0;
+
+  async function escolher(nivel) {
+    if (nivel === desafio.complexidade || mudando) return;
+    setMudando(nivel);
+    setErro("");
+    reagir("pensando", nivel === "padrao" ? "Voltando para a versão padrão…" : nivel === "simples" ? "Deixando o projeto mais simples…" : "Deixando o projeto mais desafiador…", 40000);
+    try {
+      const r = await criar(`/api/desafios/${desafio.id}/complexidade`, { nivel });
+      aoMudar(r.desafio);
+      reagir("feliz", nivel === "desafiador" ? "Desafio aceito! Agora ele vale 1,5× os pontos." : "Pronto! Os pontos continuam os mesmos.", 5000);
+    } catch (falha) {
+      setErro(falha.message);
+      reagir("surpreso", "Não consegui mudar a complexidade agora.");
+    } finally {
+      setMudando("");
+    }
+  }
+
+  return (
+    <div className="complexidade">
+      <span className="pf-campo__rotulo">Complexidade</span>
+      <div className="complexidade__opcoes" role="group" aria-label="Complexidade do projeto">
+        {ORDEM_DAS_COMPLEXIDADES.map((n) => {
+          const atual = desafio.complexidade === n;
+          return (
+            <button key={n} type="button" aria-pressed={atual} onClick={() => escolher(n)}
+              className={`complexidade__opcao${atual ? " complexidade__opcao--atual" : ""}`}
+              disabled={!atual && (travada || semTrocas || !!mudando)}>
+              <span>{mudando === n ? "ajustando…" : COMPLEXIDADES[n].nome}</span>
+              <small>{n === "desafiador" ? "1,5× os pontos" : n === "simples" ? "mesmos pontos" : "o original"}</small>
+            </button>
+          );
+        })}
+      </div>
+      <p className="complexidade__nota">
+        {travada
+          ? "A complexidade fica fixa depois da primeira entrega."
+          : semTrocas
+            ? "As trocas de complexidade deste projeto já foram usadas."
+            : `Mais simples não tira pontos; desafiador vale 1,5×. Dá para trocar antes da primeira entrega (${desafio.trocasRestantes} troca(s) restante(s)).`}
+      </p>
+      {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+    </div>
+  );
+}
+
+/** Quanto do projeto já está garantido, e o que cada entrega somou. */
+function PlacarDoProjeto({ pontuacao }) {
+  if (!pontuacao) return null;
+  const { garantidos, tabela, entregas, completo } = pontuacao;
+  const partes = (lista, nome) => (lista?.length ? ` · ${nome} ${lista.map((n) => n + 1).join(", ")}` : "");
+  return (
+    <div className="projeto__placar">
+      <div className="projeto__placar-topo">
+        <strong>{garantidos} de {tabela.maximo} pontos garantidos</strong>
+        {completo && <span className="pf-pilula pf-pilula--verde">completo!</span>}
+      </div>
+      <Barra valor={garantidos} total={tabela.maximo} rotulo="Pontos garantidos no projeto" />
+      <p className="projeto__nota">
+        Pode entregar em partes: cada requisito cumprido vale os pontos dele na hora, e o que você já
+        garantiu não se perde nas próximas entregas.
+      </p>
+      {entregas.length > 0 && (
+        <ul className="projeto__entregas">
+          {entregas.map((e, i) => (
+            <li key={i}>
+              <b>Entrega {e.tentativa || i + 1}:</b> {e.pontos > 0 ? `+${e.pontos} pontos` : "nada novo"}
+              {partes(e.requisitos, "requisito(s)")}{partes(e.extras, "extra(s)")}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Os assuntos da semana do curso que o projeto pratica (pedido de 23/10/2026: "o projeto da semana 1
+ * não tem nada a ver com a semana 1"). No projeto antigo (de antes das semanas do curso), os assuntos
+ * da semana dele — o que ele devia praticar — e o convite para gerar um novo.
+ */
+function AssuntosDoProjeto({ desafio }) {
+  const lista = desafio.assuntos || [];
+  if (!lista.length) return null;
+  const final = desafio.tipo === "projeto_final";
+  const semana = desafio.semanaDoCurso?.numero;
+  return (
+    <div className="projeto__assuntos">
+      <span className="pf-campo__rotulo">
+        {final ? "📚 Os assuntos da trilha que o projeto final junta"
+          : desafio.antigo ? `📚 Os assuntos da semana ${semana} do curso`
+          : `📚 Os assuntos da semana ${semana} que este projeto pratica`}
+      </span>
+      <ol className="projeto__assuntos-lista">
+        {lista.map((t, i) => <li key={i}><span className="projeto__assunto-n">{i + 1}</span>{t}</li>)}
+      </ol>
+    </div>
+  );
+}
+
+/** Gerar outro projeto da semana (ou outro final), só dos assuntos dela — antes da primeira entrega. */
+function TrocarProjeto({ desafio, aoTrocar }) {
+  const [trocando, setTrocando] = useState(false);
+  const [erro, setErro] = useState("");
+  // numa semana dispensada o projeto é opcional: não tem por que gerar outro
+  if (!desafio.troca || desafio.tentativas > 0 || desafio.semanaDoCurso?.dispensada) return null;
+  const final = desafio.tipo === "projeto_final";
+  const qual = final ? "outro projeto final" : `um projeto novo da semana ${desafio.semanaDoCurso?.numero ?? ""}`;
+
+  async function trocar() {
+    if (trocando) return;
+    if (!window.confirm(`Gerar ${qual}? O enunciado de agora some (nada foi entregue ainda, então não perde pontos).`)) return;
+    setTrocando(true);
+    setErro("");
+    reagir("pensando", "Montando um projeto com os assuntos da semana…", 60000);
+    try {
+      const r = await criar(`/api/desafios/${desafio.id}/trocar`, {});
+      aoTrocar(r.desafio);
+      reagir("feliz", "Projeto novo pronto! Cada requisito diz qual assunto ele pratica.", 5000);
+    } catch (falha) {
+      setErro(falha.message);
+      reagir("surpreso", "Não consegui gerar outro projeto agora.");
+    } finally {
+      setTrocando(false);
+    }
+  }
+
+  return (
+    <div className={`projeto__trocar${desafio.antigo ? " projeto__trocar--antigo" : ""}`}>
+      <p>
+        {desafio.antigo
+          ? `⚠️ Este projeto foi gerado antes das semanas do curso e pode não bater com os assuntos acima. Gere um novo, feito só dos assuntos da semana ${desafio.semanaDoCurso?.numero ?? ""}.`
+          : "Este projeto não te convenceu? Dá para gerar outro sobre os mesmos assuntos, antes da primeira entrega."}
+      </p>
+      <div className="projeto__trocar-acao">
+        <button type="button" className={`pf-botao pf-botao--pequeno${desafio.antigo ? "" : " pf-botao--sec"}`}
+          disabled={!desafio.troca.ok || trocando} onClick={trocar}>
+          {trocando ? "gerando…" : `🔄 Gerar ${qual}`}
+        </button>
+        <small>{desafio.troca.ok ? `${desafio.troca.restantes} troca(s) restante(s)` : desafio.troca.motivo}</small>
+      </div>
+      {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+    </div>
+  );
+}
+
+export function Projeto({ desafio: inicial, aoMudar }) {
+  const [desafio, setDesafio] = useState(inicial);
+  const [pontuacao, setPontuacao] = useState(inicial.pontuacao || null);
+  const c = desafio.conteudo;
+  const tabela = pontuacao?.tabela || { requisitos: [], extras: [], maximo: 0 };
+  const feitos = new Set(pontuacao?.cumpridos?.requisitos || []);
+  const extrasFeitos = new Set(pontuacao?.cumpridos?.extras || []);
+  const valor = (pts, feito, bonus) => (
+    <span className={`projeto__valor${feito ? " projeto__valor--feito" : ""}`}>{feito ? "✓ " : "+"}{pts ?? 0} pts{bonus ? " bônus" : ""}</span>
+  );
+  // o projeto mudou (complexidade ou um projeto novo): a tela inteira acompanha (o título lá em cima também)
+  const mudou = (d) => { setDesafio(d); setPontuacao(d.pontuacao || null); aoMudar?.(d); };
+  const semana = desafio.semanaDoCurso;
+  const assuntoDe = (i) => {
+    const n = c.assuntoDeCada?.[i];
+    return n && desafio.assuntos?.[n - 1] ? { n, titulo: desafio.assuntos[n - 1] } : null;
+  };
+
+  return (
+    <div className="desafio">
+      <div className="pf-cartao">
+        <div className="pf-assunto__chips">
+          <span className="pf-pilula pf-pilula--tema">{desafio.tema}</span>
+          <span className="pf-pilula">{desafio.nome}</span>
+          {semana
+            ? (
+              <span className="pf-pilula">
+                📅 {desafio.tipo === "projeto_final" ? "Reta final da trilha" : `Semana ${semana.numero} do curso`}
+                {semana.de && semana.ate ? ` · ${formatarDia(semana.de)} a ${formatarDia(semana.ate)}` : ""}
+              </span>
+            )
+            : <span className="pf-pilula pf-pilula--atencao">até {formatarDia(desafio.ate, { comSemana: true })}</span>}
+          {tabela.maximo > 0 && <span className="pf-pilula pf-pilula--verde">vale até {tabela.maximo} pontos</span>}
+        </div>
+        <AssuntosDoProjeto desafio={desafio} />
+        {desafio.antigo && <TrocarProjeto desafio={desafio} aoTrocar={mudou} />}
+        {desafio.complexidade && (
+          <Complexidade desafio={desafio} aoMudar={mudou} />
+        )}
+        {c.contexto && <Explicacao texto={c.contexto} className="desafio__texto" />}
+        <p className="pf-campo__rotulo">Requisitos · cada um vale os pontos dele</p>
+        <ol className="desafio__requisitos">
+          {c.requisitos.map((t, i) => (
+            <li key={i} className={feitos.has(i) ? "projeto__parte--feita" : undefined}>
+              <div className="projeto__parte"><span>{emLinha(t)}</span>{valor(tabela.requisitos[i], feitos.has(i))}</div>
+              {assuntoDe(i) && (
+                <span className="projeto__assunto-tag" title={assuntoDe(i).titulo}>
+                  <span className="projeto__assunto-n">{assuntoDe(i).n}</span><span className="projeto__assunto-texto">{assuntoDe(i).titulo}</span>
+                </span>
+              )}
+            </li>
+          ))}
+        </ol>
+        {c.extras.length > 0 && (
+          <>
+            <p className="pf-campo__rotulo">Desafios extras (opcionais, valem bônus)</p>
+            <ul className="avaliacao__simples">
+              {c.extras.map((t, i) => (
+                <li key={i} className={extrasFeitos.has(i) ? "projeto__parte--feita" : undefined}>
+                  <div className="projeto__parte"><span>{emLinha(t)}</span>{valor(tabela.extras[i], extrasFeitos.has(i), true)}</div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {c.entrega && (
+          <>
+            <p className="pf-campo__rotulo">Entrega</p>
+            <p style={{ margin: 0 }}>{emLinha(c.entrega)}</p>
+          </>
+        )}
+        {c.criterios.length > 0 && (
+          <>
+            <p className="pf-campo__rotulo">Como a Lisa vai avaliar</p>
+            <ul className="avaliacao__simples">{c.criterios.map((t, i) => <li key={i}>{t}</li>)}</ul>
+          </>
+        )}
+        <PlacarDoProjeto pontuacao={pontuacao} />
+        {!desafio.antigo && <TrocarProjeto desafio={desafio} aoTrocar={mudou} />}
+        {(desafio.tipo === "projeto_semanal" || desafio.tipo === "projeto_final") && (
+          <p className="pf-estat__nota projeto__trava">
+            {desafio.semanaDoCurso?.dispensada
+              ? `✅ A semana ${desafio.semana || ""} foi concluída antes das regras novas: este projeto é opcional — vale pontos, mas não trava nada.`
+              : desafio.tipo === "projeto_final"
+              ? `🏆 Projeto final da trilha: aprovado (nota ${NOTA_DE_APROVACAO}+), a trilha está concluída.`
+              : `🔓 Fecha a semana ${desafio.semana || ""} do curso: aprovado (nota ${NOTA_DE_APROVACAO}+), a semana seguinte abre.`}
+          </p>
+        )}
+      </div>
+      <DicasDaLisa key={`dicas-${desafio.complexidade}-${desafio.titulo}`} desafio={desafio} />
+      <ExemploDaLisa key={`exemplo-${desafio.complexidade}-${desafio.titulo}`} desafio={desafio} />
+      {Array.isArray(c.evidencias) ? (
+        // curso que não é de programação: a entrega é por texto, fotos, áudio ou vídeo
+        <EntregaComEvidencias
+          desafio={desafio}
+          aceitas={c.evidencias}
+          projeto
+          aoAvaliar={(r) => { if (r.pontuacao) setPontuacao(r.pontuacao); setDesafio((d) => ({ ...d, tentativas: r.tentativas })); }}
+        />
+      ) : (
+        <>
+        {desafio.resposta?.emArquivos && (
+          <p className="pf-estat__nota">Entregue em arquivos, sem GitHub: {(desafio.resposta.arquivos || []).join(", ")}.</p>
+        )}
+        <Entrega
+          desafio={desafio}
+          aoAvaliar={(r) => { if (r.pontuacao) setPontuacao(r.pontuacao); setDesafio((d) => ({ ...d, tentativas: r.tentativas })); }}
+          campo="repo"
+          rotulo="Link do repositório público no GitHub"
+          placeholder="https://github.com/seu-usuario/seu-projeto"
+          conteudoInicial={desafio.resposta?.repo}
+          aoEnviar={(repo) => criar(`/api/desafios/${desafio.id}/enviar`, { repo })}
+        />
+        </>
+      )}
+    </div>
+  );
+}

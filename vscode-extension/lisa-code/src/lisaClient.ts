@@ -1,5 +1,8 @@
 import * as vscode from "vscode";
 import { gitSnapshot, gitHeadInfo, gitCreateBranch, gitStageAndCommit, gitPushCurrent } from "./gitContext";
+import { avaliarComando, PERMITIDOS_PADRAO } from "./comandosPermitidos";
+import { resumoDaDocumentacao } from "./documentacao";
+import { editorAtual } from "./editorAtual";
 
 /** Arquivos que NUNCA deveriam entrar num commit sem uma olhada extra — o aviso aparece em
  * destaque no diálogo de confirmação (mesmo cuidado de sempre: conferir o que vai no commit
@@ -27,7 +30,10 @@ interface Content {
   parts: Part[];
 }
 
-const MAX_TOOL_ROUNDS = 10; // trava de segurança — evita loop infinito se o modelo insistir em chamar função (folga extra pro report_progress não roubar rodada de ferramenta de verdade)
+// Trava de segurança — evita loop infinito se o modelo insistir em chamar função. Era 10: uma
+// tarefa comum (ler app.js, style.css e index.html, editar, conferir) batia nela e parava no
+// meio (19/10/2026). 25 dá folga para o trabalho e ainda corta um laço de verdade.
+const MAX_TOOL_ROUNDS = 25;
 
 export type ChatEvent =
   | { type: "text"; text: string }
@@ -64,6 +70,14 @@ export class LisaClient {
   /** injeta automaticamente qual arquivo está aberto (e o que está selecionado) na mensagem,
    * pra ela saber onde você está sem você precisar dizer. */
   private includeEditorContext = true;
+  /** Ligado pelo botão "Aplicar tudo nesta sessão" no diálogo de edição. Vive só enquanto
+   *  o cliente vive: fechar o painel devolve o comportamento de perguntar sempre, que é o
+   *  padrão certo para algo que escreve no disco. */
+  private aplicarTudoNaSessao = false;
+  /** O bloco do Beyond Bits sobre o arquivo aberto, e de qual arquivo ele é. Vazio é o
+   *  caso comum e correto: a maioria dos arquivos não tem card nenhum falando deles. */
+  private contextoDoArquivo = "";
+  private arquivoDoContexto = "";
 
   constructor(private context: vscode.ExtensionContext) {
     context.subscriptions.push(
@@ -93,7 +107,7 @@ export class LisaClient {
    * a mensagem com um arquivo inteiro selecionado por acidente). */
   private editorContextBlock(): string {
     if (!this.includeEditorContext) return "";
-    const ed = vscode.window.activeTextEditor;
+    const ed = editorAtual();
     if (!ed) return "";
     const file = vscode.workspace.asRelativePath(ed.document.uri, false);
     const line = ed.selection.active.line + 1;
@@ -104,11 +118,61 @@ export class LisaClient {
       parts.push(`trecho selecionado:\n${selected.length > MAX ? selected.slice(0, MAX) + "\n...(seleção truncada)" : selected}`);
     }
     if (this.compareBase) parts.push(`branch de comparação escolhida: ${this.compareBase}`);
+    // O que o Beyond Bits sabe sobre ESTE arquivo — cards, chamados, tarefas, pensamentos.
+    // Vem do cache preenchido ao trocar de arquivo; nunca bloqueia a mensagem esperando rede.
+    if (this.contextoDoArquivo) parts.push(this.contextoDoArquivo);
     return parts.join("\n") + "\n\n";
   }
 
+  /**
+   * Busca no Beyond Bits o que tem a ver com o arquivo aberto, e guarda.
+   *
+   * Chamado quando você TROCA DE ARQUIVO, não a cada mensagem. A diferença importa: numa
+   * conversa de vinte mensagens sobre o mesmo arquivo isso é uma consulta em vez de vinte.
+   *
+   * Falhar aqui não pode atrapalhar nada: sem o contexto extra a Lisa responde como
+   * respondia antes desta funcionalidade existir. Por isso todo erro vira silêncio.
+   */
+  async atualizarContextoDoArquivo(): Promise<void> {
+    const ed = editorAtual();
+    const arquivo = ed ? vscode.workspace.asRelativePath(ed.document.uri, false) : "";
+    if (arquivo === this.arquivoDoContexto) return; // mesmo arquivo — o cache serve
+    this.arquivoDoContexto = arquivo;
+    this.contextoDoArquivo = "";
+    if (!arquivo) return;
+
+    try {
+      const token = await this.getToken();
+      const baseUrl = this.getBaseUrl();
+      if (!token || !baseUrl) return;
+      // Manda o COMEÇO do arquivo junto: é lá que mora o título, o cabeçalho e o comentário
+      // de topo — os lugares onde uma pessoa escreve do que a coisa trata. Quatro mil
+      // caracteres bastam para isso e não carregam o corpo do código para lugar nenhum.
+      let trecho = "";
+      try {
+        const bytes = await vscode.workspace.fs.readFile(ed!.document.uri);
+        trecho = Buffer.from(bytes).toString("utf8").slice(0, 4000);
+      } catch { /* sem o trecho, o caminho sozinho ainda vale */ }
+
+      const res = await fetch(`${baseUrl}/api/lisa-code/contexto`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-lisa-token": token },
+        body: JSON.stringify({ file: arquivo, trecho }),
+      });
+      const data = (await res.json()) as { ok?: boolean; bloco?: string };
+      // Só guarda se o arquivo ainda for o mesmo: numa troca rápida de abas, a resposta de
+      // uma consulta antiga pode chegar depois da nova e colar o contexto do arquivo errado.
+      if (data?.ok && this.arquivoDoContexto === arquivo) this.contextoDoArquivo = data.bloco || "";
+    } catch {
+      /* sem contexto extra — a conversa segue igual */
+    }
+  }
+
   private async getToken(): Promise<string | undefined> {
-    return this.context.secrets.get("lisaCode.token");
+    // Apara também na LEITURA: um token guardado antes desta correção continua com a quebra
+    // de linha dentro do cofre, e reconfigurar seria a única saída sem isto.
+    const guardado = await this.context.secrets.get("lisaCode.token");
+    return guardado?.trim();
   }
 
   private getBaseUrl(): string {
@@ -124,12 +188,20 @@ export class LisaClient {
     const res = await fetch(`${baseUrl}/api/lisa-code/chat`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-lisa-token": token },
-      body: JSON.stringify({ contents: this.contents }),
+      // O provedor vai a cada turno, e não uma vez na sessão: trocar em Configurações passa
+      // a valer na próxima mensagem, inclusive no meio de uma conversa. O histórico é sempre
+      // guardado no formato do Gemini, e quem traduz é o servidor (src/lib/groq.js).
+      body: JSON.stringify({ contents: this.contents, provedor: this.provedorEscolhido() }),
     });
     const data = (await res.json()) as { ok: boolean; content?: Content; error?: string };
     if (!data.ok) throw new Error(data.error || `HTTP ${res.status}`);
     if (!data.content) throw new Error("resposta vazia do servidor");
     return data.content;
+  }
+
+  /** "gemini" (padrão) ou "groq" — configuração `lisaCode.modelo`. */
+  private provedorEscolhido(): string {
+    return vscode.workspace.getConfiguration("lisaCode").get<string>("modelo", "gemini");
   }
 
   private resolveWorkspacePath(relPath: string): vscode.Uri {
@@ -180,14 +252,24 @@ export class LisaClient {
 
       await vscode.commands.executeCommand("vscode.diff", beforeUri, afterUri, `Lisa Code: ${relPath} (proposta)`);
 
-      const choice = await vscode.window.showInformationMessage(
-        `Lisa propõe uma mudança em ${relPath}: ${explanation}`,
-        { modal: false },
-        "Aplicar",
-        "Rejeitar"
-      );
-
-      if (choice !== "Aplicar") return { applied: false, reason: "usuário rejeitou a proposta" };
+      // O aceite de sessão vale só para EDIÇÃO, e isso é deliberado: uma edição errada está
+      // no diff e no git, e desfazer é um `git checkout`. Comando de terminal não tem essa
+      // rede, então ele nunca entra aqui — ver execRunCommand.
+      if (!this.aplicarTudoNaSessao) {
+        const choice = await vscode.window.showInformationMessage(
+          `Lisa propõe uma mudança em ${relPath}: ${explanation}`,
+          { modal: false },
+          "Aplicar",
+          "Aplicar tudo nesta sessão",
+          "Rejeitar"
+        );
+        if (choice === "Aplicar tudo nesta sessão") {
+          this.aplicarTudoNaSessao = true;
+          vscode.window.setStatusBarMessage("$(check-all) Lisa: aplicando edições sem perguntar nesta sessão", 6000);
+        } else if (choice !== "Aplicar") {
+          return { applied: false, reason: "usuário rejeitou a proposta" };
+        }
+      }
 
       const dir = uri.with({ path: uri.path.slice(0, uri.path.lastIndexOf("/")) });
       try {
@@ -443,6 +525,130 @@ export class LisaClient {
     }
   }
 
+
+  /**
+   * Roda um comando no terminal do workspace e devolve a saída para a Lisa ler.
+   *
+   * A decisão de o que roda sozinho mora em comandosPermitidos.ts, isolada e testada por
+   * `npm run comandos-check` na raiz do projeto — inclusive contra os disfarces que fazem uma
+   * lista de permitidos valer alguma coisa ("ls && rm -rf ." começa com um comando liberado).
+   *
+   * O aceite de sessão das EDIÇÕES não vale aqui, de propósito. Uma edição errada está no diff
+   * e no git; um comando errado pode não ter volta. Quem quiser tudo liberado muda a
+   * configuração `lisaCode.terminalSempreConfirma` conscientemente, e não de raspão.
+   */
+  /**
+   * O que este arquivo exporta sem explicação nenhuma.
+   *
+   * Roda aqui, e não no servidor, porque o arquivo é do usuário e não precisa sair da máquina
+   * dele para esta pergunta ser respondida — mesma regra de todas as outras ferramentas.
+   */
+  private async execFindUndocumented(args: Record<string, unknown>): Promise<unknown> {
+    const relPath = String(args.path || "");
+    try {
+      const uri = this.resolveWorkspacePath(relPath);
+      const bytes = await vscode.workspace.fs.readFile(uri);
+      const resumo = resumoDaDocumentacao(Buffer.from(bytes).toString("utf8"));
+      return {
+        path: relPath,
+        total: resumo.total,
+        documentados: resumo.documentados,
+        faltando: resumo.itens,
+        // Dito por extenso para não depender de o modelo interpretar um zero corretamente —
+        // a diferença entre "está tudo documentado" e "não achei nada" muda a resposta dele.
+        nota: resumo.total === 0
+          ? "este arquivo não exporta nada"
+          : resumo.semDoc === 0
+            ? "tudo que este arquivo exporta já está explicado — não proponha mudança"
+            : `${resumo.semDoc} de ${resumo.total} exportações estão sem explicação`,
+      };
+    } catch (err) {
+      return { error: `não consegui ler ${relPath}: ${(err as Error).message}` };
+    }
+  }
+
+  /**
+   * Manda o servidor rodar, em vez de rodar aqui.
+   *
+   * Não é sandbox — é outro raio de alcance. O comando roda como o usuário do iMac, com tudo
+   * que ele pode fazer. O ganho é que o iMac se reconstrói numa tarde e o notebook de trabalho
+   * não. A rota do outro lado confere a lista de liberados de novo, por conta própria.
+   */
+  private async execRunCommandRemoto(comando: string): Promise<unknown> {
+    try {
+      const token = await this.getToken();
+      const baseUrl = this.getBaseUrl();
+      if (!token || !baseUrl) return { error: "token ou URL do Beyond Bits não configurados" };
+      const res = await fetch(`${baseUrl}/api/lisa-code/executar`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-lisa-token": token },
+        body: JSON.stringify({ comando }),
+      });
+      const data = (await res.json()) as Record<string, unknown>;
+      if (!data?.ok) return { error: String(data?.error || `HTTP ${res.status}`) };
+      return data;
+    } catch (err) {
+      return { error: `não consegui falar com o servidor: ${(err as Error).message}` };
+    }
+  }
+
+  private async execRunCommand(args: Record<string, unknown>): Promise<unknown> {
+    const comando = String(args.command || "").trim();
+    const porque = String(args.explanation || "");
+    if (!comando) return { error: "comando vazio" };
+
+    const cfg = vscode.workspace.getConfiguration("lisaCode");
+    if (!cfg.get<boolean>("terminalEnabled", false)) {
+      return { error: "execução no terminal está desligada (Configurações → Lisa Code → terminalEnabled)" };
+    }
+
+    // "casa" manda para o servidor rodar. A confirmação NÃO se aplica ali: não há ninguém
+    // olhando a tela do servidor, então o que decide é só a lista de liberados, conferida lá
+    // de novo — a checagem daqui não protegeria uma chamada que não viesse desta extensão.
+    if (String(args.onde || "aqui") === "casa") return this.execRunCommandRemoto(comando);
+
+    const permitidos = cfg.get<string[]>("comandosPermitidos") || PERMITIDOS_PADRAO;
+    const sempreConfirma = cfg.get<boolean>("terminalSempreConfirma", false);
+    const veredito = avaliarComando(comando, permitidos);
+
+    if (sempreConfirma || !veredito.liberado) {
+      const aviso = veredito.liberado ? "" : ` (${veredito.motivo})`;
+      const escolha = await vscode.window.showWarningMessage(
+        `Lisa quer rodar no terminal${aviso}:\n\n${comando}\n\n${porque}`,
+        { modal: true },
+        "Rodar"
+      );
+      if (escolha !== "Rodar") return { ran: false, reason: "usuário não autorizou" };
+    }
+
+    const raiz = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!raiz) return { error: "nenhuma pasta aberta no workspace" };
+
+    try {
+      // `exec` e não o terminal integrado: a Lisa precisa LER o que saiu para continuar o
+      // raciocínio, e o terminal do VS Code não devolve a saída para a extensão.
+      const { exec } = await import("node:child_process");
+      const { promisify } = await import("node:util");
+      const rodar = promisify(exec);
+      const { stdout, stderr } = await rodar(comando, {
+        cwd: raiz,
+        timeout: 120_000,      // um comando que pendura não pode travar a conversa
+        maxBuffer: 1024 * 1024, // 1 MB: saída maior que isso é log, não resposta
+        windowsHide: true,
+      });
+      const saida = [stdout, stderr].filter(Boolean).join("\n").trim();
+      return { ran: true, command: comando, output: saida.slice(0, 20_000) || "(sem saída)" };
+    } catch (err) {
+      const e = err as { message?: string; stdout?: string; stderr?: string; killed?: boolean };
+      if (e.killed) return { ran: true, command: comando, error: "o comando passou de 2 minutos e foi encerrado" };
+      // Código de saída diferente de zero é RESULTADO, não acidente: um teste que falhou tem
+      // exatamente a informação que ela precisa para consertar. Devolver como erro seco
+      // esconderia a saída justamente no caso em que ela mais importa.
+      const saida = [e.stdout, e.stderr].filter(Boolean).join("\n").trim();
+      return { ran: true, command: comando, failed: true, output: (saida || e.message || "").slice(0, 20_000) };
+    }
+  }
+
   private async execTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     if (name === "read_file") return this.execReadFile(args);
     if (name === "propose_edit") return this.execProposeEdit(args);
@@ -455,6 +661,8 @@ export class LisaClient {
     if (name === "create_branch") return this.execCreateBranch(args);
     if (name === "git_commit") return this.execCommit(args);
     if (name === "git_push") return this.execPush(args);
+    if (name === "find_undocumented") return this.execFindUndocumented(args);
+    if (name === "run_command") return this.execRunCommand(args);
     if (name === "report_progress") return { ok: true }; // não executa nada de verdade — só um sinal de UI (ver send())
     return { error: `ferramenta desconhecida: ${name}` };
   }
@@ -507,6 +715,6 @@ export class LisaClient {
       this.contents.push({ role: "user", parts: responseParts });
     }
 
-    yield { type: "error", message: "muitas chamadas de ferramenta em sequência — parei por segurança." };
+    yield { type: "error", message: `fiz ${MAX_TOOL_ROUNDS} passos seguidos e parei por segurança. Diga "siga" para eu continuar de onde parei.` };
   }
 }

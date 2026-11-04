@@ -1,0 +1,1758 @@
+{
+  "$gito": 1,
+  "aplicacao": {
+    "nome": "Lisa_Proof",
+    "codigo": "PROOF",
+    "descricao": "App de estudo no estilo Duolingo: transforma os quadros STUDY do Abacato em trilhas com metas diárias, semanais e mensais, pontos e ofensiva de dias seguidos — para programação, música, idiomas, matemática ou qualquer tema.",
+    "tipo": "Aplicação web",
+    "situacao": "em produção",
+    "responsavel": "Brayan Rodrigues",
+    "equipe": "Beyond Bits"
+  },
+  "versao": "1.1.0-cloudflare-pages.5",
+  "atualizadoEm": "2026-11-03",
+  "compilacao": {
+    "numero": 100,
+    "data": "2026-11-03",
+    "artefato": ""
+  },
+  "historico": [
+    {
+      "versao": "1.1.0-cloudflare-pages.5",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa traz vídeos e artigos da internet para o Acervo todo dia, sobre os assuntos do curso dela, e eles entram na fila do bibliotecário.",
+      "itens": [
+        "Todo dia, duas vezes: um vídeo e um artigo sobre um assunto do curso dela (o da vez ou um dos próximos), dentro do limite de 5 envios por dia.",
+        "Vídeos do YouTube pela busca do DuckDuckGo e, sem resultado, pela página de resultados do YouTube (lida só até os primeiros vídeos). Artigos pela web (DuckDuckGo) e, sem resultado, pelo MDN (cursos de programação) e pela Wikipédia.",
+        "Se o material já está no Acervo ou na fila, ela tenta o próximo resultado. Tudo entra na fila do bibliotecário, como o envio de qualquer pessoa.",
+        "Na página Lisa joga: cada sugestão com o tipo (🎬/📰), de onde veio (só o domínio) e a situação; o link aparece depois de aprovado."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "1.1.0-cloudflare-pages.4",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "A Lisa joga a cada 30 minutos e soma pontos, as ilhas viraram ilhas de verdade em 3D, a trilha e os cadernos ganharam o visual novo, os emojis ficaram num estilo só e o modal da 1.0 ficou grande e curto.",
+      "itens": [
+        "A Lisa joga a cada 30 minutos, sempre: uma jogada por rodada do relógio (cabe no limite do Worker gratuito) e, quando nada da agenda está na vez, uma da reserva (Reino, mina, ilhas, minigame, correio). Quiz e exercício nas 3 rodadas do dia, a teoria adiantando até uma semana e o que espera há mais tempo primeiro — para os pontos andarem.",
+        "As ilhas das Grandes Expedições com cara de ilha: a praia, o mar turquesa com espuma, coqueiros, árvores, arbustos, flores, canoas, um píer e a cachoeira caindo num lago, com as construções do reino em cima — na vista da ilha e na batalha.",
+        "A trilha no visual premium: a faixa da semana como cartão de vidro, as paradas como esferas brilhantes (o verde é o feito), a estrada escura com o trecho percorrido aceso.",
+        "Os cadernos como cadernos de arame: todos do mesmo tamanho, a capa na cor do caderno, a espiral, a etiqueta com o título e o elástico.",
+        "Os emojis num estilo só, em todo aparelho: o Noto Color Emoji (Google Fonts) logo depois da fonte do texto.",
+        "Telas alinhadas: os cartões dos assuntos com a mesma altura por linha e os botões sempre no pé.",
+        "O modal da 1.0 bem maior, com o banner, um texto só apresentando o sistema e dois botões; edição nova (aparece de novo uma vez)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "1.1.0-cloudflare-pages.3",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "O modal da 1.0 ganhou o banner oficial (a Lisa apresentando o Lisa Proof 1.0) e aparece de novo para todo mundo, já no verde do visual premium.",
+      "itens": [
+        "O topo do modal de novidades é o banner da 1.0 (public/novidades/, em WebP: a versão menor no celular e a maior na tela larga), no lugar do palco roxo com o Neuro.",
+        "Edição nova do modal (2026-11-03-versao-1-banner): o anúncio aparece de novo uma vez para todos.",
+        "O modal no verde premium (selo, itens em destaque e borda) e com dois itens novos: o visual novo e a Lisa jogando sozinha.",
+        "As imagens de public/novidades/ ficam fora do portão de login, como os diagramas."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "1.1.0-cloudflare-pages.2",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "A ilha em 3D volta a funcionar e aparece igual a um reino, a Lisa passa de fato a jogar sozinha e o visual premium chega mais perto das telas de referência (ofensiva em destaque com a semana, cartões de vidro, botões brilhantes e números grandes).",
+      "itens": [
+        "Correção: \"Ver a ilha em 3D\" derrubava a tela (Application error). A decoração da ilha tropical estava no desenho da cabana, longe das funções que ela usa; foi para o terreno.",
+        "A ilha das Grandes Expedições aparece e luta no estilo do reino: a mesma ilha flutuante, as construções com o desenho e o nível do reino e os guardas em volta da Cabana do Chefe (sem o cenário de expedição).",
+        "Correção: o relógio da nuvem era barrado pelo portão de login (401) e a Lisa não jogava sozinha. A rota /api/lisa/rodada passa pelo portão e continua exigindo o segredo do relógio.",
+        "Visual premium v2: o brilho verde forte no alto da tela, cartões de vidro, botões lisos e brilhantes (texto escuro no verde, pelo contraste), títulos e números na fonte arredondada Fredoka, números grandes antes do nome em cada cartão, barras grossas com o número dentro e listas em linhas-cartão.",
+        "Tela inicial: a ofensiva em destaque, com o número grande, \"dias seguidos\" e a semana de domingo a sábado com os dias estudados marcados e o dia de hoje em destaque.",
+        "Todo mundo volta uma vez ao tema escuro (o visual premium); o botão de tema continua trocando para o claro."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "1.1.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "Tudo no lugar certo e com cara nova: as ilhas e a Forja dentro do Reino (em 3D, com menu em abas), a Arena virou o minigame do dia da Prática, a Lisa passa a jogar sozinha a cada 20 minutos e o app inteiro ganhou o visual premium escuro com acento lima.",
+      "itens": [
+        "As ilhas da Temporada viraram as Grandes Expedições, dentro do Reino: a ilha aparece no mesmo mundo 3D do reino (cenário tropical, com os guardas), a batalha passa ali e, no fim, a ilha volta. O endereço antigo /ilhas leva para lá.",
+        "A Forja mora no Reino (aba Forja), e os artefatos em efeito (Poção de Foco, Escudo de Folga) aparecem como selos por cima do mundo 3D. O endereço /forja leva para lá.",
+        "Menu do Reino reorganizado em cinco abas (Reino, Batalha, Expedições, Forja e Bolsa), cada uma só com as suas partes, com contadores (invasões e expedições do dia) e a barra grudada no alto ao rolar; no celular, as cinco cabem na tela.",
+        "A Arena Lúdica virou o minigame do dia da Prática, como o quiz: um jogo em destaque por dia (masmorra, mascote ou Parsons), +30 pontos na primeira fase vencida no dia, e cada fase nova continua rendendo moedas. O endereço /arena leva para a Prática.",
+        "A Lisa joga sozinha: o relógio da nuvem (gatilho de horário do Worker, a cada 20 minutos) roda a rotina dela, que agora repete várias ações no dia (mina, Reino, Bolsa, ilhas, minigame, correio...) com intervalo entre uma e outra. A página Lisa joga mostra se ela está jogando agora.",
+        "Ilhas, Forja e Arena saíram do menu lateral (estão dentro do Reino e da Prática).",
+        "Visual premium em todas as telas: fundo quase preto com brilho lima, superfícies em camadas, acento lima com texto escuro, botões em pílula apertáveis (maiúsculas), barras de progresso grossas, cantos maiores, títulos mais fortes e a fonte arredondada Nunito; o tema claro segue a mesma família. O mascote continua o Neuro."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "1.0.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Versão 1.0: a Temporada das Ilhas, a Arena Lúdica de Programação, o exemplo da Lisa em todo exercício, um Reino maior, o chefão que rouba (e devolve) e a correção das moedas com casas demais — com o modal anunciando a 1.0.",
+      "itens": [
+        "Temporada das Ilhas (BEYOND-0020): o arquipélago de 12 ilhas, do Navio Pirata (a garagem do reino) à conquista dos nativos com ⭐⭐. Nas ilhas se constrói com conchas 🐚 (10 por moeda: território desvalorizado), elas produzem conchas e pérolas (moedas de verdade), a tripulação é própria (Pirata, Arpoadora, Polvorista e Papagaio de Guerra) e outros jogadores podem tomar a sua ilha. Paz geral não vale: só pacto entre dois jogadores. A Lisa também tem a ilha dela.",
+        "Reino maior (BEYOND-0020): tropas novas (Lanceiro, Cavaleiro, Grifo e Colosso de Pedra), o Pomar, o Lança-Chamas, a Torre de Gelo e a Catapulta, e seis expedições novas (Pântano das Gosmas, Vale Uivante, Cemitério Esquecido, Fortaleza dos Ogros, Jardim das Águas-vivas e Desfiladeiro dos Golems).",
+        "Arena Lúdica de Programação (BEYOND-0023): a Masmorra da Depuração (pixel art: portas, armadilhas e inimigos são bugs de sintaxe, lógica ou desempenho), o Mascote Programável (a função decidir controla o mascote numa grade) e os Quebra-cabeças de Parsons (ordem e recuo). Terminal com o editor e os testes rodando na hora, a Lisa explica os erros, o progresso fica salvo e cada fase nova rende moedas; o servidor confere antes de pagar (Parsons no próprio servidor; masmorra e mascote no Node do Wandbox).",
+        "Modo dica nos exercícios (BEYOND-0022): o exemplo da Lisa — uma aplicação de exemplo, num cenário parecido, com todos os conceitos de que o exercício ou o projeto precisa, sem resolver o desafio. Gera uma vez e fica guardado.",
+        "Chefão da Procrastinação com dano (BEYOND-0018): de pé, ele rouba um pouco do reino a cada 24 horas (8, 15 ou 25 moedas, nunca mais que 5% do saldo nem, no total, mais que a recompensa dele). Derrubado, devolve tudo o que roubou, além da recompensa.",
+        "Correção (BEYOND-0019): as moedas não aparecem mais com um monte de casas decimais — a produção da mina com o bônus do humor do Neuro é arredondada na conta e na tela.",
+        "Aviso de novidades: a edição da versão 1.0 abre uma vez para todos.",
+        "Migração db/030: as colunas do roubo do chefão, proof_ilhas, proof_tripulacoes, proof_conchas, proof_ilha_batalhas, proof_pactos e proof_arena, e os tipos ilhas e arena no livro-caixa."
+      ],
+      "issues": [
+        "BEYOND-0018",
+        "BEYOND-0019",
+        "BEYOND-0020",
+        "BEYOND-0022",
+        "BEYOND-0023"
+      ]
+    },
+    {
+      "versao": "0.49.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "O Reino ganha clima e noite de verdade, e chegam as quatro ideias da Lisa: o humor do Neuro, a Forja de Artefatos, os Chefões da Procrastinação e o Duelo de Lógica.",
+      "itens": [
+        "Clima do Reino: a luz segue a hora de Brasília (amanhece, entardece com o céu dourado, anoitece com estrelas e as janelas acesas) e o tempo muda a cada 3 horas, igual para todos — céu limpo, nublado, garoa, chuva, tempestade com relâmpagos e neve (mais comum no inverno). Vento empurra as nuvens, a chuva e a neve. Um selo no canto mostra o clima de agora. Com \"reduzir movimento\" ligado, nada cai e não há relâmpago.",
+        "Humor do Neuro: a sequência de dias de estudo faz o Neuro evoluir (Animado com 3 dias, Radiante com 7, Brilhante com 14, Lendário com 30) e a mina rende de +5% a +20%. Dois dias sem estudo, ele fica chateado; três, fica revoltado (rosto bravo) e fecha as expedições até a pessoa estudar de novo. No Reino de Teste o humor só aparece.",
+        "Forja de Artefatos (menu Jogo → Forja): cada 10 pontos de estudo viram 1 de mana. Poção de Foco (30 de mana): por 2 horas, o que a pessoa ganhar estudando rende +50%, pago quando a poção acaba (até 🪙 300). Escudo de Folga (40 de mana): 24 horas sem invasões, um a cada 3 dias; atacar alguém quebra o escudo.",
+        "Chefões da Procrastinação: assuntos atrasados da trilha e cartões de revisão vencidos viram um monstro de papel gigante no mapa do Reino (Lesma da Preguiça, Hidra do Depois ou Titã da Procrastinação, pelo tamanho do atraso). Cada ponto de estudo é dano — Prática e diário em dobro, e cada página dos Cadernos vale 25. Derrubado, paga de 🪙 60 a 🪙 200; o próximo só nasce 20 horas depois.",
+        "Duelo de Lógica com a Lisa (Lisa joga → Duelo): 5 perguntas rápidas de código e raciocínio, 25 segundos cada, apostando 🪙 20, 50 ou 100. Acertou mais que a Lisa, leva a aposta do reino dela; acertou menos, a aposta fica com ela; empate devolve. Até 3 duelos por dia; o gabarito fica só no servidor.",
+        "Aviso de novidades: uma edição nova abre uma vez para todos, com o clima do Reino, o humor do Neuro, a Forja, os Chefões e o Duelo.",
+        "Migração db/029: proof_forja, proof_chefoes e proof_duelos, e os tipos forja, chefao e duelo no livro-caixa do reino."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.48.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Personagem novo Neuro Raposão (🪙 610, o prêmio do Viana), a área Presentes, o aviso de novidades da semana, e o modo espectador da Lisa que não deixa mais escolher nada.",
+      "itens": [
+        "Neuro Raposão: uma raposa azul e branca (orelhas, focinho, bochechas de pelo e rabo cheio), à venda por 🪙 610 em Reino → Personagens. Original, sem o escudo nem a marca de nenhum clube.",
+        "Área Presentes (menu Você): o que for guardado para o jogador espera lá até ele abrir; abrir põe o personagem na coleção sem cobrar. O primeiro é o Raposão do Viana.",
+        "O aviso de novidades volta a abrir uma vez para todos, com o Raposão em destaque, os Presentes, o correio, a Lisa jogando, o exercício valendo o triplo e os chamados.",
+        "Correção do modo espectador: além do servidor recusar, a tela não deixa mais escolher nada nas coisas da Lisa (botões, campos e formulários do conteúdo e das folhas param e avisam \"aqui é só olhar\"); navegar, trocar de aba, abrir seções e ver as construções continuam.",
+        "Migração db/028: proof_presentes."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.47.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Dá para ver tudo da Lisa por dentro (modo espectador), ela entrega projetos de programação sem GitHub, tem reino com nome próprio, e o correio aparece no Reino com o pombo-carteiro.",
+      "itens": [
+        "Modo espectador: na página \"Lisa joga\", \"👀 Ver tudo da Lisa por dentro\" abre o Proof dela nas mesmas telas de sempre — Reino, trilhas, Prática, cadernos, Bolsa, Raio-X —, com uma faixa no topo e \"Voltar para o meu\". Só leitura: nada se grava (403), só a conta-robô pode ser espiada, e o correio e os chamados dela ficam de fora.",
+        "Projeto de programação entregue em arquivos, sem GitHub (entregarProjetoEmArquivos): a mesma correção da IA, com os arquivos no lugar do repositório. A Lisa usa isso e escreve o código do exercício do dia; os cursos dela voltam a incluir programação (Python, JavaScript, SQL…), com o perfil que a IA propuser.",
+        "O reino da Lisa ganha nome próprio (Cidadela da Lisa) e ela resgata os vales que chegam, como qualquer jogador.",
+        "Correio no Reino: a caixa de correio no poste, perto da praça, com o pombo-carteiro; a bandeirinha sobe e o rótulo fica vermelho quando chega carta nova (a contagem atualiza a cada minuto). Tocar na caixa abre as cartas ali mesmo: avaliar o recado e responder a pergunta do quiz."
+      ],
+      "issues": [
+        "BEYOND-0014",
+        "BEYOND-0016"
+      ]
+    },
+    {
+      "versao": "0.46.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Correio: cada jogador tem um mensageiro e uma caixa; recado útil dá moedas aos dois, e no quiz do dia até 2 perguntas podem ir pelo correio para outros jogadores.",
+      "itens": [
+        "Tela Correio (menu Jogo): recebidas (com o número de não lidas), enviadas e escrever. Até 5 recados por dia.",
+        "Quem recebe avalia o recado: útil, os dois ganham 🪙 15 (quem manda ganha de até 3 recados úteis por dia, e o mesmo par rende uma vez por dia); não útil, ninguém ganha.",
+        "No quiz do dia, \"📮 Mandar esta por correio\": antes de responder ou depois de errar, até 2 perguntas vão para outro jogador e saem do placar. O quiz termina com pelo menos 3 respondidas, conta para a ofensiva e para concluir o assunto (a nota é sobre as respondidas), mas vale menos: só os acertos, vezes 0,7, sem o bônus de gabaritar.",
+        "Quem recebe a pergunta responde na caixa: acertou, ganha 🪙 10 e quem mandou ganha 🪙 5; a resposta certa e a explicação aparecem depois de responder.",
+        "A Lisa também usa o correio: às vezes manda uma pergunta do quiz dela para alguém, todo fim de tarde manda um recadinho com base nos pontos da semana e no Reino da pessoa, e avalia os recados que recebe. Ninguém manda pergunta para ela (recado pode).",
+        "Migração db/027: proof_correio e o tipo \"correio\" no livro de moedas do Reino."
+      ],
+      "issues": [
+        "BEYOND-0016"
+      ]
+    },
+    {
+      "versao": "0.45.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa joga o Proof como uma jogadora de verdade, com conta própria, e tudo o que ela faz aparece para todos na página \"Lisa joga\".",
+      "itens": [
+        "Conta própria \"Lisa robô\", marcada como jogadora-robô, que não entra pela tela: quem joga é uma rotina do relógio do iMac (npm run lisa-joga, de hora em hora).",
+        "Um curso de tecnologia por mês (redes, segurança, nuvem, testes, requisitos…), criado pela IA no perfil livre: exercícios e projetos entregues por texto ou diagrama, sem precisar de repositório no GitHub.",
+        "Todo dia, numa agenda de gente: recolhe a mina, estuda de 2 a 5 itens da teoria, faz o quiz e o exercício do dia, passa na Bolsa (das 7h às 17h) e no Reino (melhora construções com reserva, treina, invade alguém do tamanho dela); entrega o projeto da semana quando termina os assuntos ou a semana está acabando.",
+        "Ela acerta como quem aprende: a chance começa perto de 55% e sobe ao longo do mês, e os erros dos últimos quizzes puxam um pouco para baixo no dia seguinte.",
+        "Escreve no caderno do curso (domingo e quarta) e manda para o Acervo, no domingo, um vídeo e um artigo de verdade sobre o assunto da vez, achados numa busca (sem subir arquivos; os bibliotecários aprovam).",
+        "Página \"Lisa joga\" (menu Jogo): pontos, ofensiva, moedas, troféus, o curso do mês, o raio-x, o reino, a carteira da Bolsa, os cadernos, o que ela mandou para o Acervo e o diário de tudo o que fez.",
+        "Migração db/026: proof_perfis.robo e a tabela proof_lisa_diario."
+      ],
+      "issues": [
+        "BEYOND-0014"
+      ]
+    },
+    {
+      "versao": "0.44.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Tela Chamados: quem reportou um problema acompanha o status, a previsão de término e as respostas; o técnico vê todos e muda status e previsão e responde ali mesmo.",
+      "itens": [
+        "Nova tela Chamados (menu \"Você\", e no celular em \"Mais\"), com filtros Em aberto, Resolvidos e Todos.",
+        "Quem abriu vê só os seus: o status (aberto, em análise, resolvido), quando abriu, o relato, a previsão de término (em vermelho quando passou) e as respostas do técnico.",
+        "O técnico (a conta administradora do Proof) vê todos os chamados, com quem abriu, e muda o status, marca ou tira a previsão e responde sem sair do Proof. Tudo continua no card do quadro \"Chamados — Lisa Proof\" do Abacato: a coluna é o status, o prazo é a previsão e a resposta é um comentário.",
+        "Depois de mandar um \"Reportar problema\", a confirmação leva para a tela Chamados."
+      ],
+      "issues": [
+        "BEYOND-0015"
+      ]
+    },
+    {
+      "versao": "0.43.3-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "O exercício do dia vale o triplo de novo: até 360 pontos (e moedas do Reino) com nota 100.",
+      "itens": [
+        "O exercício do dia passa de até 120 para até 360 pontos com nota 100, proporcional à nota como antes (nota 50 vale 180).",
+        "A 2ª e a 3ª rodada do dia continuam valendo metade (até 180), e as moedas do Reino seguem os pontos (1 ponto = 1 moeda).",
+        "Vale do momento da mudança em diante: o que já foi ganho fica como foi gravado. O quiz do dia e os projetos não mudaram."
+      ],
+      "issues": [
+        "BEYOND-0017"
+      ]
+    },
+    {
+      "versao": "0.43.2-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Reino: toda compra cobra e grava o reino numa transação só, então uma cobrança não fica mais sem a melhoria.",
+      "itens": [
+        "Construir, treinar o Neuro e as tropas, comprar personagem, veículo, combustível e operário, e coletar a mina e o ouro agora gravam o reino e lançam as moedas numa transação só no banco (função proof_lancar_e_gravar). Antes eram dois pedidos: se o pedido era cancelado entre eles (o celular saiu da tela, por exemplo), a cobrança ficava e a melhoria não. Foi o que aconteceu com uma Mina de Ouro nível 2 paga em 30/10.",
+        "A tela do Reino faz um pedido de cada vez: enquanto uma compra está em andamento, os botões de construir e de treinar o Neuro ficam travados, em vez de disputar a mesma versão do reino.",
+        "Livro-caixa: novo tipo estorno, para devolver uma cobrança que não virou nada.",
+        "Banco: migração db/025-reino-cobra-e-grava-junto.sql (função proof_lancar_e_gravar, só para a chave de serviço, e o tipo estorno nos dois livros-caixa). Precisa ser aplicada antes de publicar.",
+        "Invasão, aluguel de operários e mercado de tropas, que mexem no saldo de duas pessoas, continuam no caminho antigo (lançar, gravar e desfazer se perder a corrida)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.43.1-cloudflare-pages.1",
+      "data": "2026-11-02",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Bolsa do Reino: quem tem ações de uma empresa que sai da bolsa recebe com segurança, e a carteira avisa quanto recebeu.",
+      "itens": [
+        "Quando uma empresa fecha o capital (a bolsa tem no máximo 12 e entram 2 por dia, então as mais antigas saem), o pagamento a quem tinha ações agora é lançado ANTES de zerar a posição, uma vez só por pessoa e ação, e com o erro conferido. Antes, a posição era zerada primeiro e o pagamento não era conferido: se ele falhasse ou a função caísse no meio, as ações sumiam sem o dinheiro entrar.",
+        "A carteira mostra, por 7 dias, as empresas suas que saíram da bolsa: \"fechou o capital: você recebeu X moedas pelas N ações — já está no seu saldo\", ou \"faliu: as suas N ações viraram pó\". Antes isso só aparecia por 3 dias no mural de notícias e na lista recolhida das últimas ordens."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.43.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "No celular, o app não abre mais \"jogado para a esquerda\"; o caderno volta a rolar; e o leitor de PDF ganha o modo texto e a leitura em tela cheia, como um leitor digital.",
+      "itens": [
+        "Início e Biblioteca Colaborativa: a página ficava mais larga que a tela do celular (450 e 978 px numa tela de 390) e o celular diminuía o zoom, jogando tudo para a esquerda. A causa era a coluna das grades crescendo até o conteúdo mais largo: o chip de anotação com o nome do caderno e da página, e a prateleira que rola para o lado. As grades agora têm a largura da tela, o chip quebra a linha e, no celular, nada dentro do conteúdo alarga a página.",
+        "Caderno: o editor não rolava em nenhum aparelho — a página crescia até o tamanho do texto e o fim das páginas longas ficava inalcançável. Corrigido.",
+        "Caderno no celular: ocupa a tela toda (sem o topo e a barra de abas do app) e, nas páginas de texto, sem a margem dos números de linha e com letra de leitura.",
+        "Leitor de PDF no celular: tela toda; tocar no meio esconde e mostra os controles (um indicador discreto mostra a página e o quanto já leu); tocar nas laterais avança ou volta uma tela.",
+        "Modo texto no leitor (botão Aa): o texto da página em letra grande, numa coluna de leitura com o tema do leitor e o tamanho da letra ajustável, em rolagem contínua; o trecho selecionado dá para copiar e mandar para o caderno.",
+        "Testado logado com celular (390 px) e tablet (820 px) emulados: largura das telas, rolagem do caderno com o dedo e com a roda do mouse, e os toques do leitor nos dois modos."
+      ],
+      "issues": [
+        "BEYOND-0007",
+        "BEYOND-0008"
+      ]
+    },
+    {
+      "versao": "0.42.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "Cadernos, notas e o leitor de PDF adaptados de verdade a celular e tablet; e o administrador libera qualquer material do acervo, inclusive o dele.",
+      "itens": [
+        "Acervo: o administrador (a conta de PROOF_ADMIN_EMAIL) aprova ou recusa qualquer envio, inclusive os próprios, mesmo com o líder da semana como segundo bibliotecário. O líder continua sem aprovar o próprio envio (fica para o administrador).",
+        "Digitando no celular ou no tablet, a barra de abas de baixo sai do caminho e o caderno ocupa exatamente a área acima do teclado, sem o fim do texto ficar escondido.",
+        "Barra de atalhos acima do teclado no caderno: desfazer, refazer, recuo e os sinais do Markdown (título, negrito, itálico, lista, tarefa, citação, código, link); nas páginas de código, os símbolos de programação.",
+        "Páginas de Markdown e de texto com corretor e maiúscula automática do teclado; as de código continuam sem.",
+        "Letra mínima de 16 px no toque (o iPhone parava de dar zoom ao tocar no editor e nos campos), botões e itens com 40 a 44 px, ferramentas numa fileira que rola para o lado, topo do caderno numa linha só e um fundo escuro para fechar a lista de páginas tocando fora.",
+        "Leitor de PDF: barra em duas linhas no celular (título em cima, controles embaixo), zoom com dois dedos (pinça) no próprio leitor, barra de marcação presa embaixo ao alcance do polegar, painel que fecha ao escolher uma página e tela cheia também no iPhone (modo foco).",
+        "As caixas de nota do leitor e os painéis de baixo ficam acima do teclado enquanto se escreve."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.41.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Exercício de desenhar diagramas: nos cursos de computação, arquitetura de software e áreas próximas, a pessoa desenha o fluxo, o modelo de dados ou a arquitetura num quadro dentro do Proof e a Lisa avalia.",
+      "itens": [
+        "Novo exercício do dia \"Desenho de diagrama\": a Lisa escreve um cenário concreto (uma clínica, uma loja, um app de entregas) e a lista do que o desenho precisa mostrar; a pessoa desenha e a Lisa avalia requisito por requisito, com 5 tentativas e a melhor nota valendo.",
+        "Tipos: fluxograma de processo, BPMN, diagrama de atividades, de classes e de casos de uso (UML), modelo de dados (tabelas com PK/FK e cardinalidade), arquitetura de software, arquitetura de nuvem e o modelo C4.",
+        "O quadro é o ProcessMap embutido na tela do exercício, com o visual do Proof (temas escuro e claro), tela cheia e rascunho guardado no navegador a cada mudança.",
+        "38 formas técnicas novas no quadro: BPMN (eventos de início, fim, tempo e mensagem, tarefas de usuário e de serviço, gateways exclusivo, paralelo e inclusivo, objeto de dados), Nuvem e infraestrutura (balanceador, API gateway, cache, CDN, DNS, contêiner, função serverless, bucket, tópico de eventos, monitoramento, firewall, data warehouse, data lake, ETL, modelo de IA, repositório Git, CI/CD, IoT, cluster/VPC) e Modelo C4 (pessoa, sistema, contêiner, componente, sistema externo).",
+        "Quando entra: nos cursos de programação e nos livres, o assunto de desenho (modelagem, UML, BPMN, arquitetura, nuvem, microsserviços) traz o diagrama primeiro; um curso da área (ciência da computação, engenharia ou arquitetura de software, sistemas, banco de dados, nuvem) ganha um diagrama a cada três dias. Os outros cursos não mudam.",
+        "A Lisa lê o desenho como texto (cada forma, o que está escrito, o que está dentro de cada raia ou fronteira e cada ligação com as pontas e os rótulos), sem depender de print."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.40.1-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "A Lisa virou bonequinha de corpo inteiro, como os outros avatares.",
+      "itens": [
+        "No lugar do selo redondo, o avatar Lisa tem corpo: a cabeça do logo colorida (cabelo castanho, rosto, lentes claras, prendedor verde e brinco dourado), roupa verde, braços, pernas e sapatos.",
+        "Cada humor tem a sua pose dos braços (comemorando com os braços para cima, surpreso com eles abertos, pensando com a mão no queixo) além da boca.",
+        "Braços e pernas cor de pele com contorno, para aparecerem no tema claro e no escuro."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.40.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Avatar novo e de graça para todos: a Lisa, o mascote da marca, como personagem do Neuro.",
+      "itens": [
+        "Personagem \"Lisa\" na loja de personagens do Reino, de graça e já liberado para todo mundo (como o Neuro Clássico e o Neuro Abacate).",
+        "O desenho é o mascote no selo de papel do logo, com as expressões de cada humor por cima: boca, bochechas, lágrima, olhos fechados, estrelinhas; os olhos piscam.",
+        "Vale em todas as telas e no boneco de papel do Reino em 3D.",
+        "Novidades do Proof anunciando o avatar."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.39.1-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Correções: o balão do Neuro espremido, os botões da loja de personagens saindo do cartão e o \"falha 503\" das anotações e da explicação.",
+      "itens": [
+        "Balão do Neuro: o balão de uma cutucada (sem fala fixa) flutua acima dele em vez de ser espremido pela coluna estreita, que quebrava uma palavra por linha e cobria o formulário (visto no Modo Domínio).",
+        "Loja de personagens: com zoom ou fonte maior, o botão \"Comprar · moedas\" passava da borda; o botão ocupa a largura do cartão e pode quebrar a linha, e seis por linha só a partir de 1240 px.",
+        "\"falha 503\": o Cloudflare derruba a requisição que passa do limite de CPU do plano gratuito (10 ms) — 17 de 1.351 nas últimas 24 h. A leitura agora se repete sozinha (até duas vezes), a explicação da Lisa também (é gravada por cima), e o erro que sobrar explica o que houve em vez de \"falha 503\"."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.39.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "Nova marca (o mascote), tela de abertura animada, cartões com cara de cartão e um visual mais limpo.",
+      "itens": [
+        "O mascote (desenho de traço com rabo de cavalo e óculos) virou o logo do sistema: barra lateral, topo do celular, tela de entrada, favicon e ícones do app.",
+        "Tela de abertura animada na primeira página da sessão: o traço do mascote se desenha, os olhos piscam e o nome aparece (um toque pula; respeita quem pede menos movimento).",
+        "Cartões redesenhados: o cartão da revisão gira de verdade (frente e verso) com o baralho atrás, cada trilha é uma pilha e \"Ver todos\" mostra mini-cartões em grade, com paginação.",
+        "Visual mais limpo: cartões planos, cabeçalhos curtos, pílulas mais leves, mais respiro; barra lateral em grupos (Estudo, Leitura, Jogo, Você) com o rodapé numa linha de ícones.",
+        "Correção: no mapa da trilha, o balão \"Começar\" do primeiro assunto da semana ficava escondido embaixo da faixa da semana."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.38.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "O resto da proposta dos cursos de qualquer tema: conversa com a Lisa, passo a passo e gráficos na matemática, leitura na pauta, diário de estudo, entrega em PDF, frase-senha e a torre do Modo Domínio feita a partir de um livro.",
+      "itens": [
+        "Conversa com a Lisa (idiomas): uma cena do dia a dia na língua do curso; a Lisa faz um papel, responde e corrige cada fala em português, e avalia a conversa no fim pela rubrica.",
+        "Passo a passo (matemática): a resolução linha a linha, conferida pelo servidor sem IA; o erro aparece na linha em que nasceu, e a última linha precisa estar na forma pedida ou isolar o x.",
+        "Gráfico (matemática): marcar pontos, a reta y = ax + b, o vértice e as raízes de parábolas arrastando pontos no plano cartesiano; montado e corrigido pelo código.",
+        "Leitura na pauta (música): a nota desenhada na clave de sol ou de fá; a pessoa escolhe o nome.",
+        "Os motores de matemática e de música são escolhidos pelo assunto; idiomas alterna ditado, conversa e desafio aberto.",
+        "Diário de estudo em cada trilha (o que aprendi, onde travei): sem nota, 5 pontos na primeira entrada do dia, conta para a ofensiva; onde a pessoa travou entra no exercício do dia seguinte.",
+        "Entrega em PDF (até 4 MB) na matemática, em idiomas e no perfil livre, lida pela Lisa e não guardada.",
+        "Frase-senha: o desafio que pede áudio, foto ou vídeo traz uma frase sorteada para falar ou escrever na foto; sem ela, a entrega vale no máximo 60. Vale também nos andares da torre de tema.",
+        "Torre de um livro no Modo Domínio: a torre de tema pode nascer de um livro da Biblioteca; cada andar cobre um trecho do livro, na ordem do sumário, e a Lisa lê as páginas ao escrever o desafio.",
+        "Banco: migração db/024-diario-e-torre-do-livro.sql (proof_diario, proof_dominios.livro_id e o tipo diario no livro de pontos). Precisa ser aplicada depois da 023 e antes de publicar.",
+        "Regras puras em src/dominio/passos.js, grafico.js, conversa.js, senha.js e diario.js, mais a leitura na pauta em musica.js e a torre do livro em modoDominio.js, com 10 casos novos no dominio-check (192 no total)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.37.0-cloudflare-pages.1",
+      "data": "2026-10-31",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "O que faltava dos cursos de qualquer tema: ritmo e afinação ao vivo, cartões com repetição espaçada, revisão da turma e o Modo Domínio de tema.",
+      "itens": [
+        "Ritmo ao vivo (música): a pessoa bate o compasso junto do metrônomo; o servidor mede o desvio de cada batida e desconta o atraso fixo do aparelho.",
+        "Afinação ao vivo (música): cantar ou tocar a nota no microfone, com a agulha do afinador na tela; o navegador detecta a altura e manda só a frequência (o som não é gravado). Vale qualquer oitava.",
+        "Nos cursos de música, o exercício do dia escolhe entre ouvido, ritmo, afinação e desafio aberto pelo assunto.",
+        "Cartões com repetição espaçada (tela Cartões): a Lisa cria os do assunto da vez, a pessoa escreve os seus; agenda SM-2 (esqueci, difícil, lembrei, fácil); 2 pontos por cartão revisado, até 20 por dia.",
+        "Revisão da turma (tela Revisão da turma): quem discorda da Lisa num critério pede a revisão de um colega, sem nomes; o que a turma confirma faz a nota e os pontos subirem; quem revisa ganha 15 pontos (até 5 revisões pagas por dia).",
+        "Modo Domínio de tema: torre de repertório, do QECR, de problemas ou de missões, sem repositório; cada andar é entregue por texto, fotos, áudio ou vídeo do YouTube e avaliado pela Lisa; a luta, os prêmios e o certificado continuam iguais.",
+        "Novidades do Proof anunciando as quatro novidades.",
+        "Banco: migração db/023-cartoes-turma-e-torres-de-tema.sql (proof_cartoes, proof_revisoes, colunas origem/perfil/tema em proof_dominios e os tipos cartoes e revisao no livro de pontos). Precisa ser aplicada antes de publicar.",
+        "Regras puras em src/dominio/musica.js, cartoes.js e revisoes.js, mais a seção da torre de tema em modoDominio.js, com 10 casos novos no dominio-check (182 no total)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.36.0-cloudflare-pages.1",
+      "data": "2026-10-30",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Cursos de qualquer tema: cada curso ganha um tipo (programação, música, idiomas, matemática ou livre) e o exercício do dia e os projetos passam a combinar com ele.",
+      "itens": [
+        "Tipo de curso (perfil) proposto pela Lisa ao criar o curso, trocável na revisão e depois em Ajustes da trilha. Trilhas antigas continuam de programação, sem mudança.",
+        "Exercício do dia por tipo de curso: lista de cálculo (número e expressão, corrigida pelo servidor sem IA, inclusive a forma fatorada ou simplificada), ditado com a voz do navegador, treino de ouvido (intervalos e acordes) e desafio aberto corrigido pela Lisa por critérios.",
+        "Entrega por evidências no lugar do GitHub, no desafio aberto e nos projetos: texto, até 3 fotos, áudio gravado na própria tela (até 90 s no exercício e 3 min no projeto) e vídeo do YouTube. A Lisa vê as fotos, ouve o áudio e assiste ao vídeo.",
+        "Fotos e áudios não são guardados: vão só para a avaliação; ficam a nota, o texto e uma miniatura das fotos.",
+        "Quiz, explicação do assunto, tarefas de teoria, dicas do projeto e complexidade do projeto falam a língua do tipo de curso (sem código fora de programação).",
+        "Novidades do Proof anunciando os cursos de qualquer tema e o mercado de tropas.",
+        "Banco: migração db/022-perfis-de-curso.sql (coluna perfil em proof_trilhas). Precisa ser aplicada antes de publicar.",
+        "Regras puras em src/dominio/perfis.js, motores.js e expressao.js, com 9 casos novos no dominio-check (172 no total)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.35.0-cloudflare-pages.1",
+      "data": "2026-10-30",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Mercado de tropas no Reino: venda tropas do exército ou da defesa para liberar espaço na hora, e compre as que outros reinos puseram à venda.",
+      "itens": [
+        "Botão \"💱 Vender\" em cada tropa do exército e da defesa: escolhe quantas e o preço por tropa (de 20% ao custo do treino). As tropas anunciadas saem na hora, liberando o espaço da reserva e a lotação do Acampamento.",
+        "Nova seção \"🏪 Mercado de tropas\" na parte de Tropas (também na tela cheia): as ofertas dos outros reinos, do mais barato ao mais caro, com o desconto sobre o treino; quem compra escolhe se vão para o exército ou para a defesa.",
+        "A compra segue as mesmas regras do treino (construção no nível da tropa, espaço da reserva e lotação do Acampamento), aceita comprar só parte do anúncio e paga o vendedor na hora.",
+        "Os meus anúncios (até 10) com o \"Retirar\": o que não foi vendido volta para a reserva de onde saiu, se couber; e as vendas recentes com quem comprou.",
+        "Reino de Teste: os reinos-robô anunciam tropas, e a vitrine deles se refaz quando fica vazia.",
+        "Banco: migração db/021-mercado-de-tropas.sql (tabela proof_mercado_tropas, a gêmea de teste e os tipos mercado_compra e mercado_venda no livro-caixa). Precisa ser aplicada antes de publicar.",
+        "Regras puras em src/dominio/mercadoDeTropas.js, com 4 casos novos no dominio-check; o treino passou a usar a mesma regra de entrada na reserva (podeReceber)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.34.0-cloudflare-pages.1",
+      "data": "2026-10-27",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Botão \"Instalar app\": o Lisa_Proof vira aplicativo pelo Chrome (desktop e Android) em um toque.",
+      "itens": [
+        "\"📲 Instalar app\" no rodapé da barra lateral e no topo do celular, ao lado de Minha conta e Reportar problema. Aparece quando o navegador oferece instalar; já instalado, some. No iPhone, explica o caminho pelo Compartilhar → Adicionar à Tela de Início.",
+        "O aviso de instalação do Chrome é guardado por um script no <head>, então o botão funciona mesmo quando o aviso chega antes de a página terminar de carregar."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.33.0-cloudflare-pages.1",
+      "data": "2026-10-26",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Biblioteca Colaborativa: mapa com relevo e construções maiores, tela redesenhada (prateleiras, ficha do material) e o Modo cinema — uma sala 3D com a turma da biblioteca nas poltronas.",
+      "itens": [
+        "O mapa ganhou relevo: colinas, um lago com riacho e a cachoeira que cai da borda, o penhasco em camadas, árvores de dois tipos, pedras, flores, caminhos de pedra com postes de luz, bancos na praça, nuvens e ilhotas; sombras de verdade.",
+        "As construções ficaram 35% maiores e mais detalhadas: a torre com sacadas, janelas em arco e agulha; o observatório com nervuras, escada e telescópio; o auditório com colunas, frontão e emblema; o cinema art déco com o letreiro CINE, marquise, cartazes, bilheteria e tapete vermelho.",
+        "A tela redesenhada: o mundo grande com o painel do nível, a faixa das construções com a barra até o próximo nível e o acervo em prateleiras (\"Chegaram agora\" e uma por tipo) com cartões de capa grande; procurar e filtrar viram uma grade; ordem por recentes, agradecidos ou A–Z.",
+        "A ficha do material: capa grande, dados, quem trouxe (com o avatar), as ações e a gorjeta; na aba de envio, a prévia do cartão como vai aparecer.",
+        "Modo cinema: uma sala 3D com tela de moldura dourada, cortinas, poltronas em degraus, arandelas e o facho do projetor; o vídeo do YouTube ou do Vimeo passa na tela com a perspectiva certa; na plateia, você, quem trouxe o vídeo e os frequentadores da biblioteca (silhuetas da poltrona; rostos e nomes em \"Ver a plateia\"); luzes, tela cheia e Esc.",
+        "A barra lateral do app rola quando os itens não cabem na altura da tela (e aperta um pouco em telas baixas)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.32.0-cloudflare-pages.1",
+      "data": "2026-10-26",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Biblioteca Colaborativa (/acervo): todos trazem livros, artigos e vídeos; o bibliotecário confere, quem trouxe ganha moedas e a ilha da biblioteca cresce.",
+      "itens": [
+        "Enviar livro em PDF, artigo científico (PDF ou link), videoaula ou vídeo teórico (YouTube ou Vimeo), com nome, capa, categoria e assunto; a capa do PDF é a 1ª página (ou uma imagem escolhida).",
+        "O bibliotecário é o administrador e o líder do ranking da semana: aprova ou recusa com motivo; ninguém aprova o próprio envio (a não ser sozinho) e cada revisão paga 🪙 25.",
+        "Aprovado, quem trouxe ganha 🪙 300 (livro), 250 (artigo), 150 (videoaula) ou 120 (vídeo teórico), mais 10% a cada nível da biblioteca.",
+        "Um mundo 3D em papel recortado: a Torre dos Livros, o Observatório dos Artigos, o Auditório das Videoaulas e o Cinema dos Vídeos crescem com o acervo; cada um tem o seu funcionário (Dona Celeste, Doutora Íris, Mestre Tobias e Pipoca) e os avatares de quem contribuiu andam pela ilha — clicando, aparece o que a pessoa trouxe.",
+        "Acervo com busca e filtros; o livro abre na biblioteca pessoal (o mesmo PDF, com marcações, busca e cursos, sem ocupar espaço); o vídeo abre na própria página; gorjeta de agradecimento para quem trouxe.",
+        "Limite de 5 envios por dia, duplicados barrados (mesmo vídeo, mesmo PDF ou mesmo título no tipo) e \"retirar do acervo\" para atender a reclamações.",
+        "Novo item \"Acervo\" no menu e a janela de Novidades anunciando a biblioteca."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.31.0-cloudflare-pages.1",
+      "data": "2026-10-26",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Bolsa: o gráfico de cada ação mostra as previsões dos consultores, hora a hora no dia e o fechamento projetado em cada pregão nas velas.",
+      "itens": [
+        "No gráfico hora a hora, cada consultor tem uma linha tracejada da abertura às 17h, com o rosto dele na ponta; a linha cheia continua sendo a cotação de verdade.",
+        "Cada um traça do seu jeito: a Madame desenha um drama, o Barão uma régua, a Dona Zuleica arredonda até as horas.",
+        "Nas velas (últimos 14 dias), o fechamento que cada um projetou em cada pregão, ao lado da vela; a dica mostra todos os números.",
+        "Legenda com o rosto e o apelido de cada consultor para ligar e desligar as linhas (a escolha fica guardada no navegador).",
+        "A cor de cada consultor passa a ser a mesma no cartão, no rosto e na linha: uma paleta validada no fundo escuro, longe do verde e do vermelho da cotação.",
+        "As datas das velas não se encostam mais em tela estreita."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.30.0-cloudflare-pages.1",
+      "data": "2026-10-26",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Bolsa do Reino: a Mesa dos Consultores — seis personagens projetam o fechamento de cada ação, cada um com uma margem de erro secreta que muda todo dia.",
+      "itens": [
+        "Seis consultores com retrato em papel recortado, cenário, história, personalidade, método, bordão e a faixa de erro que dizem ter: Madame Ametista (vidente), Barão Baltazar Cifrão (banqueiro), Luna “Foguete” (influenciadora), Professor Corvo (estatístico), Dona Zuleica (feirante) e Gorgo, o Urso (pessimista).",
+        "Cada um erra do seu jeito: a margem de erro muda todo dia e ninguém vê; a Madame exagera, o Barão acha que tudo anda pouco, a Luna vê alta em tudo, o Gorgo vê crise, o Corvo é o mais constante (com dias em que o modelo quebra) e a Zuleica arredonda tudo e entende de comida.",
+        "Na ação escolhida, “O que os consultores dizem”: uma régua com o rosto de cada um no preço projetado, o preço de agora, a fala de cada consultor e a mediana da mesa.",
+        "Ficha de cada consultor com as projeções de hoje (preço, faixa declarada e fala), a aposta do dia e o retrospecto dos últimos pregões.",
+        "Placar: depois das 17h, o fechamento, o erro de cada projeção e quem chegou mais perto (nota = 10 − erro médio); o placar do último pregão aparece sempre.",
+        "O fechamento de hoje nunca vai para a tela antes das 17h: as projeções são calculadas no servidor (GET /api/reino/bolsa/consultores), com semente, sem gravar nada no banco.",
+        "A janela de Novidades anuncia os consultores e as recompensas em triplo."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.29.0-cloudflare-pages.1",
+      "data": "2026-10-26",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "Quiz, exercício, projetos e as conquistas de andares do Modo Domínio passam a valer o triplo de pontos e moedas.",
+      "itens": [
+        "Quiz: 15 pontos por acerto e +30 por gabaritar (eram 5 e 10). Exercício: até 120 (eram 40).",
+        "Projeto da semana: até 450 (era 150). Projeto final: de 750 a 1.800, conforme o tamanho da trilha (era de 250 a 600). Projeto do mês: até 1.200 (era 400). Projeto final gerado antes da mudança também passa a valer o triplo.",
+        "Modo Domínio: os pontos de cada andar vencido, o bônus dos marcos (¼, ½, ¾ e topo), o bônus do topo e as moedas dadas no lugar de veículo ou avatar (2.400 e 4.500).",
+        "As moedas do Reino vêm dos pontos (1 ponto = 1 moeda), então triplicam junto.",
+        "Fica como estava: a parte teórica (tarefas, assuntos, meta do dia), as conquistas da conta e os pontos já ganhos.",
+        "Um multiplicador só (MULTIPLICADOR_DE_RECOMPENSAS, em src/dominio/pontos.js) controla tudo isso."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.28.0-cloudflare-pages.1",
+      "data": "2026-10-25",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Biblioteca virou uma estante virtual: livros em 3D, em pé nas prateleiras de madeira, com lombada, capa e corte das páginas.",
+      "itens": [
+        "Cada livro é uma caixa 3D (em CSS, sem WebGL): a espessura vem do número de páginas, a altura varia de livro para livro, e a cor da lombada sai da capa (ou de uma paleta de encadernação, quando a capa é branca), com o texto em contraste AA.",
+        "Na lombada: o título de cima para baixo (como manda a ABNT), o autor, filetes dourados ou faixas, o marcador de página saindo do topo no livro que está sendo lido, o selo dourado do livro lido até o fim e 🎓 quando o livro virou curso.",
+        "Passar o mouse (ou o foco do teclado) puxa o livro da prateleira e gira mostrando a capa; tocar abre o destaque, com a capa em 3D, o progresso, as marcações, os cursos e os botões Ler/Continuar, Gerar curso e Apagar.",
+        "As prateleiras se arrumam pela largura da tela (o celular usa livros menores); no fim da última, o espaço do ＋ para subir PDF. O botão Estante/Lista troca a vista, lembrada no aparelho."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.27.0-cloudflare-pages.1",
+      "data": "2026-10-25",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Cadernos de anotação no estilo Notepad++, Biblioteca de PDFs com leitor e marcações, e cursos gerados a partir dos livros — tudo ligado às trilhas, aos assuntos e às torres.",
+      "itens": [
+        "Cadernos (/cadernos): vários cadernos com módulos e páginas; editor com cor de sintaxe (Markdown com os blocos de código coloridos, JavaScript, Python, SQL, Java, C#, Go, YAML e outras), abas, números de linha, buscar e substituir, quebra de linha, tamanho da letra, espaços visíveis, prévia ao lado, tela cheia, baixar a página como arquivo e gravação automática.",
+        "Gravação segura: cada página guarda a versão; se ela mudou em outra aba ou no celular, a gravação é recusada e a tela pergunta o que fazer, em vez de apagar em silêncio.",
+        "Vínculos: o caderno inteiro, um módulo ou uma página ligados a uma trilha (ou curso), a um assunto, a uma torre do Modo Domínio, a um andar ou a um livro (e à página do livro). O bloco “📓 Anotações” aparece na trilha, em cada assunto, na torre e no leitor, com “Anotar aqui”, que cria a página já vinculada.",
+        "Biblioteca (/biblioteca): subir PDF (até 50 MB, 2 GB por pessoa); o navegador lê o PDF e manda o arquivo direto para o armazenamento privado, e guarda o texto de cada página para a busca e os cursos.",
+        "Leitor de PDF: rolagem contínua, zoom (largura, página, Ctrl+roda), temas claro, sépia e escuro, sumário, miniaturas, busca no livro, marcador de página, lembrar onde parou; destaque em 5 cores, sublinhado, nota, marcação de área (para figuras e PDF escaneado), copiar e mandar o trecho para o caderno com o link que volta à página; exportar as marcações para um caderno.",
+        "Curso a partir de um livro: escolher o livro e os capítulos; a Lisa lê o texto e monta o curso seguindo o livro (módulo = capítulo, cada assunto com as páginas que cobre e a leitura como primeira tarefa), com a opção de criar o caderno do curso já vinculado.",
+        "A explicação, o quiz e o exercício de um assunto de curso feito de um livro leem o trecho das páginas dele (e citam a página).",
+        "Migração db/019-cadernos-e-biblioteca.sql (só acrescenta: 7 tabelas, uma coluna em proof_trilhas, 2 funções fechadas para a chave anônima e o bucket privado proof-biblioteca). Testes novos: npm run biblioteca-check."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.26.2-cloudflare-pages.1",
+      "data": "2026-10-25",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "O modal de novidades ficou mais largo no computador, ocupando mais espaço da tela.",
+      "itens": [
+        "No computador, o modal vai até ~980 px de largura (antes 580), com o palco mais alto, a turma maior e a lista das novidades em três colunas.",
+        "Em tela larga e baixa (notebook), o palco encolhe para os botões caberem sem rolar; no celular, nada muda."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.26.1-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Modo Domínio: andares da torre ainda apareciam vazios — agora todos os chefões ainda não vencidos aparecem, inclusive em navegadores sem roundRect.",
+      "itens": [
+        "As plaquinhas dos andares usavam roundRect, que navegadores mais antigos não têm (Firefox antes da 112, Chrome antes do 99, Safari antes do 16): a primeira plaquinha dava erro e nenhum chefão aparecia. Agora o retângulo arredondado é desenhado à mão quando o recurso falta (também no certificado).",
+        "Cada andar é montado por conta própria: se uma peça falhar, os outros andares (e o Neuro) continuam aparecendo.",
+        "Todos os chefões ainda não vencidos da torre ficam de guarda nas portas — antes só os 14 andares acima do atual."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.26.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Modo Domínio: os chefões ficam de guarda na porta de cada andar (dá para ver todos os inimigos da subida) e a torre ganhou tela cheia.",
+      "itens": [
+        "Correção: numa torre-montanha não dava para ver nenhum inimigo — a sala fica no fundo da rocha e as pedras da boca da caverna fechavam a porta; nos andares de cima o chefão ficava em silhueta numa sala apagada.",
+        "Agora todo chefão ainda não vencido monta guarda na porta do seu andar, visível de fora (os de cima um pouco apagados); na luta ele recua para o centro da sala e o Neuro entra atrás dele.",
+        "Boca da caverna da montanha mais aberta; o Neuro espera de lado na sacada, sem cobrir o chefão.",
+        "Tela cheia da torre (botão ⛶ junto dos controles), no desenho da do Reino: barra com a torre e o andar, dock com Desafio, Branch, Resultado, Neuro, Prêmios e Andares (Certificado na torre conquistada) e painel flutuante; Esc fecha o painel e depois sai.",
+        "No celular em pé, a câmera recua e fica de frente para a porta do andar."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.25.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "Modo Domínio: cada chefão agora é um andar-sala da torre em que o Neuro entra para lutar, com muito mais relevo; e a tela de análise/montagem não espreme mais o texto.",
+      "itens": [
+        "Torre 3D refeita: cada andar é uma sala com porta em arco, sacada e escada por fora até o andar de cima; parede com pilastras, frisos, dentículos, janelas acesas e pedras salientes (na montanha, rocha bruta e boca de caverna).",
+        "Cada andar se enfeita com o tema do seu chefão, por fora e por dentro: gelo, lava, cipós, neon, braseiros, conchas, caixotes ou pedras; faixas na cor do chefão dos lados da porta.",
+        "A sala por dentro: colunas, frisos, lajotas, tapete, lustre de velas, tochas, tapeçaria e seteiras; a sala do andar de agora fica acesa e o chefão aparece pela porta; as de cima ficam escuras, com o chefão em silhueta.",
+        "Na luta, o Neuro entra na sala do chefão e a câmera entra junto (luta de lado); vencendo, ele sai e sobe a escada por fora até a sacada do andar de cima, com a câmera contornando a torre.",
+        "Telhado com ameias e anéis, pico nevado na montanha, ilha com pinheiros, pedras e caminho até a primeira porta; sombras do sol perto da vista.",
+        "Desempenho: as peças fixas são fundidas em poucos blocos por grupo de andares (o que está fora da vista não é desenhado).",
+        "Correção: enquanto a Lisa lia o repositório ou montava a torre, o balão de fala do Neuro espremia o texto da análise numa coluna estreita; agora a coluna do Neuro tem largura fixa e o aviso de espera fica junto do botão."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.24.0-cloudflare-pages.1",
+      "data": "2026-10-24",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.24.0: o Modo Domínio no ar (torre de um repositório público, chefões, prêmios para o Reino e certificado em PDF).",
+      "itens": [
+        "Junta a branch proof-modo-dominio (0.24.0-proof-modo-dominio.1).",
+        "Migração db/018-modo-dominio.sql aplicada no banco antes da publicação.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.24.0-proof-modo-dominio.1",
+      "data": "2026-10-24",
+      "branch": "proof-modo-dominio",
+      "tipo": "funcionalidade",
+      "resumo": "Modo Domínio: escalar a torre de um repositório público (GitHub ou GitLab), andar por andar, até dominar o código — com chefões, prêmios para o Reino e certificado em PDF.",
+      "itens": [
+        "Nova tela Domínio (menu): a pessoa cola o link de um repositório público do GitHub ou do GitLab e a Lisa lê o código, diz se ele aguenta um desafio e dá o nível (1 a 5).",
+        "A pessoa escolhe de 10 até o teto do nível (15, 30, 50, 75 ou 100) andares; a Lisa monta a torre do básico ao difícil, um desafio prático por andar (a torre grande sai em blocos de 25 pedidos ao mesmo tempo).",
+        "Torre 3D (torre de pedra ou montanha, sorteada por repositório), com os chefões de papel do Reino em cada andar e o Neuro no andar de agora.",
+        "A pessoa cria uma branch para a torre; a cada andar faz commit e push e clica em Entregar: a Lisa lê o que mudou desde o começo do andar, dá a nota e mede lógica, arquitetura, testes, qualidade e domínio da stack.",
+        "O Neuro luta com o chefão do andar (60 ou mais vence e sobe; abaixo disso, commit novo e outra tentativa); os atributos de cada entrega formam os atributos do Neuro na torre.",
+        "Pontos por andar (dificuldade × nível × nota) contam como moedas, ranking e ofensiva do dia; refazer só sobe a melhor nota.",
+        "Marcos a 25%, 50%, 75% e no topo pagam bônus de pontos e, conforme o nível do repositório, tropas, defesas, o próximo veículo e (no nível Mestre) o chefão do topo como avatar; o que não cabe no Reino vira moedas.",
+        "Chefões do Modo Domínio na seção Personagens do Reino: não se compram, ficam trancados até serem ganhos; vestidos, aparecem no lugar do Neuro em todas as telas e no 3D.",
+        "No topo, certificado personalizado (nome, repositório, nível, média, tecnologias e assuntos) desenhado na tela e baixado em PDF, com código de conferência.",
+        "Página pública /certificado/<código> para conferir a autenticidade, mostrando só o nome público.",
+        "Migração db/018-modo-dominio.sql: tabelas proof_dominios e proof_dominio_andares e o tipo 'dominio' no livro de pontos e no livro-caixa do Reino.",
+        "Novidades do Proof com a edição do Modo Domínio."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.23.1-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Publicação da 0.23.1: o projeto começado numa semana dispensada continua abrível como opcional.",
+      "itens": [
+        "Junta a branch proof-projeto-opcional (0.23.1-proof-projeto-opcional.1).",
+        "Sem migração de banco.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.23.1-proof-projeto-opcional.1",
+      "data": "2026-10-23",
+      "branch": "proof-projeto-opcional",
+      "tipo": "correcao",
+      "resumo": "O projeto começado numa semana dispensada (concluída antes das regras novas) não some mais: fica abrível como opcional.",
+      "itens": [
+        "Mapa da trilha: numa semana dispensada que já tem projeto, o botão \"Abrir projeto\" volta, com o aviso de que ele é opcional (vale pontos, não trava nada).",
+        "Prática: o projeto começado numa semana dispensada aparece como \"Projeto da semana N · opcional\", ao lado do projeto da vez.",
+        "Tela do projeto: explica que ele é opcional e não oferece gerar outro (e o servidor também recusa).",
+        "Correção de dados (23/10/2026, na conta que pediu): o projeto que a pessoa já fazia na Prática (LogSphere) voltou a ser o projeto da semana 1, e o gerado em 06/10, nunca aberto, saiu da semana 1 (guardado)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.23.0-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Publicação da 0.23.0: o projeto da semana ligado aos assuntos da semana do curso, com o assunto de cada requisito e a opção de gerar outro.",
+      "itens": [
+        "Junta a branch proof-projeto-da-semana (0.23.0-proof-projeto-da-semana.1).",
+        "Sem migração de banco: a semana, as datas e os assuntos ficam no conteúdo do próprio projeto.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.23.0-proof-projeto-da-semana.1",
+      "data": "2026-10-23",
+      "branch": "proof-projeto-da-semana",
+      "tipo": "correcao",
+      "resumo": "O projeto da semana passa a ser, de forma visível, o exercício dos assuntos daquela semana do curso, e dá para gerar outro antes da primeira entrega.",
+      "itens": [
+        "A IA recebe a semana do curso: os assuntos dela (com o objetivo), o que já foi estudado antes (pode usar) e o que só vem depois (não pode exigir). Cada assunto da semana entra em pelo menos um requisito.",
+        "Cada requisito volta marcado com o assunto que pratica, e a tela mostra os assuntos da semana e a etiqueta em cada requisito.",
+        "A tela do projeto mostra a semana do curso (\"Semana 1 do curso · 07/10 a 12/10\") em vez do prazo da semana do calendário (\"até dom, 11/10\").",
+        "Projetos gerados antes das semanas do curso aparecem com um aviso e o botão para gerar um novo só dos assuntos da semana.",
+        "Botão \"Gerar um projeto novo da semana N\" (POST /api/desafios/:id/trocar): antes da primeira entrega, até 3 vezes; o desafio continua o mesmo, só o enunciado muda.",
+        "A versão desafiadora da complexidade também não pode exigir o que a trilha ainda não ensinou."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.22.0-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.22.0: o projeto semanal da semana do curso, 5 personagens das expedições e os cartões do Reino arrumados.",
+      "itens": [
+        "Junta a branch proof-semana-do-curso (0.22.0-proof-semana-do-curso.1).",
+        "Sem migração de banco: os personagens novos usam as colunas que já existem e os projetos antigos continuam valendo.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.22.0-proof-semana-do-curso.1",
+      "data": "2026-10-23",
+      "branch": "proof-semana-do-curso",
+      "tipo": "funcionalidade",
+      "resumo": "O projeto semanal passa a ser o da semana do curso (a mesma do mapa e da agenda), o Reino ganha 5 personagens das expedições e os cartões do Reino ficam com tamanhos iguais por linha.",
+      "itens": [
+        "As semanas da prática são as semanas do curso: os assuntos se agrupam pela semana em que foram agendados (a \"Semana N\" do mapa e da agenda), e não mais em blocos pelos dias de estudo. A semana seguinte continua só abrindo com o projeto da semana aprovado.",
+        "A chave do projeto de cada semana é a segunda-feira da semana do curso; os projetos já feitos continuam valendo e não são reaproveitados por outra semana.",
+        "Textos da trilha, do mapa e da prática dizem qual semana o projeto abre (\"Semana 2 de 5 do curso · o projeto dela abre a semana 3\").",
+        "5 personagens novos do Neuro, inspirados nos ambientes das expedições: Cogumelo (1.000), Mergulhador (1.500), Yeti (1.800), Magma (2.500) e Alienígena (3.000). Funcionam em todos os humores, em todas as telas e no Neuro de papel da ilha 3D.",
+        "Cartões do Reino arrumados: personagens em 6, 4, 3 ou 2 por linha, garagem com os 5 veículos lado a lado na tela larga, expedições, construções e tropas com o botão sempre no pé do cartão e a mesma altura por linha.",
+        "Novidades: edição nova (semana do curso, personagens novos e cartões)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.21.0-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.21.0: a trilha amarrada à prática (quiz conclui o assunto, projeto abre a semana seguinte, projeto final do tamanho do plano), o planetoide em esfera e o fundo do mar de verdade.",
+      "itens": [
+        "Junta a branch proof-trilha-amarrada (0.21.0-proof-trilha-amarrada.1).",
+        "Migração db/017-trilha-amarrada.sql aplicada no banco logo antes do deploy (a dispensa do quiz grava o que estava concluído naquela hora).",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.21.0-proof-trilha-amarrada.1",
+      "data": "2026-10-23",
+      "branch": "proof-trilha-amarrada",
+      "tipo": "funcionalidade",
+      "resumo": "A trilha ficou amarrada à prática (o quiz conclui o assunto, o projeto abre a semana seguinte, o projeto final fecha a trilha, tudo no tamanho do plano), e as expedições ganharam planetoides esféricos e um fundo do mar de verdade.",
+      "itens": [
+        "Assunto concluído = a teoria (a checklist do card) E um quiz dele com 60% ou mais. O painel do assunto mostra \"falta o quiz\" e tem o botão \"Fazer o quiz\", que gera o quiz daquele assunto.",
+        "Semanas do plano: a trilha anda em blocos de uma semana de estudo, pela ordem da trilha e pelos dias de cada assunto, e não pela semana do calendário. Cada semana termina num projeto, e a semana seguinte só abre com ele aprovado (nota 60+). Os assuntos de semana trancada não entram no dia nem se marcam.",
+        "Projeto final: o projeto da última semana é o projeto final, do tamanho da trilha (um plano de 5 dias tem só ele; vale de 250 a 600 pontos). O projeto do mês deixou de ser gerado. Projeto reprovado dá lugar a outro, até 3 por semana; reprovados os 3, a semana libera assim mesmo.",
+        "O que já estava concluído continua concluído: os assuntos concluídos até a migração ficam dispensados do quiz, a semana inteira concluída antes não pede projeto, e o projeto da semana antigo vale para a semana do plano com os mesmos assuntos.",
+        "A prática (quiz e exercício) fica no assunto da vez das semanas abertas. A tela de hoje, a agenda, o mapa, o Raio-X e a conquista da trilha usam a regra nova (src/dominio/avanco.js e src/lib/avanco.js).",
+        "Planetoide em esfera: na expedição da Nave, o mundo curva (shader em src/componentes/reino/curvatura.js). O chão vira um planeta e tropas, monstros, tiros e construções andam em volta dele, no estilo Mario Galaxy. Tem duas luas em órbita, estrelas no fundo e a câmera mais alta durante a batalha.",
+        "Fundo do mar de verdade: nas expedições do Submarino, a ilha flutuante e as nuvens somem. Entram o leito de areia até o horizonte, as florestas de algas balançando, os cardumes, os raios de luz, as cáusticas, as bolhas subindo (inclusive do submarino e das tropas) e a névoa azul da água.",
+        "Migração db/017-trilha-amarrada.sql: grava quais assuntos já estavam concluídos (dispensa do quiz) e aceita o tipo projeto_final."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.20.0-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.20.0: o Reino de Teste à parte (o teste não mexe mais no reino de verdade) e a Bolsa das 07:00 às 17:00.",
+      "itens": [
+        "Junta a branch proof-reino-de-teste (0.20.0-proof-reino-de-teste.1).",
+        "Migração db/016-mundo-de-teste.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.20.0-proof-reino-de-teste.1",
+      "data": "2026-10-23",
+      "branch": "proof-reino-de-teste",
+      "tipo": "funcionalidade",
+      "resumo": "O modo de teste virou o Reino de Teste, um mundo à parte que nunca mexe no reino de verdade, e a Bolsa passou a negociar só das 07:00 às 17:00.",
+      "itens": [
+        "Correção: o modo de teste antigo dava veículos e combustível no reino de verdade (deu 14 expedições num dia). Ele saiu do reino de verdade, e o servidor recusa as ferramentas de teste fora do Reino de Teste.",
+        "Reino de Teste (/reino/teste): um reino à parte para cada pessoa, que nasce com tudo liberado e 100.000 moedas, com as mesmas regras do jogo. Expedições, invasões, paz, operários e carteira da bolsa ficam só nele e não entram no ranking.",
+        "Rivais de teste: cinco reinos-robô (do Robô Lata ao Robô Titânio) para invadir, alugar operários e visitar na paz. Os reinos de teste de outras pessoas também podem ser atacados.",
+        "Ferramentas do Reino de Teste: +10.000 moedas, recomeçar o dia (tanques e invasões de novo), restaurar os rivais, um rival invade você (com replay), adiantar as minas, acabar com a paz, tudo liberado de novo e recomeçar do zero.",
+        "Bolsa de Teste (/bolsa/teste): o mesmo mercado com a carteira do mundo de teste. Negocia a qualquer hora, inclusive numa hora simulada, e mostra a prévia do pregão de amanhã pela Lisa.",
+        "Bolsa com horário: compra e venda só das 07:00 às 17:00 (horário de Brasília). O preço anda de hora em hora nesse intervalo, da abertura ao fechamento decidido pela Lisa. Fora dele, a tela mostra \"pregão fechado\" e a boleta fica travada.",
+        "Migração db/016-mundo-de-teste.sql: 10 tabelas gêmeas proof_teste_* (vazias), com as mesmas regras e sem chaves estrangeiras (os robôs não são pessoas).",
+        "Limpeza autorizada do que o modo de teste antigo deixou num reino de verdade: 4 veículos não comprados, 3 cargas de combustível grátis e 1 expedição de Submarino (com o saque dela e as partes repartidas pela paz)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.19.0-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "Publicação da 0.19.0: moedas com centavos e o Reino e a Bolsa em tela larga, sem cartões encavalados.",
+      "itens": [
+        "Junta a branch proof-centavos (0.19.0-proof-centavos.1).",
+        "Migração db/015-moedas-com-centavos.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.19.0-proof-centavos.1",
+      "data": "2026-10-23",
+      "branch": "proof-centavos",
+      "tipo": "melhoria",
+      "resumo": "As moedas do Reino ganharam centavos (a venda de ações devolve centavo por centavo) e o Reino e a Bolsa passaram a usar a tela larga sem cartões encavalados.",
+      "itens": [
+        "Centavos no dinheiro: o saldo, o livro-caixa, o total e a corretagem das ordens e o custo da carteira têm duas casas; a compra e a venda de ações contam centavo por centavo (antes arredondavam para moeda inteira).",
+        "O saldo aparece com centavos (412,35) no Reino, na tela cheia e na Bolsa; os motivos \"faltam X moedas\" também.",
+        "Layout: o Reino e a Bolsa usam até 1480 px de largura; as grades do Reino contam colunas pelo espaço de verdade (não pela janela) — os cartões de personagem não encavalam mais; a Bolsa conta as colunas pela largura do terminal.",
+        "O mundo 3D fica mais alto em telas largas.",
+        "Migração db/015-moedas-com-centavos.sql: as colunas de dinheiro passam a numéricas com duas casas (nenhum saldo muda)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.18.0-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.18.0: Bolsa em tela própria e hora a hora, diamantes e operários cavando no 3D, e o modo de teste liberado para todos.",
+      "itens": [
+        "Junta a branch proof-bolsa-ouro (0.18.0-proof-bolsa-ouro.2).",
+        "Migração db/014-bolsa-hora-a-hora.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.18.0-proof-bolsa-ouro.2",
+      "data": "2026-10-23",
+      "branch": "proof-bolsa-ouro",
+      "tipo": "funcionalidade",
+      "resumo": "Modo de teste liberado para todos (por enquanto): botões para testar o Reino e a Bolsa sem esperar.",
+      "itens": [
+        "Modo de teste no Reino (e no menu da tela cheia): +1.000 moedas de teste, encher os tanques, todos os veículos, tudo no nível máximo, exército completo, adiantar 24 h das minas, Mina de Ouro lotada e tirar as moedas de teste. Cada botão mexe só no reino de quem aperta.",
+        "Na Bolsa: ver o pregão de hoje em qualquer hora (a boleta fica travada na simulação) e a prévia do pregão de amanhã pela Lisa, sem aplicar nada.",
+        "As moedas de teste entram no livro-caixa com o tipo \"teste\" (saem todas de uma vez); o combustível de teste é uma carga de 0 moeda marcada.",
+        "Desliga com a variável PROOF_MODO_TESTE=0 na hospedagem."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.18.0-proof-bolsa-ouro.1",
+      "data": "2026-10-23",
+      "branch": "proof-bolsa-ouro",
+      "tipo": "funcionalidade",
+      "resumo": "A Bolsa do Reino ganhou tela própria de home broker e cotações de hora em hora; a Mina de Ouro pode dar diamantes e os operários aparecem cavando no 3D.",
+      "itens": [
+        "Tela /bolsa (no menu): letreiro de cotações, Índice do Reino, lista de ações com minigráfico, gráfico hora a hora com mira, velas de 14 dias, boleta de compra e venda, carteira, destaques e o mural de notícias da Lisa; atualiza sozinha na virada da hora.",
+        "Cotações de hora em hora: a Lisa decide o fechamento do dia e o preço anda hora a hora da abertura até ele (o mesmo para todos, sem relógio no servidor); preço com centavos; a compra arredonda o total para cima e a venda para baixo.",
+        "Falência e fechamento de capital passam a valer na abertura do pregão, pelo fechamento de ontem.",
+        "Diamantes na Mina de Ouro: cada pedra tem 4% (nível 1) a 8% (nível 5) de chance de ser diamante (45 moedas, contra 6 do ouro); o sorteio é fixo por rodada de coleta.",
+        "Ícones novos de barra de ouro e diamante no lugar da bolinha amarela.",
+        "Operários de papel cavando com picareta em volta da Mina de Ouro no mundo 3D (até 6), e os diamantes achados brilhando ao lado.",
+        "No Reino, a Bolsa virou um resumo (índice, destaques, carteira) com o botão para a tela do pregão.",
+        "Modal de novidades novo.",
+        "Migração db/014-bolsa-hora-a-hora.sql: a abertura de cada dia e o preço das ordens com centavos."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.17.0-cloudflare-pages.1",
+      "data": "2026-10-23",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.17.0: veículos e combustível, expedições novas e planetoides, Mina de Ouro com aluguel de operários, Bolsa do Reino, tela cheia, visitas e o Neuro Abacate.",
+      "itens": [
+        "Junta a branch proof-veiculos (0.17.0-proof-veiculos.1).",
+        "Migração db/013-veiculos-ouro-bolsa.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.17.0-proof-veiculos.1",
+      "data": "2026-10-23",
+      "branch": "proof-veiculos",
+      "tipo": "funcionalidade",
+      "resumo": "Veículos com combustível e expedições novas (fundo do mar, montanhas, lava e planetoides sorteados), Mina de Ouro com operários e aluguel, Bolsa do Reino comandada pela Lisa, tela cheia com menus, visita aos vizinhos e o Neuro Abacate.",
+      "itens": [
+        "Garagem: Barco Voador (de todos), Submarino, Dirigível das Montanhas, Tanque de Magma e Nave Estelar, comprados com moedas e liberados pela Torre do Neuro.",
+        "Combustível: cada veículo faz 3 expedições por dia; com o tanque vazio, dá para abastecer com moedas (20, 35, 50... até 5 cargas extras por dia).",
+        "9 expedições novas, 3 por veículo, um lugar por nível: Recife dos Tritões, Cidade Afundada, Fossa do Kraken; Trilha dos Yetis, Ninho das Harpias, Pico do Gigante de Gelo; Forja dos Diabretes, Rio de Magma, Trono do Dragão de Lava — cada uma com terreno, estruturas, céu e covil próprios no 3D.",
+        "Nave Estelar: cada viagem cai num planetoide sorteado (raça alienígena, força de ×0,6 a ×1,8 sobre vida e dano, tesouro de 80 a 520 moedas); o radar mostra o planetoide antes de decolar.",
+        "22 monstros novos desenhados em papel (mar, montanha, lava e 7 raças alienígenas) e o veículo de cada expedição chegando na batalha.",
+        "Mina de Ouro em todo reino, com 3 operários de início: cada operário tira 1 pepita (6 moedas) a cada 8 h; contratar mais; pôr operários para alugar e alugar os de outros reinos (24 h, pagamento na hora ao dono).",
+        "Bolsa do Reino: as mesmas ações para todos; no primeiro acesso do dia a Lisa abre o pregão (variações de até ±30%, notícias ligadas ao jogo e empresas novas); sem a IA, um sorteio do dia. Compra e venda com 1% de corretagem; falência a 2 moedas; acima de 12 empresas, a mais antiga fecha o capital e paga quem tem ações.",
+        "Tela cheia do reino com barra de moedas e coletas rápidas, dock de menus e painel flutuante com cada parte da página.",
+        "Na paz, tocar numa ilha vizinha abre a visão completa daquele reino (construções, tropas, veículos, operários e o Neuro do dono).",
+        "Neuro Abacate: o mascote do Abacato como personagem, de graça para todos.",
+        "Modal de novidades novo e regras do jogo atualizadas.",
+        "Migração db/013-veiculos-ouro-bolsa.sql: veículos e operários no reino, expedições por veículo, aluguéis, ofertas e as tabelas da bolsa."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.16.0-cloudflare-pages.1",
+      "data": "2026-10-22",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.16.0: a paz entre os reinos por votação no lugar da aliança, com voto só para quem tem 3+ dias de ofensiva.",
+      "itens": [
+        "Junta a branch proof-paz (0.16.0-proof-paz.2).",
+        "Migração db/012-paz.sql: aplicar no banco antes do deploy (remove a tabela da aliança).",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.16.0-proof-paz.2",
+      "data": "2026-10-22",
+      "branch": "proof-paz",
+      "tipo": "funcionalidade",
+      "resumo": "Só vota (e só propõe) a paz quem tem 3+ dias de ofensiva de estudo; a paz continua valendo para todos os reinos.",
+      "itens": [
+        "Votar e propor a paz exigem 3 ou mais dias seguidos de ofensiva de estudo, conferidos na hora do voto.",
+        "Os 100% contam só os eleitores: os reinos aptos agora mais quem já votou. Quem não pode votar ganha a paz do mesmo jeito (sem guerra, vizinhos, mina × o número de reinos e parte das expedições).",
+        "Se a ofensiva de alguém que ainda não votou acaba e todos os outros eleitores já disseram sim, a paz começa na próxima leitura do reino.",
+        "Tela: placar \"X de Y eleitores\", aviso de quantos reinos não podem votar, e para quem não pode votar ou propor, o motivo com a ofensiva atual e um atalho para estudar.",
+        "Regras, termos da proposta e modal de novidades atualizados."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.16.0-proof-paz.1",
+      "data": "2026-10-22",
+      "branch": "proof-paz",
+      "tipo": "funcionalidade",
+      "resumo": "A aliança entre dois reinos saiu; no lugar dela, a paz entre todos os reinos, decidida por votação (100% dos votos).",
+      "itens": [
+        "Aliança desfeita: sem convites, reforços nem mina em dobro entre dois reinos (a tabela proof_aliancas sai na migração 012).",
+        "Paz por votação: qualquer jogador propõe a paz (3, 7, 14 ou 30 dias) e todos os reinos votam; o voto de quem propôs já é sim. A paz começa com 100% de sim; um único não derruba a proposta; a votação fica aberta 3 dias; uma proposta por vez.",
+        "Durante a paz: nenhum reino invade outro; todos os reinos aparecem como vizinhos no 3D (até 6 ilhas em volta, com pontes); a mina de cada reino rende × o número de reinos; quando alguém saqueia uma expedição, cada um dos outros reinos ganha 20% do saque.",
+        "Mantido: na invasão, só as tropas que caem se perdem.",
+        "Modal de novidades atualizado (edição nova).",
+        "Migração db/012-paz.sql: tabelas proof_pazes e proof_paz_votos, tipo paz_expedicao no livro-caixa e remoção de proof_aliancas."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.15.0-cloudflare-pages.1",
+      "data": "2026-10-22",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.15.0: alianças entre reinos e, na invasão, só as tropas que caem se perdem.",
+      "itens": [
+        "Junta a branch proof-alianca (0.15.0-proof-alianca.1).",
+        "Migração db/011-aliancas.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.15.0-proof-alianca.1",
+      "data": "2026-10-22",
+      "branch": "proof-alianca",
+      "tipo": "funcionalidade",
+      "resumo": "Alianças entre reinos (convite com dias de paz, mina em dobro, reforços, ver o reino do outro e reinos vizinhos) e, na invasão, só as tropas que caem se perdem.",
+      "itens": [
+        "Invasão: as tropas que sobrevivem voltam para casa; só as que caem precisam ser treinadas de novo (antes o exército inteiro era gasto, mesmo vencendo). O resultado mostra quem voltou e quem caiu.",
+        "Convite de aliança pela lista de invasões (botão 🤝): quem convida escolhe 3, 7, 14 ou 30 dias de paz, e o convite mostra todos os termos. Vale 3 dias para ser respondido; uma aliança por vez.",
+        "Enquanto a aliança vale: um não invade o outro; a mina dos dois rende em dobro; quem é invadido recebe reforço de defesa do aliado e quem invade leva reforço de ataque (metade das tropas do aliado, ou um básico do tamanho da Torre dele, sem custo para quem manda); cada um vê o reino do outro.",
+        "Reinos vizinhos: a ilha do aliado aparece ao lado da sua no 3D, ligada por uma ponte, com as construções dele.",
+        "Modal de novidades atualizado (edição nova, aparece de novo uma vez).",
+        "Migração db/011-aliancas.sql: tabela proof_aliancas."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.14.1-cloudflare-pages.1",
+      "data": "2026-10-22",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Publicação da 0.14.1: expedição sem exército parte com a Tropa da Expedição, e a arte do monstro inicia a expedição.",
+      "itens": [
+        "Junta a branch proof-expedicoes-tropa (0.14.1-proof-expedicoes-tropa.1). Sem migração de banco.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.14.1-proof-expedicoes-tropa.1",
+      "data": "2026-10-22",
+      "branch": "proof-expedicoes-tropa",
+      "tipo": "correcao",
+      "resumo": "Ninguém conseguia iniciar uma expedição: todos estavam sem Quartel e sem tropas, e o botão de atacar nem aparecia.",
+      "itens": [
+        "Sem exército, a pessoa parte com a Tropa da Expedição: emprestada, de graça e do tamanho da Torre do Neuro (quem tem exército vai com o dele). Nenhuma moeda e nenhuma tropa saem.",
+        "A arte do monstro de cada lugar virou um botão: clicar nela inicia a expedição (ou mostra, em destaque, por que ainda não dá).",
+        "Aviso no topo das expedições dizendo com que exército você vai partir."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.14.0-cloudflare-pages.1",
+      "data": "2026-10-22",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.14.0: expedições de graça, 3 por dia em qualquer lugar, com dificuldade, recompensa e terreno 3D próprios.",
+      "itens": [
+        "Junta a branch proof-expedicoes-gratis (0.14.0-proof-expedicoes-gratis.1).",
+        "Migração db/010-expedicoes-repetir.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.14.0-proof-expedicoes-gratis.1",
+      "data": "2026-10-22",
+      "branch": "proof-expedicoes-gratis",
+      "tipo": "funcionalidade",
+      "resumo": "Expedições de graça (nenhuma tropa se perde), 3 por dia em qualquer lugar, com dificuldade e recompensa próprias e um terreno 3D com estruturas personalizadas para cada uma.",
+      "itens": [
+        "Expedição não custa nada: o exército inteiro volta para casa, então não há tropa para treinar de novo nem moeda gasta.",
+        "3 expedições por dia, em qualquer lugar — dá para repetir o mesmo (a trava de uma vez por lugar saiu; migração db/010-expedicoes-repetir.sql).",
+        "Cada lugar mostra a dificuldade (Fácil, Médio, Difícil, Muito difícil, Lendário) e a recompensa. As recompensas ficaram menores (60 a 320) porque agora não há perda de tropas.",
+        "Cada uma das 8 expedições tem o seu terreno 3D: chão, céu, luz e enfeites próprios (cogumelos coloridos, vila de goblins, floresta nevada, acampamento orc, vila de areia dos bandidos, bosque assombrado com lápides, floresta sombria com teias e o covil vulcânico do Cérbero).",
+        "Estruturas personalizadas na ilha da expedição: torre de vigia, catapulta, tesouro, carroça do saque, cabana ou tenda, paliçada (de madeira, osso ou pedra vulcânica), pedra rúnica, balista, caldeirão, totem e obelisco, nas cores de cada lugar, mais um covil diferente para cada chefe.",
+        "Na ilha da expedição não aparecem as árvores nem o lote vazio do reino; depois da luta, o reino volta inteiro."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.13.0-cloudflare-pages.1",
+      "data": "2026-10-22",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.13.0: expedições contra monstros, guerra entre jogadores a cada 2 dias com revanche e o modal de novidades.",
+      "itens": [
+        "Junta a branch proof-expedicoes (0.13.0-proof-expedicoes.1).",
+        "Migração db/009-expedicoes.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.13.0-proof-expedicoes.1",
+      "data": "2026-10-22",
+      "branch": "proof-expedicoes",
+      "tipo": "funcionalidade",
+      "resumo": "Expedições contra a CPU (vilas, florestas, bosques e acampamentos de monstros), guerra entre jogadores a cada 2 dias com revanche, e o modal de novidades.",
+      "itens": [
+        "Expedições: 8 lugares contra a CPU (Bosque dos Cogumelos, Vila dos Goblins, Floresta dos Lobos, Acampamento Orc, Vila dos Bandidos, Bosque Assombrado, Floresta Sombria e Covil do Cérbero), liberados pela Torre do Neuro. Saque proporcional à destruição (3 estrelas dá +25%), tropas sobreviventes voltam para casa, cada lugar uma vez por dia e até 3 expedições por dia. Sem troféus e sem tirar moedas de ninguém.",
+        "12 monstros desenhados em 2D de papel, como as tropas e o Neuro: cogumelo, gosma, goblin, bandido, lobo, aranha, morcego, esqueleto, orc, ent, ogro e o Cérbero (chefe). Eles já começam soltos na ilha e guardam o pedaço deles.",
+        "A ilha da expedição ganha o cenário do lugar (chão, pinheiros, cogumelos, casinhas, tendas, totens) e o covil do chefe no lugar da Torre do Neuro. Dá para assistir de novo às últimas expedições.",
+        "Guerra entre jogadores: o mesmo reino só pode ser invadido por você uma vez a cada 48 h, contadas do ataque. A conta é de cada lado: quem foi atacado pode revidar na hora (selo de revanche na lista de alvos).",
+        "Modal de novidades caprichado, que aparece uma vez assim que a pessoa entra (o aviso de vale espera ele fechar).",
+        "Migração db/009-expedicoes.sql: tabela proof_expedicoes, índice das invasões por data e o tipo expedicao no livro-caixa."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.12.0-cloudflare-pages.1",
+      "data": "2026-10-21",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.12.0: Dicas da Lisa nos projetos, pontos por parte com entregas parciais, complexidade ajustável e botão Rodar nos exercícios.",
+      "itens": [
+        "Junta a branch proof-dicas-da-lisa (0.12.0-proof-dicas-da-lisa.1). Sem migração de banco.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.12.0-proof-dicas-da-lisa.1",
+      "data": "2026-10-21",
+      "branch": "proof-dicas-da-lisa",
+      "tipo": "funcionalidade",
+      "resumo": "Dicas da Lisa nos projetos, pontos por parte com entregas parciais, complexidade ajustável e o botão Rodar nos exercícios do dia.",
+      "itens": [
+        "Dicas da Lisa nos projetos da semana e do mês: com um clique, a Lisa monta um passo a passo básico (com os passos para ir marcando), dicas e o que revisar, sem entregar a solução. Gera uma vez e fica guardado.",
+        "Pontuação clara por parte: cada requisito do projeto mostra quanto vale, e cada extra vale um bônus de 10% da base. Entregar em partes soma: o que já foi cumprido fica garantido, e a próxima entrega só acrescenta o que for novo. O projeto aceita novas entregas até ficar completo ou acabarem as 5 tentativas.",
+        "Complexidade do projeto: Mais simples (mesmos pontos), Padrão ou Desafiador (1,5x os pontos). A Lisa reescreve o projeto no nível escolhido; dá para trocar até 3 vezes, antes da primeira entrega.",
+        "Botão Rodar em todo exercício do dia: JavaScript e SQL rodam no navegador (o SQL no SQLite em WebAssembly, com as tabelas de resultado); C, Python, PHP, Java, C# e outras rodam num compilador on-line (Wandbox), com entrada do teclado opcional. Laço infinito para sozinho em 5 s.",
+        "A avaliação dos projetos passa a numerar cada requisito e a avaliar os extras separadamente.",
+        "Sem migração de banco: as dicas, a complexidade e as entregas ficam nos campos conteudo e resposta do desafio."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.11.0-cloudflare-pages.1",
+      "data": "2026-10-21",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.11.0: a ilhota do Acampamento com as tropas à vista e as tropas desenhadas como recortes de papel.",
+      "itens": [
+        "Junta a branch proof-acampamento-papel (0.11.0-proof-acampamento-papel.1). Sem migração de banco.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.11.0-proof-acampamento-papel.1",
+      "data": "2026-10-21",
+      "branch": "proof-acampamento-papel",
+      "tipo": "funcionalidade",
+      "resumo": "As tropas ganham uma ilhota própria, o Acampamento, e viram desenhos de papel como o Neuro.",
+      "itens": [
+        "Nova construção ⛺ Acampamento: uma ilhota ao lado do reino, ligada por uma ponte, onde todas as tropas ficam à vista fora da batalha (exército na frente, tropas de defesa atrás).",
+        "A lotação (exército + defesa) agora cresce com o nível do Acampamento: 40, 65, 90 e 115 de espaço. Antes dependia do Terreno.",
+        "As tropas só aparecem no reino durante as batalhas; na invasão a outro reino, a ilhota some do quadro.",
+        "Todas as tropas viraram recortes 2D com borda de adesivo, nas cores do time, sempre de frente para a câmera, nas batalhas e no Acampamento.",
+        "Enquadramento da câmera refeito: cabe o reino e o Acampamento em qualquer ângulo de giro.",
+        "Sem migração de banco: reinos antigos começam com o Acampamento no nível 1."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.10.0-cloudflare-pages.1",
+      "data": "2026-10-21",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.10.0: tropas à vista na ilha, lotação da ilha e os lotes da terra nova sem flutuar.",
+      "itens": [
+        "Junta a branch proof-tropas-na-ilha (0.10.0-proof-tropas-na-ilha.1). Sem migração de banco.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.10.0-proof-tropas-na-ilha.1",
+      "data": "2026-10-21",
+      "branch": "proof-tropas-na-ilha",
+      "tipo": "funcionalidade",
+      "resumo": "As tropas ficam à vista na ilha, a ilha tem lotação (mais tropas pedem mais Terreno) e os lotes da terra nova não flutuam mais.",
+      "itens": [
+        "Correção: os lotes vazios das construções da terra nova (Biblioteca, Defesa Aérea, Morteiro, Torre Mágica e Torre do Raio) apareciam boiando fora da ilha antes de comprar o Terreno. Agora só aparecem quando a terra deles existe.",
+        "Tropas à vista: o exército fica acampado em fileiras perto do Quartel (um boneco por tropa, do Guerreiro ao Gigante; Dragão, Balão e Curandeira pairando) e as tropas de defesa ficam de guarda em volta da Torre do Neuro, do lado de fora da muralha. Somem durante a batalha e voltam depois.",
+        "Lotação da ilha: exército + tropas de defesa juntos cabem em 40 de espaço na ilha original, +25 por expansão do Terreno (65, 90, 115). Ilha lotada, o treino avisa para comprar mais Terreno. A tela do Reino mostra a lotação."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.9.0-cloudflare-pages.1",
+      "data": "2026-10-21",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.9.0: Reino maior (Terreno, visual por nível, construções e tropas novas) e os 4 chamados de 20/10 resolvidos.",
+      "itens": [
+        "Junta a branch proof-reino-expansao (0.9.0-proof-reino-expansao.1 e .2).",
+        "Migração db/008-personagens.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare com --dangerouslyUseUnsupportedNextVersion (Next 15 fora do suporte desde 21/10/2026)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.9.0-proof-reino-expansao.2",
+      "data": "2026-10-21",
+      "branch": "proof-reino-expansao",
+      "tipo": "correcao",
+      "resumo": "Os 4 chamados abertos pelos usuários no Proof: quiz extra repetindo perguntas, balão do Neuro atrás da faixa da semana, troca de senha e personagens novos.",
+      "itens": [
+        "Quiz do dia (chamado de 20/10, sério): as rodadas extras repetiam as perguntas — às vezes reformuladas, às vezes idênticas (a 3ª rodada saía igual à 2ª). A IA era chamada com temperatura 0,2 e recebia as perguntas de antes no pedido, que acabava copiando. Agora o código confere: toda pergunta nova é comparada (palavras e código) com as que a pessoa já fez no dia na trilha; repetida ou reformulada é descartada e a IA é chamada de novo (até 3 vezes) até juntar 5 novas. Rodadas extras usam temperatura 0,9 e um foco próprio (aplicação na 2ª, desafio na 3ª). Exercício extra repetido também é barrado.",
+        "Mapa da trilha (chamado de 20/10): o balão de fala do Neuro passava por baixo da faixa \"Semana\" que gruda no topo. Enquanto o Neuro fala, ele sobe acima da faixa.",
+        "Minha conta (chamado de 20/10, \"não consigo alterar minha senha\"): botão na barra lateral e no topo do celular, com nome, e-mail e troca de senha (exige a senha atual; pelo menos 10 caracteres). A conta é a do Abacato: a senha nova vale no Proof, no Abacato e na Lisa. O servidor nunca vê a senha, só as chaves (mesmo cálculo do login).",
+        "Personagens (chamado de 20/10, \"quero mais opções de personagem, quero comprar\"): 5 novos visuais do Neuro comprados com moedas no Reino — Ninja (300), Astronauta (500), Mago (800), Pirata (1.200) e Robô (2.000); o Clássico continua grátis. Cada um tem cores e acessório próprios, funciona com todos os humores e aparece em todas as telas, inclusive no boneco de papel da ilha 3D.",
+        "Migração db/008-personagens.sql (só acrescenta: personagem e personagens no reino e o tipo \"personagem\" no livro-caixa)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.9.0-proof-reino-expansao.1",
+      "data": "2026-10-21",
+      "branch": "proof-reino-expansao",
+      "tipo": "funcionalidade",
+      "resumo": "Reino maior e mais variado: visual próprio para cada nível, Terreno para aumentar a ilha, 5 construções e 4 tropas novas, e o aviso da batalha fora do caminho.",
+      "itens": [
+        "Cada nível tem um acabamento visível em todas as construções: madeira e palha (1), pedra e telha vermelha (2), pedra clara com bandeiras (3), pedra reforçada, telhado azul e ouro (4), mármore, telhado dourado e cristal que brilha (5). A Muralha nível 1 é paliçada; o Quartel ganha paliçada; a Mina ganha guindaste.",
+        "Terreno (🗺️): 3 expansões compradas com moedas. A ilha cresce de verdade (no 3D e na batalha, com o desembarque na beirada nova) e libera construções novas nos espaços novos.",
+        "Construções novas: Biblioteca (produz moedas junto com a Mina), Defesa Aérea (só acerta quem voa, dano alto), Morteiro (dano em área de longe, com alcance mínimo), Torre Mágica (dano em área, chão e ar) e Torre do Raio (dano altíssimo num alvo só).",
+        "Tropas novas: Bombardeiro (corre para a Muralha e explode, 12× de dano nela), Mago (dano em área de longe), Balão (voa e bombardeia só defesas) e Curandeira (voa e cura as tropas em volta). Mago também pode ser tropa de defesa.",
+        "Equilíbrio refeito com batalhas medidas: batalha de até 60 s, tropas um pouco mais fortes e Morteiro e Torre Mágica mais leves.",
+        "Aviso da batalha virou uma faixa fina no topo da ilha (antes ficava no meio e tapava a luta); a ilha fica mais alta durante a batalha e os rótulos somem para não atrapalhar.",
+        "Sem migração de banco: construções e tropas novas cabem nos campos que já existem."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.8.0-cloudflare-pages.1",
+      "data": "2026-10-21",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.8.0: combate no estilo Clash of Clans no Reino do Neuro.",
+      "itens": [
+        "Junta a branch proof-combate (0.8.0-proof-combate.1).",
+        "Migração db/007-combate.sql aplicada no banco antes do deploy.",
+        "Build da Cloudflare feito com --dangerouslyUseUnsupportedNextVersion: o Next.js 15 saiu do suporte oficial em 21/10/2026 e o OpenNext passou a recusá-lo. É a mesma versão do Next que já estava no ar; planejar a atualização para o Next 16."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.8.0-proof-combate.1",
+      "data": "2026-10-21",
+      "branch": "proof-combate",
+      "tipo": "funcionalidade",
+      "resumo": "Combate no estilo Clash of Clans: tropas treinadas, tropas de defesa, defesas com vida e alcance, estrelas pela destruição e replay das batalhas.",
+      "itens": [
+        "Tropas (inspiradas no Clash, com nomes próprios): Guerreiro, Arqueira, Gigante e Dragão, treinadas com moedas e liberadas pelo nível do Quartel. O exército vai inteiro em cada invasão e é gasto nela. O Neuro vai junto como herói e fica mais forte a cada nível.",
+        "Tropas de defesa: uma guarnição treinada na Torre do Neuro (capacidade pelo nível dela), que sai quando o inimigo chega perto, junto com o Neuro do reino. Só as que caem precisam ser treinadas de novo.",
+        "Defesas com vida, dano e alcance: Torre de Arqueiros (chão e ar), Canhão novo (só chão, dano alto) e a Torre do Neuro, que também atira. A Muralha agora cerca a Torre do Neuro: quem ataca de perto, por terra, precisa derrubá-la antes. Todas as construções têm vida.",
+        "A batalha é uma simulação de verdade (src/dominio/combate.js): cada tropa anda até o alvo e bate, cada defesa mira a tropa mais perto. Estrelas como no Clash: 50% destruído, a Torre do Neuro no chão e 100%. O saque e os troféus seguem as estrelas.",
+        "A simulação é determinística: o servidor decide a invasão e guarda a receita (semente e as forças); a ilha 3D roda a mesma luta passo a passo, com barras de vida, flechas, balas de canhão, fogo de dragão, construções virando ruína e placar ao vivo. Quem ataca vê a ilha do rival. Botão para pular para o resultado.",
+        "Batalhas recentes ganham \"▶ Assistir\": dá para ver de novo uma invasão sua ou quando o seu reino foi invadido.",
+        "Simulador refeito com o motor novo: rival fraco, parelho ou forte (com exército e defesa), previsão de estrelas em 8 batalhas e passo a passo da destruição, saque, troféus e tropas.",
+        "Migração db/007-combate.sql (só acrescenta: exército e guarnição no reino, o tipo \"treino\" no livro-caixa, e estrelas, destruição e a receita da batalha nas invasões)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.7.0-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.7.0: batalha épica no Reino e o vale de boas-vindas de 450 moedas.",
+      "itens": [
+        "Junta a branch proof-batalha-epica-vale (0.7.0-proof-batalha-epica-vale.1).",
+        "Migração db/006-vales.sql aplicada no banco antes do deploy."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.7.0-proof-batalha-epica-vale.1",
+      "data": "2026-10-20",
+      "branch": "proof-batalha-epica-vale",
+      "tipo": "funcionalidade",
+      "resumo": "Batalha épica (~10 s, com navios, alerta e efeitos) e o vale de boas-vindas de 450 moedas para todos os usuários, novos e antigos.",
+      "itens": [
+        "Batalha mais longa e encenada: navio voador traz os invasores (ou leva as suas tropas), desembarque com fumaça, rajadas de flechas, golpes no portão com faíscas, tremor e zoom da câmera, saque do Cofre e fuga; no ataque, a batalha acontece ao longe com clarões e o navio volta vitorioso ou avariado. Fogos sobre a torre quando a defesa vence.",
+        "Alerta grande sobre a ilha durante a batalha: \"⚠️ SEU REINO ESTÁ SENDO ATACADO!\" (pulsando, em vermelho) ou \"⚔️ BATALHA EM ANDAMENTO\" (azul), com a legenda de cada fase e uma barra de progresso.",
+        "Tropas com elmo, escudo, porta-bandeira, passo de marcha e corrida na carga; quem cai tomba para trás e some numa nuvem de fumaça.",
+        "As invasões de verdade também são encenadas na ilha; o resultado aparece quando a batalha termina.",
+        "Vale de boas-vindas: 450 moedas do Reino para todos (novos e antigos). Assim que a pessoa entra, abre uma janela com o presente e o botão Resgatar; \"Depois\" deixa o vale esperando na tela do Reino. Cada pessoa resgata uma vez só.",
+        "O vale vira moeda do Reino, não ponto de estudo: não conta como dia estudado nem bate a meta do dia.",
+        "Migração db/006-vales.sql (só acrescenta: tabelas proof_vales e proof_vales_resgates, o tipo \"vale\" no livro-caixa e o vale de boas-vindas)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.6.0-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.6.0: modo simulação de batalha no Reino, com as regras explicadas.",
+      "itens": [
+        "Junta a branch proof-simulador (0.6.0-proof-simulador.1). Sem migração de banco."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.6.0-proof-simulador.1",
+      "data": "2026-10-20",
+      "branch": "proof-simulador",
+      "tipo": "funcionalidade",
+      "resumo": "Modo simulação no Reino: treinar um ataque ou uma defesa contra um rival de mentira, com a batalha encenada na ilha 3D e as regras explicadas.",
+      "itens": [
+        "Botão \"🎮 Simular batalha\" abaixo do mundo: escolhe \"Eu ataco\" ou \"Meu reino é atacado\" e um rival mais fraco, parelho ou mais forte (tirado do próprio reino). Nada muda de verdade: moedas, troféus e escudo ficam como estão.",
+        "A ilha encena a batalha: no ataque, os soldados saem do Quartel, pulam para o outro reino e voltam (com moedas, se vencer); na defesa, os invasores marcham até a torre, os Arqueiros atiram e, se o reino cair, as moedas saem voando do Cofre. O Neuro comenta cada momento.",
+        "Passo a passo com a mesma conta da invasão de verdade: força de cada lado (com a fórmula), a sorte rolada, moedas expostas e saque, troféus e escudo. Mostra também a chance de vitória contra aquele rival e o que melhorar para subir.",
+        "Quadro \"Regras da batalha\" ao lado do simulador, com as fórmulas e os números do jogo lidos do próprio código das regras.",
+        "Sem 3D ou com \"reduzir movimento\", o resultado aparece direto, sem animação."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.5.0-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.5.0: Reino do Neuro em 3D com o Neuro de papel e o botão de invadir reinos à vista.",
+      "itens": [
+        "Junta a branch proof-reino-3d (0.5.0-proof-reino-3d.1). Sem migração de banco."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.5.0-proof-reino-3d.1",
+      "data": "2026-10-20",
+      "branch": "proof-reino-3d",
+      "tipo": "funcionalidade",
+      "resumo": "Reino do Neuro em 3D (ilha low poly com o Neuro de papel, estilo Paper Mario) e o botão de invadir reinos à vista.",
+      "itens": [
+        "A vista do reino virou um mundo 3D: uma ilha flutuante low poly com as 6 construções, cada uma crescendo com o nível (torres, cristais da mina, pilhas de moedas, tendas, trechos de muralha). Dia e noite seguem o tema do app, com as janelas acesas à noite.",
+        "O Neuro anda pela ilha como um recorte de papel 2D, sempre de frente para a câmera e \"virando a folha\" quando muda de lado. Muda de humor junto com o resto do app e dá um pulinho quando é tocado.",
+        "Arrastar ou os botões ⟲ ⟳ giram a ilha; tocar numa construção (ou no rótulo dela) leva até o cartão. Com \"reduzir movimento\", o Neuro fica parado. Sem WebGL, volta a vista plana.",
+        "Invadir reinos: botão logo abaixo do mundo, com quantas invasões restam e quantos reinos dá para invadir agora. A lista de alvos carrega sozinha (antes era preciso achar \"Procurar reinos\" no fim da tela) e explica quando todos estão com escudo e quando o primeiro abre."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.4.1-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Ranking: quem ainda não pontuou também vê a própria posição.",
+      "itens": [
+        "No Ranking, quem ainda não tinha pontos (ou troféus, no placar dos reinos) não via o cartão \"A sua posição\". Agora aparece com 0 e um convite para entrar no placar."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.4.0-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Publicação da 0.4.0: Raio-X do estudante, exercício com 5 tentativas, até 3 quizzes e exercícios por dia, ranking mundial e o Reino do Neuro.",
+      "itens": [
+        "Junta a branch proof-tentativas-raiox (versões 0.4.0-proof-tentativas-raiox.1 e .2).",
+        "Exige a migração db/005-rodadas-ranking-reino.sql aplicada no banco antes do deploy."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.4.0-proof-tentativas-raiox.2",
+      "data": "2026-10-20",
+      "branch": "proof-tentativas-raiox",
+      "tipo": "funcionalidade",
+      "resumo": "Ranking mundial, até 3 quizzes e 3 exercícios por dia, exercício com 5 tentativas e o Reino do Neuro: estudar dá moedas para construir um reino, treinar o Neuro e invadir outros jogadores.",
+      "itens": [
+        "Exercício do dia: as tentativas passam de 3 para 5 (vale a melhor nota).",
+        "Prática: depois de terminar o quiz ou o exercício do dia, dá para fazer mais um, até 3 de cada por dia e por trilha. As rodadas extras valem metade dos pontos e a IA evita repetir o que a pessoa já fez no dia. A agenda mostra um item por dia, mesmo com várias rodadas.",
+        "Nova tela Ranking: placar mundial de pontos de todos os tempos, dos últimos 7 dias e de troféus do Reino, com o top 50 e a posição da pessoa mesmo fora do top. Só aparece o nome público (apelido ou primeiro nome com a inicial do sobrenome); dá para escolher um apelido ou aparecer como \"Estudante anônimo\". Nome completo e e-mail nunca aparecem.",
+        "Nova tela Reino do Neuro: cada ponto de estudo vale uma moeda (os pontos do ranking nunca diminuem). Com as moedas, a pessoa constrói e melhora 6 construções (Torre do Neuro, Mina, Cofre, Muralha, Torre de Arqueiros, Quartel, até o nível 5, limitadas pelo nível da Torre) e treina o Neuro (até o dobro do nível da Torre).",
+        "Invasões: 3 por dia, uma por reino. Ganha quem tiver mais força, com sorte de ±15% e empate da defesa; quem vence leva 15% das moedas fora do cofre (até 250) e troféus. Reino que cai ganha escudo de 8 h, reino novo nasce com 48 h de escudo e atacar tira o próprio escudo. Relatório das últimas batalhas na tela.",
+        "Os limites de invasão ficam garantidos também no banco (índices únicos), e toda compra usa trava de versão do reino para nenhum clique duplo gastar moeda em dobro.",
+        "Navegação: Reino e Ranking no menu; no celular as abas viram Hoje, Trilhas, Prática, Reino e um \"Mais\" com Agenda, Progresso, Ranking e Raio-X.",
+        "Migração db/005-rodadas-ranking-reino.sql (só acrescenta: coluna rodada nos desafios, apelido e no_ranking no perfil, visões do ranking e as tabelas proof_reinos, proof_reino_movimentos e proof_invasoes)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.4.0-proof-tentativas-raiox.1",
+      "data": "2026-10-20",
+      "branch": "proof-tentativas-raiox",
+      "tipo": "funcionalidade",
+      "resumo": "Raio-X do estudante (todos os números num lugar só) e exercício do dia que pode ser refeito até a 3ª tentativa mesmo aprovado.",
+      "itens": [
+        "Exercício do dia: dá para enviar de novo enquanto houver tentativa, mesmo depois de aprovado — vale a melhor nota, então só pode subir. A Prática mostra \"Melhorar nota\" e quantas tentativas sobram; o botão vira \"Tentar uma nota maior\". O exercício continua contando como feito nas metas, na agenda e nas conquistas desde o primeiro aprovado. Projetos seguem como estavam.",
+        "Nova tela Raio-X (menu lateral e abas do celular): pontos no total, nível, ofensiva e recorde, dias de estudo e constância, média por dia, metas batidas, melhor dia e horário mais forte; de onde vêm os pontos; pontos por semana e por dia da semana; quiz (taxa de acerto, gabaritos); exercícios e projetos (nota média pela melhor de cada, tentativas, lista completa); cada trilha (progresso dos assuntos, pontos, acerto no quiz, notas); e todas as pontuações, com filtro por tipo.",
+        "A barra de abas do celular passa a caber qualquer quantidade de itens (eram 5 colunas fixas)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.3.1-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "Janelas acima do balão do Neuro (branch proof-chamado-balao) vão ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.3.1-proof-chamado-balao.1."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.3.1-proof-chamado-balao.1",
+      "data": "2026-10-20",
+      "branch": "proof-chamado-balao",
+      "tipo": "correcao",
+      "resumo": "O balão de fala do Neuro (e qualquer coisa posicionada na página) ficava por cima da janela de \"Reportar problema\".",
+      "itens": [
+        "As janelas do Proof (Reportar problema, detalhes do mapa da trilha) passam a abrir direto na raiz da página. Abertas pela barra lateral ou pelo topo do celular, elas ficavam presas na camada da barra, e o balão do Neuro cobria o título e a dica — relatado pelo próprio Reportar problema no primeiro chamado."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.3.0-cloudflare-pages.1",
+      "data": "2026-10-20",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Reportar problema, código colorido, editor de código e quiz com código garantido (branch proof-chamados-codigo) vão ao ar.",
+      "itens": [
+        "Mesmo conteúdo da 0.3.0-proof-chamados-codigo.1."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.3.0-proof-chamados-codigo.1",
+      "data": "2026-10-20",
+      "branch": "proof-chamados-codigo",
+      "tipo": "funcionalidade",
+      "resumo": "Reportar problema com print (vira chamado no Abacato), código sempre colorido e numerado, editor de verdade no exercício, e o quiz que dizia \"código abaixo\" sem código.",
+      "itens": [
+        "Botão \"Reportar problema\" (barra lateral e topo do celular): a pessoa conta o que aconteceu e junta um print — capturando a própria tela, anexando ou colando com Ctrl+V. Vira um card no quadro \"Chamados — Lisa Proof\" de quem administra (conta do Abacato com o e-mail PROOF_ADMIN_EMAIL), com etiqueta Bug, quem reportou, a tela, o aparelho, a versão e o print no comentário. Limite de 10 por pessoa a cada 24 horas.",
+        "Todo código mostrado (perguntas do quiz, explicações, enunciados) sai colorido pela linguagem e com número de linha, também quando a IA manda o bloco grudado numa linha só.",
+        "A caixa da solução do exercício virou um editor: números de linha, cores, linha atual destacada, fechamento de ( [ { e aspas, indentação automática, Tab, desfazer, busca (Ctrl+F), dobrar blocos e Ctrl+Enter para enviar.",
+        "Quiz: o código da pergunta vai num campo próprio; pergunta que fala de \"código abaixo\" sem trazer código é descartada, e o quiz é pedido de novo uma vez se faltar pergunta. Em quizzes já salvos sem o código, a tela avisa em vez de ficar muda."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.7",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "correcao",
+      "resumo": "A IA dizia \"a cota acabou\" quando o modelo do Google estava só sobrecarregado; agora tenta de novo e usa um modelo reserva.",
+      "itens": [
+        "Causa: o Google respondia 503 (modelo sobrecarregado, pico de demanda) e o código tratava isso como cota esgotada, punha a chave de castigo e desistia — com 35 chaves válidas e cota sobrando. Diagnóstico: 8 de 35 chaves com 503 e nenhuma com 429.",
+        "503/500/504 não castigam mais a chave: espera um pouco e tenta outra; depois de 2 sobrecargas passa para o modelo reserva (gemini-3.5-flash-lite, configurável em GEMINI_MODELO_RESERVA). Modelo inexistente (404) também vai direto para a reserva.",
+        "O castigo de cota (429) passou a valer por chave e por modelo, já que a cota do Google é por modelo.",
+        "Teto de 14 tentativas por chamada, para caber no limite de chamadas de rede do Worker.",
+        "Mensagem de erro honesta quando tudo falha: \"o modelo de IA está sobrecarregado agora (pico de uso no Google)\"."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.6",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Agenda: todos os compromissos de todas as trilhas num calendário (mês) ou numa lista (atrasados e próximos 14 dias).",
+      "itens": [
+        "Nova aba Agenda (na barra lateral e nas abas do celular).",
+        "Modo Mês: calendário de segunda a domingo com os assuntos nos dias planejados, as entregas dos projetos (semana no domingo, mês no último dia), o quiz e o exercício do dia e o 🔥 nos dias estudados; tocar no dia mostra os detalhes. No celular, cada compromisso vira um tracinho colorido; no computador, uma etiqueta com o nome.",
+        "Modo Lista: os atrasados no topo (com o Neuro cobrando) e os próximos 14 dias agrupados por dia.",
+        "Cada trilha tem uma cor e dá para esconder trilhas pelo filtro; cada compromisso leva ao lugar certo (mapa da trilha, prática ou o desafio).",
+        "A agenda é montada a partir das etapas, dos desafios e dos eventos que já existem: não há tabela nova, e ela acompanha qualquer replanejamento."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.5",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Criar curso com a Lisa: a partir do tema e do nível, a IA propõe o curso e cria o quadro STUDY no Abacato com a trilha pronta.",
+      "itens": [
+        "Nova tela Trilhas → Criar curso com a Lisa: tema, nível (iniciante, intermediário, avançado), objetivo opcional, duração (2, 4, 8 ou 12 semanas), dias de estudo e data de início.",
+        "A Lisa propõe o curso em módulos, com assuntos, objetivo, nível, dias e 3 a 5 tarefas de teoria cada; a quantidade de assuntos acompanha a duração (até 40).",
+        "Prévia antes de criar: dá para tirar assuntos, mudar o nome do quadro, gerar outra proposta ou trocar tema e nível.",
+        "Ao confirmar, cria no Abacato o quadro STUDY (um módulo por coluna, assuntos como cards, checklists de teoria) e a trilha já na ordem do curso, abrindo o mapa. Se algo falhar no meio, o quadro é desfeito inteiro.",
+        "Respeita o limite de quadros da conta do Abacato (10 para clientes, sem limite para contas internas).",
+        "A proposta pede raciocínio baixo ao modelo: a geração caiu de cerca de 100 s para cerca de 12 s."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.4",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Tema escuro, comemorações em tela cheia (ofensiva, meta do dia, conquista) e conquistas da conta que somam pontos.",
+      "itens": [
+        "Tema escuro como padrão, com botão para trocar entre escuro, claro e o do sistema (na barra lateral e no topo do celular). O tema é aplicado antes da página pintar, sem piscar.",
+        "Comemoração em tela cheia quando a ofensiva sobe (chama animada, número que vira e a semana acendendo), quando a meta do dia é batida (anel que se completa) e quando uma conquista é desbloqueada (medalha que cai girando e brilha). Vêm em fila, com confete e o Neuro.",
+        "Conquistas da conta, independentes de quadro: ofensiva (3 a 100 dias), metas do dia batidas, dias estudados, tarefas, assuntos, quizzes, quizzes gabaritados, exercícios e projetos aprovados e trilhas concluídas (300 pontos por trilha). Cada uma vale pontos no total e no nível, uma vez só.",
+        "Vitrine de conquistas na tela Progresso, por categoria, com o progresso das que faltam.",
+        "Pontos de conquista não contam para a meta do dia (senão uma conquista bateria a meta sozinha)."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.3",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Lembretes por notificação push e app instalável no celular.",
+      "itens": [
+        "Na tela Progresso, o botão Ativar lembretes inscreve o aparelho para receber notificações (com explicação para iPhone, onde só funciona com o app instalado).",
+        "O script scripts/lembretes.mjs, no relógio do iMac (meio-dia e 20h), avisa quando a ofensiva está em risco ou o quiz do dia está pendente, no máximo uma vez por tipo por dia, e apaga inscrições expiradas.",
+        "App instalável (manifesto e ícones): abre em tela cheia pela tela de início do celular.",
+        "A chave privada dos lembretes fica num arquivo próprio (.env.lembretes), usado só pelo script: não vai para o Worker."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.2.0-cloudflare-pages.2",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Fases 2 e 3: parte prática (quiz e exercício diários, projetos da semana e do mês com GitHub), mapa da trilha no estilo Duolingo e o mascote Neuro.",
+      "itens": [
+        "Nova aba Prática: por trilha, o quiz e o exercício do dia e os projetos da semana e do mês, com a situação de cada um.",
+        "Quiz do dia: 5 perguntas de múltipla escolha geradas pela IA sobre o assunto atual, uma por vez, com retorno e explicação na hora. A correção é feita no servidor (o gabarito não vai para a tela antes da resposta).",
+        "Exercício do dia: enunciado, exemplo, dicas e critérios gerados pela IA; a pessoa escreve a solução num editor e a Lisa corrige lendo o código (nota, comentário, pontos fortes e melhorias). Até 3 tentativas, vale a melhor nota.",
+        "Projetos da semana e do mês: a IA monta o projeto com os assuntos do período; a entrega é o link de um repositório PÚBLICO do GitHub, que a Lisa lê e avalia requisito por requisito. Até 5 tentativas.",
+        "Pontos da prática: 5 por acerto no quiz (+10 se gabaritar), até 40 no exercício, até 150 no projeto da semana e até 400 no do mês. Tudo conta para a meta do dia e para a ofensiva.",
+        "Mapa da trilha no estilo Duolingo: caminho desenhado em zigue-zague, assuntos como paradas (feito, atual, atrasado, trancado), baú do projeto no fim de cada semana, troféu do projeto do mês e bandeira de chegada. Tocar numa parada abre o assunto com as tarefas para marcar ali mesmo.",
+        "Neuro, o mascote: um cérebro em vetor com sete humores animados (normal, feliz, comemorando, triste, pensando, dormindo, surpreso) que reage a tarefas marcadas, assuntos concluídos, meta batida, acertos e erros no quiz e avaliações; confete nas conquistas grandes.",
+        "Cobrança dentro do app: o Neuro avisa na tela Hoje e na Prática quando a ofensiva está em risco ou o quiz do dia está pendente.",
+        "Tela Hoje mostra a prática do dia de cada trilha; Progresso conta quizzes, exercícios e projetos."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "0.1.0-cloudflare-pages.1",
+      "data": "2026-10-06",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "Primeira versão (fase 1): trilhas de estudo em cima dos quadros STUDY do Abacato, com a parte teórica, pontos, ofensiva e metas.",
+      "itens": [
+        "Login com a mesma conta do Abacato (e-mail e senha), com sessão própria da Lisa_Proof.",
+        "Lista os quadros do Abacato da pessoa cujo nome começa com STUDY; o nome sem o prefixo vira o tema.",
+        "Montagem da trilha: a IA (Gemini) ordena os cards do mais básico ao mais avançado, ignorando as colunas, e distribui nos dias de estudo escolhidos. Sem IA, segue a ordem do quadro.",
+        "Tela Hoje: assuntos do dia, atrasados e concluídos hoje, com as checklists marcáveis — marcar aqui marca o mesmo item no Abacato.",
+        "Assunto com todas as tarefas marcadas é concluído no Abacato; assunto sem tarefas pode ser concluído à mão.",
+        "A Lisa monta a checklist de teoria de um assunto (documentação, fórum, definição com a IA, resumo) e grava no card.",
+        "Explicar com a Lisa: definição, exemplo de código, erros comuns e perguntas de autoavaliação, guardadas para não gastar IA de novo.",
+        "Pontos: 10 por tarefa, 30 por assunto concluído e 20 de bônus ao bater a meta do dia; nível a cada 200 pontos.",
+        "Ofensiva de dias seguidos (com aviso de risco quando o dia ainda não teve estudo) e recorde.",
+        "Metas da semana e do mês em assuntos planejados, contando os atrasados.",
+        "Trilha completa por semana, replanejamento a partir de hoje (com ou sem IA) e ajuste dos dias de estudo.",
+        "Tela Progresso: mapa das últimas 16 semanas, nível, totais, atividade recente e escolha da meta diária.",
+        "Interface responsiva: barra lateral no computador e abas inferiores no celular."
+      ],
+      "issues": []
+    }
+  ],
+  "ficha": {
+    "escopo": {
+      "objetivo": "Criar o hábito de estudo diário — de programação ou de qualquer tema —, usando como conteúdo os quadros de estudo que a pessoa já organiza no Abacato.",
+      "inclui": [
+        "Quadros do Abacato cujo nome começa com STUDY e que pertencem à pessoa logada (dono).",
+        "Criar curso com a Lisa: a IA propõe e, com a aprovação da pessoa, cria o quadro STUDY no Abacato com a trilha pronta.",
+        "Trilha progressiva por quadro, montada pela IA ou pela ordem do quadro, com agenda nos dias de estudo escolhidos.",
+        "Parte teórica: marcar itens de checklist e concluir assuntos direto do app, refletindo no Abacato.",
+        "Checklist de teoria e explicação do assunto geradas pela IA.",
+        "Parte prática amarrada à trilha: quiz e exercício diários sobre o assunto da vez (o quiz com 60%+ conclui o assunto junto com a teoria), um projeto no fim de cada semana do curso, a mesma semana do mapa e da agenda, gerado só dos assuntos dela (usa o que veio antes, não exige o que vem depois), com o assunto de cada requisito na tela e a opção de gerar outro antes da primeira entrega (aprovado, abre a semana seguinte) e o projeto final da trilha, do tamanho do plano, tudo gerado e corrigido pela IA",
+        "Avaliação de projetos a partir de repositórios públicos do GitHub.",
+        "Pontos, nível, ofensiva de dias seguidos, meta diária e metas de semana e mês.",
+        "Conquistas da conta (valem pontos no total) e comemorações em tela cheia de ofensiva, meta e conquista.",
+        "Agenda com todos os compromissos das trilhas, em calendário mensal ou lista.",
+        "Visual premium escuro (padrão: quase preto com brilho e acento lima, cartões de vidro, fontes Nunito e Fredoka, ofensiva com a semana dia a dia) e tema claro na mesma família.",
+        "Mapa da trilha no estilo Duolingo e o mascote Neuro, com animações que reagem ao progresso.",
+        "Lembretes por notificação push (ofensiva em risco, quiz pendente), enviados pelo relógio do iMac.",
+        "Uso no computador, no tablet e no celular, instalável como app; no toque, o caderno e o leitor de PDF se ajustam ao teclado virtual, com atalhos de escrita e zoom com dois dedos.",
+        "Reportar problema com print, que vira chamado no Abacato para quem administra",
+        "Editor de código no exercício e código colorido em todas as telas",
+        "Raio-X do estudante: todos os pontos, notas, ritmo e trilhas num lugar só",
+        "Até 3 quizzes e 3 exercícios por dia por trilha (as rodadas extras valem metade dos pontos)",
+        "Ranking mundial (pontos de sempre, da semana e troféus do Reino), com apelido ou anonimato",
+        "Reino do Neuro: moedas do estudo, construções num mundo 3D, Neuro com níveis e invasões entre jogadores",
+        "Simulação de batalha no Reino (treino sem efeito real), com as regras explicadas",
+        "Vales de moedas para resgatar (o de boas-vindas: 450 moedas para todos)",
+        "Combate no estilo Clash of Clans no Reino: tropas, tropas de defesa, defesas com vida, estrelas e replay das batalhas",
+        "Terreno do Reino (a ilha cresce) e visual por nível nas construções",
+        "Acampamento do Reino: ilhota onde as tropas ficam à vista, com a lotação crescendo por nível; tropas desenhadas como recortes de papel",
+        "Minha conta: trocar a senha (vale no Proof, no Abacato e na Lisa)",
+        "Personagens do Neuro comprados com moedas, usados em todo o app: 12 no total, 5 deles inspirados nos ambientes das expedições (Cogumelo, Mergulhador, Yeti, Magma e Alienígena)",
+        "Dicas da Lisa nos projetos: passo a passo básico, dicas e o que revisar, sem entregar a solução",
+        "Projetos com pontos por requisito, entregas parciais que somam e complexidade ajustável (mais simples sem perder pontos, desafiador valendo 1,5x)",
+        "Botão Rodar nos exercícios do dia: JavaScript e SQL no navegador; C, Python, PHP, Java e outras num compilador on-line",
+        "Expedições do Reino contra a CPU, de graça (nenhuma tropa se perde), 3 por dia, cada uma com dificuldade, recompensa e terreno 3D próprios, e monstros desenhados em 2D",
+        "Guerra entre jogadores com o mesmo reino só a cada 48 h por quem ataca, revanche liberada para quem foi atacado, e só as tropas que caem se perdem",
+        "Modal de novidades na entrada, uma vez por edição",
+        "Paz entre os reinos por votação (100% dos eleitores; vota quem tem 3+ dias de ofensiva de estudo, e a paz vale para todos): sem guerra, todos vizinhos no 3D, mina × o número de reinos e expedições repartidas",
+        "Veículos e combustível no Reino: Barco, Submarino, Dirigível, Tanque de Magma e Nave Estelar, cada um com o seu mapa de expedições e 3 expedições por dia (mais com combustível pago)",
+        "Planetoides sorteados para a Nave Estelar (raça alienígena, força e tesouro aleatórios), com a batalha numa esfera, estilo Mario Galaxy; e o fundo do mar de verdade nas expedições do Submarino",
+        "Mina de Ouro com operários (3 de início) cavando no 3D, chance de diamantes, contratação e aluguel de operários entre jogadores",
+        "Bolsa do Reino em tela própria (/bolsa), estilo home broker: ações iguais para todos, pregão das 07:00 às 17:00 (horário de Brasília) com cotações de hora em hora, gráficos e velas, pregão diário decidido pela Lisa (IA), compra e venda com corretagem",
+        "Mesa dos Consultores na Bolsa: seis personagens projetam o fechamento de cada ação, com margem de erro secreta que muda todo dia, previsões traçadas no gráfico da ação (hora a hora e por pregão), placar depois das 17h e retrospecto dos últimos pregões",
+        "Tela cheia do Reino com menus suspensos e visita completa aos reinos vizinhos durante a paz",
+        "Neuro Abacate (mascote do Abacato), personagem gratuito para todos",
+        "Reino de Teste (/reino/teste e /bolsa/teste): um mundo à parte com tudo liberado, rivais-robô e ferramentas para zerar os limites do dia e recomeçar; nada dele vale no jogo de verdade (liberado para todos por enquanto; desliga com PROOF_MODO_TESTE=0)",
+        "Modo Domínio (/dominio): torre de 10 a 100 andares para dominar um repositório público do GitHub ou do GitLab; desafio por andar, entrega por commit numa branch, avaliação da IA, luta do Neuro com o chefão, prêmios para o Reino e certificado em PDF com página pública de conferência (/certificado/<código>)",
+        "Chefões do Modo Domínio como avatares (personagens que não se compram, ganhos no topo de uma torre Mestre)",
+        "Cadernos de anotação (/cadernos) no estilo Notepad++: módulos e páginas, cor de sintaxe por linguagem (Markdown, JavaScript, Python, SQL e outras), abas, buscar e substituir, prévia, gravação automática com proteção contra sobrescrita",
+        "Vínculos do caderno (inteiro, módulo ou página) com trilhas e cursos, assuntos, torres e andares do Modo Domínio e livros (até a página), com o bloco “📓 Anotações” e o “Anotar aqui” em cada um desses lugares",
+        "Biblioteca de PDFs (/biblioteca) com leitor: destaque em cores, sublinhado, notas, marcação de área, marcador de página, sumário, miniaturas, busca no texto, temas de leitura e trechos mandados para o caderno",
+        "Cursos gerados a partir de um livro da biblioteca, seguindo os capítulos, com as páginas de cada assunto; a explicação, o quiz e o exercício do assunto usam o trecho do livro",
+        "Estante virtual da Biblioteca: livros em 3D nas prateleiras, com lombada (cor da capa, título, marcador de leitura, selo de lido, 🎓 de curso), capa ao puxar e destaque com as ações",
+        "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link e vídeos (YouTube/Vimeo), com revisão do bibliotecário (o administrador, que libera qualquer envio, e o líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu; Modo cinema (sala 3D com a plateia de avatares) para os vídeos",
+        "Instalável como app (manifesto e ícones já existiam; agora com o botão \"Instalar app\" na própria tela).",
+        "Mercado de tropas no Reino: vender tropas do exército ou da defesa (saem na hora e liberam espaço) e comprar as que outros reinos anunciaram",
+        "Tipos de curso além de programação (música, idiomas, matemática e livre), com exercício do dia próprio (lista de cálculo, ditado, treino de ouvido, desafio aberto) e projetos entregues por texto, fotos, áudio ou vídeo do YouTube, avaliados pela IA",
+        "Ritmo e afinação ao vivo nos cursos de música, cartões com repetição espaçada (SM-2), revisão da turma (colegas confirmam critérios contestados, sem nomes) e o Modo Domínio de tema (torres de repertório, QECR, problemas e missões, entregues por evidências)",
+        "Conversa com a Lisa (idiomas), passo a passo conferido linha a linha e gráficos de arrastar (matemática), leitura na pauta (música), diário de estudo, entrega em PDF, frase-senha nas gravações e fotos, e a torre do Modo Domínio feita a partir de um livro da Biblioteca",
+        "Exercício de desenhar diagramas (fluxograma, BPMN, UML, modelo de dados, arquitetura de software e de nuvem, C4) num quadro embutido, avaliado pela Lisa, nos cursos de computação, arquitetura e áreas próximas",
+        "Tela Chamados: quem reportou acompanha status, previsão de término e respostas; o técnico (administrador) vê todos e muda status, previsão e responde (os chamados são cards do quadro \"Chamados — Lisa Proof\" no Abacato)",
+        "A Lisa jogadora: uma conta-robô que estuda e joga sozinha (curso do mês, quiz, exercício, projeto, minigame do dia, Reino, ilhas, Bolsa, correio, caderno, e vídeos e artigos da internet sugeridos no Acervo todo dia), várias vezes por dia pelo relógio da nuvem (uma jogada a cada 30 minutos, sempre alguma coisa), com tudo visível na página \"Lisa joga\" e o aviso de quando ela está jogando",
+        "Correio entre jogadores: recados avaliados por quem recebe (útil dá moedas aos dois) e até 2 perguntas do quiz do dia mandadas para outros jogadores (o quiz fecha com 3 respondidas, valendo menos)",
+        "Modo espectador: ver o Proof da Lisa jogadora por dentro (as mesmas telas, só leitura)",
+        "Presentes: itens guardados para um jogador (hoje, personagens), abertos por ele na área Presentes",
+        "Clima do Reino: dia e noite pela hora de Brasília e o tempo (chuva, neve, vento, tempestade) por blocos de 3 horas, iguais para todos",
+        "Humor do Neuro: a ofensiva de estudo faz o mascote evoluir (bônus na mina); dias sem estudo o revoltam e fecham as expedições",
+        "Forja de Artefatos, dentro do Reino (aba Forja): mana dos pontos de estudo para forjar a Poção de Foco (+50% por 2 h) e o Escudo de Folga (24 h sem invasões), com os artefatos em efeito como selos sobre o mundo 3D",
+        "Chefões da Procrastinação: o atraso de estudo vira um chefão no mapa do Reino, derrubado com estudo e Cadernos, com recompensa em moedas",
+        "Duelo de Lógica com a Lisa: perguntas rápidas de código e raciocínio, com aposta de moedas contra o reino dela",
+        "Temporada das Ilhas, como Grandes Expedições dentro do Reino: arquipélago para conquistar com navio e tripulação, a ilha em 3D no mesmo estilo do reino (construções e guardas), construção com conchas, produção, invasão entre jogadores e pactos individuais",
+        "Minigame do dia na Prática (a antiga Arena Lúdica): masmorra de depuração, mascote programável e quebra-cabeças de Parsons, com terminal, explicação da Lisa, +30 pontos uma vez por dia e recompensa por fase nova",
+        "Exemplo da Lisa: uma aplicação de exemplo com os conceitos de cada exercício e projeto, sem resolver o desafio",
+        "Menu do Reino em abas (Reino, Batalha, Expedições, Forja e Bolsa), com contadores e barra fixa ao rolar"
+      ],
+      "naoInclui": [
+        "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
+        "Não lê repositórios privados do GitHub nem do GitLab, nem com token configurado; do GitLab, só gitlab.com (instâncias próprias ficam de fora).",
+        "Lembretes dependem do iMac ligado: o envio roda no relógio (crontab) dele, não na Cloudflare.",
+        "Quadros em que a pessoa é só membro (não dona) não viram trilha.",
+        "Não apaga quadros nem cards do Abacato; só cria quadros quando a pessoa aprova um curso proposto pela Lisa.",
+        "Não conclui cards recorrentes do Abacato (o ciclo deles é do Abacato).",
+        "Não tem cadastro próprio: a conta é criada no Abacato.",
+        "Moedas do Reino não se compram nem se trocam por dinheiro: só vêm do estudo, da mina e dos saques.",
+        "O ranking não mostra nome completo nem e-mail de ninguém.",
+        "O Reino de Teste não passa nada para o reino de verdade (moedas, tropas, veículos, carteira) e não entra no ranking.",
+        "O projeto do mês não é mais gerado: deu lugar ao projeto final de cada trilha. Os que já existiam continuam no histórico.",
+        "No Modo Domínio, a Lisa não roda o código nem faz commits: lê o que mudou na branch da pessoa e avalia.",
+        "A página de conferência do certificado não mostra nome completo nem e-mail (só o nome público).",
+        "PDF escaneado (só imagem, sem texto) dá para ler e marcar por área, mas não serve de base para gerar curso nem para a busca: o Proof não faz OCR.",
+        "Os PDFs não são compartilhados entre contas: a biblioteca é de quem subiu; o limite é de 50 MB por arquivo e 2 GB por pessoa (o disco é o do servidor de casa).",
+        "Cadernos não são editados por mais de uma pessoa ao mesmo tempo nem guardam histórico de versões: a versão serve só para não apagar o que outra aba gravou.",
+        "A Biblioteca Colaborativa não confere direitos autorais automaticamente: aceita qualquer PDF (decisão do dono) e depende do bibliotecário, que pode retirar um material a qualquer momento.",
+        "Na Biblioteca Colaborativa, os avatares não andam ao vivo (não se vê quem está online agora); a interação é com quem contribuiu.",
+        "Não guarda as fotos nem os áudios das entregas: vão só para a avaliação da IA; ficam a nota, o texto e uma miniatura das fotos.",
+        "A revisão da turma não vê fotos inteiras nem ouve áudios (eles não são guardados): só o texto, o link do vídeo e as miniaturas.",
+        "A conversa com a Lisa é por escrito (a voz do navegador lê as falas dela, mas a pessoa não fala no microfone nessa conversa)."
+      ]
+    },
+    "stack": [
+      "Next.js 15 (App Router) e React 19, em JavaScript",
+      "Cloudflare Workers via @opennextjs/cloudflare",
+      "@supabase/supabase-js (PostgREST com a service role)",
+      "Google Gemini pela API REST, com rodízio de chaves e respostas em JSON com esquema",
+      "APIs do GitHub e do GitLab (leitura de repositórios públicos, ponta de branch e comparação de commits)",
+      "Web Push (VAPID) com a biblioteca web-push, no script de lembretes do iMac; service worker e manifesto de app",
+      "Animações em SVG e CSS, sem biblioteca (mascote Neuro e mapa da trilha)",
+      "PBKDF2 e HMAC via WebCrypto (login e sessão, mesmo esquema do Abacato)",
+      "CodeMirror 6 (editor de código e cores por linguagem; cada linguagem é carregada só quando aparece)",
+      "Three.js 0.170 (o mundo 3D do Reino, carregado só nessa tela)",
+      "PDF do certificado montado à mão no navegador (src/dominio/pdf.js); a leitura de PDF da biblioteca usa o pdf.js",
+      "pdf.js (pdfjs-dist 5.7.284) no navegador: leitor, camada de texto selecionável, sumário, capa e extração do texto ao subir",
+      "@codemirror/lang-markdown 6.5.2 (Markdown no caderno, com os blocos de código coloridos pela linguagem)",
+      "Supabase Storage (bucket privado proof-biblioteca) com endereços assinados de envio e de leitura",
+      "Web Audio, MediaRecorder, SpeechSynthesis e getUserMedia no navegador (treino de ouvido, metrônomo, detecção de altura para a afinação, gravação convertida para WAV de 16 kHz e a voz do ditado)",
+      "Quadro de diagramas reaproveitado do ProcessMap (JavaScript puro e SVG, sem dependências), servido como arquivo estático em public/diagramas e embutido num iframe do mesmo endereço",
+      "Fontes Nunito (texto), Fredoka (títulos e números) e Noto Color Emoji (os emojis num estilo só), pelo Google Fonts, e tokens de cor em CSS (src/app/globals.css: --pf-*), com o tema escuro premium como padrão",
+      "Cron Triggers da Cloudflare (worker-proof.js: o Worker do OpenNext mais o gatilho de horário que chama a rodada da Lisa)"
+    ],
+    "arquitetura": {
+      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005). Toda compra ou coleta de uma pessoa grava o reino e lança as moedas numa transação só, pela função proof_lancar_e_gravar (db/025), que só grava se a versão do reino for a lida; as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do curso (a semana de cada assunto no agendamento, a mesma do mapa e da agenda), o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check. O Modo Domínio (db/018) guarda a torre em proof_dominios e cada andar em proof_dominio_andares; as regras (níveis, chefões, pontos, luta, prêmios, conferência da IA) são puras em src/dominio/modoDominio.js, a IA em src/lib/iaDominio.js, o GitHub e o GitLab em src/lib/repositorios.js (só github.com e gitlab.com) e o caminho até o banco em src/lib/dominio.js. Cada passo que gasta IA tem trava contra clique duplo (gravação condicional ao estado lido), e só quem move a torre de andar paga o prêmio do marco. Os prêmios entram no Reino de verdade por premiarDoDominio (src/lib/reino.js), respeitando as capacidades das reservas. O certificado é desenhado num canvas e embrulhado em PDF no navegador; /certificado e /api/certificado são as únicas rotas novas sem login. A biblioteca guarda os PDFs no Storage do mesmo Supabase (bucket privado proof-biblioteca, no disco do iMac): o servidor confere o dono e assina endereços de vida curta, e o navegador envia e lê o arquivo direto, sem o PDF passar pelo Worker. O texto de cada página fica em proof_livro_paginas, e o corte dos trechos (curso, quiz, explicação) e a busca rodam em funções do Postgres, para caber no processamento curto do Worker gratuito. A Biblioteca Colaborativa guarda o acervo em proof_acervo e as gorjetas em proof_acervo_gorjetas (db/020-biblioteca-colaborativa.sql); os PDFs ficam no bucket privado proof-acervo, e o livro levado para a biblioteca pessoal aponta para o mesmo arquivo (proof_livros.acervo_id). O exercício de desenhar diagramas usa o quadro estático de public/diagramas (fora do middleware de sessão) dentro de um iframe: a tela conversa com ele por window.PonteDoProof, guarda o rascunho no navegador e manda o documento do quadro para a API; o servidor confere o tamanho, tira as imagens coladas, guarda o documento no desafio e a Lisa avalia a descrição em texto do desenho (src/dominio/diagramas.js). A Lisa jogadora roda no relógio do iMac (scripts/lisa-joga.mjs, chamando as mesmas funções das telas direto no banco) e anota o que faz em proof_lisa_diario (db/026). A Lisa jogadora roda na nuvem: o worker-proof.js embrulha o Worker do OpenNext e, a cada 30 minutos (triggers.crons no wrangler.jsonc), chama POST /api/lisa/rodada com o segredo PROOF_SEGREDO_DO_RELOGIO (guardado como segredo do Worker; a rota passa pelo portão de login, que não vê sessão no relógio, e confere o segredo ela mesma); a rodada (src/lib/lisaRotina.js) faz uma jogada: a que está na vez da agenda e espera há mais tempo, ou uma da reserva (src/dominio/lisaJogadora.js) e anota no diário (proof_lisa_diario). O minigame do dia vale pontos pelo evento \"arena\" (db/031).",
+      "diagramas": [
+        {
+          "titulo": "Visão geral",
+          "mermaid": "flowchart LR\n  U[Navegador / celular] --> W[Worker lisa-proof\\nproof.beyond.dev.br]\n  W -->|HTTP / PostgREST| T[Túnel\\nbanco.beyond.dev.br]\n  T --> PG[(Postgres do iMac\\ntabelas abacato_ e proof_)]\n  A[Abacato\\nabacato.beyond.dev.br] --> T\n  W --> G[Google Gemini]"
+        }
+      ]
+    },
+    "hospedagem": [
+      {
+        "ambiente": "Produção",
+        "onde": "Cloudflare Workers (plano gratuito), conta beyondbitsLisa, Worker lisa-proof, publicado com npm run publicar",
+        "url": "https://proof.beyond.dev.br/",
+        "verificar": true
+      },
+      {
+        "ambiente": "Produção (endereço reserva)",
+        "onde": "Cloudflare Workers, mesmo Worker lisa-proof no endereço .workers.dev",
+        "url": "https://lisa-proof.beyondbitslisa.workers.dev/",
+        "verificar": true
+      },
+      {
+        "ambiente": "Relógio dos lembretes",
+        "onde": "iMac do servidor de casa (Zorin OS), crontab ao meio-dia e às 20h rodando npm run lembretes na pasta lisa-proof",
+        "url": "",
+        "verificar": false
+      },
+      {
+        "ambiente": "Relógio da Lisa jogadora",
+        "onde": "Cloudflare Workers, gatilho de horário do próprio Worker lisa-proof (a cada 30 minutos), chamando a rodada protegida por segredo",
+        "url": "",
+        "verificar": false
+      }
+    ],
+    "bancoDeDados": [
+      {
+        "nome": "Banco da Lisa (servidor de casa)",
+        "tipo": "PostgreSQL 17.6 em Supabase auto-hospedado (Docker)",
+        "servidor": "banco.beyond.dev.br",
+        "porta": 443,
+        "base": "postgres",
+        "acesso": "",
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/031; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
+      }
+    ],
+    "integracoes": [
+      {
+        "nome": "Abacato",
+        "descricao": "Fonte dos quadros STUDY e das contas de usuário. A Lisa_Proof marca itens e conclui cards direto nas tabelas do Abacato. Também recebe os chamados do \"Reportar problema\": um card por relato no quadro \"Chamados — Lisa Proof\" do administrador, com o print no bucket privado dos comentários.",
+        "url": "https://abacato.beyond.dev.br"
+      },
+      {
+        "nome": "Google Gemini",
+        "descricao": "Monta a ordem da trilha, gera checklists de teoria, explica os assuntos, gera quiz, exercício, projetos e cartões, conversa no papel nos cursos de idiomas e corrige as entregas (código, texto, fotos, áudio, PDF e vídeo do YouTube por link, conferindo a frase-senha); analisa, monta e avalia as torres do Modo Domínio (de repositório e de tema); abre o pregão diário da Bolsa do Reino.",
+        "url": "https://ai.google.dev"
+      },
+      {
+        "nome": "GitHub",
+        "descricao": "Leitura de repositórios públicos entregues nos projetos da semana e do mês, e no Modo Domínio (código, ponta da branch do desafio e comparação de commits). GITHUB_TOKEN é opcional e só aumenta o limite de consultas.",
+        "url": "https://api.github.com"
+      },
+      {
+        "nome": "Wandbox",
+        "descricao": "Compilador on-line gratuito (sem chave) usado pelo botão Rodar dos exercícios em C, Python, PHP, Java, C# e outras linguagens. O servidor do Proof envia só o código e a entrada digitada; há um freio de 30 execuções a cada 10 minutos por pessoa. Também confere as fases da Arena Lúdica (Node 20) antes de pagar a recompensa.",
+        "url": "https://wandbox.org"
+      },
+      {
+        "nome": "jsDelivr (sql.js)",
+        "descricao": "De onde o navegador baixa o SQLite em WebAssembly (sql.js 1.10.3) na primeira vez que alguém roda um exercício de SQL.",
+        "url": "https://www.jsdelivr.com/package/npm/sql.js"
+      },
+      {
+        "nome": "GitLab",
+        "descricao": "Modo Domínio: leitura de projetos públicos do gitlab.com (código, ponta da branch e comparação de commits), sem token.",
+        "url": "https://gitlab.com/api/v4"
+      },
+      {
+        "nome": "Supabase Storage",
+        "descricao": "Os PDFs da biblioteca (bucket privado proof-biblioteca): envio e leitura por endereço assinado pelo servidor, depois de conferir o dono.",
+        "url": ""
+      },
+      {
+        "nome": "Busca na internet (Lisa)",
+        "descricao": "A Lisa jogadora procura vídeos e artigos para sugerir no Acervo: DuckDuckGo (página HTML), resultados do YouTube, a busca do MDN e a da Wikipédia em português. Só leitura, sem chave; poucas buscas por dia; o que ela acha passa pelo bibliotecário.",
+        "url": ""
+      }
+    ],
+    "links": [
+      {
+        "titulo": "Repositório",
+        "url": "https://github.com/beyondBitsLtda/beyond-assist/tree/cloudflare-pages/Abacatosys/lisa-proof"
+      },
+      {
+        "titulo": "Produção",
+        "url": "https://proof.beyond.dev.br/"
+      }
+    ],
+    "contatos": [
+      {
+        "papel": "Responsável técnico",
+        "nome": "Brayan Rodrigues"
+      }
+    ]
+  }
+}

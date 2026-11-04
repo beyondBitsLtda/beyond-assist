@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CY, GR, OR, mono } from "@/lib/theme.js";
 import { recordGame } from "@/lib/gameHistory.js";
 import { sendDiscSignal, pollDiscSignals } from "@/lib/discSignals.js";
+import { abaVisivel, criarRitmo } from "@/lib/ritmoDePoll.js";
 import { NALA, DISC, Z_GLYPH, POOP_PILE, PUDDLE, ANTICS } from "./nalaSprites.js";
 import {
   FW, FH, GROUND, NALA_H,
@@ -26,7 +27,12 @@ import {
 // em src/lib/discPhysics.js, fora do laço de desenho, pra poder ser testada.
 
 const THROWS_PER_ROUND = 5;
-const POLL_MS = 700;
+// Rápido enquanto a partida acontece, desacelerando sozinho quando ninguém joga. A 0,7s fixos,
+// uma aba esquecida aberta gastava 123 mil chamadas por dia — mais que a cota diária inteira do
+// plano gratuito da Cloudflare, e quando ela estoura TODOS os painéis param. Ver
+// src/lib/ritmoDePoll.js.
+const POLL_RAPIDO_MS = 700;
+const POLL_LENTO_MS = 8000;
 const HELLO_MS = 6000;
 const PEER_TTL_MS = 16000;
 
@@ -389,6 +395,11 @@ export default function LisaDisc({ onMood }) {
   const roleRef = useRef(role);
   roleRef.current = role;
   const pendingRef = useRef(null); // id do lance esperando resposta
+  // o ritmo de consulta do laço de sinais — guardado em ref pra dar pra acordar de fora dele.
+  // Tem que morar AQUI, no mesmo componente do laço (e de throwDisc/reportResult). Declarado no
+  // NalaField, como estava, o nome não existia neste escopo: escolher qualquer papel lançava
+  // ReferenceError no efeito de escuta e derrubava a página inteira (BEYOND-0002).
+  const ritmoRef = useRef(null);
   const onMoodRef = useRef(onMood);
   onMoodRef.current = onMood;
 
@@ -440,7 +451,14 @@ export default function LisaDisc({ onMood }) {
       }
     };
 
+    const ritmo = criarRitmo({ rapido: POLL_RAPIDO_MS, lento: POLL_LENTO_MS });
+    ritmoRef.current = ritmo;
     const loop = async () => {
+      // aba escondida não tem ninguém olhando: espera o ritmo lento e nem consulta
+      if (!abaVisivel()) {
+        if (!stop) timer = setTimeout(loop, POLL_LENTO_MS);
+        return;
+      }
       try {
         const { now, signals } = await pollDiscSignals(since);
         since = now;
@@ -448,10 +466,12 @@ export default function LisaDisc({ onMood }) {
         if (primed) signals.forEach(handle);
         primed = true;
         setError(null);
+        ritmo.registrar(signals.length);
       } catch (err) {
         setError(String(err.message || err));
+        ritmo.registrar(0);
       }
-      if (!stop) timer = setTimeout(loop, POLL_MS);
+      if (!stop) timer = setTimeout(loop, ritmo.intervalo);
     };
     loop();
 
@@ -476,10 +496,14 @@ export default function LisaDisc({ onMood }) {
     pendingRef.current = id;
     setStatus(linkedRef.current ? "DISCO A CAMINHO…" : "TREINO — NINGUÉM DO OUTRO LADO PRA PEGAR");
     onMoodRef.current?.("focused");
+    // lançou: a resposta do outro aparelho vem em seguida, então volta ao ritmo rápido na hora
+    // em vez de esperar o laço perceber sozinho
+    ritmoRef.current?.acordar();
     sendDiscSignal("throw", { id, angle: Math.round(g.angle), power: Math.round(g.power) });
   }, []);
 
   const reportResult = useCallback((r) => {
+    ritmoRef.current?.acordar();
     sendDiscSignal("result", r);
   }, []);
 

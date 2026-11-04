@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase.js";
 import { jsonResponse } from "@/lib/http.js";
 import { GEMINI_KEY_COUNT, GEMINI_MODELS } from "@/lib/gemini.js";
+import { GROQ_KEY_COUNT, GROQ_MODELS } from "@/lib/groq.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,21 @@ export async function GET() {
       .from("gemini_key_health")
       .select("key_index, model, cooldown_until, reason, last_error, updated_at");
     if (error) throw new Error(error.message);
-    return jsonResponse({ ok: true, keyCount: GEMINI_KEY_COUNT, models: GEMINI_MODELS, health: data || [] });
+    // `provedores` é a forma nova; `keyCount`/`models` continuam por compatibilidade com
+    // qualquer aba aberta com a versão anterior do painel — trocar as duas coisas ao mesmo
+    // tempo deixaria o painel em branco até a pessoa recarregar, sem dizer por quê.
+    const provedores = [
+      { id: "gemini", label: "GEMINI", keyCount: GEMINI_KEY_COUNT, models: GEMINI_MODELS },
+      { id: "groq", label: "GROQ", keyCount: GROQ_KEY_COUNT, models: GROQ_MODELS },
+    ].filter((p) => p.keyCount > 0);
+
+    return jsonResponse({
+      ok: true,
+      keyCount: GEMINI_KEY_COUNT,
+      models: GEMINI_MODELS,
+      provedores,
+      health: data || [],
+    });
   } catch (err) {
     return jsonResponse({ ok: false, error: String(err?.message || err) }, 500);
   }

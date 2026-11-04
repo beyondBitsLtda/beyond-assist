@@ -250,7 +250,7 @@ export default function ScheduledAnnouncementsPage() {
           </button>
 
           <div style={{ fontSize: 10.5, color: "rgba(207,239,251,0.4)", marginTop: 14, lineHeight: 1.5 }}>
-            Verificado a cada minuto pelo cron que já roda (mesmo do Sentinela/Trello). Escolher
+            Verificado a cada minuto pelo cron que já roda (mesmo do Sentinela/Abacato). Escolher
             um escopo aqui já é o consentimento — não passa pela pergunta "quer que eu leve em
             conta a Delp?" que existe só pra perguntas espontâneas.
           </div>

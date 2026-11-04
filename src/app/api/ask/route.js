@@ -1,13 +1,107 @@
 import {
-  detectDateRange, buildPrompt, todayLabel, withPersona, withContextDocs,
+  detectDateRange, buildPrompt, todayLabel, withPersona, withContextDocs, retrieve,
 } from "@/lib/rag.js";
 import { chatStream, detectTrelloAction } from "@/lib/gemini.js";
 import { buildActionProposal, buildClarifyPrompt, executeAction } from "@/lib/assistantActions.js";
 import { hasDelpTasks, getDelpTasksForContext } from "@/lib/delpTasks.js";
 import { resolveScope } from "@/lib/scopeResolver.js";
+import { turnosValidos, blocoDaConversa, consultaDeBusca } from "@/lib/conversa.js";
+import { fonteDosQuadros } from "@/lib/configLisa.js";
+import { pareceAcao, pendenteValida } from "@/lib/acoesNoAbacato.js";
+import { tratarAcaoNoAbacato } from "@/lib/fluxoDeAcoesNoAbacato.js";
+import { comCodigoNaTela, secaoDoCodigoDaConversa } from "@/lib/codigoNaResposta.js";
+import { secaoDoDiagrama, filtroDaMarca } from "@/lib/diagramaDaLisa.js";
+import { secaoDoProjeto } from "@/lib/processmapNaConversa.js";
+import { webDaPergunta, fontesDaBusca } from "@/lib/buscaNaWeb.js";
+import { contextoDosRepositorios } from "@/lib/repositorioNaConversa.js";
+import { notaDasImagens, imagensValidas } from "@/lib/contextoDaConversa.js";
+import { sessaoDe } from "@/lib/papelNaSessao.js";
+import { usarDoDia } from "@/lib/usoDoDia.js";
+import { lerPerfil } from "@/lib/perfilDoUsuario.js";
+import { INSTRUCAO_DO_USUARIO, secaoDoPerfil, promptDoUsuario } from "@/lib/modoUsuario.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const CABECALHOS_SSE = { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", connection: "keep-alive" };
+
+/** O erro do Gemini numa frase para a pessoa (o mesmo para o admin e o usuário). */
+function erroAmigavel(err) {
+  const keySuffix = err?.keyLabel ? ` [${err.keyLabel}]` : "";
+  if (err?.code === "QUOTA") return `⚠️ Quota do Gemini cheia${keySuffix}. Aguarde cerca de 1 minuto e pergunte de novo.`;
+  if (err?.code === "UNAVAILABLE") return `⚠️ O Gemini está com alta demanda no momento${keySuffix} (já tentei de novo automaticamente). Espere um instante e pergunte de novo.`;
+  if (/too many subrequests/i.test(String(err?.message || err))) return "⚠️ Esta pergunta precisou de mais chamadas de rede do que o servidor deixa fazer de uma vez. Pergunte de novo; se repetir, tire uma imagem do contexto.";
+  return String(err?.message || err);
+}
+
+/**
+ * Manda os pedaços da resposta sem a marca [[DESENHAR]] (02/11/2026): a Lisa a escreve quando entendeu
+ * um pedido de desenho que veio parar na conversa e perguntou "Posso fazer?" — aí a página recebe o
+ * evento "desenho" e guarda o pedido, e o "sim" seguinte desenha (src/lib/codigoNaResposta.js).
+ */
+async function falarSemAMarca(controller, send, pedacos) {
+  const filtro = filtroDaMarca();
+  let falou = false;
+  for await (const piece of pedacos) {
+    const t = filtro.passar(piece);
+    if (t) { send(controller, "token", t); falou = true; }
+  }
+  const { resto, marcou } = filtro.fim();
+  if (resto) { send(controller, "token", resto); falou = true; }
+  if (marcou) send(controller, "desenho", { pedir: true });
+  // O Gemini às vezes termina sem texto nenhum (bloqueio, limite gasto pensando): sem isto a resposta
+  // chegava vazia e a janela ficava em "processando" (BEYOND-0011).
+  if (!falou) send(controller, "token", RESPOSTA_VAZIA);
+}
+
+const RESPOSTA_VAZIA = "Não consegui formar uma resposta agora (o modelo devolveu vazio). Pergunte de novo, de outro jeito se puder.";
+
+/**
+ * A conversa do USUÁRIO do MVP (01/11/2026: "quando um usuário que não seja eu logar, ele tem acesso a
+ * uma versão limitada"). Sem a base de conhecimento do admin (os documentos dele), sem o Abacato, a
+ * Delp, a persona e o contexto pessoal dele. Com o perfil da entrevista, o Modo Tela
+ * (as imagens), os repositórios públicos que a tela leu antes
+ * (/api/repos/contexto, sem o token do admin), o código da conversa, o quadro e o projeto do ProcessMap
+ * dela. Conta no limite do dia (src/lib/usoDoDia.js).
+ */
+function conversaDoUsuario(req, body, question, images, dono) {
+  const encoder = new TextEncoder();
+  const send = (controller, event, data) => controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        send(controller, "context", []);
+        const limite = await usarDoDia(req, "pergunta");
+        if (limite) {
+          send(controller, "token", limite.erro);
+          send(controller, "done", { ok: true });
+          return;
+        }
+        const perfil = dono ? await lerPerfil(dono).catch(() => null) : null;
+        const turnos = turnosValidos(body.history?.turnos);
+        const web = await webDaPergunta(question, { turnos, ferramentasDoEscopo: [{ googleSearch: {} }] });
+        if (web.pesquisa) send(controller, "pesquisa", { consulta: web.pesquisa.consulta, buscador: web.pesquisa.buscador, total: web.pesquisa.resultados.length, lidas: web.paginas.length, erros: web.pesquisa.erros });
+        const nota = [notaDasImagens(images), web.nota].filter(Boolean).join("\n\n") || null;
+        const secaoDosRepos = typeof body.contextoDosRepos?.secao === "string" ? body.contextoDosRepos.secao.slice(0, 170_000) : "";
+        const prompt = promptDoUsuario(question, {
+          hoje: todayLabel(), nota, conversa: blocoDaConversa(turnos),
+          extra: secaoDoCodigoDaConversa(body.codigo) + secaoDoDiagrama(body.diagrama) + secaoDoProjeto(body.projeto) + secaoDosRepos,
+        });
+        const instrucao = comCodigoNaTela(INSTRUCAO_DO_USUARIO + secaoDoPerfil(perfil));
+        const metadados = [];
+        await falarSemAMarca(controller, send, chatStreamWithFallback(prompt, instrucao, web.ferramentas, images, (m) => metadados.push(m)));
+        const fontes = fontesDaBusca(metadados, 6, web.fontes);
+        if (fontes.length) send(controller, "fontes", fontes);
+        send(controller, "done", { ok: true });
+      } catch (err) {
+        send(controller, "error", { message: erroAmigavel(err) });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, { headers: CABECALHOS_SSE });
+}
 
 /**
  * Gera a resposta com `tools` (grounding via Google Search); se a chamada falhar, tenta
@@ -49,8 +143,8 @@ function looksLikeTasksQuestion(question, scope) {
   return !!detectDateRange(question);
 }
 
-async function* chatStreamWithFallback(prompt, systemInstruction, tools, images) {
-  const primary = chatStream(prompt, systemInstruction, { tools, images });
+async function* chatStreamWithFallback(prompt, systemInstruction, tools, images, aoMetadados) {
+  const primary = chatStream(prompt, systemInstruction, { tools, images, aoMetadados });
   let yieldedAny = false;
   try {
     for await (const piece of primary) {
@@ -107,9 +201,10 @@ export async function POST(req) {
   // usuário respondeu à pergunta de consentimento, não fez uma pergunta nova de verdade.
   let { question, scope = null, personaMode = false } = body;
   let delpConsent = false; // só vira true se o usuário confirmar explicitamente nesta troca
-  // uma ou mais imagens: câmera (Modo Observância) e/ou captura de tela (Modo Tela) — cada
-  // uma valida sozinha, entradas malformadas simplesmente não entram na lista.
-  const images = Array.isArray(rawImages) ? rawImages.filter((img) => img?.data && img?.mimeType) : [];
+  // uma ou mais imagens: as que a pessoa anexou (o + da barra, ou Ctrl+V), a câmera (Modo
+  // Observância) e/ou a captura de tela (Modo Tela) — cada uma valida sozinha, entradas
+  // malformadas simplesmente não entram na lista. Cada uma diz de onde veio (`origem`).
+  const images = imagensValidas(rawImages);
 
   if (!question || typeof question !== "string") {
     return new Response(JSON.stringify({ error: "question é obrigatório" }), {
@@ -117,6 +212,10 @@ export async function POST(req) {
       headers: { "content-type": "application/json" },
     });
   }
+
+  // o USUÁRIO do MVP (01/11/2026) tem a conversa dele, sem nada do admin — ver conversaDoUsuario
+  const sessao = sessaoDe(req);
+  if (sessao.papel === "usuario") return conversaDoUsuario(req, body, question, images, sessao.dono);
 
   const encoder = new TextEncoder();
   const send = (controller, event, data) =>
@@ -141,7 +240,7 @@ export async function POST(req) {
           // nem sim nem não reconhecido — trata como uma pergunta NOVA (abandona o
           // consentimento pendente) em vez de travar esperando um formato de resposta que
           // talvez nunca venha
-        } else if (!pendingAction && looksLikeTasksQuestion(question, scope) && await hasDelpTasks()) {
+        } else if (!pendingAction && !pareceAcao(question) && looksLikeTasksQuestion(question, scope) && await hasDelpTasks()) {
           send(controller, "context", []);
           send(controller, "action", { pending: { type: "delp_consent", originalQuestion: question, scope, personaMode } });
           send(controller, "token", "Antes de continuar — quer que eu leve em conta também as tarefas da Delp?");
@@ -149,11 +248,43 @@ export async function POST(req) {
           return;
         }
 
-        // ---- ações no Trello: detecta ANTES do fluxo normal, só quando faz sentido tentar ----
-        const candidateCards = (history?.cards || []).filter((c) => c.source === "TRELLO" && c.id);
+        // ---- ações no Abacato (criar, editar, concluir, reabrir, mover, arquivar) ----
+        // Antes da resposta normal, em qualquer modo. Ver src/lib/fluxoDeAcoesNoAbacato.js.
+        const fonte = await fonteDosQuadros().catch(() => "abacato");
+        if (fonte === "abacato" && pendingAction?.type !== "delp_consent") {
+          const pendente = pendenteValida(pendingAction);
+          if (pareceAcao(question, !!pendente)) {
+            let r = { respondeu: false };
+            try {
+              r = await tratarAcaoNoAbacato({
+                pergunta: question,
+                history,
+                pendente,
+                quadroPadrao: scope?.mode === "panel" && scope?.board ? scope.board : null,
+                // o rascunho de um card ("um pitch de vendas") é escrito com o que ela sabe do assunto
+                buscar: (texto) => retrieve(texto, { topK: 12, minSim: 0.25 }),
+              });
+            } catch (err) {
+              // O pedido de ação falhar não pode derrubar a conversa: segue para a resposta normal,
+              // mas avisa no registro o motivo de verdade.
+              // Um rascunho aberto não se perde por uma falha (Gemini sobrecarregado): fica pendente.
+              send(controller, "action", { pending: pendente?.type === "abacato_rascunho" ? pendente : null, debug: true, detectError: String(err?.message || err) });
+            }
+            if (r.respondeu) {
+              send(controller, "context", r.cards || []);
+              send(controller, "action", { pending: r.pending || null });
+              send(controller, "token", r.texto);
+              send(controller, "done", { ok: true });
+              return;
+            }
+          }
+        }
+
+        // ---- ações no Trello (só quando a fonte dos quadros é o Trello) ----
+        const candidateCards = fonte === "trello" ? (history?.cards || []).filter((c) => c.source === "TRELLO" && c.id) : [];
         // exclui explicitamente o consentimento da Delp (não é uma ação do Trello — evita
         // gastar uma chamada do Gemini tentando interpretar "sim"/"não" como ação de card)
-        const shouldCheckAction = pendingAction?.type !== "delp_consent" &&
+        const shouldCheckAction = fonte === "trello" && pendingAction?.type !== "delp_consent" &&
           (candidateCards.length || pendingAction) && mightBeAction(question, !!pendingAction);
         if (shouldCheckAction) {
           // se detectTrelloAction FALHAR (ex.: cota do Gemini), isso antes virava "none"
@@ -251,31 +382,57 @@ export async function POST(req) {
         // roteamento de escopo (Tarefas/Boards/Sentinela/Delp/Brain/Geral) — extraído pra
         // src/lib/scopeResolver.js, reaproveitado também pelas falas agendadas (ver
         // src/lib/scheduledAnnouncements.js), pra nunca divergir entre os dois usos.
-        const { matches, systemInstruction, tools, promptNote } = await resolveScope(scope, question, { filterSource });
+        // A conversa até aqui (BEYOND-0006): vai no prompt, e uma continuação curta ("e o prazo
+        // dele?") busca contexto junto com a pergunta anterior — sozinha não acharia nada.
+        const turnos = turnosValidos(history?.turnos);
+        const { matches, systemInstruction, tools, promptNote } = await resolveScope(scope, consultaDeBusca(question, turnos), { filterSource });
 
         send(controller, "context", matches);
 
         // Modo Observância (câmera) e/ou Modo Tela (captura de tela) — ver assistant/page.js:
         // avisa o Gemini que há imagem(ns) anexada(s) e pra que servem, senão ele não sabe
         // que pode/deve olhar pra elas ao responder.
-        const imageNote = images.length
-          ? "Há " + (images.length > 1 ? "IMAGENS anexadas" : "uma IMAGEM anexada") + ", tiradas agora mesmo: " +
-            "pode ser uma foto da câmera do usuário (postura, roupa, gesto, expressão — Modo Observância) " +
-            "e/ou uma captura da tela do computador dele (Modo Tela). Se a pergunta for sobre o que você " +
-            "vê nelas, descreva com base NAS IMAGENS de verdade — não invente. Se a pergunta não tiver " +
-            "nada a ver com isso, ignore-as e responda normalmente."
-          : null;
+        // (a nota diz o que é cada imagem, na ordem: anexadas pela pessoa, tela, câmera — ver
+        // src/lib/contextoDaConversa.js)
+        const imageNote = notaDasImagens(images);
         // Tarefas da Delp — só entra se o usuário CONFIRMOU no fluxo de consentimento acima;
         // nunca é buscado/incluído de graça.
         const delpNote = delpConsent
           ? `TAREFAS DA DELP (empresa onde o usuário trabalha) — o usuário PEDIU EXPLICITAMENTE\npra considerar isso agora:\n${await getDelpTasksForContext()}`
           : null;
-        const combinedNote = [promptNote, imageNote, delpNote].filter(Boolean).join("\n\n") || null;
+        // pediu internet (pesquisar, procurar na web, um site ou link na mensagem): em qualquer escopo,
+        // o servidor pesquisa e o Gemini abre as páginas (src/lib/buscaNaWeb.js)
+        const web = await webDaPergunta(question, { turnos, ferramentasDoEscopo: tools });
+        if (web.pesquisa) send(controller, "pesquisa", { consulta: web.pesquisa.consulta, buscador: web.pesquisa.buscador, total: web.pesquisa.resultados.length, lidas: web.paginas.length, erros: web.pesquisa.erros });
+        const combinedNote = [promptNote, imageNote, delpNote, web.nota].filter(Boolean).join("\n\n") || null;
 
-        const prompt = buildPrompt(question, matches, combinedNote);
-        for await (const piece of chatStreamWithFallback(prompt, withContextDocs(withPersona(systemInstruction, personaMode)), tools, images)) {
-          send(controller, "token", piece);
+        // o código que já apareceu na conversa vai inteiro (a conversa em si vai cortada por fala),
+        // para a Lisa ver o todo antes de propor uma correção
+        // os repositórios VINCULADOS à conversa (o + da barra, ou um link do GitHub na mensagem): a
+        // Lisa lê os arquivos que importam para a pergunta — escolhidos também pelo que está na
+        // tela — e responde com o código real (ver src/lib/repositorioNaConversa.js)
+        // A tela lê os repositórios ANTES, num pedido próprio (/api/repos/contexto), e manda a seção
+        // pronta: lida aqui, a leitura somava as chamadas dela com as desta pergunta e estourava o
+        // limite de 50 chamadas de rede por pedido do Worker. `repos` cru continua valendo para uma
+        // aba antiga, ainda com o código de antes.
+        let secaoDosRepos = "";
+        if (typeof body.contextoDosRepos?.secao === "string") {
+          secaoDosRepos = body.contextoDosRepos.secao.slice(0, 170_000);
+        } else if (Array.isArray(body.repos) && body.repos.length) {
+          const r = await contextoDosRepositorios({ vinculos: body.repos, pergunta: question, conversa: blocoDaConversa(turnos), imagens: images })
+            .catch((err) => ({ secao: "", lidos: [], avisos: [String(err?.message || err)] }));
+          secaoDosRepos = r.secao;
+          send(controller, "repos", { lidos: r.lidos, repos: r.repos || [], avisos: r.avisos });
         }
+        const prompt = buildPrompt(question, matches, combinedNote, blocoDaConversa(turnos), secaoDoCodigoDaConversa(body.codigo) + secaoDoDiagrama(body.diagrama) + secaoDoProjeto(body.projeto) + secaoDosRepos);
+        // em qualquer modo: quando o assunto é código, a resposta traz o código em blocos e a tela
+        // abre o editor que digita (src/lib/codigoNaResposta.js, src/components/panels/IdeDaLisa.js)
+        const instrucao = withContextDocs(withPersona(comCodigoNaTela(systemInstruction), personaMode));
+        const metadados = [];
+        await falarSemAMarca(controller, send, chatStreamWithFallback(prompt, instrucao, web.ferramentas, images, (m) => metadados.push(m)));
+        // as páginas lidas e os primeiros resultados: links embaixo da resposta (não entram na fala)
+        const fontes = fontesDaBusca(metadados, 6, web.fontes);
+        if (fontes.length) send(controller, "fontes", fontes);
 
         send(controller, "done", { ok: true });
       } catch (err) {
@@ -290,6 +447,8 @@ export async function POST(req) {
             ? `⚠️ Quota do Gemini cheia${keySuffix}. Aguarde cerca de 1 minuto e pergunte de novo. (Dica: evite clicar em SYNC logo antes de perguntar.)`
             : err?.code === "UNAVAILABLE"
             ? `⚠️ O Gemini está com alta demanda no momento${keySuffix} (já tentei de novo automaticamente). Espere um instante e pergunte de novo.`
+            : /too many subrequests/i.test(String(err?.message || err))
+            ? "⚠️ Esta pergunta precisou de mais chamadas de rede do que o servidor deixa fazer de uma vez (o Gemini pode ter pedido várias tentativas). Pergunte de novo; se repetir, tire uma imagem do contexto."
             : String(err?.message || err);
         send(controller, "error", { message: friendly });
       } finally {

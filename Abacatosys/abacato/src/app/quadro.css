@@ -1,0 +1,1592 @@
+/* Abacato System — a tela do quadro.
+ *
+ * Arquivo separado do globals.css de propósito: o design system (cores, botões, campos,
+ * moldura) serve ao sistema inteiro, e o quadro é uma tela só, com regras que não fazem
+ * sentido em nenhuma outra. Misturar os dois faria o arquivo de base crescer até ninguém mais
+ * conseguir dizer o que é fundação e o que é uma tela específica.
+ *
+ * Todos os valores saem dos tokens do globals.css — nenhuma cor literal aqui. É o que faz o
+ * modo escuro funcionar nesta tela sem uma única regra a mais.
+ */
+
+/* ============================================================ a moldura da tela
+
+   A tela do quadro anula o respiro do conteúdo e ocupa a área inteira. O motivo é a rolagem:
+   quem rola é a FAIXA de colunas, não a página. Com a página rolando, a barra lateral subiria
+   junto e sumiria no meio de um arrasto. */
+
+.abacato-tela-do-quadro {
+  margin: calc(-1 * var(--abacato-respiro-y)) calc(-1 * var(--abacato-respiro-x));
+  height: calc(100% + 2 * var(--abacato-respiro-y));
+  display: flex;
+  flex-direction: column;
+  background: var(--abacato-fundo);
+  min-width: 0;
+}
+
+.abacato-quadro-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px var(--abacato-respiro-x);
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+.abacato-quadro-topo__esquerda,
+.abacato-quadro-topo__direita { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.abacato-quadro-topo__direita { flex-wrap: wrap; justify-content: flex-end; }
+
+.abacato-quadro-topo__nome {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 4px 8px;
+  min-width: 0;
+  max-width: 46vw;
+  font-family: inherit;
+}
+.abacato-quadro-topo__nome:hover:not(:disabled) { border-color: var(--abacato-linha); }
+.abacato-quadro-topo__nome:focus {
+  outline: none;
+  background: var(--abacato-superficie);
+  border-color: var(--abacato-verde);
+  color: var(--abacato-tinta);
+}
+
+/* Com papel de parede o fundo vira escuro, e a tinta padrão é escura. Sem esta troca o nome do
+   quadro fica escrito em preto sobre preto: some da tela sem nenhum erro aparecer.
+
+   Cada seletor da lista vem ESCRITO POR INTEIRO, e isso não é preciosismo. Antes estava
+   `[data-parede="sim"], [data-parede="imagem"] .abacato-conta-pill` — uma vírgula que parece
+   agrupar os dois tipos de parede e na verdade agrupa "a tela com gradiente" com "a pílula
+   dentro da tela com imagem". O efeito: em quadro de gradiente, pílula, botão fantasma e
+   "adicionar coluna" continuavam com a cor do tema claro sobre um fundo escuro, e as
+   declarações erradas caíam no contêiner, onde só o `style` embutido as escondia. */
+.abacato-tela-do-quadro[data-parede="sim"],
+.abacato-tela-do-quadro[data-parede="imagem"] { color: #FFFFFF; }
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-icone,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-icone { color: rgba(255, 255, 255, 0.85); }
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-icone:hover,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-icone:hover { background: rgba(255, 255, 255, 0.18); color: #FFFFFF; }
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-conta-pill,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-conta-pill { background: rgba(255, 255, 255, 0.18); color: #FFFFFF; }
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-botao--fantasma,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-botao--fantasma { color: #FFFFFF; border-color: rgba(255, 255, 255, 0.45); }
+
+/* ...mas os PAINÉIS (card aberto, Recorrentes, Quem acessa, Colunas e Cards arquivados) abrem
+   por cima do quadro com o fundo do tema, e herdavam o branco acima: o "↩ Restaurar" e o ✕ do
+   card ficavam brancos sobre quase branco (medido em 20/10/2026: #FFF sobre #F4F6F5). Dentro
+   deles, a tinta volta a ser a do tema. */
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-painel__caixa,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-painel__caixa { color: var(--abacato-tinta); }
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-painel__caixa .abacato-icone,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-painel__caixa .abacato-icone { color: var(--abacato-tinta-2); }
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-painel__caixa .abacato-icone:hover,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-painel__caixa .abacato-icone:hover { background: var(--abacato-superficie-2); color: var(--abacato-tinta); }
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-painel__caixa .abacato-botao--fantasma,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-painel__caixa .abacato-botao--fantasma { color: var(--abacato-tinta-2); border-color: var(--abacato-linha); }
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-coluna__adicionar,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-coluna__adicionar { background: rgba(255, 255, 255, 0.16); color: #FFFFFF; }
+
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-quem,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-quem {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #FFFFFF;
+}
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-quem:hover,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-quem:hover { background: rgba(255, 255, 255, 0.28); }
+.abacato-tela-do-quadro[data-parede="sim"] .abacato-avatar--pequeno,
+.abacato-tela-do-quadro[data-parede="imagem"] .abacato-avatar--pequeno { border-color: rgba(255, 255, 255, 0.55); }
+
+.abacato-conta-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.abacato-conta-pill--alerta { background: var(--abacato-alerta-fundo); color: var(--abacato-alerta); }
+.abacato-conta-pill--atencao { background: var(--abacato-atencao-fundo); color: var(--abacato-atencao); }
+
+.abacato-aviso {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 var(--abacato-respiro-x) 8px;
+  padding: 10px 14px;
+  border-radius: var(--abacato-raio);
+  background: var(--abacato-verde-claro);
+  color: var(--abacato-tinta);
+  font-size: 13px;
+  font-weight: 500;
+}
+.abacato-aviso .abacato-icone { margin-left: auto; }
+
+.abacato-campo__erro--flutuante {
+  margin: 0 var(--abacato-respiro-x) 8px;
+  padding: 10px 14px;
+  border-radius: var(--abacato-raio);
+  background: var(--abacato-alerta-fundo);
+}
+
+/* ============================================================ faixa e colunas */
+
+.abacato-faixa {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px var(--abacato-respiro-x) 18px;
+  scrollbar-width: thin;
+}
+
+.abacato-coluna {
+  flex: 0 0 288px;
+  max-width: 288px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--abacato-superficie-2);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  box-shadow: var(--abacato-sombra);
+}
+.abacato-coluna--fantasma { opacity: 0.4; }
+.abacato-coluna--nova {
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+  padding: 8px;
+}
+
+.abacato-coluna__cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px 8px 12px;
+  position: relative;
+  cursor: grab;
+}
+.abacato-coluna__capa {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 4px;
+  border-radius: 0 0 4px 4px;
+}
+.abacato-coluna__nome {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-weight: 650;
+  font-size: 14px;
+  color: var(--abacato-tinta);
+  text-align: left;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  min-width: 0;
+}
+.abacato-coluna__nome:hover { background: var(--abacato-superficie); }
+.abacato-coluna__conta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--abacato-tinta-3);
+  font-variant-numeric: tabular-nums;
+}
+.abacato-coluna__nome-campo {
+  flex: 1;
+  font: inherit;
+  font-weight: 650;
+  font-size: 14px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--abacato-verde);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+  min-width: 0;
+}
+
+.abacato-coluna__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+  min-height: 14px;
+  scrollbar-width: thin;
+}
+
+.abacato-coluna__adicionar {
+  margin: 0 8px 10px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.abacato-coluna__adicionar:hover { background: var(--abacato-superficie); color: var(--abacato-tinta); }
+
+/* ============================================================ o card na coluna */
+
+.abacato-card {
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  /* No toque, segurar o card é o gesto de arrastar. Sem isto o celular entende como seleção de
+     texto e abre a lupa com "copiar / selecionar" por cima do arrasto. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.abacato-card:hover { border-color: var(--abacato-tinta-3); }
+.abacato-card:focus-visible { outline: 2px solid var(--abacato-verde); outline-offset: 2px; }
+.abacato-card--fantasma { opacity: 0.32; }
+.abacato-card--com-capa { padding-top: 0; overflow: hidden; }
+.abacato-card__capa { height: 30px; margin: 0 -12px 4px; }
+
+.abacato-card__etiquetas { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* Fechada, a etiqueta é uma barrinha de cor. Clicar abre o nome de TODAS as do quadro — é o
+   gesto do Trello, e resolve o problema de a cor sozinha não dizer nada a quem não decorou a
+   legenda. Como é um <button>, precisa apagar o estilo que o navegador dá a botão. */
+.abacato-card__etiqueta {
+  width: 30px;
+  height: 7px;
+  border-radius: 4px;
+  display: inline-block;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  /* A transição é da LARGURA, e não de tudo: animar a cor faria a etiqueta piscar a cada
+     redesenho da coluna. */
+  transition: width 0.12s ease, height 0.12s ease;
+}
+.abacato-card__etiqueta:hover { filter: brightness(1.08); }
+
+.abacato-card__etiqueta--aberta {
+  width: auto;
+  height: auto;
+  min-height: 18px;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: var(--abacato-raio-pilula);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: left;
+  /* O nome QUEBRA em vez de sumir: uma etiqueta chamada "Aguardando cliente" cortada em
+     "Aguardand…" não identifica nada — e identificar é o motivo de o nome estar aberto. */
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .abacato-card__etiqueta { transition: none; }
+}
+
+.abacato-card__linha { display: flex; align-items: flex-start; gap: 8px; }
+.abacato-card__titulo { font-size: 13.5px; line-height: 1.4; color: var(--abacato-tinta); flex: 1; min-width: 0; }
+
+/* O círculo de concluir, dentro do card, sem abrir nada.
+ *
+ * Fica discreto até o mouse chegar perto: um visto forte em cada card competiria com as
+ * etiquetas e com o prazo, que é o que a coluna existe para mostrar de relance. */
+.abacato-card__concluir {
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid var(--abacato-tinta-3);
+  background: transparent;
+  color: transparent;
+  font-size: 11px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.12s ease, border-color 0.12s ease;
+}
+.abacato-card:hover .abacato-card__concluir { opacity: 1; }
+.abacato-card__concluir:hover { border-color: var(--abacato-verde); color: var(--abacato-verde); }
+.abacato-card__concluir--feito {
+  opacity: 1;
+  background: var(--abacato-verde);
+  border-color: var(--abacato-verde);
+  color: #06100A;
+  font-weight: 700;
+}
+
+/* No toque não existe "passar o mouse": o círculo precisa estar visível o tempo todo. */
+@media (pointer: coarse) {
+  .abacato-card__concluir { opacity: 1; }
+}
+
+.abacato-card__sinais {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--abacato-tinta-2);
+}
+.abacato-card__pessoas { margin-left: auto; display: flex; gap: 3px; }
+
+.abacato-sinal {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.abacato-sinal--pronto { color: var(--abacato-verde-fundo); font-weight: 600; }
+
+.abacato-prazo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--abacato-raio-pilula);
+  font-weight: 600;
+  font-size: 11.5px;
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta-2);
+  margin: 0;
+}
+.abacato-prazo--atrasado { background: var(--abacato-alerta-fundo); color: var(--abacato-alerta); }
+.abacato-prazo--hoje,
+.abacato-prazo--proximo { background: var(--abacato-atencao-fundo); color: var(--abacato-atencao); }
+.abacato-prazo--concluido { background: var(--abacato-verde-claro); color: var(--abacato-verde-fundo); }
+
+.abacato-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--abacato-verde-fundo);
+  color: #FFFFFF;
+  font-size: 9.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+/* ============================================================ arrastar */
+
+/* O espaço que abre onde o card vai cair. Tracejado e não sólido: ele precisa ler como "aqui
+   ainda não tem nada", e um bloco cheio pareceria mais um card. */
+.abacato-reserva {
+  border: 2px dashed var(--abacato-verde);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--abacato-verde) 10%, transparent);
+  flex: 0 0 auto;
+}
+
+.abacato-fantasma {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  transform: rotate(2.5deg);
+  box-shadow: var(--abacato-sombra-alta);
+  border-radius: 12px;
+  opacity: 0.95;
+}
+
+/* Arrastar COLUNA: o espaço tem a largura de uma coluna, e o fantasma é uma coluna em
+   miniatura — o nome e os primeiros cards. */
+.abacato-reserva--coluna { flex: 0 0 288px; max-width: 288px; max-height: 100%; min-height: 120px; }
+.abacato-fantasma--coluna {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 8px 12px;
+  background: var(--abacato-superficie-2);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  transform: rotate(2deg);
+}
+.abacato-fantasma__cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--abacato-tinta);
+}
+.abacato-fantasma__mais { padding: 0 4px; font-size: 12px; color: var(--abacato-tinta-3); }
+
+body.abacato-arrastando { cursor: grabbing; }
+body.abacato-arrastando * { cursor: grabbing !important; }
+
+/* ============================================================ escrever um card novo */
+
+.abacato-novo-card {
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-verde);
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.abacato-novo-card__campo {
+  border: 0;
+  background: transparent;
+  resize: vertical;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--abacato-tinta);
+  outline: none;
+  min-height: 44px;
+}
+.abacato-novo-card__acoes { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.abacato-dica { font-size: 11.5px; color: var(--abacato-tinta-3); }
+.abacato-dica--bloco { display: block; line-height: 1.5; margin: 0 var(--abacato-gap) 4px; }
+
+/* ============================================================ menus suspensos */
+
+.abacato-menu { position: relative; }
+.abacato-menu__fundo { position: fixed; inset: 0; z-index: 40; }
+.abacato-menu__caixa {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 41;
+  min-width: 212px;
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  box-shadow: var(--abacato-sombra-alta);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--abacato-tinta);
+}
+.abacato-menu__caixa--direita { left: auto; right: 0; }
+.abacato-menu__titulo {
+  font-size: 10.5px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--abacato-tinta-3);
+  padding: 4px 8px;
+}
+.abacato-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--abacato-tinta);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+.abacato-menu__item:hover { background: var(--abacato-superficie-2); }
+.abacato-menu__item--ativo { background: var(--abacato-verde-claro); font-weight: 600; }
+.abacato-menu__item--perigo { color: var(--abacato-alerta); }
+.abacato-menu__item--perigo:hover { background: var(--abacato-alerta-fundo); }
+.abacato-menu__cores { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 6px 8px; }
+
+.abacato-amostra {
+  width: 22px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1px solid var(--abacato-linha);
+  flex: 0 0 auto;
+}
+
+.abacato-bolinha {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta-3);
+  cursor: pointer;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.abacato-bolinha--ativa {
+  border-color: var(--abacato-tinta);
+  box-shadow: 0 0 0 2px var(--abacato-superficie) inset;
+}
+
+.abacato-icone {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  cursor: pointer;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  flex: 0 0 auto;
+}
+.abacato-icone:hover { background: var(--abacato-superficie-2); color: var(--abacato-tinta); }
+
+/* ============================================================ o painel do card */
+
+.abacato-painel {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: flex-end;
+}
+.abacato-painel__fundo {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.42);
+}
+.abacato-painel__caixa {
+  position: relative;
+  width: min(860px, 100%);
+  /* Altura pelo CONTEÚDO, até o teto da tela. Um card com três linhas não precisa de uma caixa
+     de tela cheia com um vazio embaixo. */
+  max-height: 100%;
+  background: var(--abacato-fundo);
+  color: var(--abacato-tinta);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--abacato-raio-grande);
+  overflow: hidden;
+  box-shadow: var(--abacato-sombra-alta);
+  animation: abacato-surgir 160ms ease-out;
+}
+.abacato-painel__caixa--estreita { width: min(560px, 100%); }
+/* O painel largo entra pela ESQUERDA-direita inteira, e nao encostado numa borda: um
+ * documento aberto ocupa a tela, e uma gaveta de 1180px encostada na direita deixaria
+ * uma faixa escura inutil do outro lado. */
+.abacato-painel__caixa--larga { width: min(1180px, 100%); height: 100%; }
+
+@keyframes abacato-surgir {
+  from { transform: scale(0.97); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.abacato-painel__cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px var(--abacato-gap-2) 10px;
+  position: relative;
+  flex: 0 0 auto;
+}
+.abacato-painel__titulo {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 6px 8px;
+  color: var(--abacato-tinta);
+  font-family: inherit;
+  min-width: 0;
+  margin: 0;
+}
+.abacato-painel__titulo--fixo { border: 0; padding-left: 8px; }
+.abacato-painel__titulo:hover:not(:disabled) { border-color: var(--abacato-linha); }
+.abacato-painel__titulo:focus {
+  outline: none;
+  background: var(--abacato-superficie);
+  border-color: var(--abacato-verde);
+}
+
+.abacato-painel__migalha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 var(--abacato-gap-2) 12px;
+  font-size: 12.5px;
+  color: var(--abacato-tinta-2);
+  flex: 0 0 auto;
+}
+
+.abacato-painel__corpo {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 4px var(--abacato-gap-2) var(--abacato-gap-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--abacato-gap);
+}
+
+.abacato-painel__rodape {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 14px var(--abacato-gap-2);
+  border-top: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie);
+  flex: 0 0 auto;
+}
+.abacato-painel__estado { margin-left: auto; font-size: 11.5px; color: var(--abacato-tinta-3); }
+
+.abacato-bloco {
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.abacato-bloco__titulo {
+  font-size: 10.5px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--abacato-tinta-3);
+  margin: 0;
+  font-weight: 700;
+}
+.abacato-bloco__linha { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.abacato-bloco__acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+
+
+.abacato-datas { display: flex; gap: 10px; flex-wrap: wrap; }
+.abacato-datas .abacato-campo { flex: 1 1 200px; }
+
+.abacato-selecao {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+}
+
+.abacato-vazio-clicavel {
+  text-align: left;
+  border: 1px dashed var(--abacato-linha);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--abacato-tinta-3);
+  padding: 14px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.abacato-vazio-clicavel:hover { border-color: var(--abacato-verde); color: var(--abacato-tinta-2); }
+
+.abacato-campo__entrada--alta { min-height: 110px; resize: vertical; line-height: 1.55; }
+
+.abacato-rapido { display: flex; gap: 6px; align-items: flex-start; }
+.abacato-rapido .abacato-campo__entrada { flex: 1; }
+
+.abacato-nova-etiqueta { display: flex; flex-direction: column; gap: 8px; }
+
+/* ============================================================ checklists */
+
+.abacato-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--abacato-superficie-2);
+}
+.abacato-checklist__cabecalho { display: flex; align-items: center; gap: 6px; }
+.abacato-checklist__titulo { flex: 1; font-size: 13.5px; min-width: 0; }
+.abacato-checklist__conta {
+  font-size: 11.5px;
+  color: var(--abacato-tinta-3);
+  font-variant-numeric: tabular-nums;
+}
+.abacato-checklist__adicionar {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 4px;
+  cursor: pointer;
+}
+.abacato-checklist__adicionar:hover { color: var(--abacato-verde-fundo); }
+
+.abacato-barra-progresso {
+  height: 6px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-linha);
+  overflow: hidden;
+}
+.abacato-barra-progresso > span {
+  display: block;
+  height: 100%;
+  background: var(--abacato-verde);
+  transition: width 140ms ease-out;
+}
+
+.abacato-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 4px 2px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.abacato-item:hover { background: var(--abacato-superficie); }
+.abacato-item__texto { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.abacato-item--feito .abacato-item__texto { text-decoration: line-through; color: var(--abacato-tinta-3); }
+.abacato-item input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--abacato-verde); flex: 0 0 auto; }
+
+.abacato-link { display: flex; align-items: center; gap: 6px; }
+.abacato-link__url {
+  flex: 1;
+  color: var(--abacato-verde-fundo);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* ============================================================ tarefas que se repetem */
+
+.abacato-abas { display: flex; gap: 6px; flex-wrap: wrap; }
+.abacato-aba {
+  border: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta-2);
+  border-radius: var(--abacato-raio-pilula);
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.abacato-aba--ativa {
+  background: var(--abacato-verde-claro);
+  border-color: var(--abacato-verde);
+  color: var(--abacato-tinta);
+  font-weight: 600;
+}
+
+.abacato-dias { display: flex; gap: 5px; flex-wrap: wrap; }
+.abacato-dia {
+  width: 44px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.abacato-dia--ativo {
+  background: var(--abacato-verde);
+  border-color: var(--abacato-verde);
+  color: #06100A;
+  font-weight: 700;
+}
+
+.abacato-resumo-da-regra {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--abacato-tinta-2);
+  background: var(--abacato-superficie-2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  line-height: 1.5;
+}
+
+.abacato-recorrencia {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--abacato-superficie-2);
+}
+.abacato-recorrencia > div:first-child { flex: 1; min-width: 0; }
+.abacato-recorrencia--pausada { opacity: 0.6; }
+.abacato-recorrencia__acoes { display: flex; gap: 2px; }
+/* Cards arquivados: o começo da descrição ajuda a reconhecer o card antes de restaurar. */
+.abacato-arquivado__descricao {
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-line;
+}
+
+/* ============================================================ importar do Trello
+
+   Mora aqui, e não num terceiro arquivo, porque a tela de importação é um painel: ela reusa
+   .abacato-painel, .abacato-bloco e .abacato-dica inteiros, e separar as três regras próprias
+   dela num arquivo à parte custaria mais para achar do que para manter. */
+
+.abacato-solte {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 20px;
+  border: 2px dashed var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta-2);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.abacato-solte:hover,
+.abacato-solte--ativo { border-color: var(--abacato-verde); background: var(--abacato-verde-claro); }
+.abacato-solte:focus-within { outline: 2px solid var(--abacato-verde); outline-offset: 2px; }
+.abacato-solte__icone { font-size: 26px; color: var(--abacato-verde-fundo); }
+
+/* O campo de arquivo some, mas continua sendo ele que recebe o clique e o foco do teclado.
+   Esconder com `display: none` tiraria os dois. */
+.abacato-solte__campo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.abacato-passos {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--abacato-tinta-2);
+}
+.abacato-passos strong { color: var(--abacato-tinta); }
+
+.abacato-previa__nome {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--abacato-tinta);
+}
+.abacato-previa {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 8px;
+}
+.abacato-previa__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--abacato-superficie-2);
+}
+/* Um zero fica apagado em vez de sumir. Sumir esconderia a informação mais útil da prévia:
+   "nenhum card tem prazo" é algo que você quer descobrir ANTES de importar. */
+.abacato-previa__item--zero { opacity: 0.45; }
+.abacato-previa__numero {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--abacato-tinta);
+}
+.abacato-previa__rotulo { font-size: 11px; color: var(--abacato-tinta-2); }
+
+.abacato-aviso-linha {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--abacato-tinta-2);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--abacato-atencao-fundo);
+}
+
+.abacato-vazio__acoes { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+/* O card marcado como concluído. O título riscado é o suficiente: um card concluído ainda
+   precisa ser lido, só não precisa ser feito. */
+.abacato-card--concluido .abacato-card__titulo { color: var(--abacato-tinta-3); text-decoration: line-through; }
+
+.abacato-concluir {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--abacato-tinta);
+}
+.abacato-concluir input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--abacato-verde); }
+
+.abacato-repetir {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--abacato-superficie-2);
+}
+
+/* O recado de "o próximo já está no quadro". Verde, e não cinza: é uma coisa boa que acabou
+ * de acontecer, e a pessoa precisa notar sem procurar. */
+.abacato-recado {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--abacato-tinta);
+  background: var(--abacato-verde-claro);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+/* ============================================================ papel de parede */
+
+.abacato-paredes { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.abacato-parede {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  padding: 6px;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  text-align: left;
+}
+.abacato-parede:hover { color: var(--abacato-tinta); }
+.abacato-parede--ativa { border-color: var(--abacato-verde); color: var(--abacato-tinta); font-weight: 600; }
+.abacato-parede__amostra {
+  height: 46px;
+  border-radius: 8px;
+  border: 1px solid var(--abacato-linha);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--abacato-tinta-3);
+}
+
+.abacato-parede-atual {
+  height: 110px;
+  border-radius: 12px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  border: 1px solid var(--abacato-linha);
+}
+.abacato-parede-atual__marca {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #FFFFFF;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: var(--abacato-raio-pilula);
+}
+
+/* O véu escuro por cima da imagem.
+ *
+ * O quadro escreve em BRANCO sobre o papel de parede, e uma foto com um céu claro num canto
+ * apaga o nome do quadro exatamente ali — sem erro nenhum, só texto branco sobre branco. O véu
+ * é o que torna seguro deixar você escolher qualquer imagem. */
+.abacato-tela-do-quadro[data-parede="imagem"] { position: relative; }
+.abacato-tela-do-quadro[data-parede="imagem"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* AS PEÇAS SÃO NOMEADAS, e não `> *`.
+ *
+ * A versão com `> *` tinha especificidade maior que `.abacato-painel`, e anulava o
+ * `position: fixed` dele: abrir um card num quadro COM PAPEL DE PAREDE transformava o painel
+ * num item da coluna, empurrava a faixa de colunas para fora da tela e deixava só o card
+ * aberto por cima da imagem. As colunas não sumiam — elas eram espremidas até sumir.
+ *
+ * É a segunda vez que este mesmo erro aparece neste arquivo. O `> *` é sempre mais específico
+ * que a classe da peça que ele atinge sem querer. */
+.abacato-tela-do-quadro[data-parede="imagem"] > .abacato-quadro-topo,
+.abacato-tela-do-quadro[data-parede="imagem"] > .abacato-faixa,
+.abacato-tela-do-quadro[data-parede="imagem"] > .abacato-aviso,
+.abacato-tela-do-quadro[data-parede="imagem"] > .abacato-campo__erro--flutuante {
+  position: relative;
+  z-index: 1;
+}
+/* O topo fica UMA camada acima da faixa de colunas: com as duas em z-index 1, a faixa (que vem
+   depois) era desenhada por cima do menu "⋯" que abre do topo — "Colunas arquivadas" e "Papel de
+   parede" ficavam debaixo do "+ Adicionar coluna", impossíveis de clicar (visto em 20/10/2026). */
+.abacato-tela-do-quadro[data-parede="imagem"] > .abacato-quadro-topo { z-index: 2; }
+
+/* ============================================================ celular
+
+   Abaixo de 860px a barra lateral já virou rodapé. Aqui o quadro se ajusta ao resto: colunas
+   quase da largura da tela, painel do card em tela cheia. Uma coluna de 288px num aparelho de
+   390px deixaria metade da segunda coluna aparecendo — o suficiente para parecer erro e não o
+   suficiente para ser útil. */
+
+@media (max-width: 860px) {
+  .abacato-coluna,
+  .abacato-reserva--coluna { flex-basis: calc(100vw - 52px); max-width: calc(100vw - 52px); }
+  .abacato-quadro-topo__nome { max-width: 100%; font-size: 18px; }
+  .abacato-quadro-topo { padding: 10px var(--abacato-respiro-x); }
+  .abacato-painel { padding: 0; }
+  .abacato-painel__caixa,
+  .abacato-painel__caixa--estreita,
+  .abacato-painel__caixa--larga { width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+
+  /* A faixa encaixa uma coluna por vez ao rolar. Sem isto, o dedo quase sempre para no meio de
+     duas colunas — e ler um quadro de lado, meia coluna por vez, é cansativo. */
+  .abacato-faixa { scroll-snap-type: x mandatory; }
+  .abacato-coluna { scroll-snap-align: start; }
+}
+
+/* Alvo de toque: o mínimo confortável é 44px. Nos ícones, o botão desenhado continua com 30px,
+   mas a área que responde ao dedo cresce por fora, sem mexer no desenho. */
+@media (pointer: coarse) {
+  .abacato-icone { position: relative; }
+  .abacato-icone::after { content: ""; position: absolute; inset: -7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .abacato-painel__caixa { animation: none; }
+  .abacato-barra-progresso > span { transition: none; }
+  .abacato-fantasma { transform: none; }
+  .abacato-janelinha { animation: none; }
+}
+
+/* ============================================================ o card aberto (BEYOND-0003) */
+
+/* Modal no CENTRO da tela, e não mais gaveta encostada na direita. A variante é só do card: os
+   outros painéis (compartilhar, documentos, recorrentes) continuam como eram. O modal começa um
+   pouco abaixo do topo e rola a PÁGINA quando o card é comprido — como no Trello —, em vez de
+   espremer tudo numa caixa com rolagem própria. */
+.abacato-painel--centro {
+  justify-content: center;
+  align-items: flex-start;
+  padding: 48px 16px;
+  overflow-y: auto;
+}
+.abacato-painel--centro .abacato-painel__fundo { position: fixed; }
+.abacato-cartao-aberto {
+  width: min(760px, 100%);
+  max-height: none;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+.abacato-cartao-aberto .abacato-painel__corpo { overflow: visible; gap: 22px; padding-top: 6px; }
+.abacato-cartao-aberto__capa {
+  height: 56px;
+  flex: 0 0 auto;
+  border-radius: var(--abacato-raio-grande) var(--abacato-raio-grande) 0 0;
+}
+.abacato-cartao-aberto__recado { margin: 0 var(--abacato-gap-2) 10px; }
+
+/* O círculo de concluído, ao lado do título. */
+.abacato-concluido {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 2px solid var(--abacato-tinta-3);
+  background: transparent;
+  color: transparent;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+.abacato-concluido:hover:not(:disabled) { border-color: var(--abacato-verde); color: var(--abacato-verde); }
+.abacato-concluido--feito,
+.abacato-concluido--feito:hover:not(:disabled) { background: var(--abacato-verde); border-color: var(--abacato-verde); color: #FFFFFF; }
+.abacato-concluido:disabled { cursor: default; }
+
+/* A faixa "Adicionar": botões baixos, discretos, que só abrem a janelinha. */
+.abacato-cartao-aberto__adicionar { display: flex; flex-wrap: wrap; gap: 6px; }
+.abacato-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 0;
+  border-radius: 8px;
+  /* Misturado com a tinta, e não o superficie-2 puro: o modal tem o fundo dessa mesma cor, e o
+     botão sumia — virava texto solto que não parecia clicável. */
+  background: color-mix(in srgb, var(--abacato-tinta) 7%, var(--abacato-superficie));
+  color: var(--abacato-tinta);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.abacato-chip:hover:not(:disabled),
+.abacato-chip--ativo { background: color-mix(in srgb, var(--abacato-tinta) 14%, var(--abacato-superficie)); }
+.abacato-chip:disabled { cursor: default; }
+
+/* O que o card TEM: etiquetas, membros, prazo e recorrência, cada um com o seu rótulo. */
+.abacato-cartao-aberto__resumo { display: flex; flex-wrap: wrap; gap: 14px 26px; }
+.abacato-resumo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.abacato-resumo__rotulo { font-size: 11.5px; font-weight: 600; color: var(--abacato-tinta-2); }
+.abacato-resumo__valor { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+
+.abacato-etiqueta-pilula {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  color: #FFFFFF;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  /* Mesma sombra interna da etiqueta de sempre: escurece qualquer cor da paleta o bastante para
+     o texto branco passar no contraste — inclusive o amarelo. */
+  box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.18);
+}
+.abacato-etiqueta-pilula:disabled { cursor: default; }
+.abacato-etiqueta-pilula--larga { flex: 1; min-width: 0; height: 32px; }
+
+.abacato-avatar--medio { width: 30px; height: 30px; font-size: 12px; border: 0; cursor: pointer; }
+.abacato-avatar--medio:disabled { cursor: default; }
+.abacato-prazo--botao { border: 0; font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 11px; border-radius: 8px; cursor: pointer; }
+.abacato-prazo--botao:disabled { cursor: default; }
+
+/* Seções do corpo: título com ícone, sem caixa em volta — como no Trello. */
+.abacato-secao { display: flex; flex-direction: column; gap: 8px; }
+.abacato-secao__titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--abacato-tinta);
+}
+.abacato-secao__icone { color: var(--abacato-tinta-2); font-size: 15px; }
+
+/* A janelinha de cada botão da faixa "Adicionar". Fica POR CIMA de tudo, na posição do botão
+   que a abriu, e rola por dentro quando o conteúdo (a recorrência, por exemplo) é comprido. */
+.abacato-janelinha__fundo { z-index: 72; }
+.abacato-janelinha {
+  position: fixed;
+  z-index: 73;
+  max-height: min(72dvh, 540px);
+  overflow-y: auto;
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  box-shadow: var(--abacato-sombra-alta);
+  animation: abacato-surgir 120ms ease-out;
+}
+.abacato-janelinha__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 4px 14px;
+  font-size: 13.5px;
+}
+.abacato-janelinha__corpo { display: flex; flex-direction: column; gap: 10px; padding: 6px 14px 14px; }
+.abacato-janelinha__lista { display: flex; flex-direction: column; gap: 3px; }
+.abacato-opcao {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--abacato-tinta);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.abacato-opcao:hover { background: var(--abacato-superficie-2); }
+.abacato-opcao--marcada { font-weight: 600; }
+.abacato-opcao__marca { width: 14px; flex: 0 0 auto; color: var(--abacato-verde-fundo); font-weight: 700; }
+.abacato-opcao__texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Checklist: nome e itens editáveis com um clique, itens reordenáveis pela alça. */
+.abacato-cartao-aberto .abacato-checklist { background: transparent; padding: 0; gap: 8px; }
+.abacato-cartao-aberto .abacato-checklist__cabecalho { gap: 8px; }
+.abacato-cartao-aberto .abacato-checklist__titulo {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--abacato-tinta);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: text;
+}
+.abacato-cartao-aberto .abacato-checklist__titulo:hover:not(:disabled) { border-color: var(--abacato-linha); }
+.abacato-cartao-aberto .abacato-checklist__titulo:disabled { cursor: default; }
+.abacato-checklist__campo-titulo { flex: 1; font-weight: 700; padding: 5px 8px; }
+.abacato-checklist__itens { display: flex; flex-direction: column; gap: 1px; }
+
+.abacato-cartao-aberto .abacato-item { gap: 6px; padding: 2px 4px; }
+.abacato-item__texto {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13.5px;
+  padding: 5px 4px;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+  cursor: text;
+}
+.abacato-item__texto:disabled { cursor: default; }
+.abacato-item--feito .abacato-item__texto { text-decoration: line-through; color: var(--abacato-tinta-3); }
+.abacato-item__campo { flex: 1; padding: 5px 8px; }
+.abacato-item__alca {
+  flex: 0 0 auto;
+  padding: 4px 2px;
+  color: var(--abacato-tinta-3);
+  font-size: 12px;
+  letter-spacing: -2px;
+  cursor: grab;
+  user-select: none;
+  /* A alça não rola nada: o dedo nela arrasta na hora, sem a espera de 220ms dos cards. */
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.abacato-item--na-mao {
+  background: var(--abacato-superficie);
+  box-shadow: var(--abacato-sombra-alta);
+  position: relative;
+  z-index: 1;
+}
+
+/* Ações secundárias aparecem ao passar o mouse, e não o tempo todo: um ✕ em cada linha de uma
+   checklist de vinte itens é uma coluna de ruído. No toque não existe "passar por cima", e
+   por isso lá elas ficam sempre visíveis. */
+.abacato-mostra-no-hover { opacity: 0; transition: opacity 120ms; }
+.abacato-item:hover .abacato-item__alca,
+.abacato-item--na-mao .abacato-item__alca,
+.abacato-item:hover .abacato-mostra-no-hover,
+.abacato-link:hover .abacato-mostra-no-hover,
+.abacato-mostra-no-hover:focus-visible { opacity: 1; }
+@media (hover: none) {
+  .abacato-item__alca,
+  .abacato-mostra-no-hover { opacity: 1; }
+}
+
+@media (max-width: 860px) {
+  .abacato-painel--centro { padding: 0; }
+  .abacato-cartao-aberto { min-height: 100%; border-radius: 0; }
+  .abacato-cartao-aberto__capa { border-radius: 0; }
+  /* No telefone a janelinha ocupa a largura toda: 320px presos à posição do botão sairiam da
+     tela ou cobririam só metade dela. */
+  .abacato-janelinha { left: 10px !important; right: 10px; width: auto !important; }
+}
+
+/* ============================================================ vista: quadro | calendário */
+
+.abacato-vistas {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 3px;
+  margin-left: 6px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-superficie-2);
+  border: 1px solid var(--abacato-linha);
+}
+.abacato-vistas__aba {
+  border: 0;
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 5px 12px;
+  border-radius: var(--abacato-raio-pilula);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.abacato-vistas__aba--ativa { background: var(--abacato-superficie); color: var(--abacato-tinta); font-weight: 600; box-shadow: var(--abacato-sombra); }
+.abacato-vistas__texto { white-space: nowrap; }
+
+/* ============================================================ o calendário */
+
+.abacato-calendario {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px var(--abacato-respiro-x) 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.abacato-calendario__topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.abacato-calendario__navegar { display: flex; align-items: center; gap: 6px; }
+.abacato-calendario__mes { margin: 0; min-width: 180px; text-align: center; font-size: 17px; font-weight: 700; }
+.abacato-calendario__mes::first-letter { text-transform: uppercase; }
+
+/* A grade é desenhada pelo FUNDO: 1px de vão entre casas com o fundo na cor da linha faz as
+   divisórias sem uma borda por casa — que dobraria de espessura onde duas se encostam. */
+.abacato-calendario__grade {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--abacato-linha);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.abacato-calendario__semana {
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 8px 10px;
+}
+.abacato-calendario__casa {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 112px;
+  padding: 6px;
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+  cursor: pointer;
+}
+.abacato-calendario__casa--fora { background: var(--abacato-superficie-2); }
+.abacato-calendario__casa--fora .abacato-calendario__numero { color: var(--abacato-tinta-3); }
+.abacato-calendario__casa--escolhida { box-shadow: inset 0 0 0 2px var(--abacato-verde); }
+.abacato-calendario__casa--alvo {
+  background: color-mix(in srgb, var(--abacato-verde) 14%, var(--abacato-superficie));
+  box-shadow: inset 0 0 0 2px var(--abacato-verde);
+}
+.abacato-calendario__numero {
+  align-self: flex-start;
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: var(--abacato-raio-pilula);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+/* Hoje ganha o fundo verde-claro, e não o verde de ação: o verde forte com número branco não
+   passa no contraste, e o dia de hoje precisa ser lido de relance. */
+.abacato-calendario__casa--hoje .abacato-calendario__numero { background: var(--abacato-verde-claro); color: var(--abacato-tinta); font-weight: 700; }
+.abacato-calendario__quantos { display: none; }
+.abacato-calendario__cards { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.abacato-calendario__mais { padding-left: 4px; font-size: 11.5px; color: var(--abacato-tinta-2); }
+
+.abacato-calendario__sem-data { display: flex; flex-wrap: wrap; gap: 6px; }
+.abacato-calendario__sem-data .abacato-cal-card { max-width: 260px; }
+
+.abacato-calendario__dia {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  background: var(--abacato-superficie);
+  color: var(--abacato-tinta);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  flex: 0 0 auto;
+}
+.abacato-calendario__dia-titulo { margin: 0 0 4px; display: flex; align-items: center; justify-content: space-between; font-size: 14.5px; }
+.abacato-calendario__dia-titulo::first-letter { text-transform: uppercase; }
+.abacato-calendario__novo { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.abacato-calendario__novo .abacato-campo__entrada { flex: 1 1 220px; }
+
+/* Um card no calendário: a faixa à esquerda tem a cor do PRAZO, a mesma leitura do quadro. */
+.abacato-cal-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border-left: 3px solid var(--abacato-tinta-3);
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-tinta);
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+}
+.abacato-cal-card:hover { background: color-mix(in srgb, var(--abacato-tinta) 8%, var(--abacato-superficie-2)); }
+.abacato-cal-card--atrasado { border-left-color: var(--abacato-alerta); }
+.abacato-cal-card--hoje,
+.abacato-cal-card--proximo { border-left-color: var(--abacato-atencao); }
+.abacato-cal-card--no-prazo { border-left-color: var(--abacato-verde); }
+.abacato-cal-card--concluido { border-left-color: var(--abacato-verde-fundo); }
+.abacato-cal-card--compacto { padding: 3px 6px; font-size: 11.5px; }
+.abacato-cal-card--fantasma { opacity: 0.35; }
+.abacato-cal-card--feito .abacato-cal-card__titulo { text-decoration: line-through; color: var(--abacato-tinta-3); }
+.abacato-cal-card__titulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.abacato-cal-card__hora { flex: 0 0 auto; font-size: 11.5px; color: var(--abacato-tinta-2); font-variant-numeric: tabular-nums; }
+.abacato-cal-card__etiquetas { display: flex; flex: 0 0 auto; gap: 2px; }
+.abacato-cal-card__etiquetas > span { width: 8px; height: 8px; border-radius: 50%; }
+.abacato-fantasma--calendario { transform: rotate(2deg); }
+
+/* No telefone, sete casas em 390px não comportam título de card: a casa mostra só quantos
+   há, e tocar no dia abre a lista dele embaixo da grade — que é onde se lê. */
+@media (max-width: 860px) {
+  .abacato-vistas { margin-left: 0; }
+  /* No telefone, só os ícones: com o texto, o alternador espremia o nome do quadro até sobrar
+     "Obra Delp –". O nome da vista continua no aria-label e na dica. */
+  .abacato-vistas__texto { display: none; }
+  .abacato-vistas__aba { padding: 5px 10px; }
+  .abacato-calendario { padding: 4px 10px 18px; }
+  .abacato-calendario__mes { min-width: 0; font-size: 15.5px; }
+  .abacato-calendario__semana { padding: 6px 2px; text-align: center; font-size: 10px; letter-spacing: 0; }
+  .abacato-calendario__casa { min-height: 58px; padding: 4px 2px; align-items: center; }
+  .abacato-calendario__numero { align-self: center; }
+  .abacato-calendario__cards { display: none; }
+  .abacato-calendario__quantos {
+    display: grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: var(--abacato-raio-pilula);
+    background: var(--abacato-verde-claro);
+    color: var(--abacato-tinta);
+    font-size: 11px;
+    font-weight: 700;
+  }
+}
+
+/* Comentários do card (BEYOND-0004): caixa de escrever, prévias das imagens e a conversa. */
+.abacato-comentarios { gap: 10px; }
+.abacato-comentarios__nova { display: flex; flex-direction: column; gap: 8px; }
+.abacato-comentarios__caixa { resize: vertical; line-height: 1.5; min-height: 40px; }
+.abacato-comentarios__acoes { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.abacato-comentarios__imagens { display: flex; flex-wrap: wrap; gap: 8px; }
+.abacato-comentarios__miniatura {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 112px;
+  height: 84px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--abacato-linha);
+  background: var(--abacato-superficie-2);
+}
+.abacato-comentarios__miniatura img { width: 100%; height: 100%; object-fit: cover; display: block; }
+a.abacato-comentarios__miniatura:hover { border-color: var(--abacato-verde); }
+.abacato-comentarios__miniatura--falha { font-size: 11px; color: var(--abacato-tinta-3); text-align: center; padding: 6px; }
+.abacato-comentarios__tirar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+}
+.abacato-comentarios__lista { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.abacato-comentario { display: flex; gap: 10px; align-items: flex-start; }
+.abacato-comentario__corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.abacato-comentario__topo { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.abacato-comentario__texto {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--abacato-superficie-2);
+  border: 1px solid var(--abacato-linha);
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.abacato-comentario__edicao { display: flex; flex-direction: column; gap: 6px; }
+.abacato-comentario__opcoes { display: flex; gap: 12px; }
+.abacato-comentario__opcao {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--abacato-tinta-2);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.abacato-comentario__opcao:hover { color: var(--abacato-tinta); }

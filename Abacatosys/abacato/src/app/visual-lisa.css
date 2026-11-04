@@ -1,0 +1,97 @@
+/* ============================================================================================
+ * O VISUAL DA LISA TASK
+ *
+ * A conta Lisa Task (src/dominio/planos.js) é o Abacato com o nome e a cara da Lisa: fundo
+ * preto, superfícies azuladas, o azul da Lisa no lugar do verde e a fonte Barlow. Quem liga é o
+ * atributo `data-visual="lisa"` no <html>, posto pelo script do <head> (src/app/layout.js) a
+ * partir do cookie que o middleware grava pelo tipo da conta.
+ *
+ * Como o modo escuro, é uma troca de VALORES: cada linha redefine um token de globals.css. A
+ * Lisa só existe no escuro, então este bloco vale nos dois temas e o seletor de tema some.
+ * ============================================================================================ */
+
+:root[data-visual="lisa"],
+:root[data-visual="lisa"][data-tema] {
+  --abacato-verde: #5aa9ff;
+  --abacato-verde-fundo: #7cbcff;
+  --abacato-verde-claro: #12233a;
+  --abacato-verde-escuro: #090c12;
+  --abacato-verde-escuro-2: #10141d;
+
+  --abacato-fundo: #000000;
+  --abacato-superficie: #090c12;
+  --abacato-superficie-2: #10141d;
+  --abacato-barra: #05070b;
+  --abacato-barra-2: #10141d;
+
+  --abacato-tinta: #e7edf7;
+  --abacato-tinta-2: #9aa6bb;
+  --abacato-tinta-3: #7d889c;
+  --abacato-tinta-barra: #e7edf7;
+  --abacato-tinta-barra-2: #9aa6bb;
+
+  --abacato-alerta: #ff6b6b;
+  --abacato-alerta-fundo: #3b1a1a;
+  --abacato-atencao: #ff9d3d;
+  --abacato-atencao-fundo: #3a2416;
+  --abacato-linha: rgba(160, 180, 220, 0.11);
+
+  --abacato-raio: 14px;
+  --abacato-raio-grande: 18px;
+  --abacato-sombra: 0 4px 20px rgba(0, 0, 0, 0.5);
+  --abacato-sombra-alta: 0 8px 30px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
+
+:root[data-visual="lisa"] body {
+  font-family: "Barlow", Inter, system-ui, sans-serif;
+  font-weight: 500;
+}
+
+/* A marca vira o nome escrito, com o ponto azul da Lisa: a logo do abacate é do Abacato. */
+:root[data-visual="lisa"] .abacato-marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: auto;
+  aspect-ratio: auto;
+  background: none;
+  -webkit-mask: none;
+          mask: none;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+:root[data-visual="lisa"] .abacato-marca::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--abacato-verde);
+  box-shadow: 0 0 12px rgba(90, 169, 255, 0.8);
+}
+:root[data-visual="lisa"] .abacato-marca::after { content: "Lisa Task"; }
+:root[data-visual="lisa"] .abacato-marca--entrada { font-size: 30px; }
+
+:root[data-visual="lisa"] .abacato-entrada {
+  background: radial-gradient(1200px 600px at 50% -10%, rgba(90, 169, 255, 0.18) 0%, #05070b 55%, #000000 100%);
+}
+
+/* A abertura é a animação da logo do Abacato, e o tema é claro/escuro: nenhum dos dois existe
+ * na Lisa Task. Os documentos também não (a trava de verdade está no servidor; isto só evita
+ * que o item pisque no menu antes de a barra lateral saber o plano). */
+:root[data-visual="lisa"] .abacato-abertura,
+:root[data-visual="lisa"] .abacato-tema,
+:root[data-visual="lisa"] .abacato-barra-lateral__item[href="/documentos"] {
+  display: none !important;
+}
+
+/* Textos com duas versões (src/componentes/PorVisual.js): o HTML traz as duas e o CSS mostra
+ * a do visual, sem piscar a palavra errada na carga. */
+.abacato-so-lisa { display: none; }
+:root[data-visual="lisa"] .abacato-so-abacato { display: none; }
+:root[data-visual="lisa"] .abacato-so-lisa { display: inline; }
+
+.abacato-selo--lisatask { background: var(--abacato-verde-claro); color: var(--abacato-verde-fundo); border-color: transparent; }

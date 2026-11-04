@@ -1,0 +1,122 @@
+/*
+ * A tela de abertura (ver src/componentes/Abertura.js).
+ *
+ * Escondida por padrão: só aparece quando o script do <head> põe `data-abertura` no <html>.
+ * Sem JavaScript, não há abertura presa na tela.
+ *
+ * O estado de REPOUSO de cada peça é o final da animação — as animações só descrevem de onde
+ * a peça vem. É por isso que o "reduzir movimento" de globals.css, que desliga toda animação,
+ * não some com nada daqui.
+ *
+ * Cores só por token, como no resto do sistema. A abertura é escura nos dois temas, e os
+ * tokens dela moram só no :root.
+ */
+
+.abacato-abertura {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 44%, var(--abacato-abertura-brilho), transparent 70%),
+    var(--abacato-abertura-fundo);
+  color: var(--abacato-abertura-tinta);
+  transition: opacity 0.7s ease;
+}
+:root[data-abertura="ativa"] .abacato-abertura,
+:root[data-abertura="saindo"] .abacato-abertura {
+  display: flex;
+}
+:root[data-abertura="saindo"] .abacato-abertura {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.abacato-abertura__centro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.7s ease, filter 0.7s ease;
+}
+:root[data-abertura="saindo"] .abacato-abertura__centro {
+  transform: scale(1.04);
+  filter: blur(3px);
+}
+
+/* O mascote é pintado pela máscara: traço claro, e um feixe verde passando por ele de tempos
+ * em tempos. */
+.abacato-abertura__marca {
+  width: min(260px, 64vw);
+  aspect-ratio: 560 / 536;
+  -webkit-mask: url(/marca/abacato.png) center / contain no-repeat;
+          mask: url(/marca/abacato.png) center / contain no-repeat;
+  background: linear-gradient(
+    105deg,
+    var(--abacato-abertura-tinta) 0 42%,
+    var(--abacato-verde) 50%,
+    var(--abacato-abertura-tinta) 58% 100%
+  );
+  background-size: 320% 100%;
+  background-position: 100% 0;
+  animation:
+    abacato-abertura-surge 1s cubic-bezier(0.2, 0.7, 0.2, 1) both,
+    abacato-abertura-feixe 2.8s ease-in-out 0.8s infinite;
+}
+
+/* O desenho já traz o nome; "System" completa sem repetir. O espaçamento largo pede o mesmo
+ * tanto de recuo à esquerda, senão a palavra fica visualmente puxada para a esquerda. */
+.abacato-abertura__sistema {
+  margin-top: 10px;
+  padding-left: 0.5em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: var(--abacato-abertura-tinta-2);
+  animation: abacato-abertura-surge 0.9s 0.2s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.abacato-abertura__trilho {
+  position: relative;
+  overflow: hidden;
+  width: 168px;
+  height: 2px;
+  margin-top: 36px;
+  border-radius: var(--abacato-raio-pilula);
+  background: var(--abacato-abertura-trilho);
+  animation: abacato-abertura-surge 0.9s 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.abacato-abertura__carga {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 36%;
+  height: 100%;
+  border-radius: var(--abacato-raio-pilula);
+  background: linear-gradient(90deg, transparent, var(--abacato-verde), transparent);
+  box-shadow: 0 0 8px var(--abacato-abertura-carga-brilho);
+  transform: translateX(89%);
+  animation: abacato-abertura-carga 1.6s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+
+.abacato-abertura__texto {
+  margin-top: 14px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--abacato-abertura-tinta-2);
+  animation: abacato-abertura-surge 0.9s 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes abacato-abertura-surge {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+}
+@keyframes abacato-abertura-feixe {
+  0% { background-position: 100% 0; }
+  60%, 100% { background-position: 0 0; }
+}
+@keyframes abacato-abertura-carga {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(280%); }
+}

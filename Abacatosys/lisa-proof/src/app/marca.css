@@ -1,0 +1,74 @@
+/* A marca (31/10/2026): o mascote, o selo e a tela de abertura animada. */
+
+:root { --marca-papel: #F7F3EA; --marca-tinta: #141A16; }
+
+.mascote { display: block; overflow: visible; }
+.mascote__tinta, .mascote__pupila { fill: currentColor; }
+
+/* o selo: o mascote num círculo de papel (o rosto fica claro em qualquer fundo) */
+.marca-selo {
+  --selo: 32px;
+  display: inline-grid; place-items: center; flex: none;
+  width: var(--selo); height: var(--selo); border-radius: 50%;
+  background: var(--marca-papel); color: var(--marca-tinta);
+  box-shadow: 0 0 0 2px rgba(139, 209, 26, 0.55);
+}
+.pf-marca__icone.marca-selo { width: var(--selo); height: var(--selo); }
+
+/* ---- o desenho animado: o traço corre, a tinta preenche, os olhos piscam */
+.mascote--desenhando .mascote__traco path {
+  fill: none; stroke: currentColor; stroke-width: 0.55; stroke-linejoin: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: mascote-traco 1s cubic-bezier(0.55, 0, 0.3, 1) forwards;
+  animation-delay: calc(var(--atraso, 0.35s) + var(--i) * 55ms);
+}
+.mascote--desenhando .mascote__tinta { opacity: 0; animation: mascote-aparece 0.35s ease-out calc(var(--atraso, 0.35s) + 1.05s) forwards; }
+.mascote--desenhando .mascote__pupila {
+  opacity: 0; transform-box: fill-box; transform-origin: center;
+  animation: mascote-aparece 0.2s ease-out calc(var(--atraso, 0.35s) + 1.1s) forwards, mascote-pisca 0.3s ease-in-out calc(var(--atraso, 0.35s) + 1.6s);
+}
+@keyframes mascote-traco { to { stroke-dashoffset: 0; } }
+@keyframes mascote-aparece { to { opacity: 1; } }
+@keyframes mascote-pisca { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.12); } }
+
+/* ---- a tela de abertura */
+.abertura {
+  position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 42%, #1C3326 0%, #0D1310 62%);
+  color: #F7F3EA; cursor: pointer;
+  animation: abertura-sai 0.45s ease-in 2.25s forwards;
+}
+:root[data-abertura="vista"] .abertura { display: none; }
+.abertura__centro { display: grid; justify-items: center; gap: 10px; }
+.abertura__selo {
+  display: grid; place-items: center; width: 168px; height: 168px; border-radius: 50%;
+  background: var(--marca-papel); color: var(--marca-tinta);
+  box-shadow: 0 0 0 4px rgba(139, 209, 26, 0.7), 0 18px 50px rgba(0, 0, 0, 0.45);
+  animation: abertura-selo 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both, abertura-balanca 0.9s ease-in-out 1.45s;
+}
+.abertura__nome {
+  margin: 14px 0 0; font-size: 30px; font-weight: 700; letter-spacing: -0.01em;
+  display: flex; align-items: baseline; gap: 1px;
+}
+.abertura__nome span, .abertura__nome b { opacity: 0; transform: translateY(10px); animation: abertura-sobe 0.45s ease-out forwards; }
+.abertura__nome span:first-child { animation-delay: 1.15s; }
+.abertura__nome b { color: #8BD11A; animation-delay: 1.3s; }
+.abertura__nome span:last-child { animation-delay: 1.4s; }
+.abertura__lema { margin: 0; font-size: 14px; color: #9BA8A1; opacity: 0; animation: abertura-sobe 0.45s ease-out 1.6s forwards; }
+.abertura__barra {
+  position: absolute; left: 50%; bottom: calc(48px + env(safe-area-inset-bottom)); width: 120px; height: 3px; border-radius: 3px;
+  transform: translateX(-50%); background: rgba(247, 243, 234, 0.12); overflow: hidden;
+}
+.abertura__barra::after { content: ""; position: absolute; inset: 0; background: #8BD11A; transform-origin: left; animation: abertura-carrega 2.2s ease-in-out forwards; }
+
+@keyframes abertura-selo { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes abertura-balanca { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-6deg); } 65% { transform: rotate(4deg); } }
+@keyframes abertura-sobe { to { opacity: 1; transform: none; } }
+@keyframes abertura-carrega { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes abertura-sai { to { opacity: 0; visibility: hidden; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .abertura, .abertura *, .mascote--desenhando * { animation: none !important; }
+  .mascote--desenhando .mascote__traco { display: none; }
+  .mascote--desenhando .mascote__tinta, .mascote--desenhando .mascote__pupila, .abertura__nome span, .abertura__nome b, .abertura__lema { opacity: 1 !important; transform: none !important; }
+}

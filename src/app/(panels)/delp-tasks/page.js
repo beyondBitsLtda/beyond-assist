@@ -12,18 +12,6 @@ const COLUMNS = [
   { key: "Concluído", label: "CONCLUÍDO", color: GR },
 ];
 
-// `Buffer` é API do Node — não existe no navegador. Conversão manual pra base64, em pedaços
-// (evita "Maximum call stack size exceeded" do spread em arquivos maiores).
-function arrayBufferToBase64(buffer) {
-  let binary = "";
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-  }
-  return btoa(binary);
-}
-
 function fmtDate(iso) {
   if (!iso) return null;
   const [y, m, d] = iso.split("-");
@@ -86,12 +74,16 @@ export default function DelpTasksPage() {
     setUploading(true);
     setUploadMsg(null);
     try {
-      const buffer = await file.arrayBuffer();
-      const base64 = arrayBufferToBase64(buffer);
+      // A planilha é interpretada AQUI, no navegador, e só as linhas viajam. Antes o arquivo
+      // inteiro ia em base64 e o servidor interpretava com o ExcelJS — que depende de streams
+      // do Node e não roda no Edge runtime. O ExcelJS agora é carregado sob demanda (import
+      // dentro da função), pra não entrar no pacote de quem nunca abre esta tela.
+      const { parseDelpWorkbook } = await import("@/lib/delpWorkbook.js");
+      const rows = await parseDelpWorkbook(await file.arrayBuffer());
       const res = await fetch("/api/delp-tasks/upload", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ data: base64 }),
+        body: JSON.stringify({ rows }),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || `HTTP ${res.status}`);

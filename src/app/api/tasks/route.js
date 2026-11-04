@@ -1,4 +1,4 @@
-import { loadAllTrelloCards } from "@/lib/liveTrello.js";
+import { loadAllCards } from "@/lib/liveQuadros.js";
 import { getDateBoundaries } from "@/lib/dateRanges.js";
 import { jsonResponse } from "@/lib/http.js";
 
@@ -25,7 +25,7 @@ export async function GET(req) {
   else if (range === "upcoming") { lo = startOfToday; hi = null; label = "próximas"; }
 
   try {
-    const all = await loadAllTrelloCards();
+    const all = await loadAllCards();
 
     const tasks = all
       .filter((c) => c.due)

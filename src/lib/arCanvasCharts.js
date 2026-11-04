@@ -10,7 +10,7 @@ export const INK_DIM = "rgba(207,239,251,0.55)";
 export const INK_FAINT = "rgba(207,239,251,0.3)";
 export const LINE = "rgba(207,239,251,0.12)";
 export const MONO = "'JetBrains Mono', ui-monospace, monospace";
-export const SANS = "'Rajdhani', sans-serif";
+export const SANS = "'Barlow', Inter, system-ui, sans-serif";
 
 export function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();

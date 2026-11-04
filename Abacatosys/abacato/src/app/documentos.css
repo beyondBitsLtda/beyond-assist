@@ -1,0 +1,254 @@
+/* Abacato System — o repositório de documentos.
+ *
+ * Arquivo próprio, como o quadro.css: o globals.css é a fundação do sistema inteiro, e estas
+ * regras só fazem sentido nestas telas. Todos os valores saem dos tokens — nenhuma cor
+ * literal, que é o que faz o modo escuro funcionar aqui sem uma única regra a mais.
+ */
+
+/* ============================================================ árvore e lista
+
+   Duas colunas: a árvore de pastas à esquerda, os documentos à direita. No celular vira uma
+   coluna só — a árvore em cima, curta e rolável, porque numa tela de 390px duas colunas dariam
+   190px para cada, e nenhuma das duas serve com 190px. */
+
+.abacato-arquivo {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) 1fr;
+  gap: var(--abacato-gap);
+  align-items: start;
+}
+
+.abacato-arquivo__arvore {
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.abacato-ramo { display: flex; align-items: center; gap: 2px; border-radius: 8px; padding-right: 6px; }
+.abacato-ramo:hover { background: var(--abacato-superficie-2); }
+.abacato-ramo--ativo { background: var(--abacato-verde-claro); }
+.abacato-ramo--ativo .abacato-ramo__nome { font-weight: 600; color: var(--abacato-tinta); }
+
+.abacato-ramo__seta {
+  width: 18px;
+  height: 26px;
+  border: 0;
+  background: transparent;
+  color: var(--abacato-tinta-3);
+  cursor: pointer;
+  font-size: 10px;
+  flex: 0 0 auto;
+}
+.abacato-ramo__nome {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  padding: 6px 2px;
+  cursor: pointer;
+  min-width: 0;
+  /* Nome de pasta longo corta em vez de empurrar a árvore para fora da caixa. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.abacato-ramo__conta {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--abacato-tinta-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.abacato-arquivo__lista {
+  background: var(--abacato-superficie);
+  border: 1px solid var(--abacato-linha);
+  border-radius: var(--abacato-raio);
+  padding: 12px 14px 16px;
+  min-height: 320px;
+}
+/* A borda verde aparece enquanto se arrasta um arquivo por cima: sem ela, não há como saber
+   que soltar ali vai funcionar. */
+.abacato-arquivo__lista--soltando {
+  border-color: var(--abacato-verde);
+  background: var(--abacato-verde-claro);
+}
+
+.abacato-migalhas {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  font-size: 12.5px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--abacato-linha);
+}
+.abacato-migalhas button {
+  border: 0;
+  background: transparent;
+  color: var(--abacato-tinta-2);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 4px 6px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.abacato-migalhas button:hover { background: var(--abacato-superficie-2); color: var(--abacato-tinta); }
+.abacato-migalhas__seta { color: var(--abacato-tinta-3); }
+
+.abacato-documentos { display: flex; flex-direction: column; gap: 4px; }
+
+.abacato-doc {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--abacato-tinta);
+  font: inherit;
+  text-align: left;
+  padding: 10px 12px;
+  cursor: pointer;
+  width: 100%;
+}
+.abacato-doc:hover { background: var(--abacato-superficie-2); border-color: var(--abacato-linha); }
+.abacato-doc__selo {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--abacato-superficie-2);
+  color: var(--abacato-verde-fundo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex: 0 0 auto;
+}
+.abacato-doc__meio { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.abacato-doc__nome {
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================ o visor */
+
+/* O painel do documento é mais largo que os outros: um PDF em 620px é um PDF que ninguém lê. */
+.abacato-painel__caixa--larga { width: min(1180px, 100%); }
+
+.abacato-documento {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 1fr minmax(280px, 340px);
+  gap: var(--abacato-gap);
+  padding: 0 var(--abacato-gap) var(--abacato-gap);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.abacato-documento__visor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  background: var(--abacato-superficie-2);
+  border-radius: var(--abacato-raio);
+  overflow: hidden;
+}
+.abacato-documento__lado {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--abacato-gap);
+  min-height: 0;
+  scrollbar-width: thin;
+}
+
+.abacato-visor__moldura {
+  flex: 1 1 auto;
+  width: 100%;
+  border: 0;
+  border-radius: var(--abacato-raio);
+  background: var(--abacato-superficie);
+  min-height: 0;
+}
+.abacato-visor__texto {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  background: var(--abacato-superficie);
+  border-radius: var(--abacato-raio);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--abacato-tinta);
+  /* Linha longa quebra em vez de criar rolagem lateral — log e CSV têm linhas enormes, e rolar
+     para os lados para ler texto é o pior jeito de ler texto. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ============================================================ versões */
+
+.abacato-revisao {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 11px;
+  background: var(--abacato-superficie-2);
+  border: 1px solid transparent;
+}
+.abacato-revisao--atual { border-color: var(--abacato-verde); }
+.abacato-revisao__abrir {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--abacato-tinta);
+  font: inherit;
+  font-size: 13px;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.abacato-revisao__abrir:hover { color: var(--abacato-verde-fundo); }
+.abacato-revisao__nota {
+  font-size: 12px;
+  color: var(--abacato-tinta-2);
+  line-height: 1.5;
+  padding-left: 2px;
+  border-left: 2px solid var(--abacato-linha);
+  margin-left: 2px;
+  padding-inline-start: 8px;
+}
+
+/* ============================================================ celular */
+
+@media (max-width: 860px) {
+  .abacato-arquivo { grid-template-columns: 1fr; }
+  .abacato-arquivo__arvore { max-height: 220px; }
+
+  /* O visor vira uma coluna só, com o arquivo em cima e a história embaixo. Lado a lado em
+     390px daria 190px para o PDF, que é largura de não ler nada. */
+  .abacato-documento { grid-template-columns: 1fr; overflow-y: auto; }
+  .abacato-documento__visor { min-height: 60vh; }
+  .abacato-documento__lado { overflow: visible; }
+}

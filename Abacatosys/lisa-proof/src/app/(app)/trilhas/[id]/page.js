@@ -1,0 +1,175 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { obter, criar, remover, mudar } from "@/lib/api.js";
+import { formatarDia, NOMES_DOS_DIAS } from "@/dominio/datas.js";
+import { PERFIS } from "@/dominio/perfis.js";
+import { Barra, DiasDeEstudo } from "@/componentes/Pecas.js";
+import MapaDaTrilha from "@/componentes/MapaDaTrilha.js";
+import { comemorar } from "@/componentes/Neuro.js";
+import { AnotacoesDoAlvo } from "@/componentes/caderno/Vinculos.js";
+import { SeletorDePerfil } from "@/componentes/pratica/Motores.js";
+
+export default function Trilha() {
+  const { id } = useParams();
+  const router = useRouter();
+  const [dados, setDados] = useState(null);
+  const [erro, setErro] = useState("");
+  const [aviso, setAviso] = useState("");
+  const [ocupado, setOcupado] = useState("");
+  const [dias, setDias] = useState(null);
+  const festejou = useRef(false);
+
+  const carregar = useCallback(async () => {
+    try {
+      const d = await obter(`/api/trilhas/${id}`);
+      setDados(d);
+      setDias((atual) => atual || d.trilha.diasDeEstudo);
+      setErro("");
+    } catch (e) {
+      setErro(e.message);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    // O aviso vem da criação (ex.: "a IA não respondeu"). Lido uma vez e tirado da URL.
+    const vindo = new URLSearchParams(window.location.search).get("aviso");
+    if (vindo) {
+      setAviso(vindo);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+    carregar();
+  }, [carregar]);
+
+  // Trilha terminada (assuntos e projeto final): festa uma vez por sessão, não a cada visita.
+  useEffect(() => {
+    if (!dados?.avanco?.concluida || festejou.current) return;
+    festejou.current = true;
+    const chave = `proof-festa-${id}`;
+    try {
+      if (sessionStorage.getItem(chave)) return;
+      sessionStorage.setItem(chave, "1");
+    } catch { /* sem armazenamento: festeja assim mesmo */ }
+    setTimeout(() => comemorar(`Trilha de ${dados.trilha.tema} concluída! 🏆`), 400);
+  }, [dados, id]);
+
+  async function replanejar({ usarIa = false, comDias = false } = {}) {
+    setOcupado(usarIa ? "ia" : comDias ? "dias" : "replanejar");
+    setErro("");
+    setAviso("");
+    try {
+      const r = await criar(`/api/trilhas/${id}/replanejar`, { usarIa, ...(comDias ? { diasDeEstudo: dias } : {}) });
+      setAviso(r.aviso || (usarIa ? "A Lisa reorganizou a trilha." : "Trilha replanejada a partir de hoje."));
+      await carregar();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setOcupado("");
+    }
+  }
+
+  /** O tipo de curso decide a prática que vier depois (o exercício, o projeto e a entrega). */
+  async function mudarTipo(perfil) {
+    if (perfil === dados?.trilha?.perfil) return;
+    setOcupado("perfil");
+    setErro("");
+    try {
+      await mudar(`/api/trilhas/${id}`, { perfil });
+      setDados((d) => ({ ...d, trilha: { ...d.trilha, perfil } }));
+      setAviso(`Tipo de curso: ${PERFIS[perfil].nome}. Vale a partir da próxima prática (o que já foi gerado continua como está).`);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setOcupado("");
+    }
+  }
+
+  async function apagar() {
+    if (!window.confirm("Apagar esta trilha? O quadro no Abacato e os pontos que você já ganhou continuam.")) return;
+    setOcupado("apagar");
+    try {
+      await remover(`/api/trilhas/${id}`);
+      router.push("/trilhas");
+    } catch (e) {
+      setErro(e.message);
+      setOcupado("");
+    }
+  }
+
+  if (!dados) {
+    return erro ? <div className="pf-aviso pf-aviso--erro">{erro}</div> : <div className="pf-carregando">Desenhando a trilha…</div>;
+  }
+
+  const { trilha, avanco, progresso } = dados;
+  const terminou = avanco.concluida;
+  const semanas = avanco.unidades.length;
+  const ultimaSemana = avanco.unidades.at(-1)?.numero || semanas;
+  const daVez = avanco.semanaDaVez;
+
+  return (
+    <>
+      <div className="pf-cabecalho">
+        <div>
+          <h1>{trilha.tema}</h1>
+          <p>
+            {PERFIS[trilha.perfil]?.emoji} {PERFIS[trilha.perfil]?.nome} ·{" "}
+            {trilha.geradaPor === "ia" ? "Montada pela Lisa" : "Na ordem do quadro"} · desde {formatarDia(trilha.inicioEm)} ·{" "}
+            {trilha.diasDeEstudo.map((d) => NOMES_DOS_DIAS[d]).join(", ")}
+          </p>
+        </div>
+        <a className="pf-botao pf-botao--sec pf-botao--pequeno" href={trilha.link} target="_blank" rel="noreferrer">Abrir quadro ↗</a>
+      </div>
+
+      {aviso && <div className="pf-aviso" style={{ marginBottom: 12 }}>{aviso}</div>}
+      {erro && <div className="pf-aviso pf-aviso--erro" style={{ marginBottom: 12 }}>{erro}</div>}
+
+      <div className="pf-cartao">
+        <div className="pf-estat__rotulo">Progresso da trilha</div>
+        <div className="pf-estat__valor">
+          {progresso.feitos}<small>/{progresso.total} assuntos{terminou ? " · concluída 🏆" : ""}</small>
+        </div>
+        <Barra valor={progresso.feitos} total={progresso.total} rotulo="Progresso da trilha" />
+        {semanas > 0 && (
+          <p className="pf-estat__nota" style={{ marginTop: 8 }}>
+            {terminou
+              ? `${semanas === 1 ? "Plano de uma semana" : `${semanas} semanas de plano`} · trilha concluída com o projeto final`
+              : daVez
+                ? `Semana ${daVez.numero} de ${ultimaSemana} do curso${daVez.final ? " (a última: termina no projeto final)" : ` · o projeto dela abre a semana ${daVez.seguinte}`}`
+                : `${semanas} semana(s) de plano`}
+            {" · o assunto conclui com a teoria e o quiz dele (60%+)"}
+          </p>
+        )}
+        {trilha.resumo && <p className="pf-estat__nota" style={{ marginTop: 12 }}>{trilha.resumo}</p>}
+
+        <details className="pf-ajuste" style={{ marginTop: 8 }}>
+          <summary>Ajustes da trilha</summary>
+          <div className="pf-acoes">
+            <button className="pf-botao pf-botao--sec pf-botao--pequeno" type="button" disabled={Boolean(ocupado)} onClick={() => replanejar()}>
+              {ocupado === "replanejar" ? "Replanejando…" : "Replanejar a partir de hoje"}
+            </button>
+            <button className="pf-botao pf-botao--sec pf-botao--pequeno" type="button" disabled={Boolean(ocupado)} onClick={() => replanejar({ usarIa: true })}>
+              {ocupado === "ia" ? "A Lisa está reorganizando…" : "Refazer a ordem com a Lisa"}
+            </button>
+          </div>
+          <p className="pf-campo__rotulo" style={{ margin: "14px 0 6px" }}>Tipo de curso · decide o exercício do dia e a entrega dos projetos</p>
+          <SeletorDePerfil valor={trilha.perfil} aoMudar={mudarTipo} desabilitado={Boolean(ocupado)} />
+          <p className="pf-campo__rotulo" style={{ margin: "14px 0 6px" }}>Dias de estudo</p>
+          {dias && <DiasDeEstudo valor={dias} aoMudar={setDias} />}
+          <div className="pf-acoes" style={{ marginTop: 10 }}>
+            <button className="pf-botao pf-botao--pequeno" type="button" disabled={Boolean(ocupado)} onClick={() => replanejar({ comDias: true })}>
+              {ocupado === "dias" ? "Salvando…" : "Salvar dias e replanejar"}
+            </button>
+            <button className="pf-botao pf-botao--perigo pf-botao--pequeno" type="button" disabled={Boolean(ocupado)} onClick={apagar}>
+              Apagar trilha
+            </button>
+          </div>
+        </details>
+      </div>
+
+      <AnotacoesDoAlvo alvo={{ tipo: "trilha", id }} titulo="Anotações da trilha" nomeDoAlvo={trilha.tema} />
+
+      <MapaDaTrilha trilha={trilha} avanco={avanco} aoMudar={carregar} />
+    </>
+  );
+}

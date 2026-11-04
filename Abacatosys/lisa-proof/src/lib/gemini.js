@@ -1,0 +1,199 @@
+/**
+ * O modelo que a Lisa usa, falado direto pela API REST.
+ *
+ * Sem SDK: a biblioteca oficial do Google traz dependências que não rodam no runtime da
+ * Cloudflare, e o que a gente precisa aqui é uma chamada HTTP com JSON. Menos código, menos
+ * coisa para quebrar num deploy.
+ *
+ * VÁRIAS CHAVES, UMA FILA. O plano gratuito do Gemini tem cota por projeto; com uma chave só,
+ * um dia movimentado derruba a assistente até a meia-noite. A lista é percorrida em ordem e a
+ * primeira que responder ganha — e a que devolveu 429 fica marcada como cansada por alguns
+ * minutos, para não gastar uma ida de rede toda vez só para levar o mesmo não.
+ */
+
+const MODELO = process.env.GEMINI_CHAT_MODEL || "gemini-3.6-flash";
+const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+
+/**
+ * Acréscimo da Lisa_Proof — SOBRECARGA NÃO É COTA.
+ *
+ * O Google responde 503 ("This model is currently experiencing high demand") quando o MODELO
+ * está sobrecarregado, para todo mundo e com qualquer chave. O código herdado tratava 503 como
+ * 429 (cota): punha a chave de castigo e dizia "a cota acabou" — num pico de demanda, queimava
+ * as chaves uma a uma e desistia, com 35 chaves válidas e cota sobrando.
+ *
+ * Agora: 429 põe de castigo a chave NAQUELE modelo (a cota do Google é por modelo); 503/500/504
+ * não castigam ninguém — espera um pouco, tenta outra chave e, se o modelo seguir sobrecarregado,
+ * passa para o modelo reserva.
+ */
+// Escolhido por medição (06/10/2026, pico de demanda): os modelos "flash" respondiam 503 e o
+// 2.5 já respondia 404 (desligado); o 3.5-flash-lite respondeu em todas as tentativas.
+const MODELO_RESERVA = process.env.GEMINI_MODELO_RESERVA || "gemini-3.5-flash-lite";
+const SOBRECARGAS_ANTES_DA_RESERVA = 2; // cada 503 pode demorar dezenas de segundos para chegar
+const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Quanto tempo uma chave que estourou a cota fica de fora. */
+const DESCANSO_MS = 5 * 60 * 1000;
+const cansadas = new Map(); // chave do mapa: `${modelo}|${chave}`
+
+function chaves() {
+  return String(process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "")
+    .split(/[,\s]+/)
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
+
+export function temModelo() {
+  return chaves().length > 0;
+}
+
+/** As chaves que valem tentar agora neste modelo: as descansadas, na ordem em que foram dadas. */
+function disponiveis(modelo = MODELO) {
+  const agora = Date.now();
+  const todas = chaves();
+  const prontas = todas.filter((k) => (cansadas.get(`${modelo}|${k}`) || 0) < agora);
+  // Se TODAS estão de castigo, tenta assim mesmo: melhor um 429 do que dizer que não há
+  // assistente quando a cota pode ter virado antes da hora.
+  return prontas.length ? prontas : todas;
+}
+
+/**
+ * Uma rodada de conversa com o modelo.
+ *
+ * `contents` é o histórico no formato do Gemini; `ferramentas` são as declarações de função.
+ * Devolve a parte de conteúdo da primeira candidata — texto, chamadas de função, ou os dois.
+ */
+export async function conversar({ contents, sistema, ferramentas, maxTokens, esquema, temperatura, pensarPouco }) {
+  const lista = disponiveis();
+  if (!lista.length) {
+    throw new Error("a assistente não está configurada neste servidor (falta GEMINI_API_KEYS)");
+  }
+
+  const corpo = {
+    contents,
+    ...(sistema ? { systemInstruction: { parts: [{ text: sistema }] } } : {}),
+    ...(ferramentas?.length ? { tools: [{ functionDeclarations: ferramentas }] } : {}),
+    generationConfig: {
+      // Baixa de propósito: esta assistente cria tarefas e muda prazos. Criatividade aqui não
+      // é qualidade, é risco de inventar um id que não existe.
+      temperature: Number.isFinite(temperatura) ? temperatura : 0.2,
+      // Acréscimo da Lisa_Proof: com `esquema`, o modelo é obrigado a devolver JSON nesse
+      // formato. É o que deixa o plano da trilha ser conferido em código em vez de garimpado
+      // de um texto livre.
+      ...(esquema ? { responseMimeType: "application/json", responseSchema: esquema } : {}),
+      // Quem chama diz de quanto precisa.
+      //
+      // O padrão serve a uma resposta de conversa. Quem devolve ESTRUTURA — um quadro com
+      // trinta cards, cada um com descrição e checklist — precisa de muito mais: com 2048 o
+      // modelo era cortado no meio da chamada de função e devolvia uma resposta vazia, que
+      // na tela virava "Me conte um pouco mais" a cada tentativa. A pessoa repetia o pedido
+      // e recebia a mesma frase, sem nada dizendo que o problema era tamanho.
+      maxOutputTokens: Number.isFinite(maxTokens) ? maxTokens : 2048,
+      // Acréscimo da Lisa_Proof: respostas GRANDES e bem especificadas (um curso inteiro) não
+      // ganham nada com o modelo "pensando" antes — e o raciocínio levava a geração de 30 s a
+      // mais de 100 s. Se o modelo não aceitar a opção, a chamada é refeita sem ela (abaixo).
+      ...(pensarPouco ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
+    },
+  };
+  // O corpo vira texto uma vez só (e de novo só se mudar): com foto ou áudio da entrega ele tem
+  // megabytes, e refazer o texto a cada chave tentada gastaria o tempo de CPU do Worker.
+  let corpoEmTexto = null;
+  const buscar = (modelo, chave) =>
+    fetch(`${BASE}/${modelo}:generateContent?key=${encodeURIComponent(chave)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: (corpoEmTexto ??= JSON.stringify(corpo)),
+    });
+
+  /** Uma tentativa: devolve `{ parte }`, `{ cota }`, `{ sobrecarga }` ou `{ erro }`. */
+  async function tentar(modelo, chave) {
+    let resposta;
+    try {
+      resposta = await buscar(modelo, chave);
+      // Modelo que não conhece o ajuste de raciocínio responde 400: tira a opção e tenta de novo.
+      if (resposta.status === 400 && corpo.generationConfig.thinkingConfig) {
+        delete corpo.generationConfig.thinkingConfig;
+        corpoEmTexto = null;
+        resposta = await buscar(modelo, chave);
+      }
+    } catch (e) {
+      return { erro: new Error(`não consegui falar com o modelo: ${e.message}`) };
+    }
+    if (resposta.status === 429) return { cota: true };
+    // Modelo inexistente ou desligado pelo Google (404): nenhuma outra chave vai resolver.
+    if (resposta.status === 404) return { semModelo: true };
+    if (resposta.status === 503 || resposta.status === 500 || resposta.status === 504) return { sobrecarga: true };
+
+    const dados = await resposta.json().catch(() => null);
+    if (!resposta.ok) {
+      // A mensagem do Google costuma dizer o que falta (chave inválida, modelo inexistente).
+      return { erro: new Error(dados?.error?.message || `o modelo respondeu ${resposta.status}`) };
+    }
+
+    const candidata = dados?.candidates?.[0];
+    const parte = candidata?.content;
+    const motivo = candidata?.finishReason;
+    if (!parte) {
+      // Resposta vazia costuma ser filtro de segurança do próprio modelo — ou corte por
+      // tamanho, que é indistinguível daqui se não olharmos o motivo. Não adianta outra chave.
+      throw new Error(
+        motivo === "SAFETY" ? "o modelo recusou responder a isso"
+        : motivo === "MAX_TOKENS" ? "a resposta não coube no limite de tamanho"
+        : "o modelo devolveu uma resposta vazia"
+      );
+    }
+    // O motivo viaja junto: "parou porque terminou" e "parou porque acabou o espaço" chegam com
+    // a mesma cara, e quem chamou precisa distinguir os dois para dizer a verdade.
+    parte.motivoDeParada = motivo || null;
+    parte.modelo = modelo;
+    return { parte };
+  }
+
+  // Teto de idas ao Google por chamada: o Worker gratuito aceita 50 chamadas de rede por
+  // requisição, e 35 chaves × 2 modelos passariam disso no pior caso.
+  const MAXIMO_DE_TENTATIVAS = 14;
+  let tentativas = 0;
+  let ultimoErro = null;
+
+  for (const modelo of [...new Set([MODELO, MODELO_RESERVA].filter(Boolean))]) {
+    let sobrecargas = 0;
+    for (const chave of disponiveis(modelo)) {
+      if (tentativas++ >= MAXIMO_DE_TENTATIVAS) break;
+      const r = await tentar(modelo, chave);
+      if (r.parte) return r.parte;
+      if (r.semModelo) {
+        ultimoErro = new Error(`o modelo ${modelo} não está disponível`);
+        break; // passa direto para o modelo reserva
+      }
+      if (r.cota) {
+        cansadas.set(`${modelo}|${chave}`, Date.now() + DESCANSO_MS);
+        ultimoErro = new Error("a cota do modelo acabou por agora — tente daqui a alguns minutos");
+      } else if (r.sobrecarga) {
+        ultimoErro = new Error("o modelo de IA está sobrecarregado agora (pico de uso no Google) — tente de novo em instantes");
+        if (++sobrecargas >= SOBRECARGAS_ANTES_DA_RESERVA) break; // passa para o modelo reserva
+        await esperar(700 * sobrecargas);
+      } else {
+        ultimoErro = r.erro;
+      }
+    }
+  }
+
+  throw ultimoErro || new Error("nenhuma chave do modelo respondeu");
+}
+
+/** O texto de uma resposta, juntando as partes de texto e ignorando as de função. */
+export function textoDe(conteudo) {
+  return (conteudo?.parts || [])
+    .map((p) => p.text)
+    .filter(Boolean)
+    .join("")
+    .trim();
+}
+
+/** As chamadas de função pedidas pelo modelo nesta rodada. */
+export function chamadasDe(conteudo) {
+  return (conteudo?.parts || [])
+    .map((p) => p.functionCall)
+    .filter(Boolean)
+    .map((f) => ({ nome: f.name, args: f.args || {} }));
+}

@@ -71,7 +71,7 @@ export default function TasksPage() {
           <button
             onClick={() => load(range)}
             disabled={loading}
-            title="Busca direto do Trello (ao vivo) — atualiza sozinho a cada 1 min também"
+            title="Busca direto do Abacato (ao vivo) — atualiza sozinho a cada 1 min também"
             style={{ ...mono, fontSize: 9, letterSpacing: 2, padding: "6px 12px", marginLeft: 6, border: `1px solid ${CY}`, borderRadius: 3, background: "rgba(var(--accent-rgb),0.06)", color: "#eafcff", cursor: loading ? "wait" : "pointer" }}
           >
             {loading ? "…" : "↻ ATUALIZAR"}

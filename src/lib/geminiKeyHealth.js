@@ -1,6 +1,11 @@
 import { supabase } from "@/lib/supabase.js";
 
-// ---- saúde das chaves do Gemini, por (chave × MODELO), com persistência real ----
+// ---- saúde das chaves de IA, por (chave × MODELO), com persistência real ----
+//
+// Apesar do nome do arquivo, este módulo serve a QUALQUER provedor: a Groq entrou depois
+// e usa o mesmo mecanismo. As linhas não colidem porque a chave da tabela é (índice,
+// modelo) — o índice 0 do Gemini e o índice 0 da Groq são linhas diferentes, já que o
+// modelo difere.
 // Cada MODELO tem cota própria — uma chave pode estar ótima pro chat e zerada pra voz ao
 // mesmo tempo (foi exatamente o que aconteceu: TTS free tier = 10/dia, chat/embeddings
 // bem mais folgados, na MESMA chave). E como a Vercel não garante que a função continue
@@ -42,6 +47,28 @@ async function ensureFreshCache() {
   return hydratingPromise;
 }
 
+// ---- a reserva interativa -----------------------------------------------------------------
+//
+// Quantas chaves a INDEXAÇÃO nunca pode tocar. Sem isso, indexar e conversar bebem do mesmo
+// poço, e quem bebe rápido ganha.
+//
+// Medido em 15/09/2026: depois que o relógio saiu da Cloudflare (onde os limites do plano
+// gratuito o continham em ~300 pedaços por hora) e passou a rodar em casa sem teto, o sync
+// consumiu a cota DIÁRIA das 35 chaves do modelo de embedding numa manhã. As 35 ficaram em
+// cooldown de 12 h com motivo `rpd`, e uma pergunta no chat passou a levar 98 segundos —
+// esperando por uma chave livre que não existia. O Worker gastava 14 ms de CPU nesses 98
+// segundos: não estava calculando, estava na fila.
+//
+// A reserva vale só onde há disputa de verdade. Cota do Gemini é por (chave × MODELO), e o
+// modelo de embedding é o ÚNICO que a indexação e a conversa compartilham — chat e voz têm
+// cota própria, e nenhuma indexação jamais as consome. Por isso a reserva não precisa saber
+// de modelo: basta que a indexação fique longe do fim do pool.
+//
+// Não é preciso "preferir" a reserva no lado interativo: pickKeyIndex já filtra por
+// disponibilidade, então quando o sync esgota a parte dele, as únicas livres são as
+// reservadas — e é nelas que a conversa cai naturalmente.
+const RESERVA_INTERATIVA = Math.max(0, Number(process.env.GEMINI_RESERVA_INTERATIVA ?? 8));
+
 function isAvailableNow(keyIndex, model) {
   const entry = cache.get(`${keyIndex}:${model}`);
   return !entry || Date.now() >= entry.until;
@@ -51,20 +78,39 @@ function isAvailableNow(keyIndex, model) {
  * nesta MESMA chamada lógica) e preferindo as que não estão de cooldown — rodízio simples
  * entre as candidatas restantes. Se todas estiverem de cooldown, ainda assim devolve uma
  * (melhor tentar e deixar o próprio Gemini confirmar do que travar o app). */
-let rrPointer = 0;
-export async function pickKeyIndex(n, model, exclude = new Set()) {
+// Ponteiros separados por escopo E POR MODELO.
+//
+// Por escopo: o rodízio da indexação não deve empurrar o da conversa, senão o sync (que faz
+// milhares de chamadas) decide sozinho onde a próxima pergunta começa.
+//
+// Por modelo: este módulo passou a servir também às chaves da Groq, e os dois pools têm
+// TAMANHOS diferentes. Com um ponteiro só, 35 chamadas ao Gemini deixariam o ponteiro em 35, e
+// a próxima chamada à Groq (com 3 chaves) faria 35 % 3 — sempre a mesma chave, sempre. O
+// rodízio continuaria existindo no código e deixaria de existir na prática, sem erro nenhum.
+const ponteiros = new Map();
+const ponteiroDe = (escopo, model) => ponteiros.get(`${escopo}:${model}`) || 0;
+export async function pickKeyIndex(n, model, exclude = new Set(), { paraIngestao = false } = {}) {
   await ensureFreshCache();
+  // A indexação enxerga só o começo do pool; o fim é a reserva interativa. O `max(1, ...)`
+  // garante que ela sempre tenha ao menos uma chave, mesmo se alguém configurar uma reserva
+  // maior que o pool — melhor indexar devagar que não indexar.
+  const limite = paraIngestao ? Math.max(1, n - RESERVA_INTERATIVA) : n;
   const notExcluded = [];
-  for (let i = 0; i < n; i++) if (!exclude.has(i)) notExcluded.push(i);
-  const pool = notExcluded.length ? notExcluded : Array.from({ length: n }, (_, i) => i); // esgotou exclusão — libera geral
+  for (let i = 0; i < limite; i++) if (!exclude.has(i)) notExcluded.push(i);
+  const pool = notExcluded.length ? notExcluded : Array.from({ length: limite }, (_, i) => i); // esgotou exclusão — libera geral
   const available = pool.filter((i) => isAvailableNow(i, model));
   const finalPool = available.length ? available : pool;
-  for (let step = 0; step < n; step++) {
-    const idx = (rrPointer + step) % n;
-    if (finalPool.includes(idx)) { rrPointer = (idx + 1) % n; return idx; }
+  const escopo = paraIngestao ? "ingestao" : "interativo";
+  const inicio = ponteiroDe(escopo, model);
+  for (let step = 0; step < limite; step++) {
+    const idx = (inicio + step) % limite;
+    if (finalPool.includes(idx)) { ponteiros.set(`${escopo}:${model}`, (idx + 1) % limite); return idx; }
   }
   return finalPool[0];
 }
+
+/** Quantas chaves a indexação pode usar, para quem precisa relatar (painel e diagnóstico). */
+export function tamanhoDaReserva() { return RESERVA_INTERATIVA; }
 
 /** Registra uma tentativa de chamada (sucesso ou falha) pro painel de uso (/gemini-keys) —
  * agregado por dia via a função increment_gemini_usage (ver db/schema.sql), nunca uma linha
