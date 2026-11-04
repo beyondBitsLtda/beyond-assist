@@ -149,6 +149,7 @@ import {
   TIPOS_DE_DIAGRAMA, ORDEM_DOS_DIAGRAMAS, NOMES_DAS_FORMAS, NOTACAO_DO_TIPO, LIMITES_DO_DIAGRAMA, validarDesafioDeDiagrama,
   conferirDiagrama, descreverDiagrama, pedeDiagrama, motoresComDiagrama, tiposSugeridos, formasDoTipo,
 } from "../src/dominio/diagramas.js";
+import * as bootcamp from "../src/dominio/bootcamp.js";
 
 let passou = 0;
 function caso(nome, fn) {
@@ -3918,5 +3919,241 @@ caso("a semana da ofensiva: de domingo a sábado, com hoje e os dias que faltam"
   assert.deepEqual(s.map((d) => d.futuro), [false, false, false, true, true, true, true]);
   assert.equal(semanaDaOfensiva([], "2026-11-01")[0].hoje, true, "no domingo, hoje é o primeiro");
 });
+
+{
+  const {
+    BOOTCAMP, LINGUAGENS_DO_BOOTCAMP, JURADOS, NPCS_DO_BOOTCAMP, ORDEM_DO_FLUXO, MODELOS_DE_CODIGO, DESAFIOS_DE_RESERVA,
+    chaveDaLinguagem, caminhoPadrao, avancarNoFluxo, validarConfiguracao, totalDeRodadas, dificuldadeDaRodada, montarParticipantes,
+    npcsDisponiveis, confrontosDaRodada, prazoDaRodada, prazoPassou, normalizarSaida, conferirCaso, resumoDosTestes, validarDesafio,
+    desafioParaTela, testesParaTela, desafioDeReserva, simularNpc, etapaDoNpc, tetoDoKernel, notaDaRodada, notasDoNpc,
+    avaliacaoAutomatica, validarAvaliacao, aplicarResultado, classificacao, podeChamarJurados, skinDeJurado,
+  } = bootcamp;
+
+console.log("\nmodo bootcamp");
+
+caso("bootcamp: os desafios de reserva têm gabarito certo (a solução de cada um passa nos próprios testes)", () => {
+  assert.ok(DESAFIOS_DE_RESERVA.length >= 8);
+  for (const d of DESAFIOS_DE_RESERVA) {
+    assert.ok(d.testes.length >= BOOTCAMP.testes.min, d.id);
+    for (const [entrada, saida] of d.testes) assert.ok(conferirCaso(saida, d.resolver(entrada)), `${d.id}: ${JSON.stringify(entrada)}`);
+  }
+  assert.deepEqual([...new Set(DESAFIOS_DE_RESERVA.map((d) => d.dificuldade))].sort(), [1, 2, 3], "há desafio de cada dificuldade");
+});
+
+caso("bootcamp: as linguagens rodam no servidor (JavaScript no Node, sem SQL) e cada uma tem o seu modelo", () => {
+  assert.equal(LINGUAGENS_DO_BOOTCAMP.javascript.compilador, "nodejs-20.17.0");
+  assert.ok(!LINGUAGENS_DO_BOOTCAMP.sql, "SQL não lê stdin");
+  for (const chave of Object.keys(LINGUAGENS_DO_BOOTCAMP)) assert.ok(MODELOS_DE_CODIGO[chave], `modelo de ${chave}`);
+  assert.equal(chaveDaLinguagem("Python 3.12"), "python");
+  assert.equal(chaveDaLinguagem("C++ (gcc 13)"), "cpp");
+  assert.equal(chaveDaLinguagem("JavaScript (Node 20)"), "javascript");
+  assert.equal(chaveDaLinguagem("sql"), "");
+  assert.equal(caminhoPadrao(2, "python"), "bootcamp/rodada-2/solucao.py");
+  assert.equal(caminhoPadrao(1, "java"), "bootcamp/rodada-1/solucao.java");
+});
+
+caso("bootcamp: a configuração do torneio (formato, tempo opcional, linguagens, vagas)", () => {
+  const ok = validarConfiguracao({ nome: "Temporada 1", formato: "mata-mata" });
+  assert.ok(ok.ok);
+  assert.equal(ok.config.total, 8);
+  assert.equal(ok.config.tempoMin, null, "o tempo é opcional");
+  assert.deepEqual(ok.config.linguagens, { modo: "livre", permitidas: [] });
+  assert.equal(validarConfiguracao({ nome: "x", formato: "mata-mata" }).ok, false, "nome curto");
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "liga" }).ok, false, "formato desconhecido");
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "mata-mata", usarTempo: true, tempoMin: 7 }).ok, false, "tempo fora da lista");
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "mata-mata", usarTempo: true, tempoMin: 30 }).config.tempoMin, 30);
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "pontos-corridos", rodadas: 9 }).ok, false);
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "pontos-corridos", rodadas: 4 }).config.rodadasPontos, 4);
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "mata-mata", total: 9 }).ok, false, "no máximo 8");
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "mata-mata", total: 1 }).ok, false, "no mínimo 2");
+  const uuid = (n) => `00000000-0000-4000-8000-00000000000${n}`;
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "mata-mata", total: 2, convidados: [uuid(1), uuid(2)] }).ok, false, "convidados demais");
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "mata-mata", total: 3, convidados: [uuid(1)], npcs: ["lisa", "byte-ninja"] }).ok, false, "personagens demais");
+  assert.deepEqual(validarConfiguracao({ nome: "Temporada", formato: "mata-mata", linguagens: { modo: "jurados", permitidas: ["py", "SQL", "c++"] } }).config.linguagens, { modo: "jurados", permitidas: ["python", "cpp"] });
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "mata-mata", linguagens: { permitidas: ["sql"] } }).ok, false, "nenhuma roda");
+});
+
+caso("bootcamp: até 8 participantes, cada um com skin, nome e personalidade únicos", () => {
+  let n = 0;
+  const s = () => ((n = (n * 9301 + 49297) % 233280) / 233280);
+  const lista = montarParticipantes({
+    humanos: [{ usuarioId: "u1", nome: "Ana B.", personagem: "ninja" }, { usuarioId: "u2", nome: "Caio", personagem: "ninja" }],
+    npcs: ["lisa", "byte-ninja"], total: 8, s,
+  });
+  assert.equal(lista.length, 8);
+  assert.equal(new Set(lista.map((p) => p.skin)).size, 8, "skins únicas");
+  assert.equal(new Set(lista.map((p) => p.nome)).size, 8, "nomes únicos");
+  assert.deepEqual([...lista.map((p) => p.baia)].sort(), [0, 1, 2, 3, 4, 5, 6, 7], "uma baia para cada");
+  assert.equal(lista[0].skin, "ninja", "o organizador veste o personagem dele");
+  assert.notEqual(lista[1].skin, "ninja", "o segundo humano com a mesma skin ganha outra");
+  assert.ok(lista.some((p) => p.npcId === "lisa"), "o personagem escolhido entra");
+  assert.ok(!lista.some((p) => p.npcId === "byte-ninja"), "o Byte Ninja veste ninja, que já é de um humano");
+  assert.ok(lista.filter((p) => p.tipo === "npc").every((p) => p.personalidade && !skinDeJurado(p.skin)), "personagens com personalidade e sem a skin dos jurados");
+  assert.ok(lista.every((p) => !p.eliminado && p.pontos === 0));
+  assert.equal(montarParticipantes({ humanos: [{ usuarioId: "u1", nome: "Ana", personagem: "neuro" }], total: 3, s }).length, 3);
+  assert.ok(!npcsDisponiveis(["lisa"]).some((x) => x.skin === "lisa"));
+  assert.equal(NPCS_DO_BOOTCAMP.length, new Set(NPCS_DO_BOOTCAMP.map((x) => x.skin)).size);
+  assert.equal(JURADOS.length, 3);
+});
+
+caso("bootcamp: as rodadas do mata-mata e dos pontos corridos, e a dificuldade que sobe", () => {
+  assert.equal(totalDeRodadas("mata-mata", 8), 3);
+  assert.equal(totalDeRodadas("mata-mata", 5), 3);
+  assert.equal(totalDeRodadas("mata-mata", 3), 2);
+  assert.equal(totalDeRodadas("mata-mata", 2), 1);
+  assert.equal(totalDeRodadas("pontos-corridos", 8, 4), 4);
+  assert.deepEqual([1, 2, 3].map((r) => dificuldadeDaRodada(r, 3)), [1, 2, 3]);
+  assert.equal(dificuldadeDaRodada(1, 1), 2);
+  assert.equal(dificuldadeDaRodada(2, 2), 3, "a final é difícil");
+  const p = (id, baia, pontos = 0) => ({ id, baia, pontos, eliminado: false });
+  const oito = Array.from({ length: 8 }, (_, i) => p(`p${i}`, i));
+  assert.deepEqual(confrontosDaRodada(oito), [{ a: "p0", b: "p7" }, { a: "p1", b: "p6" }, { a: "p2", b: "p5" }, { a: "p3", b: "p4" }]);
+  const cinco = [p("a", 0, 10), p("b", 1, 50), p("c", 2, 30), p("d", 3, 20), p("e", 4, 40)];
+  assert.deepEqual(confrontosDaRodada(cinco), [{ a: "b", b: null }, { a: "e", b: "a" }, { a: "c", b: "d" }], "o melhor tem folga; depois, 2º × último");
+});
+
+caso("bootcamp: o fluxo do exercício, com a decisão 'Passou nos testes?'", () => {
+  assert.deepEqual(ORDEM_DO_FLUXO, ["leitura", "analise", "ambiente", "codigo", "testes", "revisao", "fim"]);
+  let e = "leitura";
+  assert.equal(avancarNoFluxo(e, "planejar", { plano: "um plano comprido o bastante" }).ok, false, "lê antes de planejar");
+  e = avancarNoFluxo(e, "ler").etapa;
+  assert.equal(e, "analise");
+  assert.equal(avancarNoFluxo(e, "planejar", { plano: "curto" }).ok, false, "plano curto demais");
+  e = avancarNoFluxo(e, "planejar", { plano: "ler N, somar os pares e imprimir" }).etapa;
+  assert.equal(e, "ambiente");
+  assert.equal(avancarNoFluxo(e, "ambiente", { modo: "github", linguagem: "python", repoValido: false }).ok, false, "GitHub pede o repositório");
+  assert.equal(avancarNoFluxo(e, "ambiente", { modo: "editor", linguagem: "sql" }).ok, false, "linguagem que não roda");
+  e = avancarNoFluxo(e, "ambiente", { modo: "editor", linguagem: "python" }).etapa;
+  assert.equal(e, "codigo");
+  assert.equal(avancarNoFluxo(e, "enviar", { passou: false }).ok, false, "não envia sem passar");
+  assert.equal(avancarNoFluxo(e, "testar", { passou: false }).etapa, "codigo", "não passou: volta para a correção");
+  e = avancarNoFluxo(e, "testar", { passou: true }).etapa;
+  assert.equal(e, "testes");
+  assert.equal(avancarNoFluxo(e, "ambiente", { modo: "editor", linguagem: "javascript" }).etapa, "codigo", "trocar o ambiente volta ao código");
+  assert.equal(avancarNoFluxo(e, "planejar", { plano: "revendo o plano depois dos testes" }).etapa, "testes", "rever o plano não muda a etapa");
+  e = avancarNoFluxo(e, "enviar", { passou: true }).etapa;
+  assert.equal(e, "revisao");
+  assert.equal(avancarNoFluxo(e, "testar", { passou: true }).ok, false, "depois de enviar, nada muda");
+  assert.equal(avancarNoFluxo(e, "avaliar").etapa, "fim");
+  assert.equal(avancarNoFluxo("leitura", "voar").ok, false);
+});
+
+caso("bootcamp: a comparação da saída e o desafio conferido (exemplos visíveis, testes ocultos)", () => {
+  assert.equal(normalizarSaida("1 \r\n2\t\n\n"), "1\n2");
+  assert.ok(conferirCaso("SIM", "SIM\n"));
+  assert.ok(!conferirCaso("SIM", "sim"));
+  assert.deepEqual(resumoDosTestes([{ ok: true }, { ok: false }]), { total: 2, passados: 1, passou: false, fracao: 0.5 });
+  assert.equal(resumoDosTestes([]).passou, false, "sem testes não passou");
+  const bruto = { titulo: "A soma", enunciado: "Leia dois números e imprima a soma deles.", testes: [{ entrada: "1 2", saida: "3" }, { entrada: "2 2", saida: "4" }, { entrada: "0 0", saida: "0" }, { entrada: "0 0", saida: "9" }], solucao: { linguagem: "python", codigo: "print(1)" } };
+  const r = validarDesafio(bruto);
+  assert.ok(r.ok);
+  assert.equal(r.desafio.testes.length, 3, "entrada repetida sai");
+  assert.deepEqual(r.desafio.testes.map((t) => t.oculto), [false, false, true]);
+  assert.equal(r.desafio.linguagem, null, "linguagem livre");
+  assert.equal(validarDesafio({ ...bruto, testes: bruto.testes.slice(0, 2) }).ok, false, "poucos testes");
+  assert.equal(validarDesafio(bruto, { linguagens: { modo: "jurados", permitidas: ["go"] } }).desafio.linguagem, "go", "pediu fora da lista: vale a permitida");
+  assert.equal(validarDesafio({ ...bruto, linguagem: "Rust" }, { linguagens: { modo: "jurados", permitidas: [] } }).desafio.linguagem, "rust");
+  const tela = desafioParaTela(r.desafio);
+  assert.equal(tela.exemplos.length, 2);
+  assert.equal(tela.ocultos, 1);
+  assert.ok(!("solucao" in tela) && !("testes" in tela), "a tela não vê a solução nem os ocultos");
+  const resultados = testesParaTela([{ oculto: false, ok: true, entrada: "1", esperada: "1", obtida: "1" }, { oculto: true, ok: false, entrada: "x", esperada: "y", obtida: "z" }]);
+  assert.deepEqual(resultados[1], { n: 2, oculto: true, ok: false }, "o oculto só diz se passou");
+  const reserva = desafioDeReserva({ dificuldade: 3, usados: [], linguagens: { modo: "jurados", permitidas: ["python"] }, s: () => 0 });
+  assert.equal(reserva.dificuldade, 3);
+  assert.equal(reserva.linguagem, "python");
+  assert.equal(reserva.origem, "reserva");
+  assert.ok(reserva.testes.some((t) => t.oculto));
+});
+
+caso("bootcamp: os personagens jogam pela simulação, sempre igual na mesma rodada", () => {
+  const npc = NPCS_DO_BOOTCAMP[0];
+  const testes = [{ oculto: false }, { oculto: false }, { oculto: true }, { oculto: true }];
+  const sorteioFixo = () => { let a = 7; return () => ((a = (a * 16807) % 2147483647) / 2147483647); };
+  const um = simularNpc({ npc, dificuldade: 2, testes, s: sorteioFixo() });
+  const dois = simularNpc({ npc, dificuldade: 2, testes, s: sorteioFixo() });
+  assert.deepEqual(um, dois, "mesma semente, mesmo resultado");
+  assert.ok(um.passados >= 0 && um.passados <= 4 && um.total === 4);
+  const lento = simularNpc({ npc: { ...npc, ritmo: 5 }, dificuldade: 3, testes, tempoMin: 15, s: () => 0 });
+  assert.equal(lento.estourou, true);
+  assert.equal(lento.minutos, 15);
+  assert.equal(lento.passados, 2, "estourou o tempo: entrega pela metade");
+  assert.equal(etapaDoNpc({ minutos: 20 }, 0), "leitura");
+  assert.equal(etapaDoNpc({ minutos: 20 }, 10), "codigo");
+  assert.equal(etapaDoNpc({ minutos: 20 }, 21), "revisao");
+});
+
+caso("bootcamp: as notas dos 3 jurados (o teto do Kernel pelos testes) e a avaliação sem a IA", () => {
+  assert.equal(tetoDoKernel(0), 3);
+  assert.equal(tetoDoKernel(1), 10);
+  assert.equal(notaDaRodada({ kernel: 10, vetor: 8, sintaxe: 9 }), 90);
+  assert.equal(notaDaRodada({ kernel: 99, vetor: -5, sintaxe: 6 }), 53, "nota fora de 0–10 é cortada");
+  const n = notasDoNpc(NPCS_DO_BOOTCAMP[0], { passados: 0, total: 4, sorteio: 0.99, estourou: false });
+  assert.ok(n.kernel <= 3, "o personagem também respeita o teto");
+  const sem = avaliacaoAutomatica({ testou: false });
+  assert.deepEqual(sem.notas, { kernel: 0, vetor: 0, sintaxe: 0 });
+  const com = avaliacaoAutomatica({ testou: true, enviou: true, fracao: 1, plano: "um plano bem explicado aqui", linguagemOk: true });
+  assert.equal(com.notas.kernel, 10);
+  assert.ok(com.notas.vetor > avaliacaoAutomatica({ testou: true, enviou: true, fracao: 1, plano: "" }).notas.vetor, "o plano conta na arquitetura");
+  assert.ok(avaliacaoAutomatica({ testou: true, enviou: true, fracao: 1, linguagemOk: false }).notas.sintaxe < com.notas.sintaxe, "linguagem errada perde nas regras");
+  const apelidos = new Map([["p1", { id: "h:1", fracao: 0.5, testou: true }], ["p2", { id: "h:2", fracao: 1, testou: false }]]);
+  const v = validarAvaliacao({ avaliacoes: [
+    { participante: "p1", notaKernel: 10, notaVetor: 12, notaSintaxe: -1, feedbackKernel: "ok", feedbackVetor: "ok", feedbackSintaxe: "ok" },
+    { participante: "p2", notaKernel: 10, notaVetor: 10, notaSintaxe: 10 },
+    { participante: "p9", notaKernel: 10 },
+  ] }, apelidos);
+  assert.deepEqual(v.get("h:1").notas, { kernel: 6.5, vetor: 10, sintaxe: 0 }, "teto do Kernel e notas cortadas");
+  assert.ok(!v.has("h:2"), "quem não testou não recebe nota da IA");
+  assert.equal(v.size, 1, "apelido desconhecido não entra");
+});
+
+caso("bootcamp: o mata-mata elimina até sobrar o campeão; os pontos corridos somam até a última rodada", () => {
+  const notas = (m) => new Map(Object.entries(m).map(([id, nota]) => [id, { nota, kernel: nota / 10 }]));
+  let ps = Array.from({ length: 5 }, (_, i) => ({ id: `p${i}`, baia: i, pontos: 0, eliminado: false, eliminadoNa: null }));
+  const total = totalDeRodadas("mata-mata", 5);
+  for (let r = 1; r <= total; r++) {
+    const confrontos = confrontosDaRodada(ps);
+    const res = aplicarResultado({ formato: "mata-mata", participantes: ps, confrontos, notas: notas({ p0: 90, p1: 80, p2: 70, p3: 60, p4: 50 }), numero: r, total });
+    assert.equal(res.eliminados.length, confrontos.filter((c) => c.b).length, `rodada ${r}: um sai por confronto`);
+    ps = res.participantes;
+    if (r === total) {
+      assert.equal(res.encerrado, true);
+      assert.equal(res.campeao, "p0", "a maior nota vence");
+    }
+  }
+  assert.equal(ps.filter((p) => !p.eliminado).length, 1);
+  const empate = aplicarResultado({ formato: "mata-mata", participantes: ps.slice(0, 2).map((p) => ({ ...p, eliminado: false })), confrontos: [{ a: "p0", b: "p1" }],
+    notas: new Map([["p0", { nota: 70, kernel: 6 }], ["p1", { nota: 70, kernel: 8 }]]), numero: 1, total: 1 });
+  assert.deepEqual(empate.eliminados, ["p0"], "empate na nota: decide o Kernel");
+
+  const liga = Array.from({ length: 3 }, (_, i) => ({ id: `q${i}`, baia: i, pontos: 0, eliminado: false }));
+  const r1 = aplicarResultado({ formato: "pontos-corridos", participantes: liga, notas: notas({ q0: 50, q1: 80, q2: 60 }), numero: 1, total: 2 });
+  assert.equal(r1.encerrado, false);
+  assert.equal(r1.eliminados.length, 0, "ninguém sai nos pontos corridos");
+  const r2 = aplicarResultado({ formato: "pontos-corridos", participantes: r1.participantes, notas: notas({ q0: 100, q1: 20, q2: 60 }), numero: 2, total: 2 });
+  assert.equal(r2.encerrado, true);
+  assert.equal(r2.campeao, "q0", "150 pontos contra 100 e 120");
+  assert.deepEqual(classificacao(r2.participantes).map((p) => p.id), ["q0", "q2", "q1"]);
+  assert.deepEqual(classificacao([{ id: "a", baia: 0, pontos: 90, eliminado: true, eliminadoNa: 1 }, { id: "b", baia: 1, pontos: 10, eliminado: false }]).map((p) => p.id), ["b", "a"], "quem está vivo vem antes");
+});
+
+caso("bootcamp: quem chama os jurados, o prazo e as rotas", () => {
+  assert.equal(podeChamarJurados({ souDono: true }).ok, true, "o organizador encerra a rodada");
+  assert.equal(podeChamarJurados({ souDono: false, todosEnviaram: true }).ok, true);
+  assert.equal(podeChamarJurados({ souDono: false, tempoAcabou: true }).ok, true);
+  assert.equal(podeChamarJurados({ souDono: false }).ok, false);
+  assert.equal(prazoDaRodada("2026-11-04T12:00:00.000Z", null), null, "sem limite de tempo");
+  assert.equal(prazoDaRodada("2026-11-04T12:00:00.000Z", 30), "2026-11-04T12:30:00.000Z");
+  assert.ok(prazoPassou("2026-11-04T12:30:00.000Z", Date.parse("2026-11-04T12:31:00.000Z")));
+  assert.ok(!prazoPassou(null));
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  for (const tela of ["../src/app/(app)/bootcamp/page.js", "../src/app/(app)/bootcamp/create/page.js", "../src/app/(app)/bootcamp/arena/[id]/page.js", "../src/app/(app)/bootcamp/judges/[id]/page.js"]) assert.ok(fs.existsSync(new URL(tela, import.meta.url)), tela);
+  assert.match(ler("../src/app/api/bootcamp/challenge/submit/route.js"), /export async function POST/);
+  assert.match(ler("../src/componentes/Moldura.js"), /href: "\/bootcamp", rotulo: "Bootcamp"/);
+  assert.match(ler("../db/032-bootcamp.sql"), /unique \(rodada_id, usuario_id\)/);
+  assert.ok(!ehLivre("/api/bootcamp") && !ehLivre("/bootcamp/arena/x"), "o Bootcamp pede login");
+});
+
+}
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

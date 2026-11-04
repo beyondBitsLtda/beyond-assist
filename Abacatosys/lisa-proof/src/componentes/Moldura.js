@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   IconeHoje, IconeTrilhas, IconeAgenda, IconePratica, IconeProgresso, IconeRaioX, IconeRanking, IconeReino, IconeDominio, IconeBolsa, IconeMais, Marca,
-  IconeCaderno, IconeBiblioteca, IconeAcervo, IconeChamados, IconeLisa, IconeCorreio, IconePresentes,
+  IconeCaderno, IconeBiblioteca, IconeAcervo, IconeChamados, IconeLisa, IconeCorreio, IconePresentes, IconeBootcamp,
 } from "./Icones.js";
 import { Confete } from "./Neuro.js";
 import Celebracao from "./Celebracao.js";
@@ -30,6 +30,8 @@ const ITENS = [
   { href: "/acervo", rotulo: "Acervo", Icone: IconeAcervo, grupo: "Leitura" },
   { href: "/reino", rotulo: "Reino", Icone: IconeReino, grupo: "Jogo" },
   { href: "/dominio", rotulo: "Domínio", Icone: IconeDominio, grupo: "Jogo" },
+  // o Modo Bootcamp (04/11/2026): item próprio no menu a pedido do usuário ("pode criar um menu chamado bootcamp")
+  { href: "/bootcamp", rotulo: "Bootcamp", Icone: IconeBootcamp, grupo: "Jogo" },
   { href: "/bolsa", rotulo: "Bolsa", Icone: IconeBolsa, grupo: "Jogo" },
   { href: "/ranking", rotulo: "Ranking", Icone: IconeRanking, grupo: "Jogo" },
   { href: "/correio", rotulo: "Correio", Icone: IconeCorreio, grupo: "Jogo" },

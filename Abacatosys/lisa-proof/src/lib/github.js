@@ -44,6 +44,42 @@ async function api(caminho) {
   return r.json();
 }
 
+/**
+ * Um arquivo só, no último commit da branch (Modo Bootcamp, 04/11/2026): a entrega "código de projeto" de um
+ * competidor. Três chamadas: o repositório (para conferir que é público e achar a branch padrão), o último commit
+ * da branch e o arquivo cru naquele commit — o sha garante que os testes rodam no código do commit avaliado.
+ *
+ * Devolve `{ dono, repo, branch, sha, caminho, conteudo, url, urlDoCommit }`.
+ */
+export async function lerArquivoDoRepo(endereco, caminho, { maximo = MAXIMO_POR_ARQUIVO } = {}) {
+  const alvo = lerEnderecoDoRepo(endereco);
+  if (!alvo) throw new ErroDoGitHub("link inválido — use https://github.com/usuario/repositorio");
+  const limpo = String(caminho || "").trim().replace(/^\/+/, "");
+  if (!limpo || limpo.includes("..") || !/^[A-Za-z0-9_.\-/ ]+$/.test(limpo)) throw new ErroDoGitHub("caminho do arquivo inválido");
+
+  const info = await api(`/repos/${alvo.dono}/${alvo.repo}`);
+  if (info.private) throw new ErroDoGitHub("o repositório é privado — o Bootcamp só lê repositórios públicos");
+  const branch = alvo.branch || info.default_branch;
+  const commit = await api(`/repos/${alvo.dono}/${alvo.repo}/commits/${encodeURIComponent(branch)}`);
+  const sha = commit?.sha;
+  if (!sha) throw new ErroDoGitHub("não achei o último commit da branch");
+
+  const bruto = await fetch(
+    `https://raw.githubusercontent.com/${alvo.dono}/${alvo.repo}/${sha}/${limpo.split("/").map(encodeURIComponent).join("/")}`,
+    { headers: { "user-agent": "lisa-proof" } }
+  ).catch(() => null);
+  if (!bruto) throw new ErroDoGitHub("não consegui falar com o GitHub");
+  if (bruto.status === 404) throw new ErroDoGitHub(`o arquivo ${limpo} não existe no último commit da branch ${branch}`);
+  if (!bruto.ok) throw new ErroDoGitHub(`o GitHub respondeu ${bruto.status} ao baixar o arquivo`);
+  const conteudo = await bruto.text();
+  if (conteudo.length > maximo) throw new ErroDoGitHub(`o arquivo passou de ${Math.round(maximo / 1000)} mil caracteres`);
+  return {
+    dono: alvo.dono, repo: alvo.repo, branch, sha, caminho: limpo, conteudo,
+    url: `https://github.com/${alvo.dono}/${alvo.repo}`,
+    urlDoCommit: `https://github.com/${alvo.dono}/${alvo.repo}/commit/${sha}`,
+  };
+}
+
 /** Mais perto da raiz e código antes de README: é onde costuma estar o que importa. */
 function relevancia(caminho) {
   const profundidade = caminho.split("/").length;

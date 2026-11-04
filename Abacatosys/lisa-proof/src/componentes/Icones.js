@@ -81,6 +81,11 @@ export const IconeCorreio = () => (
 );
 
 // Presentes: uma caixa com laço
+// Bootcamp: um monitor com o "</>" e a base, o escritório de TI do reality show
+export const IconeBootcamp = () => (
+  <svg {...base}><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M10 8l-2 2 2 2M14 8l2 2-2 2M9 20h6M12 16v4" /></svg>
+);
+
 export const IconePresentes = () => (
   <svg {...base}><rect x="3" y="9" width="18" height="12" rx="1.5" /><path d="M3 13h18M12 9v12M12 9c-1.5-3-6-4-6-1.5S10 9 12 9zM12 9c1.5-3 6-4 6-1.5S14 9 12 9z" /></svg>
 );

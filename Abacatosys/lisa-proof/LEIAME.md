@@ -646,6 +646,40 @@ jogadores comprarem.
 Servidor: `src/lib/reino.js` (seção "o mercado de tropas") e `/api/reino/mercado`. Tela:
 `src/componentes/reino/MercadoDeTropas.js`.
 
+## Modo Bootcamp
+
+Pedido de 04/11/2026: um reality show de programação num escritório de TI futurista, com item
+próprio no menu (**Bootcamp**, no grupo Jogo).
+
+- **Torneio.** Até 8 competidores: quem organiza, quem for convidado do ranking do Proof e os
+  personagens da Lisa nas vagas que sobram. Cada um tem skin (um personagem do Neuro), nome e
+  personalidade únicos. Formato **mata-mata** (confronto direto; com número ímpar, o melhor
+  colocado folga) ou **pontos corridos** (2 a 5 rodadas, a nota soma). O tempo por desafio é
+  opcional. As linguagens podem ser livres ou estipuladas pelos jurados em cada desafio.
+- **Os 3 jurados.** Jurado Kernel (desempenho técnico), Jurada Vetor (arquitetura) e Jurada Sintaxe
+  (conformidade com as regras), personagens originais. Eles lançam o desafio (IA) e avaliam no fim
+  da rodada. A nota da rodada é a média das três (0–10) × 10, e o Kernel não passa de
+  3 + 7 × a fração de testes certos. Sem a IA, entram os desafios do banco (`DESAFIOS_DE_RESERVA`,
+  com o gabarito conferido no `dominio-check`) e a avaliação automática.
+- **Testes.** São por entrada e saída (stdin/stdout), então valem para qualquer linguagem. Rodam no
+  Wandbox (JavaScript no Node 20); SQL fica de fora. Os dois primeiros são exemplos visíveis e os
+  outros são ocultos. Antes de abrir a rodada, a solução de referência da IA roda contra os testes,
+  e a resposta que vale é a que ela imprime.
+- **Fluxo do exercício.** Leitura → Análise e planejamento → Ambiente (editor na tela ou GitHub) →
+  Código → Testes → "Passou nos testes?" (não: volta ao código; sim: pode enviar) → Revisão →
+  Fim. No GitHub, o servidor lê o arquivo da solução no último commit da branch (só repositório
+  público).
+- **Os personagens jogam pela simulação.** O sorteio fica preso à rodada, então a mesma rodada dá
+  sempre o mesmo resultado; a IA só dá a fala de cada um.
+- **Trava.** A rodada passa por `avaliando` antes da IA, então dois cliques não avaliam duas vezes.
+  Se der erro no meio, ela volta para `aberta`.
+
+**Arquivos.** Banco: `db/032-bootcamp.sql`. Regras: `src/dominio/bootcamp.js`. Servidor:
+`src/lib/bootcamp.js` e `src/lib/iaBootcamp.js`. Rotas: `/api/bootcamp`, `/api/bootcamp/:id`,
+`/api/bootcamp/:id/jurados` e `POST /api/bootcamp/challenge/submit` (o envio do código). Telas:
+`/bootcamp`, `/bootcamp/create`, `/bootcamp/arena/:id` (o escritório em 3D:
+`src/componentes/bootcamp/Escritorio3D.js`) e `/bootcamp/judges/:id`.
+
 ## Onde as coisas moram
 
 | Caminho | O quê |

@@ -1,0 +1,224 @@
+/* ------------------------------------------------------------------ Modo Bootcamp (04/11/2026)
+ * O reality show de programação: lista de torneios, criação, arena com o escritório em 3D e o painel dos jurados.
+ * Tudo nos tokens --pf-* (visual premium escuro com acento lima). O escritório 3D é uma "tela": fundo escuro fixo
+ * nos dois temas, como o céu do Reino. */
+
+.bc-pilulas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.bc-cabecalho__acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.bc-link { padding: 0; border: 0; background: none; color: var(--pf-verde-texto); font: inherit; font-size: 13px; font-weight: 800; text-decoration: underline; cursor: pointer; }
+
+/* ---- os jurados */
+.bc-jurados { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); margin-bottom: 8px; }
+@media (min-width: 760px) { .bc-jurados { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.bc-jurado { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+.bc-jurado strong { display: block; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 16px; }
+.bc-jurado__criterio { display: inline-block; margin: 4px 0; padding: 2px 10px; border-radius: var(--pf-pilula); background: var(--pf-verde-claro); color: var(--pf-verde-texto); font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.bc-jurado .pf-estat__nota { margin: 0; }
+
+/* ---- lista de torneios */
+.bc-vazio { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.bc-vazio > div { flex: 1 1 260px; display: grid; gap: 8px; justify-items: start; }
+.bc-torneios { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .bc-torneios { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bc-torneio { display: grid; gap: 8px; }
+.bc-torneio__topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.bc-torneio__nome { font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 18px; }
+.bc-torneio__campeao { margin: 0; font-weight: 800; color: var(--pf-verde-texto); }
+.bc-torneio__acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.bc-torneio .pf-estat__nota { margin: 0; }
+
+/* ---- criação */
+.bc-criar { display: grid; gap: 14px; max-width: 920px; }
+.bc-criar__bloco { display: grid; gap: 12px; }
+.bc-criar__titulo { margin: 0; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 19px; }
+.bc-criar__linha { max-width: 320px; }
+.bc-criar__fim { display: flex; justify-content: flex-end; }
+.bc-criar .pf-estat__nota { margin: 0; }
+
+.bc-opcoes { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .bc-opcoes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bc-opcao { position: relative; display: grid; gap: 4px; padding: 14px 16px; border-radius: var(--pf-raio); border: 2px solid var(--pf-linha); background: var(--pf-superficie-2, transparent); cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease; }
+.bc-opcao input { position: absolute; opacity: 0; pointer-events: none; }
+.bc-opcao span { color: var(--pf-tinta-2); font-size: 14px; font-weight: 600; }
+.bc-opcao--escolhida { border-color: var(--pf-verde); background: var(--pf-verde-claro); }
+.bc-opcao:has(input:focus-visible) { outline: 3px solid var(--pf-verde); outline-offset: 2px; }
+
+.bc-chave { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; cursor: pointer; }
+.bc-chave input { width: 20px; height: 20px; accent-color: var(--pf-verde); }
+.bc-chave--travada { opacity: 0.5; cursor: not-allowed; }
+
+.bc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.bc-chip { min-height: 38px; padding: 6px 14px; border-radius: var(--pf-pilula); border: 1px solid var(--pf-linha); background: var(--pf-superficie-2, transparent); color: var(--pf-tinta); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.bc-chip--ativo { border-color: var(--pf-verde); background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); }
+
+.bc-jogadores { display: grid; gap: 6px; max-height: 220px; overflow: auto; margin: 0; padding: 4px 2px; list-style: none; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+
+.bc-npcs { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.bc-npc { display: grid; justify-items: center; gap: 4px; padding: 12px; border-radius: var(--pf-raio); border: 2px solid var(--pf-linha); background: var(--pf-superficie-2, transparent); color: var(--pf-tinta); font: inherit; text-align: center; cursor: pointer; transition: border-color 0.15s ease, transform 0.1s ease; }
+.bc-npc strong { font-family: var(--pf-fonte-titulo); font-weight: 600; }
+.bc-npc__personalidade { color: var(--pf-tinta-2); font-size: 12.5px; font-weight: 600; line-height: 1.35; }
+.bc-npc em { color: var(--pf-tinta-3); font-size: 12px; }
+.bc-npc--escolhido { border-color: var(--pf-verde); background: var(--pf-verde-claro); }
+.bc-npc:disabled { opacity: 0.45; cursor: not-allowed; }
+.bc-npc:active:not(:disabled) { transform: scale(0.98); }
+
+/* ---- o escritório em 3D */
+.bc-escritorio {
+  position: relative; height: 440px; margin-bottom: 16px; overflow: hidden; border-radius: var(--pf-raio-grande);
+  border: 1px solid rgba(132, 204, 22, 0.25); background: radial-gradient(120% 90% at 50% 0%, #18210e 0%, #0b0e12 60%);
+  box-shadow: 0 24px 48px -24px rgba(0, 0, 0, 0.6); touch-action: pan-y; user-select: none;
+}
+@media (max-width: 640px) { .bc-escritorio { height: 340px; } }
+.bc-escritorio canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.bc-escritorio canvas:active { cursor: grabbing; }
+.bc-escritorio--carregando { display: grid; place-items: center; color: #cfd8c4; font-weight: 700; }
+.bc-escritorio__rotulo {
+  position: absolute; left: 0; top: 0; z-index: 2; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  min-height: 26px; padding: 3px 10px; border-radius: var(--pf-pilula); border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(11, 14, 18, 0.82); color: #f2f5ee; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.bc-escritorio__rotulo--eu { border-color: #84cc16; background: #84cc16; color: #0d1a02; }
+.bc-escritorio__rotulo--fora { opacity: 0.55; text-decoration: line-through; }
+.bc-escritorio__rotulo--jurado { cursor: default; border-color: rgba(240, 190, 69, 0.6); color: #f6dc97; }
+.bc-escritorio__aviso { position: absolute; left: 50%; top: 14px; z-index: 3; transform: translateX(-50%); padding: 8px 16px; border-radius: var(--pf-pilula); background: #84cc16; color: #0d1a02; font-weight: 900; font-size: 13px; }
+.bc-escritorio__dica { position: absolute; right: 12px; bottom: 10px; z-index: 2; color: rgba(242, 245, 238, 0.6); font-size: 11.5px; font-weight: 700; }
+.bc-escritorio__moldes { position: absolute; left: -10000px; top: 0; width: 220px; pointer-events: none; }
+.bc-escritorio__moldes > div { width: 220px; height: 220px; }
+
+/* sem 3D: as baias em 2D */
+.bc-baias { display: grid; gap: 10px; margin-bottom: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 760px) { .bc-baias { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.bc-baia { display: grid; justify-items: center; gap: 4px; padding: 12px; border-radius: var(--pf-raio); border: 1px solid var(--pf-cartao-borda); background: var(--pf-cartao-fundo); color: var(--pf-tinta); font: inherit; cursor: pointer; }
+.bc-baia--eu { border: 2px solid var(--pf-verde); }
+.bc-baia--fora { opacity: 0.55; }
+.bc-baia__nome { font-weight: 900; }
+.bc-baia__etapa { color: var(--pf-tinta-2); font-size: 12.5px; font-weight: 700; text-align: center; }
+
+.bc-avatar { display: inline-grid; place-items: center; flex: 0 0 auto; }
+.bc-avatar--fora { filter: grayscale(1); opacity: 0.6; }
+
+.bc-competidor { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
+.bc-competidor__texto { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.bc-competidor__texto p { margin: 0; }
+.bc-competidor__texto strong { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 18px; }
+
+/* ---- a arena */
+.bc-arena { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1100px) { .bc-arena { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; } }
+.bc-arena__principal { display: grid; gap: 16px; min-width: 0; }
+.bc-arena__lado { display: grid; gap: 16px; }
+@media (min-width: 1100px) { .bc-arena__lado { position: sticky; top: 16px; } }
+.bc-lado__titulo { margin: 0 0 10px; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 17px; }
+
+.bc-abrir, .bc-chamar, .bc-campeao { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
+.bc-abrir h2, .bc-chamar h2, .bc-campeao h2, .bc-resultado h2 { margin: 0 0 4px; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 20px; }
+.bc-abrir > div, .bc-chamar > div { flex: 1 1 280px; }
+.bc-abrir .pf-estat__nota, .bc-chamar .pf-estat__nota { margin: 0; }
+.bc-campeao { justify-content: flex-start; border: 2px solid var(--pf-verde); }
+.bc-campeao > div { flex: 1 1 240px; display: grid; gap: 6px; justify-items: start; }
+
+.bc-confrontos ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-weight: 700; }
+.bc-confrontos em { color: var(--pf-tinta-3); font-style: normal; }
+
+/* o desafio */
+.bc-desafio { display: grid; gap: 10px; }
+.bc-desafio__topo { display: flex; flex-wrap: wrap; gap: 6px; }
+.bc-desafio__titulo { margin: 0; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 22px; }
+.bc-desafio__enunciado { margin: 0; font-size: 15.5px; line-height: 1.55; white-space: pre-line; }
+.bc-falas { display: grid; gap: 4px; margin: 0; padding: 10px 14px; list-style: none; border-radius: var(--pf-raio); background: var(--pf-destaque-fundo); color: var(--pf-codigo-tinta); font-size: 14px; }
+.bc-desafio__formato { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .bc-desafio__formato { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bc-desafio__formato p { margin: 4px 0 0; font-weight: 600; }
+.bc-desafio__requisitos { margin: 0; padding-left: 20px; display: grid; gap: 2px; }
+.bc-exemplos { display: grid; gap: 10px; }
+.bc-exemplo { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.bc-exemplo small { display: block; margin-bottom: 4px; color: var(--pf-tinta-3); font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.bc-exemplo pre, .bc-teste pre, .bc-github__passos {
+  margin: 0; padding: 10px 12px; overflow-x: auto; border-radius: 14px; background: var(--pf-codigo-fundo); color: var(--pf-codigo-tinta);
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 13px; line-height: 1.5; white-space: pre;
+}
+
+/* a minha entrega e o fluxo */
+.bc-entrega { display: grid; gap: 12px; }
+.bc-entrega__titulo { margin: 0; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 20px; }
+.bc-entrega__etapa { margin: 0; color: var(--pf-verde-texto); font-weight: 900; }
+.bc-fluxo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.bc-fluxo__etapa { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: var(--pf-pilula); border: 1px solid var(--pf-linha); color: var(--pf-tinta-3); font-size: 12.5px; font-weight: 800; }
+.bc-fluxo__marca { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--pf-superficie-2, rgba(0, 0, 0, 0.06)); font-size: 12px; }
+.bc-fluxo__etapa--feita { color: var(--pf-verde-texto); border-color: var(--pf-verde); }
+.bc-fluxo__etapa--feita .bc-fluxo__marca { background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); }
+.bc-fluxo__etapa--agora { color: var(--pf-tinta-sobre-verde); background: var(--pf-verde); border-color: var(--pf-verde); box-shadow: 0 0 0 4px rgba(132, 204, 22, 0.2); }
+.bc-fluxo__etapa--agora .bc-fluxo__marca { background: rgba(255, 255, 255, 0.35); }
+.bc-fluxo__decisao { display: inline-flex; align-items: center; gap: 6px; color: var(--pf-tinta-2); font-size: 12px; font-weight: 800; }
+.bc-fluxo__losango { display: inline-grid; place-items: center; width: 22px; height: 22px; transform: rotate(45deg); border: 2px solid currentColor; border-radius: 4px; font-size: 11px; }
+.bc-fluxo__decisao--sim { color: var(--pf-verde-texto); }
+.bc-fluxo__decisao--nao { color: var(--pf-alerta); }
+
+.bc-passo { display: grid; gap: 12px; }
+.bc-passo > p { margin: 0; }
+.bc-passo__acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.bc-passo__ambiente { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bc-plano { resize: vertical; min-height: 110px; font-family: inherit; }
+.bc-github { display: grid; gap: 8px; }
+.bc-github p { margin: 0; }
+.bc-github code { padding: 1px 6px; border-radius: 6px; background: var(--pf-superficie-2, rgba(0, 0, 0, 0.06)); font-size: 13px; }
+
+/* os testes */
+.bc-testes { display: grid; gap: 8px; }
+.bc-testes__resumo { padding: 10px 14px; border-radius: var(--pf-raio); background: var(--pf-alerta-fundo); color: var(--pf-alerta); font-weight: 900; }
+.bc-testes__resumo--ok { background: var(--pf-sucesso-fundo); color: var(--pf-verde-texto); }
+.bc-testes__lista { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.bc-teste { display: grid; gap: 8px; padding: 10px 12px; border-radius: 16px; border: 1px solid var(--pf-linha); border-left: 4px solid var(--pf-alerta); }
+.bc-teste--ok { border-left-color: var(--pf-verde); }
+.bc-teste__topo { display: flex; align-items: center; gap: 8px; }
+.bc-teste__corpo { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 760px) { .bc-teste__corpo { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.bc-teste .pf-campo__rotulo { display: block; margin-bottom: 4px; }
+.bc-teste__erro { color: #ffb4b4 !important; }
+
+/* o fim da rodada */
+.bc-resultado { display: grid; gap: 8px; justify-items: start; }
+.bc-resultado__comentario { margin: 0; font-size: 15.5px; font-style: italic; color: var(--pf-tinta-2); }
+.bc-resultado__nota { margin: 0; font-size: 16px; }
+.bc-resultado__nota strong { color: var(--pf-verde-texto); font-size: 22px; }
+
+/* o painel de status e a classificação */
+.bc-classificacao ol, .bc-tabela { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.bc-classificacao__item {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "av nome pts" "av info pts"; align-items: center; column-gap: 10px;
+  width: 100%; padding: 6px 8px; border: 0; border-radius: 14px; background: transparent; color: var(--pf-tinta); font: inherit; text-align: left; cursor: pointer;
+}
+.bc-classificacao__item:hover { background: var(--pf-superficie-2, rgba(0, 0, 0, 0.04)); }
+.bc-classificacao__item .bc-avatar { grid-area: av; }
+.bc-classificacao__nome { grid-area: nome; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bc-classificacao__info { grid-area: info; color: var(--pf-tinta-3); font-size: 12px; font-weight: 700; }
+.bc-classificacao__pontos { grid-area: pts; font-family: var(--pf-fonte-titulo); font-weight: 600; color: var(--pf-verde-texto); }
+.bc-eu > .bc-classificacao__item, li.bc-eu { box-shadow: inset 3px 0 0 var(--pf-verde); }
+.bc-fora { opacity: 0.6; }
+
+.bc-tabela { padding: 8px; }
+.bc-tabela li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 14px; }
+.bc-tabela__pos { width: 32px; font-family: var(--pf-fonte-titulo); font-weight: 600; color: var(--pf-tinta-3); }
+.bc-tabela__nome { flex: 1; min-width: 0; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bc-tabela__info { color: var(--pf-tinta-3); font-size: 12.5px; font-weight: 700; }
+.bc-tabela__pontos { min-width: 64px; text-align: right; font-family: var(--pf-fonte-titulo); font-weight: 600; color: var(--pf-verde-texto); }
+@media (max-width: 520px) { .bc-tabela__info { display: none; } }
+
+/* as notas de cada rodada */
+.bc-notas { display: grid; gap: 12px; margin: 12px 0 0; padding: 0; list-style: none; }
+.bc-nota { display: grid; gap: 10px; }
+.bc-nota__topo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bc-nota__quem { flex: 1 1 160px; display: grid; min-width: 0; }
+.bc-nota__quem .pf-estat__nota { margin: 0; }
+.bc-nota__total { font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 28px; color: var(--pf-verde-texto); }
+.bc-nota__total small { font-size: 14px; color: var(--pf-tinta-3); }
+.bc-nota__fala { margin: 0; font-style: italic; color: var(--pf-tinta-2); }
+.bc-nota__jurados { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 760px) { .bc-nota__jurados { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.bc-nota__jurado { display: grid; gap: 2px; padding: 10px 12px; border-radius: 16px; background: var(--pf-superficie-2, rgba(0, 0, 0, 0.04)); }
+.bc-nota__jurado strong { font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 20px; }
+.bc-nota__jurado p { margin: 0; color: var(--pf-tinta-2); font-size: 13.5px; }
+.bc-nota__criterio { color: var(--pf-tinta-3); font-size: 11.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+
+@media (prefers-reduced-motion: reduce) { .bc-npc, .bc-opcao { transition: none; } .bc-npc:active:not(:disabled) { transform: none; } }
