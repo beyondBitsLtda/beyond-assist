@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.1.0-cloudflare-pages.2",
+  "versao": "1.1.0-cloudflare-pages.3",
   "atualizadoEm": "2026-11-03",
   "compilacao": {
-    "numero": 97,
+    "numero": 98,
     "data": "2026-11-03",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.1.0-cloudflare-pages.3",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "O modal da 1.0 ganhou o banner oficial (a Lisa apresentando o Lisa Proof 1.0) e aparece de novo para todo mundo, já no verde do visual premium.",
+      "itens": [
+        "O topo do modal de novidades é o banner da 1.0 (public/novidades/, em WebP: a versão menor no celular e a maior na tela larga), no lugar do palco roxo com o Neuro.",
+        "Edição nova do modal (2026-11-03-versao-1-banner): o anúncio aparece de novo uma vez para todos.",
+        "O modal no verde premium (selo, itens em destaque e borda) e com dois itens novos: o visual novo e a Lisa jogando sozinha.",
+        "As imagens de public/novidades/ ficam fora do portão de login, como os diagramas."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.1.0-cloudflare-pages.2",
       "data": "2026-11-03",

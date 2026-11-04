@@ -8,9 +8,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Neuro from "./Neuro.js";
-import { urlDoFuncionario } from "./acervo/personagensDoAcervo.js";
 
-export const EDICAO_DAS_NOVIDADES = "2026-11-03-versao-1";
+// a 1.0 com o banner (03/11/2026): edição nova, para o anúncio aparecer de novo para todo mundo
+export const EDICAO_DAS_NOVIDADES = "2026-11-03-versao-1-banner";
 const CHAVE = "proof-novidades-vistas";
 
 /** Ainda há novidade para mostrar neste navegador? (Sem armazenamento: não mostra.) */
@@ -28,18 +28,17 @@ function marcarComoVistas() {
 }
 
 // a edição da VERSÃO 1.0 (03/11/2026): o Lisa_Proof sai do "em construção". O que chegou nela vem primeiro; o
-// resto lembra o que o app já é, para quem chega agora
+// resto lembra o que o app já é, para quem chega agora. O topo é o banner da 1.0 (public/novidades/).
 const NOVIDADES = [
+  { icone: "✨", destaque: true, titulo: "Visual novo", texto: "Tudo escuro e premium: cartões de vidro, a ofensiva em destaque com a sua semana dia a dia e o Reino organizado em abas." },
   { icone: "🏝️", destaque: true, titulo: "Temporada das Ilhas", texto: "A primeira temporada de domínio: no Reino, as Grandes Expedições: compre o Navio Pirata, conquiste as ilhas dos nativos (em 3D, como o seu reino), construa com conchas e dispute o arquipélago — aqui, só pacto entre dois segura um ataque." },
   { icone: "🕹️", destaque: true, titulo: "Arena Lúdica de Programação", texto: "O minigame do dia, na Prática: conserte bugs para atravessar a Masmorra da Depuração, programe o mascote para comer tudo e monte algoritmos embaralhados. Vale pontos todo dia, como o quiz." },
   { icone: "🧩", titulo: "O exemplo da Lisa nos exercícios", texto: "Travou? Em todo exercício e projeto, a Lisa mostra um exemplo que aplica todos os conceitos que você vai precisar — sem resolver o seu." },
   { icone: "⚔️", titulo: "Reino maior", texto: "Tropas novas (Lanceiro, Cavaleiro, Grifo e o Colosso de Pedra), o Pomar, o Lança-Chamas, a Torre de Gelo, a Catapulta e seis expedições novas." },
   { icone: "👹", titulo: "Chefões com dentes", texto: "De pé, o chefão da procrastinação rouba um pouquinho do reino por dia. Derrube ele e recebe tudo de volta, mais a recompensa." },
+  { icone: "🤖", titulo: "A Lisa joga sozinha", texto: "Ela estuda e joga várias vezes por dia — acompanhe tudo o que ela faz em Lisa joga." },
   { icone: "🧠", titulo: "Tudo o que já estava aqui", texto: "Trilhas e prática diária, Cadernos e Biblioteca, o Modo Domínio, a Bolsa, a Forja, o Duelo com a Lisa, o clima do Reino e o humor do Neuro." },
 ];
-
-const NA_ESQUERDA = ["celeste", "iris"];
-const NA_DIREITA = ["tobias", "pipoca"];
 
 export default function Novidades() {
   const [aberto, setAberto] = useState(false);
@@ -71,15 +70,12 @@ export default function Novidades() {
     <div className="novidades" role="dialog" aria-modal="true" aria-labelledby="novidades-titulo"
       onClick={(e) => { if (e.target === e.currentTarget) fechar(); }}>
       <div className="novidades__caixa">
-        <div className="novidades__palco" aria-hidden="true">
-          <span className="novidades__estrelas" />
-          <div className="novidades__retratos">
-            <span>{NA_ESQUERDA.map((id) => <img key={id} className="novidades__retrato novidades__retrato--solto" src={urlDoFuncionario(id)} alt="" />)}</span>
-            <span>{NA_DIREITA.map((id) => <img key={id} className="novidades__retrato novidades__retrato--solto" src={urlDoFuncionario(id)} alt="" />)}</span>
-          </div>
-          <div className="novidades__neuro"><Neuro humor="comemorando" tamanho={92} /><span className="novidades__versao" aria-hidden="true">1.0</span></div>
-          <span className="novidades__chao" />
-        </div>
+        {/* o banner da 1.0 (03/11/2026): a versão menor no celular, a maior na tela larga */}
+        <picture className="novidades__banner">
+          <source media="(min-width: 700px)" srcSet="/novidades/lisa-proof-1-0.webp" />
+          <img src="/novidades/lisa-proof-1-0-900.webp" width={1672} height={941} decoding="async"
+            alt="Lisa Proof 1.0 — agora ainda mais completo para suas necessidades! A Lisa, de óculos e prancheta, apresenta a versão nova." />
+        </picture>
         <div className="novidades__corpo">
           <span className="novidades__selo novidades__selo--versao">🎉 Versão 1.0</span>
           <h2 id="novidades-titulo" className="novidades__titulo">O Lisa_Proof chegou à versão 1.0!</h2>

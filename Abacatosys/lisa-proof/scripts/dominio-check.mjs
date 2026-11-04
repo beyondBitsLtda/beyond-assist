@@ -3404,7 +3404,11 @@ caso("Raposão: o personagem azul e branco, à venda por 610, e a área de prese
   assert.match(ler("../src/componentes/Moldura.js"), /\{ href: "\/presentes", rotulo: "Presentes", Icone: IconePresentes, grupo: "Você" \}/);
   const novidades = ler("../src/componentes/Novidades.js");
   // as edições seguintes trocaram o Raposão pelo clima e, depois, pelo anúncio da versão 1.0
-  assert.match(novidades, /EDICAO_DAS_NOVIDADES = "2026-11-03-versao-1"/, "a edição nova aparece de novo para todo mundo");
+  assert.match(novidades, /EDICAO_DAS_NOVIDADES = "2026-11-03-versao-1-banner"/, "a edição nova aparece de novo para todo mundo");
+  // o banner da 1.0 no topo do modal (03/11/2026), servido sem passar pelo portão de login
+  assert.match(novidades, /srcSet="\/novidades\/lisa-proof-1-0\.webp"/);
+  assert.ok(fs.existsSync(new URL("../public/novidades/lisa-proof-1-0.webp", import.meta.url)) && fs.existsSync(new URL("../public/novidades/lisa-proof-1-0-900.webp", import.meta.url)));
+  assert.match(fs.readFileSync(new URL("../src/middleware.js", import.meta.url), "utf8"), /diagramas\/\|novidades\/\|/);
   assert.match(novidades, /O Lisa_Proof chegou à versão 1\.0!/);
   for (const t of ["Temporada das Ilhas", "Arena Lúdica de Programação", "O exemplo da Lisa nos exercícios", "Reino maior", "Chefões com dentes"]) assert.ok(novidades.includes(t), t);
 });
