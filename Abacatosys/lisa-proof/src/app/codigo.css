@@ -78,7 +78,7 @@
   font: 400 14px/1.6 ui-monospace, "JetBrains Mono", Consolas, monospace;
 }
 .pf-editor__area .cm-editor.cm-focused { outline: none; }
-.pf-editor:focus-within { border-color: var(--pf-verde); box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18); }
+.pf-editor:focus-within { border-color: var(--pf-verde); box-shadow: 0 0 0 3px rgba(139, 209, 26, 0.18); }
 .pf-editor__area .cm-scroller { font-family: inherit; line-height: inherit; }
 .pf-editor__area .cm-content { padding: 10px 0; caret-color: #E8EDEA; }
 .pf-editor__area .cm-line { padding: 0 16px 0 6px; }
@@ -89,13 +89,13 @@
 .pf-editor__area .cm-cursor { border-left-color: #E8EDEA; border-left-width: 2px; }
 .pf-editor__area .cm-selectionBackground,
 .pf-editor__area .cm-focused .cm-selectionBackground,
-.pf-editor__area .cm-content ::selection { background: rgba(34, 197, 94, 0.28) !important; }
+.pf-editor__area .cm-content ::selection { background: rgba(139, 209, 26, 0.28) !important; }
 .pf-editor__area .cm-matchingBracket { background: rgba(255, 255, 255, 0.12); outline: 1px solid rgba(255, 255, 255, 0.25); color: inherit; }
 .pf-editor__area .cm-selectionMatch { background: rgba(255, 255, 255, 0.08); }
 .pf-editor__area .cm-placeholder { color: #5C6B63; font-style: italic; }
 .pf-editor__area .cm-foldGutter .cm-gutterElement { color: #5C6B63; cursor: pointer; }
 .pf-editor__area .cm-tooltip { background: #17201A; border: 1px solid rgba(255, 255, 255, 0.1); color: #E8EDEA; border-radius: 8px; overflow: hidden; }
-.pf-editor__area .cm-tooltip-autocomplete ul li[aria-selected] { background: rgba(34, 197, 94, 0.28); color: #FFFFFF; }
+.pf-editor__area .cm-tooltip-autocomplete ul li[aria-selected] { background: rgba(139, 209, 26, 0.28); color: #FFFFFF; }
 .pf-editor__area .cm-panels { background: #17201A; color: #E8EDEA; border-top: 1px solid rgba(255, 255, 255, 0.1); }
 .pf-editor__area .cm-panels input, .pf-editor__area .cm-panels button { font: inherit; }
 .pf-editor__area .cm-searchMatch { background: rgba(250, 204, 21, 0.25); }

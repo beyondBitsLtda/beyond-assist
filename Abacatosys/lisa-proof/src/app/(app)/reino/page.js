@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -34,6 +34,8 @@ import TelaCheia from "@/componentes/reino/TelaCheia.js";
 import ModoDeTeste from "@/componentes/reino/ModoDeTeste.js";
 import CorreioDoReino from "@/componentes/reino/CorreioDoReino.js";
 import ChefaoDoReino from "@/componentes/reino/ChefaoDoReino.js";
+import GrandesExpedicoes from "@/componentes/reino/GrandesExpedicoes.js";
+import ForjaDoReino, { EfeitosDaForja } from "@/componentes/reino/ForjaDoReino.js";
 import { MUNDO_DE_TESTE, FERRAMENTAS_DE_TESTE, urlNoMundo } from "@/dominio/mundoDeTeste.js";
 import { urlDoVeiculo } from "@/componentes/reino/veiculosDePapel.js";
 
@@ -53,6 +55,22 @@ const Mundo3D = dynamic(() => import("@/componentes/reino/Mundo3D.js"), {
  * nada vale no jogo de verdade (src/lib/mundo.js). Toda chamada ao servidor passa por `api()`, que
  * leva o mundo da página.
  */
+/**
+ * O menu do Reino (03/11/2026: "o reino tá muito cheio e bagunçado"): em vez de todas as seções uma embaixo da
+ * outra, cinco abas logo abaixo do mundo 3D, cada uma com as suas partes. As do mundo de verdade (a Forja e as
+ * ilhas) não aparecem no Reino de Teste.
+ */
+const ABAS_DO_REINO = [
+  { id: "reino", emoji: "🏰", rotulo: "Reino", secoes: ["construcoes", "minas", "personagens"] },
+  { id: "batalha", emoji: "⚔️", rotulo: "Batalha", secoes: ["invadir", "tropas", "paz"] },
+  { id: "expedicoes", emoji: "🗺️", rotulo: "Expedições", secoes: ["expedicoes", "ilhas", "garagem"] },
+  { id: "forja", emoji: "⚒️", rotulo: "Forja", secoes: ["forja"], soNoReal: true },
+  { id: "bolsa", emoji: "📈", rotulo: "Bolsa", secoes: ["bolsa"] },
+];
+const abaDaSecao = (secao) => ABAS_DO_REINO.find((a) => a.secoes.includes(secao))?.id || "reino";
+/** As construções de uma ilha do jeito que o mundo 3D lê (com o Terreno 1 das ilhas). */
+const construcoesDaIlha = (ilha) => [{ chave: "terreno", nivel: 1 }, ...ilha.construcoes.map((c) => ({ chave: c.chave, nivel: c.nivel, nome: c.nome, emoji: c.emoji }))];
+
 export default function Reino() {
   const mundo = usePathname()?.startsWith("/reino/teste") ? MUNDO_DE_TESTE : "real";
   const teste = mundo === MUNDO_DE_TESTE;
@@ -98,6 +116,26 @@ export default function Reino() {
     else if (d.chefao?.nasceuAgora) reagir("surpreso", `${d.chefao.emoji} O atraso virou um chefão: ${d.chefao.nome}!`, 5000);
   }).catch(() => setChefao(null)), []);
   useEffect(() => { verChefao(); }, [verChefao]);
+  const [aba, setAba] = useState("reino");
+  // a ilha das Grandes Expedições à vista no mundo 3D (null = o reino)
+  const [ilhaNoMundo, setIlhaNoMundo] = useState(null);
+  // a Forja, dentro do Reino: os artefatos, a mana e o que está fazendo efeito (os selos por cima do 3D)
+  const [forja, setForja] = useState(null);
+  const verForja = useCallback(() => (teste ? Promise.resolve(null) : obter("/api/forja").then((d) => {
+    setForja(d);
+    for (const p of d.pagasAgora || []) if (p.bonus > 0) comemorar(`🧪 A Poção de Foco rendeu +🪙 ${p.bonus}!`);
+    return d;
+  }).catch(() => null)), [teste]);
+  useEffect(() => { verForja(); }, [verForja]);
+  // os endereços antigos (/ilhas e /forja levam para cá): abre a aba certa assim que o reino chega
+  const reinoChegou = Boolean(reino);
+  useEffect(() => {
+    if (!reinoChegou) return;
+    const alvo = window.location.hash.slice(1);
+    if (alvo === "grandes-expedicoes" || alvo === "ilhas") mostrarSecao("ilhas", "grandes-expedicoes");
+    else if (alvo === "forja") mostrarSecao("forja");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reinoChegou]);
   const telaCheiaRef = useRef(false);
   telaCheiaRef.current = telaCheia;
   const pediuTelaCheiaDeVerdade = useRef(false);
@@ -169,14 +207,15 @@ export default function Reino() {
   }
   /** Mostra uma parte do reino: na tela cheia abre o menu dela; fora, rola até a seção. */
   function mostrarSecao(id, idDaSecao = id) {
-    if (telaCheiaRef.current) setPainel(id);
-    else document.getElementById(idDaSecao)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    if (telaCheiaRef.current) { setPainel(id); return; }
+    setAba(abaDaSecao(id));
+    setTimeout(() => document.getElementById(idDaSecao)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }), 60);
   }
   function escolherConstrucao(chave) {
     if (chave === "correio") { setCorreioAberto(true); return; }
     if (chave === "chefao") { setChefaoAberto(true); verChefao(); return; }
     if (telaCheiaRef.current) { setPainel("construcoes"); setTimeout(() => irParaConstrucao(chave), 80); }
-    else irParaConstrucao(chave);
+    else { setAba("reino"); setTimeout(() => irParaConstrucao(chave), 80); }
   }
 
   async function agir(chave, corpo, aoTerminar) {
@@ -492,9 +531,24 @@ export default function Reino() {
     expedicoes: () => (
       <Expedicoes mapa={mapa} veiculo={veiculoDoMapa} aoVeiculo={setVeiculoDoMapa} ocupado={ocupado} resultado={resultadoExp} aoFecharResultado={() => setResultadoExp(null)}
         aoPartir={partir} aoAssistir={assistirExpedicao} aoAbastecer={abastecerVeiculo} aoGaragem={() => mostrarSecao("garagem")}
-        aoBloqueado={(x) => avisar(x.liberada ? x.motivo : `${x.nome} libera com a Torre do Neuro no nível ${x.torreMinima}`)} />
+        aoBloqueado={(x) => avisar(x.liberada ? x.motivo : `${x.nome} libera com a Torre do Neuro no nível ${x.torreMinima}`)}
+        aoIlhas={() => mostrarSecao("ilhas", "grandes-expedicoes")} />
     ),
     bolsa: () => <ResumoDaBolsa bolsa={bolsa} href={teste ? "/bolsa/teste" : "/bolsa"} />,
+    ilhas: () => (teste ? null : (
+      <GrandesExpedicoes ilhaNoMundo={ilhaNoMundo} aoGaragem={() => mostrarSecao("garagem")}
+        aoVerNoMundo={(ilha, { semRolar = false } = {}) => {
+          setVisita(null);
+          setIlhaNoMundo(ilha);
+          if (!semRolar) document.querySelector(".rn-mundo")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+        }}
+        aoBatalha={(r, depois) => assistirNaIlha({
+          entrada: r.combate, papel: "atacante", titulo: `🏴‍☠️ ${r.ilha.nome.toUpperCase()}`,
+          resultado: { estrelas: r.estrelas, destruicao: r.destruicao, venceu: r.estrelas >= 2, saque: r.conchas },
+          aoTerminar: depois,
+        })} />
+    )),
+    forja: () => (teste ? null : <ForjaDoReino dados={forja} aoRecarregar={verForja} avisar={avisar} />),
     teste: () => (
       <section className="pf-secao" id="teste">
         <h2 className="pf-secao__titulo">🧪 Ferramentas do Reino de Teste <small>mexem só neste mundo — o seu reino de verdade não muda</small></h2>
@@ -599,7 +653,8 @@ export default function Reino() {
       <CorreioDoReino aberta={correioAberto} aoFechar={() => { setCorreioAberto(false); contarCartas(); }} aoLer={() => setCartas(0)} />
       <ChefaoDoReino aberta={chefaoAberto} aoFechar={() => setChefaoAberto(false)} estado={chefao} />
       <VistaDoReino reino={reino} visita={visita} telaCheia={telaCheia} aoTelaCheia={entrarNaTelaCheia} cartas={cartas} chefao={chefao?.chefao || null}
-        aoEscolher={escolherConstrucao} aoVisitar={visitar} aoVoltarDaVisita={() => setVisita(null)}>
+        ilha={ilhaNoMundo} aoVoltarDaIlha={() => setIlhaNoMundo(null)} forja={forja} aoAbrirForja={() => mostrarSecao("forja")}
+        aoEscolher={escolherConstrucao} aoVisitar={(v) => { setIlhaNoMundo(null); visitar(v); }} aoVoltarDaVisita={() => setVisita(null)}>
         {telaCheia && (
           <TelaCheia reino={reino} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} ocupado={ocupado} comTeste={teste}
             aoColetarMina={coletarMina} aoColetarOuro={coletarOuro}>
@@ -610,30 +665,46 @@ export default function Reino() {
 
       {!telaCheia && (
         <>
-          {/* o atalho para a briga: logo abaixo do mundo, com quantos alvos há agora */}
-          <div className="rn-acoes">
-            <button type="button" className="pf-botao rn-acoes__invadir" onClick={() => mostrarSecao("invadir")}>
-              ⚔️ Invadir reinos <span className="rn-acoes__conta">{restantes > 0 ? `${restantes} de ${reino.invasoes.porDia} hoje` : "acabaram as de hoje"}</span>
-            </button>
-            <span className="rn-acoes__nota">
-              {disponiveis == null ? "procurando reinos…"
-                : disponiveis > 0 ? `${disponiveis} reino(s) para invadir agora`
-                : alvos.alvos.length === 0 ? "ainda não há outros reinos"
-                : alvos.emPaz ? "🕊️ o mundo está em paz"
-                : `todos estão com escudo${escudoMaisCurto ? ` · o primeiro abre ${hora(escudoMaisCurto)}` : ""}`}
-            </span>
-            <button type="button" className="pf-botao pf-botao--sec" onClick={() => mostrarSecao("expedicoes")}>
-              🗺️ Expedições{mapa ? <span className="rn-acoes__conta rn-acoes__conta--sec">{mapa.expedicoes.restantes} hoje</span> : null}
-            </button>
-            <button type="button" className="pf-botao pf-botao--sec" onClick={() => mostrarSecao("bolsa")}>📈 Bolsa</button>
-            <button type="button" className="pf-botao pf-botao--sec" onClick={entrarNaTelaCheia}>⛶ Tela cheia</button>
-            <button type="button" className="pf-botao pf-botao--sec" aria-expanded={simulando} aria-controls="simulador" onClick={() => setSimulando((s) => !s)}>
-              🎮 {simulando ? "Fechar simulação" : "Simular batalha"}
-            </button>
-            {!teste && <Link href="/ranking" className="pf-botao pf-botao--sec rn-acoes__ranking">🏆 Ranking</Link>}
+          <div className="rn-numeros">
+            <Numero rotulo="Moedas" valor={<Moedas n={reino.saldo} centavos />} nota={`${numero(reino.cofre.protege)} a salvo no cofre (e todas podem ser gastas)`} />
+            <Numero rotulo="Troféus" valor={`🏆 ${numero(reino.trofeus)}`} nota={teste ? "troféus do mundo de teste (não entram no ranking)" : <Link href="/ranking">ver ranking dos reinos</Link>} />
+            <Numero rotulo="Ataque · Defesa" valor={`⚔️ ${reino.poder.ataque}/s · 🛡️ ${reino.poder.defesa}`} nota={`exército: ${totalDeTropas(reino.exercito.tropas)} tropa(s) · defesa: ${totalDeTropas(reino.guarnicao.tropas)}`} />
+            <Numero rotulo="Escudo" valor={reino.escudoAte ? "🛡️ Ativo" : "Sem escudo"} nota={reino.escudoAte ? `até ${hora(reino.escudoAte)} · atacar tira o escudo` : "o seu reino pode ser invadido"} />
           </div>
-          {simulando && <Simulador reino={reino} aoFechar={() => setSimulando(false)} />}
-          {teste && secoes.teste()}
+
+          {/* o menu do Reino: cinco abas; cada uma mostra só as suas partes */}
+          <nav className="rn-menu" role="tablist" aria-label="Menu do reino">
+            {ABAS_DO_REINO.filter((a) => !(teste && a.soNoReal)).map((a) => {
+              const marca = a.id === "batalha" ? (restantes > 0 ? restantes : null)
+                : a.id === "expedicoes" ? (mapa?.expedicoes.restantes || null)
+                : a.id === "forja" ? (forja?.pocao || forja?.escudoAte ? "✨" : null) : null;
+              return (
+                <button key={a.id} type="button" role="tab" aria-selected={aba === a.id} className="rn-menu__aba" onClick={() => setAba(a.id)}>
+                  <span aria-hidden="true">{a.emoji}</span> {a.rotulo}{marca ? <span className="rn-menu__marca">{marca}</span> : null}
+                </button>
+              );
+            })}
+            {teste && <button type="button" role="tab" aria-selected={aba === "teste"} className="rn-menu__aba" onClick={() => setAba("teste")}><span aria-hidden="true">🧪</span> Teste</button>}
+          </nav>
+          {aba === "batalha" && (
+            <div className="rn-acoes">
+              <span className="rn-acoes__nota">
+                ⚔️ {restantes > 0 ? `${restantes} de ${reino.invasoes.porDia} invasões hoje` : "as invasões de hoje acabaram"} ·{" "}
+                {disponiveis == null ? "procurando reinos…"
+                  : disponiveis > 0 ? `${disponiveis} reino(s) para invadir agora`
+                  : alvos.alvos.length === 0 ? "ainda não há outros reinos"
+                  : alvos.emPaz ? "🕊️ o mundo está em paz"
+                  : `todos estão com escudo${escudoMaisCurto ? ` · o primeiro abre ${hora(escudoMaisCurto)}` : ""}`}
+              </span>
+              <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" aria-expanded={simulando} aria-controls="simulador" onClick={() => setSimulando((s) => !s)}>
+                🎮 {simulando ? "Fechar simulação" : "Simular batalha"}
+              </button>
+              {!teste && <Link href="/ranking" className="pf-botao pf-botao--sec pf-botao--pequeno">🏆 Ranking</Link>}
+            </div>
+          )}
+          {aba === "batalha" && simulando && <Simulador reino={reino} aoFechar={() => setSimulando(false)} />}
+          {aba === "teste" && teste && secoes.teste()}
+          {(ABAS_DO_REINO.find((a) => a.id === aba)?.secoes || []).map((id) => <Fragment key={id}>{secoes[id]?.()}</Fragment>)}
           {!teste && reino.modoDeTeste && (
             <Link href="/reino/teste" className="rn-entrada-teste">
               <span className="rn-entrada-teste__emoji" aria-hidden="true">🧪</span>
@@ -645,22 +716,6 @@ export default function Reino() {
             </Link>
           )}
 
-          <div className="rn-numeros">
-            <Numero rotulo="Moedas" valor={<Moedas n={reino.saldo} centavos />} nota={`${numero(reino.cofre.protege)} a salvo no cofre (e todas podem ser gastas)`} />
-            <Numero rotulo="Troféus" valor={`🏆 ${numero(reino.trofeus)}`} nota={teste ? "troféus do mundo de teste (não entram no ranking)" : <Link href="/ranking">ver ranking dos reinos</Link>} />
-            <Numero rotulo="Ataque · Defesa" valor={`⚔️ ${reino.poder.ataque}/s · 🛡️ ${reino.poder.defesa}`} nota={`exército: ${totalDeTropas(reino.exercito.tropas)} tropa(s) · defesa: ${totalDeTropas(reino.guarnicao.tropas)}`} />
-            <Numero rotulo="Escudo" valor={reino.escudoAte ? "🛡️ Ativo" : "Sem escudo"} nota={reino.escudoAte ? `até ${hora(reino.escudoAte)} · atacar tira o escudo` : "o seu reino pode ser invadido"} />
-          </div>
-
-          {secoes.paz()}
-          {secoes.minas()}
-          {secoes.personagens()}
-          {secoes.tropas()}
-          {secoes.construcoes()}
-          {secoes.garagem()}
-          {secoes.expedicoes()}
-          {secoes.bolsa()}
-          {secoes.invadir()}
           <Regras />
         </>
       )}
@@ -694,26 +749,50 @@ function irParaConstrucao(chave) {
  * seção ocupa a tela toda (o mundo não é montado de novo) e os menus vêm em `children`. Numa
  * visita (na paz), o mundo mostra a ilha do vizinho.
  */
-function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, cartas = null, chefao = null, aoEscolher, aoVisitar, aoVoltarDaVisita, children }) {
+function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, cartas = null, chefao = null, ilha = null, aoVoltarDaIlha, forja = null, aoAbrirForja, aoEscolher, aoVisitar, aoVoltarDaVisita, children }) {
   const [plana, setPlana] = useState(false);
   // o rosto do Neuro no mundo é o humor dele (a ofensiva de estudo): feliz, pensando, triste ou bravo
   const humor = reino.humorDoNeuro?.humor || (reino.escudoAte ? "normal" : "feliz");
   const vendo = visita && !visita.carregando ? visita : null;
+  // a ilha das Grandes Expedições: o mesmo mundo, com o cenário dela e os guardas (Mundo3D, definirCenarioFixo)
+  const naIlha = !vendo && ilha ? ilha : null;
   return (
     <section aria-label={vendo ? `Vista do ${vendo.nome}` : "Vista do reino"} className={`rn-vista3d${telaCheia ? " rn-tela-cheia" : ""}${vendo ? " rn-vista3d--visita" : ""}`}>
       {plana ? <VistaPlana reino={reino} humor={humor} /> : (
-        <Mundo3D construcoes={vendo ? vendo.construcoes : reino.construcoes}
-          tropas={vendo ? vendo.tropas : { exercito: reino.exercito.tropas, guarnicao: reino.guarnicao.tropas }}
-          vizinhos={vendo ? [] : reino.paz?.vigente?.vizinhos || []}
-          personagem={vendo ? vendo.personagem : undefined} soLeitura={Boolean(vendo)}
-          cartas={vendo ? null : cartas} chefao={vendo ? null : chefao}
-          mineiros={vendo ? vendo.ouro?.trabalhando || 0 : reino.ouro?.equipe?.trabalhando || 0} diamantes={vendo ? 0 : reino.ouro?.diamantes || 0}
-          humor={humor} aoEscolher={vendo ? undefined : aoEscolher} aoVisitar={aoVisitar} aoFalhar={() => setPlana(true)} />
+        <Mundo3D construcoes={naIlha ? construcoesDaIlha(naIlha) : vendo ? vendo.construcoes : reino.construcoes}
+          cenario={naIlha ? "ilha-tropical" : null} guardas={naIlha ? naIlha.defensores : null}
+          tropas={naIlha ? {} : vendo ? vendo.tropas : { exercito: reino.exercito.tropas, guarnicao: reino.guarnicao.tropas }}
+          vizinhos={vendo || naIlha ? [] : reino.paz?.vigente?.vizinhos || []}
+          personagem={vendo ? vendo.personagem : undefined} soLeitura={Boolean(vendo || naIlha)}
+          cartas={vendo || naIlha ? null : cartas} chefao={vendo || naIlha ? null : chefao}
+          mineiros={naIlha ? 0 : vendo ? vendo.ouro?.trabalhando || 0 : reino.ouro?.equipe?.trabalhando || 0} diamantes={vendo || naIlha ? 0 : reino.ouro?.diamantes || 0}
+          humor={humor} aoEscolher={vendo || naIlha ? undefined : aoEscolher} aoVisitar={aoVisitar} aoFalhar={() => setPlana(true)} />
       )}
-      {!telaCheia && !vendo && <button type="button" className="rn-vista3d__cheia" onClick={aoTelaCheia}>⛶ Tela cheia</button>}
+      {!telaCheia && !vendo && !naIlha && <button type="button" className="rn-vista3d__cheia" onClick={aoTelaCheia}>⛶ Tela cheia</button>}
       <Visita visita={visita} aoVoltar={aoVoltarDaVisita} />
+      {naIlha && <IlhaNaVista ilha={naIlha} aoVoltar={aoVoltarDaIlha} />}
+      {!vendo && !naIlha && <EfeitosDaForja forja={forja} aoAbrir={aoAbrirForja} />}
       {children}
     </section>
+  );
+}
+
+/** O cartão por cima do mundo quando ele mostra uma ilha das Grandes Expedições (como o da visita a um vizinho). */
+function IlhaNaVista({ ilha, aoVoltar }) {
+  const defensores = Object.entries(ilha.defensores || {});
+  return (
+    <div className="rn-visita rn-visita--ilha" role="region" aria-label={`Vista da ${ilha.nome}`}>
+      <div className="rn-visita__topo">
+        <div>
+          <span className="rn-visita__selo">🏝️ Grande Expedição</span>
+          <h3>{ilha.emoji} {ilha.nome}</h3>
+          <small>{ilha.nomeDoNivel} · {ilha.dono ? (ilha.dono.souEu ? "a ilha é sua" : `de ${ilha.dono.nome}`) : "dos nativos"}{defensores.length ? ` · ${defensores.reduce((s, [, n]) => s + n, 0)} de guarda` : ""}{ilha.escudoAte ? " · 🛡️ com escudo" : ""}</small>
+        </div>
+        <div className="rn-visita__botoes">
+          <button type="button" className="pf-botao pf-botao--pequeno" onClick={aoVoltar}>⬅ Meu reino</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1231,7 +1310,7 @@ function HumorDoNeuro({ humor }) {
  * aonde ele leva — um cartão por lugar, com o chefe, os monstros, as estrelas e o saque. A Nave
  * mostra o radar: o planetoide sorteado para a próxima viagem.
  */
-function Expedicoes({ mapa, veiculo, aoVeiculo, ocupado, resultado, aoFecharResultado, aoPartir, aoAssistir, aoBloqueado, aoAbastecer, aoGaragem }) {
+function Expedicoes({ mapa, veiculo, aoVeiculo, ocupado, resultado, aoFecharResultado, aoPartir, aoAssistir, aoBloqueado, aoAbastecer, aoGaragem, aoIlhas }) {
   const v = mapa?.veiculos?.find((x) => x.id === veiculo) || mapa?.veiculos?.[0];
   const lugares = mapa && v ? mapa.lugares.filter((x) => x.veiculo === v.id) : [];
   return (
@@ -1270,8 +1349,8 @@ function Expedicoes({ mapa, veiculo, aoVeiculo, ocupado, resultado, aoFecharResu
       {v?.tem && v.id === "navio" && (
         <div className="pf-cartao rn-exp__trancado">
           <img src={urlDoVeiculo(v.id)} alt="" width="72" height="72" />
-          <p><strong>{v.emoji} {v.nome}</strong>: o navio não faz expedição — ele leva a sua tripulação ao arquipélago da Temporada das Ilhas.</p>
-          <Link href="/ilhas" className="pf-botao pf-botao--pequeno">🏝️ Abrir o arquipélago</Link>
+          <p><strong>{v.emoji} {v.nome}</strong>: o navio não faz expedição — ele leva a sua tripulação às Grandes Expedições, as ilhas da temporada (aqui embaixo).</p>
+          <button type="button" className="pf-botao pf-botao--pequeno" onClick={aoIlhas}>🏝️ Ir às Grandes Expedições</button>
         </div>
       )}
       {v?.tem && v.id !== "navio" && (

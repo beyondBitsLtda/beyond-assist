@@ -5,7 +5,8 @@
   // A mesma conta do Abacato e da Lisa (beyondbitsLisa). Precisa estar escrito porque a
   // credencial deste computador enxerga mais de uma conta, e aí o wrangler se recusa a adivinhar.
   "account_id": "7e4b10d80b08fef1f2fcca583577bf2d",
-  "main": ".open-next/worker.js",
+  // o worker-proof.js é o do OpenNext mais o relógio da Lisa (o gatilho de horário logo abaixo)
+  "main": "worker-proof.js",
   "compatibility_date": "2025-09-01",
   // nodejs_compat: o adaptador precisa dos módulos do Node.
   // global_fetch_strictly_public: um fetch do Worker para o próprio domínio sai para a internet
@@ -19,5 +20,7 @@
   // Quem recebe os chamados do "Reportar problema": a conta do Abacato com este e-mail (o mesmo de
   // acesso da Lisa). Não é segredo — é o endereço de quem administra; segredo fica no painel.
   "vars": { "PROOF_ADMIN_EMAIL": "bryan@beyond.dev.br" },
-  "routes": [{ "pattern": "proof.beyond.dev.br", "custom_domain": true }]
+  "routes": [{ "pattern": "proof.beyond.dev.br", "custom_domain": true }],
+  // o relógio da Lisa: a cada 20 minutos ela faz o que está na vez (src/lib/lisaRotina.js)
+  "triggers": { "crons": ["*/20 * * * *"] }
 }

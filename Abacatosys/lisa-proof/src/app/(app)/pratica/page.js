@@ -11,6 +11,7 @@ import { PERFIS } from "@/dominio/perfis.js";
 import { valorDoProjetoFinal, PROJETOS_POR_SEMANA } from "@/dominio/avanco.js";
 import Neuro, { reagir } from "@/componentes/Neuro.js";
 import { DiarioDaTrilha } from "@/componentes/pratica/Diario.js";
+import MinigameDoDia from "@/componentes/pratica/MinigameDoDia.js";
 
 /** O que o Neuro diz ao abrir a prática: a cobrança do dia. */
 function falaDoNeuro(trilhas) {
@@ -164,6 +165,7 @@ export default function Pratica() {
       </nav>
 
       {erro && <div className="pf-aviso pf-aviso--erro" style={{ marginTop: 12 }}>{erro}</div>}
+      <MinigameDoDia />
       {!dados.iaDisponivel && <div className="pf-aviso" style={{ marginTop: 12 }}>A IA não está configurada neste servidor: a prática precisa dela.</div>}
 
       {dados.trilhas.length === 0 ? (

@@ -7,7 +7,7 @@ import { NOMES_DOS_DESAFIOS } from "@/dominio/pratica.js";
 
 const numero = (n) => new Intl.NumberFormat("pt-BR").format(Math.round(n || 0));
 const quando = (iso) => new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-const ICONE_DA_ACAO = { curso: "🎓", mina: "⛏️", teoria: "📖", quiz: "❓", exercicio: "✍️", projeto: "🧩", reino: "🏰", bolsa: "📈", caderno: "📓", acervo: "🏛️", conta: "👋", correio: "🕊️", ilhas: "🏝️" };
+const ICONE_DA_ACAO = { minigame: "🕹️", curso: "🎓", mina: "⛏️", teoria: "📖", quiz: "❓", exercicio: "✍️", projeto: "🧩", reino: "🏰", bolsa: "📈", caderno: "📓", acervo: "🏛️", conta: "👋", correio: "🕊️", ilhas: "🏝️" };
 const STATUS_DO_ACERVO = { pendente: "esperando aprovação", aprovado: "aprovado", recusado: "recusado", retirado: "retirado" };
 
 /**
@@ -38,8 +38,29 @@ export default function LisaJoga() {
           <span><strong>Duelo de Lógica com a Lisa</strong><br /><span className="pf-estat__nota">5 perguntas rápidas de código e raciocínio. Venceu, leva moedas do reino dela; perdeu, a aposta fica com ela.</span></span>
         </Link>
       )}
+      {dados?.existe && <AoVivo diario={dados.diario} />}
       {dados?.existe && <Painel d={dados} />}
     </>
+  );
+}
+
+/**
+ * A Lisa ao vivo (03/11/2026: "não tô vendo a Lisa ativa, quero ver ela jogando"): o relógio da nuvem faz ela
+ * jogar a cada 20 minutos; aqui aparece se ela jogou agora há pouco e o que foi a última coisa que fez.
+ */
+function AoVivo({ diario }) {
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => { const r = setInterval(() => setAgora(Date.now()), 30_000); return () => clearInterval(r); }, []);
+  const ultima = diario?.[0];
+  if (!ultima) return null;
+  const minutos = Math.max(0, Math.round((agora - new Date(ultima.criado_em).getTime()) / 60_000));
+  const ativa = minutos <= 45;
+  const ha = minutos < 1 ? "agora mesmo" : minutos < 60 ? `há ${minutos} min` : minutos < 1440 ? `há ${Math.floor(minutos / 60)} h` : `em ${quando(ultima.criado_em)}`;
+  return (
+    <div className={`pf-cartao lj-aovivo${ativa ? " lj-aovivo--ativa" : ""}`} role="status">
+      <span className="lj-aovivo__ponto" aria-hidden="true" />
+      <span><strong>{ativa ? "A Lisa está jogando" : "A Lisa está descansando"}</strong> · última jogada {ha}: {ICONE_DA_ACAO[ultima.acao] || "•"} {ultima.resumo}</span>
+    </div>
   );
 }
 

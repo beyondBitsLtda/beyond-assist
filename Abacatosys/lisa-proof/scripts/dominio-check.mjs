@@ -39,7 +39,9 @@ import { TROPAS, ORDEM_DAS_TROPAS, ORDEM_DA_TRIPULACAO } from "../src/dominio/tr
 import { LUGARES } from "../src/dominio/combate.js";
 import { fazExpedicao } from "../src/dominio/veiculos.js";
 import { ARQUIPELAGO, CONSTRUCOES_DA_ILHA, CONCHAS_POR_MOEDA, capacidadeDaTripulacao, batalhaNaIlha, desfechoNaIlha, guardasDaConquista, construcoesAposConquista, defensorDaIlha, producaoDaIlha, juntadoNaIlha, podeConstruirNaIlha, podeTreinarTripulacao, podeAtacarIlha, pactoVigente, pactoPendente, saqueDeConchas, protecaoDoBau } from "../src/dominio/ilhas.js";
+import { PONTOS_DO_MINIGAME, jogoDoDia } from "../src/dominio/arena.js";
 import { BUGS, SOLUCOES_DOS_BUGS, ANDARES_DA_MASMORRA, arnesDoBug, lerArnes, NIVEIS_DO_MASCOTE, CODIGO_INICIAL_DO_MASCOTE, SOLUCAO_DO_MASCOTE, simularMascote, arnesDoMascote, PUZZLES_DE_PARSONS, blocosEmbaralhados, conferirParsons, faseLiberada } from "../src/dominio/arena.js";
+import { AGENDA as AGENDA_DA_LISA } from "../src/dominio/lisaJogadora.js";
 import { luzDaHora, tempoDoBloco, climaDoReino, textoDoClima, agoraEmBrasilia, TEMPOS } from "../src/dominio/clima.js";
 import {
   RIVAIS_DE_TESTE, FERRAMENTAS_DE_TESTE, reinoDoRival, reinoLiberado, reinoNovoDeTeste, urlNoMundo, ehRivalDeTeste,
@@ -3220,8 +3222,18 @@ caso("lisa jogadora: a assertividade cresce com o curso e os erros ensinam", () 
 caso("lisa jogadora: a agenda do dia, como uma pessoa", () => {
   assert.deepEqual(oQueFazerAgora({ hora: 6, diaDaSemana: 2 }), [], "de madrugada, nada");
   assert.deepEqual(oQueFazerAgora({ hora: 8, diaDaSemana: 2 }), ["curso", "mina", "teoria"]);
-  assert.deepEqual(oQueFazerAgora({ hora: 13, diaDaSemana: 2, feito: ["curso", "mina", "teoria"] }), ["quiz", "bolsa"], "a Bolsa às 10h (só abre das 7h às 17h)");
   assert.ok(!oQueFazerAgora({ hora: 9, diaDaSemana: 2 }).includes("bolsa") && oQueFazerAgora({ hora: 10, diaDaSemana: 2 }).includes("bolsa"));
+  assert.ok(!oQueFazerAgora({ hora: 17, diaDaSemana: 2 }).includes("bolsa"), "a Bolsa só negocia até as 17h");
+  // mais vezes no dia (03/11/2026: "quero ver ela jogando mais vezes"), com intervalo entre uma e outra
+  const agora = Date.parse("2026-11-03T15:00:00Z");
+  const horas = (h) => agora - h * 3_600_000;
+  assert.ok(oQueFazerAgora({ hora: 12, diaDaSemana: 2, agora, jogadas: { reino: { vezes: 1, ultima: horas(3) } } }).includes("reino"), "o Reino de novo depois de 3 h");
+  assert.ok(!oQueFazerAgora({ hora: 12, diaDaSemana: 2, agora, jogadas: { reino: { vezes: 1, ultima: horas(1) } } }).includes("reino"), "mas não antes");
+  assert.ok(!oQueFazerAgora({ hora: 20, diaDaSemana: 2, agora, jogadas: { reino: { vezes: 4, ultima: horas(9) } } }).includes("reino"), "até 4 vezes no dia");
+  assert.ok(!oQueFazerAgora({ hora: 14, diaDaSemana: 2, agora, jogadas: { quiz: { vezes: 1, ultima: horas(9) } } }).includes("quiz"), "o quiz é uma vez só");
+  assert.ok(oQueFazerAgora({ hora: 13, diaDaSemana: 2 }).includes("minigame"), "o minigame do dia entra na agenda");
+  const vezesNoDia = AGENDA_DA_LISA.reduce((s, a) => s + (a.vezes || 1), 0);
+  assert.ok(vezesNoDia >= 25, `ela joga muitas vezes no dia (${vezesNoDia})`);
   assert.ok(!oQueFazerAgora({ hora: 22, diaDaSemana: 2 }).includes("acervo"), "o Acervo é só no domingo");
   assert.ok(oQueFazerAgora({ hora: 22, diaDaSemana: 0 }).includes("acervo") && oQueFazerAgora({ hora: 22, diaDaSemana: 0 }).includes("caderno"));
   const n = itensDaTeoriaHoje(sorteioDaLisa(3));
@@ -3256,8 +3268,8 @@ caso("lisa jogadora: o diagrama dela vira um documento que o quadro aceita", () 
 });
 caso("lisa jogadora: a rotina, a conta-robô e a página pública", () => {
   const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
-  const script = ler("./lisa-joga.mjs");
-  assert.match(script, /oQueFazerAgora\(\{ hora, diaDaSemana, feito: await feitoHoje\(id\) \}\)/, "faz o que está na vez e ainda não fez hoje");
+  const script = ler("../src/lib/lisaRotina.js");
+  assert.match(script, /oQueFazerAgora\(\{ hora, diaDaSemana, jogadas: await jogadasDeHoje\(id\), agora: agora\.getTime\(\) \}\)\.slice\(0, maximo\)/, "faz o que está na vez (até algumas por rodada)");
   assert.ok(script.includes("await registrarNoDiario(id, acao, `Tentei ${NOME_DA_ACAO[acao] || acao} e não deu desta vez.`"), "falhou: fica no diário e não insiste");
   for (const f of ["marcarItem", "responderQuiz", "entregarEvidencia", "melhorarConstrucao", "invadir", "comprarAcao", "criarMaterial", "criarPagina"]) {
     assert.ok(script.includes(`${f}(`), `joga pelas mesmas funções das telas: ${f}`);
@@ -3328,7 +3340,7 @@ caso("correio: as rotas, a tela, o quiz e a Lisa", () => {
   assert.match(quiz, /const valem = perguntas\.filter\(\(p\) => !p\.enviada\);/, "o placar final sem as que foram pelo correio");
   assert.match(quiz, /<MandarPorCorreio desafioId=\{desafio\.id\}/);
   assert.match(ler("../src/componentes/Moldura.js"), /\{ href: "\/correio", rotulo: "Correio", Icone: IconeCorreio, grupo: "Jogo" \}/);
-  assert.match(ler("./lisa-joga.mjs"), /const ACOES = \{[^}]*correio[,}]/);
+  assert.match(ler("../src/lib/lisaRotina.js"), /const ACOES = \{[^}]*correio[,}]/);
   assert.ok(oQueFazerAgora({ hora: 18, diaDaSemana: 2 }).includes("correio"), "a Lisa passa no correio no fim da tarde");
 });
 
@@ -3343,7 +3355,7 @@ caso("projeto em arquivos (sem GitHub): a conferência dos arquivos", () => {
   const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
   const pratica = ler("../src/lib/pratica.js");
   assert.match(pratica, /export async function entregarProjetoEmArquivos\(\{ usuarioId, id, arquivos \}\)[\s\S]*?avaliarProjeto\(\{ tema: trilha\.tema, projeto: d\.conteudo, repositorio \}\)/, "a mesma correção do repositório");
-  const script = ler("./lisa-joga.mjs");
+  const script = ler("../src/lib/lisaRotina.js");
   assert.match(script, /await entregarProjetoEmArquivos\(\{ usuarioId: id, id: d\.id, arquivos \}\)/, "a Lisa entrega o projeto de programação em arquivos");
   assert.match(script, /await enviarExercicio\(\{ usuarioId: id, id: d\.id, codigo: await codigoDaEntrega/, "e o exercício de código");
   assert.match(script, /const criado = await criarCurso\(\{ usuarioId: id, proposta: r\.proposta,/, "o perfil do curso é o que a IA propôs");
@@ -3369,10 +3381,10 @@ caso("correio no Reino: a caixa com o pombo-carteiro, a bandeirinha e a folha da
   assert.match(mundo, /api\.current\?\.definirCartas\(cartas\);/);
   const pagina = ler("../src/app/(app)/reino/page.js");
   assert.match(pagina, /if \(chave === "correio"\) \{ setCorreioAberto\(true\); return; \}/);
-  assert.match(pagina, /cartas=\{vendo \? null : cartas\}/, "na visita a outro reino, a caixa não aparece");
+  assert.match(pagina, /cartas=\{vendo \|\| naIlha \? null : cartas\}/, "na visita a outro reino (e numa ilha), a caixa não aparece");
   assert.match(ler("../src/componentes/reino/CorreioDoReino.js"), /<Recebidas cartas=\{caixa\.recebidas\.slice\(0, 10\)\} agir=\{agir\} \/>/);
   assert.match(CONTA_DA_LISA.reino, /Lisa/, "o reino da Lisa tem nome próprio");
-  assert.match(ler("./lisa-joga.mjs"), /await renomearReino\(id, CONTA_DA_LISA\.reino\)/);
+  assert.match(ler("../src/lib/lisaRotina.js"), /await renomearReino\(id, CONTA_DA_LISA\.reino\)/);
 });
 
 caso("Raposão: o personagem azul e branco, à venda por 610, e a área de presentes", () => {
@@ -3602,7 +3614,12 @@ caso("Duelo de Lógica: o gabarito confere, a Lisa erra às vezes e quem acerta 
   const lib = fs.readFileSync(new URL("../src/lib/duelo.js", import.meta.url), "utf8");
   assert.match(lib, /\.eq\("id", d\.id\)\.eq\("status", "aberto"\)\.select\(CAMPOS\)/, "encerra uma vez só");
   assert.match(lib, /grava antes de cobrar/);
-  assert.match(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /\{ href: "\/forja", rotulo: "Forja", Icone: IconeForja, grupo: "Jogo" \}/);
+  // a Forja mora no Reino (03/11/2026: "não num menu à parte"), com os selos do que está em efeito por cima do 3D
+  const reinoPagina = fs.readFileSync(new URL("../src/app/(app)/reino/page.js", import.meta.url), "utf8");
+  assert.match(reinoPagina, /forja: \(\) => \(teste \? null : <ForjaDoReino dados=\{forja\}/);
+  assert.match(reinoPagina, /<EfeitosDaForja forja=\{forja\}/);
+  assert.match(fs.readFileSync(new URL("../src/app/(app)/forja/page.js", import.meta.url), "utf8"), /redirect\("\/reino#forja"\)/);
+  assert.doesNotMatch(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /href: "\/forja"/, "sem item à parte no menu");
 });
 
 caso("BEYOND-0019: moedas com no máximo 2 casas (o bônus do humor do Neuro não vaza ponto flutuante)", () => {
@@ -3753,8 +3770,16 @@ caso("BEYOND-0020: a Temporada das Ilhas — conquista, construção com conchas
   assert.match(lib, /if \(desfecho\.tipo === "conquista"\) \{\s*await gravarIlha/, "a conquista grava a ilha antes de tudo");
   assert.match(fs.readFileSync(new URL("../src/componentes/reino/cenariosDasExpedicoes.js", import.meta.url), "utf8"), /"ilha-tropical": \{/);
   assert.match(fs.readFileSync(new URL("../src/componentes/reino/Mundo3D.js", import.meta.url), "utf8"), /id === "barco" \|\| id === "navio"/);
-  assert.match(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /\{ href: "\/ilhas", rotulo: "Ilhas", Icone: IconeIlhas, grupo: "Jogo" \}/);
-  assert.match(fs.readFileSync(new URL("./lisa-joga.mjs", import.meta.url), "utf8"), /const ACOES = \{[^}]*ilhas \};/, "a Lisa tem a ilha dela");
+  // as ilhas moram no Reino, nas Grandes Expedições, em 3D no mesmo mundo do reino (cenário parado + guardas)
+  const doReino = fs.readFileSync(new URL("../src/app/(app)/reino/page.js", import.meta.url), "utf8");
+  assert.match(doReino, /ilhas: \(\) => \(teste \? null : \(\s*<GrandesExpedicoes/);
+  assert.match(doReino, /cenario=\{naIlha \? "ilha-tropical" : null\} guardas=\{naIlha \? naIlha\.defensores : null\}/);
+  const mundo3d = fs.readFileSync(new URL("../src/componentes/reino/Mundo3D.js", import.meta.url), "utf8");
+  assert.match(mundo3d, /function definirCenarioFixo\(c\)/);
+  assert.match(mundo3d, /if \(fixo\.cenario\) aplicarCenarioFixo\(\);/, "depois da luta, a ilha parada volta");
+  assert.match(fs.readFileSync(new URL("../src/app/(app)/ilhas/page.js", import.meta.url), "utf8"), /redirect\("\/reino#grandes-expedicoes"\)/);
+  assert.doesNotMatch(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /href: "\/ilhas"/, "sem item à parte no menu");
+  assert.match(fs.readFileSync(new URL("../src/lib/lisaRotina.js", import.meta.url), "utf8"), /const ACOES = \{[^}]*ilhas, minigame \};/, "a Lisa tem a ilha dela (e joga o minigame)");
   assert.match(fs.readFileSync(new URL("../db/030-versao-1.sql", import.meta.url), "utf8"), /'ilhas', 'arena'\)\);/);
 });
 
@@ -3816,7 +3841,41 @@ caso("BEYOND-0023: a Arena Lúdica — todo bug quebra, toda solução passa, o 
   assert.match(lib, /const NODE = "nodejs-20\.17\.0";/, "o servidor confere no Node do Wandbox, nunca no nosso");
   assert.match(lib, /update\(\{ concluida_em: new Date\(\)\.toISOString\(\), recompensa: valor \}\)\.eq\("id", id\)\.is\("concluida_em", null\)/, "paga uma vez só");
   assert.match(lib, /creditarMoedas\(usuarioId, "arena", valor/);
-  assert.match(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /\{ href: "\/arena", rotulo: "Arena", Icone: IconeArena, grupo: "Estudo" \}/);
+  // a Arena é o minigame do dia da Prática: vale pontos uma vez por dia, como o quiz
+  assert.equal(PONTOS_DO_MINIGAME, 30);
+  assert.equal(jogoDoDia("2026-11-02"), "masmorra", "segunda");
+  assert.equal(jogoDoDia("2026-11-03"), "mascote", "terça");
+  assert.equal(jogoDoDia("2026-11-08"), "parsons", "domingo");
+  assert.match(lib, /tipo: "arena", chave: chaveDoMinigame\(diaDe\(\)\), pontos: PONTOS_DO_MINIGAME/);
+  assert.match(fs.readFileSync(new URL("../src/app/(app)/pratica/page.js", import.meta.url), "utf8"), /<MinigameDoDia \/>/);
+  assert.match(fs.readFileSync(new URL("../db/031-minigame-do-dia.sql", import.meta.url), "utf8"), /'diario', 'arena'/);
+  assert.match(fs.readFileSync(new URL("../src/app/(app)/arena/page.js", import.meta.url), "utf8"), /redirect\("\/pratica#minigame"\)/);
+});
+
+caso("o menu do Reino em abas: cada aba com as suas partes, nada solto embaixo do mundo", () => {
+  const pagina = fs.readFileSync(new URL("../src/app/(app)/reino/page.js", import.meta.url), "utf8");
+  assert.match(pagina, /const ABAS_DO_REINO = \[/);
+  for (const [aba, secoes] of [["reino", "construcoes"], ["batalha", "invadir"], ["expedicoes", "ilhas"], ["forja", "forja"], ["bolsa", "bolsa"]]) {
+    assert.match(pagina, new RegExp(`id: "${aba}"[^\\n]*secoes: \\[[^\\]]*"${secoes}"`), aba);
+  }
+  assert.match(pagina, /role="tablist" aria-label="Menu do reino"/);
+  assert.doesNotMatch(pagina, /\{secoes\.paz\(\)\}\n\s*\{secoes\.minas\(\)\}/, "as seções não ficam mais todas empilhadas");
+  assert.match(pagina, /setAba\(abaDaSecao\(id\)\)/, "mostrar uma seção abre a aba dela");
+});
+
+caso("a Lisa joga sozinha: o relógio da nuvem chama a rodada a cada 20 minutos, com segredo", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const wrangler = ler("../wrangler.jsonc");
+  assert.match(wrangler, /"main": "worker-proof\.js"/);
+  assert.match(wrangler, /"triggers": \{ "crons": \["\*\/20 \* \* \* \*"\] \}/);
+  const worker = ler("../worker-proof.js");
+  assert.match(worker, /async scheduled\(evento, env, ctx\)/);
+  assert.match(worker, /"x-proof-relogio": env\.PROOF_SEGREDO_DO_RELOGIO/);
+  assert.match(worker, /export \{ DOQueueHandler, DOShardedTagCache, BucketCachePurge \} from "\.\/\.open-next\/worker\.js";/);
+  const rota = ler("../src/app/api/lisa/rodada/route.js");
+  assert.match(rota, /segredo\.length < 16 \|\| req\.headers\.get\("x-proof-relogio"\) !== segredo/, "sem o segredo, ninguém roda a Lisa");
+  assert.match(ler("../src/lib/arena.js"), /if \(!perfil\?\.robo\) throw new ErroDeAcesso\(403/, "a jogada sem conferir é só para robô");
+  assert.match(ler("./lisa-joga.mjs"), /import \{ rodadaDaLisa, criarConta \} from "@\/lib\/lisaRotina\.js";/, "o script vira atalho");
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

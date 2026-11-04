@@ -30,7 +30,7 @@
 .neuro__lingua { fill: #F472B6; }
 .neuro__lagrima { fill: #60A5FA; }
 .neuro__estrelas path { fill: #EAB308; }
-.neuro__zzz text { fill: #9CA3AF; font: 700 16px Inter, system-ui, sans-serif; }
+.neuro__zzz text { fill: #9CA3AF; font: 700 16px var(--pf-fonte); }
 .neuro__pensar circle { fill: #9CA3AF; }
 
 /* Só aparece o que é do humor atual. */
@@ -155,7 +155,7 @@
 .neuro__lisa-lagrima { fill: #60A5FA; }
 .neuro__lisa-pensar circle { fill: #9CA3AF; }
 .neuro__lisa-brilho path { fill: #FACC15; }
-.neuro__lisa-zz { fill: #6B7280; font: 700 8px Inter, system-ui, sans-serif; }
+.neuro__lisa-zz { fill: #6B7280; font: 700 8px var(--pf-fonte); }
 .neuro__lisa-zz--grande { font-size: 11px; }
 .neuro__lisa-pupila { transform-box: fill-box; transform-origin: center; animation: lisa-piscar 5s ease-in-out infinite; }
 .neuro--dormindo .neuro__lisa-pupila { display: none; }

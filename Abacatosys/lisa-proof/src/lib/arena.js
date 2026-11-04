@@ -9,11 +9,13 @@
 import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
 import { creditarMoedas } from "./reino.js";
+import { registrarEvento, estudouHoje, depoisDePontuar, resultadoDaPontuacao } from "./estudo.js";
+import { diaDe } from "@/dominio/datas.js";
 import { gerarJson, personaDo, temModelo } from "./ia.js";
 import {
   JOGOS_DA_ARENA, ORDEM_DOS_JOGOS, FASES_DA_ARENA, ANDARES_DA_MASMORRA, BUGS, andarPorId, NIVEIS_DO_MASCOTE, nivelPorId,
   PUZZLES_DE_PARSONS, puzzlePorId, CODIGO_INICIAL_DO_MASCOTE, arnesDoBug, arnesDoMascote, lerArnes, testesParaTela,
-  blocosEmbaralhados, conferirParsons, faseExiste, faseLiberada,
+  blocosEmbaralhados, conferirParsons, faseExiste, faseLiberada, PONTOS_DO_MINIGAME, chaveDoMinigame, jogoDoDia,
 } from "@/dominio/arena.js";
 
 const falhou = (error, onde) => { if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`); };
@@ -51,9 +53,13 @@ async function rodarNoNode(codigo, senha) {
 
 const senhaNova = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, "0")).join("");
 
-/** Tudo o que a tela da Arena precisa: os jogos, as fases (com o conteúdo de cada uma) e o progresso. */
+/** Tudo o que o minigame do dia precisa: os jogos, as fases (com o conteúdo), o progresso e os pontos de hoje. */
 export async function arenaDe(usuarioId) {
-  const { data, error } = await supabase.from("proof_arena").select("jogo, fase, tentativas, acertos, melhor_tempo_ms, concluida_em, recompensa").eq("usuario_id", usuarioId);
+  const hoje = diaDe();
+  const [{ data, error }, { data: doDia }] = await Promise.all([
+    supabase.from("proof_arena").select("jogo, fase, tentativas, acertos, melhor_tempo_ms, concluida_em, recompensa").eq("usuario_id", usuarioId),
+    supabase.from("proof_eventos").select("pontos").eq("usuario_id", usuarioId).eq("chave", chaveDoMinigame(hoje)).maybeSingle(),
+  ]);
   falhou(error, "arena");
   const linhas = data || [];
   const porFase = new Map(linhas.map((l) => [`${l.jogo}:${l.fase}`, l]));
@@ -75,6 +81,9 @@ export async function arenaDe(usuarioId) {
       blocos: blocosEmbaralhados(p.id, usuarioId),
     })),
     resumo: { concluidas: concluidas.size, total: totalDeFases, moedas: linhas.reduce((s, l) => s + (l.recompensa || 0), 0) },
+    doDia: jogoDoDia(hoje),
+    pontosDoDia: PONTOS_DO_MINIGAME,
+    hoje: { feito: Boolean(doDia), pontos: doDia?.pontos || 0 },
   };
 }
 
@@ -117,7 +126,36 @@ export async function conferirNaArena(usuarioId, { jogo, fase, codigos, codigo, 
       detalhe = { motivo: r.resultado?.motivo || r.erro || "o código não rodou" };
     }
   }
-  return { ok, ...detalhe, ...(await gravarTentativa(usuarioId, jogo, fase, ok, tempoMs)) };
+  const gravado = await gravarTentativa(usuarioId, jogo, fase, ok, tempoMs);
+  return { ok, ...detalhe, ...gravado, ...(ok ? await pontosDoMinigame(usuarioId, jogo, fase) : { pontosDoDia: 0 }) };
+}
+
+/**
+ * Os pontos do minigame do dia: a primeira fase vencida no dia (qualquer jogo, fase nova ou repetida) vale
+ * PONTOS_DO_MINIGAME, uma vez — contam para a meta, a ofensiva e as conquistas, como os do quiz.
+ */
+async function pontosDoMinigame(usuarioId, jogo, fase) {
+  const estudavaAntes = await estudouHoje(usuarioId);
+  const ganhou = await registrarEvento({
+    usuarioId, trilhaId: null, tipo: "arena", chave: chaveDoMinigame(diaDe()), pontos: PONTOS_DO_MINIGAME,
+    detalhe: { titulo: `Minigame do dia: ${JOGOS_DA_ARENA[jogo].nome}`, jogo, fase },
+  });
+  if (!ganhou) return { pontosDoDia: 0 };
+  const extra = resultadoDaPontuacao(ganhou, await depoisDePontuar({ usuarioId, trilhaId: null, estudavaAntes, ganhou }));
+  return { pontosDoDia: ganhou, pontuacao: extra };
+}
+
+/**
+ * A jogada de um robô (a Lisa, src/lib/lisaRotina.js): a rotina decide se ela acertou (pela chance dela, como no
+ * quiz) e a fase conta igual à de qualquer pessoa — tentativa, recompensa e os pontos do minigame do dia. Só
+ * para contas de robô (proof_perfis.robo).
+ */
+export async function jogadaDoRobo(usuarioId, { jogo, fase, ok, tempoMs }) {
+  const { data: perfil } = await supabase.from("proof_perfis").select("robo").eq("usuario_id", usuarioId).maybeSingle();
+  if (!perfil?.robo) throw new ErroDeAcesso(403, "só os robôs jogam sem conferir");
+  if (!faseExiste(jogo, fase)) throw new ErroDeAcesso(404, "essa fase não existe");
+  const gravado = await gravarTentativa(usuarioId, jogo, fase, Boolean(ok), tempoMs);
+  return { ok: Boolean(ok), ...gravado, ...(ok ? await pontosDoMinigame(usuarioId, jogo, fase) : { pontosDoDia: 0 }) };
 }
 
 /** Soma a tentativa e, na primeira vitória, conclui a fase e paga (uma vez só: concluida_em marcado antes). */

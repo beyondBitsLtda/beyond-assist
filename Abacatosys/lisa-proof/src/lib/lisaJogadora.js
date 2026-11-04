@@ -26,6 +26,19 @@ export async function registrarNoDiario(usuarioId, acao, resumo, detalhe = {}) {
   falhou(error, "diário da Lisa");
 }
 
+/** O que ela já fez (ou tentou) hoje, com quantas vezes e quando foi a última — para a agenda repetir no dia. */
+export async function jogadasDeHoje(usuarioId) {
+  const { data, error } = await supabase.from("proof_lisa_diario").select("acao, criado_em").eq("usuario_id", usuarioId).eq("dia", diaDe());
+  falhou(error, "diário de hoje");
+  const jogadas = {};
+  for (const d of data || []) {
+    const j = jogadas[d.acao] || (jogadas[d.acao] = { vezes: 0, ultima: 0 });
+    j.vezes += 1;
+    j.ultima = Math.max(j.ultima, new Date(d.criado_em).getTime());
+  }
+  return jogadas;
+}
+
 /** As ações que ela já fez (ou tentou) hoje — tentar conta: o relógio não insiste de hora em hora. */
 export async function feitoHoje(usuarioId) {
   const { data, error } = await supabase.from("proof_lisa_diario").select("acao").eq("usuario_id", usuarioId).eq("dia", diaDe());

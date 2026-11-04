@@ -12,6 +12,8 @@ export const PAINEIS = [
   { id: "tropas", emoji: "⚔️", rotulo: "Tropas" },
   { id: "garagem", emoji: "🚗", rotulo: "Garagem" },
   { id: "expedicoes", emoji: "🗺️", rotulo: "Expedições" },
+  { id: "ilhas", emoji: "🏝️", rotulo: "Ilhas" },
+  { id: "forja", emoji: "⚒️", rotulo: "Forja" },
   { id: "bolsa", emoji: "📈", rotulo: "Bolsa" },
   { id: "invadir", emoji: "🎯", rotulo: "Invadir" },
   { id: "paz", emoji: "🕊️", rotulo: "Paz" },
@@ -25,7 +27,8 @@ export const PAINEIS = [
  * Esc de novo sai da tela cheia.
  */
 export default function TelaCheia({ reino, painel, aoPainel, aoSair, ocupado, aoColetarMina, aoColetarOuro, comTeste = false, children }) {
-  const paineis = comTeste ? [...PAINEIS, { id: "teste", emoji: "🧪", rotulo: "Teste" }] : PAINEIS;
+  // as ilhas e a Forja são do mundo de verdade: no Reino de Teste não aparecem
+  const paineis = comTeste ? [...PAINEIS.filter((p) => p.id !== "ilhas" && p.id !== "forja"), { id: "teste", emoji: "🧪", rotulo: "Teste" }] : PAINEIS;
   useEffect(() => {
     const tecla = (e) => {
       if (e.key !== "Escape" || document.querySelector(".folha__fundo")) return; // a folha aberta fecha primeiro

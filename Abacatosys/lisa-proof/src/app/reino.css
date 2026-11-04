@@ -75,7 +75,7 @@
 .rn-construcao__proximo { color: var(--pf-verde-forte); }
 .rn-niveis { display: inline-flex; gap: 4px; }
 .rn-niveis span { width: 14px; height: 6px; border-radius: 3px; background: var(--pf-superficie-2); border: 1px solid var(--pf-linha); }
-.rn-niveis .rn-niveis__cheio { background: var(--pf-verde-forte); border-color: var(--pf-verde-forte); }
+.rn-niveis .rn-niveis__cheio { background: var(--pf-verde); border-color: var(--pf-verde); }
 
 /* ------------------------------------------------------------ invasões */
 .rn-procurar { display: grid; gap: 12px; justify-items: start; }
@@ -548,7 +548,7 @@ button.rn-exp__arte:disabled { cursor: progress; }
   position: absolute; left: 12px; bottom: 12px; z-index: 4; width: min(420px, calc(100% - 24px)); max-height: calc(100% - 24px); overflow-y: auto;
   padding: 12px 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.95); color: var(--pf-tinta); box-shadow: var(--pf-sombra-alta);
 }
-:root[data-tema="escuro"] .rn-visita { background: rgba(21, 30, 25, 0.95); }
+:root[data-tema="escuro"] .rn-visita { background: rgba(20, 23, 17, 0.95); border: 1px solid rgba(255, 255, 255, 0.07); }
 .rn-tela-cheia .rn-visita { bottom: 86px; }
 .rn-visita--carregando { font-weight: 700; }
 .rn-visita__topo { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
@@ -821,3 +821,68 @@ button.rn-exp__arte:disabled { cursor: progress; }
 
 /* a Temporada das Ilhas (03/11/2026): o céu do mar do Caribe nas batalhas das ilhas */
 :root .rn-mundo[data-cenario="ilha-tropical"] { background: linear-gradient(180deg, #67c7f0 0%, #b6e6fa 60%, #e8f8ff 100%); }
+
+/* ------------------------------------------------------------ o menu do Reino em abas (03/11/2026)
+   "o menu do reino tá muito cheio e bagunçado": cinco abas (Reino, Batalha, Expedições, Forja, Bolsa); cada
+   uma mostra só as suas partes. A barra gruda no alto ao rolar. */
+.rn-menu {
+  position: sticky; top: 72px; z-index: 8;
+  display: flex; gap: 4px; margin: 22px 0 6px; padding: 6px;
+  overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+  border-radius: var(--pf-pilula); background: rgba(20, 23, 17, 0.92); border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+:root:not([data-tema="escuro"]) .rn-menu { background: rgba(255, 255, 255, 0.92); border-color: var(--pf-linha); box-shadow: var(--pf-sombra); }
+@media (min-width: 900px) { .rn-menu { top: 14px; } }
+.rn-menu::-webkit-scrollbar { display: none; }
+.rn-menu__aba {
+  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 46px; padding: 8px 18px; border: 0; border-radius: var(--pf-pilula); background: transparent; cursor: pointer;
+  color: var(--pf-tinta-2); font: inherit; font-size: 13px; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.rn-menu__aba:hover { color: var(--pf-tinta); background: var(--pf-superficie-2); }
+.rn-menu__aba[aria-selected="true"] { background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); box-shadow: 0 3px 0 var(--pf-verde-sombra); }
+.rn-menu__marca {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 9999px;
+  background: #E5484D; color: #FFFFFF; font-size: 11px; font-weight: 900; letter-spacing: 0;
+}
+.rn-menu__aba[aria-selected="true"] .rn-menu__marca { background: var(--pf-tinta-sobre-verde); color: #A2E33A; }
+@media (max-width: 640px) { .rn-menu__aba { padding: 8px 14px; font-size: 12px; } }
+/* a seção aberta pelo link (#forja, #grandes-expedicoes) não fica embaixo da barra que gruda */
+.pf-principal:has(.rn-menu) .pf-secao { scroll-margin-top: 140px; }
+
+/* a linha de ações da aba Batalha */
+.rn-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; padding: 12px 14px; border-radius: var(--pf-raio); background: var(--pf-superficie); border: 1px solid var(--pf-linha); }
+.rn-acoes__nota { flex: 1 1 260px; font-size: 14px; font-weight: 700; color: var(--pf-tinta-2); }
+
+/* os artefatos da Forja em efeito, por cima do mundo 3D (embaixo do selo do clima) */
+.rn-efeitos { position: absolute; right: 10px; top: 44px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.rn-efeitos__selo {
+  border: 1px solid rgba(139, 209, 26, 0.45); cursor: pointer; padding: 5px 12px; border-radius: 9999px;
+  font: inherit; font-size: 12px; font-weight: 800; white-space: nowrap;
+  background: rgba(10, 12, 9, 0.74); color: #F2F5EE; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.rn-efeitos__selo:hover { background: rgba(10, 12, 9, 0.92); border-color: #8BD11A; }
+.rn-vista3d:has(.rn-mundo--batalha) .rn-efeitos { display: none; }
+.rn-tela-cheia .rn-efeitos { top: auto; bottom: 166px; }
+@media (max-width: 640px) { .rn-efeitos { top: 38px; } .rn-efeitos__selo { font-size: 11px; padding: 4px 10px; } }
+
+/* a ilha das Grandes Expedições aberta no mundo 3D */
+.rn-visita--ilha { border: 1px solid rgba(56, 189, 248, 0.35); }
+.rn-visita--ilha .rn-visita__selo { color: #38BDF8; }
+:root:not([data-tema="escuro"]) .rn-visita--ilha .rn-visita__selo { color: #0369A1; }
+.il-ver3d { margin: 0 0 16px; }
+
+/* o Reino no celular: as cinco abas cabem na tela (emoji em cima, nome embaixo) e os números em duas colunas */
+@media (max-width: 640px) {
+  .rn-menu { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; top: 66px; padding: 5px; border-radius: 22px; overflow: visible; }
+  .rn-menu__aba { position: relative; flex-direction: column; gap: 1px; min-height: 56px; padding: 6px 2px; font-size: 9.5px; letter-spacing: 0.02em; border-radius: 17px; }
+  .rn-menu__aba > span[aria-hidden="true"] { font-size: 19px; line-height: 1.1; }
+  .rn-menu__marca { position: absolute; top: 3px; right: 6px; min-width: 17px; height: 17px; padding: 0 4px; font-size: 10px; }
+  .rn-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .rn-numero { padding: 14px; }
+  .rn-numero .pf-estat__valor { font-size: 18px; }
+  .rn-numero .pf-estat__nota { font-size: 12px; }
+}

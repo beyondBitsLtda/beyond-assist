@@ -3,17 +3,18 @@
    verde para alta e vermelho para baixa — sempre com seta e sinal junto, nunca só a cor. */
 
 .bx {
-  --bx-fundo: #0b1220;
-  --bx-fundo-2: #060b16;
-  --bx-painel: #111a2e;
-  --bx-painel-2: #18243f;
-  --bx-linha: rgba(148, 163, 184, 0.18);
-  --bx-texto: #e2e8f0;
-  --bx-texto-2: #94a3b8;
+  /* os neutros do visual premium (03/11/2026): o mesmo quase-preto do app, em camadas */
+  --bx-fundo: #10130E;
+  --bx-fundo-2: #0A0C09;
+  --bx-painel: #161A13;
+  --bx-painel-2: #1E2319;
+  --bx-linha: rgba(255, 255, 255, 0.08);
+  --bx-texto: #F2F5EE;
+  --bx-texto-2: #9AA192;
   --bx-sobe: #4ade80;
   --bx-cai: #f87171;
   --bx-amarelo: #facc15;
-  background: var(--bx-fundo); color: var(--bx-texto); border-radius: 20px; overflow: hidden;
+  background: var(--bx-fundo); color: var(--bx-texto); border-radius: var(--pf-raio-grande); border: 1px solid rgba(255, 255, 255, 0.07); overflow: hidden;
   font-variant-numeric: tabular-nums; padding-bottom: 14px;
   container-type: inline-size; container-name: bolsa;
 }
@@ -109,7 +110,7 @@
 .bx-pilula { display: inline-flex; padding: 3px 10px; border-radius: 9999px; font-size: 13px; font-weight: 800; }
 .bx-pilula--sobe { background: rgba(74, 222, 128, 0.14); color: var(--bx-sobe); }
 .bx-pilula--cai { background: rgba(248, 113, 113, 0.14); color: var(--bx-cai); }
-.bx-pilula--igual { background: rgba(148, 163, 184, 0.14); color: var(--bx-texto-2); }
+.bx-pilula--igual { background: rgba(255, 255, 255, 0.06); color: var(--bx-texto-2); }
 .bx-numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
 .bx-numeros div { padding: 8px 10px; border-radius: 10px; background: var(--bx-painel-2); }
 .bx-numeros dt { font-size: 11px; color: var(--bx-texto-2); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -307,7 +308,7 @@
 .bx-ficha__dados div { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 8px; }
 .bx-ficha__dados dt { color: var(--bx-texto-2); }
 .bx-ficha__dados dd { margin: 0; }
-.bx-balao { position: relative; margin: 12px 0 0 8px; padding: 10px 14px; border-radius: 14px; background: #f8fafc; color: #0f172a; font-size: 14px; font-weight: 600; max-width: 62ch; }
+.bx-balao { position: relative; margin: 12px 0 0 8px; padding: 10px 14px; border-radius: 14px; background: #f8fafc; color: #0A0C09; font-size: 14px; font-weight: 600; max-width: 62ch; }
 .bx-balao::before { content: ""; position: absolute; left: -8px; top: 12px; border-style: solid; border-width: 8px 8px 8px 0; border-color: transparent #f8fafc transparent transparent; }
 .bx-ficha__fechar { width: 32px; height: 32px; border: none; border-radius: 50%; background: var(--bx-fundo-2); color: var(--bx-texto); font: inherit; font-size: 14px; cursor: pointer; }
 .bx-ficha__fechar:focus-visible { outline: 2px solid var(--bx-amarelo); outline-offset: 2px; }

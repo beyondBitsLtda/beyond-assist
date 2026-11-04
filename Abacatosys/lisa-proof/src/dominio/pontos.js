@@ -62,4 +62,5 @@ export const NOMES_DOS_EVENTOS = {
   cartoes: "Cartões revisados",
   revisao: "Revisão da turma",
   diario: "Diário de estudo",
+  arena: "Minigame do dia",
 };

@@ -74,25 +74,40 @@ export function respostasDoQuiz(perguntas, chance, sortear) {
  * projeto da semana sai na segunda à tarde; o Acervo e o caderno, no domingo. Cada hora, o relógio
  * pergunta o que está na vez e ela faz o que ainda não fez hoje.
  */
+/**
+ * A agenda do dia (desde 03/11/2026, várias coisas mais de uma vez: "quero ver ela jogando mais vezes"). `de`:
+ * a hora em que começa; `ate`: a última hora (a Bolsa só negocia das 7h às 17h); `vezes`: quantas no dia;
+ * `intervalo`: horas entre uma e outra; `dias`: só nesses dias da semana (0 = domingo).
+ */
 export const AGENDA = [
-  { acao: "curso", de: 7 },          // o curso do mês: escolhe/gera se não tem (no dia 1 ou quando o anterior acabou)
-  { acao: "mina", de: 7 },
-  { acao: "teoria", de: 8 },
+  { acao: "curso", de: 7 },           // o curso do mês: escolhe/gera se não tem (no dia 1 ou quando o anterior acabou)
+  { acao: "mina", de: 7, vezes: 4, intervalo: 3 },
+  { acao: "teoria", de: 8, vezes: 2, intervalo: 6 },
+  { acao: "reino", de: 9, vezes: 4, intervalo: 3 },
+  { acao: "bolsa", de: 10, ate: 16, vezes: 3, intervalo: 2 },
+  { acao: "ilhas", de: 11, vezes: 3, intervalo: 4 },  // a Temporada das Ilhas (BEYOND-0020): a ilha dela
   { acao: "quiz", de: 12 },
+  { acao: "minigame", de: 13, vezes: 2, intervalo: 5 }, // o minigame do dia da Prática (a Arena)
   { acao: "exercicio", de: 15 },
   { acao: "projeto", de: 16, dias: [1, 2, 3, 4, 5, 6, 0] }, // o projeto aberto: entrega quando dá
-  { acao: "reino", de: 19 },
-  { acao: "bolsa", de: 10 },         // a Bolsa só negocia das 7h às 17h
-  { acao: "caderno", de: 21, dias: [0, 3] },   // domingo e quarta: as anotações do que estudou
-  { acao: "acervo", de: 18, dias: [0] },       // domingo: vídeos e artigos da semana
-  { acao: "correio", de: 17 },      // o correio (BEYOND-0016): um recadinho para alguém e avalia os que chegaram
-  { acao: "ilhas", de: 20 },        // a Temporada das Ilhas (BEYOND-0020): a ilha dela
+  { acao: "correio", de: 17, vezes: 2, intervalo: 4 },  // o correio (BEYOND-0016): um recadinho e avalia os que chegaram
+  { acao: "acervo", de: 18, dias: [0] },        // domingo: vídeos e artigos da semana
+  { acao: "caderno", de: 21, dias: [0, 3] },    // domingo e quarta: as anotações do que estudou
 ];
 
-/** O que está na vez nesta hora e dia da semana, tirando o que já foi feito hoje. */
-export function oQueFazerAgora({ hora, diaDaSemana, feito = [] }) {
-  const ja = new Set(feito);
-  return AGENDA.filter((a) => hora >= a.de && (!a.dias || a.dias.includes(diaDaSemana)) && !ja.has(a.acao)).map((a) => a.acao);
+/**
+ * O que está na vez nesta hora e dia da semana. `jogadas`: o que ela já fez hoje ({ acao: { vezes, ultima } },
+ * `ultima` em ms); `feito` (lista de ações) ainda vale, como "uma vez cada". Tentar e não dar também conta.
+ */
+export function oQueFazerAgora({ hora, diaDaSemana, feito = [], jogadas = null, agora = Date.now() }) {
+  const ja = jogadas || Object.fromEntries(feito.map((a) => [a, { vezes: 1, ultima: 0 }]));
+  return AGENDA.filter((a) => {
+    if (hora < a.de || (a.ate !== undefined && hora > a.ate)) return false;
+    if (a.dias && !a.dias.includes(diaDaSemana)) return false;
+    const j = ja[a.acao];
+    if (!j) return true;
+    return j.vezes < (a.vezes || 1) && agora - j.ultima >= (a.intervalo || 0) * 3_600_000;
+  }).map((a) => a.acao);
 }
 
 /**

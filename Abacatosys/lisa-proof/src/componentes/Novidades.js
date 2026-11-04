@@ -30,8 +30,8 @@ function marcarComoVistas() {
 // a edição da VERSÃO 1.0 (03/11/2026): o Lisa_Proof sai do "em construção". O que chegou nela vem primeiro; o
 // resto lembra o que o app já é, para quem chega agora
 const NOVIDADES = [
-  { icone: "🏝️", destaque: true, titulo: "Temporada das Ilhas", texto: "A primeira temporada de domínio: compre o Navio Pirata, conquiste as ilhas dos nativos com a sua tripulação, construa com conchas e dispute o arquipélago com os outros jogadores — aqui, só pacto entre dois segura um ataque." },
-  { icone: "🕹️", destaque: true, titulo: "Arena Lúdica de Programação", texto: "Conserte bugs para atravessar a Masmorra da Depuração, programe o mascote para comer tudo e monte algoritmos embaralhados. O terminal roda na hora e a Lisa explica os erros." },
+  { icone: "🏝️", destaque: true, titulo: "Temporada das Ilhas", texto: "A primeira temporada de domínio: no Reino, as Grandes Expedições: compre o Navio Pirata, conquiste as ilhas dos nativos (em 3D, como o seu reino), construa com conchas e dispute o arquipélago — aqui, só pacto entre dois segura um ataque." },
+  { icone: "🕹️", destaque: true, titulo: "Arena Lúdica de Programação", texto: "O minigame do dia, na Prática: conserte bugs para atravessar a Masmorra da Depuração, programe o mascote para comer tudo e monte algoritmos embaralhados. Vale pontos todo dia, como o quiz." },
   { icone: "🧩", titulo: "O exemplo da Lisa nos exercícios", texto: "Travou? Em todo exercício e projeto, a Lisa mostra um exemplo que aplica todos os conceitos que você vai precisar — sem resolver o seu." },
   { icone: "⚔️", titulo: "Reino maior", texto: "Tropas novas (Lanceiro, Cavaleiro, Grifo e o Colosso de Pedra), o Pomar, o Lança-Chamas, a Torre de Gelo, a Catapulta e seis expedições novas." },
   { icone: "👹", titulo: "Chefões com dentes", texto: "De pé, o chefão da procrastinação rouba um pouquinho do reino por dia. Derrube ele e recebe tudo de volta, mais a recompensa." },
@@ -93,8 +93,8 @@ export default function Novidades() {
             ))}
           </ul>
           <div className="novidades__acoes">
-            <Link ref={principal} href="/ilhas" className="pf-botao novidades__principal" onClick={fechar}>🏝️ Ir para as Ilhas</Link>
-            <Link href="/arena" className="pf-botao pf-botao--sec" onClick={fechar}>🕹️ Abrir a Arena</Link>
+            <Link ref={principal} href="/reino#grandes-expedicoes" className="pf-botao novidades__principal" onClick={fechar}>🏝️ Ir para as Ilhas</Link>
+            <Link href="/pratica#minigame" className="pf-botao pf-botao--sec" onClick={fechar}>🕹️ Minigame do dia</Link>
             <button type="button" className="pf-botao pf-botao--sec" onClick={fechar}>Depois</button>
           </div>
         </div>

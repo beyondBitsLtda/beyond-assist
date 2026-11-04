@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.0.0-cloudflare-pages.1",
+  "versao": "1.1.0-cloudflare-pages.1",
   "atualizadoEm": "2026-11-03",
   "compilacao": {
-    "numero": 95,
+    "numero": 96,
     "data": "2026-11-03",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.1.0-cloudflare-pages.1",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "melhoria",
+      "resumo": "Tudo no lugar certo e com cara nova: as ilhas e a Forja dentro do Reino (em 3D, com menu em abas), a Arena virou o minigame do dia da Prática, a Lisa passa a jogar sozinha a cada 20 minutos e o app inteiro ganhou o visual premium escuro com acento lima.",
+      "itens": [
+        "As ilhas da Temporada viraram as Grandes Expedições, dentro do Reino: a ilha aparece no mesmo mundo 3D do reino (cenário tropical, com os guardas), a batalha passa ali e, no fim, a ilha volta. O endereço antigo /ilhas leva para lá.",
+        "A Forja mora no Reino (aba Forja), e os artefatos em efeito (Poção de Foco, Escudo de Folga) aparecem como selos por cima do mundo 3D. O endereço /forja leva para lá.",
+        "Menu do Reino reorganizado em cinco abas (Reino, Batalha, Expedições, Forja e Bolsa), cada uma só com as suas partes, com contadores (invasões e expedições do dia) e a barra grudada no alto ao rolar; no celular, as cinco cabem na tela.",
+        "A Arena Lúdica virou o minigame do dia da Prática, como o quiz: um jogo em destaque por dia (masmorra, mascote ou Parsons), +30 pontos na primeira fase vencida no dia, e cada fase nova continua rendendo moedas. O endereço /arena leva para a Prática.",
+        "A Lisa joga sozinha: o relógio da nuvem (gatilho de horário do Worker, a cada 20 minutos) roda a rotina dela, que agora repete várias ações no dia (mina, Reino, Bolsa, ilhas, minigame, correio...) com intervalo entre uma e outra. A página Lisa joga mostra se ela está jogando agora.",
+        "Ilhas, Forja e Arena saíram do menu lateral (estão dentro do Reino e da Prática).",
+        "Visual premium em todas as telas: fundo quase preto com brilho lima, superfícies em camadas, acento lima com texto escuro, botões em pílula apertáveis (maiúsculas), barras de progresso grossas, cantos maiores, títulos mais fortes e a fonte arredondada Nunito; o tema claro segue a mesma família. O mascote continua o Neuro."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.0.0-cloudflare-pages.1",
       "data": "2026-11-03",
@@ -1467,7 +1484,7 @@
         "Pontos, nível, ofensiva de dias seguidos, meta diária e metas de semana e mês.",
         "Conquistas da conta (valem pontos no total) e comemorações em tela cheia de ofensiva, meta e conquista.",
         "Agenda com todos os compromissos das trilhas, em calendário mensal ou lista.",
-        "Tema escuro (padrão) e claro.",
+        "Visual premium escuro (padrão: quase preto com acento lima, fonte Nunito) e tema claro na mesma família.",
         "Mapa da trilha no estilo Duolingo e o mascote Neuro, com animações que reagem ao progresso.",
         "Lembretes por notificação push (ofensiva em risco, quiz pendente), enviados pelo relógio do iMac.",
         "Uso no computador, no tablet e no celular, instalável como app; no toque, o caderno e o leitor de PDF se ajustam ao teclado virtual, com atalhos de escrita e zoom com dois dedos.",
@@ -1514,18 +1531,19 @@
         "Conversa com a Lisa (idiomas), passo a passo conferido linha a linha e gráficos de arrastar (matemática), leitura na pauta (música), diário de estudo, entrega em PDF, frase-senha nas gravações e fotos, e a torre do Modo Domínio feita a partir de um livro da Biblioteca",
         "Exercício de desenhar diagramas (fluxograma, BPMN, UML, modelo de dados, arquitetura de software e de nuvem, C4) num quadro embutido, avaliado pela Lisa, nos cursos de computação, arquitetura e áreas próximas",
         "Tela Chamados: quem reportou acompanha status, previsão de término e respostas; o técnico (administrador) vê todos e muda status, previsão e responde (os chamados são cards do quadro \"Chamados — Lisa Proof\" no Abacato)",
-        "A Lisa jogadora: uma conta-robô que estuda e joga sozinha (curso do mês, quiz, exercício, projeto, Reino, Bolsa, caderno, Acervo), com tudo visível na página \"Lisa joga\"",
+        "A Lisa jogadora: uma conta-robô que estuda e joga sozinha (curso do mês, quiz, exercício, projeto, minigame do dia, Reino, ilhas, Bolsa, correio, caderno, Acervo), várias vezes por dia pelo relógio da nuvem (a cada 20 minutos), com tudo visível na página \"Lisa joga\" e o aviso de quando ela está jogando",
         "Correio entre jogadores: recados avaliados por quem recebe (útil dá moedas aos dois) e até 2 perguntas do quiz do dia mandadas para outros jogadores (o quiz fecha com 3 respondidas, valendo menos)",
         "Modo espectador: ver o Proof da Lisa jogadora por dentro (as mesmas telas, só leitura)",
         "Presentes: itens guardados para um jogador (hoje, personagens), abertos por ele na área Presentes",
         "Clima do Reino: dia e noite pela hora de Brasília e o tempo (chuva, neve, vento, tempestade) por blocos de 3 horas, iguais para todos",
         "Humor do Neuro: a ofensiva de estudo faz o mascote evoluir (bônus na mina); dias sem estudo o revoltam e fecham as expedições",
-        "Forja de Artefatos: mana dos pontos de estudo para forjar a Poção de Foco (+50% por 2 h) e o Escudo de Folga (24 h sem invasões)",
+        "Forja de Artefatos, dentro do Reino (aba Forja): mana dos pontos de estudo para forjar a Poção de Foco (+50% por 2 h) e o Escudo de Folga (24 h sem invasões), com os artefatos em efeito como selos sobre o mundo 3D",
         "Chefões da Procrastinação: o atraso de estudo vira um chefão no mapa do Reino, derrubado com estudo e Cadernos, com recompensa em moedas",
         "Duelo de Lógica com a Lisa: perguntas rápidas de código e raciocínio, com aposta de moedas contra o reino dela",
-        "Temporada das Ilhas: arquipélago para conquistar com navio e tripulação, construção com conchas, produção, invasão entre jogadores e pactos individuais",
-        "Arena Lúdica de Programação: masmorra de depuração, mascote programável e quebra-cabeças de Parsons, com terminal, explicação da Lisa e recompensa por fase",
-        "Exemplo da Lisa: uma aplicação de exemplo com os conceitos de cada exercício e projeto, sem resolver o desafio"
+        "Temporada das Ilhas, como Grandes Expedições dentro do Reino: arquipélago para conquistar com navio e tripulação, a ilha em 3D no mesmo mundo do reino, construção com conchas, produção, invasão entre jogadores e pactos individuais",
+        "Minigame do dia na Prática (a antiga Arena Lúdica): masmorra de depuração, mascote programável e quebra-cabeças de Parsons, com terminal, explicação da Lisa, +30 pontos uma vez por dia e recompensa por fase nova",
+        "Exemplo da Lisa: uma aplicação de exemplo com os conceitos de cada exercício e projeto, sem resolver o desafio",
+        "Menu do Reino em abas (Reino, Batalha, Expedições, Forja e Bolsa), com contadores e barra fixa ao rolar"
       ],
       "naoInclui": [
         "Não executa o código enviado: exercícios e projetos são corrigidos pela IA lendo o código.",
@@ -1567,10 +1585,12 @@
       "@codemirror/lang-markdown 6.5.2 (Markdown no caderno, com os blocos de código coloridos pela linguagem)",
       "Supabase Storage (bucket privado proof-biblioteca) com endereços assinados de envio e de leitura",
       "Web Audio, MediaRecorder, SpeechSynthesis e getUserMedia no navegador (treino de ouvido, metrônomo, detecção de altura para a afinação, gravação convertida para WAV de 16 kHz e a voz do ditado)",
-      "Quadro de diagramas reaproveitado do ProcessMap (JavaScript puro e SVG, sem dependências), servido como arquivo estático em public/diagramas e embutido num iframe do mesmo endereço"
+      "Quadro de diagramas reaproveitado do ProcessMap (JavaScript puro e SVG, sem dependências), servido como arquivo estático em public/diagramas e embutido num iframe do mesmo endereço",
+      "Fonte Nunito (Google Fonts) e tokens de cor em CSS (src/app/globals.css: --pf-*), com o tema escuro premium como padrão",
+      "Cron Triggers da Cloudflare (worker-proof.js: o Worker do OpenNext mais o gatilho de horário que chama a rodada da Lisa)"
     ],
     "arquitetura": {
-      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005). Toda compra ou coleta de uma pessoa grava o reino e lança as moedas numa transação só, pela função proof_lancar_e_gravar (db/025), que só grava se a versão do reino for a lida; as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do curso (a semana de cada assunto no agendamento, a mesma do mapa e da agenda), o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check. O Modo Domínio (db/018) guarda a torre em proof_dominios e cada andar em proof_dominio_andares; as regras (níveis, chefões, pontos, luta, prêmios, conferência da IA) são puras em src/dominio/modoDominio.js, a IA em src/lib/iaDominio.js, o GitHub e o GitLab em src/lib/repositorios.js (só github.com e gitlab.com) e o caminho até o banco em src/lib/dominio.js. Cada passo que gasta IA tem trava contra clique duplo (gravação condicional ao estado lido), e só quem move a torre de andar paga o prêmio do marco. Os prêmios entram no Reino de verdade por premiarDoDominio (src/lib/reino.js), respeitando as capacidades das reservas. O certificado é desenhado num canvas e embrulhado em PDF no navegador; /certificado e /api/certificado são as únicas rotas novas sem login. A biblioteca guarda os PDFs no Storage do mesmo Supabase (bucket privado proof-biblioteca, no disco do iMac): o servidor confere o dono e assina endereços de vida curta, e o navegador envia e lê o arquivo direto, sem o PDF passar pelo Worker. O texto de cada página fica em proof_livro_paginas, e o corte dos trechos (curso, quiz, explicação) e a busca rodam em funções do Postgres, para caber no processamento curto do Worker gratuito. A Biblioteca Colaborativa guarda o acervo em proof_acervo e as gorjetas em proof_acervo_gorjetas (db/020-biblioteca-colaborativa.sql); os PDFs ficam no bucket privado proof-acervo, e o livro levado para a biblioteca pessoal aponta para o mesmo arquivo (proof_livros.acervo_id). O exercício de desenhar diagramas usa o quadro estático de public/diagramas (fora do middleware de sessão) dentro de um iframe: a tela conversa com ele por window.PonteDoProof, guarda o rascunho no navegador e manda o documento do quadro para a API; o servidor confere o tamanho, tira as imagens coladas, guarda o documento no desafio e a Lisa avalia a descrição em texto do desenho (src/dominio/diagramas.js). A Lisa jogadora roda no relógio do iMac (scripts/lisa-joga.mjs, chamando as mesmas funções das telas direto no banco) e anota o que faz em proof_lisa_diario (db/026).",
+      "resumo": "App Next.js em Worker próprio na Cloudflare (proof.beyond.dev.br), vizinho do Abacato e da Lisa. Lê e escreve no mesmo Postgres do servidor de casa, pelo túnel banco.beyond.dev.br: o conteúdo (quadros, cards, checklists) fica nas tabelas abacato_, e o que é só da Lisa_Proof (trilhas, etapas, pontos, perfis, explicações e os desafios da prática) fica nas tabelas proof_ (db/001-proof.sql e db/002-pratica.sql). A prática gera e corrige quiz, exercício e projetos com o Gemini; os projetos são lidos de repositórios públicos do GitHub (src/lib/github.js), com teto de arquivos para caber no limite de chamadas do Worker gratuito. Os lembretes push seguem o desenho da Lisa: o Worker só guarda as inscrições (proof_push, db/003-lembretes.sql) e quem envia é scripts/lembretes.mjs no crontab do iMac, com a chave privada VAPID num arquivo só dele. O login confere a tabela abacato_usuarios, e a sessão é um cookie próprio assinado com PROOF_SESSAO_SECRET. Toda permissão passa por src/lib/estudo.js, que sobe de item ou card até o quadro e confere dono e prefixo STUDY. O Reino do Neuro guarda o reino em proof_reinos, as moedas num livro-caixa (proof_reino_movimentos: o saldo é a soma dos pontos de estudo mais esses movimentos) e as batalhas em proof_invasoes (db/005). Toda compra ou coleta de uma pessoa grava o reino e lança as moedas numa transação só, pela função proof_lancar_e_gravar (db/025), que só grava se a versão do reino for a lida; as regras do jogo ficam em src/dominio/reino.js e src/dominio/tropas.js, e a batalha é uma simulação determinística (src/dominio/combate.js): o servidor sorteia a semente e decide; a tela roda a mesma simulação para mostrar a luta. O Reino de Teste é um mundo à parte, com as mesmas regras e o mesmo código: as rotas do reino aceitam ?mundo=teste e, nesse caso, src/lib/mundo.js troca cada tabela do jogo pela gêmea proof_teste_* (db/016). O mercado da bolsa (ações, preços e pregão) é um só para os dois mundos. O avanço na trilha tem uma fonte única: src/dominio/avanco.js e src/lib/avanco.js. Eles definem as semanas do curso (a semana de cada assunto no agendamento, a mesma do mapa e da agenda), o assunto concluído (teoria + quiz), o projeto que abre a semana seguinte e o projeto final, e são usados pelas telas de hoje, prática, trilha e agenda. Nas expedições, o planetoide esférico é um shader que curva o mundo plano da batalha (src/componentes/reino/curvatura.js), sem mudar o motor do combate. O ranking lê as visões proof_ranking_total e proof_ranking_semana, fechadas para as chaves públicas. As regras de agenda, ofensiva e metas são puras (src/dominio) e testadas por npm run dominio-check. O Modo Domínio (db/018) guarda a torre em proof_dominios e cada andar em proof_dominio_andares; as regras (níveis, chefões, pontos, luta, prêmios, conferência da IA) são puras em src/dominio/modoDominio.js, a IA em src/lib/iaDominio.js, o GitHub e o GitLab em src/lib/repositorios.js (só github.com e gitlab.com) e o caminho até o banco em src/lib/dominio.js. Cada passo que gasta IA tem trava contra clique duplo (gravação condicional ao estado lido), e só quem move a torre de andar paga o prêmio do marco. Os prêmios entram no Reino de verdade por premiarDoDominio (src/lib/reino.js), respeitando as capacidades das reservas. O certificado é desenhado num canvas e embrulhado em PDF no navegador; /certificado e /api/certificado são as únicas rotas novas sem login. A biblioteca guarda os PDFs no Storage do mesmo Supabase (bucket privado proof-biblioteca, no disco do iMac): o servidor confere o dono e assina endereços de vida curta, e o navegador envia e lê o arquivo direto, sem o PDF passar pelo Worker. O texto de cada página fica em proof_livro_paginas, e o corte dos trechos (curso, quiz, explicação) e a busca rodam em funções do Postgres, para caber no processamento curto do Worker gratuito. A Biblioteca Colaborativa guarda o acervo em proof_acervo e as gorjetas em proof_acervo_gorjetas (db/020-biblioteca-colaborativa.sql); os PDFs ficam no bucket privado proof-acervo, e o livro levado para a biblioteca pessoal aponta para o mesmo arquivo (proof_livros.acervo_id). O exercício de desenhar diagramas usa o quadro estático de public/diagramas (fora do middleware de sessão) dentro de um iframe: a tela conversa com ele por window.PonteDoProof, guarda o rascunho no navegador e manda o documento do quadro para a API; o servidor confere o tamanho, tira as imagens coladas, guarda o documento no desafio e a Lisa avalia a descrição em texto do desenho (src/dominio/diagramas.js). A Lisa jogadora roda no relógio do iMac (scripts/lisa-joga.mjs, chamando as mesmas funções das telas direto no banco) e anota o que faz em proof_lisa_diario (db/026). A Lisa jogadora roda na nuvem: o worker-proof.js embrulha o Worker do OpenNext e, a cada 20 minutos (triggers.crons no wrangler.jsonc), chama POST /api/lisa/rodada com o segredo PROOF_SEGREDO_DO_RELOGIO (guardado como segredo do Worker); a rodada (src/lib/lisaRotina.js) faz até 3 ações que estão na vez da agenda (src/dominio/lisaJogadora.js) e anota no diário (proof_lisa_diario). O minigame do dia vale pontos pelo evento \"arena\" (db/031).",
       "diagramas": [
         {
           "titulo": "Visão geral",
@@ -1596,6 +1616,12 @@
         "onde": "iMac do servidor de casa (Zorin OS), crontab ao meio-dia e às 20h rodando npm run lembretes na pasta lisa-proof",
         "url": "",
         "verificar": false
+      },
+      {
+        "ambiente": "Relógio da Lisa jogadora",
+        "onde": "Cloudflare Workers, gatilho de horário do próprio Worker lisa-proof (a cada 20 minutos), chamando a rodada protegida por segredo",
+        "url": "",
+        "verificar": false
       }
     ],
     "bancoDeDados": [
@@ -1606,7 +1632,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/030; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/031; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019)."
       }
     ],
     "integracoes": [

@@ -112,7 +112,7 @@
 .dm-placar__fala { text-align: center; font-weight: 700; font-size: 14px; }
 .dm-vida { height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
 .dm-vida__cheio { height: 100%; border-radius: inherit; transition: width 0.45s ease; }
-.dm-vida__cheio--neuro { background: #22C55E; }
+.dm-vida__cheio--neuro { background: var(--pf-verde); }
 .dm-vida__cheio--chefao { background: #EF4444; margin-left: auto; }
 @media (prefers-reduced-motion: reduce) { .dm-vida__cheio { transition: none; } }
 

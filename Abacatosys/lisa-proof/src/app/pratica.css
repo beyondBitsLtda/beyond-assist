@@ -16,15 +16,16 @@
 .pratica__bloco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--pf-linha); }
 .pratica__bloco:disabled { cursor: progress; opacity: 0.75; }
 .pratica__bloco--feito { border-color: #EAB308; box-shadow: 0 4px 0 #CA8A04; }
-.pratica__bloco--andamento { border-color: var(--pf-verde); box-shadow: 0 4px 0 var(--pf-verde-forte); }
+.pratica__bloco--andamento { border-color: var(--pf-verde); box-shadow: 0 4px 0 var(--pf-verde-sombra); }
 .pratica__bloco--parcial { border-color: #F97316; box-shadow: 0 4px 0 #C2410C; }
 .pratica__icone { font-size: 30px; line-height: 1; flex: none; }
 .pratica__textos { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .pratica__textos small { color: var(--pf-tinta-2); font-size: 13px; }
-.pratica__pontos { color: var(--pf-verde-forte) !important; font-weight: 600; }
+.pratica__pontos { color: var(--pf-verde-texto) !important; font-weight: 800; }
 .pratica__acao {
   flex: none; padding: 6px 12px; border-radius: var(--pf-pilula);
-  background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); font-weight: 700; font-size: 13px;
+  background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); font-weight: 900; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  box-shadow: 0 3px 0 var(--pf-verde-sombra);
 }
 
 /* ---- quiz ---- */
@@ -56,7 +57,7 @@
   flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
   border: 2px solid var(--pf-linha); font-weight: 800; font-size: 13px; color: var(--pf-tinta-2);
 }
-.quiz__opcao--certa { border-color: var(--pf-verde); box-shadow: 0 4px 0 var(--pf-verde-forte); background: var(--pf-sucesso-fundo); }
+.quiz__opcao--certa { border-color: var(--pf-verde); box-shadow: 0 4px 0 var(--pf-verde-sombra); background: var(--pf-sucesso-fundo); }
 .quiz__opcao--certa .quiz__letra { background: var(--pf-verde); border-color: var(--pf-verde); color: #FFFFFF; }
 .quiz__opcao--errada { border-color: var(--pf-alerta); box-shadow: 0 4px 0 #991B1B; background: var(--pf-alerta-fundo); }
 .quiz__opcao--errada .quiz__letra { background: var(--pf-alerta); border-color: var(--pf-alerta); color: #FFFFFF; }
@@ -426,3 +427,11 @@ body.diagrama-sem-rolar { overflow: hidden; }
 .exemplo-lisa__conceitos { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
 .exemplo-lisa__passos { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
 .exemplo-lisa__seu { margin: 6px 0 0; padding: 8px 10px; border-radius: var(--pf-raio); background: var(--pf-superficie-2); font-size: 14px; }
+
+/* ---- o minigame do dia (03/11/2026: a Arena virou minigame da Prática, como o quiz) */
+.mg-dia__bloco { width: 100%; }
+.mg-dia__corpo { margin-top: 14px; display: grid; gap: 14px; }
+.mg-dia__corpo .agenda__modos { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+/* o contador de fases do minigame é progresso, não aviso: neutro */
+.mg-dia__corpo .co-abas__n { background: var(--pf-superficie); color: var(--pf-tinta-2); border: 1px solid var(--pf-linha); font-weight: 800; }
+.mg-dia__corpo [aria-selected="true"] .co-abas__n { background: var(--pf-tinta-sobre-verde); color: #A2E33A; border-color: transparent; }

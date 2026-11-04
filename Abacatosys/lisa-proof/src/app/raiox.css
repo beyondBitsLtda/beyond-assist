@@ -1,12 +1,12 @@
 /* ============================================================ Raio-X
 
-   Gráficos de UMA série: uma cor só, o verde forte (validado nos dois temas: #16A34A passa no
-   claro e o #1FB155 no escuro — o verde claro de sempre fica claro demais sobre o fundo escuro).
+   Gráficos de UMA série: uma cor só, o lima do redesign de 03/11/2026 (marca gráfica pede 3:1:
+   #65A30D sobre o claro, #8BD11A sobre o fundo quase preto).
    Texto nunca leva a cor do dado; o valor fica na ponta da barra, e o detalhe na dica (mouse ou
    foco pelo teclado). As tabelas abaixo trazem os mesmos números. */
 
-:root { --rx-cor: #16A34A; --rx-trilho: rgba(31, 41, 55, 0.07); }
-:root[data-tema="escuro"] { --rx-cor: #1FB155; --rx-trilho: rgba(255, 255, 255, 0.06); }
+:root { --rx-cor: #65A30D; --rx-trilho: rgba(31, 41, 55, 0.07); }
+:root[data-tema="escuro"] { --rx-cor: #8BD11A; --rx-trilho: rgba(255, 255, 255, 0.06); }
 
 .rx-subtitulo { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--pf-tinta-2); }
 

@@ -116,13 +116,13 @@
 .ac-ferramentas { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 760px) { .ac-ferramentas { grid-template-columns: minmax(240px, 1fr) 220px 180px; } }
 .ac-busca { display: flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: 14px; background: var(--pf-superficie); border: 1px solid var(--pf-linha); }
-.ac-busca:focus-within { border-color: var(--pf-verde-forte); box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18); }
+.ac-busca:focus-within { border-color: var(--pf-verde-forte); box-shadow: 0 0 0 3px rgba(139, 209, 26, 0.18); }
 .ac-busca input { flex: 1; min-width: 0; border: none; background: transparent; color: var(--pf-tinta); font: inherit; padding: 12px 0; outline: none; }
 .ac-seletor { padding: 11px 12px; border-radius: 14px; border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; }
 .ac-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ac-chips button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: var(--pf-pilula); border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .ac-chips button small { opacity: 0.7; font-weight: 800; }
-.ac-chips button[aria-pressed="true"] { background: #15803d; border-color: #15803d; color: #fff; }
+.ac-chips button[aria-pressed="true"] { background: var(--pf-verde); border-color: var(--pf-verde); color: var(--pf-tinta-sobre-verde); }
 .ac-filtro-autor { margin: 0; font-size: 14px; }
 .ac-filtro-autor button { border: none; background: none; color: var(--pf-verde-forte); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0; }
 .ac-vazio { display: grid; justify-items: center; gap: 6px; padding: 36px 16px; text-align: center; border-radius: var(--pf-raio-grande); border: 2px dashed var(--pf-linha); background: transparent; cursor: pointer; font: inherit; color: var(--pf-tinta); }
@@ -162,7 +162,7 @@ button.ac-cartao:focus-visible { outline: 3px solid var(--pf-verde-forte); outli
 .ac-cartao__capa { position: relative; display: block; }
 .ac-cartao__capa .ac-capa { width: 100%; border-radius: 0; border: none; }
 .ac-cartao__selo { position: absolute; left: 8px; top: 8px; padding: 3px 8px; border-radius: 9999px; background: rgba(0, 0, 0, 0.62); color: #fff; font-size: 11px; font-weight: 800; }
-.ac-cartao__estante { position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 9999px; background: #15803d; color: #fff; font-size: 11px; font-weight: 800; }
+.ac-cartao__estante { position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 9999px; background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); font-size: 11px; font-weight: 800; }
 .ac-cartao__corpo { display: grid; align-content: start; gap: 4px; padding: 10px 12px 12px; border-top: 3px solid var(--cor); }
 .ac-cartao__titulo { font-size: 14.5px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ac-cartao__autores { font-size: 12.5px; color: var(--pf-tinta-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1em; }
@@ -252,7 +252,7 @@ button.ac-cartao:focus-visible { outline: 3px solid var(--pf-verde-forte); outli
 .ac-tipo:hover { transform: translateY(-2px); }
 .ac-tipo > span { font-size: 30px; }
 .ac-tipo small { color: var(--pf-tinta-2); font-size: 12px; }
-.ac-tipo--atual { border-color: #15803d; background: #15803d; color: #fff; }
+.ac-tipo--atual { border-color: var(--pf-verde); background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); }
 .ac-tipo--atual small { color: #ecfdf5; }
 .ac-trazer__grade { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 820px) { .ac-trazer__grade { grid-template-columns: minmax(0, 1fr) 230px; } }
@@ -266,7 +266,7 @@ button.ac-cartao:focus-visible { outline: 3px solid var(--pf-verde-forte); outli
 .ac-arquivo small { color: var(--pf-tinta-2); }
 .ac-arquivo strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ac-arquivo__icone { font-size: 28px; }
-.ac-arquivo--ok { border-style: solid; border-color: #15803d; }
+.ac-arquivo--ok { border-style: solid; border-color: var(--pf-verde); }
 .ac-arquivo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .ac-arquivo:focus-within { outline: 2px solid var(--pf-verde-forte); }
 .ac-arquivo--pequeno { padding: 9px 11px; font-size: 12.5px; font-weight: 700; width: 100%; }

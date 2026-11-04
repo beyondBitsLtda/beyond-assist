@@ -94,7 +94,7 @@
 .lp-barra__pagina { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; color: var(--pf-tinta-2); }
 .lp-barra__pagina input { width: 54px; height: 34px; text-align: center; border-radius: 9px; border: 1px solid var(--pf-linha); background: var(--pf-superficie-2); color: var(--pf-tinta); font: 600 14px sans-serif; font-family: inherit; font-variant-numeric: tabular-nums; }
 .lp-barra__curso { padding: 7px 12px; border-radius: 9px; background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); font-weight: 700; font-size: 13px; text-decoration: none; }
-.lp-barra__curso:hover { background: var(--pf-verde-forte); color: #FFFFFF; }
+.lp-barra__curso:hover { background: var(--pf-verde-vivo); color: var(--pf-tinta-sobre-verde); }
 .lp-cores { display: inline-flex; gap: 3px; padding: 0 4px; }
 .lp-cor {
   width: 22px; height: 22px; border-radius: 50%; cursor: pointer; padding: 0;
@@ -168,7 +168,7 @@
 /* a área das páginas */
 /* touch-action: o navegador rola, mas a pinça fica com o leitor (o zoom das páginas, LeitorDePdf.js) */
 .lp-rolagem { flex: 1; min-width: 0; overflow: auto; position: relative; background: #E6E8E7; overscroll-behavior: contain; touch-action: pan-x pan-y; }
-:root[data-tema="escuro"] .lp-rolagem { background: #0A0F0C; }
+:root[data-tema="escuro"] .lp-rolagem { background: #0A0C09; }
 .lp-abrindo { padding: 40px; text-align: center; }
 .lp-paginas { position: relative; margin: 0 auto; }
 .lp-lugar { position: absolute; left: 50%; transform: translateX(-50%); }
@@ -249,12 +249,12 @@
 .lp-leitura__coluna { max-width: 36em; margin: 0 auto; font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif; line-height: 1.7; }
 /* alinhado à esquerda e sem hifenizar: em tela estreita o justificado abria buracos e partia "JavaS-cript" */
 .lp-leitura__coluna p { margin: 0 0 0.85em; overflow-wrap: break-word; }
-.lp-leitura__marca { display: flex; align-items: center; gap: 10px; margin: 1.4em 0 1em; font: 600 12px/1 Inter, system-ui, sans-serif; letter-spacing: 0.04em; opacity: 0.55; }
+.lp-leitura__marca { display: flex; align-items: center; gap: 10px; margin: 1.4em 0 1em; font: 600 12px/1 var(--pf-fonte); letter-spacing: 0.04em; opacity: 0.55; }
 .lp-leitura__marca::before, .lp-leitura__marca::after { content: ""; flex: 1; border-top: 1px solid currentColor; opacity: 0.4; }
 .lp-leitura__pagina:first-of-type .lp-leitura__marca { margin-top: 0.2em; }
 .lp-leitura__vazia { font-style: italic; opacity: 0.6; text-align: left !important; }
-.lp-leitura__antes { display: block; margin: 0 auto 8px; padding: 8px 14px; border-radius: 9999px; border: 1px solid currentColor; background: none; color: inherit; opacity: 0.7; font: 600 13px Inter, system-ui, sans-serif; cursor: pointer; }
-.lp-leitura__fim { min-height: 1px; margin-top: 2em; text-align: center; font: 600 13px Inter, system-ui, sans-serif; opacity: 0.5; }
+.lp-leitura__antes { display: block; margin: 0 auto 8px; padding: 8px 14px; border-radius: 9999px; border: 1px solid currentColor; background: none; color: inherit; opacity: 0.7; font: 600 13px var(--pf-fonte); cursor: pointer; }
+.lp-leitura__fim { min-height: 1px; margin-top: 2em; text-align: center; font: 600 13px var(--pf-fonte); opacity: 0.5; }
 .lp-leitura ::selection { background: rgba(35, 98, 211, 0.3); }
 .lp-barra__letra { display: inline-grid; place-items: center; cursor: default; }
 .lp-flutua__dica { font-size: 11.5px; color: #C9D1CC; padding: 0 6px; }
@@ -264,7 +264,7 @@
 .lp-indicador {
   position: absolute; z-index: 25; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom)); transform: translateX(-50%);
   padding: 6px 12px; border-radius: 9999px; border: none; background: rgba(23, 32, 26, 0.78); color: #FFFFFF;
-  font: 600 12.5px/1 Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; cursor: pointer; backdrop-filter: blur(4px);
+  font: 600 12.5px/1 var(--pf-fonte); font-variant-numeric: tabular-nums; cursor: pointer; backdrop-filter: blur(4px);
 }
 
 /* ------------------------------------------------------------ toque: celular e tablet (31/10/2026) */

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   IconeHoje, IconeTrilhas, IconeAgenda, IconePratica, IconeProgresso, IconeRaioX, IconeRanking, IconeReino, IconeDominio, IconeBolsa, IconeMais, Marca,
-  IconeCaderno, IconeBiblioteca, IconeAcervo, IconeChamados, IconeLisa, IconeCorreio, IconePresentes, IconeForja, IconeIlhas, IconeArena,
+  IconeCaderno, IconeBiblioteca, IconeAcervo, IconeChamados, IconeLisa, IconeCorreio, IconePresentes,
 } from "./Icones.js";
 import { Confete } from "./Neuro.js";
 import Celebracao from "./Celebracao.js";
@@ -24,7 +24,6 @@ const ITENS = [
   { href: "/", rotulo: "Hoje", Icone: IconeHoje, grupo: "Estudo" },
   { href: "/trilhas", rotulo: "Trilhas", Icone: IconeTrilhas, grupo: "Estudo" },
   { href: "/pratica", rotulo: "Prática", Icone: IconePratica, grupo: "Estudo" },
-  { href: "/arena", rotulo: "Arena", Icone: IconeArena, grupo: "Estudo" },
   { href: "/agenda", rotulo: "Agenda", Icone: IconeAgenda, grupo: "Estudo" },
   { href: "/cadernos", rotulo: "Cadernos", Icone: IconeCaderno, grupo: "Leitura" },
   { href: "/biblioteca", rotulo: "Biblioteca", Icone: IconeBiblioteca, grupo: "Leitura" },
@@ -32,8 +31,6 @@ const ITENS = [
   { href: "/reino", rotulo: "Reino", Icone: IconeReino, grupo: "Jogo" },
   { href: "/dominio", rotulo: "Domínio", Icone: IconeDominio, grupo: "Jogo" },
   { href: "/bolsa", rotulo: "Bolsa", Icone: IconeBolsa, grupo: "Jogo" },
-  { href: "/forja", rotulo: "Forja", Icone: IconeForja, grupo: "Jogo" },
-  { href: "/ilhas", rotulo: "Ilhas", Icone: IconeIlhas, grupo: "Jogo" },
   { href: "/ranking", rotulo: "Ranking", Icone: IconeRanking, grupo: "Jogo" },
   { href: "/correio", rotulo: "Correio", Icone: IconeCorreio, grupo: "Jogo" },
   { href: "/lisa", rotulo: "Lisa joga", Icone: IconeLisa, grupo: "Jogo" },

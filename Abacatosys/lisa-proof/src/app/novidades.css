@@ -62,7 +62,7 @@
 /* o item com o personagem desenhado (o Raposão, 03/11/2026) */
 .novidades__item--destaque .novidades__icone:has(.neuro) { width: 70px; height: 70px; overflow: visible; }
 .novidades__acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
-.novidades__principal { flex: 1 1 220px; justify-content: center; text-align: center; font-size: 16px; box-shadow: 0 5px 0 #15803d; }
+.novidades__principal { flex: 1 1 220px; justify-content: center; text-align: center; font-size: 16px; box-shadow: 0 5px 0 var(--pf-verde-sombra); }
 
 @keyframes novidades-fundo { from { opacity: 0; } }
 @keyframes novidades-entrar { from { opacity: 0; transform: translateY(24px) scale(0.94); } }

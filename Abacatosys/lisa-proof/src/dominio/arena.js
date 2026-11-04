@@ -18,6 +18,17 @@ export const JOGOS_DA_ARENA = {
   parsons: { nome: "Quebra-cabeças de Parsons", emoji: "🧩", recompensa: 15, descricao: "Os blocos de um algoritmo vieram embaralhados: ponha na ordem e com o recuo certo." },
 };
 export const ORDEM_DOS_JOGOS = ["masmorra", "mascote", "parsons"];
+
+/**
+ * O minigame do dia (03/11/2026: "a arena não deveria ser um modo à parte, e sim minigames dos exercícios
+ * diários, igual o quiz"): a primeira fase vencida no dia vale PONTOS_DO_MINIGAME, uma vez por dia (contam para
+ * a meta e a ofensiva, como os do quiz). Cada dia da semana tem um jogo em destaque; qualquer um vale os pontos.
+ */
+export const PONTOS_DO_MINIGAME = 30;
+export const chaveDoMinigame = (dia) => `arena:${dia}`;
+const DESTAQUE_DA_SEMANA = ["parsons", "masmorra", "mascote", "parsons", "masmorra", "mascote", "parsons"]; // domingo a sábado
+/** O jogo em destaque no dia ("AAAA-MM-DD"). */
+export const jogoDoDia = (dia) => DESTAQUE_DA_SEMANA[new Date(`${dia}T12:00:00Z`).getUTCDay()];
 /** O tempo de cada teste: passou disso, o código é lento demais (os bugs de desempenho). */
 export const LIMITE_DO_TESTE_MS = 1500;
 

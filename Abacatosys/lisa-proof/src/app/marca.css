@@ -11,7 +11,7 @@
   display: inline-grid; place-items: center; flex: none;
   width: var(--selo); height: var(--selo); border-radius: 50%;
   background: var(--marca-papel); color: var(--marca-tinta);
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.55);
+  box-shadow: 0 0 0 2px rgba(139, 209, 26, 0.55);
 }
 .pf-marca__icone.marca-selo { width: var(--selo); height: var(--selo); }
 
@@ -43,7 +43,7 @@
 .abertura__selo {
   display: grid; place-items: center; width: 168px; height: 168px; border-radius: 50%;
   background: var(--marca-papel); color: var(--marca-tinta);
-  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.7), 0 18px 50px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 4px rgba(139, 209, 26, 0.7), 0 18px 50px rgba(0, 0, 0, 0.45);
   animation: abertura-selo 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both, abertura-balanca 0.9s ease-in-out 1.45s;
 }
 .abertura__nome {
@@ -52,14 +52,14 @@
 }
 .abertura__nome span, .abertura__nome b { opacity: 0; transform: translateY(10px); animation: abertura-sobe 0.45s ease-out forwards; }
 .abertura__nome span:first-child { animation-delay: 1.15s; }
-.abertura__nome b { color: #22C55E; animation-delay: 1.3s; }
+.abertura__nome b { color: #8BD11A; animation-delay: 1.3s; }
 .abertura__nome span:last-child { animation-delay: 1.4s; }
 .abertura__lema { margin: 0; font-size: 14px; color: #9BA8A1; opacity: 0; animation: abertura-sobe 0.45s ease-out 1.6s forwards; }
 .abertura__barra {
   position: absolute; left: 50%; bottom: calc(48px + env(safe-area-inset-bottom)); width: 120px; height: 3px; border-radius: 3px;
   transform: translateX(-50%); background: rgba(247, 243, 234, 0.12); overflow: hidden;
 }
-.abertura__barra::after { content: ""; position: absolute; inset: 0; background: #22C55E; transform-origin: left; animation: abertura-carrega 2.2s ease-in-out forwards; }
+.abertura__barra::after { content: ""; position: absolute; inset: 0; background: #8BD11A; transform-origin: left; animation: abertura-carrega 2.2s ease-in-out forwards; }
 
 @keyframes abertura-selo { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes abertura-balanca { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-6deg); } 65% { transform: rotate(4deg); } }

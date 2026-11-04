@@ -12,7 +12,7 @@
 
 /* ---- a entrada do duelo na tela da Lisa */
 .lj-duelo { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; text-decoration: none; color: inherit; border: 2px solid var(--pf-verde); }
-.lj-duelo:hover { box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18), var(--pf-sombra); }
+.lj-duelo:hover { box-shadow: 0 0 0 3px rgba(139, 209, 26, 0.18), var(--pf-sombra); }
 .lj-duelo__emoji { font-size: 36px; line-height: 1; }
 
 /* ---- o duelo */
@@ -113,7 +113,7 @@
 .ar-jogo__descricao { margin-bottom: 12px; }
 .ar-fases { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .ar-fase { border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); border-radius: 9999px; padding: 5px 12px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-.ar-fase[aria-selected="true"] { border-color: var(--pf-verde); box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25); }
+.ar-fase[aria-selected="true"] { border-color: var(--pf-verde); box-shadow: 0 0 0 2px rgba(139, 209, 26, 0.25); }
 .ar-fase:disabled { opacity: 0.55; cursor: not-allowed; }
 .ar-sprite { display: block; image-rendering: pixelated; }
 .ar-mapa { display: grid; gap: 0; max-width: 640px; border-radius: 10px; overflow: hidden; border: 4px solid #1f2937; outline: none; }
@@ -163,3 +163,7 @@
 .ar-bloco__botoes button { width: 30px; height: 30px; border: 1px solid var(--pf-linha); background: var(--pf-superficie-2); color: var(--pf-tinta); border-radius: 6px; cursor: pointer; font-size: 14px; }
 .ar-bloco__botoes button:disabled { opacity: 0.4; cursor: default; }
 @media (prefers-reduced-motion: reduce) { .ar-obstaculo, .ar-mascote__ai { animation: none; } }
+
+/* a Forja dentro do Reino: o que já foi forjado fica recolhido */
+.fj-historico__caixa > summary { cursor: pointer; font-weight: 800; min-height: 44px; display: flex; align-items: center; }
+.fj-historico__caixa[open] > summary { margin-bottom: 6px; }

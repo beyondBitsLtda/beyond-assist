@@ -23,7 +23,7 @@ export const HORAS_ATE_O_PROXIMO = 20;
  * Conquistas e o bônus da meta do dia não contam.
  */
 export const DANO_POR_TIPO = {
-  diario: 2, quiz: 2, exercicio: 2, projeto_semanal: 2, projeto_final: 2, projeto_mensal: 2,
+  diario: 2, arena: 2, quiz: 2, exercicio: 2, projeto_semanal: 2, projeto_final: 2, projeto_mensal: 2,
   item: 1, card: 1, cartoes: 1, revisao: 1, dominio: 1,
 };
 
