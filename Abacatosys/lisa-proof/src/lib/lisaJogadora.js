@@ -12,6 +12,9 @@ import { calcularOfensiva } from "@/dominio/ofensiva.js";
 const falhou = (error, onde) => { if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`); };
 
 /** O id da conta dela, ou null se ainda não foi criada. */
+/** Só o domínio de um link (youtube.com, pt.wikipedia.org): de onde veio a sugestão, sem expor o link antes da aprovação. */
+const dominioDe = (link) => { try { return new URL(link).hostname.replace(/^www\./, ""); } catch { return null; } };
+
 export async function idDaLisa() {
   const { data, error } = await supabase.from("abacato_usuarios").select("id").ilike("email", CONTA_DA_LISA.email).maybeSingle();
   falhou(error, "conta da Lisa");
@@ -86,7 +89,7 @@ export async function perfilDaLisa() {
     ultimosDesafios: (desafios.data || []).slice(0, 10).map((d) => ({ tipo: d.tipo, titulo: d.titulo, nota: d.nota, dia: d.periodo })),
     carteira: (posicoes.data || []).map((p) => ({ acao: p.acao_id, quantidade: p.quantidade, custo: p.custo })),
     cadernos: (cadernos.data || []).map((c) => ({ titulo: c.titulo, icone: c.icone })),
-    acervo: (acervo.data || []).map((m) => ({ titulo: m.titulo, tipo: m.tipo, link: m.status === "aprovado" ? m.link : null, status: m.status })),
+    acervo: (acervo.data || []).map((m) => ({ titulo: m.titulo, tipo: m.tipo, link: m.status === "aprovado" ? m.link : null, status: m.status, fonte: dominioDe(m.link) })),
     diario: diario.data || [],
   };
 }

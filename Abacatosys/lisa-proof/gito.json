@@ -9,14 +9,28 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.1.0-cloudflare-pages.4",
+  "versao": "1.1.0-cloudflare-pages.5",
   "atualizadoEm": "2026-11-03",
   "compilacao": {
-    "numero": 99,
+    "numero": 100,
     "data": "2026-11-03",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.1.0-cloudflare-pages.5",
+      "data": "2026-11-03",
+      "branch": "cloudflare-pages",
+      "tipo": "funcionalidade",
+      "resumo": "A Lisa traz vídeos e artigos da internet para o Acervo todo dia, sobre os assuntos do curso dela, e eles entram na fila do bibliotecário.",
+      "itens": [
+        "Todo dia, duas vezes: um vídeo e um artigo sobre um assunto do curso dela (o da vez ou um dos próximos), dentro do limite de 5 envios por dia.",
+        "Vídeos do YouTube pela busca do DuckDuckGo e, sem resultado, pela página de resultados do YouTube (lida só até os primeiros vídeos). Artigos pela web (DuckDuckGo) e, sem resultado, pelo MDN (cursos de programação) e pela Wikipédia.",
+        "Se o material já está no Acervo ou na fila, ela tenta o próximo resultado. Tudo entra na fila do bibliotecário, como o envio de qualquer pessoa.",
+        "Na página Lisa joga: cada sugestão com o tipo (🎬/📰), de onde veio (só o domínio) e a situação; o link aparece depois de aprovado."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.1.0-cloudflare-pages.4",
       "data": "2026-11-03",
@@ -1578,7 +1592,7 @@
         "Conversa com a Lisa (idiomas), passo a passo conferido linha a linha e gráficos de arrastar (matemática), leitura na pauta (música), diário de estudo, entrega em PDF, frase-senha nas gravações e fotos, e a torre do Modo Domínio feita a partir de um livro da Biblioteca",
         "Exercício de desenhar diagramas (fluxograma, BPMN, UML, modelo de dados, arquitetura de software e de nuvem, C4) num quadro embutido, avaliado pela Lisa, nos cursos de computação, arquitetura e áreas próximas",
         "Tela Chamados: quem reportou acompanha status, previsão de término e respostas; o técnico (administrador) vê todos e muda status, previsão e responde (os chamados são cards do quadro \"Chamados — Lisa Proof\" no Abacato)",
-        "A Lisa jogadora: uma conta-robô que estuda e joga sozinha (curso do mês, quiz, exercício, projeto, minigame do dia, Reino, ilhas, Bolsa, correio, caderno, Acervo), várias vezes por dia pelo relógio da nuvem (uma jogada a cada 30 minutos, sempre alguma coisa), com tudo visível na página \"Lisa joga\" e o aviso de quando ela está jogando",
+        "A Lisa jogadora: uma conta-robô que estuda e joga sozinha (curso do mês, quiz, exercício, projeto, minigame do dia, Reino, ilhas, Bolsa, correio, caderno, e vídeos e artigos da internet sugeridos no Acervo todo dia), várias vezes por dia pelo relógio da nuvem (uma jogada a cada 30 minutos, sempre alguma coisa), com tudo visível na página \"Lisa joga\" e o aviso de quando ela está jogando",
         "Correio entre jogadores: recados avaliados por quem recebe (útil dá moedas aos dois) e até 2 perguntas do quiz do dia mandadas para outros jogadores (o quiz fecha com 3 respondidas, valendo menos)",
         "Modo espectador: ver o Proof da Lisa jogadora por dentro (as mesmas telas, só leitura)",
         "Presentes: itens guardados para um jogador (hoje, personagens), abertos por ele na área Presentes",
@@ -1716,6 +1730,11 @@
       {
         "nome": "Supabase Storage",
         "descricao": "Os PDFs da biblioteca (bucket privado proof-biblioteca): envio e leitura por endereço assinado pelo servidor, depois de conferir o dono.",
+        "url": ""
+      },
+      {
+        "nome": "Busca na internet (Lisa)",
+        "descricao": "A Lisa jogadora procura vídeos e artigos para sugerir no Acervo: DuckDuckGo (página HTML), resultados do YouTube, a busca do MDN e a da Wikipédia em português. Só leitura, sem chave; poucas buscas por dia; o que ela acha passa pelo bibliotecário.",
         "url": ""
       }
     ],

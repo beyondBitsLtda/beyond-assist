@@ -3240,8 +3240,14 @@ caso("lisa jogadora: a agenda do dia, como uma pessoa", () => {
   assert.ok(oQueFazerAgora({ hora: 13, diaDaSemana: 2 }).includes("minigame"), "o minigame do dia entra na agenda");
   const vezesNoDia = AGENDA_DA_LISA.reduce((s, a) => s + (a.vezes || 1), 0);
   assert.ok(vezesNoDia >= 25, `ela joga muitas vezes no dia (${vezesNoDia})`);
-  assert.ok(!oQueFazerAgora({ hora: 22, diaDaSemana: 2 }).includes("acervo"), "o Acervo é só no domingo");
-  assert.ok(oQueFazerAgora({ hora: 22, diaDaSemana: 0 }).includes("acervo") && oQueFazerAgora({ hora: 22, diaDaSemana: 0 }).includes("caderno"));
+  // o Acervo todo dia (03/11/2026: "quero ver ela trazendo artigos e vídeos da internet e sugerindo no Acervo")
+  assert.ok(oQueFazerAgora({ hora: 10, diaDaSemana: 2 }).includes("acervo"), "o Acervo todo dia");
+  assert.ok(!oQueFazerAgora({ hora: 12, diaDaSemana: 2, agora, jogadas: { acervo: { vezes: 2, ultima: horas(6) } } }).includes("acervo"), "duas vezes (os 5 envios do dia)");
+  assert.ok(oQueFazerAgora({ hora: 22, diaDaSemana: 0 }).includes("caderno"));
+  const rotina = fs.readFileSync(new URL("../src/lib/lisaRotina.js", import.meta.url), "utf8");
+  for (const fonte of ["html.duckduckgo.com", "www.youtube.com/results", "developer.mozilla.org/api/v1/search", "pt.wikipedia.org/w/rest.php"]) assert.ok(rotina.includes(fonte), fonte);
+  assert.match(rotina, /if \(e\?\.status === 409\) continue;/, "repetido: tenta o próximo resultado");
+  assert.match(rotina, /await criarMaterial\(id, \{/, "pela mesma porta de qualquer pessoa (fila do bibliotecário)");
   const n = itensDaTeoriaHoje(sorteioDaLisa(3));
   assert.ok(n >= 2 && n <= 5, "de 2 a 5 itens da teoria por dia");
 });

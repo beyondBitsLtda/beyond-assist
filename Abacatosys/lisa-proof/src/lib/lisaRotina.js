@@ -339,9 +339,17 @@ async function caderno(id) {
   return { resumo: `Escrevi no caderno "${atual.tema}" sobre ${estudados.join(", ")}.` };
 }
 
-/** Os primeiros resultados de uma busca no DuckDuckGo (a página sem JavaScript). */
+// ---------------------------------------------------------------- o Acervo: vídeos e artigos da internet
+// Todo dia (03/11/2026: "quero ver ela trazendo artigos e vídeos da internet e sugerindo no Acervo"), sobre um
+// assunto do curso dela. As sugestões entram na fila do bibliotecário, como as de qualquer pessoa: uma pessoa
+// confere antes de virar material do Acervo (e o link só aparece na página dela depois de aprovado).
+
+const UA_DA_LISA = { "user-agent": "Mozilla/5.0 (compatible; ProofLisa/1.0)", "accept-language": "pt-BR,pt;q=0.9" };
+
+/** Os primeiros resultados de uma busca no DuckDuckGo (a página sem JavaScript, leve). */
 async function buscar(consulta) {
-  const r = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(consulta)}`, { headers: { "user-agent": "Mozilla/5.0 (Proof; Lisa jogadora)" } });
+  const r = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(consulta)}`, { headers: UA_DA_LISA });
+  if (!r.ok) return [];
   const html = await r.text();
   return [...html.matchAll(/class="result__a" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)].map(([, href, titulo]) => {
     const u = new URL(href, "https://duckduckgo.com");
@@ -350,26 +358,99 @@ async function buscar(consulta) {
   }).filter((x) => /^https?:\/\//.test(x.link));
 }
 
+/** Lê a resposta só até achar `marca` algumas vezes: a página de resultados do YouTube passa de 1 MB. */
+async function lerAte(resposta, marca, quantas = 4, limite = 1_600_000) {
+  const leitor = resposta.body.getReader();
+  const decodificar = new TextDecoder();
+  let texto = "", achados = 0, desde = 0;
+  while (texto.length < limite) {
+    const { done, value } = await leitor.read();
+    if (done) break;
+    texto += decodificar.decode(value, { stream: true });
+    for (let i = texto.indexOf(marca, desde); i >= 0; i = texto.indexOf(marca, desde)) { achados++; desde = i + marca.length; }
+    if (achados >= quantas) break;
+  }
+  leitor.cancel().catch(() => {});
+  return texto;
+}
+const desescapar = (s) => { try { return JSON.parse(`"${s}"`); } catch { return s; } };
+
+/** Vídeos do YouTube: pela busca leve do DuckDuckGo; sem nada, pela página de resultados do próprio YouTube. */
+async function videosNaInternet(consulta) {
+  const ehVideo = (l) => /youtube\.com\/watch\?v=|youtu\.be\//.test(l);
+  const doDdg = (await buscar(`${consulta} site:youtube.com`).catch(() => [])).filter((r) => ehVideo(r.link));
+  if (doDdg.length) return doDdg;
+  const r = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(consulta)}&hl=pt-BR`, { headers: UA_DA_LISA });
+  if (!r.ok || !r.body) return [];
+  const html = await lerAte(r, '"videoRenderer"');
+  return [...html.matchAll(/"videoRenderer":\{"videoId":"([\w-]{11})"[\s\S]{0,1500}?"title":\{"runs":\[\{"text":"((?:[^"\\]|\\.)*)"/g)]
+    .map(([, id, titulo]) => ({ link: `https://www.youtube.com/watch?v=${id}`, titulo: desescapar(titulo) }));
+}
+
+/** Artigos: a web pelo DuckDuckGo; sem nada, a documentação do MDN (cursos de programação) e a Wikipédia. */
+async function artigosNaInternet(consulta, { programacao = false } = {}) {
+  const fora = /youtube|youtu\.be|facebook|instagram|tiktok|twitter|x\.com|linkedin|pinterest|reddit|amazon\.|mercadolivre|shopee/;
+  const web = (await buscar(`${consulta} artigo`).catch(() => [])).filter((r) => !fora.test(r.link));
+  if (web.length) return web;
+  const json = (url) => fetch(url, { headers: UA_DA_LISA }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (programacao) {
+    const mdn = await json(`https://developer.mozilla.org/api/v1/search?q=${encodeURIComponent(consulta)}&locale=pt-BR`);
+    const docs = (mdn?.documents || []).map((d) => ({ link: `https://developer.mozilla.org${d.mdn_url}`, titulo: `${d.title} — MDN` }));
+    if (docs.length) return docs;
+  }
+  const wiki = await json(`https://pt.wikipedia.org/w/rest.php/v1/search/page?q=${encodeURIComponent(consulta)}&limit=5`);
+  return (wiki?.pages || []).map((p) => ({ link: `https://pt.wikipedia.org/wiki/${encodeURIComponent(p.key)}`, titulo: `${p.title} — Wikipédia` }));
+}
+
+/** A categoria do Acervo pelo curso dela (os cursos da Lisa são de tecnologia). */
+function categoriaDoCurso(tema, programacao) {
+  if (/dados|intelig[eê]ncia|machine|\bia\b|estat[ií]stica/i.test(tema)) return "Dados e IA";
+  if (programacao) return "Programação";
+  return "Engenharia";
+}
+
 async function acervo(id) {
   const atual = await trilhaAtual(id);
-  const assunto = atual?.detalhe.avanco.assuntoAtual?.titulo || atual?.tema || "tecnologia";
+  const avanco = atual?.detalhe.avanco;
+  const tema = String(atual?.tema || "tecnologia").replace(/^STUDY\s*/i, "");
+  // o assunto: o da vez ou um dos próximos do curso (para variar o que ela traz)
+  const assuntos = [...new Set([avanco?.assuntoAtual?.titulo, ...(avanco?.etapas || []).filter((e) => !e.concluido).map((e) => e.titulo)].filter(Boolean))].slice(0, 5);
+  const sortear = sortearPara(`acervo:${new Date().getUTCHours()}`);
+  const assunto = assuntos.length ? assuntos[Math.floor(sortear() * assuntos.length)] : tema;
+  const programacao = atual?.detalhe.trilha?.perfil === "programacao";
+  const categoria = categoriaDoCurso(tema, programacao);
+  const jeitos = ["aula", "explicado", "tutorial em português", "para iniciantes", "na prática"];
   const enviados = [];
-  const tentativas = [
-    { tipo: "video", consulta: `${assunto} ${atual?.tema || ""} site:youtube.com`, filtro: (l) => /youtube\.com\/watch\?v=|youtu\.be\//.test(l) },
-    { tipo: "artigo", consulta: `${assunto} ${atual?.tema || ""} artigo`, filtro: (l) => !/youtube|youtu\.be|facebook|instagram|tiktok|twitter|x\.com/.test(l) },
+  const tipos = [
+    { tipo: "video", nome: "vídeo", achar: () => videosNaInternet(`${assunto} ${jeitos[Math.floor(sortear() * jeitos.length)]}`) },
+    { tipo: "artigo", nome: "artigo", achar: () => artigosNaInternet(`${assunto} ${tema}`.trim(), { programacao }) },
   ];
-  for (const t of tentativas) {
-    try {
-      const achado = (await buscar(t.consulta)).find((r) => t.filtro(r.link));
-      if (!achado) continue;
-      await criarMaterial(id, {
-        tipo: t.tipo, titulo: achado.titulo.slice(0, 160) || assunto, categoria: "Engenharia", assunto: assunto.slice(0, 80),
-        descricao: `Achei este ${t.tipo === "video" ? "vídeo" : "artigo"} estudando "${atual?.tema || assunto}".`, link: achado.link,
-      });
-      enviados.push(`${t.tipo === "video" ? "um vídeo" : "um artigo"} sobre ${assunto}`);
-    } catch (e) { log(`acervo (${t.tipo}):`, e.message); }
+  let limiteDoDia = false;
+  for (const t of tipos) {
+    if (limiteDoDia) break;
+    let achados = [];
+    try { achados = (await t.achar()).slice(0, 5); } catch (e) { log(`acervo (${t.tipo}):`, e.message); }
+    for (const achado of achados) {
+      try {
+        await criarMaterial(id, {
+          tipo: t.tipo, titulo: achado.titulo.slice(0, 160) || assunto, categoria, assunto: assunto.slice(0, 80), link: achado.link,
+          descricao: `Um ${t.nome} que achei estudando "${tema}": ajuda em ${assunto}.`,
+        });
+        enviados.push({ tipo: t.tipo, titulo: achado.titulo.slice(0, 90), link: achado.link });
+        break;
+      } catch (e) {
+        if (e?.status === 409) continue; // já está no Acervo ou na fila: tenta o próximo resultado
+        if (e?.status === 429) { limiteDoDia = true; break; }
+        log(`acervo (${t.tipo}):`, e?.message || e);
+        break;
+      }
+    }
   }
-  return { resumo: enviados.length ? `Mandei para o Acervo ${enviados.join(" e ")} (esperando um bibliotecário aprovar).` : "Procurei material para o Acervo e não achei nada bom esta semana." };
+  if (!enviados.length) {
+    return { resumo: limiteDoDia ? "Já mandei o que dava para o Acervo hoje (5 por dia) — amanhã tem mais." : `Procurei vídeos e artigos sobre ${assunto} e não achei nada novo desta vez.` };
+  }
+  const lista = enviados.map((e) => `${e.tipo === "video" ? "🎬 o vídeo" : "📰 o artigo"} "${e.titulo}"`).join(" e ");
+  return { resumo: `Sugeri no Acervo ${lista} — esperando um bibliotecário aprovar.`, detalhe: { assunto, enviados } };
 }
 
 // ---------------------------------------------------------------- o correio (BEYOND-0016)

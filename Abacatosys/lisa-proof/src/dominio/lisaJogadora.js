@@ -91,7 +91,7 @@ export const AGENDA = [
   { acao: "exercicio", de: 14, vezes: 3, intervalo: 3 }, // as 3 rodadas de exercício do dia
   { acao: "projeto", de: 16, dias: [1, 2, 3, 4, 5, 6, 0] }, // o projeto aberto: entrega quando dá
   { acao: "correio", de: 17, vezes: 2, intervalo: 4 },  // o correio (BEYOND-0016): um recadinho e avalia os que chegaram
-  { acao: "acervo", de: 18, dias: [0] },        // domingo: vídeos e artigos da semana
+  { acao: "acervo", de: 9, vezes: 2, intervalo: 5 }, // todo dia, vídeos e artigos da internet para o Acervo
   { acao: "caderno", de: 21, dias: [0, 3] },    // domingo e quarta: as anotações do que estudou
 ];
 

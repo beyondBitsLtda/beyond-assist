@@ -120,10 +120,10 @@ function Painel({ d }) {
           {d.acervo.length ? (
             <ul className="lj-lista">
               {d.acervo.map((m, i) => (
-                <li key={i}>{m.link ? <a href={m.link} target="_blank" rel="noreferrer">{m.titulo}</a> : m.titulo} <span className="pf-estat__nota">· {m.tipo}, {STATUS_DO_ACERVO[m.status] || m.status}</span></li>
+                <li key={i}>{m.tipo === "video" ? "🎬" : "📰"} {m.link ? <a href={m.link} target="_blank" rel="noreferrer">{m.titulo}</a> : m.titulo} <span className="pf-estat__nota">· {m.fonte ? `de ${m.fonte}, ` : ""}{STATUS_DO_ACERVO[m.status] || m.status}</span></li>
               ))}
             </ul>
-          ) : <p className="pf-estat__nota">Ela manda vídeos e artigos todo domingo.</p>}
+          ) : <p className="pf-estat__nota">Todo dia ela traz vídeos e artigos da internet para o Acervo.</p>}
         </section>
       </div>
 
