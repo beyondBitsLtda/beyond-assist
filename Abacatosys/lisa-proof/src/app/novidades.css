@@ -139,3 +139,18 @@
 :root[data-tema="escuro"] .novidades__item { border: 1px solid rgba(255, 255, 255, 0.06); }
 :root[data-tema="escuro"] .novidades__item--destaque { border-color: rgba(139, 209, 26, 0.45); }
 @media (max-width: 560px) { .novidades { padding: 10px; } .novidades__corpo { padding: 16px; } .novidades__titulo { font-size: 23px; } }
+
+/* ---- a 1.0 grande e curta (03/11/2026: "bem mais largo, menos texto, um texto só apresentando o sistema") */
+.novidades__caixa { width: min(1180px, 100%); border-radius: 30px; }
+.novidades__corpo--curto { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px 32px; padding: 26px 34px 30px; }
+.novidades__texto { flex: 1 1 520px; display: grid; gap: 8px; }
+.novidades__corpo--curto .novidades__titulo { font-size: 34px; font-weight: 600; }
+.novidades__corpo--curto .novidades__sub { font-size: 17px; line-height: 1.55; max-width: 62ch; }
+.novidades__corpo--curto .novidades__acoes { flex: 0 1 300px; display: grid; gap: 10px; margin: 0; }
+.novidades__corpo--curto .novidades__acoes .pf-botao { width: 100%; min-height: 54px; font-size: 16px; }
+@media (max-width: 700px) {
+  .novidades__corpo--curto { padding: 20px 18px 22px; }
+  .novidades__corpo--curto .novidades__titulo { font-size: 26px; }
+  .novidades__corpo--curto .novidades__sub { font-size: 15.5px; }
+  .novidades__corpo--curto .novidades__acoes { flex-basis: 100%; }
+}

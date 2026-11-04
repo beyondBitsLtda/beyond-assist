@@ -64,10 +64,11 @@ export const CENARIOS = {
     chao: "#2f4a35", paleta: { madeira: "#3b2a1e", escura: "#24180f", telhado: "#14532d", pedra: "#4b5548", tecido: "#1e293b", brilho: "#c084fc" },
     cabana: "tenda", estaca: "madeira", luz: { ceu: "#6b8f7a", chao: "#13251a", sol: "#bfd8c8", forca: 0.9 },
   },
-  // ---- a Temporada das Ilhas (03/11/2026): areia, coqueiros e tochas tiki (ilhas.js)
+  // ---- a Temporada das Ilhas (03/11/2026): uma ilha de verdade — grama tropical, praia, o mar em volta, a
+  // cachoeira, coqueiros e flores —, com as construções do reino em cima (predios: "reino"). ilhas.js
   "ilha-tropical": {
-    chao: "#f1d99a", paleta: { madeira: "#a0703f", escura: "#6e4a2a", telhado: "#d4a95a", pedra: "#d6cfc0", tecido: "#16a34a", brilho: "#fb923c" },
-    cabana: "casa", estaca: "madeira", luz: { ceu: "#ffffff", chao: "#f1d99a", sol: "#fff1cc", forca: 1.7 },
+    chao: "#5cb848", paleta: { madeira: "#a0703f", escura: "#6e4a2a", telhado: "#d4a95a", pedra: "#d6cfc0", tecido: "#16a34a", brilho: "#fb923c" },
+    cabana: "casa", estaca: "madeira", predios: "reino", luz: { ceu: "#ffffff", chao: "#cdeee0", sol: "#fff1cc", forca: 1.6 },
   },
   "covil-cerbero": {
     chao: "#3b2b2b", paleta: { madeira: "#2a1c1c", escura: "#140d0d", telhado: "#7f1d1d", pedra: "#3f3a3a", tecido: "#450a0a", brilho: "#f97316" },
@@ -574,7 +575,7 @@ function nada(p) {
 
 /** A estrutura da expedição para uma chave do motor (null = sem cenário: use a do reino). */
 export function estruturaDaExpedicao(p, chave, nivel, cen) {
-  if (!cen) return null;
+  if (!cen || cen.predios === "reino") return null; // a ilha tropical: as construções são as do reino
   const c = cen.paleta;
   if (chave === "muralha") return nivel > 0 ? palicada(p, nivel, c, cen.estaca) : nada(p);
   if (!(nivel > 0)) return nada(p);
@@ -905,6 +906,33 @@ export function terrenoDaExpedicao(p, cen, construcoes) {
   switch (cen.id) {
     // a ilha das Grandes Expedições (03/11/2026: estava no desenho da cabana, longe de lugares(), r() e R — quebrava a tela)
     case "ilha-tropical": {
+      // a praia: um anel de areia um pouco mais largo e mais baixo que a grama, com a mesma ondulação da ilha
+      const ondular = (geo, s = 1) => {
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i), z = pos.getZ(i);
+          const a = Math.atan2(z, x);
+          const f = 1 + s * (0.04 * Math.sin(a * 3 + 1) + 0.03 * Math.sin(a * 5));
+          pos.setX(i, x * f);
+          pos.setZ(i, z * f);
+        }
+        geo.computeVertexNormals();
+        return geo;
+      };
+      g.add(p.malha(ondular(new THREE.CylinderGeometry(R + 0.95, R + 1.15, 0.24, 48)), "#f3dc9b", 0, -0.16, 0));
+      // o mar em volta: raso perto da praia, fundo mais longe, a espuma que respira e a borda que some
+      const agua = (cor, opacidade = 1) => new THREE.MeshStandardMaterial({ color: cor, roughness: 0.22, metalness: 0.08, transparent: opacidade < 1, opacity: opacidade, depthWrite: opacidade === 1 });
+      const disco = (geo, mat, y) => { const m = p.malha(geo.rotateX(-Math.PI / 2), mat, 0, y, 0); m.castShadow = false; g.add(m); return m; };
+      disco(new THREE.CircleGeometry(R + 7, 72), agua("#1597c0"), -0.13);
+      disco(ondular(new THREE.RingGeometry(R + 0.9, R + 2.4, 72, 1)), agua("#4fd1e3", 0.85), -0.12);
+      const espuma = disco(ondular(new THREE.RingGeometry(R + 1.0, R + 1.28, 72, 1)), new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.7, depthWrite: false }), -0.115);
+      disco(new THREE.RingGeometry(R + 7, R + 10, 72, 1), agua("#1597c0", 0.45), -0.13);
+      animacoes.push((tempo) => {
+        espuma.material.opacity = 0.5 + 0.25 * Math.sin(tempo * 1.6);
+        espuma.scale.setScalar(1 + 0.012 * Math.sin(tempo * 1.6));
+      });
+
+      // a vegetação: coqueiros na beirada, árvores largas, arbustos, flores e capim
       const coqueiro = (x, z, s) => {
         const inclina = (r() - 0.5) * 0.6;
         for (let k = 0; k < 4; k++) {
@@ -922,6 +950,21 @@ export function terrenoDaExpedicao(p, cen, construcoes) {
         }
         for (let k = 0; k < 3; k++) g.add(p.malha(new THREE.SphereGeometry(0.065 * s, 6, 4), "#7c4a2d", tx + (k - 1) * 0.08 * s, ty - 0.14 * s, z + 0.06 * s));
       };
+      const arbusto = (x, z, s) => {
+        const tons = ["#2f9e44", "#3fb950", "#57c95a"];
+        for (let k = 0; k < 3; k++) g.add(p.malha(new THREE.IcosahedronGeometry((0.2 + r() * 0.08) * s, 0), tons[k], x + (k - 1) * 0.16 * s, (0.16 + (k % 2) * 0.06) * s, z + (r() - 0.5) * 0.18 * s));
+      };
+      const flor = (x, z) => {
+        g.add(p.cilindro(0.012, 0.012, 0.2, 4, "#2f9e44", x, 0.1, z));
+        g.add(p.malha(new THREE.IcosahedronGeometry(0.06, 0), ["#f43f5e", "#facc15", "#fb923c", "#e879f9", "#ffffff"][Math.floor(r() * 5)], x, 0.22, z));
+      };
+      const capim = (x, z) => {
+        for (let k = 0; k < 3; k++) {
+          const folha = p.cone(0.03, 0.28 + r() * 0.12, 4, k % 2 ? "#4caf50" : "#66bb6a", x + (k - 1) * 0.05, 0.14, z);
+          folha.rotation.z = (k - 1) * 0.3;
+          g.add(folha);
+        }
+      };
       const tocha = (x, z) => {
         g.add(p.cilindro(0.04, 0.05, 1.0, 5, "#6e4a2a", x, 0.5, z));
         g.add(p.cilindro(0.09, 0.07, 0.16, 6, "#a0703f", x, 1.05, z));
@@ -930,18 +973,89 @@ export function terrenoDaExpedicao(p, cen, construcoes) {
         fogo.userData.gira = true;
         g.add(fogo);
       };
-      const canoa = (x, z) => {
-        const casco = p.malha(new THREE.SphereGeometry(0.4, 8, 4, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), "#8a5a2b", x, 0.12, z);
+      const canoa = (x, z, y = 0.12) => {
+        const casco = p.malha(new THREE.SphereGeometry(0.4, 8, 4, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), "#8a5a2b", x, y, z);
         casco.scale.set(1.8, 0.5, 0.6);
         casco.rotation.y = r() * Math.PI;
         g.add(casco);
+        return casco;
       };
+
+      // a cachoeira: um morro de pedra com musgo, a água descendo e o lago com espuma (de frente para o centro)
+      const [onde] = lugares(1, R - 2.1, R - 1.4, 1.9);
+      if (onde) {
+        const [cx, cz] = onde;
+        const c2 = new THREE.Group();
+        c2.position.set(cx, 0, cz);
+        c2.rotation.y = Math.atan2(-cx, -cz);
+        const rocha = (raio, cor, x, y, z, sy = 1) => { const m = p.malha(new THREE.DodecahedronGeometry(raio, 0), cor, x, y, z); m.scale.y = sy; c2.add(m); };
+        rocha(1.0, "#b3aa9b", 0, 0.75, -0.25, 1.4);
+        rocha(0.7, "#c2b9a9", 0.65, 1.1, -0.35, 1.25);
+        rocha(0.65, "#a39a8b", -0.65, 1.05, -0.3, 1.25);
+        rocha(0.62, "#4caf50", 0, 1.98, -0.35, 0.45);
+        rocha(0.38, "#3fb950", 0.55, 1.78, -0.4, 0.5);
+        rocha(0.32, "#66bb6a", -0.5, 1.72, -0.35, 0.5);
+        let textura = null;
+        if (typeof document !== "undefined") {
+          const tela = document.createElement("canvas");
+          tela.width = 64; tela.height = 256;
+          const x2 = tela.getContext("2d");
+          x2.fillStyle = "#8fe3f7";
+          x2.fillRect(0, 0, 64, 256);
+          for (let i = 0; i < 40; i++) {
+            x2.fillStyle = `rgba(255, 255, 255, ${0.35 + r() * 0.5})`;
+            x2.fillRect(Math.floor(r() * 60), Math.floor(r() * 256), 2 + Math.floor(r() * 4), 18 + Math.floor(r() * 50));
+          }
+          textura = new THREE.CanvasTexture(tela);
+          textura.wrapS = textura.wrapT = THREE.RepeatWrapping;
+          textura.colorSpace = THREE.SRGBColorSpace;
+        }
+        const queda = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 1.9), new THREE.MeshBasicMaterial({ color: "#e6fbff", map: textura, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false }));
+        queda.position.set(0, 1.0, 0.62);
+        queda.rotation.x = -0.12;
+        c2.add(queda);
+        const lago = p.malha(new THREE.CircleGeometry(0.78, 22).rotateX(-Math.PI / 2), agua("#4fd1e3"), 0, 0.03, 1.0);
+        lago.castShadow = false;
+        c2.add(lago);
+        const anel = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.44, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.8, depthWrite: false }));
+        anel.position.set(0, 0.04, 0.78);
+        c2.add(anel);
+        const respingos = [];
+        for (let k = 0; k < 5; k++) {
+          const gota = p.malha(new THREE.IcosahedronGeometry(0.06, 0), "#ffffff", (k - 2) * 0.12, 0.08, 0.76 + (k % 2) * 0.08);
+          gota.castShadow = false;
+          respingos.push(gota);
+          c2.add(gota);
+        }
+        for (const [x, z] of [[-0.8, 0.6], [0.85, 0.55], [0.7, 1.2]]) { const pd = p.malha(new THREE.DodecahedronGeometry(0.16, 0), "#8b8378", x, 0.08, z); pd.scale.y = 0.6; c2.add(pd); }
+        g.add(c2);
+        animacoes.push((tempo) => {
+          if (textura) textura.offset.y = (tempo * 0.9) % 1;
+          anel.scale.setScalar(1 + 0.12 * Math.sin(tempo * 4));
+          respingos.forEach((gota, k) => { gota.position.y = 0.08 + Math.abs(Math.sin(tempo * 5 + k * 1.3)) * 0.14; });
+        });
+      }
+
+      // o píer de madeira na praia (o lado da praia fica livre para o navio chegar)
+      const angPier = 0.8;
+      const pier = new THREE.Group();
+      pier.position.set(Math.cos(angPier) * (R + 0.9), 0, Math.sin(angPier) * (R + 0.9));
+      pier.rotation.y = -angPier;
+      pier.add(p.caixa(2.0, 0.07, 0.6, "#a0703f", 0.5, -0.02, 0));
+      for (const x of [-0.3, 0.3, 0.9, 1.4]) for (const z of [-0.26, 0.26]) pier.add(p.cilindro(0.04, 0.04, 0.4, 5, "#6e4a2a", x, -0.18, z));
+      g.add(pier);
+
       for (const [x, z, s] of lugares(14, R - 1.9, R - 0.4, 1.1)) coqueiro(x, z, s * 1.05);
-      for (const [x, z] of lugares(8, 1.6, R - 1.0, 1.0)) g.add(p.cilindro(0.5 + r() * 0.35, 0.5, 0.04, 9, r() > 0.4 ? "#86c76b" : "#6fbf5a", x, 0.03, z));
-      for (const [x, z] of lugares(6, 1.8, R - 1.0, 1.3)) tocha(x, z);
-      for (const [x, z] of lugares(3, R - 1.2, R - 0.5, 1.4)) canoa(x, z);
-      for (const [x, z] of lugares(10, 1.5, R - 0.6, 0.8)) estrela(x, z);
-      for (const [x, z, s] of lugares(6, 1.6, R - 0.8, 1.0)) pedra(x, z, s, "#d6cfc0");
+      for (const [x, z, s] of lugares(4, 1.8, R - 1.6, 1.3)) arvoreRedonda(x, z, s * 1.1, r() > 0.5 ? "#2fa84f" : "#3cba54");
+      for (const [x, z, s] of lugares(10, 1.5, R - 0.6, 0.8)) arbusto(x, z, s);
+      for (const [x, z] of lugares(18, 1.4, R - 0.4, 0.45)) flor(x, z);
+      for (const [x, z] of lugares(14, 1.4, R - 0.4, 0.5)) capim(x, z);
+      for (const [x, z] of lugares(4, 1.8, R - 1.0, 1.3)) tocha(x, z);
+      // na areia e na água: estrelas-do-mar, pedras e as canoas balançando
+      for (let k = 0; k < 9; k++) { const a = r() * Math.PI * 2, d = R + 0.35 + r() * 0.45; estrela(Math.cos(a) * d, Math.sin(a) * d); }
+      for (let k = 0; k < 5; k++) { const a = r() * Math.PI * 2, d = R + 0.4 + r() * 0.4; pedra(Math.cos(a) * d, Math.sin(a) * d, 0.9, "#d6cfc0"); }
+      const canoas = [2.1, 3.6, 5.2].map((a) => canoa(Math.cos(a) * (R + 1.7), Math.sin(a) * (R + 1.7), -0.06));
+      animacoes.push((tempo) => canoas.forEach((cn, k) => { cn.position.y = -0.06 + 0.025 * Math.sin(tempo * 1.4 + k); cn.rotation.z = 0.05 * Math.sin(tempo * 1.1 + k); }));
       break;
     }
     case "bosque-cogumelos":

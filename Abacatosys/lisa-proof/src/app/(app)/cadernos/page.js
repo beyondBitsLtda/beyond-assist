@@ -89,15 +89,21 @@ export default function Cadernos() {
         <ul className="cd-estante">
           {cadernos.map((c) => (
             <li key={c.id}>
+              {/* o caderno de arame (03/11/2026): todos do mesmo tamanho, a capa na cor dele, a espiral e a etiqueta */}
               <Link href={`/cadernos/${c.id}`} className={`cd-capa cd-cor--${c.cor}`}>
+                <span className="cd-capa__espiral" aria-hidden="true" />
                 <span className="cd-capa__icone" aria-hidden="true">{c.icone}</span>
-                <span className="cd-capa__titulo">{c.titulo}</span>
-                {c.descricao && <span className="cd-capa__descricao">{c.descricao}</span>}
-                <span className="cd-capa__meta">
-                  {c.paginas} página{c.paginas === 1 ? "" : "s"}{c.modulos ? ` · ${c.modulos} módulo${c.modulos === 1 ? "" : "s"}` : ""}
-                  {c.vinculos ? ` · 🔗 ${c.vinculos}` : ""}
+                <span className="cd-capa__etiqueta">
+                  <span className="cd-capa__titulo">{c.titulo}</span>
+                  {c.descricao && <span className="cd-capa__descricao">{c.descricao}</span>}
                 </span>
-                <span className="cd-capa__quando">editado {quando(c.atualizadoEm)}</span>
+                <span className="cd-capa__pe">
+                  <span className="cd-capa__meta">
+                    {c.paginas} página{c.paginas === 1 ? "" : "s"}{c.modulos ? ` · ${c.modulos} módulo${c.modulos === 1 ? "" : "s"}` : ""}
+                    {c.vinculos ? ` · 🔗 ${c.vinculos}` : ""}
+                  </span>
+                  <span className="cd-capa__quando">editado {quando(c.atualizadoEm)}</span>
+                </span>
               </Link>
             </li>
           ))}

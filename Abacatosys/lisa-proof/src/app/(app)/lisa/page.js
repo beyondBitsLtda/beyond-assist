@@ -46,7 +46,7 @@ export default function LisaJoga() {
 
 /**
  * A Lisa ao vivo (03/11/2026: "não tô vendo a Lisa ativa, quero ver ela jogando"): o relógio da nuvem faz ela
- * jogar a cada 20 minutos; aqui aparece se ela jogou agora há pouco e o que foi a última coisa que fez.
+ * jogar a cada 30 minutos; aqui aparece se ela jogou agora há pouco e o que foi a última coisa que fez.
  */
 function AoVivo({ diario }) {
   const [agora, setAgora] = useState(() => Date.now());

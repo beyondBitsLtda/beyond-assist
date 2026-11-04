@@ -81,19 +81,37 @@ export function respostasDoQuiz(perguntas, chance, sortear) {
  */
 export const AGENDA = [
   { acao: "curso", de: 7 },           // o curso do mês: escolhe/gera se não tem (no dia 1 ou quando o anterior acabou)
-  { acao: "mina", de: 7, vezes: 4, intervalo: 3 },
-  { acao: "teoria", de: 8, vezes: 2, intervalo: 6 },
-  { acao: "reino", de: 9, vezes: 4, intervalo: 3 },
+  { acao: "mina", de: 7, vezes: 6, intervalo: 2 },
+  { acao: "teoria", de: 8, vezes: 4, intervalo: 3 },
+  { acao: "reino", de: 9, vezes: 5, intervalo: 2 },
   { acao: "bolsa", de: 10, ate: 16, vezes: 3, intervalo: 2 },
-  { acao: "ilhas", de: 11, vezes: 3, intervalo: 4 },  // a Temporada das Ilhas (BEYOND-0020): a ilha dela
-  { acao: "quiz", de: 12 },
-  { acao: "minigame", de: 13, vezes: 2, intervalo: 5 }, // o minigame do dia da Prática (a Arena)
-  { acao: "exercicio", de: 15 },
+  { acao: "ilhas", de: 11, vezes: 4, intervalo: 3 },  // a Temporada das Ilhas (BEYOND-0020): a ilha dela
+  { acao: "quiz", de: 12, vezes: 3, intervalo: 3 },   // as 3 rodadas de quiz do dia (as extras valem metade)
+  { acao: "minigame", de: 13, vezes: 3, intervalo: 3 }, // o minigame do dia da Prática (a Arena)
+  { acao: "exercicio", de: 14, vezes: 3, intervalo: 3 }, // as 3 rodadas de exercício do dia
   { acao: "projeto", de: 16, dias: [1, 2, 3, 4, 5, 6, 0] }, // o projeto aberto: entrega quando dá
   { acao: "correio", de: 17, vezes: 2, intervalo: 4 },  // o correio (BEYOND-0016): um recadinho e avalia os que chegaram
   { acao: "acervo", de: 18, dias: [0] },        // domingo: vídeos e artigos da semana
   { acao: "caderno", de: 21, dias: [0, 3] },    // domingo e quarta: as anotações do que estudou
 ];
+
+/**
+ * A reserva (03/11/2026): quando nada da agenda está na vez — de madrugada, ou com tudo do dia feito —, ela ainda
+ * joga uma destas, a que está esperando há mais tempo. Assim, a cada rodada do relógio (30 min), sempre faz algo.
+ */
+export const SEMPRE = ["reino", "mina", "ilhas", "minigame", "correio"];
+
+/**
+ * As próximas jogadas de uma rodada: do que está na vez (`naVez`, na ordem da agenda), primeiro o que ainda não
+ * fez hoje e depois o que está esperando há mais tempo; nada na vez, uma da reserva (SEMPRE), também a que
+ * está esperando há mais tempo.
+ */
+export function proximasJogadas({ naVez = [], jogadas = {}, maximo = 1 }) {
+  const ultima = (acao) => jogadas?.[acao]?.ultima || 0;
+  const ordenar = (lista) => lista.map((acao, i) => ({ acao, i })).sort((a, b) => ultima(a.acao) - ultima(b.acao) || a.i - b.i).map((x) => x.acao);
+  const daAgenda = ordenar(naVez).slice(0, maximo);
+  return daAgenda.length ? daAgenda : ordenar(SEMPRE).slice(0, 1);
+}
 
 /**
  * O que está na vez nesta hora e dia da semana. `jogadas`: o que ela já fez hoje ({ acao: { vezes, ultima } },

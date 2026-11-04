@@ -1465,13 +1465,14 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
         fixo.grupo = terrenoDaExpedicao(p, cen, motor);
         mundo.add(fixo.grupo);
       }
+      aplicarTema();
+      atualizarConstrucoes(construcoesRef.current || [], false);
+      // depois das construções: trocar o terreno remonta a ilhota do Acampamento (definirTerreno), visível
       const fora = !fixo.ativo; // numa ilha: sem o Neuro, o Acampamento e os vizinhos
       neuro.visible = fora;
       acampamento.visible = fora;
       if (ilhota.grupo) { ilhota.grupo.visible = fora; ilhota.ponte.visible = fora; }
       for (const v of vizinhanca.ilhas) { v.grupo.visible = fora; v.ponte.visible = fora; }
-      aplicarTema();
-      atualizarConstrucoes(construcoesRef.current || [], false);
       if (fixo.grupo) fixo.grupo.traverse((o) => { if (o.userData.gira) girando.push(o); });
       posicionarCamera();
       sujo = true;
@@ -1480,6 +1481,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       const ver = fixo.ativo && !sim;
       if (fixo.grupo && fixo.grupo.visible !== ver) { fixo.grupo.visible = ver; sujo = true; }
       if (guardasDaIlha.visible !== ver) { guardasDaIlha.visible = ver; sujo = true; }
+      if (ver && fixo.grupo?.userData.animar) { fixo.grupo.userData.animar(t, 0); sujo = true; } // a água da ilha correndo
       if (!ver || !guardasDaIlha.children.length) return;
       for (const g of guardasDaIlha.children) {
         g.rotation.y = vista.azimute; // de frente para a câmera, como todo papel

@@ -1,5 +1,5 @@
 // A Lisa joga o Proof, rodado na mão (03/11/2026). Quem joga de verdade é o relógio da nuvem: o gatilho de
-// horário do Worker chama /api/lisa/rodada a cada 20 minutos (worker-proof.js). A rotina mora em
+// horário do Worker chama /api/lisa/rodada a cada 30 minutos (worker-proof.js). A rotina mora em
 // src/lib/lisaRotina.js; este script serve para testar ou forçar uma ação.
 //
 // Uso (na pasta do lisa-proof, com o .env.local, que tem o banco e as chaves do Gemini):

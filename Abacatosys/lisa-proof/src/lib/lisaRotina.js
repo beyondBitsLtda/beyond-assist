@@ -3,7 +3,7 @@
 // rodada, faz o que está na vez da agenda (src/dominio/lisaJogadora.js: algumas coisas mais de uma vez por dia)
 // e anota no diário dela, que é a página pública /lisa.
 //
-// QUEM CHAMA: o relógio da nuvem — o gatilho de horário do Worker do Proof (worker-proof.js, a cada 20 minutos)
+// QUEM CHAMA: o relógio da nuvem — o gatilho de horário do Worker do Proof (worker-proof.js, a cada 30 minutos)
 // chama POST /api/lisa/rodada, que roda rodadaDaLisa(). Antes era o crontab do iMac (que nunca chegou a ficar
 // ligado; por isso ela parecia parada). O script scripts/lisa-joga.mjs continua servindo para rodar na mão.
 
@@ -25,10 +25,10 @@ import { criarCaderno, criarPagina } from "@/lib/cadernos.js";
 import { conversar, textoDe } from "@/lib/gemini.js";
 import { destinatarios, mandarPerguntaDoQuiz, mandarRecado, avaliarRecado } from "@/lib/correio.js";
 import { assuntosParaODuracao } from "@/dominio/curso.js";
-import { diaDe } from "@/dominio/datas.js";
+import { diaDe, somarDias } from "@/dominio/datas.js";
 import { motorDo } from "@/dominio/motores.js";
 import {
-  CONTA_DA_LISA, temaDoMes, sorteio, sementeDe, chanceDeAcerto, respostasDoQuiz, oQueFazerAgora,
+  CONTA_DA_LISA, temaDoMes, sorteio, sementeDe, chanceDeAcerto, respostasDoQuiz, oQueFazerAgora, proximasJogadas,
   itensDaTeoriaHoje, melhoriaDaVez, compraNaBolsa, alvoDaInvasao, documentoDoDiagrama, TIPOS_DO_DIAGRAMA,
 } from "@/dominio/lisaJogadora.js";
 
@@ -106,7 +106,8 @@ async function teoria(id) {
   const atual = await trilhaAtual(id);
   if (!atual) return { resumo: "Sem curso em andamento para estudar hoje." };
   const itens = atual.detalhe.avanco.etapas
-    .filter((e) => !e.bloqueada && (!e.inicio || e.inicio <= hoje))
+    // pode adiantar até uma semana (03/11/2026): sem isso, no começo do curso só havia o primeiro assunto
+    .filter((e) => !e.bloqueada && (!e.inicio || e.inicio <= somarDias(hoje, 7)))
     .flatMap((e) => (e.checklists || []).flatMap((c) => c.itens.filter((i) => !i.feito).map((i) => ({ ...i, assunto: e.titulo }))));
   const quantos = itensDaTeoriaHoje(sortearPara("teoria"));
   const feitos = [];
@@ -128,9 +129,16 @@ async function errosRecentes(id) {
 async function quiz(id) {
   const atual = await trilhaAtual(id);
   if (!atual) return { resumo: "Sem curso, sem quiz hoje." };
-  const { desafio } = await obterOuCriarDesafio({ usuarioId: id, trilhaId: atual.id, tipo: "quiz", periodo: hoje });
+  let { desafio } = await obterOuCriarDesafio({ usuarioId: id, trilhaId: atual.id, tipo: "quiz", periodo: hoje });
   let d = await desafioDoUsuario(desafio.id, id);
-  if (d.status === "concluido") return { resumo: `O quiz de hoje já estava feito (nota ${d.nota}).` };
+  if (d.status === "concluido") {
+    // as rodadas extras do dia (até 3, valem metade): como qualquer pessoa que quer mais pontos
+    try {
+      ({ desafio } = await obterOuCriarDesafio({ usuarioId: id, trilhaId: atual.id, tipo: "quiz", periodo: hoje, novaRodada: true }));
+      d = await desafioDoUsuario(desafio.id, id);
+    } catch { return { resumo: `Já fiz as rodadas de quiz de hoje (a última com nota ${d.nota}).` }; }
+    if (d.status === "concluido") return { resumo: `O quiz de hoje já estava feito (nota ${d.nota}).` };
+  }
   const chance = chanceDeAcerto({ diasNoCurso: atual.dias, errosRecentes: await errosRecentes(id) });
   const perguntas = d.conteudo?.perguntas || [];
   const escolhas = respostasDoQuiz(perguntas, chance, sortearPara("quiz"));
@@ -217,9 +225,16 @@ Monte o MEU diagrama: de 5 a 14 formas (terminal = início/fim, process = etapa,
 async function exercicio(id) {
   const atual = await trilhaAtual(id);
   if (!atual) return { resumo: "Sem curso, sem exercício hoje." };
-  const { desafio } = await obterOuCriarDesafio({ usuarioId: id, trilhaId: atual.id, tipo: "exercicio", periodo: hoje });
-  const d = await desafioDoUsuario(desafio.id, id);
-  if (d.status === "concluido") return { resumo: `O exercício de hoje já estava entregue (nota ${d.nota}).` };
+  let { desafio } = await obterOuCriarDesafio({ usuarioId: id, trilhaId: atual.id, tipo: "exercicio", periodo: hoje });
+  let d = await desafioDoUsuario(desafio.id, id);
+  if (d.status === "concluido") {
+    // as rodadas extras do dia (até 3, valem metade)
+    try {
+      ({ desafio } = await obterOuCriarDesafio({ usuarioId: id, trilhaId: atual.id, tipo: "exercicio", periodo: hoje, novaRodada: true }));
+      d = await desafioDoUsuario(desafio.id, id);
+    } catch { return { resumo: `Já entreguei as rodadas de exercício de hoje (a última com nota ${d.nota}).` }; }
+    if (d.status === "concluido") return { resumo: `O exercício de hoje já estava entregue (nota ${d.nota}).` };
+  }
   const chance = chanceDeAcerto({ diasNoCurso: atual.dias, errosRecentes: await errosRecentes(id) });
   const motor = motorDo(d.conteudo);
   let r;
@@ -476,19 +491,20 @@ const ACOES = { curso, mina, teoria, quiz, exercicio, projeto, reino, bolsa, cad
 const NOME_DA_ACAO = { curso: "escolher o curso", mina: "recolher a mina", teoria: "estudar a teoria", quiz: "o quiz", exercicio: "o exercício", projeto: "o projeto", reino: "o Reino", bolsa: "a Bolsa", caderno: "o caderno", acervo: "o Acervo", correio: "o correio", ilhas: "as ilhas", minigame: "o minigame do dia" };
 
 /**
- * Uma rodada: o que está na vez agora, até `maximo` ações (a próxima rodada pega o resto). `so`: uma ação só,
- * fora da agenda. Devolve o que ela fez, para o log de quem chamou.
+ * Uma rodada: o que está na vez agora, até `maximo` ações (a próxima rodada pega o resto); nada na vez, uma da
+ * reserva (proximasJogadas) — ela sempre faz algo. O relógio da nuvem chama com `maximo: 1`, a cada 30 minutos:
+ * uma ação por vez cabe no limite de chamadas do Worker gratuito. `so`: uma ação só, fora da agenda.
  */
-export async function rodadaDaLisa({ so = null, maximo = 3 } = {}) {
+export async function rodadaDaLisa({ so = null, maximo = 1 } = {}) {
   hoje = diaDe();
   const id = await idDaLisa();
   if (!id) throw new Error("a conta dela ainda não existe — rode o script com --criar-conta");
   const agora = new Date();
   const hora = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hourCycle: "h23" }).format(agora));
   const diaDaSemana = new Date(`${hoje}T12:00:00Z`).getUTCDay();
-  const fila = so ? [String(so)] : oQueFazerAgora({ hora, diaDaSemana, jogadas: await jogadasDeHoje(id), agora: agora.getTime() }).slice(0, maximo);
+  const jogadas = so ? {} : await jogadasDeHoje(id);
+  const fila = so ? [String(so)] : proximasJogadas({ naVez: oQueFazerAgora({ hora, diaDaSemana, jogadas, agora: agora.getTime() }), jogadas, maximo });
   const feitas = [];
-  if (!fila.length) { log("nada na vez agora"); return feitas; }
   for (const acao of fila) {
     if (!ACOES[acao]) { log("ação desconhecida:", acao); continue; }
     try {

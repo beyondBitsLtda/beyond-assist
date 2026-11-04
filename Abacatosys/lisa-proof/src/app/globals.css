@@ -65,8 +65,9 @@
   --pf-pilula: 9999px;
   --pf-sombra: 0 6px 24px rgba(15, 18, 13, 0.06);
   --pf-sombra-alta: 0 14px 40px rgba(15, 18, 13, 0.16);
-  --pf-fonte: "Nunito", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --pf-fonte-titulo: "Fredoka", "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* os emojis num estilo só, em todo aparelho (03/11/2026): o Noto Color Emoji vem logo depois da fonte do texto */
+  --pf-fonte: "Nunito", "Noto Color Emoji", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --pf-fonte-titulo: "Fredoka", "Noto Color Emoji", "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --pf-gap: 16px;
   --pf-nav-altura: 68px;
@@ -393,8 +394,11 @@ html.pf-teclado .pf-abas { display: none; }
 
 /* minmax(0, 1fr): a coluna nunca passa da tela (sem isso, um conteúdo largo num cartão esticava todos os
    cartões e a página inteira no celular — BEYOND-0008) */
-.pf-assuntos { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 1100px) { .pf-assuntos { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; } }
+.pf-assuntos { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1100px) { .pf-assuntos { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; } }
+/* os cartões de uma linha com a mesma altura, os botões sempre no pé (03/11/2026: "espaço não uniforme, desalinhado") */
+.pf-assunto { display: flex; flex-direction: column; }
+.pf-assunto > .pf-assunto__rodape { margin-top: auto; padding-top: 14px; }
 
 .pf-assunto__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .pf-assunto__titulo { margin: 0; font-size: 19px; font-weight: 900; line-height: 1.3; }
