@@ -1,0 +1,46 @@
+{
+  "id": "BEYOND-0021",
+  "titulo": "Animações lisa.beyond",
+  "descricao": "- tire a animação da lisa pondo as mãos na tela ficou muito bizarro,.",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-12-03",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T21:50:42.425Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T22:57:24.740Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T22:07:08.164Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou tirar do rosto da Lisa a animação das mãos encostando na tela.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T22:57:24.740Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito na Lisa 0.37.1-cloudflare-pages.1: saiu a brincadeira 'Presa no vidro' (o mímico com as duas mãos espalmadas na tela). Parada, ela continua batendo no vidro, jogando videogame e cantarolando.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T21:50:42.425Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T22:07:08.164Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T22:57:24.740Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

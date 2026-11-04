@@ -1,0 +1,46 @@
+{
+  "id": "BEYOND-0019",
+  "titulo": "Moedas - Proof.beyond.dev",
+  "descricao": "As moedas estão ficando com muito mais que duas casas decimais. Corrija",
+  "tipo": "bug",
+  "prioridade": "alta",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-03",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T21:41:14.220Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T22:57:24.602Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T22:07:08.079Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou achar onde as moedas aparecem com muitas casas decimais (a mina com bônus do humor do Neuro e o saldo são suspeitos) e arredondar tudo para no máximo 2 casas, no servidor e na tela.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T22:57:24.602Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Corrigido no Proof 1.0.0-cloudflare-pages.1. A causa era o bônus da mina do humor do Neuro (×1,05, ×1,1…): a produção por hora, a capacidade e o 'para coletar' com a mina cheia saíam com o lixo do ponto flutuante (ex.: 12,600000000000001). Agora a produção por hora fica com 2 casas, a capacidade e o que a mina junta são inteiros, e a tela formata tudo. Conferi o livro-caixa: nenhum lançamento guardado tem mais de 2 casas.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T21:41:14.220Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T22:07:08.079Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T22:57:24.602Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

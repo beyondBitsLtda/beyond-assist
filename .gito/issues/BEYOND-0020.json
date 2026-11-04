@@ -1,0 +1,46 @@
+{
+  "id": "BEYOND-0020",
+  "titulo": "Novas tropas, construções , defesas, exercicitos e expedições",
+  "descricao": "Acrescente muitas outras: Novas tropas, construções , defesas, exercicitos e expedições faça muitos mais tipos.\n\n- quero que faça uma expedição diferente , uma espedição de conquista de territorio inicialemnet será uma conquista de ilhas (tipos ilhas paradiziacas) o veiculo necessário será um novo veiculo um navio.\nnas ilhas vamos dominar os nativos e poder construir coisas la igual se faz no reino, porem com uma moeda muiti mais barata pois lá é um territorio desvalorizado de moeda. a ideia é qiue o gametenha temporadas de dominios como esss ae a primeira será as ilahs, cire tropas temativas para esss ilhas, alem de poder ocnstrur poremso extrair muito recurso , poderemos invadir terriotiro de outs lplayers com essas ilhas , e nãos4rá posisvel afzer paz geral com essas ilahs apenas individualmenet entre jogadores.\n\n- A lisa tamebm vai pdoer ter  a ilha dela e jogar etc. \n\n",
+  "tipo": "melhoria",
+  "prioridade": "alta",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-03",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T21:48:57.427Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T22:57:25.135Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T22:07:08.479Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou acrescentar tropas, construções, defesas e expedições novas, e a primeira temporada de domínio: as Ilhas, conquistadas com um navio novo, com moeda própria mais barata, produção de recursos, invasão entre jogadores e paz só individual. A Lisa também ganha a ilha dela.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T22:57:25.135Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito no Proof 1.0.0-cloudflare-pages.1. Reino: 4 tropas (Lanceiro, Cavaleiro, Grifo, Colosso de Pedra), 4 construções (Pomar, Lança-Chamas, Torre de Gelo, Catapulta) e 6 expedições novas. Temporada das Ilhas (menu Jogo → Ilhas): 12 ilhas; o Navio Pirata (garagem, 900 moedas, Torre 2+) leva a tripulação; ⭐⭐ conquista, ⭐ saqueia conchas; constrói-se com conchas (10 por moeda); as ilhas produzem conchas e pérolas (moedas); tripulação própria (Pirata, Arpoadora, Polvorista, Papagaio de Guerra); até 3 ilhas por jogador e 3 ataques por dia; outros jogadores podem tomar a sua ilha (a conquista dá 12 h de escudo); sem paz geral, só pacto de 7 dias entre dois jogadores. A Lisa tem a ilha dela (a rotina compra o navio, conquista e cuida dela). Migração db/030.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T21:48:57.427Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T22:07:08.479Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T22:57:25.135Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

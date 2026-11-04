@@ -4,13 +4,13 @@
   "descricao": "- quando eu aciono o modo assistente ela trava o navegador e so depois de segundos volat a funcionar.",
   "tipo": "bug",
   "prioridade": "media",
-  "status": "em-revisao",
+  "status": "concluida",
   "responsavel": "Brayan Rodrigues",
   "prazo": "2026-11-03",
   "versaoAlvo": "",
   "criadaEm": "2026-11-03T15:15:07.796Z",
   "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
-  "atualizadaEm": "2026-11-03T16:18:09.305Z",
+  "atualizadaEm": "2026-11-03T21:35:13.899Z",
   "comentarios": [
     {
       "quando": "2026-11-03T15:48:13.864Z",
@@ -41,6 +41,11 @@
       "quando": "2026-11-03T16:18:09.305Z",
       "autor": "Brayan Rodrigues (via Claude)",
       "mudanca": "status: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-11-03T21:35:13.899Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
     }
   ]
 }

@@ -4,13 +4,13 @@
   "descricao": "- Hoje eu acho que a função de mirofone dmeor amuito trasncrever e passar a lisa o comando tanto no modo chat como no modo conversa.\n- Hoje  o modo conversa nao funciona a lisa fica pensando e nao faz nads nunca responde de volta\n- a qualidade da trasncrição tem que melhroar ta muito ruim eu falo oi lisa  e ela enetnde oi Elisa por exemplo",
   "tipo": "bug",
   "prioridade": "alta",
-  "status": "em-revisao",
+  "status": "concluida",
   "responsavel": "Brayan Rodrigues",
   "prazo": "2026-11-05",
   "versaoAlvo": "",
   "criadaEm": "2026-11-03T15:10:48.806Z",
   "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
-  "atualizadaEm": "2026-11-03T16:18:09.204Z",
+  "atualizadaEm": "2026-11-03T21:34:47.696Z",
   "comentarios": [
     {
       "quando": "2026-11-03T15:32:13.485Z",
@@ -46,6 +46,11 @@
       "quando": "2026-11-03T16:18:09.204Z",
       "autor": "Brayan Rodrigues (via Claude)",
       "mudanca": "status: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-11-03T21:34:47.696Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
     }
   ]
 }

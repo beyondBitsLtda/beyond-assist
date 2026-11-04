@@ -4,13 +4,13 @@
   "descricao": "- Crie uma tela de gerenciamento de chamados, essa tela vai pegar os chamdos abertos  mostrar para o tecnico e o requsitanet o sstaus dos chamdos , o tecnico ve d etdoos e o requisitanet ve os seus inclusive co previsça de termino",
   "tipo": "melhoria",
   "prioridade": "media",
-  "status": "em-revisao",
+  "status": "concluida",
   "responsavel": "Brayan Rodrigues",
   "prazo": "2026-11-03",
   "versaoAlvo": "",
   "criadaEm": "2026-11-03T15:26:59.411Z",
   "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
-  "atualizadaEm": "2026-11-03T16:48:11.488Z",
+  "atualizadaEm": "2026-11-03T21:35:39.666Z",
   "comentarios": [
     {
       "quando": "2026-11-03T16:24:47.493Z",
@@ -41,6 +41,11 @@
       "quando": "2026-11-03T16:48:11.488Z",
       "autor": "Brayan Rodrigues (via Claude)",
       "mudanca": "status: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-11-03T21:35:39.666Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
     }
   ]
 }

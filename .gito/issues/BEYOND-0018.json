@@ -1,0 +1,46 @@
+{
+  "id": "BEYOND-0018",
+  "titulo": "proof,beyond.dev.br - Dano chefão da procratisnação",
+  "descricao": "- Precisamos aplicar um sitema de dano do chefão da procastinação, tipo roubar moedas , porem tipo uma quantidade que não seja punitiva demais ao jogador.",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-03",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T21:39:37.315Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T22:57:24.879Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T22:07:08.245Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou fazer o chefão vivo roubar moedas do reino, pouco por dia (com teto por chefão e nunca mais que uma parte pequena do saldo), e devolver tudo o que ele roubou quando a pessoa derrubar ele.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T22:57:24.879Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito no Proof 1.0.0-cloudflare-pages.1. De pé, o chefão rouba moedas a cada 24 horas (as primeiras 24 h são de graça): Lesma 8, Hidra 15, Titã 25 por dia, nunca mais que 5% do saldo e, somando tudo, nunca mais que a recompensa dele. Quando a pessoa derruba o chefão, recebe de volta tudo o que ele roubou, além da recompensa. A folha do chefão mostra quanto ele já levou e quando é o próximo roubo; o Neuro avisa quando ele rouba.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T21:39:37.315Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T22:07:08.245Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T22:57:24.879Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

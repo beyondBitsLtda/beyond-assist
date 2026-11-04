@@ -4,13 +4,13 @@
   "descricao": "- Hoje o modo de desenho da lisa no prcess map ta muito ruim , por exemplo, se eu não falo com ela qual é o projeto que ela deve escrever ela supoe um e isso ta errado eu devo dizer explicitamente para ela , s eeu \nquero que desnehe em um projetoe specifico, se eu nao faar ela tem que enetdner que é um desneho avulso e a partr desse desenho avulso eu decido se vou criar um projeto para ele ou salvar em ume xistente.",
   "tipo": "melhoria",
   "prioridade": "media",
-  "status": "em-revisao",
+  "status": "concluida",
   "responsavel": "Brayan Rodrigues",
   "prazo": "2026-11-03",
   "versaoAlvo": "",
   "criadaEm": "2026-11-03T15:17:56.060Z",
   "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
-  "atualizadaEm": "2026-11-03T16:48:11.388Z",
+  "atualizadaEm": "2026-11-03T21:35:18.364Z",
   "comentarios": [
     {
       "quando": "2026-11-03T16:18:25.691Z",
@@ -41,6 +41,11 @@
       "quando": "2026-11-03T16:48:11.388Z",
       "autor": "Brayan Rodrigues (via Claude)",
       "mudanca": "status: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-11-03T21:35:18.364Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
     }
   ]
 }

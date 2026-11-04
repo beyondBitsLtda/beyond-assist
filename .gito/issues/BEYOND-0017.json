@@ -4,13 +4,13 @@
   "descricao": "- Os pontos de exercico diario dvem ser triplicados ",
   "tipo": "bug",
   "prioridade": "media",
-  "status": "em-revisao",
+  "status": "concluida",
   "responsavel": "Brayan Rodrigues",
   "prazo": "2026-11-12",
   "versaoAlvo": "",
   "criadaEm": "2026-11-03T15:31:30.519Z",
   "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
-  "atualizadaEm": "2026-11-03T16:18:09.415Z",
+  "atualizadaEm": "2026-11-03T21:35:08.546Z",
   "comentarios": [
     {
       "quando": "2026-11-03T16:03:33.820Z",
@@ -41,6 +41,11 @@
       "quando": "2026-11-03T16:18:09.415Z",
       "autor": "Brayan Rodrigues (via Claude)",
       "mudanca": "status: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-11-03T21:35:08.546Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
     }
   ]
 }

@@ -1,0 +1,46 @@
+{
+  "id": "BEYOND-0023",
+  "titulo": "proof.beyond.dev - Módulo Arena Lúdica de Programação",
+  "descricao": "# Especificação de Requisitos: Módulo Arena Lúdica de Programação\n\n## 1. Visão Geral\nImplementação do módulo **Arena Lúdica de Programação** no Lisa Proof, substituindo exercícios estáticos e quizzes convencionais por dinâmicas interativas e gamificadas para o aprendizado e prática de desenvolvimento de software.\n\n---\n\n## 2. Funcionalidades e Mini-Games\n\n### 2.1. Dungeon Crawler de Debugging\n* **Conceito:** Exploração de masmorra 2D em pixel art onde obstáculos, portas e inimigos representam bugs de código.\n* **Mecânica de Jogo:**\n  * O jogador interage com os desafios pelo mapa para abrir o mini terminal de depuração.\n  * O terminal apresenta o trecho de código com falha (sintaxe, lógica ou performance).\n  * A correção correta do bug desarma armadilhas, derrota inimigos ou libera a passagem para o próximo estágio.\n* **Objetivo Pedagógico:** Desenvolver capacidade de leitura de código, rastreamento de erros e depuração rápida.\n\n### 2.2. Tamagotchi de Código (Mascote Programável)\n* **Conceito:** Um mascote virtual interativo cujo comportamento depende diretamente dos scripts desenvolvidos pelo usuário.\n* **Mecânica de Jogo:**\n  * O usuário escreve funções curtas para controlar a autonomia do mascote (movimentação, tomada de decisão, verificação de condições).\n  * O simulador executa o script em tempo real.\n  * Respostas incorretas ou bugs de lógica fazem o mascote executar ações erradas ou colidir com elementos do mapa.\n* **Objetivo Pedagógico:** Fixar conceitos de lógica de programação, estruturas condicionais e laços de repetição.\n\n### 2.3. Puzzles de Parsons (Ordenação de Lógica)\n* **Conceito:** Desafio de estruturação e sequência lógica de algoritmos.\n* **Mecânica de Jogo:**\n  * A tela apresenta blocos de código embaralhados.\n  * O usuário deve arrastar e organizar os blocos na ordem exata e com a indentação correta para montar o algoritmo funcional.\n* **Objetivo Pedagógico:** Treinar a sintaxe e a estruturação lógica sem exigir digitação do zero.\n\n---\n\n## 3. Requisitos Técnicos e de Interface\n\n* **Mini Terminal Embutido:** Editor leve com realce de sintaxe e execução imediata de scripts.\n* **Feedback em Tempo Real:** Validação de entradas com mensagens explicativas de erro tratadas pela IA.\n* **Persistência de Progresso:** Integração com a conta do usuário para salvar fases concluídas, taxa de acertos e tempo de resolução.",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-03",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T22:05:09.309Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T22:57:25.256Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T22:07:08.562Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou criar a Arena Lúdica de Programação com os três jogos (masmorra de depuração, mascote programável e quebra-cabeças de Parsons), com terminal embutido, explicação da Lisa nos erros e progresso salvo na conta.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T22:57:25.256Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito no Proof 1.0.0-cloudflare-pages.1 (menu Estudo → Arena). Masmorra da Depuração: 4 andares em pixel art com 8 bugs (sintaxe, lógica e desempenho) em portas, armadilhas e inimigos; anda com as setas; o terminal abre com o editor e os testes rodando na hora. Mascote Programável: 5 níveis; a função decidir(ver) controla o mascote numa grade, com animação passo a passo. Parsons: 8 quebra-cabeças em Python e JavaScript, arrastando ou pelos botões (ordem e recuo). A Lisa explica os erros sem dar a resposta. O progresso (tentativas, acertos, melhor tempo) fica salvo e cada fase nova rende moedas; o servidor confere antes de pagar (o Parsons no próprio servidor; a masmorra e o mascote no Node do Wandbox, nunca no nosso servidor).",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T22:05:09.309Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T22:07:08.562Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T22:57:25.256Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

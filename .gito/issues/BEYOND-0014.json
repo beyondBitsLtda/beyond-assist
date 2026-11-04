@@ -4,13 +4,13 @@
   "descricao": "- Quero que a Lisa jogue quero que ela escolha um curso de tecnologia todo mes e finalize ele , quero que ela faça os quizzes exerciciso semanais  diarios d eentrega\n- quero que ela jogue o modo reino, melhroe seu reino, compre açoes , ataque outrso jogadores etc.\n- para isso cire uam rotian paar lisa jogar imitando um jogador fazendo coisa qu e joagdores fazem\n- o reino dlea deve ser visivel paar todos verem, como tuido que ela faz curss atividades o raio x dela ,ofensiva moedas qu ela vomprou etc\n\n- ela nao deve subr arquivos no modo acervo, as ela toda seman deve alimentar ali com videos sobre tecnologia, links de artigos etc.\n=- ela deve criar seeus cardernos de nota etc.\n- ela dve imitar e faezr o progresos nos cursos como alguem d everdade ous eja melhroando as acertividades e aprendnedo com o processo.",
   "tipo": "melhoria",
   "prioridade": "media",
-  "status": "em-revisao",
+  "status": "concluida",
   "responsavel": "Brayan Rodrigues",
   "prazo": "2026-11-13",
   "versaoAlvo": "",
   "criadaEm": "2026-11-03T15:23:08.373Z",
   "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
-  "atualizadaEm": "2026-11-03T18:19:04.249Z",
+  "atualizadaEm": "2026-11-03T21:35:02.555Z",
   "comentarios": [
     {
       "quando": "2026-11-03T16:48:11.572Z",
@@ -47,6 +47,11 @@
       "quando": "2026-11-03T17:23:37.464Z",
       "autor": "Brayan Rodrigues (via Claude)",
       "mudanca": "status: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-11-03T21:35:02.555Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
     }
   ]
 }

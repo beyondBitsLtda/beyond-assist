@@ -1,0 +1,46 @@
+{
+  "id": "BEYOND-0022",
+  "titulo": "proof.beyond.dev -  Modo dica nos exercicios",
+  "descricao": "- Os exercicios deve ter uma dica que mosyra uam palicação de tdoos os conceitos necessários em tdoos os exercicios inclusive os d eprojetos sabe a lisa fazer uma aplicação de código de exemplo. ",
+  "tipo": "melhoria",
+  "prioridade": "media",
+  "status": "em-revisao",
+  "responsavel": "Brayan Rodrigues",
+  "prazo": "2026-11-03",
+  "versaoAlvo": "",
+  "criadaEm": "2026-11-03T22:00:44.764Z",
+  "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+  "atualizadaEm": "2026-11-03T22:57:24.998Z",
+  "comentarios": [
+    {
+      "quando": "2026-11-03T22:07:08.362Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Vou pôr um botão de dica nos exercícios e nos projetos: a Lisa escreve um exemplo de código que aplica os conceitos necessários (sem entregar a resposta), guardado para não gerar de novo.",
+      "evidencias": []
+    },
+    {
+      "quando": "2026-11-03T22:57:24.998Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "texto": "Feito no Proof 1.0.0-cloudflare-pages.1: o 'Modo dica: o exemplo da Lisa' aparece em todo exercício (menos os treinos de música, o ditado e a conversa) e nos projetos. A Lisa lista os conceitos de que o desafio precisa e escreve uma aplicação de exemplo, num cenário diferente, usando todos eles (fora da programação, um exemplo resolvido em passos), mais como funciona e como levar a ideia para o desafio — sem resolver o desafio. Gera uma vez e fica guardado.",
+      "evidencias": []
+    }
+  ],
+  "evidencias": [],
+  "historico": [
+    {
+      "quando": "2026-11-03T22:00:44.764Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "issue criada"
+    },
+    {
+      "quando": "2026-11-03T22:07:08.362Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: aberta → em-andamento"
+    },
+    {
+      "quando": "2026-11-03T22:57:24.998Z",
+      "autor": "Brayan Rodrigues (via Claude)",
+      "mudanca": "status: em-andamento → em-revisao"
+    }
+  ]
+}

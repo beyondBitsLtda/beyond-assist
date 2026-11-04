@@ -4,13 +4,13 @@
   "descricao": "- cada jogador vai ganhar um mensageito e uma caixa de correio\n- acda jogador vai poder mandar recados uns para os outrso , esse scomentarios serão avaliadso pelo jogador que recebe e em aso de o joagdorque rece achar util ambos ganha, moedas\n- vai ser possivel mandar perguntas dos quizzes via correio, vai funcionar assim: eu comecei um quizz diario eu posos mandar ate duas perguntas por coreio para jogadres senod asism eu poss finalzar o quiz respndei apenas 3 perguntas (porem ganho moedas reduzidas) inclusive eu poso mandar as pergunts que eu errei sendo asism que posos finalizaro quizzbaer aofensiva e pontuar porme mandando para os outrso joagdores,\n- A lisa vai poder faezr isso tamebm nos quiszes dela, porem os jogadres nao vao pdoer mandar pergunats a ela apenas ela a eles, alemd e pergunats a lis apoder amandar recadinhos tamebm (e aqui ea ev mandar o rcaod com base no mundo e nas estatscas d ecada joagdor como contexto.",
   "tipo": "melhoria",
   "prioridade": "media",
-  "status": "em-revisao",
+  "status": "concluida",
   "responsavel": "Brayan Rodrigues",
   "prazo": "2026-11-19",
   "versaoAlvo": "",
   "criadaEm": "2026-11-03T15:30:37.399Z",
   "criadaPor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
-  "atualizadaEm": "2026-11-03T18:19:04.400Z",
+  "atualizadaEm": "2026-11-03T21:34:42.361Z",
   "comentarios": [
     {
       "quando": "2026-11-03T17:23:37.553Z",
@@ -47,6 +47,11 @@
       "quando": "2026-11-03T17:40:09.600Z",
       "autor": "Brayan Rodrigues (via Claude)",
       "mudanca": "status: em-andamento → em-revisao"
+    },
+    {
+      "quando": "2026-11-03T21:34:42.361Z",
+      "autor": "Brayan Rodrigues <brayan.rodrigues@delp.com.br>",
+      "mudanca": "situação: em-revisao → concluida"
     }
   ]
 }
