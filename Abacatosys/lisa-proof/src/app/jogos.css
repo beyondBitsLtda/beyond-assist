@@ -112,6 +112,9 @@
 .ar-jogos { margin-bottom: 8px; flex-wrap: wrap; }
 .ar-jogo__descricao { margin-bottom: 12px; }
 .ar-fases { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+/* a linguagem dos blocos: as do plano de estudo da pessoa (04/11/2026) */
+.ar-linguagens { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.ar-linguagens .pf-campo__rotulo { margin-right: 2px; }
 .ar-fase { border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); border-radius: 9999px; padding: 5px 12px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .ar-fase[aria-selected="true"] { border-color: var(--pf-verde); box-shadow: 0 0 0 2px rgba(139, 209, 26, 0.25); }
 .ar-fase:disabled { opacity: 0.55; cursor: not-allowed; }

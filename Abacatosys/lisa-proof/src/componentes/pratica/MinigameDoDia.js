@@ -61,25 +61,35 @@ export default function MinigameDoDia() {
           <strong>Minigame do dia{doDia ? ` · ${doDia.emoji} ${doDia.nome}` : ""}</strong>
           <small>
             {!dados ? (erro || "Carregando…")
+              : !dados.plano?.temProgramacao ? "Os minigames são de programação: eles entram quando o seu plano de estudo tiver uma trilha de programação"
               : dados.hoje.feito ? `Feito hoje ✅ +${dados.hoje.pontos} pts · dá para continuar jogando (cada fase nova rende moedas)`
               : `Vença uma fase hoje: +${dados.pontosDoDia} pts (e moedas para o reino em cada fase nova)`}
           </small>
         </span>
         <span className="pratica__acao">{aberto ? "Fechar" : dados?.hoje.feito ? "Jogar mais" : "Jogar"}</span>
       </button>
-      {aberto && dados && (
+      {aberto && dados && !dados.plano?.temProgramacao && (
+        <div className="mg-dia__corpo">
+          <p className="pf-aviso">🕹️ Os minigames do dia (a masmorra, o mascote e os blocos) são de programação, e o seu plano de estudo não tem uma trilha de programação agora. A prática do dia, logo abaixo, já vem do seu plano; quando você montar uma trilha de programação, os minigames entram nela.</p>
+        </div>
+      )}
+      {aberto && dados && dados.plano?.temProgramacao !== false && (
         <div className="mg-dia__corpo">
           <div className="agenda__modos ar-jogos" role="tablist" aria-label="Minigames">
             {dados.jogos.map((j) => (
               <button key={j.id} type="button" role="tab" aria-selected={jogo === j.id} className="agenda__modo" onClick={() => setJogo(j.id)}>
-                {j.emoji} {j.nome}{j.id === dados.doDia ? " ⭐" : ""} <span className="co-abas__n">{j.concluidas}/{j.fases}</span>
+                {j.emoji} {j.nome}{j.id === dados.doDia ? " ⭐" : ""}{j.foraDoPlano ? " · em JavaScript" : ""} <span className="co-abas__n">{j.concluidas}/{j.fases}</span>
               </button>
             ))}
           </div>
-          <p className="pf-estat__nota ar-jogo__descricao">{dados.jogos.find((j) => j.id === jogo)?.descricao} {jogo === dados.doDia ? "⭐ É o minigame em destaque hoje — mas qualquer um vale os pontos do dia." : ""}</p>
+          <p className="pf-estat__nota ar-jogo__descricao">
+            {dados.jogos.find((j) => j.id === jogo)?.descricao} {jogo === dados.doDia ? "⭐ É o minigame em destaque hoje — mas qualquer um vale os pontos do dia." : ""}
+            {jogo === "parsons" && dados.plano?.linguagens?.length ? ` Os blocos vêm na linguagem do seu plano de estudo (${dados.plano.linguagens.map((l) => l.nome).join(", ")}).` : ""}
+            {dados.jogos.find((j) => j.id === jogo)?.foraDoPlano ? " Este jogo é em JavaScript, que não está no seu plano: fica como extra." : ""}
+          </p>
           {jogo === "masmorra" && <Masmorra andares={dados.masmorra} aoConferir={aoConferir} aoExplicar={aoExplicar} />}
           {jogo === "mascote" && <Mascote niveis={dados.mascote} aoConferir={aoConferir} aoExplicar={aoExplicar} />}
-          {jogo === "parsons" && <Parsons puzzles={dados.parsons} aoConferir={aoConferir} />}
+          {jogo === "parsons" && <Parsons puzzles={dados.parsons} aoConferir={aoConferir} linguagens={dados.plano?.linguagens || []} />}
         </div>
       )}
       {Aviso}

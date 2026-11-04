@@ -41,8 +41,10 @@ export const CONQUISTAS = [
   c("Prática", "quizzes", "quiz-30", "Quizzeiro", "Terminar 30 quizzes", "❓", 30, 150),
   c("Prática", "quizzesPerfeitos", "quiz-perfeito-1", "Gabaritou!", "Acertar todas as perguntas de um quiz", "💯", 1, 30),
   c("Prática", "quizzesPerfeitos", "quiz-perfeito-10", "Mente afiada", "Gabaritar 10 quizzes", "🧠", 10, 150),
-  c("Prática", "exercicios", "exercicio-1", "Primeiro código aprovado", "Ser aprovado num exercício", "⌨️", 1, 30),
-  c("Prática", "exercicios", "exercicio-10", "Código de todo dia", "Ser aprovado em 10 exercícios", "💻", 10, 150),
+  // (04/11/2026, chamado: "Primeiro código aprovado" num curso de alemão) o exercício do dia é de todo curso —
+  // código, idiomas, música, matemática —, então o nome e o emoji não falam de código; os ids ficam
+  c("Prática", "exercicios", "exercicio-1", "Primeiro exercício aprovado", "Ser aprovado num exercício do dia", "✅", 1, 30),
+  c("Prática", "exercicios", "exercicio-10", "Exercício de todo dia", "Ser aprovado em 10 exercícios do dia", "📝", 10, 150),
 
   c("Projetos", "semanais", "semanal-1", "Primeiro projeto", "Ser aprovado num projeto da semana", "🎁", 1, 100),
   c("Projetos", "semanais", "semanal-4", "Quatro semanas construindo", "Ser aprovado em 4 projetos da semana", "🧰", 4, 300),

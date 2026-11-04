@@ -7,12 +7,26 @@ import { useRef, useState } from "react";
 import { comemorar } from "@/componentes/Neuro.js";
 import { RECUO_MAXIMO } from "@/dominio/arena.js";
 
-export default function Parsons({ puzzles, aoConferir }) {
+const NOMES = { python: "Python", javascript: "JavaScript", c: "C", php: "PHP", java: "Java" };
+
+export default function Parsons({ puzzles, aoConferir, linguagens = [] }) {
   const primeiro = puzzles.find((p) => p.liberada && !p.concluida) || puzzles.find((p) => p.liberada) || puzzles[0];
   const [puzzleId, setPuzzleId] = useState(primeiro.id);
-  const puzzle = puzzles.find((p) => p.id === puzzleId);
+  // a linguagem do plano de estudo (com mais de uma trilha de programação, dá para trocar)
+  const [linguagem, setLinguagem] = useState(linguagens[0]?.chave || primeiro.linguagem);
+  const base = puzzles.find((p) => p.id === puzzleId);
+  const versao = base.versoes?.[linguagem] || { linguagem: base.linguagem, blocos: base.blocos, nota: "" };
+  const puzzle = { ...base, ...versao };
   return (
     <div className="ar-parsons">
+      {linguagens.length > 1 && (
+        <div className="ar-linguagens" role="radiogroup" aria-label="Linguagem dos blocos (as do seu plano de estudo)">
+          <span className="pf-campo__rotulo">Do seu plano:</span>
+          {linguagens.map((l) => (
+            <button key={l.chave} type="button" role="radio" aria-checked={linguagem === l.chave} className={`bc-chip${linguagem === l.chave ? " bc-chip--ativo" : ""}`} onClick={() => setLinguagem(l.chave)}>{l.nome}</button>
+          ))}
+        </div>
+      )}
       <div className="ar-fases" role="tablist" aria-label="Quebra-cabeças">
         {puzzles.map((p, i) => (
           <button key={p.id} type="button" role="tab" aria-selected={p.id === puzzleId} className="ar-fase" disabled={!p.liberada} onClick={() => setPuzzleId(p.id)}>
@@ -20,7 +34,7 @@ export default function Parsons({ puzzles, aoConferir }) {
           </button>
         ))}
       </div>
-      <Quebra key={puzzle.id} puzzle={puzzle} aoConferir={aoConferir} />
+      <Quebra key={`${puzzle.id}:${puzzle.linguagem}`} puzzle={puzzle} aoConferir={aoConferir} />
     </div>
   );
 }
@@ -44,7 +58,7 @@ function Quebra({ puzzle, aoConferir }) {
 
   async function conferir() {
     setConferindo(true);
-    const r = await aoConferir({ jogo: "parsons", fase: puzzle.id, resposta: blocos.map((b) => ({ id: b.id, recuo: b.recuo })), tempoMs: Date.now() - inicio.current });
+    const r = await aoConferir({ jogo: "parsons", fase: puzzle.id, linguagem: puzzle.linguagem, resposta: blocos.map((b) => ({ id: b.id, recuo: b.recuo })), tempoMs: Date.now() - inicio.current });
     setConferindo(false);
     setResultado(r);
     if (r?.ok) comemorar(`🧩 Montado!${r.recompensa ? ` +🪙 ${r.recompensa}` : ""}`);
@@ -52,7 +66,7 @@ function Quebra({ puzzle, aoConferir }) {
 
   return (
     <div className="ar-quebra">
-      <p className="pf-estat__nota"><strong>{puzzle.titulo}</strong> ({puzzle.linguagem === "python" ? "Python" : "JavaScript"}) — {puzzle.enunciado}{puzzle.concluida ? " · ✅ já montado" : ""}</p>
+      <p className="pf-estat__nota"><strong>{puzzle.titulo}</strong> ({NOMES[puzzle.linguagem] || puzzle.linguagem}) — {puzzle.enunciado}{puzzle.nota ? ` ${puzzle.nota}` : ""}{puzzle.concluida ? " · ✅ já montado" : ""}</p>
       <ol className="ar-blocos" aria-label="Os blocos, na ordem montada">
         {blocos.map((b, i) => (
           <li key={b.id} className="ar-bloco" draggable

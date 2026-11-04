@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.5.0",
+  "versao": "1.5.1",
   "atualizadoEm": "2026-11-04",
   "compilacao": {
-    "numero": 106,
+    "numero": 107,
     "data": "2026-11-04",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.5.1",
+      "data": "2026-11-04",
+      "branch": "main",
+      "tipo": "correcao",
+      "resumo": "Os dois chamados abertos: a conquista do exercício não fala mais de código (vale para qualquer curso), e o minigame do dia segue o plano de estudo da pessoa.",
+      "itens": [
+        "Chamado \"Quando finalizei um exercício em alemão… falou de código\": as conquistas do exercício do dia viraram \"Primeiro exercício aprovado\" (✅) e \"Exercício de todo dia\" (📝). Elas valem para todo curso: programação, idiomas, música e matemática. Quem já tinha ganho continua com elas.",
+        "Chamado \"Isso precisa trazer de acordo com seu plano de estudo\": os 8 quebra-cabeças de Parsons do minigame do dia existem agora em Python, JavaScript, C, PHP e Java. A tela mostra os da linguagem das trilhas de programação da pessoa, com botões para trocar quando o plano tem mais de uma.",
+        "Sem JavaScript no plano, o destaque do dia é o Parsons, na linguagem do plano, e a masmorra e o mascote (em JavaScript) ficam marcados como extras. Sem nenhuma trilha de programação, o minigame avisa que é de programação, em vez de mostrar código fora do plano."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.5.0",
       "data": "2026-11-04",

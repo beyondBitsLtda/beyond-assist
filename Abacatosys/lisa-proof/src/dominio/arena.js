@@ -12,6 +12,8 @@
 // Parsons aqui mesmo; a masmorra e o mascote rodando o arnês no Wandbox (Node), nunca no nosso servidor.
 // Testado em scripts/dominio-check.mjs (inclusive: todo bug quebra e toda solução de referência passa).
 
+import { ehProgramacao, perfilPeloTema } from "./perfis.js";
+
 export const JOGOS_DA_ARENA = {
   masmorra: { nome: "Masmorra da Depuração", emoji: "🗝️", recompensa: 30, descricao: "Portas, armadilhas e inimigos são bugs. Conserte o código para abrir caminho até a escada." },
   mascote: { nome: "Mascote Programável", emoji: "🐣", recompensa: 25, descricao: "Escreva a função que decide o que o mascote faz: ele precisa comer tudo sem bater na parede nem cair na água." },
@@ -27,8 +29,16 @@ export const ORDEM_DOS_JOGOS = ["masmorra", "mascote", "parsons"];
 export const PONTOS_DO_MINIGAME = 30;
 export const chaveDoMinigame = (dia) => `arena:${dia}`;
 const DESTAQUE_DA_SEMANA = ["parsons", "masmorra", "mascote", "parsons", "masmorra", "mascote", "parsons"]; // domingo a sábado
-/** O jogo em destaque no dia ("AAAA-MM-DD"). */
-export const jogoDoDia = (dia) => DESTAQUE_DA_SEMANA[new Date(`${dia}T12:00:00Z`).getUTCDay()];
+/**
+ * O jogo em destaque no dia ("AAAA-MM-DD"). A masmorra e o mascote são em JavaScript: se o plano de estudo
+ * (`linguagens`, as das trilhas de programação) não tem JavaScript, o destaque é sempre o Parsons, que vem na
+ * linguagem do plano.
+ */
+export const jogoDoDia = (dia, linguagens = null) => (Array.isArray(linguagens) && !linguagens.includes("javascript")
+  ? "parsons"
+  : DESTAQUE_DA_SEMANA[new Date(`${dia}T12:00:00Z`).getUTCDay()]);
+/** A linguagem de cada jogo (o Parsons: a do plano). */
+export const LINGUAGEM_DOS_JOGOS = { masmorra: "javascript", mascote: "javascript", parsons: null };
 /** O tempo de cada teste: passou disso, o código é lento demais (os bugs de desempenho). */
 export const LIMITE_DO_TESTE_MS = 1500;
 
@@ -278,26 +288,125 @@ export const SOLUCAO_DO_MASCOTE = `function decidir(ver) {
 
 // ---------------------------------------------------------------- os quebra-cabeças de Parsons
 
-/** Cada linha com o recuo dela (em níveis). A ordem aqui é a resposta. */
-export const PUZZLES_DE_PARSONS = [
-  { id: "soma-ate-n", linguagem: "python", titulo: "Somar de 1 até n", enunciado: "Monte a função que soma todos os números de 1 até n.",
-    linhas: [["def soma(n):", 0], ["total = 0", 1], ["for i in range(1, n + 1):", 1], ["total += i", 2], ["return total", 1]] },
-  { id: "contar-vogais", linguagem: "javascript", titulo: "Contar vogais", enunciado: "Monte a função que conta as vogais de um texto.",
-    linhas: [["function contarVogais(texto) {", 0], ["let n = 0;", 1], ["for (const letra of texto.toLowerCase()) {", 1], ["if (\"aeiou\".includes(letra)) {", 2], ["n++;", 3], ["}", 2], ["}", 1], ["return n;", 1], ["}", 0]] },
-  { id: "maior-da-lista", linguagem: "python", titulo: "O maior da lista", enunciado: "Monte a função que acha o maior número de uma lista.",
-    linhas: [["def maior(lista):", 0], ["m = lista[0]", 1], ["for x in lista:", 1], ["if x > m:", 2], ["m = x", 3], ["return m", 1]] },
-  { id: "fizzbuzz", linguagem: "javascript", titulo: "FizzBuzz", enunciado: "Múltiplo de 15 é \"FizzBuzz\", de 3 é \"Fizz\", de 5 é \"Buzz\"; o resto é o próprio número. A ordem dos testes importa!",
-    linhas: [["function fizzbuzz(n) {", 0], ["if (n % 15 === 0) {", 1], ["return \"FizzBuzz\";", 2], ["} else if (n % 3 === 0) {", 1], ["return \"Fizz\";", 2], ["} else if (n % 5 === 0) {", 1], ["return \"Buzz\";", 2], ["}", 1], ["return String(n);", 1], ["}", 0]] },
-  { id: "fatorial", linguagem: "python", titulo: "Fatorial recursivo", enunciado: "Monte o fatorial com recursão: o caso base primeiro.",
-    linhas: [["def fatorial(n):", 0], ["if n <= 1:", 1], ["return 1", 2], ["return n * fatorial(n - 1)", 1]] },
-  { id: "inverter-texto", linguagem: "javascript", titulo: "Inverter um texto", enunciado: "Monte a função que devolve o texto de trás para frente, letra por letra.",
-    linhas: [["function inverter(texto) {", 0], ["let resultado = \"\";", 1], ["for (let i = texto.length - 1; i >= 0; i--) {", 1], ["resultado += texto[i];", 2], ["}", 1], ["return resultado;", 1], ["}", 0]] },
-  { id: "busca-binaria", linguagem: "python", titulo: "Busca binária", enunciado: "Monte a busca binária numa lista ordenada: devolve a posição do alvo ou -1.",
-    linhas: [["def busca(lista, alvo):", 0], ["ini, fim = 0, len(lista) - 1", 1], ["while ini <= fim:", 1], ["meio = (ini + fim) // 2", 2], ["if lista[meio] == alvo:", 2], ["return meio", 3], ["elif lista[meio] < alvo:", 2], ["ini = meio + 1", 3], ["else:", 2], ["fim = meio - 1", 3], ["return -1", 1]] },
-  { id: "filtrar-pares", linguagem: "javascript", titulo: "Filtrar os pares", enunciado: "Monte a função que devolve só os números pares da lista, com filter.",
-    linhas: [["function pares(lista) {", 0], ["const resultado = lista.filter((n) => {", 1], ["return n % 2 === 0;", 2], ["});", 1], ["return resultado;", 1], ["}", 0]] },
+/**
+ * Os quebra-cabeças de Parsons (04/11/2026, chamado: "isso precisa trazer de acordo com seu plano de estudo"): cada
+ * um em cinco linguagens, e a tela mostra os da linguagem das trilhas de programação da pessoa. Cada versão é a
+ * lista das linhas com o recuo (em níveis), na ordem da resposta. `linguagem` e `linhas`: a versão de sempre (a
+ * primeira de cada um), para quem não diz a linguagem. `notas`: um lembrete da linguagem, quando ajuda.
+ */
+export const LINGUAGENS_DO_PARSONS = { python: "Python", javascript: "JavaScript", c: "C", php: "PHP", java: "Java" };
+export const ORDEM_DAS_LINGUAGENS_DO_PARSONS = ["python", "javascript", "c", "php", "java"];
+
+const PUZZLES_BASE = [
+  { id: "soma-ate-n", padrao: "python", titulo: "Somar de 1 até n", enunciado: "Monte a função que soma todos os números de 1 até n.",
+    versoes: {
+      python: [["def soma(n):", 0], ["total = 0", 1], ["for i in range(1, n + 1):", 1], ["total += i", 2], ["return total", 1]],
+      javascript: [["function soma(n) {", 0], ["let total = 0;", 1], ["for (let i = 1; i <= n; i++) {", 1], ["total += i;", 2], ["}", 1], ["return total;", 1], ["}", 0]],
+      c: [["int soma(int n) {", 0], ["int total = 0;", 1], ["for (int i = 1; i <= n; i++) {", 1], ["total += i;", 2], ["}", 1], ["return total;", 1], ["}", 0]],
+      php: [["function soma($n) {", 0], ["$total = 0;", 1], ["for ($i = 1; $i <= $n; $i++) {", 1], ["$total += $i;", 2], ["}", 1], ["return $total;", 1], ["}", 0]],
+      java: [["static int soma(int n) {", 0], ["int total = 0;", 1], ["for (int i = 1; i <= n; i++) {", 1], ["total += i;", 2], ["}", 1], ["return total;", 1], ["}", 0]],
+    } },
+  { id: "contar-vogais", padrao: "javascript", titulo: "Contar vogais", enunciado: "Monte a função que conta as vogais de um texto.",
+    versoes: {
+      javascript: [["function contarVogais(texto) {", 0], ["let n = 0;", 1], ["for (const letra of texto.toLowerCase()) {", 1], ["if (\"aeiou\".includes(letra)) {", 2], ["n++;", 3], ["}", 2], ["}", 1], ["return n;", 1], ["}", 0]],
+      python: [["def contar_vogais(texto):", 0], ["n = 0", 1], ["for letra in texto.lower():", 1], ["if letra in \"aeiou\":", 2], ["n += 1", 3], ["return n", 1]],
+      c: [["int contarVogais(const char *texto) {", 0], ["int n = 0;", 1], ["for (int i = 0; texto[i] != '\\0'; i++) {", 1], ["if (strchr(\"aeiou\", tolower(texto[i]))) {", 2], ["n++;", 3], ["}", 2], ["}", 1], ["return n;", 1], ["}", 0]],
+      php: [["function contarVogais($texto) {", 0], ["$n = 0;", 1], ["foreach (str_split(strtolower($texto)) as $letra) {", 1], ["if (str_contains(\"aeiou\", $letra)) {", 2], ["$n++;", 3], ["}", 2], ["}", 1], ["return $n;", 1], ["}", 0]],
+      java: [["static int contarVogais(String texto) {", 0], ["int n = 0;", 1], ["for (char letra : texto.toLowerCase().toCharArray()) {", 1], ["if (\"aeiou\".indexOf(letra) >= 0) {", 2], ["n++;", 3], ["}", 2], ["}", 1], ["return n;", 1], ["}", 0]],
+    } },
+  { id: "maior-da-lista", padrao: "python", titulo: "O maior da lista", enunciado: "Monte a função que acha o maior número de uma lista.",
+    notas: { c: "Em C, o vetor vem junto do tamanho (n)." },
+    versoes: {
+      python: [["def maior(lista):", 0], ["m = lista[0]", 1], ["for x in lista:", 1], ["if x > m:", 2], ["m = x", 3], ["return m", 1]],
+      javascript: [["function maior(lista) {", 0], ["let m = lista[0];", 1], ["for (const x of lista) {", 1], ["if (x > m) {", 2], ["m = x;", 3], ["}", 2], ["}", 1], ["return m;", 1], ["}", 0]],
+      c: [["int maior(int lista[], int n) {", 0], ["int m = lista[0];", 1], ["for (int i = 1; i < n; i++) {", 1], ["if (lista[i] > m) {", 2], ["m = lista[i];", 3], ["}", 2], ["}", 1], ["return m;", 1], ["}", 0]],
+      php: [["function maior($lista) {", 0], ["$m = $lista[0];", 1], ["foreach ($lista as $x) {", 1], ["if ($x > $m) {", 2], ["$m = $x;", 3], ["}", 2], ["}", 1], ["return $m;", 1], ["}", 0]],
+      java: [["static int maior(int[] lista) {", 0], ["int m = lista[0];", 1], ["for (int x : lista) {", 1], ["if (x > m) {", 2], ["m = x;", 3], ["}", 2], ["}", 1], ["return m;", 1], ["}", 0]],
+    } },
+  { id: "fizzbuzz", padrao: "javascript", titulo: "FizzBuzz", enunciado: "Múltiplo de 15 é \"FizzBuzz\", de 3 é \"Fizz\", de 5 é \"Buzz\"; o resto é o próprio número. A ordem dos testes importa!",
+    notas: { c: "Em C, o número vira texto no buffer que a função recebe." },
+    versoes: {
+      javascript: [["function fizzbuzz(n) {", 0], ["if (n % 15 === 0) {", 1], ["return \"FizzBuzz\";", 2], ["} else if (n % 3 === 0) {", 1], ["return \"Fizz\";", 2], ["} else if (n % 5 === 0) {", 1], ["return \"Buzz\";", 2], ["}", 1], ["return String(n);", 1], ["}", 0]],
+      python: [["def fizzbuzz(n):", 0], ["if n % 15 == 0:", 1], ["return \"FizzBuzz\"", 2], ["elif n % 3 == 0:", 1], ["return \"Fizz\"", 2], ["elif n % 5 == 0:", 1], ["return \"Buzz\"", 2], ["return str(n)", 1]],
+      c: [["const char *fizzbuzz(int n, char *texto) {", 0], ["if (n % 15 == 0) {", 1], ["return \"FizzBuzz\";", 2], ["} else if (n % 3 == 0) {", 1], ["return \"Fizz\";", 2], ["} else if (n % 5 == 0) {", 1], ["return \"Buzz\";", 2], ["}", 1], ["sprintf(texto, \"%d\", n);", 1], ["return texto;", 1], ["}", 0]],
+      php: [["function fizzbuzz($n) {", 0], ["if ($n % 15 === 0) {", 1], ["return \"FizzBuzz\";", 2], ["} elseif ($n % 3 === 0) {", 1], ["return \"Fizz\";", 2], ["} elseif ($n % 5 === 0) {", 1], ["return \"Buzz\";", 2], ["}", 1], ["return (string) $n;", 1], ["}", 0]],
+      java: [["static String fizzbuzz(int n) {", 0], ["if (n % 15 == 0) {", 1], ["return \"FizzBuzz\";", 2], ["} else if (n % 3 == 0) {", 1], ["return \"Fizz\";", 2], ["} else if (n % 5 == 0) {", 1], ["return \"Buzz\";", 2], ["}", 1], ["return String.valueOf(n);", 1], ["}", 0]],
+    } },
+  { id: "fatorial", padrao: "python", titulo: "Fatorial recursivo", enunciado: "Monte o fatorial com recursão: o caso base primeiro.",
+    versoes: {
+      python: [["def fatorial(n):", 0], ["if n <= 1:", 1], ["return 1", 2], ["return n * fatorial(n - 1)", 1]],
+      javascript: [["function fatorial(n) {", 0], ["if (n <= 1) {", 1], ["return 1;", 2], ["}", 1], ["return n * fatorial(n - 1);", 1], ["}", 0]],
+      c: [["long fatorial(int n) {", 0], ["if (n <= 1) {", 1], ["return 1;", 2], ["}", 1], ["return n * fatorial(n - 1);", 1], ["}", 0]],
+      php: [["function fatorial($n) {", 0], ["if ($n <= 1) {", 1], ["return 1;", 2], ["}", 1], ["return $n * fatorial($n - 1);", 1], ["}", 0]],
+      java: [["static long fatorial(int n) {", 0], ["if (n <= 1) {", 1], ["return 1;", 2], ["}", 1], ["return n * fatorial(n - 1);", 1], ["}", 0]],
+    } },
+  { id: "inverter-texto", padrao: "javascript", titulo: "Inverter um texto", enunciado: "Monte a função que devolve o texto de trás para frente, letra por letra.",
+    notas: { c: "Em C, o texto é invertido no lugar: troca a primeira letra com a última, e vai fechando." },
+    versoes: {
+      javascript: [["function inverter(texto) {", 0], ["let resultado = \"\";", 1], ["for (let i = texto.length - 1; i >= 0; i--) {", 1], ["resultado += texto[i];", 2], ["}", 1], ["return resultado;", 1], ["}", 0]],
+      python: [["def inverter(texto):", 0], ["resultado = \"\"", 1], ["for letra in texto:", 1], ["resultado = letra + resultado", 2], ["return resultado", 1]],
+      c: [["void inverter(char *texto) {", 0], ["int i = 0, j = strlen(texto) - 1;", 1], ["while (i < j) {", 1], ["char t = texto[i];", 2], ["texto[i] = texto[j];", 2], ["texto[j] = t;", 2], ["i++; j--;", 2], ["}", 1], ["}", 0]],
+      php: [["function inverter($texto) {", 0], ["$resultado = \"\";", 1], ["for ($i = strlen($texto) - 1; $i >= 0; $i--) {", 1], ["$resultado .= $texto[$i];", 2], ["}", 1], ["return $resultado;", 1], ["}", 0]],
+      java: [["static String inverter(String texto) {", 0], ["StringBuilder resultado = new StringBuilder();", 1], ["for (int i = texto.length() - 1; i >= 0; i--) {", 1], ["resultado.append(texto.charAt(i));", 2], ["}", 1], ["return resultado.toString();", 1], ["}", 0]],
+    } },
+  { id: "busca-binaria", padrao: "python", titulo: "Busca binária", enunciado: "Monte a busca binária numa lista ordenada: devolve a posição do alvo ou -1.",
+    notas: { c: "Em C, o vetor vem junto do tamanho (n)." },
+    versoes: {
+      python: [["def busca(lista, alvo):", 0], ["ini, fim = 0, len(lista) - 1", 1], ["while ini <= fim:", 1], ["meio = (ini + fim) // 2", 2], ["if lista[meio] == alvo:", 2], ["return meio", 3], ["elif lista[meio] < alvo:", 2], ["ini = meio + 1", 3], ["else:", 2], ["fim = meio - 1", 3], ["return -1", 1]],
+      javascript: [["function busca(lista, alvo) {", 0], ["let ini = 0, fim = lista.length - 1;", 1], ["while (ini <= fim) {", 1], ["const meio = Math.floor((ini + fim) / 2);", 2], ["if (lista[meio] === alvo) {", 2], ["return meio;", 3], ["} else if (lista[meio] < alvo) {", 2], ["ini = meio + 1;", 3], ["} else {", 2], ["fim = meio - 1;", 3], ["}", 2], ["}", 1], ["return -1;", 1], ["}", 0]],
+      c: [["int busca(int lista[], int n, int alvo) {", 0], ["int ini = 0, fim = n - 1;", 1], ["while (ini <= fim) {", 1], ["int meio = (ini + fim) / 2;", 2], ["if (lista[meio] == alvo) {", 2], ["return meio;", 3], ["} else if (lista[meio] < alvo) {", 2], ["ini = meio + 1;", 3], ["} else {", 2], ["fim = meio - 1;", 3], ["}", 2], ["}", 1], ["return -1;", 1], ["}", 0]],
+      php: [["function busca($lista, $alvo) {", 0], ["[$ini, $fim] = [0, count($lista) - 1];", 1], ["while ($ini <= $fim) {", 1], ["$meio = intdiv($ini + $fim, 2);", 2], ["if ($lista[$meio] === $alvo) {", 2], ["return $meio;", 3], ["} elseif ($lista[$meio] < $alvo) {", 2], ["$ini = $meio + 1;", 3], ["} else {", 2], ["$fim = $meio - 1;", 3], ["}", 2], ["}", 1], ["return -1;", 1], ["}", 0]],
+      java: [["static int busca(int[] lista, int alvo) {", 0], ["int ini = 0, fim = lista.length - 1;", 1], ["while (ini <= fim) {", 1], ["int meio = (ini + fim) / 2;", 2], ["if (lista[meio] == alvo) {", 2], ["return meio;", 3], ["} else if (lista[meio] < alvo) {", 2], ["ini = meio + 1;", 3], ["} else {", 2], ["fim = meio - 1;", 3], ["}", 2], ["}", 1], ["return -1;", 1], ["}", 0]],
+    } },
+  { id: "filtrar-pares", padrao: "javascript", titulo: "Filtrar os pares", enunciado: "Monte a função que devolve só os números pares da lista.",
+    notas: { javascript: "Em JavaScript, com filter.", php: "Em PHP, com array_filter.", c: "Em C, os pares vão para o vetor saida, e a função devolve quantos são." },
+    versoes: {
+      javascript: [["function pares(lista) {", 0], ["const resultado = lista.filter((n) => {", 1], ["return n % 2 === 0;", 2], ["});", 1], ["return resultado;", 1], ["}", 0]],
+      python: [["def pares(lista):", 0], ["resultado = []", 1], ["for n in lista:", 1], ["if n % 2 == 0:", 2], ["resultado.append(n)", 3], ["return resultado", 1]],
+      c: [["int pares(int lista[], int n, int saida[]) {", 0], ["int k = 0;", 1], ["for (int i = 0; i < n; i++) {", 1], ["if (lista[i] % 2 == 0) {", 2], ["saida[k++] = lista[i];", 3], ["}", 2], ["}", 1], ["return k;", 1], ["}", 0]],
+      php: [["function pares($lista) {", 0], ["return array_values(array_filter($lista, function ($n) {", 1], ["return $n % 2 === 0;", 2], ["}));", 1], ["}", 0]],
+      java: [["static List<Integer> pares(List<Integer> lista) {", 0], ["List<Integer> resultado = new ArrayList<>();", 1], ["for (int n : lista) {", 1], ["if (n % 2 == 0) {", 2], ["resultado.add(n);", 3], ["}", 2], ["}", 1], ["return resultado;", 1], ["}", 0]],
+    } },
 ];
-export const puzzlePorId = (id) => PUZZLES_DE_PARSONS.find((p) => p.id === id) || null;
+export const PUZZLES_DE_PARSONS = PUZZLES_BASE.map((p) => ({ ...p, linguagem: p.padrao, linhas: p.versoes[p.padrao] }));
+
+/** O quebra-cabeça na linguagem pedida (ou na de sempre, se ela não tem essa versão). */
+export function puzzlePorId(id, linguagem = null) {
+  const p = PUZZLES_DE_PARSONS.find((x) => x.id === id);
+  if (!p) return null;
+  const l = linguagem && p.versoes[linguagem] ? linguagem : p.padrao;
+  return { ...p, linguagem: l, linhas: p.versoes[l], nota: p.notas?.[l] || "" };
+}
+
+// Os temas que entregam a linguagem de uma trilha de programação ("Dominando o JavaScript do Zero" → javascript;
+// "Aprenda Programação em C do Zero" → c). Java vem antes de JavaScript só quando não é "JavaScript".
+const TEMAS_DAS_LINGUAGENS = [
+  ["python", /python|django|flask|pandas|numpy/iu],
+  ["php", /(?<![\p{L}\d])php(?![\p{L}\d])|laravel/iu],
+  ["javascript", /javascript|typescript|node(\.?js)?(?![\p{L}])|react|next\.?js|angular|vue|express|front-?end/iu],
+  ["java", /(?<![\p{L}\d])java(?![\p{L}\d])|spring|kotlin/iu],
+  ["c", /linguagem c(?![\p{L}\d+#])|(?<![\p{L}\d])C(?![\p{L}\d+#])|(?<![\p{L}\d])c\+\+/u],
+];
+/** A linguagem de uma trilha pelo tema, entre as que o Parsons tem (null: o tema não diz). */
+export function linguagemDoTema(tema) {
+  const t = String(tema ?? "");
+  return TEMAS_DAS_LINGUAGENS.find(([, re]) => re.test(t))?.[0] || null;
+}
+
+/**
+ * As linguagens do plano de estudo: as das trilhas de programação, na ordem delas, sem repetir. Trilha de
+ * programação cujo tema não diz a linguagem conta como JavaScript; sem nenhuma trilha de programação, nenhuma.
+ */
+export function linguagensDoPlano(trilhas = []) {
+  const saida = [];
+  for (const t of trilhas) {
+    if (!ehProgramacao(t.perfil || perfilPeloTema(t.tema))) continue;
+    const l = linguagemDoTema(t.tema) || "javascript";
+    if (!saida.includes(l)) saida.push(l);
+  }
+  return saida;
+}
+
 export const RECUO_MAXIMO = 4;
 
 /** Um sorteio pequeno e próprio (a mesma semente dá o mesmo embaralhado). */
@@ -308,9 +417,9 @@ function sorteador(semente) {
 const sementeDoTexto = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
 
 /** Os blocos para a tela: embaralhados (nunca na ordem certa), sem o recuo — achar o recuo faz parte. */
-export function blocosEmbaralhados(puzzleId, chave = "") {
-  const p = puzzlePorId(puzzleId);
-  const s = sorteador(sementeDoTexto(`${puzzleId}:${chave}`));
+export function blocosEmbaralhados(puzzleId, chave = "", linguagem = null) {
+  const p = puzzlePorId(puzzleId, linguagem);
+  const s = sorteador(sementeDoTexto(`${puzzleId}:${chave}${linguagem ? `:${linguagem}` : ""}`));
   const blocos = p.linhas.map(([texto], i) => ({ id: `b${i}`, texto }));
   for (let tentativa = 0; tentativa < 5; tentativa++) {
     for (let i = blocos.length - 1; i > 0; i--) { const j = Math.floor(s() * (i + 1)); [blocos[i], blocos[j]] = [blocos[j], blocos[i]]; }
@@ -323,8 +432,8 @@ export function blocosEmbaralhados(puzzleId, chave = "") {
  * Confere a resposta ([{ id, recuo }] na ordem montada). Linhas iguais (os "}") valem em qualquer das posições
  * delas: compara o TEXTO e o recuo de cada posição. Devolve se acertou e quantas linhas estão no lugar.
  */
-export function conferirParsons(puzzleId, resposta) {
-  const p = puzzlePorId(puzzleId);
+export function conferirParsons(puzzleId, resposta, linguagem = null) {
+  const p = puzzlePorId(puzzleId, linguagem);
   if (!p) return { ok: false, certas: 0, total: 0 };
   const textos = new Map(p.linhas.map(([texto], i) => [`b${i}`, texto]));
   const lista = Array.isArray(resposta) ? resposta : [];

@@ -40,7 +40,7 @@ import { TROPAS, ORDEM_DAS_TROPAS, ORDEM_DA_TRIPULACAO } from "../src/dominio/tr
 import { LUGARES } from "../src/dominio/combate.js";
 import { fazExpedicao } from "../src/dominio/veiculos.js";
 import { ARQUIPELAGO, CONSTRUCOES_DA_ILHA, CONCHAS_POR_MOEDA, capacidadeDaTripulacao, batalhaNaIlha, desfechoNaIlha, guardasDaConquista, construcoesAposConquista, defensorDaIlha, producaoDaIlha, juntadoNaIlha, podeConstruirNaIlha, podeTreinarTripulacao, podeAtacarIlha, pactoVigente, pactoPendente, saqueDeConchas, protecaoDoBau } from "../src/dominio/ilhas.js";
-import { PONTOS_DO_MINIGAME, jogoDoDia } from "../src/dominio/arena.js";
+import { PONTOS_DO_MINIGAME, jogoDoDia, LINGUAGENS_DO_PARSONS, puzzlePorId, linguagemDoTema, linguagensDoPlano, LINGUAGEM_DOS_JOGOS } from "../src/dominio/arena.js";
 import { BUGS, SOLUCOES_DOS_BUGS, ANDARES_DA_MASMORRA, arnesDoBug, lerArnes, NIVEIS_DO_MASCOTE, CODIGO_INICIAL_DO_MASCOTE, SOLUCAO_DO_MASCOTE, simularMascote, arnesDoMascote, PUZZLES_DE_PARSONS, blocosEmbaralhados, conferirParsons, faseLiberada } from "../src/dominio/arena.js";
 import { AGENDA as AGENDA_DA_LISA, SEMPRE as SEMPRE_DA_LISA, proximasJogadas } from "../src/dominio/lisaJogadora.js";
 import { luzDaHora, tempoDoBloco, climaDoReino, textoDoClima, agoraEmBrasilia, TEMPOS } from "../src/dominio/clima.js";
@@ -3811,6 +3811,47 @@ caso("BEYOND-0020: a Temporada das Ilhas — conquista, construção com conchas
   assert.doesNotMatch(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /href: "\/ilhas"/, "sem item à parte no menu");
   assert.match(fs.readFileSync(new URL("../src/lib/lisaRotina.js", import.meta.url), "utf8"), /const ACOES = \{[^}]*ilhas, minigame \};/, "a Lisa tem a ilha dela (e joga o minigame)");
   assert.match(fs.readFileSync(new URL("../db/030-versao-1.sql", import.meta.url), "utf8"), /'ilhas', 'arena'\)\);/);
+});
+
+caso("chamados de 04/11/2026: as conquistas do exercício valem para todo curso, e o Parsons vem na linguagem do plano", () => {
+  // 1. "Primeiro código aprovado" num curso de alemão: o nome não fala de código (os ids ficam)
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const conquistas = ler("../src/dominio/conquistas.js");
+  assert.match(conquistas, /"exercicio-1", "Primeiro exercício aprovado"/);
+  assert.match(conquistas, /"exercicio-10", "Exercício de todo dia"/);
+  assert.doesNotMatch(conquistas, /c\("Prática", "exercicios", "exercicio-10?", "[^"]*[cC]ódigo/, "nenhuma das duas fala de código");
+  // 2. "isso precisa trazer de acordo com seu plano de estudo": cada quebra-cabeça nas 5 linguagens
+  for (const p of PUZZLES_DE_PARSONS) {
+    assert.deepEqual(Object.keys(p.versoes).sort(), Object.keys(LINGUAGENS_DO_PARSONS).sort(), `${p.id} em todas as linguagens`);
+    for (const l of Object.keys(LINGUAGENS_DO_PARSONS)) {
+      const v = puzzlePorId(p.id, l);
+      assert.equal(v.linguagem, l);
+      const certa = v.linhas.map(([, recuo], i) => ({ id: `b${i}`, recuo }));
+      assert.equal(conferirParsons(p.id, certa, l).ok, true, `${p.id}/${l}`);
+      assert.equal(conferirParsons(p.id, [...certa].reverse(), l).ok, false, `${p.id}/${l}: de trás para frente não passa`);
+      const blocos = blocosEmbaralhados(p.id, "alguém", l);
+      assert.ok(blocos.length === v.linhas.length && blocos.some((b, i) => b.id !== `b${i}`), `${p.id}/${l} vem embaralhado`);
+      assert.ok(v.linhas.every(([texto, recuo]) => texto.trim() && recuo >= 0 && recuo <= 4));
+    }
+  }
+  assert.equal(puzzlePorId("soma-ate-n", "cobol").linguagem, "python", "linguagem que não existe: a de sempre");
+  // a linguagem pelo tema da trilha (os dois planos dos chamados)
+  assert.equal(linguagemDoTema("Dominando o JavaScript do Zero"), "javascript");
+  assert.equal(linguagemDoTema("Aprenda Programação em C do Zero"), "c");
+  assert.equal(linguagemDoTema("PHP Básico para Integração com IA"), "php");
+  assert.equal(linguagemDoTema("Java com Spring Boot"), "java");
+  assert.equal(linguagemDoTema("Python para análise de dados"), "python");
+  assert.equal(linguagemDoTema("Inglês C1"), null, "C1 não é a linguagem C");
+  assert.deepEqual(linguagensDoPlano([{ tema: "Aprenda Programação em C do Zero", perfil: "programacao" }, { tema: "Dominando o JavaScript do Zero", perfil: "programacao" }]), ["c", "javascript"]);
+  assert.deepEqual(linguagensDoPlano([{ tema: "Alemão do Zero ao Prático", perfil: "idiomas" }, { tema: "PHP Básico para Integração com IA", perfil: "programacao" }]), ["php"], "o alemão fica de fora");
+  assert.deepEqual(linguagensDoPlano([{ tema: "Alemão do Zero ao Prático", perfil: "idiomas" }]), [], "sem trilha de programação, nenhuma linguagem");
+  assert.deepEqual(linguagensDoPlano([{ tema: "SQL para análise", perfil: "programacao" }]), ["javascript"], "programação sem linguagem do Parsons: JavaScript");
+  // o destaque do dia segue o plano: sem JavaScript, é o Parsons (a masmorra e o mascote são em JavaScript)
+  assert.equal(jogoDoDia("2026-11-02", ["php"]), "parsons");
+  assert.equal(jogoDoDia("2026-11-02", ["c", "javascript"]), "masmorra");
+  assert.equal(jogoDoDia("2026-11-02"), "masmorra", "sem o plano, como antes");
+  assert.deepEqual(LINGUAGEM_DOS_JOGOS, { masmorra: "javascript", mascote: "javascript", parsons: null });
+  assert.match(ler("../src/lib/arena.js"), /order\("criada_em"/, "a coluna das trilhas é criada_em");
 });
 
 caso("BEYOND-0023: a Arena Lúdica — todo bug quebra, toda solução passa, o mascote e o Parsons conferem certo", () => {

@@ -135,6 +135,18 @@ explicação, o quiz e o exercício do assunto leem esse trecho (`src/lib/leitur
 
 ## Conquistas e comemorações
 
+> **04/11/2026 (1.5.1, dois chamados).**
+> - As conquistas do exercício do dia valem para qualquer curso. Por isso viraram "Primeiro exercício aprovado"
+>   e "Exercício de todo dia", com os mesmos ids; antes eram "Primeiro código aprovado" e apareciam até num
+>   curso de alemão.
+> - O minigame do dia segue o plano de estudo. Os quebra-cabeças de Parsons existem em Python, JavaScript, C,
+>   PHP e Java (`src/dominio/arena.js`), e a tela mostra os da linguagem das trilhas de programação da pessoa
+>   (`linguagensDoPlano`, pelo tema), com botões para trocar quando há mais de uma.
+> - Sem JavaScript no plano, o destaque do dia é o Parsons, e a masmorra e o mascote, que são em JavaScript,
+>   ficam como extras.
+> - Sem nenhuma trilha de programação, o bloco avisa que os minigames são de programação, em vez de mostrar
+>   código fora do plano.
+
 **Conquistas** são da conta, não do quadro (`src/dominio/conquistas.js`): ofensiva (3, 7, 14, 30,
 60, 100 dias), metas do dia batidas, dias estudados, tarefas, assuntos, quizzes, quizzes
 gabaritados, exercícios e projetos aprovados — mais uma por trilha concluída (300 pts). Cada uma

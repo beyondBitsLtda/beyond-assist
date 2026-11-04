@@ -16,6 +16,7 @@ import {
   JOGOS_DA_ARENA, ORDEM_DOS_JOGOS, FASES_DA_ARENA, ANDARES_DA_MASMORRA, BUGS, andarPorId, NIVEIS_DO_MASCOTE, nivelPorId,
   PUZZLES_DE_PARSONS, puzzlePorId, CODIGO_INICIAL_DO_MASCOTE, arnesDoBug, arnesDoMascote, lerArnes, testesParaTela,
   blocosEmbaralhados, conferirParsons, faseExiste, faseLiberada, PONTOS_DO_MINIGAME, chaveDoMinigame, jogoDoDia,
+  LINGUAGENS_DO_PARSONS, LINGUAGEM_DOS_JOGOS, linguagensDoPlano,
 } from "@/dominio/arena.js";
 
 const falhou = (error, onde) => { if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`); };
@@ -56,11 +57,18 @@ const senhaNova = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b
 /** Tudo o que o minigame do dia precisa: os jogos, as fases (com o conteúdo), o progresso e os pontos de hoje. */
 export async function arenaDe(usuarioId) {
   const hoje = diaDe();
-  const [{ data, error }, { data: doDia }] = await Promise.all([
+  const [{ data, error }, { data: doDia }, { data: trilhas, error: eTrilhas }] = await Promise.all([
     supabase.from("proof_arena").select("jogo, fase, tentativas, acertos, melhor_tempo_ms, concluida_em, recompensa").eq("usuario_id", usuarioId),
     supabase.from("proof_eventos").select("pontos").eq("usuario_id", usuarioId).eq("chave", chaveDoMinigame(hoje)).maybeSingle(),
+    supabase.from("proof_trilhas").select("tema, perfil, status").eq("usuario_id", usuarioId).order("criada_em", { ascending: false }),
   ]);
   falhou(error, "arena");
+  // o plano de estudo: as linguagens das trilhas de programação (o Parsons vem nelas; sem nenhuma, o minigame avisa)
+  // (as trilhas em curso; todas concluídas, vale o histórico. Se a leitura falhar, fica como antes: tudo liberado)
+  const emCurso = (trilhas || []).filter((x) => x.status !== "concluida");
+  const linguagens = eTrilhas ? ["javascript", "python"] : linguagensDoPlano(emCurso.length ? emCurso : trilhas || []);
+  if (eTrilhas) console.warn("[arena] não leu as trilhas (o minigame fica sem o plano):", eTrilhas.message);
+  const doPlano = linguagens.length ? linguagens : ["javascript"];
   const linhas = data || [];
   const porFase = new Map(linhas.map((l) => [`${l.jogo}:${l.fase}`, l]));
   const concluidas = new Set(linhas.filter((l) => l.concluida_em).map((l) => `${l.jogo}:${l.fase}`));
@@ -70,18 +78,27 @@ export async function arenaDe(usuarioId) {
   };
   const totalDeFases = ORDEM_DOS_JOGOS.reduce((s, j) => s + FASES_DA_ARENA[j].length, 0);
   return {
-    jogos: ORDEM_DOS_JOGOS.map((id) => ({ id, ...JOGOS_DA_ARENA[id], fases: FASES_DA_ARENA[id].length, concluidas: FASES_DA_ARENA[id].filter((f) => concluidas.has(`${id}:${f}`)).length })),
+    jogos: ORDEM_DOS_JOGOS.map((id) => ({
+      id, ...JOGOS_DA_ARENA[id], fases: FASES_DA_ARENA[id].length, concluidas: FASES_DA_ARENA[id].filter((f) => concluidas.has(`${id}:${f}`)).length,
+      linguagem: LINGUAGEM_DOS_JOGOS[id], foraDoPlano: Boolean(LINGUAGEM_DOS_JOGOS[id]) && linguagens.length > 0 && !linguagens.includes(LINGUAGEM_DOS_JOGOS[id]),
+    })),
+    plano: { temProgramacao: linguagens.length > 0, linguagens: doPlano.map((chave) => ({ chave, nome: LINGUAGENS_DO_PARSONS[chave] })) },
     masmorra: ANDARES_DA_MASMORRA.map((a) => ({
       id: a.id, nome: a.nome, paleta: a.paleta, mapa: a.mapa, ...progresso("masmorra", a.id),
       bugs: a.bugs.map((b) => ({ id: b, nome: BUGS[b].nome, obstaculo: BUGS[b].obstaculo, tipo: BUGS[b].tipo, funcao: BUGS[b].funcao, enunciado: BUGS[b].enunciado, codigo: BUGS[b].codigo, dica: BUGS[b].dica, testes: testesParaTela(b) })),
     })),
     mascote: NIVEIS_DO_MASCOTE.map((n) => ({ ...n, codigoInicial: CODIGO_INICIAL_DO_MASCOTE, ...progresso("mascote", n.id) })),
+    // cada quebra-cabeça nas linguagens do plano (a primeira é a de abertura)
     parsons: PUZZLES_DE_PARSONS.map((p) => ({
-      id: p.id, titulo: p.titulo, enunciado: p.enunciado, linguagem: p.linguagem, ...progresso("parsons", p.id),
-      blocos: blocosEmbaralhados(p.id, usuarioId),
+      id: p.id, titulo: p.titulo, enunciado: p.enunciado, linguagem: doPlano[0], ...progresso("parsons", p.id),
+      blocos: blocosEmbaralhados(p.id, usuarioId, doPlano[0]),
+      versoes: Object.fromEntries(doPlano.map((l) => {
+        const v = puzzlePorId(p.id, l);
+        return [l, { linguagem: v.linguagem, nota: v.nota, blocos: blocosEmbaralhados(p.id, usuarioId, l) }];
+      })),
     })),
     resumo: { concluidas: concluidas.size, total: totalDeFases, moedas: linhas.reduce((s, l) => s + (l.recompensa || 0), 0) },
-    doDia: jogoDoDia(hoje),
+    doDia: jogoDoDia(hoje, linguagens.length ? linguagens : null),
     pontosDoDia: PONTOS_DO_MINIGAME,
     hoje: { feito: Boolean(doDia), pontos: doDia?.pontos || 0 },
   };
@@ -92,7 +109,7 @@ export async function arenaDe(usuarioId) {
  * `resposta` (Parsons: [{ id, recuo }]); `tempoMs`: quanto a pessoa levou na fase. Venceu pela primeira vez,
  * a recompensa cai no saldo do reino.
  */
-export async function conferirNaArena(usuarioId, { jogo, fase, codigos, codigo, resposta, tempoMs }) {
+export async function conferirNaArena(usuarioId, { jogo, fase, codigos, codigo, resposta, tempoMs, linguagem }) {
   if (!faseExiste(jogo, fase)) throw new ErroDeAcesso(404, "essa fase não existe");
   const { data: feitas, error: e0 } = await supabase.from("proof_arena").select("jogo, fase, concluida_em").eq("usuario_id", usuarioId).not("concluida_em", "is", null);
   falhou(e0, "arena");
@@ -101,7 +118,8 @@ export async function conferirNaArena(usuarioId, { jogo, fase, codigos, codigo, 
   let ok = false;
   let detalhe = {};
   if (jogo === "parsons") {
-    const r = conferirParsons(fase, resposta);
+    // a resposta é conferida na linguagem em que a pessoa montou (a do plano dela)
+    const r = conferirParsons(fase, resposta, LINGUAGENS_DO_PARSONS[linguagem] ? linguagem : null);
     ok = r.ok;
     detalhe = { certas: r.certas, total: r.total };
   } else {
