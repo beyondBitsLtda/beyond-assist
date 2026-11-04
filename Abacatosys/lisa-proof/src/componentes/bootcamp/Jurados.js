@@ -134,6 +134,86 @@ function Boca({ humor, id }) {
   return <path d="M92 111 h16" stroke="#E7C3A0" strokeWidth="3" strokeLinecap="round" />;
 }
 
+/**
+ * A apresentadora do programa, Clara Compila (personagem original): blazer verde-petróleo com o lenço lima no
+ * bolso, cabelo cacheado, argolas e o microfone de mão. Humores: normal, feliz, pensando e triste (a empatia de
+ * quem se despede de um competidor).
+ */
+export function DesenhoDaApresentadora({ humor = "normal", tamanho = 120, className = "", titulo }) {
+  const pele = "#C68B59";
+  const h = ["normal", "feliz", "pensando", "triste"].includes(humor) ? humor : "normal";
+  const sobrancelhas = {
+    normal: "M80 73 q7 -4 14 -1 M106 72 q7 -3 14 1",
+    feliz: "M80 71 q7 -5 14 -1 M106 70 q7 -4 14 1",
+    pensando: "M80 67 q7 -7 14 -3 M106 74 q7 -1 14 1",
+    triste: "M80 74 q8 -2 14 -6 M120 74 q-8 -2 -14 -6",
+  }[h];
+  return (
+    <svg viewBox="0 0 200 200" width={tamanho} height={tamanho} className={className} role={titulo ? "img" : undefined}
+      aria-label={titulo || undefined} aria-hidden={titulo ? undefined : true}>
+      {/* o cabelo cacheado por trás */}
+      {[[64, 70, 16], [136, 70, 16], [60, 96, 14], [140, 96, 14], [70, 116, 12], [130, 116, 12]].map(([x, y, r]) => (
+        <circle key={`${x}-${y}`} cx={x} cy={y} r={r} fill="#2B1A12" stroke={TINTA} strokeWidth="2.5" />
+      ))}
+      {/* o blazer, a blusa clara e o lenço lima no bolso */}
+      <path d="M50 138 Q56 124 80 122 L120 122 Q144 124 150 138 L160 200 L40 200 Z" fill="#0F766E" stroke={TINTA} strokeWidth="3" strokeLinejoin="round" />
+      <path d="M86 122 L100 158 L114 122 Z" fill="#F9FAFB" stroke={TINTA} strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M80 124 L94 162 L86 200 M120 124 L106 162 L114 200" fill="none" stroke="#115E59" strokeWidth="4" />
+      <path d="M124 150 l14 -2 l-3 9 z" fill="#84CC16" stroke={TINTA} strokeWidth="2" strokeLinejoin="round" />
+      {/* o pescoço e a cabeça */}
+      <rect x="90" y="112" width="20" height="16" fill={pele} stroke={TINTA} strokeWidth="3" />
+      <ellipse cx="100" cy="86" rx="31" ry="35" fill={pele} stroke={TINTA} strokeWidth="3" />
+      {/* a franja cacheada por cima */}
+      {[[74, 58, 12], [88, 50, 13], [104, 48, 13], [120, 54, 12], [130, 66, 10], [70, 70, 9]].map(([x, y, r]) => (
+        <circle key={`f${x}`} cx={x} cy={y} r={r} fill="#2B1A12" stroke={TINTA} strokeWidth="2.5" />
+      ))}
+      <circle cx="69" cy="100" r="5" fill="none" stroke="#F0BE45" strokeWidth="2.5" />
+      <circle cx="131" cy="100" r="5" fill="none" stroke="#F0BE45" strokeWidth="2.5" />
+
+      <path d={sobrancelhas} fill="none" stroke="#2B1A12" strokeWidth="4" strokeLinecap="round" />
+      {h === "feliz" ? (
+        <path d="M81 87 q6 -7 12 0 M107 87 q6 -7 12 0" fill="none" stroke={TINTA} strokeWidth="3.5" strokeLinecap="round" />
+      ) : (
+        <g>
+          <circle cx="87" cy="86" r="4.5" fill={TINTA} /><circle cx="113" cy="86" r="4.5" fill={TINTA} />
+          <circle cx="88.5" cy="84.5" r="1.4" fill="#FFFFFF" /><circle cx="114.5" cy="84.5" r="1.4" fill="#FFFFFF" />
+          <path d="M82 81 l-3 -3 M118 81 l3 -3" stroke={TINTA} strokeWidth="2" strokeLinecap="round" />
+        </g>
+      )}
+      <path d="M98 92 q-4 8 3 9" fill="none" stroke={TINTA} strokeWidth="2.8" strokeLinecap="round" />
+      <ellipse cx="78" cy="100" rx="7" ry="4" fill="#F87171" opacity="0.35" />
+      <ellipse cx="122" cy="100" rx="7" ry="4" fill="#F87171" opacity="0.35" />
+      {h === "feliz" ? (
+        <path d="M88 106 q12 14 24 0 z" fill="#7F1D1D" stroke={TINTA} strokeWidth="2.5" strokeLinejoin="round" />
+      ) : h === "triste" ? (
+        <path d="M91 112 q9 -6 18 0" fill="none" stroke="#9F1239" strokeWidth="3.5" strokeLinecap="round" />
+      ) : h === "pensando" ? (
+        <path d="M93 110 q7 -3 14 1" fill="none" stroke="#9F1239" strokeWidth="3.5" strokeLinecap="round" />
+      ) : (
+        <path d="M90 107 q10 8 20 0" fill="none" stroke="#9F1239" strokeWidth="3.5" strokeLinecap="round" />
+      )}
+
+      {/* os braços: o microfone de mão na frente (normal, feliz e triste) ou a mão no queixo (pensando) */}
+      {h === "pensando" ? (
+        <g>
+          <Braco d="M58 154 Q100 168 142 152" cor="#0F766E" />
+          <Braco d="M142 146 Q132 138 116 128" cor="#0F766E" />
+          <Mao x={110} y={124} pele={pele} r={9} />
+        </g>
+      ) : (
+        <g>
+          <Braco d="M58 150 Q60 172 70 186" cor="#0F766E" />
+          <Braco d="M148 160 Q148 146 138 140" cor="#0F766E" />
+          {/* o microfone fica no queixo, de lado: a boca aparece */}
+          <rect x="128" y="118" width="9" height="24" rx="3" fill="#4B5563" stroke={TINTA} strokeWidth="2.5" transform="rotate(-24 132 130)" />
+          <circle cx="127" cy="116" r="7.5" fill="#111827" stroke={TINTA} strokeWidth="2.5" />
+          <Mao x={136} y={138} pele={pele} r={8.5} />
+        </g>
+      )}
+    </svg>
+  );
+}
+
 /** O desenho do jurado `id` ("kernel", "vetor" ou "sintaxe") com o humor pedido. */
 export default function DesenhoDoJurado({ id, humor = "normal", tamanho = 120, className = "", titulo }) {
   const e = ESTILO[id] || ESTILO.kernel;

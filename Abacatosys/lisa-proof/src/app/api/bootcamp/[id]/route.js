@@ -1,6 +1,6 @@
 import { json } from "@/lib/http.js";
 import { exigirUsuario, respostaDeErro, corpoDe, ErroDeAcesso } from "@/lib/sessao.js";
-import { torneioParaTela, abrirRodada, agirNaRodada, chamarJurados, apagarTorneio } from "@/lib/bootcamp.js";
+import { torneioParaTela, abrirRodada, agirNaRodada, chamarJurados, apagarTorneio, escolherMembro } from "@/lib/bootcamp.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +23,7 @@ export async function GET(req, { params }) {
  *   { acao: "planejar", plano }                              Análise de requisitos e planejamento
  *   { acao: "ambiente", modo, linguagem, repo?, caminho? }   Configuração do ambiente (editor ou GitHub)
  *   { acao: "jurados" }                                      os jurados avaliam a rodada
+ *   { acao: "escolher-membro", membro }                      o capitão escolhe um membro do time (prova em equipe)
  * O código e os testes vão por POST /api/bootcamp/challenge/submit.
  */
 export async function POST(req, { params }) {
@@ -32,6 +33,7 @@ export async function POST(req, { params }) {
     const corpo = await corpoDe(req);
     if (corpo.acao === "abrir-rodada") return json({ ok: true, ...(await abrirRodada(usuario.id, id)) });
     if (corpo.acao === "jurados") return json({ ok: true, ...(await chamarJurados(usuario.id, id)) });
+    if (corpo.acao === "escolher-membro") return json({ ok: true, ...(await escolherMembro(usuario.id, id, corpo.membro)) });
     if (["ler", "planejar", "ambiente"].includes(corpo.acao)) return json({ ok: true, ...(await agirNaRodada(usuario.id, id, corpo)) });
     throw new ErroDeAcesso(400, "ação desconhecida");
   } catch (e) {

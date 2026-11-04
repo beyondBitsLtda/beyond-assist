@@ -4,7 +4,8 @@
 
 import { PERSONA, corte, gerarJson } from "./ia.js";
 import {
-  JURADOS, BOOTCAMP, LINGUAGENS_DO_BOOTCAMP, ORDEM_DAS_LINGUAGENS, REVIEW, validarDesafio, validarAvaliacao, numerarLinhas,
+  JURADOS, BOOTCAMP, LINGUAGENS_DO_BOOTCAMP, ORDEM_DAS_LINGUAGENS, REVIEW, APRESENTADORA, AREAS_DOS_DESAFIOS, ESPECIALIDADES, TIPOS_DE_PROVA,
+  validarDesafio, validarAvaliacao, numerarLinhas,
 } from "@/dominio/bootcamp.js";
 
 const OS_JURADOS = JURADOS.map((j) => `- ${j.nome} (${j.id}), ${j.arquetipo}: avalia ${j.criterio.toLowerCase()} — ${j.foco}. Estilo: ${j.estilo}.`).join("\n");
@@ -35,6 +36,7 @@ const ESQUEMA_DO_DESAFIO = {
     formatoSaida: { type: "STRING" },
     requisitos: { type: "ARRAY", items: { type: "STRING" } },
     linguagem: { type: "STRING" },
+    area: { type: "STRING", enum: AREAS_DOS_DESAFIOS },
     falas: {
       type: "OBJECT",
       properties: { kernel: { type: "STRING" }, vetor: { type: "STRING" }, sintaxe: { type: "STRING" } },
@@ -59,7 +61,7 @@ const DIFICULDADE = {
  * Os jurados lançam o desafio. A `solucaoPython` é a solução de referência: o servidor roda ela contra os testes
  * antes de abrir a rodada (src/lib/bootcamp.js) — a resposta que vale é a que a solução imprime de verdade.
  */
-export async function gerarDesafioDosJurados({ numero, total, dificuldade, linguagens, usados = [] }) {
+export async function gerarDesafioDosJurados({ numero, total, dificuldade, linguagens, usados = [], tipoDeProva = "rodada" }) {
   const permitidas = linguagens.permitidas?.length ? linguagens.permitidas : ORDEM_DAS_LINGUAGENS;
   const nomes = permitidas.map((k) => `${k} (${LINGUAGENS_DO_BOOTCAMP[k].rotulo})`).join(", ");
   const bruto = await gerarJson({
@@ -69,7 +71,7 @@ export async function gerarDesafioDosJurados({ numero, total, dificuldade, lingu
     temperatura: 0.8,
     pensarPouco: true,
     pedido: [
-      `Lancem o desafio da rodada ${numero} de ${total}. Dificuldade: ${DIFICULDADE[dificuldade] || DIFICULDADE[1]}.`,
+      `Lancem o desafio da rodada ${numero} de ${total}: ${TIPOS_DE_PROVA[tipoDeProva]?.nome || "Rodada"} (${TIPOS_DE_PROVA[tipoDeProva]?.descricao || ""}). Dificuldade: ${DIFICULDADE[dificuldade] || DIFICULDADE[1]}.`,
       "Ambiente: um escritório de TI futurista. O desafio é um problema de programação com entrada pelo stdin e saída pelo stdout, que dá para resolver em QUALQUER linguagem.",
       "",
       "Regras:",
@@ -78,6 +80,7 @@ export async function gerarDesafioDosJurados({ numero, total, dificuldade, lingu
       `- \`testes\`: de ${BOOTCAMP.testes.min + 1} a ${BOOTCAMP.testes.max} casos. Os 2 primeiros viram exemplos na tela; os outros ficam ocultos e devem pegar os casos de borda. Entradas pequenas (até 2000 caracteres), cada uma diferente.`,
       "- `solucaoPython`: uma solução correta em Python 3 que lê do stdin e imprime a resposta. Ela é usada para conferir os testes.",
       "- `requisitos`: de 2 a 5 regras curtas (casos de borda, o que fazer com entrada vazia, limites).",
+      `- \`area\`: a área principal do desafio, uma destas: ${AREAS_DOS_DESAFIOS.map((a) => `${a} (${ESPECIALIDADES[a].nome})`).join(", ")}.`,
       linguagens.modo === "jurados"
         ? `- \`linguagem\`: os jurados estipulam UMA destas para todos os competidores: ${nomes}. Escreva só a chave (ex.: python).`
         : "- `linguagem`: deixe vazio — nesta rodada cada competidor escolhe a sua.",
@@ -120,6 +123,12 @@ const ESQUEMA_DA_AVALIACAO = {
               },
               required: ["jurado", "tipo", "linhaInicio", "linhaFim", "fala"],
             },
+          },
+          pontosFortes: { type: "ARRAY", items: { type: "STRING" } },
+          pontosFracos: { type: "ARRAY", items: { type: "STRING" } },
+          despedida: {
+            type: "ARRAY",
+            items: { type: "OBJECT", properties: { pergunta: { type: "STRING" }, resposta: { type: "STRING" } }, required: ["pergunta", "resposta"] },
           },
         },
         required: ["participante", "notaKernel", "notaVetor", "notaSintaxe", "feedbackKernel", "feedbackVetor", "feedbackSintaxe", "review"],
@@ -170,6 +179,10 @@ export async function avaliarComOsJurados({ desafio, humanos, npcs, apelidos }) 
       "   fala e se é `elogio` (trecho bem feito) ou `bronca` (trecho mal feito), e traz a `fala` do jurado sobre AQUELE trecho:",
       "   uma frase só, teatral, no estilo dele, criativa e debochada (até 200 caracteres). Mostre os dois lados quando der:",
       "   pelo menos um elogio e uma bronca. Quem não tem código fica com o review vazio.",
+      "   `pontosFortes` e `pontosFracos`: de 1 a 3 frases curtas cada, concretas sobre a entrega (testes, código, plano, regras).",
+      `   \`despedida\`: se o competidor for eliminado, ${APRESENTADORA.nome} (${APRESENTADORA.estilo}) faz a entrevista de`,
+      "   despedida na porta de saída: 3 perguntas curtas dela e as respostas do competidor em primeira pessoa, honestas sobre",
+      "   o que deu errado no código e com bom humor, saindo de cabeça erguida (até 200 caracteres cada).",
       ...humanos.map(blocoHumano),
       "",
       "2) `falas`: para cada personagem abaixo (competidores controlados pela Lisa), uma fala curta (até 140 caracteres),",

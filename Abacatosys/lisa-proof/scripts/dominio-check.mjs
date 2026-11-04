@@ -3931,6 +3931,9 @@ caso("a semana da ofensiva: de domingo a sábado, com hoje e os dias que faltam"
     NIVEIS_DO_TORNEIO, ORDEM_DOS_NIVEIS, npcNoNivel, CENARIOS, ORDEM_DOS_CENARIOS, juradoPorId, REVIEW, numerarLinhas, trechoDoCodigo,
     validarReview, reviewAutomatica, reviewDoNpc, TRECHOS_DOS_NPCS, EMOCOES, emocaoInicial, reagirNaCena, emocaoDominante, humorDaEmocao,
     roteiroDaAvaliacao,
+    planoDaTemporada, provaDoTorneio, formarEquipes, escolhaDoCapitaoNpc, competidoresDaProva, aplicarResultadoDaProva, INSIGNIAS,
+    TIPOS_DE_PROVA, ESPECIALIDADES, AREAS_DOS_DESAFIOS, afinidade, forcaDoNpc, STATUS, APRESENTADORA, validarDespedida, validarPontos,
+    pontosAutomaticos, despedidaAutomatica, EQUIPES,
   } = bootcamp;
 
 console.log("\nmodo bootcamp");
@@ -4252,6 +4255,134 @@ caso("bootcamp: o humor aflito do Neuro e as telas da avaliação ao vivo", () =
   assert.match(ler("../src/componentes/bootcamp/AvaliacaoAoVivo.js"), /Pular esta cena[\s\S]*Pular tudo/, "dá para pular");
   assert.match(ler("../src/componentes/bootcamp/Escritorio3D.js"), /const ALTURA_DO_PALCO = 0\.5;/, "os jurados no palco, acima da bancada");
   assert.match(ler("../db/033-bootcamp-nivel-e-cenario.sql"), /add column if not exists opcoes jsonb/);
+});
+
+caso("bootcamp/temporada: o plano dos episódios (imunidade ou equipe, eliminação) até a grande final com dois", () => {
+  const tipos = (n, e, q) => planoDaTemporada(n, { eliminadosPorEpisodio: e, provaDeEquipe: q }).map((p) => p.tipo[0]).join("");
+  assert.equal(tipos(8, 1, "sorteio"), "ieieeeieieief", "8 competidores, 1 por episódio: 6 episódios e a final");
+  assert.equal(tipos(8, 2, "sorteio"), "ieeeieief");
+  assert.equal(tipos(5, 1, "capitao"), "ieeeief", "com 2 candidatos, a equipe fica no 2º episódio (nunca abrindo a temporada)");
+  assert.equal(tipos(4, 2, "nao"), "ieief", "sem prova em equipe");
+  assert.equal(tipos(3, 1, "sorteio"), "ief");
+  assert.equal(tipos(2, 1, "sorteio"), "f", "com dois, é direto a final");
+  for (const [n, e] of [[8, 1], [8, 2], [7, 2], [6, 1], [5, 2]]) {
+    const plano = planoDaTemporada(n, { eliminadosPorEpisodio: e });
+    const saem = plano.filter((p) => p.tipo === "eliminacao").reduce((a, p) => a + p.sai, 0);
+    assert.equal(n - saem, 2, `${n} com ${e} por episódio chega à final com 2`);
+    assert.equal(plano.at(-1).tipo, "final");
+    assert.ok(plano.every((p, i) => p.numero === i + 1));
+    assert.ok(plano.filter((p) => p.tipo === "equipe").every((p) => p.ativos >= 4), "equipe só com 4 ou mais");
+    assert.ok(plano.length <= 20, "cabe no limite do banco");
+  }
+  assert.equal(totalDeRodadas("temporada", 8, 3, { eliminadosPorEpisodio: 1 }), 13);
+  assert.equal(provaDoTorneio("mata-mata", 2, 8).tipo, "rodada");
+  assert.equal(provaDoTorneio("temporada", 13, 8, { eliminadosPorEpisodio: 1 }).tipo, "final");
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "temporada" }).config.opcoes.provaDeEquipe, "sorteio");
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "temporada", eliminadosPorEpisodio: 3 }).ok, false);
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "temporada", provaDeEquipe: "duelo" }).ok, false);
+  assert.ok(BOOTCAMP.formatos.includes("temporada") && BOOTCAMP.formatos[0] === "temporada", "a temporada é o formato principal");
+  assert.ok(Object.keys(TIPOS_DE_PROVA).every((t) => TIPOS_DE_PROVA[t].nome && TIPOS_DE_PROVA[t].emoji));
+});
+
+caso("bootcamp/temporada: equipes sorteadas ou com o capitão, e o capitão da CPU escolhe o mais forte", () => {
+  let a = 3;
+  const s = () => ((a = (a * 16807) % 2147483647) / 2147483647);
+  const ids = ["h:1", "n:lisa", "n:byte-ninja", "n:capita-stack", "n:raposa-regex"];
+  const [azul, laranja] = formarEquipes(ids, { s });
+  assert.equal(azul.membros.length + laranja.membros.length, 5);
+  assert.equal(azul.membros.length - laranja.membros.length, 1, "tamanhos diferem no máximo em um");
+  assert.deepEqual([...azul.membros, ...laranja.membros].sort(), [...ids].sort(), "todo mundo num time só");
+  assert.deepEqual([azul.id, laranja.id], EQUIPES.map((e) => e.id));
+  const comCapitao = formarEquipes(ids, { modo: "capitao", capitao: "h:1", escolhido: "n:capita-stack", s });
+  assert.deepEqual(comCapitao[0].membros.slice(0, 2), ["h:1", "n:capita-stack"], "o capitão e o escolhido no mesmo time");
+  assert.equal(comCapitao[0].capitao, "h:1");
+  const parts = ids.map((id, i) => ({ id, npcId: id.slice(2), baia: i }));
+  const forte = escolhaDoCapitaoNpc(["n:byte-ninja", "n:capita-stack", "n:lisa", "n:raposa-regex"], parts);
+  assert.equal(forte, "n:lisa", "a Lisa tem a maior força média");
+  assert.ok(forcaDoNpc(NPCS_DO_BOOTCAMP.find((n) => n.id === "lisa")) > forcaDoNpc(NPCS_DO_BOOTCAMP.find((n) => n.id === "magma-hotfix")));
+  assert.deepEqual(competidoresDaProva("eliminacao", [{ id: "a" }, { id: "b" }, { id: "c", eliminado: true }], ["a"]), ["b"], "na eliminação, só quem não se salvou");
+  assert.deepEqual(competidoresDaProva("imunidade", [{ id: "a" }, { id: "b" }, { id: "c", eliminado: true }]), ["a", "b"]);
+});
+
+caso("bootcamp/temporada: o resultado de cada prova e a insígnia do vencedor (toda prova tem um)", () => {
+  const ids = ["a", "b", "c", "d", "e"];
+  const parts = ids.map((id, i) => ({ id, baia: i, pontos: 0, eliminado: false }));
+  const notas = new Map(ids.map((id, i) => [id, { nota: 90 - i * 10, kernel: 9 - i }]));
+  const im = aplicarResultadoDaProva({ prova: { tipo: "imunidade", competidores: ids }, participantes: parts, notas, numero: 1 });
+  assert.deepEqual(im.salvos, ["a", "b"], "a imunidade salva metade (arredondada para baixo)");
+  assert.deepEqual(im.eliminados, [], "e não elimina ninguém");
+  assert.deepEqual(im.participantes.find((p) => p.id === "a").insignias, [{ tipo: "imunidade", numero: 1 }]);
+  assert.equal(im.participantes.find((p) => p.id === "a").pontos, 90, "a nota soma nos pontos");
+  const el = aplicarResultadoDaProva({ prova: { tipo: "eliminacao", sai: 2, competidores: ["c", "d", "e"] }, participantes: im.participantes, notas, numero: 2 });
+  assert.deepEqual(el.eliminados.sort(), ["d", "e"], "saem as menores notas");
+  assert.deepEqual(el.vencedores, ["c"], "o melhor da eliminação ganha a Volta por cima");
+  assert.ok(el.participantes.find((p) => p.id === "d").eliminado && el.participantes.find((p) => p.id === "d").eliminadoNa === 2);
+  assert.equal(aplicarResultadoDaProva({ prova: { tipo: "eliminacao", sai: 9, competidores: ["c", "d"] }, participantes: parts, notas, numero: 2 }).eliminados.length, 1, "sempre sobra alguém");
+  const equipes = [{ id: "azul", membros: ["a", "e"] }, { id: "laranja", membros: ["b", "c", "d"] }];
+  const eq = aplicarResultadoDaProva({ prova: { tipo: "equipe", competidores: ids, equipes }, participantes: parts, notas, numero: 3 });
+  assert.equal(eq.equipes.find((e) => e.id === "laranja").nota, 70, "a nota do time é a média");
+  assert.deepEqual(eq.salvos.sort(), ["b", "c", "d"], "o time vencedor fica salvo");
+  assert.ok(eq.salvos.every((pid) => eq.participantes.find((p) => p.id === pid).insignias.some((i) => i.tipo === "equipe")), "todos do time ganham a insígnia");
+  const fi = aplicarResultadoDaProva({ prova: { tipo: "final", competidores: ["b", "a"] }, participantes: parts, notas, numero: 7 });
+  assert.equal(fi.campeao, "a");
+  assert.equal(fi.vice, "b");
+  assert.equal(fi.encerrado, true);
+  assert.deepEqual(fi.eliminados, [], "na final ninguém é 'eliminado': há campeão e vice");
+  assert.ok(fi.participantes.find((p) => p.id === "a").insignias.some((i) => i.tipo === "final"));
+  const classico = aplicarResultado({ formato: "pontos-corridos", participantes: parts, notas, numero: 1, total: 3 });
+  assert.deepEqual(classico.vencedores, ["a"], "nos modos rápidos também há vencedor");
+  assert.ok(classico.participantes.find((p) => p.id === "a").insignias.some((i) => i.tipo === "rodada"), "com a insígnia de melhor da rodada");
+  assert.ok(["imunidade", "equipe", "eliminacao", "final", "rodada"].every((t) => INSIGNIAS[t]?.emoji));
+});
+
+caso("bootcamp/temporada: status e especialidades dos personagens da CPU pesam na prova", () => {
+  for (const n of NPCS_DO_BOOTCAMP) {
+    assert.deepEqual(Object.keys(n.status), Object.keys(STATUS), `${n.id}: os 5 status`);
+    assert.ok(Object.values(n.status).every((v) => v >= 1 && v <= 10));
+    assert.equal(n.especialidades.length, 2, `${n.id}: duas especialidades`);
+    assert.ok(n.especialidades.every((e) => ESPECIALIDADES[e]));
+  }
+  const raposa = NPCS_DO_BOOTCAMP.find((n) => n.id === "raposa-regex");
+  assert.equal(afinidade(raposa, "strings"), 1);
+  assert.equal(afinidade({ especialidades: ["regex"] }, "strings"), 0.5, "regex ajuda nos textos");
+  assert.equal(afinidade(raposa, "matematica"), 0);
+  assert.ok(DESAFIOS_DE_RESERVA.every((d) => AREAS_DOS_DESAFIOS.includes(d.area)), "todo desafio de reserva tem área");
+  assert.equal(validarDesafio({ titulo: "A soma", enunciado: "Leia dois números e imprima a soma deles.", testes: [{ entrada: "1", saida: "1" }, { entrada: "2", saida: "2" }, { entrada: "3", saida: "3" }], area: "regex" }).desafio.area, "logica", "área fora da lista vale lógica");
+  const testes = [{ oculto: false }, { oculto: false }, { oculto: true }, { oculto: true }];
+  let naArea = 0, fora = 0;
+  for (let i = 1; i <= 80; i++) {
+    for (const area of ["strings", "matematica"]) {
+      let a = i * 104729;
+      const s = () => ((a = (a * 16807) % 2147483647) / 2147483647);
+      const r = simularNpc({ npc: raposa, dificuldade: 2, testes, s, area }).passados;
+      if (area === "strings") naArea += r; else fora += r;
+    }
+  }
+  assert.ok(naArea > fora, "na especialidade, o personagem passa em mais testes");
+});
+
+caso("bootcamp/temporada: a despedida do eliminado (entrevista com a apresentadora e a ficha)", () => {
+  assert.equal(APRESENTADORA.nome, "Clara Compila");
+  assert.deepEqual(validarDespedida([{ pergunta: "E aí?", resposta: "Foi duro." }, { pergunta: "O que fica?", resposta: "Testar antes." }, { pergunta: "?", resposta: "" }]).length, 2);
+  assert.deepEqual(validarDespedida([{ pergunta: "só uma", resposta: "ok" }]), [], "uma pergunta só não vale");
+  assert.deepEqual(validarPontos(["Bom plano.", "Bom plano.", "", "Nomes claros.", "a", "b"]), ["Bom plano.", "Nomes claros.", "a"], "sem repetir, no máximo 3");
+  const ruim = pontosAutomaticos({ notas: { kernel: 3, vetor: 5, sintaxe: 3.5 }, testes: { passados: 0, total: 4 }, enviou: false, temPlano: false });
+  assert.ok(ruim.fortes.length >= 1 && ruim.fracos.length >= 1 && ruim.fracos.length <= 3);
+  assert.ok(ruim.fracos[0].includes("Nenhum dos 4 testes"));
+  const bom = pontosAutomaticos({ notas: { kernel: 10, vetor: 9, sintaxe: 9 }, testes: { passados: 5, total: 5 }, enviou: true, temPlano: true });
+  assert.ok(bom.fortes[0].includes("todos os 5 testes"));
+  const d = despedidaAutomatica({ nome: "Ana Souza", notas: { kernel: 9, vetor: 4, sintaxe: 8 }, testes: { passados: 2, total: 4 }, s: () => 0 });
+  assert.equal(d.length, 3);
+  assert.ok(d[0].pergunta.startsWith("Ana,"), "a apresentadora chama pelo primeiro nome");
+  assert.ok(d[1].resposta.includes("Chef Vetor"), "fala do jurado da pior nota");
+  const rot = roteiroDaAvaliacao({ participantes: [{ id: "h:1", tipo: "humano", nota: 40, resultado: "eliminado", despedida: d, pontosFortes: ["x"], pontosFracos: ["y"], insignia: null }, { id: "n:lisa", tipo: "npc", nota: 30, resultado: "eliminado" }] });
+  assert.equal(rot[0].despedir, true, "o humano eliminado se despede");
+  assert.equal(rot[1].despedir, false, "o personagem eliminado não");
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  assert.match(ler("../src/componentes/bootcamp/AvaliacaoAoVivo.js"), /"saindo"[\s\S]*"entrevista"[\s\S]*"indoEmbora"[\s\S]*FichaDeDespedida/, "as fases da despedida");
+  assert.match(ler("../db/034-bootcamp-temporada.sql"), /formato in \('temporada', 'mata-mata', 'pontos-corridos'\)/);
+  assert.match(ler("../db/034-bootcamp-temporada.sql"), /rodadas_total between 1 and 20/);
+  assert.match(ler("../src/app/bootcamp.css"), /\.pf-principal:has\(\.bc-pagina\) \{ max-width: 1760px; \}/, "as telas do Bootcamp usam a tela larga");
 });
 
 caso("bootcamp: quem chama os jurados, o prazo e as rotas", () => {

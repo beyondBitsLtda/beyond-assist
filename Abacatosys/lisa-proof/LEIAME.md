@@ -693,8 +693,37 @@ próprio no menu (**Bootcamp**, no grupo Jogo).
   (Esc). A avaliação começa sozinha uma vez por rodada para cada pessoa, e o botão "Ver a avaliação
   ao vivo" repete. O deboche é sempre sobre o código, nunca sobre a pessoa. O Neuro ganhou o humor
   `aflito`.
+- **Temporada estilo reality (1.4.0).** É o formato principal; o mata-mata e os pontos corridos
+  ficaram como modos rápidos. Cada episódio tem duas provas:
+  - a **Prova de Imunidade**, que não elimina ninguém e salva a metade de cima, ou, no episódio do
+    meio, a **Prova em Equipe**;
+  - a **Prova de Eliminação**, só para quem não se salvou, de onde saem os de menor nota.
 
-**Arquivos.** Banco: `db/032-bootcamp.sql` e `db/033-bootcamp-nivel-e-cenario.sql`. Regras: `src/dominio/bootcamp.js`. Servidor:
+  O organizador escolhe se sai 1 ou 2 por episódio. Quando sobram dois, vem a **Grande Final**.
+  `planoDaTemporada` calcula todas as provas na criação. Uma temporada de 8, saindo 1 por episódio,
+  tem 13.
+- **Prova em equipe.** Dois times, com a nota do time igual à média dos integrantes; o time vencedor
+  fica salvo. Os times saem por sorteio, ou o vencedor da última prova (o capitão) escolhe um membro
+  e o resto é sorteado (`formarEquipes`). O capitão humano escolhe na tela antes de a prova abrir
+  (`estado.pendente`); o da CPU pega o mais forte pelos status.
+- **Insígnias.** Toda prova tem vencedor, e ele ganha uma insígnia: Imunidade, Trabalho em equipe,
+  Volta por cima, Campeão e, nos modos rápidos, Melhor da rodada (`participantes[].insignias`).
+- **Grande final.** É uma arena especial no 3D: as duas baias no centro, a arquibancada nos dois
+  lados com todos os outros competidores torcendo, confete e holofotes.
+- **Status e especialidades da CPU.** Cada personagem tem lógica, velocidade, testes, arquitetura e
+  criatividade (de 1 a 10) e duas especialidades. Na área do desafio (`desafio.area`) ele joga
+  melhor, o status de testes pesa nos testes ocultos e o de arquitetura pesa na nota da Chef Vetor.
+- **Sem espera contra a CPU.** Quando o último humano da prova entrega, os personagens aparecem como
+  entregues e os jurados entram sozinhos. Uma prova sem nenhum humano (quem foi salvo só assiste) é
+  avaliada assim que abre.
+- **A despedida.** O humano eliminado deixa a bancada e vai até a porta de SAÍDA. A apresentadora
+  Clara Compila (personagem original) faz a entrevista de despedida, ele sai pela porta e a cena
+  corta para a ficha: as notas de cada jurado, os testes, os pontos, as insígnias e os pontos fortes
+  e fracos. Isso vem da IA ou, sem ela, de `pontosAutomaticos` e `despedidaAutomatica`.
+- **Largura.** As telas do Bootcamp usam até 1760px. Na arena, o 3D fica ao lado da prova e do
+  painel de status, e o desafio fica ao lado da baia.
+
+**Arquivos.** Banco: `db/032-bootcamp.sql`, `db/033-bootcamp-nivel-e-cenario.sql` e `db/034-bootcamp-temporada.sql`. Regras: `src/dominio/bootcamp.js`. Servidor:
 `src/lib/bootcamp.js` e `src/lib/iaBootcamp.js`. Rotas: `/api/bootcamp`, `/api/bootcamp/:id`,
 `/api/bootcamp/:id/jurados` e `POST /api/bootcamp/challenge/submit` (o envio do código). Telas:
 `/bootcamp`, `/bootcamp/create`, `/bootcamp/arena/:id` (o escritório em 3D:

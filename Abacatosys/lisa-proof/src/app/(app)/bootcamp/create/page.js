@@ -5,6 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { obter, criar } from "@/lib/api.js";
 import Neuro from "@/componentes/Neuro.js";
+import { StatusDoNpc } from "@/componentes/bootcamp/Pecas.js";
+import { planoDaTemporada } from "@/dominio/bootcamp.js";
+
+const EQUIPE_ROTULO = {
+  sorteio: { nome: "Times sorteados", descricao: "Os dois times saem por sorteio." },
+  capitao: { nome: "O vencedor escolhe", descricao: "Quem venceu a última prova escolhe um membro para o time dele; o resto é sorteado." },
+  nao: { nome: "Sem prova em equipe", descricao: "Todos os episódios começam com a prova de imunidade." },
+};
 
 /**
  * A configuração de um torneio novo do Modo Bootcamp: o formato (mata-mata ou pontos corridos), o tempo por
@@ -18,8 +26,9 @@ export default function CriarTorneio() {
   const [enviando, setEnviando] = useState(false);
   const [busca, setBusca] = useState("");
   const [f, setF] = useState({
-    nome: "", formato: "mata-mata", rodadas: 3, usarTempo: false, tempoMin: 30,
+    nome: "", formato: "temporada", rodadas: 3, usarTempo: false, tempoMin: 30,
     modoLinguagem: "livre", permitidas: [], total: 8, convidados: [], npcs: [], nivel: "medio", cenario: "neon",
+    eliminadosPorEpisodio: 2, provaDeEquipe: "capitao",
   });
   const mudar = (campo, valor) => setF((x) => ({ ...x, [campo]: valor }));
   const alternar = (campo, valor) => setF((x) => ({ ...x, [campo]: x[campo].includes(valor) ? x[campo].filter((v) => v !== valor) : [...x[campo], valor] }));
@@ -47,7 +56,7 @@ export default function CriarTorneio() {
       const { id } = await criar("/api/bootcamp", {
         nome: f.nome, formato: f.formato, rodadas: f.rodadas, usarTempo: f.usarTempo, tempoMin: f.tempoMin, total: f.total,
         linguagens: { modo: f.modoLinguagem, permitidas: f.permitidas }, npcs: f.npcs, convidados: f.convidados,
-        nivel: f.nivel, cenario: f.cenario,
+        nivel: f.nivel, cenario: f.cenario, eliminadosPorEpisodio: f.eliminadosPorEpisodio, provaDeEquipe: f.provaDeEquipe,
       });
       router.push(`/bootcamp/arena/${id}`);
     } catch (e2) {
@@ -57,7 +66,7 @@ export default function CriarTorneio() {
   }
 
   return (
-    <>
+    <div className="bc-pagina">
       <div className="pf-cabecalho">
         <div>
           <h1>Novo torneio</h1>
@@ -70,14 +79,14 @@ export default function CriarTorneio() {
 
       {opcoes && (
         <form className="bc-criar" onSubmit={enviar}>
-          <section className="pf-cartao bc-criar__bloco">
+          <section className="pf-cartao bc-criar__bloco bc-criar__bloco--largo">
             <label className="pf-campo">
               <span className="pf-campo__rotulo">Nome do torneio</span>
               <input className="pf-campo__entrada" value={f.nome} onChange={(e) => mudar("nome", e.target.value)} maxLength={60} placeholder="Ex.: Temporada de Algoritmos" required />
             </label>
           </section>
 
-          <section className="pf-cartao bc-criar__bloco">
+          <section className="pf-cartao bc-criar__bloco bc-criar__bloco--largo">
             <h2 className="bc-criar__titulo">Formato de disputa</h2>
             <div className="bc-opcoes" role="radiogroup" aria-label="Formato">
               {opcoes.formatos.map((o) => (
@@ -88,7 +97,38 @@ export default function CriarTorneio() {
                 </label>
               ))}
             </div>
-            {f.formato === "pontos-corridos" ? (
+            {f.formato === "temporada" ? (
+              <div className="bc-temporada-config">
+                <div className="bc-opcoes" role="radiogroup" aria-label="Quantos saem por episódio">
+                  {opcoes.eliminadosPorEpisodio.map((n) => (
+                    <label key={n} className={`bc-opcao${f.eliminadosPorEpisodio === n ? " bc-opcao--escolhida" : ""}`}>
+                      <input type="radio" name="eliminados" checked={f.eliminadosPorEpisodio === n} onChange={() => mudar("eliminadosPorEpisodio", n)} />
+                      <strong>{n === 1 ? "🎬 Temporada completa" : "⚡ Temporada rápida"}</strong>
+                      <span>{n === 1 ? "Sai 1 por episódio, como no reality." : "Saem até 2 por episódio: menos provas até a final."}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="bc-opcoes bc-opcoes--tres" role="radiogroup" aria-label="Prova em equipe">
+                  {opcoes.provasDeEquipe.map((m) => (
+                    <label key={m} className={`bc-opcao${f.provaDeEquipe === m ? " bc-opcao--escolhida" : ""}`}>
+                      <input type="radio" name="equipe" checked={f.provaDeEquipe === m} onChange={() => mudar("provaDeEquipe", m)} />
+                      <strong>🤝 {EQUIPE_ROTULO[m].nome}</strong>
+                      <span>{EQUIPE_ROTULO[m].descricao}</span>
+                    </label>
+                  ))}
+                </div>
+                <span className="pf-campo__rotulo">As provas da temporada ({planoDaTemporada(f.total, { eliminadosPorEpisodio: f.eliminadosPorEpisodio, provaDeEquipe: f.provaDeEquipe }).length})</span>
+                <ol className="bc-temporada bc-temporada--previa">
+                  {planoDaTemporada(f.total, { eliminadosPorEpisodio: f.eliminadosPorEpisodio, provaDeEquipe: f.provaDeEquipe }).map((p) => (
+                    <li key={p.numero} className={`bc-temporada__prova bc-temporada__prova--depois bc-temporada__prova--${p.tipo}`} title={opcoes.tiposDeProva[p.tipo]?.nome}>
+                      <span aria-hidden="true">{opcoes.tiposDeProva[p.tipo]?.emoji}</span>
+                      <small>{p.tipo === "final" ? "Final" : `Ep. ${p.episodio}`}</small>
+                    </li>
+                  ))}
+                </ol>
+                <p className="pf-estat__nota">🛡️ imunidade salva metade · 🤝 em equipe, o time vencedor fica salvo · 🔥 a eliminação é só de quem não se salvou · 🏆 a final é numa arena especial, com a torcida de todos. Toda prova dá uma insígnia ao vencedor.</p>
+              </div>
+            ) : f.formato === "pontos-corridos" ? (
               <label className="pf-campo bc-criar__linha">
                 <span className="pf-campo__rotulo">Rodadas</span>
                 <select className="pf-campo__entrada" value={f.rodadas} onChange={(e) => mudar("rodadas", Number(e.target.value))}>
@@ -142,7 +182,7 @@ export default function CriarTorneio() {
             <p className="pf-estat__nota">Nenhuma marcada = todas as que o Bootcamp roda. Os testes conferem a entrada (stdin) e a saída (stdout), então valem para qualquer linguagem.</p>
           </section>
 
-          <section className="pf-cartao bc-criar__bloco">
+          <section className="pf-cartao bc-criar__bloco bc-criar__bloco--largo">
             <h2 className="bc-criar__titulo">Participantes</h2>
             <label className="pf-campo bc-criar__linha">
               <span className="pf-campo__rotulo">Competidores no torneio</span>
@@ -187,6 +227,7 @@ export default function CriarTorneio() {
                     <strong>{n.nome}</strong>
                     <span className="bc-npc__personalidade">{n.personalidade}</span>
                     <em>“{n.bordao}”</em>
+                    <StatusDoNpc status={n.status} especialidades={n.especialidades} catalogo={opcoes.especialidades} rotulos={opcoes.rotulosDeStatus} />
                   </button>
                 );
               })}
@@ -212,7 +253,7 @@ export default function CriarTorneio() {
             </section>
           )}
 
-          <section className="pf-cartao bc-criar__bloco">
+          <section className="pf-cartao bc-criar__bloco bc-criar__bloco--largo">
             <h2 className="bc-criar__titulo">Cenário do escritório</h2>
             <div className="bc-cenarios-grade" role="radiogroup" aria-label="Cenário">
               {opcoes.cenarios.map((c) => (
@@ -232,6 +273,6 @@ export default function CriarTorneio() {
           </div>
         </form>
       )}
-    </>
+    </div>
   );
 }

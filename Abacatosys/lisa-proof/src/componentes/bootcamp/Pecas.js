@@ -45,7 +45,49 @@ export const RESULTADO = {
   folga: { texto: "folga: passou direto", classe: "verde" },
   pontuou: { texto: "pontuou", classe: "verde" },
   eliminado: { texto: "eliminado", classe: "alerta" },
+  // a temporada
+  salvo: { texto: "🛡️ salvo da eliminação", classe: "verde" },
+  ameacado: { texto: "🔥 vai para a prova de eliminação", classe: "atencao" },
+  sobreviveu: { texto: "segue na disputa", classe: "verde" },
+  campeao: { texto: "🏆 campeão do Bootcamp", classe: "verde" },
+  vice: { texto: "🥈 vice-campeão", classe: "tema" },
 };
+
+/** As insígnias de um competidor, em fila (emoji com o nome no título). */
+export function Insignias({ lista = [], catalogo = {}, max = 8 }) {
+  if (!lista?.length) return null;
+  return (
+    <span className="bc-insignias" aria-label={`${lista.length} insígnia(s)`}>
+      {lista.slice(0, max).map((i, k) => (
+        <span key={k} className="bc-insignia" title={`${catalogo[i.tipo]?.nome || i.tipo} · prova ${i.numero}`}>{catalogo[i.tipo]?.emoji || "🎖️"}</span>
+      ))}
+      {lista.length > max && <span className="bc-insignia">+{lista.length - max}</span>}
+    </span>
+  );
+}
+
+/** Os status (1 a 10) e as especialidades de um personagem da CPU. */
+export function StatusDoNpc({ status, especialidades = [], catalogo = {}, rotulos = {} }) {
+  if (!status) return null;
+  return (
+    <div className="bc-status">
+      {Object.entries(rotulos).map(([k, nome]) => (
+        <div key={k} className="bc-status__linha">
+          <span>{nome}</span>
+          <span className="bc-status__barra" role="meter" aria-valuemin={1} aria-valuemax={10} aria-valuenow={status[k] ?? 0} aria-label={nome}>
+            <span style={{ width: `${(status[k] ?? 0) * 10}%` }} />
+          </span>
+          <strong>{status[k] ?? 0}</strong>
+        </div>
+      ))}
+      {especialidades.length > 0 && (
+        <div className="bc-status__especialidades">
+          {especialidades.map((e) => <span key={e} className="pf-pilula">{catalogo[e]?.emoji} {catalogo[e]?.nome || e}</span>)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** O boneco do competidor (o Neuro com a skin dele). */
 export function Avatar({ p, campeaoId = null, tamanho = 56 }) {

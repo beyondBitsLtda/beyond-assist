@@ -33,7 +33,7 @@ export default function Bootcamp() {
   }
 
   return (
-    <>
+    <div className="bc-pagina">
       <div className="pf-cabecalho">
         <div>
           <h1>🏁 Bootcamp</h1>
@@ -94,6 +94,6 @@ export default function Bootcamp() {
         </ul>
       </section>
       {Aviso}
-    </>
+    </div>
   );
 }

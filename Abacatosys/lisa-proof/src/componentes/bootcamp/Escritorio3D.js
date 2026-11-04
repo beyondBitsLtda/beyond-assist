@@ -5,7 +5,7 @@ import * as THREE from "three";
 import Neuro from "@/componentes/Neuro.js";
 import { svgComoImagem, recorteDePapel } from "@/componentes/reino/papel.js";
 import { humorDoCompetidor } from "./Pecas.js";
-import DesenhoDoJurado from "./Jurados.js";
+import DesenhoDoJurado, { DesenhoDaApresentadora } from "./Jurados.js";
 
 /**
  * O escritório de TI do Modo Bootcamp em 3D (04/11/2026): um estúdio de reality show com 8 baias em duas fileiras
@@ -33,8 +33,24 @@ const ALTURA_DO_PALCO = 0.5;
 const PALCO = { x: 0, z: -2.55 };       // onde o competidor para, na frente da bancada
 const CORREDOR_Z = 1.25;                 // o corredor entre as duas fileiras
 const VELOCIDADE = 3.4;                  // unidades por segundo, andando
+// a despedida: a porta de saída fica no fim do corredor, na parede da direita, com a apresentadora ao lado
+// (o competidor para um pouco à esquerda da porta e a apresentadora fica à direita: vistos da câmera da despedida,
+// os dois aparecem lado a lado, sem um tapar o outro)
+const SAIDA = { x: 8.0, z: 0.8 };
+const FORA = { x: 11.2, z: CORREDOR_Z };
+const POS_DA_APRESENTADORA = { x: 9.35, z: 2.0 };
+// a grande final: as duas baias no centro e a arquibancada nos dois lados, com todos os outros torcendo
+const POS_DA_FINAL = [[-2.6, 0.4], [2.6, 0.4]];
+const DEGRAUS = [{ dx: 7.4, h: 0.3 }, { dx: 8.4, h: 0.6 }, { dx: 9.4, h: 0.9 }];
+const ASSENTOS = (() => {
+  const lista = [];
+  for (const degrau of DEGRAUS) for (const z of [-0.2, 1.4, 3.0]) for (const lado of [-1, 1]) lista.push({ x: lado * degrau.dx, z, y: degrau.h });
+  return lista;
+})();
+const APRESENTADORA_NA_FINAL = { x: -4.4, z: -2.4 };
 
 const COR = { mesa: "#2b313b", mesaClara: "#3a424e", metal: "#59616d", cadeira: "#20252c", bancada: "#22272f", vidro: "#9fb4c8", ouro: "#f0be45" };
+const COR_DO_TIME = { azul: "#2563eb", laranja: "#ea580c" };
 
 // a cor do monitor pela etapa do fluxo
 const TELA = {
@@ -334,17 +350,30 @@ function desenharTelao(canvas, { titulo, subtitulo }, acento = "#84cc16") {
   c.fillText(String(subtitulo || "").slice(0, 56), w / 2, h * 0.85);
 }
 
-/** O caminho da baia até o palco: sai para o corredor entre as fileiras, vai ao meio e segue até a bancada. */
-function caminhoAtePalco(base) {
+/**
+ * O caminho de onde o boneco está até o destino, sempre pelo corredor entre as fileiras (ninguém atravessa as
+ * baias): sai para o corredor, anda por ele até a altura do destino e segue até lá.
+ */
+function caminhoAte(pos, destino) {
   return [
-    new THREE.Vector3(base.x, 0, base.z),
-    new THREE.Vector3(base.x, 0, CORREDOR_Z),
-    new THREE.Vector3(PALCO.x, 0, CORREDOR_Z),
-    new THREE.Vector3(PALCO.x, 0, PALCO.z),
+    new THREE.Vector3(pos.x, 0, pos.z),
+    new THREE.Vector3(pos.x, 0, CORREDOR_Z),
+    new THREE.Vector3(destino.x, 0, CORREDOR_Z),
+    new THREE.Vector3(destino.x, 0, destino.z),
   ];
 }
 
-export default function Escritorio3D({ participantes, jurados, campeaoId = null, telao, avaliando = false, cenario = "neon", palco = null, humores = null, aoEscolher, aoFalhar }) {
+function placaDeSaida(ctx, w, h) {
+  ctx.fillStyle = "#14532d";
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = "#4ade80";
+  ctx.font = "900 70px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("SAÍDA  ➜", w / 2, h / 2 + 4);
+}
+
+export default function Escritorio3D({ participantes, jurados, apresentadora = null, campeaoId = null, telao, avaliando = false, cenario = "neon", palco = null, humores = null, final = null, aoEscolher, aoFalhar }) {
   const caixa = useRef(null);
   const moldes = useRef(null);
   const api = useRef(null);
@@ -374,7 +403,14 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
     const cena = new THREE.Scene();
     cena.fog = new THREE.Fog("#0b0e12", 16, 30);
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 60);
-    const vista = { geral: { pos: new THREE.Vector3(0, 8.2, 12.2), olhar: new THREE.Vector3(0, 0.95, -0.3) }, palco: { pos: new THREE.Vector3(0, 4.2, 3.6), olhar: new THREE.Vector3(0, 1.25, -3.3) } };
+    const vista = {
+      geral: { pos: new THREE.Vector3(0, 8.2, 12.2), olhar: new THREE.Vector3(0, 0.95, -0.3) },
+      palco: { pos: new THREE.Vector3(0, 4.2, 3.6), olhar: new THREE.Vector3(0, 1.25, -3.3) },
+      // a despedida: a câmera vira para a porta de saída, onde a apresentadora espera
+      saida: { pos: new THREE.Vector3(4.6, 3.2, 6.4), olhar: new THREE.Vector3(8.7, 1.1, 1.3) },
+      // a grande final: um pouco mais aberta, para caber a arquibancada dos dois lados
+      final: { pos: new THREE.Vector3(0, 7.6, 14.2), olhar: new THREE.Vector3(0, 1.3, 0.4) },
+    };
     const olharAtual = vista.geral.olhar.clone();
     camera.position.copy(vista.geral.pos);
     camera.lookAt(olharAtual);
@@ -455,6 +491,55 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
     estudio.add(caixaDe(6.4, 0.06, 0.04, neon, 0, 0.68, -3.18));
     for (const x of POS_DOS_JURADOS) estudio.add(caixaDe(0.5, 0.06, 0.32, COR.ouro, x, 0.95, -3.45));
 
+    // a porta de saída no fim do corredor (parede da direita) e a placa acesa em cima
+    const porta = new THREE.Group();
+    porta.position.set(10.62, 0, CORREDOR_Z);
+    porta.add(caixaDe(0.1, 2.4, 1.6, "#0b0e12", 0, 1.2, 0));
+    porta.add(caixaDe(0.16, 2.5, 0.1, COR.metal, 0, 1.25, -0.85));
+    porta.add(caixaDe(0.16, 2.5, 0.1, COR.metal, 0, 1.25, 0.85));
+    porta.add(caixaDe(0.16, 0.1, 1.8, COR.metal, 0, 2.5, 0));
+    const placaTex = texturaDeCanvas(512, 128, placaDeSaida);
+    const placa = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.4), new THREE.MeshBasicMaterial({ map: placaTex }));
+    placa.position.set(-0.1, 2.85, 0);
+    placa.rotation.y = -Math.PI / 2;
+    porta.add(placa);
+    const luzDaSaida = new THREE.PointLight("#4ade80", 2.5, 5, 1.6);
+    luzDaSaida.position.set(-0.8, 2.6, 0);
+    porta.add(luzDaSaida);
+    estudio.add(porta);
+
+    // ---- a grande final: a arquibancada nos dois lados, o confete dourado e os holofotes nos dois finalistas
+    const arquibancada = new THREE.Group();
+    const ouroAceso = mat(COR.ouro, { emissive: COR.ouro, emissiveIntensity: 0.7 });
+    for (const lado of [-1, 1]) {
+      for (const d of DEGRAUS) arquibancada.add(caixaDe(1.0, d.h, 5.2, "#2a2f38", lado * d.dx, d.h / 2, 1.4));
+      arquibancada.add(caixaDe(0.06, 0.06, 5.2, ouroAceso, lado * (DEGRAUS[0].dx - 0.5), DEGRAUS[0].h + 0.02, 1.4));
+    }
+    arquibancada.visible = false;
+    estudio.add(arquibancada);
+    const qtdConfete = 320;
+    const posConfete = new Float32Array(qtdConfete * 3);
+    const corConfete = new Float32Array(qtdConfete * 3);
+    const paleta = ["#f0be45", "#84cc16", "#e879f9", "#38bdf8", "#ffffff"].map((c) => new THREE.Color(c));
+    for (let i = 0; i < qtdConfete; i++) {
+      posConfete.set([(Math.random() - 0.5) * 16, Math.random() * 6, (Math.random() - 0.5) * 10 + 0.5], i * 3);
+      const c = paleta[i % paleta.length];
+      corConfete.set([c.r, c.g, c.b], i * 3);
+    }
+    const geoConfete = new THREE.BufferGeometry();
+    geoConfete.setAttribute("position", new THREE.BufferAttribute(posConfete, 3));
+    geoConfete.setAttribute("color", new THREE.BufferAttribute(corConfete, 3));
+    const confete = new THREE.Points(geoConfete, new THREE.PointsMaterial({ size: 0.1, vertexColors: true }));
+    confete.visible = false;
+    estudio.add(confete);
+    const holofotesDaFinal = POS_DA_FINAL.map(([x, z]) => {
+      const s = new THREE.SpotLight("#ffd77a", 0, 10, 0.5, 0.6, 1.2);
+      s.position.set(x, 6.5, z + 1.5);
+      s.target.position.set(x, 0, z);
+      estudio.add(s, s.target);
+      return s;
+    });
+
     // ---- os bonecos de papel (competidores e jurados), sempre de frente para a câmera
     const geoPapel = new THREE.PlaneGeometry(1.5, 1.5);
     geoPapel.translate(0, 0.75, 0);
@@ -473,14 +558,17 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
       return b;
     }
     IDS_DOS_JURADOS.forEach((id, i) => boneco(`jurado:${id}`, POS_DOS_JURADOS[i], Z_DOS_JURADOS, { escala: 1.45, y0: ALTURA_DO_PALCO }));
+    boneco("apresentadora", POS_DA_APRESENTADORA.x, POS_DA_APRESENTADORA.z, { escala: 1.2 });
 
-    /** Põe o boneco para andar por um caminho (ou teleporta, com "reduzir movimento"). */
-    function andar(b, pontos) {
+    /** Põe o boneco para andar por um caminho (ou teleporta, com "reduzir movimento"); `aoChegar` roda no fim. */
+    function andar(b, pontos, aoChegar = null) {
+      b.aoChegar = aoChegar;
       if (semMovimento) {
         const fim = pontos[pontos.length - 1];
         b.malha.position.x = fim.x;
         b.malha.position.z = fim.z;
         b.caminho = null;
+        aoChegar?.();
         sujo = true;
         return;
       }
@@ -522,9 +610,15 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
       trofeu.position.set(0.55, 0.86, -0.2);
       trofeu.visible = false;
       g.add(trofeu);
+      // o piso colorido do time, na prova em equipe
+      const placa = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.9), new THREE.MeshBasicMaterial({ color: "#2563eb", transparent: true, opacity: 0.32 }));
+      placa.rotation.x = -Math.PI / 2;
+      placa.position.set(0.15, 0.012, 0.3);
+      placa.visible = false;
+      g.add(placa);
       g.traverse((m) => { m.userData.baia = i; });
       estudio.add(g);
-      baias.push({ grupo: g, telaCanvas, telaTex, tela, trofeu, fundo, participante: null });
+      baias.push({ grupo: g, telaCanvas, telaTex, tela, trofeu, fundo, placa, participante: null });
     });
 
     // ---- girar arrastando; tocar numa baia escolhe o competidor
@@ -565,6 +659,8 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
       const retrato = w < h * 1.2;
       vista.geral.pos.set(0, retrato ? 11 : 8.2, retrato ? 16.5 : 12.2);
       vista.palco.pos.set(0, retrato ? 5 : 4.2, retrato ? 6.4 : 3.6);
+      vista.saida.pos.set(retrato ? 3.2 : 4.6, retrato ? 4 : 3.2, retrato ? 9 : 6.4);
+      vista.final.pos.set(0, retrato ? 11 : 7.6, retrato ? 19 : 14.2);
       camera.updateProjectionMatrix();
       sujo = true;
     }
@@ -592,7 +688,12 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
     // ---- o laço
     const relogio = new THREE.Clock();
     let antes = 0;
-    const estado = { noPalco: null, juradoAtivo: null };
+    // local: "bancada" (o code review), "saida" (a entrevista de despedida na porta) ou "fora" (foi embora);
+    // falando: quem fala agora na despedida ("apresentadora" ou "competidor")
+    const estado = { noPalco: null, juradoAtivo: null, local: null, falando: null, final: null };
+    const estaFalando = (id) => (id.startsWith("jurado:") && estado.juradoAtivo && id === `jurado:${estado.juradoAtivo}`)
+      || (id === "apresentadora" && estado.falando === "apresentadora")
+      || (id === estado.noPalco && estado.falando === "competidor");
     function quadro() {
       quadroId = requestAnimationFrame(quadro);
       if (!visivel) return;
@@ -607,7 +708,14 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
         if (!b.caminho) continue;
         const { pontos } = b.caminho;
         const alvo = pontos[b.caminho.i + 1];
-        if (!alvo) { b.caminho = null; b.andando = false; continue; }
+        if (!alvo) {
+          b.caminho = null;
+          b.andando = false;
+          const chegou = b.aoChegar;
+          b.aoChegar = null;
+          chegou?.();
+          continue;
+        }
         const pos = b.malha.position;
         const dx = alvo.x - pos.x, dz = alvo.z - pos.z;
         const dist = Math.hypot(dx, dz);
@@ -618,34 +726,40 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
 
       if (!semMovimento) {
         for (const [id, b] of bonecos) {
-          const ehJurado = id.startsWith("jurado:");
-          const falando = ehJurado && estado.juradoAtivo && id === `jurado:${estado.juradoAtivo}`;
+          const falando = estaFalando(id);
           const alvoEscala = b.escala * (falando ? 1.14 : 1) * (id === estado.noPalco && !b.andando ? 1.12 : 1);
           b.malha.scale.setScalar(THREE.MathUtils.lerp(b.malha.scale.x, alvoEscala, suave(0.15)));
           b.malha.position.y = b.y0 + (b.andando ? Math.abs(Math.sin(t * 11)) * 0.12
+            : b.torcendo ? Math.abs(Math.sin(t * 5 + b.base.z * 2 + b.base.x)) * 0.24
             : falando ? Math.abs(Math.sin(t * 6)) * 0.06
             : b.digitando ? Math.abs(Math.sin(t * 7 + b.base.x)) * 0.05
             : Math.sin(t * 1.6 + b.base.x) * 0.015);
+        }
+        if (estado.final) {
+          for (let i = 0; i < qtdConfete; i++) {
+            posConfete[i * 3 + 1] -= dt * (0.9 + (i % 5) * 0.25);
+            posConfete[i * 3] += Math.sin(t * 2 + i) * dt * 0.3;
+            if (posConfete[i * 3 + 1] < 0) posConfete[i * 3 + 1] = 6;
+          }
+          geoConfete.attributes.position.needsUpdate = true;
         }
         luzDosJurados.intensity = (api.current?.avaliando ? 9 : 6) + Math.sin(t * 2) * 0.6;
         ambiente?.animar(t);
         sujo = true;
       } else {
-        for (const [id, b] of bonecos) {
-          const falando = id.startsWith("jurado:") && estado.juradoAtivo && id === `jurado:${estado.juradoAtivo}`;
-          b.malha.scale.setScalar(b.escala * (falando ? 1.14 : 1));
-        }
+        for (const [id, b] of bonecos) b.malha.scale.setScalar(b.escala * (estaFalando(id) ? 1.14 : 1));
       }
 
-      // a câmera vai (e volta) do palco
-      const alvoVista = estado.noPalco ? vista.palco : vista.geral;
+      // a câmera vai (e volta) do palco, e vira para a porta na despedida
+      const alvoVista = !estado.noPalco ? (estado.final ? vista.final : vista.geral) : estado.local === "bancada" ? vista.palco : vista.saida;
+      for (const s of holofotesDaFinal) s.intensity = estado.final && !estado.noPalco ? 30 : 0;
       if (semMovimento) { camera.position.copy(alvoVista.pos); olharAtual.copy(alvoVista.olhar); }
       else if (camera.position.distanceTo(alvoVista.pos) > 0.01 || olharAtual.distanceTo(alvoVista.olhar) > 0.01) {
         camera.position.lerp(alvoVista.pos, suave(0.06));
         olharAtual.lerp(alvoVista.olhar, suave(0.06));
         sujo = true;
       }
-      holofote.intensity = THREE.MathUtils.lerp(holofote.intensity, estado.noPalco ? 40 : 0, semMovimento ? 1 : suave(0.1));
+      holofote.intensity = THREE.MathUtils.lerp(holofote.intensity, estado.noPalco && estado.local === "bancada" ? 40 : 0, semMovimento ? 1 : suave(0.1));
 
       if (!sujo) return;
       sujo = false;
@@ -672,12 +786,52 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
           b.telaTex.needsUpdate = true;
           b.trofeu.visible = Boolean(p && p.id === campeao);
           b.fundo.material.opacity = p && !p.eliminado ? 0.16 : 0.06;
+          // a prova em equipe: o piso da baia na cor do time
+          b.placa.visible = Boolean(p?.equipe);
+          if (p?.equipe) b.placa.material.color.set(COR_DO_TIME[p.equipe] || "#2563eb");
           const [x, z] = POSICOES[i];
           if (p) {
             const bo = boneco(p.id, x + 0.6, z + 0.55);
             bo.digitando = p.etapa === "codigo" && !p.eliminado;
-            bo.malha.material.opacity = p.eliminado && estado.noPalco !== p.id ? 0.45 : 1;
+            bo.eliminado = p.eliminado;
+            // na final, quem está na arquibancada torce aceso (não apagado como eliminado)
+            const naArquibancada = estado.final && !estado.final.includes(p.id);
+            bo.malha.material.opacity = p.eliminado && !naArquibancada && estado.noPalco !== p.id ? 0.45 : 1;
           }
+        });
+        sujo = true;
+      },
+      /** A grande final: as baias dos dois finalistas no centro e todos os outros na arquibancada, torcendo. */
+      definirFinal(dados) {
+        const ids = dados?.finalistas?.length ? dados.finalistas : null;
+        estado.final = ids;
+        arquibancada.visible = Boolean(ids);
+        confete.visible = Boolean(ids) && !semMovimento;
+        porta.visible = !ids;
+        const host = bonecos.get("apresentadora");
+        const hp = ids ? APRESENTADORA_NA_FINAL : POS_DA_APRESENTADORA;
+        host.base = { x: hp.x, z: hp.z };
+        host.malha.position.set(hp.x, host.y0, hp.z);
+        let assento = 0;
+        baias.forEach((b, i) => {
+          const p = b.participante;
+          const [x, z] = POSICOES[i];
+          const naFinal = ids && p ? ids.indexOf(p.id) : -1;
+          if (!ids) { b.grupo.position.set(x, 0, z); b.grupo.visible = true; }
+          else if (naFinal >= 0) { b.grupo.position.set(POS_DA_FINAL[naFinal][0], 0, POS_DA_FINAL[naFinal][1]); b.grupo.visible = true; }
+          else b.grupo.visible = false;
+          const bo = p && bonecos.get(p.id);
+          if (!bo) return;
+          if (!ids) { bo.base = { x: x + 0.6, z: z + 0.55 }; bo.y0 = 0; bo.torcendo = false; }
+          else if (naFinal >= 0) { bo.base = { x: POS_DA_FINAL[naFinal][0] + 0.6, z: POS_DA_FINAL[naFinal][1] + 0.55 }; bo.y0 = 0; bo.torcendo = false; }
+          else {
+            const a = ASSENTOS[assento++ % ASSENTOS.length];
+            bo.base = { x: a.x, z: a.z };
+            bo.y0 = a.y;
+            bo.torcendo = true;
+            bo.malha.material.opacity = 1;
+          }
+          if (!bo.caminho && estado.noPalco !== p.id) bo.malha.position.set(bo.base.x, bo.y0, bo.base.z);
         });
         sujo = true;
       },
@@ -695,16 +849,38 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
         b.material.visible = true;
         sujo = true;
       },
-      /** O palco da avaliação ao vivo: quem vai até a bancada e qual jurado fala. */
-      definirPalco(id, juradoAtivo) {
+      /**
+       * O palco da avaliação ao vivo: quem está na cena, qual jurado fala e onde ele está — "bancada" (o code
+       * review), "saida" (a entrevista de despedida com a apresentadora, na porta) ou "fora" (foi embora).
+       */
+      definirPalco(id, juradoAtivo, local = "bancada", falando = null) {
         if (estado.noPalco !== id) {
           const antigo = estado.noPalco && bonecos.get(estado.noPalco);
-          if (antigo) andar(antigo, [...caminhoAtePalco(antigo.base)].reverse().map((p, i) => (i === 0 ? new THREE.Vector3(antigo.malha.position.x, 0, antigo.malha.position.z) : p)));
+          if (antigo) {
+            // quem foi embora reaparece direto na baia (apagado, se saiu do torneio); os outros voltam andando
+            if (!antigo.malha.visible) {
+              antigo.malha.position.set(antigo.base.x, antigo.y0, antigo.base.z);
+              antigo.malha.visible = true;
+              antigo.caminho = null;
+            } else {
+              andar(antigo, caminhoAte(antigo.malha.position, antigo.base));
+            }
+            antigo.malha.material.opacity = antigo.eliminado ? 0.45 : 1;
+          }
           const novo = id && bonecos.get(id);
-          if (novo) { novo.malha.material.opacity = 1; andar(novo, caminhoAtePalco(novo.base)); }
+          if (novo) { novo.malha.material.opacity = 1; novo.malha.visible = true; andar(novo, caminhoAte(novo.malha.position, PALCO)); }
           estado.noPalco = id || null;
+          estado.local = id ? "bancada" : null;
+        }
+        const b = id && bonecos.get(id);
+        if (b && local !== estado.local) {
+          if (local === "saida") andar(b, caminhoAte(b.malha.position, SAIDA));
+          else if (local === "fora") andar(b, [new THREE.Vector3(b.malha.position.x, 0, b.malha.position.z), new THREE.Vector3(FORA.x, 0, FORA.z)], () => { b.malha.visible = false; sujo = true; });
+          else andar(b, caminhoAte(b.malha.position, PALCO));
+          estado.local = local;
         }
         estado.juradoAtivo = juradoAtivo || null;
+        estado.falando = falando || null;
         sujo = true;
       },
       marcarAvaliando(sim) { this.avaliando = sim; sujo = true; },
@@ -740,9 +916,14 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
   const chaveDoTelao = JSON.stringify(telao || {});
   const noPalco = palco?.id || null;
   const juradoAtivo = palco?.juradoAtivo || null;
+  const local = palco?.local || "bancada";
+  const falando = palco?.falando || null;
+  const chaveDaFinal = (final?.finalistas || []).join("|");
+  const chaveDosTimes = participantes.map((p) => p.equipe || "").join("|");
   useEffect(() => {
     const aplicar = () => {
       api.current?.definirParticipantes(participantes, campeaoId);
+      api.current?.definirFinal(final);
       api.current?.definirTelao(telao);
       api.current?.marcarAvaliando(avaliando);
     };
@@ -750,21 +931,24 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
     window.addEventListener("bootcamp-escritorio-pronto", aplicar);
     return () => window.removeEventListener("bootcamp-escritorio-pronto", aplicar);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chave, chaveDoTelao, campeaoId, avaliando]);
+  }, [chave, chaveDoTelao, campeaoId, avaliando, chaveDaFinal, chaveDosTimes]);
   useEffect(() => {
     const aplicar = () => api.current?.definirCenario(cenario);
     aplicar();
     window.addEventListener("bootcamp-escritorio-pronto", aplicar);
     return () => window.removeEventListener("bootcamp-escritorio-pronto", aplicar);
   }, [cenario]);
-  useEffect(() => { api.current?.definirPalco(noPalco, juradoAtivo); }, [noPalco, juradoAtivo]);
+  useEffect(() => { api.current?.definirPalco(noPalco, juradoAtivo, local, falando); }, [noPalco, juradoAtivo, local, falando]);
 
   // ---- as folhas de papel: redesenha quando a skin ou o humor de alguém muda
-  const humorDe = (p) => humores?.[p.id] || humorDoCompetidor(p, campeaoId);
+  const naArquibancada = (p) => Boolean(final?.finalistas?.length) && !final.finalistas.includes(p.id);
+  const humorDe = (p) => humores?.[p.id] || (naArquibancada(p) ? "comemorando" : humorDoCompetidor(p, campeaoId));
   const humorDoJurado = (id) => humores?.[`jurado:${id}`] || (avaliando ? "pensando" : "normal");
+  const humorDaApresentadora = humores?.apresentadora || "normal";
   const chaveDosHumores = [
     ...participantes.map((p) => `${p.id}:${p.skin}:${humorDe(p)}`),
     ...jurados.map((j) => `${j.id}:${humorDoJurado(j.id)}`),
+    `apresentadora:${humorDaApresentadora}`,
   ].join("|");
   useEffect(() => {
     let cancelado = false;
@@ -790,10 +974,16 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
           className={`bc-escritorio__rotulo${p.souEu ? " bc-escritorio__rotulo--eu" : ""}${p.eliminado ? " bc-escritorio__rotulo--fora" : ""}${noPalco === p.id ? " bc-escritorio__rotulo--palco" : ""}`}
           onClick={() => aoEscolher?.(p.id)} aria-label={`${p.nome}${p.souEu ? " (você)" : ""}: ${p.eliminado ? "eliminado" : p.enviada ? "enviou" : p.etapa || "aguardando"} — ver a baia`}>
           {p.id === campeaoId && <span aria-hidden="true">🏆</span>}
+          {p.salvo && !naArquibancada(p) && <span aria-hidden="true" title="salvo desta prova">🛡️</span>}
           {p.tipo === "npc" && <span aria-hidden="true">🤖</span>}
           {p.souEu ? "Você" : p.nome}
+          {p.insignias?.length > 0 && <span className="bc-escritorio__insignias" aria-hidden="true">{p.insignias.length}🎖️</span>}
         </button>
       ))}
+      <span ref={(n) => { rotulos.current.apresentadora = n; }}
+        className={`bc-escritorio__rotulo bc-escritorio__rotulo--apresentadora${falando === "apresentadora" ? " bc-escritorio__rotulo--falando" : ""}`}>
+        🎤 {apresentadora?.nome || "Clara Compila"}
+      </span>
       {jurados.map((j) => (
         <span key={j.id} ref={(n) => { rotulos.current[`jurado:${j.id}`] = n; }}
           className={`bc-escritorio__rotulo bc-escritorio__rotulo--jurado${juradoAtivo === j.id ? " bc-escritorio__rotulo--falando" : ""}`}
@@ -811,6 +1001,7 @@ export default function Escritorio3D({ participantes, jurados, campeaoId = null,
         {jurados.map((j) => (
           <div key={j.id} data-molde={`jurado:${j.id}`}><DesenhoDoJurado id={j.id} humor={humorDoJurado(j.id)} tamanho={200} /></div>
         ))}
+        <div data-molde="apresentadora"><DesenhoDaApresentadora humor={humorDaApresentadora} tamanho={200} /></div>
       </div>
     </div>
   );

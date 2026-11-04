@@ -28,7 +28,8 @@
 .bc-torneio .pf-estat__nota { margin: 0; }
 
 /* ---- criação */
-.bc-criar { display: grid; gap: 14px; max-width: 920px; }
+.bc-criar { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1200px) { .bc-criar { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bc-criar__bloco--largo, .bc-criar__fim { grid-column: 1 / -1; } }
 .bc-criar__bloco { display: grid; gap: 12px; }
 .bc-criar__titulo { margin: 0; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 19px; }
 .bc-criar__linha { max-width: 320px; }
@@ -64,7 +65,7 @@
 
 /* ---- o escritório em 3D */
 .bc-escritorio {
-  position: relative; height: 440px; margin-bottom: 16px; overflow: hidden; border-radius: var(--pf-raio-grande);
+  position: relative; height: clamp(420px, 60vh, 660px); margin-bottom: 16px; overflow: hidden; border-radius: var(--pf-raio-grande);
   border: 1px solid rgba(132, 204, 22, 0.25); background: radial-gradient(120% 90% at 50% 0%, #18210e 0%, #0b0e12 60%);
   box-shadow: 0 24px 48px -24px rgba(0, 0, 0, 0.6); touch-action: pan-y; user-select: none;
 }
@@ -104,8 +105,8 @@
 .bc-competidor__texto strong { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 18px; }
 
 /* ---- a arena */
-.bc-arena { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 1100px) { .bc-arena { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; } }
+.bc-arena { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); margin-top: 16px; }
+@media (min-width: 1200px) { .bc-arena { grid-template-columns: minmax(340px, 0.85fr) minmax(0, 1.5fr); align-items: start; } }
 .bc-arena__principal { display: grid; gap: 16px; min-width: 0; }
 .bc-arena__lado { display: grid; gap: 16px; }
 @media (min-width: 1100px) { .bc-arena__lado { position: sticky; top: 16px; } }
@@ -291,3 +292,96 @@
   .bc-aovivo__selo, .bc-aovivo__numero, .bc-review { animation: none; }
   .bc-medidor__barra > span { transition: none; }
 }
+
+/* ------------------------------------------------------------------ a temporada (04/11/2026, 1.4.0) */
+/* as telas do Bootcamp usam a largura toda da tela (o padrão do Proof é 1080px) */
+.pf-principal:has(.bc-pagina) { max-width: 1760px; }
+.bc-pagina { display: grid; gap: 0; }
+
+/* o palco: o 3D ao lado da prova e do painel de status */
+.bc-palco-grade { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1200px) { .bc-palco-grade { grid-template-columns: minmax(0, 1fr) 360px; } .bc-palco-grade__lado { position: sticky; top: 16px; } }
+.bc-palco-grade__cena { min-width: 0; display: grid; gap: 0; }
+.bc-palco-grade__lado { display: grid; gap: 14px; }
+.bc-arena__desafio, .bc-arena__trabalho { display: grid; gap: 16px; min-width: 0; align-content: start; }
+@media (min-width: 1200px) { .bc-arena__desafio { position: sticky; top: 16px; } }
+
+/* a linha da temporada */
+.bc-temporada { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; padding: 0; list-style: none; }
+.bc-temporada__prova { display: inline-grid; justify-items: center; gap: 0; min-width: 52px; padding: 6px 8px; border-radius: 14px; border: 1px solid var(--pf-linha); background: var(--pf-superficie-2, transparent); font-size: 18px; line-height: 1.1; }
+.bc-temporada__prova small { color: var(--pf-tinta-3); font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.bc-temporada__prova--feita { opacity: 0.55; }
+.bc-temporada__prova--agora { border-color: var(--pf-verde); background: var(--pf-verde-claro); box-shadow: 0 0 0 3px rgba(132, 204, 22, 0.2); }
+.bc-temporada__prova--final { border-color: #f0be45; }
+.bc-temporada--previa .bc-temporada__prova { opacity: 1; }
+
+/* a prova de agora */
+.bc-prova { display: grid; gap: 8px; border-left: 5px solid var(--pf-verde); }
+.bc-prova--eliminacao { border-left-color: #ef4444; }
+.bc-prova--equipe { border-left-color: #2563eb; }
+.bc-prova--final { border-left-color: #f0be45; }
+.bc-prova__topo { display: flex; align-items: center; gap: 10px; }
+.bc-prova__topo .bc-lado__titulo { margin: 0; }
+.bc-prova__emoji { font-size: 30px; }
+.bc-prova__descricao { margin: 0; color: var(--pf-tinta-2); font-size: 14px; font-weight: 600; }
+.bc-equipes { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.bc-equipe { display: grid; gap: 2px; padding: 10px 12px; border-radius: 14px; border: 2px solid currentColor; font-size: 13.5px; }
+.bc-equipe span { color: var(--pf-tinta-2); font-weight: 600; }
+.bc-equipe small { color: var(--pf-tinta-3); }
+.bc-equipe--venceu { box-shadow: 0 0 0 3px rgba(240, 190, 69, 0.35); }
+.bc-time--azul { color: #3b82f6; }
+.bc-time--laranja { color: #f97316; }
+.bc-time { border: 1px solid currentColor; background: transparent; }
+.bc-time-ponto { display: inline-block; width: 9px; height: 9px; margin-left: 6px; border-radius: 50%; background: currentColor; vertical-align: middle; }
+
+/* a escolha do capitão */
+.bc-escolha { display: grid; gap: 10px; margin-top: 16px; border: 2px solid #2563eb; }
+.bc-escolha h2 { margin: 0; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 20px; }
+.bc-escolha__grade { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.bc-escolha__opcao { display: grid; justify-items: center; gap: 6px; padding: 12px; border-radius: var(--pf-raio); border: 1px solid var(--pf-linha); background: var(--pf-superficie-2, transparent); text-align: center; }
+.bc-abrir { margin-top: 16px; }
+
+/* os status e as especialidades da CPU */
+.bc-status { display: grid; gap: 3px; width: 100%; }
+.bc-status__linha { display: grid; grid-template-columns: 82px minmax(0, 1fr) 20px; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: var(--pf-tinta-2); text-align: left; }
+.bc-status__linha strong { color: var(--pf-tinta); text-align: right; }
+.bc-status__barra { position: relative; display: block; height: 7px; overflow: hidden; border-radius: var(--pf-pilula); background: var(--pf-linha); }
+.bc-status__barra > span { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--pf-verde); }
+.bc-status__especialidades { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.bc-status__especialidades .pf-pilula { font-size: 11px; padding: 2px 8px; }
+
+/* as insígnias */
+.bc-insignias { display: inline-flex; flex-wrap: wrap; gap: 2px; vertical-align: middle; }
+.bc-insignia { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 3px; border-radius: 50%; background: rgba(240, 190, 69, 0.16); border: 1px solid rgba(240, 190, 69, 0.55); font-size: 12px; }
+.bc-classificacao__item { grid-template-areas: "av nome pts" "av info pts" "av ins ins"; }
+.bc-classificacao__insignias { grid-area: ins; }
+.bc-escritorio__insignias { margin-left: 4px; font-size: 11px; opacity: 0.85; }
+.bc-escritorio__rotulo--apresentadora { cursor: default; border-color: #2dd4bf; color: #ccfbf1; }
+.bc-resultado__vencedor { margin: 0; font-weight: 800; }
+.bc-aovivo__insignia { padding: 6px 12px; border-radius: var(--pf-pilula); background: rgba(240, 190, 69, 0.16); border: 1px solid rgba(240, 190, 69, 0.55); font-weight: 700; animation: bc-revelar 0.5s ease-out; }
+.bc-opcoes--tres { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.bc-temporada-config { display: grid; gap: 10px; }
+
+/* a entrevista de despedida */
+.bc-entrevista { display: grid; gap: 10px; animation: bc-entrar 0.35s ease-out; }
+.bc-entrevista__fala { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 18px; border: 1px solid var(--pf-linha); opacity: 0.65; }
+.bc-entrevista__fala--agora { opacity: 1; border-color: #2dd4bf; }
+.bc-entrevista__fala--resposta { margin-left: 28px; border-color: var(--pf-verde); }
+.bc-entrevista__fala p { margin: 4px 0 0; font-size: 16px; font-weight: 700; font-style: italic; }
+
+/* a ficha de quem saiu */
+.bc-ficha { display: grid; gap: 14px; animation: bc-entrar 0.4s ease-out; }
+.bc-ficha__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.bc-ficha__topo > div { flex: 1 1 200px; display: grid; gap: 4px; }
+.bc-ficha__topo h3 { margin: 0; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 24px; }
+.bc-ficha__topo .pf-estat__nota { margin: 0; }
+.bc-ficha__notas { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.bc-ficha__nota { display: grid; grid-template-columns: minmax(0, 1fr) 90px 44px; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 14px; background: var(--pf-superficie-2, rgba(0, 0, 0, 0.04)); }
+.bc-ficha__nota strong { text-align: right; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 18px; }
+.bc-ficha__pontos { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.bc-ficha__pontos h4 { margin: 0 0 6px; font-size: 15px; }
+.bc-ficha__pontos ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) { .bc-entrevista, .bc-ficha, .bc-aovivo__insignia { animation: none; } }
+
+@media (min-width: 1400px) { .bc-torneios { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

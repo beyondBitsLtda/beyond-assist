@@ -8,7 +8,7 @@ import { obter, criar } from "@/lib/api.js";
 import { useAviso } from "@/componentes/Pecas.js";
 import { comemorar, reagir } from "@/componentes/Neuro.js";
 import EditorDeCodigo from "@/componentes/codigo/EditorDeCodigo.js";
-import { Avatar, BaiasPlanas, Cronometro, FluxoDoExercicio, ResultadoDosTestes, ROTULO_DA_ETAPA } from "@/componentes/bootcamp/Pecas.js";
+import { Avatar, BaiasPlanas, Cronometro, FluxoDoExercicio, ResultadoDosTestes, ROTULO_DA_ETAPA, StatusDoNpc, Insignias } from "@/componentes/bootcamp/Pecas.js";
 import AvaliacaoAoVivo from "@/componentes/bootcamp/AvaliacaoAoVivo.js";
 import { caminhoPadrao, CENARIOS, ORDEM_DOS_CENARIOS, NIVEIS_DO_TORNEIO } from "@/dominio/bootcamp.js";
 
@@ -88,6 +88,18 @@ export default function Arena() {
     }
   }, [id, avisar]);
 
+  // sem espera: entregou o último humano da prova (ou a prova é só dos personagens da CPU), os jurados entram sozinhos
+  const chamouJurados = useRef(null);
+  useEffect(() => {
+    const r = dados?.rodada;
+    if (!r || r.status !== "aberta" || !dados.todosEnviaram || !dados.podeChamarJurados || dados.avaliando || ocupado) return;
+    if (chamouJurados.current === r.numero) return;
+    chamouJurados.current = r.numero;
+    setOcupado("jurados");
+    // em silêncio: se outra pessoa chamou antes, a trava do servidor responde 409 e a arena só recarrega
+    criar(`/api/bootcamp/${id}`, { acao: "jurados" }).then(setDados).catch(() => carregar()).finally(() => setOcupado(""));
+  }, [dados, ocupado, id, carregar]);
+
   if (erro && !dados) {
     return (
       <>
@@ -100,19 +112,21 @@ export default function Arena() {
 
   const { torneio, participantes, rodada, minhaEntrega, eu } = dados;
   const selecionado = participantes.find((p) => p.id === escolhido) || null;
+  const prova = rodada?.prova;
   const telao = {
-    titulo: rodada ? `Rodada ${rodada.numero} de ${torneio.rodadasTotal}` : torneio.status === "encerrado" ? "Temporada encerrada" : "Aguardando a 1ª rodada",
+    titulo: dados.final ? "GRANDE FINAL" : rodada ? `${prova?.emoji || ""} ${prova?.nome || "Rodada"} · ${rodada.numero} de ${torneio.rodadasTotal}`.trim() : torneio.status === "encerrado" ? "Temporada encerrada" : "Aguardando a 1ª prova",
     subtitulo: rodada?.desafio?.titulo || torneio.nome,
   };
 
   return (
-    <>
+    <div className="bc-pagina bc-pagina--arena">
       <div className="pf-cabecalho">
         <div>
           <h1>🏁 {torneio.nome}</h1>
           <p>{torneio.formatoNome}: {torneio.formatoDescricao}</p>
           <div className="bc-pilulas">
-            <span className="pf-pilula">Rodada {torneio.rodadaAtual || 0} de {torneio.rodadasTotal}</span>
+            <span className="pf-pilula">{torneio.formato === "temporada" ? "Prova" : "Rodada"} {torneio.rodadaAtual || 0} de {torneio.rodadasTotal}</span>
+            {eu?.insignias?.length > 0 && <span className="pf-pilula">suas insígnias: <Insignias lista={eu.insignias} catalogo={dados.insignias} /></span>}
             <span className="pf-pilula">{torneio.participantes} competidores</span>
             <span className="pf-pilula">{torneio.linguagens?.modo === "jurados" ? "⚖️ linguagem dos jurados" : "🧰 linguagem livre"}</span>
             {torneio.contraCpu && <span className="pf-pilula">{NIVEIS_DO_TORNEIO[torneio.nivel]?.emoji} nível {torneio.nivelNome}</span>}
@@ -125,6 +139,8 @@ export default function Arena() {
         </div>
       </div>
 
+      {torneio.plano && <LinhaDaTemporada plano={torneio.plano} atual={torneio.rodadaAtual} avaliada={rodada?.status === "avaliada"} />}
+
       {!sem3d && (
         <div className="bc-cenarios" role="radiogroup" aria-label="Cenário do escritório">
           <span className="pf-campo__rotulo">Cenário</span>
@@ -134,34 +150,28 @@ export default function Arena() {
               {CENARIOS[c].emoji} {CENARIOS[c].nome}
             </button>
           ))}
+          {dados.final && <span className="pf-pilula pf-pilula--verde">🏆 arena especial da grande final</span>}
         </div>
       )}
-      {sem3d ? (
-        <BaiasPlanas participantes={participantes} campeaoId={torneio.campeaoId} aoEscolher={setEscolhido} />
-      ) : (
-        <Escritorio3D participantes={participantes} jurados={dados.jurados} campeaoId={torneio.campeaoId} telao={telao}
-          avaliando={dados.avaliando} cenario={cenario || torneio.cenario} palco={cena?.palco} humores={cena?.humores}
-          aoEscolher={setEscolhido} aoFalhar={() => setSem3d(true)} />
-      )}
-      {aoVivo && rodada?.numero === aoVivo && rodada.avaliacao?.participantes?.length > 0 && (
-        <AvaliacaoAoVivo key={aoVivo} avaliacao={rodada.avaliacao} participantes={participantes} jurados={dados.jurados}
-          numero={rodada.numero} aoMudar={setCena} aoAcabar={acabarAoVivo} />
-      )}
-      {selecionado && <Competidor p={selecionado} campeaoId={torneio.campeaoId} aoFechar={() => setEscolhido(null)} />}
 
-      <div className="bc-arena">
-        <div className="bc-arena__principal">
-          <Abertura dados={dados} ocupado={ocupado} agir={agir} />
-          {rodada && <Desafio rodada={rodada} />}
-          {rodada?.status === "aberta" && eu && !eu.eliminado && minhaEntrega && (
-            <MinhaEntrega key={`${rodada.numero}`} torneioId={torneio.id} dados={dados} entrega={minhaEntrega} ocupado={ocupado} agir={agir}
-              setDados={setDados} setOcupado={setOcupado} avisar={avisar} />
+      {/* o palco: o escritório em 3D (e a avaliação ao vivo embaixo dele) ao lado da prova e do painel de status */}
+      <div className="bc-palco-grade">
+        <div className="bc-palco-grade__cena">
+          {sem3d ? (
+            <BaiasPlanas participantes={participantes} campeaoId={torneio.campeaoId} aoEscolher={setEscolhido} />
+          ) : (
+            <Escritorio3D participantes={participantes} jurados={dados.jurados} apresentadora={dados.apresentadora} campeaoId={torneio.campeaoId} telao={telao}
+              avaliando={dados.avaliando} cenario={cenario || torneio.cenario} palco={cena?.palco} humores={cena?.humores} final={dados.final}
+              aoEscolher={setEscolhido} aoFalhar={() => setSem3d(true)} />
           )}
-          {rodada?.status === "aberta" && eu?.eliminado && <p className="pf-aviso">Você saiu do torneio, mas pode acompanhar a rodada e as notas dos jurados até o fim.</p>}
-          {rodada?.status === "aberta" && <ChamarJurados dados={dados} ocupado={ocupado} agir={agir} />}
-          {rodada?.status === "avaliada" && <ResultadoDaRodada dados={dados} aoRever={aoVivo ? null : () => { setAoVivo(rodada.numero); window.scrollTo({ top: 0, behavior: "smooth" }); }} />}
+          {aoVivo && rodada?.numero === aoVivo && rodada.avaliacao?.participantes?.length > 0 && (
+            <AvaliacaoAoVivo key={aoVivo} avaliacao={rodada.avaliacao} participantes={participantes} jurados={dados.jurados}
+              apresentadora={dados.apresentadora} insignias={dados.insignias} numero={rodada.numero} aoMudar={setCena} aoAcabar={acabarAoVivo} />
+          )}
+          {selecionado && <Competidor p={selecionado} dados={dados} aoFechar={() => setEscolhido(null)} />}
         </div>
-        <aside className="bc-arena__lado">
+        <aside className="bc-palco-grade__lado">
+          {rodada && <ProvaAtual dados={dados} />}
           <Classificacao dados={dados} aoEscolher={setEscolhido} />
           {rodada?.confrontos?.length > 0 && (
             <section className="pf-cartao bc-confrontos">
@@ -175,8 +185,104 @@ export default function Arena() {
           )}
         </aside>
       </div>
+
+      <Abertura dados={dados} ocupado={ocupado} agir={agir} />
+      {dados.escolha && <EscolhaDoCapitao dados={dados} ocupado={ocupado} agir={agir} />}
+
+      {rodada && (
+        <div className="bc-arena">
+          <div className="bc-arena__desafio"><Desafio rodada={rodada} /></div>
+          <div className="bc-arena__trabalho">
+            {rodada.status === "aberta" && eu && !eu.eliminado && minhaEntrega && (
+              <MinhaEntrega key={`${rodada.numero}`} torneioId={torneio.id} dados={dados} entrega={minhaEntrega} ocupado={ocupado} agir={agir}
+                setDados={setDados} setOcupado={setOcupado} avisar={avisar} />
+            )}
+            {rodada.status === "aberta" && eu?.salvo && (
+              <p className="pf-aviso pf-aviso--ok">🛡️ Você está salvo desta prova: ela é de quem não se salvou na anterior. Assista e torça (ou secará?).</p>
+            )}
+            {rodada.status === "aberta" && eu?.eliminado && <p className="pf-aviso">Você saiu do torneio, mas pode acompanhar as provas e as notas dos jurados até o fim.</p>}
+            {rodada.status === "aberta" && <ChamarJurados dados={dados} ocupado={ocupado} agir={agir} />}
+            {rodada.status === "avaliada" && <ResultadoDaRodada dados={dados} aoRever={aoVivo ? null : () => { setAoVivo(rodada.numero); window.scrollTo({ top: 0, behavior: "smooth" }); }} />}
+          </div>
+        </div>
+      )}
       {Aviso}
-    </>
+    </div>
+  );
+}
+
+/** A temporada inteira numa linha: cada prova (imunidade, equipe, eliminação, final), com a de agora acesa. */
+function LinhaDaTemporada({ plano, atual, avaliada }) {
+  return (
+    <ol className="bc-temporada" aria-label="As provas da temporada">
+      {plano.map((p) => {
+        const estado = p.numero < atual || (p.numero === atual && avaliada) ? "feita" : p.numero === atual ? "agora" : "depois";
+        return (
+          <li key={p.numero} className={`bc-temporada__prova bc-temporada__prova--${estado} bc-temporada__prova--${p.tipo}`} title={`${p.nome} · episódio ${p.episodio}`}
+            aria-current={estado === "agora" ? "step" : undefined}>
+            <span aria-hidden="true">{p.emoji}</span>
+            <small>{p.tipo === "final" ? "Final" : `Ep. ${p.episodio}`}</small>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** A prova de agora: o tipo, quem joga, quantos saem, as equipes e quem ficou salvo. */
+function ProvaAtual({ dados }) {
+  const { rodada, participantes } = dados;
+  const prova = rodada.prova;
+  const salvos = participantes.filter((p) => p.salvo);
+  return (
+    <section className={`pf-cartao bc-prova bc-prova--${prova.tipo}`}>
+      <div className="bc-prova__topo">
+        <span className="bc-prova__emoji" aria-hidden="true">{prova.emoji}</span>
+        <div>
+          <h2 className="bc-lado__titulo">{prova.nome}</h2>
+          <span className="pf-estat__nota">{prova.tipo === "rodada" ? `Rodada ${rodada.numero}` : prova.tipo === "final" ? "A decisão" : `Episódio ${prova.episodio}`} · {prova.competidores.length} na prova{prova.sai ? ` · sai${prova.sai > 1 ? "em" : ""} ${prova.sai}` : ""}</span>
+        </div>
+      </div>
+      <p className="bc-prova__descricao">{prova.descricao}</p>
+      {prova.equipes?.length > 0 && (
+        <div className="bc-equipes">
+          {prova.equipes.map((e) => (
+            <div key={e.id} className={`bc-equipe bc-time--${e.id}`}>
+              <strong>{e.emoji} {e.nome}</strong>
+              <span>{e.nomes.join(", ")}</span>
+              {e.nomeDoCapitao && <small>capitão: {e.nomeDoCapitao}</small>}
+            </div>
+          ))}
+        </div>
+      )}
+      {salvos.length > 0 && <p className="pf-estat__nota">🛡️ Salvos desta prova: {salvos.map((p) => (p.souEu ? "você" : p.nome)).join(", ")}</p>}
+    </section>
+  );
+}
+
+/** A prova em equipe no modo "capitão": o vencedor da última prova escolhe um membro; os outros esperam. */
+function EscolhaDoCapitao({ dados, ocupado, agir }) {
+  const { escolha } = dados;
+  if (!escolha.souEu) {
+    return <p className="pf-aviso">🤝 Prova em equipe: aguardando {escolha.nomeDoCapitao}, o vencedor da última prova, escolher um membro para o time. O resto será sorteado.</p>;
+  }
+  return (
+    <section className="pf-cartao bc-escolha">
+      <h2>🤝 Você é o capitão!</h2>
+      <p className="pf-estat__nota">Como você venceu a última prova, escolha <strong>um</strong> competidor para o seu time. O resto dos times sai por sorteio, e a prova abre em seguida.</p>
+      <div className="bc-escolha__grade">
+        {escolha.disponiveis.map((p) => (
+          <div key={p.id} className="bc-escolha__opcao">
+            <Avatar p={{ ...p, eliminado: false }} tamanho={56} />
+            <strong>{p.nome}{p.tipo === "npc" ? " 🤖" : ""}</strong>
+            <StatusDoNpc status={p.status} especialidades={p.especialidades} catalogo={dados.especialidades} rotulos={dados.rotulosDeStatus} />
+            <button type="button" className="pf-botao pf-botao--pequeno" disabled={Boolean(ocupado)} onClick={() => agir({ acao: "escolher-membro", membro: p.id }, "escolher")}>
+              {ocupado === "escolher" ? "Montando os times…" : "Escolher para o meu time"}
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -197,18 +303,23 @@ function Abertura({ dados, ocupado, agir }) {
     ) : null;
   }
   if (rodada && rodada.status !== "avaliada") return null;
+  if (dados.escolha) return null;
   const proxima = (torneio.rodadaAtual || 0) + 1;
+  const nomeDaProxima = torneio.proxima ? `${torneio.proxima.emoji} ${torneio.proxima.nome}` : `rodada ${proxima}`;
   if (!podeAbrirRodada) {
-    return <p className="pf-aviso">Aguardando o organizador abrir a rodada {proxima}: os jurados lançam o desafio quando ela abrir.</p>;
+    return <p className="pf-aviso">Aguardando o organizador abrir a próxima prova ({nomeDaProxima}): os jurados lançam o desafio quando ela abrir.</p>;
   }
   return (
     <section className="pf-cartao bc-abrir">
       <div>
-        <h2>{rodada ? `Pronto para a rodada ${proxima}?` : "Tudo pronto no escritório"}</h2>
-        <p className="pf-estat__nota">Os 3 jurados lançam o desafio da rodada {proxima} de {torneio.rodadasTotal}{torneio.linguagens?.modo === "jurados" ? " e estipulam a linguagem" : ""}. {torneio.tempoMin ? `O relógio de ${torneio.tempoMin} minutos começa na hora.` : "Sem limite de tempo."}</p>
+        <h2>{rodada ? `Próxima: ${nomeDaProxima}` : `Tudo pronto no escritório: ${nomeDaProxima}`}</h2>
+        <p className="pf-estat__nota">
+          {torneio.proxima?.tipo === "equipe" && torneio.opcoes?.provaDeEquipe === "capitao" ? "O vencedor da última prova vai escolher um membro do time antes de começar. " : ""}
+          Os 3 jurados lançam o desafio da prova {proxima} de {torneio.rodadasTotal}{torneio.linguagens?.modo === "jurados" ? " e estipulam a linguagem" : ""}. {torneio.tempoMin ? `O relógio de ${torneio.tempoMin} minutos começa na hora.` : "Sem limite de tempo."}
+        </p>
       </div>
       <button type="button" className="pf-botao" disabled={Boolean(ocupado)} onClick={() => agir({ acao: "abrir-rodada" }, "abrir")}>
-        {ocupado === "abrir" ? "Os jurados estão preparando o desafio…" : `🎬 Abrir a rodada ${proxima}`}
+        {ocupado === "abrir" ? "Os jurados estão preparando o desafio…" : `🎬 Abrir: ${nomeDaProxima}`}
       </button>
     </section>
   );
@@ -449,9 +560,30 @@ function ResultadoDaRodada({ dados, aoRever }) {
   const eu = participantes.find((p) => p.souEu);
   const nomes = new Map(participantes.map((p) => [p.id, p.souEu ? "você" : p.nome]));
   const saiu = rodada.avaliacao?.eliminados || [];
+  const av = rodada.avaliacao || {};
+  const prova = rodada.prova;
+  const ameacados = (av.participantes || []).filter((a) => a.resultado === "ameacado").map((a) => nomes.get(a.id));
+  const insigniaDoVencedor = (av.participantes || []).find((a) => a.insignia);
   return (
     <section className="pf-cartao bc-resultado">
-      <h2>Resultado da rodada {rodada.numero}</h2>
+      <h2>Resultado: {prova?.emoji} {prova?.nome || `rodada ${rodada.numero}`}</h2>
+      {insigniaDoVencedor && (
+        <p className="bc-resultado__vencedor">
+          {dados.insignias?.[insigniaDoVencedor.insignia]?.emoji} {(av.vencedores || []).map((pid) => nomes.get(pid)).join(", ")} {av.vencedores?.length > 1 ? "venceram" : "venceu"} e {av.vencedores?.length > 1 ? "ganharam" : "ganhou"} a insígnia <strong>{dados.insignias?.[insigniaDoVencedor.insignia]?.nome}</strong>
+        </p>
+      )}
+      {av.equipes?.length > 0 && (
+        <div className="bc-equipes">
+          {av.equipes.map((e) => (
+            <div key={e.id} className={`bc-equipe bc-time--${e.id}${e.venceu ? " bc-equipe--venceu" : ""}`}>
+              <strong>{e.emoji} {e.nome} · {e.nota}/100 {e.venceu ? "🏅" : ""}</strong>
+              <span>{e.membros.map((pid) => nomes.get(pid)).join(", ")}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {(av.salvos || []).length > 0 && <p className="pf-estat__nota">🛡️ Salvos da eliminação: {av.salvos.map((pid) => nomes.get(pid)).join(", ")}</p>}
+      {ameacados.length > 0 && <p className="pf-estat__nota">🔥 Vão para a prova de eliminação: {ameacados.join(", ")}</p>}
       {rodada.avaliacao?.comentarioGeral && <p className="bc-resultado__comentario">“{rodada.avaliacao.comentarioGeral}”</p>}
       {eu && eu.nota !== null && eu.nota !== undefined && <p className="bc-resultado__nota">Sua nota: <strong>{eu.nota}</strong>/100 · {eu.pontos} pontos no torneio</p>}
       {saiu.length > 0 && <p className="pf-estat__nota">Saíram nesta rodada: {saiu.map((id) => nomes.get(id)).join(", ")}.</p>}
@@ -477,8 +609,12 @@ function Classificacao({ dados, aoEscolher }) {
             <button type="button" className="bc-classificacao__item" onClick={() => aoEscolher(p.id)}>
               <Avatar p={p} campeaoId={dados.torneio.campeaoId} tamanho={34} />
               <span className="bc-classificacao__nome">{p.souEu ? "Você" : p.nome}{p.tipo === "npc" ? " 🤖" : ""}</span>
-              <span className="bc-classificacao__info">{p.eliminado ? `saiu na ${p.eliminadoNa}ª` : p.etapa ? ROTULO_DA_ETAPA[p.etapa] : "—"}</span>
+              <span className="bc-classificacao__info">
+                {p.eliminado ? `saiu na prova ${p.eliminadoNa}` : p.salvo ? "🛡️ salvo desta prova" : p.etapa ? ROTULO_DA_ETAPA[p.etapa] : "—"}
+                {p.equipe && <span className={`bc-time-ponto bc-time--${p.equipe}`} aria-label={`time ${p.equipe}`} />}
+              </span>
               <span className="bc-classificacao__pontos">{p.pontos}</span>
+              <span className="bc-classificacao__insignias"><Insignias lista={p.insignias} catalogo={dados.insignias} max={5} /></span>
             </button>
           </li>
         ))}
@@ -487,8 +623,9 @@ function Classificacao({ dados, aoEscolher }) {
   );
 }
 
-/** O cartão de quem foi tocado no escritório: personalidade, etapa, testes e pontos. */
-function Competidor({ p, campeaoId, aoFechar }) {
+/** O cartão de quem foi tocado no escritório: personalidade, status e especialidades (CPU), insígnias, etapa e pontos. */
+function Competidor({ p, dados, aoFechar }) {
+  const campeaoId = dados.torneio.campeaoId;
   return (
     <section className="pf-cartao bc-competidor" aria-label={`Baia de ${p.nome}`}>
       <Avatar p={p} campeaoId={campeaoId} tamanho={72} />
@@ -496,8 +633,10 @@ function Competidor({ p, campeaoId, aoFechar }) {
         <strong>{p.souEu ? "Você" : p.nome} {p.tipo === "npc" ? <span className="pf-pilula">🤖 personagem da Lisa</span> : <span className="pf-pilula">humano</span>}</strong>
         {p.personalidade && <p className="pf-estat__nota">{p.personalidade}</p>}
         {p.bordao && <p><em>“{p.bordao}”</em></p>}
+        <StatusDoNpc status={p.status} especialidades={p.especialidades} catalogo={dados.especialidades} rotulos={dados.rotulosDeStatus} />
+        <Insignias lista={p.insignias} catalogo={dados.insignias} />
         <p className="pf-estat__nota">
-          {p.eliminado ? `Eliminado na rodada ${p.eliminadoNa}` : p.etapa ? `Agora: ${ROTULO_DA_ETAPA[p.etapa]}` : "Aguardando a rodada"}
+          {p.eliminado ? `Eliminado na prova ${p.eliminadoNa}` : p.salvo ? "Salvo desta prova" : p.etapa ? `Agora: ${ROTULO_DA_ETAPA[p.etapa]}` : "Aguardando a prova"}
           {p.testes ? ` · testes ${p.testes.passados}/${p.testes.total}` : ""} · {p.pontos} pontos{p.nota !== null && p.nota !== undefined ? ` · última nota ${p.nota}` : ""}
         </p>
       </div>

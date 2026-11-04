@@ -26,14 +26,41 @@ import {
   resumoDosTestes, validarDesafio, desafioParaTela, testesParaTela, desafioDeReserva, simularNpc, etapaDoNpc,
   notasDoNpc, notaDaRodada, avaliacaoAutomatica, aplicarResultado, classificacao, podeChamarJurados,
   NIVEIS_DO_TORNEIO, ORDEM_DOS_NIVEIS, CENARIOS, ORDEM_DOS_CENARIOS, nivelValido, cenarioValido, npcNoNivel,
-  reviewAutomatica, reviewDoNpc,
+  reviewAutomatica, reviewDoNpc, pontosAutomaticos, despedidaAutomatica,
+  TIPOS_DE_PROVA, INSIGNIAS, ESPECIALIDADES, STATUS, planoDaTemporada, competidoresDaProva, formarEquipes, escolhaDoCapitaoNpc,
+  aplicarResultadoDaProva, APRESENTADORA, provaDoTorneio,
 } from "@/dominio/bootcamp.js";
 
 const falhou = (error, onde) => { if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`); };
 const ehUuid = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || ""));
-const CAMPOS_T = "id, dono_id, nome, formato, tempo_min, linguagens, rodadas_total, participantes, humanos, rodada_atual, status, campeao, criado_em, atualizado_em, encerrado_em, opcoes";
+const CAMPOS_T = "id, dono_id, nome, formato, tempo_min, linguagens, rodadas_total, participantes, humanos, rodada_atual, status, campeao, criado_em, atualizado_em, encerrado_em, opcoes, estado";
 const nivelDo = (t) => nivelValido(t.opcoes?.nivel);
-const CAMPOS_R = "id, torneio_id, numero, desafio, confrontos, status, avaliacao, aberta_em, prazo, avaliada_em";
+const CAMPOS_R = "id, torneio_id, numero, desafio, confrontos, status, avaliacao, aberta_em, prazo, avaliada_em, prova";
+
+/**
+ * A prova da rodada. Nas rodadas da temporada ela vem gravada ({ tipo, episodio, competidores, equipes, sai });
+ * nos modos rápidos (e nas rodadas de antes da temporada existir) é uma "rodada" com todos os que estavam na disputa.
+ */
+const provaDe = (t, rodada) => rodada?.prova || {
+  tipo: "rodada", episodio: rodada?.numero || 0,
+  competidores: t.participantes.filter((p) => !p.eliminado || p.eliminadoNa === rodada?.numero).map((p) => p.id),
+};
+const naProva = (prova, id) => (prova?.competidores || []).includes(id);
+const equipeDe = (prova, id) => (prova?.equipes || []).find((e) => e.membros.includes(id)) || null;
+
+/** O plano da temporada para a tela: as provas, com o nome de cada uma. */
+const planoParaTela = (t) => (t.formato === "temporada"
+  ? planoDaTemporada(t.participantes.length, t.opcoes).map((p) => ({ numero: p.numero, tipo: p.tipo, episodio: p.episodio, nome: TIPOS_DE_PROVA[p.tipo].nome, emoji: TIPOS_DE_PROVA[p.tipo].emoji }))
+  : null);
+
+function provaParaTela(prova, nomes) {
+  const tipo = TIPOS_DE_PROVA[prova.tipo] || TIPOS_DE_PROVA.rodada;
+  return {
+    tipo: prova.tipo, nome: tipo.nome, emoji: tipo.emoji, descricao: tipo.descricao, episodio: prova.episodio, sai: prova.sai || null,
+    competidores: prova.competidores || [],
+    equipes: (prova.equipes || []).map((e) => ({ ...e, nomes: e.membros.map((id) => nomes.get(id) || "?"), nomeDoCapitao: e.capitao ? nomes.get(e.capitao) : null })),
+  };
+}
 const CAMPOS_E = "id, rodada_id, torneio_id, usuario_id, etapa, plano, modo, linguagem, repo, caminho, codigo, commit_sha, testes, passou, tentativas, enviada_em, atualizado_em";
 const ABERTOS_POR_ORGANIZADOR = 5;
 
@@ -129,7 +156,10 @@ const npcDoTorneio = (p, t) => {
 function simulacaoDo(p, rodada, t) {
   const npc = npcDoTorneio(p, t);
   if (!npc) return null;
-  return simularNpc({ npc, dificuldade: rodada.desafio.dificuldade, testes: rodada.desafio.testes, tempoMin: t.tempo_min, s: sorteio(sementeDe(`${rodada.id}:${p.npcId}`)) });
+  return simularNpc({
+    npc, dificuldade: rodada.desafio.dificuldade, testes: rodada.desafio.testes, tempoMin: t.tempo_min, area: rodada.desafio.area,
+    s: sorteio(sementeDe(`${rodada.id}:${p.npcId}`)),
+  });
 }
 
 function linguagensDoTorneio(t) {
@@ -164,6 +194,7 @@ const resumoDoTorneio = (usuarioId) => (t) => {
     nivel: nivelDo(t), nivelNome: NIVEIS_DO_TORNEIO[nivelDo(t)].nome,
     cenario: cenarioValido(t.opcoes?.cenario), cenarioNome: CENARIOS[cenarioValido(t.opcoes?.cenario)].nome,
     contraCpu: t.participantes.some((p) => p.tipo === "npc"),
+    opcoes: t.opcoes || {},
   };
 };
 
@@ -194,7 +225,15 @@ export async function bootcampDe(usuarioId) {
       tempos: BOOTCAMP.tempos.filter(Boolean),
       rodadasDosPontosCorridos: BOOTCAMP.rodadasDosPontosCorridos,
       linguagens: ORDEM_DAS_LINGUAGENS.map((chave) => ({ chave, rotulo: LINGUAGENS_DO_BOOTCAMP[chave].rotulo })),
-      npcs: NPCS_DO_BOOTCAMP.map((n) => ({ id: n.id, nome: n.nome, skin: n.skin, personalidade: n.personalidade, bordao: n.bordao, disponivel: npcsDisponiveis([meuPersonagem]).includes(n) })),
+      npcs: NPCS_DO_BOOTCAMP.map((n) => ({
+        id: n.id, nome: n.nome, skin: n.skin, personalidade: n.personalidade, bordao: n.bordao, status: n.status, especialidades: n.especialidades,
+        disponivel: npcsDisponiveis([meuPersonagem]).includes(n),
+      })),
+      especialidades: ESPECIALIDADES,
+      rotulosDeStatus: STATUS,
+      tiposDeProva: TIPOS_DE_PROVA,
+      eliminadosPorEpisodio: BOOTCAMP.eliminadosPorEpisodio,
+      provasDeEquipe: BOOTCAMP.provasDeEquipe,
       jurados: JURADOS,
       niveis: ORDEM_DOS_NIVEIS.map((id) => ({ id, ...NIVEIS_DO_TORNEIO[id] })),
       cenarios: ORDEM_DOS_CENARIOS.map((id) => ({ id, ...CENARIOS[id] })),
@@ -214,14 +253,26 @@ export async function torneioParaTela(usuarioId, id) {
   const minutos = rodada ? (agora - new Date(rodada.aberta_em).getTime()) / 60_000 : 0;
   const aberta = rodada?.status === "aberta";
   const avaliacao = new Map((rodada?.avaliacao?.participantes || []).map((a) => [a.id, a]));
+  const prova = provaDe(t, rodada);
+  const humanosNaProva = t.participantes.filter((p) => p.tipo === "humano" && naProva(prova, p.id));
+  // contra a CPU ninguém espera o relógio dos personagens: entregou o último humano da prova, todo mundo entregou
+  const todosEnviaram = Boolean(aberta) && humanosNaProva.every((h) => porUsuario.get(h.usuarioId)?.enviada_em);
 
   const participantes = t.participantes.map((p) => {
-    const base = { ...p, souEu: p.id === meuId(usuarioId), compete: Boolean(rodada) && !p.eliminado };
-    // quem saiu numa rodada anterior não tem etapa nesta
-    if (!rodada || (p.eliminado && p.eliminadoNa !== rodada.numero)) return { ...base, etapa: null, enviada: false, testes: null };
+    const npc = p.tipo === "npc" ? npcPorId(p.npcId) : null;
+    const base = {
+      ...p, souEu: p.id === meuId(usuarioId), compete: Boolean(rodada) && naProva(prova, p.id),
+      // salvo: está na disputa, mas a prova de agora não é dele (ficou salvo na prova anterior)
+      salvo: Boolean(rodada) && !p.eliminado && !naProva(prova, p.id),
+      equipe: equipeDe(prova, p.id)?.id || null,
+      insignias: p.insignias || [],
+      ...(npc ? { status: npc.status, especialidades: npc.especialidades } : {}),
+    };
+    // quem saiu antes, ou não joga esta prova, não tem etapa nela
+    if (!rodada || !naProva(prova, p.id)) return { ...base, etapa: null, enviada: false, testes: null, nota: avaliacao.get(p.id)?.nota ?? null };
     if (p.tipo === "npc") {
       const sim = simulacaoDo(p, rodada, t);
-      const etapa = aberta ? etapaDoNpc(sim, minutos) : "fim";
+      const etapa = aberta ? (todosEnviaram ? "revisao" : etapaDoNpc(sim, minutos)) : "fim";
       const enviada = !aberta || etapa === "revisao";
       return { ...base, etapa, enviada, testes: enviada ? { passados: sim.passados, total: sim.total } : null, nota: avaliacao.get(p.id)?.nota ?? null };
     }
@@ -233,35 +284,55 @@ export async function torneioParaTela(usuarioId, id) {
   const souDono = t.dono_id === usuarioId;
   const eu = t.participantes.find((p) => p.id === meuId(usuarioId));
   const tempoAcabou = Boolean(aberta && prazoPassou(rodada.prazo, agora));
-  const todosEnviaram = Boolean(aberta) && humanosAtivos(t).every((h) => porUsuario.get(h.usuarioId)?.enviada_em);
   const jurados = aberta ? podeChamarJurados({ souDono, todosEnviaram, tempoAcabou }) : { ok: false, motivo: "" };
   const nomes = new Map(t.participantes.map((p) => [p.id, p.nome]));
+  const pendente = t.estado?.pendente || null;
+  const plano = planoParaTela(t);
+  const proxima = plano ? plano[t.rodada_atual] || null : null;
 
   return {
     torneio: {
       ...resumoDoTorneio(usuarioId)(t), linguagens: t.linguagens, linguagensDisponiveis: linguagensDoTorneio(t),
-      formatoDescricao: FORMATOS[t.formato]?.descricao, campeaoId: t.campeao,
+      formatoDescricao: FORMATOS[t.formato]?.descricao, campeaoId: t.campeao, plano, proxima,
     },
     participantes,
     jurados: JURADOS,
+    apresentadora: APRESENTADORA,
     fluxo: ETAPAS_DO_FLUXO,
+    insignias: INSIGNIAS,
+    especialidades: ESPECIALIDADES,
+    rotulosDeStatus: STATUS,
+    // a prova em equipe no modo "capitão": o vencedor da última prova escolhe um membro antes de a prova abrir
+    escolha: pendente ? {
+      capitao: pendente.capitao, nomeDoCapitao: nomes.get(pendente.capitao) || "", souEu: pendente.capitao === meuId(usuarioId),
+      disponiveis: (pendente.disponiveis || []).map((pid) => {
+        const p = t.participantes.find((x) => x.id === pid);
+        const npc = p?.tipo === "npc" ? npcPorId(p.npcId) : null;
+        return { id: pid, nome: p?.nome, skin: p?.skin, tipo: p?.tipo, status: npc?.status || null, especialidades: npc?.especialidades || [] };
+      }),
+    } : null,
     rodada: rodada ? {
       numero: rodada.numero, status: rodada.status, abertaEm: rodada.aberta_em, prazo: rodada.prazo, avaliadaEm: rodada.avaliada_em,
+      prova: provaParaTela(prova, nomes),
       desafio: desafioParaTela(rodada.desafio),
       confrontos: (rodada.confrontos || []).map((c) => ({ a: c.a, b: c.b, nomeA: nomes.get(c.a), nomeB: c.b ? nomes.get(c.b) : null })),
       // avaliada: tudo o que a avaliação ao vivo precisa (as notas, o code review de cada um e o resultado)
       avaliacao: rodada.status === "avaliada" ? {
         comentarioGeral: rodada.avaliacao?.comentarioGeral || "", eliminados: rodada.avaliacao?.eliminados || [], campeao: rodada.avaliacao?.campeao || null,
         origem: rodada.avaliacao?.origem || "automatica",
+        vencedores: rodada.avaliacao?.vencedores || [], salvos: rodada.avaliacao?.salvos || [], equipes: rodada.avaliacao?.equipes || null,
         participantes: (rodada.avaliacao?.participantes || []).map((a) => ({
           id: a.id, nome: a.nome, tipo: a.tipo, nota: a.nota, notas: a.notas, resultado: a.resultado, fala: a.fala || "",
-          testes: a.testes, linguagem: a.linguagem || null, review: a.review || [],
+          testes: a.testes, linguagem: a.linguagem || null, review: a.review || [], insignia: a.insignia || null,
+          pontosFortes: a.pontosFortes || [], pontosFracos: a.pontosFracos || [], despedida: a.despedida || [],
         })),
       } : null,
     } : null,
-    minhaEntrega: eu && rodada ? entregaParaTela(porUsuario.get(usuarioId)) || { etapa: "leitura", plano: "", modo: null, linguagem: null, repo: "", caminho: "", codigo: "", testes: [], resumo: { total: 0, passados: 0, passou: false }, passou: false, tentativas: 0, enviadaEm: null } : null,
-    eu: eu ? { id: eu.id, eliminado: eu.eliminado, skin: eu.skin } : null,
-    podeAbrirRodada: souDono && t.status !== "encerrado" && (!rodada || rodada.status === "avaliada") && t.rodada_atual < t.rodadas_total,
+    // só tem entrega quem joga a prova de agora (quem ficou salvo assiste)
+    minhaEntrega: eu && rodada && naProva(prova, eu.id) ? entregaParaTela(porUsuario.get(usuarioId)) || { etapa: "leitura", plano: "", modo: null, linguagem: null, repo: "", caminho: "", codigo: "", testes: [], resumo: { total: 0, passados: 0, passou: false }, passou: false, tentativas: 0, enviadaEm: null } : null,
+    eu: eu ? { id: eu.id, eliminado: eu.eliminado, skin: eu.skin, salvo: Boolean(rodada) && !eu.eliminado && !naProva(prova, eu.id), insignias: eu.insignias || [] } : null,
+    final: prova.tipo === "final" ? { finalistas: prova.competidores } : null,
+    podeAbrirRodada: souDono && !pendente && t.status !== "encerrado" && (!rodada || rodada.status === "avaliada") && t.rodada_atual < t.rodadas_total,
     podeChamarJurados: jurados.ok,
     motivoDosJurados: jurados.motivo || "",
     tempoAcabou,
@@ -279,9 +350,13 @@ export async function juradosParaTela(usuarioId, id) {
   return {
     torneio: resumoDoTorneio(usuarioId)(t),
     jurados: JURADOS,
-    classificacao: classificacao(t.participantes).map((p, i) => ({ posicao: i + 1, id: p.id, nome: p.nome, tipo: p.tipo, skin: p.skin, pontos: p.pontos, eliminado: p.eliminado, eliminadoNa: p.eliminadoNa, souEu: p.id === meuId(usuarioId) })),
+    insignias: INSIGNIAS,
+    classificacao: classificacao(t.participantes).map((p, i) => ({ posicao: i + 1, id: p.id, nome: p.nome, tipo: p.tipo, skin: p.skin, pontos: p.pontos, eliminado: p.eliminado, eliminadoNa: p.eliminadoNa, souEu: p.id === meuId(usuarioId), insignias: p.insignias || [] })),
     rodadas: (data || []).map((r) => ({
       numero: r.numero, status: r.status, abertaEm: r.aberta_em, avaliadaEm: r.avaliada_em,
+      prova: provaParaTela(provaDe(t, r), new Map(t.participantes.map((p) => [p.id, p.nome]))),
+      vencedores: (r.avaliacao?.vencedores || []).map((pid) => porId.get(pid)?.nome).filter(Boolean),
+      equipes: r.avaliacao?.equipes || null,
       desafio: desafioParaTela(r.desafio),
       confrontos: (r.confrontos || []).map((c) => ({ ...c, nomeA: porId.get(c.a)?.nome, nomeB: c.b ? porId.get(c.b)?.nome : null })),
       avaliacao: r.avaliacao ? {
@@ -320,8 +395,8 @@ export async function criarTorneio(usuarioId, corpo) {
 
   const { data, error } = await supabase.from("proof_bootcamp_torneios").insert({
     dono_id: usuarioId, nome: c.nome, formato: c.formato, tempo_min: c.tempoMin, linguagens: c.linguagens,
-    rodadas_total: totalDeRodadas(c.formato, participantes.length, c.rodadasPontos),
-    participantes, humanos: ids, opcoes: c.opcoes,
+    rodadas_total: totalDeRodadas(c.formato, participantes.length, c.rodadasPontos, c.opcoes),
+    participantes, humanos: ids, opcoes: c.opcoes, estado: {},
   }).select("id").single();
   falhou(error, "criar torneio");
   return { id: data.id };
@@ -355,7 +430,8 @@ async function desafioDaRodada(t, numero) {
   const dificuldade = dificuldadeDaRodada(numero, t.rodadas_total, nivelDo(t));
   if (temModelo()) {
     try {
-      const daIa = await gerarDesafioDosJurados({ numero, total: t.rodadas_total, dificuldade, linguagens: t.linguagens, usados });
+      const tipoDeProva = provaDoTorneio(t.formato, numero, t.participantes.length, t.opcoes)?.tipo || "rodada";
+      const daIa = await gerarDesafioDosJurados({ numero, total: t.rodadas_total, dificuldade, linguagens: t.linguagens, usados, tipoDeProva });
       return await conferirComAReferencia(daIa);
     } catch (e) {
       console.warn("[bootcamp] desafio da IA descartado:", e?.message || e);
@@ -365,14 +441,49 @@ async function desafioDaRodada(t, numero) {
   return desafioDeReserva({ dificuldade, usados, linguagens: t.linguagens, s });
 }
 
-export async function abrirRodada(usuarioId, id) {
-  const t = await lerTorneio(usuarioId, id);
-  if (t.dono_id !== usuarioId) throw new ErroDeAcesso(403, "só quem organizou abre as rodadas");
+/**
+ * A prova da rodada `numero`: quem joga e, na prova em equipe, os dois times. No modo "capitao", o vencedor da
+ * última prova escolhe um membro: se ele for da CPU, escolhe o mais forte na hora; se for humano e ainda não
+ * escolheu, devolve { pendente } e a prova espera a escolha.
+ */
+function montarProva(t, numero, escolhido = null) {
+  if (t.formato !== "temporada") return { prova: null };
+  const item = planoDaTemporada(t.participantes.length, t.opcoes)[numero - 1];
+  if (!item) throw new ErroDeAcesso(400, "todas as provas já foram jogadas");
+  const competidores = competidoresDaProva(item.tipo, t.participantes, t.estado?.salvos || []);
+  const prova = { tipo: item.tipo, episodio: item.episodio, competidores, sai: item.sai || null };
+  if (item.tipo !== "equipe") return { prova };
+
+  const modo = t.opcoes?.provaDeEquipe === "capitao" ? "capitao" : "sorteio";
+  const vencedor = t.estado?.ultimoVencedor;
+  const capitao = modo === "capitao" && competidores.includes(vencedor) ? vencedor : null;
+  let membro = null;
+  if (capitao) {
+    const disponiveis = competidores.filter((pid) => pid !== capitao);
+    const cap = t.participantes.find((p) => p.id === capitao);
+    if (cap?.tipo === "npc") membro = escolhaDoCapitaoNpc(disponiveis, t.participantes);
+    else if (escolhido && disponiveis.includes(escolhido)) membro = escolhido;
+    else return { pendente: { tipo: "escolher-membro", capitao, numero, disponiveis } };
+  }
+  const s = sorteio(sementeDe(`equipes:${t.id}:${numero}`));
+  return { prova: { ...prova, equipes: formarEquipes(competidores, { modo: capitao ? "capitao" : "sorteio", capitao, escolhido: membro, s }) } };
+}
+
+/** Abre a próxima rodada (prova): os jurados lançam o desafio. `escolhido`: o membro que o capitão humano escolheu. */
+async function abrir(t, usuarioId, { escolhido = null } = {}) {
   if (t.status === "encerrado") throw new ErroDeAcesso(400, "o torneio já terminou");
   const atual = await lerRodada(t);
   if (atual && atual.status !== "avaliada") throw new ErroDeAcesso(400, `a rodada ${atual.numero} ainda não foi avaliada pelos jurados`);
   const numero = t.rodada_atual + 1;
   if (numero > t.rodadas_total) throw new ErroDeAcesso(400, "todas as rodadas já foram jogadas");
+
+  const montada = montarProva(t, numero, escolhido);
+  if (montada.pendente) {
+    // o capitão humano escolhe antes; a prova (e o desafio) só abrem depois da escolha
+    const { error } = await supabase.from("proof_bootcamp_torneios").update({ estado: { ...(t.estado || {}), pendente: montada.pendente }, atualizado_em: new Date().toISOString() }).eq("id", t.id);
+    falhou(error, "torneio");
+    return torneioParaTela(usuarioId, t.id);
+  }
 
   const desafio = await desafioDaRodada(t, numero);
   const conferido = validarDesafio(desafio, { linguagens: t.linguagens, dificuldade: desafio.dificuldade });
@@ -381,15 +492,34 @@ export async function abrirRodada(usuarioId, id) {
   const { error } = await supabase.from("proof_bootcamp_rodadas").insert({
     torneio_id: t.id, numero, desafio: { ...conferido.desafio, solucao: desafio.solucao || null },
     confrontos: t.formato === "mata-mata" ? confrontosDaRodada(t.participantes) : null,
+    prova: montada.prova,
     aberta_em: abertaEm, prazo: prazoDaRodada(abertaEm, t.tempo_min),
   });
   if (error?.code === "23505") throw new ErroDeAcesso(409, "essa rodada já foi aberta");
   falhou(error, "abrir rodada");
+  const { pendente: _feito, ...estado } = t.estado || {};
   const { error: e2 } = await supabase.from("proof_bootcamp_torneios")
-    .update({ rodada_atual: numero, status: "em-andamento", atualizado_em: abertaEm })
+    .update({ rodada_atual: numero, status: "em-andamento", estado, atualizado_em: abertaEm })
     .eq("id", t.id).eq("rodada_atual", numero - 1);
   falhou(e2, "torneio");
-  return torneioParaTela(usuarioId, id);
+  return torneioParaTela(usuarioId, t.id);
+}
+
+export async function abrirRodada(usuarioId, id) {
+  const t = await lerTorneio(usuarioId, id);
+  if (t.dono_id !== usuarioId) throw new ErroDeAcesso(403, "só quem organizou abre as rodadas");
+  if (t.estado?.pendente) throw new ErroDeAcesso(400, "a prova em equipe espera o capitão escolher um membro");
+  return abrir(t, usuarioId);
+}
+
+/** O capitão humano (o vencedor da última prova) escolhe um membro para o time dele; a prova em equipe abre em seguida. */
+export async function escolherMembro(usuarioId, id, membro) {
+  const t = await lerTorneio(usuarioId, id);
+  const pendente = t.estado?.pendente;
+  if (!pendente) throw new ErroDeAcesso(400, "não há escolha de equipe pendente");
+  if (pendente.capitao !== meuId(usuarioId)) throw new ErroDeAcesso(403, "só o capitão (o vencedor da última prova) escolhe");
+  if (!(pendente.disponiveis || []).includes(String(membro || ""))) throw new ErroDeAcesso(400, "escolha alguém que está na disputa");
+  return abrir(t, usuarioId, { escolhido: String(membro) });
 }
 
 // ------------------------------------------------------------------ o fluxo do exercício
@@ -402,6 +532,7 @@ async function minhaVez(usuarioId, id) {
   if (eu.eliminado) throw new ErroDeAcesso(400, "você foi eliminado: agora é torcer pelos outros");
   const rodada = await lerRodada(t);
   if (!rodada || rodada.status !== "aberta") throw new ErroDeAcesso(400, rodada?.status === "avaliando" ? "os jurados estão avaliando a rodada" : "nenhuma rodada aberta agora");
+  if (!naProva(provaDe(t, rodada), eu.id)) throw new ErroDeAcesso(400, "você está salvo desta prova: agora é assistir quem disputa");
   if (prazoPassou(rodada.prazo)) throw new ErroDeAcesso(400, "o tempo da rodada acabou: agora é com os jurados");
 
   const { error: e1 } = await supabase.from("proof_bootcamp_entregas")
@@ -537,9 +668,10 @@ export async function chamarJurados(usuarioId, id) {
 
   const entregas = await lerEntregas(rodada.id);
   const porUsuario = new Map(entregas.map((e) => [e.usuario_id, e]));
+  const prova = provaDe(t, rodada);
   const pode = podeChamarJurados({
     souDono: t.dono_id === usuarioId,
-    todosEnviaram: humanosAtivos(t).every((h) => porUsuario.get(h.usuarioId)?.enviada_em),
+    todosEnviaram: t.participantes.filter((p) => p.tipo === "humano" && naProva(prova, p.id)).every((h) => porUsuario.get(h.usuarioId)?.enviada_em),
     tempoAcabou: prazoPassou(rodada.prazo),
   });
   if (!pode.ok) throw new ErroDeAcesso(400, pode.motivo);
@@ -551,7 +683,8 @@ export async function chamarJurados(usuarioId, id) {
 
   try {
     const desafio = rodada.desafio;
-    const lista = ativos(t);
+    // os jurados avaliam só quem jogou esta prova (quem ficou salvo assiste)
+    const lista = t.participantes.filter((p) => naProva(prova, p.id));
     const apelidoDe = new Map(lista.map((p, i) => [p.id, `p${i + 1}`]));
     const humanos = [];
     const npcs = [];
@@ -605,32 +738,60 @@ export async function chamarJurados(usuarioId, id) {
         feedback = Object.fromEntries(Object.keys(auto.feedback).map((j) => [j, daIa?.feedback?.[j] || auto.feedback[j]]));
         testes = h.testes;
         // o code review: o da IA (linhas do código de verdade) ou, sem ela, um item por jurado com as falas do banco
+        const temPlano = h.plano.trim().length >= BOOTCAMP.minimoDoPlano;
         const review = daIa?.review?.length ? daIa.review : reviewAutomatica({
-          codigo: h.codigo, fracao: h.fracao, enviou: h.enviou, linguagemOk: h.linguagemOk, temPlano: h.plano.trim().length >= BOOTCAMP.minimoDoPlano, s,
+          codigo: h.codigo, fracao: h.fracao, enviou: h.enviou, linguagemOk: h.linguagemOk, temPlano, s,
         });
-        extra = { enviou: h.enviou, linguagem: h.linguagem, modo: h.modo, commitSha: h.commitSha, review };
+        // a despedida (se sair nesta rodada): os pontos fortes e fracos e a entrevista com a apresentadora
+        const auto2 = pontosAutomaticos({ notas: notasDele, testes: h.testes, enviou: h.enviou, temPlano, linguagemOk: h.linguagemOk });
+        extra = {
+          enviou: h.enviou, linguagem: h.linguagem, modo: h.modo, commitSha: h.commitSha, review,
+          pontosFortes: daIa?.pontosFortes?.length ? daIa.pontosFortes : auto2.fortes,
+          pontosFracos: daIa?.pontosFracos?.length ? daIa.pontosFracos : auto2.fracos,
+          despedida: daIa?.despedida?.length ? daIa.despedida : despedidaAutomatica({ nome: p.nome, notas: notasDele, testes: h.testes, s }),
+        };
       }
       const nota = notaDaRodada(notasDele);
       notas.set(p.id, { nota, kernel: notasDele.kernel });
       return { id: p.id, nome: p.nome, tipo: p.tipo, notas: notasDele, feedback, nota, testes, ...extra };
     });
 
-    const res = aplicarResultado({ formato: t.formato, participantes: t.participantes, confrontos: rodada.confrontos || [], notas, numero: rodada.numero, total: t.rodadas_total });
+    // o resultado: na temporada, pelo tipo da prova; nos modos rápidos, como antes (com o "melhor da rodada")
+    const temporada = t.formato === "temporada";
+    const res = temporada
+      ? aplicarResultadoDaProva({ prova: { ...prova, competidores: lista.map((p) => p.id) }, participantes: t.participantes, notas, numero: rodada.numero })
+      : aplicarResultado({ formato: t.formato, participantes: t.participantes, confrontos: rodada.confrontos || [], notas, numero: rodada.numero, total: t.rodadas_total });
     const folgas = new Set((rodada.confrontos || []).filter((c) => !c.b).map((c) => c.a));
+    const resultadoDe = (pid) => {
+      if (!temporada) return res.eliminados.includes(pid) ? "eliminado" : folgas.has(pid) ? "folga" : t.formato === "mata-mata" ? "avancou" : "pontuou";
+      if (prova.tipo === "final") return pid === res.campeao ? "campeao" : "vice";
+      if (prova.tipo === "eliminacao") return res.eliminados.includes(pid) ? "eliminado" : "sobreviveu";
+      return res.salvos.includes(pid) ? "salvo" : "ameacado";
+    };
+    const insigniaDaProva = temporada ? (prova.tipo === "final" ? "final" : prova.tipo) : "rodada";
     const avaliacao = {
       origem: ia ? "jurados" : "automatica",
       comentarioGeral: ia?.comentarioGeral || "Os jurados conferiram os testes, o plano e as regras de cada entrega.",
+      prova: { tipo: prova.tipo, episodio: prova.episodio },
       participantes: avaliados.map((a) => ({
         ...a,
-        resultado: res.eliminados.includes(a.id) ? "eliminado" : folgas.has(a.id) ? "folga" : t.formato === "mata-mata" ? "avancou" : "pontuou",
+        resultado: resultadoDe(a.id),
+        insignia: (res.vencedores || []).includes(a.id) ? insigniaDaProva : null,
       })),
-      eliminados: res.eliminados, avancaram: res.avancaram, campeao: res.campeao,
+      eliminados: res.eliminados, avancaram: res.avancaram || [], campeao: res.campeao,
+      vencedores: res.vencedores || [], salvos: res.salvos || [], equipes: res.equipes || null,
+    };
+    // o que a temporada lembra para a próxima prova: quem se salvou da eliminação e quem venceu (o capitão)
+    const estado = {
+      ...(t.estado || {}),
+      salvos: temporada && (prova.tipo === "imunidade" || prova.tipo === "equipe") ? res.salvos : [],
+      ultimoVencedor: (res.vencedores || [])[0] || null,
     };
     const agora = new Date().toISOString();
     const { error: e1 } = await supabase.from("proof_bootcamp_rodadas").update({ status: "avaliada", avaliacao, avaliada_em: agora }).eq("id", rodada.id).eq("status", "avaliando");
     falhou(e1, "rodada");
     const { error: e2 } = await supabase.from("proof_bootcamp_torneios").update({
-      participantes: res.participantes, atualizado_em: agora,
+      participantes: res.participantes, estado, atualizado_em: agora,
       ...(res.encerrado ? { status: "encerrado", campeao: res.campeao, encerrado_em: agora } : {}),
     }).eq("id", t.id);
     falhou(e2, "torneio");

@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { obter } from "@/lib/api.js";
 import Codigo from "@/componentes/codigo/Codigo.js";
 import DesenhoDoJurado from "@/componentes/bootcamp/Jurados.js";
-import { Avatar, RESULTADO } from "@/componentes/bootcamp/Pecas.js";
+import { Avatar, RESULTADO, Insignias } from "@/componentes/bootcamp/Pecas.js";
 
 /**
  * O painel dos 3 jurados do Modo Bootcamp: a classificação e, rodada por rodada, o desafio, o comentário dos
@@ -32,7 +32,7 @@ export default function PainelDosJurados() {
   const campeaoId = torneio.campeao?.id || null;
 
   return (
-    <>
+    <div className="bc-pagina">
       <div className="pf-cabecalho">
         <div>
           <h1>⚖️ Jurados · {torneio.nome}</h1>
@@ -64,7 +64,8 @@ export default function PainelDosJurados() {
               <span className="bc-tabela__pos">{c.posicao}º</span>
               <Avatar p={c} campeaoId={campeaoId} tamanho={34} />
               <span className="bc-tabela__nome">{c.id === campeaoId ? "🏆 " : ""}{c.souEu ? "Você" : c.nome}{c.tipo === "npc" ? " 🤖" : ""}</span>
-              <span className="bc-tabela__info">{c.eliminado ? `saiu na rodada ${c.eliminadoNa}` : "na disputa"}</span>
+              <span className="bc-tabela__info">{c.eliminado ? `saiu na prova ${c.eliminadoNa}` : "na disputa"}</span>
+              <Insignias lista={c.insignias} catalogo={dados.insignias} />
               <span className="bc-tabela__pontos">{c.pontos} pts</span>
             </li>
           ))}
@@ -74,11 +75,21 @@ export default function PainelDosJurados() {
       {!rodadas.length && <p className="pf-aviso">Nenhuma rodada ainda: os jurados entram quando o organizador abrir a primeira.</p>}
       {rodadas.map((r) => (
         <section key={r.numero} className="pf-secao">
-          <h2 className="pf-secao__titulo">Rodada {r.numero}: {r.desafio.titulo}{r.avaliacao?.origem === "automatica" && <small title="A IA dos jurados não respondeu: as notas saíram dos testes, do plano e das regras">avaliação automática</small>}</h2>
-          {!r.avaliacao && <p className="pf-aviso">{r.status === "avaliando" ? "Os jurados estão avaliando esta rodada…" : "Rodada em andamento: os jurados avaliam no fim."}</p>}
+          <h2 className="pf-secao__titulo">{r.prova?.emoji} {r.prova?.tipo === "rodada" ? `Rodada ${r.numero}` : `${r.prova?.nome} · prova ${r.numero}`}: {r.desafio.titulo}{r.avaliacao?.origem === "automatica" && <small title="A IA dos jurados não respondeu: as notas saíram dos testes, do plano e das regras">avaliação automática</small>}</h2>
+          {!r.avaliacao && <p className="pf-aviso">{r.status === "avaliando" ? "Os jurados estão avaliando esta prova…" : "Prova em andamento: os jurados avaliam no fim."}</p>}
           {r.avaliacao && (
             <>
               {r.avaliacao.comentarioGeral && <p className="bc-resultado__comentario">“{r.avaliacao.comentarioGeral}”</p>}
+              {r.vencedores?.length > 0 && <p className="bc-resultado__vencedor">🎖️ Vencedor{r.vencedores.length > 1 ? "es" : ""} da prova: {r.vencedores.join(", ")}</p>}
+              {r.equipes?.length > 0 && (
+                <div className="bc-equipes">
+                  {r.equipes.map((e) => (
+                    <div key={e.id} className={`bc-equipe bc-time--${e.id}${e.venceu ? " bc-equipe--venceu" : ""}`}>
+                      <strong>{e.emoji} {e.nome} · {e.nota}/100 {e.venceu ? "🏅" : ""}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
               {r.confrontos?.length > 0 && (
                 <p className="pf-estat__nota">Confrontos: {r.confrontos.map((c) => (c.b ? `${c.nomeA} × ${c.nomeB}` : `${c.nomeA} (folga)`)).join(" · ")}</p>
               )}
@@ -135,6 +146,6 @@ export default function PainelDosJurados() {
           )}
         </section>
       ))}
-    </>
+    </div>
   );
 }

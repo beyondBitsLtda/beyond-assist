@@ -9,14 +9,33 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.3.0",
+  "versao": "1.4.0",
   "atualizadoEm": "2026-11-04",
   "compilacao": {
-    "numero": 103,
+    "numero": 104,
     "data": "2026-11-04",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.4.0",
+      "data": "2026-11-04",
+      "branch": "main",
+      "tipo": "funcionalidade",
+      "resumo": "O Bootcamp vira uma temporada de reality: episódios com prova de imunidade (ou em equipe) e prova de eliminação, insígnia para todo vencedor, grande final numa arena com torcida, personagens da CPU com status e especialidades, despedida com a apresentadora e telas na largura toda.",
+      "itens": [
+        "Formato novo \"Temporada (reality)\", o padrão: cada episódio tem a Prova de Imunidade (não elimina e salva a metade com as melhores notas) e a Prova de Eliminação, que só quem não se salvou joga. Saem 1 ou 2 por episódio, como o organizador escolher, até sobrarem dois para a Grande Final.",
+        "Prova em Equipe no episódio do meio: dois times, com a nota do time igual à média dos integrantes, e o time vencedor fica salvo da eliminação. Os times saem por sorteio, ou o vencedor da última prova escolhe um membro e o resto é sorteado. O capitão humano escolhe na tela; o da CPU pega o mais forte.",
+        "Toda prova tem vencedor, e ele ganha uma insígnia (Imunidade, Trabalho em equipe, Volta por cima, Campeão ou, nos modos rápidos, Melhor da rodada), mostrada no painel, no 3D e na classificação.",
+        "Grande Final numa arena especial: as duas baias no centro, a arquibancada nos dois lados com todos os outros competidores torcendo, confete e holofotes dourados.",
+        "Cada personagem da CPU tem status (lógica, velocidade, testes, arquitetura e criatividade, de 1 a 10) e duas especialidades. Quando o desafio é da área dele, ele joga melhor; o status de testes pesa nos testes ocultos e o de arquitetura pesa na nota da Chef Vetor.",
+        "Sem espera contra a CPU: quando o último humano da prova entrega, os personagens aparecem como entregues e os jurados entram sozinhos. Uma prova só de personagens é avaliada assim que abre.",
+        "Despedida: o humano eliminado deixa a bancada, vai até a porta de saída e faz a entrevista de despedida com a apresentadora Clara Compila (personagem original); depois sai pela porta e a cena corta para a ficha com as notas de cada jurado, os testes, os pontos, as insígnias e os pontos fortes e fracos.",
+        "Telas do Bootcamp na largura toda (até 1760px): na arena, o escritório 3D fica ao lado da prova e do painel de status, e o desafio fica ao lado da baia. O escritório ficou mais alto.",
+        "Banco: migração db/034-bootcamp-temporada.sql (o formato temporada, até 20 provas, o estado da temporada e a prova de cada rodada)."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.3.0",
       "data": "2026-11-04",
@@ -1657,7 +1676,7 @@
         "Minigame do dia na Prática (a antiga Arena Lúdica): masmorra de depuração, mascote programável e quebra-cabeças de Parsons, com terminal, explicação da Lisa, +30 pontos uma vez por dia e recompensa por fase nova",
         "Exemplo da Lisa: uma aplicação de exemplo com os conceitos de cada exercício e projeto, sem resolver o desafio",
         "Menu do Reino em abas (Reino, Batalha, Expedições, Forja e Bolsa), com contadores e barra fixa ao rolar",
-        "Modo Bootcamp: torneios de programação em mata-mata ou pontos corridos, com até 8 competidores (pessoas do Proof e personagens da Lisa com skin, nome e personalidade únicos), escritório de TI em 3D com 5 cenários, nível contra a CPU (fácil a lendário), 3 jurados desenhados que lançam e avaliam os desafios, avaliação ao vivo com code review dos trechos e medidor de emoção, tempo opcional, linguagem livre ou estipulada, entrega no editor da tela ou pelo GitHub e testes unitários de entrada e saída num compilador on-line"
+        "Modo Bootcamp: temporada no estilo reality (prova de imunidade ou em equipe e prova de eliminação a cada episódio, insígnia para todo vencedor e grande final numa arena com torcida) ou modos rápidos (mata-mata e pontos corridos), até 8 competidores (pessoas do Proof e personagens da Lisa com skin, personalidade, status e especialidades), escritório de TI em 3D com 5 cenários, nível contra a CPU, 3 jurados desenhados, avaliação ao vivo com code review, medidor de emoção e despedida com a apresentadora, entrega no editor da tela ou pelo GitHub e testes de entrada e saída num compilador on-line"
       ],
       "naoInclui": [
         "Não executa o código de ninguém no próprio servidor: o Rodar, a Arena Lúdica e os testes do Modo Bootcamp rodam no Wandbox (compilador on-line); os exercícios e projetos da prática são corrigidos pela IA lendo o código.",
@@ -1682,7 +1701,8 @@
         "A revisão da turma não vê fotos inteiras nem ouve áudios (eles não são guardados): só o texto, o link do vídeo e as miniaturas.",
         "A conversa com a Lisa é por escrito (a voz do navegador lê as falas dela, mas a pessoa não fala no microfone nessa conversa).",
         "No Modo Bootcamp, os personagens da Lisa não escrevem código de verdade (jogam por simulação), os testes não rodam SQL (só linguagens que leem stdin) e o GitHub só vale com repositório público.",
-        "Os jurados do Modo Bootcamp são personagens originais: não imitam nome, rosto nem bordão de nenhuma pessoa real, e o deboche da avaliação é sobre o código, nunca sobre a pessoa."
+        "Os jurados e a apresentadora do Modo Bootcamp são personagens originais: não imitam nome, rosto nem bordão de nenhuma pessoa real, e o deboche da avaliação é sobre o código, nunca sobre a pessoa.",
+        "Na prova em equipe do Bootcamp, cada integrante entrega a própria solução: não há edição de código em conjunto em tempo real (a nota do time é a média)."
       ]
     },
     "stack": [
