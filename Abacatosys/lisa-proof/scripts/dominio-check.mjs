@@ -3419,9 +3419,12 @@ caso("Raposão: o personagem azul e branco, à venda por 610, e a área de prese
   assert.match(ler("../src/componentes/Moldura.js"), /\{ href: "\/presentes", rotulo: "Presentes", Icone: IconePresentes, grupo: "Você" \}/);
   const novidades = ler("../src/componentes/Novidades.js");
   // as edições seguintes trocaram o Raposão pelo clima e, depois, pelo anúncio da versão 1.0
-  assert.match(novidades, /EDICAO_DAS_NOVIDADES = "2026-11-03-versao-1-grande"/, "a edição nova aparece de novo para todo mundo");
+  // (1.6.0) a sequência de banners: cada um é visto uma vez; quem viu a edição da 1.0 conta como quem viu o banner dela
+  assert.match(novidades, /const EDICAO_ANTIGA = "2026-11-03-versao-1-grande"/, "a edição da 1.0 continua reconhecida");
+  assert.match(novidades, /export const EDICAO_DAS_NOVIDADES = `2026-11-05-\$\{BANNERS_DAS_NOVIDADES/, "a edição nova muda com os banners");
   // o banner da 1.0 no topo do modal (03/11/2026), servido sem passar pelo portão de login
-  assert.match(novidades, /srcSet="\/novidades\/lisa-proof-1-0\.webp"/);
+  assert.match(novidades, /imagem: "lisa-proof-1-0"/);
+  assert.match(novidades, /srcSet=\{`\/novidades\/\$\{banner\.imagem\}\.webp`\}/, "cada banner: a versão grande na tela larga e a -900 no celular");
   assert.ok(fs.existsSync(new URL("../public/novidades/lisa-proof-1-0.webp", import.meta.url)) && fs.existsSync(new URL("../public/novidades/lisa-proof-1-0-900.webp", import.meta.url)));
   assert.match(fs.readFileSync(new URL("../src/middleware.js", import.meta.url), "utf8"), /diagramas\/\|novidades\/\|/);
   // a versão grande e curta (03/11/2026): o banner, um texto só apresentando o sistema e dois botões
@@ -3811,6 +3814,32 @@ caso("BEYOND-0020: a Temporada das Ilhas — conquista, construção com conchas
   assert.doesNotMatch(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /href: "\/ilhas"/, "sem item à parte no menu");
   assert.match(fs.readFileSync(new URL("../src/lib/lisaRotina.js", import.meta.url), "utf8"), /const ACOES = \{[^}]*ilhas, minigame \};/, "a Lisa tem a ilha dela (e joga o minigame)");
   assert.match(fs.readFileSync(new URL("../db/030-versao-1.sql", import.meta.url), "utf8"), /'ilhas', 'arena'\)\);/);
+});
+
+caso("1.6.0: o visual premium em todas as telas e os banners do Bootcamp e das Grandes Expedições depois da 1.0", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const css = ler("../src/app/globals.css");
+  // o premium mora nas peças que todas as telas usam
+  for (const token of ["--pf-aurora-1", "--pf-ruido", "--pf-anel", "--pf-veu", "--pf-titulo-tinta", "--pf-curva"]) assert.ok(css.includes(`${token}:`), `o token ${token}`);
+  assert.match(css, /--pf-fonte-titulo: "Plus Jakarta Sans"/, "os títulos na Plus Jakarta Sans");
+  assert.match(ler("../src/app/layout.js"), /family=Plus\+Jakarta\+Sans/, "e a fonte é carregada");
+  assert.match(css, /body::before \{[^}]*position: fixed[^}]*z-index: -2[^}]*pointer-events: none/, "a aurora por baixo do conteúdo, sem pegar o clique");
+  assert.match(css, /body::after \{[^}]*z-index: -1[^}]*pointer-events: none/, "o grão por baixo do conteúdo");
+  assert.match(css, /\.pf-cartao::before \{\s*content: ""; position: absolute; inset: 0;/, "a borda de luz por dentro do cartão (por fora, criava rolagem de 1px)");
+  assert.match(css, /\.pf-cartao::after \{[^}]*pointer-events: none/, "o véu não pega o clique");
+  assert.match(css, /\.pf-cartao \{\s*position: relative;/, "o cartão segura a borda e o véu");
+  assert.match(css, /:where\(\.pf-cartao\) \{ animation: pf-surgir/, "a entrada em cascata, com especificidade zero (quem tem animação própria continua com ela)");
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*body::before \{ animation: none; \}/, "reduzir movimento para a aurora, a entrada, o reflexo e o brilho da barra");
+  assert.doesNotMatch(css, /\.pf-cartao[^{]*\{[^}]*backdrop-filter/, "o cartão sem backdrop-filter (quebraria o position: fixed de quem está dentro)");
+  // os banners: a 1.0, o Bootcamp e as Grandes Expedições, nessa ordem, com os arquivos no public
+  const nov = ler("../src/componentes/Novidades.js");
+  const ids = [...nov.matchAll(/^\s{4}id: "([^"]+)",/gm)].map((m) => m[1]);
+  assert.deepEqual(ids, ["versao-1", "bootcamp", "grandes-expedicoes"], "o Bootcamp e as Grandes Expedições logo depois da 1.0");
+  for (const nome of ["lisa-proof-1-0", "bootcamp-desafio", "grandes-expedicoes"]) {
+    for (const sufixo of ["", "-900"]) assert.ok(fs.existsSync(new URL(`../public/novidades/${nome}${sufixo}.webp`, import.meta.url)), `${nome}${sufixo}.webp`);
+  }
+  assert.match(nov, /localStorage\.getItem\(CHAVE_ANTIGA\) === EDICAO_ANTIGA\) vistos\.add\("versao-1"\)/, "quem já viu a 1.0 vê só os novos");
+  assert.match(nov, /export function novidadesPendentes\(\)/, "o aviso de vale continua esperando as novidades");
 });
 
 caso("chamados de 04/11/2026: as conquistas do exercício valem para todo curso, e o Parsons vem na linguagem do plano", () => {

@@ -67,7 +67,28 @@
   --pf-sombra-alta: 0 14px 40px rgba(15, 18, 13, 0.16);
   /* os emojis num estilo só, em todo aparelho (03/11/2026): o Noto Color Emoji vem logo depois da fonte do texto */
   --pf-fonte: "Nunito", "Noto Color Emoji", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --pf-fonte-titulo: "Fredoka", "Noto Color Emoji", "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* (1.6.0) os títulos, os números e os botões na Plus Jakarta Sans (firme e geométrica); o texto segue na Nunito */
+  --pf-fonte-titulo: "Plus Jakarta Sans", "Noto Color Emoji", "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --pf-fonte-mascote: "Fredoka", "Noto Color Emoji", "Nunito", system-ui, sans-serif;
+
+  /* (1.6.0) o premium: a aurora do fundo, o grão, a borda de luz dos cartões, o véu e a curva das animações */
+  --pf-aurora-1: rgba(132, 204, 22, 0.16);
+  --pf-aurora-2: rgba(34, 197, 94, 0.08);
+  --pf-aurora-3: rgba(190, 242, 100, 0.14);
+  --pf-ruido: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  --pf-ruido-forca: 0.05;
+  --pf-anel: linear-gradient(155deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.35) 30%, rgba(22, 26, 18, 0.06) 65%, rgba(132, 204, 22, 0.35) 100%);
+  --pf-anel-forca: 0.85;
+  --pf-veu: radial-gradient(130% 90% at 0% 0%, rgba(132, 204, 22, 0.06), transparent 46%);
+  --pf-titulo-tinta: linear-gradient(180deg, #161A12 35%, #3F6212 115%);
+  --pf-valor-brilho: none;
+  --pf-pilula-fundo: linear-gradient(180deg, #FFFFFF, #F1F3EC);
+  --pf-campo-fundo: #FFFFFF;
+  --pf-lateral-fundo: radial-gradient(140% 45% at 0% 0%, rgba(139, 209, 26, 0.16), transparent 62%), linear-gradient(180deg, #10140C 0%, #080A07 100%);
+  --pf-nav-ativo-fundo: linear-gradient(90deg, rgba(139, 209, 26, 0.24), rgba(139, 209, 26, 0.05));
+  --pf-botao-brilho-hover: 0 16px 36px -10px rgba(101, 163, 13, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --pf-botao-sec-brilho-hover: 0 10px 22px -10px rgba(15, 18, 13, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --pf-curva: cubic-bezier(0.22, 0.8, 0.24, 1);
 
   --pf-gap: 16px;
   --pf-nav-altura: 68px;
@@ -85,17 +106,34 @@
     --pf-verde-texto: #9AD83A;
     --pf-verde-claro: #1C2610;
     --pf-destaque-fundo: #18210E;
-    --pf-fundo: #070906;
+    --pf-fundo: #050704;
     --pf-superficie: #12150F;
     --pf-superficie-2: #1A1E16;
     --pf-barra: #080A07;
     --pf-barra-2: #161A12;
     --pf-brilho: rgba(139, 209, 26, 0.30);
-    --pf-cartao-fundo: linear-gradient(180deg, rgba(255, 255, 255, 0.065) 0%, rgba(255, 255, 255, 0.018) 55%, rgba(255, 255, 255, 0.01) 100%), rgba(14, 17, 11, 0.82);
-    --pf-cartao-borda: rgba(255, 255, 255, 0.085);
-    --pf-cartao-sombra: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 24px 48px -24px rgba(0, 0, 0, 0.8);
-    --pf-botao-sec-fundo: linear-gradient(180deg, #1C2017 0%, #0D100A 100%);
-    --pf-botao-sec-brilho: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 24px -12px rgba(0, 0, 0, 0.8);
+    /* (1.6.0) o vidro escuro: mais profundo, com a luz no alto e a sombra longa */
+    --pf-cartao-fundo: linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.022) 38%, rgba(255, 255, 255, 0.008) 100%), rgba(11, 14, 9, 0.80);
+    --pf-cartao-borda: rgba(255, 255, 255, 0.025);
+    --pf-cartao-sombra: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 0 rgba(0, 0, 0, 0.45), 0 32px 64px -32px rgba(0, 0, 0, 0.9);
+    --pf-botao-fundo: linear-gradient(180deg, #B8F04E 0%, #93D923 52%, #78BE12 100%);
+    --pf-botao-fundo-hover: linear-gradient(180deg, #C8F76A 0%, #A2E33A 52%, #86CC1A 100%);
+    --pf-botao-brilho: 0 12px 30px -12px rgba(139, 209, 26, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -2px 0 rgba(40, 70, 0, 0.25);
+    --pf-botao-brilho-hover: 0 18px 44px -12px rgba(162, 227, 58, 0.9), 0 0 0 4px rgba(162, 227, 58, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -2px 0 rgba(40, 70, 0, 0.25);
+    --pf-botao-sec-fundo: linear-gradient(180deg, rgba(255, 255, 255, 0.075) 0%, rgba(255, 255, 255, 0.025) 100%), #0C0F0A;
+    --pf-botao-sec-brilho: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 10px 24px -14px rgba(0, 0, 0, 0.9);
+    --pf-botao-sec-brilho-hover: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 0 1px rgba(162, 227, 58, 0.25), 0 12px 28px -14px rgba(139, 209, 26, 0.35);
+    --pf-aurora-1: rgba(139, 209, 26, 0.24);
+    --pf-aurora-2: rgba(34, 197, 94, 0.13);
+    --pf-aurora-3: rgba(217, 249, 157, 0.07);
+    --pf-ruido-forca: 0.075;
+    --pf-anel: linear-gradient(155deg, rgba(206, 255, 140, 0.34) 0%, rgba(255, 255, 255, 0.10) 22%, rgba(255, 255, 255, 0.025) 55%, rgba(139, 209, 26, 0.16) 100%);
+    --pf-anel-forca: 0.9;
+    --pf-veu: radial-gradient(130% 90% at 0% 0%, rgba(190, 255, 110, 0.065), transparent 48%);
+    --pf-titulo-tinta: linear-gradient(180deg, #FFFFFF 30%, #DCF7B0 115%);
+    --pf-valor-brilho: 0 0 28px rgba(139, 209, 26, 0.28);
+    --pf-pilula-fundo: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025));
+    --pf-campo-fundo: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)), #0A0D08;
     --pf-tinta: #F2F5EE;
     --pf-tinta-2: #9AA192;
     --pf-tinta-3: #6B7265;
@@ -120,13 +158,8 @@
 html, body { margin: 0; padding: 0; }
 
 body {
-  background:
-    radial-gradient(110% 55% at 50% -12%, var(--pf-brilho), transparent 64%),
-    radial-gradient(55% 45% at 100% 0%, var(--pf-brilho), transparent 72%),
-    radial-gradient(60% 40% at 0% 100%, rgba(139, 209, 26, 0.05), transparent 70%),
-    var(--pf-fundo);
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  /* (1.6.0) a aurora (body::before) e o grão (body::after) ficam por baixo do conteúdo: ver o fim do arquivo */
+  background: var(--pf-fundo);
   color: var(--pf-tinta);
   font-family: var(--pf-fonte);
   font-size: 15px;
@@ -148,12 +181,13 @@ button { font: inherit; }
 
 .pf-lateral {
   display: none;
-  background: var(--pf-barra);
+  background: var(--pf-lateral-fundo);
   color: var(--pf-tinta-barra);
   padding: 26px 14px 18px;
   flex-direction: column;
   gap: 26px;
-  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset -1px 0 0 rgba(139, 209, 26, 0.05);
 }
 
 .pf-marca { display: flex; align-items: center; gap: 12px; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 20px; letter-spacing: 0; text-decoration: none; }
@@ -165,16 +199,26 @@ button { font: inherit; }
 .pf-nav__grupo { display: flex; flex-direction: column; gap: 1px; }
 .pf-nav__rotulo { padding: 0 14px 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(154, 161, 146, 0.55); }
 .pf-nav__item {
-  display: flex; align-items: center; gap: 14px;
-  padding: 9px 14px; border-radius: 14px; font-size: 13px;
+  position: relative; display: flex; align-items: center; gap: 14px;
+  padding: 9px 14px; border-radius: 14px; font-size: 12.5px;
   color: var(--pf-tinta-barra-2); text-decoration: none; font-weight: 800;
-  letter-spacing: 0.06em; text-transform: uppercase;
-  border: 2px solid transparent;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  border: 1px solid transparent;
+  transition: background 0.25s var(--pf-curva), color 0.2s ease, border-color 0.25s ease, box-shadow 0.3s ease;
 }
-.pf-nav__item:hover { background: var(--pf-barra-2); color: var(--pf-tinta-barra); }
-.pf-nav__item--ativo, .pf-nav__item--ativo:hover { background: rgba(139, 209, 26, 0.10); border-color: rgba(139, 209, 26, 0.45); color: #A2E33A; }
-.pf-nav__item--ativo svg { color: #A2E33A; }
-.pf-nav__item svg { width: 20px; height: 20px; flex: none; }
+.pf-nav__item:hover { background: rgba(255, 255, 255, 0.045); color: var(--pf-tinta-barra); }
+.pf-nav__item:hover svg { transform: translateX(2px); color: #C9F08A; }
+.pf-nav__item--ativo, .pf-nav__item--ativo:hover {
+  background: var(--pf-nav-ativo-fundo); border-color: rgba(162, 227, 58, 0.30); color: #D9F99D;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 28px -14px rgba(139, 209, 26, 0.7);
+}
+/* o item ativo ganha a barrinha acesa na borda do menu */
+.pf-nav__item--ativo::before {
+  content: ""; position: absolute; left: -14px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 4px 4px 0;
+  background: #A3E635; box-shadow: 0 0 14px 2px rgba(163, 230, 53, 0.65);
+}
+.pf-nav__item--ativo svg { color: #BEF264; filter: drop-shadow(0 0 6px rgba(163, 230, 53, 0.55)); }
+.pf-nav__item svg { width: 20px; height: 20px; flex: none; transition: transform 0.25s var(--pf-curva), color 0.2s ease; }
 
 .pf-lateral__rodape { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
 .pf-lateral__ferramentas { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -243,8 +287,9 @@ button { font: inherit; }
   min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pf-abas__item svg { width: 24px; height: 24px; padding: 3px 12px; box-sizing: content-box; border-radius: 9999px; }
-.pf-abas__item--ativo { color: #A2E33A; }
-.pf-abas__item--ativo svg { background: rgba(139, 209, 26, 0.16); }
+.pf-abas__item--ativo { color: #BEF264; }
+.pf-abas__item--ativo svg { background: linear-gradient(180deg, rgba(162, 227, 58, 0.26), rgba(139, 209, 26, 0.10)); box-shadow: 0 0 18px -4px rgba(139, 209, 26, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+.pf-abas__item svg { transition: background 0.25s ease, box-shadow 0.25s ease; }
 
 .pf-principal {
   width: 100%; max-width: 1080px; margin: 0 auto;
@@ -290,16 +335,20 @@ html.pf-teclado .pf-abas { display: none; }
 /* ------------------------------------------------------------------ tipografia e blocos */
 
 .pf-cabecalho { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
-.pf-cabecalho h1 { margin: 0; font-family: var(--pf-fonte-titulo); font-size: 28px; font-weight: 600; line-height: 1.15; letter-spacing: -0.005em; }
+.pf-cabecalho h1 {
+  margin: 0; font-family: var(--pf-fonte-titulo); font-size: 30px; font-weight: 800; line-height: 1.08; letter-spacing: -0.03em;
+  background: var(--pf-titulo-tinta); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
 .pf-cabecalho p { margin: 8px 0 0; max-width: 64ch; color: var(--pf-tinta-2); font-size: 15px; font-weight: 600; }
-@media (min-width: 900px) { .pf-cabecalho h1 { font-size: 34px; } }
+@media (min-width: 900px) { .pf-cabecalho h1 { font-size: clamp(34px, 1.2vw + 22px, 44px); } }
 
 .pf-secao { margin-top: 36px; }
-.pf-secao__titulo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 14px; font-family: var(--pf-fonte-titulo); font-size: 21px; font-weight: 600; letter-spacing: 0; }
+.pf-secao__titulo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 14px; font-family: var(--pf-fonte-titulo); font-size: 21px; font-weight: 750; letter-spacing: -0.02em; }
 .pf-secao__titulo small, .pf-secao__titulo a { font-family: var(--pf-fonte); }
 .pf-secao__titulo small { font-weight: 700; color: var(--pf-tinta-2); font-size: 13px; }
 
 .pf-cartao {
+  position: relative;
   background: var(--pf-cartao-fundo);
   border-radius: var(--pf-raio);
   border: 1px solid var(--pf-cartao-borda);
@@ -321,7 +370,7 @@ html.pf-teclado .pf-abas { display: none; }
 .pf-cartao:has(> .pf-estat__valor) > * { order: 2; }
 .pf-cartao:has(> .pf-estat__valor) > .pf-estat__valor { order: 0; margin-top: 0; }
 .pf-cartao:has(> .pf-estat__valor) > .pf-estat__rotulo { order: 1; font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--pf-tinta); }
-.pf-estat__valor { font-family: var(--pf-fonte-titulo); font-size: 34px; font-weight: 600; line-height: 1.1; margin: 6px 0 4px; font-variant-numeric: tabular-nums; color: var(--pf-verde-texto); }
+.pf-estat__valor { font-family: var(--pf-fonte-titulo); font-size: 36px; font-weight: 800; line-height: 1.05; letter-spacing: -0.035em; margin: 6px 0 4px; font-variant-numeric: tabular-nums; color: var(--pf-verde-texto); text-shadow: var(--pf-valor-brilho); }
 :root[data-tema="escuro"] .pf-estat__valor { text-shadow: 0 0 22px rgba(139, 209, 26, 0.35); }
 .pf-estat__valor small { font-family: var(--pf-fonte); text-shadow: none; }
 .pf-estat__valor small { font-size: 15px; font-weight: 700; color: var(--pf-tinta-2); }
@@ -347,8 +396,8 @@ html.pf-teclado .pf-abas { display: none; }
 .pf-pilula {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 3px 10px; border-radius: var(--pf-pilula);
-  font-size: 12px; font-weight: 800; background: var(--pf-superficie-2); color: var(--pf-tinta-2);
-  border: 1px solid var(--pf-linha);
+  font-size: 12px; font-weight: 800; background: var(--pf-pilula-fundo); color: var(--pf-tinta-2);
+  border: 1px solid var(--pf-linha); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   white-space: nowrap;
 }
 .pf-pilula--verde { background: var(--pf-sucesso-fundo); color: var(--pf-verde-texto); border-color: rgba(139, 209, 26, 0.25); }
@@ -361,28 +410,33 @@ html.pf-teclado .pf-abas { display: none; }
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 46px; padding: 11px 22px; border-radius: var(--pf-pilula);
   border: 1px solid rgba(255, 255, 255, 0.18); background: var(--pf-botao-fundo); color: var(--pf-tinta-sobre-verde);
-  font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 14.5px; letter-spacing: 0.05em; text-transform: uppercase; line-height: 1.2;
+  font-family: var(--pf-fonte-titulo); font-weight: 750; font-size: 13.5px; letter-spacing: 0.07em; text-transform: uppercase; line-height: 1.2;
   text-decoration: none; cursor: pointer;
+  position: relative; overflow: hidden;
   box-shadow: var(--pf-botao-brilho);
-  transition: transform 0.1s ease, box-shadow 0.15s ease, background 0.15s ease, filter 0.15s ease;
+  transition: transform 0.12s ease, box-shadow 0.3s var(--pf-curva), background 0.2s ease, filter 0.15s ease;
 }
-.pf-botao:hover { background: var(--pf-botao-fundo-hover); color: var(--pf-tinta-sobre-verde); }
+.pf-botao:hover { background: var(--pf-botao-fundo-hover); color: var(--pf-tinta-sobre-verde); box-shadow: var(--pf-botao-brilho-hover); }
 .pf-botao:active:not(:disabled) { transform: scale(0.97); }
 .pf-botao:disabled { opacity: 0.55; cursor: progress; }
 .pf-botao--sec { background: var(--pf-botao-sec-fundo); color: var(--pf-tinta); border-color: var(--pf-linha); box-shadow: var(--pf-botao-sec-brilho); }
-.pf-botao--sec:hover { background: var(--pf-superficie-2); color: var(--pf-tinta); }
+.pf-botao--sec:hover { background: var(--pf-superficie-2); color: var(--pf-tinta); box-shadow: var(--pf-botao-sec-brilho-hover); }
 :root[data-tema="escuro"] .pf-botao--sec { border-color: rgba(255, 255, 255, 0.13); }
 :root[data-tema="escuro"] .pf-botao--sec:hover { background: linear-gradient(180deg, #252A1F 0%, #13170F 100%); }
 .pf-botao--perigo { background: transparent; color: var(--pf-alerta); border-color: var(--pf-alerta-fundo); box-shadow: none; }
-.pf-botao--perigo:hover { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+.pf-botao--perigo:hover { background: var(--pf-alerta-fundo); color: var(--pf-alerta); box-shadow: 0 0 0 1px color-mix(in srgb, var(--pf-alerta) 35%, transparent); }
 .pf-botao--pequeno { min-height: 38px; padding: 7px 16px; font-size: 12.5px; }
 @media (prefers-reduced-motion: reduce) { .pf-botao { transition: none; } .pf-botao:active:not(:disabled) { transform: none; } }
 
 .pf-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
 
-.pf-aviso { padding: 13px 16px; border-radius: 16px; background: var(--pf-atencao-fundo); color: var(--pf-atencao); font-size: 14px; font-weight: 700; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); }
-.pf-aviso--erro { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
-.pf-aviso--ok { background: var(--pf-sucesso-fundo); color: var(--pf-verde-texto); }
+.pf-aviso {
+  padding: 13px 16px 13px 18px; border-radius: 16px; background-color: var(--pf-atencao-fundo); color: var(--pf-atencao); font-size: 14px; font-weight: 700;
+  background-image: linear-gradient(90deg, color-mix(in srgb, currentColor 13%, transparent), transparent 60%);
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent); box-shadow: inset 3px 0 0 color-mix(in srgb, currentColor 75%, transparent);
+}
+.pf-aviso--erro { background-color: var(--pf-alerta-fundo); color: var(--pf-alerta); }
+.pf-aviso--ok { background-color: var(--pf-sucesso-fundo); color: var(--pf-verde-texto); }
 
 .pf-vazio { text-align: center; padding: 32px 16px; color: var(--pf-tinta-2); }
 .pf-vazio h2 { color: var(--pf-tinta); font-size: 20px; font-weight: 900; margin: 0 0 8px; }
@@ -419,10 +473,11 @@ html.pf-teclado .pf-abas { display: none; }
 .pf-item__caixa {
   flex: none; width: 24px; height: 24px; margin-top: 0; border-radius: 8px;
   border: 2px solid var(--pf-tinta-3); display: grid; place-items: center;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.3s var(--pf-curva), transform 0.2s var(--pf-curva);
 }
 .pf-item__caixa svg { width: 15px; height: 15px; color: var(--pf-tinta-sobre-verde); opacity: 0; }
-.pf-item--feito .pf-item__caixa { background: var(--pf-verde); border-color: var(--pf-verde); }
+.pf-item--feito .pf-item__caixa { background: var(--pf-botao-fundo); border-color: var(--pf-verde); box-shadow: 0 0 16px -2px rgba(139, 209, 26, 0.55); }
+.pf-item:hover .pf-item__caixa { border-color: var(--pf-verde); transform: scale(1.06); }
 .pf-item--feito .pf-item__caixa svg { opacity: 1; }
 .pf-item--feito .pf-item__texto { color: var(--pf-tinta-2); text-decoration: line-through; }
 
@@ -455,11 +510,14 @@ html.pf-teclado .pf-abas { display: none; }
 .pf-campo { display: grid; gap: 6px; }
 .pf-campo__rotulo { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pf-tinta-2); }
 .pf-campo__entrada {
-  min-height: 50px; padding: 12px 18px; border-radius: 18px; border: 1.5px solid var(--pf-linha);
-  background: var(--pf-superficie-2); color: var(--pf-tinta); font: inherit; font-weight: 700; width: 100%;
+  min-height: 50px; padding: 12px 18px; border-radius: 18px; border: 1px solid var(--pf-linha);
+  background: var(--pf-campo-fundo); color: var(--pf-tinta); font: inherit; font-weight: 700; width: 100%;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: border-color 0.2s ease, box-shadow 0.25s var(--pf-curva), background 0.2s ease;
 }
+.pf-campo__entrada:hover { border-color: color-mix(in srgb, var(--pf-tinta) 16%, transparent); }
 .pf-campo__entrada::placeholder { color: var(--pf-tinta-3); font-weight: 600; }
-.pf-campo__entrada:focus { outline: none; border-color: var(--pf-verde); box-shadow: 0 0 0 4px rgba(139, 209, 26, 0.16); }
+.pf-campo__entrada:focus { outline: none; border-color: var(--pf-verde); box-shadow: 0 0 0 4px rgba(139, 209, 26, 0.16), 0 0 24px -6px rgba(139, 209, 26, 0.45); }
 .pf-marcar { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
 .pf-marcar input { width: 20px; height: 20px; accent-color: var(--pf-verde); }
 
@@ -602,3 +660,125 @@ h1, h2, h3, .pf-vazio h2, .pf-assunto__titulo, .pf-quadro__tema, .pf-entrada__ma
 /* o Neuro com o halo verde, como o mascote das telas de referência */
 :root[data-tema="escuro"] .hoje__neuro { background: radial-gradient(45% 140% at 10% 50%, rgba(139, 209, 26, 0.24), transparent 70%), var(--pf-cartao-fundo); }
 :root[data-tema="escuro"] .hoje__neuro svg:first-of-type { filter: drop-shadow(0 0 22px rgba(139, 209, 26, 0.35)); }
+
+
+/* ------------------------------------------------------------------ o premium (1.6.0, 05/11/2026)
+ * "O design ainda ruim… pensa, é uma aplicação premium… mais coerente, aplique mais texturas e animações."
+ * Tudo aqui vale para todas as telas, porque mora nas peças que todas usam:
+ *  - o fundo tem duas camadas por baixo do conteúdo: a aurora verde (que respira devagar) e o grão de filme;
+ *  - o cartão ganha a borda de luz (um degradê só na borda, por máscara), o véu (a luz no canto e o grão) e a
+ *    entrada (sobe e aparece, em cascata);
+ *  - o botão principal ganha o reflexo que passa no hover; a barra de progresso, o brilho que corre;
+ *  - a página entra em cascata a cada troca de tela.
+ * Nada disso muda o tamanho de nada nem pega o clique (pointer-events: none), e tudo para com "reduzir movimento". */
+
+body::before {
+  content: ""; position: fixed; inset: -18vmax; z-index: -2; pointer-events: none;
+  background:
+    radial-gradient(70vmax 34vmax at 50% 0%, var(--pf-brilho), transparent 68%),
+    radial-gradient(38vmax 30vmax at 82% 8%, var(--pf-aurora-1), transparent 70%),
+    radial-gradient(34vmax 28vmax at 12% 92%, var(--pf-aurora-2), transparent 72%),
+    radial-gradient(28vmax 22vmax at 46% 48%, var(--pf-aurora-3), transparent 72%),
+    radial-gradient(22vmax 18vmax at 96% 70%, var(--pf-aurora-2), transparent 70%);
+  animation: pf-aurora 46s ease-in-out infinite alternate;
+  will-change: transform;
+}
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image: var(--pf-ruido); background-size: 180px 180px;
+  opacity: var(--pf-ruido-forca); mix-blend-mode: overlay;
+}
+@keyframes pf-aurora {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-3vmax, 2.5vmax, 0) scale(1.07); }
+  100% { transform: translate3d(2.5vmax, -2vmax, 0) scale(1.02); }
+}
+
+/* o menu lateral também tem o grão */
+.pf-lateral::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: var(--pf-ruido); background-size: 180px 180px; opacity: 0.05; mix-blend-mode: overlay;
+}
+
+/* a borda de luz do cartão: o degradê só na borda (a máscara recorta o meio); por dentro (inset 0), para não passar
+   1px da caixa e criar rolagem onde o cartão encosta na borda */
+.pf-cartao::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: var(--pf-anel); opacity: var(--pf-anel-forca);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  transition: opacity 0.35s var(--pf-curva), filter 0.35s var(--pf-curva);
+}
+.pf-cartao:hover::before { opacity: 1; filter: brightness(1.35) saturate(1.15); }
+/* o véu: a luz no canto e o grão, por cima e sem pegar o clique */
+.pf-cartao::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: var(--pf-veu), var(--pf-ruido) 0 0 / 180px 180px;
+  opacity: 0.55; mix-blend-mode: soft-light;
+}
+/* os cartões que são links ou botões sobem um pouco */
+a.pf-cartao, button.pf-cartao { transition: transform 0.3s var(--pf-curva), box-shadow 0.3s var(--pf-curva); }
+a.pf-cartao:hover, button.pf-cartao:hover { transform: translateY(-3px); box-shadow: var(--pf-cartao-sombra), 0 22px 44px -22px rgba(139, 209, 26, 0.35); }
+
+/* a entrada: a página e os cartões sobem e aparecem, em cascata */
+@keyframes pf-surgir {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.pf-principal > * { animation: pf-surgir 0.6s var(--pf-curva) both; }
+.pf-principal > :nth-child(2) { animation-delay: 0.05s; }
+.pf-principal > :nth-child(3) { animation-delay: 0.1s; }
+.pf-principal > :nth-child(4) { animation-delay: 0.15s; }
+.pf-principal > :nth-child(5) { animation-delay: 0.2s; }
+.pf-principal > :nth-child(n + 6) { animation-delay: 0.25s; }
+:where(.pf-cartao) { animation: pf-surgir 0.55s var(--pf-curva) both; }
+:where(.pf-cartao):nth-child(2) { animation-delay: 0.04s; }
+:where(.pf-cartao):nth-child(3) { animation-delay: 0.08s; }
+:where(.pf-cartao):nth-child(4) { animation-delay: 0.12s; }
+:where(.pf-cartao):nth-child(5) { animation-delay: 0.16s; }
+:where(.pf-cartao):nth-child(6) { animation-delay: 0.2s; }
+:where(.pf-cartao):nth-child(n + 7) { animation-delay: 0.24s; }
+
+/* o reflexo que passa no botão */
+.pf-botao::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.5) 48%, rgba(255, 255, 255, 0.12) 56%, transparent 70%);
+  transform: translateX(-130%);
+}
+.pf-botao:hover::after { transform: translateX(130%); transition: transform 0.85s var(--pf-curva); }
+.pf-botao--sec::after, .pf-botao--perigo::after { background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.12) 50%, transparent 70%); }
+.pf-botao:disabled::after { display: none; }
+
+/* o brilho que corre na barra de progresso */
+.pf-barra__cheio::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.45) 50%, transparent 100%) no-repeat;
+  background-size: 40% 100%; animation: pf-correr 2.6s ease-in-out infinite; mix-blend-mode: overlay;
+}
+@keyframes pf-correr { from { background-position: -60% 0; } to { background-position: 160% 0; } }
+
+/* "carregando…": o texto com o brilho que passa */
+.pf-carregando {
+  background: linear-gradient(90deg, var(--pf-tinta-3) 0%, var(--pf-tinta) 45%, var(--pf-tinta-3) 90%) 0 0 / 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: pf-carregar 1.8s linear infinite;
+}
+@keyframes pf-carregar { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* o aviso entra deslizando */
+.pf-aviso { animation: pf-deslizar 0.45s var(--pf-curva) both; }
+@keyframes pf-deslizar { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* o cartão da ofensiva é escuro nos dois temas: o rótulo dele fica claro (no tema claro, a regra dos números o deixava
+   escuro, e ele sumia) */
+.pf-ofensiva:has(> .pf-estat__valor) > .pf-estat__rotulo { color: #F2F5EE; }
+
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; }
+  .pf-principal > *, :where(.pf-cartao), .pf-aviso { animation: none; }
+  .pf-botao::after, .pf-barra__cheio::before { display: none; }
+  .pf-carregando { animation: none; color: var(--pf-tinta-2); background: none; }
+  .pf-nav__item, .pf-nav__item svg, a.pf-cartao, button.pf-cartao { transition: none; }
+  a.pf-cartao:hover, button.pf-cartao:hover { transform: none; }
+}

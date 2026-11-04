@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.5.2",
-  "atualizadoEm": "2026-11-04",
+  "versao": "1.6.0",
+  "atualizadoEm": "2026-11-05",
   "compilacao": {
-    "numero": 108,
-    "data": "2026-11-04",
+    "numero": 109,
+    "data": "2026-11-05",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.6.0",
+      "data": "2026-11-05",
+      "branch": "main",
+      "tipo": "melhoria",
+      "resumo": "O Proof inteiro com visual premium e coerente (aurora verde, grão, vidro com borda de luz, títulos em Plus Jakarta e animações em todas as telas) e os banners do Bootcamp e das Grandes Expedições logo depois do anúncio da 1.0.",
+      "itens": [
+        "Visual premium em todas as telas, pelas peças que todas usam: o fundo com a aurora verde que respira devagar e o grão de filme; os cartões de vidro com a borda de luz, a luz no canto e a textura; as pílulas, os campos e os avisos de vidro; o menu lateral com o item ativo aceso.",
+        "Tipografia nova: os títulos, os números e os botões na Plus Jakarta Sans (firme e geométrica), com o título da página em degradê; o texto segue na Nunito.",
+        "Animações: a página e os cartões entram em cascata, os botões ganham o reflexo que passa no hover, a barra de progresso tem o brilho que corre, os cartões que são links sobem no hover e o \"carregando\" pisca com um brilho. Com \"reduzir movimento\" no sistema, tudo fica parado.",
+        "Bootcamp na mesma linguagem: as opções, os personagens, os cenários e os chips de vidro, com brilho ao passar o mouse e o halo no escolhido; a prova de agora na linha da temporada pulsa.",
+        "Novidades: o anúncio virou uma sequência de banners — a 1.0, o Bootcamp e as Grandes Expedições —, com os pontinhos e a transição. Quem já tinha visto a 1.0 vê só os dois novos, com o link para o Bootcamp e para as expedições.",
+        "Correção: no tema claro, o rótulo do cartão da ofensiva (que é escuro) sumia."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.5.2",
       "data": "2026-11-04",

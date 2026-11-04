@@ -133,6 +133,32 @@ módulos = capítulos e assuntos = trechos de páginas; `validarCursoDoLivro` co
 leitura como primeira tarefa. Ao criar, `proof_leituras` guarda as páginas de cada card, e a
 explicação, o quiz e o exercício do assunto leem esse trecho (`src/lib/leituras.js`).
 
+## O visual premium (1.6.0, 05/11/2026)
+
+> "O design ainda ruim… pensa, é uma aplicação premium… mais coerente, aplique mais texturas e animações."
+> O premium mora nas peças que todas as telas usam (`src/app/globals.css`):
+> - **Fonte:** os títulos, os números e os botões na **Plus Jakarta Sans**; o texto segue na Nunito.
+> - **Tokens novos nos dois temas:** `--pf-aurora-*`, `--pf-ruido`, `--pf-anel`, `--pf-veu`, `--pf-titulo-tinta` e
+>   `--pf-curva`.
+> - **Fundo:** a aurora verde, que respira devagar (`body::before`), e o grão de filme (`body::after`), os dois por
+>   baixo do conteúdo.
+> - **Cartão:** a borda de luz (um degradê só na borda, por máscara, por dentro da caixa), o véu (a luz no canto e o
+>   grão) e a entrada em cascata. Os cartões que são links sobem no hover. Sem `backdrop-filter` e sem
+>   `transform` parado, para não quebrar o `position: fixed` de quem está dentro.
+> - **Botões:** o reflexo que passa no hover e o brilho maior.
+> - **Barra de progresso:** o brilho que corre.
+> - **Pílulas e campos:** viraram vidro.
+> - **Aviso:** a tinta da cor dele num degradê, com a barra à esquerda.
+> - **Menu lateral:** o item ativo acende, com a barrinha na borda.
+> - **Páginas:** entram em cascata.
+> - **Reduzir movimento:** desliga tudo isso.
+>
+> As opções, os personagens, os cenários e os chips do Bootcamp seguem a mesma linguagem.
+>
+> **Os banners de novidades:** o anúncio virou uma sequência (`componentes/Novidades.js`): a 1.0, o **Bootcamp** e
+> as **Grandes Expedições**, com os pontinhos e a transição. Quem já tinha visto a 1.0 vê só os dois novos. Os
+> banners ficam em `public/novidades/`, a versão `-900` no celular.
+
 ## Conquistas e comemorações
 
 > **04/11/2026 (1.5.1, dois chamados).**

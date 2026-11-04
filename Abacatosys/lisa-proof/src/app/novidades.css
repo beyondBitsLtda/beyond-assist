@@ -154,3 +154,31 @@
   .novidades__corpo--curto .novidades__sub { font-size: 15.5px; }
   .novidades__corpo--curto .novidades__acoes { flex-basis: 100%; }
 }
+
+/* ------------------------------------------------------------------ a sequência de banners (05/11/2026)
+   A 1.0, o Bootcamp e as Grandes Expedições, um depois do outro: cada banner entra deslizando, os pontinhos dizem
+   onde se está (e levam a qualquer um) e o X fecha a sequência. A caixa ganha a borda de luz do premium (1.6.0). */
+.novidades__caixa { position: relative; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(139, 209, 26, 0.08), 0 0 80px -30px rgba(139, 209, 26, 0.45); }
+.novidades__slide { animation: novidades-trocar 0.5s cubic-bezier(0.22, 0.8, 0.24, 1) both; }
+.novidades__slide .novidades__banner img { animation: novidades-zoom 7s ease-out both; }
+.novidades__banner { overflow: hidden; }
+@keyframes novidades-trocar { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes novidades-zoom { from { transform: scale(1.06); } to { transform: scale(1); } }
+.novidades__fechar {
+  position: absolute; top: 12px; right: 12px; z-index: 3; width: 40px; height: 40px; border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(8, 10, 7, 0.55); color: #fff; font: inherit; font-size: 16px; font-weight: 800;
+  cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); transition: background 0.2s ease, transform 0.2s ease;
+}
+.novidades__fechar:hover { background: rgba(8, 10, 7, 0.8); transform: scale(1.06); }
+.novidades__fechar:focus-visible { outline: 3px solid var(--pf-verde); outline-offset: 2px; }
+.novidades__pontos { display: flex; justify-content: center; gap: 8px; padding: 0 0 22px; }
+.novidades__ponto {
+  width: 9px; height: 9px; padding: 0; border: 0; border-radius: 9999px; background: var(--pf-tinta-3); opacity: 0.55; cursor: pointer;
+  transition: width 0.35s cubic-bezier(0.22, 0.8, 0.24, 1), background 0.25s ease, opacity 0.25s ease;
+}
+.novidades__ponto--atual { width: 30px; background: var(--pf-verde); opacity: 1; box-shadow: 0 0 12px rgba(139, 209, 26, 0.6); }
+.novidades__ponto:focus-visible { outline: 3px solid var(--pf-verde); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .novidades__slide, .novidades__slide .novidades__banner img { animation: none; }
+  .novidades__ponto, .novidades__fechar { transition: none; }
+}
