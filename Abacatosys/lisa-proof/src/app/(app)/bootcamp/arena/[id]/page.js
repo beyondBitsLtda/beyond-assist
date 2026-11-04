@@ -9,7 +9,8 @@ import { useAviso } from "@/componentes/Pecas.js";
 import { comemorar, reagir } from "@/componentes/Neuro.js";
 import EditorDeCodigo from "@/componentes/codigo/EditorDeCodigo.js";
 import { Avatar, BaiasPlanas, Cronometro, FluxoDoExercicio, ResultadoDosTestes, ROTULO_DA_ETAPA } from "@/componentes/bootcamp/Pecas.js";
-import { caminhoPadrao } from "@/dominio/bootcamp.js";
+import AvaliacaoAoVivo from "@/componentes/bootcamp/AvaliacaoAoVivo.js";
+import { caminhoPadrao, CENARIOS, ORDEM_DOS_CENARIOS, NIVEIS_DO_TORNEIO } from "@/dominio/bootcamp.js";
 
 const Escritorio3D = dynamic(() => import("@/componentes/bootcamp/Escritorio3D.js"), {
   ssr: false,
@@ -33,9 +34,26 @@ export default function Arena() {
   const [escolhido, setEscolhido] = useState(null);
   const [Aviso, avisar] = useAviso();
   const campeaoAntes = useRef(null);
+  const [cenario, setCenario] = useState(null); // o escolhido neste navegador ou, sem escolha, o do torneio
+  const [aoVivo, setAoVivo] = useState(null);   // o número da rodada cuja avaliação está passando ao vivo
+  const [cena, setCena] = useState(null);       // { palco, humores } da avaliação ao vivo, para o 3D
 
   const carregar = useCallback(() => obter(`/api/bootcamp/${id}`).then((d) => { setDados(d); setErro(""); }).catch((e) => setErro(e.message)), [id]);
   useEffect(() => { carregar(); }, [carregar]);
+
+  useEffect(() => { if (dados && cenario === null) setCenario(guardado(`bootcamp:cenario:${id}`) || dados.torneio.cenario || "neon"); }, [dados, cenario, id]);
+  const escolherCenario = (c) => { setCenario(c); guardar(`bootcamp:cenario:${id}`, c); };
+
+  // a avaliação ao vivo começa sozinha, uma vez por rodada para cada pessoa (e dá para rever depois)
+  useEffect(() => {
+    const r = dados?.rodada;
+    if (!r || r.status !== "avaliada" || !r.avaliacao?.participantes?.length || aoVivo) return;
+    const chave = `bootcamp:visto:${id}:${r.numero}`;
+    if (guardado(chave)) return;
+    guardar(chave, "1");
+    setAoVivo(r.numero);
+  }, [dados, aoVivo, id]);
+  const acabarAoVivo = useCallback(() => { setAoVivo(null); setCena(null); }, []);
 
   // com a rodada aberta, a arena se atualiza sozinha: os outros competidores andam pelo fluxo
   const aberta = dados?.rodada?.status === "aberta" || dados?.avaliando;
@@ -97,6 +115,7 @@ export default function Arena() {
             <span className="pf-pilula">Rodada {torneio.rodadaAtual || 0} de {torneio.rodadasTotal}</span>
             <span className="pf-pilula">{torneio.participantes} competidores</span>
             <span className="pf-pilula">{torneio.linguagens?.modo === "jurados" ? "⚖️ linguagem dos jurados" : "🧰 linguagem livre"}</span>
+            {torneio.contraCpu && <span className="pf-pilula">{NIVEIS_DO_TORNEIO[torneio.nivel]?.emoji} nível {torneio.nivelNome}</span>}
             {rodada?.status === "aberta" ? <Cronometro prazo={rodada.prazo} /> : <span className="pf-pilula">{torneio.tempoMin ? `⏱️ ${torneio.tempoMin} min por desafio` : "⏳ sem limite de tempo"}</span>}
           </div>
         </div>
@@ -106,11 +125,27 @@ export default function Arena() {
         </div>
       </div>
 
+      {!sem3d && (
+        <div className="bc-cenarios" role="radiogroup" aria-label="Cenário do escritório">
+          <span className="pf-campo__rotulo">Cenário</span>
+          {ORDEM_DOS_CENARIOS.map((c) => (
+            <button key={c} type="button" role="radio" aria-checked={(cenario || torneio.cenario) === c} data-so-olhar title={CENARIOS[c].descricao}
+              className={`bc-chip${(cenario || torneio.cenario) === c ? " bc-chip--ativo" : ""}`} onClick={() => escolherCenario(c)}>
+              {CENARIOS[c].emoji} {CENARIOS[c].nome}
+            </button>
+          ))}
+        </div>
+      )}
       {sem3d ? (
         <BaiasPlanas participantes={participantes} campeaoId={torneio.campeaoId} aoEscolher={setEscolhido} />
       ) : (
         <Escritorio3D participantes={participantes} jurados={dados.jurados} campeaoId={torneio.campeaoId} telao={telao}
-          avaliando={dados.avaliando} aoEscolher={setEscolhido} aoFalhar={() => setSem3d(true)} />
+          avaliando={dados.avaliando} cenario={cenario || torneio.cenario} palco={cena?.palco} humores={cena?.humores}
+          aoEscolher={setEscolhido} aoFalhar={() => setSem3d(true)} />
+      )}
+      {aoVivo && rodada?.numero === aoVivo && rodada.avaliacao?.participantes?.length > 0 && (
+        <AvaliacaoAoVivo key={aoVivo} avaliacao={rodada.avaliacao} participantes={participantes} jurados={dados.jurados}
+          numero={rodada.numero} aoMudar={setCena} aoAcabar={acabarAoVivo} />
       )}
       {selecionado && <Competidor p={selecionado} campeaoId={torneio.campeaoId} aoFechar={() => setEscolhido(null)} />}
 
@@ -124,7 +159,7 @@ export default function Arena() {
           )}
           {rodada?.status === "aberta" && eu?.eliminado && <p className="pf-aviso">Você saiu do torneio, mas pode acompanhar a rodada e as notas dos jurados até o fim.</p>}
           {rodada?.status === "aberta" && <ChamarJurados dados={dados} ocupado={ocupado} agir={agir} />}
-          {rodada?.status === "avaliada" && <ResultadoDaRodada dados={dados} />}
+          {rodada?.status === "avaliada" && <ResultadoDaRodada dados={dados} aoRever={aoVivo ? null : () => { setAoVivo(rodada.numero); window.scrollTo({ top: 0, behavior: "smooth" }); }} />}
         </div>
         <aside className="bc-arena__lado">
           <Classificacao dados={dados} aoEscolher={setEscolhido} />
@@ -409,7 +444,7 @@ function ChamarJurados({ dados, ocupado, agir }) {
 }
 
 /** O fim da rodada: o comentário dos jurados, a minha nota e quem saiu. */
-function ResultadoDaRodada({ dados }) {
+function ResultadoDaRodada({ dados, aoRever }) {
   const { rodada, participantes, torneio } = dados;
   const eu = participantes.find((p) => p.souEu);
   const nomes = new Map(participantes.map((p) => [p.id, p.souEu ? "você" : p.nome]));
@@ -420,7 +455,12 @@ function ResultadoDaRodada({ dados }) {
       {rodada.avaliacao?.comentarioGeral && <p className="bc-resultado__comentario">“{rodada.avaliacao.comentarioGeral}”</p>}
       {eu && eu.nota !== null && eu.nota !== undefined && <p className="bc-resultado__nota">Sua nota: <strong>{eu.nota}</strong>/100 · {eu.pontos} pontos no torneio</p>}
       {saiu.length > 0 && <p className="pf-estat__nota">Saíram nesta rodada: {saiu.map((id) => nomes.get(id)).join(", ")}.</p>}
-      <Link href={`/bootcamp/judges/${torneio.id}`} className="pf-botao pf-botao--sec pf-botao--pequeno">Ver as notas e os feedbacks dos jurados</Link>
+      <div className="bc-passo__acoes">
+        {aoRever && rodada.avaliacao?.participantes?.length > 0 && (
+          <button type="button" className="pf-botao pf-botao--pequeno" data-so-olhar onClick={aoRever}>🎬 Ver a avaliação ao vivo</button>
+        )}
+        <Link href={`/bootcamp/judges/${torneio.id}`} className="pf-botao pf-botao--sec pf-botao--pequeno">Ver as notas e os feedbacks dos jurados</Link>
+      </div>
     </section>
   );
 }

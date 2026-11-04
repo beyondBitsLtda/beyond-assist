@@ -2,6 +2,29 @@
 
 import { useEffect, useState } from "react";
 import Neuro from "@/componentes/Neuro.js";
+import { EMOCOES, ORDEM_DAS_EMOCOES, emocaoDominante } from "@/dominio/bootcamp.js";
+
+/**
+ * O medidor de emoção da avaliação ao vivo: as quatro emoções (aflição, felicidade, raiva e tristeza) de 0 a 100,
+ * com a que manda agora em destaque.
+ */
+export function MedidorDeEmocao({ emocao }) {
+  const dominante = emocaoDominante(emocao);
+  return (
+    <div className="bc-medidor" aria-label={`Emoção agora: ${EMOCOES[dominante].nome}`}>
+      <span className="bc-medidor__agora">{EMOCOES[dominante].emoji} {EMOCOES[dominante].nome}</span>
+      {ORDEM_DAS_EMOCOES.map((k) => (
+        <div key={k} className={`bc-medidor__linha bc-medidor__linha--${k}${k === dominante ? " bc-medidor__linha--dominante" : ""}`}>
+          <span className="bc-medidor__rotulo" aria-hidden="true">{EMOCOES[k].emoji}</span>
+          <span className="bc-medidor__barra" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={emocao[k]} aria-label={EMOCOES[k].nome}>
+            <span style={{ width: `${emocao[k]}%` }} />
+          </span>
+          <span className="bc-medidor__valor">{emocao[k]}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** O humor do Neuro pela situação do competidor (também no 3D: src/componentes/bootcamp/Escritorio3D.js). */
 export function humorDoCompetidor(p, campeaoId) {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { obter, remover } from "@/lib/api.js";
 import { useAviso } from "@/componentes/Pecas.js";
 import Neuro from "@/componentes/Neuro.js";
+import DesenhoDoJurado from "@/componentes/bootcamp/Jurados.js";
 
 const SITUACAO = { preparando: "aguardando a 1ª rodada", "em-andamento": "em andamento", encerrado: "encerrado" };
 
@@ -46,11 +47,11 @@ export default function Bootcamp() {
         <section className="bc-jurados" aria-label="Os jurados">
           {dados.opcoes.jurados.map((j) => (
             <div key={j.id} className="pf-cartao bc-jurado">
-              <Neuro personagem={j.personagem} humor="normal" tamanho={72} />
+              <DesenhoDoJurado id={j.id} tamanho={84} />
               <div>
                 <strong>{j.emoji} {j.nome}</strong>
                 <span className="bc-jurado__criterio">{j.criterio}</span>
-                <p className="pf-estat__nota">Olha {j.foco}.</p>
+                <p className="pf-estat__nota">{j.arquetipo[0].toUpperCase() + j.arquetipo.slice(1)}. Olha {j.foco}.</p>
               </div>
             </div>
           ))}

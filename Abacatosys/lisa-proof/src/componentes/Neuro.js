@@ -19,7 +19,9 @@ import LisaDoNeuro from "./marca/LisaDoNeuro.js";
  */
 
 // "bravo" (03/11/2026): o Neuro revoltado, quando a pessoa some por dias (src/dominio/humorDoNeuro.js)
-export const HUMORES = ["normal", "feliz", "comemorando", "triste", "pensando", "dormindo", "surpreso", "bravo"];
+// "aflito" (04/11/2026): o nervoso de quem espera a nota dos jurados no Modo Bootcamp — sobrancelha de preocupação,
+// boca tremida e uma gota de suor
+export const HUMORES = ["normal", "feliz", "comemorando", "triste", "pensando", "dormindo", "surpreso", "bravo", "aflito"];
 
 // ---- personagens (visuais do Neuro comprados no Reino: src/dominio/personagens.js)
 // O personagem que a pessoa usa mora no atributo data-personagem do <html> (a moldura põe, ao
@@ -200,7 +202,7 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
             <ellipse cx="73" cy="119" rx="8" ry="5" className="neuro__bochecha" />
             <ellipse cx="127" cy="119" rx="8" ry="5" className="neuro__bochecha" />
 
-            <g className="v v-normal v-triste v-surpreso v-pensando v-bravo">
+            <g className="v v-normal v-triste v-surpreso v-pensando v-bravo v-aflito">
               <g className="neuro__olhos">
                 <ellipse cx="86" cy="100" rx="10" ry="12" className="neuro__olho" />
                 <ellipse cx="114" cy="100" rx="10" ry="12" className="neuro__olho" />
@@ -219,6 +221,7 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
             <path className="v v-surpreso neuro__linha" d="M77 82 q9 -6 18 0 M105 82 q9 -6 18 0" strokeWidth="3" />
             <path className="v v-pensando neuro__linha" d="M77 86 q9 -3 18 1 M105 82 q9 -6 18 -2" strokeWidth="3" />
             <path className="v v-bravo neuro__linha" d="M74 83 l18 8 M126 83 l-18 8" strokeWidth="4.5" />
+            <path className="v v-aflito neuro__linha" d="M76 86 q8 -6 16 -9 M124 86 q-8 -6 -16 -9" strokeWidth="3.5" />
 
             <path className="v v-normal neuro__linha" d="M91 119 q9 8 18 0" />
             <g className="v v-feliz v-comemorando">
@@ -230,9 +233,12 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
             <path className="v v-pensando neuro__linha" d="M92 123 q4 -3 8 0 q4 3 8 0" />
             <path className="v v-dormindo neuro__linha" d="M95 122 h10" />
             <path className="v v-bravo neuro__linha" d="M89 128 q11 -9 22 0" />
+            <path className="v v-aflito neuro__linha" d="M88 125 q3 -4 6 0 q3 4 6 0 q3 -4 6 0 q3 4 6 0" />
 
             {/* extras por humor */}
             <path className="v v-triste neuro__lagrima" d="M131 106 q5 8 0 11 q-5 -3 0 -11 z" />
+            {/* a gota de suor da aflição, na testa */}
+            <path className="v v-aflito neuro__suor" d="M146 62 q7 10 0 15 q-7 -5 0 -15 z" />
             {/* o "💢" da raiva, no alto da cabeça */}
             <path className="v v-bravo neuro__raiva" d="M146 30 q6 4 6 10 M166 30 q-6 4 -6 10 M146 54 q6 -4 6 -10 M166 54 q-6 -4 -6 -10" />
 
@@ -340,7 +346,7 @@ export default function Neuro({ humor = "normal", fala = "", tamanho = 120, ouvi
               <circle cx="60" cy="9" r="7" fill="#F0ABFC" stroke="#86198F" strokeWidth="3" />
               <circle cx="140" cy="9" r="7" fill="#F0ABFC" stroke="#86198F" strokeWidth="3" />
               {/* o terceiro olho segue o humor como os outros dois: aberto, fechado de alegria ou dormindo */}
-              <g className="v v-normal v-triste v-surpreso v-pensando">
+              <g className="v v-normal v-triste v-surpreso v-pensando v-bravo v-aflito">
                 <ellipse cx="100" cy="68" rx="8" ry="9" fill="#FFFFFF" stroke="#1A2E05" strokeWidth="2.5" />
                 <circle cx="100" cy="70" r="4" fill="#1F2937" />
               </g>

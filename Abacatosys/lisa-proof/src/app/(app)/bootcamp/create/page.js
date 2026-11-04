@@ -19,7 +19,7 @@ export default function CriarTorneio() {
   const [busca, setBusca] = useState("");
   const [f, setF] = useState({
     nome: "", formato: "mata-mata", rodadas: 3, usarTempo: false, tempoMin: 30,
-    modoLinguagem: "livre", permitidas: [], total: 8, convidados: [], npcs: [],
+    modoLinguagem: "livre", permitidas: [], total: 8, convidados: [], npcs: [], nivel: "medio", cenario: "neon",
   });
   const mudar = (campo, valor) => setF((x) => ({ ...x, [campo]: valor }));
   const alternar = (campo, valor) => setF((x) => ({ ...x, [campo]: x[campo].includes(valor) ? x[campo].filter((v) => v !== valor) : [...x[campo], valor] }));
@@ -47,6 +47,7 @@ export default function CriarTorneio() {
       const { id } = await criar("/api/bootcamp", {
         nome: f.nome, formato: f.formato, rodadas: f.rodadas, usarTempo: f.usarTempo, tempoMin: f.tempoMin, total: f.total,
         linguagens: { modo: f.modoLinguagem, permitidas: f.permitidas }, npcs: f.npcs, convidados: f.convidados,
+        nivel: f.nivel, cenario: f.cenario,
       });
       router.push(`/bootcamp/arena/${id}`);
     } catch (e2) {
@@ -193,6 +194,37 @@ export default function CriarTorneio() {
             <p className="pf-estat__nota">
               Você{f.convidados.length ? ` + ${f.convidados.length} convidado(s)` : ""} + {Math.max(0, vagasDosPersonagens)} personagem(ns) da Lisa = {f.total} competidores, cada um com skin, nome e personalidade únicos. As vagas sem escolha são sorteadas.
             </p>
+          </section>
+
+          {vagasDosPersonagens > 0 && (
+            <section className="pf-cartao bc-criar__bloco">
+              <h2 className="bc-criar__titulo">Nível do torneio contra a CPU</h2>
+              <div className="bc-opcoes bc-opcoes--quatro" role="radiogroup" aria-label="Nível">
+                {opcoes.niveis.map((n) => (
+                  <label key={n.id} className={`bc-opcao${f.nivel === n.id ? " bc-opcao--escolhida" : ""}`}>
+                    <input type="radio" name="nivel" value={n.id} checked={f.nivel === n.id} onChange={() => mudar("nivel", n.id)} />
+                    <strong>{n.emoji} {n.nome}</strong>
+                    <span>{n.descricao}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="pf-estat__nota">O nível muda a habilidade e a rapidez dos personagens da Lisa e a dificuldade dos desafios dos jurados.</p>
+            </section>
+          )}
+
+          <section className="pf-cartao bc-criar__bloco">
+            <h2 className="bc-criar__titulo">Cenário do escritório</h2>
+            <div className="bc-cenarios-grade" role="radiogroup" aria-label="Cenário">
+              {opcoes.cenarios.map((c) => (
+                <label key={c.id} className={`bc-cenario bc-cenario--${c.id}${f.cenario === c.id ? " bc-cenario--escolhido" : ""}`}>
+                  <input type="radio" name="cenario" value={c.id} checked={f.cenario === c.id} onChange={() => mudar("cenario", c.id)} />
+                  <span className="bc-cenario__previa" aria-hidden="true">{c.emoji}</span>
+                  <strong>{c.nome}</strong>
+                  <span>{c.descricao}</span>
+                </label>
+              ))}
+            </div>
+            <p className="pf-estat__nota">É o cenário que abre para todo mundo; na arena, cada competidor pode trocar o da própria tela.</p>
           </section>
 
           <div className="bc-criar__fim">

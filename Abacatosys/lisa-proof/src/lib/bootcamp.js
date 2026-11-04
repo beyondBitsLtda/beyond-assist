@@ -25,11 +25,14 @@ import {
   montarParticipantes, npcsDisponiveis, confrontosDaRodada, prazoDaRodada, prazoPassou, normalizarSaida, conferirCaso,
   resumoDosTestes, validarDesafio, desafioParaTela, testesParaTela, desafioDeReserva, simularNpc, etapaDoNpc,
   notasDoNpc, notaDaRodada, avaliacaoAutomatica, aplicarResultado, classificacao, podeChamarJurados,
+  NIVEIS_DO_TORNEIO, ORDEM_DOS_NIVEIS, CENARIOS, ORDEM_DOS_CENARIOS, nivelValido, cenarioValido, npcNoNivel,
+  reviewAutomatica, reviewDoNpc,
 } from "@/dominio/bootcamp.js";
 
 const falhou = (error, onde) => { if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`); };
 const ehUuid = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || ""));
-const CAMPOS_T = "id, dono_id, nome, formato, tempo_min, linguagens, rodadas_total, participantes, humanos, rodada_atual, status, campeao, criado_em, atualizado_em, encerrado_em";
+const CAMPOS_T = "id, dono_id, nome, formato, tempo_min, linguagens, rodadas_total, participantes, humanos, rodada_atual, status, campeao, criado_em, atualizado_em, encerrado_em, opcoes";
+const nivelDo = (t) => nivelValido(t.opcoes?.nivel);
 const CAMPOS_R = "id, torneio_id, numero, desafio, confrontos, status, avaliacao, aberta_em, prazo, avaliada_em";
 const CAMPOS_E = "id, rodada_id, torneio_id, usuario_id, etapa, plano, modo, linguagem, repo, caminho, codigo, commit_sha, testes, passou, tentativas, enviada_em, atualizado_em";
 const ABERTOS_POR_ORGANIZADOR = 5;
@@ -116,11 +119,17 @@ const meuId = (usuarioId) => `h:${usuarioId}`;
 const ativos = (t) => t.participantes.filter((p) => !p.eliminado);
 const humanosAtivos = (t) => ativos(t).filter((p) => p.tipo === "humano");
 
-/** O que o personagem da Lisa fez nesta rodada (sempre o mesmo resultado para a mesma rodada). */
-function simulacaoDo(p, rodada, tempoMin) {
+/** O personagem da Lisa no nível do torneio (mais ou menos habilidoso e rápido). */
+const npcDoTorneio = (p, t) => {
   const npc = npcPorId(p.npcId);
+  return npc ? npcNoNivel(npc, nivelDo(t)) : null;
+};
+
+/** O que o personagem da Lisa fez nesta rodada (sempre o mesmo resultado para a mesma rodada). */
+function simulacaoDo(p, rodada, t) {
+  const npc = npcDoTorneio(p, t);
   if (!npc) return null;
-  return simularNpc({ npc, dificuldade: rodada.desafio.dificuldade, testes: rodada.desafio.testes, tempoMin, s: sorteio(sementeDe(`${rodada.id}:${p.npcId}`)) });
+  return simularNpc({ npc, dificuldade: rodada.desafio.dificuldade, testes: rodada.desafio.testes, tempoMin: t.tempo_min, s: sorteio(sementeDe(`${rodada.id}:${p.npcId}`)) });
 }
 
 function linguagensDoTorneio(t) {
@@ -152,6 +161,9 @@ const resumoDoTorneio = (usuarioId) => (t) => {
     humanos: t.participantes.filter((p) => p.tipo === "humano").length, souDono: t.dono_id === usuarioId,
     campeao: campeao ? { id: campeao.id, nome: campeao.nome, skin: campeao.skin, souEu: campeao.id === meuId(usuarioId) } : null,
     eu: t.participantes.find((p) => p.id === meuId(usuarioId)) || null, criadoEm: t.criado_em,
+    nivel: nivelDo(t), nivelNome: NIVEIS_DO_TORNEIO[nivelDo(t)].nome,
+    cenario: cenarioValido(t.opcoes?.cenario), cenarioNome: CENARIOS[cenarioValido(t.opcoes?.cenario)].nome,
+    contraCpu: t.participantes.some((p) => p.tipo === "npc"),
   };
 };
 
@@ -184,6 +196,8 @@ export async function bootcampDe(usuarioId) {
       linguagens: ORDEM_DAS_LINGUAGENS.map((chave) => ({ chave, rotulo: LINGUAGENS_DO_BOOTCAMP[chave].rotulo })),
       npcs: NPCS_DO_BOOTCAMP.map((n) => ({ id: n.id, nome: n.nome, skin: n.skin, personalidade: n.personalidade, bordao: n.bordao, disponivel: npcsDisponiveis([meuPersonagem]).includes(n) })),
       jurados: JURADOS,
+      niveis: ORDEM_DOS_NIVEIS.map((id) => ({ id, ...NIVEIS_DO_TORNEIO[id] })),
+      cenarios: ORDEM_DOS_CENARIOS.map((id) => ({ id, ...CENARIOS[id] })),
       jogadores,
       meuPersonagem,
     },
@@ -206,7 +220,7 @@ export async function torneioParaTela(usuarioId, id) {
     // quem saiu numa rodada anterior não tem etapa nesta
     if (!rodada || (p.eliminado && p.eliminadoNa !== rodada.numero)) return { ...base, etapa: null, enviada: false, testes: null };
     if (p.tipo === "npc") {
-      const sim = simulacaoDo(p, rodada, t.tempo_min);
+      const sim = simulacaoDo(p, rodada, t);
       const etapa = aberta ? etapaDoNpc(sim, minutos) : "fim";
       const enviada = !aberta || etapa === "revisao";
       return { ...base, etapa, enviada, testes: enviada ? { passados: sim.passados, total: sim.total } : null, nota: avaliacao.get(p.id)?.nota ?? null };
@@ -235,7 +249,15 @@ export async function torneioParaTela(usuarioId, id) {
       numero: rodada.numero, status: rodada.status, abertaEm: rodada.aberta_em, prazo: rodada.prazo, avaliadaEm: rodada.avaliada_em,
       desafio: desafioParaTela(rodada.desafio),
       confrontos: (rodada.confrontos || []).map((c) => ({ a: c.a, b: c.b, nomeA: nomes.get(c.a), nomeB: c.b ? nomes.get(c.b) : null })),
-      avaliacao: rodada.status === "avaliada" ? { comentarioGeral: rodada.avaliacao?.comentarioGeral || "", eliminados: rodada.avaliacao?.eliminados || [], campeao: rodada.avaliacao?.campeao || null } : null,
+      // avaliada: tudo o que a avaliação ao vivo precisa (as notas, o code review de cada um e o resultado)
+      avaliacao: rodada.status === "avaliada" ? {
+        comentarioGeral: rodada.avaliacao?.comentarioGeral || "", eliminados: rodada.avaliacao?.eliminados || [], campeao: rodada.avaliacao?.campeao || null,
+        origem: rodada.avaliacao?.origem || "automatica",
+        participantes: (rodada.avaliacao?.participantes || []).map((a) => ({
+          id: a.id, nome: a.nome, tipo: a.tipo, nota: a.nota, notas: a.notas, resultado: a.resultado, fala: a.fala || "",
+          testes: a.testes, linguagem: a.linguagem || null, review: a.review || [],
+        })),
+      } : null,
     } : null,
     minhaEntrega: eu && rodada ? entregaParaTela(porUsuario.get(usuarioId)) || { etapa: "leitura", plano: "", modo: null, linguagem: null, repo: "", caminho: "", codigo: "", testes: [], resumo: { total: 0, passados: 0, passou: false }, passou: false, tentativas: 0, enviadaEm: null } : null,
     eu: eu ? { id: eu.id, eliminado: eu.eliminado, skin: eu.skin } : null,
@@ -299,7 +321,7 @@ export async function criarTorneio(usuarioId, corpo) {
   const { data, error } = await supabase.from("proof_bootcamp_torneios").insert({
     dono_id: usuarioId, nome: c.nome, formato: c.formato, tempo_min: c.tempoMin, linguagens: c.linguagens,
     rodadas_total: totalDeRodadas(c.formato, participantes.length, c.rodadasPontos),
-    participantes, humanos: ids,
+    participantes, humanos: ids, opcoes: c.opcoes,
   }).select("id").single();
   falhou(error, "criar torneio");
   return { id: data.id };
@@ -330,7 +352,7 @@ async function conferirComAReferencia(desafio) {
 async function desafioDaRodada(t, numero) {
   const { data: anteriores } = await supabase.from("proof_bootcamp_rodadas").select("desafio").eq("torneio_id", t.id);
   const usados = (anteriores || []).map((r) => r.desafio?.titulo).filter(Boolean);
-  const dificuldade = dificuldadeDaRodada(numero, t.rodadas_total);
+  const dificuldade = dificuldadeDaRodada(numero, t.rodadas_total, nivelDo(t));
   if (temModelo()) {
     try {
       const daIa = await gerarDesafioDosJurados({ numero, total: t.rodadas_total, dificuldade, linguagens: t.linguagens, usados });
@@ -536,7 +558,7 @@ export async function chamarJurados(usuarioId, id) {
     const sims = new Map();
     for (const p of lista) {
       if (p.tipo === "npc") {
-        const sim = simulacaoDo(p, rodada, t.tempo_min);
+        const sim = simulacaoDo(p, rodada, t);
         sims.set(p.id, sim);
         npcs.push({ apelido: apelidoDe.get(p.id), nome: p.nome, personalidade: p.personalidade, passados: sim.passados, total: sim.total });
         continue;
@@ -553,7 +575,7 @@ export async function chamarJurados(usuarioId, id) {
     let ia = null;
     if (temModelo()) {
       try {
-        const apelidos = new Map(humanos.map((h) => [h.apelido, { id: h.id, fracao: h.fracao, testou: h.testou }]));
+        const apelidos = new Map(humanos.map((h) => [h.apelido, { id: h.id, fracao: h.fracao, testou: h.testou, codigo: h.codigo }]));
         ia = await avaliarComOsJurados({ desafio, humanos, npcs, apelidos });
       } catch (e) {
         console.warn("[bootcamp] avaliação da IA falhou, vale a automática:", e?.message || e);
@@ -566,13 +588,15 @@ export async function chamarJurados(usuarioId, id) {
       let feedback;
       let testes;
       let extra = {};
+      // o sorteio das falas de reserva também fica preso à rodada e ao competidor
+      const s = sorteio(sementeDe(`review:${rodada.id}:${p.id}`));
       if (p.tipo === "npc") {
         const sim = sims.get(p.id);
-        const npc = npcPorId(p.npcId);
+        const npc = npcDoTorneio(p, t);
         notasDele = notasDoNpc(npc, sim);
         feedback = feedbackDoNpc(npc, sim);
         testes = { passados: sim.passados, total: sim.total };
-        extra = { fala: ia?.falas.get(apelidoDe.get(p.id)) || p.bordao || "", enviou: true, minutos: sim.minutos };
+        extra = { fala: ia?.falas.get(apelidoDe.get(p.id)) || p.bordao || "", enviou: true, minutos: sim.minutos, review: reviewDoNpc(p.npcId, sim, s) };
       } else {
         const h = humanos.find((x) => x.id === p.id);
         const daIa = ia?.porHumano.get(p.id);
@@ -580,7 +604,11 @@ export async function chamarJurados(usuarioId, id) {
         notasDele = daIa?.notas || auto.notas;
         feedback = Object.fromEntries(Object.keys(auto.feedback).map((j) => [j, daIa?.feedback?.[j] || auto.feedback[j]]));
         testes = h.testes;
-        extra = { enviou: h.enviou, linguagem: h.linguagem, modo: h.modo, commitSha: h.commitSha };
+        // o code review: o da IA (linhas do código de verdade) ou, sem ela, um item por jurado com as falas do banco
+        const review = daIa?.review?.length ? daIa.review : reviewAutomatica({
+          codigo: h.codigo, fracao: h.fracao, enviou: h.enviou, linguagemOk: h.linguagemOk, temPlano: h.plano.trim().length >= BOOTCAMP.minimoDoPlano, s,
+        });
+        extra = { enviou: h.enviou, linguagem: h.linguagem, modo: h.modo, commitSha: h.commitSha, review };
       }
       const nota = notaDaRodada(notasDele);
       notas.set(p.id, { nota, kernel: notasDele.kernel });

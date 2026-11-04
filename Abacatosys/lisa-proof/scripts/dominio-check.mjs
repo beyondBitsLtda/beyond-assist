@@ -3524,7 +3524,8 @@ caso("humor do Neuro: a sequência faz ele evoluir (mina com bônus); sumir por 
   assert.match(lib, /if \(humor\.expedicoesFechadas\) throw new ErroDeAcesso\(400/, "o servidor barra a expedição, não só a tela");
   assert.match(lib, /fatorDaMinaNaPaz\(\(await pazDeAgora\(\)\)\.paz, agora\) \* fatorDaMinaDoHumor\(await humorDoNeuroDe\(usuarioId\)\)/, "a coleta usa o bônus");
   assert.match(lib, /if \(emTeste\(\)\) return \{ \.\.\.h, bonusDaMina: 0, expedicoesFechadas: false/, "no Reino de Teste só aparece");
-  assert.match(fs.readFileSync(new URL("../src/componentes/Neuro.js", import.meta.url), "utf8"), /export const HUMORES = \[[^\]]*"bravo"\]/);
+  // o "bravo" continua na lista (o "aflito" do Modo Bootcamp entrou depois dele, em 04/11/2026)
+  assert.match(fs.readFileSync(new URL("../src/componentes/Neuro.js", import.meta.url), "utf8"), /export const HUMORES = \[[^\]]*"bravo"[^\]]*\]/);
 });
 
 caso("Forja de Artefatos: estudo vira mana; a poção rende +50% por 2 h (com teto) e o escudo protege 24 h, um a cada 3 dias", () => {
@@ -3926,7 +3927,10 @@ caso("a semana da ofensiva: de domingo a sábado, com hoje e os dias que faltam"
     chaveDaLinguagem, caminhoPadrao, avancarNoFluxo, validarConfiguracao, totalDeRodadas, dificuldadeDaRodada, montarParticipantes,
     npcsDisponiveis, confrontosDaRodada, prazoDaRodada, prazoPassou, normalizarSaida, conferirCaso, resumoDosTestes, validarDesafio,
     desafioParaTela, testesParaTela, desafioDeReserva, simularNpc, etapaDoNpc, tetoDoKernel, notaDaRodada, notasDoNpc,
-    avaliacaoAutomatica, validarAvaliacao, aplicarResultado, classificacao, podeChamarJurados, skinDeJurado,
+    avaliacaoAutomatica, validarAvaliacao, aplicarResultado, classificacao, podeChamarJurados,
+    NIVEIS_DO_TORNEIO, ORDEM_DOS_NIVEIS, npcNoNivel, CENARIOS, ORDEM_DOS_CENARIOS, juradoPorId, REVIEW, numerarLinhas, trechoDoCodigo,
+    validarReview, reviewAutomatica, reviewDoNpc, TRECHOS_DOS_NPCS, EMOCOES, emocaoInicial, reagirNaCena, emocaoDominante, humorDaEmocao,
+    roteiroDaAvaliacao,
   } = bootcamp;
 
 console.log("\nmodo bootcamp");
@@ -3988,7 +3992,7 @@ caso("bootcamp: até 8 participantes, cada um com skin, nome e personalidade ún
   assert.notEqual(lista[1].skin, "ninja", "o segundo humano com a mesma skin ganha outra");
   assert.ok(lista.some((p) => p.npcId === "lisa"), "o personagem escolhido entra");
   assert.ok(!lista.some((p) => p.npcId === "byte-ninja"), "o Byte Ninja veste ninja, que já é de um humano");
-  assert.ok(lista.filter((p) => p.tipo === "npc").every((p) => p.personalidade && !skinDeJurado(p.skin)), "personagens com personalidade e sem a skin dos jurados");
+  assert.ok(lista.filter((p) => p.tipo === "npc").every((p) => p.personalidade && p.bordao), "personagens com personalidade e bordão");
   assert.ok(lista.every((p) => !p.eliminado && p.pontos === 0));
   assert.equal(montarParticipantes({ humanos: [{ usuarioId: "u1", nome: "Ana", personagem: "neuro" }], total: 3, s }).length, 3);
   assert.ok(!npcsDisponiveis(["lisa"]).some((x) => x.skin === "lisa"));
@@ -4135,6 +4139,119 @@ caso("bootcamp: o mata-mata elimina até sobrar o campeão; os pontos corridos s
   assert.equal(r2.campeao, "q0", "150 pontos contra 100 e 120");
   assert.deepEqual(classificacao(r2.participantes).map((p) => p.id), ["q0", "q2", "q1"]);
   assert.deepEqual(classificacao([{ id: "a", baia: 0, pontos: 90, eliminado: true, eliminadoNa: 1 }, { id: "b", baia: 1, pontos: 10, eliminado: false }]).map((p) => p.id), ["b", "a"], "quem está vivo vem antes");
+});
+
+caso("bootcamp: os jurados novos (arquétipos, com falas de reserva) e o nível do torneio contra a CPU", () => {
+  assert.deepEqual(JURADOS.map((j) => j.id), ["kernel", "vetor", "sintaxe"], "os ids não mudam: as notas guardadas usam eles");
+  for (const j of JURADOS) {
+    assert.ok(j.arquetipo && j.estilo && j.elogios.length >= 3 && j.broncas.length >= 3, j.id);
+    assert.ok(!("personagem" in j), "o jurado é desenho próprio, não skin do Neuro");
+  }
+  assert.equal(juradoPorId("vetor").nome, "Chef Vetor");
+  assert.deepEqual(ORDEM_DOS_NIVEIS, ["facil", "medio", "dificil", "lendario"]);
+  assert.deepEqual([1, 2, 3].map((r) => dificuldadeDaRodada(r, 3, "facil")), [1, 2, 2]);
+  assert.deepEqual([1, 2, 3].map((r) => dificuldadeDaRodada(r, 3, "medio")), [1, 2, 3], "o médio é o de antes");
+  assert.deepEqual([1, 2, 3].map((r) => dificuldadeDaRodada(r, 3, "dificil")), [2, 3, 3]);
+  assert.deepEqual([1, 2].map((r) => dificuldadeDaRodada(r, 2, "lendario")), [3, 3]);
+  assert.equal(dificuldadeDaRodada(1, 3, "inventado"), 1, "nível desconhecido vale como médio");
+  const lisa = NPCS_DO_BOOTCAMP.find((n) => n.id === "lisa");
+  assert.ok(npcNoNivel(lisa, "facil").habilidade < lisa.habilidade && npcNoNivel(lisa, "lendario").habilidade > lisa.habilidade);
+  assert.ok(npcNoNivel(lisa, "lendario").habilidade <= 0.97 && npcNoNivel({ ...lisa, habilidade: 0.31 }, "facil").habilidade >= 0.3, "dentro dos limites");
+  assert.ok(npcNoNivel(lisa, "lendario").ritmo < lisa.ritmo, "no lendário eles são mais rápidos");
+  const testes = [{ oculto: false }, { oculto: false }, { oculto: true }, { oculto: true }];
+  let ganhos = { facil: 0, lendario: 0 };
+  for (let i = 1; i <= 60; i++) {
+    for (const nivel of ["facil", "lendario"]) {
+      let a = i * 7919;
+      const s = () => ((a = (a * 16807) % 2147483647) / 2147483647);
+      ganhos[nivel] += simularNpc({ npc: npcNoNivel(lisa, nivel), dificuldade: 2, testes, s }).passados;
+    }
+  }
+  assert.ok(ganhos.lendario > ganhos.facil, "no lendário os personagens passam em mais testes");
+  assert.deepEqual(validarConfiguracao({ nome: "Temporada", formato: "mata-mata" }).config.opcoes, { nivel: "medio", cenario: "neon" });
+  assert.deepEqual(validarConfiguracao({ nome: "Temporada", formato: "mata-mata", nivel: "dificil", cenario: "cyber" }).config.opcoes, { nivel: "dificil", cenario: "cyber" });
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "mata-mata", nivel: "impossivel" }).ok, false);
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "mata-mata", cenario: "praia" }).ok, false);
+  assert.deepEqual(ORDEM_DOS_CENARIOS, ["neon", "datacenter", "orbital", "loft", "cyber"], "os 5 cenários");
+  assert.ok(ORDEM_DOS_CENARIOS.every((c) => CENARIOS[c].nome && CENARIOS[c].descricao));
+});
+
+caso("bootcamp: o code review ao vivo aponta linhas do código de verdade (a IA não inventa código)", () => {
+  const codigo = "import sys\nlinhas = sys.stdin.read().split()\nsoma = 0\nfor x in linhas[1:]:\n    if int(x) % 2 == 0:\n        soma += int(x)\nprint(soma)\n";
+  assert.equal(numerarLinhas(codigo).split("\n")[3], "4| for x in linhas[1:]:");
+  assert.deepEqual(trechoDoCodigo(codigo, 4, 6), { linhaInicio: 4, linhaFim: 6, trecho: "for x in linhas[1:]:\n    if int(x) % 2 == 0:\n        soma += int(x)" });
+  assert.equal(trechoDoCodigo(codigo, 99, 100), null, "linha fora do código");
+  assert.equal(trechoDoCodigo(codigo, 1, 999).linhaFim, Math.min(REVIEW.maxLinhas, 8), "no máximo 8 linhas");
+  assert.equal(trechoDoCodigo(codigo, 5, 2).linhaFim, 5, "fim antes do início vira uma linha só");
+  const r = validarReview([
+    { jurado: "Kernel", tipo: "bronca", linhaInicio: 4, linhaFim: 6, fala: "Laço dentro de laço, mon Dieu!" },
+    { jurado: "kernel", tipo: "elogio", linhaInicio: 4, linhaFim: 4, fala: "repetido" },
+    { jurado: "sintaxe", tipo: "elogio", linhaInicio: 7, linhaFim: 7, fala: "Formato perfeito." },
+    { jurado: "alguem", tipo: "elogio", linhaInicio: 1, linhaFim: 1, fala: "?" },
+    { jurado: "vetor", tipo: "talvez", linhaInicio: 1, linhaFim: 1, fala: "?" },
+    { jurado: "vetor", tipo: "bronca", linhaInicio: 50, linhaFim: 51, fala: "linha que não existe" },
+    { jurado: "vetor", tipo: "bronca", linhaInicio: 2, linhaFim: 2, fala: "" },
+  ], codigo);
+  assert.deepEqual(r.map((x) => [x.jurado, x.tipo, x.linhaInicio]), [["kernel", "bronca", 4], ["sintaxe", "elogio", 7]]);
+  assert.equal(r[1].trecho, "print(soma)", "o trecho sai do código");
+  const muitos = validarReview(Array.from({ length: 9 }, (_, i) => ({ jurado: "vetor", tipo: "bronca", linhaInicio: i + 1, linhaFim: i + 1, fala: `x${i}` })), codigo);
+  assert.equal(muitos.length, REVIEW.maxItens);
+  const apelidos = new Map([["p1", { id: "h:1", fracao: 1, testou: true, codigo }]]);
+  const v = validarAvaliacao({ avaliacoes: [{ participante: "p1", notaKernel: 9, notaVetor: 8, notaSintaxe: 10, review: [{ jurado: "vetor", tipo: "elogio", linhaInicio: 3, linhaFim: 3, fala: "Nome claro." }] }] }, apelidos);
+  assert.equal(v.get("h:1").review[0].trecho, "soma = 0", "a avaliação da IA traz o review conferido");
+
+  let a = 5;
+  const s = () => ((a = (a * 16807) % 2147483647) / 2147483647);
+  const bom = reviewAutomatica({ codigo, fracao: 1, enviou: true, linguagemOk: true, temPlano: true, s });
+  assert.deepEqual(bom.map((x) => [x.jurado, x.tipo]), [["kernel", "elogio"], ["vetor", "elogio"], ["sintaxe", "elogio"]]);
+  assert.ok(bom.every((x) => codigo.includes(x.trecho) && x.fala), "trechos do código e falas do banco");
+  assert.ok(bom[0].trecho.includes("for x in"), "o Kernel olha o laço");
+  assert.ok(bom[2].trecho.includes("print(soma)"), "a Sintaxe olha a saída");
+  const ruim = reviewAutomatica({ codigo, fracao: 0.5, enviou: false, linguagemOk: true, temPlano: false, s });
+  assert.ok(ruim.every((x) => x.tipo === "bronca"));
+  assert.ok(ruim.every((x) => JURADOS.find((j) => j.id === x.jurado).broncas.includes(x.fala)), "bronca do banco do próprio jurado");
+  assert.deepEqual(reviewAutomatica({ codigo: "   ", s }), [], "sem código, sem review");
+  for (const n of NPCS_DO_BOOTCAMP) assert.ok(TRECHOS_DOS_NPCS[n.id]?.bom && TRECHOS_DOS_NPCS[n.id]?.ruim, `trechos de ${n.id}`);
+  const npc = reviewDoNpc("raposa-regex", { passou: false }, s);
+  assert.equal(npc[0].tipo, "bronca");
+  assert.equal(npc[0].trecho, TRECHOS_DOS_NPCS["raposa-regex"].ruim);
+  assert.equal(reviewDoNpc("raposa-regex", { passou: true }, s)[0].tipo, "elogio");
+});
+
+caso("bootcamp: as emoções da avaliação ao vivo (aflição, felicidade, raiva, tristeza) e o roteiro", () => {
+  assert.deepEqual(Object.keys(EMOCOES), ["aflicao", "felicidade", "raiva", "tristeza"]);
+  let e = emocaoInicial();
+  assert.equal(emocaoDominante(e), "aflicao");
+  assert.equal(humorDaEmocao(e), "aflito", "chega aflito na bancada");
+  assert.equal(humorDaEmocao(reagirNaCena(e, { tipo: "elogio" })), "feliz", "um elogio já alegra");
+  e = reagirNaCena(reagirNaCena(e, { tipo: "bronca" }), { tipo: "bronca" });
+  assert.equal(humorDaEmocao(e), "bravo", "duas broncas e a raiva toma conta");
+  assert.equal(humorDaEmocao(reagirNaCena(e, { tipo: "resultado", resultado: "eliminado" })), "triste");
+  assert.equal(humorDaEmocao(reagirNaCena(emocaoInicial(), { tipo: "resultado", resultado: "avancou", campeao: true })), "comemorando");
+  const alta = reagirNaCena(reagirNaCena(emocaoInicial(), { tipo: "nota", nota: 95 }), { tipo: "resultado", resultado: "avancou" });
+  assert.equal(humorDaEmocao(alta), "comemorando", "nota alta e avançou: festa");
+  for (const v of Object.values(reagirNaCena(reagirNaCena(e, { tipo: "bronca" }), { tipo: "bronca" }))) assert.ok(v >= 0 && v <= 100, "sempre de 0 a 100");
+  const rot = roteiroDaAvaliacao({
+    campeao: "h:1",
+    participantes: [
+      { id: "n:lisa", nome: "Lisa", tipo: "npc", nota: 70, resultado: "eliminado", fala: "Revanche!", review: [{ jurado: "kernel" }] },
+      { id: "h:1", nome: "Ana", tipo: "humano", nota: 92, resultado: "avancou" },
+    ],
+  });
+  assert.deepEqual(rot.map((p) => p.id), ["h:1", "n:lisa"], "do melhor prato ao pior");
+  assert.equal(rot[0].campeao, true);
+  assert.deepEqual(rot[0].review, [], "sem review, lista vazia");
+  assert.equal(rot[1].fala, "Revanche!");
+  assert.deepEqual(roteiroDaAvaliacao(null), []);
+});
+
+caso("bootcamp: o humor aflito do Neuro e as telas da avaliação ao vivo", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  assert.match(ler("../src/componentes/Neuro.js"), /"bravo", "aflito"\]/, "o humor novo na lista");
+  assert.match(ler("../src/app/neuro.css"), /\.neuro--aflito \.v-aflito/, "e no CSS");
+  assert.match(ler("../src/componentes/bootcamp/AvaliacaoAoVivo.js"), /Pular esta cena[\s\S]*Pular tudo/, "dá para pular");
+  assert.match(ler("../src/componentes/bootcamp/Escritorio3D.js"), /const ALTURA_DO_PALCO = 0\.5;/, "os jurados no palco, acima da bancada");
+  assert.match(ler("../db/033-bootcamp-nivel-e-cenario.sql"), /add column if not exists opcoes jsonb/);
 });
 
 caso("bootcamp: quem chama os jurados, o prazo e as rotas", () => {

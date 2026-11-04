@@ -37,6 +37,11 @@ export default function LisaDoNeuro() {
       <Braco humores="v-surpreso" d="M114 128 Q129 131 138 123" mao={[140, 121]} />
       <Braco humores="v-pensando v-triste" d="M87 129 Q81 141 80 154" mao={[80, 156]} />
       <Braco humores="v-pensando" d="M114 128 Q129 130 121 120" mao={[118, 117]} />
+      {/* aflita: as mãos juntas na frente do peito; brava: as mãos na cintura */}
+      <Braco humores="v-aflito" d="M86 128 Q80 140 95 141" mao={[96, 141]} />
+      <Braco humores="v-aflito" d="M114 128 Q120 140 105 141" mao={[104, 141]} />
+      <Braco humores="v-bravo" d="M86 128 Q70 138 80 148" mao={[81, 149]} />
+      <Braco humores="v-bravo" d="M114 128 Q130 138 120 148" mao={[119, 149]} />
 
       {/* o pescoço e a roupa */}
       <rect x="94.5" y="112" width="11" height="14" rx="3" className="neuro__lisa-pele neuro__lisa-contorno" />
@@ -67,6 +72,9 @@ export default function LisaDoNeuro() {
         <path d="M62.6 69.8 l6.4 -1.4" className="v v-pensando neuro__lisa-boca" />
         <ellipse cx="66" cy="69.4" rx="2" ry="2.6" className="v v-surpreso neuro__lisa-tinta" />
         <path d="M63 69.2 q3 1.2 6 0" className="v v-dormindo neuro__lisa-boca" />
+        <path d="M61.4 70.6 q1.1 -1.4 2.2 0 q1.1 1.4 2.2 0 q1.1 -1.4 2.2 0 q1.1 1.4 2.2 0" className="v v-aflito neuro__lisa-boca" />
+        <path d="M61 71 q5 -3.6 10 0" className="v v-bravo neuro__lisa-boca" />
+        <path d="M80 44 q2.6 4 0 6 q-2.6 -2 0 -6 z" className="v v-aflito neuro__lisa-lagrima" />
 
         {/* triste: a lágrima; dormindo: os olhos fechados e os zz; pensando: as bolinhas */}
         <path d="M55 60 q-3 4.6 0 6.8 q3 -2.2 0 -6.8 z" className="v v-triste neuro__lisa-lagrima" />

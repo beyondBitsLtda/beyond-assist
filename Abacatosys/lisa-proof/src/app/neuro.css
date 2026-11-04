@@ -32,12 +32,18 @@
 .neuro__estrelas path { fill: #EAB308; }
 .neuro__zzz text { fill: #9CA3AF; font: 700 16px var(--pf-fonte); }
 .neuro__pensar circle { fill: #9CA3AF; }
+.neuro__suor { fill: #7DD3FC; stroke: #0284C7; stroke-width: 1.5; }
 
 /* Só aparece o que é do humor atual. */
 .neuro .v { display: none; }
 .neuro--normal .v-normal, .neuro--feliz .v-feliz, .neuro--comemorando .v-comemorando,
 .neuro--triste .v-triste, .neuro--pensando .v-pensando, .neuro--dormindo .v-dormindo,
-.neuro--surpreso .v-surpreso, .neuro--bravo .v-bravo { display: inline; }
+.neuro--surpreso .v-surpreso, .neuro--bravo .v-bravo, .neuro--aflito .v-aflito { display: inline; }
+
+/* aflito (04/11/2026, Modo Bootcamp): treme de leve, como quem espera a nota dos jurados */
+.neuro--aflito .neuro__boneco { animation: neuro-tremer 0.45s ease-in-out infinite; }
+@keyframes neuro-tremer { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-1.5px); } 75% { transform: translateX(1.5px); } }
+@media (prefers-reduced-motion: reduce) { .neuro--aflito .neuro__boneco { animation: none; } }
 
 /* Pontos de giro em coordenadas do desenho. */
 .neuro__boneco { transform-box: view-box; transform-origin: 100px 182px; }

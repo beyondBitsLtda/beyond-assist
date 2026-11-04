@@ -220,5 +220,74 @@
 .bc-nota__jurado strong { font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 20px; }
 .bc-nota__jurado p { margin: 0; color: var(--pf-tinta-2); font-size: 13.5px; }
 .bc-nota__criterio { color: var(--pf-tinta-3); font-size: 11.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+.bc-nota__review summary { cursor: pointer; font-weight: 800; color: var(--pf-verde-texto); }
+.bc-nota__review ul { display: grid; gap: 10px; margin: 10px 0 0; padding: 0; list-style: none; }
 
-@media (prefers-reduced-motion: reduce) { .bc-npc, .bc-opcao { transition: none; } .bc-npc:active:not(:disabled) { transform: none; } }
+/* ---- os cenários (04/11/2026): o seletor da arena e os cartões da criação */
+.bc-cenarios { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.bc-cenarios .pf-campo__rotulo { margin-right: 4px; }
+.bc-opcoes--quatro { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.bc-cenarios-grade { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+.bc-cenario { position: relative; display: grid; gap: 4px; padding: 0 0 12px; overflow: hidden; border-radius: var(--pf-raio); border: 2px solid var(--pf-linha); cursor: pointer; }
+.bc-cenario input { position: absolute; opacity: 0; pointer-events: none; }
+.bc-cenario strong, .bc-cenario > span:last-child { padding: 0 12px; }
+.bc-cenario > span:last-child { color: var(--pf-tinta-2); font-size: 12.5px; font-weight: 600; }
+.bc-cenario__previa { display: grid; place-items: center; height: 70px; font-size: 30px; }
+.bc-cenario--neon .bc-cenario__previa { background: radial-gradient(120% 120% at 50% 0%, #2c3d12 0%, #0b0e12 70%); }
+.bc-cenario--datacenter .bc-cenario__previa { background: repeating-linear-gradient(90deg, #0f1a2b 0 18px, #13233a 18px 22px), #060b14; }
+.bc-cenario--orbital .bc-cenario__previa { background: radial-gradient(circle at 70% 120%, #1d4ed8 0 38%, transparent 39%), radial-gradient(#ffffff 1px, transparent 1px) 0 0 / 14px 14px, #02030a; }
+.bc-cenario--loft .bc-cenario__previa { background: linear-gradient(180deg, #4c1d95 0%, #db2777 45%, #f97316 75%, #fcd34d 100%); }
+.bc-cenario--cyber .bc-cenario__previa { background: linear-gradient(135deg, #3b0764 0%, #07020f 55%, #0e7490 100%); }
+.bc-cenario--escolhido { border-color: var(--pf-verde); box-shadow: 0 0 0 4px rgba(132, 204, 22, 0.18); }
+.bc-cenario:has(input:focus-visible) { outline: 3px solid var(--pf-verde); outline-offset: 2px; }
+
+/* os rótulos do palco: quem está na bancada e o jurado que fala */
+.bc-escritorio__rotulo--palco { border-color: #f0be45; background: #f0be45; color: #1a1205; }
+.bc-escritorio__rotulo--falando { border-color: #f0be45; background: rgba(240, 190, 69, 0.95); color: #1a1205; transform-origin: center; }
+
+/* ---- a avaliação ao vivo */
+.bc-aovivo { display: grid; gap: 12px; margin: -4px 0 16px; padding: 14px; border-radius: var(--pf-raio-grande); border: 2px solid #f0be45; background: var(--pf-cartao-fundo); box-shadow: var(--pf-cartao-sombra); }
+.bc-aovivo__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.bc-aovivo__topo strong { font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 18px; }
+.bc-aovivo__selo { padding: 3px 10px; border-radius: var(--pf-pilula); background: #DC2626; color: #FFFFFF; font-size: 12px; font-weight: 900; letter-spacing: 0.08em; animation: bc-piscar 1.2s ease-in-out infinite; }
+@keyframes bc-piscar { 50% { opacity: 0.55; } }
+.bc-aovivo__pular { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.bc-aovivo__corpo { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .bc-aovivo__corpo { grid-template-columns: 300px minmax(0, 1fr); } }
+.bc-aovivo__competidor { display: grid; gap: 10px; grid-template-columns: auto minmax(0, 1fr); align-items: center; align-content: start; }
+.bc-aovivo__competidor strong { font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 18px; }
+.bc-aovivo__competidor .pf-estat__nota { margin: 2px 0 0; }
+.bc-aovivo__competidor .bc-medidor { grid-column: 1 / -1; }
+.bc-aovivo__palco { min-height: 180px; display: grid; align-content: start; }
+.bc-aovivo__anuncio { margin: 0; align-self: center; font-family: var(--pf-fonte-titulo); font-size: 22px; }
+.bc-aovivo__nota { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 180px; text-align: center; }
+.bc-aovivo__numero { font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 64px; line-height: 1; color: var(--pf-verde-texto); animation: bc-revelar 0.5s ease-out; }
+.bc-aovivo__numero small { font-size: 22px; color: var(--pf-tinta-3); }
+@keyframes bc-revelar { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* o medidor de emoção */
+.bc-medidor { display: grid; gap: 5px; padding: 10px 12px; border-radius: 16px; background: var(--pf-superficie-2, rgba(0, 0, 0, 0.04)); border: 1px solid var(--pf-linha); }
+.bc-medidor__agora { font-weight: 900; font-size: 14px; }
+.bc-medidor__linha { display: grid; grid-template-columns: 22px minmax(0, 1fr) 30px; align-items: center; gap: 8px; opacity: 0.7; }
+.bc-medidor__linha--dominante { opacity: 1; }
+.bc-medidor__barra { position: relative; height: 10px; overflow: hidden; border-radius: var(--pf-pilula); background: var(--pf-linha); }
+.bc-medidor__barra > span { position: absolute; inset: 0 auto 0 0; border-radius: inherit; transition: width 0.6s ease; }
+.bc-medidor__linha--aflicao .bc-medidor__barra > span { background: #38BDF8; }
+.bc-medidor__linha--felicidade .bc-medidor__barra > span { background: var(--pf-verde); }
+.bc-medidor__linha--raiva .bc-medidor__barra > span { background: #EF4444; }
+.bc-medidor__linha--tristeza .bc-medidor__barra > span { background: #818CF8; }
+.bc-medidor__valor { color: var(--pf-tinta-3); font-size: 12px; font-weight: 800; text-align: right; }
+
+/* os itens do code review */
+.bc-review { display: grid; gap: 8px; padding: 12px; border-radius: 18px; border: 1px solid var(--pf-linha); border-left: 5px solid var(--pf-alerta); animation: bc-entrar 0.35s ease-out; }
+.bc-review--elogio { border-left-color: var(--pf-verde); }
+@keyframes bc-entrar { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+.bc-review__jurado { display: flex; align-items: center; gap: 10px; }
+.bc-review__jurado > div { display: grid; gap: 4px; justify-items: start; }
+.bc-review__fala { margin: 0; font-size: 16px; font-weight: 700; font-style: italic; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bc-npc, .bc-opcao { transition: none; } .bc-npc:active:not(:disabled) { transform: none; }
+  .bc-aovivo__selo, .bc-aovivo__numero, .bc-review { animation: none; }
+  .bc-medidor__barra > span { transition: none; }
+}

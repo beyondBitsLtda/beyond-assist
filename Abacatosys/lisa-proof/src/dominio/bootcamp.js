@@ -79,26 +79,95 @@ export const MODELOS_DE_CODIGO = {
 };
 
 // ------------------------------------------------------------------ os 3 jurados
-// Personagens originais. Cada um avalia um critério; as skins são do Neuro e nenhum competidor usa as mesmas.
+// Personagens originais, inspirados nos ARQUÉTIPOS de uma bancada de reality de cozinha (o francês ranzinza, a
+// perfeccionista implacável e o durão tatuado), nunca em pessoas reais: nem nome, nem rosto, nem bordão de
+// ninguém. Cada um avalia um critério e tem o seu desenho (src/componentes/bootcamp/Jurados.js). As falas de
+// reserva valem quando a IA não responde; o deboche é sempre sobre o código, nunca sobre a pessoa.
 export const JURADOS = [
   {
-    id: "kernel", nome: "Jurado Kernel", emoji: "⚙️", personagem: "robo",
+    id: "kernel", nome: "Chef Kernel", emoji: "🥖", arquetipo: "o francês ranzinza",
     criterio: "Desempenho técnico", foco: "se a solução está correta, passa nos testes (inclusive os ocultos) e é eficiente",
-    estilo: "exigente e direto, fala de números e de complexidade",
+    estilo: "dramático e ranzinza, com expressões em francês; sofre em voz alta com laço dentro de laço e trata memória desperdiçada como manteiga jogada fora",
+    elogios: [
+      "Oh là là! Linear, limpo e rápido. Isso é alta gastronomia computacional.",
+      "Passou nos testes ocultos sem suar. Je suis impressionné, e eu nunca fico impressionado.",
+      "Isso roda mais rápido que garçom fugindo de cliente chato. Magnifique!",
+      "Nenhum byte desperdiçado. Finalmente alguém que respeita a manteiga.",
+    ],
+    broncas: [
+      "Mon Dieu! Laço dentro de laço: é um suflê que murchou antes de sair do forno.",
+      "Isso não é código, é um croissant amassado no fundo da mochila.",
+      "Você alocou memória como quem joga manteiga no lixo. Eu sinto dor física.",
+      "O teste oculto estourou o tempo. O forno apitou e o prato não estava pronto, chéri.",
+      "Esse if aninhado tem mais andares que a Torre Eiffel. Desce daí!",
+    ],
   },
   {
-    id: "vetor", nome: "Jurada Vetor", emoji: "📐", personagem: "mago",
+    id: "vetor", nome: "Chef Vetor", emoji: "🔪", arquetipo: "a perfeccionista implacável",
     criterio: "Arquitetura", foco: "a organização do código, os nomes, a legibilidade e o planejamento feito antes de codar",
-    estilo: "elegante e caprichosa, elogia código limpo e cobra funções bem divididas",
+    estilo: "elegante, fala baixo e corta fundo; ama função pequena e nome claro, e não perdoa gambiarra disfarçada",
+    elogios: [
+      "Nomes claros, funções pequenas, nada sobrando. É assim que se empratar código.",
+      "Dá para ler isso tomando um café, sem esforço nenhum. Elegante.",
+      "O planejamento aparece no código. Isso é raro, e eu valorizo.",
+      "Cada coisa no seu lugar. Até o meu armário de facas tem inveja.",
+    ],
+    broncas: [
+      "Uma variável chamada x2_final_agora_vai. Eu preciso de um minuto.",
+      "Uma função fazendo tudo ao mesmo tempo. Isso não é arquitetura, é a gaveta da bagunça.",
+      "O plano dizia uma coisa e o código fez outra. Você leu o próprio plano?",
+      "Bonito por fora, um labirinto por dentro. Parece apartamento decorado.",
+      "Copiou e colou o mesmo bloco três vezes. Repetição não é tempero.",
+    ],
   },
   {
-    id: "sintaxe", nome: "Jurada Sintaxe", emoji: "📜", personagem: "astronauta",
+    id: "sintaxe", nome: "Chef Sintaxe", emoji: "🤘", arquetipo: "o durão tatuado",
     criterio: "Conformidade com as regras", foco: "se a entrega segue o enunciado, os requisitos, a linguagem estipulada e o formato da saída",
-    estilo: "rigorosa e bem-humorada, não deixa passar um detalhe do enunciado",
+    estilo: "durão de poucas palavras e muito sarcasmo; regra é regra, e detalhe é o que separa amador de profissional",
+    elogios: [
+      "Seguiu o enunciado à risca. Sem firula. Respeito.",
+      "Formato da saída perfeito. Nada para reclamar, e eu adoro reclamar.",
+      "Entregou no prazo e do jeito pedido. Isso é profissional.",
+    ],
+    broncas: [
+      "Pediram SIM. Você imprimiu 'Sim'. Volta para o fim da fila.",
+      "Espaço sobrando no fim da linha. Detalhe? Detalhe é o que separa amador de profissional.",
+      "Leu o enunciado ou só olhou as figuras?",
+      "No meu restaurante, prato atrasado vai direto para o lixo.",
+      "A regra estava escrita. Em português. Com letra grande.",
+    ],
   },
 ];
 export const IDS_DOS_JURADOS = JURADOS.map((j) => j.id);
-const SKINS_DOS_JURADOS = new Set(JURADOS.map((j) => j.personagem));
+export const juradoPorId = (id) => JURADOS.find((j) => j.id === id) || null;
+
+// ------------------------------------------------------------------ o nível do torneio contra a CPU
+// Muda os personagens da Lisa (habilidade e ritmo) e a faixa de dificuldade dos desafios (da 1ª à última rodada).
+export const NIVEIS_DO_TORNEIO = {
+  facil: { nome: "Fácil", emoji: "🌱", descricao: "Personagens mais tranquilos e desafios leves.", habilidade: -0.15, ritmo: 1.25, dificuldade: [1, 2] },
+  medio: { nome: "Médio", emoji: "⚡", descricao: "Personagens no ritmo normal; os desafios vão do fácil ao difícil.", habilidade: 0, ritmo: 1, dificuldade: [1, 3] },
+  dificil: { nome: "Difícil", emoji: "🔥", descricao: "Personagens afiados e desafios que já começam no médio.", habilidade: 0.08, ritmo: 0.85, dificuldade: [2, 3] },
+  lendario: { nome: "Lendário", emoji: "👑", descricao: "Os personagens quase não erram, e todo desafio é difícil.", habilidade: 0.14, ritmo: 0.7, dificuldade: [3, 3] },
+};
+export const ORDEM_DOS_NIVEIS = ["facil", "medio", "dificil", "lendario"];
+export const nivelValido = (nivel) => (NIVEIS_DO_TORNEIO[nivel] ? nivel : "medio");
+
+/** O personagem no nível do torneio: mais (ou menos) habilidoso e mais (ou menos) rápido. */
+export function npcNoNivel(npc, nivel = "medio") {
+  const n = NIVEIS_DO_TORNEIO[nivelValido(nivel)];
+  return { ...npc, habilidade: Math.min(0.97, Math.max(0.3, npc.habilidade + n.habilidade)), ritmo: npc.ritmo * n.ritmo };
+}
+
+// ------------------------------------------------------------------ os cenários do escritório em 3D
+export const CENARIOS = {
+  neon: { nome: "Escritório Neon", emoji: "💚", descricao: "O estúdio escuro com faixas de neon lima." },
+  datacenter: { nome: "Data Center", emoji: "🗄️", descricao: "Corredores de servidores piscando sob luz azul fria." },
+  orbital: { nome: "Estação Orbital", emoji: "🛰️", descricao: "Um laboratório em órbita, com a Terra e as estrelas nas janelas." },
+  loft: { nome: "Loft da Startup", emoji: "🌇", descricao: "Tijolinho, madeira, plantas e o pôr do sol da cidade no janelão." },
+  cyber: { nome: "Cidade Cyberpunk", emoji: "🌃", descricao: "Noite de chuva, letreiros magenta e ciano e o chão molhado." },
+};
+export const ORDEM_DOS_CENARIOS = ["neon", "datacenter", "orbital", "loft", "cyber"];
+export const cenarioValido = (cenario) => (CENARIOS[cenario] ? cenario : "neon");
 
 // ------------------------------------------------------------------ os personagens da Lisa
 // Os competidores controlados pelo modelo da Lisa: skin, nome e personalidade únicos. `habilidade` (0–1) é a
@@ -219,7 +288,10 @@ export function validarConfiguracao(bruto = {}) {
   if (formato === "pontos-corridos" && !BOOTCAMP.rodadasDosPontosCorridos.includes(rodadasPontos)) {
     return { ok: false, motivo: `nos pontos corridos, escolha de ${BOOTCAMP.rodadasDosPontosCorridos[0]} a ${BOOTCAMP.rodadasDosPontosCorridos.at(-1)} rodadas` };
   }
-  return { ok: true, config: { nome, formato, tempoMin, linguagens: { modo, permitidas }, total, rodadasPontos, npcs, convidados } };
+  if (bruto.nivel && !NIVEIS_DO_TORNEIO[bruto.nivel]) return { ok: false, motivo: `escolha o nível: ${ORDEM_DOS_NIVEIS.map((n) => NIVEIS_DO_TORNEIO[n].nome).join(", ")}` };
+  if (bruto.cenario && !CENARIOS[bruto.cenario]) return { ok: false, motivo: "cenário desconhecido" };
+  const opcoes = { nivel: nivelValido(bruto.nivel), cenario: cenarioValido(bruto.cenario) };
+  return { ok: true, config: { nome, formato, tempoMin, linguagens: { modo, permitidas }, total, rodadasPontos, npcs, convidados, opcoes } };
 }
 
 /** Quantas rodadas o torneio tem: no mata-mata, até sobrar um (com folga para número ímpar); nos pontos corridos, as escolhidas. */
@@ -228,10 +300,14 @@ export function totalDeRodadas(formato, participantes, rodadasPontos = 3) {
   return rodadasPontos;
 }
 
-/** A dificuldade (1 a 3) sobe com as rodadas: a primeira é fácil e a última é a mais difícil. */
-export function dificuldadeDaRodada(numero, total) {
-  if (total <= 1) return 2;
-  return Math.min(3, Math.max(1, 1 + Math.round(((numero - 1) * 2) / (total - 1))));
+/**
+ * A dificuldade (1 a 3) sobe com as rodadas, dentro da faixa do nível: no médio, a primeira é fácil e a última é a
+ * mais difícil; no fácil vai de 1 a 2; no difícil, de 2 a 3; no lendário, é sempre 3.
+ */
+export function dificuldadeDaRodada(numero, total, nivel = "medio") {
+  const [min, max] = NIVEIS_DO_TORNEIO[nivelValido(nivel)].dificuldade;
+  if (total <= 1) return Math.round((min + max) / 2);
+  return Math.min(max, Math.max(min, min + Math.round(((numero - 1) * (max - min)) / (total - 1))));
 }
 
 const embaralhar = (lista, s) => {
@@ -275,9 +351,6 @@ export function montarParticipantes({ humanos, npcs = [], total, s }) {
   const baias = embaralhar(lista.map((_, i) => i), s);
   return lista.map((p, i) => ({ ...p, baia: baias[i], eliminado: false, eliminadoNa: null, pontos: 0 }));
 }
-
-/** Nenhum competidor veste a skin de um jurado? (Os humanos podem: é a skin que já usam no Proof.) */
-export const skinDeJurado = (skin) => SKINS_DOS_JURADOS.has(skin);
 
 // ------------------------------------------------------------------ rodadas e confrontos
 
@@ -573,9 +646,10 @@ export function avaliacaoAutomatica({ enviou = false, testou = false, fracao = 0
 }
 
 /**
- * Confere a avaliação que a IA mandou para os humanos. `apelidos`: Map apelido ("p1") → { id, fracao, testou }.
- * Nota fora de 0–10 é cortada e o Kernel respeita o teto dos testes; quem a IA esqueceu fica de fora (a
- * avaliação automática cobre). Devolve Map id → { notas, feedback }.
+ * Confere a avaliação que a IA mandou para os humanos. `apelidos`: Map apelido ("p1") → { id, fracao, testou,
+ * codigo }. Nota fora de 0–10 é cortada e o Kernel respeita o teto dos testes; quem a IA esqueceu fica de fora
+ * (a avaliação automática cobre). O code review vem por número de linha e o trecho sai do código de verdade
+ * (validarReview). Devolve Map id → { notas, feedback, review }.
  */
 export function validarAvaliacao(bruto, apelidos) {
   const saida = new Map();
@@ -586,9 +660,200 @@ export function validarAvaliacao(bruto, apelidos) {
     saida.set(alvo.id, {
       notas: { kernel: Math.min(nota(a.notaKernel), tetoDoKernel(alvo.fracao)), vetor: nota(a.notaVetor), sintaxe: nota(a.notaSintaxe) },
       feedback: { kernel: limpar(a.feedbackKernel, 400), vetor: limpar(a.feedbackVetor, 400), sintaxe: limpar(a.feedbackSintaxe, 400) },
+      review: validarReview(a.review, alvo.codigo || ""),
     });
   }
   return saida;
+}
+
+// ------------------------------------------------------------------ o code review ao vivo
+
+export const REVIEW = { maxItens: 4, maxLinhas: 8, fala: 240 };
+
+/** O código com o número de cada linha ("1| ..."), para a IA apontar os trechos sem copiar nada. */
+export function numerarLinhas(codigo, max = 400) {
+  return String(codigo ?? "").replace(/\r\n?/g, "\n").split("\n").slice(0, max).map((l, i) => `${i + 1}| ${l}`).join("\n");
+}
+
+/** O trecho das linhas ini–fim (1 em diante), no máximo REVIEW.maxLinhas; null se não sobra nada. */
+export function trechoDoCodigo(codigo, ini, fim) {
+  const linhas = String(codigo ?? "").replace(/\r\n?/g, "\n").split("\n");
+  let a = Math.trunc(Number(ini));
+  let b = Math.trunc(Number(fim));
+  if (!Number.isFinite(a) || a < 1 || a > linhas.length) return null;
+  if (!Number.isFinite(b) || b < a) b = a;
+  b = Math.min(b, linhas.length, a + REVIEW.maxLinhas - 1);
+  const texto = linhas.slice(a - 1, b).join("\n").replace(/\s+$/, "");
+  return texto.trim() ? { linhaInicio: a, linhaFim: b, trecho: texto } : null;
+}
+
+/**
+ * Confere os itens de code review: o jurado existe, o tipo é elogio ou bronca, a fala não é vazia e as linhas
+ * apontam para o código de verdade. No máximo REVIEW.maxItens, sem repetir o mesmo trecho com o mesmo jurado.
+ */
+export function validarReview(bruto, codigo) {
+  const vistos = new Set();
+  const itens = [];
+  for (const r of Array.isArray(bruto) ? bruto : []) {
+    if (itens.length >= REVIEW.maxItens) break;
+    const jurado = juradoPorId(String(r?.jurado || "").trim().toLowerCase());
+    const tipo = r?.tipo === "elogio" || r?.tipo === "bronca" ? r.tipo : null;
+    const fala = limpar(r?.fala, REVIEW.fala);
+    const trecho = trechoDoCodigo(codigo, r?.linhaInicio, r?.linhaFim);
+    if (!jurado || !tipo || !fala || !trecho) continue;
+    const chave = `${jurado.id}:${trecho.linhaInicio}`;
+    if (vistos.has(chave)) continue;
+    vistos.add(chave);
+    itens.push({ jurado: jurado.id, tipo, fala, ...trecho });
+  }
+  return itens;
+}
+
+const sortear = (lista, s) => lista[Math.floor(s() * lista.length) % lista.length];
+
+/** As linhas que chamam a atenção de cada jurado: laço (Kernel), o bloco mais comprido (Vetor) e a saída (Sintaxe). */
+function linhasDeInteresse(codigo) {
+  const linhas = String(codigo ?? "").replace(/\r\n?/g, "\n").split("\n");
+  const achar = (re) => linhas.findIndex((l) => re.test(l)) + 1;
+  const laco = achar(/\b(for|while|forEach|map|reduce|loop)\b/);
+  const saida = achar(/\b(print|println|printf|puts|echo|console\.log|cout|Console\.Write|fmt\.Print|System\.out)/);
+  const cheias = linhas.map((l, i) => [i + 1, l.trim().length]).filter(([, n]) => n > 0);
+  const maisLonga = cheias.sort((a, b) => b[1] - a[1])[0]?.[0] || 1;
+  return { laco: laco || maisLonga, maisLonga, saida: saida || linhas.length };
+}
+
+/**
+ * O code review sem a IA: um item por jurado, no trecho que interessa a ele, com uma fala do banco dele. Elogio
+ * quando o critério foi bem (testes, tamanho, regras) e bronca quando não. `s`: o sorteio (preso à rodada).
+ */
+export function reviewAutomatica({ codigo, fracao = 0, enviou = false, linguagemOk = true, temPlano = false, s }) {
+  if (!String(codigo ?? "").trim()) return [];
+  const { laco, maisLonga, saida } = linhasDeInteresse(codigo);
+  const bomKernel = fracao >= 1;
+  const bomVetor = temPlano && fracao >= 0.8;
+  const bomSintaxe = enviou && linguagemOk && fracao >= 1;
+  const item = (id, bom, linha) => {
+    const j = juradoPorId(id);
+    const t = trechoDoCodigo(codigo, Math.max(1, linha - 1), linha + 2);
+    return t ? { jurado: id, tipo: bom ? "elogio" : "bronca", fala: sortear(bom ? j.elogios : j.broncas, s), ...t } : null;
+  };
+  return [item("kernel", bomKernel, laco), item("vetor", bomVetor, maisLonga), item("sintaxe", bomSintaxe, saida)].filter(Boolean);
+}
+
+// Um trecho "do jeito" de cada personagem da Lisa: eles jogam pela simulação, então o review mostra um pedaço
+// típico do estilo deles — o bom quando a rodada foi bem, o ruim quando foi mal.
+export const TRECHOS_DOS_NPCS = {
+  lisa: {
+    bom: "function resolver(linhas) {\n  const n = Number(linhas[0]);\n  return somar(lerNumeros(linhas[1]).slice(0, n));\n}",
+    ruim: "// TODO: tratar a entrada vazia\nconst n = Number(linhas[0]);",
+  },
+  "byte-ninja": {
+    bom: "print(sum(x for x in map(int, input().split()) if x % 2 == 0))",
+    ruim: "a=input().split();print(a and a[::-1]or 0)",
+  },
+  "capita-stack": {
+    bom: "assert resolver('1\\n-2') == '-2'\nassert resolver('3\\n1 3 5') == '0'",
+    ruim: "if (n === 0) return 0; // e se for negativo? deixa pra lá",
+  },
+  "raposa-regex": {
+    bom: "const vogais = texto.match(/[aeiou]/g) ?? [];\nconsole.log(vogais.length);",
+    ruim: "const ok = /^(?:\\(\\)|\\[\\]|\\{\\})*$/.test(s); // confia",
+  },
+  "cogu-commit": {
+    bom: "git commit -m \"feat: lê a entrada\"\ngit commit -m \"feat: resolve o caso de borda\"",
+    ruim: "git commit -m \"ajustes\"\ngit commit -m \"ajustes 2\"\ngit commit -m \"agora vai\"",
+  },
+  "mergulho-profundo": {
+    bom: "// invariante: soma guarda os pares já lidos\nfor (const x of numeros) if (x % 2 === 0) soma += x;",
+    ruim: "// 40 linhas de análise do problema...\n// (o código ficou para a próxima rodada)",
+  },
+  "yeti-legado": {
+    bom: "for (int i = 0; i < n; i++) {\n    if (v[i] % 2 == 0) soma += v[i];\n}",
+    ruim: "goto fim; /* funciona desde 1998, não mexe */",
+  },
+  "magma-hotfix": {
+    bom: "console.log(resolver(entrada)); // de primeira, passou!",
+    ruim: "try { resolver(); } catch (e) { /* depois eu vejo */ }",
+  },
+  "zorg-compilador": {
+    bom: "const crivo = new Uint8Array(n + 1); // O(n log log n), como no meu planeta",
+    ruim: "const cache = new Map();\nconst cacheDoCache = new Map(); // otimização prematura nível galáctico",
+  },
+  "abacatinho-agil": {
+    bom: "// tarefa 1: ler ✅\n// tarefa 2: resolver ✅\n// tarefa 3: imprimir ✅",
+    ruim: "// sprint 1: planejar o planejamento do plano",
+  },
+};
+
+/** O review de um personagem: o trecho típico dele (bom ou ruim) e a fala de um jurado do banco. */
+export function reviewDoNpc(npcId, sim, s) {
+  const t = TRECHOS_DOS_NPCS[npcId];
+  if (!t) return [];
+  const bom = sim.passou;
+  const j = sortear(JURADOS, s);
+  const trecho = bom ? t.bom : t.ruim;
+  return [{ jurado: j.id, tipo: bom ? "elogio" : "bronca", fala: sortear(bom ? j.elogios : j.broncas, s), linhaInicio: 1, linhaFim: trecho.split("\n").length, trecho }];
+}
+
+// ------------------------------------------------------------------ as emoções na avaliação ao vivo
+// Quatro emoções de 0 a 100, que mudam a cada passo da cena: começa aflito; elogio alegra; bronca irrita e
+// entristece; a nota e o resultado fecham. A que estiver mais alta manda no humor do avatar e no medidor.
+export const EMOCOES = {
+  aflicao: { nome: "Aflição", emoji: "😰", humor: "aflito" },
+  felicidade: { nome: "Felicidade", emoji: "😄", humor: "feliz" },
+  raiva: { nome: "Raiva", emoji: "😠", humor: "bravo" },
+  tristeza: { nome: "Tristeza", emoji: "😢", humor: "triste" },
+};
+export const ORDEM_DAS_EMOCOES = ["aflicao", "felicidade", "raiva", "tristeza"];
+
+export const emocaoInicial = () => ({ aflicao: 60, felicidade: 10, raiva: 5, tristeza: 10 });
+
+/** A emoção depois de um passo da cena: { tipo: "elogio"|"bronca"|"nota"|"resultado", nota?, resultado?, campeao? }. */
+export function reagirNaCena(estado, evento) {
+  const e = { ...estado };
+  const somar = (k, v) => { e[k] = Math.round(entre(e[k] + v, 0, 100)); };
+  // um elogio já tira a aflição do topo; duas broncas seguidas já deixam a raiva na frente
+  if (evento.tipo === "elogio") { somar("felicidade", 30); somar("aflicao", -25); somar("raiva", -5); somar("tristeza", -5); }
+  if (evento.tipo === "bronca") { somar("raiva", 28); somar("tristeza", 12); somar("felicidade", -10); }
+  if (evento.tipo === "nota") {
+    const n = Number(evento.nota) || 0;
+    if (n >= 85) { somar("felicidade", 35); somar("aflicao", -40); }
+    else if (n >= 60) { somar("felicidade", 15); somar("aflicao", -25); }
+    else { somar("tristeza", 25); somar("aflicao", -10); somar("raiva", 5); }
+  }
+  if (evento.tipo === "resultado") {
+    if (evento.campeao) { e.felicidade = 100; somar("aflicao", -100); somar("tristeza", -100); somar("raiva", -100); }
+    else if (evento.resultado === "eliminado") { e.tristeza = Math.max(e.tristeza, 85); somar("felicidade", -30); somar("aflicao", -30); }
+    // passou de fase: alívio e alegria (com nota alta, vira festa)
+    else { somar("felicidade", 40); somar("aflicao", -50); }
+  }
+  return e;
+}
+
+export function emocaoDominante(estado) {
+  return ORDEM_DAS_EMOCOES.reduce((a, b) => ((estado[b] ?? 0) > (estado[a] ?? 0) ? b : a), ORDEM_DAS_EMOCOES[0]);
+}
+
+/** O humor do Neuro para a emoção que manda: muito feliz vira comemoração. */
+export function humorDaEmocao(estado) {
+  const d = emocaoDominante(estado);
+  if (d === "felicidade" && estado.felicidade >= 85) return "comemorando";
+  return EMOCOES[d].humor;
+}
+
+/**
+ * O roteiro da avaliação ao vivo: um passo por competidor, do melhor prato ao pior (a tensão fica para o fim),
+ * cada um com o code review, a nota e o resultado. `avaliacao.participantes` vem de chamarJurados.
+ */
+export function roteiroDaAvaliacao(avaliacao) {
+  const lista = Array.isArray(avaliacao?.participantes) ? [...avaliacao.participantes] : [];
+  return lista
+    .sort((a, b) => (b.nota - a.nota) || String(a.id).localeCompare(String(b.id)))
+    .map((a) => ({
+      id: a.id, nome: a.nome, tipo: a.tipo, nota: a.nota, resultado: a.resultado, fala: a.fala || "",
+      campeao: Boolean(avaliacao.campeao && avaliacao.campeao === a.id),
+      review: Array.isArray(a.review) ? a.review : [],
+    }));
 }
 
 // ------------------------------------------------------------------ o resultado da rodada

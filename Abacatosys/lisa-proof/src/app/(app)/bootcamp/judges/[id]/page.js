@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { obter } from "@/lib/api.js";
-import Neuro from "@/componentes/Neuro.js";
+import Codigo from "@/componentes/codigo/Codigo.js";
+import DesenhoDoJurado from "@/componentes/bootcamp/Jurados.js";
 import { Avatar, RESULTADO } from "@/componentes/bootcamp/Pecas.js";
 
 /**
@@ -45,11 +46,11 @@ export default function PainelDosJurados() {
       <section className="bc-jurados" aria-label="Os jurados">
         {jurados.map((j) => (
           <div key={j.id} className="pf-cartao bc-jurado">
-            <Neuro personagem={j.personagem} humor="normal" tamanho={72} />
+            <DesenhoDoJurado id={j.id} tamanho={84} />
             <div>
               <strong>{j.emoji} {j.nome}</strong>
               <span className="bc-jurado__criterio">{j.criterio}</span>
-              <p className="pf-estat__nota">Olha {j.foco}.</p>
+              <p className="pf-estat__nota">{j.arquetipo[0].toUpperCase() + j.arquetipo.slice(1)}. Olha {j.foco}.</p>
             </div>
           </div>
         ))}
@@ -107,6 +108,26 @@ export default function PainelDosJurados() {
                         </div>
                       ))}
                     </div>
+                    {a.review?.length > 0 && (
+                      <details className="bc-nota__review">
+                        <summary>🔍 O code review ao vivo ({a.review.length} {a.review.length === 1 ? "trecho" : "trechos"}){a.tipo === "npc" ? " · trecho típico do personagem" : ""}</summary>
+                        <ul>
+                          {a.review.map((r, i) => (
+                            <li key={i} className={`bc-review bc-review--${r.tipo}`}>
+                              <div className="bc-review__jurado">
+                                <DesenhoDoJurado id={r.jurado} humor={r.tipo === "elogio" ? "feliz" : "bravo"} tamanho={48} />
+                                <div>
+                                  <strong>{jurados.find((j) => j.id === r.jurado)?.nome}</strong>
+                                  <span className={`pf-pilula pf-pilula--${r.tipo === "elogio" ? "verde" : "alerta"}`}>{r.tipo === "elogio" ? "✅ bem avaliado" : "❌ mal avaliado"} · linhas {r.linhaInicio}–{r.linhaFim}</span>
+                                </div>
+                              </div>
+                              <p className="bc-review__fala">“{r.fala}”</p>
+                              <Codigo texto={r.trecho} linguagem={a.linguagem || "javascript"} />
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
                   </li>
                 ))}
               </ul>

@@ -673,8 +673,28 @@ próprio no menu (**Bootcamp**, no grupo Jogo).
   sempre o mesmo resultado; a IA só dá a fala de cada um.
 - **Trava.** A rodada passa por `avaliando` antes da IA, então dois cliques não avaliam duas vezes.
   Se der erro no meio, ela volta para `aberta`.
+- **Nível contra a CPU (1.3.0).** Fácil, Médio, Difícil e Lendário (`NIVEIS_DO_TORNEIO`). O nível
+  muda a habilidade e o ritmo dos personagens (`npcNoNivel`) e a faixa de dificuldade dos desafios
+  (`dificuldadeDaRodada`). O nível e o cenário ficam em `proof_bootcamp_torneios.opcoes`
+  (`db/033`).
+- **5 cenários (1.3.0).** Escritório Neon, Data Center, Estação Orbital, Loft da Startup e Cidade
+  Cyberpunk. O organizador escolhe o cenário padrão, e cada competidor troca o da própria tela
+  (guardado no navegador). O 3D troca só o ambiente, sem remontar as baias.
+- **Os jurados desenhados (1.3.0).** Chef Kernel, o francês ranzinza; Chef Vetor, a perfeccionista
+  implacável; e Chef Sintaxe, o durão tatuado. São personagens originais inspirados nos arquétipos de
+  uma bancada de reality de cozinha, nunca em pessoas reais, e estão em
+  `src/componentes/bootcamp/Jurados.js`. Ficam num palco atrás da bancada, que é mais baixa (no chão,
+  a bancada escondia os três).
+- **Avaliação ao vivo (1.3.0).** Um competidor por vez vai até a bancada, do melhor prato ao pior; a
+  câmera se aproxima e os jurados fazem o code review. A IA aponta as linhas, e o trecho sai do código
+  de verdade (`validarReview`); sem a IA, entra um item por jurado com as falas do banco dele. Os
+  personagens mostram um trecho típico do estilo deles. O avatar reage com aflição, felicidade, raiva
+  ou tristeza (`reagirNaCena`), e um medidor mostra as quatro emoções. Dá para pular a cena ou tudo
+  (Esc). A avaliação começa sozinha uma vez por rodada para cada pessoa, e o botão "Ver a avaliação
+  ao vivo" repete. O deboche é sempre sobre o código, nunca sobre a pessoa. O Neuro ganhou o humor
+  `aflito`.
 
-**Arquivos.** Banco: `db/032-bootcamp.sql`. Regras: `src/dominio/bootcamp.js`. Servidor:
+**Arquivos.** Banco: `db/032-bootcamp.sql` e `db/033-bootcamp-nivel-e-cenario.sql`. Regras: `src/dominio/bootcamp.js`. Servidor:
 `src/lib/bootcamp.js` e `src/lib/iaBootcamp.js`. Rotas: `/api/bootcamp`, `/api/bootcamp/:id`,
 `/api/bootcamp/:id/jurados` e `POST /api/bootcamp/challenge/submit` (o envio do código). Telas:
 `/bootcamp`, `/bootcamp/create`, `/bootcamp/arena/:id` (o escritório em 3D:
