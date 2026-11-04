@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.5.1",
+  "versao": "1.5.2",
   "atualizadoEm": "2026-11-04",
   "compilacao": {
-    "numero": 107,
+    "numero": 108,
     "data": "2026-11-04",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.5.2",
+      "data": "2026-11-04",
+      "branch": "main",
+      "tipo": "correcao",
+      "resumo": "No Bootcamp: a avaliação ao vivo não mostra a nota de ninguém antes da vez dele, nota baixa não sai sorrindo, o code review é uma análise técnica do código e o layout não estoura mais as bordas.",
+      "itens": [
+        "Na avaliação ao vivo, cada competidor só aparece com a nota, os pontos, a insígnia e a situação (salvo ou eliminado) da prova quando passa pela bancada; o campeão e quem saiu também só aparecem na hora, e o cartão de resultado fica para o fim.",
+        "Depois da avaliação, a cara de cada avatar vem da nota e do resultado: quem vai para a eliminação fica aflito, e nota baixa fica triste em vez de sorrindo. Na cena, quem escapa com nota baixa sente alívio, não festa.",
+        "O code review dos jurados é uma análise técnica do código: a leitura da entrada, o algoritmo e a complexidade (laço dentro de laço é O(n²)), os testes, a organização em funções, os nomes, os casos de borda e os comentários, cada item com as linhas e o porquê.",
+        "O pedido à IA exige um review completo (4 a 6 itens cobrindo o código inteiro) e proíbe comentar maiúsculas, acentos, espaços ou a formatação da saída; falas desse tipo são descartadas, e o que faltar vem da análise técnica.",
+        "O review dos personagens da CPU passa a ser sobre a solução de referência da prova (com os testes de cada um), e não mais um trecho genérico do personagem.",
+        "Layout: o painel de status ao lado do 3D tem a altura dele (a lista rola por dentro, sem buraco embaixo do 3D) e o texto comprido do desafio (palavra sem espaço, caminho, número enorme) quebra dentro do cartão, sem estourar a borda.",
+        "Na prova de eliminação, sai quem tem a menor nota. No plano antigo de 2 por episódio, saía também o segundo pior; esse plano só continua nos torneios criados antes da 1.5.0."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.5.1",
       "data": "2026-11-04",

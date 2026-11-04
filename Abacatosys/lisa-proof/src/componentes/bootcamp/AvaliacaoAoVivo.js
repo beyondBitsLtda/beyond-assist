@@ -5,7 +5,7 @@ import Neuro from "@/componentes/Neuro.js";
 import Codigo from "@/componentes/codigo/Codigo.js";
 import DesenhoDoJurado, { DesenhoDaApresentadora } from "./Jurados.js";
 import { MedidorDeEmocao, RESULTADO, Insignias } from "./Pecas.js";
-import { roteiroDaAvaliacao, emocaoInicial, reagirNaCena, humorDaEmocao } from "@/dominio/bootcamp.js";
+import { roteiroDaAvaliacao, emocaoInicial, reagirNaCena, humorDaEmocao, humorDoResultado } from "@/dominio/bootcamp.js";
 
 // quanto dura cada parte da cena (ms); com "reduzir movimento", as caminhadas são curtas (o avatar vai direto)
 const TEMPO = {
@@ -26,7 +26,7 @@ const TEMPO = {
  * `aoMudar({ palco, humores })` leva a cena ao escritório 3D; `aoAcabar()` fecha. Dá para pular a cena de um
  * competidor ou a avaliação inteira (também com Esc).
  */
-export default function AvaliacaoAoVivo({ avaliacao, participantes, jurados, apresentadora, insignias = {}, numero, aoMudar, aoAcabar }) {
+export default function AvaliacaoAoVivo({ avaliacao, participantes, jurados, apresentadora, insignias = {}, numero, aoMudar, aoAcabar, aoRevelar }) {
   const roteiro = useMemo(() => roteiroDaAvaliacao(avaliacao), [avaliacao]);
   const porId = useMemo(() => new Map(participantes.map((p) => [p.id, p])), [participantes]);
   const juradoPor = useMemo(() => new Map(jurados.map((j) => [j.id, j])), [jurados]);
@@ -78,7 +78,7 @@ export default function AvaliacaoAoVivo({ avaliacao, participantes, jurados, apr
         else { setFase("nota"); setEmocao((e) => reagirNaCena(e, { tipo: "nota", nota: passo.nota })); }
       } else if (fase === "nota") {
         setFase("resultado");
-        setEmocao((e) => reagirNaCena(e, { tipo: "resultado", resultado: passo.resultado, campeao: passo.campeao }));
+        setEmocao((e) => reagirNaCena(e, { tipo: "resultado", resultado: passo.resultado, campeao: passo.campeao, nota: passo.nota }));
       } else if (fase === "resultado") {
         if (passo.despedir && entrevista.length) { setFase("saindo"); setItem(0); } else proximo();
       } else if (fase === "saindo") {
@@ -104,8 +104,17 @@ export default function AvaliacaoAoVivo({ avaliacao, participantes, jurados, apr
     if (atual) h[`jurado:${atual.jurado}`] = atual.tipo === "elogio" ? "feliz" : "bravo";
     if (fase === "resultado") for (const j of jurados) h[`jurado:${j.id}`] = passo?.resultado === "eliminado" || passo?.resultado === "ameacado" ? "normal" : "feliz";
     h.apresentadora = fase === "entrevista" ? (quemFala === "apresentadora" ? "pensando" : "triste") : fase === "indoEmbora" ? "feliz" : "normal";
+    // quem já passou pela bancada fica com a cara da nota dele; quem ainda espera, aflito
+    roteiro.forEach((p, i) => { if (i < indice) h[p.id] = humorDoResultado(p); else if (i > indice) h[p.id] = "aflito"; });
     return h;
-  }, [jurados, atual, fase, passo, quemFala]);
+  }, [jurados, atual, fase, passo, quemFala, roteiro, indice]);
+
+  // o que a tela pode mostrar: a nota (os pontos, a insígnia, quem saiu) de quem já passou pela bancada
+  useEffect(() => {
+    if (!aoRevelar) return;
+    const revelado = ["nota", "resultado", "saindo", "entrevista", "indoEmbora", "ficha"].includes(fase);
+    aoRevelar(new Set([...roteiro.slice(0, indice).map((p) => p.id), ...(revelado && passo ? [passo.id] : [])]));
+  }, [aoRevelar, roteiro, indice, fase, passo]);
   const local = ["saindo", "entrevista"].includes(fase) ? "saida" : ["indoEmbora", "ficha"].includes(fase) ? "fora" : "bancada";
   useEffect(() => {
     if (!passo) return;
@@ -164,7 +173,7 @@ export default function AvaliacaoAoVivo({ avaliacao, participantes, jurados, apr
                   <DesenhoDoJurado id={atual.jurado} humor={atual.tipo === "elogio" ? "feliz" : "bravo"} tamanho={64} />
                   <div>
                     <strong>{jurado?.emoji} {jurado?.nome}</strong>
-                    <span className={`pf-pilula pf-pilula--${atual.tipo === "elogio" ? "verde" : "alerta"}`}>{atual.trecho ? `${atual.tipo === "elogio" ? "✅ bem avaliado" : "❌ mal avaliado"} · linhas ${atual.linhaInicio}–${atual.linhaFim}` : "❌ entrega vazia"}</span>
+                    <span className={`pf-pilula pf-pilula--${atual.tipo === "elogio" ? "verde" : "alerta"}`}>{atual.trecho ? `${atual.tipo === "elogio" ? "✅ bem avaliado" : "❌ mal avaliado"} · linhas ${atual.linhaInicio}–${atual.linhaFim}` : atual.rotulo || "❌ entrega vazia"}</span>
                   </div>
                 </div>
                 <p className="bc-review__fala">“{atual.fala}”</p>

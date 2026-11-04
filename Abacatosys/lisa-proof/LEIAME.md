@@ -784,6 +784,26 @@ próprio no menu (**Bootcamp**, no grupo Jogo).
   e rolando por dentro. O editor cresce até o fim da coluna, e a página desce até eles quando a implementação
   começa. Os "\n" que a IA escrevia por extenso no enunciado viram quebras de linha (`comLinhas`), também nos
   desafios já gravados.
+- **Avaliação que faz sentido (1.5.2).**
+  - **Review técnico:** o code review sem a IA, e o complemento do review da IA, é uma análise do código de verdade
+    (`analisarCodigo`): a leitura da entrada, o algoritmo (laço dentro de laço é O(n²)), os testes, as funções,
+    os nomes, os casos de borda, os comentários e o tamanho. Cada item aponta as linhas e diz o porquê e como
+    melhorar.
+  - **Pedido à IA:** um review completo, de 4 a 6 itens cobrindo o código inteiro, com conteúdo técnico, e proíbe
+    comentar maiúsculas, acentos, espaços ou a formatação da saída. As falas desse tipo são descartadas
+    (`NAO_E_REVIEW`).
+  - **Personagens:** o review deles é sobre a solução de referência da prova (a da IA ou o gabarito do banco),
+    com os testes de cada um.
+- **Sem spoiler na avaliação ao vivo (1.5.2).** Até passar pela bancada, cada competidor aparece com os pontos, as
+  insígnias e a situação de antes da prova (`avaliacao.participantes[].pontosAntes`). Ninguém vê quem saiu, nem o
+  campeão, antes da hora, e o cartão de resultado só aparece no fim (ou em "Pular tudo").
+- **A cara da nota (1.5.2).** Depois da avaliação, o humor de cada avatar vem da nota e do resultado
+  (`humorDoResultado`): quem vai para a eliminação fica aflito, e nota baixa não volta sorrindo para a baia. Na
+  cena, o alívio de quem passa cresce com a nota.
+- **Layout que não estoura (1.5.2).**
+  - O painel ao lado do 3D tem a altura dele, e a lista de status rola por dentro.
+  - O texto comprido do desafio (uma palavra, um caminho, um número enorme) quebra dentro do cartão, e os
+    exemplos rolam por dentro.
 
 **Arquivos.** Banco: `db/032-bootcamp.sql`, `db/033-bootcamp-nivel-e-cenario.sql` e `db/034-bootcamp-temporada.sql`. Regras: `src/dominio/bootcamp.js`. Servidor:
 `src/lib/bootcamp.js` e `src/lib/iaBootcamp.js`. Rotas: `/api/bootcamp`, `/api/bootcamp/:id`,

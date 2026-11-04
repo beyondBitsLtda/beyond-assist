@@ -991,7 +991,11 @@ export function validarAvaliacao(bruto, apelidos) {
 
 // ------------------------------------------------------------------ o code review ao vivo
 
-export const REVIEW = { maxItens: 4, maxLinhas: 8, fala: 240 };
+export const REVIEW = { maxItens: 6, minItens: 4, maxLinhas: 8, fala: 260 };
+
+// o que não é code review (04/11/2026: "nada de ficar avaliando se uma letra tá maiúscula ou não"): os testes já
+// conferem a saída, e maiúscula, espaço e acento no texto não dizem nada sobre o código
+const NAO_E_REVIEW = /mai[uú]scul|min[uú]scul|caixa[ -](alta|baixa)|letra (grande|pequena)|acentua[cç][aã]o|acento|espa[cç]o (em branco|a mais|sobrando)|ponto e v[ií]rgula|indenta[cç][aã]o|aspas (simples|duplas)/i;
 
 /** O código com o número de cada linha ("1| ..."), para a IA apontar os trechos sem copiar nada. */
 export function numerarLinhas(codigo, max = 400) {
@@ -1023,7 +1027,7 @@ export function validarReview(bruto, codigo) {
     const tipo = r?.tipo === "elogio" || r?.tipo === "bronca" ? r.tipo : null;
     const fala = limpar(r?.fala, REVIEW.fala);
     const trecho = trechoDoCodigo(codigo, r?.linhaInicio, r?.linhaFim);
-    if (!jurado || !tipo || !fala || !trecho) continue;
+    if (!jurado || !tipo || !fala || !trecho || NAO_E_REVIEW.test(fala)) continue;
     const chave = `${jurado.id}:${trecho.linhaInicio}`;
     if (vistos.has(chave)) continue;
     vistos.add(chave);
@@ -1034,18 +1038,152 @@ export function validarReview(bruto, codigo) {
 
 const sortear = (lista, s) => lista[Math.floor(s() * lista.length) % lista.length];
 
-/** As linhas que chamam a atenção de cada jurado: laço (Kernel), o bloco mais comprido (Vetor) e a saída (Sintaxe). */
-function linhasDeInteresse(codigo) {
+// ------------------------------------------------------------------ a análise técnica do código (1.5.2)
+//
+// O review sem a IA (e o complemento do review da IA) olha o código de verdade, como um revisor: a leitura da
+// entrada, o algoritmo (laço dentro de laço é O(n²)), os testes, a organização em funções, os nomes, os casos de
+// borda, os comentários e o tamanho. Cada achado aponta as linhas e diz o porquê e como melhorar; o jurado entra
+// com uma expressão curta, mas o conteúdo é técnico. Só por padrões de texto (sem rodar nada): serve para Python,
+// JavaScript, TypeScript, C, C++, Java, C#, PHP, Go e afins.
+
+const RE_ENTRADA = /\binput\s*\(|sys\.stdin|readFileSync|\breadline\b|\bscanf\s*\(|\bfgets\s*\(|new Scanner|\bcin\s*>>|php:\/\/stdin|STDIN|stream_get_contents|BufferedReader|Console\.ReadLine|bufio\.|io\.read|\bgets\b/;
+const RE_SAIDA = /\bprint\s*\(|\bprintln!?\s*\(|\bprintf\s*\(|\bputs\b|\becho\b|console\.log|\bcout\s*<<|Console\.Write|System\.out|fmt\.Print|process\.stdout/;
+const RE_LACO = /^\s*(for|while|foreach|loop)\b|^\s*\}?\s*while\s*\(|\.(forEach|map|filter|reduce|flatMap)\s*\(|\bfor\b.+\bin\b.+[\]\)]/;
+const RE_FUNCAO = /^\s*(?:async\s+)?(?:def|function|func|fn)\s+(\w+)|^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>|^\s*(?:public\s+|private\s+|protected\s+)?(?:static\s+)?(?:const\s+)?[\w<>\[\]*]+\s+\*?(\w+)\s*\([^;]*\)\s*\{?\s*$/;
+const NAO_E_FUNCAO = new Set(["if", "for", "while", "switch", "catch", "return", "else", "main"]);
+const RE_BORDA = /\bif\b.*(==\s*0\b|===\s*0\b|<=\s*0\b|<\s*1\b|\.length\s*===?\s*0|len\([^)]*\)\s*==\s*0|\bnot\s+\w|!\s*\w|is None|===?\s*null|isEmpty|strlen\([^)]*\)\s*==\s*0|empty\(|<\s*0\b|>\s*\d{3,})|\btry\b|\bexcept\b|\bcatch\b/;
+const RE_COMENTARIO = /^\s*(#(?!include|!)|\/\/|\/\*|\*\s|"""|''')/;
+const RE_VARIAVEL_CURTA = /(?:\b(?:let|const|var|int|long|double|float|char|auto|string|String)\s+|^\s*\$?|;\s*\$?)([a-zA-Z])\s*=(?!=)/;
+const CURTAS_DE_LACO = new Set(["i", "j", "k", "n", "x", "y"]);
+const RE_VARIAVEL_CLARA = /(?:\b(?:let|const|var|int|long|double|float|auto)\s+|^\s*\$?)([a-zA-Z_]\w{3,})\s*=(?!=)/;
+
+const ABERTURAS = {
+  kernel: { elogio: ["Magnifique!", "Ah, oui!"], bronca: ["Mon Dieu!", "Non, non, non."] },
+  vetor: { elogio: ["Impecável.", "Isso sim é arquitetura."], bronca: ["Inaceitável.", "Desorganizado."] },
+  sintaxe: { elogio: ["Dentro da regra.", "Respeito."], bronca: ["Regra é regra.", "Fora da regra."] },
+};
+const comAbertura = (jurado, tipo, texto, s) => limpar(`${sortear(ABERTURAS[jurado][tipo], s)} ${texto}`, REVIEW.fala);
+
+/**
+ * A análise do código: os achados, cada um { jurado, tipo, linhas: [ini, fim] | null, texto, rotulo?, peso }.
+ * `testes`: { passados, total } (o resultado de verdade); `parte`: true quando é só uma parte do programa (a
+ * colaborativa), que não lê a entrada nem imprime.
+ */
+export function analisarCodigo(codigo, { testes = { passados: 0, total: 0 }, parte = false } = {}) {
   const linhas = String(codigo ?? "").replace(/\r\n?/g, "\n").split("\n");
-  const achar = (re) => linhas.findIndex((l) => re.test(l)) + 1;
-  const laco = achar(/\b(for|while|forEach|map|reduce|loop)\b/);
-  const saida = achar(/\b(print|println|printf|puts|echo|console\.log|cout|Console\.Write|fmt\.Print|System\.out)/);
-  const cheias = linhas.map((l, i) => [i + 1, l.trim().length]).filter(([, n]) => n > 0);
-  const maisLonga = cheias.sort((a, b) => b[1] - a[1])[0]?.[0] || 1;
-  return { laco: laco || maisLonga, maisLonga, saida: saida || linhas.length };
+  const cheias = linhas.map((l, i) => ({ n: i + 1, l })).filter((x) => x.l.trim() && !RE_COMENTARIO.test(x.l));
+  const temChaves = /[{}]/.test(codigo);
+  // o nível de cada linha: a profundidade das chaves ou, sem chaves (Python), o recuo
+  let profundidade = 0;
+  const nivel = new Map();
+  for (const x of linhas.map((l, i) => ({ n: i + 1, l }))) {
+    const semTexto = x.l.replace(/(["'`])(?:\\.|(?!\1).)*\1/g, "");
+    nivel.set(x.n, temChaves ? profundidade : Math.floor((x.l.match(/^\s*/)[0].replace(/\t/g, "    ").length) / 2));
+    profundidade += (semTexto.match(/\{/g) || []).length - (semTexto.match(/\}/g) || []).length;
+  }
+  const dentroDe = (n, m) => {
+    // a linha m está dentro do bloco que começa na linha n?
+    const base = nivel.get(n);
+    for (let k = n + 1; k <= m; k++) {
+      const lk = linhas[k - 1];
+      if (!lk.trim()) continue;
+      if (k === m) return nivel.get(k) > base;
+      if (nivel.get(k) <= base && !(temChaves && /^\s*\}/.test(lk) && nivel.get(k) === base + 1)) return false;
+    }
+    return false;
+  };
+  const achados = [];
+  const linhaDe = (re) => cheias.find((x) => re.test(x.l))?.n || null;
+
+  // a entrada e a saída (o programa inteiro; a parte da colaborativa não lê nem imprime)
+  if (!parte) {
+    const entrada = linhaDe(RE_ENTRADA);
+    if (entrada) achados.push({ jurado: "sintaxe", tipo: "elogio", linhas: [entrada, entrada], peso: 2, texto: "Lê a entrada pelo stdin logo no começo, no formato do enunciado: é o que deixa os testes conversarem com o programa." });
+    else achados.push({ jurado: "sintaxe", tipo: "bronca", linhas: null, rotulo: "❌ entrada", peso: 5, texto: "Não encontrei a leitura da entrada (stdin): sem ela, os testes não chegam ao código. Leia a entrada e só depois resolva." });
+    if (!linhaDe(RE_SAIDA)) achados.push({ jurado: "sintaxe", tipo: "bronca", linhas: null, rotulo: "❌ saída", peso: 5, texto: "O programa não imprime nada: o resultado precisa sair no stdout, no formato pedido." });
+  }
+
+  // o algoritmo: laço dentro de laço (O(n²)) ou uma passada só
+  const lacos = cheias.filter((x) => RE_LACO.test(x.l));
+  const duplo = cheias.find((x) => (x.l.match(/\bfor\b/g) || []).length >= 2);
+  let aninhado = duplo ? [duplo.n, duplo.n] : null;
+  for (const a of lacos) for (const b of lacos) if (!aninhado && b.n > a.n && dentroDe(a.n, b.n)) aninhado = [a.n, b.n];
+  if (aninhado) {
+    achados.push({ jurado: "kernel", tipo: "bronca", linhas: [aninhado[0], Math.min(aninhado[1] + 1, aninhado[0] + REVIEW.maxLinhas - 1)], peso: 4,
+      texto: `Laço dentro de laço (linhas ${aninhado[0]}–${aninhado[1]}): o custo vira O(n²). Com um dicionário ou um conjunto (ou ordenando antes), dá para resolver numa passada.` });
+  } else if (lacos.length) {
+    const l = lacos[0].n;
+    achados.push({ jurado: "kernel", tipo: "elogio", linhas: [l, l + 2], peso: 3, texto: "Uma passada só pelos dados (O(n)): o custo cresce junto com a entrada, sem trabalho repetido." });
+  }
+
+  // os testes: o resultado de verdade
+  if (testes.total > 0) {
+    if (testes.passados === testes.total) achados.push({ jurado: "kernel", tipo: "elogio", linhas: null, rotulo: "🧪 testes", peso: 3, texto: `Passou em todos os ${testes.total} testes, inclusive os ocultos: a lógica cobre os casos que os exemplos não mostram.` });
+    else achados.push({ jurado: "kernel", tipo: "bronca", linhas: null, rotulo: "🧪 testes", peso: 6, texto: `Passou em ${testes.passados} de ${testes.total} testes: a lógica quebra em algum caso que os exemplos não mostram (entrada vazia, negativos, um elemento só, valores repetidos).` });
+  }
+
+  // a organização: a lógica numa função com nome (ou tudo no escopo global)
+  const funcao = cheias.map((x) => ({ n: x.n, m: x.l.match(RE_FUNCAO) })).find((x) => x.m && !NAO_E_FUNCAO.has(x.m[1] || x.m[2] || x.m[3]));
+  if (funcao) {
+    const nome = funcao.m[1] || funcao.m[2] || funcao.m[3];
+    achados.push({ jurado: "vetor", tipo: "elogio", linhas: [funcao.n, funcao.n], peso: 2, texto: `A lógica mora numa função com nome (${nome}): dá para testar e reaproveitar sem mexer na leitura e na saída.` });
+  } else if (cheias.length > 8 && !parte) {
+    achados.push({ jurado: "vetor", tipo: "bronca", linhas: [cheias[0].n, Math.min(cheias[0].n + 3, linhas.length)], peso: 3, texto: "Tudo no escopo global: separe a lógica numa função (por exemplo, resolver(entrada)) e deixe a leitura e a saída nas pontas." });
+  }
+
+  // os nomes: variáveis de uma letra (fora dos contadores de laço)
+  const curtasDa = (l) => [...l.matchAll(new RegExp(RE_VARIAVEL_CURTA.source, "g"))].map((m) => m[1]).filter((v) => !CURTAS_DE_LACO.has(v));
+  const curtas = [...new Set(cheias.flatMap((x) => curtasDa(x.l)))];
+  const nomeClaro = (l) => l.match(RE_VARIAVEL_CLARA)?.[1];
+  const claras = [...new Set(cheias.map((x) => nomeClaro(x.l)).filter(Boolean))];
+  if (curtas.length < 2 && claras.length >= 2) {
+    const l = cheias.find((x) => claras.includes(nomeClaro(x.l))).n;
+    achados.push({ jurado: "vetor", tipo: "elogio", linhas: [l, l], peso: 1, texto: `Nomes que dizem o que guardam (${claras.slice(0, 3).join(", ")}): dá para ler o código sem adivinhar.` });
+  }
+  if (curtas.length >= 2) {
+    const l = cheias.find((x) => curtasDa(x.l).length).n;
+    achados.push({ jurado: "vetor", tipo: "bronca", linhas: [l, l], peso: 2, texto: `Variáveis de uma letra (${curtas.slice(0, 3).join(", ")}) escondem a intenção: nomes como soma, maior ou total contam a história do código.` });
+  }
+
+  // os casos de borda
+  // (x % 2 == 0 é a conta do problema, não um caso de borda)
+  const borda = cheias.find((x) => RE_BORDA.test(x.l.replace(/%\s*[\w.()[\]]+\s*===?\s*0/g, "")))?.n || null;
+  if (borda) achados.push({ jurado: "sintaxe", tipo: "elogio", linhas: [borda, borda + 1], peso: 3, texto: `Trata o caso de borda antes da conta principal (linha ${borda}): é o que segura os testes ocultos.` });
+  else if (testes.total && testes.passados < testes.total) achados.push({ jurado: "sintaxe", tipo: "bronca", linhas: null, rotulo: "❌ casos de borda", peso: 4, texto: "Não há nenhuma verificação de caso de borda (lista vazia, zero, negativo): é por aí que os testes ocultos derrubam a solução." });
+
+  // os comentários e o tamanho
+  const comentario = linhas.findIndex((l) => RE_COMENTARIO.test(l) && l.trim().length > 4) + 1;
+  if (comentario) achados.push({ jurado: "vetor", tipo: "elogio", linhas: [comentario, comentario], peso: 1, texto: `Comenta o porquê (linha ${comentario}): ajuda quem for ler e mexer depois.` });
+  if (cheias.length > 70) achados.push({ jurado: "vetor", tipo: "bronca", linhas: [1, 3], peso: 2, texto: `São ${cheias.length} linhas para este problema: divida em funções menores, cada uma com uma responsabilidade.` });
+  return achados;
 }
 
 /**
+ * Os achados viram itens do code review: os mais importantes primeiro (no máximo REVIEW.maxItens, com pelo menos um
+ * de cada jurado quando houver), cada um com o trecho de verdade do código (ou sem trecho, com um rótulo, quando o
+ * achado é do programa inteiro, como os testes), na ordem das linhas.
+ */
+export function reviewDaAnalise(codigo, achados, s, maximo = REVIEW.maxItens) {
+  const ordenados = [...achados].sort((a, b) => b.peso - a.peso);
+  const escolhidos = [];
+  for (const j of IDS_DOS_JURADOS) { const a = ordenados.find((x) => x.jurado === j); if (a) escolhidos.push(a); }
+  for (const a of ordenados) if (escolhidos.length < maximo && !escolhidos.includes(a)) escolhidos.push(a);
+  return escolhidos.slice(0, maximo).map((a) => {
+    const t = a.linhas ? trechoDoCodigo(codigo, a.linhas[0], a.linhas[1]) : null;
+    return { jurado: a.jurado, tipo: a.tipo, fala: comAbertura(a.jurado, a.tipo, a.texto, s), ...(t || { linhaInicio: null, linhaFim: null, trecho: "", rotulo: a.rotulo || (a.tipo === "elogio" ? "✅ programa" : "❌ programa") }) };
+  }).sort((a, b) => (a.linhaInicio ?? 1e9) - (b.linhaInicio ?? 1e9));
+}
+
+/** O review da IA com pelo menos REVIEW.minItens itens: o que faltar vem da análise técnica (sem repetir linha). */
+export function completarReview(daIa = [], codigo, achados, s) {
+  if (daIa.length >= REVIEW.minItens) return daIa;
+  const usadas = new Set(daIa.map((r) => `${r.jurado}:${r.linhaInicio}`));
+  const extra = reviewDaAnalise(codigo, achados, s).filter((r) => !usadas.has(`${r.jurado}:${r.linhaInicio}`));
+  return [...daIa, ...extra].slice(0, REVIEW.maxItens).sort((a, b) => (a.linhaInicio ?? 1e9) - (b.linhaInicio ?? 1e9));
+}
+
+/**
+ * O code review sem a IA:/**
  * O code review sem a IA: um item por jurado, no trecho que interessa a ele, com uma fala do banco dele. Elogio
  * quando o critério foi bem (testes, tamanho, regras) e bronca quando não. `s`: o sorteio (preso à rodada).
  */
@@ -1074,12 +1212,26 @@ export function testarNaBancada(entrega) {
     && String(entrega.codigo ?? "").trim() && !(Array.isArray(entrega.testes) && entrega.testes.length));
 }
 
-export function reviewAutomatica({ codigo, fracao = 0, enviou = false, linguagemOk = true, temPlano = false, s }) {
+export function reviewAutomatica({ codigo, fracao = 0, enviou = false, linguagemOk = true, temPlano = false, s, testes = null, parte = false }) {
   // sem código, o review é a bronca de cada jurado pela entrega vazia (sem trecho: não há linha para apontar)
   if (!String(codigo ?? "").trim()) {
-    return IDS_DOS_JURADOS.map((id) => ({ jurado: id, tipo: "bronca", fala: sortear(BRONCAS_SEM_CODIGO[id], s), linhaInicio: null, linhaFim: null, trecho: "" }));
+    return IDS_DOS_JURADOS.map((id) => ({ jurado: id, tipo: "bronca", fala: sortear(BRONCAS_SEM_CODIGO[id], s), linhaInicio: null, linhaFim: null, trecho: "", rotulo: "❌ entrega vazia" }));
   }
-  const { laco, maisLonga, saida } = linhasDeInteresse(codigo);
+  // (1.5.2) o review completo: a análise técnica do código, com o resultado dos testes
+  const total = testes?.total ?? 0;
+  const achados = analisarCodigo(codigo, { testes: testes || { passados: 0, total: 0 }, parte });
+  if (!linguagemOk) achados.push({ jurado: "sintaxe", tipo: "bronca", linhas: null, rotulo: "❌ linguagem", peso: 5, texto: "A linguagem não foi a que os jurados estipularam para esta prova." });
+  if (!enviou && total) achados.push({ jurado: "sintaxe", tipo: "bronca", linhas: null, rotulo: "❌ envio", peso: 2, texto: "A entrega não foi enviada para a revisão: os jurados avaliaram o último código salvo." });
+  return reviewDaAnalise(codigo, achados, s);
+}
+
+/** (antes da 1.5.2) o review de três itens, um por jurado, com falas sorteadas do banco. */
+export function reviewAutomaticaAntiga({ codigo, fracao = 0, enviou = false, linguagemOk = true, temPlano = false, s }) {
+  const linhas = String(codigo ?? "").split("\n");
+  const achar = (re) => linhas.findIndex((l) => re.test(l)) + 1;
+  const laco = achar(RE_LACO) || 1;
+  const maisLonga = laco;
+  const saida = achar(RE_SAIDA) || linhas.length;
   const bomKernel = fracao >= 1;
   const bomVetor = temPlano && fracao >= 0.8;
   const bomSintaxe = enviou && linguagemOk && fracao >= 1;
@@ -1137,7 +1289,15 @@ export const TRECHOS_DOS_NPCS = {
 };
 
 /** O review de um personagem: o trecho típico dele (bom ou ruim) e a fala de um jurado do banco. */
-export function reviewDoNpc(npcId, sim, s) {
+export function reviewDoNpc(npcId, sim, s, referencia = null) {
+  // (1.5.2) com o código de referência da prova: a análise técnica dele (2 ou 3 achados, sorteados pela rodada) e o
+  // resultado dos testes do personagem — o review é sobre um código de verdade deste desafio
+  if (String(referencia || "").trim()) {
+    const achados = analisarCodigo(referencia, { testes: { passados: sim.passados ?? 0, total: sim.total ?? 0 } });
+    const testes = achados.filter((a) => a.rotulo === "🧪 testes");
+    const outros = achados.filter((a) => a.rotulo !== "🧪 testes").sort(() => s() - 0.5).slice(0, 2);
+    return reviewDaAnalise(referencia, [...testes.map((a) => ({ ...a, peso: 10 })), ...outros], s, 3);
+  }
   const t = TRECHOS_DOS_NPCS[npcId];
   if (!t) return [];
   const bom = sim.passou;
@@ -1175,14 +1335,38 @@ export function reagirNaCena(estado, evento) {
   if (evento.tipo === "resultado") {
     if (evento.campeao) { e.felicidade = 100; somar("aflicao", -100); somar("tristeza", -100); somar("raiva", -100); }
     else if (evento.resultado === "eliminado") { e.tristeza = Math.max(e.tristeza, 85); somar("felicidade", -30); somar("aflicao", -30); }
-    // passou de fase: alívio e alegria (com nota alta, vira festa)
-    else { somar("felicidade", 40); somar("aflicao", -50); }
+    else if (evento.resultado === "vice") { e.tristeza = Math.max(e.tristeza, 70); somar("felicidade", -20); }
+    // vai para a prova de eliminação: a aflição volta (e, com nota baixa, a tristeza)
+    else if (evento.resultado === "ameacado") { somar("aflicao", 35); somar("felicidade", -25); if ((Number(evento.nota) || 0) < 60) somar("tristeza", 20); }
+    // passou de fase: o alívio cresce com a nota (nota baixa que escapou é alívio, não festa)
+    else {
+      const n = Number(evento.nota);
+      const alegria = !Number.isFinite(n) || n >= 75 ? 40 : n >= 60 ? 20 : 8;
+      somar("felicidade", alegria); somar("aflicao", -Math.round(alegria * 1.2));
+      if (Number.isFinite(n) && n < 60) somar("tristeza", 10);
+    }
   }
   return e;
 }
 
 export function emocaoDominante(estado) {
   return ORDEM_DAS_EMOCOES.reduce((a, b) => ((estado[b] ?? 0) > (estado[a] ?? 0) ? b : a), ORDEM_DAS_EMOCOES[0]);
+}
+
+/**
+ * O humor de quem já foi avaliado, pela nota e pelo resultado (04/11/2026: "personagens com notas baixas saem
+ * sorrindo da avaliação"): campeão comemora; quem saiu, ou é vice, fica triste; quem vai para a eliminação fica
+ * aflito (ou triste, com nota baixa); o resto, pela nota.
+ */
+export function humorDoResultado({ nota = null, resultado = null, campeao = false } = {}) {
+  if (campeao || resultado === "campeao") return "comemorando";
+  if (resultado === "eliminado" || resultado === "vice") return "triste";
+  const n = Number(nota);
+  if (!Number.isFinite(n)) return "normal";
+  const pelaNota = n >= 88 ? "comemorando" : n >= 75 ? "feliz" : n >= 60 ? "normal" : n >= 45 ? "aflito" : "triste";
+  if (resultado === "ameacado") return n < 60 ? "triste" : "aflito";
+  if (resultado === "sobreviveu") return n >= 75 ? "feliz" : n >= 60 ? "normal" : "aflito";
+  return pelaNota;
 }
 
 /** O humor do Neuro para a emoção que manda: muito feliz vira comemoração. */

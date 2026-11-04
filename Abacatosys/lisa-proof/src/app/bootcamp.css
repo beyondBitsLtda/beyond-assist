@@ -172,7 +172,13 @@
 .bc-confrontos em { color: var(--pf-tinta-3); font-style: normal; }
 
 /* o desafio */
-.bc-desafio { display: grid; gap: 14px; }
+.bc-desafio { display: grid; gap: 14px; min-width: 0; }
+/* (1.5.2) nada estoura a borda do cartão: texto comprido (uma palavra, um número, um caminho) quebra; o código e os
+   exemplos rolam por dentro */
+.bc-desafio, .bc-entrega, .bc-resultado, .bc-aovivo, .bc-prova, .bc-chamar, .bc-nota { overflow-wrap: anywhere; min-width: 0; }
+.bc-desafio pre, .bc-entrega pre, .bc-aovivo pre, .bc-nota pre { overflow-wrap: normal; max-width: 100%; }
+.bc-exemplo > div { min-width: 0; }
+.bc-arena__desafio > *, .bc-arena__trabalho > * { min-width: 0; max-width: 100%; }
 .bc-desafio__cabeca, .bc-desafio__texto, .bc-desafio__casos { display: grid; gap: 10px; align-content: start; min-width: 0; }
 /* o desafio largo vira duas colunas: o texto à esquerda, os exemplos à direita (pela largura do próprio cartão) */
 .bc-arena__desafio { container: desafio / inline-size; }
@@ -379,8 +385,13 @@
 .bc-palco-grade { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 1200px) {
   .bc-palco-grade { grid-template-columns: minmax(0, 1fr) 380px; }
-  .bc-palco-grade__lado { position: sticky; top: 16px; display: flex; flex-direction: column; min-height: var(--bc-altura-3d); }
-  .bc-palco-grade__lado > .bc-classificacao { flex: 1 1 auto; }
+  /* (1.5.2) o painel ao lado tem a altura do 3D: a prova em cima e o painel de status embaixo, rolando por dentro
+     quando a lista é comprida — nada de buraco embaixo do 3D */
+  .bc-palco-grade > .bc-palco-grade__lado { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 14px; height: var(--bc-altura-3d); min-height: 0; }
+  .bc-palco-grade__lado > .bc-prova { flex: none; max-height: 45%; overflow-y: auto; scrollbar-width: thin; }
+  .bc-palco-grade__lado > .bc-classificacao { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .bc-palco-grade__lado > .bc-classificacao > ol { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+  .bc-palco-grade__lado > .bc-confrontos { flex: none; max-height: 30%; overflow-y: auto; }
 }
 .bc-palco-grade__cena { min-width: 0; display: grid; gap: 0; }
 .bc-palco-grade__lado { display: grid; gap: 14px; }

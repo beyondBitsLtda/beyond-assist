@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Neuro from "@/componentes/Neuro.js";
-import { EMOCOES, ORDEM_DAS_EMOCOES, emocaoDominante } from "@/dominio/bootcamp.js";
+import { EMOCOES, ORDEM_DAS_EMOCOES, emocaoDominante, humorDoResultado } from "@/dominio/bootcamp.js";
 
 /**
  * O medidor de emoção da avaliação ao vivo: as quatro emoções (aflição, felicidade, raiva e tristeza) de 0 a 100,
@@ -30,6 +30,8 @@ export function MedidorDeEmocao({ emocao }) {
 export function humorDoCompetidor(p, campeaoId) {
   if (p.id === campeaoId) return "comemorando";
   if (p.eliminado) return "triste";
+  // a prova já avaliada: a cara é a da nota e do resultado (nota baixa não volta sorrindo para a baia)
+  if (p.etapa === "fim" && p.nota !== null && p.nota !== undefined) return humorDoResultado({ nota: p.nota, resultado: p.resultado });
   if (p.enviada) return "feliz";
   if (p.etapa === "codigo" || p.etapa === "analise" || p.etapa === "testes") return "pensando";
   return "normal";

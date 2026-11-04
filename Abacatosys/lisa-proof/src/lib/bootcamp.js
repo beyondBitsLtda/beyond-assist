@@ -30,7 +30,7 @@ import {
   TIPOS_DE_PROVA, INSIGNIAS, ESPECIALIDADES, STATUS, planoDaTemporada, competidoresDaProva, formarEquipes, escolhaDoCapitaoNpc,
   aplicarResultadoDaProva, APRESENTADORA, provaDoTorneio, testarNaBancada,
   rotuloDaProva, desafioColaborativo, dividirPartes, modeloDasPartes, programaDoTime, programaDeTeste, codigoDoNpcNasPartes,
-  acertosDoNpcNasPartes, reviewDaParteDoNpc, despedidaDoNpc,
+  acertosDoNpcNasPartes, reviewDaParteDoNpc, despedidaDoNpc, analisarCodigo, reviewDaAnalise, completarReview, DESAFIOS_DE_RESERVA,
 } from "@/dominio/bootcamp.js";
 
 const falhou = (error, onde) => { if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`); };
@@ -154,6 +154,17 @@ const npcDoTorneio = (p, t) => {
   return npc ? npcNoNivel(npc, nivelDo(t)) : null;
 };
 
+/**
+ * O código de referência da prova, para o review dos personagens (1.5.2): a solução que a IA dos jurados mandou
+ * (conferida nos testes) ou, no desafio do banco, o gabarito dele em JavaScript. Sem nenhum, null.
+ */
+function referenciaDaProva(desafio) {
+  if (String(desafio?.solucao?.codigo || "").trim()) return desafio.solucao.codigo;
+  const doBanco = DESAFIOS_DE_RESERVA.find((d) => d.titulo === desafio?.titulo);
+  if (!doBanco?.resolver) return null;
+  return `const resolver = ${doBanco.resolver.toString()};\n\nconst entrada = require("fs").readFileSync(0, "utf8");\nconsole.log(resolver(entrada));\n`;
+}
+
 /** O que o personagem da Lisa fez nesta rodada (sempre o mesmo resultado para a mesma rodada). */
 function simulacaoDo(p, rodada, t) {
   const npc = npcDoTorneio(p, t);
@@ -276,11 +287,11 @@ export async function torneioParaTela(usuarioId, id) {
       const sim = simulacaoDo(p, rodada, t);
       const etapa = aberta ? (todosEnviaram ? "revisao" : etapaDoNpc(sim, minutos)) : "fim";
       const enviada = !aberta || etapa === "revisao";
-      return { ...base, etapa, enviada, testes: enviada ? { passados: sim.passados, total: sim.total } : null, nota: avaliacao.get(p.id)?.nota ?? null };
+      return { ...base, etapa, enviada, testes: enviada ? { passados: sim.passados, total: sim.total } : null, nota: avaliacao.get(p.id)?.nota ?? null, resultado: avaliacao.get(p.id)?.resultado ?? null };
     }
     const e = porUsuario.get(p.usuarioId);
     const r = resumoDosTestes(e?.testes);
-    return { ...base, etapa: aberta ? e?.etapa || "leitura" : "fim", enviada: Boolean(e?.enviada_em), testes: r.total ? { passados: r.passados, total: r.total } : null, nota: avaliacao.get(p.id)?.nota ?? null };
+    return { ...base, etapa: aberta ? e?.etapa || "leitura" : "fim", enviada: Boolean(e?.enviada_em), testes: r.total ? { passados: r.passados, total: r.total } : null, nota: avaliacao.get(p.id)?.nota ?? null, resultado: avaliacao.get(p.id)?.resultado ?? null };
   });
 
   const souDono = t.dono_id === usuarioId;
@@ -341,7 +352,7 @@ export async function torneioParaTela(usuarioId, id) {
         origem: rodada.avaliacao?.origem || "automatica",
         vencedores: rodada.avaliacao?.vencedores || [], salvos: rodada.avaliacao?.salvos || [], equipes: rodada.avaliacao?.equipes || null,
         participantes: (rodada.avaliacao?.participantes || []).map((a) => ({
-          id: a.id, nome: a.nome, tipo: a.tipo, nota: a.nota, notas: a.notas, resultado: a.resultado, fala: a.fala || "",
+          id: a.id, nome: a.nome, tipo: a.tipo, nota: a.nota, notas: a.notas, resultado: a.resultado, fala: a.fala || "", pontosAntes: a.pontosAntes ?? null,
           testes: a.testes, linguagem: a.linguagem || null, review: a.review || [], insignia: a.insignia || null,
           pontosFortes: a.pontosFortes || [], pontosFracos: a.pontosFracos || [], despedida: a.despedida || [],
         })),
@@ -741,6 +752,8 @@ async function testarNaBancadaQuemFaltou(lista, porUsuario, desafio) {
  * o do personagem, o gabarito ou o bug, pelo sorteio da rodada) mais a parte principal; os testes rodam uma vez por
  * time. Devolve Map time → { passados, total, fracao, faltou (humanos sem código), npcs: Map → { codigo, acertos } }.
  */
+const REVIEW_LINHAS = 8;
+
 async function integrarOsTimes({ t, rodada, prova, colab, porUsuario, desafio }) {
   const saida = new Map();
   for (const e of prova.equipes || []) {
@@ -859,8 +872,17 @@ export async function chamarJurados(usuarioId, id) {
         testes = { passados: sim.passados, total: sim.total };
         // na colaborativa, o review mostra a parte que ele escreveu de verdade (a boa, ou a do bug)
         const daParte = doTime(p.id)?.npcs.get(p.id);
-        const review = daParte?.codigo ? reviewDaParteDoNpc({ codigo: daParte.codigo, acertou: Object.values(daParte.acertos).every(Boolean), s }) : [];
-        extra = { fala: ia?.falas.get(apelidoDe.get(p.id)) || p.bordao || "", enviou: true, minutos: sim.minutos, review: review.length ? review : reviewDoNpc(p.npcId, sim, s) };
+        let review;
+        if (daParte?.codigo) {
+          // a parte dele na colaborativa: a análise técnica dela e, se escorregou, o erro que quebrou o time
+          const bug = !Object.values(daParte.acertos).every(Boolean);
+          const achados = analisarCodigo(daParte.codigo, { testes: { passados: sim.passados, total: sim.total }, parte: true });
+          if (bug) achados.push({ jurado: "kernel", tipo: "bronca", linhas: [1, Math.min(REVIEW_LINHAS, daParte.codigo.split("\n").length)], peso: 9, texto: "Esta parte tem um erro que derruba testes do programa do time: o contrato da função não foi cumprido em algum caso." });
+          review = reviewDaAnalise(daParte.codigo, achados, s, 3);
+        } else {
+          review = reviewDoNpc(p.npcId, sim, s, referenciaDaProva(desafio));
+        }
+        extra = { fala: ia?.falas.get(apelidoDe.get(p.id)) || p.bordao || "", enviou: true, minutos: sim.minutos, review };
       } else {
         const h = humanos.find((x) => x.id === p.id);
         const daIa = ia?.porHumano.get(p.id);
@@ -870,9 +892,10 @@ export async function chamarJurados(usuarioId, id) {
         testes = h.testes;
         // o code review: o da IA (linhas do código de verdade) ou, sem ela, um item por jurado com as falas do banco
         const temPlano = h.plano.trim().length >= BOOTCAMP.minimoDoPlano;
-        const review = daIa?.review?.length ? daIa.review : reviewAutomatica({
-          codigo: h.codigo, fracao: h.fracao, enviou: h.enviou, linguagemOk: h.linguagemOk, temPlano, s,
-        });
+        const parteDoTime = Boolean(doTime(p.id));
+        const review = daIa?.review?.length
+          ? completarReview(daIa.review, h.codigo, analisarCodigo(h.codigo, { testes: h.testes, parte: parteDoTime }), s)
+          : reviewAutomatica({ codigo: h.codigo, fracao: h.fracao, enviou: h.enviou, linguagemOk: h.linguagemOk, temPlano, s, testes: h.testes, parte: parteDoTime });
         // a despedida (se sair nesta rodada): os pontos fortes e fracos e a entrevista com a apresentadora
         const auto2 = pontosAutomaticos({ notas: notasDele, testes: h.testes, enviou: h.enviou, temPlano, linguagemOk: h.linguagemOk, temCodigo: h.temCodigo });
         extra = {
@@ -905,7 +928,7 @@ export async function chamarJurados(usuarioId, id) {
       comentarioGeral: ia?.comentarioGeral || "Os jurados conferiram os testes, o plano e as regras de cada entrega.",
       prova: { tipo: prova.tipo, episodio: prova.episodio },
       participantes: avaliados.map((a) => {
-        const base = { ...a, resultado: resultadoDe(a.id), insignia: (res.vencedores || []).includes(a.id) ? insigniaDaProva : null };
+        const base = { ...a, resultado: resultadoDe(a.id), insignia: (res.vencedores || []).includes(a.id) ? insigniaDaProva : null, pontosAntes: t.participantes.find((x) => x.id === a.id)?.pontos ?? 0 };
         if (base.resultado !== "eliminado" || a.tipo !== "npc") return base;
         const p = t.participantes.find((x) => x.id === a.id);
         const npc = p && npcDoTorneio(p, t);

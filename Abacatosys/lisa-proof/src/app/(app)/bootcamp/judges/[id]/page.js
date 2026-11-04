@@ -168,7 +168,7 @@ export default function PainelDosJurados() {
                     </div>
                     {a.review?.length > 0 && (
                       <details className="bc-nota__review">
-                        <summary>🔍 O code review ao vivo ({a.review.length} {a.review.length === 1 ? "trecho" : "trechos"}){a.tipo === "npc" ? " · trecho típico do personagem" : ""}</summary>
+                        <summary>🔍 O code review ao vivo ({a.review.length} {a.review.length === 1 ? "trecho" : "trechos"}){a.tipo === "npc" ? " · a solução do personagem" : ""}</summary>
                         <ul>
                           {a.review.map((r, i) => (
                             <li key={i} className={`bc-review bc-review--${r.tipo}`}>
@@ -176,7 +176,7 @@ export default function PainelDosJurados() {
                                 <DesenhoDoJurado id={r.jurado} humor={r.tipo === "elogio" ? "feliz" : "bravo"} tamanho={48} />
                                 <div>
                                   <strong>{jurados.find((j) => j.id === r.jurado)?.nome}</strong>
-                                  <span className={`pf-pilula pf-pilula--${r.tipo === "elogio" ? "verde" : "alerta"}`}>{r.trecho ? `${r.tipo === "elogio" ? "✅ bem avaliado" : "❌ mal avaliado"} · linhas ${r.linhaInicio}–${r.linhaFim}` : "❌ entrega vazia"}</span>
+                                  <span className={`pf-pilula pf-pilula--${r.tipo === "elogio" ? "verde" : "alerta"}`}>{r.trecho ? `${r.tipo === "elogio" ? "✅ bem avaliado" : "❌ mal avaliado"} · linhas ${r.linhaInicio}–${r.linhaFim}` : r.rotulo || "❌ entrega vazia"}</span>
                                 </div>
                               </div>
                               <p className="bc-review__fala">“{r.fala}”</p>

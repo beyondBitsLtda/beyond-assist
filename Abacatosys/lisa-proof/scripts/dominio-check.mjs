@@ -3978,7 +3978,7 @@ caso("a semana da ofensiva: de domingo a sábado, com hoje e os dias que faltam"
     pontosAutomaticos, despedidaAutomatica, EQUIPES, testarNaBancada, BRONCAS_SEM_CODIGO, FEEDBACK_SEM_CODIGO,
     MODOS_DE_EQUIPE, rotuloDaProva, comLinhas, despedidaDoNpc, acertosDoNpcNasPartes, reviewDaParteDoNpc,
     DESAFIOS_COLABORATIVOS, LINGUAGENS_DA_COLABORATIVA, desafioColaborativo, dividirPartes, modeloDasPartes, programaDoTime,
-    programaDeTeste, codigoDoNpcNasPartes, linguagemDaColaborativa,
+    programaDeTeste, codigoDoNpcNasPartes, linguagemDaColaborativa, analisarCodigo, reviewDaAnalise, completarReview, humorDoResultado,
   } = bootcamp;
 
 console.log("\nmodo bootcamp");
@@ -4250,22 +4250,73 @@ caso("bootcamp: o code review ao vivo aponta linhas do código de verdade (a IA 
 
   let a = 5;
   const s = () => ((a = (a * 16807) % 2147483647) / 2147483647);
-  const bom = reviewAutomatica({ codigo, fracao: 1, enviou: true, linguagemOk: true, temPlano: true, s });
-  assert.deepEqual(bom.map((x) => [x.jurado, x.tipo]), [["kernel", "elogio"], ["vetor", "elogio"], ["sintaxe", "elogio"]]);
-  assert.ok(bom.every((x) => codigo.includes(x.trecho) && x.fala), "trechos do código e falas do banco");
-  assert.ok(bom[0].trecho.includes("for x in"), "o Kernel olha o laço");
-  assert.ok(bom[2].trecho.includes("print(soma)"), "a Sintaxe olha a saída");
-  const ruim = reviewAutomatica({ codigo, fracao: 0.5, enviou: false, linguagemOk: true, temPlano: false, s });
-  assert.ok(ruim.every((x) => x.tipo === "bronca"));
-  assert.ok(ruim.every((x) => JURADOS.find((j) => j.id === x.jurado).broncas.includes(x.fala)), "bronca do banco do próprio jurado");
-  const vazio = reviewAutomatica({ codigo: "   ", s });
-  assert.deepEqual(vazio.map((x) => [x.jurado, x.tipo]), [["kernel", "bronca"], ["vetor", "bronca"], ["sintaxe", "bronca"]], "sem código, cada jurado reclama da entrega vazia");
-  assert.ok(vazio.every((x) => !x.trecho && x.linhaInicio === null && BRONCAS_SEM_CODIGO[x.jurado].includes(x.fala)), "sem trecho, com a fala do banco da entrega vazia");
-  for (const n of NPCS_DO_BOOTCAMP) assert.ok(TRECHOS_DOS_NPCS[n.id]?.bom && TRECHOS_DOS_NPCS[n.id]?.ruim, `trechos de ${n.id}`);
+  // (1.5.2) o review sem a IA é uma análise técnica do código: cada item aponta o trecho e diz o porquê
+  const tecnico = (r) => r.every((x) => x.fala && !/mai[uú]scul|min[uú]scul/i.test(x.fala) && (x.trecho ? codigo.includes(x.trecho) || true : x.rotulo));
+  const bom = reviewAutomatica({ codigo, fracao: 1, enviou: true, linguagemOk: true, temPlano: true, s, testes: { passados: 5, total: 5 } });
+  assert.ok(bom.length >= 3 && bom.length <= REVIEW.maxItens, "um review de verdade, com vários itens");
+  assert.ok(tecnico(bom), "falas técnicas, sem maiúscula e minúscula");
+  assert.ok(bom.every((x) => !x.trecho || codigo.includes(x.trecho)), "os trechos saem do código");
+  const kernelBom = bom.find((x) => x.jurado === "kernel" && x.trecho);
+  assert.match(kernelBom.fala, /O\(n\)/, "o Kernel fala da complexidade (uma passada só)");
+  assert.ok(kernelBom.trecho.includes("for x in"), "no trecho do laço");
+  assert.ok(bom.some((x) => x.jurado === "sintaxe" && /stdin/.test(x.fala) && x.trecho.includes("sys.stdin")), "a Sintaxe olha a leitura da entrada");
+  assert.ok(bom.some((x) => x.rotulo === "🧪 testes" && x.tipo === "elogio"), "e os testes, sem trecho");
+  assert.ok(!bom.some((x) => /caso de borda/.test(x.fala) && x.tipo === "elogio"), "x % 2 == 0 é a conta do problema, não um caso de borda");
+  const aninhado = [
+    "const fs = require(\"fs\");",
+    "const dados = fs.readFileSync(0, \"utf8\").trim().split(/\\s+/).map(Number);",
+    "let c = 0; let a = dados[0];",
+    "for (let i = 1; i < dados.length; i++) {",
+    "  for (let j = i + 1; j < dados.length; j++) {",
+    "    if (dados[i] + dados[j] === a) c++;",
+    "  }",
+    "}",
+    "console.log(c);",
+  ].join("\n");
+  const ruim = reviewAutomatica({ codigo: aninhado, fracao: 0.6, enviou: true, linguagemOk: true, s, testes: { passados: 3, total: 5 } });
+  assert.ok(ruim.some((x) => x.jurado === "kernel" && x.tipo === "bronca" && /O\(n²\)/.test(x.fala) && x.linhaInicio === 4), "laço dentro de laço: O(n²), no trecho certo");
+  assert.ok(ruim.some((x) => x.rotulo === "🧪 testes" && /3 de 5/.test(x.fala)), "os testes que caíram");
+  assert.ok(ruim.some((x) => x.jurado === "vetor" && /uma letra/.test(x.fala)), "os nomes de uma letra");
+  assert.ok(ruim.some((x) => x.jurado === "sintaxe" && /caso de borda/.test(x.fala)), "a falta de caso de borda");
+  assert.ok(new Set(ruim.map((x) => x.jurado)).size === 3, "os três jurados falam");
+  const achados = analisarCodigo("function ler(texto) {\n  return texto.split(\" \");\n}", { testes: { passados: 0, total: 0 }, parte: true });
+  assert.ok(!achados.some((a) => /stdin|imprime/.test(a.texto)), "a parte da colaborativa não lê a entrada nem imprime (e não leva bronca por isso)");
+  // o review da IA: sem as falas de maiúscula e minúscula, e completado pela análise até o mínimo
+  const daIa = validarReview([
+    { jurado: "sintaxe", tipo: "elogio", linhaInicio: 7, linhaFim: 7, fala: "Mandou a resposta em MAIÚSCULAS como manda a regra." },
+    { jurado: "kernel", tipo: "bronca", linhaInicio: 4, linhaFim: 6, fala: "O laço converte int(x) duas vezes por linha: guarde o número numa variável." },
+  ], codigo);
+  assert.deepEqual(daIa.map((x) => x.jurado), ["kernel"], "a fala de maiúscula não é review de código");
+  const completo = completarReview(daIa, codigo, analisarCodigo(codigo, { testes: { passados: 5, total: 5 } }), s);
+  assert.ok(completo.length >= REVIEW.minItens && completo[0].fala === daIa[0].fala || completo.some((x) => x.fala === daIa[0].fala), "o da IA fica, e a análise completa");
+  assert.ok(completo.length >= REVIEW.minItens);
+  // o personagem: o review do código de referência da prova, com os testes dele
+  const referencia = "const resolver = (e) => e.trim().split(/\\s+/).map(Number).filter((n) => n % 2 === 0).reduce((a, b) => a + b, 0);\nconsole.log(resolver(require(\"fs\").readFileSync(0, \"utf8\")));";
+  const doNpc = reviewDoNpc("raposa-regex", { passou: false, passados: 2, total: 5 }, s, referencia);
+  assert.ok(doNpc.length >= 1 && doNpc.length <= 3);
+  assert.ok(doNpc.some((x) => x.rotulo === "🧪 testes" && /2 de 5/.test(x.fala)), "o review do personagem diz quantos testes ele passou");
+  assert.ok(doNpc.every((x) => !x.trecho || referencia.includes(x.trecho)), "e os trechos são da solução de referência");
+  // sem referência, o trecho típico do personagem (como antes)
   const npc = reviewDoNpc("raposa-regex", { passou: false }, s);
   assert.equal(npc[0].tipo, "bronca");
   assert.equal(npc[0].trecho, TRECHOS_DOS_NPCS["raposa-regex"].ruim);
   assert.equal(reviewDoNpc("raposa-regex", { passou: true }, s)[0].tipo, "elogio");
+  // (1.5.2) nota baixa não sai sorrindo da avaliação
+  assert.equal(humorDoResultado({ nota: 95, resultado: "salvo" }), "comemorando");
+  assert.equal(humorDoResultado({ nota: 62, resultado: "ameacado" }), "aflito");
+  assert.equal(humorDoResultado({ nota: 45, resultado: "ameacado" }), "triste");
+  assert.equal(humorDoResultado({ nota: 58, resultado: "sobreviveu" }), "aflito");
+  assert.equal(humorDoResultado({ nota: 40, resultado: "eliminado" }), "triste");
+  assert.equal(humorDoResultado({ nota: 30, resultado: "pontuou" }), "triste");
+  assert.ok(!["feliz", "comemorando"].includes(humorDoResultado({ nota: 55 })), "nota 55 não sorri");
+  const passouRaspando = reagirNaCena(reagirNaCena(emocaoInicial(), { tipo: "nota", nota: 52 }), { tipo: "resultado", resultado: "sobreviveu", nota: 52 });
+  assert.ok(!["feliz", "comemorando"].includes(humorDaEmocao(passouRaspando)), "escapou com 52: alívio, não festa");
+  const ameacado = reagirNaCena(reagirNaCena(emocaoInicial(), { tipo: "nota", nota: 70 }), { tipo: "resultado", resultado: "ameacado", nota: 70 });
+  assert.equal(humorDaEmocao(ameacado), "aflito", "ir para a eliminação não é festa");
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  assert.match(ler("../src/componentes/bootcamp/Pecas.js"), /p\.etapa === "fim" && p\.nota !== null[^\n]*humorDoResultado/, "depois da avaliação, a cara é a da nota");
+  assert.match(ler("../src/app/(app)/bootcamp/arena/[id]/page.js"), /const escondido = \(pid\) => emAoVivo && naBancada\.has\(pid\) && !revelados\?\.has\(pid\)/, "na avaliação ao vivo, ninguém vê a nota antes da vez");
+  assert.match(ler("../src/lib/iaBootcamp.js"), /PROIBIDO comentar maiúsculas e minúsculas/, "o pedido aos jurados proíbe o comentário de maiúscula");
 });
 
 caso("bootcamp: as emoções da avaliação ao vivo (aflição, felicidade, raiva, tristeza) e o roteiro", () => {

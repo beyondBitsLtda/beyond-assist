@@ -37,6 +37,7 @@ export default function Arena() {
   const [cenario, setCenario] = useState(null); // o escolhido neste navegador ou, sem escolha, o do torneio
   const [aoVivo, setAoVivo] = useState(null);   // o número da rodada cuja avaliação está passando ao vivo
   const [cena, setCena] = useState(null);       // { palco, humores } da avaliação ao vivo, para o 3D
+  const [revelados, setRevelados] = useState(null); // na avaliação ao vivo: quem já passou pela bancada
   const salvarRascunho = useRef(null);           // a baia registra aqui o "salvar o código do editor agora"
   const registrarRascunho = useCallback((f) => { salvarRascunho.current = f; }, []);
 
@@ -53,9 +54,10 @@ export default function Arena() {
     const chave = `bootcamp:visto:${id}:${r.numero}`;
     if (guardado(chave)) return;
     guardar(chave, "1");
+    setRevelados(new Set());
     setAoVivo(r.numero);
   }, [dados, aoVivo, id]);
-  const acabarAoVivo = useCallback(() => { setAoVivo(null); setCena(null); }, []);
+  const acabarAoVivo = useCallback(() => { setAoVivo(null); setCena(null); setRevelados(null); }, []);
 
   // com a rodada aberta, a arena se atualiza sozinha: os outros competidores andam pelo fluxo
   const aberta = dados?.rodada?.status === "aberta" || dados?.avaliando;
@@ -121,7 +123,25 @@ export default function Arena() {
   }
   if (!dados) return <p className="pf-estat__nota">Entrando no escritório…</p>;
 
-  const { torneio, participantes, rodada, minhaEntrega, eu } = dados;
+  const { torneio, rodada, minhaEntrega, eu } = dados;
+  // na avaliação ao vivo, a nota de ninguém aparece antes da vez dele (04/11/2026): até passar pela bancada, cada um
+  // fica com os pontos, as insígnias e a situação de antes da prova (e o campeão só aparece no fim)
+  const emAoVivo = Boolean(aoVivo && rodada?.numero === aoVivo && rodada.avaliacao?.participantes?.length);
+  const naBancada = new Map((rodada?.avaliacao?.participantes || []).map((a) => [a.id, a]));
+  const escondido = (pid) => emAoVivo && naBancada.has(pid) && !revelados?.has(pid);
+  const participantes = dados.participantes.map((p) => {
+    if (!escondido(p.id)) return p;
+    const a = naBancada.get(p.id);
+    const saiuAgora = p.eliminadoNa === rodada.numero;
+    return {
+      ...p, pontos: a.pontosAntes ?? (p.pontos - (rodada.prova?.tipo === "eliminacao" ? 0 : a.nota || 0)), nota: null, resultado: null, testes: null,
+      etapa: "revisao", enviada: true, eliminado: saiuAgora ? false : p.eliminado, eliminadoNa: saiuAgora ? null : p.eliminadoNa,
+      insignias: (p.insignias || []).filter((i) => i.numero !== rodada.numero),
+    };
+  });
+  const campeaoVisivel = torneio.campeaoId && escondido(torneio.campeaoId) ? null : torneio.campeaoId;
+  const dadosVisiveis = { ...dados, participantes, torneio: { ...torneio, campeaoId: campeaoVisivel } };
+  const minhasInsignias = participantes.find((p) => p.souEu)?.insignias || eu?.insignias || [];
   const selecionado = participantes.find((p) => p.id === escolhido) || null;
   const prova = rodada?.prova;
   const codando = rodada?.status === "aberta" && Boolean(minhaEntrega) && !eu?.eliminado && ["codigo", "testes"].includes(minhaEntrega.etapa);
@@ -138,7 +158,7 @@ export default function Arena() {
           <p>{torneio.formatoNome}: {torneio.formatoDescricao}</p>
           <div className="bc-pilulas">
             <span className="pf-pilula">{torneio.formato === "temporada" ? "Prova" : "Rodada"} {torneio.rodadaAtual || 0} de {torneio.rodadasTotal}</span>
-            {eu?.insignias?.length > 0 && <span className="pf-pilula">suas insígnias: <Insignias lista={eu.insignias} catalogo={dados.insignias} /></span>}
+            {minhasInsignias.length > 0 && <span className="pf-pilula">suas insígnias: <Insignias lista={minhasInsignias} catalogo={dados.insignias} /></span>}
             <span className="pf-pilula">{torneio.participantes} competidores</span>
             <span className="pf-pilula">{torneio.linguagens?.modo === "jurados" ? "⚖️ linguagem dos jurados" : "🧰 linguagem livre"}</span>
             {torneio.contraCpu && <span className="pf-pilula">{NIVEIS_DO_TORNEIO[torneio.nivel]?.emoji} nível {torneio.nivelNome}</span>}
@@ -157,10 +177,10 @@ export default function Arena() {
       <div className="bc-palco-grade">
         <div className="bc-palco-grade__cena">
           {sem3d ? (
-            <BaiasPlanas participantes={participantes} campeaoId={torneio.campeaoId} aoEscolher={setEscolhido} />
+            <BaiasPlanas participantes={participantes} campeaoId={campeaoVisivel} aoEscolher={setEscolhido} />
           ) : (
             <div className="bc-cena3d">
-              <Escritorio3D participantes={participantes} jurados={dados.jurados} apresentadora={dados.apresentadora} campeaoId={torneio.campeaoId} telao={telao}
+              <Escritorio3D participantes={participantes} jurados={dados.jurados} apresentadora={dados.apresentadora} campeaoId={campeaoVisivel} telao={telao}
                 avaliando={dados.avaliando} cenario={cenario || torneio.cenario} palco={cena?.palco} humores={cena?.humores} final={dados.final}
                 aoEscolher={setEscolhido} aoFalhar={() => setSem3d(true)} />
               {/* data-so-olhar: trocar o cenário da própria tela vale também no modo espectador */}
@@ -175,13 +195,13 @@ export default function Arena() {
           )}
           {aoVivo && rodada?.numero === aoVivo && rodada.avaliacao?.participantes?.length > 0 && (
             <AvaliacaoAoVivo key={aoVivo} avaliacao={rodada.avaliacao} participantes={participantes} jurados={dados.jurados}
-              apresentadora={dados.apresentadora} insignias={dados.insignias} numero={rodada.numero} aoMudar={setCena} aoAcabar={acabarAoVivo} />
+              apresentadora={dados.apresentadora} insignias={dados.insignias} numero={rodada.numero} aoMudar={setCena} aoAcabar={acabarAoVivo} aoRevelar={setRevelados} />
           )}
-          {selecionado && <Competidor p={selecionado} dados={dados} aoFechar={() => setEscolhido(null)} />}
+          {selecionado && <Competidor p={participantes.find((p) => p.id === selecionado.id) || selecionado} dados={dadosVisiveis} aoFechar={() => setEscolhido(null)} />}
         </div>
         <aside className="bc-palco-grade__lado">
           {rodada && <ProvaAtual dados={dados} />}
-          <Classificacao dados={dados} aoEscolher={setEscolhido} />
+          <Classificacao dados={dadosVisiveis} aoEscolher={setEscolhido} />
           {rodada?.confrontos?.length > 0 && (
             <section className="pf-cartao bc-confrontos">
               <h2 className="bc-lado__titulo">⚔️ Confrontos da rodada {rodada.numero}</h2>
@@ -211,7 +231,9 @@ export default function Arena() {
             )}
             {rodada.status === "aberta" && eu?.eliminado && <p className="pf-aviso">Você saiu do torneio, mas pode acompanhar as provas e as notas dos jurados até o fim.</p>}
             {rodada.status === "aberta" && <ChamarJurados dados={dados} ocupado={ocupado} agir={agir} antesDeChamar={() => salvarRascunho.current?.()} />}
-            {rodada.status === "avaliada" && <ResultadoDaRodada dados={dados} aoRever={aoVivo ? null : () => { setAoVivo(rodada.numero); window.scrollTo({ top: 0, behavior: "smooth" }); }} />}
+            {rodada.status === "avaliada" && (emAoVivo
+              ? <p className="pf-aviso" role="status">⚖️ A avaliação está passando ao vivo: o resultado de cada um aparece na vez dele (ou tudo de uma vez, em ⏩ Pular tudo).</p>
+              : <ResultadoDaRodada dados={dados} aoRever={aoVivo ? null : () => { setRevelados(new Set()); setAoVivo(rodada.numero); window.scrollTo({ top: 0, behavior: "smooth" }); }} />)}
           </div>
         </div>
       )}
