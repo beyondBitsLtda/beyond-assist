@@ -6,12 +6,12 @@ import { useRouter } from "next/navigation";
 import { obter, criar } from "@/lib/api.js";
 import Neuro from "@/componentes/Neuro.js";
 import { StatusDoNpc } from "@/componentes/bootcamp/Pecas.js";
-import { planoDaTemporada } from "@/dominio/bootcamp.js";
+import { planoDaTemporada, rotuloDaProva } from "@/dominio/bootcamp.js";
 
 const EQUIPE_ROTULO = {
   sorteio: { nome: "Times sorteados", descricao: "Os dois times saem por sorteio." },
   capitao: { nome: "O vencedor escolhe", descricao: "Quem venceu a última prova escolhe um membro para o time dele; o resto é sorteado." },
-  nao: { nome: "Sem prova em equipe", descricao: "Todos os episódios começam com a prova de imunidade." },
+  nao: { nome: "Sem prova em equipe", descricao: "Todos os episódios começam com a prova de imunidade (sem a prova pela média e sem a colaborativa)." },
 };
 const EMOJI_DO_FORMATO = { temporada: "🎬", "mata-mata": "⚔️", "pontos-corridos": "📊" };
 
@@ -29,7 +29,7 @@ export default function CriarTorneio() {
   const [f, setF] = useState({
     nome: "", formato: "temporada", rodadas: 3, usarTempo: false, tempoMin: 30,
     modoLinguagem: "livre", permitidas: [], total: 8, convidados: [], npcs: [], nivel: "medio", cenario: "neon",
-    eliminadosPorEpisodio: 2, provaDeEquipe: "capitao",
+    eliminadosPorEpisodio: 1, provaDeEquipe: "capitao",
   });
   const mudar = (campo, valor) => setF((x) => ({ ...x, [campo]: valor }));
   const alternar = (campo, valor) => setF((x) => ({ ...x, [campo]: x[campo].includes(valor) ? x[campo].filter((v) => v !== valor) : [...x[campo], valor] }));
@@ -40,7 +40,7 @@ export default function CriarTorneio() {
   const sorteados = Math.max(0, vagasDosPersonagens - f.npcs.length);
   const rodadasDoMataMata = Math.ceil(Math.log2(Math.max(2, f.total)));
   const plano = useMemo(
-    () => planoDaTemporada(f.total, { eliminadosPorEpisodio: f.eliminadosPorEpisodio, provaDeEquipe: f.provaDeEquipe }),
+    () => planoDaTemporada(f.total, { eliminadosPorEpisodio: 1, provaDeEquipe: f.provaDeEquipe, versaoDoPlano: 2 }),
     [f.total, f.eliminadosPorEpisodio, f.provaDeEquipe],
   );
   const jogadores = useMemo(() => {
@@ -103,6 +103,7 @@ export default function CriarTorneio() {
               </div>
               {temporada ? (
                 <>
+                  {opcoes.eliminadosPorEpisodio.length > 1 && (
                   <div className="bc-criar__grupo">
                     <span className="pf-campo__rotulo">Ritmo da temporada</span>
                     <div className="bc-opcoes" role="radiogroup" aria-label="Quantos saem por episódio">
@@ -115,8 +116,9 @@ export default function CriarTorneio() {
                       ))}
                     </div>
                   </div>
+                  )}
                   <div className="bc-criar__grupo">
-                    <span className="pf-campo__rotulo">Prova em equipe (no meio da temporada)</span>
+                    <span className="pf-campo__rotulo">Os times das provas em equipe (a pela média e a colaborativa)</span>
                     <div className="bc-opcoes bc-opcoes--tres" role="radiogroup" aria-label="Prova em equipe">
                       {opcoes.provasDeEquipe.map((m) => (
                         <label key={m} className={`bc-opcao${f.provaDeEquipe === m ? " bc-opcao--escolhida" : ""}`}>
@@ -127,7 +129,7 @@ export default function CriarTorneio() {
                       ))}
                     </div>
                   </div>
-                  <p className="pf-estat__nota">🛡️ A imunidade salva metade · 🤝 em equipe, o time vencedor fica salvo · 🔥 a eliminação é só de quem não se salvou · 🏆 a final é numa arena especial, com a torcida de todos. Toda prova dá uma insígnia ao vencedor.</p>
+                  <p className="pf-estat__nota">🛡️ A imunidade salva metade · 🤝 na prova em equipe, a nota do time é a média · 🧩 na colaborativa, cada um escreve uma parte e os códigos se juntam num programa só · 🔥 a eliminação é de quem não se salvou: sai 1, e a nota dela não soma pontos · 🏆 a final é numa arena especial, com a torcida de todos. Toda prova dá uma insígnia ao vencedor.</p>
                 </>
               ) : f.formato === "pontos-corridos" ? (
                 <label className="pf-campo bc-criar__linha">
@@ -283,7 +285,7 @@ export default function CriarTorneio() {
               </label>
               <dl className="bc-resumo__lista">
                 <dt>Formato</dt><dd>{EMOJI_DO_FORMATO[f.formato]} {formato?.nome}</dd>
-                {temporada && <><dt>Ritmo</dt><dd>{f.eliminadosPorEpisodio === 1 ? "sai 1 por episódio" : "saem até 2 por episódio"}</dd></>}
+                {temporada && <><dt>Eliminação</dt><dd>sai 1 por episódio</dd></>}
                 {temporada && <><dt>Em equipe</dt><dd>{EQUIPE_ROTULO[f.provaDeEquipe].nome}</dd></>}
                 {f.formato === "pontos-corridos" && <><dt>Rodadas</dt><dd>{f.rodadas}</dd></>}
                 {f.formato === "mata-mata" && <><dt>Rodadas</dt><dd>{rodadasDoMataMata}</dd></>}
@@ -299,8 +301,8 @@ export default function CriarTorneio() {
                   <span className="pf-campo__rotulo">As {plano.length} provas da temporada</span>
                   <ol className="bc-temporada bc-temporada--previa bc-temporada--compacta">
                     {plano.map((p) => (
-                      <li key={p.numero} className={`bc-temporada__prova bc-temporada__prova--depois bc-temporada__prova--${p.tipo}`} title={opcoes.tiposDeProva[p.tipo]?.nome}>
-                        <span aria-hidden="true">{opcoes.tiposDeProva[p.tipo]?.emoji}</span>
+                      <li key={p.numero} className={`bc-temporada__prova bc-temporada__prova--depois bc-temporada__prova--${p.tipo}`} title={rotuloDaProva(p).nome}>
+                        <span aria-hidden="true">{rotuloDaProva(p).emoji}</span>
                         <small>{p.tipo === "final" ? "Final" : `Ep. ${p.episodio}`}</small>
                       </li>
                     ))}

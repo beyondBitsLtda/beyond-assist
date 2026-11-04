@@ -350,6 +350,24 @@ function desenharTelao(canvas, { titulo, subtitulo }, acento = "#84cc16") {
   c.fillText(String(subtitulo || "").slice(0, 56), w / 2, h * 0.85);
 }
 
+// a prova em equipe: cada time senta junto, o Azul nas baias da esquerda e o Laranja nas da direita (1.5.0)
+const LADOS_DOS_TIMES = { azul: [0, 1, 4, 5], laranja: [2, 3, 6, 7] };
+
+/** Quem senta em cada baia: a baia de cada um, ou, na prova em equipe, os times juntos (o resto nas baias livres). */
+function assentosDaProva(lista) {
+  if (!lista.some((p) => p.equipe)) return new Map(lista.map((p) => [p.baia, p]));
+  const mapa = new Map();
+  const sentados = new Set();
+  for (const [time, lugares] of Object.entries(LADOS_DOS_TIMES)) {
+    lista.filter((p) => p.equipe === time).sort((a, b) => a.baia - b.baia).forEach((p, i) => {
+      if (i < lugares.length) { mapa.set(lugares[i], p); sentados.add(p.id); }
+    });
+  }
+  const livres = POSICOES.map((_, i) => i).filter((i) => !mapa.has(i));
+  lista.filter((p) => !sentados.has(p.id)).sort((a, b) => a.baia - b.baia).forEach((p, i) => { if (i < livres.length) mapa.set(livres[i], p); });
+  return mapa;
+}
+
 /**
  * O caminho de onde o boneco está até o destino, sempre pelo corredor entre as fileiras (ninguém atravessa as
  * baias): sai para o corredor, anda por ele até a altura do destino e segue até lá.
@@ -778,7 +796,7 @@ export default function Escritorio3D({ participantes, jurados, apresentadora = n
       avaliando: false,
       definirCenario,
       definirParticipantes(lista, campeao) {
-        const porBaia = new Map(lista.map((p) => [p.baia, p]));
+        const porBaia = assentosDaProva(lista);
         baias.forEach((b, i) => {
           const p = porBaia.get(i) || null;
           b.participante = p;
@@ -792,6 +810,12 @@ export default function Escritorio3D({ participantes, jurados, apresentadora = n
           const [x, z] = POSICOES[i];
           if (p) {
             const bo = boneco(p.id, x + 0.6, z + 0.55);
+            // mudou de baia (os times sentam juntos na prova em equipe, e cada um volta à sua depois): vai andando
+            const nova = { x: x + 0.6, z: z + 0.55 };
+            if (!estado.final && (bo.base.x !== nova.x || bo.base.z !== nova.z)) {
+              bo.base = nova;
+              if (estado.noPalco !== p.id && bo.malha.visible) andar(bo, caminhoAte(bo.malha.position, nova));
+            }
             bo.digitando = p.etapa === "codigo" && !p.eliminado;
             bo.eliminado = p.eliminado;
             // na final, quem está na arquibancada torce aceso (não apagado como eliminado)

@@ -7,17 +7,28 @@ import { obter } from "@/lib/api.js";
 import Codigo from "@/componentes/codigo/Codigo.js";
 import DesenhoDoJurado from "@/componentes/bootcamp/Jurados.js";
 import { Avatar, RESULTADO, Insignias } from "@/componentes/bootcamp/Pecas.js";
+import { APRESENTADORA } from "@/dominio/bootcamp.js";
 
 /**
- * O painel dos 3 jurados do Modo Bootcamp: a classificação e, rodada por rodada, o desafio, o comentário dos
- * jurados, as notas de cada critério (desempenho técnico, arquitetura e regras) e o feedback de cada um.
+ * O painel dos 3 jurados do Modo Bootcamp: a classificação, as entrevistas de despedida de quem saiu e, rodada por
+ * rodada, o desafio, o comentário dos jurados, as notas de cada critério (desempenho técnico, arquitetura e regras)
+ * e o feedback de cada um.
  */
 export default function PainelDosJurados() {
   const { id } = useParams();
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
+  // o link "ver a entrevista de despedida" da arena (#despedida-<id>) abre e mostra a entrevista dele
+  const [abertaNoLink, setAbertaNoLink] = useState("");
 
   useEffect(() => { obter(`/api/bootcamp/${id}/jurados`).then(setDados).catch((e) => setErro(e.message)); }, [id]);
+  useEffect(() => {
+    if (!dados) return;
+    const alvo = decodeURIComponent(window.location.hash.replace(/^#despedida-/, ""));
+    if (!alvo || alvo === window.location.hash) return;
+    setAbertaNoLink(alvo);
+    requestAnimationFrame(() => document.getElementById(`despedida-${alvo}`)?.scrollIntoView({ block: "start" }));
+  }, [dados]);
 
   if (erro) {
     return (
@@ -29,6 +40,10 @@ export default function PainelDosJurados() {
   }
   if (!dados) return <p className="pf-estat__nota">Chamando os jurados…</p>;
   const { torneio, jurados, classificacao, rodadas } = dados;
+  // as entrevistas de despedida de quem saiu (humanos e personagens), da mais recente para a mais antiga
+  const despedidas = rodadas.flatMap((r) => (r.avaliacao?.participantes || [])
+    .filter((a) => a.resultado === "eliminado" && a.despedida?.length)
+    .map((a) => ({ ...a, numero: r.numero, prova: r.prova })));
   const campeaoId = torneio.campeao?.id || null;
 
   return (
@@ -73,6 +88,33 @@ export default function PainelDosJurados() {
           ))}
         </ol>
       </section>
+      {despedidas.length > 0 && (
+        <section className="pf-secao bc-despedidas" aria-label="As entrevistas de despedida">
+          <h2 className="pf-secao__titulo">🎤 As despedidas</h2>
+          {despedidas.map((d) => (
+            <details key={`${d.numero}:${d.id}`} id={`despedida-${d.id}`} className="pf-cartao bc-despedida" open={abertaNoLink === d.id}>
+              <summary>
+                <Avatar p={{ ...d, eliminado: true }} tamanho={36} />
+                <span><strong>{d.souEu ? "Você" : d.nome}</strong><small>saiu na {d.prova?.nome?.toLowerCase() || "prova"} {d.numero} · {d.nota}/100</small></span>
+              </summary>
+              <div className="bc-despedida__entrevista">
+                {d.despedida.map((x, i) => (
+                  <div key={i}>
+                    <p><strong>{APRESENTADORA.emoji} {APRESENTADORA.nome}:</strong> {x.pergunta}</p>
+                    <p className="bc-despedida__resposta"><strong>{d.souEu ? "Você" : d.nome}:</strong> {x.resposta}</p>
+                  </div>
+                ))}
+              </div>
+              {(d.pontosFortes?.length > 0 || d.pontosFracos?.length > 0) && (
+                <div className="bc-ficha__pontos">
+                  <div><h4>💪 Pontos fortes</h4><ul>{(d.pontosFortes || []).map((x, i) => <li key={i}>{x}</li>)}</ul></div>
+                  <div><h4>🛠️ Pontos fracos</h4><ul>{(d.pontosFracos || []).map((x, i) => <li key={i}>{x}</li>)}</ul></div>
+                </div>
+              )}
+            </details>
+          ))}
+        </section>
+      )}
       </aside>
 
       <div className="bc-jurados-grade__provas">
@@ -90,6 +132,7 @@ export default function PainelDosJurados() {
                   {r.equipes.map((e) => (
                     <div key={e.id} className={`bc-equipe bc-time--${e.id}${e.venceu ? " bc-equipe--venceu" : ""}`}>
                       <strong>{e.emoji} {e.nome} · {e.nota}/100 {e.venceu ? "🏅" : ""}</strong>
+                      {e.integracao && <small>🧩 programa do time: {e.integracao.passados}/{e.integracao.total} testes{e.integracao.faltou.length ? ` · faltou a parte de ${e.integracao.faltou.join(", ")}` : ""}</small>}
                     </div>
                   ))}
                 </div>

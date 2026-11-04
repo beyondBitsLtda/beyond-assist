@@ -9,14 +9,32 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.4.1",
+  "versao": "1.5.0",
   "atualizadoEm": "2026-11-04",
   "compilacao": {
-    "numero": 105,
+    "numero": 106,
     "data": "2026-11-04",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.5.0",
+      "data": "2026-11-04",
+      "branch": "main",
+      "tipo": "funcionalidade",
+      "resumo": "No Bootcamp chega a prova colaborativa: o time divide o código em partes, que se juntam num programa só. Também: os times sentam juntos, a eliminação tira sempre 1 e não soma pontos, todo eliminado dá entrevista de despedida (dá para rever) e a prova vira uma IDE na altura da tela.",
+      "itens": [
+        "Prova colaborativa: o desafio vem dividido em quatro funções encadeadas (por exemplo, ler, limpar, calcular e formatar), e cada membro do time escreve a sua. Na bancada, os jurados juntam o código de todos e rodam os testes do programa do time, que valem para o time inteiro.",
+        "Na colaborativa, a pessoa fica com as partes mais centrais, e o editor já vem com a assinatura e o contrato de cada uma. Rodar os testes junta a sua parte com o gabarito das outras, para testar a sua função sem depender do time. Os personagens da CPU acertam ou escorregam na parte deles conforme a habilidade.",
+        "A prova em equipe pela média continua: numa temporada longa há as duas (a pela média e, mais adiante, a colaborativa); numa curta, só a colaborativa. Banco com 3 desafios colaborativos, com gabarito em JavaScript e em Python.",
+        "Na prova de eliminação sai sempre 1, nunca 2 (a temporada rápida saiu), e a nota dela não soma nos pontos.",
+        "Na prova em equipe, cada time senta junto no escritório 3D: o Azul nas baias da esquerda e o Laranja nas da direita.",
+        "O personagem da CPU eliminado também dá a entrevista de despedida à apresentadora, com o bordão dele, e ganha a ficha de pontos fortes e fracos. Todas as entrevistas ficam em \"As despedidas\", no painel dos jurados, e na arena quem saiu tem o link para revê-la.",
+        "A prova virou uma IDE: o desafio e o editor ficam lado a lado, os dois com a altura da tela, e o editor cresce até o fim da coluna. A página desce até eles quando a implementação começa.",
+        "Correção: os \"\\n\" que a IA escrevia por extenso no enunciado e na entrada e saída viram quebras de linha, também nos desafios já gravados."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.4.1",
       "data": "2026-11-04",
@@ -1694,7 +1712,7 @@
         "Minigame do dia na Prática (a antiga Arena Lúdica): masmorra de depuração, mascote programável e quebra-cabeças de Parsons, com terminal, explicação da Lisa, +30 pontos uma vez por dia e recompensa por fase nova",
         "Exemplo da Lisa: uma aplicação de exemplo com os conceitos de cada exercício e projeto, sem resolver o desafio",
         "Menu do Reino em abas (Reino, Batalha, Expedições, Forja e Bolsa), com contadores e barra fixa ao rolar",
-        "Modo Bootcamp: temporada no estilo reality (prova de imunidade ou em equipe e prova de eliminação a cada episódio, insígnia para todo vencedor e grande final numa arena com torcida) ou modos rápidos (mata-mata e pontos corridos), até 8 competidores (pessoas do Proof e personagens da Lisa com skin, personalidade, status e especialidades), escritório de TI em 3D com 5 cenários, nível contra a CPU, 3 jurados desenhados, avaliação ao vivo com code review, medidor de emoção e despedida com a apresentadora, entrega no editor da tela (com o rascunho salvo sozinho e \"Testar e enviar\" num clique) ou pelo GitHub e testes de entrada e saída num compilador on-line"
+        "Modo Bootcamp: temporada no estilo reality (prova de imunidade, em equipe pela média ou colaborativa, com o código do time dividido em partes que se juntam, e prova de eliminação, que tira 1, a cada episódio, insígnia para todo vencedor e grande final numa arena com torcida) ou modos rápidos (mata-mata e pontos corridos), até 8 competidores (pessoas do Proof e personagens da Lisa com skin, personalidade, status e especialidades), escritório de TI em 3D com 5 cenários, nível contra a CPU, 3 jurados desenhados, avaliação ao vivo com code review, medidor de emoção e despedida de todo eliminado com a apresentadora, entrega no editor da tela (com o rascunho salvo sozinho e \"Testar e enviar\" num clique) ou pelo GitHub e testes de entrada e saída num compilador on-line"
       ],
       "naoInclui": [
         "Não executa o código de ninguém no próprio servidor: o Rodar, a Arena Lúdica e os testes do Modo Bootcamp rodam no Wandbox (compilador on-line); os exercícios e projetos da prática são corrigidos pela IA lendo o código.",
@@ -1720,7 +1738,7 @@
         "A conversa com a Lisa é por escrito (a voz do navegador lê as falas dela, mas a pessoa não fala no microfone nessa conversa).",
         "No Modo Bootcamp, os personagens da Lisa não escrevem código de verdade (jogam por simulação), os testes não rodam SQL (só linguagens que leem stdin) e o GitHub só vale com repositório público.",
         "Os jurados e a apresentadora do Modo Bootcamp são personagens originais: não imitam nome, rosto nem bordão de nenhuma pessoa real, e o deboche da avaliação é sobre o código, nunca sobre a pessoa.",
-        "Na prova em equipe do Bootcamp, cada integrante entrega a própria solução: não há edição de código em conjunto em tempo real (a nota do time é a média)."
+        "No Bootcamp, não há edição de código em conjunto em tempo real: na prova colaborativa, cada membro escreve a sua parte e os jurados juntam tudo na bancada."
       ]
     },
     "stack": [

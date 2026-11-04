@@ -29,6 +29,8 @@ import {
   reviewAutomatica, reviewDoNpc, pontosAutomaticos, despedidaAutomatica,
   TIPOS_DE_PROVA, INSIGNIAS, ESPECIALIDADES, STATUS, planoDaTemporada, competidoresDaProva, formarEquipes, escolhaDoCapitaoNpc,
   aplicarResultadoDaProva, APRESENTADORA, provaDoTorneio, testarNaBancada,
+  rotuloDaProva, desafioColaborativo, dividirPartes, modeloDasPartes, programaDoTime, programaDeTeste, codigoDoNpcNasPartes,
+  acertosDoNpcNasPartes, reviewDaParteDoNpc, despedidaDoNpc,
 } from "@/dominio/bootcamp.js";
 
 const falhou = (error, onde) => { if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`); };
@@ -50,13 +52,13 @@ const equipeDe = (prova, id) => (prova?.equipes || []).find((e) => e.membros.inc
 
 /** O plano da temporada para a tela: as provas, com o nome de cada uma. */
 const planoParaTela = (t) => (t.formato === "temporada"
-  ? planoDaTemporada(t.participantes.length, t.opcoes).map((p) => ({ numero: p.numero, tipo: p.tipo, episodio: p.episodio, nome: TIPOS_DE_PROVA[p.tipo].nome, emoji: TIPOS_DE_PROVA[p.tipo].emoji }))
+  ? planoDaTemporada(t.participantes.length, t.opcoes).map((p) => ({ numero: p.numero, tipo: p.tipo, modo: p.modo || null, episodio: p.episodio, nome: rotuloDaProva(p).nome, emoji: rotuloDaProva(p).emoji }))
   : null);
 
 function provaParaTela(prova, nomes) {
-  const tipo = TIPOS_DE_PROVA[prova.tipo] || TIPOS_DE_PROVA.rodada;
+  const tipo = rotuloDaProva(prova);
   return {
-    tipo: prova.tipo, nome: tipo.nome, emoji: tipo.emoji, descricao: tipo.descricao, episodio: prova.episodio, sai: prova.sai || null,
+    tipo: prova.tipo, modo: prova.modo || null, nome: tipo.nome, emoji: tipo.emoji, descricao: tipo.descricao, episodio: prova.episodio, sai: prova.sai || null,
     competidores: prova.competidores || [],
     equipes: (prova.equipes || []).map((e) => ({ ...e, nomes: e.membros.map((id) => nomes.get(id) || "?"), nomeDoCapitao: e.capitao ? nomes.get(e.capitao) : null })),
   };
@@ -283,6 +285,22 @@ export async function torneioParaTela(usuarioId, id) {
 
   const souDono = t.dono_id === usuarioId;
   const eu = t.participantes.find((p) => p.id === meuId(usuarioId));
+  const colab = rodada?.desafio?.colaborativa || null;
+  const meuTime = colab ? equipeDe(prova, meuId(usuarioId)) : null;
+  const nomesDaProva = new Map(t.participantes.map((p) => [p.id, p.nome]));
+  const colaborativa = colab ? {
+    linguagem: colab.linguagem, principal: colab.principal,
+    // a divisão de cada time: quem escreve cada parte (no meu time, marcando a minha)
+    times: (prova.equipes || []).map((e) => ({
+      id: e.id, meu: e.id === meuTime?.id,
+      divisao: colab.partes.map((parte) => {
+        const dono = Object.entries(e.partes || {}).find(([, ps]) => ps.includes(parte.id))?.[0] || null;
+        return { parte: parte.id, nome: parte.nome, funcao: parte.funcao, descricao: parte.descricao, responsavel: dono, nomeDoResponsavel: nomesDaProva.get(dono) || "", souEu: dono === meuId(usuarioId) };
+      }),
+    })),
+    minhasPartes: meuTime?.partes?.[meuId(usuarioId)] || [],
+    modelo: meuTime ? modeloDasPartes(colab, meuTime.partes?.[meuId(usuarioId)] || []) : "",
+  } : null;
   const tempoAcabou = Boolean(aberta && prazoPassou(rodada.prazo, agora));
   const jurados = aberta ? podeChamarJurados({ souDono, todosEnviaram, tempoAcabou }) : { ok: false, motivo: "" };
   const nomes = new Map(t.participantes.map((p) => [p.id, p.nome]));
@@ -315,6 +333,7 @@ export async function torneioParaTela(usuarioId, id) {
       numero: rodada.numero, status: rodada.status, abertaEm: rodada.aberta_em, prazo: rodada.prazo, avaliadaEm: rodada.avaliada_em,
       prova: provaParaTela(prova, nomes),
       desafio: desafioParaTela(rodada.desafio),
+      colaborativa,
       confrontos: (rodada.confrontos || []).map((c) => ({ a: c.a, b: c.b, nomeA: nomes.get(c.a), nomeB: c.b ? nomes.get(c.b) : null })),
       // avaliada: tudo o que a avaliação ao vivo precisa (as notas, o code review de cada um e o resultado)
       avaliacao: rodada.status === "avaliada" ? {
@@ -424,10 +443,14 @@ async function conferirComAReferencia(desafio) {
   return { ...desafio, testes };
 }
 
-async function desafioDaRodada(t, numero) {
+async function desafioDaRodada(t, numero, prova = null) {
   const { data: anteriores } = await supabase.from("proof_bootcamp_rodadas").select("desafio").eq("torneio_id", t.id);
   const usados = (anteriores || []).map((r) => r.desafio?.titulo).filter(Boolean);
   const dificuldade = dificuldadeDaRodada(numero, t.rodadas_total, nivelDo(t));
+  if (prova?.modo === "colaborativa") {
+    const colaborativo = desafioColaborativo({ usados, permitidas: t.linguagens?.permitidas || [], s: sorteio(sementeDe(`colaborativa:${t.id}:${numero}`)) });
+    if (colaborativo) return colaborativo;
+  }
   if (temModelo()) {
     try {
       const tipoDeProva = provaDoTorneio(t.formato, numero, t.participantes.length, t.opcoes)?.tipo || "rodada";
@@ -451,7 +474,7 @@ function montarProva(t, numero, escolhido = null) {
   const item = planoDaTemporada(t.participantes.length, t.opcoes)[numero - 1];
   if (!item) throw new ErroDeAcesso(400, "todas as provas já foram jogadas");
   const competidores = competidoresDaProva(item.tipo, t.participantes, t.estado?.salvos || []);
-  const prova = { tipo: item.tipo, episodio: item.episodio, competidores, sai: item.sai || null };
+  const prova = { tipo: item.tipo, episodio: item.episodio, competidores, sai: item.sai || null, ...(item.tipo === "equipe" ? { modo: item.modo || "media" } : {}) };
   if (item.tipo !== "equipe") return { prova };
 
   const modo = t.opcoes?.provaDeEquipe === "capitao" ? "capitao" : "sorteio";
@@ -485,9 +508,21 @@ async function abrir(t, usuarioId, { escolhido = null } = {}) {
     return torneioParaTela(usuarioId, t.id);
   }
 
-  const desafio = await desafioDaRodada(t, numero);
+  const desafio = await desafioDaRodada(t, numero, montada.prova);
   const conferido = validarDesafio(desafio, { linguagens: t.linguagens, dificuldade: desafio.dificuldade });
   if (!conferido.ok) throw new ErroDeAcesso(500, `desafio inválido: ${conferido.motivo}`);
+  // a colaborativa: as partes do desafio divididas em cada time (os humanos primeiro, com as partes mais centrais);
+  // sem nenhuma linguagem da colaborativa no torneio, a prova em equipe volta a ser pela média
+  if (montada.prova?.modo === "colaborativa") {
+    const colab = conferido.desafio.colaborativa;
+    if (!colab) montada.prova.modo = "media";
+    else {
+      const humano = (pid) => t.participantes.find((p) => p.id === pid)?.tipo === "humano";
+      montada.prova.equipes = (montada.prova.equipes || []).map((e) => ({
+        ...e, partes: dividirPartes(colab.ordem, [...e.membros.filter(humano), ...e.membros.filter((pid) => !humano(pid))]),
+      }));
+    }
+  }
   const abertaEm = new Date().toISOString();
   const { error } = await supabase.from("proof_bootcamp_rodadas").insert({
     torneio_id: t.id, numero, desafio: { ...conferido.desafio, solucao: desafio.solucao || null },
@@ -591,6 +626,7 @@ export async function agirNaRodada(usuarioId, id, corpo) {
     const repo = modo === "github" ? String(corpo?.repo || "").trim().slice(0, 300) : null;
     const caminho = modo === "github" ? String(corpo?.caminho || "").trim().replace(/^\/+/, "").slice(0, BOOTCAMP.limites.caminho) || caminhoPadrao(rodada.numero, linguagem) : null;
     const endereco = repo ? lerEnderecoDoRepo(repo) : null;
+    if (rodada.desafio.colaborativa && modo === "github") throw new ErroDeAcesso(400, "na prova colaborativa, o time junta o código no editor da tela");
     const r = avancarNoFluxo(entrega.etapa, "ambiente", { modo, linguagem, repoValido: Boolean(endereco) });
     if (!r.ok) throw new ErroDeAcesso(400, r.motivo);
     const mudou = modo !== entrega.modo || linguagem !== entrega.linguagem || repo !== entrega.repo || caminho !== entrega.caminho;
@@ -608,7 +644,10 @@ export async function agirNaRodada(usuarioId, id, corpo) {
  * de novo). A decisão "Passou nos testes?" do fluxo: não → volta para o código; sim → pode ir para a revisão.
  */
 export async function testarEntrega(usuarioId, id, corpo) {
-  const { rodada, entrega } = await minhaVez(usuarioId, id);
+  const { t, rodada, entrega } = await minhaVez(usuarioId, id);
+  // na colaborativa, as minhas funções rodam junto do gabarito das outras partes (o programa do time é na bancada)
+  const colab = rodada.desafio.colaborativa || null;
+  const minhas = colab ? equipeDe(provaDe(t, rodada), meuId(usuarioId))?.partes?.[meuId(usuarioId)] || [] : null;
   if (!entrega.modo || !entrega.linguagem) throw new ErroDeAcesso(400, "configure o ambiente (modo e linguagem) antes de testar");
   const enviar = Boolean(corpo?.enviar);
 
@@ -637,7 +676,7 @@ export async function testarEntrega(usuarioId, id, corpo) {
     const r0 = avancarNoFluxo(entrega.etapa, "testar", { passou: false });
     if (!r0.ok) throw new ErroDeAcesso(400, r0.motivo);
     frear(usuarioId, rodada.desafio.testes.length);
-    resultados = await rodarTestes(entrega.linguagem, codigo, rodada.desafio.testes);
+    resultados = await rodarTestes(entrega.linguagem, colab ? programaDeTeste(colab, minhas, codigo) : codigo, rodada.desafio.testes);
     passou = resumoDosTestes(resultados).passou;
     etapa = avancarNoFluxo(entrega.etapa, "testar", { passou }).etapa;
   }
@@ -697,6 +736,46 @@ async function testarNaBancadaQuemFaltou(lista, porUsuario, desafio) {
   }
 }
 
+/**
+ * A colaborativa na bancada: o programa de cada time é o código de cada membro (o da pessoa, como está no servidor;
+ * o do personagem, o gabarito ou o bug, pelo sorteio da rodada) mais a parte principal; os testes rodam uma vez por
+ * time. Devolve Map time → { passados, total, fracao, faltou (humanos sem código), npcs: Map → { codigo, acertos } }.
+ */
+async function integrarOsTimes({ t, rodada, prova, colab, porUsuario, desafio }) {
+  const saida = new Map();
+  for (const e of prova.equipes || []) {
+    const blocos = [];
+    const faltou = [];
+    const npcs = new Map();
+    for (const pid of e.membros) {
+      const partes = e.partes?.[pid] || [];
+      const p = t.participantes.find((x) => x.id === pid);
+      if (!partes.length || !p) continue;
+      if (p.tipo === "npc") {
+        const npc = npcDoTorneio(p, t);
+        const acertos = acertosDoNpcNasPartes({ npc, partes, area: desafio.area, dificuldade: desafio.dificuldade, s: sorteio(sementeDe(`colab:${rodada.id}:${p.npcId}`)) });
+        const codigo = codigoDoNpcNasPartes(colab, partes, acertos);
+        npcs.set(pid, { codigo, acertos });
+        blocos.push(codigo);
+      } else {
+        const codigo = String(porUsuario.get(p.usuarioId)?.codigo || "");
+        if (!codigo.trim()) faltou.push(pid);
+        blocos.push(codigo);
+      }
+    }
+    let resultados;
+    try {
+      resultados = await rodarTestes(colab.linguagem, programaDoTime(colab, blocos), desafio.testes);
+    } catch (erro) {
+      console.warn("[bootcamp] o programa do time não rodou:", erro?.message || erro);
+      resultados = desafio.testes.map((x) => ({ oculto: x.oculto, ok: false, entrada: x.entrada, esperada: x.saida, obtida: "", erro: "o compilador on-line não respondeu" }));
+    }
+    const r = resumoDosTestes(resultados);
+    saida.set(e.id, { passados: r.passados, total: r.total, fracao: r.fracao, faltou, npcs });
+  }
+  return saida;
+}
+
 export async function chamarJurados(usuarioId, id) {
   const t = await lerTorneio(usuarioId, id);
   const rodada = await lerRodada(t);
@@ -723,20 +802,29 @@ export async function chamarJurados(usuarioId, id) {
     const desafio = rodada.desafio;
     // os jurados avaliam só quem jogou esta prova (quem ficou salvo assiste)
     const lista = t.participantes.filter((p) => naProva(prova, p.id));
-    await testarNaBancadaQuemFaltou(lista, porUsuario, desafio);
+    const colab = prova.tipo === "equipe" && desafio.colaborativa ? desafio.colaborativa : null;
+    const integracao = colab ? await integrarOsTimes({ t, rodada, prova, colab, porUsuario, desafio }) : null;
+    if (!colab) await testarNaBancadaQuemFaltou(lista, porUsuario, desafio);
+    const doTime = (pid) => integracao?.get(equipeDe(prova, pid)?.id) || null;
     const apelidoDe = new Map(lista.map((p, i) => [p.id, `p${i + 1}`]));
     const humanos = [];
     const npcs = [];
     const sims = new Map();
     for (const p of lista) {
       if (p.tipo === "npc") {
-        const sim = simulacaoDo(p, rodada, t);
+        const simulada = simulacaoDo(p, rodada, t);
+        // na colaborativa, o resultado de todos é o do programa do time
+        const time = doTime(p.id);
+        const sim = time ? { ...simulada, passados: time.passados, total: time.total, passou: time.total > 0 && time.passados === time.total } : simulada;
         sims.set(p.id, sim);
         npcs.push({ apelido: apelidoDe.get(p.id), nome: p.nome, personalidade: p.personalidade, passados: sim.passados, total: sim.total });
         continue;
       }
       const e = porUsuario.get(p.usuarioId);
-      const r = resumoDosTestes(e?.testes);
+      const time = doTime(p.id);
+      const temCodigoAqui = Boolean(String(e?.codigo || "").trim());
+      // na colaborativa, os testes são os do programa do time (quem não escreveu a parte fica sem nota)
+      const r = time ? (temCodigoAqui ? { passados: time.passados, total: time.total, fracao: time.fracao } : { passados: 0, total: 0, fracao: 0 }) : resumoDosTestes(e?.testes);
       humanos.push({
         id: p.id, apelido: apelidoDe.get(p.id), nome: p.nome, linguagem: e?.linguagem || null, modo: e?.modo || null, plano: e?.plano || "",
         codigo: e?.codigo || "", testes: { passados: r.passados, total: r.total }, enviou: Boolean(e?.enviada_em), fracao: r.fracao, testou: r.total > 0,
@@ -769,7 +857,10 @@ export async function chamarJurados(usuarioId, id) {
         notasDele = notasDoNpc(npc, sim);
         feedback = feedbackDoNpc(npc, sim);
         testes = { passados: sim.passados, total: sim.total };
-        extra = { fala: ia?.falas.get(apelidoDe.get(p.id)) || p.bordao || "", enviou: true, minutos: sim.minutos, review: reviewDoNpc(p.npcId, sim, s) };
+        // na colaborativa, o review mostra a parte que ele escreveu de verdade (a boa, ou a do bug)
+        const daParte = doTime(p.id)?.npcs.get(p.id);
+        const review = daParte?.codigo ? reviewDaParteDoNpc({ codigo: daParte.codigo, acertou: Object.values(daParte.acertos).every(Boolean), s }) : [];
+        extra = { fala: ia?.falas.get(apelidoDe.get(p.id)) || p.bordao || "", enviou: true, minutos: sim.minutos, review: review.length ? review : reviewDoNpc(p.npcId, sim, s) };
       } else {
         const h = humanos.find((x) => x.id === p.id);
         const daIa = ia?.porHumano.get(p.id);
@@ -813,13 +904,24 @@ export async function chamarJurados(usuarioId, id) {
       origem: ia ? "jurados" : "automatica",
       comentarioGeral: ia?.comentarioGeral || "Os jurados conferiram os testes, o plano e as regras de cada entrega.",
       prova: { tipo: prova.tipo, episodio: prova.episodio },
-      participantes: avaliados.map((a) => ({
-        ...a,
-        resultado: resultadoDe(a.id),
-        insignia: (res.vencedores || []).includes(a.id) ? insigniaDaProva : null,
-      })),
+      participantes: avaliados.map((a) => {
+        const base = { ...a, resultado: resultadoDe(a.id), insignia: (res.vencedores || []).includes(a.id) ? insigniaDaProva : null };
+        if (base.resultado !== "eliminado" || a.tipo !== "npc") return base;
+        const p = t.participantes.find((x) => x.id === a.id);
+        const npc = p && npcDoTorneio(p, t);
+        const pontos = pontosAutomaticos({ notas: a.notas, testes: a.testes, enviou: true, temPlano: true, linguagemOk: true });
+        return {
+          ...base, pontosFortes: pontos.fortes, pontosFracos: pontos.fracos,
+          despedida: npc ? despedidaDoNpc({ npc: { ...npc, nome: p.nome }, notas: a.notas, testes: a.testes, area: desafio.area, s: sorteio(sementeDe(`despedida:${rodada.id}:${a.id}`)) }) : [],
+        };
+      }),
       eliminados: res.eliminados, avancaram: res.avancaram || [], campeao: res.campeao,
-      vencedores: res.vencedores || [], salvos: res.salvos || [], equipes: res.equipes || null,
+      vencedores: res.vencedores || [], salvos: res.salvos || [],
+      // na colaborativa, cada time leva o resultado do programa dele e quem não entregou a parte
+      equipes: res.equipes ? res.equipes.map((e) => {
+        const r = integracao?.get(e.id);
+        return r ? { ...e, integracao: { passados: r.passados, total: r.total, faltou: r.faltou.map((pid) => t.participantes.find((x) => x.id === pid)?.nome || "?") } } : e;
+      }) : null,
     };
     // o que a temporada lembra para a próxima prova: quem se salvou da eliminação e quem venceu (o capitão)
     const estado = {

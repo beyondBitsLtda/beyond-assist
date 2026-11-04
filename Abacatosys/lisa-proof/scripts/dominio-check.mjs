@@ -3,6 +3,7 @@
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 import { diaDe, somarDias, diaDaSemana, inicioDaSemana, fimDoMes, diaValido, formatarDia } from "../src/dominio/datas.js";
 import { calcularOfensiva, semanaDaOfensiva } from "../src/dominio/ofensiva.js";
 import { ehQuadroDeEstudo, temaDo } from "../src/dominio/estudo.js";
@@ -3934,6 +3935,9 @@ caso("a semana da ofensiva: de domingo a sábado, com hoje e os dias que faltam"
     planoDaTemporada, provaDoTorneio, formarEquipes, escolhaDoCapitaoNpc, competidoresDaProva, aplicarResultadoDaProva, INSIGNIAS,
     TIPOS_DE_PROVA, ESPECIALIDADES, AREAS_DOS_DESAFIOS, afinidade, forcaDoNpc, STATUS, APRESENTADORA, validarDespedida, validarPontos,
     pontosAutomaticos, despedidaAutomatica, EQUIPES, testarNaBancada, BRONCAS_SEM_CODIGO, FEEDBACK_SEM_CODIGO,
+    MODOS_DE_EQUIPE, rotuloDaProva, comLinhas, despedidaDoNpc, acertosDoNpcNasPartes, reviewDaParteDoNpc,
+    DESAFIOS_COLABORATIVOS, LINGUAGENS_DA_COLABORATIVA, desafioColaborativo, dividirPartes, modeloDasPartes, programaDoTime,
+    programaDeTeste, codigoDoNpcNasPartes, linguagemDaColaborativa,
   } = bootcamp;
 
 console.log("\nmodo bootcamp");
@@ -4280,10 +4284,120 @@ caso("bootcamp/temporada: o plano dos episódios (imunidade ou equipe, eliminaç
   assert.equal(provaDoTorneio("mata-mata", 2, 8).tipo, "rodada");
   assert.equal(provaDoTorneio("temporada", 13, 8, { eliminadosPorEpisodio: 1 }).tipo, "final");
   assert.equal(validarConfiguracao({ nome: "Temporada", formato: "temporada" }).config.opcoes.provaDeEquipe, "sorteio");
-  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "temporada", eliminadosPorEpisodio: 3 }).ok, false);
+  // (1.5.0) sai sempre 1 por episódio, peça o que pedir, e o torneio novo usa o plano 2
+  assert.deepEqual([3, 2, undefined].map((e) => validarConfiguracao({ nome: "Temporada", formato: "temporada", eliminadosPorEpisodio: e }).config.opcoes.eliminadosPorEpisodio), [1, 1, 1]);
+  assert.equal(validarConfiguracao({ nome: "Temporada", formato: "temporada" }).config.opcoes.versaoDoPlano, 2);
   assert.equal(validarConfiguracao({ nome: "Temporada", formato: "temporada", provaDeEquipe: "duelo" }).ok, false);
   assert.ok(BOOTCAMP.formatos.includes("temporada") && BOOTCAMP.formatos[0] === "temporada", "a temporada é o formato principal");
   assert.ok(Object.keys(TIPOS_DE_PROVA).every((t) => TIPOS_DE_PROVA[t].nome && TIPOS_DE_PROVA[t].emoji));
+});
+
+caso("bootcamp 1.5.0: o plano 2 (1 por episódio, a prova em equipe pela média e a colaborativa) e a eliminação sem pontos", () => {
+  const modos = (n, q = "capitao") => planoDaTemporada(n, { provaDeEquipe: q, versaoDoPlano: 2 })
+    .map((p) => (p.tipo === "equipe" ? (p.modo === "colaborativa" ? "C" : "M") : p.tipo[0])).join("");
+  assert.equal(modos(8), "ieMeieCeieief", "8: a média no 2º episódio, a colaborativa no 4º, 13 provas");
+  assert.equal(modos(7), "ieMeCeieief");
+  assert.equal(modos(6), "ieCeieief", "temporada curta: uma só, a colaborativa");
+  assert.equal(modos(5), "ieCeief");
+  assert.equal(modos(8, "nao"), "ieieieieieief", "sem prova em equipe");
+  for (const n of [3, 4, 5, 6, 7, 8]) {
+    const plano = planoDaTemporada(n, { provaDeEquipe: "sorteio", versaoDoPlano: 2, eliminadosPorEpisodio: 2 });
+    assert.ok(plano.filter((p) => p.tipo === "eliminacao").every((p) => p.sai === 1), `${n}: na eliminação sai 1, nunca 2`);
+    assert.equal(plano.at(-1).tipo, "final");
+  }
+  // o torneio do plano antigo (2 por episódio) continua igual: o plano dele não muda no meio da temporada
+  assert.equal(planoDaTemporada(8, { eliminadosPorEpisodio: 2, provaDeEquipe: "sorteio" }).map((p) => p.tipo[0]).join(""), "ieeeieief");
+  assert.equal(rotuloDaProva({ tipo: "equipe", modo: "colaborativa" }).nome, "Prova Colaborativa");
+  assert.equal(rotuloDaProva({ tipo: "equipe" }).nome, TIPOS_DE_PROVA.equipe.nome);
+  assert.equal(rotuloDaProva({ tipo: "eliminacao" }).emoji, "🔥");
+  assert.ok(MODOS_DE_EQUIPE.media && MODOS_DE_EQUIPE.colaborativa);
+
+  // a prova de eliminação não soma pontos; a de imunidade soma
+  const participantes = [{ id: "a", pontos: 100 }, { id: "b", pontos: 50 }, { id: "c", pontos: 70 }];
+  const notas = new Map([["a", { nota: 90, kernel: 9 }], ["b", { nota: 40, kernel: 4 }], ["c", { nota: 60, kernel: 6 }]]);
+  const elim = aplicarResultadoDaProva({ prova: { tipo: "eliminacao", competidores: ["a", "b", "c"], sai: 1 }, participantes, notas, numero: 2 });
+  assert.deepEqual(elim.participantes.map((p) => p.pontos), [100, 50, 70], "a nota da eliminação não entra no agregado");
+  assert.deepEqual(elim.eliminados, ["b"], "e sai só 1");
+  const imun = aplicarResultadoDaProva({ prova: { tipo: "imunidade", competidores: ["a", "b", "c"] }, participantes, notas, numero: 1 });
+  assert.deepEqual(imun.participantes.map((p) => p.pontos), [190, 90, 130]);
+});
+
+caso("bootcamp 1.5.0: o banco da prova colaborativa (os gabaritos rodam de verdade; cada bug quebra algum teste)", () => {
+  const temPython = spawnSync("python", ["--version"], { encoding: "utf8" }).status === 0;
+  const rodar = (ling, programa, entrada) => {
+    const r = ling === "python"
+      ? spawnSync("python", ["-c", programa], { input: entrada, encoding: "utf8", timeout: 10_000 })
+      : spawnSync(process.execPath, ["-e", programa], { input: entrada, encoding: "utf8", timeout: 10_000 });
+    return String(r.stdout || "").replace(/\r\n/g, "\n").trim();
+  };
+  assert.ok(DESAFIOS_COLABORATIVOS.length >= 3);
+  for (const ling of LINGUAGENS_DA_COLABORATIVA.filter((l) => l !== "python" || temPython)) {
+    for (const d of DESAFIOS_COLABORATIVOS) {
+      const outros = DESAFIOS_COLABORATIVOS.filter((x) => x.id !== d.id).map((x) => x.titulo);
+      const cru = desafioColaborativo({ usados: outros, permitidas: [ling], s: () => 0 });
+      const v = validarDesafio(cru, { linguagens: { modo: "livre", permitidas: [] }, dificuldade: 2 });
+      assert.ok(v.ok, d.id);
+      const colab = v.desafio.colaborativa;
+      assert.equal(v.desafio.linguagem, ling, "o time inteiro escreve na linguagem da colaborativa");
+      assert.equal(colab.partes.length, 4);
+      assert.deepEqual([...colab.ordem].sort(), colab.partes.map((p) => p.id).sort(), "a ordem tem todas as partes");
+      const todas = colab.partes.map((p) => p.id);
+      const passa = (programa) => v.desafio.testes.filter((x) => rodar(ling, programa, x.entrada) === x.saida).length;
+      assert.equal(passa(programaDoTime(colab, [codigoDoNpcNasPartes(colab, todas, {})])), v.desafio.testes.length, `gabarito ${ling}/${d.id}`);
+      for (const parte of todas) {
+        assert.ok(passa(programaDoTime(colab, [codigoDoNpcNasPartes(colab, todas, { [parte]: false })])) < v.desafio.testes.length, `bug de ${parte} quebra algum teste (${ling}/${d.id})`);
+      }
+      // testar a minha parte: as outras entram com o gabarito
+      const minha = colab.ordem[0];
+      assert.equal(passa(programaDeTeste(colab, [minha], colab.codigo[minha].referencia)), v.desafio.testes.length, "a minha parte certa + o gabarito das outras passa");
+      assert.equal(passa(programaDeTeste(colab, [minha], modeloDasPartes(colab, [minha]))), 0, "o modelo vazio não passa (mas roda)");
+      // a tela nunca vê o gabarito nem o bug
+      const tela = JSON.stringify(desafioParaTela(v.desafio));
+      assert.ok(!/referencia|comBug/.test(tela), "a tela nunca vê o gabarito");
+      assert.equal(desafioParaTela(v.desafio).colaborativa.principal, colab.principal, "a tela tem a parte principal");
+    }
+  }
+  assert.equal(linguagemDaColaborativa(["go", "rust"]), null, "sem JavaScript nem Python, a colaborativa não acontece (vira pela média)");
+  assert.equal(linguagemDaColaborativa([]), "javascript");
+  assert.equal(linguagemDaColaborativa(["python", "go"]), "python");
+  // a divisão: humanos primeiro, com as partes mais centrais
+  const ordem = ["calcular", "limpar", "ler", "formatar"];
+  assert.deepEqual(dividirPartes(ordem, ["h:1", "n:a", "n:b"]), { "h:1": ["calcular", "formatar"], "n:a": ["limpar"], "n:b": ["ler"] });
+  assert.deepEqual(Object.values(dividirPartes(ordem, ["a", "b", "c", "d"])).map((x) => x.length), [1, 1, 1, 1]);
+  assert.deepEqual(dividirPartes(ordem, ["a"]), { a: ordem });
+  assert.ok(modeloDasPartes({ linguagem: "javascript", partes: [{ id: "ler", nome: "Leitura", funcao: "ler", parametro: "texto", descricao: "x" }] }, ["ler"]).includes("function ler(texto)"));
+  // o personagem: o mesmo acerto para a mesma rodada
+  let a = 7;
+  const s1 = () => ((a = (a * 16807) % 2147483647) / 2147483647);
+  const npc = NPCS_DO_BOOTCAMP[0];
+  const x = acertosDoNpcNasPartes({ npc, partes: ["ler", "somar"], area: "estruturas", dificuldade: 2, s: s1 });
+  assert.deepEqual(Object.keys(x), ["ler", "somar"]);
+  assert.ok(Object.values(x).every((v) => typeof v === "boolean"));
+  const rv = reviewDaParteDoNpc({ codigo: "function ler(texto) {\n  return 1;\n}", acertou: false, s: s1 });
+  assert.equal(rv[0].tipo, "bronca");
+  assert.ok(rv[0].trecho.includes("function ler"));
+});
+
+caso("bootcamp 1.5.0: a despedida dos personagens eliminados e o texto do desafio com quebras de linha", () => {
+  let a = 11;
+  const s = () => ((a = (a * 16807) % 2147483647) / 2147483647);
+  const npc = NPCS_DO_BOOTCAMP.find((n) => n.especialidades?.length) || NPCS_DO_BOOTCAMP[0];
+  const d = despedidaDoNpc({ npc, notas: { kernel: 3, vetor: 7, sintaxe: 6 }, testes: { passados: 2, total: 5 }, area: "matematica", s });
+  assert.equal(d.length, 3);
+  assert.ok(d[0].resposta.includes(npc.bordao), "responde com o bordão dele");
+  assert.match(d[1].resposta, /Chef Kernel/, "o jurado que pesou (a menor nota)");
+  assert.ok(d.every((x) => x.pergunta && x.resposta));
+  const rot = roteiroDaAvaliacao({ participantes: [
+    { id: "n:x", nome: "X", tipo: "npc", nota: 40, resultado: "eliminado", despedida: d },
+    { id: "n:y", nome: "Y", tipo: "npc", nota: 80, resultado: "sobreviveu" },
+  ] });
+  assert.deepEqual(rot.map((r) => [r.id, r.despedir]), [["n:y", false], ["n:x", true]], "o personagem eliminado ganha a cena da despedida");
+  assert.equal(comLinhas("Linha 1: N.\\nLinha 2:  as notas  \\n"), "Linha 1: N.\nLinha 2: as notas", "o \\n por extenso vira quebra de linha");
+  const v = validarDesafio({ titulo: "Notas", enunciado: "Leia as notas de cada time e imprima a média.", formatoEntrada: "Linha 1: N.\\nLinha 2: notas.", formatoSaida: "A média.",
+    requisitos: ["Média\\ntruncada"], testes: [{ entrada: "1", saida: "1" }, { entrada: "2", saida: "2" }, { entrada: "3", saida: "3" }] });
+  assert.equal(v.desafio.formatoEntrada, "Linha 1: N.\nLinha 2: notas.");
+  assert.equal(v.desafio.requisitos[0], "Média truncada");
+  assert.equal(desafioParaTela({ ...v.desafio, formatoSaida: "a\\nb" }).formatoSaida, "a\nb", "conserta também os desafios já gravados");
 });
 
 caso("bootcamp/temporada: equipes sorteadas ou com o capitão, e o capitão da CPU escolhe o mais forte", () => {
@@ -4439,7 +4553,8 @@ caso("bootcamp: a entrega vazia (a nota zero explicada) e os testes na bancada (
   const css = ler("../src/app/bootcamp.css");
   assert.match(css, /\.bc-criar \{ grid-template-columns: minmax\(0, 1fr\) 360px; \}/, "a criação: as opções numa coluna e o resumo ao lado");
   assert.match(css, /\.bc-arena--lendo \{ grid-template-columns: minmax\(0, 1fr\) 380px; \}/, "lendo: o desafio largo");
-  assert.match(css, /\.bc-arena--codando \{ grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.25fr\); \}/, "codando: o desafio e o editor lado a lado");
+  assert.match(css, /\.bc-arena--codando \{\s*grid-template-columns: minmax\(0, 0\.9fr\) minmax\(0, 1\.1fr\); align-items: stretch;\s*height: calc\(100vh - 32px\)/, "codando: o desafio e o editor lado a lado, na altura da tela");
+  assert.match(css, /\.bc-arena--codando \.pf-editor__area \.cm-editor \{ flex: 1 1 auto; height: 100%;/, "o editor cresce até o fim da coluna");
   assert.match(css, /@container desafio \(min-width: 720px\)/, "o desafio largo vira duas colunas");
   assert.match(css, /\.pf-moldura:has\(\.bc-pagina\) \{ grid-template-columns: 240px minmax\(0, 1fr\); \}/, "a coluna do conteúdo não passa da tela");
   assert.match(css, /\.bc-tabela \{ display: grid; gap: 4px; grid-template-columns: minmax\(0, 1fr\);/, "a classificação não empurra os pontos para fora");

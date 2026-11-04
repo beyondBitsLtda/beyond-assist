@@ -742,6 +742,36 @@ próprio no menu (**Bootcamp**, no grupo Jogo).
     desafio fica largo, em duas colunas (o texto e os exemplos), e a baia fica ao lado; codando, o
     desafio e o editor ficam lado a lado, e o desafio rola por dentro.
   - **Jurados:** a classificação fica fixa ao lado das provas.
+- **A prova colaborativa (1.5.0).** É uma prova em equipe em que o desafio vem dividido em quatro partes
+  encadeadas (por exemplo, `ler → limpar → calcular → formatar`). Cada membro escreve a sua função, e a parte
+  principal do time chama todas e imprime.
+  - **Divisão:** `dividirPartes` reparte as funções pela ordem de importância do desafio, com os humanos
+    primeiro, que ficam com as mais centrais. O editor já vem com a assinatura e o contrato das suas partes.
+  - **Testar a minha parte:** as outras partes entram com o gabarito (`programaDeTeste`), então a pessoa testa a
+    própria função sem depender do time.
+  - **Na bancada:** os jurados juntam o código de todos (`integrarOsTimes`) e rodam os testes do programa de
+    cada time. Para cada personagem, entra o gabarito ou a versão com bug, conforme o sorteio da rodada e a
+    habilidade dele. O resultado vale para o time inteiro.
+  - **Banco e linguagem:** `src/dominio/bootcampColaborativo.js` tem 3 desafios, com gabarito e versão com bug
+    em JavaScript e em Python. O dominio-check roda os gabaritos de verdade e confere que cada bug quebra algum
+    teste. O time escreve em JavaScript, se o torneio permitir, ou em Python; sem nenhuma das duas, a prova volta
+    a ser por média.
+- **Plano 2 da temporada (1.5.0, `opcoes.versaoDoPlano: 2`).**
+  - Sai sempre 1 por episódio; a opção de 2 saiu.
+  - Numa temporada longa há duas provas em equipe: a por média, perto de um terço da temporada, e a colaborativa,
+    perto de dois terços. Numa temporada curta há só a colaborativa.
+  - Os torneios criados antes continuam com o plano deles.
+- **Eliminação sem pontos (1.5.0).** A nota da prova de eliminação só decide quem sai: ela não soma nos pontos.
+- **Os times juntos no 3D (1.5.0).** Na prova em equipe, o Time Azul senta nas baias da esquerda e o Laranja nas
+  da direita. Os avatares andam até lá e voltam para as baias deles na prova seguinte.
+- **Despedida de todos (1.5.0).** O personagem da CPU eliminado também ganha a cena da entrevista com a
+  apresentadora. As respostas usam o bordão dele, o jurado que pesou e a especialidade (`despedidaDoNpc`), e a
+  ficha mostra os pontos fortes e fracos. No painel dos jurados, "As despedidas" guarda todas as entrevistas, e
+  na arena, quem saiu tem o link "Ver a entrevista de despedida".
+- **A prova como uma IDE (1.5.0).** Codando, o desafio e o editor ficam lado a lado, os dois com a altura da tela
+  e rolando por dentro. O editor cresce até o fim da coluna, e a página desce até eles quando a implementação
+  começa. Os "\n" que a IA escrevia por extenso no enunciado viram quebras de linha (`comLinhas`), também nos
+  desafios já gravados.
 
 **Arquivos.** Banco: `db/032-bootcamp.sql`, `db/033-bootcamp-nivel-e-cenario.sql` e `db/034-bootcamp-temporada.sql`. Regras: `src/dominio/bootcamp.js`. Servidor:
 `src/lib/bootcamp.js` e `src/lib/iaBootcamp.js`. Rotas: `/api/bootcamp`, `/api/bootcamp/:id`,

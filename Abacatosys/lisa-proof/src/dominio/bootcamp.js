@@ -9,13 +9,17 @@
 
 import { EXECUCAO } from "./execucao.js";
 import { PERSONAGENS } from "./personagens.js";
+import { validarColaborativa, colaborativaParaTela } from "./bootcampColaborativo.js";
+
+export * from "./bootcampColaborativo.js";
 
 export const BOOTCAMP = {
   minParticipantes: 2,
   maxParticipantes: 8,
   formatos: ["temporada", "mata-mata", "pontos-corridos"],
-  // na temporada: quantos saem em cada episódio (1 = temporada completa; 2 = temporada rápida)
-  eliminadosPorEpisodio: [1, 2],
+  // na temporada: quantos saem em cada episódio — sempre 1, como no reality (a "temporada rápida", de 2, saiu
+  // na 1.5.0; os torneios que já tinham 2 continuam com o plano deles)
+  eliminadosPorEpisodio: [1],
   // a prova em equipe do meio da temporada: times sorteados, o vencedor da última prova escolhe um membro, ou sem equipe
   provasDeEquipe: ["sorteio", "capitao", "nao"],
   // minutos por desafio; null = sem limite de tempo (o tempo é opcional na criação do torneio)
@@ -52,6 +56,18 @@ export const INSIGNIAS = {
   final: { nome: "Campeão do Bootcamp", emoji: "🏆", descricao: "Venceu a grande final." },
   rodada: { nome: "Melhor da rodada", emoji: "⭐", descricao: "Teve a maior nota da rodada." },
 };
+
+/** Os dois modos da prova em equipe: pela média das notas, ou a colaborativa (as partes do código se juntam). */
+export const MODOS_DE_EQUIPE = {
+  media: { nome: "Prova em Equipe", emoji: "🤝", descricao: "Dois times: a nota do time é a média dos integrantes, e o time vencedor fica salvo da prova de eliminação." },
+  colaborativa: { nome: "Prova Colaborativa", emoji: "🧩", descricao: "Dois times: o desafio vem dividido em partes, cada membro escreve a sua e os códigos se juntam num programa só. Os testes do programa do time decidem, e o time vencedor fica salvo da prova de eliminação." },
+};
+
+/** O nome, o emoji e a descrição de uma prova, contando o modo da prova em equipe. */
+export function rotuloDaProva(prova) {
+  if (prova?.tipo === "equipe" && MODOS_DE_EQUIPE[prova.modo]) return MODOS_DE_EQUIPE[prova.modo];
+  return TIPOS_DE_PROVA[prova?.tipo] || TIPOS_DE_PROVA.rodada;
+}
 
 export const EQUIPES = [
   { id: "azul", nome: "Time Azul", cor: "#2563EB", emoji: "🔵" },
@@ -365,12 +381,12 @@ export function validarConfiguracao(bruto = {}) {
   if (bruto.cenario && !CENARIOS[bruto.cenario]) return { ok: false, motivo: "cenário desconhecido" };
   const opcoes = { nivel: nivelValido(bruto.nivel), cenario: cenarioValido(bruto.cenario) };
   if (formato === "temporada") {
-    const eliminados = Number(bruto.eliminadosPorEpisodio) || 1;
-    if (!BOOTCAMP.eliminadosPorEpisodio.includes(eliminados)) return { ok: false, motivo: "escolha quantos saem por episódio: 1 ou 2" };
     const equipe = bruto.provaDeEquipe || "sorteio";
     if (!BOOTCAMP.provasDeEquipe.includes(equipe)) return { ok: false, motivo: "escolha como montar as equipes" };
-    opcoes.eliminadosPorEpisodio = eliminados;
+    // sempre 1 por episódio; o plano 2 tem a prova em equipe pela média e a colaborativa
+    opcoes.eliminadosPorEpisodio = 1;
     opcoes.provaDeEquipe = equipe;
+    opcoes.versaoDoPlano = 2;
   }
   return { ok: true, config: { nome, formato, tempoMin, linguagens: { modo, permitidas }, total, rodadasPontos, npcs, convidados, opcoes } };
 }
@@ -398,29 +414,38 @@ function quantosSaem(ativos, grupo, eliminadosPorEpisodio) {
  * Na prova em equipe, o time menor tem floor(ativos/2): é ele que limita quantos podem sair (sempre sobra alguém
  * do time que perdeu). A prova em equipe só acontece com 4 ou mais na disputa.
  */
-export function planoDaTemporada(total, { eliminadosPorEpisodio = 1, provaDeEquipe = "sorteio" } = {}) {
-  const montar = (comEquipeNo) => {
+export function planoDaTemporada(total, { eliminadosPorEpisodio = 1, provaDeEquipe = "sorteio", versaoDoPlano = 1 } = {}) {
+  const v2 = Number(versaoDoPlano) >= 2;
+  const saem = v2 ? 1 : eliminadosPorEpisodio;
+  // equipes: Map episódio → modo ("media" | "colaborativa")
+  const montar = (equipes = new Map()) => {
     const episodios = [];
     let ativos = total;
     while (ativos > 2) {
-      const equipe = episodios.length === comEquipeNo && ativos >= 4;
-      const grupo = equipe ? Math.floor(ativos / 2) : ativos - Math.floor(ativos / 2);
-      const sai = quantosSaem(ativos, grupo, eliminadosPorEpisodio);
-      episodios.push({ ativos, sai, equipe });
+      const modo = ativos >= 4 ? equipes.get(episodios.length) || null : null;
+      const grupo = modo ? Math.floor(ativos / 2) : ativos - Math.floor(ativos / 2);
+      const sai = quantosSaem(ativos, grupo, saem);
+      episodios.push({ ativos, sai, modo });
       ativos -= sai;
     }
     return episodios;
   };
-  let episodios = montar(-1);
+  let episodios = montar();
   if (provaDeEquipe !== "nao") {
-    // o episódio do meio, entre os que ainda têm 4 ou mais competidores
+    // os episódios que ainda têm 4 ou mais competidores
     const candidatos = episodios.map((e, i) => (e.ativos >= 4 ? i : -1)).filter((i) => i >= 0);
-    // (arredondado para cima: com dois candidatos, a equipe fica no segundo, nunca abrindo a temporada)
-    if (candidatos.length) episodios = montar(candidatos[Math.ceil((candidatos.length - 1) / 2)]);
+    if (v2 && candidatos.length >= 4) {
+      // temporada longa: uma pela média, a um terço, e a colaborativa, a dois terços
+      episodios = montar(new Map([[candidatos[Math.floor(candidatos.length / 3)], "media"], [candidatos[Math.floor((2 * candidatos.length) / 3)], "colaborativa"]]));
+    } else if (candidatos.length) {
+      // uma só, no episódio do meio (arredondado para cima: com dois candidatos, fica no segundo, nunca abrindo a
+      // temporada); no plano 2 ela é a colaborativa
+      episodios = montar(new Map([[candidatos[Math.ceil((candidatos.length - 1) / 2)], v2 ? "colaborativa" : "media"]]));
+    }
   }
   const provas = [];
   episodios.forEach((e, i) => {
-    provas.push({ tipo: e.equipe ? "equipe" : "imunidade", episodio: i + 1, ativos: e.ativos });
+    provas.push(e.modo ? { tipo: "equipe", modo: e.modo, episodio: i + 1, ativos: e.ativos } : { tipo: "imunidade", episodio: i + 1, ativos: e.ativos });
     provas.push({ tipo: "eliminacao", episodio: i + 1, ativos: e.ativos, sai: e.sai });
   });
   provas.push({ tipo: "final", episodio: episodios.length + 1, ativos: Math.min(2, total) });
@@ -495,7 +520,9 @@ const darInsignia = (p, tipo, numero) => ({ ...p, insignias: [...(p.insignias ||
 export function aplicarResultadoDaProva({ prova, participantes, notas, numero }) {
   const ids = prova.competidores || [];
   const ranking = ordenarPorNota(ids, notas);
-  let lista = participantes.map((p) => (ids.includes(p.id) ? { ...p, pontos: p.pontos + (notas.get(p.id)?.nota ?? 0) } : { ...p }));
+  // a prova de eliminação só decide quem sai: a nota dela não soma nos pontos (1.5.0)
+  const somaPontos = prova.tipo !== "eliminacao";
+  let lista = participantes.map((p) => (ids.includes(p.id) && somaPontos ? { ...p, pontos: p.pontos + (notas.get(p.id)?.nota ?? 0) } : { ...p }));
   const daLista = (fn) => { lista = lista.map(fn); };
   let salvos = [];
   let eliminados = [];
@@ -517,6 +544,7 @@ export function aplicarResultadoDaProva({ prova, participantes, notas, numero })
     if (primeira) primeira.venceu = true;
     if (segunda) segunda.venceu = false;
   } else if (prova.tipo === "eliminacao") {
+    // sai 1 (só os torneios do plano antigo de 2 por episódio guardam `sai` maior)
     const sai = Math.max(1, Math.min(prova.sai || 1, ranking.length - 1));
     eliminados = ranking.slice(-sai);
     vencedores = ranking.slice(0, 1);
@@ -631,9 +659,18 @@ export function resumoDosTestes(resultados) {
  *     dificuldade, falas: { kernel, vetor, sintaxe }, testes: [{ entrada, saida, oculto }], solucao }
  * Os 2 primeiros testes são exemplos visíveis; os outros ficam ocultos (só o servidor vê).
  */
+/**
+ * Um texto com as quebras de linha preservadas: o "\\n" escrito por extenso (como a IA às vezes devolve) vira
+ * quebra de verdade, os espaços repetidos de cada linha somem e as linhas vazias saem.
+ */
+export function comLinhas(texto, max = 400) {
+  return String(texto ?? "").replace(/\\r\\n|\\n/g, "\n").replace(/\r\n?/g, "\n").split("\n")
+    .map((l) => l.replace(/[ \t]+/g, " ").trim()).filter(Boolean).join("\n").slice(0, max);
+}
+
 export function validarDesafio(bruto, { linguagens = { modo: "livre", permitidas: [] }, dificuldade = 1 } = {}) {
   const titulo = limpar(bruto?.titulo, 80);
-  const enunciado = String(bruto?.enunciado ?? "").trim().slice(0, BOOTCAMP.limites.enunciado);
+  const enunciado = comLinhas(bruto?.enunciado, BOOTCAMP.limites.enunciado);
   if (titulo.length < 3) return { ok: false, motivo: "desafio sem título" };
   if (enunciado.length < 20) return { ok: false, motivo: "desafio sem enunciado" };
 
@@ -651,15 +688,18 @@ export function validarDesafio(bruto, { linguagens = { modo: "livre", permitidas
     const lista = linguagens.permitidas?.length ? linguagens.permitidas : ORDEM_DAS_LINGUAGENS;
     linguagem = lista.includes(pedida) ? pedida : lista[0];
   }
+  // a colaborativa: o time inteiro escreve na linguagem dela (é o que deixa as partes se encaixarem)
+  const colaborativa = validarColaborativa(bruto?.colaborativa);
+  if (colaborativa) linguagem = colaborativa.linguagem;
   const falas = Object.fromEntries(IDS_DOS_JURADOS.map((j) => [j, limpar(bruto?.falas?.[j], 220)]));
   return {
     ok: true,
     desafio: {
       titulo,
       enunciado,
-      formatoEntrada: limpar(bruto?.formatoEntrada, 400),
-      formatoSaida: limpar(bruto?.formatoSaida, 400),
-      requisitos: (Array.isArray(bruto?.requisitos) ? bruto.requisitos : []).map((r) => limpar(r, 200)).filter(Boolean).slice(0, 6),
+      formatoEntrada: comLinhas(bruto?.formatoEntrada, 400),
+      formatoSaida: comLinhas(bruto?.formatoSaida, 400),
+      requisitos: (Array.isArray(bruto?.requisitos) ? bruto.requisitos : []).map((r) => limpar(String(r ?? "").replace(/\\n/g, " "), 200)).filter(Boolean).slice(0, 6),
       linguagem,
       dificuldade: [1, 2, 3].includes(Number(bruto?.dificuldade)) ? Number(bruto.dificuldade) : dificuldade,
       // a área do desafio: é nela que pesam as especialidades dos personagens
@@ -668,6 +708,7 @@ export function validarDesafio(bruto, { linguagens = { modo: "livre", permitidas
       testes,
       solucao: bruto?.solucao ? { linguagem: chaveDaLinguagem(bruto.solucao.linguagem) || "python", codigo: String(bruto.solucao.codigo || "").slice(0, BOOTCAMP.limites.codigo) } : null,
       origem: bruto?.origem === "reserva" ? "reserva" : "jurados",
+      ...(colaborativa ? { colaborativa } : {}),
     },
   };
 }
@@ -676,8 +717,10 @@ export function validarDesafio(bruto, { linguagens = { modo: "livre", permitidas
 export function desafioParaTela(d) {
   if (!d) return null;
   return {
-    titulo: d.titulo, enunciado: d.enunciado, formatoEntrada: d.formatoEntrada, formatoSaida: d.formatoSaida,
-    requisitos: d.requisitos || [], linguagem: d.linguagem || null, dificuldade: d.dificuldade, falas: d.falas || {}, origem: d.origem,
+    // (comLinhas também conserta os desafios gravados antes da 1.5.0, com o "\\n" por extenso)
+    titulo: d.titulo, enunciado: comLinhas(d.enunciado, BOOTCAMP.limites.enunciado), formatoEntrada: comLinhas(d.formatoEntrada), formatoSaida: comLinhas(d.formatoSaida),
+    requisitos: (d.requisitos || []).map((r) => String(r).replace(/\\n/g, " ")),
+    colaborativa: colaborativaParaTela(d.colaborativa), linguagem: d.linguagem || null, dificuldade: d.dificuldade, falas: d.falas || {}, origem: d.origem,
     area: d.area || "logica",
     exemplos: (d.testes || []).filter((t) => !t.oculto).map((t) => ({ entrada: t.entrada, saida: t.saida })),
     ocultos: (d.testes || []).filter((t) => t.oculto).length,
@@ -821,6 +864,25 @@ export function simularNpc({ npc, dificuldade = 1, testes = [], tempoMin = null,
   }
   const passados = ok.filter(Boolean).length;
   return { passados, total: testes.length, passou: testes.length > 0 && passados === testes.length, minutos, estourou, sorteio: s() };
+}
+
+/**
+ * A chance de um personagem da CPU acertar uma parte da prova colaborativa: a habilidade dele, um pouco mais na
+ * especialidade e um pouco menos com a dificuldade. Devolve { [parte]: true | false } (sempre o mesmo para a
+ * mesma rodada, pelo sorteio `s`).
+ */
+export function acertosDoNpcNasPartes({ npc, partes = [], area = null, dificuldade = 2, s }) {
+  const chance = entre((npc?.habilidade ?? 0.7) + 0.06 * afinidade(npc, area) - 0.05 * (dificuldade - 1) + 0.08, 0.4, 0.95);
+  return Object.fromEntries(partes.map((p) => [p, s() < chance]));
+}
+
+/** O code review do personagem na colaborativa: o trecho da parte que ele escreveu (o bom, ou o do bug). */
+export function reviewDaParteDoNpc({ codigo = "", acertou = true, s }) {
+  const t = trechoDoCodigo(codigo, 1, REVIEW.maxLinhas);
+  if (!t) return [];
+  const id = acertou ? "vetor" : "kernel";
+  const j = juradoPorId(id);
+  return [{ jurado: id, tipo: acertou ? "elogio" : "bronca", fala: sortear(acertou ? j.elogios : j.broncas, s), ...t }];
 }
 
 /** Em que etapa do fluxo o personagem está, pelo tempo que passou desde a abertura da rodada. */
@@ -1210,6 +1272,30 @@ export function despedidaAutomatica({ nome, notas = {}, testes = { passados: 0, 
 }
 
 /**
+ * A entrevista de despedida de um personagem da CPU, com a personalidade dele: o bordão, o jurado que pesou e a
+ * especialidade (ou a falta dela) no desafio. Sem IA: é sempre a mesma para a mesma rodada.
+ */
+export function despedidaDoNpc({ npc, notas = {}, testes = { passados: 0, total: 0 }, area = null, s = Math.random }) {
+  const pior = IDS_DOS_JURADOS.reduce((a, b) => ((Number(notas[b]) || 0) < (Number(notas[a]) || 0) ? b : a), IDS_DOS_JURADOS[0]);
+  const nomeDaArea = (id) => ESPECIALIDADES[id]?.nome?.toLowerCase() || id;
+  const naEspecialidade = area && (npc?.especialidades || []).includes(area);
+  const minha = (npc?.especialidades || [])[0];
+  return [
+    {
+      pergunta: `${npc?.nome || "Competidor"}, chegou a hora de dizer tchau ao escritório. Como você está saindo daqui?`,
+      resposta: `“${npc?.bordao || "Faz parte."}” ${testes.total ? `Hoje não deu: ${testes.passados} de ${testes.total} testes.` : "Hoje o código não saiu como eu queria."} Saio de cabeça erguida.`,
+    },
+    {
+      pergunta: "O que mais pesou na avaliação dos jurados?",
+      resposta: `O ${juradoPorId(pior).nome} pegou pesado com o meu ${NOME_DO_CRITERIO[pior]}. ${naEspecialidade
+        ? "E logo na minha especialidade: essa vai doer por uma semana."
+        : minha && area ? `Minha praia é ${nomeDaArea(minha)}, e o desafio era de ${nomeDaArea(area)}.` : "Os jurados viram o que eu não vi."}`,
+    },
+    { pergunta: "Um recado para quem fica na disputa?", resposta: sortear(RECADOS, s) },
+  ];
+}
+
+/**
  * O roteiro da avaliação ao vivo: um passo por competidor, do melhor prato ao pior (a tensão fica para o fim),
  * cada um com o code review, a nota e o resultado. O humano eliminado ganha a despedida: a entrevista com a
  * apresentadora e a ficha (notas, testes, pontos fortes e fracos). `avaliacao.participantes` vem de chamarJurados.
@@ -1223,7 +1309,8 @@ export function roteiroDaAvaliacao(avaliacao) {
       campeao: Boolean(avaliacao.campeao && avaliacao.campeao === a.id),
       review: Array.isArray(a.review) ? a.review : [],
       notas: a.notas || {}, testes: a.testes || { passados: 0, total: 0 }, insignia: a.insignia || null,
-      despedir: a.tipo === "humano" && a.resultado === "eliminado",
+      // quem sai (humano ou personagem da CPU) ganha a cena da despedida, quando a entrevista existe
+      despedir: a.resultado === "eliminado" && Array.isArray(a.despedida) && a.despedida.length > 0,
       despedida: Array.isArray(a.despedida) ? a.despedida : [],
       pontosFortes: Array.isArray(a.pontosFortes) ? a.pontosFortes : [],
       pontosFracos: Array.isArray(a.pontosFracos) ? a.pontosFracos : [],

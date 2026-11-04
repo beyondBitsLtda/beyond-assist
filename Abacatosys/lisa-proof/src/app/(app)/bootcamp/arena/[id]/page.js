@@ -102,6 +102,15 @@ export default function Arena() {
     criar(`/api/bootcamp/${id}`, { acao: "jurados" }).then(setDados).catch(() => carregar()).finally(() => setOcupado(""));
   }, [dados, ocupado, id, carregar]);
 
+  // a implementação começou: a página desce até o desafio e o editor (que ocupam a altura da tela)
+  const areaDeTrabalho = useRef(null);
+  const codandoAgora = dados?.rodada?.status === "aberta" && !dados?.eu?.eliminado && ["codigo", "testes"].includes(dados?.minhaEntrega?.etapa);
+  useEffect(() => {
+    if (!codandoAgora) return;
+    const semMovimento = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    areaDeTrabalho.current?.scrollIntoView({ behavior: semMovimento ? "auto" : "smooth", block: "start" });
+  }, [codandoAgora]);
+
   if (erro && !dados) {
     return (
       <>
@@ -190,7 +199,7 @@ export default function Arena() {
       {dados.escolha && <EscolhaDoCapitao dados={dados} ocupado={ocupado} agir={agir} />}
 
       {rodada && (
-        <div className={`bc-arena bc-arena--${codando ? "codando" : "lendo"}`}>
+        <div ref={areaDeTrabalho} className={`bc-arena bc-arena--${codando ? "codando" : "lendo"}`}>
           <div className="bc-arena__desafio"><Desafio rodada={rodada} /></div>
           <div className="bc-arena__trabalho">
             {rodada.status === "aberta" && eu && !eu.eliminado && minhaEntrega && (
@@ -356,6 +365,7 @@ function Desafio({ rodada }) {
           <ul className="bc-desafio__requisitos">{d.requisitos.map((r, i) => <li key={i}>{r}</li>)}</ul>
         </>
       )}
+      {rodada.colaborativa && <DivisaoDoTime colaborativa={rodada.colaborativa} />}
       </div>
       <div className="bc-desafio__casos">
       <span className="pf-campo__rotulo">Exemplos</span>
@@ -370,6 +380,30 @@ function Desafio({ rodada }) {
       <p className="pf-estat__nota">+ {d.ocultos} teste(s) oculto(s): os jurados só dizem se passou.</p>
       </div>
     </section>
+  );
+}
+
+/** A prova colaborativa: as partes do programa, na ordem, e quem escreve cada uma no meu time. */
+function DivisaoDoTime({ colaborativa }) {
+  const meu = colaborativa.times.find((t) => t.meu) || null;
+  const lista = meu?.divisao || colaborativa.times[0]?.divisao || [];
+  return (
+    <div className="bc-divisao">
+      <span className="pf-campo__rotulo">🧩 {meu ? "A divisão do seu time" : "As partes do programa"}</span>
+      <ol className="bc-divisao__lista">
+        {lista.map((d) => (
+          <li key={d.parte} className={`bc-divisao__parte${d.souEu ? " bc-divisao__parte--minha" : ""}`}>
+            <code>{d.funcao}()</code>
+            <div>
+              <strong>{d.nome}</strong>
+              {meu && <span className="bc-divisao__dono">{d.souEu ? "você" : d.nomeDoResponsavel}</span>}
+              <p>{d.descricao}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className="pf-estat__nota">A parte principal do time chama as funções nessa ordem e imprime: <code>{colaborativa.principal.split("\n").at(-1)}</code>. Na bancada, os jurados juntam o código de todos e rodam os testes no programa do time.</p>
+    </div>
   );
 }
 
@@ -389,7 +423,8 @@ function MinhaEntrega({ torneioId, dados, entrega, ocupado, agir, setDados, setO
   const [revendo, setRevendo] = useState(""); // "plano" | "ambiente": voltar uma etapa para mexer
   const etapa = entrega.etapa;
 
-  const modelo = useMemo(() => linguagens.find((l) => l.chave === (entrega.linguagem || linguagem))?.modelo || "", [linguagens, entrega.linguagem, linguagem]);
+  const colaborativa = dados.rodada?.colaborativa || null;
+  const modelo = useMemo(() => colaborativa?.modelo || linguagens.find((l) => l.chave === (entrega.linguagem || linguagem))?.modelo || "", [colaborativa, linguagens, entrega.linguagem, linguagem]);
   // o editor começa com o modelo da linguagem (lê a entrada e imprime), uma vez, se ainda não há código
   const preencheu = useRef(Boolean(codigo));
   useEffect(() => {
@@ -484,11 +519,13 @@ function MinhaEntrega({ torneioId, dados, entrega, ocupado, agir, setDados, setO
               <strong>⌨️ Código direto na tela</strong>
               <span>No editor embutido aqui no navegador.</span>
             </label>
-            <label className={`bc-opcao${modo === "github" ? " bc-opcao--escolhida" : ""}`}>
-              <input type="radio" name="modo" checked={modo === "github"} onChange={() => setModo("github")} />
-              <strong>🐙 Código de projeto (GitHub)</strong>
-              <span>Você faz commit e push num repositório público; os jurados leem o último commit.</span>
-            </label>
+            {!colaborativa && (
+              <label className={`bc-opcao${modo === "github" ? " bc-opcao--escolhida" : ""}`}>
+                <input type="radio" name="modo" checked={modo === "github"} onChange={() => setModo("github")} />
+                <strong>🐙 Código de projeto (GitHub)</strong>
+                <span>Você faz commit e push num repositório público; os jurados leem o último commit.</span>
+              </label>
+            )}
           </div>
           <label className="pf-campo">
             <span className="pf-campo__rotulo">Linguagem</span>
@@ -524,6 +561,9 @@ function MinhaEntrega({ torneioId, dados, entrega, ocupado, agir, setDados, setO
           <div className="bc-passo__ambiente">
             <span className="pf-pilula">{entrega.modo === "github" ? "🐙 GitHub" : "⌨️ Editor"}</span>
             <span className="pf-pilula">{linguagens.find((l) => l.chave === entrega.linguagem)?.rotulo || entrega.linguagem}</span>
+            {colaborativa?.minhasPartes?.length > 0 && (
+              <span className="pf-pilula pf-pilula--verde" title="Rodar os testes junta a sua parte com o gabarito das outras">🧩 sua parte: {colaborativa.minhasPartes.map((p) => `${p}()`).join(", ")}</span>
+            )}
             <button type="button" className="bc-link" onClick={() => setRevendo("plano")}>rever o plano</button>
             <button type="button" className="bc-link" onClick={() => setRevendo("ambiente")}>trocar o ambiente</button>
           </div>
@@ -637,6 +677,7 @@ function ResultadoDaRodada({ dados, aoRever }) {
             <div key={e.id} className={`bc-equipe bc-time--${e.id}${e.venceu ? " bc-equipe--venceu" : ""}`}>
               <strong>{e.emoji} {e.nome} · {e.nota}/100 {e.venceu ? "🏅" : ""}</strong>
               <span>{e.membros.map((pid) => nomes.get(pid)).join(", ")}</span>
+              {e.integracao && <small>🧩 programa do time: {e.integracao.passados}/{e.integracao.total} testes{e.integracao.faltou.length ? ` · faltou a parte de ${e.integracao.faltou.join(", ")}` : ""}</small>}
             </div>
           ))}
         </div>
@@ -697,6 +738,7 @@ function Competidor({ p, dados, aoFechar }) {
         {p.bordao && <p><em>“{p.bordao}”</em></p>}
         <StatusDoNpc status={p.status} especialidades={p.especialidades} catalogo={dados.especialidades} rotulos={dados.rotulosDeStatus} />
         <Insignias lista={p.insignias} catalogo={dados.insignias} />
+        {p.eliminado && <Link href={`/bootcamp/judges/${dados.torneio.id}#despedida-${encodeURIComponent(p.id)}`} className="bc-link">🎤 Ver a entrevista de despedida</Link>}
         <p className="pf-estat__nota">
           {p.eliminado ? `Eliminado na prova ${p.eliminadoNa}` : p.salvo ? "Salvo desta prova" : p.etapa ? `Agora: ${ROTULO_DA_ETAPA[p.etapa]}` : "Aguardando a prova"}
           {p.testes ? ` · testes ${p.testes.passados}/${p.testes.total}` : ""} · {p.pontos} pontos{p.nota !== null && p.nota !== undefined ? ` · última nota ${p.nota}` : ""}
