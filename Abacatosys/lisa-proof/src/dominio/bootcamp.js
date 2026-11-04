@@ -857,16 +857,34 @@ export function notasDoNpc(npc, sim) {
   };
 }
 
+/** O porquê da nota zero, na voz de cada jurado: nenhum código chegou à bancada (o editor estava vazio). */
+export const FEEDBACK_SEM_CODIGO = {
+  kernel: "Nenhum código chegou à bancada: sem código não há teste, e sem teste não há desempenho para medir. Zero.",
+  vetor: "Não tinha arquitetura para ler: o editor estava vazio quando a prova fechou. Zero.",
+  sintaxe: "A prova fechou sem entrega: nada foi escrito nem enviado aos jurados. Zero.",
+};
+
 /**
  * A avaliação sem a IA (ou para quem a IA deixou de fora): pelos testes, pelo plano e pela regra da linguagem.
- * `entrega`: { enviou, fracao, plano, linguagemOk, testou }.
+ * `entrega`: { enviou, fracao, plano, linguagemOk, testou, temCodigo }. Sem código, a nota é zero e o feedback
+ * diz por quê; com código que não chegou a rodar (o compilador on-line não respondeu), o Kernel fica sem nota,
+ * mas o plano e as regras ainda contam.
  */
-export function avaliacaoAutomatica({ enviou = false, testou = false, fracao = 0, plano = "", linguagemOk = true }) {
-  if (!testou) {
-    const vazio = "Sem entrega nesta rodada.";
-    return { notas: { kernel: 0, vetor: 0, sintaxe: 0 }, feedback: { kernel: vazio, vetor: vazio, sintaxe: vazio } };
+export function avaliacaoAutomatica({ enviou = false, testou = false, fracao = 0, plano = "", linguagemOk = true, temCodigo = testou }) {
+  if (!testou && !temCodigo) {
+    return { notas: { kernel: 0, vetor: 0, sintaxe: 0 }, feedback: { ...FEEDBACK_SEM_CODIGO } };
   }
   const temPlano = String(plano || "").trim().length >= BOOTCAMP.minimoDoPlano;
+  if (!testou) {
+    return {
+      notas: { kernel: 0, vetor: arred(temPlano ? 6 : 3.5), sintaxe: arred(entre((enviou ? 5 : 3) - (linguagemOk ? 0 : 3), 0, 10)) },
+      feedback: {
+        kernel: "Os testes não chegaram a rodar (o compilador on-line não respondeu): sem desempenho medido, sem nota de desempenho.",
+        vetor: temPlano ? "O plano estava lá; o código ficou sem teste." : "Faltou um plano, e o código ficou sem teste.",
+        sintaxe: !linguagemOk ? "A linguagem não foi a que os jurados estipularam." : enviou ? "Entrega dentro das regras da rodada." : "A entrega não foi enviada para a revisão a tempo.",
+      },
+    };
+  }
   // tudo certo, com plano e enviado a tempo, dá 97: um humano perfeito não perde para a simulação dos personagens
   const notas = {
     kernel: tetoDoKernel(fracao),
@@ -969,8 +987,36 @@ function linhasDeInteresse(codigo) {
  * O code review sem a IA: um item por jurado, no trecho que interessa a ele, com uma fala do banco dele. Elogio
  * quando o critério foi bem (testes, tamanho, regras) e bronca quando não. `s`: o sorteio (preso à rodada).
  */
+// a bancada sem código: cada jurado debocha da entrega vazia (nunca da pessoa) e diz o que faltou
+export const BRONCAS_SEM_CODIGO = {
+  kernel: [
+    "Mon Dieu! Eu vim provar o prato e o prato está vazio. Nem um console.log para eu reclamar!",
+    "Zero linhas, zero testes, zero desempenho. Pelo menos este código não tem bug nenhum.",
+  ],
+  vetor: [
+    "Arquitetura impecável: nada acoplado, nada duplicado... porque não existe nada. Inaceitável.",
+    "Eu queria ver a ideia virar código. A ideia talvez existisse; o código, não.",
+  ],
+  sintaxe: [
+    "Regra número um do Bootcamp: entregar. E a regra número um ficou em branco.",
+    "Editor vazio na bancada? Isso nem chega a não compilar: simplesmente não existe.",
+  ],
+};
+
+/**
+ * Os jurados rodam os testes na bancada (quando a prova fecha) para quem não enviou, escreveu no editor e não
+ * chegou a testar o código de agora: assim a nota é a do último código, e não um zero por falta de clique.
+ */
+export function testarNaBancada(entrega) {
+  return Boolean(entrega && !entrega.enviada_em && entrega.modo === "editor" && entrega.linguagem
+    && String(entrega.codigo ?? "").trim() && !(Array.isArray(entrega.testes) && entrega.testes.length));
+}
+
 export function reviewAutomatica({ codigo, fracao = 0, enviou = false, linguagemOk = true, temPlano = false, s }) {
-  if (!String(codigo ?? "").trim()) return [];
+  // sem código, o review é a bronca de cada jurado pela entrega vazia (sem trecho: não há linha para apontar)
+  if (!String(codigo ?? "").trim()) {
+    return IDS_DOS_JURADOS.map((id) => ({ jurado: id, tipo: "bronca", fala: sortear(BRONCAS_SEM_CODIGO[id], s), linhaInicio: null, linhaFim: null, trecho: "" }));
+  }
   const { laco, maisLonga, saida } = linhasDeInteresse(codigo);
   const bomKernel = fracao >= 1;
   const bomVetor = temPlano && fracao >= 0.8;
@@ -1115,13 +1161,14 @@ const NOME_DO_CRITERIO = { kernel: "desempenho técnico", vetor: "arquitetura", 
  * Os pontos fortes e fracos sem a IA: pelas notas de cada jurado, pelos testes, pelo plano e pelo envio. Sempre
  * sai pelo menos um de cada.
  */
-export function pontosAutomaticos({ notas = {}, testes = { passados: 0, total: 0 }, enviou = false, temPlano = false, linguagemOk = true }) {
+export function pontosAutomaticos({ notas = {}, testes = { passados: 0, total: 0 }, enviou = false, temPlano = false, linguagemOk = true, temCodigo = true }) {
   const fortes = [];
   const fracos = [];
   const passouTudo = testes.total > 0 && testes.passados === testes.total;
   if (passouTudo) fortes.push(`Passou em todos os ${testes.total} testes, inclusive os ocultos.`);
   else if (testes.total && !testes.passados) fracos.push(`Nenhum dos ${testes.total} testes passou: a solução não chegou a funcionar.`);
   else if (testes.total) fracos.push(`Passou em ${testes.passados} de ${testes.total} testes: os casos de borda ficaram de fora.`);
+  else if (!temCodigo) fracos.push("Nenhum código chegou aos jurados: a prova fechou com o editor vazio.");
   else fracos.push("Não chegou a rodar os testes nesta rodada.");
   for (const id of IDS_DOS_JURADOS) {
     const n = Number(notas[id]) || 0;

@@ -164,11 +164,11 @@ export default function AvaliacaoAoVivo({ avaliacao, participantes, jurados, apr
                   <DesenhoDoJurado id={atual.jurado} humor={atual.tipo === "elogio" ? "feliz" : "bravo"} tamanho={64} />
                   <div>
                     <strong>{jurado?.emoji} {jurado?.nome}</strong>
-                    <span className={`pf-pilula pf-pilula--${atual.tipo === "elogio" ? "verde" : "alerta"}`}>{atual.tipo === "elogio" ? "✅ bem avaliado" : "❌ mal avaliado"} · linhas {atual.linhaInicio}–{atual.linhaFim}</span>
+                    <span className={`pf-pilula pf-pilula--${atual.tipo === "elogio" ? "verde" : "alerta"}`}>{atual.trecho ? `${atual.tipo === "elogio" ? "✅ bem avaliado" : "❌ mal avaliado"} · linhas ${atual.linhaInicio}–${atual.linhaFim}` : "❌ entrega vazia"}</span>
                   </div>
                 </div>
                 <p className="bc-review__fala">“{atual.fala}”</p>
-                <Codigo texto={atual.trecho} linguagem={avaliacao.participantes.find((a) => a.id === passo.id)?.linguagem || "javascript"} />
+                {atual.trecho && <Codigo texto={atual.trecho} linguagem={avaliacao.participantes.find((a) => a.id === passo.id)?.linguagem || "javascript"} />}
                 <span className="pf-estat__nota">{item + 1} de {review.length} no code review</span>
               </div>
             )}

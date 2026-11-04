@@ -3933,7 +3933,7 @@ caso("a semana da ofensiva: de domingo a sábado, com hoje e os dias que faltam"
     roteiroDaAvaliacao,
     planoDaTemporada, provaDoTorneio, formarEquipes, escolhaDoCapitaoNpc, competidoresDaProva, aplicarResultadoDaProva, INSIGNIAS,
     TIPOS_DE_PROVA, ESPECIALIDADES, AREAS_DOS_DESAFIOS, afinidade, forcaDoNpc, STATUS, APRESENTADORA, validarDespedida, validarPontos,
-    pontosAutomaticos, despedidaAutomatica, EQUIPES,
+    pontosAutomaticos, despedidaAutomatica, EQUIPES, testarNaBancada, BRONCAS_SEM_CODIGO, FEEDBACK_SEM_CODIGO,
   } = bootcamp;
 
 console.log("\nmodo bootcamp");
@@ -4213,7 +4213,9 @@ caso("bootcamp: o code review ao vivo aponta linhas do código de verdade (a IA 
   const ruim = reviewAutomatica({ codigo, fracao: 0.5, enviou: false, linguagemOk: true, temPlano: false, s });
   assert.ok(ruim.every((x) => x.tipo === "bronca"));
   assert.ok(ruim.every((x) => JURADOS.find((j) => j.id === x.jurado).broncas.includes(x.fala)), "bronca do banco do próprio jurado");
-  assert.deepEqual(reviewAutomatica({ codigo: "   ", s }), [], "sem código, sem review");
+  const vazio = reviewAutomatica({ codigo: "   ", s });
+  assert.deepEqual(vazio.map((x) => [x.jurado, x.tipo]), [["kernel", "bronca"], ["vetor", "bronca"], ["sintaxe", "bronca"]], "sem código, cada jurado reclama da entrega vazia");
+  assert.ok(vazio.every((x) => !x.trecho && x.linhaInicio === null && BRONCAS_SEM_CODIGO[x.jurado].includes(x.fala)), "sem trecho, com a fala do banco da entrega vazia");
   for (const n of NPCS_DO_BOOTCAMP) assert.ok(TRECHOS_DOS_NPCS[n.id]?.bom && TRECHOS_DOS_NPCS[n.id]?.ruim, `trechos de ${n.id}`);
   const npc = reviewDoNpc("raposa-regex", { passou: false }, s);
   assert.equal(npc[0].tipo, "bronca");
@@ -4400,6 +4402,48 @@ caso("bootcamp: quem chama os jurados, o prazo e as rotas", () => {
   assert.match(ler("../src/componentes/Moldura.js"), /href: "\/bootcamp", rotulo: "Bootcamp"/);
   assert.match(ler("../db/032-bootcamp.sql"), /unique \(rodada_id, usuario_id\)/);
   assert.ok(!ehLivre("/api/bootcamp") && !ehLivre("/bootcamp/arena/x"), "o Bootcamp pede login");
+});
+
+caso("bootcamp: a entrega vazia (a nota zero explicada) e os testes na bancada (1.4.1)", () => {
+  // o caso real de 04/11/2026: a prova fechou com o editor vazio e a nota zero veio sem nenhuma explicação
+  const zero = avaliacaoAutomatica({ testou: false, temCodigo: false, enviou: false });
+  assert.deepEqual(zero.notas, { kernel: 0, vetor: 0, sintaxe: 0 });
+  assert.deepEqual(zero.feedback, FEEDBACK_SEM_CODIGO, "o feedback diz que nenhum código chegou à bancada");
+  assert.ok(Object.values(FEEDBACK_SEM_CODIGO).every((x) => /código|entrega|editor/.test(x)), "e explica o zero");
+  const semTeste = avaliacaoAutomatica({ testou: false, temCodigo: true, plano: "ler N e imprimir a sequência", enviou: false });
+  assert.equal(semTeste.notas.kernel, 0, "código que não rodou: sem nota de desempenho");
+  assert.ok(semTeste.notas.vetor > 0 && semTeste.notas.sintaxe > 0, "mas o plano e as regras ainda contam");
+  const pontos = pontosAutomaticos({ notas: zero.notas, testes: { passados: 0, total: 0 }, temCodigo: false });
+  assert.match(pontos.fracos[0], /editor vazio/, "o ponto fraco diz que a prova fechou sem código");
+  assert.match(pontosAutomaticos({ testes: { passados: 0, total: 0 } }).fracos[0], /Não chegou a rodar os testes/);
+  for (const id of ["kernel", "vetor", "sintaxe"]) assert.ok(BRONCAS_SEM_CODIGO[id].length >= 2, "broncas da entrega vazia: " + id);
+
+  const rascunho = { enviada_em: null, modo: "editor", linguagem: "javascript", codigo: "console.log(1)", testes: [] };
+  assert.equal(testarNaBancada(rascunho), true, "escreveu e não testou: os jurados testam na bancada");
+  assert.equal(testarNaBancada({ ...rascunho, testes: [{ ok: false }] }), false, "já testou este código: vale o resultado");
+  assert.equal(testarNaBancada({ ...rascunho, enviada_em: "2026-11-04T18:00:00Z" }), false, "enviou: vale o envio");
+  assert.equal(testarNaBancada({ ...rascunho, codigo: "  " }), false, "sem código, nada a testar");
+  assert.equal(testarNaBancada({ ...rascunho, modo: "github" }), false, "GitHub: vale o último commit testado");
+  assert.equal(testarNaBancada({ ...rascunho, linguagem: null }), false, "sem ambiente configurado");
+  assert.equal(testarNaBancada(undefined), false);
+
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const arena = ler("../src/app/(app)/bootcamp/arena/[id]/page.js");
+  assert.match(arena, /acao: "rascunho", codigo: atual/, "o editor salva o rascunho no servidor");
+  assert.match(arena, /Testar e enviar para os jurados/, "enviar roda os testes antes, num clique só");
+  assert.match(arena, /bc-chamar--discreto/, "encerrar a prova antes da hora é discreto (não parece o botão de entregar)");
+  assert.doesNotMatch(arena, /Encerrar a rodada e chamar os jurados/);
+  assert.match(ler("../src/lib/bootcamp.js"), /await testarNaBancadaQuemFaltou\(lista, porUsuario, desafio\)/, "os jurados testam na bancada antes de avaliar");
+  assert.match(ler("../src/app/api/bootcamp/[id]/route.js"), /"rascunho"\]\.includes\(corpo\.acao\)/, "a rota aceita o rascunho");
+  // o layout (1.4.1): sem cartão curto ao lado de comprido, sem desafio espremido, sem lista que empurra os pontos
+  const css = ler("../src/app/bootcamp.css");
+  assert.match(css, /\.bc-criar \{ grid-template-columns: minmax\(0, 1fr\) 360px; \}/, "a criação: as opções numa coluna e o resumo ao lado");
+  assert.match(css, /\.bc-arena--lendo \{ grid-template-columns: minmax\(0, 1fr\) 380px; \}/, "lendo: o desafio largo");
+  assert.match(css, /\.bc-arena--codando \{ grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.25fr\); \}/, "codando: o desafio e o editor lado a lado");
+  assert.match(css, /@container desafio \(min-width: 720px\)/, "o desafio largo vira duas colunas");
+  assert.match(css, /\.pf-moldura:has\(\.bc-pagina\) \{ grid-template-columns: 240px minmax\(0, 1fr\); \}/, "a coluna do conteúdo não passa da tela");
+  assert.match(css, /\.bc-tabela \{ display: grid; gap: 4px; grid-template-columns: minmax\(0, 1fr\);/, "a classificação não empurra os pontos para fora");
+  assert.match(arena, /className="bc-cena3d__cenario"/, "o cenário fica dentro do 3D");
 });
 
 }

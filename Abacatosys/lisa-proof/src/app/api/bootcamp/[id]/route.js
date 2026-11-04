@@ -22,6 +22,7 @@ export async function GET(req, { params }) {
  *   { acao: "ler" }                                          Início: li o enunciado
  *   { acao: "planejar", plano }                              Análise de requisitos e planejamento
  *   { acao: "ambiente", modo, linguagem, repo?, caminho? }   Configuração do ambiente (editor ou GitHub)
+ *   { acao: "rascunho", codigo }                             o código do editor, salvo sozinho (responde só { salvo })
  *   { acao: "jurados" }                                      os jurados avaliam a rodada
  *   { acao: "escolher-membro", membro }                      o capitão escolhe um membro do time (prova em equipe)
  * O código e os testes vão por POST /api/bootcamp/challenge/submit.
@@ -34,7 +35,7 @@ export async function POST(req, { params }) {
     if (corpo.acao === "abrir-rodada") return json({ ok: true, ...(await abrirRodada(usuario.id, id)) });
     if (corpo.acao === "jurados") return json({ ok: true, ...(await chamarJurados(usuario.id, id)) });
     if (corpo.acao === "escolher-membro") return json({ ok: true, ...(await escolherMembro(usuario.id, id, corpo.membro)) });
-    if (["ler", "planejar", "ambiente"].includes(corpo.acao)) return json({ ok: true, ...(await agirNaRodada(usuario.id, id, corpo)) });
+    if (["ler", "planejar", "ambiente", "rascunho"].includes(corpo.acao)) return json({ ok: true, ...(await agirNaRodada(usuario.id, id, corpo)) });
     throw new ErroDeAcesso(400, "ação desconhecida");
   } catch (e) {
     return respostaDeErro(e);

@@ -36,7 +36,7 @@ export default function PainelDosJurados() {
       <div className="pf-cabecalho">
         <div>
           <h1>⚖️ Jurados · {torneio.nome}</h1>
-          <p>Cada jurado dá uma nota de 0 a 10 no seu critério; a nota da rodada é a média dos três, vezes 10. {torneio.formato === "mata-mata" ? "No mata-mata, quem tira a nota menor no confronto sai." : "Nos pontos corridos, as notas somam rodada a rodada."}</p>
+          <p>Cada jurado dá uma nota de 0 a 10 no seu critério; a nota da rodada é a média dos três, vezes 10. {torneio.formato === "temporada" ? "Na temporada, toda prova tem vencedor (e insígnia); na eliminação, sai quem tirar a menor nota." : torneio.formato === "mata-mata" ? "No mata-mata, quem tira a nota menor no confronto sai." : "Nos pontos corridos, as notas somam rodada a rodada."}</p>
         </div>
         <div className="bc-cabecalho__acoes">
           <Link href={`/bootcamp/arena/${torneio.id}`} className="pf-botao">Voltar à arena</Link>
@@ -56,6 +56,8 @@ export default function PainelDosJurados() {
         ))}
       </section>
 
+      <div className="bc-jurados-grade">
+      <aside className="bc-jurados-grade__lado">
       <section className="pf-secao">
         <h2 className="pf-secao__titulo">Classificação <small>{torneio.status === "encerrado" ? "final" : `rodada ${torneio.rodadaAtual || 0} de ${torneio.rodadasTotal}`}</small></h2>
         <ol className="pf-cartao bc-tabela">
@@ -71,7 +73,9 @@ export default function PainelDosJurados() {
           ))}
         </ol>
       </section>
+      </aside>
 
+      <div className="bc-jurados-grade__provas">
       {!rodadas.length && <p className="pf-aviso">Nenhuma rodada ainda: os jurados entram quando o organizador abrir a primeira.</p>}
       {rodadas.map((r) => (
         <section key={r.numero} className="pf-secao">
@@ -129,11 +133,11 @@ export default function PainelDosJurados() {
                                 <DesenhoDoJurado id={r.jurado} humor={r.tipo === "elogio" ? "feliz" : "bravo"} tamanho={48} />
                                 <div>
                                   <strong>{jurados.find((j) => j.id === r.jurado)?.nome}</strong>
-                                  <span className={`pf-pilula pf-pilula--${r.tipo === "elogio" ? "verde" : "alerta"}`}>{r.tipo === "elogio" ? "✅ bem avaliado" : "❌ mal avaliado"} · linhas {r.linhaInicio}–{r.linhaFim}</span>
+                                  <span className={`pf-pilula pf-pilula--${r.tipo === "elogio" ? "verde" : "alerta"}`}>{r.trecho ? `${r.tipo === "elogio" ? "✅ bem avaliado" : "❌ mal avaliado"} · linhas ${r.linhaInicio}–${r.linhaFim}` : "❌ entrega vazia"}</span>
                                 </div>
                               </div>
                               <p className="bc-review__fala">“{r.fala}”</p>
-                              <Codigo texto={r.trecho} linguagem={a.linguagem || "javascript"} />
+                              {r.trecho && <Codigo texto={r.trecho} linguagem={a.linguagem || "javascript"} />}
                             </li>
                           ))}
                         </ul>
@@ -146,6 +150,8 @@ export default function PainelDosJurados() {
           )}
         </section>
       ))}
+      </div>
+      </div>
     </div>
   );
 }

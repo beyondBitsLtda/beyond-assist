@@ -722,6 +722,26 @@ próprio no menu (**Bootcamp**, no grupo Jogo).
   e fracos. Isso vem da IA ou, sem ela, de `pontosAutomaticos` e `despedidaAutomatica`.
 - **Largura.** As telas do Bootcamp usam até 1760px. Na arena, o 3D fica ao lado da prova e do
   painel de status, e o desafio fica ao lado da baia.
+- **Nada de nota zero por falta de clique (1.4.1).** Em 04/11/2026, uma prova fechou com o editor da
+  pessoa vazio no servidor. O código só subia ao rodar os testes, e o botão verde "Encerrar a rodada e
+  chamar os jurados" parecia o de entregar. A nota saiu zero, sem nenhuma explicação. Agora:
+  - o editor salva o rascunho no servidor 2,5 s depois da última tecla (`acao: "rascunho"`, que
+    responde só `{ salvo }`). Se o código mudou, os testes antigos deixam de valer e a entrega volta
+    para a implementação;
+  - ao fechar a prova, os jurados rodam os testes na bancada para quem não enviou e não testou o
+    código atual (`testarNaBancada`, com no máximo 30 casos por avaliação);
+  - "Testar e enviar" roda os testes e envia num clique só;
+  - encerrar a prova antes da hora virou um cartão discreto, com um aviso claro;
+  - quando nenhum código chega, a nota zero vem explicada: o feedback dos três jurados, uma bronca de
+    cada um sobre a entrega vazia na avaliação ao vivo e o ponto fraco na ficha.
+- **Layout (1.4.1).**
+  - **Criação:** as opções ficam numa coluna, com cada bloco na largura toda, e o resumo fixo ao lado
+    traz o nome, as escolhas, as provas da temporada e o botão de criar.
+  - **Arena:** o cenário virou um seletor dentro do 3D. A altura do 3D acompanha a tela e termina
+    junto com o painel ao lado, que ficou compacto. As colunas de baixo mudam com a etapa: lendo, o
+    desafio fica largo, em duas colunas (o texto e os exemplos), e a baia fica ao lado; codando, o
+    desafio e o editor ficam lado a lado, e o desafio rola por dentro.
+  - **Jurados:** a classificação fica fixa ao lado das provas.
 
 **Arquivos.** Banco: `db/032-bootcamp.sql`, `db/033-bootcamp-nivel-e-cenario.sql` e `db/034-bootcamp-temporada.sql`. Regras: `src/dominio/bootcamp.js`. Servidor:
 `src/lib/bootcamp.js` e `src/lib/iaBootcamp.js`. Rotas: `/api/bootcamp`, `/api/bootcamp/:id`,

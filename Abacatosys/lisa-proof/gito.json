@@ -9,14 +9,32 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.4.0",
+  "versao": "1.4.1",
   "atualizadoEm": "2026-11-04",
   "compilacao": {
-    "numero": 104,
+    "numero": 105,
     "data": "2026-11-04",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.4.1",
+      "data": "2026-11-04",
+      "branch": "main",
+      "tipo": "correcao",
+      "resumo": "No Bootcamp, nenhuma nota zero por falta de clique: o código do editor é salvo sozinho, os jurados testam o último código de quem não enviou e o zero vem explicado. As telas foram redistribuídas, sem espaço vazio nem partes espremidas.",
+      "itens": [
+        "Correção: uma prova fechou com o editor vazio no servidor (o código só subia ao rodar os testes) e a nota saiu zero sem nenhuma explicação. Agora o editor salva o rascunho no servidor sozinho, 2,5 segundos depois da última tecla.",
+        "Ao fechar a prova, os jurados rodam os testes no último código de quem não enviou e não testou: a nota vem do código, e não de um clique que faltou.",
+        "O botão de entrega agora é \"Testar e enviar\": testa e envia num clique só (se não passar em todos os testes, volta para o código).",
+        "Encerrar a prova antes da hora virou um cartão discreto, com o botão secundário e um aviso claro: não parece mais o botão de entregar.",
+        "Quando nenhum código chega aos jurados, o zero vem explicado: o feedback de cada jurado, uma bronca de cada um sobre a entrega vazia na avaliação ao vivo e o ponto fraco na ficha.",
+        "Criação do torneio: as opções ficam numa coluna, cada uma na largura toda, e o resumo fixo ao lado traz o nome, as escolhas, as provas da temporada e o botão de criar. Não sobra mais buraco ao lado de cartão curto.",
+        "Arena: o cenário virou um seletor dentro do 3D. O 3D acompanha a altura da tela e termina junto com o painel de status, que ficou compacto. Lendo, o desafio fica largo, em duas colunas; codando, o desafio e o editor ficam lado a lado.",
+        "Painel dos jurados: a classificação fica fixa ao lado das provas, e a explicação do formato temporada foi corrigida."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.4.0",
       "data": "2026-11-04",
@@ -1676,7 +1694,7 @@
         "Minigame do dia na Prática (a antiga Arena Lúdica): masmorra de depuração, mascote programável e quebra-cabeças de Parsons, com terminal, explicação da Lisa, +30 pontos uma vez por dia e recompensa por fase nova",
         "Exemplo da Lisa: uma aplicação de exemplo com os conceitos de cada exercício e projeto, sem resolver o desafio",
         "Menu do Reino em abas (Reino, Batalha, Expedições, Forja e Bolsa), com contadores e barra fixa ao rolar",
-        "Modo Bootcamp: temporada no estilo reality (prova de imunidade ou em equipe e prova de eliminação a cada episódio, insígnia para todo vencedor e grande final numa arena com torcida) ou modos rápidos (mata-mata e pontos corridos), até 8 competidores (pessoas do Proof e personagens da Lisa com skin, personalidade, status e especialidades), escritório de TI em 3D com 5 cenários, nível contra a CPU, 3 jurados desenhados, avaliação ao vivo com code review, medidor de emoção e despedida com a apresentadora, entrega no editor da tela ou pelo GitHub e testes de entrada e saída num compilador on-line"
+        "Modo Bootcamp: temporada no estilo reality (prova de imunidade ou em equipe e prova de eliminação a cada episódio, insígnia para todo vencedor e grande final numa arena com torcida) ou modos rápidos (mata-mata e pontos corridos), até 8 competidores (pessoas do Proof e personagens da Lisa com skin, personalidade, status e especialidades), escritório de TI em 3D com 5 cenários, nível contra a CPU, 3 jurados desenhados, avaliação ao vivo com code review, medidor de emoção e despedida com a apresentadora, entrega no editor da tela (com o rascunho salvo sozinho e \"Testar e enviar\" num clique) ou pelo GitHub e testes de entrada e saída num compilador on-line"
       ],
       "naoInclui": [
         "Não executa o código de ninguém no próprio servidor: o Rodar, a Arena Lúdica e os testes do Modo Bootcamp rodam no Wandbox (compilador on-line); os exercícios e projetos da prática são corrigidos pela IA lendo o código.",

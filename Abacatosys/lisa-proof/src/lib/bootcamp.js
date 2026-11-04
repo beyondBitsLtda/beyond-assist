@@ -28,7 +28,7 @@ import {
   NIVEIS_DO_TORNEIO, ORDEM_DOS_NIVEIS, CENARIOS, ORDEM_DOS_CENARIOS, nivelValido, cenarioValido, npcNoNivel,
   reviewAutomatica, reviewDoNpc, pontosAutomaticos, despedidaAutomatica,
   TIPOS_DE_PROVA, INSIGNIAS, ESPECIALIDADES, STATUS, planoDaTemporada, competidoresDaProva, formarEquipes, escolhaDoCapitaoNpc,
-  aplicarResultadoDaProva, APRESENTADORA, provaDoTorneio,
+  aplicarResultadoDaProva, APRESENTADORA, provaDoTorneio, testarNaBancada,
 } from "@/dominio/bootcamp.js";
 
 const falhou = (error, onde) => { if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`); };
@@ -556,10 +556,21 @@ async function gravarEntrega(entrega, mudancas) {
  *   { acao: "ler" }                                         Início: li o enunciado
  *   { acao: "planejar", plano }                             Análise de requisitos e planejamento
  *   { acao: "ambiente", modo, linguagem, repo?, caminho? }  Configuração do ambiente (editor ou GitHub)
+ *   { acao: "rascunho", codigo }                            o código do editor, salvo sozinho enquanto a pessoa digita
  */
 export async function agirNaRodada(usuarioId, id, corpo) {
   const { t, rodada, entrega } = await minhaVez(usuarioId, id);
   const acao = String(corpo?.acao || "");
+
+  // o rascunho responde leve (sem a tela inteira): ele vai a cada pausa na digitação
+  if (acao === "rascunho") {
+    if (entrega.modo !== "editor" || !["codigo", "testes"].includes(entrega.etapa)) return { salvo: false };
+    const codigo = String(corpo?.codigo ?? "");
+    if (codigo.length > BOOTCAMP.limites.codigo) throw new ErroDeAcesso(400, "o código passou de 20 mil caracteres");
+    // o código mudou: os testes de antes não valem para ele (e a entrega volta para a implementação)
+    if (codigo !== (entrega.codigo || "")) await gravarEntrega(entrega, { codigo, testes: [], passou: false, etapa: "codigo" });
+    return { salvo: true };
+  }
 
   if (acao === "ler") {
     const r = avancarNoFluxo(entrega.etapa, "ler");
@@ -659,6 +670,33 @@ function feedbackDoNpc(npc, sim) {
   };
 }
 
+// no máximo estes casos de teste rodam na bancada por avaliação (o limite de chamadas de cada requisição do Worker)
+const CASOS_NA_BANCADA = 30;
+
+/**
+ * Quem não enviou, escreveu no editor e não testou o código de agora: os jurados rodam os testes na bancada e
+ * gravam o resultado na entrega (e na cópia da memória, que a avaliação usa em seguida). Se o compilador não
+ * responder, vale o que havia; a avaliação segue.
+ */
+async function testarNaBancadaQuemFaltou(lista, porUsuario, desafio) {
+  let orcamento = CASOS_NA_BANCADA;
+  for (const p of lista) {
+    const e = p.tipo === "humano" ? porUsuario.get(p.usuarioId) : null;
+    if (!testarNaBancada(e) || desafio.testes.length > orcamento) continue;
+    orcamento -= desafio.testes.length;
+    try {
+      const resultados = await rodarTestes(e.linguagem, e.codigo, desafio.testes);
+      const passou = resumoDosTestes(resultados).passou;
+      Object.assign(e, { testes: resultados, passou, tentativas: (e.tentativas || 0) + 1 });
+      const { error } = await supabase.from("proof_bootcamp_entregas")
+        .update({ testes: resultados, passou, tentativas: e.tentativas, atualizado_em: new Date().toISOString() }).eq("id", e.id);
+      if (error) console.warn("[bootcamp] não gravou os testes da bancada:", error.message);
+    } catch (erro) {
+      console.warn("[bootcamp] os testes da bancada não rodaram:", erro?.message || erro);
+    }
+  }
+}
+
 export async function chamarJurados(usuarioId, id) {
   const t = await lerTorneio(usuarioId, id);
   const rodada = await lerRodada(t);
@@ -685,6 +723,7 @@ export async function chamarJurados(usuarioId, id) {
     const desafio = rodada.desafio;
     // os jurados avaliam só quem jogou esta prova (quem ficou salvo assiste)
     const lista = t.participantes.filter((p) => naProva(prova, p.id));
+    await testarNaBancadaQuemFaltou(lista, porUsuario, desafio);
     const apelidoDe = new Map(lista.map((p, i) => [p.id, `p${i + 1}`]));
     const humanos = [];
     const npcs = [];
@@ -701,6 +740,7 @@ export async function chamarJurados(usuarioId, id) {
       humanos.push({
         id: p.id, apelido: apelidoDe.get(p.id), nome: p.nome, linguagem: e?.linguagem || null, modo: e?.modo || null, plano: e?.plano || "",
         codigo: e?.codigo || "", testes: { passados: r.passados, total: r.total }, enviou: Boolean(e?.enviada_em), fracao: r.fracao, testou: r.total > 0,
+        temCodigo: Boolean(String(e?.codigo || "").trim()),
         linguagemOk: !desafio.linguagem || !e?.linguagem || e.linguagem === desafio.linguagem, commitSha: e?.commit_sha || null,
       });
     }
@@ -733,7 +773,7 @@ export async function chamarJurados(usuarioId, id) {
       } else {
         const h = humanos.find((x) => x.id === p.id);
         const daIa = ia?.porHumano.get(p.id);
-        const auto = avaliacaoAutomatica({ enviou: h.enviou, testou: h.testou, fracao: h.fracao, plano: h.plano, linguagemOk: h.linguagemOk });
+        const auto = avaliacaoAutomatica({ enviou: h.enviou, testou: h.testou, fracao: h.fracao, plano: h.plano, linguagemOk: h.linguagemOk, temCodigo: h.temCodigo });
         notasDele = daIa?.notas || auto.notas;
         feedback = Object.fromEntries(Object.keys(auto.feedback).map((j) => [j, daIa?.feedback?.[j] || auto.feedback[j]]));
         testes = h.testes;
@@ -743,7 +783,7 @@ export async function chamarJurados(usuarioId, id) {
           codigo: h.codigo, fracao: h.fracao, enviou: h.enviou, linguagemOk: h.linguagemOk, temPlano, s,
         });
         // a despedida (se sair nesta rodada): os pontos fortes e fracos e a entrevista com a apresentadora
-        const auto2 = pontosAutomaticos({ notas: notasDele, testes: h.testes, enviou: h.enviou, temPlano, linguagemOk: h.linguagemOk });
+        const auto2 = pontosAutomaticos({ notas: notasDele, testes: h.testes, enviou: h.enviou, temPlano, linguagemOk: h.linguagemOk, temCodigo: h.temCodigo });
         extra = {
           enviou: h.enviou, linguagem: h.linguagem, modo: h.modo, commitSha: h.commitSha, review,
           pontosFortes: daIa?.pontosFortes?.length ? daIa.pontosFortes : auto2.fortes,

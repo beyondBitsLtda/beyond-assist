@@ -28,16 +28,33 @@
 .bc-torneio .pf-estat__nota { margin: 0; }
 
 /* ---- criação */
-.bc-criar { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-items: start; }
-@media (min-width: 1200px) { .bc-criar { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bc-criar__bloco--largo, .bc-criar__fim { grid-column: 1 / -1; } }
-.bc-criar__bloco { display: grid; gap: 12px; }
+/* (1.4.1) as opções numa coluna, cada bloco com a largura toda, e o resumo fixo ao lado com o botão de criar:
+   nada de cartão curto ao lado de cartão comprido (o buraco que sobrava na grade de duas colunas) */
+.bc-criar { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1200px) { .bc-criar { grid-template-columns: minmax(0, 1fr) 360px; } .bc-criar__resumo { position: sticky; top: 16px; } }
+.bc-criar__config { display: grid; gap: 14px; min-width: 0; }
+.bc-criar__bloco { display: grid; gap: 14px; }
+.bc-criar__grupo { display: grid; gap: 8px; min-width: 0; }
 .bc-criar__titulo { margin: 0; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 19px; }
 .bc-criar__linha { max-width: 320px; }
-.bc-criar__fim { display: flex; justify-content: flex-end; }
+.bc-criar__tempo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.bc-criar__tempo .pf-estat__nota { flex: 1 1 260px; }
+.bc-criar__minutos { width: auto; min-width: 150px; }
+.bc-criar__divisor { width: 100%; height: 1px; margin: 2px 0; border: 0; background: var(--pf-linha); }
+.bc-criar__duas { display: grid; gap: 14px 18px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
 .bc-criar .pf-estat__nota { margin: 0; }
 
-.bc-opcoes { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 640px) { .bc-opcoes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* o resumo do torneio (o "bilhete" da temporada) */
+.bc-resumo { display: grid; gap: 14px; }
+.bc-resumo__lista { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; margin: 0; padding: 12px 14px; border-radius: 16px; background: var(--pf-superficie-2, rgba(0, 0, 0, 0.04)); }
+.bc-resumo__lista dt { align-self: center; color: var(--pf-tinta-3); font-size: 11.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+.bc-resumo__lista dd { margin: 0; font-size: 14px; font-weight: 700; text-align: right; }
+.bc-resumo__criar { width: 100%; justify-content: center; }
+.bc-temporada--compacta { margin: 0; gap: 4px; }
+.bc-temporada--compacta .bc-temporada__prova { min-width: 44px; padding: 4px 6px; font-size: 15px; }
+
+/* as opções se ajustam à largura de onde estão (o formulário largo, a baia estreita, o celular) */
+.bc-opcoes { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .bc-opcao { position: relative; display: grid; gap: 4px; padding: 14px 16px; border-radius: var(--pf-raio); border: 2px solid var(--pf-linha); background: var(--pf-superficie-2, transparent); cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease; }
 .bc-opcao input { position: absolute; opacity: 0; pointer-events: none; }
 .bc-opcao span { color: var(--pf-tinta-2); font-size: 14px; font-weight: 600; }
@@ -65,7 +82,7 @@
 
 /* ---- o escritório em 3D */
 .bc-escritorio {
-  position: relative; height: clamp(420px, 60vh, 660px); margin-bottom: 16px; overflow: hidden; border-radius: var(--pf-raio-grande);
+  position: relative; height: var(--bc-altura-3d, clamp(420px, 60vh, 660px)); margin-bottom: 16px; overflow: hidden; border-radius: var(--pf-raio-grande);
   border: 1px solid rgba(132, 204, 22, 0.25); background: radial-gradient(120% 90% at 50% 0%, #18210e 0%, #0b0e12 60%);
   box-shadow: 0 24px 48px -24px rgba(0, 0, 0, 0.6); touch-action: pan-y; user-select: none;
 }
@@ -104,9 +121,17 @@
 .bc-competidor__texto p { margin: 0; }
 .bc-competidor__texto strong { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 18px; }
 
-/* ---- a arena */
-.bc-arena { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); margin-top: 16px; }
-@media (min-width: 1200px) { .bc-arena { grid-template-columns: minmax(340px, 0.85fr) minmax(0, 1.5fr); align-items: start; } }
+/* ---- a arena
+   (1.4.1) as colunas mudam com a etapa: lendo (leitura, plano, ambiente, ou só assistindo), o desafio fica largo
+   e a baia ao lado, na largura do painel de cima; codando (implementação e testes), o desafio e o editor lado a
+   lado, e o desafio rola por dentro para ficar sempre à vista */
+.bc-arena { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); margin-top: 16px; align-items: start; }
+@media (min-width: 1200px) {
+  .bc-arena--lendo { grid-template-columns: minmax(0, 1fr) 380px; }
+  .bc-arena--lendo .bc-arena__trabalho { position: sticky; top: 16px; }
+  .bc-arena--codando { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+  .bc-arena--codando .bc-arena__desafio { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; border-radius: var(--pf-raio-grande); }
+}
 .bc-arena__principal { display: grid; gap: 16px; min-width: 0; }
 .bc-arena__lado { display: grid; gap: 16px; }
 @media (min-width: 1100px) { .bc-arena__lado { position: sticky; top: 16px; } }
@@ -123,13 +148,19 @@
 .bc-confrontos em { color: var(--pf-tinta-3); font-style: normal; }
 
 /* o desafio */
-.bc-desafio { display: grid; gap: 10px; }
+.bc-desafio { display: grid; gap: 14px; }
+.bc-desafio__cabeca, .bc-desafio__texto, .bc-desafio__casos { display: grid; gap: 10px; align-content: start; min-width: 0; }
+/* o desafio largo vira duas colunas: o texto à esquerda, os exemplos à direita (pela largura do próprio cartão) */
+.bc-arena__desafio { container: desafio / inline-size; }
+@container desafio (min-width: 720px) {
+  .bc-desafio { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 28px; align-items: start; }
+  .bc-desafio__cabeca { grid-column: 1 / -1; }
+}
 .bc-desafio__topo { display: flex; flex-wrap: wrap; gap: 6px; }
 .bc-desafio__titulo { margin: 0; font-family: var(--pf-fonte-titulo); font-weight: 600; font-size: 22px; }
 .bc-desafio__enunciado { margin: 0; font-size: 15.5px; line-height: 1.55; white-space: pre-line; }
 .bc-falas { display: grid; gap: 4px; margin: 0; padding: 10px 14px; list-style: none; border-radius: var(--pf-raio); background: var(--pf-destaque-fundo); color: var(--pf-codigo-tinta); font-size: 14px; }
-.bc-desafio__formato { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 640px) { .bc-desafio__formato { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bc-desafio__formato { display: grid; gap: 10px 18px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 .bc-desafio__formato p { margin: 4px 0 0; font-weight: 600; }
 .bc-desafio__requisitos { margin: 0; padding-left: 20px; display: grid; gap: 2px; }
 .bc-exemplos { display: grid; gap: 10px; }
@@ -139,6 +170,7 @@
   margin: 0; padding: 10px 12px; overflow-x: auto; border-radius: 14px; background: var(--pf-codigo-fundo); color: var(--pf-codigo-tinta);
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 13px; line-height: 1.5; white-space: pre;
 }
+.bc-exemplo pre { max-height: 260px; overflow-y: auto; }
 
 /* a minha entrega e o fluxo */
 .bc-entrega { display: grid; gap: 12px; }
@@ -185,14 +217,18 @@
 .bc-resultado__nota strong { color: var(--pf-verde-texto); font-size: 22px; }
 
 /* o painel de status e a classificação */
-.bc-classificacao ol, .bc-tabela { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+/* a coluna em minmax(0, 1fr): um nome comprido encolhe (com reticências) em vez de empurrar os pontos para fora */
+.bc-classificacao ol, .bc-tabela { display: grid; gap: 4px; grid-template-columns: minmax(0, 1fr); margin: 0; padding: 0; list-style: none; }
 .bc-classificacao__item {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "av nome pts" "av info pts"; align-items: center; column-gap: 10px;
-  width: 100%; padding: 6px 8px; border: 0; border-radius: 14px; background: transparent; color: var(--pf-tinta); font: inherit; text-align: left; cursor: pointer;
+  width: 100%; padding: 5px 8px; border: 0; border-radius: 14px; background: transparent; color: var(--pf-tinta); font: inherit; text-align: left; cursor: pointer;
 }
 .bc-classificacao__item:hover { background: var(--pf-superficie-2, rgba(0, 0, 0, 0.04)); }
 .bc-classificacao__item .bc-avatar { grid-area: av; }
-.bc-classificacao__nome { grid-area: nome; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* (1.4.1) compacto: as insígnias vão na linha do nome, e cada competidor ocupa duas linhas */
+.bc-classificacao__nome { grid-area: nome; display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 900; }
+.bc-classificacao__texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bc-classificacao__nome .bc-insignia { min-width: 18px; height: 18px; font-size: 10px; }
 .bc-classificacao__info { grid-area: info; color: var(--pf-tinta-3); font-size: 12px; font-weight: 700; }
 .bc-classificacao__pontos { grid-area: pts; font-family: var(--pf-fonte-titulo); font-weight: 600; color: var(--pf-verde-texto); }
 .bc-eu > .bc-classificacao__item, li.bc-eu { box-shadow: inset 3px 0 0 var(--pf-verde); }
@@ -227,13 +263,13 @@
 /* ---- os cenários (04/11/2026): o seletor da arena e os cartões da criação */
 .bc-cenarios { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
 .bc-cenarios .pf-campo__rotulo { margin-right: 4px; }
-.bc-opcoes--quatro { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
-.bc-cenarios-grade { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+.bc-opcoes--quatro { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.bc-cenarios-grade { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 .bc-cenario { position: relative; display: grid; gap: 4px; padding: 0 0 12px; overflow: hidden; border-radius: var(--pf-raio); border: 2px solid var(--pf-linha); cursor: pointer; }
 .bc-cenario input { position: absolute; opacity: 0; pointer-events: none; }
 .bc-cenario strong, .bc-cenario > span:last-child { padding: 0 12px; }
 .bc-cenario > span:last-child { color: var(--pf-tinta-2); font-size: 12.5px; font-weight: 600; }
-.bc-cenario__previa { display: grid; place-items: center; height: 70px; font-size: 30px; }
+.bc-cenario__previa { display: grid; place-items: center; height: 84px; font-size: 32px; }
 .bc-cenario--neon .bc-cenario__previa { background: radial-gradient(120% 120% at 50% 0%, #2c3d12 0%, #0b0e12 70%); }
 .bc-cenario--datacenter .bc-cenario__previa { background: repeating-linear-gradient(90deg, #0f1a2b 0 18px, #13233a 18px 22px), #060b14; }
 .bc-cenario--orbital .bc-cenario__previa { background: radial-gradient(circle at 70% 120%, #1d4ed8 0 38%, transparent 39%), radial-gradient(#ffffff 1px, transparent 1px) 0 0 / 14px 14px, #02030a; }
@@ -296,15 +332,55 @@
 /* ------------------------------------------------------------------ a temporada (04/11/2026, 1.4.0) */
 /* as telas do Bootcamp usam a largura toda da tela (o padrão do Proof é 1080px) */
 .pf-principal:has(.bc-pagina) { max-width: 1760px; }
-.bc-pagina { display: grid; gap: 0; }
+/* a coluna do conteúdo nunca cresce além da tela por causa de um filho largo (1fr = minmax(auto, 1fr)) */
+@media (min-width: 900px) { .pf-moldura:has(.bc-pagina) { grid-template-columns: 240px minmax(0, 1fr); } }
+/* a altura do escritório 3D: quase a tela toda que sobra abaixo do cabeçalho, sem passar de 680px */
+.bc-pagina { display: grid; gap: 0; min-width: 0; --bc-altura-3d: clamp(460px, calc(100vh - 230px), 680px); }
+@media (max-width: 640px) { .bc-pagina { --bc-altura-3d: 340px; } }
 
-/* o palco: o 3D ao lado da prova e do painel de status */
+/* o palco: o 3D ao lado da prova e do painel de status (com o fundo dos dois alinhado) */
 .bc-palco-grade { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
-@media (min-width: 1200px) { .bc-palco-grade { grid-template-columns: minmax(0, 1fr) 360px; } .bc-palco-grade__lado { position: sticky; top: 16px; } }
+@media (min-width: 1200px) {
+  .bc-palco-grade { grid-template-columns: minmax(0, 1fr) 380px; }
+  .bc-palco-grade__lado { position: sticky; top: 16px; display: flex; flex-direction: column; min-height: var(--bc-altura-3d); }
+  .bc-palco-grade__lado > .bc-classificacao { flex: 1 1 auto; }
+}
 .bc-palco-grade__cena { min-width: 0; display: grid; gap: 0; }
 .bc-palco-grade__lado { display: grid; gap: 14px; }
 .bc-arena__desafio, .bc-arena__trabalho { display: grid; gap: 16px; min-width: 0; align-content: start; }
-@media (min-width: 1200px) { .bc-arena__desafio { position: sticky; top: 16px; } }
+
+/* o cenário dentro do 3D: um seletor pequeno no canto (antes era uma linha inteira de botões) */
+.bc-cena3d { position: relative; margin-bottom: 16px; }
+.bc-cena3d > .bc-escritorio { margin-bottom: 0; }
+.bc-cena3d__cenario {
+  position: absolute; left: 12px; top: 12px; z-index: 4; display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 12px;
+  border-radius: var(--pf-pilula); border: 1px solid rgba(255, 255, 255, 0.28); background: rgba(11, 14, 18, 0.82); color: #f2f5ee;
+  font-size: 13px; font-weight: 800; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.bc-cena3d__cenario select {
+  min-height: 32px; padding: 4px 26px 4px 2px; border: 0; border-radius: var(--pf-pilula); background: transparent; color: inherit; font: inherit; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 14px) 52%, calc(100% - 9px) 52%; background-size: 5px 5px; background-repeat: no-repeat;
+}
+.bc-cena3d__cenario select:focus-visible { outline: 3px solid var(--pf-verde); outline-offset: 2px; }
+.bc-cena3d__cenario option { color: #111; background: #fff; }
+.bc-cena3d__final { position: absolute; right: 12px; top: 12px; z-index: 4; padding: 6px 12px; border-radius: var(--pf-pilula); background: #f0be45; color: #1a1205; font-size: 12.5px; font-weight: 900; }
+
+/* encerrar a prova antes da hora: discreto, para não parecer o botão de entregar (04/11/2026) */
+.bc-chamar--discreto { border-style: dashed; background: transparent; box-shadow: none; }
+.bc-chamar--discreto h2 { font-size: 17px; }
+
+/* o painel dos jurados: as provas no meio e a classificação fixa ao lado */
+.bc-jurados-grade { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1200px) {
+  .bc-jurados-grade { grid-template-columns: minmax(0, 1fr) 380px; }
+  .bc-jurados-grade__lado { grid-column: 2; grid-row: 1; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; scrollbar-width: thin; }
+  .bc-jurados-grade__provas { grid-column: 1; grid-row: 1; }
+  .bc-jurados-grade__lado .bc-tabela__info { display: none; }
+}
+.bc-jurados-grade__provas { min-width: 0; }
+.bc-jurados-grade__lado .pf-secao, .bc-jurados-grade__provas > .pf-secao:first-child { margin-top: 0; }
 
 /* a linha da temporada */
 .bc-temporada { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; padding: 0; list-style: none; }
@@ -353,8 +429,6 @@
 /* as insígnias */
 .bc-insignias { display: inline-flex; flex-wrap: wrap; gap: 2px; vertical-align: middle; }
 .bc-insignia { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 3px; border-radius: 50%; background: rgba(240, 190, 69, 0.16); border: 1px solid rgba(240, 190, 69, 0.55); font-size: 12px; }
-.bc-classificacao__item { grid-template-areas: "av nome pts" "av info pts" "av ins ins"; }
-.bc-classificacao__insignias { grid-area: ins; }
 .bc-escritorio__insignias { margin-left: 4px; font-size: 11px; opacity: 0.85; }
 .bc-escritorio__rotulo--apresentadora { cursor: default; border-color: #2dd4bf; color: #ccfbf1; }
 .bc-resultado__vencedor { margin: 0; font-weight: 800; }

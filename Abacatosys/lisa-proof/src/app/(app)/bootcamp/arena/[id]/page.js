@@ -37,6 +37,8 @@ export default function Arena() {
   const [cenario, setCenario] = useState(null); // o escolhido neste navegador ou, sem escolha, o do torneio
   const [aoVivo, setAoVivo] = useState(null);   // o número da rodada cuja avaliação está passando ao vivo
   const [cena, setCena] = useState(null);       // { palco, humores } da avaliação ao vivo, para o 3D
+  const salvarRascunho = useRef(null);           // a baia registra aqui o "salvar o código do editor agora"
+  const registrarRascunho = useCallback((f) => { salvarRascunho.current = f; }, []);
 
   const carregar = useCallback(() => obter(`/api/bootcamp/${id}`).then((d) => { setDados(d); setErro(""); }).catch((e) => setErro(e.message)), [id]);
   useEffect(() => { carregar(); }, [carregar]);
@@ -113,6 +115,7 @@ export default function Arena() {
   const { torneio, participantes, rodada, minhaEntrega, eu } = dados;
   const selecionado = participantes.find((p) => p.id === escolhido) || null;
   const prova = rodada?.prova;
+  const codando = rodada?.status === "aberta" && Boolean(minhaEntrega) && !eu?.eliminado && ["codigo", "testes"].includes(minhaEntrega.etapa);
   const telao = {
     titulo: dados.final ? "GRANDE FINAL" : rodada ? `${prova?.emoji || ""} ${prova?.nome || "Rodada"} · ${rodada.numero} de ${torneio.rodadasTotal}`.trim() : torneio.status === "encerrado" ? "Temporada encerrada" : "Aguardando a 1ª prova",
     subtitulo: rodada?.desafio?.titulo || torneio.nome,
@@ -141,28 +144,25 @@ export default function Arena() {
 
       {torneio.plano && <LinhaDaTemporada plano={torneio.plano} atual={torneio.rodadaAtual} avaliada={rodada?.status === "avaliada"} />}
 
-      {!sem3d && (
-        <div className="bc-cenarios" role="radiogroup" aria-label="Cenário do escritório">
-          <span className="pf-campo__rotulo">Cenário</span>
-          {ORDEM_DOS_CENARIOS.map((c) => (
-            <button key={c} type="button" role="radio" aria-checked={(cenario || torneio.cenario) === c} data-so-olhar title={CENARIOS[c].descricao}
-              className={`bc-chip${(cenario || torneio.cenario) === c ? " bc-chip--ativo" : ""}`} onClick={() => escolherCenario(c)}>
-              {CENARIOS[c].emoji} {CENARIOS[c].nome}
-            </button>
-          ))}
-          {dados.final && <span className="pf-pilula pf-pilula--verde">🏆 arena especial da grande final</span>}
-        </div>
-      )}
-
       {/* o palco: o escritório em 3D (e a avaliação ao vivo embaixo dele) ao lado da prova e do painel de status */}
       <div className="bc-palco-grade">
         <div className="bc-palco-grade__cena">
           {sem3d ? (
             <BaiasPlanas participantes={participantes} campeaoId={torneio.campeaoId} aoEscolher={setEscolhido} />
           ) : (
-            <Escritorio3D participantes={participantes} jurados={dados.jurados} apresentadora={dados.apresentadora} campeaoId={torneio.campeaoId} telao={telao}
-              avaliando={dados.avaliando} cenario={cenario || torneio.cenario} palco={cena?.palco} humores={cena?.humores} final={dados.final}
-              aoEscolher={setEscolhido} aoFalhar={() => setSem3d(true)} />
+            <div className="bc-cena3d">
+              <Escritorio3D participantes={participantes} jurados={dados.jurados} apresentadora={dados.apresentadora} campeaoId={torneio.campeaoId} telao={telao}
+                avaliando={dados.avaliando} cenario={cenario || torneio.cenario} palco={cena?.palco} humores={cena?.humores} final={dados.final}
+                aoEscolher={setEscolhido} aoFalhar={() => setSem3d(true)} />
+              {/* data-so-olhar: trocar o cenário da própria tela vale também no modo espectador */}
+              <label className="bc-cena3d__cenario" title={CENARIOS[cenario || torneio.cenario]?.descricao}>
+                <span aria-hidden="true">{CENARIOS[cenario || torneio.cenario]?.emoji || "🎨"}</span>
+                <select aria-label="Cenário do escritório" value={cenario || torneio.cenario} onChange={(e) => escolherCenario(e.target.value)} data-so-olhar>
+                  {ORDEM_DOS_CENARIOS.map((c) => <option key={c} value={c}>{CENARIOS[c].nome}</option>)}
+                </select>
+              </label>
+              {dados.final && <span className="bc-cena3d__final">🏆 arena especial da grande final</span>}
+            </div>
           )}
           {aoVivo && rodada?.numero === aoVivo && rodada.avaliacao?.participantes?.length > 0 && (
             <AvaliacaoAoVivo key={aoVivo} avaliacao={rodada.avaliacao} participantes={participantes} jurados={dados.jurados}
@@ -190,18 +190,18 @@ export default function Arena() {
       {dados.escolha && <EscolhaDoCapitao dados={dados} ocupado={ocupado} agir={agir} />}
 
       {rodada && (
-        <div className="bc-arena">
+        <div className={`bc-arena bc-arena--${codando ? "codando" : "lendo"}`}>
           <div className="bc-arena__desafio"><Desafio rodada={rodada} /></div>
           <div className="bc-arena__trabalho">
             {rodada.status === "aberta" && eu && !eu.eliminado && minhaEntrega && (
               <MinhaEntrega key={`${rodada.numero}`} torneioId={torneio.id} dados={dados} entrega={minhaEntrega} ocupado={ocupado} agir={agir}
-                setDados={setDados} setOcupado={setOcupado} avisar={avisar} />
+                setDados={setDados} setOcupado={setOcupado} avisar={avisar} aoRegistrarRascunho={registrarRascunho} />
             )}
             {rodada.status === "aberta" && eu?.salvo && (
               <p className="pf-aviso pf-aviso--ok">🛡️ Você está salvo desta prova: ela é de quem não se salvou na anterior. Assista e torça (ou secará?).</p>
             )}
             {rodada.status === "aberta" && eu?.eliminado && <p className="pf-aviso">Você saiu do torneio, mas pode acompanhar as provas e as notas dos jurados até o fim.</p>}
-            {rodada.status === "aberta" && <ChamarJurados dados={dados} ocupado={ocupado} agir={agir} />}
+            {rodada.status === "aberta" && <ChamarJurados dados={dados} ocupado={ocupado} agir={agir} antesDeChamar={() => salvarRascunho.current?.()} />}
             {rodada.status === "avaliada" && <ResultadoDaRodada dados={dados} aoRever={aoVivo ? null : () => { setAoVivo(rodada.numero); window.scrollTo({ top: 0, behavior: "smooth" }); }} />}
           </div>
         </div>
@@ -330,13 +330,16 @@ function Desafio({ rodada }) {
   const d = rodada.desafio;
   return (
     <section className="pf-cartao bc-desafio">
+      <div className="bc-desafio__cabeca">
       <div className="bc-desafio__topo">
-        <span className="pf-pilula">Rodada {rodada.numero}</span>
+        <span className="pf-pilula">{rodada.prova && rodada.prova.tipo !== "rodada" ? `${rodada.prova.emoji} Prova` : "Rodada"} {rodada.numero}</span>
         <span className="pf-pilula" title="dificuldade">{estrelas(d.dificuldade)}</span>
         {d.linguagem && <span className="pf-pilula pf-pilula--verde">linguagem: {d.linguagem}</span>}
         {d.origem === "reserva" && <span className="pf-pilula" title="A IA dos jurados não respondeu e entrou um desafio do banco do Bootcamp">desafio do banco</span>}
       </div>
       <h2 className="bc-desafio__titulo">{d.titulo}</h2>
+      </div>
+      <div className="bc-desafio__texto">
       {Object.values(d.falas || {}).some(Boolean) && (
         <ul className="bc-falas">
           {["kernel", "vetor", "sintaxe"].map((j) => d.falas?.[j] && <li key={j}><strong>{j === "kernel" ? "⚙️ Kernel" : j === "vetor" ? "📐 Vetor" : "📜 Sintaxe"}:</strong> “{d.falas[j]}”</li>)}
@@ -353,22 +356,25 @@ function Desafio({ rodada }) {
           <ul className="bc-desafio__requisitos">{d.requisitos.map((r, i) => <li key={i}>{r}</li>)}</ul>
         </>
       )}
+      </div>
+      <div className="bc-desafio__casos">
       <span className="pf-campo__rotulo">Exemplos</span>
       <div className="bc-exemplos">
         {d.exemplos.map((e, i) => (
           <div key={i} className="bc-exemplo">
-            <div><small>entrada</small><pre>{e.entrada || "(vazia)"}</pre></div>
+            <div><small>entrada {d.exemplos.length > 1 ? i + 1 : ""}</small><pre>{e.entrada || "(vazia)"}</pre></div>
             <div><small>saída</small><pre>{e.saida}</pre></div>
           </div>
         ))}
       </div>
       <p className="pf-estat__nota">+ {d.ocultos} teste(s) oculto(s): os jurados só dizem se passou.</p>
+      </div>
     </section>
   );
 }
 
 /** A minha entrega, etapa por etapa do fluxo. */
-function MinhaEntrega({ torneioId, dados, entrega, ocupado, agir, setDados, setOcupado, avisar }) {
+function MinhaEntrega({ torneioId, dados, entrega, ocupado, agir, setDados, setOcupado, avisar, aoRegistrarRascunho }) {
   const { rodada, torneio, fluxo } = dados;
   const exigida = rodada.desafio.linguagem;
   const linguagens = torneio.linguagensDisponiveis;
@@ -393,10 +399,34 @@ function MinhaEntrega({ torneioId, dados, entrega, ocupado, agir, setDados, setO
   }, [etapa, entrega.modo, modelo]);
   useEffect(() => { if (codigo) guardar(chaveDoRascunho, codigo); }, [codigo, chaveDoRascunho]);
 
+  // o rascunho também vai para o servidor (2,5 s depois da última tecla): se a prova fechar sem o envio, os
+  // jurados testam e avaliam o último código, e não uma entrega vazia
+  const codigoAtual = useRef(codigo);
+  codigoAtual.current = codigo;
+  const noServidor = useRef(entrega.codigo || "");
+  const salvarNoServidor = useCallback(async () => {
+    if (entrega.modo !== "editor" || !["codigo", "testes"].includes(etapa)) return;
+    const atual = codigoAtual.current;
+    if (atual === noServidor.current) return;
+    try {
+      await criar(`/api/bootcamp/${torneioId}`, { acao: "rascunho", codigo: atual });
+      noServidor.current = atual;
+    } catch { /* fica para a próxima pausa; o rascunho do navegador continua guardado */ }
+  }, [entrega.modo, etapa, torneioId]);
+  useEffect(() => {
+    const r = setTimeout(salvarNoServidor, 2500);
+    return () => clearTimeout(r);
+  }, [codigo, salvarNoServidor]);
+  useEffect(() => {
+    aoRegistrarRascunho?.(salvarNoServidor);
+    return () => aoRegistrarRascunho?.(null);
+  }, [aoRegistrarRascunho, salvarNoServidor]);
+
   async function testar(enviar) {
     setOcupado(enviar ? "enviar" : "testar");
     try {
       const r = await criar("/api/bootcamp/challenge/submit", { torneioId, codigo: entrega.modo === "editor" ? codigo : undefined, enviar });
+      if (entrega.modo === "editor") noServidor.current = codigo; // os testes gravam o código junto
       setDados(r);
       setResultado(r.resultado);
       if (r.resultado.enviada) comemorar("📨 Entrega enviada aos jurados!");
@@ -412,6 +442,8 @@ function MinhaEntrega({ torneioId, dados, entrega, ocupado, agir, setDados, setO
 
   const testadoIgual = entrega.modo === "github" || codigo === entrega.codigo;
   const podeEnviar = entrega.passou && etapa === "testes" && testadoIgual;
+  // enviar roda os testes antes (se o código de agora ainda não passou): um clique só para entregar
+  const temCodigo = entrega.modo === "github" || codigo.trim().length > 0;
   const mostrarPlano = etapa === "analise" || revendo === "plano";
   const mostrarAmbiente = etapa === "ambiente" || revendo === "ambiente";
 
@@ -509,12 +541,15 @@ function MinhaEntrega({ torneioId, dados, entrega, ocupado, agir, setDados, setO
             <button type="button" className="pf-botao pf-botao--sec" disabled={Boolean(ocupado)} onClick={() => testar(false)}>
               {ocupado === "testar" ? "Rodando os testes…" : entrega.modo === "github" ? "🧪 Ler o último commit e rodar os testes" : "🧪 Rodar os testes"}
             </button>
-            <button type="button" className="pf-botao" disabled={Boolean(ocupado) || !podeEnviar} onClick={() => testar(true)}
-              title={podeEnviar ? undefined : "Passe em todos os testes (com o código que está no editor) para enviar"}>
-              {ocupado === "enviar" ? "Enviando…" : "📨 Enviar para a revisão dos jurados"}
+            <button type="button" className="pf-botao" disabled={Boolean(ocupado) || !temCodigo} onClick={() => testar(true)}
+              title={temCodigo ? undefined : "Escreva a solução antes de enviar"}>
+              {ocupado === "enviar" ? (podeEnviar ? "Enviando…" : "Testando e enviando…") : podeEnviar ? "📨 Enviar para os jurados" : "📨 Testar e enviar para os jurados"}
             </button>
           </div>
-          {entrega.passou && !testadoIgual && <p className="pf-estat__nota">O código mudou depois do último teste: rode os testes de novo para poder enviar.</p>}
+          <p className="pf-estat__nota">
+            {podeEnviar ? "Passou em todos os testes: é só enviar." : "Enviar roda os testes primeiro: se passar em todos, a entrega vai para os jurados; se não, volta para o código."}
+            {entrega.modo === "editor" ? " O seu código fica salvo sozinho enquanto você digita." : ""}
+          </p>
           {resultado && <ResultadoDosTestes testes={resultado.testes} resumo={resultado.resumo} />}
           {resultado && !resultado.resumo.passou && <p className="pf-aviso">Passou nos testes? <strong>Não.</strong> De volta à implementação: corrija e rode de novo.</p>}
         </div>
@@ -531,24 +566,46 @@ function MinhaEntrega({ torneioId, dados, entrega, ocupado, agir, setDados, setO
 }
 
 /** Chamar os jurados: quando todos enviaram, quando o tempo acabou ou quando o organizador encerra. */
-function ChamarJurados({ dados, ocupado, agir }) {
+function ChamarJurados({ dados, ocupado, agir, antesDeChamar }) {
   const souDono = dados.torneio.souDono;
   if (dados.avaliando) return <p className="pf-aviso" role="status">⚖️ Os jurados estão avaliando a rodada…</p>;
+  const euFaltando = Boolean(dados.minhaEntrega && !dados.minhaEntrega.enviadaEm);
+  const antesDaHora = souDono && !dados.todosEnviaram && !dados.tempoAcabou;
   async function chamar() {
-    if (souDono && !dados.todosEnviaram && !dados.tempoAcabou
-      && !window.confirm("Nem todos enviaram. Encerrar a rodada agora? Quem não enviou é avaliado pelo que testou até aqui.")) return;
+    if (antesDaHora && !window.confirm(euFaltando
+      ? "Você ainda não enviou a sua entrega. Encerrar a prova mesmo assim? Os jurados rodam os testes no código que está no seu editor e avaliam do jeito que estiver."
+      : "Nem todos enviaram. Encerrar a prova agora? Quem não enviou é avaliado pelo último código que escreveu.")) return;
+    await antesDeChamar?.();
     await agir({ acao: "jurados" }, "jurados");
+  }
+  // antes da hora, encerrar é a exceção (e não o jeito de entregar): um cartão discreto, com o botão secundário
+  if (antesDaHora) {
+    return (
+      <section className="pf-cartao bc-chamar bc-chamar--discreto">
+        <div>
+          <h2>⏹️ Encerrar a prova</h2>
+          <p className="pf-estat__nota">
+            {euFaltando
+              ? "Para entregar, use “Testar e enviar” na sua baia: os jurados entram sozinhos depois do envio. Encerrar agora leva aos jurados o código do seu editor do jeito que estiver."
+              : "Os jurados entram sozinhos quando todos enviarem. Como organizador, você pode encerrar antes: quem não enviou é avaliado pelo último código que escreveu."}
+          </p>
+        </div>
+        <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" disabled={!dados.podeChamarJurados || Boolean(ocupado)} onClick={chamar}>
+          {ocupado === "jurados" ? "Os jurados estão avaliando…" : "Encerrar a prova agora"}
+        </button>
+      </section>
+    );
   }
   return (
     <section className="pf-cartao bc-chamar">
       <div>
         <h2>⚖️ Os jurados</h2>
         <p className="pf-estat__nota">
-          {dados.todosEnviaram ? "Todos os humanos enviaram: os jurados podem entrar." : dados.tempoAcabou ? "O tempo acabou: os jurados podem entrar." : dados.motivoDosJurados || "O organizador pode encerrar a rodada a qualquer momento."}
+          {dados.todosEnviaram && !dados.participantes.some((p) => p.compete && p.tipo === "humano") ? "Esta prova é só dos personagens da CPU: os jurados entram sozinhos." : dados.todosEnviaram ? "Todos os humanos enviaram: os jurados podem entrar." : dados.tempoAcabou ? "O tempo acabou: os jurados podem entrar." : dados.motivoDosJurados || "O organizador pode encerrar a rodada a qualquer momento."}
         </p>
       </div>
       <button type="button" className="pf-botao" disabled={!dados.podeChamarJurados || Boolean(ocupado)} onClick={chamar}>
-        {ocupado === "jurados" ? "Os jurados estão avaliando…" : souDono && !dados.todosEnviaram && !dados.tempoAcabou ? "Encerrar a rodada e chamar os jurados" : "Chamar os jurados"}
+        {ocupado === "jurados" ? "Os jurados estão avaliando…" : "Chamar os jurados"}
       </button>
     </section>
   );
@@ -564,6 +621,8 @@ function ResultadoDaRodada({ dados, aoRever }) {
   const prova = rodada.prova;
   const ameacados = (av.participantes || []).filter((a) => a.resultado === "ameacado").map((a) => nomes.get(a.id));
   const insigniaDoVencedor = (av.participantes || []).find((a) => a.insignia);
+  const minha = (av.participantes || []).find((a) => a.id === eu?.id);
+  const semCodigo = Boolean(minha) && !minha.testes?.total;
   return (
     <section className="pf-cartao bc-resultado">
       <h2>Resultado: {prova?.emoji} {prova?.nome || `rodada ${rodada.numero}`}</h2>
@@ -586,6 +645,7 @@ function ResultadoDaRodada({ dados, aoRever }) {
       {ameacados.length > 0 && <p className="pf-estat__nota">🔥 Vão para a prova de eliminação: {ameacados.join(", ")}</p>}
       {rodada.avaliacao?.comentarioGeral && <p className="bc-resultado__comentario">“{rodada.avaliacao.comentarioGeral}”</p>}
       {eu && eu.nota !== null && eu.nota !== undefined && <p className="bc-resultado__nota">Sua nota: <strong>{eu.nota}</strong>/100 · {eu.pontos} pontos no torneio</p>}
+      {semCodigo && <p className="pf-aviso">Nenhum código chegou aos jurados nesta prova: o editor estava vazio quando ela fechou. Na próxima, escreva a solução e use “Testar e enviar” na sua baia.</p>}
       {saiu.length > 0 && <p className="pf-estat__nota">Saíram nesta rodada: {saiu.map((id) => nomes.get(id)).join(", ")}.</p>}
       <div className="bc-passo__acoes">
         {aoRever && rodada.avaliacao?.participantes?.length > 0 && (
@@ -607,14 +667,16 @@ function Classificacao({ dados, aoEscolher }) {
         {lista.map((p) => (
           <li key={p.id} className={`${p.souEu ? "bc-eu" : ""}${p.eliminado ? " bc-fora" : ""}`}>
             <button type="button" className="bc-classificacao__item" onClick={() => aoEscolher(p.id)}>
-              <Avatar p={p} campeaoId={dados.torneio.campeaoId} tamanho={34} />
-              <span className="bc-classificacao__nome">{p.souEu ? "Você" : p.nome}{p.tipo === "npc" ? " 🤖" : ""}</span>
+              <Avatar p={p} campeaoId={dados.torneio.campeaoId} tamanho={30} />
+              <span className="bc-classificacao__nome">
+                <span className="bc-classificacao__texto">{p.souEu ? "Você" : p.nome}{p.tipo === "npc" ? " 🤖" : ""}</span>
+                <Insignias lista={p.insignias} catalogo={dados.insignias} max={4} />
+              </span>
               <span className="bc-classificacao__info">
                 {p.eliminado ? `saiu na prova ${p.eliminadoNa}` : p.salvo ? "🛡️ salvo desta prova" : p.etapa ? ROTULO_DA_ETAPA[p.etapa] : "—"}
                 {p.equipe && <span className={`bc-time-ponto bc-time--${p.equipe}`} aria-label={`time ${p.equipe}`} />}
               </span>
               <span className="bc-classificacao__pontos">{p.pontos}</span>
-              <span className="bc-classificacao__insignias"><Insignias lista={p.insignias} catalogo={dados.insignias} max={5} /></span>
             </button>
           </li>
         ))}
