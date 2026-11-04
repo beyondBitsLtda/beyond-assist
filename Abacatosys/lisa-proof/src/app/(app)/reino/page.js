@@ -760,7 +760,7 @@ function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, cartas = null, ch
     <section aria-label={vendo ? `Vista do ${vendo.nome}` : "Vista do reino"} className={`rn-vista3d${telaCheia ? " rn-tela-cheia" : ""}${vendo ? " rn-vista3d--visita" : ""}`}>
       {plana ? <VistaPlana reino={reino} humor={humor} /> : (
         <Mundo3D construcoes={naIlha ? construcoesDaIlha(naIlha) : vendo ? vendo.construcoes : reino.construcoes}
-          cenario={naIlha ? "ilha-tropical" : null} guardas={naIlha ? naIlha.defensores : null}
+          cenario={null} guardas={naIlha ? naIlha.defensores || {} : null}
           tropas={naIlha ? {} : vendo ? vendo.tropas : { exercito: reino.exercito.tropas, guarnicao: reino.guarnicao.tropas }}
           vizinhos={vendo || naIlha ? [] : reino.paz?.vigente?.vizinhos || []}
           personagem={vendo ? vendo.personagem : undefined} soLeitura={Boolean(vendo || naIlha)}

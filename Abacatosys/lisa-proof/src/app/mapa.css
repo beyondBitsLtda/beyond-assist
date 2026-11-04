@@ -29,7 +29,7 @@
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 14px 18px; border-radius: var(--pf-raio);
   background: var(--pf-verde); color: var(--pf-tinta-sobre-verde);
-  box-shadow: 0 4px 0 var(--pf-verde-sombra);
+  background: var(--pf-botao-fundo); box-shadow: var(--pf-botao-brilho);
 }
 .mapa__faixa div { display: grid; }
 .mapa__faixa strong { font-size: 17px; }

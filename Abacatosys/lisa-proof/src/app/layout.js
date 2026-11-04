@@ -48,6 +48,8 @@ const SCRIPT_DO_TEMA = `
 (function () {
   var escuro = true;
   try {
+    // o visual premium (03/11/2026) é escuro: quem tinha o claro salvo volta ao escuro uma vez (dá para trocar de novo)
+    if (localStorage.getItem("proof-visual") !== "premium") { localStorage.setItem("proof-tema", "escuro"); localStorage.setItem("proof-visual", "premium"); }
     var s = localStorage.getItem("proof-tema") || "escuro";
     escuro = s === "escuro" || (s === "sistema" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   } catch (e) { /* sem armazenamento: fica no padrão, escuro */ }
@@ -65,7 +67,7 @@ export default function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_DE_INSTALAR }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&display=swap" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800;900&display=swap" />
       </head>
       <body>{children}</body>
     </html>

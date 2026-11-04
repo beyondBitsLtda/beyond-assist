@@ -32,3 +32,20 @@ export function calcularOfensiva(dias, hoje) {
 
   return { atual, recorde, estudouHoje, emRisco: !estudouHoje && atual > 0 };
 }
+
+const LETRAS_DA_SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+/**
+ * A semana da ofensiva, de domingo a sábado (a fileira de dias da tela inicial, 03/11/2026): cada dia com a letra,
+ * se teve estudo, se é hoje e se ainda vai chegar.
+ * @param {Iterable<string>} dias  dias ("AAAA-MM-DD") em que houve estudo
+ * @param {string} hoje
+ */
+export function semanaDaOfensiva(dias, hoje) {
+  const conjunto = new Set(dias);
+  const domingo = somarDias(hoje, -new Date(`${hoje}T12:00:00Z`).getUTCDay());
+  return LETRAS_DA_SEMANA.map((letra, i) => {
+    const dia = somarDias(domingo, i);
+    return { dia, letra, estudou: conjunto.has(dia), hoje: dia === hoje, futuro: dia > hoje };
+  });
+}

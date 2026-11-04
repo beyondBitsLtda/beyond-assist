@@ -842,7 +842,8 @@ button.rn-exp__arte:disabled { cursor: progress; }
   transition: background 0.15s ease, color 0.15s ease;
 }
 .rn-menu__aba:hover { color: var(--pf-tinta); background: var(--pf-superficie-2); }
-.rn-menu__aba[aria-selected="true"] { background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); box-shadow: 0 3px 0 var(--pf-verde-sombra); }
+.rn-menu__aba[aria-selected="true"] { background: var(--pf-botao-fundo); color: var(--pf-tinta-sobre-verde); box-shadow: var(--pf-botao-brilho); }
+.rn-menu__aba { font-family: var(--pf-fonte-titulo); font-weight: 600; }
 .rn-menu__marca {
   display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 9999px;
   background: #E5484D; color: #FFFFFF; font-size: 11px; font-weight: 900; letter-spacing: 0;

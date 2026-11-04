@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { diaDe, somarDias, diaDaSemana, inicioDaSemana, fimDoMes, diaValido, formatarDia } from "../src/dominio/datas.js";
-import { calcularOfensiva } from "../src/dominio/ofensiva.js";
+import { calcularOfensiva, semanaDaOfensiva } from "../src/dominio/ofensiva.js";
 import { ehQuadroDeEstudo, temaDo } from "../src/dominio/estudo.js";
 import {
   validarPlano, planoPadrao, agendar, montarEtapas, planoDoReplanejamento,
@@ -3730,7 +3730,7 @@ caso("BEYOND-0020: a Temporada das Ilhas — conquista, construção com conchas
   assert.deepEqual(guardasDaConquista("tesouro"), { nativo: 5, xama: 2, chefeTiki: 1 }, "metade dos nativos fica de guarda");
   assert.deepEqual(construcoesAposConquista({ castelo: 1, mina: 3, torre: 1 }), { castelo: 1, mina: 2 }, "trocou de dono: cada uma perde um nível");
   const def = defensorDaIlha({ id: "coqueiro", dono_id: "dono", construcoes: { castelo: 2 }, guardas: { nativo: 2 } });
-  assert.equal(def.cenario, "ilha-tropical");
+  assert.equal(def.cenario, null, "a ilha luta no estilo do reino (03/11/2026)");
   assert.equal(def.construcoes.terreno, 1);
   assert.deepEqual(def.monstros, { nativo: 2 }, "a ilha de jogador é defendida pelos guardas");
   // produção e coleta
@@ -3773,10 +3773,15 @@ caso("BEYOND-0020: a Temporada das Ilhas — conquista, construção com conchas
   // as ilhas moram no Reino, nas Grandes Expedições, em 3D no mesmo mundo do reino (cenário parado + guardas)
   const doReino = fs.readFileSync(new URL("../src/app/(app)/reino/page.js", import.meta.url), "utf8");
   assert.match(doReino, /ilhas: \(\) => \(teste \? null : \(\s*<GrandesExpedicoes/);
-  assert.match(doReino, /cenario=\{naIlha \? "ilha-tropical" : null\} guardas=\{naIlha \? naIlha\.defensores : null\}/);
+  // "a ilha deve ser igual ao modo reino": a mesma ilha flutuante, só com os guardas (sem cenário de expedição)
+  assert.match(doReino, /cenario=\{null\} guardas=\{naIlha \? naIlha\.defensores \|\| \{\} : null\}/);
   const mundo3d = fs.readFileSync(new URL("../src/componentes/reino/Mundo3D.js", import.meta.url), "utf8");
   assert.match(mundo3d, /function definirCenarioFixo\(c\)/);
-  assert.match(mundo3d, /if \(fixo\.cenario\) aplicarCenarioFixo\(\);/, "depois da luta, a ilha parada volta");
+  assert.match(mundo3d, /if \(fixo\.ativo\) aplicarCenarioFixo\(\);/, "depois da luta, a ilha parada volta");
+  // o cenário tropical usa lugares(), r() e R do terreno: no desenho da cabana ele quebrava a tela (03/11/2026)
+  const cenarios = fs.readFileSync(new URL("../src/componentes/reino/cenariosDasExpedicoes.js", import.meta.url), "utf8");
+  const noTerreno = cenarios.indexOf("const lugares = (n, de, ate, folga)");
+  assert.ok(noTerreno > 0 && cenarios.indexOf('case "ilha-tropical"') > noTerreno, "a decoração da ilha fica no terreno, onde lugares() existe");
   assert.match(fs.readFileSync(new URL("../src/app/(app)/ilhas/page.js", import.meta.url), "utf8"), /redirect\("\/reino#grandes-expedicoes"\)/);
   assert.doesNotMatch(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /href: "\/ilhas"/, "sem item à parte no menu");
   assert.match(fs.readFileSync(new URL("../src/lib/lisaRotina.js", import.meta.url), "utf8"), /const ACOES = \{[^}]*ilhas, minigame \};/, "a Lisa tem a ilha dela (e joga o minigame)");
@@ -3871,11 +3876,24 @@ caso("a Lisa joga sozinha: o relógio da nuvem chama a rodada a cada 20 minutos,
   const worker = ler("../worker-proof.js");
   assert.match(worker, /async scheduled\(evento, env, ctx\)/);
   assert.match(worker, /"x-proof-relogio": env\.PROOF_SEGREDO_DO_RELOGIO/);
+  // o portão de login deixa só esta rota passar sem sessão (o relógio não tem cookie); a rota exige o segredo
+  assert.ok(ehLivre("/api/lisa/rodada"), "o relógio passa pelo portão");
+  for (const fechado of ["/api/lisa", "/api/lisa/rodadas", "/api/lisa/duelo", "/lisa"]) assert.ok(!ehLivre(fechado), fechado);
   assert.match(worker, /export \{ DOQueueHandler, DOShardedTagCache, BucketCachePurge \} from "\.\/\.open-next\/worker\.js";/);
   const rota = ler("../src/app/api/lisa/rodada/route.js");
   assert.match(rota, /segredo\.length < 16 \|\| req\.headers\.get\("x-proof-relogio"\) !== segredo/, "sem o segredo, ninguém roda a Lisa");
   assert.match(ler("../src/lib/arena.js"), /if \(!perfil\?\.robo\) throw new ErroDeAcesso\(403/, "a jogada sem conferir é só para robô");
   assert.match(ler("./lisa-joga.mjs"), /import \{ rodadaDaLisa, criarConta \} from "@\/lib\/lisaRotina\.js";/, "o script vira atalho");
+});
+
+caso("a semana da ofensiva: de domingo a sábado, com hoje e os dias que faltam", () => {
+  const s = semanaDaOfensiva(["2026-11-01", "2026-11-02", "2026-10-31"], "2026-11-03");
+  assert.deepEqual(s.map((d) => d.letra).join(""), "DSTQQSS");
+  assert.equal(s[0].dia, "2026-11-01", "começa no domingo");
+  assert.deepEqual(s.map((d) => d.estudou), [true, true, false, false, false, false, false]);
+  assert.equal(s.findIndex((d) => d.hoje), 2, "terça é hoje");
+  assert.deepEqual(s.map((d) => d.futuro), [false, false, false, true, true, true, true]);
+  assert.equal(semanaDaOfensiva([], "2026-11-01")[0].hoje, true, "no domingo, hoje é o primeiro");
 });
 
 console.log(`\n${passou} caso(s) passaram${process.exitCode ? ", com falhas acima" : ""}.\n`);

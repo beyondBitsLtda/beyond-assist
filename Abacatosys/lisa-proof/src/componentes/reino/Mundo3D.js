@@ -1417,25 +1417,26 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       }
     }
 
-    // ---- a ilha de uma Grande Expedição, parada (03/11/2026: "as ilhas devem ser 3D igual são os reinos, e
-    // integradas ao reino"): o mesmo mundo mostra a ilha com o cenário dela (a areia e os coqueiros de
-    // cenariosDasExpedicoes.js), as construções no desenho do lugar e os guardas de papel em volta da Cabana.
-    // O Neuro, o Acampamento e os vizinhos saem de cena. Na batalha o cenário parado sai da frente (a luta traz
-    // o dela) e volta no fim. `null` volta para o reino.
-    const fixo = { id: null, chave: "", grupo: null, cenario: null };
+    // ---- a ilha de uma Grande Expedição, parada (03/11/2026: "a ilha deve ser igual ao modo reino, exibir da
+    // mesma forma"): o mesmo mundo mostra a ilha como um reino — a ilha flutuante, as construções com o desenho e
+    // o nível do reino e os guardas de papel em volta da Cabana do Chefe. O Neuro, o Acampamento e os vizinhos
+    // saem de cena. Com `id`, um cenário de expedição troca o terreno (cenariosDasExpedicoes.js); sem `id`, fica o
+    // terreno do reino. Na batalha os guardas parados saem da frente e voltam no fim. `null` volta para o reino.
+    const fixo = { id: null, chave: "", grupo: null, cenario: null, ativo: false };
     const guardasDaIlha = new THREE.Group();
     mundo.add(guardasDaIlha);
     const ANEL_DOS_GUARDAS = [[1.3, 0.6], [-1.2, 0.9], [0.5, -1.4], [-1.0, -1.1], [1.6, -0.6], [-1.7, -0.1], [0.2, 1.6], [1.2, 1.4], [-0.4, 1.9], [2.0, 0.4]];
     function definirCenarioFixo(c) {
       const id = c?.id || null;
-      const chave = id ? `${id}:${JSON.stringify(c.guardas || {})}` : "";
+      const chave = c ? `${id || "reino"}:${JSON.stringify(c.guardas || {})}` : "";
       if (chave === fixo.chave) return;
       if (fixo.grupo) { mundo.remove(fixo.grupo); fixo.grupo.traverse((m) => m.geometry?.dispose()); fixo.grupo = null; }
       for (const g of [...guardasDaIlha.children]) guardasDaIlha.remove(g);
       fixo.id = id;
       fixo.chave = chave;
       fixo.cenario = id ? cenarioDe({ cenario: id }) : null;
-      if (fixo.cenario) {
+      fixo.ativo = Boolean(c);
+      if (fixo.ativo) {
         // os guardas: recortes de papel parados em volta da Cabana do Chefe
         const [cx, cz] = LUGARES.castelo;
         let i = 0;
@@ -1464,10 +1465,11 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
         fixo.grupo = terrenoDaExpedicao(p, cen, motor);
         mundo.add(fixo.grupo);
       }
-      neuro.visible = !cen;
-      acampamento.visible = !cen;
-      if (ilhota.grupo) { ilhota.grupo.visible = !cen; ilhota.ponte.visible = !cen; }
-      for (const v of vizinhanca.ilhas) { v.grupo.visible = !cen; v.ponte.visible = !cen; }
+      const fora = !fixo.ativo; // numa ilha: sem o Neuro, o Acampamento e os vizinhos
+      neuro.visible = fora;
+      acampamento.visible = fora;
+      if (ilhota.grupo) { ilhota.grupo.visible = fora; ilhota.ponte.visible = fora; }
+      for (const v of vizinhanca.ilhas) { v.grupo.visible = fora; v.ponte.visible = fora; }
       aplicarTema();
       atualizarConstrucoes(construcoesRef.current || [], false);
       if (fixo.grupo) fixo.grupo.traverse((o) => { if (o.userData.gira) girando.push(o); });
@@ -1475,7 +1477,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       sujo = true;
     }
     function animarGuardas(t) {
-      const ver = Boolean(fixo.cenario) && !sim;
+      const ver = fixo.ativo && !sim;
       if (fixo.grupo && fixo.grupo.visible !== ver) { fixo.grupo.visible = ver; sujo = true; }
       if (guardasDaIlha.visible !== ver) { guardasDaIlha.visible = ver; sujo = true; }
       if (!ver || !guardasDaIlha.children.length) return;
@@ -1768,7 +1770,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       tremor = 0;
       legendaRef.current?.(null);
       // a luta foi numa ilha das Grandes Expedições que estava à vista: o cenário parado volta
-      if (fixo.cenario) aplicarCenarioFixo();
+      if (fixo.ativo) aplicarCenarioFixo();
       sujo = true;
       fim?.();
     }
@@ -2362,11 +2364,11 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaveDoChefao]);
 
-  // ---- a ilha parada (Grandes Expedições): o cenário dela e os guardas; null = o reino de sempre. Vem depois
+  // ---- a ilha parada (Grandes Expedições): os guardas (e, se vier, um cenário); null = o reino de sempre. Vem depois
   // do efeito das construções, para as construções da ilha já estarem lá quando o cenário entra.
-  const chaveDoCenario = cenario ? `${cenario}:${JSON.stringify(guardas || {})}` : "";
+  const chaveDoCenario = cenario || guardas ? `${cenario || "reino"}:${JSON.stringify(guardas || {})}` : "";
   useEffect(() => {
-    api.current?.definirCenarioFixo(cenario ? { id: cenario, guardas } : null);
+    api.current?.definirCenarioFixo(cenario || guardas ? { id: cenario, guardas: guardas || {} } : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaveDoCenario]);
 

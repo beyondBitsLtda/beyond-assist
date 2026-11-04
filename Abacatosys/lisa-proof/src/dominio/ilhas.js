@@ -29,6 +29,8 @@ export const HORAS_ATE_ENCHER_NA_ILHA = 12;
 export const DIAS_DO_PACTO = 7;
 export const HORAS_PARA_ACEITAR_PACTO = 48;
 export const VEICULO_DAS_ILHAS = "navio";
+// o cenário tropical (cenariosDasExpedicoes.js) existe, mas desde 03/11/2026 a ilha aparece e luta no estilo do
+// reino ("a ilha deve ser igual ao modo reino, exibir da mesma forma"): o defensor vai sem cenário.
 export const CENARIO_DAS_ILHAS = "ilha-tropical";
 
 /** A temporada está aberta? (Depois do fim, as ilhas ficam como estão até a próxima.) */
@@ -156,7 +158,7 @@ export function defensorDaIlha(ilha) {
     guarnicao: {},
     monstros: contagensDeMonstros(ilha.dono_id ? ilha.guardas : def.nativos),
     tema: "ilha",
-    cenario: CENARIO_DAS_ILHAS,
+    cenario: null, // no estilo do reino (a ilha flutuante de sempre), como uma invasão
     veiculo: VEICULO_DAS_ILHAS,
   };
 }

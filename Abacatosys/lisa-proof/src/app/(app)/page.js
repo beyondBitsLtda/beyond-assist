@@ -52,7 +52,7 @@ function Meta({ titulo, meta }) {
       <div className="pf-estat__valor">
         {meta.feitas}<small>/{meta.total} assuntos</small>
       </div>
-      <Barra valor={meta.feitas} total={meta.total} rotulo={titulo} />
+      <Barra valor={meta.feitas} total={meta.total} rotulo={titulo} numeros />
       <p className="pf-estat__nota">
         {meta.total === 0
           ? "Nada planejado para terminar neste período."
@@ -112,12 +112,24 @@ export default function Hoje() {
       </div>
 
       <div className="pf-grade">
+        {/* a ofensiva em destaque (03/11/2026, visual premium): o número grande e a semana, dia a dia */}
         <div className={`pf-cartao pf-ofensiva${o.emRisco ? " pf-ofensiva--risco" : ""}`}>
-          <div className="pf-estat__rotulo">Ofensiva</div>
-          <div className="pf-estat__valor">
+          <div className="pf-ofensiva__topo">
             <span className="pf-ofensiva__fogo" aria-hidden="true">🔥</span>
-            {o.atual}<small style={{ color: "inherit" }}> {o.atual === 1 ? "dia" : "dias"}</small>
+            <span className="pf-ofensiva__numero">{String(o.atual).padStart(2, "0")}</span>
+            <span className="pf-ofensiva__rotulo">{o.atual === 1 ? "dia seguido" : "dias seguidos"}</span>
           </div>
+          {o.semana && (
+            <ol className="pf-semana-ofensiva" aria-label="Esta semana">
+              {o.semana.map((d) => (
+                <li key={d.dia} className={`pf-semana-ofensiva__dia${d.estudou ? " pf-semana-ofensiva__dia--feito" : ""}${d.hoje ? " pf-semana-ofensiva__dia--hoje" : ""}`}
+                  aria-label={`${formatarDia(d.dia, { comSemana: true })}: ${d.estudou ? "estudou" : d.futuro ? "ainda vai chegar" : "sem estudo"}`}>
+                  <span className="pf-semana-ofensiva__letra" aria-hidden="true">{d.letra}</span>
+                  <span className="pf-semana-ofensiva__marca" aria-hidden="true">{d.estudou ? "✓" : ""}</span>
+                </li>
+              ))}
+            </ol>
+          )}
           <p className="pf-estat__nota">{notaDaOfensiva(o)} Recorde: {o.recorde}.</p>
         </div>
 
@@ -126,7 +138,7 @@ export default function Hoje() {
           <div className="pf-estat__valor">
             {resumo.pontosHoje}<small>/{resumo.metaDiaria} pts</small>
           </div>
-          <Barra valor={resumo.pontosHoje} total={resumo.metaDiaria} rotulo="Meta do dia" />
+          <Barra valor={resumo.pontosHoje} total={resumo.metaDiaria} rotulo="Meta do dia" numeros />
           <p className="pf-estat__nota">
             {resumo.pontosHoje >= resumo.metaDiaria ? "Meta batida! 🎉" : `Faltam ${resumo.metaDiaria - resumo.pontosHoje} pontos.`}
           </p>

@@ -2,7 +2,8 @@
 
 .agenda__modos { display: inline-flex; padding: 4px; gap: 4px; border-radius: 9999px; background: var(--pf-superficie-2); border: 1px solid var(--pf-linha); }
 .agenda__modo { border: none; background: none; color: var(--pf-tinta-2); font: inherit; font-size: 12.5px; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; padding: 8px 18px; border-radius: 9999px; cursor: pointer; min-height: 38px; white-space: nowrap; }
-.agenda__modo[aria-selected="true"] { background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); }
+.agenda__modo[aria-selected="true"] { background: var(--pf-botao-fundo); color: var(--pf-tinta-sobre-verde); box-shadow: var(--pf-botao-brilho); }
+.agenda__modo { font-family: var(--pf-fonte-titulo); font-weight: 600 !important; }
 
 .agenda__filtros { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .agenda__filtro {

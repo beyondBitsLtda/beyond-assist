@@ -25,7 +25,7 @@
 .pratica__acao {
   flex: none; padding: 6px 12px; border-radius: var(--pf-pilula);
   background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); font-weight: 900; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
-  box-shadow: 0 3px 0 var(--pf-verde-sombra);
+  background: var(--pf-botao-fundo); box-shadow: var(--pf-botao-brilho); font-family: var(--pf-fonte-titulo); font-weight: 600;
 }
 
 /* ---- quiz ---- */

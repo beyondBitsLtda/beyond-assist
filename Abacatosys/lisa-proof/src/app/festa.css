@@ -25,7 +25,7 @@
   animation: festa-quicar 0.6s 0.7s both cubic-bezier(0.2, 1.6, 0.4, 1);
 }
 .festa__neuro { margin-top: 2px; animation: festa-subir 0.5s 0.55s both ease-out; }
-.festa__continuar { width: 100%; max-width: 320px; font-size: 16px; text-transform: uppercase; letter-spacing: 0.04em; box-shadow: 0 5px 0 var(--pf-verde-sombra); animation: festa-subir 0.5s 0.65s both ease-out; }
+.festa__continuar { width: 100%; max-width: 320px; font-size: 16px; text-transform: uppercase; letter-spacing: 0.04em; box-shadow: var(--pf-botao-brilho); animation: festa-subir 0.5s 0.65s both ease-out; }
 
 /* ---- ofensiva: a chama e o número que vira ---- */
 .festa__chama { width: 150px; height: 180px; filter: drop-shadow(0 0 28px rgba(249, 115, 22, 0.75)); animation: festa-acender 0.7s both cubic-bezier(0.2, 1.4, 0.4, 1); }

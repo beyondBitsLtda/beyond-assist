@@ -5,7 +5,7 @@ import { perfilDe, buscarTodas, checklistsDosCards, linkDoAbacato } from "@/lib/
 import { resumoDaPratica } from "@/lib/pratica.js";
 import { avancoDasTrilhas } from "@/lib/avanco.js";
 import { diaDe } from "@/dominio/datas.js";
-import { calcularOfensiva } from "@/dominio/ofensiva.js";
+import { calcularOfensiva, semanaDaOfensiva } from "@/dominio/ofensiva.js";
 import { resumoDasMetas, tarefasDoDia } from "@/dominio/metas.js";
 import { nivelPorPontos, pontosDoDiaParaMeta } from "@/dominio/pontos.js";
 
@@ -32,7 +32,7 @@ export async function GET(req) {
     const trilhas = trilhasR.data || [];
     const trilhaPorId = new Map(trilhas.map((t) => [t.id, t]));
 
-    const ofensiva = calcularOfensiva(eventos.map((e) => e.dia), hoje);
+    const ofensiva = { ...calcularOfensiva(eventos.map((e) => e.dia), hoje), semana: semanaDaOfensiva(eventos.map((e) => e.dia), hoje) };
     const total = eventos.reduce((s, e) => s + e.pontos, 0);
     // A mesma conta que o servidor usa para dar o bônus — senão a tela diria "meta batida" com
     // pontos de conquista, e o bônus não viria.

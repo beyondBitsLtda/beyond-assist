@@ -307,6 +307,9 @@ export const LIVRES = [
   // Mostra só o nome público, o repositório e as notas — nada de e-mail nem nome completo.
   { prefixo: "/certificado", motivo: "a página de conferência de um certificado do Modo Domínio" },
   { prefixo: "/api/certificado/", motivo: "os dados da conferência de um certificado (só leitura, por código)" },
+  // O relógio da Lisa (03/11/2026): o gatilho de horário do Worker (worker-proof.js) não tem sessão. A rota em si
+  // exige o segredo PROOF_SEGREDO_DO_RELOGIO no cabeçalho x-proof-relogio — sem ele, 403.
+  { prefixo: "/api/lisa/rodada", motivo: "o relógio da nuvem roda a Lisa (protegida pelo segredo do relógio)" },
   // Não há cadastro aqui: a conta é criada no Abacato.
 ];
 

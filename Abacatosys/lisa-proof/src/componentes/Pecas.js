@@ -3,12 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NOMES_DOS_DIAS } from "@/dominio/datas.js";
 
-/** Barra de progresso com o número lido em voz alta por leitor de tela. */
-export function Barra({ valor, total, rotulo }) {
+/**
+ * Barra de progresso com o número lido em voz alta por leitor de tela. `numeros`: a barra grossa com
+ * "valor/total" escrito dentro (o visual premium de 03/11/2026).
+ */
+export function Barra({ valor, total, rotulo, numeros = false }) {
   const pct = total > 0 ? Math.min(100, Math.round((valor / total) * 100)) : 0;
   return (
-    <div className="pf-barra" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={rotulo}>
+    <div className={`pf-barra${numeros ? " pf-barra--numeros" : ""}`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={rotulo}>
       <div className="pf-barra__cheio" style={{ width: `${pct}%` }} />
+      {numeros && <span className="pf-barra__texto" aria-hidden="true">{valor}/{total}</span>}
     </div>
   );
 }
