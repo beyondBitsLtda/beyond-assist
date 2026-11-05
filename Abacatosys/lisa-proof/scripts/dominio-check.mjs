@@ -3327,6 +3327,13 @@ caso("prática 1.8.1: o exemplo do diagrama é um diagrama, o código tem as que
   assert.equal(codigoLegivel(normal), normal, "código com quebras de verdade fica como está");
   const ex = validarExemploDaLisa({ titulo: "x", conceitos: [{ nome: "laço", explicacao: "repete" }], codigo: ["for (const x of lista) {", "  console.log(x);", "}"].join(BARRA_N), comoFunciona: [], paraOSeu: "" });
   assert.equal(ex.codigo.split("\n").length, 3);
+  // o projeto semanal que travou: veio sem o código, mas com os passos — o exemplo vai em passos, sem erro
+  const semCodigo = validarExemploDaLisa({ titulo: "x", conceitos: [{ nome: "laço", explicacao: "repete" }], passos: ["Crie a janela.", "Desenhe o texto."], comoFunciona: [], paraOSeu: "" }, { comCodigo: true });
+  assert.deepEqual([semCodigo.codigo, semCodigo.linguagem, semCodigo.passos.length], ["", "", 2]);
+  assert.throws(() => validarExemploDaLisa({ conceitos: [{ nome: "a", explicacao: "b" }], comoFunciona: [] }, { comCodigo: true }), /não conseguiu montar/, "sem código e sem passos, aí sim é erro");
+  const iaPratica = ler("../src/lib/iaPratica.js").replace(/\r\n/g, "\n");
+  assert.ok(iaPratica.includes('...(comCodigo ? ["codigo", "linguagem"] : ["passos"])'), "o código (ou os passos) é obrigatório no esquema");
+  assert.equal(iaPratica.match(/for \(let tentativa = 1; tentativa <= 2; tentativa\+\+\)/g)?.length, 2, "a recusa da conferência ganha uma segunda tentativa (código e diagrama)");
   // o exemplo do exercício de diagrama: formas e ligações viram o documento do quadro
   const d = validarExemploDeDiagrama({
     titulo: "O check-in de um hotel", conceitos: [{ nome: "Decisão", explicacao: "o losango escolhe o caminho" }],

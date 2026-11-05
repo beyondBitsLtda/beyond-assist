@@ -9,14 +9,27 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.8.1",
+  "versao": "1.8.2",
   "atualizadoEm": "2026-11-05",
   "compilacao": {
-    "numero": 112,
+    "numero": 113,
     "data": "2026-11-05",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.8.2",
+      "data": "2026-11-05",
+      "branch": "main",
+      "tipo": "correcao",
+      "resumo": "O exemplo da Lisa no projeto (e no exercício) não trava mais em \"a Lisa não conseguiu montar o exemplo\".",
+      "itens": [
+        "O código do exemplo (ou os passos, fora da programação) passa a ser obrigatório no pedido à IA: antes era opcional, e às vezes o exemplo vinha sem ele e era recusado.",
+        "Se mesmo assim vier sem o código mas com os passos, o exemplo aparece em passos em vez de dar erro.",
+        "Uma recusa da conferência ganha uma segunda tentativa no servidor antes de virar erro na tela (no exemplo em código e no exemplo em diagrama)."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.8.1",
       "data": "2026-11-05",

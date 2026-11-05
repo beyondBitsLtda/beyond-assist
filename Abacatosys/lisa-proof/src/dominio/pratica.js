@@ -473,13 +473,16 @@ export function validarExemploDaLisa(bruto, { comCodigo = true } = {}) {
   if (conceitos.length < 1) throw new Error("a Lisa não conseguiu montar o exemplo — tente de novo");
   const codigo = comCodigo ? semCercas(codigoLegivel(bruto?.codigo)).slice(0, 6000) : "";
   const passos = listaDeTextos(bruto?.passos, 400, 10);
-  if (comCodigo ? codigo.length < 20 : passos.length < 2) throw new Error("a Lisa não conseguiu montar o exemplo — tente de novo");
+  // 05/11/2026 (o projeto semanal travou em "não conseguiu montar"): o modelo às vezes manda o exemplo sem o
+  // código. Com os passos, o exemplo vai em passos — melhor que erro; sem os dois, aí sim é erro.
+  const comOCodigo = comCodigo && codigo.length >= 20;
+  if (!comOCodigo && passos.length < 2) throw new Error("a Lisa não conseguiu montar o exemplo — tente de novo");
   return {
     titulo: texto(bruto?.titulo, 120) || "Um exemplo parecido",
     conceitos,
-    linguagem: comCodigo ? texto(bruto?.linguagem, 30).toLowerCase() : "",
-    codigo,
-    passos: comCodigo ? [] : passos,
+    linguagem: comOCodigo ? texto(bruto?.linguagem, 30).toLowerCase() : "",
+    codigo: comOCodigo ? codigo : "",
+    passos: comOCodigo ? [] : passos,
     comoFunciona: listaDeTextos(bruto?.comoFunciona, 300, 8),
     paraOSeu: texto(bruto?.paraOSeu, 500),
   };

@@ -863,10 +863,28 @@ const ESQUEMA_DO_EXEMPLO = {
  * exemplo é resolvido em passos, sem código.
  */
 export async function gerarExemploDaLisa({ tema, perfil = "programacao", resumo, linguagem = "", comCodigo = true }) {
-  const bruto = await gerarJson({
+  // 05/11/2026 (o projeto semanal travou em "não conseguiu montar"): o código (ou os passos) era opcional no
+  // esquema, e o modelo às vezes mandava o exemplo sem ele. Agora é obrigatório, e uma recusa da conferência
+  // ganha uma segunda tentativa antes de virar erro na tela.
+  const esquema = { ...ESQUEMA_DO_EXEMPLO, required: [...ESQUEMA_DO_EXEMPLO.required, ...(comCodigo ? ["codigo", "linguagem"] : ["passos"])] };
+  let falha;
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    const bruto = await pedirExemploDaLisa({ tema, perfil, resumo, linguagem, comCodigo, esquema });
+    try {
+      return validarExemploDaLisa(bruto, { comCodigo });
+    } catch (e) {
+      falha = e;
+    }
+  }
+  throw falha;
+}
+
+function pedirExemploDaLisa({ tema, perfil, resumo, linguagem, comCodigo, esquema }) {
+  return gerarJson({
     sistema: personaDo(comCodigo ? "programacao" : perfil) + " Aqui você ensina com um exemplo: mostra os conceitos funcionando num caso parecido, sem fazer o trabalho do estudante.",
-    esquema: ESQUEMA_DO_EXEMPLO,
-    maxTokens: 6000,
+    esquema,
+    maxTokens: 8000,
+    pensarPouco: true,
     pedido: [
       `Tema do curso: ${tema}`,
       linguagem ? `Linguagem do desafio: ${linguagem}` : "",
@@ -890,7 +908,6 @@ export async function gerarExemploDaLisa({ tema, perfil = "programacao", resumo,
       "Regras: o exemplo NÃO pode ser a solução do desafio, nem uma versão dele com outros nomes. Português do Brasil.",
     ].filter(Boolean).join("\n"),
   });
-  return validarExemploDaLisa(bruto, { comCodigo });
 }
 
 const ESQUEMA_DO_EXEMPLO_DE_DIAGRAMA = {
@@ -913,7 +930,21 @@ const ESQUEMA_DO_EXEMPLO_DE_DIAGRAMA = {
  */
 export async function gerarExemploDeDiagrama({ tema, resumo, tipo = "fluxograma" }) {
   const nome = (TIPOS_DE_DIAGRAMA[tipo] || TIPOS_DE_DIAGRAMA.fluxograma).nome;
-  const bruto = await gerarJson({
+  // como no exemplo em código: uma recusa da conferência ganha uma segunda tentativa antes de virar erro na tela
+  let falha;
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    const bruto = await pedirExemploDeDiagrama({ tema, resumo, tipo, nome });
+    try {
+      return validarExemploDeDiagrama(bruto);
+    } catch (e) {
+      falha = e;
+    }
+  }
+  throw falha;
+}
+
+function pedirExemploDeDiagrama({ tema, resumo, tipo, nome }) {
+  return gerarJson({
     sistema: personaDo("programacao") + " Aqui você ensina com um exemplo: mostra a notação funcionando num caso parecido, sem fazer o desenho do estudante.",
     esquema: ESQUEMA_DO_EXEMPLO_DE_DIAGRAMA,
     maxTokens: 6000,
@@ -941,7 +972,6 @@ export async function gerarExemploDeDiagrama({ tema, resumo, tipo = "fluxograma"
       "Regras: o exemplo NÃO pode ser a solução do desafio, nem uma versão dele com outros nomes. Português do Brasil.",
     ].filter(Boolean).join("\n"),
   });
-  return validarExemploDeDiagrama(bruto);
 }
 
 // ---------------------------------------------------------------- avaliação
