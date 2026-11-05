@@ -1,6 +1,8 @@
 import { json } from "@/lib/http.js";
 import { supabase } from "@/lib/supabase.js";
 import { COOKIE_SESSAO, conferirChave, criarSessao } from "@/lib/auth.js";
+import { registrarPresenca } from "@/lib/uso.js";
+import { aparelhoDe } from "@/dominio/uso.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +55,9 @@ export async function POST(req) {
   }
 
   const cookie = await criarSessao(usuario, segredo);
+  // o painel do uso (/uso): todo login abre um acesso
+  await registrarPresenca(usuario, { entrou: true, aparelho: aparelhoDe(req.headers.get("user-agent")) })
+    .catch((e) => console.warn("[uso] login não registrado:", e?.message || e));
   return json({ ok: true, usuario: { id: usuario.id, nome: usuario.nome } }, 200, {
     "set-cookie": `${COOKIE_SESSAO}=${cookie}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 7}`,
   });

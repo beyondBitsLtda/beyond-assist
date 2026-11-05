@@ -1,0 +1,43 @@
+/* /uso — o painel do uso do Proof (1.8.0, 04/11/2026): só o administrador vê. */
+
+.pf-principal:has(.uso__tabela) { max-width: 1480px; }
+
+.uso__periodos { display: inline-flex; padding: 4px; gap: 4px; border-radius: 9999px; background: var(--pf-superficie-2); border: 1px solid var(--pf-linha); }
+.uso__periodo { border: none; background: none; color: var(--pf-tinta-2); font: inherit; font-family: var(--pf-fonte-titulo); font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 8px 16px; border-radius: 9999px; cursor: pointer; min-height: 38px; white-space: nowrap; }
+.uso__periodo[aria-selected="true"] { background: var(--pf-botao-fundo); color: var(--pf-tinta-sobre-verde); box-shadow: var(--pf-botao-brilho); }
+
+.uso__aviso { margin: 0 0 16px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta-2); font-size: 13px; line-height: 1.5; }
+.uso__totais { margin-bottom: 16px; }
+.uso__totais .pf-estat__valor small { font-size: 0.5em; color: var(--pf-tinta-3); margin-left: 2px; }
+
+.uso__tabela-cartao { padding: 0; overflow-x: auto; }
+.uso__tabela { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 880px; }
+.uso__tabela thead th { position: sticky; top: 0; text-align: left; padding: 12px 14px; font-size: 11.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pf-tinta-2); border-bottom: 1px solid var(--pf-linha); background: var(--pf-superficie); }
+.uso__tabela td, .uso__tabela tbody th { padding: 12px 14px; vertical-align: top; border-bottom: 1px solid var(--pf-linha); text-align: left; font-weight: 600; }
+.uso__tabela tbody th strong { display: block; font-size: 14px; }
+.uso__tabela small { display: block; color: var(--pf-tinta-3); font-size: 12px; font-weight: 600; margin-top: 2px; }
+.uso__linha { cursor: pointer; transition: background 0.15s ease; }
+/* as colunas de número não quebram ("1 h 38 min" numa linha); a de ações e a de áreas, sim */
+.uso__linha > td:nth-child(-n + 5) { white-space: nowrap; }
+.uso__oque { min-width: 220px; }
+.uso__linha:hover, .uso__linha:focus-visible, .uso__linha--aberta { background: var(--pf-superficie-2); outline: none; }
+.uso__linha--parada { opacity: 0.55; }
+.uso__area { display: inline-block; margin: 0 4px 4px 0; font-size: 11.5px; }
+.uso__nada { color: var(--pf-tinta-3); font-weight: 600; }
+
+.uso__detalhe > td { background: var(--pf-superficie-2); padding: 16px 18px 20px; }
+.uso__detalhe-grade { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.uso__detalhe-grade h3 { margin: 0 0 8px; font-size: 14px; font-family: var(--pf-fonte-titulo); }
+.uso__detalhe-grade h3 + * { margin-bottom: 14px; }
+.uso__acessos, .uso__areas, .uso__lista-acoes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.uso__acessos li { display: grid; gap: 1px; padding: 8px 10px; border-radius: 10px; background: var(--pf-superficie); border: 1px solid var(--pf-linha); font-size: 12.5px; }
+.uso__acessos li span { color: var(--pf-tinta-2); }
+.uso__areas li { display: grid; grid-template-columns: 110px minmax(0, 1fr) 54px; align-items: center; gap: 8px; font-size: 12.5px; }
+.uso__barra { height: 8px; border-radius: 9999px; background: var(--pf-linha); overflow: hidden; }
+.uso__barra > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #8BD11A, #C8F76A); }
+.uso__areas small { text-align: right; color: var(--pf-tinta-2); }
+.uso__lista-acoes li { font-size: 12.5px; }
+.uso__lista-acoes li::first-letter { color: var(--pf-verde-texto); }
+
+/* o aviso de transparência na tela de entrada */
+.pf-entrada__nota--uso { margin-top: 6px; font-size: 11.5px; line-height: 1.45; opacity: 0.75; }

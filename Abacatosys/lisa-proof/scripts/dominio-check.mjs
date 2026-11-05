@@ -151,6 +151,7 @@ import {
   conferirDiagrama, descreverDiagrama, pedeDiagrama, motoresComDiagrama, tiposSugeridos, formasDoTipo,
 } from "../src/dominio/diagramas.js";
 import * as bootcamp from "../src/dominio/bootcamp.js";
+import * as usoDoProof from "../src/dominio/uso.js";
 
 let passou = 0;
 function caso(nome, fn) {
@@ -3814,6 +3815,46 @@ caso("BEYOND-0020: a Temporada das Ilhas — conquista, construção com conchas
   assert.doesNotMatch(fs.readFileSync(new URL("../src/componentes/Moldura.js", import.meta.url), "utf8"), /href: "\/ilhas"/, "sem item à parte no menu");
   assert.match(fs.readFileSync(new URL("../src/lib/lisaRotina.js", import.meta.url), "utf8"), /const ACOES = \{[^}]*ilhas, minigame \};/, "a Lisa tem a ilha dela (e joga o minigame)");
   assert.match(fs.readFileSync(new URL("../db/030-versao-1.sql", import.meta.url), "utf8"), /'ilhas', 'arena'\)\);/);
+});
+
+caso("1.8.0: o painel do uso — a batida de presença, os acessos, as áreas e as ações de cada pessoa", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const u = usoDoProof;
+  const aberto = { ultimo: "2026-11-04T10:00:00Z", segundos: 120, paginas: { reino: 2 } };
+  assert.deepEqual(u.somarBatida(aberto, "2026-11-04T10:01:00Z", "reino"), { segundos: 180, paginas: { reino: 3 }, ultimo: "2026-11-04T10:01:00.000Z" }, "a batida soma o minuto e a área");
+  assert.equal(u.somarBatida(aberto, "2026-11-04T10:04:00Z", "pratica").segundos, 120 + u.PRESENCA.tetoPorBatida, "a aba que dormiu não conta o sono (teto por batida)");
+  assert.equal(u.somarBatida(aberto, "2026-11-04T10:06:00Z", "pratica"), null, "mais de 5 min parada: a próxima batida abre outro acesso");
+  assert.equal(u.somarBatida(aberto, "2026-11-04T10:03:00Z", "pratica", { semTempo: true }).segundos, 120, "a aba que voltou marca sem somar o tempo escondida");
+  assert.equal(u.somarBatida(null, "2026-11-04T10:01:00Z", "hoje"), null, "sem acesso aberto, abre um");
+  assert.deepEqual(["/reino/teste", "/", "/bootcamp/arena/x", "/xyz"].map(u.areaDoCaminho), ["reino", "hoje", "bootcamp", "outras"], "a área pela 1ª parte do caminho");
+  assert.deepEqual(["Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile", "Mozilla/5.0 (Windows NT 10.0)", "Mozilla/5.0 (iPad; CPU OS 17_0)"].map(u.aparelhoDe), ["celular", "computador", "tablet"]);
+  assert.deepEqual([u.contagemDaAcao("quiz", 1), u.contagemDaAcao("quiz", 3)], ["1 quiz", "3 quizzes"], "singular e plural");
+  assert.equal(u.acaoDe("teste"), null, "ajuste e teste não são ação de ninguém");
+  const r = u.resumoDoUso({
+    pessoas: [{ id: "a", nome: "Ana" }, { id: "b", nome: "Bia" }, { id: "l", nome: "Lisa", robo: true }],
+    acessos: [
+      { usuario_id: "a", inicio: "2026-11-04T10:00:00Z", ultimo: "2026-11-04T10:30:00Z", segundos: 1800, paginas: { reino: 20, pratica: 10 }, aparelho: "celular", entrou: true },
+      { usuario_id: "a", inicio: "2026-11-03T20:00:00Z", ultimo: "2026-11-03T20:10:00Z", segundos: 600, paginas: { hoje: 10 } },
+      { usuario_id: "l", inicio: "2026-11-04T11:00:00Z", ultimo: "2026-11-04T11:05:00Z", segundos: 300, paginas: {} },
+    ],
+    acoes: [{ usuario_id: "a", tipo: "quiz", quando: "2026-11-04T10:10:00Z", pontos: 20 }, { usuario_id: "a", tipo: "construcao", quando: "2026-11-04T10:20:00Z", valor: -300 }, { usuario_id: "a", tipo: "teste", quando: "x" }],
+  });
+  assert.deepEqual(r.totais, { pessoas: 2, ativas: 1, acessos: 2, segundos: 2400, acoes: 2 }, "a robô fica fora dos totais");
+  const ana = r.pessoas[0];
+  assert.deepEqual([ana.nome, ana.acessos, ana.logins, ana.diasAtivos, ana.mediaPorAcesso], ["Ana", 2, 1, 2, 1200]);
+  assert.deepEqual(ana.areas.map((a) => a.area), ["reino", "pratica", "hoje"], "as áreas pelo tempo");
+  assert.deepEqual(r.pessoas.map((p) => p.nome), ["Ana", "Bia", "Lisa"], "quem usou primeiro, a robô no fim");
+  // o servidor: só o administrador lê o painel; a batida nunca derruba a tela; o login abre um acesso; o aviso na entrada
+  const lib = ler("../src/lib/uso.js");
+  assert.match(lib, /if \(!ehAdministrador\(usuario\)\) throw new ErroDeAcesso\(403/, "só o administrador vê o uso");
+  assert.match(ler("../src/app/api/presenca/route.js"), /registrarPresenca\(usuario, \{ caminho[^}]*\}\)\s*\.catch\(/, "a batida que falha não vira erro na tela");
+  assert.match(ler("../src/app/api/auth/entrar/route.js"), /registrarPresenca\(usuario, \{ entrou: true[^}]*\}\)\s*\.catch\(/, "o login abre um acesso, sem nunca derrubar o login");
+  assert.match(ler("../src/app/entrar/page.js"), /registra os seus acessos, o tempo de uso e as atividades/, "quem entra sabe que o uso é registrado");
+  const moldura = ler("../src/componentes/Moldura.js");
+  assert.match(moldura, /\{ href: "\/uso", rotulo: "Uso", Icone: IconeUso, grupo: "Você", soAdmin: true \}/, "o item Uso só para o administrador");
+  assert.match(moldura, /setInterval\(\(\) => bater\(\), 60_000\)/, "a batida de minuto em minuto");
+  assert.match(moldura, /if \(document\.visibilityState !== "visible"\) return;/, "só com a aba visível");
+  assert.match(ler("../db/036-uso.sql"), /create table if not exists public\.proof_acessos/, "a tabela dos acessos");
 });
 
 caso("1.7.0: as moedas do reino no Bootcamp, a ilha da Lisa na paz, o desafio sem estourar e a Agenda e a Bolsa sem vão", () => {

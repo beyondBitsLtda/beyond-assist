@@ -106,6 +106,11 @@ export const IconeArena = () => (
 );
 
 // Mais: três pontos
+// Uso: o relógio com o gráfico (o painel do administrador)
+export const IconeUso = () => (
+  <svg {...base}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /><path d="M3 21h4" /></svg>
+);
+
 export const IconeMais = () => (
   <svg {...base}><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>
 );

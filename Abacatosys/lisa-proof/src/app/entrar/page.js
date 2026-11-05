@@ -87,6 +87,7 @@ export default function Entrar() {
         </button>
 
         <p className="pf-entrada__nota">Use a mesma conta do Abacato.</p>
+        <p className="pf-entrada__nota pf-entrada__nota--uso">O Proof registra os seus acessos, o tempo de uso e as atividades no app, para acompanhar e melhorar o estudo. O que você escreve não entra nesse registro.</p>
       </form>
     </main>
   );

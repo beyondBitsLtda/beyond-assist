@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.7.0",
+  "versao": "1.8.0",
   "atualizadoEm": "2026-11-04",
   "compilacao": {
-    "numero": 110,
+    "numero": 111,
     "data": "2026-11-04",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.8.0",
+      "data": "2026-11-04",
+      "branch": "main",
+      "tipo": "funcionalidade",
+      "resumo": "O painel do uso para o administrador: quando cada pessoa entrou, quanto tempo ficou no Proof, em que áreas e o que fez.",
+      "itens": [
+        "Tela Uso (/uso), só para o administrador: os totais do período (7, 30 ou 90 dias) e, por pessoa, o último acesso, os acessos e logins, o tempo e a média, os dias ativos, as áreas onde mais ficou e o que fez (quizzes, exercícios, assuntos, construções, Bolsa, Bootcamp…).",
+        "Clicar na pessoa abre cada acesso (início, fim, duração, aparelho e áreas), o tempo por área e as últimas ações com pontos e moedas.",
+        "O tempo é medido por uma batida por minuto com a aba visível (com teto, para a aba esquecida não contar a tarde inteira); o login abre um acesso. Guarda só quando, quanto tempo, onde e o tipo de aparelho — nada do que a pessoa escreve.",
+        "A tela de entrada avisa que o Proof registra os acessos, o tempo de uso e as atividades (transparência, LGPD).",
+        "Banco: a migração 036 cria a tabela dos acessos (proof_acessos)."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.7.0",
       "data": "2026-11-04",
@@ -1775,7 +1790,8 @@
         "Minigame do dia na Prática (a antiga Arena Lúdica): masmorra de depuração, mascote programável e quebra-cabeças de Parsons, com terminal, explicação da Lisa, +30 pontos uma vez por dia e recompensa por fase nova",
         "Exemplo da Lisa: uma aplicação de exemplo com os conceitos de cada exercício e projeto, sem resolver o desafio",
         "Menu do Reino em abas (Reino, Batalha, Expedições, Forja e Bolsa), com contadores e barra fixa ao rolar",
-        "Modo Bootcamp: temporada no estilo reality (prova de imunidade, em equipe pela média ou colaborativa, com o código do time dividido em partes que se juntam, e prova de eliminação, que tira 1, a cada episódio, insígnia para todo vencedor e grande final numa arena com torcida) ou modos rápidos (mata-mata e pontos corridos), até 8 competidores (pessoas do Proof e personagens da Lisa com skin, personalidade, status e especialidades), escritório de TI em 3D com 5 cenários, nível contra a CPU, 3 jurados desenhados, avaliação ao vivo com code review, medidor de emoção e despedida de todo eliminado com a apresentadora, entrega no editor da tela (com o rascunho salvo sozinho e \"Testar e enviar\" num clique) ou pelo GitHub e testes de entrada e saída num compilador on-line, e moedas do reino a cada prova (pela nota, com bônus para quem vence, o campeão e o vice, e teto de 300 por dia)"
+        "Modo Bootcamp: temporada no estilo reality (prova de imunidade, em equipe pela média ou colaborativa, com o código do time dividido em partes que se juntam, e prova de eliminação, que tira 1, a cada episódio, insígnia para todo vencedor e grande final numa arena com torcida) ou modos rápidos (mata-mata e pontos corridos), até 8 competidores (pessoas do Proof e personagens da Lisa com skin, personalidade, status e especialidades), escritório de TI em 3D com 5 cenários, nível contra a CPU, 3 jurados desenhados, avaliação ao vivo com code review, medidor de emoção e despedida de todo eliminado com a apresentadora, entrega no editor da tela (com o rascunho salvo sozinho e \"Testar e enviar\" num clique) ou pelo GitHub e testes de entrada e saída num compilador on-line, e moedas do reino a cada prova (pela nota, com bônus para quem vence, o campeão e o vice, e teto de 300 por dia)",
+        "Painel do uso para o administrador (/uso): acessos e logins, tempo no app, áreas usadas e ações de cada pessoa, por período, medido por uma batida por minuto com a aba visível (sem guardar o que a pessoa escreve)"
       ],
       "naoInclui": [
         "Não executa o código de ninguém no próprio servidor: o Rodar, a Arena Lúdica e os testes do Modo Bootcamp rodam no Wandbox (compilador on-line); os exercícios e projetos da prática são corrigidos pela IA lendo o código.",

@@ -21,6 +21,7 @@ import "./lisa.css";
 import "./correio.css";
 import "./jogos.css";
 import "./bootcamp.css";
+import "./uso.css";
 import { SCRIPT_DE_INSTALAR } from "@/lib/instalarApp.js";
 
 export const metadata = {

@@ -133,6 +133,39 @@ módulos = capítulos e assuntos = trechos de páginas; `validarCursoDoLivro` co
 leitura como primeira tarefa. Ao criar, `proof_leituras` guarda as páginas de cada card, e a
 explicação, o quiz e o exercício do assunto leem esse trecho (`src/lib/leituras.js`).
 
+## O painel do uso (1.8.0, 04/11/2026)
+
+> "Um painel para o meu usuário lá no Proof para que eu possa ver quando as pessoas logaram, quanto tempo elas
+> passaram no Proof e o que fizeram."
+>
+> **Onde fica e quem vê:** `/uso`, só para o administrador (`PROOF_ADMIN_EMAIL`, o mesmo dos chamados). O item
+> "Uso" aparece no menu só para ele, e a rota recusa os outros com 403.
+>
+> **Como o tempo é medido:**
+> - **A batida:** com a aba visível, a moldura manda uma batida por minuto para `/api/presenca`, com a área em que
+>   a pessoa está. Cada batida soma o tempo desde a anterior, com teto de 90 s (a aba que dormiu não conta o sono),
+>   e um minuto na área.
+> - **O acesso:** uma pausa de mais de 5 minutos fecha o acesso, e a próxima batida abre outro. Todo login também
+>   abre um acesso. A aba que volta a ficar visível marca a presença sem somar o tempo em que ficou escondida.
+> - **Onde está:** a regra fica em `src/dominio/uso.js`; o banco, em `src/lib/uso.js`; a tabela é
+>   `proof_acessos` (migração 036).
+>
+> **O que fizeram:** sai do que o Proof já grava, os eventos de estudo (`proof_eventos`) e o livro-caixa do Reino
+> (`proof_reino_movimentos`), contados por tipo ("3 quizzes", "1 construção no Reino").
+>
+> **A tela:** os totais do período (7, 30 ou 90 dias) e uma linha por pessoa, com:
+> - o último acesso, os acessos e os logins;
+> - o tempo, a média e os dias ativos;
+> - as áreas onde mais ficou e o que fez.
+>
+> Clicar na pessoa abre os acessos (início, fim, duração, aparelho e áreas), o tempo por área e as últimas ações. A
+> Lisa jogadora (robô) aparece no fim e fica fora dos totais.
+>
+> **Privacidade (LGPD):**
+> - **O que se guarda:** só quando, quanto tempo, onde e o tipo de aparelho; nada do que a pessoa escreve.
+> - **Transparência:** a tela de entrada avisa que o uso é registrado.
+> - **Uso do painel:** a própria tela lembra que ele serve para acompanhar o uso, não para avaliar ninguém sozinho.
+
 ## Moedas no Bootcamp, a ilha da Lisa na paz e telas sem vão (1.7.0, 04/11/2026)
 
 > **As moedas do reino no Bootcamp** ("a cada prova passada o usuário deveria ganhar as moedas"):

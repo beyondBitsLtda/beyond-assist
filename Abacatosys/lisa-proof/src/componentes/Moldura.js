@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   IconeHoje, IconeTrilhas, IconeAgenda, IconePratica, IconeProgresso, IconeRaioX, IconeRanking, IconeReino, IconeDominio, IconeBolsa, IconeMais, Marca,
-  IconeCaderno, IconeBiblioteca, IconeAcervo, IconeChamados, IconeLisa, IconeCorreio, IconePresentes, IconeBootcamp,
+  IconeCaderno, IconeBiblioteca, IconeAcervo, IconeChamados, IconeLisa, IconeCorreio, IconePresentes, IconeBootcamp, IconeUso,
 } from "./Icones.js";
 import { Confete } from "./Neuro.js";
 import Celebracao from "./Celebracao.js";
@@ -40,6 +40,8 @@ const ITENS = [
   { href: "/raio-x", rotulo: "Raio-X", Icone: IconeRaioX, grupo: "Você" },
   { href: "/presentes", rotulo: "Presentes", Icone: IconePresentes, grupo: "Você" },
   { href: "/chamados", rotulo: "Chamados", Icone: IconeChamados, grupo: "Você" },
+  // o painel do uso (04/11/2026): só o administrador vê o item (e a rota recusa os outros)
+  { href: "/uso", rotulo: "Uso", Icone: IconeUso, grupo: "Você", soAdmin: true },
 ];
 const GRUPOS = [...new Set(ITENS.map((i) => i.grupo))];
 
@@ -126,8 +128,35 @@ function FaixaDoEspectador() {
   );
 }
 
+/**
+ * A batida de presença do painel do uso (src/dominio/uso.js): com a aba visível, uma por minuto, com a área em que a
+ * pessoa está; quando a aba volta a ficar visível, uma que marca a presença sem somar o tempo escondido. A resposta diz
+ * se a pessoa é o administrador (para o item "Uso" do menu).
+ */
+function usePresenca(caminho) {
+  const [admin, setAdmin] = useState(false);
+  const onde = useRef(caminho);
+  onde.current = caminho;
+  useEffect(() => {
+    let parado = false;
+    const bater = (voltou = false) => {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/presenca", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ caminho: onde.current, voltou }) })
+        .then((r) => r.json()).then((r) => { if (!parado && typeof r?.admin === "boolean") setAdmin(r.admin); }).catch(() => {});
+    };
+    bater();
+    const relogio = setInterval(() => bater(), 60_000);
+    const voltou = () => { if (document.visibilityState === "visible") bater(true); };
+    document.addEventListener("visibilitychange", voltou);
+    return () => { parado = true; clearInterval(relogio); document.removeEventListener("visibilitychange", voltou); };
+  }, []);
+  return admin;
+}
+
 export default function Moldura({ children }) {
   const caminho = usePathname() || "/";
+  const admin = usePresenca(caminho);
+  const visivel = (i) => !i.soAdmin || admin;
 
   return (
     <div className="pf-moldura">
@@ -143,7 +172,7 @@ export default function Moldura({ children }) {
           {GRUPOS.map((grupo) => (
             <div key={grupo} className="pf-nav__grupo" role="group" aria-label={grupo}>
               <span className="pf-nav__rotulo" aria-hidden="true">{grupo}</span>
-              {ITENS.filter((i) => i.grupo === grupo).map(({ href, rotulo, Icone }) => (
+              {ITENS.filter((i) => i.grupo === grupo && visivel(i)).map(({ href, rotulo, Icone }) => (
                 <Link
                   key={href}
                   href={href}
@@ -199,7 +228,7 @@ export default function Moldura({ children }) {
             {rotulo}
           </Link>
         ))}
-        <Mais caminho={caminho} />
+        <Mais caminho={caminho} admin={admin} />
       </nav>
       <Celebracao />
       <TelaDeAbertura />
@@ -212,10 +241,11 @@ export default function Moldura({ children }) {
 }
 
 /** A 5ª aba do celular: abre um menu com o resto (Agenda, Cadernos, Biblioteca, Progresso, Domínio, Bolsa, Ranking, Raio-X). */
-function Mais({ caminho }) {
+function Mais({ caminho, admin }) {
   const [aberto, setAberto] = useState(false);
   const caixa = useRef(null);
-  const algumAtivo = NO_MAIS.some((i) => ativo(caminho, i.href));
+  const itens = NO_MAIS.filter((i) => !i.soAdmin || admin);
+  const algumAtivo = itens.some((i) => ativo(caminho, i.href));
 
   useEffect(() => setAberto(false), [caminho]);
   useEffect(() => {
@@ -236,7 +266,7 @@ function Mais({ caminho }) {
       </button>
       {aberto && (
         <div className="pf-mais__menu">
-          {NO_MAIS.map(({ href, rotulo, Icone }) => (
+          {itens.map(({ href, rotulo, Icone }) => (
             <Link key={href} href={href} aria-current={ativo(caminho, href) ? "page" : undefined}>
               <Icone />
               {rotulo}
