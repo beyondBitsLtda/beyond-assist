@@ -9,14 +9,26 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.9.0",
+  "versao": "1.9.1",
   "atualizadoEm": "2026-11-05",
   "compilacao": {
-    "numero": 114,
+    "numero": 115,
     "data": "2026-11-05",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.9.1",
+      "data": "2026-11-05",
+      "branch": "main",
+      "tipo": "correcao",
+      "resumo": "Grandes Expedições: com o navio comprado e sem tripulação, o painel da ilha mostra os passos para zarpar, com os botões ali mesmo.",
+      "itens": [
+        "O botão \"Zarpar e conquistar\" ficava desabilitado só com \"treine a tripulação antes de zarpar\", e o lugar de treinar ficava lá embaixo na página: parecia que o navio não servia.",
+        "Agora o painel da ilha mostra os 3 passos: trocar moedas por conchas (o pacote que cobre 5 piratas), treinar +5 piratas ou +5 arpoadoras (as tropas que o navio aceita sem Porto) e zarpar, com um atalho para a seção da tripulação."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.9.0",
       "data": "2026-11-05",

@@ -3997,6 +3997,12 @@ caso("BEYOND-0020: a Temporada das Ilhas — conquista, construção com conchas
   assert.match(podeAtacarIlha({ ...ok, temNavio: false }).motivo, /Navio/);
   assert.match(podeAtacarIlha({ ...ok, ataquesHoje: 3 }).motivo, /3 ataques de hoje/);
   assert.match(podeAtacarIlha({ ...ok, tripulacao: {} }).motivo, /tripulação/);
+  // 05/11/2026 (o navio comprado e o botão desabilitado): sem tripulação, a tela mostra os passos ali mesmo
+  assert.equal(podeAtacarIlha({ ...ok, tripulacao: {} }).semTripulacao, true);
+  assert.ok(podeAtacarIlha({ ...ok, tripulacao: {} }).motivo.includes("treine piratas (pagos em conchas)"));
+  const tela = fs.readFileSync(new URL("../src/componentes/reino/GrandesExpedicoes.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.ok(tela.includes("{ilha.semTripulacao && tripulacao && (\n            <PassosDaTripulacao"), "os passos no painel da ilha");
+  assert.ok(fs.readFileSync(new URL("../src/lib/ilhas.js", import.meta.url), "utf8").includes("semTripulacao: Boolean(pode.semTripulacao)"));
   assert.match(podeAtacarIlha({ ...ok, ilhasMinhas: [{}, {}, {}] }).motivo, /3 ilhas/);
   assert.match(podeAtacarIlha({ ...ok, ilha: { id: "coqueiro", dono_id: "eu" } }).motivo, /já é sua/);
   assert.match(podeAtacarIlha({ ...ok, ilha: { id: "coqueiro", dono_id: "ele", escudo_ate: "2026-11-04T00:00:00Z" } }).motivo, /escudo/);

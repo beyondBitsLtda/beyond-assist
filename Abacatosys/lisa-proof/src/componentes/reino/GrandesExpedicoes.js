@@ -127,6 +127,7 @@ export default function GrandesExpedicoes({ ilhaNoMundo = null, aoVerNoMundo, ao
           <div className="il-grade">
             <Mapa ilhas={dados.ilhas} escolhida={escolhida} aoEscolher={setEscolhida} />
             {ilha && <PainelDaIlha ilha={ilha} ocupado={ocupado} aoAtacar={atacar} agir={agir} conchas={dados.conchas}
+              tripulacao={dados.tripulacao} pacotes={dados.regras.pacotes} conchasPorMoeda={dados.regras.conchasPorMoeda} moedas={dados.moedas}
               noMundo={ilhaNoMundo?.id === ilha.id} aoVerNoMundo={() => aoVerNoMundo?.(ilha)} />}
           </div>
 
@@ -167,7 +168,7 @@ function Mapa({ ilhas, escolhida, aoEscolher }) {
   );
 }
 
-function PainelDaIlha({ ilha, ocupado, aoAtacar, agir, conchas: saldo, noMundo, aoVerNoMundo }) {
+function PainelDaIlha({ ilha, ocupado, aoAtacar, agir, conchas: saldo, noMundo, aoVerNoMundo, tripulacao, pacotes = [], conchasPorMoeda = 10, moedas = 0 }) {
   const minha = ilha.dono?.souEu;
   const defensores = Object.entries(ilha.defensores || {});
   return (
@@ -199,6 +200,9 @@ function PainelDaIlha({ ilha, ocupado, aoAtacar, agir, conchas: saldo, noMundo, 
             {ocupado === `atacar:${ilha.id}` ? "Zarpando…" : ilha.dono ? `⚔️ Invadir a ilha de ${ilha.dono.nome}` : "🏴‍☠️ Zarpar e conquistar"}
           </button>
           {!ilha.podeAtacar && ilha.motivoDoAtaque && <p className="pf-estat__nota">{ilha.motivoDoAtaque}</p>}
+          {ilha.semTripulacao && tripulacao && (
+            <PassosDaTripulacao t={tripulacao} conchas={saldo} moedas={moedas} pacotes={pacotes} conchasPorMoeda={conchasPorMoeda} ocupado={ocupado} agir={agir} />
+          )}
           {ilha.dono && !ilha.pacto && (
             <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" disabled={Boolean(ocupado)}
               onClick={() => agir(`pacto:${ilha.dono.id}`, { acao: "pacto", com: ilha.dono.id }, () => `🤝 Pedido de pacto mandado para ${ilha.dono.nome}`)}>
@@ -228,10 +232,54 @@ function PainelDaIlha({ ilha, ocupado, aoAtacar, agir, conchas: saldo, noMundo, 
   );
 }
 
+/**
+ * Os passos para a primeira tripulação (05/11/2026: "estou com o navio comprado, mas a opção de conquistar fica
+ * desabilitada"): o navio sozinho não zarpa. Aqui mesmo, no painel da ilha: trocar moedas por conchas, treinar a
+ * tripulação (piratas e arpoadoras, que o navio aceita sem Porto) e zarpar — sem precisar achar a seção lá embaixo.
+ */
+function PassosDaTripulacao({ t, conchas, moedas, pacotes, conchasPorMoeda, ocupado, agir }) {
+  const basicas = t.catalogo.filter((x) => x.id === "pirata" || x.id === "arpoadora");
+  const maisBarata = Math.min(...basicas.map((x) => x.custo * 5));
+  const falta = Math.max(0, maisBarata - conchas);
+  // o menor pacote de troca que cobre 5 piratas (ou o maior que der)
+  const pacote = pacotes.find((m) => m * conchasPorMoeda >= falta && m <= moedas) || [...pacotes].reverse().find((m) => m <= moedas);
+  return (
+    <div className="il-passos" role="group" aria-label="Como montar a tripulação">
+      <p className="il-passos__titulo">🏴‍☠️ Falta a tripulação para zarpar</p>
+      <ol>
+        <li className={falta === 0 ? "il-passos__feito" : ""}>
+          <span>Conchas para pagar: você tem 🐚 {conchas}.</span>
+          {falta > 0 && (pacote ? (
+            <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" disabled={Boolean(ocupado)}
+              onClick={() => agir(`conchas:${pacote}`, { acao: "conchas", moedas: pacote }, (r) => `🐚 +${r.conchas} conchas`)}>
+              Trocar 🪙 {pacote} → 🐚 {pacote * conchasPorMoeda}
+            </button>
+          ) : <small>Faltam moedas do reino para trocar por conchas.</small>)}
+        </li>
+        <li>
+          <span>Treine a tripulação (o navio leva {t.capacidade} de espaço):</span>
+          <span className="il-passos__botoes">
+            {basicas.map((x) => (
+              <button key={x.id} type="button" className="pf-botao pf-botao--pequeno" disabled={!x.pode5 || Boolean(ocupado)} title={x.motivo || undefined}
+                onClick={() => agir(`treinar:${x.id}`, { acao: "treinar", tropa: x.id, quantidade: 5 }, () => `${x.emoji} +5 ${x.nome}`)}>
+                {x.emoji} +5 {x.nome} · 🐚 {x.custo * 5}
+              </button>
+            ))}
+            <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={() => document.getElementById("il-tripulacao")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+              ver todas as tropas ↓
+            </button>
+          </span>
+        </li>
+        <li><span>Zarpe: ⭐⭐ (a Cabana do Chefe no chão, ou metade da ilha) conquista a ilha.</span></li>
+      </ol>
+    </div>
+  );
+}
+
 function Tripulacao({ t, ocupado, agir }) {
   const lista = Object.entries(t.tropas);
   return (
-    <section className="pf-secao" aria-label="Tripulação">
+    <section className="pf-secao" id="il-tripulacao" aria-label="Tripulação">
       <h2 className="pf-secao__titulo">🏴‍☠️ A tripulação <small>{t.usado} de {t.capacidade} de espaço · Porto {t.porto}</small></h2>
       <p className="pf-estat__nota">Quem vai no navio a cada ataque. O espaço cresce com o Porto das suas ilhas (+12 por nível); as tropas mais fortes pedem um Porto maior.{lista.length ? "" : " Ainda ninguém a bordo."}</p>
       <ul className="il-tripulacao">

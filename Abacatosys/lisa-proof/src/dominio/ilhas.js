@@ -134,7 +134,8 @@ export function podeAtacarIlha({ usuarioId, ilha, temNavio, tripulacao, ataquesH
   if (!ilha) return { ok: false, motivo: "essa ilha não existe" };
   if (ilha.dono_id === usuarioId) return { ok: false, motivo: "a ilha já é sua" };
   if (ataquesHoje >= ATAQUES_DE_ILHA_POR_DIA) return { ok: false, motivo: `já foram os ${ATAQUES_DE_ILHA_POR_DIA} ataques de hoje — amanhã o navio sai de novo` };
-  if (!Object.keys(contagens(tripulacao)).length) return { ok: false, motivo: "treine a tripulação antes de zarpar" };
+  // 05/11/2026 ("estou com o navio comprado, mas a opção de conquistar fica desabilitada"): a mensagem diz onde e como
+  if (!Object.keys(contagens(tripulacao)).length) return { ok: false, semTripulacao: true, motivo: "o navio está sem tripulação: treine piratas (pagos em conchas) para zarpar — os passos estão logo abaixo" };
   if (ilhasMinhas.length >= ILHAS_POR_JOGADOR) return { ok: false, motivo: `você já tem ${ILHAS_POR_JOGADOR} ilhas — o máximo da temporada` };
   if (ilha.escudo_ate && new Date(ilha.escudo_ate).getTime() > agora.getTime()) return { ok: false, motivo: "a ilha acabou de ser conquistada e está com escudo" };
   if (ilha.dono_id && pactoVigente(pactos, usuarioId, ilha.dono_id, agora)) return { ok: false, motivo: "vocês têm um pacto: nada de ataque até ele acabar" };

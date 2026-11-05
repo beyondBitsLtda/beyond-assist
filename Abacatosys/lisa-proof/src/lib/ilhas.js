@@ -152,7 +152,7 @@ export async function estadoDasIlhas(usuarioId) {
         }),
         // para mostrar a ilha no 3D (o mesmo motor da batalha)
         construcoesDoMotor: defensor.construcoes,
-        podeAtacar: pode.ok, motivoDoAtaque: pode.ok ? "" : pode.motivo,
+        podeAtacar: pode.ok, motivoDoAtaque: pode.ok ? "" : pode.motivo, semTripulacao: Boolean(pode.semTripulacao),
         pacto: i.dono_id && !minha ? Boolean(pactoVigente(pactos, usuarioId, i.dono_id, agora)) : false,
       };
     }),

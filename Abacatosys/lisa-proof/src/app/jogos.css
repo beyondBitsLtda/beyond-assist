@@ -89,6 +89,14 @@
 .il-painel__sub { margin: 6px 0 0; font-size: 15px; }
 .il-painel__acoes { display: grid; gap: 8px; justify-items: start; }
 .il-painel__acoes p { margin: 0; }
+/* 05/11/2026: os passos para a primeira tripulação, no painel da ilha (o navio sozinho não zarpa) */
+.il-passos { justify-self: stretch; padding: 12px 14px; border-radius: 16px; border: 1px dashed color-mix(in srgb, var(--pf-verde) 55%, transparent); background: var(--pf-brilho); }
+.il-passos__titulo { margin: 0 0 8px; font-weight: 800; color: var(--pf-tinta); }
+.il-passos ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; font-size: 14px; }
+.il-passos li { display: grid; gap: 6px; justify-items: start; }
+.il-passos li small { color: var(--pf-tinta-2); }
+.il-passos__feito > span::after { content: " ✓"; color: var(--pf-verde-texto); font-weight: 800; }
+.il-passos__botoes { display: flex; flex-wrap: wrap; gap: 6px; }
 .il-defensores { display: grid; gap: 4px; }
 .il-defensores__lista { display: flex; flex-wrap: wrap; gap: 8px; }
 .il-defensor { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
