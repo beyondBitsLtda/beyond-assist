@@ -76,7 +76,7 @@
   --pf-aurora-2: rgba(34, 197, 94, 0.08);
   --pf-aurora-3: rgba(190, 242, 100, 0.14);
   --pf-ruido: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-  --pf-ruido-forca: 0.05;
+  --pf-ruido-forca: 0.025;
   --pf-anel: linear-gradient(155deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.35) 30%, rgba(22, 26, 18, 0.06) 65%, rgba(132, 204, 22, 0.35) 100%);
   --pf-anel-forca: 0.85;
   --pf-veu: radial-gradient(130% 90% at 0% 0%, rgba(132, 204, 22, 0.06), transparent 46%);
@@ -126,7 +126,7 @@
     --pf-aurora-1: rgba(139, 209, 26, 0.24);
     --pf-aurora-2: rgba(34, 197, 94, 0.13);
     --pf-aurora-3: rgba(217, 249, 157, 0.07);
-    --pf-ruido-forca: 0.075;
+    --pf-ruido-forca: 0.035;
     --pf-anel: linear-gradient(155deg, rgba(206, 255, 140, 0.34) 0%, rgba(255, 255, 255, 0.10) 22%, rgba(255, 255, 255, 0.025) 55%, rgba(139, 209, 26, 0.16) 100%);
     --pf-anel-forca: 0.9;
     --pf-veu: radial-gradient(130% 90% at 0% 0%, rgba(190, 255, 110, 0.065), transparent 48%);
@@ -694,11 +694,6 @@ body::after {
   100% { transform: translate3d(2.5vmax, -2vmax, 0) scale(1.02); }
 }
 
-/* o menu lateral também tem o grão */
-.pf-lateral::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background-image: var(--pf-ruido); background-size: 180px 180px; opacity: 0.05; mix-blend-mode: overlay;
-}
 
 /* a borda de luz do cartão: o degradê só na borda (a máscara recorta o meio); por dentro (inset 0), para não passar
    1px da caixa e criar rolagem onde o cartão encosta na borda */
@@ -711,11 +706,10 @@ body::after {
   transition: opacity 0.35s var(--pf-curva), filter 0.35s var(--pf-curva);
 }
 .pf-cartao:hover::before { opacity: 1; filter: brightness(1.35) saturate(1.15); }
-/* o véu: a luz no canto e o grão, por cima e sem pegar o clique */
+/* o véu: só a luz no canto, por cima e sem pegar o clique (04/11/2026: sem o grão — a textura nos cartões não ficou boa) */
 .pf-cartao::after {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  background: var(--pf-veu), var(--pf-ruido) 0 0 / 180px 180px;
-  opacity: 0.55; mix-blend-mode: soft-light;
+  background: var(--pf-veu); opacity: 0.6;
 }
 /* os cartões que são links ou botões sobem um pouco */
 a.pf-cartao, button.pf-cartao { transition: transform 0.3s var(--pf-curva), box-shadow 0.3s var(--pf-curva); }

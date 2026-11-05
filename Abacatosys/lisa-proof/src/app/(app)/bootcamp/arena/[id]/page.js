@@ -708,6 +708,10 @@ function ResultadoDaRodada({ dados, aoRever }) {
       {ameacados.length > 0 && <p className="pf-estat__nota">🔥 Vão para a prova de eliminação: {ameacados.join(", ")}</p>}
       {rodada.avaliacao?.comentarioGeral && <p className="bc-resultado__comentario">“{rodada.avaliacao.comentarioGeral}”</p>}
       {eu && eu.nota !== null && eu.nota !== undefined && <p className="bc-resultado__nota">Sua nota: <strong>{eu.nota}</strong>/100 · {eu.pontos} pontos no torneio</p>}
+      {minha?.moedas > 0 && (
+        <p className="bc-resultado__moedas">🪙 Você ganhou <strong>{minha.moedas}</strong> moedas no reino nesta prova{minha.moedasNoTeto ? " (o teto do dia do Bootcamp é 300)" : ""} · <Link href="/reino">ver o reino</Link></p>
+      )}
+      {minha && !minha.moedas && minha.moedasNoTeto && <p className="pf-estat__nota">🪙 Você já bateu o teto de moedas do Bootcamp hoje (300): esta prova não paga mais.</p>}
       {semCodigo && <p className="pf-aviso">Nenhum código chegou aos jurados nesta prova: o editor estava vazio quando ela fechou. Na próxima, escreva a solução e use “Testar e enviar” na sua baia.</p>}
       {saiu.length > 0 && <p className="pf-estat__nota">Saíram nesta rodada: {saiu.map((id) => nomes.get(id)).join(", ")}.</p>}
       <div className="bc-passo__acoes">

@@ -457,6 +457,19 @@ button.rn-exp__arte:disabled { cursor: progress; }
 .rn-aliado { display: grid; gap: 10px; border-left: 4px solid #15803d; margin-bottom: 12px; }
 .rn-aliado__beneficios { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
 .rn-aliado__beneficios li { display: flex; gap: 8px; }
+/* os vizinhos da paz, com o botão de visitar (04/11/2026) */
+.rn-vizinhos { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.rn-vizinho {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; cursor: pointer; text-align: left;
+  border: 1px solid var(--pf-linha); background: var(--pf-pilula-fundo, var(--pf-superficie-2)); color: var(--pf-tinta); font: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+.rn-vizinho:hover { border-color: rgba(162, 227, 58, 0.45); box-shadow: 0 10px 24px -14px rgba(139, 209, 26, 0.6); transform: translateY(-1px); }
+.rn-vizinho__texto { flex: 1; min-width: 0; display: grid; }
+.rn-vizinho__texto strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rn-vizinho__texto small { color: var(--pf-tinta-3); font-size: 12px; font-weight: 700; }
+.rn-vizinho__ir { color: var(--pf-verde-texto); font-size: 12.5px; font-weight: 800; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .rn-vizinho { transition: none; } .rn-vizinho:hover { transform: none; } }
 .rn-aliado__reino { display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: var(--pf-superficie-2); }
 .rn-aliado__predios { display: flex; flex-wrap: wrap; gap: 6px; }
 .rn-convite-novo { display: grid; gap: 8px; }

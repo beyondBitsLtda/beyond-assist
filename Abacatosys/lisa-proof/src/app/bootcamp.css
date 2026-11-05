@@ -135,8 +135,11 @@
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); align-items: stretch;
     height: calc(100vh - 32px); min-height: 620px; scroll-margin-top: 16px;
   }
-  .bc-arena--codando .bc-arena__desafio { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; border-radius: var(--pf-raio-grande); }
-  .bc-arena--codando .bc-arena__desafio > .bc-desafio { min-height: 100%; align-content: start; }
+  /* o painel do desafio rola por dentro; o cartão cresce com o conteúdo (04/11/2026: "modais atravessando a interface"
+     — com min-height: 100% numa grade, o cartão ficava preso na altura do painel e os exemplos passavam da borda dele) */
+  .bc-arena--codando .bc-arena__desafio { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; border-radius: var(--pf-raio-grande); display: flex; flex-direction: column; gap: 16px; }
+  .bc-arena--codando .bc-arena__desafio > * { flex: none; }
+  .bc-arena--codando .bc-arena__desafio > .bc-desafio { flex: 1 0 auto; align-content: start; }
   .bc-arena--codando .bc-arena__trabalho { min-height: 0; display: flex; flex-direction: column; gap: 12px; }
   .bc-arena--codando .bc-entrega { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
   .bc-arena--codando .bc-entrega > .bc-passo { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -258,6 +261,11 @@
 .bc-resultado__comentario { margin: 0; font-size: 15.5px; font-style: italic; color: var(--pf-tinta-2); }
 .bc-resultado__nota { margin: 0; font-size: 16px; }
 .bc-resultado__nota strong { color: var(--pf-verde-texto); font-size: 22px; }
+/* as moedas do reino que a prova pagou (04/11/2026) */
+.bc-resultado__moedas { margin: 0; padding: 10px 14px; border-radius: 14px; border: 1px solid rgba(240, 190, 69, 0.45); background: linear-gradient(135deg, rgba(240, 190, 69, 0.16), rgba(240, 190, 69, 0.05)); font-weight: 700; }
+.bc-resultado__moedas strong { color: #F0BE45; font-size: 18px; }
+.bc-resultado__moedas a { color: var(--pf-verde-texto); font-weight: 800; }
+:root:not([data-tema="escuro"]) .bc-resultado__moedas strong { color: #9A6B00; }
 
 /* o painel de status e a classificação */
 /* a coluna em minmax(0, 1fr): um nome comprido encolhe (com reticências) em vez de empurrar os pontos para fora */
@@ -504,7 +512,8 @@
 .bc-ficha__pontos h4 { margin: 0 0 6px; font-size: 15px; }
 .bc-ficha__pontos ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-weight: 600; }
 
-@media (prefers-reduced-motion: reduce) { .bc-entrevista, .bc-ficha, .bc-aovivo__insignia { animation: none; } }
+.bc-aovivo__moedas { padding: 6px 12px; border-radius: var(--pf-pilula); background: rgba(240, 190, 69, 0.12); border: 1px solid rgba(240, 190, 69, 0.45); font-weight: 800; animation: bc-revelar 0.5s ease-out 0.25s both; }
+@media (prefers-reduced-motion: reduce) { .bc-entrevista, .bc-ficha, .bc-aovivo__insignia, .bc-aovivo__moedas { animation: none; } }
 
 /* as entrevistas de despedida, para rever no painel dos jurados (1.5.0) */
 .bc-despedidas { display: grid; gap: 8px; }

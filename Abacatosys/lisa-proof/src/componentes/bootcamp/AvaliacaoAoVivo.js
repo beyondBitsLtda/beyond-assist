@@ -188,6 +188,7 @@ export default function AvaliacaoAoVivo({ avaliacao, participantes, jurados, apr
                 {fase === "resultado" && passo.insignia && (
                   <span className="bc-aovivo__insignia">{insignias[passo.insignia]?.emoji || "🎖️"} ganhou a insígnia <strong>{insignias[passo.insignia]?.nome || passo.insignia}</strong></span>
                 )}
+                {fase === "resultado" && passo.moedas > 0 && <span className="bc-aovivo__moedas">🪙 +{passo.moedas} moedas no reino</span>}
                 {passo.fala && fase === "resultado" && <p className="bc-nota__fala">“{passo.fala}”</p>}
               </div>
             )}

@@ -65,7 +65,7 @@ function Mes({ dados, itens, selecionado, aoSelecionar }) {
               </span>
               <span className="agenda__chips" aria-hidden="true">
                 {doDia.slice(0, 3).map((x) => (
-                  <span key={x.chave} className={`agenda__chip agenda__chip--${x.situacao}`} style={{ "--cor": x.cor }}>
+                  <span key={x.chave} className={`agenda__chip agenda__chip--${x.situacao}`} style={{ "--cor": x.cor }} title={`${textoDaEtiqueta(x)} · ${x.tema}`}>
                     <span className="agenda__chip-texto">{ICONES[x.tipo]} {textoDaEtiqueta(x)}</span>
                   </span>
                 ))}

@@ -244,12 +244,18 @@ export default function Terminal({ mundo = "real" }) {
               ? <GraficoDoDia horas={acao.horas} abertura={acao.abertura} previsoes={previsoesDoDia(mesa, acao.id, quem)} rotulo={`${acao.nome} hoje: abriu a ${preco(acao.abertura)}, agora ${preco(acao.preco)}`} />
               : <GraficoDeVelas velas={acao.velas} previsoes={previsoesDosPregoes(mesa, acao.id, quem)} rotulo={`${acao.nome} nos últimos ${acao.velas.length} dias`} />}
             {acao.noticia && <p className="bx-noticia"><span>📰</span> {acao.noticia}</p>}
-            <OpinioesDaAcao mesa={mesa} acao={acao} />
             <p className="bx-descricao">{acao.descricao}</p>
           </section>
         )}
 
         {acao && <Boleta acao={acao} saldo={bolsa.saldo} regras={bolsa.regras} ocupado={ocupado} pregao={p} teste={teste} aoEnviar={negociar} />}
+
+        {/* o que a mesa projeta para a ação escolhida: uma faixa larga, embaixo da ação e da boleta (04/11/2026) */}
+        {acao && mesa && (
+          <section className="bx-painel bx-opinioes-painel" aria-label={`O que os consultores dizem sobre ${acao.nome}`}>
+            <OpinioesDaAcao mesa={mesa} acao={acao} />
+          </section>
+        )}
       </div>
 
       <div className="bx-mesa-faixa">

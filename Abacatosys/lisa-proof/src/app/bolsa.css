@@ -70,14 +70,20 @@
 .bx-manchete span { display: inline-block; margin-right: 8px; padding: 1px 8px; border-radius: 6px; background: var(--bx-amarelo); color: #1f1300; font-size: 11px; font-weight: 800; letter-spacing: 0.04em; }
 
 /* ---- a grade: lista | ação | boleta */
-.bx-grade-principal { display: grid; gap: 12px; padding: 0 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "acao" "boleta" "lista"; }
+.bx-grade-principal { display: grid; gap: 12px; padding: 0 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "acao" "opinioes" "boleta" "lista"; }
 @container bolsa (min-width: 760px) {
-  .bx-grade-principal { grid-template-columns: 290px minmax(0, 1fr); grid-template-areas: "lista acao" "lista boleta"; }
+  .bx-grade-principal { grid-template-columns: 290px minmax(0, 1fr); grid-template-areas: "lista acao" "lista boleta" "opinioes opinioes"; }
 }
-/* três colunas quando o terminal é largo: antes disso, a boleta vai embaixo do gráfico (que fica largo) */
+/* três colunas quando o terminal é largo: antes disso, a boleta vai embaixo do gráfico (que fica largo). As opiniões
+   dos consultores ficam numa faixa da largura toda, embaixo (04/11/2026: dentro da ação, deixavam um vão nas outras) */
 @container bolsa (min-width: 1180px) {
-  .bx-grade-principal { grid-template-columns: 300px minmax(0, 1fr) 330px; grid-template-areas: "lista acao boleta"; }
+  .bx-grade-principal { grid-template-columns: 300px minmax(0, 1fr) 330px; grid-template-areas: "lista acao boleta" "opinioes opinioes opinioes"; }
 }
+.bx-opinioes-painel { grid-area: opinioes; }
+.bx-opinioes-painel > .bx-opinioes { margin: 0; padding: 0; background: none; }
+@container bolsa (min-width: 760px) { .bx-opinioes-painel .bx-opinioes__lista { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; } }
+@container bolsa (min-width: 1180px) { .bx-opinioes-painel .bx-opinioes__lista { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.bx-opinioes-painel .bx-opinioes__lista li { padding: 8px 10px; border-radius: 12px; background: var(--bx-painel-2); }
 .bx-lista { grid-area: lista; }
 .bx-acao { grid-area: acao; }
 .bx-boleta { grid-area: boleta; }
@@ -251,8 +257,12 @@
 .bx-mesa h2 { font-size: 17px; }
 .bx-mesa__sub { margin: 4px 0 12px; color: var(--bx-texto-2); font-size: 13px; max-width: 80ch; }
 .bx-mesa__grade { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
-@container bolsa (min-width: 1100px) { .bx-mesa__grade { grid-template-columns: minmax(0, 1fr) 290px; } }
-.bx-mesa__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); }
+@container bolsa (min-width: 1100px) { .bx-mesa__grade { grid-template-columns: minmax(0, 1fr) 290px; align-items: start; } }
+/* 04/11/2026: com auto-fill, a tela larga dava 4 por linha (e a 2ª linha com 2 e um vão); e a lista, esticada até a
+   altura do placar, esticava os cartões junto. Agora são 1, 2 ou 3 colunas (os 6 em linhas cheias) e nada estica. */
+.bx-mesa__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); align-content: start; }
+@container bolsa (min-width: 620px) { .bx-mesa__lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container bolsa (min-width: 1100px) { .bx-mesa__lista { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .bx-consultor {
   width: 100%; height: 100%; display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px 12px; align-items: start; text-align: left;
   padding: 10px; border-radius: 14px; border: 1px solid var(--bx-linha); border-top: 3px solid var(--cor); background: var(--bx-painel-2);

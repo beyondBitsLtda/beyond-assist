@@ -241,7 +241,7 @@ async function pazParaTela(usuarioId, apurou = false) {
   const { paz, votacao } = await pazDeAgora();
   if (paz) {
     const total = await totalDeReinos();
-    const { data: outros } = await db.from("proof_reinos").select("usuario_id, nome, construcoes, trofeus").neq("usuario_id", usuarioId).order("trofeus", { ascending: false }).limit(12);
+    const { data: outros } = await db.from("proof_reinos").select("usuario_id, nome, construcoes, trofeus").neq("usuario_id", usuarioId).order("trofeus", { ascending: false }).limit(40);
     const nomes = await nomesPublicos((outros || []).map((r) => r.usuario_id));
     return {
       vigente: {
@@ -498,6 +498,15 @@ async function lancarEGravar(reino, lancamentos, mudancas) {
 /** Lança moedas a favor de alguém. Devolve o id do lançamento (para desfazer, se o resto falhar). */
 export function creditarMoedas(usuarioId, tipo, valor, detalhe = {}) {
   return noMundo("real", () => lancar(usuarioId, tipo, valor, detalhe));
+}
+
+/** Quantas moedas de um tipo alguém já recebeu num dia (o `dia` vai no detalhe do lançamento; o teto do Bootcamp). */
+export function moedasDoDia(usuarioId, tipo, dia = diaDe()) {
+  return noMundo("real", async () => {
+    const { data, error } = await db.from("proof_reino_movimentos").select("valor").eq("usuario_id", usuarioId).eq("tipo", tipo).eq("detalhe->>dia", dia);
+    falhou(error, "livro-caixa");
+    return (data || []).reduce((s, m) => s + (Number(m.valor) || 0), 0);
+  });
 }
 
 /** Desfaz lançamentos feitos por creditarMoedas. */

@@ -12,13 +12,14 @@
 import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
 import { destinatarios } from "./correio.js";
-import { nomesPublicos } from "./reino.js";
+import { nomesPublicos, creditarMoedas, moedasDoDia } from "./reino.js";
 import { lerArquivoDoRepo, lerEnderecoDoRepo, ErroDoGitHub } from "./github.js";
 import { temModelo } from "./ia.js";
 import { gerarDesafioDosJurados, avaliarComOsJurados } from "./iaBootcamp.js";
 import { prepararParaCompilador, resultadoDoServidor } from "@/dominio/execucao.js";
 import { sorteio } from "@/dominio/bolsa.js";
 import { sementeDe } from "@/dominio/modoDominio.js";
+import { diaDe } from "@/dominio/datas.js";
 import {
   BOOTCAMP, FORMATOS, JURADOS, LINGUAGENS_DO_BOOTCAMP, ORDEM_DAS_LINGUAGENS, NPCS_DO_BOOTCAMP, ETAPAS_DO_FLUXO, MODELOS_DE_CODIGO,
   npcPorId, chaveDaLinguagem, caminhoPadrao, avancarNoFluxo, validarConfiguracao, totalDeRodadas, dificuldadeDaRodada,
@@ -31,6 +32,7 @@ import {
   aplicarResultadoDaProva, APRESENTADORA, provaDoTorneio, testarNaBancada,
   rotuloDaProva, desafioColaborativo, dividirPartes, modeloDasPartes, programaDoTime, programaDeTeste, codigoDoNpcNasPartes,
   acertosDoNpcNasPartes, reviewDaParteDoNpc, despedidaDoNpc, analisarCodigo, reviewDaAnalise, completarReview, DESAFIOS_DE_RESERVA,
+  moedasDaProva,
 } from "@/dominio/bootcamp.js";
 
 const falhou = (error, onde) => { if (error) throw new ErroDeAcesso(500, `${onde}: ${error.message}`); };
@@ -354,6 +356,7 @@ export async function torneioParaTela(usuarioId, id) {
         participantes: (rodada.avaliacao?.participantes || []).map((a) => ({
           id: a.id, nome: a.nome, tipo: a.tipo, nota: a.nota, notas: a.notas, resultado: a.resultado, fala: a.fala || "", pontosAntes: a.pontosAntes ?? null,
           testes: a.testes, linguagem: a.linguagem || null, review: a.review || [], insignia: a.insignia || null,
+          moedas: a.moedas || 0, moedasNoTeto: Boolean(a.moedasNoTeto),
           pontosFortes: a.pontosFortes || [], pontosFracos: a.pontosFracos || [], despedida: a.despedida || [],
         })),
       } : null,
@@ -811,6 +814,10 @@ export async function chamarJurados(usuarioId, id) {
   falhou(eTrava, "rodada");
   if (!travada?.length) throw new ErroDeAcesso(409, "os jurados já estão avaliando a rodada");
 
+  // as moedas do reino de cada humano: creditadas só depois que a avaliação e o torneio gravaram (a trava acima
+  // garante uma avaliação por rodada; se algo falhar no meio, a rodada reabre e nada foi pago)
+  const creditos = [];
+  const dia = diaDe();
   try {
     const desafio = rodada.desafio;
     // os jurados avaliam só quem jogou esta prova (quem ficou salvo assiste)
@@ -923,12 +930,28 @@ export async function chamarJurados(usuarioId, id) {
       return res.salvos.includes(pid) ? "salvo" : "ameacado";
     };
     const insigniaDaProva = temporada ? (prova.tipo === "final" ? "final" : prova.tipo) : "rodada";
+    const moedasDe = new Map();
+    for (const a of avaliados) {
+      const p = t.participantes.find((x) => x.id === a.id);
+      if (a.tipo !== "humano" || !p?.usuarioId) continue;
+      const jaHoje = await moedasDoDia(p.usuarioId, "bootcamp", dia).catch(() => 0);
+      const m = moedasDaProva({
+        // vale quem enviou e quem deixou o código no editor (desde a 1.4.1 os jurados avaliam esse código também)
+        nota: a.nota, enviou: a.enviou || Boolean(humanos.find((h) => h.id === a.id)?.temCodigo), venceu: (res.vencedores || []).includes(a.id),
+        campeao: Boolean(res.encerrado && res.campeao === a.id), vice: resultadoDe(a.id) === "vice",
+      }, jaHoje);
+      moedasDe.set(a.id, m);
+      if (m.moedas > 0) creditos.push({ usuarioId: p.usuarioId, moedas: m.moedas, detalhe: { dia, torneio: t.id, rodada: rodada.numero, prova: prova.tipo || t.formato, nota: a.nota, partes: m.partes } });
+    }
     const avaliacao = {
       origem: ia ? "jurados" : "automatica",
       comentarioGeral: ia?.comentarioGeral || "Os jurados conferiram os testes, o plano e as regras de cada entrega.",
       prova: { tipo: prova.tipo, episodio: prova.episodio },
       participantes: avaliados.map((a) => {
-        const base = { ...a, resultado: resultadoDe(a.id), insignia: (res.vencedores || []).includes(a.id) ? insigniaDaProva : null, pontosAntes: t.participantes.find((x) => x.id === a.id)?.pontos ?? 0 };
+        const base = {
+          ...a, resultado: resultadoDe(a.id), insignia: (res.vencedores || []).includes(a.id) ? insigniaDaProva : null, pontosAntes: t.participantes.find((x) => x.id === a.id)?.pontos ?? 0,
+          ...(moedasDe.has(a.id) ? { moedas: moedasDe.get(a.id).moedas, moedasNoTeto: moedasDe.get(a.id).noTeto } : {}),
+        };
         if (base.resultado !== "eliminado" || a.tipo !== "npc") return base;
         const p = t.participantes.find((x) => x.id === a.id);
         const npc = p && npcDoTorneio(p, t);
@@ -965,6 +988,10 @@ export async function chamarJurados(usuarioId, id) {
     // deu errado no meio: a rodada volta a ficar aberta para chamar os jurados de novo
     await supabase.from("proof_bootcamp_rodadas").update({ status: "aberta" }).eq("id", rodada.id).eq("status", "avaliando");
     throw e;
+  }
+  // a avaliação já valeu: uma falha no livro-caixa não desfaz a prova (fica no log para conferir)
+  for (const c of creditos) {
+    await creditarMoedas(c.usuarioId, "bootcamp", c.moedas, c.detalhe).catch((e) => console.warn("[bootcamp] moedas não creditadas:", e?.message || e));
   }
   return torneioParaTela(usuarioId, id);
 }

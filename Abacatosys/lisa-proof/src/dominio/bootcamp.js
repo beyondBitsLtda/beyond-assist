@@ -907,6 +907,31 @@ export function notaDaRodada(notas) {
   return Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10);
 }
 
+/**
+ * As moedas do reino que cada prova do Bootcamp paga (04/11/2026: "a cada prova passada o usuário deveria ganhar as
+ * moedas"). Só para gente (os personagens da CPU não têm reino) e só para quem deixou código para os jurados: metade da nota (até 50), mais
+ * o bônus de quem venceu a prova (a insígnia), do campeão e do vice da temporada. O teto do dia segura quem quisesse
+ * criar torneio atrás de torneio só para juntar moedas.
+ */
+export const MOEDAS_DO_BOOTCAMP = { porPonto: 0.5, vitoria: 25, campeao: 150, vice: 50, tetoDoDia: 300 };
+
+/** As moedas de um competidor numa prova: `{ moedas, bruto, partes, noTeto }`. `jaHoje`: o que já recebeu hoje. */
+export function moedasDaProva({ nota, enviou, venceu = false, campeao = false, vice = false }, jaHoje = 0) {
+  const M = MOEDAS_DO_BOOTCAMP;
+  const partes = [];
+  if (enviou) {
+    const pelaNota = Math.round(entre(Number(nota) || 0, 0, 100) * M.porPonto);
+    if (pelaNota > 0) partes.push({ motivo: "nota", moedas: pelaNota });
+    if (campeao) partes.push({ motivo: "campeão", moedas: M.campeao });
+    else if (venceu) partes.push({ motivo: "vitória da prova", moedas: M.vitoria });
+    if (vice && !campeao) partes.push({ motivo: "vice", moedas: M.vice });
+  }
+  const bruto = partes.reduce((s, p) => s + p.moedas, 0);
+  const sobra = Math.max(0, M.tetoDoDia - Math.max(0, Number(jaHoje) || 0));
+  const moedas = Math.min(bruto, sobra);
+  return { moedas, bruto, partes, noTeto: bruto > moedas };
+}
+
 /** As notas de um personagem: saem da simulação; o status de arquitetura dele puxa a Chef Vetor. */
 export function notasDoNpc(npc, sim) {
   const f = sim.total ? sim.passados / sim.total : 0;
@@ -1493,6 +1518,7 @@ export function roteiroDaAvaliacao(avaliacao) {
       campeao: Boolean(avaliacao.campeao && avaliacao.campeao === a.id),
       review: Array.isArray(a.review) ? a.review : [],
       notas: a.notas || {}, testes: a.testes || { passados: 0, total: 0 }, insignia: a.insignia || null,
+      moedas: Number(a.moedas) || 0,
       // quem sai (humano ou personagem da CPU) ganha a cena da despedida, quando a entrevista existe
       despedir: a.resultado === "eliminado" && Array.isArray(a.despedida) && a.despedida.length > 0,
       despedida: Array.isArray(a.despedida) ? a.despedida : [],

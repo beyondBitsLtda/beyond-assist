@@ -9,14 +9,31 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.6.0",
-  "atualizadoEm": "2026-11-05",
+  "versao": "1.7.0",
+  "atualizadoEm": "2026-11-04",
   "compilacao": {
-    "numero": 109,
-    "data": "2026-11-05",
+    "numero": 110,
+    "data": "2026-11-04",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.7.0",
+      "data": "2026-11-04",
+      "branch": "main",
+      "tipo": "funcionalidade",
+      "resumo": "Cada prova do Bootcamp paga moedas do reino, a ilha da Lisa volta a aparecer na paz, o desafio do Bootcamp não atravessa mais a interface e a Agenda e a Bolsa ficaram sem espaço vazio e sem a textura nos cartões.",
+      "itens": [
+        "Bootcamp: cada prova paga moedas do reino a quem deixou código para os jurados — metade da nota (até 50), mais 25 para quem vence a prova, 150 para o campeão e 50 para o vice, com o teto de 300 por dia. As moedas aparecem na avaliação ao vivo e no resultado, e só entram no reino depois que a avaliação gravou.",
+        "Reino na paz: o mundo 3D desenhava só 6 ilhas vizinhas e a 7ª (a Cidadela da Lisa) ficava de fora. Agora cabem 10, em dois anéis, e o painel da paz lista todos os vizinhos com o botão Visitar.",
+        "Bootcamp: no modo de codificação, o cartão do desafio ficava preso na altura do painel e os exemplos de entrada e saída passavam da borda; agora o cartão cresce com o conteúdo e rola por dentro.",
+        "Visual: a textura (o grão) saiu dos cartões e do menu lateral, e a do fundo ficou bem mais fraca.",
+        "Agenda: o mês usa a tela larga, com dias maiores e etiquetas mais legíveis (o texto inteiro ao passar o mouse), e o painel do dia virou um cartão ao lado que rola por dentro.",
+        "Bolsa: \"O que os consultores dizem\" virou uma faixa larga em 3 colunas embaixo da ação e da boleta (sem o vão ao lado), e a Mesa dos Consultores tem 3 cartões por linha, sem cartão esticado.",
+        "Banco: a migração 035 acrescenta o tipo \"bootcamp\" no livro-caixa das moedas."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.6.0",
       "data": "2026-11-05",
@@ -1758,7 +1775,7 @@
         "Minigame do dia na Prática (a antiga Arena Lúdica): masmorra de depuração, mascote programável e quebra-cabeças de Parsons, com terminal, explicação da Lisa, +30 pontos uma vez por dia e recompensa por fase nova",
         "Exemplo da Lisa: uma aplicação de exemplo com os conceitos de cada exercício e projeto, sem resolver o desafio",
         "Menu do Reino em abas (Reino, Batalha, Expedições, Forja e Bolsa), com contadores e barra fixa ao rolar",
-        "Modo Bootcamp: temporada no estilo reality (prova de imunidade, em equipe pela média ou colaborativa, com o código do time dividido em partes que se juntam, e prova de eliminação, que tira 1, a cada episódio, insígnia para todo vencedor e grande final numa arena com torcida) ou modos rápidos (mata-mata e pontos corridos), até 8 competidores (pessoas do Proof e personagens da Lisa com skin, personalidade, status e especialidades), escritório de TI em 3D com 5 cenários, nível contra a CPU, 3 jurados desenhados, avaliação ao vivo com code review, medidor de emoção e despedida de todo eliminado com a apresentadora, entrega no editor da tela (com o rascunho salvo sozinho e \"Testar e enviar\" num clique) ou pelo GitHub e testes de entrada e saída num compilador on-line"
+        "Modo Bootcamp: temporada no estilo reality (prova de imunidade, em equipe pela média ou colaborativa, com o código do time dividido em partes que se juntam, e prova de eliminação, que tira 1, a cada episódio, insígnia para todo vencedor e grande final numa arena com torcida) ou modos rápidos (mata-mata e pontos corridos), até 8 competidores (pessoas do Proof e personagens da Lisa com skin, personalidade, status e especialidades), escritório de TI em 3D com 5 cenários, nível contra a CPU, 3 jurados desenhados, avaliação ao vivo com code review, medidor de emoção e despedida de todo eliminado com a apresentadora, entrega no editor da tela (com o rascunho salvo sozinho e \"Testar e enviar\" num clique) ou pelo GitHub e testes de entrada e saída num compilador on-line, e moedas do reino a cada prova (pela nota, com bônus para quem vence, o campeão e o vice, e teto de 300 por dia)"
       ],
       "naoInclui": [
         "Não executa o código de ninguém no próprio servidor: o Rodar, a Arena Lúdica e os testes do Modo Bootcamp rodam no Wandbox (compilador on-line); os exercícios e projetos da prática são corrigidos pela IA lendo o código.",

@@ -692,7 +692,9 @@ const raioDoAcampamento = (nivel) => 2.4 + 0.65 * (Math.max(1, Math.min(4, nivel
 const PARA_A_CAMERA = [Math.SQRT1_2, Math.SQRT1_2];   // de onde a câmera olha, no começo
 const PARA_O_LADO = [Math.SQRT1_2, -Math.SQRT1_2];    // a direita da tela, no começo
 const VAO_DA_PONTE = 1.3;
-const MAXIMO_DE_VIZINHOS = 6; // na paz, quantas ilhas vizinhas cabem em volta do reino
+// na paz, quantas ilhas vizinhas cabem em volta do reino (04/11/2026: eram 6, e com 8 reinos a 7ª — a Cidadela da
+// Lisa — ficava de fora; acima de 6 elas se alternam em dois anéis). Quem passar disso aparece no painel da paz.
+const MAXIMO_DE_VIZINHOS = 10;
 
 function ilhaDoAcampamento(p, nivel) {
   const g = new THREE.Group();
@@ -2047,10 +2049,13 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
         const ang = ((k === 1 ? 150 : 40 + (170 * i) / (k - 1)) * Math.PI) / 180;
         const dir = [Math.cos(ang) * PARA_O_LADO[0] - Math.sin(ang) * PARA_A_CAMERA[0], Math.cos(ang) * PARA_O_LADO[1] - Math.sin(ang) * PARA_A_CAMERA[1]];
         const rv = raioDaIlha(terreno) * ESCALA_DO_VIZINHO;
-        const dist = R + VAO_DA_PONTE + rv;
+        // com mais de 6, uma sim, uma não vai para o anel de fora (as ilhas não se encostam)
+        const anelDeFora = k > 6 && i % 2 === 1;
+        const dist = R + VAO_DA_PONTE + rv + (anelDeFora ? 2 * rv + 1.1 : 0);
         const centro = [dir[0] * dist, dir[1] * dist];
         g.position.set(centro[0], 0, centro[1]);
-        const ponteDaIlha = ponte(p, [dir[0] * (R - 0.2), dir[1] * (R - 0.2)], [dir[0] * (R + VAO_DA_PONTE + 0.25), dir[1] * (R + VAO_DA_PONTE + 0.25)]);
+        const fimDaPonte = dist - rv + 0.25; // no anel de fora, a ponte passa entre as ilhas de dentro
+        const ponteDaIlha = ponte(p, [dir[0] * (R - 0.2), dir[1] * (R - 0.2)], [dir[0] * fimDaPonte, dir[1] * fimDaPonte]);
         g.visible = !emBatalha;
         ponteDaIlha.visible = !emBatalha;
         mundo.add(g, ponteDaIlha);

@@ -3816,6 +3816,55 @@ caso("BEYOND-0020: a Temporada das Ilhas — conquista, construção com conchas
   assert.match(fs.readFileSync(new URL("../db/030-versao-1.sql", import.meta.url), "utf8"), /'ilhas', 'arena'\)\);/);
 });
 
+caso("1.7.0: as moedas do reino no Bootcamp, a ilha da Lisa na paz, o desafio sem estourar e a Agenda e a Bolsa sem vão", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const { moedasDaProva, MOEDAS_DO_BOOTCAMP: M } = bootcamp;
+  // a regra: metade da nota, o bônus de quem venceu, do campeão e do vice, e o teto do dia
+  assert.equal(moedasDaProva({ nota: 80, enviou: true }).moedas, 40, "metade da nota");
+  assert.equal(moedasDaProva({ nota: 81, enviou: true }).moedas, 41, "arredondada");
+  assert.equal(moedasDaProva({ nota: 80, enviou: true, venceu: true }).moedas, 40 + M.vitoria, "quem vence a prova ganha o bônus");
+  assert.equal(moedasDaProva({ nota: 100, enviou: true, venceu: true, campeao: true }).moedas, 50 + M.campeao, "o campeão leva o bônus de campeão (sem somar o da vitória)");
+  assert.equal(moedasDaProva({ nota: 60, enviou: true, vice: true }).moedas, 30 + M.vice, "o vice também ganha");
+  assert.equal(moedasDaProva({ nota: 90, enviou: false, venceu: true }).moedas, 0, "sem código para os jurados, sem moedas");
+  assert.equal(moedasDaProva({ nota: 0, enviou: true }).moedas, 0, "nota zero não paga");
+  assert.equal(moedasDaProva({ nota: 140, enviou: true }).moedas, 50, "a nota passa de 100 só no erro: a conta trava em 50");
+  const quase = moedasDaProva({ nota: 80, enviou: true }, M.tetoDoDia - 10);
+  assert.deepEqual([quase.moedas, quase.bruto, quase.noTeto], [10, 40, true], "o teto do dia corta o que passar");
+  const cheio = moedasDaProva({ nota: 80, enviou: true }, M.tetoDoDia + 5);
+  assert.deepEqual([cheio.moedas, cheio.noTeto], [0, true], "com o teto batido, a prova não paga");
+  assert.deepEqual(moedasDaProva({ nota: 80, enviou: true, venceu: true }).partes.map((p) => p.motivo), ["nota", "vitória da prova"], "as partes vão no lançamento");
+  assert.equal(bootcamp.roteiroDaAvaliacao({ participantes: [{ id: "h:1", nome: "Eu", tipo: "humano", nota: 70, moedas: 35 }] })[0].moedas, 35, "a avaliação ao vivo leva as moedas");
+  // o crédito: só depois que a avaliação e o torneio gravaram (se algo falhar no meio, a rodada reabre e nada foi pago)
+  const lib = ler("../src/lib/bootcamp.js");
+  const reabre = lib.indexOf(`update({ status: "aberta" }).eq("id", rodada.id).eq("status", "avaliando")`);
+  const credita = lib.indexOf(`await creditarMoedas(c.usuarioId, "bootcamp", c.moedas, c.detalhe)`);
+  assert.ok(reabre > 0 && credita > reabre, "credita depois do bloco que pode reabrir a rodada");
+  assert.match(lib, /moedasDoDia\(p\.usuarioId, "bootcamp", dia\)/, "o teto lê o que a pessoa já ganhou hoje");
+  assert.match(lib, /moedas: a\.moedas \|\| 0, moedasNoTeto: Boolean\(a\.moedasNoTeto\)/, "a tela recebe as moedas de cada um");
+  const sql = ler("../db/035-bootcamp-moedas.sql");
+  assert.equal((sql.match(/'arena', 'bootcamp'/g) || []).length, 2, "o tipo 'bootcamp' no livro-caixa de verdade e no de teste, sem perder os outros");
+  // a ilha da Lisa: até 10 ilhas no mundo 3D (eram 6), o servidor manda até 40 e o painel da paz lista todos para visitar
+  assert.match(ler("../src/componentes/reino/Mundo3D.js"), /const MAXIMO_DE_VIZINHOS = 10;/, "10 ilhas vizinhas");
+  assert.match(ler("../src/componentes/reino/Mundo3D.js"), /const fimDaPonte = dist - rv \+ 0\.25;/, "a ponte do anel de fora chega na ilha");
+  assert.match(ler("../src/lib/reino.js"), /\.neq\("usuario_id", usuarioId\)\.order\("trofeus", \{ ascending: false \}\)\.limit\(40\)/, "a paz manda até 40 vizinhos");
+  assert.match(ler("../src/app/(app)/reino/page.js"), /className="rn-vizinho" data-so-olhar onClick=\{\(\) => aoVisitar\?\.\(x\)\}/, "cada vizinho tem o botão de visitar");
+  // o desafio do Bootcamp cresce com o conteúdo dentro do painel que rola (antes, min-height: 100% o prendia)
+  const bc = ler("../src/app/bootcamp.css");
+  assert.match(bc, /\.bc-arena--codando \.bc-arena__desafio > \.bc-desafio \{ flex: 1 0 auto;/, "o cartão do desafio cresce");
+  assert.doesNotMatch(bc, /\.bc-arena__desafio > \.bc-desafio \{ min-height: 100%/, "sem o min-height que prendia o cartão");
+  // sem a textura nos cartões e no menu
+  const css = ler("../src/app/globals.css");
+  assert.doesNotMatch(css, /\.pf-cartao::after \{[^}]*--pf-ruido/, "o cartão sem o grão");
+  assert.doesNotMatch(css, /\.pf-lateral::after/, "o menu sem o grão");
+  // a Agenda na tela larga e a Bolsa sem o vão ao lado das opiniões
+  assert.match(ler("../src/app/agenda.css"), /\.pf-principal:has\(\.agenda__layout\) \{ max-width: 1480px; \}/, "a agenda usa a tela larga");
+  const bx = ler("../src/app/bolsa.css");
+  assert.match(bx, /grid-template-areas: "lista acao boleta" "opinioes opinioes opinioes";/, "as opiniões numa faixa larga");
+  assert.match(bx, /\.bx-mesa__lista \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/, "a mesa em 3 colunas (6 cartões em 2 linhas cheias)");
+  const terminal = ler("../src/componentes/bolsa/Terminal.js");
+  assert.ok(terminal.indexOf("bx-opinioes-painel") > terminal.indexOf("<Boleta acao="), "as opiniões saem de dentro do painel da ação");
+});
+
 caso("1.6.0: o visual premium em todas as telas e os banners do Bootcamp e das Grandes Expedições depois da 1.0", () => {
   const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
   const css = ler("../src/app/globals.css");

@@ -451,7 +451,7 @@ export default function Reino() {
 
   // ---- as partes do reino: a página mostra todas, uma embaixo da outra; a tela cheia, uma por vez num menu
   const secoes = {
-    paz: () => <Paz reino={reino} ocupado={ocupado} aoAgir={agirPaz} aoPropor={() => setPropondo(true)} />,
+    paz: () => <Paz reino={reino} ocupado={ocupado} aoAgir={agirPaz} aoPropor={() => setPropondo(true)} aoVisitar={(x) => { setIlhaNoMundo(null); visitar(x); }} />,
     minas: () => (
       <>
         <div className="pf-grade pf-grade--2 pf-secao">
@@ -1169,7 +1169,7 @@ function Termos({ termos }) {
 }
 
 /** A paz entre os reinos: a paz que vale agora, a votação aberta (com o placar e o voto) ou o convite para propor. */
-function Paz({ reino, ocupado, aoAgir, aoPropor }) {
+function Paz({ reino, ocupado, aoAgir, aoPropor, aoVisitar }) {
   const paz = reino.paz || {};
   const v = paz.vigente, vt = paz.votacao;
   return (
@@ -1186,8 +1186,22 @@ function Paz({ reino, ocupado, aoAgir, aoPropor }) {
             <li>⚔️ <span>Sem guerra: nenhum reino pode invadir outro</span></li>
             <li>⛏️ <span>A sua mina rende ×{v.fatorDaMina}: {formatarMoedas(reino.mina.porHora)} moeda(s) por hora</span></li>
             <li>🗺️ <span>Expedições repartem: quando alguém saqueia, cada um dos outros reinos ganha {Math.round(v.parteDaExpedicao * 100)}% do saque</span></li>
-            <li>🏝️ <span>Todos vizinhos: {v.vizinhos.map((x) => x.nome).join(", ") || "—"}</span></li>
+            <li>🏝️ <span>Todos viram vizinhos: toque numa ilha no mundo 3D, ou visite por aqui</span></li>
           </ul>
+          {/* todos os vizinhos, com o botão de visitar: o mundo 3D desenha até 10 ilhas, e esta lista não tem limite */}
+          {v.vizinhos.length > 0 && (
+            <ul className="rn-vizinhos" aria-label="Os reinos vizinhos">
+              {v.vizinhos.map((x) => (
+                <li key={x.id}>
+                  <button type="button" className="rn-vizinho" data-so-olhar onClick={() => aoVisitar?.(x)}>
+                    <span aria-hidden="true">🏝️</span>
+                    <span className="rn-vizinho__texto"><strong>{x.nome}</strong><small>{x.dono}</small></span>
+                    <span className="rn-vizinho__ir">Visitar →</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </article>
       )}
       {vt && (

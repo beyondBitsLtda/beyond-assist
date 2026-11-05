@@ -14,10 +14,29 @@
 .agenda__filtro[aria-pressed="false"] { opacity: 0.45; text-decoration: line-through; }
 .agenda__bolinha { width: 10px; height: 10px; border-radius: 50%; background: var(--cor); }
 
-.agenda__layout { display: grid; gap: 16px; }
-@media (min-width: 1440px) { .agenda__layout { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; } }
-.agenda__painel { display: grid; gap: 8px; }
-@media (min-width: 1440px) { .agenda__painel { position: sticky; top: 16px; } }
+/* 04/11/2026 ("elementos desproporcionais, espaços vazios"): no mês, a agenda usa a tela larga (antes ficava em 1080px
+   no meio, com o calendário espremido e as etiquetas cortadas); o painel do dia vira um cartão ao lado, da altura da
+   tela, que rola por dentro em vez de esticar a página */
+.pf-principal:has(.agenda__layout) { max-width: 1480px; }
+.agenda__layout { display: grid; gap: 18px; }
+@media (min-width: 1200px) { .agenda__layout { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; } }
+.agenda__painel {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 16px; border-radius: var(--pf-raio-grande, 20px);
+  border: 1px solid var(--pf-linha); background: var(--pf-superficie); box-shadow: var(--pf-cartao-sombra);
+}
+.agenda__painel > .pf-secao__titulo { margin: 0; flex-direction: row; align-items: baseline; }
+.agenda__painel > .pf-secao__titulo small { font-size: 12.5px; color: var(--pf-tinta-3); font-weight: 700; white-space: nowrap; }
+.agenda__painel .agenda__lista { min-height: 0; }
+@media (min-width: 1200px) {
+  .agenda__painel { position: sticky; top: 16px; max-height: calc(100vh - 32px); }
+  .agenda__painel .agenda__lista { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 2px; }
+}
+/* embaixo do calendário (telas médias), os compromissos do dia em colunas, para não virar uma tira comprida */
+@media (min-width: 760px) and (max-width: 1199px) { .agenda__painel .agenda__lista { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); } }
+.agenda__painel .agenda__item { padding: 10px 12px; gap: 10px; border-radius: 12px; }
+.agenda__painel .agenda__icone { font-size: 18px; }
+.agenda__painel .agenda__textos strong { font-size: 13.5px; }
+.agenda__painel .agenda__item .pf-pilula { font-size: 11px; padding: 3px 8px; white-space: nowrap; }
 
 .agenda__navegacao { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .agenda__mes-nome { flex: 1; text-align: center; font-size: 17px; }
@@ -48,15 +67,22 @@
 .agenda__mais { font-size: 10px; font-weight: 700; color: var(--pf-tinta-2); line-height: 5px; }
 
 @media (min-width: 760px) {
-  .agenda__dia { min-height: 108px; }
+  .agenda__dia { min-height: 108px; padding: 6px; gap: 4px; }
+  .agenda__numero { font-size: 13.5px; }
   .agenda__chips { flex-direction: column; flex-wrap: nowrap; }
   .agenda__chip {
     width: auto; height: auto; padding: 2px 6px; border-radius: 6px; min-width: 0;
     background: color-mix(in srgb, var(--cor) 18%, transparent); border-left: 3px solid var(--cor);
   }
-  .agenda__chip-texto { display: block; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agenda__chip-texto { display: block; font-size: 11.5px; font-weight: 700; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .agenda__chip--feito .agenda__chip-texto { text-decoration: line-through; }
   .agenda__mais { line-height: 1.2; padding-left: 4px; }
+}
+@media (min-width: 1200px) {
+  .agenda__mes { padding: 12px; }
+  .agenda__grade { gap: 6px; }
+  .agenda__dia { min-height: 124px; padding: 8px; border-radius: 12px; }
+  .agenda__chip { padding: 3px 7px; }
 }
 
 .agenda__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }

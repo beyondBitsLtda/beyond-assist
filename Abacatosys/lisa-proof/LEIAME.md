@@ -133,6 +133,45 @@ módulos = capítulos e assuntos = trechos de páginas; `validarCursoDoLivro` co
 leitura como primeira tarefa. Ao criar, `proof_leituras` guarda as páginas de cada card, e a
 explicação, o quiz e o exercício do assunto leem esse trecho (`src/lib/leituras.js`).
 
+## Moedas no Bootcamp, a ilha da Lisa na paz e telas sem vão (1.7.0, 04/11/2026)
+
+> **As moedas do reino no Bootcamp** ("a cada prova passada o usuário deveria ganhar as moedas"):
+> - **Quem ganha:** cada prova paga as pessoas que deixaram código para os jurados, enviado ou no editor. Os
+>   personagens da CPU não têm reino.
+> - **Quanto:** metade da nota (até 50), mais **25** para quem vence a prova (a insígnia), **150** para o campeão e
+>   **50** para o vice.
+> - **Teto do dia:** **300** moedas do Bootcamp por pessoa, para ninguém juntar moedas criando torneio atrás de
+>   torneio.
+> - **Onde está:** a regra é `moedasDaProva` (`src/dominio/bootcamp.js`).
+> - **Quando paga:** o crédito (`creditarMoedas`, tipo `bootcamp` no livro-caixa) só acontece **depois** que a
+>   avaliação e o torneio gravaram. Se algo falha no meio, a rodada reabre e nada foi pago.
+> - **Na tela:** as moedas aparecem na avaliação ao vivo e no resultado da prova.
+> - **Banco:** a migração `db/035-bootcamp-moedas.sql` acrescenta o tipo `bootcamp`.
+>
+> **A ilha da Lisa na paz:**
+> - **O problema:** o mundo 3D só desenhava 6 ilhas vizinhas. Com 8 reinos, a 7ª (a Cidadela da Lisa) ficava de fora.
+> - **No mundo 3D:** agora cabem até 10 ilhas, alternadas em dois anéis, com a ponte do anel de fora passando entre
+>   as de dentro.
+> - **No servidor:** a paz manda até 40 vizinhos.
+> - **No painel da paz:** todos os vizinhos aparecem, cada um com o botão **Visitar**.
+>
+> **Bootcamp, sem cartão atravessando a interface:** no modo de codificação, o cartão do desafio estava preso na
+> altura do painel (`min-height: 100%` numa grade). Os exemplos de entrada e saída passavam da borda dele. Agora o
+> painel é flex, o cartão cresce com o conteúdo e rola por dentro.
+>
+> **Sem a textura:** o grão saiu dos cartões e do menu lateral; o do fundo ficou bem mais fraco.
+>
+> **Agenda:**
+> - **Largura:** no mês, usa a tela larga (antes ficava em 1080px no meio).
+> - **Calendário:** os dias são maiores e as etiquetas, mais legíveis, com o texto inteiro ao passar o mouse.
+> - **Painel do dia:** virou um cartão ao lado, da altura da tela, que rola por dentro.
+>
+> **Bolsa:**
+> - **As opiniões:** "O que os consultores dizem" saiu de dentro do painel da ação. Virou uma faixa larga em 3
+>   colunas, sem o vão ao lado.
+> - **A mesa:** a Mesa dos Consultores tem 3 cartões por linha (os 6 em duas linhas cheias), e nenhum cartão estica
+>   pela altura do placar.
+
 ## O visual premium (1.6.0, 05/11/2026)
 
 > "O design ainda ruim… pensa, é uma aplicação premium… mais coerente, aplique mais texturas e animações."
