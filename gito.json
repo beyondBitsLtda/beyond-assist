@@ -9,14 +9,29 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "0.38.0",
+  "versao": "0.39.0",
   "atualizadoEm": "2026-11-04",
   "compilacao": {
-    "numero": 74,
+    "numero": 75,
     "data": "2026-11-04",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "0.39.0",
+      "data": "2026-11-04",
+      "branch": "main",
+      "tipo": "funcionalidade",
+      "resumo": "O painel \"Uso dos usuários\" para o admin: quando cada pessoa entrou na Lisa, quanto tempo ficou, em que telas e o que fez.",
+      "itens": [
+        "Painel /uso (Painéis → Sistema → Uso dos usuários), só para o admin: por período (7, 30 ou 90 dias), o último acesso, os acessos e logins, o tempo, os dias ativos, as telas onde mais ficou e o que cada pessoa fez (perguntas, desenhos, comentários de tela, falas e fluxogramas).",
+        "Clicar na pessoa abre cada acesso (início, fim, duração, aparelho e telas), o tempo por tela, a criação da conta e o último login.",
+        "O tempo é medido por uma batida por minuto com a aba visível (com teto, para a aba esquecida não contar a tarde inteira); o login abre um acesso. Guarda só quando, quanto tempo, onde e o tipo de aparelho — nada do conteúdo das conversas.",
+        "A tela de entrada avisa que a Lisa registra os acessos, o tempo e as contagens de uso (transparência, LGPD).",
+        "Banco: a tabela lisa_presenca (db/uso_dos_usuarios.sql)."
+      ],
+      "issues": []
+    },
     {
       "versao": "0.38.0",
       "data": "2026-11-04",
@@ -1180,7 +1195,8 @@
         "Versões anteriores de cada fluxograma do ProcessMap, com \"voltar para esta\"",
         "Modo MVP: usuários convidados (que não são o dono) entram numa versão limitada — conversa e voz, Modo Tela, editor de código, ProcessMap, repositórios públicos, entrevista do primeiro acesso e o atalho da Lisa Task —, com limite diário de uso",
         "Lisa Task: é o Abacato com o nome e o visual da Lisa (conta do tipo Lisa Task), só com os quadros de tarefas; a parte de documentos (projetos, pastas e arquivos) não existe para ela e é barrada no servidor. O menu Lisa Task abre lisatask.beyond.dev.br (o mesmo Abacato, com o título e o ícone da Lisa na aba) em outra aba já com a conta da Lisa (a conta Lisa Task nasce no primeiro acesso).",
-        "Rota GET /api/ping, que responde { \"status\": \"online\" } para conferir se a plataforma está no ar."
+        "Rota GET /api/ping, que responde { \"status\": \"online\" } para conferir se a plataforma está no ar.",
+        "Painel \"Uso dos usuários\" para o admin (/uso): acessos e logins, tempo na Lisa, telas usadas e o que cada pessoa fez (perguntas, desenhos, comentários de tela, falas e fluxogramas), por período, sem guardar o conteúdo das conversas"
       ],
       "naoInclui": [
         "Não é multiusuário: o login existe, mas só para o responsável.",

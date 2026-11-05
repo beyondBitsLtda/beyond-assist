@@ -38,7 +38,8 @@
     "notas-check": "node --import ./scripts/alias-loader.mjs scripts/notas-check.mjs",
     "cf:build": "opennextjs-cloudflare build",
     "cf:deploy": "opennextjs-cloudflare deploy",
-    "cf:preview": "opennextjs-cloudflare preview"
+    "cf:preview": "opennextjs-cloudflare preview",
+    "uso-check": "node --import ./scripts/alias-loader.mjs scripts/uso-check.mjs"
   },
   "//dependencies": "@opennextjs/cloudflare e wrangler ficam em dependencies, e não em devDependencies, de propósito: o servidor de build da Cloudflare instala SÓ as dependências de produção. Como devDependency o adaptador não é instalado lá, o `npx` iria buscar uma cópia solta na hora do build — foi assim que o primeiro deploy morreu em ERESOLVE.",
   "dependencies": {

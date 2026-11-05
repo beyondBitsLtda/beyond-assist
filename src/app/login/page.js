@@ -97,6 +97,7 @@ export default function Login() {
         <button type="submit" disabled={enviando} style={{ ...estilos.botao, opacity: enviando ? 0.55 : 1 }}>
           {enviando ? "VERIFICANDO…" : "ENTRAR"}
         </button>
+        <p style={estilos.aviso}>A Lisa registra os seus acessos, o tempo de uso e quantas perguntas, desenhos e falas você usou. O conteúdo das conversas não entra nesse registro.</p>
       </form>
     </main>
   );
@@ -105,6 +106,7 @@ export default function Login() {
 const CIANO = "rgb(var(--accent-rgb, 56 225 255))";
 
 const estilos = {
+  aviso: { margin: "14px 0 0", fontSize: 11, lineHeight: 1.5, color: "rgba(207,239,251,0.5)", textAlign: "center" },
   tela: {
     minHeight: "100dvh",
     display: "flex",

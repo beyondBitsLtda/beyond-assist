@@ -1,4 +1,5 @@
-import { COOKIE_SESSAO, COOKIE_RENOVA } from "@/lib/authSession.js";
+import { COOKIE_SESSAO, COOKIE_RENOVA, lerPayload } from "@/lib/authSession.js";
+import { registrarPresenca, aparelhoDe } from "@/lib/usoDosUsuarios.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +52,10 @@ export async function POST(req) {
 
   const dados = await resposta.json().catch(() => null);
   if (!dados?.access_token) return json({ ok: false, error: "resposta inesperada do autenticador" }, 502);
+
+  // o painel "Uso dos usuários": todo login abre um acesso (nunca derruba o login)
+  await registrarPresenca(lerPayload(dados.access_token)?.sub, { entrou: true, aparelho: aparelhoDe(req.headers.get("user-agent")) })
+    .catch((err) => console.warn("[uso] login não registrado:", err?.message || err));
 
   const base = "HttpOnly; Secure; SameSite=Lax; Path=/";
   const cabecalhos = new Headers({ "content-type": "application/json", "cache-control": "no-store" });

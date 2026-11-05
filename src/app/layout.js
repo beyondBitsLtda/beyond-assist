@@ -1,6 +1,7 @@
 import "./globals.css";
 import Abertura, { SCRIPT_DA_ABERTURA } from "@/components/shell/Abertura.js";
 import { SCRIPT_DE_INSTALAR } from "@/lib/instalarApp.js";
+import Presenca from "@/components/shell/Presenca.js";
 
 // manifest + ícones: o Chrome passa a oferecer "Instalar app" (ver src/lib/instalarApp.js)
 export const metadata = {
@@ -38,6 +39,8 @@ export default function RootLayout({ children }) {
       </head>
       <body>
         <Abertura />
+        {/* a batida de presença do painel "Uso dos usuários" (src/lib/usoDosUsuarios.js) */}
+        <Presenca />
         {children}
       </body>
     </html>

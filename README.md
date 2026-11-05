@@ -253,6 +253,32 @@ Assistente), mexendo com o volume; transcrevendo e organizando, ele fica "pensan
 texto já transcrito fica no `localStorage` do aparelho até ser organizado, para sobreviver a
 um recarregamento no meio. Testes: `npm run notas-check`.
 
+## Uso dos usuários (painel do admin)
+
+**Onde fica e quem vê:** **/uso**, no menu Painéis → Sistema → "Uso dos usuários". Só o admin abre: o portão barra
+o usuário, e a rota `/api/uso-dos-usuarios` confere de novo.
+
+**O que mostra:** por período (7, 30 ou 90 dias), uma linha por pessoa, com:
+- o último acesso, os acessos e os logins;
+- o tempo na Lisa, a média e os dias ativos;
+- as telas onde mais ficou;
+- o que fez: perguntas, desenhos, comentários de tela, falas (de `lisa_uso`) e fluxogramas criados.
+
+Clicar na pessoa abre cada acesso, o tempo por tela, a data de criação da conta e o último login.
+
+**Como o tempo é medido:**
+- **A batida:** `src/components/shell/Presenca.js`, em todas as telas, manda uma batida por minuto para
+  `/api/presenca` com a aba visível. Cada batida soma o tempo desde a anterior, com teto de 90 s.
+- **O acesso:** uma pausa de mais de 5 minutos fecha o acesso. O login também abre um.
+- **Onde está:** a regra fica em `src/lib/usoDosUsuarios.js`; a tabela é `lisa_presenca`
+  (`db/uso_dos_usuarios.sql`).
+
+**Privacidade:**
+- **O que se guarda:** só quando, quanto tempo, onde e o tipo de aparelho; o conteúdo das conversas não entra.
+- **Transparência:** a tela de entrada avisa que o uso é registrado.
+
+**Testes:** `npm run uso-check`.
+
 ## Instalar como app
 
 A Lisa é instalável pelo Chrome (desktop e Android): `public/manifest.webmanifest` (abre em

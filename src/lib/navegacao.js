@@ -50,6 +50,7 @@ export const GRUPOS_DE_PAINEIS = [
     itens: [
       { href: "/sync-status", rotulo: "Progresso do sync" },
       { href: "/gemini-keys", rotulo: "Chaves de IA" },
+      { href: "/uso", rotulo: "Uso dos usuários", detalhe: "Quem entrou, quanto tempo ficou e o que fez" },
       // A tela do iMac vale nos dois lugares: em casa ela é embutida; na nuvem, o painel
       // entrega o endereço próprio que o túnel publica.
       { href: "/maquina", rotulo: "Tela do servidor" },

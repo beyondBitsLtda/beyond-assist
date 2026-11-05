@@ -200,6 +200,7 @@ export const DO_USUARIO = [
   { prefixo: "/api/fluxogramas", motivo: "os projetos e fluxogramas da pessoa (filtrados pelo dono)" },
   { prefixo: "/api/notas", motivo: "o Tomar nota (por pessoa)" },
   { prefixo: "/api/perfil", motivo: "a entrevista do primeiro acesso" },
+  { prefixo: "/api/presenca", motivo: "a batida de presença (o painel \"Uso dos usuários\" do admin)" },
 ];
 
 const casaCom = (caminho) => (l) => (l.prefixo.endsWith("/")
