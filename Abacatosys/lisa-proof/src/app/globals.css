@@ -720,7 +720,9 @@ a.pf-cartao:hover, button.pf-cartao:hover { transform: translateY(-3px); box-sha
   from { opacity: 0; transform: translateY(14px) scale(0.985); }
   to { opacity: 1; transform: none; }
 }
-.pf-principal > * { animation: pf-surgir 0.6s var(--pf-curva) both; }
+/* "backwards", não "both" (05/11/2026): terminada a entrada, o bloco fica sem transform — com "both" o transform
+   ficava valendo e prendia todo position: fixed de dentro (a tela cheia do diagrama não cobria a tela) */
+.pf-principal > * { animation: pf-surgir 0.6s var(--pf-curva) backwards; }
 .pf-principal > :nth-child(2) { animation-delay: 0.05s; }
 .pf-principal > :nth-child(3) { animation-delay: 0.1s; }
 .pf-principal > :nth-child(4) { animation-delay: 0.15s; }

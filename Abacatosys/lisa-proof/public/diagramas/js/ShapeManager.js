@@ -1263,7 +1263,10 @@ PM.ShapeManager = class ShapeManager {
     } else if (connEl) {
       // 6) SELECIONAR LINHA
       const id = connEl.dataset.cid;
-      if (e.shiftKey || e.ctrlKey) this.toggleSelection(id); else this.setSelection([id]);
+      if (e.shiftKey || e.ctrlKey) this.toggleSelection(id);
+      // Lisa_Proof (05/11/2026): já é a única selecionada, não redesenha. Trocar o DOM debaixo do ponteiro a cada
+      // clique fazia o navegador engolir o duplo clique — e o rótulo da seta (Sim/Não) não abria para editar.
+      else if (!(this.sel.size === 1 && this.sel.has(id))) this.setSelection([id]);
     } else {
       // 7) CLIQUE NO VAZIO: limpa a seleção e inicia seleção por área
       if (!e.shiftKey && !e.ctrlKey) this.clearSelection();
@@ -1513,8 +1516,11 @@ PM.ShapeManager = class ShapeManager {
     // Com o ponteiro "capturado" pelo SVG (setPointerCapture no pointerdown), o
     // dblclick chega com o alvo = o próprio SVG. O que está debaixo do mouse é
     // perguntado ao documento (elementFromPoint).
-    const sob = document.elementFromPoint(e.clientX, e.clientY);
-    const t = sob && this.svg.contains(sob) ? sob : e.target;
+    // Lisa_Proof (05/11/2026): olha a PILHA debaixo do mouse, não só o de cima. Com a linha selecionada, as
+    // alças da sobreposição (as pontas e os nomes "Saída"/"Entrada") ficam por cima dela e roubavam o duplo
+    // clique — em vez de editar o rótulo da seta, nascia um Processo novo no lugar.
+    const pilha = document.elementsFromPoint(e.clientX, e.clientY).filter((el) => this.svg.contains(el));
+    const t = pilha.find((el) => el.closest('.shape') || el.closest('.conn')) || pilha[0] || e.target;
     const shapeEl = t.closest('.shape');
     const connEl = t.closest('.conn');
     if (this.mode === 'mindmap') {

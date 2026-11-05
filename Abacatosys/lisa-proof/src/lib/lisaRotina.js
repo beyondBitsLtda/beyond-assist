@@ -24,6 +24,7 @@ import { valesPendentes, resgatarVale } from "@/lib/vales.js";
 import { criarCaderno, criarPagina } from "@/lib/cadernos.js";
 import { conversar, textoDe } from "@/lib/gemini.js";
 import { destinatarios, mandarPerguntaDoQuiz, mandarRecado, avaliarRecado } from "@/lib/correio.js";
+import { recadoDoRobo, vereditoDoRecado } from "@/dominio/correio.js";
 import { assuntosParaODuracao } from "@/dominio/curso.js";
 import { diaDe, somarDias } from "@/dominio/datas.js";
 import { motorDo } from "@/dominio/motores.js";
@@ -40,11 +41,16 @@ const DIAS_DE_ESTUDO = [1, 2, 3, 4, 5, 6]; // segunda a sábado; domingo é do A
 // o que ela prefere melhorar no Reino (a mina primeiro: é dela que vem a renda)
 const PRIORIDADE = { mina: 6, cofre: 5, castelo: 4, quartel: 4, acampamento: 3, muralha: 3, torre: 3 };
 
-/** Uma resposta curta do Gemini, em texto. */
-async function escrever(pedido, { sistema, maxTokens = 2048 } = {}) {
-  const parte = await conversar({ contents: [{ role: "user", parts: [{ text: pedido }] }], sistema, maxTokens, temperatura: 0.6 });
+/**
+ * Uma resposta do Gemini, em texto — sempre inteira. O raciocínio do modelo gasta do mesmo limite de tamanho
+ * (`maxTokens`): com pouco limite, sobrava um pedaço da frase, e ele ia para o ar assim (05/11/2026, os
+ * recados "Oi, God! 1665 pontos em"). Texto cortado vira erro; textos curtos pedem `pensarPouco`.
+ */
+async function escrever(pedido, { sistema, maxTokens = 2048, pensarPouco = false } = {}) {
+  const parte = await conversar({ contents: [{ role: "user", parts: [{ text: pedido }] }], sistema, maxTokens, temperatura: 0.6, pensarPouco });
   const texto = textoDe(parte);
   if (!texto) throw new Error("o Gemini não devolveu texto");
+  if (parte.motivoDeParada === "MAX_TOKENS") throw new Error("o texto do Gemini veio cortado (acabou o limite de tamanho)");
   return texto;
 }
 const ESTUDANTE = "Você é a Lisa, uma estudante dedicada fazendo um curso no Proof. Escreva em português do Brasil, em primeira pessoa, como uma aluna (não como professora). Não invente links.";
@@ -462,8 +468,9 @@ async function correio(id) {
   for (const c of chegaram || []) {
     try {
       const veredito = await escrever(`Um jogador me mandou este recado no Proof: "${c.texto}"
-Responda só SIM se ele é útil (uma dica, um incentivo de verdade, uma pergunta sobre estudo) ou NAO se é vazio, repetido ou só para ganhar moedas.`, { maxTokens: 10 });
-      const util = /^s*sim/i.test(veredito);
+Responda só SIM se ele é útil (uma dica, um incentivo de verdade, uma pergunta sobre estudo) ou NAO se é vazio, repetido ou só para ganhar moedas.`, { maxTokens: 1024, pensarPouco: true });
+      const util = vereditoDoRecado(veredito);
+      if (util === null) { log("avaliar recado: resposta sem SIM nem NAO:", veredito.slice(0, 60)); continue; }
       await avaliarRecado(id, c.id, util);
       feito.push(`li um recado (${util ? "útil" : "não tão útil"})`);
     } catch (e) { log("avaliar recado:", e.message); }
@@ -477,8 +484,11 @@ Responda só SIM se ele é útil (uma dica, um incentivo de verdade, uma pergunt
         supabase.from("proof_ranking_semana").select("pontos").eq("usuario_id", alvo.id).maybeSingle(),
         supabase.from("proof_reinos").select("trofeus, neuro_nivel").eq("usuario_id", alvo.id).maybeSingle(),
       ]);
-      const texto = await escrever(`Escreva um recadinho (até 280 caracteres) para ${alvo.nome}, outro jogador do Proof. O que sei: ${Number(semana?.pontos || 0)} pontos nos últimos 7 dias; no Reino, ${Number(reino?.trofeus || 0)} troféus e o Neuro no nível ${reino?.neuro_nivel || 1}. Seja gentil e específica: um incentivo ou uma dica de estudo ou de jogo que combine com esses números. Não invente outros fatos. Só o texto do recado.`, { sistema: "Você é a Lisa, jogadora-robô do Proof, simpática e direta. Português do Brasil.", maxTokens: 300 });
-      await mandarRecado(id, { paraId: alvo.id, texto: texto.slice(0, 480) });
+      const texto = await escrever(`Escreva um recadinho (até 280 caracteres) para ${alvo.nome}, outro jogador do Proof. O que sei: ${Number(semana?.pontos || 0)} pontos nos últimos 7 dias; no Reino, ${Number(reino?.trofeus || 0)} troféus e o Neuro no nível ${reino?.neuro_nivel || 1}. Seja gentil e específica: um incentivo ou uma dica de estudo ou de jogo que combine com esses números. Não invente outros fatos. Escreva frases completas e termine o recado com ponto final, exclamação ou emoji. Só o texto do recado.`, { sistema: "Você é a Lisa, jogadora-robô do Proof, simpática e direta. Português do Brasil.", maxTokens: 2048, pensarPouco: true });
+      // só vai recado inteiro: o que vier cortado ou sem fim de frase fica para a próxima rodada
+      const recado = recadoDoRobo(texto);
+      if (!recado) throw new Error(`recado sem fim de frase, não mandei: ${JSON.stringify(texto.slice(0, 60))}`);
+      await mandarRecado(id, { paraId: alvo.id, texto: recado });
       feito.push(`mandei um recado para ${alvo.nome}`);
     }
   } catch (e) { log("recado:", e.message); }

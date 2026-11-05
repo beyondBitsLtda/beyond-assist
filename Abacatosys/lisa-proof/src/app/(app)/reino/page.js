@@ -1382,7 +1382,8 @@ function Expedicoes({ mapa, veiculo, aoVeiculo, ocupado, resultado, aoFecharResu
         <div className={`pf-aviso rn-exp__tropa${mapa.tropa.emprestada ? " rn-exp__tropa--emprestada" : ""}`}>
           {mapa.tropa.emprestada
             ? <>🎒 <strong>Seu exército está vazio, então você parte com a Tropa da Expedição:</strong> {descreverTropas(mapa.tropa.tropas)} + o Neuro. Emprestada e de graça — não precisa treinar nada.</>
-            : <>⚔️ <strong>Você parte com o seu exército:</strong> {descreverTropas(mapa.tropa.tropas)} + o Neuro. Nenhuma tropa se perde.</>}
+            : <>⚔️ <strong>Você parte com todas as suas tropas, o exército e a defesa:</strong> {descreverTropas(mapa.tropa.tropas)} + o Neuro.
+              {Object.keys(mapa.tropa.reforco || {}).length > 0 && <> A Tropa da Expedição completou o que faltava ({descreverTropas(mapa.tropa.reforco)}).</>} Nenhuma tropa se perde.</>}
         </div>
       )}
       {resultado && <ResultadoDaExpedicao r={resultado} aoFechar={aoFecharResultado} />}

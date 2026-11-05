@@ -320,7 +320,13 @@ PM.App = class App {
         // Esc: volta para Selecionar, limpa seleção e fecha janelas
         case 'escape': m.setTool('select'); m.clearSelection(); this.$('#helpModal').hidden = true; this.theme.close(); break;
         // Enter: edita o texto da forma selecionada
-        case 'enter': { const s = m.selectedShapes(); if (s.length === 1) { e.preventDefault(); this.editText('shape', s[0].id); } break; }
+        // Lisa_Proof (05/11/2026): Enter ou F2 com UMA linha selecionada edita o rótulo dela (Sim/Não…)
+        case 'enter': case 'f2': {
+          const s = m.selectedShapes(), c = m.selectedConns();
+          if (s.length === 1) { e.preventDefault(); this.editText('shape', s[0].id); }
+          else if (!s.length && c.length === 1) { e.preventDefault(); this.editText('conn', c[0].id); }
+          break;
+        }
         case 'v': tb.run('select'); break;
         case 'h': tb.run('hand'); break;
         case 'p': tb.run('pen'); break;

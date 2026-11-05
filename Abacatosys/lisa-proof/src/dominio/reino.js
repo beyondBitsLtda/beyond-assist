@@ -30,7 +30,7 @@ import { defensorDaExpedicao, saqueDaExpedicao } from "./monstros.js";
 import { vagasDaMina, capacidadeEmPepitas, HORAS_POR_PEPITA, VALOR_DA_PEPITA } from "./ouro.js";
 import { centavos, faltam } from "./moedas.js";
 import {
-  capacidadeDoExercito, capacidadeDaGuarnicao, contagens, totalDeTropas, danoPorSegundo, espacoUsado, TROPAS, lotacaoDoAcampamento,
+  capacidadeDoExercito, capacidadeDaGuarnicao, contagens, totalDeTropas, danoPorSegundo, espacoUsado, TROPAS, lotacaoDoAcampamento, somarTropas,
 } from "./tropas.js";
 
 const def = (chave) => PREDIOS_EM_COMBATE[chave].defesa;
@@ -317,9 +317,20 @@ export function batalha({ atacante, defensor, saldoDoDefensor, semente }) {
  * 22/10/2026: ninguém tinha Quartel nem tropas, e o botão de atacar nem aparecia — a expedição
  * "de graça" pedia moedas para treinar o exército antes.
  */
-export function exercitoDaExpedicao(exercito, nivelDaTorre) {
-  if (totalDeTropas(exercito) > 0) return { exercito: contagens(exercito), emprestado: false };
-  return { exercito: exercitoDeTreino(Math.max(1, nivelDaTorre || 1), 1), emprestado: true };
+// 05/11/2026 ("antes ia toda a minha tropa, inclusive a de defesa; agora vai só um gato pingado"): a expedição
+// não gasta tropa, então parte com TODAS — o exército e a guarnição. E quem tem pouca tropa não sai pior do
+// que quem não tem nenhuma: a Tropa da Expedição completa o que faltar (por tipo, vale o maior dos dois).
+export function exercitoDaExpedicao(exercito, nivelDaTorre, guarnicao = {}) {
+  const minhas = somarTropas(contagens(exercito), contagens(guarnicao));
+  const emprestada = exercitoDeTreino(Math.max(1, nivelDaTorre || 1), 1);
+  if (totalDeTropas(minhas) === 0) return { exercito: emprestada, emprestado: true, reforco: {} };
+  if (espacoUsado(minhas) >= espacoUsado(emprestada)) return { exercito: minhas, emprestado: false, reforco: {} };
+  const junto = {}, reforco = {};
+  for (const t of new Set([...Object.keys(minhas), ...Object.keys(emprestada)])) {
+    junto[t] = Math.max(minhas[t] || 0, emprestada[t] || 0);
+    if (junto[t] > (minhas[t] || 0)) reforco[t] = junto[t] - (minhas[t] || 0);
+  }
+  return { exercito: contagens(junto), emprestado: false, reforco: contagens(reforco) };
 }
 
 /**

@@ -84,7 +84,21 @@
 .quiz__erro { background: var(--pf-alerta-fundo); color: var(--pf-alerta); }
 
 /* ---- exercício e projeto ---- */
-.desafio { display: grid; gap: 14px; max-width: 860px; }
+.desafio { display: grid; gap: 14px; min-width: 0; }
+.desafio > * { min-width: 0; }
+/* 05/11/2026 ("muito espaço nas laterais vazio e o conteúdo espremido no meio"): o exercício usa a largura da
+   página (antes parava em 860 px, e o exemplo da Lisa ficava de fora, mais largo). O de diagrama ganha a página
+   larga, com o enunciado ao lado do quadro, que fica do tamanho da tela. */
+.exercicio { display: grid; gap: 14px; min-width: 0; }
+.exercicio > * { min-width: 0; }
+.exercicio > .exemplo-lisa { margin-top: 0; }
+.pf-principal:has(.exercicio--diagrama) { max-width: 1480px; }
+@media (min-width: 1180px) {
+  .desafio--diagrama { grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); align-items: start; }
+  .desafio--diagrama > :first-child { position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; }
+  .desafio--diagrama > :nth-child(n + 3) { grid-column: 1 / -1; }
+  .desafio--diagrama .diagrama__moldura { height: clamp(520px, calc(100dvh - 240px), 920px); }
+}
 .desafio .pf-campo__rotulo { margin: 14px 0 6px; display: block; }
 .desafio__texto { font-size: 15px; }
 .desafio__texto h3 { font-size: 16px; margin: 12px 0 6px; }
@@ -415,8 +429,12 @@
 .diagrama__moldura { position: relative; height: clamp(440px, 68vh, 760px); border: 1px solid var(--pf-linha); border-radius: 14px; overflow: hidden; background: var(--pf-superficie-2); }
 .diagrama__quadro { display: block; width: 100%; height: 100%; border: 0; }
 .diagrama__carregando { position: absolute; inset: 0; display: grid; place-items: center; color: var(--pf-tinta-2); font-size: 14px; }
-.diagrama--cheia { position: fixed; inset: 0; z-index: 1000; margin: 0; border-radius: 0; grid-template-rows: auto 1fr auto auto auto auto; overflow: auto; }
-.diagrama--cheia .diagrama__moldura { height: auto; min-height: 320px; }
+.diagrama--cheia {
+  position: fixed; inset: 0; z-index: 1000; margin: 0; width: 100%; height: 100dvh; max-height: none; border-radius: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto auto; overflow: auto; background: var(--pf-fundo); padding: 12px 16px;
+}
+.desafio--diagrama .diagrama--cheia .diagrama__moldura, .diagrama--cheia .diagrama__moldura { height: auto; min-height: 320px; }
+.diagrama--cheia:fullscreen { width: 100vw; height: 100vh; }
 body.diagrama-sem-rolar { overflow: hidden; }
 @media (max-width: 520px) { .conversa__fala { max-width: 100%; } .diagrama__moldura { height: 70vh; } }
 
@@ -427,6 +445,12 @@ body.diagrama-sem-rolar { overflow: hidden; }
 .exemplo-lisa__conceitos { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
 .exemplo-lisa__passos { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
 .exemplo-lisa__seu { margin: 6px 0 0; padding: 8px 10px; border-radius: var(--pf-raio); background: var(--pf-superficie-2); font-size: 14px; }
+/* 05/11/2026: o exemplo não estoura a página — o código rola dentro da caixa dele e o texto quebra */
+.dicas-lisa > *, .exemplo-lisa__corpo, .exemplo-lisa__corpo > * { min-width: 0; }
+.exemplo-lisa .pf-codigo { max-width: 100%; }
+.exemplo-lisa .pf-codigo__corpo { overflow-x: auto; }
+.exemplo-lisa__seu, .exemplo-lisa__conceitos li, .exemplo-lisa__passos li { overflow-wrap: anywhere; }
+.diagrama__moldura--exemplo { height: clamp(360px, 60vh, 640px); margin-bottom: 10px; }
 
 /* ---- o minigame do dia (03/11/2026: a Arena virou minigame da Prática, como o quiz) */
 .mg-dia__bloco { width: 100%; }

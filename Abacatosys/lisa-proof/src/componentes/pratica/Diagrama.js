@@ -38,6 +38,7 @@ const temaDoApp = () => (document.documentElement.dataset.tema === "claro" ? "cl
 export function DesenhoDeDiagrama({ desafio }) {
   const c = desafio.conteudo;
   const quadro = useRef(null);
+  const secao = useRef(null);
   const espera = useRef(null);
   const aberto = useRef(false);
   const [pronto, setPronto] = useState(false);
@@ -98,13 +99,35 @@ export function DesenhoDeDiagrama({ desafio }) {
 
   useEffect(() => { ponte()?.travar(encerrado); }, [encerrado]);
 
-  // tela cheia: Esc fora do quadro sai, e a página não rola por baixo
+  // Tela cheia (05/11/2026: "a função de tela cheia do fluxograma não funciona"): a de verdade do navegador,
+  // que põe o quadro por cima de tudo. Antes era só CSS (position: fixed), e a animação de entrada das telas
+  // (.pf-principal > *, com transform) prendia o quadro dentro do bloco do exercício. Onde o navegador não
+  // deixa (iPhone), fica a tela cheia da página — com a animação desligada enquanto ela está aberta.
+  async function entrarNaTelaCheia() {
+    setTelaCheia(true);
+    const el = secao.current;
+    try {
+      if (el?.requestFullscreen && !document.fullscreenElement) await el.requestFullscreen({ navigationUI: "hide" });
+    } catch { /* sem a do navegador: fica a da página */ }
+  }
+  function sairDaTelaCheia() {
+    setTelaCheia(false);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+
+  // Esc fora do quadro sai; o Esc do navegador (que tira a tela cheia dele) também; e a página não rola por baixo
   useEffect(() => {
     if (!telaCheia) return undefined;
-    const sair = (e) => { if (e.key === "Escape") setTelaCheia(false); };
+    const sair = (e) => { if (e.key === "Escape") sairDaTelaCheia(); };
+    const mudou = () => { if (!document.fullscreenElement) setTelaCheia(false); };
     document.addEventListener("keydown", sair);
+    document.addEventListener("fullscreenchange", mudou);
     document.body.classList.add("diagrama-sem-rolar");
-    return () => { document.removeEventListener("keydown", sair); document.body.classList.remove("diagrama-sem-rolar"); };
+    return () => {
+      document.removeEventListener("keydown", sair);
+      document.removeEventListener("fullscreenchange", mudou);
+      document.body.classList.remove("diagrama-sem-rolar");
+    };
   }, [telaCheia]);
 
   async function enviar() {
@@ -113,7 +136,7 @@ export function DesenhoDeDiagrama({ desafio }) {
     if (p.vazio()) { setErro("desenhe o diagrama antes de enviar"); return; }
     setEnviando(true);
     setErro("");
-    setTelaCheia(false);
+    sairDaTelaCheia();
     reagir("pensando", "Olhando o seu diagrama com calma…", 60000);
     try {
       const diagrama = p.exportar();
@@ -132,7 +155,7 @@ export function DesenhoDeDiagrama({ desafio }) {
 
   const params = new URLSearchParams({ embutido: "1", tema: "escuro", colecao: c.colecao || "flow" });
   return (
-    <div className="desafio">
+    <div className="desafio desafio--diagrama">
       <Cabecalho desafio={desafio}>
         <span className="pf-pilula diagrama__tipo">{tipo.nome}</span>
         <Explicacao texto={c.cenario} className="desafio__texto" />
@@ -151,12 +174,12 @@ export function DesenhoDeDiagrama({ desafio }) {
         )}
       </Cabecalho>
 
-      <section className={`pf-cartao diagrama${telaCheia ? " diagrama--cheia" : ""}`} aria-label="O quadro de desenho">
+      <section ref={secao} className={`pf-cartao diagrama${telaCheia ? " diagrama--cheia" : ""}`} aria-label="O quadro de desenho">
         <div className="diagrama__barra">
           <p className="pf-estat__nota diagrama__ajuda">
-            Arraste as formas da barra para o quadro · ligue puxando das bolinhas da borda · dois cliques para escrever · a coleção de formas muda no topo da barra
+            Arraste as formas da barra para o quadro · ligue puxando das bolinhas da borda · dois cliques para escrever · o rótulo de uma seta (Sim/Não): selecione a seta e aperte Enter, ou use o painel ao lado · a coleção de formas muda no topo da barra
           </p>
-          <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={() => setTelaCheia((v) => !v)}>
+          <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={() => (telaCheia ? sairDaTelaCheia() : entrarNaTelaCheia())}>
             {telaCheia ? "Sair da tela cheia" : "⛶ Tela cheia"}
           </button>
           {telaCheia && !encerrado && (
@@ -187,6 +210,53 @@ export function DesenhoDeDiagrama({ desafio }) {
       </section>
       {estado.avaliacao && <Avaliacao avaliacao={estado.avaliacao} nota={estado.nota} />}
       {Aviso}
+    </div>
+  );
+}
+
+/**
+ * Um diagrama só para olhar (05/11/2026): o exemplo da Lisa no exercício de diagrama abre no mesmo quadro,
+ * travado — dá para arrastar a vista e dar zoom, não para mexer nas formas.
+ */
+export function DiagramaParaVer({ documento, colecao = "flow", titulo = "Diagrama de exemplo" }) {
+  const quadro = useRef(null);
+  const aberto = useRef(false);
+  const [pronto, setPronto] = useState(false);
+  const ponte = () => quadro.current?.contentWindow?.PonteDoProof || null;
+
+  function abriu() {
+    const p = ponte();
+    if (!p || aberto.current) return;
+    aberto.current = true;
+    p.tema(temaDoApp());
+    p.colecao(colecao);
+    try { p.importar(documento); } catch { /* um documento estragado deixa o quadro vazio */ }
+    p.travar(true);
+    setPronto(true);
+  }
+  const abrir = useRef(abriu);
+  abrir.current = abriu;
+
+  useEffect(() => {
+    function ouvir(e) {
+      if (e.source === quadro.current?.contentWindow && e.data?.origem === "quadro" && e.data.tipo === "pronto") abrir.current();
+    }
+    window.addEventListener("message", ouvir);
+    abrir.current();
+    return () => window.removeEventListener("message", ouvir);
+  }, []);
+
+  useEffect(() => {
+    const observa = new MutationObserver(() => ponte()?.tema(temaDoApp()));
+    observa.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
+    return () => observa.disconnect();
+  }, []);
+
+  const params = new URLSearchParams({ embutido: "1", tema: "escuro", colecao });
+  return (
+    <div className="diagrama__moldura diagrama__moldura--exemplo">
+      {!pronto && <div className="diagrama__carregando">Abrindo o exemplo…</div>}
+      <iframe ref={quadro} className="diagrama__quadro" title={`Exemplo da Lisa: ${titulo}`} src={`/diagramas/index.html?${params}`} onLoad={abriu} />
     </div>
   );
 }

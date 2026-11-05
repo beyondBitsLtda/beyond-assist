@@ -9,14 +9,30 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.8.0",
-  "atualizadoEm": "2026-11-04",
+  "versao": "1.8.1",
+  "atualizadoEm": "2026-11-05",
   "compilacao": {
-    "numero": 111,
-    "data": "2026-11-04",
+    "numero": 112,
+    "data": "2026-11-05",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.8.1",
+      "data": "2026-11-05",
+      "branch": "main",
+      "tipo": "correcao",
+      "resumo": "Recados da Lisa robô inteiros, expedição com todas as tropas, exercício de diagrama largo com tela cheia que funciona, rótulo das setas editável e o exemplo da Lisa em diagrama.",
+      "itens": [
+        "Correio: os recados da Lisa robô chegavam cortados no meio da frase (\"Oi, God! 1665 pontos em\"). O raciocínio do modelo gastava o limite de tamanho; agora ela só manda recado inteiro e, se vier cortado, tenta na próxima rodada. A leitura dos recados que ela recebe (útil ou não) também voltou a funcionar.",
+        "Expedição: parte com TODAS as tropas, o exército e a defesa (a expedição não gasta tropa). Quem tem pouca tropa não sai pior do que quem não tem nenhuma: a Tropa da Expedição completa o que faltar, e a tela diz o que foi completado.",
+        "Exercício: a tela usa a largura da página (antes parava em 860 px, com o exemplo da Lisa estourando para o lado). O de diagrama ganha a página larga, com o enunciado ao lado do quadro.",
+        "Tela cheia do quadro: agora é a do navegador. A animação de entrada das telas deixava um transform valendo e prendia o quadro dentro do bloco do exercício (também vale para qualquer outra janela fixa dentro das telas).",
+        "Quadro: o rótulo das setas (Sim/Não) dá para editar — o painel ao lado aparece no quadro do exercício, Enter ou F2 com a seta selecionada abre o rótulo, e o duplo clique na seta selecionada não é mais engolido (antes nascia um Processo no lugar).",
+        "Exemplo da Lisa: no exercício de diagrama, o exemplo é um diagrama de outro cenário, aberto no quadro só para olhar (o exemplo antigo em código é refeito ao pedir). O código dos exemplos volta a ter as linhas quando o modelo manda as quebras escapadas, e não estoura mais a página."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.8.0",
       "data": "2026-11-04",

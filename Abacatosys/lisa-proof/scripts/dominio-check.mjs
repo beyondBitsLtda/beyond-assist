@@ -14,7 +14,7 @@ import {
 import { resumoDasMetas, tarefasDoDia } from "../src/dominio/metas.js";
 import { nivelPorPontos, MULTIPLICADOR_DE_RECOMPENSAS, PONTOS } from "../src/dominio/pontos.js";
 import {
-  temExemploDaLisa, validarExemploDaLisa,
+  temExemploDaLisa, validarExemploDaLisa, validarExemploDeDiagrama, exemploAindaServe, codigoLegivel,
   periodoDe, periodoPermitido, pontosDoQuiz, PONTOS_DA_PRATICA, arquivosDoProjeto, pontosDaNota, validarQuiz, quizParaTela,
   separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo, podeReenviar, entregaConcluida,
   validarAvaliacao, assuntoAtual, TENTATIVAS, RODADAS_POR_DIA, podeAbrirRodada, fatorDaRodada, comFatorDaRodada,
@@ -97,7 +97,7 @@ import {
 } from "../src/dominio/mercadoDeTropas.js";
 import { estatisticas, conquistasNovas, desbloqueadasDe, vitrine } from "../src/dominio/conquistas.js";
 import {
-  CORREIO, conferirRecado, contaDoQuiz, podeMandarPergunta, perguntaNaCarta, recompensaDoRecado, recompensaDaPergunta, podeEscreverPara,
+  CORREIO, conferirRecado, contaDoQuiz, podeMandarPergunta, perguntaNaCarta, recompensaDoRecado, recompensaDaPergunta, podeEscreverPara, recadoDoRobo, vereditoDoRecado,
 } from "../src/dominio/correio.js";
 import {
   CONTA_DA_LISA, TEMAS_DE_TECNOLOGIA, temaDoMes, sorteio as sorteioDaLisa, chanceDeAcerto, respostasDoQuiz, oQueFazerAgora, itensDaTeoriaHoje,
@@ -1396,8 +1396,18 @@ caso("expedições: sem exército, vai a Tropa da Expedição (emprestada, do ta
   assert.deepEqual(vazio.exercito, exercitoDeTreino(2, 1));
   // Torre 0 (reino novo) ainda leva a tropa do nível 1
   assert.deepEqual(exercitoDaExpedicao(null, 0).exercito, exercitoDeTreino(1, 1));
-  // quem tem exército vai com o dele
-  assert.deepEqual(exercitoDaExpedicao({ guerreiro: 3 }, 5), { exercito: { guerreiro: 3 }, emprestado: false });
+  // quem tem exército forte vai com o dele
+  const forte = exercitoDeTreino(5, 1);
+  assert.deepEqual(exercitoDaExpedicao(forte, 5), { exercito: forte, emprestado: false, reforco: {} });
+  // 1.8.1 (05/11/2026): vão TODAS as tropas, a defesa também — e a Tropa da Expedição completa quem tem pouca
+  const pouca = exercitoDaExpedicao({ gigante: 1, arqueira: 1, lanceiro: 1 }, 5, { mago: 2, gigante: 2, arqueira: 2 });
+  assert.equal(pouca.emprestado, false);
+  assert.equal(pouca.exercito.lanceiro, 1, "a tropa que a Tropa da Expedição não tem continua indo");
+  assert.ok(pouca.exercito.mago >= 2 && pouca.exercito.gigante >= 3, "a defesa vai junto");
+  for (const [tp, n] of Object.entries(exercitoDeTreino(5, 1))) assert.ok((pouca.exercito[tp] || 0) >= n, `nunca menos que a emprestada: ${tp}`);
+  assert.ok(Object.keys(pouca.reforco).length > 0 && !("lanceiro" in pouca.reforco));
+  const comDefesa = exercitoDaExpedicao(forte, 5, { mago: 2 });
+  assert.equal(comDefesa.exercito.mago, (forte.mago || 0) + 2, "o exército forte leva a defesa junto");
   // e a Tropa da Expedição vence o primeiro lugar com folga
   const x = expedicaoPorId("bosque-cogumelos");
   const r = batalhaDeExpedicao({ atacante: { exercito: exercitoDaExpedicao({}, 1).exercito, neuro_nivel: 1 }, expedicao: x, semente: 7 });
@@ -3308,6 +3318,64 @@ caso("correio: o recado, para quem dá para escrever, e ninguém pergunta para a
   assert.equal(podeEscreverPara({ de: "a", para: "lisa", tipo: "pergunta", paraEhRobo: true }).ok, false, "a Lisa não recebe pergunta");
   assert.equal(podeEscreverPara({ de: "a", para: "lisa", tipo: "recado", paraEhRobo: true }).ok, true, "recado para a Lisa pode");
 });
+caso("prática 1.8.1: o exemplo do diagrama é um diagrama, o código tem as quebras e a tela usa a largura", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  // o código com as quebras escapadas (visto em 05/11/2026) volta a ter linhas; o código normal não muda
+  const BARRA_N = "\\n"; // o "\n" escrito, com a barra (como o modelo devolveu)
+  assert.equal(codigoLegivel(["const a = [", "  1,", "  2", "];"].join(BARRA_N)), "const a = [\n  1,\n  2\n];");
+  const normal = `const s = "a${BARRA_N}";\nconsole.log(s);`;
+  assert.equal(codigoLegivel(normal), normal, "código com quebras de verdade fica como está");
+  const ex = validarExemploDaLisa({ titulo: "x", conceitos: [{ nome: "laço", explicacao: "repete" }], codigo: ["for (const x of lista) {", "  console.log(x);", "}"].join(BARRA_N), comoFunciona: [], paraOSeu: "" });
+  assert.equal(ex.codigo.split("\n").length, 3);
+  // o exemplo do exercício de diagrama: formas e ligações viram o documento do quadro
+  const d = validarExemploDeDiagrama({
+    titulo: "O check-in de um hotel", conceitos: [{ nome: "Decisão", explicacao: "o losango escolhe o caminho" }],
+    formas: [{ id: "f1", tipo: "terminal", texto: "Início" }, { id: "f2", tipo: "data", texto: "Reserva do hóspede" }, { id: "f3", tipo: "decision", texto: "Reserva existe?" },
+      { id: "f4", tipo: "process", texto: "Entregar a chave" }, { id: "f5", tipo: "inventado", texto: "Pedir documento" }, { id: "f6", tipo: "terminal", texto: "Fim" }],
+    ligacoes: [{ de: "f1", para: "f2" }, { de: "f2", para: "f3" }, { de: "f3", para: "f4", rotulo: "Sim" }, { de: "f3", para: "f5", rotulo: "Não" }, { de: "f4", para: "f6" }, { de: "f5", para: "f9" }],
+    comoFunciona: ["Começa no início."], paraOSeu: "Leve a decisão para o seu.",
+  });
+  const aba = d.diagrama.pages[0];
+  assert.equal(d.diagrama.format, "processmap");
+  assert.equal(aba.shapes.length, 6);
+  assert.equal(aba.shapes.find((s) => s.id === "f5").type, "process", "forma desconhecida vira processo");
+  assert.equal(aba.connections.length, 5, "a ligação para uma forma que não existe sai");
+  assert.equal(aba.connections.find((c) => c.from === "f3" && c.to === "f4").label, "Sim");
+  assert.equal(d.codigo, "");
+  assert.throws(() => validarExemploDeDiagrama({ conceitos: [{ nome: "a", explicacao: "b" }], formas: [{ id: "f1", texto: "só" }], ligacoes: [] }));
+  // o exemplo antigo em código não serve mais no exercício de diagrama (a Lisa refaz); nos outros, serve
+  assert.equal(exemploAindaServe({ codigo: "x" }, "diagrama"), false);
+  assert.equal(exemploAindaServe(d, "diagrama"), true);
+  assert.equal(exemploAindaServe({ codigo: "x" }, "codigo"), true);
+  assert.equal(exemploAindaServe(null, "codigo"), false);
+  const tem = (arquivo, trecho) => assert.ok(ler(arquivo).replace(/\r\n/g, "\n").includes(trecho), `${arquivo}: ${trecho}`);
+  tem("../src/lib/pratica.js", 'motor === "diagrama"\n      ? await gerarExemploDeDiagrama(');
+  tem("../src/lib/pratica.js", "if (exemploAindaServe(d.conteudo?.aplicacao, motor)) return d.conteudo.aplicacao;");
+  tem("../src/componentes/Desafios.js", "<DiagramaParaVer documento={exemplo.diagrama}");
+  tem("../src/componentes/Desafios.js", "<Codigo texto={codigoLegivel(exemplo.codigo)}");
+  // a tela cheia é a do navegador, e a animação de entrada não prende mais o que é position: fixed
+  tem("../src/componentes/pratica/Diagrama.js", "el?.requestFullscreen && !document.fullscreenElement");
+  tem("../src/app/globals.css", ".pf-principal > * { animation: pf-surgir 0.6s var(--pf-curva) backwards; }");
+  // o exercício usa a largura: sem o teto de 860 px, e o de diagrama com a página larga
+  assert.ok(!ler("../src/app/pratica.css").includes(".desafio { display: grid; gap: 14px; max-width: 860px; }"));
+  tem("../src/app/pratica.css", ".pf-principal:has(.exercicio--diagrama) { max-width: 1480px; }");
+});
+caso("correio 1.8.1: a Lisa robô só manda recado inteiro e lê o próprio veredito", () => {
+  // os 7 recados que ela mandou até 05/11/2026, todos cortados no meio da frase
+  for (const cortado of ["Oi, God! Mandou bem demais com esses 1", "Oi, God! 1665 pontos em", "Oi, Davi C.! Lisa aqui", "Oi, Davi C.! Lisa aqui. Mandou",
+    "Oi, Davi C.! Mandou muito bem", "Oi, Davi C.! Mandou super bem com", "Oi, Islan F.! Lisa aqui"]) {
+    assert.equal(recadoDoRobo(cortado), null, cortado);
+  }
+  const bom = "Oi, God! 1665 pontos em 7 dias é muita dedicação. Que tal usar umas moedas para subir a mina do Reino? Ela rende mais a cada nível.";
+  assert.equal(recadoDoRobo(bom), bom);
+  assert.equal(recadoDoRobo(`"${bom}"`), bom, "sem as aspas que o modelo às vezes põe");
+  assert.equal(recadoDoRobo("Oi, Ana! Seu Neuro está no nível 3, continue firme nos quizzes 🚀"), "Oi, Ana! Seu Neuro está no nível 3, continue firme nos quizzes 🚀", "emoji fecha a frase");
+  assert.equal(recadoDoRobo(bom, { cortado: true }), null, "o limite do modelo cortou: não vai, mesmo que pareça inteiro");
+  const longo = recadoDoRobo(`${bom} `.repeat(5));
+  assert.ok(longo.length <= CORREIO.recadoMaximo && /[.!?]$/.test(longo) && bom.includes(longo.split(". ").pop().split("? ").pop()), "comprido demais fica até a última frase inteira");
+  assert.equal(conferirRecado(longo).ok, true);
+  assert.deepEqual(["SIM", " sim.", "Sim, é útil", "NAO", "Não.", "nao", "talvez", ""].map(vereditoDoRecado), [true, true, true, false, false, false, null, null]);
+});
 caso("correio: o quiz termina com 3 respondidas e 2 pelo correio, valendo menos e sem o bônus", () => {
   const perguntas = Array.from({ length: 5 }, () => ({ opcoes: ["a", "b", "c", "d"], correta: 1 }));
   const normal = contaDoQuiz(perguntas, { 0: 1, 1: 1, 2: 1, 3: 1, 4: 1 }, [], pontosDoQuiz, PONTOS_DA_PRATICA.acertoNoQuiz);
@@ -3698,7 +3766,7 @@ caso("BEYOND-0022: o exemplo da Lisa vale para exercícios e projetos, e chega c
   const tela = fs.readFileSync(new URL("../src/componentes/Desafios.js", import.meta.url), "utf8");
   assert.match(tela, /\{temExemploDaLisa\(desafio\.tipo, desafio\.motor\) && <ExemploDaLisa desafio=\{desafio\} \/>\}/, "em todo exercício que tem o que aplicar");
   assert.match(tela, /<ExemploDaLisa key=\{`exemplo-/, "e nos projetos");
-  assert.match(fs.readFileSync(new URL("../src/lib/pratica.js", import.meta.url), "utf8"), /if \(d\.conteudo\?\.aplicacao\) return d\.conteudo\.aplicacao;/, "gera uma vez só");
+  assert.match(fs.readFileSync(new URL("../src/lib/pratica.js", import.meta.url), "utf8"), /if \(exemploAindaServe\(d\.conteudo\?\.aplicacao, motor\)\) return d\.conteudo\.aplicacao;/, "gera uma vez só (no diagrama, o exemplo antigo em código é refeito)");
   assert.match(fs.readFileSync(new URL("../src/app/api/desafios/[id]/exemplo/route.js", import.meta.url), "utf8"), /exemploDaLisa\(\{ usuarioId: usuario\.id, id \}\)/, "a rota existe");
 });
 

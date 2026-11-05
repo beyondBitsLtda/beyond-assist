@@ -7,6 +7,7 @@
 import { inicioDaSemana, fimDaSemana, inicioDoMes, fimDoMes, diaValido, diaDaSemana } from "./datas.js";
 import { MULTIPLICADOR_DE_RECOMPENSAS } from "./pontos.js";
 import { MOTORES, motorDo, evidenciasAceitas } from "./motores.js";
+import { documentoDoDiagrama, TIPOS_DO_DIAGRAMA } from "./lisaJogadora.js";
 
 // "projeto_mensal" ficou só para a história: desde 23/10/2026 a última semana do plano termina no
 // PROJETO FINAL, do tamanho da trilha (src/dominio/avanco.js), e ninguém gera projeto do mês novo.
@@ -451,6 +452,17 @@ export const temExemploDaLisa = (tipo, motor) => tipo !== "quiz" && !MOTORES_SEM
 const semCercas = (codigo) => String(codigo ?? "").replace(/\r\n/g, "\n").replace(/^\s*`{3}[\w+#-]*\n?/, "").replace(/\n?`{3}\s*$/, "").trim();
 
 /**
+ * O código como ele é (05/11/2026): às vezes o modelo devolve o código com as quebras escapadas — uma linha
+ * só, com "\n" escrito no meio ("const lista = [\n  { id: 10 }…") — e a tela mostrava uma linha sem fim.
+ * Código sem nenhuma quebra de verdade e com "\n" escrito ganha as quebras (e os "\t" e as aspas) de volta.
+ */
+export function codigoLegivel(codigo) {
+  const t = String(codigo ?? "");
+  if (t.includes("\n") || !t.includes("\\n")) return t;
+  return t.replace(/\\r\\n|\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, "\"");
+}
+
+/**
  * O exemplo, conferido: os conceitos (nome e para que serve), o código (ou, fora da programação, o exemplo
  * resolvido em passos), como ele funciona e como levar a ideia para o desafio — sem resolver o desafio.
  */
@@ -459,7 +471,7 @@ export function validarExemploDaLisa(bruto, { comCodigo = true } = {}) {
     .map((c) => ({ nome: texto(c?.nome, 80), explicacao: texto(c?.explicacao, 300) }))
     .filter((c) => c.nome && c.explicacao).slice(0, 8);
   if (conceitos.length < 1) throw new Error("a Lisa não conseguiu montar o exemplo — tente de novo");
-  const codigo = comCodigo ? semCercas(bruto?.codigo).slice(0, 6000) : "";
+  const codigo = comCodigo ? semCercas(codigoLegivel(bruto?.codigo)).slice(0, 6000) : "";
   const passos = listaDeTextos(bruto?.passos, 400, 10);
   if (comCodigo ? codigo.length < 20 : passos.length < 2) throw new Error("a Lisa não conseguiu montar o exemplo — tente de novo");
   return {
@@ -472,6 +484,39 @@ export function validarExemploDaLisa(bruto, { comCodigo = true } = {}) {
     paraOSeu: texto(bruto?.paraOSeu, 500),
   };
 }
+
+/**
+ * O exemplo da Lisa de um exercício de DIAGRAMA (05/11/2026: "é um exercício de fluxograma, não faz sentido o
+ * exemplo dela ser um código"): um diagrama de outro cenário, que abre no mesmo quadro, só para olhar. A IA
+ * manda as formas e as ligações; aqui vira o documento do quadro (o mesmo formato da entrega da Lisa robô).
+ */
+export function validarExemploDeDiagrama(bruto) {
+  const conceitos = (Array.isArray(bruto?.conceitos) ? bruto.conceitos : [])
+    .map((c) => ({ nome: texto(c?.nome, 80), explicacao: texto(c?.explicacao, 300) }))
+    .filter((c) => c.nome && c.explicacao).slice(0, 8);
+  const formas = (Array.isArray(bruto?.formas) ? bruto.formas : [])
+    .map((f, i) => ({ id: texto(f?.id, 20) || `f${i + 1}`, tipo: TIPOS_DO_DIAGRAMA.includes(f?.tipo) ? f.tipo : "process", texto: texto(f?.texto, 120) }))
+    .filter((f) => f.texto).slice(0, 24);
+  const ids = new Set(formas.map((f) => f.id));
+  const ligacoes = (Array.isArray(bruto?.ligacoes) ? bruto.ligacoes : [])
+    .map((l) => ({ de: texto(l?.de, 20), para: texto(l?.para, 20), rotulo: texto(l?.rotulo, 40) }))
+    .filter((l) => ids.has(l.de) && ids.has(l.para) && l.de !== l.para).slice(0, 40);
+  if (conceitos.length < 1 || formas.length < 4 || ligacoes.length < 3) throw new Error("a Lisa não conseguiu montar o exemplo — tente de novo");
+  const titulo = texto(bruto?.titulo, 120) || "Um diagrama parecido";
+  return {
+    titulo,
+    conceitos,
+    linguagem: "",
+    codigo: "",
+    passos: [],
+    diagrama: documentoDoDiagrama({ titulo, formas, ligacoes }),
+    comoFunciona: listaDeTextos(bruto?.comoFunciona, 300, 8),
+    paraOSeu: texto(bruto?.paraOSeu, 500),
+  };
+}
+
+/** O exemplo guardado ainda serve? No exercício de diagrama, só o exemplo em diagrama (o de código ficou para trás). */
+export const exemploAindaServe = (aplicacao, motor) => Boolean(aplicacao) && (motor !== "diagrama" || Boolean(aplicacao.diagrama));
 
 /**
  * A avaliação da IA, conferida. `aprovado` sai da NOTA, não do que o modelo disse: um "aprovado"

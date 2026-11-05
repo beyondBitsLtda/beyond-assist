@@ -518,3 +518,9 @@ html.embutido .kbd-hint { display: none; }
 /* depois de avaliado (sem tentativas), o quadro fica só para ver: nada recebe clique de edição */
 html.quadro-travado .toolbar, html.quadro-travado .props { pointer-events: none; opacity: .55; }
 html.quadro-travado #layerShapes, html.quadro-travado #layerConnections { pointer-events: none; }
+/* 05/11/2026 ("nem consigo trocar a legenda das setas"): o painel ao lado (com o "Rótulo da linha") sumia abaixo de
+   1100 px — e o quadro no exercício quase sempre é mais estreito que isso. No modo embutido ele fica até 760 px. */
+@media (max-width: 1100px) { html.embutido .props { display: block; width: 210px; padding: 12px; } }
+@media (max-width: 760px) { html.embutido .props { display: none; } }
+/* travado (o exemplo da Lisa, ou o desenho já avaliado), o painel não tem o que editar */
+html.embutido.quadro-travado .props { display: none; }

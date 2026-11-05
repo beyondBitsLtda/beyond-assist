@@ -18,6 +18,7 @@ import {
   gerarDesafioAberto, gerarCalculo, gerarDitado, avaliarEntrega,
   gerarPassos, gerarConversa, responderNaConversa, avaliarConversa, gerarDesafioDeDiagrama, avaliarDiagrama,
   gerarExemploDaLisa,
+  gerarExemploDeDiagrama,
 } from "./iaPratica.js";
 import { lerRepositorio, ErroDoGitHub } from "./github.js";
 import { diaDe } from "@/dominio/datas.js";
@@ -29,6 +30,7 @@ import {
   tabelaDePontos, cumpridosNaAvaliacao, juntarCumpridos, pontosDoProjeto, projetoCompleto,
   complexidadeDe, podeTrocarComplexidade, TROCAS_DE_COMPLEXIDADE, podeTrocarProjeto, projetoAntigo, arquivosDoProjeto,
   temExemploDaLisa,
+  exemploAindaServe,
 } from "@/dominio/pratica.js";
 import {
   MOTORES, motorDo, corrigeNoServidor, exercicioParaTela, avaliacaoDoMotor, conferirEvidencia,
@@ -679,7 +681,8 @@ export async function exemploDaLisa({ usuarioId, id }) {
   const d = await desafioDoUsuario(id, usuarioId);
   const motor = eProjeto(d.tipo) ? "aberto" : motorDo(d.conteudo || {});
   if (!temExemploDaLisa(d.tipo, motor)) throw new ErroDeAcesso(400, "este desafio não tem exemplo da Lisa");
-  if (d.conteudo?.aplicacao) return d.conteudo.aplicacao;
+  // no exercício de diagrama, o exemplo antigo em código (antes de 05/11/2026) é refeito como diagrama
+  if (exemploAindaServe(d.conteudo?.aplicacao, motor)) return d.conteudo.aplicacao;
   if (!temModelo()) throw new ErroDeAcesso(503, "a IA não está configurada neste servidor");
   const trilha = await trilhaDoUsuario(d.trilha_id, usuarioId);
   const perfil = perfilValido(trilha.perfil);
@@ -687,7 +690,9 @@ export async function exemploDaLisa({ usuarioId, id }) {
   const comCodigo = motor === "codigo" || (perfil === "programacao" && !Array.isArray(d.conteudo?.evidencias));
   let aplicacao;
   try {
-    aplicacao = await gerarExemploDaLisa({ tema: trilha.tema, perfil, resumo: resumoDoDesafio(d.conteudo), linguagem: d.conteudo?.linguagem || "", comCodigo });
+    aplicacao = motor === "diagrama"
+      ? await gerarExemploDeDiagrama({ tema: trilha.tema, resumo: resumoDoDesafio(d.conteudo), tipo: d.conteudo?.tipo })
+      : await gerarExemploDaLisa({ tema: trilha.tema, perfil, resumo: resumoDoDesafio(d.conteudo), linguagem: d.conteudo?.linguagem || "", comCodigo });
   } catch (e) {
     throw new ErroDeAcesso(502, e.message);
   }

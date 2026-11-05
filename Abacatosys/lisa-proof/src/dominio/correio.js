@@ -31,6 +31,35 @@ export function conferirRecado(texto) {
   return { ok: true, texto: t };
 }
 
+// O recado que a Lisa robô escreve (05/11/2026): os 7 primeiros chegaram cortados no meio da frase ("Oi, God!
+// 1665 pontos em") — o raciocínio do modelo gastava o limite de tamanho e sobrava um pedaço do texto.
+const RECADO_DO_ROBO_MINIMO = 40;
+const TERMINA_A_FRASE = /(?:[.!?…)"”']|\p{Extended_Pictographic}️?)$/u;
+
+/**
+ * O recado da Lisa robô, pronto para ir — ou null quando não dá para mandar: veio cortado pelo limite do
+ * modelo (`cortado`), é curto demais ou não termina a frase. Comprido demais, fica até a última frase inteira.
+ */
+export function recadoDoRobo(texto, { cortado = false } = {}) {
+  if (cortado) return null;
+  let t = limpo(texto).replace(/^["“'«]+|["”'»]+$/g, "").trim();
+  if (t.length > CORREIO.recadoMaximo) {
+    const cabe = t.slice(0, CORREIO.recadoMaximo);
+    const fim = Math.max(...[". ", "! ", "? ", "… "].map((s) => cabe.lastIndexOf(s)));
+    t = fim > 0 ? cabe.slice(0, fim + 1) : "";
+  }
+  if (t.length < RECADO_DO_ROBO_MINIMO || !TERMINA_A_FRASE.test(t)) return null;
+  return t;
+}
+
+/** O que a Lisa robô respondeu sobre um recado que recebeu: true (útil), false (não) ou null (não deu para ler). */
+export function vereditoDoRecado(resposta) {
+  const t = limpo(resposta).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  if (/^\W*sim\b/.test(t)) return true;
+  if (/^\W*nao\b/.test(t)) return false;
+  return null;
+}
+
 /**
  * A conta do quiz com as perguntas mandadas por correio (`enviadas`, os índices): elas saem do placar —
  * mesmo a que tinha sido respondida errada. O quiz termina quando toda pergunta foi respondida ou mandada.

@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { criar, obter } from "@/lib/api.js";
 import { formatarDia } from "@/dominio/datas.js";
-import { NOTA_DE_APROVACAO, podeReenviar, COMPLEXIDADES, ORDEM_DAS_COMPLEXIDADES, temExemploDaLisa } from "@/dominio/pratica.js";
+import { NOTA_DE_APROVACAO, podeReenviar, COMPLEXIDADES, ORDEM_DAS_COMPLEXIDADES, temExemploDaLisa, exemploAindaServe, codigoLegivel } from "@/dominio/pratica.js";
+import { TIPOS_DE_DIAGRAMA } from "@/dominio/diagramas.js";
 import { CORREIO } from "@/dominio/correio.js";
 import { execucaoDoExercicio } from "@/dominio/execucao.js";
 import { rodarCodigo } from "./codigo/rodar.js";
@@ -18,7 +19,7 @@ import { DesafioAberto, ListaDeCalculo, Ditado, TreinoDeOuvido, EntregaComEviden
 import { TreinoDeRitmo, TreinoDeAfinacao, LeituraNaPauta } from "./pratica/MotoresDeMusica.js";
 import { PassoAPasso, Grafico } from "./pratica/MotoresDeMatematica.js";
 import { ConversaComALisa } from "./pratica/Conversa.js";
-import { DesenhoDeDiagrama } from "./pratica/Diagrama.js";
+import { DesenhoDeDiagrama, DiagramaParaVer } from "./pratica/Diagrama.js";
 
 const LETRAS = ["A", "B", "C", "D"];
 
@@ -400,10 +401,10 @@ function Rodar({ linguagem, tema, codigo }) {
 
 export function Exercicio({ desafio }) {
   return (
-    <>
+    <div className={`exercicio${desafio.motor === "diagrama" ? " exercicio--diagrama" : ""}`}>
       <CorpoDoExercicio desafio={desafio} />
       {temExemploDaLisa(desafio.tipo, desafio.motor) && <ExemploDaLisa desafio={desafio} />}
-    </>
+    </div>
   );
 }
 
@@ -472,7 +473,9 @@ function CorpoDoExercicio({ desafio }) {
  * e leva a ideia para o dela. Não resolve o desafio. Gera uma vez (fica guardado no desafio).
  */
 function ExemploDaLisa({ desafio }) {
-  const [exemplo, setExemplo] = useState(desafio.conteudo?.aplicacao || null);
+  // no exercício de diagrama, o exemplo antigo em código não vale: a Lisa refaz como diagrama ao pedir de novo
+  const [exemplo, setExemplo] = useState(exemploAindaServe(desafio.conteudo?.aplicacao, desafio.motor) ? desafio.conteudo.aplicacao : null);
+  const colecao = TIPOS_DE_DIAGRAMA[desafio.conteudo?.tipo]?.colecao || desafio.conteudo?.colecao || "flow";
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
 
@@ -520,10 +523,15 @@ function ExemploDaLisa({ desafio }) {
           <ul className="exemplo-lisa__conceitos">
             {exemplo.conceitos.map((c, i) => <li key={i}><strong>{c.nome}</strong> — {emLinha(c.explicacao)}</li>)}
           </ul>
-          {exemplo.codigo ? (
+          {exemplo.diagrama ? (
+            <>
+              <p className="pf-campo__rotulo">O exemplo, desenhado no quadro (só para olhar)</p>
+              <DiagramaParaVer documento={exemplo.diagrama} colecao={colecao} titulo={exemplo.titulo} />
+            </>
+          ) : exemplo.codigo ? (
             <>
               <p className="pf-campo__rotulo">O exemplo{exemplo.linguagem ? ` (${exemplo.linguagem})` : ""}</p>
-              <Codigo texto={exemplo.codigo} linguagem={exemplo.linguagem || desafio.conteudo?.linguagem || desafio.tema} />
+              <Codigo texto={codigoLegivel(exemplo.codigo)} linguagem={exemplo.linguagem || desafio.conteudo?.linguagem || desafio.tema} />
             </>
           ) : (
             <>

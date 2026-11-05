@@ -824,7 +824,7 @@ export async function expedicoesDe(usuarioId) {
   const vezesHoje = new Map();
   for (const x of tanques.lista) vezesHoje.set(x.expedicao, (vezesHoje.get(x.expedicao) || 0) + 1);
   const torre = niveisDe(eu).castelo;
-  const tropa = exercitoDaExpedicao(eu.exercito, torre);
+  const tropa = exercitoDaExpedicao(eu.exercito, torre, eu.guarnicao);
   const meus = veiculosDe(eu.veiculos).filter(fazExpedicao);
   const planetoide = planetoideDaVez(usuarioId, tanques);
   const garagem = garagemParaTela(eu, saldo, tanques);
@@ -837,7 +837,7 @@ export async function expedicoesDe(usuarioId) {
     },
     veiculos: garagem,
     // com que exército a pessoa parte: o dela, ou a Tropa da Expedição (emprestada, de graça)
-    tropa: { emprestada: tropa.emprestado, tropas: tropa.exercito },
+    tropa: { emprestada: tropa.emprestado, tropas: tropa.exercito, reforco: tropa.reforco },
     // o Neuro revoltado (dias sem estudo) fecha as expedições até a pessoa estudar de novo
     fechadas: humor.expedicoesFechadas ? humor.texto : "",
     lugares: [...EXPEDICOES, planetoide].map((x) => {
@@ -889,7 +889,7 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
   const humor = await humorDoNeuroDe(usuarioId);
   if (humor.expedicoesFechadas) throw new ErroDeAcesso(400, "o Neuro está revoltado e fechou as expedições: estude hoje para ele abrir de novo");
 
-  const tropa = exercitoDaExpedicao(eu.exercito, torre);
+  const tropa = exercitoDaExpedicao(eu.exercito, torre, eu.guarnicao);
   const r = batalhaDeExpedicao({ atacante: { exercito: tropa.exercito, neuro_nivel: eu.neuro_nivel }, expedicao, semente: semente() });
 
   const ins = await db.from("proof_expedicoes").insert({
@@ -922,7 +922,7 @@ export async function atacarExpedicao(usuarioId, expedicaoId) {
 
   return {
     venceu: r.venceu, estrelas: r.estrelas, destruicao: r.destruicao, saque: r.saque,
-    caidas: r.caidas, combate: r.entrada, emprestado: tropa.emprestado, repartido,
+    caidas: r.caidas, combate: r.entrada, emprestado: tropa.emprestado, reforco: tropa.reforco, repartido,
     expedicao: { id: expedicao.id, nome: expedicao.nome, tipo: expedicao.tipo, chefe: expedicao.chefe, dificuldade: expedicao.dificuldade, veiculo, forca: expedicao.forca || 1 },
   };
 }

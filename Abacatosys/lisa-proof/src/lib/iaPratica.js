@@ -2,7 +2,8 @@
 // Tudo que sai daqui passa pelas conferências de src/dominio/pratica.js.
 
 import { PERSONA, personaDo, corte, gerarJson } from "./ia.js";
-import { validarQuiz, validarExercicio, validarProjeto, validarGuia, validarAvaliacao, perguntasNovas, exercicioRepetido, FOCO_DA_RODADA, validarExemploDaLisa } from "@/dominio/pratica.js";
+import { validarQuiz, validarExercicio, validarProjeto, validarGuia, validarAvaliacao, perguntasNovas, exercicioRepetido, FOCO_DA_RODADA, validarExemploDaLisa, validarExemploDeDiagrama } from "@/dominio/pratica.js";
+import { TIPOS_DO_DIAGRAMA } from "@/dominio/lisaJogadora.js";
 import { validarAberto, validarCalculo, validarDitado, EVIDENCIAS } from "@/dominio/motores.js";
 import { FORMAS } from "@/dominio/expressao.js";
 import { perfilValido, ehProgramacao, evidenciasDoPerfil } from "@/dominio/perfis.js";
@@ -890,6 +891,57 @@ export async function gerarExemploDaLisa({ tema, perfil = "programacao", resumo,
     ].filter(Boolean).join("\n"),
   });
   return validarExemploDaLisa(bruto, { comCodigo });
+}
+
+const ESQUEMA_DO_EXEMPLO_DE_DIAGRAMA = {
+  type: "OBJECT",
+  properties: {
+    titulo: { type: "STRING" },
+    conceitos: ESQUEMA_DO_EXEMPLO.properties.conceitos,
+    formas: { type: "ARRAY", items: { type: "OBJECT", properties: { id: { type: "STRING" }, tipo: { type: "STRING", enum: TIPOS_DO_DIAGRAMA }, texto: { type: "STRING" } }, required: ["id", "tipo", "texto"] } },
+    ligacoes: { type: "ARRAY", items: { type: "OBJECT", properties: { de: { type: "STRING" }, para: { type: "STRING" }, rotulo: { type: "STRING" } }, required: ["de", "para"] } },
+    comoFunciona: { type: "ARRAY", items: { type: "STRING" } },
+    paraOSeu: { type: "STRING" },
+  },
+  required: ["titulo", "conceitos", "formas", "ligacoes", "comoFunciona", "paraOSeu"],
+};
+
+/**
+ * O exemplo da Lisa de um exercício de DIAGRAMA (05/11/2026): um diagrama do mesmo tipo, de OUTRO cenário, que
+ * usa os mesmos recursos da notação (início e fim, decisão com saídas rotuladas, laço…). A tela abre o desenho
+ * no quadro, só para olhar. Não resolve o desafio.
+ */
+export async function gerarExemploDeDiagrama({ tema, resumo, tipo = "fluxograma" }) {
+  const nome = (TIPOS_DE_DIAGRAMA[tipo] || TIPOS_DE_DIAGRAMA.fluxograma).nome;
+  const bruto = await gerarJson({
+    sistema: personaDo("programacao") + " Aqui você ensina com um exemplo: mostra a notação funcionando num caso parecido, sem fazer o desenho do estudante.",
+    esquema: ESQUEMA_DO_EXEMPLO_DE_DIAGRAMA,
+    maxTokens: 6000,
+    pensarPouco: true,
+    pedido: [
+      `Tema do curso: ${tema}`,
+      `Tipo de diagrama do desafio: ${nome}`,
+      NOTACAO_DO_TIPO[tipo] ? `Notação esperada: ${NOTACAO_DO_TIPO[tipo]}` : "",
+      "O desafio do estudante:",
+      resumo,
+      "",
+      "Monte o EXEMPLO DA LISA em forma de DIAGRAMA (nada de código):",
+      "- `conceitos`: os recursos do diagrama de que o desafio precisa (de 2 a 6), cada um com o nome e uma frase de para que serve.",
+      `- \`formas\` e \`ligacoes\`: UM ${nome} de exemplo, completo, num cenário DIFERENTE do desafio (outro assunto,`,
+      "  outros nomes), que usa todos esses recursos. De 6 a 14 formas. O `tipo` de cada forma: terminal (início e fim),",
+      "  process (um passo), decision (uma pergunta, no losango), data (entrada ou saída de dados), database (onde os dados",
+      "  ficam), document (um documento ou relatório) ou note (uma observação). `texto`: curto, até 6 palavras. `id`: f1, f2…",
+      "  Cada ligação liga duas formas (`de` e `para`, com os ids) no sentido do fluxo; as saídas de cada decisão levam o",
+      "  `rotulo` (Sim/Não ou a condição). Nenhuma forma solta.",
+      "- `comoFunciona`: de 3 a 6 frases curtas explicando o diagrama, na ordem do fluxo.",
+      "- `paraOSeu`: 2 ou 3 frases dizendo como levar a ideia para o desafio — o que muda e por onde começar — SEM dar o",
+      "  desenho do desafio.",
+      "- `titulo`: o nome do exemplo (ex.: \"O check-in de um hotel\").",
+      "",
+      "Regras: o exemplo NÃO pode ser a solução do desafio, nem uma versão dele com outros nomes. Português do Brasil.",
+    ].filter(Boolean).join("\n"),
+  });
+  return validarExemploDeDiagrama(bruto);
 }
 
 // ---------------------------------------------------------------- avaliação
