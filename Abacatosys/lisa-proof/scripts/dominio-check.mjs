@@ -152,6 +152,8 @@ import {
 } from "../src/dominio/diagramas.js";
 import * as bootcamp from "../src/dominio/bootcamp.js";
 import * as usoDoProof from "../src/dominio/uso.js";
+import * as ide from "../src/dominio/ide.js";
+import * as shell from "../src/dominio/shell.js";
 
 let passou = 0;
 function caso(nome, fn) {
@@ -3318,6 +3320,146 @@ caso("correio: o recado, para quem dá para escrever, e ninguém pergunta para a
   assert.equal(podeEscreverPara({ de: "a", para: "lisa", tipo: "pergunta", paraEhRobo: true }).ok, false, "a Lisa não recebe pergunta");
   assert.equal(podeEscreverPara({ de: "a", para: "lisa", tipo: "recado", paraEhRobo: true }).ok, true, "recado para a Lisa pode");
 });
+// ---------------------------------------------------------------- a IDE livre (1.9.0, 05/11/2026)
+caso("IDE: caminhos, nomes e linguagens por extensão", () => {
+  assert.deepEqual([ide.normalizarCaminho("/src", "../a.js"), ide.normalizarCaminho("/src", "~/b"), ide.normalizarCaminho("/", "./x/./y/../z"), ide.normalizarCaminho("/a", "/")], ["/a.js", "/b", "/x/z", "/"]);
+  assert.deepEqual([ide.caminhoParaMostrar("/"), ide.caminhoParaMostrar("/src/lib")], ["~", "~/src/lib"]);
+  assert.equal(ide.nomeValido("main.py").ok, true);
+  assert.equal(ide.nomeValido("a/b").ok, false);
+  assert.equal(ide.nomeValido("..").ok, false);
+  assert.equal(ide.nomeValido("ruim?.txt").ok, false, "o caractere que o Windows recusa (o .zip abre no Windows)");
+  assert.deepEqual(["a.js", "b.py", "c.sql", "index.html", "m.c", "x.lua", "y.rs", "README.md"].map((c) => ide.linguagemDoArquivo(c).executor), ["js", "python", "sql", "previa", "servidor", "servidor", "servidor", null]);
+  assert.equal(ide.linguagemDoArquivo("Main.java").compilador, "openjdk-jdk-21+35");
+  assert.ok(ide.COMPILADORES_DA_IDE.has("lua-5.4.7") && ide.COMPILADORES_DA_IDE.has("gcc-13.2.0-c"), "a rota só aceita os compiladores da lista");
+});
+caso("IDE: o sistema de arquivos (gravar, pastas, mover, copiar, apagar, árvore) e os limites", () => {
+  let p = ide.projetoVazio("t");
+  p = ide.escrever(p, "/src/lib/a.js", "1");
+  assert.ok(ide.ehPasta(p, "/src") && ide.ehPasta(p, "/src/lib"), "as pastas do caminho existem pelo arquivo");
+  p = ide.escrever(p, "/src/lib/a.js", "2", { acrescentar: true });
+  assert.equal(p.arquivos["/src/lib/a.js"], "12");
+  p = ide.criarPasta(p, "/dados");
+  assert.throws(() => ide.criarPasta(p, "/x/y"), /mkdir -p/);
+  p = ide.criarPasta(p, "/x/y", { pais: true });
+  assert.deepEqual(ide.listar(p, "/").map((f) => f.nome), ["dados", "src", "x"], "pastas primeiro, em ordem");
+  p = ide.mover(p, "/src/lib/a.js", "/dados");
+  assert.ok(ide.ehArquivo(p, "/dados/a.js") && !ide.ehArquivo(p, "/src/lib/a.js"), "mover para dentro da pasta");
+  p = ide.copiar(p, "/dados", "/copia", { recursivo: true });
+  assert.equal(p.arquivos["/copia/a.js"], "12");
+  assert.throws(() => ide.remover(p, "/copia"), /rm -r/);
+  p = ide.remover(p, "/copia", { recursivo: true });
+  assert.ok(!ide.existe(p, "/copia"));
+  assert.throws(() => ide.mover(p, "/dados", "/dados/sub"), /dentro dela mesma/);
+  assert.ok(ide.arvore(p, "/").some((l) => l.includes("└── ") || l.includes("├── ")));
+  assert.throws(() => ide.escrever(p, "/grande.txt", "x".repeat(ide.IDE.maxTamanhoDoArquivo + 1)), /passou/);
+  let cheio = ide.projetoVazio();
+  for (let i = 0; i < ide.IDE.maxArquivos; i++) cheio = { ...cheio, arquivos: { ...cheio.arquivos, ["/f" + i]: "" } };
+  assert.throws(() => ide.escrever(cheio, "/mais.txt", ""), /chegou a 300 arquivos/);
+});
+caso("IDE: o projeto que chega da tela é conferido antes de gravar", () => {
+  const ok = ide.conferirProjeto({ nome: "  Meu  ", arquivos: { "main.py": "print(1)", "/src/../a.txt": "a", "/x": 5 }, pastas: ["/vazia", "/a?b"], principal: "main.py" });
+  assert.equal(ok.ok, true);
+  assert.deepEqual(Object.keys(ok.projeto.arquivos).sort(), ["/a.txt", "/main.py"], "caminhos normalizados e só texto");
+  assert.deepEqual(ok.projeto.pastas, ["/vazia"], "pasta com nome inválido sai");
+  assert.equal(ok.projeto.principal, "/main.py");
+  assert.equal(ide.conferirProjeto({ arquivos: { "/a:b.txt": "" } }).ok, false);
+  assert.equal(ide.conferirProjeto({ arquivos: Object.fromEntries(Array.from({ length: 301 }, (_, i) => ["/f" + i, ""])) }).ok, false);
+  assert.ok(Object.keys(ide.MODELOS_DE_PROJETO).length >= 8);
+  for (const [k, m] of Object.entries(ide.MODELOS_DE_PROJETO)) {
+    const p = ide.projetoDoModelo(k);
+    assert.equal(ide.conferirProjeto(p).ok, true, k);
+    if (m.principal) assert.ok(p.arquivos[m.principal] !== undefined, k + ": o principal existe");
+  }
+});
+caso("IDE: a diferença do que o programa fez entra no projeto sem desfazer a edição do meio", () => {
+  const antes = ide.projetoDoModelo("python");
+  const depois = ide.remover(ide.escrever(antes, "/saida.txt", "ok"), "/util.py");
+  const agora = ide.escrever(antes, "/main.py", "# editado enquanto rodava");
+  const r = ide.aplicarDiferenca(agora, ide.diferencaDoProjeto(antes, depois));
+  assert.equal(r.arquivos["/main.py"], "# editado enquanto rodava");
+  assert.equal(r.arquivos["/saida.txt"], "ok");
+  assert.ok(!("/util.py" in r.arquivos));
+  assert.equal(ide.diferencaDoProjeto(antes, antes), null);
+});
+caso("IDE: o programa que lê a entrada é reconhecido (input, scanf, Scanner, cin...)", () => {
+  const l = (ext) => ide.linguagemDoArquivo("x." + ext);
+  assert.equal(ide.leEntrada("n = input()", l("py")), true);
+  assert.equal(ide.leEntrada("print(1)", l("py")), false);
+  assert.equal(ide.leEntrada("scanf(\"%d\", &n);", l("c")), true);
+  assert.equal(ide.leEntrada("std::cin >> n;", l("cpp")), true);
+  assert.equal(ide.leEntrada("new Scanner(System.in)", l("java")), true);
+  assert.equal(ide.leEntrada("const n = prompt('?')", l("js")), true);
+  assert.equal(ide.leEntrada("local x = io.read()", l("lua")), true);
+});
+caso("terminal: aspas, variáveis, curingas, operadores e erros de sintaxe", () => {
+  const env = { USER: "aluno", NOME: "Ana" };
+  assert.deepEqual(shell.tokenizar(" echo \"oi $NOME\" 'sem $NOME' a\\ b # comentário", env).map((t) => t.valor), ["echo", "oi Ana", "sem $NOME", "a b"]);
+  assert.deepEqual(shell.tokenizar("a|b&&c>>d<e;f 2>&1", env).map((t) => t.valor), ["a", "|", "b", "&&", "c", ">>", "d", "<", "e", ";", "f", "2>&1"]);
+  assert.equal(shell.tokenizar("ls *.js")[1].curinga, true);
+  assert.equal(shell.tokenizar("ls '*.js'")[1].curinga, false, "entre aspas não expande");
+  assert.throws(() => shell.tokenizar("echo \"aberto"), /sem fechar/);
+  assert.throws(() => shell.analisar(shell.tokenizar("| ls")), /sintaxe/);
+  assert.throws(() => shell.analisar(shell.tokenizar("echo >")), /faltou o arquivo/);
+  const seq = shell.analisar(shell.tokenizar("cat a.txt | grep x > b.txt && echo ok"));
+  assert.equal(seq.length, 2);
+  assert.equal(seq[0].pipeline.length, 2);
+  assert.equal(seq[0].pipeline[1].saida, "b.txt");
+  assert.equal(seq[1].conector, "&&");
+  const p = ide.projetoDoModelo("javascript");
+  assert.deepEqual(shell.expandirCuringa(p, "/", "*.js"), ["index.js", "util.js"]);
+  assert.deepEqual(shell.expandirCuringa(p, "/", "*.nada"), ["*.nada"], "sem casar, fica a palavra");
+});
+caso("terminal: o que cada programa pede (node, python, gcc, javac/java, sqlite3, ./executável)", () => {
+  const e = shell.ESTADO_INICIAL(ide.escrever(ide.projetoDoModelo("c"), "/Main.java", "class Main {}"));
+  const ped = (l) => shell.pedidoDoPrograma(l.split(" "), e);
+  assert.deepEqual(ped("node"), { tipo: "repl", linguagem: "javascript" });
+  assert.deepEqual(ped("python3"), { tipo: "repl", linguagem: "python" });
+  assert.equal(ped("python nada.py").erro, "python: nada.py: arquivo não encontrado");
+  const gcc = ped("gcc main.c -o app -lm");
+  assert.deepEqual([gcc.tipo, gcc.saida, gcc.fontes, gcc.opcoes], ["compilar", "/app", ["/main.c"], ["-lm"]]);
+  assert.equal(ped("g++ main.c").linguagem.chave, "cpp", "o g++ compila como C++ (como o de verdade)");
+  assert.equal(ped("gcc main.c -oapp -Wall").saida, "/app");
+  assert.deepEqual(ped("gcc main.c -Wall -O2 -std=c11").opcoes, ["-Wall", "-O2", "-std=c11"]);
+  assert.equal(ped("javac Main.java").saida, "/Main.class");
+  assert.equal(ped("java Main").arquivo, "/Main.java");
+  assert.equal(ped("go run").erro, "go: não achei arquivos .go nesta pasta");
+  assert.deepEqual(ped("sqlite3 loja.db"), { tipo: "sql", banco: "/loja.db", sql: null, rotulo: "SQL (SQLite)" });
+  assert.equal(ped("./nada").erro, "./nada: arquivo não encontrado");
+  assert.equal(shell.pedidoDoPrograma(["ls"], e), null, "comando de dentro não é programa");
+  assert.deepEqual(["/a.js", "/m.py", "/q.sql", "/m.c", "/x.cpp", "/Main.java", "/w.html", "/s.lua", "/r.md"].map(shell.comandoParaRodar),
+    ["node a.js", "python m.py", "sqlite3 < q.sql", "gcc m.c -o m && ./m", "g++ x.cpp -o x && ./x", "java Main.java", "preview w.html", "run s.lua", ""]);
+});
+caso("terminal: o Tab completa o comando e o caminho; a entrada é pedida antes de rodar", () => {
+  const e = shell.ESTADO_INICIAL(ide.criarPasta(ide.projetoDoModelo("python"), "/src"));
+  assert.equal(shell.completar("tre", e).linha, "tree ");
+  assert.equal(shell.completar("pyt", e).linha, "python", "python e python3: completa até onde os dois concordam, como o bash");
+  assert.equal(shell.completar("cat ma", e).linha, "cat main.py ");
+  assert.equal(shell.completar("cd s", e).linha, "cd src/");
+  assert.ok(shell.completar("python ", e).opcoes.length >= 3, "mais de uma opção: a lista");
+  assert.equal(shell.precisaDeEntrada("python main.py", e), true);
+  assert.equal(shell.precisaDeEntrada("python main.py < entrada.txt", e), false);
+  assert.equal(shell.precisaDeEntrada("echo Ana | python main.py", e), false);
+  const c = shell.ESTADO_INICIAL(ide.projetoDoModelo("c"));
+  assert.equal(shell.precisaDeEntrada("gcc main.c -o app && ./app", c), true, "o ./app ainda não existe, mas o main.c usa scanf");
+});
+caso("IDE: as travas (sem acesso à conta, compiladores da lista, versão do projeto, a migração e o atalho)", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const exec = ler("../src/componentes/ide/executores.js");
+  assert.match(exec, /self\.fetch = \(url, opcoes\) => doProof\(url\) \? Promise\.reject/, "o programa não chama o próprio Proof");
+  assert.match(exec, /self\.XMLHttpRequest = undefined/);
+  const tela = ler("../src/componentes/ide/Ide.js");
+  assert.match(tela, /sandbox="allow-scripts allow-modals allow-forms allow-popups"/, "a prévia sem allow-same-origin: origem opaca");
+  assert.doesNotMatch(tela, /allow-same-origin/);
+  assert.match(ler("../src/lib/execucao.js"), /if \(!COMPILADORES_DA_IDE\.has\(compilador\)\) throw new ErroDeAcesso\(400/);
+  assert.match(ler("../src/lib/execucao.js"), /export async function rodarNaIde[\s\S]*?frear\(usuarioId\);/, "o mesmo freio do Rodar");
+  assert.match(ler("../src/lib/ide.js"), /\.eq\("versao", versao\)/, "duas abas não apagam o trabalho uma da outra");
+  assert.match(ler("../src/lib/ide.js"), /conferirProjeto\(corpo\)/);
+  assert.match(ler("../db/037-ide.sql"), /create table if not exists public\.proof_ide_projetos/);
+  assert.match(ler("../src/app/(app)/pratica/page.js"), /href="\/pratica\/ide"/, "a IDE mora na Prática, sem item novo no menu");
+  assert.doesNotMatch(ler("../src/componentes/Moldura.js"), /\/pratica\/ide/);
+  assert.match(ler("../src/app/layout.js"), /import "\.\/ide\.css";/);
+});
+
 caso("prática 1.8.1: o exemplo do diagrama é um diagrama, o código tem as quebras e a tela usa a largura", () => {
   const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
   // o código com as quebras escapadas (visto em 05/11/2026) volta a ter linhas; o código normal não muda

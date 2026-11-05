@@ -162,6 +162,11 @@ export default function Pratica() {
           <span aria-hidden="true">🤝</span>
           <span><strong>Revisão da turma</strong><small>Revise a entrega de um colega e ganhe pontos e moedas</small></span>
         </Link>
+        {/* a IDE livre (05/11/2026): escrever e rodar código em qualquer linguagem, com terminal */}
+        <Link className="pratica__atalho" href="/pratica/ide">
+          <span aria-hidden="true">💻</span>
+          <span><strong>IDE e terminal</strong><small>Escreva e rode código em mais de 30 linguagens, com terminal, pip, npm e prévia web</small></span>
+        </Link>
       </nav>
 
       {erro && <div className="pf-aviso pf-aviso--erro" style={{ marginTop: 12 }}>{erro}</div>}

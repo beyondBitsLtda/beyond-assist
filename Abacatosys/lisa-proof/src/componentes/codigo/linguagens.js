@@ -32,6 +32,15 @@ const CARREGADORES = {
   ruby: legado(async () => (await import("@codemirror/legacy-modes/mode/ruby")).ruby),
   swift: legado(async () => (await import("@codemirror/legacy-modes/mode/swift")).swift),
   yaml: legado(async () => (await import("@codemirror/legacy-modes/mode/yaml")).yaml),
+  // as linguagens da IDE livre (05/11/2026)
+  lua: legado(async () => (await import("@codemirror/legacy-modes/mode/lua")).lua),
+  perl: legado(async () => (await import("@codemirror/legacy-modes/mode/perl")).perl),
+  r: legado(async () => (await import("@codemirror/legacy-modes/mode/r")).r),
+  haskell: legado(async () => (await import("@codemirror/legacy-modes/mode/haskell")).haskell),
+  julia: legado(async () => (await import("@codemirror/legacy-modes/mode/julia")).julia),
+  pascal: legado(async () => (await import("@codemirror/legacy-modes/mode/pascal")).pascal),
+  groovy: legado(async () => (await import("@codemirror/legacy-modes/mode/groovy")).groovy),
+  scala: legado(async () => (await import("@codemirror/legacy-modes/mode/clike")).scala),
   // o caderno (25/10/2026): Markdown com os blocos ```js coloridos pela linguagem de cada um
   markdown: async () => {
     const [{ markdown, markdownLanguage }, { LanguageDescription }] = await Promise.all([
@@ -59,6 +68,7 @@ const APELIDOS = {
   bash: "shell", sh: "shell", zsh: "shell", terminal: "shell", console: "shell",
   rb: "ruby", golang: "go", rs: "rust",
   md: "markdown", yml: "yaml",
+  pl: "perl", hs: "haskell", jl: "julia", pas: "pascal",
 };
 
 /** "Python 3.12" → "python"; "C" → "cpp"; algo desconhecido → "" (o código sai sem cor, mas sai). */
@@ -69,7 +79,7 @@ export function chaveDaLinguagem(nome) {
 }
 
 /** O rótulo que aparece no canto do bloco: o nome como a pessoa reconhece. */
-const ROTULOS = { javascript: "JavaScript", typescript: "TypeScript", jsx: "JSX", tsx: "TSX", python: "Python", java: "Java", cpp: "C/C++", sql: "SQL", html: "HTML", css: "CSS", php: "PHP", json: "JSON", go: "Go", rust: "Rust", csharp: "C#", kotlin: "Kotlin", dart: "Dart", shell: "Terminal", ruby: "Ruby", swift: "Swift", yaml: "YAML", markdown: "Markdown" };
+const ROTULOS = { javascript: "JavaScript", typescript: "TypeScript", jsx: "JSX", tsx: "TSX", python: "Python", java: "Java", cpp: "C/C++", sql: "SQL", html: "HTML", css: "CSS", php: "PHP", json: "JSON", go: "Go", rust: "Rust", csharp: "C#", kotlin: "Kotlin", dart: "Dart", shell: "Terminal", ruby: "Ruby", swift: "Swift", yaml: "YAML", markdown: "Markdown", lua: "Lua", perl: "Perl", r: "R", haskell: "Haskell", julia: "Julia", pascal: "Pascal", groovy: "Groovy", scala: "Scala" };
 export function rotuloDaLinguagem(nome) {
   const chave = chaveDaLinguagem(nome);
   if (chave === "cpp" && String(nome || "").trim().toLowerCase() === "c") return "C";

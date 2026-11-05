@@ -24,14 +24,16 @@ import { carregarLinguagem, rotuloDaLinguagem } from "./linguagens.js";
  * desfazer/refazer, busca (Ctrl+F), dobrar blocos e sugestões das palavras já usadas.
  *
  * Ctrl+Enter (Cmd+Enter no Mac) chama `aoCtrlEnter`, que envia a solução.
+ *
+ * Na IDE livre (05/11/2026): `nome` (o arquivo na barra), `atalhos` (o texto do canto) e `aoCtrlS` (salvar).
  */
-export default function EditorDeCodigo({ valor, aoMudar, linguagem, desabilitado, placeholder, aoCtrlEnter, rotulo = "Editor de código" }) {
+export default function EditorDeCodigo({ valor, aoMudar, linguagem, desabilitado, placeholder, aoCtrlEnter, aoCtrlS, rotulo = "Editor de código", nome = "solucao", atalhos = "Tab indenta · Ctrl+F busca · Ctrl+Enter envia", classe = "" }) {
   const caixa = useRef(null);
   const vista = useRef(null);
   const travas = useRef({ linguagem: new Compartment(), leitura: new Compartment() });
   // os callbacks mudam a cada render; o editor guarda a versão mais nova sem ser recriado
-  const ultimo = useRef({ aoMudar, aoCtrlEnter });
-  ultimo.current = { aoMudar, aoCtrlEnter };
+  const ultimo = useRef({ aoMudar, aoCtrlEnter, aoCtrlS });
+  ultimo.current = { aoMudar, aoCtrlEnter, aoCtrlS };
 
   useEffect(() => {
     const t = travas.current;
@@ -60,6 +62,7 @@ export default function EditorDeCodigo({ valor, aoMudar, linguagem, desabilitado
           dica(placeholder || ""),
           keymap.of([
             { key: "Mod-Enter", run: () => { ultimo.current.aoCtrlEnter?.(); return true; } },
+            { key: "Mod-s", preventDefault: true, run: () => { ultimo.current.aoCtrlS?.(); return Boolean(ultimo.current.aoCtrlS); } },
             ...closeBracketsKeymap,
             ...defaultKeymap,
             ...searchKeymap,
@@ -104,13 +107,13 @@ export default function EditorDeCodigo({ valor, aoMudar, linguagem, desabilitado
     }
   }, [valor]);
 
-  const nome = rotuloDaLinguagem(linguagem);
+  const nomeDaLinguagem = rotuloDaLinguagem(linguagem);
   return (
-    <div className={`pf-editor${desabilitado ? " pf-editor--travado" : ""}`}>
+    <div className={`pf-editor${desabilitado ? " pf-editor--travado" : ""}${classe ? ` ${classe}` : ""}`}>
       <div className="pf-editor__barra">
         <span className="pf-editor__bolinhas" aria-hidden="true"><i /><i /><i /></span>
-        <span className="pf-editor__nome">{nome ? `solucao · ${nome}` : "solucao"}</span>
-        <span className="pf-editor__atalhos">Tab indenta · Ctrl+F busca · Ctrl+Enter envia</span>
+        <span className="pf-editor__nome">{nomeDaLinguagem ? `${nome} · ${nomeDaLinguagem}` : nome}</span>
+        <span className="pf-editor__atalhos">{atalhos}</span>
       </div>
       <div ref={caixa} className="pf-editor__area" />
     </div>

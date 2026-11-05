@@ -909,6 +909,53 @@ próprio no menu (**Bootcamp**, no grupo Jogo).
 `/bootcamp`, `/bootcamp/create`, `/bootcamp/arena/:id` (o escritório em 3D:
 `src/componentes/bootcamp/Escritorio3D.js`) e `/bootcamp/judges/:id`.
 
+## IDE livre e terminal (1.9.0)
+
+Pedido de 05/11/2026: "ponha um modo de IDE e terminal livre para os usuários poderem escrever seus códigos e
+testarem; faça esse terminal da forma mais completa possível". Mora na Prática (atalho "IDE e terminal", rota
+`/pratica/ide`), sem item novo no menu.
+
+- **Projetos na conta.** Cada pessoa tem até 30 projetos (300 arquivos, 1,5 milhão de letras cada), salvos sozinhos
+  1,2 s depois da última mudança. Enquanto não salva, um rascunho fica no navegador. A `versao` do projeto impede
+  que duas abas apaguem o trabalho uma da outra: a segunda recebe 409 e escolhe qual versão fica. Há 10 modelos
+  para começar (vazio, JavaScript, Python, página web, C, C++, Java, SQL, Lua e Go).
+- **A tela.** O explorador (criar, renomear com F2, apagar com Delete, marcar o principal ★, arrastar arquivos do
+  computador), as abas, o editor do exercício (com o nome do arquivo e Ctrl+S), a prévia da página ao lado e o
+  terminal embaixo, com a altura de arrastar. Há também tela cheia e o .zip do projeto. Atalhos: Ctrl+Enter roda,
+  Ctrl+S salva, Ctrl+J vai ao terminal e Ctrl+B mostra os arquivos. No celular, o explorador vira uma gaveta.
+- **O terminal** (`src/dominio/shell.js`, puro e testado):
+  - **Sintaxe:** aspas, `$VARIÁVEIS`, curingas (`*.js`), `>`, `>>`, `<`, `2>`, `|`, `&&`, `||`, `;`, `!!`.
+  - **Comandos:** `ls`, `cd`, `pwd`, `tree`, `mkdir -p`, `touch`, `cat`, `head`, `tail`, `wc`, `rm -r`, `mv`, `cp -r`,
+    `find`, `grep -inrvc`, `sort`, `uniq`, `echo`, `export`, `history`, `open` e `preview`.
+  - **Teclado:** histórico com ↑↓, Tab que completa, Ctrl+C que interrompe, Ctrl+L que limpa e Ctrl+D que sai do
+    modo interativo.
+  - **Programas que leem a entrada:** quem usa `input()`, `scanf`, `Scanner` etc. sem `<` nem `|` faz o terminal
+    pedir as linhas antes de rodar.
+- **Onde cada linguagem roda** (`src/componentes/ide/executores.js`):
+  - **JavaScript:** um Worker que imita o Node. Tem `require` e `import`/`export` entre os arquivos, `fs` que grava
+    no projeto, `path`, `readline`, `process`, `prompt`, timers (o programa termina quando acabam) e
+    `console.table`. O `npm install` põe o pacote no `package.json`, e ele vem do esm.sh na hora de rodar. O
+    `fetch` funciona para a internet, mas não para o próprio Proof.
+  - **Python:** o Pyodide 0.26.4 da jsDelivr, num Worker que fica vivo entre as rodadas. Tem `pip install`
+    (micropip), o `requirements.txt` instalado sozinho, e numpy, pandas etc. carregados pelo `import`. O
+    `input()` mostra a resposta, e os arquivos gravados voltam ao projeto.
+  - **SQL:** o sql.js. O `banco.db` é guardado no projeto em base64, e o modo interativo `sqlite3` aceita
+    `.tables`, `.schema`, `.mode` e `.read`.
+  - **O resto:** C, C++, Java, Go, Rust, Lua, Ruby, PHP, Bash, Perl, R, Haskell e outras vão ao Wandbox por
+    `POST /api/ide/rodar`, com os outros arquivos do projeto junto. A rota só aceita os compiladores de
+    `COMPILADORES_DA_IDE` e usa o mesmo freio de 30 execuções a cada 10 minutos do Rodar do exercício. O
+    `gcc`/`javac`/`rustc`/`go build` deixa um "executável" no projeto, que o `./app` roda.
+- **A prévia web** (`src/componentes/ide/previa.js`): um `<iframe sandbox>` sem `allow-same-origin` (origem opaca,
+  sem acesso à conta). O CSS e o JavaScript do projeto vão embutidos, e os módulos viram data: URLs. O `fetch`
+  de arquivo do projeto responde com o arquivo, e o console da página vai para o terminal. A moldura nasce de novo
+  a cada mudança: trocar o `srcdoc` de uma moldura já carregada deixava a página em branco.
+
+**Arquivos.** Banco: `db/037-ide.sql` (`proof_ide_projetos`). Regras: `src/dominio/ide.js` e `src/dominio/shell.js`.
+Servidor: `src/lib/ide.js` e `rodarNaIde` em `src/lib/execucao.js`. Rotas: `/api/ide/projetos`,
+`/api/ide/projetos/:id` e `/api/ide/rodar`. Tela: `src/componentes/ide/` e `src/app/ide.css`. Testes:
+`npm run dominio-check` (a parte pura) e `npm run ide-check` (o terminal rodando linhas e o JavaScript do navegador
+rodando de verdade, num contexto do vm).
+
 ## Onde as coisas moram
 
 | Caminho | O quê |
@@ -924,6 +971,7 @@ próprio no menu (**Bootcamp**, no grupo Jogo).
 | `src/lib/auth.js` | Cópia do login do Abacato. **Não mude `chaveDeLogin` aqui sem mudar lá.** |
 | `db/001-proof.sql` · `db/002-pratica.sql` | Tabelas `proof_`. |
 | `public/diagramas/` | O quadro de diagramas (ProcessMap) do exercício de desenhar; `js/Ponte.js` é a ponte com a tela. |
+| `src/componentes/ide/` · `src/dominio/ide.js` · `src/dominio/shell.js` | A IDE livre: a tela, os executores (Node do navegador, Pyodide, sql.js, Wandbox), o sistema de arquivos e o terminal. |
 
 ## Colocar no ar
 
