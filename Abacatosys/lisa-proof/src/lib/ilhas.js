@@ -158,7 +158,8 @@ export async function estadoDasIlhas(usuarioId) {
     }),
     tripulacao: {
       tropas: tripulacao, usado: espacoUsado(tripulacao), capacidade: capacidadeDaTripulacao(minhas), porto: nivelDoPorto(minhas),
-      catalogo: ORDEM_DA_TRIPULACAO.map((t) => {
+      // na ordem do Porto que pedem e do preço (06/11/2026: com 24 tropas, as que dá para treinar já vêm primeiro)
+      catalogo: [...ORDEM_DA_TRIPULACAO].sort((a, b) => TROPAS[a].nivelMinimo - TROPAS[b].nivelMinimo || TROPAS[a].custo - TROPAS[b].custo).map((t) => {
         const um = podeTreinarTripulacao({ tropa: t, quantidade: 1, tripulacao, ilhasMinhas: minhas, conchas });
         const cinco = podeTreinarTripulacao({ tropa: t, quantidade: 5, tripulacao, ilhasMinhas: minhas, conchas });
         return { id: t, ...TROPAS[t], tem: tripulacao[t] || 0, pode1: um.ok, pode5: cinco.ok, motivo: um.ok ? "" : um.motivo };

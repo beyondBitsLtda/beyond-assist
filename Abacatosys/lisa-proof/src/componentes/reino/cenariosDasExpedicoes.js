@@ -65,10 +65,10 @@ export const CENARIOS = {
     cabana: "tenda", estaca: "madeira", luz: { ceu: "#6b8f7a", chao: "#13251a", sol: "#bfd8c8", forca: 0.9 },
   },
   // ---- a Temporada das Ilhas (03/11/2026): uma ilha de verdade — grama tropical, praia, o mar em volta, a
-  // cachoeira, coqueiros e flores —, com as construções do reino em cima (predios: "reino"). ilhas.js
+  // cachoeira, coqueiros e flores. Desde 06/11/2026, com as construções da ilha no desenho dela (predios: "ilha"). ilhas.js
   "ilha-tropical": {
     chao: "#5cb848", paleta: { madeira: "#a0703f", escura: "#6e4a2a", telhado: "#d4a95a", pedra: "#d6cfc0", tecido: "#16a34a", brilho: "#fb923c" },
-    cabana: "casa", estaca: "madeira", predios: "reino", luz: { ceu: "#ffffff", chao: "#cdeee0", sol: "#fff1cc", forca: 1.6 },
+    cabana: "casa", estaca: "madeira", predios: "ilha", luz: { ceu: "#ffffff", chao: "#cdeee0", sol: "#fff1cc", forca: 1.6 },
   },
   "covil-cerbero": {
     chao: "#3b2b2b", paleta: { madeira: "#2a1c1c", escura: "#140d0d", telhado: "#7f1d1d", pedra: "#3f3a3a", tecido: "#450a0a", brilho: "#f97316" },
@@ -573,9 +573,160 @@ function nada(p) {
   return g;
 }
 
+// ------------------------------------------------------------------ as construções da ilha (06/11/2026)
+// "Quando eu mudar para a visão da ilha devo ver tudo relacionado à ilha, inclusive as construções": a ilha das
+// Grandes Expedições mostra as construções DELA — a Cabana do Chefe de palha, o Coqueiral, o Recife de Pérolas e o
+// Porto com o barco —, e as defesas no desenho do lugar (o totem é a Torre Tiki, a balista é o Lança-Arpões).
+const PALHA = "#d9b26f", PALHA_ESCURA = "#b0894a", FOLHA = "#16a34a", FOLHA_CLARA = "#4ade80", COCO = "#7c4a2d", CORAL = "#fb7185", CORAL_CLARO = "#fda4af", PEROLA = "#f8fafc";
+const esfera = (p, r, cor, x, y, z) => p.malha(new THREE.SphereGeometry(r, 8, 6), cor, x, y, z);
+
+/** Um coqueiro: o tronco em gomos inclinados e as folhas em leque, com cocos no alto. */
+function coqueiro(p, x, z, altura, inclinacao, giro, cocos = 3) {
+  const g = new THREE.Group();
+  const gomos = 5;
+  let topoX = 0;
+  for (let i = 0; i < gomos; i++) {
+    const t = (i + 0.5) / gomos;
+    topoX = Math.sin(inclinacao) * altura * t * t;
+    g.add(p.cilindro(0.055, 0.07, altura / gomos + 0.02, 6, i % 2 ? "#8a5a2b" : "#9c6a37", topoX, altura * t, 0));
+  }
+  for (let k = 0; k < 6; k++) {
+    const pivo = new THREE.Group();
+    pivo.position.set(topoX, altura, 0);
+    pivo.rotation.y = (k / 6) * Math.PI * 2;
+    const folha = p.caixa(0.62, 0.035, 0.17, k % 2 ? FOLHA : FOLHA_CLARA, 0.3, -0.08, 0);
+    folha.rotation.z = -0.42;
+    pivo.add(folha);
+    g.add(pivo);
+  }
+  for (let k = 0; k < cocos; k++) {
+    const a = (k / Math.max(1, cocos)) * Math.PI * 2;
+    g.add(esfera(p, 0.065, COCO, topoX + Math.cos(a) * 0.08, altura - 0.06, Math.sin(a) * 0.08));
+  }
+  g.position.set(x, 0, z);
+  g.rotation.y = giro;
+  return g;
+}
+
+/** Castelo → a Cabana do Chefe: redonda, telhado de palha em camadas, totens na porta e tochas. */
+function cabanaDoChefe(p, n, c) {
+  const g = new THREE.Group();
+  g.add(p.cilindro(0.78, 0.86, 0.72, 12, c.madeira, 0, 0.36, 0));
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    g.add(p.cilindro(0.04, 0.04, 0.74, 5, c.escura, Math.cos(a) * 0.84, 0.37, Math.sin(a) * 0.84));
+  }
+  g.add(p.cone(1.2, 0.9, 12, PALHA, 0, 1.15, 0));
+  g.add(p.cone(1.24, 0.12, 12, PALHA_ESCURA, 0, 0.74, 0));
+  if (n >= 3) g.add(p.cone(0.62, 0.5, 12, PALHA_ESCURA, 0, 1.72, 0));
+  g.add(p.caixa(0.34, 0.48, 0.06, ESCURO, 0, 0.24, 0.84));
+  for (const lado of [-1, 1]) {
+    // os totens da porta, com olhos
+    g.add(p.caixa(0.18, 0.62 + 0.08 * n, 0.18, lado < 0 ? c.telhado : c.madeira, lado * 0.42, 0.31 + 0.04 * n, 0.92));
+    g.add(p.caixa(0.05, 0.05, 0.02, ESCURO, lado * 0.42 - 0.04, 0.5 + 0.06 * n, 1.02));
+    g.add(p.caixa(0.05, 0.05, 0.02, ESCURO, lado * 0.42 + 0.04, 0.5 + 0.06 * n, 1.02));
+    if (n >= 2) {
+      g.add(p.cilindro(0.03, 0.03, 0.55, 5, c.escura, lado * 0.82, 0.28, 0.62));
+      const chama = p.malha(new THREE.OctahedronGeometry(0.08, 0), p.brilho(c.brilho), lado * 0.82, 0.6, 0.62);
+      chama.userData.gira = true;
+      g.add(chama);
+    }
+  }
+  if (n >= 4) p.bandeira(g, 0, n >= 3 ? 1.9 : 1.55, 0, c.tecido);
+  if (n >= 5) {
+    const cristal = p.malha(new THREE.OctahedronGeometry(0.16, 0), p.brilho(c.brilho), 0, 2.7, 0);
+    cristal.userData.gira = true;
+    g.add(cristal);
+  }
+  return g;
+}
+
+/** Mina → o Coqueiral: coqueiros (mais a cada nível), um monte de cocos e o cesto da colheita. */
+function coqueiral(p, n, c) {
+  const g = new THREE.Group();
+  const lugares = [[-0.45, -0.3], [0.4, -0.42], [0.05, 0.45], [-0.62, 0.32], [0.62, 0.22], [-0.1, -0.7], [0.35, 0.72]];
+  const quantos = Math.min(lugares.length, 2 + n);
+  for (let i = 0; i < quantos; i++) {
+    const [x, z] = lugares[i];
+    g.add(coqueiro(p, x, z, 1.05 + (i % 3) * 0.18, 0.3 + (i % 2) * 0.18, i * 1.7, 2 + (i % 2)));
+  }
+  for (let i = 0; i < 3 + n; i++) {
+    const a = (i / (3 + n)) * Math.PI * 2;
+    g.add(esfera(p, 0.08, COCO, 0.15 + Math.cos(a) * 0.14, 0.08 + (i % 2) * 0.07, 0.15 + Math.sin(a) * 0.14));
+  }
+  g.add(p.cilindro(0.2, 0.15, 0.22, 8, c.madeira, -0.25, 0.11, 0.25));
+  return g;
+}
+
+/** Biblioteca → o Recife de Pérolas: uma lagoa com borda de pedra, corais e ostras abertas com a pérola brilhando. */
+function recifeDePerolas(p, n, c) {
+  const g = new THREE.Group();
+  g.add(p.cilindro(0.82, 0.88, 0.12, 18, c.pedra, 0, 0.06, 0));
+  const agua = new THREE.MeshStandardMaterial({ color: "#38bdf8", transparent: true, opacity: 0.85, roughness: 0.2, metalness: 0.1, flatShading: true });
+  g.add(p.malha(new THREE.CylinderGeometry(0.72, 0.72, 0.13, 18), agua, 0, 0.08, 0));
+  for (let i = 0; i < 4 + n; i++) {
+    const a = (i / (4 + n)) * Math.PI * 2 + 0.3;
+    const ramo = p.cone(0.07, 0.34 + (i % 3) * 0.1, 5, i % 2 ? CORAL : CORAL_CLARO, Math.cos(a) * 0.8, 0.28, Math.sin(a) * 0.8);
+    ramo.rotation.z = Math.cos(a) * 0.25;
+    g.add(ramo);
+  }
+  const ostras = Math.min(5, 1 + n);
+  for (let i = 0; i < ostras; i++) {
+    const a = (i / ostras) * Math.PI * 2;
+    const x = Math.cos(a) * 0.36, z = Math.sin(a) * 0.36;
+    const concha = p.malha(new THREE.SphereGeometry(0.13, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), "#a8a29e", x, 0.15, z);
+    concha.rotation.x = Math.PI;
+    g.add(concha);
+    const tampa = p.malha(new THREE.SphereGeometry(0.13, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), "#d6d3d1", x, 0.2, z - 0.06);
+    tampa.rotation.x = -0.9;
+    g.add(tampa);
+    const perola = p.malha(new THREE.SphereGeometry(0.06, 10, 8), p.brilho(PEROLA), x, 0.2, z);
+    perola.userData.gira = true;
+    g.add(perola);
+  }
+  return g;
+}
+
+/** Quartel → o Porto: o píer de tábuas, o barco com a vela, caixotes e (do nível 3) um guindaste. */
+function porto(p, n, c) {
+  const g = new THREE.Group();
+  g.add(p.caixa(1.5, 0.07, 0.5, c.madeira, 0, 0.2, 0.35));
+  for (let i = -3; i <= 3; i++) g.add(p.caixa(0.03, 0.075, 0.5, c.escura, i * 0.2, 0.205, 0.35));
+  for (const x of [-0.68, 0, 0.68]) g.add(p.cilindro(0.05, 0.05, 0.36, 6, c.escura, x, 0.12, 0.58));
+  // o barco: casco, proa, mastro e vela
+  g.add(p.caixa(0.95, 0.24, 0.38, c.escura, 0.05, 0.12, -0.3));
+  const proa = p.cone(0.19, 0.32, 4, c.escura, 0.66, 0.13, -0.3);
+  proa.rotation.z = -Math.PI / 2;
+  proa.rotation.x = Math.PI / 4;
+  g.add(proa);
+  g.add(p.caixa(0.85, 0.05, 0.3, c.madeira, 0.05, 0.25, -0.3));
+  g.add(p.cilindro(0.03, 0.03, 0.9, 5, c.madeira, 0.05, 0.7, -0.3));
+  g.add(p.caixa(0.04, 0.5, 0.42, PEROLA, 0.08, 0.78, -0.3));
+  if (n >= 2) g.add(p.caixa(0.04, 0.12, 0.2, c.tecido, 0.06, 1.12, -0.3));
+  for (let i = 0; i < Math.min(4, n); i++) g.add(p.caixa(0.2, 0.2, 0.2, i % 2 ? c.madeira : PALHA_ESCURA, -0.55 + i * 0.24, 0.34, 0.42 + (i % 2) * 0.05));
+  if (n >= 3) {
+    g.add(p.cilindro(0.04, 0.05, 0.9, 5, c.escura, -0.7, 0.55, 0.15));
+    const braco = p.caixa(0.6, 0.04, 0.04, c.escura, -0.45, 0.98, 0.15);
+    braco.rotation.z = 0.3;
+    g.add(braco);
+  }
+  return g;
+}
+
+/** A construção da ilha no desenho do lugar (null: a chave não é da ilha, fica o desenho de sempre). */
+function estruturaDaIlha(p, chave, nivel, cen) {
+  const c = cen.paleta;
+  if (chave === "muralha") return nivel > 0 ? palicada(p, nivel, c, "madeira") : nada(p);
+  const DA_ILHA = { castelo: cabanaDoChefe, mina: coqueiral, biblioteca: recifeDePerolas, quartel: porto, cofre: tesouro, torre: totem, canhao: catapulta, defesaAerea: balista };
+  if (!DA_ILHA[chave]) return null;
+  return nivel > 0 ? DA_ILHA[chave](p, nivel, c) : nada(p);
+}
+
 /** A estrutura da expedição para uma chave do motor (null = sem cenário: use a do reino). */
 export function estruturaDaExpedicao(p, chave, nivel, cen) {
-  if (!cen || cen.predios === "reino") return null; // a ilha tropical: as construções são as do reino
+  if (!cen || cen.predios === "reino") return null;
+  // a ilha tropical (06/11/2026): as construções da ilha no desenho dela (Cabana do Chefe, Coqueiral, Recife, Porto…)
+  if (cen.predios === "ilha") return estruturaDaIlha(p, chave, nivel, cen);
   const c = cen.paleta;
   if (chave === "muralha") return nivel > 0 ? palicada(p, nivel, c, cen.estaca) : nada(p);
   if (!(nivel > 0)) return nada(p);

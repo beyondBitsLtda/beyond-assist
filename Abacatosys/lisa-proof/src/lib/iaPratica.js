@@ -2,7 +2,7 @@
 // Tudo que sai daqui passa pelas conferências de src/dominio/pratica.js.
 
 import { PERSONA, personaDo, corte, gerarJson } from "./ia.js";
-import { validarQuiz, validarExercicio, validarProjeto, validarGuia, validarAvaliacao, perguntasNovas, exercicioRepetido, FOCO_DA_RODADA, validarExemploDaLisa, validarExemploDeDiagrama } from "@/dominio/pratica.js";
+import { validarQuiz, validarExercicio, validarProjeto, validarGuia, validarAvaliacao, perguntasNovas, exercicioRepetido, FOCO_DA_RODADA, validarExemploDaLisa, validarExemploDeDiagrama, linhasDoContextoDoQuiz, semAsForaDoAssunto } from "@/dominio/pratica.js";
 import { TIPOS_DO_DIAGRAMA } from "@/dominio/lisaJogadora.js";
 import { validarAberto, validarCalculo, validarDitado, EVIDENCIAS } from "@/dominio/motores.js";
 import { FORMAS } from "@/dominio/expressao.js";
@@ -82,6 +82,7 @@ const ESQUEMA_DO_QUIZ = {
       items: {
         type: "OBJECT",
         properties: {
+          ponto: { type: "STRING" },
           pergunta: { type: "STRING" },
           codigo: { type: "STRING" },
           linguagem: { type: "STRING" },
@@ -89,12 +90,51 @@ const ESQUEMA_DO_QUIZ = {
           correta: { type: "INTEGER" },
           explicacao: { type: "STRING" },
         },
-        required: ["pergunta", "opcoes", "correta", "explicacao"],
+        required: ["ponto", "pergunta", "opcoes", "correta", "explicacao"],
       },
     },
   },
   required: ["perguntas"],
 };
+
+const ESQUEMA_DA_CONFERENCIA = {
+  type: "OBJECT",
+  properties: { fora: { type: "ARRAY", items: { type: "INTEGER" } } },
+  required: ["fora"],
+};
+
+/**
+ * A conferência do quiz (06/11/2026: "a Lisa só pode gerar quiz do curso, coerente, e do assunto da etapa"):
+ * uma segunda olhada, curta, que aponta as perguntas fora do assunto da etapa — de outro tema, de outra
+ * tecnologia ou de um assunto que só vem depois na trilha. Devolve os índices (de 0) para tirar. Se a
+ * conferência falhar, não derruba o quiz: as regras do pedido já prendem as perguntas ao assunto.
+ */
+async function perguntasForaDoAssunto({ tema, assunto, contexto, perguntas, perfil }) {
+  if (!perguntas.length) return [];
+  try {
+    const r = await gerarJson({
+      sistema: personaDo(perfil) + " Agora você confere um quiz antes de ele chegar ao estudante.",
+      esquema: ESQUEMA_DA_CONFERENCIA,
+      maxTokens: 2048,
+      pensarPouco: true,
+      pedido: [
+        `Curso: ${tema}`,
+        `Assunto da etapa: ${assunto.titulo}`,
+        assunto.descricao ? `Descrição: ${corte(assunto.descricao, 400)}` : "",
+        ...linhasDoContextoDoQuiz(contexto || {}),
+        "",
+        "Perguntas do quiz:",
+        ...perguntas.map((p, i) => `${i + 1}. ${corte(p.pergunta, 300)}${p.codigo ? ` [código: ${corte(p.codigo, 200)}]` : ""} — opções: ${p.opcoes.map((o) => corte(o, 80)).join(" | ")}`),
+        "",
+        "Liste em `fora` os números das perguntas que NÃO são sobre o assunto da etapa dentro deste curso: de outro tema, de outra linguagem ou tecnologia, ou de um assunto que só vem depois na trilha. Usar algo já estudado antes como base é permitido. Todas no assunto: `fora` vazio.",
+      ].filter(Boolean).join("\n"),
+    });
+    return (Array.isArray(r?.fora) ? r.fora : []).map(Number).filter((n) => n >= 1 && n <= perguntas.length).map((n) => n - 1);
+  } catch (e) {
+    console.warn("conferência do quiz falhou:", e?.message);
+    return [];
+  }
+}
 
 /** 5 perguntas de múltipla escolha sobre o assunto do dia. Se a conferência descartar perguntas
  *  (ex.: "observe o código abaixo" sem código), pede mais uma vez e fica com o melhor dos dois. */
@@ -104,25 +144,32 @@ const ESQUEMA_DO_QUIZ = {
  * é chamada de novo, até juntar 5 perguntas novas (no máximo 3 pedidos). Com menos de 3 novas, o
  * quiz não é criado — melhor um erro claro que um quiz requentado.
  */
-export async function gerarQuiz({ tema, assunto, anteriores = [], rodada = 1, perfil = "programacao" }) {
+export async function gerarQuiz({ tema, assunto, anteriores = [], rodada = 1, perfil = "programacao", contexto = null }) {
   const extra = rodada > 1 || anteriores.length > 0;
-  let juntas = [], base = null, ultimoErro = null;
-  for (let tentativa = 0; tentativa < (extra ? 3 : 2) && juntas.length < 5; tentativa++) {
+  let juntas = [], base = null, ultimoErro = null, foraDoAssunto = 0;
+  for (let tentativa = 0; tentativa < 3 && juntas.length < 5; tentativa++) {
     const ja = [...anteriores, ...juntas];
     try {
-      const quiz = validarQuiz(await pedirQuiz({ tema, assunto, evitar: ja.map((p) => p.pergunta), rodada, temperatura: extra ? 0.9 : undefined, perfil }));
+      const quiz = validarQuiz(await pedirQuiz({ tema, assunto, evitar: ja.map((p) => p.pergunta), rodada, temperatura: extra ? 0.9 : undefined, perfil, contexto }));
+      // a pergunta que fugiu do assunto da etapa (ou do curso) sai antes de chegar à pessoa
+      const novas = perguntasNovas(quiz.perguntas, ja);
+      const fora = await perguntasForaDoAssunto({ tema, assunto, contexto, perguntas: novas, perfil });
+      foraDoAssunto += fora.length;
       base = base || quiz;
-      juntas = [...juntas, ...perguntasNovas(quiz.perguntas, ja)].slice(0, 5);
+      juntas = [...juntas, ...semAsForaDoAssunto(novas, fora)].slice(0, 5);
     } catch (e) {
       ultimoErro = e;
     }
+    // sem rodada extra, 4 boas já bastam (não vale mais uma ida à IA por uma pergunta)
+    if (!extra && juntas.length >= 4) break;
   }
-  if (juntas.length >= (extra ? 3 : 1)) return { ...base, perguntas: juntas };
+  if (juntas.length >= 3) return { ...base, perguntas: juntas };
+  if (foraDoAssunto) throw new Error("não consegui montar um quiz só com perguntas deste assunto — tente de novo em instantes");
   if (ultimoErro && !base) throw ultimoErro;
   throw new Error("não consegui montar um quiz com perguntas diferentes das que você já fez hoje — tente de novo em instantes");
 }
 
-async function pedirQuiz({ tema, assunto, evitar = [], rodada = 1, temperatura, perfil = "programacao" }) {
+async function pedirQuiz({ tema, assunto, evitar = [], rodada = 1, temperatura, perfil = "programacao", contexto = null }) {
   const outro = PRATICA_DO_PERFIL[perfilValido(perfil)];
   return gerarJson({
     temperatura,
@@ -130,26 +177,29 @@ async function pedirQuiz({ tema, assunto, evitar = [], rodada = 1, temperatura, 
     esquema: ESQUEMA_DO_QUIZ,
     maxTokens: 6144,
     pedido: [
-      `Tema: ${tema}`,
-      `Assunto do dia: ${assunto.titulo}`,
+      `Curso (o tema da trilha): ${tema}`,
+      `Assunto da etapa: ${assunto.titulo}`,
       assunto.descricao ? `Descrição: ${corte(assunto.descricao, 500)}` : "",
+      ...linhasDoContextoDoQuiz(contexto || {}),
       assunto.trecho || "", // curso a partir de um livro: o trecho das páginas do assunto (src/lib/leituras.js)
       "",
       "Crie um quiz rápido de 5 perguntas de múltipla escolha sobre este assunto.",
+      "- TODAS as perguntas são sobre o assunto da etapa, dentro deste curso. Nada de outro tema, de outra linguagem ou tecnologia, nem de assunto que ainda não chegou na trilha.",
+      "- `ponto`: em poucas palavras, qual ponto do assunto (do checklist ou do objetivo) a pergunta cobre. Se não der para dizer, a pergunta está fora do assunto: troque por outra.",
       "- Exatamente 4 opções por pergunta, todas plausíveis e diferentes; `correta` é o índice (0 a 3) da certa.",
       "- Varie a posição da resposta certa entre as perguntas.",
       ...(outro
         ? [`- ${outro.quiz}`,
           "- NÃO é um curso de programação: deixe `codigo` e `linguagem` sempre vazios, e não fale em código.",
           "- Se a pergunta precisar de um texto (uma frase, um diálogo curto, uma conta), ele vai DENTRO da própria `pergunta`, entre aspas; nunca escreva \"abaixo\", \"a seguir\" ou \"o trecho seguinte\"."]
-        : ["- Misture conceito e leitura de código curto.",
+        : ["- Misture conceito e leitura de código curto. O código é sempre da linguagem ou tecnologia do curso.",
           "- Pergunta sobre código: o código vai INTEIRO no campo `codigo` (com as quebras de linha de verdade, indentado, completo o bastante para a pergunta fazer sentido) e a linguagem em `linguagem` (ex.: javascript, c, python, sql).",
           "- A `pergunta` nunca contém código nem crases ```. Se ela disser \"código abaixo\", \"trecho a seguir\" ou \"observe o programa\", o campo `codigo` é obrigatório — pergunta assim sem código é descartada.",
           "- Pergunta só de conceito: deixe `codigo` vazio."]),
       "- `explicacao`: 1 ou 2 frases dizendo por que a certa é a certa.",
       "- Dificuldade progressiva: as primeiras mais fáceis.",
       evitar.length || rodada > 1 ? `\nEste é um quiz EXTRA do dia (rodada ${rodada}): ${FOCO_DA_RODADA[rodada] || FOCO_DA_RODADA[3]}.` : "",
-      evitar.length ? `PROIBIDO repetir, reformular ou trocar só as palavras destas perguntas, que a pessoa já respondeu hoje (use outros conceitos e OUTROS códigos):\n${evitar.slice(0, 20).map((p) => `- ${corte(p, 160)}`).join("\n")}` : "",
+      evitar.length ? `PROIBIDO repetir, reformular ou trocar só as palavras destas perguntas, que a pessoa já respondeu hoje (use OUTROS pontos do MESMO assunto e OUTROS códigos — sem sair do assunto):\n${evitar.slice(0, 20).map((p) => `- ${corte(p, 160)}`).join("\n")}` : "",
     ].filter(Boolean).join("\n"),
   });
 }
@@ -896,7 +946,8 @@ function pedirExemploDaLisa({ tema, perfil, resumo, linguagem, comCodigo, esquem
       ...(comCodigo
         ? ["- `codigo`: UMA aplicação de exemplo, completa e que roda, num cenário DIFERENTE do desafio (outro assunto, outros",
           "  nomes), que usa todos esses conceitos juntos. De 20 a 70 linhas, com comentários curtos em português marcando",
-          "  onde cada conceito aparece. Sem markdown nem crases em volta: só o código.",
+          "  onde cada conceito aparece. Sem markdown nem crases em volta: só o código. Uma instrução por linha, com quebras",
+          "  de linha de verdade e recuo de 2 espaços nos blocos — NUNCA o programa inteiro numa linha só.",
           `- \`linguagem\`: a linguagem do código (${linguagem || "a do curso"}), em minúsculas.`]
         : ["- `passos`: um exemplo RESOLVIDO, passo a passo (de 3 a 8 passos), de um caso DIFERENTE do desafio que usa todos",
           "  esses conceitos. Cada passo em 1 ou 2 frases."]),

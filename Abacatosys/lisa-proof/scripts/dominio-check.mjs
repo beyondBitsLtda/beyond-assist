@@ -14,7 +14,7 @@ import {
 import { resumoDasMetas, tarefasDoDia } from "../src/dominio/metas.js";
 import { nivelPorPontos, MULTIPLICADOR_DE_RECOMPENSAS, PONTOS } from "../src/dominio/pontos.js";
 import {
-  temExemploDaLisa, validarExemploDaLisa, validarExemploDeDiagrama, exemploAindaServe, codigoLegivel,
+  temExemploDaLisa, validarExemploDaLisa, validarExemploDeDiagrama, exemploAindaServe, codigoLegivel, codigoDoExemplo,
   periodoDe, periodoPermitido, pontosDoQuiz, PONTOS_DA_PRATICA, arquivosDoProjeto, pontosDaNota, validarQuiz, quizParaTela,
   separarCodigoDaPergunta, perguntaPedeCodigo, textoDeCodigo, podeReenviar, entregaConcluida,
   validarAvaliacao, assuntoAtual, TENTATIVAS, RODADAS_POR_DIA, podeAbrirRodada, fatorDaRodada, comFatorDaRodada,
@@ -154,6 +154,12 @@ import * as bootcamp from "../src/dominio/bootcamp.js";
 import * as usoDoProof from "../src/dominio/uso.js";
 import * as ide from "../src/dominio/ide.js";
 import * as shell from "../src/dominio/shell.js";
+import * as tropasDePapel from "../src/componentes/reino/tropasDePapel.js";
+import * as apostilaDom from "../src/dominio/apostila.js";
+import * as cadernosDom from "../src/dominio/cadernos.js";
+import * as praticaDom from "../src/dominio/pratica.js";
+import * as correioDom from "../src/dominio/correio.js";
+import * as markdownDom from "../src/dominio/markdown.js";
 
 let passou = 0;
 function caso(nome, fn) {
@@ -3460,6 +3466,160 @@ caso("IDE: as travas (sem acesso à conta, compiladores da lista, versão do pro
   assert.match(ler("../src/app/layout.js"), /import "\.\/ide\.css";/);
 });
 
+// ---------------------------------------------------------------- a tripulação nova e a visão da ilha (1.10.0, 06/11/2026)
+caso("ilhas 1.10.0: mais 20 tipos de tripulação, todos entram na batalha e têm o seu desenho", () => {
+  assert.equal(ORDEM_DA_TRIPULACAO.length, 24, "as 4 de antes e as 20 novas");
+  assert.equal(new Set(ORDEM_DA_TRIPULACAO).size, 24, "sem repetir");
+  const { svgDaTropa, TAMANHO_DO_PAPEL, ALTURA_DE_VOO } = tropasDePapel;
+  const doGuerreiro = svgDaTropa("guerreiro", "#2f6fd6");
+  for (const t of ORDEM_DA_TRIPULACAO) {
+    const d = TROPAS[t];
+    assert.equal(d.temporada, "ilhas", `${t} é da temporada`);
+    assert.ok(!ORDEM_DAS_TROPAS.includes(t), `${t} não vai para o Quartel`);
+    assert.ok(d.nivelMinimo >= 1 && d.nivelMinimo <= 5, `${t}: Porto de 1 a 5`);
+    assert.ok(d.custo > 0 && d.espaco > 0 && d.vida > 0 && (d.dano > 0 || d.cura > 0), `${t}: números de tropa`);
+    // quem não está na ORDEM_DE_ENTRADA do motor nunca entra na batalha
+    const e = montarCombate({ atacante: { exercito: { [t]: 1 }, neuro_nivel: 0 }, defensor: { construcoes: { castelo: 1 }, neuro_nivel: 1 }, semente: 1 });
+    assert.equal(e.entradas.filter((x) => x.tipo === t).length, 1, `${t} entra na batalha`);
+    assert.notEqual(svgDaTropa(t, "#2f6fd6"), doGuerreiro, `${t} tem desenho próprio`);
+    assert.ok(TAMANHO_DO_PAPEL[t] > 0, `${t} tem tamanho no 3D`);
+    if (d.voa) assert.ok(ALTURA_DE_VOO[t] > 0, `${t} voa: tem altura de voo`);
+  }
+  for (let n = 1; n <= 5; n++) assert.ok(ORDEM_DA_TRIPULACAO.filter((t) => TROPAS[t].nivelMinimo === n).length >= 2, `há tropas para o Porto ${n}`);
+  assert.ok(ORDEM_DA_TRIPULACAO.some((t) => TROPAS[t].cura > 0) && ORDEM_DA_TRIPULACAO.some((t) => TROPAS[t].voa) && ORDEM_DA_TRIPULACAO.some((t) => TROPAS[t].area > 0), "cura, voo e dano em área");
+});
+caso("ilhas 1.10.0: a visão da ilha mostra tudo dela (construções no desenho da ilha, extração, coleta, guardas e tripulação)", () => {
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const cen = ler("../src/componentes/reino/cenariosDasExpedicoes.js");
+  for (const f of ["function cabanaDoChefe", "function coqueiral", "function recifeDePerolas", "function porto", "function estruturaDaIlha"]) assert.ok(cen.includes(f), f);
+  const mundo = ler("../src/componentes/reino/Mundo3D.js");
+  assert.ok(mundo.includes("function definirExtracao(e)") && mundo.includes("animarExtracao(agora / 1000);"), "os trabalhadores e o que está pronto para coletar no 3D");
+  const reino = ler("../src/app/(app)/reino/page.js");
+  assert.ok(reino.includes("<GrandesExpedicoes foco={ilhaNoMundo.id}"), "com a ilha no 3D, a visão dela embaixo");
+  assert.ok(reino.includes("{!telaCheia && !(ilhaNoMundo && !teste) && ("), "os números e as abas do Reino saem enquanto a ilha está na vista");
+  assert.ok(reino.includes("aoEscolher={vendo ? undefined : naIlha ? aoEscolherNaIlha : aoEscolher}"), "clicar numa construção da ilha leva ao cartão dela");
+  assert.ok(reino.includes("extracao={extracao}"));
+  const tela = ler("../src/componentes/reino/GrandesExpedicoes.js");
+  assert.ok(tela.includes("function IlhaEmFoco("), "a visão da ilha");
+  for (const parte of ["⛏️ Extração", "🏗️ Construções", "Pronto para coletar", "<Tripulacao t={dados.tripulacao}"]) assert.ok(tela.includes(parte), parte);
+});
+
+caso("apostila 1.11.0: a aula completa do checklist vira apostila (todos os pontos, Markdown pronto, capa e categoria próprias)", () => {
+  const { validarApostila, apostilaCompleta, juntarSecoes, limparMarkdown, paginasDaApostila, categoriaDoCaderno, tituloDaApostila } = apostilaDom;
+  const pontos = ["Ler a documentação do MDN sobre arrays", "Pedir à Lisa a definição de map/filter", "Escrever um resumo próprio"];
+  const longo = "Explicação completa do ponto, com exemplo e erros comuns. ".repeat(12);
+  const bruto = {
+    titulo: "Arrays e seus métodos", introducao: "O que é e por quê.",
+    secoes: [{ ponto: 1, titulo: "Arrays", conteudo: longo }, { ponto: 3, titulo: "Seu resumo", conteudo: longo }, { ponto: 9, titulo: "Extra", conteudo: "fora do checklist" }, { ponto: 2, titulo: "", conteudo: "sem título" }],
+    resumo: "- arrays guardam listas", exercicios: [{ pergunta: "O que faz map?", resposta: "Transforma cada item." }, { pergunta: "", resposta: "x" }],
+    fontes: [{ titulo: "MDN — Array", url: "https://developer.mozilla.org/pt-BR/docs/Web/JavaScript/Reference/Global_Objects/Array" }, { titulo: "Ruim", url: "javascript:alert(1)" }],
+  };
+  const v = validarApostila(bruto, { pontos });
+  assert.deepEqual(v.faltando, [2], "o ponto 2 do checklist ficou sem seção");
+  assert.equal(v.apostila.secoes.find((s) => s.titulo === "Extra").ponto, 0, "ponto fora do checklist vira seção extra");
+  assert.equal(v.apostila.exercicios.length, 1);
+  assert.deepEqual(v.apostila.fontes.map((f) => f.titulo), ["MDN — Array"], "link que não é http(s) não entra");
+  assert.match(apostilaCompleta(v).motivo, /faltou cobrir o ponto 2/);
+  const juntada = juntarSecoes(v.apostila, [{ ponto: 2, titulo: "map e filter", conteudo: longo }]);
+  assert.deepEqual(juntada.secoes.map((s) => s.ponto), [1, 2, 3, 0], "as seções que faltaram entram na ordem do checklist");
+  assert.equal(apostilaCompleta({ apostila: juntada, faltando: [] }).ok, true);
+  assert.match(apostilaCompleta({ apostila: { ...juntada, secoes: [{ ponto: 1, titulo: "a", conteudo: "curto" }], introducao: "", resumo: "", exercicios: [] }, faltando: [] }).motivo, /curta demais/, "a aula curta (o filete) é recusada");
+  // o Markdown: <br> vira quebra, o título 1 desce para 2 — e o código fica como está; a cerca esquecida fecha
+  assert.equal(limparMarkdown("# Título\nTexto<br>mais\n```html\n<br>\n# não mexe\n```"), "## Título\nTexto\nmais\n```html\n<br>\n# não mexe\n```");
+  assert.equal(limparMarkdown("```js\nconst a = 1;"), "```js\nconst a = 1;\n```");
+  // as páginas: comece aqui (o mapa do checklist e a volta ao assunto), uma por seção, a revisão e as fontes
+  const paginas = paginasDaApostila(juntada, { tema: "JavaScript", assunto: { titulo: "Arrays", objetivo: "usar map e filter" }, pontos, trilhaId: "t1", cardId: "c1" });
+  assert.deepEqual(paginas.map((p) => p.titulo), ["Comece aqui", "1. Arrays", "2. map e filter", "3. Seu resumo", "4. Extra", "Revisão e exercícios", "Fontes para ir além"]);
+  assert.ok(paginas[0].conteudo.includes("## O que esta aula cobre") && paginas[0].conteudo.includes("2. Pedir à Lisa a definição de map/filter — seção 2"));
+  assert.ok(paginas[0].conteudo.includes("(/trilhas/t1?assunto=c1)"), "a apostila volta ao assunto na trilha");
+  assert.ok(paginas[2].conteudo.startsWith("# 2. map e filter") && paginas[2].conteudo.includes("> 📌 Do checklist: Pedir à Lisa"));
+  assert.ok(paginas[5].conteudo.includes("### Exercício 1") && paginas[5].conteudo.includes("### Resposta 1"));
+  const blocos = markdownDom.blocosDoMarkdown(paginas[6].conteudo);
+  assert.equal(blocos.find((b) => b.tipo === "lista").itens[0].linha[0].t, "link", "a fonte sai como link na prévia");
+  assert.equal(categoriaDoCaderno("apostila"), "apostila");
+  assert.equal(categoriaDoCaderno("qualquer"), "caderno");
+  assert.equal(tituloDaApostila("Arrays"), "Apostila — Arrays");
+
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.match(ler("../db/038-apostilas.sql"), /add column if not exists categoria text not null default 'caderno'/);
+  assert.ok(ler("../src/lib/cadernos.js").includes("categoria, criado_em, atualizado_em"), "o caderno lê a categoria");
+  assert.ok(ler("../src/lib/vinculos.js").includes("`/apostilas/${v.caderno_id}`"), "o vínculo da apostila abre na leitura");
+  const assunto = ler("../src/componentes/Assunto.js");
+  assert.ok(assunto.includes("🎓 Aula completa com a Lisa") && assunto.includes("Abrir a apostila agora"), "o modo aula no assunto, e abrir na hora");
+  const estante = ler("../src/app/(app)/cadernos/page.js");
+  assert.ok(estante.includes("function CapaDaApostila(") && estante.includes("📘 Apostilas"), "a categoria e a capa da apostila");
+  const leitura = ler("../src/app/(app)/apostilas/[id]/page.js");
+  assert.ok(leitura.includes("<Previa texto={p.conteudo} />") && leitura.includes("Sumário"), "a apostila abre já renderizada, com sumário");
+  const ia = ler("../src/lib/iaApostila.js");
+  assert.ok(ia.includes("ESQUEMA_DAS_SECOES") && ia.includes("faltando.join"), "o ponto que faltou ganha uma segunda chamada");
+});
+
+caso("trilha 1.11.0: a estrutura do caderno só quando a pessoa pede, e o menu por semana", () => {
+  const { nomeDaSemana, estruturaPorSemana, anotacoesPorSemana } = cadernosDom;
+  assert.equal(nomeDaSemana({ numero: 2, de: "2026-11-10", ate: "2026-11-15" }), "Semana 2 · 10/11 a 15/11");
+  assert.equal(nomeDaSemana({ numero: 4, de: "2026-11-24", ate: "2026-11-24", final: true }), "Semana 4 · 24/11 · final");
+  const avanco = {
+    antes: [{ cardId: "c0", titulo: "Já sabia" }],
+    unidades: [
+      { numero: 1, de: "2026-11-03", ate: "2026-11-07", etapas: [{ cardId: "c1", titulo: "Variáveis" }, { cardId: "c2", titulo: "Funções" }] },
+      { numero: 2, de: "2026-11-10", ate: "2026-11-14", final: true, etapas: [{ cardId: "c3", titulo: "Arrays" }] },
+    ],
+  };
+  assert.deepEqual(estruturaPorSemana(avanco).map((m) => [m.titulo, m.assuntos.length]), [["Antes do plano", 1], ["Semana 1 · 03/11 a 07/11", 2], ["Semana 2 · 10/11 a 14/11 · final", 1]]);
+  const anotacoes = [
+    { id: "v1", alvo: { tipo: "trilha", id: "t" }, caderno: { categoria: "caderno" } },
+    { id: "v2", alvo: { tipo: "assunto", id: "c1" }, caderno: { categoria: "caderno" }, pagina: { titulo: "Variáveis" } },
+    { id: "v3", alvo: { tipo: "assunto", id: "c1" }, caderno: { categoria: "apostila" } },
+    { id: "v4", alvo: { tipo: "assunto", id: "c9" }, caderno: { categoria: "caderno" } },
+  ];
+  const a = anotacoesPorSemana(anotacoes, avanco);
+  assert.deepEqual(a.daTrilha.map((x) => x.id), ["v1"]);
+  assert.deepEqual(a.semanas.map((s) => [s.titulo, s.total, s.apostilas]), [["Antes do plano", 0, 0], ["Semana 1 · 03/11 a 07/11", 2, 1], ["Semana 2 · 10/11 a 14/11 · final", 0, 0]]);
+  assert.deepEqual(a.semanas[1].assuntos[0].itens.map((x) => x.id), ["v2", "v3"]);
+  assert.deepEqual(a.soltas.map((x) => x.id), ["v4"], "o assunto que saiu do plano não some");
+  assert.equal(a.total, 4);
+
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.ok(ler("../src/app/(app)/trilhas/novo/page.js").includes("const [comCaderno, setComCaderno] = useState(false);"), "criar o curso não cria mais o caderno sem a pessoa pedir");
+  const trilha = ler("../src/app/(app)/trilhas/[id]/page.js");
+  assert.ok(trilha.includes("<CadernosDaTrilha trilha={trilha} avanco={avanco} />") && !trilha.includes("AnotacoesDoAlvo"), "a trilha usa o menu por semana");
+  const menu = ler("../src/componentes/caderno/CadernosDaTrilha.js");
+  assert.ok(menu.includes("<details className=\"cd-trilha\">"), "o menu nasce fechado");
+  assert.ok(menu.includes("🧱 Criar a estrutura do caderno") && menu.includes("`/api/trilhas/${trilha.id}/caderno`"), "a estrutura só no botão");
+  assert.ok(ler("../src/lib/cadernoDaTrilha.js").includes("estruturaPorSemana(avanco)"), "a estrutura pedida é por semana");
+  assert.ok(ler("../src/componentes/MapaDaTrilha.js").includes("\"proof-abrir-assunto\""), "o menu abre o assunto no mapa");
+});
+
+caso("quiz 1.11.0: a Lisa só gera quiz do curso e do assunto da etapa", () => {
+  const { contextoDoQuiz, linhasDoContextoDoQuiz, semAsForaDoAssunto, FOCO_DA_RODADA } = praticaDom;
+  const etapas = Array.from({ length: 20 }, (_, i) => ({ cardId: `c${i + 1}`, titulo: `Assunto ${i + 1}`, ordem: i + 1 })).reverse();
+  const ctx = contextoDoQuiz(etapas, { cardId: "c10", objetivo: " usar laços " }, [" Ler a doc ", "", "Resumir"]);
+  assert.deepEqual(ctx.antes, ["Assunto 4", "Assunto 5", "Assunto 6", "Assunto 7", "Assunto 8", "Assunto 9"], "os 6 de antes, os mais perto, na ordem da trilha");
+  assert.deepEqual(ctx.depois, ["Assunto 11", "Assunto 12", "Assunto 13", "Assunto 14", "Assunto 15", "Assunto 16", "Assunto 17", "Assunto 18"]);
+  assert.deepEqual([ctx.objetivo, ctx.pontos], ["usar laços", ["Ler a doc", "Resumir"]]);
+  assert.deepEqual(contextoDoQuiz(etapas, { cardId: "outro" }).depois, [], "assunto fora da trilha não ganha lista de depois");
+  const linhas = linhasDoContextoDoQuiz(ctx).join("\n");
+  assert.ok(linhas.includes("PROIBIDO perguntar sobre: Assunto 11;") && linhas.includes("- Ler a doc"));
+  assert.deepEqual(semAsForaDoAssunto(["a", "b", "c"], [1]), ["a", "c"]);
+  for (const r of [2, 3]) assert.match(FOCO_DA_RODADA[r], /sem sair do assunto/, "a rodada extra muda o foco, não o assunto");
+
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const ia = ler("../src/lib/iaPratica.js");
+  assert.ok(ia.includes("required: [\"ponto\", \"pergunta\", \"opcoes\", \"correta\", \"explicacao\"]"), "cada pergunta diz o ponto do assunto que cobre");
+  assert.ok(ia.includes("const fora = await perguntasForaDoAssunto(") && ia.includes("semAsForaDoAssunto(novas, fora)"), "a conferência tira a pergunta fora do assunto");
+  assert.ok(ia.includes("TODAS as perguntas são sobre o assunto da etapa, dentro deste curso"));
+  assert.ok(!ia.includes("use outros conceitos e OUTROS códigos"), "a rodada extra não manda mais \"usar outros conceitos\"");
+  assert.ok(ler("../src/lib/pratica.js").includes("contextoDoQuiz(avanco.etapas, assuntos[0]"), "o quiz leva o contexto da etapa");
+  // a pergunta da Lisa robô pelo correio só vai para quem estuda o mesmo curso
+  const { mesmoCurso } = correioDom;
+  assert.equal(mesmoCurso("JavaScript", "JavaScript moderno"), true);
+  assert.equal(mesmoCurso("Python para dados", "Python"), true);
+  assert.equal(mesmoCurso("Excel avançado", "Docker para iniciantes"), false);
+  assert.equal(mesmoCurso("Banco de dados SQL", "Ciência de dados"), false, "palavra genérica não junta cursos diferentes");
+  assert.equal(mesmoCurso("", "JavaScript"), false);
+  assert.ok(ler("../src/lib/lisaRotina.js").includes("mesmoCurso(t.tema, atual.tema)"));
+});
+
 caso("prática 1.8.1: o exemplo do diagrama é um diagrama, o código tem as quebras e a tela usa a largura", () => {
   const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
   // o código com as quebras escapadas (visto em 05/11/2026) volta a ter linhas; o código normal não muda
@@ -3501,7 +3661,21 @@ caso("prática 1.8.1: o exemplo do diagrama é um diagrama, o código tem as que
   tem("../src/lib/pratica.js", 'motor === "diagrama"\n      ? await gerarExemploDeDiagrama(');
   tem("../src/lib/pratica.js", "if (exemploAindaServe(d.conteudo?.aplicacao, motor)) return d.conteudo.aplicacao;");
   tem("../src/componentes/Desafios.js", "<DiagramaParaVer documento={exemplo.diagrama}");
-  tem("../src/componentes/Desafios.js", "<Codigo texto={codigoLegivel(exemplo.codigo)}");
+  // 06/11/2026: o código do exemplo no editor do tamanho do exercício (só leitura), formatado, com Rodar, Copiar e Abrir na IDE
+  tem("../src/componentes/Desafios.js", "const codigo = codigoDoExemplo(exemplo.codigo, String(linguagem || \"\").toLowerCase());");
+  tem("../src/componentes/Desafios.js", "<EditorDeCodigo valor={codigo} linguagem={linguagem} soLeitura");
+  tem("../src/componentes/Desafios.js", "<Rodar linguagem={linguagem} tema={desafio.tema} codigo={codigo} rotulo=\"▶ Rodar o exemplo\" />");
+  tem("../src/componentes/ide/Ide.js", "sessionStorage.getItem(\"proof-ide-importar\")");
+  // o código numa linha só ganha as linhas de volta (o do print: uma classe inteira numa linha)
+  const umaLinha = "class Fila { constructor() { this.itens = []; } entrar(x) { this.itens.push(x); } } const f = new Fila(); for (let i = 0; i < 2; i++) { f.entrar(i); } if (f.itens.length) { console.log(\"ok\"); } else { console.log(\"vazia\"); }";
+  const formatado = codigoDoExemplo(umaLinha, "javascript");
+  assert.ok(formatado.split("\n").length >= 12, "virou várias linhas");
+  assert.ok(formatado.includes("for (let i = 0; i < 2; i++) {"), "o for inteiro numa linha (o ; dentro dos parênteses não quebra)");
+  assert.ok(formatado.includes("} else {"));
+  new Function(formatado); // continua JavaScript válido
+  assert.equal(codigoDoExemplo("a();\nb();\nc();\nd();\n", "javascript"), "a();\nb();\nc();\nd();\n", "código bom fica como está");
+  assert.throws(() => validarExemploDaLisa({ conceitos: [{ nome: "a", explicacao: "b" }], linguagem: "python", codigo: "def f(x): return x * 2; print(f(2)); print(f(3)); print(f(4)); print(f(5)); print(f(6)); print(f(7)); print(f(8)); print(f(9)); print(f(10)); print(f(11))", comoFunciona: [] }, { comCodigo: true }), /linha só/, "Python numa linha não dá para refazer: a IA tenta de novo");
+  assert.ok(validarExemploDaLisa({ conceitos: [{ nome: "a", explicacao: "b" }], linguagem: "javascript", codigo: umaLinha, comoFunciona: [] }, { comCodigo: true }).codigo.split("\n").length >= 12, "o JavaScript numa linha é refeito e aceito");
   // a tela cheia é a do navegador, e a animação de entrada não prende mais o que é position: fixed
   tem("../src/componentes/pratica/Diagrama.js", "el?.requestFullscreen && !document.fullscreenElement");
   tem("../src/app/globals.css", ".pf-principal > * { animation: pf-surgir 0.6s var(--pf-curva) backwards; }");
@@ -4021,11 +4195,12 @@ caso("BEYOND-0020: a Temporada das Ilhas — conquista, construção com conchas
   // as ilhas moram no Reino, nas Grandes Expedições, em 3D no mesmo mundo do reino (cenário parado + guardas)
   const doReino = fs.readFileSync(new URL("../src/app/(app)/reino/page.js", import.meta.url), "utf8");
   assert.match(doReino, /ilhas: \(\) => \(teste \? null : \(\s*<GrandesExpedicoes/);
-  // a ilha com cara de ilha (mar, praia, cachoeira, vegetação) e as construções do reino em cima
+  // a ilha com cara de ilha (mar, praia, cachoeira, vegetação) e, desde 06/11/2026, as construções DELA em cima
   assert.match(doReino, /cenario=\{naIlha \? "ilha-tropical" : null\} guardas=\{naIlha \? naIlha\.defensores \|\| \{\} : null\}/);
   const cen = fs.readFileSync(new URL("../src/componentes/reino/cenariosDasExpedicoes.js", import.meta.url), "utf8");
-  assert.match(cen, /predios: "reino"/);
+  assert.match(cen, /predios: "ilha"/);
   assert.match(cen, /if \(!cen \|\| cen\.predios === "reino"\) return null;/);
+  assert.match(cen, /if \(cen\.predios === "ilha"\) return estruturaDaIlha\(p, chave, nivel, cen\);/);
   for (const peca of ["const cachoeira", "const queda", "o mar em volta", "const coqueiro", "const arbusto", "o píer"]) assert.ok(cen.includes(peca.replace("const cachoeira", "a cachoeira")), peca);
   const mundo3d = fs.readFileSync(new URL("../src/componentes/reino/Mundo3D.js", import.meta.url), "utf8");
   assert.match(mundo3d, /function definirCenarioFixo\(c\)/);

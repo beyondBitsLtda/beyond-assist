@@ -8,7 +8,7 @@ import { PERFIS } from "@/dominio/perfis.js";
 import { Barra, DiasDeEstudo } from "@/componentes/Pecas.js";
 import MapaDaTrilha from "@/componentes/MapaDaTrilha.js";
 import { comemorar } from "@/componentes/Neuro.js";
-import { AnotacoesDoAlvo } from "@/componentes/caderno/Vinculos.js";
+import CadernosDaTrilha from "@/componentes/caderno/CadernosDaTrilha.js";
 import { SeletorDePerfil } from "@/componentes/pratica/Motores.js";
 
 export default function Trilha() {
@@ -167,7 +167,8 @@ export default function Trilha() {
         </details>
       </div>
 
-      <AnotacoesDoAlvo alvo={{ tipo: "trilha", id }} titulo="Anotações da trilha" nomeDoAlvo={trilha.tema} />
+      {/* os cadernos e as apostilas da trilha, por semana, num menu fechado (06/11/2026) */}
+      <CadernosDaTrilha trilha={trilha} avanco={avanco} />
 
       <MapaDaTrilha trilha={trilha} avanco={avanco} aoMudar={carregar} />
     </>

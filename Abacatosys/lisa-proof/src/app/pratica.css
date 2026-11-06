@@ -451,6 +451,9 @@ body.diagrama-sem-rolar { overflow: hidden; }
 .exemplo-lisa .pf-codigo__corpo { overflow-x: auto; }
 .exemplo-lisa__seu, .exemplo-lisa__conceitos li, .exemplo-lisa__passos li { overflow-wrap: anywhere; }
 .diagrama__moldura--exemplo { height: clamp(360px, 60vh, 640px); margin-bottom: 10px; }
+/* 06/11/2026: o código do exemplo no editor do tamanho do exercício, com Copiar, Abrir na IDE e o Rodar */
+.exemplo-lisa__ide { display: grid; gap: 8px; margin-bottom: 10px; min-width: 0; }
+.exemplo-lisa__acoes { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* ---- o minigame do dia (03/11/2026: a Arena virou minigame da Prática, como o quiz) */
 .mg-dia__bloco { width: 100%; }

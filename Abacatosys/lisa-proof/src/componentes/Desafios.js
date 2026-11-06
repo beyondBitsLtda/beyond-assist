@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { criar, obter } from "@/lib/api.js";
 import { formatarDia } from "@/dominio/datas.js";
-import { NOTA_DE_APROVACAO, podeReenviar, COMPLEXIDADES, ORDEM_DAS_COMPLEXIDADES, temExemploDaLisa, exemploAindaServe, codigoLegivel } from "@/dominio/pratica.js";
+import { NOTA_DE_APROVACAO, podeReenviar, COMPLEXIDADES, ORDEM_DAS_COMPLEXIDADES, temExemploDaLisa, exemploAindaServe, codigoDoExemplo } from "@/dominio/pratica.js";
 import { TIPOS_DE_DIAGRAMA } from "@/dominio/diagramas.js";
 import { CORREIO } from "@/dominio/correio.js";
 import { execucaoDoExercicio } from "@/dominio/execucao.js";
@@ -341,7 +341,7 @@ function Entrega({ desafio, campo, rotulo, aoEnviar, aoAvaliar, conteudoInicial,
  * "▶ Rodar": roda o código do exercício e mostra a saída, antes de enviar para a Lisa (pedido de
  * 21/10/2026). JavaScript e SQL rodam no navegador; as outras linguagens, num compilador on-line.
  */
-function Rodar({ linguagem, tema, codigo }) {
+function Rodar({ linguagem, tema, codigo, rotulo = "▶ Rodar" }) {
   const exec = execucaoDoExercicio(linguagem, tema);
   const [rodando, setRodando] = useState(false);
   const [resultado, setResultado] = useState(null);
@@ -360,7 +360,7 @@ function Rodar({ linguagem, tema, codigo }) {
     <div className="rodar">
       <div className="rodar__barra">
         <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={rodar} disabled={rodando || !codigo.trim()}>
-          {rodando ? "Rodando…" : "▶ Rodar"}
+          {rodando ? "Rodando…" : rotulo}
         </button>
         <span className="rodar__onde">{exec.rotulo} · {exec.onde === "navegador" ? "roda aqui no navegador" : "roda num compilador on-line"}</span>
         {exec.onde === "servidor" && (
@@ -529,10 +529,7 @@ function ExemploDaLisa({ desafio }) {
               <DiagramaParaVer documento={exemplo.diagrama} colecao={colecao} titulo={exemplo.titulo} />
             </>
           ) : exemplo.codigo ? (
-            <>
-              <p className="pf-campo__rotulo">O exemplo{exemplo.linguagem ? ` (${exemplo.linguagem})` : ""}</p>
-              <Codigo texto={codigoLegivel(exemplo.codigo)} linguagem={exemplo.linguagem || desafio.conteudo?.linguagem || desafio.tema} />
-            </>
+            <CodigoDoExemplo exemplo={exemplo} desafio={desafio} />
           ) : (
             <>
               <p className="pf-campo__rotulo">O exemplo, resolvido passo a passo</p>
@@ -550,6 +547,46 @@ function ExemploDaLisa({ desafio }) {
       )}
     </section>
   );
+}
+
+/**
+ * O código do exemplo da Lisa (06/11/2026: "a ajuda da Lisa deveria abrir uma IDE do tamanho da que usamos no
+ * exercício para programar, não apenas esse filete de código"): o mesmo editor da solução, do mesmo tamanho, só para
+ * ler (dá para selecionar e copiar), com o Rodar do exercício, o Copiar e o "Abrir na IDE" (um projeto novo da IDE
+ * livre com o exemplo, para mexer à vontade). O código que veio numa linha só ganha as linhas de volta.
+ */
+function CodigoDoExemplo({ exemplo, desafio }) {
+  const linguagem = exemplo.linguagem || desafio.conteudo?.linguagem || desafio.tema;
+  const codigo = codigoDoExemplo(exemplo.codigo, String(linguagem || "").toLowerCase());
+  const [copiado, setCopiado] = useState(false);
+  const arquivo = arquivoDoExemplo(linguagem);
+  async function copiar() {
+    try { await navigator.clipboard.writeText(codigo); setCopiado(true); setTimeout(() => setCopiado(false), 1800); } catch { /* sem permissão: dá para selecionar no editor */ }
+  }
+  function abrirNaIde() {
+    try {
+      sessionStorage.setItem("proof-ide-importar", JSON.stringify({ nome: `Exemplo da Lisa — ${exemplo.titulo}`.slice(0, 80), arquivo, codigo }));
+    } catch { /* sem sessionStorage: a IDE abre sem o exemplo */ }
+    window.location.href = "/pratica/ide?exemplo=1";
+  }
+  return (
+    <div className="exemplo-lisa__ide">
+      <p className="pf-campo__rotulo">O exemplo{exemplo.linguagem ? ` (${exemplo.linguagem})` : ""}</p>
+      <EditorDeCodigo valor={codigo} linguagem={linguagem} soLeitura nome={arquivo} rotulo="Código do exemplo da Lisa" atalhos="só leitura · Ctrl+F busca · selecione para copiar" />
+      <div className="exemplo-lisa__acoes">
+        <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={copiar}>{copiado ? "✓ Copiado" : "📋 Copiar o código"}</button>
+        <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={abrirNaIde}>💻 Abrir na IDE</button>
+      </div>
+      <Rodar linguagem={linguagem} tema={desafio.tema} codigo={codigo} rotulo="▶ Rodar o exemplo" />
+    </div>
+  );
+}
+
+/** O nome do arquivo do exemplo pela linguagem (o que a IDE livre usa para colorir e rodar). */
+function arquivoDoExemplo(linguagem) {
+  const l = String(linguagem || "").toLowerCase().trim();
+  const NOMES = { javascript: "exemplo.js", js: "exemplo.js", typescript: "exemplo.ts", ts: "exemplo.ts", python: "exemplo.py", py: "exemplo.py", java: "Exemplo.java", c: "exemplo.c", cpp: "exemplo.cpp", "c++": "exemplo.cpp", csharp: "Exemplo.cs", "c#": "Exemplo.cs", go: "main.go", rust: "main.rs", php: "exemplo.php", ruby: "exemplo.rb", sql: "exemplo.sql", lua: "exemplo.lua", swift: "exemplo.swift", kotlin: "exemplo.kt", bash: "exemplo.sh", shell: "exemplo.sh" };
+  return NOMES[l] || NOMES[l.split(/s/)[0]] || "exemplo.txt";
 }
 
 // ================================================================ dicas da Lisa (projetos)

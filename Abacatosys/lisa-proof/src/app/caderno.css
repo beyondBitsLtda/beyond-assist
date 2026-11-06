@@ -413,3 +413,118 @@
   .cd-topo__acao { padding-inline: 10px; }
   html.pf-teclado .cd-caderno--digitando .cd-abas, html.pf-teclado .cd-caderno--digitando .cd-ferramentas { display: none; }
 }
+
+/* ============================================================ Apostilas e a trilha por semana (06/11/2026)
+
+   O modo aula no assunto (a Lisa escreve a aula completa do checklist), as categorias da estante
+   (cadernos e apostilas), a capa encadernada da apostila, a leitura dela já renderizada e o menu dos
+   cadernos da trilha, por semana. Prefixos `pf-aula`, `cd-categorias`, `cd-capa--apostila`, `ap-` e `cd-trilha`. */
+
+/* ------------------------------------------------------------ o modo aula, no assunto */
+.pf-aula { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 14px 0 4px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--pf-linha); background: var(--pf-superficie-2); }
+.pf-aula--pronta { border-color: var(--pf-verde); background: var(--pf-sucesso-fundo); }
+:root[data-tema="escuro"] .pf-aula--pronta { background: var(--pf-brilho); }
+.pf-aula__texto { display: grid; gap: 2px; flex: 1 1 260px; min-width: 0; font-size: 14px; line-height: 1.45; }
+.pf-aula__texto span { color: var(--pf-tinta-2); }
+.pf-aula__acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ------------------------------------------------------------ a estante: cadernos | apostilas */
+.cd-categorias { display: inline-flex; gap: 4px; padding: 4px; margin: 0 0 18px; border-radius: var(--pf-pilula); border: 1px solid var(--pf-linha); background: var(--pf-superficie); }
+.cd-categorias__aba { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 16px; border: none; border-radius: var(--pf-pilula); background: transparent; color: var(--pf-tinta-2); font: 700 14px var(--pf-fonte); cursor: pointer; }
+.cd-categorias__aba[aria-selected="true"] { background: var(--pf-verde); color: var(--pf-tinta-sobre-verde); }
+.cd-categorias__aba:focus-visible { outline: 3px solid var(--pf-verde); outline-offset: 2px; }
+.cd-categorias__conta { min-width: 22px; padding: 1px 7px; border-radius: var(--pf-pilula); background: rgba(0, 0, 0, 0.08); font-size: 12px; text-align: center; }
+:root[data-tema="escuro"] .cd-categorias__aba:not([aria-selected="true"]) .cd-categorias__conta { background: rgba(255, 255, 255, 0.1); }
+
+/* a capa da apostila: encadernada, papel claro, a lombada na cor com a costura, a faixa "Apostila" */
+.cd-capa--apostila {
+  padding: 0 18px 14px 36px; border-radius: 4px 12px 12px 4px; color: #1C1F18;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 25px, rgba(35, 98, 211, 0.09) 25px 26px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.07), transparent 22px),
+    #F7F3EA;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 3px 2px 0 -1px #E4DED0, 6px 4px 0 -2px #CFC6B2, 12px 16px 28px rgba(0, 0, 0, 0.45);
+}
+.cd-capa--apostila::before { left: 0; right: auto; top: 0; bottom: 0; width: 24px; border-radius: 4px 0 0 4px; background: linear-gradient(90deg, rgba(0, 0, 0, 0.18), rgba(255, 255, 255, 0.12) 60%, rgba(0, 0, 0, 0.22)), var(--cd-cor); box-shadow: none; }
+.cd-capa--apostila::after { content: ""; position: absolute; left: 11px; top: 10px; bottom: 10px; width: 2px; background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0 7px, transparent 7px 13px); }
+.cd-capa--apostila:hover { box-shadow: 3px 2px 0 -1px #E4DED0, 6px 4px 0 -2px #CFC6B2, 16px 22px 34px rgba(0, 0, 0, 0.55); }
+.cd-capa__faixa { display: flex; justify-content: space-between; align-items: center; margin: 0 -18px 4px -12px; padding: 12px 16px 10px 12px; background: var(--cd-cor); color: #FFFFFF; font: 800 11px/1 var(--pf-fonte-titulo); letter-spacing: 0.2em; text-transform: uppercase; }
+.cd-capa__faixa span:last-child { font-size: 18px; letter-spacing: 0; }
+.cd-capa__tituloDaApostila { font-family: var(--pf-fonte-titulo); font-weight: 800; font-size: 18px; line-height: 1.2; color: #1C1F18; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.cd-capa--apostila .cd-capa__descricao { color: #4B5144; -webkit-line-clamp: 3; }
+.cd-capa--apostila .cd-capa__pe { color: #2E3328; text-shadow: none; border-top: 1px solid rgba(0, 0, 0, 0.12); padding-top: 8px; }
+.cd-capa--apostila .cd-capa__quando { color: #5B6152; }
+
+/* ------------------------------------------------------------ a apostila aberta, já renderizada */
+.ap { display: grid; gap: 18px; }
+.ap-capa { display: grid; gap: 8px; padding: 20px 22px 18px; border-radius: var(--pf-raio); border: 1px solid var(--pf-linha); border-left: 10px solid var(--cd-cor, var(--pf-verde)); background: var(--pf-superficie); box-shadow: var(--pf-sombra); }
+.ap-capa__voltar { justify-self: start; font-size: 13px; font-weight: 700; color: var(--pf-tinta-2); text-decoration: none; }
+.ap-capa__voltar:hover { color: var(--pf-tinta); text-decoration: underline; }
+.ap-capa__faixa { justify-self: start; padding: 4px 12px; border-radius: var(--pf-pilula); background: var(--cd-cor, var(--pf-verde)); color: #FFFFFF; font: 800 11px/1.4 var(--pf-fonte-titulo); letter-spacing: 0.16em; text-transform: uppercase; }
+.ap-capa__titulo { margin: 2px 0 0; font-family: var(--pf-fonte-titulo); font-size: clamp(24px, 4vw, 34px); line-height: 1.15; overflow-wrap: anywhere; }
+.ap-capa__meta { margin: 0; color: var(--pf-tinta-2); font-size: 14px; }
+.ap-capa__acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.ap-corpo { display: grid; gap: 18px; align-items: start; }
+@media (min-width: 1000px) { .ap-corpo { grid-template-columns: 250px minmax(0, 1fr); } }
+.ap-sumario__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.ap-sumario__lista a { display: block; padding: 7px 10px; border-radius: 10px; color: var(--pf-tinta-2); text-decoration: none; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+.ap-sumario__lista a:hover { background: var(--pf-superficie-2); color: var(--pf-tinta); }
+.ap-sumario__lista a[aria-current="true"] { background: var(--pf-superficie-2); color: var(--pf-tinta); font-weight: 700; box-shadow: inset 3px 0 0 var(--cd-cor, var(--pf-verde)); }
+.ap-sumario__titulo { margin: 0 0 6px 10px; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--pf-tinta-3); }
+.ap-sumario__lado { display: none; }
+.ap-sumario__celular { position: sticky; top: 8px; z-index: 2; border: 1px solid var(--pf-linha); border-radius: 14px; background: var(--pf-superficie); box-shadow: var(--pf-sombra); }
+.ap-sumario__celular > summary { cursor: pointer; padding: 12px 14px; min-height: 44px; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ap-sumario__celular .ap-sumario__lista { padding: 0 8px 10px; max-height: 60vh; overflow: auto; }
+@media (min-width: 1000px) {
+  .ap-sumario { position: sticky; top: 14px; max-height: calc(100dvh - 28px); overflow: auto; padding: 14px 8px; border: 1px solid var(--pf-linha); border-radius: var(--pf-raio); background: var(--pf-superficie); }
+  .ap-sumario__celular { display: none; }
+  .ap-sumario__lado { display: block; }
+}
+.ap-folhas { display: grid; gap: 18px; min-width: 0; }
+.ap-folha { scroll-margin-top: 70px; border: 1px solid var(--pf-linha); border-radius: var(--pf-raio); background: var(--pf-superficie); box-shadow: var(--pf-sombra); overflow: hidden; }
+.ap-folha .cd-previa { max-width: 900px; padding: 24px clamp(16px, 4vw, 40px) 12px; }
+.ap-folha .cd-previa > h2:first-child { margin-top: 0; }
+.ap-folha__pe { display: flex; justify-content: space-between; gap: 12px; padding: 12px clamp(16px, 4vw, 40px) 16px; border-top: 1px solid var(--pf-linha); font-size: 13px; font-weight: 700; }
+.ap-folha__pe a { color: var(--pf-verde-forte); text-decoration: none; overflow-wrap: anywhere; }
+:root[data-tema="escuro"] .ap-folha__pe a { color: var(--pf-verde); }
+.ap-folha__pe a:hover { text-decoration: underline; }
+.ap-folha__pe span { color: var(--pf-tinta-3); }
+@media print {
+  .pf-topo, .pf-abas, .ap-sumario, .ap-capa__acoes, .ap-capa__voltar, .ap-folha__pe { display: none !important; }
+  .ap-folha { break-before: page; box-shadow: none; border: none; }
+  .ap-capa { box-shadow: none; }
+}
+
+/* ------------------------------------------------------------ a trilha: cadernos e apostilas por semana */
+.cd-trilha { margin: 14px 0; border: 1px solid var(--pf-linha); border-radius: var(--pf-raio); background: var(--pf-superficie); box-shadow: var(--pf-sombra); }
+.cd-trilha__resumo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-height: 52px; padding: 12px 18px; cursor: pointer; list-style: none; }
+.cd-trilha__resumo::-webkit-details-marker { display: none; }
+.cd-trilha__resumo::after { content: "▾"; color: var(--pf-tinta-3); transition: transform 0.15s ease; }
+.cd-trilha[open] > .cd-trilha__resumo::after { transform: rotate(180deg); }
+.cd-trilha__titulo { font-weight: 750; font-size: 15px; }
+.cd-trilha__conta { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--pf-tinta-2); }
+.cd-trilha__corpo { display: grid; gap: 12px; padding: 0 18px 18px; }
+.cd-trilha__acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.cd-trilha__dica { margin: 0; font-size: 13px; color: var(--pf-tinta-2); }
+.cd-trilha__grupo { display: grid; gap: 6px; }
+.cd-trilha__rotulo { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pf-tinta-3); }
+.cd-trilha__semana { border: 1px solid var(--pf-linha); border-radius: 14px; background: var(--pf-superficie-2); }
+.cd-trilha__semana > summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; min-height: 46px; padding: 10px 14px; cursor: pointer; font-weight: 700; font-size: 14px; }
+.cd-trilha__semana > summary small { font-weight: 600; color: var(--pf-tinta-2); }
+.cd-trilha__assuntos { list-style: none; margin: 0; padding: 0 14px 12px; display: grid; gap: 10px; }
+.cd-trilha__assuntos > li { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--pf-linha); }
+.cd-trilha__assunto { justify-self: start; font-weight: 650; font-size: 14px; color: var(--pf-tinta); text-decoration: none; overflow-wrap: anywhere; }
+.cd-trilha__assunto:hover { text-decoration: underline; }
+.cd-trilha__vazio { color: var(--pf-tinta-3); font-size: 12.5px; }
+.cd-trilha__itens { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.cd-trilha__itens > li { min-width: 0; max-width: 100%; }
+.cd-trilha__item { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; max-width: 100%; min-height: 36px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--pf-linha); background: var(--pf-superficie); color: var(--pf-tinta); text-decoration: none; font-size: 13px; }
+.cd-trilha__item:hover { border-color: var(--pf-verde); }
+.cd-trilha__item--apostila { border-color: #2362D3; box-shadow: inset 3px 0 0 #2362D3; font-weight: 700; }
+.cd-trilha__nome { font-weight: 650; overflow-wrap: anywhere; }
+.cd-trilha__pagina { color: var(--pf-tinta-2); overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .cd-trilha__resumo, .cd-trilha__corpo { padding-left: 14px; padding-right: 14px; }
+  .cd-trilha__conta { margin-left: 0; }
+}

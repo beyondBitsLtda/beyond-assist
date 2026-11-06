@@ -67,9 +67,14 @@ export const PREDIOS_EM_COMBATE = {
   muralha: { vida: (n) => 600 + 400 * n },
 };
 // gigantes e balões na frente (seguram o fogo), bombardeiros logo atrás (para abrir a muralha)
+// Quem não está aqui NÃO entra na batalha: toda tropa nova tem de ganhar o seu lugar (a tripulação de 06/11/2026
+// também — os tanques na frente, quem cura no fim). A ordem relativa das antigas não muda (as reprises batem).
 const ORDEM_DE_ENTRADA = [
-  "colosso", "gigante", "cavaleiro", "balao", "grifo", "papagaio", "bombardeiro", "polvorista",
-  "guerreiro", "lanceiro", "pirata", "arqueira", "arpoadora", "mago", "dragao", "curandeira",
+  "colosso", "golemDeCoral", "tartaruga", "gigante", "filhoteKraken", "polvoDeGuerra", "caranguejoCouracado", "ancoreiro",
+  "cavaleiro", "balao", "albatroz", "grifo", "papagaio", "fantasma", "gaivota", "bombardeiro", "polvorista",
+  "capita", "gancho", "bucaneiro", "guerreiro", "lanceiro", "pirata", "marujo", "macaco",
+  "arqueira", "arpoadora", "mosqueteira", "canhoneira", "mago", "sereia", "bruxa", "dragao",
+  "curandeira", "cozinheiro", "navegadora",
 ];
 const PREDIOS_DA_BATALHA = [
   "castelo", "mina", "cofre", "quartel", "torre", "canhao", "biblioteca", "defesaAerea", "morteiro", "torreMagica", "torreRaio",
@@ -97,6 +102,8 @@ const ARMAS = {
   tritao: "flecha", kraken: "magia", harpia: "flecha", salamandra: "fogo", diabrete: "fogo", dragaoDeLava: "fogo",
   zorg: "raio", ciborgue: "missil", polvoEstelar: "magia", disco: "raio", rainhaAlien: "raio",
   arpoadora: "flecha", polvorista: "explosao", xama: "magia", chefeTiki: "fogo",
+  // a tripulação nova (06/11/2026): quem atira de longe
+  mosqueteira: "flecha", sereia: "magia", canhoneira: "bomba", bruxa: "magia", albatroz: "bomba",
 };
 const arma = (u) => (u.tipo === "heroi" ? (u.lado === "defesa" ? "livro" : "golpe") : ARMAS[u.tipo] || "golpe");
 

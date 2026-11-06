@@ -118,6 +118,28 @@ export function recompensaDaPergunta(acertou) {
   return acertou ? { destinatario: CORREIO.recompensaDaPergunta, remetente: CORREIO.ajudaDaPergunta } : { destinatario: 0, remetente: 0 };
 }
 
+// as palavras que não dizem de que é o curso ("Fundamentos de", "para dados", "Curso completo")
+const PALAVRAS_GENERICAS = new Set([
+  "a", "o", "as", "os", "e", "de", "da", "do", "das", "dos", "em", "no", "na", "nos", "nas", "para", "com", "por", "um", "uma",
+  "curso", "introducao", "fundamentos", "basico", "basica", "intermediario", "avancado", "avancada", "pratico", "pratica",
+  "completo", "completa", "essencial", "guia", "moderno", "moderna", "dados", "programacao", "desenvolvimento", "web",
+  "sistemas", "tecnologia", "aplicacoes", "aplicado", "aplicada", "iniciantes", "zero",
+]);
+
+const palavrasDoTema = (tema) => String(tema || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+  .split(/[^a-z0-9+#]+/).filter((p) => p && !PALAVRAS_GENERICAS.has(p));
+
+/**
+ * Os dois cursos são do mesmo assunto? ("JavaScript" e "JavaScript moderno" sim; "Excel" e "Docker" não.)
+ * A Lisa robô só manda uma pergunta do quiz dela pelo correio para quem estuda o mesmo curso (06/11/2026:
+ * "a Lisa só pode gerar quiz do curso, coerente, e do assunto da etapa que o usuário está na trilha").
+ */
+export function mesmoCurso(temaA, temaB) {
+  const a = new Set(palavrasDoTema(temaA));
+  const b = palavrasDoTema(temaB);
+  return a.size > 0 && b.some((p) => a.has(p));
+}
+
 /** Ninguém manda pergunta para a Lisa (ela é robô); recado pode. E ninguém escreve para si mesmo. */
 export function podeEscreverPara({ de, para, tipo, paraEhRobo }) {
   if (!para) return { ok: false, motivo: "escolha para quem vai" };

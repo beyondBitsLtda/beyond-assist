@@ -793,7 +793,7 @@ function nuvens(p) {
 // svgComoImagem e recorteDePapel moram em ./papel.js (a torre do Modo Domínio usa as mesmas)
 
 // ------------------------------------------------------------------ o componente
-export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "normal", personagem: personagemFixo, soLeitura = false, mineiros = 0, diamantes = 0, cartas = null, chefao = null, cenario = null, guardas = null, aoEscolher, aoVisitar, aoFalhar }) {
+export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "normal", personagem: personagemFixo, soLeitura = false, mineiros = 0, diamantes = 0, extracao = null, cartas = null, chefao = null, cenario = null, guardas = null, aoEscolher, aoVisitar, aoFalhar }) {
   const caixa = useRef(null);
   const molde = useRef(null);
   const rotulos = useRef({});
@@ -1373,6 +1373,78 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
         m.position.y = TAMANHO_DO_MINEIRO / 2 + (ciclo >= 0.55 && ciclo < 0.65 ? -0.04 : 0);
       }
       if (!semMovimento) for (const j of joias.children) { j.rotation.y = t * 1.6 + j.userData.giro; j.position.y = j.userData.y + Math.sin(t * 3 + j.userData.giro) * 0.04; }
+    }
+
+    // ---- a extração na ilha das Grandes Expedições (06/11/2026: "devo ver tudo relacionado à ilha, inclusive a
+    // extração de recursos"): os trabalhadores colhendo no Coqueiral e mergulhando no Recife de Pérolas (um por
+    // nível, os mesmos papéis dos mineiros) e o que está pronto para coletar — o monte de conchas e as pérolas.
+    const extracaoDaIlha = new THREE.Group();
+    mundo.add(extracaoDaIlha);
+    const geoConcha = new THREE.ConeGeometry(0.075, 0.09, 5);
+    const matConchas = ["#fde2e4", "#fbcfe8", "#fef3c7", "#ffe4e6"].map((cor) => new THREE.MeshStandardMaterial({ color: cor, flatShading: true, roughness: 0.6 }));
+    const geoPerola = new THREE.SphereGeometry(0.07, 10, 8);
+    const matPerola = new THREE.MeshStandardMaterial({ color: "#f8fafc", emissive: "#e0f2fe", emissiveIntensity: 0.55, roughness: 0.15, metalness: 0.3 });
+    const LUGAR_DOS_COLHEDORES = [[0.95, 0.55], [-0.85, 0.75], [0.25, 1.15], [1.15, -0.35], [-0.2, -1.1]];
+    function definirExtracao(e) {
+      for (const m of [...extracaoDaIlha.children]) extracaoDaIlha.remove(m);
+      if (!e) { sujo = true; return; }
+      const trabalhadores = (chave, quantos) => {
+        const [lx, lz] = LUGARES_DO_MUNDO[chave];
+        const n = Math.max(0, Math.min(LUGAR_DOS_COLHEDORES.length, Math.floor(quantos || 0)));
+        for (let i = 0; i < n; i++) {
+          const [dx, dz] = LUGAR_DOS_COLHEDORES[i];
+          const papel = new THREE.Mesh(geoPapel, matMineiro[0]);
+          papel.scale.set(TAMANHO_DO_MINEIRO * 0.9, TAMANHO_DO_MINEIRO * 0.9, 1);
+          papel.position.set(lx + dx, (TAMANHO_DO_MINEIRO * 0.9) / 2, lz + dz);
+          papel.userData = { fase: (i * 0.41) % 1, ritmo: 1.2 + (i % 3) * 0.2, dx, dz, trabalhador: true };
+          const sombra = new THREE.Mesh(geoSombraDaTropa, matSombraDaTropa);
+          sombra.rotation.x = -Math.PI / 2;
+          sombra.scale.setScalar(0.56);
+          sombra.position.set(lx + dx, 0.03, lz + dz);
+          extracaoDaIlha.add(papel, sombra);
+        }
+      };
+      trabalhadores("mina", e.coqueiral);
+      trabalhadores("biblioteca", e.recife);
+      // o monte de conchas (uma a cada 25 prontas, até 18) na frente do Coqueiral
+      const [mx, mz] = LUGARES_DO_MUNDO.mina;
+      const conchas = Math.min(18, Math.ceil((e.conchas || 0) / 25));
+      for (let i = 0; i < conchas; i++) {
+        const camada = Math.floor(i / 7), a = (i % 7) * 0.9 + camada;
+        const r = 0.24 - camada * 0.08;
+        const concha = new THREE.Mesh(geoConcha, matConchas[i % matConchas.length]);
+        concha.position.set(mx + 0.75 + Math.cos(a) * r, 0.05 + camada * 0.08, mz - 0.75 + Math.sin(a) * r);
+        concha.rotation.z = (i % 3) * 0.6;
+        extracaoDaIlha.add(concha);
+      }
+      // as pérolas prontas (uma por moeda, até 12) na beira do Recife, brilhando
+      const [bx, bz] = LUGARES_DO_MUNDO.biblioteca;
+      const perolas = Math.min(12, Math.floor(e.perolas || 0));
+      for (let i = 0; i < perolas; i++) {
+        const a = (i / Math.max(1, perolas)) * Math.PI * 1.2 - 0.6;
+        const perola = new THREE.Mesh(geoPerola, matPerola);
+        perola.position.set(bx + Math.cos(a) * 1.0, 0.09, bz + Math.sin(a) * 1.0);
+        perola.userData = { y: 0.09, giro: i * 0.7, perola: true };
+        extracaoDaIlha.add(perola);
+      }
+      sujo = true;
+    }
+    function animarExtracao(t) {
+      extracaoDaIlha.visible = fixo.ativo && !sim;
+      if (!extracaoDaIlha.visible || !extracaoDaIlha.children.length) return;
+      const dirX = Math.cos(vista.azimute), dirZ = -Math.sin(vista.azimute);
+      for (const m of extracaoDaIlha.children) {
+        if (m.userData.trabalhador) {
+          m.rotation.y = vista.azimute;
+          const lado = m.userData.dx * dirX + m.userData.dz * dirZ;
+          m.scale.x = TAMANHO_DO_MINEIRO * 0.9 * (lado > 0 ? -1 : 1);
+          if (semMovimento) { m.material = matMineiro[0]; continue; }
+          const ciclo = (t * m.userData.ritmo + m.userData.fase) % 1;
+          m.material = matMineiro[ciclo < 0.55 ? 0 : 1];
+        } else if (m.userData.perola && !semMovimento) {
+          m.position.y = m.userData.y + Math.abs(Math.sin(t * 2 + m.userData.giro)) * 0.05;
+        }
+      }
     }
 
     // ---- o Chefão da Procrastinação (03/11/2026): o atraso de estudo vira um monstro de papel gigante pairando
@@ -2190,6 +2262,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       }
 
       animarMineiros(agora / 1000);
+      animarExtracao(agora / 1000);
       animarClima(agora / 1000, dt);
       animarChefao(agora / 1000);
       animarGuardas(agora / 1000);
@@ -2301,6 +2374,7 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
       mostrarTropas,
       definirVizinhos,
       definirMineiros,
+      definirExtracao,
       definirCartas,
       definirChefao,
       definirCenarioFixo,
@@ -2357,6 +2431,13 @@ export default function Mundo3D({ construcoes, tropas, vizinhos = [], humor = "n
   useEffect(() => {
     api.current?.definirMineiros(mineiros, diamantes);
   }, [mineiros, diamantes]);
+
+  // ---- a extração na ilha das Grandes Expedições: os trabalhadores e o que está pronto para coletar
+  const chaveDaExtracao = extracao ? `${extracao.coqueiral}|${extracao.recife}|${extracao.conchas}|${extracao.perolas}` : "";
+  useEffect(() => {
+    api.current?.definirExtracao(extracao);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveDaExtracao]);
 
   // ---- o correio: a caixa aparece com `cartas` (as não lidas; null = sem caixa, como numa visita)
   useEffect(() => {

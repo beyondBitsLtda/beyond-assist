@@ -9,14 +9,45 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.9.1",
-  "atualizadoEm": "2026-11-05",
+  "versao": "1.11.0",
+  "atualizadoEm": "2026-11-06",
   "compilacao": {
-    "numero": 115,
-    "data": "2026-11-05",
+    "numero": 117,
+    "data": "2026-11-06",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.11.0",
+      "data": "2026-11-06",
+      "branch": "main",
+      "tipo": "funcionalidade",
+      "resumo": "O modo aula: a Lisa transforma o checklist de teoria de um assunto numa apostila completa (uma categoria nova nos Cadernos); a estrutura do caderno do curso só nasce quando a pessoa pede, com um menu por semana na trilha; e o quiz fica preso ao curso e ao assunto da etapa.",
+      "itens": [
+        "Modo aula: no assunto da trilha, o botão “🎓 Aula completa com a Lisa” escreve a aula inteira do checklist de teoria — uma seção por ponto (se o item manda ler a documentação, a seção ensina o que a documentação traz, com o link nas fontes), exemplos, erros comuns, revisão com exercícios e respostas. Ponto que ficar de fora ganha uma segunda chamada; aula curta é recusada.",
+        "A aula vira uma apostila: um caderno da categoria nova “Apostila”, ligado ao assunto, que abre na hora (“Abrir a apostila agora”) já renderizada, com sumário, navegação entre as páginas e impressão. Dá para refazer a aula ou editar no caderno.",
+        "Cadernos: a estante tem duas categorias, 📓 Cadernos e 📘 Apostilas, e a apostila tem capa própria (encadernada, com a lombada costurada e a faixa “Apostila”).",
+        "A estrutura do caderno do curso só é criada quando a pessoa pede: ao criar o curso, a opção vem desmarcada; na trilha, o botão “🧱 Criar a estrutura do caderno” monta um módulo por semana do plano e uma página por assunto, já ligados.",
+        "Na trilha, a área de anotações virou o menu fechado “📓 Cadernos e apostilas da trilha”: o que é da trilha inteira e uma gaveta por semana (a da vez já aberta), com cada assunto e as páginas e apostilas dele.",
+        "Quiz: o pedido leva o curso, o assunto da etapa, os pontos do checklist dele, o que veio antes (só como base) e o que vem depois (proibido); cada pergunta diz o ponto que cobre, e uma conferência descarta a que fugiu do assunto. As rodadas extras mudam o foco sem sair do assunto.",
+        "A Lisa robô só manda pergunta do quiz dela pelo correio para quem estuda o mesmo curso."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "1.10.0",
+      "data": "2026-11-06",
+      "branch": "main",
+      "tipo": "funcionalidade",
+      "resumo": "Mais 20 tipos de tripulação, a visão da ilha com tudo dela (construções no desenho da ilha, extração e coleta) e o exemplo da Lisa num editor do tamanho do exercício.",
+      "itens": [
+        "Tripulação: mais 20 tipos (24 no total), do Porto 1 ao 5 — Marujo, Mosqueteira, Cozinheiro de Bordo (cura), Gaivota Ladra, Bucaneiro, Ancoreiro, Macaco Saqueador, Caranguejo Couraçado, Sereia Cantora, Canhoneira, Mestre do Gancho, Polvo de Guerra, Navegadora (cura), Pirata Fantasma, Tartaruga Couraçada, Filhote de Kraken, Albatroz de Guerra, Bruxa do Mar, Capitã Lendária e Golem de Coral —, cada uma com o seu desenho de papel, os seus números de batalha e o seu lugar na ordem de entrada. O catálogo vem na ordem do Porto e do preço.",
+        "Visão da ilha: com a ilha no 3D, o Reino mostra só ela — o título, a produção, o que está pronto para coletar (com a barra e o botão Coletar), os guardas, o Baú, todas as construções com os botões de construir e melhorar, o ataque (se não é sua) e a tripulação. Clicar numa construção no 3D leva ao cartão dela.",
+        "No 3D, as construções da ilha ganharam o desenho dela: a Cabana do Chefe de palha com totens e tochas, o Coqueiral com cocos, o Recife de Pérolas com ostras abertas, o Porto com o barco, além da Paliçada, da Torre Tiki, do Canhão de Coco e do Lança-Arpões. A extração aparece: os catadores no Coqueiral, os mergulhadores no Recife e o monte de conchas e as pérolas prontas para coletar.",
+        "Exemplo da Lisa no exercício: o código abre no mesmo editor da solução (do mesmo tamanho, só leitura), com o Rodar o exemplo, o Copiar e o Abrir na IDE (um projeto novo da IDE livre com o exemplo). O código que vinha numa linha só ganha as linhas de volta; a IA agora é pedida a escrever com quebras de linha, e o que não dá para refazer é pedido de novo."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.9.1",
       "data": "2026-11-05",
@@ -1851,7 +1882,10 @@
         "Menu do Reino em abas (Reino, Batalha, Expedições, Forja e Bolsa), com contadores e barra fixa ao rolar",
         "Modo Bootcamp: temporada no estilo reality (prova de imunidade, em equipe pela média ou colaborativa, com o código do time dividido em partes que se juntam, e prova de eliminação, que tira 1, a cada episódio, insígnia para todo vencedor e grande final numa arena com torcida) ou modos rápidos (mata-mata e pontos corridos), até 8 competidores (pessoas do Proof e personagens da Lisa com skin, personalidade, status e especialidades), escritório de TI em 3D com 5 cenários, nível contra a CPU, 3 jurados desenhados, avaliação ao vivo com code review, medidor de emoção e despedida de todo eliminado com a apresentadora, entrega no editor da tela (com o rascunho salvo sozinho e \"Testar e enviar\" num clique) ou pelo GitHub e testes de entrada e saída num compilador on-line, e moedas do reino a cada prova (pela nota, com bônus para quem vence, o campeão e o vice, e teto de 300 por dia)",
         "Painel do uso para o administrador (/uso): acessos e logins, tempo no app, áreas usadas e ações de cada pessoa, por período, medido por uma batida por minuto com a aba visível (sem guardar o que a pessoa escreve)",
-        "IDE livre na Prática (/pratica/ide): projetos de código na conta, editor com abas, terminal (shell sobre os arquivos do projeto, com pipes e redirecionamentos), JavaScript (Node do navegador) e Python (Pyodide) e SQL (sql.js) rodando no navegador, as outras linguagens no Wandbox, prévia de páginas web e o projeto em .zip."
+        "IDE livre na Prática (/pratica/ide): projetos de código na conta, editor com abas, terminal (shell sobre os arquivos do projeto, com pipes e redirecionamentos), JavaScript (Node do navegador) e Python (Pyodide) e SQL (sql.js) rodando no navegador, as outras linguagens no Wandbox, prévia de páginas web e o projeto em .zip.",
+        "Grandes Expedições com 24 tipos de tripulação e a visão da ilha (construções no desenho da ilha, extração e coleta, guardas e tripulação), e o exemplo da Lisa no editor do exercício, com Rodar e Abrir na IDE.",
+        "Modo aula: a aula completa do checklist de teoria de um assunto, escrita pela Lisa, vira uma apostila (categoria própria nos Cadernos, capa encadernada, leitura já renderizada com sumário e impressão).",
+        "Na trilha, o menu “Cadernos e apostilas da trilha”, por semana; a estrutura do caderno do curso (um módulo por semana, uma página por assunto) só quando a pessoa pede."
       ],
       "naoInclui": [
         "Não executa o código de ninguém no próprio servidor: o Rodar, a Arena Lúdica e os testes do Modo Bootcamp rodam no Wandbox (compilador on-line); os exercícios e projetos da prática são corrigidos pela IA lendo o código.",
@@ -1877,7 +1911,8 @@
         "A conversa com a Lisa é por escrito (a voz do navegador lê as falas dela, mas a pessoa não fala no microfone nessa conversa).",
         "No Modo Bootcamp, os personagens da Lisa não escrevem código de verdade (jogam por simulação), os testes não rodam SQL (só linguagens que leem stdin) e o GitHub só vale com repositório público.",
         "Os jurados e a apresentadora do Modo Bootcamp são personagens originais: não imitam nome, rosto nem bordão de nenhuma pessoa real, e o deboche da avaliação é sobre o código, nunca sobre a pessoa.",
-        "No Bootcamp, não há edição de código em conjunto em tempo real: na prova colaborativa, cada membro escreve a sua parte e os jurados juntam tudo na bancada."
+        "No Bootcamp, não há edição de código em conjunto em tempo real: na prova colaborativa, cada membro escreve a sua parte e os jurados juntam tudo na bancada.",
+        "A Lisa não cria estrutura de caderno sozinha: só quando a pessoa pede (na criação do curso, marcando a opção, ou no botão da trilha). A apostila também só nasce no pedido."
       ]
     },
     "stack": [
@@ -1944,7 +1979,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/031; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019). A IDE livre (1.9.0) guarda os projetos em proof_ide_projetos (db/037-ide.sql)."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/031; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019). A IDE livre (1.9.0) guarda os projetos em proof_ide_projetos (db/037-ide.sql). As apostilas (1.11.0) são cadernos com a coluna categoria = 'apostila' em proof_cadernos (db/038-apostilas.sql)."
       }
     ],
     "integracoes": [

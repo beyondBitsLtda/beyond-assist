@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { pedir, obter, criar, mudar } from "@/lib/api.js";
 import { NOTA_DE_APROVACAO } from "@/dominio/pratica.js";
@@ -45,6 +46,9 @@ export default function Assunto({ tarefa, aoMudar }) {
   const [erro, setErro] = useState("");
   const [explicacao, setExplicacao] = useState(null); // null = fechada; string = aberta
   const [pedindo, setPedindo] = useState("");
+  // o modo aula (06/11/2026): a apostila deste assunto — undefined = ainda não sei; null = não tem
+  const [apostila, setApostila] = useState(undefined);
+  const [apostilaNova, setApostilaNova] = useState(false);
 
   const itens = checklists.flatMap((c) => c.itens);
   const feitos = itens.filter((i) => i.feito).length;
@@ -55,6 +59,30 @@ export default function Assunto({ tarefa, aoMudar }) {
   // o quiz do assunto: o aprovado conclui o assunto (com a teoria); o dispensado já veio concluído
   const precisaDoQuiz = !concluido && !trancado && !tarefa.quiz && !tarefa.dispensa && Boolean(tarefa.trilhaId);
   const teoriaFeita = concluido || Boolean(tarefa.teoria);
+
+  const comAula = Boolean(tarefa.trilhaId && tarefa.cardId);
+  useEffect(() => {
+    if (!comAula) return;
+    let vivo = true;
+    obter(`/api/cards/${tarefa.cardId}/apostila`).then((r) => vivo && setApostila(r.apostila || null)).catch(() => vivo && setApostila(null));
+    return () => { vivo = false; };
+  }, [comAula, tarefa.cardId]);
+
+  /** A aula completa do checklist, como apostila. `refazer`: escreve outra no lugar da que existe. */
+  async function pedirAula({ refazer = false } = {}) {
+    if (refazer && !window.confirm("Refazer a aula? A Lisa escreve uma apostila nova e a atual (com o que você mudou nela) é trocada.")) return;
+    setPedindo("aula");
+    setErro("");
+    try {
+      const r = await criar(`/api/cards/${tarefa.cardId}/apostila`, { refazer });
+      setApostila(r.apostila);
+      setApostilaNova(Boolean(r.apostila?.nova));
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setPedindo("");
+    }
+  }
 
   async function fazerQuiz() {
     setPedindo("quiz");
@@ -188,6 +216,38 @@ export default function Assunto({ tarefa, aoMudar }) {
         <p className="pf-assunto__objetivo">
           Este assunto ainda não tem tarefas. A Lisa pode montar uma checklist de teoria e gravar direto no card do Abacato.
         </p>
+      )}
+
+      {/* o modo aula: o checklist inteiro numa aula completa, que vira uma apostila (Cadernos › Apostilas) */}
+      {comAula && !trancado && (
+        <div className={`pf-aula${apostilaNova ? " pf-aula--pronta" : ""}`}>
+          <div className="pf-aula__texto">
+            <strong>{apostilaNova ? "📘 A apostila está pronta!" : "🎓 Modo aula"}</strong>
+            <span>
+              {apostilaNova
+                ? `“${apostila.titulo}” — ${apostila.secoes ? `${apostila.secoes} páginas, ` : ""}com todos os pontos do checklist. Ela também fica em Cadernos › Apostilas.`
+                : apostila
+                  ? "A aula completa deste assunto já virou apostila: todos os pontos do checklist, para ler já formatada."
+                  : itens.length
+                    ? "Em vez de abrir cada fonte do checklist, peça à Lisa a aula completa: uma apostila com todos os pontos, já formatada."
+                    : "Peça à Lisa a aula completa do assunto: uma apostila para ler já formatada."}
+            </span>
+          </div>
+          <div className="pf-aula__acoes">
+            {apostila ? (
+              <>
+                <Link className="pf-botao pf-botao--pequeno" href={apostila.href}>{apostilaNova ? "Abrir a apostila agora" : "📘 Abrir a apostila"}</Link>
+                <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={() => pedirAula({ refazer: true })} disabled={Boolean(pedindo)}>
+                  {pedindo === "aula" ? "A Lisa está reescrevendo…" : "↻ Refazer a aula"}
+                </button>
+              </>
+            ) : (
+              <button type="button" className="pf-botao pf-botao--pequeno" onClick={() => pedirAula()} disabled={Boolean(pedindo) || apostila === undefined}>
+                {pedindo === "aula" ? "A Lisa está escrevendo a aula… (até 1 min)" : "🎓 Aula completa com a Lisa"}
+              </button>
+            )}
+          </div>
+        </div>
       )}
 
       {explicacao !== null && <Explicacao texto={explicacao} />}

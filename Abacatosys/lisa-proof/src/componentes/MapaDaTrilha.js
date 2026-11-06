@@ -214,6 +214,16 @@ export default function MapaDaTrilha({ trilha, avanco, aoMudar }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // o menu dos cadernos da trilha (CadernosDaTrilha) abre um assunto daqui mesmo, sem recarregar
+  useEffect(() => {
+    function abrir(e) {
+      const parada = unidades.flatMap((u) => u.paradas).find((p) => p.tipo === "assunto" && String(p.etapa?.cardId) === String(e.detail));
+      if (parada) setAberta(parada);
+    }
+    window.addEventListener("proof-abrir-assunto", abrir);
+    return () => window.removeEventListener("proof-abrir-assunto", abrir);
+  }, [unidades]);
+
   // Estável entre renderizações: a Folha usa isto como dependência para ouvir o Esc.
   const fechar = useCallback(() => {
     setAberta(null);

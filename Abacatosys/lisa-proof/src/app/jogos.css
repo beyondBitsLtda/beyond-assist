@@ -97,6 +97,34 @@
 .il-passos li small { color: var(--pf-tinta-2); }
 .il-passos__feito > span::after { content: " ✓"; color: var(--pf-verde-texto); font-weight: 800; }
 .il-passos__botoes { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---- a visão da ilha (06/11/2026): com a ilha no 3D, tudo dela embaixo — extração, construções, guardas, tripulação */
+.il-foco { display: grid; gap: 12px; }
+.il-foco__topo { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.il-foco__topo h2 { margin: 0; font-family: var(--pf-fonte-titulo); font-size: 22px; }
+.il-foco__topo p { margin: 2px 0 0; }
+.il-foco__emoji { font-size: 40px; line-height: 1; }
+.il-foco__voltar { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; }
+.il-foco__sub { margin: 6px 0 0; font-size: 16px; font-weight: 800; color: var(--pf-tinta); }
+.il-foco__extracao { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.il-foco__fonte { display: flex; gap: 12px; align-items: flex-start; }
+.il-foco__fonte-emoji { font-size: 34px; line-height: 1; }
+.il-foco__fonte p { margin: 4px 0 0; }
+.il-foco__coleta { display: grid; gap: 8px; align-content: start; justify-items: start; }
+.il-foco__coleta p { margin: 0; }
+.il-foco__barra { width: 100%; height: 12px; border-radius: 999px; background: var(--pf-linha); overflow: hidden; }
+.il-foco__barra span { display: block; height: 100%; border-radius: 999px; background: var(--pf-botao-fundo); transition: width .4s ease; }
+.il-foco__predios { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.il-foco__predio { display: grid; gap: 6px; align-content: start; justify-items: start; }
+.il-foco__predio p { margin: 0; }
+.il-foco__predio--vazio { opacity: 0.8; border-style: dashed; }
+.il-foco__predio-topo { display: flex; gap: 10px; align-items: center; }
+.il-foco__predio-topo strong { display: block; }
+.il-foco__predio-topo small { color: var(--pf-tinta-2); font-weight: 700; }
+.il-foco__predio-emoji { font-size: 28px; line-height: 1; }
+.il-foco__predio--destaque { animation: il-destaque 1.4s ease-out; }
+@keyframes il-destaque { 0% { box-shadow: 0 0 0 0 var(--pf-verde); } 30% { box-shadow: 0 0 0 5px var(--pf-verde); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .il-foco__predio--destaque { animation: none; box-shadow: 0 0 0 3px var(--pf-verde); } }
 .il-defensores { display: grid; gap: 4px; }
 .il-defensores__lista { display: flex; flex-wrap: wrap; gap: 8px; }
 .il-defensor { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }

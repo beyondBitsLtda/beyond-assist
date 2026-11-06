@@ -81,6 +81,17 @@ export default function Ide() {
 
   const carregarLista = useCallback(async (abrir) => {
     try {
+      // o "Abrir na IDE" do exemplo da Lisa (06/11/2026): um projeto novo com o código do exemplo
+      let importar = null;
+      try { importar = JSON.parse(sessionStorage.getItem("proof-ide-importar") || "null"); sessionStorage.removeItem("proof-ide-importar"); } catch { /* sem nada para importar */ }
+      if (importar?.codigo && importar.arquivo) {
+        const { projeto: novo } = await criar("/api/ide/projetos", { modelo: "vazio", nome: importar.nome });
+        const caminho = "/" + String(importar.arquivo).replace(/^\/+/, "");
+        const comExemplo = { ...novo, arquivos: { ...novo.arquivos, [caminho]: importar.codigo }, principal: caminho };
+        const r = await definir(`/api/ide/projetos/${novo.id}`, { nome: comExemplo.nome, arquivos: comExemplo.arquivos, pastas: comExemplo.pastas, principal: caminho, versao: novo.versao });
+        abrir = novo.id;
+        void r;
+      }
       const { projetos: lista } = await obter("/api/ide/projetos");
       setProjetos(lista);
       const alvo = abrir || (lista.some((p) => p.id === lerLocal(CHAVE_DO_ULTIMO)) ? lerLocal(CHAVE_DO_ULTIMO) : lista[0]?.id);

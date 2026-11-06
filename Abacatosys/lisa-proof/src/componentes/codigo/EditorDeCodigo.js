@@ -27,7 +27,7 @@ import { carregarLinguagem, rotuloDaLinguagem } from "./linguagens.js";
  *
  * Na IDE livre (05/11/2026): `nome` (o arquivo na barra), `atalhos` (o texto do canto) e `aoCtrlS` (salvar).
  */
-export default function EditorDeCodigo({ valor, aoMudar, linguagem, desabilitado, placeholder, aoCtrlEnter, aoCtrlS, rotulo = "Editor de código", nome = "solucao", atalhos = "Tab indenta · Ctrl+F busca · Ctrl+Enter envia", classe = "" }) {
+export default function EditorDeCodigo({ valor, aoMudar, linguagem, desabilitado, placeholder, aoCtrlEnter, aoCtrlS, rotulo = "Editor de código", nome = "solucao", atalhos = "Tab indenta · Ctrl+F busca · Ctrl+Enter envia", classe = "", soLeitura = false }) {
   const caixa = useRef(null);
   const vista = useRef(null);
   const travas = useRef({ linguagem: new Compartment(), leitura: new Compartment() });
@@ -74,7 +74,7 @@ export default function EditorDeCodigo({ valor, aoMudar, linguagem, desabilitado
           EditorView.updateListener.of((u) => { if (u.docChanged) ultimo.current.aoMudar?.(u.state.doc.toString()); }),
           EditorView.contentAttributes.of({ "aria-label": rotulo, spellcheck: "false", autocorrect: "off", autocapitalize: "off" }),
           t.linguagem.of([]),
-          t.leitura.of([EditorState.readOnly.of(Boolean(desabilitado)), EditorView.editable.of(!desabilitado)]),
+          t.leitura.of([EditorState.readOnly.of(Boolean(desabilitado || soLeitura)), EditorView.editable.of(!desabilitado)]),
         ],
       }),
     });
@@ -95,9 +95,9 @@ export default function EditorDeCodigo({ valor, aoMudar, linguagem, desabilitado
 
   useEffect(() => {
     vista.current?.dispatch({
-      effects: travas.current.leitura.reconfigure([EditorState.readOnly.of(Boolean(desabilitado)), EditorView.editable.of(!desabilitado)]),
+      effects: travas.current.leitura.reconfigure([EditorState.readOnly.of(Boolean(desabilitado || soLeitura)), EditorView.editable.of(!desabilitado)]),
     });
-  }, [desabilitado]);
+  }, [desabilitado, soLeitura]);
 
   // valor trocado de fora (ex.: a tentativa anterior chegou do servidor)
   useEffect(() => {

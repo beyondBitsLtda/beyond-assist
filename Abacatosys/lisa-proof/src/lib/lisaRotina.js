@@ -24,7 +24,7 @@ import { valesPendentes, resgatarVale } from "@/lib/vales.js";
 import { criarCaderno, criarPagina } from "@/lib/cadernos.js";
 import { conversar, textoDe } from "@/lib/gemini.js";
 import { destinatarios, mandarPerguntaDoQuiz, mandarRecado, avaliarRecado } from "@/lib/correio.js";
-import { recadoDoRobo, vereditoDoRecado } from "@/dominio/correio.js";
+import { recadoDoRobo, vereditoDoRecado, mesmoCurso } from "@/dominio/correio.js";
 import { assuntosParaODuracao } from "@/dominio/curso.js";
 import { diaDe, somarDias } from "@/dominio/datas.js";
 import { motorDo } from "@/dominio/motores.js";
@@ -152,7 +152,13 @@ async function quiz(id) {
   let peloCorreio = "";
   if (!d.resposta?.enviadas?.length && sortearPara("quiz-correio")() < 0.4) {
     try {
-      const lista = (await destinatarios(id)).filter((x) => !x.robo);
+      // só para quem estuda o mesmo curso que ela (06/11/2026): a pergunta tem de ser do curso da pessoa
+      const humanos = (await destinatarios(id)).filter((x) => !x.robo);
+      const { data: cursos } = humanos.length
+        ? await supabase.from("proof_trilhas").select("usuario_id, tema").in("usuario_id", humanos.map((x) => x.id)).eq("status", "ativa")
+        : { data: [] };
+      const doMesmoCurso = new Set((cursos || []).filter((t) => mesmoCurso(t.tema, atual.tema)).map((t) => t.usuario_id));
+      const lista = humanos.filter((x) => doMesmoCurso.has(x.id));
       const alvo = lista[Math.floor(sortearPara("quiz-alvo")() * lista.length)];
       if (alvo) { await mandarPerguntaDoQuiz(id, d.id, { indice: 0, paraId: alvo.id }); peloCorreio = ` Mandei uma pergunta pelo correio para ${alvo.nome}.`; d = await desafioDoUsuario(d.id, id); }
     } catch (e) { log("quiz pelo correio:", e.message); }

@@ -8,6 +8,8 @@
 //
 // Puro: sem banco, sem rede.
 
+import { formatarDia } from "./datas.js";
+
 export const LIMITES_DO_CADERNO = {
   titulo: 120,
   tituloDaPagina: 160,
@@ -256,4 +258,55 @@ export function citacaoDoLivro({ livroId, livroTitulo, pagina, texto, nota }) {
 export function anexarAoConteudo(conteudo, trecho) {
   const base = String(conteudo || "").replace(/\s+$/, "");
   return base ? `${base}\n\n${trecho}\n` : `${trecho}\n`;
+}
+
+// ---------------------------------------------------------------- a trilha, por semana (06/11/2026)
+
+/** O nome de uma semana do plano: "Semana 2 · 10/11 a 15/11" (a última diz que é a do projeto final). */
+export function nomeDaSemana(u) {
+  if (!u) return "Antes do plano";
+  const periodo = u.de ? ` · ${formatarDia(u.de)}${u.ate && u.ate !== u.de ? ` a ${formatarDia(u.ate)}` : ""}` : "";
+  return `Semana ${u.numero}${periodo}${u.final ? " · final" : ""}`;
+}
+
+/**
+ * A estrutura do caderno do curso, pedida na trilha ("a Lisa só pode gerar estrutura de cadernos se o
+ * usuário pedir… ver por semana as estruturas geradas"): um módulo por semana do plano, uma página por
+ * assunto. Os assuntos concluídos antes do plano (`antes`) ficam num módulo próprio, no começo.
+ *
+ * @param avanco  o avanço da trilha (src/dominio/avanco.js): `unidades` com as etapas, e `antes`
+ */
+export function estruturaPorSemana(avanco) {
+  const modulos = [];
+  const antes = avanco?.antes || [];
+  if (antes.length) modulos.push({ titulo: "Antes do plano", semana: null, assuntos: antes });
+  for (const u of avanco?.unidades || []) {
+    if (u.etapas?.length) modulos.push({ titulo: nomeDaSemana(u), semana: u.numero, assuntos: u.etapas });
+  }
+  return modulos;
+}
+
+/**
+ * As anotações, apostilas e estruturas ligadas à trilha, arrumadas por semana para o menu da trilha:
+ * `daTrilha` (o que é da trilha inteira, como o caderno do curso), `semanas` (cada semana com os
+ * assuntos dela e o que está ligado a cada um) e `soltas` (assunto que saiu do plano).
+ *
+ * @param anotacoes  as de GET /api/vinculos?tipo=trilha (src/lib/vinculos.js: vinculosDoAlvo)
+ */
+export function anotacoesPorSemana(anotacoes, avanco) {
+  const lista = Array.isArray(anotacoes) ? anotacoes : [];
+  const daTrilha = lista.filter((a) => a.alvo?.tipo === "trilha");
+  const doAssunto = (cardId) => lista.filter((a) => a.alvo?.tipo === "assunto" && String(a.alvo.id) === String(cardId));
+  const vistos = new Set();
+  const semanas = estruturaPorSemana(avanco).map((m) => {
+    const assuntos = m.assuntos.map((e) => {
+      const itens = doAssunto(e.cardId);
+      for (const i of itens) vistos.add(i.id);
+      return { cardId: e.cardId, titulo: e.titulo, itens, apostilas: itens.filter((i) => i.caderno?.categoria === "apostila").length };
+    });
+    const total = assuntos.reduce((s, a) => s + a.itens.length, 0);
+    return { titulo: m.titulo, semana: m.semana, assuntos, total, apostilas: assuntos.reduce((s, a) => s + a.apostilas, 0) };
+  });
+  const soltas = lista.filter((a) => a.alvo?.tipo === "assunto" && !vistos.has(a.id));
+  return { daTrilha, semanas, soltas, total: lista.length };
 }

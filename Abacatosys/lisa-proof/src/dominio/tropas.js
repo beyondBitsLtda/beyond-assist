@@ -99,10 +99,124 @@ export const TROPAS = {
     alcance: 0.7, velocidade: 2.6, voa: true, acertaAr: true, alvo: "defesa", nivelMinimo: 3, temporada: "ilhas",
     descricao: "Voa rápido até as defesas e bica sem parar. Frágil contra a Torre Tiki.",
   },
+  // ---- mais 20 da tripulação (06/11/2026: "crie mais 20 tipos de tripulação"). O nível é o do Porto (1 a 5).
+  // Porto 1
+  marujo: {
+    nome: "Marujo", emoji: "⛵", espaco: 1, custo: 45, vida: 70, dano: 10, intervalo: 0.8,
+    alcance: 0.6, velocidade: 2.1, voa: false, acertaAr: false, alvo: "qualquer", nivelMinimo: 1, temporada: "ilhas",
+    descricao: "Ligeiro no convés e mais barato que o pirata — mas cai rápido.",
+  },
+  mosqueteira: {
+    nome: "Mosqueteira", emoji: "🔫", espaco: 1, custo: 130, vida: 40, dano: 22, intervalo: 1.6,
+    alcance: 3.4, velocidade: 1.5, voa: false, acertaAr: true, alvo: "qualquer", nivelMinimo: 1, temporada: "ilhas",
+    descricao: "O mosquete alcança mais longe que o arpão e acerta quem voa; demora a recarregar.",
+  },
+  cozinheiro: {
+    nome: "Cozinheiro de Bordo", emoji: "🍲", espaco: 2, custo: 150, vida: 160, dano: 0, cura: 12, intervalo: 1.0,
+    alcance: 2.0, velocidade: 1.5, voa: false, acertaAr: false, alvo: "aliado", nivelMinimo: 1, temporada: "ilhas",
+    descricao: "Serve sopa quente no meio da luta: cura quem está em volta. Não ataca.",
+  },
+  gaivota: {
+    nome: "Gaivota Ladra", emoji: "🕊️", espaco: 1, custo: 90, vida: 40, dano: 8, intervalo: 0.7,
+    alcance: 0.6, velocidade: 3.0, voa: true, acertaAr: true, alvo: "qualquer", nivelMinimo: 1, temporada: "ilhas",
+    descricao: "Voa por cima da paliçada e bica o que achar primeiro. Rápida e frágil.",
+  },
+  // Porto 2
+  bucaneiro: {
+    nome: "Bucaneiro", emoji: "🪓", espaco: 2, custo: 160, vida: 280, dano: 26, intervalo: 1.1, area: 0.7,
+    alcance: 0.7, velocidade: 1.6, voa: false, acertaAr: false, alvo: "qualquer", nivelMinimo: 2, temporada: "ilhas",
+    descricao: "O machado acerta todo mundo em volta (dano em área). Bom contra os nativos juntos.",
+  },
+  ancoreiro: {
+    nome: "Ancoreiro", emoji: "⚓", espaco: 3, custo: 230, vida: 420, dano: 30, intervalo: 1.6,
+    alcance: 0.9, velocidade: 1.2, voa: false, acertaAr: false, alvo: "defesa", nivelMinimo: 2, temporada: "ilhas",
+    descricao: "Arrasta uma âncora até as defesas e bate com ela. Aguenta muito.",
+  },
+  macaco: {
+    nome: "Macaco Saqueador", emoji: "🐒", espaco: 1, custo: 70, vida: 55, dano: 9, intervalo: 0.6,
+    alcance: 0.5, velocidade: 3.2, voa: false, acertaAr: false, alvo: "qualquer", nivelMinimo: 2, temporada: "ilhas",
+    descricao: "O mais rápido da tripulação: corre, pula e ataca sem parar.",
+  },
+  caranguejoCouracado: {
+    nome: "Caranguejo Couraçado", emoji: "🦀", espaco: 3, custo: 200, vida: 520, dano: 14, intervalo: 1.2,
+    alcance: 0.6, velocidade: 0.9, voa: false, acertaAr: false, alvo: "defesa", nivelMinimo: 2, temporada: "ilhas",
+    descricao: "A carapaça segura os tiros das defesas enquanto a tripulação ataca.",
+  },
+  sereia: {
+    nome: "Sereia Cantora", emoji: "🧜", espaco: 3, custo: 280, vida: 150, dano: 34, intervalo: 1.3, area: 1.0,
+    alcance: 2.8, velocidade: 1.4, voa: false, acertaAr: true, alvo: "qualquer", nivelMinimo: 2, temporada: "ilhas",
+    descricao: "O canto atinge um grupo inteiro de longe, no chão e no ar.",
+  },
+  // Porto 3
+  canhoneira: {
+    nome: "Canhoneira", emoji: "🧨", espaco: 3, custo: 320, vida: 80, dano: 48, intervalo: 2.2, area: 1.0,
+    alcance: 3.2, velocidade: 1.2, voa: false, acertaAr: false, alvo: "qualquer", nivelMinimo: 3, temporada: "ilhas",
+    descricao: "Carrega um canhão de mão: tiro lento e devastador em área, só no chão.",
+  },
+  gancho: {
+    nome: "Mestre do Gancho", emoji: "🪝", espaco: 3, custo: 300, vida: 360, dano: 36, intervalo: 1.0,
+    alcance: 0.8, velocidade: 1.8, voa: false, acertaAr: false, alvo: "qualquer", nivelMinimo: 3, temporada: "ilhas",
+    descricao: "Puxa o inimigo com o gancho e luta de perto. Forte e firme.",
+  },
+  polvoDeGuerra: {
+    nome: "Polvo de Guerra", emoji: "🐙", espaco: 6, custo: 520, vida: 900, dano: 30, intervalo: 1.4, area: 1.1,
+    alcance: 1.0, velocidade: 1.0, voa: false, acertaAr: false, alvo: "qualquer", nivelMinimo: 3, temporada: "ilhas",
+    descricao: "Oito braços batendo ao mesmo tempo: dano em volta e muita vida.",
+  },
+  navegadora: {
+    nome: "Navegadora", emoji: "🧭", espaco: 4, custo: 420, vida: 260, dano: 0, cura: 26, intervalo: 1.0,
+    alcance: 2.6, velocidade: 1.6, voa: false, acertaAr: false, alvo: "aliado", nivelMinimo: 3, temporada: "ilhas",
+    descricao: "Lê as estrelas e cuida da tripulação: cura forte em volta. Não ataca.",
+  },
+  fantasma: {
+    nome: "Pirata Fantasma", emoji: "👻", espaco: 4, custo: 460, vida: 300, dano: 40, intervalo: 1.3,
+    alcance: 0.8, velocidade: 1.7, voa: true, acertaAr: false, alvo: "defesa", nivelMinimo: 3, temporada: "ilhas",
+    descricao: "Atravessa a paliçada flutuando e assombra as defesas. A Torre Tiki o derruba.",
+  },
+  // Porto 4
+  tartaruga: {
+    nome: "Tartaruga Couraçada", emoji: "🐢", espaco: 8, custo: 700, vida: 1500, dano: 28, intervalo: 1.6, area: 0.7,
+    alcance: 0.8, velocidade: 0.7, voa: false, acertaAr: false, alvo: "defesa", nivelMinimo: 4, temporada: "ilhas",
+    descricao: "Uma fortaleza que anda: segura o fogo das defesas por muito tempo.",
+  },
+  filhoteKraken: {
+    nome: "Filhote de Kraken", emoji: "🦑", espaco: 10, custo: 950, vida: 1300, dano: 60, intervalo: 1.5, area: 1.2,
+    alcance: 1.4, velocidade: 1.0, voa: false, acertaAr: false, alvo: "qualquer", nivelMinimo: 4, temporada: "ilhas",
+    descricao: "Os tentáculos esmagam tudo em volta. É só um filhote — imagine a mãe.",
+  },
+  albatroz: {
+    nome: "Albatroz de Guerra", emoji: "🦢", espaco: 6, custo: 620, vida: 520, dano: 70, intervalo: 2.0,
+    alcance: 0.6, velocidade: 1.4, voa: true, acertaAr: false, alvo: "defesa", nivelMinimo: 4, temporada: "ilhas",
+    descricao: "Plana sobre a ilha e larga cocos pesados nas defesas. O Lança-Arpões é o perigo dele.",
+  },
+  bruxa: {
+    nome: "Bruxa do Mar", emoji: "🔮", espaco: 5, custo: 680, vida: 220, dano: 55, intervalo: 1.6, area: 1.0,
+    alcance: 3.0, velocidade: 1.4, voa: false, acertaAr: true, alvo: "qualquer", nivelMinimo: 4, temporada: "ilhas",
+    descricao: "A magia das marés: dano em área de longe, no chão e no ar.",
+  },
+  // Porto 5
+  capita: {
+    nome: "Capitã Lendária", emoji: "👑", espaco: 10, custo: 1200, vida: 1400, dano: 75, intervalo: 1.0, area: 0.8,
+    alcance: 0.9, velocidade: 1.7, voa: false, acertaAr: false, alvo: "qualquer", nivelMinimo: 5, temporada: "ilhas",
+    descricao: "A lenda dos sete mares: forte, rápida e corta tudo em volta.",
+  },
+  golemDeCoral: {
+    nome: "Golem de Coral", emoji: "🪸", espaco: 14, custo: 1500, vida: 2600, dano: 55, intervalo: 1.8, area: 1.0,
+    alcance: 0.9, velocidade: 0.7, voa: false, acertaAr: false, alvo: "defesa", nivelMinimo: 5, temporada: "ilhas",
+    descricao: "Coral vivo que se ergue do recife: o maior tanque das ilhas.",
+  },
 };
 export const ORDEM_DAS_TROPAS = ["guerreiro", "arqueira", "lanceiro", "bombardeiro", "gigante", "cavaleiro", "mago", "balao", "grifo", "dragao", "curandeira", "colosso"];
 /** A tripulação da Temporada das Ilhas: só no Porto das ilhas (ilhas.js), nunca no Quartel. */
-export const ORDEM_DA_TRIPULACAO = ["pirata", "arpoadora", "polvorista", "papagaio"];
+export const ORDEM_DA_TRIPULACAO = [
+  "pirata", "arpoadora", "polvorista", "papagaio",
+  // mais 20 (06/11/2026), na ordem do Porto que pedem
+  "marujo", "mosqueteira", "cozinheiro", "gaivota",
+  "bucaneiro", "ancoreiro", "macaco", "caranguejoCouracado", "sereia",
+  "canhoneira", "gancho", "polvoDeGuerra", "navegadora", "fantasma",
+  "tartaruga", "filhoteKraken", "albatroz", "bruxa",
+  "capita", "golemDeCoral",
+];
 /** Todas, para o motor de combate e as contagens (o Reino e as ilhas usam o mesmo motor). */
 export const TODAS_AS_TROPAS = [...ORDEM_DAS_TROPAS, ...ORDEM_DA_TRIPULACAO];
 export const RESERVAS = { exercito: "exército", guarnicao: "tropas de defesa" };

@@ -136,7 +136,7 @@ export async function vinculosDoCaderno(usuarioId, cadernoId) {
 export async function vinculosDoAlvo(usuarioId, { tipo, id }) {
   if (!TIPOS_DE_ALVO[tipo] || !uuidValido(id)) throw new ErroDeAcesso(400, "destino inválido");
   let consulta = supabase.from("proof_vinculos")
-    .select(`${CAMPOS_DO_VINCULO}, proof_cadernos(id, titulo, icone, cor), proof_caderno_paginas(id, titulo, tipo)`)
+    .select(`${CAMPOS_DO_VINCULO}, proof_cadernos(id, titulo, icone, cor, categoria), proof_caderno_paginas(id, titulo, tipo)`)
     .eq("usuario_id", usuarioId);
   if (tipo === "trilha") {
     const { data: etapas } = await supabase.from("proof_etapas").select("card_id, proof_trilhas!inner(usuario_id)").eq("trilha_id", id).eq("proof_trilhas.usuario_id", usuarioId);
@@ -154,9 +154,11 @@ export async function vinculosDoAlvo(usuarioId, { tipo, id }) {
   const vivo = await alvosVivos(usuarioId, data);
   return data.map((v) => ({
     id: v.id,
-    caderno: v.proof_cadernos ? { id: v.proof_cadernos.id, titulo: v.proof_cadernos.titulo, icone: v.proof_cadernos.icone, cor: v.proof_cadernos.cor } : null,
+    caderno: v.proof_cadernos ? { id: v.proof_cadernos.id, titulo: v.proof_cadernos.titulo, icone: v.proof_cadernos.icone, cor: v.proof_cadernos.cor, categoria: v.proof_cadernos.categoria === "apostila" ? "apostila" : "caderno" } : null,
     pagina: v.proof_caderno_paginas ? { id: v.proof_caderno_paginas.id, titulo: v.proof_caderno_paginas.titulo, tipo: v.proof_caderno_paginas.tipo } : null,
-    href: enderecoDaPagina(v.caderno_id, v.pagina_id),
+    // a apostila abre na leitura (já renderizada); o caderno, no editor
+    href: v.proof_cadernos?.categoria === "apostila" && !v.pagina_id ? `/apostilas/${v.caderno_id}` : enderecoDaPagina(v.caderno_id, v.pagina_id),
+    paginaId: v.pagina_id,
     alvo: vivo(v),
   }));
 }

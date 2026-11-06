@@ -38,7 +38,8 @@ export default function NovoCurso() {
   const [livroId, setLivroId] = useState("");
   const [livro, setLivro] = useState(null);
   const [capitulosFora, setCapitulosFora] = useState(new Set());
-  const [comCaderno, setComCaderno] = useState(true);
+  // a estrutura do caderno só quando a pessoa pede (06/11/2026): desmarcado; dá para criar depois, na trilha
+  const [comCaderno, setComCaderno] = useState(false);
 
   // ?livro= (o botão "Gerar curso" da biblioteca e do leitor)
   useEffect(() => {
@@ -225,7 +226,7 @@ export default function NovoCurso() {
 
           <label className="curso__caderno">
             <input type="checkbox" checked={comCaderno} onChange={(e) => setComCaderno(e.target.checked)} disabled={ocupado} />
-            <span>📓 Criar também o caderno do curso — um módulo por módulo, uma página por assunto, já ligadas à trilha{fonte === "livro" ? " e às páginas do livro" : ""}</span>
+            <span>📓 Criar também a estrutura do caderno do curso (opcional) — um módulo por módulo, uma página por assunto, já ligadas à trilha{fonte === "livro" ? " e às páginas do livro" : ""}. Se preferir, dá para criar depois, na trilha.</span>
           </label>
 
           <button className="pf-botao" type="submit" disabled={ocupado || !podePropor}>
@@ -295,7 +296,7 @@ export default function NovoCurso() {
 
           <label className="curso__caderno">
             <input type="checkbox" checked={comCaderno} onChange={(e) => setComCaderno(e.target.checked)} disabled={ocupado} />
-            <span>📓 Criar também o caderno do curso</span>
+            <span>📓 Criar também a estrutura do caderno do curso (opcional — dá para criar depois, na trilha)</span>
           </label>
           <div className="pf-acoes curso__confirmar">
             <button type="button" className="pf-botao" onClick={confirmar} disabled={ocupado || resumo.assuntos < 3}>

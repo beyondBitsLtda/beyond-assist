@@ -4,11 +4,12 @@
 
 import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
+import { categoriaDoCaderno } from "@/dominio/apostila.js";
 import {
   validarCaderno, validarPagina, ordemNoFim, moverEntreIrmaos, uuidValido, anexarAoConteudo, LIMITES_DO_CADERNO,
 } from "@/dominio/cadernos.js";
 
-const CAMPOS_DO_CADERNO = "id, titulo, descricao, cor, icone, criado_em, atualizado_em";
+const CAMPOS_DO_CADERNO = "id, titulo, descricao, cor, icone, categoria, criado_em, atualizado_em";
 const CAMPOS_DA_PAGINA = "id, caderno_id, modulo_id, tipo, titulo, linguagem, ordem, versao, criado_em, atualizado_em";
 
 function falhou(error, onde) {
@@ -16,7 +17,7 @@ function falhou(error, onde) {
 }
 
 export function cadernoParaTela(c, extra = {}) {
-  return { id: c.id, titulo: c.titulo, descricao: c.descricao, cor: c.cor, icone: c.icone, criadoEm: c.criado_em, atualizadoEm: c.atualizado_em, ...extra };
+  return { id: c.id, titulo: c.titulo, descricao: c.descricao, cor: c.cor, icone: c.icone, categoria: categoriaDoCaderno(c.categoria), criadoEm: c.criado_em, atualizadoEm: c.atualizado_em, ...extra };
 }
 
 export function paginaParaTela(p, conteudo) {
@@ -73,13 +74,13 @@ export async function listarCadernos(usuarioId) {
   return cadernos.map((c) => cadernoParaTela(c, { paginas: nPaginas.get(c.id) || 0, modulos: nModulos.get(c.id) || 0, vinculos: nVinculos.get(c.id) || 0 }));
 }
 
-/** Caderno novo, já com uma página para começar a escrever. */
-export async function criarCaderno(usuarioId, bruto, { primeiraPagina = true } = {}) {
+/** Caderno novo, já com uma página para começar a escrever. `categoria`: "apostila" só pelo modo aula (src/lib/apostilas.js). */
+export async function criarCaderno(usuarioId, bruto, { primeiraPagina = true, categoria = "caderno" } = {}) {
   const v = validarCaderno(bruto);
   if (!v.ok) throw new ErroDeAcesso(400, v.erros.join("; "));
   const { count } = await supabase.from("proof_cadernos").select("id", { count: "exact", head: true }).eq("usuario_id", usuarioId);
   if ((count || 0) >= LIMITES_DO_CADERNO.cadernos) throw new ErroDeAcesso(403, `você chegou a ${LIMITES_DO_CADERNO.cadernos} cadernos — apague um que não usa mais`);
-  const { data, error } = await supabase.from("proof_cadernos").insert({ ...v.caderno, usuario_id: usuarioId }).select(CAMPOS_DO_CADERNO).single();
+  const { data, error } = await supabase.from("proof_cadernos").insert({ ...v.caderno, categoria: categoriaDoCaderno(categoria), usuario_id: usuarioId }).select(CAMPOS_DO_CADERNO).single();
   falhou(error, "criar caderno");
   let pagina = null;
   if (primeiraPagina) {

@@ -115,11 +115,54 @@ export function exercicioRepetido(novo, anteriores = []) {
   return anteriores.some((a) => sobreposicao(t, palavrasDe(`${a.titulo || ""} ${String(a.enunciado || "").slice(0, 400)}`)) >= 0.7);
 }
 
-/** O foco de cada rodada extra, para a IA ir por outro caminho (e não só "não repita"). */
+/** O foco de cada rodada extra, para a IA ir por outro caminho (e não só "não repita") — sempre no MESMO assunto. */
 export const FOCO_DA_RODADA = {
-  2: "foque em APLICAÇÃO: situações práticas, casos de uso do dia a dia e erros comuns de iniciante",
-  3: "foque em DESAFIO: leitura de código um pouco mais longo, pegadinhas, comparações entre duas formas de fazer e \"o que acontece se…\"",
+  2: "foque em APLICAÇÃO do assunto do dia: situações práticas, casos de uso do dia a dia e erros comuns de iniciante — sem sair do assunto",
+  3: "foque em DESAFIO dentro do assunto do dia: leitura de código um pouco mais longo, pegadinhas, comparações entre duas formas de fazer e \"o que acontece se…\" — sem sair do assunto",
 };
+
+// ---------------------------------------------------------------- o quiz no assunto da etapa (06/11/2026)
+// "certifique que a Lisa só pode gerar quiz do curso, coerente, e do assunto da etapa que o usuário está na
+// trilha": o pedido do quiz leva o curso, o assunto, os pontos do checklist dele, o que já veio antes (base)
+// e o que vem depois (proibido); e uma conferência descarta a pergunta que fugiu do assunto.
+
+/**
+ * O contexto do quiz de um assunto: os pontos do checklist de teoria dele, os assuntos de antes (até 6, os
+ * mais perto) e os de depois (até 8) na ordem da trilha.
+ *
+ * @param etapas   as etapas da trilha (src/dominio/avanco.js), na ordem
+ * @param assunto  a etapa do quiz ({ cardId, titulo, objetivo, descricao })
+ * @param pontos   os textos do checklist de teoria do assunto
+ */
+export function contextoDoQuiz(etapas, assunto, pontos = []) {
+  const lista = [...(etapas || [])].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+  const i = lista.findIndex((e) => String(e.cardId) === String(assunto?.cardId));
+  const titulos = (de) => de.map((e) => String(e.titulo || "").trim()).filter(Boolean);
+  return {
+    objetivo: String(assunto?.objetivo || "").trim(),
+    pontos: (pontos || []).map((p) => String(p || "").trim()).filter(Boolean).slice(0, 12),
+    antes: i > 0 ? titulos(lista.slice(Math.max(0, i - 6), i)) : [],
+    depois: i >= 0 ? titulos(lista.slice(i + 1, i + 9)) : [],
+  };
+}
+
+/** As linhas do pedido do quiz que prendem as perguntas ao assunto da etapa (e ao curso). */
+export function linhasDoContextoDoQuiz(contexto = {}) {
+  const linhas = [];
+  if (contexto.objetivo) linhas.push(`Objetivo do assunto: ${contexto.objetivo.slice(0, 300)}`);
+  if (contexto.pontos?.length) {
+    linhas.push(["Pontos do checklist de teoria deste assunto (as perguntas cobrem ESTES pontos):", ...contexto.pontos.map((p) => `- ${p.slice(0, 200)}`)].join("\n"));
+  }
+  if (contexto.antes?.length) linhas.push(`Já estudado antes na trilha (pode aparecer só como base, nunca como o foco da pergunta): ${contexto.antes.join("; ")}`);
+  if (contexto.depois?.length) linhas.push(`Vem DEPOIS na trilha — PROIBIDO perguntar sobre: ${contexto.depois.join("; ")}`);
+  return linhas;
+}
+
+/** Tira as perguntas que a conferência apontou como fora do assunto (`fora`: os índices, de 0). */
+export function semAsForaDoAssunto(perguntas, fora) {
+  const tirar = new Set(fora || []);
+  return (perguntas || []).filter((_, i) => !tirar.has(i));
+}
 
 /** Dá para abrir mais uma rodada hoje? `doDia`: os desafios deste tipo, trilha e dia. */
 export function podeAbrirRodada(tipo, doDia) {
@@ -462,6 +505,74 @@ export function codigoLegivel(codigo) {
   return t.replace(/\\r\\n|\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, "\"");
 }
 
+// As linguagens de chaves e ponto e vírgula, onde dá para refazer as linhas pelas chaves.
+const DE_CHAVES = new Set(["javascript", "js", "jsx", "typescript", "ts", "tsx", "java", "c", "cpp", "c++", "csharp", "c#", "cs", "go", "rust", "php", "swift", "kotlin", "dart", "scala", "groovy"]);
+const ehLinhaUnica = (t) => { const ls = String(t).split("\n"); return ls.length <= 3 && String(t).length > 120 || ls.some((l) => l.length > 220); };
+
+/**
+ * O código que veio numa linha só (06/11/2026: "a ajuda da Lisa deveria abrir uma IDE do tamanho da do exercício, não
+ * esse filete de código") ganha as linhas e o recuo de volta, pelas chaves: quebra depois de `{`, `;` (fora dos
+ * parênteses, para o `for` ficar inteiro) e antes de `}`. Strings, template strings e comentários passam intactos.
+ * Só nas linguagens de chaves; nas outras (Python...), o código fica como veio (a conferência pede de novo à IA).
+ */
+export function formatarCodigoEmLinha(codigo, linguagem = "") {
+  const t = String(codigo ?? "");
+  if (!ehLinhaUnica(t) || !/[{}]/.test(t)) return t;
+  if (!DE_CHAVES.has(String(linguagem).toLowerCase().trim())) return t;
+  let saida = "", nivel = 0, parenteses = 0, i = 0;
+  const novaLinha = () => { saida = saida.replace(/[ \t]+$/, ""); if (!saida.endsWith("\n")) saida += "\n"; saida += "  ".repeat(Math.max(0, nivel)); };
+  const pularEspacos = () => { while (t[i] === " " || t[i] === "\t") i++; };
+  while (i < t.length) {
+    const c = t[i];
+    if (c === "\"" || c === "'" || c === "`") {
+      let j = i + 1;
+      while (j < t.length && t[j] !== c) j += t[j] === "\\" ? 2 : 1;
+      saida += t.slice(i, j + 1);
+      i = j + 1;
+      continue;
+    }
+    if (c === "/" && t[i + 1] === "*") { const fim = t.indexOf("*/", i + 2); const ate = fim < 0 ? t.length : fim + 2; saida += t.slice(i, ate); i = ate; continue; }
+    if (c === "/" && t[i + 1] === "/") { const fim = t.indexOf("\n", i); const ate = fim < 0 ? t.length : fim; saida += t.slice(i, ate); i = ate; continue; }
+    if (c === "(" || c === "[") { parenteses++; saida += c; i++; continue; }
+    if (c === ")" || c === "]") { parenteses = Math.max(0, parenteses - 1); saida += c; i++; continue; }
+    if (c === "{") {
+      const antes = saida.replace(/[ \t]+$/, "");
+      saida = antes + (!antes || /[\n(]$/.test(antes) ? "{" : " {");
+      nivel++;
+      i++;
+      pularEspacos();
+      if (t[i] === "}") { saida += "}"; nivel--; i++; continue; } // {} vazio fica junto
+      novaLinha();
+      continue;
+    }
+    if (c === "}") {
+      nivel = Math.max(0, nivel - 1);
+      novaLinha();
+      saida += "}";
+      i++;
+      pularEspacos();
+      if (t[i] === ";" || t[i] === "," || t[i] === ")" || t[i] === "]") continue;
+      if (/^(else|catch|finally|while)\b/.test(t.slice(i))) { saida += " "; continue; }
+      if (i < t.length) novaLinha();
+      continue;
+    }
+    if (c === ";" && parenteses === 0) {
+      saida += ";";
+      i++;
+      pularEspacos();
+      if (i < t.length && t[i] !== "}") novaLinha();
+      continue;
+    }
+    if (c === "\n") { novaLinha(); i++; pularEspacos(); continue; }
+    saida += c;
+    i++;
+  }
+  return saida.replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+}
+
+/** O código do exemplo da Lisa pronto para mostrar: as quebras escapadas de volta e, se veio numa linha, as linhas refeitas. */
+export const codigoDoExemplo = (codigo, linguagem) => formatarCodigoEmLinha(codigoLegivel(codigo), linguagem);
+
 /**
  * O exemplo, conferido: os conceitos (nome e para que serve), o código (ou, fora da programação, o exemplo
  * resolvido em passos), como ele funciona e como levar a ideia para o desafio — sem resolver o desafio.
@@ -471,7 +582,9 @@ export function validarExemploDaLisa(bruto, { comCodigo = true } = {}) {
     .map((c) => ({ nome: texto(c?.nome, 80), explicacao: texto(c?.explicacao, 300) }))
     .filter((c) => c.nome && c.explicacao).slice(0, 8);
   if (conceitos.length < 1) throw new Error("a Lisa não conseguiu montar o exemplo — tente de novo");
-  const codigo = comCodigo ? semCercas(codigoLegivel(bruto?.codigo)).slice(0, 6000) : "";
+  const codigo = comCodigo ? codigoDoExemplo(semCercas(codigoLegivel(bruto?.codigo)), texto(bruto?.linguagem, 30).toLowerCase()).trim().slice(0, 6000) : "";
+  // 06/11/2026: código numa linha só que não deu para refazer (Python, por exemplo) não serve — a IA tenta de novo
+  if (comCodigo && codigo.length >= 20 && ehLinhaUnica(codigo)) throw new Error("a Lisa não conseguiu montar o exemplo — o código veio numa linha só");
   const passos = listaDeTextos(bruto?.passos, 400, 10);
   // 05/11/2026 (o projeto semanal travou em "não conseguiu montar"): o modelo às vezes manda o exemplo sem o
   // código. Com os passos, o exemplo vai em passos — melhor que erro; sem os dois, aí sim é erro.

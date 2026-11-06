@@ -10,7 +10,7 @@ import { supabase } from "./supabase.js";
 import { ErroDeAcesso } from "./sessao.js";
 import {
   registrarEvento, registrarOuMelhorar, quadroDeEstudo, trilhaDoUsuario,
-  estudouHoje, depoisDePontuar, resultadoDaPontuacao,
+  estudouHoje, depoisDePontuar, resultadoDaPontuacao, checklistsDosCards,
 } from "./estudo.js";
 import { temModelo } from "./ia.js";
 import {
@@ -31,6 +31,7 @@ import {
   complexidadeDe, podeTrocarComplexidade, TROCAS_DE_COMPLEXIDADE, podeTrocarProjeto, projetoAntigo, arquivosDoProjeto,
   temExemploDaLisa,
   exemploAindaServe,
+  contextoDoQuiz,
 } from "@/dominio/pratica.js";
 import {
   MOTORES, motorDo, corrigeNoServidor, exercicioParaTela, avaliacaoDoMotor, conferirEvidencia,
@@ -345,9 +346,13 @@ export async function obterOuCriarDesafio({ usuarioId, trilhaId, tipo, periodo, 
     if (travadas.length) {
       assuntos[0] = { ...assuntos[0], descricao: `${assuntos[0].descricao || ""}\nNo diário, a pessoa contou que travou em: ${travadas.join(" | ")}. Se couber no assunto, trabalhe isso.`.trim() };
     }
+    // o quiz fica no assunto da etapa (06/11/2026): os pontos do checklist dele, o que veio antes e o que vem depois
+    const contexto = tipo === "quiz"
+      ? contextoDoQuiz(avanco.etapas, assuntos[0], ((await checklistsDosCards([assuntos[0].cardId])).get(assuntos[0].cardId) || []).flatMap((c) => c.itens.map((i) => i.texto)))
+      : null;
     try {
       if (tipo === "quiz") {
-        conteudo = await gerarQuiz({ tema: trilha.tema, assunto: assuntos[0], anteriores, rodada, perfil });
+        conteudo = await gerarQuiz({ tema: trilha.tema, assunto: assuntos[0], anteriores, rodada, perfil, contexto });
         titulo = `Quiz${rodada > 1 ? ` ${rodada}` : ""}: ${assuntos[0].titulo}`;
       } else {
         conteudo = await gerarExercicioDoPerfil({ tema: trilha.tema, perfil, assunto: assuntos[0], evitar, anteriores, rodada, dia: hoje });

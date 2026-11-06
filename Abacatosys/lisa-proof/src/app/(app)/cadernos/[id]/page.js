@@ -442,7 +442,7 @@ export default function Caderno() {
   return (
     <div className={`cd-caderno cd-cor--${caderno.cor}${telaCheia ? " cd-caderno--cheia" : ""}${focado ? " cd-caderno--digitando" : ""}${prosaNoCelular ? " cd-caderno--prosa" : ""}`}>
       <div className="cd-topo">
-        <Link href="/cadernos" className="cd-topo__voltar" aria-label="Voltar para os cadernos">←</Link>
+        <Link href={caderno.categoria === "apostila" ? "/cadernos?categoria=apostila" : "/cadernos"} className="cd-topo__voltar" aria-label="Voltar para os cadernos">←</Link>
         <button type="button" className="cd-topo__nome" onClick={() => setPainel({ tipo: "caderno" })} title="Nome, cor e ícone do caderno">
           <span aria-hidden="true">{caderno.icone}</span>
           <span>{caderno.titulo}</span>
@@ -450,6 +450,10 @@ export default function Caderno() {
         <div className="cd-topo__chips">
           {vinculosDoCaderno.slice(0, 3).map((v) => <ChipDoAlvo key={v.id} alvo={v.alvo} />)}
         </div>
+        {/* a apostila (06/11/2026) também abre aqui, para editar; a leitura dela, já renderizada, é /apostilas/:id */}
+        {caderno.categoria === "apostila" && (
+          <Link className="pf-botao pf-botao--pequeno cd-topo__acao" href={`/apostilas/${caderno.id}`}>📘 <span className="cd-topo__rotulo">Ler a apostila</span></Link>
+        )}
         <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno cd-topo__acao" onClick={() => setPainel({ tipo: "vinculos", paginaId: ativa })}>
           🔗 <span className="cd-topo__rotulo">Vínculos</span>{vinculos.length ? ` (${vinculos.length})` : ""}
         </button>

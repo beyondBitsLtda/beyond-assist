@@ -119,6 +119,8 @@ export default function Reino() {
   const [aba, setAba] = useState("reino");
   // a ilha das Grandes Expedições à vista no mundo 3D (null = o reino)
   const [ilhaNoMundo, setIlhaNoMundo] = useState(null);
+  // a construção da ilha clicada no 3D (a visão da ilha traz o cartão dela); `n` faz o mesmo clique piscar de novo
+  const [destaqueNaIlha, setDestaqueNaIlha] = useState(null);
   // a Forja, dentro do Reino: os artefatos, a mana e o que está fazendo efeito (os selos por cima do 3D)
   const [forja, setForja] = useState(null);
   const verForja = useCallback(() => (teste ? Promise.resolve(null) : obter("/api/forja").then((d) => {
@@ -206,6 +208,25 @@ export default function Reino() {
     if (document.fullscreenElement) { pediuTelaCheiaDeVerdade.current = false; document.exitFullscreen?.().catch(() => {}); }
   }
   /** Mostra uma parte do reino: na tela cheia abre o menu dela; fora, rola até a seção. */
+  /** Abre a ilha das Grandes Expedições no mundo 3D (a visão da ilha). */
+  function verIlhaNoMundo(ilha, { semRolar = false } = {}) {
+    setVisita(null);
+    setIlhaNoMundo(ilha);
+    if (!semRolar) document.querySelector(".rn-mundo")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+  }
+  function batalhaNaIlha(r, depois) {
+    assistirNaIlha({
+      entrada: r.combate, papel: "atacante", titulo: `🏴‍☠️ ${r.ilha.nome.toUpperCase()}`,
+      resultado: { estrelas: r.estrelas, destruicao: r.destruicao, venceu: r.estrelas >= 2, saque: r.conchas },
+      aoTerminar: depois,
+    });
+  }
+  function sairDaIlha(paraSecao = null) {
+    setIlhaNoMundo(null);
+    setDestaqueNaIlha(null);
+    if (paraSecao) setTimeout(() => mostrarSecao(paraSecao), 0);
+  }
+
   function mostrarSecao(id, idDaSecao = id) {
     if (telaCheiaRef.current) { setPainel(id); return; }
     setAba(abaDaSecao(id));
@@ -536,17 +557,7 @@ export default function Reino() {
     ),
     bolsa: () => <ResumoDaBolsa bolsa={bolsa} href={teste ? "/bolsa/teste" : "/bolsa"} />,
     ilhas: () => (teste ? null : (
-      <GrandesExpedicoes ilhaNoMundo={ilhaNoMundo} aoGaragem={() => mostrarSecao("garagem")}
-        aoVerNoMundo={(ilha, { semRolar = false } = {}) => {
-          setVisita(null);
-          setIlhaNoMundo(ilha);
-          if (!semRolar) document.querySelector(".rn-mundo")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
-        }}
-        aoBatalha={(r, depois) => assistirNaIlha({
-          entrada: r.combate, papel: "atacante", titulo: `🏴‍☠️ ${r.ilha.nome.toUpperCase()}`,
-          resultado: { estrelas: r.estrelas, destruicao: r.destruicao, venceu: r.estrelas >= 2, saque: r.conchas },
-          aoTerminar: depois,
-        })} />
+      <GrandesExpedicoes ilhaNoMundo={ilhaNoMundo} aoGaragem={() => mostrarSecao("garagem")} aoVerNoMundo={verIlhaNoMundo} aoBatalha={batalhaNaIlha} />
     )),
     forja: () => (teste ? null : <ForjaDoReino dados={forja} aoRecarregar={verForja} avisar={avisar} />),
     teste: () => (
@@ -641,8 +652,17 @@ export default function Reino() {
       {!telaCheia && (
         <div className="pf-cabecalho">
           <div>
-            <h1>{teste ? `🧪 ${reino.nome}` : reino.nome}</h1>
-            <p>{teste ? "Teste tudo à vontade — nada daqui chega ao seu reino de verdade." : "Estude, ganhe moedas, construa — e defenda o seu reino."} <NomeDoReino atual={reino.nome} ocupado={ocupado === "nome"} aoSalvar={(nome) => agir("nome", { acao: "nome", nome }, () => avisar("Reino renomeado"))} /></p>
+            {ilhaNoMundo && !teste ? (
+              <>
+                <h1>{ilhaNoMundo.emoji} {ilhaNoMundo.nome}</h1>
+                <p>Tudo da ilha: as construções, a extração de conchas e pérolas, os guardas e a tripulação. Clique numa construção no 3D para ver o cartão dela.</p>
+              </>
+            ) : (
+              <>
+                <h1>{teste ? `🧪 ${reino.nome}` : reino.nome}</h1>
+                <p>{teste ? "Teste tudo à vontade — nada daqui chega ao seu reino de verdade." : "Estude, ganhe moedas, construa — e defenda o seu reino."} <NomeDoReino atual={reino.nome} ocupado={ocupado === "nome"} aoSalvar={(nome) => agir("nome", { acao: "nome", nome }, () => avisar("Reino renomeado"))} /></p>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -653,7 +673,8 @@ export default function Reino() {
       <CorreioDoReino aberta={correioAberto} aoFechar={() => { setCorreioAberto(false); contarCartas(); }} aoLer={() => setCartas(0)} />
       <ChefaoDoReino aberta={chefaoAberto} aoFechar={() => setChefaoAberto(false)} estado={chefao} />
       <VistaDoReino reino={reino} visita={visita} telaCheia={telaCheia} aoTelaCheia={entrarNaTelaCheia} cartas={cartas} chefao={chefao?.chefao || null}
-        ilha={ilhaNoMundo} aoVoltarDaIlha={() => setIlhaNoMundo(null)} forja={forja} aoAbrirForja={() => mostrarSecao("forja")}
+        ilha={ilhaNoMundo} aoVoltarDaIlha={() => sairDaIlha()} aoEscolherNaIlha={(chave) => setDestaqueNaIlha((d) => ({ chave, n: (d?.n || 0) + 1 }))}
+        forja={forja} aoAbrirForja={() => mostrarSecao("forja")}
         aoEscolher={escolherConstrucao} aoVisitar={(v) => { setIlhaNoMundo(null); visitar(v); }} aoVoltarDaVisita={() => setVisita(null)}>
         {telaCheia && (
           <TelaCheia reino={reino} painel={painel} aoPainel={setPainel} aoSair={sairDaTelaCheia} ocupado={ocupado} comTeste={teste}
@@ -663,7 +684,12 @@ export default function Reino() {
         )}
       </VistaDoReino>
 
-      {!telaCheia && (
+      {!telaCheia && ilhaNoMundo && !teste && (
+        <GrandesExpedicoes foco={ilhaNoMundo.id} destaque={destaqueNaIlha} ilhaNoMundo={ilhaNoMundo} aoVerNoMundo={verIlhaNoMundo} aoBatalha={batalhaNaIlha}
+          aoGaragem={() => sairDaIlha("garagem")} aoSairDoFoco={() => sairDaIlha()} aoArquipelago={() => sairDaIlha("ilhas")} />
+      )}
+
+      {!telaCheia && !(ilhaNoMundo && !teste) && (
         <>
           <div className="rn-numeros">
             <Numero rotulo="Moedas" valor={<Moedas n={reino.saldo} centavos />} nota={`${numero(reino.cofre.protege)} a salvo no cofre (e todas podem ser gastas)`} />
@@ -749,13 +775,16 @@ function irParaConstrucao(chave) {
  * seção ocupa a tela toda (o mundo não é montado de novo) e os menus vêm em `children`. Numa
  * visita (na paz), o mundo mostra a ilha do vizinho.
  */
-function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, cartas = null, chefao = null, ilha = null, aoVoltarDaIlha, forja = null, aoAbrirForja, aoEscolher, aoVisitar, aoVoltarDaVisita, children }) {
+function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, cartas = null, chefao = null, ilha = null, aoVoltarDaIlha, aoEscolherNaIlha, forja = null, aoAbrirForja, aoEscolher, aoVisitar, aoVoltarDaVisita, children }) {
   const [plana, setPlana] = useState(false);
   // o rosto do Neuro no mundo é o humor dele (a ofensiva de estudo): feliz, pensando, triste ou bravo
   const humor = reino.humorDoNeuro?.humor || (reino.escudoAte ? "normal" : "feliz");
   const vendo = visita && !visita.carregando ? visita : null;
   // a ilha das Grandes Expedições: o mesmo mundo, com o cenário dela e os guardas (Mundo3D, definirCenarioFixo)
   const naIlha = !vendo && ilha ? ilha : null;
+  // a extração na ilha (06/11/2026): os trabalhadores do Coqueiral e do Recife e o que está pronto para coletar
+  const nivelNaIlha = (chave) => naIlha?.construcoes.find((c) => c.chave === chave)?.nivel || 0;
+  const extracao = naIlha ? { coqueiral: nivelNaIlha("mina"), recife: nivelNaIlha("biblioteca"), conchas: naIlha.juntado?.conchas || 0, perolas: naIlha.juntado?.moedas || 0 } : null;
   return (
     <section aria-label={vendo ? `Vista do ${vendo.nome}` : "Vista do reino"} className={`rn-vista3d${telaCheia ? " rn-tela-cheia" : ""}${vendo ? " rn-vista3d--visita" : ""}`}>
       {plana ? <VistaPlana reino={reino} humor={humor} /> : (
@@ -766,7 +795,8 @@ function VistaDoReino({ reino, visita, telaCheia, aoTelaCheia, cartas = null, ch
           personagem={vendo ? vendo.personagem : undefined} soLeitura={Boolean(vendo || naIlha)}
           cartas={vendo || naIlha ? null : cartas} chefao={vendo || naIlha ? null : chefao}
           mineiros={naIlha ? 0 : vendo ? vendo.ouro?.trabalhando || 0 : reino.ouro?.equipe?.trabalhando || 0} diamantes={vendo || naIlha ? 0 : reino.ouro?.diamantes || 0}
-          humor={humor} aoEscolher={vendo || naIlha ? undefined : aoEscolher} aoVisitar={aoVisitar} aoFalhar={() => setPlana(true)} />
+          extracao={extracao}
+          humor={humor} aoEscolher={vendo ? undefined : naIlha ? aoEscolherNaIlha : aoEscolher} aoVisitar={aoVisitar} aoFalhar={() => setPlana(true)} />
       )}
       {!telaCheia && !vendo && !naIlha && <button type="button" className="rn-vista3d__cheia" onClick={aoTelaCheia}>⛶ Tela cheia</button>}
       <Visita visita={visita} aoVoltar={aoVoltarDaVisita} />
@@ -787,8 +817,11 @@ function IlhaNaVista({ ilha, aoVoltar }) {
           <span className="rn-visita__selo">🏝️ Grande Expedição</span>
           <h3>{ilha.emoji} {ilha.nome}</h3>
           <small>{ilha.nomeDoNivel} · {ilha.dono ? (ilha.dono.souEu ? "a ilha é sua" : `de ${ilha.dono.nome}`) : "dos nativos"}{defensores.length ? ` · ${defensores.reduce((s, [, n]) => s + n, 0)} de guarda` : ""}{ilha.escudoAte ? " · 🛡️ com escudo" : ""}</small>
+          {/* a extração (06/11/2026): o que a ilha produz e o que já juntou */}
+          <small style={{ display: "block" }}>⛏️ produz 🐚 {ilha.producao?.conchas || 0}/h · 🪙 {ilha.producao?.moedas || 0}/h{ilha.juntado ? ` · pronto: 🐚 ${ilha.juntado.conchas} · 🪙 ${ilha.juntado.moedas}` : ""}</small>
         </div>
         <div className="rn-visita__botoes">
+          <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={() => document.getElementById("ilha-em-foco")?.scrollIntoView({ behavior: "smooth", block: "start" })}>↓ Tudo da ilha</button>
           <button type="button" className="pf-botao pf-botao--pequeno" onClick={aoVoltar}>⬅ Meu reino</button>
         </div>
       </div>

@@ -6,6 +6,7 @@
 // de qualquer "tipo" e não precisa saber quem é tropa e quem é monstro.
 
 import { ehMonstroDePapel, svgDoMonstro, TAMANHO_DOS_MONSTROS, VOO_DOS_MONSTROS } from "./monstrosDePapel.js";
+import { DESENHOS_DA_TRIPULACAO, TAMANHO_DA_TRIPULACAO, VOO_DA_TRIPULACAO } from "./tripulacaoDePapel.js";
 
 /** Escurece (ou clareia, com fator > 1) uma cor #rrggbb. */
 function tom(hex, fator) {
@@ -213,7 +214,7 @@ const DESENHOS = {
 /** O SVG de uma tropa na cor do time. */
 export function svgDaTropa(tipo, cor) {
   if (ehMonstroDePapel(tipo)) return svgDoMonstro(tipo);
-  const desenho = DESENHOS[tipo] || DESENHOS.guerreiro;
+  const desenho = DESENHOS[tipo] || DESENHOS_DA_TRIPULACAO[tipo] || DESENHOS.guerreiro;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -12 212 212" width="424" height="424"><g ${TRACO}>${desenho(cor, tom(cor, 0.62))}</g></svg>`;
 }
 
@@ -221,6 +222,6 @@ export function svgDaTropa(tipo, cor) {
 export const TAMANHO_DO_PAPEL = {
   guerreiro: 0.95, arqueira: 0.95, bombardeiro: 0.9, mago: 1.05, gigante: 1.8, balao: 1.6, dragao: 1.9, curandeira: 1.15,
   lanceiro: 1.0, cavaleiro: 1.35, grifo: 1.5, colosso: 2.1, pirata: 0.95, arpoadora: 0.95, polvorista: 0.95, papagaio: 1.05,
-  ...TAMANHO_DOS_MONSTROS,
+  ...TAMANHO_DA_TRIPULACAO, ...TAMANHO_DOS_MONSTROS,
 };
-export const ALTURA_DE_VOO = { balao: 1.5, dragao: 1.35, curandeira: 1.2, grifo: 1.3, papagaio: 1.15, ...VOO_DOS_MONSTROS };
+export const ALTURA_DE_VOO = { balao: 1.5, dragao: 1.35, curandeira: 1.2, grifo: 1.3, papagaio: 1.15, ...VOO_DA_TRIPULACAO, ...VOO_DOS_MONSTROS };

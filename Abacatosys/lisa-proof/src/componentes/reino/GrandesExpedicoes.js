@@ -9,7 +9,7 @@ import { urlDoMonstro } from "@/componentes/reino/monstrosDePapel.js";
 import { urlDoVeiculo } from "@/componentes/reino/veiculosDePapel.js";
 import { MONSTROS } from "@/dominio/monstros.js";
 import { TROPAS } from "@/dominio/tropas.js";
-import { CONSTRUCOES_DA_ILHA } from "@/dominio/ilhas.js";
+import { CONSTRUCOES_DA_ILHA, HORAS_ATE_ENCHER_NA_ILHA, protecaoDoBau } from "@/dominio/ilhas.js";
 import { formatarMoedas } from "@/dominio/moedas.js";
 
 const quando = (iso) => new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -28,7 +28,7 @@ const DESFECHO = { conquista: "conquistou", saque: "saqueou", derrota: "não con
  * conchas e pérolas (moedas para o reino) e dispute as ilhas com os outros jogadores — a paz aqui é só por pacto
  * entre dois. As regras moram em src/dominio/ilhas.js.
  */
-export default function GrandesExpedicoes({ ilhaNoMundo = null, aoVerNoMundo, aoBatalha, aoGaragem }) {
+export default function GrandesExpedicoes({ ilhaNoMundo = null, aoVerNoMundo, aoBatalha, aoGaragem, foco = null, destaque = null, aoSairDoFoco, aoArquipelago }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [escolhida, setEscolhida] = useState(null);
@@ -80,6 +80,22 @@ export default function GrandesExpedicoes({ ilhaNoMundo = null, aoVerNoMundo, ao
   const ilha = dados?.ilhas.find((i) => i.id === escolhida) || null;
   const minhas = dados?.ilhas.filter((i) => i.dono?.souEu) || [];
   const juntado = minhas.reduce((s, i) => ({ conchas: s.conchas + (i.juntado?.conchas || 0), moedas: s.moedas + (i.juntado?.moedas || 0) }), { conchas: 0, moedas: 0 });
+
+  // a VISÃO DA ILHA (06/11/2026): com a ilha no mundo 3D, o Reino mostra só ela — tudo dela, aqui embaixo
+  if (foco) {
+    const emFoco = dados?.ilhas.find((i) => i.id === foco) || null;
+    return (
+      <>
+        {erro && <div className="pf-aviso pf-aviso--erro">{erro}</div>}
+        {!dados && !erro && <p className="pf-estat__nota">Içando as velas…</p>}
+        {dados && emFoco && (
+          <IlhaEmFoco ilha={emFoco} dados={dados} minhas={minhas} ocupado={ocupado} agir={agir} aoAtacar={atacar} destaque={destaque}
+            aoSair={aoSairDoFoco} aoArquipelago={aoArquipelago} aoGaragem={aoGaragem} />
+        )}
+        {Aviso}
+      </>
+    );
+  }
 
   return (
     <section className="pf-secao il-secao" id="grandes-expedicoes" aria-label="Grandes Expedições">
@@ -233,6 +249,150 @@ function PainelDaIlha({ ilha, ocupado, aoAtacar, agir, conchas: saldo, noMundo, 
 }
 
 /**
+ * A visão da ilha (06/11/2026: "quando eu mudar para a visão da ilha devo ver tudo relacionado à ilha, inclusive as
+ * construções e a extração de recursos"): o que ela produz e o que já juntou (com a coleta), as construções com os
+ * botões, os guardas, o ataque (se não é sua) e a tripulação. Clicar numa construção no 3D (`destaque`) traz o cartão dela.
+ */
+function IlhaEmFoco({ ilha, dados, minhas, ocupado, agir, aoAtacar, destaque, aoSair, aoArquipelago, aoGaragem }) {
+  const minha = ilha.dono?.souEu;
+  const nivel = Object.fromEntries(ilha.construcoes.map((c) => [c.chave, c.nivel]));
+  const defensores = Object.entries(ilha.defensores || {});
+  const guardas = defensores.reduce((s, [, n]) => s + n, 0);
+  const j = ilha.juntado;
+  const cheio = j ? Math.min(100, Math.round((j.horas / HORAS_ATE_ENCHER_NA_ILHA) * 100)) : 0;
+
+  // a construção clicada no 3D: o cartão dela aparece e pisca
+  useEffect(() => {
+    if (!destaque?.chave) return;
+    const el = document.getElementById(`ilha-construcao-${destaque.chave}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+    el.classList.remove("il-foco__predio--destaque");
+    void el.offsetWidth;
+    el.classList.add("il-foco__predio--destaque");
+  }, [destaque]);
+
+  return (
+    <section className="pf-secao il-foco" id="ilha-em-foco" aria-label={`Tudo da ${ilha.nome}`}>
+      <div className="il-foco__topo">
+        <span className="il-foco__emoji" aria-hidden="true">{ilha.emoji}</span>
+        <div>
+          <h2>{ilha.nome}</h2>
+          <p className="pf-estat__nota">{ilha.nomeDoNivel} · {ilha.dono ? (minha ? "a ilha é sua" : `de ${ilha.dono.nome}`) : "dos nativos"}{ilha.escudoAte ? ` · 🛡️ escudo até ${quando(ilha.escudoAte)}` : ""}{ilha.pacto ? " · 🤝 vocês têm um pacto" : ""}</p>
+        </div>
+        <div className="il-foco__voltar">
+          <button type="button" className="pf-botao pf-botao--sec pf-botao--pequeno" onClick={aoArquipelago}>🗺️ Todas as ilhas</button>
+          <button type="button" className="pf-botao pf-botao--pequeno" onClick={aoSair}>⬅ Meu reino</button>
+        </div>
+      </div>
+
+      <div className="il-faixa">
+        <div className="il-faixa__item"><span className="pf-estat__rotulo">Produção</span><strong>🐚 {ilha.producao.conchas}/h · 🪙 {ilha.producao.moedas}/h</strong></div>
+        <div className="il-faixa__item"><span className="pf-estat__rotulo">Pronto para coletar</span><strong>{j ? `🐚 ${j.conchas} · 🪙 ${j.moedas}` : "só o dono coleta"}</strong></div>
+        <div className="il-faixa__item"><span className="pf-estat__rotulo">{ilha.dono ? "Guardas" : "Nativos"}</span><strong>{guardas}</strong></div>
+        <div className="il-faixa__item"><span className="pf-estat__rotulo">Baú do Tesouro</span><strong>{nivel.cofre ? `protege 🐚 ${protecaoDoBau([{ construcoes: nivel }])}` : "não tem"}</strong></div>
+        <div className="il-faixa__item"><span className="pf-estat__rotulo">Suas conchas</span><strong>{conchas(dados.conchas)}</strong></div>
+      </div>
+
+      <h3 className="il-foco__sub">⛏️ Extração</h3>
+      <div className="il-foco__extracao">
+        <div className="pf-cartao il-foco__fonte">
+          <span className="il-foco__fonte-emoji" aria-hidden="true">🌴</span>
+          <div>
+            <strong>Coqueiral {nivel.mina ? `nv ${nivel.mina}` : "— não construído"}</strong>
+            <p className="pf-estat__nota">{nivel.mina ? `Os catadores juntam 🐚 ${ilha.producao.conchas} conchas por hora (até ${HORAS_ATE_ENCHER_NA_ILHA} h sem coletar).` : "Construa o Coqueiral para a ilha produzir conchas."}</p>
+          </div>
+        </div>
+        <div className="pf-cartao il-foco__fonte">
+          <span className="il-foco__fonte-emoji" aria-hidden="true">🦪</span>
+          <div>
+            <strong>Recife de Pérolas {nivel.biblioteca ? `nv ${nivel.biblioteca}` : "— não construído"}</strong>
+            <p className="pf-estat__nota">{nivel.biblioteca ? `Os mergulhadores trazem pérolas: 🪙 ${ilha.producao.moedas} moedas do reino por hora.` : "Construa o Recife para a ilha render moedas de verdade para o reino."}</p>
+          </div>
+        </div>
+        {minha && j && (
+          <div className="pf-cartao il-foco__coleta">
+            <div className="il-foco__barra" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={cheio} aria-label="Quanto a ilha já encheu">
+              <span style={{ width: `${cheio}%` }} />
+            </div>
+            <p className="pf-estat__nota">{String(j.horas).replace(".", ",")} h de produção juntadas{cheio >= 100 ? " — cheio: colete para a ilha voltar a produzir" : ` · enche em ${Math.max(0, HORAS_ATE_ENCHER_NA_ILHA - j.horas).toFixed(1).replace(".", ",")} h`}</p>
+            <button type="button" className="pf-botao pf-botao--pequeno" disabled={Boolean(ocupado) || (!j.conchas && !j.moedas)}
+              onClick={() => agir("coletar", { acao: "coletar" }, (r) => { comemorar(`🏝️ +🐚 ${r.conchas} e +🪙 ${r.moedas}`); return `Coletou 🐚 ${r.conchas} e 🪙 ${r.moedas} das suas ilhas`; })}>
+              ⛏️ Coletar · 🐚 {j.conchas} · 🪙 {j.moedas}
+            </button>
+            {minhas.length > 1 && <small className="pf-estat__nota">A coleta junta a produção de todas as suas ilhas.</small>}
+          </div>
+        )}
+      </div>
+
+      <h3 className="il-foco__sub">🏗️ Construções</h3>
+      <div className="il-foco__predios">
+        {ilha.construcoes.map((c) => (
+          <div key={c.chave} id={`ilha-construcao-${c.chave}`} className={`pf-cartao il-foco__predio${c.nivel ? "" : " il-foco__predio--vazio"}`}>
+            <div className="il-foco__predio-topo">
+              <span className="il-foco__predio-emoji" aria-hidden="true">{c.emoji}</span>
+              <div><strong>{c.nome}</strong><small>{c.nivel ? `nível ${c.nivel} de 5` : "não construída"}</small></div>
+            </div>
+            <p className="pf-estat__nota">{c.efeito}</p>
+            {minha && c.nivel < 5 && (
+              <>
+                <button type="button" className="pf-botao pf-botao--pequeno" disabled={!c.pode || Boolean(ocupado)} title={c.motivo || undefined}
+                  onClick={() => agir(`construir:${c.chave}`, { acao: "construir", ilha: ilha.id, chave: c.chave }, (r) => `${c.emoji} ${c.nome} no nível ${r.nivel}`)}>
+                  {c.nivel ? "Melhorar" : "Construir"} · 🐚 {c.custo}
+                </button>
+                {!c.pode && c.motivo && <small className="il-construcoes__motivo">{c.motivo}</small>}
+              </>
+            )}
+            {minha && c.nivel >= 5 && <small className="pf-estat__nota">nível máximo</small>}
+          </div>
+        ))}
+      </div>
+      {minha && dados.conchas < 300 && <p className="pf-estat__nota">Precisa de conchas? Troque moedas em 🗺️ Todas as ilhas, ou colete a produção.</p>}
+
+      {defensores.length > 0 && (
+        <>
+          <h3 className="il-foco__sub">{ilha.dono ? "🛡️ Guardas" : "🗿 Nativos"}</h3>
+          <div className="il-defensores__lista">
+            {defensores.map(([tipo, n]) => (
+              <span key={tipo} className="il-defensor" title={MONSTROS[tipo]?.nome || TROPAS[tipo]?.nome}>
+                <img src={MONSTROS[tipo] ? urlDoMonstro(tipo) : urlDaTropa(tipo)} alt="" width="40" height="40" /> {n}× {MONSTROS[tipo]?.nome || TROPAS[tipo]?.nome || tipo}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+
+      {!minha && (
+        <>
+          <h3 className="il-foco__sub">🏴‍☠️ Conquistar</h3>
+          <div className="il-painel__acoes">
+            {!dados.temNavio ? (
+              <>
+                <p className="pf-estat__nota">Para navegar até as ilhas, você precisa do {dados.navio.emoji} {dados.navio.nome} (🪙 {dados.navio.preco}).</p>
+                <button type="button" className="pf-botao pf-botao--pequeno" onClick={aoGaragem}>🚗 Ir à garagem</button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="pf-botao" disabled={!ilha.podeAtacar || Boolean(ocupado)} onClick={() => aoAtacar(ilha)}>
+                  {ocupado === `atacar:${ilha.id}` ? "Zarpando…" : ilha.dono ? `⚔️ Invadir a ilha de ${ilha.dono.nome}` : "🏴‍☠️ Zarpar e conquistar"}
+                </button>
+                {!ilha.podeAtacar && ilha.motivoDoAtaque && <p className="pf-estat__nota">{ilha.motivoDoAtaque}</p>}
+                {ilha.semTripulacao && (
+                  <PassosDaTripulacao t={dados.tripulacao} conchas={dados.conchas} moedas={dados.moedas} pacotes={dados.regras.pacotes} conchasPorMoeda={dados.regras.conchasPorMoeda} ocupado={ocupado} agir={agir} />
+                )}
+              </>
+            )}
+            <p className="pf-estat__nota">⭐⭐ (a Cabana do Chefe no chão, ou metade da ilha) conquista a ilha; ⭐ leva conchas. Quem cai na batalha sai da tripulação.</p>
+          </div>
+        </>
+      )}
+
+      <Tripulacao t={dados.tripulacao} ocupado={ocupado} agir={agir} />
+    </section>
+  );
+}
+
+/**
  * Os passos para a primeira tripulação (05/11/2026: "estou com o navio comprado, mas a opção de conquistar fica
  * desabilitada"): o navio sozinho não zarpa. Aqui mesmo, no painel da ilha: trocar moedas por conchas, treinar a
  * tripulação (piratas e arpoadoras, que o navio aceita sem Porto) e zarpar — sem precisar achar a seção lá embaixo.
@@ -288,7 +448,7 @@ function Tripulacao({ t, ocupado, agir }) {
             <img src={urlDaTropa(x.id)} alt="" width="64" height="64" />
             <div>
               <strong>{x.emoji} {x.nome}</strong> {x.tem ? <span className="pf-pilula">a bordo: {x.tem}</span> : null}
-              <p className="pf-estat__nota">{x.descricao} · ❤️ {x.vida} · 💥 {x.dano} · espaço {x.espaco}</p>
+              <p className="pf-estat__nota">{x.descricao} · ❤️ {x.vida} · {x.cura ? `💚 cura ${x.cura}` : `💥 ${x.dano}`} · espaço {x.espaco} · ⚓ Porto {x.nivelMinimo}{x.voa ? " · voa" : ""}</p>
               <div className="il-tropa__botoes">
                 <button type="button" className="pf-botao pf-botao--pequeno" disabled={!x.pode1 || Boolean(ocupado)} title={x.motivo || undefined}
                   onClick={() => agir(`treinar:${x.id}`, { acao: "treinar", tropa: x.id, quantidade: 1 }, () => `${x.emoji} +1 ${x.nome}`)}>+1 · 🐚 {x.custo}</button>
