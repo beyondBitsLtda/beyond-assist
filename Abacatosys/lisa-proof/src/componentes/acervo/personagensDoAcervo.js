@@ -5,6 +5,7 @@
 //   Doutora Íris, a Cientista        — o Observatório dos Artigos (jaleco, óculos de proteção, frasco)
 //   Mestre Tobias, o Professor       — o Auditório das Videoaulas (uma tartaruga de barba, com bengala)
 //   Pipoca, o Projecionista          — o Cinema dos Vídeos (um guaxinim de quepe, com o balde de pipoca)
+//   Bit, a Mantenedora               — a Oficina dos Repositórios (uma coruja de moletom, com o notebook)
 
 const C = "#1f2937";
 
@@ -109,6 +110,26 @@ const DESENHOS = {
     <path d="M94 84Q100 89 106 84" fill="none" stroke-width="2.5"/>
     <path d="M82 40L118 40L116 30Q100 24 84 30Z" fill="#dc2626"/>
     <path d="M80 40L120 40" fill="none" stroke="#fbbf24" stroke-width="5"/>`,
+
+  bit: () => `
+    <ellipse cx="88" cy="192" rx="10" ry="5" fill="#f59e0b"/><ellipse cx="112" cy="192" rx="10" ry="5" fill="#f59e0b"/>
+    <path d="M64 114Q64 94 100 92Q136 94 136 114L140 186L60 186Z" fill="#4f46e5"/>
+    <path d="M93 98L91 116M107 98L109 116" fill="none" stroke="#e0e7ff" stroke-width="3"/>
+    <circle cx="91" cy="118" r="2.5" fill="#e0e7ff" stroke-width="1.5"/><circle cx="109" cy="118" r="2.5" fill="#e0e7ff" stroke-width="1.5"/>
+    <rect x="62" y="122" width="76" height="48" rx="5" fill="#cbd5e1"/>
+    <circle cx="100" cy="146" r="15" fill="#0f172a"/>
+    <path d="M94 140L88 146L94 152M106 140L112 146L106 152M102 138L98 154" fill="none" stroke="#86efac" stroke-width="3"/>
+    <rect x="56" y="168" width="88" height="7" rx="3" fill="#94a3b8"/>
+    <ellipse cx="62" cy="144" rx="9" ry="14" fill="#92400e"/><ellipse cx="138" cy="144" rx="9" ry="14" fill="#92400e"/>
+    <circle cx="100" cy="62" r="38" fill="#4338ca"/>
+    <path d="M74 44L70 24L90 38Z" fill="#a16207"/><path d="M126 44L130 24L110 38Z" fill="#a16207"/>
+    <circle cx="100" cy="64" r="30" fill="#a16207"/>
+    <path d="M78 52Q100 40 122 52" fill="none" stroke="#78350f" stroke-width="3"/>
+    <circle cx="88" cy="65" r="13" fill="#fef3c7"/><circle cx="112" cy="65" r="13" fill="#fef3c7"/>
+    <circle cx="89" cy="66" r="6" fill="${C}" stroke="none"/><circle cx="111" cy="66" r="6" fill="${C}" stroke="none"/>
+    <circle cx="91" cy="64" r="2" fill="#fff" stroke="none"/><circle cx="113" cy="64" r="2" fill="#fff" stroke="none"/>
+    <path d="M95 78L105 78L100 88Z" fill="#f59e0b"/>
+    <ellipse cx="80" cy="80" rx="4.5" ry="2.8" fill="#fca5a5" fill-opacity=".6" stroke="none"/><ellipse cx="120" cy="80" rx="4.5" ry="2.8" fill="#fca5a5" fill-opacity=".6" stroke="none"/>`,
 };
 
 export const IDS_DOS_FUNCIONARIOS = Object.keys(DESENHOS);

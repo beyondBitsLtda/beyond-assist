@@ -25,7 +25,7 @@ import { PERSONAGENS } from "@/dominio/personagens.js";
 import { LIMITES_DA_BIBLIOTECA } from "@/dominio/biblioteca.js";
 import {
   TIPOS_DE_MATERIAL, ORDEM_DOS_TIPOS, ENVIOS_POR_DIA, GORJETAS, PAGAMENTO_DA_REVISAO,
-  validarMaterial, estadoDaBiblioteca, recompensaDe, podeRevisar, podeRetirar, podeAgradecer, motivoValido, videoDoLink,
+  validarMaterial, estadoDaBiblioteca, recompensaDe, podeRevisar, podeRetirar, podeAgradecer, motivoValido, videoDoLink, repositorioDoLink,
 } from "@/dominio/acervo.js";
 
 const VIDA_DO_ENDERECO = 3 * 60 * 60;
@@ -82,7 +82,8 @@ function materialParaTela(m, extra = {}) {
   return {
     id: m.id, tipo: m.tipo, titulo: m.titulo, autores: m.autores, categoria: m.categoria, assunto: m.assunto, descricao: m.descricao,
     paginas: m.paginas, tamanho: Number(m.tamanho || 0), temPdf: Boolean(m.arquivo),
-    link: m.tipo === "artigo" ? m.link : null, video: TIPOS_DE_MATERIAL[m.tipo]?.formato === "video" ? videoDoLink(m.link) : null,
+    link: m.tipo === "artigo" || m.tipo === "repositorio" ? m.link : null, video: TIPOS_DE_MATERIAL[m.tipo]?.formato === "video" ? videoDoLink(m.link) : null,
+    repositorio: m.tipo === "repositorio" ? repositorioDoLink(m.link) : null,
     status: m.status, motivo: m.motivo, recompensa: m.recompensa, enviadoEm: m.criado_em, revisadoEm: m.revisado_em, ...extra,
   };
 }

@@ -12,6 +12,7 @@ import "./bolsa.css";
 import "./dominio.css";
 import "./caderno.css";
 import "./biblioteca.css";
+import "./ereader.css";
 import "./estante.css";
 import "./acervo.css";
 import "./marca.css";

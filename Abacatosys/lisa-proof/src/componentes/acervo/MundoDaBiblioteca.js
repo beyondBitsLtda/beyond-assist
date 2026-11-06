@@ -36,7 +36,8 @@ const LOMBADAS = ["#c8332f", "#2f6fd6", "#f0be45", "#3c9356", "#8b5cf6", "#ea7a2
 
 /** O tamanho da ilha e onde fica cada construção (ângulo, em graus, a partir da frente). */
 const RAIO = 9.4;
-const ANGULO = { livro: -55, artigo: 55, videoaula: 140, video: 220 };
+// o repositório (06/11/2026) ocupa o lado vazio da ilha, entre o cinema e a torre
+const ANGULO = { livro: -55, artigo: 55, videoaula: 140, video: 220, repositorio: -100 };
 const RAIO_DAS_CONSTRUCOES = 5.5;
 const ESCALA_DAS_CONSTRUCOES = 1.35;
 const PRACA = 2.9;
@@ -453,7 +454,105 @@ function cinema(p, nivel, texturas) {
   return g;
 }
 
-const CONSTRUIR = { livro: torreDosLivros, artigo: observatorio, videoaula: auditorio, video: cinema };
+/**
+ * A Oficina dos Repositórios (06/11/2026): prédio de concreto escuro com o letreiro "</>", janelas com as
+ * linhas de código acesas e a porta de vidro; a árvore de branches na frente (os commits em bolinhas), os
+ * racks de servidor com as luzinhas do lado, e no alto a antena, a parabólica e os painéis solares.
+ */
+function oficinaDosRepositorios(p, nivel, texturas) {
+  const g = new THREE.Group();
+  const andares = nivel >= 5 ? 2 : 1;
+  const h = 1.15 * andares + nivel * 0.04;
+  const L = 2.1, P = 1.5, frente = -0.15 + P / 2;
+  g.add(p.em(p.caixa(3.0, 0.18, 2.3, COR.pedra), 0, 0.09, 0));
+  g.add(p.em(p.caixa(L, h, P, "#334155"), 0, 0.18 + h / 2, -0.15));
+  for (const x of [-L / 2, L / 2]) g.add(p.em(p.caixa(0.12, h + 0.04, 0.12, "#64748b"), x, 0.18 + h / 2, frente));
+  if (andares === 2) g.add(p.em(p.caixa(L + 0.06, 0.08, P + 0.06, "#64748b"), 0, 0.18 + 1.15, -0.15));
+  // a porta de vidro
+  g.add(p.em(p.caixa(0.62, 0.7, 0.05, "#7dd3fc", { emissive: "#0c4a6e", emissiveIntensity: 0.45 }), 0, 0.53, frente + 0.01));
+  g.add(p.em(p.caixa(0.03, 0.7, 0.06, "#94a3b8"), 0, 0.53, frente + 0.02));
+  // as janelas, com as linhas de código acesas
+  const CORES_DO_CODIGO = ["#86efac", "#c4b5fd", "#7dd3fc", "#fde68a", "#f9a8d4"];
+  for (let a = 0; a < andares; a++) {
+    const meio = 0.18 + a * 1.15 + (a === 0 ? 0.8 : 0.52);
+    for (const x of a === 0 ? [-0.68, 0.68] : [-0.62, 0, 0.62]) {
+      g.add(p.em(p.caixa(0.5, 0.42, 0.04, "#0f172a"), x, meio, frente + 0.01));
+      for (let k = 0; k < 4; k++) {
+        const larg = 0.12 + ((k * 5 + a * 3 + Math.round((x + 1) * 10)) % 4) * 0.06;
+        const cor = CORES_DO_CODIGO[(k + a + Math.round((x + 1) * 3)) % CORES_DO_CODIGO.length];
+        g.add(p.em(p.caixa(larg, 0.035, 0.02, cor, { emissive: cor, emissiveIntensity: 0.6 }), x - 0.19 + (k % 2) * 0.05 + larg / 2, meio + 0.13 - k * 0.085, frente + 0.035));
+      }
+    }
+  }
+  // a laje e o letreiro "</>"
+  const topo = 0.18 + h;
+  g.add(p.em(p.caixa(L + 0.1, 0.08, P + 0.1, "#475569"), 0, topo + 0.04, -0.15));
+  const escuro = p.mat("#1e293b");
+  const letreiro = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.42, 0.08), [escuro, escuro, escuro, escuro,
+    new THREE.MeshStandardMaterial({ map: texturas.codigo, emissive: "#ffffff", emissiveMap: texturas.codigo, emissiveIntensity: 0.7 }), escuro]);
+  letreiro.position.set(0, topo + 0.3, frente - 0.05);
+  g.add(letreiro);
+  for (const x of [-0.4, 0.4]) g.add(p.em(p.caixa(0.04, 0.12, 0.04, "#64748b"), x, topo + 0.12, frente - 0.05));
+  // a árvore de branches: o tronco (a main), um galho que sai e volta (o merge) e os commits
+  if (nivel >= 2) {
+    const arv = new THREE.Group();
+    const commit = (x, y, cor) => arv.add(p.em(p.esfera(0.07, cor, { emissive: cor, emissiveIntensity: 0.35 }), x, y, 0));
+    const galho = (x1, y1, x2, y2, cor) => {
+      const c = p.cilindro(0.025, 0.025, Math.hypot(x2 - x1, y2 - y1), cor, 6);
+      c.position.set((x1 + x2) / 2, (y1 + y2) / 2, 0);
+      c.rotation.z = -Math.atan2(x2 - x1, y2 - y1);
+      arv.add(c);
+    };
+    galho(0, 0, 0, 1.0, "#94a3b8");
+    for (const y of [0.15, 0.5, 0.9]) commit(0, y, "#86efac");
+    galho(0, 0.3, 0.3, 0.5, "#c4b5fd"); galho(0.3, 0.5, 0.3, 0.72, "#c4b5fd"); galho(0.3, 0.72, 0, 0.9, "#c4b5fd");
+    commit(0.3, 0.5, "#c4b5fd"); commit(0.3, 0.72, "#c4b5fd");
+    if (nivel >= 6) {
+      galho(0, 0.5, -0.28, 0.66, "#7dd3fc"); galho(-0.28, 0.66, -0.28, 0.98, "#7dd3fc");
+      commit(-0.28, 0.66, "#7dd3fc"); commit(-0.28, 0.98, "#7dd3fc");
+    }
+    arv.position.set(-1.05, 0.18, 0.98);
+    g.add(arv);
+  }
+  // os racks de servidor do lado, com as luzinhas
+  if (nivel >= 3) {
+    const racks = Math.min(3, 1 + Math.floor((nivel - 3) / 2));
+    for (let i = 0; i < racks; i++) {
+      const r = new THREE.Group();
+      r.add(p.em(p.caixa(0.36, 0.95, 0.42, "#1e293b"), 0, 0.475, 0));
+      for (let k = 0; k < 5; k++) {
+        r.add(p.em(p.caixa(0.28, 0.025, 0.02, "#475569"), 0, 0.15 + k * 0.16, 0.215));
+        const luz = k % 2 ? "#22c55e" : "#f59e0b";
+        r.add(p.em(p.esfera(0.022, luz, { emissive: luz, emissiveIntensity: 1.1 }, 6, 4), 0.1, 0.19 + k * 0.16, 0.22));
+      }
+      r.position.set(L / 2 + 0.27, 0.18, 0.35 - i * 0.5);
+      g.add(r);
+    }
+  }
+  let alto = topo + 0.6;
+  if (nivel >= 4) {
+    g.add(p.em(p.cilindro(0.02, 0.03, 0.9, "#94a3b8", 6), 0.7, topo + 0.45, -0.55));
+    g.add(p.em(p.esfera(0.05, "#ef4444", { emissive: "#991b1b", emissiveIntensity: 0.8 }), 0.7, topo + 0.92, -0.55));
+    const prato = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.14, 12, 1, true), p.mat("#e5e7eb", { side: THREE.DoubleSide }));
+    prato.rotation.x = Math.PI * 0.7;
+    prato.position.set(-0.6, topo + 0.35, -0.55);
+    g.add(prato);
+    alto = topo + 1.0;
+  }
+  if (nivel >= 7) {
+    for (const x of [-0.5, 0.1]) {
+      const painel = p.caixa(0.5, 0.03, 0.4, "#1d4ed8", { metalness: 0.3, roughness: 0.4 });
+      painel.position.set(x, topo + 0.2, -0.35);
+      painel.rotation.x = -0.4;
+      g.add(painel);
+    }
+  }
+  if (nivel >= 9) g.add(p.em(p.caixa(L + 0.12, 0.05, 0.05, "#a78bfa", { emissive: "#7c3aed", emissiveIntensity: 1.0 }), 0, topo + 0.09, frente + 0.03));
+  g.userData.altura = alto;
+  return g;
+}
+
+const CONSTRUIR = { livro: torreDosLivros, artigo: observatorio, videoaula: auditorio, video: cinema, repositorio: oficinaDosRepositorios };
 
 // ------------------------------------------------------------------ o componente
 
@@ -498,7 +597,11 @@ export default function MundoDaBiblioteca({ estado, contribuidores = [], aoEscol
     cena.add(contraluz);
 
     const p = criarPecas();
-    const texturas = { cine: texturaDeTexto("CINE", { largura: 128, alturaT: 384, fonte: "bold 92px Georgia, serif" }), cachoeira: texturaDaCachoeira() };
+    const texturas = {
+      cine: texturaDeTexto("CINE", { largura: 128, alturaT: 384, fonte: "bold 92px Georgia, serif" }), cachoeira: texturaDaCachoeira(),
+      // o letreiro da Oficina dos Repositórios
+      codigo: texturaDeTexto("</>", { cor: "#86efac", fundo: "#0f172a", largura: 256, alturaT: 96, fonte: "bold 68px ui-monospace, Consolas, monospace" }),
+    };
     // o "CINE" na vertical: uma letra embaixo da outra
     {
       const c = texturas.cine.image;

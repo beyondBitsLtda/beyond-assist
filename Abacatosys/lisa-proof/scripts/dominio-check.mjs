@@ -75,7 +75,7 @@ import { projetar, humorDoDia, avaliar, relatorioDaMesa, notaPeloErro, pctDaFala
 import { svgDoConsultor } from "../src/componentes/bolsa/consultoresDePapel.js";
 import {
   TIPOS_DE_MATERIAL, ORDEM_DOS_TIPOS, CONSTRUCOES_DO_ACERVO, CATEGORIAS_DO_ACERVO, GORJETAS, nivelDaConstrucao, nivelDaBiblioteca, recompensaDe,
-  estadoDaBiblioteca, videoDoLink, linkValido, validarMaterial, podeRevisar, podeRetirar, podeAgradecer, motivoValido,
+  estadoDaBiblioteca, videoDoLink, linkValido, validarMaterial, podeRevisar, podeRetirar, podeAgradecer, motivoValido, repositorioDoLink,
 } from "../src/dominio/acervo.js";
 import { svgDoFuncionario } from "../src/componentes/acervo/personagensDoAcervo.js";
 import { centavos, formatarMoedas, faltam } from "../src/dominio/moedas.js";
@@ -160,6 +160,7 @@ import * as cadernosDom from "../src/dominio/cadernos.js";
 import * as praticaDom from "../src/dominio/pratica.js";
 import * as correioDom from "../src/dominio/correio.js";
 import * as markdownDom from "../src/dominio/markdown.js";
+import * as ereader from "../src/dominio/ereader.js";
 
 let passou = 0;
 function caso(nome, fn) {
@@ -2386,9 +2387,9 @@ caso("consultores: a previsão hora a hora vai da abertura ao fechamento projeta
 
 const HASH_DE_TESTE = "a".repeat(64);
 
-caso("acervo: quatro tipos, cada um com a sua construção e quem cuida dela", () => {
-  assert.deepEqual(ORDEM_DOS_TIPOS, ["livro", "artigo", "videoaula", "video"]);
-  assert.deepEqual(ORDEM_DOS_TIPOS.map((t) => TIPOS_DE_MATERIAL[t].recompensa), [300, 250, 150, 120], "o livro vale mais que o vídeo");
+caso("acervo: cinco tipos, cada um com a sua construção e quem cuida dela", () => {
+  assert.deepEqual(ORDEM_DOS_TIPOS, ["livro", "artigo", "videoaula", "video", "repositorio"]);
+  assert.deepEqual(ORDEM_DOS_TIPOS.map((t) => TIPOS_DE_MATERIAL[t].recompensa), [300, 250, 150, 120, 200], "o livro vale mais que o vídeo");
   for (const t of ORDEM_DOS_TIPOS) {
     const c = CONSTRUCOES_DO_ACERVO[t];
     assert.ok(c.nome && c.personagem.nome && c.personagem.cargo, t);
@@ -2462,6 +2463,98 @@ caso("acervo: o que vale como envio (e o que acusa duplicado)", () => {
   assert.match(validarMaterial({ ...base, tipo: "inventado" }).erros.join(), /tipo/);
   assert.equal(validarMaterial({ ...base, tipo: "livro", pdf, capa: "data:text/html;base64,AAAA" }).material.capa, null, "capa só de imagem");
   assert.equal(validarMaterial({ ...base, tipo: "livro", pdf, capa: "data:image/jpeg;base64,AAAA" }).material.capa, "data:image/jpeg;base64,AAAA");
+});
+
+caso("acervo 1.12.0: repositórios por link (GitHub, GitLab, Bitbucket e Codeberg)", () => {
+  const r = repositorioDoLink("https://github.com/vercel/next.js/tree/canary/packages/next");
+  assert.deepEqual(r, {
+    plataforma: "github", nomeDaPlataforma: "GitHub", dono: "vercel", nome: "next.js", caminho: "vercel/next.js", url: "https://github.com/vercel/next.js",
+    clonar: "git clone https://github.com/vercel/next.js.git", miniatura: "https://opengraph.githubassets.com/1/vercel/next.js",
+  }, "a página de dentro vira a raiz do repositório");
+  assert.equal(repositorioDoLink("https://github.com/vercel/next.js.git").url, "https://github.com/vercel/next.js", "o link de clone");
+  assert.equal(repositorioDoLink("https://www.github.com/vercel/next.js?tab=readme").url, "https://github.com/vercel/next.js");
+  const lab = repositorioDoLink("https://gitlab.com/grupo/subgrupo/projeto/-/merge_requests/3");
+  assert.deepEqual([lab.dono, lab.nome, lab.url, lab.miniatura], ["grupo/subgrupo", "projeto", "https://gitlab.com/grupo/subgrupo/projeto", null], "o GitLab com subgrupo");
+  assert.equal(repositorioDoLink("https://bitbucket.org/equipe/app/src/main/").url, "https://bitbucket.org/equipe/app");
+  assert.equal(repositorioDoLink("https://codeberg.org/forgejo/forgejo").nomeDaPlataforma, "Codeberg");
+  for (const ruim of ["https://github.com/vercel", "https://github.com/settings/profile", "https://github.com/topics/javascript", "http://github.com/a/b",
+    "https://exemplo.com/a/b", "https://github.com/a/%E0%A4%A", "javascript:alert(1)", "", null]) {
+    assert.equal(repositorioDoLink(ruim), null, String(ruim));
+  }
+  const base = { titulo: "Next.js", categoria: "Programação", assunto: "react" };
+  const v = validarMaterial({ ...base, tipo: "repositorio", link: "https://github.com/Vercel/Next.js/tree/canary" });
+  assert.equal(v.ok, true, v.erros?.join("; "));
+  assert.equal(v.chave, "repo:github:vercel/next.js", "o mesmo repositório é duplicado, com qualquer título e página");
+  assert.equal(v.material.link, "https://github.com/Vercel/Next.js", "guarda a raiz do repositório");
+  assert.match(validarMaterial({ ...base, tipo: "repositorio", link: "https://youtu.be/dQw4w9WgXcQ" }).erros.join(), /GitHub, GitLab, Bitbucket ou Codeberg/);
+  assert.equal(recompensaDe("repositorio", 1), 200);
+  assert.equal(CONSTRUCOES_DO_ACERVO.repositorio.personagem.id, "bit");
+
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.match(ler("../db/039-acervo-repositorios.sql"), /check \(tipo in \('livro', 'artigo', 'videoaula', 'video', 'repositorio'\)\)/, "o banco aceita o tipo novo");
+  const mundo = ler("../src/componentes/acervo/MundoDaBiblioteca.js");
+  assert.ok(mundo.includes("repositorio: oficinaDosRepositorios") && mundo.includes("repositorio: -100"), "a Oficina na ilha, no lado vazio");
+  const tela = ler("../src/componentes/acervo/TelaDoAcervo.js");
+  assert.ok(tela.includes("<Clonar comando={m.repositorio.clonar} />") && tela.includes("Abrir no ${m.repositorio.nomeDaPlataforma}"), "a ficha abre na plataforma e mostra o clone");
+  assert.ok(ler("../src/lib/acervo.js").includes("repositorio: m.tipo === \"repositorio\" ? repositorioDoLink(m.link) : null"));
+});
+
+caso("biblioteca 1.12.0: o modo leitura (o livro aberto, uma ou duas páginas, a folha que vira)", () => {
+  const { vistasDoLivro, vistaDaPagina, paginaDaVista, layoutDoLivro, anguloDoArrasto, progressoDoAngulo, deveVirar, suavizar, duracaoDaVirada, capituloDaPagina, rodapeDaLeitura } = ereader;
+  // as vistas: uma página; ou duas, com a capa sozinha à direita, como um livro aberto
+  assert.deepEqual(vistasDoLivro(3, false), [[1], [2], [3]]);
+  assert.deepEqual(vistasDoLivro(5, true), [[null, 1], [2, 3], [4, 5]]);
+  assert.deepEqual(vistasDoLivro(6, true), [[null, 1], [2, 3], [4, 5], [6, null]], "a última pode ficar sem a da direita");
+  assert.deepEqual(vistasDoLivro(0, true), []);
+  for (const [n, v] of [[1, 0], [2, 1], [3, 1], [4, 2], [6, 3]]) assert.equal(vistaDaPagina(n, 6, true), v, `página ${n}`);
+  assert.equal(vistaDaPagina(4, 6, false), 3);
+  assert.equal(vistaDaPagina(99, 6, false), 5, "página fora do livro vai para a última");
+  assert.equal(paginaDaVista([null, 1]), 1);
+  assert.equal(paginaDaVista([8, 9]), 8);
+  // o tamanho: celular e tablet de pé, uma página; tablet deitado e computador, duas
+  const celular = layoutDoLivro({ largura: 390, altura: 760, proporcao: 0.7 });
+  assert.equal(celular.duas, false);
+  assert.ok(celular.pagina.largura <= 390 - 20 && celular.pagina.altura <= 760 - 28, "cabe na tela do celular");
+  const computador = layoutDoLivro({ largura: 1440, altura: 820, proporcao: 0.7 });
+  assert.equal(computador.duas, true);
+  assert.equal(computador.livro.largura, computador.pagina.largura * 2);
+  assert.ok(computador.pagina.altura <= 820 - 60);
+  assert.equal(layoutDoLivro({ largura: 820, altura: 1180, proporcao: 0.7 }).duas, false, "tablet de pé: uma página");
+  assert.equal(layoutDoLivro({ largura: 1180, altura: 820, proporcao: 0.7 }).duas, true, "tablet deitado: duas");
+  assert.equal(layoutDoLivro({ largura: 1440, altura: 820, proporcao: 0.7, preferencia: "uma" }).duas, false, "a pessoa escolhe uma");
+  assert.equal(layoutDoLivro({ largura: 700, altura: 900, proporcao: 0.7, preferencia: "duas" }).duas, true, "ou duas");
+  // a folha segue o dedo: a borda dela fica embaixo do dedo
+  assert.equal(Math.round(anguloDoArrasto({ direcao: "frente", x: 1000, lombada: 600, larguraDaPagina: 400 })), 0, "o dedo na borda: a folha deitada");
+  assert.equal(Math.round(anguloDoArrasto({ direcao: "frente", x: 600, lombada: 600, larguraDaPagina: 400 })), -90, "o dedo na lombada: a folha em pé");
+  assert.equal(Math.round(anguloDoArrasto({ direcao: "frente", x: 100, lombada: 600, larguraDaPagina: 400 })), -180, "passou da outra página: virou");
+  assert.equal(Math.round(anguloDoArrasto({ direcao: "tras", x: 400, lombada: 600, larguraDaPagina: 400 })), 60);
+  assert.equal(progressoDoAngulo(-90), 0.5);
+  assert.equal(deveVirar({ progresso: 0.6, velocidade: 0, direcao: "frente" }), true, "passou da metade");
+  assert.equal(deveVirar({ progresso: 0.2, velocidade: -0.8, direcao: "frente" }), true, "um puxão rápido vira");
+  assert.equal(deveVirar({ progresso: 0.7, velocidade: 0.8, direcao: "frente" }), false, "puxou de volta: não vira");
+  assert.equal(deveVirar({ progresso: 0.3, velocidade: 0, direcao: "tras" }), false);
+  assert.deepEqual([suavizar(0), suavizar(0.5), suavizar(1)], [0, 0.5, 1]);
+  assert.ok(duracaoDaVirada(1) > duracaoDaVirada(0.2) && duracaoDaVirada(1) <= 600);
+  // o rodapé: a página, o total e quanto falta para o capítulo acabar
+  const sumario = [{ titulo: "1. Começo", pagina: 3, nivel: 1 }, { titulo: "1.1 Parte", pagina: 5, nivel: 2 }, { titulo: "2. Meio", pagina: 10, nivel: 1 }];
+  assert.deepEqual(capituloDaPagina(sumario, 6, 40), { titulo: "1. Começo", faltam: 3 });
+  assert.deepEqual(capituloDaPagina(sumario, 9, 40), { titulo: "1. Começo", faltam: 0 });
+  assert.deepEqual(capituloDaPagina(sumario, 12, 40), { titulo: "2. Meio", faltam: 28 });
+  assert.equal(capituloDaPagina(sumario, 1, 40), null, "antes do primeiro capítulo");
+  assert.equal(capituloDaPagina([], 5, 40), null);
+  assert.equal(rodapeDaLeitura({ pagina: 6, total: 40, capitulo: { titulo: "x", faltam: 3 } }), "Página 6 de 40 · faltam 3 páginas neste capítulo");
+  assert.equal(rodapeDaLeitura({ pagina: 9, total: 40, capitulo: { titulo: "x", faltam: 0 } }), "Página 9 de 40 · última página do capítulo");
+  assert.equal(rodapeDaLeitura({ pagina: 1, total: 40, capitulo: null }), "Página 1 de 40");
+
+  const ler = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const leitor = ler("../src/componentes/biblioteca/LeitorDePdf.js");
+  assert.ok(leitor.includes("<LeitorLivro") && leitor.includes("onClick={abrirModoLivro}"), "o botão do modo leitura no leitor");
+  assert.ok(leitor.includes("if (modoLivroRef.current) return;"), "o teclado do leitor não briga com o do modo leitura");
+  assert.ok(leitor.includes('modo: "livro", ...JSON.parse('), "quem abre a primeira vez começa no modo leitura");
+  const livro = ler("../src/componentes/biblioteca/LeitorLivro.js");
+  assert.ok(livro.includes("transform: `rotateY(${folha.angulo}deg)`") && livro.includes("er-face--verso"), "a folha vira em 3D, com o verso");
+  assert.ok(livro.includes('onPointerDown={aoBaixar}') && livro.includes("ponteiros.current.size === 2"), "o dedo vira a folha, e a pinça amplia");
+  assert.ok(ler("../src/app/layout.js").includes('import "./ereader.css";'));
 });
 
 caso("acervo: quem revisa, quem retira e quem agradece", () => {

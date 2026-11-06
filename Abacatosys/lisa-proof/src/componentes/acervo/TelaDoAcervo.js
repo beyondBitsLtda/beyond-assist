@@ -2,7 +2,7 @@
 
 // A TELA DA BIBLIOTECA COLABORATIVA (26/10/2026). Redesenhada no mesmo dia ("melhore a interface
 // muito mesmo"): o mundo 3D grande no alto, com um painel flutuante do nível; uma faixa com as
-// quatro construções (o nível de cada uma, a barra até o próximo e quanto vale agora); e o acervo em
+// construções (cinco desde 06/11/2026: o nível de cada uma, a barra até o próximo e quanto vale agora); e o acervo em
 // PRATELEIRAS, como numa loja de filmes — "Chegaram agora" e uma prateleira por tipo — com cartões de
 // capa grande. Procurando ou filtrando, as prateleiras viram uma grade. Clicar num cartão abre a
 // FICHA do material (capa, quem trouxe, as ações e a gorjeta).
@@ -10,7 +10,8 @@
 // Ler um PDF do acervo é "levar para a minha biblioteca": o livro entra na estante da pessoa
 // apontando para o mesmo arquivo e abre no leitor de sempre. Vídeo: assistir aqui mesmo ou no MODO
 // CINEMA (SalaDeCinema.js), uma sala 3D com a turma da biblioteca nas poltronas. Artigo por link
-// abre na fonte.
+// abre na fonte. Repositório (06/11/2026: GitHub, GitLab, Bitbucket ou Codeberg) abre na plataforma, com
+// o comando de clonar para copiar; o do GitHub tem a capa que o próprio GitHub gera.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
@@ -22,7 +23,7 @@ import { formatarMoedas } from "@/dominio/moedas.js";
 import { formatarTamanho } from "@/dominio/biblioteca.js";
 import {
   TIPOS_DE_MATERIAL, ORDEM_DOS_TIPOS, CONSTRUCOES_DO_ACERVO, CATEGORIAS_DO_ACERVO, LIMITES_DO_ACERVO,
-  NIVEIS_DA_BIBLIOTECA, NIVEIS_DA_CONSTRUCAO, videoDoLink, linkValido,
+  NIVEIS_DA_BIBLIOTECA, NIVEIS_DA_CONSTRUCAO, videoDoLink, linkValido, repositorioDoLink,
 } from "@/dominio/acervo.js";
 import { abrirPdf, sumarioDoPdf, metadadosDoPdf, capaDoPdf, enviarTextoDoLivro, enviarArquivo } from "@/componentes/biblioteca/pdf.js";
 import { urlDoFuncionario } from "./personagensDoAcervo.js";
@@ -74,15 +75,25 @@ function capaDaImagem(arquivo) {
 /** A capa: a imagem guardada; o vídeo com a miniatura sobre ela mesma desfocada; ou o ícone do tipo. */
 function Capa({ m, fonte: fonteDada, grande = false }) {
   const [falhou, setFalhou] = useState(false);
-  const fonte = fonteDada ?? (m.video?.miniatura || (m.id ? `/api/acervo/${m.id}/capa` : null));
+  const fonte = fonteDada ?? (m.video?.miniatura || m.repositorio?.miniatura || (m.id ? `/api/acervo/${m.id}/capa` : null));
   const classe = `ac-capa ac-capa--${m.tipo}${grande ? " ac-capa--grande" : ""}`;
-  if (!fonte || falhou) return <span className={classe} aria-hidden="true"><span className="ac-capa__icone">{TIPOS_DE_MATERIAL[m.tipo].icone}</span></span>;
-  if (m.video || TIPOS_DE_MATERIAL[m.tipo].formato === "video") {
+  if (!fonte || falhou) {
+    return (
+      <span className={classe} aria-hidden="true">
+        <span className="ac-capa__icone">{TIPOS_DE_MATERIAL[m.tipo].icone}</span>
+        {/* o repositório sem imagem: o caminho dele, como no terminal */}
+        {m.repositorio && <span className="ac-capa__repo">{m.repositorio.nomeDaPlataforma}<br />{m.repositorio.caminho}</span>}
+      </span>
+    );
+  }
+  // o vídeo e o repositório do GitHub: a imagem larga sobre ela mesma desfocada (o vídeo leva o ▶)
+  const repoComImagem = Boolean(m.repositorio?.miniatura && fonte === m.repositorio.miniatura);
+  if (m.video || TIPOS_DE_MATERIAL[m.tipo].formato === "video" || repoComImagem) {
     return (
       <span className={`${classe} ac-capa--filme`}>
         <img className="ac-capa__fundo" src={fonte} alt="" aria-hidden="true" loading="lazy" />
         <img className="ac-capa__miniatura" src={fonte} alt="" loading="lazy" onError={() => setFalhou(true)} />
-        <span className="ac-capa__play" aria-hidden="true">▶</span>
+        {!repoComImagem && <span className="ac-capa__play" aria-hidden="true">▶</span>}
       </span>
     );
   }
@@ -99,7 +110,7 @@ function Cartao({ m, aoAbrir, previa = false }) {
   return (
     <Corpo {...(previa ? {} : { type: "button", onClick: () => aoAbrir(m) })} className={`ac-cartao ac-cartao--${m.tipo}${previa ? " ac-cartao--previa" : ""}`} aria-label={previa ? undefined : `${t.nome}: ${m.titulo}`}>
       <span className="ac-cartao__capa">
-        <Capa m={m} fonte={previa ? m.capaDaPrevia || m.video?.miniatura || null : undefined} />
+        <Capa m={m} fonte={previa ? m.capaDaPrevia || m.video?.miniatura || m.repositorio?.miniatura || null : undefined} />
         <span className="ac-cartao__selo">{t.icone} {t.nome}</span>
         {m.naMinhaBiblioteca && <span className="ac-cartao__estante">📖 na estante</span>}
       </span>
@@ -252,7 +263,7 @@ export default function TelaDoAcervo() {
       <header className="ac-topo">
         <div>
           <h1>Biblioteca Colaborativa</h1>
-          <p>Traga livros, artigos e vídeos para todos: o bibliotecário confere, você ganha moedas e a biblioteca cresce.</p>
+          <p>Traga livros, artigos, vídeos e repositórios para todos: o bibliotecário confere, você ganha moedas e a biblioteca cresce.</p>
         </div>
         <div className="ac-topo__acoes">
           <span className="ac-saldo" title="as suas moedas do Reino">{moedas(dados.saldo)}</span>
@@ -386,7 +397,7 @@ export default function TelaDoAcervo() {
             <button type="button" className="ac-vazio" onClick={() => setAba("trazer")}>
               <span aria-hidden="true">🏛️</span>
               <strong>O acervo ainda está vazio</strong>
-              <span>Seja a primeira pessoa a trazer um livro, um artigo ou um vídeo — e ganhe moedas quando o bibliotecário aprovar.</span>
+              <span>Seja a primeira pessoa a trazer um livro, um artigo, um vídeo ou um repositório — e ganhe moedas quando o bibliotecário aprovar.</span>
             </button>
           ) : filtrando ? (
             materiais.length ? (
@@ -474,6 +485,7 @@ function Ficha({ m, saldo, gorjetas, souBibliotecario, aoFechar, aoLer, aoAssist
           <dl className="ac-ficha__dados">
             {m.paginas > 0 && <div><dt>Páginas</dt><dd>{m.paginas}</dd></div>}
             {m.tamanho > 0 && <div><dt>Tamanho</dt><dd>{formatarTamanho(m.tamanho)}</dd></div>}
+            {m.repositorio && <div><dt>Onde</dt><dd>{m.repositorio.nomeDaPlataforma} · {m.repositorio.caminho}</dd></div>}
             {m.revisadoEm && <div><dt>No acervo desde</dt><dd>{new Date(m.revisadoEm).toLocaleDateString("pt-BR")}</dd></div>}
             <div><dt>Agradecimentos</dt><dd>🙏 {m.gorjetas.quantos}{m.gorjetas.moedas ? ` · ${moedas(m.gorjetas.moedas)}` : ""}</dd></div>
           </dl>
@@ -481,8 +493,13 @@ function Ficha({ m, saldo, gorjetas, souBibliotecario, aoFechar, aoLer, aoAssist
             {m.temPdf && <button type="button" className="pf-botao" onClick={() => aoLer(m)}>{m.naMinhaBiblioteca ? "📖 Abrir na minha biblioteca" : "📖 Ler na minha biblioteca"}</button>}
             {m.video && <button type="button" className="pf-botao" onClick={() => aoCinema(m)}>🎬 Assistir no Modo cinema</button>}
             {m.video && <button type="button" className="pf-botao pf-botao--sec" onClick={() => aoAssistir(m)}>▶ Assistir aqui</button>}
-            {m.link && !m.temPdf && <a className="pf-botao" href={m.link} target="_blank" rel="noopener noreferrer">🔗 Abrir o artigo</a>}
+            {m.link && !m.temPdf && (
+              <a className="pf-botao" href={m.link} target="_blank" rel="noopener noreferrer">
+                {m.repositorio ? `💻 Abrir no ${m.repositorio.nomeDaPlataforma}` : "🔗 Abrir o artigo"}
+              </a>
+            )}
           </div>
+          {m.repositorio && <Clonar comando={m.repositorio.clonar} />}
           <div className="ac-ficha__quem">
             <Neuro personagem={m.autor.personagem} humor="feliz" tamanho={58} />
             <div>
@@ -509,9 +526,28 @@ function Ficha({ m, saldo, gorjetas, souBibliotecario, aoFechar, aoLer, aoAssist
   );
 }
 
+/** O comando de clonar o repositório, para copiar com um toque. */
+function Clonar({ comando }) {
+  const [copiado, setCopiado] = useState(false);
+  async function copiar() {
+    try { await navigator.clipboard.writeText(comando); setCopiado(true); setTimeout(() => setCopiado(false), 1800); } catch { /* sem permissão: dá para selecionar o texto */ }
+  }
+  return (
+    <div className="ac-clonar">
+      <span className="pf-campo__rotulo">Clonar no seu computador</span>
+      <div className="ac-clonar__linha">
+        <code>{comando}</code>
+        <button type="button" onClick={copiar}>{copiado ? "✓ Copiado" : "📋 Copiar"}</button>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- trazer material
 
 const VAZIO = { tipo: "livro", titulo: "", autores: "", categoria: "", assunto: "", descricao: "", link: "", modoDoArtigo: "pdf" };
+const ROTULO_DO_LINK = { video: "Link do vídeo (YouTube ou Vimeo)", repositorio: "Link do repositório (GitHub, GitLab, Bitbucket ou Codeberg)" };
+const EXEMPLO_DO_LINK = { video: "https://www.youtube.com/watch?v=…", repositorio: "https://github.com/dono/projeto" };
 
 function Trazer({ dados, avisar, aoEnviar }) {
   const [f, setF] = useState(VAZIO);
@@ -522,7 +558,13 @@ function Trazer({ dados, avisar, aoEnviar }) {
   const def = TIPOS_DE_MATERIAL[f.tipo];
   const usaPdf = def.formato === "pdf" || (def.formato === "pdf-ou-link" && f.modoDoArtigo === "pdf");
   const video = def.formato === "video" ? videoDoLink(f.link) : null;
+  const repositorio = def.formato === "repositorio" ? repositorioDoLink(f.link) : null;
   const mudar = (campo, valor) => setF((x) => ({ ...x, [campo]: valor }));
+  // o link do repositório já diz o nome e o dono: preenche o que ainda está vazio
+  function mudarLink(valor) {
+    const r = def.formato === "repositorio" ? repositorioDoLink(valor) : null;
+    setF((x) => ({ ...x, link: valor, ...(r ? { titulo: x.titulo || r.nome, autores: x.autores || r.dono } : {}) }));
+  }
   const restantes = Math.max(0, dados.envios.porDia - dados.envios.hoje);
 
   async function escolherPdf(a) {
@@ -583,8 +625,9 @@ function Trazer({ dados, avisar, aoEnviar }) {
     return undefined;
   }
 
-  const capaVista = capaPropria || (usaPdf ? leitura?.capa : null) || video?.miniatura || null;
-  const previa = { tipo: f.tipo, titulo: f.titulo, autores: f.autores, categoria: f.categoria, video, capaDaPrevia: capaVista };
+  const capaVista = capaPropria || (usaPdf ? leitura?.capa : null) || video?.miniatura || repositorio?.miniatura || null;
+  const previa = { tipo: f.tipo, titulo: f.titulo, autores: f.autores, categoria: f.categoria, video, repositorio, capaDaPrevia: capaVista };
+  const capaAutomatica = def.formato === "video" || Boolean(repositorio?.miniatura); // a do vídeo e a do GitHub
   return (
     <form className="ac-trazer" onSubmit={enviar}>
       <div className="ac-trazer__passo">
@@ -621,10 +664,12 @@ function Trazer({ dados, avisar, aoEnviar }) {
             </label>
           ) : (
             <label className="pf-campo">
-              <span className="pf-campo__rotulo">{def.formato === "video" ? "Link do vídeo (YouTube ou Vimeo)" : "Link do artigo (DOI ou página)"}</span>
-              <input className="pf-campo__entrada" type="url" inputMode="url" placeholder="https://" value={f.link} onChange={(e) => mudar("link", e.target.value)} required />
+              <span className="pf-campo__rotulo">{ROTULO_DO_LINK[def.formato] || "Link do artigo (DOI ou página)"}</span>
+              <input className="pf-campo__entrada" type="url" inputMode="url" placeholder={EXEMPLO_DO_LINK[def.formato] || "https://"} value={f.link} onChange={(e) => mudarLink(e.target.value)} required />
               {f.link && def.formato === "video" && !video && <small className="ac-erro">Esse link não é de um vídeo do YouTube ou do Vimeo.</small>}
-              {f.link && def.formato !== "video" && !linkValido(f.link) && <small className="ac-erro">Esse link não parece válido.</small>}
+              {f.link && def.formato === "repositorio" && !repositorio && <small className="ac-erro">Esse link não é de um repositório do GitHub, GitLab, Bitbucket ou Codeberg (o endereço precisa ter o dono e o nome do projeto).</small>}
+              {repositorio && <small className="ac-ok">✓ {repositorio.nomeDaPlataforma} · {repositorio.caminho}</small>}
+              {f.link && def.formato !== "video" && def.formato !== "repositorio" && !linkValido(f.link) && <small className="ac-erro">Esse link não parece válido.</small>}
             </label>
           )}
           <div className="ac-trazer__passo">
@@ -636,7 +681,7 @@ function Trazer({ dados, avisar, aoEnviar }) {
             <input className="pf-campo__entrada" value={f.titulo} maxLength={LIMITES_DO_ACERVO.titulo} onChange={(e) => mudar("titulo", e.target.value)} required minLength={3} />
           </label>
           <label className="pf-campo">
-            <span className="pf-campo__rotulo">{f.tipo === "artigo" ? "Autores e revista" : def.formato === "video" ? "Canal ou professor" : "Autor(es)"}</span>
+            <span className="pf-campo__rotulo">{f.tipo === "artigo" ? "Autores e revista" : def.formato === "video" ? "Canal ou professor" : def.formato === "repositorio" ? "Dono ou organização" : "Autor(es)"}</span>
             <input className="pf-campo__entrada" value={f.autores} maxLength={LIMITES_DO_ACERVO.autores} onChange={(e) => mudar("autores", e.target.value)} />
           </label>
           <div className="ac-trazer__dupla">
@@ -661,13 +706,15 @@ function Trazer({ dados, avisar, aoEnviar }) {
         <aside className="ac-trazer__previa" aria-label="Como vai aparecer no acervo">
           <span className="pf-campo__rotulo">Como vai aparecer</span>
           <Cartao m={previa} previa />
-          {def.formato !== "video" && (
+          {!capaAutomatica && (
             <label className="ac-arquivo ac-arquivo--pequeno">
               <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => { escolherCapa(e.target.files?.[0]); e.target.value = ""; }} />
               <span>🖼️ {capaPropria ? "Trocar a imagem da capa" : usaPdf ? "Usar outra capa (a padrão é a 1ª página)" : "Escolher uma capa"}</span>
             </label>
           )}
           {def.formato === "video" && <small className="ac-ajuda">A capa é a miniatura do vídeo.</small>}
+          {repositorio?.miniatura && <small className="ac-ajuda">A capa é a imagem que o GitHub gera para o repositório.</small>}
+          {def.formato === "repositorio" && <small className="ac-ajuda">Só repositório público: o bibliotecário abre o link para conferir antes de aprovar.</small>}
           <small className="ac-ajuda">Aprovado, vale <strong>{moedas(dados.biblioteca.recompensas[f.tipo])}</strong> para você.</small>
         </aside>
       </div>

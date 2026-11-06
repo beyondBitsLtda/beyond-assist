@@ -9,14 +9,45 @@
     "responsavel": "Brayan Rodrigues",
     "equipe": "Beyond Bits"
   },
-  "versao": "1.11.0",
+  "versao": "1.13.0",
   "atualizadoEm": "2026-11-06",
   "compilacao": {
-    "numero": 117,
+    "numero": 119,
     "data": "2026-11-06",
     "artefato": ""
   },
   "historico": [
+    {
+      "versao": "1.13.0",
+      "data": "2026-11-06",
+      "branch": "main",
+      "tipo": "funcionalidade",
+      "resumo": "O modo leitura da biblioteca: o livro aberto na tela inteira, com a interface limpa e a página que vira — uma página no celular e no tablet de pé, duas lado a lado no tablet deitado e no computador.",
+      "itens": [
+        "Modo leitura (📖 Ler, no leitor): o livro na tela inteira, sem nada em volta. Os controles somem para a leitura e voltam com um toque no meio da página (no computador, com o mouse perto do alto ou de baixo).",
+        "A página vira como uma folha de verdade, em 3D: segue o dedo (ou o mouse) e, ao soltar, termina de virar ou volta, com a sombra que a folha joga na página de baixo e a luz na própria folha. Também vira com um toque nas laterais, com as setas do teclado, o espaço e a roda do mouse.",
+        "Uma página no celular e no tablet de pé; duas lado a lado (com a capa sozinha, como um livro aberto) no tablet deitado e no computador — ou a que a pessoa escolher.",
+        "Aparência: os temas Claro, Sépia e Noite (a página invertida para ler no escuro), e o jeito de passar a página (virar a folha, deslizar ou sem animação; quem pede menos movimento no aparelho já começa sem).",
+        "Dois toques (ou duplo clique) ampliam a página; a pinça também. A barra de baixo leva a qualquer página e mostra quantas faltam para o capítulo acabar; o sumário e os marcadores e destaques abrem numa folha ao lado (no celular, de baixo).",
+        "Os destaques e as notas feitos no modo página aparecem no modo leitura; o 🔖 marca a página. Para marcar trechos, anotar e buscar, o modo página continua a um toque (em Aa), assim como o modo texto de letra grande.",
+        "Quem abre a biblioteca pela primeira vez num aparelho já começa no modo leitura; quem já escolheu um modo continua nele. Onde parou continua guardado no aparelho e no servidor."
+      ],
+      "issues": []
+    },
+    {
+      "versao": "1.12.0",
+      "data": "2026-11-06",
+      "branch": "main",
+      "tipo": "funcionalidade",
+      "resumo": "O Acervo aceita repositórios: dá para trazer o link de um projeto do GitHub, GitLab, Bitbucket ou Codeberg, que ganha a sua construção na ilha, a Oficina dos Repositórios.",
+      "itens": [
+        "Tipo novo no Acervo, 💻 Repositório (vale 200 moedas aprovado, no nível 1 da biblioteca): cole o link do GitHub, GitLab (com subgrupos), Bitbucket ou Codeberg — pode ser o de uma página de dentro ou o de clonar, que o Acervo guarda a raiz do repositório. O nome e o dono se preenchem sozinhos pelo link.",
+        "O mesmo repositório não entra duas vezes (com qualquer título ou página do link).",
+        "A ficha do repositório abre na plataforma e mostra o comando de clonar com o botão de copiar; o do GitHub tem como capa a imagem que o próprio GitHub gera para o projeto.",
+        "Na ilha do Acervo, a Oficina dos Repositórios: prédio com o letreiro </>, janelas com linhas de código, a árvore de branches com os commits, racks de servidor, antena e painéis solares conforme o nível, e a Bit, a Mantenedora (uma coruja de moletom com o notebook)."
+      ],
+      "issues": []
+    },
     {
       "versao": "1.11.0",
       "data": "2026-11-06",
@@ -1856,10 +1887,10 @@
         "Chefões do Modo Domínio como avatares (personagens que não se compram, ganhos no topo de uma torre Mestre)",
         "Cadernos de anotação (/cadernos) no estilo Notepad++: módulos e páginas, cor de sintaxe por linguagem (Markdown, JavaScript, Python, SQL e outras), abas, buscar e substituir, prévia, gravação automática com proteção contra sobrescrita",
         "Vínculos do caderno (inteiro, módulo ou página) com trilhas e cursos, assuntos, torres e andares do Modo Domínio e livros (até a página), com o bloco “📓 Anotações” e o “Anotar aqui” em cada um desses lugares",
-        "Biblioteca de PDFs (/biblioteca) com leitor: destaque em cores, sublinhado, notas, marcação de área, marcador de página, sumário, miniaturas, busca no texto, temas de leitura e trechos mandados para o caderno",
+        "Biblioteca de PDFs (/biblioteca) com leitor: destaque em cores, sublinhado, notas, marcação de área, marcador de página, sumário, miniaturas, busca no texto, temas de leitura e trechos mandados para o caderno; e o modo leitura: o livro na tela inteira com a página que vira em 3D, uma ou duas páginas conforme a tela, temas Claro, Sépia e Noite, zoom por toque e pinça, sumário e marcadores",
         "Cursos gerados a partir de um livro da biblioteca, seguindo os capítulos, com as páginas de cada assunto; a explicação, o quiz e o exercício do assunto usam o trecho do livro",
         "Estante virtual da Biblioteca: livros em 3D nas prateleiras, com lombada (cor da capa, título, marcador de leitura, selo de lido, 🎓 de curso), capa ao puxar e destaque com as ações",
-        "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link e vídeos (YouTube/Vimeo), com revisão do bibliotecário (o administrador, que libera qualquer envio, e o líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu; Modo cinema (sala 3D com a plateia de avatares) para os vídeos",
+        "Biblioteca Colaborativa (/acervo): acervo comum de livros e artigos em PDF, artigos por link, vídeos (YouTube/Vimeo) e repositórios por link (GitHub, GitLab, Bitbucket ou Codeberg, com o comando de clonar), com revisão do bibliotecário (o administrador, que libera qualquer envio, e o líder da semana), moedas por material aprovado e por revisão, gorjetas, mundo 3D com construções por tipo e avatares de quem contribuiu; Modo cinema (sala 3D com a plateia de avatares) para os vídeos",
         "Instalável como app (manifesto e ícones já existiam; agora com o botão \"Instalar app\" na própria tela).",
         "Mercado de tropas no Reino: vender tropas do exército ou da defesa (saem na hora e liberam espaço) e comprar as que outros reinos anunciaram",
         "Tipos de curso além de programação (música, idiomas, matemática e livre), com exercício do dia próprio (lista de cálculo, ditado, treino de ouvido, desafio aberto) e projetos entregues por texto, fotos, áudio ou vídeo do YouTube, avaliados pela IA",
@@ -1912,7 +1943,9 @@
         "No Modo Bootcamp, os personagens da Lisa não escrevem código de verdade (jogam por simulação), os testes não rodam SQL (só linguagens que leem stdin) e o GitHub só vale com repositório público.",
         "Os jurados e a apresentadora do Modo Bootcamp são personagens originais: não imitam nome, rosto nem bordão de nenhuma pessoa real, e o deboche da avaliação é sobre o código, nunca sobre a pessoa.",
         "No Bootcamp, não há edição de código em conjunto em tempo real: na prova colaborativa, cada membro escreve a sua parte e os jurados juntam tudo na bancada.",
-        "A Lisa não cria estrutura de caderno sozinha: só quando a pessoa pede (na criação do curso, marcando a opção, ou no botão da trilha). A apostila também só nasce no pedido."
+        "A Lisa não cria estrutura de caderno sozinha: só quando a pessoa pede (na criação do curso, marcando a opção, ou no botão da trilha). A apostila também só nasce no pedido.",
+        "No Acervo, o repositório não é conferido automaticamente (se existe, se é público, a licença): o bibliotecário abre o link antes de aprovar. O Proof não clona nem lê o código do repositório do acervo.",
+        "No modo leitura, os trechos não se selecionam nem se marcam (a página é uma imagem): para destacar, anotar e buscar, a pessoa passa para o modo página com um toque."
       ]
     },
     "stack": [
@@ -1979,7 +2012,7 @@
         "porta": 443,
         "base": "postgres",
         "acesso": "",
-        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/031; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019). A IDE livre (1.9.0) guarda os projetos em proof_ide_projetos (db/037-ide.sql). As apostilas (1.11.0) são cadernos com a coluna categoria = 'apostila' em proof_cadernos (db/038-apostilas.sql)."
+        "observacao": "O mesmo banco da Lisa e do Abacato. A Lisa_Proof usa as tabelas abacato_ (conteúdo) e cria as suas com prefixo proof_ (db/001 a db/031; as proof_teste_* são o Reino de Teste). Acesso só pelo túnel da Cloudflare, em HTTPS. Os PDFs da biblioteca ficam no Storage do mesmo Supabase, no bucket privado proof-biblioteca (db/019). A IDE livre (1.9.0) guarda os projetos em proof_ide_projetos (db/037-ide.sql). As apostilas (1.11.0) são cadernos com a coluna categoria = 'apostila' em proof_cadernos (db/038-apostilas.sql). O tipo 'repositorio' do Acervo (1.12.0) entrou na regra de tipo de proof_acervo (db/039-acervo-repositorios.sql)."
       }
     ],
     "integracoes": [

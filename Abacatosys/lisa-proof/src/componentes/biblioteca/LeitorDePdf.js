@@ -9,6 +9,7 @@ import { abrirPdf, enviarTextoDoLivro } from "./pdf.js";
 import PaginaDoPdf from "./PaginaDoPdf.js";
 import Miniatura from "./Miniatura.js";
 import LeituraEmTexto from "./LeituraEmTexto.js";
+import LeitorLivro from "./LeitorLivro.js";
 import { AnotacoesDoAlvo } from "../caderno/Vinculos.js";
 
 const VAO = 14; // espaço entre as páginas
@@ -23,10 +24,14 @@ const PAINEIS = [
   { chave: "anotacoes", rotulo: "Caderno", icone: "📓" },
 ];
 
-// modo: "pagina" (o PDF como é) ou "texto" (o texto da página em letra grande); letra: o tamanho no modo texto
+// modo: "pagina" (o PDF como é, para marcar), "texto" (o texto da página em letra grande) ou "livro" (o modo
+// leitura, 06/11/2026: o livro aberto na tela inteira, com a página que vira); letra: o tamanho no modo texto;
+// livroLayout e livroAnimacao: as escolhas do modo leitura (src/dominio/ereader.js)
 const PREFS_PADRAO = { tema: "claro", cor: "amarelo", modo: "pagina", letra: 19 };
+// quem abre a biblioteca pela primeira vez neste aparelho já começa no modo leitura (o servidor desenha o
+// leitor com PREFS_PADRAO; a escolha guardada, ou o modo leitura, entra logo depois de abrir)
 function lerPrefs() {
-  try { return { ...PREFS_PADRAO, ...JSON.parse(localStorage.getItem(PREFS) || "{}") }; } catch { return PREFS_PADRAO; }
+  try { return { ...PREFS_PADRAO, modo: "livro", ...JSON.parse(localStorage.getItem(PREFS) || "{}") }; } catch { return { ...PREFS_PADRAO, modo: "livro" }; }
 }
 const ehToque = (e) => e.pointerType === "touch" || e.pointerType === "pen";
 
@@ -191,6 +196,21 @@ export default function LeitorDePdf({ livroId }) {
   }, [escala]);
 
   const modoTexto = prefs.modo === "texto";
+  const modoLivro = prefs.modo === "livro";
+  const modoLivroRef = useRef(modoLivro);
+  modoLivroRef.current = modoLivro;
+  /** O modo leitura começa na página de agora; ao sair, o modo página (ou o texto) volta para onde ele parou. */
+  function abrirModoLivro() {
+    setInicioDoTexto({ n: paginaAtual, chave: Date.now() });
+    setSelecao(null); setAberta(null); setPainel(null);
+    mudarPrefs({ modo: "livro" });
+  }
+  function sairDoModoLivro(para) {
+    const voltar = paginaAtual;
+    if (para === "texto") { setInicioDoTexto({ n: voltar, chave: Date.now() }); mudarPrefs({ modo: "texto" }); return; }
+    mudarPrefs({ modo: "pagina" });
+    setTimeout(() => irParaPagina(voltar), 80);
+  }
   /** Ir para uma página pelos controles (barra, painel, teclado): no modo texto, a leitura recomeça nela. */
   const irPara = (n) => {
     const alvo = Math.min(Math.max(1, Math.round(n) || 1), total || 1);
@@ -315,6 +335,7 @@ export default function LeitorDePdf({ livroId }) {
 
   useEffect(() => {
     const tecla = (e) => {
+      if (modoLivroRef.current) return; // o modo leitura cuida do teclado dele
       const digitando = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "");
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") { e.preventDefault(); setPainel("busca"); setTimeout(() => document.getElementById("lp-busca")?.focus(), 50); return; }
       if (digitando) return;
@@ -336,7 +357,7 @@ export default function LeitorDePdf({ livroId }) {
 
   // a dica dos toques, uma vez por aparelho
   useEffect(() => {
-    if (!pdf || !window.matchMedia("(pointer: coarse)").matches) return;
+    if (!pdf || modoLivro || !window.matchMedia("(pointer: coarse)").matches) return;
     try {
       if (localStorage.getItem("proof-leitor-dica-toque")) return;
       localStorage.setItem("proof-leitor-dica-toque", "1");
@@ -526,6 +547,7 @@ export default function LeitorDePdf({ livroId }) {
             <button type="button" className="lp-barra__botao" onClick={() => irPara(paginaAtual + 1)} disabled={paginaAtual >= total} aria-label="Próxima página">›</button>
           </form>
           <div className="lp-barra__grupo">
+            <button type="button" className="lp-barra__botao lp-barra__livro" onClick={abrirModoLivro} title="Modo leitura: o livro aberto na tela inteira, com a página que vira" aria-label="Modo leitura">📖<span className="lp-barra__curso-texto"> Ler</span></button>
             <button type="button" className="lp-barra__botao lp-barra__modo" aria-pressed={modoTexto} onClick={alternarModoTexto} title={modoTexto ? "Voltar à página do PDF" : "Modo texto: o texto da página em letra grande (bom no celular)"} aria-label="Modo texto">Aa</button>
             {modoTexto ? (
               <>
@@ -669,13 +691,14 @@ export default function LeitorDePdf({ livroId }) {
           />
         )}
         {/* a rolagem do PDF fica montada (escondida) no modo texto: o zoom, a pinça e as medidas continuam valendo */}
-        <div ref={rolagem} className="lp-rolagem" hidden={modoTexto} onScroll={aoRolar} onPointerUp={aoSoltar} onKeyUp={(e) => e.shiftKey && lerSelecao()}>
+        <div ref={rolagem} className="lp-rolagem" hidden={modoTexto || modoLivro} onScroll={aoRolar} onPointerUp={aoSoltar} onKeyUp={(e) => e.shiftKey && lerSelecao()}>
           {!pdf && <div className="pf-carregando lp-abrindo">Abrindo o livro…</div>}
           {pdf && (
             <div className="lp-paginas" ref={paginasRef} style={{ height: topos[total + 1], minWidth: larguraMaxima + 32 }}>
               {paginasParaDesenhar.map(({ n, largura, altura }) => (
                 <div key={n} className="lp-lugar" style={{ top: topos[n], height: altura, width: largura }}>
-                  {n >= visiveis.de - 1 && n <= visiveis.ate + 1 ? (
+                  {/* no modo leitura a rolagem está escondida: não desenha nada (o modo leitura desenha as dele) */}
+                  {!modoLivro && n >= visiveis.de - 1 && n <= visiveis.ate + 1 ? (
                     <PaginaDoPdf
                       pdf={pdf} numero={n} escala={escala} largura={largura} altura={altura}
                       visivel={n >= visiveis.de && n <= visiveis.ate}
@@ -753,6 +776,15 @@ export default function LeitorDePdf({ livroId }) {
           livro={livro} livroId={livroId} envio={paraCaderno}
           aoFechar={() => setParaCaderno(null)}
           aoFeito={(msg) => { setParaCaderno(null); setAviso(msg); window.getSelection()?.removeAllRanges(); }}
+        />
+      )}
+
+      {/* o modo leitura (06/11/2026): por cima de tudo, na tela inteira */}
+      {modoLivro && (
+        <LeitorLivro
+          pdf={pdf} livro={livro} total={total} base={base} alvo={inicioDoTexto} marcacoes={marcacoes}
+          prefs={prefs} mudarPrefs={mudarPrefs} aoMudarPagina={aoMudarPaginaNoTexto} aoSair={sairDoModoLivro}
+          aoAlternarMarcador={alternarMarcador} aviso={aviso}
         />
       )}
     </div>

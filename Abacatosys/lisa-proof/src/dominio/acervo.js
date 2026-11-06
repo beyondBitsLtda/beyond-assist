@@ -19,8 +19,10 @@ export const TIPOS_DE_MATERIAL = {
   artigo: { nome: "Artigo científico", plural: "Artigos científicos", icone: "🔬", recompensa: 250, formato: "pdf-ou-link" },
   videoaula: { nome: "Videoaula", plural: "Videoaulas", icone: "🎓", recompensa: 150, formato: "video" },
   video: { nome: "Vídeo teórico", plural: "Vídeos teóricos", icone: "🎬", recompensa: 120, formato: "video" },
+  // 06/11/2026: "no acervo ponha a funcionalidade de poder pôr links de repositórios também"
+  repositorio: { nome: "Repositório", plural: "Repositórios", icone: "💻", recompensa: 200, formato: "repositorio" },
 };
-export const ORDEM_DOS_TIPOS = ["livro", "artigo", "videoaula", "video"];
+export const ORDEM_DOS_TIPOS = ["livro", "artigo", "videoaula", "video", "repositorio"];
 
 /**
  * Cada tipo tem a sua construção na ilha e quem trabalha nela (a gestão daquele acervo). As falas
@@ -53,6 +55,13 @@ export const CONSTRUCOES_DO_ACERVO = {
     personagem: {
       id: "pipoca", nome: "Pipoca", cargo: "o Projecionista",
       falas: ["Rolo novo na cabine! Pipoca e teoria, a melhor sessão.", "Separo os vídeos por tema, duração e quanta pipoca pedem.", "Documentário de física às oito; de história, às dez.", "Luz apagada, cérebro ligado!"],
+    },
+  },
+  repositorio: {
+    nome: "Oficina dos Repositórios",
+    personagem: {
+      id: "bit", nome: "Bit", cargo: "a Mantenedora",
+      falas: ["README primeiro! Ninguém usa o que não entende.", "Commit pequeno e mensagem clara: assim a história do código fica legível.", "Antes de juntar uma branch, eu leio o diff linha por linha.", "Repositório bom tem licença, exemplo e teste — eu confiro os três."],
     },
   },
 };
@@ -162,6 +171,55 @@ export function videoDoLink(bruto) {
   return null;
 }
 
+/** As plataformas de repositório aceitas e o nome delas na tela. */
+export const PLATAFORMAS_DE_REPOSITORIO = {
+  "github.com": "GitHub", "gitlab.com": "GitLab", "bitbucket.org": "Bitbucket", "codeberg.org": "Codeberg",
+};
+// os caminhos do GitHub que não são de repositório (github.com/settings/profile, github.com/topics/js…)
+const RESERVADOS_DO_GITHUB = new Set([
+  "about", "account", "apps", "codespaces", "collections", "contact", "customer-stories", "enterprise", "events", "explore",
+  "features", "gist", "issues", "login", "marketplace", "new", "notifications", "orgs", "organizations", "pricing", "pulls",
+  "search", "security", "settings", "site", "sponsors", "topics", "trending", "users",
+]);
+// onde o caminho deixa de ser o repositório e passa a ser uma página dele (/tree/main, /-/issues, /src/…)
+const FIM_DO_REPOSITORIO = new Set(["-", "tree", "blob", "commits", "commit", "issues", "pulls", "pull", "wiki", "releases", "actions", "src", "branches", "tags", "merge_requests", "raw", "compare", "network", "graphs", "projects", "discussions", "security", "settings"]);
+const PEDACO = /^[A-Za-z0-9_.-]{1,100}$/;
+
+/**
+ * O repositório de um link do GitHub, GitLab, Bitbucket ou Codeberg: { plataforma, nomeDaPlataforma,
+ * dono, nome, caminho, url, clonar, miniatura } ou nulo. Aceita o link de uma página do repositório
+ * (/tree/main, /blob/…, /-/issues) e o ".git" do clone; o endereço guardado é sempre o da raiz do
+ * repositório. O GitLab aceita subgrupos (gitlab.com/grupo/subgrupo/projeto).
+ */
+export function repositorioDoLink(bruto) {
+  const s = linkValido(bruto);
+  if (!s) return null;
+  const u = new URL(s);
+  if (u.protocol !== "https:") return null;
+  const host = u.hostname.toLowerCase().replace(/^www\./, "");
+  const nomeDaPlataforma = PLATAFORMAS_DE_REPOSITORIO[host];
+  if (!nomeDaPlataforma) return null;
+  // um "%" quebrado vira um pedaço inválido (e o link é recusado), em vez de derrubar a conferência
+  const partes = u.pathname.split("/").filter(Boolean).map((p) => { try { return decodeURIComponent(p); } catch { return "%"; } });
+  const fim = partes.findIndex((p, i) => i >= 2 && FIM_DO_REPOSITORIO.has(p));
+  let pedacos = fim >= 0 ? partes.slice(0, fim) : partes;
+  if (host !== "gitlab.com") pedacos = pedacos.slice(0, 2); // só o GitLab tem subgrupos
+  else pedacos = pedacos.slice(0, 6);
+  if (pedacos.length < 2) return null;
+  pedacos[pedacos.length - 1] = pedacos[pedacos.length - 1].replace(/\.git$/i, "");
+  if (!pedacos.every((p) => PEDACO.test(p) && p !== "." && p !== "..")) return null;
+  if (host === "github.com" && RESERVADOS_DO_GITHUB.has(pedacos[0].toLowerCase())) return null;
+  const caminho = pedacos.join("/");
+  const url = `https://${host}/${caminho}`;
+  const plataforma = nomeDaPlataforma.toLowerCase();
+  return {
+    plataforma, nomeDaPlataforma, dono: pedacos.slice(0, -1).join("/"), nome: pedacos[pedacos.length - 1], caminho, url,
+    clonar: `git clone ${url}.git`,
+    // a imagem que o próprio GitHub gera para o repositório (nome, descrição, estrelas)
+    miniatura: plataforma === "github" ? `https://opengraph.githubassets.com/1/${caminho}` : null,
+  };
+}
+
 // ---------------------------------------------------------------- envio
 
 /** O título comparável: minúsculo, sem acento, sem pontuação. */
@@ -169,9 +227,11 @@ export function normalizarTitulo(t) {
   return String(t ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-/** A chave que acusa duplicado: o mesmo vídeo, ou o mesmo título no mesmo tipo. */
-export function chaveDoMaterial({ tipo, titulo, video }) {
-  return video ? `video:${video.plataforma}:${video.id}` : `${tipo}:${normalizarTitulo(titulo)}`;
+/** A chave que acusa duplicado: o mesmo vídeo, o mesmo repositório, ou o mesmo título no mesmo tipo. */
+export function chaveDoMaterial({ tipo, titulo, video, repositorio }) {
+  if (video) return `video:${video.plataforma}:${video.id}`;
+  if (repositorio) return `repo:${repositorio.plataforma}:${repositorio.caminho.toLowerCase()}`;
+  return `${tipo}:${normalizarTitulo(titulo)}`;
 }
 
 function sumarioValido(bruto, paginas) {
@@ -198,7 +258,7 @@ export function validarMaterial(bruto) {
   const assunto = textoDoAcervo(bruto?.assunto, LIMITES_DO_ACERVO.assunto);
   if (assunto.length < 2) erros.push("diga o assunto");
 
-  let pdf = null, link = null, video = null;
+  let pdf = null, link = null, video = null, repositorio = null;
   const querPdf = def.formato === "pdf" || (def.formato === "pdf-ou-link" && bruto?.pdf);
   if (querPdf) {
     const tamanho = inteiro(bruto?.pdf?.tamanho), paginas = inteiro(bruto?.pdf?.paginas);
@@ -213,6 +273,10 @@ export function validarMaterial(bruto) {
     video = videoDoLink(bruto?.link);
     if (!video) erros.push("cole o link do vídeo (YouTube ou Vimeo)");
     else link = linkValido(bruto.link);
+  } else if (def.formato === "repositorio") {
+    repositorio = repositorioDoLink(bruto?.link);
+    if (!repositorio) erros.push("cole o link do repositório (GitHub, GitLab, Bitbucket ou Codeberg)");
+    else link = repositorio.url; // sempre a raiz do repositório, sem a página de dentro
   } else {
     link = linkValido(bruto?.link);
     if (!link) erros.push("anexe o PDF ou cole o link do artigo");
@@ -220,7 +284,7 @@ export function validarMaterial(bruto) {
   const capa = typeof bruto?.capa === "string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(bruto.capa) && bruto.capa.length <= LIMITES_DO_ACERVO.capa
     ? bruto.capa : null;
   const material = {
-    tipo, titulo, categoria, assunto, pdf, link, video, capa,
+    tipo, titulo, categoria, assunto, pdf, link, video, repositorio, capa,
     autores: textoDoAcervo(bruto?.autores, LIMITES_DO_ACERVO.autores),
     descricao: String(bruto?.descricao ?? "").trim().slice(0, LIMITES_DO_ACERVO.descricao),
   };
